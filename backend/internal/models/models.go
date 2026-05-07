@@ -6,24 +6,35 @@ import (
 )
 
 type User struct {
-	ID          string    `json:"id"`
-	Email       string    `json:"email"`
-	Name        string    `json:"name"`
-	AvatarURL   string    `json:"avatar_url"`
-	AccountRole string    `json:"account_role"`
-	IsSystem    bool      `json:"is_system"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID                string     `json:"id"`
+	Email             string     `json:"email"`
+	Name              string     `json:"name"`
+	AvatarURL         string     `json:"avatar_url"`
+	AvatarStorageKey  *string    `json:"-"`
+	AvatarUpdatedAt   *time.Time `json:"avatar_updated_at,omitempty"`
+	AccountRole       string     `json:"account_role"`
+	IsSystem          bool       `json:"is_system"`
+	CreatedAt         time.Time  `json:"created_at"`
 }
 
 type Project struct {
-	ID          string    `json:"id"`
-	WorkspaceID string    `json:"workspace_id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Visibility  string    `json:"visibility"`
-	MyRole      string    `json:"my_role,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          string `json:"id"`
+	WorkspaceID string `json:"workspace_id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Visibility  string `json:"visibility"`
+	// Tags are free-form labels (e.g. "mechanical", "electronics",
+	// "jewelry") that replaced the old single project_type enum. v1 of
+	// the model is purely advisory: the backend doesn't gate behavior on
+	// tags, the FileTree menu and Workshop filter just read them. See
+	// CONTRACT.md "Project tags".
+	Tags                []string   `json:"tags"`
+	ThumbnailStorageKey *string    `json:"-"`
+	ThumbnailURL        string     `json:"thumbnail_url,omitempty"`
+	ThumbnailUpdatedAt  *time.Time `json:"thumbnail_updated_at,omitempty"`
+	MyRole              string     `json:"my_role,omitempty"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
 }
 
 // Workspace is the top-level multi-member container that owns projects.
@@ -61,18 +72,21 @@ type WorkspaceInvite struct {
 }
 
 type File struct {
-	ID          string    `json:"id"`
-	ProjectID   string    `json:"project_id"`
-	ParentID    *string   `json:"parent_id"`
-	Name        string    `json:"name"`
-	Kind        string    `json:"kind"`
-	Content     *string   `json:"content,omitempty"`
-	StorageKey  *string   `json:"storage_key,omitempty"`
-	MimeType    *string   `json:"mime_type,omitempty"`
-	Size        *int64    `json:"size,omitempty"`
-	DownloadURL *string   `json:"download_url,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID                 string    `json:"id"`
+	ProjectID          string    `json:"project_id"`
+	ParentID           *string   `json:"parent_id"`
+	Name               string    `json:"name"`
+	Kind               string    `json:"kind"`
+	Content            *string   `json:"content,omitempty"`
+	StorageKey         *string   `json:"storage_key,omitempty"`
+	MimeType           *string   `json:"mime_type,omitempty"`
+	Size               *int64    `json:"size,omitempty"`
+	MeshStorageKey     *string   `json:"mesh_storage_key,omitempty"`
+	MeshURL            *string   `json:"mesh_url,omitempty"`
+	TessellationStatus *string   `json:"tessellation_status,omitempty"`
+	DownloadURL        *string   `json:"download_url,omitempty"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 type Thread struct {

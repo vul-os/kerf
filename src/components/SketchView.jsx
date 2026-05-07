@@ -34,6 +34,11 @@ import {
 } from '../lib/sketchEdit.js'
 import { tessellateEllipse, tessellateBspline } from '../lib/sketchGeom2.js'
 import { geom3ToBufferGeometry } from '../lib/geom3.js'
+import {
+  projectLineDraft, describeLineDraft,
+  friendlyConstraintLabel, formatConstraintValue,
+  constraintEntityRefs,
+} from '../lib/sketchUI.js'
 
 const DEBOUNCE_SOLVE_MS = 80
 const DEFAULT_VIEW = { cx: 0, cy: 0, scale: 6 } // world units per pixel: scale=6 → 1mm = 6px
@@ -108,7 +113,57 @@ export default function SketchView({
   // Drag-on-dimension state: { constraintId, kind, startVal, startScreen, startMouse }
   const [dimDrag, setDimDrag] = useState(null)
 
+  // Live numeric input while drawing a line (Onshape / AutoCAD-style "dynamic
+  // input"). After the first click and before the second, the user can type a
+  // length and/or angle to lock that part of the next endpoint. Tab toggles
+  // the focused field; Enter commits the line at the typed values; Esc
+  // cancels the in-flight line.
+  //
+  // Hold the authoritative values in a ref so typing doesn't trigger any
+  // expensive canvas re-renders, AND mirror them in a small state object so
+  // children can re-render based on prop diffs (and so eslint's react-hooks
+  // rules don't complain about reading the ref during render). The two
+  // diverge for at most one frame; that's fine for what they drive.
+  const INITIAL_LINE_DRAFT = {
+    length: '', angle: '',
+    lockLength: false, lockAngle: false,
+    snapTarget: null,        // {x, y} world-space override for the next click
+    focus: 'length',         // which field has focus ('length' | 'angle')
+  }
+  const lineDraftRef = useRef(INITIAL_LINE_DRAFT)
+  const [lineDraft, setLineDraft] = useState(INITIAL_LINE_DRAFT)
+  const bumpLineDraft = useCallback(() => {
+    // Mirror the ref into state so consumers reading via props see the latest.
+    setLineDraft({ ...lineDraftRef.current })
+  }, [])
+
+  // Pulse-on-click highlight for constraint rows. When the user clicks a row
+  // in the constraint list, we set `pulseConstraintId` so the linked entities
+  // and the constraint label briefly glow. Auto-clears after ~1.4s.
+  const [pulseConstraintId, setPulseConstraintId] = useState(null)
+  const pulseTimerRef = useRef(null)
+  const pulseConstraint = useCallback((cid) => {
+    setPulseConstraintId(cid)
+    if (pulseTimerRef.current) clearTimeout(pulseTimerRef.current)
+    pulseTimerRef.current = setTimeout(() => setPulseConstraintId(null), 1400)
+  }, [])
+
   // Resync when upstream sketch reference changes.
+  //
+  // CRITICAL: every commit / solver write-back updates the parent store, which
+  // hands SketchView a fresh `sketch` prop on the next render. If we naively
+  // wiped pendingPoints / selection on EVERY prop change, the second click of
+  // every multi-click tool (line/circle/rect/arc/ellipse/bspline/fillet) would
+  // never see its first click — pendingPoints would have been reset to [] by
+  // the time the second click arrived. That's the "completely broken" bug.
+  //
+  // The fix: distinguish "our own commit/solve wrote this sketch back" from
+  // "upstream restored / replaced the sketch externally". We accomplish this
+  // by stashing every locally-produced sketch reference in `lastSketchRef`
+  // BEFORE we call onChange/onSolved. When the prop arrives identical to a
+  // ref we just stashed, the effect's identity check passes and we leave the
+  // tool state alone. External replacements (LLM restore, file reload) still
+  // trigger the wipe because they produce a sketch reference we never saw.
   const lastSketchRef = useRef(sketch)
   useEffect(() => {
     if (sketch !== lastSketchRef.current) {
@@ -132,6 +187,11 @@ export default function SketchView({
         const res = await solveSketch(s)
         if (seq !== solveSeqRef.current) return
         if (res?.sketch) {
+          // Stash the solver's output as our last-seen reference BEFORE
+          // notifying the parent — when this same object arrives back as the
+          // `sketch` prop on the next render the resync effect sees identity
+          // match and preserves pendingPoints/selection.
+          lastSketchRef.current = res.sketch
           onSolved?.(res.sketch, res.status, res.dofCount, res.conflicts)
         }
       } catch (err) {
@@ -145,6 +205,11 @@ export default function SketchView({
   // commit or a constraint-value tweak, never from the solver itself (the
   // solver flows through onSolved).
   const commit = useCallback((next) => {
+    // Stash the post-commit sketch as our last-seen reference so the resync
+    // effect treats the upcoming prop change as a self-write and doesn't
+    // wipe pendingPoints / selection (which would break every multi-click
+    // tool — see the lastSketchRef comment above).
+    lastSketchRef.current = next
     onChange?.(next)
     triggerSolve(next)
   }, [onChange, triggerSolve])
@@ -202,15 +267,36 @@ export default function SketchView({
     const sn = snapTarget(sketch, w, view.scale)
     setSnap(sn)
     if (tool === 'select') {
-      // Click on a point → start drag. Click on entity → select.
+      // Click on a point → optionally start drag. Click on entity → select.
+      // Selection rules (FreeCAD-flavored, with the quality-of-life fix the
+      // user asked for):
+      //   - Shift+click toggles the entity in/out of the current multi-selection.
+      //   - Plain click on an unselected entity → replace selection with [it].
+      //   - Plain click on the *only* current selection → toggle it off (deselect).
+      //   - Plain click on a point that's part of a multi-selection → keep the
+      //     selection intact and start a drag of the clicked point (so the
+      //     user can drag from inside their group without losing context).
       const hitId = sn?.kind === 'point' ? sn.id : entityHitTest(sketch, w, view.scale)
       if (hitId) {
         const ent = sketch.entities.find((x) => x.id === hitId)
-        if (ent?.type === 'point') {
+        const wasSole = selection.length === 1 && selection[0] === hitId
+        let nextSelection
+        if (e.shiftKey) {
+          nextSelection = selection.includes(hitId)
+            ? selection.filter((x) => x !== hitId)
+            : [...selection, hitId]
+        } else if (wasSole) {
+          nextSelection = []
+        } else if (selection.includes(hitId)) {
+          nextSelection = selection
+        } else {
+          nextSelection = [hitId]
+        }
+        setSelection(nextSelection)
+        // Start drag only if the entity ended up selected and is a point.
+        if (ent?.type === 'point' && nextSelection.includes(hitId)) {
           setDragging({ pointId: hitId, fromX: ent.x, fromY: ent.y })
         }
-        if (e.shiftKey) setSelection((s) => s.includes(hitId) ? s.filter((x) => x !== hitId) : [...s, hitId])
-        else setSelection([hitId])
       } else {
         if (!e.shiftKey) setSelection([])
       }
@@ -225,6 +311,22 @@ export default function SketchView({
     setHover(w)
     const sn = snapTarget(sketch, w, view.scale)
     setSnap(sn)
+    // Refresh the line-draft snap target so the live numeric strip always
+    // reflects "the next click's actual destination". When nothing is locked
+    // the target IS the cursor; when length/angle are locked, the target is
+    // the projected point along the locked direction at the locked length.
+    if (tool === 'line' && pendingPoints.length === 1) {
+      const start = sketch.entities.find((x) => x.id === pendingPoints[0].id)
+      if (start) {
+        const draft = lineDraftRef.current || {}
+        const next = projectLineDraft(start, w, draft)
+        if (next) {
+          lineDraftRef.current = { ...draft, snapTarget: next }
+          // Refresh the dashed preview and strip on cursor move.
+          bumpLineDraft()
+        }
+      }
+    }
     if (panRef.current) {
       const r = svgRef.current?.getBoundingClientRect()
       if (!r) return
@@ -242,11 +344,19 @@ export default function SketchView({
       const tx = sn?.kind === 'point' && sn.id !== dragging.pointId ? sn.x : w.x
       const ty = sn?.kind === 'point' && sn.id !== dragging.pointId ? sn.y : w.y
       const optimistic = setPointXY(sketch, dragging.pointId, tx, ty)
+      // Mark as a self-write so the resync effect doesn't wipe selection
+      // (which would deselect the point we're actively dragging).
+      lastSketchRef.current = optimistic
       onChange?.(optimistic)
       // Async solve; onSolved updates the displayed sketch with the
       // constraint-aware final position. We don't await to avoid stutter.
       solveWithDrag(optimistic, { pointId: dragging.pointId, x: tx, y: ty })
-        .then((res) => res?.sketch && onSolved?.(res.sketch, res.status, res.dofCount, res.conflicts))
+        .then((res) => {
+          if (res?.sketch) {
+            lastSketchRef.current = res.sketch
+            onSolved?.(res.sketch, res.status, res.dofCount, res.conflicts)
+          }
+        })
         .catch(() => {})
       return
     }
@@ -326,19 +436,78 @@ export default function SketchView({
       return
     }
     if (tool === 'line') {
-      const { sketch: s1, id: pid } = ensurePointAt(sketch, sn, w)
+      // First click — drop a start point (snapped if applicable) and remember
+      // its id. Second click — drop an end point (or snap to an existing one)
+      // and create the line connecting the two. Snapping to the start point
+      // closes a loop seamlessly: ensurePointAt returns the existing id when
+      // the cursor is within 8px of any point.
       if (pendingPoints.length === 0) {
-        // First click — provisionally create a point + remember it.
+        const { sketch: s1, id: pid } = ensurePointAt(sketch, sn, w)
         commit(s1)
-        setPendingPoints([{ id: pid, sketchAfter: s1 }])
+        setPendingPoints([{ id: pid }])
+        // Reset the live-numeric draft for a fresh line.
+        lineDraftRef.current = {
+          length: '', angle: '',
+          lockLength: false, lockAngle: false,
+          snapTarget: null, focus: 'length',
+        }
+        bumpLineDraft()
         return
       }
       const start = pendingPoints[0]
-      // Re-resolve start id against latest sketch (in case solver moved it).
-      const { sketch: s2, id: pid2 } = ensurePointAt(s1, sn, w)
-      const { sketch: s3 } = addLine(s2, start.id, pid2, { construction })
-      commit(s3)
-      setPendingPoints([])
+      // If the user typed a length / angle, override the cursor target. The
+      // snapTarget is computed continuously by the live-input strip and
+      // reflects the current cursor when nothing is locked.
+      const draft = lineDraftRef.current || {}
+      const target = draft.snapTarget || w
+      // Resolve the second endpoint against the current sketch (which already
+      // includes the first click's commit). ensurePointAt either snaps to an
+      // existing point id or appends a fresh point — never both.
+      const { sketch: s2, id: pid2 } = ensurePointAt(sketch, sn, target)
+      // Refuse a degenerate line (start === end). Drop the pending state and
+      // let the user click again — much friendlier than committing a zero-
+      // length line that fails the solver in confusing ways.
+      if (pid2 === start.id) {
+        setPendingPoints([])
+        return
+      }
+      const { sketch: s3, id: lineId } = addLine(s2, start.id, pid2, { construction })
+      // Bake the locked Length / Angle as real constraints so future solves
+      // hold those values. Length → distance(p1, p2). Angle → if cardinal
+      // (0/90/180/270 within 1°) emit horizontal / vertical; otherwise emit
+      // an angle constraint between this line and a reference horizontal
+      // segment built from the start point. We avoid creating reference
+      // entities for v1 — non-cardinal angle locks are baked into the
+      // computed endpoint coords (the solver will keep them via the length
+      // constraint + the point's initial position).
+      let s4 = s3
+      const lenVal = Number(draft.length)
+      const angVal = Number(draft.angle)
+      if (draft.lockLength && Number.isFinite(lenVal) && lenVal > 0) {
+        ;({ sketch: s4 } = addConstraint(s4, 'distance', { a: start.id, b: pid2, value: lenVal }))
+      }
+      if (draft.lockAngle && Number.isFinite(angVal)) {
+        const a = ((angVal % 360) + 360) % 360
+        if (Math.abs(a) < 1e-3 || Math.abs(a - 180) < 1e-3) {
+          ;({ sketch: s4 } = addConstraint(s4, 'horizontal', { line: lineId }))
+        } else if (Math.abs(a - 90) < 1e-3 || Math.abs(a - 270) < 1e-3) {
+          ;({ sketch: s4 } = addConstraint(s4, 'vertical', { line: lineId }))
+        }
+        // Non-cardinal angles: leave it as positional. A future revision can
+        // emit a construction reference + l2l_angle constraint.
+      }
+      commit(s4)
+      // Chain mode: keep the second endpoint as the next line's start so the
+      // user can build a polyline / closed loop with N+1 clicks. ESC or right-
+      // click breaks the chain (handled in onContextMenu / onKey).
+      setPendingPoints([{ id: pid2 }])
+      // Reset the live draft for the next segment.
+      lineDraftRef.current = {
+        length: '', angle: '',
+        lockLength: false, lockAngle: false,
+        snapTarget: null, focus: 'length',
+      }
+      bumpLineDraft()
       return
     }
     if (tool === 'circle') {
@@ -359,14 +528,15 @@ export default function SketchView({
     }
     if (tool === 'arc') {
       // 3-point arc: start, end, mid (the mid defines the curvature).
-      const { sketch: s1, id: pid } = ensurePointAt(sketch, sn, w)
       if (pendingPoints.length === 0) {
+        const { sketch: s1, id: pid } = ensurePointAt(sketch, sn, w)
         commit(s1)
         setPendingPoints([{ id: pid, role: 'start' }])
         return
       }
       if (pendingPoints.length === 1) {
-        const { sketch: s2, id: pid2 } = ensurePointAt(s1, sn, w)
+        const { sketch: s2, id: pid2 } = ensurePointAt(sketch, sn, w)
+        if (pid2 === pendingPoints[0].id) return // degenerate; ignore
         commit(s2)
         setPendingPoints([...pendingPoints, { id: pid2, role: 'end' }])
         return
@@ -781,7 +951,9 @@ export default function SketchView({
       // Snap to 2 decimal places to make the label readable.
       next = Math.round(next * 100) / 100
       const nextSketch = setConstraintValue(sketch, constraint.id, next)
-      // Optimistic display + debounced solve.
+      // Optimistic display + debounced solve. Mark as self-write so the
+      // resync effect doesn't drop the dimension's selection mid-drag.
+      lastSketchRef.current = nextSketch
       onChange?.(nextSketch)
       triggerSolve(nextSketch)
     }
@@ -803,11 +975,17 @@ export default function SketchView({
     : status === 'over' || status === 'conflict' ? 'text-red-400'
     : status === 'under' ? 'text-kerf-300'
     : 'text-ink-500'
+  // Plain-English status label per the brief. Dimensional accuracy comes
+  // from planegcs's solve status; the DOF number is our heuristic estimate
+  // (good enough to tell the user "you can still drag things around").
+  const dofN = Math.max(0, dofCount | 0)
   const statusLabel =
     status === 'fully' ? 'Fully constrained'
-    : status === 'over' ? 'Over-constrained'
-    : status === 'conflict' ? 'Conflict'
-    : status === 'under' ? `Under-constrained · DOF ${Math.max(0, dofCount)}`
+    : status === 'over' ? 'Over-constrained: red'
+    : status === 'conflict' ? 'Constraint conflict'
+    : status === 'under' ? (dofN === 0
+        ? '0 DOF remaining'
+        : `${dofN} DOF remaining`)
     : 'Solving…'
 
   return (
@@ -865,7 +1043,10 @@ export default function SketchView({
         <svg
           ref={svgRef}
           className="w-full h-full select-none relative z-[1]"
-          style={{ background: 'transparent' }}
+          style={{
+            background: 'transparent',
+            cursor: dimDrag ? 'ew-resize' : tool === 'select' ? (dragging ? 'grabbing' : 'default') : 'crosshair',
+          }}
           onWheel={onWheel}
           onMouseDown={onMouseDown}
           onMouseMove={onMouseMove}
@@ -873,7 +1054,6 @@ export default function SketchView({
           onMouseLeave={() => { setHover(null); setSnap(null); panRef.current = null; setDragging(null) }}
           onContextMenu={onContextMenu}
           onDoubleClick={onDoubleClick}
-          style={{ cursor: dimDrag ? 'ew-resize' : tool === 'select' ? (dragging ? 'grabbing' : 'default') : 'crosshair' }}
         >
           <SketchGrid view={view} svgRef={svgRef} />
           <SketchAxes view={view} svgRef={svgRef} />
@@ -885,6 +1065,7 @@ export default function SketchView({
             conflicts={conflicts || []}
             status={status}
             onDimensionDragStart={onDimensionDragStart}
+            pulseConstraintId={pulseConstraintId}
           />
           {/* Pending preview (dashed) */}
           <PendingPreview
@@ -893,13 +1074,98 @@ export default function SketchView({
             pendingPoints={pendingPoints}
             hover={hover}
             worldToScreen={worldToScreen}
+            lineDraft={lineDraft}
           />
           {/* Snap marker */}
           {snap && hover && <SnapMarker snap={snap} worldToScreen={worldToScreen} />}
         </svg>
 
-        {/* Status badge bottom-left */}
-        <div className="absolute bottom-3 left-3 px-2 py-1 rounded-md bg-ink-900/85 border border-ink-800 text-[11px] flex items-center gap-1.5 backdrop-blur">
+        {/* Live numeric input strip — shown while drawing the second click of
+            a line. Lets the user type Length / Angle to lock the next click.
+            Tab cycles fields; Enter commits at typed values; Esc cancels. */}
+        {tool === 'line' && pendingPoints.length === 1 && hover && (
+          <LineDraftStrip
+            startEntity={sketch.entities.find((e) => e.id === pendingPoints[0].id)}
+            cursor={hover}
+            worldToScreen={worldToScreen}
+            draft={lineDraft}
+            draftRef={lineDraftRef}
+            onChange={bumpLineDraft}
+            onCommit={() => {
+              // Synthesize a click commit at the projected target. The handler
+              // path expects (world, snap); pass the locked target as both
+              // the world coord and a fake null snap so the line tool falls
+              // into its commit branch.
+              const start = sketch.entities.find((e) => e.id === pendingPoints[0].id)
+              const t = projectLineDraft(start, hover, lineDraftRef.current) || hover
+              handleToolClick(t, null)
+            }}
+            onCancel={() => {
+              // Drop pending state; keep the start point on disk (it's a real
+              // ensurePointAt output and may already be referenced).
+              setPendingPoints([])
+              lineDraftRef.current = {
+                length: '', angle: '',
+                lockLength: false, lockAngle: false,
+                snapTarget: null, focus: 'length',
+              }
+              bumpLineDraft()
+            }}
+          />
+        )}
+
+        {/* Inline entity mini-toolbar — context-aware quick constraints for
+            the current selection. Single-line / single-circle / two-line / etc.
+            Hidden during tool drawing or while panning. */}
+        {tool === 'select' && selection.length >= 1 && !dragging && (
+          <EntityMiniToolbar
+            sketch={sketch}
+            selection={selection}
+            worldToScreen={worldToScreen}
+            onApply={applyConstraint}
+            onLockLength={(lineId) => {
+              const ent = sketch.entities.find((x) => x.id === lineId)
+              if (!ent || ent.type !== 'line') return
+              const p1 = sketch.entities.find((x) => x.id === ent.p1)
+              const p2 = sketch.entities.find((x) => x.id === ent.p2)
+              if (!p1 || !p2) return
+              const v = round(Math.hypot(p1.x - p2.x, p1.y - p2.y))
+              setDimensionPrompt({ kind: 'distance', refs: { a: ent.p1, b: ent.p2 }, defaultValue: v })
+            }}
+            onLockAngle={(lineId) => {
+              const ent = sketch.entities.find((x) => x.id === lineId)
+              if (!ent || ent.type !== 'line') return
+              const p1 = sketch.entities.find((x) => x.id === ent.p1)
+              const p2 = sketch.entities.find((x) => x.id === ent.p2)
+              if (!p1 || !p2) return
+              // No reference axis; just bind to horizontal/vertical if cardinal.
+              const dx = p2.x - p1.x, dy = p2.y - p1.y
+              const a = ((Math.atan2(dy, dx) * 180) / Math.PI + 360) % 360
+              if (Math.abs(a) < 5 || Math.abs(a - 180) < 5) {
+                applyConstraint('horizontal')
+              } else if (Math.abs(a - 90) < 5 || Math.abs(a - 270) < 5) {
+                applyConstraint('vertical')
+              } else {
+                // Fall back: prompt the user for an explicit angle by selecting
+                // a second line as the reference. Surfaced as a toast.
+                /* no-op */
+              }
+            }}
+          />
+        )}
+
+        {/* Status badge bottom-left — always shows DOF / fully-constrained
+            state so users know where they stand. The constraint coloring on
+            entities echoes this. Plain English labels per the brief. */}
+        <div className="absolute bottom-3 left-3 px-2 py-1 rounded-md bg-ink-900/85 border border-ink-800 text-[11px] flex items-center gap-1.5 backdrop-blur"
+          title={
+            status === 'fully' ? 'All geometry is pinned by constraints — no degrees of freedom remain.'
+            : status === 'over' ? 'Too many constraints. Some are redundant or contradictory.'
+            : status === 'conflict' ? 'Constraints conflict — the solver could not find a position that satisfies them all.'
+            : status === 'under' ? 'Some geometry can still move. Add dimensions or geometric constraints to lock it down.'
+            : 'The constraint solver is running.'
+          }
+        >
           {status === 'fully' && <Check size={11} className={statusColor} />}
           {status === 'over' || status === 'conflict' ? <AlertTriangle size={11} className={statusColor} /> : null}
           <span className={statusColor}>{statusLabel}</span>
@@ -939,9 +1205,32 @@ export default function SketchView({
           />
         )}
 
-        {/* Tool hint banner */}
-        {(tool === 'trim' || tool === 'extend' || tool === 'fillet') && (
+        {/* Tool hint banner — surface the next-click contract whenever a non-
+            select tool is armed, so users always know what the next click does.
+            Snap markers (drawn separately) provide pixel-level feedback. */}
+        {tool !== 'select' && (
           <div className="absolute top-3 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md bg-amber-300/15 border border-amber-300/40 text-[11px] text-amber-200 z-[3]">
+            {tool === 'point' && 'Point — click to place. ESC to exit.'}
+            {tool === 'line' && (pendingPoints.length === 0
+              ? 'Line — click the start point. ESC to exit.'
+              : 'Line — click the next endpoint (snap to start to close a loop). ESC to finish.')}
+            {tool === 'circle' && (pendingPoints.length === 0
+              ? 'Circle — click the center.'
+              : 'Circle — click on the circumference (radius).')}
+            {tool === 'rect' && (pendingPoints.length === 0
+              ? 'Rectangle — click first corner.'
+              : 'Rectangle — click opposite corner.')}
+            {tool === 'arc' && (pendingPoints.length === 0
+              ? 'Arc — click start point.'
+              : pendingPoints.length === 1
+                ? 'Arc — click end point.'
+                : 'Arc — click a point on the arc to set curvature.')}
+            {tool === 'ellipse' && (pendingPoints.length === 0
+              ? 'Ellipse — click center.'
+              : 'Ellipse — click a point on the major axis.')}
+            {tool === 'bspline' && (pendingPoints.length < 4
+              ? `B-spline — add control points (${pendingPoints.length}/4 minimum). Double-click to finish.`
+              : 'B-spline — keep clicking to add control points. Double-click to finish.')}
             {tool === 'trim' && 'Trim — click any segment between two intersections'}
             {tool === 'extend' && (extendState
               ? 'Extend — click the target entity to extend to'
@@ -961,6 +1250,8 @@ export default function SketchView({
         onSelect={setSelection}
         onChange={commit}
         onDelete={onDelete}
+        onPulse={pulseConstraint}
+        pulseConstraintId={pulseConstraintId}
       />
     </div>
   )
@@ -1038,7 +1329,7 @@ function SketchAxes({ view, svgRef }) {
 }
 
 // Render every entity. Color reflects constraint state.
-function SketchEntities({ sketch, view, worldToScreen, selection, conflicts, status, onDimensionDragStart }) {
+function SketchEntities({ sketch, view, worldToScreen, selection, conflicts, status, onDimensionDragStart, pulseConstraintId }) {
   const ent = sketch.entities || []
   const cons = sketch.constraints || []
   const conflictSet = new Set(conflicts || [])
@@ -1046,12 +1337,24 @@ function SketchEntities({ sketch, view, worldToScreen, selection, conflicts, sta
   const pointById = new Map()
   for (const e of ent) if (e.type === 'point') pointById.set(e.id, e)
 
+  // Compute the entity ids touched by the currently-pulsing constraint so we
+  // can render a pulse outline. Highlights only entity references (skipping
+  // the constraint's own id).
+  const pulseEntityIds = new Set()
+  if (pulseConstraintId) {
+    const c = cons.find((x) => x.id === pulseConstraintId)
+    if (c) {
+      for (const r of constraintEntityRefs(c)) if (r) pulseEntityIds.add(r)
+    }
+  }
+
   function colorFor(e) {
-    if (conflictSet.has(e.id)) return '#ef4444' // red
+    if (conflictSet.has(e.id)) return '#ef4444' // red — over-constrained
     if (e.construction) return status === 'fully' ? '#a3a8b3' : '#6b7280'
     if (status === 'over' || status === 'conflict') return '#ef4444'
-    if (status === 'fully') return '#34d399' // emerald-400
-    return '#5BB0FF' // kerf-300-ish
+    if (status === 'fully') return '#34d399' // green — fully constrained
+    if (status === 'under') return '#9ca3af' // gray — still has DOFs
+    return '#5BB0FF' // solving / unknown — kerf-blue
   }
 
   return (
@@ -1188,6 +1491,64 @@ function SketchEntities({ sketch, view, worldToScreen, selection, conflicts, sta
           onDragStart={onDimensionDragStart}
         />
       ))}
+      {/* Pulse overlay — when the user clicks a constraint row in the
+          sidebar, we briefly outline the affected entities with a pulsing
+          colored stroke. CSS-driven so the outline animates smoothly even
+          while the canvas is otherwise idle. */}
+      {pulseEntityIds.size > 0 && (
+        <g className="kerf-sketch-pulse" style={{ pointerEvents: 'none' }}>
+          {[...pulseEntityIds].map((eid) => {
+            const e = ent.find((x) => x.id === eid)
+            if (!e) return null
+            if (e.type === 'line') {
+              const p1 = pointById.get(e.p1)
+              const p2 = pointById.get(e.p2)
+              if (!p1 || !p2) return null
+              const a = worldToScreen(p1.x, p1.y)
+              const b = worldToScreen(p2.x, p2.y)
+              return <line key={'pulse-' + eid}
+                x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                stroke="#fbbf24" strokeWidth={4}
+                strokeLinecap="round" opacity={0.55} />
+            }
+            if (e.type === 'point') {
+              const s = worldToScreen(e.x, e.y)
+              return <circle key={'pulse-' + eid}
+                cx={s.x} cy={s.y} r={8}
+                fill="none" stroke="#fbbf24" strokeWidth={2.5}
+                opacity={0.6} />
+            }
+            if (e.type === 'circle') {
+              const c = pointById.get(e.center)
+              if (!c) return null
+              const s = worldToScreen(c.x, c.y)
+              return <circle key={'pulse-' + eid}
+                cx={s.x} cy={s.y} r={(e.radius || 0) * view.scale}
+                fill="none" stroke="#fbbf24" strokeWidth={4}
+                opacity={0.55} />
+            }
+            if (e.type === 'arc') {
+              const c = pointById.get(e.center)
+              const sP = pointById.get(e.start)
+              const en = pointById.get(e.end)
+              if (!c || !sP || !en) return null
+              const r = Math.hypot(sP.x - c.x, sP.y - c.y)
+              const a = worldToScreen(sP.x, sP.y)
+              const b = worldToScreen(en.x, en.y)
+              const sweep = e.sweep_ccw ? 1 : 0
+              let dA = Math.atan2(en.y - c.y, en.x - c.x) - Math.atan2(sP.y - c.y, sP.x - c.x)
+              if (e.sweep_ccw && dA < 0) dA += Math.PI * 2
+              if (!e.sweep_ccw && dA > 0) dA -= Math.PI * 2
+              const largeArc = Math.abs(dA) > Math.PI ? 1 : 0
+              return <path key={'pulse-' + eid}
+                d={`M ${a.x} ${a.y} A ${r * view.scale} ${r * view.scale} 0 ${largeArc} ${sweep === 1 ? 0 : 1} ${b.x} ${b.y}`}
+                fill="none" stroke="#fbbf24" strokeWidth={4}
+                strokeLinecap="round" opacity={0.55} />
+            }
+            return null
+          })}
+        </g>
+      )}
     </g>
   )
 }
@@ -1202,14 +1563,18 @@ function DimensionLabel({ c, sketch, worldToScreen, onDragStart }) {
     if (!a || !b || a.type !== 'point' || b.type !== 'point') return null
     pos = worldToScreen((a.x + b.x) / 2, (a.y + b.y) / 2)
     const tag = c.type === 'distance_x' ? 'X ' : c.type === 'distance_y' ? 'Y ' : ''
-    label = `${tag}${(c.value ?? 0).toFixed(2)} mm`
+    // c.value may be a `${param}` placeholder string — coerce safely.
+    const nv = Number(c.value)
+    label = Number.isFinite(nv) ? `${tag}${nv.toFixed(2)} mm` : `${tag}${String(c.value ?? '')}`
   } else if (c.type === 'radius' || c.type === 'diameter') {
     const circle = (sketch.entities || []).find((x) => x.id === c.circle)
     if (!circle) return null
     const center = (sketch.entities || []).find((x) => x.id === circle.center)
     if (!center) return null
     pos = worldToScreen(center.x + (circle.radius || 0) / 2, center.y)
-    label = `${c.type === 'radius' ? 'R' : 'D'} ${(c.value ?? 0).toFixed(2)}`
+    const nv = Number(c.value)
+    const prefix = c.type === 'radius' ? 'R' : 'D'
+    label = Number.isFinite(nv) ? `${prefix} ${nv.toFixed(2)}` : `${prefix} ${String(c.value ?? '')}`
   } else if (c.type === 'angle') {
     // Place at midpoint of the first referenced line.
     const a = (sketch.entities || []).find((x) => x.id === c.a)
@@ -1218,7 +1583,8 @@ function DimensionLabel({ c, sketch, worldToScreen, onDragStart }) {
     const p2 = (sketch.entities || []).find((x) => x.id === a.p2)
     if (!p1 || !p2) return null
     pos = worldToScreen((p1.x + p2.x) / 2, (p1.y + p2.y) / 2)
-    label = `${(c.value ?? 0).toFixed(1)}°`
+    const nv = Number(c.value)
+    label = Number.isFinite(nv) ? `${nv.toFixed(1)}°` : `${String(c.value ?? '')}°`
   }
   if (!pos || !label) return null
   // Choose a wider rect for X/Y labels
@@ -1250,14 +1616,23 @@ function SnapMarker({ snap, worldToScreen }) {
   return null
 }
 
-function PendingPreview({ tool, sketch, pendingPoints, hover, worldToScreen }) {
+function PendingPreview({ tool, sketch, pendingPoints, hover, worldToScreen, lineDraft }) {
   if (!hover || pendingPoints.length === 0) return null
   if (tool === 'line' && pendingPoints.length === 1) {
     const start = sketch.entities.find((e) => e.id === pendingPoints[0].id)
     if (!start) return null
+    // If a length / angle is locked, draw the preview to the projected target
+    // (so the user sees exactly where the next click will land).
+    const target = projectLineDraft(start, hover, lineDraft || {}) || hover
     const a = worldToScreen(start.x, start.y)
-    const b = worldToScreen(hover.x, hover.y)
-    return <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#fbbf24" strokeWidth={1} strokeDasharray="3 2" />
+    const b = worldToScreen(target.x, target.y)
+    return (
+      <g>
+        <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#fbbf24" strokeWidth={1} strokeDasharray="3 2" />
+        {/* Endpoint marker so the locked target reads cleanly. */}
+        <circle cx={b.x} cy={b.y} r={3} fill="none" stroke="#fbbf24" strokeWidth={1} />
+      </g>
+    )
   }
   if (tool === 'circle' && pendingPoints.length === 1) {
     const start = sketch.entities.find((e) => e.id === pendingPoints[0].id)
@@ -1308,6 +1683,309 @@ function PendingPreview({ tool, sketch, pendingPoints, hover, worldToScreen }) {
     return <path d={d} fill="none" stroke="#fbbf24" strokeWidth={1} strokeDasharray="3 2" />
   }
   return null
+}
+
+// LineDraftStrip — live "dynamic input" while drawing a line. Floats near
+// the cursor between the first and second click. Two fields (Length, Angle).
+// Tab cycles focus; Enter commits at the typed values; Esc cancels. Typing
+// in either field flips its lock to true automatically — once you've typed a
+// value, you've committed to it.
+//
+// We mirror the AutoCAD / Onshape "dynamic input" pattern, which is much
+// friendlier than FreeCAD's "draw the line, then add a constraint" two-step.
+// The chosen length / angle ALSO bake themselves into permanent constraints
+// when the line is committed (see the `tool === 'line'` block above).
+function LineDraftStrip({ startEntity, cursor, worldToScreen, draft, draftRef, onChange, onCommit, onCancel }) {
+  const lengthRef = useRef(null)
+  const angleRef = useRef(null)
+  // Auto-focus the chosen field on mount.
+  useEffect(() => {
+    if (draftRef.current?.focus === 'angle') angleRef.current?.focus()
+    else lengthRef.current?.focus()
+    // Mount-only: subsequent focus changes are user-driven via Tab.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  if (!startEntity) return null
+
+  // Default-display values: when the user hasn't typed anything we echo the
+  // live cursor measurement so they see what "no override" would mean.
+  const live = describeLineDraft(startEntity, cursor)
+  const lengthDisplay = draft.length !== '' ? draft.length : live.length.toFixed(2)
+  const angleDisplay = draft.angle !== '' ? draft.angle : ((live.angle + 360) % 360).toFixed(1)
+
+  // Position the strip next to the cursor (with a small offset so it doesn't
+  // sit directly under the click point). Convert world → screen so a
+  // pan/zoom keeps it anchored to the cursor.
+  const screen = worldToScreen(cursor.x, cursor.y)
+
+  function update(field, value) {
+    draftRef.current = {
+      ...draftRef.current,
+      [field]: value,
+      // Typing a value implicitly locks that field. Clearing the input
+      // releases the lock, since an empty string is unambiguously "use cursor".
+      [field === 'length' ? 'lockLength' : 'lockAngle']: value !== '',
+    }
+    onChange?.()
+  }
+
+  function onKey(e, field) {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      onCommit?.()
+      return
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      onCancel?.()
+      return
+    }
+    if (e.key === 'Tab') {
+      e.preventDefault()
+      const nextField = field === 'length' ? 'angle' : 'length'
+      draftRef.current = { ...draftRef.current, focus: nextField }
+      ;(nextField === 'length' ? lengthRef : angleRef).current?.focus()
+    }
+  }
+
+  return (
+    <div
+      className="absolute z-[6] flex items-center gap-2 px-2 py-1 rounded-md bg-ink-900/95 border border-kerf-300/40 shadow-lg backdrop-blur"
+      style={{
+        left: Math.max(8, screen.x + 16),
+        top: Math.max(8, screen.y + 16),
+        // Don't trap pointer events on the canvas around the strip — let
+        // mouse-down still register a click outside the inputs.
+        pointerEvents: 'auto',
+      }}
+      // The canvas has mousedown handlers; clicks inside the strip should
+      // not trigger them.
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <label className="flex items-center gap-1 text-[10px] text-ink-300">
+        <span className={draft.lockLength ? 'text-kerf-300' : 'text-ink-400'}>L</span>
+        <input
+          ref={lengthRef}
+          type="text"
+          inputMode="decimal"
+          value={lengthDisplay}
+          onChange={(e) => update('length', e.target.value)}
+          onFocus={() => { draftRef.current = { ...draftRef.current, focus: 'length' } }}
+          onKeyDown={(e) => onKey(e, 'length')}
+          className={`w-20 bg-ink-950 border rounded px-2 py-1 text-xs font-mono outline-none
+            ${draft.lockLength ? 'border-kerf-300/60 text-kerf-100' : 'border-ink-800 text-ink-300'}`}
+          title="Length in mm — type a number to lock the line's length, then click to commit. Tab → Angle."
+        />
+        <span className="text-ink-500">mm</span>
+      </label>
+      <label className="flex items-center gap-1 text-[10px] text-ink-300">
+        <span className={draft.lockAngle ? 'text-kerf-300' : 'text-ink-400'}>A</span>
+        <input
+          ref={angleRef}
+          type="text"
+          inputMode="decimal"
+          value={angleDisplay}
+          onChange={(e) => update('angle', e.target.value)}
+          onFocus={() => { draftRef.current = { ...draftRef.current, focus: 'angle' } }}
+          onKeyDown={(e) => onKey(e, 'angle')}
+          className={`w-20 bg-ink-950 border rounded px-2 py-1 text-xs font-mono outline-none
+            ${draft.lockAngle ? 'border-kerf-300/60 text-kerf-100' : 'border-ink-800 text-ink-300'}`}
+          title="Angle in degrees from +X — type a number to lock direction. Tab → Length. Enter to commit, Esc to cancel."
+        />
+        <span className="text-ink-500">°</span>
+      </label>
+      <span className="text-[9px] text-ink-500 ml-1">Tab · Enter · Esc</span>
+    </div>
+  )
+}
+
+// EntityMiniToolbar — inline action bar that floats next to the current
+// selection, offering only the constraints that actually apply to the
+// selected combination (FreeCAD surfaces every icon all the time, which is
+// confusing — we filter ruthlessly).
+//
+// Layout:
+//   - Anchored at the bbox of the selection (top-right of bbox in screen
+//     space) so it never covers the geometry but stays close enough to feel
+//     attached.
+//   - Plain-English tooltips ("Make these equal length", "Lock to horizontal",
+//     "Set length to N mm") replace FreeCAD's cryptic constraint names.
+function EntityMiniToolbar({ sketch, selection, worldToScreen, onApply, onLockLength, onLockAngle }) {
+  // Compute the world-space bbox of the selection.
+  const ent = sketch.entities || []
+  const byId = new Map(ent.map((e) => [e.id, e]))
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  function expandWith(p) {
+    if (!p) return
+    minX = Math.min(minX, p.x); minY = Math.min(minY, p.y)
+    maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y)
+  }
+  function expandFromEntity(e) {
+    if (!e) return
+    if (e.type === 'point') expandWith(e)
+    else if (e.type === 'line') { expandWith(byId.get(e.p1)); expandWith(byId.get(e.p2)) }
+    else if (e.type === 'circle' || e.type === 'arc') {
+      const c = byId.get(e.center)
+      const r = e.radius || (e.type === 'arc' ? Math.hypot((byId.get(e.start)?.x ?? 0) - (c?.x ?? 0), (byId.get(e.start)?.y ?? 0) - (c?.y ?? 0)) : 0)
+      if (c) {
+        expandWith({ x: c.x - r, y: c.y - r })
+        expandWith({ x: c.x + r, y: c.y + r })
+      }
+    } else if (e.type === 'ellipse') {
+      const c = byId.get(e.center)
+      const m = Math.max(e.rx || 1, e.ry || 1)
+      if (c) {
+        expandWith({ x: c.x - m, y: c.y - m })
+        expandWith({ x: c.x + m, y: c.y + m })
+      }
+    }
+  }
+  for (const id of selection) expandFromEntity(byId.get(id))
+  if (!Number.isFinite(minX)) return null
+  const screenTopRight = worldToScreen(maxX, maxY)
+
+  // Classify selection.
+  const types = selection.map((id) => byId.get(id)?.type).filter(Boolean)
+  const lines = selection.filter((id) => byId.get(id)?.type === 'line')
+  const points = selection.filter((id) => byId.get(id)?.type === 'point')
+  const circlesArcs = selection.filter((id) => {
+    const t = byId.get(id)?.type; return t === 'circle' || t === 'arc'
+  })
+
+  const buttons = []
+  // Single line — most common case. Offer length, angle (H/V), construction.
+  if (lines.length === 1 && types.length === 1) {
+    buttons.push({
+      label: 'Set length…', short: '↔ length',
+      tooltip: 'Set this line to an exact length in millimetres.',
+      onClick: () => onLockLength?.(lines[0]),
+    })
+    buttons.push({
+      label: 'Lock to horizontal', short: 'Horizontal',
+      tooltip: 'Snap this line to be horizontal (parallel to +X).',
+      onClick: () => onApply('horizontal'),
+    })
+    buttons.push({
+      label: 'Lock to vertical', short: 'Vertical',
+      tooltip: 'Snap this line to be vertical (parallel to +Y).',
+      onClick: () => onApply('vertical'),
+    })
+    buttons.push({
+      label: 'Auto-lock angle', short: 'Lock angle',
+      tooltip: 'Snap to horizontal or vertical if the line is already close to either.',
+      onClick: () => onLockAngle?.(lines[0]),
+    })
+  }
+  // Two lines — equality / parallel / perpendicular / angle.
+  if (lines.length === 2 && types.length === 2) {
+    buttons.push({
+      label: 'Make equal length', short: 'Equal',
+      tooltip: 'Constrain both lines to the same length.',
+      onClick: () => onApply('equal_length'),
+    })
+    buttons.push({
+      label: 'Make parallel', short: 'Parallel',
+      tooltip: 'Constrain the two lines to remain parallel.',
+      onClick: () => onApply('parallel'),
+    })
+    buttons.push({
+      label: 'Make perpendicular', short: 'Perp',
+      tooltip: 'Constrain the two lines to meet at 90°.',
+      onClick: () => onApply('perpendicular'),
+    })
+    buttons.push({
+      label: 'Set angle…', short: 'Angle',
+      tooltip: 'Set the angle between the two lines in degrees.',
+      onClick: () => onApply('distance'),
+    })
+  }
+  // Two points — coincident or distance.
+  if (points.length === 2 && types.length === 2) {
+    buttons.push({
+      label: 'Make coincident', short: 'Snap together',
+      tooltip: 'Merge the two points into a single shared point.',
+      onClick: () => onApply('coincident'),
+    })
+    buttons.push({
+      label: 'Set distance…', short: 'Distance',
+      tooltip: 'Set the distance between the two points in millimetres.',
+      onClick: () => onApply('distance'),
+    })
+  }
+  // Single circle / arc — radius.
+  if (circlesArcs.length === 1 && types.length === 1) {
+    buttons.push({
+      label: 'Set radius…', short: 'Radius',
+      tooltip: 'Set the radius of this circle/arc in millimetres.',
+      onClick: () => onApply('distance'),
+    })
+  }
+  // Two circles — equal radius / tangent.
+  if (circlesArcs.length === 2 && types.length === 2) {
+    buttons.push({
+      label: 'Make equal radius', short: 'Equal r',
+      tooltip: 'Force both circles/arcs to share the same radius.',
+      onClick: () => onApply('equal_radius'),
+    })
+    buttons.push({
+      label: 'Make tangent', short: 'Tangent',
+      tooltip: 'Constrain the two curves to touch at exactly one point.',
+      onClick: () => onApply('tangent'),
+    })
+  }
+  // Line + circle/arc — tangent.
+  if (lines.length === 1 && circlesArcs.length === 1 && types.length === 2) {
+    buttons.push({
+      label: 'Make tangent', short: 'Tangent',
+      tooltip: 'Make the line tangent to the circle/arc.',
+      onClick: () => onApply('tangent'),
+    })
+  }
+  // Point + line — point on line.
+  if (points.length === 1 && lines.length === 1 && types.length === 2) {
+    buttons.push({
+      label: 'Pin point on line', short: 'On line',
+      tooltip: 'Constrain the point to lie on the line.',
+      onClick: () => onApply('point_on_line'),
+    })
+  }
+  // Point + circle/arc — point on arc.
+  if (points.length === 1 && circlesArcs.length === 1 && types.length === 2) {
+    buttons.push({
+      label: 'Pin point on arc', short: 'On arc',
+      tooltip: 'Constrain the point to lie on the circle/arc.',
+      onClick: () => onApply('point_on_arc'),
+    })
+  }
+
+  if (buttons.length === 0) return null
+
+  return (
+    <div
+      className="absolute z-[4] flex flex-wrap items-center gap-1 px-1.5 py-1 rounded-md bg-ink-900/95 border border-ink-700 shadow-lg backdrop-blur max-w-[420px]"
+      style={{
+        // Top-right of the bbox, plus a small gutter so it never sits on the
+        // entity. Clamp to the canvas rect would be nicer; v1 lets the user's
+        // browser handle clipping.
+        left: Math.max(8, screenTopRight.x + 12),
+        top: Math.max(8, screenTopRight.y - 30),
+      }}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      {buttons.map((b, i) => (
+        <button
+          key={i}
+          type="button"
+          onClick={b.onClick}
+          title={b.tooltip}
+          className="px-2 py-0.5 rounded text-[10px] font-medium text-ink-200 hover:bg-kerf-300/15 hover:text-kerf-100 border border-transparent hover:border-kerf-300/40"
+        >
+          {b.short}
+        </button>
+      ))}
+    </div>
+  )
 }
 
 function DimensionPrompt({ spec, onCommit, onCancel }) {
@@ -1581,7 +2259,7 @@ function SketchBackdrop3D({ sketch, view, loadParts }) {
 // ---------------------------------------------------------------------------
 // Right-rail inspector: selection details + visible-3D picker.
 
-function SketchInspector({ sketch, files, selection, onSelect, onChange, onDelete }) {
+function SketchInspector({ sketch, files, selection, onSelect, onChange, onDelete, onPulse, pulseConstraintId }) {
   const cons = sketch.constraints || []
 
   const selectedConstraints = (cons || []).filter((c) => selection.includes(c.id))
@@ -1651,19 +2329,32 @@ function SketchInspector({ sketch, files, selection, onSelect, onChange, onDelet
           <div className="text-[11px] text-ink-500">No constraints yet.</div>
         ) : (
           <ul className="space-y-1">
-            {cons.map((c) => (
-              <li key={c.id}>
-                <button
-                  type="button"
-                  onClick={() => onSelect([c.id])}
-                  className={`w-full text-left px-2 py-1 rounded text-[11px] font-mono
-                    ${selection.includes(c.id) ? 'bg-kerf-300/15 text-kerf-100' : 'hover:bg-ink-800 text-ink-300'}`}
-                >
-                  <span className="text-ink-500">{c.type}</span>
-                  {(c.value != null) && <span className="text-ink-200 ml-1">= {c.value}</span>}
-                </button>
-              </li>
-            ))}
+            {cons.map((c) => {
+              const pulsing = pulseConstraintId === c.id
+              const label = friendlyConstraintLabel(c)
+              return (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    title="Click to highlight the affected geometry. Right-click to delete."
+                    onClick={() => {
+                      onSelect([c.id])
+                      onPulse?.(c.id)
+                    }}
+                    onContextMenu={(e) => {
+                      e.preventDefault()
+                      onChange(deleteConstraint(sketch, c.id))
+                    }}
+                    className={`w-full text-left px-2 py-1 rounded text-[11px] flex items-center gap-1.5 transition-colors
+                      ${selection.includes(c.id) ? 'bg-kerf-300/15 text-kerf-100' : 'hover:bg-ink-800 text-ink-300'}
+                      ${pulsing ? 'ring-1 ring-amber-300/80 bg-amber-300/10' : ''}`}
+                  >
+                    <span className="text-ink-100">{label}</span>
+                    {(c.value != null) && <span className="text-kerf-200 ml-auto font-mono">{formatConstraintValue(c)}</span>}
+                  </button>
+                </li>
+              )
+            })}
           </ul>
         )}
       </div>

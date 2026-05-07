@@ -71,7 +71,10 @@ export default function BOMTable({
       <tbody>
         {rows.map((r) => (
           <BOMRow
-            key={r.file_id}
+            // Configurations / variants — two rows can now share a
+            // file_id (M3 vs M4 of one Part), so the key has to disambiguate
+            // by config_id too. Empty config_id is the no-configurations case.
+            key={`${r.file_id}::${r.config_id || ''}`}
             row={r}
             editable={editable}
             override={findOverride(overrides, r.file_id)}
@@ -113,6 +116,18 @@ function BOMRow({ row, editable, override, onChangeOverride, onOpen, compact }) 
           ) : (
             <span className="text-ink-100 truncate" title={note ? `${row.path || part.name}\n\nNote: ${note}` : (row.path || part.name)}>
               {part.name || <span className="italic text-ink-500">unnamed</span>}
+            </span>
+          )}
+          {/* Configurations / variants — when a row is for a specific
+              configuration of a Part (M3 vs M4 vs M5 of one screw), show
+              the config label in a small chip after the part name so each
+              row stays distinguishable in the list. */}
+          {(row.config_label || row.config_id) && (
+            <span
+              title={`Configuration: ${row.config_label || row.config_id}`}
+              className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono bg-kerf-300/10 text-kerf-300 border border-kerf-300/30 flex-shrink-0"
+            >
+              {row.config_label || row.config_id}
             </span>
           )}
           {(row.author?.is_verified_publisher || part.author?.is_verified_publisher) && (

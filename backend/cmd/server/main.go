@@ -72,6 +72,25 @@ func main() {
 		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok", "env": cfg.Env})
 	})
 
+	// /api/config — public bootstrap config consumed by the frontend's
+	// useCloudConfig hook. Exposes only what the SPA needs to decide
+	// which build flavor it's talking to (cloud vs OSS) and whether
+	// to skip the login screen (local_mode).
+	r.Get("/api/config", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"google_client_id": cfg.GoogleClientID,
+			"cloud_enabled":    cfg.Cloud.Enabled,
+			"local_mode":       cfg.LocalMode,
+			"default_model":    cfg.DefaultModel,
+		})
+	})
+
+	// /api/bootstrap — public read of the on-disk state.json (single-machine
+	// brew/curl-install path). Always present; a multi-user deploy with no
+	// state.json simply gets has_state=false.
+	r.Get("/api/bootstrap", deps.Bootstrap)
+
 	r.Route("/auth", func(r chi.Router) {
 		r.Post("/register", deps.Register)
 		r.Post("/login", deps.Login)
@@ -79,20 +98,25 @@ func main() {
 		r.Post("/logout", deps.Logout)
 		r.Get("/google/start", deps.GoogleStart)
 		r.Get("/google/callback", deps.GoogleCallback)
+		// Local-mode-only: auto-account endpoint. Handler 404s on
+		// cloud builds / local_mode=false so the cloud signup flow
+		// can't be bypassed.
+		r.Post("/bootstrap-local", deps.BootstrapLocal)
 	})
 
 	r.Route("/api", func(r chi.Router) {
 		// Public share lookup (token-only auth handled inside).
 		r.Group(func(r chi.Router) {
-			r.Use(kmw.OptionalAuth(authSvc))
+			r.Use(kmw.OptionalAuth(authSvc, pool))
 			r.Get("/share/{token}", deps.LookupShare)
 		})
 
 		// Authenticated routes.
 		r.Group(func(r chi.Router) {
-			r.Use(kmw.RequireAuth(authSvc))
+			r.Use(kmw.RequireAuth(authSvc, pool))
 
 			r.Get("/me", deps.Me)
+			r.Patch("/me", deps.UpdateMe)
 			r.Get("/models", deps.ListModels)
 			r.Post("/share/{token}/accept", deps.AcceptShare)
 

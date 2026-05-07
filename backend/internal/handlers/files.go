@@ -199,17 +199,16 @@ func (d *Deps) CreateFile(w http.ResponseWriter, r *http.Request) {
 	if body.Kind == "" {
 		body.Kind = "file"
 	}
-	if body.Kind != "file" && body.Kind != "folder" && body.Kind != "assembly" && body.Kind != "drawing" && body.Kind != "sketch" && body.Kind != "part" && body.Kind != "feature" && body.Kind != "circuit" {
+	if body.Kind != "file" && body.Kind != "folder" && body.Kind != "assembly" && body.Kind != "drawing" && body.Kind != "sketch" && body.Kind != "part" && body.Kind != "feature" && body.Kind != "circuit" && body.Kind != "equations" {
 		writeError(w, http.StatusBadRequest, "invalid kind")
 		return
 	}
-	// NOTE: v1 is intentionally **permissive** on cross-type file kinds — we
-	// do not consult the parent project's project_type here, so a mechanical
-	// project can hold a .circuit.tsx and an electronics project can hold a
-	// quick mechanical bracket. Rationale + future strict-mode toggle live
-	// alongside the ProjectTypeKinds registry in projecttype.go and in
-	// CONTRACT.md "Project types". The FileTree's "+ New" menu filters by
-	// type so the *default* surface stays narrow per domain.
+	// NOTE: cross-tag file kinds are unrestricted by design. We don't
+	// consult the parent project's tags here — a project tagged
+	// "mechanical" can hold a .circuit.tsx and a project tagged
+	// "electronics" can hold a mechanical bracket. The FileTree's "+ New"
+	// menu offers tag-aware suggestions for the *default* surface but the
+	// API stays open. See CONTRACT.md "Project tags".
 	content := ""
 	if body.Content != nil {
 		content = *body.Content
@@ -245,7 +244,7 @@ func (d *Deps) CreateFile(w http.ResponseWriter, r *http.Request) {
 					_ = d.Mirror.Mkdir(name, segs)
 				}
 			}
-		case "file", "assembly", "drawing", "sketch", "part", "feature", "circuit":
+		case "file", "assembly", "drawing", "sketch", "part", "feature", "circuit", "equations":
 			d.fsWriteFile(r.Context(), pid, f.ID, content)
 		}
 	}
@@ -286,7 +285,7 @@ func (d *Deps) GetFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Filesystem mode: prefer on-disk content for text-bearing kinds.
-	if d.Mirror != nil && (f.Kind == "file" || f.Kind == "assembly" || f.Kind == "drawing" || f.Kind == "sketch" || f.Kind == "part" || f.Kind == "feature" || f.Kind == "circuit") {
+	if d.Mirror != nil && (f.Kind == "file" || f.Kind == "assembly" || f.Kind == "drawing" || f.Kind == "sketch" || f.Kind == "part" || f.Kind == "feature" || f.Kind == "circuit" || f.Kind == "equations") {
 		dbContent := ""
 		if f.Content != nil {
 			dbContent = *f.Content
@@ -350,14 +349,14 @@ func (d *Deps) UpdateFile(w http.ResponseWriter, r *http.Request) {
 	}
 	// Mirror through to disk on content change.
 	if d.Mirror != nil && body.Content != nil &&
-		(f.Kind == "file" || f.Kind == "assembly" || f.Kind == "drawing" || f.Kind == "sketch" || f.Kind == "part" || f.Kind == "feature" || f.Kind == "circuit") {
+		(f.Kind == "file" || f.Kind == "assembly" || f.Kind == "drawing" || f.Kind == "sketch" || f.Kind == "part" || f.Kind == "feature" || f.Kind == "circuit" || f.Kind == "equations") {
 		d.fsWriteFile(r.Context(), pid, f.ID, *body.Content)
 	}
 	// Rename: move the on-disk file to match the new name. Pure renames
 	// (no content) and renames-with-content both go through here — the
 	// content path above already wrote the new file at the new name.
 	if d.Mirror != nil && body.Name != nil && *body.Name != f.Name &&
-		(f.Kind == "file" || f.Kind == "assembly" || f.Kind == "drawing" || f.Kind == "sketch" || f.Kind == "part" || f.Kind == "feature" || f.Kind == "circuit" || f.Kind == "folder") {
+		(f.Kind == "file" || f.Kind == "assembly" || f.Kind == "drawing" || f.Kind == "sketch" || f.Kind == "part" || f.Kind == "feature" || f.Kind == "circuit" || f.Kind == "equations" || f.Kind == "folder") {
 		// f.Name is the post-update name; we need to know the OLD name to
 		// move from. Look at body.Name vs current row — if they differ, do
 		// a Move. (We don't have the old segments here; this is a known
@@ -601,7 +600,7 @@ func (d *Deps) RestoreFile(w http.ResponseWriter, r *http.Request) {
 	// Re-mirror to disk if filesystem mode is on.
 	if d.Mirror != nil &&
 		(kind == "file" || kind == "assembly" || kind == "drawing" || kind == "sketch" ||
-			kind == "part" || kind == "feature" || kind == "circuit") {
+			kind == "part" || kind == "feature" || kind == "circuit" || kind == "equations") {
 		d.fsWriteFile(r.Context(), pid, fid, content)
 	} else if d.Mirror != nil && kind == "folder" {
 		if name, _ := d.projectName(r.Context(), pid); name != "" {

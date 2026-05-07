@@ -27,15 +27,22 @@ func FeatureFiles(s *runner.Suite, env *runner.Env) {
 	c := env.Client
 	ctx := context.Background()
 
-	owner, status, raw := register(c, "feat-owner@example.com", "featpass1", "Feat Owner")
+	owner, status, raw := registerWS(c, "feat-owner@example.com", "featpass1", "Feat Owner")
 	if !s.Status("register feat owner", status, 201, raw) {
+		return
+	}
+	if !s.True("feat owner default_workspace present", owner.DefaultWorkspace != nil,
+		"expected default_workspace on register response") {
 		return
 	}
 	var proj struct {
 		ID string `json:"id"`
 	}
 	status, raw, _ = c.DoJSON("POST", "/api/projects",
-		map[string]string{"name": "Feature project"}, owner.AccessToken, &proj)
+		map[string]string{
+			"name":         "Feature project",
+			"workspace_id": owner.DefaultWorkspace.ID,
+		}, owner.AccessToken, &proj)
 	if !s.Status("create feat project", status, 201, raw) {
 		return
 	}
@@ -148,6 +155,54 @@ func FeatureFiles(s *runner.Suite, env *runner.Env) {
 		if s.Status("POST /files kind="+k+" via API", status, 201, raw) {
 			s.Equal("API row kind="+k, f.Kind, k)
 		}
+	}
+
+	// --- "Use in feature" UI workflow: the SketchView toolbar creates a
+	// .feature file seeded with a single pad referencing the originating
+	// sketch's path. Mirror the createFeatureFromSketch store action with
+	// raw API calls and assert the sketch + feature plumbing round-trips. ---
+	var sketchRow struct {
+		ID   string `json:"id"`
+		Kind string `json:"kind"`
+	}
+	status, raw, _ = c.DoJSON("POST", "/api/projects/"+pid+"/files",
+		map[string]any{
+			"name":    "profile.sketch",
+			"kind":    "sketch",
+			"content": `{"entities":[]}`,
+		}, owner.AccessToken, &sketchRow)
+	if s.Status("create sketch via API", status, 201, raw) {
+		s.Equal("sketch.kind", sketchRow.Kind, "sketch")
+		s.NotEmpty("sketch.id", sketchRow.ID)
+	}
+
+	featureSeed := `{"features":[{"id":"f1","op":"pad","sketch_path":"/profile.sketch","height":5,"direction":"up"}]}`
+	var featRow struct {
+		ID   string `json:"id"`
+		Kind string `json:"kind"`
+	}
+	status, raw, _ = c.DoJSON("POST", "/api/projects/"+pid+"/files",
+		map[string]any{
+			"name":      "profile.feature",
+			"kind":      "feature",
+			"parent_id": nil,
+			"content":   featureSeed,
+		}, owner.AccessToken, &featRow)
+	if s.Status("create feature-from-sketch via API", status, 201, raw) {
+		s.Equal("feature.kind", featRow.Kind, "feature")
+		s.NotEmpty("feature.id", featRow.ID)
+	}
+
+	// Round-trip the seeded content via GET /files/:id.
+	var featGet struct {
+		Kind    string `json:"kind"`
+		Content string `json:"content"`
+	}
+	status, raw, _ = c.DoJSON("GET", "/api/projects/"+pid+"/files/"+featRow.ID, nil,
+		owner.AccessToken, &featGet)
+	if s.Status("get feature-from-sketch", status, 200, raw) {
+		s.Equal("feature.kind round-trip", featGet.Kind, "feature")
+		s.Equal("feature.content round-trip", featGet.Content, featureSeed)
 	}
 }
 

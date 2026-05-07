@@ -49,6 +49,12 @@ import (
 // `NonStocked` and `Note` are populated from per-assembly BOM overrides (BOM
 // rework). They are omitempty so older clients (and the LLM `generate_bom`
 // tool, which doesn't apply overrides) keep their existing payload shape.
+//
+// `ConfigID` and `ConfigLabel` are populated from the configurations /
+// variants feature: when an assembly's component pins a specific
+// configuration (M3 vs M4 of one screw Part), the BOM rolls up by
+// (file_id, config_id) so each variant becomes its own row. Empty when the
+// underlying part has no configurations or the component didn't pin one.
 type BOMRow struct {
 	Part               BOMPart     `json:"part"`
 	FileID             string      `json:"file_id"`
@@ -59,6 +65,8 @@ type BOMRow struct {
 	PrimaryDistributor *bomDistRef `json:"primary_distributor,omitempty"`
 	NonStocked         bool        `json:"non_stocked,omitempty"`
 	Note               string      `json:"note,omitempty"`
+	ConfigID           string      `json:"config_id,omitempty"`
+	ConfigLabel        string      `json:"config_label,omitempty"`
 }
 
 type bomDistRef struct {
@@ -131,13 +139,14 @@ type fileRow struct {
 }
 
 // componentRef is the parsed shape of an assembly's components. We mirror
-// just the fields needed for BOM (file_id + optional quantity); the full
-// schema lives in tools/assembly_tools.go.
+// just the fields needed for BOM (file_id + optional quantity + config
+// pin); the full schema lives in tools/assembly_tools.go.
 type componentRef struct {
 	FileID   string `json:"file_id"`
 	ObjectID string `json:"object_id"`
 	PartID   string `json:"part_id"` // legacy
 	Quantity *int   `json:"quantity,omitempty"`
+	ConfigID string `json:"config_id,omitempty"`
 }
 
 // bomOverride mirrors the per-Part override shape authored by the inline
@@ -201,30 +210,42 @@ func bomCompute(ctx context.Context, pool *pgxpool.Pool, projectID string) ([]BO
 	paths := buildPathTable(files)
 
 	// aggKey: prefer MPN; fallback to file id. Two parts with the same MPN
-	// across the project collapse into one row (with a warning).
+	// across the project collapse into one row (with a warning). When a
+	// component pins a configuration (M3 vs M4 of one screw Part), the key
+	// is suffixed with `|cfg=<id>` so each variant becomes its own row —
+	// the BOM-by-config grouping the configurations / variants feature
+	// requires.
 	type agg struct {
 		count    int
 		fileID   string
 		fileRow  *fileRow
+		configID string
 		warnings []string
 	}
 	aggregates := make(map[string]*agg)
 	warnings := make([]string, 0)
 
 	// addPart bumps the rollup for `partID` by `quantity`. The aggregate is
-	// keyed by MPN when present; otherwise by file id (so two unnamed parts
-	// don't collide).
-	addPart := func(partFile *fileRow, quantity int) {
+	// keyed by (MPN-or-fileID, config_id) so M3 and M4 instances of the
+	// same Part collapse into separate rows. `configID` is the active
+	// config id resolved by `resolveActiveConfig` against the Part's
+	// configurations + the component's pin.
+	addPart := func(partFile *fileRow, quantity int, configID string) {
 		doc := parsePartContent(partFile.Content)
-		key := strings.TrimSpace(doc.MPN)
-		if key == "" {
-			key = "fid:" + partFile.ID
+		base := strings.TrimSpace(doc.MPN)
+		if base == "" {
+			base = "fid:" + partFile.ID
+		}
+		key := base
+		if configID != "" {
+			key = base + "|cfg=" + configID
 		}
 		a := aggregates[key]
 		if a == nil {
 			a = &agg{
-				fileID:  partFile.ID,
-				fileRow: partFile,
+				fileID:   partFile.ID,
+				fileRow:  partFile,
+				configID: configID,
 			}
 			aggregates[key] = a
 		} else if a.fileID != partFile.ID && doc.MPN != "" {
@@ -236,18 +257,57 @@ func bomCompute(ctx context.Context, pool *pgxpool.Pool, projectID string) ([]BO
 		a.count += quantity
 	}
 
+	// resolveActiveConfig returns the config id that a component instance
+	// should be rolled up under, given the part's configuration list and
+	// the component's optional pin. Empty when the part has no
+	// configurations or nothing matches (in which case the row collapses
+	// the way it always has).
+	resolveActiveConfig := func(doc partDoc, pinned string) string {
+		if len(doc.Configurations) == 0 {
+			return ""
+		}
+		// Direct hit on the pin.
+		if pinned != "" {
+			for _, c := range doc.Configurations {
+				if c.ID == pinned {
+					return c.ID
+				}
+			}
+		}
+		// Fall back to default_config.
+		def := strings.TrimSpace(doc.DefaultConfig)
+		if def != "" {
+			for _, c := range doc.Configurations {
+				if c.ID == def {
+					return c.ID
+				}
+			}
+		}
+		// Last resort — first declared config.
+		return doc.Configurations[0].ID
+	}
+
 	// Recursive walker shared across the per-assembly loop. `visited` is
 	// scoped per top-level walk so a Part can legitimately appear in two
 	// branches of the same tree without being deduped — only assembly
 	// re-entrancy is the cycle case.
-	var walk func(fid string, multiplier int, visited map[string]bool) error
-	walk = func(fid string, multiplier int, visited map[string]bool) error {
+	//
+	// `configHint` carries the parent component's config pin DOWN into
+	// nested assemblies so a sub-assembly that references a configurable
+	// Part can inherit the variant from above when its own component
+	// doesn't override. Today's componentRef supports a `config_id` pin
+	// but most sub-assemblies won't set one — the inheritance keeps the
+	// roll-up sensible.
+	var walk func(fid string, multiplier int, configHint string, visited map[string]bool) error
+	walk = func(fid string, multiplier int, configHint string, visited map[string]bool) error {
 		f := byID[fid]
 		if f == nil {
 			return nil
 		}
 		if f.Kind == "part" {
-			addPart(f, multiplier)
+			doc := parsePartContent(f.Content)
+			cfgID := resolveActiveConfig(doc, configHint)
+			addPart(f, multiplier, cfgID)
 			return nil
 		}
 		if f.Kind != "assembly" {
@@ -270,7 +330,13 @@ func bomCompute(ctx context.Context, pool *pgxpool.Pool, projectID string) ([]BO
 			if c.Quantity != nil && *c.Quantity > 0 {
 				q = *c.Quantity
 			}
-			if err := walk(c.FileID, multiplier*q, visited); err != nil {
+			// A child component's pin always wins over the inherited hint;
+			// missing → inherit.
+			nextHint := configHint
+			if c.ConfigID != "" {
+				nextHint = c.ConfigID
+			}
+			if err := walk(c.FileID, multiplier*q, nextHint, visited); err != nil {
 				return err
 			}
 		}
@@ -293,7 +359,7 @@ func bomCompute(ctx context.Context, pool *pgxpool.Pool, projectID string) ([]BO
 			continue
 		}
 		visited := map[string]bool{}
-		if err := walk(f.ID, 1, visited); err != nil {
+		if err := walk(f.ID, 1, "", visited); err != nil {
 			return nil, nil, nil, err
 		}
 		for _, ov := range parseAssemblyOverrides(f.Content) {
@@ -336,6 +402,22 @@ func bomCompute(ctx context.Context, pool *pgxpool.Pool, projectID string) ([]BO
 			Path:   paths[a.fileID],
 			Count:  count,
 		}
+		// Configurations / variants — each row carries the active config's
+		// id + label so the frontend can render `<part name> (M3)` and the
+		// LLM can recognize that two rows belong to the same Part.
+		if a.configID != "" {
+			row.ConfigID = a.configID
+			for _, c := range doc.Configurations {
+				if c.ID == a.configID {
+					if c.Label != "" {
+						row.ConfigLabel = c.Label
+					} else {
+						row.ConfigLabel = c.ID
+					}
+					break
+				}
+			}
+		}
 		if hasOverride {
 			if ov.NonStocked {
 				row.NonStocked = true
@@ -376,10 +458,14 @@ func bomCompute(ctx context.Context, pool *pgxpool.Pool, projectID string) ([]BO
 		rows = append(rows, row)
 	}
 
-	// Stable order: by name then by path.
+	// Stable order: by name, then config id (so M3/M4/M5 of the same Part
+	// stay next to each other), then path.
 	sort.SliceStable(rows, func(i, j int) bool {
 		if rows[i].Part.Name != rows[j].Part.Name {
 			return rows[i].Part.Name < rows[j].Part.Name
+		}
+		if rows[i].ConfigID != rows[j].ConfigID {
+			return rows[i].ConfigID < rows[j].ConfigID
 		}
 		return rows[i].Path < rows[j].Path
 	})
@@ -512,20 +598,32 @@ type partDist struct {
 }
 
 type partDoc struct {
-	Version         int            `json:"version"`
-	Name            string         `json:"name"`
-	Description     string         `json:"description,omitempty"`
-	Category        string         `json:"category,omitempty"`
-	Manufacturer    string         `json:"manufacturer,omitempty"`
-	MPN             string         `json:"mpn,omitempty"`
-	Value           string         `json:"value,omitempty"`
-	DatasheetURL    string         `json:"datasheet_url,omitempty"`
-	Distributors    []partDist     `json:"distributors"`
-	ModelStorageKey string         `json:"model_storage_key,omitempty"`
-	ModelMimeType   string         `json:"model_mime_type,omitempty"`
-	SymbolFileID    string         `json:"symbol_file_id,omitempty"`
-	FootprintFileID string         `json:"footprint_file_id,omitempty"`
-	Metadata        map[string]any `json:"metadata,omitempty"`
+	Version         int                `json:"version"`
+	Name            string             `json:"name"`
+	Description     string             `json:"description,omitempty"`
+	Category        string             `json:"category,omitempty"`
+	Manufacturer    string             `json:"manufacturer,omitempty"`
+	MPN             string             `json:"mpn,omitempty"`
+	Value           string             `json:"value,omitempty"`
+	DatasheetURL    string             `json:"datasheet_url,omitempty"`
+	Distributors    []partDist         `json:"distributors"`
+	ModelStorageKey string             `json:"model_storage_key,omitempty"`
+	ModelMimeType   string             `json:"model_mime_type,omitempty"`
+	SymbolFileID    string             `json:"symbol_file_id,omitempty"`
+	FootprintFileID string             `json:"footprint_file_id,omitempty"`
+	Metadata        map[string]any     `json:"metadata,omitempty"`
+	DefaultConfig   string             `json:"default_config,omitempty"`
+	Configurations  []partConfiguration `json:"configurations,omitempty"`
+}
+
+// partConfiguration mirrors the configurations / variants entry shape on a
+// Part's JSON content. The BOM aggregator looks up labels by id when
+// rolling up rows — `params` are unused server-side (the runner consumes
+// them) but parsed so future tools can surface them.
+type partConfiguration struct {
+	ID     string         `json:"id"`
+	Label  string         `json:"label,omitempty"`
+	Params map[string]any `json:"params,omitempty"`
 }
 
 func parsePartContent(s string) partDoc {

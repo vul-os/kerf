@@ -79,14 +79,15 @@ refresh_tokens(id uuid pk, user_id uuid fk, token_hash text unique,
 
 projects(id uuid pk, owner_id uuid fk users, name text, description text,
          visibility text check in ('private','unlisted','public') default 'private',
-         project_type text check in ('mechanical','electronics','architecture') default 'mechanical',
+         tags text[] not null default '{}',
          created_at, updated_at)
--- project_type gates which renderer loads, which LLM-prompt addendum is
--- emitted, and which file kinds the FileTree's "+ New" dropdown surfaces.
--- See "Project types" below for the per-type table; v1 is permissive on the
--- API surface (any kind may be created in any project — the menu just
--- hides non-default kinds), so cross-domain edge cases (a quick mechanical
--- bracket inside an electronics project) don't 400.
+-- tags are free-form labels (e.g. ['mechanical','electronics','jewelry']) that
+-- power the Workshop filter chip strip, the project-card badges, and the
+-- LLM prompt addendum. No whitelist; a curated preset list lives in
+-- src/lib/projectTags.js (mirrored as LLM hints in
+-- backend/internal/llm/llm.go).  GIN-indexed for fast `@>` array-contains
+-- queries. See "Project tags" below; the previous project_type enum was
+-- dropped in migration 1746577500000.
 
 project_members(project_id uuid fk, user_id uuid fk,
                 role text check in ('owner','editor','viewer'),
@@ -171,17 +172,13 @@ schema_migrations(version text pk, applied_at timestamptz default now())
 - `GET /api/me` → `User`
 
 ### Projects
-- `GET    /api/projects` → `Project[]` (anything I own or am a member of)
-- `POST   /api/projects` `{name, description?, project_type?}` → `Project`
-  - `project_type` defaults to `'mechanical'` if omitted (forward-compat for
-    older clients). Validated against the small enum
-    (`mechanical`/`electronics`/`architecture`).
-  - The starter file is type-aware: `mechanical`/`architecture` →
-    seed `main.jscad`; `electronics` → seed `main.circuit.tsx`.
-- `GET    /api/projects/:id` → `Project` (includes `my_role`, `project_type`)
-- `PATCH  /api/projects/:id` `{name?, description?, visibility?, project_type?}` → `Project`
-  - `project_type` is patchable so a misclassified project can be fixed
-    after creation (rare; mostly create-time).
+- `GET    /api/projects` → `Project[]` (anything I own or am a member of). Optional repeatable `?tag=<value>` filter, ANDed across all supplied values; `?workspace_id=` / `?workspace_slug=` scope to one workspace.
+- `POST   /api/projects` `{workspace_id, name, description?, tags?, starter?}` → `Project`
+  - `tags` is a free-form string array (default `[]`). Server trims whitespace, drops empties, dedupes (order-stable).
+  - `starter` is `"jscad"` | `"circuit"` | `"blank"`; defaults to `"jscad"`. Drives the seed file: jscad → `main.jscad`, circuit → `main.circuit.tsx`, blank → no seed file inserted.
+- `GET    /api/projects/:id` → `Project` (includes `my_role`, `tags`)
+- `PATCH  /api/projects/:id` `{name?, description?, visibility?, tags?, workspace_id?}` → `Project`
+  - `tags` is a full replacement when provided; pass `[]` to clear.
 - `DELETE /api/projects/:id` → 204 (owner only)
 
 ### Files
@@ -298,8 +295,8 @@ Incomplete sessions auto-expire after `[limits].upload_session_ttl_hours`
 User    = {id, email, name, avatar_url, account_role, is_system, created_at}
 // account_role is the global role on the platform: 'user' | 'admin' | 'system'.
 // is_system is true only for the seeded system account.
-Project = {id, owner_id, name, description, visibility,
-           project_type: 'mechanical'|'electronics'|'architecture',
+Project = {id, workspace_id, name, description, visibility,
+           tags: string[],            // free-form, e.g. ["mechanical","jewelry"]
            my_role: 'owner'|'editor'|'viewer', created_at, updated_at}
 File    = {id, project_id, parent_id, name, kind: 'file'|'folder'|'assembly'|'step'|'drawing'|'sketch'|'part'|'feature'|'circuit',
            content?, storage_key?, mime_type?, size?, download_url?,
@@ -323,49 +320,60 @@ Member  = {user_id, project_id, role, user: User, created_at}
 ShareLink = {id, project_id, token?, role, expires_at, revoked_at, max_uses, uses, created_at}
 ```
 
-## Project types
+## Project tags
 
-A `project_type` enum on the project row is the seam for taking Kerf
-beyond mechanical CAD (electronics via tscircuit, architecture).
-The chat / files / revisions plumbing stays shared; the type gates
-which renderer loads, which LLM-prompt addendum is emitted, and which
-file kinds the FileTree's "+ New" menu surfaces.
+Projects carry a `tags TEXT[]` column (a GIN index, no whitelist) that
+replaces the previous single `project_type` enum. Real projects are
+multi-domain (a drone is mechanical + electronics + drawings; jewelry
+overlaps with surfacing) and a single label lied about that. The chat /
+files / revisions / renderer plumbing stays shared and is fully
+unconditional on tags — tags drive UI hints (Workshop filter chip strip,
+LLM prompt addendum, project-card badges) and nothing else.
 
-| Type | Native file kinds (UI menu) | Default starter file | Renderer |
-|---|---|---|---|
-| **mechanical** *(default)* | `file`, `folder`, `sketch`, `assembly`, `drawing`, `feature`, `part` | `main.jscad` | Three.js 3D + 2D drawing canvas |
-| **electronics** | `folder`, `circuit`, `part`, `drawing` | `main.circuit.tsx` | tscircuit schematic + PCB + 3D-board |
-| **architecture** *(WIP stub)* | `file`, `folder`, `sketch`, `drawing` | `main.jscad` | Mechanical surface for now |
+The frontend ships a curated preset list in `src/lib/projectTags.js`
+that the create dialog and Workshop filter both consume so the UX stays
+consistent: **Mechanical**, **Electronics**, **Architecture**,
+**Jewelry**, **PCB**, **Robotics**, **Drone**, **Lighting**. Each preset
+defines an icon, a chip color, a suggested starter file, and a
+suggested kinds list. Free-text tags are accepted everywhere — the
+preset list is purely cosmetic.
 
-**Permissive vs strict file-kind enforcement.** v1 ships **permissive**:
-the backend's `CreateFile` accepts any kind in any project, and the only
-type-aware gate is the FileTree's create-dropdown filter. Rationale:
-strict gates would surprise users dropping a quick mechanical bracket
-into an electronics project (or vice versa) — the cross-domain case is
-rare but real, especially for the upcoming "PCB-as-part in mechanical
-assembly" feature. The single source of truth on the backend lives in
-`backend/internal/handlers/projecttype.go` (`ProjectTypeKinds` map +
-`KindAllowedFor` helper, currently unused by handlers but ready when we
-flip strict mode on); on the frontend it lives in
-`src/lib/projectTypes.js` (mirrored constant). Adding a fifth type later
-is a CHECK-constraint update + map entry on each side — no data
-migration.
+**Permissive file-kind model.** The backend's `CreateFile` accepts any
+kind in any project. There is no tag-aware gate — a project tagged
+"mechanical" can hold a `.circuit.tsx`, a project tagged "electronics"
+can hold a quick mechanical bracket, and the FileTree's "+ New" menu
+shows the full union of kinds. Suggested kinds per tag exist only as an
+LLM-prompt hint.
+
+**Starter file is an explicit pick.** The create body now carries a
+`starter` field: `"jscad"` (default → `main.jscad`), `"circuit"`
+(→ `main.circuit.tsx`), or `"blank"` (no seed file). The single source
+of truth on the backend lives in
+`backend/internal/handlers/starter.go` (`StarterFor` switch); on the
+frontend it lives in `src/lib/projectTags.js` (`STARTER_OPTIONS`). Tag
+selection in the create dialog *suggests* a starter (e.g. picking the
+"electronics" chip nudges the dropdown to `circuit`) but the user can
+override before submitting.
 
 **LLM addendum.** The agent loop in
-`backend/internal/handlers/messages.go` reads the project's
-`project_type` once per request and prepends a single line to the system
-prompt:
+`backend/internal/handlers/messages.go` reads the project's `tags`
+array once per request and prepends a single line to the system prompt:
 
-> Project type: `<type>`. Native file kinds: `<comma-list>`. Default starter file: `<name>`.
+> Project tags: `<comma-list>`. Suggested file kinds: `<comma-list>`.
 
 Tiny on the wire (~30-40 tokens) so we re-emit it on every call rather
-than caching at thread level — keeps thread switches and project-type
-patches trivially correct.
+than caching at thread level — keeps thread switches and tag patches
+trivially correct. Tag-to-kinds suggestions live in
+`backend/internal/llm/llm.go` (`tagKindHints`) and roughly mirror the
+frontend preset list.
 
-**Workshop multi-type.** The cloud Workshop carries `project_type`
-through on listings and accepts a `?type=` filter (`mechanical`,
-`electronics`, `architecture`, or omitted for "all"). Forks
-preserve the source project's type. See `### Workshop` below.
+**Workshop tag filter.** The cloud Workshop carries the source
+project's `tags` array on every listing and accepts a repeatable
+`?tag=` query param. Multiple tags are ANDed (`p.tags @> $::text[]`) so
+`?tag=mechanical&tag=jewelry` returns only listings carrying both. The
+UI is a multi-select chip strip backed by URL params, so deep links
+restore the same filter set. Forks preserve the source project's tags.
+See `### Workshop` below.
 
 ## JSCAD file convention
 
@@ -707,6 +715,6 @@ Object keys are namespaced: `projects/<project_id>/assets/<uuid>-<filename>`.
 - **Backend agent** owns: `backend/**`
 - **CAD workspace agent** owns: `src/routes/Editor.jsx`, `src/components/{Renderer,CodeEditor,ChatPanel,FileTree,PartChip,ShareModal}.jsx`, `src/lib/{jscadRunner,geom3}.js`, `src/store/workspace.js`
 - **Pages agent** owns: `src/routes/{Landing,Login,Signup,Projects}.jsx`, `src/components/{Layout,Header,Button,Input,Card}.jsx`
-- **Branding agent** owns: `public/favicon.svg`, `src/components/Logo.jsx`, `src/styles/brand.css`
+- **Branding agent** owns: `public/favicon.svg`, `public/og-image.svg`, `src/components/Logo.jsx`, `src/styles/brand.css`. Rasterised icons + social-preview cards (`favicon-{16,32,48}.png`, `favicon.ico`, `apple-touch-icon.png`, `icon-{192,512,maskable}.png`, `og-image.png`, `twitter-card.png`) are generated from the source SVGs by `scripts/build-icons.mjs` — run `npm run build:icons` after editing the brand mark and commit the regenerated PNGs. The PWA manifest (`public/manifest.webmanifest`), `public/robots.txt`, and `public/sitemap.xml` live alongside.
 
 Shared (do not modify): `src/main.jsx`, `src/App.jsx`, `src/lib/api.js`, `src/store/auth.js`, `src/index.css`, `src/routes/{ProtectedRoute,AuthCallback}.jsx`, `vite.config.js`, `package.json`, `.env*`.

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Share2, Save, Loader2, ArrowLeft, Check, History, X, RotateCcw, Undo2, Redo2, GitBranch, Clock, MessageSquare, PanelRightClose, PanelRightOpen } from 'lucide-react'
+import { Share2, Save, Loader2, ArrowLeft, Check, History, X, RotateCcw, Undo2, Redo2, GitBranch, Clock, MessageSquare, PanelRightClose, PanelRightOpen, Plus, Box, SlidersHorizontal } from 'lucide-react'
 import { LogoWordmark } from '../components/Logo.jsx'
 import FileTree from '../components/FileTree.jsx'
 import Renderer from '../components/Renderer.jsx'
@@ -9,7 +9,6 @@ import ChatPanel from '../components/ChatPanel.jsx'
 import ShareModal from '../components/ShareModal.jsx'
 import ObjectsPanel from '../components/ObjectsPanel.jsx'
 import CircuitComponentsPanel from '../components/CircuitComponentsPanel.jsx'
-import FeaturePanel from '../components/FeaturePanel.jsx'
 import ExportButton from '../components/ExportButton.jsx'
 import MeasureToolbar from '../components/MeasureToolbar.jsx'
 import FeatureInspector from '../components/FeatureInspector.jsx'
@@ -21,6 +20,8 @@ import SketchView from '../components/SketchView.jsx'
 import FeatureView from '../components/FeatureView.jsx'
 import CircuitEditor from '../components/CircuitEditor.jsx'
 import LibraryEditor from '../components/LibraryEditor.jsx'
+import EquationsEditor from '../components/EquationsEditor.jsx'
+import ConfigurationsPanel from '../components/ConfigurationsPanel.jsx'
 import ActivityTimeline from '../components/ActivityTimeline.jsx'
 import { useWorkspace, loadFilePartsForProject } from '../store/workspace.js'
 import { useAuth } from '../store/auth.js'
@@ -101,6 +102,13 @@ function isPartFile(file) {
   return n.endsWith('.part')
 }
 
+function isEquationsFile(file) {
+  if (!file) return false
+  if (file.kind === 'equations') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.equations')
+}
+
 export default function Editor() {
   const { projectId, fileId } = useParams()
   const navigate = useNavigate()
@@ -141,6 +149,7 @@ export default function Editor() {
     if (isFeatureFile(w.currentFile)) return
     if (isCircuitFile(w.currentFile)) return
     if (isPartFile(w.currentFile)) return
+    if (isEquationsFile(w.currentFile)) return
     if (runTimerRef.current) clearTimeout(runTimerRef.current)
     const code = w.currentFileContent
     const delay = runDebounceFor(code)
@@ -408,6 +417,7 @@ export default function Editor() {
   const featureFile = isFeatureFile(w.currentFile)
   const circuitFile = isCircuitFile(w.currentFile)
   const partFile = isPartFile(w.currentFile)
+  const equationsFile = isEquationsFile(w.currentFile)
   // Resolver used by FeatureView to fetch sketch contents on demand. We
   // re-read the latest file content rather than relying on the cached
   // sketch parse from the workspace store (which may be stale if the user
@@ -444,6 +454,72 @@ export default function Editor() {
     [projectId]
   )
 
+  // Configurations / variants — derive the configuration list for the
+  // open file from the relevant parsed-* slot in the workspace store. The
+  // dropdown is hidden whenever the list is empty. Toggle the
+  // ConfigurationsPanel (per-row editor) via a local UI flag.
+  const fileConfigurations = useMemo(() => {
+    if (partFile && w.currentPart) {
+      return {
+        list: Array.isArray(w.currentPart.configurations) ? w.currentPart.configurations : [],
+        defaultId: w.currentPart.default_config || '',
+      }
+    }
+    if (featureFile && w.currentFeature) {
+      return {
+        list: Array.isArray(w.currentFeature.configurations) ? w.currentFeature.configurations : [],
+        defaultId: w.currentFeature.default_config || '',
+      }
+    }
+    if (sketchFile && w.parsedSketch) {
+      return {
+        list: Array.isArray(w.parsedSketch.configurations) ? w.parsedSketch.configurations : [],
+        defaultId: w.parsedSketch.default_config || '',
+      }
+    }
+    return { list: [], defaultId: '' }
+  }, [partFile, featureFile, sketchFile, w.currentPart, w.currentFeature, w.parsedSketch])
+
+  // Resolve the picked-or-default config id for the open file.
+  const activeConfigId = useMemo(() => {
+    if (!w.currentFileId) return ''
+    const picked = w.currentConfigByFile?.[w.currentFileId] || ''
+    if (picked && fileConfigurations.list.find((c) => c.id === picked)) return picked
+    if (fileConfigurations.defaultId
+      && fileConfigurations.list.find((c) => c.id === fileConfigurations.defaultId)) {
+      return fileConfigurations.defaultId
+    }
+    return fileConfigurations.list[0]?.id || ''
+  }, [w.currentFileId, w.currentConfigByFile, fileConfigurations])
+
+  const [configsPanelOpen, setConfigsPanelOpen] = useState(false)
+  const showConfigsHeader = (partFile || featureFile || sketchFile)
+
+  // Helper: persist edits to the configurations array back into the open
+  // file's content, via the same per-kind update path the editor uses for
+  // direct field tweaks. The host slots already serialize on save.
+  const handleConfigurationsChange = useCallback((next) => {
+    if (partFile) {
+      w.updatePart({
+        configurations: next.configurations,
+        default_config: next.default_config,
+      })
+    } else if (featureFile) {
+      w.updateFeature((tree) => ({
+        ...tree,
+        configurations: next.configurations,
+        default_config: next.default_config,
+      }))
+    } else if (sketchFile) {
+      w.updateSketch((sk) => ({
+        ...sk,
+        configurations: next.configurations,
+        default_config: next.default_config,
+      }))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [partFile, featureFile, sketchFile])
+
   // Drawing-only state: per-source topologies (computed lazily once per
   // source's parts) + the active dimension tool + the SVG ref for export.
   const [drawingTool, setDrawingTool] = useState('pointer')
@@ -469,7 +545,15 @@ export default function Editor() {
         >
           <ArrowLeft size={15} />
         </button>
-        <LogoWordmark />
+        <button
+          type="button"
+          onClick={() => navigate('/')}
+          className="flex items-center hover:opacity-80 transition-opacity"
+          title="Kerf home"
+          aria-label="Kerf home"
+        >
+          <LogoWordmark />
+        </button>
         <span className="text-ink-700">/</span>
         {editingName ? (
           <input
@@ -607,55 +691,97 @@ export default function Editor() {
             title="Drag to resize"
           />
           <div style={{ height: `${100 - leftSplitPct}%` }} className="min-h-0 flex flex-col">
-            {/* Tabs: Objects (always) + Features (JSCAD files only). The
-                Features tab is the FreeCAD PartDesign-style panel — sketch →
-                3D feature, no hand-written JSCAD required. */}
-            {(() => {
-              // Features panel applies to JSCAD files (it generates JSCAD code from
-              // sketches). Excluded for STEP / assembly / drawing / sketch / circuit
-              // / folder, AND for .feature files — those have their own dedicated
-              // feature timeline at the top of FeatureView, so a parallel panel here
-              // would be redundant.
-              const showFeatures = !stepFile && !assemblyFile && !drawingFile && !sketchFile
-                && !circuitFile && !featureFile
-                && w.currentFile && w.currentFile.kind !== 'folder'
-              return circuitFile ? (
-                <CircuitComponentsPanel
-                  selectedRefdes={w.selectedCircuitRefdes}
-                  selectedNet={w.selectedCircuitNet}
-                  onSelectRefdes={(r) => w.selectCircuitRefdes(r)}
-                  onSelectNet={(n) => w.selectCircuitNet(n)}
+            {circuitFile ? (
+              <CircuitComponentsPanel
+                selectedRefdes={w.selectedCircuitRefdes}
+                selectedNet={w.selectedCircuitNet}
+                onSelectRefdes={(r) => w.selectCircuitRefdes(r)}
+                onSelectNet={(n) => w.selectCircuitNet(n)}
+              />
+            ) : (
+              <div className="flex-1 min-h-0">
+                <ObjectsPanel
+                  parts={w.parts}
+                  hiddenIds={hiddenIds}
+                  selectedId={w.pickedPart?.part_id}
+                  onToggleVisibility={(id) => w.togglePartVisibility(w.currentFileId, id)}
+                  onSelect={(id) => w.pickPart(id)}
+                  onIsolate={(id) => w.isolatePart(w.currentFileId, id)}
+                  onShowAll={() => w.showAllParts(w.currentFileId)}
+                  onRecolorPart={(id, rgb) => w.recolorPart(id, rgb)}
+                  onMovePart={(id, d) => w.movePart(id, d)}
+                  onSetPartPosition={(id, p) => w.setPartPosition(id, p)}
+                  isStepFile={stepFile}
                 />
-              ) : (
-                <div className="flex-1 min-h-0 flex flex-col">
-                  {showFeatures && (
-                    <div className="flex-shrink-0 max-h-[45%] min-h-0 border-b border-ink-800 flex flex-col">
-                      <FeaturePanel files={w.files} parts={w.parts} />
-                    </div>
-                  )}
-                  <div className="flex-1 min-h-0">
-                    <ObjectsPanel
-                      parts={w.parts}
-                      hiddenIds={hiddenIds}
-                      selectedId={w.pickedPart?.part_id}
-                      onToggleVisibility={(id) => w.togglePartVisibility(w.currentFileId, id)}
-                      onSelect={(id) => w.pickPart(id)}
-                      onIsolate={(id) => w.isolatePart(w.currentFileId, id)}
-                      onShowAll={() => w.showAllParts(w.currentFileId)}
-                      onRecolorPart={(id, rgb) => w.recolorPart(id, rgb)}
-                      onMovePart={(id, d) => w.movePart(id, d)}
-                      onSetPartPosition={(id, p) => w.setPartPosition(id, p)}
-                      isStepFile={stepFile}
-                    />
-                  </div>
-                </div>
-              )
-            })()}
+              </div>
+            )}
           </div>
         </aside>
 
         {/* Center: renderer + editor (or full-bleed DrawingView/SketchView for special kinds) */}
         <main id="editor-center" className="flex flex-col min-w-0 min-h-0 relative">
+          {/* Configurations / variants — small chrome above the editor that
+              picks the active config for the open file. Only rendered for
+              file kinds that support configurations (Part / Feature /
+              Sketch). The "Configure variants" button toggles the
+              ConfigurationsPanel slide-out. */}
+          {showConfigsHeader && (fileConfigurations.list.length > 0 || configsPanelOpen) && (
+            <div className="flex items-center gap-2 border-b border-ink-800 bg-ink-900/40 px-3 py-1.5 text-[11px]">
+              {fileConfigurations.list.length > 0 ? (
+                <>
+                  <span className="text-ink-500 uppercase tracking-wider text-[9px]">Config</span>
+                  <select
+                    value={activeConfigId}
+                    onChange={(e) => w.setCurrentConfig(w.currentFileId, e.target.value)}
+                    className="bg-ink-950 border border-ink-800 rounded px-2 py-1 text-[11px] text-ink-100 outline-none focus:border-kerf-300/60"
+                  >
+                    {fileConfigurations.list.map((cfg) => (
+                      <option key={cfg.id} value={cfg.id}>
+                        {cfg.label}{cfg.id === fileConfigurations.defaultId ? '  ★' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              ) : (
+                <span className="text-ink-500 italic">No configurations defined.</span>
+              )}
+              <div className="flex-1" />
+              <button
+                type="button"
+                onClick={() => setConfigsPanelOpen((v) => !v)}
+                className={`inline-flex items-center gap-1.5 px-2 py-1 rounded border text-[10px] ${
+                  configsPanelOpen
+                    ? 'bg-kerf-300/10 border-kerf-300/60 text-kerf-300'
+                    : 'bg-ink-900 border-ink-800 text-ink-300 hover:text-kerf-300 hover:border-kerf-300/40'
+                }`}
+                title="Edit configurations"
+              >
+                <SlidersHorizontal size={11} />
+                Configure variants
+              </button>
+            </div>
+          )}
+          {showConfigsHeader && fileConfigurations.list.length === 0 && !configsPanelOpen && (
+            <div className="flex items-center justify-end border-b border-ink-800 bg-ink-900/40 px-3 py-1 text-[10px]">
+              <button
+                type="button"
+                onClick={() => setConfigsPanelOpen(true)}
+                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-ink-500 hover:text-kerf-300"
+                title="Add per-file parameter overrides"
+              >
+                <SlidersHorizontal size={10} />
+                Add variants
+              </button>
+            </div>
+          )}
+          {configsPanelOpen && showConfigsHeader && (
+            <ConfigurationsPanel
+              configurations={fileConfigurations.list}
+              defaultConfig={fileConfigurations.defaultId}
+              onChange={handleConfigurationsChange}
+              onClose={() => setConfigsPanelOpen(false)}
+            />
+          )}
           {partFile ? (
             <div className="flex-1 min-h-0 relative">
               <LibraryEditor />
@@ -666,19 +792,42 @@ export default function Editor() {
                 </div>
               )}
             </div>
-          ) : sketchFile && w.parsedSketch ? (
+          ) : equationsFile ? (
             <div className="flex-1 min-h-0 relative">
-              <SketchView
-                sketch={w.parsedSketch}
-                files={w.files}
-                onChange={(next) => w.updateSketch(() => next)}
-                onSolved={(next, status, dof, conflicts) =>
-                  w.setSketchSolved(next, status, dof, conflicts)}
-                status={w.sketchStatus}
-                dofCount={w.sketchDof}
-                conflicts={w.sketchConflicts}
-                loadParts={sketchLoadParts}
-              />
+              <EquationsEditor />
+              {w.toast && (
+                <div className="absolute bottom-3 right-3 z-20 px-3 py-2 rounded-md bg-ink-900 border border-kerf-300/60 text-kerf-300 text-xs shadow-xl"
+                  onClick={() => w.dismissToast()}>
+                  {w.toast}
+                </div>
+              )}
+            </div>
+          ) : sketchFile && w.parsedSketch ? (
+            <div className="flex-1 min-h-0 relative flex flex-col">
+              <div className="flex items-center gap-2 border-b border-ink-800 bg-ink-900/40 px-3 py-1.5">
+                <button
+                  type="button"
+                  onClick={() => w.createFeatureFromSketch(w.currentFileId)}
+                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-kerf-300/10 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/20 text-xs"
+                >
+                  <Plus size={11} />
+                  <Box size={11} />
+                  New feature from sketch
+                </button>
+              </div>
+              <div className="flex-1 min-h-0 relative">
+                <SketchView
+                  sketch={w.parsedSketch}
+                  files={w.files}
+                  onChange={(next) => w.updateSketch(() => next)}
+                  onSolved={(next, status, dof, conflicts) =>
+                    w.setSketchSolved(next, status, dof, conflicts)}
+                  status={w.sketchStatus}
+                  dofCount={w.sketchDof}
+                  conflicts={w.sketchConflicts}
+                  loadParts={sketchLoadParts}
+                />
+              </div>
               {w.toast && (
                 <div className="absolute bottom-3 right-3 z-20 px-3 py-2 rounded-md bg-ink-900 border border-kerf-300/60 text-kerf-300 text-xs shadow-xl"
                   onClick={() => w.dismissToast()}>

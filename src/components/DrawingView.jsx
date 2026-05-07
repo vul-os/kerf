@@ -65,6 +65,22 @@ function isSnappingTool(t) {
     || SYMBOL_TOOLS.has(t)
 }
 
+// localStorage key for the snap toggle. Mirrored from DrawingToolbar — both
+// components read/write this key directly and broadcast a custom event so
+// they stay in sync without prop-drilling through Editor.jsx.
+const SNAP_LS_KEY = 'kerf:drawing:snap'
+
+function readSnapEnabled() {
+  if (typeof window === 'undefined') return true
+  try {
+    const v = window.localStorage.getItem(SNAP_LS_KEY)
+    if (v === null) return true
+    return v === '1' || v === 'true'
+  } catch {
+    return true
+  }
+}
+
 const DrawingView = forwardRef(function DrawingView({
   drawing,
   partsByFileId,
@@ -172,6 +188,21 @@ const DrawingView = forwardRef(function DrawingView({
   // Cursor readout state. Updated on every mousemove inside the SVG.
   // Hidden when the user leaves the SVG entirely.
   const [hudPos, setHudPos] = useState(null) // {x, y} in page mm
+
+  // Snap-enabled state — mirrored from localStorage (`kerf:drawing:snap`).
+  // The DrawingToolbar writes this key and dispatches a custom event we
+  // listen for here so the canvas updates in the same tick without any
+  // prop wiring through Editor.jsx.
+  const [snapEnabled, setSnapEnabled] = useState(readSnapEnabled)
+  useEffect(() => {
+    function onChanged() { setSnapEnabled(readSnapEnabled()) }
+    window.addEventListener('kerf:drawing-snap-changed', onChanged)
+    window.addEventListener('storage', onChanged)
+    return () => {
+      window.removeEventListener('kerf:drawing-snap-changed', onChanged)
+      window.removeEventListener('storage', onChanged)
+    }
+  }, [])
 
   useEffect(() => {
     function down(e) {
@@ -446,20 +477,21 @@ const DrawingView = forwardRef(function DrawingView({
 
   // Helper: snap-and-find-view in one go (used by every click handler).
   // `altKey=true` (or holding Alt during the click) disables snapping for
-  // that pick, returning the raw page-mm position with kind='free'.
+  // that pick, returning the raw page-mm position with kind='free'. Snap is
+  // also disabled globally when the toolbar toggle is off.
   // Snapping runs even when the cursor isn't strictly inside a view's
   // bbox so origin snaps and near-edge snaps still work.
   const snapAt = useCallback((cx, cy, altKey = false) => {
     const [px, py] = clientToMm(cx, cy)
     const view = findViewAt(px, py)
-    if (isSnappingTool(tool) && !altKey) {
+    if (isSnappingTool(tool) && !altKey && snapEnabled) {
       const snap = findSnap(px, py, view)
       if (snap && snap.kind && snap.kind !== 'free') {
         return { ...snap, viewId: snap.viewId || view?.id || null, page: [px, py] }
       }
     }
     return { viewId: view?.id || null, x: px, y: py, kind: 'free', page: [px, py] }
-  }, [clientToMm, findViewAt, findSnap, tool])
+  }, [clientToMm, findViewAt, findSnap, tool, snapEnabled])
 
   // Click handler — dispatches based on the active tool.
   const onSvgClick = useCallback((e) => {
@@ -776,8 +808,9 @@ const DrawingView = forwardRef(function DrawingView({
     setHudPos({ x: px, y: py })
     if (panRef.current.active) return
 
-    // Live snap indicator (only for tools that snap; Alt disables snapping).
-    if (isSnappingTool(tool) && !e.altKey) {
+    // Live snap indicator (only for tools that snap; Alt or the toolbar
+    // toggle disables snapping).
+    if (isSnappingTool(tool) && !e.altKey && snapEnabled) {
       const view = findViewAt(px, py)
       const snap = findSnap(px, py, view)
       // Only show a marker when an actual hard feature was hit — kind='free'
@@ -809,7 +842,7 @@ const DrawingView = forwardRef(function DrawingView({
       }
       if (patch) onUpdateAnnotation?.(ann.id, patch)
     }
-  }, [tool, clientToMm, findViewAt, findSnap, onPointerMove, annDraft, onUpdateAnnotation, setAnnDraft])
+  }, [tool, clientToMm, findViewAt, findSnap, onPointerMove, annDraft, onUpdateAnnotation, setAnnDraft, snapEnabled])
 
   const onSvgMouseLeave = useCallback((e) => {
     onPointerUp(e)
@@ -1302,6 +1335,16 @@ function ViewGroup({ view, projection }) {
         </g>
       )}
       {projection.polylines.map((pl, i) => {
+        // BUG FIX (drawing snap + projection visibility):
+        // Per-view `show_hidden` flag — toggled from DrawingPropertiesPanel —
+        // was stored on the view object and surfaced as an Eye/EyeOff button
+        // but the renderer never read it, so clicking the icon did nothing
+        // visually. Skip 'hidden' polylines when the view opts out. We also
+        // honour `show_silhouette` (already on the model with no consumer)
+        // for symmetry. `show_hidden`/`show_silhouette` default to true when
+        // undefined so existing drawings render unchanged.
+        if (pl.kind === 'hidden' && view.show_hidden === false) return null
+        if (pl.kind === 'silhouette' && view.show_silhouette === false) return null
         const stroke = pl.kind === 'hidden' ? HIDDEN_STROKE
           : pl.kind === 'silhouette' ? SILHOUETTE_STROKE
           : VISIBLE_STROKE

@@ -112,15 +112,18 @@ export function getPricing() {
 // the bearer token whenever it's present.
 
 export const workshop = {
-  // GET /api/workshop/?page=&sort=&type=
-  // `type` is the optional project_type filter ('mechanical' / 'electronics'
-  // / 'architecture'). Omit (or pass falsy) for the unfiltered
-  // "All" view. The backend validates against the same small enum.
-  list({ page = 1, sort = 'newest', type } = {}) {
+  // GET /api/workshop/?page=&sort=&tag=
+  // `tag` is an optional string or string[] of tag filters; multiple tags
+  // are ANDed server-side. Omit for the unfiltered "All" view. Free-form
+  // (no enum validation) so any tag the user wrote on a project is valid.
+  list({ page = 1, sort = 'newest', tag } = {}) {
     const q = new URLSearchParams()
     if (page) q.set('page', String(page))
     if (sort) q.set('sort', sort)
-    if (type) q.set('type', type)
+    const tags = Array.isArray(tag) ? tag : (tag ? [tag] : [])
+    for (const t of tags) {
+      if (t) q.append('tag', t)
+    }
     return request(`/api/workshop/?${q.toString()}`)
   },
 

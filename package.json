@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "init": "node ./scripts/init-config.mjs",
-    "predev": "node ./scripts/init-config.mjs",
+    "build:docs": "node ./scripts/build-docs-manifest.mjs",
+    "build:icons": "node ./scripts/build-icons.mjs",
+    "predev": "node ./scripts/init-config.mjs && node ./scripts/build-docs-manifest.mjs",
     "dev": "concurrently -n web,api -c cyan,magenta \"npm:dev:web\" \"npm:dev:api\"",
     "dev:web": "vite",
     "dev:api": "cd backend && go run ./cmd/server --config ../kerf.toml",
@@ -16,12 +18,15 @@
     "migrate:cloud": "cd backend && go run -tags=cloud ./cloud/cmd/migrate --config ../kerf.toml",
     "migrate:all": "npm run migrate && npm run migrate:cloud",
     "build": "npm run build:web && npm run build:api",
+    "prebuild:web": "node ./scripts/build-docs-manifest.mjs",
     "build:web": "vite build",
     "build:api": "cd backend && go build -o ../kerf ./cmd/server",
     "build:cloud": "npm run build:web && cd backend && go build -tags=cloud -o ../kerf-cloud ./cmd/server",
     "start": "./kerf --config ./kerf.toml",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@jscad/modeling": "^2.12.1",
@@ -35,6 +40,7 @@
     "highlight.js": "^11.11.1",
     "jspdf": "^4.2.1",
     "lucide-react": "^0.468.0",
+    "mathjs": "^15.2.0",
     "occt-import-js": "^0.0.23",
     "opencascade.js": "^1.1.1",
     "react": "^19.2.5",
@@ -61,7 +67,9 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.5.0",
+    "sharp": "^0.34.5",
     "tailwindcss": "^4.0.0",
-    "vite": "^8.0.10"
+    "vite": "^8.0.10",
+    "vitest": "^4.1.5"
   }
 }

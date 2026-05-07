@@ -95,16 +95,72 @@ export const api = {
     }
   },
 
+  // ---- Workspaces ----
+  listWorkspaces: () => request('/api/workspaces'),
+  getWorkspace: (slug) => request(`/api/workspaces/${encodeURIComponent(slug)}`),
+  createWorkspace: (body) => request('/api/workspaces', { method: 'POST', body }),
+  updateWorkspace: (slug, patch) =>
+    request(`/api/workspaces/${encodeURIComponent(slug)}`, { method: 'PATCH', body: patch }),
+  deleteWorkspace: (slug) =>
+    request(`/api/workspaces/${encodeURIComponent(slug)}`, { method: 'DELETE' }),
+  inviteWorkspaceMember: (slug, email, role) =>
+    request(`/api/workspaces/${encodeURIComponent(slug)}/members`, { method: 'POST', body: { email, role } }),
+  removeWorkspaceMember: (slug, userId) =>
+    request(`/api/workspaces/${encodeURIComponent(slug)}/members/${encodeURIComponent(userId)}`, { method: 'DELETE' }),
+  changeWorkspaceMemberRole: (slug, userId, role) =>
+    request(`/api/workspaces/${encodeURIComponent(slug)}/members/${encodeURIComponent(userId)}`, { method: 'PATCH', body: { role } }),
+  uploadWorkspaceAvatar: async (slug, blob) => {
+    const fd = new FormData()
+    const name = (blob && blob.name) || 'avatar.png'
+    fd.append('file', blob, name)
+    const url = `${API_URL}/api/workspaces/${encodeURIComponent(slug)}/avatar`
+    const token = useAuth.getState().accessToken
+    const headers = {}
+    if (token) headers.authorization = `Bearer ${token}`
+    let res = await fetch(url, { method: 'POST', headers, body: fd })
+    if (res.status === 401 && useAuth.getState().refreshToken) {
+      try {
+        const newToken = await refreshAccessToken()
+        headers.authorization = `Bearer ${newToken}`
+        res = await fetch(url, { method: 'POST', headers, body: fd })
+      } catch { /* fall through */ }
+    }
+    if (!res.ok) {
+      const text = await res.text()
+      let msg = text
+      try { msg = JSON.parse(text).error || text } catch { /* ignore */ }
+      throw new ApiError(res.status, msg || res.statusText)
+    }
+    return res.json()
+  },
+  deleteWorkspaceAvatar: (slug) =>
+    request(`/api/workspaces/${encodeURIComponent(slug)}/avatar`, { method: 'DELETE' }),
+
   // ---- Projects ----
-  listProjects: () => request('/api/projects'),
-  // createProject accepts an optional project_type ('mechanical' /
-  // 'electronics' / 'architecture'). Old call-sites that pass
-  // (name, description) still work — the backend defaults to 'mechanical'
-  // when project_type is omitted. New call-sites pass an options object
-  // for clarity; we accept both shapes.
-  createProject: (name, description, projectType) => {
-    const body = { name, description }
-    if (projectType) body.project_type = projectType
+  // listProjects(workspaceId, { tag })
+  // - workspaceId: optional. When set, scopes the listing to that workspace.
+  // - tag: optional string or string[] of tag filters; multiple tags are
+  //   ANDed server-side (every tag must be present on the row).
+  listProjects: (workspaceId, opts = {}) => {
+    const q = new URLSearchParams()
+    if (workspaceId) q.set('workspace_id', workspaceId)
+    const tags = Array.isArray(opts.tag) ? opts.tag : (opts.tag ? [opts.tag] : [])
+    for (const t of tags) {
+      if (t) q.append('tag', t)
+    }
+    const qs = q.toString()
+    return request(`/api/projects${qs ? `?${qs}` : ''}`)
+  },
+  // createProject — body is `{ workspace_id, name, description, tags?, starter? }`.
+  // - tags: array of free-form strings; the backend trims+dedupes.
+  // - starter: "jscad" | "circuit" | "blank"; defaults to "jscad" server-side.
+  // Old (name, description) positional shape is still accepted for
+  // back-compat — the workspace store fills workspace_id when it's missing.
+  createProject: (nameOrBody, description) => {
+    if (nameOrBody && typeof nameOrBody === 'object') {
+      return request('/api/projects', { method: 'POST', body: nameOrBody })
+    }
+    const body = { name: nameOrBody, description }
     return request('/api/projects', { method: 'POST', body })
   },
   getProject: (id) => request(`/api/projects/${id}`),

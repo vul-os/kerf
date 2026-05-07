@@ -46,6 +46,11 @@ var allScenarios = []scenarioDef{
 	{Name: "activity", Opts: runner.BootOptions{}, Run: scenarios.Activity},
 	{Name: "avatars", Opts: runner.BootOptions{}, Run: scenarios.Avatars},
 	{Name: "bootstrap", Opts: runner.BootOptions{}, Run: scenarios.Bootstrap},
+	{Name: "workspaces", Opts: runner.BootOptions{}, Run: scenarios.Workspaces},
+	{Name: "project_tags", Opts: runner.BootOptions{}, Run: scenarios.ProjectTags},
+	{Name: "equations", Opts: runner.BootOptions{}, Run: scenarios.Equations},
+	{Name: "configurations", Opts: runner.BootOptions{}, Run: scenarios.Configurations},
+	{Name: "local_mode", Opts: runner.BootOptions{}, Run: scenarios.LocalMode},
 }
 
 func main() {

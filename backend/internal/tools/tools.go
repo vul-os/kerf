@@ -76,6 +76,14 @@ var Registry = []Tool{
 	{Spec: createPartSpec, Write: true, Run: runCreatePart},
 	{Spec: createCircuitSpec, Write: true, Run: runCreateCircuit},
 
+	// Equations: project-level named parameters.
+	{Spec: readEquationsSpec, Run: runReadEquations},
+	{Spec: setEquationSpec, Write: true, Run: runSetEquation},
+
+	// Configurations: per-file parameter overrides (variants).
+	{Spec: addConfigurationSpec, Write: true, Run: runAddConfiguration},
+	{Spec: setActiveConfigSpec, Write: true, Run: runSetActiveConfig},
+
 	// Authoring docs the LLM searches before editing non-.jscad kinds.
 	{Spec: searchKerfDocsSpec, Run: runSearchKerfDocs},
 

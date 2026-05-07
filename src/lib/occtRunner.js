@@ -24,6 +24,71 @@
 //     { error: 'worker-broken' } — there's no main-thread evaluator for OCCT
 //     (we DON'T want to load the wasm onto the main thread).
 
+import { substituteFeatureTree, substituteSketch } from './equations.js'
+
+// Equations injection hook — see store/workspace.js loadProject for the
+// resolver that walks the project tree, parses every `.equations` file, and
+// returns the merged scope. Mirrors setSketchResolver in jscadRunner.js.
+let equationsResolver = null
+export function setEquationsResolver(fn) {
+  // fn: () => Promise<{ values: { [name]: number }, errors, duplicates }> | null
+  equationsResolver = fn || null
+}
+
+// Active-configuration resolver hook. The workspace store registers a
+// closure that returns the current open feature file's active-config
+// `params` object (or null when the file has no configurations). The
+// resolver is consulted on every runFeatures call so a config switch
+// triggers a fresh substitution + re-evaluation. Decoupled from
+// FeatureView (which we don't touch) so configurations can layer over
+// the existing runner without changing the public API.
+let activeConfigResolver = null
+export function setActiveConfigResolver(fn) {
+  // fn: () => { [name]: number } | null
+  activeConfigResolver = fn || null
+}
+
+// Apply the equations scope to a tree + sketches pair. The substitution is
+// pure JSON-walking so it's safe for arbitrary node shapes — string fields
+// containing `${name}` placeholders get expanded; everything else passes
+// through. Sketches get the same treatment for dimensional constraint values
+// (distance/angle/radius/diameter).
+//
+// `configParams` is the active configuration's per-file param overrides
+// (see src/lib/part.js getActiveConfig). Merged OVER the equations scope
+// so configs always win on key collision. Passing null/empty is a no-op.
+async function applyEquations(tree, sketches, configParams) {
+  let scope = {}
+  if (equationsResolver) {
+    try {
+      const res = await equationsResolver()
+      scope = res?.values || {}
+    } catch {
+      scope = {}
+    }
+  }
+  if (configParams && typeof configParams === 'object') {
+    scope = { ...scope, ...configParams }
+  }
+  if (!scope || Object.keys(scope).length === 0) return { tree, sketches }
+  const subTree = substituteFeatureTree(tree || [], scope)
+  const subSketches = {}
+  for (const [path, raw] of Object.entries(sketches || {})) {
+    if (typeof raw !== 'string' || raw === '') {
+      subSketches[path] = raw
+      continue
+    }
+    try {
+      const obj = JSON.parse(raw)
+      const sub = substituteSketch(obj, scope)
+      subSketches[path] = JSON.stringify(sub)
+    } catch {
+      subSketches[path] = raw
+    }
+  }
+  return { tree: subTree, sketches: subSketches }
+}
+
 let worker = null
 let workerBroken = false
 let nextRunId = 1
@@ -105,16 +170,27 @@ export function prewarmOcct() {
 }
 
 // Run a feature tree. Returns the mesh list or an error envelope.
-export async function runFeatures(tree, sketches) {
+//
+// `configParams` is optional — the active configuration's per-file param
+// overrides. Merged OVER the equations scope before `${name}` substitution.
+// Callers without configurations pass null/undefined; we then consult the
+// registered activeConfigResolver (set by the workspace store on project
+// load) so existing call sites (FeatureView) pick up configs without
+// changing their signature.
+export async function runFeatures(tree, sketches, configParams) {
   const w = ensureWorker()
   if (!w) return { error: 'occt worker unavailable in this environment' }
+  if (configParams == null && activeConfigResolver) {
+    try { configParams = activeConfigResolver() || null } catch { configParams = null }
+  }
+  const { tree: subTree, sketches: subSketches } = await applyEquations(tree || [], sketches || {}, configParams)
   const runId = ++nextRunId
   latestRunId = runId
   const promise = new Promise((resolve) => {
     pending.set(runId, { resolve, kind: 'evaluate' })
   })
   try {
-    w.postMessage({ type: 'evaluate', runId, tree: tree || [], sketches: sketches || {} })
+    w.postMessage({ type: 'evaluate', runId, tree: subTree, sketches: subSketches })
   } catch (err) {
     pending.delete(runId)
     return { error: `failed to dispatch occt run: ${err?.message || String(err)}` }
@@ -128,15 +204,19 @@ export async function runFeatures(tree, sketches) {
 // Returns:
 //   { ok: true, frame: { origin, normal, uDir, vDir }, outline: [[u,v]...], planar }
 //   { ok: false, reason }
-export async function requestFaceOutline(tree, sketches, faceId) {
+export async function requestFaceOutline(tree, sketches, faceId, configParams) {
   const w = ensureWorker()
   if (!w) return { ok: false, reason: 'occt worker unavailable' }
+  if (configParams == null && activeConfigResolver) {
+    try { configParams = activeConfigResolver() || null } catch { configParams = null }
+  }
+  const { tree: subTree, sketches: subSketches } = await applyEquations(tree || [], sketches || {}, configParams)
   const runId = ++nextRunId
   const promise = new Promise((resolve) => {
     pending.set(runId, { resolve, kind: 'face_outline' })
   })
   try {
-    w.postMessage({ type: 'face_outline', runId, tree: tree || [], sketches: sketches || {}, faceId })
+    w.postMessage({ type: 'face_outline', runId, tree: subTree, sketches: subSketches, faceId })
   } catch (err) {
     pending.delete(runId)
     return { ok: false, reason: `failed to dispatch face_outline: ${err?.message || String(err)}` }
@@ -175,9 +255,14 @@ export const DEFAULT_FEATURE = JSON.stringify({
 
 // Parse a .feature file's content into the canonical tree shape. Tolerant
 // of empty / malformed input — returns an empty tree in those cases.
+//
+// Configurations / variants (see src/lib/part.js for the canonical shape):
+// a `.feature` file may declare per-file parameter overrides. The active
+// config's `params` are merged OVER the equations scope before the OCCT
+// worker substitutes `${name}` placeholders inside feature node fields.
 export function parseFeature(content) {
   const text = (content || '').trim()
-  if (!text) return { version: 1, name: 'New feature', features: [] }
+  if (!text) return { version: 1, name: 'New feature', features: [], default_config: '', configurations: [] }
   try {
     const obj = JSON.parse(text)
     return {
@@ -185,9 +270,25 @@ export function parseFeature(content) {
       name: obj.name || 'New feature',
       features: Array.isArray(obj.features) ? obj.features : [],
       metadata: obj.metadata || {},
+      default_config: typeof obj.default_config === 'string' ? obj.default_config : '',
+      configurations: Array.isArray(obj.configurations)
+        ? obj.configurations.map(normalizeFeatureConfiguration).filter(Boolean)
+        : [],
     }
   } catch {
-    return { version: 1, name: 'New feature', features: [] }
+    return { version: 1, name: 'New feature', features: [], default_config: '', configurations: [] }
+  }
+}
+
+function normalizeFeatureConfiguration(raw) {
+  if (!raw || typeof raw !== 'object') return null
+  const id = typeof raw.id === 'string' ? raw.id.trim() : ''
+  if (!id) return null
+  return {
+    id,
+    label: typeof raw.label === 'string' && raw.label ? raw.label : id,
+    params: raw.params && typeof raw.params === 'object' && !Array.isArray(raw.params)
+      ? raw.params : {},
   }
 }
 
@@ -200,6 +301,16 @@ export function serializeFeature(parsed) {
   }
   if (parsed?.metadata && typeof parsed.metadata === 'object') {
     out.metadata = parsed.metadata
+  }
+  if (typeof parsed?.default_config === 'string' && parsed.default_config) {
+    out.default_config = parsed.default_config
+  }
+  if (Array.isArray(parsed?.configurations) && parsed.configurations.length > 0) {
+    out.configurations = parsed.configurations.map((c) => ({
+      id: c.id,
+      label: c.label || c.id,
+      params: c.params && typeof c.params === 'object' ? c.params : {},
+    }))
   }
   return JSON.stringify(out, null, 2)
 }

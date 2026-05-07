@@ -18,6 +18,11 @@ const API_URL = import.meta.env.VITE_API_URL || ''
 const DEFAULTS = {
   ready: false,
   cloudEnabled: false,
+  // localMode default is true so an OSS build that fails to fetch
+  // /api/config (e.g. CORS misconfigured) still skips /login, matching
+  // server-side defaults. The cloud build always overrides via the
+  // /api/config response.
+  localMode: true,
   googleClientId: '',
   paystackPublicKey: '',
 }
@@ -38,6 +43,10 @@ const useStore = create((set, get) => ({
         set({
           ready: true,
           cloudEnabled: !!data.cloud_enabled,
+          // local_mode is the single source of truth for "skip the
+          // login screen". Fall back to !cloud_enabled when the
+          // backend hasn't surfaced the flag yet (older binary).
+          localMode: data.local_mode != null ? !!data.local_mode : !data.cloud_enabled,
           googleClientId: data.google_client_id || '',
           paystackPublicKey: data.paystack_public_key || '',
           _inflight: null,
@@ -63,6 +72,7 @@ export function useCloudConfig() {
   return {
     ready: state.ready,
     cloudEnabled: state.cloudEnabled,
+    localMode: state.localMode,
     googleClientId: state.googleClientId,
     paystackPublicKey: state.paystackPublicKey,
   }

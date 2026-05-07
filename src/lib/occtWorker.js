@@ -195,12 +195,22 @@ function opPocket(oc, prev, node, sketches, tracker) {
   if (!face) throw new Error(`pocket: sketch '${node.sketch_path}' produced no profile`)
   const d = Math.abs(Number(node.depth) || 0)
   if (d <= 0) throw new Error('pocket: depth must be > 0')
-  // Pocket = subtract a downward prism from the prev shape.
-  // We extrude the face along -Z by `depth` so a sketch on the top face
-  // cuts INTO the body. Real pocket-on-face requires picking a face's
-  // origin; v1 keeps it XY-plane-relative.
-  const vec = track(tracker, new oc.gp_Vec_4(0, 0, -d))
-  const prism = track(tracker, new oc.BRepPrimAPI_MakePrism_1(face, vec, false, true))
+  // Pocket = subtract a prism that straddles the sketch plane from the prev
+  // shape. The naive "extrude only down by depth" approach misses bodies
+  // built by `direction='up'` Pads (which sit at Z >= 0). We instead place
+  // the face at +d and extrude by -2d so the prism spans Z ∈ [-d, +d]. That
+  // way the cut bites into the body regardless of which side of the sketch
+  // plane it sits on, by exactly `depth` from the plane on each side.
+  // Real face-anchored pockets (Phase 3) replace this with picking the face
+  // and extruding inward along the face normal — but for a v1 contract this
+  // is the right call.
+  const trsf = track(tracker, new oc.gp_Trsf_1())
+  const vUp = track(tracker, new oc.gp_Vec_4(0, 0, d))
+  trsf.SetTranslation_1(vUp)
+  const lUp = track(tracker, new oc.TopLoc_Location_2(trsf))
+  const lifted = face.Moved?.(lUp, false) ?? face
+  const vec = track(tracker, new oc.gp_Vec_4(0, 0, -2 * d))
+  const prism = track(tracker, new oc.BRepPrimAPI_MakePrism_1(lifted, vec, false, true))
   prism.Build()
   if (!prism.IsDone()) throw new Error('pocket: prism build failed')
   const tool = prism.Shape()
@@ -317,21 +327,35 @@ function opShell(oc, prev, node, _sketches, tracker) {
 
 function opHole(oc, prev, node, _sketches, tracker) {
   // v1 hole: cut a cylinder of `diameter` × `depth` through the previous
-  // shape, centered at the sketch's first point. The sketch_path is used
-  // only to pick the (x,y) center; orientation defaults to -Z.
+  // shape, centered at a point picked from the sketch. Center selection
+  // priority:
+  //   1. The center of the FIRST circle in the sketch (the canonical "hole
+  //      sketch" — user draws a circle to mark where the hole goes).
+  //   2. The first non-origin point.
+  //   3. (0, 0) if the sketch is empty.
+  // Orientation defaults to -Z; the cylinder is double-length and centered
+  // on the sketch plane so it always punches all the way through bodies
+  // sitting on either side.
   if (!prev) throw new Error('hole: no target shape')
   const dia = Number(node.diameter) || 0
   const depth = Number(node.depth) || 0
   if (dia <= 0 || depth <= 0) throw new Error('hole: diameter and depth required')
   const json = node.sketch_path ? node._sketches?.[node.sketch_path] : null
   let cx = 0, cy = 0
-  // Pull center: read the first point in the sketch entities.
   try {
     const obj = json
       ? (typeof json === 'string' ? JSON.parse(json) : json)
       : null
-    const pt = obj?.entities?.find?.((e) => e.type === 'point' && e.id !== 'origin')
-    if (pt) { cx = Number(pt.x) || 0; cy = Number(pt.y) || 0 }
+    const ent = obj?.entities || []
+    // Prefer a circle's center.
+    const circle = ent.find?.((e) => e.type === 'circle')
+    if (circle) {
+      const cp = ent.find((e) => e.type === 'point' && e.id === circle.center)
+      if (cp) { cx = Number(cp.x) || 0; cy = Number(cp.y) || 0 }
+    } else {
+      const pt = ent.find?.((e) => e.type === 'point' && e.id !== 'origin')
+      if (pt) { cx = Number(pt.x) || 0; cy = Number(pt.y) || 0 }
+    }
   } catch { /* */ }
   const ax1 = track(tracker, new oc.gp_Ax2_3(
     track(tracker, new oc.gp_Pnt_3(cx, cy, depth)),

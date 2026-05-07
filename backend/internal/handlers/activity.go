@@ -142,12 +142,21 @@ func (d *Deps) GetActivity(w http.ResponseWriter, r *http.Request) {
 // page may still be 100 % from one source if it dominates the time range —
 // that's the desired behaviour).
 func loadActivity(ctx context.Context, pool *pgxpool.Pool, projectID string, limit int, before *time.Time) ([]ActivityEvent, error) {
-	// Resolve the project owner once for the user_id fallback on sources that
-	// don't track an author column today (chat_messages, files).
+	// Resolve a "project owner" once for the user_id fallback on sources that
+	// don't track an author column today (chat_messages, files). Post-workspaces
+	// there's no `projects.owner_id` — the owner is the (oldest) workspace
+	// member with role='owner' on the project's workspace.
 	// TODO: drop this fallback once chat_messages.user_id and files.created_by /
 	// files.deleted_by exist.
 	var ownerID string
-	if err := pool.QueryRow(ctx, `select owner_id from projects where id = $1`, projectID).Scan(&ownerID); err != nil {
+	if err := pool.QueryRow(ctx, `
+		select wm.user_id
+		from projects p
+		join workspace_members wm on wm.workspace_id = p.workspace_id
+		where p.id = $1 and wm.role = 'owner'
+		order by wm.created_at asc
+		limit 1
+	`, projectID).Scan(&ownerID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return []ActivityEvent{}, nil
 		}

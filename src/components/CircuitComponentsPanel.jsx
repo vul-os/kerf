@@ -16,9 +16,11 @@
 // matches ObjectsPanel: ink-900 bg, 11px header label, hover bg-ink-800,
 // kerf-300 accent for selection.
 
-import { useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, Cpu, CircuitBoard, HelpCircle } from 'lucide-react'
-import { useWorkspace } from '../store/workspace.js'
+import { useEffect, useMemo, useState } from 'react'
+import { ChevronDown, ChevronRight, Cpu, CircuitBoard, HelpCircle, Link2, Link2Off } from 'lucide-react'
+import { useWorkspace, loadFilePartsForProject } from '../store/workspace.js'
+import LibraryPicker from './LibraryPicker.jsx'
+import { parseLibraryMappings } from '../lib/circuitMappings.js'
 
 // Roll up the raw CircuitJSON into the two displayable lists. We tolerate
 // transient mid-compile states where some entities are missing pairs.
@@ -121,12 +123,44 @@ export default function CircuitComponentsPanel({
   onSelectNet,
 }) {
   const currentCircuit = useWorkspace((s) => s.currentCircuit)
+  const currentFileContent = useWorkspace((s) => s.currentFileContent)
   const circuitLoading = useWorkspace((s) => s.circuitLoading)
+  const projectId = useWorkspace((s) => s.projectId)
+  const setCircuitLibraryMapping = useWorkspace((s) => s.setCircuitLibraryMapping)
 
   const { components, nets } = useMemo(
     () => summarize(currentCircuit?.raw),
     [currentCircuit?.raw],
   )
+
+  // refdes → file_id, parsed live from the TSX source. Updates as the user
+  // types or links a new part. parseLibraryMappings tolerates absent / malformed.
+  const mappings = useMemo(() => parseLibraryMappings(currentFileContent), [currentFileContent])
+
+  // Display name lookup for mapped Library Parts. We pull a project-wide list
+  // of kind='part' files once and resolve names client-side; LibraryPicker
+  // offers a richer browse, but the panel just needs `R1 → "Yageo RC0402JR-071K"`.
+  const [partNamesByFileId, setPartNamesByFileId] = useState({})
+  useEffect(() => {
+    if (!projectId) return
+    let cancelled = false
+    loadFilePartsForProject(projectId).then((rows) => {
+      if (cancelled) return
+      const out = {}
+      for (const r of rows || []) {
+        if (r?.id && (r.name || r.label || r.mpn)) {
+          out[r.id] = r.label || r.name || r.mpn
+        }
+      }
+      setPartNamesByFileId(out)
+    }).catch(() => { /* non-fatal — chips just show the file id */ })
+    return () => { cancelled = true }
+  }, [projectId])
+
+  // Picker state. `pickFor` holds the refdes whose mapping is being edited;
+  // null means closed. Selecting a part calls setCircuitLibraryMapping and
+  // closes the picker.
+  const [pickFor, setPickFor] = useState(null)
 
   const [openComponents, setOpenComponents] = useState(true)
   const [openNets, setOpenNets] = useState(true)
@@ -160,25 +194,53 @@ export default function CircuitComponentsPanel({
             >
               {components.map((c) => {
                 const active = selectedRefdes === c.refdes
+                const mappedFileId = mappings[c.refdes] || null
+                const mappedName = mappedFileId ? (partNamesByFileId[mappedFileId] || '(linked)') : null
                 return (
-                  <button
+                  <div
                     key={c.refdes}
-                    type="button"
-                    onClick={() => onSelectRefdes?.(active ? null : c.refdes)}
-                    className={`group w-full flex items-baseline gap-1.5 px-2 py-[3px] text-left rounded-sm select-none ${
+                    className={`group w-full flex items-center gap-1 px-2 py-[3px] rounded-sm select-none ${
                       active
                         ? 'bg-kerf-300/15 text-kerf-100'
                         : 'hover:bg-ink-800 text-ink-200'
                     }`}
                   >
-                    <span className="text-xs font-mono w-10 truncate text-kerf-300/90">{c.refdes}</span>
-                    <span className="flex-1 text-xs truncate">{c.value || <span className="text-ink-600">—</span>}</span>
-                    {c.footprint && (
-                      <span className="text-[10px] font-mono text-ink-500 truncate max-w-[7rem]">
-                        {c.footprint}
-                      </span>
+                    <button
+                      type="button"
+                      onClick={() => onSelectRefdes?.(active ? null : c.refdes)}
+                      className="flex-1 flex items-baseline gap-1.5 text-left min-w-0"
+                    >
+                      <span className="text-xs font-mono w-10 truncate text-kerf-300/90">{c.refdes}</span>
+                      <span className="flex-1 text-xs truncate">{c.value || <span className="text-ink-600">—</span>}</span>
+                      {c.footprint && (
+                        <span className="text-[10px] font-mono text-ink-500 truncate max-w-[6rem]">
+                          {c.footprint}
+                        </span>
+                      )}
+                    </button>
+                    {mappedName && (
+                      <button
+                        type="button"
+                        title={`Linked to Library: ${mappedName} — click to unlink`}
+                        onClick={(e) => { e.stopPropagation(); setCircuitLibraryMapping(c.refdes, null) }}
+                        className="text-[10px] inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-kerf-300/10 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/20 max-w-[8rem] truncate"
+                      >
+                        <Link2 size={10} className="flex-shrink-0" />
+                        <span className="truncate">{mappedName}</span>
+                      </button>
                     )}
-                  </button>
+                    {!mappedName && (
+                      <button
+                        type="button"
+                        title="Link to a Library part"
+                        onClick={(e) => { e.stopPropagation(); setPickFor(c.refdes) }}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-ink-400 hover:bg-ink-800 hover:text-kerf-300"
+                      >
+                        <Link2Off size={10} />
+                        Link
+                      </button>
+                    )}
+                  </div>
                 )
               })}
             </Section>
@@ -212,6 +274,20 @@ export default function CircuitComponentsPanel({
           </>
         )}
       </div>
+
+      {pickFor && (
+        <LibraryPicker
+          currentProjectId={projectId}
+          onClose={() => setPickFor(null)}
+          onSelect={(part) => {
+            // LibraryPicker emits a row payload; both project-local rows and
+            // global library rows carry `id` (file_id) for the part file.
+            const fid = part?.id || part?.file_id
+            if (fid) setCircuitLibraryMapping(pickFor, fid)
+            setPickFor(null)
+          }}
+        />
+      )}
     </div>
   )
 }

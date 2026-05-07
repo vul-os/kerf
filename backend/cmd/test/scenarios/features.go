@@ -25,13 +25,14 @@ func Features(s *runner.Suite, env *runner.Env) {
 
 	// --- Project create / update / delete ---
 	var proj struct {
-		ID      string `json:"id"`
-		OwnerID string `json:"owner_id"`
-		Name    string `json:"name"`
-		MyRole  string `json:"my_role"`
+		ID          string `json:"id"`
+		WorkspaceID string `json:"workspace_id"`
+		Name        string `json:"name"`
+		MyRole      string `json:"my_role"`
 	}
 	status, raw, _ = c.DoJSON("POST", "/api/projects", map[string]string{
-		"name": "Feature project",
+		"name":         "Feature project",
+		"workspace_id": owner.DefaultWorkspace.ID,
 	}, owner.AccessToken, &proj)
 	if !s.Status("create project", status, 201, raw) {
 		return
@@ -190,7 +191,9 @@ func Features(s *runner.Suite, env *runner.Env) {
 	status, raw, _ = c.Do("GET", "/api/share/"+share.Token, nil, "")
 	s.Status("share lookup anon", status, 200, raw)
 
-	// guest accepts → guest now has viewer role on the project.
+	// guest accepts → guest now has access to the project. Workspaces v1 has
+	// roles {owner | admin | member}; share-link acceptance grants `member`.
+	// (TODO: per-project viewer role for read-only sharing.)
 	status, raw, _ = c.Do("POST", "/api/share/"+share.Token+"/accept", nil, guest.AccessToken)
 	s.Status("share accept by guest", status, 200, raw)
 
@@ -200,13 +203,21 @@ func Features(s *runner.Suite, env *runner.Env) {
 	}
 	status, raw, _ = c.DoJSON("GET", "/api/projects/"+pid, nil, guest.AccessToken, &guestSeesProject)
 	if s.Status("guest GET shared project", status, 200, raw) {
-		s.Equal("guest role", guestSeesProject.MyRole, "viewer")
+		// Until per-project viewer ships, share-link acceptance lands as
+		// `editor` (= workspace `member`) on the legacy /api/projects role
+		// surface — see projectRole() in handlers.go.
+		s.Equal("guest role", guestSeesProject.MyRole, "editor")
 	}
 
 	// --- Members: add by email, change role, remove ---
-	type memberResp struct {
+	// Response shape from the post-workspaces /api/projects/:pid/members route
+	// is `{added: WorkspaceMember{...}}` — see inviteIntoWorkspace.
+	type memberView struct {
 		UserID string `json:"user_id"`
 		Role   string `json:"role"`
+	}
+	type memberResp struct {
+		Added *memberView `json:"added"`
 	}
 	// Add a third user just for member CRUD.
 	third, status, raw := register(c, "third@example.com", "thirdpassword1", "Third")
@@ -215,20 +226,20 @@ func Features(s *runner.Suite, env *runner.Env) {
 	}
 	var added memberResp
 	status, raw, _ = c.DoJSON("POST", fmt.Sprintf("/api/projects/%s/members", pid),
-		map[string]string{"email": "third@example.com", "role": "editor"},
+		map[string]string{"email": "third@example.com", "role": "member"},
 		owner.AccessToken, &added)
-	if s.Status("add member", status, 201, raw) {
-		s.Equal("added.role", added.Role, "editor")
-		s.Equal("added.user_id", added.UserID, third.User.ID)
+	if s.Status("add member", status, 201, raw) && s.True("added present", added.Added != nil) {
+		s.Equal("added.role", added.Added.Role, "member")
+		s.Equal("added.user_id", added.Added.UserID, third.User.ID)
 	}
 
-	// Change role.
-	var changed memberResp
+	// Change role to admin (the only legal up-shift in v1; viewer doesn't exist).
+	var changed memberView
 	status, raw, _ = c.DoJSON("PATCH",
 		fmt.Sprintf("/api/projects/%s/members/%s", pid, third.User.ID),
-		map[string]string{"role": "viewer"}, owner.AccessToken, &changed)
+		map[string]string{"role": "admin"}, owner.AccessToken, &changed)
 	if s.Status("change role", status, 200, raw) {
-		s.Equal("changed.role", changed.Role, "viewer")
+		s.Equal("changed.role", changed.Role, "admin")
 	}
 
 	// Remove.

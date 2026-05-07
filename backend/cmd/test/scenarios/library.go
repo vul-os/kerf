@@ -46,7 +46,7 @@ func Library(s *runner.Suite, env *runner.Env) {
 		OwnerID string `json:"owner_id"`
 	}
 	status, raw, _ = c.DoJSON("POST", "/api/projects",
-		map[string]string{"name": "Library project"}, owner.AccessToken, &proj)
+		map[string]string{"name": "Library project", "workspace_id": owner.DefaultWorkspace.ID}, owner.AccessToken, &proj)
 	if !s.Status("create lib project", status, 201, raw) {
 		return
 	}
@@ -184,7 +184,7 @@ func Library(s *runner.Suite, env *runner.Env) {
 		ID string `json:"id"`
 	}
 	status, raw, _ = c.DoJSON("POST", "/api/projects",
-		map[string]string{"name": "empty-bom"}, owner.AccessToken, &emptyProj)
+		map[string]string{"name": "empty-bom", "workspace_id": owner.DefaultWorkspace.ID}, owner.AccessToken, &emptyProj)
 	s.Status("create empty proj", status, 201, raw)
 	var bomEmpty bomResp
 	status, raw, _ = c.DoJSON("GET", "/api/projects/"+emptyProj.ID+"/bom",

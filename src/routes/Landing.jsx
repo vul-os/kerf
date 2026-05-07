@@ -1,36 +1,149 @@
+/**
+ * Landing — production marketing page.
+ *
+ * Sections (top → bottom):
+ *   1. Hero — headline, subheadline, two CTAs, three-pane editor
+ *      illustration above the fold (>=lg) or below (mobile).
+ *   2. Capability tour — seven cards, each with a domain illustration
+ *      (Library and Workshop split into their own stories).
+ *   3. Chat loop — single-frame view of how an LLM turn shapes geometry.
+ *   4. Recently shipped — three cards drawn from ROADMAP.md ✅ rows.
+ *   5. Roadmap glimpse — four "🔮 planned" tiles.
+ *   6. Local vs hosted — same product, two ways to run it.
+ *   7. Pricing teaser — three plan cards linking to /pricing.
+ *   8. Made in South Africa — small pride block.
+ *   9. Footer (own component).
+ *
+ * Palette is locked to ink-* / kerf-* / cyan-edge / magenta-edge from
+ * src/index.css. No raster assets — everything inline SVG.
+ *
+ * Density note: spacing is tuned for competitive density (Linear/Vercel
+ * style) — section padding ~py-12/14, card gaps ~gap-4/5, card insets
+ * ~p-5/6. Don't pad this page back out without checking with a designer.
+ */
 import { Link } from 'react-router-dom'
 import {
   ArrowRight,
-  MessageSquareCode,
-  MousePointerClick,
-  Code2,
-  Star,
-  Box,
-  Sparkles,
-  PenTool,
-  Layers,
-  FileText,
-  GitBranch,
-  Boxes,
-  Ruler,
-  History,
   Github,
-  ExternalLink,
+  Code2,
+  Layers,
+  PenTool,
+  FileText,
+  Boxes,
+  Sparkles,
+  Wallet,
+  Server,
+  Zap,
+  Check,
+  CircuitBoard,
+  Workflow,
+  Shapes,
+  Share2,
 } from 'lucide-react'
 import Header from '../components/Header.jsx'
+import Footer from '../components/Footer.jsx'
 import Button from '../components/Button.jsx'
+import {
+  HeroIllustration,
+  JscadIllustration,
+  FeatureTreeIllustration,
+  SketcherIllustration,
+  DrawingIllustration,
+  CircuitIllustration,
+  LibraryIllustration,
+  WorkshopIllustration,
+  ChatLoopIllustration,
+} from '../components/illustrations/index.js'
 
-const GITHUB_URL = 'https://github.com/exolution/kerf'
+const GITHUB_URL = 'https://github.com/imranp/kerf'
+
+/* -------------------------------------------------------------------------- */
+/* Section: Hero                                                               */
+/* -------------------------------------------------------------------------- */
+
+function Hero() {
+  return (
+    <section className="relative overflow-hidden">
+      <HeroBackdrop />
+
+      <div className="relative mx-auto max-w-7xl px-6 pt-14 pb-16 sm:pt-16 lg:pt-20 lg:pb-20">
+        <div className="grid lg:grid-cols-[1fr_1.15fr] gap-8 lg:gap-12 items-center">
+          <div>
+            <span className="inline-flex items-center gap-2 rounded-full border border-ink-800 bg-ink-900/70 backdrop-blur px-3 py-1 text-xs text-ink-300 font-mono">
+              <span className="w-1.5 h-1.5 rounded-full bg-kerf-300 animate-pulse" />
+              public beta · open source
+            </span>
+
+            <h1 className="mt-4 font-display text-[2.6rem] sm:text-5xl lg:text-[4.25rem] font-semibold tracking-[-0.03em] leading-[1.02]">
+              CAD that
+              <br />
+              <span className="relative inline-block">
+                <span className="relative z-10 text-kerf-300">talks back</span>
+                <span
+                  aria-hidden
+                  className="absolute left-0 right-0 -bottom-2 h-2.5 bg-kerf-300/15 -skew-x-12 rounded-sm"
+                />
+              </span>
+              .
+            </h1>
+
+            <p className="mt-4 text-lg text-ink-300 leading-relaxed max-w-xl">
+              Kerf is a chat-native CAD workspace. Write JSCAD, draft B-rep
+              features, sketch with constraints, lay out PCBs, and ship real
+              engineering drawings — with an LLM editing the source for you.
+            </p>
+
+            <div className="mt-5 flex flex-wrap items-center gap-3">
+              <Button as={Link} to="/signup" variant="primary" size="lg">
+                Try it free
+                <ArrowRight size={16} />
+              </Button>
+              <Button as={Link} to="/docs/install" variant="outline" size="lg">
+                Install locally
+              </Button>
+            </div>
+
+            <ul className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-ink-400 font-mono">
+              <li className="flex items-center gap-1.5">
+                <span className="w-1 h-1 rounded-full bg-ink-500" />
+                MIT licensed
+              </li>
+              <li className="flex items-center gap-1.5">
+                <span className="w-1 h-1 rounded-full bg-ink-500" />
+                32 MB single binary
+              </li>
+              <li className="flex items-center gap-1.5">
+                <span className="w-1 h-1 rounded-full bg-ink-500" />
+                no card required
+              </li>
+            </ul>
+          </div>
+
+          <div className="relative hidden md:block">
+            <div className="relative rounded-2xl border border-ink-800 bg-ink-900/40 backdrop-blur shadow-2xl shadow-black/60 overflow-hidden aspect-[3/2]">
+              <HeroIllustration className="block w-full h-full" />
+            </div>
+            <div
+              aria-hidden
+              className="absolute -inset-6 -z-10 rounded-[2rem] bg-kerf-300/[0.05] blur-3xl"
+            />
+          </div>
+        </div>
+
+        <LogoStrip />
+      </div>
+    </section>
+  )
+}
 
 function HeroBackdrop() {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-      {/* Dot grid */}
       <div
         className="absolute inset-0 opacity-[0.18]"
         style={{
           backgroundImage:
-            'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.55) 1px, transparent 0)',
+            'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.5) 1px, transparent 0)',
           backgroundSize: '28px 28px',
           maskImage:
             'radial-gradient(ellipse 70% 60% at 50% 30%, black 30%, transparent 80%)',
@@ -38,673 +151,660 @@ function HeroBackdrop() {
             'radial-gradient(ellipse 70% 60% at 50% 30%, black 30%, transparent 80%)',
         }}
       />
-      {/* Soft warm glow */}
       <div
-        className="absolute -top-40 left-1/2 -translate-x-1/2 w-[1100px] h-[700px] opacity-40"
+        className="absolute -top-40 left-1/2 -translate-x-1/2 w-[1100px] h-[700px] opacity-50"
         style={{
           background:
             'radial-gradient(ellipse at center, rgba(255,214,51,0.18) 0%, rgba(255,214,51,0.04) 35%, transparent 70%)',
         }}
       />
-      <div className="absolute left-0 right-0 top-[42rem] h-px bg-gradient-to-r from-transparent via-ink-700 to-transparent" />
+    </div>
+  )
+}
+
+function LogoStrip() {
+  // The "trusted by" strip is honest: list the technologies under the
+  // hood, not vapor logos. Pure typographic, low-key.
+  const items = ['JSCAD', 'OpenCascade', 'tscircuit', 'planegcs', 'TechDraw', 'Three.js']
+  return (
+    <div className="mt-10 lg:mt-12 flex flex-col items-center gap-3">
+      <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-ink-500">
+        Built on open kernels
+      </p>
+      <ul className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
+        {items.map((it) => (
+          <li
+            key={it}
+            className="font-mono text-sm text-ink-400 hover:text-ink-200 transition-colors"
+          >
+            {it}
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
 
 /* -------------------------------------------------------------------------- */
-/* Hero workspace mock                                                        */
+/* Section: Capability tour                                                    */
 /* -------------------------------------------------------------------------- */
 
-function WorkspaceMock() {
+const CAPABILITIES = [
+  {
+    icon: Code2,
+    title: 'JSCAD code authoring',
+    body: 'Plain JavaScript with @jscad/modeling. Worker-based eval, IndexedDB mesh cache, file-revisions undo for every keystroke.',
+    Illustration: JscadIllustration,
+  },
+  {
+    icon: Layers,
+    title: 'OCCT B-rep features',
+    body: 'Pad, Pocket, Revolve, Fillet, Chamfer, Shell, Hole, Draft. A timeline you can scrub, with real solid-modeling parity.',
+    Illustration: FeatureTreeIllustration,
+  },
+  {
+    icon: PenTool,
+    title: '2D parametric sketcher',
+    body: 'planegcs solver. Parallel, perpendicular, equal, tangent, distance, angle. Drag-to-solve with live DOF feedback.',
+    Illustration: SketcherIllustration,
+  },
+  {
+    icon: FileText,
+    title: 'TechDraw 2D drawings',
+    body: 'Multi-sheet drawings. Linear, aligned, radius, diameter, angular, baseline, chain, ordinate dims. GD&T frames per Y14.5.',
+    Illustration: DrawingIllustration,
+  },
+  {
+    icon: CircuitBoard,
+    title: 'Electronics via tscircuit',
+    body: 'TSX → CircuitJSON. Schematic and PCB views. 3D board preview. Cross-link parts to mechanical assemblies.',
+    Illustration: CircuitIllustration,
+  },
+  {
+    icon: Boxes,
+    title: 'Library',
+    body: "Drop-in parts. Yours, the community's, curated. Every project has its own parts; verified-publisher accounts (Adafruit, McMaster-style) seed common components. Drop them into assemblies, drive BOMs, sync 3D models for the schematic.",
+    Illustration: LibraryIllustration,
+  },
+  {
+    icon: Share2,
+    title: 'Workshop',
+    body: 'Publish a project; fork what others built. One click publishes a project to the Workshop, where anyone can browse, like, or fork it as a starting point for their own work. Same MIT-licensed code that runs locally.',
+    Illustration: WorkshopIllustration,
+  },
+]
+
+function CapabilityTour() {
   return (
-    <div className="relative">
-      <div className="relative rounded-2xl border border-ink-800 bg-ink-900/80 backdrop-blur shadow-2xl shadow-black/60 overflow-hidden">
-        <div className="h-9 flex items-center gap-2 px-3 border-b border-ink-800 bg-ink-900">
-          <div className="flex gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-ink-700" />
-            <span className="w-2.5 h-2.5 rounded-full bg-ink-700" />
-            <span className="w-2.5 h-2.5 rounded-full bg-ink-700" />
-          </div>
-          <div className="flex-1 text-center text-[11px] font-mono text-ink-400 tracking-wider">
-            kerf · bracket-v3
-          </div>
-          <div className="w-12" />
+    <section className="relative border-t border-ink-900">
+      <div className="mx-auto max-w-7xl px-6 py-12 lg:py-14">
+        <div className="max-w-2xl mb-8">
+          <p className="font-mono text-xs uppercase tracking-[0.2em] text-kerf-300">
+            What you can build
+          </p>
+          <h2 className="mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-[-0.02em]">
+            One workspace.
+            <br />
+            <span className="text-ink-300">Every CAD discipline.</span>
+          </h2>
         </div>
 
-        <div className="grid grid-cols-[150px_1fr_220px] h-[440px] text-[11px] font-mono">
-          {/* File tree */}
-          <div className="border-r border-ink-800 bg-ink-900/60 py-3 px-2 flex flex-col gap-0.5 text-ink-300">
-            <div className="px-2 py-1 text-[10px] text-ink-500 uppercase tracking-widest">
-              Files
-            </div>
-            <FileRow name="bracket.jscad" active />
-            <FileRow name="hinge.jscad" />
-            <FileRow name="profile.sketch" />
-            <FileRow name="frame.assembly" muted />
-            <FileRow name="sheet.drawing" muted />
-            <div className="px-2 mt-3 text-[10px] text-ink-500 uppercase tracking-widest">
-              Threads
-            </div>
-            <ThreadRow title="thicken the wall" starred />
-            <ThreadRow title="add fillet 2mm" />
-          </div>
-
-          {/* Center: 3D + code */}
-          <div className="flex flex-col">
-            <div className="relative flex-1 border-b border-ink-800 bg-gradient-to-b from-ink-850 to-ink-900 overflow-hidden">
-              <div
-                className="absolute inset-0 opacity-30"
-                style={{
-                  backgroundImage:
-                    'linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px)',
-                  backgroundSize: '22px 22px',
-                  maskImage:
-                    'linear-gradient(to bottom, transparent 0%, black 40%, black 100%)',
-                  WebkitMaskImage:
-                    'linear-gradient(to bottom, transparent 0%, black 40%, black 100%)',
-                }}
-              />
-              <IsoPart />
-              <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-kerf-300/15 border border-kerf-300/40 text-kerf-200 text-[10px] font-mono">
-                <span className="w-1.5 h-1.5 rounded-full bg-kerf-300" />
-                bracket#wall
-              </div>
-              <div className="absolute bottom-3 right-3 text-ink-500 text-[9px] font-mono leading-tight text-right">
-                <div>X 12.4</div>
-                <div>Y 0.0</div>
-                <div>Z 8.2</div>
-              </div>
-            </div>
-
-            <div className="h-[140px] bg-ink-900 px-3 py-2 leading-relaxed text-ink-300 overflow-hidden">
-              <CodeLine n={1}>
-                <Kw>import</Kw> {'{ '}primitives, transforms{' }'}{' '}
-                <Kw>from</Kw> <Str>{`'@jscad/modeling'`}</Str>
-              </CodeLine>
-              <CodeLine n={2} />
-              <CodeLine n={3}>
-                <Kw>export default function</Kw>() {'{'}
-              </CodeLine>
-              <CodeLine n={4}>
-                {'  '}<Kw>const</Kw> wall = primitives.<Fn>cuboid</Fn>(
-                {'{ size: ['}<Num>40</Num>, <Num>6</Num>, <Num>20</Num>{']'} {'}'})
-              </CodeLine>
-              <CodeLine n={5}>
-                {'  '}<Kw>return</Kw> [{'{ id: '}<Str>{`'wall'`}</Str>, geom: wall {'}'}]
-              </CodeLine>
-              <CodeLine n={6}>{'}'}</CodeLine>
-            </div>
-          </div>
-
-          {/* Chat */}
-          <div className="border-l border-ink-800 bg-ink-900/60 flex flex-col">
-            <div className="px-3 py-2 border-b border-ink-800 text-[10px] text-ink-500 uppercase tracking-widest">
-              Chat
-            </div>
-            <div className="flex-1 px-3 py-3 flex flex-col gap-3 overflow-hidden">
-              <ChatBubble role="user">
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-kerf-300/15 border border-kerf-300/30 text-kerf-200 text-[10px] mr-1 font-mono">
-                  bracket#wall
-                </span>
-                make this 6mm thick
-              </ChatBubble>
-              <ChatBubble role="assistant">
-                Updated <span className="text-kerf-200 font-mono">size[1]</span>{' '}
-                from <span className="text-ink-100 font-mono">4</span> to{' '}
-                <span className="text-ink-100 font-mono">6</span>.
-              </ChatBubble>
-              <ChatBubble role="user">add a 2mm fillet on the top edge</ChatBubble>
-              <div className="flex items-center gap-2 text-ink-400">
-                <Sparkles size={11} className="text-kerf-300" />
-                <span>thinking…</span>
-              </div>
-            </div>
-            <div className="px-3 py-2 border-t border-ink-800">
-              <div className="h-7 rounded-md border border-ink-700 bg-ink-950/60 px-2 flex items-center text-[10px] text-ink-500">
-                Ask kerf…
-              </div>
-            </div>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {CAPABILITIES.map((c) => (
+            <CapabilityCard key={c.title} {...c} />
+          ))}
         </div>
       </div>
-
-      <div className="absolute -inset-4 -z-10 rounded-[2rem] bg-kerf-300/[0.04] blur-2xl" />
-    </div>
+    </section>
   )
 }
 
-function IsoPart() {
+function CapabilityCard({ icon: Icon, title, body, Illustration }) {
   return (
-    <svg
-      viewBox="0 0 320 240"
-      className="absolute inset-0 m-auto w-3/4 h-3/4"
-      aria-hidden
-    >
-      <defs>
-        <linearGradient id="topFace" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="#2d323d" />
-          <stop offset="100%" stopColor="#1a1d24" />
-        </linearGradient>
-        <linearGradient id="frontFace" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="#232730" />
-          <stop offset="100%" stopColor="#14171c" />
-        </linearGradient>
-        <linearGradient id="sideFace" x1="0" x2="1" y1="0" y2="0">
-          <stop offset="0%" stopColor="#1a1d24" />
-          <stop offset="100%" stopColor="#0f1115" />
-        </linearGradient>
-      </defs>
-
-      <polygon points="60,160 200,180 280,140 140,120" fill="url(#topFace)" stroke="#3a4150" />
-      <polygon points="60,160 200,180 200,210 60,190" fill="url(#frontFace)" stroke="#3a4150" />
-      <polygon points="200,180 280,140 280,170 200,210" fill="url(#sideFace)" stroke="#3a4150" />
-
-      <polygon
-        points="100,80 220,100 220,150 100,130"
-        fill="url(#frontFace)"
-        stroke="#ffd633"
-        strokeWidth="1.5"
-      />
-      <polygon
-        points="220,100 250,82 250,132 220,150"
-        fill="url(#sideFace)"
-        stroke="#ffd633"
-        strokeWidth="1.5"
-      />
-      <polygon
-        points="100,80 220,100 250,82 130,62"
-        fill="url(#topFace)"
-        stroke="#ffd633"
-        strokeWidth="1.5"
-      />
-
-      <circle cx="120" cy="160" r="4" fill="#0a0b0d" stroke="#3a4150" />
-      <circle cx="170" cy="167" r="4" fill="#0a0b0d" stroke="#3a4150" />
-
-      <line x1="100" y1="80" x2="100" y2="50" stroke="#5a6275" strokeDasharray="2 3" />
-      <line x1="220" y1="100" x2="220" y2="50" stroke="#5a6275" strokeDasharray="2 3" />
-      <line x1="100" y1="55" x2="220" y2="55" stroke="#ffd633" strokeWidth="1" />
-      <text
-        x="160"
-        y="48"
-        textAnchor="middle"
-        fontFamily="ui-monospace, monospace"
-        fontSize="10"
-        fill="#ffd633"
-      >
-        40mm
-      </text>
-    </svg>
-  )
-}
-
-function FileRow({ name, active = false, muted = false }) {
-  return (
-    <div
-      className={
-        'flex items-center gap-1.5 px-2 py-1 rounded ' +
-        (active
-          ? 'bg-kerf-300/10 text-kerf-200 border border-kerf-300/20'
-          : muted
-            ? 'text-ink-400'
-            : 'text-ink-200 hover:bg-ink-800/60')
-      }
-    >
-      <Box size={10} className="opacity-70" />
-      <span className="truncate">{name}</span>
-    </div>
-  )
-}
-
-function ThreadRow({ title, starred = false }) {
-  return (
-    <div className="flex items-center gap-1.5 px-2 py-1 rounded text-ink-300 hover:bg-ink-800/60">
-      {starred ? (
-        <Star size={10} className="text-kerf-300 fill-kerf-300" />
-      ) : (
-        <MessageSquareCode size={10} className="opacity-60" />
-      )}
-      <span className="truncate">{title}</span>
-    </div>
-  )
-}
-
-function CodeLine({ n, children }) {
-  return (
-    <div className="flex">
-      <span className="w-6 text-right pr-2 text-ink-600 select-none">{n}</span>
-      <span className="text-ink-200 whitespace-pre">{children}</span>
-    </div>
-  )
-}
-
-function Kw({ children }) { return <span className="text-magenta-edge">{children}</span> }
-function Fn({ children }) { return <span className="text-cyan-edge">{children}</span> }
-function Str({ children }) { return <span className="text-kerf-200">{children}</span> }
-function Num({ children }) { return <span className="text-kerf-300">{children}</span> }
-
-function ChatBubble({ role, children }) {
-  const isUser = role === 'user'
-  return (
-    <div
-      className={
-        'rounded-md px-2.5 py-1.5 text-[11px] leading-snug ' +
-        (isUser
-          ? 'bg-ink-800 text-ink-100 self-end max-w-[85%]'
-          : 'bg-ink-950/40 border border-ink-800 text-ink-200 max-w-[90%]')
-      }
-    >
-      {children}
-    </div>
-  )
-}
-
-/* -------------------------------------------------------------------------- */
-/* How-it-works rows                                                          */
-/* -------------------------------------------------------------------------- */
-
-function ChatToModelDiagram() {
-  return (
-    <svg viewBox="0 0 280 140" className="w-full h-full" aria-hidden>
-      <rect x="6" y="14" width="110" height="40" rx="8" fill="#14171c" stroke="#232730" />
-      <text x="18" y="32" fill="#8a93a6" fontSize="9" fontFamily="ui-monospace">user</text>
-      <text x="18" y="46" fill="#e2e6ee" fontSize="10" fontFamily="ui-monospace">make this 6mm</text>
-      <line x1="120" y1="34" x2="156" y2="34" stroke="#ffd633" strokeWidth="1.2" markerEnd="url(#arr)" />
-      <rect x="160" y="14" width="114" height="40" rx="8" fill="#0f1115" stroke="#3a4150" />
-      <text x="172" y="32" fill="#ffd633" fontSize="9" fontFamily="ui-monospace">edit_file</text>
-      <text x="172" y="46" fill="#b8bfcc" fontSize="10" fontFamily="ui-monospace">size[1]: 4 → 6</text>
-      <line x1="217" y1="58" x2="217" y2="80" stroke="#5a6275" strokeDasharray="2 3" />
-      <polygon points="160,90 274,90 274,126 160,126" fill="url(#face)" stroke="#ffd633" strokeWidth="1" />
-      <line x1="160" y1="86" x2="274" y2="86" stroke="#3a4150" />
-      <text x="217" y="138" textAnchor="middle" fill="#5a6275" fontSize="8" fontFamily="ui-monospace">re-rendered</text>
-      <defs>
-        <linearGradient id="face" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="#232730" />
-          <stop offset="100%" stopColor="#14171c" />
-        </linearGradient>
-        <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-          <path d="M0,0 L10,5 L0,10 z" fill="#ffd633" />
-        </marker>
-      </defs>
-    </svg>
-  )
-}
-
-function SketchDiagram() {
-  return (
-    <svg viewBox="0 0 280 140" className="w-full h-full" aria-hidden>
-      <line x1="40" y1="40" x2="240" y2="40" stroke="#ffd633" strokeWidth="1.5" />
-      <line x1="40" y1="100" x2="240" y2="100" stroke="#ffd633" strokeWidth="1.5" />
-      <line x1="40" y1="40" x2="40" y2="100" stroke="#5a6275" strokeWidth="1" />
-      <line x1="240" y1="40" x2="240" y2="100" stroke="#5a6275" strokeWidth="1" />
-      {/* parallel hash marks */}
-      <g stroke="#ffd633" strokeWidth="1">
-        <line x1="138" y1="35" x2="142" y2="45" />
-        <line x1="142" y1="35" x2="146" y2="45" />
-        <line x1="138" y1="95" x2="142" y2="105" />
-        <line x1="142" y1="95" x2="146" y2="105" />
-      </g>
-      {/* perpendicular tick at corner */}
-      <rect x="40" y="40" width="6" height="6" fill="none" stroke="#6bd4ff" strokeWidth="0.8" />
-      {/* distance dim */}
-      <line x1="20" y1="40" x2="20" y2="100" stroke="#8a93a6" strokeWidth="0.8" />
-      <line x1="14" y1="40" x2="26" y2="40" stroke="#8a93a6" strokeWidth="0.8" />
-      <line x1="14" y1="100" x2="26" y2="100" stroke="#8a93a6" strokeWidth="0.8" />
-      <text x="14" y="74" fill="#ffd633" fontSize="10" fontFamily="ui-monospace">10</text>
-      <circle cx="40" cy="40" r="2.5" fill="#0a0b0d" stroke="#ffd633" />
-      <circle cx="240" cy="40" r="2.5" fill="#0a0b0d" stroke="#ffd633" />
-      <circle cx="40" cy="100" r="2.5" fill="#0a0b0d" stroke="#ffd633" />
-      <circle cx="240" cy="100" r="2.5" fill="#0a0b0d" stroke="#ffd633" />
-      <text x="140" y="128" textAnchor="middle" fill="#5a6275" fontSize="8" fontFamily="ui-monospace">parallel · 10mm · ⟂</text>
-    </svg>
-  )
-}
-
-function AssemblyDiagram() {
-  return (
-    <svg viewBox="0 0 280 140" className="w-full h-full" aria-hidden>
-      <defs>
-        <linearGradient id="assTop" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="#2d323d" />
-          <stop offset="100%" stopColor="#1a1d24" />
-        </linearGradient>
-        <linearGradient id="assSide" x1="0" x2="1" y1="0" y2="0">
-          <stop offset="0%" stopColor="#1a1d24" />
-          <stop offset="100%" stopColor="#0f1115" />
-        </linearGradient>
-      </defs>
-      {/* base */}
-      <polygon points="40,80 140,100 200,76 100,56" fill="url(#assTop)" stroke="#3a4150" />
-      <polygon points="40,80 140,100 140,118 40,98" fill="#14171c" stroke="#3a4150" />
-      <polygon points="140,100 200,76 200,94 140,118" fill="url(#assSide)" stroke="#3a4150" />
-      {/* top component (highlighted) */}
-      <polygon points="80,60 160,76 192,60 112,44" fill="url(#assTop)" stroke="#ffd633" strokeWidth="1.2" />
-      <polygon points="80,60 160,76 160,90 80,74" fill="#14171c" stroke="#ffd633" strokeWidth="1.2" />
-      <polygon points="160,76 192,60 192,74 160,90" fill="url(#assSide)" stroke="#ffd633" strokeWidth="1.2" />
-      {/* arrows showing place */}
-      <line x1="220" y1="40" x2="200" y2="62" stroke="#ffd633" strokeWidth="1" markerEnd="url(#arr2)" />
-      <text x="230" y="36" fill="#ffd633" fontSize="9" fontFamily="ui-monospace">+ wall</text>
-      <text x="230" y="48" fill="#5a6275" fontSize="8" fontFamily="ui-monospace">component</text>
-      <defs>
-        <marker id="arr2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-          <path d="M0,0 L10,5 L0,10 z" fill="#ffd633" />
-        </marker>
-      </defs>
-      <text x="140" y="130" textAnchor="middle" fill="#5a6275" fontSize="8" fontFamily="ui-monospace">Object → Component</text>
-    </svg>
-  )
-}
-
-function HowRow({ index, title, copy, children }) {
-  return (
-    <div className="grid md:grid-cols-2 gap-8 items-center py-12 border-t border-ink-900 first:border-t-0">
-      <div className={index % 2 === 0 ? '' : 'md:order-2'}>
-        <div className="flex items-center gap-3 mb-4">
-          <span className="font-mono text-xs text-kerf-300 border border-kerf-300/30 rounded-md w-7 h-7 grid place-items-center bg-kerf-300/5">
-            {String(index + 1).padStart(2, '0')}
+    <article className="group relative rounded-2xl border border-ink-800 bg-ink-900/40 overflow-hidden transition-colors hover:border-ink-700 hover:bg-ink-900/60">
+      <div className="aspect-[16/10] bg-ink-950/60 border-b border-ink-800 overflow-hidden">
+        <Illustration className="block w-full h-full" />
+      </div>
+      <div className="p-5">
+        <div className="flex items-center gap-2.5 mb-1.5">
+          <span className="grid place-items-center w-7 h-7 rounded-md bg-kerf-300/10 border border-kerf-300/30 text-kerf-300 group-hover:bg-kerf-300/20 transition-colors">
+            <Icon size={13} />
           </span>
-          <h3 className="font-display text-2xl font-semibold tracking-tight text-ink-100">
+          <h3 className="font-display text-base font-semibold tracking-tight text-ink-100">
             {title}
           </h3>
         </div>
-        <p className="text-ink-300 leading-relaxed max-w-md">{copy}</p>
+        <p className="text-sm text-ink-300 leading-relaxed">{body}</p>
       </div>
-      <div className={'rounded-xl border border-ink-800 bg-ink-900/50 p-4 h-[200px] flex items-center justify-center ' + (index % 2 === 0 ? '' : 'md:order-1')}>
-        {children}
-      </div>
-    </div>
+    </article>
   )
 }
 
 /* -------------------------------------------------------------------------- */
-/* What-you-can-do tiles                                                      */
+/* Section: Chat loop                                                          */
 /* -------------------------------------------------------------------------- */
 
-function CapabilityTile({ icon: Icon, title, body }) {
+function ChatLoop() {
   return (
-    <div className="group rounded-xl border border-ink-800 bg-ink-900/40 p-5 hover:border-ink-700 transition-colors">
-      <div className="flex items-center gap-3 mb-3">
-        <span className="inline-flex items-center justify-center w-9 h-9 rounded-md bg-ink-950 border border-ink-800 group-hover:border-kerf-300/40 transition-colors">
-          <Icon size={16} className="text-kerf-300" />
-        </span>
-        <h3 className="font-display text-base font-semibold tracking-tight text-ink-100">
-          {title}
-        </h3>
+    <section className="relative border-t border-ink-900 bg-gradient-to-b from-ink-950 to-ink-900/30">
+      <div className="mx-auto max-w-6xl px-6 py-12 lg:py-14">
+        <div className="max-w-2xl mb-8">
+          <p className="font-mono text-xs uppercase tracking-[0.2em] text-kerf-300">
+            The chat loop
+          </p>
+          <h2 className="mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-[-0.02em]">
+            From a sentence to a part.
+          </h2>
+          <p className="mt-3 text-ink-300 leading-relaxed max-w-xl">
+            Every chat turn is a small, deliberate program. The model picks
+            tools from a small fixed surface — file ops, validation,
+            doc-search — edits the source, then re-renders.
+          </p>
+        </div>
+
+        <div className="hidden sm:block rounded-2xl border border-ink-800 bg-ink-950/60 backdrop-blur p-4 sm:p-6 lg:p-8">
+          <div className="w-full aspect-[16/5] overflow-hidden">
+            <ChatLoopIllustration className="block w-full h-full" />
+          </div>
+        </div>
+
+        <div className="mt-5 grid sm:grid-cols-3 gap-4">
+          <FactCard
+            icon={Workflow}
+            title="Small tool surface"
+            body="file ops · object ops · validation · BOM · 4 create_* scaffolders"
+          />
+          <FactCard
+            icon={Sparkles}
+            title="Doc-search backed"
+            body="search_kerf_docs reads /docs/llm/*.md before editing"
+          />
+          <FactCard
+            icon={Shapes}
+            title="Every domain, same loop"
+            body="JSCAD, B-rep, sketches, drawings, circuits, BOM"
+          />
+        </div>
       </div>
-      <p className="text-sm text-ink-300 leading-relaxed">{body}</p>
+    </section>
+  )
+}
+
+function FactCard({ icon: Icon, title, body }) {
+  return (
+    <div className="rounded-xl border border-ink-800 bg-ink-900/40 p-4">
+      <div className="flex items-center gap-2 text-ink-300 mb-2">
+        <Icon size={14} className="text-kerf-300" />
+        <span className="font-display text-sm font-semibold tracking-tight text-ink-100">
+          {title}
+        </span>
+      </div>
+      <p className="text-xs text-ink-400 leading-relaxed font-mono">{body}</p>
     </div>
   )
 }
 
 /* -------------------------------------------------------------------------- */
-/* Page                                                                       */
+/* Section: Recently shipped                                                   */
+/* -------------------------------------------------------------------------- */
+
+const SHIPPED = [
+  {
+    title: 'Workspaces (orgs)',
+    body: 'Multi-member containers with role-based access, slug routing under /w/:slug, and per-workspace billing in cloud.',
+    docHref: '/docs/workspaces',
+  },
+  {
+    title: 'Sketcher v2 polish',
+    body: 'Trim/extend/fillet 2D, mirror/pattern, ellipse/B-spline, multi-loop holes, external geometry, 3D backdrop.',
+    docHref: '/docs/sketcher',
+  },
+  {
+    title: 'Electronics + BOM rework',
+    body: 'tscircuit components/nets panel, Library ↔ Circuit linking, inline BOM with quantity overrides and distributor data.',
+    docHref: '/docs/electronics',
+  },
+]
+
+function RecentlyShipped() {
+  return (
+    <section className="relative border-t border-ink-900">
+      <div className="mx-auto max-w-7xl px-6 py-12 lg:py-14">
+        <div className="flex items-end justify-between mb-6 gap-6">
+          <div className="max-w-2xl">
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-kerf-300">
+              Recently shipped
+            </p>
+            <h2 className="mt-2 font-display text-3xl sm:text-4xl font-semibold tracking-[-0.02em]">
+              Moving fast, in public.
+            </h2>
+          </div>
+          <Link
+            to="/docs/roadmap"
+            className="hidden sm:inline-flex items-center gap-1.5 text-sm text-ink-400 hover:text-ink-100 transition-colors"
+          >
+            full roadmap
+            <ArrowRight size={14} />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {SHIPPED.map((s) => (
+            <Link
+              key={s.title}
+              to={s.docHref}
+              className="group relative rounded-2xl border border-ink-800 bg-ink-900/40 p-5 hover:border-kerf-300/40 hover:bg-ink-900/70 transition-colors"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/10 border border-emerald-400/30 px-2 py-0.5 text-[10px] font-mono uppercase tracking-widest text-emerald-300">
+                  <Check size={10} strokeWidth={3} />
+                  shipped
+                </span>
+                <ArrowRight
+                  size={14}
+                  className="text-ink-500 group-hover:text-kerf-300 group-hover:translate-x-0.5 transition-all"
+                />
+              </div>
+              <h3 className="font-display text-lg font-semibold tracking-tight text-ink-100 mb-1.5">
+                {s.title}
+              </h3>
+              <p className="text-sm text-ink-300 leading-relaxed">{s.body}</p>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* Section: Roadmap glimpse                                                    */
+/* -------------------------------------------------------------------------- */
+
+const ROADMAP = [
+  { title: 'NURBS surfacing', body: 'sweep2 · networkSrf · blendSrf for jewelry & freeform.' },
+  { title: 'SPICE simulation', body: 'ngspice-wasm in a Worker. Probe pins, get plots.' },
+  { title: 'FEM analysis', body: 'CalculiX + Gmsh. Linear static, modal, bonded contact.' },
+  { title: 'Direct face manipulation', body: 'Gumball on faces, parametric timeline intact.' },
+]
+
+function RoadmapGlimpse() {
+  return (
+    <section className="relative border-t border-ink-900 bg-ink-950/60">
+      <div className="mx-auto max-w-7xl px-6 py-12 lg:py-14">
+        <div className="max-w-2xl mb-6">
+          <p className="font-mono text-xs uppercase tracking-[0.2em] text-kerf-300">
+            On the way
+          </p>
+          <h2 className="mt-2 font-display text-3xl sm:text-4xl font-semibold tracking-[-0.02em]">
+            What we're building next.
+          </h2>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {ROADMAP.map((r) => (
+            <div
+              key={r.title}
+              className="rounded-xl border border-dashed border-ink-700 bg-ink-900/30 p-4 hover:border-kerf-300/30 hover:bg-ink-900/50 transition-colors"
+            >
+              <span className="inline-flex items-center gap-1 rounded-full bg-ink-900 border border-ink-800 px-2 py-0.5 text-[10px] font-mono uppercase tracking-widest text-ink-400 mb-2">
+                <span aria-hidden>🔮</span>
+                planned
+              </span>
+              <h3 className="font-display text-sm font-semibold tracking-tight text-ink-100 mb-1">
+                {r.title}
+              </h3>
+              <p className="text-xs text-ink-400 leading-relaxed">{r.body}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* Section: Local vs Hosted                                                    */
+/* -------------------------------------------------------------------------- */
+
+const SHARED_FEATURES = [
+  'Full editor: JSCAD, B-rep, sketcher, drawings, electronics',
+  'Library, BOM, Workshop sharing',
+  'File revisions = unlimited undo',
+  'Workspaces with member roles',
+  'Multi-domain via free-form tags',
+]
+
+function LocalVsHosted() {
+  return (
+    <section className="relative border-t border-ink-900">
+      <div className="mx-auto max-w-6xl px-6 py-12 lg:py-14">
+        <div className="text-center mb-8 max-w-2xl mx-auto">
+          <p className="font-mono text-xs uppercase tracking-[0.2em] text-kerf-300">
+            Local or hosted
+          </p>
+          <h2 className="mt-2 font-display text-3xl sm:text-4xl font-semibold tracking-[-0.02em]">
+            Same product. Two ways to run it.
+          </h2>
+          <p className="mt-3 text-ink-300 leading-relaxed">
+            Every line of code is open source — including billing,
+            Workshop, and git sync. We host the binary as a service so you
+            don't have to operate Postgres yourself.
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-4">
+          <RunCard
+            icon={<Server size={16} />}
+            label="Local install"
+            sub="MIT · self-host"
+            ctaText="Install locally"
+            ctaTo="/docs/install"
+            extra="Bring your own LLM API key"
+            features={SHARED_FEATURES}
+          />
+          <RunCard
+            icon={<Zap size={16} />}
+            label="Hosted"
+            sub="we run it for you"
+            highlighted
+            ctaText="Sign up free"
+            ctaTo="/signup"
+            extra="Metered LLM tokens + storage"
+            features={SHARED_FEATURES}
+            extras={['Daily backups', 'GitHub OAuth + branch sync', 'Paystack billing (USD/ZAR)']}
+          />
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function RunCard({ icon, label, sub, ctaText, ctaTo, features, extras = [], extra, highlighted }) {
+  return (
+    <div
+      className={
+        'rounded-2xl border bg-ink-900/40 backdrop-blur p-5 flex flex-col gap-4 ' +
+        (highlighted
+          ? 'border-kerf-300/40 ring-1 ring-kerf-300/20'
+          : 'border-ink-800')
+      }
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <span className="grid place-items-center w-9 h-9 rounded-lg bg-kerf-300/15 border border-kerf-300/30 text-kerf-300">
+            {icon}
+          </span>
+          <div>
+            <h3 className="font-display text-lg font-semibold tracking-tight text-ink-100">
+              {label}
+            </h3>
+            <p className="text-xs text-ink-400 font-mono">{sub}</p>
+          </div>
+        </div>
+        {highlighted ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-kerf-300 text-ink-950 text-[10px] font-mono font-semibold uppercase tracking-widest px-2.5 py-0.5">
+            zero-ops
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 rounded-full bg-ink-800 text-ink-300 text-[10px] font-mono uppercase tracking-widest px-2.5 py-0.5">
+            32 MB
+          </span>
+        )}
+      </div>
+
+      <ul className="flex flex-col gap-2">
+        {features.map((f) => (
+          <li key={f} className="flex items-start gap-2.5 text-sm text-ink-200">
+            <Check size={13} className="mt-1 text-kerf-300 shrink-0" />
+            <span>{f}</span>
+          </li>
+        ))}
+        {extras.map((f) => (
+          <li key={f} className="flex items-start gap-2.5 text-sm text-ink-200">
+            <Check size={13} className="mt-1 text-kerf-300 shrink-0" />
+            <span>{f}</span>
+          </li>
+        ))}
+      </ul>
+
+      <div className="rounded-md bg-ink-950/60 border border-ink-800 px-3 py-1.5">
+        <p className="text-xs text-ink-400 font-mono">{extra}</p>
+      </div>
+
+      <Button
+        as={Link}
+        to={ctaTo}
+        variant={highlighted ? 'primary' : 'outline'}
+        size="md"
+        className="w-full"
+      >
+        {ctaText}
+        <ArrowRight size={14} />
+      </Button>
+    </div>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* Section: Pricing teaser                                                     */
+/* -------------------------------------------------------------------------- */
+
+function PricingTeaser() {
+  return (
+    <section className="relative border-t border-ink-900 bg-gradient-to-b from-ink-950 to-ink-900/40">
+      <div className="mx-auto max-w-7xl px-6 py-12 lg:py-14">
+        <div className="flex items-end justify-between mb-6 gap-6">
+          <div className="max-w-2xl">
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-kerf-300">
+              Pricing
+            </p>
+            <h2 className="mt-2 font-display text-3xl sm:text-4xl font-semibold tracking-[-0.02em]">
+              No seats. No tiers. Just usage.
+            </h2>
+          </div>
+          <Link
+            to="/pricing"
+            className="hidden sm:inline-flex items-center gap-1.5 text-sm text-ink-400 hover:text-ink-100 transition-colors"
+          >
+            see full pricing
+            <ArrowRight size={14} />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <TeaserPlan
+            label="Free local install"
+            price="$0"
+            note="MIT · forever"
+            bullets={['Single Go binary', 'Bring your own LLM key', 'Bring your own Postgres']}
+            ctaTo="/docs/install"
+            ctaText="Install"
+          />
+          <TeaserPlan
+            highlighted
+            label="Hosted Free"
+            price="$0"
+            note="50 MB free"
+            bullets={['No card required', 'Workspaces + sharing', 'Metered when you exceed free tier']}
+            ctaTo="/signup"
+            ctaText="Sign up"
+          />
+          <TeaserPlan
+            label="Pay-as-you-go"
+            price="$0.20"
+            note="per GB-month + LLM"
+            bullets={['USD displayed, ZAR settled', 'Top up in $5 increments', 'Stop anytime']}
+            ctaTo="/pricing"
+            ctaText="See rates"
+          />
+        </div>
+
+        <p className="mt-4 text-center text-xs text-ink-500 font-mono">
+          USD displayed · ZAR settled via Paystack · 20% margin over provider list price
+        </p>
+      </div>
+    </section>
+  )
+}
+
+function TeaserPlan({ label, price, note, bullets, ctaTo, ctaText, highlighted }) {
+  return (
+    <div
+      className={
+        'relative rounded-2xl border p-5 bg-ink-900/40 backdrop-blur transition-colors ' +
+        (highlighted
+          ? 'border-kerf-300/40 ring-1 ring-kerf-300/20'
+          : 'border-ink-800 hover:border-ink-700')
+      }
+    >
+      <div className="flex items-baseline justify-between mb-1">
+        <h3 className="font-display text-base font-semibold tracking-tight text-ink-100">
+          {label}
+        </h3>
+        {highlighted && (
+          <span className="text-[10px] font-mono uppercase tracking-widest text-kerf-300">
+            popular
+          </span>
+        )}
+      </div>
+      <div className="flex items-baseline gap-2 mb-3">
+        <span className="font-display text-3xl font-semibold tracking-tight text-ink-100">
+          {price}
+        </span>
+        <span className="text-xs text-ink-400 font-mono">{note}</span>
+      </div>
+      <ul className="flex flex-col gap-1.5 mb-4">
+        {bullets.map((b) => (
+          <li key={b} className="flex items-start gap-2 text-sm text-ink-300">
+            <span className="mt-2 w-1 h-1 rounded-full bg-ink-500 shrink-0" />
+            <span>{b}</span>
+          </li>
+        ))}
+      </ul>
+      <Link
+        to={ctaTo}
+        className={
+          'inline-flex items-center justify-center gap-1.5 w-full h-9 rounded-md text-sm font-medium transition-colors ' +
+          (highlighted
+            ? 'bg-kerf-300 text-ink-950 hover:bg-kerf-200'
+            : 'bg-ink-800 text-ink-100 border border-ink-700 hover:border-ink-600')
+        }
+      >
+        {ctaText}
+        <ArrowRight size={13} />
+      </Link>
+    </div>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* Section: Made in South Africa                                               */
+/* -------------------------------------------------------------------------- */
+
+function MadeInSA() {
+  return (
+    <section className="relative border-t border-ink-900">
+      <div className="mx-auto max-w-5xl px-6 py-12">
+        <div className="rounded-2xl border border-ink-800 bg-ink-900/30 backdrop-blur p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center gap-5 justify-between">
+          <div className="flex items-center gap-5">
+            <span
+              className="text-4xl leading-none shrink-0"
+              aria-hidden
+            >
+              🇿🇦
+            </span>
+            <div>
+              <p className="font-display text-lg font-semibold tracking-tight text-ink-100">
+                Built by a small team in Durban.
+              </p>
+              <p className="text-sm text-ink-400 leading-relaxed mt-1">
+                Engineered for engineers everywhere.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <a
+              href={GITHUB_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 rounded-md border border-ink-800 bg-ink-900/60 px-3 py-1.5 text-xs text-ink-300 hover:border-ink-700 hover:text-ink-100 transition-colors"
+            >
+              <Github size={13} />
+              <span className="font-mono">imranp/kerf</span>
+            </a>
+            <Link
+              to="/pricing"
+              className="inline-flex items-center gap-2 rounded-md border border-ink-800 bg-ink-900/60 px-3 py-1.5 text-xs text-ink-300 hover:border-ink-700 hover:text-ink-100 transition-colors"
+            >
+              <Wallet size={13} />
+              See pricing
+            </Link>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* CTA strip (between sections)                                                */
+/* -------------------------------------------------------------------------- */
+
+function CTAStrip() {
+  return (
+    <section className="relative border-t border-ink-900">
+      <div className="mx-auto max-w-7xl px-6 py-12 lg:py-14">
+        <div className="rounded-2xl border border-ink-800 bg-gradient-to-br from-ink-900 via-ink-900 to-ink-950 p-7 lg:p-10 relative overflow-hidden">
+          <div
+            aria-hidden
+            className="absolute -right-32 -top-32 w-96 h-96 rounded-full bg-kerf-300/10 blur-3xl"
+          />
+          <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+            <div>
+              <h2 className="font-display text-3xl sm:text-4xl font-semibold tracking-[-0.02em]">
+                Cut your first part.
+              </h2>
+              <p className="mt-2 text-ink-300 max-w-xl">
+                Sign up free and ship a model in the next ten minutes — or
+                clone the repo and self-host. Both paths are first-class.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Button as={Link} to="/signup" variant="primary" size="lg">
+                Try it free
+                <ArrowRight size={16} />
+              </Button>
+              <Button as="a" href={GITHUB_URL} target="_blank" rel="noreferrer" variant="outline" size="lg">
+                <Github size={16} />
+                GitHub
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* Page                                                                        */
 /* -------------------------------------------------------------------------- */
 
 export default function Landing() {
   return (
     <div className="min-h-screen bg-ink-950 text-ink-100">
       <Header />
-
-      {/* HERO */}
-      <section className="relative">
-        <HeroBackdrop />
-
-        <div className="relative mx-auto max-w-7xl px-6 pt-20 pb-24 lg:pt-28 lg:pb-32">
-          <div className="grid lg:grid-cols-[1.05fr_1.15fr] gap-12 items-center">
-            <div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-ink-800 bg-ink-900/70 backdrop-blur px-3 py-1 text-xs text-ink-300 font-mono">
-                <span className="w-1.5 h-1.5 rounded-full bg-kerf-300 animate-pulse" />
-                public beta · open source
-              </span>
-
-              <h1 className="mt-6 font-display text-5xl sm:text-6xl lg:text-7xl font-semibold tracking-[-0.03em] leading-[1.02]">
-                CAD that you can
-                <br />
-                <span className="relative inline-block text-kerf-300">
-                  talk to
-                  <span
-                    aria-hidden
-                    className="absolute left-0 right-0 -bottom-2 h-2 bg-kerf-300/20 -skew-x-12 rounded-sm"
-                  />
-                </span>
-                .
-              </h1>
-
-              <p className="mt-7 text-lg text-ink-300 leading-relaxed max-w-xl">
-                Kerf is a chat-driven CAD workspace. Write{' '}
-                <span className="text-ink-100 font-mono text-base">JSCAD</span>,
-                sketch with constraints, assemble parts, and produce real engineering
-                drawings — with an LLM in the loop that edits the source for you.
-              </p>
-
-              <div className="mt-9 flex flex-wrap items-center gap-3">
-                <Button as={Link} to="/signup" variant="primary" size="lg">
-                  Get started
-                  <ArrowRight size={16} />
-                </Button>
-                <Button
-                  as="a"
-                  href={GITHUB_URL}
-                  target="_blank"
-                  rel="noreferrer"
-                  variant="outline"
-                  size="lg"
-                >
-                  <Github size={16} />
-                  View on GitHub
-                </Button>
-              </div>
-
-              <div className="mt-10 flex items-center gap-6 text-xs text-ink-400 font-mono">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-1 h-1 rounded-full bg-ink-500" />
-                  MIT licensed
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-1 h-1 rounded-full bg-ink-500" />
-                  single-binary self-host
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-1 h-1 rounded-full bg-ink-500" />
-                  no card required
-                </span>
-              </div>
-            </div>
-
-            <div className="lg:pl-4">
-              <WorkspaceMock />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* HOW IT WORKS */}
-      <section className="relative border-t border-ink-900">
-        <div className="mx-auto max-w-6xl px-6 py-20 lg:py-24">
-          <div className="max-w-2xl mb-8">
-            <p className="font-mono text-xs uppercase tracking-[0.2em] text-kerf-300">
-              How it works
-            </p>
-            <h2 className="mt-3 font-display text-3xl sm:text-4xl font-semibold tracking-tight">
-              From a sentence to a part — and back.
-            </h2>
-            <p className="mt-4 text-ink-300 leading-relaxed">
-              Three loops, one workspace. Chat refines code, sketches feed extrusions,
-              parts compose into assemblies.
-            </p>
-          </div>
-
-          <HowRow
-            index={0}
-            title="Chat → 3D model"
-            copy="Click any part in the viewport to drop a chip into chat. The agent reads the JSCAD, makes a precise edit, and the worker re-renders. Every tool call is a chat row; Cmd+Z undoes anything."
-          >
-            <ChatToModelDiagram />
-          </HowRow>
-
-          <HowRow
-            index={1}
-            title="Sketch with constraints"
-            copy="Draw a 2D profile, add parallel/perpendicular/equal/distance/angle constraints, and let planegcs solve the geometry. The output is a Geom2 your JSCAD imports — fully parametric."
-          >
-            <SketchDiagram />
-          </HowRow>
-
-          <HowRow
-            index={2}
-            title="Assemble parts"
-            copy="Insert any Object from any Part as a Component placed at a transform — OnShape-style. Multi-Object insert, rigid groups, and the same chat agent that knows the rest of your project."
-          >
-            <AssemblyDiagram />
-          </HowRow>
-        </div>
-      </section>
-
-      {/* WHAT YOU CAN DO */}
-      <section className="relative border-t border-ink-900 bg-ink-950">
-        <div className="mx-auto max-w-7xl px-6 py-20 lg:py-24">
-          <div className="max-w-2xl mb-12">
-            <p className="font-mono text-xs uppercase tracking-[0.2em] text-kerf-300">
-              What you can do
-            </p>
-            <h2 className="mt-3 font-display text-3xl sm:text-4xl font-semibold tracking-tight">
-              Real engineering output, end to end.
-            </h2>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <CapabilityTile
-              icon={Code2}
-              title="JSCAD authoring"
-              body="Plain JavaScript with @jscad/modeling. Multi-Object Parts. Worker-based eval, mesh cache, file-size-aware debounce."
-            />
-            <CapabilityTile
-              icon={MousePointerClick}
-              title="Click parts, chat to refine"
-              body="Every Object has a stable id. Click in the viewport to pin chat to that geometry. The LLM edits exactly that surface, hole, or feature."
-            />
-            <CapabilityTile
-              icon={PenTool}
-              title="Constraint sketches"
-              body="planegcs solver. Parallel, perpendicular, equal, tangent, coincident, distance, angle. Drag-to-solve with live DOF feedback."
-            />
-            <CapabilityTile
-              icon={Layers}
-              title="Assemblies"
-              body="Insert dialog, multi-Object Parts, rigid groups. Components reference Objects across files. Transform panel and chat both edit them."
-            />
-            <CapabilityTile
-              icon={FileText}
-              title="2D drawings"
-              body="Multi-sheet TechDraw-style drawings. 3-view, sections, details. Linear/aligned/radius/diameter/angular/baseline/chain/ordinate dimensions."
-            />
-            <CapabilityTile
-              icon={Ruler}
-              title="GD&T + symbols"
-              body="Surface finish, weld, GD&T frames per ASME Y14.5. Centerlines, break-lines, balloons, leaders — every symbol an engineer expects."
-            />
-            <CapabilityTile
-              icon={Boxes}
-              title="STEP I/O"
-              body="Chunked resumable uploads, SHA-256 verified. Import STEP from a URL. STEP export today via mesh; B-rep export when OCCT lands."
-            />
-            <CapabilityTile
-              icon={History}
-              title="File revisions = undo"
-              body="Every edit — by hand, by chat, by tool — appends a revision. Cmd+Z restores. Soft-deleted files stay restorable from the History drawer."
-            />
-            <CapabilityTile
-              icon={GitBranch}
-              title="Self-host or hosted"
-              body="Single Go binary, embedded frontend, ~32 MB. Or use the hosted tier with Workshop sharing, git, and metered billing."
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* CTA strip */}
-      <section className="border-t border-ink-900">
-        <div className="mx-auto max-w-7xl px-6 py-16 lg:py-20">
-          <div className="rounded-2xl border border-ink-800 bg-gradient-to-br from-ink-900 to-ink-950 p-10 lg:p-14 relative overflow-hidden">
-            <div
-              aria-hidden
-              className="absolute -right-24 -top-24 w-80 h-80 rounded-full bg-kerf-300/10 blur-3xl"
-            />
-            <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-              <div>
-                <h2 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight">
-                  Cut your first part.
-                </h2>
-                <p className="mt-3 text-ink-300 max-w-xl">
-                  Sign up free and ship a model in the next ten minutes — or clone the
-                  repo and self-host. Both paths are first-class.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <Button as={Link} to="/signup" variant="primary" size="lg">
-                  Get started
-                  <ArrowRight size={16} />
-                </Button>
-                <Button
-                  as="a"
-                  href={GITHUB_URL}
-                  target="_blank"
-                  rel="noreferrer"
-                  variant="outline"
-                  size="lg"
-                >
-                  <Github size={16} />
-                  GitHub
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* FOOTER */}
-      <footer className="border-t border-ink-900">
-        <div className="mx-auto max-w-7xl px-6 py-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3 text-xs text-ink-400 font-mono">
-            <span className="inline-block w-3 h-0.5 bg-kerf-300" />
-            <span>© 2026 Kerf</span>
-            <span className="text-ink-600">·</span>
-            <span>MIT (cloud tier proprietary)</span>
-          </div>
-          <nav className="flex items-center gap-5 text-xs text-ink-400">
-            <a
-              href={GITHUB_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 hover:text-ink-100"
-            >
-              <Github size={12} />
-              GitHub
-            </a>
-            <a
-              href={`${GITHUB_URL}/tree/main/docs`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 hover:text-ink-100"
-            >
-              Docs
-              <ExternalLink size={11} />
-            </a>
-            <a
-              href={`${GITHUB_URL}/blob/main/ROADMAP.md`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 hover:text-ink-100"
-            >
-              Roadmap
-              <ExternalLink size={11} />
-            </a>
-            <Link to="/login" className="hover:text-ink-100">
-              Sign in
-            </Link>
-          </nav>
-        </div>
-      </footer>
+      <Hero />
+      <CapabilityTour />
+      <ChatLoop />
+      <RecentlyShipped />
+      <RoadmapGlimpse />
+      <LocalVsHosted />
+      <PricingTeaser />
+      <CTAStrip />
+      <MadeInSA />
+      <Footer />
     </div>
   )
 }

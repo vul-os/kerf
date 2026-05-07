@@ -45,6 +45,25 @@ export const PART_VISIBILITY_VALUES = ['private', 'unlisted', 'public']
 
 // Tolerant parse — invalid / missing JSON falls back to a defaulted Part with
 // `version=1` and an empty distributors array. Always succeeds.
+//
+// Configurations / variants
+// -------------------------
+// A Part may declare per-file parameter overrides (M3 / M4 / M5 sized
+// flavors of one fastener; engraved vs blank lid). Shape:
+//
+//   { ...,
+//     "default_config": "M3",
+//     "configurations": [
+//       { "id": "M3", "label": "M3", "params": { "d": 3, "head_d": 5.5 } },
+//       { "id": "M4", "label": "M4", "params": { "d": 4, "head_d": 7   } },
+//       ...
+//     ]
+//   }
+//
+// At runtime the active config's `params` are merged OVER the equations
+// scope (config wins on collision) and passed to the runner. Same shape
+// applies to `.feature` and `.jscad` files — `getActiveConfig()` here is
+// the canonical lookup.
 export function parsePart(content) {
   let raw = null
   if (typeof content === 'string' && content.trim()) {
@@ -76,7 +95,54 @@ export function parsePart(content) {
     photos: Array.isArray(r.photos)
       ? r.photos.map(normalizePhoto).filter(Boolean)
       : [],
+    default_config: typeof r.default_config === 'string' && r.default_config.trim()
+      ? r.default_config.trim() : '',
+    configurations: Array.isArray(r.configurations)
+      ? r.configurations.map(normalizeConfiguration).filter(Boolean)
+      : [],
   }
+}
+
+// normalizeConfiguration — one row of a `configurations` array. `id` is
+// required (string, non-empty); `label` falls back to `id`; `params` is a
+// plain object of param-name → number (we don't enforce shape so future
+// non-numeric params still round-trip).
+export function normalizeConfiguration(raw) {
+  if (!raw || typeof raw !== 'object') return null
+  const id = typeof raw.id === 'string' ? raw.id.trim() : ''
+  if (!id) return null
+  const out = { id }
+  out.label = typeof raw.label === 'string' && raw.label ? raw.label : id
+  if (raw.params && typeof raw.params === 'object' && !Array.isArray(raw.params)) {
+    out.params = raw.params
+  } else {
+    out.params = {}
+  }
+  return out
+}
+
+// getActiveConfig: pick the config matching `configId`; falls back to
+// `default_config` if `configId` is empty/missing or unknown. Returns null
+// if the parsed file has no configurations or nothing matches.
+//
+// Works on any parsed object that exposes `configurations` and
+// `default_config` — Part, Sketch, Feature. Defensive against missing
+// fields.
+export function getActiveConfig(parsed, configId) {
+  if (!parsed || typeof parsed !== 'object') return null
+  const list = Array.isArray(parsed.configurations) ? parsed.configurations : []
+  if (list.length === 0) return null
+  if (typeof configId === 'string' && configId.trim()) {
+    const want = configId.trim()
+    const hit = list.find((c) => c && c.id === want)
+    if (hit) return hit
+  }
+  const def = typeof parsed.default_config === 'string' ? parsed.default_config.trim() : ''
+  if (def) {
+    const hit = list.find((c) => c && c.id === def)
+    if (hit) return hit
+  }
+  return list[0] || null
 }
 
 function normalizePhoto(raw) {
@@ -143,6 +209,14 @@ export function serializePart(part) {
   if (p.symbol_file_id) out.symbol_file_id = p.symbol_file_id
   if (p.footprint_file_id) out.footprint_file_id = p.footprint_file_id
   if (p.metadata && Object.keys(p.metadata).length > 0) out.metadata = p.metadata
+  if (p.default_config) out.default_config = p.default_config
+  if (Array.isArray(p.configurations) && p.configurations.length > 0) {
+    out.configurations = p.configurations.map((c) => ({
+      id: c.id,
+      label: c.label || c.id,
+      params: c.params && typeof c.params === 'object' ? c.params : {},
+    }))
+  }
   return JSON.stringify(out, null, 2)
 }
 

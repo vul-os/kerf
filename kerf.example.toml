@@ -15,6 +15,13 @@
 port = "8080"
 env = "local"                         # "local" | "dev" | "main"
 cors_origin = "http://localhost:5173"
+# local_mode collapses the OSS auth wall: when true (the default), the
+# frontend auto-creates a singleton user via POST /auth/bootstrap-local
+# on first paint and never shows /login. Set to false to run a multi-user
+# OSS deploy (the regular register/login flow renders). Cloud builds
+# (cloud.enabled = true) ignore this and force multi-user.
+# Override at runtime with KERF_LOCAL_MODE=true|false.
+local_mode = true
 
 # ---------------------------------------------------------------------------
 # Database (Postgres)

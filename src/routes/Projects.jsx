@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useWorkspaces } from '../store/workspaces.js'
 import {
   AlertCircle,
   Box,
@@ -11,6 +12,7 @@ import {
   Trash2,
   Pencil,
   Sparkles,
+  Tag,
   X,
 } from 'lucide-react'
 import clsx from 'clsx'
@@ -20,7 +22,13 @@ import Button from '../components/Button.jsx'
 import Input, { Textarea } from '../components/Input.jsx'
 import { api, ApiError } from '../lib/api.js'
 import { useAuth } from '../store/auth.js'
-import { PROJECT_TYPES, DEFAULT_PROJECT_TYPE, projectTypeById } from '../lib/projectTypes.js'
+import {
+  STARTER_OPTIONS,
+  DEFAULT_STARTER,
+  presetById,
+  suggestStarterFor,
+  tagSuggestionsFor,
+} from '../lib/projectTags.js'
 // Forward dep — workspace agent owns this file. Treat as optional.
 import ShareModal from '../components/ShareModal.jsx'
 
@@ -93,83 +101,145 @@ function Modal({ open, onClose, title, children, footer, widthClass = 'max-w-md'
   )
 }
 
-// ProjectTypePicker — 3-option grid that drives `type` in the new-project
-// modal. Stub types (architecture) render with a "WIP" pill so
-// users know they default to the mechanical surface for now. Selection
-// is keyboard-accessible: each card is a real radio input wrapped in a
-// label so arrow keys and tab work without us reimplementing focus.
-function ProjectTypePicker({ value, onChange }) {
+// TagsField — chip multi-select with free-text input. Active tags appear
+// as removable chips on top; the preset row below adds a tag on click;
+// typing a fresh value + Enter (or comma) adds a free-form tag. The
+// backend stores anything we send, so the preset list is purely cosmetic.
+function TagsField({ tags, onChange }) {
+  const [draft, setDraft] = useState('')
+  const inputRef = useRef(null)
+  const suggestions = tagSuggestionsFor(tags)
+
+  const add = (raw) => {
+    const t = String(raw || '').trim().toLowerCase()
+    if (!t) return
+    if (tags.includes(t)) return
+    onChange([...tags, t])
+    setDraft('')
+  }
+  const remove = (t) => onChange(tags.filter((x) => x !== t))
+  const onKeyDown = (e) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault()
+      add(draft)
+    } else if (e.key === 'Backspace' && draft === '' && tags.length > 0) {
+      remove(tags[tags.length - 1])
+    }
+  }
+
   return (
-    <fieldset>
-      <legend className="text-[11px] font-mono uppercase tracking-wider text-ink-400 mb-2">
-        Project type
-      </legend>
-      <div className="grid grid-cols-2 gap-2">
-        {PROJECT_TYPES.map((t) => {
-          const Icon = t.icon
-          const selected = value === t.id
+    <div>
+      <label className="block text-[11px] font-mono uppercase tracking-wider text-ink-400 mb-1.5">
+        Tags
+      </label>
+      <div
+        className="flex flex-wrap items-center gap-1.5 px-2 py-1.5 rounded-lg border border-ink-800 bg-ink-950/40 focus-within:border-kerf-300/40"
+        onClick={() => inputRef.current?.focus()}
+      >
+        {tags.map((t) => {
+          const preset = presetById(t)
+          const Icon = preset?.icon || Tag
           return (
-            <label
-              key={t.id}
+            <span
+              key={t}
               className={clsx(
-                'group relative flex items-start gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors',
-                selected
-                  ? `${t.border} bg-ink-800/60`
-                  : 'border-ink-800 bg-ink-900 hover:border-ink-700',
+                'inline-flex items-center gap-1 pl-1.5 pr-1 py-0.5 rounded-md text-[11px] font-mono uppercase tracking-wider border',
+                preset?.badgeBg ||
+                  'bg-ink-800/80 text-ink-200 border-ink-700',
               )}
             >
-              <input
-                type="radio"
-                name="project_type"
-                value={t.id}
-                checked={selected}
-                onChange={() => onChange(t.id)}
-                className="sr-only"
-              />
-              <div
-                className={clsx(
-                  'mt-0.5 grid place-items-center w-7 h-7 rounded-md border shrink-0',
-                  selected
-                    ? `${t.badgeBg}`
-                    : 'bg-ink-800 border-ink-700 text-ink-300',
-                )}
+              <Icon size={10} />
+              {t}
+              <button
+                type="button"
+                aria-label={`Remove tag ${t}`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  remove(t)
+                }}
+                className="ml-0.5 grid place-items-center w-3.5 h-3.5 rounded-sm hover:bg-ink-700/60"
               >
-                <Icon size={14} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[13px] font-semibold text-ink-100">{t.label}</span>
-                  {t.wip && (
-                    <span className="px-1 py-px rounded bg-ink-800 text-[9px] font-mono uppercase tracking-wider text-ink-400">
-                      WIP
-                    </span>
-                  )}
-                </div>
-                <span className="block mt-0.5 text-[11px] text-ink-400 leading-tight">
-                  {t.subtitle}
-                </span>
-              </div>
-              {/* Faint corner check when selected, mirrors the picker pattern
-                  the assembly-insert dialog uses. */}
-              <span
-                className={clsx(
-                  'absolute top-2 right-2 w-2 h-2 rounded-full transition-opacity',
-                  selected ? `${t.accent} opacity-100` : 'opacity-0',
-                )}
-                style={{ background: 'currentColor' }}
-              />
-            </label>
+                <X size={9} />
+              </button>
+            </span>
+          )
+        })}
+        <input
+          ref={inputRef}
+          type="text"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={onKeyDown}
+          onBlur={() => add(draft)}
+          placeholder={tags.length === 0 ? 'mechanical, electronics, …' : ''}
+          className="flex-1 min-w-[8ch] bg-transparent outline-none text-[13px] text-ink-100 placeholder:text-ink-500 py-0.5"
+        />
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {suggestions.map((p) => {
+          const Icon = p.icon
+          const disabled = p.active
+          return (
+            <button
+              key={p.id}
+              type="button"
+              disabled={disabled}
+              onClick={() => add(p.id)}
+              title={disabled ? 'Already added' : `Add ${p.label}`}
+              className={clsx(
+                'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono uppercase tracking-wider border transition-colors',
+                disabled
+                  ? 'opacity-40 cursor-not-allowed border-ink-800 text-ink-500'
+                  : `${p.badgeBg} hover:brightness-125`,
+              )}
+            >
+              <Icon size={10} />
+              {p.label}
+            </button>
           )
         })}
       </div>
-    </fieldset>
+    </div>
   )
 }
 
-function NewProjectModalBody({ onClose, onCreated }) {
+// StarterField — small dropdown that picks the seed file. We pre-set this
+// from suggestStarterFor(tags) but flag whether the user has overridden,
+// so subsequent tag toggles don't blow away an explicit choice.
+function StarterField({ value, onChange }) {
+  return (
+    <div>
+      <label
+        htmlFor="starter"
+        className="block text-[11px] font-mono uppercase tracking-wider text-ink-400 mb-1.5"
+      >
+        Starter file
+      </label>
+      <select
+        id="starter"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full h-9 px-2 rounded-lg border border-ink-800 bg-ink-950/40 text-[13px] text-ink-100 focus:outline-none focus:border-kerf-300/40"
+      >
+        {STARTER_OPTIONS.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.label} — {s.hint}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
+function NewProjectModalBody({ onClose, onCreated, workspaceId }) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [projectType, setProjectType] = useState(DEFAULT_PROJECT_TYPE)
+  const [tags, setTags] = useState([])
+  const [starter, setStarter] = useState(DEFAULT_STARTER)
+  // Tracks whether the user has explicitly touched the starter dropdown.
+  // While this is false, tag changes auto-pick a sensible starter; once
+  // the user commits to a value, we leave their choice alone.
+  const [starterTouched, setStarterTouched] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
   const inputRef = useRef(null)
@@ -178,6 +248,13 @@ function NewProjectModalBody({ onClose, onCreated }) {
     const t = setTimeout(() => inputRef.current?.focus(), 30)
     return () => clearTimeout(t)
   }, [])
+
+  // Auto-pick starter from tags until the user overrides it.
+  useEffect(() => {
+    if (starterTouched) return
+    const next = suggestStarterFor(tags)
+    if (next !== starter) setStarter(next)
+  }, [tags, starter, starterTouched])
 
   const onSubmit = async (e) => {
     e.preventDefault()
@@ -189,7 +266,13 @@ function NewProjectModalBody({ onClose, onCreated }) {
     setError(null)
     setSubmitting(true)
     try {
-      const project = await api.createProject(name.trim(), description.trim(), projectType)
+      const project = await api.createProject({
+        workspace_id: workspaceId,
+        name: name.trim(),
+        description: description.trim(),
+        tags,
+        starter,
+      })
       onCreated(project)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not create project.')
@@ -226,7 +309,6 @@ function NewProjectModalBody({ onClose, onCreated }) {
             <span>{error}</span>
           </div>
         )}
-        <ProjectTypePicker value={projectType} onChange={setProjectType} />
         <Input
           ref={inputRef}
           label="Name"
@@ -244,6 +326,14 @@ function NewProjectModalBody({ onClose, onCreated }) {
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
+        <TagsField tags={tags} onChange={setTags} />
+        <StarterField
+          value={starter}
+          onChange={(v) => {
+            setStarter(v)
+            setStarterTouched(true)
+          }}
+        />
         {/* Submit button is handled in footer; hidden submit lets Enter work */}
         <button type="submit" className="hidden" />
       </form>
@@ -251,9 +341,9 @@ function NewProjectModalBody({ onClose, onCreated }) {
   )
 }
 
-function NewProjectModal({ open, onClose, onCreated }) {
+function NewProjectModal({ open, onClose, onCreated, workspaceId }) {
   if (!open) return null
-  return <NewProjectModalBody onClose={onClose} onCreated={onCreated} />
+  return <NewProjectModalBody onClose={onClose} onCreated={onCreated} workspaceId={workspaceId} />
 }
 
 function RenameModalBody({ onClose, project, onSaved }) {
@@ -525,22 +615,44 @@ function ThumbnailPreview({ project }) {
   )
 }
 
-function ProjectTypeBadge({ projectType }) {
-  // Falls back to mechanical so old project rows missing the field don't
-  // render a blank chip.
-  const t = projectTypeById(projectType || DEFAULT_PROJECT_TYPE)
-  const Icon = t.icon
+// ProjectTagsBadges renders a project's tags as small chips. We cap the
+// visible count at 3 and append a "+N" overflow indicator so a wildly-
+// tagged project doesn't blow out the card layout. Falls back silently
+// when the project has no tags (older row, blank-tagged project).
+function ProjectTagsBadges({ tags }) {
+  const list = Array.isArray(tags) ? tags : []
+  if (list.length === 0) return null
+  const visible = list.slice(0, 3)
+  const overflow = list.length - visible.length
   return (
-    <span
-      title={t.subtitle}
-      className={clsx(
-        'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono uppercase tracking-wider border',
-        t.badgeBg,
+    <>
+      {visible.map((t) => {
+        const preset = presetById(t)
+        const Icon = preset?.icon || Tag
+        return (
+          <span
+            key={t}
+            title={preset?.label || t}
+            className={clsx(
+              'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono uppercase tracking-wider border',
+              preset?.badgeBg ||
+                'bg-ink-800/60 text-ink-300 border-ink-700',
+            )}
+          >
+            <Icon size={10} />
+            {t}
+          </span>
+        )
+      })}
+      {overflow > 0 && (
+        <span
+          title={list.slice(3).join(', ')}
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono uppercase tracking-wider border bg-ink-800/60 text-ink-300 border-ink-700"
+        >
+          +{overflow}
+        </span>
       )}
-    >
-      <Icon size={10} />
-      {t.label}
-    </span>
+    </>
   )
 }
 
@@ -595,7 +707,7 @@ function ProjectCard({ project, currentUserId, onShare, onRename, onDelete }) {
             >
               {isOwner ? 'You' : `Shared · ${project.my_role || 'viewer'}`}
             </span>
-            <ProjectTypeBadge projectType={project.project_type} />
+            <ProjectTagsBadges tags={project.tags} />
           </div>
         </div>
       </Link>
@@ -633,32 +745,48 @@ function SkeletonCard() {
 
 function EmptyState({ onCreate }) {
   return (
-    <Card className="p-10 text-center">
-      <div className="mx-auto grid place-items-center w-12 h-12 rounded-xl bg-ink-800 border border-ink-700">
-        <Sparkles size={20} className="text-kerf-300" />
-      </div>
-      <h3 className="mt-4 font-display text-lg font-semibold tracking-tight">
-        No projects yet
-      </h3>
-      <p className="mt-1 text-sm text-ink-400">
-        Create one to start. Pick a project type — we&apos;ll seed it with the
-        right starter file (<span className="font-mono text-ink-200">main.jscad</span>{' '}
-        for mechanical, <span className="font-mono text-ink-200">main.circuit.tsx</span>{' '}
-        for electronics).
-      </p>
-      <div className="mt-5">
-        <Button variant="primary" size="md" onClick={onCreate}>
-          <Plus size={14} />
-          New project
-        </Button>
-      </div>
-    </Card>
+    <div className="relative">
+      {/* Soft gradient backdrop for the empty state — feels like a landing
+          surface, not a dead grid. */}
+      <div
+        aria-hidden
+        className="absolute inset-0 -z-10 rounded-3xl
+                   bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))]
+                   from-kerf-300/10 via-ink-900/0 to-transparent blur-2xl"
+      />
+
+      <Card className="px-6 sm:px-10 py-12 text-center border-ink-800 bg-ink-900/60 backdrop-blur-sm">
+        <div className="mx-auto grid place-items-center w-14 h-14 rounded-2xl bg-kerf-300/15 border border-kerf-300/30 shadow-inner">
+          <Sparkles size={24} className="text-kerf-300" />
+        </div>
+        <h3 className="mt-5 font-display text-2xl font-semibold tracking-tight text-ink-100">
+          Start your first project
+        </h3>
+        <p className="mt-1.5 text-sm text-ink-400 max-w-md mx-auto leading-relaxed">
+          Mix any file kinds in one project — sketches, features, drawings,
+          assemblies, circuits, library parts, plain JSCAD modules. Tag it
+          for the Workshop later.
+        </p>
+
+        <div className="mt-7 flex items-center justify-center">
+          <Button variant="primary" size="md" onClick={onCreate}>
+            <Plus size={14} />
+            New project
+          </Button>
+        </div>
+      </Card>
+    </div>
   )
 }
 
 export default function Projects() {
   const navigate = useNavigate()
   const user = useAuth((s) => s.user)
+  const { workspaceSlug } = useParams()
+  const workspaces = useWorkspaces((s) => s.workspaces)
+  const currentSlug = useWorkspaces((s) => s.currentSlug)
+  const setCurrent = useWorkspaces((s) => s.setCurrent)
+  const loadAll = useWorkspaces((s) => s.loadAll)
   const [projects, setProjects] = useState(null)
   const [error, setError] = useState(null)
 
@@ -667,10 +795,33 @@ export default function Projects() {
   const [deleteOf, setDeleteOf] = useState(null)
   const [shareOf, setShareOf] = useState(null)
 
+  // Hydrate workspace list once; pick a default; keep URL slug in sync with the
+  // store. The bare /projects URL redirects to /w/<current>/projects below.
+  const wsLoaded = useWorkspaces((s) => s.loaded)
+  const wsLoading = useWorkspaces((s) => s.loading)
   useEffect(() => {
+    if (!wsLoaded && !wsLoading) loadAll()
+  }, [wsLoaded, wsLoading, loadAll])
+
+  useEffect(() => {
+    if (workspaceSlug && workspaceSlug !== currentSlug) setCurrent(workspaceSlug)
+  }, [workspaceSlug, currentSlug, setCurrent])
+
+  useEffect(() => {
+    if (!workspaceSlug && currentSlug) {
+      navigate(`/w/${currentSlug}/projects`, { replace: true })
+    }
+  }, [workspaceSlug, currentSlug, navigate])
+
+  const activeWorkspace = workspaces.find((w) => w.slug === (workspaceSlug || currentSlug)) || null
+  const activeWorkspaceId = activeWorkspace?.id || null
+
+  useEffect(() => {
+    if (!activeWorkspaceId) { setProjects([]); return }
     let cancelled = false
+    setProjects(null)
     api
-      .listProjects()
+      .listProjects(activeWorkspaceId)
       .then((list) => {
         if (cancelled) return
         const arr = Array.isArray(list) ? list : []
@@ -686,10 +837,8 @@ export default function Projects() {
         setError(err instanceof ApiError ? err.message : 'Could not load projects.')
         setProjects([])
       })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+    return () => { cancelled = true }
+  }, [activeWorkspaceId])
 
   const onCreated = (project) => {
     setShowNew(false)
@@ -763,6 +912,7 @@ export default function Projects() {
         open={showNew}
         onClose={() => setShowNew(false)}
         onCreated={onCreated}
+        workspaceId={activeWorkspaceId}
       />
       <RenameModal
         open={!!renameOf}

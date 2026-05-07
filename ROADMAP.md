@@ -42,8 +42,9 @@ local install, optional hosted tier with billing + workshop sharing + git.
 | **Cloud git → object-storage Storer** | 🚧 in flight | Stateless serverless deploys (R2/S3 backed bare repos) |
 | **Test scenarios: assembly + sketcher + drawing** | 📋 next | Integration coverage |
 | **Sketcher v2 improvements** | 📋 next | Trim/extend/fillet (2D), mirror/pattern, ellipse/B-spline, more constraints, external geometry, 3D backdrop, multi-loop holes |
-| **Equations / global parameters** | 📋 next | Project-level `.equations` JSON; mathjs expressions; injected into JSCAD + `.feature` + `.sketch` eval; LLM-flattering parametric layer; no kernel dependency |
-| **Configurations / variants** | 📋 next | Per-file parameter overrides (M3/M4/M5 size flavors of one Part); editor config dropdown; assembly Components reference specific config; BOM groups by `(file, config)` |
+| **Sketcher v1 fixes** | 🚨 urgent | Live tooling broken: line tool unreliable, sketch can't drive Pad / Pocket / Hole reliably. Audit SketchView interactions + planegcs round-trip, repair the sketch→feature handoff, integration tests covering: line draw → constraint solve → use as Pad sketch → resulting body has expected vertex count. |
+| **Equations / global parameters** | ✅ shipped | `.equations` JSON kind; mathjs evaluator (`src/lib/equations.js`); EquationsEditor (full-bleed table); injected into JSCAD as `params` arg, `.feature` + `.sketch` via `${name}` placeholders; backend `read_equations` / `set_equation` LLM tools + `docs/llm/equations.md`. Multi-file merge with last-loaded-wins. |
+| **Configurations / variants** | ✅ shipped | Per-file parameter overrides round-trip in `.part` / `.feature` / `.sketch` JSON (`{default_config, configurations:[{id, label, params}]}`); editor config dropdown + ConfigurationsPanel slide-out; assembly components pin via `config_id` (frontend `parseAssembly` + backend BOM both honor); BOM groups by `(file_id, config_id)` and surfaces a `config_label` chip in BOMTable; LLM tools `add_configuration` / `set_active_config` + `docs/llm/configurations.md`; integration scenario `configurations` covers Part round-trip, assembly references, BOM rollup, and tool repin/clear. |
 | **Materials database (`.material` Library kind)** | 🔮 planned | Curated `kerf-system/materials` Library project; ~500 common engineering materials (E/ν/ρ/α/yield/k/cₚ); consumed by FEM, tolerance, Part defaults, drawing callouts; shared mech ↔ architecture |
 | **3D assembly mates (Tier 0 foundation)** | 🔮 planned | Coincident / concentric / parallel / perpendicular / distance / angle / tangent; SolveSpace solver (GPL3) subprocess; `mates: [...]` on `.assembly`; depends on Phase 3 |
 | **Scripting: `.script.ts` automation** | 🔮 planned | Browser-Worker TypeScript via esbuild-wasm; typed `kerf.*` API; backend heavy ops (FEM/CAM/STEP-tess) called via fixed RPC; never evals user code on the backend |
@@ -55,12 +56,18 @@ local install, optional hosted tier with billing + workshop sharing + git.
 | **Topology optimization** | 🔮 planned | CalculiX SIMP wrapper; density-field → mesh; `.topo` file kind references `.feature` design space; "make it 30% lighter" demo; depends on FEM |
 | **Architecture: IFC + text-DSL** | 🔮 planned | Architectural project type. `.bim` text-DSL → IfcOpenShell (LGPL) compiler → `.ifc` artifact → web-ifc/Three.js viewer. Walls/slabs/spaces/openings/levels/site; IFC4 subset grows iteratively |
 | **NURBS surfacing (Phase 4)** | 🔮 planned | sweep1/sweep2/networkSrf/blendSrf, surface continuity. Rhino-tier territory. |
-| **Auth-optional removal** | 📋 next | Replace with auto-account-on-first-run |
+| **Phase 4a: jewelry-priority surfacing** | 📋 next | Promote three Phase-4 ops to "ship now" because jewelry users need them: **sweep2** (twin-rail sweep — ring shanks, bracelet bands), **networkSrf** (fit a surface to a U/V grid of edges — organic settings, prong baskets), **blendSrf** (G1/G2 blend between two edges — bezels, claw bases). LLM tools (`feature_sweep2`, `feature_network_srf`, `feature_blend_srf`) so the model can compose jewelry geometry from text descriptions. Tests covering each op end-to-end. |
+| **Phase 4b: direct face manipulation (gumball)** | 🔮 planned | Click a face → gumball appears with translate / rotate / scale handles. Drags emit `push_pull`-style nodes into the timeline (parametric stays intact, no "history off" mode). Bridges Rhino's direct-modeling feel without abandoning the timeline. |
+| **Auth-optional removal** | ✅ shipped | Local-mode-only: `[server].local_mode = true` (the OSS default) gates a new `POST /auth/bootstrap-local` endpoint that auto-creates a singleton user + workspace and returns a session, idempotent on subsequent calls. Frontend's `useCloudConfig` surfaces the flag; `App.jsx` calls `tryBootstrapLocal()` after the existing `/api/bootstrap` probe and redirects `/`, `/login`, `/signup` to `/projects` once authed. Cloud builds force `local_mode=false` and `/auth/bootstrap-local` returns 404 — multi-user signup/login is unchanged. Override at runtime via `KERF_LOCAL_MODE`. |
 | **Performance: server-side STEP pre-tessellation** | 📋 next | wazero or Node sidecar; reduces in-browser STEP parse |
 | **Performance: diff-based + compressed revisions** | 📋 next | ~50× shrink on `file_revisions` storage |
 | **Project-type enum (mechanical / electronics / architecture …)** | 🔮 planned | Mandatory at create; gates renderer, LLM tools, file extensions; workshop multi-type from day one |
+| **Drop project types → free-form tags** | ✅ shipped | `projects.project_type` enum replaced by `projects.tags TEXT[]` with a GIN index. Migration backfills the old single value into a 1-element tags array. Create dialog renders preset tag chips (Mechanical / Electronics / Architecture / Jewelry / PCB / Robotics / Drone / Lighting) + a free-text input + an explicit Starter dropdown (`jscad` / `circuit` / `blank`). Workshop filter is a multi-select tag chip strip backed by repeatable `?tag=` URL params (ANDed). LLM prompt addendum reads the tags array. BRep stays a file kind (`.feature`), not a project type — compose freely with `.jscad`, `.circuit.tsx`, `.assembly` in the same project. |
 | **Electronics projects via tscircuit** | 🔮 planned | TSX → Circuit JSON; schematic + PCB + 3D-board viewers; LLM edits `.circuit.tsx` |
 | **Cross-project parts (PCB-as-part in mechanical assembly)** | 🔮 planned | Reference electronics project's `board_3d` or `board_outline_2d` from a mechanical Component, pinned or tracking-latest |
+| **Electronics: SPICE simulation** | 🔮 planned | ngspice-wasm in a Web Worker; auto-emit `.cir` netlist from CircuitJSON; transient + DC + AC analyses; probe markers placed on schematic nets/pins → time/frequency plots overlay; SPICE results stored on a `.simulation` file kind. See plan section below. |
+| **Electronics: RF simulation** | 🔮 planned | s-parameter / Smith-chart analysis via scikit-rf-style toolkit (port to TS or backend Python subprocess); openEMS for EM field solver later. Distinct from SPICE — typical SPICE is poor at >100MHz. |
+| **Electronics: autorouting** | 🔮 planned | Wrap FreeRouting (Java, GPL) as a backend subprocess; export tscircuit board outline + nets to Specctra DSN, route, import SES, write back to CircuitJSON. ML-based reroute (DeepPCB-style) is a phase-2 upgrade. |
 | **Library system v1 (Parts + BOM)** | 🚧 in flight | `kind='part'` files with rich metadata; Assembly Components reference Parts; BOM rollup endpoint + CSV export; per-Part `visibility` (private/unlisted/public); product photos attached to Parts; "verified publisher" flag for curated libraries (Adafruit, Sparkfun, McMaster, Misumi, etc.). KiCad-style for both mech and electronics. |
 | **Library Phase 2: distributor APIs** | 🔮 planned | Live pricing + stock from DigiKey / Mouser / LCSC / McMaster |
 | **Library Phase 3: curated manufacturer libraries** | 🔮 planned | Verified-publisher accounts (e.g. `kerf-system/adafruit-parts`), Workshop badge, manufacturer-contributed updates via PR |
@@ -968,6 +975,135 @@ That's the wrong abstraction.
   highlights it on the schematic + PCB + 3D simultaneously
   (cross-view selection sync, mirroring how the mechanical
   ObjectsPanel ↔ Renderer already work).
+
+---
+
+## Electronics: SPICE simulation
+
+Adds simulation as a first-class tab in the CircuitEditor, with results
+that visually overlay the existing schematic. Three-phase ramp:
+
+### Phase 1 — Transient + DC analysis (browser, ngspice-wasm)
+
+- **Engine.** [ngspice](http://ngspice.sourceforge.net/) compiled to WebAssembly,
+  run in a dedicated Web Worker. Existing community ports
+  (`ngspice-wasm`, `eda-toolkit/wasm-spice`) are starting points; if none
+  are mature enough, we fork the closest one.
+- **Netlist emit.** A new `src/lib/circuitToSpice.js` walks the compiled
+  CircuitJSON and emits a `.cir` netlist:
+  - `source_resistor` → `R<refdes> n+ n- <ohms>`
+  - `source_capacitor` → `C<refdes> n+ n- <farads>`
+  - `source_inductor` → `L<refdes> n+ n- <henries>`
+  - `source_voltage_source` → `V<refdes> n+ n- DC <v>` or `SIN(...)` / `PULSE(...)` from a typed `waveform` prop on the tscircuit element.
+  - Active devices reference SPICE model cards (BJT, MOSFET, diode) bundled in `kerf-system/spice-models` Library workspace; the Library Part's `spice_model` field overrides for custom MPNs.
+- **Probes.** A new schematic tool: click a net or pin to drop a probe.
+  Probe markers serialize into the circuit file's `library_mappings`
+  comment block (or a sibling `simulation` field). Each probe becomes a
+  `.print` / `.save` directive in the netlist.
+- **Run.** A new "Simulation" tab next to PCB / 3D in CircuitEditor. UI:
+  analysis selector (transient / DC / DC sweep), time / V controls,
+  Run button. Results render as a Plotly-style time-series chart (one
+  trace per probe). Cursor over the chart highlights the corresponding
+  probe on the schematic — that's the user's "link to drawing when
+  clicked" metaphor extended to electronics.
+- **Storage.** Sim runs persist as `.simulation` files (new `kind`)
+  alongside the `.circuit.tsx`. Each `.simulation` references a circuit
+  file and stores the analysis spec + last result waveforms (compressed).
+  Re-runs don't blow away history — the LLM and the user can compare
+  runs over time.
+
+### Phase 2 — AC / Bode / noise + small-signal
+
+- AC sweep: frequency-domain magnitude/phase per probe, log/lin axis.
+- Bode plot view (gain + phase vs freq) for op-amp / filter circuits.
+- Noise analysis: input-referred noise spectral density.
+
+### Phase 3 — Mixed-signal + behavioural
+
+- Verilog-A / behavioural model support (ngspice has `bsource`).
+- Mixed-mode digital + analog co-simulation via Icarus Verilog
+  cosimulation hook.
+
+### LLM integration
+
+`run_simulation(circuit_file_id, analysis: 'transient'|'dc'|'ac', ...)`
+becomes a tool the model can call. Probe placement remains a user UX
+action (the model can recommend probes via comments in the TSX).
+
+### Out of scope (phase 1)
+
+- RF / s-parameters — separate roadmap entry.
+- Thermal coupling — distinct domain.
+- Schematic-driven simulation directives (FreeCAD-style `.tran` blocks
+  inside the schematic) — defer until basic flow ships.
+
+---
+
+## Electronics: RF simulation
+
+Distinct from SPICE because typical SPICE is unreliable above
+~100 MHz (parasitic models break down, transmission-line effects
+dominate). RF needs a different toolchain.
+
+### Phase 1 — Lumped-network s-parameter analysis
+
+- Library: port [scikit-rf](https://scikit-rf.readthedocs.io/) primitives
+  to TypeScript (the parts that matter — Network, ABCD/S/Z conversion,
+  cascade, port renormalization). Or run scikit-rf as a backend Python
+  subprocess; cleaner, less work, requires Python at install-time.
+- UX: drop matching networks (L-net / Pi-net / T-net) onto a circuit;
+  enter source/load impedances; see Smith chart with marker sweep, plus
+  S11 / S21 magnitude curves.
+- Touchstone (`.s2p`, `.s3p`) import for vendor-supplied parts.
+
+### Phase 2 — Distributed / EM solver
+
+- Integrate [openEMS](https://www.openems.de/) (FDTD method, GPL3).
+  Backend subprocess, computational. Project type stays `electronics`,
+  but a new `.emsim` file kind references board geometry +
+  port definitions and produces field data.
+- Antenna / matching-stub design workflow.
+
+### Phase 3 — IBIS / S-parameter signal integrity
+
+- IBIS model loader. Eye-diagram / jitter analysis on differential pairs.
+- Useful for high-speed digital — DDR3+, USB, PCIe routing checks.
+
+Multi-quarter; gated on real RF user demand.
+
+---
+
+## Electronics: autorouting
+
+The tscircuit autolayout already handles trace routing for simple
+boards. For multi-layer boards with constraints, integrate a real
+autorouter:
+
+### Phase 1 — FreeRouting integration
+
+- [FreeRouting](https://github.com/freerouting/freerouting) is the
+  open-source autorouter KiCad ships hooks for. Java; GPL3.
+- Backend subprocess on save: export tscircuit board to Specctra DSN,
+  invoke FreeRouting CLI, import resulting SES, write traces back into
+  the CircuitJSON.
+- Per-net constraints (width, clearance, layer affinity, length-match)
+  surface as TSX props on `<trace>` elements; the exporter encodes them
+  in DSN.
+- UX: "Auto-route board" button in the PCB tab. Progress + result
+  preview before the route is committed.
+
+### Phase 2 — Incremental / push-and-shove routing
+
+- KiCad's interactive router is also available standalone (under
+  `pcbnew_router`) but extracting just the routing engine is non-trivial.
+  Watch the upstream `freerouting/freerouting` v2 work — they're
+  improving interactive UX.
+
+### Phase 3 — ML-assisted reroute
+
+- Watch [DeepPCB](https://www.deeppcb.ai/) and academic ML routers.
+  Likely a paid backend service rather than an open-source dependency.
+  Punt unless users specifically ask.
 
 ---
 

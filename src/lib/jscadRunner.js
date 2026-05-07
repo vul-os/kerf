@@ -29,6 +29,28 @@ import * as modeling from '@jscad/modeling'
 import { parseSketch } from './sketchSolver.js'
 import { sketchToGeom2 } from './sketchGeom2.js'
 
+// Equations injection — see store/workspace.js loadProject for the resolver
+// that walks the project tree, parses every `.equations` file, evaluates the
+// rows, and returns the merged scope. The runner pulls the scope on every
+// evaluation so a user editing equations triggers a re-run via the standard
+// debounce pipeline (the workspace store touches the JSCAD source after the
+// equations file mutates).
+let equationsResolver = null
+export function setEquationsResolver(fn) {
+  // fn: () => Promise<{ values: { [name]: number }, errors, duplicates }> | null
+  equationsResolver = fn || null
+}
+
+async function resolveEquationsScope() {
+  if (!equationsResolver) return {}
+  try {
+    const res = await equationsResolver()
+    return res?.values || {}
+  } catch {
+    return {}
+  }
+}
+
 // ---- Main-thread fallback (also used inline if the worker never spins up) --
 
 // Pull out `import X from '/foo.sketch'` lines so the main thread can resolve
@@ -125,22 +147,34 @@ const SCOPE_KEYS = [
   'hulls', 'text',
 ]
 
-async function runJscadOnMainThread(code) {
+async function runJscadOnMainThread(code, configParams) {
   if (!code || !code.trim()) return { parts: [] }
   try {
     const { stripped, imports } = extractSketchImports(code)
     const sketchProfiles = await resolveSketchImports(imports)
+    const equationsValues = await resolveEquationsScope()
+    // Configurations / variants — the active config's params layer over the
+    // equations scope (config wins on collision). Passing configParams=null
+    // (the common case for a file without configurations) is a no-op.
+    const mergedParams = (configParams && typeof configParams === 'object')
+      ? { ...equationsValues, ...configParams }
+      : equationsValues
     const body = transformSource(stripped)
     const sketchKeys = Object.keys(sketchProfiles)
-    const args = ['modeling', ...SCOPE_KEYS, ...sketchKeys]
+    const args = ['modeling', 'params', ...SCOPE_KEYS, ...sketchKeys]
     const values = [
       modeling,
+      mergedParams,
       ...SCOPE_KEYS.map((k) => modeling[k]),
       ...sketchKeys.map((k) => sketchProfiles[k]),
     ]
     const factory = new Function(...args, body)
     const exported = factory(...values)
-    let result = typeof exported === 'function' ? exported(modeling) : exported
+    // Build a scope the user's main-export function can destructure.
+    // Matches the worker's contract: { ...modeling, params } so a single
+    // `function ({ primitives, transforms, params })` argument list works.
+    const userScope = { ...modeling, params: mergedParams }
+    let result = typeof exported === 'function' ? exported(userScope) : exported
     if (result && typeof result.then === 'function') result = await result
     const parts = normalizeParts(result)
     return { parts }
@@ -204,7 +238,13 @@ function ensureWorker() {
 
 // Public API ------------------------------------------------------------------
 
-export async function runJscad(code) {
+// runJscad(code, configParams?) — the optional `configParams` is the active
+// configuration's `params` map for the file (per-file parameter overrides;
+// see src/lib/part.js getActiveConfig). Merged OVER the equations scope so
+// configs always win on key collision. The workspace store passes it; the
+// public surface stays backwards compatible (one-arg callers behave as
+// before).
+export async function runJscad(code, configParams) {
   const w = ensureWorker()
   // Pre-resolve any `.sketch` imports on the main thread so the worker only
   // ever evaluates pure JSCAD code with sketch profiles already converted to
@@ -213,12 +253,16 @@ export async function runJscad(code) {
   // imports the work is essentially zero.
   const { stripped, imports } = extractSketchImports(code || '')
   const sketchProfiles = imports.length > 0 ? await resolveSketchImports(imports) : {}
+  const equationsValues = await resolveEquationsScope()
+  const mergedParams = (configParams && typeof configParams === 'object')
+    ? { ...equationsValues, ...configParams }
+    : equationsValues
   if (!w) {
     // Inline fallback: still respect runId so a later call wins on the main
     // thread too (used by tests and worker-failure paths).
     const runId = ++nextRunId
     latestRunId = runId
-    const res = await runJscadOnMainThread(code)
+    const res = await runJscadOnMainThread(code, configParams)
     if (runId !== latestRunId) return { stale: true }
     return res
   }
@@ -228,13 +272,15 @@ export async function runJscad(code) {
   try {
     promise = new Promise((resolve, reject) => {
       pending.set(runId, { resolve, reject })
-      w.postMessage({ type: 'run', runId, code: stripped, sketchProfiles })
+      // The worker contract uses `equationsValues` as the param map; we send
+      // the merged scope so the worker doesn't need to know about configs.
+      w.postMessage({ type: 'run', runId, code: stripped, sketchProfiles, equationsValues: mergedParams })
     })
     const res = await promise
     return res
   } catch {
     // Worker died mid-flight → fall back to main thread.
-    return runJscadOnMainThread(code)
+    return runJscadOnMainThread(code, configParams)
   }
 }
 

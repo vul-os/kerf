@@ -28,6 +28,11 @@ match, then `read_file('/docs/llm/<page>.md')` to load the full text.
 - `email.md` — transactional email subsystem (cloud-only). When the
   user asks "did I get a receipt", "why didn't the welcome email
   arrive", point them at `/admin/email` and the cloud_email_log.
+- `configurations.md` — per-file parameter overrides (M3/M4/M5
+  variants of one Part / Feature / Sketch); how `default_config` and
+  `configurations[]` round-trip; how assembly components pin via
+  `config_id`; BOM groups by `(file_id, config_id)`; tools
+  `add_configuration` / `set_active_config`.
 
 ## When to consult which
 
@@ -41,6 +46,7 @@ match, then `read_file('/docs/llm/<page>.md')` to load the full text.
 | Build or edit a `.drawing` (views, dims)    | `drawing.md`            |
 | Manage a `.part` (MPN, distributors, …)     | `part.md`               |
 | Edit a `.circuit.tsx` electronics design    | `circuit.md`            |
+| Add per-file variants (M3/M4/M5, etc.)      | `configurations.md`     |
 
 ## Workflow
 

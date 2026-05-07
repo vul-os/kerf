@@ -266,14 +266,14 @@ func (d *Deps) PostMessage(w http.ResponseWriter, r *http.Request) {
 		FileRevisionsMax: d.Cfg.FileRevisionsMax,
 	}
 
-	// Resolve the project_type once per request. Used to prepend a small
-	// per-call addendum to the SystemPrompt so the model knows which domain
-	// it's in (mechanical / electronics / architecture). Missing
-	// or unknown values fall through to "" and the addendum is skipped.
-	var projectType string
+	// Resolve the project tags once per request. Used to prepend a small
+	// per-call addendum to the SystemPrompt so the model knows the active
+	// domain mix (e.g. ["mechanical","electronics"]). Empty/missing tag
+	// arrays fall through to "" and the addendum is skipped.
+	var projectTags []string
 	_ = d.Pool.QueryRow(r.Context(),
-		`select project_type from projects where id = $1`, pid).Scan(&projectType)
-	typeAddendum := llm.BuildProjectTypeAddendum(projectType)
+		`select tags from projects where id = $1`, pid).Scan(&projectTags)
+	typeAddendum := llm.BuildProjectTagsAddendum(projectTags)
 
 	// Agent loop.
 	toolSpecs := tools.Specs(role)

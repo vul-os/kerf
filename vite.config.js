@@ -75,7 +75,12 @@ export default defineConfig(({ mode }) => {
       // Excluding it from optimizeDeps + treating the .wasm as a static asset
       // (assetsInclude below) lets the worker import the URL via `?url` and
       // hand it to OCCT's `locateFile` hook at runtime.
-      exclude: ['opencascade.js'],
+      //
+      // @salusoft89/planegcs has the same shape: emscripten glue + a sibling
+      // .wasm. We pass the asset URL through `?url` in sketchSolver.js; mark
+      // it excluded from pre-bundling so the dev server doesn't try to evaluate
+      // the wasm itself as ESM.
+      exclude: ['opencascade.js', '@salusoft89/planegcs'],
     },
     assetsInclude: ['**/*.wasm'],
   }

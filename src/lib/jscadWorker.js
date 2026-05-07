@@ -53,20 +53,26 @@ const SCOPE_KEYS = [
   'hulls', 'text',
 ]
 
-async function runJscadInWorker(code, sketchProfiles) {
+async function runJscadInWorker(code, sketchProfiles, equationsValues) {
   if (!code || !code.trim()) return { parts: [] }
   try {
     const body = transformSource(code)
     const sketchKeys = sketchProfiles ? Object.keys(sketchProfiles) : []
-    const args = ['modeling', ...SCOPE_KEYS, ...sketchKeys]
+    const args = ['modeling', 'params', ...SCOPE_KEYS, ...sketchKeys]
     const values = [
       modeling,
+      equationsValues || {},
       ...SCOPE_KEYS.map((k) => modeling[k]),
       ...sketchKeys.map((k) => sketchProfiles[k]),
     ]
     const factory = new Function(...args, body)
     const exported = factory(...values)
-    let result = typeof exported === 'function' ? exported(modeling) : exported
+    // Build the scope object the user's default-export function destructures.
+    // Mirrors the main-thread runner: { ...modeling, params } so one
+    // `function ({ primitives, transforms, params })` shape works on both
+    // paths.
+    const userScope = { ...modeling, params: equationsValues || {} }
+    let result = typeof exported === 'function' ? exported(userScope) : exported
     if (result && typeof result.then === 'function') result = await result
     const parts = normalizeParts(result)
     // Strip non-cloneable members defensively. JSCAD Geom3s are { polygons: [{vertices}], transforms? }.
@@ -80,8 +86,8 @@ async function runJscadInWorker(code, sketchProfiles) {
 self.addEventListener('message', async (ev) => {
   const msg = ev.data || {}
   if (msg.type === 'run') {
-    const { runId, code, sketchProfiles } = msg
-    const res = await runJscadInWorker(code, sketchProfiles || {})
+    const { runId, code, sketchProfiles, equationsValues } = msg
+    const res = await runJscadInWorker(code, sketchProfiles || {}, equationsValues || {})
     if (res.error) {
       self.postMessage({ type: 'error', runId, error: res.error })
     } else {

@@ -11,13 +11,16 @@
 //   - the live `parts` array for the currently-open file (JSCAD or STEP).
 import { create } from 'zustand'
 import { api, ApiError } from '../lib/api.js'
-import { runJscad, setSketchResolver } from '../lib/jscadRunner.js'
+import { runJscad, setSketchResolver, setEquationsResolver as setJscadEquationsResolver } from '../lib/jscadRunner.js'
+import { setEquationsResolver as setOcctEquationsResolver, setActiveConfigResolver as setOcctActiveConfigResolver } from '../lib/occtRunner.js'
 import { loadStep } from '../lib/stepLoader.js'
 import { loadMeshFromURL } from '../lib/meshLoader.js'
 import { withColorizedPart, withTranslatedPart } from '../lib/sourceEdit.js'
 import { parseAssembly, resolveAssemblyParts as resolveAssemblyPartsHelper } from '../lib/assembly.js'
-import { parseSketch, serializeSketch, defaultSketch } from '../lib/sketchSolver.js'
-import { parsePart, serializePart, defaultPart } from '../lib/part.js'
+import { parseSketch, serializeSketch, defaultSketch, setSketchEquationsResolverSync } from '../lib/sketchSolver.js'
+import { mergeEquationFiles } from '../lib/equations.js'
+import { parsePart, serializePart, defaultPart, getActiveConfig } from '../lib/part.js'
+import { parseLibraryMappings, setCircuitMapping as setCircuitMappingHelper } from '../lib/circuitMappings.js'
 import {
   parseFeature, serializeFeature, DEFAULT_FEATURE, cancelFeatures, destroyOcct,
 } from '../lib/occtRunner.js'
@@ -90,6 +93,7 @@ function fileKindFor(file) {
   if (file.kind === 'part') return 'part'
   if (file.kind === 'feature') return 'feature'
   if (file.kind === 'circuit') return 'circuit'
+  if (file.kind === 'equations') return 'equations'
   const name = (file.name || '').toLowerCase()
   // Circuit must be checked BEFORE generic .tsx so a tscircuit file routes to
   // the CircuitEditor; pure .tsx files (if we ever support them) keep the
@@ -101,6 +105,7 @@ function fileKindFor(file) {
   if (name.endsWith('.sketch')) return 'sketch'
   if (name.endsWith('.part')) return 'part'
   if (name.endsWith('.feature')) return 'feature'
+  if (name.endsWith('.equations')) return 'equations'
   return 'jscad'
 }
 
@@ -219,6 +224,26 @@ const initial = {
 
   // BOM state (project-level, set on demand by loadBOM(projectId)):
   bomState: { rows: [], total: null, warnings: [], loading: false, error: null },
+
+  // Configurations / variants — per-file picked-config map (session-only).
+  // Keyed by fileId; the value is the picked `configurations[].id`. When a
+  // file has configurations and no entry here, the parsed file's
+  // `default_config` (or the first config) wins. Persisted in-memory only:
+  // navigating away and back resets to the file's default.
+  // Set via setCurrentConfig(fileId, configId); read via getActiveConfigParams(fileId)
+  // and the editor's <select> control.
+  currentConfigByFile: {},
+
+  // Equations cache (project-level). Populated by refreshEquationsCache —
+  // walks every `.equations` file in the tree, parses + evaluates them in
+  // declaration order, merges (last-loaded wins on duplicate name), and
+  // exposes the result as { values, errors, duplicates }.
+  // Consumed by:
+  //   - jscadRunner (async, via setEquationsResolver) → injected as `params`
+  //   - occtRunner (async)                            → substitutes ${name} in features/sketches
+  //   - sketchSolver (sync)                            → resolves dimensional constraint values
+  // Refreshed whenever a `.equations` file is created/edited/deleted.
+  equationsScope: { values: {}, errors: [], duplicates: [] },
 
   // In-flight chunked upload state. Null when no upload is running.
   // {filename, received, total, bytes, totalBytes, status: 'hashing'|'uploading'|'error',
@@ -440,6 +465,35 @@ export const useWorkspace = create((set, get) => ({
         return null
       }
     })
+    // Equations resolver: walks every `.equations` file in the project,
+    // parses + evaluates them in declaration order, and returns the merged
+    // {values, errors, duplicates} scope. The async variant is consumed by
+    // jscadRunner / occtRunner (substitution happens before posting to the
+    // worker); the sync variant feeds the planegcs solver in sketchSolver,
+    // which can't await per-constraint. Both share an in-store cache that
+    // the equations editor invalidates on save (see refreshEquationsCache).
+    const equationsAsync = async () => {
+      const state = useWorkspace.getState()
+      if (state.projectId !== id) return { values: {}, errors: [], duplicates: [] }
+      // Cached from the most recent refreshEquationsCache call.
+      if (state.equationsScope) return state.equationsScope
+      return await get().refreshEquationsCache()
+    }
+    setJscadEquationsResolver(equationsAsync)
+    setOcctEquationsResolver(equationsAsync)
+    setSketchEquationsResolverSync(() => {
+      const state = useWorkspace.getState()
+      return state.equationsScope || { values: {}, errors: [], duplicates: [] }
+    })
+    // Configurations / variants — the OCCT runner pulls the open feature
+    // file's active-config params via this resolver every runFeatures call,
+    // so a config switch triggers a fresh substitution. JSCAD calls pass
+    // configParams explicitly via the editor's debounced run loop.
+    setOcctActiveConfigResolver(() => {
+      const state = useWorkspace.getState()
+      if (!state.currentFileId) return null
+      return state.getActiveConfigParams(state.currentFileId)
+    })
     try {
       const [project, files, threads] = await Promise.all([
         api.getProject(id),
@@ -456,6 +510,11 @@ export const useWorkspace = create((set, get) => ({
         loadingProject: false,
         currentThreadId: threads[0]?.id ?? null,
       })
+
+      // Warm the equations cache so the first JSCAD/feature evaluation has
+      // resolved params available. This runs before selectFile() so the
+      // initial render of main.jscad sees the param scope.
+      try { await get().refreshEquationsCache() } catch { /* tolerate */ }
 
       if (main) await get().selectFile(main.id)
       if (threads[0]) await get().selectThread(threads[0].id)
@@ -588,6 +647,20 @@ export const useWorkspace = create((set, get) => ({
         // model doesn't block the UI on every focus.
         return
       }
+      if (kind === 'equations') {
+        // Equations files are JSON edited via the dedicated EquationsEditor.
+        // The 3D renderer above shows nothing — equations have no geometry of
+        // their own; they affect every other open file via the param scope.
+        set({
+          currentFile: file,
+          currentFileContent: file.content ?? '',
+          dirty: false,
+          parts: [],
+          loadingParts: false,
+          partsError: null,
+        })
+        return
+      }
       if (kind === 'assembly') {
         set({
           currentFile: file,
@@ -673,7 +746,12 @@ export const useWorkspace = create((set, get) => ({
           set({ parts: cached.parts || [], partsError: null, loadingParts: false })
           return
         }
-        const res = await runJscad(content)
+        // Configurations / variants — for JSCAD files we keep configs in a
+        // structured leading comment for later. For Part/Feature/Sketch the
+        // workspace has parsed-* slots already populated by the relevant
+        // branch above; this JSCAD-text path passes null (no configs on
+        // raw .jscad files in v1; the dropdown stays hidden).
+        const res = await runJscad(content, null)
         if (get().currentFileId !== fileId) return
         if (res?.stale) return
         if (res.error) {
@@ -772,6 +850,17 @@ export const useWorkspace = create((set, get) => ({
     set({ selectedCircuitNet: name || null, selectedCircuitRefdes: null })
   },
 
+  // Library-mapping accessors for the active circuit file. The mapping lives
+  // as a top-of-file comment in the TSX source (see lib/circuitMappings.js).
+  // Reading is a pure parse off the in-memory content; writing rewrites the
+  // marker comment, marks the file dirty, and lets the autosave loop persist.
+  circuitLibraryMappings: () => parseLibraryMappings(get().currentFileContent),
+  setCircuitLibraryMapping: (refdes, partFileId) => {
+    if (!refdes) return
+    const next = setCircuitMappingHelper(get().currentFileContent || '', refdes, partFileId)
+    set({ currentFileContent: next.content, dirty: true })
+  },
+
   saveFile: async () => {
     const { projectId, currentFileId, currentFileContent, dirty, currentFile } = get()
     if (!projectId || !currentFileId || !dirty) return
@@ -789,6 +878,12 @@ export const useWorkspace = create((set, get) => ({
         currentFile: updated,
         files: s.files.map((f) => f.id === updated.id ? { ...f, ...updated, content: undefined } : f),
       }))
+      // If we just saved an `.equations` file, refresh the cached scope so the
+      // next JSCAD/feature/sketch evaluation picks up the new values.
+      if (currentFile && (currentFile.kind === 'equations' ||
+          (currentFile.name || '').toLowerCase().endsWith('.equations'))) {
+        try { await get().refreshEquationsCache() } catch { /* tolerate */ }
+      }
     } catch (err) {
       set({ saving: false, loadError: err?.message || String(err) })
     }
@@ -842,6 +937,7 @@ export const useWorkspace = create((set, get) => ({
       sketch: 'untitled.sketch',
       part: 'untitled.part',
       circuit: 'untitled.circuit.tsx',
+      feature: 'untitled.feature',
     }
     let seedContent = ''
     if (kind === 'assembly') seedContent = '{"components":[]}'
@@ -849,6 +945,9 @@ export const useWorkspace = create((set, get) => ({
     else if (kind === 'sketch') seedContent = DEFAULT_SKETCH
     else if (kind === 'part') seedContent = DEFAULT_PART
     else if (kind === 'circuit') seedContent = DEFAULT_CIRCUIT
+    else if (kind === 'feature') seedContent = '{"features":[]}'
+    else if (kind === 'equations') seedContent = JSON.stringify({ version: 1, params: [] }, null, 2)
+    if (!defaults.equations) defaults.equations = 'params.equations'
     try {
       const created = await api.createFile(projectId, {
         name: defaults[kind] || 'untitled',
@@ -857,10 +956,49 @@ export const useWorkspace = create((set, get) => ({
         content: seedContent,
       })
       set((s) => ({ files: [...s.files, { ...created, content: undefined }] }))
+      if (kind === 'equations') {
+        try { await get().refreshEquationsCache() } catch { /* tolerate */ }
+      }
       if (kind !== 'folder') await get().selectFile(created.id)
       return created
     } catch (err) {
       set({ loadError: err?.message || String(err) })
+    }
+  },
+
+  createFeatureFromSketch: async (sketchFileId) => {
+    const { projectId, files } = get()
+    if (!projectId) return
+    const sketch = (files || []).find((f) => f.id === sketchFileId)
+    if (!sketch) return
+    // Compute the sketch's path: walk parent_id chain for the prefix.
+    const byId = new Map(files.map((f) => [f.id, f]))
+    const segs = []
+    let cur = sketch
+    let safety = 0
+    while (cur && safety++ < 64) {
+      segs.unshift(cur.name)
+      if (!cur.parent_id) break
+      cur = byId.get(cur.parent_id)
+    }
+    const sketchPath = '/' + segs.join('/')
+    const baseName = sketch.name.replace(/\.sketch$/, '')
+    const seed = JSON.stringify({
+      features: [{
+        id: 'f1', op: 'pad', sketch_path: sketchPath, height: 10, direction: 'up',
+      }],
+    })
+    try {
+      const created = await api.createFile(projectId, {
+        name: baseName + '.feature',
+        kind: 'feature',
+        parent_id: sketch.parent_id,
+        content: seed,
+      })
+      set((s) => ({ files: [...s.files, { ...created, content: undefined }] }))
+      await get().selectFile(created.id)
+    } catch (err) {
+      set({ toast: 'Could not create feature: ' + (err?.message || String(err)) })
     }
   },
 
@@ -984,21 +1122,27 @@ export const useWorkspace = create((set, get) => ({
   },
 
   deleteFile: async (id) => {
-    const { projectId, currentFileId } = get()
+    const { projectId, currentFileId, files } = get()
+    const target = files.find((f) => f.id === id)
+    const wasEquations = target && (target.kind === 'equations' ||
+      (target.name || '').toLowerCase().endsWith('.equations'))
     try {
       await api.deleteFile(projectId, id)
       set((s) => {
-        const files = s.files.filter((f) => f.id !== id && f.parent_id !== id)
+        const remaining = s.files.filter((f) => f.id !== id && f.parent_id !== id)
         const next = currentFileId === id
-          ? (files.find((f) => f.kind !== 'folder') || null)
+          ? (remaining.find((f) => f.kind !== 'folder') || null)
           : s.currentFile
         return {
-          files,
+          files: remaining,
           currentFileId: currentFileId === id ? (next?.id ?? null) : currentFileId,
           currentFile: currentFileId === id ? null : s.currentFile,
           currentFileContent: currentFileId === id ? '' : s.currentFileContent,
         }
       })
+      if (wasEquations) {
+        try { await get().refreshEquationsCache() } catch { /* tolerate */ }
+      }
       if (currentFileId === id) {
         const f = get().files.find((f) => f.kind !== 'folder')
         if (f) await get().selectFile(f.id)
@@ -1347,6 +1491,10 @@ export const useWorkspace = create((set, get) => ({
 
   reset: () => {
     setSketchResolver(null)
+    setJscadEquationsResolver(null)
+    setOcctEquationsResolver(null)
+    setSketchEquationsResolverSync(null)
+    setOcctActiveConfigResolver(null)
     // Drop any in-flight OCCT run + tear down the worker so the next project's
     // first feature evaluation pays only the wasm-compile cost (not the heap
     // accumulated from the previous project).
@@ -1933,6 +2081,128 @@ export const useWorkspace = create((set, get) => ({
     }
   },
 
+  // ---- Equations cache ----
+  // Walk every `.equations` file in the project, fetch its content, parse +
+  // evaluate it, and stash the merged scope under `equationsScope`. Called
+  // from loadProject (warm-up) and after any file mutation that touches an
+  // `.equations` file (createFile / updateFile / deleteFile branches that
+  // detect the kind). The runners consume the cached scope synchronously
+  // (sketchSolver) and asynchronously (jscadRunner / occtRunner via the
+  // resolver hook registered in loadProject).
+  refreshEquationsCache: async () => {
+    const state = get()
+    const pid = state.projectId
+    if (!pid) {
+      const empty = { values: {}, errors: [], duplicates: [] }
+      set({ equationsScope: empty })
+      return empty
+    }
+    // Find every .equations file in the tree (kind='equations' OR name
+    // ends in .equations — tolerate both surfaces).
+    const equationsFiles = (state.files || []).filter((f) => {
+      if (!f) return false
+      if (f.kind === 'equations') return true
+      const n = (f.name || '').toLowerCase()
+      return n.endsWith('.equations')
+    })
+    // Sort alphabetically by name so duplicate-resolution order is stable.
+    equationsFiles.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+    const fetched = []
+    for (const f of equationsFiles) {
+      try {
+        const fresh = await api.getFile(pid, f.id)
+        fetched.push({ path: '/' + (fresh.name || f.name), content: fresh.content || '' })
+      } catch {
+        // Skip on fetch failure; the row's params just stay missing from the scope.
+      }
+    }
+    const scope = mergeEquationFiles(fetched)
+    set({ equationsScope: scope })
+    return scope
+  },
+
+  // ---- Configurations / variants ----
+  //
+  // Pick the active configuration for a given file. Re-runs the JSCAD /
+  // OCCT pipeline on change so the renderer reflects the new params.
+  // Triggering a re-run here mirrors what the equations editor does on
+  // save, and keeps the runner pull-only (no extra event bus).
+  setCurrentConfig: (fileId, configId) => {
+    if (!fileId) return
+    const next = { ...get().currentConfigByFile }
+    if (configId == null || configId === '') {
+      delete next[fileId]
+    } else {
+      next[fileId] = String(configId)
+    }
+    set({ currentConfigByFile: next })
+    // Re-evaluate the open file if the change targeted it. The cheap path:
+    // call the same loadFileForEditor that originally produced the parts —
+    // it picks up the new configParams via getActiveConfigParams.
+    const state = get()
+    if (state.currentFileId === fileId) {
+      const file = state.currentFile
+      const kind = file ? fileKindFor(file) : null
+      if (kind === 'jscad') {
+        // Re-run JSCAD with the new merged params. We don't want to refetch
+        // the file content from the server — just re-evaluate.
+        ;(async () => {
+          try {
+            const cfgParams = get().getActiveConfigParams(fileId)
+            const res = await runJscad(state.currentFileContent || '', cfgParams)
+            if (get().currentFileId !== fileId) return
+            if (res?.stale) return
+            if (res.error) {
+              set({ partsError: res.error })
+            } else {
+              set({ parts: res.parts || [], partsError: null })
+            }
+          } catch { /* ignore */ }
+        })()
+      } else if (kind === 'feature') {
+        // FeatureView's own debounced run-loop will pick up the new config
+        // on its next pass (it reads currentConfigByFile via the store).
+        // We still nudge the renderer by clearing stale meshes? — no, that
+        // would flash. Just let the next runFeatures call merge fresh.
+      }
+    }
+  },
+
+  // Returns the active configuration's params object for `fileId`, or null
+  // when the file has no configurations. The lookup considers the
+  // user-picked config first, then the file's default_config, then the
+  // first declared config. Used by the JSCAD/OCCT runner integration so
+  // the renderer reflects the picked variant.
+  getActiveConfigParams: (fileId) => {
+    const state = get()
+    const file = state.files?.find?.((f) => f.id === fileId)
+    // For the open file we rely on the parsed-* slots so this works even
+    // for content the user has typed but not saved.
+    let parsed = null
+    if (state.currentFileId === fileId) {
+      // The parsed slot for the OPEN file:
+      if (state.currentPart) parsed = state.currentPart
+      else if (state.currentFeature) parsed = state.currentFeature
+      else if (state.parsedSketch) parsed = state.parsedSketch
+    }
+    if (!parsed && file) {
+      // Fall back to parsing whatever cached content the file row carries
+      // (parts of the tree never opened in this session won't have it,
+      // which is fine — those configs are invisible to runners anyway).
+      const content = file.content
+      if (content == null) return null
+      const kind = fileKindFor(file)
+      if (kind === 'part') parsed = parsePart(content)
+      else if (kind === 'feature') parsed = parseFeature(content)
+      else if (kind === 'sketch') parsed = parseSketch(content)
+      else return null
+    }
+    if (!parsed) return null
+    const picked = state.currentConfigByFile?.[fileId]
+    const cfg = getActiveConfig(parsed, picked)
+    return cfg?.params || null
+  },
+
   // ---- BOM actions ----
   // Pull the project's bill-of-materials and stash it in the store. The
   // BOMPanel + BOMPage subscribe; calling loadBOM again refetches from
@@ -2317,17 +2587,26 @@ async function resolveAssemblyParts(_get, projectId, contentJson) {
 }
 
 // loadComponentParts: fetch + run a referenced file. JSCAD or STEP or nested
-// assembly. Cached by (file_id, content-hash) so re-rendering after a
-// transform tweak is fast. Exported via the store action so the AssemblyEditor
-// can probe a source's part-id list for its dropdown.
-async function loadComponentParts(projectId, fileId) {
+// assembly. Cached by (file_id, content-hash, config_id) so re-rendering
+// after a transform tweak is fast and switching configs invalidates only
+// what it should. Exported via the store action so the AssemblyEditor can
+// probe a source's part-id list for its dropdown.
+//
+// `configId` is the component's pinned configuration (see
+// src/lib/assembly.js parseAssembly). For files that declare configurations
+// the active config's `params` are merged OVER the equations scope before
+// running JSCAD. STEP-backed Parts ignore configurations for geometry
+// purposes (the STEP file is fixed) but their config_id still flows
+// through to the BOM aggregation backend.
+async function loadComponentParts(projectId, fileId, configId) {
   // First-pass: cheap content fetch (we always need the latest text/blob).
   const file = await api.getFile(projectId, fileId)
   const name = (file.name || '').toLowerCase()
+  const cfgKey = configId ? `::cfg=${configId}` : ''
   if (file.kind === 'assembly') {
     // Nested assemblies — recursive resolve. Cache by content hash.
     const sig = strHash(file.content || '')
-    const k = cacheKey(file.id, sig)
+    const k = cacheKey(file.id, sig) + cfgKey
     const hit = componentResultCache.get(k)
     if (hit) return hit.parts
     const parts = await resolveAssemblyParts(() => ({}), projectId, file.content || '')
@@ -2341,7 +2620,7 @@ async function loadComponentParts(projectId, fileId) {
     // arrives in Phase 2), and emit a single Object id'd by the Part's name.
     // Parts without a model contribute zero parts (BOM still counts them).
     const sig = strHash(file.content || '')
-    const k = cacheKey(file.id, sig)
+    const k = cacheKey(file.id, sig) + cfgKey
     const hit = componentResultCache.get(k)
     if (hit) return hit.parts
     const meta = parsePart(file.content || '')
@@ -2354,9 +2633,14 @@ async function loadComponentParts(projectId, fileId) {
       const { parts: stepParts } = await loadStep(buf)
       // Re-id everything under a single Part-named id so downstream
       // assembly resolution gives the user a clean single-handle Object.
+      // When a config is pinned, suffix it so the assembly's Object picker
+      // can distinguish M3 vs M4 instances of the same Part.
+      const cfg = configId ? getActiveConfig(meta, configId) : null
+      const labelSuffix = cfg?.label ? ` (${cfg.label})` : ''
+      const baseLabel = `${meta.name}${labelSuffix}`
       const partsOut = (stepParts || []).map((p, idx) => ({
         ...p,
-        id: stepParts.length === 1 ? meta.name : `${meta.name}/${p.id || idx}`,
+        id: stepParts.length === 1 ? baseLabel : `${baseLabel}/${p.id || idx}`,
       }))
       componentResultCache.set(k, { parts: partsOut })
       return partsOut
@@ -2389,12 +2673,15 @@ async function loadComponentParts(projectId, fileId) {
     componentResultCache.set(k, { parts })
     return parts
   }
-  // JSCAD — cache by content hash so saves reload it.
+  // JSCAD — cache by content hash so saves reload it. Config_id is only
+  // meaningful here when the JSCAD source destructures `params` (it
+  // probably doesn't, since plain `.jscad` files don't currently declare
+  // configurations); we still carry it in the cache key for forward-compat.
   const sig = strHash(file.content || '')
-  const k = cacheKey(file.id, sig)
+  const k = cacheKey(file.id, sig) + cfgKey
   const hit = componentResultCache.get(k)
   if (hit) return hit.parts
-  const res = await runJscad(file.content || '')
+  const res = await runJscad(file.content || '', null)
   if (res.error) throw new Error(res.error)
   const parts = res.parts || []
   componentResultCache.set(k, { parts })
@@ -2417,9 +2704,11 @@ async function fetchStorageBlob(storageKey) {
 }
 
 // Public re-export: the AssemblyEditor uses this to populate its part_id
-// dropdown without poking at module-private internals.
-export function loadFilePartsForProject(projectId, fileId) {
-  return loadComponentParts(projectId, fileId)
+// dropdown without poking at module-private internals. `configId` is
+// optional — pass it when previewing a specific configuration (e.g. the
+// component's pinned config); otherwise the file's default_config wins.
+export function loadFilePartsForProject(projectId, fileId, configId) {
+  return loadComponentParts(projectId, fileId, configId || null)
 }
 
 // Resolve an absolute POSIX-like path (e.g. "/folder/foo.sketch") against

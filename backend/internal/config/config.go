@@ -18,6 +18,12 @@ type Config struct {
 	Env        string
 	Port       string
 	CORSOrigin string
+	// LocalMode collapses the OSS auth wall: when true, the frontend
+	// auto-creates a singleton user via POST /auth/bootstrap-local on
+	// first paint and never shows /login. Default true for OSS builds;
+	// the cloud build forces this to false (multi-user). Override via
+	// [server].local_mode in kerf.toml or KERF_LOCAL_MODE=true|false.
+	LocalMode bool
 
 	// Database
 	DatabaseURL string
@@ -163,6 +169,11 @@ type tomlConfig struct {
 		Port       string `toml:"port"`
 		Env        string `toml:"env"`
 		CORSOrigin string `toml:"cors_origin"`
+		// LocalMode is a tri-state: nil → default (true for OSS, forced
+		// false for cloud), true → single-user auto-bootstrap, false →
+		// multi-user signup/login. Pointer so we can distinguish "unset"
+		// from "explicitly false".
+		LocalMode *bool `toml:"local_mode"`
 	} `toml:"server"`
 
 	Database struct {
@@ -368,6 +379,7 @@ func fromTOML(t *tomlConfig) *Config {
 		Env:        firstNonEmpty(t.Server.Env, "local"),
 		Port:       firstNonEmpty(t.Server.Port, "8080"),
 		CORSOrigin: firstNonEmpty(t.Server.CORSOrigin, "http://localhost:5173"),
+		LocalMode:  resolveLocalMode(t.Server.LocalMode, t.Cloud.Enabled),
 
 		DatabaseURL: t.Database.URL,
 
@@ -526,6 +538,36 @@ func defaultFloat(v, def float64) float64 {
 		return def
 	}
 	return v
+}
+
+// resolveLocalMode picks the runtime LocalMode value. Precedence:
+//
+//  1. KERF_LOCAL_MODE env var (parsed as bool) — wins for both OSS and cloud.
+//  2. [server].local_mode in kerf.toml — wins when the cloud bundle is OFF.
+//     The cloud bundle ignores any TOML override and forces multi-user.
+//  3. Default: true for OSS (cloud_enabled=false), false for cloud.
+//
+// The override-via-env path is the lever the test runner uses to flip the
+// flag per scenario without authoring a TOML file.
+func resolveLocalMode(tomlVal *bool, cloudEnabled bool) bool {
+	if v := strings.TrimSpace(os.Getenv("KERF_LOCAL_MODE")); v != "" {
+		switch strings.ToLower(v) {
+		case "1", "true", "yes", "on":
+			return true
+		case "0", "false", "no", "off":
+			return false
+		}
+	}
+	if cloudEnabled {
+		// Cloud bundle is multi-user by definition. Ignore any TOML
+		// override that says otherwise — leaving local_mode=true here
+		// would silently disable auth on a hosted deploy.
+		return false
+	}
+	if tomlVal != nil {
+		return *tomlVal
+	}
+	return true
 }
 
 func parseDuration(v string, def time.Duration) time.Duration {

@@ -33,7 +33,7 @@ func Sketcher(s *runner.Suite, env *runner.Env) {
 		ID string `json:"id"`
 	}
 	status, raw, _ = c.DoJSON("POST", "/api/projects",
-		map[string]string{"name": "Sketcher project"}, owner.AccessToken, &proj)
+		map[string]string{"name": "Sketcher project", "workspace_id": owner.DefaultWorkspace.ID}, owner.AccessToken, &proj)
 	if !s.Status("create sketch project", status, 201, raw) {
 		return
 	}
@@ -110,6 +110,180 @@ func Sketcher(s *runner.Suite, env *runner.Env) {
 			plane, _ := doc["plane"].(map[string]any)
 			s.Equal("sketch.plane.name=XZ", plane["name"], "XZ")
 		}
+	}
+
+	// --- End-to-end sketch → feature handoff ---
+	//
+	// Mirrors the user-facing flow that "Pad a closed-rectangle sketch"
+	// drives: write a hand-crafted sketch JSON containing 4 points + 4 lines
+	// forming a closed rectangle, then create a `.feature` file with
+	// op:'pad' / 'pocket' / 'hole' referencing that sketch by path. We
+	// verify the round-trip is faithful — the sketcher UI relies on the
+	// sketch_path being preserved verbatim so the OCCT worker can resolve
+	// the profile when evaluating the feature tree. (The actual mesh
+	// evaluation happens client-side in the worker; the backend's job is
+	// just to persist + serve.)
+	rectSketchJSON := `{
+  "version": 1,
+  "plane": {"type": "base", "name": "XY"},
+  "entities": [
+    {"id": "origin", "type": "point", "x": 0, "y": 0},
+    {"id": "p_tl", "type": "point", "x": 0, "y": 10},
+    {"id": "p_tr", "type": "point", "x": 20, "y": 10},
+    {"id": "p_br", "type": "point", "x": 20, "y": 0},
+    {"id": "ln_top",    "type": "line", "p1": "p_tl", "p2": "p_tr"},
+    {"id": "ln_right",  "type": "line", "p1": "p_tr", "p2": "p_br"},
+    {"id": "ln_bottom", "type": "line", "p1": "p_br", "p2": "origin"},
+    {"id": "ln_left",   "type": "line", "p1": "origin", "p2": "p_tl"}
+  ],
+  "constraints": [
+    {"id": "cn_h1", "type": "horizontal", "line": "ln_top"},
+    {"id": "cn_h2", "type": "horizontal", "line": "ln_bottom"},
+    {"id": "cn_v1", "type": "vertical",   "line": "ln_left"},
+    {"id": "cn_v2", "type": "vertical",   "line": "ln_right"}
+  ],
+  "visible_3d": [],
+  "solved": {},
+  "metadata": {}
+}`
+	out3 := runTool(s, ctx, pc, "create_sketch", map[string]any{
+		"path":  "/sketches/rect.sketch",
+		"plane": "XY",
+		"name":  "Rect profile",
+	})
+	rectSketchID, _ := out3["id"].(string)
+	if !s.NotEmpty("create_sketch rect id", rectSketchID) {
+		return
+	}
+	rectSketchPath, _ := out3["path"].(string)
+	s.NotEmpty("create_sketch rect path", rectSketchPath)
+	// Overwrite the seeded content with the rectangle profile. write_file
+	// on an existing .sketch is allowed (the READONLY guard only blocks
+	// CREATE); the SketchView calls the same persistence route under the
+	// hood when its solver fires.
+	wfRect := runTool(s, ctx, pc, "write_file", map[string]any{
+		"path":    rectSketchPath,
+		"content": rectSketchJSON,
+	})
+	if _, isErr := wfRect["code"]; isErr {
+		s.Fail("write_file rect sketch",
+			"expected success, got code="+asString(wfRect["code"])+
+				" error="+asString(wfRect["error"]))
+		return
+	}
+	var rectGet struct {
+		Kind    string `json:"kind"`
+		Content string `json:"content"`
+	}
+	status, raw, _ = c.DoJSON("GET", "/api/projects/"+pid+"/files/"+rectSketchID, nil,
+		owner.AccessToken, &rectGet)
+	if s.Status("get rect sketch", status, 200, raw) {
+		s.Equal("rect sketch kind", rectGet.Kind, "sketch")
+		s.Contains("rect sketch content has 4 lines", rectGet.Content, "ln_bottom")
+	}
+
+	// Pad feature referencing the rectangle sketch by path. The seed shape
+	// matches what the SketchView's "New feature from sketch" toolbar emits
+	// (see workspace.js#createFeatureFromSketch).
+	padFeatureSeed := fmt.Sprintf(
+		`{"version":1,"name":"Padded rect","features":[{"id":"f_pad","op":"pad","sketch_path":%q,"height":5,"direction":"up"}]}`,
+		rectSketchPath,
+	)
+	var padFeat struct {
+		ID   string `json:"id"`
+		Kind string `json:"kind"`
+	}
+	status, raw, _ = c.DoJSON("POST", "/api/projects/"+pid+"/files",
+		map[string]any{
+			"name":      "rect-pad.feature",
+			"kind":      "feature",
+			"parent_id": nil,
+			"content":   padFeatureSeed,
+		}, owner.AccessToken, &padFeat)
+	if !s.Status("create pad feature", status, 201, raw) {
+		return
+	}
+	s.Equal("pad feature kind", padFeat.Kind, "feature")
+	s.NotEmpty("pad feature id", padFeat.ID)
+
+	// Round-trip the pad feature: the sketch_path must be byte-identical
+	// after the file goes through persistence (the OCCT worker resolves
+	// profiles by exact-string path match against the loaded sketches map).
+	var padGet struct {
+		Kind    string `json:"kind"`
+		Content string `json:"content"`
+	}
+	status, raw, _ = c.DoJSON("GET", "/api/projects/"+pid+"/files/"+padFeat.ID, nil,
+		owner.AccessToken, &padGet)
+	if s.Status("get pad feature", status, 200, raw) {
+		s.Equal("pad feature kind round-trip", padGet.Kind, "feature")
+		s.Equal("pad feature content round-trip", padGet.Content, padFeatureSeed)
+		s.Contains("pad feature content has sketch_path",
+			padGet.Content, rectSketchPath)
+		s.Contains("pad feature content has op:pad", padGet.Content, `"op":"pad"`)
+	}
+
+	// Pocket feature referencing the same sketch. Pocket sits AFTER the
+	// pad in the same tree — the OCCT evaluator threads `current` through
+	// the ops and the pocket subtracts from the pad result.
+	pocketFeatureSeed := fmt.Sprintf(
+		`{"version":1,"name":"Padded + pocketed","features":[{"id":"f_pad","op":"pad","sketch_path":%q,"height":10,"direction":"up"},{"id":"f_pocket","op":"pocket","sketch_path":%q,"depth":3}]}`,
+		rectSketchPath, rectSketchPath,
+	)
+	var pocketFeat struct {
+		ID string `json:"id"`
+	}
+	status, raw, _ = c.DoJSON("POST", "/api/projects/"+pid+"/files",
+		map[string]any{
+			"name":      "rect-pocket.feature",
+			"kind":      "feature",
+			"parent_id": nil,
+			"content":   pocketFeatureSeed,
+		}, owner.AccessToken, &pocketFeat)
+	if !s.Status("create pocket feature", status, 201, raw) {
+		return
+	}
+	s.NotEmpty("pocket feature id", pocketFeat.ID)
+	var pocketGet struct {
+		Content string `json:"content"`
+	}
+	status, raw, _ = c.DoJSON("GET", "/api/projects/"+pid+"/files/"+pocketFeat.ID, nil,
+		owner.AccessToken, &pocketGet)
+	if s.Status("get pocket feature", status, 200, raw) {
+		s.Contains("pocket feature has op:pocket", pocketGet.Content, `"op":"pocket"`)
+		s.Contains("pocket feature carries sketch_path", pocketGet.Content, rectSketchPath)
+	}
+
+	// Hole feature: needs a center sketch with a single point (or a circle
+	// whose center is the hole position). Use the same rectangle sketch's
+	// existing point — the hole op picks the first non-origin point as
+	// the hole center.
+	holeFeatureSeed := fmt.Sprintf(
+		`{"version":1,"name":"Padded + drilled","features":[{"id":"f_pad","op":"pad","sketch_path":%q,"height":10,"direction":"up"},{"id":"f_hole","op":"hole","sketch_path":%q,"diameter":3,"depth":15}]}`,
+		rectSketchPath, rectSketchPath,
+	)
+	var holeFeat struct {
+		ID string `json:"id"`
+	}
+	status, raw, _ = c.DoJSON("POST", "/api/projects/"+pid+"/files",
+		map[string]any{
+			"name":      "rect-hole.feature",
+			"kind":      "feature",
+			"parent_id": nil,
+			"content":   holeFeatureSeed,
+		}, owner.AccessToken, &holeFeat)
+	if !s.Status("create hole feature", status, 201, raw) {
+		return
+	}
+	s.NotEmpty("hole feature id", holeFeat.ID)
+	var holeGet struct {
+		Content string `json:"content"`
+	}
+	status, raw, _ = c.DoJSON("GET", "/api/projects/"+pid+"/files/"+holeFeat.ID, nil,
+		owner.AccessToken, &holeGet)
+	if s.Status("get hole feature", status, 200, raw) {
+		s.Contains("hole feature has op:hole", holeGet.Content, `"op":"hole"`)
+		s.Contains("hole feature has diameter", holeGet.Content, `"diameter":3`)
 	}
 
 	// --- Part with model_storage_key referenced by an assembly: BOM

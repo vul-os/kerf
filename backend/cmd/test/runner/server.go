@@ -76,6 +76,11 @@ type BootOptions struct {
 	// StatePath, if non-empty, sets KERF_STATE_PATH for the duration of
 	// Boot so the bootstrap state.json lands under the test's tempdir.
 	StatePath string
+	// LocalMode is a tri-state pointer. nil → leave the config default
+	// (true under OSS), &true → force local_mode on, &false → force
+	// it off. Lets the local_mode scenario flip the flag explicitly
+	// while leaving every other scenario unchanged.
+	LocalMode *bool
 }
 
 // DatabaseURL returns the test DB URL: env override or the documented default.
@@ -236,6 +241,10 @@ func buildConfig(opts BootOptions) *config.Config {
 		cfg.SystemUserName = opts.SystemUserName
 	}
 
+	if opts.LocalMode != nil {
+		cfg.LocalMode = *opts.LocalMode
+	}
+
 	return cfg
 }
 
@@ -258,6 +267,7 @@ func buildRouter(cfg *config.Config, authSvc *auth.Service, deps *handlers.Deps)
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"google_client_id": cfg.GoogleClientID,
 			"cloud_enabled":    cfg.Cloud.Enabled,
+			"local_mode":       cfg.LocalMode,
 			"default_model":    cfg.DefaultModel,
 		})
 	})
@@ -271,6 +281,7 @@ func buildRouter(cfg *config.Config, authSvc *auth.Service, deps *handlers.Deps)
 		r.Post("/logout", deps.Logout)
 		r.Get("/google/start", deps.GoogleStart)
 		r.Get("/google/callback", deps.GoogleCallback)
+		r.Post("/bootstrap-local", deps.BootstrapLocal)
 	})
 
 	r.Route("/api", func(r chi.Router) {
@@ -288,6 +299,27 @@ func buildRouter(cfg *config.Config, authSvc *auth.Service, deps *handlers.Deps)
 			r.Get("/models", deps.ListModels)
 			r.Post("/share/{token}/accept", deps.AcceptShare)
 			r.Get("/blobs/*", deps.ServeBlob)
+
+			// Workspaces — mirrors cmd/server/main.go's wiring.
+			r.Route("/workspaces", func(r chi.Router) {
+				r.Get("/", deps.ListWorkspaces)
+				r.Post("/", deps.CreateWorkspace)
+				r.Post("/accept", deps.AcceptWorkspaceInvite)
+				r.Get("/avatar/{id}", deps.ServeWorkspaceAvatar)
+
+				r.Route("/{slug}", func(r chi.Router) {
+					r.Get("/", deps.GetWorkspace)
+					r.Patch("/", deps.UpdateWorkspace)
+					r.Delete("/", deps.DeleteWorkspace)
+
+					r.Post("/avatar", deps.UploadWorkspaceAvatar)
+					r.Delete("/avatar", deps.DeleteWorkspaceAvatar)
+
+					r.Post("/members", deps.InviteWorkspaceMember)
+					r.Patch("/members/{user_id}", deps.ChangeWorkspaceMemberRole)
+					r.Delete("/members/{user_id}", deps.RemoveWorkspaceMember)
+				})
+			})
 
 			r.Route("/projects", func(r chi.Router) {
 				r.Get("/", deps.ListProjects)

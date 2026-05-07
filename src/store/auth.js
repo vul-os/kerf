@@ -70,6 +70,40 @@ export const useAuth = create(
         set({ bootstrapInflight: p })
         return p
       },
+
+      // tryBootstrapLocal hits POST /auth/bootstrap-local — the
+      // local-mode auto-account endpoint. The backend creates the
+      // singleton user (and their default workspace) on first call
+      // and re-issues tokens for the same user on every subsequent
+      // call. We only call this when the cloud config says
+      // local_mode=true AND we don't already have a session — the
+      // cloud build's /auth/bootstrap-local returns 404, so calling
+      // it there would just be a noisy no-op.
+      //
+      // Returns true on success (session populated), false otherwise.
+      tryBootstrapLocal: async () => {
+        const s = get()
+        if (s.accessToken) return true
+        try {
+          const res = await fetch(`${API_URL}/auth/bootstrap-local`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            credentials: 'omit',
+            body: JSON.stringify({}),
+          })
+          if (!res.ok) return false
+          const data = await res.json()
+          set({
+            accessToken: data.access_token || null,
+            refreshToken: data.refresh_token || null,
+            user: data.user || null,
+          })
+          return !!(data && data.access_token)
+        } catch (err) {
+          console.warn('[auth] /auth/bootstrap-local failed:', err)
+          return false
+        }
+      },
     }),
     {
       name: 'kerf.auth',

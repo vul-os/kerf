@@ -9,27 +9,19 @@
 // the API drives whether the Next button is enabled.
 
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { AlertCircle, ArrowLeft, ArrowRight, Heart, Loader2, Sparkles, GitFork, Star } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { AlertCircle, ArrowLeft, ArrowRight, Heart, Loader2, Sparkles, GitFork, Star, Tag } from 'lucide-react'
 import Layout from '../components/Layout.jsx'
 import Card from '../components/Card.jsx'
 import Button from '../components/Button.jsx'
 import { ApiError } from '../lib/api.js'
 import { useAuth } from '../store/auth.js'
 import { workshop } from './api.js'
-import { PROJECT_TYPES, projectTypeById } from '../lib/projectTypes.js'
+import { TAG_PRESETS, presetById } from '../lib/projectTags.js'
 
 const SORT_OPTIONS = [
   { id: 'newest', label: 'Newest' },
   { id: 'popular', label: 'Most liked' },
-]
-
-// Tab strip values — 'all' is the implicit default (no filter sent to the
-// API). Order mirrors PROJECT_TYPES so the picker order matches the
-// Workshop tab order; UX consistency.
-const TYPE_TABS = [
-  { id: 'all', label: 'All' },
-  ...PROJECT_TYPES.map((t) => ({ id: t.id, label: t.label })),
 ]
 
 function relativeTime(iso) {
@@ -85,11 +77,10 @@ function AuthorChip({ author }) {
 
 function ListingCard({ listing, signedIn, onLikeToggle, busyLike }) {
   const liked = !!listing.liked_by_me
-  // Surface the project_type as a small badge in the card's top-left corner
-  // so visitors browsing 'All' can tell mechanical from electronics at a
-  // glance. Falls back to mechanical for old listings missing the field.
-  const t = projectTypeById(listing.project_type || 'mechanical')
-  const TypeIcon = t.icon
+  // Show up to two tag chips on the thumbnail corner to give a per-card
+  // hint at the project's domain. Falls through silently for older
+  // listings that have no tags yet.
+  const tags = Array.isArray(listing.tags) ? listing.tags.slice(0, 2) : []
   return (
     <Card className="group overflow-hidden hover:border-ink-700 transition-colors">
       <Link
@@ -110,16 +101,28 @@ function ListingCard({ listing, signedIn, onLikeToggle, busyLike }) {
             </div>
           )}
           <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-ink-950/80 to-transparent pointer-events-none" />
-          <span
-            className={
-              'absolute top-2 left-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono uppercase tracking-wider border backdrop-blur-md ' +
-              t.badgeBg
-            }
-            title={t.subtitle}
-          >
-            <TypeIcon size={10} />
-            {t.label}
-          </span>
+          {tags.length > 0 && (
+            <div className="absolute top-2 left-2 flex flex-wrap gap-1">
+              {tags.map((t) => {
+                const preset = presetById(t)
+                const Icon = preset?.icon || Tag
+                return (
+                  <span
+                    key={t}
+                    title={preset?.label || t}
+                    className={
+                      'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono uppercase tracking-wider border backdrop-blur-md ' +
+                      (preset?.badgeBg ||
+                        'bg-ink-900/70 text-ink-200 border-ink-700')
+                    }
+                  >
+                    <Icon size={10} />
+                    {t}
+                  </span>
+                )
+              })}
+            </div>
+          )}
         </div>
         <div className="p-4">
           <h3 className="font-display text-base font-semibold tracking-tight text-ink-100 truncate">
@@ -184,19 +187,45 @@ function SkeletonCard() {
 export function Workshop() {
   const user = useAuth((s) => s.user)
   const signedIn = !!user
+  const [searchParams, setSearchParams] = useSearchParams()
   const [page, setPage] = useState(1)
   const [sort, setSort] = useState('newest')
-  const [typeFilter, setTypeFilter] = useState('all')
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
   const [likeBusy, setLikeBusy] = useState({})
 
+  // Active tag filters live in the URL (?tag=foo&tag=bar) so a deep-link
+  // restores the same filter set. Reading is straightforward; writing is
+  // gated behind toggleTag so a click on a chip flips its membership and
+  // resets pagination.
+  const activeTags = useMemo(() => searchParams.getAll('tag'), [searchParams])
+  const tagsKey = activeTags.join(',')
+
+  const toggleTag = (id) => {
+    const next = new URLSearchParams(searchParams)
+    const have = next.getAll('tag')
+    if (have.includes(id)) {
+      next.delete('tag')
+      for (const t of have) if (t !== id) next.append('tag', t)
+    } else {
+      next.append('tag', id)
+    }
+    setPage(1)
+    setSearchParams(next, { replace: true })
+  }
+  const clearTags = () => {
+    const next = new URLSearchParams(searchParams)
+    next.delete('tag')
+    setPage(1)
+    setSearchParams(next, { replace: true })
+  }
+
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     workshop
-      .list({ page, sort, type: typeFilter === 'all' ? undefined : typeFilter })
+      .list({ page, sort, tag: activeTags })
       .then((resp) => {
         if (cancelled) return
         setData(resp || { listings: [], has_more: false })
@@ -213,7 +242,10 @@ export function Workshop() {
     return () => {
       cancelled = true
     }
-  }, [page, sort, typeFilter])
+    // tagsKey is the stable string-form of activeTags so the array
+    // identity changing doesn't refire the effect spuriously.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, sort, tagsKey])
 
   const listings = data?.listings || []
   const hasMore = !!data?.has_more
@@ -325,28 +357,43 @@ export function Workshop() {
         </div>
       </div>
 
-      {/* Type tab strip — sits between header and grid. Filters are
-          additive with the sort dropdown above. Resets pagination so a
-          tab switch doesn't land the user on an empty page-N. */}
+      {/* Tag chip strip — multi-select. Clicking a chip toggles it in/out of
+          the filter set; the URL reflects every active tag (?tag= can repeat).
+          Selected chips render with their preset color, unselected stay neutral. */}
       <div className="mb-6 flex items-center gap-1 overflow-x-auto pb-1">
-        {TYPE_TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => {
-              setPage(1)
-              setTypeFilter(tab.id)
-            }}
-            className={
-              'h-8 px-3 rounded-full text-xs font-medium transition-colors whitespace-nowrap border ' +
-              (typeFilter === tab.id
-                ? 'bg-ink-100 text-ink-950 border-ink-100'
-                : 'text-ink-300 hover:text-ink-100 border-ink-800 hover:border-ink-700 bg-ink-900')
-            }
-          >
-            {tab.label}
-          </button>
-        ))}
+        <button
+          type="button"
+          onClick={clearTags}
+          className={
+            'h-8 px-3 rounded-full text-xs font-medium transition-colors whitespace-nowrap border ' +
+            (activeTags.length === 0
+              ? 'bg-ink-100 text-ink-950 border-ink-100'
+              : 'text-ink-300 hover:text-ink-100 border-ink-800 hover:border-ink-700 bg-ink-900')
+          }
+        >
+          All
+        </button>
+        {TAG_PRESETS.map((p) => {
+          const Icon = p.icon
+          const active = activeTags.includes(p.id)
+          return (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => toggleTag(p.id)}
+              title={active ? `Remove ${p.label} filter` : `Filter by ${p.label}`}
+              className={
+                'inline-flex items-center gap-1 h-8 px-3 rounded-full text-xs font-medium transition-colors whitespace-nowrap border ' +
+                (active
+                  ? p.badgeBg + ' brightness-125'
+                  : 'text-ink-300 hover:text-ink-100 border-ink-800 hover:border-ink-700 bg-ink-900')
+              }
+            >
+              <Icon size={11} />
+              {p.label}
+            </button>
+          )
+        })}
       </div>
 
       {error && (

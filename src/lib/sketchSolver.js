@@ -24,26 +24,65 @@
 //     named param OR an object_param ref. We always pass the number — that's
 //     enough for our v1 dimensional constraints.
 
+// Browser build: we ship `planegcs.wasm` as a public asset (see
+// `public/planegcs.wasm`, mirrored from the npm package at install time) and
+// point planegcs's `locateFile` hook at `/planegcs.wasm`. This sidesteps the
+// `new URL("planegcs.wasm", import.meta.url)` fallback inside the package's
+// emscripten glue, which Vite/Rolldown would otherwise flag as an
+// unsupported "ESM integration proposal for Wasm". The trick mirrors how
+// `src/lib/stepLoader.js` serves `occt-import-js.wasm`.
+//
+// Tests under Node (vitest) override via `KERF_PLANEGCS_WASM` so the test
+// runner can point at the file inside `node_modules/`.
+import { substituteParams } from './equations.js'
+
+const PLANEGCS_PUBLIC_URL = '/planegcs.wasm'
+
 let modulePromise = null
 let lastFailure = null
+
+// Equations injection — see store/workspace.js loadProject for the resolver
+// that walks the project tree, parses every `.equations` file, evaluates the
+// rows, and returns the merged scope. Sketches reference params via `${name}`
+// placeholders inside dimensional constraint values (distance / distance_x /
+// distance_y / angle / radius / diameter). When no resolver is registered or
+// the value is a plain number, this collapses to a no-op `Number(v) || 0`.
+
+let equationsResolverSync = null
+export function setSketchEquationsResolverSync(fn) {
+  // fn: () => { values: { [name]: number } } | null
+  // SYNC because the planegcs solver is sync and we don't want every constraint
+  // value to await a fetch. The store calls this with a getter that returns
+  // the cached scope built once per project load.
+  equationsResolverSync = fn || null
+}
+
+// numericValue resolves a constraint value that may be either a number or a
+// string with `${name}` placeholders. Falls back to 0 if the result is NaN.
+function numericValue(v) {
+  if (typeof v === 'number') return v
+  if (typeof v === 'string' && equationsResolverSync) {
+    const scope = equationsResolverSync()?.values || {}
+    const sub = substituteParams(v, scope)
+    if (typeof sub === 'number' && Number.isFinite(sub)) return sub
+    const n = Number(sub)
+    return Number.isFinite(n) ? n : 0
+  }
+  const n = Number(v)
+  return Number.isFinite(n) ? n : 0
+}
 
 async function loadPlanegcs() {
   if (modulePromise) return modulePromise
   modulePromise = (async () => {
     try {
       const mod = await import('@salusoft89/planegcs')
-      // Pin the wasm URL via Vite's import.meta.url so dev + prod both
-      // resolve correctly. Vite's file-loader hashes the wasm name in
-      // production; passing a real URL keeps locateFile() stable.
-      const wasmUrl = new URL(
-        '@salusoft89/planegcs/dist/planegcs_dist/planegcs.wasm',
-        import.meta.url,
-      ).href
+      const proc = (typeof globalThis !== 'undefined' && globalThis.process) || null
+      const envOverride = proc?.env?.KERF_PLANEGCS_WASM || null
+      const wasmUrl = envOverride || PLANEGCS_PUBLIC_URL
       const make = mod.make_gcs_wrapper
       const Algorithm = mod.Algorithm
       const SolveStatus = mod.SolveStatus
-      // The wrapper is constructed afresh per solve to keep the API stateless;
-      // only the WASM module itself is cached across calls.
       return { mod, wasmUrl, make, Algorithm, SolveStatus }
     } catch (err) {
       lastFailure = err
@@ -128,9 +167,32 @@ export function parseSketch(content) {
       visible_3d: Array.isArray(obj.visible_3d) ? obj.visible_3d : [],
       solved: obj.solved && typeof obj.solved === 'object' ? obj.solved : {},
       metadata: obj.metadata && typeof obj.metadata === 'object' ? obj.metadata : {},
+      // Configurations / variants (see src/lib/part.js for the canonical
+      // shape and getActiveConfig helper). A sketch can carry param
+      // overrides too — useful for an M3/M4/M5 hole-pattern sketch where
+      // dimensional constraints reference `${d}` and the active config
+      // sets it. The fields round-trip even though the solver itself is
+      // dimensionless; the runner integration in workspace.js does the
+      // actual merging.
+      default_config: typeof obj.default_config === 'string' ? obj.default_config : '',
+      configurations: Array.isArray(obj.configurations)
+        ? obj.configurations.map(normalizeSketchConfiguration).filter(Boolean)
+        : [],
     }
   } catch {
     return defaultSketch()
+  }
+}
+
+function normalizeSketchConfiguration(raw) {
+  if (!raw || typeof raw !== 'object') return null
+  const id = typeof raw.id === 'string' ? raw.id.trim() : ''
+  if (!id) return null
+  return {
+    id,
+    label: typeof raw.label === 'string' && raw.label ? raw.label : id,
+    params: raw.params && typeof raw.params === 'object' && !Array.isArray(raw.params)
+      ? raw.params : {},
   }
 }
 
@@ -147,6 +209,16 @@ export function serializeSketch(sketch) {
     solved: sketch.solved && typeof sketch.solved === 'object' ? sketch.solved : {},
     metadata: sketch.metadata || {},
   }
+  if (typeof sketch.default_config === 'string' && sketch.default_config) {
+    out.default_config = sketch.default_config
+  }
+  if (Array.isArray(sketch.configurations) && sketch.configurations.length > 0) {
+    out.configurations = sketch.configurations.map((c) => ({
+      id: c.id,
+      label: c.label || c.id,
+      params: c.params && typeof c.params === 'object' ? c.params : {},
+    }))
+  }
   return JSON.stringify(out, null, 2)
 }
 
@@ -161,11 +233,22 @@ export function serializeSketch(sketch) {
 function estimateDof(sketch) {
   const ent = sketch.entities || []
   let dof = 0
+  let hasOrigin = false
   for (const e of ent) {
-    if (e.type === 'point') dof += 2
-    else if (e.type === 'circle') dof += 1 // radius (center is its own point)
-    else if (e.type === 'arc') dof += 3 // start_angle, end_angle, radius (endpoints are points)
+    if (e.type === 'point') {
+      dof += 2
+      if (e.id === 'origin') hasOrigin = true
+    } else if (e.type === 'circle') {
+      dof += 1 // radius (center is its own point)
+    } else if (e.type === 'arc') {
+      dof += 3 // start_angle, end_angle, radius (endpoints are points)
+    }
   }
+  // The origin point is permanently pinned by the planegcs wrapper (fixed=true)
+  // so it removes 2 DOF immediately. Without this subtraction the sketcher
+  // could never report "fully constrained" — there's no Kerf constraint for
+  // the implicit origin pin.
+  if (hasOrigin) dof -= 2
   // Each dimensional / geometric constraint removes ~1 DOF. This is a
   // rough heuristic; real DOF depends on rank. Good enough for the badge.
   for (const c of sketch.constraints || []) {
@@ -353,21 +436,21 @@ function buildPlanegcsPrimitives(sketch) {
             id: nextId(),
             type: 'p2p_distance',
             p1_id: c.a, p2_id: c.b,
-            distance: Number(c.value) || 0,
+            distance: numericValue(c.value),
           })
         } else if (aEnt?.type === 'point' && bEnt?.type === 'line') {
           constraints.push({
             id: nextId(),
             type: 'p2l_distance',
             p_id: c.a, l_id: c.b,
-            distance: Number(c.value) || 0,
+            distance: numericValue(c.value),
           })
         } else if (aEnt?.type === 'line' && bEnt?.type === 'point') {
           constraints.push({
             id: nextId(),
             type: 'p2l_distance',
             p_id: c.b, l_id: c.a,
-            distance: Number(c.value) || 0,
+            distance: numericValue(c.value),
           })
         }
         break
@@ -383,7 +466,7 @@ function buildPlanegcsPrimitives(sketch) {
           type: 'difference',
           param1: { o_id: c.a, prop },
           param2: { o_id: c.b, prop },
-          difference: Number(c.value) || 0,
+          difference: numericValue(c.value),
         })
         break
       }
@@ -392,7 +475,7 @@ function buildPlanegcsPrimitives(sketch) {
           id: nextId(),
           type: 'l2l_angle_ll',
           l1_id: c.a, l2_id: c.b,
-          angle: ((Number(c.value) || 0) * Math.PI) / 180,
+          angle: ((numericValue(c.value)) * Math.PI) / 180,
         })
         break
       case 'radius':
@@ -400,7 +483,7 @@ function buildPlanegcsPrimitives(sketch) {
           id: nextId(),
           type: 'circle_radius',
           c_id: c.circle,
-          radius: Number(c.value) || 0,
+          radius: numericValue(c.value),
         })
         break
       case 'diameter':
@@ -408,7 +491,7 @@ function buildPlanegcsPrimitives(sketch) {
           id: nextId(),
           type: 'circle_diameter',
           c_id: c.circle,
-          diameter: Number(c.value) || 0,
+          diameter: numericValue(c.value),
         })
         break
       case 'symmetric': {

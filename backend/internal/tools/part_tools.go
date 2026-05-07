@@ -85,6 +85,24 @@ type partDoc struct {
 	Visibility      string            `json:"visibility,omitempty"`
 	Photos          []partPhotoTool   `json:"photos,omitempty"`
 	Metadata        map[string]any    `json:"metadata,omitempty"`
+	// Configurations / variants — see backend/internal/llm/docs/configurations.md.
+	// `DefaultConfig` is the id of the configuration the file picks when no
+	// explicit pin is supplied; `Configurations` is the row list (id +
+	// label + per-config params). Empty array (or empty default) means
+	// "no variants" and the file behaves like every other Part.
+	DefaultConfig  string              `json:"default_config,omitempty"`
+	Configurations []partConfiguration `json:"configurations,omitempty"`
+}
+
+// partConfiguration mirrors the configurations / variants entry shape on a
+// Part's JSON content. Tools that author or read configs (add_configuration,
+// generate_bom) round-trip these fields verbatim. `Params` is a free-form
+// map so each config can override any subset of the equations scope; the
+// runner merges it OVER the equations scope before evaluation.
+type partConfiguration struct {
+	ID     string         `json:"id"`
+	Label  string         `json:"label,omitempty"`
+	Params map[string]any `json:"params,omitempty"`
 }
 
 // parsePartContent is tolerant: missing / malformed JSON falls back to a
@@ -266,6 +284,10 @@ type bomRow struct {
 	UnitPriceUSD       *float64    `json:"unit_price_usd,omitempty"`
 	TotalPriceUSD      *float64    `json:"total_price_usd,omitempty"`
 	PrimaryDistributor *bomDistRef `json:"primary_distributor,omitempty"`
+	// Configurations / variants — populated when the rolled-up component
+	// pinned a specific configuration (M3 vs M4 of one screw Part).
+	ConfigID    string `json:"config_id,omitempty"`
+	ConfigLabel string `json:"config_label,omitempty"`
 }
 
 // bomFileRow is the slice of `files` we need to walk.
@@ -282,6 +304,7 @@ type bomComponentRef struct {
 	ObjectID string `json:"object_id"`
 	PartID   string `json:"part_id"`
 	Quantity *int   `json:"quantity,omitempty"`
+	ConfigID string `json:"config_id,omitempty"`
 }
 
 type bomAssemblyRef struct {
@@ -342,24 +365,52 @@ func computeBOMTool(ctx context.Context, pc ProjectCtx) ([]bomRow, *float64, []s
 	paths := buildBOMPathTable(files)
 
 	type agg struct {
-		count   int
-		fileID  uuid.UUID
-		fileRow *bomFileRow
+		count    int
+		fileID   uuid.UUID
+		fileRow  *bomFileRow
+		configID string
 	}
 	aggregates := make(map[string]*agg)
 	warnings := make([]string, 0)
 
-	addPart := func(partFile *bomFileRow, quantity int) {
+	resolveActiveConfig := func(doc partDoc, pinned string) string {
+		if len(doc.Configurations) == 0 {
+			return ""
+		}
+		if pinned != "" {
+			for _, c := range doc.Configurations {
+				if c.ID == pinned {
+					return c.ID
+				}
+			}
+		}
+		def := strings.TrimSpace(doc.DefaultConfig)
+		if def != "" {
+			for _, c := range doc.Configurations {
+				if c.ID == def {
+					return c.ID
+				}
+			}
+		}
+		return doc.Configurations[0].ID
+	}
+
+	addPart := func(partFile *bomFileRow, quantity int, configID string) {
 		doc := parsePartContent(partFile.Content)
-		key := strings.TrimSpace(doc.MPN)
-		if key == "" {
-			key = "fid:" + partFile.ID.String()
+		base := strings.TrimSpace(doc.MPN)
+		if base == "" {
+			base = "fid:" + partFile.ID.String()
+		}
+		key := base
+		if configID != "" {
+			key = base + "|cfg=" + configID
 		}
 		a := aggregates[key]
 		if a == nil {
 			a = &agg{
-				fileID:  partFile.ID,
-				fileRow: partFile,
+				fileID:   partFile.ID,
+				fileRow:  partFile,
+				configID: configID,
 			}
 			aggregates[key] = a
 		} else if a.fileID != partFile.ID && doc.MPN != "" {
@@ -369,14 +420,16 @@ func computeBOMTool(ctx context.Context, pc ProjectCtx) ([]bomRow, *float64, []s
 		a.count += quantity
 	}
 
-	var walk func(fid uuid.UUID, multiplier int, visited map[uuid.UUID]bool)
-	walk = func(fid uuid.UUID, multiplier int, visited map[uuid.UUID]bool) {
+	var walk func(fid uuid.UUID, multiplier int, configHint string, visited map[uuid.UUID]bool)
+	walk = func(fid uuid.UUID, multiplier int, configHint string, visited map[uuid.UUID]bool) {
 		f := byID[fid]
 		if f == nil {
 			return
 		}
 		if f.Kind == "part" {
-			addPart(f, multiplier)
+			doc := parsePartContent(f.Content)
+			cfgID := resolveActiveConfig(doc, configHint)
+			addPart(f, multiplier, cfgID)
 			return
 		}
 		if f.Kind != "assembly" {
@@ -402,7 +455,11 @@ func computeBOMTool(ctx context.Context, pc ProjectCtx) ([]bomRow, *float64, []s
 			if c.Quantity != nil && *c.Quantity > 0 {
 				q = *c.Quantity
 			}
-			walk(cid, multiplier*q, visited)
+			nextHint := configHint
+			if c.ConfigID != "" {
+				nextHint = c.ConfigID
+			}
+			walk(cid, multiplier*q, nextHint, visited)
 		}
 	}
 
@@ -412,7 +469,7 @@ func computeBOMTool(ctx context.Context, pc ProjectCtx) ([]bomRow, *float64, []s
 			continue
 		}
 		visited := map[uuid.UUID]bool{}
-		walk(f.ID, 1, visited)
+		walk(f.ID, 1, "", visited)
 	}
 
 	out := make([]bomRow, 0, len(aggregates))
@@ -425,6 +482,19 @@ func computeBOMTool(ctx context.Context, pc ProjectCtx) ([]bomRow, *float64, []s
 			FileID: a.fileID.String(),
 			Path:   paths[a.fileID],
 			Count:  a.count,
+		}
+		if a.configID != "" {
+			row.ConfigID = a.configID
+			for _, c := range doc.Configurations {
+				if c.ID == a.configID {
+					if c.Label != "" {
+						row.ConfigLabel = c.Label
+					} else {
+						row.ConfigLabel = c.ID
+					}
+					break
+				}
+			}
 		}
 		var unitPrice *float64
 		for _, dl := range doc.Distributors {
@@ -451,10 +521,14 @@ func computeBOMTool(ctx context.Context, pc ProjectCtx) ([]bomRow, *float64, []s
 		out = append(out, row)
 	}
 
-	// Stable order by name, then path.
+	// Stable order by name, then config id (so M3/M4/M5 of the same Part
+	// stay next to each other), then path.
 	sort.SliceStable(out, func(i, j int) bool {
 		if out[i].Part.Name != out[j].Part.Name {
 			return out[i].Part.Name < out[j].Part.Name
+		}
+		if out[i].ConfigID != out[j].ConfigID {
+			return out[i].ConfigID < out[j].ConfigID
 		}
 		return out[i].Path < out[j].Path
 	})

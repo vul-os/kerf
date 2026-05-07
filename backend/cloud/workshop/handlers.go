@@ -106,11 +106,11 @@ type listingView struct {
 	PublishedAt  time.Time  `json:"published_at"`
 	UpdatedAt    time.Time  `json:"updated_at"`
 	LikedByMe    bool       `json:"liked_by_me"`
-	// ProjectType ('mechanical' | 'electronics' | …) is denormalized from
-	// the source project so the Workshop UI can render a per-type tab strip
-	// + filter chip without a second join. See ROADMAP.md "Multi-domain
-	// support: project types".
-	ProjectType string `json:"project_type"`
+	// Tags are denormalized from the source project so the Workshop UI can
+	// render tag chips and filter without a second join. Free-form (any
+	// strings the project owner picked); the UI presents a small preset
+	// set as suggestions. See CONTRACT.md "Project tags".
+	Tags []string `json:"tags"`
 }
 
 type listingDetailView struct {
@@ -275,40 +275,34 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 		orderBy = "l.likes_count desc, l.published_at desc"
 	}
 
-	// Optional ?type=<project_type> filter. Empty (or "all") means no
-	// filter; we validate against the small known set so a bad query
-	// param can't slip a SQL fragment in. Tying the filter to the source
-	// project's denormalized type keeps the join cheap (no jsonb probe).
-	typeFilter := strings.TrimSpace(r.URL.Query().Get("type"))
-	if typeFilter == "all" {
-		typeFilter = ""
-	}
-	if typeFilter != "" {
-		switch typeFilter {
-		case "mechanical", "electronics", "architecture":
-			// ok
-		default:
-			writeError(w, http.StatusBadRequest, "invalid type filter")
-			return
+	// Optional ?tag=<value> filter. Repeatable; empty values are dropped.
+	// Multiple tags are ANDed (`p.tags @> filters`) so ?tag=jewelry&tag=ring
+	// returns only projects carrying both. Free-form: we don't validate
+	// against any whitelist — the preset list is a UX hint.
+	tagFilters := []string{}
+	for _, t := range r.URL.Query()["tag"] {
+		t = strings.TrimSpace(t)
+		if t != "" {
+			tagFilters = append(tagFilters, t)
 		}
 	}
 
-	// args[0] = uid, args[1] = pageSize+1, args[2] = offset, args[3?] = typeFilter
+	// args[0] = uid, args[1] = pageSize+1, args[2] = offset, args[3?] = tagFilters
 	args := []any{uid, pageSize + 1, offset}
-	whereType := ""
-	if typeFilter != "" {
-		args = append(args, typeFilter)
-		whereType = " where p.project_type = $4 "
+	whereTags := ""
+	if len(tagFilters) > 0 {
+		args = append(args, tagFilters)
+		whereTags = " where p.tags @> $4::text[] "
 	}
 
 	// We over-fetch by 1 row to compute has_more without a count(*). The
-	// projects join is required to surface project_type; it's already
-	// implicit via the listing's project_id FK so it adds no rows.
+	// projects join is required to surface tags; it's already implicit via
+	// the listing's project_id FK so it adds no rows.
 	q := fmt.Sprintf(`
         select l.id, l.slug, l.title, l.description, l.thumbnail_url,
                l.likes_count, l.forks_count, l.published_at, l.updated_at,
                u.id, u.name, u.avatar_url,
-               coalesce(p.project_type, 'mechanical') as project_type,
+               coalesce(p.tags, '{}'::text[]) as tags,
                case when $1 = '' then false
                     else exists(
                         select 1 from cloud_workshop_likes
@@ -321,7 +315,7 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
         %s
         order by %s
         limit $2 offset $3
-    `, whereType, orderBy)
+    `, whereTags, orderBy)
 
 	rows, err := h.Pool.Query(r.Context(), q, args...)
 	if err != nil {
@@ -337,7 +331,7 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 			&v.ID, &v.Slug, &v.Title, &v.Description, &v.ThumbnailURL,
 			&v.LikesCount, &v.ForksCount, &v.PublishedAt, &v.UpdatedAt,
 			&v.Author.ID, &v.Author.Name, &v.Author.AvatarURL,
-			&v.ProjectType,
+			&v.Tags,
 			&v.LikedByMe,
 		); err != nil {
 			writeError(w, http.StatusInternalServerError, err.Error())
@@ -371,7 +365,7 @@ func (h *Handlers) Get(w http.ResponseWriter, r *http.Request) {
                l.likes_count, l.forks_count, l.published_at, l.updated_at,
                l.project_id,
                u.id, u.name, u.avatar_url,
-               coalesce(p.project_type, 'mechanical') as project_type,
+               coalesce(p.tags, '{}'::text[]) as tags,
                case when $1 = '' then false
                     else exists(
                         select 1 from cloud_workshop_likes
@@ -387,7 +381,7 @@ func (h *Handlers) Get(w http.ResponseWriter, r *http.Request) {
 		&v.LikesCount, &v.ForksCount, &v.PublishedAt, &v.UpdatedAt,
 		&v.ProjectID,
 		&v.Author.ID, &v.Author.Name, &v.Author.AvatarURL,
-		&v.ProjectType,
+		&v.Tags,
 		&v.LikedByMe,
 	)
 	if err != nil {
@@ -725,18 +719,17 @@ func (h *Handlers) Fork(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Pull the source project's metadata so the fork preserves the
-	// description + project_type (visibility resets to 'private' — the
-	// forker can re-publish if they want). project_type carries over so
-	// an electronics fork doesn't suddenly render with the mechanical
-	// editor.
+	// description + tags (visibility resets to 'private' — the forker can
+	// re-publish if they want). Tags carry over so an electronics-tagged
+	// fork keeps its tag chips and the LLM addendum stays correct.
 	var (
-		srcDesc        string
-		srcProjectType string
+		srcDesc string
+		srcTags []string
 	)
 	if err := tx.QueryRow(r.Context(),
-		`select description, coalesce(project_type, 'mechanical') from projects where id = $1`,
+		`select description, coalesce(tags, '{}'::text[]) from projects where id = $1`,
 		srcProjectID,
-	).Scan(&srcDesc, &srcProjectType); err != nil {
+	).Scan(&srcDesc, &srcTags); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -749,10 +742,10 @@ func (h *Handlers) Fork(w http.ResponseWriter, r *http.Request) {
 	// Create the new project + owner membership row.
 	var newProjectID string
 	if err := tx.QueryRow(r.Context(), `
-        insert into projects(owner_id, name, description, visibility, project_type)
+        insert into projects(owner_id, name, description, visibility, tags)
         values ($1, $2, $3, 'private', $4)
         returning id
-    `, uid, newName, srcDesc, srcProjectType).Scan(&newProjectID); err != nil {
+    `, uid, newName, srcDesc, srcTags).Scan(&newProjectID); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}

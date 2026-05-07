@@ -12,17 +12,31 @@ import (
 
 	"github.com/imranp/kerf/backend/internal/auth"
 	"github.com/imranp/kerf/backend/internal/config"
+	"github.com/imranp/kerf/backend/internal/distributors"
+	"github.com/imranp/kerf/backend/internal/filesystem"
 	"github.com/imranp/kerf/backend/internal/llm"
 	"github.com/imranp/kerf/backend/internal/storage"
 )
 
+// DistributorsRegistry is the slice of *distributors.Registry the admin handlers
+// need. Kept as an interface so cloud_enabled can swap a concrete *Registry
+// in via the type assertion in distributor_admin's RefreshPart path.
+type DistributorsRegistry interface {
+	Meta() []distributors.ServiceMeta
+	Upsert(ctx context.Context, name string, enabled bool, rateLimitPerMinute int, creds distributors.Credentials) (distributors.ServiceMeta, error)
+	Reload(ctx context.Context) error
+	Delete(ctx context.Context, name string) error
+}
+
 // Deps bundles everything handlers need.
 type Deps struct {
-	Cfg     *config.Config
-	Pool    *pgxpool.Pool
-	Auth    *auth.Service
-	LLM     *llm.Registry
-	Storage storage.Storage
+	Cfg          *config.Config
+	Pool         *pgxpool.Pool
+	Auth         *auth.Service
+	LLM          *llm.Registry
+	Storage      storage.Storage
+	Distributors DistributorsRegistry
+	Mirror       *filesystem.Mirror
 }
 
 func writeJSON(w http.ResponseWriter, status int, body interface{}) {
@@ -84,19 +98,20 @@ func projectRole(ctx context.Context, pool *pgxpool.Pool, projectID, userID stri
 	return "", true, nil
 }
 
-// requireMember returns the caller's role; writes 404/403 and returns "" if not authorized.
+// requireMember returns the caller's role; writes 404 and returns "" if not authorized.
+//
+// Both "project missing" and "caller has no role on the project's workspace"
+// return the same 404 — leaking project existence to outsiders is a small but
+// real privacy issue (project names are often product code-names). 403 was the
+// older response shape; we tightened it.
 func requireMember(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool, projectID, userID string) string {
 	role, exists, err := projectRole(r.Context(), pool, projectID, userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return ""
 	}
-	if !exists {
+	if !exists || role == "" {
 		writeError(w, http.StatusNotFound, "project not found")
-		return ""
-	}
-	if role == "" {
-		writeError(w, http.StatusForbidden, "forbidden")
 		return ""
 	}
 	return role

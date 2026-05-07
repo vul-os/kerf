@@ -1,134 +1,233 @@
+<div align="center">
+
+<img src="public/favicon.svg" width="84" height="84" alt="Kerf">
+
 # Kerf
 
-**Chat-driven CAD.** Write JSCAD on one side, see the 3D model on the other,
-and let an LLM edit the source for you. Multi-file projects, parametric
-sketches, assemblies, and TechDraw-style 2D drawings — all from a single Go
-binary that runs in your browser.
+**Chat-driven CAD that produces real engineering output.**
 
-OpenCASCADE-backed B-rep features (precise fillets, lossless STEP export) are
-on the roadmap; today's kernel is JSCAD-mesh, and both will coexist per-file
-once OCCT lands.
+JSCAD code · OpenCascade B-rep features · planegcs sketcher · tscircuit electronics · TechDraw drawings · assemblies · library + BOM · workshop sharing · workspace billing — with an LLM editing the source for you.
 
-<!-- screenshot: editor split — JSCAD source · 3D viewport · chat -->
+[![License: MIT](https://img.shields.io/badge/License-MIT-FFD633.svg?style=flat-square)](LICENSE)
+[![Made in](https://img.shields.io/badge/Built%20in-Durban%20%F0%9F%87%BF%F0%9F%87%A6-1f2937?style=flat-square)](https://kerf.app)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-FFD633.svg?style=flat-square)](#contributing)
+[![Single binary](https://img.shields.io/badge/single%20binary-~32%20MB-1f2937?style=flat-square)](#install)
 
-## Quickstart
+[Website](https://kerf.app) · [Docs](https://kerf.app/docs) · [Roadmap](./ROADMAP.md) · [Contributing](#contributing)
+
+</div>
+
+---
+
+## Screenshots
+
+<!-- Drop the actual files into public/screenshots/ — the paths below resolve once images land. -->
+
+<p align="center">
+  <img src="public/screenshots/editor.png" alt="The Kerf editor: file tree, 3D viewport, chat panel" width="100%">
+  <em>The editor — file tree, 3D viewport, and the LLM chat panel side by side.</em>
+</p>
+
+<p align="center">
+  <img src="public/screenshots/sketcher-features.png" alt="Sketcher with constraints driving an OCCT feature timeline" width="100%">
+  <em>2D parametric sketcher driving an OpenCascade B-rep feature timeline.</em>
+</p>
+
+---
+
+## What it is
+
+A single workspace for mechanical, electronics, drawings, and library parts — written entirely in code (JSCAD / `.feature` JSON / `.circuit.tsx` / `.sketch` / `.drawing`) so an LLM can read, diff, and edit it. Multi-domain projects via free-form tags. Browser-native. Single-binary local install (~32 MB) or hosted at [kerf.app](https://kerf.app).
+
+## Why
+
+- **Code-first** — everything is text. Diffs, code review, branching, version control. The LLM doesn't have to "see" pixels — it edits source.
+- **Two real kernels** — JSCAD for fast iteration; OpenCascade B-rep (`.feature` files) for fillets / shells / lossless STEP export. Pick per file.
+- **Multi-domain** — mechanical assemblies and PCB schematics in the same project. Cross-reference a board outline from a mechanical Component.
+- **Open source** — MIT throughout, including the cloud bundle. Self-host the same code we run.
+- **Local-first** — no telemetry, no phone-home. The hosted tier exists for convenience, not lock-in.
+
+## Install
+
+### Hosted
+
+[kerf.app](https://kerf.app) — sign up, you get 50 MB free, top up with credits when you need more LLM tokens or storage.
+
+### Local (single binary)
 
 ```sh
-brew install exolution/tap/kerf       # or: curl -fsSL https://kerf.app/install.sh | sh
+# Homebrew (macOS / Linux)
+brew install exolution/tap/kerf
+
+# Or one-shot installer
+curl -fsSL https://kerf.app/install.sh | sh
+
+# Run (creates kerf.toml on first start)
 createdb kerf
-kerf --config ./kerf.toml             # writes a starter kerf.toml on first run
+kerf
+# → http://localhost:8080
 ```
 
-Open <http://localhost:8080>. For local single-user mode, set
-`[auth].optional = true` in `kerf.toml` so there's no signup screen.
+In local mode the binary auto-creates a single user and skips the login screen entirely (`[server].local_mode = true` is the default).
 
-For a development setup (`npm run dev`, hot reload, both servers), see
-[docs/getting-started.md](./docs/getting-started.md).
+### From source
+
+```sh
+git clone https://github.com/imranp/kerf
+cd kerf
+npm install
+npm run dev          # vite :5173 + go :8080
+```
+
+You'll need Go 1.24+, Node 22+, and Postgres 14+.
+
+## Build
+
+```sh
+npm run build              # full single binary at ./kerf — embeds the SPA via go:embed
+npm run build:web          # just the Vite frontend (outputs to backend/internal/web/dist)
+npm run build:api          # just the Go backend
+npm run build:icons        # regenerate favicon set + OG image from public/favicon.svg
+npm run build:docs         # rebuild public/docs-manifest.json from the markdown corpus
+```
+
+### Build flags
+
+The Go backend uses build tags to gate the optional cloud bundle. Default is **OSS**.
+
+```sh
+# OSS build (default) — single-user local install, no billing, no Workshop
+go build -o kerf ./backend/cmd/server
+
+# Cloud build — adds Workshop sharing, Paystack billing, git, transactional email
+go build -tags=cloud -o kerf-cloud ./backend/cmd/server
+
+# Or via npm
+npm run build              # OSS
+npm run build:cloud        # cloud
+```
+
+The same source tree builds both. Cloud-only code lives under `backend/cloud/`, `cloud/`, `src/cloud/` and is compiled in only when the `cloud` build tag is set. The OSS binary cannot accidentally pull in cloud code.
+
+### Configuration
+
+`kerf.toml` (search order: `--config` flag → `KERF_CONFIG` env → `./kerf.toml` → `~/.config/kerf/config.toml` → `/etc/kerf/config.toml`). Starter file emitted on first run. Notable knobs:
+
+| Key | Effect |
+|---|---|
+| `[server].local_mode = true` | Single-user mode; auto-login, skip register/login UI |
+| `[server].port = 8080` | HTTP port |
+| `[storage].backend = "filesystem"` | Mirror projects to `filesystem_root` for git workflows |
+| `[storage].backend = "s3"` | S3 / R2 / MinIO; set credentials in `[storage.s3]` |
+| `[llm.anthropic].api_key` / `[llm.openai].api_key` / etc. | Activate that LLM provider |
+| `[limits].file_revisions_max` | Per-file undo history cap (default 200) |
+| `[cloud.paystack].secret_key` | (cloud build only) billing |
+
+Full schema: see [`kerf.example.toml`](./kerf.example.toml).
 
 ## What you can do today
 
-| Capability                                | Status      |
-|-------------------------------------------|-------------|
-| JSCAD authoring + chat-driven edits       | Shipped     |
-| Multi-Object Parts (OnShape part-studio style) | Shipped |
-| 2D parametric sketches with planegcs constraints | Shipped |
-| Assemblies (Component = placed Object instance) | Shipped |
-| Multi-sheet 2D drawings, dimensions, GD&T, sections | Shipped |
-| STEP import/export, chunked resumable uploads | Shipped  |
-| File revisions (Cmd+Z, full history drawer) | Shipped   |
-| Single-binary build (~32 MB, embedded frontend) | Shipped |
-| Brew tap + curl install                   | Shipped     |
-| Filesystem / S3 / R2 / MinIO storage      | Shipped     |
-| OCCT-backed `.feature` files (real B-rep) | Planned     |
-| Direct edge/face selection + push/pull    | Planned     |
+| Capability | Status |
+|---|---|
+| JSCAD authoring + chat-driven edits | ✅ |
+| OpenCascade `.feature` files (Pad / Pocket / Revolve / Fillet / Chamfer / Shell / Hole / Patterns / Push-Pull / Sweep1 / Loft / Variable-radius fillet) | ✅ |
+| 2D parametric sketcher (planegcs constraints, live length/angle dynamic input, plain-English mini-toolbar) | ✅ |
+| TechDraw-flavored drawings (multi-sheet, dimensions, GD&T, hatching, leaders, balloons) | ✅ |
+| Electronics via tscircuit (TSX → schematic + PCB + 3D board viewers) | ✅ |
+| Library + BOM (per-Part visibility, distributors, photos, verified-publisher badge) | ✅ |
+| Assemblies (Component = placed Object instance with config/variant ref) | ✅ |
+| Equations + global parameters (mathjs, injected into all runners) | ✅ |
+| Workspaces (orgs) with members + roles + per-workspace billing | ✅ |
+| Workshop sharing (free-tier social gallery, like + fork) | ✅ |
+| Git (commits / branches / merge / GitHub sync) | ✅ |
+| STEP import/export, chunked resumable uploads, server-side tessellation | ✅ |
+| File revisions (Cmd+Z, full history drawer) | ✅ |
+| Single-binary build (~32 MB, embedded frontend) | ✅ |
+| Filesystem / S3 / R2 / MinIO storage | ✅ |
+| 🔮 NURBS surfacing for jewelry (sweep2, networkSrf, blendSrf) | planned |
+| 🔮 SPICE simulation, RF, autorouting (electronics) | planned |
+| 🔮 FEM (CalculiX + Gmsh) | planned |
 
-The full roadmap — shipped, in-flight, next, planned — is in
-[ROADMAP.md](./ROADMAP.md).
-
-## Philosophy
-
-**JSCAD is the source format.** Plain JavaScript + `@jscad/modeling`. Diffable,
-reviewable, scriptable, and the one CAD format an LLM can actually reason
-about. Every Part lives in version control as readable code.
-
-**Two kernels coexist.** JSCAD evaluates fast (Web Worker, IndexedDB-cached
-mesh, ~one sprint to ship a new feature). OpenCASCADE will land alongside it
-in a `.feature` file kind for the precision-critical work mesh CAD can't
-deliver — real fillets, lossless STEP, edge identity. Pick per-file. Same
-trade Rhino and FreeCAD make.
-
-**Browser-native, single binary.** No native install. Frontend embedded in
-the Go binary via `//go:embed`. Postgres for state. Pluggable storage for
-binary assets. The OSS build does no phoning home.
-
-**Chat is a peer, not a wrapper.** The agent loop runs synchronously inside
-the message handler — read, edit, validate, place — and every tool call
-shows up as a chat row. You see what it did and you can undo it.
-
-**OnShape × Workshop × FreeCAD.** Part studios, multi-user sharing, real
-engineering output.
+The full ROADMAP — shipped, in-flight, next, planned — is in [ROADMAP.md](./ROADMAP.md).
 
 ## Project structure
 
 ```
-backend/                    Go API server (MIT)
-  cmd/server/                 entry point
-  cmd/migrate/                schema migrator
-  cmd/test/                   integration test runner
-  internal/                   handlers, auth, storage, LLM, tools
-  internal/web/dist/          embedded Vite bundle (built by build:web)
-  migrations/                 OSS schema
-  cloud/                      proprietary cloud backend (build-tagged)
-src/                        React + Vite frontend (MIT)
-src/cloud/                  proprietary cloud frontend
-cloud/                      top-level cloud README + LICENSE
-docs/                       extended docs
-kerf.example.toml           backend config template
+backend/
+├── cmd/server/        — HTTP API entrypoint
+├── cmd/migrate/       — schema migrator
+├── cmd/test/          — integration test runner
+├── internal/          — handlers, auth, storage, LLM, tools
+├── internal/web/dist/ — embedded Vite bundle (built by build:web)
+├── migrations/        — OSS schema
+└── cloud/             — cloud-tier handlers (build-tagged)
+
+src/
+├── components/        — React components
+├── routes/            — pages (Editor, Projects, Library, Workshop, Docs, …)
+├── lib/               — runners (JSCAD / OCCT / sketch / equations), API client
+├── store/             — Zustand stores (workspace, auth, workspaces)
+└── cloud/             — cloud-tier UI
+
+cloud/                 — top-level cloud bundle metadata
+docs/                  — public-facing docs (rendered at /docs)
+public/                — static assets (icons, OG image, screenshots, planegcs.wasm)
+ROADMAP.md             — direction
+CONTRACT.md            — API + data model spec
 ```
 
-## npm scripts (dev)
+## Tech stack
 
-| Script                  | What it does                                           |
-|-------------------------|--------------------------------------------------------|
-| `npm run dev`           | Vite (:5173) + Go server (:8080) side by side          |
-| `npm run init`          | Copy `kerf.example.toml` → `kerf.toml` (idempotent)    |
-| `npm run migrate`       | Apply pending OSS migrations                           |
-| `npm run migrate:reset` | Drop schema and re-apply                               |
-| `npm run build`         | OSS single binary at `./kerf`                          |
-| `npm run build:cloud`   | Cloud single binary at `./kerf-cloud`                  |
-| `npm run start`         | Run the built binary                                   |
-| `npm run lint`          | ESLint                                                 |
+- **Frontend**: Vite 8, React 19, React Router 7, Tailwind v4, Zustand, Three.js, `@jscad/modeling`, `@monaco-editor/react`
+- **Sketcher**: planegcs (FreeCAD's solver, compiled to WASM)
+- **B-rep kernel**: OpenCascade.js (~15 MB compressed wasm, lazy-chunked)
+- **Electronics**: tscircuit (TSX → CircuitJSON), circuit-to-svg
+- **Backend**: Go 1.24, chi, pgx, JWT, `golang.org/x/oauth2/google`
+- **DB**: Postgres 14+ (Supabase-compatible)
+- **LLM**: multi-provider — Anthropic, OpenAI, Moonshot, Gemini (default `claude-opus-4-7`)
+- **Cloud-only**: Paystack (USD-priced, ZAR-settled), bunny.net CDN, go-git
 
-## Configuration
+## Testing
 
-A single `kerf.toml`. Search order:
-`--config <path>` → `KERF_CONFIG` env → `./kerf.toml` →
-`~/.config/kerf/config.toml` → `/etc/kerf/config.toml`. Full schema in
-`kerf.example.toml`.
+```sh
+# Backend integration scenarios (boots a real server + Postgres)
+createdb kerf_test
+KERF_TEST_DATABASE_URL='postgres://localhost/kerf_test?sslmode=disable' \
+  go run ./backend/cmd/test
+# → 14 scenarios, ~450 assertions
 
-Notable knobs:
+# Frontend unit tests (vitest)
+npm test
+# → 22 tests covering sketcher pure helpers + planegcs solver round-trip
 
-| Key                                 | Effect                                          |
-|-------------------------------------|-------------------------------------------------|
-| `[auth].optional = true`            | Single-user mode; no login UI                   |
-| `[storage].backend = "filesystem"`  | Mirror projects to disk under `filesystem_root` |
-| `[storage].backend = "s3"`          | S3 / R2 / MinIO; set `[storage.s3]`             |
-| `[llm.<provider>].api_key`          | Activates that LLM provider                     |
-| `[limits].file_revisions_max`       | Per-file undo history cap (default 200)         |
+# Type-check + lint
+npm run lint
+```
+
+## Contributing
+
+PRs welcome. Pick anything marked `📋 next` or `🔮 planned` in [ROADMAP.md](./ROADMAP.md). For larger work, open an issue first so we can align scope.
+
+- **Style**: ESLint + Prettier defaults. Match the surrounding code; we don't bikeshed.
+- **Tests**: every PR that touches a backend handler should add or extend a scenario in `backend/cmd/test/scenarios/`. Frontend changes: add a vitest if the logic isn't UI-only.
+- **Commits**: imperative tense, ~70 chars (`fix sketcher line-tool double-commit`).
+- **The LLM edits source files directly.** If you add a new file kind or feature, also add a `backend/internal/llm/docs/<topic>.md` so the model knows about it. The doc-search tool indexes that directory automatically.
+
+See [CONTRACT.md](./CONTRACT.md) for the API + data model spec — the source of truth for cross-cutting changes.
 
 ## License
 
-- `LICENSE` (MIT) covers everything except files under `cloud/**`,
-  `backend/cloud/**`, and `src/cloud/**`.
-- [`cloud/LICENSE`](./cloud/LICENSE) is a proprietary, source-available
-  license for the hosted-tier code. Personal/non-commercial self-hosting is
-  permitted; commercial use requires written agreement.
+MIT — see [LICENSE](./LICENSE). The cloud bundle is the same MIT license; you can self-host it. Anyone can run, fork, modify, distribute, sublicense, or sell.
+
+Built in Durban 🇿🇦 by a small team. Engineered for engineers everywhere.
 
 ## Links
 
-- [docs/](./docs/) — extended guides: getting started, concepts, sketching,
-  assemblies, drawings, cloud, contributing, architecture, LLM tools.
-- [ROADMAP.md](./ROADMAP.md) — shipped, in-flight, next, planned.
-- [CONTRACT.md](./CONTRACT.md) — full API + data model spec.
-- [backend/README.md](./backend/README.md) — backend dev guide.
-- [cloud/README.md](./cloud/README.md) — hosted-tier build/deploy.
+- [Docs](https://kerf.app/docs) — getting started, concepts, sketching, assemblies, drawings, electronics
+- [ROADMAP.md](./ROADMAP.md) — shipped · in-flight · next · planned
+- [CONTRACT.md](./CONTRACT.md) — full API + data model
+- [backend/README.md](./backend/README.md) — backend developer guide
+- [cloud/README.md](./cloud/README.md) — hosted-tier build/deploy notes
+- [Issues](https://github.com/imranp/kerf/issues) · [Discussions](https://github.com/imranp/kerf/discussions)
+</content>
+</invoke>

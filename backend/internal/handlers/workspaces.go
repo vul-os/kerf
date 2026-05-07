@@ -155,7 +155,7 @@ func (d *Deps) attachWorkspaceAvatar(ws *models.Workspace, key *string) {
 		return
 	}
 	if d.Storage != nil {
-		ws.AvatarURL = d.Storage.PublicURL(*key)
+		ws.AvatarURL = d.Storage.PublicURL(*key, ws.UpdatedAt)
 	}
 }
 
@@ -224,7 +224,40 @@ func createPersonalWorkspace(ctx context.Context, pool *pgxpool.Pool, userID, di
 // ListWorkspaces returns workspaces the caller is a member of.
 func (d *Deps) ListWorkspaces(w http.ResponseWriter, r *http.Request) {
 	uid := middleware.UserID(r.Context())
-	rows, err := d.Pool.Query(r.Context(), `
+	out, err := d.listWorkspacesFor(r.Context(), uid)
+	if err != nil {
+		genericServerError(w, err)
+		return
+	}
+	// Lazy bootstrap: any authed user that somehow ended up with zero
+	// workspaces (seeded system user, pre-workspaces account, etc.) gets a
+	// personal one minted on first list call. Without this, a logged-in
+	// session where the register-time creation didn't happen would forever
+	// see an empty list and have nowhere to put projects.
+	if len(out) == 0 {
+		var name, email string
+		_ = d.Pool.QueryRow(r.Context(), `select name, email from users where id = $1`, uid).Scan(&name, &email)
+		display := strings.TrimSpace(name)
+		if display == "" {
+			if at := strings.Index(email, "@"); at > 0 {
+				display = email[:at]
+			} else {
+				display = "My"
+			}
+		}
+		if _, err := createPersonalWorkspace(r.Context(), d.Pool, uid, display); err == nil {
+			out, err = d.listWorkspacesFor(r.Context(), uid)
+			if err != nil {
+				genericServerError(w, err)
+				return
+			}
+		}
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (d *Deps) listWorkspacesFor(ctx context.Context, uid string) ([]models.Workspace, error) {
+	rows, err := d.Pool.Query(ctx, `
 		select w.id, w.slug, w.name, w.avatar_storage_key, w.created_by,
 		       w.created_at, w.updated_at, m.role,
 		       (select count(*) from workspace_members wm where wm.workspace_id = w.id) as member_count,
@@ -235,8 +268,7 @@ func (d *Deps) ListWorkspaces(w http.ResponseWriter, r *http.Request) {
 		order by w.created_at asc
 	`, uid)
 	if err != nil {
-		genericServerError(w, err)
-		return
+		return nil, err
 	}
 	defer rows.Close()
 	out := []models.Workspace{}
@@ -247,13 +279,12 @@ func (d *Deps) ListWorkspaces(w http.ResponseWriter, r *http.Request) {
 		)
 		if err := rows.Scan(&ws.ID, &ws.Slug, &ws.Name, &key, &ws.CreatedBy,
 			&ws.CreatedAt, &ws.UpdatedAt, &ws.MyRole, &ws.MemberCount, &ws.ProjectCount); err != nil {
-			genericServerError(w, err)
-			return
+			return nil, err
 		}
 		d.attachWorkspaceAvatar(&ws, key)
 		out = append(out, ws)
 	}
-	writeJSON(w, http.StatusOK, out)
+	return out, nil
 }
 
 type createWorkspaceReq struct {

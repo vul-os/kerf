@@ -3,10 +3,9 @@ import {
   ChevronDown, ChevronRight,
   FileCode, Folder, FolderOpen, Layers,
   FilePlus, FolderPlus, Plus, Trash2, Box, Upload, Ruler, PenTool, X, RefreshCw,
-  Package, Cylinder, CircuitBoard, Loader2, AlertCircle,
+  Package, Cylinder, CircuitBoard, Loader2, AlertCircle, Variable,
 } from 'lucide-react'
 import { useWorkspace } from '../store/workspace.js'
-import { projectTypeById, DEFAULT_PROJECT_TYPE } from '../lib/projectTypes.js'
 
 // Build a tree from a flat list of {id, parent_id, name, kind}.
 function buildTree(files) {
@@ -38,6 +37,7 @@ function KindIcon({ kind, name, open }) {
   if (kind === 'part') return <Package size={14} className={`${cls} text-emerald-300`} />
   if (kind === 'feature') return <Cylinder size={14} className={`${cls} text-amber-300`} />
   if (kind === 'circuit') return <CircuitBoard size={14} className={`${cls} text-cyan-edge`} />
+  if (kind === 'equations') return <Variable size={14} className={`${cls} text-kerf-300`} />
   const lower = (name || '').toLowerCase()
   if (lower.endsWith('.step') || lower.endsWith('.stp')) {
     return <Box size={14} className={`${cls} text-cyan-edge`} />
@@ -56,6 +56,9 @@ function KindIcon({ kind, name, open }) {
   }
   if (lower.endsWith('.circuit.tsx')) {
     return <CircuitBoard size={14} className={`${cls} text-cyan-edge`} />
+  }
+  if (lower.endsWith('.equations')) {
+    return <Variable size={14} className={`${cls} text-kerf-300`} />
   }
   return <FileCode size={14} className={`${cls} text-ink-200`} />
 }
@@ -311,34 +314,36 @@ function UploadProgressStrip({ onRetry }) {
   )
 }
 
-// KIND_ROWS is the master catalog of "+ New" dropdown entries. CreateMenu
-// filters this list by the active project_type's `kinds` array — kinds the
-// type doesn't surface as primary are simply omitted from the menu (the
-// API still accepts them, see ROADMAP.md "Multi-domain support").
+// KIND_ROWS is the master catalog of "+ New" dropdown entries. With
+// project types removed (May 2026), CreateMenu shows the full union
+// unconditionally — every project can create every canonical kind.
+// `hint` doubles as the row tooltip explaining what the kind is for.
 const KIND_ROWS = {
-  file:     { icon: FilePlus,     label: 'File',     hint: '.jscad code',                       color: 'text-kerf-300' },
-  folder:   { icon: FolderPlus,   label: 'Folder',   hint: 'organize files' },
-  sketch:   { icon: PenTool,      label: 'Sketch',   hint: '2D parametric profile',             color: 'text-amber-300' },
-  feature:  { icon: Cylinder,     label: 'Feature',  hint: 'B-rep solid (OCCT)',                color: 'text-amber-300' },
-  assembly: { icon: Layers,       label: 'Assembly', hint: 'compose parts',                     color: 'text-cyan-edge' },
-  drawing:  { icon: Ruler,        label: 'Drawing',  hint: '2D technical drawing',              color: 'text-kerf-300' },
-  circuit:  { icon: CircuitBoard, label: 'Circuit',  hint: 'electronics .circuit.tsx (tscircuit)', color: 'text-cyan-edge' },
-  part:     { icon: Package,      label: 'Part',     hint: 'library Part with metadata',        color: 'text-emerald-300' },
+  folder:    { icon: FolderPlus,   label: 'Folder',    hint: 'Group related files' },
+  file:      { icon: FilePlus,     label: 'File',      hint: 'Generic .jscad code module',                color: 'text-kerf-300' },
+  sketch:    { icon: PenTool,      label: 'Sketch',    hint: '2D parametric profile for features',        color: 'text-amber-300' },
+  assembly:  { icon: Layers,       label: 'Assembly',  hint: 'Compose parts and sub-assemblies',          color: 'text-cyan-edge' },
+  drawing:   { icon: Ruler,        label: 'Drawing',   hint: '2D technical drawing with views & dims',    color: 'text-kerf-300' },
+  feature:   { icon: Cylinder,     label: 'Feature',   hint: 'OCCT B-rep timeline (extrude, fillet, …)',  color: 'text-amber-300' },
+  part:      { icon: Package,      label: 'Part',      hint: 'Library Part with metadata for the BOM',    color: 'text-emerald-300' },
+  circuit:   { icon: CircuitBoard, label: 'Circuit',   hint: 'tscircuit electronics (.circuit.tsx)',      color: 'text-cyan-edge' },
+  equations: { icon: Variable,     label: 'Equations', hint: 'Project-level named parameters (.equations)', color: 'text-kerf-300' },
 }
 
+// Canonical menu order: folder + generic file first (basic primitives),
+// followed by domain-specific kinds in roughly mechanical → drawings →
+// library → electronics order. The `step` and `jscad` aliases are
+// import-only / synthetic and intentionally absent here.
+const KIND_ORDER = ['folder', 'file', 'sketch', 'assembly', 'drawing', 'feature', 'part', 'circuit', 'equations']
+
 // CreateMenu — single "+ New" dropdown that replaces the row of icon
-// buttons in the FileTree header. Filters its entries by the active
-// project's project_type so e.g. an electronics project surfaces Circuit /
-// Part / Drawing prominently, while mechanical surfaces JSCAD / Sketch /
-// Assembly / Feature. Closes on click-outside / Escape.
-function CreateMenu({ onCreate, openImportPicker, projectType }) {
+// buttons in the FileTree header. Shows the full union of canonical
+// kinds; STEP import is appended as a separate row. Closes on
+// click-outside / Escape.
+function CreateMenu({ onCreate, openImportPicker }) {
   const [open, setOpen] = useState(false)
   const wrapRef = useRef(null)
-  const t = projectTypeById(projectType || DEFAULT_PROJECT_TYPE)
-  // Filter: keep entries from KIND_ROWS that the type lists. We preserve
-  // the order of `t.kinds` (mirrors the human-readable per-type ordering)
-  // and group the basic file/folder pair if both are present.
-  const visibleKinds = t.kinds.filter((k) => KIND_ROWS[k])
+  const visibleKinds = KIND_ORDER
 
   useEffect(() => {
     if (!open) return
@@ -365,7 +370,7 @@ function CreateMenu({ onCreate, openImportPicker, projectType }) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-ink-200 hover:text-kerf-300 hover:bg-ink-800 border border-ink-700 hover:border-ink-600"
-        title={`Create or import (${t.label} project)`}
+        title="Create a new file or folder, or import a STEP file"
       >
         <Plus size={12} />
         <span>New</span>
@@ -378,8 +383,8 @@ function CreateMenu({ onCreate, openImportPicker, projectType }) {
         >
           {visibleKinds.map((kind, i) => {
             const row = KIND_ROWS[kind]
-            // Insert a separator after the last basic (file/folder) entry
-            // when transitioning to the type-specific kinds — preserves
+            // Insert a separator after the last basic (folder/file) entry
+            // when transitioning to the domain-specific kinds — preserves
             // the visual grouping the menu had pre-refactor.
             const isBasic = kind === 'file' || kind === 'folder'
             const prevBasic = i > 0 && (visibleKinds[i - 1] === 'file' || visibleKinds[i - 1] === 'folder')
@@ -411,6 +416,7 @@ function CreateRow({ icon: Icon, label, hint, color = 'text-ink-200', onClick })
     <button
       type="button"
       onClick={onClick}
+      title={hint ? `${label} — ${hint}` : label}
       className="w-full flex items-start gap-2.5 px-3 py-1.5 text-left hover:bg-ink-800 group"
     >
       <Icon size={14} className={`mt-0.5 ${color}`} />
@@ -457,9 +463,6 @@ function ContextMenu({ x, y, onClose, onRename, onDelete, onNewFile, onNewFolder
 }
 
 export default function FileTree({ files, currentFileId, onSelect, onCreate, onRename, onDelete, onImportStep }) {
-  // Pull the active project's type so the CreateMenu can filter to its
-  // native kinds. Missing project (initial load) → default to mechanical.
-  const projectType = useWorkspace((s) => s.project?.project_type) || DEFAULT_PROJECT_TYPE
   const byParent = useMemo(() => buildTree(files || []), [files])
   const roots = byParent.get('__root__') || []
   const [expanded, setExpanded] = useState(() => new Set(
@@ -508,7 +511,6 @@ export default function FileTree({ files, currentFileId, onSelect, onCreate, onR
         <CreateMenu
           onCreate={onCreate}
           openImportPicker={() => openImportPicker(null)}
-          projectType={projectType}
         />
       </div>
       <input

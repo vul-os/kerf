@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ChevronDown, LogOut, User as UserIcon, ImagePlus } from 'lucide-react'
+import { ChevronDown, LogOut, User as UserIcon, Settings, CreditCard, Activity, UserCog, Users } from 'lucide-react'
 import clsx from 'clsx'
 import { LogoWordmark } from './Logo.jsx'
-import AvatarUploader from './AvatarUploader.jsx'
+import WorkspaceSwitcher from './WorkspaceSwitcher.jsx'
 import { useAuth } from '../store/auth.js'
+import { useWorkspaces } from '../store/workspaces.js'
+import { useCloudConfig } from '../cloud/useCloudConfig.js'
 import { api } from '../lib/api.js'
 
 function initials(name = '', email = '') {
@@ -17,7 +19,7 @@ function initials(name = '', email = '') {
   return src.slice(0, 2).toUpperCase()
 }
 
-function UserMenu({ user, onLogout, onEditAvatar }) {
+function UserMenu({ user, onLogout, currentWorkspaceSlug, cloudEnabled }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
 
@@ -78,34 +80,82 @@ function UserMenu({ user, onLogout, onEditAvatar }) {
             'py-1.5 z-50',
           )}
         >
-          <div className="px-3 py-2 border-b border-ink-800">
+          <div className="px-3 py-2.5 border-b border-ink-800">
             <p className="text-sm text-ink-100 truncate">{user?.name || 'Signed in'}</p>
             <p className="text-xs text-ink-400 truncate font-mono">{user?.email}</p>
           </div>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              setOpen(false)
-              onEditAvatar?.()
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-ink-100 hover:bg-ink-800/80"
-          >
-            <ImagePlus size={14} className="text-ink-300" />
-            Edit avatar
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              setOpen(false)
-              onLogout()
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-ink-100 hover:bg-ink-800/80"
-          >
-            <LogOut size={14} className="text-ink-300" />
-            Sign out
-          </button>
+
+          <div className="py-1">
+            <Link
+              to="/profile"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-100 hover:bg-ink-800/80"
+            >
+              <UserCog size={14} className="text-ink-300" />
+              Profile
+            </Link>
+          </div>
+
+          {currentWorkspaceSlug && (
+            <div className="py-1 border-t border-ink-800">
+              <p className="px-3 pt-1 pb-0.5 text-[10px] font-mono uppercase tracking-[0.18em] text-ink-500">
+                Workspace
+              </p>
+              <Link
+                to={`/w/${currentWorkspaceSlug}/members`}
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-100 hover:bg-ink-800/80"
+              >
+                <Users size={14} className="text-ink-300" />
+                Members
+              </Link>
+              <Link
+                to={`/w/${currentWorkspaceSlug}/settings`}
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-100 hover:bg-ink-800/80"
+              >
+                <Settings size={14} className="text-ink-300" />
+                Settings
+              </Link>
+              {cloudEnabled && (
+                <>
+                  <Link
+                    to="/billing"
+                    role="menuitem"
+                    onClick={() => setOpen(false)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-100 hover:bg-ink-800/80"
+                  >
+                    <CreditCard size={14} className="text-ink-300" />
+                    Billing
+                  </Link>
+                  <Link
+                    to="/usage"
+                    role="menuitem"
+                    onClick={() => setOpen(false)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-100 hover:bg-ink-800/80"
+                  >
+                    <Activity size={14} className="text-ink-300" />
+                    Usage
+                  </Link>
+                </>
+              )}
+            </div>
+          )}
+
+          <div className="py-1 border-t border-ink-800">
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => { setOpen(false); onLogout() }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-100 hover:bg-ink-800/80"
+            >
+              <LogOut size={14} className="text-ink-300" />
+              Sign out
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -118,8 +168,9 @@ export default function Layout({ children, wide = false, padded = true }) {
   const accessToken = useAuth((s) => s.accessToken)
   const setUser = useAuth((s) => s.setUser)
   const logout = useAuth((s) => s.logout)
+  const currentWorkspaceSlug = useWorkspaces((s) => s.currentSlug)
+  const { cloudEnabled } = useCloudConfig()
   const fetchedRef = useRef(false)
-  const [avatarOpen, setAvatarOpen] = useState(false)
 
   // Hydrate user once if we have a token but no profile yet.
   useEffect(() => {
@@ -160,9 +211,17 @@ export default function Layout({ children, wide = false, padded = true }) {
             wide ? 'max-w-none' : 'max-w-7xl',
           )}
         >
-          <Link to="/projects" className="flex items-center" aria-label="Kerf projects">
-            <LogoWordmark />
-          </Link>
+          <div className="flex items-center gap-3 min-w-0">
+            <Link to="/" className="flex items-center flex-shrink-0" aria-label="Kerf home">
+              <LogoWordmark />
+            </Link>
+            {accessToken && (
+              <>
+                <span className="text-ink-700 select-none flex-shrink-0">/</span>
+                <WorkspaceSwitcher />
+              </>
+            )}
+          </div>
           <div className="flex items-center gap-3">
             {!user && accessToken && (
               <span className="text-xs text-ink-400 flex items-center gap-1.5">
@@ -173,7 +232,8 @@ export default function Layout({ children, wide = false, padded = true }) {
             <UserMenu
               user={fallbackUser}
               onLogout={onLogout}
-              onEditAvatar={() => setAvatarOpen(true)}
+              currentWorkspaceSlug={currentWorkspaceSlug}
+              cloudEnabled={cloudEnabled}
             />
           </div>
         </div>
@@ -188,12 +248,6 @@ export default function Layout({ children, wide = false, padded = true }) {
         {children}
       </main>
 
-      {avatarOpen && user && (
-        <AvatarUploader
-          user={user}
-          onClose={() => setAvatarOpen(false)}
-        />
-      )}
     </div>
   )
 }

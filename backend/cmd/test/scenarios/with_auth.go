@@ -19,6 +19,14 @@ type authBundle struct {
 		Email string `json:"email"`
 		Name  string `json:"name"`
 	} `json:"user"`
+	// Register and Login both surface the user's default workspace; tests
+	// that go on to create projects should pass its id as `workspace_id`
+	// in the create body.
+	DefaultWorkspace *struct {
+		ID   string `json:"id"`
+		Slug string `json:"slug"`
+		Name string `json:"name"`
+	} `json:"default_workspace,omitempty"`
 }
 
 // register is a tiny inline helper. The richer version lives in
@@ -86,19 +94,22 @@ func WithAuth(s *runner.Suite, env *runner.Env) {
 		return
 	}
 
-	// Alice creates a project.
+	// Alice creates a project. After workspaces v1, projects belong to a
+	// workspace via workspace_id; the OwnerID column was dropped, ownership
+	// is derived through workspace membership.
 	var aliceProj struct {
-		ID      string `json:"id"`
-		OwnerID string `json:"owner_id"`
-		MyRole  string `json:"my_role"`
+		ID          string `json:"id"`
+		WorkspaceID string `json:"workspace_id"`
+		MyRole      string `json:"my_role"`
 	}
 	status, raw, _ = c.DoJSON("POST", "/api/projects", map[string]string{
-		"name": "Alice's secret",
+		"name":         "Alice's secret",
+		"workspace_id": loginBundle.DefaultWorkspace.ID,
 	}, loginBundle.AccessToken, &aliceProj)
 	if !s.Status("alice create project", status, 201, raw) {
 		return
 	}
-	s.Equal("alice project owner", aliceProj.OwnerID, loginBundle.User.ID)
+	s.Equal("alice project workspace", aliceProj.WorkspaceID, loginBundle.DefaultWorkspace.ID)
 
 	// Bob's GET → 404 (not 403 — keep existence private).
 	status, raw, _ = c.Do("GET", "/api/projects/"+aliceProj.ID, nil, bob.AccessToken)

@@ -85,48 +85,65 @@ Add a fillet in a feature tree:
 
 If unsure whether to edit or create, edit.
 
-Project types: every project carries a project_type (mechanical / electronics / architecture). The agent loop prepends a one-line "Project type: <t>. Native file kinds: <list>. Default starter: <name>." to every call so you know the active domain. Tune your defaults to that domain — e.g. in an electronics project, prefer editing main.circuit.tsx and creating .circuit.tsx files; in a mechanical project, prefer .jscad / .feature / .assembly. The API itself is permissive (any kind may be created in any project), so honor explicit user requests that cross the type boundary instead of refusing.`
+Project tags: every project carries a free-form tags array (e.g. ["mechanical","electronics","jewelry"]). The agent loop prepends a one-line "Project tags: <comma-list>. Suggested file kinds: <list>." to every call so you know the active domain mix. Tune your defaults to the most specific tag — e.g. an "electronics" tag suggests preferring main.circuit.tsx and .circuit.tsx; "mechanical"/"jewelry"/"surfacing" suggest .jscad / .feature / .assembly. The API is permissive (any kind may be created in any project), so honor explicit user requests that cross domain boundaries instead of refusing.`
 
 
-// ProjectTypeKindsDoc maps each project_type to the file kinds the UI
-// surfaces by default. Mirrored from backend/internal/handlers/projecttype.go
-// so the addendum builder doesn't introduce a circular import. Kept narrow
-// on purpose — the LLM only needs the human-readable list, not the full
-// validation surface.
-var ProjectTypeKindsDoc = map[string][]string{
-	"mechanical":   {"jscad", "sketch", "assembly", "drawing", "step", "feature", "part"},
-	"electronics":  {"circuit", "part", "drawing", "step"},
+// tagKindHints maps a known preset tag to the file kinds an agent should
+// prefer when that tag is present on the project. Order is intent-rank
+// (most-relevant first); the "suggested kinds" line in the addendum is
+// computed by walking the tags in user-supplied order, taking the union.
+// Unknown tags are simply skipped — the addendum still surfaces the raw
+// tag list so the model can reason about it.
+var tagKindHints = map[string][]string{
+	"mechanical":   {"jscad", "sketch", "assembly", "drawing", "feature", "part"},
+	"electronics":  {"circuit", "part", "drawing"},
+	"pcb":          {"circuit", "part", "drawing"},
 	"architecture": {"jscad", "sketch", "drawing"},
+	"jewelry":      {"jscad", "feature", "sketch"},
+	"surfacing":    {"jscad", "feature"},
+	"robotics":     {"jscad", "assembly", "circuit", "feature"},
+	"drone":        {"jscad", "assembly", "circuit"},
+	"lighting":     {"jscad", "circuit", "drawing"},
 }
 
-// ProjectTypeStarterDoc is the default starter file name per type. Used by
-// the per-call system-prompt addendum so the model knows which file the
-// user most likely wants to edit on a fresh project.
-var ProjectTypeStarterDoc = map[string]string{
-	"mechanical":   "main.jscad",
-	"electronics":  "main.circuit.tsx",
-	"architecture": "main.jscad",
-}
-
-// BuildProjectTypeAddendum returns a single-line system-prompt fragment that
-// names the active project_type and its native file kinds. Cheap to compute
+// BuildProjectTagsAddendum returns a single-line system-prompt fragment that
+// names the active tags + a derived suggested-kinds list. Cheap to compute
 // and tiny on the wire (~30-40 tokens) so we run it on every agent call
-// rather than caching at thread level — keeps thread switches and project-
-// type patches trivially correct.
+// rather than caching at thread level — keeps thread switches and tag
+// patches trivially correct.
 //
-// Returns "" for unknown types so the call site can no-op the concat.
-func BuildProjectTypeAddendum(projectType string) string {
-	kinds, ok := ProjectTypeKindsDoc[projectType]
-	if !ok {
+// Returns "" for an empty tag list so the call site can no-op the concat.
+func BuildProjectTagsAddendum(tags []string) string {
+	clean := make([]string, 0, len(tags))
+	for _, t := range tags {
+		t = strings.TrimSpace(t)
+		if t == "" {
+			continue
+		}
+		clean = append(clean, t)
+	}
+	if len(clean) == 0 {
 		return ""
 	}
-	starter := ProjectTypeStarterDoc[projectType]
-	if starter == "" {
-		starter = "main.jscad"
+	// Union of suggested kinds across all known tags, preserving the order
+	// of first appearance so the most-relevant kind for the user's first
+	// tag leads the list.
+	seen := map[string]bool{}
+	kinds := []string{}
+	for _, t := range clean {
+		for _, k := range tagKindHints[strings.ToLower(t)] {
+			if seen[k] {
+				continue
+			}
+			seen[k] = true
+			kinds = append(kinds, k)
+		}
 	}
-	return "\n\nProject type: " + projectType +
-		". Native file kinds: " + strings.Join(kinds, ", ") +
-		". Default starter file: " + starter + "."
+	out := "\n\nProject tags: " + strings.Join(clean, ", ") + "."
+	if len(kinds) > 0 {
+		out += " Suggested file kinds: " + strings.Join(kinds, ", ") + "."
+	}
+	return out
 }
 
 // ToolCall is a single tool invocation requested by the assistant.

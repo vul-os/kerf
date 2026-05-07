@@ -25,10 +25,85 @@ type authResponse struct {
 	DefaultWorkspace *models.Workspace `json:"default_workspace,omitempty"`
 }
 
+// OnUserRegistered is an OSS-side hook the cloud build assigns to send the
+// welcome email after a successful registration. The OSS build leaves it nil
+// (no email plumbing), so callers must nil-check before invoking. Kept in the
+// OSS package so handlers/* never imports backend/cloud/*.
+var OnUserRegistered func(ctx context.Context, userID, email, name string)
+
 type registerReq struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 	Name     string `json:"name"`
+}
+
+// BootstrapLocal is the local-mode-only auto-account endpoint. When
+// `[server].local_mode = true` (the OSS default), the frontend hits this
+// on first paint and gets back a fully-authed bundle without ever
+// rendering /login.
+//
+// Behavior:
+//
+//   - Cloud build / local_mode=false → 404. The endpoint simply isn't
+//     wired into the cloud router, but we also gate here in defense in
+//     depth so a misconfigured proxy can't accidentally expose it.
+//   - First call (zero users): create the singleton user (email +
+//     name come from [system_user] when set, falling back to
+//     "local@kerf.local" / "Local"), attach a personal workspace,
+//     mint tokens, return.
+//   - Subsequent calls: look up the same email and re-mint tokens.
+//     The user, workspace, and projects all persist across restarts.
+//
+// Idempotent — safe to hammer from a flaky frontend boot path.
+func (d *Deps) BootstrapLocal(w http.ResponseWriter, r *http.Request) {
+	if !d.Cfg.LocalMode {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	}
+	email := strings.TrimSpace(strings.ToLower(d.Cfg.SystemUserEmail))
+	if email == "" {
+		email = "local@kerf.local"
+	}
+	name := strings.TrimSpace(d.Cfg.SystemUserName)
+	if name == "" {
+		name = "Local"
+	}
+
+	ctx := r.Context()
+	var u models.User
+	err := d.Pool.QueryRow(ctx,
+		`select id, email, name, avatar_url, account_role, is_system, created_at
+		   from users where email = $1`,
+		email).Scan(&u.ID, &u.Email, &u.Name, &u.AvatarURL, &u.AccountRole, &u.IsSystem, &u.CreatedAt)
+	if err != nil {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			genericServerError(w, err)
+			return
+		}
+		// First boot: create the singleton user. We deliberately leave
+		// password_hash NULL — the local-mode user authenticates only
+		// via this endpoint + the issued refresh token. There's no
+		// /auth/login path against this account.
+		err = d.Pool.QueryRow(ctx, `
+			insert into users(email, name, account_role, is_system)
+			values ($1, $2, 'system', true)
+			returning id, email, name, avatar_url, account_role, is_system, created_at
+		`, email, name).Scan(&u.ID, &u.Email, &u.Name, &u.AvatarURL, &u.AccountRole, &u.IsSystem, &u.CreatedAt)
+		if err != nil {
+			if isUniqueViolation(err) {
+				// Race: another concurrent bootstrap-local won. Re-read.
+				err = d.Pool.QueryRow(ctx,
+					`select id, email, name, avatar_url, account_role, is_system, created_at
+					   from users where email = $1`,
+					email).Scan(&u.ID, &u.Email, &u.Name, &u.AvatarURL, &u.AccountRole, &u.IsSystem, &u.CreatedAt)
+			}
+			if err != nil {
+				genericServerError(w, err)
+				return
+			}
+		}
+	}
+	d.issueAndRespond(w, r, u, http.StatusOK)
 }
 
 // Register creates a new email/password user and issues tokens.
@@ -168,6 +243,21 @@ func (d *Deps) issueAndRespond(w http.ResponseWriter, r *http.Request, u models.
 	resp := authResponse{AccessToken: access, RefreshToken: refresh, User: u}
 	if ws, ok, err := d.defaultWorkspaceForUser(r.Context(), u.ID); err == nil && ok {
 		resp.DefaultWorkspace = &ws
+	} else if err == nil && !ok {
+		// Lazy bootstrap: any user without a workspace (seeded system user,
+		// pre-workspaces account, failed register-time creation) gets one on
+		// next sign-in. Non-fatal on error — the client can still create one.
+		display := strings.TrimSpace(u.Name)
+		if display == "" {
+			if at := strings.Index(u.Email, "@"); at > 0 {
+				display = u.Email[:at]
+			} else {
+				display = "My"
+			}
+		}
+		if ws, err := createPersonalWorkspace(r.Context(), d.Pool, u.ID, display); err == nil {
+			resp.DefaultWorkspace = &ws
+		}
 	}
 	writeJSON(w, status, resp)
 }
@@ -318,6 +408,14 @@ func (d *Deps) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 func (d *Deps) upsertGoogleUser(ctx context.Context, sub, email, name, picture string) (models.User, error) {
 	email = strings.TrimSpace(strings.ToLower(email))
 	var u models.User
+	// On every successful path, mirror the Google avatar to our own storage so
+	// we don't depend on Google's URL going forward. The helper short-circuits
+	// when the user already has a storage-backed avatar.
+	defer func() {
+		if u.ID != "" && picture != "" {
+			go d.pullGoogleAvatar(u.ID, picture)
+		}
+	}()
 	// 1. By google_id.
 	err := d.Pool.QueryRow(ctx, `
 		update users set name = coalesce(nullif($2,''), name),

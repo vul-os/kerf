@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import {
   MousePointer2,
   Ruler,
@@ -23,7 +24,25 @@ import {
   CircleDot,
   Anchor,
   Box,
+  Magnet,
 } from 'lucide-react'
+
+// localStorage key for the drawing-canvas snap toggle. Read by both the
+// toolbar (button state) and DrawingView (skip-snap when disabled). Both
+// listen for the `kerf:drawing-snap-changed` custom event so a click here
+// updates the canvas in the same tick.
+const SNAP_LS_KEY = 'kerf:drawing:snap'
+
+function readSnapEnabled() {
+  if (typeof window === 'undefined') return true
+  try {
+    const v = window.localStorage.getItem(SNAP_LS_KEY)
+    if (v === null) return true // default ON
+    return v === '1' || v === 'true'
+  } catch {
+    return true
+  }
+}
 
 // Floating toolbar for the drawing editor — modelled on MeasureToolbar but
 // reorganized into engineering-drawing groups: Views, Dimensions, Annotations,
@@ -92,6 +111,26 @@ export default function DrawingToolbar({
   onAddSheet,
   showSheetActions = false,
 }) {
+  // Snap-enabled state. Persisted under `kerf:drawing:snap`; broadcast via a
+  // window custom event so DrawingView (mounted as a sibling, not a child)
+  // can react without prop-drilling through Editor.jsx.
+  const [snapEnabled, setSnapEnabled] = useState(readSnapEnabled)
+  useEffect(() => {
+    function onChanged() { setSnapEnabled(readSnapEnabled()) }
+    window.addEventListener('kerf:drawing-snap-changed', onChanged)
+    window.addEventListener('storage', onChanged)
+    return () => {
+      window.removeEventListener('kerf:drawing-snap-changed', onChanged)
+      window.removeEventListener('storage', onChanged)
+    }
+  }, [])
+  const toggleSnap = () => {
+    const next = !snapEnabled
+    try { window.localStorage.setItem(SNAP_LS_KEY, next ? '1' : '0') } catch {}
+    setSnapEnabled(next)
+    window.dispatchEvent(new CustomEvent('kerf:drawing-snap-changed'))
+  }
+
   return (
     <div className="absolute top-3 left-3 z-10 flex flex-col gap-1 p-1 rounded-md bg-ink-900/85 border border-ink-700 backdrop-blur shadow-lg">
       {TOOL_GROUPS.map((group, gi) => (
@@ -117,6 +156,21 @@ export default function DrawingToolbar({
           })}
         </div>
       ))}
+      {/* Snap toggle — last group, always visible. Active state mirrors the
+          tool buttons so the user can scan the column for "what's enabled". */}
+      <div className="h-px bg-ink-700/70 mx-0.5 my-0.5" />
+      <button
+        type="button"
+        title={snapEnabled ? 'Snap on (click to disable)' : 'Snap off (click to enable)'}
+        onClick={toggleSnap}
+        className={`p-1.5 rounded transition-colors ${
+          snapEnabled
+            ? 'bg-kerf-300 text-ink-950'
+            : 'bg-ink-900/60 text-ink-300 hover:text-kerf-300 hover:bg-ink-800 border border-ink-700/50'
+        }`}
+      >
+        <Magnet size={14} />
+      </button>
       {showSheetActions && (
         <>
           <div className="h-px bg-ink-700/70 mx-0.5 my-0.5" />

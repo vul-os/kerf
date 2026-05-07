@@ -32,7 +32,7 @@ func Activity(s *runner.Suite, env *runner.Env) {
 		ID string `json:"id"`
 	}
 	status, raw, _ = c.DoJSON("POST", "/api/projects",
-		map[string]string{"name": "Active project"}, owner.AccessToken, &proj)
+		map[string]string{"name": "Active project", "workspace_id": owner.DefaultWorkspace.ID}, owner.AccessToken, &proj)
 	if !s.Status("create act project", status, 201, raw) {
 		return
 	}

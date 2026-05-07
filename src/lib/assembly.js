@@ -208,6 +208,13 @@ export function parseAssembly(jsonStr) {
         clamp01(Number(c.color[2])),
       ]
     }
+    // Configurations / variants — a Component may pin a specific config of
+    // its referenced file ("M3" vs "M4" of a single screw Part). Empty/missing
+    // means "use the file's default_config" (resolved at render time). When
+    // the referenced file has no configurations, the field is ignored.
+    if (typeof c.config_id === 'string' && c.config_id.trim()) {
+      out.config_id = c.config_id.trim()
+    }
     components.push(out)
   }
 
@@ -263,6 +270,9 @@ export function serializeAssembly(obj) {
     if (c.params && typeof c.params === 'object') out.params = c.params
     if (c.visible === false) out.visible = false
     if (Array.isArray(c.color) && c.color.length >= 3) out.color = c.color
+    if (typeof c.config_id === 'string' && c.config_id.trim()) {
+      out.config_id = c.config_id.trim()
+    }
     return out
   })
   const overrides = (obj && Array.isArray(obj.overrides) ? obj.overrides : [])
@@ -392,11 +402,13 @@ export const radToDeg = (r) => Number(r) / DEG
 // resolveAssemblyParts: pure helper that walks an assembly's components and
 // returns the flat parts list ready for the renderer/projection pipeline.
 //
-//   loadParts: async (fileId) => Promise<[{id, geom, color?}]>
+//   loadParts: async (fileId, configId?) => Promise<[{id, geom, color?}]>
 //     Resolves a referenced file's exported Objects. The caller decides how —
 //     JSCAD run, STEP load, or recursive assembly resolve. Implementation
 //     lives in the workspace store so this module stays free of API/store
-//     dependencies.
+//     dependencies. `configId` is the component's pinned configuration (or
+//     undefined when the component doesn't pin one) — the loader should
+//     fall back to the file's `default_config` when this is empty.
 //   onMissing?: (componentId, objectId, fileId) => void   // optional warning hook
 //
 // Behaviour:
@@ -419,7 +431,7 @@ export async function resolveAssemblyParts({ content, loadParts, onMissing } = {
     if (!c.file_id) continue
     let baseParts
     try {
-      baseParts = await loadParts(c.file_id)
+      baseParts = await loadParts(c.file_id, c.config_id || null)
     } catch (err) {
       console.warn(`assembly: failed to load component ${c.id}:`, err)
       continue

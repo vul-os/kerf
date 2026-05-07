@@ -388,8 +388,8 @@ func upsertProject(ctx context.Context, tx pgx.Tx, ownerID string, m *manifest) 
 			return "", false, err
 		}
 		err = tx.QueryRow(ctx, `
-			insert into projects(owner_id, name, description, visibility, project_type)
-			values ($1, $2, $3, $4, 'mechanical')
+			insert into projects(owner_id, name, description, visibility, tags)
+			values ($1, $2, $3, $4, ARRAY['mechanical']::text[])
 			returning id
 		`, ownerID, m.LibraryName, m.LibraryDescription, m.LibraryVisibility).Scan(&id)
 		if err != nil {

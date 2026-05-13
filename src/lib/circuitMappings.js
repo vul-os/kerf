@@ -129,6 +129,17 @@ export async function evalLibraryModel3D(content) {
   // URL/path doesn't. We accept anything that smells like JS source.
   const looksLikeJs = /\bfunction\b|=>|\bexport\b/.test(src)
   if (!looksLikeJs) return null
+  // Cheap parse-check — `new Function` throws SyntaxError synchronously
+  // on malformed input. Strip `export default` first since `new Function`
+  // doesn't permit it. This catches obvious typos before they hand the
+  // source to runJscad (which can hang in worker mode without a timeout).
+  const probe = 'return ' + src.replace(/^\s*export\s+(default\s+)?/, '')
+  try { new Function(probe) } catch {
+    if (typeof console !== 'undefined') {
+      console.warn('evalLibraryModel3D: source has syntax errors; falling through')
+    }
+    return null
+  }
   // Lazy import so this module stays tree-shakable for non-3D callers and
   // tests that don't exercise the JSCAD path don't pay the import cost.
   let runJscad
@@ -142,10 +153,18 @@ export async function evalLibraryModel3D(content) {
   }
   let res
   try {
-    res = await runJscad(src)
+    // Race against a 3s timeout — runJscad can hang in test environments
+    // (worker stub, no Worker context). Falling through is fine; the teal
+    // box is the visible payoff.
+    res = await Promise.race([
+      runJscad(src),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('runJscad timeout')), 3000),
+      ),
+    ])
   } catch (err) {
     if (typeof console !== 'undefined') {
-      console.warn('evalLibraryModel3D: runJscad threw:', err)
+      console.warn('evalLibraryModel3D: runJscad failed:', err)
     }
     return null
   }

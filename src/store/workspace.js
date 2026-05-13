@@ -96,10 +96,14 @@ function fileKindFor(file) {
   if (file.kind === 'feature') return 'feature'
   if (file.kind === 'circuit') return 'circuit'
   if (file.kind === 'equations') return 'equations'
+  if (file.kind === 'script') return 'script'
   const name = (file.name || '').toLowerCase()
   // Circuit must be checked BEFORE generic .tsx so a tscircuit file routes to
   // the CircuitEditor; pure .tsx files (if we ever support them) keep the
-  // default JSCAD/text path.
+  // default JSCAD/text path. Script (.script.ts) checked BEFORE generic .ts
+  // for the same reason — engine is deferred but the read-only viewer routes
+  // by extension today.
+  if (name.endsWith('.script.ts')) return 'script'
   if (name.endsWith('.circuit.tsx')) return 'circuit'
   if (name.endsWith('.step') || name.endsWith('.stp')) return 'step'
   if (name.endsWith('.assembly')) return 'assembly'

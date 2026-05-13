@@ -21,6 +21,7 @@ import FeatureView from '../components/FeatureView.jsx'
 import CircuitEditor from '../components/CircuitEditor.jsx'
 import LibraryEditor from '../components/LibraryEditor.jsx'
 import EquationsEditor from '../components/EquationsEditor.jsx'
+import ScriptEditor from '../components/ScriptEditor.jsx'
 import ConfigurationsPanel from '../components/ConfigurationsPanel.jsx'
 import ActivityTimeline from '../components/ActivityTimeline.jsx'
 import { useWorkspace, loadFilePartsForProject } from '../store/workspace.js'
@@ -109,6 +110,13 @@ function isEquationsFile(file) {
   return n.endsWith('.equations')
 }
 
+function isScriptFile(file) {
+  if (!file) return false
+  if (file.kind === 'script') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.script.ts')
+}
+
 export default function Editor() {
   const { projectId, fileId } = useParams()
   const navigate = useNavigate()
@@ -150,6 +158,7 @@ export default function Editor() {
     if (isCircuitFile(w.currentFile)) return
     if (isPartFile(w.currentFile)) return
     if (isEquationsFile(w.currentFile)) return
+    if (isScriptFile(w.currentFile)) return
     if (runTimerRef.current) clearTimeout(runTimerRef.current)
     const code = w.currentFileContent
     const delay = runDebounceFor(code)
@@ -418,6 +427,7 @@ export default function Editor() {
   const circuitFile = isCircuitFile(w.currentFile)
   const partFile = isPartFile(w.currentFile)
   const equationsFile = isEquationsFile(w.currentFile)
+  const scriptFile = isScriptFile(w.currentFile)
   // Resolver used by FeatureView to fetch sketch contents on demand. We
   // re-read the latest file content rather than relying on the cached
   // sketch parse from the workspace store (which may be stale if the user
@@ -795,6 +805,19 @@ export default function Editor() {
           ) : equationsFile ? (
             <div className="flex-1 min-h-0 relative">
               <EquationsEditor />
+              {w.toast && (
+                <div className="absolute bottom-3 right-3 z-20 px-3 py-2 rounded-md bg-ink-900 border border-kerf-300/60 text-kerf-300 text-xs shadow-xl"
+                  onClick={() => w.dismissToast()}>
+                  {w.toast}
+                </div>
+              )}
+            </div>
+          ) : scriptFile ? (
+            <div className="flex-1 min-h-0 relative">
+              <ScriptEditor
+                content={w.currentFileContent}
+                fileName={w.currentFile?.name}
+              />
               {w.toast && (
                 <div className="absolute bottom-3 right-3 z-20 px-3 py-2 rounded-md bg-ink-900 border border-kerf-300/60 text-kerf-300 text-xs shadow-xl"
                   onClick={() => w.dismissToast()}>

@@ -53,6 +53,7 @@ var allScenarios = []scenarioDef{
 	{Name: "configurations", Opts: runner.BootOptions{}, Run: scenarios.Configurations},
 	{Name: "local_mode", Opts: runner.BootOptions{}, Run: scenarios.LocalMode},
 	{Name: "derived_cache", Opts: runner.BootOptions{}, Run: scenarios.DerivedCache},
+	{Name: "script_kind", Opts: runner.BootOptions{}, Run: scenarios.ScriptKind},
 }
 
 func main() {

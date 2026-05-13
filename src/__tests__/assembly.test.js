@@ -27,6 +27,8 @@ import {
   identityMatrix,
   loadExternalParts,
   derivedKindForRefKind,
+  addMate,
+  removeMate,
 } from '../lib/assembly.js'
 
 describe('parseAssembly / serializeAssembly — external_ref round-trip', () => {
@@ -581,5 +583,121 @@ describe('loadExternalParts — write-back populate (ROADMAP row 67 Phase 2)', (
     await flush()
     expect(encodePayload).not.toHaveBeenCalled()
     expect(store).not.toHaveBeenCalled()
+  })
+})
+
+describe('mates — schema-only round-trip (ROADMAP row 49)', () => {
+  // Shape-only slice: JSON round-trips through parse/serialize, no solver runs.
+  // The eventual SolveSpace subprocess writes/reads against this same shape.
+
+  const COMP_A = '11111111-1111-1111-1111-111111111111'
+  const COMP_B = '22222222-2222-2222-2222-222222222222'
+
+  const buildJson = (mates) => JSON.stringify({
+    components: [
+      { id: 'a', file_id: 'fa', object_id: 'oa', transform: identityMatrix() },
+      { id: 'b', file_id: 'fb', object_id: 'ob', transform: identityMatrix() },
+    ],
+    mates,
+  })
+
+  it('parses all 7 mate types and round-trips through serialize → parse', () => {
+    const all = [
+      { id: 'm-1', type: 'coincident', a: { component_id: COMP_A, feature: 'face', feature_id: 'f-1' }, b: { component_id: COMP_B, feature: 'face', feature_id: 'f-2' } },
+      { id: 'm-2', type: 'concentric', a: { component_id: COMP_A, feature: 'edge', feature_id: 'e-1' }, b: { component_id: COMP_B, feature: 'edge', feature_id: 'e-2' } },
+      { id: 'm-3', type: 'parallel', a: { component_id: COMP_A, feature: 'axis', feature_id: 'x-1' }, b: { component_id: COMP_B, feature: 'axis', feature_id: 'x-2' } },
+      { id: 'm-4', type: 'perpendicular', a: { component_id: COMP_A, feature: 'face', feature_id: 'f-3' }, b: { component_id: COMP_B, feature: 'face', feature_id: 'f-4' } },
+      { id: 'm-5', type: 'distance', a: { component_id: COMP_A, feature: 'face', feature_id: 'f-5' }, b: { component_id: COMP_B, feature: 'face', feature_id: 'f-6' }, value: 25 },
+      { id: 'm-6', type: 'angle', a: { component_id: COMP_A, feature: 'face', feature_id: 'f-7' }, b: { component_id: COMP_B, feature: 'face', feature_id: 'f-8' }, value: 90 },
+      { id: 'm-7', type: 'tangent', a: { component_id: COMP_A, feature: 'edge', feature_id: 'e-3' }, b: { component_id: COMP_B, feature: 'face', feature_id: 'f-9' } },
+    ]
+    const parsed = parseAssembly(buildJson(all))
+    expect(parsed.mates).toHaveLength(7)
+    expect(parsed.mates.map((m) => m.type)).toEqual([
+      'coincident', 'concentric', 'parallel', 'perpendicular', 'distance', 'angle', 'tangent',
+    ])
+    // Dimensional mates carry numeric value; non-dimensional are null.
+    expect(parsed.mates[4].value).toBe(25)
+    expect(parsed.mates[5].value).toBe(90)
+    expect(parsed.mates[0].value).toBeNull()
+    // Round-trip: serialize → parse preserves every field.
+    const reParsed = parseAssembly(serializeAssembly(parsed))
+    expect(reParsed.mates).toEqual(parsed.mates)
+  })
+
+  it('omits the mates field when empty (back-compat with pre-mates files)', () => {
+    const text = serializeAssembly({
+      components: [{ id: 'a', file_id: 'fa', object_id: 'oa', transform: identityMatrix() }],
+      mates: [],
+    })
+    const doc = JSON.parse(text)
+    expect(doc.mates).toBeUndefined()
+    // Absent-field round-trip yields an empty mates array on parse.
+    expect(parseAssembly(text).mates).toEqual([])
+  })
+
+  it('drops malformed mates: missing type, unknown type, bad feature, missing a/b', () => {
+    const malformed = [
+      // missing type
+      { id: 'bad-1', a: { component_id: COMP_A, feature: 'face', feature_id: 'f-1' }, b: { component_id: COMP_B, feature: 'face', feature_id: 'f-2' } },
+      // unknown type
+      { id: 'bad-2', type: 'glue', a: { component_id: COMP_A, feature: 'face', feature_id: 'f-1' }, b: { component_id: COMP_B, feature: 'face', feature_id: 'f-2' } },
+      // bad feature
+      { id: 'bad-3', type: 'coincident', a: { component_id: COMP_A, feature: 'plane', feature_id: 'f-1' }, b: { component_id: COMP_B, feature: 'face', feature_id: 'f-2' } },
+      // missing b
+      { id: 'bad-4', type: 'coincident', a: { component_id: COMP_A, feature: 'face', feature_id: 'f-1' } },
+      // valid — should survive
+      { id: 'ok', type: 'coincident', a: { component_id: COMP_A, feature: 'face', feature_id: 'f-1' }, b: { component_id: COMP_B, feature: 'face', feature_id: 'f-2' } },
+    ]
+    const parsed = parseAssembly(buildJson(malformed))
+    expect(parsed.mates).toHaveLength(1)
+    expect(parsed.mates[0].id).toBe('ok')
+  })
+
+  it('coerces dimensional value; non-dimensional gets null even if value supplied', () => {
+    const mates = [
+      { id: 'd', type: 'distance', a: { component_id: COMP_A, feature: 'face', feature_id: 'f-1' }, b: { component_id: COMP_B, feature: 'face', feature_id: 'f-2' }, value: '12.5' },
+      { id: 'c', type: 'coincident', a: { component_id: COMP_A, feature: 'face', feature_id: 'f-1' }, b: { component_id: COMP_B, feature: 'face', feature_id: 'f-2' }, value: 999 },
+    ]
+    const parsed = parseAssembly(buildJson(mates))
+    expect(parsed.mates[0].value).toBe(12.5)
+    expect(parsed.mates[1].value).toBeNull()
+  })
+
+  it('addMate appends a valid mate; rejects malformed and is immutable', () => {
+    const rows = [
+      { id: 'm-1', type: 'coincident', a: { component_id: COMP_A, feature: 'face', feature_id: 'f-1' }, b: { component_id: COMP_B, feature: 'face', feature_id: 'f-2' }, value: null },
+    ]
+    const before = JSON.stringify(rows)
+    const next = addMate(rows, {
+      id: 'm-2', type: 'distance',
+      a: { component_id: COMP_A, feature: 'face', feature_id: 'f-3' },
+      b: { component_id: COMP_B, feature: 'face', feature_id: 'f-4' },
+      value: 10,
+    })
+    expect(next).not.toBe(rows)
+    expect(JSON.stringify(rows)).toBe(before) // input untouched
+    expect(next).toHaveLength(2)
+    expect(next[1].id).toBe('m-2')
+    expect(next[1].value).toBe(10)
+    // Malformed mate → returns a fresh copy with no append.
+    const noop = addMate(rows, { type: 'glue' })
+    expect(noop).not.toBe(rows)
+    expect(noop).toHaveLength(1)
+  })
+
+  it('removeMate filters by id and returns a new array', () => {
+    const rows = [
+      { id: 'm-1', type: 'coincident', a: { component_id: COMP_A, feature: 'face', feature_id: 'f-1' }, b: { component_id: COMP_B, feature: 'face', feature_id: 'f-2' }, value: null },
+      { id: 'm-2', type: 'parallel', a: { component_id: COMP_A, feature: 'axis', feature_id: 'x-1' }, b: { component_id: COMP_B, feature: 'axis', feature_id: 'x-2' }, value: null },
+    ]
+    const next = removeMate(rows, 'm-1')
+    expect(next).not.toBe(rows)
+    expect(rows).toHaveLength(2)
+    expect(next).toHaveLength(1)
+    expect(next[0].id).toBe('m-2')
+    // Unknown id → returns new array containing all rows.
+    const same = removeMate(rows, 'nope')
+    expect(same).toHaveLength(2)
   })
 })

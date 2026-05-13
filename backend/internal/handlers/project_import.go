@@ -405,7 +405,7 @@ func safeZipPath(p string) bool {
 func validImportKind(k string) bool {
 	switch k {
 	case "file", "folder", "assembly", "drawing", "sketch", "part",
-		"feature", "circuit", "equations", "material", "simulation", "step":
+		"feature", "circuit", "equations", "material", "simulation", "script", "step":
 		return true
 	}
 	return false

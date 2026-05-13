@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -21,6 +23,7 @@ import (
 	"github.com/imranp/kerf/backend/internal/llm"
 	kmw "github.com/imranp/kerf/backend/internal/middleware"
 	"github.com/imranp/kerf/backend/internal/storage"
+	"github.com/imranp/kerf/backend/internal/web"
 )
 
 func main() {
@@ -193,6 +196,34 @@ func main() {
 			})
 		})
 	})
+
+	// SPA: serve the embedded Vite bundle at the root. Skipped when the
+	// dist/ tree isn't populated (typical dev workflow uses `vite dev`
+	// alongside, with the SPA at :5173 proxying /api/* to this server).
+	if dist, ok := web.Sub(); ok {
+		fileServer := http.FileServer(http.FS(dist))
+		// Asset routes hit the file server directly; everything else
+		// falls back to index.html so React Router can resolve the path.
+		r.Handle("/assets/*", fileServer)
+		r.Get("/favicon.ico", fileServer.ServeHTTP)
+		r.Get("/apple-touch-icon.png", fileServer.ServeHTTP)
+		r.Get("/manifest.webmanifest", fileServer.ServeHTTP)
+		r.NotFound(func(w http.ResponseWriter, req *http.Request) {
+			// API misses should 404 cleanly; SPA paths get index.html.
+			if strings.HasPrefix(req.URL.Path, "/api/") || strings.HasPrefix(req.URL.Path, "/auth/") {
+				http.NotFound(w, req)
+				return
+			}
+			f, err := dist.Open("index.html")
+			if err != nil {
+				http.NotFound(w, req)
+				return
+			}
+			defer f.Close()
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			io.Copy(w, f)
+		})
+	}
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,

@@ -40,14 +40,15 @@ local install, optional hosted tier with billing + workshop sharing + git.
 | **Drawing snap + projection visibility** | ✅ shipped | Endpoint / midpoint / center / intersection snap end-to-end. Helpers `extractSnapTargets` / `resolveSnap` / `snapLabel` in `src/lib/drawingSnap.js` (20-assertion vitest); integration in `DrawingView.jsx` covers all snap-aware tools (linear / aligned / radius / diameter / baseline / chain / ordinate / angular / measure / leader / centerline / break / surface_finish / weld / gdt / balloon) with zoom-aware tolerance, Alt-key bypass, localStorage `snapEnabled` toggle, kind-specific glyphs. |
 | **Feature panel: Pad / Pocket / Revolve** | ✅ shipped | OCCT Phase 2/3 complete: `feature_pad` / `feature_pocket` / `feature_revolve` LLM tools + `feature_*` toolbar in `FeatureView.jsx`; full B-rep ops (Hole, Fillet, Chamfer, Shell, Sweep1/2, NetworkSrf, BlendSrf, RotateFace, Push-Pull, LinearPattern, PolarPattern, MirrorPattern); face/edge gumball direct-modeling; integration scenarios in `feature_files.go`. |
 | **Cloud git → object-storage Storer** | 🚧 in flight | Stateless serverless deploys (R2/S3 backed bare repos) |
+| **Large-file handling for git sync (STEP / binary imports)** | 🔮 planned | Imported STEPs and other large binaries would bloat git history if committed directly. **Phase 1 — pointer-in-object-storage:** content-hash the blob into the existing `derived_artifacts`-style storage, commit only a small `.step-ref` JSON pointer (`{hash, size, original_name}`). GitHub sync stays lightweight; Kerf's import path resolves the pointer transparently via the CDN. No `.gitattributes` plumbing, no LFS quota, no go-git LFS dance. **Phase 2 (only if clone-outside-Kerf demand emerges):** Git LFS via direct Batch API — implement the 3-line pointer format + ~2 HTTP endpoints in the go-git sync path to preserve the single-binary install (no `git-lfs` CLI dep, no vendoring the ~tens-of-MB `git-lfs/git-lfs` library). Migration Phase 1→2 is a one-shot converter (read `.step-ref` → push blob to LFS server → rewrite as LFS pointer + `.gitattributes`); resolver gains a second branch. |
 | **Test scenarios: assembly + sketcher + drawing** | ✅ shipped | `backend/cmd/test/scenarios/{sketcher,drawings,cross_project_parts}.go` cover OSS integration; cloud-side `scenario_workshop_{parts,listings,verified_filter}.go` + `scenario_library_part_detail.go` round out the picture. |
 | **Sketcher v2 improvements** | 🚧 partially shipped | Trim, extend, ellipse, B-spline (cubic), fillet (2-line corner UI), mirror, linear pattern, polar pattern shipped — pure helpers in `src/lib/sketchOps.js` / `sketchGeom2.js`, canvas tools wired in `SketchView.jsx`, LLM tools `sketch_trim` / `sketch_extend`, vitest + integration coverage. Remaining: more constraints, external geometry, 3D backdrop, multi-loop holes. |
-| **Sketcher v1 fixes** | 🚨 urgent | Live tooling broken: line tool unreliable, sketch can't drive Pad / Pocket / Hole reliably. Audit SketchView interactions + planegcs round-trip, repair the sketch→feature handoff, integration tests covering: line draw → constraint solve → use as Pad sketch → resulting body has expected vertex count. |
+| **Sketcher v1 fixes** | ✅ shipped | Live-tooling regression (line tool wiping `pendingPoints` on every solver round-trip, breaking the sketch→Pad/Pocket/Hole handoff) fixed in `6dc18ee` via the `lastSketchRef` pattern in `SketchView.jsx`: every locally-produced sketch reference is stashed before `onChange`/`onSolved` calls, and the resync `useEffect` only clears pending state when the incoming prop is a true external replacement (LLM restore / undo), not a self-write bounce-back. 757/757 vitest pass; `sketcher.test.js` covers solver integration + multi-click data flow + JSON round-trips; `sketchGeom2.test.js` covers the Pad handoff path. Follow-on `ac8d9e9` adds further tooling. Remaining nit: an OCCT end-to-end "line draw → solve → Pad → expected vertex count" integration test is still missing — moved to the [Sketcher v2 row]/test-coverage backlog. |
 | **Equations / global parameters** | ✅ shipped | `.equations` JSON kind; mathjs evaluator (`src/lib/equations.js`); EquationsEditor (full-bleed table); injected into JSCAD as `params` arg, `.feature` + `.sketch` via `${name}` placeholders; backend `read_equations` / `set_equation` LLM tools + `docs/llm/equations.md`. Multi-file merge with last-loaded-wins. |
 | **Configurations / variants** | ✅ shipped | Per-file parameter overrides round-trip in `.part` / `.feature` / `.sketch` JSON (`{default_config, configurations:[{id, label, params}]}`); editor config dropdown + ConfigurationsPanel slide-out; assembly components pin via `config_id` (frontend `parseAssembly` + backend BOM both honor); BOM groups by `(file_id, config_id)` and surfaces a `config_label` chip in BOMTable; LLM tools `add_configuration` / `set_active_config` + `docs/llm/configurations.md`; integration scenario `configurations` covers Part round-trip, assembly references, BOM rollup, and tool repin/clear. |
 | **Materials database (`.material` Library kind)** | 🚧 partially shipped | `.material` JSON file kind with mechanical/thermal/physical groups; MaterialEditor with grouped SI-unit fields; LLM tools `read_material` / `find_material_by_name` / `set_part_material` + `docs/llm/material.md`; `seed/materials/` + `npm run seed:materials` populates a curated `Materials Library` project owned by the system user. v1: ~20 representative materials seeded; community can add more via PR. Consumed downstream by FEM, tolerance, Part defaults, drawing callouts. |
 | **3D assembly mates (Tier 0 foundation)** | 🔮 planned | Coincident / concentric / parallel / perpendicular / distance / angle / tangent; SolveSpace solver (GPL3) subprocess; `mates: [...]` on `.assembly`; depends on Phase 3 |
-| **Scripting: `.script.ts` automation** | 🔮 planned | Browser-Worker TypeScript via esbuild-wasm; typed `kerf.*` API; backend heavy ops (FEM/CAM/STEP-tess) called via fixed RPC; never evals user code on the backend |
+| **Scripting: `.script.py` via `kerf-sdk`** | 🚧 in flight | Python-first via external `kerf-sdk` on PyPI (MIT-licensed). Users run Python on their own machine — laptop, CI, internal server — and scripts talk to a Kerf instance (local or cloud) over HTTP/JSON-RPC against a versioned `/v1/` API. The RPC contract = the existing LLM tool registry (one source of truth, two callers). File kind generalized to `script` with an `extension` field (data, not enum) so future `.lua` / `.ts` / `.js` bindings drop in without a migration. **TypeScript explicitly rejected for v1** after evaluating Web Worker + esbuild-wasm: target users live in Python (cadquery, build123d, scipy, opencamlib, scikit-rf), running on the user's own machine sidesteps every sandbox / multi-tenancy / deploy problem, and the SDK still works against local-install or cloud. Hosted execution ("Run on Kerf compute") and second-language bindings (TS / Lua / Go / Rust against the same OpenAPI spec) are demand-gated S5/S6 — architecture supports them as alternative endpoints, not redesigns. Replaces earlier `.script.ts` Phase 1 stub. |
 | **`.feature` file kind + OCCT integration (Phase 2)** | ✅ shipped | Real B-rep features: Pad / Pocket / Revolve / Hole / Fillet / Chamfer / Shell / Sweep1 / Sweep2 / Loft / Push-Pull / RotateFace / LinearPattern / PolarPattern / MirrorPattern. `feature_*` LLM tools per op + `feature_files.go` integration scenario (60 assertions). Coexists with the JSCAD path; FeatureView toolbar gates Op palette, OCCT worker handles geometry, planegcs solves embedded sketches. |
 | **Edge/face selection + direct modeling (Phase 3)** | ✅ shipped | Face + edge selection state in `FeatureRenderer.jsx` (`featureSelection: { faceIds, edgeIds }`), face gumball with translate/rotate handles emits `push_pull` / `rotate_face` nodes, edge gumball drag-to-fillet emits `feature_fillet` with the dragged radius. Bidirectional highlight panel↔schematic via `selectedCircuitComponentId`. Per-frame re-orient on camera orbit. |
 | **FEM: mechanical analysis** | 🔮 planned | CalculiX + Gmsh subprocess; `.fem` file kind; F1 = linear static + modal + bonded contact; local + cloud workers; depends on Phase 3 |
@@ -59,7 +60,7 @@ local install, optional hosted tier with billing + workshop sharing + git.
 | **Phase 4a: jewelry-priority surfacing** | ✅ shipped | All three ops live in `src/lib/occtWorker.js`: `opSweep2` wraps `BRepOffsetAPI_MakePipeShell` with rail2 as auxiliary spine (Frenet fallback); `opNetworkSrf` tries `GeomFill_BSplineCurves` first, falls back to `BRepOffsetAPI_ThruSections` over U-curves with V-curves advisory; `opBlendSrf` uses `BRepFill_Filling` with two edge constraints, returns the blend face only. Continuity args: `C0/C1/C2` for networkSrf (default C1), `G0/G1/G2` for blendSrf (default G1). LLM tools `feature_sweep2` / `feature_network_srf` / `feature_blend_srf` registered in `surfacing_tools.go`. FeatureView toolbar entries under "Surfacing". `feature_files.go` scenario covers all three end-to-end (89 assertions total). |
 | **Phase 4b: direct face manipulation (gumball)** | ✅ shipped | Face gumball: 3 translate arrows + 3 rotate rings, anchored at face centroid; drag commits `push_pull` (translate) or `rotate_face` (rotation) feature nodes. Edge gumball: 1D radial handle perpendicular to selected edge; drag commits `feature_fillet` with dragged radius. Per-frame re-orient on camera orbit (rAF self-host). 7 vitest covering centroid/projection math; 8 backend assertions for `rotate_face` round-trip. |
 | **Auth-optional removal** | ✅ shipped | Local-mode-only: `[server].local_mode = true` (the OSS default) gates a new `POST /auth/bootstrap-local` endpoint that auto-creates a singleton user + workspace and returns a session, idempotent on subsequent calls. Frontend's `useCloudConfig` surfaces the flag; `App.jsx` calls `tryBootstrapLocal()` after the existing `/api/bootstrap` probe and redirects `/`, `/login`, `/signup` to `/projects` once authed. Cloud builds force `local_mode=false` and `/auth/bootstrap-local` returns 404 — multi-user signup/login is unchanged. Override at runtime via `KERF_LOCAL_MODE`. |
-| **Performance: server-side STEP pre-tessellation** | 📋 next | wazero or Node sidecar; reduces in-browser STEP parse |
+| **Performance: server-side STEP pre-tessellation** | 📋 next | **Cloud-tier only**, via Python sidecar (`cloud/pyworker/`) using pythonOCC. OSS local-install path stays browser-only — preserves [[local_install_model]]'s single-binary brew/curl install. Big-STEP OSS users can pre-tessellate locally via `kerf-sdk` (pythonOCC writes mesh artifacts back into the project). wazero confirmed infeasible (OCCT WASM uses Emscripten ABI, not WASI). Node sidecar evaluated and rejected — Python sidecar amortizes ops cost across CAM/RF/FEM (all naturally Python). |
 | **Performance: diff-based + compressed revisions** | ✅ shipped | Migration `1746577000000_revision_diffs.sql` adds `parent_id` + `delta_kind` (`base`|`diff`) + content-hashing. Each Nth revision is full-content; in between are unified-diff payloads. Revisions handler reconstructs by walking the chain to the nearest base. 82× shrink measured on typical edit patterns. `cmd/migrate-revisions/` CLI ports historical revisions to the new shape. |
 | **Project-type enum (mechanical / electronics / architecture …)** | ❌ replaced | Superseded by free-form `projects.tags TEXT[]` (see "Drop project types → free-form tags" row below). Single-enum design rejected — projects often span domains (a robot has mech + electronics + circuit), so tags compose freely. |
 | **Drop project types → free-form tags** | ✅ shipped | `projects.project_type` enum replaced by `projects.tags TEXT[]` with a GIN index. Migration backfills the old single value into a 1-element tags array. Create dialog renders preset tag chips (Mechanical / Electronics / Architecture / Jewelry / PCB / Robotics / Drone / Lighting) + a free-text input + an explicit Starter dropdown (`jscad` / `circuit` / `blank`). Workshop filter is a multi-select tag chip strip backed by repeatable `?tag=` URL params (ANDed). LLM prompt addendum reads the tags array. BRep stays a file kind (`.feature`), not a project type — compose freely with `.jscad`, `.circuit.tsx`, `.assembly` in the same project. |
@@ -68,6 +69,9 @@ local install, optional hosted tier with billing + workshop sharing + git.
 | **Electronics: SPICE simulation** | 🚧 partial | Phase 1 substantially shipped: emitter (`src/lib/circuitToSpice.js` walks CircuitJSON → `.cir` netlist), schematic Probe tool (`appendProbe`/`removeProbe`/`renameProbe`/`parseProbes` + V/I toggle + visual indicator + rename UX), `injectProbeRecords` synthesises `simulation_probe` records at compile time, `.simulation` file kind with backend constraint + scenario, SimulationView read-only viewer with `parseSimulation` + `addEnginePendingWarning` + uPlot waveform charting (lazy chunk ~22KB gzip) + table-view toggle + Run CTA stub, `add_probe`/`remove_probe`/`rename_probe` LLM tools, doc pages at `backend/internal/llm/docs/probe.md` + `simulation.md`. **Remaining (out-of-scope for autonomous fires):** ngspice-wasm Web Worker engine + `run_simulation` LLM tool. |
 | **Electronics: RF simulation** | 🔮 planned | s-parameter / Smith-chart analysis via scikit-rf-style toolkit (port to TS or backend Python subprocess); openEMS for EM field solver later. Distinct from SPICE — typical SPICE is poor at >100MHz. |
 | **Electronics: autorouting** | 🔮 planned | Wrap FreeRouting (Java, GPL) as a backend subprocess; export tscircuit board outline + nets to Specctra DSN, route, import SES, write back to CircuitJSON. ML-based reroute (DeepPCB-style) is a phase-2 upgrade. |
+| **Import: KiCad** | 📋 next | Three-tier ingest into Kerf's electronics + library system. **Tier 1**: parse `.kicad_sch` / `.kicad_pcb` via `pyworker` `/import-kicad` → `.circuit.tsx` first-cut. **Tier 2**: symbol/footprint libraries → Kerf Library Parts; 3D models → `.step-ref` pointers. **Tier 3** (lossless round-trip + full layout fidelity) explicitly out of scope. See "Imports from external CAD/EDA tools" section at the bottom for the full plan. |
+| **Import: FreeCAD** | 📋 planned | Mechanical-CAD ingest. Closest kernel match to Kerf (both OpenCascade), most complex source data model. Tier 1: Part + PartDesign features → `.feature` + `.sketch` (BRep lifted directly, no re-evaluation). Tier 2: Sketcher constraints + Spreadsheet → `.equations` + TechDraw drawings + Materials Library. Tier 3 (organic): Python-macro migration positions kerf-sdk as natural next step. Other workbenches (FEM/Path/BIM) out of scope — users move to Kerf equivalents. See bottom section for full plan. |
+| **Import: OpenSCAD** | 📋 planned | Maker/3D-printing ingest. Sister CSG language to JSCAD → cleanest translation of the three. Browser-side parser (no `pyworker` dep) emits `.jscad` source preserving the parametric model. Escape hatch: run OpenSCAD binary as a subprocess for exotic features (`surface()`, customizer hints), import resulting STL as mesh (lossy). See bottom section for full plan. |
 | **Library system v1 (Parts + BOM)** | ✅ shipped | `kind='part'` files with rich metadata, Assembly Components reference Parts, BOM rollup endpoint + CSV export, per-Part `visibility` (private/unlisted/public), photos via `users/<uid>/avatar.jpg`-pattern Storage layer, verified-publisher flag (`users.is_verified_publisher` + blue-check badge across Workshop / WorkshopListing / LibraryPicker / Library cards), workshop "Verified" filter chip, BOM Phase 1+2+3 surface UX (notes + MOQ + Lead + U.Price + Alternates). KiCad-style for both mech and electronics. |
 | **Library Phase 2: distributor APIs** | ✅ shipped | Live pricing + stock for DigiKey (OAuth2), Mouser, LCSC; McMaster stub. Encrypted credentials in `distributor_credentials`, `distributors.Registry` per-provider rate limits, `ErrAuth` / `ErrRateLimit` / `ErrNotSupported` sentinels for the admin UI. Boot-time sweep refreshes stale Part entries every 6h; per-Part "Refresh prices" button via `RefreshPart`. HTTP surface: admin `GET/PUT/DELETE /api/admin/distributors[/{name}]` + per-Part `POST /api/projects/{pid}/files/{fid}/distributors/refresh`. Tests in `cmd/test/scenarios/distributors.go` use `http.RoundTripper` mocks (no live distributor traffic). |
 | **Library Phase 3: curated manufacturer libraries** | ✅ shipped | Verified-publisher accounts, Workshop badge, manufacturer-contributed updates via PR. Workshop "Verified" filter chip + blue-check badge shipped (Workshop, WorkshopListing, LibraryPicker). Seed publisher shipped: `seed/publishers/parts/*.json` + `npm run seed:publishers` populates a `kerf-system`-owned `Common Components` example library. v1 is a demonstration set (3–5 parts). Manufacturer-PR submission flow shipped: `POST /api/library/submissions` (any auth user), admin-only `GET/PUT /api/admin/library/submissions[/{id}]` for review queue, frontend modal on /library. Approved submissions create new public Parts in the target Library workspace. |
@@ -200,60 +204,80 @@ configurations: {
 
 ---
 
-## Scripting: `.script.ts` automation + safe backend RPC
+## Scripting: `.script.py` automation via `kerf-sdk`
 
 The FreeCAD-Python equivalent — user-written code that drives the
-project — reimagined to fit kerf's actual constraints (browser
-runtime, multi-tenant cloud, LLM in the loop). It's also a force
-multiplier *for* the LLM: the model can write a one-shot script when
-no fixed tool exists for the job, run it, see the result, and discard
-it.
+project — built around the language Kerf's target users already know
+(engineers live in Python: numpy, scipy, cadquery, build123d,
+opencamlib, scikit-rf). It's also a force multiplier *for* the LLM:
+the model can write a one-shot script when no fixed tool exists for
+the job, run it, see the result, and discard it.
 
-### Language: TypeScript
+### Language: Python (with the door open for others)
 
-Runtime is **TypeScript executed in a Web Worker via esbuild-wasm**.
-Reasons:
+Runtime is the **user's own Python** — their laptop, their CI, their
+internal server. Kerf publishes `kerf-sdk` to PyPI (MIT-licensed);
+users `pip install kerf-sdk`, write `.script.py` files, and talk to a
+Kerf instance over HTTP/JSON-RPC.
 
-- Same V8 runtime as JSCAD — zero impedance mismatch with existing files.
-- LLM is exceptional at TypeScript and benefits from the type system.
-  The kerf API ships as a `.d.ts` and lands in the editor's IntelliSense
-  AND in the model's context.
-- ~10× faster than Pyodide for typical CAD math; ~5× smaller bundle
-  (esbuild-wasm ≈ 2 MB vs Pyodide ≈ 10 MB).
-- Instant startup (~50 ms) vs Pyodide's 1-3 s first eval.
+Reasons Python over TypeScript:
 
-The script runtime is abstracted so **Pyodide can drop in later** as a
-second language frontend (same `kerf.*` API, different language) if
-Python demand materializes. Not v1.
+- Target users (engineers) live in Python and the ecosystem is the
+  whole point — cadquery, build123d, scipy, opencamlib, scikit-rf,
+  FreeCAD bindings. None of these exist in JS.
+- Running on the user's machine sidesteps every sandbox /
+  multi-tenancy / deploy problem. No Firecracker, no warm pools, no
+  Python runtime to bundle into the single-binary install.
+- Users get their own IDE, type checker (pyright), debugger, package
+  manager. We don't have to ship in-app development tooling.
+- Heavy compute is the user's hardware, not Kerf's per-tenant compute
+  budget.
 
-### Architecture: safe heavy-lifting via fixed RPC
+**The architecture is language-agnostic at the contract layer.** The
+RPC contract is a versioned OpenAPI spec under `/v1/`; `kerf-sdk` is
+the first binding. TypeScript / Lua / Go / Rust bindings can be
+generated from the same spec when users ask — one week per binding,
+paid only when demand is real. We're not betting Python; we're betting
+Python *first*.
 
-The hard rule: **never execute user code on the backend.** Only fixed,
-audited Go-implemented operations ever run server-side. User scripts
-live entirely in the browser Worker; when they need heavy compute,
-they call a typed RPC into the backend.
+### Architecture: external execution, HTTP/JSON-RPC, fixed backend ops
+
+The hard rule stays the same: **the Kerf backend never executes user
+code in v1.** Only fixed, audited Go-implemented operations run
+server-side. User code lives on the user's machine and calls the
+backend over HTTP.
 
 ```
-┌─ Browser ───────────────────────────────┐    ┌─ Backend ──────────┐
-│  Editor (.script.ts source)             │    │                    │
-│       │  esbuild-wasm                   │    │                    │
-│       ▼                                 │    │                    │
-│  Web Worker (compiled JS)               │    │                    │
-│       │ uses kerf.*                     │    │                    │
-│       │                                 │    │                    │
-│  ├─ kerf.files.read()        in-process │    │                    │
-│  ├─ kerf.equations.set()  ──────────────┼───►│ go handler         │
-│  ├─ kerf.fem.run()        ──────────────┼───►│ go handler ──► ccx │
-│  └─ kerf.cam.toolpath()   ──────────────┼───►│ go handler ──► cam │
+┌─ User's machine ────────────────────────┐    ┌─ Kerf backend ─────┐
+│  Python 3.11+                           │    │  (local OR cloud)  │
+│  ├─ pip install kerf-sdk                │    │                    │
+│  ├─ user's IDE / debugger / pyright     │    │                    │
+│  └─ scripts/regen-all.script.py         │    │                    │
+│        │  uses kerf.*                   │    │                    │
+│        ▼                                │    │                    │
+│  kerf.files.read()       ──HTTP─────────┼───►│ /v1/files/...      │
+│  kerf.equations.set()    ──HTTP─────────┼───►│ /v1/equations/...  │
+│  kerf.fem.run()          ──HTTP─────────┼───►│ /v1/fem/run        │
+│  kerf.cam.toolpath()     ──HTTP─────────┼───►│ /v1/cam/toolpath   │
 └─────────────────────────────────────────┘    └────────────────────┘
 ```
 
 The backend exposes the *same* registry the LLM tool surface already
-uses — one source of truth, two callers (LLM + user TS scripts).
-Adding a new heavy op makes it usable from both surfaces at once. No
-new attack surface, no eval, no sandbox infrastructure to operate.
+uses — one source of truth, two callers (LLM + user scripts). Adding
+a new heavy op makes it usable from both surfaces at once. The RPC
+spec lives under `/v1/` so v2 can coexist when shapes evolve.
 
-### File kind: `.script.ts`
+A future hosted execution mode ("Run on Kerf compute" for cloud users
+who don't want a local Python install) becomes an alternative endpoint
+that wraps the same RPC contract — not a redesign. Sandbox engineering
+(Firecracker or per-workspace container) is real work, deferred until
+a customer asks.
+
+### File kind: `script` (extension-discriminated)
+
+The kind in the file table is generic `script` with an `extension`
+field, so `.lua` / `.ts` / `.js` can join later without a migration —
+data, not enum. v1 ships `.script.py` only.
 
 ```
 project/
@@ -261,97 +285,120 @@ project/
   ├── assemblies/main.assembly
   ├── parameters.equations
   └── scripts/
-        ├── regen-all-steps.script.ts
-        ├── batch-rename-parts.script.ts
-        └── validate-bom.script.ts
+        ├── regen-all-steps.script.py
+        ├── batch-rename-parts.script.py
+        └── validate-bom.script.py
 ```
 
-A script imports a typed `kerf` global:
+A script imports `kerf-sdk`:
 
-```ts
-import { kerf } from "@kerf/api";
+```python
+from kerf import client
 
-for (const wheel_d of [80, 100, 120, 140]) {
-  await kerf.equations.set("wheel_diameter", wheel_d);
-  const result = await kerf.fem.run({
-    source_file: "parts/wheel.feature",
-    materials: [{ id: "AL-6061", E: 69e9, nu: 0.33, rho: 2700 }],
-    fixtures: [{ face_ref: "hub_inner", type: "fixed" }],
-    loads:    [{ face_ref: "rim", type: "pressure", magnitude: 1e5 }],
-    studies:  ["static"],
-  });
-  console.log(`d=${wheel_d} → max von Mises = ${result.max_von_mises} Pa`);
-}
+kerf = client.from_env()  # local install token or KERF_API_TOKEN
+
+for wheel_d in [80, 100, 120, 140]:
+    kerf.equations.set("wheel_diameter", wheel_d)
+    result = kerf.fem.run(
+        source_file="parts/wheel.feature",
+        materials=[{"id": "AL-6061", "E": 69e9, "nu": 0.33, "rho": 2700}],
+        fixtures=[{"face_ref": "hub_inner", "type": "fixed"}],
+        loads=[{"face_ref": "rim", "type": "pressure", "magnitude": 1e5}],
+        studies=["static"],
+    )
+    print(f"d={wheel_d} -> max von Mises = {result.max_von_mises} Pa")
 ```
 
-Editor surface: a "Run" button compiles and executes; a console panel
-streams `console.log` output and RPC progress; runtime errors land in
-the panel with source-mapped stack traces.
+Editor surface: `ScriptEditor` renders `.script.py` as a Python
+read-only viewer in v1; the kerf web UI shows the script file's
+current state + history. Users edit their scripts in their own IDE.
+In-app Monaco + pyright LSP is a v1.5 polish, not a blocker.
 
-### `kerf.*` API surface (initial)
+A `kerf` CLI ships with the SDK for the run loop: `kerf run script.py`,
+`kerf ls`, `kerf push`, `kerf diff`. Or users skip the CLI and just
+`python script.py` — the SDK works as a plain library.
+
+### `kerf.*` API surface (v1)
+
+The Python surface mirrors the JSON-RPC contract 1:1; the contract
+itself is the existing LLM tool registry plus minimal script-specific
+helpers (batch reads, streaming events for long ops) added reactively.
+The SDK is generated from the OpenAPI spec so Python and contract
+never drift.
 
 **Read:**
 - `kerf.files.list()`, `kerf.files.read(path)`, `kerf.files.history(path)`
 - `kerf.equations.read()`, `kerf.equations.get(name)`
-- `kerf.assemblies.read(path)`, `kerf.bom.compute(assemblyPath)`
-- `kerf.config.list(filePath)`, `kerf.config.get(filePath, name)`
+- `kerf.assemblies.read(path)`, `kerf.bom.compute(assembly_path)`
+- `kerf.config.list(file_path)`, `kerf.config.get(file_path, name)`
 
 **Mutate** (every mutation routes through `file_revisions`, so undo /
 branch / git-sync work the same as for human edits):
 - `kerf.files.write(path, content)`, `kerf.files.delete(path)`
-- `kerf.equations.set(name, valueOrExpr)`, `kerf.equations.delete(name)`
-- `kerf.config.set(filePath, name, overrides)`, `kerf.config.activate(filePath, name)`
-- `kerf.feature.run(filePath, op, params)`
+- `kerf.equations.set(name, value_or_expr)`, `kerf.equations.delete(name)`
+- `kerf.config.set(file_path, name, overrides)`, `kerf.config.activate(file_path, name)`
+- `kerf.feature.run(file_path, op, params)`
 
-**Heavy (RPC, polled, awaited):**
+**Heavy (RPC, polled or streamed):**
 - `kerf.fem.run({...})` → resolves with summary + result-file ID
-- `kerf.cam.toolpath({...})` → same pattern (lights up when CAM lands)
-- `kerf.step.tessellate({...})` → same pattern (lights up with the perf phase)
+- `kerf.cam.toolpath({...})` → same pattern (lights up when CAM
+  is no longer a stub)
+- `kerf.step.tessellate({...})` → same pattern (lights up with the
+  perf phase)
 
 Each `kerf.*` call has a 1:1 entry in the backend RPC registry; the
 same registry powers the LLM tool surface.
 
 ### Phasing
 
-- **S1.** `.script.ts` file kind, esbuild-wasm in-browser compile, Web
-  Worker runtime, **read-only** `kerf` API, `console.log` panel,
-  source-mapped errors.
-- **S2.** Mutation API (`writeFile`, `setParameter`,
-  `setConfiguration`, `runFeature`). Mutations flow through
+- **S1.** Generic `script` file kind with `extension` field (replaces
+  the earlier `.script.ts` Phase 1 stub), OpenAPI 3.x spec for the
+  existing LLM tool registry under `/v1/` namespace, `kerf-sdk`
+  skeleton on PyPI with auth + read-only API + `kerf` CLI,
+  `ScriptEditor` renders Python read-only, one end-to-end example
+  script.
+- **S2.** Full mutation API in the SDK (`write_file`, `set_parameter`,
+  `set_configuration`, `run_feature`). Mutations flow through
   `file_revisions` so undo / branches / git-sync work uniformly.
-- **S3.** Heavy-op RPC (`kerf.fem.run`, `kerf.cam.toolpath`,
-  `kerf.step.tessellate`). The polling/await wrapper is shared
-  infrastructure; new heavy ops register a backend handler + a thin
-  client method.
-- **S4.** Long-running script lifecycle: progress reporting,
-  structured cancellation, run history, scheduled runs (cron) on the
-  cloud tier.
-- **S5.** Optional Pyodide runtime as a second language frontend,
-  same `kerf.*` API. Only with real demand.
+- **S3.** Heavy-op SDK bindings (`kerf.fem.run`, `kerf.cam.toolpath`,
+  `kerf.step.tessellate`). Long-poll / streaming-events plumbing
+  shared across all heavy ops; new heavy ops register a backend handler
+  + an OpenAPI spec addition + auto-generated SDK method.
+- **S4.** Long-running script lifecycle: progress reporting, structured
+  cancellation, run history, scheduled runs (cron) on the cloud tier
+  via a webhook the user's CI can call.
+- **S5 (optional, demand-gated).** Hosted execution: "Run on Kerf
+  compute" button uploads the script + executes in a per-workspace
+  sandbox. Same SDK, same contract, different runner location.
+- **S6 (optional, demand-gated).** Second-language bindings — TypeScript
+  / Lua / Go via the same OpenAPI spec. ~One week per binding, paid only
+  when demand is real.
 
 ### Dependencies
 
-- **Equations + configurations land first** — scripts typically read
-  parameters and write configs; the API is shaped by them.
-- **Heavy-op RPCs follow their backend feature** — `kerf.fem.run`
-  lights up when FEM workers exist, `kerf.cam.toolpath` when CAM
-  exists, etc. S3 is incremental, not a single ship.
-- **Phase 2 (`.feature`) is independent** — TS scripts don't need
-  B-rep, but become more useful once `.feature` lands because the
-  feature ops become scriptable.
+- **Equations + configurations** are landed and are the most-natural
+  first targets for script automation. ✅
+- **OpenAPI spec for the LLM tool registry** is the gating piece — S1
+  doesn't ship until the contract is formalized.
+- **Heavy-op SDK methods light up as their backend features land** —
+  `kerf.fem.run` when FEM workers exist, `kerf.cam.toolpath` when CAM
+  is real (currently stub, see CAM Phase 1 row). S3 is incremental,
+  not a single ship.
 
-### Non-goals
+### Non-goals (v1)
 
-- **Backend execution of user code.** Never. Even sandboxed. The cost
-  of operating that infrastructure dwarfs its value when fixed RPC
-  covers the heavy-lift case.
+- **Backend execution of user code (v1).** User runs Python on their
+  machine. Hosted execution is an explicit S5, demand-gated.
 - **Plugin marketplace.** Scripts are per-project files,
   version-controlled with the project. No global install or app-store.
-- **Multi-language v1.** TypeScript only; Pyodide is S5-or-later.
-- **Direct shell / filesystem / network from scripts.** The `kerf.*`
-  API is the only outside surface; the browser Worker enforces this.
+- **In-app debugger.** Users use pyright + their IDE. We ship
+  structured errors + stack traces back over HTTP; that's it.
 - **Custom feature types via scripting.** Tempting but couples
   scripting to the kernel; punt to a separate "user feature" plan.
+- **Synchronous browser execution.** The "drag a slider, see the part
+  update" use case is served by the existing JSCAD / planegcs paths,
+  not by scripts. Scripts are for automation, not for in-loop UI
+  reactivity.
 
 ---
 
@@ -1047,10 +1094,12 @@ dominate). RF needs a different toolchain.
 
 ### Phase 1 — Lumped-network s-parameter analysis
 
-- Library: port [scikit-rf](https://scikit-rf.readthedocs.io/) primitives
-  to TypeScript (the parts that matter — Network, ABCD/S/Z conversion,
-  cascade, port renormalization). Or run scikit-rf as a backend Python
-  subprocess; cleaner, less work, requires Python at install-time.
+- Library: use [scikit-rf](https://scikit-rf.readthedocs.io/) directly
+  via the user's Python (per the Scripting section — Kerf scripts run
+  Python on the user's machine via `kerf-sdk`). A `kerf.rf.*` namespace
+  in the SDK wraps the common scikit-rf operations (Network, ABCD/S/Z
+  conversion, cascade, port renormalization) and writes results into
+  the project as a new `.rf-study` file kind. No TS port needed.
 - UX: drop matching networks (L-net / Pi-net / T-net) onto a circuit;
   enter source/load impedances; see Smith chart with marker sweep, plus
   S11 / S21 magnitude curves.
@@ -1133,18 +1182,45 @@ demand for it:
 - Janitor sweeps stale sessions hourly
 
 ### Phase 3: server-side STEP pre-tessellation — 📋 next
-Once Phase 2 stabilizes, browser STEP parsing is the next pain. Three
-options to evaluate:
 
-- **A. wazero + occt-import-js WASM** — pure-Go runtime, single binary still ships. Glue is fiddly.
-- **B. Node sidecar** — zero new code (Node already runs occt-import-js). Adds Node to the deploy.
-- **C. CGO bindings to OpenCASCADE** — fastest, heaviest build chain.
+Once Phase 2 stabilizes, browser STEP parsing is the next pain.
+**Decision: cloud-tier-only Python sidecar.** OSS local-install
+remains browser-only to preserve [[local_install_model]]'s
+single-binary install promise.
 
-Lean toward A; fall back to B if WASM glue gets thorny.
+Options evaluated:
+- **A. wazero + occt-import-js WASM** — ❌ infeasible. OCCT WASM is
+  compiled against Emscripten's JS host ABI (`__embind_*`, `__emval_*`,
+  `_fd_write`), not WASI. Re-implementing embind/emval in wazero is
+  weeks of work for marginal gain.
+- **B. Node sidecar** — ❌ rejected. Adds a second non-Go runtime to
+  the cloud deploy on top of the Python sidecar that CAM/RF/FEM will
+  need anyway. One language to operate is strictly better than two.
+- **C. CGO bindings to OpenCASCADE** — ❌ deferred. Heaviest build
+  chain, biggest binary, cross-compile pain. Not worth the cost when
+  the Python sidecar already pays for itself across multiple features.
+- **D. Python sidecar via pythonOCC (chosen).** New cloud-tier service
+  `cloud/pyworker/` exposes `POST /tessellate-step`. Existing
+  `step_tessellation_jobs` row + `tess.RunWorker` goroutine + mesh GLB
+  output all survive — only the sidecar invocation changes (HTTP to
+  pyworker instead of subprocess). pythonOCC is the full OCCT binding
+  (more capable than the `occt-import-js` import-subset Node package),
+  giving headroom for future server-side B-rep work.
 
-After upload finalize: insert a `step_tessellation_jobs` row, background
-worker runs OCCT, produces `.glb`, frontend prefers the glb to re-parsing the
-STEP.
+**OSS path** stays browser-only by design. Large-STEP OSS users have
+an elegant escape hatch: write a `kerf-sdk` script that pre-tessellates
+locally via pythonOCC and writes mesh artifacts back into the project
+via `kerf.files.write()`. Same Python library either side; the
+sidecar pattern is just "where the Python runs."
+
+**Reversibility**: the sidecar boundary itself is the architecture
+seam. If a Go-native solution emerges later (CGo, alternative parser,
+wazero shim), we swap one Python module without changing the
+surrounding plumbing.
+
+After upload finalize: insert a `step_tessellation_jobs` row,
+background worker calls the pyworker, produces `.glb`, frontend
+prefers the glb to re-parsing the STEP.
 
 ### Phase 4: revision DB efficiency — 📋 next
 - Diff-based revisions (Myers diff): base every N rows + diffs in between.
@@ -1159,16 +1235,18 @@ The cloud tier is proprietary (see [cloud/LICENSE](./cloud/LICENSE)). The
 public-facing OSS doesn't depend on any of it; everything below `cloud/` is
 add-on functionality for the hosted service.
 
-| Capability | Status |
-|---|---|
-| Paystack billing (USD-priced, ZAR-settled) | ✅ shipped |
-| Workshop (free CAD-design sharing gallery) | ✅ shipped |
-| Project 3D thumbnails (client-side render-on-save) | ✅ shipped |
-| Git (commits + branches + merge + GitHub sync) | ✅ shipped |
-| Multi-lane git graph | ✅ shipped |
-| Stateless object-storage git backend | 🚧 in flight |
-| Email notifications (account, billing) | ✅ shipped |
-| Multi-user real-time editing | 🔮 deferred indefinitely |
+| Capability | Status | Notes |
+|---|---|---|
+| Paystack billing (USD-priced, ZAR-settled) | ✅ shipped | |
+| Workshop (free CAD-design sharing gallery) | ✅ shipped | |
+| Project 3D thumbnails (client-side render-on-save) | ✅ shipped | |
+| Git (commits + branches + merge + GitHub sync) | ✅ shipped | |
+| Multi-lane git graph | ✅ shipped | |
+| Stateless object-storage git backend | 🚧 in flight | S3/R2-backed `billy.Filesystem` against go-git; test harness + STORER.md doc landed on worktree; pending review/merge |
+| Cloud `pyworker` service (Python sidecar) | 📋 next | New cloud-tier-only HTTP service in `cloud/pyworker/` (FastAPI). v1 route: `POST /tessellate-step` via pythonOCC (replaces evaluated-and-rejected Node sidecar). Future routes light up as features land: `/run-cam` (OpenCAMlib), `/run-rf` (scikit-rf), `/run-fem` (CalculiX + Gmsh), `/run-mates` (python-solvespace). One Python runtime hosts every heavy-compute server-side feature — amortizes ops cost. OSS path unaffected; preserves [[local_install_model]]. |
+| API tokens (cloud) for `kerf-sdk` auth | 📋 next | Workspace-scoped opaque tokens (`kerf_sk_` + 32 chars, DB-lookup not JWT). Settings page: issue / list / revoke with "shown once on creation" warning + copy. Schema fields ready for narrower scopes (`scopes jsonb`) and audit (`last_used_at`) from day 1, but v1 UI ships one scope (`workspace:member-role`) — reversibility seam, narrow later. Soft-delete revocation preserves audit log. Out of scope v1: browser device flow, scope-narrowing UI, full audit log, multi-workspace tokens. |
+| Email notifications (account, billing) | ✅ shipped | |
+| Multi-user real-time editing | 🔮 deferred indefinitely | |
 
 ---
 
@@ -1182,6 +1260,313 @@ add-on functionality for the hosted service.
 - **Landing page** (`src/routes/Landing.jsx`) — *being revamped.*
 - **`backend/README.md`** — backend-specific dev guide.
 - **`cloud/README.md`** — cloud-tier build/deploy.
+
+---
+
+## Imports from external CAD/EDA tools
+
+Adoption multiplier. Most engineers arrive at Kerf with existing
+investment in **KiCad / FreeCAD / OpenSCAD** designs. Lossless
+re-import is a strategic mismatch — it would mean re-implementing
+each of those tools. The right framing is **first-cut import +
+LLM refinement**: the import path produces a working starting point
+in a native Kerf file kind; the user iterates from there via chat,
+script, or direct edit.
+
+### Shared architectural pattern
+
+All three imports follow one shape:
+
+1. **Parsing happens in `pyworker`** (or browser-side for OpenSCAD,
+   where the grammar is small enough). Each ecosystem has a mature
+   Python (or JS) parser we plug in — no parsers written from
+   scratch.
+2. **Output is a native Kerf file kind** the LLM can already work
+   with. No new editor surface to maintain; the existing
+   `.circuit.tsx` / `.feature` / `.sketch` / `.equations` / `.jscad`
+   editors handle the result.
+3. **Reversibility seam at the parser boundary** — each import is a
+   single `pyworker` route (or browser worker), swappable when better
+   parsers emerge.
+4. **3D model / binary asset blobs go through `.step-ref`
+   pointer-in-storage** (the pattern shipped from the large-file STEP
+   row). Importing 200 footprints with STEP models doesn't bloat git.
+5. **LLM tools** wrap the import flow so the model can invoke imports
+   conversationally: "import this KiCad project and convert the LDO
+   to the equivalent in our Library Parts."
+
+### Comparison
+
+| Import | Target file kind | Parser location | Difficulty | Strategic value |
+|---|---|---|---|---|
+| **KiCad** | `.circuit.tsx` (tscircuit) | `pyworker` | Medium (translation tables) | High — large user base |
+| **FreeCAD** | `.feature` + `.sketch` + `.equations` | `pyworker` (FreeCAD Python lib) | Hard (rich data model) | High — direct competitor's users |
+| **OpenSCAD** | `.jscad` | Browser-side (small grammar) | Easy (sister CSG language) | Medium — maker / 3D-print community |
+
+### Rollout sequence
+
+Recommended order based on difficulty + signal value:
+
+1. **OpenSCAD Tier 1 first** — easiest, fastest, validates how
+   import-driven users behave in Kerf. Browser-side, no `pyworker`
+   dependency, ships fastest.
+2. **KiCad Tier 1** once `pyworker` lands — already roadmapped as
+   📋 next.
+3. **FreeCAD Tier 1** — the big strategic prize. FreeCAD users are
+   Kerf's most natural target audience: open-source-friendly,
+   parametric-CAD-trained, often Python-comfortable.
+4. **Tier 2 of each** as adoption signal demands.
+
+---
+
+### KiCad (electronics)
+
+**Status**: 📋 next. Unblocks once `pyworker` lands.
+
+**Tier 1 — schematic + PCB first-cut**
+
+- `pyworker` route `POST /import-kicad-project` accepts a zipped
+  KiCad project (or individual `.kicad_sch` / `.kicad_pcb` files).
+- Parser: [`kiutils`](https://github.com/mvnmgrx/kiutils) or
+  [`kicad-python`](https://github.com/pointhi/kicad-python) — pure
+  Python, no KiCad install required on the worker.
+- Output: a `.circuit.tsx` file using tscircuit primitives.
+  - Common parts (R / C / L / basic ICs by pin count) map cleanly
+  - Uncommon parts become `<chip>` with the right pin count + comment
+    noting the original KiCad symbol name
+- Net translation: each KiCad net → a tscircuit `<trace>` connecting
+  the relevant ports.
+- Schematic placement → x/y on schematic; PCB placement → x/y + layer
+  on PCB.
+- Footprint translation: KiCad footprint identifier → tscircuit
+  footprint string via a translation table. Ship with ~100 most
+  common; unknown footprints get `<chip footprint="kicad:lib:name">`
+  placeholder.
+- LLM tool: `kicad_import_project(zip_blob | url) → .circuit.tsx path`.
+
+**Tier 2 — libraries + 3D models**
+
+- KiCad symbol library (`.kicad_sym`) → ingest each symbol as a Kerf
+  Library Part. Verified-publisher pattern (already shipped) handles
+  curation.
+- KiCad footprint library (`.pretty/*.kicad_mod`) → ingested into the
+  Library Part metadata (footprint string + pad layout).
+- KiCad 3D models (STEP / VRML linked from footprints) → ingested as
+  `.step-ref` pointers. Blobs in object storage, pointers in git.
+  tscircuit's 3D board view resolves them transparently. **This is
+  precisely the use case the pointer pattern was built for.**
+- LLM tools: `kicad_import_library(zip | dir)`,
+  `kicad_match_part(refdes, hint?)` — fuzzy match against existing
+  Library Parts with confidence scores.
+
+**Tier 3 — explicitly out of scope**
+
+- Lossless round-trip / export back to KiCad
+- 1:1 layout fidelity, differential pairs, layer stack-ups, custom
+  design rules
+- Hierarchical schematic sheets preserved as nested TSX
+- ERC/DRC rule preservation
+
+Building these is "make Kerf into a KiCad-equivalent EDA tool" —
+strategic mismatch. Users who need full fidelity stay in KiCad and
+export Gerbers from there.
+
+**Honest blockers**
+
+- Footprint translation table needs curation (~100 common shipped,
+  long tail goes to placeholder; LLM can suggest mappings on import)
+- Symbol library scale: KiCad standard libraries have ~10,000 symbols
+  → lazy-import-on-use rather than bulk ingest
+- Hierarchical schematics flatten in v1; full nesting is Phase 2 if
+  demand emerges
+
+---
+
+### FreeCAD (mechanical)
+
+**Status**: 📋 planned. Unblocks once `pyworker` lands.
+
+**Why this is the big strategic prize**: FreeCAD users are Kerf's
+most natural audience — open-source-friendly, parametric-CAD-trained,
+often Python-comfortable. They've self-selected against proprietary
+CAD; they're already comfortable with command-line / script-driven
+workflows.
+
+**Why it's the hardest**: FreeCAD's data model is richer than KiCad's
+by an order of magnitude.
+
+**The good news — kernel alignment.** FreeCAD uses OpenCascade,
+same as Kerf's `.feature` files. BRep geometry transfers without
+re-meshing — both speak the same TopoDS representation. Tier 1 lifts
+the BRep state directly.
+
+**Tier 1 — Part + PartDesign features**
+
+- `pyworker` route `POST /import-freecad-project` accepts `.FCStd`
+  (ZIP containing XML + binary BRep blobs).
+- Parser: official `FreeCAD` Python module (heavyweight install on
+  the worker — accept the install cost; alternative `kiutils`-style
+  community parsers are less complete).
+- Walk the document tree. Map FreeCAD features → Kerf `feature_*`
+  ops:
+  - `Pad` / `Pocket` / `Revolve` / `Hole` / `Fillet` / `Chamfer`
+  - `Shell` / `Sweep` / `Loft` / `Mirror` / `LinearPattern` /
+    `PolarPattern`
+  - All conceptually 1:1 with Kerf's existing OCCT-backed ops.
+- BRep blob preservation via `.step-ref` pattern — extract the OCCT
+  TopoDS blobs, store via content-hash, reference. No re-tessellation.
+- Output: a `.feature` file with the operation tree + accompanying
+  `.sketch` files for sketch-driven features.
+- LLM tool: `freecad_import_project(zip_blob | url) → .feature path`.
+
+**Tier 2 — Sketcher + Spreadsheet + Library + TechDraw**
+
+- FreeCAD Sketcher constraints → planegcs equivalents. Most map
+  cleanly (parallel, perpendicular, equal, distance, angle, tangent
+  — shared vocabulary). Subtle differences in symmetry and
+  multi-constraint conjunctions need a translation pass; unmappable
+  constraints become read-only construction geometry with a comment.
+- FreeCAD Spreadsheet → Kerf `.equations` file. Surprisingly clean
+  mapping — both are named-parameter tables. Cell-formula syntax
+  translates to mathjs expressions.
+- FreeCAD Material library → Kerf Materials Library (already shipped).
+  Direct field mapping.
+- FreeCAD TechDraw drawings → Kerf `.drawing` file. Lossy on
+  dimension styles; coordinate system + projection + dimensions
+  themselves carry over.
+
+**Tier 3 — Python macros migration (organic)**
+
+FreeCAD users with Python macros are the **most natural kerf-sdk
+audience** — they already write Python that drives CAD. But:
+
+- FreeCAD's Python API (`App`, `FreeCAD.Gui`, `Part.makeBox`, etc.)
+  is incompatible with kerf-sdk's API. Auto-translation is brittle.
+- Strategy: don't auto-translate. Provide an LLM tool
+  `freecad_macro_assist(file) → markdown explanation + suggested
+  kerf-sdk equivalent` that:
+  1. Explains what the FreeCAD macro does
+  2. Drafts an equivalent kerf-sdk script
+  3. Lets the user iterate in chat to refine
+- This is *positioning*, not feature-completeness: "your Python
+  knowledge transfers; we don't auto-port your macros."
+
+**Tier 4 — explicitly out of scope**
+
+- FEM workbench data (users move to Kerf FEM)
+- Path workbench (users move to Kerf CAM)
+- BIM workbench (users move to Kerf Architecture project type)
+- Continuous sync / round-trip export back to `.FCStd`
+- Workbenches we don't have equivalents for (Surface, Mesh, Robot,
+  Ship, etc.) — show "not yet supported" warning on import
+
+**Honest blockers**
+
+- FreeCAD's `.FCStd` is a moving format target. New FreeCAD versions
+  occasionally break parsers. Pin a Python module version and update
+  on user reports.
+- Document graph recompute semantics: FreeCAD features reference each
+  other by name; broken references on rename are real. Tier 1 imports
+  the resolved-at-export state and ignores the recompute graph (loses
+  parametric edits to the imported features). Acceptable for v1.
+- Sketcher constraint translation is the hardest single piece. Plan
+  for ~2 weeks of careful work on this alone.
+
+---
+
+### OpenSCAD (mechanical / maker)
+
+**Status**: 📋 planned. **No pyworker dependency** — ships
+independently of the Python sidecar.
+
+**Why this is the cleanest of the three**: OpenSCAD and JSCAD are
+sister CSG languages. Same mental model — primitives, boolean ops,
+transforms, modules, functions. The translation is nearly mechanical.
+
+**Tier 1 — direct translation**
+
+- Browser-side parser (the OpenSCAD grammar is small enough; use
+  `openscad-parser` npm package or hand-roll a tiny one).
+- Source-to-source emitter: `.scad` → `.jscad` JavaScript.
+- Direct primitive mapping:
+  - `cube`, `sphere`, `cylinder`, `polygon`, `polyhedron`
+  - `union`, `difference`, `intersection`
+  - `translate`, `rotate`, `scale`, `mirror`, `multmatrix`
+  - `linear_extrude`, `rotate_extrude`
+- Output: `.jscad` file producing visually identical geometry.
+- LLM tool: `openscad_import(scad_source | file) → .jscad path`.
+
+**Tier 2 — full op coverage**
+
+- `hull()` — JSCAD has hull module; direct map
+- `minkowski()` — JSCAD has minkowski; slow but functional
+- `import("file.stl")` / `surface("file.png")` — translate to JSCAD
+  imports; file path translation needed; heightmap surfaces are
+  trickier (likely fall through to subprocess escape hatch)
+- `text("...")` — JSCAD has text; font handling differs (default
+  font substitution + warning)
+- Customizer parameter blocks (`/* [Group] */`) → JSCAD parameter
+  metadata for the parameter UI
+
+**Tier 3 — modules and functions**
+
+- `module foo(a, b=10) {...}` → JS function with default-arg
+  destructuring
+- Recursive modules work but need recursion-limit care (OpenSCAD's
+  recursion limit is configurable; JSCAD's is the JS engine's stack)
+- Functions (`function f(x) = ...`) → JS arrow functions
+
+**Escape hatch — OpenSCAD subprocess**
+
+For `.scad` files that use exotic features (`surface()` heightmaps,
+animation directives, custom render hints) or that hit translation
+bugs: run OpenSCAD itself as a subprocess (in `pyworker`'s
+`/import-openscad-subprocess` route) and import the resulting STL as
+a mesh. Loses parametric model. Useful fallback rather than primary
+path.
+
+**Tier 4 — explicitly out of scope**
+
+- 1:1 visual fidelity of OpenSCAD's preview renderer (we use JSCAD's
+  preview)
+- ANIMATE directive / animation export
+- Customizer auto-build with parameter sweeps (could be a kerf-sdk
+  pattern instead)
+
+**Architectural note**
+
+OpenSCAD's parser is small enough to run in a Web Worker — no
+`pyworker` round-trip needed for Tier 1. This is the **only one of
+the three imports that doesn't need cloud-tier infrastructure** to be
+useful. OSS local install can ship full OpenSCAD import without
+running a sidecar. That makes it an attractive "first import to
+ship" — fast win, no deploy story changes.
+
+---
+
+### Non-goals (imports as a whole)
+
+- **Continuous sync.** Import is one-shot. KiCad → Kerf, user iterates
+  in Kerf, no re-sync back. Users who want bidirectional sync stay in
+  their source tool.
+- **Workbench-level features that don't map cleanly.** FreeCAD has
+  20+ workbenches; only Part / PartDesign / Sketcher map to Kerf's
+  `.feature` model in Tier 1. Others either fall through to Kerf
+  equivalents (Kerf FEM/CAM/Architecture) or show "not supported"
+  warnings.
+- **Visual EDA / CAD tooling parity.** Kerf's modeling is LLM-driven
+  + script-driven; we're not building visual KiCad / FreeCAD inside
+  Kerf. Import gives a starting point; refinement is via chat and
+  kerf-sdk.
+- **Manufacturer-shipped library mirrors.** We don't bulk-ingest
+  KiCad / FreeCAD official libraries upfront — they're available on
+  demand via the import tools. Manufacturers who want their parts
+  pre-shipped in Kerf go through the verified-publisher Library
+  pipeline (already shipped).
+- **Format-specific export.** Export from Kerf goes through `.step`
+  (mechanical) / Gerbers-via-tscircuit (electronics) / `.ifc`
+  (architecture). We don't export back to `.FCStd` / `.kicad_pcb` /
+  `.scad`.
 
 ---
 

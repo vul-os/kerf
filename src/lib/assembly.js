@@ -132,7 +132,16 @@ export function toMatrix4(rowMajor) {
 
 // ----- Parsing / serialization ----------------------------------------------
 
-const EMPTY = { components: [] }
+const EMPTY = { components: [], overrides: [], mates: [] }
+
+// Mate vocabulary — ROADMAP row 49. Dimensional types (distance/angle) carry
+// a numeric `value`; the rest pin geometry directly. SolveSpace is the
+// eventual solver but no solver runs in this slice — schema-only round-trip.
+const MATE_TYPES = new Set([
+  'coincident', 'concentric', 'parallel', 'perpendicular', 'distance', 'angle', 'tangent',
+])
+const DIMENSIONAL_MATE_TYPES = new Set(['distance', 'angle'])
+const MATE_FEATURES = new Set(['face', 'edge', 'vertex', 'axis'])
 
 // Wildcard sentinel for legacy `"*"` Object ids. Kept as a distinct constant
 // so call sites read clearly; it's only ever produced by `parseAssembly`
@@ -246,7 +255,18 @@ export function parseAssembly(jsonStr) {
       overrides.push(row)
     }
   }
-  return { components, overrides }
+
+  // Mates — ROADMAP row 49 (3D assembly mates Tier 0). Shape-only on the
+  // frontend; the eventual SolveSpace subprocess writes/reads against this
+  // shape. Tolerant parser: drop malformed entries.
+  const mates = []
+  if (Array.isArray(raw.mates)) {
+    for (const m of raw.mates) {
+      const parsed = parseMate(m)
+      if (parsed) mates.push(parsed)
+    }
+  }
+  return { components, overrides, mates }
 }
 
 function clamp01(n) {
@@ -280,6 +300,34 @@ function parseExternalRef(raw) {
     : ''
   if (lastSeen) out.last_seen_updated_at = lastSeen
   return out
+}
+
+// parseMate: tolerant — returns null for missing type/a/b, unknown type, or
+// invalid feature on either side. Coerces `value` to a finite number for
+// dimensional mates (distance/angle); non-dimensional types get value=null.
+function parseMate(raw) {
+  if (!raw || typeof raw !== 'object') return null
+  const type = typeof raw.type === 'string' ? raw.type.trim() : ''
+  if (!MATE_TYPES.has(type)) return null
+  const a = parseMateRef(raw.a)
+  const b = parseMateRef(raw.b)
+  if (!a || !b) return null
+  const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : ''
+  const out = { id, type, a, b, value: null }
+  if (DIMENSIONAL_MATE_TYPES.has(type) && raw.value != null) {
+    const n = Number(raw.value)
+    if (Number.isFinite(n)) out.value = n
+  }
+  return out
+}
+
+function parseMateRef(raw) {
+  if (!raw || typeof raw !== 'object') return null
+  const componentId = typeof raw.component_id === 'string' ? raw.component_id.trim() : ''
+  const feature = typeof raw.feature === 'string' ? raw.feature.trim() : ''
+  const featureId = typeof raw.feature_id === 'string' ? raw.feature_id.trim() : ''
+  if (!componentId || !MATE_FEATURES.has(feature) || !featureId) return null
+  return { component_id: componentId, feature, feature_id: featureId }
 }
 
 // serializeAssembly: produce stable, pretty JSON for storage. Always writes
@@ -336,9 +384,28 @@ export function serializeAssembly(obj) {
       return row
     })
     .filter(Boolean)
+  // Mates round-trip — drop malformed entries via the same parser.
+  const mates = (obj && Array.isArray(obj.mates) ? obj.mates : [])
+    .map(parseMate)
+    .filter(Boolean)
   const doc = { components }
   if (overrides.length > 0) doc.overrides = overrides
+  if (mates.length > 0) doc.mates = mates
   return JSON.stringify(doc, null, 2)
+}
+
+/** Append a mate row; returns a new array (input untouched). Drops invalid mates. */
+export function addMate(rows, mate) {
+  const list = Array.isArray(rows) ? rows : []
+  const parsed = parseMate(mate)
+  if (!parsed) return list.slice()
+  return [...list, parsed]
+}
+
+/** Filter out the mate with the given id; returns a new array (input untouched). */
+export function removeMate(rows, mateId) {
+  const list = Array.isArray(rows) ? rows : []
+  return list.filter((m) => m && m.id !== mateId)
 }
 
 export const EMPTY_ASSEMBLY = EMPTY

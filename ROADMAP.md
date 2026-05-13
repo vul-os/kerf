@@ -51,10 +51,10 @@ local install, optional hosted tier with billing + workshop sharing + git.
 | **Scripting: `.script.py` via `kerf-sdk`** | 🚧 in flight | Python-first via external `kerf-sdk` on PyPI (MIT-licensed). Users run Python on their own machine — laptop, CI, internal server — and scripts talk to a Kerf instance (local or cloud) over HTTP/JSON-RPC against a versioned `/v1/` API. The RPC contract = the existing LLM tool registry (one source of truth, two callers). File kind generalized to `script` with an `extension` field (data, not enum) so future `.lua` / `.ts` / `.js` bindings drop in without a migration. **TypeScript explicitly rejected for v1** after evaluating Web Worker + esbuild-wasm: target users live in Python (cadquery, build123d, scipy, opencamlib, scikit-rf), running on the user's own machine sidesteps every sandbox / multi-tenancy / deploy problem, and the SDK still works against local-install or cloud. Hosted execution ("Run on Kerf compute") and second-language bindings (TS / Lua / Go / Rust against the same OpenAPI spec) are demand-gated S5/S6 — architecture supports them as alternative endpoints, not redesigns. Replaces earlier `.script.ts` Phase 1 stub. |
 | **`.feature` file kind + OCCT integration (Phase 2)** | ✅ shipped | Real B-rep features: Pad / Pocket / Revolve / Hole / Fillet / Chamfer / Shell / Sweep1 / Sweep2 / Loft / Push-Pull / RotateFace / LinearPattern / PolarPattern / MirrorPattern. `feature_*` LLM tools per op + `feature_files.go` integration scenario (60 assertions). Coexists with the JSCAD path; FeatureView toolbar gates Op palette, OCCT worker handles geometry, planegcs solves embedded sketches. |
 | **Edge/face selection + direct modeling (Phase 3)** | ✅ shipped | Face + edge selection state in `FeatureRenderer.jsx` (`featureSelection: { faceIds, edgeIds }`), face gumball with translate/rotate handles emits `push_pull` / `rotate_face` nodes, edge gumball drag-to-fillet emits `feature_fillet` with the dragged radius. Bidirectional highlight panel↔schematic via `selectedCircuitComponentId`. Per-frame re-orient on camera orbit. |
-| **FEM: mechanical analysis** | 🔮 planned | CalculiX + Gmsh subprocess; `.fem` file kind; F1 = linear static + modal + bonded contact; local + cloud workers; depends on Phase 3 |
+| **FEM: mechanical analysis** | 🔮 planned | **FEniCSx primary** (LGPL3, Python-native, active UK/US consortium dev, UFL differentiable, multiphysics-natural, GPU on roadmap); CalculiX kept as documented second-solver option behind same `pyworker` `/run-fem` route for FreeCAD-bit-exact compat + frictional contact when demanded. Gmsh for meshing in both. `.fem` file kind; F1 = linear static + modal + bonded contact; depends on Phase 3. |
 | **Tolerance stack-up** | 🔮 planned | 1D worst-case + RSS between two faces; walks dimension chain through mates; Monte-Carlo follow-on; depends on 3D mates |
 | **CAM toolpath generation** | 🔮 planned | OpenCAMlib (LGPL 2.1); 2.5D ops (face/contour/pocket/drill/profile); G-code with selectable post (LinuxCNC/GRBL/Mach3/Fanuc); `.cam` file kind; depends on Phase 2 |
-| **Topology optimization** | 🔮 planned | CalculiX SIMP wrapper; density-field → mesh; `.topo` file kind references `.feature` design space; "make it 30% lighter" demo; depends on FEM |
+| **Topology optimization** | 🔮 planned | Density-field SIMP via FEniCSx's UFL differentiability (gradient-aware natively — much cleaner than a separate optimization wrapper around CalculiX). `.topo` file kind references `.feature` design space; "make it 30% lighter" demo; depends on FEM. |
 | **Architecture: IFC + text-DSL** | 🔮 planned | Architectural project type. `.bim` text-DSL → IfcOpenShell (LGPL) compiler → `.ifc` artifact → web-ifc/Three.js viewer. Walls/slabs/spaces/openings/levels/site; IFC4 subset grows iteratively |
 | **NURBS surfacing (Phase 4)** | 🔮 planned | sweep1/sweep2/networkSrf/blendSrf, surface continuity. Rhino-tier territory. |
 | **Phase 4a: jewelry-priority surfacing** | ✅ shipped | All three ops live in `src/lib/occtWorker.js`: `opSweep2` wraps `BRepOffsetAPI_MakePipeShell` with rail2 as auxiliary spine (Frenet fallback); `opNetworkSrf` tries `GeomFill_BSplineCurves` first, falls back to `BRepOffsetAPI_ThruSections` over U-curves with V-curves advisory; `opBlendSrf` uses `BRepFill_Filling` with two edge constraints, returns the blend face only. Continuity args: `C0/C1/C2` for networkSrf (default C1), `G0/G1/G2` for blendSrf (default G1). LLM tools `feature_sweep2` / `feature_network_srf` / `feature_blend_srf` registered in `surfacing_tools.go`. FeatureView toolbar entries under "Surfacing". `feature_files.go` scenario covers all three end-to-end (89 assertions total). |
@@ -445,14 +445,34 @@ the demo that justifies a chat-LLM CAD tool over traditional GUIs.
 
 ### Stack
 
-- **Solver: CalculiX** (GPL2, subprocess) — most capable OSS mechanical
-  solver; Abaqus-compatible `.inp` syntax, which is the single most
-  LLM-trainable FEM format in existence.
-- **Mesher: Gmsh** (GPL2, subprocess) — de facto OSS mesher.
-- **License posture:** subprocess invocation only; never linked into
-  the MIT kerf binary. Runtime subprocess use of GPL software is not
-  derivative work. Both tools install separately (`brew install --cask
-  kerf-fem-tools` locally; baked into the cloud VM image).
+- **Solver: FEniCSx** (LGPL3, Python-native) — modern, actively developed
+  by a UK/US research consortium funded through 2027+. UFL (Unified Form
+  Language) makes coupled multiphysics first-class and forms are
+  **differentiable** — which makes topology optimization, inverse
+  problems, and future ML-CAD integration land cleanly without separate
+  optimization wrappers. GPU acceleration on roadmap. Python-native fit
+  with `pyworker` (no subprocess wrangling).
+- **Mesher: Gmsh** (GPL2, Python bindings) — de facto OSS mesher; same
+  in either solver branch.
+- **Second solver: CalculiX** (GPL2) — kept as a documented future
+  alternative behind the same `pyworker` `/run-fem` route via an
+  optional `solver` field. Lands when demanded — typically for
+  FreeCAD-bit-exact behavior parity or frictional-contact workloads
+  where CalculiX's polish currently exceeds FEniCSx's. Migration
+  surface: one Python module in `pyworker`; no API or schema changes.
+- **License posture:** FEniCSx is LGPL3; HTTP boundary via `pyworker`
+  keeps Kerf core MIT. CalculiX (GPL2) when added uses the same HTTP
+  boundary pattern. Neither solver linked into the MIT kerf binary.
+  Both run inside the cloud-tier `pyworker` service; OSS users who
+  want server-side FEM run `kerf-pyworker` themselves locally.
+- **Why FEniCSx over CalculiX as primary:** CalculiX's strengths (deep
+  element variety, mature frictional contact, Abaqus-style `.inp`
+  format) are real but locked to a near-static legacy codebase. FEniCSx
+  is where the modern FEM frontier lives — multiphysics, GPU,
+  differentiable, AMR. For a CAD tool that wants to grow into
+  thermal-structural / FSI / topology opt / ML-aware design in the
+  3-5-year horizon, the modern stack wins. CalculiX stays available
+  for the specific cases where it leads, behind the same seam.
 
 ### Data model
 
@@ -484,9 +504,9 @@ tensor, modal frequencies + mode shapes, summary JSON (max stress, FoS).
   on top of linear static).
 - **Bonded contact in assemblies** — multi-body studies, parts tied at
   touching faces. No friction yet.
-- **Compute targets:** local subprocess (OSS, gmsh+ccx on PATH) and
-  cloud worker (hosted, same `.fem` job spec). Queue mirrors the
-  STEP-tessellation pattern.
+- **Compute targets:** cloud-tier `pyworker` (`/run-fem` route) for
+  hosted users; optional self-hosted `kerf-pyworker` for OSS users
+  who want server-side FEM locally. Same job spec either side.
 - **Renderer:** stress-colored mesh with displacement-scale slider;
   mode-shape playback for modal results.
 - **LLM tool:** single `fem_run({ source_file, materials, fixtures,
@@ -506,7 +526,7 @@ A `.jscad` fallback (faces by normal/region) is possible later, not v1.
 - **F1.** Linear static + modal + bonded contact, local + cloud
   workers, single LLM tool.
 - **F2.** Frictionless contact, multi-step loading, anisotropic materials.
-- **F3.** Thermal + thermal-mechanical (likely add Elmer alongside CalculiX).
+- **F3.** Thermal + thermal-mechanical (natural in FEniCSx via UFL coupled forms; no second solver needed).
 - **F4.** Frictional contact, plasticity / hyperelastic, dynamic
   implicit/explicit. Multi-quarter; only with demand.
 
@@ -615,7 +635,7 @@ pillar after FEM.
 
 "Make this bracket 30% lighter." Killer chat-driven demo once FEM is in.
 
-- **Solver:** **CalculiX SIMP** (built into newer CalculiX) is the v1
+- **Solver:** **FEniCSx with UFL-differentiable density-field SIMP** is the v1
   pick — same binary already invoked for FEM. Alternative: **ToOptix**
   (GPL3) for level-set methods.
 - **Output:** density field on the mesh → marching-cubes to a new
@@ -624,7 +644,7 @@ pillar after FEM.
   space + fixed regions; load cases reuse FEM's `fixtures` / `loads`
   vocabulary; adds volume-fraction target.
 - **LLM tool:** `topo_run({...})` → optimized mesh + summary metrics.
-- **Phasing:** O1 (CalculiX SIMP wrapper + density viz). O2 (mesh
+- **Phasing:** O1 (FEniCSx UFL-SIMP via `pyworker` `/run-topo` + density viz; gradients come for free from UFL — no separate optimization wrapper needed). O2 (mesh
   export). O3 (multi-load-case + manufacturing constraints, e.g.
   3D-print overhang).
 - **Dependencies:** FEM landed.
@@ -642,7 +662,7 @@ tools are exposed, and which file extensions are valid in that project.
 
 | Type | Modeling kernels | Native file kinds | LLM tool surface | Renderer |
 |---|---|---|---|---|
-| **mechanical** *(today's default)* | JSCAD + (Phase 2) OCCT + (post-P3) CalculiX | `jscad`, `sketch`, `assembly`, `drawing`, `step`, `feature`, `fem` | feature/sketch/assembly/drawing/fem tools | Three.js 3D + 2D drawing canvas |
+| **mechanical** *(today's default)* | JSCAD + (Phase 2) OCCT + (post-P3) FEniCSx | `jscad`, `sketch`, `assembly`, `drawing`, `step`, `feature`, `fem` | feature/sketch/assembly/drawing/fem tools | Three.js 3D + 2D drawing canvas |
 | **electronics** | [tscircuit](https://tscircuit.com) (TSX → Circuit JSON) | `circuit.tsx`, `circuit.json`, `netlist` | place-component, connect, set-outline, run-DRC, compile | tscircuit schematic + PCB + 3D-board viewers |
 | **architecture** | text-DSL → IFC (IfcOpenShell, LGPL) | `bim`, `ifc`, `drawing`, `sketch`, `material` | wall/slab/opening/space/level ops, IFC compile, BOQ | 2D floor-plan + 3D building view (web-ifc + Three.js) |
 
@@ -1229,6 +1249,116 @@ prefers the glb to re-parsing the STEP.
 
 ---
 
+## Scalability — large projects + dense scenes
+
+Honest read on the current ceiling. The client renders everything in one
+Three.js scene with no LOD, no frustum culling, no draw-call batching;
+assemblies are a flat component list (no nesting, no lazy expansion);
+heavy CAD compute runs in browser WASM workers (OCCT, JSCAD, tscircuit)
+capped at the ~2-4 GB WASM heap.
+
+### Current practical limits
+
+| Scale | Status |
+|---|---|
+| 100–500 parts | smooth |
+| 1k–5k parts | marginal, frame rate drops |
+| 10k+ parts (full building, dense PCB) | unresponsive — draw-call bound, not VRAM bound |
+| STEP > ~100 MB | may hang the browser on parse |
+| Nested assemblies | not supported (must flatten) |
+
+**The bottleneck is draw calls per frame, not GPU memory.** One part =
+one draw call. So a building or full-machine assembly chokes long
+before VRAM is full. **None of this is architecturally blocked** — the
+seams exist (mesh cache, worker boundary, component resolver). It's
+unbuilt work.
+
+### Phased plan
+
+Roughly priority-ordered; each phase compounds the previous one. The
+first two alone should get us 5-10× the practical part count.
+
+**S1 — Frustum culling (📋 next)**
+
+Off-screen geometry shouldn't be drawn. Three.js has `Frustum` +
+`frustumCulled` per-object; today many of our meshes have it disabled
+or aren't checked correctly because positions live on parent groups.
+Audit + fix culling per-mesh; verify with a 10k-part synthetic scene
+that the GPU only processes what's visible. Should be ~1-week agent
+work. **Biggest single win.**
+
+**S2 — Batched draw calls across distinct parts (📋 next)**
+
+Today `InstancedMesh` only batches *repeats of the same part*. The
+real win is batching across distinct parts with similar materials.
+Two approaches:
+- **Mesh merging at compile time** — bake multiple `.feature` /
+  `.part` results into a single buffer per material; rebuild on edit.
+  Lossier (per-part picking needs vertex ranges) but big draw-call
+  win.
+- **`BatchedMesh` (Three.js 0.152+)** — multi-draw under the hood;
+  preserves per-object identity for picking. Slightly newer API,
+  rendering-equivalent.
+
+Lean toward `BatchedMesh`. ~2-week agent task once it lands stable.
+
+**S3 — Server-side pre-tessellation (📋 next, already roadmapped)**
+
+Big STEPs come in as `.glb` instead of raw B-rep. Cloud `pyworker`
+`/tessellate-step` route already implemented; merge + wire the
+existing Node-sidecar replacement. See Performance Phase 3 above.
+
+**S4 — LOD (level of detail)**
+
+Coarse meshes when zoomed out, fine when zoomed in. Mesh decimation
+in `pyworker` (pythonOCC + open3d) produces per-part LOD levels
+stored as derived artifacts (same cache as STEP pre-tess). Frontend
+swaps levels based on screen-space size. **Important once batched
+draws are in place** — they amplify each other.
+
+**S5 — Hierarchical assemblies with lazy resolve**
+
+Today's assembly model is a flat component list. Move to a tree:
+sub-assemblies as nodes, lazy-expand on demand. Don't tessellate the
+whole building to look at one room. Schema change to `.assembly`:
+add `subassemblies` array alongside `components`. Frontend
+ComponentTree component manages expand/collapse with per-node
+visibility + tessellation gating.
+
+This is the bigger architectural lift — affects assembly schema,
+BOM rollup (needs to walk tree), git diffs, LLM tool surface.
+Probably 4-6 weeks of focused work.
+
+**S6 — IndexedDB-backed mesh streaming**
+
+Today the whole scene's meshes load into VRAM at once. For very
+large scenes (10k+ visible parts after culling), stream mesh chunks
+from IndexedDB on demand based on view frustum + LOD level. Most
+useful AFTER S1+S4 land; before those, this just shifts the bottle-
+neck.
+
+### Reversibility seams
+
+The scalability stack is **modular**. Each phase ships behind a
+feature flag (`KERF_SCENE_BATCHED`, `KERF_SCENE_LOD`,
+`KERF_SCENE_HIERARCHICAL`) so degraded paths stay available if the
+new path has bugs. The mesh cache + worker boundary + component
+resolver are the architecture seams — all three already exist and
+don't need redesign for any phase.
+
+### Non-goals
+
+- **Multi-GPU / distributed rendering.** That's enterprise-vis
+  territory; not what a chat-driven CAD tool optimizes for.
+- **Game-engine-grade culling** (occlusion + portal culling). S1's
+  frustum culling is sufficient for foreseeable CAD scenes; the
+  ROI on occlusion culling is poor compared to S2+S4.
+- **Real-time multi-million-triangle scenes.** Kerf is for design,
+  not for arch-viz walkthroughs. If users need that, they export
+  `.glb` and bring it to a viewer optimized for it.
+
+---
+
 ## Cloud (hosted-tier) roadmap
 
 The cloud tier is proprietary (see [cloud/LICENSE](./cloud/LICENSE)). The
@@ -1243,10 +1373,9 @@ add-on functionality for the hosted service.
 | Git (commits + branches + merge + GitHub sync) | ✅ shipped | |
 | Multi-lane git graph | ✅ shipped | |
 | Stateless object-storage git backend | 🚧 in flight | S3/R2-backed `billy.Filesystem` against go-git; test harness + STORER.md doc landed on worktree; pending review/merge |
-| Cloud `pyworker` service (Python sidecar) | 📋 next | New cloud-tier-only HTTP service in `cloud/pyworker/` (FastAPI). v1 route: `POST /tessellate-step` via pythonOCC (replaces evaluated-and-rejected Node sidecar). Future routes light up as features land: `/run-cam` (OpenCAMlib), `/run-rf` (scikit-rf), `/run-fem` (CalculiX + Gmsh), `/run-mates` (python-solvespace). One Python runtime hosts every heavy-compute server-side feature — amortizes ops cost. OSS path unaffected; preserves [[local_install_model]]. |
+| Cloud `pyworker` service (Python sidecar) | 🚧 in flight | Cloud-tier-only HTTP service `cloud/pyworker/` (FastAPI). Scaffold + `/tessellate-step` (pythonOCC) + `/run-mates` (python-solvespace) landed on worktree pending review. Future routes as features land: `/run-cam` (OpenCAMlib), `/run-rf` (scikit-rf), `/run-fem` (**FEniCSx primary; CalculiX as documented optional second-solver behind same route**), `/compile-ifc` (IfcOpenShell), `/import-kicad` (kiutils), `/import-freecad` (FreeCAD Python module). One Python runtime hosts every heavy-compute server-side feature — amortizes ops cost. OSS path unaffected; OSS users who want server-side compute run `kerf-pyworker` themselves. Preserves [[local_install_model]]. |
 | API tokens (cloud) for `kerf-sdk` auth | 📋 next | Workspace-scoped opaque tokens (`kerf_sk_` + 32 chars, DB-lookup not JWT). Settings page: issue / list / revoke with "shown once on creation" warning + copy. Schema fields ready for narrower scopes (`scopes jsonb`) and audit (`last_used_at`) from day 1, but v1 UI ships one scope (`workspace:member-role`) — reversibility seam, narrow later. Soft-delete revocation preserves audit log. Out of scope v1: browser device flow, scope-narrowing UI, full audit log, multi-workspace tokens. |
 | Email notifications (account, billing) | ✅ shipped | |
-| Multi-user real-time editing | 🔮 deferred indefinitely | |
 
 ---
 

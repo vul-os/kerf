@@ -1,0 +1,48 @@
+name: Publish kerf-sdk to npm
+
+on:
+  push:
+    tags:
+      - "sdk-ts-v*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # required to create GitHub Release
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        working-directory: packages/kerf-sdk-ts
+        run: npm ci
+
+      - name: Build
+        working-directory: packages/kerf-sdk-ts
+        run: npm run build
+
+      - name: Run tests
+        working-directory: packages/kerf-sdk-ts
+        run: npm test
+
+      - name: Publish to npm
+        working-directory: packages/kerf-sdk-ts
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "kerf-sdk (npm) ${{ github.ref_name }}"
+          body: |
+            TypeScript SDK for Kerf — `npm install kerf-sdk`
+
+            See [`packages/kerf-sdk-ts/README.md`](https://github.com/kerf-sh/kerf/tree/main/packages/kerf-sdk-ts) for usage.
+          generate_release_notes: true

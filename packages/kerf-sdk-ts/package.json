@@ -1,0 +1,33 @@
+{
+  "name": "kerf-sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for Kerf — chat-driven CAD",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "lint": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "engines": { "node": ">=18.0.0" },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kerf-sh/kerf.git",
+    "directory": "packages/kerf-sdk-ts"
+  },
+  "homepage": "https://github.com/kerf-sh/kerf/tree/main/packages/kerf-sdk-ts",
+  "keywords": ["kerf", "cad", "sdk"]
+}

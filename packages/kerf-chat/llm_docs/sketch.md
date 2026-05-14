@@ -50,14 +50,44 @@ Future-shape (face-anchored): `{ "type": "face", "file_id": "<uuid>",
 
 ## Entities
 
-| `type`   | required keys                                                    |
-|----------|------------------------------------------------------------------|
-| `point`  | `id`, `x`, `y`                                                   |
-| `line`   | `id`, `p1`, `p2`                                                 |
-| `arc`    | `id`, `center`, `start`, `end`, `sweep_ccw` (bool), `radius`     |
-| `circle` | `id`, `center`, `radius`                                         |
-| `ellipse`| `id`, `center`, `radius_x`, `radius_y`, optional `rotation`      |
-| `bspline`| `id`, `points` (array of point ids), optional `degree`, `knots`  |
+| `type`   | required keys                                                                    |
+|----------|----------------------------------------------------------------------------------|
+| `point`  | `id`, `x`, `y`                                                                   |
+| `line`   | `id`, `p1`, `p2`                                                                 |
+| `arc`    | `id`, `center`, `start`, `end`, `sweep_ccw` (bool), `radius`                     |
+| `circle` | `id`, `center`, `radius`                                                         |
+| `ellipse`| `id`, `center`, `radius_x`, `radius_y`, optional `rotation`                      |
+| `bspline`| `id`, `controls` (array of point ids), `degree` (3)                              |
+| `bezier` | `id`, `control_points` (array of point ids), `degree` (inferred: n+1 pts → n)   |
+
+### Bezier curves
+
+A polynomial Bezier curve is defined entirely by its control points. Unlike
+B-splines, the first and last control points are exactly on the curve; the
+inner points are "handles" that pull the curve toward them.
+
+```json
+{
+  "id": "bz1",
+  "type": "bezier",
+  "degree": 3,
+  "control_points": ["p0", "p1", "p2", "p3"]
+}
+```
+
+Rules:
+- **Degree 2 (quadratic)**: 3 control points. One handle.
+- **Degree 3 (cubic)**: 4 control points. The most common case. Two handles.
+- Degree is inferred from the `control_points` count (`n+1 points → degree n`).
+- All control points must be `point` entities in the same sketch.
+- Add `"construction": true` for reference-only curves excluded from extrude.
+
+UI: select the **Bezier** tool (key `Z`), click control points in sequence,
+then press **Enter** or **double-click** to commit. The ghost preview shows the
+actual Bezier curve as soon as 3 points exist.
+
+Control-point drag works like any other point — select a control-point entity
+and drag. The curve updates live via the constraint solver.
 
 Add `"construction": true` to mark an entity as construction-only — it
 participates in constraints but isn't extruded.
@@ -78,6 +108,12 @@ Geometric:
 - `midpoint` — `{point, line}` point pinned to the line's midpoint
 - `symmetric` — `{p1, p2, axis}` axis is a line id
 - `block` — `{point}` lock the point at its current `(x, y)`; pair with `coordinate_x`/`coordinate_y` if you want a specific value
+- `bezier_tangent` — `{p0, p1, p2}` direction-only tangent at a Bezier junction: p1 is the shared endpoint; p0 and p2 are the adjacent handles of each segment. Enforces p0–p1–p2 collinearity (G1 direction).
+- `bezier_g1` — `{p0, p1, p2}` G0+G1 at a Bezier junction (use alongside a `coincident` for the shared endpoint). Same collinearity as `bezier_tangent`.
+
+> **G2 note**: planegcs 1.1.x has no `CurvatureMatch` primitive in its
+> push_primitive API, so G2 curvature-continuity constraints are not yet
+> supported. Ship G0+G1 today; G2 will land when the upstream binding adds it.
 
 Dimensional (carry `value`):
 - `distance` — `{p1, p2, value}` Euclidean distance

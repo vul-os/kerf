@@ -62,12 +62,20 @@ Used for:
 
 `backend/storage/git_storer.py` — `S3GitStorer` wraps pygit2 bare repos on S3:
 
-- `clone_to_local`: downloads all S3 keys under prefix → local bare repo
-- `push_from_local`: repacks with `git gc`, uploads objects/ then refs/, deletes orphan S3 keys
+- `clone_to_local`: downloads every S3 key under the prefix into a local bare repo. Empty prefix → `pygit2.init_repository(bare=True)`.
+- `push_from_local`: repacks with `git gc --aggressive --prune=now`, uploads pack files → loose objects → refs (in that order), then writes a sentinel `_marker` object under conditional-put for optimistic concurrency. Orphan keys are batch-deleted via `delete_objects` (up to 1000/call).
 
-Consistency: packs uploaded **before** refs. Orphan cleanup is best-effort post-push.
+Consistency: objects uploaded **before** refs so a concurrent reader never sees a ref pointing at a missing object. Two simultaneous writers are detected via the `_marker` ETag — the loser raises `StorerConcurrencyError` and the caller retries with fresh state. For coarser-grained "one push per project" semantics, hold a DB advisory lock at the route layer.
 
-moto integration tests: `backend/tests/test_git_storer.py`.
+OSS / local-install: not used. Filesystem-backed git lives directly on disk and is handled by `pygit2` against the local repo path. The Storer is only constructed when `STORAGE_BACKEND=s3`.
+
+Tests (`backend/tests/test_git_storer.py`, hermetic via `moto`):
+- single-commit push → re-clone round-trip
+- empty-prefix bootstrap
+- multi-commit history + repack + orphan cleanup
+- stale-ETag concurrent-push detection
+- batch delete of large orphan sets
+- force-replace history drops old loose objects
 
 ## Large-file handling (STEP ≥ 5 MB)
 

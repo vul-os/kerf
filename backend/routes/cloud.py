@@ -19,7 +19,7 @@ from db.connection import get_pool_required
 from dependencies import require_auth
 from storage import get_storage_required
 from storage.s3 import S3Storage
-from storage.git_storer import S3GitStorer
+from storage.git_storer import S3GitStorer, StorerConcurrencyError
 from utils.encrypt import encrypt_secret, decrypt_secret
 
 router = APIRouter()
@@ -468,6 +468,8 @@ async def git_push(
         await asyncio.get_event_loop().run_in_executor(None, storer.push_from_local, local_dir)
     except HTTPException:
         raise
+    except StorerConcurrencyError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

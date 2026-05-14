@@ -72,14 +72,27 @@ async def lifespan(app: FastAPI):
     )
     set_storage(storage)
 
+    # Cloud-tier only: server-side STEP pre-tessellation worker. OSS
+    # local-install path keeps tessellation in the browser to preserve the
+    # single-binary brew/curl install promise.
+    auto_tess_count = (
+        int(os.getenv("AUTO_TESS_WORKERS", "1"))
+        if settings.cloud_enabled and not settings.local_mode
+        else 0
+    )
+    # When auto-tess is active it subsumes the legacy polling TessWorker.
+    legacy_tess_count = 0 if auto_tess_count else int(os.getenv("TESS_WORKERS", "1"))
+
     workers_task = asyncio.create_task(
         start_all_workers(
             pool=get_pool(),
             storage_getter=lambda: storage,
             fem_count=int(os.getenv("FEM_WORKERS", "1")),
             sim_count=int(os.getenv("SIM_WORKERS", "1")),
-            tess_count=int(os.getenv("TESS_WORKERS", "1")),
+            tess_count=legacy_tess_count,
             cam_count=int(os.getenv("CAM_WORKERS", "0")),
+            auto_tess_count=auto_tess_count,
+            auto_tess_timeout=settings.step_tessellate_timeout_sec,
         )
     )
 

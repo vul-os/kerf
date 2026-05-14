@@ -1,58 +1,88 @@
 """
-AutoTessWorker — PG LISTEN/NOTIFY-based tessellation job worker.
+AutoTessWorker — cloud-tier STEP pre-tessellation worker.
 
-This worker extends BaseWorker to process ``step_tessellation_jobs`` rows that
-are in ``status='queued'``. It differs from TessWorker in that it is woken up
-by PostgreSQL NOTIFY on the ``step_file_uploaded`` channel rather than pure
-polling. A long poll interval is used because the worker primarily relies on
-the NOTIFY signal; the poll is a fallback for missed notifications or
-startup.
+Wakes on PG NOTIFY ``step_file_uploaded`` (payload = file_id) and processes
+``step_tessellation_jobs`` rows where ``status='queued'``. Pulls the STEP blob
+from object storage, hands it to the pyworker ``/run-tess`` route (occt-import-js
+Node sidecar), and stores the resulting GLB in ``derived_artifacts`` keyed by
+``(file_id, content_sha256, 'step_mesh')`` for content-hash idempotency. The
+file row's ``mesh_storage_key`` is populated so the frontend can resolve the
+mesh without going through the artifact table.
 
-The worker only processes jobs for workspaces that belong to the ``cloud`` tier.
+This worker is **cloud-tier-only**. It must not be started when
+``settings.local_mode`` is True or ``settings.cloud_enabled`` is False — the
+OSS local-install path tessellates in the browser. Gating happens at the
+``start_all_workers`` call site in ``main.py``; this module assumes the
+caller already decided to start it.
 """
 
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
+import time
 from typing import Callable, Optional
 
 import asyncpg
 
 from workers.base import BaseWorker
-from workers.tess_worker import TessDriver, TessInputSpec
+from workers.tess_worker import TessInputSpec
 
 
 logger = logging.getLogger(__name__)
 
 
+_STUCK_RUNNING_RECOVERY_SECONDS = 600
+_NOTIFY_CHANNEL = "step_file_uploaded"
+
+
 async def notify_step_uploaded(conn: asyncpg.Connection, file_id: str) -> None:
-    """
-    Send a PG NOTIFY on the ``step_file_uploaded`` channel with the given
-    file_id as the payload.
+    """Fire PG NOTIFY on ``step_file_uploaded`` so the worker wakes immediately."""
+    await conn.execute("SELECT pg_notify($1, $2)", _NOTIFY_CHANNEL, file_id)
 
-    This function is called from the upload-finalise path in the API to signal
-    the AutoTessWorker that a new step file is ready for tessellation.
 
-    Parameters
-    ----------
-    conn : asyncpg.Connection
-        An active database connection.
-    file_id : str
-        The UUID of the newly uploaded step file (as a string).
-    """
-    await conn.execute("SELECT pg_notify('step_file_uploaded', $1)", file_id)
+class _TessHTTPDriver:
+    """Calls pyworker /run-tess and returns the raw GLB bytes."""
+
+    def __init__(self, pyworker_url: str, timeout: int) -> None:
+        self.pyworker_url = pyworker_url
+        self.timeout = timeout
+
+    async def tessellate(self, step_bytes: bytes, spec: TessInputSpec) -> bytes:
+        import base64
+        import aiohttp
+
+        req = {
+            "step_b64": base64.b64encode(step_bytes).decode(),
+            "input_spec": spec.to_dict(),
+        }
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{self.pyworker_url}/run-tess",
+                json=req,
+                timeout=aiohttp.ClientTimeout(total=self.timeout + 30),
+            ) as resp:
+                if resp.status != 200:
+                    body = await resp.text()
+                    raise RuntimeError(f"pyworker status {resp.status}: {body[:400]}")
+                data = await resp.json()
+
+        errors = data.get("errors") or []
+        if errors:
+            raise RuntimeError(f"pyworker tess errors: {errors}")
+
+        glb_b64 = data.get("glb_b64") or ""
+        if not glb_b64:
+            raise RuntimeError("pyworker returned empty glb_b64")
+
+        return base64.b64decode(glb_b64)
 
 
 class AutoTessWorker(BaseWorker):
-    """
-    A worker that processes queued tessellation jobs using PG LISTEN/NOTIFY.
-
-    It claims rows from ``step_tessellation_jobs`` that are ``status='queued'``
-    for cloud-tier workspaces only. Jobs that have been stuck in ``'running'``
-    for more than 10 minutes are re-queued as a safety measure.
-    """
+    """Cloud-tier STEP → GLB pre-tessellation worker driven by PG LISTEN/NOTIFY."""
 
     name = "auto_tess"
 
@@ -61,27 +91,103 @@ class AutoTessWorker(BaseWorker):
         pool: asyncpg.Pool,
         storage_getter: Callable,
         pyworker_url: str = "http://localhost:8090",
-        poll_interval: float = 30.0,
+        poll_interval: float = 60.0,
         timeout: int = 300,
+        driver: Optional[_TessHTTPDriver] = None,
     ) -> None:
         super().__init__(self.name, pool, poll_interval)
         self.storage_getter = storage_getter
-        self.driver = TessDriver(pyworker_url=pyworker_url, timeout=timeout)
+        self.driver = driver if driver is not None else _TessHTTPDriver(
+            pyworker_url=pyworker_url, timeout=timeout
+        )
         self.timeout = timeout
-        self._notify_event = asyncio.Event()
+        self._wake = asyncio.Event()
         self._listener_task: Optional[asyncio.Task] = None
 
-    # -------------------------------------------------------------------------
-    # BaseWorker interface
-    # -------------------------------------------------------------------------
+    # ------------------------------------------------------------------ run loop
+
+    async def run(self, ctx: asyncio.TaskGroup) -> None:
+        self._listener_task = ctx.create_task(self._listen_loop())
+        try:
+            await super().run(ctx)
+        finally:
+            if self._listener_task and not self._listener_task.done():
+                self._listener_task.cancel()
+
+    async def _loop(self) -> None:
+        # Override the polling loop: drain whatever's queued, then sleep until
+        # either a NOTIFY arrives or the long fallback poll fires. The fallback
+        # exists because NOTIFY is best-effort across reconnects and we don't
+        # want a missed signal to strand a job forever.
+        while not self._shutdown:
+            try:
+                await self._recover_stuck_jobs()
+                drained = False
+                while not self._shutdown:
+                    ran = await self.run_one()
+                    if not ran:
+                        break
+                    drained = True
+                if drained:
+                    continue
+                try:
+                    await asyncio.wait_for(self._wake.wait(), timeout=self.poll_interval)
+                except asyncio.TimeoutError:
+                    pass
+                self._wake.clear()
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                logger.exception("auto_tess: run loop error, backing off")
+                await asyncio.sleep(self.error_delay)
+
+    # ----------------------------------------------------------------- listener
+
+    async def _listen_loop(self) -> None:
+        def _on_notify(*_args):
+            self._wake.set()
+
+        while not self._shutdown:
+            try:
+                async with self.pool.acquire() as conn:
+                    await conn.add_listener(_NOTIFY_CHANNEL, _on_notify)
+                    try:
+                        while not self._shutdown:
+                            # Keep the connection checked-out so the LISTEN
+                            # stays active; asyncpg fires callbacks on this
+                            # connection's read path. Sleep in long chunks
+                            # rather than busy-wait.
+                            await asyncio.sleep(3600)
+                    finally:
+                        try:
+                            await conn.remove_listener(_NOTIFY_CHANNEL, _on_notify)
+                        except Exception:
+                            pass
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                logger.exception("auto_tess: listener error, reconnecting in 5s")
+                await asyncio.sleep(5.0)
+
+    # ------------------------------------------------------------- recovery
+
+    async def _recover_stuck_jobs(self) -> None:
+        try:
+            await self.pool.execute(
+                f"""
+                UPDATE step_tessellation_jobs
+                SET status = 'queued', started_at = NULL
+                WHERE status = 'running'
+                  AND started_at IS NOT NULL
+                  AND started_at < now() - interval '{int(_STUCK_RUNNING_RECOVERY_SECONDS)} seconds'
+                """,
+            )
+        except Exception:
+            logger.exception("auto_tess: stuck-job recovery failed")
+
+    # ------------------------------------------------------------- core work
 
     async def run_one(self) -> bool:
-        """
-        Attempt to claim and process one tessellation job.
-
-        Returns True if a job was found and processed (or failed), False if
-        no jobs were available.
-        """
         async with self.pool.acquire() as conn:
             async with conn.transaction():
                 row = await conn.fetchrow(
@@ -89,10 +195,7 @@ class AutoTessWorker(BaseWorker):
                     SELECT j.id, j.file_id, f.project_id, f.storage_key, j.input_spec
                     FROM step_tessellation_jobs j
                     JOIN files f ON f.id = j.file_id
-                    JOIN projects p ON p.id = f.project_id
-                    JOIN workspaces w ON w.id = p.workspace_id
                     WHERE j.status = 'queued'
-                      AND w.tier = 'cloud'
                       AND f.deleted_at IS NULL
                     ORDER BY j.created_at ASC
                     FOR UPDATE OF j SKIP LOCKED
@@ -102,17 +205,17 @@ class AutoTessWorker(BaseWorker):
                 if row is None:
                     return False
 
-                job_id: str = row["id"]
-                file_id: str = row["file_id"]
-                storage_key: str = row["storage_key"]
+                job_id = row["id"]
+                file_id = row["file_id"]
+                storage_key: Optional[str] = row["storage_key"]
                 input_spec_raw = row["input_spec"]
 
                 if not storage_key:
                     await conn.execute(
                         """
                         UPDATE step_tessellation_jobs
-                        SET status = 'error', error = 'file has no storage_key',
-                            finished_at = now()
+                        SET status='error', error='file has no storage_key',
+                            finished_at=now()
                         WHERE id = $1
                         """,
                         job_id,
@@ -122,96 +225,224 @@ class AutoTessWorker(BaseWorker):
                 await conn.execute(
                     """
                     UPDATE step_tessellation_jobs
-                    SET status = 'running', started_at = now()
+                    SET status='running', started_at=now(), error=NULL
                     WHERE id = $1
                     """,
                     job_id,
                 )
 
-        logger.info(f"auto_tess: claimed job={job_id} file={file_id}")
-
-        input_spec = TessInputSpec.from_dict(
+        spec = TessInputSpec.from_dict(
             input_spec_raw if isinstance(input_spec_raw, dict)
-            else json.loads(input_spec_raw) if input_spec_raw else {}
+            else (json.loads(input_spec_raw) if input_spec_raw else {})
         )
 
-        # Download the STEP file from storage.
-        storage = self.storage_getter()
-        try:
-            rc = await storage.get(storage_key)
-            step_bytes = await rc.read()
-            await rc.close()
-        except Exception as e:
-            logger.error(f"auto_tess: download step failed (job={job_id}): {e}")
-            await self.mark_error("step_tessellation_jobs", job_id, f"download step: {e}")
-            return True
-
-        if not step_bytes:
-            await self.mark_error("step_tessellation_jobs", job_id, "empty step file")
-            return True
-
-        # Run tessellation via pyworker.
-        try:
-            async with asyncio.timeout(self.timeout):
-                result = await self.driver.run_tess(step_bytes, input_spec)
-        except asyncio.TimeoutError:
-            await self.mark_error("step_tessellation_jobs", job_id, "tessellation timeout")
-            return True
-        except Exception as e:
-            logger.error(f"auto_tess: job={job_id} tess failed: {e}")
-            await self.mark_error("step_tessellation_jobs", job_id, str(e))
-            return True
-
-        # Persist result and update files.mesh_storage_key.
-        mesh_key = result.output_key or ""
-        try:
-            async with self.pool.acquire() as conn:
-                async with conn.transaction():
-                    await conn.execute(
-                        """
-                        UPDATE step_tessellation_jobs
-                        SET status = 'done', mesh_storage_key = $2,
-                            finished_at = now(), error = null
-                        WHERE id = $1
-                        """,
-                        job_id,
-                        mesh_key,
-                    )
-                    if mesh_key:
-                        await conn.execute(
-                            "UPDATE files SET mesh_storage_key = $2 WHERE id = $1",
-                            file_id,
-                            mesh_key,
-                        )
-        except Exception as e:
-            logger.exception(f"auto_tess: mark-done failed (job={job_id}): {e}")
-            await self.mark_error("step_tessellation_jobs", job_id, f"mark done: {e}")
-            return True
-
-        logger.info(f"auto_tess: job={job_id} file={file_id} done mesh={mesh_key}")
+        t0 = time.monotonic()
+        await self._process(job_id=job_id, file_id=file_id, storage_key=storage_key, spec=spec, t0=t0)
         return True
 
-    # -------------------------------------------------------------------------
-    # PG LISTEN/NOTIFY helpers
-    # -------------------------------------------------------------------------
+    async def _process(
+        self,
+        *,
+        job_id,
+        file_id,
+        storage_key: str,
+        spec: TessInputSpec,
+        t0: float,
+    ) -> None:
+        storage = self.storage_getter()
+        try:
+            step_bytes = await _read_storage(storage, storage_key)
+        except FileNotFoundError as e:
+            await self._fail(job_id, file_id, f"storage missing: {e}", t0)
+            return
+        except Exception as e:
+            logger.exception("auto_tess: download step failed (job=%s)", job_id)
+            await self._fail(job_id, file_id, f"download step: {e}", t0)
+            return
 
-    async def _listen_notify(self) -> None:
-        """
-        Coroutine that listens for PG NOTIFY events on the ``step_file_uploaded``
-        channel on a dedicated connection. When a notification is received,
-        ``_notify_event.set()`` is called to wake up the worker loop.
-        """
-        while not self._shutdown:
+        if not step_bytes:
+            await self._fail(job_id, file_id, "empty step file", t0)
+            return
+
+        sha256_hex = hashlib.sha256(step_bytes).hexdigest()
+
+        cached = await self._reuse_cached_artifact(file_id, sha256_hex)
+        if cached:
+            await self._mark_done(
+                job_id=job_id,
+                file_id=file_id,
+                content_sha256=sha256_hex,
+                mesh_storage_key=cached,
+            )
+            duration_ms = int((time.monotonic() - t0) * 1000)
+            logger.info(
+                "auto_tess job_id=%s file_id=%s status=done cached=1 "
+                "sha256=%s mesh_key=%s duration_ms=%d",
+                job_id, file_id, sha256_hex[:12], cached, duration_ms,
+            )
+            return
+
+        try:
+            async with asyncio.timeout(self.timeout):
+                glb_bytes = await self.driver.tessellate(step_bytes, spec)
+        except asyncio.TimeoutError:
+            await self._fail(job_id, file_id, "tessellation timeout", t0)
+            return
+        except Exception as e:
+            logger.exception("auto_tess: tess failed (job=%s)", job_id)
+            await self._fail(job_id, file_id, str(e), t0)
+            return
+
+        if not glb_bytes:
+            await self._fail(job_id, file_id, "tessellator produced empty mesh", t0)
+            return
+
+        mesh_key = f"meshes/step/{sha256_hex}.glb"
+        try:
+            await _write_storage(storage, mesh_key, glb_bytes)
+        except Exception as e:
+            logger.exception("auto_tess: mesh put failed (job=%s)", job_id)
+            await self._fail(job_id, file_id, f"mesh put: {e}", t0)
+            return
+
+        try:
+            await self._persist_artifact(
+                file_id=file_id,
+                content_sha256=sha256_hex,
+                payload=glb_bytes,
+            )
+        except Exception:
+            # Artifact cache miss isn't fatal — the mesh is in storage and the
+            # job row will still link the file via mesh_storage_key. Log loud.
+            logger.exception("auto_tess: derived_artifact upsert failed (job=%s)", job_id)
+
+        await self._mark_done(
+            job_id=job_id,
+            file_id=file_id,
+            content_sha256=sha256_hex,
+            mesh_storage_key=mesh_key,
+        )
+
+        duration_ms = int((time.monotonic() - t0) * 1000)
+        logger.info(
+            "auto_tess job_id=%s file_id=%s status=done cached=0 "
+            "sha256=%s mesh_key=%s mesh_size=%d duration_ms=%d",
+            job_id, file_id, sha256_hex[:12], mesh_key, len(glb_bytes), duration_ms,
+        )
+
+    # ----------------------------------------------------------- db helpers
+
+    async def _reuse_cached_artifact(self, file_id, content_sha256: str) -> Optional[str]:
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT id FROM derived_artifacts
+                WHERE source_file_id = $1
+                  AND content_sha256 = $2
+                  AND derived_kind = 'step_mesh'
+                """,
+                file_id,
+                content_sha256,
+            )
+            if not row:
+                return None
+            await conn.execute(
+                "UPDATE derived_artifacts SET last_accessed_at = now() WHERE id = $1",
+                row["id"],
+            )
+        return f"meshes/step/{content_sha256}.glb"
+
+    async def _persist_artifact(self, *, file_id, content_sha256: str, payload: bytes) -> None:
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO derived_artifacts
+                    (source_file_id, content_sha256, derived_kind, payload, payload_size_bytes)
+                VALUES ($1, $2, 'step_mesh', $3, $4)
+                ON CONFLICT (source_file_id, content_sha256, derived_kind)
+                DO UPDATE SET last_accessed_at = now()
+                """,
+                file_id,
+                content_sha256,
+                payload,
+                len(payload),
+            )
+
+    async def _mark_done(
+        self,
+        *,
+        job_id,
+        file_id,
+        content_sha256: str,
+        mesh_storage_key: str,
+    ) -> None:
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                await conn.execute(
+                    """
+                    UPDATE step_tessellation_jobs
+                    SET status='done', mesh_storage_key=$2, content_sha256=$3,
+                        finished_at=now(), error=NULL
+                    WHERE id = $1
+                    """,
+                    job_id,
+                    mesh_storage_key,
+                    content_sha256,
+                )
+                await conn.execute(
+                    "UPDATE files SET mesh_storage_key = $2 WHERE id = $1",
+                    file_id,
+                    mesh_storage_key,
+                )
+
+    async def _fail(self, job_id, file_id, error: str, t0: float) -> None:
+        truncated = error[:800] if len(error) > 800 else error
+        try:
+            await self.pool.execute(
+                """
+                UPDATE step_tessellation_jobs
+                SET status='error', error=$2, finished_at=now()
+                WHERE id = $1
+                """,
+                job_id,
+                truncated,
+            )
+        except Exception:
+            logger.exception("auto_tess: failed to mark error (job=%s)", job_id)
+        duration_ms = int((time.monotonic() - t0) * 1000)
+        logger.warning(
+            "auto_tess job_id=%s file_id=%s status=error duration_ms=%d error=%s",
+            job_id, file_id, duration_ms, truncated,
+        )
+
+
+# -------------------------------------------------------------- storage helpers
+
+
+async def _read_storage(storage, key: str) -> bytes:
+    """Read all bytes from a Storage backend.
+
+    Storage.get returns ``(reader, content_type)`` with a sync file-like reader.
+    """
+    handle = await storage.get(key)
+    if isinstance(handle, tuple):
+        reader = handle[0]
+    else:
+        reader = handle
+    try:
+        data = reader.read()
+        if asyncio.iscoroutine(data):
+            data = await data
+        return data
+    finally:
+        close = getattr(reader, "close", None)
+        if callable(close):
             try:
-                async with self.pool.acquire() as conn:
-                    await conn.add_listener(
-                        "step_file_uploaded",
-                        lambda *args: self._notify_event.set(),
-                    )
-                    await self._notify_event.wait()
-                    self._notify_event.clear()
-            except asyncio.CancelledError:
-                break
+                close()
             except Exception:
-                logger.exception("auto_tess: listen_notify error, retrying in 5s")
-                await asyncio.sleep(5.0)
+                pass
+
+
+async def _write_storage(storage, key: str, payload: bytes) -> None:
+    import io
+    await storage.put(key, io.BytesIO(payload), "model/gltf-binary", len(payload))

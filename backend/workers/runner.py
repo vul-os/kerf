@@ -9,6 +9,7 @@ import asyncpg
 from workers.fem_worker import FEMWorker
 from workers.spice_worker import SPICEWorker
 from workers.tess_worker import TessWorker
+from workers.auto_tess_worker import AutoTessWorker
 from workers.cam_worker import CAMWorker
 
 logger = logging.getLogger(__name__)
@@ -35,10 +36,12 @@ async def start_all_workers(
     sim_count: int = 1,
     tess_count: int = 1,
     cam_count: int = 0,
+    auto_tess_count: int = 0,
     fem_timeout: int = 300,
     sim_timeout: int = 300,
     tess_timeout: int = 300,
     cam_timeout: int = 300,
+    auto_tess_timeout: int = 300,
 ):
     pyworker_url = os.getenv("PYWORKER_URL", "http://localhost:8090")
 
@@ -85,6 +88,16 @@ async def start_all_workers(
                 storage_getter=storage_getter,
                 pyworker_url=pyworker_url,
                 timeout=cam_timeout,
+            )
+        )
+
+    for i in range(auto_tess_count):
+        workers.append(
+            AutoTessWorker(
+                pool=pool,
+                storage_getter=storage_getter,
+                pyworker_url=pyworker_url,
+                timeout=auto_tess_timeout,
             )
         )
 

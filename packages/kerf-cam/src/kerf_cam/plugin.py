@@ -47,6 +47,18 @@ async def register(app: FastAPI, ctx):
     ctx.tools.register("cam_run", cam_run_spec, run_cam_run)
     ctx.tools.register("cam_job_status", cam_job_status_spec, run_cam_job_status)
 
+    # Tool database LLM tools (T7)
+    from kerf_cam.tools.tool_db import (
+        create_tool_spec, run_create_tool,
+        update_tool_spec, run_update_tool,
+        delete_tool_spec, run_delete_tool,
+        list_tools_llm_spec, run_list_tools,
+    )
+    ctx.tools.register("create_tool", create_tool_spec, run_create_tool)
+    ctx.tools.register("update_tool", update_tool_spec, run_update_tool)
+    ctx.tools.register("delete_tool", delete_tool_spec, run_delete_tool)
+    ctx.tools.register("list_tools", list_tools_llm_spec, run_list_tools)
+
     # Register background worker as a factory — WorkerRegistry.start_all()
     # calls `await factory()` and expects an awaitable returning the worker.
     from kerf_cam.worker import CAMWorker

@@ -42,7 +42,10 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from kerf_cam.tool_db import Tool
 
 
 # ---------------------------------------------------------------------------
@@ -86,6 +89,21 @@ class PostOpts:
     machine_kinematic: str = "head_table"   # "head_table" | "table_table" | "head_head"
     no_n_numbers: bool = False
     coolant: str = "flood"                  # "flood" | "mist" | "off"
+
+    # Optional resolved tool — when set, post-processors emit a tool-comment
+    # line and fall back to the tool's feeds/speeds when not explicitly overridden.
+    tool: Optional["Tool"] = field(default=None, repr=False)
+
+    def apply_tool_defaults(self) -> None:
+        """If a Tool is attached, apply its feeds/rpm as defaults (no-op if fields
+        were explicitly set to non-default values by the caller)."""
+        if self.tool is None:
+            return
+        t = self.tool
+        if self.feed_cut_mm_min == 1000.0 and t.feed_rate_mm_min is not None:
+            self.feed_cut_mm_min = t.feed_rate_mm_min
+        if self.spindle_rpm == 12000 and t.effective_spindle_rpm is not None:
+            self.spindle_rpm = int(t.effective_spindle_rpm)
 
 
 # ---------------------------------------------------------------------------
@@ -165,6 +183,9 @@ def emit_gcode_constant_tilt(
     """
     if opts is None:
         opts = PostOpts()
+
+    # Apply tool defaults before resolving feeds.
+    opts.apply_tool_defaults()
 
     if opts.machine_kinematic not in ("head_table",):
         raise NotImplementedError(

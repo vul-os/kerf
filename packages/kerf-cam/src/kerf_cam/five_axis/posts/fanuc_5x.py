@@ -70,6 +70,9 @@ def emit(
     lines.append(f"{_n()}(MACHINE KINEMATIC: {opts.machine_kinematic.upper()})")
     tcp_note = "G43.4 RTCP ENABLED" if opts.use_tcp else "TOOL-TIP COORDS - MACHINE HANDLES RTCP"
     lines.append(f"{_n()}(TCP MODE: {tcp_note})")
+    if opts.tool is not None:
+        fanuc_tool_comment = opts.tool.to_comment().upper()
+        lines.append(f"{_n()}({fanuc_tool_comment})")
     lines.append(f"{_n()}G90 G94 G17 G21")
     lines.append(f"{_n()}G54")
     lines.append(f"{_n()}M6 T{opts.tool_number}")

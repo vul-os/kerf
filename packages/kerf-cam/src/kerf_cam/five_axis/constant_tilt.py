@@ -87,7 +87,7 @@ def _add(a: tuple, b: tuple, scale: float = 1.0) -> tuple:
 # Public entry point
 # ---------------------------------------------------------------------------
 
-def run_constant_tilt(spec: dict[str, Any]) -> dict[str, Any]:
+def run_constant_tilt(spec: dict[str, Any], pool=None) -> dict[str, Any]:
     """Compute constant-tilt finishing CL points for *spec*.
 
     Spec keys
@@ -96,18 +96,49 @@ def run_constant_tilt(spec: dict[str, Any]) -> dict[str, Any]:
     drive_face_id   : int   — zero-based face index (from TopExp_Explorer walk).
     tilt_deg        : float — tool axis tilt off surface normal (°); 0–30.
     step_over_mm    : float — iso-curve spacing and row step-over (mm).
-    ball_radius_mm  : float — ball-end mill radius (mm).
+    ball_radius_mm  : float — ball-end mill radius (mm).  Mutually exclusive with
+                              tool_id.
+    tool_id         : str   — (optional) id of a .tool file in the project.
+                              When given, ball_radius_mm is taken from the tool.
+                              Requires pool + project_id to be set.
+    project_id      : str   — (optional) project id, required when tool_id is given.
     tool_length_mm  : float — (informational; not used in tip math — T5/T6 job).
     lead_deg        : float — (optional) additional lead/lag tilt along path, default 0.
 
+    When both ball_radius_mm and tool_id are given, the explicit ball_radius_mm
+    takes precedence (backwards compat).
+
     Returns a CAMResult dict (see module docstring).
     """
+    import asyncio
+
     brep_path = spec["brep_path"]
     face_id = int(spec.get("drive_face_id", 0))
     tilt_deg = float(spec.get("tilt_deg", 0.0))
     step_over_mm = float(spec.get("step_over_mm", 1.0))
-    ball_r = float(spec.get("ball_radius_mm", 1.5))
     lead_deg = float(spec.get("lead_deg", 0.0))
+
+    # Resolve ball radius: explicit > tool_id lookup > default.
+    tool_obj = None
+    tool_id = spec.get("tool_id")
+    if "ball_radius_mm" in spec and spec["ball_radius_mm"] is not None:
+        ball_r = float(spec["ball_radius_mm"])
+    elif tool_id and pool is not None:
+        project_id = spec.get("project_id", "")
+        from kerf_cam.tool_db import load_tool
+        try:
+            loop = asyncio.get_event_loop()
+            tool_obj = loop.run_until_complete(load_tool(pool, project_id, tool_id))
+            ball_r = tool_obj.effective_ball_radius
+        except Exception as exc:
+            return {
+                "cl_points": [],
+                "warnings": [],
+                "skipped_uv": 0,
+                "errors": [f"Failed to load tool {tool_id!r}: {exc}"],
+            }
+    else:
+        ball_r = float(spec.get("ball_radius_mm", 1.5))
 
     if tilt_deg < 0 or tilt_deg > 30:
         return {
@@ -178,8 +209,11 @@ def run_constant_tilt(spec: dict[str, Any]) -> dict[str, Any]:
             "Verify the toolpath visually before machining."
         )
 
-    return {
+    result: dict[str, Any] = {
         "cl_points": cl_points,
         "warnings": warnings,
         "skipped_uv": skipped,
     }
+    if tool_obj is not None:
+        result["tool"] = tool_obj.to_dict()
+    return result

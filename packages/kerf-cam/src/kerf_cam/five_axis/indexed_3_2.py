@@ -223,7 +223,7 @@ def _run_sub_op(
 # Public entry point
 # ---------------------------------------------------------------------------
 
-def run_3_2_indexed(spec: dict[str, Any]) -> dict[str, Any]:
+def run_3_2_indexed(spec: dict[str, Any], pool=None) -> dict[str, Any]:
     """Compute 3+2 indexed CL points for *spec*.
 
     Spec keys
@@ -232,11 +232,15 @@ def run_3_2_indexed(spec: dict[str, Any]) -> dict[str, Any]:
     drive_face_normal  : list  — [nx, ny, nz] normal to align with +Z.
     three_axis_op      : str   — sub-op: "face" | "parallel_3d" | "waterline" |
                                  "pocket" | "contour" | "profile".
-    tool_diameter      : float — mm (default 3.0).
+    tool_diameter      : float — mm (default 3.0).  Mutually exclusive with tool_id.
+    tool_id            : str   — (optional) id of a .tool file in the project.
+                                 When given, tool_diameter is taken from the tool.
+                                 Requires pool + project_id to be set.
+    project_id         : str   — (optional) project id, required when tool_id is given.
     step_over          : float — mm (default 1.0).
     step_down          : float — mm (default 0.5).
-    feed_rate          : float — mm/min (default 1000.0).
-    spindle_rpm        : int   — (default 10000).
+    feed_rate          : float — mm/min (default 1000.0).  Overrides tool feed if set.
+    spindle_rpm        : int   — (default 10000).  Overrides tool rpm if set.
     direction          : str   — "x" | "y" for parallel_3d (default "x").
 
     Returns a CAMResult dict:
@@ -251,10 +255,52 @@ def run_3_2_indexed(spec: dict[str, Any]) -> dict[str, Any]:
     The T5/T6 post-processor will prepend a G0 A<a> C<c> positioning move
     before emitting the 3-axis G-code from these points.
     """
+    import asyncio
+
     stl_path = spec["stl_path"]
     raw_normal = spec.get("drive_face_normal", [0.0, 0.0, 1.0])
     sub_op = spec.get("three_axis_op", "face")
     warnings: list[str] = []
+
+    # Resolve tool_diameter: explicit > tool_id lookup > default.
+    tool_obj = None
+    tool_id = spec.get("tool_id")
+    if "tool_diameter" in spec and spec["tool_diameter"] is not None:
+        _tool_diameter = float(spec["tool_diameter"])
+    elif tool_id and pool is not None:
+        project_id = spec.get("project_id", "")
+        from kerf_cam.tool_db import load_tool
+        try:
+            loop = asyncio.get_event_loop()
+            tool_obj = loop.run_until_complete(load_tool(pool, project_id, tool_id))
+            _tool_diameter = tool_obj.diameter_mm
+        except Exception as exc:
+            return {
+                "cl_points": [],
+                "rotation_matrix": [],
+                "rotated_normal": [],
+                "warnings": [],
+                "errors": [f"Failed to load tool {tool_id!r}: {exc}"],
+            }
+    else:
+        _tool_diameter = float(spec.get("tool_diameter", 3.0))
+
+    # Allow tool's feeds/speeds to serve as defaults when not explicitly overridden.
+    effective_feed = spec.get("feed_rate")
+    effective_rpm = spec.get("spindle_rpm")
+    if tool_obj is not None:
+        if effective_feed is None and tool_obj.feed_rate_mm_min is not None:
+            effective_feed = tool_obj.feed_rate_mm_min
+        if effective_rpm is None and tool_obj.effective_spindle_rpm is not None:
+            effective_rpm = tool_obj.effective_spindle_rpm
+
+    # Write resolved values back into spec copy for _run_sub_op.
+    _spec_resolved = dict(spec)
+    _spec_resolved["tool_diameter"] = _tool_diameter
+    if effective_feed is not None:
+        _spec_resolved["feed_rate"] = effective_feed
+    if effective_rpm is not None:
+        _spec_resolved["spindle_rpm"] = effective_rpm
 
     # Normalise drive_face_normal.
     nx, ny, nz = float(raw_normal[0]), float(raw_normal[1]), float(raw_normal[2])
@@ -306,8 +352,8 @@ def run_3_2_indexed(spec: dict[str, Any]) -> dict[str, Any]:
             "errors": ["opencamlib not installed — cannot run 3-axis sub-op"],
         }
 
-    # Run the requested 3-axis op.
-    ocl_points = _run_sub_op(sub_op, surface, spec)
+    # Run the requested 3-axis op (use resolved spec with effective tool_diameter).
+    ocl_points = _run_sub_op(sub_op, surface, _spec_resolved)
 
     cl_points = [
         {"x": pt.x, "y": pt.y, "z": pt.z}
@@ -326,9 +372,12 @@ def run_3_2_indexed(spec: dict[str, Any]) -> dict[str, Any]:
         "before sending to machine (5-axis R7)."
     )
 
-    return {
+    result: dict[str, Any] = {
         "cl_points": cl_points,
         "rotation_matrix": R,
         "rotated_normal": [rotated_src[0], rotated_src[1], rotated_src[2]],
         "warnings": warnings,
     }
+    if tool_obj is not None:
+        result["tool"] = tool_obj.to_dict()
+    return result

@@ -386,19 +386,10 @@ function ThreeDenseMesh({ url }) {
 
     Promise.all([
       import('three'),
-      import('@react-three/fiber'),
-      import('@react-three/drei'),
+      import('three/examples/jsm/loaders/GLTFLoader.js'),
     ])
-      .then(([THREE, r3f, drei]) => {
+      .then(([THREE, { GLTFLoader }]) => {
         if (cancelled || !containerRef.current) return
-        const { Canvas, useFrame } = r3f
-        const { OrbitControls, useGLTF } = drei
-
-        function MeshScene({ gltfUrl }) {
-          const { scene } = useGLTF(gltfUrl)
-          useFrame(() => {})
-          return <primitive object={scene} />
-        }
 
         const canvas = document.createElement('canvas')
         canvas.style.width = '100%'
@@ -412,7 +403,26 @@ function ThreeDenseMesh({ url }) {
         camera.position.set(5, 5, 5)
         camera.lookAt(0, 0, 0)
 
-        sceneObj = { renderer, camera }
+        const scene = new THREE.Scene()
+        scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+        const dir = new THREE.DirectionalLight(0xffffff, 0.4)
+        dir.position.set(5, 10, 5)
+        scene.add(dir)
+
+        const loader = new GLTFLoader()
+        loader.load(url, (gltf) => {
+          if (cancelled) return
+          scene.add(gltf.scene)
+        }, undefined, (err) => console.error('GLB load error', err))
+
+        sceneObj = { renderer, camera, scene }
+
+        const animate = () => {
+          if (cancelled) return
+          renderer.render(scene, camera)
+          requestAnimationFrame(animate)
+        }
+        animate()
       })
       .catch((err) => {
         console.error('Three.js load error', err)

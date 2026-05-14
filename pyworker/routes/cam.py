@@ -56,13 +56,41 @@ try:
 except ImportError:
     pass
 
-# Gate pythonOCC — needed for STEP→STL conversion and B-rep wire extraction.
-_occ_available = False
+# Gate pythonOCC — use kerf_cad_core for shared STEP/STL helpers.
 try:
-    from OCC.Core.STEPControl import STEPControl_Reader as _STEPControl_Reader  # noqa: F401
-    _occ_available = True
+    from kerf_cad_core import _OCC_AVAILABLE as _occ_available, convert_step_to_stl
 except ImportError:
-    pass
+    # kerf_cad_core not installed — fall back to direct OCC check.
+    _occ_available = False
+    try:
+        from OCC.Core.STEPControl import STEPControl_Reader as _STEPControl_Reader  # noqa: F401
+        _occ_available = True
+    except ImportError:
+        pass
+
+    def convert_step_to_stl(step_path: str, stl_path: str, linear_deflection: float = 0.1):
+        """Inline fallback when kerf_cad_core is not installed."""
+        from OCC.Core.STEPControl import STEPControl_Reader
+        from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh
+        from OCC.Core.StlAPI import StlAPI_Writer
+        from OCC.Core.IFSelect import IFSelect_RetDone
+
+        reader = STEPControl_Reader()
+        status = reader.ReadFile(step_path)
+        if status != IFSelect_RetDone:
+            raise RuntimeError(f"STEPControl_Reader failed on {step_path} (status={status})")
+        reader.TransferRoots()
+        shape = reader.OneShape()
+        mesh = BRepMesh_IncrementalMesh(shape, linear_deflection)
+        mesh.Perform()
+        if not mesh.IsDone():
+            raise RuntimeError("BRepMesh_IncrementalMesh did not complete")
+        writer = StlAPI_Writer()
+        writer.ASCIIMode = True
+        result = writer.Write(shape, stl_path)
+        if not result:
+            raise RuntimeError(f"StlAPI_Writer failed writing {stl_path}")
+        return shape
 
 
 class CAMOperation(BaseModel):
@@ -182,38 +210,6 @@ async def run_cam(req: CAMRequest):
         "warnings": warnings,
         "errors": errors,
     }
-
-
-def convert_step_to_stl(step_path: str, stl_path: str, linear_deflection: float = 0.1):
-    """Read a STEP file with pythonOCC, write an ASCII STL, and return the OCC shape.
-
-    Returns the OCC shape so callers can reuse it for B-rep operations without
-    re-reading the file.
-    """
-    from OCC.Core.STEPControl import STEPControl_Reader
-    from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh
-    from OCC.Core.StlAPI import StlAPI_Writer
-    from OCC.Core.IFSelect import IFSelect_RetDone
-
-    reader = STEPControl_Reader()
-    status = reader.ReadFile(step_path)
-    if status != IFSelect_RetDone:
-        raise RuntimeError(f"STEPControl_Reader failed on {step_path} (status={status})")
-    reader.TransferRoots()
-    shape = reader.OneShape()
-
-    mesh = BRepMesh_IncrementalMesh(shape, linear_deflection)
-    mesh.Perform()
-    if not mesh.IsDone():
-        raise RuntimeError("BRepMesh_IncrementalMesh did not complete")
-
-    writer = StlAPI_Writer()
-    writer.ASCIIMode = True
-    result = writer.Write(shape, stl_path)
-    if not result:
-        raise RuntimeError(f"StlAPI_Writer failed writing {stl_path}")
-
-    return shape
 
 
 def extract_face_wires(occ_shape, op: "CAMOperation") -> List[List[tuple]]:

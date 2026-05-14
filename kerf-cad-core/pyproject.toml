@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kerf-cad-core"
+version = "0.1.0"
+description = "Shared pythonOCC base layer for Kerf CAD compute plugins"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.111",
+]
+
+[project.optional-dependencies]
+occ = [
+    "pythonocc-core",
+]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+]
+
+[project.entry-points."kerf.plugins"]
+cad-core = "kerf_cad_core.plugin:register"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kerf_cad_core"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

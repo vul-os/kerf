@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kerf-tess"
+version = "0.1.0"
+description = "Server-side STEP tessellation worker for Kerf"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.111",
+    "asyncpg>=0.29",
+    "aiohttp>=3.9",
+    "kerf-cad-core",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+]
+
+[project.entry-points."kerf.plugins"]
+tess = "kerf_tess.plugin:register"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kerf_tess"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

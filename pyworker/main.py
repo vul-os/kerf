@@ -1,13 +1,23 @@
 from fastapi import FastAPI
 
-from pyworker.routes import fem, spice, topo, autoroute, tess, cam, ifc, import_kicad, import_kicad_library, import_freecad, rf, mates, pour, rhino3dm as rhino3dm_routes, render as render_routes
+from pyworker.routes import fem, spice, topo, autoroute, cam, ifc, import_kicad, import_kicad_library, import_freecad, rf, mates, pour, rhino3dm as rhino3dm_routes, render as render_routes
+
+# tess route migrated to kerf-tess plugin; import from new location.
+try:
+    from kerf_tess.routes import router as _tess_router
+    _tess_from_plugin = True
+except ImportError:
+    # Fallback: kerf-tess not installed — route will be absent.
+    _tess_router = None
+    _tess_from_plugin = False
 
 app = FastAPI()
 
 app.include_router(fem.router, prefix="", tags=["fem"])
 app.include_router(spice.router, prefix="", tags=["spice"])
 app.include_router(topo.router, prefix="", tags=["topo"])
-app.include_router(tess.router, prefix="", tags=["tess"])
+if _tess_router is not None:
+    app.include_router(_tess_router, prefix="", tags=["tess"])
 app.include_router(cam.router, prefix="", tags=["cam"])
 app.include_router(ifc.router, prefix="", tags=["ifc"])
 app.include_router(import_kicad.router, prefix="", tags=["import"])

@@ -216,6 +216,14 @@ export default function Settings() {
           </div>
         </section>
 
+        {/* About */}
+        <section>
+          <h2 className="text-sm font-semibold text-ink-100 mb-1">About</h2>
+          <div className="text-xs text-ink-400 space-y-1 max-w-md">
+            <Row k="Kerf version" v={`v${__APP_VERSION__}`} />
+          </div>
+        </section>
+
         {/* Danger zone */}
         <section className="border border-red-400/30 rounded-md p-4 bg-red-400/5">
           <h2 className="text-sm font-semibold text-red-300 mb-1 flex items-center gap-2">

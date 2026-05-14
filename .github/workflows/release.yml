@@ -1,0 +1,141 @@
+# Kerf release workflow
+#
+# Triggered by pushing a version tag (v*) — but NOT sdk-v* tags (those
+# trigger packages/kerf-sdk/.github/workflows/publish.yml instead).
+#
+# What this does:
+#   1. Builds a Docker image for each persona (full, mech, electronics, bim)
+#      using the repo-root Dockerfile and the KERF_PERSONA build-arg.
+#   2. Pushes to GitHub Container Registry (ghcr.io/kerf-sh/kerf).
+#      :latest and :<version> point to the "full" persona.
+#      :<version>-mech / -electronics / -bim are the persona variants.
+#   3. Creates a GitHub Release with auto-generated notes from commits since
+#      the previous v* tag.
+#
+# Usage:
+#   git tag v0.2.0 && git push origin v0.2.0
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*'        # matches v0.1.0, v1.2.3, …
+      - '!sdk-v*'        # tag-filter exclusion (belt-and-suspenders — the
+                          # sdk workflow only fires on sdk-v* anyway)
+
+permissions:
+  contents: write      # create GitHub Release
+  packages: write      # push to ghcr.io
+
+jobs:
+  release:
+    name: Build, push, and release
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        persona:
+          - full
+          - mech
+          - electronics
+          - bim
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # needed so `gh release create --generate-notes`
+                           # can walk commits back to the previous tag
+
+      # Strip the leading 'v' for Docker tags (v0.1.0 → 0.1.0)
+      - name: Derive version string
+        id: ver
+        run: |
+          RAW="${GITHUB_REF_NAME}"          # e.g. v0.1.0
+          VERSION="${RAW#v}"                # e.g. 0.1.0
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${RAW}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ── Persona-specific image ──────────────────────────────────────────
+      # Every persona gets a :<version>-<persona> tag.
+      # The "full" persona additionally gets :<version> and :latest.
+      - name: Build and push (${{ matrix.persona }})
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: |
+            KERF_PERSONA=${{ matrix.persona }}
+          tags: |
+            ghcr.io/kerf-sh/kerf:${{ steps.ver.outputs.version }}-${{ matrix.persona }}
+          cache-from: type=gha,scope=${{ matrix.persona }}
+          cache-to:   type=gha,mode=max,scope=${{ matrix.persona }}
+
+      # ── Canonical tags for "full" only ─────────────────────────────────
+      - name: Tag full persona as :version and :latest
+        if: matrix.persona == 'full'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: |
+            KERF_PERSONA=full
+          tags: |
+            ghcr.io/kerf-sh/kerf:${{ steps.ver.outputs.version }}
+            ghcr.io/kerf-sh/kerf:latest
+          cache-from: type=gha,scope=full
+          cache-to:   type=gha,mode=max,scope=full
+
+      # ── GitHub Release (only once — run in the "full" matrix leg) ──────
+      - name: Create GitHub Release
+        if: matrix.persona == 'full'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.ver.outputs.version }}"
+          TAG="${{ steps.ver.outputs.tag }}"
+
+          gh release create "$TAG" \
+            --generate-notes \
+            --title "Kerf ${TAG}" \
+            --notes-start-tag "$(git tag --sort=-version:refname | grep '^v' | grep -v "^${TAG}$" | head -1 || echo '')" \
+            --notes "## Container image
+
+          Pull the full persona:
+          \`\`\`
+          docker pull ghcr.io/kerf-sh/kerf:${VERSION}
+          \`\`\`
+
+          Run it:
+          \`\`\`
+          docker run -e KERF_DATABASE_URL=postgres://user:pass@host/kerf \\
+                     -e KERF_CONFIG=/etc/kerf/config.toml \\
+                     -p 8080:8080 \\
+                     ghcr.io/kerf-sh/kerf:${VERSION}
+          \`\`\`
+
+          **Persona variants:**
+          | Tag | Persona |
+          |-----|---------|
+          | \`ghcr.io/kerf-sh/kerf:${VERSION}\` | full (everything) |
+          | \`ghcr.io/kerf-sh/kerf:${VERSION}-mech\` | mechanical CAD stack |
+          | \`ghcr.io/kerf-sh/kerf:${VERSION}-electronics\` | EDA / PCB stack |
+          | \`ghcr.io/kerf-sh/kerf:${VERSION}-bim\` | BIM stack |
+
+          See [docs/capabilities.md](https://github.com/kerf-sh/kerf/blob/main/docs/capabilities.md) for what each persona includes.
+          " 2>/dev/null || true
+          # `|| true` so a duplicate-release error on re-run doesn't fail CI.
+          # `gh release create --generate-notes` appends auto-generated commit
+          # notes on top of the manual body above.

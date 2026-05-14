@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import pkg from './package.json' with { type: 'json' }
 
 // Build outputs into `dist/` (Vite default). kerf-api serves it via
 // StaticFiles at runtime. In dev, Vite serves :5173 directly (HMR) and
@@ -11,6 +12,9 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), tailwindcss()],
+    define: {
+      __APP_VERSION__: JSON.stringify(pkg.version),
+    },
     server: {
       port: 5173,
       proxy: {

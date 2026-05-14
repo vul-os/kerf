@@ -179,13 +179,18 @@ def _discover_entry_points() -> dict[str, Any]:
 
 
 def _mount_health(app: FastAPI) -> None:
+    try:
+        _kerf_version = importlib.metadata.version("kerf-core")
+    except importlib.metadata.PackageNotFoundError:
+        _kerf_version = "0.1.0"
+
     @app.get("/health", tags=["health"])
     async def health() -> dict:
-        return {"status": "ok"}
+        return {"status": "ok", "version": _kerf_version}
 
     @app.get("/healthz", tags=["health"])
     async def healthz() -> dict:
-        return {"status": "ok"}
+        return {"status": "ok", "version": _kerf_version}
 
     @app.get("/health/capabilities", tags=["health"])
     async def capabilities() -> JSONResponse:
@@ -204,6 +209,7 @@ def _mount_health(app: FastAPI) -> None:
             )
         return JSONResponse(
             {
+                "version": _kerf_version,
                 "plugins": plugins_data,
                 "capabilities": sorted(all_caps),
             }

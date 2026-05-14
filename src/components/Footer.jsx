@@ -130,6 +130,12 @@ export default function Footer() {
               <span className="text-base leading-none" aria-hidden>🇿🇦</span>
               <span>Built in South Africa</span>
             </span>
+
+            <span className="hidden sm:inline text-ink-700">·</span>
+
+            <span className="font-mono text-[11px] text-ink-600" title="Kerf version">
+              v{__APP_VERSION__}
+            </span>
           </div>
         </div>
       </div>

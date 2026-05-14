@@ -142,4 +142,4 @@ game for an OSS PR; anything under `packages/kerf-billing/` or
 
 Bug reports → GitHub Issues. Feature discussions → GitHub Discussions.
 
-Next: [architecture.md](./architecture.md) · [capabilities.md](./capabilities.md)
+Next: [architecture.md](./architecture.md) · [capabilities.md](./capabilities.md) · [releasing.md](./releasing.md)

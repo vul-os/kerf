@@ -2105,6 +2105,144 @@ function opToSolid(oc, prev, node, _sketches, tracker) {
 }
 
 // ---------------------------------------------------------------------------
+// NURBS booleans v1 — T4: shape-type helpers + opBoolean
+// ---------------------------------------------------------------------------
+
+/**
+ * Return true if `shape` is a TopoDS_Solid (ShapeType === SOLID).
+ * Uses the numeric enum value 2 as a fallback when TopAbs_SOLID is not
+ * directly accessible on the oc object.
+ */
+function _isSolid(oc, shape) {
+  if (!shape || typeof shape.ShapeType !== 'function') return false
+  try {
+    const st = shape.ShapeType()
+    const SOLID = oc.TopAbs_ShapeEnum?.TopAbs_SOLID ?? 2
+    return st === SOLID
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Return a human-readable name for the ShapeType of `shape`.
+ * Used in error messages when a boolean receives a non-solid operand.
+ */
+function _shapeKindName(oc, shape) {
+  if (!shape || typeof shape.ShapeType !== 'function') return 'UNKNOWN'
+  try {
+    const st = shape.ShapeType()
+    const e = oc.TopAbs_ShapeEnum || {}
+    if (st === (e.TopAbs_COMPOUND  ?? 0)) return 'COMPOUND'
+    if (st === (e.TopAbs_COMPSOLID ?? 1)) return 'COMPSOLID'
+    if (st === (e.TopAbs_SOLID     ?? 2)) return 'SOLID'
+    if (st === (e.TopAbs_SHELL     ?? 3)) return 'SHELL'
+    if (st === (e.TopAbs_FACE      ?? 4)) return 'FACE'
+    if (st === (e.TopAbs_WIRE      ?? 5)) return 'WIRE'
+    if (st === (e.TopAbs_EDGE      ?? 6)) return 'EDGE'
+    if (st === (e.TopAbs_VERTEX    ?? 7)) return 'VERTEX'
+    return `SHAPE(${st})`
+  } catch {
+    return 'UNKNOWN'
+  }
+}
+
+/**
+ * Return true when `shape` contains no sub-shapes (degenerate boolean result).
+ * Uses TopExp_Explorer to look for at least one face; if none, the result
+ * is considered empty. Falls back to false (non-empty) on probe failure.
+ */
+function _isEmptyShape(oc, shape) {
+  if (!shape) return true
+  try {
+    const FACE  = oc.TopAbs_ShapeEnum?.TopAbs_FACE  ?? 4
+    const SHAPE = oc.TopAbs_ShapeEnum?.TopAbs_SHAPE ?? 8
+    const exp = new oc.TopExp_Explorer_2(shape, FACE, SHAPE)
+    const empty = !exp.More()
+    try { exp.delete() } catch { /* */ }
+    return empty
+  } catch {
+    return false
+  }
+}
+
+/**
+ * opBoolean — NURBS booleans v1 T4.
+ *
+ * Performs BRepAlgoAPI_Cut / Fuse / Common between two bodies looked up by
+ * id in `bodyMap`. Both operands must be TopoDS_Solid; if either is a surface
+ * body (face / shell) the op throws with a hint to run feature_to_solid first.
+ *
+ * Fallback path 3: if BRepAlgoAPI_Common_3 is absent we compute
+ *   A ∩ B = A − (A − B)
+ * via two successive Cuts (a Boolean identity).
+ *
+ * Node schema:
+ *   { op: "boolean", id, target_a_id, target_b_id, kind: "cut"|"fuse"|"common" }
+ */
+function opBoolean(oc, _prev, node, _sketches, tracker, bodyMap) {
+  const aId = node.target_a_id
+  const bId = node.target_b_id
+  if (!aId) throw new Error('boolean: target_a_id is required')
+  if (!bId) throw new Error('boolean: target_b_id is required')
+
+  const a = bodyMap && bodyMap[aId]
+  const b = bodyMap && bodyMap[bId]
+  if (!a) throw new Error(`boolean: target_a '${aId}' not found in evaluated tree`)
+  if (!b) throw new Error(`boolean: target_b '${bId}' not found in evaluated tree`)
+
+  // Operands must be solids — surface bodies need feature_to_solid first.
+  if (!_isSolid(oc, a)) {
+    const kind = _shapeKindName(oc, a)
+    throw new Error(
+      `boolean: target_a is a ${kind}, not a solid — run feature_to_solid on '${aId}' first`
+    )
+  }
+  if (!_isSolid(oc, b)) {
+    const kind = _shapeKindName(oc, b)
+    throw new Error(
+      `boolean: target_b is a ${kind}, not a solid — run feature_to_solid on '${bId}' first`
+    )
+  }
+
+  const pr = () => new oc.Message_ProgressRange_1()
+
+  let algo
+  switch (node.kind) {
+    case 'cut':
+      algo = track(tracker, new oc.BRepAlgoAPI_Cut_3(a, b, pr()))
+      break
+    case 'fuse':
+      algo = track(tracker, new oc.BRepAlgoAPI_Fuse_3(a, b, pr()))
+      break
+    case 'common':
+      if (typeof oc.BRepAlgoAPI_Common_3 !== 'function') {
+        // Fallback path 3: A ∩ B = A − (A − B)
+        const inner = track(tracker, new oc.BRepAlgoAPI_Cut_3(a, b, pr()))
+        inner.Build(pr())
+        if (!inner.IsDone()) throw new Error('boolean: common-via-cut inner step failed')
+        algo = track(tracker, new oc.BRepAlgoAPI_Cut_3(a, inner.Shape(), pr()))
+      } else {
+        algo = track(tracker, new oc.BRepAlgoAPI_Common_3(a, b, pr()))
+      }
+      break
+    default:
+      throw new Error(`boolean: unknown kind '${node.kind}' (expected cut|fuse|common)`)
+  }
+
+  algo.Build(pr())
+  if (!algo.IsDone()) throw new Error(`boolean: ${node.kind} algorithm failed (BOPAlgo error)`)
+
+  const result = algo.Shape()
+  if (_isEmptyShape(oc, result)) {
+    throw new Error(
+      `boolean: ${node.kind} produced an empty result (operands may not intersect)`
+    )
+  }
+  return result
+}
+
+// ---------------------------------------------------------------------------
 // Tree evaluation.
 //
 // The evaluator walks the feature tree top-to-bottom, threading the
@@ -2129,6 +2267,10 @@ function evaluateTree(oc, tree, sketches) {
   // to compute the faceNames map.  Carries over through in-place ops
   // (pocket/fillet/chamfer/…) so the final mesh still gets names.
   let currentFaceNamer = null
+  // bodyMap: { [nodeId]: TopoDS_Shape } — populated after every op so that
+  // opBoolean and opToSolid can look up arbitrary earlier results by id.
+  // Entries are ALIASES of the in-flight `current`; never double-free them.
+  const bodyMap = {}
 
   // Helper: push the current shape as a mesh entry, including faceNames.
   function pushCurrentMesh(bodyId) {
@@ -2334,6 +2476,18 @@ function evaluateTree(oc, tree, sketches) {
           // which routes it through the worker error envelope.
           next = opToSolid(oc, current, node, sketches, tracker)
           break
+        case 'boolean': {
+          // boolean is a new body: finalize the previous body first so it
+          // gets its own mesh entry, then produce the boolean result.
+          if (current) {
+            pushCurrentMesh(`body-${meshes.length}`)
+            cleanupShape(oc, current)
+            current = null
+          }
+          next = opBoolean(oc, null, node, sketches, tracker, bodyMap)
+          currentFaceNamer = null
+          break
+        }
         default:
           throw new Error(`unknown feature op '${node.op}'`)
       }
@@ -2349,6 +2503,9 @@ function evaluateTree(oc, tree, sketches) {
     if (current && current !== next) cleanupShape(oc, current)
     current = next
     currentTrack = next
+    // Populate bodyMap so later ops (boolean, to_solid-with-target) can look
+    // up this node's result by id. Stored as alias — never delete here.
+    if (node.id && next) bodyMap[node.id] = next
   }
   if (current) {
     pushCurrentMesh(`body-${meshes.length}`)
@@ -2377,6 +2534,8 @@ async function evaluateToFinalShape(oc, tree, sketches) {
   const tracker = makeTracker()
   let current = null
   let currentFaceNamer = null
+  // bodyMap mirrors evaluateTree's map so opBoolean can resolve operands by id.
+  const bodyMap = {}
   for (const raw of tree || []) {
     const node = { ...raw, _sketches: sketches }
     let next = null
@@ -2530,6 +2689,12 @@ async function evaluateToFinalShape(oc, tree, sketches) {
           next = opVariableRadiusFillet(oc, current, node, sketches, tracker); break
         case 'to_solid':
           next = opToSolid(oc, current, node, sketches, tracker); break
+        case 'boolean':
+          if (current) cleanupShape(oc, current)
+          current = null
+          next = opBoolean(oc, null, node, sketches, tracker, bodyMap)
+          currentFaceNamer = null
+          break
         default: throw new Error(`unknown feature op '${node.op}'`)
       }
     } catch {
@@ -2538,6 +2703,8 @@ async function evaluateToFinalShape(oc, tree, sketches) {
     }
     if (current && current !== next) cleanupShape(oc, current)
     current = next
+    // Populate bodyMap for subsequent ops that reference this node by id.
+    if (node.id && next) bodyMap[node.id] = next
   }
   freeAll(tracker)
   return { shape: current, faceNamer: currentFaceNamer }

@@ -1,5 +1,5 @@
 import numpy as np
-from geom.nurbs import NurbsCurve, NurbsSurface
+from kerf_cad_core.geom.nurbs import NurbsCurve, NurbsSurface
 
 
 def sweep1(profile: NurbsCurve, path: NurbsCurve, scale: float = 1.0) -> NurbsSurface:

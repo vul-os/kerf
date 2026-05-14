@@ -1,4 +1,6 @@
-from geom.nurbs import (
+"""NURBS surface helpers for kerf-cad-core."""
+
+from kerf_cad_core.geom.nurbs import (
     NurbsCurve,
     NurbsSurface,
     de_boor,
@@ -15,14 +17,14 @@ from geom.nurbs import (
     occt_surface_to_nurbs,
 )
 
-from geom.sweep1 import (
+from kerf_cad_core.geom.sweep1 import (
     sweep1,
     sweep1_with_twist,
     sweep1_variable_scale,
     profile_along_path,
 )
 
-from geom.sweep2 import (
+from kerf_cad_core.geom.sweep2 import (
     sweep2,
     sweep2_with_scaling,
     sweep2_with_twist,
@@ -30,7 +32,7 @@ from geom.sweep2 import (
     normalize_rails,
 )
 
-from geom.network_srf import (
+from kerf_cad_core.geom.network_srf import (
     network_srf,
     network_srf_with_compatibility,
     network_srf_global,
@@ -39,7 +41,7 @@ from geom.network_srf import (
     validate_curves_for_skinning,
 )
 
-from geom.blend_srf import (
+from kerf_cad_core.geom.blend_srf import (
     blend_srf,
     blend_srf_g1,
     blend_srf_with_curves,

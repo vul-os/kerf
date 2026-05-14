@@ -417,7 +417,7 @@ def parse_sketch_curves(sketch_content: str) -> list:
 
 
 def sketch_to_nurbs_curve(entity: dict) -> Optional["NurbsCurve"]:
-    from geom.nurbs import NurbsCurve, make_line_nurbs, make_circle_nurbs
+    from kerf_cad_core.geom.nurbs import NurbsCurve, make_line_nurbs, make_circle_nurbs
     import numpy as np
 
     etype = entity.get("type", "")

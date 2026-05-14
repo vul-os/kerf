@@ -1,8 +1,8 @@
 import json
 import unittest
 
-from geom.dsn_writer import AutorouteParams, circuit_to_dsn, _build_layer_map
-from geom.ses_reader import ses_to_routes, Route, Via, RoutingResult
+from kerf_electronics.freerouting.dsn_writer import AutorouteParams, circuit_to_dsn, _build_layer_map
+from kerf_electronics.freerouting.ses_reader import ses_to_routes, Route, Via, RoutingResult
 
 
 class TestDsnWriter(unittest.TestCase):

@@ -5,12 +5,12 @@ import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from geom.rf_analysis import (
+from kerf_electronics.geom.rf_analysis import (
     RFNetwork, vswr, return_loss, insertion_loss,
     impedance_from_s11, match_target, cascade_2ports
 )
-from geom.touchstone import read_touchstone, write_touchstone, read_touchstone_from_string
-from geom.smith_chart import smith_to_cartesian, cartesian_to_smith
+from kerf_electronics.geom.touchstone import read_touchstone, write_touchstone, read_touchstone_from_string
+from kerf_electronics.geom.smith_chart import smith_to_cartesian, cartesian_to_smith
 
 
 class TestRFNetwork(unittest.TestCase):

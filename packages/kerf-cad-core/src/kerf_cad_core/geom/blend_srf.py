@@ -1,5 +1,5 @@
 import numpy as np
-from geom.nurbs import NurbsCurve, NurbsSurface
+from kerf_cad_core.geom.nurbs import NurbsCurve, NurbsSurface
 
 
 def blend_srf(surf1: NurbsSurface, surf2: NurbsSurface,

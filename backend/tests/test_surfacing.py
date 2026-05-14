@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from geom import (
+from kerf_cad_core.geom import (
     NurbsCurve,
     NurbsSurface,
     make_line_nurbs,

@@ -20,4 +20,10 @@ _BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _BACKEND not in sys.path:
     sys.path.insert(0, _BACKEND)
 
+# Add kerf-cad-core/src so `import kerf_cad_core` resolves for surfacing tests.
+_REPO_ROOT = os.path.dirname(_BACKEND)
+_CAD_CORE_SRC = os.path.join(_REPO_ROOT, "packages", "kerf-cad-core", "src")
+if _CAD_CORE_SRC not in sys.path:
+    sys.path.insert(0, _CAD_CORE_SRC)
+
 import tools  # noqa: F401  — side-effect: locks in real package in sys.modules

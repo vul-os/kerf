@@ -1,5 +1,5 @@
 import numpy as np
-from geom.nurbs import NurbsCurve, NurbsSurface
+from kerf_cad_core.geom.nurbs import NurbsCurve, NurbsSurface
 
 
 def sweep2(profile: NurbsCurve, rail1: NurbsCurve, rail2: NurbsCurve) -> NurbsSurface:
@@ -256,7 +256,7 @@ def check_rail_compatibility(rail1: NurbsCurve, rail2: NurbsCurve) -> bool:
 
 
 def normalize_rails(rail1: NurbsCurve, rail2: NurbsCurve) -> tuple:
-    from geom.nurbs import knot_insertion
+    from kerf_cad_core.geom.nurbs import knot_insertion
 
     if not check_rail_compatibility(rail1, rail2):
         max_knots = max(len(rail1.knots), len(rail2.knots))

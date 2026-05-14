@@ -1,7 +1,7 @@
 import numpy as np
 import re
 from pathlib import Path
-from geom.rf_analysis import RFNetwork
+from kerf_electronics.geom.rf_analysis import RFNetwork
 
 
 def read_touchstone(filename: str) -> RFNetwork:

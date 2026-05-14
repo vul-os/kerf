@@ -1,5 +1,5 @@
 import numpy as np
-from geom.nurbs import NurbsCurve, NurbsSurface
+from kerf_cad_core.geom.nurbs import NurbsCurve, NurbsSurface
 
 
 def network_srf(curves: list[NurbsCurve], degree_u: int = 3) -> NurbsSurface:
@@ -40,7 +40,7 @@ def network_srf(curves: list[NurbsCurve], degree_u: int = 3) -> NurbsSurface:
 
 
 def align_knot_vectors(curves: list[NurbsCurve]) -> list[NurbsCurve]:
-    from geom.nurbs import knot_insertion
+    from kerf_cad_core.geom.nurbs import knot_insertion
 
     max_num_knots = max(len(c.knots) for c in curves)
     target_knots = np.linspace(0, 1, max_num_knots)

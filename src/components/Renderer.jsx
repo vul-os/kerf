@@ -7,6 +7,8 @@ import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
 import { geom3ToBufferGeometry, combinedBoundingBox } from '../lib/geom3.js'
 import { getTopologyLazy } from '../lib/topology.js'
 import { distance, formatDistance } from '../lib/measure.js'
+import { cullByFrustum, setUserVisible, frustumCullEnabled } from '../lib/frustumCull.js'
+import { planInstances, instancingEnabled } from '../lib/instancingPlan.js'
 
 const PALETTE = [0xc9a96b, 0x6b9bc9, 0xc96b89, 0x89c96b, 0xc9b86b, 0x9b6bc9]
 const HIGHLIGHT_EMISSIVE = 0x4d3c00 // kerf yellow tint
@@ -89,6 +91,11 @@ function Renderer({
   // (We track shift internally on click; this is just a hook for tests.)
   // Assembly extension: highlight all parts whose `componentId` matches.
   selectedComponentId = null,
+  // S2 instancing: optional array of raw assembly Component rows
+  // (from parseAssembly), containing file_id + config_id so the instancing
+  // planner can group identical parts into InstancedMesh objects.
+  // Only used when KERF_INSTANCING is on. Non-assembly callers omit this.
+  assemblyComponents = null,
 }, ref) {
   const mountRef = useRef(null)
   const stateRef = useRef(null) // holds three.js objects across renders
@@ -166,6 +173,21 @@ function Renderer({
     function loop() {
       if (!running) return
       controls.update()
+
+      // S1: frustum cull — toggle mesh.visible per frame so Three.js skips
+      // off-screen geometry in both the render call AND picking.  We only cull
+      // the meshGroup children; aux groups (edges, vertices, overlays) are
+      // small enough that their built-in frustumCulled path is sufficient.
+      const s = stateRef.current
+      if (s) {
+        const enabled = frustumCullEnabled()
+        cullByFrustum(s.meshGroup.children, camera, { enabled })
+        // InstancedMesh entries live directly in meshGroup too — Three.js
+        // already handles per-instance culling for InstancedMesh via its own
+        // frustumCulled flag, so we just let them pass through (cullByFrustum
+        // skips objects without geometry.boundingBox in a safe way).
+      }
+
       renderer.render(scene, camera)
       // Update leader-line HUD (project the midpoint to screen).
       const pos = stateRef.current?.leaderMidpoint
@@ -230,7 +252,15 @@ function Renderer({
         const visible = meshGroup.children.filter((mm) => mm.visible)
         const hits = raycaster.intersectObjects(visible, false)
         if (hits.length > 0) {
-          const id = hits[0].object.userData.id
+          const hitObj = hits[0].object
+          let id = hitObj.userData.id
+          // S2: InstancedMesh hit — map instanceId back to the Component.id
+          // so the rest of the picking pipeline (gumball, selection highlight,
+          // assembly editor) sees the same component-level id it expects.
+          if (!id && hitObj.isInstancedMesh && hitObj.userData.componentIds) {
+            const instanceId = hits[0].instanceId
+            id = hitObj.userData.componentIds[instanceId] ?? null
+          }
           setHudId(id)
           stateRef.current?.onPickRef?.(id)
         } else {
@@ -311,8 +341,82 @@ function Renderer({
     while (vertexGroup.children.length) vertexGroup.remove(vertexGroup.children[0])
 
     const entries = []
+
+    // S2: Build instancing plan when assemblyComponents is provided and the
+    // KERF_INSTANCING flag is on.  When instancing is active, identical parts
+    // are batched into a single InstancedMesh (one draw call for N copies).
+    // Singletons fall through to the regular per-Mesh path below.
+    //
+    // The plan uses assemblyComponents (raw parsed rows with file_id /
+    // config_id) for grouping.  Geometries come from the matching `parts`
+    // entries (keyed by componentId which is set by resolveAssemblyParts).
+    const useInstancing = instancingEnabled() && Array.isArray(assemblyComponents) && assemblyComponents.length > 0
+
+    // componentId → resolved {part, geometry, color, paletteIndex} for fast lookup.
+    const partByComponentId = new Map()
+    if (useInstancing) {
+      ;(parts || []).forEach((part, i) => {
+        if (!part?.geom || !part.componentId) return
+        const geometry = resolveGeometry(part.geom)
+        if (!geometry) return
+        const color = part.color != null ? part.color : PALETTE[i % PALETTE.length]
+        if (!partByComponentId.has(part.componentId)) {
+          partByComponentId.set(part.componentId, { part, geometry, color, idx: i })
+        }
+      })
+    }
+
+    // Set of componentIds handled by InstancedMesh (won't create individual Mesh for these).
+    const instancedComponentIds = new Set()
+
+    if (useInstancing) {
+      const { groups } = planInstances(assemblyComponents)
+      for (const group of groups) {
+        // Find the first componentId in this group that has a resolved geometry.
+        let templateEntry = null
+        for (const cid of group.componentIds) {
+          if (partByComponentId.has(cid)) { templateEntry = partByComponentId.get(cid); break }
+        }
+        if (!templateEntry) continue  // no geometry available for this group yet — skip
+
+        const { geometry, color } = templateEntry
+        const material = new THREE.MeshStandardMaterial({
+          color,
+          metalness: 0.15,
+          roughness: 0.55,
+          flatShading: true,
+          emissive: 0x000000,
+        })
+
+        const count = group.componentIds.length
+        const instMesh = new THREE.InstancedMesh(geometry, material, count)
+        instMesh.userData.kind = 'part-instanced'
+        // Parallel list: instanceId → Component.id so pick handlers can look up
+        // the right component.
+        instMesh.userData.componentIds = group.componentIds
+
+        group.transforms.forEach((m4, idx) => {
+          instMesh.setMatrixAt(idx, m4)
+        })
+        instMesh.instanceMatrix.needsUpdate = true
+
+        // Compute a bounding box for the whole instanced set (union of all instances).
+        instMesh.computeBoundingBox()
+
+        meshGroup.add(instMesh)
+        entries.push({ id: group.key, geometry })
+
+        // Mark all these componentIds as handled.
+        for (const cid of group.componentIds) instancedComponentIds.add(cid)
+      }
+    }
+
+    // Per-Mesh path: handles singletons (instancing mode) OR all parts (non-instancing).
     ;(parts || []).forEach((part, i) => {
       if (!part?.geom) return
+      // Skip parts whose componentId was already batched into an InstancedMesh.
+      if (useInstancing && part.componentId && instancedComponentIds.has(part.componentId)) return
+
       const geometry = resolveGeometry(part.geom)
       if (!geometry) return
       const color = part.color != null ? part.color : PALETTE[i % PALETTE.length]
@@ -367,7 +471,7 @@ function Renderer({
       }
       s.lastPartsKey = key
     }
-  }, [parts, topologies])
+  }, [parts, topologies, assemblyComponents])
 
   // ----- Visibility toggling -----
   useEffect(() => {
@@ -375,7 +479,24 @@ function Renderer({
     if (!s) return
     const hidden = hiddenIds || new Set()
     s.meshGroup.children.forEach((m) => {
-      m.visible = !hidden.has(m.userData.id)
+      // Use setUserVisible so cullByFrustum can distinguish "hidden by user"
+      // from "hidden by frustum" and never accidentally un-hides user-hidden
+      // meshes on the next frame.
+      //
+      // S2 InstancedMesh: Three.js doesn't support per-instance visibility
+      // via a simple flag.  Our policy: if ALL instances in this batch are
+      // hidden, hide the whole InstancedMesh; if ANY are visible, keep it
+      // visible (individual hidden instances remain visible within the batch —
+      // acceptable trade-off, rare in practice because users hide whole groups).
+      if (m.isInstancedMesh) {
+        const cids = m.userData.componentIds || []
+        const allHidden = cids.length > 0 && cids.every((cid) => hidden.has(cid))
+        setUserVisible(m, !allHidden)
+        return
+      }
+      const id = m.userData.id ?? m.userData.componentId
+      const userVisible = id ? !hidden.has(id) : true
+      setUserVisible(m, userVisible)
     })
     // Hide aux for hidden parts too.
     for (const [partId, aux] of s.perPart.entries()) {
@@ -390,6 +511,38 @@ function Renderer({
     const s = stateRef.current
     if (!s) return
     s.meshGroup.children.forEach((m) => {
+      if (m.isInstancedMesh) {
+        // S2: For InstancedMesh we use per-instance color to highlight.
+        // We reset all instances to white (multiplicative identity) then
+        // tint the selected one with the emissive-equivalent color.
+        const cids = m.userData.componentIds
+        if (!cids) return
+        // Ensure instanceColor buffer exists.
+        if (!m.instanceColor) {
+          const colors = new Float32Array(m.count * 3)
+          colors.fill(1) // white = no tint
+          m.instanceColor = new THREE.InstancedBufferAttribute(colors, 3)
+          m.material.vertexColors = false // keep base color; instance color multiplies
+        }
+        for (let i = 0; i < m.count; i++) {
+          const cid = cids[i]
+          const isSel = cid === selectedId
+            || (selectedComponentId && cid === selectedComponentId)
+          // Tint: emissive highlight → shift toward warm yellow
+          if (isSel) {
+            const h = HIGHLIGHT_EMISSIVE
+            m.instanceColor.setXYZ(i,
+              1 + ((h >> 16) & 0xff) / 255,
+              1 + ((h >> 8) & 0xff) / 255,
+              1 + ((h) & 0xff) / 255,
+            )
+          } else {
+            m.instanceColor.setXYZ(i, 1, 1, 1)
+          }
+        }
+        m.instanceColor.needsUpdate = true
+        return
+      }
       const isSel = m.userData.id === selectedId
         || (selectedComponentId && m.userData.componentId === selectedComponentId)
       if (m.material && 'emissive' in m.material) {

@@ -47,7 +47,7 @@ import { distance, formatDistance } from '../lib/measure.js'
 import { extractDisplayGeometryFromParts } from '../lib/femDisplacement.js'
 import { exportSvg, exportPng, exportPdf } from '../lib/svgExport.js'
 import { api } from '../lib/api.js'
-import { mateRefFromPick } from '../lib/assembly.js'
+import { mateRefFromPick, parseAssembly } from '../lib/assembly.js'
 
 const AUTOSAVE_MS = 500
 // Re-eval debounce, scaled by file size. Small files feel snappy at 250ms;
@@ -587,6 +587,21 @@ export default function Editor() {
 
   const stepFile = isStepFile(w.currentFile)
   const assemblyFile = isAssemblyFile(w.currentFile)
+
+  // S2 instancing: derive the raw assembly component list so Renderer's
+  // instancing planner can group identical parts into batched draw calls.
+  // parseAssembly is cheap (JSON.parse + normalization); memoised off content.
+  // Only computed when the current file is an assembly.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const assemblyComponents = useMemo(() => {
+    if (!assemblyFile || !w.currentFileContent) return null
+    try {
+      const parsed = parseAssembly(w.currentFileContent)
+      return parsed.components || null
+    } catch {
+      return null
+    }
+  }, [assemblyFile, w.currentFileContent])
   const drawingFile = isDrawingFile(w.currentFile)
   const sketchFile = isSketchFile(w.currentFile)
   const featureFile = isFeatureFile(w.currentFile)
@@ -1313,6 +1328,7 @@ export default function Editor() {
               mode={w.measureMode}
               selectedFeatures={w.selectedFeatures}
               onPickFeature={handlePickFeature}
+              assemblyComponents={assemblyComponents}
               className="w-full h-full"
             />
             {assemblyPickSide && (

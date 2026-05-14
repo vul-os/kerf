@@ -39,6 +39,7 @@
 import { useEffect, useImperativeHandle, useRef, useState, forwardRef } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { cullByFrustum, frustumCullEnabled } from '../lib/frustumCull.js'
 
 const BG_COLOR = 0x0f1115
 const HOVER_FACE = 0xffd633
@@ -131,6 +132,18 @@ const FeatureRenderer = forwardRef(function FeatureRenderer({
     function loop() {
       if (!running) return
       controls.update()
+
+      // S1: frustum cull — skip rendering of meshes whose AABB lies outside
+      // the camera frustum. FeatureRenderer meshes are typically a small number
+      // of feature-body meshes (one per part body), so the overhead is minimal.
+      const s = stateRef.current
+      if (s) {
+        const enabled = frustumCullEnabled()
+        cullByFrustum(s.meshGroup.children, camera, { enabled })
+        // Edge lines share the frustum with their parent mesh; cull them too.
+        cullByFrustum(s.edgeGroup.children, camera, { enabled })
+      }
+
       renderer.render(scene, camera)
       requestAnimationFrame(loop)
     }

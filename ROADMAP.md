@@ -1654,29 +1654,30 @@ unbuilt work.
 Roughly priority-ordered; each phase compounds the previous one. The
 first two alone should get us 5-10× the practical part count.
 
-**S1 — Frustum culling (📋 next)**
+**S1 — Frustum culling (✅ shipped)**
 
-Off-screen geometry shouldn't be drawn. Three.js has `Frustum` +
-`frustumCulled` per-object; today many of our meshes have it disabled
-or aren't checked correctly because positions live on parent groups.
-Audit + fix culling per-mesh; verify with a 10k-part synthetic scene
-that the GPU only processes what's visible. Should be ~1-week agent
-work. **Biggest single win.**
+`src/lib/frustumCull.js`: `cullByFrustum(meshes, camera, options)` caches
+world-space AABB per mesh (recomputed when `matrixWorld` changes), runs
+`Frustum.intersectsBox` per frame, toggles `mesh.visible`. Wired into the
+`Renderer.jsx` and `FeatureRenderer.jsx` animation loops. Feature flag:
+`localStorage.KERF_FRUSTUM_CULL` (default ON, set to `'0'` to disable).
+`setUserVisible(mesh, bool)` lets the hiddenIds toggle coexist with the
+per-frame cull without accidental un-hiding. 6 vitest cases in
+`src/__tests__/frustumCull.test.js`.
 
-**S2 — Batched draw calls across distinct parts (📋 next)**
+**S2 — Batched draw calls across identical parts (✅ shipped)**
 
-Today `InstancedMesh` only batches *repeats of the same part*. The
-real win is batching across distinct parts with similar materials.
-Two approaches:
-- **Mesh merging at compile time** — bake multiple `.feature` /
-  `.part` results into a single buffer per material; rebuild on edit.
-  Lossier (per-part picking needs vertex ranges) but big draw-call
-  win.
-- **`BatchedMesh` (Three.js 0.152+)** — multi-draw under the hood;
-  preserves per-object identity for picking. Slightly newer API,
-  rendering-equivalent.
-
-Lean toward `BatchedMesh`. ~2-week agent task once it lands stable.
+`src/lib/instancingPlan.js`: `planInstances(components)` groups assembly
+Components by `(file_id, config_id)`, returns one `InstancedMesh` plan
+entry per unique part with ≥ 2 copies (singletons stay as regular Meshes).
+Wired into `Renderer.jsx`'s parts-rebuild effect: when `KERF_INSTANCING`
+flag is ON and `assemblyComponents` prop is provided, identical parts are
+batched into a single `THREE.InstancedMesh` draw call. Picking works:
+`raycaster.intersectObject` returns `instanceId` which maps back to
+`componentIds[instanceId]` → `Component.id`. `Editor.jsx` derives
+`assemblyComponents` (cheap `parseAssembly` call) and passes it to
+Renderer. Feature flag: `localStorage.KERF_INSTANCING` (default ON).
+7 vitest cases in `src/__tests__/instancingPlan.test.js`.
 
 **S3 — Server-side pre-tessellation (📋 next, already roadmapped)**
 

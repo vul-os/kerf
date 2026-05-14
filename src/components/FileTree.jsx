@@ -3,7 +3,7 @@ import {
   ChevronDown, ChevronRight,
   FileCode, Folder, FolderOpen, Layers,
   FilePlus, FolderPlus, Plus, Trash2, Box, Upload, Ruler, PenTool, X, RefreshCw,
-  Package, Cylinder, CircuitBoard, Loader2, AlertCircle, Variable, FileBox,
+  Package, Cylinder, CircuitBoard, Loader2, AlertCircle, Variable, FileBox, Cable,
 } from 'lucide-react'
 import { useWorkspace } from '../store/workspace.js'
 import { FreeCADImportDialog, isFCStdFile } from './FreeCADImport.jsx'
@@ -39,6 +39,7 @@ function KindIcon({ kind, name, open }) {
   if (kind === 'feature') return <Cylinder size={14} className={`${cls} text-amber-300`} />
   if (kind === 'circuit') return <CircuitBoard size={14} className={`${cls} text-cyan-edge`} />
   if (kind === 'equations') return <Variable size={14} className={`${cls} text-kerf-300`} />
+  if (kind === 'wiring') return <Cable size={14} className={`${cls} text-orange-300`} />
   if (kind === 'step-ref') return (
     <span className="relative flex-shrink-0 inline-flex items-center">
       <Box size={14} className="text-cyan-edge" />
@@ -66,6 +67,9 @@ function KindIcon({ kind, name, open }) {
   }
   if (lower.endsWith('.equations')) {
     return <Variable size={14} className={`${cls} text-kerf-300`} />
+  }
+  if (lower.endsWith('.wiring')) {
+    return <Cable size={14} className={`${cls} text-orange-300`} />
   }
   if (lower.endsWith('.fcstd')) {
     return <FileBox size={14} className={`${cls} text-orange-300`} />
@@ -356,13 +360,14 @@ const KIND_ROWS = {
   part:      { icon: Package,      label: 'Part',      hint: 'Library Part with metadata for the BOM',    color: 'text-emerald-300' },
   circuit:   { icon: CircuitBoard, label: 'Circuit',   hint: 'tscircuit electronics (.circuit.tsx)',      color: 'text-cyan-edge' },
   equations: { icon: Variable,     label: 'Equations', hint: 'Project-level named parameters (.equations)', color: 'text-kerf-300' },
+  wiring:    { icon: Cable,        label: 'Wiring',    hint: 'Cable harness / wiring diagram (.wiring)',  color: 'text-orange-300' },
 }
 
 // Canonical menu order: folder + generic file first (basic primitives),
 // followed by domain-specific kinds in roughly mechanical → drawings →
 // library → electronics order. The `step` and `jscad` aliases are
 // import-only / synthetic and intentionally absent here.
-const KIND_ORDER = ['folder', 'file', 'sketch', 'assembly', 'drawing', 'feature', 'part', 'circuit', 'equations']
+const KIND_ORDER = ['folder', 'file', 'sketch', 'assembly', 'drawing', 'feature', 'part', 'circuit', 'equations', 'wiring']
 
 // CreateMenu — single "+ New" dropdown that replaces the row of icon
 // buttons in the FileTree header. Shows the full union of canonical

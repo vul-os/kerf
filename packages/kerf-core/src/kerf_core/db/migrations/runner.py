@@ -8,7 +8,7 @@ from pathlib import Path
 async def run_migrations(database_url: str):
     conn = await asyncpg.connect(database_url)
 
-    migrations_dir = Path(__file__).parent / "migrations"
+    migrations_dir = Path(__file__).parent
     migration_files = sorted(migrations_dir.glob("*.sql"))
 
     for migration_file in migration_files:

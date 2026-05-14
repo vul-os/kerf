@@ -129,9 +129,17 @@ function opSurfaceBoolean(oc, _prev, node, _sketches, tracker, bodyMap, override
     throw new Error(`surface_boolean: unknown kind '${kind}' (expected cut|fuse|common)`)
   }
 
-  const fuzziness = typeof node.fuzziness === 'number' && node.fuzziness > 0
-    ? node.fuzziness
-    : 1e-4
+  // Accept fuzzy_value (inspector) > fuzziness (python tool) > tolerance > 1e-4
+  const rawFuzzy = (typeof node.fuzzy_value === 'number' && node.fuzzy_value > 0)
+    ? node.fuzzy_value
+    : (typeof node.fuzziness === 'number' && node.fuzziness > 0)
+      ? node.fuzziness
+      : (typeof node.tolerance === 'number' && node.tolerance > 0)
+        ? node.tolerance
+        : 1e-4
+  const fuzziness = rawFuzzy
+
+  const coarseMode = node.coarse_mode === true
 
   const p4 = getNurbsPhase4Bindings_mock(oc, P4_C1)
   const hasShapeFix = p4['ShapeFix_Shape']
@@ -139,7 +147,7 @@ function opSurfaceBoolean(oc, _prev, node, _sketches, tracker, bodyMap, override
   const hasBOPAlgo  = p4['BOPAlgo_Builder']
 
   function maybeFixShape(shape) {
-    if (!hasShapeFix) return shape
+    if (coarseMode || !hasShapeFix) return shape
     try {
       const fixer = track(tracker, new oc.ShapeFix_Shape_2(shape))
       fixer.Perform({})
@@ -203,7 +211,7 @@ function opSurfaceBoolean(oc, _prev, node, _sketches, tracker, bodyMap, override
     throw new Error(`surface_boolean: ${kind} produced an empty result (operands may not intersect)`)
   }
 
-  if (hasUnify) {
+  if (!coarseMode && hasUnify) {
     try {
       const unify = track(tracker, new oc.ShapeUpgrade_UnifySameDomain_2(result, true, true, false))
       unify.Build()
@@ -510,5 +518,131 @@ describe('opSurfaceBoolean — probe-gated ShapeFix + Unify + Fuzzy', () => {
     const node = { target_a_id: 'a', target_b_id: 'b', kind: 'cut' }
     opSurfaceBoolean(oc, null, node, {}, [], { a: makeShape(), b: makeShape() })
     expect(fuzzyValue).toBeNull()
+  })
+})
+
+// ── 5. Inspector field plumbing: fuzzy_value, tolerance, coarse_mode ──────────
+//
+// These new fields are set by the T4 FeatureView inspector.
+// Verify they thread through to the worker behaviour correctly.
+
+describe('opSurfaceBoolean — T4 inspector field plumbing', () => {
+  it('fuzzy_value field is used for SetFuzzyValue when BOPAlgo_Builder present', () => {
+    let fuzzyValue = null
+    const resultShape = makeShape('result')
+    const oc = {
+      BOPAlgo_Builder: function() {},  // presence flag
+      BRepAlgoAPI_Cut_3: class {
+        constructor() {}
+        SetFuzzyValue(v) { fuzzyValue = v }
+        Build() {}
+        IsDone() { return true }
+        Shape() { return resultShape }
+      },
+    }
+    // fuzzy_value (inspector field name) takes precedence over fuzziness
+    const node = { target_a_id: 'a', target_b_id: 'b', kind: 'cut', fuzzy_value: 2e-3, fuzziness: 5e-4 }
+    opSurfaceBoolean(oc, null, node, {}, [], { a: makeShape(), b: makeShape() })
+    expect(fuzzyValue).toBeCloseTo(2e-3)
+  })
+
+  it('tolerance field is used for SetFuzzyValue when fuzzy_value and fuzziness absent', () => {
+    let fuzzyValue = null
+    const resultShape = makeShape('result')
+    const oc = {
+      BOPAlgo_Builder: function() {},
+      BRepAlgoAPI_Cut_3: class {
+        constructor() {}
+        SetFuzzyValue(v) { fuzzyValue = v }
+        Build() {}
+        IsDone() { return true }
+        Shape() { return resultShape }
+      },
+    }
+    const node = { target_a_id: 'a', target_b_id: 'b', kind: 'cut', tolerance: 1e-3 }
+    opSurfaceBoolean(oc, null, node, {}, [], { a: makeShape(), b: makeShape() })
+    expect(fuzzyValue).toBeCloseTo(1e-3)
+  })
+
+  it('fuzziness takes precedence over tolerance when both present', () => {
+    let fuzzyValue = null
+    const resultShape = makeShape('result')
+    const oc = {
+      BOPAlgo_Builder: function() {},
+      BRepAlgoAPI_Cut_3: class {
+        constructor() {}
+        SetFuzzyValue(v) { fuzzyValue = v }
+        Build() {}
+        IsDone() { return true }
+        Shape() { return resultShape }
+      },
+    }
+    const node = { target_a_id: 'a', target_b_id: 'b', kind: 'cut', fuzziness: 3e-4, tolerance: 1e-3 }
+    opSurfaceBoolean(oc, null, node, {}, [], { a: makeShape(), b: makeShape() })
+    expect(fuzzyValue).toBeCloseTo(3e-4)
+  })
+
+  it('coarse_mode:true skips ShapeFix_Shape pre-pass', () => {
+    let fixCallCount = 0
+    const resultShape = makeShape('result')
+    const oc = {
+      ShapeFix_Shape: function() {},  // binding present
+      ShapeFix_Shape_2: class {
+        constructor() { fixCallCount++ }
+        Perform() {}
+        Shape() { return makeShape('fixed') }
+      },
+      BRepAlgoAPI_Cut_3: makeAlgoClass(resultShape),
+    }
+    const node = { target_a_id: 'a', target_b_id: 'b', kind: 'cut', coarse_mode: true }
+    opSurfaceBoolean(oc, null, node, {}, [], { a: makeShape(), b: makeShape() })
+    expect(fixCallCount).toBe(0)
+  })
+
+  it('coarse_mode:true skips ShapeUpgrade_UnifySameDomain cleanup', () => {
+    let unifyCalled = false
+    const unifiedShape = makeShape('unified')
+    const resultShape = makeShape('result')
+    const oc = {
+      ShapeUpgrade_UnifySameDomain: function() {},  // binding present
+      ShapeUpgrade_UnifySameDomain_2: class {
+        constructor() { unifyCalled = true }
+        Build() {}
+        Shape() { return unifiedShape }
+      },
+      BRepAlgoAPI_Cut_3: makeAlgoClass(resultShape),
+    }
+    const node = { target_a_id: 'a', target_b_id: 'b', kind: 'cut', coarse_mode: true }
+    const { result } = opSurfaceBoolean(oc, null, node, {}, [], { a: makeShape(), b: makeShape() })
+    expect(unifyCalled).toBe(false)
+    // Result is the raw algo shape, not the unified one.
+    expect(result).toBe(resultShape)
+  })
+
+  it('coarse_mode:false (default) still applies ShapeFix_Shape when binding present', () => {
+    let fixCallCount = 0
+    const resultShape = makeShape('result')
+    const oc = {
+      ShapeFix_Shape: function() {},
+      ShapeFix_Shape_2: class {
+        constructor() { fixCallCount++ }
+        Perform() {}
+        Shape() { return makeShape('fixed') }
+      },
+      BRepAlgoAPI_Cut_3: makeAlgoClass(resultShape),
+    }
+    const node = { target_a_id: 'a', target_b_id: 'b', kind: 'cut', coarse_mode: false }
+    opSurfaceBoolean(oc, null, node, {}, [], { a: makeShape('a'), b: makeShape('b') })
+    expect(fixCallCount).toBe(2)
+  })
+
+  it('target_a and target_b must reference upstream nodes (bodyMap lookup)', () => {
+    // Verify that the node's target_a_id and target_b_id must resolve in bodyMap.
+    const node = { target_a_id: 'upstream-sweep', target_b_id: 'upstream-blend', kind: 'cut' }
+    // bodyMap has only one of the two.
+    expect(() => opSurfaceBoolean({}, null, node, {}, [], { 'upstream-sweep': makeShape() }))
+      .toThrow(/target_b.*not found/)
+    expect(() => opSurfaceBoolean({}, null, node, {}, [], { 'upstream-blend': makeShape() }))
+      .toThrow(/target_a.*not found/)
   })
 })

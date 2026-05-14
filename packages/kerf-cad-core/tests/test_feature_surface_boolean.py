@@ -266,3 +266,77 @@ class TestSurfaceBooleanErrors:
         result = run_tool(ctx, fid,
                           target_a_id="a", target_b_id="b", kind="cut")
         assert result.get("code") == "NOT_FOUND"
+
+
+# ---------------------------------------------------------------------------
+# coarse_mode handling (T6 performance flag)
+# ---------------------------------------------------------------------------
+
+class TestSurfaceBooleanCoarseMode:
+    def test_coarse_mode_absent_by_default(self):
+        ctx, store, fid = make_ctx()
+        run_tool(ctx, fid, target_a_id="a", target_b_id="b", kind="cut")
+        doc = json.loads(store["content"])
+        node = doc["features"][0]
+        assert "coarse_mode" not in node
+
+    def test_coarse_mode_true_stored_when_provided(self):
+        ctx, store, fid = make_ctx()
+        run_tool(ctx, fid, target_a_id="a", target_b_id="b", kind="cut",
+                 coarse_mode=True)
+        doc = json.loads(store["content"])
+        node = doc["features"][0]
+        assert node.get("coarse_mode") is True
+
+    def test_coarse_mode_false_not_stored(self):
+        # Only store when True; False is the default — no point polluting the node.
+        ctx, store, fid = make_ctx()
+        run_tool(ctx, fid, target_a_id="a", target_b_id="b", kind="cut",
+                 coarse_mode=False)
+        doc = json.loads(store["content"])
+        node = doc["features"][0]
+        assert "coarse_mode" not in node
+
+    def test_coarse_mode_in_spec_schema(self):
+        props = feature_surface_boolean_spec.input_schema["properties"]
+        assert "coarse_mode" in props
+        assert props["coarse_mode"]["type"] == "boolean"
+
+    def test_coarse_mode_not_required(self):
+        required = feature_surface_boolean_spec.input_schema.get("required", [])
+        assert "coarse_mode" not in required
+
+
+# ---------------------------------------------------------------------------
+# fuzzy_value + tolerance plumbing (T4/T5 inspector fields)
+# ---------------------------------------------------------------------------
+
+class TestSurfaceBooleanFuzzyValuePlumbing:
+    def test_fuzziness_threads_to_node(self):
+        """fuzziness is stored verbatim and the worker reads it."""
+        ctx, store, fid = make_ctx()
+        run_tool(ctx, fid, target_a_id="a", target_b_id="b", kind="fuse",
+                 fuzziness=5e-4)
+        doc = json.loads(store["content"])
+        node = doc["features"][0]
+        assert abs(node["fuzziness"] - 5e-4) < 1e-12
+
+    def test_fuzziness_default_absent_means_worker_picks_1e_4(self):
+        """When fuzziness not in node, worker defaults to 1e-4 (not our concern to store)."""
+        ctx, store, fid = make_ctx()
+        run_tool(ctx, fid, target_a_id="a", target_b_id="b", kind="cut")
+        doc = json.loads(store["content"])
+        node = doc["features"][0]
+        # The Python tool must NOT inject a default — worker owns that logic.
+        assert "fuzziness" not in node
+
+    def test_multiple_nodes_accumulate_with_distinct_ids(self):
+        ctx, store, fid = make_ctx()
+        run_tool(ctx, fid, target_a_id="a", target_b_id="b", kind="cut")
+        run_tool(ctx, fid, target_a_id="c", target_b_id="d", kind="fuse")
+        doc = json.loads(store["content"])
+        assert len(doc["features"]) == 2
+        ids = [n["id"] for n in doc["features"]]
+        assert ids[0] != ids[1]
+        assert ids[0].startswith("surface_boolean-")
+        assert ids[1].startswith("surface_boolean-")

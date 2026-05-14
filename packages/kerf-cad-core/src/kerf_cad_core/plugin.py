@@ -40,6 +40,12 @@ except ImportError:
 # ── OCC availability ──────────────────────────────────────────────────────────
 from kerf_cad_core.occ_helpers import _OCC_AVAILABLE
 
+# Import the feature tool so the @register decorator fires on plugin load.
+try:
+    import kerf_cad_core.feature_boss_with_draft  # noqa: F401 — side-effect import
+except Exception as _import_err:
+    logger.warning("kerf-cad-core: could not load feature_boss_with_draft: %s", _import_err)
+
 _PROVIDES_FULL = [
     "cad.step-io",
     "cad.brep-mesh",

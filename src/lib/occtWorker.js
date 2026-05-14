@@ -189,6 +189,171 @@ function opPad(oc, _prev, node, sketches, tracker) {
   return builder.Shape()
 }
 
+// ---------------------------------------------------------------------------
+// walkSideFaces — helper used by opBossWithDraft.
+//
+// Returns an array of TopoDS_Face objects that are the lateral (side) faces
+// of an extruded prism — i.e. the faces whose surface normal is NOT parallel
+// to the extrusion axis direction.
+//
+// The extrusion axis `axisDir` is a 3-element array [ax, ay, az] (unit vector).
+// We walk every FACE in `shape` via TopExp_Explorer and reject any face whose
+// centroid-normal is within 15° of parallel to axisDir (dot product ≥ 0.966).
+// That threshold is tight enough to exclude the flat caps on any reasonable
+// prism, and loose enough to tolerate sub-1° floating-point noise.
+function walkSideFaces(oc, shape, axisDir) {
+  const [ax, ay, az] = axisDir
+  const axLen = Math.sqrt(ax * ax + ay * ay + az * az)
+  if (axLen < 1e-10) return []
+  const nx = ax / axLen, ny = ay / axLen, nz = az / axLen
+
+  const sideFaces = []
+  let exp
+  try {
+    exp = new oc.TopExp_Explorer_2(
+      shape,
+      oc.TopAbs_ShapeEnum.TopAbs_FACE,
+      oc.TopAbs_ShapeEnum.TopAbs_SHAPE,
+    )
+  } catch {
+    return sideFaces
+  }
+  for (; exp.More(); exp.Next()) {
+    const fSh = oc.TopoDS.Face_1(exp.Current())
+    // Compute the surface normal at the parameter midpoint.
+    try {
+      const surf = oc.BRep_Tool.Surface_2(fSh)
+      const props = new oc.GeomLProp_SLProps_2(surf, 0.5, 0.5, 1, 1e-7)
+      if (props.IsNormalDefined()) {
+        const n = props.Normal()
+        const fnx = n.X(), fny = n.Y(), fnz = n.Z()
+        const dot = Math.abs(fnx * nx + fny * ny + fnz * nz)
+        // dot close to 1.0 → face normal ∥ axis → top/bottom cap → skip
+        if (dot < 0.966) {
+          sideFaces.push(fSh)
+        }
+      }
+      try { props.delete?.() } catch { /* */ }
+    } catch {
+      // If we can't get the normal, include the face conservatively.
+      sideFaces.push(fSh)
+    }
+  }
+  try { exp.delete() } catch { /* */ }
+  return sideFaces
+}
+
+// boss_with_draft — FreeCAD-parity shortcut: pad + draft in one step.
+//
+// OCCT pathway:
+//   1. faceForSketchPath → planar face.
+//   2. Compute extrusion vector (same logic as opPad).
+//   3. BRepPrimAPI_MakePrism → prism solid.
+//   4. walkSideFaces to enumerate the lateral faces.
+//   5. BRepOffsetAPI_DraftAngle — for each side face call Add(face, normal,
+//      draft_rad, neutral_plane) where neutral_plane = sketch plane (Z=0 in
+//      the transformed frame).
+//   6. Build(), IsDone() check, return shape.
+//
+// `draft_direction`:
+//   'outward'  → positive angle widens the prism away from the sketch plane.
+//   'inward'   → negate the angle so the prism narrows toward the sketch plane.
+function opBossWithDraft(oc, _prev, node, sketches, tracker) {
+  const face = faceForSketchPath(oc, node.sketch_path, sketches, tracker)
+  if (!face) throw new Error(`boss_with_draft: sketch '${node.sketch_path}' produced no profile`)
+
+  const h = Math.abs(Number(node.height) || 0)
+  if (h <= 0) throw new Error('boss_with_draft: height must be > 0')
+
+  const rawAngleDeg = Number(node.draft_angle_deg) || 0
+  const draftDir = node.draft_direction || 'outward'
+  // Inward draft → negate so the taper converges toward the sketch plane.
+  const signedAngleDeg = draftDir === 'inward' ? -rawAngleDeg : rawAngleDeg
+  const draftRad = (signedAngleDeg * Math.PI) / 180
+
+  // ── 1. Compute extrusion vector (mirrors opPad logic) ──────────────────
+  let from = face
+  let dz = h
+  const axisDir = [0, 0, 1]
+  if (node.direction === 'down') {
+    dz = -h
+    axisDir[2] = -1
+  } else if (node.direction === 'symmetric') {
+    const trsf = track(tracker, new oc.gp_Trsf_1())
+    const vOff = track(tracker, new oc.gp_Vec_4(0, 0, -h / 2))
+    trsf.SetTranslation_1(vOff)
+    const loc = track(tracker, new oc.TopLoc_Location_2(trsf))
+    from = face.Moved?.(loc, false) ?? face
+    dz = h
+  }
+  const vec = track(tracker, new oc.gp_Vec_4(0, 0, dz))
+
+  // ── 2. Extrude via BRepPrimAPI_MakePrism ──────────────────────────────
+  const prismBuilder = track(tracker, new oc.BRepPrimAPI_MakePrism_1(from, vec, false, true))
+  prismBuilder.Build()
+  if (!prismBuilder.IsDone()) throw new Error('boss_with_draft: prism build failed')
+  const prism = prismBuilder.Shape()
+
+  // If the draft angle is 0 the user just wants a plain pad — return the
+  // prism directly (BRepOffsetAPI_DraftAngle with 0 rad is a no-op but may
+  // produce degenerate topology on some OCCT versions).
+  if (Math.abs(draftRad) < 1e-9) {
+    return prism
+  }
+
+  // ── 3. Collect side faces ─────────────────────────────────────────────
+  const sideFaces = walkSideFaces(oc, prism, axisDir)
+  if (sideFaces.length === 0) {
+    // No side faces found (e.g. open profile / degenerate prism).
+    // Fall back gracefully to a plain pad.
+    return prism
+  }
+
+  // ── 4. Apply BRepOffsetAPI_DraftAngle ─────────────────────────────────
+  // Neutral plane = sketch plane. For 'up'/'symmetric' extrusions the sketch
+  // sits at Z=0, so the neutral plane is the XY plane through the origin.
+  // For 'down' extrusion the sketch still sits at Z=0 — same neutral plane.
+  // We express this as a gp_Pln with origin (0,0,0) and normal along axisDir.
+  let draftBuilder
+  try {
+    draftBuilder = track(tracker, new oc.BRepOffsetAPI_DraftAngle(prism))
+  } catch {
+    // Binding absent — fall back to the plain prism.
+    return prism
+  }
+
+  const neutralOrigin = track(tracker, new oc.gp_Pnt_3(0, 0, 0))
+  const neutralNormal = track(tracker, new oc.gp_Dir_4(axisDir[0], axisDir[1], axisDir[2]))
+  const neutralPlane = track(tracker, new oc.gp_Pln_2(neutralOrigin, neutralNormal))
+
+  // Direction vector along which draft is applied (extrusion axis).
+  const draftDirVec = track(tracker, new oc.gp_Dir_4(axisDir[0], axisDir[1], axisDir[2]))
+
+  let addedAny = false
+  for (const sf of sideFaces) {
+    try {
+      draftBuilder.Add(sf, draftDirVec, draftRad, neutralPlane)
+      addedAny = true
+    } catch {
+      // Face rejected by the draft builder (e.g. already drafted, non-planar).
+      // Continue with remaining faces rather than bailing.
+    }
+  }
+
+  if (!addedAny) {
+    // Could not draft any face — return plain prism.
+    return prism
+  }
+
+  draftBuilder.Build()
+  if (!draftBuilder.IsDone()) {
+    throw new Error(
+      'boss_with_draft: draft build failed — try a smaller angle or a simpler profile',
+    )
+  }
+  return draftBuilder.Shape()
+}
+
 function opPocket(oc, prev, node, sketches, tracker) {
   if (!prev) throw new Error('pocket: no target shape (must follow a pad)')
   const face = faceForSketchPath(oc, node.sketch_path, sketches, tracker)
@@ -950,6 +1115,17 @@ function evaluateTree(oc, tree, sketches) {
           }
           next = opPad(oc, null, node, sketches, tracker)
           break
+        case 'boss_with_draft':
+          if (current) {
+            meshes.push({
+              id: node._prevId || `body-${meshes.length}`,
+              ...breptToMesh(oc, current),
+            })
+            cleanupShape(oc, current)
+            current = null
+          }
+          next = opBossWithDraft(oc, null, node, sketches, tracker)
+          break
         case 'pocket':   next = opPocket(oc, current, node, sketches, tracker); break
         case 'revolve':
           if (current) {
@@ -1057,6 +1233,10 @@ async function evaluateToFinalShape(oc, tree, sketches) {
           if (current) cleanupShape(oc, current)
           current = null
           next = opPad(oc, null, node, sketches, tracker); break
+        case 'boss_with_draft':
+          if (current) cleanupShape(oc, current)
+          current = null
+          next = opBossWithDraft(oc, null, node, sketches, tracker); break
         case 'pocket':   next = opPocket(oc, current, node, sketches, tracker); break
         case 'revolve':
           if (current) cleanupShape(oc, current)

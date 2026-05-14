@@ -78,6 +78,32 @@ const FEATURE_KINDS = [
     ],
   },
   {
+    op: 'boss_with_draft',
+    label: 'Boss + draft',
+    icon: Box,
+    defaults: {
+      sketch_path: '',
+      height: 10,
+      direction: 'up',
+      draft_angle_deg: 3,
+      draft_direction: 'outward',
+    },
+    fields: [
+      { key: 'sketch_path', kind: 'sketch_picker', label: 'Sketch' },
+      { key: 'height', kind: 'number', label: 'Height (mm)', min: 0.001 },
+      { key: 'direction', kind: 'select', label: 'Direction', options: [
+        { value: 'up', label: 'Up (+Z)' },
+        { value: 'down', label: 'Down (-Z)' },
+        { value: 'symmetric', label: 'Symmetric' },
+      ] },
+      { key: 'draft_angle_deg', kind: 'number', label: 'Draft angle (°)', min: -30, max: 30 },
+      { key: 'draft_direction', kind: 'select', label: 'Draft direction', options: [
+        { value: 'outward', label: 'Outward (widen away from sketch)' },
+        { value: 'inward', label: 'Inward (narrow toward sketch)' },
+      ] },
+    ],
+  },
+  {
     op: 'pocket',
     label: 'Pocket',
     icon: Disc,
@@ -303,7 +329,7 @@ const FEATURE_KINDS = [
 const KIND_BY_OP = Object.fromEntries(FEATURE_KINDS.map((k) => [k.op, k]))
 
 const FEATURE_CATEGORIES = [
-  { id: 'sketch',   label: 'Sketch-based',  ops: ['pad', 'pocket', 'revolve', 'hole'] },
+  { id: 'sketch',   label: 'Sketch-based',  ops: ['pad', 'boss_with_draft', 'pocket', 'revolve', 'hole'] },
   { id: 'modify',   label: 'Modify',        ops: ['fillet', 'chamfer', 'shell', 'push_pull', 'variable_radius_fillet'] },
   { id: 'pattern',  label: 'Pattern',       ops: ['linear_pattern', 'polar_pattern', 'mirror_pattern'] },
   { id: 'surface',  label: 'Surfacing',     ops: ['sweep1', 'sweep2', 'loft', 'network_srf', 'blend_srf'] },

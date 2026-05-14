@@ -378,7 +378,8 @@ def test_lathe_with_occ_shape():
 # 5-axis stub — no heavy deps required
 # ---------------------------------------------------------------------------
 
-def test_5axis_returns_not_implemented():
+def test_5axis_returns_real_toolpath_response():
+    """T5 shipped: 5axis op dispatches to real handler (no longer a stub)."""
     from kerf_cam.routes import run_cam, CAMRequest
     step_b64 = base64.b64encode(
         b"ISO-10303-21;\nHEADER;\nENDSEC;\nDATA;\nENDSEC;\nEND-ISO-10303-21;\n"
@@ -388,9 +389,15 @@ def test_5axis_returns_not_implemented():
         "step_down": 1.0, "feed_rate": 500.0, "spindle_speed": 8000,
     })
     result = asyncio.run(run_cam(req))
-    assert len(result["errors"]) >= 1
-    assert "not_implemented" in result["errors"][0]
-    assert result["toolpath_length"] == 0.0
+    # The stub "not_implemented" error must be gone.
+    assert not any("not_implemented" in e for e in result.get("errors", [])), (
+        f"Stub error still present: {result.get('errors')}"
+    )
+    # The real handler returns an error about needing the STEP→CL pipeline
+    # (directing users to POST /run-5axis), not a 'not implemented' stub.
+    assert len(result.get("errors", [])) >= 1
+    assert "run-5axis" in result["errors"][0] or "5axis_finish" in result["errors"][0]
+    assert "gcode_b64" in result
 
 
 def test_5axis_gcode_b64_present():

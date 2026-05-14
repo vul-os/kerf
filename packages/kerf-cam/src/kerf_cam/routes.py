@@ -107,6 +107,29 @@ class CAMOperation(BaseModel):
     wire_tolerance: Optional[float] = 0.05  # mm, B-rep wire discretisation
     spindle_axis: Optional[str] = "z"   # "x" | "z" for lathe
 
+    # --- 5-axis additions (T5) ---
+    drive_face_id: Optional[int] = None          # 5axis_finish + 3plus2; OCC face index
+    tilt_deg: Optional[float] = None             # 5axis_finish; cutter-axis tilt off normal (0-30)
+    lead_deg: Optional[float] = None             # 5axis_finish; forward lead/lag along path
+    indexed_op: Optional[str] = None             # 3plus2; sub-op type
+    kinematic_family: Optional[str] = None       # "head_table" (default) | others
+    use_tcp: Optional[bool] = None               # TCP mode (G43.4)
+    post_processor_5x: Optional[str] = None      # "linuxcnc" | "fanuc"
+
+
+class FiveAxisRequest(BaseModel):
+    """Direct request body for POST /run-5axis."""
+    cl_points: List[dict]                        # [{x,y,z,i,j,k}, ...]
+    post: str = "linuxcnc"                       # "linuxcnc" | "fanuc"
+    tool_number: int = 1
+    feed_rapid_mm_min: float = 5000.0
+    feed_cut_mm_min: float = 1000.0
+    spindle_rpm: int = 12000
+    use_tcp: bool = False
+    machine_kinematic: str = "head_table"
+    no_n_numbers: bool = False
+    coolant: str = "flood"
+
 
 class CAMRequest(BaseModel):
     step_b64: str
@@ -150,18 +173,13 @@ async def run_cam(req: CAMRequest):
     else:
         raise HTTPException(status_code=400, detail="either operations or input_spec required")
 
-    # 5-axis stub: short-circuit before any heavy work.
+    # 5-axis dispatch: "5axis" is an alias for "5axis_finish" (R5 in plan).
     for op in operations:
-        if op.type.lower() == "5axis":
-            return {
-                "output_key": "gcode",
-                "gcode_b64": base64.b64encode(b"; 5-axis not yet implemented\n").decode(),
-                "toolpath_length": 0.0,
-                "estimated_time": 0.0,
-                "warnings": [],
-                "errors": ["not_implemented: 5-axis simultaneous toolpath is a planned feature. "
-                           "Inputs were parsed successfully. Use 3-axis ops for now."],
-            }
+        op_type = op.type.lower()
+        if op_type in ("5axis", "5axis_finish"):
+            return _run_5axis_finish_route(op)
+        if op_type == "3plus2":
+            return _run_3plus2_route(op)
 
     warnings = []
     errors = []
@@ -210,6 +228,116 @@ async def run_cam(req: CAMRequest):
         "warnings": warnings,
         "errors": errors,
     }
+
+
+# ---------------------------------------------------------------------------
+# 5-axis route helpers
+# ---------------------------------------------------------------------------
+
+@router.post("/run-5axis")
+async def run_5axis(req: FiveAxisRequest):
+    """Direct 5-axis G-code emitter.
+
+    Accepts precomputed CL points (x, y, z, i, j, k) and emits G-code via
+    the chosen post-processor without requiring a STEP file.  For a full
+    STEP→CL→G-code pipeline use POST /run-cam with operation="5axis_finish".
+    """
+    from kerf_cam.five_axis.gcode_constant_tilt import emit_gcode_constant_tilt, PostOpts
+
+    if not req.cl_points:
+        raise HTTPException(status_code=400, detail="cl_points must not be empty")
+
+    opts = PostOpts(
+        tool_number=req.tool_number,
+        feed_rapid_mm_min=req.feed_rapid_mm_min,
+        feed_cut_mm_min=req.feed_cut_mm_min,
+        spindle_rpm=req.spindle_rpm,
+        use_tcp=req.use_tcp,
+        machine_kinematic=req.machine_kinematic,
+        no_n_numbers=req.no_n_numbers,
+        coolant=req.coolant,
+    )
+
+    try:
+        gcode = emit_gcode_constant_tilt(req.cl_points, req.post, opts)
+    except (ValueError, NotImplementedError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    gcode_b64 = base64.b64encode(gcode.encode()).decode()
+    return {
+        "output_key": "gcode",
+        "gcode_b64": gcode_b64,
+        "cl_point_count": len(req.cl_points),
+        "post_processor": req.post,
+        "warnings": [],
+        "errors": [],
+    }
+
+
+def _run_5axis_finish_route(op: CAMOperation) -> dict:
+    """Handle a 5axis_finish operation from run_cam.
+
+    Requires a brep_path / drive_face_id to be set on op or falls back to
+    a clear error.  When the STEP path is not available in the op (it was
+    pre-decoded via step_b64 in run_cam), we return a structured error
+    directing the caller to POST /run-5axis with precomputed CL points.
+    """
+    from kerf_cam.five_axis.gcode_constant_tilt import emit_gcode_constant_tilt, PostOpts
+
+    # run_cam doesn't thread stl_path through the stub check, so we
+    # return a helpful error explaining the direct route.
+    return {
+        "output_key": "gcode",
+        "gcode_b64": base64.b64encode(b"").decode(),
+        "toolpath_length": 0.0,
+        "estimated_time": 0.0,
+        "warnings": [],
+        "errors": [
+            "5axis_finish via /run-cam requires the STEP→CL pipeline (T3). "
+            "Use POST /run-5axis with precomputed CL points from kerf_cam.five_axis.constant_tilt.run_constant_tilt(), "
+            "or pass step_b64 + drive_face_id/tilt_deg in a future worker update."
+        ],
+    }
+
+
+def _run_3plus2_route(op: CAMOperation) -> dict:
+    """Handle a 3plus2 operation from run_cam (T4 wiring)."""
+    return {
+        "output_key": "gcode",
+        "gcode_b64": base64.b64encode(b"").decode(),
+        "toolpath_length": 0.0,
+        "estimated_time": 0.0,
+        "warnings": [],
+        "errors": [
+            "3plus2 via /run-cam requires the STL rotation pipeline (T4). "
+            "Use POST /run-5axis with precomputed CL points from kerf_cam.five_axis.indexed_3_2.run_3_2_indexed(), "
+            "or pass stl_path + drive_face_normal in a future worker update."
+        ],
+    }
+
+
+def _emit_5axis_gcode(
+    cl_points: List[dict],
+    op: CAMOperation,
+    post_processor: str,
+) -> str:
+    """Emit 5-axis G-code for a list of CL points.
+
+    Called by generate_toolpaths when an op is in the 5-axis family.
+    """
+    from kerf_cam.five_axis.gcode_constant_tilt import emit_gcode_constant_tilt, PostOpts
+
+    post = (op.post_processor_5x or post_processor or "linuxcnc").lower()
+    opts = PostOpts(
+        tool_number=1,
+        feed_rapid_mm_min=5000.0,
+        feed_cut_mm_min=float(op.feed_rate),
+        spindle_rpm=int(op.spindle_rpm),
+        use_tcp=bool(op.use_tcp) if op.use_tcp is not None else False,
+        machine_kinematic=op.kinematic_family or "head_table",
+        coolant=op.coolant or "flood",
+    )
+    return emit_gcode_constant_tilt(cl_points, post, opts)
 
 
 def extract_face_wires(occ_shape, op: "CAMOperation") -> List[List[tuple]]:

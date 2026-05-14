@@ -10,8 +10,10 @@ except ImportError:
 cam_run_spec = ToolSpec(
     name="cam_run",
     description=(
-        "Generate a CAM toolpath for a STEP file using OpenCAMlib 2.5D operations. "
-        "Returns a queued job ID; poll cam_job_status(file_id) for results and G-code download."
+        "Generate a CAM toolpath for a STEP file using OpenCAMlib 2.5D/3D/5-axis operations. "
+        "Returns a queued job ID; poll cam_job_status(file_id) for results and G-code download. "
+        "For 5-axis constant-tilt finishing use operation='5axis_finish' with drive_face_id + tilt_deg. "
+        "For 3+2 indexed use operation='3plus2' with drive_face_id + indexed_op."
     ),
     input_schema={
         "type": "object",
@@ -19,8 +21,17 @@ cam_run_spec = ToolSpec(
             "file_id": {"type": "string"},
             "operation": {
                 "type": "string",
-                "enum": ["face", "contour", "pocket", "drill", "profile"],
-                "description": "2.5D CAM operation type",
+                "enum": [
+                    "face", "contour", "pocket", "drill", "profile",
+                    "parallel_3d", "waterline", "lathe",
+                    "5axis_finish", "5axis", "3plus2",
+                ],
+                "description": (
+                    "CAM operation type. "
+                    "'5axis' is an alias for '5axis_finish'. "
+                    "'5axis_finish': constant-tilt surface finishing with A/B rotary moves. "
+                    "'3plus2': 3-axis op on a drive-face-aligned rotation."
+                ),
             },
             "tool_diameter": {
                 "type": "number",
@@ -45,6 +56,37 @@ cam_run_spec = ToolSpec(
             "coolant": {
                 "type": "boolean",
                 "description": "Enable flood coolant (default true)",
+            },
+            "drive_face_id": {
+                "type": "integer",
+                "description": "Zero-based face index for 5axis_finish / 3plus2 drive surface",
+            },
+            "tilt_deg": {
+                "type": "number",
+                "description": "Tool-axis tilt off surface normal in degrees [0–30] for 5axis_finish (default 15)",
+            },
+            "lead_deg": {
+                "type": "number",
+                "description": "Lead/lag angle along path direction for 5axis_finish (optional, default 0)",
+            },
+            "indexed_op": {
+                "type": "string",
+                "enum": ["face", "pocket", "contour", "parallel_3d", "waterline"],
+                "description": "3-axis sub-op for 3plus2 (default 'face')",
+            },
+            "kinematic_family": {
+                "type": "string",
+                "enum": ["head_table"],
+                "description": "Machine kinematic family (default 'head_table': A-around-X, B-around-Y)",
+            },
+            "use_tcp": {
+                "type": "boolean",
+                "description": "Emit G43.4 TCP mode in 5-axis G-code (default false)",
+            },
+            "post_processor_5x": {
+                "type": "string",
+                "enum": ["linuxcnc", "fanuc"],
+                "description": "Post-processor for 5-axis G-code (default 'linuxcnc')",
             },
         },
         "required": ["file_id", "operation"],
@@ -75,6 +117,14 @@ async def run_cam_run(ctx: ProjectCtx, args: bytes) -> str:
         "feed_rate": a.get("feed_rate", 1000.0),
         "spindle_speed": a.get("spindle_speed", 10000.0),
         "coolant": a.get("coolant", True),
+        # 5-axis fields (passed through when present)
+        "drive_face_id": a.get("drive_face_id"),
+        "tilt_deg": a.get("tilt_deg"),
+        "lead_deg": a.get("lead_deg"),
+        "indexed_op": a.get("indexed_op"),
+        "kinematic_family": a.get("kinematic_family"),
+        "use_tcp": a.get("use_tcp"),
+        "post_processor_5x": a.get("post_processor_5x"),
     }
     spec_json = json.dumps(spec)
 

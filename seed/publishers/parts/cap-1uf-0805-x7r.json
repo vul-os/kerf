@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "name": "Capacitor 1µF 0805 X7R",
+  "description": "Multi-layer ceramic chip capacitor, 1 µF, 16V, X7R dielectric, ±10%, 0805 SMD package.",
+  "category": "Capacitors",
+  "manufacturer": "Murata",
+  "mpn": "GRM188R71C105KA93D",
+  "value": "1u",
+  "distributors": [
+    {"name": "digikey", "sku": "490-3248-1-ND", "url": "https://www.digikey.com/en/products/detail/murata-electronics/GRM188R71C105KA93D/499694", "price_usd": 0.04, "stock": 10000},
+    {"name": "mouser", "sku": "963-GRM188R71C105KA93D", "url": "https://www.mouser.com/ProductDetail/Murata-Electronics/GRM188R71C105KA93D", "price_usd": 0.03, "stock": 9000},
+    {"name": "lcsc", "sku": "C14637", "url": "https://www.lcsc.com/product-detail/C14637", "price_usd": 0.005, "stock": 50000}
+  ],
+  "visibility": "public",
+  "metadata": {"package": "0805", "dielectric": "X7R", "voltage_v": 16, "tolerance": "10%"}
+}

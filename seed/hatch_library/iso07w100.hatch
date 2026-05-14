@@ -1,0 +1,9 @@
+{
+  "kind": "hatch_pattern",
+  "name": "ISO 07W100 - General",
+  "description": "Uniform 45-degree lines at 1mm spacing. General purpose ISO hatch.",
+  "category": "iso/general",
+  "lines": [
+    { "angle_deg": 45, "spacing_mm": 1, "offset_mm": 0 }
+  ]
+}

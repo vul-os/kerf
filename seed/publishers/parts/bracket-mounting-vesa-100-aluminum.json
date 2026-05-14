@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "VESA 100 Mount Adapter Aluminum",
+  "description": "VESA 100x100mm mounting adapter plate for LCD/LED monitors. Fits 100mm hole pattern. Aluminum 6061-T6.",
+  "category": "mechanical/bracket",
+  "manufacturer": "Kerf Workshop",
+  "mpn": "KERF-BRK-VES-100-AL",
+  "distributors": [
+    {"name": "digikey", "sku": "KBRK-VES100-AL-ND", "url": "https://www.digikey.com/en/products/detail/kerf/KERF-BRK-VES-100-AL", "price_usd": 7.25, "stock": 550},
+    {"name": "mcmaster", "sku": "MCKRF-VES100AL", "url": "https://www.mcmaster.com/KERF-BRK-VES-100-AL", "price_usd": 6.50, "stock": 400},
+    {"name": "misumi", "sku": "MSM-VESABRK-100AL", "url": "https://us.misumi-ec.com/v2/detail/dsearch?search=KERF-BRK-VES-100-AL", "price_usd": 5.60, "stock": 950}
+  ],
+  "visibility": "public",
+  "metadata": {"material": "aluminum 6061-T6", "dimensions": {"length_mm": 120, "width_mm": 120, "thickness_mm": 3}, "hole_pattern": "VESA 100x100mm (4xM4)"}
+}

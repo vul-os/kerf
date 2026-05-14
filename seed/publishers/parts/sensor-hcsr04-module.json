@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "name": "HC-SR04 Ultrasonic Sensor Module",
+  "description": "Ultrasonic distance sensor module, 2cm-400cm range, 4-pin connector. Trigger/echo interface.",
+  "category": "Sensors",
+  "manufacturer": "Generic",
+  "mpn": "HC-SR04",
+  "value": "HC-SR04",
+  "distributors": [
+    {"name": "digikey", "sku": "HC-SR04-ND", "url": "https://www.digikey.com/en/products/detail/sparkfun-electronics/HC-SR04/13109256", "price_usd": 3.95, "stock": 500},
+    {"name": "mouser", "sku": "474-HC-SR04", "url": "https://www.mouser.com/ProductDetail/SparkFun/HC-SR04", "price_usd": 3.80, "stock": 400},
+    {"name": "lcsc", "sku": "C9753", "url": "https://www.lcsc.com/product-detail/C9753", "price_usd": 0.95, "stock": 3000}
+  ],
+  "visibility": "public",
+  "metadata": {"package": "module", "interface": "GPIO", "range_cm": "2-400"}
+}

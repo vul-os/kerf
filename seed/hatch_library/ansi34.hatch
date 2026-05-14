@@ -1,0 +1,9 @@
+{
+  "kind": "hatch_pattern",
+  "name": "ANSI 34 - Zinc",
+  "description": "Horizontal parallel lines. Zinc and galvanized sections.",
+  "category": "ansi/zinc",
+  "lines": [
+    { "angle_deg": 0, "spacing_mm": 5, "offset_mm": 0 }
+  ]
+}

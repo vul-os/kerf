@@ -25,6 +25,11 @@ import {
   Anchor,
   Box,
   Magnet,
+  // NEW: drafting completeness
+  Grid2x2,
+  ArrowUpRight,
+  FileText,
+  Link2,
 } from 'lucide-react'
 
 // localStorage key for the drawing-canvas snap toggle. Read by both the
@@ -98,6 +103,17 @@ const TOOL_GROUPS = [
     items: [
       { id: 'measure-distance', icon: Gauge,   label: 'Measure distance (transient)' },
       { id: 'measure-angle',    icon: Compass, label: 'Measure angle (transient)' },
+    ],
+  },
+  // ---------------------------------------------------------------------------
+  // NEW: Drafting completeness tools.
+  {
+    label: 'Completeness',
+    items: [
+      { id: 'hatch',     icon: Grid2x2,      label: 'Hatch · click polygon then dbl-click to pick pattern' },
+      { id: 'dc-leader', icon: ArrowUpRight,  label: 'Leader (with text)' },
+      { id: 'rich-text', icon: FileText,      label: 'Rich text annotation' },
+      { id: 'dim-chain', icon: Link2,         label: 'Dimension chain · click picks, dbl-click to finish' },
     ],
   },
 ]

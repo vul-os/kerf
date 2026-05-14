@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "name": "Fused Silica (Quartz)",
+  "category": "ceramic/glass/fused-silica",
+  "common_names": ["fused silica", "quartz glass", "vitreous silica", "SiO2 glass"],
+  "color_hex": "#f0f8ff",
+  "mechanical": {
+    "E_GPa": 73,
+    "G_GPa": 31,
+    "nu": 0.17,
+    "yield_MPa": null,
+    "ultimate_MPa": 50,
+    "elongation_pct": 1
+  },
+  "thermal": {
+    "alpha_per_K": 0.5e-6,
+    "k_W_mK": 1.38,
+    "cp_J_kgK": 740,
+    "T_min_C": -200,
+    "T_max_C": 1100
+  },
+  "physical": {
+    "rho_kg_m3": 2200
+  },
+  "callout": "Fused SiO2",
+  "notes": "High-purity fused silica/quartz glass. Near-zero thermal expansion, excellent UV transmission, extreme temperature capability. Used in optics, semiconductors, crucibles. Source: Heraeus Fused Silica / Corning 7980."
+}

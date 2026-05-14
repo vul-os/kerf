@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "DS18B20 Temperature Sensor TO-92",
+  "description": "1-wire digital temperature sensor, -55 to 125C range, TO-92 package. Dallas DS18B20.",
+  "category": "Sensors",
+  "manufacturer": "Maxim Integrated",
+  "mpn": "DS18B20+",
+  "value": "DS18B20",
+  "distributors": [
+    {"name": "digikey", "sku": "DS18B20+-ND", "url": "https://www.digikey.com/en/products/detail/maxim-integrated/DS18B20/894298", "price_usd": 1.80, "stock": 2500},
+    {"name": "mouser", "sku": "700-DS18B20+", "url": "https://www.mouser.com/ProductDetail/Maxim-Integrated/DS18B20", "price_usd": 1.70, "stock": 2000}
+  ],
+  "visibility": "public",
+  "metadata": {"package": "TO-92", "interface": "1-Wire", "temp_range": "-55 to 125C"}
+}

@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "RP2040 Microcontroller QFN-56",
+  "description": "Dual-core ARM Cortex-M0+ MCU, 264KB SRAM, 16MB flash, 133MHz, QFN-56 SMD package. Raspberry Pi Pico.",
+  "category": "Microcontrollers",
+  "manufacturer": "Raspberry Pi",
+  "mpn": "RP2040",
+  "value": "RP2040",
+  "distributors": [
+    {"name": "digikey", "sku": "264-RP2040-ND", "url": "https://www.digikey.com/en/products/detail/raspberry-pi/RP2040/1364856", "price_usd": 1.00, "stock": 5000},
+    {"name": "mouser", "sku": "424-RP2040", "url": "https://www.mouser.com/ProductDetail/Raspberry-Pi/RP2040", "price_usd": 0.95, "stock": 4500}
+  ],
+  "visibility": "public",
+  "metadata": {"package": "QFN-56", "cores": 2, "clock_max_mhz": 133, "core": "Cortex-M0+"}
+}

@@ -25,6 +25,15 @@ import EquationsEditor from '../components/EquationsEditor.jsx'
 import ScriptEditor from '../components/ScriptEditor.jsx'
 import ToleranceView from '../components/ToleranceView.jsx'
 import TopoView from '../components/TopoView.jsx'
+import GraphEditor from '../components/GraphEditor.jsx'
+import RenderView from '../components/RenderView.jsx'
+import FamilyEditor from '../components/FamilyEditor.jsx'
+import ScheduleEditor from '../components/ScheduleEditor.jsx'
+import ViewEditor from '../components/ViewEditor.jsx'
+import SheetEditor from '../components/SheetEditor.jsx'
+import MEPView from '../components/MEPView.jsx'
+import StairView from '../components/StairView.jsx'
+import RailingView from '../components/RailingView.jsx'
 import ConfigurationsPanel from '../components/ConfigurationsPanel.jsx'
 import ActivityTimeline from '../components/ActivityTimeline.jsx'
 import { useWorkspace, loadFilePartsForProject } from '../store/workspace.js'
@@ -141,6 +150,83 @@ function isTopoFile(file) {
   return n.endsWith('.topo')
 }
 
+function isSubdFile(file) {
+  if (!file) return false
+  if (file.kind === 'subd') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.subd')
+}
+
+function isMeshFile(file) {
+  if (!file) return false
+  if (file.kind === 'mesh') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.mesh')
+}
+
+function isGraphFile(file) {
+  if (!file) return false
+  if (file.kind === 'graph') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.graph')
+}
+
+function isRenderFile(file) {
+  if (!file) return false
+  if (file.kind === 'render') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.render')
+}
+
+function isFamilyFile(file) {
+  if (!file) return false
+  if (file.kind === 'family') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.family.json')
+}
+
+function isScheduleFile(file) {
+  if (!file) return false
+  if (file.kind === 'schedule') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.schedule.json')
+}
+
+function isViewFile(file) {
+  if (!file) return false
+  if (file.kind === 'view') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.view.json')
+}
+
+function isSheetFile(file) {
+  if (!file) return false
+  if (file.kind === 'sheet') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.sheet.json')
+}
+
+function isMEPFile(file) {
+  if (!file) return false
+  if (['duct', 'pipe', 'conduit'].includes(file.kind)) return true
+  const n = (file.name || '').toLowerCase()
+  return n.includes('.duct.json') || n.includes('.pipe.json') || n.includes('.conduit.json')
+}
+
+function isStairFile(file) {
+  if (!file) return false
+  if (file.kind === 'stair') return true
+  const n = (file.name || '').toLowerCase()
+  return n.includes('.stair.json')
+}
+
+function isRailingFile(file) {
+  if (!file) return false
+  if (file.kind === 'railing') return true
+  const n = (file.name || '').toLowerCase()
+  return n.includes('.railing.json')
+}
+
 export default function Editor() {
   const { projectId, fileId } = useParams()
   const navigate = useNavigate()
@@ -185,6 +271,17 @@ export default function Editor() {
     if (isScriptFile(w.currentFile)) return
     if (isToleranceFile(w.currentFile)) return
     if (isTopoFile(w.currentFile)) return
+    if (isSubdFile(w.currentFile)) return
+    if (isMeshFile(w.currentFile)) return
+    if (isGraphFile(w.currentFile)) return
+    if (isRenderFile(w.currentFile)) return
+    if (isFamilyFile(w.currentFile)) return
+    if (isScheduleFile(w.currentFile)) return
+    if (isViewFile(w.currentFile)) return
+    if (isSheetFile(w.currentFile)) return
+    if (isMEPFile(w.currentFile)) return
+    if (isStairFile(w.currentFile)) return
+    if (isRailingFile(w.currentFile)) return
     if (runTimerRef.current) clearTimeout(runTimerRef.current)
     const code = w.currentFileContent
     const delay = runDebounceFor(code)
@@ -457,6 +554,15 @@ export default function Editor() {
   const scriptFile = isScriptFile(w.currentFile)
   const toleranceFile = isToleranceFile(w.currentFile)
   const topoFile = isTopoFile(w.currentFile)
+  const graphFile = isGraphFile(w.currentFile)
+  const renderFile = isRenderFile(w.currentFile)
+  const familyFile = isFamilyFile(w.currentFile)
+  const scheduleFile = isScheduleFile(w.currentFile)
+  const viewFile = isViewFile(w.currentFile)
+  const sheetFile = isSheetFile(w.currentFile)
+  const mepFile = isMEPFile(w.currentFile)
+  const stairFile = isStairFile(w.currentFile)
+  const railingFile = isRailingFile(w.currentFile)
   // Resolver used by FeatureView to fetch sketch contents on demand. We
   // re-read the latest file content rather than relying on the cached
   // sketch parse from the workspace store (which may be stale if the user
@@ -873,6 +979,104 @@ export default function Editor() {
                 fileName={w.currentFile?.name}
                 projectId={projectId}
                 fileId={fileId}
+              />
+              {w.toast && (
+                <div className="absolute bottom-3 right-3 z-20 px-3 py-2 rounded-md bg-ink-900 border border-kerf-300/60 text-kerf-300 text-xs shadow-xl"
+                  onClick={() => w.dismissToast()}>
+                  {w.toast}
+                </div>
+              )}
+            </div>
+          ) : graphFile ? (
+            <div className="flex-1 min-h-0 relative">
+              <GraphEditor
+                content={w.currentFileContent}
+                fileName={w.currentFile?.name}
+                onContentChange={(v) => w.editContent(v)}
+              />
+              {w.toast && (
+                <div className="absolute bottom-3 right-3 z-20 px-3 py-2 rounded-md bg-ink-900 border border-kerf-300/60 text-kerf-300 text-xs shadow-xl"
+                  onClick={() => w.dismissToast()}>
+                  {w.toast}
+                </div>
+              )}
+            </div>
+          ) : familyFile ? (
+            <div className="flex-1 min-h-0 relative">
+              <FamilyEditor
+                content={w.currentFileContent}
+                fileName={w.currentFile?.name}
+                onContentChange={(v) => w.editContent(v)}
+              />
+              {w.toast && (
+                <div className="absolute bottom-3 right-3 z-20 px-3 py-2 rounded-md bg-ink-900 border border-kerf-300/60 text-kerf-300 text-xs shadow-xl"
+                  onClick={() => w.dismissToast()}>
+                  {w.toast}
+                </div>
+              )}
+            </div>
+          ) : scheduleFile ? (
+            <div className="flex-1 min-h-0 relative">
+              <ScheduleEditor
+                content={w.currentFileContent}
+                fileName={w.currentFile?.name}
+                onContentChange={(v) => w.editContent(v)}
+              />
+              {w.toast && (
+                <div className="absolute bottom-3 right-3 z-20 px-3 py-2 rounded-md bg-ink-900 border border-kerf-300/60 text-kerf-300 text-xs shadow-xl"
+                  onClick={() => w.dismissToast()}>
+                  {w.toast}
+                </div>
+              )}
+            </div>
+          ) : viewFile ? (
+            <div className="flex-1 min-h-0 relative">
+              <ViewEditor
+                content={w.currentFileContent}
+                fileName={w.currentFile?.name}
+                onContentChange={(v) => w.editContent(v)}
+              />
+              {w.toast && (
+                <div className="absolute bottom-3 right-3 z-20 px-3 py-2 rounded-md bg-ink-900 border border-kerf-300/60 text-kerf-300 text-xs shadow-xl"
+                  onClick={() => w.dismissToast()}>
+                  {w.toast}
+                </div>
+              )}
+            </div>
+          ) : mepFile ? (
+            <div className="flex-1 min-h-0 relative">
+              <MEPView
+                content={w.currentFileContent}
+                fileName={w.currentFile?.name}
+                onContentChange={(v) => w.editContent(v)}
+              />
+              {w.toast && (
+                <div className="absolute bottom-3 right-3 z-20 px-3 py-2 rounded-md bg-ink-900 border border-kerf-300/60 text-kerf-300 text-xs shadow-xl"
+                  onClick={() => w.dismissToast()}>
+                  {w.toast}
+                </div>
+              )}
+            </div>
+          ) : sheetFile ? (
+            <div className="flex-1 min-h-0 relative">
+              <SheetEditor
+                content={w.currentFileContent}
+                fileName={w.currentFile?.name}
+                onContentChange={(v) => w.editContent(v)}
+              />
+              {w.toast && (
+                <div className="absolute bottom-3 right-3 z-20 px-3 py-2 rounded-md bg-ink-900 border border-kerf-300/60 text-kerf-300 text-xs shadow-xl"
+                  onClick={() => w.dismissToast()}>
+                  {w.toast}
+                </div>
+              )}
+            </div>
+          ) : renderFile ? (
+            <div className="flex-1 min-h-0 relative">
+              <RenderView
+                content={(() => { try { return JSON.parse(w.currentFileContent || '{}') } catch { return null } })()}
+                fileName={w.currentFile?.name}
+                onContentChange={(v) => w.editContent(JSON.stringify(v, null, 2))}
               />
               {w.toast && (
                 <div className="absolute bottom-3 right-3 z-20 px-3 py-2 rounded-md bg-ink-900 border border-kerf-300/60 text-kerf-300 text-xs shadow-xl"

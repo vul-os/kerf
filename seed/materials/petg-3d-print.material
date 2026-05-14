@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "name": "PETG (3D Print)",
+  "category": "polymer/thermoplastic/polyester",
+  "common_names": ["PETG filament 3D printing", "glycol-modified PET"],
+  "color_hex": "#b8d4d0",
+  "mechanical": {
+    "E_GPa": 2.0,
+    "G_GPa": 0.74,
+    "nu": 0.40,
+    "yield_MPa": 48,
+    "ultimate_MPa": 53,
+    "elongation_pct": 28
+  },
+  "thermal": {
+    "alpha_per_K": 58e-6,
+    "k_W_mK": 0.22,
+    "cp_J_kgK": 1350,
+    "T_min_C": -40,
+    "T_max_C": 75
+  },
+  "physical": {
+    "rho_kg_m3": 1275
+  },
+  "callout": "PETG-3D",
+  "notes": "3D printing grade PETG with improved layer adhesion. Higher elongation than PLA. Good chemical resistance and moisture barrier. Source: Hatchbox / eSUN PETG datasheet."
+}

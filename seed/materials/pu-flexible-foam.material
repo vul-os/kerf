@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "name": "PU Flexible Foam",
+  "category": "polymer/foam/flexible/polyurethane",
+  "common_names": ["flexible polyurethane foam", "PU foam", "polyurethane cushioning foam"],
+  "color_hex": "#ffe4c4",
+  "mechanical": {
+    "E_GPa": 0.0008,
+    "G_GPa": 0.0003,
+    "nu": 0.45,
+    "yield_MPa": 0.08,
+    "ultimate_MPa": 0.15,
+    "elongation_pct": 120
+  },
+  "thermal": {
+    "alpha_per_K": 100e-6,
+    "k_W_mK": 0.035,
+    "cp_J_kgK": 1600,
+    "T_min_C": -40,
+    "T_max_C": 90
+  },
+  "physical": {
+    "rho_kg_m3": 30
+  },
+  "callout": "PU-Flex",
+  "notes": "Flexible polyurethane foam — standard cushioning and upholstery foam. High elongation and energy absorption. Properties vary widely with density; values at ~30 kg/m\u00b3. Source: Carpenter / ASTM D3574."
+}

@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "ATmega328P Microcontroller TQFP-32",
+  "description": "8-bit AVR microcontroller, 32KB flash, 2KB SRAM, 1KB EEPROM, 20MHz max, TQFP-32 SMD package.",
+  "category": "Microcontrollers",
+  "manufacturer": "Microchip",
+  "mpn": "ATmega328P-AU",
+  "value": "ATmega328P",
+  "distributors": [
+    {"name": "digikey", "sku": "ATmega328P-AU-ND", "url": "https://www.digikey.com/en/products/detail/microchip-technology/ATmega328P-AU/8934507", "price_usd": 2.20, "stock": 3000},
+    {"name": "mouser", "sku": "579-ATmega328P-AU", "url": "https://www.mouser.com/ProductDetail/Microchip/ATmega328P-AU", "price_usd": 2.15, "stock": 2500}
+  ],
+  "visibility": "public",
+  "metadata": {"package": "TQFP-32", "flash_kb": 32, "clock_max_mhz": 20}
+}

@@ -30,6 +30,7 @@ import * as JSCADModeling from '@jscad/modeling'
 import { extractBoardOutline } from '../lib/circuitOutline.js'
 import { sketchToGeom2 } from '../lib/sketchGeom2.js'
 import { meshCache } from '../lib/meshCache.js'
+import { subdToBufferGeometry, meshDocToBufferGeometry } from '../lib/subdToBufferGeometry.js'
 import { git as gitApi } from '../cloud/api.js'
 
 // Prune the IndexedDB mesh cache on first store import (i.e. app start). Best-
@@ -99,6 +100,8 @@ function fileKindFor(file) {
   if (file.kind === 'circuit') return 'circuit'
   if (file.kind === 'equations') return 'equations'
   if (file.kind === 'script') return 'script'
+  if (file.kind === 'subd') return 'subd'
+  if (file.kind === 'mesh') return 'mesh'
   const name = (file.name || '').toLowerCase()
   // Circuit must be checked BEFORE generic .tsx so a tscircuit file routes to
   // the CircuitEditor; pure .tsx files (if we ever support them) keep the
@@ -114,6 +117,8 @@ function fileKindFor(file) {
   if (name.endsWith('.part')) return 'part'
   if (name.endsWith('.feature')) return 'feature'
   if (name.endsWith('.equations')) return 'equations'
+  if (name.endsWith('.subd')) return 'subd'
+  if (name.endsWith('.mesh')) return 'mesh'
   return 'jscad'
 }
 
@@ -668,6 +673,64 @@ export const useWorkspace = create((set, get) => ({
           loadingParts: false,
           partsError: null,
         })
+        return
+      }
+      if (kind === 'subd') {
+        // Subdivision surface file (.subd): JSON with a control_mesh +
+        // subdivision_level.  We run the Catmull-Clark subdivider client-side
+        // and push the resulting BufferGeometry into parts so the standard
+        // Renderer displays it immediately.
+        set({
+          currentFile: file,
+          currentFileContent: file.content ?? '',
+          dirty: false,
+          parts: [],
+          loadingParts: false,
+          partsError: null,
+        })
+        try {
+          const doc = JSON.parse(file.content ?? '{}')
+          const geom = subdToBufferGeometry(doc)
+          if (get().currentFileId === fileId) {
+            set({
+              parts: [{ id: file.id, geom, color: 0xc9a96b }],
+              loadingParts: false,
+              partsError: null,
+            })
+          }
+        } catch (err) {
+          if (get().currentFileId === fileId) {
+            set({ loadingParts: false, partsError: err?.message || 'Failed to load subd' })
+          }
+        }
+        return
+      }
+      if (kind === 'mesh') {
+        // Triangle mesh file (.mesh): JSON with vertices, indices, optional normals.
+        // Push directly into a BufferGeometry; no subdivision step.
+        set({
+          currentFile: file,
+          currentFileContent: file.content ?? '',
+          dirty: false,
+          parts: [],
+          loadingParts: false,
+          partsError: null,
+        })
+        try {
+          const meshDoc = JSON.parse(file.content ?? '{}')
+          const geom = meshDocToBufferGeometry(meshDoc)
+          if (get().currentFileId === fileId) {
+            set({
+              parts: [{ id: file.id, geom, color: 0x6b9bc9 }],
+              loadingParts: false,
+              partsError: null,
+            })
+          }
+        } catch (err) {
+          if (get().currentFileId === fileId) {
+            set({ loadingParts: false, partsError: err?.message || 'Failed to load mesh' })
+          }
+        }
         return
       }
       if (kind === 'assembly') {

@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "T-Junction Bracket 50mm Aluminum",
+  "description": "T-shaped structural bracket for 50mm profile junctions, 4mm thickness. Aluminum 6061-T6 with M6 tapped holes.",
+  "category": "mechanical/bracket",
+  "manufacturer": "Kerf Workshop",
+  "mpn": "KERF-BRK-T-AL-50",
+  "distributors": [
+    {"name": "digikey", "sku": "KBRK-T50-AL-ND", "url": "https://www.digikey.com/en/products/detail/kerf/KERF-BRK-T-AL-50", "price_usd": 4.25, "stock": 700},
+    {"name": "mcmaster", "sku": "MCKRF-T50AL", "url": "https://www.mcmaster.com/KERF-BRK-T-AL-50", "price_usd": 3.75, "stock": 500},
+    {"name": "misumi", "sku": "MSM-TBRK-50AL", "url": "https://us.misumi-ec.com/v2/detail/dsearch?search=KERF-BRK-T-AL-50", "price_usd": 3.20, "stock": 1800}
+  ],
+  "visibility": "public",
+  "metadata": {"material": "aluminum 6061-T6", "dimensions": {"length_mm": 50, "width_mm": 100, "thickness_mm": 4}, "hole_pattern": "6xM6 on 50mm centers"}
+}

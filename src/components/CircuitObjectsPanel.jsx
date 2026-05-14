@@ -3,9 +3,10 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, ChevronRight, Cpu, CircuitBoard, HelpCircle, Link2, Library } from 'lucide-react'
+import { ChevronDown, ChevronRight, Cpu, CircuitBoard, HelpCircle, Link2, Library, ShieldAlert, AlertTriangle, AlertCircle } from 'lucide-react'
 import { useWorkspace } from '../store/workspace.js'
 import { parseLibraryMappings } from '../lib/circuitMappings.js'
+import { runERC } from '../lib/erc.js'
 import LibraryPicker from './LibraryPicker.jsx'
 
 // Engineering-notation prefixes covering 1e-12 (p) → 1e9 (G). We pick the
@@ -226,6 +227,20 @@ export default function CircuitObjectsPanel({ circuitJson }) {
   const [pickFor, setPickFor] = useState(null)
   const [openComponents, setOpenComponents] = useState(true)
   const [openNets, setOpenNets] = useState(true)
+  const [openERC, setOpenERC] = useState(true)
+
+  // ERC — run on every circuitJson update; cheap pure function.
+  const ercResult = useMemo(() => {
+    if (!Array.isArray(circuitJson) || circuitJson.length === 0) {
+      return { errors: [], warnings: [] }
+    }
+    try {
+      return runERC(circuitJson)
+    } catch {
+      return { errors: [], warnings: [] }
+    }
+  }, [circuitJson])
+
   const empty = components.length === 0 && nets.length === 0
 
   // When the selection changes externally (e.g. user clicks the schematic),
@@ -249,9 +264,23 @@ export default function CircuitObjectsPanel({ circuitJson }) {
         <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-400">
           Circuit
         </span>
-        <span className="text-[10px] text-ink-500 font-mono">
-          {components.length}c · {nets.length}n
-        </span>
+        <div className="flex items-center gap-2">
+          {ercResult.errors.length > 0 && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] font-mono text-red-400" title={`${ercResult.errors.length} ERC error${ercResult.errors.length !== 1 ? 's' : ''}`}>
+              <AlertCircle size={10} />
+              {ercResult.errors.length}
+            </span>
+          )}
+          {ercResult.warnings.length > 0 && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] font-mono text-amber-400" title={`${ercResult.warnings.length} ERC warning${ercResult.warnings.length !== 1 ? 's' : ''}`}>
+              <AlertTriangle size={10} />
+              {ercResult.warnings.length}
+            </span>
+          )}
+          <span className="text-[10px] text-ink-500 font-mono">
+            {components.length}c · {nets.length}n
+          </span>
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto py-1 min-h-0">
@@ -353,6 +382,12 @@ export default function CircuitObjectsPanel({ circuitJson }) {
                 </div>
               ))}
             </Section>
+            <ErcTab
+              ercResult={ercResult}
+              open={openERC}
+              onToggle={() => setOpenERC((v) => !v)}
+              onSelectComponent={selectCircuitComponent}
+            />
           </>
         )}
       </div>
@@ -388,6 +423,100 @@ function Section({ icon: Icon, title, count, open, onToggle, children }) {
         <span className="ml-auto font-mono text-ink-600 tabular-nums">{count}</span>
       </button>
       {open && <div className="px-1 pb-1">{children}</div>}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// ErcTab — collapsible ERC section inside CircuitObjectsPanel.
+// Shows errors (red) and warnings (amber) from runERC output.
+// Clicking an item selects the component in the schematic view.
+// ---------------------------------------------------------------------------
+function ErcTab({ ercResult, open, onToggle, onSelectComponent }) {
+  const { errors, warnings } = ercResult
+  const total = errors.length + warnings.length
+
+  return (
+    <div className="mb-1 border-t border-ink-800/60 pt-0.5">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-center gap-1.5 px-2 py-1 text-[10px] uppercase tracking-wider text-ink-500 hover:text-ink-300"
+      >
+        {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+        <ShieldAlert size={11} />
+        <span className="font-semibold">ERC</span>
+        {errors.length > 0 ? (
+          <span className="ml-auto font-mono text-red-400 tabular-nums">{errors.length}E {warnings.length > 0 ? `${warnings.length}W` : ''}</span>
+        ) : warnings.length > 0 ? (
+          <span className="ml-auto font-mono text-amber-400 tabular-nums">{warnings.length}W</span>
+        ) : (
+          <span className="ml-auto font-mono text-emerald-500 tabular-nums">OK</span>
+        )}
+      </button>
+      {open && (
+        <div className="px-1 pb-1">
+          {total === 0 ? (
+            <div className="px-2 py-2 text-[11px] text-emerald-600 text-center">
+              No ERC violations
+            </div>
+          ) : (
+            <>
+              {errors.map((err, i) => (
+                <ErcItem
+                  key={`e-${i}`}
+                  item={err}
+                  isError
+                  onSelectComponent={onSelectComponent}
+                />
+              ))}
+              {warnings.map((warn, i) => (
+                <ErcItem
+                  key={`w-${i}`}
+                  item={warn}
+                  isError={false}
+                  onSelectComponent={onSelectComponent}
+                />
+              ))}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ErcItem({ item, isError, onSelectComponent }) {
+  const hasTarget = item.component_id || item.port_id
+  return (
+    <div
+      role={hasTarget ? 'button' : undefined}
+      tabIndex={hasTarget ? 0 : undefined}
+      onClick={() => {
+        if (item.component_id && onSelectComponent) onSelectComponent(item.component_id)
+      }}
+      onKeyDown={(e) => {
+        if ((e.key === 'Enter' || e.key === ' ') && item.component_id && onSelectComponent) {
+          e.preventDefault()
+          onSelectComponent(item.component_id)
+        }
+      }}
+      className={`flex items-start gap-1.5 px-2 py-[3px] rounded-sm text-ink-200 ${
+        hasTarget ? 'cursor-pointer hover:bg-ink-800' : ''
+      }`}
+      title={hasTarget ? 'Click to highlight component' : undefined}
+    >
+      <span className={`mt-0.5 flex-shrink-0 ${isError ? 'text-red-400' : 'text-amber-400'}`}>
+        {isError ? <AlertCircle size={10} /> : <AlertTriangle size={10} />}
+      </span>
+      <div className="min-w-0">
+        <div className={`text-[10px] font-semibold font-mono ${isError ? 'text-red-400' : 'text-amber-400'}`}>
+          {item.kind}
+        </div>
+        <div className="text-[11px] leading-snug break-words text-ink-300">
+          {item.message}
+        </div>
+      </div>
     </div>
   )
 }

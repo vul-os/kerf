@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "name": "MCP1700-3302 Linear Regulator SOT-23",
+  "description": "Low-quiescent-current LDO, 3.3V output, 250mA max, SOT-23 package.",
+  "category": "Regulators",
+  "manufacturer": "Microchip",
+  "mpn": "MCP1700-3302E/TO",
+  "value": "3.3V",
+  "distributors": [
+    {"name": "digikey", "sku": "MCP1700-3302E-TO-ND", "url": "https://www.digikey.com/en/products/detail/microchip-technology/MCP1700-3302E-TO/784120", "price_usd": 0.45, "stock": 3000},
+    {"name": "mouser", "sku": "579-MCP1700-3302E-TO", "url": "https://www.mouser.com/ProductDetail/Microchip/MCP1700-3302E-TO", "price_usd": 0.42, "stock": 2500},
+    {"name": "lcsc", "sku": "C8249", "url": "https://www.lcsc.com/product-detail/C8249", "price_usd": 0.12, "stock": 8000}
+  ],
+  "visibility": "public",
+  "metadata": {"package": "SOT-23", "output_v": 3.3, "dropout_v": 0.178, "current_ma": 250}
+}

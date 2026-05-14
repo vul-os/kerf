@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "TV Wall Mount Bracket Medium",
+  "description": "Full-motion TV wall mount for 32-55 inch displays. Supports up to 35kg. Powder-coated steel arms.",
+  "category": "mechanical/bracket",
+  "manufacturer": "Kerf Workshop",
+  "mpn": "KERF-BRK-WMTV-MED",
+  "distributors": [
+    {"name": "digikey", "sku": "KBRK-WMTV-MED-ND", "url": "https://www.digikey.com/en/products/detail/kerf/KERF-BRK-WMTV-MED", "price_usd": 28.50, "stock": 200},
+    {"name": "mcmaster", "sku": "MCKRF-WMTVMED", "url": "https://www.mcmaster.com/KERF-BRK-WMTV-MED", "price_usd": 24.99, "stock": 150},
+    {"name": "misumi", "sku": "MSM-WMTBRK-MED", "url": "https://us.misumi-ec.com/v2/detail/dsearch?search=KERF-BRK-WMTV-MED", "price_usd": 21.50, "stock": 400}
+  ],
+  "visibility": "public",
+  "metadata": {"material": "steel powder-coated", "dimensions": {"length_mm": 400, "width_mm": 200, "thickness_mm": 6}, "hole_pattern": "VESA 200x200max (4xM6)"}
+}

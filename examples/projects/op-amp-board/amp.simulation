@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "circuit_file_id": "*",
+  "analysis": {
+    "type": "dc",
+    "sweep": {
+      "source": "VIN",
+      "start": "-5",
+      "end": "5",
+      "step": "0.1"
+    }
+  },
+  "probes": [
+    { "name": "VOUT", "kind": "V", "source_port_id": "net.VOUT" },
+    { "name": "VIN", "kind": "V", "source_port_id": "net.VIN" },
+    { "name": "I_R2", "kind": "I", "source_component_id": "R2" }
+  ],
+  "results": {
+    "waveforms": [],
+    "warnings": ["Engine pending — ngspice-wasm not yet wired."],
+    "errors": []
+  }
+}

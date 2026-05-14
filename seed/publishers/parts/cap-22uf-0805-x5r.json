@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "name": "Capacitor 22µF 0805 X5R",
+  "description": "Multi-layer ceramic chip capacitor, 22 µF, 16V, X5R dielectric, ±20%, 0805 SMD package.",
+  "category": "Capacitors",
+  "manufacturer": "TDK",
+  "mpn": "C2012X5R1C226M125AC",
+  "value": "22u",
+  "distributors": [
+    {"name": "digikey", "sku": "445-173037-1-ND", "url": "https://www.digikey.com/en/products/detail/tdk-corporation/C2012X5R1C226M125AC/13114990", "price_usd": 0.12, "stock": 5000},
+    {"name": "mouser", "sku": "810-C2012X5R1C226M125AC", "url": "https://www.mouser.com/ProductDetail/TDK/C2012X5R1C226M125AC", "price_usd": 0.11, "stock": 4500},
+    {"name": "lcsc", "sku": "C24876", "url": "https://www.lcsc.com/product-detail/C24876", "price_usd": 0.02, "stock": 20000}
+  ],
+  "visibility": "public",
+  "metadata": {"package": "0805", "dielectric": "X5R", "voltage_v": 16, "tolerance": "20%"}
+}

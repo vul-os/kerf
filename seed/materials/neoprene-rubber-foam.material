@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "name": "Neoprene Rubber Foam",
+  "category": "elastomer/foam/neoprene",
+  "common_names": ["neoprene foam", "polychloroprene foam", "CR foam", "closed-cell neoprene"],
+  "color_hex": "#8b4513",
+  "mechanical": {
+    "E_GPa": 0.001,
+    "G_GPa": 0.0004,
+    "nu": 0.47,
+    "yield_MPa": 0.10,
+    "ultimate_MPa": 0.25,
+    "elongation_pct": 180
+  },
+  "thermal": {
+    "alpha_per_K": 120e-6,
+    "k_W_mK": 0.045,
+    "cp_J_kgK": 1500,
+    "T_min_C": -30,
+    "T_max_C": 100
+  },
+  "physical": {
+    "rho_kg_m3": 150
+  },
+  "callout": "Neoprene-Foam",
+  "notes": "Closed-cell neoprene (polychloroprene) rubber foam. Good weather, oil, and flame resistance. Used in marine, gaskets, vibration isolation. Source: Armstrong Closed-Cell Neoprene / ASTM D1056."
+}

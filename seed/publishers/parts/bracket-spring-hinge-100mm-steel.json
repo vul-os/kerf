@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "Spring Hinge Bracket 100mm Steel",
+  "description": "Heavy-duty spring-loaded hinge bracket, 100mm leaf length. Self-closing action. Stainless steel construction.",
+  "category": "mechanical/bracket",
+  "manufacturer": "Kerf Workshop",
+  "mpn": "KERF-BRK-SPG-ST-100",
+  "distributors": [
+    {"name": "digikey", "sku": "KBRK-SPG100-ST-ND", "url": "https://www.digikey.com/en/products/detail/kerf/KERF-BRK-SPG-ST-100", "price_usd": 14.50, "stock": 280},
+    {"name": "mcmaster", "sku": "MCKRF-SPG100ST", "url": "https://www.mcmaster.com/KERF-BRK-SPG-ST-100", "price_usd": 12.99, "stock": 200},
+    {"name": "misumi", "sku": "MSM-SPGHBRK-100ST", "url": "https://us.misumi-ec.com/v2/detail/dsearch?search=KERF-BRK-SPG-ST-100", "price_usd": 11.20, "stock": 500}
+  ],
+  "visibility": "public",
+  "metadata": {"material": "stainless steel", "dimensions": {"length_mm": 100, "width_mm": 50, "thickness_mm": 4}, "hole_pattern": "6xM5 per leaf"}
+}

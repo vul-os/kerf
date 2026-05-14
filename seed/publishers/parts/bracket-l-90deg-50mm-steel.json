@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "L-Bracket 90deg 50mm Steel",
+  "description": "Heavy-duty right-angle L-bracket with 50mm legs, 5mm thickness, pre-drilled hole pattern. Powder-coated steel.",
+  "category": "mechanical/bracket",
+  "manufacturer": "Kerf Workshop",
+  "mpn": "KERF-BRK-L-ST-50",
+  "distributors": [
+    {"name": "digikey", "sku": "KBRK-L50-ST-ND", "url": "https://www.digikey.com/en/products/detail/kerf/KERF-BRK-L-ST-50", "price_usd": 5.80, "stock": 900},
+    {"name": "mcmaster", "sku": "MCKRF-L50ST", "url": "https://www.mcmaster.com/KERF-BRK-L-ST-50", "price_usd": 4.99, "stock": 600},
+    {"name": "misumi", "sku": "MSM-LBRK-50ST", "url": "https://us.misumi-ec.com/v2/detail/dsearch?search=KERF-BRK-L-ST-50", "price_usd": 4.20, "stock": 1500}
+  ],
+  "visibility": "public",
+  "metadata": {"material": "steel powder-coated", "dimensions": {"length_mm": 50, "width_mm": 50, "thickness_mm": 5}, "hole_pattern": "6xM6 on 40mm centers"}
+}

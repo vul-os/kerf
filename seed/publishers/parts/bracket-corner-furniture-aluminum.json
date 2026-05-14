@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "Furniture Corner Bracket Aluminum",
+  "description": "Decorative-structural corner bracket for furniture assembly. Fits 20-40mm panels. Brushed aluminum finish.",
+  "category": "mechanical/bracket",
+  "manufacturer": "Kerf Workshop",
+  "mpn": "KERF-BRK-FURN-AL",
+  "distributors": [
+    {"name": "digikey", "sku": "KBRK-FURN-AL-ND", "url": "https://www.digikey.com/en/products/detail/kerf/KERF-BRK-FURN-AL", "price_usd": 4.80, "stock": 650},
+    {"name": "mcmaster", "sku": "MCKRF-FURNAL", "url": "https://www.mcmaster.com/KERF-BRK-FURN-AL", "price_usd": 4.20, "stock": 500},
+    {"name": "misumi", "sku": "MSM-FURNBRK-AL", "url": "https://us.misumi-ec.com/v2/detail/dsearch?search=KERF-BRK-FURN-AL", "price_usd": 3.60, "stock": 1300}
+  ],
+  "visibility": "public",
+  "metadata": {"material": "aluminum brushed", "dimensions": {"length_mm": 40, "width_mm": 40, "thickness_mm": 2}, "hole_pattern": "4xM4 countersunk"}
+}

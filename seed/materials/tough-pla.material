@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "name": "Tough-PLA (3D Print)",
+  "category": "polymer/thermoplastic/biodegradable",
+  "common_names": ["tough PLA filament", "impact-modified PLA", "PLA-IMP"],
+  "color_hex": "#c8e6c9",
+  "mechanical": {
+    "E_GPa": 2.3,
+    "G_GPa": 0.85,
+    "nu": 0.37,
+    "yield_MPa": 43,
+    "ultimate_MPa": 52,
+    "elongation_pct": 22
+  },
+  "thermal": {
+    "alpha_per_K": 72e-6,
+    "k_W_mK": 0.14,
+    "cp_J_kgK": 1820,
+    "T_min_C": -20,
+    "T_max_C": 58
+  },
+  "physical": {
+    "rho_kg_m3": 1220
+  },
+  "callout": "Tough-PLA",
+  "notes": "Impact-modified PLA with higher toughness and elongation. Preserves printability of PLA with ABS-like mechanicals. Source: Polylite PLA-Tough / eSUN Tough PLA."
+}

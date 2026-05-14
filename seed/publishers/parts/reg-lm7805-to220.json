@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "LM7805 Regulator TO-220",
+  "description": "Linear voltage regulator, 5V output, 1.5A max, TO-220 package. Classic 7805.",
+  "category": "Regulators",
+  "manufacturer": "Texas Instruments",
+  "mpn": "LM7805CP",
+  "value": "5V",
+  "distributors": [
+    {"name": "digikey", "sku": "296-1411-5-ND", "url": "https://www.digikey.com/en/products/detail/texas-instruments/LM7805CP/591841", "price_usd": 0.60, "stock": 2500},
+    {"name": "mouser", "sku": "595-LM7805CP", "url": "https://www.mouser.com/ProductDetail/Texas-Instruments/LM7805CP", "price_usd": 0.55, "stock": 2000}
+  ],
+  "visibility": "public",
+  "metadata": {"package": "TO-220", "output_v": 5.0, "current_ma": 1500}
+}

@@ -1,0 +1,11 @@
+{
+  "kind": "hatch_pattern",
+  "name": "Earth - Earth Section",
+  "description": "Alternating short angled marks with varying dash. Soil and earth sections.",
+  "category": "geotechnical",
+  "lines": [
+    { "angle_deg": 60, "spacing_mm": 8, "offset_mm": 0, "dash": [4, 2] },
+    { "angle_deg": 120, "spacing_mm": 8, "offset_mm": 0, "dash": [4, 2] },
+    { "angle_deg": 90, "spacing_mm": 8, "offset_mm": 0, "dash": [2, 4] }
+  ]
+}

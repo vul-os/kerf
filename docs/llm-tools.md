@@ -1,133 +1,434 @@
-# LLM tools
+# LLM tools (~150)
 
-The catalog of tools chat can call. Each tool is a Python function in
-`backend/tools/`; the agent loop dispatches to it via asyncio and
-streams results back to the model.
+Kerf exposes ~150 Python tools the LLM can call. Each tool lives in
+`backend/tools/` and is registered via the `@register` decorator, which
+auto-generates the JSON-RPC schema and wires it into the agent loop. When
+a chat message arrives, the LLM decides which tool to call; the agent loop
+dispatches via asyncio and streams results back.
 
-The surface is intentionally **small and stable**. Domain-specific edit
-tools (formerly `assembly_*`, `drawing_*`, `feature_*`, `set_part_*`,
-`add_component`, …) were removed in favour of a doc-search-first model:
-the LLM consults an embedded authoring corpus (`search_kerf_docs`) and
-then edits the file's JSON directly via the standard file ops. This
-keeps the tool count stable as new domains land — the new behaviour is
-authored as a doc, not a tool.
+## How it all works
+
+The tool system follows a **doc-search-first** pattern:
+
+1. The LLM receives a user request (e.g. *"add a fillet to this part"*).
+2. It calls `search_kerf_docs("fillet")` — this hits an embedded markdown
+   corpus (`backend/llm_docs/*.md`) and returns `{path, title, excerpt, score}`.
+3. The LLM reads the relevant doc via `read_file` (paths under `/docs/llm/` are
+   routed to the corpus, not the project tree).
+4. Armed with the right conventions, the LLM calls the low-level tools
+   (`read_file`, `edit_file`, `create_file`, etc.) to mutate the JSON directly.
+
+This keeps the tool surface stable — new domain knowledge lives in docs,
+not new tool functions. The `@register` decorator handles schema generation
+so adding a tool is: write the function, add one line to `registry.py`.
+
+### The @register decorator
+
+Every tool function in `backend/tools/` is prefixed with `@register`.
+This decorator does three things:
+
+1. **Schema generation** — inspects the function signature and docstring
+   to produce a JSON-Schema for that tool's parameters.
+2. **Registry injection** — adds the function to the central `Registry`
+   map that the agent loop consults on every call.
+3. **Permission tagging** — attaches a `read` or `write` permission label
+   derived from the function's name (or an explicit `perm=` kwarg).
+
+Example:
+
+```python
+@register
+def feature_fillet(session, part_path, edge_ids, radius):
+    """Add fillet to specified edges.  [write]
+    Args:
+      part_path:  path to .part or .feature file
+      edge_ids:   list of edge identifiers
+      radius:     fillet radius in mm
+    """
+    ...
+```
+
+The decorator infers `"editor+"` for names starting with `set_`, `add_`,
+`create_`, `delete_`, `run_`, `write_`, etc.; everything else is
+`"viewer+"`. Explicit overrides via `perm="editor"` are supported.
+
+### The agent loop
+
+```
+User message
+    └─▶ LLM decides: search_kerf_docs or direct tool call
+            ├─▶ search_kerf_docs → read_file (corpus) → direct tools
+            └─▶ direct tool call → agent loop → asyncio dispatch → result
+                    └─▶ stream back to LLM
+```
+
+The loop never modifies files directly — it always delegates to tools.
+All results are JSON with a predictable shape the LLM can reason about.
 
 ## Permissions
 
-Every tool is either **read** (viewer+) or **write** (editor+). Viewers
-calling write tools get `{"error":"...", "code":"FORBIDDEN"}` — never a 500.
-Tool-level errors always come back as JSON the model can reason about.
+Every tool is **read** (viewer+) or **write** (editor+). Viewers calling
+write tools get `{"error":"...", "code":"FORBIDDEN"}` — never a 500.
+Tool errors are always JSON the model can inspect and respond to.
 
-## Files
+---
 
-| Tool             | Role    | What it does                                            |
-|------------------|---------|---------------------------------------------------------|
-| `list_files`     | viewer+ | Flat list of every file's absolute path + kind + size   |
-| `read_file`      | viewer+ | Read text content. Paths under `/docs/llm/` route to the embedded authoring corpus instead of the project tree. |
-| `write_file`     | editor+ | Overwrite a file's content; auto-creates folders        |
-| `edit_file`      | editor+ | Replace one unique substring; errors if 0 or >1 matches |
-| `create_file`    | editor+ | Make a new `file` / `folder` / `assembly` / `drawing`   |
-| `delete_file`    | editor+ | Soft-delete a file or folder (recursive)                |
-| `search_code`    | viewer+ | Case-insensitive substring search across text files     |
-| `import_step`    | editor+ | Download a STEP file from an HTTPS URL into the project. 30s timeout, 50 MB cap. |
+## File ops
 
-Path conventions: POSIX-like, leading `/`, no trailing `/`. Root is `/`.
+Basic read/write/manipulate on the project tree. All paths are POSIX-like,
+absolute, no trailing slash. The `import_*` tools pull external formats
+(STEP, Rhino 3DM, KiCad, OpenSCAD) into native Kerf geometry. Imports
+are subject to a 30 s timeout and 50 MB cap per file.
 
-## Object operations
+`list_files` · `read_file` · `write_file` · `edit_file` · `create_file` · `delete_file` · `search_code` · `validate_jscad` · `import_step` · `import_3dm` · `import_kicad` · `import_openscad`
 
-For mutating Objects inside a JSCAD Part (the `[{id, geom}, …]` return
-literal). Both rely on bracket-matching — they bail with `PARSE_FAILED`
-on non-conventional layouts.
+### Path conventions
 
-| Tool                | Role    | What it does                                          |
-|---------------------|---------|-------------------------------------------------------|
-| `duplicate_object`  | editor+ | Clone one Object entry; default new id `<id>-copy`    |
-| `delete_object`     | editor+ | Remove one Object entry from the array                |
+- POSIX: leading `/`, no trailing `/`
+- Root is `/` (project root)
+- `/docs/llm/*` paths are routed to the authoring corpus (not the project tree)
+- Soft-delete: `delete_file` sets `deleted_at`; it does not drop the bytes until purge
 
-## Validation + queries
+---
 
-| Tool             | Role    | What it does                                                |
-|------------------|---------|-------------------------------------------------------------|
-| `validate_jscad` | viewer+ | Stub — real validation runs in the browser                  |
-| `generate_bom`   | viewer+ | Walks every assembly + part, rolls up Component instances by MPN, returns rows + total |
+## Sketching
 
-## Scaffolding (canonical seeds)
+Sketch entities (lines, arcs, circles, splines, B-splines) and the
+constraint solver. Constraints are either geometric (coincident,
+parallel, perpendicular, tangent, equal…) or dimensional (distance,
+angle, radius…). The sketch doc (`backend/llm_docs/sketch.md`) has the
+full constraint vocabulary and entity ID reference.
 
-These produce a properly-shaped JSON / TSX seed the LLM would otherwise
-have to guess (version field, default content, validators). After
-scaffolding, the LLM edits the file via the standard write/edit tools.
+`sketch_add_entity` · `sketch_add_constraint` · `sketch_set_constraint_value` · `sketch_delete_entity` · `sketch_trim` · `sketch_extend` · `sketch_carbon_copy` · `sketch_validate` · `sketch_offset_selection` · `sketch_convert_curve_type`
 
-| Tool             | Role    | What it does                                                |
-|------------------|---------|-------------------------------------------------------------|
-| `create_sketch`  | editor+ | New `.sketch` with version=1, plane, origin point.          |
-| `create_feature` | editor+ | New `.feature` with empty `features[]` and version=1.       |
-| `create_part`    | editor+ | New `.part` with required name + sane defaults.             |
-| `create_circuit` | editor+ | New `.circuit.tsx` with a tscircuit `<board>` template.     |
+---
 
-## Authoring corpus
+## Features
 
-| Tool                | Role    | What it does                                                |
-|---------------------|---------|-------------------------------------------------------------|
-| `search_kerf_docs`  | viewer+ | Keyword-searches an embedded markdown corpus that documents every non-`.jscad` file kind. Returns `{path, title, excerpt, score}` hits. |
+OCCT-style timeline operations — pad, pocket, revolve, fillet, chamfer,
+sweep, blend, draft, rib, mirror, helix, multi-transform, push-pull,
+and surface/curve operations. Features are stored as JSON nodes in
+`.feature` files; each node carries a `type`, a set of references to
+sketch geometry or existing features, and domain-specific parameters.
 
-The hits' `path` values are `/docs/llm/<topic>.md`. The LLM follows up
-with `read_file('/docs/llm/<topic>.md')` (the read_file tool routes
-`/docs/llm/` paths to the embedded corpus instead of the project tree).
+`feature_pad` · `feature_pocket` · `feature_revolve` · `feature_fillet` · `feature_chamfer` · `feature_shell` · `feature_sweep1` · `feature_sweep2` · `feature_network_srf` · `feature_blend_srf` · `feature_draft` · `feature_rib` · `feature_mirror` · `feature_helix` · `feature_multi_transform` · `push_pull` · `rotate_face` · `surface_continuity` · `curve_project_to_surface` · `curve_intersect` · `curve_blend` · `curve_match` · `curve_offset_3d` · `polyline_to_nurbs` · `simplify_curve`
 
-Pages currently in the corpus:
+### Editing features
 
-- `assembly.md` — Component placement; transform shape; cycle rules.
-- `sketch.md` — Entity types + the planegcs constraint vocabulary.
-- `feature.md` — OCCT timeline operations: pad / pocket / revolve /
-  fillet / chamfer / shell / hole. Notes on future Rhino-style ops.
-- `drawing.md` — Multi-sheet shape, dimensions, annotations,
-  centerlines, breaks, GD&T.
-- `part.md` — Library metadata: distributors, photos, visibility.
-- `circuit.md` — tscircuit JSX patterns and selectors.
-- `jscad.md` — JSCAD authoring conventions.
-- `index.md` — table of contents with one-line per page.
+Features live in `.feature` files as a JSON array. To add a fillet:
+1. `read_file` the `.feature` to find the edge IDs and current node list
+2. `edit_file` to push a `{type:"fillet", edge_ids:[…], radius:3}` node
+The feature tree is evaluated in order; later features can reference earlier
+results by their output node ID.
 
-The corpus is loaded at startup via `importlib.resources`
-(see `backend/tools/docs.py`). Adding or updating an authoring
-guide is a markdown edit + server restart — no schema changes, no migration.
+---
+
+## Mesh + SubD + 3DM
+
+Polygonal modeling, subdivision surfaces, and Rhino 3DM interchange.
+Mesh tools cover the full repair-decimate-smooth cycle. SubD tools
+build NURBS-quality subdivision geometry. 3DM tools handle bidirectional
+Rhino file exchange.
+
+`mesh_validate` · `mesh_decimate` · `mesh_smooth` · `mesh_repair` · `mesh_fill_holes` · `mesh_remesh` · `surface_from_points` · `create_subd` · `subdivide_subd` · `extrude_face_subd` · `bevel_edge_subd` · `set_edge_crease` · `import_3dm` · `export_3dm`
+
+---
+
+## Assembly + Mates
+
+Component placement, rigid groups, and mechanical mates. Assemblies
+are hierarchical — an assembly can contain sub-assemblies and parts.
+Components reference external part files by path. Mates constrain DOFs
+between component origins (coincident, parallel, distance, angle, gear,
+rack-pinion, cam…). After any structural change, call `solve_assembly`
+to recompute positions.
+
+`assembly_add_external_component` · `assembly_add_component` · `add_mate` · `delete_mate` · `list_mates` · `solve_assembly` · `bulk_refresh_external_refs` · `lock_assembly`
+
+### Hierarchy rules
+
+- An assembly can contain `assembly` or `part` components
+- Rigid groups lock relative positions within a group
+- `lock_assembly` prevents any degree of freedom from solving
+- `bulk_refresh_external_refs` relinks all out-of-date component paths
+
+---
+
+## Equations + Configurations + Graph
+
+Parametric equations, named configurations, and the solver graph.
+Equations drive dimensions across parts and features. Configurations
+bundle equation snapshots for what-if studies. The graph API exposes
+nodes and edges for the solver dependency DAG — useful for driving
+complex parametric interdependencies.
+
+`read_equations` · `set_equation` · `add_configuration` · `set_active_config` · `create_graph` · `add_graph_node` · `connect_graph_nodes` · `set_graph_param` · `evaluate_graph`
+
+### Equations vs. graph
+
+Equations are the high-level API (human-readable key → value). The graph
+is the low-level DAG: nodes are parameters or operations, edges carry
+dependencies. `evaluate_graph` runs the solver on the full DAG and returns
+updated parameter values.
+
+---
+
+## Architecture / BIM
+
+Full architectural workflow: elements, categories, hosts, families,
+types, schedules, views, sheets, revisions, phases, stairs, railings,
+MEP routing, and curtain walls. BIM docs cover IFC import/export, element
+category taxonomy, host/hosted element relationships, and family-building
+conventions.
+
+`create_bim` · `read_bim` · `compile_bim_to_ifc` · `read_ifc` · `set_element_category` · `set_element_host` · `unset_element_host` · `move_element` · `find_hosted` · `validate_bim_categories` · `create_family` · `add_family_param` · `add_family_type` · `instantiate_family` · `update_instance` · `bulk_set_type_param` · `apply_type_to_instance` · `clone_type` · `delete_type` · `create_schedule` · `update_schedule_filter` · `run_schedule` · `create_view` · `set_view_filters` · `add_view_annotation` · `run_view` · `create_sheet` · `add_viewport_to_sheet` · `remove_viewport` · `add_revision_cloud` · `add_sheet_revision` · `set_active_sheet_revision` · `list_sheet_revisions` · `update_title_block_field` · `set_phase` · `add_view_filter` · `remove_view_filter` · `create_stair` · `add_stair_flight` · `add_stair_landing` · `validate_stair` · `create_railing` · `railing_from_stair` · `set_baluster_spacing` · `validate_railing` · `create_mep_route` · `add_mep_segment` · `add_mep_fitting` · `auto_route_mep` · `compute_route_pressure_drop` · `create_curtain_wall` · `set_curtain_wall_division` · `set_curtain_wall_panel_type` · `set_curtain_wall_mullion_type` · `validate_curtain_wall`
+
+---
+
+## Electronics — schematic
+
+ERC, probes, buses, sub-sheets, hierarchical labels, and flattening.
+The circuit doc (`backend/llm_docs/circuit.md`) covers tscircuit JSX
+patterns and selector syntax for schematic elements.
+
+`add_probe` · `remove_probe` · `rename_probe` · `run_erc` · `add_bus` · `expand_bus` · `add_differential_pair` · `list_differential_pairs` · `add_sub_sheet` · `remove_sub_sheet` · `add_global_label` · `add_hierarchical_label` · `flatten_hierarchy` · `validate_hierarchy`
+
+---
+
+## Electronics — PCB
+
+Routing, copper pours, DRC, layers, net classes, length tuning,
+via stitching, pad overrides, and shove router. Full parameter reference
+in the PCB docs. DRC runs rule checks on the board; `set_drc_rule` lets
+you define custom clearance, width, and via rules per net class.
+
+`route_trace_segments` · `delete_trace` · `split_trace` · `merge_traces` · `move_trace_vertex` · `add_copper_pour` · `delete_copper_pour` · `set_pour_net` · `set_pour_clearance` · `run_pcb_drc` · `set_drc_rule` · `add_pcb_layer` · `remove_pcb_layer` · `set_pcb_layer_visibility` · `set_pcb_layer_color` · `reorder_pcb_layers` · `set_board_layer_count` · `assign_to_layer` · `define_net_class` · `assign_net_to_class` · `remove_net_class` · `list_net_classes` · `get_effective_net_rules` · `set_trace_target_length` · `tune_trace_to_target` · `match_diff_pair` · `report_diff_pair_skew` · `add_via_stitching` · `apply_teardrops` · `remove_via_stitching` · `set_pad_mask_override` · `set_pad_paste_override` · `clear_pad_overrides` · `route_with_shove` · `autoroute_circuit`
+
+### Net class workflow
+
+1. `define_net_class("Power", width_mils=40, clearance_mils=12)`
+2. `assign_net_to_class("VCC", "Power")` for each power net
+3. `get_effective_net_rules` to verify the rules applied correctly
+4. `tune_trace_to_target` or `set_trace_target_length` for length matching
+
+---
+
+## Analysis
+
+FEA, simulation, RF, topology optimization, tolerance analysis, and
+inspection. Jobs are submitted asynchronously; status tools poll for
+completion. `compare_models` diffs two version of the same part.
+
+`fem_run` · `fem_job_status` · `run_simulation` · `sim_job_status` · `run_rf_study` · `rf_job_status` · `import_touchstone` · `topo_run` · `tolerance_stack` · `tolerance_monte_carlo` · `compare_models`
+
+---
+
+## CAM
+
+CNC machining operations. Jobs run asynchronously; check status with
+the `_status` tool. `cam_run` submits a job and returns a job handle;
+`cam_job_status` returns current state (queued / running / done / error).
+
+`cam_run` · `cam_job_status`
+
+---
+
+## Materials + Distributors
+
+Material lookup by name or property, and assignment to parts.
+`find_material_by_name` does a fuzzy search across the material library.
+Distributor stock lookups go through the API routes and are not part
+of the core tool set.
+
+`read_material` · `find_material_by_name` · `set_part_material`
+
+---
+
+## Render
+
+Ray-traced renders with camera, lighting, and material overrides.
+Render jobs are async; poll with `run_render` and check status.
+Camera, lights, and material overrides can be set before running.
+
+`create_render` · `set_render_camera` · `add_render_light` · `set_render_material_override` · `run_render`
+
+---
+
+## Layers / Canvas
+
+Layer management and display modes. Layers group objects for visibility,
+color, and rendering control. `assign_to_layer` places objects on canvas
+layers; `switch_display_mode` changes the viewport shading (wireframe,
+shaded, rendered, x-ray…).
+
+`create_layer` · `delete_layer` · `set_layer_visibility` · `set_layer_color` · `assign_to_layer` · `switch_display_mode`
+
+---
+
+## 2D Draft
+
+Drawing creation and 2D entity manipulation. Drafts are the base geometry
+for detail views and DXF export. Linear patterns, offsets, and fillet
+corners build up draft geometry from primitive shapes.
+
+`create_draft` · `add_draft_entity` · `offset_draft_entity` · `fillet_draft_corner` · `pattern_linear_draft` · `export_draft_dxf`
+
+---
+
+## Drawings — drafting depth
+
+Hatches, leaders, chain dimensions, and rich text annotations for
+completed drawings. These operate on drawing viewports after the drawing
+structure is set up with `create_drawing`.
+
+`add_hatch_to_drawing` · `add_leader_to_drawing` · `add_dimension_chain_to_drawing` · `add_rich_text_to_drawing`
+
+---
 
 ## Revisions
 
-| Tool                | Role    | What it does                                          |
-|---------------------|---------|-------------------------------------------------------|
-| `list_revisions`    | viewer+ | Per-file edit history, newest first, with previews    |
-| `restore_revision`  | editor+ | Roll a file back; clears `deleted_at` if soft-deleted |
+Version history and restore. Every mutable file is soft-deleted first
+(`deleted_at` timestamp); revisions let you walk and restore that history
+without losing the audit trail.
 
-## When chat reaches for which tool
+`list_revisions` · `restore_revision`
 
-- *"Make this 6 mm thick"* (with a chip referencing an Object) →
-  `read_file`, then `edit_file` with a tight substring pair.
-- *"Add a fillet to the top edge"* of a `.feature` →
-  `search_kerf_docs("fillet feature")` → `read_file('/docs/llm/feature.md')`
-  → `read_file` the .feature → `edit_file` to append a fillet node.
-- *"Insert two of bracket.jscad's wall Object"* in an assembly →
-  `search_kerf_docs("assembly add component")` →
-  `read_file('/docs/llm/assembly.md')` → `read_file` the bracket file
-  to discover Object ids → `edit_file` the assembly's `components`
-  array.
+---
+
+## Misc
+
+Scaffolding seeds, validation, autorouting, BOM generation, and doc
+search. Scaffolding tools emit properly-shaped JSON/TSX with version
+fields and defaults — the LLM then edits via the standard file ops.
+This avoids the LLM having to guess the schema for a new file.
+
+`search_kerf_docs` · `run_validation` · `autoroute_circuit` · `duplicate_object` · `delete_object` · `create_part` · `create_sketch` · `create_feature` · `create_circuit` · `create_drawing` · `generate_bom`
+
+---
+
+## Authoring corpus
+
+`search_kerf_docs` hits `backend/llm_docs/*.md` — guides that document
+conventions for sketch constraints, feature parameters, assembly mates,
+PCB routing, BIM categories, and more. After searching, the LLM reads
+the relevant doc then edits the file's JSON directly.
+
+Current docs: `assembly.md` · `sketch.md` · `feature.md` · `drawing.md`
+· `part.md` · `circuit.md` · `jscad.md` · `index.md`
+
+## When to use which tool — usage patterns
+
+### Geometry edits
+
+- *"Make this 6 mm thick"* → `read_file` the `.feature`, then `edit_file`
+  with a tight substring pair on the pad's `depth` field.
+- *"Add a fillet to the top edge"* → `search_kerf_docs("fillet feature")`
+  → `read_file('/docs/llm/feature.md')` → `read_file` the feature →
+  `edit_file` to append a fillet node.
+- *"Sweep this profile along this rail"* → `search_kerf_docs("sweep")`
+  → read the sweep section → `edit_file` to add a `feature_sweep1` node.
+
+### Assembly operations
+
+- *"Insert two of bracket.jscad's wall Object"* → `search_kerf_docs("assembly add component")`
+  → `read_file('/docs/llm/assembly.md')` → `read_file` bracket to get
+  Object ids → `edit_file` the assembly's `components` array.
+- *"Mate these two faces with a distance of 5 mm"* → `add_mate` with
+  type `distance`, references to the two faces, and `distance=5`.
+- *"Refresh all external references after moving a part"* → `bulk_refresh_external_refs`.
+
+### Schematic / PCB
+
+- *"Run ERC on this sheet"* → `run_erc` on the open schematic.
+- *"Add a differential pair to USB+ and USB-"* → `add_differential_pair`
+  with the two net names.
+- *"Route net N$5 between these two pads"* → `route_trace_segments` or
+  `autoroute_circuit`.
+- *"Set all power traces to 40 mils"* → `define_net_class` (or update
+  existing) + `assign_net_to_class`.
+
+### BIM / Architecture
+
+- *"Set all door instances to category Door"* → `set_element_category`
+  with a filter for door instances.
+- *"Host this wall to the floor below it"* → `set_element_host` with
+  the wall and floor references.
+- *"Create a 2nd floor stair"* → `create_stair` → `add_stair_flight` →
+  `add_stair_landing` → `validate_stair`.
+- *"Auto-route this MEP route"* → `create_mep_route` → `auto_route_mep`
+  → `compute_route_pressure_drop` to validate sizing.
+- *"Build a curtain wall with 150 mm mullions"* → `create_curtain_wall`
+  → `set_curtain_wall_division` → `set_curtain_wall_mullion_type`
+  → `validate_curtain_wall`.
+- *"Add a revision cloud to sheet A3"* → `set_active_sheet_revision` →
+  `add_revision_cloud` on the sheet.
+
+### Drawings
+
 - *"Create a 3-view drawing of the assembly"* → `create_file` with
-  `kind='drawing'` and an empty `{}` content (the frontend hydrates
-  defaults), or `search_kerf_docs("drawing standard views")` → seed
-  with a pre-shaped `sheets[].views[]` array via `write_file`.
-- *"What did this file look like an hour ago?"* → `list_revisions`,
-  then `restore_revision` if the user confirms.
+  `kind='drawing'` and `{}` content (frontend hydrates defaults), or
+  `search_kerf_docs("drawing standard views")` → seed via `write_file`.
+- *"Add a section hatch to this view"* → `add_hatch_to_drawing`.
 
-## Where the source lives
+### History and recovery
 
-- Tool registry — `backend/tools/registry.py`
-- Implementations — per-domain files in `backend/tools/` (`file_ops.py`,
-  `object_ops.py`, `scaffold.py`, `revisions.py`, `validation.py`, etc.)
-- Authoring corpus — `backend/llm_docs/*.md` (loaded via
-  `importlib.resources` at startup)
-- Wire schema for tool calls / results — see `backend/llm_docs/` (per-kind specs) and `docs/v1-rpc.md`
+- *"What did this file look like an hour ago?"* → `list_revisions`, then
+  `restore_revision` if the user confirms.
+- *"Restore to version 3"* → `restore_revision` with the revision ID.
 
-Adding a new tool is a one-file change: write the spec, write the
-executor, add an entry to `Registry` in `registry.py`. Adding a new
-authoring page is a single `.md` edit + server restart.
+## Where things live
 
-Next: [getting-started.md](./getting-started.md)
+- **Tool registry**: `backend/tools/registry.py`
+- **Implementations**: `backend/tools/*.py` (one file per domain)
+- **Authoring corpus**: `backend/llm_docs/*.md`
+- **Wire schema**: `backend/llm_docs/` and `docs/v1-rpc.md`
+
+Adding a tool = write the function + one decorator line in `registry.py`.
+Adding an authoring doc = write the `.md` file + restart the server.
+
+### Tool file layout
+
+| File | Domain |
+|------|--------|
+| `file_ops.py` | File read/write/import |
+| `object_ops.py` | Object mutation in JSCAD |
+| `sketch.py` | Sketch entities + constraints |
+| `feature_*.py` | Solid features |
+| `surfacing.py` | Surface operations |
+| `curve_ops.py` | Curve operations |
+| `mesh.py` | Mesh modeling |
+| `subd.py` | Subdivision surfaces |
+| `import_3dm.py` | 3DM interchange |
+| `assembly.py` | Assembly + mates |
+| `equations.py` | Parametric equations |
+| `configurations.py` | Named configurations |
+| `graph.py` | Solver graph |
+| `bim*.py` | BIM, families, MEP |
+| `erc.py` | Schematic ERC |
+| `buses.py` | Bus operations |
+| `routing.py` | PCB routing |
+| `pour.py` | Copper pours |
+| `pcb_drc.py` | Design rule check |
+| `pcb_layer_tools.py` | PCB layer management |
+| `net_classes.py` | Net classes |
+| `length_tuning.py` | Length tuning |
+| `via_stitching.py` | Via stitching |
+| `pad_overrides.py` | Pad overrides |
+| `shove_router.py` | Shove router |
+| `fem.py` | FEA |
+| `sim.py` | Simulation |
+| `rf.py` | RF analysis |
+| `topo.py` | Topology optimization |
+| `tolerance.py` | Tolerance analysis |
+| `inspection.py` | Inspection |
+| `cam.py` | CAM |
+| `material.py` | Materials |
+| `render.py` | Rendering |
+| `project_layers.py` | Canvas layers |
+| `draft.py` | 2D draft |
+| `drafting_complete.py` | Drawing annotations |
+| `revisions.py` | Version history |
+| `docs.py` | Doc search |
+| `validation.py` | Validation |
+| `autoroute.py` | Autorouting |
+| `scaffold.py` | File scaffolding |

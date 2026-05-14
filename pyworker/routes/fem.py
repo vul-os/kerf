@@ -1,17 +1,24 @@
 import base64
 import json
-import logging
-import os
-import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
-from typing import Optional
 
 router = APIRouter()
+
+# Gate dolfinx — import only if available; pyworker must boot without it.
+_DOLFINX_AVAILABLE = False
+try:
+    import dolfinx  # noqa: F401
+    _DOLFINX_AVAILABLE = True
+except ImportError:
+    pass
+
+ENGINE_PENDING_WARNING = "Engine pending — FEniCSx (dolfinx) not yet installed."
+
 
 @router.post("/run-fem")
 async def run_fem(req: dict):
@@ -37,6 +44,15 @@ async def run_fem(req: dict):
     })
     boundary_conditions = input_spec.get("boundary_conditions", [])
     loads = input_spec.get("loads", [])
+
+    # Return early with warning sentinel when dolfinx is absent and fenicsx
+    # is the requested solver — mirror the /run-topo pattern.
+    if solver == "fenicsx" and not _DOLFINX_AVAILABLE:
+        return {
+            "status": "pending",
+            "warnings": [ENGINE_PENDING_WARNING],
+            "errors": [],
+        }
 
     with tempfile.TemporaryDirectory() as tmpdir:
         step_path = Path(tmpdir) / "input.step"
@@ -70,7 +86,7 @@ def generate_mesh(step_path: str, mesh_size: float, tmpdir: str) -> Path:
     except ImportError as e:
         raise RuntimeError(f"gmsh not installed: {e}. Install with: pip install gmsh")
 
-    gmsh.initialize()  # noqa: gmsh is lazily imported above
+    gmsh.initialize()
     gmsh.option.setNumber("General.Terminal", 0)
     gmsh.option.setNumber("Mesh.CharacteristicSizeMax", mesh_size)
     gmsh.option.setNumber("Mesh.Algorithm3D", 10)
@@ -104,51 +120,27 @@ def run_simulation(mesh_path: str, solver: str, analysis_type: str,
 
 def run_fenicsx(mesh_path: str, analysis_type: str, material_props: dict,
                boundary_conditions: list, loads: list, tmpdir: str) -> dict:
-    import json as json_mod
+    """
+    Run a FEniCSx analysis directly in-process.
 
-    script = f"""
-import json
-import numpy as np
-from fenicsx_utils import run_static_analysis
+    dolfinx availability is already confirmed by the caller (run_fem checks
+    _DOLFINX_AVAILABLE before reaching here for fenicsx solver).
+    """
+    import importlib.util
 
-material_props = {json_mod.dumps(material_props)}
-boundary_conditions = {json_mod.dumps(boundary_conditions)}
-loads = {json_mod.dumps(loads)}
+    # Import fenicsx_utils relative to pyworker root
+    utils_path = Path(__file__).parent.parent / "fenicsx_utils.py"
+    spec = importlib.util.spec_from_file_location("fenicsx_utils", utils_path)
+    fenicsx_utils = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fenicsx_utils)
 
-result = run_static_analysis(
-    mesh_path="{mesh_path}",
-    material_props=material_props,
-    boundary_conditions=boundary_conditions,
-    loads=loads,
-    analysis_type="{analysis_type}"
-)
-print("FEM_RESULT:" + json.dumps(result))
-"""
-
-    script_path = Path(tmpdir) / "fenicsx_script.py"
-    script_path.write_text(script)
-
-    result_file = Path(tmpdir) / "result.json"
-    env = os.environ.copy()
-    env["PYTHONPATH"] = "/usr/local/lib/python3.11/site-packages:" + str(Path(__file__).parent)
-
-    proc = subprocess.run(
-        [sys.executable, str(script_path)],
-        capture_output=True,
-        text=True,
-        timeout=600,
-        env=env
+    return fenicsx_utils.run_static_analysis(
+        mesh_path=mesh_path,
+        material_props=material_props,
+        boundary_conditions=boundary_conditions,
+        loads=loads,
+        analysis_type=analysis_type,
     )
-
-    if proc.returncode != 0:
-        raise RuntimeError(f"fenicsx failed: {proc.stderr}")
-
-    for line in proc.stdout.splitlines():
-        if line.startswith("FEM_RESULT:"):
-            result_data = json_mod.loads(line[len("FEM_RESULT:"):])
-            return result_data
-
-    raise RuntimeError("fenicsx produced no result")
 
 
 def run_calculix(mesh_path: str, analysis_type: str, material_props: dict,

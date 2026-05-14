@@ -1,5 +1,11 @@
 # BIM (.bim) — Architecture file format
 
+> **Categories and hosted-element relationships** (Revit-parity foundation) are
+> documented separately in **`bim_categories.md`**.  That file covers the
+> `category` enum, `host_ref` field, HOST_RULES, cascade-move behaviour, and
+> the `set_element_category` / `set_element_host` / `move_element` /
+> `validate_bim_categories` tools.
+
 A `.bim` file is Kerf's architectural project type. It can be authored
 either as **JSON** (machine-readable, what LLM tools write) or as the
 human-friendly **text DSL** (what the in-editor syntax highlighter

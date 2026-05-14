@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "Crystal 16MHz HC-49S",
+  "description": "Quartz crystal, 16MHz, HC-49S through-hole package, 20ppm tolerance.",
+  "category": "Crystals",
+  "manufacturer": "Abracon",
+  "mpn": "ABM8G-16.000MHZ-18-D2Y-T",
+  "value": "16MHz",
+  "distributors": [
+    {"name": "digikey", "sku": "535-10203-ND", "url": "https://www.digikey.com/en/products/detail/abracon-corporation/ABM8G-16-000MHZ-18-D2Y-T/3890406", "price_usd": 0.45, "stock": 2000},
+    {"name": "mouser", "sku": "442-ABM8G-16.000MHZ", "url": "https://www.mouser.com/ProductDetail/Abracon/ABM8G-16-000MHZ-18-D2Y-T", "price_usd": 0.42, "stock": 1800}
+  ],
+  "visibility": "public",
+  "metadata": {"package": "HC-49S", "frequency_mhz": 16, "tolerance_ppm": 20}
+}

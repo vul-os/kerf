@@ -1,0 +1,9 @@
+{
+  "kind": "hatch_pattern",
+  "name": "ANSI 31 - Concrete",
+  "description": "45-degree parallel lines, spacing 6mm. Default hatch for general concrete sections.",
+  "category": "ansi/concrete",
+  "lines": [
+    { "angle_deg": 45, "spacing_mm": 6, "offset_mm": 0 }
+  ]
+}

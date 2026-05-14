@@ -23,17 +23,18 @@ def _load(rel):
     spec.loader.exec_module(mod)
     return mod
 
-# registry and context have no upstream imports beyond stdlib
-_registry_mod = _load("tools/registry.py")
-_context_mod   = _load("tools/context.py")
+# registry and context have no upstream imports beyond stdlib.
+# Use setdefault so we don't clobber the real module when the full suite runs.
+_registry_mod = sys.modules.get("tools.registry") or _load("tools/registry.py")
+_context_mod  = sys.modules.get("tools.context")  or _load("tools/context.py")
 
 # Patch sys.modules so that 'tools.registry' and 'tools.context' resolve correctly
-sys.modules["tools.registry"] = _registry_mod
-sys.modules["tools.context"]  = _context_mod
+sys.modules.setdefault("tools.registry", _registry_mod)
+sys.modules.setdefault("tools.context",  _context_mod)
 
 # Load surfacing (needed by feature_helix for helpers)
-_surfacing_mod = _load("tools/surfacing.py")
-sys.modules["tools.surfacing"] = _surfacing_mod
+_surfacing_mod = sys.modules.get("tools.surfacing") or _load("tools/surfacing.py")
+sys.modules.setdefault("tools.surfacing", _surfacing_mod)
 
 # Now load feature_helix itself
 _helix_mod = _load("tools/feature_helix.py")
@@ -77,7 +78,7 @@ def make_ctx(initial_content: str = "") -> tuple[ProjectCtx, dict]:
 
 def run_tool(ctx, file_id, **kwargs):
     args = {"file_id": str(file_id), **kwargs}
-    raw = asyncio.get_event_loop().run_until_complete(
+    raw = asyncio.new_event_loop().run_until_complete(
         run_feature_helix(ctx, json.dumps(args).encode())
     )
     return json.loads(raw)
@@ -225,7 +226,7 @@ def test_tool_profile_sketch_id_stored():
 def test_tool_invalid_file_uuid():
     ctx, store, _ = make_ctx()
     args = json.dumps({"file_id": "not-a-uuid", "pitch_mm": 1, "height_mm": 5, "radius_mm": 2})
-    raw = asyncio.get_event_loop().run_until_complete(
+    raw = asyncio.new_event_loop().run_until_complete(
         run_feature_helix(ctx, args.encode())
     )
     result = json.loads(raw)

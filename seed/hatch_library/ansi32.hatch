@@ -1,0 +1,10 @@
+{
+  "kind": "hatch_pattern",
+  "name": "ANSI 32 - Steel",
+  "description": "Bidirectional 45/135-degree crosshatch. Standard steel section fill.",
+  "category": "ansi/steel",
+  "lines": [
+    { "angle_deg": 45, "spacing_mm": 5, "offset_mm": 0 },
+    { "angle_deg": 135, "spacing_mm": 5, "offset_mm": 0 }
+  ]
+}

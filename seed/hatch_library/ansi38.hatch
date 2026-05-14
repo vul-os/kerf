@@ -1,0 +1,10 @@
+{
+  "kind": "hatch_pattern",
+  "name": "ANSI 38 - Aluminum",
+  "description": "Double 45-degree diagonal lines. General aluminum sections.",
+  "category": "ansi/aluminum",
+  "lines": [
+    { "angle_deg": 45, "spacing_mm": 4, "offset_mm": 0 },
+    { "angle_deg": 45, "spacing_mm": 4, "offset_mm": 2 }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "name": "ABS (3D Print)",
+  "category": "polymer/thermoplastic/acrylonitrile-butadiene-styrene",
+  "common_names": ["ABS filament 3D printing", "acrylonitrile butadiene styrene"],
+  "color_hex": "#f0e68c",
+  "mechanical": {
+    "E_GPa": 2.1,
+    "G_GPa": 0.78,
+    "nu": 0.38,
+    "yield_MPa": 40,
+    "ultimate_MPa": 46,
+    "elongation_pct": 25
+  },
+  "thermal": {
+    "alpha_per_K": 90e-6,
+    "k_W_mK": 0.17,
+    "cp_J_kgK": 1400,
+    "T_min_C": -40,
+    "T_max_C": 95
+  },
+  "physical": {
+    "rho_kg_m3": 1050
+  },
+  "callout": "ABS-3D",
+  "notes": "3D printing grade ABS. Higher heat resistance than PLA; prone to warping. Requires heated bed ~100°C. Source: Formlabs ABS / Stratasys материал."
+}

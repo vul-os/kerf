@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "name": "PA12 Nylon (3D Print)",
+  "category": "polymer/thermoplastic/nylon",
+  "common_names": ["nylon 12 3D printing", "polyamide 12 filament", "PA12 SLS powder"],
+  "color_hex": "#e8e0d5",
+  "mechanical": {
+    "E_GPa": 1.8,
+    "G_GPa": 0.65,
+    "nu": 0.38,
+    "yield_MPa": 45,
+    "ultimate_MPa": 60,
+    "elongation_pct": 50
+  },
+  "thermal": {
+    "alpha_per_K": 80e-6,
+    "k_W_mK": 0.23,
+    "cp_J_kgK": 1600,
+    "T_min_C": -40,
+    "T_max_C": 120
+  },
+  "physical": {
+    "rho_kg_m3": 1010
+  },
+  "callout": "PA12-Nylon",
+  "notes": "PA12 nylon optimized for 3D printing (laser sintering or FDM). Lower moisture absorption than PA6/PA66. Excellent fatigue resistance for functional parts. Source: EOS PA2200 / Ultimaker Nylon."
+}

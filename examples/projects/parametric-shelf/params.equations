@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "params": [
+    { "name": "width", "expr": "600", "unit": "mm", "comment": "Shelf unit width" },
+    { "name": "depth", "expr": "250", "unit": "mm", "comment": "Shelf depth" },
+    { "name": "height", "expr": "800", "unit": "mm", "comment": "Overall height" },
+    { "name": "shelf_count", "expr": "4", "comment": "Number of shelves" }
+  ]
+}

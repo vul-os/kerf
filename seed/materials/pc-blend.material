@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "name": "PC-Blend (3D Print)",
+  "category": "polymer/thermoplastic/polycarbonate/blend",
+  "common_names": ["polycarbonate blend filament", "PC-ABS blend", "PC-ASA blend"],
+  "color_hex": "#d4e4f7",
+  "mechanical": {
+    "E_GPa": 2.4,
+    "G_GPa": 0.90,
+    "nu": 0.38,
+    "yield_MPa": 55,
+    "ultimate_MPa": 65,
+    "elongation_pct": 20
+  },
+  "thermal": {
+    "alpha_per_K": 65e-6,
+    "k_W_mK": 0.20,
+    "cp_J_kgK": 1200,
+    "T_min_C": -40,
+    "T_max_C": 120
+  },
+  "physical": {
+    "rho_kg_m3": 1150
+  },
+  "callout": "PC-Blend",
+  "notes": "Polycarbonate blend for 3D printing — combines PC strength with easier printability (often blended with ABS or ASA). High impact and heat resistance. Source: Polymaker PC-Max / IC3D PCBlend."
+}

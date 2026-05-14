@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "STM32F103C8T6 Microcontroller LQFP-48",
+  "description": "32-bit ARM Cortex-M3 MCU, 64KB flash, 20KB SRAM, 72MHz, LQFP-48 SMD package. Blue Pill compatible.",
+  "category": "Microcontrollers",
+  "manufacturer": "STMicroelectronics",
+  "mpn": "STM32F103C8T6",
+  "value": "STM32F103C8T6",
+  "distributors": [
+    {"name": "digikey", "sku": "497-STM32F103C8T6-ND", "url": "https://www.digikey.com/en/products/detail/stmicroelectronics/STM32F103C8T6/585965", "price_usd": 5.50, "stock": 800},
+    {"name": "mouser", "sku": "511-STM32F103C8T6", "url": "https://www.mouser.com/ProductDetail/STMicroelectronics/STM32F103C8T6", "price_usd": 5.40, "stock": 600}
+  ],
+  "visibility": "public",
+  "metadata": {"package": "LQFP-48", "flash_kb": 64, "clock_max_mhz": 72, "core": "Cortex-M3"}
+}

@@ -26,7 +26,7 @@
 //     ambiguous.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Maximize2, RotateCcw, AlertTriangle, Layers, Eye, EyeOff, Zap, Loader, CheckCircle, ShieldAlert } from 'lucide-react'
+import { Maximize2, RotateCcw, AlertTriangle, Layers, Eye, EyeOff, Zap, Loader, CheckCircle, ShieldAlert, X } from 'lucide-react'
 import { convertCircuitJsonToPcbSvg } from 'circuit-to-svg'
 import { runDRC } from '../lib/pcbDRC.js'
 import { orthogonalSnap, corner45 } from '../lib/pcbRouting.js'
@@ -139,9 +139,10 @@ export default function PCBView({ circuitJson, highlightRefdes = null, onSelectR
   const [showPourDialog, setShowPourDialog] = useState(false)
   const [pendingPourVertices, setPendingPourVertices] = useState(null)
 
-  // DRC results — recomputed whenever circuitJson changes and DRC is enabled.
+  // DRC results — always recomputed so the status chip reflects current state
+  // even before the user opens the DRC overlay.
   const drcResult = useMemo(() => {
-    if (!showDRC || !Array.isArray(circuitJson) || circuitJson.length === 0) {
+    if (!Array.isArray(circuitJson) || circuitJson.length === 0) {
       return { errors: [], warnings: [] }
     }
     try {
@@ -149,7 +150,10 @@ export default function PCBView({ circuitJson, highlightRefdes = null, onSelectR
     } catch {
       return { errors: [], warnings: [] }
     }
-  }, [circuitJson, showDRC])
+  }, [circuitJson])
+
+  // Drawer that lists all DRC items; toggled by clicking the status chip.
+  const [drcOpen, setDrcOpen] = useState(false)
 
   // Resize tracking.
   useEffect(() => {
@@ -679,6 +683,14 @@ export default function PCBView({ circuitJson, highlightRefdes = null, onSelectR
 
       {/* View toolbar (top-right) */}
       <div className="absolute top-2 right-2 flex items-center gap-1 rounded-md bg-ink-900/90 border border-ink-800 backdrop-blur p-1 shadow-lg">
+        {/* DRC status chip — always visible; click opens/closes the drawer */}
+        <DRCStatusChip
+          errors={drcResult.errors}
+          warnings={drcResult.warnings}
+          open={drcOpen}
+          onToggle={() => setDrcOpen((o) => !o)}
+        />
+        <span className="h-4 w-px bg-ink-800" />
         {/* Autoroute button — only shown when caller passes onAutoroute */}
         {onAutoroute && (
           <>
@@ -737,6 +749,30 @@ export default function PCBView({ circuitJson, highlightRefdes = null, onSelectR
           {Math.round(view.scale * 100)}%
         </span>
       </div>
+
+      {/* DRC drawer — slides in from the right; lists all errors + warnings */}
+      {drcOpen && (
+        <DRCDrawer
+          errors={drcResult.errors}
+          warnings={drcResult.warnings}
+          viewBox={viewBox}
+          view={view}
+          size={size}
+          onFocus={(x, y) => {
+            // Pan/zoom the viewport so the given board coordinate is centred.
+            if (!viewBox) return
+            const [vx, vy, vw, vh] = viewBox
+            const targetScale = Math.max(view.scale, 20)
+            const nx = (x - vx) / vw
+            const ny = (y - vy) / vh
+            const bx = nx * vw  // board px at current scale=1 is just vw-space
+            const tx = size.w / 2 - bx * targetScale
+            const ty = size.h / 2 - ny * vh * targetScale
+            setView({ tx, ty, scale: targetScale })
+          }}
+          onClose={() => setDrcOpen(false)}
+        />
+      )}
     </div>
   )
 }
@@ -797,6 +833,111 @@ function DRCOverlay({ errors, warnings, view, viewBox, onTooltip }) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// DRCStatusChip — compact chip showing error/warning counts.
+// Green = no issues, amber = warnings only, red = any errors.
+// ---------------------------------------------------------------------------
+function DRCStatusChip({ errors, warnings, open, onToggle }) {
+  const hasErrors = errors.length > 0
+  const hasWarnings = warnings.length > 0
+
+  let chipClass = 'bg-emerald-900/40 text-emerald-300 border-emerald-800/50'
+  let label = 'DRC: 0 errors'
+  if (hasErrors) {
+    chipClass = 'bg-red-900/40 text-red-300 border-red-800/50'
+    label = `DRC: ${errors.length} error${errors.length !== 1 ? 's' : ''}${warnings.length ? `, ${warnings.length} warn` : ''}`
+  } else if (hasWarnings) {
+    chipClass = 'bg-amber-900/40 text-amber-300 border-amber-800/50'
+    label = `DRC: ${warnings.length} warning${warnings.length !== 1 ? 's' : ''}`
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      title={open ? 'Close DRC panel' : 'Open DRC issue list'}
+      className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-semibold border transition-colors ${chipClass} ${open ? 'ring-1 ring-current' : ''}`}
+    >
+      <ShieldAlert size={11} />
+      <span>{label}</span>
+    </button>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// DRCDrawer — side panel listing all DRC issues; each item pans/zooms on click.
+// ---------------------------------------------------------------------------
+function DRCDrawer({ errors, warnings, onFocus, onClose }) {
+  const all = [
+    ...errors.map((e) => ({ ...e, isError: true })),
+    ...warnings.map((w) => ({ ...w, isError: false })),
+  ]
+
+  return (
+    <div className="absolute top-10 right-2 z-40 w-72 max-h-[calc(100%-3rem)] flex flex-col rounded-md bg-ink-900/95 border border-ink-700 shadow-xl backdrop-blur overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-ink-800 flex-shrink-0">
+        <div className="flex items-center gap-1.5">
+          <ShieldAlert size={12} className="text-ink-400" />
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-300">DRC Results</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {errors.length > 0 && (
+            <span className="text-[10px] font-mono text-red-400">{errors.length}E</span>
+          )}
+          {warnings.length > 0 && (
+            <span className="text-[10px] font-mono text-amber-400">{warnings.length}W</span>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-0.5 rounded hover:bg-ink-800 text-ink-500 hover:text-ink-300"
+            title="Close"
+          >
+            <X size={12} />
+          </button>
+        </div>
+      </div>
+
+      {/* Issue list */}
+      <div className="flex-1 overflow-y-auto py-1 min-h-0">
+        {all.length === 0 ? (
+          <div className="px-3 py-4 text-xs text-ink-500 text-center">
+            No DRC violations found
+          </div>
+        ) : (
+          all.map((item, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onFocus(item.x, item.y)}
+              className="w-full text-left px-3 py-2 hover:bg-ink-800 flex items-start gap-2 group border-b border-ink-800/50 last:border-b-0"
+              title="Click to pan to this issue"
+            >
+              <span
+                className={`mt-0.5 flex-shrink-0 w-1.5 h-1.5 rounded-full ${item.isError ? 'bg-red-400' : 'bg-amber-400'}`}
+              />
+              <div className="min-w-0">
+                <div className={`text-[10px] font-semibold font-mono ${item.isError ? 'text-red-400' : 'text-amber-400'}`}>
+                  {item.kind}
+                </div>
+                <div className="text-[11px] text-ink-300 leading-snug break-words">
+                  {item.message}
+                </div>
+                {item.x != null && (
+                  <div className="text-[9px] font-mono text-ink-600 mt-0.5">
+                    ({item.x.toFixed(2)}, {item.y.toFixed(2)}) mm
+                  </div>
+                )}
+              </div>
+            </button>
+          ))
+        )}
+      </div>
     </div>
   )
 }

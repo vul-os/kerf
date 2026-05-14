@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "Connector USB Micro-B SMD",
+  "description": "USB micro-B receptacle, surface mount, 5-pin. Common mobile device connector.",
+  "category": "Connectors",
+  "manufacturer": "Amphenol",
+  "mpn": "10104110-0001LF",
+  "value": "USB Micro-B",
+  "distributors": [
+    {"name": "digikey", "sku": "609-4618-1-ND", "url": "https://www.digikey.com/en/products/detail/amphenol-cs-fci/10104110-0001LF/2208461", "price_usd": 0.55, "stock": 3000},
+    {"name": "mouser", "sku": "523-10104110-0001LF", "url": "https://www.mouser.com/ProductDetail/Amphenol/10104110-0001LF", "price_usd": 0.50, "stock": 2500}
+  ],
+  "visibility": "public",
+  "metadata": {"package": "SMD", "gender": "receptacle", "pins": 5}
+}

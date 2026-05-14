@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "Corner 3-Way Bracket 25mm Aluminum",
+  "description": "3D corner bracket for 25mm box frames, connects three perpendicular faces. Aluminum 6061-T6, 3mm thickness.",
+  "category": "mechanical/bracket",
+  "manufacturer": "Kerf Workshop",
+  "mpn": "KERF-BRK-3W-AL-25",
+  "distributors": [
+    {"name": "digikey", "sku": "KBRK-3W25-AL-ND", "url": "https://www.digikey.com/en/products/detail/kerf/KERF-BRK-3W-AL-25", "price_usd": 2.85, "stock": 1100},
+    {"name": "mcmaster", "sku": "MCKRF-3W25AL", "url": "https://www.mcmaster.com/KERF-BRK-3W-AL-25", "price_usd": 2.45, "stock": 900},
+    {"name": "misumi", "sku": "MSM-3WBRK-25AL", "url": "https://us.misumi-ec.com/v2/detail/dsearch?search=KERF-BRK-3W-AL-25", "price_usd": 2.10, "stock": 2200}
+  ],
+  "visibility": "public",
+  "metadata": {"material": "aluminum 6061-T6", "dimensions": {"length_mm": 25, "width_mm": 25, "thickness_mm": 3}, "hole_pattern": "3xM4 per face"}
+}

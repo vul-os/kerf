@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "name": "PLA (3D Print)",
+  "category": "polymer/thermoplastic/biodegradable",
+  "common_names": ["polylactic acid 3D printing", "PLA filament"],
+  "color_hex": "#a8d5a2",
+  "mechanical": {
+    "E_GPa": 3.3,
+    "G_GPa": 1.2,
+    "nu": 0.36,
+    "yield_MPa": 57,
+    "ultimate_MPa": 62,
+    "elongation_pct": 8
+  },
+  "thermal": {
+    "alpha_per_K": 65e-6,
+    "k_W_mK": 0.12,
+    "cp_J_kgK": 1850,
+    "T_min_C": -20,
+    "T_max_C": 55
+  },
+  "physical": {
+    "rho_kg_m3": 1240
+  },
+  "callout": "PLA-3D",
+  "notes": "Optimized for FDM 3D printing. Slightly lower modulus than generic PLA due to filament-grade modifiers. Glass transition ~58°C. Source: Prusa Research / Filament specifications."
+}

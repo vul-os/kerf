@@ -12,6 +12,20 @@ symbols layered on top.
 
 Coordinates throughout are **page millimetres** (top-left origin).
 
+## Drawings vs Sheets vs Views
+
+| Artifact         | What it is                                                           | When to use                                |
+|------------------|---------------------------------------------------------------------|--------------------------------------------|
+| `.drawing`       | The root document — one or more sheets, full drawing state           | Every drawing starts here                  |
+| `.view.json`     | A saved camera/projection from a `.bim` model (Revit-style)         | Reuse a specific view across drawings      |
+| `.sheet.json`    | A print-ready layout: title block + positioned viewports            | Pre-built sheet templates for reuse        |
+
+A `.view.json` captures `source_file_id`, `projection`, `scale`, `position`,
+and camera pose — drop it onto any sheet to restore that exact viewport.
+A `.sheet.json` holds a populated `frame` plus an array of viewport slots,
+each referencing a `.view.json`. Assemble sheets from views for complex
+multi-view layouts.
+
 ## Create a drawing
 
 File tree → **New file → Drawing**. The Drawing Editor opens with a single
@@ -41,15 +55,27 @@ Sheet sizes: `A4` / `A3` / `A2` / `A1` / `A0` / `ANSI_A` / `ANSI_B` / `ANSI_C`
 supplies a different title-block layout and exposes its own extra fields
 (material, tolerances, revision) under `frame.extra`.
 
-Add a sheet via the **+** tab or the `add_sheet` tool. Set sheet-level
-properties via `set_drawing_scale` and `set_title_field`.
+Add a sheet via the **+** tab or `add_sheet`. Set sheet-level properties via
+`set_drawing_scale` and `set_title_field`.
+
+### Sheets + Revisions
+
+Revisions auto-number upward: `A → B → … Z → AA → AB → … ZZ`. Use
+`add_sheet_revision` to stamp a new rev on a sheet's frame. `update_title_block_field`
+writes any frame field (`title`, `author`, `date`, `scale_label`, `sheet_number`,
+`notes`, or any `extra` key):
+
+```
+update_title_block_field(sheet_id, field="revision", value="B")
+update_title_block_field(sheet_id, field="extra.material", value="6061-T6")
+```
 
 ## View types
 
-Every view projects a 3D source (`.jscad`, `.assembly`, or `.step`) onto a
-plane. The view's `position` is page-mm of its bounding-box top-left.
+Every view projects a 3D source (`.jscad`, `.assembly`, `.step`) onto a plane.
+The view's `position` is page-mm of its bounding-box top-left.
 
-| Projection                                       | Use                                  |
+| Projection                                         | Use                                  |
 |--------------------------------------------------|--------------------------------------|
 | `front` / `top` / `right` / `left` / `back` / `bottom` | Standard orthographic              |
 | `iso`                                            | Isometric for orientation reference  |
@@ -67,8 +93,27 @@ Set `is_section: true` on a view. The renderer fills the projected bbox with a
 45° SVG `<pattern>` hatch clipped to the section's bounded region. `hatch_spacing`
 and `hatch_angle` are tunable per-view.
 
-Section *cuts* — actually slicing the geometry along a section line — are
-planned.
+### Hatching
+
+`add_hatch_to_drawing` fills a closed boundary with a crosshatch pattern.
+
+```ts
+add_hatch_to_drawing({
+  sheet_id, boundary: { kind:"polyline"|"circle"|"rect", ... },
+  pattern: "ANSI31" | "ANSI32" | "ANSI33" | "ANSI34" | "ANSI35" |
+           "ARB025" | "BRICK" | "CELTIC" | "DOTS" | "EARTH" |
+           "FLEX" | "GOST_ACK" | "GOST_CARDBOARD" | "GOST_CONCRETE" |
+           "GOST_CORK" | "GOST_CROSS" | "GOST_DIAMOND" | "GOST_GLOBAL" |
+           "GOST_INSUL" | "GOST_METAL" | "GOST_PLASTIC" | "GOST_STONE" |
+           "GOST_TILE" | "HONEYCOMB" | "ISO02" | "ISO03" | "ISO04" |
+           "ISO05" | "ISO06" | "ISO07" | "ISO10" | "ISO11" | "ISO12" |
+           "PLASTIC" | "SQUARES" | "STEEL" | "SWAMP" | "Zebra",
+  scale: 1.0, angle: 45
+})
+```
+
+For custom patterns, drop a `.pat` seed file under `seed/hatch_library/`
+and reference it by name. Full pattern spec: `backend/llm_docs/drawing.md`.
 
 ### Detail views
 
@@ -79,16 +124,16 @@ Planned: zoom-and-crop of a region of a parent view, with its own scale label.
 Dimensions read live from the projected geometry; an optional `value` string
 overrides the auto-measurement (the UI flags overrides with a small "M" badge).
 
-| Kind        | Description                                           |
-|-------------|-------------------------------------------------------|
-| `linear`    | Horizontal or vertical distance between two picks     |
-| `aligned`   | Distance along the line connecting two picks          |
-| `radius`    | Arc / circle radius                                   |
-| `diameter`  | Circle diameter                                       |
-| `angular`   | Angle between two picks at a vertex                   |
-| `baseline`  | Multiple distances all measured from a single datum   |
-| `chain`     | A run of consecutive distances between adjacent picks |
-| `ordinate`  | Distances from an origin, drawn as labelled offsets   |
+| Kind          | Description                                           |
+|---------------|-------------------------------------------------------|
+| `linear`      | Horizontal or vertical distance between two picks     |
+| `aligned`     | Distance along the line connecting two picks          |
+| `radius`      | Arc / circle radius                                   |
+| `diameter`    | Circle diameter                                       |
+| `angular`     | Angle between two picks at a vertex                   |
+| `baseline`    | Multiple distances all measured from a single datum    |
+| `chain`       | A run of consecutive distances between adjacent picks |
+| `ordinate`    | Distances from an origin, drawn as labelled offsets   |
 
 Add via:
 
@@ -98,18 +143,49 @@ Add via:
 The `offset` field on linear/aligned/baseline/chain controls how far the
 dimension line stands off from the geometry.
 
+### Dimension chains
+
+`add_dimension_chain_to_drawing` places a full chain in one call — picks are
+laid end-to-end and each segment gets its own label. Returns all the created
+dimension IDs:
+
+```
+add_dimension_chain_to_drawing({ sheet_id, view_id, picks:[{x,y},...], offset:8 })
+```
+
 ## Annotations
 
 Free text and visual callouts — most carry an optional `view_id` to ride with
 their view, or float free on the sheet.
 
-| Kind             | Visual                                                |
-|------------------|-------------------------------------------------------|
-| `text`           | Plain text, freely placed                             |
-| `note`           | Boxed text — for shop notes / general specs           |
-| `leader`         | Arrow + text from a target point to a label position  |
-| `balloon`        | Numbered circle for BOM callouts; optional leader     |
-| `polyline` / `rect` / `circle` | Free-drawn vector shapes                |
+| Kind                      | Visual                                              |
+|---------------------------|-----------------------------------------------------|
+| `text`                    | Plain text, freely placed                           |
+| `note`                    | Boxed text — for shop notes / general specs         |
+| `leader`                  | Arrow + text from a target point to a label position |
+| `rich_text`              | Multi-line / bold / italic annotation              |
+| `balloon`                 | Numbered circle for BOM callouts; optional leader   |
+| `polyline` / `rect` / `circle` | Free-drawn vector shapes                           |
+
+### Leader lines
+
+`add_leader_to_drawing` draws an arrow from a pick point to a text anchor:
+
+```
+add_leader_to_drawing({ sheet_id, from:{x,y}, to:{x,y}, text:"Ø3 thru" })
+```
+
+### Rich text
+
+`add_rich_text_to_drawing` places formatted text blocks with line breaks and
+font styling:
+
+```
+add_rich_text_to_drawing({ sheet_id, x:50, y:200, lines:[
+  { text:"MATERIAL:", bold:true },
+  { text:"6061-T6 Aluminum", bold:false }
+]})
+```
 
 Add via the annotation toolbar or `add_annotation` (polymorphic by `kind`),
 remove via `remove_annotation`.
@@ -119,7 +195,7 @@ remove via `remove_annotation`.
 | Symbol            | Params                                           |
 |-------------------|--------------------------------------------------|
 | `surface_finish`  | `ra` (roughness), `machined: bool`               |
-| `weld`            | `text`, `side: 'arrow' \| 'other'`               |
+| `weld`            | `text`, `side: 'arrow' \| 'other'`              |
 | `gdt`             | `characteristic`, `tolerance`, `datums[]`        |
 
 GD&T frames render as multi-cell tables per ASME Y14.5. Add via
@@ -159,6 +235,12 @@ The export button on the editor toolbar produces:
 
 - **PDF** — one page per sheet via `jspdf` + `svg2pdf.js`.
 - **SVG** — one file per sheet, raw vector for handing off to a layout tool.
+
+## DXF export
+
+Via the `.draft` file kind's `export_draft_dxf` tool. Draft files share the
+same projection/annotation model as drawings; export any sheet or view to DXF
+for CAM or third-party CAD.
 
 ## Wire format
 

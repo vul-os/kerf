@@ -1,0 +1,62 @@
+version=1
+name="Two Story House"
+
+site { name: "Suburban Lot", lat: 47.6, lon: -122.3, elevation: 50 }
+
+level "L1" elevation=0
+level "L2" elevation=2800
+
+// Level 1 — 4 exterior walls
+wall on="L1" from=(0,0) to=(10000,0) height=2800 thickness=150
+wall on="L1" from=(10000,0) to=(10000,8000) height=2800 thickness=150
+wall on="L1" from=(10000,8000) to=(0,8000) height=2800 thickness=150
+wall on="L1" from=(0,8000) to=(0,0) height=2800 thickness=150
+
+// Level 2 — 4 exterior walls
+wall on="L2" from=(0,0) to=(10000,0) height=2600 thickness=150
+wall on="L2" from=(10000,0) to=(10000,8000) height=2600 thickness=150
+wall on="L2" from=(10000,8000) to=(0,8000) height=2600 thickness=150
+wall on="L2" from=(0,8000) to=(0,0) height=2600 thickness=150
+
+// Interior walls L1
+wall on="L1" from=(5000,0) to=(5000,8000) height=2800 thickness=100
+wall on="L1" from=(0,4000) to=(10000,4000) height=2800 thickness=100
+
+// Interior walls L2
+wall on="L2" from=(5000,0) to=(5000,8000) height=2600 thickness=100
+wall on="L2" from=(0,4000) to=(10000,4000) height=2600 thickness=100
+
+// Level 1 slab
+slab on="L1" boundary=[(0,0),(10000,0),(10000,8000),(0,8000)] thickness=200
+
+// Level 2 slab (floor between L1 and L2)
+slab on="L2" boundary=[(0,0),(10000,0),(10000,8000),(0,8000)] thickness=200
+
+// Roof — gable style (two sloping planes)
+roof on="L2" style=gable pitch=30 coverage=[(0,0,3500),(10000,0,3500),(10000,8000,3500),(0,8000,3500)]
+
+// Windows — L1 front
+opening in="wall_0" position=(2000,0) width=1200 height=1400
+opening in="wall_0" position=(7000,0) width=1200 height=1400
+
+// Windows — L1 back
+opening in="wall_2" position=(5000,0) width=1500 height=1400
+
+// Windows — L2 front
+opening in="wall_4" position=(2000,0) width=1200 height=1200
+opening in="wall_4" position=(7000,0) width=1200 height=1200
+
+// Windows — L2 back
+opening in="wall_6" position=(5000,0) width=1500 height=1200
+
+// Doors — L1 front
+opening in="wall_0" position=(4500,0) width=900 height=2100
+
+// Doors — L1 back
+opening in="wall_2" position=(8000,0) width=900 height=2100
+
+// Interior spaces
+space on="L1" boundary=[(150,150),(4850,150),(4850,7850),(150,7850)] name="Living Room"
+space on="L1" boundary=[(5150,150),(9850,150),(9850,7850),(5150,7850)] name="Kitchen"
+space on="L2" boundary=[(150,150),(4850,150),(4850,7850),(150,7850)] name="Bedroom 1"
+space on="L2" boundary=[(5150,150),(9850,150),(9850,7850),(5150,7850)] name="Bedroom 2"

@@ -1,0 +1,9 @@
+{
+  "kind": "hatch_pattern",
+  "name": "ANSI 37 - Dotted Insulation",
+  "description": "Dotted diagonal lines. Foam and insulation materials.",
+  "category": "ansi/insulation",
+  "lines": [
+    { "angle_deg": 45, "spacing_mm": 4, "offset_mm": 0, "dash": [1, 3] }
+  ]
+}

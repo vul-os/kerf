@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "name": "Borosilicate Glass",
+  "category": "ceramic/glass/borosilicate",
+  "common_names": ["borosilicate glass", "Pyrex", " Duran glass"],
+  "color_hex": "#d4e5f7",
+  "mechanical": {
+    "E_GPa": 64,
+    "G_GPa": 25,
+    "nu": 0.20,
+    "yield_MPa": null,
+    "ultimate_MPa": 65,
+    "elongation_pct": 3
+  },
+  "thermal": {
+    "alpha_per_K": 3.3e-6,
+    "k_W_mK": 1.14,
+    "cp_J_kgK": 800,
+    "T_min_C": -80,
+    "T_max_C": 500
+  },
+  "physical": {
+    "rho_kg_m3": 2230
+  },
+  "callout": "Borosilicate",
+  "notes": "Low-thermal-expansion borosilicate glass (e.g. Pyrex, Duran). Excellent thermal shock resistance. Used in cookware, lab glass, optics. Source: Schott Duran / Corning 7740."
+}

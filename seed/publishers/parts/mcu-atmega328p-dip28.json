@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "ATmega328P Microcontroller DIP-28",
+  "description": "8-bit AVR microcontroller, 32KB flash, 2KB SRAM, 1KB EEPROM, 20MHz max, DIP-28 through-hole package.",
+  "category": "Microcontrollers",
+  "manufacturer": "Microchip",
+  "mpn": "ATmega328P-PU",
+  "value": "ATmega328P",
+  "distributors": [
+    {"name": "digikey", "sku": "ATmega328P-PU-ND", "url": "https://www.digikey.com/en/products/detail/microchip-technology/ATmega328P-PU/8934511", "price_usd": 2.50, "stock": 1500},
+    {"name": "mouser", "sku": "579-ATmega328P-PU", "url": "https://www.mouser.com/ProductDetail/Microchip/ATmega328P-PU", "price_usd": 2.45, "stock": 1200}
+  ],
+  "visibility": "public",
+  "metadata": {"package": "DIP-28", "flash_kb": 32, "clock_max_mhz": 20}
+}

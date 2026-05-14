@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "VESA 75 Mount Adapter Aluminum",
+  "description": "VESA 75x75mm mounting adapter plate for LCD/LED monitors. Fits 75mm hole pattern. Aluminum 6061-T6.",
+  "category": "mechanical/bracket",
+  "manufacturer": "Kerf Workshop",
+  "mpn": "KERF-BRK-VES-75-AL",
+  "distributors": [
+    {"name": "digikey", "sku": "KBRK-VES75-AL-ND", "url": "https://www.digikey.com/en/products/detail/kerf/KERF-BRK-VES-75-AL", "price_usd": 6.75, "stock": 600},
+    {"name": "mcmaster", "sku": "MCKRF-VES75AL", "url": "https://www.mcmaster.com/KERF-BRK-VES-75-AL", "price_usd": 5.99, "stock": 450},
+    {"name": "misumi", "sku": "MSM-VESABRK-75AL", "url": "https://us.misumi-ec.com/v2/detail/dsearch?search=KERF-BRK-VES-75-AL", "price_usd": 5.20, "stock": 1100}
+  ],
+  "visibility": "public",
+  "metadata": {"material": "aluminum 6061-T6", "dimensions": {"length_mm": 100, "width_mm": 100, "thickness_mm": 3}, "hole_pattern": "VESA 75x75mm (4xM4)"}
+}

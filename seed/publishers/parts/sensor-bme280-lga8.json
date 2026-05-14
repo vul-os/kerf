@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "BME280 Sensor LGA-8",
+  "description": "Digital temperature, humidity, and pressure sensor, I2C/SPI, LGA-8 package. Bosch BME280.",
+  "category": "Sensors",
+  "manufacturer": "Bosch Sensortec",
+  "mpn": "BME280",
+  "value": "BME280",
+  "distributors": [
+    {"name": "digikey", "sku": "BME280-ND", "url": "https://www.digikey.com/en/products/detail/bosch-sensortec/BME280/9546967", "price_usd": 4.50, "stock": 1200},
+    {"name": "mouser", "sku": "262-BME280", "url": "https://www.mouser.com/ProductDetail/Bosch-Sensortec/BME280", "price_usd": 4.40, "stock": 1000}
+  ],
+  "visibility": "public",
+  "metadata": {"package": "LGA-8", "interface": "I2C/SPI", "temp_range": "-40 to 85C"}
+}

@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "name": "Connector JST-XH 4-pin Battery",
+  "description": "JST XH series 4-pin header, 2.5mm pitch, for 2S LiPo battery balance leads.",
+  "category": "Connectors",
+  "manufacturer": "JST",
+  "mpn": "XHP-4",
+  "value": "JST-XH 4-pin",
+  "distributors": [
+    {"name": "digikey", "sku": "455-2880-ND", "url": "https://www.digikey.com/en/products/detail/jst-sales-america-inc/XHP-4/720890", "price_usd": 0.25, "stock": 5000},
+    {"name": "mouser", "sku": "523-XHP-4", "url": "https://www.mouser.com/ProductDetail/JST/XHP-4", "price_usd": 0.22, "stock": 4500},
+    {"name": "lcsc", "sku": "C27467", "url": "https://www.lcsc.com/product-detail/C27467", "price_usd": 0.05, "stock": 15000}
+  ],
+  "visibility": "public",
+  "metadata": {"package": "through-hole", "pitch_mm": 2.5, "pins": 4}
+}

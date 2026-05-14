@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from pyworker.routes import fem, spice, topo, autoroute, tess, cam, ifc, import_kicad, import_freecad, rf, mates, pour
+from pyworker.routes import fem, spice, topo, autoroute, tess, cam, ifc, import_kicad, import_kicad_library, import_freecad, rf, mates, pour, rhino3dm as rhino3dm_routes, render as render_routes
 
 app = FastAPI()
 
@@ -11,11 +11,14 @@ app.include_router(tess.router, prefix="", tags=["tess"])
 app.include_router(cam.router, prefix="", tags=["cam"])
 app.include_router(ifc.router, prefix="", tags=["ifc"])
 app.include_router(import_kicad.router, prefix="", tags=["import"])
+app.include_router(import_kicad_library.router, prefix="", tags=["import"])
 app.include_router(import_freecad.router, prefix="", tags=["import"])
 app.include_router(rf.router, prefix="", tags=["rf"])
 app.include_router(autoroute.router, prefix="", tags=["autoroute"])
 app.include_router(mates.router, prefix="", tags=["mates"])
 app.include_router(pour.router, prefix="", tags=["pour"])
+app.include_router(rhino3dm_routes.router, prefix="", tags=["rhino3dm"])
+app.include_router(render_routes.router, prefix="", tags=["render"])
 
 @app.get("/healthz")
 async def healthz():

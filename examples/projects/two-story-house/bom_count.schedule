@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "bim_file_id": "*",
+  "schedule": {
+    "name": "Element Count by Category",
+    "grouping": "category",
+    "columns": ["category", "count", "total_area"]
+  },
+  "counts": [
+    { "category": "wall", "count": 12, "total_area": 428.4 },
+    { "category": "slab", "count": 2, "total_area": 160.0 },
+    { "category": "roof", "count": 1, "total_area": 95.0 },
+    { "category": "opening_window", "count": 6, "total_area": 15.6 },
+    { "category": "opening_door", "count": 2, "total_area": 3.78 },
+    { "category": "space", "count": 4, "total_area": 0 }
+  ],
+  "notes": "Area in m². Wall area excludes openings."
+}

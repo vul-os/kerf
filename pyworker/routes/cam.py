@@ -43,6 +43,22 @@ from typing import Optional, List
 
 router = APIRouter()
 
+# Gate opencamlib — import once at module load so tests can monkeypatch the flag.
+_ocl_available = False
+try:
+    import opencamlib as ocl  # noqa: F401
+    _ocl_available = True
+except ImportError:
+    pass
+
+# Gate pythonOCC — needed for STEP→STL conversion.
+_occ_available = False
+try:
+    from OCC.Core.STEPControl import STEPControl_Reader as _STEPControl_Reader  # noqa: F401
+    _occ_available = True
+except ImportError:
+    pass
+
 
 class CAMOperation(BaseModel):
     type: str
@@ -92,12 +108,6 @@ async def run_cam(req: CAMRequest):
     else:
         raise HTTPException(status_code=400, detail="either operations or input_spec required")
 
-    try:
-        import opencamlib as ocl  # noqa: F401 — presence check only
-        _ocl_available = True
-    except ImportError:
-        _ocl_available = False
-
     warnings = []
     errors = []
     toolpath_length = 0.0
@@ -108,16 +118,24 @@ async def run_cam(req: CAMRequest):
         step_path.write_bytes(step_bytes)
 
         if not _ocl_available:
-            # Graceful fallback: generate a mock bounding-box toolpath
-            # TODO: when opencamlib is available, replace with real STEP→STL→OCL pipeline
             warnings.append("opencamlib not installed — returning mock scaffold toolpath. "
                             "Install: pip install opencamlib (or build from source: "
                             "https://github.com/aewallin/opencamlib)")
             g_code, toolpath_length, estimated_time = _mock_toolpath(operations)
         else:
             try:
+                stl_path = None
+                if _occ_available:
+                    stl_path = str(Path(tmpdir) / "input.stl")
+                    convert_step_to_stl(str(step_path), stl_path)
+                else:
+                    warnings.append(
+                        "pythonOCC not installed — surface mesh unavailable; "
+                        "toolpath will be computed on an empty surface. "
+                        "Install: conda install -c conda-forge pythonocc-core"
+                    )
                 g_code, toolpath_length, estimated_time = generate_toolpaths(
-                    str(step_path), operations, req.post_processor
+                    str(step_path), operations, req.post_processor, stl_path=stl_path
                 )
             except Exception as e:
                 errors.append(str(e))
@@ -136,6 +154,38 @@ async def run_cam(req: CAMRequest):
         "warnings": warnings,
         "errors": errors,
     }
+
+
+def convert_step_to_stl(step_path: str, stl_path: str, linear_deflection: float = 0.1) -> None:
+    """Read a STEP file with pythonOCC and write a triangulated ASCII STL.
+
+    linear_deflection controls mesh quality (mm units); 0.1 mm gives a
+    reasonable balance between accuracy and file size for 2.5D CAM.  Tighter
+    values (e.g. 0.01) produce more triangles — useful for small detailed parts
+    but slower.  Callers can override via the parameter.
+    """
+    from OCC.Core.STEPControl import STEPControl_Reader
+    from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh
+    from OCC.Core.StlAPI import StlAPI_Writer
+    from OCC.Core.IFSelect import IFSelect_RetDone
+
+    reader = STEPControl_Reader()
+    status = reader.ReadFile(step_path)
+    if status != IFSelect_RetDone:
+        raise RuntimeError(f"STEPControl_Reader failed on {step_path} (status={status})")
+    reader.TransferRoots()
+    shape = reader.OneShape()
+
+    mesh = BRepMesh_IncrementalMesh(shape, linear_deflection)
+    mesh.Perform()
+    if not mesh.IsDone():
+        raise RuntimeError("BRepMesh_IncrementalMesh did not complete")
+
+    writer = StlAPI_Writer()
+    writer.ASCIIMode = True
+    result = writer.Write(shape, stl_path)
+    if not result:
+        raise RuntimeError(f"StlAPI_Writer failed writing {stl_path}")
 
 
 def _mock_toolpath(operations: List[CAMOperation]):
@@ -166,20 +216,24 @@ def _mock_toolpath(operations: List[CAMOperation]):
     return "\n".join(lines), total_length, estimated_time
 
 
-def generate_toolpaths(step_path: str, operations: List[CAMOperation], post_processor: str):
+def generate_toolpaths(
+    step_path: str,
+    operations: List[CAMOperation],
+    post_processor: str,
+    stl_path: Optional[str] = None,
+):
     """Generate real toolpaths via opencamlib.
 
-    NOTE: opencamlib works with STL meshes, not STEP files directly.
-    In production this requires a STEP→STL conversion step (e.g. via pythonOCC
-    or FreeCAD). For now we generate a scaffold waterline toolpath on a simple
-    placeholder surface and TODO the STEP→STL pipeline.
+    When stl_path is provided (STEP converted via pythonOCC), the STL is loaded
+    into an ocl.STLSurf and used as the cutter-location surface for all ops.
+    Without stl_path (pythonOCC unavailable) the surface is empty and the
+    resulting toolpath will have no CL points, but the pipeline still runs.
     """
     import opencamlib as ocl
 
-    # TODO: convert STEP → STL via pythonOCC before loading into ocl
-    # For now, create a simple flat surface as a proxy
-    # stl_path = convert_step_to_stl(step_path)  # not yet implemented
-    # mid = ocl.STLObj(); mid.readFile(stl_path)
+    surface = ocl.STLSurf()
+    if stl_path:
+        _load_stl_into_surface(stl_path, surface)
 
     toolpaths = []
     total_length = 0.0
@@ -188,11 +242,8 @@ def generate_toolpaths(step_path: str, operations: List[CAMOperation], post_proc
         tool = ocl.CylCutter(op.tool_diameter / 1000.0, 50.0 / 1000.0)
         op_type = op.type.lower()
 
-        # Use a simple adaptive dropcutter on a placeholder flat surface
-        # Real implementation needs the STL loaded from the converted STEP
-        clpoints = _run_ocl_op(op_type, tool, op)
+        clpoints = _run_ocl_op(op_type, tool, op, surface)
         toolpaths.append(clpoints)
-        # Approximate length from point count * step_over
         total_length += len(clpoints) * (op.step_over / 1000.0)
 
     feed = operations[0].feed_rate if operations else 1000.0
@@ -202,13 +253,83 @@ def generate_toolpaths(step_path: str, operations: List[CAMOperation], post_proc
     return g_code, total_length, estimated_time
 
 
-def _run_ocl_op(op_type: str, tool, op: CAMOperation):
-    """Run an opencamlib operation, returning a list of CL points."""
+def _load_stl_into_surface(stl_path: str, surface) -> None:
+    """Parse an ASCII STL file and add its triangles to an ocl.STLSurf."""
     import opencamlib as ocl
 
-    # Placeholder: return empty list until STEP→STL conversion is wired up
-    # Real: lw = ocl.Waterline(stl_surface); lw.setTool(tool); lw.run(); return lw.getCLPoints()
-    return []
+    with open(stl_path, "r", errors="replace") as fh:
+        lines = fh.readlines()
+
+    verts = []
+    for line in lines:
+        line = line.strip()
+        if line.startswith("vertex "):
+            parts = line.split()
+            verts.append(ocl.Point(float(parts[1]), float(parts[2]), float(parts[3])))
+            if len(verts) == 3:
+                surface.addTriangle(ocl.Triangle(verts[0], verts[1], verts[2]))
+                verts = []
+
+
+def _run_ocl_op(op_type: str, tool, op: CAMOperation, surface):
+    """Run an opencamlib PathDropCutter pass and return a list of CL points."""
+    import opencamlib as ocl
+
+    pdc = ocl.PathDropCutter()
+    pdc.setSTL(surface)
+    pdc.setCutter(tool)
+    pdc.setZ(-(op.step_down / 1000.0))
+    pdc.setSampling(op.step_over / 2000.0)
+
+    path = ocl.Path()
+    step = op.step_over / 1000.0
+
+    if op_type in ("face", "pocket"):
+        # Raster scan over the STL bounding box (or a 10×10 mm default when
+        # the surface is empty)
+        bb = surface.getBounds() if hasattr(surface, "getBounds") else None
+        if bb and hasattr(bb, "minpt") and hasattr(bb, "maxpt"):
+            x_min, x_max = bb.minpt.x, bb.maxpt.x
+            y_min, y_max = bb.minpt.y, bb.maxpt.y
+        else:
+            x_min, y_min, x_max, y_max = 0.0, 0.0, 0.01, 0.01
+        y = y_min
+        while y <= y_max + 1e-9:
+            path.append(ocl.Line(
+                ocl.Point(x_min, y, 0.0),
+                ocl.Point(x_max, y, 0.0),
+            ))
+            y += step
+    elif op_type in ("contour", "profile"):
+        # Rectangular perimeter pass
+        bb = surface.getBounds() if hasattr(surface, "getBounds") else None
+        if bb and hasattr(bb, "minpt") and hasattr(bb, "maxpt"):
+            x0, x1 = bb.minpt.x, bb.maxpt.x
+            y0, y1 = bb.minpt.y, bb.maxpt.y
+        else:
+            x0, y0, x1, y1 = 0.0, 0.0, 0.01, 0.01
+        corners = [
+            ocl.Point(x0, y0, 0.0),
+            ocl.Point(x1, y0, 0.0),
+            ocl.Point(x1, y1, 0.0),
+            ocl.Point(x0, y1, 0.0),
+            ocl.Point(x0, y0, 0.0),
+        ]
+        for a, b in zip(corners, corners[1:]):
+            path.append(ocl.Line(a, b))
+    elif op_type == "drill":
+        # Vertical plunge at origin — caller usually overrides with hole centres
+        path.append(ocl.Line(
+            ocl.Point(0.0, 0.0, 0.0),
+            ocl.Point(0.0, 0.0, -(op.step_down / 1000.0)),
+        ))
+    else:
+        # Unknown op type: no path
+        return []
+
+    pdc.setPath(path)
+    pdc.run()
+    return pdc.getCLPoints()
 
 
 def _emit_gcode(toolpaths, operations: List[CAMOperation], post_processor: str) -> str:

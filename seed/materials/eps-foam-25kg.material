@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "name": "EPS Foam (25 kg/m\u00b3)",
+  "category": "polymer/foam/rigid/polystyrene",
+  "common_names": ["expanded polystyrene foam 25kg", "EPS 25", "Styrofoam"],
+  "color_hex": "#f5f5dc",
+  "mechanical": {
+    "E_GPa": 0.005,
+    "G_GPa": 0.002,
+    "nu": 0.10,
+    "yield_MPa": 0.18,
+    "ultimate_MPa": 0.30,
+    "elongation_pct": 8
+  },
+  "thermal": {
+    "alpha_per_K": 60e-6,
+    "k_W_mK": 0.034,
+    "cp_J_kgK": 1400,
+    "T_min_C": -180,
+    "T_max_C": 85
+  },
+  "physical": {
+    "rho_kg_m3": 25
+  },
+  "callout": "EPS-25",
+  "notes": "Expanded polystyrene foam at 25 kg/m\u00b3 density. Common packaging and insulation foam. Low mechanical properties but excellent insulator. Source: BASF Styropor / ISO 845."
+}

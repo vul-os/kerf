@@ -1,3 +1,5 @@
+import base64
+import io
 import json
 import uuid
 from tools.registry import ToolSpec, err_payload, ok_payload, register
@@ -41,7 +43,6 @@ async def record_revision_for_file(ctx: ProjectCtx, file_id: uuid.UUID, content:
         )
     make_base = latest is None or diffs_after >= 20
     import gzip
-    import base64
     if make_base:
         gz = gzip.compress(content.encode())
         await ctx.pool.execute(
@@ -107,6 +108,109 @@ def serialize_topo_content(d: dict) -> str:
     return json.dumps(d, indent="  ")
 
 
+async def _fetch_step_b64_for_feature(ctx: ProjectCtx, feature_id: uuid.UUID) -> str:
+    """
+    Fetch the STEP bytes for a .feature file from storage and return as base64.
+
+    The feature file may reference a compiled STEP via storage_key (kind='step')
+    or be a step-ref (kind='step-ref').  When the feature file itself has no
+    storage_key (it is a JSON feature tree not yet compiled to STEP), we return
+    an empty string so pyworker can fall back to the unit-cube mesh.
+    """
+    row = await ctx.pool.fetchrow(
+        "SELECT kind, storage_key, content FROM files WHERE id = $1 AND deleted_at IS NULL",
+        feature_id,
+    )
+    if not row:
+        return ""
+
+    if row["kind"] == "step-ref":
+        try:
+            ref = json.loads(row["content"])
+            blob_key = f"blobs/step/{ref['hash']}"
+        except Exception:
+            return ""
+        if ctx.storage is None:
+            return ""
+        try:
+            blob_io, _ = await ctx.storage.get(blob_key)
+            step_bytes = blob_io.read()
+            return base64.b64encode(step_bytes).decode()
+        except Exception:
+            return ""
+
+    if row["storage_key"]:
+        if ctx.storage is None:
+            return ""
+        try:
+            blob_io, _ = await ctx.storage.get(row["storage_key"])
+            step_bytes = blob_io.read()
+            return base64.b64encode(step_bytes).decode()
+        except Exception:
+            return ""
+
+    return ""
+
+
+async def _persist_step_output(
+    ctx: ProjectCtx,
+    topo_file_id: uuid.UUID,
+    step_b64: str,
+    topo_name: str,
+) -> str:
+    """
+    Store the optimized STEP (base64) as a new 'step' file in the project,
+    sibling to the .topo file.  Returns the new file id string, or "" on error.
+    """
+    if not step_b64:
+        return ""
+    try:
+        step_bytes = base64.b64decode(step_b64)
+    except Exception:
+        return ""
+
+    topo_row = await ctx.pool.fetchrow(
+        "SELECT parent_id FROM files WHERE id = $1 AND project_id = $2 AND deleted_at IS NULL",
+        topo_file_id, ctx.project_id,
+    )
+    parent_id = topo_row["parent_id"] if topo_row else None
+
+    base_name = topo_name.removesuffix(".topo") if topo_name.endswith(".topo") else topo_name
+    out_name = f"{base_name}_optimized.step"
+
+    storage_key = f"topo/{ctx.project_id}/{topo_file_id}/optimized.step"
+
+    if ctx.storage is not None:
+        try:
+            await ctx.storage.put(
+                storage_key,
+                io.BytesIO(step_bytes),
+                "model/step",
+                len(step_bytes),
+            )
+        except Exception:
+            storage_key = None
+    else:
+        storage_key = None
+
+    new_file_id = uuid.uuid4()
+    await ctx.pool.execute(
+        """
+        INSERT INTO files (id, project_id, parent_id, name, kind, content, storage_key, mime_type, size)
+        VALUES ($1, $2, $3, $4, 'step', '', $5, 'model/step', $6)
+        ON CONFLICT DO NOTHING
+        """,
+        new_file_id,
+        ctx.project_id,
+        parent_id,
+        out_name,
+        storage_key,
+        len(step_bytes),
+    )
+
+    return str(new_file_id)
+
+
 topo_run_spec = ToolSpec(
     name="topo_run",
     description="Submit a topology-optimization (SIMP via FEniCSx) job for a .topo file.",
@@ -137,10 +241,11 @@ async def run_topo_run(ctx: ProjectCtx, args: bytes) -> str:
         return err_payload(f"path is not a .topo file (kind={rp.get('kind')})", "BAD_KIND")
 
     row = await ctx.pool.fetchrow(
-        "SELECT content FROM files WHERE id = $1 AND project_id = $2",
+        "SELECT content, name FROM files WHERE id = $1 AND project_id = $2",
         rp["id"], ctx.project_id,
     )
     content = row["content"] if row and row["content"] else ""
+    topo_name = row["name"] if row and row["name"] else "optimization.topo"
 
     doc = parse_topo_content(content)
 
@@ -151,6 +256,8 @@ async def run_topo_run(ctx: ProjectCtx, args: bytes) -> str:
     penal_pow = doc.get("penalization_power", 3)
     filter_rad = doc.get("filter_radius_mm", 1.5)
     conv_tol = doc.get("convergence_tolerance", 1e-4)
+    boundary_conditions = doc.get("boundary_conditions") or []
+    loads = doc.get("loads") or []
 
     if not ds_fp:
         return err_payload("topo file is missing design_space_feature_path", "BAD_TOPO")
@@ -173,6 +280,8 @@ async def run_topo_run(ctx: ProjectCtx, args: bytes) -> str:
     if mat_rp.get("kind") != "material":
         return err_payload("material_path is not a .material file", "BAD_TOPO")
 
+    step_b64 = await _fetch_step_b64_for_feature(ctx, ds_rp["id"])
+
     payload = {
         "project_id": str(ctx.project_id),
         "topo_file_id": str(rp["id"]),
@@ -183,11 +292,13 @@ async def run_topo_run(ctx: ProjectCtx, args: bytes) -> str:
         "filter_radius_mm": filter_rad,
         "max_iterations": max_iter,
         "convergence_tolerance": conv_tol,
+        "step_b64": step_b64,
+        "boundary_conditions": boundary_conditions,
+        "loads": loads,
     }
 
     body = json.dumps(payload)
 
-    import httpx
     req_url = "http://localhost:9090/run-topo"
     try:
         response = ctx.http_client.post(req_url, content=body, headers={"content-type": "application/json"}, timeout=30.0)
@@ -223,9 +334,24 @@ async def run_topo_run(ctx: ProjectCtx, args: bytes) -> str:
     warnings = engine_resp.get("warnings") or []
     error_msg = engine_resp.get("error") or ""
 
+    output_mesh_file_id = engine_resp.get("output_mesh_file_id", "")
+
+    if status == "success" and engine_resp.get("step_b64"):
+        try:
+            new_fid = await _persist_step_output(
+                ctx,
+                rp["id"],
+                engine_resp["step_b64"],
+                topo_name,
+            )
+            if new_fid:
+                output_mesh_file_id = new_fid
+        except Exception as exc:
+            warnings.append(f"STEP persist failed: {exc}")
+
     doc["results"]["status"] = status
     doc["results"]["iterations"] = engine_resp.get("iterations", 0)
-    doc["results"]["output_mesh_file_id"] = engine_resp.get("output_mesh_file_id", "")
+    doc["results"]["output_mesh_file_id"] = output_mesh_file_id
 
     fc = engine_resp.get("final_compliance")
     if fc:
@@ -234,6 +360,10 @@ async def run_topo_run(ctx: ProjectCtx, args: bytes) -> str:
     fvf = engine_resp.get("final_volume_fraction")
     if fvf:
         doc["results"]["final_volume_fraction"] = fvf
+
+    density_field = engine_resp.get("density_field")
+    if density_field:
+        doc["results"]["density_field"] = density_field
 
     for w in warnings:
         if w:
@@ -252,7 +382,7 @@ async def run_topo_run(ctx: ProjectCtx, args: bytes) -> str:
     return ok_payload({
         "status": status,
         "topo_path": topo_path,
-        "output_mesh_file_id": engine_resp.get("output_mesh_file_id", ""),
+        "output_mesh_file_id": output_mesh_file_id,
         "final_compliance": engine_resp.get("final_compliance", 0),
         "final_volume_fraction": engine_resp.get("final_volume_fraction", 0),
         "iterations": engine_resp.get("iterations", 0),

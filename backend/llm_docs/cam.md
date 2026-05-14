@@ -105,9 +105,13 @@ Response mirrors `cam_job_status` above.
   If not installed, the route returns a mock scaffold toolpath with a warning.
   Install: `pip install opencamlib` or build from source at
   https://github.com/aewallin/opencamlib (requires C++ build tools + Boost).
-- **STEP → STL conversion**: opencamlib operates on STL meshes. A STEP → STL
-  conversion step via pythonOCC is on the roadmap; currently the pyworker uses
-  a scaffold path with a TODO marker.
+- **STEP → STL conversion**: `pyworker/routes/cam.py` converts the STEP file via
+  pythonOCC (`STEPControl_Reader` → `BRepMesh_IncrementalMesh` at 0.1 mm linear
+  deflection → `StlAPI_Writer` ASCII STL). The resulting mesh is loaded into
+  `ocl.STLSurf` using the parsed ASCII vertex lines. If pythonOCC is not installed,
+  the STL surface is empty and toolpath extents fall back to a 10×10 mm default;
+  a warning is added to the response.
+  Install pythonOCC: `conda install -c conda-forge pythonocc-core`
 - **Post-processors**: `fanuc` (default), `linuxcnc`, `grbl`, `mach3` — all emit
   standard G-code with minor header/footer differences.
 - **2.5D only**: depth is constant per pass. 3-axis simultaneous (3D contouring)

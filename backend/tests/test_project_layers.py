@@ -23,8 +23,10 @@ def _load_module(name, path):
     spec.loader.exec_module(mod)
     return mod
 
-_load_module("tools.registry", os.path.join(_TOOLS, "registry.py"))
-_load_module("tools.context",  os.path.join(_TOOLS, "context.py"))
+if "tools.registry" not in sys.modules:
+    _load_module("tools.registry", os.path.join(_TOOLS, "registry.py"))
+if "tools.context" not in sys.modules:
+    _load_module("tools.context", os.path.join(_TOOLS, "context.py"))
 _pl = _load_module("tools.project_layers", os.path.join(_TOOLS, "project_layers.py"))
 
 _default_canvas  = _pl._default_canvas

@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "Triangular Gusset Bracket 50mm Steel",
+  "description": "Triangular gusset plate for reinforcing 90-degree joints in 50mm framing. Powder-coated steel, 4mm thickness.",
+  "category": "mechanical/bracket",
+  "manufacturer": "Kerf Workshop",
+  "mpn": "KERF-BRK-GUS-ST-50",
+  "distributors": [
+    {"name": "digikey", "sku": "KBRK-GUS50-ST-ND", "url": "https://www.digikey.com/en/products/detail/kerf/KERF-BRK-GUS-ST-50", "price_usd": 3.95, "stock": 800},
+    {"name": "mcmaster", "sku": "MCKRF-GUS50ST", "url": "https://www.mcmaster.com/KERF-BRK-GUS-ST-50", "price_usd": 3.40, "stock": 600},
+    {"name": "misumi", "sku": "MSM-GUSBRK-50ST", "url": "https://us.misumi-ec.com/v2/detail/dsearch?search=KERF-BRK-GUS-ST-50", "price_usd": 2.90, "stock": 1600}
+  ],
+  "visibility": "public",
+  "metadata": {"material": "steel powder-coated", "dimensions": {"length_mm": 50, "width_mm": 50, "thickness_mm": 4}, "hole_pattern": "4xM5 equilateral triangle"}
+}

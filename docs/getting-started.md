@@ -1,109 +1,69 @@
 # Getting started
 
-Install Kerf, create a project, edit a JSCAD file, see the model render.
+Kerf is a browser-based CAD platform where an AI agent loop sits between your intent and your files. Describe what you want in plain English — "add a fillet here", "route this signal to pin 3", "optimize this topology" — and the LLM edits the underlying JSON or code directly, re-rendering in the viewport within milliseconds. Every edit is versioned; every file is plain JSON or script you can read, fork, and version-control.
 
-## Install
-
-Pick the path that suits you. Self-host needs a Postgres database; cloud is the
-hosted version at kerf.app (no install).
-
-### Homebrew (recommended)
-
-```sh
-brew install exolution/tap/kerf
-```
-
-This drops a single `kerf` binary on your `$PATH`. The frontend is embedded in
-the binary.
-
-### curl
-
-```sh
-curl -fsSL https://kerf.app/install.sh | sh
-```
-
-Same binary, downloaded straight from GitHub Releases.
-
-### From source (dev mode)
+## Quick start
 
 ```sh
 git clone https://github.com/exolution/kerf
 cd kerf
 npm install
-npm run init           # writes kerf.toml from kerf.example.toml
-createdb kerf          # Postgres on localhost:5432
-npm run migrate
-npm run dev            # vite :5173 + go server :8080
+cd backend && pip install -r requirements.txt
+uvicorn main:app --reload --port 8080
+# back in kerf root:
+npm run dev
 ```
 
-Open <http://localhost:5173>.
+Open http://localhost:5173. On first run Kerf writes `kerf.toml` via `npm run init`; set `auth.optional = true` and your LLM API key (`[llm.anthropic]` or `[llm.openai]`). Full schema is in `kerf.example.toml`.
 
-## First-run config
+## What you can do
 
-Kerf reads a single `kerf.toml`. The `init` script writes one with defaults; at
-minimum, set:
+| File kind | What it is | LLM docs |
+|-----------|------------|----------|
+| `.jscad` | Parametric 3D model — JSCAD `[{id, geom}]` array, debounced re-render at ~250 ms | `/docs/llm/jscad.md` |
+| `.feature` | OCCT B-rep feature tree — pad/pocket/revolve/fillet/chamfer/shell/hole | `/docs/llm/feature.md` |
+| `.sketch` | 2D constraint sketch — planegcs geometric constraints + dimensions | `/docs/llm/sketch.md` |
+| `.assembly` | Assembly composition — components placed at transforms, cycle rules | `/docs/llm/assembly.md` |
+| `.drawing` | 2D technical drawing — multi-sheet, GD&T, centerlines, breaks | `/docs/llm/drawing.md` |
+| `.part` | Library part metadata — MPN, distributors, photos, visibility | `/docs/llm/part.md` |
+| `.circuit.tsx` | tscircuit PCB — JSX board/schematic, ERC, autoroute | `/docs/llm/circuit.md` |
+| `.simulation` | SPICE netlist — op-amp, transient, AC sweep, noise analysis | `/docs/llm/simulation.md` |
+| `.bim` | BIM architectural — walls/doors/windows/roofs as text DSL | `/docs/llm/bim.md` |
+| `.family` | Parametric family — window/door/family definitions with types | `/docs/llm/family.md` |
+| `.schedule` | Live BOM — rolling query across assemblies, totals by MPN | `/docs/llm/schedule.md` |
+| `.view` | Derived viewport — saved camera, layers, section cuts | `/docs/llm/view.md` |
+| `.sheet` | Print sheet — page size, title block, arranged views | `/docs/llm/sheet.md` |
+| `.render` | Render config — lighting, environment, output resolution | `/docs/llm/render.md` |
+| `.graph` | Parametric graph — Grasshopper-equivalent node network | `/docs/llm/graph.md` |
+| `.subd` | Subdivision surface — smooth subdivision from mesh cage | `/docs/llm/subd.md` |
+| `.mesh` | Mesh ops — import 3DM, repair, convert to solid | `/docs/llm/mesh.md` |
+| `.draft` | Draft entity — slope, distance, reference lines in drawing | `/docs/llm/draft.md` |
+| `.tolerance` | Tolerance stack-up — worst-case and RSS analysis | `/docs/llm/tolerance.md` |
+| `.fem` | Mechanical FEA — mesh, boundary conditions, solve | `/docs/llm/fem.md` |
+| `.topo` | Topology optimization — density field under constraints | `/docs/llm/topo.md` |
+| `.cam` | CAM toolpath — facing, pocket, profile, drilling cycles | `/docs/llm/cam.md` |
+| `.rf-study` | RF s-parameter study — port calibration, S/Y/Z parameters | `/docs/llm/rf.md` |
+| `.material` | Material definition — 55 seeded (steel, aluminium, FR4, ...) | `/docs/llm/material.md` |
+| `.equations` | Global equations — cross-file parameter references | `/docs/llm/equations.md` |
 
-```toml
-[auth]
-optional = true            # single-user local mode — no signup screen
+## AI loop
 
-[llm.anthropic]
-api_key = "sk-ant-..."     # or [llm.openai], [llm.gemini], [llm.moonshot]
-```
+The chat input at the bottom of the viewport is the LLM agent. When you send a message it:
 
-`auth.optional = true` is for personal local installs only. For multi-user
-deploys, leave it `false` and let users sign up.
+1. Calls `list_files` to see your project tree
+2. Calls `search_kerf_docs` to find relevant docs in the 68-page embedded corpus (`backend/llm_docs/`)
+3. Reads the matching `/docs/llm/<topic>.md` page via `read_file`
+4. Calls `edit_file` / `write_file` / domain tools to mutate files
+5. The viewport re-renders within ~250 ms
 
-The full schema lives in `kerf.example.toml` at the repo root.
+**Core tools (always available):** `list_files`, `read_file`, `write_file`, `edit_file`, `create_file`, `delete_file`, `search_code`, `import_step`, `duplicate_object`, `delete_object`, `validate_jscad`, `generate_bom`, `create_sketch`, `create_feature`, `create_part`, `create_circuit`, `search_kerf_docs`, `list_revisions`, `restore_revision`.
 
-## Create your first project
+**Domain tools (50+):** Assembly placement/mates, PCB autoroute/shove/ERC/length-tuning/pour/DRC, feature draft/helix/mirror/multi-transform/rib, mesh repair/convert, render config, BIM curtain-wall/family/railings/stairs/MEP, graph nodes, SPICE simulation, RF s-parameters, CAM toolpaths, FEA solve, tolerance analysis, topology optimization, curve ops, sketch constraints, sheet layout, view config, material lookup, equation evaluation, configurations, pad overrides, inspection, and more.
 
-1. Open Kerf, click **New project**, name it `hello-cube`.
-2. The default `main.jscad` opens with a starter cuboid. The 3D viewport on the
-   right renders it as you type.
+## Next
 
-<!-- screenshot: editor with the default cuboid loaded -->
-
-## Edit JSCAD
-
-Replace the file content with:
-
-```js
-import { primitives, transforms, booleans } from '@jscad/modeling'
-
-export default function () {
-  const base   = primitives.cuboid({ size: [40, 40, 8] })
-  const post   = transforms.translate(
-    [0, 0, 12],
-    primitives.cylinder({ radius: 6, height: 24 })
-  )
-  const body   = booleans.union(base, post)
-  return [{ id: 'body', geom: body }]
-}
-```
-
-Save (auto-saves on idle). The viewport re-renders within ~250 ms — Kerf
-debounces re-evaluation based on file size, so a 5-line file feels instant and
-a 5000-line one waits a beat.
-
-<!-- screenshot: cube + cylinder rendered in viewport -->
-
-## Click a part. Chat to refine.
-
-1. Click anywhere on the rendered geometry. The clicked **Object** (here `body`)
-   appears as a chip in the chat composer at the bottom right.
-2. Type: *"add a 2 mm fillet around the top edge of the post"* and hit send.
-3. The LLM edits `main.jscad` via the `edit_file` tool. The new revision lands
-   in the file's history (Cmd+Z to undo).
-
-If you don't have an LLM API key, that's fine — you can still hand-edit the
-file; you just won't get the chat side of the loop.
-
-## What's next
-
-- Concepts behind Project / File / Object — see [concepts.md](./concepts.md).
-- Drawing 2D sketches with constraints — see [sketching.md](./sketching.md).
-- Building assemblies of multiple parts — see [assemblies.md](./assemblies.md).
-- Producing dimensioned drawings — see [drawings.md](./drawings.md).
-
-Next: [concepts.md](./concepts.md)
+- Sketching 2D with constraints → [sketching.md](./sketching.md)
+- Electronics & PCB design → [electronics.md](./electronics.md)
+- System internals → [architecture.md](./architecture.md)
+- Multi-part assemblies → [assemblies.md](./assemblies.md)
+- Dimensioned drawings → [drawings.md](./drawings.md)

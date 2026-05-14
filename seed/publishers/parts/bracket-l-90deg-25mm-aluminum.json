@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "L-Bracket 90deg 25mm Aluminum",
+  "description": "Right-angle L-bracket with 25mm legs, 3mm thickness, pre-drilled hole pattern. Aluminum 6061-T6.",
+  "category": "mechanical/bracket",
+  "manufacturer": "Kerf Workshop",
+  "mpn": "KERF-BRK-L-AL-25",
+  "distributors": [
+    {"name": "digikey", "sku": "KBRK-L25-AL-ND", "url": "https://www.digikey.com/en/products/detail/kerf/KERF-BRK-L-AL-25", "price_usd": 3.45, "stock": 1200},
+    {"name": "mcmaster", "sku": "MCKRF-L25AL", "url": "https://www.mcmaster.com/KERF-BRK-L-AL-25", "price_usd": 2.99, "stock": 800},
+    {"name": "misumi", "sku": "MSM-LBRK-25AL", "url": "https://us.misumi-ec.com/v2/detail/dsearch?search=KERF-BRK-L-AL-25", "price_usd": 2.50, "stock": 2000}
+  ],
+  "visibility": "public",
+  "metadata": {"material": "aluminum 6061-T6", "dimensions": {"length_mm": 25, "width_mm": 25, "thickness_mm": 3}, "hole_pattern": "4xM4 on 20mm centers"}
+}

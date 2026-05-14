@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "Crystal 32.768kHz CC4V-T1A Watch",
+  "description": "Quartz crystal, 32.768kHz, CC4V-T1A SMD watch crystal, 20ppm tolerance. Real-time clock crystal.",
+  "category": "Crystals",
+  "manufacturer": "Abracon",
+  "mpn": "CC4V-T1A-32.768KHZ",
+  "value": "32.768kHz",
+  "distributors": [
+    {"name": "digikey", "sku": "535-10204-ND", "url": "https://www.digikey.com/en/products/detail/abracon-corporation/CC4V-T1A-32-768KHZ/3890407", "price_usd": 0.35, "stock": 3000},
+    {"name": "mouser", "sku": "442-CC4V-T1A-32.768KHZ", "url": "https://www.mouser.com/ProductDetail/Abracon/CC4V-T1A-32-768KHZ", "price_usd": 0.32, "stock": 2500}
+  ],
+  "visibility": "public",
+  "metadata": {"package": "CC4V-T1A", "frequency_hz": 32768, "tolerance_ppm": 20}
+}

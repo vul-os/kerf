@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "name": "Wood-Filled PLA (3D Print)",
+  "category": "polymer/thermoplastic/biodegradable/composite",
+  "common_names": ["wood-PLA filament", "PLA-wood composite", "biocomposite filament"],
+  "color_hex": "#d2a679",
+  "mechanical": {
+    "E_GPa": 3.0,
+    "G_GPa": 1.1,
+    "nu": 0.35,
+    "yield_MPa": 35,
+    "ultimate_MPa": 42,
+    "elongation_pct": 5
+  },
+  "thermal": {
+    "alpha_per_K": 55e-6,
+    "k_W_mK": 0.30,
+    "cp_J_kgK": 1900,
+    "T_min_C": -20,
+    "T_max_C": 55
+  },
+  "physical": {
+    "rho_kg_m3": 1380
+  },
+  "callout": "Wood-PLA",
+  "notes": "PLA filled with 20-30% wood fibers. Lower modulus than standard PLA due to fiber content. Suitable for aesthetic parts; higher density increases print weight. Source: Hatchbox Wood / Polylite Wood."
+}

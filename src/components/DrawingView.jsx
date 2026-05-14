@@ -13,6 +13,15 @@ import {
   extractSnapTargets, resolveSnap, snapLabel, SNAP_COLOR, SNAP_MARKER_MM,
 } from '../lib/drawingSnap.js'
 import { Plus, X as XIcon } from 'lucide-react'
+// ---------------------------------------------------------------------------
+// Drafting completeness helpers (hatch / leader / rich-text / dim-chain).
+import {
+  HATCH_PATTERNS,
+  addHatch,
+  addLeader,
+  addRichText,
+  addDimensionChain,
+} from '../lib/draftingComplete.js'
 
 // Drawing renderer — a single SVG element. Renders the sheet, each view's
 // projected polylines, the title block, dimensions, and now annotations and
@@ -59,9 +68,12 @@ const DIM_TOOLS = new Set([...TWO_POINT_DIMS, 'angular', ...MULTI_POINT_DIMS])
 const MEASURE_TOOLS = new Set(['measure-distance', 'measure-angle'])
 const SYMBOL_TOOLS = new Set(['surface_finish', 'weld', 'gdt', 'balloon'])
 const ANN_PLACE_TOOLS = new Set(['leader', 'note', 'text', 'centerline', 'break'])
+// ---------------------------------------------------------------------------
+// NEW: Drafting completeness tool ids.
+const DRAFTING_COMPLETENESS_TOOLS = new Set(['hatch', 'dc-leader', 'rich-text', 'dim-chain'])
 function isSnappingTool(t) {
   return DIM_TOOLS.has(t) || MEASURE_TOOLS.has(t)
-    || t === 'leader' || t === 'centerline' || t === 'break'
+    || t === 'leader' || t === 'dc-leader' || t === 'centerline' || t === 'break'
     || SYMBOL_TOOLS.has(t)
 }
 
@@ -184,6 +196,19 @@ const DrawingView = forwardRef(function DrawingView({
   // overlay (not SVG) so the user gets browser-native input handling.
   // {kind:'text'|'leader', viewId?, mmX, mmY, screenLeft, screenTop, value, from?, to?}
   const [textInput, setTextInput] = useState(null)
+
+  // ---------------------------------------------------------------------------
+  // NEW: Drafting completeness state.
+  //
+  // hatchPopover: opened after the user clicks a polygon region in 'hatch' mode.
+  //   { polygon:[{x,y}], screenLeft, screenTop }
+  // dcLeaderDraft: first click captured for the dc-leader tool.
+  //   { from:{x,y}, viewId }
+  // dimChainDraft: accumulates picks for dim-chain (double-click to commit).
+  //   { picks:[{x,y}], viewId }
+  const [hatchPopover, setHatchPopover] = useState(null)
+  const [dcLeaderDraft, setDcLeaderDraft] = useState(null)
+  const [dimChainDraft, setDimChainDraft] = useState(null)
 
   // Cursor readout state. Updated on every mousemove inside the SVG.
   // Hidden when the user leaves the SVG entirely.
@@ -636,6 +661,62 @@ const DrawingView = forwardRef(function DrawingView({
       return
     }
 
+    // ---------------------------------------------------------------------------
+    // NEW: Drafting completeness tools.
+
+    // Hatch: 3+ clicks build a polygon, then a popover opens for pattern config.
+    if (tool === 'hatch') {
+      if (!annDraft || annDraft.kind !== 'hatch-draft') {
+        setAnnDraft({ kind: 'hatch-draft', viewId: sn.viewId, points: [{ x: sn.x, y: sn.y }] })
+      } else {
+        const pts = [...annDraft.points, { x: sn.x, y: sn.y }]
+        setAnnDraft({ ...annDraft, points: pts })
+      }
+      return
+    }
+
+    // dc-leader: 2 clicks → arrow tip then label point, then inline text input.
+    if (tool === 'dc-leader') {
+      if (!dcLeaderDraft) {
+        setDcLeaderDraft({ from: { x: sn.x, y: sn.y }, viewId: sn.viewId })
+      } else {
+        setTextInput({
+          kind: 'dc-leader',
+          viewId: dcLeaderDraft.viewId,
+          from: dcLeaderDraft.from,
+          to: { x: sn.x, y: sn.y },
+          x: sn.x, y: sn.y,
+          screenLeft: e.clientX, screenTop: e.clientY,
+          value: '',
+        })
+        setDcLeaderDraft(null)
+      }
+      return
+    }
+
+    // rich-text: single click → inline text input with extra styling options.
+    if (tool === 'rich-text') {
+      setTextInput({
+        kind: 'rich-text',
+        viewId: sn.viewId,
+        x: sn.x, y: sn.y,
+        screenLeft: e.clientX, screenTop: e.clientY,
+        value: '',
+      })
+      return
+    }
+
+    // dim-chain: multi-click, double-click to commit (mirrors 'chain' but
+    // launched from the new toolbar button, so it keeps its own state).
+    if (tool === 'dim-chain') {
+      if (!dimChainDraft) {
+        setDimChainDraft({ viewId: sn.viewId, picks: [{ x: sn.x, y: sn.y }] })
+      } else {
+        setDimChainDraft({ ...dimChainDraft, picks: [...dimChainDraft.picks, { x: sn.x, y: sn.y }] })
+      }
+      return
+    }
+
     // ---- Dimension authoring ----
     // Fall through to dimension flow for remaining tools.
     if (!sn.viewId) return
@@ -707,6 +788,8 @@ const DrawingView = forwardRef(function DrawingView({
     onAddDimension, onAddAnnotation, onAddCenterline, onAddBreak, onAddSymbol,
     onSelectDimension, onSelectAnnotation, onResetTool,
     setMeasure, setAnnDraft,
+    // NEW: drafting completeness
+    dcLeaderDraft, setDcLeaderDraft, dimChainDraft, setDimChainDraft, setHatchPopover,
   ])
 
   // Double-click commits a polyline-draft (≥2 points needed) OR a multi-pick
@@ -737,6 +820,37 @@ const DrawingView = forwardRef(function DrawingView({
       onResetTool?.()
       return
     }
+    // NEW: dim-chain double-click commit.
+    if (tool === 'dim-chain' && dimChainDraft) {
+      const picks = dimChainDraft.picks || []
+      if (picks.length < 2) { setDimChainDraft(null); return }
+      e.preventDefault()
+      onAddDimension?.({
+        view_id: dimChainDraft.viewId,
+        kind: 'chain',
+        picks,
+        offset: 8,
+      })
+      setDimChainDraft(null)
+      onResetTool?.()
+      return
+    }
+
+    // NEW: hatch polygon double-click to open popover.
+    if (tool === 'hatch' && annDraft?.kind === 'hatch-draft') {
+      const pts = annDraft.points || []
+      if (pts.length < 3) { setAnnDraft(null); return }
+      e.preventDefault()
+      // Open the pattern-picker popover. The actual annotation is committed
+      // when the user confirms in the popover.
+      const rect = svgRef.current?.getBoundingClientRect()
+      const cx = rect ? rect.left + rect.width / 2 : e.clientX
+      const cy = rect ? rect.top + rect.height / 2 : e.clientY
+      setHatchPopover({ polygon: pts, viewId: annDraft.viewId, screenLeft: cx, screenTop: cy })
+      setAnnDraft(null)
+      return
+    }
+
     if (tool !== 'polyline' || !annDraft || annDraft.kind !== 'polyline-draft') return
     if ((annDraft.points || []).length < 2) {
       // Cancel — single-point polyline isn't useful.
@@ -751,7 +865,7 @@ const DrawingView = forwardRef(function DrawingView({
     })
     setAnnDraft(null)
     onResetTool?.()
-  }, [tool, annDraft, onAddAnnotation, onResetTool, setAnnDraft])
+  }, [tool, annDraft, dimChainDraft, onAddAnnotation, onAddDimension, onResetTool, setAnnDraft, setDimChainDraft, setHatchPopover])
 
   // Mousedown for rect/circle annotations + annotation drag in pointer mode.
   const onSvgMouseDown = useCallback((e) => {
@@ -1156,6 +1270,37 @@ const DrawingView = forwardRef(function DrawingView({
         {hover && hover.kind && hover.kind !== 'free' && (
           <SnapMarker hover={hover} />
         )}
+
+        {/* NEW: dim-chain draft preview — picks + rubber-band. */}
+        {tool === 'dim-chain' && dimChainDraft && (
+          <g pointerEvents="none">
+            {(dimChainDraft.picks || []).map((p, i) => (
+              <circle key={i} cx={p.x} cy={p.y} r={0.9} fill="#ffd633" />
+            ))}
+            {hover && dimChainDraft.picks.length > 0 && (() => {
+              const last = dimChainDraft.picks[dimChainDraft.picks.length - 1]
+              return (
+                <line x1={last.x} y1={last.y} x2={hover.x} y2={hover.y}
+                      stroke="#ffd633" strokeDasharray="1.5,1.5"
+                      strokeWidth={0.25} vectorEffect="non-scaling-stroke" />
+              )
+            })()}
+          </g>
+        )}
+
+        {/* NEW: dc-leader draft preview — first point dot. */}
+        {tool === 'dc-leader' && dcLeaderDraft && (
+          <g pointerEvents="none">
+            <circle cx={dcLeaderDraft.from.x} cy={dcLeaderDraft.from.y}
+                    r={0.8} fill="#ffd633" />
+            {hover && (
+              <line x1={dcLeaderDraft.from.x} y1={dcLeaderDraft.from.y}
+                    x2={hover.x} y2={hover.y}
+                    stroke="#ffd633" strokeDasharray="1.5,1.5"
+                    strokeWidth={0.25} vectorEffect="non-scaling-stroke" />
+            )}
+          </g>
+        )}
       </svg>
 
       {/* Inline text input overlay for text/leader annotations. Rendered as
@@ -1193,6 +1338,27 @@ const DrawingView = forwardRef(function DrawingView({
                   to: textInput.to,
                   text: v,
                 })
+              // NEW: drafting completeness kinds.
+              } else if (textInput.kind === 'dc-leader') {
+                onAddAnnotation?.({
+                  kind: 'leader',
+                  view_id: textInput.viewId || undefined,
+                  from: textInput.from,
+                  to: textInput.to,
+                  text: v,
+                })
+              } else if (textInput.kind === 'rich-text') {
+                onAddAnnotation?.({
+                  kind: 'rich_text',
+                  view_id: textInput.viewId || undefined,
+                  x: textInput.x,
+                  y: textInput.y,
+                  text: v,
+                  bold: false,
+                  italic: false,
+                  fontSize: 3.5,
+                  color: '#1a1f2a',
+                })
               }
             }
             setTextInput(null)
@@ -1202,6 +1368,36 @@ const DrawingView = forwardRef(function DrawingView({
             setTextInput(null)
             onResetTool?.()
           }}
+        />
+      )}
+
+      {/* ---------------------------------------------------------------------------
+          NEW: Hatch pattern-picker popover. Opens after the user double-clicks
+          to close a hatch polygon (≥3 points). The user picks a pattern, scale
+          and angle then presses Apply — DrawingView calls onAddAnnotation with
+          a hatch entity and the popover closes. */}
+      {hatchPopover && (
+        <HatchPopover
+          polygon={hatchPopover.polygon}
+          viewId={hatchPopover.viewId}
+          onApply={({ patternId, scale, angle }) => {
+            // Build the hatch annotation inline — HATCH_PATTERNS and
+            // patternToSvgFill are module-level imports from draftingComplete.js
+            const pat = HATCH_PATTERNS.find((p) => p.id === patternId) || HATCH_PATTERNS[0]
+            const fill = patternToSvgFill(pat, scale, angle)
+            onAddAnnotation?.({
+              kind: 'hatch',
+              view_id: hatchPopover.viewId || undefined,
+              polygon: hatchPopover.polygon,
+              patternId: fill.id,
+              patternDef: fill,
+              scale,
+              angle,
+            })
+            setHatchPopover(null)
+            onResetTool?.()
+          }}
+          onCancel={() => { setHatchPopover(null); onResetTool?.() }}
         />
       )}
 
@@ -1217,7 +1413,7 @@ const DrawingView = forwardRef(function DrawingView({
 
       {/* Hint chip at the bottom — explains the current tool's flow. */}
       <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-md bg-ink-900/85 border border-ink-700 text-[11px] font-mono text-kerf-300 backdrop-blur shadow-lg">
-        {toolHint(tool, draft, measure, annDraft)}
+        {toolHint(tool, draft, measure, annDraft, dcLeaderDraft, dimChainDraft)}
       </div>
 
       {/* Sheet tab bar — bottom edge. Only renders when there's more than one
@@ -2173,6 +2369,27 @@ function DraftAnnotation({ draft }) {
       </g>
     )
   }
+  // ---------------------------------------------------------------------------
+  // NEW: Drafting completeness draft previews.
+  if (draft.kind === 'hatch-draft') {
+    if (!draft.points?.length) return null
+    const pts = draft.points.map((p) => `${p.x},${p.y}`).join(' ')
+    return (
+      <g pointerEvents="none">
+        <polygon points={pts} fill="rgba(255,214,51,0.10)" stroke={stroke}
+                 strokeWidth={0.3} strokeDasharray="1.5,1.5"
+                 vectorEffect="non-scaling-stroke" />
+        {draft.points.map((p, i) => (
+          <circle key={i} cx={p.x} cy={p.y} r={0.7} fill={stroke} />
+        ))}
+        <text x={draft.points[0].x + 1} y={draft.points[0].y - 1.5}
+              fontSize={2.2} fill={stroke}
+              fontFamily="ui-monospace, Menlo, monospace">
+          {draft.points.length} pts · dbl-click to pick pattern
+        </text>
+      </g>
+    )
+  }
   return null
 }
 
@@ -2594,7 +2811,8 @@ function SnapMarker({ hover }) {
   )
 }
 
-function toolHint(tool, draft, measure, annDraft) {
+// eslint-disable-next-line no-unused-vars
+function toolHint(tool, draft, measure, annDraft, dcLeaderDraft, dimChainDraft) {
   if (tool === 'pointer') return 'pan: middle-mouse / space-drag · zoom: scroll · click to select · Del to remove'
   if (tool === 'measure-distance') {
     if (!measure || measure.b) return 'Measure distance · click first point (snaps)'
@@ -2645,5 +2863,80 @@ function toolHint(tool, draft, measure, annDraft) {
     if (draft.stage === 1) return `${kind} · click second point`
     return `${kind} · click to set offset`
   }
+  // ---------------------------------------------------------------------------
+  // NEW: Drafting completeness tool hints.
+  if (tool === 'hatch') {
+    if (!annDraft || annDraft.kind !== 'hatch-draft') return 'Hatch · click polygon corners (≥3 pts) · double-click to pick pattern'
+    return `Hatch · ${annDraft.points.length} pts · click to add · double-click to open pattern picker`
+  }
+  if (tool === 'dc-leader') {
+    if (!dcLeaderDraft) return 'Leader · click arrow tip (snaps)'
+    return 'Leader · click label position then type text · Enter to commit'
+  }
+  if (tool === 'rich-text') return 'Rich text · click to place; type text · Enter to commit'
+  if (tool === 'dim-chain') {
+    if (!dimChainDraft) return 'Dimension chain · click first point'
+    return `Dimension chain · ${(dimChainDraft.picks || []).length} pts · click to add · double-click to finish`
+  }
   return ''
+}
+
+// ---------------------------------------------------------------------------
+// NEW: HatchPopover — small overlay panel for picking hatch pattern, scale,
+// and angle after the user closes a polygon in hatch mode.
+
+function HatchPopover({ onApply, onCancel }) {
+  const [patternId, setPatternId] = useState(HATCH_PATTERNS[0].id)
+  const [scale, setScale] = useState(1)
+  const [angle, setAngle] = useState(45)
+  return (
+    <div
+      className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 p-4 rounded-lg shadow-xl border border-ink-600 bg-ink-900 text-kerf-200 text-[12px] font-mono"
+      style={{ minWidth: 260 }}
+    >
+      <div className="font-semibold text-kerf-300 mb-3">Hatch pattern</div>
+      <label className="block mb-2">
+        <span className="text-ink-400 text-[11px] uppercase tracking-wide">Pattern</span>
+        <select
+          value={patternId}
+          onChange={(e) => setPatternId(e.target.value)}
+          className="mt-1 block w-full bg-ink-800 border border-ink-600 rounded px-2 py-1 text-kerf-200"
+        >
+          {HATCH_PATTERNS.map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+      </label>
+      <label className="block mb-2">
+        <span className="text-ink-400 text-[11px] uppercase tracking-wide">Scale</span>
+        <input
+          type="number" min={0.1} max={10} step={0.1}
+          value={scale}
+          onChange={(e) => setScale(parseFloat(e.target.value) || 1)}
+          className="mt-1 block w-full bg-ink-800 border border-ink-600 rounded px-2 py-1 text-kerf-200"
+        />
+      </label>
+      <label className="block mb-3">
+        <span className="text-ink-400 text-[11px] uppercase tracking-wide">Angle (°)</span>
+        <input
+          type="number" min={-180} max={180} step={5}
+          value={angle}
+          onChange={(e) => setAngle(parseFloat(e.target.value) ?? 45)}
+          className="mt-1 block w-full bg-ink-800 border border-ink-600 rounded px-2 py-1 text-kerf-200"
+        />
+      </label>
+      <div className="flex gap-2 justify-end">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-3 py-1 rounded bg-ink-800 border border-ink-600 text-ink-300 hover:text-kerf-300"
+        >Cancel</button>
+        <button
+          type="button"
+          onClick={() => onApply({ patternId, scale, angle })}
+          className="px-3 py-1 rounded bg-kerf-300 text-ink-950 font-semibold hover:bg-kerf-200"
+        >Apply</button>
+      </div>
+    </div>
+  )
 }

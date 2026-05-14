@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "MPU6050 IMU QFN-24",
+  "description": "6-axis IMU, 3-axis gyro + 3-axis accelerometer, I2C, QFN-24 package. InvenSense MPU6050.",
+  "category": "Sensors",
+  "manufacturer": "InvenSense",
+  "mpn": "MPU6050",
+  "value": "MPU6050",
+  "distributors": [
+    {"name": "digikey", "sku": "MPU6050-ND", "url": "https://www.digikey.com/en/products/detail/invensense/MPU6050/3903751", "price_usd": 3.20, "stock": 1500},
+    {"name": "mouser", "sku": "410-MPU6050", "url": "https://www.mouser.com/ProductDetail/InvenSense/MPU6050", "price_usd": 3.10, "stock": 1200}
+  ],
+  "visibility": "public",
+  "metadata": {"package": "QFN-24", "interface": "I2C", "gyro_range": "250 to 2000dps"}
+}

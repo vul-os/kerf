@@ -132,7 +132,7 @@ class File(Base):
     extension = Column(Text, nullable=True)
 
     __table_args__ = (
-        CheckConstraint("kind IN ('file','folder','assembly','step','drawing','sketch','part','feature','circuit','equations','material','simulation','script')", name="files_kind_check"),
+        CheckConstraint("kind IN ('file','folder','assembly','step','drawing','sketch','part','feature','circuit','equations','material','simulation','script','step-ref','assembly_lock','canvas','schedule','view','sheet','stair','railing','curtain_wall','graph')", name="files_kind_check"),
         Index("files_project_id_idx", "project_id"),
         Index("files_parent_id_idx", "parent_id"),
         Index("files_storage_key_idx", "storage_key"),

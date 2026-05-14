@@ -1,0 +1,11 @@
+{
+  "kind": "hatch_pattern",
+  "name": "Wood - Wood Grain",
+  "description": "Variable spacing diagonal grain pattern. Wood materials.",
+  "category": "natural/wood",
+  "lines": [
+    { "angle_deg": 45, "spacing_mm": 3, "offset_mm": 0 },
+    { "angle_deg": 45, "spacing_mm": 7, "offset_mm": 1.5 },
+    { "angle_deg": 45, "spacing_mm": 5, "offset_mm": 4.5 }
+  ]
+}

@@ -11,16 +11,26 @@ _spec = importlib.util.spec_from_file_location(
 _mod = importlib.util.module_from_spec(_spec)
 
 # Stub the registry dependency so the @register decorator doesn't fail.
+# Preserve any pre-existing real module so we don't poison sys.modules for
+# other test files collected in the same session.
 import types
 _reg_stub = types.ModuleType("tools.registry")
 _reg_stub.ToolSpec   = type("ToolSpec", (), {"__init__": lambda s, **kw: s.__dict__.update(kw)})
 _reg_stub.err_payload = lambda msg, code: __import__("json").dumps({"error": msg, "code": code})
 _reg_stub.ok_payload  = lambda v: __import__("json").dumps(v)
 _reg_stub.register    = lambda spec, write=False: (lambda fn: fn)
+_prev_registry = sys.modules.get("tools.registry")
 sys.modules["tools.registry"] = _reg_stub
 
 _spec.loader.exec_module(_mod)
 _run_erc = _mod._run_erc
+
+# Restore the real tools.registry (or remove the stub) so subsequent imports
+# in other test files see the proper module.
+if _prev_registry is not None:
+    sys.modules["tools.registry"] = _prev_registry
+else:
+    del sys.modules["tools.registry"]
 
 
 # ---------------------------------------------------------------------------

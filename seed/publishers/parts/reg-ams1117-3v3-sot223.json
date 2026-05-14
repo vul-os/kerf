@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "name": "AMS1117-3.3V Regulator SOT-223",
+  "description": "Low-dropout linear regulator, 3.3V output, 1A max, SOT-223 package.",
+  "category": "Regulators",
+  "manufacturer": "Advanced Monolithic Systems",
+  "mpn": "AMS1117-3.3",
+  "value": "3.3V",
+  "distributors": [
+    {"name": "digikey", "sku": "AMS1117-3.3-ND", "url": "https://www.digikey.com/en/products/detail/advanced-monolithic-systems/AMS1117-3-3/793956", "price_usd": 0.35, "stock": 4000},
+    {"name": "mouser", "sku": "939-AMS1117-3.3", "url": "https://www.mouser.com/ProductDetail/Advanced-Monolithic-Systems/AMS1117-3-3", "price_usd": 0.32, "stock": 3500},
+    {"name": "lcsc", "sku": "C9555", "url": "https://www.lcsc.com/product-detail/C9555", "price_usd": 0.08, "stock": 10000}
+  ],
+  "visibility": "public",
+  "metadata": {"package": "SOT-223", "output_v": 3.3, "dropout_v": 1.2, "current_ma": 1000}
+}

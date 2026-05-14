@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "name": "TPU-85A (3D Print)",
+  "category": "polymer/elastomer/thermoplastic-polyurethane",
+  "common_names": ["TPU 85A filament", "flexible TPU 85 Shore A"],
+  "color_hex": "#ffd700",
+  "mechanical": {
+    "E_GPa": 0.12,
+    "G_GPa": 0.04,
+    "nu": 0.48,
+    "yield_MPa": 15,
+    "ultimate_MPa": 35,
+    "elongation_pct": 450
+  },
+  "thermal": {
+    "alpha_per_K": 150e-6,
+    "k_W_mK": 0.25,
+    "cp_J_kgK": 1700,
+    "T_min_C": -30,
+    "T_max_C": 80
+  },
+  "physical": {
+    "rho_kg_m3": 1150
+  },
+  "callout": "TPU-85A",
+  "notes": "Soft, flexible TPU at 85 Shore A hardness. Excellent abrasion and impact resistance. Slower print speed recommended due to flexibility. Source: NinjaTek NinjaFlex / Tianse."
+}

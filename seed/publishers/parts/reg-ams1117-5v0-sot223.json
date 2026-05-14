@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "name": "AMS1117-5.0V Regulator SOT-223",
+  "description": "Low-dropout linear regulator, 5.0V output, 1A max, SOT-223 package.",
+  "category": "Regulators",
+  "manufacturer": "Advanced Monolithic Systems",
+  "mpn": "AMS1117-5.0",
+  "value": "5V",
+  "distributors": [
+    {"name": "digikey", "sku": "AMS1117-5.0-ND", "url": "https://www.digikey.com/en/products/detail/advanced-monolithic-systems/AMS1117-5-0/793955", "price_usd": 0.35, "stock": 4000},
+    {"name": "mouser", "sku": "939-AMS1117-5.0", "url": "https://www.mouser.com/ProductDetail/Advanced-Monolithic-Systems/AMS1117-5-0", "price_usd": 0.32, "stock": 3500},
+    {"name": "lcsc", "sku": "C9556", "url": "https://www.lcsc.com/product-detail/C9556", "price_usd": 0.08, "stock": 10000}
+  ],
+  "visibility": "public",
+  "metadata": {"package": "SOT-223", "output_v": 5.0, "dropout_v": 1.2, "current_ma": 1000}
+}

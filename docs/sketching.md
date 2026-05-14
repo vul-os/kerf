@@ -97,18 +97,21 @@ Constraints are classified as **geometric** (quality) or **dimensional** (size).
 
 ### Geometric constraints
 
-| Constraint    | Selection                          | Meaning                                  |
-|---------------|------------------------------------|------------------------------------------|
-| coincident    | point + point, or point + curve     | Snap one point onto another point or curve |
-| parallel      | line + line                        | Lines share the same direction           |
-| perpendicular | line + line                        | 90° angle between lines                  |
-| tangent       | line + circle/arc, or circle + circle | External tangency at point of contact  |
-| equal length  | line + line, or arc + arc          | Identical size                           |
-| equal radius  | circle + circle, or arc + arc      | Identical radius                         |
-| symmetric     | point + point, line + line          | Mirror symmetry about a centerline       |
-| fix           | any entity                         | Lock entity at its current position      |
-| horizontal    | line                               | Force line to be horizontal              |
-| vertical      | line                               | Force line to be vertical                |
+| Constraint      | Selection                             | Meaning                                     |
+|-----------------|---------------------------------------|---------------------------------------------|
+| coincident      | point + point, or point + curve       | Snap one point onto another point or curve   |
+| parallel        | line + line                           | Lines share the same direction              |
+| parallel_lines  | line + line                           | Same direction (planegcs primitive)         |
+| perpendicular   | line + line                           | 90° angle between lines                    |
+| tangent         | line + circle/arc, or circle + circle | External tangency at point of contact       |
+| equal length    | line + line, or arc + arc             | Identical size                              |
+| equal radius    | circle + circle, or arc + arc         | Identical radius                            |
+| equal_angle     | line + line                           | Identical angle between pairs               |
+| symmetric       | point + point, line + line            | Mirror symmetry about a centerline          |
+| block           | point                                 | Lock point at current (x, y)                |
+| fix             | any entity                            | Lock entity at its current position         |
+| horizontal      | line                                  | Force line to be horizontal                 |
+| vertical        | line                                  | Force line to be vertical                   |
 
 ```json
 { "type": "parallel", "entityA": "L1", "entityB": "L2" }
@@ -116,12 +119,14 @@ Constraints are classified as **geometric** (quality) or **dimensional** (size).
 
 ### Dimensional constraints
 
-| Constraint | Selection                      | Parameter         |
-|------------|--------------------------------|-------------------|
-| distance   | point + point, or line + line  | Length in mm      |
-| angle      | line + line                    | Angle in degrees  |
-| radius     | circle, arc                    | Radius in mm      |
-| diameter   | circle                         | Diameter in mm    |
+| Constraint         | Selection                      | Parameter            |
+|--------------------|--------------------------------|----------------------|
+| distance           | point + point, or line + line  | Length in mm         |
+| horizontal_distance| point + point                  | X projection in mm   |
+| vertical_distance  | point + point                  | Y projection in mm   |
+| angle              | line + line                    | Angle in degrees     |
+| radius             | circle, arc                    | Radius in mm         |
+| diameter           | circle                         | Diameter in mm       |
 
 ```json
 { "type": "distance", "entityA": "L1", "value": 25.5 }
@@ -189,7 +194,7 @@ When the source 3D geometry changes, the projection updates automatically.
 
 ## Multi-loop holes
 
-A single sketch profile can contain multiple closed loops. The outer loop defines the solid boundary; inner loops become holes:
+A single sketch can contain multiple closed loops. When extruded via the `.feature` pipeline, nested loops automatically become pockets (boolean subtract). The `sketchGeom2.js` converter sorts loops by area — largest is the outer boundary; smaller loops contained within are treated as holes (CW orientation subtracted from the outer CCW region).
 
 ```json
 {
@@ -201,7 +206,44 @@ A single sketch profile can contain multiple closed loops. The outer loop define
 }
 ```
 
-On extrusion, the solver treats counter-clockwise loops as holes and clockwise loops as solid boundaries.
+## 3D backdrop
+
+When editing a sketch on a feature face, the parent solid renders behind the sketch plane for context. Set `visible_3d` in the sketch metadata to include entity IDs to render, or enable `SketchBackdrop3D` in the UI to show the full solid as a translucent backdrop.
+
+## Carbon copy
+
+Pull geometry from another sketch as driven reference entities using `sketch_carbon_copy`. Copied entities carry `is_reference: true` and `construction: true` — they render distinctly and are excluded from extrusion.
+
+```json
+{
+  "id": "profile_rect_L1",
+  "type": "line",
+  "p1": "profile_rect_origin",
+  "p2": "profile_rect_p1",
+  "is_reference": true,
+  "construction": true,
+  "cc_source": "profile_rect_sketch",
+  "source_id": "L1"
+}
+```
+
+The top-level `cc_sources` array tracks source sketch IDs. Use `sketch_validate` to check for unresolved references.
+
+**LLM tool:** `sketch_carbon_copy({ source_file_path, target_file_path, entity_ids?, translation?, rotation_deg? })`
+
+## Edge projection
+
+Project edges from existing 3D features into the sketch. The projection preserves curve type — arcs project as arcs, circles as circles, B-splines as B-splines.
+
+```json
+{
+  "type": "external_projection",
+  "source": { "type": "edge_ref", "file_id": "part-uuid", "object_id": "body-uuid", "edge_index": 0 },
+  "projected": { "type": "arc", "start": "P_proj_s", "end": "P_proj_e", "center": "P_proj_c", "radius": 15 }
+}
+```
+
+Projected entities update automatically when the source geometry changes.
 
 ## Solver behavior
 
@@ -238,8 +280,24 @@ Chat can create and modify sketches using these tools:
 | `sketch_mirror`    | Mirror entities about an axis                  |
 | `sketch_pattern_linear` | Create a linear pattern                   |
 | `sketch_pattern_polar`  | Create a polar pattern                    |
-| `sketch_add_bsp line`   | Add a B-spline                          |
+| `sketch_add_bspline`   | Add a B-spline                          |
 | `sketch_add_ellipse`    | Add an ellipse                        |
+| `sketch_carbon_copy` | Copy geometry from another sketch as reference |
+| `sketch_validate`  | Validate sketch for errors before extrusion     |
+
+## Validation
+
+Run `sketch_validate({ file_path })` before using a sketch in a feature operation. Returns `{ errors, warnings }` with `{ kind, severity, message, entity_id? }`.
+
+| Kind                      | Severity | Trigger                                         |
+|---------------------------|----------|-------------------------------------------------|
+| `open_contour`            | error    | Edge loop has an endpoint connected to only one edge |
+| `self_intersection`       | error    | Non-adjacent edges cross                        |
+| `redundant_constraint`    | error    | DOF < 0 (over-constrained)                    |
+| `dangling_endpoint`       | warning  | Endpoint has no coincident/fixed constraint    |
+| `unresolved_external_ref`  | error    | Reference source sketch is missing or deleted  |
+
+A sketch with zero errors is safe to extrude.
 
 ## Exporting to JSCAD
 

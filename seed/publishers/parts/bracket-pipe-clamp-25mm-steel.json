@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "Pipe Clamp Bracket 25mm Steel",
+  "description": "U-bolt style pipe clamp bracket for 25mm diameter pipes. Zinc-plated steel, includes matching plate.",
+  "category": "mechanical/bracket",
+  "manufacturer": "Kerf Workshop",
+  "mpn": "KERF-BRK-PCL-ST-25",
+  "distributors": [
+    {"name": "digikey", "sku": "KBRK-PCL25-ST-ND", "url": "https://www.digikey.com/en/products/detail/kerf/KERF-BRK-PCL-ST-25", "price_usd": 2.45, "stock": 1400},
+    {"name": "mcmaster", "sku": "MCKRF-PCL25ST", "url": "https://www.mcmaster.com/KERF-BRK-PCL-ST-25", "price_usd": 1.99, "stock": 1100},
+    {"name": "misumi", "sku": "MSM-PCLBRK-25ST", "url": "https://us.misumi-ec.com/v2/detail/dsearch?search=KERF-BRK-PCL-ST-25", "price_usd": 1.70, "stock": 2500}
+  ],
+  "visibility": "public",
+  "metadata": {"material": "steel zinc-plated", "dimensions": {"length_mm": 40, "width_mm": 30, "thickness_mm": 4}, "hole_pattern": "2xM6 for 25mm pipe"}
+}

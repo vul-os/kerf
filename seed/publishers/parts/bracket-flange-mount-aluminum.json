@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "Flange Mount Bracket Aluminum",
+  "description": "Circular flange bracket for motor or bearing mounting. 60mm bolt circle, 8mm thickness. Aluminum 6061-T6.",
+  "category": "mechanical/bracket",
+  "manufacturer": "Kerf Workshop",
+  "mpn": "KERF-BRK-FLG-AL",
+  "distributors": [
+    {"name": "digikey", "sku": "KBRK-FLG-AL-ND", "url": "https://www.digikey.com/en/products/detail/kerf/KERF-BRK-FLG-AL", "price_usd": 8.95, "stock": 350},
+    {"name": "mcmaster", "sku": "MCKRF-FLGAL", "url": "https://www.mcmaster.com/KERF-BRK-FLG-AL", "price_usd": 7.80, "stock": 280},
+    {"name": "misumi", "sku": "MSM-FLGBRK-AL", "url": "https://us.misumi-ec.com/v2/detail/dsearch?search=KERF-BRK-FLG-AL", "price_usd": 6.70, "stock": 600}
+  ],
+  "visibility": "public",
+  "metadata": {"material": "aluminum 6061-T6", "dimensions": {"length_mm": 80, "width_mm": 80, "thickness_mm": 8}, "hole_pattern": "6xM6 on 60mm bolt circle"}
+}

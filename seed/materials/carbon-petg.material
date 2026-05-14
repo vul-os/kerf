@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "name": "Carbon-PETG (3D Print)",
+  "category": "polymer/thermoplastic/polyester/composite",
+  "common_names": ["carbon fiber PETG", "CF-PETG filament", "PETG-CF"],
+  "color_hex": "#2f2f2f",
+  "mechanical": {
+    "E_GPa": 3.5,
+    "G_GPa": 1.30,
+    "nu": 0.36,
+    "yield_MPa": 55,
+    "ultimate_MPa": 65,
+    "elongation_pct": 12
+  },
+  "thermal": {
+    "alpha_per_K": 45e-6,
+    "k_W_mK": 0.35,
+    "cp_J_kgK": 1200,
+    "T_min_C": -40,
+    "T_max_C": 80
+  },
+  "physical": {
+    "rho_kg_m3": 1180
+  },
+  "callout": "Carbon-PETG",
+  "notes": "PETG reinforced with 10-15% carbon fiber. Significantly higher stiffness and strength than standard PETG. Lower thermal expansion. Source: Protopasta Carbon Fiber PETG / eSUN CF-PETG."
+}

@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "Floating Shelf Bracket 300mm Steel",
+  "description": "Heavy-duty floating shelf bracket, 300mm arm, supports up to 50kg. Powder-coated steel, 5mm thickness.",
+  "category": "mechanical/bracket",
+  "manufacturer": "Kerf Workshop",
+  "mpn": "KERF-BRK-SH-ST-300",
+  "distributors": [
+    {"name": "digikey", "sku": "KBRK-SH300-ST-ND", "url": "https://www.digikey.com/en/products/detail/kerf/KERF-BRK-SH-ST-300", "price_usd": 12.50, "stock": 400},
+    {"name": "mcmaster", "sku": "MCKRF-SH300ST", "url": "https://www.mcmaster.com/KERF-BRK-SH-ST-300", "price_usd": 10.99, "stock": 300},
+    {"name": "misumi", "sku": "MSM-SHBRK-300ST", "url": "https://us.misumi-ec.com/v2/detail/dsearch?search=KERF-BRK-SH-ST-300", "price_usd": 9.50, "stock": 700}
+  ],
+  "visibility": "public",
+  "metadata": {"material": "steel powder-coated", "dimensions": {"length_mm": 300, "width_mm": 40, "thickness_mm": 5}, "hole_pattern": "6xM8 staggered on arm"}
+}

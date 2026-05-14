@@ -1,0 +1,9 @@
+{
+  "kind": "hatch_pattern",
+  "name": "ANSI 33 - Brass",
+  "description": "Vertical parallel lines. Brass and copper alloy sections.",
+  "category": "ansi/brass",
+  "lines": [
+    { "angle_deg": 90, "spacing_mm": 5, "offset_mm": 0 }
+  ]
+}

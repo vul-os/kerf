@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "Terminal Block Screw 2-pin 5.08mm",
+  "description": "Screw terminal block, 2-pin, 5.08mm pitch, 16A max, for PCB through-hole mount.",
+  "category": "Connectors",
+  "manufacturer": "Phoenix Contact",
+  "mpn": "MKDSN-2.5-2-5.08",
+  "value": "2-pin 5.08mm",
+  "distributors": [
+    {"name": "digikey", "sku": "1981064-ND", "url": "https://www.digikey.com/en/products/detail/phoenix-contact/MKDSN-2-5-2-5-08/892538", "price_usd": 1.40, "stock": 800},
+    {"name": "mouser", "sku": "530-MKDSN2.5/2-5.08", "url": "https://www.mouser.com/ProductDetail/Phoenix-Contact/MKDSN2-5-2-5-08", "price_usd": 1.30, "stock": 700}
+  ],
+  "visibility": "public",
+  "metadata": {"package": "through-hole", "pitch_mm": 5.08, "pins": 2, "current_ma": 16000}
+}

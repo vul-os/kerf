@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "Pipe Clamp Bracket 50mm Steel",
+  "description": "U-bolt style pipe clamp bracket for 50mm diameter pipes. Zinc-plated steel, includes matching plate.",
+  "category": "mechanical/bracket",
+  "manufacturer": "Kerf Workshop",
+  "mpn": "KERF-BRK-PCL-ST-50",
+  "distributors": [
+    {"name": "digikey", "sku": "KBRK-PCL50-ST-ND", "url": "https://www.digikey.com/en/products/detail/kerf/KERF-BRK-PCL-ST-50", "price_usd": 3.65, "stock": 950},
+    {"name": "mcmaster", "sku": "MCKRF-PCL50ST", "url": "https://www.mcmaster.com/KERF-BRK-PCL-ST-50", "price_usd": 3.20, "stock": 750},
+    {"name": "misumi", "sku": "MSM-PCLBRK-50ST", "url": "https://us.misumi-ec.com/v2/detail/dsearch?search=KERF-BRK-PCL-ST-50", "price_usd": 2.75, "stock": 1800}
+  ],
+  "visibility": "public",
+  "metadata": {"material": "steel zinc-plated", "dimensions": {"length_mm": 70, "width_mm": 50, "thickness_mm": 5}, "hole_pattern": "2xM8 for 50mm pipe"}
+}

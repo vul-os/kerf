@@ -1,0 +1,10 @@
+{
+  "kind": "hatch_pattern",
+  "name": "Water - Liquid",
+  "description": "Wavy horizontal lines. Water and fluid sections.",
+  "category": "fluids",
+  "lines": [
+    { "angle_deg": 0, "spacing_mm": 5, "offset_mm": 0, "dash": [10, 3] },
+    { "angle_deg": 0, "spacing_mm": 5, "offset_mm": 2.5, "dash": [10, 3] }
+  ]
+}

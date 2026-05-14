@@ -1,0 +1,10 @@
+{
+  "kind": "hatch_pattern",
+  "name": "ANSI 35 - Fire-Rated Brick",
+  "description": "Crosshatch with dashed lines simulating fire-rated masonry. Brick, fireproofing sections.",
+  "category": "ansi/fire",
+  "lines": [
+    { "angle_deg": 45, "spacing_mm": 6, "offset_mm": 0, "dash": [12, 3] },
+    { "angle_deg": 135, "spacing_mm": 6, "offset_mm": 0, "dash": [12, 3] }
+  ]
+}

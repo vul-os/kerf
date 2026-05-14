@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "name": "Resistor 10Ω 0603 1%",
+  "description": "Thick-film chip resistor, 10 Ω, 1/10W, ±1%, 0603 SMD package.",
+  "category": "Resistors",
+  "manufacturer": "Yageo",
+  "mpn": "RC0603FR-0710RL",
+  "value": "10",
+  "distributors": [
+    {"name": "digikey", "sku": "311-10.0CRCT-ND", "url": "https://www.digikey.com/en/products/detail/yageo/RC0603FR-0710RL/727818", "price_usd": 0.01, "stock": 20000},
+    {"name": "mouser", "sku": "603-RC0603FR-0710RL", "url": "https://www.mouser.com/ProductDetail/Yageo/RC0603FR-0710RL", "price_usd": 0.008, "stock": 18000},
+    {"name": "lcsc", "sku": "C25791", "url": "https://www.lcsc.com/product-detail/C25791", "price_usd": 0.002, "stock": 100000}
+  ],
+  "visibility": "public",
+  "metadata": {"package": "0603", "tolerance": "1%", "power_w": 0.1}
+}

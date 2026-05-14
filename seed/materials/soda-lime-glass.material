@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "name": "Soda-Lime Glass",
+  "category": "ceramic/glass/soda-lime",
+  "common_names": ["soda lime glass", "window glass", "float glass"],
+  "color_hex": "#c8e6c5",
+  "mechanical": {
+    "E_GPa": 72,
+    "G_GPa": 29,
+    "nu": 0.23,
+    "yield_MPa": null,
+    "ultimate_MPa": 50,
+    "elongation_pct": 2
+  },
+  "thermal": {
+    "alpha_per_K": 9.0e-6,
+    "k_W_mK": 1.05,
+    "cp_J_kgK": 720,
+    "T_min_C": -40,
+    "T_max_C": 300
+  },
+  "physical": {
+    "rho_kg_m3": 2500
+  },
+  "callout": "Soda-Lime",
+  "notes": "Most common glass type — window glass, bottles, containers. ~70% SiO2, 15% Na2O, 15% CaO. Lower cost, higher thermal expansion than borosilicate. Source: Pilkington float glass / ASTM C1036."
+}

@@ -1,0 +1,10 @@
+{
+  "kind": "hatch_pattern",
+  "name": "ANSI 36 - Magnesium",
+  "description": "45-degree lines overlaid with horizontal lines. Magnesium alloys.",
+  "category": "ansi/magnesium",
+  "lines": [
+    { "angle_deg": 45, "spacing_mm": 5, "offset_mm": 0 },
+    { "angle_deg": 0, "spacing_mm": 5, "offset_mm": 2.5 }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "name": "ASA (3D Print)",
+  "category": "polymer/thermoplastic/asa",
+  "common_names": ["ASA filament 3D printing", "UV-resistant ASA"],
+  "color_hex": "#e8dcc8",
+  "mechanical": {
+    "E_GPa": 2.2,
+    "G_GPa": 0.82,
+    "nu": 0.38,
+    "yield_MPa": 43,
+    "ultimate_MPa": 52,
+    "elongation_pct": 18
+  },
+  "thermal": {
+    "alpha_per_K": 78e-6,
+    "k_W_mK": 0.15,
+    "cp_J_kgK": 1300,
+    "T_min_C": -40,
+    "T_max_C": 100
+  },
+  "physical": {
+    "rho_kg_m3": 1070
+  },
+  "callout": "ASA-3D",
+  "notes": "3D printing grade ASA with UV stabilizers. Outdoor durability substitute for ABS. Lower warping tendency. Source: BASF Luran S / OWA filament specs."
+}

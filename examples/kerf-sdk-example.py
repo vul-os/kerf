@@ -7,7 +7,7 @@ This script demonstrates how to interact with the Kerf API using raw HTTP reques
 It shows the exact HTTP shapes for authentication, file operations, and error handling.
 
 Usage:
-    KERF_URL=https://app.kerf.dev python3 examples/kerf_sdk_example.py
+    KERF_URL=https://app.kerf.sh python3 examples/kerf_sdk_example.py
     KERF_URL=http://localhost:8080 python3 examples/kerf_sdk_example.py
 
 Requirements: requests (pip install requests)
@@ -288,7 +288,7 @@ def run_demo():
     print("Step 1: Authenticate")
     print("  POST /auth/login  {\"email\": \"...\", \"password\": \"...\"}")
 
-    email = os.environ.get("KERF_EMAIL", "demo@kerf.dev")
+    email = os.environ.get("KERF_EMAIL", "demo@kerf.sh")
     password = os.environ.get("KERF_PASSWORD", "demo-password")
 
     try:

@@ -462,7 +462,7 @@ export default function Library() {
           <h1 className="mt-4 font-display text-2xl font-semibold tracking-tight">Library</h1>
           <p className="mt-2 text-sm text-ink-400">
             The parts catalog is part of the hosted tier. Sign in at{' '}
-            <a className="text-kerf-300 hover:underline" href="https://kerf.dev">kerf.dev</a>{' '}
+            <a className="text-kerf-300 hover:underline" href="https://kerf.sh">kerf.sh</a>{' '}
             to browse community-published Parts and verified-publisher catalogs.
           </p>
         </div>

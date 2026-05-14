@@ -261,6 +261,13 @@ const ITEMS = [
     docHref: '/docs/imports',
   },
 
+  {
+    title: 'Workshop thumbnail polish',
+    body: 'User-triggered "Refresh thumbnail" button in the editor header + publish flow re-snaps the current view on demand. Gallery images can be pinned as the project\'s primary cover (star icon per card); the auto-captured thumbnail becomes a fallback. is_primary column + partial unique index on project_workshop_images enforce at most one primary per project at the DB level.',
+    status: 'shipped',
+    area: 'Workshop',
+  },
+
   /* ── 🚧 in flight ──────────────────────────────────────────────── */
   {
     title: 'NURBS Phase 4 — surface-direct booleans (C1)',

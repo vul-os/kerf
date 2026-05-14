@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kerf-fem"
+version = "0.1.0"
+description = "Finite-element analysis plugin for Kerf"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "asyncpg",
+    "aiohttp",
+]
+
+[project.optional-dependencies]
+fenicsx = [
+    "fenics-dolfinx",
+    "meshio",
+    "gmsh",
+]
+slepc = [
+    "slepc4py",
+]
+calculix = [
+    # ccx binary — install via system package manager, not pip
+]
+
+[project.entry-points."kerf.plugins"]
+fem = "kerf_fem.plugin:register"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kerf_fem"]

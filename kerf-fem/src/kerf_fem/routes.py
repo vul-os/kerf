@@ -139,13 +139,7 @@ def run_fenicsx(mesh_path: str, analysis_type: str, material_props: dict,
     dolfinx availability is already confirmed by the caller (run_fem checks
     _DOLFINX_AVAILABLE before reaching here for fenicsx solver).
     """
-    import importlib.util
-
-    # Import fenicsx_utils relative to pyworker root
-    utils_path = Path(__file__).parent.parent / "fenicsx_utils.py"
-    spec = importlib.util.spec_from_file_location("fenicsx_utils", utils_path)
-    fenicsx_utils = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(fenicsx_utils)
+    from kerf_fem import fenicsx_utils  # package-relative import
 
     return fenicsx_utils.run_static_analysis(
         mesh_path=mesh_path,
@@ -158,10 +152,7 @@ def run_fenicsx(mesh_path: str, analysis_type: str, material_props: dict,
 
 def run_calculix(mesh_path: str, analysis_type: str, material_props: dict,
                  boundary_conditions: list, loads: list, tmpdir: str) -> dict:
-    utils_path = Path(__file__).parent.parent / "calculix_utils.py"
-    spec = importlib.util.spec_from_file_location("calculix_utils", utils_path)
-    calculix_utils = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(calculix_utils)
+    from kerf_fem import calculix_utils  # package-relative import
 
     return calculix_utils.run_static_analysis(
         mesh_path=mesh_path,

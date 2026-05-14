@@ -95,14 +95,7 @@ def test_cantilever_tip_deflection():
     """
     FEM tip deflection must be within 5 % of the Euler-Bernoulli prediction.
     """
-    import sys
-    import importlib.util
-    from pathlib import Path as _Path
-
-    utils_path = _Path(__file__).parent.parent / "fenicsx_utils.py"
-    spec = importlib.util.spec_from_file_location("fenicsx_utils", utils_path)
-    fenicsx_utils = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(fenicsx_utils)
+    from kerf_fem import fenicsx_utils
 
     E = 200e9
     nu = 0.3

@@ -1,7 +1,11 @@
 import json
 import uuid
-from tools.registry import ToolSpec, err_payload, ok_payload, register
-from tools.context import ProjectCtx
+
+try:
+    from tools.registry import ToolSpec, err_payload, ok_payload, register
+    from tools.context import ProjectCtx
+except ImportError:
+    from kerf_fem._compat import ToolSpec, err_payload, ok_payload, register, ProjectCtx
 
 
 fem_run_spec = ToolSpec(

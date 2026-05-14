@@ -25,12 +25,7 @@ import pytest
 ocl = pytest.importorskip("opencamlib", reason="opencamlib not installed")
 _occ_stl = pytest.importorskip("OCC.Core.STEPControl", reason="pythonOCC not installed")
 
-# Add pyworker to the path so the route module is importable standalone.
-_PYWORKER = Path(__file__).parent.parent.parent / "pyworker"
-if str(_PYWORKER) not in sys.path:
-    sys.path.insert(0, str(_PYWORKER))
-
-from routes.cam import convert_step_to_stl, _load_stl_into_surface, _run_ocl_op, CAMOperation  # noqa: E402
+from kerf_cam.routes import convert_step_to_stl, _load_stl_into_surface, _run_ocl_op, CAMOperation  # noqa: E402
 
 
 # ---------------------------------------------------------------------------

@@ -31,11 +31,7 @@ dolfinx = pytest.importorskip("dolfinx", reason="dolfinx not installed")
 gmsh_mod = pytest.importorskip("gmsh", reason="gmsh not installed")
 occ_step = pytest.importorskip("OCC.Core.STEPControl", reason="pythonOCC not installed")
 
-_PYWORKER = Path(__file__).parent.parent
-if str(_PYWORKER) not in sys.path:
-    sys.path.insert(0, str(_PYWORKER))
-
-from routes.topo import (
+from kerf_topo.routes import (
     TopoRequest,
     BoundaryCondition,
     Load,

@@ -21,10 +21,6 @@ from pathlib import Path
 
 import pytest
 
-_PYWORKER = Path(__file__).parent.parent
-if str(_PYWORKER) not in sys.path:
-    sys.path.insert(0, str(_PYWORKER))
-
 # ── dep guards ─────────────────────────────────────────────────────────────────
 
 numpy_mod = pytest.importorskip("numpy", reason="numpy not installed")
@@ -32,7 +28,7 @@ import numpy as np  # noqa: E402 — after importorskip
 
 occ_step = pytest.importorskip("OCC.Core.STEPControl", reason="pythonOCC not installed")
 
-from routes.topo import (  # noqa: E402
+from kerf_topo.routes import (  # noqa: E402
     _density_field_to_grid,
     _laplacian_smooth,
     _connected_components,
@@ -260,7 +256,7 @@ class TestMultiBody:
         import dolfinx.fem
         from mpi4py import MPI
 
-        from routes.topo import _oc_update, _heaviside_filter
+        from kerf_topo.routes import _oc_update, _heaviside_filter
 
         comm = MPI.COMM_WORLD
         mesh = dolfinx.mesh.create_unit_cube(comm, 6, 6, 6)

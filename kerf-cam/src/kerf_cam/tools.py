@@ -1,6 +1,10 @@
 import json
-from tools.registry import ToolSpec, err_payload, ok_payload, register
-from tools.context import ProjectCtx
+
+try:
+    from tools.registry import ToolSpec, err_payload, ok_payload, register
+    from tools.context import ProjectCtx
+except ImportError:
+    from kerf_cam._compat import ToolSpec, err_payload, ok_payload, register, ProjectCtx
 
 
 cam_run_spec = ToolSpec(

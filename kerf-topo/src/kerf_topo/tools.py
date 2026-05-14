@@ -2,8 +2,12 @@ import base64
 import io
 import json
 import uuid
-from tools.registry import ToolSpec, err_payload, ok_payload, register
-from tools.context import ProjectCtx
+
+try:
+    from tools.registry import ToolSpec, err_payload, ok_payload, register
+    from tools.context import ProjectCtx
+except ImportError:
+    from kerf_topo._compat import ToolSpec, err_payload, ok_payload, register, ProjectCtx
 
 
 async def resolve_path(ctx: ProjectCtx, path: str) -> dict:

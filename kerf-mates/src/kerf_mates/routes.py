@@ -11,12 +11,6 @@ Body: {
 Delegates to the solvespace_wrapper pure-Python solver.
 """
 
-import sys
-import os
-
-# Allow importing from backend/tools
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "backend"))
-
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Any, Optional
@@ -39,7 +33,7 @@ async def run_mates(req: MatesRequest):
     convergence info. Falls back gracefully if the solver fails.
     """
     try:
-        from tools.solvespace_wrapper import solve_assembly
+        from kerf_mates.solver import solve_assembly
         result = solve_assembly(
             components=req.components,
             mates=req.mates,

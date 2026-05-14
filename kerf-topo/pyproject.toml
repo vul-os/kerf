@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kerf-topo"
+version = "0.1.0"
+description = "Topology-optimization plugin for Kerf"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "pydantic",
+]
+
+[project.optional-dependencies]
+fenicsx = [
+    "fenics-dolfinx",
+    "gmsh",
+]
+post = [
+    "scikit-image",
+    "scipy",
+    "pythonocc-core",
+]
+
+[project.entry-points."kerf.plugins"]
+topo = "kerf_topo.plugin:register"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kerf_topo"]

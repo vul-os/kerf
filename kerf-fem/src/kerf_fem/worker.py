@@ -6,7 +6,10 @@ from typing import Optional
 
 import asyncpg
 
-from workers.base import BaseWorker
+try:
+    from workers.base import BaseWorker
+except ImportError:
+    from kerf_fem._compat import BaseWorker
 
 logger = logging.getLogger(__name__)
 

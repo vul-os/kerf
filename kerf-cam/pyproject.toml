@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kerf-cam"
+version = "0.1.0"
+description = "CAM toolpath-generation plugin for Kerf"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "pydantic",
+    "asyncpg",
+    "aiohttp",
+]
+
+[project.optional-dependencies]
+opencamlib = [
+    "opencamlib",
+]
+occ = [
+    "pythonocc-core",
+]
+
+[project.entry-points."kerf.plugins"]
+cam = "kerf_cam.plugin:register"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kerf_cam"]

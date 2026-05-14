@@ -77,12 +77,7 @@ def test_modal_first_frequency():
     First natural frequency from SLEPc GHEP must be within 5 % of the
     Euler-Bernoulli analytical value for a clamped-free beam.
     """
-    import importlib.util
-
-    utils_path = Path(__file__).parent.parent / "fenicsx_utils.py"
-    spec = importlib.util.spec_from_file_location("fenicsx_utils", utils_path)
-    fenicsx_utils = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(fenicsx_utils)
+    from kerf_fem import fenicsx_utils
 
     material_props = {
         "E": _E,
@@ -121,12 +116,7 @@ def test_modal_first_frequency():
 
 def test_modal_returns_mode_shapes():
     """mode_shapes must be present and match number of frequencies."""
-    import importlib.util
-
-    utils_path = Path(__file__).parent.parent / "fenicsx_utils.py"
-    spec = importlib.util.spec_from_file_location("fenicsx_utils", utils_path)
-    fenicsx_utils = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(fenicsx_utils)
+    from kerf_fem import fenicsx_utils
 
     material_props = {"E": _E, "nu": _nu, "rho": _rho, "yield_strength": 250e6}
     boundary_conditions = [{"type": "fixed", "face_tags": [10]}]

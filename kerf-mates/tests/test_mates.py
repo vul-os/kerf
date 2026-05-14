@@ -1,6 +1,6 @@
 import unittest
 import math
-from tools.solvespace_wrapper import (
+from kerf_mates.solver import (
     Entity,
     MateConstraint,
     GeometricConstraintSolver,

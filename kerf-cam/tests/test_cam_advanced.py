@@ -24,10 +24,7 @@ from typing import List
 
 import pytest
 
-# Add pyworker to sys.path so route modules are importable standalone.
-_PYWORKER = Path(__file__).parent.parent.parent / "pyworker"
-if str(_PYWORKER) not in sys.path:
-    sys.path.insert(0, str(_PYWORKER))
+# kerf_cam is a proper package — no manual sys.path manipulation needed.
 
 _has_ocl = pytest.importorskip("opencamlib", reason="opencamlib not installed") if False else None
 _has_occ = pytest.importorskip("OCC.Core.STEPControl", reason="pythonOCC not installed") if False else None
@@ -190,7 +187,7 @@ def _write_cube_step(tmpdir: str) -> str:
 
 
 def _make_op(**kwargs):
-    from routes.cam import CAMOperation
+    from kerf_cam.routes import CAMOperation
     defaults = dict(
         type="face",
         tool_diameter=3.0,
@@ -210,7 +207,7 @@ def _make_op(**kwargs):
 
 @requires_occ
 def test_brep_extracts_at_least_one_wire():
-    from routes.cam import convert_step_to_stl, extract_face_wires
+    from kerf_cam.routes import convert_step_to_stl, extract_face_wires
     with tempfile.TemporaryDirectory() as tmpdir:
         occ_shape = convert_step_to_stl(_write_cube_step(tmpdir), str(Path(tmpdir) / "out.stl"))
         op = _make_op(type="contour")
@@ -221,7 +218,7 @@ def test_brep_extracts_at_least_one_wire():
 @requires_occ
 def test_brep_outer_wire_has_four_corners():
     """The cube top face outer wire should be a closed quadrilateral."""
-    from routes.cam import convert_step_to_stl, extract_face_wires
+    from kerf_cam.routes import convert_step_to_stl, extract_face_wires
     with tempfile.TemporaryDirectory() as tmpdir:
         occ_shape = convert_step_to_stl(_write_cube_step(tmpdir), str(Path(tmpdir) / "out.stl"))
         op = _make_op(type="contour", wire_tolerance=0.01)
@@ -231,7 +228,7 @@ def test_brep_outer_wire_has_four_corners():
 
 @requires_occ
 def test_brep_outer_wire_coords_within_cube_xy():
-    from routes.cam import convert_step_to_stl, extract_face_wires
+    from kerf_cam.routes import convert_step_to_stl, extract_face_wires
     with tempfile.TemporaryDirectory() as tmpdir:
         occ_shape = convert_step_to_stl(_write_cube_step(tmpdir), str(Path(tmpdir) / "out.stl"))
         op = _make_op(type="contour")
@@ -244,7 +241,7 @@ def test_brep_outer_wire_coords_within_cube_xy():
 
 @requires_occ
 def test_brep_face_id_selects_specific_face():
-    from routes.cam import convert_step_to_stl, extract_face_wires
+    from kerf_cam.routes import convert_step_to_stl, extract_face_wires
     with tempfile.TemporaryDirectory() as tmpdir:
         occ_shape = convert_step_to_stl(_write_cube_step(tmpdir), str(Path(tmpdir) / "out.stl"))
         op = _make_op(type="pocket", face_id=0)
@@ -258,7 +255,7 @@ def test_brep_face_id_selects_specific_face():
 
 @requires_both
 def test_parallel_3d_x_produces_cl_points():
-    from routes.cam import convert_step_to_stl, _load_stl_into_surface, _run_parallel_3d
+    from kerf_cam.routes import convert_step_to_stl, _load_stl_into_surface, _run_parallel_3d
     import opencamlib as ocl
     with tempfile.TemporaryDirectory() as tmpdir:
         convert_step_to_stl(_write_cube_step(tmpdir), str(Path(tmpdir) / "out.stl"))
@@ -271,7 +268,7 @@ def test_parallel_3d_x_produces_cl_points():
 
 @requires_both
 def test_parallel_3d_y_produces_cl_points():
-    from routes.cam import convert_step_to_stl, _load_stl_into_surface, _run_parallel_3d
+    from kerf_cam.routes import convert_step_to_stl, _load_stl_into_surface, _run_parallel_3d
     import opencamlib as ocl
     with tempfile.TemporaryDirectory() as tmpdir:
         convert_step_to_stl(_write_cube_step(tmpdir), str(Path(tmpdir) / "out.stl"))
@@ -284,7 +281,7 @@ def test_parallel_3d_y_produces_cl_points():
 
 @requires_both
 def test_parallel_3d_angle_produces_cl_points():
-    from routes.cam import convert_step_to_stl, _load_stl_into_surface, _run_parallel_3d
+    from kerf_cam.routes import convert_step_to_stl, _load_stl_into_surface, _run_parallel_3d
     import opencamlib as ocl
     with tempfile.TemporaryDirectory() as tmpdir:
         convert_step_to_stl(_write_cube_step(tmpdir), str(Path(tmpdir) / "out.stl"))
@@ -297,7 +294,7 @@ def test_parallel_3d_angle_produces_cl_points():
 
 @requires_both
 def test_parallel_3d_cl_within_cube_xy():
-    from routes.cam import convert_step_to_stl, _load_stl_into_surface, _run_parallel_3d
+    from kerf_cam.routes import convert_step_to_stl, _load_stl_into_surface, _run_parallel_3d
     import opencamlib as ocl
     with tempfile.TemporaryDirectory() as tmpdir:
         convert_step_to_stl(_write_cube_step(tmpdir), str(Path(tmpdir) / "out.stl"))
@@ -317,7 +314,7 @@ def test_parallel_3d_cl_within_cube_xy():
 
 @requires_both
 def test_waterline_produces_cl_points():
-    from routes.cam import convert_step_to_stl, _load_stl_into_surface, _run_waterline
+    from kerf_cam.routes import convert_step_to_stl, _load_stl_into_surface, _run_waterline
     import opencamlib as ocl
     with tempfile.TemporaryDirectory() as tmpdir:
         convert_step_to_stl(_write_cube_step(tmpdir), str(Path(tmpdir) / "out.stl"))
@@ -331,7 +328,7 @@ def test_waterline_produces_cl_points():
 @requires_both
 def test_waterline_z_levels_span_range():
     """Z values of waterline CL points must span a non-trivial range."""
-    from routes.cam import convert_step_to_stl, _load_stl_into_surface, _run_waterline
+    from kerf_cam.routes import convert_step_to_stl, _load_stl_into_surface, _run_waterline
     import opencamlib as ocl
     with tempfile.TemporaryDirectory() as tmpdir:
         convert_step_to_stl(_write_cube_step(tmpdir), str(Path(tmpdir) / "out.stl"))
@@ -349,7 +346,7 @@ def test_waterline_z_levels_span_range():
 
 def test_lathe_gcode_without_occ():
     """Lathe op emits valid G-code even when pythonOCC is not present."""
-    from routes.cam import _run_lathe_op
+    from kerf_cam.routes import _run_lathe_op
     op = _make_op(type="lathe", step_down=1.0, step_over=1.0, feed_rate=200.0, spindle_rpm=1500, spindle_axis="z")
     gcode, length = _run_lathe_op(op, occ_shape=None)
     assert "G18" in gcode, "lathe G-code missing G18 (X-Z plane select)"
@@ -359,7 +356,7 @@ def test_lathe_gcode_without_occ():
 
 
 def test_lathe_gcode_has_spindle_on():
-    from routes.cam import _run_lathe_op
+    from kerf_cam.routes import _run_lathe_op
     op = _make_op(type="lathe", step_down=1.0, step_over=1.0, feed_rate=200.0, spindle_rpm=2000)
     gcode, _ = _run_lathe_op(op, occ_shape=None)
     assert "M3" in gcode
@@ -368,7 +365,7 @@ def test_lathe_gcode_has_spindle_on():
 @requires_occ
 def test_lathe_with_occ_shape():
     """When pythonOCC is available the lathe op tries to extract a profile."""
-    from routes.cam import convert_step_to_stl, _run_lathe_op
+    from kerf_cam.routes import convert_step_to_stl, _run_lathe_op
     with tempfile.TemporaryDirectory() as tmpdir:
         occ_shape = convert_step_to_stl(_write_cube_step(tmpdir), str(Path(tmpdir) / "out.stl"))
         op = _make_op(type="lathe", step_down=1.0, step_over=1.0, feed_rate=200.0, spindle_rpm=1500)
@@ -382,7 +379,7 @@ def test_lathe_with_occ_shape():
 # ---------------------------------------------------------------------------
 
 def test_5axis_returns_not_implemented():
-    from routes.cam import run_cam, CAMRequest
+    from kerf_cam.routes import run_cam, CAMRequest
     step_b64 = base64.b64encode(
         b"ISO-10303-21;\nHEADER;\nENDSEC;\nDATA;\nENDSEC;\nEND-ISO-10303-21;\n"
     ).decode()
@@ -397,7 +394,7 @@ def test_5axis_returns_not_implemented():
 
 
 def test_5axis_gcode_b64_present():
-    from routes.cam import run_cam, CAMRequest
+    from kerf_cam.routes import run_cam, CAMRequest
     step_b64 = base64.b64encode(
         b"ISO-10303-21;\nHEADER;\nENDSEC;\nDATA;\nENDSEC;\nEND-ISO-10303-21;\n"
     ).decode()
@@ -416,7 +413,7 @@ def test_5axis_gcode_b64_present():
 @requires_both
 def test_contour_op_uses_real_wire():
     """contour op on a cube produces CL points that stay within cube XY."""
-    from routes.cam import (
+    from kerf_cam.routes import (
         convert_step_to_stl, _load_stl_into_surface, _run_brep_contour_pocket,
     )
     import opencamlib as ocl

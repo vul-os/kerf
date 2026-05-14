@@ -71,12 +71,8 @@ def _build_beam_msh(msh_path: Path, L, b, h, mesh_size=0.025):
 
 
 def _load_calculix_utils():
-    import importlib.util
-    utils_path = Path(__file__).parent.parent / "calculix_utils.py"
-    spec = importlib.util.spec_from_file_location("calculix_utils", utils_path)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+    from kerf_fem import calculix_utils
+    return calculix_utils
 
 
 @_needs_ccx

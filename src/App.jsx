@@ -112,7 +112,7 @@ export default function App() {
         element={localShortcut ? <Navigate to="/projects" replace /> : <Signup />}
       />
       <Route path="/auth/callback" element={<AuthCallback />} />
-      <Route path="/pricing" element={<Pricing />} />
+      {cloudEnabled && <Route path="/pricing" element={<Pricing />} />}
       <Route path="/docs" element={<DocsHome />} />
       <Route path="/docs/:slug" element={<DocsArticle />} />
       {cloudEnabled && <Route path="/workshop" element={<Workshop />} />}

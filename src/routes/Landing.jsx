@@ -58,6 +58,7 @@ import { useState } from 'react'
 import Header from '../components/Header.jsx'
 import Footer from '../components/Footer.jsx'
 import Button from '../components/Button.jsx'
+import { useCloudConfig } from '../cloud/useCloudConfig.js'
 import {
   HeroIllustration,
   JscadIllustration,
@@ -1172,13 +1173,15 @@ function MadeInSA() {
               <Github size={13} />
               <span className="font-mono">kerf-sh/kerf</span>
             </a>
-            <Link
-              to="/pricing"
-              className="inline-flex items-center gap-2 rounded-md border border-ink-800 bg-ink-900/60 px-3 py-1.5 text-xs text-ink-300 hover:border-ink-700 hover:text-ink-100 transition-colors"
-            >
-              <Wallet size={13} />
-              See pricing
-            </Link>
+            {cloudEnabled && (
+              <Link
+                to="/pricing"
+                className="inline-flex items-center gap-2 rounded-md border border-ink-800 bg-ink-900/60 px-3 py-1.5 text-xs text-ink-300 hover:border-ink-700 hover:text-ink-100 transition-colors"
+              >
+                <Wallet size={13} />
+                See pricing
+              </Link>
+            )}
           </div>
         </div>
       </div>
@@ -1190,7 +1193,7 @@ function MadeInSA() {
 /* CTA strip (between sections)                                                */
 /* -------------------------------------------------------------------------- */
 
-function CTAStrip() {
+function CTAStrip({ cloudEnabled = false }) {
   return (
     <section className="relative border-t border-ink-900">
       <div className="mx-auto max-w-7xl px-6 py-12 lg:py-14">
@@ -1234,6 +1237,7 @@ function CTAStrip() {
 /* -------------------------------------------------------------------------- */
 
 export default function Landing() {
+  const { cloudEnabled } = useCloudConfig()
   return (
     <div className="min-h-screen bg-ink-950 text-ink-100">
       <Header />
@@ -1245,8 +1249,8 @@ export default function Landing() {
       <RecentlyShipped />
       <RoadmapGlimpse />
       <LocalVsHosted />
-      <PricingTeaser />
-      <CTAStrip />
+      {cloudEnabled && <PricingTeaser />}
+      <CTAStrip cloudEnabled={cloudEnabled} />
       <MadeInSA />
       <Footer />
     </div>

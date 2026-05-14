@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Share2, Save, Loader2, ArrowLeft, Check, History, X, RotateCcw, Undo2, Redo2, GitBranch, Clock, MessageSquare, PanelRightClose, PanelRightOpen, Plus, Box, SlidersHorizontal } from 'lucide-react'
+import { Share2, Save, Loader2, ArrowLeft, Check, History, X, RotateCcw, Undo2, Redo2, GitBranch, Clock, MessageSquare, PanelRightClose, PanelRightOpen, Plus, Box, SlidersHorizontal, ChevronDown, ArrowRight, RotateCw } from 'lucide-react'
 import { LogoWordmark } from '../components/Logo.jsx'
 import FileTree from '../components/FileTree.jsx'
 import Renderer from '../components/Renderer.jsx'
@@ -48,6 +48,166 @@ import { extractDisplayGeometryFromParts } from '../lib/femDisplacement.js'
 import { exportSvg, exportPng, exportPdf } from '../lib/svgExport.js'
 import { api } from '../lib/api.js'
 import { mateRefFromPick, parseAssembly } from '../lib/assembly.js'
+import { _internalLoops } from '../lib/sketchGeom2.js'
+
+// ---------------------------------------------------------------------------
+// Build3DDropdown — toolbar dropdown in the sketch header that scaffolds a
+// .jscad file from the current .sketch using extrude_linear or extrude_rotate.
+//
+// Only visible when the sketch has at least one closed loop (i.e. extrudable).
+// ---------------------------------------------------------------------------
+
+function Build3DModal({ op, sketchName, onConfirm, onClose }) {
+  const isRevolve = op === 'extrude_rotate'
+  const [height, setHeight] = useState('10')
+  const [angle, setAngle] = useState('360')
+  const [filename, setFilename] = useState(sketchName.replace(/\.sketch$/, '') + '.jscad')
+
+  function handleSubmit(e) {
+    e.preventDefault()
+    const params = isRevolve
+      ? { angle_deg: parseFloat(angle) || 360 }
+      : { height_mm: parseFloat(height) || 10 }
+    onConfirm({ op, params, filename })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-ink-900 border border-ink-700 rounded-lg shadow-2xl w-80 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-sm font-medium text-ink-100">
+            {isRevolve ? 'Revolve sketch' : 'Extrude sketch'}
+          </span>
+          <button type="button" onClick={onClose} className="text-ink-400 hover:text-ink-200">
+            <X size={14} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          {isRevolve ? (
+            <label className="flex flex-col gap-1">
+              <span className="text-[11px] text-ink-400">Angle (degrees)</span>
+              <input
+                type="number"
+                min="1"
+                max="360"
+                step="1"
+                value={angle}
+                onChange={(e) => setAngle(e.target.value)}
+                className="bg-ink-800 border border-ink-700 rounded px-2 py-1 text-xs text-ink-100 outline-none focus:border-kerf-300/60"
+                autoFocus
+              />
+            </label>
+          ) : (
+            <label className="flex flex-col gap-1">
+              <span className="text-[11px] text-ink-400">Height (mm)</span>
+              <input
+                type="number"
+                min="0.01"
+                step="0.5"
+                value={height}
+                onChange={(e) => setHeight(e.target.value)}
+                className="bg-ink-800 border border-ink-700 rounded px-2 py-1 text-xs text-ink-100 outline-none focus:border-kerf-300/60"
+                autoFocus
+              />
+            </label>
+          )}
+          <label className="flex flex-col gap-1">
+            <span className="text-[11px] text-ink-400">Output filename</span>
+            <input
+              type="text"
+              value={filename}
+              onChange={(e) => setFilename(e.target.value)}
+              className="bg-ink-800 border border-ink-700 rounded px-2 py-1 text-xs font-mono text-ink-100 outline-none focus:border-kerf-300/60"
+            />
+          </label>
+          <div className="flex gap-2 mt-1">
+            <button
+              type="submit"
+              className="flex-1 py-1.5 rounded bg-kerf-300/15 border border-kerf-300/40 text-kerf-200 text-xs hover:bg-kerf-300/25"
+            >
+              Build 3D
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 rounded border border-ink-700 text-ink-400 text-xs hover:bg-ink-800"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function Build3DDropdown({ sketch, sketchName, onBuild, disabled }) {
+  const [open, setOpen] = useState(false)
+  const [modal, setModal] = useState(null) // 'extrude_linear' | 'extrude_rotate'
+  const wrapRef = useRef(null)
+
+  // Close on click-outside.
+  useEffect(() => {
+    if (!open) return
+    const handler = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false)
+    }
+    window.addEventListener('mousedown', handler)
+    return () => window.removeEventListener('mousedown', handler)
+  }, [open])
+
+  function handleConfirm({ op, params }) {
+    setModal(null)
+    onBuild(op, params)
+  }
+
+  if (disabled) return null
+
+  return (
+    <>
+      <div ref={wrapRef} className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="inline-flex items-center gap-1 px-2 py-1 rounded bg-amber-300/10 border border-amber-300/25 text-amber-200 hover:bg-amber-300/20 text-xs"
+          title="Build a 3D part from this sketch (extrude or revolve)"
+        >
+          <Box size={11} />
+          <span>Build 3D</span>
+          <ChevronDown size={10} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+        </button>
+        {open && (
+          <div className="absolute left-0 top-full mt-1 z-40 min-w-[160px] bg-ink-850 border border-ink-700 rounded-md shadow-lg py-1">
+            <button
+              type="button"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-ink-100 hover:bg-ink-700 text-left"
+              onClick={() => { setOpen(false); setModal('extrude_linear') }}
+            >
+              <ArrowRight size={12} className="text-amber-300" />
+              <span>Extrude</span>
+            </button>
+            <button
+              type="button"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-ink-100 hover:bg-ink-700 text-left"
+              onClick={() => { setOpen(false); setModal('extrude_rotate') }}
+            >
+              <RotateCw size={12} className="text-amber-300" />
+              <span>Revolve</span>
+            </button>
+          </div>
+        )}
+      </div>
+      {modal && (
+        <Build3DModal
+          op={modal}
+          sketchName={sketchName}
+          onConfirm={handleConfirm}
+          onClose={() => setModal(null)}
+        />
+      )}
+    </>
+  )
+}
 
 const AUTOSAVE_MS = 500
 // Re-eval debounce, scaled by file size. Small files feel snappy at 250ms;
@@ -702,6 +862,17 @@ export default function Editor() {
     return { list: [], defaultId: '' }
   }, [partFile, featureFile, sketchFile, w.currentPart, w.currentFeature, w.parsedSketch])
 
+  // True when the current sketch has at least one closed loop — the "Build 3D"
+  // dropdown is only shown when there's something to extrude.
+  const sketchHasClosedLoops = useMemo(() => {
+    if (!sketchFile || !w.parsedSketch) return false
+    try {
+      return _internalLoops(w.parsedSketch).length > 0
+    } catch {
+      return false
+    }
+  }, [sketchFile, w.parsedSketch])
+
   // Resolve the picked-or-default config id for the open file.
   const activeConfigId = useMemo(() => {
     if (!w.currentFileId) return ''
@@ -1187,6 +1358,12 @@ export default function Editor() {
                   <Box size={11} />
                   New feature from sketch
                 </button>
+                <Build3DDropdown
+                  sketch={w.parsedSketch}
+                  sketchName={w.currentFile?.name || 'untitled.sketch'}
+                  disabled={!sketchHasClosedLoops}
+                  onBuild={(op, params) => w.createJscadFromSketch(w.currentFileId, op, params)}
+                />
               </div>
               <div className="flex-1 min-h-0 relative">
                 <SketchView

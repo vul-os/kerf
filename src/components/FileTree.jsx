@@ -69,7 +69,21 @@ function KindIcon({ kind, name, open }) {
   return <FileCode size={14} className={`${cls} text-ink-200`} />
 }
 
-function Node({ file, depth, byParent, expanded, toggle, currentFileId, onSelect, onCreate, onRename, onDelete, onImportStep, renamingId, setRenamingId }) {
+// SketchBacklink chip — rendered on .jscad file rows that import a .sketch.
+// `sketchName` is the basename of the first imported sketch, e.g. "bracket.sketch".
+function SketchBacklinkChip({ sketchName }) {
+  if (!sketchName) return null
+  return (
+    <span
+      className="flex-shrink-0 text-[10px] text-ink-500 font-mono leading-none px-1 py-0.5 rounded bg-ink-800/60 border border-ink-700/50 ml-1 truncate max-w-[80px]"
+      title={`Imports sketch: ${sketchName}`}
+    >
+      ← {sketchName}
+    </span>
+  )
+}
+
+function Node({ file, depth, byParent, expanded, toggle, currentFileId, onSelect, onCreate, onRename, onDelete, onImportStep, renamingId, setRenamingId, jscadSketchLinks }) {
   const [menu, setMenu] = useState(null) // {x, y}
   const inputRef = useRef(null)
   const isRenaming = renamingId === file.id
@@ -146,7 +160,10 @@ function Node({ file, depth, byParent, expanded, toggle, currentFileId, onSelect
             onClick={(e) => e.stopPropagation()}
           />
         ) : (
-          <span className="flex-1 text-xs font-mono truncate">{file.name}</span>
+          <span className="flex-1 text-xs font-mono truncate min-w-0">{file.name}</span>
+        )}
+        {!isRenaming && jscadSketchLinks?.get(file.id) && (
+          <SketchBacklinkChip sketchName={jscadSketchLinks.get(file.id)} />
         )}
         {!isRenaming && file.tessellation_status === 'running' && (
           <span title="Generating preview mesh (server-side STEP tessellation)" className="flex-shrink-0 text-cyan-edge">
@@ -209,6 +226,7 @@ function Node({ file, depth, byParent, expanded, toggle, currentFileId, onSelect
           onImportStep={onImportStep}
           renamingId={renamingId}
           setRenamingId={setRenamingId}
+          jscadSketchLinks={jscadSketchLinks}
         />
       ))}
       {menu && (
@@ -470,7 +488,7 @@ function ContextMenu({ x, y, onClose, onRename, onDelete, onNewFile, onNewFolder
   )
 }
 
-export default function FileTree({ files, currentFileId, onSelect, onCreate, onRename, onDelete, onImportStep, onImportKicad }) {
+export default function FileTree({ files, currentFileId, onSelect, onCreate, onRename, onDelete, onImportStep, onImportKicad, jscadSketchLinks }) {
   const byParent = useMemo(() => buildTree(files || []), [files])
   const roots = byParent.get('__root__') || []
   const [expanded, setExpanded] = useState(() => new Set(
@@ -488,6 +506,11 @@ export default function FileTree({ files, currentFileId, onSelect, onCreate, onR
   // the user re-pick the file.
   const lastPickRef = useRef(null) // {file, parentId} | null
   const w = useWorkspace()
+  // Subscribe to the jscadSketchLinks map from the workspace store so the
+  // backlink chips update when new .jscad files are opened / created.
+  const storeLinks = useWorkspace((s) => s.jscadSketchLinks)
+  // Caller can pass an explicit map (useful for tests); fall back to the store.
+  const resolvedLinks = jscadSketchLinks || storeLinks
 
   const toggle = (id) => setExpanded((s) => {
     const next = new Set(s)
@@ -632,6 +655,7 @@ export default function FileTree({ files, currentFileId, onSelect, onCreate, onR
             onImportStep={openImportPicker}
             renamingId={renamingId}
             setRenamingId={setRenamingId}
+            jscadSketchLinks={resolvedLinks}
           />
         ))}
       </div>

@@ -307,6 +307,14 @@ const initial = {
   activityLoading: false,
   activityError: null,
   activityNextCursor: null,
+
+  // jscadSketchLinks — Map<fileId, string> from a .jscad file's id to the
+  // basename of the first .sketch it imports (e.g. "bracket.sketch"). Built
+  // (and updated) whenever file content changes via _rebuildJscadSketchLinks.
+  // Consumed by FileTree to render the "← <sketch-name>" backlink chip.
+  // NOTE: cross-file invalidation agent (depGraph.js) should adopt this cache
+  // rather than building a separate parse pass — see Task 5 coordination note.
+  jscadSketchLinks: new Map(),
 }
 
 // Tolerant JSON parse for drawing content. Empty/blank → defaults.
@@ -871,6 +879,13 @@ export const useWorkspace = create((set, get) => ({
         currentFileContent: file.content ?? '',
         dirty: false,
       })
+      // Update the jscad→sketch backlink cache now that we have the content.
+      if (file.content) {
+        const lowerName = (file.name || '').toLowerCase()
+        if (lowerName.endsWith('.jscad') || lowerName.endsWith('.js')) {
+          get()._rebuildJscadSketchLinks([{ ...file }])
+        }
+      }
       // Try the IndexedDB mesh cache first (keyed by SHA-256 of source). Hit
       // → instant parts without touching the worker. Miss → run JSCAD via the
       // worker, then store the result for next time.
@@ -1139,6 +1154,106 @@ export const useWorkspace = create((set, get) => ({
     } catch (err) {
       set({ toast: 'Could not create feature: ' + (err?.message || String(err)) })
     }
+  },
+
+  // ---- Build 3D: create a .jscad file that imports a .sketch profile ----
+  //
+  // Scaffolds the minimal JSCAD source for the given operation
+  // (extrude_linear or extrude_rotate), then opens the new file.
+  // The file-tree backlink chip is updated via _rebuildJscadSketchLinks.
+  createJscadFromSketch: async (sketchFileId, operation, params = {}) => {
+    const { projectId, files } = get()
+    if (!projectId) return null
+    const sketch = (files || []).find((f) => f.id === sketchFileId)
+    if (!sketch) return null
+
+    // Build the absolute path to the sketch.
+    const byId = new Map(files.map((f) => [f.id, f]))
+    const segs = []
+    let cur = sketch
+    let safety = 0
+    while (cur && safety++ < 64) {
+      segs.unshift(cur.name)
+      if (!cur.parent_id) break
+      cur = byId.get(cur.parent_id)
+    }
+    const sketchPath = '/' + segs.join('/')
+    const baseName = sketch.name.replace(/\.sketch$/, '')
+    const objectId = baseName
+
+    // Generate canonical JSCAD source.
+    let opCall
+    if (operation === 'extrude_rotate') {
+      const angle = params.angle_deg ?? 360
+      const segments = params.segments ?? 32
+      opCall = `extrusions.extrudeRotate({ angle: (${angle} / 180) * Math.PI, segments: ${segments} }, profile)`
+    } else {
+      // extrude_linear (default)
+      const heightExpr = params.height_param
+        ? `params.${params.height_param}`
+        : (params.height_mm ?? 10)
+      opCall = `extrusions.extrudeLinear({ height: ${heightExpr} }, profile)`
+    }
+
+    const content = [
+      `// Generated from ${sketchPath} — edit the sketch to change dimensions; the 3D updates automatically.`,
+      `import profile from '${sketchPath}'`,
+      ``,
+      `export default function ({ extrusions, params }) {`,
+      `  const body = ${opCall}`,
+      `  return [{ id: '${objectId}', geom: body }]`,
+      `}`,
+    ].join('\n')
+
+    try {
+      const created = await api.createFile(projectId, {
+        name: baseName + '.jscad',
+        kind: 'file',
+        parent_id: sketch.parent_id,
+        content,
+      })
+      const next = [...(get().files), { ...created, content: undefined }]
+      set({ files: next })
+      // Update the backlink chip cache.
+      get()._rebuildJscadSketchLinks(next)
+      await get().selectFile(created.id)
+      return created
+    } catch (err) {
+      set({ toast: 'Could not create JSCAD: ' + (err?.message || String(err)) })
+      return null
+    }
+  },
+
+  // Rebuild the jscadSketchLinks Map from the current files list. Called
+  // lazily whenever a file is created or its content changes.
+  // Only scans files whose names end in '.jscad' and whose `content` field
+  // is already loaded (i.e. it was recently selected/fetched).
+  // For the common case, content is only available for the currently-open
+  // file — so we index what we know and merge incrementally.
+  //
+  // COORDINATION NOTE (cross-file invalidation agent): if depGraph.js lands
+  // a `buildSketchImports()` helper that scans all .jscad file contents, call
+  // that here instead of the inline SKETCH_IMPORT_RE pass below.
+  _rebuildJscadSketchLinks: (files) => {
+    const list = files || get().files
+    const re = new RegExp(SKETCH_IMPORT_RE.source, SKETCH_IMPORT_RE.flags)
+    const links = new Map(get().jscadSketchLinks) // preserve existing entries
+    for (const f of list) {
+      const lower = (f.name || '').toLowerCase()
+      if (!lower.endsWith('.jscad') && !lower.endsWith('.js')) continue
+      if (!f.content) continue // content not loaded yet; keep existing entry
+      // Find the first sketch import binding.
+      re.lastIndex = 0
+      const m = re.exec(f.content)
+      if (m) {
+        // m[2] is the path, e.g. '/parts/bracket.sketch'
+        const sketchBase = m[2].split('/').pop() // 'bracket.sketch'
+        links.set(f.id, sketchBase)
+      } else {
+        links.delete(f.id)
+      }
+    }
+    set({ jscadSketchLinks: links })
   },
 
   // Upload a binary asset to the project, add the resulting File row to the

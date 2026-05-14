@@ -53,6 +53,7 @@ import {
   buildFaceNamesForRevolve,
   nameOpOutput,
 } from './faceNaming.js'
+import { resolveFaceRef } from './faceRef.js'
 
 // The opencascade.js package ships a JS shim (`opencascade.wasm.js`) plus
 // the matching `.wasm` blob. Vite bundles the JS but won't auto-resolve
@@ -729,22 +730,25 @@ function opMirrorPattern(oc, prev, node, _sketches, tracker) {
 //   6. BRepPrimAPI_MakePrism(placed_profile, vec) → cutter solid
 //   7. BRepAlgoAPI_Cut_3(prev, cutter)          → result
 //
-// Face-id stability caveat (mirrors push_pull): target_face_id is a
-// post-evaluation snapshot index.  Structural upstream edits can renumber
-// faces.  Phase 4 persistent-naming will fix this.
+// T4: opCutFromSketch uses resolveFaceRef — tries target_face_name first,
+// falls back to target_face_id integer.
 function opCutFromSketch(oc, prev, node, sketches, tracker, builderRef) {
   if (!prev) throw new Error('cut_from_sketch: no target shape (must follow a body-building op)')
-  const faceId = Number(node.target_face_id)
-  if (!Number.isFinite(faceId) || faceId < 0) {
-    throw new Error('cut_from_sketch: target_face_id must be a non-negative integer')
-  }
   const depth = Number(node.depth) || 0
   if (depth <= 0) throw new Error('cut_from_sketch: depth must be > 0')
   const reverse = Boolean(node.reverse)
 
-  // 1. Retrieve and validate the target face.
-  const face = faceById(oc, prev, faceId)
-  if (!face) throw new Error(`cut_from_sketch: face id ${faceId} not found on target body`)
+  // 1. Retrieve and validate the target face (name-first, integer fallback).
+  const face = resolveFaceRef(oc, prev, node, node._faceNames || {}, faceById, {
+    nameKey: 'target_face_name',
+    idKey:   'target_face_id',
+  })
+  if (!face) {
+    const hint = node.target_face_name
+      ? `name '${node.target_face_name}' not found`
+      : `face id ${node.target_face_id} not found`
+    throw new Error(`cut_from_sketch: ${hint} on target body`)
+  }
 
   // 2. Compute face frame (must be planar).
   const frame = faceFrame(oc, face)
@@ -806,14 +810,21 @@ function opCutFromSketch(oc, prev, node, sketches, tracker, builderRef) {
 // Implemented by extracting the face's outer wire as a planar profile,
 // extruding by `distance` along the face normal, then fuse-or-cut against
 // the body.
+// T4: opPushPull uses resolveFaceRef — tries face_name first, falls back to face_id.
 function opPushPull(oc, prev, node, _sketches, tracker, builderRef) {
   if (!prev) throw new Error('push_pull: no target shape')
   const distance = Number(node.distance) || 0
   if (distance === 0) return prev
-  const faceId = Number(node.face_id)
-  if (!Number.isFinite(faceId)) throw new Error('push_pull: face_id required')
-  const face = faceById(oc, prev, faceId)
-  if (!face) throw new Error(`push_pull: face id ${faceId} not found`)
+  const face = resolveFaceRef(oc, prev, node, node._faceNames || {}, faceById, {
+    nameKey: 'face_name',
+    idKey:   'face_id',
+  })
+  if (!face) {
+    const hint = node.face_name
+      ? `name '${node.face_name}' not found`
+      : `face id ${node.face_id} not found`
+    throw new Error(`push_pull: ${hint}`)
+  }
   const frame = faceFrame(oc, face)
   if (!frame || !frame.planar) {
     throw new Error('push_pull: face is non-planar (only planar push/pull supported)')
@@ -2282,9 +2293,15 @@ function evaluateTree(oc, tree, sketches) {
     meshes.push({ id: bodyId, ...mesh, faceNames })
   }
 
-  // Inject sketch lookup into hole/(future) ops via node decoration.
+  // Inject sketch lookup + current face-names into hole/(future) ops via node decoration.
   for (const raw of tree) {
-    const node = { ...raw, _sketches: sketches }
+    // _faceNames: the face-name map for the CURRENT shape at dispatch time.
+    // Op handlers (cut_from_sketch, push_pull) use this for resolveFaceRef.
+    let _faceNames = {}
+    if (current && currentFaceNamer) {
+      try { _faceNames = currentFaceNamer(oc, current) || {} } catch { /* ignore */ }
+    }
+    const node = { ...raw, _sketches: sketches, _faceNames }
     let next = null
     try {
       switch (node.op) {
@@ -2537,7 +2554,11 @@ async function evaluateToFinalShape(oc, tree, sketches) {
   // bodyMap mirrors evaluateTree's map so opBoolean can resolve operands by id.
   const bodyMap = {}
   for (const raw of tree || []) {
-    const node = { ...raw, _sketches: sketches }
+    let _faceNames = {}
+    if (current && currentFaceNamer) {
+      try { _faceNames = currentFaceNamer(oc, current) || {} } catch { /* ignore */ }
+    }
+    const node = { ...raw, _sketches: sketches, _faceNames }
     let next = null
     try {
       switch (node.op) {

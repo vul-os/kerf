@@ -17,6 +17,7 @@ dependencies = [
     "kerf-core>=0.1.0",
     "kerf-auth>=0.1.0",
     "kerf-api>=0.1.0",
+    "kerf-pricing>=0.1.0",
 ]
 
 [project.optional-dependencies]

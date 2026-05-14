@@ -1,17 +1,24 @@
-# 5-axis CAM — Constant-tilt G-code emission
+# 5-axis CAM — G-code emission (constant-tilt + 3+2 indexed)
 
-Kerf generates real 5-axis G-code from constant-tilt CL points produced by the
-T3 solver (`kerf_cam.five_axis.constant_tilt.run_constant_tilt`).  T5 translates
-those CL points into A/B rotary-axis moves for LinuxCNC and Fanuc controllers.
+Kerf generates real 5-axis G-code via two modes:
+
+- **Constant-tilt** (T5): each CL point carries a tool-axis vector `(i,j,k)`;
+  A/B rotary angles are emitted on every `G1` line.
+- **3+2 indexed** (T6): the table is positioned once at the top of the program
+  (`G0 A<a> B<b>`), then a pure 3-axis body runs with A/B held constant.
+
+Both modes use the same `POST /run-5axis` endpoint and the same LinuxCNC / Fanuc
+post-processors.
 
 The pipeline has two entry points:
 
-1. **`POST /run-cam`** with `operation="5axis_finish"` — accepts a STEP file,
-   dispatches to the STEP→CL pipeline (T3), then calls T5 to emit G-code.
+1. **`POST /run-cam`** with `operation="5axis_finish"` or `operation="3plus2"` —
+   accepts a STEP file, dispatches to the CL pipeline, then emits G-code.
    _Currently requires precomputed CL points; see note below._
 
 2. **`POST /run-5axis`** — accepts precomputed CL points directly.  Fastest
    path for scripting workflows where the CL data is already available.
+   Use `mode="constant_tilt"` (default) or `mode="3plus2"`.
 
 ## LLM tool — `cam_run` with `operation="5axis_finish"`
 
@@ -52,6 +59,8 @@ use_tcp           Emit G43.4 TCP mode (default false)
 Accepts precomputed CL points (from `run_constant_tilt` or `run_3_2_indexed`)
 and emits G-code without needing a STEP file.
 
+### Constant-tilt mode (default)
+
 Body:
 
 ```json
@@ -61,6 +70,7 @@ Body:
     {"x": 5.0, "y": 0.0, "z": 2.5, "i": 0.259, "j": 0.0, "k": 0.966},
     {"x": 10.0, "y": 0.0, "z": 2.5, "i": 0.259, "j": 0.0, "k": 0.966}
   ],
+  "mode": "constant_tilt",
   "post": "linuxcnc",
   "tool_number": 1,
   "feed_rapid_mm_min": 5000,
@@ -72,7 +82,31 @@ Body:
 }
 ```
 
-Response:
+### 3+2 indexed mode
+
+Body — CL points are in the **rotated frame** (output of `run_3_2_indexed`).
+The `i/j/k` on the first point encodes the drive-face tool-axis vector; all
+points in the job share the same orientation:
+
+```json
+{
+  "cl_points": [
+    {"x": 0.0, "y": 0.0, "z": 0.5, "i": 0.354, "j": 0.354, "k": 0.707},
+    {"x": 2.0, "y": 0.0, "z": 0.5, "i": 0.354, "j": 0.354, "k": 0.707},
+    {"x": 4.0, "y": 0.0, "z": 0.5, "i": 0.354, "j": 0.354, "k": 0.707}
+  ],
+  "mode": "3plus2",
+  "post": "linuxcnc",
+  "feed_cut_mm_min": 800,
+  "spindle_rpm": 18000,
+  "coolant": "flood"
+}
+```
+
+The emitter extracts A/B from the first point's i/j/k, emits one `G0 A<a> B<b>`
+orientation move, then writes pure X/Y/Z `G1` lines for the body.
+
+Response (both modes):
 
 ```json
 {
@@ -80,6 +114,7 @@ Response:
   "gcode_b64": "<base64 G-code>",
   "cl_point_count": 3,
   "post_processor": "linuxcnc",
+  "mode": "3plus2",
   "warnings": [],
   "errors": []
 }
@@ -101,6 +136,97 @@ Each element of `cl_points` is an object with:
 
 `i`, `j`, `k` should form a unit vector.  The emitter normalises implicitly
 via `atan2`.
+
+In **3+2 indexed mode** the `i/j/k` encodes the drive-face orientation and only
+needs to be present on the first CL point.  All body points use the same
+rotation; subsequent `i/j/k` values are ignored.
+
+## 3+2 indexed mode
+
+### When to use 3+2 vs continuous-5-axis
+
+| | 3+2 indexed | Continuous 5-axis |
+|---|---|---|
+| **Best for** | Pockets, faces, contours on angled faces; parts that can be fully machined from one tilted orientation | Sculptured surfaces, freeform shapes, impeller hubs |
+| **G-code shape** | One `G0 A<a> B<b>` at top; plain `G1 X Y Z` body | Per-line `G1 X Y Z A<a> B<b>` |
+| **Machine requirement** | Any 5-axis machine; no inverse-kinematics TCP required during cut | Requires live RTCP / G43.4 during cutting |
+| **Cycle-time** | Lower (no rotary interpolation during cut) | Higher (constant rotary motion) |
+| **Suitable controller** | All 5-axis controllers including older Fanuc 18i | Modern controllers (Fanuc 30i/31i, LinuxCNC ≥2.8) |
+
+### Input: `target_face_normal`
+
+`run_3_2_indexed` (T4) requires a `drive_face_normal` — the `[nx, ny, nz]`
+outward normal of the face you want to mill normal-to.  T4 builds a rotation R
+that maps this normal to `+Z`, rotates all STL triangles, runs the chosen
+3-axis sub-op on the rotated geometry, and returns:
+
+```json
+{
+  "cl_points": [{"x": ..., "y": ..., "z": ...}, ...],
+  "rotation_matrix": [[r00, r01, r02], ...],
+  "rotated_normal": [0.0, 0.0, 1.0],
+  "warnings": [...]
+}
+```
+
+The `cl_points` are in the rotated frame.  Pass them to
+`emit_gcode_indexed_3_2` with the first point carrying the `i/j/k` tool-axis
+vector that encodes the drive-face orientation.
+
+Convenience: `run_3_2_indexed` does not add `i/j/k` to the returned
+`cl_points` — you need to compute the (i, j, k) corresponding to `drive_face_normal`
+and add it to the first point, or pass the original `drive_face_normal` as the
+tool-axis vector directly.  The T6 emitter only reads `i/j/k` from the first
+point.
+
+### Sample output — LinuxCNC, A=30°, B=45°, 5 XY points
+
+```gcode
+%
+; INFO: drive face is axis-aligned ...   ← only if axis-aligned
+; WARNING: no collision/gouge check ...
+; Generated by Kerf CAM — LinuxCNC 3+2 indexed post (head_table A/B)
+; Machine kinematic: head_table
+; TCP mode: tool-tip coords (machine handles RTCP)
+; Indexed orientation: A=30.000 B=45.000
+G90 G94 G17 G21
+G54
+M6 T1
+G0 Z50.000 A0.000 B0.000
+; G43.4 H1  ; uncomment to enable TCP if machine supports it
+G0 A30.000 B45.000 F5000     ← ONE orientation move
+S12000 M3
+M8
+G0 X0.000 Y0.000 Z2.500 F5000
+G1 X0.000 Y0.000 Z0.500 F1000
+G1 X2.000 Y0.000 Z0.500      ← pure X/Y/Z, no A/B
+G1 X4.000 Y0.000 Z0.500
+G1 X6.000 Y0.000 Z0.500
+G1 X8.000 Y0.000 Z0.500
+G0 Z50.000 F5000
+G0 A0.000 B0.000             ← return rotaries to home
+G49
+M9
+M5
+M30
+%
+```
+
+### Axis-aligned short-circuit (A=B=0)
+
+When `drive_face_normal ≈ (0,0,1)` (face already normal to +Z), T6 detects
+`A=0, B=0` and skips the orientation move entirely.  The output is plain 3-axis
+G-code with an informational comment.  The footer still emits `G0 A0.000 B0.000`
+(harmless no-op on a machine where the rotaries are already at home).
+
+### End-of-program: home rotation decision
+
+The footer always returns the rotaries to home (`G0 A0.000 B0.000`) regardless
+of whether the job was axis-aligned.  Rationale: leaving the table parked at a
+non-zero orientation after the program ends is a safety hazard — the next
+program (typically a 3-axis op) would machine at the skewed angle.  Operators
+who want to leave the table indexed can comment out the `G0 A0.000 B0.000` footer
+line manually.
 
 ## Angle conventions — head_table kinematic
 
@@ -176,6 +302,8 @@ emitted in the G-code.
 
 ## Python API
 
+### Constant-tilt
+
 ```python
 from kerf_cam.five_axis.gcode_constant_tilt import emit_gcode_constant_tilt, PostOpts
 
@@ -195,6 +323,33 @@ opts = PostOpts(
 )
 
 gcode = emit_gcode_constant_tilt(cl_points, post="linuxcnc", opts=opts)
+print(gcode)
+```
+
+### 3+2 indexed
+
+```python
+from kerf_cam.five_axis.gcode_indexed_3_2 import emit_gcode_indexed_3_2
+from kerf_cam.five_axis.gcode_constant_tilt import PostOpts
+
+# CL points from run_3_2_indexed (rotated frame).
+# Add i/j/k to first point encoding the drive-face tool-axis direction.
+import math
+a_deg, b_deg = 30.0, 45.0
+b_rad, a_rad = math.radians(b_deg), math.radians(a_deg)
+tool_axis = (math.sin(b_rad)*math.cos(a_rad),
+             math.sin(b_rad)*math.sin(a_rad),
+             math.cos(b_rad))
+
+cl_points = [
+    {"x": 0.0, "y": 0.0, "z": 0.5,
+     "i": tool_axis[0], "j": tool_axis[1], "k": tool_axis[2]},
+    {"x": 2.0, "y": 0.0, "z": 0.5},
+    {"x": 4.0, "y": 0.0, "z": 0.5},
+]
+
+opts = PostOpts(feed_cut_mm_min=800.0, spindle_rpm=18000)
+gcode = emit_gcode_indexed_3_2(cl_points, post="linuxcnc", opts=opts)
 print(gcode)
 ```
 

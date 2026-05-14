@@ -236,14 +236,21 @@ proximity to keep "intent" alive across edits.
 - Pattern `count` must be ≥ 2.
 - `version` stays `1`.
 
+## Surfacing ops (live — worker-evaluated)
+
+These ops are fully wired in the browser worker and produce solid geometry:
+
+- `sweep1` — sweep a closed profile along **one** open-curve path. Supports
+  `mode: "auto" | "frenet" | "corrected_frenet"`. See `feature_sweep1.md`.
+- `sweep2` — sweep a closed profile along **two** rails. Supports
+  `mode: "auto" | "frenet"`.
+- `network_srf` — surface from a U/V grid of curves.
+- `blend_srf` — G0/G1/G2 blend between two edges of an existing body.
+- `loft` — loft through ≥2 profile sketches.
+
 ## Future ops (Rhino-tier; Phase 4 — not yet evaluated)
 
-These nodes parse but the worker rejects them today; reserved for the
-NURBS surfacing phase:
-- `sweep1` — sweep one rail along one profile.
-- `sweep2` — sweep two rails along one profile.
-- `networkSrf` — surface from a network of curves.
-- `blendSrf` — G1/G2 blend between two surfaces.
+These nodes parse but the worker has no handler yet:
 - `matchSrf` — match an edge of one surface to another with continuity.
 
 ## Common edits

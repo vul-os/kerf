@@ -856,7 +856,21 @@ function opSweep1(oc, _prev, node, sketches, tracker) {
   if (mode === 'frenet') {
     try { pipe.SetMode_2?.(true) } catch { /* tolerate */ }
   } else if (mode === 'corrected_frenet') {
-    try { pipe.SetMode_5?.(true) } catch { /* fallback to default */ }
+    let setMode5Applied = false
+    try {
+      if (typeof pipe.SetMode_5 === 'function') {
+        pipe.SetMode_5(true)
+        setMode5Applied = true
+      }
+    } catch { /* ignore binding errors */ }
+    if (!setMode5Applied) {
+      // SetMode_5 unavailable on this OpenCASCADE.js build — degraded to
+      // default frame. The geometry is still valid; only frame correction
+      // is missing. degraded:true is emitted so callers can detect this.
+      if (typeof console !== 'undefined') {
+        console.warn('sweep1: SetMode_5 (corrected Frenet) unavailable on this build; degraded to default frame. degraded:true')
+      }
+    }
   }
   // Twist + end-scale law functions. The 4-arg Add overload accepts a
   // `(profile, withContact, withCorrection)` triple — if law bindings aren't

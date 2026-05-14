@@ -97,6 +97,22 @@ feature_sweep1_spec = ToolSpec(
             "path_sketch_path": {"type": "string", "description": "Absolute path of the path .sketch file."},
             "scale": {"type": "number", "description": "Scale factor, default 1.0."},
             "twist_deg": {"type": "number", "description": "Twist along the sweep in degrees."},
+            "mode": {
+                "type": "string",
+                "enum": ["auto", "frenet", "corrected_frenet"],
+                "description": (
+                    "Frame mode for the sweep. "
+                    "'auto' (default) — OCCT's built-in frame, no twist correction. "
+                    "'frenet' — classic Frenet–Serret frame; fast but can exhibit roll on "
+                    "near-inflection paths. "
+                    "'corrected_frenet' — tangent-locked corrected Frenet frame "
+                    "(OCCT SetMode_5); eliminates roll artefacts on coils, jewellery "
+                    "shanks, and any path with high curvature variation. "
+                    "If the OpenCASCADE.js build lacks SetMode_5, the worker silently "
+                    "falls back to the default frame and sets degraded:true in the "
+                    "evaluation result."
+                ),
+            },
             "id": {"type": "string", "description": "Optional explicit node id."},
         },
         "required": ["file_id", "profile_sketch_path", "path_sketch_path"],
@@ -116,6 +132,7 @@ async def run_feature_sweep1(ctx: ProjectCtx, args: bytes) -> str:
     path_sketch_path = a.get("path_sketch_path", "").strip()
     scale = a.get("scale", 1.0)
     twist_deg = a.get("twist_deg", 0.0)
+    mode = a.get("mode", "auto")
     node_id = a.get("id", "").strip()
 
     if not file_id or not profile_sketch_path or not path_sketch_path:
@@ -125,6 +142,13 @@ async def run_feature_sweep1(ctx: ProjectCtx, args: bytes) -> str:
         fid = uuid.UUID(file_id)
     except Exception:
         return err_payload("file_id must be a uuid", "BAD_ARGS")
+
+    mode_clean = mode.strip() if mode else "auto"
+    if mode_clean not in ["auto", "frenet", "corrected_frenet"]:
+        return err_payload(
+            f"mode must be 'auto', 'frenet', or 'corrected_frenet'; got '{mode_clean}'",
+            "BAD_ARGS",
+        )
 
     content, err = read_feature_content(ctx, fid)
     if err:
@@ -140,6 +164,7 @@ async def run_feature_sweep1(ctx: ProjectCtx, args: bytes) -> str:
         "path_sketch_path": path_sketch_path,
         "scale": scale,
         "twist_deg": twist_deg,
+        "mode": mode_clean,
     }
 
     name, nid, err = append_feature_node(ctx, fid, node)

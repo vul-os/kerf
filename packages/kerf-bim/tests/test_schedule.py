@@ -3,7 +3,7 @@ import importlib.util
 import sys
 import types
 
-_TOOLS = "/Users/pc/code/exo/kerf/.claude/worktrees/agent-a32c4befabb8b2b49/kerf-bim/src/kerf_bim/tools"
+_TOOLS = "packages/kerf-bim/src/kerf_bim/tools"
 
 _spec = importlib.util.spec_from_file_location(
     "tools.schedule", f"{_TOOLS}/schedule.py"

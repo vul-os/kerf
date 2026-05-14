@@ -4,7 +4,7 @@ import sys
 import types
 import unittest
 
-_TOOLS = "/Users/pc/code/exo/kerf/.claude/worktrees/agent-a32c4befabb8b2b49/kerf-imports/src/kerf_imports/tools"
+_TOOLS = "packages/kerf-imports/src/kerf_imports/tools"
 _SPEC = importlib.util.spec_from_file_location("tools.sheet_revisions", f"{_TOOLS}/sheet_revisions.py")
 
 _REG_STUB = types.ModuleType("tools.registry")

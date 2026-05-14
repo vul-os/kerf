@@ -1,4 +1,4 @@
-from distributors.service import (
+from kerf_cloud.distributors.service import (
     PROVIDER_MCMASTER,
     DistributorNotSupported,
     DistributorPart,

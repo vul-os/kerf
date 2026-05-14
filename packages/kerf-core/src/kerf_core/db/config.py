@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class DatabaseSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix='KERF_', env_file='.env', env_file_encoding='utf-8')
+    model_config = SettingsConfigDict(env_prefix='KERF_', env_file='.env', env_file_encoding='utf-8', extra='ignore')
 
     database_url: str = "postgres://postgres:postgres@localhost:5432/kerf"
     db_max_conns: int = 10

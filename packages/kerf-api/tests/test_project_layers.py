@@ -1,37 +1,12 @@
-"""
-Tests for project-level layer + display-mode helpers.
-
-All tests operate on plain dicts (no DB / async required).
-We load project_layers.py directly via importlib to avoid the package
-__init__.py which eagerly imports DB config and would fail without env vars.
-"""
-import importlib.util
+"""Tests for project-level layer + display-mode helpers (pure-dict, no DB)."""
 import json
-import os
 import re
-import sys
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
-_BACKEND = os.path.dirname(_HERE)
-_TOOLS = os.path.join(_BACKEND, "tools")
-
-# Load registry + context stubs first so project_layers.py can import them.
-def _load_module(name, path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    mod  = importlib.util.module_from_spec(spec)
-    sys.modules[name] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-if "tools.registry" not in sys.modules:
-    _load_module("tools.registry", os.path.join(_TOOLS, "registry.py"))
-if "tools.context" not in sys.modules:
-    _load_module("tools.context", os.path.join(_TOOLS, "context.py"))
-_pl = _load_module("tools.project_layers", os.path.join(_TOOLS, "project_layers.py"))
-
-_default_canvas  = _pl._default_canvas
-_next_layer_id   = _pl._next_layer_id
-_HEX_RE          = _pl._HEX_RE
+from kerf_api.tools.project_layers import (
+    _default_canvas,
+    _next_layer_id,
+    _HEX_RE,
+)
 
 
 # ---------------------------------------------------------------------------

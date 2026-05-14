@@ -1,65 +1,24 @@
-"""
-Tests for subd.py LLM tools.
-
-Uses importlib.util.spec_from_file_location to avoid the tools/__init__.py
-db-import chain (same pattern as test_feature_helix.py, test_project_layers.py).
-"""
+"""Tests for subd.py LLM tools."""
 import json
 import math
-import sys
-import os
 import uuid
 import asyncio
-import importlib.util
 
-_BACKEND = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), "backend")
-_PLUGIN_TOOLS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src", "kerf_imports", "tools")
-
-
-def _load(rel):
-    path = os.path.join(_BACKEND, rel)
-    spec = importlib.util.spec_from_file_location(
-        rel.replace("/", ".").replace(".py", ""), path
-    )
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-def _load_plugin(filename):
-    path = os.path.join(_PLUGIN_TOOLS, filename)
-    name = "tools." + filename.replace(".py", "")
-    spec = importlib.util.spec_from_file_location(name, path)
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[name] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-_registry_mod = sys.modules.get("tools.registry") or _load("tools/registry.py")
-_context_mod = sys.modules.get("tools.context") or _load("tools/context.py")
-sys.modules.setdefault("tools.registry", _registry_mod)
-sys.modules.setdefault("tools.context", _context_mod)
-
-_subd_mod = _load_plugin("subd.py")
-
-# Expose helpers
-_cube_mesh = _subd_mod._cube_mesh
-_sphere_mesh = _subd_mod._sphere_mesh
-_cylinder_mesh = _subd_mod._cylinder_mesh
-_cc_once = _subd_mod._cc_once
-_subdivide_mesh = _subd_mod._subdivide_mesh
-_triangulate_display_mesh = _subd_mod._triangulate_display_mesh
-_edge_key = _subd_mod._edge_key
-
-run_create_subd = _subd_mod.run_create_subd
-run_subdivide_subd = _subd_mod.run_subdivide_subd
-run_extrude_face_subd = _subd_mod.run_extrude_face_subd
-run_bevel_edge_subd = _subd_mod.run_bevel_edge_subd
-run_set_edge_crease = _subd_mod.run_set_edge_crease
-
-ProjectCtx = _context_mod.ProjectCtx
+from kerf_core.utils.context import ProjectCtx
+from kerf_imports.tools.subd import (
+    _cube_mesh,
+    _sphere_mesh,
+    _cylinder_mesh,
+    _cc_once,
+    _subdivide_mesh,
+    _triangulate_display_mesh,
+    _edge_key,
+    run_create_subd,
+    run_subdivide_subd,
+    run_extrude_face_subd,
+    run_bevel_edge_subd,
+    run_set_edge_crease,
+)
 
 
 # ── FakePool / ctx factory ────────────────────────────────────────────────────

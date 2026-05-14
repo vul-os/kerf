@@ -1,12 +1,6 @@
 import json
 import pytest
-import importlib.util
-
-spec = importlib.util.spec_from_file_location("via_stitching", "/Users/pc/code/exo/kerf/.claude/worktrees/agent-a32c4befabb8b2b49/kerf-electronics/src/kerf_electronics/tools/via_stitching.py")
-mod = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(mod)
-
-via_stitching = mod
+from kerf_electronics.tools import via_stitching
 
 
 def board():
@@ -213,7 +207,7 @@ async def test_apply_teardrops_preserves_original():
 def test_teardrop_path_points_numeric():
     pad = {"x": 10.0, "y": 10.0, "width": 1.6}
     trace = {"route": [{"x": 5, "y": 10}, {"x": 15, "y": 10}], "width": 0.25}
-    path = mod._teardrop_for_pad_via(pad, trace, 1.5)
+    path = via_stitching._teardrop_for_pad_via(pad, trace, 1.5)
     assert path is not None
     assert len(path) == 3
     for pt in path:

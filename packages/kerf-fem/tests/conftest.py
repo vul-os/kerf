@@ -1,7 +1,17 @@
-"""Add src/ to the Python path so kerf_fem is importable without pip install."""
+"""Pytest config: add every plugin's src/ to sys.path so kerf_*.* imports
+resolve without requiring `pip install -e` of each plugin.
+"""
+import os
 import sys
-from pathlib import Path
 
-src = Path(__file__).parent.parent / "src"
-if str(src) not in sys.path:
-    sys.path.insert(0, str(src))
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_PLUGIN_ROOT = os.path.dirname(_HERE)
+_PACKAGES_ROOT = os.path.dirname(_PLUGIN_ROOT)
+
+if os.path.basename(_PACKAGES_ROOT) == "packages":
+    for entry in os.listdir(_PACKAGES_ROOT):
+        if not entry.startswith("kerf-"):
+            continue
+        src = os.path.join(_PACKAGES_ROOT, entry, "src")
+        if os.path.isdir(src) and src not in sys.path:
+            sys.path.insert(0, src)

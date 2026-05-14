@@ -44,7 +44,6 @@ def _register_tools(ctx) -> None:
         "kerf_api.tools.configurations",
         "kerf_api.tools.equations",
         "kerf_api.tools.validation",
-        "kerf_api.tools.layers",
         "kerf_api.tools.project_layers",
         "kerf_api.tools.material",
     ]

@@ -1,7 +1,7 @@
 """test_draft.py — pytest suite for the Draft workbench engine and LLM tools."""
 import importlib.util, sys, types, unittest
 
-_spec = importlib.util.spec_from_file_location("tools.draft", "/Users/pc/code/exo/kerf/.claude/worktrees/agent-a32c4befabb8b2b49/kerf-imports/src/kerf_imports/tools/draft.py")
+_spec = importlib.util.spec_from_file_location("tools.draft", "packages/kerf-imports/src/kerf_imports/tools/draft.py")
 _mod = types.ModuleType("tools.draft")
 
 _reg_stub = types.ModuleType("tools.registry")

@@ -8,7 +8,7 @@ from typing import Optional
 
 import aiohttp
 
-from distributors.service import (
+from kerf_cloud.distributors.service import (
     ALL_PROVIDERS,
     PROVIDER_DIGIKEY,
     PROVIDER_LCSC,
@@ -128,19 +128,19 @@ class Registry:
 
     def _build_service(self, name: str, creds: Credentials) -> Service:
         if name == PROVIDER_DIGIKEY:
-            from distributors.digikey import DigiKeyService
+            from kerf_cloud.distributors.digikey import DigiKeyService
 
             return DigiKeyService(creds, self._http_timeout.total)
         elif name == PROVIDER_MOUSER:
-            from distributors.mouser import MouserService
+            from kerf_cloud.distributors.mouser import MouserService
 
             return MouserService(creds, self._http_timeout.total)
         elif name == PROVIDER_LCSC:
-            from distributors.lcsc import LCSCService
+            from kerf_cloud.distributors.lcsc import LCSCService
 
             return LCSCService(creds, self._http_timeout.total, self._fx)
         elif name == PROVIDER_MCMASTER:
-            from distributors.mcmaster import McMasterService
+            from kerf_cloud.distributors.mcmaster import McMasterService
 
             return McMasterService()
         else:

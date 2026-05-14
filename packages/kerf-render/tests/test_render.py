@@ -1,61 +1,19 @@
-"""
-test_render.py — pytest suite for tools/render.py.
-
-Uses importlib.util.spec_from_file_location to load the module without
-triggering the tools/__init__.py database chain (same pattern as test_mesh.py).
-"""
-
+"""Tests for kerf_render tools."""
 import asyncio
-import importlib.util
 import json
-import os
-import sys
-import types
 import uuid
 
-_BACKEND = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), "backend")
-_PLUGIN_TOOLS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src", "kerf_render")
-
-
-def _load(rel):
-    path = os.path.join(_BACKEND, rel)
-    spec = importlib.util.spec_from_file_location(
-        rel.replace("/", ".").replace(".py", ""), path
-    )
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-def _load_plugin(filename):
-    path = os.path.join(_PLUGIN_TOOLS, filename)
-    name = "tools." + filename.replace(".py", "")
-    spec = importlib.util.spec_from_file_location(name, path)
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[name] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-_registry_mod = sys.modules.get("tools.registry") or _load("tools/registry.py")
-_context_mod  = sys.modules.get("tools.context")  or _load("tools/context.py")
-sys.modules.setdefault("tools.registry", _registry_mod)
-sys.modules.setdefault("tools.context",  _context_mod)
-
-_render_mod = _load_plugin("tools.py")
-
-# Expose symbols under test
-_default_render_doc       = _render_mod._default_render_doc
-_parse                    = _render_mod._parse
-_serialize                = _render_mod._serialize
-create_render             = _render_mod.create_render
-set_render_camera         = _render_mod.set_render_camera
-add_render_light          = _render_mod.add_render_light
-set_render_material_override = _render_mod.set_render_material_override
-run_render                = _render_mod.run_render
-
-ProjectCtx = _context_mod.ProjectCtx
+from kerf_core.utils.context import ProjectCtx
+from kerf_render.tools import (
+    _default_render_doc,
+    _parse,
+    _serialize,
+    create_render,
+    set_render_camera,
+    add_render_light,
+    set_render_material_override,
+    run_render,
+)
 
 
 # ─── helpers ──────────────────────────────────────────────────────────────────

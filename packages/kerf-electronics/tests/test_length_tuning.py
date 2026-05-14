@@ -25,7 +25,7 @@ sys.modules["tools.registry"] = _reg_stub
 
 _spec = importlib.util.spec_from_file_location(
     "tools.length_tuning",
-    "/Users/pc/code/exo/kerf/.claude/worktrees/agent-a32c4befabb8b2b49/kerf-electronics/src/kerf_electronics/tools/length_tuning.py",
+    "packages/kerf-electronics/src/kerf_electronics/tools/length_tuning.py",
 )
 _mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_mod)

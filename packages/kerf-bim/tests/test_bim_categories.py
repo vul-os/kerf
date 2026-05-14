@@ -7,7 +7,7 @@ import json
 import sys
 import types
 
-_TOOLS = "/Users/pc/code/exo/kerf/.claude/worktrees/agent-a32c4befabb8b2b49/kerf-bim/src/kerf_bim/tools"
+_TOOLS = "packages/kerf-bim/src/kerf_bim/tools"
 
 # ── Stub dependencies so @register calls don't blow up ────────────────────────
 

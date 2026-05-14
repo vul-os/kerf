@@ -162,7 +162,7 @@ kerf-workers = { workspace = true }
 # tree (which still hosts shared tools/ / workers/ / utils/ used by plugins
 # until the next migration pass).
 testpaths = [
-    "backend/tests",
+    
     "packages/kerf-core/tests",
     "packages/kerf-auth/tests",
     "packages/kerf-api/tests",
@@ -181,7 +181,7 @@ testpaths = [
     "packages/kerf-imports/tests",
     "packages/kerf-render/tests",
     "packages/kerf-workers/tests",
-    "pyworker/tests",
+    
 ]
 asyncio_mode = "auto"
 # importlib mode lets multiple plugin tests/ dirs coexist without conflicting

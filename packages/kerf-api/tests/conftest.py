@@ -1,20 +1,17 @@
+"""Pytest config: add every plugin's src/ to sys.path so kerf_*.* imports
+resolve without requiring `pip install -e` of each plugin.
 """
-Ensure both backend/ and the plugin's src/ are on sys.path so that:
-- bare 'tools.*' imports in migrated tool modules resolve correctly
-- plugin package imports (kerf_api.*) resolve from src/
-"""
-import sys
 import os
+import sys
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-_PLUGIN_ROOT = os.path.dirname(_HERE)        # e.g. packages/kerf-api/
-_parent = os.path.dirname(_PLUGIN_ROOT)
-# Handle both flat layout (kerf-X/ directly in repo root) and
-# monorepo layout (packages/kerf-X/ inside packages/).
-_REPO_ROOT = os.path.dirname(_parent) if os.path.basename(_parent) == "packages" else _parent
-_BACKEND = os.path.join(_REPO_ROOT, "backend")
-_SRC = os.path.join(_PLUGIN_ROOT, "src")
+_PLUGIN_ROOT = os.path.dirname(_HERE)
+_PACKAGES_ROOT = os.path.dirname(_PLUGIN_ROOT)
 
-for p in (_BACKEND, _SRC):
-    if p not in sys.path:
-        sys.path.insert(0, p)
+if os.path.basename(_PACKAGES_ROOT) == "packages":
+    for entry in os.listdir(_PACKAGES_ROOT):
+        if not entry.startswith("kerf-"):
+            continue
+        src = os.path.join(_PACKAGES_ROOT, entry, "src")
+        if os.path.isdir(src) and src not in sys.path:
+            sys.path.insert(0, src)

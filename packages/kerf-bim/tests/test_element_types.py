@@ -3,11 +3,12 @@ import importlib.util
 import sys
 import types
 import json
+import uuid
 import asyncio
 
 
 _spec = importlib.util.spec_from_file_location(
-    "tools.element_types", "/Users/pc/code/exo/kerf/.claude/worktrees/agent-a32c4befabb8b2b49/kerf-bim/src/kerf_bim/tools/element_types.py"
+    "tools.element_types", "packages/kerf-bim/src/kerf_bim/tools/element_types.py"
 )
 _reg_stub = types.ModuleType("tools.registry")
 _reg_stub.ToolSpec = type("ToolSpec", (), {"__init__": lambda s, **kw: s.__dict__.update(kw)})
@@ -96,6 +97,8 @@ class MockCtx:
     def __init__(self, pool, project_id="proj-1"):
         self.pool = pool
         self.project_id = project_id
+        self.file_revisions_max = 200
+        self.user_id = uuid.uuid4()
 
 
 WINDOW_FAMILY = {

@@ -103,7 +103,7 @@ async def record_revision_for_file(ctx: ProjectCtx, file_id: uuid.UUID, content:
         file_id,
     )
 
-    user_id = ctx.user_id if ctx.user_id != uuid.Nil else None
+    user_id = ctx.user_id if ctx.user_id != uuid.UUID(int=0) else None
 
     if latest is None or latest["kind"] == "base":
         diffs_after = 0

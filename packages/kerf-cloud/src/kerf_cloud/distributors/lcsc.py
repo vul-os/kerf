@@ -6,7 +6,7 @@ from typing import Optional
 
 import aiohttp
 
-from distributors.service import (
+from kerf_cloud.distributors.service import (
     PROVIDER_LCSC,
     Credentials,
     DistributorNotFound,

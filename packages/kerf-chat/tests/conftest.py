@@ -1,20 +1,17 @@
+"""Pytest config: add every plugin's src/ to sys.path so kerf_*.* imports
+resolve without requiring `pip install -e` of each plugin.
 """
-Ensure both backend/ and kerf-chat/src/ are on sys.path so that:
-- bare 'tools.*' imports in kerf_chat.tools modules resolve to backend/tools
-- package imports (kerf_chat.*) resolve from src/
-
-This mirrors the pattern used by kerf-bim/conftest.py.
-"""
-import sys
 import os
+import sys
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-_PLUGIN_ROOT = os.path.dirname(_HERE)                            # packages/kerf-chat/
-_PACKAGES = os.path.dirname(_PLUGIN_ROOT)                       # packages/
-_REPO_ROOT = os.path.dirname(_PACKAGES)                         # worktree root
-_BACKEND = os.path.join(_REPO_ROOT, "backend")
-_SRC = os.path.join(_PLUGIN_ROOT, "src")
+_PLUGIN_ROOT = os.path.dirname(_HERE)
+_PACKAGES_ROOT = os.path.dirname(_PLUGIN_ROOT)
 
-for p in (_BACKEND, _SRC):
-    if p not in sys.path:
-        sys.path.insert(0, p)
+if os.path.basename(_PACKAGES_ROOT) == "packages":
+    for entry in os.listdir(_PACKAGES_ROOT):
+        if not entry.startswith("kerf-"):
+            continue
+        src = os.path.join(_PACKAGES_ROOT, entry, "src")
+        if os.path.isdir(src) and src not in sys.path:
+            sys.path.insert(0, src)

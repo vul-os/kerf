@@ -49,7 +49,7 @@ def _load_module():
 
     spec = importlib.util.spec_from_file_location(
         "tools.import_3dm",
-        "/Users/pc/code/exo/kerf/.claude/worktrees/agent-a32c4befabb8b2b49/kerf-imports/src/kerf_imports/tools/import_3dm.py",
+        "packages/kerf-imports/src/kerf_imports/tools/import_3dm.py",
     )
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)

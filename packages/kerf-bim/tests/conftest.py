@@ -1,14 +1,17 @@
-"""Pytest config for kerf-bim tests.
-
-Ensures plugin src/ is on sys.path so test files can import kerf_bim.*
-directly without requiring `pip install -e`.
+"""Pytest config: add every plugin's src/ to sys.path so kerf_*.* imports
+resolve without requiring `pip install -e` of each plugin.
 """
-import sys
 import os
+import sys
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _PLUGIN_ROOT = os.path.dirname(_HERE)
-_SRC = os.path.join(_PLUGIN_ROOT, "src")
+_PACKAGES_ROOT = os.path.dirname(_PLUGIN_ROOT)
 
-if _SRC not in sys.path:
-    sys.path.insert(0, _SRC)
+if os.path.basename(_PACKAGES_ROOT) == "packages":
+    for entry in os.listdir(_PACKAGES_ROOT):
+        if not entry.startswith("kerf-"):
+            continue
+        src = os.path.join(_PACKAGES_ROOT, entry, "src")
+        if os.path.isdir(src) and src not in sys.path:
+            sys.path.insert(0, src)

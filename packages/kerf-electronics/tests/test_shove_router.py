@@ -4,7 +4,7 @@ import sys
 import types
 
 _spec = importlib.util.spec_from_file_location(
-    "tools.shove_router", "/Users/pc/code/exo/kerf/.claude/worktrees/agent-a32c4befabb8b2b49/kerf-electronics/src/kerf_electronics/tools/shove_router.py"
+    "tools.shove_router", "packages/kerf-electronics/src/kerf_electronics/tools/shove_router.py"
 )
 _mod = importlib.util.module_from_spec(_spec)
 

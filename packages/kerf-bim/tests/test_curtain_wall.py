@@ -19,7 +19,7 @@ _prev_registry = sys.modules.get("tools.registry")
 sys.modules["tools.registry"] = _reg_stub
 
 _spec = importlib.util.spec_from_file_location(
-    "tools.curtain_wall", "/Users/pc/code/exo/kerf/.claude/worktrees/agent-a32c4befabb8b2b49/kerf-bim/src/kerf_bim/tools/curtain_wall.py"
+    "tools.curtain_wall", "packages/kerf-bim/src/kerf_bim/tools/curtain_wall.py"
 )
 _mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_mod)

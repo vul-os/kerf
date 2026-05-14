@@ -13,20 +13,26 @@
 // optimistically treat the project as un-listed and let the publish
 // endpoint handle idempotency.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertCircle, Globe, Loader2, X } from 'lucide-react'
+import { AlertCircle, Globe, Loader2, RotateCcw, X } from 'lucide-react'
 import Button from '../components/Button.jsx'
 import Input, { Textarea } from '../components/Input.jsx'
 import WorkshopImageGallery from '../components/WorkshopImageGallery.jsx'
-import { ApiError } from '../lib/api.js'
+import { api, ApiError } from '../lib/api.js'
 import { workshop } from './api.js'
 
-function PublishModal({ open, onClose, project, onPublished }) {
+// PublishModal accepts an optional `captureSnapshot` async function from the
+// Editor. When provided, "Refresh thumbnail" calls it to re-snap the current
+// view and upload to projects/:pid/thumbnail.
+function PublishModal({ open, onClose, project, onPublished, captureSnapshot }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
+  const [thumbRefreshing, setThumbRefreshing] = useState(false)
+  const [thumbToast, setThumbToast] = useState(null)
+  const toastTimerRef = useRef(null)
 
   useEffect(() => {
     if (!open) return
@@ -34,7 +40,26 @@ function PublishModal({ open, onClose, project, onPublished }) {
     setDescription(project?.description || '')
     setError(null)
     setSubmitting(false)
+    setThumbToast(null)
   }, [open, project?.id, project?.name, project?.description])
+
+  const onRefreshThumbnail = async () => {
+    if (!captureSnapshot || thumbRefreshing || !project?.id) return
+    setThumbRefreshing(true)
+    try {
+      const blob = await captureSnapshot({ size: 512, quality: 0.7 })
+      if (blob) {
+        await api.uploadProjectThumbnail(project.id, blob)
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+        setThumbToast('Thumbnail updated')
+        toastTimerRef.current = setTimeout(() => setThumbToast(null), 3000)
+      }
+    } catch (err) {
+      console.warn('[PublishModal] thumbnail refresh failed', err)
+    } finally {
+      setThumbRefreshing(false)
+    }
+  }
 
   if (!open) return null
 
@@ -103,7 +128,24 @@ function PublishModal({ open, onClose, project, onPublished }) {
             placeholder="What is it? Who's it for?"
           />
           {project?.id && (
-            <div className="pt-1">
+            <div className="pt-1 flex flex-col gap-3">
+              {captureSnapshot && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={onRefreshThumbnail}
+                    disabled={thumbRefreshing}
+                    className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded bg-ink-800 border border-ink-700 text-ink-200 hover:bg-ink-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {thumbRefreshing
+                      ? <><Loader2 size={12} className="animate-spin" /> Refreshing…</>
+                      : <><RotateCcw size={12} /> Refresh thumbnail</>}
+                  </button>
+                  {thumbToast && (
+                    <span className="text-xs text-emerald-400 font-mono">{thumbToast}</span>
+                  )}
+                </div>
+              )}
               <WorkshopImageGallery projectId={project.id} />
             </div>
           )}
@@ -141,7 +183,10 @@ function PublishModal({ open, onClose, project, onPublished }) {
   )
 }
 
-export function PublishButton({ project, existingSlug, onChange, size = 'sm', variant = 'ghost' }) {
+// captureSnapshot: optional async () => Blob|null, forwarded from the Editor's
+// currentViewRef.snapshot(). When absent, the "Refresh thumbnail" affordance
+// in the modal is hidden.
+export function PublishButton({ project, existingSlug, onChange, size = 'sm', variant = 'ghost', captureSnapshot }) {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [slug, setSlug] = useState(existingSlug || null)
@@ -195,6 +240,7 @@ export function PublishButton({ project, existingSlug, onChange, size = 'sm', va
         onClose={() => setOpen(false)}
         project={project}
         onPublished={onPublished}
+        captureSnapshot={captureSnapshot}
       />
     </>
   )

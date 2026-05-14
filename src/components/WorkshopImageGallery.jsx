@@ -15,7 +15,7 @@
 // server sees a flat sequence (0..N-1) afterwards.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { GripVertical, Plus, Trash2, Loader2, AlertCircle, Image as ImageIcon } from 'lucide-react'
+import { GripVertical, Plus, Trash2, Loader2, AlertCircle, Image as ImageIcon, Star } from 'lucide-react'
 import { api, ApiError } from '../lib/api.js'
 
 const MAX_IMAGES = 10
@@ -103,6 +103,36 @@ export default function WorkshopImageGallery({ projectId, readOnly = false }) {
     }
   }
 
+  const onSetPrimary = async (image) => {
+    if (readOnly) return
+    // Optimistically update — toggle: if already primary, unpin; else pin.
+    const wasPrimary = image.is_primary
+    setImages((prev) =>
+      prev.map((x) => ({
+        ...x,
+        // Clear any existing primary, then set/unset the target.
+        is_primary: x.id === image.id ? !wasPrimary : false,
+      })),
+    )
+    try {
+      const updated = await api.workshopImages.setPrimary(projectId, image.id)
+      // Server is authoritative — sync the target row; clear others.
+      setImages((prev) =>
+        prev.map((x) =>
+          x.id === updated.id
+            ? { ...x, is_primary: updated.is_primary }
+            : { ...x, is_primary: false },
+        ),
+      )
+    } catch (err) {
+      // Revert on failure.
+      setImages((prev) =>
+        prev.map((x) => ({ ...x, is_primary: x.id === image.id ? wasPrimary : x.is_primary })),
+      )
+      setError(err instanceof ApiError ? err.message : 'Could not update primary image.')
+    }
+  }
+
   // ----- Drag/drop reorder -----
   const onDragStart = (id) => setDragId(id)
   const onDragEnd = () => setDragId(null)
@@ -174,6 +204,13 @@ export default function WorkshopImageGallery({ projectId, readOnly = false }) {
         />
       </div>
 
+      {!readOnly && images.length > 0 && (
+        <div className="flex items-center gap-1.5 text-[10px] text-ink-400 font-mono">
+          <Star size={10} className="text-amber-400 fill-amber-400 shrink-0" />
+          <span>Click the star on a card to pin it as your primary cover image. Otherwise we use the auto-captured thumbnail.</span>
+        </div>
+      )}
+
       {error && (
         <div className="flex items-start gap-2 rounded border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
           <AlertCircle size={13} className="mt-0.5 shrink-0" />
@@ -203,7 +240,7 @@ export default function WorkshopImageGallery({ projectId, readOnly = false }) {
               onDrop={() => onDrop(img.id)}
               className={[
                 'group relative rounded-lg overflow-hidden border bg-ink-900',
-                dragId === img.id ? 'border-kerf-300/60 opacity-60' : 'border-ink-700',
+                img.is_primary ? 'border-amber-400/60' : (dragId === img.id ? 'border-kerf-300/60 opacity-60' : 'border-ink-700'),
                 readOnly ? '' : 'cursor-grab',
               ].join(' ')}
             >
@@ -215,6 +252,23 @@ export default function WorkshopImageGallery({ projectId, readOnly = false }) {
                   draggable={false}
                 />
               </div>
+              {/* Primary badge — always visible when pinned, hover-only otherwise */}
+              {!readOnly && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onSetPrimary(img) }}
+                  aria-label={img.is_primary ? 'Unpin as primary' : 'Pin as primary image'}
+                  title={img.is_primary ? 'Primary cover — click to unpin' : 'Set as primary cover image'}
+                  className={[
+                    'absolute bottom-1.5 right-1.5 p-1 rounded transition-opacity',
+                    img.is_primary
+                      ? 'bg-amber-400/20 text-amber-300 opacity-100'
+                      : 'bg-ink-950/80 text-ink-400 hover:text-amber-300 opacity-0 group-hover:opacity-100',
+                  ].join(' ')}
+                >
+                  <Star size={13} className={img.is_primary ? 'fill-amber-400 stroke-amber-400' : ''} />
+                </button>
+              )}
               {!readOnly && (
                 <>
                   <div className="absolute top-1.5 left-1.5 px-1 py-0.5 rounded bg-ink-950/80 text-ink-300 opacity-0 group-hover:opacity-100 transition-opacity">

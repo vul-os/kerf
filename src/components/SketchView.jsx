@@ -81,6 +81,7 @@ const CONSTRAINTS = [
   { id: 'equal_length',     key: '',    icon: Equal,          label: 'Equal length' },
   { id: 'equal_radius',     key: '',    icon: Equal,          label: 'Equal radius' },
   { id: 'symmetric',        key: '',    icon: FlipHorizontal2, label: 'Symmetric (2 pts + line)' },
+  { id: 'symmetric_over_line', key: '', icon: FlipHorizontal2, label: 'Symmetric over construction line' },
   { id: 'block',            key: '',    icon: Pin,            label: 'Block (pin in place)' },
   { id: 'point_on_line',    key: '',    icon: Magnet,         label: 'Point on line' },
   { id: 'point_on_circle',  key: '',    icon: CircleDot,      label: 'Point on circle' },
@@ -681,6 +682,34 @@ export default function SketchView({
       const lns = sel.filter(isLine)
       if (ps.length >= 2 && lns.length >= 1) {
         ;({ sketch: next } = addConstraint(sketch, 'symmetric', { a: ps[0], b: ps[1], line: lns[0] }))
+      }
+    } else if (kind === 'symmetric_over_line') {
+      // Need 2 entities (any kind) + 1 construction line.
+      // The construction line is identified as the line with construction=true
+      // if available, otherwise the last selected line entity.
+      const ent = sketch.entities || []
+      const get = (id) => ent.find((e) => e.id === id)
+      const lns = sel.filter(isLine)
+      // Prefer construction lines; fall back to any line.
+      const constructionLns = lns.filter((id) => get(id)?.construction)
+      const lineId = constructionLns[0] ?? lns[0]
+      // The two entities to mirror are the non-line items, or non-construction
+      // items when all selected are lines.
+      let nonLineIds = sel.filter((id) => !lns.includes(id))
+      if (nonLineIds.length < 2 && lns.length >= 3) {
+        // All selection is lines: the two non-construction lines are the entities.
+        const nonConstructionLns = lns.filter((id) => !get(id)?.construction)
+        nonLineIds = nonConstructionLns.slice(0, 2)
+      } else if (nonLineIds.length < 2 && lns.length >= 2) {
+        // Mix: pull pairs from available lines.
+        nonLineIds = lns.filter((id) => id !== lineId).slice(0, 2)
+      }
+      if (nonLineIds.length >= 2 && lineId) {
+        ;({ sketch: next } = addConstraint(sketch, 'symmetric_over_line', {
+          entity_a_id: nonLineIds[0],
+          entity_b_id: nonLineIds[1],
+          construction_line_id: lineId,
+        }))
       }
     } else if (kind === 'block') {
       // Pin everything in the selection in place.
@@ -1712,6 +1741,13 @@ function SketchEntities({ sketch, view, worldToScreen, selection, conflicts, sta
           onDragStart={onDimensionDragStart}
         />
       ))}
+      {/* Symmetric-over-line glyph badges */}
+      {cons.filter((c) => c.type === 'symmetric_over_line').map((c) => (
+        <SymmetricOverLineGlyph
+          key={'sol-' + c.id} c={c} sketch={sketch}
+          worldToScreen={worldToScreen}
+        />
+      ))}
       {/* Pulse overlay — when the user clicks a constraint row in the
           sidebar, we briefly outline the affected entities with a pulsing
           colored stroke. CSS-driven so the outline animates smoothly even
@@ -1824,6 +1860,40 @@ function DimensionLabel({ c, sketch, worldToScreen, onDragStart }) {
       <rect x={-w / 2} y={-8} width={w} height={14} rx={2}
         fill="rgba(15,18,23,0.92)" stroke="#3a4150" />
       <text x={0} y={3} textAnchor="middle" fontSize={9} fill="#cbd1da">{label}</text>
+    </g>
+  )
+}
+
+// SymmetricOverLineGlyph — renders a small ⟺ mirror badge at the midpoint of
+// the construction line for each symmetric_over_line constraint. Hovering the
+// badge highlights all three involved entities (entity_a, entity_b, the line).
+function SymmetricOverLineGlyph({ c, sketch, worldToScreen, onHover }) {
+  if (c.type !== 'symmetric_over_line') return null
+  const ent = sketch.entities || []
+  const lineEnt = ent.find((e) => e.id === c.construction_line_id)
+  if (!lineEnt || lineEnt.type !== 'line') return null
+  const pointById = new Map()
+  for (const e of ent) if (e.type === 'point') pointById.set(e.id, e)
+  const lp1 = pointById.get(lineEnt.p1)
+  const lp2 = pointById.get(lineEnt.p2)
+  if (!lp1 || !lp2) return null
+  const mx = (lp1.x + lp2.x) / 2
+  const my = (lp1.y + lp2.y) / 2
+  const s = worldToScreen(mx, my)
+  return (
+    <g
+      transform={`translate(${s.x},${s.y})`}
+      style={{ cursor: 'default', pointerEvents: 'all' }}
+      onMouseEnter={() => onHover?.(c.id)}
+      onMouseLeave={() => onHover?.(null)}
+    >
+      {/* Background badge */}
+      <rect x={-9} y={-7} width={18} height={14} rx={3}
+        fill="rgba(15,18,23,0.88)" stroke="#6b7280" strokeWidth={0.8} />
+      {/* ⟺ glyph: two horizontal arrows */}
+      <line x1={-5} y1={0} x2={5} y2={0} stroke="#a3a8b3" strokeWidth={1.2} />
+      <polyline points="-5,0 -2,-2.5 -2,2.5 -5,0" fill="#a3a8b3" stroke="none" />
+      <polyline points="5,0 2,-2.5 2,2.5 5,0" fill="#a3a8b3" stroke="none" />
     </g>
   )
 }

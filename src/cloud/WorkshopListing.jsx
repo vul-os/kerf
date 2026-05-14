@@ -9,6 +9,8 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import {
   AlertCircle,
   ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
   GitFork,
   Heart,
   Loader2,
@@ -21,7 +23,7 @@ import Layout from '../components/Layout.jsx'
 import Card from '../components/Card.jsx'
 import Button from '../components/Button.jsx'
 import Input from '../components/Input.jsx'
-import { ApiError } from '../lib/api.js'
+import { api, ApiError } from '../lib/api.js'
 import { useAuth } from '../store/auth.js'
 import { workshop } from './api.js'
 
@@ -126,6 +128,89 @@ function ForkDialog({ open, onClose, listing, onForked }) {
   )
 }
 
+// ImageCarousel — gallery viewer for project_workshop_images. Falls
+// back to the single thumbnail_url when no gallery images exist so the
+// detail page never renders a blank hero. Cycles via prev/next + thumbnail
+// strip; arrow keys are intentionally not wired (we share the focus
+// surface with the rest of the page).
+function ImageCarousel({ slides, fallbackUrl }) {
+  const list = slides && slides.length > 0
+    ? slides
+    : (fallbackUrl ? [{ url: fallbackUrl, caption: null, _fallback: true }] : [])
+  const [idx, setIdx] = useState(0)
+
+  useEffect(() => { setIdx(0) }, [slides?.length])
+
+  if (list.length === 0) {
+    return (
+      <div className="aspect-[16/10] w-full grid place-items-center bg-gradient-to-br from-ink-800 via-ink-850 to-ink-900">
+        <Sparkles size={36} className="text-kerf-300/60" />
+      </div>
+    )
+  }
+
+  const active = list[Math.min(idx, list.length - 1)]
+  const go = (delta) => setIdx((i) => (i + delta + list.length) % list.length)
+
+  return (
+    <div className="flex flex-col">
+      <div className="relative aspect-[16/10] bg-ink-800">
+        <img
+          src={active.url}
+          alt={active.caption || ''}
+          className="w-full h-full object-cover"
+        />
+        {list.length > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={() => go(-1)}
+              aria-label="Previous image"
+              className="absolute left-2 top-1/2 -translate-y-1/2 grid place-items-center w-9 h-9 rounded-full bg-ink-950/70 text-ink-100 hover:bg-ink-950"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <button
+              type="button"
+              onClick={() => go(1)}
+              aria-label="Next image"
+              className="absolute right-2 top-1/2 -translate-y-1/2 grid place-items-center w-9 h-9 rounded-full bg-ink-950/70 text-ink-100 hover:bg-ink-950"
+            >
+              <ChevronRight size={18} />
+            </button>
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-ink-950/70 text-[10px] font-mono text-ink-200">
+              {idx + 1} / {list.length}
+            </div>
+          </>
+        )}
+        {active.caption && (
+          <div className="absolute bottom-2 right-2 max-w-[55%] px-2 py-1 rounded bg-ink-950/70 text-[11px] text-ink-100">
+            {active.caption}
+          </div>
+        )}
+      </div>
+      {list.length > 1 && (
+        <div className="flex gap-1.5 overflow-x-auto px-2 py-2 bg-ink-900/60">
+          {list.map((s, i) => (
+            <button
+              key={s.id || s.url}
+              type="button"
+              onClick={() => setIdx(i)}
+              aria-label={`Show image ${i + 1}`}
+              className={[
+                'flex-shrink-0 w-16 h-12 rounded overflow-hidden border-2 transition-colors',
+                i === idx ? 'border-kerf-300' : 'border-ink-800 hover:border-ink-600',
+              ].join(' ')}
+            >
+              <img src={s.url} alt="" className="w-full h-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function WorkshopListing() {
   const { slug } = useParams()
   const navigate = useNavigate()
@@ -137,16 +222,26 @@ export function WorkshopListing() {
   const [error, setError] = useState(null)
   const [likeBusy, setLikeBusy] = useState(false)
   const [forkOpen, setForkOpen] = useState(false)
+  const [galleryImages, setGalleryImages] = useState([])
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
+    setGalleryImages([])
     workshop
       .get(slug)
       .then((resp) => {
         if (cancelled) return
         setListing(resp)
         setError(null)
+        // Fetch the multi-image gallery in parallel — failures here are
+        // non-fatal (the carousel falls back to the single thumbnail).
+        const pid = resp?.project_id
+        if (pid) {
+          api.workshopImages.list(pid).then((g) => {
+            if (!cancelled) setGalleryImages(g?.images || [])
+          }).catch(() => {})
+        }
       })
       .catch((err) => {
         if (cancelled) return
@@ -242,19 +337,7 @@ export function WorkshopListing() {
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 flex flex-col gap-6">
             <Card className="overflow-hidden">
-              <div className="aspect-[16/10] bg-ink-800">
-                {listing.thumbnail_url ? (
-                  <img
-                    src={listing.thumbnail_url}
-                    alt={listing.title}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full grid place-items-center bg-gradient-to-br from-ink-800 via-ink-850 to-ink-900">
-                    <Sparkles size={36} className="text-kerf-300/60" />
-                  </div>
-                )}
-              </div>
+              <ImageCarousel slides={galleryImages} fallbackUrl={listing.thumbnail_url} />
             </Card>
 
             <Card className="p-6">

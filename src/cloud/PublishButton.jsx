@@ -18,6 +18,7 @@ import { useNavigate } from 'react-router-dom'
 import { AlertCircle, Globe, Loader2, X } from 'lucide-react'
 import Button from '../components/Button.jsx'
 import Input, { Textarea } from '../components/Input.jsx'
+import WorkshopImageGallery from '../components/WorkshopImageGallery.jsx'
 import { ApiError } from '../lib/api.js'
 import { workshop } from './api.js'
 
@@ -60,8 +61,8 @@ function PublishModal({ open, onClose, project, onPublished }) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-center px-4">
       <div className="absolute inset-0 bg-ink-950/80 backdrop-blur-sm" onClick={onClose} aria-hidden />
-      <div className="relative w-full max-w-md bg-ink-900 border border-ink-800 rounded-2xl shadow-2xl shadow-black/50">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-ink-800">
+      <div className="relative w-full max-w-2xl bg-ink-900 border border-ink-800 rounded-2xl shadow-2xl shadow-black/50 max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-ink-800 flex-shrink-0">
           <h2 className="font-display text-lg font-semibold tracking-tight">Publish to workshop</h2>
           <button
             type="button"
@@ -72,7 +73,7 @@ function PublishModal({ open, onClose, project, onPublished }) {
             <X size={16} />
           </button>
         </div>
-        <form onSubmit={onSubmit} className="p-5 flex flex-col gap-4">
+        <form onSubmit={onSubmit} className="p-5 flex flex-col gap-4 overflow-y-auto">
           <p className="text-sm text-ink-300">
             Anyone will be able to browse this listing, like it, and fork their
             own copy. You stay the owner of the original project.
@@ -101,6 +102,11 @@ function PublishModal({ open, onClose, project, onPublished }) {
             onChange={(e) => setDescription(e.target.value)}
             placeholder="What is it? Who's it for?"
           />
+          {project?.id && (
+            <div className="pt-1">
+              <WorkshopImageGallery projectId={project.id} />
+            </div>
+          )}
           {error && (
             <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
               <AlertCircle size={14} className="mt-0.5 shrink-0" />

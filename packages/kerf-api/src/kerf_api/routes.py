@@ -3769,7 +3769,7 @@ async def update_distributor(
         if reg is None:
             return {"error": "distributor registry not initialized"}
         body_data = await request.json()
-        from distributors.service import Credentials, validate_credentials
+        from kerf_cloud.distributors.service import Credentials, validate_credentials
 
         secret = body_data.get("secret", {})
         creds = Credentials(
@@ -3849,7 +3849,7 @@ async def refresh_part_distributors(
     try:
         reg = get_registry()
         if reg is not None:
-            from distributors.sync import refresh_part
+            from kerf_cloud.distributors.sync import refresh_part
             new_content, n, _ = await refresh_part(pool, reg, row["content"])
             if n > 0:
                 async with pool.acquire() as conn2:

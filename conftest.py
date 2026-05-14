@@ -1,7 +1,7 @@
 """Repo-root conftest.
 
 Ensures the legacy ``backend/`` tree (which still hosts ``tools/``,
-``workers/``, ``utils/``, ``geom/``, ``distributors/``) is importable by all
+``workers/``, ``utils/``, ``geom/``) is importable by all
 plugin tests until those modules are migrated into plugins.
 
 This file is collected by pytest before any test modules.

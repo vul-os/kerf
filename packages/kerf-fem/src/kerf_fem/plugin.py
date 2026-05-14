@@ -53,14 +53,16 @@ async def register(app: FastAPI, ctx):
 
     # Register background worker
     from kerf_fem.worker import FEMWorker
-    ctx.workers.register(
-        "fem",
-        FEMWorker(
-            pool=ctx.pool,
-            storage_getter=lambda: ctx.storage,
-            pyworker_url=ctx.config.get("pyworker_url", "http://localhost:8090"),
-        ),
+    fem_worker = FEMWorker(
+        pool=ctx.pool,
+        storage_getter=lambda: ctx.storage,
+        pyworker_url=getattr(ctx.config, "pyworker_url", "http://localhost:8090"),
     )
+
+    async def _fem_factory():
+        return fem_worker
+
+    ctx.workers.register("fem", _fem_factory)
 
     # Build `provides` list based on available deps
     provides = []

@@ -47,16 +47,19 @@ async def register(app: FastAPI, ctx):
     ctx.tools.register("cam_run", cam_run_spec, run_cam_run)
     ctx.tools.register("cam_job_status", cam_job_status_spec, run_cam_job_status)
 
-    # Register background worker
+    # Register background worker as a factory — WorkerRegistry.start_all()
+    # calls `await factory()` and expects an awaitable returning the worker.
     from kerf_cam.worker import CAMWorker
-    ctx.workers.register(
-        "cam",
-        CAMWorker(
-            pool=ctx.pool,
-            storage_getter=lambda: ctx.storage,
-            pyworker_url=ctx.config.get("pyworker_url", "http://localhost:8090"),
-        ),
+    cam_worker = CAMWorker(
+        pool=ctx.pool,
+        storage_getter=lambda: ctx.storage,
+        pyworker_url=getattr(ctx.config, "pyworker_url", "http://localhost:8090"),
     )
+
+    async def _cam_factory():
+        return cam_worker
+
+    ctx.workers.register("cam", _cam_factory)
 
     # Capabilities depend on available deps
     provides = ["cam.2_5d"]   # pure-Python mock always available

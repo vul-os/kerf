@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     usage_enabled: bool = False
     max_threads_per_project: int = 50
     file_revisions_max: int = 200
+
+    # Compute-worker dispatch endpoint (pythonOCC + FEM + CAM + topo subprocess).
+    pyworker_url: str = "http://localhost:8090"
     step_max_bytes: int = 200_000_000
     upload_chunk_size: int = 5_242_880
     upload_session_ttl_hours: int = 24

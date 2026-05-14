@@ -105,6 +105,101 @@ function _logNurbsBooleanBindings(oc) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// NURBS Phase 4 full — binding probe (C1-T1 / PB-1)
+//
+// Extended probe covering all four Capability 1 classes.
+// Capability 1 (surface-direct booleans) gates on BOPAlgo_Builder,
+// BRepAlgoAPI_Section, ShapeFix_Shape, ShapeFix_Solid,
+// ShapeUpgrade_UnifySameDomain.
+//
+// Results are logged as [occt-phase4] <class>: OK|MISSING and are
+// exported via getNurbsPhase4Bindings(oc) for opSurfaceBoolean to
+// branch on at runtime.
+//
+// Capability 2–4 classes (trim-by-curve, matchSrf, curvature comb) are
+// also probed so their owners have the gate data from the same boot log.
+//
+// **Honest uncertainty (plan's PB-1 note):** BOPAlgo_Builder and
+// BRepAlgoAPI_Section are unconfirmed at static-analysis time —
+// opencascade.js's binding generator sometimes trims infrastructure
+// classes not referenced in demo code.  The SetFuzzyValue method on
+// BOPAlgo_Builder is additionally unverified; opSurfaceBoolean branches
+// on whether the class itself is present, then tries the method call
+// at runtime with a guard.
+
+const NURBS_PHASE4_C1_BINDINGS = [
+  'BOPAlgo_Builder',
+  'BRepAlgoAPI_Section',
+  'ShapeFix_Shape',
+  'ShapeFix_Solid',
+  'ShapeUpgrade_UnifySameDomain',
+]
+
+const NURBS_PHASE4_C2_BINDINGS = [
+  'BRepFeat_SplitShape',
+  'BRepProj_Projection',
+  'BRepBuilderAPI_MakeFace_18',
+]
+
+const NURBS_PHASE4_C3_BINDINGS = [
+  'GeomAPI_ExtremaCurveSurface',
+  'GeomFill_NSections',
+  'ShapeAnalysis_Surface',
+]
+
+const NURBS_PHASE4_C4_BINDINGS = [
+  'BRepLProp_SLProps',
+  'GeomLProp_SLProps',
+]
+
+const NURBS_PHASE4_ALL_BINDINGS = [
+  ...NURBS_PHASE4_C1_BINDINGS,
+  ...NURBS_PHASE4_C2_BINDINGS,
+  ...NURBS_PHASE4_C3_BINDINGS,
+  ...NURBS_PHASE4_C4_BINDINGS,
+]
+
+/**
+ * Return a map of { [className]: boolean } for all Phase 4 full capability
+ * gating classes.  Structured so callers can slice by capability:
+ *
+ *   const p4 = getNurbsPhase4Bindings(oc)
+ *   const c1Go = NURBS_PHASE4_C1_BINDINGS.every(k => p4[k])
+ *
+ * @param {object} oc — resolved opencascade.js handle
+ * @returns {Record<string, boolean>}
+ */
+export function getNurbsPhase4Bindings(oc) {
+  return Object.fromEntries(
+    NURBS_PHASE4_ALL_BINDINGS.map(cls => [cls, typeof oc[cls] === 'function'])
+  )
+}
+
+/**
+ * Log Phase 4 binding probe results at boot.
+ * Groups output by capability so the console is readable.
+ */
+function _logNurbsPhase4Bindings(oc) {
+  const groups = [
+    ['C1 (surface-direct booleans)', NURBS_PHASE4_C1_BINDINGS],
+    ['C2 (trim-by-curve)',           NURBS_PHASE4_C2_BINDINGS],
+    ['C3 (matchSrf)',                NURBS_PHASE4_C3_BINDINGS],
+    ['C4 (curvature comb)',          NURBS_PHASE4_C4_BINDINGS],
+  ]
+  for (const [label, classes] of groups) {
+    const statuses = classes.map(cls => {
+      const ok = typeof oc[cls] === 'function'
+      // eslint-disable-next-line no-console
+      console.info(`[occt-phase4] ${label} — ${cls}: ${ok ? 'OK' : 'MISSING'}`)
+      return ok
+    })
+    const allOk = statuses.every(Boolean)
+    // eslint-disable-next-line no-console
+    console.info(`[occt-phase4] ${label} gate: ${allOk ? 'GO' : 'PARTIAL/BLOCKED'}`)
+  }
+}
+
 // Lazy-init OCCT. Returns a Promise<oc>. The first call kicks off the wasm
 // download + compile; subsequent calls re-use the resolved module.
 function loadOcct() {
@@ -116,8 +211,10 @@ function loadOcct() {
       throw new Error('opencascade.js: initOpenCascade not exported')
     }
     const oc = await init({ locateFile: () => wasmUrl })
-    // T1: probe the three gating classes once at boot.
+    // v1 probe (T1): three gating classes for the solid-cap path.
     _logNurbsBooleanBindings(oc)
+    // Phase 4 full probe (C1-T1 / PB-1): all four capability gates.
+    _logNurbsPhase4Bindings(oc)
     return oc
   })()
   return ocPromise

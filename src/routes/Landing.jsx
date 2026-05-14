@@ -83,6 +83,7 @@ import {
   StairsMepIllustration,
   ViewportScaleIllustration,
   FineGrainedUndoIllustration,
+  TolerancePlusMatesIllustration,
 } from '../components/illustrations/index.js'
 
 const GITHUB_URL = 'https://github.com/kerf-sh/kerf'
@@ -430,7 +431,7 @@ const CAPABILITY_GROUPS = [
         icon: Activity,
         title: 'Tolerance + mates',
         body: 'Worst-case · RSS · Monte-Carlo dimension stacks. tolerance_auto_chain walks the assembly-mate graph by BFS between two feature refs and builds the dimension chain for you. Mates UI is back with BREP face/edge picker.',
-        Illustration: null,
+        Illustration: TolerancePlusMatesIllustration,
       },
     ],
   },

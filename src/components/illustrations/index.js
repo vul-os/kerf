@@ -22,3 +22,4 @@ export { default as RevitParityIllustration } from './RevitParityIllustration.js
 export { default as StairsMepIllustration } from './StairsMepIllustration.jsx'
 export { default as ViewportScaleIllustration } from './ViewportScaleIllustration.jsx'
 export { default as FineGrainedUndoIllustration } from './FineGrainedUndoIllustration.jsx'
+export { default as TolerancePlusMatesIllustration } from './TolerancePlusMatesIllustration.jsx'

@@ -2,7 +2,13 @@ version: "3.9"
 
 services:
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # Override persona for local dev — 'full' installs every plugin.
+      # For lighter images use: mech | electronics | bim | api-only | compute-only
+      args:
+        KERF_PERSONA: ${KERF_PERSONA:-full}
     ports:
       - "${PORT:-8080}:8080"
     environment:

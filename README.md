@@ -85,7 +85,7 @@ You'll need Python 3.11+, Node 22+, and Postgres 14+.
 ```sh
 npm run build              # full production build — compiles the SPA via Vite
 npm run build:web          # just the Vite frontend (outputs to backend/web/dist)
-npm run build:api          # install Python dependencies (pip install -r backend/requirements.txt)
+npm run build:api          # install Python dependencies (pip install -e .[full])
 npm run build:icons        # regenerate favicon set + OG image from public/favicon.svg
 npm run build:docs         # rebuild public/docs-manifest.json from the markdown corpus
 ```
@@ -96,17 +96,17 @@ The Python backend uses environment variables and optional feature flags to gate
 
 ```sh
 # OSS build (default) — single-user local install, no billing, no Workshop
-cd backend && pip install -r requirements.txt && uvicorn main:app --reload
+pip install -e .[full] && kerf-server --reload
 
 # Cloud build — adds Workshop sharing, Paystack billing, git, transactional email
-KERF_CLOUD=true uvicorn main:app --reload
+CLOUD_ENABLED=true kerf-server --reload
 
 # Or via npm
 npm run build              # OSS
 npm run build:cloud        # cloud
 ```
 
-The same source tree runs both. Cloud-only code lives under `backend/cloud/`, `cloud/`, `src/cloud/` and is activated only when the `KERF_CLOUD=true` env var is set. The OSS install cannot accidentally pull in cloud code.
+The same source tree runs both. Cloud-only plugins (`kerf-billing`, `kerf-cloud`) are only active when installed (e.g. `pip install -e .[full]`). The OSS install (`pip install -e .[mech]` etc.) cannot accidentally pull in cloud code.
 
 ### Configuration
 
@@ -151,16 +151,29 @@ The full ROADMAP — shipped, in-flight, next, planned — is in [ROADMAP.md](./
 ## Project structure
 
 ```
-backend/
-├── main.py            — FastAPI entrypoint (uvicorn main:app)
-├── routes/            — API route handlers (auth, projects, files, chat, …)
-├── tools/             — LLM-callable tool implementations
-├── db/                — asyncpg connection pool + query helpers
-├── workers/           — background async task workers
-├── distributors/      — distributor price-sync workers
-├── web/dist/          — Vite bundle (built by build:web; served by FastAPI)
-├── migrations/        — Alembic schema migrations
-└── cloud/             — cloud-tier handlers (KERF_CLOUD-gated)
+packages/
+├── kerf-core/         — FastAPI app factory, plugin loader, shared infra
+├── kerf-auth/         — auth routes + JWT middleware
+├── kerf-api/          — core API routes
+├── kerf-chat/         — LLM chat + tool dispatch
+├── kerf-v1/           — v1 REST endpoints
+├── kerf-billing/      — billing routes (cloud-only)
+├── kerf-cloud/        — cloud-tier routes (Workshop, git, email, fx)
+├── kerf-cad-core/     — OpenCascade .feature file kernel
+├── kerf-tess/         — server-side tessellation worker
+├── kerf-fem/          — FEM (CalculiX / Gmsh) worker
+├── kerf-cam/          — CAM post-processor
+├── kerf-topo/         — topology optimisation worker
+├── kerf-mates/        — assembly mates solver
+├── kerf-bim/          — BIM / IFC routes
+├── kerf-electronics/  — EDA / PCB routes
+├── kerf-imports/      — STEP / 3DM import pipeline
+├── kerf-render/       — render worker
+└── kerf-workers/      — generic background worker harness
+
+backend/               — transitional shared code (tools/, workers/, geom/ — not yet split)
+Dockerfile             — monorepo image; use KERF_PERSONA build-arg to select plugin set
+docker-compose.yml     — local dev stack (app + postgres + redis)
 
 src/
 ├── components/        — React components
@@ -211,7 +224,7 @@ PRs welcome. Pick anything marked `📋 next` or `🔮 planned` in [ROADMAP.md](
 - **Style**: ESLint + Prettier defaults. Match the surrounding code; we don't bikeshed.
 - **Tests**: every PR that touches a backend handler should add or extend a test in `backend/tests/`. Frontend changes: add a vitest if the logic isn't UI-only.
 - **Commits**: imperative tense, ~70 chars (`fix sketcher line-tool double-commit`).
-- **The LLM edits source files directly.** If you add a new file kind or feature, also add a `backend/llm_docs/<topic>.md` so the model knows about it. The doc-search tool indexes that directory automatically.
+- **The LLM edits source files directly.** If you add a new file kind or feature, also add a `packages/kerf-chat/llm_docs/<topic>.md` so the model knows about it. The doc-search tool indexes that directory automatically.
 
 See [docs/architecture.md](./docs/architecture.md) for the API + data model spec — the source of truth for cross-cutting changes.
 

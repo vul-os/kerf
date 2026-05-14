@@ -1,3 +1,8 @@
+# Build the image from the monorepo root:
+#   docker build --build-arg KERF_PERSONA=api-only \
+#     -t gcr.io/PROJECT/kerf-api:latest .
+# For compute pods: KERF_PERSONA=compute-only
+# Entry point is `kerf-server` (console_script from packages/kerf-core).
 apiVersion: v1
 kind: Namespace
 metadata:

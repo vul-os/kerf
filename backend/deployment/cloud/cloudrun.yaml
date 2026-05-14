@@ -1,5 +1,11 @@
 # Cloud Run Service Configuration
 # Deploy with: gcloud run services replace service.yaml
+#
+# Build the image from the monorepo root:
+#   docker build --build-arg KERF_PERSONA=api-only \
+#     -t gcr.io/PROJECT/kerf-api:latest .
+# For a full-stack pod: KERF_PERSONA=full
+# Entry point is `kerf-server` (console_script from packages/kerf-core).
 
 apiVersion: serving.knative.dev/v1
 kind: Service

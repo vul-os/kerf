@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 _TOOL_MODULES = [
     "kerf_cad_core.feature_cut_from_sketch",
     "kerf_cad_core.feature_hole_pattern_from_sketch",
+    "kerf_cad_core.extrude_sketch_to_jscad",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

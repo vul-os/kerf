@@ -58,3 +58,6 @@ env/
 
 # Misc
 .cache/
+
+# Internal sizing / pricing scratchpad (commercial — never commit)
+billingmodel/

@@ -1,8 +1,11 @@
 # CAM Toolpath Generation
 
-Kerf generates 2.5D CNC toolpaths from STEP files using OpenCAMlib. The pipeline
-meshes the STEP geometry and runs a selected 2.5D operation, then emits G-code
+Kerf generates CNC toolpaths from STEP files using OpenCAMlib. The pipeline
+meshes the STEP geometry and runs a selected operation, then emits G-code
 with a configurable post-processor (LinuxCNC / GRBL / Mach3 / Fanuc).
+
+Supported operations: `face`, `contour`, `pocket`, `drill`, `profile`,
+`parallel_3d`, `waterline`, `lathe`, `5axis` (stub).
 
 ## Workflow
 
@@ -16,16 +19,28 @@ with a configurable post-processor (LinuxCNC / GRBL / Mach3 / Fanuc).
 
 ```
 file_id        UUID of the STEP file (required)
-operation      "face" | "contour" | "pocket" | "drill" | "profile" (required)
+operation      "face" | "contour" | "pocket" | "drill" | "profile"
+               | "parallel_3d" | "waterline" | "lathe" | "5axis"  (required)
 tool_diameter  Tool diameter in mm (optional, default 3.0)
 step_over      Radial step-over in mm (optional, default 0.5)
 step_down      Axial depth-of-cut per pass in mm (optional, default 0.5)
 feed_rate      Feed rate in mm/min (optional, default 1000.0)
 spindle_speed  Spindle speed in RPM (optional, default 10000.0)
 coolant        Enable flood coolant (optional, default true)
+face_id        Integer index of the target face for contour/pocket (optional;
+               default = planar face with highest Z centroid = top face)
+wire_tolerance Discretisation tolerance in mm for B-rep wire extraction
+               (optional, default 0.05)
+direction      Raster direction for parallel_3d: "x" (default) | "y"
+               (optional)
+angle_deg      Arbitrary raster angle in degrees for parallel_3d (optional;
+               overrides direction when set)
+spindle_axis   Spindle axis for lathe: "x" | "z" (optional, default "z")
 ```
 
-### Example
+### Examples
+
+#### Pocket with real B-rep boundary
 
 ```json
 {
@@ -36,7 +51,52 @@ coolant        Enable flood coolant (optional, default true)
   "step_down": 1.0,
   "feed_rate": 800.0,
   "spindle_speed": 12000.0,
-  "coolant": true
+  "coolant": true,
+  "wire_tolerance": 0.05
+}
+```
+
+#### 3D parallel raster at 45°
+
+```json
+{
+  "file_id": "<uuid>",
+  "operation": "parallel_3d",
+  "tool_diameter": 6.0,
+  "step_over": 1.0,
+  "step_down": 0.5,
+  "feed_rate": 1500.0,
+  "spindle_speed": 15000.0,
+  "angle_deg": 45.0
+}
+```
+
+#### Waterline finishing
+
+```json
+{
+  "file_id": "<uuid>",
+  "operation": "waterline",
+  "tool_diameter": 3.0,
+  "step_over": 1.0,
+  "step_down": 1.0,
+  "feed_rate": 600.0,
+  "spindle_speed": 18000.0
+}
+```
+
+#### Lathe turning
+
+```json
+{
+  "file_id": "<uuid>",
+  "operation": "lathe",
+  "tool_diameter": 3.0,
+  "step_down": 1.0,
+  "step_over": 1.0,
+  "feed_rate": 200.0,
+  "spindle_speed": 1500,
+  "spindle_axis": "z"
 }
 ```
 
@@ -75,13 +135,14 @@ Body:
 
 ```json
 {
-  "operation": "profile",
-  "tool_diameter": 3.0,
+  "operation": "parallel_3d",
+  "tool_diameter": 6.0,
   "step_over": 1.5,
   "step_down": 0.5,
-  "feed_rate": 1000.0,
-  "spindle_speed": 10000.0,
-  "coolant": true
+  "feed_rate": 1500.0,
+  "spindle_speed": 15000.0,
+  "coolant": true,
+  "angle_deg": 45.0
 }
 ```
 
@@ -99,6 +160,76 @@ GET /api/projects/{pid}/files/{fid}/cam/status
 
 Response mirrors `cam_job_status` above.
 
+## Operation details
+
+### `contour` / `pocket` — B-rep boundary extraction
+
+When pythonOCC is available, `contour` and `pocket` extract the real face loop
+from the STEP B-rep rather than using the bounding box:
+
+1. `TopExp_Explorer` walks all faces.
+2. Planar faces with a Z-axis normal (|nz| > 0.99) are collected.
+3. The target face is selected by `face_id` (if given) or by highest Z centroid
+   (top face by default).
+4. `BRepTools.OuterWire` gives the outer boundary; additional wires are holes.
+5. Each wire is discretised via `GCPnts_QuasiUniformDeflection` at
+   `wire_tolerance` mm into `(x, y)` tuples that become `ocl.Line` segments
+   in a `PathDropCutter` pass.
+
+Falls back to bounding-box perimeter if no Z-normal face is found.
+
+### `parallel_3d` — 3D parallel raster
+
+Drop-cutter raster across the full STL bounding box. Parameters:
+
+- `direction`: `"x"` (default) — lines parallel to X, stepping in Y;
+  `"y"` — lines parallel to Y, stepping in X.
+- `angle_deg`: arbitrary raster angle (degrees). Overrides `direction` when set.
+  Lines are projected across the bounding box diagonal, rotated by the angle.
+- `step_over`: line spacing in mm.
+
+Uses `PathDropCutter` (not `ZigZag`) so the tool follows the actual 3D surface.
+
+### `waterline` — constant-Z contouring
+
+Contours at constant Z levels from part top to bottom, stepping by `step_down`
+per pass.
+
+- Uses `ocl.AdaptiveWaterline` when available in the installed opencamlib build.
+- Falls back to `PathDropCutter` rectangular perimeter at each Z level when
+  `AdaptiveWaterline` is absent.
+
+### `lathe` — 2-axis turning
+
+Generates lathe G-code in the X-Z plane (G18). Output uses:
+
+- `G18` — X-Z plane selection
+- `G96 S<rpm> M3` — constant surface speed, spindle on
+- `G1` linear moves for turning passes
+- `M5` spindle off, no M30 (lathe programs typically end on M2 or M30 at a
+  higher level; the snippet is inserted between standard header/footer)
+
+When pythonOCC is available, the op tries to extract a turning profile from the
+largest face with a Y-normal (X-Z plane face) in the B-rep. If no such face
+exists, a default cylindrical roughing pass is emitted.
+
+The lathe post does **not** use a separate post-processor flag; lathe G-code is
+self-contained within the normal G-code file. The G18 block distinguishes it
+from mill ops. A dedicated lathe post-processor (G7x cycles) is a planned
+enhancement.
+
+### `5axis` — stub
+
+5-axis simultaneous toolpath is not yet implemented. The operation is
+schema-wired and will parse inputs, then immediately return:
+
+```json
+{
+  "errors": ["not_implemented: 5-axis simultaneous toolpath is a planned feature. ..."],
+  "toolpath_length": 0.0
+}
+```
+
 ## Notes
 
 - **OpenCAMlib dependency**: the pyworker engine requires `opencamlib` (LGPL 2.1).
@@ -113,6 +244,11 @@ Response mirrors `cam_job_status` above.
   a warning is added to the response.
   Install pythonOCC: `conda install -c conda-forge pythonocc-core`
 - **Post-processors**: `fanuc` (default), `linuxcnc`, `grbl`, `mach3` — all emit
-  standard G-code with minor header/footer differences.
-- **2.5D only**: depth is constant per pass. 3-axis simultaneous (3D contouring)
-  is a future enhancement.
+  standard G-code with minor header/footer differences. Lathe G-code is embedded
+  inline; a dedicated lathe post (`G71`/`G72` roughing cycles) is planned.
+- **Local install deps**:
+  ```
+  conda install -c conda-forge pythonocc-core
+  pip install opencamlib
+  ```
+  Both are try/except gated — pyworker boots without them (mock toolpaths returned).

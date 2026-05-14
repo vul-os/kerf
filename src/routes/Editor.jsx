@@ -18,6 +18,7 @@ import DrawingToolbar from '../components/DrawingToolbar.jsx'
 import DrawingPropertiesPanel from '../components/DrawingPropertiesPanel.jsx'
 import SketchView from '../components/SketchView.jsx'
 import FeatureView from '../components/FeatureView.jsx'
+import SectionView from '../components/SectionView.jsx'
 import CircuitEditor from '../components/CircuitEditor.jsx'
 import LibraryEditor from '../components/LibraryEditor.jsx'
 import MaterialEditor from '../components/MaterialEditor.jsx'
@@ -395,6 +396,13 @@ function isFemFile(file) {
   if (file.kind === 'fem') return true
   const n = (file.name || '').toLowerCase()
   return n.endsWith('.fem')
+}
+
+function isSectionFile(file) {
+  if (!file) return false
+  if (file.kind === 'section') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.section')
 }
 
 export default function Editor() {
@@ -798,6 +806,7 @@ export default function Editor() {
   const stairFile = isStairFile(w.currentFile)
   const railingFile = isRailingFile(w.currentFile)
   const femFile = isFemFile(w.currentFile)
+  const sectionFile = isSectionFile(w.currentFile)
 
   // Build a THREE.BufferGeometry from the current parts to pass into FEMView
   // so DeformedShapeOverlay can render the morphed surface (instead of a proxy
@@ -1420,6 +1429,20 @@ export default function Editor() {
                 files={w.files}
                 onChangeTree={(next) => w.updateFeature(() => next)}
                 loadSketchContent={featureSketchLoader}
+              />
+              {w.toast && (
+                <div className="absolute bottom-3 right-3 z-20 px-3 py-2 rounded-md bg-ink-900 border border-kerf-300/60 text-kerf-300 text-xs shadow-xl"
+                  onClick={() => w.dismissToast()}>
+                  {w.toast}
+                </div>
+              )}
+            </div>
+          ) : sectionFile ? (
+            <div className="flex-1 min-h-0 relative">
+              <SectionView
+                viewRef={currentViewRef}
+                parsedFeature={w.currentFeature || { features: [] }}
+                edgeSegments={null}
               />
               {w.toast && (
                 <div className="absolute bottom-3 right-3 z-20 px-3 py-2 rounded-md bg-ink-900 border border-kerf-300/60 text-kerf-300 text-xs shadow-xl"

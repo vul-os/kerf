@@ -49,7 +49,7 @@ import {
   Disc, Layers, Drill, Sigma, AlertTriangle, Loader2, Play,
   Move, Crosshair, GitBranch, Repeat, FlipHorizontal,
   PencilLine, Pointer, Waves, Layers3, Aperture, Plus,
-  X, ChevronRight, LayoutGrid, Combine,
+  X, ChevronRight, LayoutGrid, Combine, Scissors,
 } from 'lucide-react'
 import FeatureRenderer from './FeatureRenderer.jsx'
 import {
@@ -378,13 +378,36 @@ const FEATURE_KINDS = [
       ] },
     ],
   },
+  // Slicing v0.2 — plane cross-section via BRepAlgoAPI_Section.
+  // Returns a compound of intersection edges (1D outline, not a solid).
+  // Inspector: target solid picker + plane point/normal xyz inputs.
+  // Section-plane gumball is deferred to v0.3 (TODO: add drag-to-reposition
+  // gumball in Gumball.jsx that snaps to face plane when armed).
+  {
+    op: 'section',
+    label: 'Section',
+    icon: Scissors,
+    defaults: {
+      target_solid_ref: '',
+      plane: { point: [0, 0, 0], normal: [0, 0, 1] },
+    },
+    fields: [
+      { key: 'target_solid_ref', kind: 'feature_picker', label: 'Target solid' },
+      { key: 'plane.point[0]',  kind: 'number', label: 'Plane point X (mm)' },
+      { key: 'plane.point[1]',  kind: 'number', label: 'Plane point Y (mm)' },
+      { key: 'plane.point[2]',  kind: 'number', label: 'Plane point Z (mm)' },
+      { key: 'plane.normal[0]', kind: 'number', label: 'Normal X' },
+      { key: 'plane.normal[1]', kind: 'number', label: 'Normal Y' },
+      { key: 'plane.normal[2]', kind: 'number', label: 'Normal Z' },
+    ],
+  },
 ]
 
 const KIND_BY_OP = Object.fromEntries(FEATURE_KINDS.map((k) => [k.op, k]))
 
 const FEATURE_CATEGORIES = [
   { id: 'sketch',   label: 'Sketch-based',  ops: ['pad', 'boss_with_draft', 'pocket', 'cut_from_sketch', 'revolve', 'hole', 'hole_pattern'] },
-  { id: 'modify',   label: 'Modify',        ops: ['fillet', 'chamfer', 'shell', 'push_pull', 'variable_radius_fillet', 'to_solid', 'boolean'] },
+  { id: 'modify',   label: 'Modify',        ops: ['fillet', 'chamfer', 'shell', 'push_pull', 'variable_radius_fillet', 'to_solid', 'boolean', 'section'] },
   { id: 'pattern',  label: 'Pattern',       ops: ['linear_pattern', 'polar_pattern', 'mirror_pattern'] },
   { id: 'surface',  label: 'Surfacing',     ops: ['sweep1', 'sweep2', 'loft', 'network_srf', 'blend_srf'] },
 ]

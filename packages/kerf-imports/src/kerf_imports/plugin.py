@@ -77,6 +77,7 @@ def _register_tools(ctx, provides: list) -> None:
     """Register all imports/Rhino-parity LLM tools into ctx.tools."""
     tool_modules = [
         "kerf_imports.tools.import_3dm",
+        "kerf_imports.tools.import_freecad",
         "kerf_imports.tools.subd",
         "kerf_imports.tools.mesh",
         "kerf_imports.tools.curve_ops",

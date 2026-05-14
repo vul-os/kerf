@@ -404,6 +404,16 @@ export default function Editor() {
   const w = useWorkspace()
   const inputRef = useRef(null)
   const rendererRef = useRef(null)
+  // Active view's imperative handle. Every view component sets this
+  // via `viewRef` (or `ref` for the Renderer) so the thumbnail
+  // useEffect below can call snapshot() without branching on kind.
+  const currentViewRef = useRef(null)
+  // Reset the view-ref whenever the active file changes so the
+  // useEffect doesn't fire a snapshot against a unmounted view.
+  // Each new view's useImperativeHandle wires the ref again on mount.
+  useEffect(() => {
+    currentViewRef.current = null
+  }, [w.currentFile?.id, w.currentFile?.kind])
 
   // ----- Project lifecycle -----
   useEffect(() => {
@@ -509,30 +519,36 @@ export default function Editor() {
   }, [w.currentFileContent, w.dirty])
 
   // ----- Project thumbnail capture (debounced after save) -----
-  // Renders the scene and uploads a JPEG to the project so the projects
-  // list can <img> it. We only fire when:
-  //   * a JSCAD/assembly file is open (drawings + STEP excluded)
-  //   * the file is currently saved + clean (saveStatus === 'saved')
-  //   * the renderer has parts to draw
-  //   * 2 seconds have elapsed since the most recent edit/save settle
+  // We dispatch via `currentViewRef` — every file-view component
+  // (Renderer for 3D, SketchView/DrawingView/Schematic/PCB/Wiring/RF
+  // for 2D & SVG, BIMView/FEMView/TopoView for their own canvases)
+  // implements the same `snapshot({size, quality}) → Blob|null` shape
+  // via useImperativeHandle. The Editor no longer branches on kind here.
+  //
+  // We still skip STEP files (binary, no view) and gate on a clean save
+  // so we don't fire mid-edit. Importantly: we DON'T require
+  // `w.parts.length > 0` anymore — that was specific to JSCAD/3D and
+  // blocked thumbnails for sketches, drawings, schematics, etc.
   const thumbTimerRef = useRef(null)
   const thumbInFlightRef = useRef(false)
   useEffect(() => {
     if (!projectId) return
-    if (!rendererRef.current) return
+    if (!currentViewRef.current) return
     if (isStepFile(w.currentFile)) return
-    if (isDrawingFile(w.currentFile)) return
     if (w.dirty || w.saving) return
-    if (!w.parts || w.parts.length === 0) return
     if (thumbTimerRef.current) clearTimeout(thumbTimerRef.current)
     thumbTimerRef.current = setTimeout(async () => {
       if (thumbInFlightRef.current) return
       thumbInFlightRef.current = true
       try {
-        const blob = await rendererRef.current?.snapshot?.({ size: 512, quality: 0.7 })
+        const blob = await currentViewRef.current?.snapshot?.({ size: 512, quality: 0.7 })
         if (blob) await api.uploadProjectThumbnail(projectId, blob)
-      } catch {
-        // Best-effort — never surface a thumbnail error to the user.
+      } catch (err) {
+        // Surface errors at console.warn rather than swallowing them —
+        // the upload path can fail for a half-dozen reasons (network,
+        // taint, decode) and silent failure made the original 3D-only
+        // bug invisible for months.
+        console.warn('[Editor] thumbnail capture failed', err)
       } finally {
         thumbInFlightRef.current = false
       }
@@ -1336,6 +1352,7 @@ export default function Editor() {
           ) : topoFile ? (
             <div className="flex-1 min-h-0 relative">
               <TopoView
+                viewRef={currentViewRef}
                 content={w.currentFileContent}
                 fileName={w.currentFile?.name}
               />
@@ -1367,6 +1384,7 @@ export default function Editor() {
               </div>
               <div className="flex-1 min-h-0 relative">
                 <SketchView
+                  viewRef={currentViewRef}
                   sketch={w.parsedSketch}
                   files={w.files}
                   onChange={(next) => w.updateSketch(() => next)}
@@ -1387,7 +1405,7 @@ export default function Editor() {
             </div>
           ) : circuitFile ? (
             <div className="flex-1 min-h-0 relative">
-              <CircuitEditor />
+              <CircuitEditor viewRef={currentViewRef} />
               {w.toast && (
                 <div className="absolute bottom-3 right-3 z-20 px-3 py-2 rounded-md bg-ink-900 border border-kerf-300/60 text-kerf-300 text-xs shadow-xl"
                   onClick={() => w.dismissToast()}>
@@ -1414,6 +1432,7 @@ export default function Editor() {
             <div className="flex-1 min-h-0 relative">
               <DrawingView
                 ref={drawingSvgRef}
+                viewRef={currentViewRef}
                 drawing={w.parsedDrawing}
                 partsByFileId={w.drawingSourceParts}
                 topologiesByFileId={drawingTopologies}
@@ -1481,6 +1500,7 @@ export default function Editor() {
           ) : femFile ? (
             <div className="flex-1 min-h-0 overflow-y-auto p-3">
               <FEMView
+                viewRef={currentViewRef}
                 file={w.currentFile}
                 projectId={projectId}
                 geometry={femDisplayGeometry}
@@ -1496,7 +1516,12 @@ export default function Editor() {
           <>
           <div style={{ height: `${splitPct}%` }} className="min-h-0 relative">
             <Renderer
-              ref={rendererRef}
+              ref={(r) => {
+                rendererRef.current = r
+                // Renderer is the active view for JSCAD/assembly files;
+                // route thumbnail capture through its existing snapshot().
+                currentViewRef.current = r
+              }}
               parts={w.parts}
               selectedId={w.pickedPart?.part_id}
               selectedComponentId={assemblyFile ? w.selectedComponentId : null}

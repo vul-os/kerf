@@ -216,7 +216,7 @@ const TABS = [
   { id: '3d',        label: '3D',        icon: Box },
 ]
 
-export default function CircuitEditor() {
+export default function CircuitEditor({ viewRef } = {}) {
   const w = useWorkspace()
   const [tab, setTab] = useState('source')
 
@@ -367,6 +367,7 @@ export default function CircuitEditor() {
         )}
         {tab === 'schematic' && (
           <SchematicView
+            viewRef={viewRef}
             circuitJson={w.currentCircuit?.raw || []}
             highlightRefdes={w.selectedCircuitRefdes}
             onSelectRefdes={(r) => useWorkspace.getState().selectCircuitRefdes(r)}
@@ -378,6 +379,7 @@ export default function CircuitEditor() {
         )}
         {tab === 'pcb' && (
           <PCBView
+            viewRef={viewRef}
             circuitJson={w.currentCircuit?.raw || []}
             highlightRefdes={w.selectedCircuitRefdes}
             onSelectRefdes={(r) => useWorkspace.getState().selectCircuitRefdes(r)}

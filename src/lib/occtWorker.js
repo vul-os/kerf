@@ -57,6 +57,47 @@ import wasmUrl from 'opencascade.js/dist/opencascade.wasm.wasm?url'
 
 let ocPromise = null
 
+// ---------------------------------------------------------------------------
+// NURBS booleans v1 — T1: binding probe
+// ---------------------------------------------------------------------------
+// The three classes below are unconfirmed in the current opencascade.js build.
+// We probe them once at worker boot so T2–T7 can branch on which fallback path
+// to take. Results are logged to the console AND returned from
+// getNurbsBooleanBindings() for programmatic use (e.g. by the boolean handler).
+
+const NURBS_BOOLEAN_BINDINGS = [
+  'BRepBuilderAPI_Sewing',
+  'BRepBuilderAPI_MakeSolid_1',
+  'BRepAlgoAPI_Common_3',
+]
+
+/**
+ * Return a map of { [className]: boolean } indicating which of the three
+ * gating NURBS-boolean OCCT classes are present in this build.
+ *
+ * @param {object} oc — resolved opencascade.js handle
+ * @returns {{ BRepBuilderAPI_Sewing: boolean, BRepBuilderAPI_MakeSolid_1: boolean, BRepAlgoAPI_Common_3: boolean }}
+ */
+export function getNurbsBooleanBindings(oc) {
+  return Object.fromEntries(
+    NURBS_BOOLEAN_BINDINGS.map(cls => [cls, typeof oc[cls] === 'function'])
+  )
+}
+
+/**
+ * Log presence of the three gating NURBS-boolean bindings once at boot.
+ * Callers (T2/T4) can use getNurbsBooleanBindings(oc) to branch at runtime.
+ *
+ * @param {object} oc — resolved opencascade.js handle
+ */
+function _logNurbsBooleanBindings(oc) {
+  for (const cls of NURBS_BOOLEAN_BINDINGS) {
+    const status = typeof oc[cls] === 'function' ? 'OK' : 'MISSING'
+    // eslint-disable-next-line no-console
+    console.log(`[occt-bindings] ${cls}: ${status}`)
+  }
+}
+
 // Lazy-init OCCT. Returns a Promise<oc>. The first call kicks off the wasm
 // download + compile; subsequent calls re-use the resolved module.
 function loadOcct() {
@@ -68,6 +109,8 @@ function loadOcct() {
       throw new Error('opencascade.js: initOpenCascade not exported')
     }
     const oc = await init({ locateFile: () => wasmUrl })
+    // T1: probe the three gating classes once at boot.
+    _logNurbsBooleanBindings(oc)
     return oc
   })()
   return ocPromise

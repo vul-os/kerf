@@ -1098,3 +1098,145 @@ function _edgeAxisDominant(oc, edge) {
     return null
   }
 }
+
+// ---------------------------------------------------------------------------
+// NURBS booleans v1 — T1: surfaceToSolid helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Thrown when `BRepBuilderAPI_Sewing` is absent from this OCCT WASM build.
+ * This is unrecoverable without a WASM rebuild. Callers should surface this
+ * to the operator and halt T2+ work until the binding ships.
+ */
+export class SurfaceToSolidUnsupportedError extends Error {
+  constructor(msg) {
+    super(msg || 'surfaceToSolid: BRepBuilderAPI_Sewing is not bound in this OCCT build — rebuild opencascade.js with the Sewing binding to proceed')
+    this.name = 'SurfaceToSolidUnsupportedError'
+    this.code = 'OCCT_BINDING_MISSING'
+  }
+}
+
+/**
+ * Convert a TopoDS_Shape composed of faces (e.g. a swept surface, blend, or
+ * network) into a TopoDS_Solid by sewing the faces and capping into a solid.
+ *
+ * Falls back gracefully when bindings are missing:
+ *   - `BRepBuilderAPI_Sewing` missing  → throws SurfaceToSolidUnsupportedError
+ *   - `BRepBuilderAPI_MakeSolid_1` missing → hand-rolls via BRep_Builder.MakeSolid + Add
+ *
+ * @param {object}        oc     — opencascade.js handle
+ * @param {object}        shape  — TopoDS_Shape input (face, shell, or sewn-face collection)
+ * @param {Array}         tracker — makeTracker() accumulator for OCCT handles
+ * @param {{ tolerance?: number }} opts
+ * @returns {{ solid: object, warnings: string[] }}
+ */
+export function surfaceToSolid(oc, shape, tracker, opts = {}) {
+  if (!shape) {
+    const e = new Error('surfaceToSolid: shape is required')
+    e.code = 'BAD_ARGS'
+    throw e
+  }
+
+  // Guard: Sewing is the hard blocker — no usable fallback.
+  if (typeof oc.BRepBuilderAPI_Sewing !== 'function') {
+    throw new SurfaceToSolidUnsupportedError()
+  }
+
+  const tolerance = (typeof opts.tolerance === 'number' && isFinite(opts.tolerance))
+    ? opts.tolerance
+    : 1e-4
+
+  // Step 1: sew the input faces / shells into a closed shell.
+  // BRepBuilderAPI_Sewing(tolerance, option_sewing, option_analyse, option_cut, option_non_manifold)
+  let sewer
+  try {
+    sewer = track(tracker, new oc.BRepBuilderAPI_Sewing(tolerance, true, true, true, false))
+  } catch (err) {
+    const e = new Error(`surfaceToSolid: BRepBuilderAPI_Sewing constructor failed: ${err?.message || err}`)
+    e.code = 'OP_FAILED'
+    throw e
+  }
+  sewer.Add(shape)
+  try {
+    // Some builds expose Perform with a progress range; others accept no args.
+    if (typeof oc.Message_ProgressRange_1 === 'function') {
+      sewer.Perform(new oc.Message_ProgressRange_1())
+    } else {
+      sewer.Perform()
+    }
+  } catch (err) {
+    const e = new Error(`surfaceToSolid: Sewing.Perform() failed: ${err?.message || err}`)
+    e.code = 'OP_FAILED'
+    throw e
+  }
+  const sewed = sewer.SewedShape()
+
+  // Step 2: extract the first shell from the sewing result.
+  let shell = null
+  try {
+    const SHELL = oc.TopAbs_ShapeEnum?.TopAbs_SHELL ?? 3
+    const SHAPE = oc.TopAbs_ShapeEnum?.TopAbs_SHAPE ?? 8
+    const exp = track(tracker, new oc.TopExp_Explorer_2(sewed, SHELL, SHAPE))
+    if (exp.More()) {
+      shell = exp.Current()
+    }
+  } catch {
+    // TopExp_Explorer may not be needed if sewed is already a shell type.
+    shell = sewed
+  }
+
+  const warnings = []
+
+  // Step 3: promote shell → solid.
+  if (typeof oc.BRepBuilderAPI_MakeSolid_1 === 'function') {
+    // Primary path: use BRepBuilderAPI_MakeSolid_1.
+    // The constructor can accept a TopoDS_Shell directly or be built via Add().
+    let ms
+    try {
+      ms = track(tracker, new oc.BRepBuilderAPI_MakeSolid_1())
+    } catch (err) {
+      const e = new Error(`surfaceToSolid: BRepBuilderAPI_MakeSolid_1 constructor failed: ${err?.message || err}`)
+      e.code = 'OP_FAILED'
+      throw e
+    }
+    if (shell) {
+      try {
+        ms.Add(shell)
+      } catch {
+        // Some builds overload Add differently; try passing to Build.
+      }
+    }
+    try {
+      if (typeof oc.Message_ProgressRange_1 === 'function') {
+        ms.Build(new oc.Message_ProgressRange_1())
+      } else {
+        ms.Build()
+      }
+    } catch { /* IsDone() will tell us */ }
+
+    if (typeof ms.IsDone === 'function' && ms.IsDone()) {
+      return { solid: ms.Solid(), warnings }
+    }
+    // IsDone false: fall through to BRep_Builder fallback below.
+    warnings.push('BRepBuilderAPI_MakeSolid_1.IsDone() false — falling back to BRep_Builder path')
+  }
+
+  // Fallback path 2: BRep_Builder.MakeSolid + Add.
+  // This path is also taken when MakeSolid_1 is absent OR its IsDone() is false.
+  if (typeof oc.BRep_Builder === 'function') {
+    try {
+      const solid = track(tracker, new oc.TopoDS_Solid())
+      const builder = track(tracker, new oc.BRep_Builder())
+      builder.MakeSolid(solid)
+      const shellTarget = shell || sewed
+      builder.Add(solid, shellTarget)
+      return { solid, warnings }
+    } catch (err) {
+      warnings.push(`BRep_Builder fallback failed: ${err?.message || err}`)
+    }
+  }
+
+  // Last resort: return the sewed shell with a warning (not a closed solid).
+  warnings.push('not a closed solid; returned as shell — neither MakeSolid_1 nor BRep_Builder path succeeded')
+  return { solid: sewed, warnings }
+}

@@ -87,9 +87,6 @@ export default function Footer() {
             <Item href={`${GITHUB_URL}/releases`} external>
               Changelog
             </Item>
-            <Item href="https://status.kerf.dev" external>
-              Status
-            </Item>
           </Col>
 
           <Col title="Legal">
@@ -109,23 +106,7 @@ export default function Footer() {
             <span className="text-xs text-ink-500 font-mono">MIT licensed</span>
           </div>
 
-          <div className="flex items-center gap-5">
-            <a
-              href="https://status.kerf.dev"
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-2 text-xs text-ink-400 hover:text-ink-200 transition-colors"
-              aria-label="System status"
-            >
-              <span className="relative inline-flex">
-                <span className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-50" />
-                <span className="relative w-2 h-2 rounded-full bg-emerald-400" />
-              </span>
-              All systems operational
-            </a>
-
-            <span className="hidden sm:inline text-ink-700">·</span>
-
+          <div className="flex items-center gap-4">
             <span className="inline-flex items-center gap-1.5 text-[11px] text-ink-500">
               <span className="text-base leading-none" aria-hidden>🇿🇦</span>
               <span>Built in South Africa</span>

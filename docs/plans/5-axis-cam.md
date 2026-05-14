@@ -455,3 +455,10 @@ These belong in a separate ROADMAP row once v1 lands:
 - OCL upstream: `https://github.com/aewallin/opencamlib`.
 - FreeCAD Path Workbench (their 5-axis is also stub-only) —
   `https://wiki.freecad.org/Path_Workbench` ("5-axis is in development").
+
+## T1 results landed
+
+T1 (OCL native 5-axis primitive audit) is complete. Findings: **CONFIRMED —
+OCL has no native 5-axis primitive.** The "layered on pythonOCC" design above
+is the only viable path. See the sibling audit document for full details:
+[docs/plans/5-axis-cam-ocl-audit.md](./5-axis-cam-ocl-audit.md).

@@ -3,9 +3,10 @@ import {
   ChevronDown, ChevronRight,
   FileCode, Folder, FolderOpen, Layers,
   FilePlus, FolderPlus, Plus, Trash2, Box, Upload, Ruler, PenTool, X, RefreshCw,
-  Package, Cylinder, CircuitBoard, Loader2, AlertCircle, Variable,
+  Package, Cylinder, CircuitBoard, Loader2, AlertCircle, Variable, FileBox,
 } from 'lucide-react'
 import { useWorkspace } from '../store/workspace.js'
+import { FreeCADImportDialog, isFCStdFile } from './FreeCADImport.jsx'
 
 // Build a tree from a flat list of {id, parent_id, name, kind}.
 function buildTree(files) {
@@ -65,6 +66,9 @@ function KindIcon({ kind, name, open }) {
   }
   if (lower.endsWith('.equations')) {
     return <Variable size={14} className={`${cls} text-kerf-300`} />
+  }
+  if (lower.endsWith('.fcstd')) {
+    return <FileBox size={14} className={`${cls} text-orange-300`} />
   }
   return <FileCode size={14} className={`${cls} text-ink-200`} />
 }
@@ -364,7 +368,7 @@ const KIND_ORDER = ['folder', 'file', 'sketch', 'assembly', 'drawing', 'feature'
 // buttons in the FileTree header. Shows the full union of canonical
 // kinds; STEP import is appended as a separate row. Closes on
 // click-outside / Escape.
-function CreateMenu({ onCreate, openImportPicker, openKicadPicker }) {
+function CreateMenu({ onCreate, openImportPicker, openKicadPicker, openFreecadPicker }) {
   const [open, setOpen] = useState(false)
   const wrapRef = useRef(null)
   const visibleKinds = KIND_ORDER
@@ -431,6 +435,8 @@ function CreateMenu({ onCreate, openImportPicker, openKicadPicker }) {
             onClick={() => pick(() => openImportPicker?.())} />
           <CreateRow icon={CircuitBoard} label="Import KiCad" hint=".kicad_sch / .kicad_pcb" color="text-cyan-edge"
             onClick={() => pick(() => openKicadPicker?.())} />
+          <CreateRow icon={FileBox} label="Import FreeCAD" hint=".FCStd — FreeCAD 0.19+" color="text-orange-300"
+            onClick={() => pick(() => openFreecadPicker?.())} />
         </div>
       )}
     </div>
@@ -488,7 +494,7 @@ function ContextMenu({ x, y, onClose, onRename, onDelete, onNewFile, onNewFolder
   )
 }
 
-export default function FileTree({ files, currentFileId, onSelect, onCreate, onRename, onDelete, onImportStep, onImportKicad, jscadSketchLinks }) {
+export default function FileTree({ files, currentFileId, onSelect, onCreate, onRename, onDelete, onImportStep, onImportKicad, onImportFreecad, jscadSketchLinks }) {
   const byParent = useMemo(() => buildTree(files || []), [files])
   const roots = byParent.get('__root__') || []
   const [expanded, setExpanded] = useState(() => new Set(
@@ -497,6 +503,7 @@ export default function FileTree({ files, currentFileId, onSelect, onCreate, onR
   const [renamingId, setRenamingId] = useState(null)
   const [menu, setMenu] = useState(null)
   const [kicadImporting, setKicadImporting] = useState(false)
+  const [freecadDialogOpen, setFreecadDialogOpen] = useState(false)
   const [kicadError, setKicadError] = useState(null)
   const fileInputRef = useRef(null)
   const kicadInputRef = useRef(null)
@@ -531,6 +538,10 @@ export default function FileTree({ files, currentFileId, onSelect, onCreate, onR
       kicadInputRef.current.value = ''
       kicadInputRef.current.click()
     }
+  }
+
+  function openFreecadPicker() {
+    setFreecadDialogOpen(true)
   }
 
   function onFilePicked(e) {
@@ -589,6 +600,7 @@ export default function FileTree({ files, currentFileId, onSelect, onCreate, onR
           onCreate={onCreate}
           openImportPicker={() => openImportPicker(null)}
           openKicadPicker={openKicadPicker}
+          openFreecadPicker={openFreecadPicker}
         />
       </div>
       <input
@@ -619,12 +631,48 @@ export default function FileTree({ files, currentFileId, onSelect, onCreate, onR
         </div>
       )}
       <UploadProgressStrip onRetry={retryLastImport} />
+      {freecadDialogOpen && (
+        <FreeCADImportDialog
+          projectId={w.projectId ?? null}
+          open={freecadDialogOpen}
+          onClose={() => setFreecadDialogOpen(false)}
+          onImported={(result) => {
+            setFreecadDialogOpen(false)
+            onImportFreecad?.(result)
+            w.loadFiles?.()
+          }}
+        />
+      )}
       <div
         className="flex-1 overflow-auto py-1 min-h-0"
         onContextMenu={(e) => {
           if (e.target === e.currentTarget) {
             e.preventDefault()
             setMenu({ x: e.clientX, y: e.clientY })
+          }
+        }}
+        onDragOver={(e) => {
+          // Accept .FCStd drags onto the tree background.
+          const items = e.dataTransfer?.items
+          if (items) {
+            for (const item of items) {
+              if (item.kind === 'file') { e.preventDefault(); break }
+            }
+          }
+        }}
+        onDrop={(e) => {
+          const file = e.dataTransfer?.files?.[0]
+          if (!file) return
+          if (isFCStdFile(file)) {
+            e.preventDefault()
+            setFreecadDialogOpen(true)
+            // Defer: dialog is now open — user can see the drop zone.
+            // We auto-trigger the import directly without re-picking.
+            // Store the dropped file so the dialog can kick off immediately.
+            // We use a small trick: open the dialog and programmatically
+            // start the import by dispatching a synthetic CustomEvent that
+            // FreeCADImportDialog listens for via the window.
+            window.dispatchEvent(new CustomEvent('kerf:fcstd-drop', { detail: { file } }))
           }
         }}
       >

@@ -483,6 +483,27 @@ export const api = {
       `/api/projects/${projectId}/files/${fileId}/tolerance/run`,
       { method: 'POST', body: { method, samples, rss_k } },
     ),
+
+  // ---- FreeCAD import (T7 stub) ----
+  // Kick off a FreeCAD import given a blob/asset id returned by uploadAsset
+  // or uploadAssetChunked. The backend handler lives in T7
+  // (packages/kerf-imports/src/kerf_imports/tools/import_freecad.py) which
+  // wires POST /api/projects/:id/imports/freecad. Until T7 ships this stub
+  // raises a clear error so the UI can surface an honest message.
+  //
+  // T7 hook: replace this stub with:
+  //   importFreecadProject: (projectId, fileBlobId, opts = {}) =>
+  //     request(`/api/projects/${projectId}/imports/freecad`, {
+  //       method: 'POST',
+  //       body: { file_blob_id: fileBlobId, import_folder: opts.importFolder ?? '/freecad_import', mode: opts.mode ?? 'project' },
+  //     }),
+  importFreecadProject: (_projectId, _fileBlobId, _opts = {}) =>
+    Promise.reject(
+      Object.assign(
+        new Error('T7 not yet shipped — the FreeCAD import backend handler (import_freecad_project) is pending. Upload succeeded; run the import once T7 lands.'),
+        { code: 'FREECAD_T7_PENDING' },
+      ),
+    ),
 }
 
 // ---------------------------------------------------------------------------

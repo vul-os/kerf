@@ -239,7 +239,9 @@ const FEATURE_KINDS = [
     op: 'mirror_pattern',
     label: 'Mirror',
     icon: FlipHorizontal,
-    defaults: { plane: 'xy' },
+    // T6: plane_face_name dual-writes the persistent face name alongside the
+    // plane field (which can be a numeric face id when picked from the viewport).
+    defaults: { plane: 'xy', plane_face_name: '' },
     fields: [
       { key: 'plane', kind: 'plane_picker', label: 'Plane (axis-pair or face)' },
     ],
@@ -663,7 +665,10 @@ export default function FeatureView({
       // Treat axis/plane picks: fill with the face id (numeric) for plane,
       // and reject for axis (the user should pick an edge for axis).
       if (mode === 'one_shot_plane' && target) {
-        patchFeature(target.featureId, { [target.fieldKey]: faceId })
+        const patch = { [target.fieldKey]: faceId }
+        // T6: dual-write plane_face_name when picking a face as the mirror plane.
+        if (faceName && target.fieldKey === 'plane') patch.plane_face_name = faceName
+        patchFeature(target.featureId, patch)
         setFeaturePickMode(null)
       }
     }

@@ -327,7 +327,11 @@ function parseMateRef(raw) {
   const feature = typeof raw.feature === 'string' ? raw.feature.trim() : ''
   const featureId = typeof raw.feature_id === 'string' ? raw.feature_id.trim() : ''
   if (!componentId || !MATE_FEATURES.has(feature) || !featureId) return null
-  return { component_id: componentId, feature, feature_id: featureId }
+  const ref = { component_id: componentId, feature, feature_id: featureId }
+  // T6: round-trip persistent face/edge name alongside the legacy integer id.
+  const featureName = typeof raw.feature_name === 'string' ? raw.feature_name.trim() : ''
+  if (featureName) ref.feature_name = featureName
+  return ref
 }
 
 // serializeAssembly: produce stable, pretty JSON for storage. Always writes
@@ -415,14 +419,23 @@ export function removeMate(rows, mateId) {
 // Object's id). We want only the componentId for the constraint. Renderer kind
 // 'face' | 'edge' | 'vertex' maps directly onto MATE_FEATURES.
 //
-// Returns { component_id, feature, feature_id } or null when the pick is
-// unusable (null/empty partId or featureId, unsupported kind such as 'axis').
-export function mateRefFromPick(partId, kind, featureId) {
+// T6: accepts an optional `featureName` (persistent face/edge name from the
+// worker's faceNames map). When supplied, both feature_id (legacy integer
+// string like 'face-3') and feature_name (persistent, e.g. 'Pad-A.TopCap')
+// are written into the ref for dual-write compatibility.
+//
+// Returns { component_id, feature, feature_id[, feature_name] } or null when
+// the pick is unusable (null/empty partId or featureId, unsupported kind).
+export function mateRefFromPick(partId, kind, featureId, featureName = '') {
   if (!partId || !featureId) return null
   const feature = kind === 'face' ? 'face' : kind === 'edge' ? 'edge' : kind === 'vertex' ? 'vertex' : null
   if (!feature) return null
   const component_id = partId.includes('/') ? partId.split('/')[0] : partId
-  return { component_id, feature, feature_id: String(featureId) }
+  const ref = { component_id, feature, feature_id: String(featureId) }
+  if (featureName && typeof featureName === 'string' && featureName.trim()) {
+    ref.feature_name = featureName.trim()
+  }
+  return ref
 }
 
 export const EMPTY_ASSEMBLY = EMPTY

@@ -427,6 +427,193 @@ async def run_feature_blend_srf(ctx: ProjectCtx, args: bytes) -> str:
     })
 
 
+# ── feature_to_solid ─────────────────────────────────────────────────────────
+
+feature_to_solid_spec = ToolSpec(
+    name="feature_to_solid",
+    description=(
+        "Append a `to_solid` node to a `.feature` file. Promotes the named "
+        "feature's surface output (a TopoDS_Face / Shell / sewn-face collection) "
+        "to a TopoDS_Solid via BRepBuilderAPI_Sewing + MakeSolid. Required as a "
+        "preparatory step before `feature_boolean` can consume a surface body."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_id": {"type": "string", "description": "Target .feature file id."},
+            "target_id": {
+                "type": "string",
+                "description": "Existing feature node id whose output to promote.",
+            },
+            "options": {
+                "type": "object",
+                "properties": {
+                    "tolerance": {
+                        "type": "number",
+                        "description": "Sewing tolerance in model units (default 1e-6, raise for noisy NURBS).",
+                    },
+                    "id": {"type": "string"},
+                },
+            },
+        },
+        "required": ["file_id", "target_id"],
+    },
+)
+
+
+@register(feature_to_solid_spec, write=True)
+async def run_feature_to_solid(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    file_id = a.get("file_id", "").strip()
+    target_id = a.get("target_id", "").strip()
+    options = a.get("options", {})
+
+    if not file_id or not target_id:
+        return err_payload("file_id and target_id are required", "BAD_ARGS")
+
+    try:
+        fid = uuid.UUID(file_id)
+    except Exception:
+        return err_payload("file_id must be a uuid", "BAD_ARGS")
+
+    content, err = read_feature_content(ctx, fid)
+    if err:
+        return err_payload(f"file not found: {err}", "NOT_FOUND")
+
+    node_id = ""
+    tolerance = 1e-6
+
+    if isinstance(options, dict):
+        node_id = options.get("id", "").strip() or ""
+        tol = options.get("tolerance")
+        if isinstance(tol, (int, float)) and tol > 0:
+            tolerance = float(tol)
+
+    if not node_id:
+        node_id = next_node_id(content, "to_solid")
+
+    node = {
+        "id": node_id,
+        "op": "to_solid",
+        "target_id": target_id,
+        "tolerance": tolerance,
+    }
+
+    name, nid, err = append_feature_node(ctx, fid, node)
+    if err:
+        return err_payload(err, "ERROR")
+
+    return ok_payload({
+        "file_id": file_id,
+        "name": name,
+        "id": nid,
+        "op": "to_solid",
+    })
+
+
+# ── feature_boolean ───────────────────────────────────────────────────────────
+
+feature_boolean_spec = ToolSpec(
+    name="feature_boolean",
+    description=(
+        "Append a `boolean` node to a `.feature` file. Performs a CSG-style "
+        "operation between two existing feature bodies. Both targets must "
+        "resolve to TopoDS_Solid — if either is a surface, run "
+        "`feature_to_solid` on it first."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_id": {"type": "string", "description": "Target .feature file id."},
+            "target_a_id": {
+                "type": "string",
+                "description": "First operand (the 'A' side; the one preserved on cut).",
+            },
+            "target_b_id": {
+                "type": "string",
+                "description": "Second operand (the 'B' side; the tool body on cut).",
+            },
+            "kind": {
+                "type": "string",
+                "enum": ["cut", "fuse", "common"],
+                "description": "cut = A − B, fuse = A ∪ B, common = A ∩ B.",
+            },
+            "options": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                },
+            },
+        },
+        "required": ["file_id", "target_a_id", "target_b_id", "kind"],
+    },
+)
+
+
+@register(feature_boolean_spec, write=True)
+async def run_feature_boolean(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    file_id = a.get("file_id", "").strip()
+    target_a_id = a.get("target_a_id", "").strip()
+    target_b_id = a.get("target_b_id", "").strip()
+    kind = a.get("kind", "").strip()
+    options = a.get("options", {})
+
+    if not file_id or not target_a_id or not target_b_id or not kind:
+        return err_payload(
+            "file_id, target_a_id, target_b_id, and kind are required", "BAD_ARGS"
+        )
+
+    if kind not in ("cut", "fuse", "common"):
+        return err_payload(
+            f"kind must be 'cut', 'fuse', or 'common'; got '{kind}'", "BAD_ARGS"
+        )
+
+    try:
+        fid = uuid.UUID(file_id)
+    except Exception:
+        return err_payload("file_id must be a uuid", "BAD_ARGS")
+
+    content, err = read_feature_content(ctx, fid)
+    if err:
+        return err_payload(f"file not found: {err}", "NOT_FOUND")
+
+    node_id = ""
+    if isinstance(options, dict):
+        node_id = options.get("id", "").strip() or ""
+
+    if not node_id:
+        node_id = next_node_id(content, "boolean")
+
+    node = {
+        "id": node_id,
+        "op": "boolean",
+        "target_a_id": target_a_id,
+        "target_b_id": target_b_id,
+        "kind": kind,
+    }
+
+    name, nid, err = append_feature_node(ctx, fid, node)
+    if err:
+        return err_payload(err, "ERROR")
+
+    return ok_payload({
+        "file_id": file_id,
+        "name": name,
+        "id": nid,
+        "op": "boolean",
+        "kind": kind,
+    })
+
+
 def parse_sketch_curves(sketch_content: str) -> list:
     try:
         sketch = json.loads(sketch_content)

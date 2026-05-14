@@ -275,9 +275,11 @@ describe('opLoft symmetric arg guards (logic-level)', () => {
     ).toThrow('at least 2 profile sketches')
   })
 
-  it('throws when symmetric=true and closed=true', () => {
+  it('throws when symmetric=true and closed=true (3 profiles, to bypass the <3 guard)', () => {
+    // With 3 profiles + closed=true the closed-length guard passes (≥3).
+    // The symmetric+closed guard is reached next and throws.
     expect(() =>
-      simulateGuards(['/a.sketch', '/b.sketch'], { symmetric: true, closed: true }),
+      simulateGuards(['/a.sketch', '/b.sketch', '/c.sketch'], { symmetric: true, closed: true }),
     ).toThrow('symmetric and closed cannot both be true')
   })
 

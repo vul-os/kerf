@@ -2351,6 +2351,175 @@ function opBoolean(oc, _prev, node, _sketches, tracker, bodyMap) {
 }
 
 // ---------------------------------------------------------------------------
+// NURBS Phase 4 Capability 1 — surface-direct booleans (C1-T2)
+// ---------------------------------------------------------------------------
+//
+// opSurfaceBoolean performs a CSG-style operation between two Face/Shell/Solid
+// operands using BRepAlgoAPI_Cut_3 / Fuse_3 / Common_3 without enforcing that
+// the inputs are solids.  Unlike opBoolean (v1 solid-cap path), this op:
+//   - Accepts any TopoDS_Shape topology (Face, Shell, Compound, Solid).
+//   - Optionally runs a ShapeFix_Shape pre-pass on each operand when the
+//     binding is present (softens tolerance inconsistencies in raw NURBS).
+//   - Optionally runs ShapeUpgrade_UnifySameDomain cleanup on the result.
+//   - Attempts to call SetFuzzyValue on the underlying builder when
+//     BOPAlgo_Builder is bound and exposes the method.
+//   - Returns the raw TopoDS_Compound/Shape result; breptToMesh handles it
+//     via TopExp_Explorer the same as any other compound.
+//
+// Binding coverage (C1-T1 probe gate):
+//   BRepAlgoAPI_Cut_3 / Fuse_3 — confirmed (used by opBoolean).
+//   BRepAlgoAPI_Common_3       — probed in NURBS_BOOLEAN_BINDINGS.
+//   BOPAlgo_Builder            — probed in NURBS_PHASE4_C1_BINDINGS.
+//   BRepAlgoAPI_Section        — probed in NURBS_PHASE4_C1_BINDINGS.
+//   ShapeFix_Shape             — probed in NURBS_PHASE4_C1_BINDINGS.
+//   ShapeUpgrade_UnifySameDomain — probed in NURBS_PHASE4_C1_BINDINGS.
+//
+// Plan ref: docs/plans/nurbs-phase-4-full.md § Capability 1, C1-T2.
+// Open question (plan's Q1): does BRepAlgoAPI_Cut_3 accept Face/Shell in
+// this binding?  We attempt the call; if it throws, the error is surfaced
+// via the worker error envelope with a clear escalation message.
+
+/**
+ * opSurfaceBoolean — NURBS Phase 4 C1-T2.
+ *
+ * Performs a surface-direct boolean between two bodies looked up by id in
+ * `bodyMap`. Accepts Face / Shell / Solid — does NOT require solids.
+ *
+ * Node schema:
+ *   {
+ *     op: "surface_boolean",
+ *     id: string,
+ *     target_a_id: string,
+ *     target_b_id: string,
+ *     kind: "cut" | "fuse" | "common",
+ *     fuzziness?: number,   // default 1e-4; raise to 1e-3 on tangent misses
+ *   }
+ *
+ * @param {object} oc        — opencascade.js handle
+ * @param {null}   _prev     — unused (surface_boolean is a new body)
+ * @param {object} node      — feature node
+ * @param {object} _sketches — unused
+ * @param {object} tracker   — OCCT object lifetime tracker
+ * @param {object} bodyMap   — { [nodeId]: TopoDS_Shape }
+ */
+function opSurfaceBoolean(oc, _prev, node, _sketches, tracker, bodyMap) {
+  const aId = node.target_a_id
+  const bId = node.target_b_id
+  if (!aId) throw new Error('surface_boolean: target_a_id is required')
+  if (!bId) throw new Error('surface_boolean: target_b_id is required')
+
+  const a = bodyMap && bodyMap[aId]
+  const b = bodyMap && bodyMap[bId]
+  if (!a) throw new Error(`surface_boolean: target_a '${aId}' not found in evaluated tree`)
+  if (!b) throw new Error(`surface_boolean: target_b '${bId}' not found in evaluated tree`)
+
+  const kind = node.kind || 'cut'
+  if (!['cut', 'fuse', 'common'].includes(kind)) {
+    throw new Error(`surface_boolean: unknown kind '${kind}' (expected cut|fuse|common)`)
+  }
+
+  const fuzziness = typeof node.fuzziness === 'number' && node.fuzziness > 0
+    ? node.fuzziness
+    : 1e-4
+
+  // Phase 4 binding probe results — gate optional features.
+  const p4 = getNurbsPhase4Bindings(oc)
+  const hasShapeFix = p4['ShapeFix_Shape']
+  const hasUnify    = p4['ShapeUpgrade_UnifySameDomain']
+  const hasBOPAlgo  = p4['BOPAlgo_Builder']
+
+  // Optional ShapeFix_Shape pre-pass on each operand.
+  // Only applied if the binding is present; silently skipped otherwise.
+  function maybeFixShape(shape) {
+    if (!hasShapeFix) return shape
+    try {
+      const fixer = track(tracker, new oc.ShapeFix_Shape_2(shape))
+      fixer.Perform(new oc.Message_ProgressRange_1())
+      return fixer.Shape()
+    } catch {
+      // ShapeFix unavailable at runtime despite probe; return original.
+      return shape
+    }
+  }
+
+  const fixedA = maybeFixShape(a)
+  const fixedB = maybeFixShape(b)
+
+  const pr = () => new oc.Message_ProgressRange_1()
+
+  // Build the algorithm.  Attempt SetFuzzyValue when BOPAlgo_Builder is
+  // present — it may be callable on the underlying builder via the
+  // BRepAlgoAPI_* algorithm object's inherited interface.
+  function buildAlgo(AlgoClass, opA, opB) {
+    const algo = track(tracker, new AlgoClass(opA, opB, pr()))
+    // Try SetFuzzyValue — may not be exposed depending on binding depth.
+    if (hasBOPAlgo) {
+      try {
+        if (typeof algo.SetFuzzyValue === 'function') {
+          algo.SetFuzzyValue(fuzziness)
+        }
+      } catch { /* not available — continue without */ }
+    }
+    algo.Build(pr())
+    return algo
+  }
+
+  let algo
+  switch (kind) {
+    case 'cut':
+      algo = buildAlgo(oc.BRepAlgoAPI_Cut_3, fixedA, fixedB)
+      break
+    case 'fuse':
+      algo = buildAlgo(oc.BRepAlgoAPI_Fuse_3, fixedA, fixedB)
+      break
+    case 'common':
+      if (typeof oc.BRepAlgoAPI_Common_3 !== 'function') {
+        // Fallback: A ∩ B = A − (A − B) — same identity as opBoolean.
+        // Note: on face-fragment outputs the identity may produce a
+        // different fragment count vs solids (plan Q3); C1-T9 will test.
+        const inner = buildAlgo(oc.BRepAlgoAPI_Cut_3, fixedA, fixedB)
+        if (!inner.IsDone()) throw new Error('surface_boolean: common-via-cut inner step failed')
+        algo = buildAlgo(oc.BRepAlgoAPI_Cut_3, fixedA, inner.Shape())
+      } else {
+        algo = buildAlgo(oc.BRepAlgoAPI_Common_3, fixedA, fixedB)
+      }
+      break
+    default:
+      throw new Error(`surface_boolean: unknown kind '${kind}'`)
+  }
+
+  if (!algo.IsDone()) {
+    // Check whether the binding refused non-solid operands (plan Q1 failure
+    // mode).  We can't distinguish at this level, so surface a clear message
+    // that prompts escalation to C1-T10 (custom WASM rebuild).
+    throw new Error(
+      `surface_boolean: ${kind} algorithm failed (BOPAlgo error). ` +
+      'If operands are Face/Shell, this build may not support non-solid operands — ' +
+      'try feature_to_solid first, or escalate to C1-T10 (WASM rebuild).'
+    )
+  }
+
+  let result = algo.Shape()
+
+  if (_isEmptyShape(oc, result)) {
+    throw new Error(
+      `surface_boolean: ${kind} produced an empty result (operands may not intersect)`
+    )
+  }
+
+  // Optional ShapeUpgrade_UnifySameDomain cleanup on the result.
+  if (hasUnify) {
+    try {
+      const unify = track(tracker, new oc.ShapeUpgrade_UnifySameDomain_2(result, true, true, false))
+      unify.Build()
+      result = unify.Shape()
+    } catch { /* not available — return un-unified result */ }
+  }
+
+  return result
+}
+
+// ---------------------------------------------------------------------------
 // Tree evaluation.
 //
 // The evaluator walks the feature tree top-to-bottom, threading the
@@ -2602,6 +2771,19 @@ function evaluateTree(oc, tree, sketches) {
           currentFaceNamer = null
           break
         }
+        case 'surface_boolean': {
+          // surface_boolean is a new body: finalize previous mesh entry first.
+          // Unlike opBoolean, operands need not be solids; returns a compound
+          // of trimmed face fragments.  breptToMesh handles compounds natively.
+          if (current) {
+            pushCurrentMesh(`body-${meshes.length}`)
+            cleanupShape(oc, current)
+            current = null
+          }
+          next = opSurfaceBoolean(oc, null, node, sketches, tracker, bodyMap)
+          currentFaceNamer = null
+          break
+        }
         default:
           throw new Error(`unknown feature op '${node.op}'`)
       }
@@ -2811,6 +2993,12 @@ async function evaluateToFinalShape(oc, tree, sketches) {
           if (current) cleanupShape(oc, current)
           current = null
           next = opBoolean(oc, null, node, sketches, tracker, bodyMap)
+          currentFaceNamer = null
+          break
+        case 'surface_boolean':
+          if (current) cleanupShape(oc, current)
+          current = null
+          next = opSurfaceBoolean(oc, null, node, sketches, tracker, bodyMap)
           currentFaceNamer = null
           break
         default: throw new Error(`unknown feature op '${node.op}'`)

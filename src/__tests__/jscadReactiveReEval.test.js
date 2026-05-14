@@ -1,16 +1,14 @@
 // jscadReactiveReEval.test.js
 //
-// Covers the reactive re-evaluation wiring introduced in task 4 of the
-// sketch-to-jscad workflow (docs/plans/sketch-to-jscad.md):
+// Covers the reactive re-evaluation wiring for the sketch-to-jscad workflow:
 //
-//   • `fileAbsPath`       — walks the parent_id chain to build '/a/b/c.sketch'
+//   • `fileAbsPath`        — walks the parent_id chain to build '/a/b/c.sketch'
 //   • `jscadImportsSketch` — matches SKETCH_IMPORT_RE against a sketch path
-//   • `_reEvalJscadForSketch` store action — fires runJscad when the currently-
-//     open file is a .jscad that imports the mutated sketch; no-ops otherwise.
+//   • `_reEvalJscadForSketch` v1 — re-runs open .jscad that imports the sketch
+//   • `_reEvalJscadForSketch` v2 (cross-file):
+//       - evicts componentResultCache for affected jscads
+//       - re-resolves open assembly when dep graph touches it
 //   • LLM-tool path: `updateSketch` calls `_reEvalJscadForSketch` after save.
-//
-// Scope note (v1): only the currently-open file is re-evaluated. Cross-file
-// graph invalidation (assembly C → jscad B → sketch A) is deferred.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
@@ -29,8 +27,10 @@ vi.mock('../lib/meshCache.js', () => ({
 // factory can reference it without hitting the TDZ (vi.mock calls are hoisted
 // to the top of the file by vitest's transformer, but const declarations are
 // not — vi.hoisted runs before that hoisting boundary).
-const { mockRunJscad } = vi.hoisted(() => ({
+const { mockRunJscad, mockDependentsOfSketch, mockResolveAssemblyPartsHelper } = vi.hoisted(() => ({
   mockRunJscad: vi.fn(),
+  mockDependentsOfSketch: vi.fn(() => ({ jscads: [], assemblies: [] })),
+  mockResolveAssemblyPartsHelper: vi.fn(async () => []),
 }))
 
 vi.mock('../lib/jscadRunner.js', async (importOriginal) => {
@@ -79,9 +79,17 @@ vi.mock('../cloud/api.js', () => ({ git: {} }))
 vi.mock('../lib/stepLoader.js', () => ({ loadStep: vi.fn() }))
 vi.mock('../lib/meshLoader.js', () => ({ loadMeshFromURL: vi.fn() }))
 vi.mock('../lib/assembly.js', () => ({
-  parseAssembly: () => null,
-  resolveAssemblyParts: vi.fn(),
+  parseAssembly: (s) => {
+    if (!s) return { components: [], overrides: [] }
+    try { return { components: JSON.parse(s)?.components || [], overrides: [] } } catch { return { components: [], overrides: [] } }
+  },
+  resolveAssemblyParts: mockResolveAssemblyPartsHelper,
   loadExternalParts: vi.fn(),
+}))
+vi.mock('../lib/depGraph.js', () => ({
+  dependentsOfSketch: mockDependentsOfSketch,
+  buildSketchImports: vi.fn(() => new Map()),
+  buildAssemblyDeps: vi.fn(() => new Map()),
 }))
 vi.mock('../lib/derivedPayload.js', () => ({
   encodePayload: vi.fn(),
@@ -103,7 +111,7 @@ vi.mock('../lib/sourceEdit.js', () => ({
 vi.mock('@jscad/modeling', () => ({}))
 
 // ---- Now import the things we actually want to test -------------------------
-import { fileAbsPath, jscadImportsSketch, useWorkspace } from '../store/workspace.js'
+import { fileAbsPath, jscadImportsSketch, useWorkspace, evictComponentCacheForFile } from '../store/workspace.js'
 import { SKETCH_IMPORT_RE } from '../lib/jscadRunner.js'
 
 // ---------------------------------------------------------------------------
@@ -394,5 +402,163 @@ describe('updateSketch cascades to JSCAD re-eval', () => {
     )
 
     expect(mockRunJscad).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// evictComponentCacheForFile
+// ---------------------------------------------------------------------------
+describe('evictComponentCacheForFile', () => {
+  it('is exported from workspace.js', () => {
+    expect(typeof evictComponentCacheForFile).toBe('function')
+  })
+
+  it('does not throw for null/empty fileId', () => {
+    expect(() => evictComponentCacheForFile(null)).not.toThrow()
+    expect(() => evictComponentCacheForFile('')).not.toThrow()
+    expect(() => evictComponentCacheForFile(undefined)).not.toThrow()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Cross-file dep-graph walk: componentResultCache eviction
+// ---------------------------------------------------------------------------
+describe('_reEvalJscadForSketch cross-file: cache eviction and assembly re-resolve', () => {
+  beforeEach(() => {
+    mockRunJscad.mockReset()
+    mockDependentsOfSketch.mockReset()
+    mockResolveAssemblyPartsHelper.mockReset()
+    // Default: nothing affected
+    mockDependentsOfSketch.mockReturnValue({ jscads: [], assemblies: [] })
+    mockResolveAssemblyPartsHelper.mockResolvedValue([])
+  })
+
+  afterEach(() => {
+    useWorkspace.setState({
+      currentFileId: null,
+      currentFile: null,
+      currentFileContent: '',
+      parts: [],
+      partsError: null,
+      loadingParts: false,
+      files: [],
+      projectId: null,
+    })
+  })
+
+  it('calls dependentsOfSketch with the sketch path and current files', async () => {
+    const files = [
+      { id: 'folder-parts', name: 'parts', kind: 'folder', parent_id: null },
+      { id: 'sketch-a', name: 'a.sketch', kind: 'sketch', parent_id: 'folder-parts' },
+    ]
+    mockDependentsOfSketch.mockReturnValue({ jscads: [], assemblies: [] })
+
+    useWorkspace.setState({
+      currentFileId: 'sketch-a',
+      currentFile: { id: 'sketch-a', name: 'a.sketch', kind: 'sketch', parent_id: null },
+      currentFileContent: '{}',
+      files,
+      getActiveConfigParams: () => null,
+    })
+
+    await useWorkspace.getState()._reEvalJscadForSketch('/parts/a.sketch')
+
+    expect(mockDependentsOfSketch).toHaveBeenCalledOnce()
+    expect(mockDependentsOfSketch).toHaveBeenCalledWith('/parts/a.sketch', files)
+  })
+
+  it('re-resolves the open assembly when dep graph includes it', async () => {
+    const assemblyContent = JSON.stringify({ components: [{ id: 'c1', file_id: 'jscad-b', object_id: 'body' }] })
+    const freshParts = [{ id: 'refreshed-part', geom: {} }]
+    mockDependentsOfSketch.mockReturnValue({ jscads: ['jscad-b'], assemblies: ['asm-top'] })
+    mockResolveAssemblyPartsHelper.mockResolvedValue(freshParts)
+
+    useWorkspace.setState({
+      projectId: 'proj-1',
+      currentFileId: 'asm-top',
+      currentFile: { id: 'asm-top', name: 'top.assembly', kind: 'assembly', parent_id: null },
+      currentFileContent: assemblyContent,
+      files: [],
+      parts: [],
+      partsError: null,
+      loadingParts: false,
+      getActiveConfigParams: () => null,
+    })
+
+    await useWorkspace.getState()._reEvalJscadForSketch('/a.sketch')
+
+    // resolveAssemblyParts (the helper) should have been called.
+    expect(mockResolveAssemblyPartsHelper).toHaveBeenCalled()
+    // runJscad should NOT have been called (no jscad is open).
+    expect(mockRunJscad).not.toHaveBeenCalled()
+    // The store's parts should reflect the fresh result.
+    const state = useWorkspace.getState()
+    expect(state.parts).toEqual(freshParts)
+    expect(state.partsError).toBeNull()
+    expect(state.loadingParts).toBe(false)
+  })
+
+  it('does NOT re-resolve when the open assembly is NOT in the dep graph', async () => {
+    mockDependentsOfSketch.mockReturnValue({ jscads: ['jscad-b'], assemblies: ['asm-other'] })
+
+    useWorkspace.setState({
+      projectId: 'proj-1',
+      currentFileId: 'asm-unrelated',
+      currentFile: { id: 'asm-unrelated', name: 'unrelated.assembly', kind: 'assembly', parent_id: null },
+      currentFileContent: '{"components":[]}',
+      files: [],
+    })
+
+    await useWorkspace.getState()._reEvalJscadForSketch('/a.sketch')
+
+    expect(mockResolveAssemblyPartsHelper).not.toHaveBeenCalled()
+    expect(mockRunJscad).not.toHaveBeenCalled()
+  })
+
+  it('still re-evals the open jscad (v1 path) even when dep graph also finds assemblies', async () => {
+    const jscadSrc = `import profile from '/a.sketch'\nexport default function () { return [] }`
+    mockRunJscad.mockResolvedValueOnce({ parts: [{ id: 'p0', geom: {} }] })
+    // dep graph says the jscad also belongs to an assembly, but since a jscad is open
+    // the v1 path should run (and NOT trigger an assembly re-resolve).
+    mockDependentsOfSketch.mockReturnValue({ jscads: ['jscad-b'], assemblies: ['asm-top'] })
+
+    useWorkspace.setState({
+      projectId: 'proj-1',
+      currentFileId: 'jscad-b',
+      currentFile: { id: 'jscad-b', name: 'b.jscad', kind: 'file', parent_id: null },
+      currentFileContent: jscadSrc,
+      files: [],
+      parts: [],
+      getActiveConfigParams: () => null,
+    })
+
+    await useWorkspace.getState()._reEvalJscadForSketch('/a.sketch')
+
+    expect(mockRunJscad).toHaveBeenCalledOnce()
+    expect(mockResolveAssemblyPartsHelper).not.toHaveBeenCalled()
+    const state = useWorkspace.getState()
+    expect(state.parts).toHaveLength(1)
+  })
+
+  it('sets partsError when assembly re-resolve throws', async () => {
+    mockDependentsOfSketch.mockReturnValue({ jscads: ['jscad-b'], assemblies: ['asm-top'] })
+    mockResolveAssemblyPartsHelper.mockRejectedValue(new Error('resolve failed'))
+
+    useWorkspace.setState({
+      projectId: 'proj-1',
+      currentFileId: 'asm-top',
+      currentFile: { id: 'asm-top', name: 'top.assembly', kind: 'assembly', parent_id: null },
+      currentFileContent: '{"components":[]}',
+      files: [],
+      parts: [],
+      partsError: null,
+      loadingParts: false,
+    })
+
+    await useWorkspace.getState()._reEvalJscadForSketch('/a.sketch')
+
+    const state = useWorkspace.getState()
+    expect(state.partsError).toBe('resolve failed')
+    expect(state.loadingParts).toBe(false)
   })
 })

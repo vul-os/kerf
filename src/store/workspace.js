@@ -12,6 +12,7 @@
 import { create } from 'zustand'
 import { api, ApiError } from '../lib/api.js'
 import { runJscad, setSketchResolver, setSketchLister, setEquationsResolver as setJscadEquationsResolver, SKETCH_IMPORT_RE } from '../lib/jscadRunner.js'
+import { dependentsOfSketch } from '../lib/depGraph.js'
 import { setEquationsResolver as setOcctEquationsResolver, setActiveConfigResolver as setOcctActiveConfigResolver } from '../lib/occtRunner.js'
 import { loadStep } from '../lib/stepLoader.js'
 import { loadMeshFromURL } from '../lib/meshLoader.js'
@@ -450,6 +451,17 @@ function shortId(prefix) {
 const componentResultCache = new Map()
 function cacheKey(fileId, contentSig) {
   return `${fileId}::${contentSig}`
+}
+// Evict all cache entries whose key starts with `${fileId}::`. This is needed
+// for transitive sketch-change invalidation: when a .jscad is affected by a
+// sketch edit its content hasn't changed (only a dep has), so we can't rely on
+// the content-hash key changing — we must proactively evict by file_id prefix.
+export function evictComponentCacheForFile(fileId) {
+  if (!fileId) return
+  const prefix = `${fileId}::`
+  for (const k of componentResultCache.keys()) {
+    if (k.startsWith(prefix)) componentResultCache.delete(k)
+  }
 }
 // Tiny djb2 string hash; used to invalidate the cache when a referenced file's
 // content changes. updated_at would also work but isn't always available on
@@ -2055,11 +2067,10 @@ export const useWorkspace = create((set, get) => ({
         currentFile: updated,
         files: s.files.map((f) => f.id === updated.id ? { ...f, ...updated, content: undefined } : f),
       }))
-      // Reactive re-eval: if a JSCAD file is currently open and its source
-      // imports the sketch we just saved, re-run it so the 3D viewport stays
-      // in sync without requiring a manual refresh.
-      // Scope (v1): only the currently-open file. Cross-file graph invalidation
-      // (assembly C → jscad B → sketch A) is deferred — see ROADMAP.
+      // Reactive re-eval: walks the full cross-file dep graph
+      // (sketch → jscads → assemblies). Evicts componentResultCache for every
+      // affected .jscad; if an assembly is open and is downstream, triggers
+      // an immediate re-resolve. See _reEvalJscadForSketch for details.
       const sketchPath = fileAbsPath(get().files, currentFileId)
       await get()._reEvalJscadForSketch(sketchPath)
     } catch (err) {
@@ -2067,28 +2078,84 @@ export const useWorkspace = create((set, get) => ({
     }
   },
 
-  // Internal helper: if the currently-open file is a .jscad that imports the
-  // sketch at `sketchAbsPath`, re-run it and update parts / partsError.
-  // Called by updateSketch after a sketch is saved, and indirectly by
-  // sendMessage after LLM sketch_* tool calls trigger loadFileForEditor
-  // (which already re-runs runJscad via the standard JSCAD branch — so the
-  // LLM path is fully covered once sketch_* tools are in FILE_MUTATING_TOOLS).
+  // Internal helper: re-evaluate everything downstream of a sketch mutation.
+  //
+  // v1 scope (preserved): if the currently-open file is a .jscad that imports
+  //   the mutated sketch, re-run it so the viewport stays live.
+  //
+  // v2 cross-file graph walk (new): also:
+  //   1. Walk dependentsOfSketch(sketchAbsPath, files) to find ALL .jscad files
+  //      that import the sketch and ALL .assembly files that reference those
+  //      jscads.
+  //   2. Evict componentResultCache for every affected .jscad file so that the
+  //      next assembly resolve recomputes from scratch instead of serving stale
+  //      cached parts.
+  //   3. If the currently-open file is an .assembly whose dep graph touches any
+  //      of the affected jscads, trigger a full assembly re-resolve so the
+  //      viewport refreshes immediately (no manual reload required).
+  //
+  // LLM-tool path: sketch_* tools are in FILE_MUTATING_TOOLS, which causes
+  //   sendMessage → loadFileForEditor. loadFileForEditor for a .jscad already
+  //   calls runJscad; for an .assembly it already calls resolveAssemblyParts.
+  //   The new cache eviction here ensures those re-resolves see fresh results.
+  //
+  // .feature → .assembly propagation: deferred. .feature files may also import
+  //   sketches (via sketch_id / sketch_file_id), but the OCCT re-evaluation is
+  //   owned by FeatureView's debounced effect which already fires on any sketch
+  //   save that flows through loadFileForEditor. Wiring .feature → .assembly
+  //   invalidation requires OCCT result caching (not yet present) — flag for
+  //   future work.
   _reEvalJscadForSketch: async (sketchAbsPath) => {
     const state = get()
-    const { currentFile, currentFileContent, currentFileId } = state
+    const { currentFile, currentFileContent, currentFileId, files, projectId } = state
     if (!currentFile || !currentFileId) return
-    if (fileKindFor(currentFile) !== 'jscad') return
-    if (!jscadImportsSketch(currentFileContent, sketchAbsPath)) return
-    // The sketch content changed; re-resolve sketch imports and re-eval.
-    const cfgParams = state.getActiveConfigParams ? state.getActiveConfigParams(currentFileId) : null
-    const res = await runJscad(currentFileContent, cfgParams)
-    // Guard: user may have navigated away while JSCAD was running.
-    if (get().currentFileId !== currentFileId) return
-    if (res?.stale) return
-    if (res.error) {
-      set({ partsError: res.error, loadingParts: false })
-    } else {
-      set({ parts: res.parts || [], partsError: null, loadingParts: false })
+
+    // --- Cross-file dep graph walk (v2) ---
+    // Run this unconditionally (regardless of what file is open) so cache
+    // eviction is always performed.
+    const { jscads: affectedJscads, assemblies: affectedAssemblies } = dependentsOfSketch(
+      sketchAbsPath,
+      Array.isArray(files) ? files : [],
+    )
+
+    // Evict componentResultCache for every affected .jscad.
+    for (const jscadId of affectedJscads) {
+      evictComponentCacheForFile(jscadId)
+    }
+
+    const openKind = fileKindFor(currentFile)
+
+    // --- v1: open file is a .jscad that imports the sketch ---
+    if (openKind === 'jscad') {
+      if (jscadImportsSketch(currentFileContent, sketchAbsPath)) {
+        const cfgParams = state.getActiveConfigParams ? state.getActiveConfigParams(currentFileId) : null
+        const res = await runJscad(currentFileContent, cfgParams)
+        // Guard: user may have navigated away while JSCAD was running.
+        if (get().currentFileId !== currentFileId) return
+        if (res?.stale) return
+        if (res.error) {
+          set({ partsError: res.error, loadingParts: false })
+        } else {
+          set({ parts: res.parts || [], partsError: null, loadingParts: false })
+        }
+      }
+      return
+    }
+
+    // --- v2: open file is an .assembly touched by the dep graph ---
+    if (openKind === 'assembly' && affectedAssemblies.includes(currentFileId)) {
+      if (!projectId) return
+      set({ loadingParts: true, partsError: null })
+      try {
+        const parts = await resolveAssemblyParts(get, projectId, currentFileContent)
+        // Guard: user may have navigated away while resolving.
+        if (get().currentFileId !== currentFileId) return
+        set({ parts, partsError: null, loadingParts: false })
+      } catch (err) {
+        if (get().currentFileId === currentFileId) {
+          set({ loadingParts: false, partsError: err?.message || 'Assembly resolve failed' })
+        }
+      }
     }
   },
 

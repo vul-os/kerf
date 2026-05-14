@@ -1,7 +1,8 @@
 # Sketch → JSCAD workflow
 
-> **Status:** planned (no code yet). Mesh-side analog of the existing
-> `.sketch → .feature` BRep path.
+> **Status:** tasks 4 (reactive re-eval, v1) and the cross-file dep-graph
+> invalidation follow-up are **landed**. Tasks 1–3, 5 remain open.
+> Mesh-side analog of the existing `.sketch → .feature` BRep path.
 
 ## Motivation
 
@@ -446,11 +447,12 @@ sibling `packages/kerf-cad-core/src/kerf_cad_core/jscad_scaffold.py`).
 
 ## Open architectural questions
 
-1. **Cross-file invalidation.** When sketch `A.sketch` is edited and is
-   imported by `B.jscad` which is imported by `C.jscad` which is
-   referenced by `D.assembly`, what gets re-evaluated? v1 only re-runs
-   the open file; full graph invalidation (with `componentResultCache`
-   busting) is a follow-up — track scope in a dedicated row.
+1. **Cross-file invalidation.** Landed. `_reEvalJscadForSketch` now walks
+   `dependentsOfSketch` (in `src/lib/depGraph.js`) on every sketch save:
+   evicts `componentResultCache` for all affected `.jscad` files; if the
+   currently-open file is an `.assembly` downstream of the mutation it is
+   immediately re-resolved. `.feature → .assembly` propagation is still
+   deferred (see `_reEvalJscadForSketch` JSDoc for scope note).
 2. **`require()` legacy.** The docs hinted at `require('/x.sketch')` —
    should we *also* implement that for ergonomic parity? Verdict from
    this plan: no, because ES `import` is statically inspectable; add

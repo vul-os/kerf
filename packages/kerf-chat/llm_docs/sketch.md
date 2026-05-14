@@ -106,7 +106,11 @@ Geometric:
 - `point_on_line` — `{point, line}` point lies on the line (free to slide along)
 - `point_on_arc` — `{point, arc}`
 - `midpoint` — `{point, line}` point pinned to the line's midpoint
-- `symmetric` — `{p1, p2, axis}` axis is a line id
+- `symmetric` — `{p1, p2, axis}` axis is a line id (legacy: axis-aligned; uses any line)
+- `symmetric_over_line` — `{entity_a_id, entity_b_id, construction_line_id}` mirror entity_a
+  across an arbitrary construction line so it is the mirror image of entity_b. Works with
+  points, lines, circles, arcs, bezier and bspline curves. Composite entities are decomposed
+  into multiple `p2p_symmetric_ppl` point-pair primitives automatically.
 - `block` — `{point}` lock the point at its current `(x, y)`; pair with `coordinate_x`/`coordinate_y` if you want a specific value
 - `bezier_tangent` — `{p0, p1, p2}` direction-only tangent at a Bezier junction: p1 is the shared endpoint; p0 and p2 are the adjacent handles of each segment. Enforces p0–p1–p2 collinearity (G1 direction).
 - `bezier_g1` — `{p0, p1, p2}` G0+G1 at a Bezier junction (use alongside a `coincident` for the shared endpoint). Same collinearity as `bezier_tangent`.
@@ -122,6 +126,80 @@ Dimensional (carry `value`):
 - `angle` — `{line1, line2, value}` degrees
 - `radius` — `{circle, value}` (or `{arc, value}`)
 - `diameter` — `{circle, value}`
+
+## Symmetry constraints
+
+Kerf supports two symmetry constraint types.
+
+### Axis-aligned symmetry (`symmetric`)
+
+The legacy form. Takes two *point* entity ids and a line id.
+
+```json
+{ "id": "c1", "type": "symmetric", "a": "p1", "b": "p2", "line": "axis_line" }
+```
+
+### Arbitrary-line symmetry (`symmetric_over_line`)
+
+Mirror any entity (or pair of composite entities) across a user-drawn
+construction line. The construction line must be a `line` entity with
+`"construction": true` to distinguish it from profile geometry.
+
+```json
+{
+  "id": "c2",
+  "type": "symmetric_over_line",
+  "entity_a_id": "p1",
+  "entity_b_id": "p2",
+  "construction_line_id": "axis"
+}
+```
+
+**Before** adding the constraint — two free points and a diagonal construction line:
+
+```json
+{
+  "entities": [
+    { "id": "origin", "type": "point", "x": 0,  "y": 0 },
+    { "id": "p1",     "type": "point", "x": -5, "y": 3 },
+    { "id": "p2",     "type": "point", "x": 7,  "y": 8 },
+    { "id": "lp1",    "type": "point", "x": 0,  "y": 0 },
+    { "id": "lp2",    "type": "point", "x": 10, "y": 0 },
+    { "id": "axis",   "type": "line",  "p1": "lp1", "p2": "lp2", "construction": true }
+  ],
+  "constraints": []
+}
+```
+
+**After** adding `symmetric_over_line` (once solved, p2 will be the mirror image of p1
+across the horizontal axis line):
+
+```json
+{
+  "constraints": [
+    {
+      "id": "sym1",
+      "type": "symmetric_over_line",
+      "entity_a_id": "p1",
+      "entity_b_id": "p2",
+      "construction_line_id": "axis"
+    }
+  ]
+}
+```
+
+Supported entity pairs:
+
+| entity_a / entity_b | planegcs primitives emitted |
+|---------------------|------------------------------|
+| `point` / `point`   | 1 × `p2p_symmetric_ppl`     |
+| `line` / `line`     | 2 × `p2p_symmetric_ppl`     |
+| `circle` / `circle` | 1 × `p2p_symmetric_ppl` (centers) + `equal_radius_cc` |
+| `arc` / `arc`       | 3 × `p2p_symmetric_ppl` (center, start↔end, end↔start) + `equal_radius_aa` |
+| `bezier` / `bezier` | N × `p2p_symmetric_ppl` (control_points[i] ↔ control_points[N-1-i]) |
+| `bspline` / `bspline` | N × `p2p_symmetric_ppl` (controls[i] ↔ controls[N-1-i]) |
+
+The arc case intentionally swaps start/end to preserve the winding direction.
 
 ## Common authoring patterns
 

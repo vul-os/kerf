@@ -742,6 +742,13 @@ export default function Editor() {
   const [chatCollapsed, setChatCollapsed] = useState(() => {
     try { return localStorage.getItem('kerf:chatCollapsed') === '1' } catch { return false }
   })
+  // Thumbnail refresh (user-triggered "Refresh thumbnail" button in the header).
+  const [thumbRefreshing, setThumbRefreshing] = useState(false)
+  const [thumbToast, setThumbToast] = useState(null)
+  const thumbToastTimerRef = useRef(null)
+  const captureSnapshotFn = useCallback(async (opts) => {
+    return currentViewRef.current?.snapshot?.(opts || { size: 512, quality: 0.7 }) ?? null
+  }, [])
   useEffect(() => {
     try { localStorage.setItem('kerf:chatCollapsed', chatCollapsed ? '1' : '0') } catch {}
   }, [chatCollapsed])
@@ -1054,7 +1061,42 @@ export default function Editor() {
         <ExportButton />
 
         {cloudEnabled && w.project && (
-          <PublishButton project={w.project} />
+          <>
+            <button
+              type="button"
+              disabled={thumbRefreshing || !currentViewRef.current}
+              title="Refresh thumbnail from current view"
+              aria-label="Refresh thumbnail"
+              onClick={async () => {
+                if (thumbRefreshing || !projectId) return
+                setThumbRefreshing(true)
+                try {
+                  const blob = await captureSnapshotFn({ size: 512, quality: 0.7 })
+                  if (blob) {
+                    await api.uploadProjectThumbnail(projectId, blob)
+                    if (thumbToastTimerRef.current) clearTimeout(thumbToastTimerRef.current)
+                    setThumbToast('Thumbnail updated')
+                    thumbToastTimerRef.current = setTimeout(() => setThumbToast(null), 3000)
+                  }
+                } catch (err) {
+                  console.warn('[Editor] manual thumbnail refresh failed', err)
+                } finally {
+                  setThumbRefreshing(false)
+                }
+              }}
+              className="p-1.5 rounded hover:bg-ink-800 text-ink-300 hover:text-kerf-300 disabled:opacity-40 disabled:hover:bg-transparent"
+            >
+              {thumbRefreshing
+                ? <Loader2 size={14} className="animate-spin" />
+                : <RotateCcw size={14} />}
+            </button>
+            {thumbToast && (
+              <span className="text-[11px] font-mono text-emerald-400 whitespace-nowrap">
+                {thumbToast}
+              </span>
+            )}
+            <PublishButton project={w.project} captureSnapshot={captureSnapshotFn} />
+          </>
         )}
 
         <button

@@ -1,10 +1,10 @@
 """
-Tests for backend/tools/pcb_drc.py — run_pcb_drc and set_drc_rule tools.
+Tests for kerf_electronics/tools/pcb_drc.py — run_pcb_drc and set_drc_rule tools.
 """
 import json
 import unittest
 
-from tools.pcb_drc import _run_drc_on_circuit, _DEFAULT_RULES
+from kerf_electronics.tools.pcb_drc import _run_drc_on_circuit, _DEFAULT_RULES
 from tools.registry import Registry
 
 

@@ -9,15 +9,11 @@ from . import (
     surfacing,
     feature_draft,
     feature_mirror,
-    sim,
     assembly,
     tolerance,
     docs,
     material,
-    pcb_layer_tools,
-    pcb_drc,
     project_layers,
-    routing,
     sketch,
     # Moved to plugin packages:
     # fem -> kerf-fem
@@ -26,7 +22,8 @@ from . import (
     # bim, bim_categories, family, schedule, view, sheet, stairs, railings,
     # mep, curtain_wall, element_types -> kerf-bim
     # rf, autoroute, pour, erc, net_classes, buses, via_stitching, shove_router,
-    # pad_overrides, hier_schematic, length_tuning -> kerf-electronics
+    # pad_overrides, hier_schematic, length_tuning, pcb_drc, pcb_layer_tools,
+    # routing, sim -> kerf-electronics
     # subd, mesh, curve_ops, draft, inspection, graph, import_3dm,
     # feature_helix, feature_multi_transform, feature_rib, sheet_revisions -> kerf-imports
     # render -> kerf-render

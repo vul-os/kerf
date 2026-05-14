@@ -1,12 +1,15 @@
 """test_erc.py — pytest suite for the ERC engine and LLM tool."""
 import importlib.util
+import os
 import sys
 import unittest
 
 # Load tools.erc directly (avoids triggering the full tools package init
 # which requires a live DB/env config for unrelated modules).
 _spec = importlib.util.spec_from_file_location(
-    "tools.erc", "/Users/pc/code/exo/kerf/.claude/worktrees/agent-a32c4befabb8b2b49/kerf-electronics/src/kerf_electronics/tools/erc.py"
+    "tools.erc",
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                 "src", "kerf_electronics", "tools", "erc.py"),
 )
 _mod = importlib.util.module_from_spec(_spec)
 

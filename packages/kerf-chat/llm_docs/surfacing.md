@@ -14,11 +14,69 @@ When choosing between them:
 | A patch fitted to a 4-or-more-curve U/V edge grid          | `network_srf`   |
 | A smooth bridge between two existing edges                 | `blend_srf`     |
 | A simple sweep along ONE rail                              | `sweep1` (Phase 4 starter) |
-| Cross-section morph between ≥2 closed profiles             | `loft` (Phase 4 starter)   |
+| Cross-section morph between ≥2 closed profiles             | `loft` / `feature_loft` tool |
 
 All three append nodes to the host `.feature` file's `features` array.
 You can author them via `feature_sweep2` / `feature_network_srf` /
 `feature_blend_srf`, or hand-edit JSON after consulting `feature.md`.
+
+## `loft` — loft through closed profile sketches
+
+```json
+{
+  "id": "loft-1",
+  "op": "loft",
+  "profile_sketch_paths": ["/p1.sketch", "/p2.sketch"],
+  "ruled": false,
+  "closed": false,
+  "symmetric": false,
+  "continuity": "C0"
+}
+```
+
+Author via `feature_loft(file_id, profile_sketch_paths, ...)`.
+
+`ruled: true` → planar/linear blends between profiles (ruled surface).
+`closed: true` → joins last profile back to first (requires ≥3 profiles).
+`continuity`: `C0` = piecewise blend (default); `C1`/`C2` = NURBS smoothing.
+
+### `symmetric: true` — mid-plane symmetric loft
+
+Produces a **thin-walled body symmetric about the mid-plane** between two
+sketch profiles. Useful for handles, mounting brackets, ergonomic grips —
+any shape where you want to draw one profile and have the symmetric mate
+implied automatically.
+
+**Requirements:**
+- Exactly 2 profiles (more is ambiguous — use regular loft for ≥3).
+- Both sketch planes must be **parallel** (non-parallel → build error).
+- Incompatible with `closed: true`.
+
+**Algorithm.** The worker:
+1. Reads the world-space plane frame of each sketch (origin + normal).
+2. Verifies the normals are parallel (dot product ≥ cos(5°) ≈ 0.9962).
+3. Computes the mid-plane: `origin = midpoint(o0, o1)`, `normal = avg(n0, n1)`.
+4. Mirrors both wires across the mid-plane: `wire0' = mirror(wire0)`,
+   `wire1' = mirror(wire1)`.
+5. Feeds `[wire0, wire1, wire1', wire0']` to `BRepOffsetAPI_ThruSections`,
+   producing a body symmetric about the mid-plane.
+
+**Example — ergonomic handle:**
+
+```text
+feature_loft(
+  file_id              = <handle.feature id>,
+  profile_sketch_paths = ["/profiles/oval-front.sketch",
+                           "/profiles/oval-back.sketch"],
+  symmetric            = true,
+  continuity           = "C1"
+)
+```
+
+Both sketches must sit on parallel planes (e.g., face-anchored planes at
+Z=0 and Z=40). The result is a 4-section loft symmetric about Z=20.
+
+---
 
 ## `sweep2` — twin-rail sweep
 

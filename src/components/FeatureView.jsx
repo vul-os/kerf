@@ -296,10 +296,11 @@ const FEATURE_KINDS = [
     op: 'loft',
     label: 'Loft',
     icon: Layers3,
-    defaults: { profile_sketch_paths: [], ruled: false, closed: false, continuity: 'C0' },
+    defaults: { profile_sketch_paths: [], ruled: false, symmetric: false, closed: false, continuity: 'C0' },
     fields: [
       { key: 'profile_sketch_paths', kind: 'sketch_path_list', label: 'Profile sketches (≥2, ordered)' },
       { key: 'ruled', kind: 'bool', label: 'Ruled (linear blends)' },
+      { key: 'symmetric', kind: 'bool', label: 'Symmetric (mid-plane)' },
       { key: 'closed', kind: 'bool', label: 'Closed loop (≥3 profiles)' },
       { key: 'continuity', kind: 'select', label: 'Continuity', options: [
         { value: 'C0', label: 'C0 (position)' },

@@ -1141,6 +1141,37 @@ function opBlendSrf(oc, prev, node, _sketches, tracker) {
 // `ruled=true` produces planar/linear blends; `ruled=false` produces NURBS
 // blends. `closed=true` joins the last profile back to the first (≥3
 // profiles required, OCCT enforces).
+//
+// `symmetric=true` — mid-plane symmetric loft (exactly 2 profiles required).
+// The worker:
+//   1. Extracts world-space plane frames from both sketch JSON plane specs.
+//   2. Validates that both normals are parallel (dot ≈ ±1 within 5°).
+//   3. Computes mid-plane: origin = midpoint of both plane origins,
+//      normal = normalised sum of both normals.
+//   4. Mirrors wire0 and wire1 across the mid-plane → wire0', wire1'.
+//   5. Feeds [wire0, wire1, wire1', wire0'] to ThruSections, yielding a
+//      body that is symmetric about the mid-plane.
+// Non-parallel planes → BAD_ARGS.  `symmetric + closed` → error.
+
+// Extract world-space {origin, normal} from a sketch JSON plane spec.
+// For base planes (XY/XZ/YZ) the origin is at the standard plane through
+// the world origin; for face-anchored planes the frame carries the exact
+// world position.
+function sketchPlaneFrame(sketchJson) {
+  let parsed
+  try { parsed = typeof sketchJson === 'string' ? JSON.parse(sketchJson) : sketchJson } catch { parsed = null }
+  const plane = parsed?.plane || { type: 'base', name: 'XY' }
+  if (plane.type === 'face' && plane.frame
+      && Array.isArray(plane.frame.origin) && Array.isArray(plane.frame.normal)) {
+    return { origin: plane.frame.origin.slice(0, 3), normal: plane.frame.normal.slice(0, 3) }
+  }
+  const name = (plane.name || 'XY').toUpperCase()
+  if (name === 'XZ') return { origin: [0, 0, 0], normal: [0, 1, 0] }
+  if (name === 'YZ') return { origin: [0, 0, 0], normal: [1, 0, 0] }
+  // XY (default)
+  return { origin: [0, 0, 0], normal: [0, 0, 1] }
+}
+
 function opLoft(oc, _prev, node, sketches, tracker) {
   const paths = Array.isArray(node.profile_sketch_paths) ? node.profile_sketch_paths : []
   if (paths.length < 2) {
@@ -1149,19 +1180,102 @@ function opLoft(oc, _prev, node, sketches, tracker) {
   if (node.closed && paths.length < 3) {
     throw new Error('loft: closed loft requires ≥3 profiles')
   }
-  const isSolid = true
-  const isRuled = !!node.ruled
-  const presision = 1e-6
-  const builder = track(tracker, new oc.BRepOffsetAPI_ThruSections_1(isSolid, isRuled, presision))
+  if (node.symmetric && node.closed) {
+    throw new Error('loft: symmetric and closed cannot both be true')
+  }
+  if (node.symmetric && paths.length !== 2) {
+    throw new Error(`loft: symmetric mode requires exactly 2 profiles, got ${paths.length}`)
+  }
+
+  // Build all profile wires in world space.
+  const wires = []
   for (let i = 0; i < paths.length; i++) {
     const wire = wireForSketchPath(oc, paths[i], sketches, tracker, { closed: true, preferGeom2: true })
     if (!wire) {
       throw new Error(`loft: profile sketch '${paths[i]}' produced no wire (sketch must form a closed loop)`)
     }
+    wires.push(wire)
+  }
+
+  // Symmetric path: compute mid-plane, mirror both profiles, build 4-wire loft.
+  if (node.symmetric) {
+    const json0 = sketches?.[paths[0]]
+    const json1 = sketches?.[paths[1]]
+    const frame0 = sketchPlaneFrame(json0)
+    const frame1 = sketchPlaneFrame(json1)
+
+    // Validate parallel planes: dot product of normalised normals must be ≈ ±1.
+    const n0 = frame0.normal, n1 = frame1.normal
+    const len0 = Math.sqrt(n0[0] ** 2 + n0[1] ** 2 + n0[2] ** 2) || 1
+    const len1 = Math.sqrt(n1[0] ** 2 + n1[1] ** 2 + n1[2] ** 2) || 1
+    const dn0 = n0.map((v) => v / len0)
+    const dn1 = n1.map((v) => v / len1)
+    const dotAbs = Math.abs(dn0[0] * dn1[0] + dn0[1] * dn1[1] + dn0[2] * dn1[2])
+    // 5° tolerance: cos(5°) ≈ 0.9962
+    if (dotAbs < 0.9962) {
+      throw new Error(
+        'loft: symmetric mode requires parallel sketch planes; '
+        + `got dot product ${dotAbs.toFixed(4)} (planes are ${(Math.acos(Math.min(dotAbs, 1)) * 180 / Math.PI).toFixed(1)}° apart)`
+      )
+    }
+
+    // Mid-plane: origin = midpoint; normal = averaged normalised normals.
+    const o0 = frame0.origin, o1 = frame1.origin
+    const midOrigin = [
+      (o0[0] + o1[0]) * 0.5,
+      (o0[1] + o1[1]) * 0.5,
+      (o0[2] + o1[2]) * 0.5,
+    ]
+    // Average the normals (both point roughly the same direction; dot is ≥ 0).
+    // If they point in opposite directions, flip n1 before averaging.
+    const rawDot = dn0[0] * dn1[0] + dn0[1] * dn1[1] + dn0[2] * dn1[2]
+    const sign = rawDot >= 0 ? 1 : -1
+    const sumN = [dn0[0] + sign * dn1[0], dn0[1] + sign * dn1[1], dn0[2] + sign * dn1[2]]
+    const sumLen = Math.sqrt(sumN[0] ** 2 + sumN[1] ** 2 + sumN[2] ** 2) || 1
+    const midNormal = sumN.map((v) => v / sumLen)
+
+    // Mirror both wires across the mid-plane.
+    // mirrorShape(oc, shape, origin, normal, tracker) → mirrored shape
+    const wire0m = mirrorShape(oc, wires[0], midOrigin, midNormal, tracker)
+    const wire1m = mirrorShape(oc, wires[1], midOrigin, midNormal, tracker)
+
+    if (!wire0m || !wire1m) {
+      throw new Error('loft: symmetric mirror failed (could not reflect profile wires)')
+    }
+
+    // Sequence: [p1, p2, p2', p1'] — forms a closed symmetric stack.
+    const symmetricWires = [wires[0], wires[1], wire1m, wire0m]
+    const isSolid = true
+    const isRuled = !!node.ruled
+    const precision = 1e-6
+    const builder = track(tracker, new oc.BRepOffsetAPI_ThruSections_1(isSolid, isRuled, precision))
+    for (const w of symmetricWires) {
+      try {
+        if (typeof builder.AddWire === 'function') builder.AddWire(w)
+        else if (typeof builder.AddWire_1 === 'function') builder.AddWire_1(w)
+      } catch (err) {
+        throw new Error(`loft (symmetric): AddWire failed: ${err?.message || err}`)
+      }
+    }
+    const cont = (node.continuity || 'C0').toUpperCase()
+    if (cont === 'C1' || cont === 'C2') {
+      try { builder.SetSmoothing?.(true) } catch { /* */ }
+    }
+    builder.Build(new oc.Message_ProgressRange_1())
+    if (!builder.IsDone()) throw new Error('loft (symmetric): build failed')
+    return builder.Shape()
+  }
+
+  // Standard (non-symmetric) path — unchanged from original implementation.
+  const isSolid = true
+  const isRuled = !!node.ruled
+  const presision = 1e-6
+  const builder = track(tracker, new oc.BRepOffsetAPI_ThruSections_1(isSolid, isRuled, presision))
+  for (let i = 0; i < wires.length; i++) {
     try {
       // AddWire is the standard method; some builds expose it as AddWire_1.
-      if (typeof builder.AddWire === 'function') builder.AddWire(wire)
-      else if (typeof builder.AddWire_1 === 'function') builder.AddWire_1(wire)
+      if (typeof builder.AddWire === 'function') builder.AddWire(wires[i])
+      else if (typeof builder.AddWire_1 === 'function') builder.AddWire_1(wires[i])
     } catch (err) {
       throw new Error(`loft: AddWire failed for '${paths[i]}': ${err?.message || err}`)
     }

@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 _TOOL_MODULES = [
     "kerf_cad_core.feature_cut_from_sketch",
     "kerf_cad_core.feature_hole_pattern_from_sketch",
+    "kerf_cad_core.feature_loft",
     "kerf_cad_core.extrude_sketch_to_jscad",
 ]
 
@@ -60,6 +61,11 @@ try:
     import kerf_cad_core.feature_hole_pattern_from_sketch  # noqa: F401 — side-effect import
 except Exception as _import_err:
     logger.warning("kerf-cad-core: could not load feature_hole_pattern_from_sketch: %s", _import_err)
+
+try:
+    import kerf_cad_core.feature_loft  # noqa: F401 — side-effect import
+except Exception as _import_err:
+    logger.warning("kerf-cad-core: could not load feature_loft: %s", _import_err)
 
 _PROVIDES_FULL = [
     "cad.step-io",

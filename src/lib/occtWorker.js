@@ -2351,6 +2351,99 @@ function opBoolean(oc, _prev, node, _sketches, tracker, bodyMap) {
 }
 
 // ---------------------------------------------------------------------------
+// Slicing: plane-section / cross-section  (v0.2)
+// ---------------------------------------------------------------------------
+//
+// opSection intersects a solid with a plane using BRepAlgoAPI_Section and
+// returns the resulting edge compound (a 1D TopoDS_Compound of edges — NOT a
+// solid).  The caller should treat the result like a wire/outline.
+//
+// Node schema:
+//   { op: 'section', target_solid_ref: <nodeId>, plane: { point: [x,y,z], normal: [x,y,z] } }
+//
+// Binding gate: BRepAlgoAPI_Section is probed in NURBS_PHASE4_C1_BINDINGS.
+// If the binding is absent we fail fast with a clear "wasm binding missing"
+// message (same pattern as opToSolid).
+//
+// The result is a compound of TopoDS_Edge.  breptToMesh will extract edges
+// from it natively via TopExp_Explorer — no special renderer path is needed
+// to show the cross-section edges.
+
+/**
+ * Intersect a solid with a plane and return the resulting edge compound.
+ *
+ * @param {object} oc       - resolved opencascade.js handle
+ * @param {object} _prev    - unused (section always looks up its target by id)
+ * @param {object} node     - feature node: { target_solid_ref, plane: { point, normal } }
+ * @param {object} _sketches - unused
+ * @param {Array}  tracker  - OCCT handle tracker for cleanup
+ * @param {object} bodyMap  - { [nodeId]: TopoDS_Shape } — prior evaluated shapes
+ * @returns {object} TopoDS_Compound of intersection edges
+ */
+function opSection(oc, _prev, node, _sketches, tracker, bodyMap) {
+  // ── Binding gate ──────────────────────────────────────────────────────────
+  if (typeof oc.BRepAlgoAPI_Section !== 'function') {
+    throw new Error(
+      'section: wasm binding missing — BRepAlgoAPI_Section not present in this OCCT build ' +
+      '(C1 binding probe reported MISSING at boot)'
+    )
+  }
+
+  // ── Resolve target solid ──────────────────────────────────────────────────
+  const solidId = node.target_solid_ref
+  if (!solidId) throw new Error('section: target_solid_ref is required')
+  const targetShape = bodyMap && bodyMap[solidId]
+  if (!targetShape) throw new Error(`section: target_solid_ref '${solidId}' not found in evaluated tree`)
+
+  // ── Validate + unpack plane ───────────────────────────────────────────────
+  const planeSpec = node.plane
+  if (!planeSpec) throw new Error('section: plane is required')
+  const pt  = planeSpec.point  || [0, 0, 0]
+  const nrm = planeSpec.normal || [0, 0, 1]
+
+  if (!Array.isArray(pt)  || pt.length < 3)  throw new Error('section: plane.point must be [x,y,z]')
+  if (!Array.isArray(nrm) || nrm.length < 3) throw new Error('section: plane.normal must be [x,y,z]')
+
+  const [px, py, pz] = pt.map(Number)
+  const [nx, ny, nz] = nrm.map(Number)
+
+  const mag = Math.sqrt(nx * nx + ny * ny + nz * nz)
+  if (mag < 1e-10) throw new Error('section: plane.normal has zero magnitude')
+
+  // ── Build gp_Pln from point + unit normal ─────────────────────────────────
+  const origin = track(tracker, new oc.gp_Pnt_3(px, py, pz))
+  const axis   = track(tracker, new oc.gp_Dir_4(nx / mag, ny / mag, nz / mag))
+  const plane  = track(tracker, new oc.gp_Pln_2(origin, axis))
+
+  // ── Run BRepAlgoAPI_Section ───────────────────────────────────────────────
+  // Constructor overload: BRepAlgoAPI_Section(shape, plane, buildPCurves)
+  // opencascade.js exposes this as the overload that takes a TopoDS_Shape + gp_Pln.
+  // We use the 2-arg form and call Build() separately so we can check IsDone().
+  const pr = () => new oc.Message_ProgressRange_1()
+  let algo
+  // Try the shape+plane overload first (most common in opencascade.js).
+  // Different builds expose different constructor numbering; we try the
+  // most likely ones and fall back gracefully.
+  if (typeof oc.BRepAlgoAPI_Section_3 === 'function') {
+    algo = track(tracker, new oc.BRepAlgoAPI_Section_3(targetShape, plane, pr()))
+  } else {
+    // Fallback: plain constructor that accepts (shape, plane).
+    algo = track(tracker, new oc.BRepAlgoAPI_Section(targetShape, plane, true))
+  }
+
+  if (typeof algo.Build === 'function') algo.Build(pr())
+
+  if (typeof algo.IsDone === 'function' && !algo.IsDone()) {
+    throw new Error('section: BRepAlgoAPI_Section.IsDone() returned false — section may be degenerate or parallel to solid')
+  }
+
+  const result = algo.Shape()
+  if (!result) throw new Error('section: BRepAlgoAPI_Section returned null shape')
+
+  return result
+}
+
+// ---------------------------------------------------------------------------
 // NURBS Phase 4 Capability 1 — surface-direct booleans (C1-T2)
 // ---------------------------------------------------------------------------
 //
@@ -2784,6 +2877,19 @@ function evaluateTree(oc, tree, sketches) {
           currentFaceNamer = null
           break
         }
+        case 'section': {
+          // section produces a compound of intersection edges (1D, not a solid).
+          // Finalize the previous body as its own mesh entry first so both stay
+          // visible in the renderer.
+          if (current) {
+            pushCurrentMesh(`body-${meshes.length}`)
+            cleanupShape(oc, current)
+            current = null
+          }
+          next = opSection(oc, null, node, sketches, tracker, bodyMap)
+          currentFaceNamer = null
+          break
+        }
         default:
           throw new Error(`unknown feature op '${node.op}'`)
       }
@@ -2999,6 +3105,12 @@ async function evaluateToFinalShape(oc, tree, sketches) {
           if (current) cleanupShape(oc, current)
           current = null
           next = opSurfaceBoolean(oc, null, node, sketches, tracker, bodyMap)
+          currentFaceNamer = null
+          break
+        case 'section':
+          if (current) cleanupShape(oc, current)
+          current = null
+          next = opSection(oc, null, node, sketches, tracker, bodyMap)
           currentFaceNamer = null
           break
         default: throw new Error(`unknown feature op '${node.op}'`)

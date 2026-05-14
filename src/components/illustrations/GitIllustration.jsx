@@ -1,44 +1,24 @@
 /**
- * GitIllustration — multi-lane lattice graph (main + 2 feature branches)
- * with a GitHub sync glyph in the corner. Communicates "real git +
- * cloud sync" for the cloud tier.
+ * GitIllustration — clear git-graph metaphor: a main lane with a feature
+ * branch that diverges and merges back, plus a second feature branch that
+ * tips out. Commit dots are large and unlabeled so the SHAPE of the graph
+ * reads at a glance; a single HEAD chip + GitHub corner tile carry the
+ * cloud-sync meaning. Heavy text removed.
  *
- * viewBox 320×200.
+ * viewBox 320×200. Palette locked.
  */
-function Dot({ cx, cy, color, label, refLabel }) {
-  return (
-    <g>
-      <circle cx={cx} cy={cy} r="4.5" fill="#0a0b0d" stroke={color} strokeWidth="1.4" />
-      <circle cx={cx} cy={cy} r="1.8" fill={color} />
-      <text
-        x={cx + 12}
-        y={cy + 3}
-        fontSize="7.5"
-        fontFamily="ui-monospace, monospace"
-        fill="#b8bfcc"
-      >
-        {label}
-      </text>
-      {refLabel && (
-        <text
-          x={cx + 12}
-          y={cy + 12}
-          fontSize="6.5"
-          fontFamily="ui-monospace, monospace"
-          fill={color}
-        >
-          {refLabel}
-        </text>
-      )}
-    </g>
-  )
-}
-
 export default function GitIllustration({ className = '' }) {
-  // Three lanes at x = 60 (main), 110 (feat-a), 160 (feat-b).
-  const main = '#ffd633'
-  const lane2 = '#6bd4ff'
-  const lane3 = '#ff6bd4'
+  const MAIN = '#ffd633'
+  const FEAT_A = '#6bd4ff'
+  const FEAT_B = '#ff6bd4'
+
+  // Lane x positions (horizontal layout: commits flow left → right).
+  const LANE_MAIN_Y = 110
+  const LANE_A_Y = 78
+  const LANE_B_Y = 142
+
+  // Commit x positions along main lane.
+  const X = [44, 76, 108, 140, 172, 204]
 
   return (
     <svg
@@ -46,62 +26,191 @@ export default function GitIllustration({ className = '' }) {
       preserveAspectRatio="xMidYMid meet"
       className={className}
       role="img"
-      aria-label="Multi-lane git graph with three branches and a GitHub sync indicator"
+      aria-label="A horizontal git graph with a feature branch diverging from and merging back into main, plus a second feature branch tipping out"
     >
       <rect x="8" y="14" width="304" height="172" rx="8" fill="#0a0b0d" stroke="#1a1d24" />
-      <text x="22" y="32" fontSize="8" fontFamily="ui-monospace, monospace" fill="#5a6275" letterSpacing="1.4">
+
+      {/* header */}
+      <text
+        x="22"
+        y="32"
+        fontSize="9"
+        fontFamily="ui-monospace, SFMono-Regular, monospace"
+        fill="#6a7185"
+        letterSpacing="1.4"
+      >
         GIT · CLOUD SYNC
       </text>
+      <line x1="22" y1="40" x2="298" y2="40" stroke="#1a1d24" strokeWidth="0.6" />
 
-      {/* lattice lines */}
-      <g fill="none" strokeWidth="1.4" strokeLinecap="round">
-        {/* main lane (vertical) */}
-        <line x1="60" y1="48" x2="60" y2="172" stroke={main} />
-        {/* feat-a branch out from main */}
-        <path d="M 60 76 C 60 90, 110 90, 110 104" stroke={lane2} />
-        <line x1="110" y1="104" x2="110" y2="148" stroke={lane2} />
-        {/* feat-a merges back to main */}
-        <path d="M 110 148 C 110 160, 60 160, 60 172" stroke={lane2} />
-        {/* feat-b branch out from main (later) */}
-        <path d="M 60 124 C 60 134, 160 134, 160 144" stroke={lane3} />
-        <line x1="160" y1="144" x2="160" y2="168" stroke={lane3} />
-      </g>
-
-      {/* commit dots */}
-      <Dot cx={60} cy={56} color={main} label="initial scaffold" />
-      <Dot cx={60} cy={80} color={main} label="add bracket part" />
-      <Dot cx={110} cy={108} color={lane2} label="wip: fillet" refLabel="feat/fillet" />
-      <Dot cx={110} cy={132} color={lane2} label="fillet ok" />
-      <Dot cx={60} cy={128} color={main} label="merge fillet" />
-      <Dot cx={160} cy={152} color={lane3} label="board v2" refLabel="feat/pcb" />
-      <Dot cx={60} cy={168} color={main} label="release v0.4" refLabel="HEAD → main" />
-
-      {/* GitHub sync glyph */}
-      <g transform="translate(244, 50)">
-        <rect width="56" height="44" rx="6" fill="#0f1115" stroke="#1a1d24" />
-        <g transform="translate(8, 8)">
-          {/* Octocat-ish silhouette */}
-          <circle cx="10" cy="10" r="8" fill="#1a1d24" stroke="#b8bfcc" strokeWidth="0.8" />
-          <path
-            d="M 10 4 C 13 4, 15 6, 15 9 L 15 11 C 15 13, 13 14, 11 14 L 11 16 L 9 16 L 9 14 C 7 14, 5 13, 5 11 L 5 9 C 5 6, 7 4, 10 4 Z"
-            fill="#b8bfcc"
-          />
-          <text x="22" y="12" fontSize="7" fontFamily="ui-monospace, monospace" fill="#b8bfcc">
-            github
-          </text>
-          <text x="22" y="22" fontSize="6" fontFamily="ui-monospace, monospace" fill="#7BB661">
-            ↑ in sync
-          </text>
-        </g>
-      </g>
-
-      {/* footer */}
-      <text x="22" y="184" fontSize="7" fontFamily="ui-monospace, monospace" fill="#5a6275">
-        go-git · pygit2 · S3 storer
+      {/* lane labels (very minimal) */}
+      <text
+        x="22"
+        y={LANE_A_Y + 3}
+        fontSize="7"
+        fontFamily="ui-monospace, SFMono-Regular, monospace"
+        fill={FEAT_A}
+        opacity="0.85"
+      >
+        feat/a
       </text>
-      <text x="296" y="184" textAnchor="end" fontSize="7" fontFamily="ui-monospace, monospace" fill="#5a6275">
-        AES-GCM tokens
+      <text
+        x="22"
+        y={LANE_MAIN_Y + 3}
+        fontSize="7"
+        fontFamily="ui-monospace, SFMono-Regular, monospace"
+        fill={MAIN}
+      >
+        main
+      </text>
+      <text
+        x="22"
+        y={LANE_B_Y + 3}
+        fontSize="7"
+        fontFamily="ui-monospace, SFMono-Regular, monospace"
+        fill={FEAT_B}
+        opacity="0.85"
+      >
+        feat/b
+      </text>
+
+      {/* === branch curves === */}
+      <g fill="none" strokeWidth="1.6" strokeLinecap="round">
+        {/* main lane — straight horizontal */}
+        <line x1={X[0]} y1={LANE_MAIN_Y} x2={X[5]} y2={LANE_MAIN_Y} stroke={MAIN} />
+
+        {/* feat/a: branch from main at X[1], merge back at X[4] */}
+        <path
+          d={`M ${X[1]} ${LANE_MAIN_Y} C ${X[1] + 12} ${LANE_MAIN_Y}, ${X[2] - 12} ${LANE_A_Y}, ${X[2]} ${LANE_A_Y}`}
+          stroke={FEAT_A}
+        />
+        <line x1={X[2]} y1={LANE_A_Y} x2={X[3]} y2={LANE_A_Y} stroke={FEAT_A} />
+        <path
+          d={`M ${X[3]} ${LANE_A_Y} C ${X[3] + 12} ${LANE_A_Y}, ${X[4] - 12} ${LANE_MAIN_Y}, ${X[4]} ${LANE_MAIN_Y}`}
+          stroke={FEAT_A}
+        />
+
+        {/* feat/b: branch from main at X[3], tips out (in progress) */}
+        <path
+          d={`M ${X[3]} ${LANE_MAIN_Y} C ${X[3] + 12} ${LANE_MAIN_Y}, ${X[4] - 12} ${LANE_B_Y}, ${X[4]} ${LANE_B_Y}`}
+          stroke={FEAT_B}
+        />
+        <line x1={X[4]} y1={LANE_B_Y} x2={X[5] - 10} y2={LANE_B_Y} stroke={FEAT_B} />
+      </g>
+
+      {/* === commit dots === */}
+      {/* main lane dots */}
+      <CommitDot cx={X[0]} cy={LANE_MAIN_Y} color={MAIN} />
+      <CommitDot cx={X[1]} cy={LANE_MAIN_Y} color={MAIN} />
+      <CommitDot cx={X[3]} cy={LANE_MAIN_Y} color={MAIN} />
+      <CommitDot cx={X[4]} cy={LANE_MAIN_Y} color={MAIN} merge />
+      <CommitDot cx={X[5]} cy={LANE_MAIN_Y} color={MAIN} head />
+
+      {/* feat/a dots */}
+      <CommitDot cx={X[2]} cy={LANE_A_Y} color={FEAT_A} />
+      <CommitDot cx={X[3]} cy={LANE_A_Y} color={FEAT_A} />
+
+      {/* feat/b tip */}
+      <CommitDot cx={X[4]} cy={LANE_B_Y} color={FEAT_B} />
+      <CommitDot cx={X[5] - 10} cy={LANE_B_Y} color={FEAT_B} tip />
+
+      {/* HEAD chip floats above the latest main commit */}
+      <g transform={`translate(${X[5] - 16}, ${LANE_MAIN_Y - 24})`}>
+        <rect width="34" height="13" rx="2.5" fill="#0a0b0d" stroke={MAIN} strokeOpacity="0.75" />
+        <text
+          x="17"
+          y="9.5"
+          textAnchor="middle"
+          fontSize="7"
+          fontFamily="ui-monospace, SFMono-Regular, monospace"
+          fill={MAIN}
+        >
+          HEAD
+        </text>
+        <line
+          x1="17"
+          y1="13"
+          x2="17"
+          y2={20}
+          stroke={MAIN}
+          strokeOpacity="0.55"
+          strokeWidth="0.7"
+        />
+      </g>
+
+      {/* === GitHub sync tile (right side) === */}
+      <g transform="translate(240, 64)">
+        <rect width="60" height="56" rx="6" fill="#0f1115" stroke="#1a1d24" />
+        {/* GitHub mark — simplified circle + cat tail loop */}
+        <g transform="translate(10, 8)">
+          <circle cx="20" cy="20" r="14" fill="#0a0b0d" stroke="#cbd0dc" strokeWidth="1" />
+          <path
+            d="M 20 11 C 25 11, 28.5 14, 28.5 19 C 28.5 23, 26 25, 23 25.5 C 23.4 25.9, 23.7 26.6, 23.7 27.6 L 23.7 30.5 M 16.3 30.5 L 16.3 28 C 13.5 28.5, 12.4 26.8, 12 26.0 C 11.6 25.2, 10.7 24, 9.6 23.8 M 16.3 28 C 17.5 28.2, 18.5 28.2, 19.5 28"
+            fill="none"
+            stroke="#cbd0dc"
+            strokeWidth="1"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </g>
+        <text
+          x="30"
+          y="51"
+          textAnchor="middle"
+          fontSize="7"
+          fontFamily="ui-monospace, SFMono-Regular, monospace"
+          fill="#7BB661"
+        >
+          ↑ in sync
+        </text>
+      </g>
+
+      {/* sync arrow from HEAD area to github tile */}
+      <g stroke="#3a4150" strokeWidth="0.8" fill="none" strokeDasharray="2 2">
+        <line x1={X[5] + 4} y1={LANE_MAIN_Y - 10} x2="244" y2="92" />
+      </g>
+
+      {/* footer — pygit2 only (cloud-internal tech stripped) */}
+      <text
+        x="22"
+        y="180"
+        fontSize="7"
+        fontFamily="ui-monospace, SFMono-Regular, monospace"
+        fill="#5a6275"
+      >
+        pygit2 · branches · merges
+      </text>
+      <text
+        x="298"
+        y="180"
+        textAnchor="end"
+        fontSize="7"
+        fontFamily="ui-monospace, SFMono-Regular, monospace"
+        fill="#5a6275"
+      >
+        push / pull
       </text>
     </svg>
+  )
+}
+
+function CommitDot({ cx, cy, color, head, merge, tip }) {
+  const outerR = head ? 5.5 : merge ? 5 : 4
+  return (
+    <g>
+      {tip && (
+        <circle
+          cx={cx}
+          cy={cy}
+          r={outerR + 3}
+          fill="none"
+          stroke={color}
+          strokeOpacity="0.35"
+          strokeWidth="0.8"
+        />
+      )}
+      <circle cx={cx} cy={cy} r={outerR} fill="#0a0b0d" stroke={color} strokeWidth="1.4" />
+      <circle cx={cx} cy={cy} r={outerR - 2.2} fill={color} />
+    </g>
   )
 }

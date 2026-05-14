@@ -8,9 +8,54 @@
  *
  * Communicates "source of truth = sketch; JSCAD is just the wrapper".
  *
- * viewBox 320×200. Palette locked to ink-* / kerf-* (#ffd633 accent).
+ * viewBox 320×200. Three panes:
+ *   pane 1 (sketch):  x=20  w=86   → 106
+ *   pane 2 (JSCAD):   x=118 w=116  → 234
+ *   pane 3 (3D):      x=240 w=68   → 308
+ *
+ * Code lines are pre-formatted single rows so they fit within the JSCAD
+ * pane at viewBox-native size (max width ≈ 100px at 7pt mono ≈ 24 chars).
+ * Palette locked to ink-* / kerf-* (#ffd633 accent).
  */
 export default function SketchToJscadIllustration({ className = '' }) {
+  const codeRows = [
+    { y: 72, parts: [
+      { text: 'import', fill: '#ff6bd4' },
+      { text: ' { extrudeLinear }', fill: '#cbd0dc' },
+    ] },
+    { y: 82, parts: [
+      { text: 'from', fill: '#ff6bd4' },
+      { text: ' ', fill: '#cbd0dc' },
+      { text: "'@jscad/modeling'", fill: '#7BB661' },
+    ] },
+    { y: 100, parts: [
+      { text: 'import', fill: '#ff6bd4' },
+      { text: ' profile ', fill: '#cbd0dc' },
+      { text: 'from', fill: '#ff6bd4' },
+    ] },
+    { y: 110, parts: [
+      { text: "  './bracket.sketch'", fill: '#7BB661' },
+    ] },
+    { y: 128, parts: [
+      { text: 'export const', fill: '#6bd4ff' },
+      { text: ' main = () =>', fill: '#cbd0dc' },
+    ] },
+    { y: 140, parts: [
+      { text: '  extrudeLinear(', fill: '#cbd0dc' },
+    ] },
+    { y: 150, parts: [
+      { text: "    { height: ", fill: '#cbd0dc' },
+      { text: '20', fill: '#ffd633' },
+      { text: ' },', fill: '#cbd0dc' },
+    ] },
+    { y: 160, parts: [
+      { text: '    profile', fill: '#cbd0dc' },
+    ] },
+    { y: 170, parts: [
+      { text: '  )', fill: '#cbd0dc' },
+    ] },
+  ]
+
   return (
     <svg
       viewBox="0 0 320 200"
@@ -29,108 +74,118 @@ export default function SketchToJscadIllustration({ className = '' }) {
       <rect x="8" y="14" width="304" height="172" rx="8" fill="#0a0b0d" stroke="#1a1d24" />
 
       {/* header strip */}
-      <text x="22" y="30" fontSize="8" fontFamily="ui-monospace, monospace" fill="#5a6275" letterSpacing="1.4">
+      <text
+        x="22"
+        y="32"
+        fontSize="9"
+        fontFamily="ui-monospace, SFMono-Regular, monospace"
+        fill="#6a7185"
+        letterSpacing="1.4"
+      >
         SKETCH → JSCAD
       </text>
-      <text x="298" y="30" textAnchor="end" fontSize="8" fontFamily="ui-monospace, monospace" fill="#3a4150" letterSpacing="1.2">
+      <text
+        x="298"
+        y="32"
+        textAnchor="end"
+        fontSize="8"
+        fontFamily="ui-monospace, monospace"
+        fill="#3a4150"
+        letterSpacing="1.2"
+      >
         reactive · revisioned
       </text>
-      <line x1="22" y1="36" x2="298" y2="36" stroke="#1a1d24" strokeWidth="0.6" />
+      <line x1="22" y1="40" x2="298" y2="40" stroke="#1a1d24" strokeWidth="0.6" />
 
       {/* === Pane 1: sketch === */}
       <g>
-        <rect x="20" y="44" width="86" height="128" rx="4" fill="#0a0b0d" stroke="#1a1d24" />
-        <rect x="20" y="44" width="86" height="128" fill="url(#s2j-grid)" />
+        <rect x="20" y="48" width="86" height="124" rx="4" fill="#0a0b0d" stroke="#1a1d24" />
+        <rect x="20" y="48" width="86" height="124" fill="url(#s2j-grid)" />
 
         {/* axes */}
         <line x1="30" y1="108" x2="98" y2="108" stroke="#3a4150" strokeWidth="0.6" strokeDasharray="2 3" />
-        <line x1="38" y1="54" x2="38" y2="162" stroke="#3a4150" strokeWidth="0.6" strokeDasharray="2 3" />
+        <line x1="38" y1="58" x2="38" y2="162" stroke="#3a4150" strokeWidth="0.6" strokeDasharray="2 3" />
 
         {/* L-shaped profile (green = solved) */}
         <g stroke="#7BB661" strokeWidth="1.5" fill="none" strokeLinejoin="round">
-          <polygon points="46,74 88,74 88,98 66,98 66,142 46,142" />
+          <polygon points="46,76 88,76 88,98 66,98 66,140 46,140" />
         </g>
         {/* vertices */}
         {[
-          [46, 74],
-          [88, 74],
+          [46, 76],
+          [88, 76],
           [88, 98],
           [66, 98],
-          [66, 142],
-          [46, 142],
+          [66, 140],
+          [46, 140],
         ].map(([x, y]) => (
           <circle key={`${x}-${y}`} cx={x} cy={y} r="1.8" fill="#0a0b0d" stroke="#7BB661" strokeWidth="0.9" />
         ))}
 
         {/* one dim chip */}
         <g>
-          <line x1="46" y1="160" x2="88" y2="160" stroke="#5a6275" strokeWidth="0.6" />
-          <polygon points="46,160 50,158 50,162" fill="#5a6275" />
-          <polygon points="88,160 84,158 84,162" fill="#5a6275" />
-          <rect x="59" y="153" width="16" height="11" rx="2" fill="#0a0b0d" stroke="#1a1d24" />
-          <text x="67" y="161" textAnchor="middle" fontSize="7" fontFamily="ui-monospace, monospace" fill="#ffd633">
+          <line x1="46" y1="158" x2="88" y2="158" stroke="#5a6275" strokeWidth="0.6" />
+          <polygon points="46,158 50,156 50,160" fill="#5a6275" />
+          <polygon points="88,158 84,156 84,160" fill="#5a6275" />
+          <rect x="59" y="151" width="16" height="11" rx="2" fill="#0a0b0d" stroke="#1a1d24" />
+          <text x="67" y="159" textAnchor="middle" fontSize="7" fontFamily="ui-monospace, monospace" fill="#ffd633">
             40
           </text>
         </g>
 
-        <text x="63" y="52" textAnchor="middle" fontSize="7" fontFamily="ui-monospace, monospace" fill="#5a6275">
+        <text x="63" y="56" textAnchor="middle" fontSize="7" fontFamily="ui-monospace, monospace" fill="#5a6275">
           bracket.sketch
         </text>
       </g>
 
       {/* arrow 1 → JSCAD */}
       <g stroke="#ffd633" strokeWidth="0.9" fill="none" strokeLinecap="round">
-        <line x1="108" y1="108" x2="118" y2="108" />
-        <polygon points="118,108 114,105.5 114,110.5" fill="#ffd633" stroke="none" />
+        <line x1="108" y1="110" x2="116" y2="110" />
+        <polygon points="116,110 112,107.5 112,112.5" fill="#ffd633" stroke="none" />
       </g>
 
       {/* === Pane 2: JSCAD code === */}
       <g>
-        <rect x="120" y="44" width="112" height="128" rx="4" fill="#0f1115" stroke="#1a1d24" />
-        <text x="128" y="56" fontSize="7" fontFamily="ui-monospace, monospace" fill="#5a6275">
+        <rect x="118" y="48" width="116" height="124" rx="4" fill="#0f1115" stroke="#1a1d24" />
+        <text x="126" y="60" fontSize="7" fontFamily="ui-monospace, monospace" fill="#5a6275">
           bracket.jscad
         </text>
-        <line x1="124" y1="60" x2="228" y2="60" stroke="#1a1d24" strokeWidth="0.6" />
-        <g fontSize="7" fontFamily="ui-monospace, monospace">
-          <text x="128" y="72" fill="#ff6bd4">import</text>
-          <text x="156" y="72" fill="#b8bfcc"> {'{'} extrudeLinear </text>
-          <text x="128" y="82" fill="#b8bfcc">{'}'} = </text>
-          <text x="148" y="82" fill="#7BB661">'@jscad/...'</text>
+        <line x1="122" y1="64" x2="230" y2="64" stroke="#1a1d24" strokeWidth="0.6" />
 
-          <text x="128" y="98" fill="#ff6bd4">import</text>
-          <text x="156" y="98" fill="#b8bfcc"> profile </text>
-          <text x="128" y="108" fill="#ff6bd4">from </text>
-          <text x="148" y="108" fill="#7BB661">'./bracket.sketch'</text>
-
-          <text x="128" y="124" fill="#6bd4ff">export const</text>
-          <text x="180" y="124" fill="#b8bfcc">main = ()=&gt;</text>
-          <text x="136" y="136" fill="#b8bfcc">extrudeLinear(</text>
-          <text x="136" y="146" fill="#b8bfcc">  {'{'} height: </text>
-          <text x="190" y="146" fill="#ffd633">20</text>
-          <text x="200" y="146" fill="#b8bfcc">{'}'},</text>
-          <text x="136" y="156" fill="#b8bfcc">  profile</text>
-          <text x="136" y="166" fill="#b8bfcc">)</text>
-        </g>
         {/* re-eval badge */}
-        <g transform="translate(184, 48)">
+        <g transform="translate(188, 50)">
           <rect width="40" height="11" rx="2" fill="#ffd633" fillOpacity="0.16" stroke="#ffd633" strokeOpacity="0.45" />
           <text x="20" y="8.5" textAnchor="middle" fontSize="6.5" fontFamily="ui-monospace, monospace" fill="#ffd633">
             reactive
           </text>
         </g>
+
+        {/* code rows — built with <tspan>s so concatenation lays out
+            within the pane's horizontal range */}
+        <g fontSize="7" fontFamily="ui-monospace, SFMono-Regular, monospace">
+          {codeRows.map((row) => (
+            <text key={row.y} x="126" y={row.y}>
+              {row.parts.map((p, i) => (
+                <tspan key={i} fill={p.fill}>
+                  {p.text}
+                </tspan>
+              ))}
+            </text>
+          ))}
+        </g>
       </g>
 
       {/* arrow 2 → 3D */}
       <g stroke="#ffd633" strokeWidth="0.9" fill="none" strokeLinecap="round">
-        <line x1="234" y1="108" x2="244" y2="108" />
-        <polygon points="244,108 240,105.5 240,110.5" fill="#ffd633" stroke="none" />
+        <line x1="234" y1="110" x2="240" y2="110" />
+        <polygon points="240,110 236,107.5 236,112.5" fill="#ffd633" stroke="none" />
       </g>
 
       {/* === Pane 3: 3D result (axonometric L-bracket) === */}
       <g>
-        <rect x="246" y="44" width="62" height="128" rx="4" fill="#0a0b0d" stroke="#1a1d24" />
-        {/* mini axonometric isometric L-shape */}
-        <g transform="translate(252, 96)" strokeLinejoin="round">
+        <rect x="240" y="48" width="68" height="124" rx="4" fill="#0a0b0d" stroke="#1a1d24" />
+        {/* mini axonometric L-shape — fits in 68×124 pane */}
+        <g transform="translate(248, 96)" strokeLinejoin="round">
           {/* front face (L-profile) */}
           <polygon
             points="0,8 28,8 28,22 14,22 14,46 0,46"
@@ -168,12 +223,12 @@ export default function SketchToJscadIllustration({ className = '' }) {
           <line x1="22" y1="14" x2="36" y2="14" stroke="#ffd633" strokeWidth="0.9" />
         </g>
 
-        {/* hint label */}
-        <text x="277" y="60" textAnchor="middle" fontSize="7" fontFamily="ui-monospace, monospace" fill="#5a6275">
+        {/* hint labels */}
+        <text x="274" y="60" textAnchor="middle" fontSize="7" fontFamily="ui-monospace, monospace" fill="#5a6275">
           @jscad mesh
         </text>
-        <text x="277" y="160" textAnchor="middle" fontSize="6.5" fontFamily="ui-monospace, monospace" fill="#5a6275">
-          IndexedDB-cached
+        <text x="274" y="160" textAnchor="middle" fontSize="6.5" fontFamily="ui-monospace, monospace" fill="#5a6275">
+          IDB-cached
         </text>
       </g>
     </svg>

@@ -52,7 +52,7 @@ scripts/                npm helper scripts (init-config, etc.)
 Kerf is dual-licensed:
 
 - **MIT** covers everything outside `cloud/`, `backend/cloud/`, and `src/cloud/`.
-- **Proprietary** covers those three trees — see [cloud/LICENSE](../cloud/LICENSE).
+- **Proprietary** covers those three trees — see [LICENSE-CLOUD](../LICENSE-CLOUD).
 
 PRs that change OSS files are welcome under the standard MIT contributor
 flow. PRs that touch cloud files require a separate license arrangement —

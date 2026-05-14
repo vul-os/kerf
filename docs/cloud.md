@@ -4,10 +4,10 @@ Kerf's hosted tier — managed Postgres + storage + LLM keys with surfaces the
 OSS build doesn't ship.
 
 > **Licensing.** Cloud-tier code is **proprietary** under `cloud/`,
-> `backend/cloud/`, and `src/cloud/`. See [cloud/LICENSE](../cloud/LICENSE).
+> `backend/cloud/`, and `src/cloud/`. See [LICENSE-CLOUD](../LICENSE-CLOUD).
 > OSS core (everything else) is MIT and runs standalone.
 
-Hands-on build/deploy guide: [cloud/README.md](../cloud/README.md).
+Hands-on build/deploy guide: [docs/cloud-operator.md](./cloud-operator.md).
 
 ## Cloud-only vs OSS
 
@@ -124,4 +124,4 @@ npm run build:cloud    # + Paystack + Workshop + git + billing UI
 Frontend reads cloud flag from `/api/config` at runtime; backend reads
 `KERF_CLOUD=1` / `cloud_enabled=true` from `.env`.
 
-Full deploy / migrations / pricing: [cloud/README.md](../cloud/README.md).
+Full deploy / migrations / pricing: [docs/cloud-operator.md](./cloud-operator.md).

@@ -7,7 +7,7 @@ document is about *direction*, not interface details.
 
 Kerf is dual-licensed: the OSS core (everything outside `cloud/`,
 `backend/cloud/`, and `src/cloud/`) is MIT. The hosted-tier code under those
-paths is governed by [cloud/LICENSE](./cloud/LICENSE).
+paths is governed by [LICENSE-CLOUD](./LICENSE-CLOUD).
 
 ---
 
@@ -1748,7 +1748,7 @@ don't need redesign for any phase.
 
 ## Cloud (hosted-tier) roadmap
 
-The cloud tier is proprietary (see [cloud/LICENSE](./cloud/LICENSE)). The
+The cloud tier is proprietary (see [LICENSE-CLOUD](./LICENSE-CLOUD)). The
 public-facing OSS doesn't depend on any of it; everything below `cloud/` is
 add-on functionality for the hosted service.
 
@@ -1774,7 +1774,7 @@ add-on functionality for the hosted service.
   cloud, contributing, architecture deep-dive.
 - **Landing page** (`src/routes/Landing.jsx`) — *being revamped.*
 - **`backend/README.md`** — backend-specific dev guide.
-- **`cloud/README.md`** — cloud-tier build/deploy.
+- **`docs/cloud-operator.md`** — cloud-tier build/deploy.
 
 ---
 

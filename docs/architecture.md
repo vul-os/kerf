@@ -199,6 +199,6 @@ boots everything: API + SPA + agent loop on `:8080`.
 - **LLM tool surface** — [llm-tools.md](./llm-tools.md).
 - **Backend internals** — [backend/README.md](../backend/README.md).
 - **Roadmap + philosophy** — [ROADMAP.md](../ROADMAP.md).
-- **Cloud build & pricing** — [cloud/README.md](../cloud/README.md).
+- **Cloud build & pricing** — [docs/cloud-operator.md](./cloud-operator.md).
 
 Next: [llm-tools.md](./llm-tools.md)

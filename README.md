@@ -240,7 +240,7 @@ Built in Durban 🇿🇦 by a small team. Engineered for engineers everywhere.
 - [ROADMAP.md](./ROADMAP.md) — shipped · in-flight · next · planned
 - [docs/architecture.md](./docs/architecture.md) — full API + data model
 - [backend/README.md](./backend/README.md) — backend developer guide
-- [cloud/README.md](./cloud/README.md) — hosted-tier build/deploy notes
+- [docs/cloud-operator.md](./docs/cloud-operator.md) — hosted-tier build/deploy notes
 - [Issues](https://github.com/imranp/kerf/issues) · [Discussions](https://github.com/imranp/kerf/discussions)
 </content>
 </invoke>

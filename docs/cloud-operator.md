@@ -3,7 +3,7 @@
 This directory and the two sibling directories `backend/cloud/` and `src/cloud/`
 contain the proprietary code that powers the **hosted** version of Kerf at
 kerf.app (or wherever it ends up running). It is **not** covered by the MIT
-license that applies to the rest of this repo. See `cloud/LICENSE`.
+license that applies to the rest of this repo. See `LICENSE-CLOUD`.
 
 ## What's here vs. there
 
@@ -12,7 +12,7 @@ license that applies to the rest of this repo. See `cloud/LICENSE`.
 | `LICENSE` (root)      | MIT         | Covers OSS code (everything below)         |
 | `backend/**`          | MIT         | Python (FastAPI) API server, LLM proxy, file storage |
 | `src/**`              | MIT         | React frontend                             |
-| `cloud/LICENSE`       | proprietary | Terms for everything cloud-marked          |
+| `LICENSE-CLOUD`       | proprietary | Terms for everything cloud-marked          |
 | `backend/cloud/**`    | proprietary | Paystack billing, FX, quotas, usage events |
 | `src/cloud/**`        | proprietary | Billing UI, plan selector, usage widget    |
 

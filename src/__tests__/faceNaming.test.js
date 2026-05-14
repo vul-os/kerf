@@ -25,6 +25,8 @@ import {
   classifyFaceForRevolve,
   buildFaceNamesForExtrude,
   buildFaceNamesForRevolve,
+  carryForward,
+  nameOpOutput,
 } from '../lib/faceNaming.js'
 
 // ---------------------------------------------------------------------------
@@ -455,5 +457,330 @@ describe('sortedVertexValences', () => {
   it('sorts correctly for unsorted input', () => {
     const face = { ...makeTopCap(0), vertexValences: [4, 1, 3, 2] }
     expect(sortedVertexValences(face)).toEqual([1, 2, 3, 4])
+  })
+})
+
+// ===========================================================================
+// T2: carryForward
+// ===========================================================================
+
+describe('carryForward', () => {
+  const inputNames = { 0: 'Pad-A.TopCap', 1: 'Pad-A.BottomCap', 2: 'Pad-A.Side.seg-0' }
+
+  it('returns prior name when exactly one input maps to output', () => {
+    const modMap = { modified: { 0: [0] }, generated: [], deletedInputs: new Set() }
+    expect(carryForward(inputNames, 0, modMap)).toBe('Pad-A.TopCap')
+  })
+
+  it('returns null when output is listed as generated', () => {
+    const modMap = { modified: {}, generated: [3], deletedInputs: new Set() }
+    expect(carryForward(inputNames, 3, modMap)).toBe(null)
+  })
+
+  it('returns null when multiple inputs map to the same output (split)', () => {
+    const modMap = {
+      modified: { 0: [5], 1: [5] },  // two inputs → one output
+      generated: [],
+      deletedInputs: new Set(),
+    }
+    expect(carryForward(inputNames, 5, modMap)).toBe(null)
+  })
+
+  it('returns null when zero inputs map to output (also new)', () => {
+    const modMap = { modified: {}, generated: [], deletedInputs: new Set() }
+    expect(carryForward(inputNames, 7, modMap)).toBe(null)
+  })
+
+  it('prefers generated flag over modified list when both present', () => {
+    // generated takes priority — the face is new even if it also appears in modified.
+    const modMap = { modified: { 0: [0] }, generated: [0], deletedInputs: new Set() }
+    expect(carryForward(inputNames, 0, modMap)).toBe(null)
+  })
+})
+
+// ===========================================================================
+// T2: nameOpOutput — fillet
+// ===========================================================================
+
+describe('nameOpOutput — fillet', () => {
+  // 6-face box: top(0) + bottom(1) + 4 sides(2-5). Prior names are extrude names.
+  const oldNames = {
+    0: 'Pad-A.TopCap',
+    1: 'Pad-A.BottomCap',
+    2: 'Pad-A.Side.seg-0',
+    3: 'Pad-A.Side.seg-1',
+    4: 'Pad-A.Side.seg-2',
+    5: 'Pad-A.Side.seg-3',
+  }
+
+  // After fillet: new faces at indices 6, 7 (generated fillet surfaces).
+  // Old faces 0, 1, 2, 3, 4, 5 map 1-to-1 (modified identity).
+  function makeFilletModMap(filletIndices) {
+    const modified = {}
+    for (let i = 0; i < 6; i++) modified[i] = [i]  // unchanged
+    return {
+      modified,
+      generated: filletIndices,
+      deletedInputs: new Set(),
+    }
+  }
+
+  const newFaces = makeRectBoxFaces()
+  // Extend with 2 fillet surfaces (cylindrical faces).
+  const filletFace6 = { ...makeSideFace(6, [1, 1, 0], null, [16, 17, 18, 19]), surfaceKind: 'cylinder', isCap: false }
+  const filletFace7 = { ...makeSideFace(7, [-1, 1, 0], null, [20, 21, 22, 23]), surfaceKind: 'cylinder', isCap: false }
+  const allNewFaces = [...newFaces, filletFace6, filletFace7]
+
+  const modMap = makeFilletModMap([6, 7])
+
+  it('generated fillet faces get Fillet role', () => {
+    const names = nameOpOutput('fillet', oldNames, allNewFaces, modMap, { nodeId: 'Fil-G' })
+    expect(names['6']).toMatch(/^Fil-G\.Fillet(:\d+)?$/)
+    expect(names['7']).toMatch(/^Fil-G\.Fillet(:\d+)?$/)
+  })
+
+  it('unchanged faces carry their prior names', () => {
+    const names = nameOpOutput('fillet', oldNames, allNewFaces, modMap, { nodeId: 'Fil-G' })
+    expect(names['0']).toBe('Pad-A.TopCap')
+    expect(names['1']).toBe('Pad-A.BottomCap')
+    expect(names['2']).toBe('Pad-A.Side.seg-0')
+  })
+
+  it('produces a name for every output face', () => {
+    const names = nameOpOutput('fillet', oldNames, allNewFaces, modMap, { nodeId: 'Fil-G' })
+    expect(Object.keys(names).length).toBe(allNewFaces.length)
+  })
+})
+
+// ===========================================================================
+// T2: nameOpOutput — chamfer (mirrors fillet with different role name)
+// ===========================================================================
+
+describe('nameOpOutput — chamfer', () => {
+  const oldNames = { 0: 'Pad-A.TopCap', 1: 'Pad-A.BottomCap' }
+  const newFaces = [
+    makeTopCap(0),
+    makeBottomCap(1),
+    { ...makeSideFace(2, [1, 1, 0], null, [8, 9, 10, 11]), isCap: false }, // chamfer surface
+  ]
+  const modMap = {
+    modified: { 0: [0], 1: [1] },
+    generated: [2],
+    deletedInputs: new Set(),
+  }
+
+  it('generated chamfer face gets Chamfer role', () => {
+    const names = nameOpOutput('chamfer', oldNames, newFaces, modMap, { nodeId: 'Chm-H' })
+    expect(names['2']).toMatch(/^Chm-H\.Chamfer/)
+  })
+
+  it('unchanged faces carry prior names', () => {
+    const names = nameOpOutput('chamfer', oldNames, newFaces, modMap, { nodeId: 'Chm-H' })
+    expect(names['0']).toBe('Pad-A.TopCap')
+    expect(names['1']).toBe('Pad-A.BottomCap')
+  })
+
+  it('modified but not deleted face with no clear parent gets Adjacent.<hash>', () => {
+    // Simulate: face 0 gets modified into face 0 but input face doesn't exist in oldNames.
+    const partialOld = {}  // empty prior names
+    const modMap2 = { modified: { 0: [0] }, generated: [], deletedInputs: new Set() }
+    const names = nameOpOutput('chamfer', partialOld, [makeTopCap(0)], modMap2, { nodeId: 'Chm-H' })
+    // carry returns null (no prior name), so Adjacent.<hash>
+    expect(names['0']).toMatch(/^Chm-H\.Adjacent\.h[0-9a-f]{8}/)
+  })
+})
+
+// ===========================================================================
+// T2: nameOpOutput — shell
+// ===========================================================================
+
+describe('nameOpOutput — shell', () => {
+  // Input: 6 faces of a box. Shell removes top face, adds inner wall faces.
+  // After shell: outer faces 1-5 carried over; inner faces 6-10 new.
+  const oldNames = {
+    0: 'Pad-A.TopCap',  // removed face — becomes deleted
+    1: 'Pad-A.BottomCap',
+    2: 'Pad-A.Side.seg-0',
+    3: 'Pad-A.Side.seg-1',
+    4: 'Pad-A.Side.seg-2',
+    5: 'Pad-A.Side.seg-3',
+  }
+
+  // After shell: outer faces 1-5 remain (same index), inner faces 6-10 are new.
+  const outerFaces = makeRectBoxFaces().slice(1).map((f, i) => ({ ...f, index: i + 1 }))
+  const innerFaces = Array.from({ length: 5 }, (_, i) => ({
+    ...makeSideFace(i + 6, [0, 1, 0], null, [20 + i * 4, 21 + i * 4, 22 + i * 4, 23 + i * 4]),
+    surfaceKind: 'plane',
+    isCap: false,
+  }))
+  const allNewFaces = [...outerFaces, ...innerFaces]
+
+  const modMap = {
+    modified: {
+      1: [1], 2: [2], 3: [3], 4: [4], 5: [5],
+    },
+    generated: [6, 7, 8, 9, 10],
+    deletedInputs: new Set([0]),
+  }
+
+  it('inner wall faces get Wall.<hash> names', () => {
+    const names = nameOpOutput('shell', oldNames, allNewFaces, modMap, { nodeId: 'Shl-I' })
+    for (const i of [6, 7, 8, 9, 10]) {
+      expect(names[String(i)]).toMatch(/^Shl-I\.Wall\.h[0-9a-f]{8}/)
+    }
+  })
+
+  it('outer faces get Original.<priorName> prefix', () => {
+    const names = nameOpOutput('shell', oldNames, allNewFaces, modMap, { nodeId: 'Shl-I' })
+    expect(names['1']).toBe('Shl-I.Original.Pad-A.BottomCap')
+    expect(names['2']).toBe('Shl-I.Original.Pad-A.Side.seg-0')
+  })
+
+  it('all output faces are named', () => {
+    const names = nameOpOutput('shell', oldNames, allNewFaces, modMap, { nodeId: 'Shl-I' })
+    expect(Object.keys(names).length).toBe(allNewFaces.length)
+  })
+})
+
+// ===========================================================================
+// T2: nameOpOutput — cut_from_sketch
+// ===========================================================================
+
+describe('nameOpOutput — cut_from_sketch', () => {
+  // Input body: 6-face box. Cut removes material, adds floor + side faces.
+  const oldNames = {
+    0: 'Pad-A.TopCap',
+    1: 'Pad-A.BottomCap',
+    2: 'Pad-A.Side.seg-0',
+    3: 'Pad-A.Side.seg-1',
+    4: 'Pad-A.Side.seg-2',
+    5: 'Pad-A.Side.seg-3',
+  }
+
+  // After cut: original faces 0-5 carried over (modified 1:1).
+  // New face 6: CutFloor (cap); new faces 7, 8: CutSide.
+  const origFaces = makeRectBoxFaces()
+  const cutFloor = { ...makeTopCap(6, { sharedEdgeIndices: [30, 31, 32, 33] }), isCap: true }
+  const cutSide1 = { ...makeSideFace(7, [1, 0, 0], null, [34, 35, 36, 37]), isCap: false }
+  const cutSide2 = { ...makeSideFace(8, [0, 1, 0], null, [38, 39, 40, 41]), isCap: false }
+  const allNewFaces = [...origFaces, cutFloor, cutSide1, cutSide2]
+
+  const modMap = {
+    modified: { 0: [0], 1: [1], 2: [2], 3: [3], 4: [4], 5: [5] },
+    generated: [6, 7, 8],
+    deletedInputs: new Set(),
+  }
+  const sketchEntityIds = ['cut-seg-0', 'cut-seg-1']
+
+  it('floor face (isCap=true) gets CutFloor role', () => {
+    const names = nameOpOutput('cut_from_sketch', oldNames, allNewFaces, modMap, { nodeId: 'Cut-J', sketchEntityIds })
+    expect(names['6']).toBe('Cut-J.CutFloor')
+  })
+
+  it('side faces get CutSide.<sketchEntityId>', () => {
+    const names = nameOpOutput('cut_from_sketch', oldNames, allNewFaces, modMap, { nodeId: 'Cut-J', sketchEntityIds })
+    expect(names['7']).toBe('Cut-J.CutSide.cut-seg-0')
+    expect(names['8']).toBe('Cut-J.CutSide.cut-seg-1')
+  })
+
+  it('original unchanged faces get Original.<priorName>', () => {
+    const names = nameOpOutput('cut_from_sketch', oldNames, allNewFaces, modMap, { nodeId: 'Cut-J', sketchEntityIds })
+    expect(names['0']).toBe('Cut-J.Original.Pad-A.TopCap')
+    expect(names['1']).toBe('Cut-J.Original.Pad-A.BottomCap')
+  })
+
+  it('falls back to topo-hash for side face when sketchEntityIds is empty', () => {
+    const names = nameOpOutput('cut_from_sketch', oldNames, allNewFaces, modMap, { nodeId: 'Cut-J', sketchEntityIds: [] })
+    // hash fallback
+    expect(names['7']).toMatch(/^Cut-J\.CutSide\.h[0-9a-f]{8}/)
+  })
+})
+
+// ===========================================================================
+// T2: nameOpOutput — push_pull
+// ===========================================================================
+
+describe('nameOpOutput — push_pull', () => {
+  const oldNames = {
+    0: 'Pad-A.TopCap',
+    1: 'Pad-A.BottomCap',
+    2: 'Pad-A.Side.seg-0',
+    3: 'Pad-A.Side.seg-1',
+    4: 'Pad-A.Side.seg-2',
+    5: 'Pad-A.Side.seg-3',
+  }
+
+  // After push_pull (positive): original faces carried over, new cap + side.
+  const origFaces = makeRectBoxFaces()
+  const ppCap  = { ...makeTopCap(6, { sharedEdgeIndices: [30, 31, 32, 33] }), isCap: true }
+  const ppSide = { ...makeSideFace(7, [1, 0, 0], null, [34, 35, 36, 37]), isCap: false }
+  const allNewFaces = [...origFaces, ppCap, ppSide]
+
+  const modMap = {
+    modified: { 0: [0], 1: [1], 2: [2], 3: [3], 4: [4], 5: [5] },
+    generated: [6, 7],
+    deletedInputs: new Set(),
+  }
+
+  it('cap face gets PushPullCap role', () => {
+    const names = nameOpOutput('push_pull', oldNames, allNewFaces, modMap, { nodeId: 'PP-K' })
+    expect(names['6']).toBe('PP-K.PushPullCap')
+  })
+
+  it('side face gets PushPullSide.<hash> role', () => {
+    const names = nameOpOutput('push_pull', oldNames, allNewFaces, modMap, { nodeId: 'PP-K' })
+    expect(names['7']).toMatch(/^PP-K\.PushPullSide\.h[0-9a-f]{8}/)
+  })
+
+  it('original unchanged faces get Original.<priorName>', () => {
+    const names = nameOpOutput('push_pull', oldNames, allNewFaces, modMap, { nodeId: 'PP-K' })
+    expect(names['0']).toBe('PP-K.Original.Pad-A.TopCap')
+    expect(names['2']).toBe('PP-K.Original.Pad-A.Side.seg-0')
+  })
+
+  it('all output faces are named', () => {
+    const names = nameOpOutput('push_pull', oldNames, allNewFaces, modMap, { nodeId: 'PP-K' })
+    expect(Object.keys(names).length).toBe(allNewFaces.length)
+  })
+
+  it('all names are unique', () => {
+    const names = nameOpOutput('push_pull', oldNames, allNewFaces, modMap, { nodeId: 'PP-K' })
+    const vals = Object.values(names)
+    expect(new Set(vals).size).toBe(vals.length)
+  })
+})
+
+// ===========================================================================
+// T2: nameOpOutput — carry-forward chain stability
+// ===========================================================================
+
+describe('nameOpOutput — carry-forward chain: fillet after pad', () => {
+  // Simulate a two-op chain: Pad → Fillet.
+  // After Pad: top(0), bottom(1), side(2).
+  // After Fillet: same 3 faces unchanged + 1 new fillet face(3).
+  const padNames = {
+    0: 'Pad-A.TopCap',
+    1: 'Pad-A.BottomCap',
+    2: 'Pad-A.Side.seg-0',
+  }
+
+  const facesAfterFillet = [
+    makeTopCap(0),
+    makeBottomCap(1),
+    makeSideFace(2, [1, 0, 0], 'seg-0', [0, 4, 8, 9]),
+    { ...makeSideFace(3, [0.7, 0.7, 0], null, [50, 51, 52, 53]), surfaceKind: 'cylinder', isCap: false },
+  ]
+  const modMapFillet = {
+    modified: { 0: [0], 1: [1], 2: [2] },
+    generated: [3],
+    deletedInputs: new Set(),
+  }
+
+  it('prior Pad names survive through a fillet op', () => {
+    const names = nameOpOutput('fillet', padNames, facesAfterFillet, modMapFillet, { nodeId: 'Fil-G' })
+    expect(names['0']).toBe('Pad-A.TopCap')
+    expect(names['1']).toBe('Pad-A.BottomCap')
+    expect(names['2']).toBe('Pad-A.Side.seg-0')
+    expect(names['3']).toMatch(/^Fil-G\.Fillet/)
   })
 })

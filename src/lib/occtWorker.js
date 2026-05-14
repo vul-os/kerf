@@ -50,6 +50,7 @@ import { parseSketch } from './sketchSolver.js'
 import {
   buildFaceNamesForExtrude,
   buildFaceNamesForRevolve,
+  nameOpOutput,
 } from './faceNaming.js'
 
 // The opencascade.js package ships a JS shim (`opencascade.wasm.js`) plus
@@ -452,7 +453,7 @@ function opRevolve(oc, _prev, node, sketches, tracker) {
   return builder.Shape()
 }
 
-function opFillet(oc, prev, node, _sketches, tracker) {
+function opFillet(oc, prev, node, _sketches, tracker, builderRef) {
   if (!prev) throw new Error('fillet: no target shape')
   const r = Number(node.radius) || 0
   if (r <= 0) throw new Error('fillet: radius must be > 0')
@@ -466,10 +467,11 @@ function opFillet(oc, prev, node, _sketches, tracker) {
   }
   builder.Build()
   if (!builder.IsDone()) throw new Error('fillet: build failed')
+  if (builderRef) builderRef.builder = builder
   return builder.Shape()
 }
 
-function opChamfer(oc, prev, node, _sketches, tracker) {
+function opChamfer(oc, prev, node, _sketches, tracker, builderRef) {
   if (!prev) throw new Error('chamfer: no target shape')
   const dist = Number(node.distance) || 0
   if (dist <= 0) throw new Error('chamfer: distance must be > 0')
@@ -484,10 +486,11 @@ function opChamfer(oc, prev, node, _sketches, tracker) {
   }
   builder.Build()
   if (!builder.IsDone()) throw new Error('chamfer: build failed')
+  if (builderRef) builderRef.builder = builder
   return builder.Shape()
 }
 
-function opShell(oc, prev, node, _sketches, tracker) {
+function opShell(oc, prev, node, _sketches, tracker, builderRef) {
   if (!prev) throw new Error('shell: no target shape')
   const t = Number(node.thickness) || 0
   if (t <= 0) throw new Error('shell: thickness must be > 0')
@@ -534,6 +537,7 @@ function opShell(oc, prev, node, _sketches, tracker) {
     new oc.Message_ProgressRange_1())
   builder.Build(new oc.Message_ProgressRange_1())
   if (!builder.IsDone()) throw new Error('shell: build failed')
+  if (builderRef) builderRef.builder = builder
   return builder.Shape()
 }
 
@@ -727,7 +731,7 @@ function opMirrorPattern(oc, prev, node, _sketches, tracker) {
 // Face-id stability caveat (mirrors push_pull): target_face_id is a
 // post-evaluation snapshot index.  Structural upstream edits can renumber
 // faces.  Phase 4 persistent-naming will fix this.
-function opCutFromSketch(oc, prev, node, sketches, tracker) {
+function opCutFromSketch(oc, prev, node, sketches, tracker, builderRef) {
   if (!prev) throw new Error('cut_from_sketch: no target shape (must follow a body-building op)')
   const faceId = Number(node.target_face_id)
   if (!Number.isFinite(faceId) || faceId < 0) {
@@ -781,15 +785,19 @@ function opCutFromSketch(oc, prev, node, sketches, tracker) {
   const vec = track(tracker, new oc.gp_Vec_4(nx, ny, nz))
 
   // 6. Build the cutter solid.
-  const builder = track(tracker, new oc.BRepPrimAPI_MakePrism_1(orientedProfile, vec, false, true))
-  builder.Build()
-  if (!builder.IsDone()) throw new Error('cut_from_sketch: cutter prism build failed')
-  const cutter = builder.Shape()
+  const prismBuilder = track(tracker, new oc.BRepPrimAPI_MakePrism_1(orientedProfile, vec, false, true))
+  prismBuilder.Build()
+  if (!prismBuilder.IsDone()) throw new Error('cut_from_sketch: cutter prism build failed')
+  const cutter = prismBuilder.Shape()
 
   // 7. Boolean subtraction.
   const cut = track(tracker, new oc.BRepAlgoAPI_Cut_3(prev, cutter, new oc.Message_ProgressRange_1()))
   cut.Build(new oc.Message_ProgressRange_1())
   if (!cut.IsDone()) throw new Error('cut_from_sketch: boolean cut failed')
+  if (builderRef) {
+    builderRef.builder = cut
+    builderRef.frame = frame
+  }
   return cut.Shape()
 }
 
@@ -797,7 +805,7 @@ function opCutFromSketch(oc, prev, node, sketches, tracker) {
 // Implemented by extracting the face's outer wire as a planar profile,
 // extruding by `distance` along the face normal, then fuse-or-cut against
 // the body.
-function opPushPull(oc, prev, node, _sketches, tracker) {
+function opPushPull(oc, prev, node, _sketches, tracker, builderRef) {
   if (!prev) throw new Error('push_pull: no target shape')
   const distance = Number(node.distance) || 0
   if (distance === 0) return prev
@@ -814,20 +822,22 @@ function opPushPull(oc, prev, node, _sketches, tracker) {
   const dy = frame.normal[1] * distance
   const dz = frame.normal[2] * distance
   const vec = track(tracker, new oc.gp_Vec_4(dx, dy, dz))
-  const builder = track(tracker, new oc.BRepPrimAPI_MakePrism_1(face, vec, false, true))
-  builder.Build()
-  if (!builder.IsDone()) throw new Error('push_pull: prism build failed')
-  const tool = builder.Shape()
+  const prismBuilder = track(tracker, new oc.BRepPrimAPI_MakePrism_1(face, vec, false, true))
+  prismBuilder.Build()
+  if (!prismBuilder.IsDone()) throw new Error('push_pull: prism build failed')
+  const tool = prismBuilder.Shape()
   // Positive distance → fuse; negative → cut.
   if (distance > 0) {
     const fuse = track(tracker, new oc.BRepAlgoAPI_Fuse_3(prev, tool, new oc.Message_ProgressRange_1()))
     fuse.Build(new oc.Message_ProgressRange_1())
     if (!fuse.IsDone()) throw new Error('push_pull: boolean fuse failed')
+    if (builderRef) { builderRef.builder = fuse; builderRef.frame = frame }
     return fuse.Shape()
   } else {
     const cut = track(tracker, new oc.BRepAlgoAPI_Cut_3(prev, tool, new oc.Message_ProgressRange_1()))
     cut.Build(new oc.Message_ProgressRange_1())
     if (!cut.IsDone()) throw new Error('push_pull: boolean cut failed')
+    if (builderRef) { builderRef.builder = cut; builderRef.frame = frame }
     return cut.Shape()
   }
 }
@@ -1758,6 +1768,289 @@ function computeRevolveFaceNames(oc, resultShape, nodeId, axis, isFullCircle, sk
 }
 
 // ---------------------------------------------------------------------------
+// T2: ModifiedMap extraction + per-op face namers
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract a ModifiedMap from an OCCT builder (BRepFilletAPI_MakeFillet,
+ * BRepAlgoAPI_Cut, BRepAlgoAPI_Fuse, BRepOffsetAPI_MakeThickSolid, etc.)
+ * by walking all faces of the INPUT shape and calling builder.Modified()
+ * on each to find which output faces they map to.
+ *
+ * OCCT binding gaps: `BRepAlgoAPI_BooleanOperation::Modified` takes a
+ * `TopoDS_Shape` and returns a `TopTools_ListOfShape`.  In opencascade.js
+ * the binding is exposed as `Modified_1(shape)` (aliased for overload
+ * disambiguation).  If the binding is absent we fall back to treating every
+ * output face as "generated" (safe but loses carry-over semantics).
+ *
+ * @param {object}   oc
+ * @param {object}   builder   - OCCT builder after Build() / IsDone()
+ * @param {object}   inputShape - TopoDS_Shape BEFORE the op
+ * @param {object}   outputShape - TopoDS_Shape AFTER the op (builder.Shape())
+ * @returns {import('./faceNaming.js').ModifiedMap}
+ */
+function extractModifiedMap(oc, builder, inputShape, outputShape) {
+  /** @type {import('./faceNaming.js').ModifiedMap} */
+  const result = { modified: {}, generated: [], deletedInputs: new Set() }
+
+  // Build an output-face hashcode → index map so we can translate OCCT
+  // shape pointers back to our 0-based face indices.
+  const outputFaceHashToIdx = new Map()
+  let outIdx = 0
+  let outExp
+  try {
+    outExp = new oc.TopExp_Explorer_2(
+      outputShape, oc.TopAbs_ShapeEnum.TopAbs_FACE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE)
+    for (; outExp.More(); outExp.Next()) {
+      try {
+        const h = oc.TopoDS.Face_1(outExp.Current()).HashCode(2147483647)
+        outputFaceHashToIdx.set(h, outIdx)
+      } catch { /* */ }
+      outIdx++
+    }
+    try { outExp.delete?.() } catch { /* */ }
+  } catch {
+    // Cannot walk output faces — treat all as generated.
+    for (let i = 0; i < outIdx; i++) result.generated.push(i)
+    return result
+  }
+
+  // Walk input faces and query Modified().
+  // opencascade.js exposes this as Modified_1(shape) on BRepAlgoAPI builders
+  // and as Modified(shape) on BRepFilletAPI / BRepOffsetAPI builders.
+  // We try both overload names.
+  const modifiedFn = (
+    typeof builder.Modified_1 === 'function' ? (sh) => builder.Modified_1(sh) :
+    typeof builder.Modified   === 'function' ? (sh) => builder.Modified(sh)   :
+    null
+  )
+  const isDeletedFn = (
+    typeof builder.IsDeleted   === 'function' ? (sh) => builder.IsDeleted(sh)   :
+    typeof builder.IsDeleted_1 === 'function' ? (sh) => builder.IsDeleted_1(sh) :
+    null
+  )
+  const generatedFn = (
+    typeof builder.Generated_1 === 'function' ? (sh) => builder.Generated_1(sh) :
+    typeof builder.Generated   === 'function' ? (sh) => builder.Generated(sh)   :
+    null
+  )
+
+  let inIdx = 0
+  let inExp
+  try {
+    inExp = new oc.TopExp_Explorer_2(
+      inputShape, oc.TopAbs_ShapeEnum.TopAbs_FACE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE)
+  } catch {
+    // Cannot walk input faces.
+    for (let i = 0; i < outIdx; i++) result.generated.push(i)
+    return result
+  }
+
+  const coveredOutputIndices = new Set()
+
+  for (; inExp.More(); inExp.Next()) {
+    const inFaceSh = oc.TopoDS.Face_1(inExp.Current())
+
+    // IsDeleted?
+    let deleted = false
+    if (isDeletedFn) {
+      try { deleted = isDeletedFn(inFaceSh) } catch { /* */ }
+    }
+    if (deleted) {
+      result.deletedInputs.add(inIdx)
+      inIdx++
+      continue
+    }
+
+    // Modified images?
+    if (modifiedFn) {
+      try {
+        const modList = modifiedFn(inFaceSh)
+        // TopTools_ListOfShape iteration: First() / Next() / IsEmpty() / Value()
+        // opencascade.js may not bind an iterator — we try a simple for-each
+        // style via the list's own API.
+        const outIndices = []
+        try {
+          // Try TopoDS_ListOfShape iterator pattern.
+          for (let it = modList.First?.(); it && !it.IsNull?.(); it = it.Next?.()) {
+            try {
+              const h = oc.TopoDS.Face_1(it.Value()).HashCode(2147483647)
+              const oi = outputFaceHashToIdx.get(h)
+              if (oi !== undefined) outIndices.push(oi)
+            } catch { /* */ }
+          }
+        } catch { /* list iteration pattern unavailable */ }
+        result.modified[inIdx] = outIndices
+        for (const oi of outIndices) coveredOutputIndices.add(oi)
+      } catch { /* Modified unavailable for this face */ }
+    }
+
+    // Generated faces from this input face (e.g. fillet surfaces generated
+    // from an edge of this face — not a standard OCCT pattern but some ops
+    // use it).
+    if (generatedFn) {
+      try {
+        const genList = generatedFn(inFaceSh)
+        try {
+          for (let it = genList.First?.(); it && !it.IsNull?.(); it = it.Next?.()) {
+            try {
+              const h = oc.TopoDS.Face_1(it.Value()).HashCode(2147483647)
+              const oi = outputFaceHashToIdx.get(h)
+              if (oi !== undefined && !coveredOutputIndices.has(oi)) {
+                result.generated.push(oi)
+                coveredOutputIndices.add(oi)
+              }
+            } catch { /* */ }
+          }
+        } catch { /* */ }
+      } catch { /* */ }
+    }
+
+    inIdx++
+  }
+  try { inExp.delete?.() } catch { /* */ }
+
+  // Any output face not covered by Modified or Generated is genuinely new.
+  for (let i = 0; i < outIdx; i++) {
+    if (!coveredOutputIndices.has(i)) {
+      result.generated.push(i)
+    }
+  }
+
+  return result
+}
+
+/**
+ * Heuristic: classify output faces of a fillet/chamfer/shell/cut/push_pull
+ * result as cap vs side using the same dot-product test as extrude.
+ *
+ * We store `isCap: true` on descriptors that look like caps relative to the
+ * +Z axis (the most common push_pull / cut_from_sketch direction). In the
+ * absence of a known axis we mark no faces as caps and rely on the position-
+ * based side-face ordering instead.
+ *
+ * @param {object}   oc
+ * @param {object}   shape - output TopoDS_Shape
+ * @param {number[]} [axis] - cap-detection axis; [0,0,1] when omitted
+ * @returns {FaceDescriptor[]}
+ */
+function extractFaceDescriptorsWithCaps(oc, shape, axis) {
+  const descriptors = extractFaceDescriptors(oc, shape, {})
+  if (!axis || axis.length < 3) return descriptors
+  const [ax, ay, az] = axis
+  const len = Math.sqrt(ax * ax + ay * ay + az * az) || 1
+  const nx = ax / len, ny = ay / len, nz = az / len
+  for (const d of descriptors) {
+    const [fx, fy, fz] = d.normal || [0, 0, 0]
+    const dot = Math.abs(fx * nx + fy * ny + fz * nz)
+    d.isCap = dot >= 0.966
+  }
+  return descriptors
+}
+
+/**
+ * Build a namer closure for fillet/chamfer ops.
+ *
+ * @param {object}   oc
+ * @param {object}   builder     - BRepFilletAPI_MakeFillet or _MakeChamfer
+ * @param {object}   inputShape  - shape BEFORE the op
+ * @param {string}   nodeId
+ * @param {string}   opKind      - 'fillet' | 'chamfer'
+ * @param {Record<number,string>} prevFaceNames - face names from prior namer
+ * @returns {(oc_:object, shape:object) => Record<string,string>}
+ */
+function makeFilletChamferNamer(oc, builder, inputShape, nodeId, opKind, prevFaceNames) {
+  // Snapshot the inputShape reference and prevFaceNames at closure-creation
+  // time so subsequent ops don't corrupt them.
+  const snapshotInputShape = inputShape
+  const snapshotPrev = { ...prevFaceNames }
+  return (_oc, outputShape) => {
+    try {
+      const modMap = extractModifiedMap(oc, builder, snapshotInputShape, outputShape)
+      const newFaces = extractFaceDescriptors(oc, outputShape, {})
+      return nameOpOutput(opKind, snapshotPrev, newFaces, modMap, { nodeId })
+    } catch {
+      return {}
+    }
+  }
+}
+
+/**
+ * Build a namer closure for shell ops.
+ *
+ * @param {object}   oc
+ * @param {object}   builder     - BRepOffsetAPI_MakeThickSolid
+ * @param {object}   inputShape
+ * @param {string}   nodeId
+ * @param {Record<number,string>} prevFaceNames
+ * @returns {(oc_:object, shape:object) => Record<string,string>}
+ */
+function makeShellNamer(oc, builder, inputShape, nodeId, prevFaceNames) {
+  const snapshotInputShape = inputShape
+  const snapshotPrev = { ...prevFaceNames }
+  return (_oc, outputShape) => {
+    try {
+      const modMap = extractModifiedMap(oc, builder, snapshotInputShape, outputShape)
+      const newFaces = extractFaceDescriptors(oc, outputShape, {})
+      return nameOpOutput('shell', snapshotPrev, newFaces, modMap, { nodeId })
+    } catch {
+      return {}
+    }
+  }
+}
+
+/**
+ * Build a namer closure for cut_from_sketch.
+ *
+ * @param {object}   oc
+ * @param {object}   builder     - BRepAlgoAPI_Cut_3
+ * @param {object}   inputShape
+ * @param {string}   nodeId
+ * @param {number[]} cutNormal   - extrusion direction of the cut
+ * @param {string[]} sketchEntityIds
+ * @param {Record<number,string>} prevFaceNames
+ * @returns {(oc_:object, shape:object) => Record<string,string>}
+ */
+function makeCutFromSketchNamer(oc, builder, inputShape, nodeId, cutNormal, sketchEntityIds, prevFaceNames) {
+  const snapshotInputShape = inputShape
+  const snapshotPrev = { ...prevFaceNames }
+  return (_oc, outputShape) => {
+    try {
+      const modMap = extractModifiedMap(oc, builder, snapshotInputShape, outputShape)
+      const newFaces = extractFaceDescriptorsWithCaps(oc, outputShape, cutNormal)
+      return nameOpOutput('cut_from_sketch', snapshotPrev, newFaces, modMap, { nodeId, sketchEntityIds })
+    } catch {
+      return {}
+    }
+  }
+}
+
+/**
+ * Build a namer closure for push_pull.
+ *
+ * @param {object}   oc
+ * @param {object}   builder     - BRepAlgoAPI_Fuse_3 or _Cut_3
+ * @param {object}   inputShape
+ * @param {string}   nodeId
+ * @param {number[]} faceNormal  - face normal of the pulled face (used as cap axis)
+ * @param {Record<number,string>} prevFaceNames
+ * @returns {(oc_:object, shape:object) => Record<string,string>}
+ */
+function makePushPullNamer(oc, builder, inputShape, nodeId, faceNormal, prevFaceNames) {
+  const snapshotInputShape = inputShape
+  const snapshotPrev = { ...prevFaceNames }
+  return (_oc, outputShape) => {
+    try {
+      const modMap = extractModifiedMap(oc, builder, snapshotInputShape, outputShape)
+      const newFaces = extractFaceDescriptorsWithCaps(oc, outputShape, faceNormal)
+      return nameOpOutput('push_pull', snapshotPrev, newFaces, modMap, { nodeId })
+    } catch {
+      return {}
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Tree evaluation.
 //
 // The evaluator walks the feature tree top-to-bottom, threading the
@@ -1862,16 +2155,74 @@ function evaluateTree(oc, tree, sketches) {
             computeRevolveFaceNames(oc_, shape, revNodeId, revAxisDir, revFull, revSketchJson)
           break
         }
-        case 'fillet':   next = opFillet(oc, current, node, sketches, tracker); break
-        case 'chamfer':  next = opChamfer(oc, current, node, sketches, tracker); break
-        case 'shell':    next = opShell(oc, current, node, sketches, tracker); break
+        case 'fillet': {
+          // Snapshot old face names, capture builder for carry-over namer.
+          const filNodeId = node.id || node.op
+          let filPrevNames = {}
+          try { if (currentFaceNamer) filPrevNames = currentFaceNamer(oc, current) } catch { /* */ }
+          const filInputShape = current
+          const filRef = {}
+          next = opFillet(oc, current, node, sketches, tracker, filRef)
+          if (filRef.builder) {
+            currentFaceNamer = makeFilletChamferNamer(oc, filRef.builder, filInputShape, filNodeId, 'fillet', filPrevNames)
+          }
+          // else: keep prior namer (builder capture failed; graceful degradation)
+          break
+        }
+        case 'chamfer': {
+          const chmNodeId = node.id || node.op
+          let chmPrevNames = {}
+          try { if (currentFaceNamer) chmPrevNames = currentFaceNamer(oc, current) } catch { /* */ }
+          const chmInputShape = current
+          const chmRef = {}
+          next = opChamfer(oc, current, node, sketches, tracker, chmRef)
+          if (chmRef.builder) {
+            currentFaceNamer = makeFilletChamferNamer(oc, chmRef.builder, chmInputShape, chmNodeId, 'chamfer', chmPrevNames)
+          }
+          break
+        }
+        case 'shell': {
+          const shlNodeId = node.id || node.op
+          let shlPrevNames = {}
+          try { if (currentFaceNamer) shlPrevNames = currentFaceNamer(oc, current) } catch { /* */ }
+          const shlInputShape = current
+          const shlRef = {}
+          next = opShell(oc, current, node, sketches, tracker, shlRef)
+          if (shlRef.builder) {
+            currentFaceNamer = makeShellNamer(oc, shlRef.builder, shlInputShape, shlNodeId, shlPrevNames)
+          }
+          break
+        }
         case 'hole':         next = opHole(oc, current, node, sketches, tracker); break
         case 'hole_pattern': next = opHolePattern(oc, current, node, sketches, tracker); break
         case 'linear_pattern': next = opLinearPattern(oc, current, node, sketches, tracker); break
         case 'polar_pattern':  next = opPolarPattern(oc, current, node, sketches, tracker); break
         case 'mirror_pattern': next = opMirrorPattern(oc, current, node, sketches, tracker); break
-        case 'push_pull':           next = opPushPull(oc, current, node, sketches, tracker); break
-        case 'cut_from_sketch':     next = opCutFromSketch(oc, current, node, sketches, tracker); break
+        case 'push_pull': {
+          const ppNodeId = node.id || node.op
+          let ppPrevNames = {}
+          try { if (currentFaceNamer) ppPrevNames = currentFaceNamer(oc, current) } catch { /* */ }
+          const ppInputShape = current
+          const ppRef = {}
+          next = opPushPull(oc, current, node, sketches, tracker, ppRef)
+          if (ppRef.builder && ppRef.frame) {
+            currentFaceNamer = makePushPullNamer(oc, ppRef.builder, ppInputShape, ppNodeId, ppRef.frame.normal, ppPrevNames)
+          }
+          break
+        }
+        case 'cut_from_sketch': {
+          const cfsNodeId = node.id || node.op
+          let cfsPrevNames = {}
+          try { if (currentFaceNamer) cfsPrevNames = currentFaceNamer(oc, current) } catch { /* */ }
+          const cfsInputShape = current
+          const cfsRef = {}
+          const cfsSketchIds = extractWireEntityIds(sketches?.[node.sketch_path] || null)
+          next = opCutFromSketch(oc, current, node, sketches, tracker, cfsRef)
+          if (cfsRef.builder && cfsRef.frame) {
+            currentFaceNamer = makeCutFromSketchNamer(oc, cfsRef.builder, cfsInputShape, cfsNodeId, cfsRef.frame.normal, cfsSketchIds, cfsPrevNames)
+          }
+          break
+        }
         case 'sweep1':
           if (current) {
             pushCurrentMesh(`body-${meshes.length}`)
@@ -2021,16 +2372,72 @@ async function evaluateToFinalShape(oc, tree, sketches) {
             computeRevolveFaceNames(oc_, shape, revNodeId, revAxisDir, revFull, revSketchJson)
           break
         }
-        case 'fillet':   next = opFillet(oc, current, node, sketches, tracker); break
-        case 'chamfer':  next = opChamfer(oc, current, node, sketches, tracker); break
-        case 'shell':    next = opShell(oc, current, node, sketches, tracker); break
+        case 'fillet': {
+          const filNodeId2 = node.id || node.op
+          let filPrevNames2 = {}
+          try { if (currentFaceNamer) filPrevNames2 = currentFaceNamer(oc, current) } catch { /* */ }
+          const filInputShape2 = current
+          const filRef2 = {}
+          next = opFillet(oc, current, node, sketches, tracker, filRef2)
+          if (filRef2.builder) {
+            currentFaceNamer = makeFilletChamferNamer(oc, filRef2.builder, filInputShape2, filNodeId2, 'fillet', filPrevNames2)
+          }
+          break
+        }
+        case 'chamfer': {
+          const chmNodeId2 = node.id || node.op
+          let chmPrevNames2 = {}
+          try { if (currentFaceNamer) chmPrevNames2 = currentFaceNamer(oc, current) } catch { /* */ }
+          const chmInputShape2 = current
+          const chmRef2 = {}
+          next = opChamfer(oc, current, node, sketches, tracker, chmRef2)
+          if (chmRef2.builder) {
+            currentFaceNamer = makeFilletChamferNamer(oc, chmRef2.builder, chmInputShape2, chmNodeId2, 'chamfer', chmPrevNames2)
+          }
+          break
+        }
+        case 'shell': {
+          const shlNodeId2 = node.id || node.op
+          let shlPrevNames2 = {}
+          try { if (currentFaceNamer) shlPrevNames2 = currentFaceNamer(oc, current) } catch { /* */ }
+          const shlInputShape2 = current
+          const shlRef2 = {}
+          next = opShell(oc, current, node, sketches, tracker, shlRef2)
+          if (shlRef2.builder) {
+            currentFaceNamer = makeShellNamer(oc, shlRef2.builder, shlInputShape2, shlNodeId2, shlPrevNames2)
+          }
+          break
+        }
         case 'hole':         next = opHole(oc, current, node, sketches, tracker); break
         case 'hole_pattern': next = opHolePattern(oc, current, node, sketches, tracker); break
         case 'linear_pattern': next = opLinearPattern(oc, current, node, sketches, tracker); break
         case 'polar_pattern':  next = opPolarPattern(oc, current, node, sketches, tracker); break
         case 'mirror_pattern': next = opMirrorPattern(oc, current, node, sketches, tracker); break
-        case 'push_pull':           next = opPushPull(oc, current, node, sketches, tracker); break
-        case 'cut_from_sketch':     next = opCutFromSketch(oc, current, node, sketches, tracker); break
+        case 'push_pull': {
+          const ppNodeId2 = node.id || node.op
+          let ppPrevNames2 = {}
+          try { if (currentFaceNamer) ppPrevNames2 = currentFaceNamer(oc, current) } catch { /* */ }
+          const ppInputShape2 = current
+          const ppRef2 = {}
+          next = opPushPull(oc, current, node, sketches, tracker, ppRef2)
+          if (ppRef2.builder && ppRef2.frame) {
+            currentFaceNamer = makePushPullNamer(oc, ppRef2.builder, ppInputShape2, ppNodeId2, ppRef2.frame.normal, ppPrevNames2)
+          }
+          break
+        }
+        case 'cut_from_sketch': {
+          const cfsNodeId2 = node.id || node.op
+          let cfsPrevNames2 = {}
+          try { if (currentFaceNamer) cfsPrevNames2 = currentFaceNamer(oc, current) } catch { /* */ }
+          const cfsInputShape2 = current
+          const cfsRef2 = {}
+          const cfsSketchIds2 = extractWireEntityIds(sketches?.[node.sketch_path] || null)
+          next = opCutFromSketch(oc, current, node, sketches, tracker, cfsRef2)
+          if (cfsRef2.builder && cfsRef2.frame) {
+            currentFaceNamer = makeCutFromSketchNamer(oc, cfsRef2.builder, cfsInputShape2, cfsNodeId2, cfsRef2.frame.normal, cfsSketchIds2, cfsPrevNames2)
+          }
+          break
+        }
         case 'sweep1':
           if (current) cleanupShape(oc, current)
           current = null

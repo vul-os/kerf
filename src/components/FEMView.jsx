@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Activity, AlertTriangle, CheckCircle, Loader2, Play } from 'lucide-react'
 import { useAuth } from '../store/auth.js'
+import DeformedShapeOverlay from './FEMDeformedShape.jsx'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
@@ -50,6 +51,12 @@ export default function FEMView({ file, projectId }) {
   const [running, setRunning] = useState(false)
   const [jobStatus, setJobStatus] = useState(null)
   const [error, setError] = useState(null)
+
+  // Deformed-shape overlay state
+  const [showOverlay, setShowOverlay] = useState(false)
+  const [dispScale, setDispScale] = useState(10)
+  const [colorMode, setColorMode] = useState('displacement') // 'displacement' | 'vonmises'
+
   const pollingRef = useRef(null)
 
   const fid = file?.id
@@ -162,6 +169,7 @@ export default function FEMView({ file, projectId }) {
 
   const result = jobStatus?.result && typeof jobStatus.result === 'object' ? jobStatus.result : null
   const status = jobStatus?.status
+  const hasDeformedShape = result?.node_displacements?.length > 0
 
   return (
     <div style={styles.root}>
@@ -292,6 +300,57 @@ export default function FEMView({ file, projectId }) {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* Deformed-shape overlay controls */}
+          {hasDeformedShape && (
+            <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={styles.sectionTitle}>Deformed Shape</div>
+              <div style={styles.row}>
+                <label style={styles.label}>Show overlay</label>
+                <input
+                  type="checkbox"
+                  checked={showOverlay}
+                  onChange={e => setShowOverlay(e.target.checked)}
+                  style={{ cursor: 'pointer' }}
+                />
+              </div>
+              {showOverlay && (
+                <>
+                  <div style={styles.row}>
+                    <label style={styles.label}>Scale factor</label>
+                    <input
+                      type="range"
+                      min={1}
+                      max={200}
+                      value={dispScale}
+                      onChange={e => setDispScale(Number(e.target.value))}
+                      style={{ flex: 1 }}
+                    />
+                    <span style={{ ...styles.mono, minWidth: 36, textAlign: 'right' }}>{dispScale}×</span>
+                  </div>
+                  <div style={styles.row}>
+                    <label style={styles.label}>Colour by</label>
+                    <select
+                      value={colorMode}
+                      onChange={e => setColorMode(e.target.value)}
+                      style={styles.select}
+                    >
+                      <option value="displacement">Displacement magnitude</option>
+                      <option value="vonmises">von Mises stress</option>
+                    </select>
+                  </div>
+                  <DeformedShapeOverlay
+                    nodeDisplacements={result.node_displacements}
+                    stresses={result.stresses}
+                    scale={dispScale}
+                    colorMode={colorMode}
+                    maxDisplacement={result.max_displacement}
+                    maxStress={result.max_vonmises_stress}
+                  />
+                </>
+              )}
             </div>
           )}
 

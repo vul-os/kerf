@@ -9,6 +9,20 @@ nodes mean continuity of displacement — exactly the tied/bonded condition).
 No Lagrange multiplier coupling is needed.  If the mesh is non-conformal, a
 Lagrange-multiplier approach would be required; that is deferred because Gmsh
 occ.fragment() already gives conformal interfaces for Boolean-fused solids.
+
+Multi-material support
+----------------------
+material_props can be either:
+  - a single dict {E, nu, rho, yield_strength}  → applied to all cells (legacy)
+  - a list [{body_tag: int, material_props: {E, nu, ...}}, ...]
+    where body_tag matches a Gmsh physical-volume tag; the Lamé parameters are
+    assembled as piecewise-constant DG0 fields, one value per cell.
+
+SLEPc modal analysis
+---------------------
+_run_modal uses slepc4py when available (gated by _SLEPC_AVAILABLE).
+The GHEP K x = λ M x is solved for the first N eigenpairs; frequencies in Hz
+are sqrt(λ) / (2π).  Mode shapes are returned as per-node displacement lists.
 """
 
 import tempfile
@@ -23,10 +37,17 @@ try:
 except ImportError:
     pass
 
+_SLEPC_AVAILABLE = False
+try:
+    from slepc4py import SLEPc as _SLEPc  # noqa: F401
+    _SLEPC_AVAILABLE = True
+except ImportError:
+    pass
+
 ENGINE_PENDING_WARNING = "Engine pending — FEniCSx (dolfinx) not yet installed."
 
 
-def run_static_analysis(mesh_path: str, material_props: dict,
+def run_static_analysis(mesh_path: str, material_props,
                         boundary_conditions: list, loads: list,
                         analysis_type: str = "linear_static") -> dict:
     if not _DOLFINX_AVAILABLE:
@@ -78,7 +99,6 @@ def _msh_to_xdmf(msh_path: str, xdmf_path: str, facet_xdmf_path: str) -> None:
     # collect physical group tags per volume cell
     vol_cell_data = {}
     for key, blocks in msh.cell_data.items():
-        # meshio stores cell_data keyed by field name; blocks are per cell-type
         for i_cb, cb in enumerate(msh.cells):
             if cb.type.startswith("tetra") or cb.type.startswith("triangle"):
                 if i_cb < len(blocks):
@@ -99,7 +119,6 @@ def _msh_to_xdmf(msh_path: str, xdmf_path: str, facet_xdmf_path: str) -> None:
     for i_cb, cb in enumerate(msh.cells):
         if cb.type == facet_type:
             facet_data = cb.data
-            # look for gmsh:physical tag on this cell block
             for key, blocks in msh.cell_data.items():
                 if i_cb < len(blocks):
                     facet_tags = blocks[i_cb]
@@ -114,7 +133,6 @@ def _msh_to_xdmf(msh_path: str, xdmf_path: str, facet_xdmf_path: str) -> None:
         )
         meshio.write(facet_xdmf_path, facet_mesh)
     else:
-        # Write a minimal placeholder so dolfinx XDMF read doesn't crash
         meshio.write(facet_xdmf_path, meshio.Mesh(
             points=msh.points,
             cells=[(facet_type, np.zeros((0, 3 if facet_type == "triangle" else 2), dtype=int))],
@@ -122,10 +140,102 @@ def _msh_to_xdmf(msh_path: str, xdmf_path: str, facet_xdmf_path: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Multi-material helper
+# ---------------------------------------------------------------------------
+
+def _resolve_material_props(material_props):
+    """
+    Normalise material_props to a list of {body_tag, E, nu, rho, yield_strength}.
+
+    Accepts either:
+      - a single dict  → [{body_tag: None, ...}]
+      - a list of dicts with 'body_tag' key
+    """
+    if isinstance(material_props, dict):
+        return [{"body_tag": None, **material_props}]
+    # list form: [{body_tag: int, material_props: {...}}, ...]
+    out = []
+    for entry in material_props:
+        tag = entry.get("body_tag")
+        props = entry.get("material_props", entry)
+        out.append({"body_tag": tag, **props})
+    return out
+
+
+def _build_lame_fields(domain, cell_tags, mat_list, tdim):
+    """
+    Build piecewise-constant DG0 Lamé parameter fields (lambda, mu) from a
+    list of per-body material specs.  When there is only one spec with no
+    body_tag, returns scalar constants for back-compat.
+
+    Returns (lam_field, mu_field, yield_arr, rho_field) where each is either a
+    scalar float or a dolfinx.fem.Function on DG0.  The caller passes the
+    appropriate UFL expression.
+    """
+    import dolfinx.fem
+    import ufl
+
+    single = len(mat_list) == 1 and mat_list[0]["body_tag"] is None
+
+    def _lame(E, nu):
+        lam = E * nu / ((1.0 + nu) * (1.0 - 2.0 * nu))
+        mu = E / (2.0 * (1.0 + nu))
+        return lam, mu
+
+    if single:
+        m = mat_list[0]
+        E = float(m["E"])
+        nu = float(m["nu"])
+        lam, mu = _lame(E, nu)
+        rho = float(m.get("rho", 7850.0))
+        ys = float(m.get("yield_strength", 250e6))
+        return lam, mu, ys, rho
+
+    # Multi-body: build DG0 fields
+    Q = dolfinx.fem.functionspace(domain, ("DG", 0))
+    lam_fn = dolfinx.fem.Function(Q)
+    mu_fn = dolfinx.fem.Function(Q)
+    rho_fn = dolfinx.fem.Function(Q)
+
+    # Default to first material spec for any untagged cells
+    default = mat_list[0]
+    E_def = float(default["E"])
+    nu_def = float(default["nu"])
+    lam_def, mu_def = _lame(E_def, nu_def)
+    rho_def = float(default.get("rho", 7850.0))
+
+    lam_fn.x.array[:] = lam_def
+    mu_fn.x.array[:] = mu_def
+    rho_fn.x.array[:] = rho_def
+
+    max_ys = float(default.get("yield_strength", 250e6))
+
+    if cell_tags is not None:
+        for spec in mat_list:
+            tag = spec.get("body_tag")
+            if tag is None:
+                continue
+            E = float(spec["E"])
+            nu = float(spec["nu"])
+            lam, mu = _lame(E, nu)
+            rho = float(spec.get("rho", 7850.0))
+            ys = float(spec.get("yield_strength", 250e6))
+            max_ys = max(max_ys, ys)
+
+            mask = cell_tags.values == tag
+            cell_indices = cell_tags.indices[mask]
+            lam_fn.x.array[cell_indices] = lam
+            mu_fn.x.array[cell_indices] = mu
+            rho_fn.x.array[cell_indices] = rho
+
+    return lam_fn, mu_fn, max_ys, rho_fn
+
+
+# ---------------------------------------------------------------------------
 # Linear static (small-strain linear elasticity)
 # ---------------------------------------------------------------------------
 
-def _run_linear_static(mesh_path: str, material_props: dict,
+def _run_linear_static(mesh_path: str, material_props,
                        boundary_conditions: list, loads: list) -> dict:
     import dolfinx
     import dolfinx.fem
@@ -138,13 +248,8 @@ def _run_linear_static(mesh_path: str, material_props: dict,
 
     comm = MPI.COMM_WORLD
 
-    E = float(material_props["E"])
-    nu = float(material_props["nu"])
-    yield_strength = float(material_props.get("yield_strength", 250e6))
-
-    # Lamé parameters
-    lam = E * nu / ((1.0 + nu) * (1.0 - 2.0 * nu))
-    mu = E / (2.0 * (1.0 + nu))
+    mat_list = _resolve_material_props(material_props)
+    single_mat = len(mat_list) == 1 and mat_list[0]["body_tag"] is None
 
     with tempfile.TemporaryDirectory() as tmp:
         xdmf_vol = str(Path(tmp) / "vol.xdmf")
@@ -153,7 +258,6 @@ def _run_linear_static(mesh_path: str, material_props: dict,
 
         with dolfinx.io.XDMFFile(comm, xdmf_vol, "r") as f:
             domain = f.read_mesh(ghost_mode=dmesh.GhostMode.shared_facet)
-            # try to read cell tags (physical volume groups for multi-body)
             try:
                 cell_tags = f.read_meshtags(domain, name="gmsh:physical")
             except Exception:
@@ -163,7 +267,6 @@ def _run_linear_static(mesh_path: str, material_props: dict,
         fdim = tdim - 1
         domain.topology.create_connectivity(fdim, tdim)
 
-        # Read facet tags if available
         facet_tags = None
         try:
             with dolfinx.io.XDMFFile(comm, xdmf_fac, "r") as f:
@@ -171,32 +274,24 @@ def _run_linear_static(mesh_path: str, material_props: dict,
         except Exception:
             pass
 
-    # ------------------------------------------------------------------
-    # Function space: P1 Lagrange vector (displacement)
-    # ------------------------------------------------------------------
+    # Build Lamé fields (scalar or DG0 Function)
+    lam_field, mu_field, yield_strength, rho_field = _build_lame_fields(
+        domain, cell_tags, mat_list, domain.topology.dim
+    )
+
     V = dolfinx.fem.functionspace(domain, ("Lagrange", 1, (tdim,)))
 
-    # ------------------------------------------------------------------
-    # UFL forms — standard small-strain linear elasticity
-    #   σ(u) = λ tr(ε(u)) I + 2μ ε(u)
-    #   ε(u) = sym(∇u)
-    #   Weak form: ∫ σ(u):ε(v) dx = ∫ f·v dx + ∫ t·v ds
-    # ------------------------------------------------------------------
     def eps(v):
         return ufl.sym(ufl.grad(v))
 
     def sigma(v):
-        return lam * ufl.tr(eps(v)) * ufl.Identity(tdim) + 2.0 * mu * eps(v)
+        return lam_field * ufl.tr(eps(v)) * ufl.Identity(tdim) + 2.0 * mu_field * eps(v)
 
     u = ufl.TrialFunction(V)
     v = ufl.TestFunction(V)
 
-    # Bilinear form
     a_form = ufl.inner(sigma(u), eps(v)) * ufl.dx
 
-    # ------------------------------------------------------------------
-    # Dirichlet BCs
-    # ------------------------------------------------------------------
     bcs = []
 
     for bc_spec in boundary_conditions:
@@ -204,8 +299,6 @@ def _run_linear_static(mesh_path: str, material_props: dict,
         tags = bc_spec.get("face_tags", [])
 
         if not tags:
-            # Fallback: locate boundary geometrically if no tags provided
-            # (shouldn't happen in normal use, but keeps things robust)
             facets = dmesh.locate_entities_boundary(
                 domain, fdim, lambda x: np.ones(x.shape[1], dtype=bool)
             )
@@ -214,7 +307,6 @@ def _run_linear_static(mesh_path: str, material_props: dict,
                 mask = np.isin(facet_tags.values, tags)
                 facets = facet_tags.indices[mask]
             else:
-                # No facet tags loaded — fall back to all boundary facets
                 facets = dmesh.locate_entities_boundary(
                     domain, fdim, lambda x: np.ones(x.shape[1], dtype=bool)
                 )
@@ -235,10 +327,6 @@ def _run_linear_static(mesh_path: str, material_props: dict,
             bc_val = dolfinx.fem.Constant(domain, PETSc.ScalarType(vals))
             bcs.append(dolfinx.fem.dirichletbc(bc_val, dofs, V))
 
-    # ------------------------------------------------------------------
-    # Neumann loads (traction + pressure)
-    # ------------------------------------------------------------------
-    # Build facet meshtags for Neumann surfaces
     neumann_facets_list = []
     marker_id = 100
 
@@ -257,7 +345,6 @@ def _run_linear_static(mesh_path: str, material_props: dict,
             neumann_facets_list.append((lf, marker_id, load_spec, tags))
             marker_id += 1
 
-    # Assemble ds measure from combined facet tags
     if neumann_facets_list:
         all_nf = np.concatenate([x[0] for x in neumann_facets_list])
         all_nm = np.concatenate([
@@ -269,7 +356,6 @@ def _run_linear_static(mesh_path: str, material_props: dict,
     else:
         ds = ufl.Measure("ds", domain=domain)
 
-    # Build RHS linear form
     f_body = dolfinx.fem.Constant(domain, PETSc.ScalarType([0.0] * tdim))
     L_form = ufl.inner(f_body, v) * ufl.dx
 
@@ -278,21 +364,13 @@ def _run_linear_static(mesh_path: str, material_props: dict,
         value = float(load_spec.get("value", 0.0))
 
         if load_type == "pressure":
-            # Pressure = normal traction (inward); direction computed from geometry
-            # Use scalar pressure; positive value = compressive (into surface)
-            # FEniCSx: t = -p * n  (n outward normal)
             n = ufl.FacetNormal(domain)
             t = dolfinx.fem.Constant(domain, PETSc.ScalarType(-value))
             L_form = L_form + ufl.inner(t * n, v) * ds(mid)
         elif load_type == "force":
-            # Distribute force over tagged facets (uniform traction)
-            # Direction: user can supply vector or we default to -z / -y
             direction = load_spec.get("direction", None)
             if direction is None:
-                if tdim == 3:
-                    direction = [0.0, 0.0, -1.0]
-                else:
-                    direction = [0.0, -1.0]
+                direction = [0.0, 0.0, -1.0] if tdim == 3 else [0.0, -1.0]
             t_vec = dolfinx.fem.Constant(domain, PETSc.ScalarType(
                 [float(d) * value for d in direction[:tdim]]
             ))
@@ -304,9 +382,6 @@ def _run_linear_static(mesh_path: str, material_props: dict,
             ))
             L_form = L_form + ufl.inner(t_vec, v) * ds(mid)
 
-    # ------------------------------------------------------------------
-    # Solve
-    # ------------------------------------------------------------------
     problem = dolfinx.fem.petsc.LinearProblem(
         a_form, L_form, bcs=bcs,
         petsc_options={"ksp_type": "preonly", "pc_type": "lu",
@@ -314,15 +389,10 @@ def _run_linear_static(mesh_path: str, material_props: dict,
     )
     u_sol = problem.solve()
 
-    # ------------------------------------------------------------------
-    # Post-process: displacement magnitudes + von Mises stress
-    # ------------------------------------------------------------------
     u_arr = u_sol.x.array.reshape(-1, tdim)
     disp_mag = np.linalg.norm(u_arr, axis=1)
     max_disp = float(np.max(disp_mag)) if len(disp_mag) > 0 else 0.0
 
-    # Von Mises stress — interpolated into a DG0 scalar field
-    # σ_vm = sqrt( 3/2 * s:s )  where s = σ - (1/3) tr(σ) I  (deviatoric)
     Q = dolfinx.fem.functionspace(domain, ("DG", 0))
 
     def von_mises_expr(v_field):
@@ -340,7 +410,6 @@ def _run_linear_static(mesh_path: str, material_props: dict,
     max_stress = float(np.max(vm_arr)) if len(vm_arr) > 0 else 0.0
     fos = float(yield_strength / max_stress) if max_stress > 0 else float("inf")
 
-    # Per-node displacement components (for downstream use / FEMView extension)
     node_disp = [
         {"ux": float(row[0]), "uy": float(row[1]),
          "uz": float(row[2]) if tdim == 3 else 0.0,
@@ -362,10 +431,10 @@ def _run_linear_static(mesh_path: str, material_props: dict,
 
 
 # ---------------------------------------------------------------------------
-# Modal analysis
+# Modal analysis (GHEP eigensolver via SLEPc)
 # ---------------------------------------------------------------------------
 
-def _run_modal(mesh_path: str, material_props: dict,
+def _run_modal(mesh_path: str, material_props,
                boundary_conditions: list) -> dict:
     import dolfinx
     import dolfinx.fem
@@ -378,12 +447,7 @@ def _run_modal(mesh_path: str, material_props: dict,
 
     comm = MPI.COMM_WORLD
 
-    E = float(material_props["E"])
-    nu = float(material_props["nu"])
-    rho = float(material_props.get("rho", 7850.0))
-
-    lam = E * nu / ((1.0 + nu) * (1.0 - 2.0 * nu))
-    mu = E / (2.0 * (1.0 + nu))
+    mat_list = _resolve_material_props(material_props)
 
     with tempfile.TemporaryDirectory() as tmp:
         xdmf_vol = str(Path(tmp) / "vol.xdmf")
@@ -392,10 +456,25 @@ def _run_modal(mesh_path: str, material_props: dict,
 
         with dolfinx.io.XDMFFile(comm, xdmf_vol, "r") as f:
             domain = f.read_mesh(ghost_mode=dmesh.GhostMode.shared_facet)
+            try:
+                cell_tags = f.read_meshtags(domain, name="gmsh:physical")
+            except Exception:
+                cell_tags = None
+
+        facet_tags = None
+        try:
+            with dolfinx.io.XDMFFile(comm, xdmf_fac, "r") as f:
+                facet_tags = f.read_meshtags(domain, name="gmsh:physical")
+        except Exception:
+            pass
 
     tdim = domain.topology.dim
     fdim = tdim - 1
     domain.topology.create_connectivity(fdim, tdim)
+
+    lam_field, mu_field, _ys, rho_field = _build_lame_fields(
+        domain, cell_tags, mat_list, tdim
+    )
 
     V = dolfinx.fem.functionspace(domain, ("Lagrange", 1, (tdim,)))
 
@@ -403,46 +482,93 @@ def _run_modal(mesh_path: str, material_props: dict,
         return ufl.sym(ufl.grad(v))
 
     def sigma(v):
-        return lam * ufl.tr(eps(v)) * ufl.Identity(tdim) + 2.0 * mu * eps(v)
+        return lam_field * ufl.tr(eps(v)) * ufl.Identity(tdim) + 2.0 * mu_field * eps(v)
 
     u = ufl.TrialFunction(V)
     v = ufl.TestFunction(V)
 
-    k_form = dolfinx.fem.form(ufl.inner(sigma(u), eps(v)) * ufl.dx)
-    m_form = dolfinx.fem.form(rho * ufl.inner(u, v) * ufl.dx)
+    # Apply homogeneous Dirichlet BCs before assembling K and M so that rigid-
+    # body modes are suppressed.  Without BCs the free-body GHEP has zero
+    # eigenvalues (rigid-body modes) which can confuse the Krylov solver.
+    bcs = []
+    for bc_spec in boundary_conditions:
+        tags = bc_spec.get("face_tags", [])
+        if facet_tags is not None and tags:
+            mask = np.isin(facet_tags.values, tags)
+            facets = facet_tags.indices[mask]
+        else:
+            facets = dmesh.locate_entities_boundary(
+                domain, fdim, lambda x: np.ones(x.shape[1], dtype=bool)
+            )
+        if len(facets) == 0:
+            continue
+        dofs = dolfinx.fem.locate_dofs_topological(V, fdim, facets)
+        bc_val = dolfinx.fem.Constant(domain, PETSc.ScalarType([0.0] * tdim))
+        bcs.append(dolfinx.fem.dirichletbc(bc_val, dofs, V))
 
-    K = dolfinx.fem.petsc.assemble_matrix(k_form)
-    M = dolfinx.fem.petsc.assemble_matrix(m_form)
+    k_form = dolfinx.fem.form(ufl.inner(sigma(u), eps(v)) * ufl.dx)
+    m_form = dolfinx.fem.form(rho_field * ufl.inner(u, v) * ufl.dx)
+
+    K = dolfinx.fem.petsc.assemble_matrix(k_form, bcs=bcs)
+    M = dolfinx.fem.petsc.assemble_matrix(m_form, bcs=bcs)
     K.assemble()
     M.assemble()
 
-    try:
-        from slepc4py import SLEPc
-    except ImportError:
+    if not _SLEPC_AVAILABLE:
         return {
             "frequencies": [],
+            "mode_shapes": [],
             "warnings": ["SLEPc not installed — modal analysis unavailable"],
             "errors": [],
         }
 
+    from slepc4py import SLEPc
+
+    nev = 10  # request first 10 eigenvalues
+
     eps_solver = SLEPc.EPS().create(comm)
     eps_solver.setOperators(K, M)
     eps_solver.setProblemType(SLEPc.EPS.ProblemType.GHEP)
-    eps_solver.setDimensions(nev=10)
+    # KRYLOVSCHUR is the default and best for symmetric problems; set explicitly
+    # for clarity.  The shift-and-invert spectral transform moves the search
+    # window to near zero to find the lowest-frequency modes first.
+    eps_solver.setType(SLEPc.EPS.Type.KRYLOVSCHUR)
+    st = eps_solver.getST()
+    st.setType(SLEPc.ST.Type.SINVERT)
+    st.setShift(0.0)
+
+    eps_solver.setDimensions(nev=nev)
     eps_solver.setTolerances(tol=1e-6, max_it=1000)
+    eps_solver.setFromOptions()
     eps_solver.solve()
 
     nconv = eps_solver.getConverged()
     frequencies = []
-    for i in range(min(nconv, 10)):
-        eigval = eps_solver.getEigenvalue(i)
+    mode_shapes = []
+
+    # Allocate vectors for eigenvector extraction
+    vr, _ = K.createVecs()
+
+    for i in range(min(nconv, nev)):
+        eigval = eps_solver.getEigenpair(i, vr)
         omega2 = eigval.real
-        if omega2 > 0:
-            freq = float(np.sqrt(omega2) / (2.0 * np.pi))
-            frequencies.append(freq)
+        if omega2 <= 0:
+            continue
+        freq = float(np.sqrt(omega2) / (2.0 * np.pi))
+        frequencies.append(freq)
+
+        # Mode shape: per-node displacement components
+        mode_arr = vr.array.reshape(-1, tdim)
+        shape = [
+            {"ux": float(row[0]), "uy": float(row[1]),
+             "uz": float(row[2]) if tdim == 3 else 0.0}
+            for row in mode_arr.tolist()
+        ]
+        mode_shapes.append(shape)
 
     return {
         "frequencies": frequencies,
+        "mode_shapes": mode_shapes,
         "warnings": [],
         "errors": [],
     }
@@ -452,7 +578,7 @@ def _run_modal(mesh_path: str, material_props: dict,
 # Thermal (steady-state heat conduction)
 # ---------------------------------------------------------------------------
 
-def _run_thermal(mesh_path: str, material_props: dict,
+def _run_thermal(mesh_path: str, material_props,
                  boundary_conditions: list, loads: list) -> dict:
     import dolfinx
     import dolfinx.fem
@@ -465,7 +591,9 @@ def _run_thermal(mesh_path: str, material_props: dict,
 
     comm = MPI.COMM_WORLD
 
-    k_cond = float(material_props.get("k", 205.0))
+    mat_list = _resolve_material_props(material_props)
+    # Thermal conductivity: use first material block's 'k' field
+    k_cond = float(mat_list[0].get("k", 205.0))
 
     with tempfile.TemporaryDirectory() as tmp:
         xdmf_vol = str(Path(tmp) / "vol.xdmf")

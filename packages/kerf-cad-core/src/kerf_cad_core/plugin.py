@@ -26,6 +26,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.feature_hole_pattern_from_sketch",
     "kerf_cad_core.feature_loft",
     "kerf_cad_core.feature_section",
+    "kerf_cad_core.cam_layered",
     "kerf_cad_core.extrude_sketch_to_jscad",
     "kerf_cad_core.surfacing",
 ]

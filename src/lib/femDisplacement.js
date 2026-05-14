@@ -73,6 +73,54 @@ export function scalarToRGB(t) {
 }
 
 /**
+ * Build a plain-object BufferGeometry descriptor (no Three.js dependency) from
+ * an array of parts as returned by the JSCAD runner or OCCT worker.
+ *
+ * The FEM displacement array is indexed against FEM mesh nodes, which are in a
+ * different order from the display vertices.  This function returns the first
+ * part's positions/indices so FEMDeformedShape can render a morphed surface;
+ * displacements are applied positionally (index i → vertex i) which is a visual
+ * approximation sufficient for showing deformation topology.
+ *
+ * Returns null when parts is empty or contains no usable geometry.
+ * Returns { positions: Float32Array, indices: Uint32Array | null }.
+ */
+export function extractDisplayGeometryFromParts(parts) {
+  if (!parts || parts.length === 0) return null
+  for (const part of parts) {
+    const geom = part.geom
+    if (!geom) continue
+    // Three.js BufferGeometry (STEP / OCCT path)
+    if (geom.isBufferGeometry) {
+      const posAttr = geom.attributes?.position
+      if (!posAttr) continue
+      const positions = new Float32Array(posAttr.array)
+      const indices = geom.index ? new Uint32Array(geom.index.array) : null
+      return { positions, indices }
+    }
+    // JSCAD Geom3 (polygon list) — flatten triangles into flat position array
+    if (Array.isArray(geom.polygons)) {
+      const tris = []
+      for (const poly of geom.polygons) {
+        const verts = poly.vertices || []
+        for (let i = 1; i + 1 < verts.length; i++) {
+          tris.push(verts[0], verts[i], verts[i + 1])
+        }
+      }
+      if (tris.length === 0) continue
+      const positions = new Float32Array(tris.length * 3)
+      for (let i = 0; i < tris.length; i++) {
+        positions[i * 3 + 0] = tris[i][0]
+        positions[i * 3 + 1] = tris[i][1]
+        positions[i * 3 + 2] = tris[i][2]
+      }
+      return { positions, indices: null }
+    }
+  }
+  return null
+}
+
+/**
  * Build a vertex-color Float32Array (R,G,B per vertex) for a set of nodes,
  * coloured by their displacement magnitude relative to [0, maxMag].
  */

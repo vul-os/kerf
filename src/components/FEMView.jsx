@@ -42,7 +42,11 @@ function fmtMm(m) {
   return (m * 1000).toFixed(4) + ' mm'
 }
 
-export default function FEMView({ file, projectId }) {
+// geometry: optional THREE.BufferGeometry from the linked source part/feature
+// (passed in by Editor.jsx when a source mesh is available). Forwarded to
+// DeformedShapeOverlay so it renders an actual morphed surface instead of the
+// point-cloud proxy.
+export default function FEMView({ file, projectId, geometry }) {
   const { accessToken } = useAuth()
   const [preset, setPreset] = useState('steel')
   const [analysisType, setAnalysisType] = useState('linear_static')
@@ -348,6 +352,7 @@ export default function FEMView({ file, projectId }) {
                     colorMode={colorMode}
                     maxDisplacement={result.max_displacement}
                     maxStress={result.max_vonmises_stress}
+                    geometry={geometry}
                   />
                 </>
               )}

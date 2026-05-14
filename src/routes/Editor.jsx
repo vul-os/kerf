@@ -25,6 +25,7 @@ import EquationsEditor from '../components/EquationsEditor.jsx'
 import ScriptEditor from '../components/ScriptEditor.jsx'
 import ToleranceView from '../components/ToleranceView.jsx'
 import TopoView from '../components/TopoView.jsx'
+import FEMView from '../components/FEMView.jsx'
 import GraphEditor from '../components/GraphEditor.jsx'
 import RenderView from '../components/RenderView.jsx'
 import FamilyEditor from '../components/FamilyEditor.jsx'
@@ -43,6 +44,7 @@ import { runJscad, cancelJscad } from '../lib/jscadRunner.js'
 import { getTopologyLazy } from '../lib/topology.js'
 import { meshCache } from '../lib/meshCache.js'
 import { distance, formatDistance } from '../lib/measure.js'
+import { extractDisplayGeometryFromParts } from '../lib/femDisplacement.js'
 import { exportSvg, exportPng, exportPdf } from '../lib/svgExport.js'
 import { api } from '../lib/api.js'
 import { mateRefFromPick } from '../lib/assembly.js'
@@ -228,6 +230,13 @@ function isRailingFile(file) {
   return n.includes('.railing.json')
 }
 
+function isFemFile(file) {
+  if (!file) return false
+  if (file.kind === 'fem') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.fem')
+}
+
 export default function Editor() {
   const { projectId, fileId } = useParams()
   const navigate = useNavigate()
@@ -283,6 +292,7 @@ export default function Editor() {
     if (isMEPFile(w.currentFile)) return
     if (isStairFile(w.currentFile)) return
     if (isRailingFile(w.currentFile)) return
+    if (isFemFile(w.currentFile)) return
     if (runTimerRef.current) clearTimeout(runTimerRef.current)
     const code = w.currentFileContent
     const delay = runDebounceFor(code)
@@ -596,6 +606,25 @@ export default function Editor() {
   const mepFile = isMEPFile(w.currentFile)
   const stairFile = isStairFile(w.currentFile)
   const railingFile = isRailingFile(w.currentFile)
+  const femFile = isFemFile(w.currentFile)
+
+  // Build a THREE.BufferGeometry from the current parts to pass into FEMView
+  // so DeformedShapeOverlay can render the morphed surface (instead of a proxy
+  // point cloud). We only do this when a .fem file is open and parts are loaded.
+  // extractDisplayGeometryFromParts returns a plain { positions, indices } object;
+  // we wrap it in a minimal BufferGeometry-compatible shape that FEMDeformedShape
+  // expects (it reads .attributes.position.array and .index.array).
+  const femDisplayGeometry = useMemo(() => {
+    if (!femFile) return null
+    const desc = extractDisplayGeometryFromParts(w.parts)
+    if (!desc) return null
+    return {
+      isBufferGeometry: true,
+      attributes: { position: { array: desc.positions } },
+      index: desc.indices ? { array: desc.indices } : null,
+    }
+  }, [femFile, w.parts])
+
   // Resolver used by FeatureView to fetch sketch contents on demand. We
   // re-read the latest file content rather than relying on the cached
   // sketch parse from the workspace store (which may be stale if the user
@@ -1249,6 +1278,20 @@ export default function Editor() {
                     `${(w.currentFile?.name || 'drawing').replace(/\.[^.]+$/, '')}.pdf`,
                     { size: sh?.frame?.size, orientation: sh?.frame?.orientation })
                 }}
+              />
+              {w.toast && (
+                <div className="absolute bottom-3 right-3 z-20 px-3 py-2 rounded-md bg-ink-900 border border-kerf-300/60 text-kerf-300 text-xs shadow-xl"
+                  onClick={() => w.dismissToast()}>
+                  {w.toast}
+                </div>
+              )}
+            </div>
+          ) : femFile ? (
+            <div className="flex-1 min-h-0 overflow-y-auto p-3">
+              <FEMView
+                file={w.currentFile}
+                projectId={projectId}
+                geometry={femDisplayGeometry}
               />
               {w.toast && (
                 <div className="absolute bottom-3 right-3 z-20 px-3 py-2 rounded-md bg-ink-900 border border-kerf-300/60 text-kerf-300 text-xs shadow-xl"

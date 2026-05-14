@@ -4,6 +4,7 @@ import {
   displacementMagnitudes,
   scalarToRGB,
   buildDisplacementColors,
+  extractDisplayGeometryFromParts,
 } from '../lib/femDisplacement.js'
 
 describe('applyDisplacementScale', () => {
@@ -83,6 +84,68 @@ describe('scalarToRGB', () => {
     const [r2] = scalarToRGB(2)
     expect(r1).toBeCloseTo(0)
     expect(r2).toBeCloseTo(1)
+  })
+})
+
+describe('extractDisplayGeometryFromParts', () => {
+  it('returns null for empty parts', () => {
+    expect(extractDisplayGeometryFromParts([])).toBeNull()
+    expect(extractDisplayGeometryFromParts(null)).toBeNull()
+  })
+
+  it('returns null when parts have no usable geometry', () => {
+    expect(extractDisplayGeometryFromParts([{ geom: null }, { geom: undefined }])).toBeNull()
+  })
+
+  it('extracts from a JSCAD Geom3 polygon list', () => {
+    const geom = {
+      polygons: [
+        { vertices: [[0, 0, 0], [1, 0, 0], [0, 1, 0]] },
+        { vertices: [[0, 0, 1], [1, 0, 1], [0, 1, 1]] },
+      ],
+    }
+    const result = extractDisplayGeometryFromParts([{ geom }])
+    expect(result).not.toBeNull()
+    expect(result.positions).toBeInstanceOf(Float32Array)
+    expect(result.positions.length).toBe(18) // 2 triangles × 3 verts × 3 coords
+    expect(result.indices).toBeNull()
+  })
+
+  it('extracts from a Three.js-like BufferGeometry', () => {
+    const geom = {
+      isBufferGeometry: true,
+      attributes: {
+        position: { array: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]) },
+      },
+      index: { array: new Uint32Array([0, 1, 2]) },
+    }
+    const result = extractDisplayGeometryFromParts([{ geom }])
+    expect(result).not.toBeNull()
+    expect(result.positions.length).toBe(9)
+    expect(result.indices).toBeInstanceOf(Uint32Array)
+    expect(result.indices[0]).toBe(0)
+  })
+
+  it('skips parts with empty BufferGeometry and uses the next', () => {
+    const empty = { isBufferGeometry: true, attributes: {}, index: null }
+    const valid = {
+      isBufferGeometry: true,
+      attributes: { position: { array: new Float32Array([0, 0, 0]) } },
+      index: null,
+    }
+    const result = extractDisplayGeometryFromParts([{ geom: empty }, { geom: valid }])
+    expect(result).not.toBeNull()
+    expect(result.positions.length).toBe(3)
+  })
+
+  it('fans quads correctly for polygons with 4+ vertices', () => {
+    const geom = {
+      polygons: [
+        { vertices: [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0]] }, // quad → 2 triangles
+      ],
+    }
+    const result = extractDisplayGeometryFromParts([{ geom }])
+    expect(result.positions.length).toBe(18) // 2 tris × 3 verts × 3 coords
   })
 })
 

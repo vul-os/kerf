@@ -1,4 +1,5 @@
 import base64
+import importlib.util
 import json
 import subprocess
 import sys
@@ -18,6 +19,8 @@ except ImportError:
     pass
 
 ENGINE_PENDING_WARNING = "Engine pending — FEniCSx (dolfinx) not yet installed."
+
+_CALCULIX_PENDING_WARNING = "Engine pending — CalculiX (ccx) not installed or not in PATH."
 
 
 @router.post("/run-fem")
@@ -53,6 +56,16 @@ async def run_fem(req: dict):
             "warnings": [ENGINE_PENDING_WARNING],
             "errors": [],
         }
+
+    # Gate CalculiX — check binary presence without importing anything heavy.
+    if solver == "calculix":
+        import shutil
+        if not shutil.which("ccx"):
+            return {
+                "status": "pending",
+                "warnings": [_CALCULIX_PENDING_WARNING],
+                "errors": [],
+            }
 
     with tempfile.TemporaryDirectory() as tmpdir:
         step_path = Path(tmpdir) / "input.step"
@@ -144,44 +157,16 @@ def run_fenicsx(mesh_path: str, analysis_type: str, material_props: dict,
 
 
 def run_calculix(mesh_path: str, analysis_type: str, material_props: dict,
-                boundary_conditions: list, loads: list, tmpdir: str) -> dict:
-    import json as json_mod
+                 boundary_conditions: list, loads: list, tmpdir: str) -> dict:
+    utils_path = Path(__file__).parent.parent / "calculix_utils.py"
+    spec = importlib.util.spec_from_file_location("calculix_utils", utils_path)
+    calculix_utils = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(calculix_utils)
 
-    script = f"""
-import json
-import numpy as np
-from calculix_utils import run_static_analysis
-
-material_props = {json_mod.dumps(material_props)}
-boundary_conditions = {json_mod.dumps(boundary_conditions)}
-loads = {json_mod.dumps(loads)}
-
-result = run_static_analysis(
-    mesh_path="{mesh_path}",
-    material_props=material_props,
-    boundary_conditions=boundary_conditions,
-    loads=loads,
-    analysis_type="{analysis_type}"
-)
-print("FEM_RESULT:" + json.dumps(result))
-"""
-
-    script_path = Path(tmpdir) / "calculix_script.py"
-    script_path.write_text(script)
-
-    proc = subprocess.run(
-        [sys.executable, str(script_path)],
-        capture_output=True,
-        text=True,
-        timeout=600
+    return calculix_utils.run_static_analysis(
+        mesh_path=mesh_path,
+        material_props=material_props,
+        boundary_conditions=boundary_conditions,
+        loads=loads,
+        analysis_type=analysis_type,
     )
-
-    if proc.returncode != 0:
-        raise RuntimeError(f"calculix failed: {proc.stderr}")
-
-    for line in proc.stdout.splitlines():
-        if line.startswith("FEM_RESULT:"):
-            result_data = json_mod.loads(line[len("FEM_RESULT:"):])
-            return result_data
-
-    raise RuntimeError("calculix produced no result")

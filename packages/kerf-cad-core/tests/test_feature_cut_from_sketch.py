@@ -36,10 +36,12 @@ def test_valid_args_face_id_zero():
     assert err is None
 
 
-def test_target_face_id_none_rejected():
+def test_target_face_id_none_accepted():
+    # T3/T7: target_face_id=None is now valid when the caller provides
+    # target_face_name instead.  The validator only rejects a non-None,
+    # non-integer value.
     err, code = validate_cut_from_sketch_args(None, "/slot.sketch", 5.0, False)
-    assert code == "BAD_ARGS"
-    assert "target_face_id" in err
+    assert err is None and code is None
 
 
 def test_target_face_id_negative_rejected():
@@ -142,3 +144,65 @@ def test_build_node_face_id_zero():
 def test_build_node_target_id_stored():
     node = build_cut_from_sketch_node("cut-7", "sweep1-3", 2, "/s.sketch", 10.0, False)
     assert node["target_id"] == "sweep1-3"
+
+
+# ── T7: target_face_name dual-write ──────────────────────────────────────────
+
+def test_build_node_dual_write_name_and_id():
+    """T7: both target_face_name and target_face_id appear in the node."""
+    node = build_cut_from_sketch_node(
+        "cut-8", "pad-1", 3, "/slot.sketch", 5.0, False,
+        target_face_name="Pad-A.TopCap",
+    )
+    assert node["target_face_name"] == "Pad-A.TopCap"
+    assert node["target_face_id"] == 3
+
+
+def test_build_node_name_only_no_id():
+    """T7: target_face_name with no integer — only name key written."""
+    node = build_cut_from_sketch_node(
+        "cut-9", "pad-1", None, "/slot.sketch", 5.0, False,
+        target_face_name="Pad-A.TopCap",
+    )
+    assert node["target_face_name"] == "Pad-A.TopCap"
+    assert "target_face_id" not in node
+
+
+def test_build_node_id_only_no_name():
+    """T7: classic call without target_face_name — id present, name absent."""
+    node = build_cut_from_sketch_node("cut-10", "pad-1", 5, "/s.sketch", 2.0, False)
+    assert node["target_face_id"] == 5
+    assert "target_face_name" not in node
+
+
+def test_build_node_empty_name_not_written():
+    """T7: empty target_face_name string should not appear in the node."""
+    node = build_cut_from_sketch_node(
+        "cut-11", "pad-1", 2, "/s.sketch", 1.0, False,
+        target_face_name="",
+    )
+    assert "target_face_name" not in node
+
+
+def test_build_node_name_round_trips_json():
+    """T7: node serializes to JSON and back with target_face_name intact."""
+    node = build_cut_from_sketch_node(
+        "cut-12", "pad-1", 7, "/slot.sketch", 4.0, False,
+        target_face_name="Pad-A.Side.seg-3",
+    )
+    loaded = json.loads(json.dumps(node))
+    assert loaded["target_face_name"] == "Pad-A.Side.seg-3"
+    assert loaded["target_face_id"] == 7
+
+
+def test_validate_args_none_face_id_valid():
+    """T7: validate passes when face_id is None (name-only path)."""
+    err, code = validate_cut_from_sketch_args(None, "/s.sketch", 3.0, False)
+    assert err is None and code is None
+
+
+def test_validate_args_float_face_id_still_rejected():
+    """T7: float is still rejected even after the None relaxation."""
+    err, code = validate_cut_from_sketch_args(3.5, "/s.sketch", 5.0, False)
+    assert code == "BAD_ARGS"
+    assert "integer" in err

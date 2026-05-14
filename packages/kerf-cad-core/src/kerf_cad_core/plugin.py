@@ -5,6 +5,9 @@ This plugin registers NO HTTP routes — it is a library plugin.  Its sole
 purpose is to make OCC helpers available to other plugins and to report its
 availability via ``/health/capabilities``.
 
+It also registers CAD-core LLM tools (feature_cut_from_sketch, etc.) into
+the tool registry so the chat agent can invoke them.
+
 Entry-point (pyproject.toml):
     [project.entry-points."kerf.plugins"]
     cad-core = "kerf_cad_core.plugin:register"
@@ -16,6 +19,11 @@ import logging
 from typing import TYPE_CHECKING
 
 logger = logging.getLogger(__name__)
+
+# ── LLM tool modules provided by this plugin ─────────────────────────────────
+_TOOL_MODULES = [
+    "kerf_cad_core.feature_cut_from_sketch",
+]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────
 # Import lazily so this plugin boots even before kerf_core is installed.
@@ -71,9 +79,22 @@ async def register(app, ctx: "PluginContext") -> "PluginManifest":
             "Install: conda install -c conda-forge pythonocc-core"
         )
 
+    # ── Register LLM tools ────────────────────────────────────────────────
+    _register_tools()
+
     return PluginManifest(
         name="cad-core",
         version="0.1.0",
         provides=provides,
         depends=[],
     )
+
+
+def _register_tools() -> None:
+    """Import tool modules so their @register decorators fire."""
+    import importlib
+    for module_path in _TOOL_MODULES:
+        try:
+            importlib.import_module(module_path)
+        except Exception as exc:  # pragma: no cover
+            logger.warning("kerf-cad-core: failed to load tool %s: %s", module_path, exc)

@@ -593,6 +593,87 @@ function opMirrorPattern(oc, prev, node, _sketches, tracker) {
   return fused
 }
 
+// Cut a sketched region from any planar face of the target body, extruding
+// the cutter normal to that face (not normal to the sketch plane like pocket).
+//
+// OCCT pathway:
+//   1. faceById(prev, target_face_id)           → target face
+//   2. faceFrame(face)                          → origin + normal + uDir + vDir
+//   3. faceForSketchPath(sketch_path)           → profile face on XY
+//   4. placeFaceOnPlane(profile, face-anchored) → orient profile onto face frame
+//   5. vec = -normal * depth  (flipped when reverse=true)
+//   6. BRepPrimAPI_MakePrism(placed_profile, vec) → cutter solid
+//   7. BRepAlgoAPI_Cut_3(prev, cutter)          → result
+//
+// Face-id stability caveat (mirrors push_pull): target_face_id is a
+// post-evaluation snapshot index.  Structural upstream edits can renumber
+// faces.  Phase 4 persistent-naming will fix this.
+function opCutFromSketch(oc, prev, node, sketches, tracker) {
+  if (!prev) throw new Error('cut_from_sketch: no target shape (must follow a body-building op)')
+  const faceId = Number(node.target_face_id)
+  if (!Number.isFinite(faceId) || faceId < 0) {
+    throw new Error('cut_from_sketch: target_face_id must be a non-negative integer')
+  }
+  const depth = Number(node.depth) || 0
+  if (depth <= 0) throw new Error('cut_from_sketch: depth must be > 0')
+  const reverse = Boolean(node.reverse)
+
+  // 1. Retrieve and validate the target face.
+  const face = faceById(oc, prev, faceId)
+  if (!face) throw new Error(`cut_from_sketch: face id ${faceId} not found on target body`)
+
+  // 2. Compute face frame (must be planar).
+  const frame = faceFrame(oc, face)
+  if (!frame || !frame.planar) {
+    throw new Error('cut_from_sketch: target face is non-planar — only planar faces are supported')
+  }
+
+  // 3. Build the sketch profile face on XY (via faceForSketchPath which
+  //    honours the sketch's own declared plane).
+  const profileFace = faceForSketchPath(oc, node.sketch_path, sketches, tracker)
+  if (!profileFace) {
+    throw new Error(`cut_from_sketch: sketch '${node.sketch_path}' produced no closed profile`)
+  }
+
+  // 4. Re-orient the profile onto the target face's frame.
+  //    placeFaceOnPlane already handles the face-anchored case: we pass a
+  //    plane spec with type='face' and the resolved world-space frame from
+  //    faceFrame (origin, normal, uDir, vDir).
+  const plane = {
+    type: 'face',
+    frame: {
+      origin: frame.origin,
+      normal: frame.normal,
+      uDir: frame.uDir,
+      vDir: frame.vDir,
+    },
+  }
+  const orientedProfile = placeFaceOnPlane(oc, profileFace, plane, tracker)
+  if (!orientedProfile) {
+    throw new Error('cut_from_sketch: failed to orient profile onto target face frame')
+  }
+
+  // 5. Compute the extrusion vector: along -normal * depth into the body,
+  //    or +normal * depth when reverse=true.
+  const sign = reverse ? 1 : -1
+  const nx = frame.normal[0] * sign * depth
+  const ny = frame.normal[1] * sign * depth
+  const nz = frame.normal[2] * sign * depth
+  const vec = track(tracker, new oc.gp_Vec_4(nx, ny, nz))
+
+  // 6. Build the cutter solid.
+  const builder = track(tracker, new oc.BRepPrimAPI_MakePrism_1(orientedProfile, vec, false, true))
+  builder.Build()
+  if (!builder.IsDone()) throw new Error('cut_from_sketch: cutter prism build failed')
+  const cutter = builder.Shape()
+
+  // 7. Boolean subtraction.
+  const cut = track(tracker, new oc.BRepAlgoAPI_Cut_3(prev, cutter, new oc.Message_ProgressRange_1()))
+  cut.Build(new oc.Message_ProgressRange_1())
+  if (!cut.IsDone()) throw new Error('cut_from_sketch: boolean cut failed')
+  return cut.Shape()
+}
+
 // Push/pull a face outward (positive distance) or inward (negative).
 // Implemented by extracting the face's outer wire as a planar profile,
 // extruding by `distance` along the face normal, then fuse-or-cut against
@@ -1142,7 +1223,8 @@ function evaluateTree(oc, tree, sketches) {
         case 'linear_pattern': next = opLinearPattern(oc, current, node, sketches, tracker); break
         case 'polar_pattern':  next = opPolarPattern(oc, current, node, sketches, tracker); break
         case 'mirror_pattern': next = opMirrorPattern(oc, current, node, sketches, tracker); break
-        case 'push_pull':      next = opPushPull(oc, current, node, sketches, tracker); break
+        case 'push_pull':           next = opPushPull(oc, current, node, sketches, tracker); break
+        case 'cut_from_sketch':     next = opCutFromSketch(oc, current, node, sketches, tracker); break
         case 'sweep1':
           if (current) {
             meshes.push({ id: `body-${meshes.length}`, ...breptToMesh(oc, current) })
@@ -1249,7 +1331,8 @@ async function evaluateToFinalShape(oc, tree, sketches) {
         case 'linear_pattern': next = opLinearPattern(oc, current, node, sketches, tracker); break
         case 'polar_pattern':  next = opPolarPattern(oc, current, node, sketches, tracker); break
         case 'mirror_pattern': next = opMirrorPattern(oc, current, node, sketches, tracker); break
-        case 'push_pull':      next = opPushPull(oc, current, node, sketches, tracker); break
+        case 'push_pull':           next = opPushPull(oc, current, node, sketches, tracker); break
+        case 'cut_from_sketch':     next = opCutFromSketch(oc, current, node, sketches, tracker); break
         case 'sweep1':
           if (current) cleanupShape(oc, current)
           current = null

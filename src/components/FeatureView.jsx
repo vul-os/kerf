@@ -115,6 +115,19 @@ const FEATURE_KINDS = [
     ],
   },
   {
+    op: 'cut_from_sketch',
+    label: 'Cut from sketch',
+    icon: Disc,
+    defaults: { target_id: '', target_face_id: -1, sketch_path: '', depth: 5, reverse: false },
+    fields: [
+      { key: 'target_id', kind: 'feature_picker', label: 'Target body' },
+      { key: 'target_face_id', kind: 'face_picker_single', label: 'Face' },
+      { key: 'sketch_path', kind: 'sketch_picker', label: 'Sketch' },
+      { key: 'depth', kind: 'number', label: 'Depth (mm)', min: 0.001 },
+      { key: 'reverse', kind: 'bool', label: 'Reverse direction' },
+    ],
+  },
+  {
     op: 'revolve',
     label: 'Revolve',
     icon: RotateCcw,
@@ -329,7 +342,7 @@ const FEATURE_KINDS = [
 const KIND_BY_OP = Object.fromEntries(FEATURE_KINDS.map((k) => [k.op, k]))
 
 const FEATURE_CATEGORIES = [
-  { id: 'sketch',   label: 'Sketch-based',  ops: ['pad', 'boss_with_draft', 'pocket', 'revolve', 'hole'] },
+  { id: 'sketch',   label: 'Sketch-based',  ops: ['pad', 'boss_with_draft', 'pocket', 'cut_from_sketch', 'revolve', 'hole'] },
   { id: 'modify',   label: 'Modify',        ops: ['fillet', 'chamfer', 'shell', 'push_pull', 'variable_radius_fillet'] },
   { id: 'pattern',  label: 'Pattern',       ops: ['linear_pattern', 'polar_pattern', 'mirror_pattern'] },
   { id: 'surface',  label: 'Surfacing',     ops: ['sweep1', 'sweep2', 'loft', 'network_srf', 'blend_srf'] },

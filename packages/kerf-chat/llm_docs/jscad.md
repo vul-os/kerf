@@ -10,17 +10,10 @@ This is the kind you edit MOST often — and you usually edit it via
 ## Canonical file shape
 
 ```js
-const { primitives, booleans, transforms, extrusions, hulls } =
-  require('@jscad/modeling')
-
-const { cuboid, cylinder, sphere } = primitives.shapes ?? primitives
-const { translate, rotateZ } = transforms
-const { union, subtract, intersect } = booleans
-
-module.exports = function () {
-  const base = cuboid({ size: [40, 40, 10] })
-  const peg  = translate([0, 0, 5],
-    cylinder({ radius: 4, height: 20 }))
+export default function ({ primitives, transforms, booleans, extrusions }) {
+  const base = primitives.cuboid({ size: [40, 40, 10] })
+  const peg  = transforms.translate([0, 0, 5],
+    primitives.cylinder({ radius: 4, height: 20 }))
 
   return [
     { id: 'base', geom: base },
@@ -29,6 +22,8 @@ module.exports = function () {
 }
 ```
 
+The default export receives the `@jscad/modeling` namespaces spread
+into a single object — destructure whichever namespaces you need.
 The `[{id, geom}, ...]` return is canonical. Every entry is an
 **Object**; `id` becomes its identity for assemblies and viewport
 picking.
@@ -69,37 +64,151 @@ summary.
 
 ## Importing sketches
 
-```js
-const profile = require('/profile.sketch')
+Use a top-level ES `import` statement — this is the **only** form the
+runtime implements. The runner strips the import line, resolves the
+`.sketch` path through the project tree, converts it to a JSCAD `Geom2`,
+and injects it into the function's argument scope under the binding name
+you choose.
 
-return [
-  { id: 'wall', geom: extrusions.extrudeLinear({ height: 20 }, profile) },
-]
+```js
+import profile from '/parts/bracket-outline.sketch'
+
+export default function ({ extrusions }) {
+  return [
+    { id: 'wall', geom: extrusions.extrudeLinear({ height: 20 }, profile) },
+  ]
+}
+```
+
+The binding name (`profile` above) is arbitrary — pick something
+descriptive. Multiple sketches work with multiple import lines:
+
+```js
+import outerProfile from '/parts/shell-outer.sketch'
+import innerProfile from '/parts/shell-inner.sketch'
+
+export default function ({ extrusions, booleans }) {
+  const outer = extrusions.extrudeLinear({ height: 30 }, outerProfile)
+  const inner = extrusions.extrudeLinear({ height: 30 }, innerProfile)
+  return [{ id: 'shell', geom: booleans.subtract(outer, inner) }]
+}
 ```
 
 Sketches resolve to a `Geom2`. `extrudeLinear` and `extrudeRotate`
-both accept it.
+both accept it directly.
+
+> **Do not** use `require('/x.sketch')` — the runtime does not implement
+> CommonJS `require` resolution for sketch paths. Only the ES `import`
+> form above is wired end-to-end.
+
+## Equations as `params` — parametric values from `.equations`
+
+Any `.equations` file in the project is evaluated and its resolved
+values are injected into the JSCAD function as `params` — the same
+argument object that carries the modeling namespaces. You don't need
+to import or read the equations file; the runner merges the scope for
+you before calling your function.
+
+```js
+// params.equations defines: wall_thickness = 3, height = 20
+export default function ({ primitives, extrusions, params }) {
+  const { wall_thickness, height } = params
+  const profile = primitives.rectangle({ size: [60, 40] })
+  const shell = extrusions.extrudeLinear({ height }, profile)
+  return [{ id: 'shell', geom: shell }]
+}
+```
+
+If the `.equations` file also drives sketch dimensions (via
+`${wall_thickness}` placeholders in the sketch), then editing one
+equation reflows both the sketch profile and the JSCAD extrusion
+simultaneously — the sketch and the `.jscad` share the same param
+scope.
+
+`params` is always an object (never null). If no `.equations` file
+exists in the project, `params` is `{}`. Always destructure with a
+fallback if you want to handle that case:
+
+```js
+const { wall_thickness = 3 } = params   // fallback to 3 if no equations
+```
+
+> For the full equations file syntax and where values flow (sketches,
+> features, JSCAD), see [`equations.md`](equations.md).
+
+## Choosing `.jscad` vs `.feature`
+
+| Aspect | `.sketch` + `.jscad` (mesh) | `.sketch` + `.feature` (BRep) |
+|---|---|---|
+| Geometry kernel | JSCAD CSG (mesh booleans) | OCCT (B-rep) |
+| STEP export | Tessellated (lossy) | Lossless |
+| Real fillets | No (`hull` / `roundedCuboid` only) | Yes (`feature_fillet`) |
+| Programmability | Full JS — loops, conditionals, recursion | JSON tree; loops via configurations |
+| Local dependency | None — pure JS | OCCT WASM (~6 MB) |
+| Eval cost | ms-scale | 10s of ms to seconds |
+| Manufacturing-grade | No (mesh tolerances) | Yes |
+| Surfacing | Limited | NURBS sweep / network / blend |
+
+**Rule of thumb:**
+
+- Pick `.feature` when the user mentions STEP export, manufacturing,
+  fillets, chamfers, draft angles, or interop with FreeCAD / SolidWorks.
+- Pick `.sketch + .jscad` when the user wants quick parametric variants,
+  mesh-only ops (`hull`, `colorize`, instancing), or has no OCCT installed.
+
+## Complete worked example — sketch import + params + extrude
+
+This is the canonical pattern emitted by the `extrude_sketch_to_jscad`
+tool. Copy it as-is and edit the values:
+
+```js
+// Generated from /parts/bracket-outline.sketch
+// Edit the sketch to change the profile; the 3D updates automatically.
+// Edit params.equations to change bracket_h; it reflows here and in the sketch.
+import profile from '/parts/bracket-outline.sketch'
+
+export default function ({ extrusions, params }) {
+  // params.bracket_h comes from the project's .equations file.
+  // Fallback to 10 mm if no equations file exists yet.
+  const height = params.bracket_h ?? 10
+
+  const body = extrusions.extrudeLinear({ height }, profile)
+  return [{ id: 'bracket', geom: body }]
+}
+```
+
+The sketch (`/parts/bracket-outline.sketch`) contains the 2D profile with
+constrained dimensions. The `.equations` file holds `bracket_h`. Changing
+either one reflows the 3D without touching this file.
 
 ## Importing other JSCAD files
 
 ```js
-const parts = require('/parts.jscad')   // returns the array of Objects
-const peg = parts.find(p => p.id === 'peg').geom
+import parts from '/shared/parts.jscad'  // not supported yet — use copy-paste for now
 ```
+
+> Cross-file JSCAD imports are not yet implemented. For shared geometry,
+> copy the relevant primitive definitions directly into your file or factor
+> out the common shape into a `.sketch` profile and import that instead.
 
 ## Common edits
 
 ### Make a dimension parametric
 
-Pull magic numbers into a top-of-file `params` block:
+If a value is local to this file, define it as a const at the top:
 
 ```js
-const params = { width: 40, height: 10, peg_d: 8 }
-const base = cuboid({ size: [params.width, params.width, params.height] })
+export default function ({ primitives }) {
+  const width = 40, height = 10, peg_d = 8
+  const base = primitives.cuboid({ size: [width, width, height] })
+  // ...
+}
 ```
 
-Then a `set the width to 60` request becomes a one-line
-`edit_file('"width": 40' → '"width": 60')`.
+Then a `set the width to 60` request is a one-line `edit_file`.
+
+For project-wide params shared with sketches and features, use a
+`.equations` file and read from `params` (see the section above).
 
 ### Add a fillet (JSCAD path — no real B-rep round)
 
@@ -146,3 +255,10 @@ too if the entry is a unique substring.
   synchronous.
 - Don't reference Three.js directly. JSCAD's geometry is its own
   format; the renderer turns it into Three.js meshes.
+- Don't use `require('@jscad/modeling')` or `require('/x.sketch')` —
+  neither is implemented. The runner does not provide a CommonJS
+  `require`. Use `export default function ({ ...namespaces })` for
+  the modeling API and `import profile from '/x.sketch'` for sketches.
+- Don't use `import` statements for `@jscad/modeling` — the runner
+  strips all `import` lines from `@jscad/modeling`; namespaces are
+  injected via the function argument automatically.

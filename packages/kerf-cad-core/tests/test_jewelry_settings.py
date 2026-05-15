@@ -62,6 +62,8 @@ from kerf_cad_core.jewelry.settings import (
     jewelry_gypsy_pave_spec,
     jewelry_illusion_spec,
     jewelry_invisible_spec,
+    # v3 ToolSpec objects
+    jewelry_prong_variant_spec,
     # Runners
     run_jewelry_create_prong_head,
     run_jewelry_create_bezel,
@@ -77,6 +79,9 @@ from kerf_cad_core.jewelry.settings import (
     run_jewelry_create_gypsy_pave,
     run_jewelry_create_illusion,
     run_jewelry_create_invisible,
+    # v3 runners
+    # v3 runners
+    run_jewelry_create_prong_variant,
     # Pure-Python helpers
     build_prong_head_node,
     build_bezel_node,
@@ -92,6 +97,9 @@ from kerf_cad_core.jewelry.settings import (
     build_gypsy_pave_node,
     build_illusion_node,
     build_invisible_node,
+    # v3 helpers
+    # v3 helpers
+    build_prong_variant_node,
     _compute_pave_grid,
     _compute_cluster_positions,
 )
@@ -3151,3 +3159,264 @@ class TestOccNewStyles:
         ax = gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1))
         cyl = BRepPrimAPI_MakeCylinder(ax, node["cluster_diameter"] / 2.0, node["dome_height"])
         assert not cyl.Shape().IsNull()
+
+
+# ============================================================================
+# v3 — Prong variant library (ToolSpec + geometry + runner)
+# ============================================================================
+
+class TestProngVariantSpec:
+    def test_name(self):
+        assert jewelry_prong_variant_spec.name == "jewelry_create_prong_variant"
+
+    def test_required_fields(self):
+        req = jewelry_prong_variant_spec.input_schema["required"]
+        for f in ["file_id", "variant", "stone_diameter", "prong_count", "wire_gauge", "prong_height"]:
+            assert f in req
+
+    def test_variant_enum_contains_all_six(self):
+        props = jewelry_prong_variant_spec.input_schema["properties"]
+        enum = set(props["variant"].get("enum", []))
+        expected = {"double_prong", "claw_prong", "v_prong", "fishtail_prong", "split_prong", "decorative_prong"}
+        assert expected == enum
+
+    def test_variant_profile_enum(self):
+        props = jewelry_prong_variant_spec.input_schema["properties"]
+        enum = set(props["variant_profile"].get("enum", []))
+        assert {"round", "tapered", "filigree", "star", "leaf"} == enum
+
+    def test_optional_fields_not_required(self):
+        req = jewelry_prong_variant_spec.input_schema["required"]
+        assert "variant_param" not in req
+        assert "variant_profile" not in req
+        assert "id" not in req
+
+
+class TestProngVariantGeometry:
+    def _make_node(self, variant="double_prong", **kw):
+        defaults = dict(
+            node_id="pv-1",
+            variant=variant,
+            stone_diameter=6.5,
+            prong_count=4,
+            wire_gauge=1.0,
+            prong_height=2.0,
+        )
+        defaults.update(kw)
+        return build_prong_variant_node(**defaults)
+
+    def test_head_outer_diameter(self):
+        node = self._make_node()
+        assert math.isclose(node["_head_outer_diameter"], 6.5 + 2 * 1.0, rel_tol=1e-5)
+
+    def test_prong_pitch_deg_4_prong(self):
+        node = self._make_node(prong_count=4)
+        assert math.isclose(node["_prong_pitch_deg"], 90.0, rel_tol=1e-5)
+
+    def test_prong_pitch_deg_6_prong(self):
+        node = self._make_node(prong_count=6)
+        assert math.isclose(node["_prong_pitch_deg"], 60.0, rel_tol=1e-5)
+
+    def test_op_field(self):
+        node = self._make_node()
+        assert node["op"] == "jewelry_prong_variant"
+
+    def test_variant_stored(self):
+        for v in ["double_prong", "claw_prong", "v_prong", "fishtail_prong", "split_prong", "decorative_prong"]:
+            node = self._make_node(variant=v)
+            assert node["variant"] == v
+
+    def test_variant_param_stored(self):
+        node = self._make_node(variant_param=0.6)
+        assert math.isclose(node["variant_param"], 0.6, rel_tol=1e-5)
+
+    def test_variant_profile_stored(self):
+        node = self._make_node(variant="decorative_prong", variant_profile="star")
+        assert node["variant_profile"] == "star"
+
+
+class TestProngVariantRunner:
+    @pytest.mark.parametrize("variant", [
+        "double_prong", "claw_prong", "v_prong",
+        "fishtail_prong", "split_prong", "decorative_prong",
+    ])
+    def test_all_variants_accepted(self, variant):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_prong_variant, ctx, fid,
+            variant=variant,
+            stone_diameter=6.5,
+            prong_count=4,
+            wire_gauge=1.0,
+            prong_height=2.0,
+        )
+        assert result.get("error") is None, f"variant={variant}: {result}"
+        assert result["op"] == "jewelry_prong_variant"
+        assert result["variant"] == variant
+
+    def test_node_appended(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_prong_variant, ctx, fid,
+            variant="claw_prong",
+            stone_diameter=5.0,
+            prong_count=6,
+            wire_gauge=0.9,
+            prong_height=1.8,
+        )
+        node = get_last_node(store)
+        assert node["op"] == "jewelry_prong_variant"
+        assert node["variant"] == "claw_prong"
+
+    def test_node_id_auto_generated(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_prong_variant, ctx, fid,
+            variant="split_prong",
+            stone_diameter=5.0, prong_count=4,
+            wire_gauge=1.0, prong_height=2.0,
+        )
+        node = get_last_node(store)
+        assert node["id"].startswith("jewelry_prong_variant-")
+
+    def test_explicit_id(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_prong_variant, ctx, fid,
+            variant="v_prong",
+            stone_diameter=5.0, prong_count=4,
+            wire_gauge=1.0, prong_height=2.0,
+            id="my-v-prong",
+        )
+        node = get_last_node(store)
+        assert node["id"] == "my-v-prong"
+
+    def test_invalid_variant_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_prong_variant, ctx, fid,
+            variant="magic_prong",
+            stone_diameter=6.5, prong_count=4,
+            wire_gauge=1.0, prong_height=2.0,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_prong_count_below_2_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_prong_variant, ctx, fid,
+            variant="double_prong",
+            stone_diameter=6.5, prong_count=1,
+            wire_gauge=1.0, prong_height=2.0,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_negative_wire_gauge_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_prong_variant, ctx, fid,
+            variant="claw_prong",
+            stone_diameter=6.5, prong_count=4,
+            wire_gauge=-1.0, prong_height=2.0,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_negative_variant_param_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_prong_variant, ctx, fid,
+            variant="claw_prong",
+            stone_diameter=6.5, prong_count=4,
+            wire_gauge=1.0, prong_height=2.0,
+            variant_param=-0.5,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_v_prong_angle_ge_90_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_prong_variant, ctx, fid,
+            variant="v_prong",
+            stone_diameter=6.5, prong_count=4,
+            wire_gauge=1.0, prong_height=2.0,
+            variant_param=90.0,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_split_prong_fraction_above_1_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_prong_variant, ctx, fid,
+            variant="split_prong",
+            stone_diameter=6.5, prong_count=4,
+            wire_gauge=1.0, prong_height=2.0,
+            variant_param=1.5,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_invalid_variant_profile_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_prong_variant, ctx, fid,
+            variant="decorative_prong",
+            stone_diameter=6.5, prong_count=4,
+            wire_gauge=1.0, prong_height=2.0,
+            variant_profile="diamond_cut",
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_zero_stone_diameter_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_prong_variant, ctx, fid,
+            variant="double_prong",
+            stone_diameter=0, prong_count=4,
+            wire_gauge=1.0, prong_height=2.0,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_non_uuid_file_id_rejected(self):
+        ctx, _, _ = make_ctx()
+        result = call_tool(
+            run_jewelry_create_prong_variant, ctx, "bad-id",
+            variant="double_prong",
+            stone_diameter=6.5, prong_count=4,
+            wire_gauge=1.0, prong_height=2.0,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_missing_file_not_found(self):
+        ctx, _, fid = make_ctx(kind="NOT_FOUND")
+        result = call_tool(
+            run_jewelry_create_prong_variant, ctx, fid,
+            variant="double_prong",
+            stone_diameter=6.5, prong_count=4,
+            wire_gauge=1.0, prong_height=2.0,
+        )
+        assert result.get("code") == "NOT_FOUND"
+
+    def test_decorative_prong_all_profiles_accepted(self):
+        for profile in ["round", "tapered", "filigree", "star", "leaf"]:
+            ctx, store, fid = make_ctx()
+            result = call_tool(
+                run_jewelry_create_prong_variant, ctx, fid,
+                variant="decorative_prong",
+                stone_diameter=6.5, prong_count=4,
+                wire_gauge=1.0, prong_height=2.0,
+                variant_profile=profile,
+            )
+            assert result.get("error") is None, f"profile={profile}: {result}"
+
+    def test_v_prong_valid_angle(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_prong_variant, ctx, fid,
+            variant="v_prong",
+            stone_diameter=7.0, prong_count=4,
+            wire_gauge=1.1, prong_height=2.5,
+            variant_param=45.0,
+        )
+        assert result.get("error") is None
+        node = get_last_node(store)
+        assert math.isclose(node["variant_param"], 45.0)
+

@@ -1,7 +1,7 @@
 """
 kerf_cad_core.jewelry.settings — Parametric stone setting generators.
 
-Fourteen setting types, each with:
+Twenty-two setting types, each with:
   1. A pure-Python geometry helper that returns a node-spec dict (no OCCT
      required — the dict is consumed by the OCCT worker's opJewelry* handlers).
   2. An LLM tool (ToolSpec + @register runner) following the exact pattern
@@ -23,6 +23,13 @@ bead_grain   — stones held by raised metal beads cut up from the surface.
 gypsy_pave   — flush-set stones with engraved star/bright-cut accents.
 illusion     — faceted metal plate around a small stone to make it look larger.
 invisible    — stones with grooved girdles held on a hidden rail.
+
+prong_variant — double, claw, v, fishtail, split, or decorative prong wire variants.
+head_gallery  — basket/peg head + decorative gallery rail (plain, scalloped,
+                milgrain_edge, pierced, filigree).
+under_bezel   — sub-collet that elevates a stone above the shank.
+peg_setting   — post head for earrings and pendants.
+coronet       — tapered crown of graduated prongs (vintage/Victorian look).
 
 Geometry approach (shared)
 --------------------------
@@ -2684,3 +2691,283 @@ async def run_jewelry_create_invisible(ctx: ProjectCtx, args: bytes) -> str:
         "_total_width": node["_total_width"],
         "_total_height": node["_total_height"],
     })
+
+
+# ===========================================================================
+# PRONG / HEAD VARIANT LIBRARY
+# ===========================================================================
+#
+# Six additional prong-wire variants: double_prong, claw_prong, v_prong,
+# fishtail_prong, split_prong, decorative_prong.
+# Each shares the same parametric core (stone_diameter, prong_count,
+# wire_gauge, prong_height) and adds a variant-specific parameter.
+# ---------------------------------------------------------------------------
+
+_VALID_PRONG_VARIANTS = {
+    "double_prong",
+    "claw_prong",
+    "v_prong",
+    "fishtail_prong",
+    "split_prong",
+    "decorative_prong",
+}
+
+_VALID_DECORATIVE_PROFILES = {"round", "tapered", "filigree", "star", "leaf"}
+
+
+def build_prong_variant_node(
+    node_id: str,
+    variant: str,
+    stone_diameter: float,
+    prong_count: int,
+    wire_gauge: float,
+    prong_height: float,
+    *,
+    # variant-specific optional param — meaning depends on variant
+    variant_param: float = 0.0,
+    variant_profile: str = "round",
+) -> dict:
+    """
+    Compute a prong-variant node spec.
+
+    Variants
+    --------
+    double_prong
+        Two parallel wires of `wire_gauge` run side-by-side per prong
+        position (doubles the grip area).  `variant_param` = gap between the
+        two wires in mm (default 0.3 mm).
+
+    claw_prong
+        A single wire with a curved claw tip that hooks over the stone's
+        girdle; provides maximum security.  `variant_param` = claw hook depth
+        in mm (default 0.4 mm).
+
+    v_prong
+        A V-shaped prong with a sharp internal corner that cradles a pointed
+        culet (marquise, pear, princess corners).  `variant_param` = half-
+        angle of the V in degrees (default 45°).  Best used with 4-prong.
+
+    fishtail_prong
+        The prong tip is split into two curved tines that spread over the
+        girdle like a fishtail; this is the most decorative option.
+        `variant_param` = fishtail spread width in mm (default 0.8 mm).
+
+    split_prong
+        The prong is split through most of its height into two tines;
+        common in bypass / two-tone rings.  `variant_param` = split start
+        height above the bearing seat as a fraction of `prong_height`
+        (default 0.5, i.e. split begins halfway up).
+
+    decorative_prong
+        A prong with a decorative cross-section profile.  `variant_param`
+        is unused; instead `variant_profile` selects the profile:
+        `round`, `tapered`, `filigree`, `star`, `leaf`.
+
+    Derived hints
+    -------------
+    _head_outer_diameter — same formula as jewelry_prong_head:
+                           stone_diameter + 2 * wire_gauge.
+    _prong_pitch_deg     — angular pitch between adjacent prongs =
+                           360 / prong_count.
+    """
+    head_outer_diameter = stone_diameter + 2.0 * wire_gauge
+    prong_pitch_deg = 360.0 / prong_count if prong_count > 0 else 0.0
+
+    return {
+        "id": node_id,
+        "op": "jewelry_prong_variant",
+        "variant": variant,
+        "stone_diameter": stone_diameter,
+        "prong_count": prong_count,
+        "wire_gauge": wire_gauge,
+        "prong_height": prong_height,
+        "variant_param": variant_param,
+        "variant_profile": variant_profile,
+        "_head_outer_diameter": round(head_outer_diameter, 4),
+        "_prong_pitch_deg": round(prong_pitch_deg, 4),
+    }
+
+
+jewelry_prong_variant_spec = ToolSpec(
+    name="jewelry_create_prong_variant",
+    description=(
+        "Append a `jewelry_prong_variant` node to a `.feature` file. "
+        "Generates one of six specialised prong-wire variants (double, claw, "
+        "V, fishtail, split, decorative) sized to the stone. "
+        "All variants share `stone_diameter`, `prong_count`, `wire_gauge`, and "
+        "`prong_height`; each adds a variant-specific parameter. "
+        "\n\nVariants:\n"
+        "- **`double_prong`** — two side-by-side wires per prong position. "
+        "`variant_param` = gap between wires in mm (default 0.3).\n"
+        "- **`claw_prong`** — curved claw tip hooks over the girdle. "
+        "`variant_param` = claw hook depth in mm (default 0.4).\n"
+        "- **`v_prong`** — V-shaped prong for pointed stones (marquise/pear/princess). "
+        "`variant_param` = V half-angle in degrees (default 45).\n"
+        "- **`fishtail_prong`** — split fishtail tip for decorative look. "
+        "`variant_param` = fishtail spread width in mm (default 0.8).\n"
+        "- **`split_prong`** — prong split into two tines from mid-height. "
+        "`variant_param` = split start as fraction of prong_height (default 0.5).\n"
+        "- **`decorative_prong`** — custom cross-section profile. "
+        "`variant_profile` selects profile: `round`, `tapered`, `filigree`, `star`, `leaf`.\n"
+        "\nOutput: node spec consumed by the OCCT worker's opJewelryProngVariant handler."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_id": {
+                "type": "string",
+                "description": "Target .feature file id (uuid).",
+            },
+            "variant": {
+                "type": "string",
+                "enum": sorted(_VALID_PRONG_VARIANTS),
+                "description": "Prong variant type.",
+            },
+            "stone_diameter": {
+                "type": "number",
+                "description": "Girdle diameter of the stone in mm.",
+            },
+            "prong_count": {
+                "type": "integer",
+                "description": "Number of prong positions around the stone (typically 4 or 6).",
+            },
+            "wire_gauge": {
+                "type": "number",
+                "description": "Prong wire diameter in mm (typical 0.8–1.5).",
+            },
+            "prong_height": {
+                "type": "number",
+                "description": "Height the prong extends above the stone's girdle plane in mm.",
+            },
+            "variant_param": {
+                "type": "number",
+                "description": (
+                    "Variant-specific numeric parameter (see variant descriptions above). "
+                    "Default 0.0 (worker uses built-in default for each variant)."
+                ),
+            },
+            "variant_profile": {
+                "type": "string",
+                "enum": sorted(_VALID_DECORATIVE_PROFILES),
+                "description": (
+                    "Profile for `decorative_prong` variant. "
+                    "One of: round, tapered, filigree, star, leaf. "
+                    "Ignored for all other variants."
+                ),
+            },
+            "id": {
+                "type": "string",
+                "description": "Optional explicit node id.",
+            },
+        },
+        "required": ["file_id", "variant", "stone_diameter", "prong_count", "wire_gauge", "prong_height"],
+    },
+)
+
+
+@register(jewelry_prong_variant_spec, write=True)
+async def run_jewelry_create_prong_variant(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    file_id_str = a.get("file_id", "").strip()
+    variant = a.get("variant", "").strip().lower()
+    stone_diameter = a.get("stone_diameter")
+    prong_count = a.get("prong_count")
+    wire_gauge = a.get("wire_gauge")
+    prong_height = a.get("prong_height")
+    variant_param = a.get("variant_param", 0.0)
+    variant_profile = a.get("variant_profile", "round")
+    node_id = a.get("id", "").strip()
+
+    if not file_id_str:
+        return err_payload("file_id is required", "BAD_ARGS")
+
+    if variant not in _VALID_PRONG_VARIANTS:
+        return err_payload(
+            f"variant must be one of {sorted(_VALID_PRONG_VARIANTS)}; got {variant!r}",
+            "BAD_ARGS",
+        )
+
+    for fname, fval in [
+        ("stone_diameter", stone_diameter),
+        ("wire_gauge", wire_gauge),
+        ("prong_height", prong_height),
+    ]:
+        err = _positive(fname, fval)
+        if err:
+            return err_payload(err, "BAD_ARGS")
+
+    try:
+        pc = int(prong_count)
+    except (TypeError, ValueError):
+        return err_payload("prong_count must be an integer", "BAD_ARGS")
+    if pc < 2:
+        return err_payload(f"prong_count must be >= 2; got {pc}", "BAD_ARGS")
+
+    try:
+        vp = float(variant_param)
+    except (TypeError, ValueError):
+        vp = 0.0
+    if vp < 0:
+        return err_payload(f"variant_param must be >= 0; got {vp}", "BAD_ARGS")
+
+    vprofile = (variant_profile or "round").strip().lower()
+    if vprofile not in _VALID_DECORATIVE_PROFILES:
+        return err_payload(
+            f"variant_profile must be one of {sorted(_VALID_DECORATIVE_PROFILES)}; got {variant_profile!r}",
+            "BAD_ARGS",
+        )
+
+    # v_prong half-angle must be < 90.
+    if variant == "v_prong" and vp > 0 and vp >= 90.0:
+        return err_payload(
+            f"v_prong variant_param (half-angle) must be < 90°; got {vp}", "BAD_ARGS"
+        )
+
+    # split_prong fraction must be in (0, 1].
+    if variant == "split_prong" and vp > 0 and vp > 1.0:
+        return err_payload(
+            f"split_prong variant_param (split fraction) must be in (0, 1]; got {vp}",
+            "BAD_ARGS",
+        )
+
+    try:
+        fid = uuid.UUID(file_id_str)
+    except Exception:
+        return err_payload("file_id must be a uuid", "BAD_ARGS")
+
+    content, err = read_feature_content(ctx, fid)
+    if err:
+        return err_payload(f"file not found: {err}", "NOT_FOUND")
+
+    if not node_id:
+        node_id = next_node_id(content, "jewelry_prong_variant")
+
+    node = build_prong_variant_node(
+        node_id=node_id,
+        variant=variant,
+        stone_diameter=float(stone_diameter),
+        prong_count=pc,
+        wire_gauge=float(wire_gauge),
+        prong_height=float(prong_height),
+        variant_param=vp,
+        variant_profile=vprofile,
+    )
+
+    _, nid, err = append_feature_node(ctx, fid, node)
+    if err:
+        return err_payload(err, "ERROR")
+
+    return ok_payload({
+        "file_id": file_id_str,
+        "id": nid,
+        "op": "jewelry_prong_variant",
+        "variant": variant,
+        "stone_diameter": float(stone_diameter),
+        "prong_count": pc,
+        "_head_outer_diameter": node["_head_outer_diameter"],
+    })
+

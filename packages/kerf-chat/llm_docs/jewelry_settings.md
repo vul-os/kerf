@@ -1,6 +1,6 @@
 # Jewelry setting generators
 
-Fourteen LLM tools create parametric stone-setting solids as `.feature` nodes.
+Nineteen LLM tools create parametric stone-setting solids as `.feature` nodes.
 Each tool appends a node to an existing `.feature` file; the OCCT worker
 evaluates the node and returns a `TopoDS_Solid` (or placement data for array
 settings like pavé, halo, and cluster).
@@ -703,3 +703,55 @@ Derived node hints:
 
 Result node op: `jewelry_invisible`. Total setting footprint: 12 × 6 mm,
 8 stones. `seat_positions` lists all 8 stone pockets for downstream cutting.
+
+---
+
+## `jewelry_create_prong_variant`
+
+Generates a specialised prong-wire variant (double, claw, V, fishtail, split,
+or decorative) for stones that need a different grip geometry.
+
+### Variants
+
+| Variant           | Description                                                         | `variant_param` meaning                        |
+|-------------------|---------------------------------------------------------------------|------------------------------------------------|
+| `double_prong`    | Two parallel wires per prong position — extra grip area             | Gap between the two wires in mm (default 0.3) |
+| `claw_prong`      | Curved claw tip hooks over the girdle; maximum security             | Claw hook depth in mm (default 0.4)           |
+| `v_prong`         | V-shaped prong for pointed-corner stones (marquise / pear / princess) | V half-angle in degrees (default 45)       |
+| `fishtail_prong`  | Split fishtail tip fans over the girdle; decorative look            | Fishtail spread width in mm (default 0.8)     |
+| `split_prong`     | Prong split into two tines from mid-height; bypass / two-tone rings | Split start as fraction of `prong_height` (default 0.5) |
+| `decorative_prong`| Custom cross-section profile (see `variant_profile`)                | Unused; see `variant_profile`                 |
+
+Decorative profiles (`variant_profile`): `round`, `tapered`, `filigree`, `star`, `leaf`.
+
+### Parameters
+
+| Parameter          | Required | Default    | Notes                                                           |
+|--------------------|----------|------------|-----------------------------------------------------------------|
+| `file_id`          | yes      | —          | Target `.feature` file uuid                                     |
+| `variant`          | yes      | —          | One of the six variants above                                   |
+| `stone_diameter`   | yes      | —          | Girdle diameter in mm                                           |
+| `prong_count`      | yes      | —          | Number of prong positions (>= 2; typically 4 or 6)             |
+| `wire_gauge`       | yes      | —          | Prong wire diameter in mm (typical 0.8–1.5)                    |
+| `prong_height`     | yes      | —          | Height above girdle in mm                                       |
+| `variant_param`    | no       | `0.0`      | Variant-specific numeric (see table); 0 = worker default       |
+| `variant_profile`  | no       | `"round"`  | Profile for `decorative_prong`; ignored otherwise              |
+| `id`               | no       | auto       | Explicit node id                                                |
+
+### Worked example — claw prong for marquise
+
+```json
+{
+  "file_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "variant": "v_prong",
+  "stone_diameter": 10.5,
+  "prong_count": 4,
+  "wire_gauge": 1.1,
+  "prong_height": 2.8,
+  "variant_param": 45
+}
+```
+
+Result node op: `jewelry_prong_variant`. Boolean-fuse onto a shank.
+
+---

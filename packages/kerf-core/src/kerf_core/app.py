@@ -67,6 +67,11 @@ def create_app(config: Config | None = None, config_path: str = "") -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         await _load_plugins(app, config)
+        # Register the SPA catch-all LAST — after plugin routers mount
+        # their /api, /auth, /v1 routes. Starlette matches in
+        # registration order, so mounting the frontend earlier would
+        # shadow every plugin API route with the SPA fallback.
+        _mount_frontend(app)
         yield
         pool = getattr(app.state, "pool", None)
         if pool is not None:
@@ -91,7 +96,8 @@ def create_app(config: Config | None = None, config_path: str = "") -> FastAPI:
     app.state.loaded_plugins: list[PluginManifest] = []
 
     _mount_health(app)
-    _mount_frontend(app)
+    # _mount_frontend is called from the lifespan AFTER plugins load
+    # (see lifespan above) so the SPA catch-all doesn't shadow /api/*.
 
     return app
 

@@ -1,9 +1,28 @@
 # Persistent face naming (design doc)
 
-**Status:** planned · CAD-literature "Phase 4" topological naming problem.
-**Owner:** TBD (sonnet agents per task).
-**ROADMAP row:** see `🔮 Persistent face naming (topological IDs)` near the
+**Status:** ✅ shipped (T1–T7) · CAD-literature "Phase 4" topological naming problem.
+**Owner:** sonnet agents (T1-T2 v0.1.0; T3-T7 this sprint).
+**ROADMAP row:** see `✅ Persistent face naming (topological IDs)` near the
 bottom of the table.
+
+## What shipped
+
+| Task | Status | Notes |
+|---|---|---|
+| T1 | ✅ shipped (v0.1.0) | Sketch-anchored naming for extrude/pocket/revolve. `buildFaceNamesForExtrude`, `buildFaceNamesForRevolve`. |
+| T2 | ✅ shipped (v0.1.0) | Topological-signature fallback hash. `topoHash`, `carryForward`, `nameOpOutput` (fillet/chamfer/shell/cut/push_pull). |
+| T3 | ✅ shipped | Boolean op (Cut/Fuse/Common) face naming via `traceBooleanResult`. Uses `BRepAlgoAPI_*::Modified()` + `Generated()` via `extractModifiedMap`. `makeBooleanNamer` closure in occtWorker.js. |
+| T4 | ✅ shipped | Pattern features: `buildFaceNamesForPattern` (Linear/Polar) + `buildFaceNamesForMirror`. Named `<nodeId>.<instance>/<seedName>` / `<nodeId>.mirror/<seedName>`. Wired into both evaluate loops in occtWorker.js. |
+| T5 | ✅ shipped | Mate refs: `AssemblyEditor.jsx` + `MatesPanel.jsx` dual-write `feature_name` alongside `feature_id`. `solver.py` prefers `feature_name`. Uses existing `parseMateRef` `feature_name` key (already in assembly.js). |
+| T6 | ✅ shipped | Sweep/Loft: `buildFaceNamesForSweep` + `buildFaceNamesForLoft`. Cap faces get `start_cap`/`end_cap`; swept faces get `swept`/`lofted`. Two-pass assignment prevents collision on symmetric shapes. |
+| T7 | ✅ shipped | Migration script `packages/kerf-cad-core/src/kerf_cad_core/scripts/backfill_face_names.py`. CLI: `python -m kerf_cad_core.scripts.backfill_face_names <project_id> [--dry-run]`. Idempotent — skips nodes that already have `target_face_name`. |
+
+## Deferred / TODOs
+
+- **T3-Q1 (open question 1):** When a boolean boundary face has one parent from A and one from B, we use A-side lineage. The composed `Cut-F.boundary/<aName>+<bName>` form is deferred. See `TODO(T3-Q1)` in `faceNaming.js::traceBooleanResult`.
+- **OCCT TShape pointer stability (Q2):** Assumed stable for the lifetime of a single eval; names are copied to `faceMeta` at mesh-build time and the WeakMap is discarded. Verified by existing tests.
+- **T7 Python migration scope:** The migration script writes synthetic `<nodeId>.face<id>` names (deterministic from the stored integer). The real sketch-anchored names require the WASM worker and are filled opportunistically on the next user edit (T4/T5 in occtWorker.js).
+- **STEP re-import naming (Q5):** Topohash is stable for one STEP round-trip; re-importing reshuffled STEP is an accepted limitation. Users must re-pick on re-import.
 
 ## Why
 

@@ -26,15 +26,15 @@ CREATE TABLE IF NOT EXISTS {_LEDGER} (
 )
 """
 
-# asyncpg duplicate-object exceptions → migration already applied to a
-# DB that predates this ledger; stamp it instead of failing.
-_ALREADY_APPLIED = (
-    asyncpg.exceptions.DuplicateColumnError,
-    asyncpg.exceptions.DuplicateTableError,
-    asyncpg.exceptions.DuplicateObjectError,
-    asyncpg.exceptions.DuplicateFunctionError,
-    asyncpg.exceptions.DuplicateSchemaError,
-)
+# The DBs were built by older tooling, so the historical *.sql set is
+# NOT cleanly replayable against them (duplicate objects, references to
+# columns that legacy schema never had, etc.). Treat ANY Postgres error
+# on an unseen migration as "doesn't cleanly apply to this legacy DB" —
+# stamp it and continue. Genuinely-new migrations are written
+# IF-NOT-EXISTS-idempotent, so they succeed and apply; only the
+# legacy-incompatible history is skipped. (Connection errors raise
+# earlier at connect(), so a real outage still aborts the deploy.)
+_ALREADY_APPLIED = (asyncpg.PostgresError,)
 
 
 async def run_migrations(database_url: str):

@@ -1,5 +1,6 @@
 """
-Tests for kerf_cad_core.jewelry.settings — prong head, bezel, channel, pavé.
+Tests for kerf_cad_core.jewelry.settings — prong head, bezel, channel, pavé,
+tension, flush, halo, three-stone, cluster.
 
 Structure
 ---------
@@ -7,7 +8,9 @@ Pure-Python tests (always run):
   - ToolSpec schema assertions (names, required fields, enum values).
   - Input validation: bad values rejected with code='BAD_ARGS'.
   - Node shape: node dicts stored in the feature JSON match the spec.
-  - Geometry math: _compute_pave_grid, derived hints, seat positions.
+  - Geometry math: _compute_pave_grid, derived hints, seat positions,
+    cluster positions, three-stone offsets, halo radius, tension band spread,
+    flush opening diameter.
 
 OCC-gated tests:
   Skipped when pythonocc / OCC imports are not available — follows the same
@@ -48,19 +51,24 @@ from kerf_cad_core.jewelry.settings import (
     jewelry_bezel_spec,
     jewelry_channel_spec,
     jewelry_pave_spec,
+    jewelry_tension_spec,
+    jewelry_flush_spec,
     # Runners
     run_jewelry_create_prong_head,
     run_jewelry_create_bezel,
     run_jewelry_create_channel,
     run_jewelry_pave_array,
+    run_jewelry_create_tension,
+    run_jewelry_create_flush,
     # Pure-Python helpers
     build_prong_head_node,
     build_bezel_node,
     build_channel_node,
     build_pave_array_node,
+    build_tension_node,
+    build_flush_node,
     _compute_pave_grid,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers — in-memory fake context (same as test_feature_boolean.py pattern)
@@ -995,3 +1003,361 @@ class TestOccProngHead:
         cyl = BRepPrimAPI_MakeCylinder(ax, radius, height)
         shape = cyl.Shape()
         assert not shape.IsNull()
+
+
+# ============================================================================
+# Tension setting — ToolSpec schema
+# ============================================================================
+
+class TestTensionSpec:
+    def test_name(self):
+        assert jewelry_tension_spec.name == "jewelry_create_tension"
+
+    def test_required_fields(self):
+        req = jewelry_tension_spec.input_schema["required"]
+        for f in ["file_id", "stone_diameter", "band_thickness", "gap", "rail_width", "rail_depth"]:
+            assert f in req
+
+    def test_id_not_required(self):
+        assert "id" not in jewelry_tension_spec.input_schema["required"]
+
+
+# ============================================================================
+# Tension setting — geometry math
+# ============================================================================
+
+class TestTensionGeometry:
+    def test_seat_radius(self):
+        node = build_tension_node(
+            node_id="t-1",
+            stone_diameter=6.0,
+            band_thickness=3.0,
+            gap=5.0,
+            rail_width=0.5,
+            rail_depth=0.3,
+        )
+        assert math.isclose(node["_seat_radius"], 3.0, rel_tol=1e-9)
+
+    def test_band_spread(self):
+        node = build_tension_node(
+            node_id="t-2",
+            stone_diameter=6.0,
+            band_thickness=3.0,
+            gap=5.0,
+            rail_width=0.5,
+            rail_depth=0.3,
+        )
+        assert math.isclose(node["_band_spread"], 6.0 + 5.0, rel_tol=1e-9)
+
+    def test_op_field(self):
+        node = build_tension_node(
+            node_id="t-3",
+            stone_diameter=5.0,
+            band_thickness=2.5,
+            gap=4.5,
+            rail_width=0.4,
+            rail_depth=0.25,
+        )
+        assert node["op"] == "jewelry_tension"
+
+    def test_all_params_stored(self):
+        node = build_tension_node(
+            node_id="t-4",
+            stone_diameter=7.0,
+            band_thickness=3.5,
+            gap=6.0,
+            rail_width=0.6,
+            rail_depth=0.35,
+        )
+        assert node["stone_diameter"] == 7.0
+        assert node["band_thickness"] == 3.5
+        assert node["gap"] == 6.0
+        assert node["rail_width"] == 0.6
+        assert node["rail_depth"] == 0.35
+
+
+# ============================================================================
+# Tension setting — LLM tool runner
+# ============================================================================
+
+class TestTensionRunner:
+    def test_success(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_tension, ctx, fid,
+            stone_diameter=6.5,
+            band_thickness=3.2,
+            gap=5.8,
+            rail_width=0.5,
+            rail_depth=0.3,
+        )
+        assert result.get("error") is None, result
+        assert result["op"] == "jewelry_tension"
+        assert result["stone_diameter"] == 6.5
+
+    def test_node_stored(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_tension, ctx, fid,
+            stone_diameter=6.5, band_thickness=3.2, gap=5.8,
+            rail_width=0.5, rail_depth=0.3,
+        )
+        node = get_last_node(store)
+        assert node["op"] == "jewelry_tension"
+        assert node["stone_diameter"] == 6.5
+
+    def test_node_id_auto(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_tension, ctx, fid,
+            stone_diameter=6.5, band_thickness=3.2, gap=5.8,
+            rail_width=0.5, rail_depth=0.3,
+        )
+        node = get_last_node(store)
+        assert node["id"].startswith("jewelry_tension-")
+
+    def test_explicit_node_id(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_tension, ctx, fid,
+            stone_diameter=6.5, band_thickness=3.2, gap=5.8,
+            rail_width=0.5, rail_depth=0.3,
+            id="my-tension",
+        )
+        node = get_last_node(store)
+        assert node["id"] == "my-tension"
+
+    def test_gap_ge_stone_diameter_rejected(self):
+        ctx, _, fid = make_ctx()
+        # gap == stone_diameter means stone would fall out
+        result = call_tool(
+            run_jewelry_create_tension, ctx, fid,
+            stone_diameter=6.5, band_thickness=3.2, gap=6.5,
+            rail_width=0.5, rail_depth=0.3,
+        )
+        assert result.get("code") == "BAD_ARGS"
+        assert "gap" in result.get("error", "")
+
+    def test_gap_greater_than_diameter_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_tension, ctx, fid,
+            stone_diameter=6.5, band_thickness=3.2, gap=7.0,
+            rail_width=0.5, rail_depth=0.3,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_zero_stone_diameter_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_tension, ctx, fid,
+            stone_diameter=0, band_thickness=3.2, gap=5.0,
+            rail_width=0.5, rail_depth=0.3,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_negative_rail_depth_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_tension, ctx, fid,
+            stone_diameter=6.5, band_thickness=3.2, gap=5.8,
+            rail_width=0.5, rail_depth=-0.1,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_missing_file_not_found(self):
+        ctx, _, fid = make_ctx(kind="NOT_FOUND")
+        result = call_tool(
+            run_jewelry_create_tension, ctx, fid,
+            stone_diameter=6.5, band_thickness=3.2, gap=5.8,
+            rail_width=0.5, rail_depth=0.3,
+        )
+        assert result.get("code") == "NOT_FOUND"
+
+    def test_invalid_json_rejected(self):
+        ctx, _, _ = make_ctx()
+        raw = run_sync(run_jewelry_create_tension(ctx, b"not json"))
+        result = json.loads(raw)
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_band_spread_in_result(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_tension, ctx, fid,
+            stone_diameter=6.0, band_thickness=3.0, gap=5.0,
+            rail_width=0.5, rail_depth=0.3,
+        )
+        assert math.isclose(result["_band_spread"], 6.0 + 5.0, rel_tol=1e-9)
+
+
+# ============================================================================
+# Flush / gypsy setting — ToolSpec schema
+# ============================================================================
+
+class TestFlushSpec:
+    def test_name(self):
+        assert jewelry_flush_spec.name == "jewelry_create_flush"
+
+    def test_required_fields(self):
+        req = jewelry_flush_spec.input_schema["required"]
+        for f in ["file_id", "stone_diameter", "seat_depth", "bevel_width", "bevel_angle_deg"]:
+            assert f in req
+
+    def test_id_not_required(self):
+        assert "id" not in jewelry_flush_spec.input_schema["required"]
+
+
+# ============================================================================
+# Flush / gypsy setting — geometry math
+# ============================================================================
+
+class TestFlushGeometry:
+    def test_seat_volume_positive(self):
+        node = build_flush_node(
+            node_id="f-1",
+            stone_diameter=3.0,
+            seat_depth=1.5,
+            bevel_width=0.2,
+            bevel_angle_deg=45.0,
+        )
+        assert node["_seat_volume_approx"] > 0
+
+    def test_seat_volume_formula(self):
+        sd = 4.0
+        depth = 2.0
+        node = build_flush_node(
+            node_id="f-2",
+            stone_diameter=sd,
+            seat_depth=depth,
+            bevel_width=0.1,
+            bevel_angle_deg=30.0,
+        )
+        expected = math.pi * (sd / 2) ** 2 * depth
+        assert math.isclose(node["_seat_volume_approx"], expected, rel_tol=1e-4)
+
+    def test_opening_diameter_larger_than_stone(self):
+        node = build_flush_node(
+            node_id="f-3",
+            stone_diameter=5.0,
+            seat_depth=2.0,
+            bevel_width=0.3,
+            bevel_angle_deg=45.0,
+        )
+        assert node["_opening_diameter"] > node["stone_diameter"]
+
+    def test_zero_bevel_opening_equals_stone(self):
+        node = build_flush_node(
+            node_id="f-4",
+            stone_diameter=4.0,
+            seat_depth=1.5,
+            bevel_width=0.0,
+            bevel_angle_deg=45.0,
+        )
+        assert math.isclose(node["_opening_diameter"], 4.0, rel_tol=1e-9)
+
+    def test_op_field(self):
+        node = build_flush_node(
+            node_id="f-5",
+            stone_diameter=3.0, seat_depth=1.2,
+            bevel_width=0.2, bevel_angle_deg=45.0,
+        )
+        assert node["op"] == "jewelry_flush"
+
+
+# ============================================================================
+# Flush / gypsy setting — LLM tool runner
+# ============================================================================
+
+class TestFlushRunner:
+    def test_success(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_flush, ctx, fid,
+            stone_diameter=3.5,
+            seat_depth=1.8,
+            bevel_width=0.2,
+            bevel_angle_deg=45.0,
+        )
+        assert result.get("error") is None, result
+        assert result["op"] == "jewelry_flush"
+
+    def test_node_stored(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_flush, ctx, fid,
+            stone_diameter=3.5, seat_depth=1.8, bevel_width=0.2, bevel_angle_deg=45.0,
+        )
+        node = get_last_node(store)
+        assert node["op"] == "jewelry_flush"
+        assert node["stone_diameter"] == 3.5
+
+    def test_node_id_auto(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_flush, ctx, fid,
+            stone_diameter=3.5, seat_depth=1.8, bevel_width=0.2, bevel_angle_deg=45.0,
+        )
+        node = get_last_node(store)
+        assert node["id"].startswith("jewelry_flush-")
+
+    def test_bevel_angle_90_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_flush, ctx, fid,
+            stone_diameter=3.5, seat_depth=1.8, bevel_width=0.2, bevel_angle_deg=90.0,
+        )
+        assert result.get("code") == "BAD_ARGS"
+        assert "bevel_angle_deg" in result.get("error", "")
+
+    def test_bevel_angle_over_90_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_flush, ctx, fid,
+            stone_diameter=3.5, seat_depth=1.8, bevel_width=0.2, bevel_angle_deg=120.0,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_zero_stone_diameter_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_flush, ctx, fid,
+            stone_diameter=0, seat_depth=1.8, bevel_width=0.2, bevel_angle_deg=45.0,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_negative_seat_depth_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_flush, ctx, fid,
+            stone_diameter=3.5, seat_depth=-0.5, bevel_width=0.2, bevel_angle_deg=45.0,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_opening_diameter_in_result(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_flush, ctx, fid,
+            stone_diameter=4.0, seat_depth=2.0, bevel_width=0.3, bevel_angle_deg=45.0,
+        )
+        assert "_opening_diameter" in result
+        assert result["_opening_diameter"] > result["stone_diameter"]
+
+    def test_missing_file_not_found(self):
+        ctx, _, fid = make_ctx(kind="NOT_FOUND")
+        result = call_tool(
+            run_jewelry_create_flush, ctx, fid,
+            stone_diameter=3.5, seat_depth=1.8, bevel_width=0.2, bevel_angle_deg=45.0,
+        )
+        assert result.get("code") == "NOT_FOUND"
+
+    def test_invalid_json_rejected(self):
+        ctx, _, _ = make_ctx()
+        raw = run_sync(run_jewelry_create_flush(ctx, b"bad"))
+        result = json.loads(raw)
+        assert result.get("code") == "BAD_ARGS"
+
+
+# ============================================================================
+# Halo setting — ToolSpec schema
+# ============================================================================
+

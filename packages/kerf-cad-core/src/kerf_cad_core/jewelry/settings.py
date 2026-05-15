@@ -1,10 +1,9 @@
 """
 kerf_cad_core.jewelry.settings — Parametric stone setting generators.
 
-Four setting types, each with:
+Nine setting types, each with:
   1. A pure-Python geometry helper that returns a node-spec dict (no OCCT
-     required — the dict is consumed by the OCCT worker's opJewelryProngHead /
-     opJewelryBezel / opJewelryChannel / opJewelryPave handlers).
+     required — the dict is consumed by the OCCT worker's opJewelry* handlers).
   2. An LLM tool (ToolSpec + @register runner) following the exact pattern
      in kerf_cad_core.surfacing.
 
@@ -14,6 +13,11 @@ prong_head   — 4-, 6-, basket, trellis, or cathedral prong head.
 bezel        — full or partial bezel / collet, with optional taper.
 channel      — parallel-rail channel for a row of N calibrated stones.
 pave_array   — grid-project over a target region; return placement transforms.
+tension      — stone held by spring pressure between two band ends.
+flush        — stone set into a drilled seat flush with the metal surface.
+halo         — center stone seat ringed by a pavé/accent halo.
+three_stone  — center + two graduated side-stone seats on a shared base.
+cluster      — N small stones grouped to read as one large stone.
 
 Geometry approach (shared)
 --------------------------
@@ -944,3 +948,334 @@ async def run_jewelry_pave_array(ctx: ProjectCtx, args: bytes) -> str:
         "region_width": float(region_width),
         "region_height": float(region_height),
     })
+
+
+# ---------------------------------------------------------------------------
+# Tension setting
+# ---------------------------------------------------------------------------
+
+def build_tension_node(
+    node_id: str,
+    stone_diameter: float,
+    band_thickness: float,
+    gap: float,
+    rail_width: float,
+    rail_depth: float,
+) -> dict:
+    """
+    Compute the tension-setting node spec.
+
+    The worker's opJewelryTension builds:
+      - Two band-end bodies of thickness `band_thickness`, each with a curved
+        inward face that cradles the stone girdle.  The gap between the two
+        facing surfaces equals `gap` (the stone is captured by spring tension).
+      - A horizontal tension rail on each side of width `rail_width` and
+        depth `rail_depth` that forms the bearing shelf gripping the girdle.
+
+    The stone is NOT set into a drilled seat — it is suspended between the two
+    opposing rails, held only by the metal's spring tension.
+
+    Derived hints:
+      _seat_radius  — radius of the bearing cradle = stone_diameter / 2.
+      _band_spread  — total spread of the two band ends = stone_diameter + gap.
+    """
+    seat_radius = stone_diameter / 2.0
+    band_spread = stone_diameter + gap
+
+    return {
+        "id": node_id,
+        "op": "jewelry_tension",
+        "stone_diameter": stone_diameter,
+        "band_thickness": band_thickness,
+        "gap": gap,
+        "rail_width": rail_width,
+        "rail_depth": rail_depth,
+        "_seat_radius": round(seat_radius, 4),
+        "_band_spread": round(band_spread, 4),
+    }
+
+
+jewelry_tension_spec = ToolSpec(
+    name="jewelry_create_tension",
+    description=(
+        "Append a `jewelry_tension` node to a `.feature` file. "
+        "Generates a tension setting where the stone is held purely by the "
+        "spring pressure of two opposing band ends. "
+        "The stone floats in a gap between the band ends; each end has an "
+        "inward-curved bearing rail that grips the stone's girdle. "
+        "Output: a node spec consumed by the OCCT worker's opJewelryTension "
+        "handler to produce two TopoDS_Solid band-end bodies."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_id": {
+                "type": "string",
+                "description": "Target .feature file id (uuid).",
+            },
+            "stone_diameter": {
+                "type": "number",
+                "description": "Girdle diameter of the stone in mm.",
+            },
+            "band_thickness": {
+                "type": "number",
+                "description": "Thickness of the band metal at the setting point in mm (typical 2.0–4.0).",
+            },
+            "gap": {
+                "type": "number",
+                "description": (
+                    "Gap between the two band-end faces in mm. "
+                    "Must be < stone_diameter so the stone is retained."
+                ),
+            },
+            "rail_width": {
+                "type": "number",
+                "description": "Width of the bearing rail that grips the girdle in mm (typical 0.3–0.8).",
+            },
+            "rail_depth": {
+                "type": "number",
+                "description": "Depth of the bearing rail notch in mm (typical 0.2–0.5).",
+            },
+            "id": {
+                "type": "string",
+                "description": "Optional explicit node id.",
+            },
+        },
+        "required": ["file_id", "stone_diameter", "band_thickness", "gap", "rail_width", "rail_depth"],
+    },
+)
+
+
+@register(jewelry_tension_spec, write=True)
+async def run_jewelry_create_tension(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    file_id_str = a.get("file_id", "").strip()
+    stone_diameter = a.get("stone_diameter")
+    band_thickness = a.get("band_thickness")
+    gap = a.get("gap")
+    rail_width = a.get("rail_width")
+    rail_depth = a.get("rail_depth")
+    node_id = a.get("id", "").strip()
+
+    if not file_id_str:
+        return err_payload("file_id is required", "BAD_ARGS")
+
+    for fname, fval in [
+        ("stone_diameter", stone_diameter),
+        ("band_thickness", band_thickness),
+        ("gap", gap),
+        ("rail_width", rail_width),
+        ("rail_depth", rail_depth),
+    ]:
+        err = _positive(fname, fval)
+        if err:
+            return err_payload(err, "BAD_ARGS")
+
+    try:
+        sd = float(stone_diameter)
+        gp = float(gap)
+    except (TypeError, ValueError):
+        return err_payload("stone_diameter and gap must be numbers", "BAD_ARGS")
+
+    if gp >= sd:
+        return err_payload(
+            f"gap ({gp}) must be less than stone_diameter ({sd}) so the stone is retained",
+            "BAD_ARGS",
+        )
+
+    try:
+        fid = uuid.UUID(file_id_str)
+    except Exception:
+        return err_payload("file_id must be a uuid", "BAD_ARGS")
+
+    content, err = read_feature_content(ctx, fid)
+    if err:
+        return err_payload(f"file not found: {err}", "NOT_FOUND")
+
+    if not node_id:
+        node_id = next_node_id(content, "jewelry_tension")
+
+    node = build_tension_node(
+        node_id=node_id,
+        stone_diameter=sd,
+        band_thickness=float(band_thickness),
+        gap=gp,
+        rail_width=float(rail_width),
+        rail_depth=float(rail_depth),
+    )
+
+    _, nid, err = append_feature_node(ctx, fid, node)
+    if err:
+        return err_payload(err, "ERROR")
+
+    return ok_payload({
+        "file_id": file_id_str,
+        "id": nid,
+        "op": "jewelry_tension",
+        "stone_diameter": sd,
+        "gap": gp,
+        "_band_spread": node["_band_spread"],
+    })
+
+
+# ---------------------------------------------------------------------------
+# Flush / gypsy setting
+# ---------------------------------------------------------------------------
+
+def build_flush_node(
+    node_id: str,
+    stone_diameter: float,
+    seat_depth: float,
+    bevel_width: float,
+    bevel_angle_deg: float,
+) -> dict:
+    """
+    Compute the flush-setting node spec.
+
+    The worker's opJewelryFlush builds a drilled cylindrical seat of diameter
+    `stone_diameter` and depth `seat_depth` sunk into the metal surface.  A
+    chamfer of width `bevel_width` at `bevel_angle_deg` trims the opening edge
+    so that the stone's crown is flush with or just proud of the metal.
+
+    Derived hints:
+      _seat_volume_approx  — π r² h (mm³) for material-removal estimate.
+      _opening_diameter    — stone_diameter + 2 * bevel_width * tan(bevel_angle).
+    """
+    r = stone_diameter / 2.0
+    seat_volume = math.pi * r * r * seat_depth
+    opening_diameter = stone_diameter + 2.0 * bevel_width * math.tan(
+        math.radians(bevel_angle_deg)
+    )
+
+    return {
+        "id": node_id,
+        "op": "jewelry_flush",
+        "stone_diameter": stone_diameter,
+        "seat_depth": seat_depth,
+        "bevel_width": bevel_width,
+        "bevel_angle_deg": bevel_angle_deg,
+        "_seat_volume_approx": round(seat_volume, 4),
+        "_opening_diameter": round(opening_diameter, 4),
+    }
+
+
+jewelry_flush_spec = ToolSpec(
+    name="jewelry_create_flush",
+    description=(
+        "Append a `jewelry_flush` node to a `.feature` file. "
+        "Generates a flush (gypsy) setting where the stone is set into a "
+        "drilled seat so its table sits level with — or just proud of — the "
+        "surrounding metal surface. "
+        "The worker's opJewelryFlush handler drills a cylindrical pocket of "
+        "`stone_diameter` × `seat_depth` and adds a chamfered opening edge "
+        "(bevel) to ease the stone in and catch light. "
+        "Output: a boolean-cut node spec. Pair with the parent metal body "
+        "using a `feature_boolean` cut."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_id": {
+                "type": "string",
+                "description": "Target .feature file id (uuid).",
+            },
+            "stone_diameter": {
+                "type": "number",
+                "description": "Girdle diameter of the stone in mm.",
+            },
+            "seat_depth": {
+                "type": "number",
+                "description": "Depth of the drilled seat in mm (typically 60–80% of stone depth).",
+            },
+            "bevel_width": {
+                "type": "number",
+                "description": "Width of the opening bevel/chamfer in mm (typical 0.1–0.3).",
+            },
+            "bevel_angle_deg": {
+                "type": "number",
+                "description": "Angle of the bevel chamfer in degrees (typical 30–60°).",
+            },
+            "id": {
+                "type": "string",
+                "description": "Optional explicit node id.",
+            },
+        },
+        "required": ["file_id", "stone_diameter", "seat_depth", "bevel_width", "bevel_angle_deg"],
+    },
+)
+
+
+@register(jewelry_flush_spec, write=True)
+async def run_jewelry_create_flush(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    file_id_str = a.get("file_id", "").strip()
+    stone_diameter = a.get("stone_diameter")
+    seat_depth = a.get("seat_depth")
+    bevel_width = a.get("bevel_width")
+    bevel_angle_deg = a.get("bevel_angle_deg")
+    node_id = a.get("id", "").strip()
+
+    if not file_id_str:
+        return err_payload("file_id is required", "BAD_ARGS")
+
+    for fname, fval in [
+        ("stone_diameter", stone_diameter),
+        ("seat_depth", seat_depth),
+        ("bevel_width", bevel_width),
+        ("bevel_angle_deg", bevel_angle_deg),
+    ]:
+        err = _positive(fname, fval)
+        if err:
+            return err_payload(err, "BAD_ARGS")
+
+    try:
+        ba = float(bevel_angle_deg)
+    except (TypeError, ValueError):
+        return err_payload("bevel_angle_deg must be a number", "BAD_ARGS")
+
+    if ba >= 90.0:
+        return err_payload(
+            f"bevel_angle_deg must be < 90°; got {ba}", "BAD_ARGS"
+        )
+
+    try:
+        fid = uuid.UUID(file_id_str)
+    except Exception:
+        return err_payload("file_id must be a uuid", "BAD_ARGS")
+
+    content, err = read_feature_content(ctx, fid)
+    if err:
+        return err_payload(f"file not found: {err}", "NOT_FOUND")
+
+    if not node_id:
+        node_id = next_node_id(content, "jewelry_flush")
+
+    node = build_flush_node(
+        node_id=node_id,
+        stone_diameter=float(stone_diameter),
+        seat_depth=float(seat_depth),
+        bevel_width=float(bevel_width),
+        bevel_angle_deg=ba,
+    )
+
+    _, nid, err = append_feature_node(ctx, fid, node)
+    if err:
+        return err_payload(err, "ERROR")
+
+    return ok_payload({
+        "file_id": file_id_str,
+        "id": nid,
+        "op": "jewelry_flush",
+        "stone_diameter": float(stone_diameter),
+        "_opening_diameter": node["_opening_diameter"],
+    })
+
+

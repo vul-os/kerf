@@ -1,8 +1,9 @@
 # Jewelry setting generators
 
-Four LLM tools create parametric stone-setting solids as `.feature` nodes.
+Nine LLM tools create parametric stone-setting solids as `.feature` nodes.
 Each tool appends a node to an existing `.feature` file; the OCCT worker
-evaluates the node and returns a `TopoDS_Solid` (or placement data for pavé).
+evaluates the node and returns a `TopoDS_Solid` (or placement data for array
+settings like pavé, halo, and cluster).
 
 Units: millimetres throughout.
 
@@ -232,3 +233,96 @@ and `transforms` (4×4 column-major matrices in world space).
 - On curved surfaces (ring shoulders), apply the `jewelry_pave` node with the
   correct `surface_normal`; the worker projects placements onto the face normal
   at evaluation time.
+
+---
+
+## `jewelry_create_tension`
+
+Generates a tension setting where the stone is held by spring pressure between
+two opposing band ends — no prongs or bezel.
+
+### How it works
+
+1. Two band-end bodies of thickness `band_thickness` face each other with a
+   gap of `gap` between them.  The stone diameter must exceed `gap` so the
+   stone is retained by the spring tension.
+2. Each facing surface has an inward-curved bearing rail of width `rail_width`
+   and depth `rail_depth` that grips the stone's girdle.
+
+Derived node hints: `_seat_radius` (= stone_diameter / 2),
+`_band_spread` (= stone_diameter + gap).
+
+### Parameters
+
+| Parameter        | Required | Notes                                                              |
+|------------------|----------|--------------------------------------------------------------------|
+| `file_id`        | yes      | Target `.feature` file uuid                                        |
+| `stone_diameter` | yes      | Girdle diameter of the stone in mm                                 |
+| `band_thickness` | yes      | Thickness of the band metal at the setting point in mm (2.0–4.0)  |
+| `gap`            | yes      | Gap between band-end faces in mm. Must be < `stone_diameter`       |
+| `rail_width`     | yes      | Width of the bearing rail in mm (typical 0.3–0.8)                  |
+| `rail_depth`     | yes      | Depth of the bearing rail notch in mm (typical 0.2–0.5)            |
+| `id`             | no       | Explicit node id                                                   |
+
+### Worked example
+
+```json
+{
+  "file_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "stone_diameter": 6.5,
+  "band_thickness": 3.2,
+  "gap": 5.8,
+  "rail_width": 0.5,
+  "rail_depth": 0.3
+}
+```
+
+Result node op: `jewelry_tension`. The evaluate result posts two band-end
+`TopoDS_Solid` bodies.
+
+---
+
+## `jewelry_create_flush`
+
+Generates a flush (gypsy) setting where the stone is set into a drilled seat
+so its table sits level with the surrounding metal surface.
+
+### How it works
+
+1. A cylindrical seat of diameter `stone_diameter` and depth `seat_depth` is
+   drilled into the metal.
+2. A chamfered opening edge of width `bevel_width` at `bevel_angle_deg`
+   eases the stone in and catches light.
+
+Derived node hints:
+- `_seat_volume_approx` = π r² × seat_depth (mm³) — material-removal estimate.
+- `_opening_diameter` = stone_diameter + 2 × bevel_width × tan(bevel_angle_deg).
+
+### Parameters
+
+| Parameter         | Required | Notes                                                              |
+|-------------------|----------|--------------------------------------------------------------------|
+| `file_id`         | yes      | Target `.feature` file uuid                                        |
+| `stone_diameter`  | yes      | Girdle diameter of the stone in mm                                 |
+| `seat_depth`      | yes      | Depth of the drilled seat in mm (typically 60–80% of stone depth)  |
+| `bevel_width`     | yes      | Width of the opening chamfer in mm (typical 0.1–0.3)               |
+| `bevel_angle_deg` | yes      | Angle of the bevel in degrees. Must be < 90°. Typical: 30–60°      |
+| `id`              | no       | Explicit node id                                                   |
+
+### Worked example
+
+```json
+{
+  "file_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "stone_diameter": 3.5,
+  "seat_depth": 1.8,
+  "bevel_width": 0.2,
+  "bevel_angle_deg": 45
+}
+```
+
+Result node op: `jewelry_flush`. Pair with a `feature_boolean` cut against
+the parent metal body to produce the actual seat pocket.
+
+---
+

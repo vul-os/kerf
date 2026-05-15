@@ -35,6 +35,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.jewelry.chain",
     "kerf_cad_core.jewelry.findings",
     "kerf_cad_core.jewelry.decorative",
+    "kerf_cad_core.jewelry.pieces",
     "kerf_cad_core.sheet_metal",
 ]
 

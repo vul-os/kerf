@@ -36,6 +36,7 @@ import SheetEditor from '../components/SheetEditor.jsx'
 import MEPView from '../components/MEPView.jsx'
 import StairView from '../components/StairView.jsx'
 import RailingView from '../components/RailingView.jsx'
+import PLCView from '../components/PLCView.jsx'
 import ConfigurationsPanel from '../components/ConfigurationsPanel.jsx'
 import ActivityTimeline from '../components/ActivityTimeline.jsx'
 import { useWorkspace, loadFilePartsForProject } from '../store/workspace.js'
@@ -405,6 +406,13 @@ function isSectionFile(file) {
   return n.endsWith('.section')
 }
 
+function isPLCFile(file) {
+  if (!file) return false
+  if (file.kind === 'plc_st') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.plc.st')
+}
+
 export default function Editor() {
   const { projectId, fileId } = useParams()
   const navigate = useNavigate()
@@ -471,6 +479,7 @@ export default function Editor() {
     if (isStairFile(w.currentFile)) return
     if (isRailingFile(w.currentFile)) return
     if (isFemFile(w.currentFile)) return
+    if (isPLCFile(w.currentFile)) return
     if (runTimerRef.current) clearTimeout(runTimerRef.current)
     const code = w.currentFileContent
     const delay = runDebounceFor(code)
@@ -814,6 +823,7 @@ export default function Editor() {
   const railingFile = isRailingFile(w.currentFile)
   const femFile = isFemFile(w.currentFile)
   const sectionFile = isSectionFile(w.currentFile)
+  const plcFile = isPLCFile(w.currentFile)
 
   // Build a THREE.BufferGeometry from the current parts to pass into FEMView
   // so DeformedShapeOverlay can render the morphed surface (instead of a proxy
@@ -1569,6 +1579,24 @@ export default function Editor() {
                 file={w.currentFile}
                 projectId={projectId}
                 geometry={femDisplayGeometry}
+              />
+              {w.toast && (
+                <div className="absolute bottom-3 right-3 z-20 px-3 py-2 rounded-md bg-ink-900 border border-kerf-300/60 text-kerf-300 text-xs shadow-xl"
+                  onClick={() => w.dismissToast()}>
+                  {w.toast}
+                </div>
+              )}
+            </div>
+          ) : plcFile ? (
+            <div className="flex-1 min-h-0 relative">
+              <PLCView
+                viewRef={currentViewRef}
+                content={w.currentFileContent}
+                projectId={projectId}
+                fileId={w.currentFileId}
+                fileName={w.currentFile?.name}
+                onContentChange={(v) => w.editContent(v)}
+                className="h-full"
               />
               {w.toast && (
                 <div className="absolute bottom-3 right-3 z-20 px-3 py-2 rounded-md bg-ink-900 border border-kerf-300/60 text-kerf-300 text-xs shadow-xl"

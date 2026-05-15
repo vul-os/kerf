@@ -27,6 +27,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.extrude_sketch_to_jscad",
     "kerf_cad_core.surfacing",
     "kerf_cad_core.quad_remesh",
+    "kerf_cad_core.jewelry.gemstones",
+    "kerf_cad_core.jewelry.gem_seat",
     "kerf_cad_core.jewelry.tool_metal_cost",
 ]
 

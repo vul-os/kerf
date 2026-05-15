@@ -44,6 +44,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.struct.tools",
     "kerf_cad_core.feature_thread",
     "kerf_cad_core.assembly.tools",
+    "kerf_cad_core.assembly.perf",
     "kerf_cad_core.weldment",
     "kerf_cad_core.civil.tools",
     "kerf_cad_core.gears",

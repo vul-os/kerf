@@ -6,12 +6,17 @@ Parametric chain / bracelet / necklace generator.
 
 Provides:
   - Chain link generators (cable, curb, figaro, rope, box, snake, byzantine,
-    mariner/anchor) — each fully parametric; emits a node-spec describing the
+    mariner/anchor, rolo, bismark, wheat, herringbone, omega, popcorn,
+    ball, singapore) — each fully parametric; emits a node-spec describing the
     repeating link geometry and overall chain assembly.
   - Clasps (lobster, spring_ring, toggle, box_clasp) as parametric attachment
     nodes.
-  - Standard-length helpers (bracelet 7"/18 cm, necklace 16/18/20/24") with
-    link-count ↔ length round-trips.
+  - Standard-length helpers (bracelet 7"/18 cm, necklace 16/18/20/24",
+    anklet 9–11", men's 20–30", choker/collar sizes) with link-count ↔ length
+    round-trips.
+  - Wire-gauge preset table (fine/medium/heavy per style) via
+    ``gauge_preset`` parameter.
+  - Metal weight estimator: ``chain_weight_estimate``.
   - LLM tools: jewelry_create_chain (write), jewelry_chain_length (read).
 
 Geometry strategy
@@ -44,6 +49,9 @@ Node-spec schema (``chain_assembly``)
       "total_length_mm": float,      # = link_pitch_mm × link_count
       "link_pitch_mm":   float,      # centre-to-centre advance per link
       "open_ends":       bool,       # True → leave both end-links open for clasp attachment
+
+      // Optional graduated flag (links scale linearly from centre toward ends)
+      "graduated":       bool,       # optional — default absent/false
 
       // Optional clasp sub-node (inlined, not a separate feature node)
       "clasp":           dict | null
@@ -98,12 +106,25 @@ _VALID_LINK_STYLES = frozenset([
     "snake",
     "byzantine",
     "mariner",      # also known as anchor chain
+    # v2 additions
+    "rolo",         # round/belcher — wide round links, 1:1 aspect
+    "bismark",      # multi-row parallel interlocked links
+    "wheat",        # spiga — twisted figure-8 links in a helical spiral
+    "herringbone",  # flat V-shaped woven surface
+    "omega",        # solid curved plates on a fabric/box spine (distinct from snake)
+    "popcorn",      # bumpy spherical bead-like links
+    "ball",         # smooth spherical beads on wire (bead chain)
+    "singapore",    # twisted curb — diagonal figure-8 twist pattern
 ])
 
 # Style aliases (accepted but normalised)
 _STYLE_ALIASES: dict[str, str] = {
-    "anchor": "mariner",
+    "anchor":          "mariner",
     "diamond_cut_curb": "curb",  # handled via link_hints
+    "belcher":         "rolo",
+    "spiga":           "wheat",
+    "bead":            "ball",
+    "bead_chain":      "ball",
 }
 
 # Supported clasp styles
@@ -116,11 +137,20 @@ _VALID_CLASP_STYLES = frozenset([
 
 # Standard chain lengths (name → mm)
 _STANDARD_LENGTHS_MM: dict[str, float] = {
+    # Anklets
+    "anklet_9in":      228.6,
+    "anklet_9.5in":    241.3,
+    "anklet_10in":     254.0,
+    "anklet_10.5in":   266.7,
+    "anklet_11in":     279.4,
     # Bracelets
     "bracelet_6.5in":  165.1,
     "bracelet_7in":    177.8,
     "bracelet_7.5in":  190.5,
     "bracelet_8in":    203.2,
+    # Choker / collar
+    "choker_14in":     355.6,
+    "choker_16in":     406.4,
     # Necklaces
     "collar_14in":     355.6,
     "collar_16in":     406.4,
@@ -131,6 +161,13 @@ _STANDARD_LENGTHS_MM: dict[str, float] = {
     "opera_28in":      711.2,
     "rope_30in":       762.0,
     "rope_36in":       914.4,
+    # Men's chain lengths (longer necklaces)
+    "mens_20in":       508.0,
+    "mens_22in":       558.8,
+    "mens_24in":       609.6,
+    "mens_26in":       660.4,
+    "mens_28in":       711.2,
+    "mens_30in":       762.0,
     # Metric bracelet
     "bracelet_18cm":   180.0,
     "bracelet_19cm":   190.0,
@@ -140,21 +177,61 @@ _STANDARD_LENGTHS_MM: dict[str, float] = {
     "necklace_45cm":   450.0,
     "necklace_50cm":   500.0,
     "necklace_60cm":   600.0,
+    # Metric men's / long
+    "necklace_55cm":   550.0,
+    "necklace_70cm":   700.0,
+    "necklace_75cm":   750.0,
 }
 
 # Wire-gauge to typical link-length multiplier (outer link length ≈ multiplier × wire_gauge)
 # These are empirical defaults — the LLM/user can override.
 _STYLE_LINK_MULTIPLIERS: dict[str, tuple[float, float]] = {
     # (length_mult, width_mult) — both relative to wire_gauge_mm
-    "cable":    (3.5, 2.5),
-    "curb":     (3.0, 2.5),
-    "figaro":   (3.5, 2.5),   # mixed links (3 short + 1 long)
-    "rope":     (2.5, 2.0),
-    "box":      (2.0, 2.0),
-    "snake":    (2.2, 2.8),
-    "byzantine":(3.8, 2.5),
-    "mariner":  (4.0, 2.8),
+    "cable":      (3.5, 2.5),
+    "curb":       (3.0, 2.5),
+    "figaro":     (3.5, 2.5),   # mixed links (3 short + 1 long)
+    "rope":       (2.5, 2.0),
+    "box":        (2.0, 2.0),
+    "snake":      (2.2, 2.8),
+    "byzantine":  (3.8, 2.5),
+    "mariner":    (4.0, 2.8),
+    # v2 additions
+    "rolo":       (2.5, 2.5),   # near-round links; roughly 1:1 aspect
+    "bismark":    (3.2, 4.0),   # wide multi-row; width dominates
+    "wheat":      (3.0, 2.2),   # spiga twist; compact width
+    "herringbone":(1.5, 3.5),   # short pitch, very wide flat surface
+    "omega":      (1.8, 4.5),   # plate-width >> gauge; very wide flat collar
+    "popcorn":    (3.0, 3.0),   # near-spherical bumps; square aspect
+    "ball":       (2.8, 2.8),   # spherical beads; square aspect
+    "singapore":  (3.0, 2.5),   # twisted curb; similar to curb defaults
 }
+
+# ---------------------------------------------------------------------------
+# Gauge presets: named weight classes → wire_gauge_mm per style
+# ---------------------------------------------------------------------------
+
+#: Gauge preset table: style → {"fine": mm, "medium": mm, "heavy": mm}
+#: Values represent typical industry wire gauges in mm.
+GAUGE_PRESETS: dict[str, dict[str, float]] = {
+    "cable":      {"fine": 0.7,  "medium": 1.0,  "heavy": 1.5},
+    "curb":       {"fine": 0.8,  "medium": 1.2,  "heavy": 1.8},
+    "figaro":     {"fine": 0.8,  "medium": 1.1,  "heavy": 1.6},
+    "rope":       {"fine": 0.6,  "medium": 0.9,  "heavy": 1.3},
+    "box":        {"fine": 0.8,  "medium": 1.2,  "heavy": 1.8},
+    "snake":      {"fine": 0.9,  "medium": 1.4,  "heavy": 2.0},
+    "byzantine":  {"fine": 0.7,  "medium": 1.0,  "heavy": 1.4},
+    "mariner":    {"fine": 1.0,  "medium": 1.5,  "heavy": 2.2},
+    "rolo":       {"fine": 1.0,  "medium": 1.5,  "heavy": 2.2},
+    "bismark":    {"fine": 0.9,  "medium": 1.3,  "heavy": 1.9},
+    "wheat":      {"fine": 0.7,  "medium": 1.0,  "heavy": 1.5},
+    "herringbone":{"fine": 1.0,  "medium": 1.5,  "heavy": 2.2},
+    "omega":      {"fine": 1.2,  "medium": 1.8,  "heavy": 2.5},
+    "popcorn":    {"fine": 1.0,  "medium": 1.5,  "heavy": 2.0},
+    "ball":       {"fine": 1.0,  "medium": 1.5,  "heavy": 2.5},
+    "singapore":  {"fine": 0.8,  "medium": 1.1,  "heavy": 1.6},
+}
+
+_VALID_GAUGE_WEIGHTS = frozenset(["fine", "medium", "heavy"])
 
 
 # ---------------------------------------------------------------------------
@@ -182,16 +259,25 @@ def link_pitch(style: str, link_length_mm: float, link_width_mm: float,
     float   Pitch in mm.
     """
     inner_len = link_length_mm - 2.0 * wire_gauge_mm
-    if style in ("box", "snake"):
-        # Box and snake chains: links sit side-by-side along the length;
+    if style in ("box", "snake", "omega"):
+        # Box, snake, omega: links/plates sit side-by-side along the length;
         # pitch ≈ link_length / 2 (alternating orientation overlap)
         return max(link_length_mm * 0.5, wire_gauge_mm * 1.1)
     elif style == "byzantine":
         # Byzantine has a more compact, dense pattern
         return max(inner_len * 0.7, wire_gauge_mm * 1.1)
-    elif style == "rope":
-        # Rope: continuous twist; pitch per link is quite small
+    elif style in ("rope", "wheat"):
+        # Rope / wheat (spiga): continuous twist; pitch per link is quite small
         return max(inner_len * 0.5, wire_gauge_mm * 1.1)
+    elif style == "herringbone":
+        # Herringbone: extremely flat; very short pitch (nearly continuous surface)
+        return max(link_length_mm * 0.4, wire_gauge_mm * 1.1)
+    elif style == "bismark":
+        # Bismark: multi-row; slightly more compact than cable
+        return max(inner_len * 0.8, wire_gauge_mm * 1.1)
+    elif style in ("ball", "popcorn"):
+        # Ball / popcorn: beads sit centre-to-centre ≈ link_length
+        return max(link_length_mm, wire_gauge_mm * 1.1)
     else:
         return max(inner_len, wire_gauge_mm * 1.1)
 
@@ -308,15 +394,135 @@ def _mariner_hints(wire_gauge_mm: float, link_length_mm: float,
     }
 
 
+def _rolo_hints(wire_gauge_mm: float, link_length_mm: float,
+                link_width_mm: float) -> dict:
+    """Rolo (belcher): wide round links with near-1:1 aspect; alternating 90° rotation."""
+    aspect = link_length_mm / link_width_mm if link_width_mm > 0 else 1.0
+    return {
+        "type": "rolo",
+        "cross_section": "round",
+        "aspect_ratio": round(aspect, 3),
+        "alternating_rotation_deg": 90,
+        "inner_diameter_mm": round(link_width_mm - 2.0 * wire_gauge_mm, 3),
+    }
+
+
+def _bismark_hints(wire_gauge_mm: float, link_length_mm: float,
+                   link_width_mm: float, *, rows: int = 2) -> dict:
+    """Bismark: multiple parallel rows of interlocked oval links woven together."""
+    return {
+        "type": "bismark",
+        "cross_section": "round",
+        "rows": rows,
+        "row_spacing_mm": round(link_width_mm / max(rows, 1), 3),
+        "alternating_rotation_deg": 90,
+    }
+
+
+def _wheat_hints(wire_gauge_mm: float, link_length_mm: float,
+                 link_width_mm: float) -> dict:
+    """Wheat (spiga): figure-8 twisted links spiralling into a rope-like strand."""
+    return {
+        "type": "wheat",
+        "cross_section": "round",
+        "twist_angle_deg": 45.0,          # default spiga helix angle
+        "figure8_ratio": round(link_length_mm / max(link_width_mm, wire_gauge_mm), 3),
+        "helix_radius_mult": 0.45,        # helix radius = mult × link_width
+    }
+
+
+def _herringbone_hints(wire_gauge_mm: float, link_length_mm: float,
+                       link_width_mm: float) -> dict:
+    """Herringbone: flat V-shaped woven surface; no visible individual links."""
+    return {
+        "type": "herringbone",
+        "cross_section": "flat",
+        "surface_width_mm": round(link_width_mm, 3),
+        "v_angle_deg": 45.0,              # angle of the V chevron
+        "layer_count": 2,                 # doubled layer for classic herringbone
+        "thickness_mm": round(wire_gauge_mm * 0.5, 3),
+    }
+
+
+def _omega_hints(wire_gauge_mm: float, link_length_mm: float,
+                 link_width_mm: float) -> dict:
+    """Omega: solid curved metal plates on a fine box/fabric core spine.
+
+    Note: the existing ``snake`` style uses ``type='snake'`` for scalloped
+    elements.  This ``omega`` style explicitly uses curved plates — a distinct
+    construction mapped onto the same ``cross_section='scalloped_flat'`` hint
+    so the worker renders a similar flat-plate geometry.
+    """
+    plate_w = round(link_width_mm * 1.1, 3)
+    return {
+        "type": "omega",
+        "cross_section": "scalloped_flat",
+        "plate_width_mm": plate_w,
+        "plate_height_mm": round(wire_gauge_mm * 0.6, 3),
+        "core_width_mm": round(link_width_mm * 0.25, 3),
+        "plate_curvature": "convex",      # plates curve outward
+    }
+
+
+def _popcorn_hints(wire_gauge_mm: float, link_length_mm: float,
+                   link_width_mm: float) -> dict:
+    """Popcorn: bumpy spheroidal bead-like links, wider than they are long."""
+    sphere_d = round(min(link_length_mm, link_width_mm), 3)
+    return {
+        "type": "popcorn",
+        "cross_section": "round",
+        "sphere_diameter_mm": sphere_d,
+        "neck_diameter_mm": round(wire_gauge_mm * 1.2, 3),
+        "texture": "smooth_sphere",
+    }
+
+
+def _ball_hints(wire_gauge_mm: float, link_length_mm: float,
+                link_width_mm: float) -> dict:
+    """Ball/bead chain: smooth spherical beads connected by short cylindrical necks."""
+    bead_d = round(min(link_length_mm, link_width_mm), 3)
+    neck_d = round(wire_gauge_mm * 0.9, 3)
+    return {
+        "type": "ball",
+        "cross_section": "round",
+        "bead_diameter_mm": bead_d,
+        "neck_diameter_mm": neck_d,
+        "neck_length_mm": round(wire_gauge_mm * 0.5, 3),
+        "texture": "smooth_sphere",
+    }
+
+
+def _singapore_hints(wire_gauge_mm: float, link_length_mm: float,
+                     link_width_mm: float) -> dict:
+    """Singapore (twisted curb): figure-8 links twisted 90° — diagonal facets."""
+    return {
+        "type": "singapore",
+        "cross_section": "round",
+        "twist_deg": 90,
+        "diamond_facets": 0,              # no diamond-cut; natural twist reflection
+        "diagonal_angle_deg": 45.0,
+        "flat_face": False,
+    }
+
+
 _LINK_HINT_BUILDERS = {
-    "cable":    _cable_hints,
-    "curb":     _curb_hints,
-    "figaro":   _figaro_hints,
-    "rope":     _rope_hints,
-    "box":      _box_hints,
-    "snake":    _snake_hints,
-    "byzantine":_byzantine_hints,
-    "mariner":  _mariner_hints,
+    "cable":      _cable_hints,
+    "curb":       _curb_hints,
+    "figaro":     _figaro_hints,
+    "rope":       _rope_hints,
+    "box":        _box_hints,
+    "snake":      _snake_hints,
+    "byzantine":  _byzantine_hints,
+    "mariner":    _mariner_hints,
+    # v2 additions
+    "rolo":       _rolo_hints,
+    "bismark":    _bismark_hints,
+    "wheat":      _wheat_hints,
+    "herringbone":_herringbone_hints,
+    "omega":      _omega_hints,
+    "popcorn":    _popcorn_hints,
+    "ball":       _ball_hints,
+    "singapore":  _singapore_hints,
 }
 
 # kwargs forwarded to each hint builder (subset that each style accepts)
@@ -324,6 +530,7 @@ _STYLE_EXTRA_KWARGS: dict[str, set[str]] = {
     "curb":    {"diamond_cut", "flat"},
     "figaro":  {"long_link_ratio"},
     "rope":    {"twist_angle_deg"},
+    "bismark": {"rows"},
 }
 
 
@@ -404,8 +611,11 @@ def compute_chain_params(
     flat: bool = False,
     long_link_ratio: float = 2.5,
     twist_angle_deg: float = 45.0,
+    rows: int = 2,                   # bismark style: number of parallel rows
     # Options
     open_ends: bool = True,
+    graduated: bool = False,         # links scale linearly from centre toward ends
+    gauge_preset: Optional[str] = None,  # "fine"/"medium"/"heavy" → sets wire_gauge_mm
 ) -> dict:
     """Compute and validate the full parametric chain spec.
 
@@ -439,9 +649,20 @@ def compute_chain_params(
     long_link_ratio : float
         Figaro style only — ratio of the long link's length to the short link.
     twist_angle_deg : float
-        Rope style only — helix twist angle per link (degrees).
+        Rope/wheat style — helix twist angle per link (degrees).
+    rows : int
+        Bismark style only — number of parallel link rows (default 2).
     open_ends : bool
         Leave end-links open for clasp attachment (default True).
+    graduated : bool
+        When True, the ``graduated`` hint is set in the node spec; the worker
+        scales links linearly from the centre toward the ends (default False).
+    gauge_preset : str, optional
+        Named weight class — ``"fine"``, ``"medium"``, or ``"heavy"`` — that
+        overrides ``wire_gauge_mm`` with a style-appropriate default from the
+        ``GAUGE_PRESETS`` table.  Mutually exclusive with supplying an explicit
+        non-zero ``wire_gauge_mm`` that differs from the preset; the preset
+        wins when both are supplied.
 
     Returns
     -------
@@ -462,6 +683,16 @@ def compute_chain_params(
             f"Valid styles: {sorted(_VALID_LINK_STYLES)}. "
             f"Aliases: {sorted(_STYLE_ALIASES)}."
         )
+
+    # --- Apply gauge preset (overrides wire_gauge_mm) ---
+    if gauge_preset is not None:
+        gp = str(gauge_preset).strip().lower()
+        if gp not in _VALID_GAUGE_WEIGHTS:
+            raise ValueError(
+                f"Unknown gauge_preset {gauge_preset!r}. "
+                f"Valid: {sorted(_VALID_GAUGE_WEIGHTS)}."
+            )
+        wire_gauge_mm = GAUGE_PRESETS[style][gp]
 
     # --- Validate wire gauge ---
     if wire_gauge_mm <= 0:
@@ -546,9 +777,11 @@ def compute_chain_params(
             kwargs["long_link_ratio"] = long_link_ratio
         if "twist_angle_deg" in allowed:
             kwargs["twist_angle_deg"] = twist_angle_deg
+        if "rows" in allowed:
+            kwargs["rows"] = rows
     link_hints = builder(wire_gauge_mm, link_length_mm, link_width_mm, **kwargs)
 
-    return {
+    spec: dict = {
         "style": style,
         "wire_gauge_mm": round(wire_gauge_mm, 4),
         "link_length_mm": round(link_length_mm, 4),
@@ -559,6 +792,9 @@ def compute_chain_params(
         "link_pitch_mm": round(pitch_mm, 4),
         "open_ends": open_ends,
     }
+    if graduated:
+        spec["graduated"] = True
+    return spec
 
 
 # ---------------------------------------------------------------------------
@@ -670,6 +906,125 @@ def standard_length_names() -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# Weight estimate helper
+# ---------------------------------------------------------------------------
+
+def chain_weight_estimate(
+    style: str,
+    wire_gauge_mm: float,
+    total_length_mm: float,
+    density_g_per_cm3: float,
+    *,
+    fill_factor: Optional[float] = None,
+) -> float:
+    """Estimate the metal mass of a chain in grams.
+
+    The formula approximates the metal volume per unit length of chain as the
+    cross-sectional area of the wire (a circle of diameter ``wire_gauge_mm``)
+    multiplied by an empirical *fill factor* that accounts for how much of the
+    chain's swept length is actually metal (versus open space between links).
+
+    Formula::
+
+        wire_area   = π × (wire_gauge_mm / 2)² mm²
+        volume_mm3  = wire_area × fill_factor × total_length_mm
+        mass_g      = volume_mm3 × density_g_per_cm3 × 1e-3
+
+    The fill factor (dimensionless, 0–1) is style-dependent and derived from
+    empirical observations of typical chain constructions.  Users may override
+    it for custom structures.
+
+    Parameters
+    ----------
+    style : str
+        Chain link style (resolved through aliases).  Used to look up the
+        default fill factor.
+    wire_gauge_mm : float
+        Wire / rod diameter in mm.  Must be > 0.
+    total_length_mm : float
+        Total chain length in mm.  Must be > 0.
+    density_g_per_cm3 : float
+        Metal density in g/cm³.  E.g. 18-karat yellow gold ≈ 15.5, sterling
+        silver ≈ 10.3, 14-karat white gold ≈ 13.0.  Must be > 0.
+    fill_factor : float, optional
+        Override the style default (0 < fill_factor ≤ 1).
+
+    Returns
+    -------
+    float
+        Estimated chain mass in grams (rounded to 3 decimal places).
+
+    Raises
+    ------
+    ValueError
+        On invalid inputs.
+
+    Notes
+    -----
+    This is an *approximation*.  Actual cast or assembled chains vary by
+    manufacturer.  For a production cost quote, multiply by the spot price
+    per gram of the chosen alloy.
+    """
+    # Validate style
+    norm_style = str(style).strip().lower()
+    norm_style = _STYLE_ALIASES.get(norm_style, norm_style)
+    if norm_style not in _VALID_LINK_STYLES:
+        raise ValueError(
+            f"Unknown chain style {style!r}. "
+            f"Valid: {sorted(_VALID_LINK_STYLES)}."
+        )
+    if wire_gauge_mm <= 0:
+        raise ValueError(f"wire_gauge_mm must be > 0; got {wire_gauge_mm}")
+    if total_length_mm <= 0:
+        raise ValueError(f"total_length_mm must be > 0; got {total_length_mm}")
+    if density_g_per_cm3 <= 0:
+        raise ValueError(
+            f"density_g_per_cm3 must be > 0; got {density_g_per_cm3}"
+        )
+
+    # Default fill factors per style (empirical)
+    _FILL_FACTORS: dict[str, float] = {
+        "cable":      0.55,
+        "curb":       0.65,
+        "figaro":     0.55,
+        "rope":       0.70,
+        "box":        0.40,   # mostly hollow tube
+        "snake":      0.60,
+        "byzantine":  0.75,   # dense weave
+        "mariner":    0.55,
+        "rolo":       0.50,
+        "bismark":    0.80,   # multi-row, very dense
+        "wheat":      0.65,
+        "herringbone":0.85,   # near-solid surface
+        "omega":      0.70,
+        "popcorn":    0.55,
+        "ball":       0.50,
+        "singapore":  0.60,
+    }
+
+    if fill_factor is not None:
+        ff = float(fill_factor)
+        if not (0 < ff <= 1.0):
+            raise ValueError(
+                f"fill_factor must be in (0, 1]; got {fill_factor}"
+            )
+    else:
+        ff = _FILL_FACTORS[norm_style]
+
+    # Wire cross-section area in mm²
+    radius_mm = wire_gauge_mm / 2.0
+    wire_area_mm2 = _PI * radius_mm ** 2
+
+    # Volume in mm³
+    volume_mm3 = wire_area_mm2 * ff * total_length_mm
+
+    # Convert mm³ → cm³ (1 cm³ = 1000 mm³) then × density
+    mass_g = volume_mm3 * density_g_per_cm3 * 1e-3
+
+    return round(mass_g, 3)
+
+
+# ---------------------------------------------------------------------------
 # LLM tool: jewelry_chain_length  (read — no DB write)
 # ---------------------------------------------------------------------------
 
@@ -677,14 +1032,17 @@ jewelry_chain_length_spec = ToolSpec(
     name="jewelry_chain_length",
     description=(
         "Read-only helper: convert between chain total_length_mm and link_count "
-        "for a given link style and wire gauge, OR look up a standard bracelet / "
-        "necklace length by name.\n\n"
+        "for a given link style and wire gauge, OR look up a standard length by name.\n\n"
         "Standard length names (use as standard_length param):\n"
+        "  Anklets: anklet_9in, anklet_9.5in, anklet_10in, anklet_10.5in, anklet_11in.\n"
         "  Bracelets: bracelet_6.5in, bracelet_7in, bracelet_7.5in, bracelet_8in, "
         "bracelet_18cm, bracelet_19cm, bracelet_20cm.\n"
+        "  Chokers: choker_14in, choker_16in.\n"
         "  Necklaces: collar_14in, collar_16in, princess_18in, matinee_20in, "
         "matinee_22in, opera_24in, opera_28in, rope_30in, rope_36in, "
-        "necklace_40cm, necklace_45cm, necklace_50cm, necklace_60cm.\n\n"
+        "necklace_40cm, necklace_45cm, necklace_50cm, necklace_55cm, "
+        "necklace_60cm, necklace_70cm, necklace_75cm.\n"
+        "  Men's: mens_20in, mens_22in, mens_24in, mens_26in, mens_28in, mens_30in.\n\n"
         "Modes (provide exactly one):\n"
         "  1. standard_length + style + wire_gauge_mm → link_count + total_length_mm\n"
         "  2. total_length_mm  + style + wire_gauge_mm → link_count\n"
@@ -872,19 +1230,31 @@ jewelry_create_chain_spec = ToolSpec(
     name="jewelry_create_chain",
     description=(
         "Append a `chain_assembly` node to a `.feature` file.\n\n"
-        "Builds a fully parametric chain from one of eight link styles:\n"
+        "Builds a fully parametric chain from one of sixteen link styles:\n"
         "  cable       — alternating round-wire ovals (classic)\n"
         "  curb        — twisted flat links; set diamond_cut=true for faceted finish\n"
         "  figaro      — repeating 3-short + 1-long link pattern\n"
         "  rope        — small ovals twisted into a continuous helix\n"
         "  box         — square tube links joined end-to-end\n"
-        "  snake       — wide flat scalloped elements (omega)\n"
+        "  snake       — wide flat scalloped elements\n"
         "  byzantine   — complex 4-link cluster weave\n"
-        "  mariner     — oval links with a central stabiliser bar (anchor chain)\n\n"
+        "  mariner     — oval links with a central stabiliser bar (anchor chain)\n"
+        "  rolo        — round/belcher: wide round links, ~1:1 aspect\n"
+        "  bismark     — multi-row parallel interlocked links; use rows= to set count\n"
+        "  wheat       — spiga: twisted figure-8 links in a helical spiral\n"
+        "  herringbone — flat V-shaped woven surface; very wide, no visible links\n"
+        "  omega       — solid curved plates on a fabric/box core spine\n"
+        "  popcorn     — bumpy spheroidal bead-like links\n"
+        "  ball        — smooth spherical beads on wire (bead chain)\n"
+        "  singapore   — twisted curb: figure-8 links rotated 90°\n\n"
         "Specify chain length via exactly one of:\n"
-        "  standard_length (e.g. 'bracelet_7in', 'princess_18in')\n"
+        "  standard_length (e.g. 'bracelet_7in', 'princess_18in', 'anklet_9in',\n"
+        "                   'mens_24in', 'choker_16in')\n"
         "  total_length_mm\n"
         "  link_count\n\n"
+        "Use gauge_preset='fine'/'medium'/'heavy' instead of wire_gauge_mm for "
+        "quick weight selection.\n\n"
+        "Set graduated=true for a necklace that scales links from centre outward.\n\n"
         "Optionally attach a clasp inline by providing clasp_style.\n"
         "All dimensions in mm.  The occtWorker opChainAssembly evaluates the "
         "node and builds the repeating link geometry."
@@ -974,6 +1344,26 @@ jewelry_create_chain_spec = ToolSpec(
                     + ". The clasp sub-spec is embedded in the node."
                 ),
             },
+            "gauge_preset": {
+                "type": "string",
+                "enum": sorted(_VALID_GAUGE_WEIGHTS),
+                "description": (
+                    "Named weight class: 'fine', 'medium', or 'heavy'. "
+                    "Selects a style-appropriate wire_gauge_mm from the GAUGE_PRESETS "
+                    "table and overrides the wire_gauge_mm parameter."
+                ),
+            },
+            "rows": {
+                "type": "integer",
+                "description": "Bismark style only — number of parallel link rows. Default 2.",
+            },
+            "graduated": {
+                "type": "boolean",
+                "description": (
+                    "When true, adds a 'graduated' hint so the worker scales links "
+                    "linearly from the centre toward the ends. Default false."
+                ),
+            },
             "id": {
                 "type": "string",
                 "description": "Optional explicit node id.",
@@ -1003,7 +1393,10 @@ async def run_jewelry_create_chain(ctx: ProjectCtx, args: bytes) -> str:
     flat            = bool(a.get("flat", False))
     long_link_ratio = a.get("long_link_ratio", 2.5)
     twist_angle_deg = a.get("twist_angle_deg", 45.0)
+    rows            = a.get("rows", 2)
     open_ends       = bool(a.get("open_ends", True))
+    graduated       = bool(a.get("graduated", False))
+    gauge_preset    = a.get("gauge_preset", None)
     clasp_style     = a.get("clasp_style", None)
     node_id         = a.get("id", "").strip()
 
@@ -1012,14 +1405,19 @@ async def run_jewelry_create_chain(ctx: ProjectCtx, args: bytes) -> str:
         return err_payload("file_id is required", "BAD_ARGS")
     if not style:
         return err_payload("style is required", "BAD_ARGS")
-    if wire_gauge_mm is None:
-        return err_payload("wire_gauge_mm is required", "BAD_ARGS")
+    # wire_gauge_mm is required unless gauge_preset is supplied
+    if wire_gauge_mm is None and gauge_preset is None:
+        return err_payload("wire_gauge_mm is required (or provide gauge_preset)", "BAD_ARGS")
 
     # --- Numeric coercions ---
-    try:
-        wire_gauge_mm = float(wire_gauge_mm)
-    except (TypeError, ValueError):
-        return err_payload("wire_gauge_mm must be a number", "BAD_ARGS")
+    if wire_gauge_mm is not None:
+        try:
+            wire_gauge_mm = float(wire_gauge_mm)
+        except (TypeError, ValueError):
+            return err_payload("wire_gauge_mm must be a number", "BAD_ARGS")
+    else:
+        # gauge_preset will set it inside compute_chain_params; use sentinel
+        wire_gauge_mm = 1.0  # placeholder; overridden by gauge_preset
 
     if link_length_mm is not None:
         try:
@@ -1055,6 +1453,11 @@ async def run_jewelry_create_chain(ctx: ProjectCtx, args: bytes) -> str:
     except (TypeError, ValueError):
         return err_payload("twist_angle_deg must be a number", "BAD_ARGS")
 
+    try:
+        rows = int(rows)
+    except (TypeError, ValueError):
+        return err_payload("rows must be an integer", "BAD_ARGS")
+
     # --- Validate file_id UUID ---
     try:
         fid = uuid.UUID(file_id_str)
@@ -1075,7 +1478,10 @@ async def run_jewelry_create_chain(ctx: ProjectCtx, args: bytes) -> str:
             flat=flat,
             long_link_ratio=long_link_ratio,
             twist_angle_deg=twist_angle_deg,
+            rows=rows,
             open_ends=open_ends,
+            graduated=graduated,
+            gauge_preset=gauge_preset,
         )
     except ValueError as e:
         return err_payload(str(e), "BAD_ARGS")

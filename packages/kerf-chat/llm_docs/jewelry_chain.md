@@ -13,6 +13,8 @@ Two LLM tools for parametric chain CAD:
 
 ## Link styles
 
+### Original styles
+
 | Style | Description |
 |-------|-------------|
 | `cable` | Alternating round-wire ovals, every other link rotated 90° — the classic all-purpose chain |
@@ -20,11 +22,33 @@ Two LLM tools for parametric chain CAD:
 | `figaro` | Repeating pattern of (by default) 3 short links + 1 elongated link; `long_link_ratio` controls the elongation |
 | `rope` | Small oval links twisted into a continuous helical spiral; `twist_angle_deg` controls the helix pitch |
 | `box` | Square hollow tube links joined end-to-end; clean, architectural look |
-| `snake` | Wide flat scalloped elements (also called omega chain) on a fine box core |
+| `snake` | Wide flat scalloped elements on a fine box core |
 | `byzantine` | Complex 4-link cluster weave — historically rich, dense pattern |
 | `mariner` | Oval links each with a perpendicular central stabiliser bar — anchor chain profile |
 
-**Alias**: `anchor` is accepted as an alias for `mariner`.
+### v2 styles
+
+| Style | Description | Key hint fields |
+|-------|-------------|-----------------|
+| `rolo` | Round/belcher: wide round links with ~1:1 aspect, alternating 90° rotation | `inner_diameter_mm`, `aspect_ratio` |
+| `bismark` | Multi-row parallel interlocked oval links; use `rows=` for row count (default 2) | `rows`, `row_spacing_mm` |
+| `wheat` | Spiga: figure-8 links twisted into a helical spiral — rope-like appearance | `figure8_ratio`, `helix_radius_mult` |
+| `herringbone` | Flat V-shaped woven surface; no visible individual links; very wide | `surface_width_mm`, `v_angle_deg`, `layer_count` |
+| `omega` | Solid curved plates on a fine box/fabric core spine — wide flat collar look | `plate_width_mm`, `plate_curvature` |
+| `popcorn` | Bumpy spheroidal bead-like links — textured, chunky | `sphere_diameter_mm`, `neck_diameter_mm` |
+| `ball` | Smooth spherical beads connected by short cylindrical necks (bead chain) | `bead_diameter_mm`, `neck_diameter_mm`, `neck_length_mm` |
+| `singapore` | Twisted curb: figure-8 links rotated 90° — diagonal light reflection | `twist_deg`, `diagonal_angle_deg` |
+
+### Style aliases
+
+| Alias | Resolves to |
+|-------|-------------|
+| `anchor` | `mariner` |
+| `belcher` | `rolo` |
+| `spiga` | `wheat` |
+| `bead` | `ball` |
+| `bead_chain` | `ball` |
+| `diamond_cut_curb` | `curb` (use `diamond_cut=true`) |
 
 ---
 
@@ -45,6 +69,16 @@ Attach a clasp inline by passing `clasp_style` to `jewelry_create_chain`.
 
 Use as the `standard_length` parameter:
 
+### Anklets
+
+| Name | Length |
+|------|--------|
+| `anklet_9in`    | 228.6 mm |
+| `anklet_9.5in`  | 241.3 mm |
+| `anklet_10in`   | 254.0 mm |
+| `anklet_10.5in` | 266.7 mm |
+| `anklet_11in`   | 279.4 mm |
+
 ### Bracelets
 
 | Name | Length |
@@ -56,6 +90,13 @@ Use as the `standard_length` parameter:
 | `bracelet_18cm`  | 180.0 mm |
 | `bracelet_19cm`  | 190.0 mm |
 | `bracelet_20cm`  | 200.0 mm |
+
+### Chokers
+
+| Name | Length |
+|------|--------|
+| `choker_14in` | 355.6 mm |
+| `choker_16in` | 406.4 mm |
 
 ### Necklaces
 
@@ -73,7 +114,21 @@ Use as the `standard_length` parameter:
 | `necklace_40cm` | 400.0 mm |
 | `necklace_45cm` | 450.0 mm |
 | `necklace_50cm` | 500.0 mm |
+| `necklace_55cm` | 550.0 mm |
 | `necklace_60cm` | 600.0 mm |
+| `necklace_70cm` | 700.0 mm |
+| `necklace_75cm` | 750.0 mm |
+
+### Men's chain lengths
+
+| Name | Length |
+|------|--------|
+| `mens_20in` | 508.0 mm |
+| `mens_22in` | 558.8 mm |
+| `mens_24in` | 609.6 mm |
+| `mens_26in` | 660.4 mm |
+| `mens_28in` | 711.2 mm |
+| `mens_30in` | 762.0 mm |
 
 ---
 
@@ -92,6 +147,14 @@ derived from `wire_gauge_mm`:
 | snake | 2.2 | 2.8 |
 | byzantine | 3.8 | 2.5 |
 | mariner | 4.0 | 2.8 |
+| rolo | 2.5 | 2.5 |
+| bismark | 3.2 | 4.0 |
+| wheat | 3.0 | 2.2 |
+| herringbone | 1.5 | 3.5 |
+| omega | 1.8 | 4.5 |
+| popcorn | 3.0 | 3.0 |
+| ball | 2.8 | 2.8 |
+| singapore | 3.0 | 2.5 |
 
 ---
 
@@ -100,9 +163,12 @@ derived from `wire_gauge_mm`:
 Link pitch = the centre-to-centre chain advance per link:
 
 - Most interlocking styles: `pitch ≈ link_length − 2 × wire_gauge`
-- Box / snake: `pitch ≈ link_length / 2` (side-by-side overlap)
+- Box / snake / omega: `pitch ≈ link_length / 2` (side-by-side overlap)
 - Byzantine: `pitch ≈ (link_length − 2 × gauge) × 0.7` (compact weave)
-- Rope: `pitch ≈ (link_length − 2 × gauge) × 0.5` (tight helix)
+- Rope / wheat (spiga): `pitch ≈ (link_length − 2 × gauge) × 0.5` (tight helix)
+- Herringbone: `pitch ≈ link_length × 0.4` (near-continuous surface)
+- Bismark: `pitch ≈ (link_length − 2 × gauge) × 0.8` (slightly compact multi-row)
+- Ball / popcorn: `pitch ≈ link_length` (bead centre-to-centre)
 
 ```
 link_count  = round(total_length_mm / pitch_mm)
@@ -110,6 +176,77 @@ total_length_mm = link_count × pitch_mm
 ```
 
 Use `jewelry_chain_length` to compute these without writing to a file.
+
+---
+
+## Gauge presets
+
+Use `gauge_preset` instead of `wire_gauge_mm` to quickly select fine / medium / heavy
+weight. Typical values (mm):
+
+| Style | fine | medium | heavy |
+|-------|------|--------|-------|
+| cable | 0.7 | 1.0 | 1.5 |
+| curb | 0.8 | 1.2 | 1.8 |
+| figaro | 0.8 | 1.1 | 1.6 |
+| rope | 0.6 | 0.9 | 1.3 |
+| box | 0.8 | 1.2 | 1.8 |
+| snake | 0.9 | 1.4 | 2.0 |
+| byzantine | 0.7 | 1.0 | 1.4 |
+| mariner | 1.0 | 1.5 | 2.2 |
+| rolo | 1.0 | 1.5 | 2.2 |
+| bismark | 0.9 | 1.3 | 1.9 |
+| wheat | 0.7 | 1.0 | 1.5 |
+| herringbone | 1.0 | 1.5 | 2.2 |
+| omega | 1.2 | 1.8 | 2.5 |
+| popcorn | 1.0 | 1.5 | 2.0 |
+| ball | 1.0 | 1.5 | 2.5 |
+| singapore | 0.8 | 1.1 | 1.6 |
+
+Example: `"gauge_preset": "heavy"` on a `mariner` chain sets `wire_gauge_mm = 2.2`.
+
+---
+
+## Metal weight estimate
+
+`chain_weight_estimate(style, wire_gauge_mm, total_length_mm, density_g_per_cm3)`
+returns an approximate chain mass in grams.
+
+**Formula**:
+```
+wire_area_mm2 = π × (wire_gauge_mm / 2)²
+volume_mm3    = wire_area_mm2 × fill_factor × total_length_mm
+mass_g        = volume_mm3 × density_g_per_cm3 × 1e-3
+```
+
+`fill_factor` is an empirical per-style constant (0–1) representing the fraction of
+the chain's swept volume that is solid metal.  Dense styles like bismark (0.80) and
+herringbone (0.85) have high fill factors; hollow styles like box (0.40) have lower ones.
+
+**Common metal densities** (g/cm³):
+
+| Metal | Density |
+|-------|---------|
+| 18k yellow gold | 15.5 |
+| 14k yellow gold | 13.0 |
+| 14k white gold | 13.0 |
+| 18k white gold | 14.7 |
+| Sterling silver 925 | 10.3 |
+| Platinum 950 | 20.7 |
+| Titanium | 4.5 |
+
+This is a Python helper function — it does **not** write to a file or call any LLM tool.
+Pass `fill_factor=` to override the style default for custom constructions.
+
+---
+
+## Graduated chains
+
+Set `graduated=true` to request that the worker scale links linearly from the centre
+outward toward the clasp ends (smaller links at the sides, larger at the centre).
+The hint is stored as `"graduated": true` in the node spec.
+
+---
 
 ---
 
@@ -226,6 +363,41 @@ Response:
 }
 ```
 
+**Rolo anklet, medium gauge:**
+
+```json
+{
+  "file_id": "<uuid>",
+  "style": "rolo",
+  "gauge_preset": "medium",
+  "standard_length": "anklet_10in"
+}
+```
+
+**Bismark necklace, 3 rows, men's 24-inch:**
+
+```json
+{
+  "file_id": "<uuid>",
+  "style": "bismark",
+  "wire_gauge_mm": 1.3,
+  "rows": 3,
+  "standard_length": "mens_24in"
+}
+```
+
+**Graduated herringbone necklace:**
+
+```json
+{
+  "file_id": "<uuid>",
+  "style": "herringbone",
+  "wire_gauge_mm": 1.5,
+  "standard_length": "princess_18in",
+  "graduated": true
+}
+```
+
 ---
 
 ### `jewelry_chain_length` — read-only length helper
@@ -271,8 +443,9 @@ Response:
 
 | Parameter | Constraint |
 |-----------|-----------|
-| `style` | One of: cable, curb, figaro, rope, box, snake, byzantine, mariner (alias: anchor) |
+| `style` | One of the 16 valid styles or an alias; see tables above |
 | `wire_gauge_mm` | > 0 mm; ≤ 20 mm |
+| `gauge_preset` | `"fine"`, `"medium"`, or `"heavy"`; overrides `wire_gauge_mm` |
 | `link_length_mm` | > 0 mm; ≥ wire_gauge_mm |
 | `link_width_mm` | > 0 mm; ≥ wire_gauge_mm |
 | `link_count` | Positive integer ≥ 1 |
@@ -281,7 +454,9 @@ Response:
 | Length source | Exactly one of `link_count`, `total_length_mm`, `standard_length` |
 | `clasp_style` | One of: lobster, spring_ring, toggle, box_clasp |
 | `long_link_ratio` | Figaro only; > 0 |
-| `twist_angle_deg` | Rope only; degrees |
+| `twist_angle_deg` | Rope/wheat only; degrees |
+| `rows` | Bismark only; positive integer ≥ 1 (default 2) |
+| `graduated` | Boolean; default false |
 
 Error code `BAD_ARGS` is returned for all constraint violations.  
 Error code `NOT_FOUND` is returned when the target file does not exist or is not a feature file.

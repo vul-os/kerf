@@ -9,6 +9,12 @@ Pure-Python section (always runs):
   - LLM tool specs: names, required fields, enums
   - LLM tool runner jewelry_create_chain: success paths, node shape, error paths
   - LLM tool runner jewelry_chain_length: success paths, error paths
+  - v2 link styles: rolo, bismark, wheat, herringbone, omega, popcorn, ball, singapore
+  - v2 sizing: anklet, men's, choker standard lengths
+  - gauge_preset table
+  - chain_weight_estimate: sane values, formula, validation
+  - graduated flag
+  - aliases: belcher, spiga, bead, bead_chain
 
 OCC-gated section:
   - Skipped cleanly when pythonOCC absent.
@@ -27,9 +33,11 @@ from kerf_cad_core.jewelry.chain import (
     _VALID_CLASP_STYLES,
     _STANDARD_LENGTHS_MM,
     _STYLE_ALIASES,
+    GAUGE_PRESETS,
     compute_chain_params,
     compute_clasp_params,
     chain_length_to_link_count,
+    chain_weight_estimate,
     link_count_to_chain_length,
     link_pitch,
     standard_length_names,
@@ -739,6 +747,549 @@ class TestChainLengthToolErrors:
         ctx, _, _ = make_ctx()
         r = run_sync(run_jewelry_chain_length(ctx, b"bad json"))
         assert "error" in r
+
+
+# ---------------------------------------------------------------------------
+# v2: New link styles
+# ---------------------------------------------------------------------------
+
+_NEW_STYLES = [
+    "rolo", "bismark", "wheat", "herringbone",
+    "omega", "popcorn", "ball", "singapore",
+]
+
+
+class TestNewLinkStyles:
+    """Each new style must produce a valid chain spec with correct link_hints."""
+
+    @pytest.mark.parametrize("style", _NEW_STYLES)
+    def test_style_produces_spec(self, style):
+        p = compute_chain_params(style, wire_gauge_mm=1.0, link_count=50)
+        assert p["style"] == style
+        assert p["link_count"] == 50
+        assert p["link_length_mm"] > 0
+        assert p["link_width_mm"] > 0
+        assert p["link_pitch_mm"] > 0
+        assert p["total_length_mm"] > 0
+        assert "link_hints" in p
+
+    @pytest.mark.parametrize("style", _NEW_STYLES)
+    def test_link_hints_has_type_key(self, style):
+        p = compute_chain_params(style, wire_gauge_mm=1.0, link_count=10)
+        assert p["link_hints"]["type"] == style, (
+            f"style={style!r}: link_hints['type'] expected {style!r}, "
+            f"got {p['link_hints'].get('type')!r}"
+        )
+
+    @pytest.mark.parametrize("style", _NEW_STYLES)
+    def test_style_total_length(self, style):
+        p = compute_chain_params(style, wire_gauge_mm=1.2, total_length_mm=450.0)
+        assert p["link_count"] >= 1
+        assert abs(p["total_length_mm"] - p["link_count"] * p["link_pitch_mm"]) < 1e-3
+
+    @pytest.mark.parametrize("style", _NEW_STYLES)
+    def test_pitch_positive(self, style):
+        p = compute_chain_params(style, wire_gauge_mm=1.0, link_count=30)
+        assert p["link_pitch_mm"] > 0
+
+    def test_rolo_has_inner_diameter(self):
+        p = compute_chain_params("rolo", wire_gauge_mm=1.5, link_count=40)
+        h = p["link_hints"]
+        assert "inner_diameter_mm" in h
+        assert h["inner_diameter_mm"] > 0
+
+    def test_rolo_alternating_rotation(self):
+        p = compute_chain_params("rolo", wire_gauge_mm=1.0, link_count=40)
+        h = p["link_hints"]
+        assert h["alternating_rotation_deg"] == 90
+
+    def test_bismark_rows_default(self):
+        p = compute_chain_params("bismark", wire_gauge_mm=1.0, link_count=40)
+        h = p["link_hints"]
+        assert h["rows"] == 2
+
+    def test_bismark_rows_custom(self):
+        p = compute_chain_params("bismark", wire_gauge_mm=1.0, link_count=40, rows=3)
+        h = p["link_hints"]
+        assert h["rows"] == 3
+
+    def test_wheat_helix_radius_mult(self):
+        p = compute_chain_params("wheat", wire_gauge_mm=1.0, link_count=50)
+        h = p["link_hints"]
+        assert "helix_radius_mult" in h
+        assert h["helix_radius_mult"] > 0
+
+    def test_herringbone_layer_count(self):
+        p = compute_chain_params("herringbone", wire_gauge_mm=1.0, link_count=30)
+        h = p["link_hints"]
+        assert h["layer_count"] == 2
+        assert h["surface_width_mm"] > 0
+
+    def test_omega_plate_width_wider_than_gauge(self):
+        p = compute_chain_params("omega", wire_gauge_mm=1.0, link_count=40)
+        h = p["link_hints"]
+        assert h["plate_width_mm"] > 1.0   # wider than wire gauge
+        assert h["plate_curvature"] == "convex"
+
+    def test_popcorn_sphere_diameter_positive(self):
+        p = compute_chain_params("popcorn", wire_gauge_mm=1.5, link_count=30)
+        h = p["link_hints"]
+        assert h["sphere_diameter_mm"] > 0
+        assert h["neck_diameter_mm"] > 0
+
+    def test_ball_bead_diameter_positive(self):
+        p = compute_chain_params("ball", wire_gauge_mm=1.5, link_count=30)
+        h = p["link_hints"]
+        assert h["bead_diameter_mm"] > 0
+        assert h["neck_diameter_mm"] > 0
+        assert h["neck_length_mm"] > 0
+
+    def test_singapore_has_twist(self):
+        p = compute_chain_params("singapore", wire_gauge_mm=1.0, link_count=50)
+        h = p["link_hints"]
+        assert h["twist_deg"] == 90
+        assert "diagonal_angle_deg" in h
+
+    def test_new_styles_in_valid_set(self):
+        for s in _NEW_STYLES:
+            assert s in _VALID_LINK_STYLES
+
+
+# ---------------------------------------------------------------------------
+# v2: Style aliases (new)
+# ---------------------------------------------------------------------------
+
+class TestNewStyleAliases:
+    def test_belcher_resolves_to_rolo(self):
+        p = compute_chain_params("belcher", wire_gauge_mm=1.0, link_count=20)
+        assert p["style"] == "rolo"
+
+    def test_spiga_resolves_to_wheat(self):
+        p = compute_chain_params("spiga", wire_gauge_mm=1.0, link_count=20)
+        assert p["style"] == "wheat"
+
+    def test_bead_resolves_to_ball(self):
+        p = compute_chain_params("bead", wire_gauge_mm=1.0, link_count=20)
+        assert p["style"] == "ball"
+
+    def test_bead_chain_resolves_to_ball(self):
+        p = compute_chain_params("bead_chain", wire_gauge_mm=1.0, link_count=20)
+        assert p["style"] == "ball"
+
+
+# ---------------------------------------------------------------------------
+# v2: Pitch round-trips for new styles
+# ---------------------------------------------------------------------------
+
+class TestNewStylePitchRoundTrip:
+    @pytest.mark.parametrize("style", _NEW_STYLES)
+    def test_round_trip_new_style(self, style):
+        gauge = 1.0
+        target_mm = 450.0
+        p = compute_chain_params(style, wire_gauge_mm=gauge, total_length_mm=target_mm)
+        pitch = p["link_pitch_mm"]
+        back_mm = link_count_to_chain_length(p["link_count"], pitch)
+        assert abs(back_mm - target_mm) <= pitch + 1e-6, (
+            f"style={style}: target={target_mm}, back={back_mm}, pitch={pitch}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# v2: Sizing — anklet, men's, choker standard lengths
+# ---------------------------------------------------------------------------
+
+class TestV2StandardLengths:
+    def test_anklet_9in(self):
+        assert _STANDARD_LENGTHS_MM["anklet_9in"] == pytest.approx(228.6)
+
+    def test_anklet_10in(self):
+        assert _STANDARD_LENGTHS_MM["anklet_10in"] == pytest.approx(254.0)
+
+    def test_anklet_11in(self):
+        assert _STANDARD_LENGTHS_MM["anklet_11in"] == pytest.approx(279.4)
+
+    def test_mens_24in(self):
+        assert _STANDARD_LENGTHS_MM["mens_24in"] == pytest.approx(609.6)
+
+    def test_mens_30in(self):
+        assert _STANDARD_LENGTHS_MM["mens_30in"] == pytest.approx(762.0)
+
+    def test_choker_14in(self):
+        assert _STANDARD_LENGTHS_MM["choker_14in"] == pytest.approx(355.6)
+
+    def test_choker_16in(self):
+        assert _STANDARD_LENGTHS_MM["choker_16in"] == pytest.approx(406.4)
+
+    def test_necklace_55cm(self):
+        assert _STANDARD_LENGTHS_MM["necklace_55cm"] == pytest.approx(550.0)
+
+    def test_necklace_70cm(self):
+        assert _STANDARD_LENGTHS_MM["necklace_70cm"] == pytest.approx(700.0)
+
+    def test_all_anklets_in_range(self):
+        anklets = {k: v for k, v in _STANDARD_LENGTHS_MM.items()
+                   if k.startswith("anklet_")}
+        assert len(anklets) >= 5
+        for name, mm in anklets.items():
+            assert 220 <= mm <= 300, f"{name}: {mm} mm out of anklet range"
+
+    def test_all_mens_lengths_ge_508mm(self):
+        mens = {k: v for k, v in _STANDARD_LENGTHS_MM.items()
+                if k.startswith("mens_")}
+        assert len(mens) >= 6
+        for name, mm in mens.items():
+            assert mm >= 508.0, f"{name}: {mm} mm is shorter than 20in"
+
+    def test_all_standard_lengths_positive(self):
+        for name, mm in _STANDARD_LENGTHS_MM.items():
+            assert mm > 0, f"Standard length {name!r} = {mm} is not positive"
+
+    def test_standard_length_names_sorted(self):
+        names = standard_length_names()
+        assert names == sorted(names)
+
+    @pytest.mark.parametrize("std_len", ["anklet_9in", "anklet_10in", "mens_24in",
+                                          "choker_14in", "necklace_70cm"])
+    def test_new_standard_lengths_work_with_compute(self, std_len):
+        p = compute_chain_params("cable", wire_gauge_mm=1.0,
+                                 standard_length=std_len)
+        assert p["link_count"] >= 1
+        assert p["total_length_mm"] > 0
+
+
+# ---------------------------------------------------------------------------
+# v2: Gauge presets
+# ---------------------------------------------------------------------------
+
+class TestGaugePresets:
+    def test_all_styles_have_presets(self):
+        for style in _VALID_LINK_STYLES:
+            assert style in GAUGE_PRESETS, f"Style {style!r} missing from GAUGE_PRESETS"
+            p = GAUGE_PRESETS[style]
+            assert "fine" in p
+            assert "medium" in p
+            assert "heavy" in p
+
+    def test_fine_lt_medium_lt_heavy(self):
+        for style, p in GAUGE_PRESETS.items():
+            assert p["fine"] < p["medium"], (
+                f"{style}: fine ({p['fine']}) >= medium ({p['medium']})"
+            )
+            assert p["medium"] < p["heavy"], (
+                f"{style}: medium ({p['medium']}) >= heavy ({p['heavy']})"
+            )
+
+    def test_all_preset_gauges_positive(self):
+        for style, p in GAUGE_PRESETS.items():
+            for weight, mm in p.items():
+                assert mm > 0, f"{style}/{weight}: gauge {mm} is not positive"
+
+    def test_gauge_preset_overrides_wire_gauge(self):
+        # With gauge_preset='medium' for cable, wire_gauge should be 1.0
+        p = compute_chain_params("cable", wire_gauge_mm=99.0,
+                                 gauge_preset="medium", link_count=50)
+        assert p["wire_gauge_mm"] == pytest.approx(GAUGE_PRESETS["cable"]["medium"])
+
+    def test_gauge_preset_fine(self):
+        p = compute_chain_params("rope", wire_gauge_mm=1.0,
+                                 gauge_preset="fine", link_count=100)
+        assert p["wire_gauge_mm"] == pytest.approx(GAUGE_PRESETS["rope"]["fine"])
+
+    def test_gauge_preset_heavy(self):
+        p = compute_chain_params("mariner", wire_gauge_mm=1.0,
+                                 gauge_preset="heavy", link_count=30)
+        assert p["wire_gauge_mm"] == pytest.approx(GAUGE_PRESETS["mariner"]["heavy"])
+
+    def test_invalid_gauge_preset_raises(self):
+        with pytest.raises(ValueError, match="Unknown gauge_preset"):
+            compute_chain_params("cable", wire_gauge_mm=1.0,
+                                 gauge_preset="extra_heavy", link_count=10)
+
+    @pytest.mark.parametrize("style", sorted(_VALID_LINK_STYLES))
+    def test_all_styles_accept_gauge_preset(self, style):
+        p = compute_chain_params(style, wire_gauge_mm=1.0,
+                                 gauge_preset="medium", link_count=30)
+        assert p["wire_gauge_mm"] == pytest.approx(GAUGE_PRESETS[style]["medium"])
+
+
+# ---------------------------------------------------------------------------
+# v2: chain_weight_estimate
+# ---------------------------------------------------------------------------
+
+class TestChainWeightEstimate:
+    # 18-karat yellow gold density ≈ 15.5 g/cm³ (industry standard)
+    GOLD_18K = 15.5
+    # Sterling silver ≈ 10.3 g/cm³
+    SILVER_925 = 10.3
+
+    def test_cable_bracelet_weight_positive(self):
+        w = chain_weight_estimate("cable", wire_gauge_mm=1.0,
+                                  total_length_mm=177.8,
+                                  density_g_per_cm3=self.GOLD_18K)
+        assert w > 0
+
+    def test_weight_scales_with_length(self):
+        w1 = chain_weight_estimate("cable", wire_gauge_mm=1.0,
+                                   total_length_mm=177.8,
+                                   density_g_per_cm3=self.GOLD_18K)
+        w2 = chain_weight_estimate("cable", wire_gauge_mm=1.0,
+                                   total_length_mm=355.6,
+                                   density_g_per_cm3=self.GOLD_18K)
+        assert abs(w2 - 2 * w1) < 0.01  # doubling length doubles weight
+
+    def test_weight_scales_with_density(self):
+        w_gold = chain_weight_estimate("cable", wire_gauge_mm=1.0,
+                                       total_length_mm=450.0,
+                                       density_g_per_cm3=self.GOLD_18K)
+        w_silver = chain_weight_estimate("cable", wire_gauge_mm=1.0,
+                                          total_length_mm=450.0,
+                                          density_g_per_cm3=self.SILVER_925)
+        # Gold is heavier than silver → gold weight should exceed silver weight
+        assert w_gold > w_silver
+        # Ratio should match density ratio within rounding
+        assert abs(w_gold / w_silver - self.GOLD_18K / self.SILVER_925) < 0.01
+
+    def test_formula_manual_check(self):
+        """Manual: cable fill=0.55, gauge=1.0, length=100, density=1.0 g/cm³.
+
+        The return value is rounded to 3 decimal places, so tolerance is 0.001.
+        """
+        import math as _math
+        gauge = 1.0
+        fill = 0.55
+        length = 100.0
+        density = 1.0
+        expected = _math.pi * (gauge / 2) ** 2 * fill * length * density * 1e-3
+        w = chain_weight_estimate("cable", wire_gauge_mm=gauge,
+                                   total_length_mm=length,
+                                   density_g_per_cm3=density)
+        # Result is rounded to 3 dp so max rounding error is 0.0005
+        assert abs(w - expected) < 0.001
+
+    def test_fill_factor_override(self):
+        w_default = chain_weight_estimate("cable", wire_gauge_mm=1.0,
+                                           total_length_mm=200.0,
+                                           density_g_per_cm3=self.GOLD_18K)
+        w_full = chain_weight_estimate("cable", wire_gauge_mm=1.0,
+                                        total_length_mm=200.0,
+                                        density_g_per_cm3=self.GOLD_18K,
+                                        fill_factor=1.0)
+        # fill_factor=1.0 should give a heavier result than the default (< 1.0)
+        assert w_full > w_default
+
+    def test_alias_accepted(self):
+        """Aliases should resolve correctly in weight estimate."""
+        w_belcher = chain_weight_estimate("belcher", wire_gauge_mm=1.5,
+                                           total_length_mm=450.0,
+                                           density_g_per_cm3=self.GOLD_18K)
+        w_rolo = chain_weight_estimate("rolo", wire_gauge_mm=1.5,
+                                        total_length_mm=450.0,
+                                        density_g_per_cm3=self.GOLD_18K)
+        assert abs(w_belcher - w_rolo) < 1e-6
+
+    def test_typical_bracelet_weight_range(self):
+        """18k gold cable bracelet ~1–5 g is a physically realistic range."""
+        w = chain_weight_estimate("cable", wire_gauge_mm=1.0,
+                                   total_length_mm=177.8,
+                                   density_g_per_cm3=self.GOLD_18K)
+        assert 0.5 < w < 10.0, f"Bracelet weight {w:.3f} g outside plausible range"
+
+    @pytest.mark.parametrize("style", sorted(_VALID_LINK_STYLES))
+    def test_all_styles_return_positive_weight(self, style):
+        w = chain_weight_estimate(style, wire_gauge_mm=1.0,
+                                   total_length_mm=450.0,
+                                   density_g_per_cm3=self.GOLD_18K)
+        assert w > 0, f"style={style!r}: weight={w}"
+
+    def test_zero_gauge_raises(self):
+        with pytest.raises(ValueError, match="wire_gauge_mm must be > 0"):
+            chain_weight_estimate("cable", wire_gauge_mm=0,
+                                   total_length_mm=200.0,
+                                   density_g_per_cm3=self.GOLD_18K)
+
+    def test_zero_length_raises(self):
+        with pytest.raises(ValueError, match="total_length_mm must be > 0"):
+            chain_weight_estimate("cable", wire_gauge_mm=1.0,
+                                   total_length_mm=0,
+                                   density_g_per_cm3=self.GOLD_18K)
+
+    def test_zero_density_raises(self):
+        with pytest.raises(ValueError, match="density_g_per_cm3 must be > 0"):
+            chain_weight_estimate("cable", wire_gauge_mm=1.0,
+                                   total_length_mm=200.0,
+                                   density_g_per_cm3=0)
+
+    def test_invalid_style_raises(self):
+        with pytest.raises(ValueError, match="Unknown chain style"):
+            chain_weight_estimate("chain_mail", wire_gauge_mm=1.0,
+                                   total_length_mm=200.0,
+                                   density_g_per_cm3=self.GOLD_18K)
+
+    def test_invalid_fill_factor_raises(self):
+        with pytest.raises(ValueError, match="fill_factor must be in"):
+            chain_weight_estimate("cable", wire_gauge_mm=1.0,
+                                   total_length_mm=200.0,
+                                   density_g_per_cm3=self.GOLD_18K,
+                                   fill_factor=1.5)
+
+    def test_fill_factor_zero_raises(self):
+        with pytest.raises(ValueError, match="fill_factor must be in"):
+            chain_weight_estimate("cable", wire_gauge_mm=1.0,
+                                   total_length_mm=200.0,
+                                   density_g_per_cm3=self.GOLD_18K,
+                                   fill_factor=0)
+
+    def test_bismark_heavier_than_cable(self):
+        """Bismark is multi-row so its fill factor is higher → heavier per mm."""
+        w_bismark = chain_weight_estimate("bismark", wire_gauge_mm=1.0,
+                                           total_length_mm=450.0,
+                                           density_g_per_cm3=self.GOLD_18K)
+        w_cable = chain_weight_estimate("cable", wire_gauge_mm=1.0,
+                                         total_length_mm=450.0,
+                                         density_g_per_cm3=self.GOLD_18K)
+        assert w_bismark > w_cable
+
+
+# ---------------------------------------------------------------------------
+# v2: graduated flag
+# ---------------------------------------------------------------------------
+
+class TestGraduatedFlag:
+    def test_graduated_false_not_in_spec(self):
+        p = compute_chain_params("cable", wire_gauge_mm=1.0, link_count=50)
+        assert "graduated" not in p
+
+    def test_graduated_true_in_spec(self):
+        p = compute_chain_params("cable", wire_gauge_mm=1.0,
+                                  link_count=50, graduated=True)
+        assert p.get("graduated") is True
+
+    @pytest.mark.parametrize("style", sorted(_VALID_LINK_STYLES))
+    def test_graduated_accepted_by_all_styles(self, style):
+        p = compute_chain_params(style, wire_gauge_mm=1.0,
+                                  link_count=30, graduated=True)
+        assert p.get("graduated") is True
+
+    def test_graduated_via_create_tool(self):
+        ctx, store, fid = make_ctx()
+        r = run_create(ctx, fid, style="cable", wire_gauge_mm=1.0,
+                       link_count=50, graduated=True)
+        assert "error" not in r
+        doc = json.loads(store["content"])
+        node = doc["features"][0]
+        assert node.get("graduated") is True
+
+    def test_no_graduated_default_in_tool(self):
+        ctx, store, fid = make_ctx()
+        run_create(ctx, fid, style="cable", wire_gauge_mm=1.0, link_count=50)
+        doc = json.loads(store["content"])
+        node = doc["features"][0]
+        assert "graduated" not in node
+
+
+# ---------------------------------------------------------------------------
+# v2: gauge_preset via LLM tool
+# ---------------------------------------------------------------------------
+
+class TestGaugePresetViaTool:
+    def test_gauge_preset_medium_via_tool(self):
+        ctx, store, fid = make_ctx()
+        r = run_create(ctx, fid, style="cable", wire_gauge_mm=1.0,
+                       link_count=50, gauge_preset="medium")
+        assert "error" not in r
+        doc = json.loads(store["content"])
+        node = doc["features"][0]
+        assert node["wire_gauge_mm"] == pytest.approx(
+            GAUGE_PRESETS["cable"]["medium"]
+        )
+
+    def test_invalid_gauge_preset_via_tool(self):
+        ctx, store, fid = make_ctx()
+        r = run_create(ctx, fid, style="cable", wire_gauge_mm=1.0,
+                       link_count=50, gauge_preset="ultra_heavy")
+        assert "error" in r
+
+    def test_bismark_rows_via_tool(self):
+        ctx, store, fid = make_ctx()
+        r = run_create(ctx, fid, style="bismark", wire_gauge_mm=1.0,
+                       link_count=40, rows=3)
+        assert "error" not in r
+        doc = json.loads(store["content"])
+        node = doc["features"][0]
+        assert node["link_hints"]["rows"] == 3
+
+
+# ---------------------------------------------------------------------------
+# v2: ToolSpec enum completeness for new styles
+# ---------------------------------------------------------------------------
+
+class TestV2ToolSpecEnums:
+    def test_create_chain_style_enum_includes_new_styles(self):
+        props = jewelry_create_chain_spec.input_schema["properties"]
+        enum_set = set(props["style"]["enum"])
+        for style in _NEW_STYLES:
+            assert style in enum_set, f"New style {style!r} missing from enum"
+
+    def test_chain_length_style_enum_includes_new_styles(self):
+        props = jewelry_chain_length_spec.input_schema["properties"]
+        enum_set = set(props["style"]["enum"])
+        for style in _NEW_STYLES:
+            assert style in enum_set, f"New style {style!r} missing from chain_length enum"
+
+    def test_create_chain_has_gauge_preset_field(self):
+        props = jewelry_create_chain_spec.input_schema["properties"]
+        assert "gauge_preset" in props
+        assert set(props["gauge_preset"]["enum"]) == {"fine", "medium", "heavy"}
+
+    def test_create_chain_has_graduated_field(self):
+        props = jewelry_create_chain_spec.input_schema["properties"]
+        assert "graduated" in props
+        assert props["graduated"]["type"] == "boolean"
+
+    def test_create_chain_has_rows_field(self):
+        props = jewelry_create_chain_spec.input_schema["properties"]
+        assert "rows" in props
+        assert props["rows"]["type"] == "integer"
+
+
+# ---------------------------------------------------------------------------
+# v2: new styles all succeed through create tool
+# ---------------------------------------------------------------------------
+
+class TestNewStylesViaTool:
+    @pytest.mark.parametrize("style", _NEW_STYLES)
+    def test_new_style_tool_success(self, style):
+        ctx, store, fid = make_ctx()
+        r = run_create(ctx, fid, style=style, wire_gauge_mm=1.0, link_count=50)
+        assert "error" not in r, f"style={style!r}: {r}"
+
+    def test_rolo_anklet_via_tool(self):
+        ctx, store, fid = make_ctx()
+        r = run_create(ctx, fid, style="rolo", wire_gauge_mm=1.2,
+                       standard_length="anklet_9in")
+        assert "error" not in r
+
+    def test_omega_mens_necklace_via_tool(self):
+        ctx, store, fid = make_ctx()
+        r = run_create(ctx, fid, style="omega", wire_gauge_mm=1.5,
+                       standard_length="mens_24in")
+        assert "error" not in r
+
+    def test_herringbone_choker_via_tool(self):
+        ctx, store, fid = make_ctx()
+        r = run_create(ctx, fid, style="herringbone", wire_gauge_mm=1.0,
+                       standard_length="choker_16in")
+        assert "error" not in r
+
+    @pytest.mark.parametrize("alias,expected",
+                              [("belcher", "rolo"), ("spiga", "wheat"),
+                               ("bead", "ball"), ("bead_chain", "ball")])
+    def test_alias_via_tool(self, alias, expected):
+        ctx, store, fid = make_ctx()
+        r = run_create(ctx, fid, style=alias, wire_gauge_mm=1.0, link_count=30)
+        assert "error" not in r
+        doc = json.loads(store["content"])
+        assert doc["features"][0]["style"] == expected
 
 
 # ---------------------------------------------------------------------------

@@ -23,6 +23,12 @@ import AdminPublishers from './routes/AdminPublishers.jsx'
 import Mechanical from './routes/domains/Mechanical.jsx'
 import ProtectedRoute from './routes/ProtectedRoute.jsx'
 import Electronics from './routes/domains/Electronics.jsx'
+import CompareHub from './routes/compare/index.jsx'
+import FreecadPage from './routes/compare/Freecad.jsx'
+import KicadPage from './routes/compare/Kicad.jsx'
+import RhinoPage from './routes/compare/Rhino.jsx'
+import RevitPage from './routes/compare/Revit.jsx'
+import FusionPage from './routes/compare/Fusion.jsx'
 import ShortcutsModal from './components/ShortcutsModal.jsx'
 import { useAuth } from './store/auth.js'
 import { api } from './lib/api.js'
@@ -123,6 +129,12 @@ export default function App() {
       <Route path="/docs/:slug" element={<DocsArticle />} />
       <Route path="/domains/electronics" element={<Electronics />} />
       <Route path="/domains/mechanical" element={<Mechanical />} />
+      <Route path="/compare" element={<CompareHub />} />
+      <Route path="/compare/freecad" element={<FreecadPage />} />
+      <Route path="/compare/kicad" element={<KicadPage />} />
+      <Route path="/compare/rhino" element={<RhinoPage />} />
+      <Route path="/compare/revit" element={<RevitPage />} />
+      <Route path="/compare/fusion" element={<FusionPage />} />
       {cloudEnabled && <Route path="/workshop" element={<Workshop />} />}
       {cloudEnabled && (
         <Route path="/workshop/:slug" element={<WorkshopListing />} />

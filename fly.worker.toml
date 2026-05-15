@@ -24,7 +24,7 @@ primary_region = "fra"
 #   flyctl secrets set --app kerf-workers DATABASE_URL=... etc.
 
 [processes]
-  worker = "kerf-server --host 0.0.0.0 --port 8080 --workers-only"
+  worker = "python -m kerf_workers.runner"
 
 [[vm]]
   size = "performance-2x"

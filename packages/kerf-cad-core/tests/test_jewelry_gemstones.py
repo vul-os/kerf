@@ -156,11 +156,11 @@ class TestCaratFormula:
 
     def test_unknown_cut_carat_from_mm_raises(self):
         with pytest.raises(ValueError):
-            carat_from_mm("kite", 5.0)
+            carat_from_mm("not_a_real_cut", 5.0)
 
     def test_unknown_cut_mm_from_carat_raises(self):
         with pytest.raises(ValueError):
-            mm_from_carat("kite", 1.0)
+            mm_from_carat("not_a_real_cut", 1.0)
 
 
 # ---------------------------------------------------------------------------
@@ -241,7 +241,7 @@ class TestGemstoneProportions:
 
     def test_unknown_cut_raises(self):
         with pytest.raises(ValueError, match="Unknown cut"):
-            gemstone_proportions("kite", diameter_mm=5.0)
+            gemstone_proportions("not_a_real_cut", diameter_mm=5.0)
 
     def test_negative_diameter_raises(self):
         with pytest.raises(ValueError):
@@ -384,9 +384,9 @@ class TestRunJewelryCreateGemstoneErrors:
 
     def test_unknown_cut(self):
         ctx, _, fid = make_ctx()
-        result = run_tool(ctx, fid, cut="kite", diameter_mm=5.0)
+        result = run_tool(ctx, fid, cut="not_a_real_cut", diameter_mm=5.0)
         assert result.get("code") == "BAD_ARGS"
-        assert "kite" in result.get("error", "")
+        assert "not_a_real_cut" in result.get("error", "")
 
     def test_negative_carat(self):
         ctx, _, fid = make_ctx()

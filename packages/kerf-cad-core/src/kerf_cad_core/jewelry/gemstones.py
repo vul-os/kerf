@@ -131,6 +131,20 @@ GEMSTONE_CUTS = {
     "heart",
     "baguette",
     "briolette",
+    # Historical / specialty cuts added in third slice:
+    "old_european",      # Precursor to round brilliant; high crown, small table
+    "old_mine",          # Victorian cushion brilliant; high crown, small culet
+    "rose_cut",          # Flat base, dome top, triangular facets; no pavilion
+    "single_cut",        # Simplified brilliant, 17 facets; melee size
+    "french_cut",        # Square step cut with X-pattern table; art-deco
+    "half_moon",         # Semi-circular fancy; modified brilliant half-oval
+    "trapezoid",         # Trapezoidal step cut; tapered side stone
+    "kite",              # Kite/arrowhead angular fancy; triangular derivative
+    "bullet",            # Pointed-top rounded-base brilliant; tapered fancy
+    "tapered_baguette",  # Baguette with angled ends; channel side stone
+    "lozenge",           # Diamond/rhombus four-point step cut
+    "shield",            # Irregular pentagon / shield-shaped brilliant
+    "calf_head",         # Wide pear variant; low-set teardrop (bouche)
 }
 
 
@@ -211,6 +225,20 @@ _CARAT_REF: dict[str, tuple[float, float]] = {
     "heart":           (6.5, 3.0),   # same ref as round brilliant (≈same volume)
     "baguette":        (5.0, 3.0),   # 3:1 narrow bar; shallow step cut
     "briolette":       (5.5, 3.0),   # elongated teardrop; half-round cross-section
+    # Historical / specialty cuts (third slice):
+    "old_european":    (6.5, 3.0),   # same footprint as round brilliant
+    "old_mine":        (5.5, 3.0),   # cushion outline; ~same depth as princess
+    "rose_cut":        (7.8, 3.0),   # flat base = more spread per carat; ~1.2× round
+    "single_cut":      (4.1, 3.0),   # tiny melee; shallow ~17-facet brilliant
+    "french_cut":      (5.0, 3.0),   # small square step; similar to small baguette
+    "half_moon":       (8.5, 3.0),   # half-oval; wide face, shallow depth
+    "trapezoid":       (6.5, 3.0),   # trapezoidal step; similar volume to baguette
+    "kite":            (6.0, 3.0),   # kite/arrowhead; triangular derivative, moderate depth
+    "bullet":          (5.5, 3.0),   # tapered pear; similar volume to small pear
+    "tapered_baguette":(5.2, 3.0),   # baguette with angled ends; slightly deeper
+    "lozenge":         (6.5, 3.0),   # rhombus step cut; similar to marquise volume
+    "shield":          (6.8, 3.0),   # irregular pentagon; large face, moderate depth
+    "calf_head":       (8.5, 3.0),   # wide low-set pear variant; large spread
 }
 
 
@@ -600,6 +628,257 @@ _CUT_DEFAULTS: dict[str, dict] = {
             "facet_rows": 8,    # horizontal rows of triangular facets
         },
     },
+
+    # -----------------------------------------------------------------------
+    # Historical / specialty cuts (third slice)
+    # All map to an existing facet family; no worker change needed.
+    # -----------------------------------------------------------------------
+
+    "old_european": {
+        # Precursor to round brilliant (pre-1930s).  Characteristics:
+        # very high crown (~22%), small table (~40%), large open culet (visible from above).
+        # Family: round_brilliant (N-gon facets, circular girdle).
+        # GIA reference: crown angle ~40°, pavilion angle ~40°, table 35–53%.
+        "table_pct": 40.0,
+        "crown_angle_deg": 40.0,
+        "crown_height_pct": 22.0,
+        "pavilion_angle_deg": 40.0,
+        "pavilion_depth_pct": 43.0,
+        "girdle_pct": 3.0,
+        "aspect_ratio": 1.0,
+        "extras": {
+            "facet_count": 58,
+            "culet": "large",          # characteristic open culet
+            "facet_family": "round_brilliant",
+        },
+    },
+
+    "old_mine": {
+        # Victorian-era cushion brilliant (pre-round brilliant).
+        # High crown, small round table, large culet, squarish cushion outline.
+        # Family: cushion (modified brilliant, soft-square footprint).
+        # GIA reference: crown angle ~38–42°, cushion outline, large culet.
+        "table_pct": 40.0,
+        "crown_angle_deg": 38.0,
+        "crown_height_pct": 20.0,
+        "pavilion_angle_deg": 41.0,
+        "pavilion_depth_pct": 43.0,
+        "girdle_pct": 3.0,
+        "aspect_ratio": 1.0,          # squarish cushion
+        "extras": {
+            "facet_count": 58,
+            "culet": "large",
+            "corner_radius_pct": 20,  # rounder corners than modern cushion
+            "facet_family": "cushion",
+        },
+    },
+
+    "rose_cut": {
+        # Flat-base dome-top cut; triangular facets arranged in two rows.
+        # No pavilion — all volume is in the crown dome.  table_pct=0 (no flat table).
+        # Family: round_brilliant (circular girdle, N-gon facet rows).
+        # GIA reference: crown angle ~15–25°, flat bottom, 6–24 triangular facets.
+        # pavilion_angle_deg is a nominal placeholder (flat base = pavilion_depth_pct=0).
+        "table_pct": 0.0,            # no table facet
+        "crown_angle_deg": 20.0,     # shallow dome
+        "crown_height_pct": 25.0,    # dome is ~25% of diameter
+        "pavilion_angle_deg": 1.0,   # nominal; flat base encoded in pavilion_depth_pct=0
+        "pavilion_depth_pct": 0.0,   # flat base; girdle sits on the stone
+        "girdle_pct": 2.0,
+        "aspect_ratio": 1.0,
+        "extras": {
+            "facet_count": 24,        # full rose cut (double rose = 24 facets)
+            "facet_rows": 2,          # 6 base + 6 upper triangular facets per half
+            "flat_base": True,
+            "facet_family": "round_brilliant",
+        },
+    },
+
+    "single_cut": {
+        # Simplified brilliant, 17 or 18 facets — melee size side stones.
+        # Table + 8 crown facets + 8 pavilion facets + girdle.
+        # Family: round_brilliant (circular girdle, simplified N-gon facets).
+        # Industry reference: table 60–70%, total depth ~50–55%.
+        "table_pct": 65.0,
+        "crown_angle_deg": 30.0,
+        "crown_height_pct": 10.0,
+        "pavilion_angle_deg": 40.0,
+        "pavilion_depth_pct": 42.0,
+        "girdle_pct": 2.0,
+        "aspect_ratio": 1.0,
+        "extras": {
+            "facet_count": 17,
+            "facet_family": "round_brilliant",
+        },
+    },
+
+    "french_cut": {
+        # Square step cut with X-pattern table; art-deco favourite.
+        # High crown relative to width; corners sharp (no corner cut).
+        # Family: princess (square modified brilliant footprint, step-like crown).
+        # Industry reference: table ~65–70%, total depth ~55–60%, 1:1 L:W.
+        "table_pct": 68.0,
+        "crown_angle_deg": 28.0,
+        "crown_height_pct": 11.0,
+        "pavilion_angle_deg": 43.0,
+        "pavilion_depth_pct": 42.0,
+        "girdle_pct": 2.0,
+        "aspect_ratio": 1.0,          # square
+        "extras": {
+            "step_rows": 1,            # single step row (X cross on table)
+            "corner_cut_ratio": 0.0,   # sharp corners
+            "facet_family": "princess",
+        },
+    },
+
+    "half_moon": {
+        # Semi-circular fancy (D-shaped or crescent).
+        # One straight edge, one curved; modified brilliant facet pattern.
+        # Family: oval (elliptical modified brilliant; worker trims to half).
+        # Industry reference: table ~56%, depth ~58–62%, aspect ~0.56 (2:1 L:W).
+        "table_pct": 56.0,
+        "crown_angle_deg": 34.5,
+        "crown_height_pct": 14.0,
+        "pavilion_angle_deg": 40.75,
+        "pavilion_depth_pct": 43.0,
+        "girdle_pct": 2.5,
+        "aspect_ratio": 0.56,         # width ≈ 0.56 × length (half-oval proportions)
+        "extras": {
+            "straight_edge": True,     # flat chord edge (trimmed oval)
+            "facet_family": "oval",
+        },
+    },
+
+    "trapezoid": {
+        # Trapezoidal step cut — common tapered side stone alongside emerald cuts.
+        # Four sides; two parallel (top/bottom) with one pair of angled sides.
+        # Family: baguette (rectangular step cut; worker uses angled girdle).
+        # Industry reference: table ~65%, depth ~45–50%, step_rows=2–3.
+        "table_pct": 65.0,
+        "crown_angle_deg": 10.0,
+        "crown_height_pct": 5.0,
+        "pavilion_angle_deg": 43.0,
+        "pavilion_depth_pct": 40.0,
+        "girdle_pct": 2.0,
+        "aspect_ratio": 0.55,         # mid-range trapezoid width/length
+        "extras": {
+            "step_rows": 2,
+            "taper_ratio": 0.80,       # ratio of narrow end to wide end
+            "facet_family": "baguette",
+        },
+    },
+
+    "kite": {
+        # Kite or arrowhead cut — four-sided polygon with one acute point.
+        # Brilliant-cut facet arrangement; angular fancy.
+        # Family: trillion (triangular/polygonal modified brilliant).
+        # Industry reference: table ~55%, depth ~45–55%, aspect ~0.65.
+        "table_pct": 55.0,
+        "crown_angle_deg": 34.0,
+        "crown_height_pct": 12.0,
+        "pavilion_angle_deg": 41.0,
+        "pavilion_depth_pct": 40.0,
+        "girdle_pct": 2.5,
+        "aspect_ratio": 0.65,         # width ≈ 0.65 × length (kite outline)
+        "extras": {
+            "sides": 4,
+            "acute_point": True,
+            "facet_family": "trillion",
+        },
+    },
+
+    "bullet": {
+        # Bullet / tapered baguette with one pointed end.
+        # Top is flat/rounded; bottom terminates in a point (like a pear with
+        # a flattened rounded top instead of a second lobe).
+        # Family: pear (teardrop modified brilliant; worker uses asymmetric outline).
+        # Industry reference: table ~55%, depth ~55–60%, aspect ~0.60.
+        "table_pct": 55.0,
+        "crown_angle_deg": 33.0,
+        "crown_height_pct": 13.0,
+        "pavilion_angle_deg": 41.0,
+        "pavilion_depth_pct": 43.0,
+        "girdle_pct": 2.5,
+        "aspect_ratio": 0.60,         # width ≈ 0.60 × length
+        "extras": {
+            "flat_top": True,          # rounded/flat top end (not pointed)
+            "facet_family": "pear",
+        },
+    },
+
+    "tapered_baguette": {
+        # Baguette with both short ends angled inward (trapezoidal bar).
+        # Narrower at one end; very common channel-set side stone.
+        # Family: baguette (rectangular step cut; worker angles the short faces).
+        # Industry reference: table ~68–72%, depth ~40–48%, step_rows=2.
+        "table_pct": 70.0,
+        "crown_angle_deg": 8.0,
+        "crown_height_pct": 4.0,
+        "pavilion_angle_deg": 43.0,
+        "pavilion_depth_pct": 40.0,
+        "girdle_pct": 1.5,
+        "aspect_ratio": 0.30,         # narrow bar; slightly wider than baguette
+        "extras": {
+            "step_rows": 2,
+            "taper_ratio": 0.70,       # narrow end / wide end width ratio
+            "facet_family": "baguette",
+        },
+    },
+
+    "lozenge": {
+        # Four-pointed rhombus (diamond shape); step-cut facets.
+        # Equal diagonals (square lozenge) or unequal (elongated).
+        # Family: marquise (boat/pointed-oval; worker uses rhombus outline).
+        # Industry reference: table ~55–65%, depth ~45–55%, L:W ≈ 1.5:1.
+        "table_pct": 58.0,
+        "crown_angle_deg": 18.0,
+        "crown_height_pct": 9.0,
+        "pavilion_angle_deg": 42.0,
+        "pavilion_depth_pct": 42.0,
+        "girdle_pct": 2.0,
+        "aspect_ratio": 0.65,         # width = 0.65 × length (1.5:1 lozenge)
+        "extras": {
+            "step_rows": 2,
+            "facet_family": "marquise",
+        },
+    },
+
+    "shield": {
+        # Irregular five-sided / shield-shaped stone.
+        # Wide at top, tapering to a central point at bottom.
+        # Brilliant-cut facets on large surface.
+        # Family: trillion (polygonal modified brilliant; worker uses 5-sided outline).
+        # Industry reference: table ~55%, depth ~45–55%, aspect ~0.85.
+        "table_pct": 55.0,
+        "crown_angle_deg": 35.0,
+        "crown_height_pct": 13.0,
+        "pavilion_angle_deg": 41.0,
+        "pavilion_depth_pct": 42.0,
+        "girdle_pct": 2.5,
+        "aspect_ratio": 0.85,         # wide shield
+        "extras": {
+            "sides": 5,
+            "facet_family": "trillion",
+        },
+    },
+
+    "calf_head": {
+        # Wide pear variant (also called "bouche"); low dome, very wide teardrop.
+        # Broader than a standard pear; head is more oval and lower in profile.
+        # Family: pear (teardrop modified brilliant; worker uses wider aspect).
+        # Industry reference: table ~55%, depth ~55%, aspect ~0.75–0.80.
+        "table_pct": 55.0,
+        "crown_angle_deg": 32.0,
+        "crown_height_pct": 13.0,
+        "pavilion_angle_deg": 40.0,
+        "pavilion_depth_pct": 42.0,
+        "girdle_pct": 2.5,
+        "aspect_ratio": 0.78,         # notably wider than standard pear (0.62)
+        "extras": {
+            "wide_head": True,
+            "facet_family": "pear",
+        },
+    },
 }
 
 
@@ -650,15 +929,18 @@ jewelry_create_gemstone_spec = ToolSpec(
     description=(
         "Append a `gemstone` node to a `.feature` file. "
         "Generates a parametric gemstone solid with industry-standard proportions. "
-        "Supported cuts: round_brilliant, princess, oval, emerald, marquise, pear, cushion, "
-        "radiant, asscher, trillion, heart, baguette, briolette. "
+        "Classic cuts: round_brilliant, princess, oval, emerald, marquise, pear, cushion. "
+        "Fancy cuts: radiant, asscher, trillion, heart, baguette, briolette. "
+        "Historical/specialty cuts: old_european, old_mine, rose_cut, single_cut, french_cut, "
+        "half_moon, trapezoid, kite, bullet, tapered_baguette, lozenge, shield, calf_head. "
         "Size the stone by carat OR by diameter_mm (long axis for non-round cuts). "
         "Carat formula: carat = (diameter_mm / ref_mm)^3 where ref_mm is calibrated per cut "
         "and material density (default: diamond, 3.51 g/cm³). "
         "Pass material='ruby' (or density_g_cm3=4.00) for accurate coloured-stone carat weights. "
         "The gemstone node stores proportions used by the OCCT "
         "worker to build a closed solid (pavilion cone + girdle cylinder + crown prism). "
-        "Use jewelry_cut_gem_seat to cut the matching seat from a ring shank or bezel."
+        "Use jewelry_cut_gem_seat to cut the matching seat from a ring shank or bezel. "
+        "Use jewelry_gem_report for a read-only gemologist-style proportion analysis."
     ),
     input_schema={
         "type": "object",
@@ -672,11 +954,18 @@ jewelry_create_gemstone_spec = ToolSpec(
                 "enum": sorted(GEMSTONE_CUTS),
                 "description": (
                     "Gemstone cut style. "
-                    "round_brilliant=57 facets, princess=square brilliant, oval=elliptical brilliant, "
-                    "emerald=rectangular step cut, marquise=boat, pear=teardrop, cushion=soft square, "
-                    "radiant=cropped-corner rectangular brilliant, asscher=square step cut, "
-                    "trillion=triangular brilliant, heart=heart-shaped brilliant, "
-                    "baguette=narrow rectangular step cut, briolette=all-facet elongated teardrop."
+                    "Classic: round_brilliant=57 facets, princess=square brilliant, oval=elliptical, "
+                    "emerald=rectangular step, marquise=boat, pear=teardrop, cushion=soft square. "
+                    "Fancy: radiant=cropped-corner rectangular brilliant, asscher=square step, "
+                    "trillion=triangular brilliant, heart=heart-shaped, "
+                    "baguette=narrow step cut, briolette=all-facet teardrop. "
+                    "Historical: old_european=high-crown round precursor, old_mine=Victorian cushion, "
+                    "rose_cut=flat-base dome, single_cut=17-facet melee brilliant, "
+                    "french_cut=square step art-deco, half_moon=D-shaped semi-circular, "
+                    "trapezoid=tapered step side stone, kite=arrowhead angular fancy, "
+                    "bullet=pointed-base tapered fancy, tapered_baguette=angled-end bar, "
+                    "lozenge=rhombus step cut, shield=five-sided brilliant, "
+                    "calf_head=wide-pear bouche variant."
                 ),
             },
             "carat": {

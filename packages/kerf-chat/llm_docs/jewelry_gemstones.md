@@ -36,6 +36,26 @@ Two LLM tools handle the jewelry gemstone workflow:
 | `baguette` | Narrow rectangular step cut | 3:1 L:W, step_rows=2 |
 | `briolette` | All-facet elongated teardrop, no table | 8 facet rows, no table |
 
+### Historical / specialty cuts
+
+These map to existing facet families — no OCCT worker change needed.
+
+| Key | Description | Facet family | Notes |
+|-----|-------------|--------------|-------|
+| `old_european` | Pre-1930s round brilliant precursor | round_brilliant | High crown ~40°, small table ~40%, large culet |
+| `old_mine` | Victorian cushion brilliant | cushion | High crown ~38°, large culet, square outline |
+| `rose_cut` | Flat-base dome top, triangular facets | round_brilliant | No table, no pavilion; 24 facets |
+| `single_cut` | Simplified 17-facet brilliant | round_brilliant | Melee side stones |
+| `french_cut` | Square step with X-pattern table | princess | Art-deco; 1 step row, sharp corners |
+| `half_moon` | D-shaped semi-circular fancy | oval | Straight chord edge, curved girdle |
+| `trapezoid` | Tapered step-cut side stone | baguette | step_rows=2, taper_ratio=0.80 |
+| `kite` | Arrowhead four-sided angular fancy | trillion | 4 sides, acute point |
+| `bullet` | Tapered fancy with pointed base | pear | Flat/rounded top, pointed bottom |
+| `tapered_baguette` | Baguette with angled short ends | baguette | step_rows=2, taper_ratio=0.70 |
+| `lozenge` | Rhombus four-point step cut | marquise | step_rows=2, 1.5:1 L:W |
+| `shield` | Five-sided shield-shaped brilliant | trillion | 5 sides, wide top tapering to point |
+| `calf_head` | Wide pear variant (bouche) | pear | Broader than standard pear; aspect ≈ 0.78 |
+
 ---
 
 ## Carat ↔ mm formula
@@ -70,6 +90,19 @@ Default material is `diamond` for backward compatibility.
 | heart | 6.5 | same volume class as round brilliant |
 | baguette | 5.0 | narrow bar, shallow |
 | briolette | 5.5 | elongated teardrop |
+| old_european | 6.5 | same footprint as round brilliant |
+| old_mine | 5.5 | cushion outline; ~same depth as princess |
+| rose_cut | 7.8 | flat base = more spread per carat |
+| single_cut | 4.1 | tiny melee; shallow 17-facet |
+| french_cut | 5.0 | small square step |
+| half_moon | 8.5 | half-oval; wide face, shallow |
+| trapezoid | 6.5 | trapezoidal step |
+| kite | 6.0 | kite/arrowhead; triangular derivative |
+| bullet | 5.5 | tapered pear; similar to small pear |
+| tapered_baguette | 5.2 | baguette with angled ends |
+| lozenge | 6.5 | rhombus step cut |
+| shield | 6.8 | irregular pentagon; large face |
+| calf_head | 8.5 | wide low-set pear variant |
 
 ---
 
@@ -143,9 +176,98 @@ Society gem property tables.
 | baguette | 70 | 8 | 43 | ~46 | 0.33 | step_rows=2 |
 | briolette | 0 | 30 | 45 | ~102 | 0.50 | facet_rows=8 (no table) |
 
-All other cuts follow GIA/AGS published ranges. Override any parameter via
+### Historical / specialty cut proportions
+
+| Cut | Table % | Crown° | Pav° | Depth % | Aspect | Family |
+|-----|---------|--------|------|---------|--------|--------|
+| old_european | 40 | 40 | 40 | ~68 | 1.0 | round_brilliant |
+| old_mine | 40 | 38 | 41 | ~66 | 1.0 | cushion |
+| rose_cut | 0 | 20 | 1 | ~27 | 1.0 | round_brilliant |
+| single_cut | 65 | 30 | 40 | ~54 | 1.0 | round_brilliant |
+| french_cut | 68 | 28 | 43 | ~57 | 1.0 | princess |
+| half_moon | 56 | 34.5 | 40.75 | ~59 | 0.56 | oval |
+| trapezoid | 65 | 10 | 43 | ~47 | 0.55 | baguette |
+| kite | 55 | 34 | 41 | ~54 | 0.65 | trillion |
+| bullet | 55 | 33 | 41 | ~58 | 0.60 | pear |
+| tapered_baguette | 70 | 8 | 43 | ~46 | 0.30 | baguette |
+| lozenge | 58 | 18 | 42 | ~53 | 0.65 | marquise |
+| shield | 55 | 35 | 41 | ~57 | 0.85 | trillion |
+| calf_head | 55 | 32 | 40 | ~57 | 0.78 | pear |
+
+All cuts follow GIA/AGS published ranges. Override any parameter via
 the tool's optional kwargs (`table_pct`, `crown_angle_deg`, `pavilion_angle_deg`,
 `girdle_pct`, `aspect_ratio`).
+
+---
+
+## Tool: `jewelry_gem_report` (read-only)
+
+Returns a gemologist-style proportion report for any cut + size without
+writing anything.  Use this before `jewelry_create_gemstone` to inspect
+proportions or verify carat estimates.
+
+### Input
+
+```
+cut          : string  (required) — any GEMSTONE_CUTS key
+carat        : number  (one of)   — stone weight in carats
+diameter_mm  : number  (one of)   — primary dimension in mm
+material     : string  (optional) — density lookup (default: 'diamond')
+density_g_cm3: number  (optional) — explicit density override
+```
+
+### Output schema
+
+```json
+{
+  "cut": "round_brilliant",
+  "facet_family": "round_brilliant",
+  "material": "diamond",
+  "spread_mm": 6.5,
+  "width_mm": 6.5,
+  "depth_mm": 4.02,
+  "carat_est": 1.0,
+  "table_pct": 57.0,
+  "total_depth_pct": 61.8,
+  "crown_height_pct": 16.2,
+  "pavilion_depth_pct": 43.1,
+  "girdle_pct": 2.5,
+  "crown_angle_deg": 34.5,
+  "pavilion_angle_deg": 40.75,
+  "aspect_ratio": 1.0,
+  "lw_ratio": 1.0,
+  "proportion_grade": "Excellent"
+}
+```
+
+### Proportion grade heuristic
+
+The `proportion_grade` field applies GIA/AGS ideal-window ranges
+per cut family across four indicators (table %, depth %, crown angle,
+pavilion angle):
+
+| Misses | Grade |
+|--------|-------|
+| 0 | Excellent |
+| 1 | Very Good |
+| 2 | Good |
+| 3+ | Fair |
+
+Default proportions for round brilliant (`Tolkowsky ideal`) grade
+**Excellent**.  Historical cuts (old_european, rose_cut, etc.) use
+their own appropriate windows.
+
+### Example
+
+```
+# Inspect a 1 ct round brilliant before creating it
+jewelry_gem_report(cut="round_brilliant", carat=1.0)
+# → spread_mm=6.5, depth_mm=4.02, proportion_grade="Excellent"
+
+# Check if an old European would fit a 5 mm seat
+jewelry_gem_report(cut="old_european", diameter_mm=5.0)
+# → spread_mm=5.0, table_pct=40.0, crown_angle_deg=40.0, proportion_grade="Very Good"
+```
 
 ---
 

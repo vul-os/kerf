@@ -73,6 +73,50 @@ Default material is `diamond` for backward compatibility.
 
 ---
 
+## Coloured-stone density correction
+
+Pass `material` or `density_g_cm3` to get accurate carat weights for coloured
+stones.  The formula scales the reference dimension as:
+
+```
+ref_mm_material = ref_mm_diamond × (3.51 / rho) ^ (1/3)
+```
+
+so that volume × density = 0.2 g (1 carat) for any cut shape.
+
+### Built-in density table (g/cm³, GIA Gem Reference Guide)
+
+| Material | Density | Notes |
+|----------|---------|-------|
+| diamond | 3.51 | calibration baseline |
+| ruby | 3.99 | corundum |
+| sapphire | 4.00 | corundum |
+| emerald | 2.72 | beryl |
+| amethyst | 2.65 | quartz |
+| citrine | 2.65 | quartz |
+| aquamarine | 2.72 | beryl |
+| morganite | 2.71 | beryl |
+| topaz | 3.53 | — |
+| garnet | 3.78 | pyrope–almandine |
+| spinel | 3.60 | — |
+| tanzanite | 3.35 | zoisite |
+| peridot | 3.32 | — |
+| tourmaline | 3.10 | — |
+| opal | 2.08 | — |
+| moonstone | 2.56 | orthoclase feldspar |
+| alexandrite | 3.73 | chrysoberyl |
+| zircon | 4.67 | high type |
+| pearl | 2.71 | nacre |
+
+For a stone not in this list, pass `density_g_cm3=<value>` explicitly.
+Unknown material names fall back to diamond silently (backward-compatible).
+
+**Sources:** GIA Gem Reference Guide (Liddicoat, 1995), GIA Gemology Reference
+(gia.edu/gems-gemology), GIA Gem Encyclopedia (2014 ed.), International Gem
+Society gem property tables.
+
+---
+
 ## Default proportions (industry standard)
 
 ### Round brilliant (GIA ideal / Tolkowsky)
@@ -202,6 +246,31 @@ Tighten `girdle_clearance_mm` to 0.02 for a press-fit (gypsy/flush set).
 Increase to 0.10 for a bezel set where the metal will be pushed over.
 
 ---
+
+## Worked example: 1 ct ruby oval solitaire (coloured stone)
+
+```
+# Ruby is denser than diamond (3.99 vs 3.51 g/cm³), so 1 ct ruby is
+# physically smaller than a 1 ct diamond of the same cut.
+
+jewelry_create_gemstone(
+    file_id="<feature_file_uuid>",
+    cut="oval",
+    carat=1.0,
+    material="ruby",       # triggers density correction automatically
+    position=[0, 0, 5],
+)
+# → diameter_mm ≈ 7.39 mm (vs 7.70 mm for 1 ct diamond oval)
+
+jewelry_cut_gem_seat(
+    file_id="<feature_file_uuid>",
+    cut="oval",
+    carat=1.0,
+    material="ruby",
+    position=[0, 0, 5],
+    auto_cut_host_id="sweep1-1"
+)
+```
 
 ## Worked example: 1 ct round brilliant solitaire
 

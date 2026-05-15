@@ -29,6 +29,7 @@ import pytest
 
 from kerf_cad_core.jewelry.gemstones import (
     GEMSTONE_CUTS,
+    GEMSTONE_DENSITIES,
     carat_from_mm,
     mm_from_carat,
     gemstone_proportions,
@@ -509,3 +510,142 @@ class TestFancyCuts:
         assert result["op"] == "gemstone"
         assert result["cut"] == cut
 
+
+# ---------------------------------------------------------------------------
+# Coloured-stone density correction
+# ---------------------------------------------------------------------------
+
+class TestGemstoneDensities:
+    """Density table completeness and correctness."""
+
+    REQUIRED_MATERIALS = [
+        "diamond", "ruby", "sapphire", "emerald", "amethyst", "topaz",
+        "garnet", "aquamarine", "citrine", "peridot", "tanzanite", "opal",
+    ]
+
+    def test_density_table_has_required_materials(self):
+        for mat in self.REQUIRED_MATERIALS:
+            assert mat in GEMSTONE_DENSITIES, f"Missing density for {mat!r}"
+
+    def test_diamond_density(self):
+        assert GEMSTONE_DENSITIES["diamond"] == pytest.approx(3.51, abs=0.05)
+
+    def test_ruby_density(self):
+        # Corundum SG ≈ 3.97–4.05; nominal 3.99–4.00
+        assert GEMSTONE_DENSITIES["ruby"] == pytest.approx(4.0, abs=0.1)
+
+    def test_sapphire_density(self):
+        assert GEMSTONE_DENSITIES["sapphire"] == pytest.approx(4.0, abs=0.1)
+
+    def test_emerald_density(self):
+        # Beryl SG ≈ 2.67–2.78, typical 2.72
+        assert GEMSTONE_DENSITIES["emerald"] == pytest.approx(2.72, abs=0.1)
+
+    def test_opal_is_lighter_than_diamond(self):
+        assert GEMSTONE_DENSITIES["opal"] < GEMSTONE_DENSITIES["diamond"]
+
+    def test_zircon_is_heavier_than_diamond(self):
+        assert GEMSTONE_DENSITIES["zircon"] > GEMSTONE_DENSITIES["diamond"]
+
+    def test_all_densities_positive(self):
+        for mat, rho in GEMSTONE_DENSITIES.items():
+            assert rho > 0, f"{mat} has non-positive density"
+
+
+class TestColourStoneCaratCorrection:
+    """carat↔mm formulae produce correct values for coloured stones."""
+
+    def test_ruby_1ct_larger_than_diamond_1ct(self):
+        """1 ct ruby is physically smaller than 1 ct diamond because ruby is denser."""
+        # mm_from_carat for ruby should return SMALLER mm than for diamond
+        mm_diamond = mm_from_carat("round_brilliant", 1.0)
+        mm_ruby    = mm_from_carat("round_brilliant", 1.0, material="ruby")
+        assert mm_ruby < mm_diamond, (
+            f"1 ct ruby ({mm_ruby:.3f} mm) should be smaller than 1 ct diamond ({mm_diamond:.3f} mm)"
+        )
+
+    def test_emerald_1ct_larger_mm_than_diamond(self):
+        """1 ct emerald is physically larger because emerald is less dense than diamond."""
+        mm_diamond = mm_from_carat("round_brilliant", 1.0)
+        mm_emerald = mm_from_carat("round_brilliant", 1.0, material="emerald")
+        assert mm_emerald > mm_diamond
+
+    def test_ruby_round_trip(self):
+        """mm_from_carat(carat_from_mm(d, ruby), ruby) == d for ruby."""
+        for dim in [4.0, 6.0, 8.0]:
+            ct   = carat_from_mm("round_brilliant", dim, material="ruby")
+            back = mm_from_carat("round_brilliant", ct, material="ruby")
+            assert back == pytest.approx(dim, rel=1e-9)
+
+    def test_density_override(self):
+        """Explicit density_g_cm3 matches equivalent material name lookup."""
+        dim = 6.0
+        ct_by_name    = carat_from_mm("round_brilliant", dim, material="ruby")
+        ct_by_density = carat_from_mm("round_brilliant", dim,
+                                      density_g_cm3=GEMSTONE_DENSITIES["ruby"])
+        assert ct_by_name == pytest.approx(ct_by_density, rel=1e-9)
+
+    def test_diamond_default_unchanged(self):
+        """No material kwarg ⇒ same result as material='diamond' (backward-compat)."""
+        dim = 6.5
+        ct_default = carat_from_mm("round_brilliant", dim)
+        ct_diamond = carat_from_mm("round_brilliant", dim, material="diamond")
+        assert ct_default == pytest.approx(ct_diamond, rel=1e-12)
+
+    def test_unknown_material_falls_back_to_diamond(self):
+        """Unknown material silently falls back to diamond (no error)."""
+        ct_unknown = carat_from_mm("round_brilliant", 6.5, material="unobtainium")
+        ct_diamond = carat_from_mm("round_brilliant", 6.5)
+        assert ct_unknown == pytest.approx(ct_diamond, rel=1e-9)
+
+    def test_ruby_1ct_carat_correct_value(self):
+        """1 ct ruby round brilliant: check that mm < diamond reference.
+
+        Diamond ref = 6.5 mm.  Ruby density = 3.99 g/cm³.
+        ref_mm_ruby = 6.5 × (3.51/3.99)^(1/3) ≈ 6.24 mm.
+        """
+        mm_ruby = mm_from_carat("round_brilliant", 1.0, material="ruby")
+        expected = 6.5 * (3.51 / GEMSTONE_DENSITIES["ruby"]) ** (1.0 / 3.0)
+        assert mm_ruby == pytest.approx(expected, rel=1e-6)
+
+    def test_negative_density_raises(self):
+        with pytest.raises(ValueError):
+            carat_from_mm("round_brilliant", 6.5, density_g_cm3=-1.0)
+
+    def test_zero_density_raises(self):
+        with pytest.raises(ValueError):
+            mm_from_carat("round_brilliant", 1.0, density_g_cm3=0.0)
+
+    def test_gemstone_proportions_accepts_material(self):
+        """gemstone_proportions with carat + material uses correct mm."""
+        props_diamond = gemstone_proportions("round_brilliant", carat=1.0)
+        props_ruby    = gemstone_proportions("round_brilliant", carat=1.0, material="ruby")
+        # Ruby 1 ct → smaller physical stone
+        assert props_ruby.diameter_mm < props_diamond.diameter_mm
+
+    def test_gemstone_proportions_accepts_density_g_cm3(self):
+        props = gemstone_proportions(
+            "round_brilliant", carat=1.0,
+            density_g_cm3=GEMSTONE_DENSITIES["sapphire"],
+        )
+        expected_mm = mm_from_carat("round_brilliant", 1.0, material="sapphire")
+        assert props.diameter_mm == pytest.approx(expected_mm, rel=1e-9)
+
+    def test_tool_runner_density_g_cm3(self):
+        """LLM tool runner accepts density_g_cm3 and stores correct diameter."""
+        ctx, store, fid = make_ctx()
+        rho_ruby = GEMSTONE_DENSITIES["ruby"]
+        result = run_tool(ctx, fid, cut="round_brilliant", carat=1.0,
+                          material="ruby", density_g_cm3=rho_ruby)
+        assert result.get("error") is None, result
+        expected_mm = mm_from_carat("round_brilliant", 1.0, density_g_cm3=rho_ruby)
+        assert result["diameter_mm"] == pytest.approx(expected_mm, rel=1e-6)
+
+    def test_tool_runner_material_ruby_carat_approx(self):
+        """carat_approx in tool response reflects ruby density."""
+        ctx, store, fid = make_ctx()
+        result = run_tool(ctx, fid, cut="round_brilliant", diameter_mm=6.5,
+                          material="ruby")
+        assert result.get("error") is None, result
+        # 6.5 mm ruby should give MORE than 1 carat (ruby is denser)
+        assert result["carat_approx"] > 1.0

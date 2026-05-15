@@ -3,7 +3,7 @@ parser.py — top-level IFC file parser.
 
 parse_ifc_file(path) → IFCImportResult
 
-Walks the IFC model by entity type (Tier 1 set):
+Walks the IFC model by entity type (Tier 1 + Tier 2 set):
     IfcSite               → site metadata
     IfcBuildingStorey     → level nodes
     IfcWall               → wall nodes  (includes IfcWallStandardCase)
@@ -11,10 +11,12 @@ Walks the IFC model by entity type (Tier 1 set):
                             writes both types)
     IfcSlab               → slab nodes
     IfcSpace              → space nodes
+    IfcWindow / IfcDoor   → openings[] nodes  [Tier 2]
+    IfcFlowSegment etc.   → mep[] nodes       [Tier 2]
 
-Tier-2 types (IfcColumn, IfcBeam, IfcCurtainWall, IfcWindow, IfcDoor,
-IfcRailing, IfcStairFlight, IfcMember, IfcPlate, families, schedules,
-views) are skipped with a summary warning.
+Tier-2 structural types (IfcColumn, IfcBeam, IfcCurtainWall, IfcRailing,
+IfcStairFlight, IfcMember, IfcPlate, families, schedules, views) are
+skipped with a summary warning.
 
 ## Placement chain note
 
@@ -38,23 +40,21 @@ from kerf_bim.import_ifc.levels import translate_level
 from kerf_bim.import_ifc.walls import translate_wall
 from kerf_bim.import_ifc.slabs import translate_slab
 from kerf_bim.import_ifc.spaces import translate_space
+from kerf_bim.import_ifc.openings import translate_opening
+from kerf_bim.import_ifc.mep import translate_mep_element, MEP_QUERY_TYPES
 
 logger = logging.getLogger(__name__)
 
-# Tier-2 entity types that are intentionally skipped in this release.
-_TIER2_TYPES = (
+# Tier-2 structural entity types still intentionally skipped (not yet supported).
+# Windows, doors, and MEP distribution elements are now translated (Tier 2).
+_TIER2_SKIPPED_TYPES = (
     "IfcColumn",
     "IfcBeam",
     "IfcCurtainWall",
-    "IfcWindow",
-    "IfcDoor",
     "IfcRailing",
     "IfcStairFlight",
     "IfcMember",
     "IfcPlate",
-    "IfcFlowTerminal",
-    "IfcFlowSegment",
-    "IfcFlowFitting",
 )
 
 
@@ -100,6 +100,7 @@ def parse_ifc_file(path: Path) -> IFCImportResult:
         "slabs": [],
         "spaces": [],
         "openings": [],
+        "mep": [],
     }
 
     # ── Project name from IfcProject ────────────────────────────────────────
@@ -203,9 +204,45 @@ def parse_ifc_file(path: Path) -> IFCImportResult:
         except Exception as exc:
             warnings.append(f"space {gid!r}: translation error ({exc}); skipped")
 
-    # ── Tier-2 skip summary ──────────────────────────────────────────────────
+    # ── Openings: IfcWindow + IfcDoor ────────────────────────────────────────
+    opening_entities: dict[str, Any] = {}
+    for otype in ("IfcWindow", "IfcDoor"):
+        try:
+            for elem in ifc_file.by_type(otype):
+                gid = getattr(elem, "GlobalId", id(elem))
+                opening_entities[gid] = elem
+        except Exception as exc:
+            warnings.append(f"{otype} query failed: {exc}")
+
+    for gid, ifc_opening in opening_entities.items():
+        try:
+            opening_node = translate_opening(ifc_opening, level_guid_to_name, warnings)
+            if opening_node:
+                bim["openings"].append(opening_node)
+        except Exception as exc:
+            warnings.append(f"opening {gid!r}: translation error ({exc}); skipped")
+
+    # ── MEP: IfcDistributionElement subtypes ─────────────────────────────────
+    mep_entities: dict[str, Any] = {}
+    for mep_type in MEP_QUERY_TYPES:
+        try:
+            for elem in ifc_file.by_type(mep_type):
+                gid = getattr(elem, "GlobalId", id(elem))
+                mep_entities[gid] = elem
+        except Exception as exc:
+            warnings.append(f"{mep_type} query failed: {exc}")
+
+    for gid, ifc_mep in mep_entities.items():
+        try:
+            mep_node = translate_mep_element(ifc_mep, level_guid_to_name, warnings)
+            if mep_node:
+                bim["mep"].append(mep_node)
+        except Exception as exc:
+            warnings.append(f"mep element {gid!r}: translation error ({exc}); skipped")
+
+    # ── Tier-2 structural skip summary ───────────────────────────────────────
     tier2_counts: dict[str, int] = {}
-    for t2_type in _TIER2_TYPES:
+    for t2_type in _TIER2_SKIPPED_TYPES:
         try:
             entities = ifc_file.by_type(t2_type)
             if entities:
@@ -216,16 +253,18 @@ def parse_ifc_file(path: Path) -> IFCImportResult:
     if tier2_counts:
         summary = ", ".join(f"{t}×{n}" for t, n in sorted(tier2_counts.items()))
         warnings.append(
-            f"Tier-2 entity types skipped (not yet supported): {summary}. "
+            f"Tier-2 structural entity types skipped (not yet supported): {summary}. "
             "These will be supported in a future IFC import release."
         )
 
     stats = {
-        "sites":  len(sites),
-        "levels": len(bim["levels"]),
-        "walls":  len(bim["walls"]),
-        "slabs":  len(bim["slabs"]),
-        "spaces": len(bim["spaces"]),
+        "sites":    len(sites),
+        "levels":   len(bim["levels"]),
+        "walls":    len(bim["walls"]),
+        "slabs":    len(bim["slabs"]),
+        "spaces":   len(bim["spaces"]),
+        "openings": len(bim["openings"]),
+        "mep":      len(bim["mep"]),
     }
 
     return IFCImportResult(bim_payload=bim, stats=stats, warnings=warnings)

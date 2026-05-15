@@ -16,6 +16,10 @@ trillion         Triangular modified brilliant (Trillion™ / triangular brillia
 heart            Heart-shaped modified brilliant.
 baguette         Rectangular step cut (long narrow bar).
 briolette        Elongated teardrop with all-facet surface; no table.
+portuguese       Round step + brilliant hybrid; many concentric step rows.
+ceylon           Barion-style hybrid: rectangular brilliant with step pavilion.
+flanders         Square brilliant with softly cropped corners (4-fold symmetry).
+square_emerald   Square step cut (equal L:W emerald); also called "Quadrillion".
 
 Each cut is described by a *proportions dict* whose keys follow GIA/AGS
 conventions (all linear dimensions as mm, angles in degrees).
@@ -95,6 +99,8 @@ Briolette:
 LLM-facing tools
 ----------------
   jewelry_create_gemstone  — appends a gemstone node to a .feature file
+  jewelry_gem_report       — read-only proportion report + 4Cs estimate
+  jewelry_gem_catalog      — read-only birthstone/gem property lookup
 """
 
 from __future__ import annotations
@@ -145,6 +151,11 @@ GEMSTONE_CUTS = {
     "lozenge",           # Diamond/rhombus four-point step cut
     "shield",            # Irregular pentagon / shield-shaped brilliant
     "calf_head",         # Wide pear variant; low-set teardrop (bouche)
+    # Step / mixed cuts added in fourth slice:
+    "portuguese",        # Round step+brilliant hybrid; many concentric rows; high fire
+    "ceylon",            # Barion-style hybrid: rectangular brilliant crown, step pavilion
+    "flanders",          # Square brilliant with lightly cropped corners (4-fold symmetry)
+    "square_emerald",    # Square step cut (equal L:W emerald); "Quadrillion" square emerald
 }
 
 
@@ -203,6 +214,248 @@ _DIAMOND_DENSITY: float = GEMSTONE_DENSITIES["diamond"]
 
 
 # ---------------------------------------------------------------------------
+# Birthstone / gem property catalog
+# ---------------------------------------------------------------------------
+#
+# Reference sources:
+#   GIA Gem Reference Guide (Liddicoat, GIA 1995) — hardness, RI, density
+#   GIA Gemology Reference: https://www.gia.edu/gems-gemology
+#   Gemological Institute of America Gem Encyclopedia, 2014 ed.
+#   American Gem Society (AGS) birthstone list: https://www.americangemsociety.org
+#   Jewelers of America modern + traditional birthstone chart (updated 2016)
+#   International Gem Society (IGS) gem property tables
+#
+# Each entry: {
+#   "months"         : list[int]  — birth months (1=January … 12=December)
+#   "mohs"           : float | tuple[float,float]  — hardness (range or midpoint)
+#   "ri"             : float | tuple[float,float]  — refractive index (range or midpoint)
+#   "density"        : float      — specific gravity in g/cm³ (see GEMSTONE_DENSITIES for source)
+#   "common_cuts"    : list[str]  — preferred cut styles (keys from GEMSTONE_CUTS)
+#   "colour_range"   : str        — brief colour description
+# }
+#
+# density values are cross-referenced with GEMSTONE_DENSITIES; the canonical
+# value lives in GEMSTONE_DENSITIES.  This catalog entry mirrors it for
+# convenience but the carat↔mm math always reads from GEMSTONE_DENSITIES.
+#
+# Mohs / RI sources: GIA Gem Reference Guide, IGS; range = published span,
+#   single value = midpoint of span.
+
+GEM_CATALOG: dict[str, dict] = {
+    "diamond": {
+        "months": [4],          # April — GIA / Jewelers of America
+        "mohs": 10.0,           # Exact; hardest natural mineral
+        "ri": (2.417, 2.419),   # GIA; isotropic cubic
+        "density": 3.51,
+        "common_cuts": ["round_brilliant", "princess", "cushion", "oval",
+                        "pear", "marquise", "radiant", "asscher", "heart"],
+        "colour_range": "Colourless to light yellow/brown; rare fancy colours (pink, blue, green)",
+    },
+    "ruby": {
+        "months": [7],          # July
+        "mohs": 9.0,
+        "ri": (1.762, 1.770),   # GIA; uniaxial negative; corundum ω/ε
+        "density": 3.99,
+        "common_cuts": ["oval", "cushion", "round_brilliant", "pear", "emerald"],
+        "colour_range": "Pinkish-red to deep red; finest are 'pigeon's blood' vivid red",
+    },
+    "sapphire": {
+        "months": [9],          # September
+        "mohs": 9.0,
+        "ri": (1.762, 1.770),
+        "density": 4.00,
+        "common_cuts": ["oval", "cushion", "round_brilliant", "princess", "pear"],
+        "colour_range": "Blue (classic); also pink, yellow, orange, purple, colourless, parti",
+    },
+    "emerald": {
+        "months": [5],          # May
+        "mohs": (7.5, 8.0),
+        "ri": (1.565, 1.602),   # GIA; beryl biaxial negative
+        "density": 2.72,
+        "common_cuts": ["emerald", "oval", "cushion", "pear", "round_brilliant"],
+        "colour_range": "Bluish-green to yellowish-green; finest are vivid medium-dark green",
+    },
+    "amethyst": {
+        "months": [2],          # February
+        "mohs": 7.0,
+        "ri": (1.544, 1.553),   # GIA; quartz uniaxial positive
+        "density": 2.65,
+        "common_cuts": ["round_brilliant", "oval", "cushion", "pear", "trillion"],
+        "colour_range": "Light lilac to deep purple-violet; finest are vivid medium-dark purple",
+    },
+    "aquamarine": {
+        "months": [3],          # March
+        "mohs": (7.5, 8.0),
+        "ri": (1.567, 1.590),   # GIA; beryl biaxial negative
+        "density": 2.72,
+        "common_cuts": ["emerald", "oval", "round_brilliant", "pear", "cushion"],
+        "colour_range": "Pale blue to blue-green; finest are medium-dark blue ('Santa Maria')",
+    },
+    "topaz": {
+        "months": [11],         # November (blue/yellow; November also has citrine)
+        "mohs": 8.0,
+        "ri": (1.609, 1.643),   # GIA; biaxial positive; varies with colour
+        "density": 3.53,
+        "common_cuts": ["oval", "cushion", "pear", "round_brilliant", "princess"],
+        "colour_range": "Colourless, blue (treated), imperial orange-yellow, pink, red",
+    },
+    "garnet": {
+        "months": [1],          # January
+        "mohs": (6.5, 7.5),
+        "ri": (1.714, 1.888),   # GIA; range across species (pyrope–spessartine–demantoid)
+        "density": 3.78,
+        "common_cuts": ["round_brilliant", "oval", "cushion", "pear", "trillion"],
+        "colour_range": "Red (pyrope/almandine), orange (spessartine/hessonite), green (tsavorite/demantoid), purple-red (rhodolite)",
+    },
+    "peridot": {
+        "months": [8],          # August
+        "mohs": (6.5, 7.0),
+        "ri": (1.650, 1.703),   # GIA; biaxial positive; olivine
+        "density": 3.32,
+        "common_cuts": ["oval", "round_brilliant", "cushion", "pear", "trillion"],
+        "colour_range": "Yellowish-green to olive-green to brownish-green",
+    },
+    "citrine": {
+        "months": [11],         # November (also shares with topaz)
+        "mohs": 7.0,
+        "ri": (1.544, 1.553),
+        "density": 2.65,
+        "common_cuts": ["round_brilliant", "oval", "cushion", "pear", "trillion"],
+        "colour_range": "Pale yellow to deep orange-yellow ('Madeira'); brownish-orange ('Palmeira')",
+    },
+    "tanzanite": {
+        "months": [12],         # December (also shares with turquoise, zircon, blue topaz)
+        "mohs": (6.0, 7.0),
+        "ri": (1.691, 1.700),   # GIA; biaxial positive; zoisite
+        "density": 3.35,
+        "common_cuts": ["oval", "cushion", "round_brilliant", "pear", "trillion"],
+        "colour_range": "Violetish-blue to blue-violet; trichroic (blue/violet/burgundy)",
+    },
+    "opal": {
+        "months": [10],         # October (also shares with tourmaline)
+        "mohs": (5.5, 6.5),
+        "ri": (1.370, 1.520),   # GIA; amorphous; range varies widely
+        "density": 2.08,
+        "common_cuts": ["oval", "cushion", "round_brilliant", "pear"],
+        "colour_range": "White/grey/black body colour with spectral play-of-colour; fire opal = orange-red",
+    },
+    "pearl": {
+        "months": [6],          # June (also shares with moonstone, alexandrite)
+        "mohs": (2.5, 4.5),
+        "ri": (1.530, 1.685),   # GIA; nacre birefringent composite
+        "density": 2.71,
+        "common_cuts": ["round_brilliant"],   # cabochon/bead; no standard faceted cut
+        "colour_range": "White, cream, pink, gold, grey, black; overtone rosé, green, blue",
+    },
+    "turquoise": {
+        "months": [12],         # December
+        "mohs": (5.0, 6.0),
+        "ri": (1.610, 1.650),   # GIA; biaxial positive
+        "density": 2.75,
+        "common_cuts": ["oval", "cushion", "round_brilliant"],   # typically cabochon
+        "colour_range": "Sky-blue to blue-green to yellowish-green; finest is robin's-egg blue",
+    },
+    "tourmaline": {
+        "months": [10],         # October (shares with opal)
+        "mohs": (7.0, 7.5),
+        "ri": (1.624, 1.644),   # GIA; uniaxial negative; mid-range elbaite
+        "density": 3.10,
+        "common_cuts": ["oval", "pear", "cushion", "round_brilliant", "emerald"],
+        "colour_range": "Every colour; Paraíba neon blue-green, rubellite red-pink, chrome green, watermelon bicolour",
+    },
+    "spinel": {
+        "months": [8],          # August (modern addition, shares with peridot and sardonyx)
+        "mohs": 8.0,
+        "ri": (1.712, 1.762),   # GIA; isotropic; range by trace elements
+        "density": 3.60,
+        "common_cuts": ["oval", "cushion", "round_brilliant", "pear"],
+        "colour_range": "Red, pink, orange, blue, purple, black; finest is vivid red ('Balas ruby')",
+    },
+    "morganite": {
+        "months": [],           # No traditional birth month; rose beryl
+        "mohs": (7.5, 8.0),
+        "ri": (1.572, 1.600),   # GIA; beryl biaxial negative
+        "density": 2.71,
+        "common_cuts": ["oval", "cushion", "round_brilliant", "pear", "heart"],
+        "colour_range": "Pale pink to peach-pink to rose; deep peachy-pink most desirable",
+    },
+    "alexandrite": {
+        "months": [6],          # June
+        "mohs": (8.5, 9.0),     # GIA; chrysoberyl
+        "ri": (1.746, 1.755),   # GIA; biaxial positive
+        "density": 3.73,
+        "common_cuts": ["oval", "cushion", "round_brilliant", "pear"],
+        "colour_range": "Green in daylight/fluorescent; red-purple in incandescent; colour-change",
+    },
+    "moonstone": {
+        "months": [6],          # June
+        "mohs": (6.0, 6.5),
+        "ri": (1.518, 1.526),   # GIA; orthoclase feldspar; biaxial negative
+        "density": 2.56,
+        "common_cuts": ["oval", "cushion", "round_brilliant"],   # often cabochon
+        "colour_range": "Colourless to white with blue adularescence; peach, grey-green varieties",
+    },
+    "zircon": {
+        "months": [12],         # December
+        "mohs": (6.0, 7.5),
+        "ri": (1.925, 1.984),   # GIA; biaxial positive (high type); uniaxial low type
+        "density": 4.67,
+        "common_cuts": ["round_brilliant", "oval", "cushion", "princess"],
+        "colour_range": "Blue (heat-treated), golden-yellow, orange, red, green, colourless",
+    },
+}
+
+
+def _catalog_lookup(query: str) -> list[tuple[str, dict]]:
+    """Return matching catalog entries for a gem name or birth-month query.
+
+    Supports:
+    - Gem name (exact or case-insensitive substring): e.g. "ruby", "Ruby"
+    - Month name (English): e.g. "january", "April"
+    - Month number (1–12): e.g. "1", "04"
+
+    Returns a list of (gem_name, entry) tuples.
+    """
+    q = query.strip().lower()
+    results: list[tuple[str, dict]] = []
+
+    # Try month name → number
+    _MONTH_NAMES = {
+        "january": 1, "february": 2, "march": 3, "april": 4,
+        "may": 5, "june": 6, "july": 7, "august": 8,
+        "september": 9, "october": 10, "november": 11, "december": 12,
+    }
+    month_num: Optional[int] = None
+    if q in _MONTH_NAMES:
+        month_num = _MONTH_NAMES[q]
+    else:
+        try:
+            n = int(q)
+            if 1 <= n <= 12:
+                month_num = n
+        except ValueError:
+            pass
+
+    if month_num is not None:
+        # Return all gems whose birth months include this month
+        for name, entry in GEM_CATALOG.items():
+            if month_num in entry["months"]:
+                results.append((name, entry))
+        return results
+
+    # Exact name match first
+    if q in GEM_CATALOG:
+        return [(q, GEM_CATALOG[q])]
+
+    # Substring match
+    for name, entry in GEM_CATALOG.items():
+        if q in name:
+            results.append((name, entry))
+
+    return results
+
+
+# ---------------------------------------------------------------------------
 # Carat ↔ mm sizing
 # ---------------------------------------------------------------------------
 
@@ -239,6 +492,11 @@ _CARAT_REF: dict[str, tuple[float, float]] = {
     "lozenge":         (6.5, 3.0),   # rhombus step cut; similar to marquise volume
     "shield":          (6.8, 3.0),   # irregular pentagon; large face, moderate depth
     "calf_head":       (8.5, 3.0),   # wide low-set pear variant; large spread
+    # Step / mixed cuts (fourth slice):
+    "portuguese":      (6.5, 3.0),   # round step+brilliant hybrid; similar spread to round_brilliant
+    "ceylon":          (6.5, 3.0),   # barion hybrid; rectangular brilliant; ~same volume as radiant
+    "flanders":        (5.5, 3.0),   # square brilliant; similar to princess
+    "square_emerald":  (5.5, 3.0),   # square step cut; same footprint as asscher
 }
 
 
@@ -879,6 +1137,104 @@ _CUT_DEFAULTS: dict[str, dict] = {
             "facet_family": "pear",
         },
     },
+
+    # -----------------------------------------------------------------------
+    # Step / mixed cuts (fourth slice)
+    # All map to an existing facet family; no worker change needed.
+    # -----------------------------------------------------------------------
+
+    "portuguese": {
+        # Round step + brilliant hybrid with many concentric step rows on the
+        # crown and an 8-rayed star pavilion.  Developed in Portugal; very high
+        # fire from the many step rows.  Circular girdle like round_brilliant.
+        # Family: round_brilliant (circular girdle; worker renders as step+brilliant).
+        # Ref: Gemological Institute of America Gem Encyclopedia 2014; Tolkowsky
+        #      variation proportions; AGS/GIA step-brilliant hybrid notes.
+        # Industry reference: table ~55%, total depth ~66%, crown angle ~35°,
+        #   step_rows_crown=4 (unusual for a round), pavilion star pattern.
+        "table_pct": 55.0,
+        "crown_angle_deg": 35.0,
+        "crown_height_pct": 17.0,
+        "pavilion_angle_deg": 40.75,
+        "pavilion_depth_pct": 43.5,
+        "girdle_pct": 2.5,
+        "aspect_ratio": 1.0,
+        "extras": {
+            "step_rows_crown": 4,   # concentric step rows on crown (distinguishing feature)
+            "facet_count": 73,      # typical Portuguese cut facet count
+            "facet_family": "round_brilliant",
+        },
+    },
+
+    "ceylon": {
+        # Barion / Ceylon hybrid cut: brilliant crown facets (modified brilliant
+        # pattern) combined with a step-cut pavilion.  Developed by Basil Watermeyer
+        # (South Africa, 1960s).  Rectangular or oval outline.
+        # Family: emerald (rectangular step; worker uses brilliant crown overlay).
+        # Industry reference: table ~58%, depth ~62–66%, crown angle ~33°,
+        #   pavilion step_rows=3, aspect ~0.75 (rectangular barion).
+        # Sources: GIA Gem Encyclopedia 2014; IGS "barion cut" reference;
+        #   Watermeyer, B. "Diamond Cutting" (1980, Prestige Press, SA).
+        "table_pct": 58.0,
+        "crown_angle_deg": 33.0,
+        "crown_height_pct": 14.0,
+        "pavilion_angle_deg": 41.0,
+        "pavilion_depth_pct": 43.0,
+        "girdle_pct": 2.5,
+        "aspect_ratio": 0.75,         # rectangular barion; width = 0.75 × length
+        "extras": {
+            "step_rows": 3,           # step pavilion rows (barion feature)
+            "brilliant_crown": True,  # modified-brilliant crown facets
+            "corner_cut_ratio": 0.12, # light corner cut; less than emerald
+            "facet_family": "emerald",
+        },
+    },
+
+    "flanders": {
+        # Flanders cut: square brilliant with softly cropped corners (4-fold
+        # symmetry, similar to princess but with larger table and fewer main
+        # facets).  Developed in Antwerp in the 1980s.
+        # Family: princess (square modified brilliant; worker uses 4-fold outline).
+        # Industry reference: table ~67%, depth ~66%, crown angle ~30°,
+        #   corner_cut_ratio=0.05 (light trim only), 4-fold symmetry.
+        # Sources: GIA Gem Encyclopedia 2014; Antwerp Diamond High Council (HRD)
+        #   cut documentation; IGS "Flanders cut" notes.
+        "table_pct": 67.0,
+        "crown_angle_deg": 30.0,
+        "crown_height_pct": 11.0,
+        "pavilion_angle_deg": 42.0,
+        "pavilion_depth_pct": 43.0,
+        "girdle_pct": 2.0,
+        "aspect_ratio": 1.0,          # square
+        "extras": {
+            "corner_cut_ratio": 0.05,  # very light corner trim (softer than princess)
+            "facet_count": 65,         # Flanders cut typical facet count
+            "facet_family": "princess",
+        },
+    },
+
+    "square_emerald": {
+        # Square emerald cut: equal length and width step cut with cropped corners.
+        # Also called "square emerald" or "Quadrillion"-style step cut.
+        # Distinguished from asscher by lower crown, less deep corner cuts, and
+        # fewer step rows visible.  L:W = 1:1.
+        # Family: emerald (rectangular step cut; worker uses square L:W).
+        # Industry reference: table ~62%, depth ~60–65%, crown angle ~12–16°,
+        #   step_rows=3, corner_cut_ratio=0.12 (intermediate between emerald/asscher).
+        # Sources: GIA "Shape and Cutting Style" guidelines; IGS step cut references.
+        "table_pct": 62.0,
+        "crown_angle_deg": 14.0,
+        "crown_height_pct": 8.5,
+        "pavilion_angle_deg": 44.0,
+        "pavilion_depth_pct": 43.0,
+        "girdle_pct": 2.0,
+        "aspect_ratio": 1.0,          # square (L:W = 1:1)
+        "extras": {
+            "step_rows": 3,
+            "corner_cut_ratio": 0.12,  # intermediate between emerald (0.15) and asscher (0.20)
+            "facet_family": "emerald",
+        },
+    },
 }
 
 
@@ -933,6 +1289,9 @@ jewelry_create_gemstone_spec = ToolSpec(
         "Fancy cuts: radiant, asscher, trillion, heart, baguette, briolette. "
         "Historical/specialty cuts: old_european, old_mine, rose_cut, single_cut, french_cut, "
         "half_moon, trapezoid, kite, bullet, tapered_baguette, lozenge, shield, calf_head. "
+        "Step/mixed cuts: portuguese (round step+brilliant hybrid), ceylon/barion (brilliant "
+        "crown + step pavilion), flanders (square brilliant, light corner crop), "
+        "square_emerald (square step cut, Quadrillion style). "
         "Size the stone by carat OR by diameter_mm (long axis for non-round cuts). "
         "Carat formula: carat = (diameter_mm / ref_mm)^3 where ref_mm is calibrated per cut "
         "and material density (default: diamond, 3.51 g/cm³). "
@@ -965,7 +1324,11 @@ jewelry_create_gemstone_spec = ToolSpec(
                     "trapezoid=tapered step side stone, kite=arrowhead angular fancy, "
                     "bullet=pointed-base tapered fancy, tapered_baguette=angled-end bar, "
                     "lozenge=rhombus step cut, shield=five-sided brilliant, "
-                    "calf_head=wide-pear bouche variant."
+                    "calf_head=wide-pear bouche variant. "
+                    "Step/mixed: portuguese=round step+brilliant hybrid, "
+                    "ceylon=barion brilliant-crown+step-pavilion, "
+                    "flanders=square brilliant light-crop, "
+                    "square_emerald=square step cut (Quadrillion)."
                 ),
             },
             "carat": {
@@ -1284,6 +1647,15 @@ _GRADE_WINDOWS: dict[str, dict] = {
                         "crown_angle": (31.0, 39.0), "pavilion_angle": (38.0, 44.0)},
     "calf_head":       {"table_pct": (52.0, 62.0), "depth_pct": (54.0, 64.0),
                         "crown_angle": (29.0, 36.0), "pavilion_angle": (37.0, 43.0)},
+    # Step / mixed cuts (fourth slice) — windows derived from industry references
+    "portuguese":      {"table_pct": (52.0, 60.0), "depth_pct": (62.0, 70.0),
+                        "crown_angle": (33.0, 38.0), "pavilion_angle": (39.0, 43.0)},
+    "ceylon":          {"table_pct": (55.0, 65.0), "depth_pct": (60.0, 68.0),
+                        "crown_angle": (30.0, 37.0), "pavilion_angle": (38.0, 44.0)},
+    "flanders":        {"table_pct": (63.0, 72.0), "depth_pct": (63.0, 70.0),
+                        "crown_angle": (27.0, 34.0), "pavilion_angle": (40.0, 45.0)},
+    "square_emerald":  {"table_pct": (58.0, 70.0), "depth_pct": (58.0, 66.0),
+                        "crown_angle": (10.0, 18.0), "pavilion_angle": (42.0, 47.0)},
 }
 
 
@@ -1326,8 +1698,11 @@ jewelry_gem_report_spec = ToolSpec(
         "Read-only gemologist-style report for a gemstone cut + size. "
         "Given a cut and either carat or diameter_mm (plus optional material), "
         "returns: estimated carat, spread (mm), depth %, table %, length/width ratio, "
-        "crown and pavilion angle summary, and a light-return/proportion grade "
-        "(Excellent / Very Good / Good / Fair) based on GIA/AGS ideal windows. "
+        "crown and pavilion angle summary, a light-return/proportion grade "
+        "(Excellent / Very Good / Good / Fair) based on GIA/AGS ideal windows, "
+        "a 4Cs-style estimate with colour-scale and clarity placeholders "
+        "(clearly labelled as estimates, not lab grades), and a "
+        "recommended-setting suggestion for the cut and size. "
         "Does NOT write any file — use this to inspect proportions before calling "
         "jewelry_create_gemstone."
     ),
@@ -1368,6 +1743,134 @@ jewelry_gem_report_spec = ToolSpec(
         "required": ["cut"],
     },
 )
+
+
+# ---------------------------------------------------------------------------
+# 4Cs estimate helpers  (estimates only — not lab grades)
+# ---------------------------------------------------------------------------
+
+# Colour scale placeholder mapping.
+# For diamond: GIA D–Z scale (D = colourless, Z = light yellow/brown).
+# For coloured stones: hue/saturation descriptors from GIA colour grading.
+# These are heuristic placeholders; no optical measurement is performed.
+_DIAMOND_COLOUR_HINT = (
+    "estimate — not a lab grade: GIA D–Z scale. "
+    "D–F = colourless, G–J = near-colourless, K–M = faint yellow, "
+    "N–Z = very light to light yellow."
+)
+_COLOURED_COLOUR_HINT = (
+    "estimate — not a lab grade: GIA colour dimensions — hue / saturation / tone. "
+    "Finest coloured stones: vivid saturation, medium-dark tone, pure hue."
+)
+
+# Clarity scale placeholder.
+# For diamond: GIA FL–I3 scale.
+# For coloured stones: GIA type I/II/III clarity types.
+_CLARITY_HINT_DIAMOND = (
+    "estimate — not a lab grade: GIA FL / IF / VVS1-2 / VS1-2 / SI1-2 / I1-2-3. "
+    "Eye-clean threshold: VS2 for rounds, SI1–SI2 for step cuts (larger table)."
+)
+_CLARITY_HINT_COLOURED = (
+    "estimate — not a lab grade: GIA type I (eye-clean expected, e.g. aquamarine) / "
+    "type II (some inclusions, e.g. ruby/sapphire) / "
+    "type III (inclusions expected, e.g. emerald). "
+    "Eye-clean is practical standard for most coloured stones."
+)
+
+# Step cuts have a large open table which makes inclusions more visible.
+_STEP_CUT_KEYS = frozenset({
+    "emerald", "asscher", "baguette", "tapered_baguette", "french_cut",
+    "trapezoid", "lozenge", "square_emerald",
+})
+
+
+def _colour_hint(material: str) -> str:
+    """Return a colour-scale placeholder string for the given material."""
+    mat = (material or "diamond").lower().strip()
+    if mat == "diamond":
+        return _DIAMOND_COLOUR_HINT
+    return _COLOURED_COLOUR_HINT
+
+
+def _clarity_hint(cut: str, material: str) -> str:
+    """Return a clarity placeholder string, noting step-cut visibility."""
+    mat = (material or "diamond").lower().strip()
+    if mat == "diamond":
+        base = _CLARITY_HINT_DIAMOND
+    else:
+        base = _CLARITY_HINT_COLOURED
+    if cut in _STEP_CUT_KEYS:
+        return base + (
+            " NOTE: step cuts (large open table) show inclusions more readily — "
+            "prefer higher clarity grade for this cut."
+        )
+    return base
+
+
+# Recommended-setting suggestions per cut family + size bracket.
+# Source: RhinoGold / GIA setting design guidelines; standard trade practice.
+
+def _recommended_setting(cut: str, diameter_mm: float) -> str:
+    """Return a recommended-setting string for a given cut and size.
+
+    This is a trade heuristic based on GIA and standard jewellery-design
+    practice.  It is a suggestion, not a constraint.
+    """
+    # Broad size brackets
+    melee  = diameter_mm < 3.5
+    small  = 3.5 <= diameter_mm < 5.0
+    medium = 5.0 <= diameter_mm < 8.0
+    large  = diameter_mm >= 8.0
+
+    _SETTINGS: dict[str, str] = {
+        "round_brilliant": (
+            "prong (4 or 6 claw) solitaire" if medium or large else
+            "channel or pavé" if melee else "bezel or prong"
+        ),
+        "princess": (
+            "4-prong v-tip solitaire or bezel" if medium or large else
+            "channel set" if melee or small else "4-prong v-tip"
+        ),
+        "oval": "prong (4–6 claw) or bezel; east-west orientation popular for modern settings",
+        "emerald": "4-prong or bezel (open-corner); step-cut clarity demands clean setting",
+        "marquise": "6-prong v-tip to protect points; or bezel for a sleek look",
+        "pear": "3–5 prong with v-tip on point; east-west bezel for modern look",
+        "cushion": "4-prong or bezel; halo setting very popular for cushion",
+        "radiant": "4-prong v-corner or bezel; halo enhances the brilliant sparkle",
+        "asscher": "4-prong squared or bezel; step-cut: keep clarity high",
+        "trillion": "3-prong (one per corner) or bezel; often used as side stones flanking a centre",
+        "heart": "3–5 prong with v-tip in cleft; bezel needs skilled metalwork around cleft",
+        "baguette": "channel set (pairs or rows); common as side-stone accent; half-bezel",
+        "briolette": "wrapped or caged wire setting; drilled bail for pendants",
+        "old_european": "4–6 prong antique-style or milgrain bezel; Victorian/Edwardian reproduction",
+        "old_mine": "4-prong antique-style; milgrain or grain-set; Victorian/Edwardian reproduction",
+        "rose_cut": "bezel or low-profile rubover; flush or gypsy set; bohemian / art-nouveau styles",
+        "single_cut": "channel or pavé; bright-cut shared-prong for melee accents",
+        "french_cut": "channel set or milgrain-edge bezel; art-deco geometric patterns",
+        "half_moon": "bezel or 2-claw; flanking a centre stone (paired half-moons); flush shoulder",
+        "trapezoid": "channel set; side stone flanking emerald or radiant centre",
+        "kite": "bezel or 2-claw at wide corners; angular contemporary designs",
+        "bullet": "2-claw or bezel; tapered side stone flanking oval or cushion",
+        "tapered_baguette": "channel set; classic shoulder stone in graduating rows",
+        "lozenge": "bezel or 2-claw; geometric/art-deco accent",
+        "shield": "bezel; irregular shape needs custom metalwork; statement ring",
+        "calf_head": "4-prong or bezel; pendant or cocktail ring; wide teardrop lends itself to drop earrings",
+        "portuguese": "4–6 prong or open bezel to show off fire from step rows; solitaire preferred",
+        "ceylon": "4-prong or bezel; step pavilion benefits from open under-gallery for light",
+        "flanders": "4-prong v-corner solitaire; similar to princess but corner trim reduces chip risk",
+        "square_emerald": "4-prong squared or bezel; step clarity demands clean setting; cathedral mount popular",
+    }
+
+    setting = _SETTINGS.get(cut)
+    if setting is None:
+        setting = "prong or bezel solitaire"
+
+    size_note = ""
+    if melee:
+        size_note = " (melee size — channel/pavé preferred)"
+    elif large:
+        size_note = " (large stone — secure prong/bezel recommended)"
+    return setting + size_note
 
 
 @register(jewelry_gem_report_spec, write=False)
@@ -1453,10 +1956,12 @@ async def run_jewelry_gem_report(ctx: ProjectCtx, args: bytes) -> str:
     # Facet family (from extras if tagged, else the cut itself)
     facet_family = props.extras.get("facet_family", cut)
 
+    material_str = mat_label or "diamond"
+
     return ok_payload({
         "cut": cut,
         "facet_family": facet_family,
-        "material": mat_label or "diamond",
+        "material": material_str,
         # Sizing
         "spread_mm": round(props.diameter_mm, 3),
         "width_mm": width_mm,
@@ -1476,4 +1981,81 @@ async def run_jewelry_gem_report(ctx: ProjectCtx, args: bytes) -> str:
         "lw_ratio": lw_ratio,
         # Grade
         "proportion_grade": grade,
+        # 4Cs-style estimates (clearly labelled — NOT lab grades)
+        "colour_scale_hint": _colour_hint(material_str),
+        "clarity_hint": _clarity_hint(cut, material_str),
+        "recommended_setting": _recommended_setting(cut, props.diameter_mm),
     })
+
+
+# ---------------------------------------------------------------------------
+# LLM tool: jewelry_gem_catalog  (read-only)
+# ---------------------------------------------------------------------------
+
+jewelry_gem_catalog_spec = ToolSpec(
+    name="jewelry_gem_catalog",
+    description=(
+        "Read-only birthstone and gem property catalog. "
+        "Lookup by gem name (e.g. 'ruby') or birth month (name or 1–12). "
+        "Returns: birth month(s), Mohs hardness, refractive index, typical density, "
+        "common cuts, and colour range for each matching gem. "
+        "Does NOT write any file. "
+        "Sources: GIA Gem Reference Guide (Liddicoat, 1995), GIA Gemology Reference, "
+        "GIA Gem Encyclopedia (2014), Jewelers of America birthstone list (2016 revision), "
+        "AGS birthstone chart, International Gem Society."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": (
+                    "Gem name (e.g. 'ruby', 'sapphire', 'morganite') or "
+                    "birth month as English name (e.g. 'january', 'April') or "
+                    "as a number 1–12 (e.g. '4' for April). "
+                    "Case-insensitive. Partial name match supported."
+                ),
+            },
+        },
+        "required": ["query"],
+    },
+)
+
+
+@register(jewelry_gem_catalog_spec, write=False)
+async def run_jewelry_gem_catalog(ctx: ProjectCtx, args: bytes) -> str:
+    """Read-only gem catalog lookup — returns gem properties, writes nothing."""
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    query = a.get("query", "").strip()
+    if not query:
+        return err_payload("query is required", "BAD_ARGS")
+
+    matches = _catalog_lookup(query)
+    if not matches:
+        return err_payload(
+            f"No gem found matching {query!r}. "
+            f"Available gems: {sorted(GEM_CATALOG.keys())}",
+            "NOT_FOUND",
+        )
+
+    results = []
+    for name, entry in matches:
+        # Resolve density from GEMSTONE_DENSITIES (canonical); fall back to catalog value
+        density = GEMSTONE_DENSITIES.get(name, entry.get("density"))
+        results.append({
+            "gem": name,
+            "birth_months": entry["months"],
+            "mohs_hardness": entry["mohs"],
+            "refractive_index": entry["ri"],
+            "density_g_cm3": density,
+            "common_cuts": entry["common_cuts"],
+            "colour_range": entry["colour_range"],
+            # Cross-reference: all cuts for this gem that are in GEMSTONE_CUTS
+            "supported_cuts": [c for c in entry["common_cuts"] if c in GEMSTONE_CUTS],
+        })
+
+    return ok_payload({"results": results, "count": len(results)})

@@ -118,6 +118,7 @@ def _register_tools(ctx, provides: list) -> None:
         "kerf_electronics.tools.netlist_export",
         "kerf_electronics.tools.testpoint",
         "kerf_electronics.tools.variants",
+        "kerf_electronics.tools.odbpp_export",
     ]
 
     for module_path in tool_modules:

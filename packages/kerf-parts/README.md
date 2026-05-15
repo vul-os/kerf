@@ -89,13 +89,39 @@ manifest change.
 | --- | --- |
 | Manifest + pinning + per-source ref override | **done** |
 | Fetcher (clone/refresh/skip, `--only/--heavy/--cache-dir/--ref`) | **done** |
-| KiCad symbols + footprints adapter | **done** — reuses `kerf_imports.kicad_library`, no reparsing |
+| KiCad symbols + footprints adapter | **done** — reuses `kerf_imports.kicad_library`, no reparsing; per-file errors non-fatal |
 | Automatic embedded per-part attribution (provenance) | **done** — see below |
 | Seed into system `Parts Library` project (idempotent, hash-incremental) | **done** |
 | Gitignored attribution NOTICE (regenerated from the embedded data) | **done** |
 | `kicad-packages3D` (3D bodies) | intentionally no-op at seed time (refs only); fetch wired |
 | `bolts` adapter | **scaffold** — fetch wired, conversion is a documented TODO |
 | `freecad-library` adapter | **scaffold** — fetch + file discovery wired; conversion reuses `kerf_imports.freecad` (TODO) |
+
+### What is fully reproducible vs still manual
+
+**Fully reproducible** (given network + Postgres):
+
+1. `kerf-parts-fetch` — deterministic: pins a specific upstream tag, clones
+   `--depth 1`, re-runs are idempotent (skip if already at ref).
+2. `kerf-seed-parts` — deterministic: content-hash incremental, unchanged
+   parts are skipped, changed parts updated; never deletes.
+3. Attribution NOTICE — regenerated from the same structured blocks embedded
+   in each part, so it and the in-part data can never diverge.
+
+**One-time / manual today**:
+
+- Pin bumps: edit `parts-sources.toml`, re-fetch, commit only the manifest.
+  See "How to bump a pin" below.
+- New upstream sources: add a `[[source]]` entry + register an adapter in
+  `src/kerf_parts/adapters/`.
+- `bolts` and `freecad-library` adapters are scaffolded (fetch wired, convert
+  returns `[]`); implementing the conversion is a separate task per-adapter.
+
+**Not reproducible by design**:
+
+- The `.parts-cache/` and generated NOTICE are gitignored.  Each contributor
+  re-fetches locally.  This is intentional: bundling the data would violate
+  the upstream CC-BY-SA / LGPL terms.
 
 ## Automatic attribution (provenance)
 
@@ -144,3 +170,9 @@ Fully hermetic (no network, no DB):
 ```bash
 python -m pytest packages/kerf-parts/tests/ -q
 ```
+
+Test fixtures in `tests/fixtures/synthetic/` are **hand-authored** synthetic
+KiCad-syntax files (fictional component names, clearly not from any upstream
+library).  They exercise the full adapter + provenance + seed pipeline without
+committing any third-party content.  `kiutils` must be installed for the KiCad
+adapter tests (`pip install kiutils`); tests skip gracefully if it is absent.

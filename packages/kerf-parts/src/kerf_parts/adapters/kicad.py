@@ -21,8 +21,9 @@ authorship. The helper guarantees a non-empty ``original_author`` /
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from ..manifest import Source
 from ..model import KerfPart, part_filename
@@ -33,8 +34,26 @@ class KiCadUnavailable(RuntimeError):
     """kiutils (and hence kerf_imports' KiCad scanner) is not installed."""
 
 
-def _scan(src_dir: Path) -> list[dict]:
-    """Run kerf_imports' existing KiCad directory scanner over *src_dir*."""
+@dataclass
+class _ScanResult:
+    """Structured return from :func:`_scan` so warnings/errors travel cleanly."""
+
+    parts: list[dict] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+
+
+def _scan(src_dir: Path) -> _ScanResult:
+    """Run kerf_imports' existing KiCad directory scanner over *src_dir*.
+
+    Returns a :class:`_ScanResult` carrying the converted part dicts plus any
+    per-file warnings/errors.  Parse failures for individual files are *never*
+    fatal: they are captured in ``result.errors`` so the caller can log them
+    and continue converting the rest of the library.
+
+    Also sets the legacy ``_scan.last_warnings`` / ``_scan.last_errors``
+    function attributes for callers that still read them (back-compat).
+    """
     try:
         from kerf_imports.kicad_library import _parse_mod_files, _parse_sym_files
     except ImportError as exc:  # kerf_imports not importable
@@ -46,13 +65,18 @@ def _scan(src_dir: Path) -> list[dict]:
             "kiutils not installed; `pip install kiutils` to convert KiCad libraries"
         ) from exc
 
-    parts: list[dict] = []
-    sym_w, sym_e = _parse_sym_files(src_dir, parts)
-    mod_w, mod_e = _parse_mod_files(src_dir, parts)
-    # Parser-level warnings/errors are non-fatal here; the seeder logs counts.
-    _scan.last_warnings = sym_w + mod_w  # type: ignore[attr-defined]
-    _scan.last_errors = sym_e + mod_e  # type: ignore[attr-defined]
-    return parts
+    raw: list[dict] = []
+    sym_w, sym_e = _parse_sym_files(src_dir, raw)
+    mod_w, mod_e = _parse_mod_files(src_dir, raw)
+    result = _ScanResult(
+        parts=raw,
+        warnings=sym_w + mod_w,
+        errors=sym_e + mod_e,
+    )
+    # Legacy function-attribute accessors preserved for back-compat.
+    _scan.last_warnings = result.warnings  # type: ignore[attr-defined]
+    _scan.last_errors = result.errors  # type: ignore[attr-defined]
+    return result
 
 
 def _rel_path(source: Source, raw: dict) -> str:
@@ -184,10 +208,35 @@ def _to_kerf_part(source: Source, src_dir: Path, raw: dict) -> KerfPart:
     return kp
 
 
-def adapt(source: Source, src_dir) -> list[KerfPart]:
-    """Convert a cloned KiCad symbols/footprints repo into Kerf parts."""
+def adapt(
+    source: Source,
+    src_dir,
+    *,
+    log: Callable[[str], None] = lambda _: None,
+) -> list[KerfPart]:
+    """Convert a cloned KiCad symbols/footprints repo into Kerf parts.
+
+    *log* is called with a human-readable string for each warning/error
+    captured by the underlying scanner.  It defaults to a no-op so callers
+    that do not care about diagnostics need not pass it; the seed runner
+    passes ``print`` so per-file errors surface in the CLI output.
+
+    Parse failures for individual files are non-fatal: the bad file is
+    skipped and all successfully parsed parts are returned.  A blank or
+    name-less raw part dict is also silently skipped (the scanner should
+    never emit one, but belt-and-suspenders).
+    """
     src = Path(src_dir)
-    return [_to_kerf_part(source, src, raw) for raw in _scan(src)]
+    result = _scan(src)
+    for w in result.warnings:
+        log(f"  [kicad] warning: {w}")
+    for e in result.errors:
+        log(f"  [kicad] parse error (file skipped): {e}")
+    return [
+        _to_kerf_part(source, src, raw)
+        for raw in result.parts
+        if raw.get("name")  # skip degenerate dicts with no name
+    ]
 
 
 def adapt_packages3d(source: Source, src_dir) -> list[KerfPart]:

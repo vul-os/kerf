@@ -1,0 +1,100 @@
+(kicad_symbol_lib
+  (version 20211014)
+  (generator kicad_symbol_editor)
+  (generator_version "99.0")
+  (symbol "KerfResistor"
+    (pin_numbers hide)
+    (in_bom yes)
+    (on_board yes)
+    (property "Reference" "R"
+      (id 0)
+      (at 2.032 0 90)
+      (effects (font (size 1.27 1.27))))
+    (property "Value" "KerfResistor"
+      (id 1)
+      (at 0 0 90)
+      (effects (font (size 1.27 1.27))))
+    (property "Footprint" ""
+      (id 2)
+      (at 0 0 0)
+      (effects (font (size 1.27 1.27)) (hide yes)))
+    (property "Datasheet" "~"
+      (id 3)
+      (at 0 0 0)
+      (effects (font (size 1.27 1.27)) (hide yes)))
+    (property "Description" "Synthetic test resistor — hand-authored, not from any upstream library"
+      (id 4)
+      (at 0 0 0)
+      (effects (font (size 1.27 1.27)) (hide yes)))
+    (symbol "KerfResistor_0_1"
+      (rectangle
+        (start -1.016 2.286)
+        (end 1.016 -2.286)
+        (stroke (width 0.254) (type default))
+        (fill (type none)))
+    )
+    (symbol "KerfResistor_1_1"
+      (pin passive line
+        (at 0 3.81 270)
+        (length 1.524)
+        (name "A" (effects (font (size 1.27 1.27))))
+        (number "1" (effects (font (size 1.27 1.27)))))
+      (pin passive line
+        (at 0 -3.81 90)
+        (length 1.524)
+        (name "B" (effects (font (size 1.27 1.27))))
+        (number "2" (effects (font (size 1.27 1.27)))))
+    )
+  )
+  (symbol "KerfOpAmp"
+    (in_bom yes)
+    (on_board yes)
+    (property "Reference" "U"
+      (id 0)
+      (at 0 0 0)
+      (effects (font (size 1.27 1.27))))
+    (property "Value" "KerfOpAmp"
+      (id 1)
+      (at 0 0 0)
+      (effects (font (size 1.27 1.27))))
+    (property "Footprint" ""
+      (id 2)
+      (at 0 0 0)
+      (effects (font (size 1.27 1.27)) (hide yes)))
+    (property "Datasheet" "~"
+      (id 3)
+      (at 0 0 0)
+      (effects (font (size 1.27 1.27)) (hide yes)))
+    (property "Description" "Synthetic test op-amp — hand-authored, not from any upstream library"
+      (id 4)
+      (at 0 0 0)
+      (effects (font (size 1.27 1.27)) (hide yes)))
+    (symbol "KerfOpAmp_1_1"
+      (pin input line
+        (at -5.08 1.27 0)
+        (length 1.524)
+        (name "IN+" (effects (font (size 1.27 1.27))))
+        (number "1" (effects (font (size 1.27 1.27)))))
+      (pin input line
+        (at -5.08 -1.27 0)
+        (length 1.524)
+        (name "IN-" (effects (font (size 1.27 1.27))))
+        (number "2" (effects (font (size 1.27 1.27)))))
+      (pin power_in line
+        (at 0 5.08 270)
+        (length 1.524)
+        (name "VCC" (effects (font (size 1.27 1.27))))
+        (number "3" (effects (font (size 1.27 1.27)))))
+      (pin power_in line
+        (at 0 -5.08 90)
+        (length 1.524)
+        (name "GND" (effects (font (size 1.27 1.27))))
+        (number "4" (effects (font (size 1.27 1.27)))))
+      (pin output line
+        (at 5.08 0 180)
+        (length 1.524)
+        (name "OUT" (effects (font (size 1.27 1.27))))
+        (number "5" (effects (font (size 1.27 1.27)))))
+    )
+  )
+)

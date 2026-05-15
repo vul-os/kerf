@@ -23,6 +23,17 @@ SRCS = [
            "LGPL-2.1-or-later", "bolts-blt", "bolts"),
 ]
 
+# Synthetic source + fixture for KiCad adapter seed path tests.
+_SYNTHETIC_FIXTURES = Path(__file__).parent / "fixtures" / "synthetic"
+_KICAD_SRC = Source(
+    "kerf-test-lib",
+    "https://example.com/kerf-test-lib.git",
+    "1.0.0",
+    "CC-BY-SA-4.0 WITH KiCad-Library-Exception",
+    "kicad-sym",
+    "kicad",
+)
+
 
 def test_write_notice_into_gitignored_generated_dir(tmp_path):
     generated = tmp_path / GENERATED_DIRNAME
@@ -92,3 +103,132 @@ def test_convert_sources_runs_scaffold_adapter(tmp_path):
     )
     assert parts == []
     assert any("0 part(s) converted" in m for m in logs)
+
+
+# ---------------------------------------------------------------------------
+# KiCad seed path — end-to-end with synthetic fixtures (no network, no DB)
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def kiutils_available():
+    try:
+        import kiutils  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def test_convert_sources_kicad_produces_valid_kind_part_files(
+    tmp_path, kiutils_available
+):
+    """The key seed DoD: given a pre-populated cache dir with synthetic KiCad
+    fixtures, convert_sources produces >=1 valid ``kind='part'`` file
+    carrying provenance.  Hermetic — no network, no git clone.
+    """
+    if not kiutils_available:
+        pytest.skip("kiutils not installed")
+
+    import shutil
+
+    # Simulate a pre-populated .parts-cache/<name>/ by symlinking/copying
+    # the synthetic fixtures into a tmp cache dir.
+    cache_dir = tmp_path / ".parts-cache"
+    lib_cache = cache_dir / _KICAD_SRC.name
+    shutil.copytree(_SYNTHETIC_FIXTURES, lib_cache)
+
+    logs = []
+    parts = convert_sources([_KICAD_SRC], cache_dir, log=logs.append)
+
+    assert parts, "convert_sources must produce parts from synthetic KiCad fixtures"
+    assert any("part(s) converted" in m for m in logs)
+
+    # Every part is a valid kind='part' doc.
+    for p in parts:
+        doc = p.to_part_doc()
+        assert doc["version"] == 1
+        assert doc["category"] == "electronic"
+        # Attribution block travels with every part.
+        a = doc["metadata"].get("attribution")
+        assert a, f"{p.name}: missing attribution block"
+        assert a["original_author"], f"{p.name}: blank original_author"
+        assert a["source_url"], f"{p.name}: blank source_url"
+        assert a["license"], f"{p.name}: blank license"
+        # rel_path must be stable + end with .part.
+        assert p.rel_path.endswith(".part"), p.rel_path
+
+
+def test_convert_sources_kicad_symbols_and_footprints_both_present(
+    tmp_path, kiutils_available
+):
+    """Both symbols (KerfResistor, KerfOpAmp) and the footprint (KerfCap_0402)
+    must be present in the converted output.
+    """
+    if not kiutils_available:
+        pytest.skip("kiutils not installed")
+
+    import shutil
+
+    cache_dir = tmp_path / ".parts-cache"
+    shutil.copytree(_SYNTHETIC_FIXTURES, cache_dir / _KICAD_SRC.name)
+    parts = convert_sources([_KICAD_SRC], cache_dir)
+
+    sym_names = {
+        (p.schematic_symbol or {}).get("entry_name")
+        for p in parts
+        if p.schematic_symbol
+    }
+    fp_names = {
+        (p.pcb_footprint or {}).get("entry_name")
+        for p in parts
+        if p.pcb_footprint
+    }
+    assert "KerfResistor" in sym_names
+    assert "KerfOpAmp" in sym_names
+    assert "KerfCap_0402" in fp_names
+
+
+def test_convert_sources_kicad_notice_carries_attribution(
+    tmp_path, kiutils_available
+):
+    """The NOTICE file written alongside the conversion must carry per-part
+    attribution sourced from the same embedded blocks (single source of truth).
+    """
+    if not kiutils_available:
+        pytest.skip("kiutils not installed")
+
+    import shutil
+
+    cache_dir = tmp_path / ".parts-cache"
+    shutil.copytree(_SYNTHETIC_FIXTURES, cache_dir / _KICAD_SRC.name)
+    parts = convert_sources([_KICAD_SRC], cache_dir)
+
+    generated_dir = cache_dir / GENERATED_DIRNAME
+    notice_path = write_notice(generated_dir, [_KICAD_SRC], parts)
+    text = notice_path.read_text(encoding="utf-8")
+
+    assert "NOT redistributed by Kerf" in text
+    assert "kerf-test-lib" in text
+    assert "CC-BY-SA-4.0" in text
+    assert "Per-part original authorship" in text
+    # Source URL from the manifest appears in the NOTICE.
+    assert "example.com/kerf-test-lib.git" in text
+
+
+def test_convert_sources_kicad_is_idempotent(tmp_path, kiutils_available):
+    """Running convert_sources twice on the same cache produces the same
+    content hashes (stable, incremental re-seeding will skip unchanged parts).
+    """
+    if not kiutils_available:
+        pytest.skip("kiutils not installed")
+
+    import shutil
+
+    cache_dir = tmp_path / ".parts-cache"
+    shutil.copytree(_SYNTHETIC_FIXTURES, cache_dir / _KICAD_SRC.name)
+
+    parts1 = convert_sources([_KICAD_SRC], cache_dir)
+    parts2 = convert_sources([_KICAD_SRC], cache_dir)
+
+    hashes1 = sorted(p.ensure_hash() for p in parts1)
+    hashes2 = sorted(p.ensure_hash() for p in parts2)
+    assert hashes1 == hashes2, "convert_sources must be deterministic"

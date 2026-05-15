@@ -2,12 +2,14 @@
  * /compare — hub page linking to each tool comparison.
  *
  * Five cards: FreeCAD · KiCad · Rhino · Revit · Fusion 360
- * No raster assets; inline SVG iconography via Lucide.
+ * No raster assets; inline SVG iconography via Lucide. Shares the same
+ * prominent fairness note as every comparison page.
  */
 import { Link } from 'react-router-dom'
 import { ArrowRight, Code2, CircuitBoard, Gem, Building2, Cloud } from 'lucide-react'
 import Header from '../../components/Header.jsx'
 import Footer from '../../components/Footer.jsx'
+import { FairnessNote } from './Freecad.jsx'
 
 const CARDS = [
   {
@@ -16,7 +18,7 @@ const CARDS = [
     label: 'FreeCAD',
     tagline: 'Open-source parametric B-rep modeller',
     blurb:
-      "FreeCAD is the benchmark for open-source solid modelling. Compare its mature workbenches against Kerf's chat-native feature tree and sketcher.",
+      'FreeCAD 1.0 is a mature, LGPL, desktop parametric CAD package with a built-in Assembly workbench, FEM, and a decade-old workbench community. We compare it honestly against Kerf.',
     accent: 'cyan-edge',
   },
   {
@@ -25,16 +27,16 @@ const CARDS = [
     label: 'KiCad',
     tagline: 'Open-source EDA suite',
     blurb:
-      "KiCad is the go-to free EDA tool for PCB design. See how Kerf's integrated electronics + mechanical workspace stacks up.",
+      "KiCad 10 (2026) is a deep, free EDA suite with native IPC-2581/ODB++ and a huge library. See where it leads and where Kerf's unified electronics + mechanical workspace differs.",
     accent: 'magenta-edge',
   },
   {
     slug: 'rhino',
     icon: Gem,
     label: 'Rhino',
-    tagline: 'NURBS & jewelry CAD (RhinoGold / Matrix)',
+    tagline: 'NURBS & jewelry CAD (MatrixGold / RhinoGold)',
     blurb:
-      'Rhino with RhinoGold or Matrix is the reference tool for NURBS surfacing and professional jewelry design. Honest gaps and real capabilities on both sides.',
+      'Rhino 8 with MatrixGold / RhinoGold is the professional reference for NURBS surfacing and jewelry. Honest gaps and real capabilities on both sides.',
     accent: 'kerf-300',
   },
   {
@@ -43,7 +45,7 @@ const CARDS = [
     label: 'Revit',
     tagline: 'Industry-standard BIM platform',
     blurb:
-      "Revit is Autodesk's dominant BIM platform for architecture and construction. Compare its deep toolset with Kerf's IFC-capable open-core workspace.",
+      "Revit is Autodesk's dominant BIM platform for AEC, with full MEP and family authoring. We compare its depth with Kerf's lighter, IFC-capable open-core workspace.",
     accent: 'cyan-edge',
   },
   {
@@ -52,7 +54,7 @@ const CARDS = [
     label: 'Fusion 360',
     tagline: 'Cloud-connected mechanical CAD',
     blurb:
-      "Fusion 360 pioneered cloud-connected parametric CAD with integrated CAM. See where it leads and where Kerf's open-core, chat-driven approach differs.",
+      "Fusion 360 pioneered cloud-connected parametric CAD with CAM, FEM, and generative design. See where it leads and where Kerf's open-core, chat-driven approach differs.",
     accent: 'magenta-edge',
   },
 ]
@@ -100,9 +102,12 @@ export default function CompareHub() {
             How does Kerf compare?
           </h1>
           <p className="mt-4 text-ink-300 leading-relaxed max-w-2xl">
-            Honest, fact-based comparisons between Kerf and the tools engineers
-            already know. We credit genuine strengths on both sides and state gaps
-            clearly — no spin.
+            These tools are genuinely excellent — many are decades old, deeply
+            validated, and free or affordable. Kerf is young by comparison.
+            These pages credit each competitor's real strengths first and
+            generously, state Kerf's gaps without spin, and use a comprehensive
+            side-by-side table where the competitor often wins. The aim is an
+            honest decision aid, not marketing.
           </p>
         </div>
 
@@ -113,19 +118,8 @@ export default function CompareHub() {
           ))}
         </div>
 
-        {/* Footer note */}
-        <p className="mt-10 text-xs text-ink-500 font-mono text-center">
-          Comparisons updated 2026-05-15 — open an issue at{' '}
-          <a
-            href="https://github.com/kerf-sh/kerf/issues"
-            target="_blank"
-            rel="noreferrer"
-            className="text-ink-400 hover:text-ink-200 underline underline-offset-2"
-          >
-            kerf.sh
-          </a>{' '}
-          if inaccurate.
-        </p>
+        {/* Fairness footer — same component used on every comparison page */}
+        <FairnessNote />
       </main>
 
       <Footer />

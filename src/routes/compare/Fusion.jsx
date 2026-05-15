@@ -1,52 +1,154 @@
 /**
  * /compare/fusion — Kerf vs Fusion 360
  *
- * Fusion 360 pioneered cloud-connected parametric CAD with integrated CAM.
- * Kerf's differentiators are its MIT open-core, chat-native workflow,
- * electronics integration, and no per-seat subscription cost.
+ * Web-grounded (last reviewed 2026-05-15). Autodesk Fusion (formerly Fusion
+ * 360) pioneered cloud-connected parametric CAD with integrated CAM, CAE,
+ * and electronics. Commercial use is ~US$680/yr (~$85/mo); a restricted
+ * free personal tier exists (must convert once non-commercial / >US$1,000
+ * annual revenue); a startup programme is ~$150/3yr. Fusion Electronics is
+ * the EAGLE-derived PCB workspace (standalone EAGLE end-of-life 2026-06-07),
+ * with push & shove routing, base SPICE, and extension-gated signal
+ * integrity / cooling. Generative design is cloud-based.
+ *
+ * Kerf covers similar ground — B-rep, CAM, electronics, drawings — with an
+ * MIT open-core licence, chat-native workflow, jewelry domain, and no
+ * per-seat subscription. Fusion's assembly/motion, FEM, generative design,
+ * and community are ahead today.
  */
-import { Link } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
 import Header from '../../components/Header.jsx'
 import Footer from '../../components/Footer.jsx'
 import { makeCompareMeta } from './compareMeta.js'
-import { Section, Li, CompareTable, TableFooter, CTAStrip } from './Freecad.jsx'
+import {
+  Section,
+  Li,
+  CompareTable,
+  TableFooter,
+  FairnessNote,
+  CTAStrip,
+  Breadcrumb,
+  HeadMeta,
+  GOOD,
+  WEAK,
+  GAP,
+} from './Freecad.jsx'
 
 const meta = makeCompareMeta('fusion')
 
 const TABLE = [
-  { feature: 'License / cost',              competitor: 'Proprietary; ~$680/yr subscription',   kerf: 'MIT open-core; free local or hosted' },
-  { feature: 'Parametric B-rep',            competitor: '✅ Mature timeline-based modelling',   kerf: '✅ OCCT feature tree — Pad/Pocket/Revolve/Fillet/Chamfer/Draft/etc.' },
-  { feature: 'Constraint sketcher',         competitor: '✅ Full parametric sketcher',           kerf: '✅ Sketcher v2 (planegcs) — all major constraints' },
-  { feature: 'Sheet metal',                 competitor: '✅ Full sheet metal WB',                kerf: '✅ Flange + unfold + flat-pattern DXF export' },
-  { feature: 'Assembly',                    competitor: '✅ Full joint + motion study',          kerf: '⚠️ Assembly feature in progress' },
-  { feature: '3-axis CAM',                  competitor: '✅ Built-in + simulation',              kerf: '✅ 3-axis CAM + tool DB' },
-  { feature: '5-axis CAM',                  competitor: '✅ (paid tier)',                        kerf: '✅ 5-axis CAM 3+2' },
-  { feature: 'FEM / simulation',            competitor: '✅ Linear static + thermal (paid)',     kerf: '❌ Not yet' },
-  { feature: '2D drawings',                 competitor: '✅ Full drawing + annotations',         kerf: '✅ Multi-sheet TechDraw drawings + GD&T ASME Y14.5' },
-  { feature: 'PCB / electronics',           competitor: '✅ EAGLE-derived PCB (Fusion Electron)',kerf: '✅ Full EDA — schematic, routing, DRC, Gerber, SPICE' },
-  { feature: 'MCAD/ECAD integration',       competitor: '✅ Native ECAD workspace bridge',      kerf: '✅ Mechanical + electronics co-resident in same workspace' },
-  { feature: 'Generative design',           competitor: '✅ Cloud-based generative design',     kerf: '❌ Not yet' },
-  { feature: 'Chat / LLM editing',          competitor: '❌',                                   kerf: '✅ Chat-native — model edits source per turn' },
-  { feature: 'Open source',                 competitor: '❌ Proprietary',                       kerf: '✅ MIT — full codebase on GitHub' },
-  { feature: 'Offline / self-hosted',       competitor: '⚠️ Limited offline mode',             kerf: '✅ Full offline via single-binary local install' },
-  { feature: 'Python scripting',            competitor: '✅ Fusion API + scripts',              kerf: '✅ kerf-sdk on PyPI — HTTP/JSON-RPC' },
-  { feature: 'Jewelry / specialised tools', competitor: '❌ Generic CAD only',                 kerf: '✅ Jewelry domain: ring v4, gemstones v2, settings v3/v4, chain v2' },
+  // Licensing & platform
+  { group: 'Licensing & platform', feature: 'License',
+    competitor: `${WEAK} Proprietary subscription`,
+    kerf: `${GOOD} MIT open-core` },
+  { group: 'Licensing & platform', feature: 'Cost',
+    competitor: `${WEAK} ~US$680/yr (~$85/mo); startup ~$150/3yr`,
+    kerf: `${GOOD} Free local; pay-as-you-go hosted` },
+  { group: 'Licensing & platform', feature: 'Free tier',
+    competitor: `${WEAK} Personal-use only (non-commercial, < US$1k rev)`,
+    kerf: `${GOOD} Full free local install, no revenue cap` },
+  { group: 'Licensing & platform', feature: 'Offline / self-host',
+    competitor: `${WEAK} Limited offline; cloud-tied`,
+    kerf: `${GOOD} Full offline single-binary install` },
+  { group: 'Licensing & platform', feature: 'Open source',
+    competitor: `${GAP} Proprietary`,
+    kerf: `${GOOD} MIT — full codebase on GitHub` },
+  { group: 'Licensing & platform', feature: 'Maturity',
+    competitor: `${GOOD} Millions of users, mature`,
+    kerf: `${WEAK} Early-stage, < 2 yr public` },
+
+  // Modeling
+  { group: 'Modeling', feature: 'Parametric B-rep',
+    competitor: `${GOOD} Timeline-based modelling (mature)`,
+    kerf: `${GOOD} OCCT feature tree — pad/pocket/revolve/loft/etc.` },
+  { group: 'Modeling', feature: 'Constraint sketcher',
+    competitor: `${GOOD} Full parametric sketcher`,
+    kerf: `${GOOD} Sketcher v2 — all major constraints` },
+  { group: 'Modeling', feature: 'Sheet metal',
+    competitor: `${GOOD} Full sheet-metal workspace`,
+    kerf: `${GOOD} Flange + unfold + flat-pattern DXF` },
+  { group: 'Modeling', feature: 'Freeform / T-spline',
+    competitor: `${GOOD} Sculpt (T-spline) freeform`,
+    kerf: `${WEAK} NURBS Phase 4 (early); no T-spline sculpt` },
+
+  // Assemblies
+  { group: 'Assemblies', feature: 'Joints / mates',
+    competitor: `${GOOD} Full joint system`,
+    kerf: `${WEAK} Assembly mates (newer)` },
+  { group: 'Assemblies', feature: 'Motion study',
+    competitor: `${GOOD} Motion + interference detection`,
+    kerf: `${GAP} Not yet` },
+
+  // CAM / fabrication
+  { group: 'CAM / fabrication', feature: '2.5/3-axis CAM',
+    competitor: `${GOOD} Built-in + verified simulation`,
+    kerf: `${GOOD} 3-axis CAM + tool DB` },
+  { group: 'CAM / fabrication', feature: 'Multi-axis CAM',
+    competitor: `${GOOD} 4/5-axis (paid extension)`,
+    kerf: `${GOOD} 5-axis CAM 3+2` },
+  { group: 'CAM / fabrication', feature: 'Additive / slicing',
+    competitor: `${GOOD} Additive workspace`,
+    kerf: `${GOOD} Slicing Tier 1` },
+
+  // Simulation
+  { group: 'Simulation', feature: 'FEM (static / thermal)',
+    competitor: `${GOOD} Built-in (extension/cloud-metered)`,
+    kerf: `${GAP} Not yet` },
+  { group: 'Simulation', feature: 'Generative design',
+    competitor: `${GOOD} Cloud topology optimisation`,
+    kerf: `${GAP} Not yet` },
+
+  // Drawings
+  { group: 'Drawings & docs', feature: '2D drawings',
+    competitor: `${GOOD} Full drawing + annotations`,
+    kerf: `${GOOD} Multi-sheet drawings` },
+  { group: 'Drawings & docs', feature: 'GD&T',
+    competitor: `${GOOD} ASME / ISO GD&T`,
+    kerf: `${GOOD} ASME Y14.5 GD&T framework` },
+
+  // Electronics
+  { group: 'Electronics', feature: 'Schematic + PCB',
+    competitor: `${GOOD} Fusion Electronics (EAGLE-derived)`,
+    kerf: `${GOOD} Hierarchical schematic + PCB layout` },
+  { group: 'Electronics', feature: 'Routing',
+    competitor: `${GOOD} Push & shove routing`,
+    kerf: `${GOOD} Shove router + FreeRouting` },
+  { group: 'Electronics', feature: 'SPICE / RF',
+    competitor: `${WEAK} Base SPICE; SI via paid extension`,
+    kerf: `${GOOD} SPICE + model lib + scikit-rf RF` },
+  { group: 'Electronics', feature: 'Fab output',
+    competitor: `${GOOD} Gerber / NC / IPC outputs`,
+    kerf: `${GOOD} Gerber / Excellon / IPC-2581 / ODB++` },
+  { group: 'Electronics', feature: 'MCAD/ECAD bridge',
+    competitor: `${GOOD} Native ECAD↔MCAD link`,
+    kerf: `${GOOD} Co-resident; IDF + board STEP` },
+
+  // Domain breadth
+  { group: 'Domain breadth', feature: 'Jewelry tooling',
+    competitor: `${GAP} Generic CAD only`,
+    kerf: `${GOOD} Ring v4, gemstones v2 (30 cuts), settings, chain v2` },
+  { group: 'Domain breadth', feature: 'Architecture / IFC',
+    competitor: `${GAP} Not an AEC tool`,
+    kerf: `${WEAK} IFC Tier 2 import + structural grid` },
+
+  // Ecosystem & SDK
+  { group: 'Ecosystem & SDK', feature: 'Chat / LLM editing',
+    competitor: `${GAP} None`,
+    kerf: `${GOOD} Chat-native — edits source per turn` },
+  { group: 'Ecosystem & SDK', feature: 'Scripting',
+    competitor: `${GOOD} Fusion API (Python/C++)`,
+    kerf: `${GOOD} kerf-sdk on PyPI — HTTP/JSON-RPC` },
+  { group: 'Ecosystem & SDK', feature: 'Community & training',
+    competitor: `${GOOD} Millions of users, vast tutorials`,
+    kerf: `${WEAK} Early-stage, growing` },
 ]
 
 export default function FusionPage() {
   return (
     <div className="min-h-screen bg-ink-950 text-ink-100">
+      <HeadMeta meta={meta} />
       <Header />
 
       <main className="mx-auto max-w-4xl px-6 pt-12 pb-20">
-        <Link
-          to="/compare"
-          className="inline-flex items-center gap-1.5 text-sm text-ink-400 hover:text-ink-100 transition-colors mb-8"
-        >
-          <ArrowLeft size={13} />
-          All comparisons
-        </Link>
+        <Breadcrumb />
 
         <div className="mb-10">
           <p className="font-mono text-xs uppercase tracking-[0.2em] text-kerf-300 mb-2">
@@ -56,99 +158,127 @@ export default function FusionPage() {
             Kerf vs Fusion 360
           </h1>
           <p className="mt-4 text-ink-300 leading-relaxed max-w-2xl">
-            Fusion 360 pioneered the cloud-connected parametric CAD model with
-            integrated CAM, simulation, and electronics. Kerf covers similar
-            ground — B-rep, CAM, electronics, drawings — with an MIT open-core
-            licence, chat-native workflow, and no per-seat subscription.
+            Autodesk Fusion pioneered cloud-connected parametric CAD with
+            integrated CAM, CAE, and electronics, and has millions of users. It
+            is a polished, mature platform at ~US$680/yr (with a restricted
+            free personal tier). Kerf covers similar ground — B-rep, CAM,
+            electronics, drawings — with an MIT open-core licence, chat-native
+            workflow, a jewelry domain, and no per-seat subscription. Fusion's
+            assembly/motion, FEM, generative design, and community are clearly
+            ahead today; this is an honest look at both.
           </p>
         </div>
 
-        <Section title="Where Fusion 360 shines">
+        <Section title="Where Fusion 360 is strong">
           <ul className="flex flex-col gap-3">
             <Li>
-              <strong className="text-ink-100">Mature integrated parametric CAD + CAM.</strong>{' '}
-              Fusion's timeline-based modelling and CAM workspace are polished
-              and well-documented, with years of user feedback baked in.
+              <strong className="text-ink-100">Mature integrated CAD + CAM.</strong>{' '}
+              Timeline-based modelling and a polished CAM workspace with
+              verified toolpath simulation, refined over many years of user
+              feedback.
             </Li>
             <Li>
-              <strong className="text-ink-100">Full assembly and motion simulation.</strong>{' '}
-              Fusion's joint and contact-set assembly tools, including motion
-              studies and interference detection, are production-ready. Kerf's
-              assembly is still in progress.
+              <strong className="text-ink-100">Full assembly and motion.</strong>{' '}
+              Joints, contact sets, motion studies, and interference detection
+              are production-ready. Kerf's assembly mates are newer and lack
+              motion study.
             </Li>
             <Li>
-              <strong className="text-ink-100">FEM simulation (paid tier).</strong>{' '}
-              Linear static and thermal FEM analysis are built in — a capability
-              Kerf does not yet have.
+              <strong className="text-ink-100">Built-in FEM simulation.</strong>{' '}
+              Linear static and thermal analysis (extension / cloud-metered) —
+              a capability Kerf does not have at all.
             </Li>
             <Li>
-              <strong className="text-ink-100">Generative design.</strong>{' '}
-              Cloud-based topology optimisation that explores the design space
-              automatically — unique to Fusion's platform.
+              <strong className="text-ink-100">Cloud generative design.</strong>{' '}
+              Automated topology exploration across the design space — a
+              flagship Fusion capability with no Kerf equivalent yet.
             </Li>
             <Li>
-              <strong className="text-ink-100">Large community and training resources.</strong>{' '}
-              Millions of users, extensive official tutorials, and a large
+              <strong className="text-ink-100">T-spline freeform (Sculpt).</strong>{' '}
+              Organic surface modelling that Kerf's early NURBS Phase 4 does not
+              match.
+            </Li>
+            <Li>
+              <strong className="text-ink-100">Native ECAD↔MCAD link.</strong>{' '}
+              Fusion Electronics ties the PCB workspace tightly to the
+              mechanical model in one Autodesk platform.
+            </Li>
+            <Li>
+              <strong className="text-ink-100">Huge community and training.</strong>{' '}
+              Millions of users, extensive official tutorials, and a deep
               third-party learning ecosystem.
             </Li>
           </ul>
         </Section>
 
-        <Section title="Where Kerf is different">
+        <Section title="Where Kerf differs">
           <ul className="flex flex-col gap-3">
             <Li>
-              <strong className="text-ink-100">MIT open-core, dramatically lower cost.</strong>{' '}
-              Fusion costs ~$680/yr per seat (personal use is restricted).
-              Kerf's full feature set is MIT-licensed — self-host for free, or
-              use hosted on a pay-as-you-go basis with no seat subscription.
+              <strong className="text-ink-100">MIT open-core, lower cost, no revenue cap.</strong>{' '}
+              Fusion is ~US$680/yr and its free tier is non-commercial only
+              (must convert past ~US$1,000 annual revenue). Kerf's full feature
+              set is MIT — free locally with no revenue restriction.
             </Li>
             <Li>
               <strong className="text-ink-100">Chat-native workflow.</strong>{' '}
               Describe a feature, constraint, or routing requirement in plain
               language; the LLM edits the source backed by live doc-search.
-              Fusion has no equivalent LLM integration today.
+              Fusion has no comparable LLM integration.
             </Li>
             <Li>
-              <strong className="text-ink-100">True offline, open-source local install.</strong>{' '}
-              Kerf runs as a 32 MB single binary with no Autodesk account, no
-              telemetry, and no limited-offline mode. The full codebase is on
-              GitHub under MIT.
+              <strong className="text-ink-100">True offline, open codebase.</strong>{' '}
+              A single binary with no Autodesk account and no limited-offline
+              caveat. The full codebase is on GitHub under MIT.
             </Li>
             <Li>
-              <strong className="text-ink-100">Richer electronics stack.</strong>{' '}
-              Kerf's EDA covers hierarchical schematic, shove router, SPICE +
-              model lib, RF via scikit-rf, DRC + IPC-2221B presets, and a full
-              Gerber/IPC-2581 fab pack — beyond what Fusion Electron offers.
+              <strong className="text-ink-100">Richer in-box electronics.</strong>{' '}
+              Hierarchical schematic, shove router + FreeRouting, SPICE + model
+              lib, scikit-rf RF, DRC + IPC-2221B, and a Gerber/IPC-2581/ODB++
+              fab pack — beyond Fusion Electronics' base feature set.
             </Li>
             <Li>
               <strong className="text-ink-100">Jewelry domain built in.</strong>{' '}
               Ring v4, gemstones v2 (30 cuts), settings v3/v4, chain v2, and a
-              31-template library are first-class — not available in Fusion at all.
+              31-template library — not available in Fusion at all.
+            </Li>
+            <Li>
+              <strong className="text-ink-100">kerf-sdk Python scripting.</strong>{' '}
+              Automate over HTTP/JSON-RPC from your own machine — the same
+              interface the LLM uses internally.
             </Li>
           </ul>
         </Section>
 
-        <Section title="Honest gaps">
+        <Section title="Honest gaps — where Kerf is behind today">
           <ul className="flex flex-col gap-3">
             <Li>
-              <strong className="text-ink-100">Assembly is still in progress.</strong>{' '}
-              Kerf's assembly feature is under active development. Fusion's full
-              joint and motion simulation workflow is significantly ahead.
+              <strong className="text-ink-100">Assembly / motion is behind.</strong>{' '}
+              Fusion's joint + motion-study + interference workflow is
+              significantly ahead of Kerf's assembly mates.
             </Li>
             <Li>
-              <strong className="text-ink-100">No FEM simulation yet.</strong>{' '}
-              Kerf does not yet have structural or thermal FEM analysis. Fusion's
-              built-in simulation covers linear static and thermal.
+              <strong className="text-ink-100">No FEM simulation.</strong>{' '}
+              Kerf has no structural or thermal FEM. Fusion's built-in
+              simulation covers linear static and thermal.
             </Li>
             <Li>
               <strong className="text-ink-100">No generative design.</strong>{' '}
-              Cloud topology optimisation is on Kerf's long-term roadmap but not
-              yet available.
+              Cloud topology optimisation is roadmap, not shipped.
+            </Li>
+            <Li>
+              <strong className="text-ink-100">No T-spline freeform.</strong>{' '}
+              Fusion's Sculpt workspace has no Kerf counterpart; NURBS Phase 4
+              is early.
             </Li>
             <Li>
               <strong className="text-ink-100">Smaller community.</strong>{' '}
-              Fusion's millions of users means more tutorials, forum answers, and
-              third-party content than Kerf's early-stage community.
+              Fusion's millions of users mean far more tutorials, forum
+              answers, and third-party content.
+            </Li>
+            <Li>
+              <strong className="text-ink-100">Less hardened CAM verification.</strong>{' '}
+              Fusion's CAM has years of in-the-field toolpath validation; Kerf's
+              is younger.
             </Li>
           </ul>
         </Section>
@@ -158,6 +288,7 @@ export default function FusionPage() {
           <TableFooter />
         </Section>
 
+        <FairnessNote />
         <CTAStrip />
       </main>
 

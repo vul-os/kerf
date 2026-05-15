@@ -30,6 +30,7 @@ RUN npm install --no-audit --no-fund
 COPY vite.config.js index.html ./
 COPY src/ ./src/
 COPY public/ ./public/
+COPY scripts/ ./scripts/
 COPY postcss.config.* tailwind.config.* eslint.config.* ./
 RUN npm run build
 

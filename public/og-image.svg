@@ -14,17 +14,17 @@
   <!-- LOGOMARK (left side). Mark drawn at scale 14× the favicon viewBox.
        Centered around (315, 315). Original viewBox is 32 units; scale 14 → 448px tall. -->
   <g transform="translate(91 91) scale(14)">
-    <!-- Upper-left half -->
-    <path d="M5 5 H24 L5 24 Z" fill="#ffd633"/>
-    <!-- Lower-right half, offset perpendicular to the cut -->
-    <path d="M27 8 V27 H8 Z" fill="#ffd633"/>
+    <!-- New kerf "K" mark (matches public/favicon.svg) -->
+    <rect x="7" y="6" width="3.5" height="20" fill="#ffd633"/>
+    <polygon points="10.5,16 26,6 26,13" fill="#ffd633"/>
+    <polygon points="10.5,16 26,19 26,26" fill="#ffd633"/>
   </g>
 
   <!-- Vertical hairline rule between mark and wordmark column -->
   <line x1="600" y1="190" x2="600" y2="440" stroke="#232730" stroke-width="1"/>
 
   <!-- WORDMARK + TAGLINE (right side) -->
-  <g font-family="Geist, Inter, system-ui, sans-serif" fill="#e2e6ee">
+  <g font-family="Geist, Inter, Helvetica, Arial, sans-serif" fill="#e2e6ee">
     <!-- "kerf" wordmark -->
     <text x="660" y="320"
           font-size="180"
@@ -41,7 +41,7 @@
 
     <!-- Caret-style accent under the tagline, in mono — gives it that terminal feel -->
     <text x="664" y="438"
-          font-family="JetBrains Mono, ui-monospace, Menlo, monospace"
+          font-family="JetBrains Mono, Menlo, Courier New, monospace"
           font-size="18"
           fill="#ffd633"
           opacity="0.85">&gt; sketch · cut · refine</text>

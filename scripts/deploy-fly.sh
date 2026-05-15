@@ -109,10 +109,11 @@ REQUIRED_VARS=(
   KERF_STORAGE_S3_ACCESS_KEY
   KERF_STORAGE_S3_SECRET_KEY
   KERF_STORAGE_S3_ENDPOINT
-  LLM_ANTHROPIC_API_KEY
   CLOUD_ENABLED
   KERF_LOCAL_MODE
 )
+# LLM provider keys are intentionally NOT required — the app boots without
+# them (chat/LLM tools stay dormant until a key is added post-deploy).
 
 MISSING=()
 for var in "${REQUIRED_VARS[@]}"; do

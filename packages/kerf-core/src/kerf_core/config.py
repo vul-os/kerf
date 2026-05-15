@@ -87,6 +87,16 @@ class Settings(BaseSettings):
             self.local_mode = False
         return self
 
+    @model_validator(mode="after")
+    def _google_client_id_single_source(self):
+        # The Google OAuth client ID is a public value the frontend needs
+        # at build time (VITE_GOOGLE_CLIENT_ID). Rather than duplicate it,
+        # the backend falls back to that same var when GOOGLE_CLIENT_ID is
+        # unset — one value to configure.
+        if not self.google_client_id:
+            self.google_client_id = os.environ.get("VITE_GOOGLE_CLIENT_ID", "")
+        return self
+
     @classmethod
     def load(cls, config_path: str = "") -> "Settings":
         """Load a Settings instance.

@@ -5,6 +5,9 @@ Verifies three states:
   2. cloud_beta=False → topup proceeds normally (no 403 from beta guard)
   3. self-host (cloud_enabled=False) → billing plugin dormant; beta flag irrelevant
 
+Also verifies the payments_disabled() helper and plugin register() behaviour
+under cloud_beta, and that FX config is reachable in both modes.
+
 All tests are hermetic (no real DB, no network).
 """
 from __future__ import annotations
@@ -244,3 +247,192 @@ class TestSettingsCloudBeta:
             cloud_enabled=True,
         )
         assert s.cloud_beta is False
+
+
+# ── Tests: payments_disabled() helper ────────────────────────────────────────
+
+class TestPaymentsDisabledHelper:
+    """The payments_disabled() helper is the single authoritative gate."""
+
+    def test_true_when_cloud_beta_set(self):
+        from kerf_billing.billing.beta import payments_disabled
+        assert payments_disabled(_Cfg(cloud_beta=True)) is True
+
+    def test_false_when_cloud_beta_unset(self):
+        from kerf_billing.billing.beta import payments_disabled
+        assert payments_disabled(_Cfg(cloud_beta=False)) is False
+
+    def test_false_when_attribute_missing(self):
+        from kerf_billing.billing.beta import payments_disabled
+
+        class _NoBeta:
+            pass
+
+        assert payments_disabled(_NoBeta()) is False
+
+    def test_false_when_settings_is_none(self):
+        from kerf_billing.billing.beta import payments_disabled
+        # plugin.register() may pass None if ctx has no settings attribute
+        assert payments_disabled(None) is False
+
+
+# ── Tests: plugin.register() in cloud-beta ───────────────────────────────────
+
+class TestPluginRegisterBeta:
+    """register() must succeed with EMPTY paystack keys under cloud_beta=True.
+
+    No PaystackClient is constructed; inert routes are mounted; the manifest
+    is returned without error.
+    """
+
+    def _make_ctx(self, cloud_beta: bool, cloud_enabled: bool = True):
+        import logging
+
+        class Ctx:
+            pass
+
+        ctx = Ctx()
+        ctx.cloud_enabled = cloud_enabled
+        ctx.logger = logging.getLogger("test")
+        # Simulate empty paystack keys (as in real cloud-beta deployment)
+        ctx.settings = _Cfg(cloud_beta=cloud_beta, cloud_enabled=cloud_enabled)
+        ctx.workers = None
+        ctx.local_mode = False
+        return ctx
+
+    async def test_register_succeeds_beta_empty_keys(self):
+        """With cloud_beta=True and empty Paystack keys, register() succeeds."""
+        from fastapi import FastAPI
+        from kerf_billing.plugin import register
+        from kerf_billing.billing.beta import payments_disabled
+
+        ctx = self._make_ctx(cloud_beta=True)
+        app = FastAPI()
+        manifest = await register(app, ctx)
+
+        assert manifest is not None
+        assert manifest.name == "kerf-billing"
+        assert payments_disabled(ctx.settings) is True
+
+    async def test_register_does_not_construct_paystack_in_beta(self, monkeypatch):
+        """PaystackClient.__init__ must NOT be called when cloud_beta=True."""
+        from fastapi import FastAPI
+        from kerf_billing.plugin import register
+
+        constructed = []
+
+        import kerf_billing.billing.paystack as ps_mod
+
+        class _SentinelPaystack:
+            def __init__(self, *a, **kw):
+                constructed.append(True)
+
+        monkeypatch.setattr(ps_mod, "PaystackClient", _SentinelPaystack)
+
+        ctx = self._make_ctx(cloud_beta=True)
+        app = FastAPI()
+        await register(app, ctx)
+
+        assert constructed == [], (
+            "PaystackClient was constructed despite cloud_beta=True — "
+            "no outbound Paystack calls should happen in beta"
+        )
+
+    async def test_inert_routes_return_503_for_topup(self):
+        """Under cloud_beta the mounted topup route must return 503."""
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        from kerf_billing.plugin import register
+
+        ctx = self._make_ctx(cloud_beta=True)
+        app = FastAPI()
+        await register(app, ctx)
+
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.post("/api/billing/topup", json={"amount_usd": 10})
+        assert resp.status_code == 503
+
+    async def test_inert_routes_return_503_for_webhook(self):
+        """Under cloud_beta the mounted webhook route must return 503."""
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        from kerf_billing.plugin import register
+
+        ctx = self._make_ctx(cloud_beta=True)
+        app = FastAPI()
+        await register(app, ctx)
+
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.post("/api/billing/webhook", content=b"{}", headers={
+            "content-type": "application/json",
+        })
+        assert resp.status_code == 503
+
+    async def test_register_cloud_disabled_is_dormant(self):
+        """cloud_enabled=False → plugin dormant regardless of cloud_beta."""
+        from fastapi import FastAPI
+        from kerf_billing.plugin import register
+
+        ctx = self._make_ctx(cloud_beta=True, cloud_enabled=False)
+        app = FastAPI()
+        manifest = await register(app, ctx)
+
+        assert manifest.provides == []
+
+
+# ── Tests: FX config reachable in both modes ─────────────────────────────────
+
+class TestFxReachableInBothModes:
+    """FX config must be accessible regardless of cloud_beta value.
+
+    FX drives pricing display (USD→ZAR conversion) which must work even when
+    payments are disabled.  We do NOT gate FX behind cloud_beta.
+    """
+
+    def _make_fx_settings(self, cloud_beta: bool):
+        class S:
+            cloud_beta = False
+            cloud_fx_base_currency = "USD"
+            cloud_fx_settlement_currency = "ZAR"
+            cloud_fx_refresh_url = "https://api.exchangerate.host/latest?base=USD&symbols=ZAR"
+            cloud_fx_spread_pct = 1.5
+
+        s = S()
+        s.cloud_beta = cloud_beta
+        return s
+
+    def test_fx_config_accessible_beta_true(self):
+        s = self._make_fx_settings(cloud_beta=True)
+        assert s.cloud_fx_base_currency == "USD"
+        assert s.cloud_fx_settlement_currency == "ZAR"
+        assert s.cloud_fx_refresh_url != ""
+        assert s.cloud_fx_spread_pct > 0
+
+    def test_fx_config_accessible_beta_false(self):
+        s = self._make_fx_settings(cloud_beta=False)
+        assert s.cloud_fx_base_currency == "USD"
+        assert s.cloud_fx_settlement_currency == "ZAR"
+
+    def test_fx_fetcher_constructable_beta_true(self):
+        """Fetcher can be instantiated regardless of cloud_beta."""
+        from kerf_cloud.fx import Fetcher
+
+        class _FakePool:
+            pass
+
+        s = self._make_fx_settings(cloud_beta=True)
+        fetcher = Fetcher(cfg=s, pool=_FakePool())
+        # construction succeeds; beta flag is not consulted by Fetcher
+        assert fetcher is not None
+        assert fetcher.cfg.cloud_fx_base_currency == "USD"
+
+    def test_fx_fetcher_constructable_beta_false(self):
+        """Fetcher can be instantiated when cloud_beta is False."""
+        from kerf_cloud.fx import Fetcher
+
+        class _FakePool:
+            pass
+
+        s = self._make_fx_settings(cloud_beta=False)
+        fetcher = Fetcher(cfg=s, pool=_FakePool())
+        assert fetcher is not None

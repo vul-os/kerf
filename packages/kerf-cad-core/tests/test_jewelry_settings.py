@@ -1,7 +1,8 @@
 """
 Tests for kerf_cad_core.jewelry.settings — prong head, bezel, channel, pavé,
 tension, flush, halo, three-stone, cluster, bar, bead/grain, gypsy-pavé,
-illusion, invisible.
+illusion, invisible, plus v4 settings: suspension_mount, vtip_protector,
+bombe_cluster, patterned_bezel, trellis_prong, bar_channel_graduated.
 
 Structure
 ---------
@@ -11,7 +12,7 @@ Pure-Python tests (always run):
   - Node shape: node dicts stored in the feature JSON match the spec.
   - Geometry math: _compute_pave_grid, derived hints, seat positions,
     cluster positions, three-stone offsets, halo radius, tension band spread,
-    flush opening diameter.
+    flush opening diameter, bombe positions, graduated row positions.
 
 OCC-gated tests:
   Skipped when pythonocc / OCC imports are not available — follows the same
@@ -68,6 +69,13 @@ from kerf_cad_core.jewelry.settings import (
     jewelry_under_bezel_spec,
     jewelry_peg_setting_spec,
     jewelry_coronet_spec,
+    # v4 ToolSpec objects
+    jewelry_suspension_mount_spec,
+    jewelry_vtip_protector_spec,
+    jewelry_bombe_cluster_spec,
+    jewelry_patterned_bezel_spec,
+    jewelry_trellis_prong_spec,
+    jewelry_bar_channel_graduated_spec,
     # Runners
     run_jewelry_create_prong_head,
     run_jewelry_create_bezel,
@@ -89,6 +97,13 @@ from kerf_cad_core.jewelry.settings import (
     run_jewelry_create_under_bezel,
     run_jewelry_create_peg_setting,
     run_jewelry_create_coronet,
+    # v4 runners
+    run_jewelry_create_suspension_mount,
+    run_jewelry_create_vtip_protector,
+    run_jewelry_create_bombe_cluster,
+    run_jewelry_create_patterned_bezel,
+    run_jewelry_create_trellis_prong,
+    run_jewelry_create_bar_channel_graduated,
     # Pure-Python helpers
     build_prong_head_node,
     build_bezel_node,
@@ -110,8 +125,17 @@ from kerf_cad_core.jewelry.settings import (
     build_under_bezel_node,
     build_peg_setting_node,
     build_coronet_node,
+    # v4 helpers
+    build_suspension_mount_node,
+    build_vtip_protector_node,
+    build_bombe_cluster_node,
+    build_patterned_bezel_node,
+    build_trellis_prong_node,
+    build_bar_channel_graduated_node,
     _compute_pave_grid,
     _compute_cluster_positions,
+    _compute_bombe_positions,
+    _compute_graduated_row,
 )
 
 
@@ -4164,3 +4188,1096 @@ class TestV3OCC:
         ax = gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1))
         cyl = BRepPrimAPI_MakeCylinder(ax, node["_base_diameter"] / 2.0, node["crown_height"])
         assert not cyl.Shape().IsNull()
+
+
+# ============================================================================
+# V4: Suspension / dangle mount — ToolSpec schema
+# ============================================================================
+
+class TestSuspensionMountSpec:
+    def test_name(self):
+        assert jewelry_suspension_mount_spec.name == "jewelry_create_suspension_mount"
+
+    def test_required_fields(self):
+        req = jewelry_suspension_mount_spec.input_schema["required"]
+        for f in ["file_id", "stone_diameter", "seat_style", "seat_depth",
+                  "ring_wire_diameter", "ring_inner_diameter", "bail_height"]:
+            assert f in req
+
+    def test_seat_style_enum(self):
+        props = jewelry_suspension_mount_spec.input_schema["properties"]
+        enum = props["seat_style"].get("enum", [])
+        assert set(enum) == {"bezel_cup", "prong_cup", "claw_cup"}
+
+    def test_optional_id_not_required(self):
+        req = jewelry_suspension_mount_spec.input_schema["required"]
+        assert "id" not in req
+
+
+# ============================================================================
+# V4: Suspension mount — geometry math
+# ============================================================================
+
+class TestSuspensionMountGeometry:
+    def test_ring_outer_diameter(self):
+        node = build_suspension_mount_node(
+            node_id="sm-1",
+            stone_diameter=5.0,
+            seat_style="bezel_cup",
+            seat_depth=1.5,
+            ring_wire_diameter=0.8,
+            ring_inner_diameter=2.0,
+            bail_height=1.5,
+        )
+        expected = 2.0 + 2 * 0.8
+        assert math.isclose(node["_ring_outer_diameter"], expected, rel_tol=1e-5)
+
+    def test_total_height(self):
+        node = build_suspension_mount_node(
+            node_id="sm-2",
+            stone_diameter=4.0,
+            seat_style="prong_cup",
+            seat_depth=1.2,
+            ring_wire_diameter=0.9,
+            ring_inner_diameter=2.5,
+            bail_height=2.0,
+        )
+        expected = 1.2 + 2.0 + 0.9
+        assert math.isclose(node["_total_height"], expected, rel_tol=1e-5)
+
+    def test_seat_radius(self):
+        node = build_suspension_mount_node(
+            node_id="sm-3",
+            stone_diameter=6.0,
+            seat_style="claw_cup",
+            seat_depth=1.8,
+            ring_wire_diameter=1.0,
+            ring_inner_diameter=3.0,
+            bail_height=1.5,
+        )
+        assert math.isclose(node["_seat_radius"], 3.0, rel_tol=1e-9)
+
+    def test_op_field(self):
+        node = build_suspension_mount_node(
+            node_id="sm-4",
+            stone_diameter=5.0,
+            seat_style="bezel_cup",
+            seat_depth=1.5,
+            ring_wire_diameter=0.8,
+            ring_inner_diameter=2.0,
+            bail_height=1.5,
+        )
+        assert node["op"] == "jewelry_suspension_mount"
+
+
+# ============================================================================
+# V4: Suspension mount — LLM tool runner
+# ============================================================================
+
+class TestSuspensionMountRunner:
+    def test_success_bezel_cup(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_suspension_mount, ctx, fid,
+            stone_diameter=5.0,
+            seat_style="bezel_cup",
+            seat_depth=1.5,
+            ring_wire_diameter=0.8,
+            ring_inner_diameter=2.5,
+            bail_height=1.5,
+        )
+        assert result.get("error") is None, result
+        assert result["op"] == "jewelry_suspension_mount"
+        assert result["seat_style"] == "bezel_cup"
+
+    def test_success_prong_cup(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_suspension_mount, ctx, fid,
+            stone_diameter=4.0,
+            seat_style="prong_cup",
+            seat_depth=1.0,
+            ring_wire_diameter=0.9,
+            ring_inner_diameter=2.0,
+            bail_height=2.0,
+        )
+        assert result.get("error") is None
+        node = get_last_node(store)
+        assert node["seat_style"] == "prong_cup"
+
+    def test_node_id_auto_generated(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_suspension_mount, ctx, fid,
+            stone_diameter=5.0, seat_style="bezel_cup",
+            seat_depth=1.5, ring_wire_diameter=0.8,
+            ring_inner_diameter=2.0, bail_height=1.5,
+        )
+        node = get_last_node(store)
+        assert node["id"].startswith("jewelry_suspension_mount-")
+
+    def test_ring_inner_must_exceed_wire_diameter(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_suspension_mount, ctx, fid,
+            stone_diameter=5.0, seat_style="bezel_cup",
+            seat_depth=1.5, ring_wire_diameter=1.5,
+            ring_inner_diameter=1.0,  # less than wire_diameter — invalid
+            bail_height=1.5,
+        )
+        assert result.get("code") == "BAD_ARGS"
+        assert "ring_inner_diameter" in result.get("error", "")
+
+    def test_invalid_seat_style_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_suspension_mount, ctx, fid,
+            stone_diameter=5.0, seat_style="tube_cup",
+            seat_depth=1.5, ring_wire_diameter=0.8,
+            ring_inner_diameter=2.0, bail_height=1.5,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_zero_stone_diameter_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_suspension_mount, ctx, fid,
+            stone_diameter=0, seat_style="bezel_cup",
+            seat_depth=1.5, ring_wire_diameter=0.8,
+            ring_inner_diameter=2.0, bail_height=1.5,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    @pytest.mark.parametrize("style", ["bezel_cup", "prong_cup", "claw_cup"])
+    def test_all_seat_styles_accepted(self, style):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_suspension_mount, ctx, fid,
+            stone_diameter=5.0, seat_style=style,
+            seat_depth=1.5, ring_wire_diameter=0.8,
+            ring_inner_diameter=2.0, bail_height=1.5,
+        )
+        assert result.get("error") is None, f"style={style}: {result}"
+
+
+# ============================================================================
+# V4: V-tip protector — ToolSpec schema
+# ============================================================================
+
+class TestVtipProtectorSpec:
+    def test_name(self):
+        assert jewelry_vtip_protector_spec.name == "jewelry_create_vtip_protector"
+
+    def test_required_fields(self):
+        req = jewelry_vtip_protector_spec.input_schema["required"]
+        for f in ["file_id", "stone_shape", "tip_count", "tip_width",
+                  "tip_length", "wall_thickness", "seat_angle_deg"]:
+            assert f in req
+
+    def test_stone_shape_enum(self):
+        props = jewelry_vtip_protector_spec.input_schema["properties"]
+        enum = props["stone_shape"].get("enum", [])
+        assert set(enum) == {"pear", "marquise", "heart", "trillion"}
+
+
+# ============================================================================
+# V4: V-tip protector — geometry math
+# ============================================================================
+
+class TestVtipProtectorGeometry:
+    def test_tip_opening_width(self):
+        node = build_vtip_protector_node(
+            node_id="vt-1",
+            stone_shape="marquise",
+            tip_count=2,
+            tip_width=0.6,
+            tip_length=1.0,
+            wall_thickness=0.3,
+            seat_angle_deg=60.0,
+        )
+        half_rad = math.radians(30.0)
+        expected = 2.0 * 1.0 * math.tan(half_rad)
+        assert math.isclose(node["_tip_opening_width"], expected, rel_tol=1e-4)
+
+    def test_cap_area_approx(self):
+        node = build_vtip_protector_node(
+            node_id="vt-2",
+            stone_shape="trillion",
+            tip_count=3,
+            tip_width=0.8,
+            tip_length=1.2,
+            wall_thickness=0.25,
+            seat_angle_deg=60.0,
+        )
+        expected = 0.5 * 0.8 * 1.2
+        assert math.isclose(node["_cap_area_approx"], expected, rel_tol=1e-5)
+
+    def test_op_field(self):
+        node = build_vtip_protector_node(
+            node_id="vt-3",
+            stone_shape="pear",
+            tip_count=1,
+            tip_width=0.5,
+            tip_length=0.8,
+            wall_thickness=0.2,
+            seat_angle_deg=45.0,
+        )
+        assert node["op"] == "jewelry_vtip_protector"
+        assert node["stone_shape"] == "pear"
+        assert node["tip_count"] == 1
+
+
+# ============================================================================
+# V4: V-tip protector — LLM tool runner
+# ============================================================================
+
+class TestVtipProtectorRunner:
+    def test_success_pear(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_vtip_protector, ctx, fid,
+            stone_shape="pear",
+            tip_count=1,
+            tip_width=0.6,
+            tip_length=1.0,
+            wall_thickness=0.3,
+            seat_angle_deg=50.0,
+        )
+        assert result.get("error") is None, result
+        assert result["op"] == "jewelry_vtip_protector"
+
+    def test_success_trillion(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_vtip_protector, ctx, fid,
+            stone_shape="trillion",
+            tip_count=3,
+            tip_width=0.7,
+            tip_length=1.2,
+            wall_thickness=0.3,
+            seat_angle_deg=60.0,
+        )
+        assert result.get("error") is None
+        node = get_last_node(store)
+        assert node["stone_shape"] == "trillion"
+        assert node["tip_count"] == 3
+
+    def test_node_id_auto_generated(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_vtip_protector, ctx, fid,
+            stone_shape="marquise", tip_count=2,
+            tip_width=0.5, tip_length=1.0,
+            wall_thickness=0.25, seat_angle_deg=55.0,
+        )
+        node = get_last_node(store)
+        assert node["id"].startswith("jewelry_vtip_protector-")
+
+    def test_seat_angle_180_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_vtip_protector, ctx, fid,
+            stone_shape="pear", tip_count=1,
+            tip_width=0.5, tip_length=1.0,
+            wall_thickness=0.25, seat_angle_deg=180.0,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_zero_tip_count_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_vtip_protector, ctx, fid,
+            stone_shape="pear", tip_count=0,
+            tip_width=0.5, tip_length=1.0,
+            wall_thickness=0.25, seat_angle_deg=50.0,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_invalid_stone_shape_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_vtip_protector, ctx, fid,
+            stone_shape="oval",  # not in valid set
+            tip_count=2, tip_width=0.5, tip_length=1.0,
+            wall_thickness=0.25, seat_angle_deg=55.0,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    @pytest.mark.parametrize("shape", ["pear", "marquise", "heart", "trillion"])
+    def test_all_stone_shapes_accepted(self, shape):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_vtip_protector, ctx, fid,
+            stone_shape=shape, tip_count=2,
+            tip_width=0.6, tip_length=1.0,
+            wall_thickness=0.3, seat_angle_deg=60.0,
+        )
+        assert result.get("error") is None, f"shape={shape}: {result}"
+
+
+# ============================================================================
+# V4: Bombé cluster — ToolSpec schema
+# ============================================================================
+
+class TestBombeClusterSpec:
+    def test_name(self):
+        assert jewelry_bombe_cluster_spec.name == "jewelry_create_bombe_cluster"
+
+    def test_required_fields(self):
+        req = jewelry_bombe_cluster_spec.input_schema["required"]
+        for f in ["file_id", "dome_radius", "stone_size", "stone_count",
+                  "cap_half_angle_deg", "base_height"]:
+            assert f in req
+
+
+# ============================================================================
+# V4: Bombé cluster — geometry math
+# ============================================================================
+
+class TestBombeClusterGeometry:
+    def test_base_diameter(self):
+        node = build_bombe_cluster_node(
+            node_id="bc-1",
+            dome_radius=8.0,
+            stone_size=1.2,
+            stone_count=7,
+            cap_half_angle_deg=60.0,
+            base_height=1.5,
+        )
+        expected = 2.0 * 8.0 * math.sin(math.radians(60.0))
+        assert math.isclose(node["_base_diameter"], expected, rel_tol=1e-4)
+
+    def test_cap_arc_length(self):
+        node = build_bombe_cluster_node(
+            node_id="bc-2",
+            dome_radius=10.0,
+            stone_size=1.0,
+            stone_count=5,
+            cap_half_angle_deg=45.0,
+            base_height=1.0,
+        )
+        expected = 10.0 * math.radians(45.0)
+        assert math.isclose(node["_cap_arc_length"], expected, rel_tol=1e-4)
+
+    def test_actual_count_matches_stone_count(self):
+        node = build_bombe_cluster_node(
+            node_id="bc-3",
+            dome_radius=7.0,
+            stone_size=1.0,
+            stone_count=9,
+            cap_half_angle_deg=70.0,
+            base_height=1.2,
+        )
+        assert node["_actual_count"] == 9
+        assert len(node["positions"]) == 9
+
+    def test_single_stone_at_pole(self):
+        positions = _compute_bombe_positions(dome_radius=8.0, stone_size=1.0, stone_count=1)
+        assert len(positions) == 1
+        assert math.isclose(positions[0]["polar_deg"], 0.0, abs_tol=1e-9)
+
+    def test_positions_have_required_keys(self):
+        positions = _compute_bombe_positions(dome_radius=8.0, stone_size=1.0, stone_count=5)
+        for p in positions:
+            assert "x" in p and "y" in p and "z" in p
+            assert "polar_deg" in p and "azimuth_deg" in p
+
+    def test_op_field(self):
+        node = build_bombe_cluster_node(
+            node_id="bc-4",
+            dome_radius=8.0, stone_size=1.0,
+            stone_count=5, cap_half_angle_deg=60.0, base_height=1.0,
+        )
+        assert node["op"] == "jewelry_bombe_cluster"
+
+
+# ============================================================================
+# V4: Bombé cluster — LLM tool runner
+# ============================================================================
+
+class TestBombeClusterRunner:
+    def test_success(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_bombe_cluster, ctx, fid,
+            dome_radius=8.0,
+            stone_size=1.2,
+            stone_count=7,
+            cap_half_angle_deg=60.0,
+            base_height=1.5,
+        )
+        assert result.get("error") is None, result
+        assert result["op"] == "jewelry_bombe_cluster"
+        assert result["stone_count"] == 7
+
+    def test_node_id_auto_generated(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_bombe_cluster, ctx, fid,
+            dome_radius=8.0, stone_size=1.0,
+            stone_count=5, cap_half_angle_deg=60.0, base_height=1.0,
+        )
+        node = get_last_node(store)
+        assert node["id"].startswith("jewelry_bombe_cluster-")
+
+    def test_cap_angle_90_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_bombe_cluster, ctx, fid,
+            dome_radius=8.0, stone_size=1.0,
+            stone_count=5, cap_half_angle_deg=90.0,  # >= 90 — invalid
+            base_height=1.0,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_zero_stone_count_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_bombe_cluster, ctx, fid,
+            dome_radius=8.0, stone_size=1.0,
+            stone_count=0, cap_half_angle_deg=60.0, base_height=1.0,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_result_contains_base_diameter(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_bombe_cluster, ctx, fid,
+            dome_radius=8.0, stone_size=1.0,
+            stone_count=3, cap_half_angle_deg=60.0, base_height=1.0,
+        )
+        assert "_base_diameter" in result
+
+
+# ============================================================================
+# V4: Patterned bezel — ToolSpec schema
+# ============================================================================
+
+class TestPatternedBezelSpec:
+    def test_name(self):
+        assert jewelry_patterned_bezel_spec.name == "jewelry_create_patterned_bezel"
+
+    def test_required_fields(self):
+        req = jewelry_patterned_bezel_spec.input_schema["required"]
+        for f in ["file_id", "stone_diameter", "wall_thickness", "bezel_height",
+                  "bearing_ledge_height", "pattern", "petal_count"]:
+            assert f in req
+
+    def test_pattern_enum(self):
+        props = jewelry_patterned_bezel_spec.input_schema["properties"]
+        enum = props["pattern"].get("enum", [])
+        assert set(enum) == {"lotus", "compass", "star", "plain"}
+
+
+# ============================================================================
+# V4: Patterned bezel — geometry math
+# ============================================================================
+
+class TestPatternedBezelGeometry:
+    def test_outer_diameter(self):
+        node = build_patterned_bezel_node(
+            node_id="pb-1",
+            stone_diameter=7.0,
+            wall_thickness=0.5,
+            bezel_height=3.0,
+            bearing_ledge_height=1.2,
+            pattern="lotus",
+            petal_count=8,
+        )
+        assert math.isclose(node["_outer_diameter"], 7.0 + 2 * 0.5, rel_tol=1e-9)
+
+    def test_petal_pitch_deg(self):
+        node = build_patterned_bezel_node(
+            node_id="pb-2",
+            stone_diameter=6.0,
+            wall_thickness=0.4,
+            bezel_height=2.5,
+            bearing_ledge_height=1.0,
+            pattern="star",
+            petal_count=12,
+        )
+        assert math.isclose(node["_petal_pitch_deg"], 360.0 / 12, rel_tol=1e-5)
+
+    def test_op_field(self):
+        node = build_patterned_bezel_node(
+            node_id="pb-3",
+            stone_diameter=5.0, wall_thickness=0.4,
+            bezel_height=2.0, bearing_ledge_height=0.8,
+            pattern="compass", petal_count=8,
+        )
+        assert node["op"] == "jewelry_patterned_bezel"
+        assert node["pattern"] == "compass"
+
+
+# ============================================================================
+# V4: Patterned bezel — LLM tool runner
+# ============================================================================
+
+class TestPatternedBezelRunner:
+    def test_success_lotus(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_patterned_bezel, ctx, fid,
+            stone_diameter=7.0,
+            wall_thickness=0.5,
+            bezel_height=3.0,
+            bearing_ledge_height=1.2,
+            pattern="lotus",
+            petal_count=8,
+        )
+        assert result.get("error") is None, result
+        assert result["op"] == "jewelry_patterned_bezel"
+        assert result["pattern"] == "lotus"
+
+    def test_success_compass(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_patterned_bezel, ctx, fid,
+            stone_diameter=6.0,
+            wall_thickness=0.5,
+            bezel_height=2.8,
+            bearing_ledge_height=1.1,
+            pattern="compass",
+            petal_count=8,
+        )
+        assert result.get("error") is None
+        node = get_last_node(store)
+        assert node["pattern"] == "compass"
+        assert node["petal_count"] == 8
+
+    def test_node_id_auto_generated(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_patterned_bezel, ctx, fid,
+            stone_diameter=6.0, wall_thickness=0.5,
+            bezel_height=2.5, bearing_ledge_height=1.0,
+            pattern="star", petal_count=6,
+        )
+        node = get_last_node(store)
+        assert node["id"].startswith("jewelry_patterned_bezel-")
+
+    def test_bearing_ledge_must_be_less_than_height(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_patterned_bezel, ctx, fid,
+            stone_diameter=6.0, wall_thickness=0.5,
+            bezel_height=2.0, bearing_ledge_height=2.0,  # equal — invalid
+            pattern="lotus", petal_count=8,
+        )
+        assert result.get("code") == "BAD_ARGS"
+        assert "bearing_ledge_height" in result.get("error", "")
+
+    def test_petal_count_too_low_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_patterned_bezel, ctx, fid,
+            stone_diameter=6.0, wall_thickness=0.5,
+            bezel_height=2.5, bearing_ledge_height=1.0,
+            pattern="lotus", petal_count=2,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_invalid_pattern_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_patterned_bezel, ctx, fid,
+            stone_diameter=6.0, wall_thickness=0.5,
+            bezel_height=2.5, bearing_ledge_height=1.0,
+            pattern="snowflake", petal_count=8,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    @pytest.mark.parametrize("pattern", ["lotus", "compass", "star", "plain"])
+    def test_all_patterns_accepted(self, pattern):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_patterned_bezel, ctx, fid,
+            stone_diameter=6.0, wall_thickness=0.5,
+            bezel_height=2.5, bearing_ledge_height=1.0,
+            pattern=pattern, petal_count=8,
+        )
+        assert result.get("error") is None, f"pattern={pattern}: {result}"
+
+
+# ============================================================================
+# V4: Trellis prong — ToolSpec schema
+# ============================================================================
+
+class TestTrellisProngSpec:
+    def test_name(self):
+        assert jewelry_trellis_prong_spec.name == "jewelry_create_trellis_prong"
+
+    def test_required_fields(self):
+        req = jewelry_trellis_prong_spec.input_schema["required"]
+        for f in ["file_id", "stone_diameter", "prong_count", "wire_gauge",
+                  "prong_height", "weave_style", "cross_height"]:
+            assert f in req
+
+    def test_weave_style_enum(self):
+        props = jewelry_trellis_prong_spec.input_schema["properties"]
+        enum = props["weave_style"].get("enum", [])
+        assert set(enum) == {"x_cross", "diagonal", "square"}
+
+
+# ============================================================================
+# V4: Trellis prong — geometry math
+# ============================================================================
+
+class TestTrellisProngGeometry:
+    def test_outer_diameter(self):
+        node = build_trellis_prong_node(
+            node_id="tp-1",
+            stone_diameter=6.5,
+            prong_count=6,
+            wire_gauge=1.0,
+            prong_height=2.5,
+            weave_style="x_cross",
+            cross_height=1.0,
+        )
+        assert math.isclose(node["_outer_diameter"], 6.5 + 2 * 1.0, rel_tol=1e-9)
+
+    def test_cross_clearance(self):
+        node = build_trellis_prong_node(
+            node_id="tp-2",
+            stone_diameter=5.0,
+            prong_count=4,
+            wire_gauge=0.9,
+            prong_height=2.0,
+            weave_style="diagonal",
+            cross_height=0.8,
+        )
+        assert math.isclose(node["_cross_clearance"], 0.9 * 2.0, rel_tol=1e-9)
+
+    def test_prong_pitch_deg(self):
+        node = build_trellis_prong_node(
+            node_id="tp-3",
+            stone_diameter=6.0,
+            prong_count=8,
+            wire_gauge=1.0,
+            prong_height=2.5,
+            weave_style="square",
+            cross_height=1.0,
+        )
+        assert math.isclose(node["_prong_pitch_deg"], 360.0 / 8, rel_tol=1e-5)
+
+    def test_op_field(self):
+        node = build_trellis_prong_node(
+            node_id="tp-4",
+            stone_diameter=5.0, prong_count=4, wire_gauge=0.9,
+            prong_height=2.0, weave_style="x_cross", cross_height=0.8,
+        )
+        assert node["op"] == "jewelry_trellis_prong"
+        assert node["weave_style"] == "x_cross"
+
+
+# ============================================================================
+# V4: Trellis prong — LLM tool runner
+# ============================================================================
+
+class TestTrellisProngRunner:
+    def test_success_x_cross(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_trellis_prong, ctx, fid,
+            stone_diameter=6.5,
+            prong_count=6,
+            wire_gauge=1.0,
+            prong_height=2.5,
+            weave_style="x_cross",
+            cross_height=1.0,
+        )
+        assert result.get("error") is None, result
+        assert result["op"] == "jewelry_trellis_prong"
+        assert result["weave_style"] == "x_cross"
+
+    def test_success_diagonal(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_trellis_prong, ctx, fid,
+            stone_diameter=5.0,
+            prong_count=4,
+            wire_gauge=0.9,
+            prong_height=2.0,
+            weave_style="diagonal",
+            cross_height=0.8,
+        )
+        assert result.get("error") is None
+        node = get_last_node(store)
+        assert node["weave_style"] == "diagonal"
+
+    def test_node_id_auto_generated(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_trellis_prong, ctx, fid,
+            stone_diameter=5.0, prong_count=4, wire_gauge=0.9,
+            prong_height=2.0, weave_style="x_cross", cross_height=0.8,
+        )
+        node = get_last_node(store)
+        assert node["id"].startswith("jewelry_trellis_prong-")
+
+    def test_odd_prong_count_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_trellis_prong, ctx, fid,
+            stone_diameter=6.0, prong_count=5,  # odd — invalid
+            wire_gauge=1.0, prong_height=2.5,
+            weave_style="x_cross", cross_height=1.0,
+        )
+        assert result.get("code") == "BAD_ARGS"
+        assert "even" in result.get("error", "").lower()
+
+    def test_prong_count_too_low_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_trellis_prong, ctx, fid,
+            stone_diameter=6.0, prong_count=2,  # < 4 — invalid
+            wire_gauge=1.0, prong_height=2.5,
+            weave_style="x_cross", cross_height=1.0,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_cross_height_must_be_less_than_prong_height(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_trellis_prong, ctx, fid,
+            stone_diameter=6.0, prong_count=4,
+            wire_gauge=1.0, prong_height=2.0,
+            weave_style="x_cross", cross_height=2.5,  # > prong_height — invalid
+        )
+        assert result.get("code") == "BAD_ARGS"
+        assert "cross_height" in result.get("error", "")
+
+    def test_invalid_weave_style_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_trellis_prong, ctx, fid,
+            stone_diameter=5.0, prong_count=4,
+            wire_gauge=1.0, prong_height=2.0,
+            weave_style="hexagonal", cross_height=0.8,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    @pytest.mark.parametrize("style", ["x_cross", "diagonal", "square"])
+    def test_all_weave_styles_accepted(self, style):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_trellis_prong, ctx, fid,
+            stone_diameter=6.0, prong_count=4,
+            wire_gauge=1.0, prong_height=2.5,
+            weave_style=style, cross_height=1.0,
+        )
+        assert result.get("error") is None, f"style={style}: {result}"
+
+
+# ============================================================================
+# V4: Bar-channel graduated row — ToolSpec schema
+# ============================================================================
+
+class TestBarChannelGraduatedSpec:
+    def test_name(self):
+        assert jewelry_bar_channel_graduated_spec.name == "jewelry_create_bar_channel_graduated"
+
+    def test_required_fields(self):
+        req = jewelry_bar_channel_graduated_spec.input_schema["required"]
+        for f in ["file_id", "stone_count", "largest_diameter", "smallest_diameter",
+                  "stone_spacing", "bar_width", "bar_height", "floor_thickness"]:
+            assert f in req
+
+
+# ============================================================================
+# V4: Bar-channel graduated row — geometry math
+# ============================================================================
+
+class TestBarChannelGraduatedGeometry:
+    def test_single_stone(self):
+        stones = _compute_graduated_row(
+            stone_count=1,
+            largest_diameter=3.0,
+            smallest_diameter=3.0,
+            stone_spacing=0.2,
+        )
+        assert len(stones) == 1
+        assert math.isclose(stones[0]["diameter"], 3.0, rel_tol=1e-9)
+        assert math.isclose(stones[0]["x_center"], 1.5, rel_tol=1e-9)
+
+    def test_uniform_row(self):
+        stones = _compute_graduated_row(
+            stone_count=3,
+            largest_diameter=2.0,
+            smallest_diameter=2.0,
+            stone_spacing=0.1,
+        )
+        assert len(stones) == 3
+        # All diameters equal when largest == smallest
+        for s in stones:
+            assert math.isclose(s["diameter"], 2.0, rel_tol=1e-9)
+        # Positions should be strictly increasing
+        x_positions = [s["x_center"] for s in stones]
+        assert x_positions == sorted(x_positions)
+
+    def test_graduated_diameters_decreasing(self):
+        stones = _compute_graduated_row(
+            stone_count=5,
+            largest_diameter=4.0,
+            smallest_diameter=2.0,
+            stone_spacing=0.1,
+        )
+        diameters = [s["diameter"] for s in stones]
+        for i in range(len(diameters) - 1):
+            assert diameters[i] >= diameters[i + 1]
+
+    def test_total_row_length_positive(self):
+        node = build_bar_channel_graduated_node(
+            node_id="bcg-1",
+            stone_count=5,
+            largest_diameter=3.5,
+            smallest_diameter=2.0,
+            stone_spacing=0.15,
+            bar_width=0.6,
+            bar_height=1.0,
+            floor_thickness=0.4,
+        )
+        assert node["_total_row_length"] > 0
+
+    def test_bar_count_equals_stone_count_minus_one(self):
+        node = build_bar_channel_graduated_node(
+            node_id="bcg-2",
+            stone_count=7,
+            largest_diameter=3.0,
+            smallest_diameter=1.5,
+            stone_spacing=0.1,
+            bar_width=0.5,
+            bar_height=0.9,
+            floor_thickness=0.35,
+        )
+        assert node["_bar_count"] == 6  # 7 stones -> 6 bars
+
+    def test_op_field(self):
+        node = build_bar_channel_graduated_node(
+            node_id="bcg-3",
+            stone_count=3,
+            largest_diameter=3.0, smallest_diameter=2.0,
+            stone_spacing=0.1, bar_width=0.5,
+            bar_height=0.9, floor_thickness=0.3,
+        )
+        assert node["op"] == "jewelry_bar_channel_graduated"
+
+    def test_stones_list_in_node(self):
+        node = build_bar_channel_graduated_node(
+            node_id="bcg-4",
+            stone_count=4,
+            largest_diameter=3.0, smallest_diameter=2.0,
+            stone_spacing=0.1, bar_width=0.5,
+            bar_height=0.9, floor_thickness=0.3,
+        )
+        assert len(node["stones"]) == 4
+        for s in node["stones"]:
+            assert "index" in s and "diameter" in s and "x_center" in s
+
+
+# ============================================================================
+# V4: Bar-channel graduated row — LLM tool runner
+# ============================================================================
+
+class TestBarChannelGraduatedRunner:
+    def test_success(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_bar_channel_graduated, ctx, fid,
+            stone_count=5,
+            largest_diameter=3.5,
+            smallest_diameter=2.0,
+            stone_spacing=0.15,
+            bar_width=0.6,
+            bar_height=1.0,
+            floor_thickness=0.4,
+        )
+        assert result.get("error") is None, result
+        assert result["op"] == "jewelry_bar_channel_graduated"
+        assert result["stone_count"] == 5
+
+    def test_success_uniform_row(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_bar_channel_graduated, ctx, fid,
+            stone_count=3,
+            largest_diameter=2.5,
+            smallest_diameter=2.5,  # same — uniform
+            stone_spacing=0.1,
+            bar_width=0.5,
+            bar_height=0.8,
+            floor_thickness=0.3,
+        )
+        assert result.get("error") is None
+
+    def test_node_id_auto_generated(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_bar_channel_graduated, ctx, fid,
+            stone_count=3, largest_diameter=3.0, smallest_diameter=2.0,
+            stone_spacing=0.1, bar_width=0.5, bar_height=0.9, floor_thickness=0.3,
+        )
+        node = get_last_node(store)
+        assert node["id"].startswith("jewelry_bar_channel_graduated-")
+
+    def test_smallest_greater_than_largest_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_bar_channel_graduated, ctx, fid,
+            stone_count=3,
+            largest_diameter=2.0,
+            smallest_diameter=3.0,  # larger — invalid
+            stone_spacing=0.1,
+            bar_width=0.5, bar_height=0.9, floor_thickness=0.3,
+        )
+        assert result.get("code") == "BAD_ARGS"
+        assert "smallest_diameter" in result.get("error", "")
+
+    def test_zero_stone_count_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_bar_channel_graduated, ctx, fid,
+            stone_count=0,
+            largest_diameter=3.0, smallest_diameter=2.0,
+            stone_spacing=0.1, bar_width=0.5, bar_height=0.9, floor_thickness=0.3,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_negative_stone_spacing_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_bar_channel_graduated, ctx, fid,
+            stone_count=3,
+            largest_diameter=3.0, smallest_diameter=2.0,
+            stone_spacing=-0.1,  # negative — invalid
+            bar_width=0.5, bar_height=0.9, floor_thickness=0.3,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_result_contains_row_length_and_bar_count(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_bar_channel_graduated, ctx, fid,
+            stone_count=4, largest_diameter=3.0, smallest_diameter=1.8,
+            stone_spacing=0.12, bar_width=0.5, bar_height=1.0, floor_thickness=0.35,
+        )
+        assert "_total_row_length" in result
+        assert "_bar_count" in result
+        assert result["_bar_count"] == 3  # 4 stones -> 3 bars
+
+
+# ============================================================================
+# OCC-gated tests — v4 settings
+# ============================================================================
+
+@skip_no_occ
+class TestV4OCC:
+    """Smoke tests for v4 settings: use node-spec derived dimensions to build
+    trivial OCCT cylinders, verifying geometry hints are numerically reasonable."""
+
+    def test_occ_suspension_mount_ring(self):
+        from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeTorus  # type: ignore
+        from OCC.Core.gp import gp_Pnt, gp_Ax2, gp_Dir  # type: ignore
+
+        node = build_suspension_mount_node(
+            node_id="occ-sm-1",
+            stone_diameter=5.0,
+            seat_style="bezel_cup",
+            seat_depth=1.5,
+            ring_wire_diameter=0.8,
+            ring_inner_diameter=2.5,
+            bail_height=1.5,
+        )
+        # Torus with major radius = (ring_inner + ring_outer) / 4, minor = ring_wire/2
+        major_r = (node["ring_inner_diameter"] + node["_ring_outer_diameter"]) / 4.0
+        minor_r = node["ring_wire_diameter"] / 2.0
+        ax = gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1))
+        torus = BRepPrimAPI_MakeTorus(ax, major_r, minor_r)
+        assert not torus.Shape().IsNull()
+
+    def test_occ_vtip_protector_box(self):
+        from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox  # type: ignore
+
+        node = build_vtip_protector_node(
+            node_id="occ-vt-1",
+            stone_shape="marquise",
+            tip_count=2,
+            tip_width=0.6,
+            tip_length=1.0,
+            wall_thickness=0.3,
+            seat_angle_deg=60.0,
+        )
+        # Box of tip_width x tip_length x wall_thickness per cap
+        box = BRepPrimAPI_MakeBox(node["tip_width"], node["tip_length"], node["wall_thickness"])
+        assert not box.Shape().IsNull()
+
+    def test_occ_bombe_cluster_cylinder(self):
+        from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeCylinder  # type: ignore
+        from OCC.Core.gp import gp_Pnt, gp_Ax2, gp_Dir  # type: ignore
+
+        node = build_bombe_cluster_node(
+            node_id="occ-bc-1",
+            dome_radius=8.0,
+            stone_size=1.2,
+            stone_count=7,
+            cap_half_angle_deg=60.0,
+            base_height=1.5,
+        )
+        ax = gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1))
+        cyl = BRepPrimAPI_MakeCylinder(ax, node["_base_diameter"] / 2.0, node["base_height"])
+        assert not cyl.Shape().IsNull()
+
+    def test_occ_patterned_bezel_cylinder(self):
+        from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeCylinder  # type: ignore
+        from OCC.Core.gp import gp_Pnt, gp_Ax2, gp_Dir  # type: ignore
+
+        node = build_patterned_bezel_node(
+            node_id="occ-pb-1",
+            stone_diameter=7.0,
+            wall_thickness=0.5,
+            bezel_height=3.0,
+            bearing_ledge_height=1.2,
+            pattern="lotus",
+            petal_count=8,
+        )
+        ax = gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1))
+        cyl = BRepPrimAPI_MakeCylinder(ax, node["_outer_diameter"] / 2.0, node["bezel_height"])
+        assert not cyl.Shape().IsNull()
+
+    def test_occ_trellis_prong_cylinder(self):
+        from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeCylinder  # type: ignore
+        from OCC.Core.gp import gp_Pnt, gp_Ax2, gp_Dir  # type: ignore
+
+        node = build_trellis_prong_node(
+            node_id="occ-tp-1",
+            stone_diameter=6.5,
+            prong_count=6,
+            wire_gauge=1.0,
+            prong_height=2.5,
+            weave_style="x_cross",
+            cross_height=1.0,
+        )
+        ax = gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1))
+        cyl = BRepPrimAPI_MakeCylinder(ax, node["_outer_diameter"] / 2.0, node["prong_height"])
+        assert not cyl.Shape().IsNull()
+
+    def test_occ_bar_channel_graduated_box(self):
+        from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox  # type: ignore
+
+        node = build_bar_channel_graduated_node(
+            node_id="occ-bcg-1",
+            stone_count=5,
+            largest_diameter=3.5,
+            smallest_diameter=2.0,
+            stone_spacing=0.15,
+            bar_width=0.6,
+            bar_height=1.0,
+            floor_thickness=0.4,
+        )
+        # Build a box of total row length × bar_height × floor_thickness
+        box = BRepPrimAPI_MakeBox(
+            node["_total_row_length"],
+            node["bar_height"],
+            node["floor_thickness"],
+        )
+        assert not box.Shape().IsNull()

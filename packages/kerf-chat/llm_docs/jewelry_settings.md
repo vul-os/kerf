@@ -940,11 +940,308 @@ Result node op: `jewelry_coronet`. Boolean-fuse onto a shank.
 
 ---
 
+---
+
+## `jewelry_create_suspension_mount`
+
+Generates an articulated dangle mount for drop earrings and pendants — a stone
+seat attached to a jump-ring-style pivot loop that lets the mount swing freely.
+
+### How it works
+
+1. A stone seat of `seat_style` is built to accept `stone_diameter`.
+2. A jump-ring pivot loop (wire diameter = `ring_wire_diameter`, inner passage
+   diameter = `ring_inner_diameter`) is placed above the seat.
+3. A short `bail_height` cylinder connects seat to ring.
+
+Seat styles:
+- **`bezel_cup`** — full bezel collar seat.
+- **`prong_cup`** — open 4-prong cup seat.
+- **`claw_cup`** — claw-tip prong cup for maximum stone visibility.
+
+`ring_inner_diameter` must be > `ring_wire_diameter`.
+
+### Parameters
+
+| Parameter            | Required | Notes                                                              |
+|----------------------|----------|--------------------------------------------------------------------|
+| `file_id`            | yes      | Target `.feature` file uuid                                        |
+| `stone_diameter`     | yes      | Girdle diameter of the stone in mm                                 |
+| `seat_style`         | yes      | `bezel_cup`, `prong_cup`, or `claw_cup`                           |
+| `seat_depth`         | yes      | Stone seat depth in mm (40–60% of stone depth)                     |
+| `ring_wire_diameter` | yes      | Jump-ring wire cross-section diameter in mm (typical 0.7–1.2)     |
+| `ring_inner_diameter`| yes      | Jump-ring passage diameter in mm. Must be > `ring_wire_diameter`  |
+| `bail_height`        | yes      | Bail cylinder height connecting seat to ring in mm (typical 1–3)  |
+| `id`                 | no       | Explicit node id                                                   |
+
+### Worked example — drop earring pendant mount
+
+```json
+{
+  "file_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "stone_diameter": 6.0,
+  "seat_style": "bezel_cup",
+  "seat_depth": 1.5,
+  "ring_wire_diameter": 0.9,
+  "ring_inner_diameter": 2.5,
+  "bail_height": 2.0
+}
+```
+
+Result node op: `jewelry_suspension_mount`.
+
+---
+
+## `jewelry_create_vtip_protector`
+
+Generates protective V-tip metal caps for pointed stone corners (pear,
+marquise, heart, trillion).
+
+### How it works
+
+Each cap is a V-channel sleeve that wraps snugly around a stone's sharp corner
+to prevent chipping during wear. The internal angle `seat_angle_deg` must match
+the stone's corner included angle.
+
+Stone shapes:
+- **`pear`** — 1 pointed tip (culet end).
+- **`marquise`** — 2 pointed tips (both ends).
+- **`heart`** — 2 tips (lower lobe clefts).
+- **`trillion`** — 3 tips (one per triangular corner).
+
+### Parameters
+
+| Parameter        | Required | Notes                                                                |
+|------------------|----------|----------------------------------------------------------------------|
+| `file_id`        | yes      | Target `.feature` file uuid                                          |
+| `stone_shape`    | yes      | `pear`, `marquise`, `heart`, or `trillion`                          |
+| `tip_count`      | yes      | Number of V-tip caps (≥ 1; defaults: pear=1, marquise=2, heart=2, trillion=3) |
+| `tip_width`      | yes      | V-channel base width in mm (typical 0.4–1.0)                        |
+| `tip_length`     | yes      | Cap length along the stone edge in mm (typical 0.5–1.5)             |
+| `wall_thickness` | yes      | Cap wall thickness in mm (typical 0.2–0.5)                          |
+| `seat_angle_deg` | yes      | Internal V-angle in degrees — match stone's corner angle. Must be in (0, 180) |
+| `id`             | no       | Explicit node id                                                     |
+
+### Worked example — trillion V-tips
+
+```json
+{
+  "file_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "stone_shape": "trillion",
+  "tip_count": 3,
+  "tip_width": 0.7,
+  "tip_length": 1.2,
+  "wall_thickness": 0.3,
+  "seat_angle_deg": 60
+}
+```
+
+Result node op: `jewelry_vtip_protector`.
+
+---
+
+## `jewelry_create_bombe_cluster`
+
+Generates a bombé (strongly domed) multi-stone cluster where stone seats are
+distributed across a spherical cap surface using a Fibonacci-spiral layout.
+
+### How it works
+
+1. A spherical cap of `dome_radius` subtending `cap_half_angle_deg` at the
+   pole forms the dome base (half-angle < 90°).
+2. `stone_count` stones of `stone_size` are placed on the cap surface using a
+   Fibonacci (sunflower) spiral — the densest uniform distribution on a sphere.
+3. A flat base ring of `base_height` closes the bottom for shank attachment.
+4. The evaluate result includes `seat_positions` — per-stone world-space
+   transforms on the dome for downstream boolean seat cutting.
+
+### Parameters
+
+| Parameter           | Required | Notes                                                           |
+|---------------------|----------|-----------------------------------------------------------------|
+| `file_id`           | yes      | Target `.feature` file uuid                                     |
+| `dome_radius`       | yes      | Spherical dome radius in mm (typical 4–15)                      |
+| `stone_size`        | yes      | Girdle diameter of each stone in mm                             |
+| `stone_count`       | yes      | Number of stones distributed on the dome (≥ 1)                  |
+| `cap_half_angle_deg`| yes      | Half-angle of the dome cap in degrees. Must be in (0, 90)       |
+| `base_height`       | yes      | Base ring height at the cap equator in mm                       |
+| `id`                | no       | Explicit node id                                                |
+
+### Worked example — 9-stone bombé ring top
+
+```json
+{
+  "file_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "dome_radius": 7.0,
+  "stone_size": 1.2,
+  "stone_count": 9,
+  "cap_half_angle_deg": 65,
+  "base_height": 1.2
+}
+```
+
+Result node op: `jewelry_bombe_cluster`.
+
+---
+
+## `jewelry_create_patterned_bezel`
+
+Generates a decorative bezel collar with a petal, compass-point, or star-notch
+pattern cut into the bezel wall.
+
+### How it works
+
+A full 360° bezel collar is built (same as `jewelry_bezel` with `full` style),
+then the wall is pierced or shaped with `petal_count` repeating decorative
+motifs controlled by `pattern`. The bearing ledge seat is unaffected.
+
+Patterns:
+- **`lotus`** — rounded petal cutouts from the top edge.
+- **`compass`** — pointed projections extending outward (compass rose / sun-ray).
+- **`star`** — V-notch star outline cut into the top edge.
+- **`plain`** — standard full bezel, no cutouts.
+
+### Parameters
+
+| Parameter              | Required | Notes                                                         |
+|------------------------|----------|---------------------------------------------------------------|
+| `file_id`              | yes      | Target `.feature` file uuid                                   |
+| `stone_diameter`       | yes      | Girdle diameter in mm                                         |
+| `wall_thickness`       | yes      | Bezel wall thickness in mm (typical 0.3–0.8)                  |
+| `bezel_height`         | yes      | Total collar height in mm                                     |
+| `bearing_ledge_height` | yes      | Stone seat height from base; must be < `bezel_height`         |
+| `pattern`              | yes      | `lotus`, `compass`, `star`, or `plain`                        |
+| `petal_count`          | yes      | Number of repeating motif units (≥ 3; typical 6, 8, 12, 16)  |
+| `id`                   | no       | Explicit node id                                              |
+
+### Worked example — lotus bezel for a round stone
+
+```json
+{
+  "file_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "stone_diameter": 7.0,
+  "wall_thickness": 0.5,
+  "bezel_height": 3.0,
+  "bearing_ledge_height": 1.2,
+  "pattern": "lotus",
+  "petal_count": 8
+}
+```
+
+Result node op: `jewelry_patterned_bezel`.
+
+---
+
+## `jewelry_create_trellis_prong`
+
+Generates a trellis (cross-prong) basket setting — prong wires that cross each
+other in an interwoven pattern forming a decorative cage around the stone.
+
+### How it works
+
+1. `prong_count` prong wires (must be even, ≥ 4) are arranged in pairs around
+   the stone.
+2. Adjacent pairs cross each other at `cross_height` above the girdle plane.
+3. The `weave_style` controls the crossing geometry:
+   - **`x_cross`** — clean X crossing (plain weave; over/under alternates).
+   - **`diagonal`** — all wires slant the same direction (twill style).
+   - **`square`** — straight prongs with horizontal cross-bars at `cross_height`.
+
+`cross_height` must be < `prong_height`.
+
+### Parameters
+
+| Parameter      | Required | Notes                                                                      |
+|----------------|----------|----------------------------------------------------------------------------|
+| `file_id`      | yes      | Target `.feature` file uuid                                                |
+| `stone_diameter`| yes     | Girdle diameter in mm                                                      |
+| `prong_count`  | yes      | Even number of prong wires (≥ 4; typical 4, 6, 8)                         |
+| `wire_gauge`   | yes      | Prong wire diameter in mm (typical 0.8–1.5)                               |
+| `prong_height` | yes      | Height above girdle plane in mm                                            |
+| `weave_style`  | yes      | `x_cross`, `diagonal`, or `square`                                        |
+| `cross_height` | yes      | Height above girdle at which wires cross in mm. Must be < `prong_height`  |
+| `id`           | no       | Explicit node id                                                           |
+
+### Worked example — 6-prong X-cross trellis for a 1 ct round
+
+```json
+{
+  "file_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "stone_diameter": 6.5,
+  "prong_count": 6,
+  "wire_gauge": 1.0,
+  "prong_height": 2.5,
+  "weave_style": "x_cross",
+  "cross_height": 1.0
+}
+```
+
+Result node op: `jewelry_trellis_prong`.
+
+---
+
+## `jewelry_create_bar_channel_graduated`
+
+Generates a graduated-row setting combining bar separators and a channel floor
+— a row of stones that decreases in size from largest to smallest, with a pair
+of bar pillars between each adjacent stone pair.
+
+### How it works
+
+1. `stone_count` stones are sized linearly from `largest_diameter` (first stone)
+   to `smallest_diameter` (last stone) along the X-axis.
+2. A pair of bar pillars of `bar_width` × `bar_height` is placed between each
+   adjacent stone pair (so `stone_count − 1` bar pairs total).
+3. A channel floor of `floor_thickness` runs the full row length.
+4. The evaluate result includes `stones` — per-stone `{index, diameter, x_center}`
+   for downstream boolean seat cutting.
+
+`smallest_diameter` must be ≤ `largest_diameter`. `stone_spacing` may be 0
+(stones touching).
+
+### Parameters
+
+| Parameter          | Required | Notes                                                              |
+|--------------------|----------|--------------------------------------------------------------------|
+| `file_id`          | yes      | Target `.feature` file uuid                                        |
+| `stone_count`      | yes      | Number of stones in the row (≥ 1)                                  |
+| `largest_diameter` | yes      | Girdle diameter of the largest stone in mm                         |
+| `smallest_diameter`| yes      | Girdle diameter of the smallest stone in mm (≤ `largest_diameter`)|
+| `stone_spacing`    | yes      | Edge-to-edge gap between stones in mm (≥ 0; typical 0.1–0.3)      |
+| `bar_width`        | yes      | Bar pillar width in mm (typical 0.4–1.0)                           |
+| `bar_height`       | yes      | Bar pillar height above stone seat in mm (typical 0.5–1.5)         |
+| `floor_thickness`  | yes      | Channel floor thickness in mm                                      |
+| `id`               | no       | Explicit node id                                                   |
+
+### Worked example — 7-stone tapered eternity band row
+
+```json
+{
+  "file_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "stone_count": 7,
+  "largest_diameter": 3.5,
+  "smallest_diameter": 2.0,
+  "stone_spacing": 0.15,
+  "bar_width": 0.6,
+  "bar_height": 1.0,
+  "floor_thickness": 0.4
+}
+```
+
+Result node op: `jewelry_bar_channel_graduated`. Bar count = 6 (one pair between
+each adjacent stone). Pair with downstream boolean seat cuts using `stones`.
+
+---
+
 ## FeatureView inspector entries — deferred
 
-The five new settings (`jewelry_prong_variant`, `jewelry_head_gallery`,
-`jewelry_under_bezel`, `jewelry_peg_setting`, `jewelry_coronet`) do **not**
-yet have FeatureView inspector panel entries (`src/components/` is out of
-scope for this agent).  Add inspector cards for each in a follow-up task,
-following the pattern of the existing `JewelryProngHeadPanel` and
-`JewelryBezelPanel` components.
+The v4 settings (`jewelry_suspension_mount`, `jewelry_vtip_protector`,
+`jewelry_bombe_cluster`, `jewelry_patterned_bezel`, `jewelry_trellis_prong`,
+`jewelry_bar_channel_graduated`) do **not** yet have FeatureView inspector
+panel entries (`src/components/` is out of scope for this agent).  Add
+inspector cards for each in a follow-up task, following the pattern of the
+existing `JewelryProngHeadPanel` and `JewelryBezelPanel` components.
+
+The five v3 settings (`jewelry_prong_variant`, `jewelry_head_gallery`,
+`jewelry_under_bezel`, `jewelry_peg_setting`, `jewelry_coronet`) also remain
+deferred for the same reason.

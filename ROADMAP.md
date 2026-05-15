@@ -21,6 +21,47 @@ local install, optional hosted tier with billing + workshop sharing + git.
 
 ---
 
+## 🎯 Priority gaps — market parity (URGENT)
+
+These are the table-stakes capabilities a professional in each domain hits
+within the first hour, and which currently block any claim of being
+"equivalent to Rhino / Revit / FreeCAD / KiCad". Ordered by
+lift-to-credibility ratio. **These take precedence over new breadth — one
+deep, trustworthy domain beats four shallow ones.** Flip Status as items land
+(🔴 not started · 🚧 in flight · ✅ shipped).
+
+### P0 — credibility blockers (each ≈ one focused workstream)
+
+| # | Persona | Capability you CANNOT do today | Why it blocks "best CAD" | Status |
+|---|---|---|---|---|
+| P0-1 | ECAD / PCB | **Fabrication output** — Gerber RS-274X, Excellon drill, IPC-2581 / ODB++, pick-and-place, fab BOM | Design side is KiCad-class (ERC, hier-schematic, shove router, autoroute, SPICE) but a board **cannot be manufactured** — defeats the purpose of a PCB tool | 🔴 not started |
+| P0-2 | Architect + Mechanical | **DWG / DXF import + export** (no DXF/DWG read or write anywhere) | The architecture market runs on DWG; much of mechanical 2D too. Total absence disqualifies Kerf for most firms in minute one | 🔴 not started |
+| P0-3 | Mechanical | **Sheet metal** — flange / bend / unfold / flat-pattern / bend tables | Every mechanical CAD (incl. FreeCAD's SheetMetal WB) has it. Absence is the fastest "this isn't serious" signal | 🔴 not started |
+| P0-4 | All (esp. chat-driven) | **Persistent face-naming hardening** — boolean-heavy regression corpus + stress on real production models | T3–T7 just landed but unproven. Chat-driven re-eval is the core promise; a topological-naming failure breaks the product, not just annoys | 🔴 not started |
+| P0-5 | Mechanical + Architect | **Large-assembly performance ceiling** — defined + measured budget, LOD / lazy-load for 1000s of parts | Pros hit this fast; an unknown ceiling is an unknown product | 🔴 not started |
+
+### P1 — depth that converts evaluators to users
+
+| # | Persona | Capability you CANNOT do today | Status |
+|---|---|---|---|
+| P1-1 | ECAD / PCB | Native parts library (symbols + footprints + 3D + supplier data) and **3D board STEP export** for MCAD-ECAD co-design (today: import user's KiCad libs only) | 🔴 not started |
+| P1-2 | Jewelry | **Jewelry toolkit** — gem/stone library, prong/head placement, pavé/channel auto-array on a surface, bezel/cutter generation, ring sizer, metal weight + casting cost. *The only gap needing real new breadth — biggest build of the five* | 🔴 not started |
+| P1-3 | Mechanical | Weldments (structural members + cut lists); GD&T-from-model on drawings (drawing engine + GD&T frames exist; model-driven callouts do not) | 🔴 not started |
+| P1-4 | Architect | Parametric family editor (Revit's actual moat); IFC import Tier 2 (families / MEP / schedules / openings — Tier 1 only today); construction-doc detailing (dimensioned plans/sections from model, revision clouds, sheet-set management) | 🔴 not started |
+| P1-5 | Jewelry | Surface-boolean robustness on dense NURBS — eliminate runtime escalation paths so organic models survive booleans reliably | 🔴 not started |
+
+### P2 — moats / defer (tracked, explicitly NOT urgent — multi-year or niche)
+
+Real-time multi-user collaboration · nonlinear / thermal / CFD / fatigue
+simulation · cross-discipline clash detection · scan-to-CAD / point clouds ·
+energy & daylight analysis. Listed so they are not lost; none should block P0/P1.
+
+**Recommended sequencing (solo, "keep it simple"):** P0-4 (protects
+everything) → P0-1 (smallest lift-to-credibility, ECAD is already ~80% there)
+→ P0-3 → P0-2 → P0-5, then P1 by whichever persona you choose to win first.
+
+---
+
 ## Status overview
 
 | Area | Status | Notes |

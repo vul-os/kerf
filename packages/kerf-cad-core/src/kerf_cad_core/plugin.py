@@ -29,6 +29,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.quad_remesh",
     "kerf_cad_core.jewelry.gemstones",
     "kerf_cad_core.jewelry.gem_seat",
+    "kerf_cad_core.jewelry.ring",
     "kerf_cad_core.jewelry.tool_metal_cost",
 ]
 

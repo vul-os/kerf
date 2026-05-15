@@ -45,7 +45,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy monorepo pyproject + all plugin packages.
-COPY pyproject.toml ./
+COPY pyproject.toml README.md ./
 COPY packages/ ./packages/
 
 # Install the selected persona with uv: the kerf-* deps in each extra are

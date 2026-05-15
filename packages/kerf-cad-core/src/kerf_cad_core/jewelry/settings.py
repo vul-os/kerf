@@ -2971,3 +2971,218 @@ async def run_jewelry_create_prong_variant(ctx: ProjectCtx, args: bytes) -> str:
         "_head_outer_diameter": node["_head_outer_diameter"],
     })
 
+
+# ===========================================================================
+# HEAD + GALLERY BUILDER
+# ===========================================================================
+#
+# A basket/peg head (accepts a stone seat) combined with a decorative gallery
+# rail (the ornamental wire band that runs under the head and above the shank).
+# Gallery styles: plain, scalloped, milgrain_edge, pierced, filigree.
+# ---------------------------------------------------------------------------
+
+_VALID_GALLERY_STYLES = {"plain", "scalloped", "milgrain_edge", "pierced", "filigree"}
+
+
+def build_head_gallery_node(
+    node_id: str,
+    head_diameter: float,
+    head_height: float,
+    gallery_height: float,
+    gallery_style: str,
+    motif_pitch: float,
+) -> dict:
+    """
+    Compute the head + gallery builder node spec.
+
+    The worker's opJewelryHeadGallery builds:
+      - A basket/peg head (open framework) of outer diameter `head_diameter`
+        and height `head_height`.  The head provides the stone seat: the
+        caller places a prong or bezel node with a matching `stone_diameter`
+        to complete the assembly.
+      - A gallery rail band of height `gallery_height` attached below the
+        head.  The style controls how the rail is decorated:
+
+        plain          — a plain round-wire or rectangular gallery strip.
+        scalloped      — a series of U-shaped scallops cut from the lower
+                         edge of the rail.  `motif_pitch` controls the
+                         scallop centre-to-centre distance in mm.
+        milgrain_edge  — a row of tiny raised beads (milgrain) along both
+                         edges of the rail produced by the worker's
+                         knurling op.  `motif_pitch` = bead diameter in mm.
+        pierced        — open pierced (sawn) decorative motifs repeated at
+                         `motif_pitch` intervals.
+        filigree       — a filigree wire-work lattice; `motif_pitch`
+                         controls the cell size.
+
+    Derived hints:
+      _gallery_outer_diameter — same as head_diameter (the gallery wraps at
+                                the head's base diameter).
+      _gallery_circumference  — π × head_diameter (arc length of one full
+                                revolution; used by the worker to tile motifs).
+      _motif_count            — floor(circumference / motif_pitch), or 0 if
+                                motif_pitch is 0 (plain style ignores it).
+    """
+    gallery_circumference = math.pi * head_diameter
+    motif_count = (
+        max(1, int(math.floor(gallery_circumference / motif_pitch)))
+        if motif_pitch > 0
+        else 0
+    )
+
+    return {
+        "id": node_id,
+        "op": "jewelry_head_gallery",
+        "head_diameter": head_diameter,
+        "head_height": head_height,
+        "gallery_height": gallery_height,
+        "gallery_style": gallery_style,
+        "motif_pitch": motif_pitch,
+        "_gallery_outer_diameter": round(head_diameter, 4),
+        "_gallery_circumference": round(gallery_circumference, 4),
+        "_motif_count": motif_count,
+    }
+
+
+jewelry_head_gallery_spec = ToolSpec(
+    name="jewelry_create_head_gallery",
+    description=(
+        "Append a `jewelry_head_gallery` node to a `.feature` file. "
+        "Generates a basket/peg head (open framework that accepts a stone seat) "
+        "combined with a decorative gallery rail running below the head. "
+        "The head's `head_diameter` should match the stone-setting diameter "
+        "of a companion `jewelry_create_prong_head` or `jewelry_create_bezel` node. "
+        "\n\nGallery styles:\n"
+        "- **`plain`** — a plain round-wire or rectangular strip.\n"
+        "- **`scalloped`** — U-shaped scallops cut from the lower rail edge at "
+        "`motif_pitch` intervals.\n"
+        "- **`milgrain_edge`** — rows of tiny raised milgrain beads along both "
+        "edges; `motif_pitch` = bead diameter.\n"
+        "- **`pierced`** — open pierced motifs repeating at `motif_pitch` intervals.\n"
+        "- **`filigree`** — filigree wire-work lattice; `motif_pitch` = cell size.\n"
+        "\nOutput: node spec consumed by the OCCT worker's opJewelryHeadGallery handler."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_id": {
+                "type": "string",
+                "description": "Target .feature file id (uuid).",
+            },
+            "head_diameter": {
+                "type": "number",
+                "description": "Outer diameter of the head basket in mm.",
+            },
+            "head_height": {
+                "type": "number",
+                "description": "Height of the head basket in mm.",
+            },
+            "gallery_height": {
+                "type": "number",
+                "description": "Height of the gallery rail band below the head in mm.",
+            },
+            "gallery_style": {
+                "type": "string",
+                "enum": sorted(_VALID_GALLERY_STYLES),
+                "description": "Decorative style of the gallery rail.",
+            },
+            "motif_pitch": {
+                "type": "number",
+                "description": (
+                    "Motif repeat pitch in mm (scallop c-c, milgrain bead diameter, "
+                    "pierced motif c-c, or filigree cell size). "
+                    "Set to 0 for `plain` style. Must be >= 0."
+                ),
+            },
+            "id": {
+                "type": "string",
+                "description": "Optional explicit node id.",
+            },
+        },
+        "required": ["file_id", "head_diameter", "head_height", "gallery_height", "gallery_style", "motif_pitch"],
+    },
+)
+
+
+@register(jewelry_head_gallery_spec, write=True)
+async def run_jewelry_create_head_gallery(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    file_id_str = a.get("file_id", "").strip()
+    head_diameter = a.get("head_diameter")
+    head_height = a.get("head_height")
+    gallery_height = a.get("gallery_height")
+    gallery_style = a.get("gallery_style", "plain")
+    motif_pitch = a.get("motif_pitch", 0.0)
+    node_id = a.get("id", "").strip()
+
+    if not file_id_str:
+        return err_payload("file_id is required", "BAD_ARGS")
+
+    for fname, fval in [
+        ("head_diameter", head_diameter),
+        ("head_height", head_height),
+        ("gallery_height", gallery_height),
+    ]:
+        err = _positive(fname, fval)
+        if err:
+            return err_payload(err, "BAD_ARGS")
+
+    gallery_style_clean = (gallery_style or "plain").strip().lower()
+    if gallery_style_clean not in _VALID_GALLERY_STYLES:
+        return err_payload(
+            f"gallery_style must be one of {sorted(_VALID_GALLERY_STYLES)}; got {gallery_style!r}",
+            "BAD_ARGS",
+        )
+
+    try:
+        mp = float(motif_pitch)
+    except (TypeError, ValueError):
+        return err_payload("motif_pitch must be a number", "BAD_ARGS")
+    if mp < 0:
+        return err_payload(f"motif_pitch must be >= 0; got {mp}", "BAD_ARGS")
+
+    if gallery_style_clean != "plain" and mp == 0.0:
+        return err_payload(
+            f"motif_pitch must be > 0 for gallery_style '{gallery_style_clean}'",
+            "BAD_ARGS",
+        )
+
+    try:
+        fid = uuid.UUID(file_id_str)
+    except Exception:
+        return err_payload("file_id must be a uuid", "BAD_ARGS")
+
+    content, err = read_feature_content(ctx, fid)
+    if err:
+        return err_payload(f"file not found: {err}", "NOT_FOUND")
+
+    if not node_id:
+        node_id = next_node_id(content, "jewelry_head_gallery")
+
+    node = build_head_gallery_node(
+        node_id=node_id,
+        head_diameter=float(head_diameter),
+        head_height=float(head_height),
+        gallery_height=float(gallery_height),
+        gallery_style=gallery_style_clean,
+        motif_pitch=mp,
+    )
+
+    _, nid, err = append_feature_node(ctx, fid, node)
+    if err:
+        return err_payload(err, "ERROR")
+
+    return ok_payload({
+        "file_id": file_id_str,
+        "id": nid,
+        "op": "jewelry_head_gallery",
+        "gallery_style": gallery_style_clean,
+        "head_diameter": float(head_diameter),
+        "_motif_count": node["_motif_count"],
+    })
+
+

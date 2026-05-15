@@ -755,3 +755,57 @@ Decorative profiles (`variant_profile`): `round`, `tapered`, `filigree`, `star`,
 Result node op: `jewelry_prong_variant`. Boolean-fuse onto a shank.
 
 ---
+
+## `jewelry_create_head_gallery`
+
+Generates a basket/peg head with a decorative gallery rail below it.
+
+### How it works
+
+1. A basket/peg head framework of outer diameter `head_diameter` and height
+   `head_height` provides an open stone seat.  Pair with a companion
+   `jewelry_create_prong_head` or `jewelry_create_bezel` node (matching
+   `stone_diameter`) to complete the setting.
+2. A gallery rail of height `gallery_height` wraps below the head.  Five
+   decorative styles are available, each tiling a motif at `motif_pitch`
+   intervals around the circumference (π × `head_diameter`).
+
+### Gallery styles
+
+| Style           | Description                                          |
+|-----------------|------------------------------------------------------|
+| `plain`         | Plain round-wire or rectangular strip; no tiling    |
+| `scalloped`     | U-shaped scallops on the lower rail edge            |
+| `milgrain_edge` | Rows of raised milgrain beads on both edges         |
+| `pierced`       | Open pierced motifs; openwork appearance            |
+| `filigree`      | Fine wire-work lattice across the entire rail face  |
+
+### Parameters
+
+| Parameter        | Required | Default    | Notes                                                                       |
+|------------------|----------|------------|-----------------------------------------------------------------------------|
+| `file_id`        | yes      | —          | Target `.feature` file uuid                                                 |
+| `head_diameter`  | yes      | —          | Outer diameter of the head basket in mm                                     |
+| `head_height`    | yes      | —          | Height of the basket framework in mm                                        |
+| `gallery_height` | yes      | —          | Height of the gallery rail band in mm                                       |
+| `gallery_style`  | yes      | —          | Style of the gallery decoration (see table above)                           |
+| `motif_pitch`    | yes      | —          | Motif repeat pitch in mm; set to `0` for `plain`. Must be > 0 for others   |
+| `id`             | no       | auto       | Explicit node id                                                            |
+
+### Worked example — scalloped gallery under a 6-prong head
+
+```json
+{
+  "file_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "head_diameter": 9.5,
+  "head_height": 3.5,
+  "gallery_height": 1.2,
+  "gallery_style": "scalloped",
+  "motif_pitch": 1.5
+}
+```
+
+Result node op: `jewelry_head_gallery`. Fuse onto a shank with a boolean union.
+
+---
+

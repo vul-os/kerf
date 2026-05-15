@@ -64,6 +64,7 @@ from kerf_cad_core.jewelry.settings import (
     jewelry_invisible_spec,
     # v3 ToolSpec objects
     jewelry_prong_variant_spec,
+    jewelry_head_gallery_spec,
     # Runners
     run_jewelry_create_prong_head,
     run_jewelry_create_bezel,
@@ -82,6 +83,7 @@ from kerf_cad_core.jewelry.settings import (
     # v3 runners
     # v3 runners
     run_jewelry_create_prong_variant,
+    run_jewelry_create_head_gallery,
     # Pure-Python helpers
     build_prong_head_node,
     build_bezel_node,
@@ -100,6 +102,7 @@ from kerf_cad_core.jewelry.settings import (
     # v3 helpers
     # v3 helpers
     build_prong_variant_node,
+    build_head_gallery_node,
     _compute_pave_grid,
     _compute_cluster_positions,
 )
@@ -3419,4 +3422,173 @@ class TestProngVariantRunner:
         assert result.get("error") is None
         node = get_last_node(store)
         assert math.isclose(node["variant_param"], 45.0)
+
+
+# ============================================================================
+# v3 — Head + gallery builder (ToolSpec + geometry + runner)
+# ============================================================================
+
+class TestHeadGallerySpec:
+    def test_name(self):
+        assert jewelry_head_gallery_spec.name == "jewelry_create_head_gallery"
+
+    def test_required_fields(self):
+        req = jewelry_head_gallery_spec.input_schema["required"]
+        for f in ["file_id", "head_diameter", "head_height", "gallery_height", "gallery_style", "motif_pitch"]:
+            assert f in req
+
+    def test_gallery_style_enum(self):
+        props = jewelry_head_gallery_spec.input_schema["properties"]
+        enum = set(props["gallery_style"].get("enum", []))
+        assert {"plain", "scalloped", "milgrain_edge", "pierced", "filigree"} == enum
+
+    def test_optional_fields_not_required(self):
+        req = jewelry_head_gallery_spec.input_schema["required"]
+        assert "id" not in req
+
+
+class TestHeadGalleryGeometry:
+    def _make_node(self, **kw):
+        defaults = dict(
+            node_id="hg-1",
+            head_diameter=9.0,
+            head_height=3.0,
+            gallery_height=1.5,
+            gallery_style="scalloped",
+            motif_pitch=1.2,
+        )
+        defaults.update(kw)
+        return build_head_gallery_node(**defaults)
+
+    def test_op_field(self):
+        node = self._make_node()
+        assert node["op"] == "jewelry_head_gallery"
+
+    def test_gallery_outer_diameter_equals_head(self):
+        node = self._make_node(head_diameter=10.0)
+        assert math.isclose(node["_gallery_outer_diameter"], 10.0, rel_tol=1e-5)
+
+    def test_gallery_circumference(self):
+        node = self._make_node(head_diameter=8.0)
+        assert math.isclose(node["_gallery_circumference"], math.pi * 8.0, rel_tol=1e-5)
+
+    def test_motif_count_plain(self):
+        node = self._make_node(gallery_style="plain", motif_pitch=0.0)
+        assert node["_motif_count"] == 0
+
+    def test_motif_count_scalloped(self):
+        # circumference = π * 9 ≈ 28.27; pitch = 1.2 → floor(28.27/1.2) = 23
+        node = self._make_node(gallery_style="scalloped", motif_pitch=1.2, head_diameter=9.0)
+        expected = max(1, int(math.floor(math.pi * 9.0 / 1.2)))
+        assert node["_motif_count"] == expected
+
+    def test_motif_pitch_stored(self):
+        node = self._make_node(motif_pitch=2.0)
+        assert math.isclose(node["motif_pitch"], 2.0, rel_tol=1e-5)
+
+    def test_gallery_style_stored(self):
+        for style in ["plain", "scalloped", "milgrain_edge", "pierced", "filigree"]:
+            pitch = 0.0 if style == "plain" else 1.0
+            node = self._make_node(gallery_style=style, motif_pitch=pitch)
+            assert node["gallery_style"] == style
+
+
+class TestHeadGalleryRunner:
+    @pytest.mark.parametrize("style,pitch", [
+        ("plain", 0.0),
+        ("scalloped", 1.2),
+        ("milgrain_edge", 0.5),
+        ("pierced", 1.5),
+        ("filigree", 2.0),
+    ])
+    def test_all_styles_accepted(self, style, pitch):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_head_gallery, ctx, fid,
+            head_diameter=9.0,
+            head_height=3.0,
+            gallery_height=1.5,
+            gallery_style=style,
+            motif_pitch=pitch,
+        )
+        assert result.get("error") is None, f"style={style}: {result}"
+        assert result["op"] == "jewelry_head_gallery"
+
+    def test_node_appended(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_head_gallery, ctx, fid,
+            head_diameter=9.0,
+            head_height=3.0,
+            gallery_height=1.5,
+            gallery_style="filigree",
+            motif_pitch=2.0,
+        )
+        node = get_last_node(store)
+        assert node["op"] == "jewelry_head_gallery"
+        assert node["gallery_style"] == "filigree"
+
+    def test_node_id_auto_generated(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_head_gallery, ctx, fid,
+            head_diameter=8.0, head_height=2.5,
+            gallery_height=1.0, gallery_style="plain", motif_pitch=0.0,
+        )
+        node = get_last_node(store)
+        assert node["id"].startswith("jewelry_head_gallery-")
+
+    def test_invalid_style_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_head_gallery, ctx, fid,
+            head_diameter=9.0, head_height=3.0,
+            gallery_height=1.5, gallery_style="rope", motif_pitch=1.0,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_nonplain_zero_motif_pitch_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_head_gallery, ctx, fid,
+            head_diameter=9.0, head_height=3.0,
+            gallery_height=1.5, gallery_style="scalloped", motif_pitch=0.0,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_negative_motif_pitch_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_head_gallery, ctx, fid,
+            head_diameter=9.0, head_height=3.0,
+            gallery_height=1.5, gallery_style="plain", motif_pitch=-1.0,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_zero_head_diameter_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_head_gallery, ctx, fid,
+            head_diameter=0, head_height=3.0,
+            gallery_height=1.5, gallery_style="plain", motif_pitch=0.0,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_non_uuid_file_id_rejected(self):
+        ctx, _, _ = make_ctx()
+        result = call_tool(
+            run_jewelry_create_head_gallery, ctx, "bad-id",
+            head_diameter=9.0, head_height=3.0,
+            gallery_height=1.5, gallery_style="plain", motif_pitch=0.0,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_missing_file_not_found(self):
+        ctx, _, fid = make_ctx(kind="NOT_FOUND")
+        result = call_tool(
+            run_jewelry_create_head_gallery, ctx, fid,
+            head_diameter=9.0, head_height=3.0,
+            gallery_height=1.5, gallery_style="plain", motif_pitch=0.0,
+        )
+        assert result.get("code") == "NOT_FOUND"
 

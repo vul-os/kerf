@@ -88,6 +88,28 @@ cam_run_spec = ToolSpec(
                 "enum": ["linuxcnc", "fanuc"],
                 "description": "Post-processor for 5-axis G-code (default 'linuxcnc')",
             },
+            "tool_id": {
+                "type": "string",
+                "description": (
+                    "Optional tool DB id (e.g. 'T1') to load from the project's "
+                    ".tool files and wire into the 3-axis post-processor. "
+                    "When set, the tool's feed_rate_mm_min, plunge_rate_mm_min, "
+                    "and spindle_rpm_min are used as defaults (caller-supplied "
+                    "feed_rate / spindle_speed still override them). "
+                    "Ignored for 5-axis operations (use PostOpts.tool there)."
+                ),
+            },
+            "post_processor": {
+                "type": "string",
+                "enum": ["linuxcnc", "grbl", "mach3", "fanuc"],
+                "description": (
+                    "Post-processor for 3-axis G-code. "
+                    "'linuxcnc' (default) — G-code with ; comments + % tape markers. "
+                    "'grbl' — same as linuxcnc but M6 is a comment (no tool changer). "
+                    "'mach3' — parenthetical comments, T<n> M6 tool call. "
+                    "'fanuc' — N-number sequence + parenthetical comments."
+                ),
+            },
         },
         "required": ["file_id", "operation"],
     },
@@ -109,6 +131,21 @@ async def run_cam_run(ctx: ProjectCtx, args: bytes) -> str:
     if not operation:
         return err_payload("operation is required", "BAD_ARGS")
 
+    # Resolve optional Tool from DB when tool_id is provided.
+    tool = None
+    tool_id = a.get("tool_id")
+    if tool_id:
+        try:
+            from kerf_cam.tool_db import load_tool as _load_tool
+            tool = await _load_tool(ctx.pool, ctx.project_id, str(tool_id))
+        except KeyError:
+            return err_payload(
+                f"tool_id {tool_id!r} not found in project tool DB",
+                "TOOL_NOT_FOUND",
+            )
+        except Exception as e:
+            return err_payload(f"failed to load tool {tool_id!r}: {e}", "TOOL_LOAD_ERROR")
+
     spec = {
         "operation": operation,
         "tool_diameter": a.get("tool_diameter", 3.0),
@@ -117,6 +154,10 @@ async def run_cam_run(ctx: ProjectCtx, args: bytes) -> str:
         "feed_rate": a.get("feed_rate", 1000.0),
         "spindle_speed": a.get("spindle_speed", 10000.0),
         "coolant": a.get("coolant", True),
+        # 3-axis tool + post-processor fields
+        "tool_id": tool_id,
+        "tool_dict": tool.to_dict() if tool is not None else None,
+        "post_processor": a.get("post_processor", "linuxcnc"),
         # 5-axis fields (passed through when present)
         "drive_face_id": a.get("drive_face_id"),
         "tilt_deg": a.get("tilt_deg"),

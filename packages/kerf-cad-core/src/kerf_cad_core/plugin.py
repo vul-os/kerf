@@ -42,6 +42,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.gdt.tools",
     "kerf_cad_core.arch.tools",
     "kerf_cad_core.struct.tools",
+    "kerf_cad_core.feature_thread",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

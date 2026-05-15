@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kerf-plc"
+version = "0.1.0"
+description = "IEC 61131-3 Structured Text plugin for Kerf (.plc.st — syntax-highlighted editor + offline MATIEC lint)"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+]
+
+[project.entry-points."kerf.plugins"]
+plc = "kerf_plc.plugin:register"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kerf_plc"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

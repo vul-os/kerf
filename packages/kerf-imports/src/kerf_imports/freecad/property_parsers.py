@@ -299,6 +299,61 @@ def _parse_path(elem: ET.Element, _zf: zipfile.ZipFile | None) -> str:
     return elem.get("v") or elem.get("value") or elem.text or ""
 
 
+def _parse_property_map(
+    elem: ET.Element, _zf: zipfile.ZipFile | None
+) -> dict[str, str]:
+    """
+    ``App::PropertyMap`` — a flat string→string dict.
+
+    FreeCAD XML shape::
+
+        <Map count="N">
+          <Item key="Density" value="7900 kg/m^3"/>
+          <Item key="Name" value="Steel"/>
+          ...
+        </Map>
+    """
+    result: dict[str, str] = {}
+    for child in elem:
+        if child.tag not in ("Item", "item"):
+            continue
+        key = child.get("key") or child.get("k") or ""
+        val = child.get("value") or child.get("v") or child.text or ""
+        if key:
+            result[key] = val
+    return result
+
+
+def _parse_spreadsheet_cells(
+    elem: ET.Element, _zf: zipfile.ZipFile | None
+) -> list[dict[str, str]]:
+    """
+    ``Spreadsheet::PropertySheet`` — list of cell dicts.
+
+    FreeCAD XML shape::
+
+        <Cells>
+          <Cell address="A1" content="wall_thickness" />
+          <Cell address="B1" content="2 mm" alias="wall_thickness" />
+          <Cell address="B2" content="=wall_thickness / 4" alias="hole_radius" />
+        </Cells>
+
+    Returns a list of ``{"address": str, "content": str, "alias"?: str}`` dicts.
+    """
+    result: list[dict[str, str]] = []
+    for cell in elem.iter("Cell"):
+        address = cell.get("address", "")
+        content = cell.get("content", "")
+        alias = cell.get("alias", "")
+        if not address:
+            continue
+        entry: dict[str, str] = {"address": address, "content": content}
+        if alias:
+            entry["alias"] = alias
+        result.append(entry)
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Dispatch table
 # ---------------------------------------------------------------------------
@@ -412,6 +467,15 @@ _CONVERTERS: dict[str, Any] = {
     "App::PropertyPath": _parse_path,
     "PropertyPath": _parse_path,
     "Path": _parse_path,
+
+    # --- material map (App::PropertyMap — flat string→string dict) ---
+    "App::PropertyMap": _parse_property_map,
+    "PropertyMap": _parse_property_map,
+    "Map": _parse_property_map,
+
+    # --- spreadsheet cells (Spreadsheet::PropertySheet) ---
+    "Spreadsheet::PropertySheet": _parse_spreadsheet_cells,
+    "PropertySheet": _parse_spreadsheet_cells,
 }
 
 

@@ -60,7 +60,7 @@ async def _call(tool_name: str, args: dict) -> dict:
 def _run(coro):
     """Run an async coroutine synchronously."""
     import asyncio
-    return asyncio.get_event_loop().run_until_complete(coro)
+    return asyncio.new_event_loop().run_until_complete(coro)
 
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────────

@@ -19,6 +19,7 @@ import WorkspaceSettings from './routes/WorkspaceSettings.jsx'
 import WorkspaceMembers from './routes/WorkspaceMembers.jsx'
 import AdminDistributors from './routes/AdminDistributors.jsx'
 import AdminPublishers from './routes/AdminPublishers.jsx'
+import Mechanical from './routes/domains/Mechanical.jsx'
 import ProtectedRoute from './routes/ProtectedRoute.jsx'
 import Electronics from './routes/domains/Electronics.jsx'
 import ShortcutsModal from './components/ShortcutsModal.jsx'
@@ -120,6 +121,7 @@ export default function App() {
       <Route path="/docs" element={<DocsHome />} />
       <Route path="/docs/:slug" element={<DocsArticle />} />
       <Route path="/electronics" element={<Electronics />} />
+      <Route path="/mechanical" element={<Mechanical />} />
       {cloudEnabled && <Route path="/workshop" element={<Workshop />} />}
       {cloudEnabled && (
         <Route path="/workshop/:slug" element={<WorkshopListing />} />

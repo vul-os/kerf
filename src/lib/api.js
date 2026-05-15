@@ -554,6 +554,15 @@ export const api = {
   // Returns { svg: string|null, warnings: string[] }.
   runWireviz: (projectId, fileId) =>
     request(`/api/projects/${projectId}/files/${fileId}/wiring/run`, { method: 'POST' }),
+
+  // ---- PLC lint ----
+  // POSTs ST source directly to pyworker POST /lint-plc via the kerf-api thin
+  // handler.  Returns { diagnostics: [...], warnings: [...] }.
+  lintPLC: (projectId, source) =>
+    request(`/api/projects/${projectId}/plc/lint`, {
+      method: 'POST',
+      body: { source },
+    }),
 }
 
 // ---------------------------------------------------------------------------

@@ -463,6 +463,34 @@ const FEATURE_KINDS = [
       { key: 'align_to_boundary',   kind: 'boolean', label: 'Align to boundary' },
     ],
   },
+  // NURBS Phase 4 C4 — curvature comb overlay (visualisation-only).
+  // GeomAbs_G3 doesn't exist in stock OCCT — overlay lets users EYEBALL
+  // G3 continuity at face junctions instead of enforcing it algorithmically.
+  {
+    op: 'surface_curvature_combs',
+    label: 'CurvatureCombs',
+    icon: Waves,
+    defaults: {
+      target_feature_ref: '',
+      target_face_name: '',
+      uv_density: 0.1,
+      scale_factor: 10,
+      show_combs: true,
+    },
+    caption: (
+      'Curvature-comb overlay — renders principal-curvature combs on NURBS faces ' +
+      '(blue=concave, red=convex, white=flat). ' +
+      'Use to eyeball G2/G3 continuity at face junctions. ' +
+      'Viz-only: stock OCCT has no GeomAbs_G3.'
+    ),
+    fields: [
+      { key: 'target_feature_ref', kind: 'feature_picker', label: 'Target surface/solid' },
+      { key: 'target_face_name',   kind: 'text',    label: 'Face name (blank = all faces)' },
+      { key: 'uv_density',         kind: 'number',  label: 'UV density', min: 0.01, max: 0.5, step: 0.01 },
+      { key: 'scale_factor',       kind: 'number',  label: 'Scale factor', min: 0.1, step: 1 },
+      { key: 'show_combs',         kind: 'boolean', label: 'Show combs' },
+    ],
+  },
 ]
 
 const KIND_BY_OP = Object.fromEntries(FEATURE_KINDS.map((k) => [k.op, k]))
@@ -471,7 +499,7 @@ const FEATURE_CATEGORIES = [
   { id: 'sketch',   label: 'Sketch-based',  ops: ['pad', 'boss_with_draft', 'pocket', 'cut_from_sketch', 'revolve', 'hole', 'hole_pattern'] },
   { id: 'modify',   label: 'Modify',        ops: ['fillet', 'chamfer', 'shell', 'push_pull', 'variable_radius_fillet', 'to_solid', 'boolean', 'section', 'quad_remesh'] },
   { id: 'pattern',  label: 'Pattern',       ops: ['linear_pattern', 'polar_pattern', 'mirror_pattern'] },
-  { id: 'surface',  label: 'Surfacing',     ops: ['sweep1', 'sweep2', 'loft', 'network_srf', 'blend_srf', 'surface_boolean'] },
+  { id: 'surface',  label: 'Surfacing',     ops: ['sweep1', 'sweep2', 'loft', 'network_srf', 'blend_srf', 'surface_boolean', 'surface_curvature_combs'] },
 ]
 
 const DEBOUNCE_MS = 300

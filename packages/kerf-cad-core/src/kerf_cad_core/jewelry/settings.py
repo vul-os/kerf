@@ -3186,3 +3186,555 @@ async def run_jewelry_create_head_gallery(ctx: ProjectCtx, args: bytes) -> str:
     })
 
 
+# ===========================================================================
+# UNDER-BEZEL / PEG SETTINGS
+# ===========================================================================
+
+def build_under_bezel_node(
+    node_id: str,
+    stone_diameter: float,
+    wall_thickness: float,
+    collet_height: float,
+    base_diameter: float,
+    base_thickness: float,
+) -> dict:
+    """
+    Compute the under-bezel (sub-collet) node spec.
+
+    The worker's opJewelryUnderBezel builds a low collet that sits under the
+    stone, providing an elevated bearing surface so the stone is raised above
+    the shank.  Useful as a secondary support beneath a bezel or halo setting.
+
+    Geometry:
+      - Inner bore = stone_diameter.
+      - Outer wall = stone_diameter + 2 × wall_thickness.
+      - The collet rises to `collet_height`.
+      - A circular base plate of diameter `base_diameter` and thickness
+        `base_thickness` extends outward at the bottom to fuse onto the shank.
+
+    Derived hints:
+      _outer_diameter    — stone_diameter + 2 * wall_thickness.
+      _collet_volume_approx — approximate material volume (mm³) of the
+                              annular collet (excluding base plate).
+    """
+    outer_diameter = stone_diameter + 2.0 * wall_thickness
+    r_outer = outer_diameter / 2.0
+    r_inner = stone_diameter / 2.0
+    collet_volume = math.pi * (r_outer ** 2 - r_inner ** 2) * collet_height
+
+    return {
+        "id": node_id,
+        "op": "jewelry_under_bezel",
+        "stone_diameter": stone_diameter,
+        "wall_thickness": wall_thickness,
+        "collet_height": collet_height,
+        "base_diameter": base_diameter,
+        "base_thickness": base_thickness,
+        "_outer_diameter": round(outer_diameter, 4),
+        "_collet_volume_approx": round(collet_volume, 4),
+    }
+
+
+jewelry_under_bezel_spec = ToolSpec(
+    name="jewelry_create_under_bezel",
+    description=(
+        "Append a `jewelry_under_bezel` node to a `.feature` file. "
+        "Generates a sub-collet (under-bezel) — a short metal collar that sits "
+        "beneath the stone and raises it above the shank. "
+        "Used as a secondary support under bezels, halos, or other settings "
+        "where the stone needs to be elevated. "
+        "The collet has inner bore = `stone_diameter`, outer wall = "
+        "`stone_diameter + 2 × wall_thickness`, and height = `collet_height`. "
+        "A flat base plate of `base_diameter` × `base_thickness` extends below "
+        "the collet for fusing onto a shank. "
+        "Output: a TopoDS_Solid consumed by opJewelryUnderBezel."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_id": {
+                "type": "string",
+                "description": "Target .feature file id (uuid).",
+            },
+            "stone_diameter": {
+                "type": "number",
+                "description": "Girdle diameter of the stone in mm.",
+            },
+            "wall_thickness": {
+                "type": "number",
+                "description": "Wall thickness of the collet in mm (typical 0.3–0.8).",
+            },
+            "collet_height": {
+                "type": "number",
+                "description": "Height of the collet tube in mm.",
+            },
+            "base_diameter": {
+                "type": "number",
+                "description": (
+                    "Diameter of the flat base plate in mm. "
+                    "Must be >= stone_diameter + 2 × wall_thickness."
+                ),
+            },
+            "base_thickness": {
+                "type": "number",
+                "description": "Thickness of the base plate in mm.",
+            },
+            "id": {
+                "type": "string",
+                "description": "Optional explicit node id.",
+            },
+        },
+        "required": ["file_id", "stone_diameter", "wall_thickness", "collet_height", "base_diameter", "base_thickness"],
+    },
+)
+
+
+@register(jewelry_under_bezel_spec, write=True)
+async def run_jewelry_create_under_bezel(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    file_id_str = a.get("file_id", "").strip()
+    stone_diameter = a.get("stone_diameter")
+    wall_thickness = a.get("wall_thickness")
+    collet_height = a.get("collet_height")
+    base_diameter = a.get("base_diameter")
+    base_thickness = a.get("base_thickness")
+    node_id = a.get("id", "").strip()
+
+    if not file_id_str:
+        return err_payload("file_id is required", "BAD_ARGS")
+
+    for fname, fval in [
+        ("stone_diameter", stone_diameter),
+        ("wall_thickness", wall_thickness),
+        ("collet_height", collet_height),
+        ("base_diameter", base_diameter),
+        ("base_thickness", base_thickness),
+    ]:
+        err = _positive(fname, fval)
+        if err:
+            return err_payload(err, "BAD_ARGS")
+
+    try:
+        sd = float(stone_diameter)
+        wt = float(wall_thickness)
+        bd = float(base_diameter)
+    except (TypeError, ValueError):
+        return err_payload("stone_diameter, wall_thickness, base_diameter must be numbers", "BAD_ARGS")
+
+    min_base = sd + 2.0 * wt
+    if bd < min_base:
+        return err_payload(
+            f"base_diameter ({bd}) must be >= stone_diameter + 2×wall_thickness ({min_base:.4f})",
+            "BAD_ARGS",
+        )
+
+    try:
+        fid = uuid.UUID(file_id_str)
+    except Exception:
+        return err_payload("file_id must be a uuid", "BAD_ARGS")
+
+    content, err = read_feature_content(ctx, fid)
+    if err:
+        return err_payload(f"file not found: {err}", "NOT_FOUND")
+
+    if not node_id:
+        node_id = next_node_id(content, "jewelry_under_bezel")
+
+    node = build_under_bezel_node(
+        node_id=node_id,
+        stone_diameter=sd,
+        wall_thickness=wt,
+        collet_height=float(collet_height),
+        base_diameter=bd,
+        base_thickness=float(base_thickness),
+    )
+
+    _, nid, err = append_feature_node(ctx, fid, node)
+    if err:
+        return err_payload(err, "ERROR")
+
+    return ok_payload({
+        "file_id": file_id_str,
+        "id": nid,
+        "op": "jewelry_under_bezel",
+        "stone_diameter": sd,
+        "_outer_diameter": node["_outer_diameter"],
+    })
+
+
+# ---------------------------------------------------------------------------
+# Peg setting (post head for earrings / pendants)
+# ---------------------------------------------------------------------------
+
+def build_peg_setting_node(
+    node_id: str,
+    stone_diameter: float,
+    peg_diameter: float,
+    peg_length: float,
+    base_diameter: float,
+    base_thickness: float,
+) -> dict:
+    """
+    Compute the peg-setting node spec.
+
+    The worker's opJewelryPegSetting builds:
+      - A cylindrical peg (post) of diameter `peg_diameter` and length
+        `peg_length` extending downward from a head cup.
+      - A shallow cup / seat at the top of the peg sized to accept the stone
+        (inner diameter = stone_diameter; the stone rests in the cup and may
+        be secured with adhesive or a small retaining ledge).
+      - An optional base disc of `base_diameter` × `base_thickness` at the
+        foot of the peg for soldering onto a finding or ear-post socket.
+
+    Typical use: drops, briolette hangers, stud-earring settings, and
+    pendant bezels where the stone hangs below the setting.
+
+    Derived hints:
+      _cup_depth        — default cup depth = stone_diameter × 0.2.
+      _peg_aspect_ratio — peg_length / peg_diameter.
+    """
+    cup_depth = stone_diameter * 0.2
+    peg_aspect_ratio = peg_length / peg_diameter if peg_diameter > 0 else 0.0
+
+    return {
+        "id": node_id,
+        "op": "jewelry_peg_setting",
+        "stone_diameter": stone_diameter,
+        "peg_diameter": peg_diameter,
+        "peg_length": peg_length,
+        "base_diameter": base_diameter,
+        "base_thickness": base_thickness,
+        "_cup_depth": round(cup_depth, 4),
+        "_peg_aspect_ratio": round(peg_aspect_ratio, 4),
+    }
+
+
+jewelry_peg_setting_spec = ToolSpec(
+    name="jewelry_create_peg_setting",
+    description=(
+        "Append a `jewelry_peg_setting` node to a `.feature` file. "
+        "Generates a peg (post) setting for earrings and pendants — a cylindrical "
+        "post with a shallow stone-cup at the top and an optional base disc. "
+        "The stone sits in the cup (held by adhesive or a small retaining ledge); "
+        "the peg solders into an earring back or pendant finding. "
+        "Parameters: `stone_diameter` for the cup seat, `peg_diameter` / "
+        "`peg_length` for the post, and `base_diameter` / `base_thickness` for "
+        "the soldering foot. "
+        "Output: a TopoDS_Solid consumed by opJewelryPegSetting."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_id": {
+                "type": "string",
+                "description": "Target .feature file id (uuid).",
+            },
+            "stone_diameter": {
+                "type": "number",
+                "description": "Girdle diameter of the stone in mm (sets the cup seat size).",
+            },
+            "peg_diameter": {
+                "type": "number",
+                "description": "Diameter of the cylindrical post in mm.",
+            },
+            "peg_length": {
+                "type": "number",
+                "description": "Length (height) of the post in mm.",
+            },
+            "base_diameter": {
+                "type": "number",
+                "description": "Diameter of the soldering base disc in mm. Must be >= peg_diameter.",
+            },
+            "base_thickness": {
+                "type": "number",
+                "description": "Thickness of the base disc in mm.",
+            },
+            "id": {
+                "type": "string",
+                "description": "Optional explicit node id.",
+            },
+        },
+        "required": ["file_id", "stone_diameter", "peg_diameter", "peg_length", "base_diameter", "base_thickness"],
+    },
+)
+
+
+@register(jewelry_peg_setting_spec, write=True)
+async def run_jewelry_create_peg_setting(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    file_id_str = a.get("file_id", "").strip()
+    stone_diameter = a.get("stone_diameter")
+    peg_diameter = a.get("peg_diameter")
+    peg_length = a.get("peg_length")
+    base_diameter = a.get("base_diameter")
+    base_thickness = a.get("base_thickness")
+    node_id = a.get("id", "").strip()
+
+    if not file_id_str:
+        return err_payload("file_id is required", "BAD_ARGS")
+
+    for fname, fval in [
+        ("stone_diameter", stone_diameter),
+        ("peg_diameter", peg_diameter),
+        ("peg_length", peg_length),
+        ("base_diameter", base_diameter),
+        ("base_thickness", base_thickness),
+    ]:
+        err = _positive(fname, fval)
+        if err:
+            return err_payload(err, "BAD_ARGS")
+
+    try:
+        pd = float(peg_diameter)
+        bd = float(base_diameter)
+    except (TypeError, ValueError):
+        return err_payload("peg_diameter and base_diameter must be numbers", "BAD_ARGS")
+
+    if bd < pd:
+        return err_payload(
+            f"base_diameter ({bd}) must be >= peg_diameter ({pd})",
+            "BAD_ARGS",
+        )
+
+    try:
+        fid = uuid.UUID(file_id_str)
+    except Exception:
+        return err_payload("file_id must be a uuid", "BAD_ARGS")
+
+    content, err = read_feature_content(ctx, fid)
+    if err:
+        return err_payload(f"file not found: {err}", "NOT_FOUND")
+
+    if not node_id:
+        node_id = next_node_id(content, "jewelry_peg_setting")
+
+    node = build_peg_setting_node(
+        node_id=node_id,
+        stone_diameter=float(stone_diameter),
+        peg_diameter=pd,
+        peg_length=float(peg_length),
+        base_diameter=bd,
+        base_thickness=float(base_thickness),
+    )
+
+    _, nid, err = append_feature_node(ctx, fid, node)
+    if err:
+        return err_payload(err, "ERROR")
+
+    return ok_payload({
+        "file_id": file_id_str,
+        "id": nid,
+        "op": "jewelry_peg_setting",
+        "stone_diameter": float(stone_diameter),
+        "peg_diameter": pd,
+        "_cup_depth": node["_cup_depth"],
+    })
+
+
+# ===========================================================================
+# CROWN / CORONET SETTING
+# ===========================================================================
+#
+# A tapered crown of graduated prongs — a vintage look typical of antique
+# and Victorian jewellery where the prongs form a regal coronet silhouette.
+# ---------------------------------------------------------------------------
+
+def build_coronet_node(
+    node_id: str,
+    stone_diameter: float,
+    prong_count: int,
+    crown_height: float,
+    taper: float,
+    wire_gauge: float,
+) -> dict:
+    """
+    Compute the crown / coronet setting node spec.
+
+    The worker's opJewelryCoronet builds:
+      - `prong_count` prong wires of `wire_gauge` arranged evenly around the
+        stone and rising to `crown_height` above the girdle plane.
+      - Each prong tapers inward by `taper` mm over its full height (positive
+        taper = prong leans over the stone; negative = flares outward).
+        Typical values: 0.2–0.6 mm (subtle inward lean gives the classic
+        coronet dome).
+      - The base of the crown is a low cylinder (height = crown_height × 0.25)
+        with the prong wire footings, which the caller boolean-fuses onto a
+        shank.
+
+    The coronet produces a narrower, more upright silhouette than a basket
+    head because the prongs converge toward the stone's table rather than
+    being parallel.
+
+    Derived hints:
+      _base_diameter     — stone_diameter + 2 × wire_gauge (same as prong head).
+      _tip_diameter      — base_diameter - 2 × taper (reduced diameter at tip).
+      _prong_pitch_deg   — 360 / prong_count.
+    """
+    base_diameter = stone_diameter + 2.0 * wire_gauge
+    tip_diameter = max(stone_diameter, base_diameter - 2.0 * taper)
+    prong_pitch_deg = 360.0 / prong_count if prong_count > 0 else 0.0
+
+    return {
+        "id": node_id,
+        "op": "jewelry_coronet",
+        "stone_diameter": stone_diameter,
+        "prong_count": prong_count,
+        "crown_height": crown_height,
+        "taper": taper,
+        "wire_gauge": wire_gauge,
+        "_base_diameter": round(base_diameter, 4),
+        "_tip_diameter": round(tip_diameter, 4),
+        "_prong_pitch_deg": round(prong_pitch_deg, 4),
+    }
+
+
+jewelry_coronet_spec = ToolSpec(
+    name="jewelry_create_coronet",
+    description=(
+        "Append a `jewelry_coronet` node to a `.feature` file. "
+        "Generates a crown (coronet) setting — a tapered arrangement of "
+        "`prong_count` graduated prong wires that lean inward toward the stone "
+        "and form a regal coronet silhouette typical of antique and Victorian "
+        "jewellery. "
+        "Each prong wire has diameter `wire_gauge` and rises to `crown_height` "
+        "above the girdle plane, tapering inward by `taper` mm (0 = straight; "
+        "typical 0.2–0.6 mm for the classic dome effect). "
+        "The setting base is a short cylinder fused onto a shank. "
+        "Output: node spec consumed by the OCCT worker's opJewelryCoronet handler."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_id": {
+                "type": "string",
+                "description": "Target .feature file id (uuid).",
+            },
+            "stone_diameter": {
+                "type": "number",
+                "description": "Girdle diameter of the stone in mm.",
+            },
+            "prong_count": {
+                "type": "integer",
+                "description": "Number of prongs in the coronet (typically 6, 8, or 10).",
+            },
+            "crown_height": {
+                "type": "number",
+                "description": "Height the prongs rise above the girdle plane in mm.",
+            },
+            "taper": {
+                "type": "number",
+                "description": (
+                    "Inward lean of each prong tip relative to its base in mm. "
+                    "0 = straight prongs. Positive = lean inward (coronet dome); "
+                    "must be < wire_gauge so tips remain solid."
+                ),
+            },
+            "wire_gauge": {
+                "type": "number",
+                "description": "Prong wire diameter in mm (typical 0.8–1.5).",
+            },
+            "id": {
+                "type": "string",
+                "description": "Optional explicit node id.",
+            },
+        },
+        "required": ["file_id", "stone_diameter", "prong_count", "crown_height", "taper", "wire_gauge"],
+    },
+)
+
+
+@register(jewelry_coronet_spec, write=True)
+async def run_jewelry_create_coronet(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    file_id_str = a.get("file_id", "").strip()
+    stone_diameter = a.get("stone_diameter")
+    prong_count = a.get("prong_count")
+    crown_height = a.get("crown_height")
+    taper = a.get("taper")
+    wire_gauge = a.get("wire_gauge")
+    node_id = a.get("id", "").strip()
+
+    if not file_id_str:
+        return err_payload("file_id is required", "BAD_ARGS")
+
+    for fname, fval in [
+        ("stone_diameter", stone_diameter),
+        ("crown_height", crown_height),
+        ("wire_gauge", wire_gauge),
+    ]:
+        err = _positive(fname, fval)
+        if err:
+            return err_payload(err, "BAD_ARGS")
+
+    # taper may be 0 (straight prongs); only forbid negative taper.
+    try:
+        tap = float(taper)
+    except (TypeError, ValueError):
+        return err_payload("taper must be a number", "BAD_ARGS")
+    if tap < 0:
+        return err_payload(f"taper must be >= 0; got {tap}", "BAD_ARGS")
+
+    try:
+        pc = int(prong_count)
+    except (TypeError, ValueError):
+        return err_payload("prong_count must be an integer", "BAD_ARGS")
+    if pc < 3:
+        return err_payload(f"prong_count must be >= 3; got {pc}", "BAD_ARGS")
+
+    try:
+        wg = float(wire_gauge)
+    except (TypeError, ValueError):
+        return err_payload("wire_gauge must be a number", "BAD_ARGS")
+
+    if tap >= wg:
+        return err_payload(
+            f"taper ({tap}) must be < wire_gauge ({wg}) so prong tips remain solid",
+            "BAD_ARGS",
+        )
+
+    try:
+        fid = uuid.UUID(file_id_str)
+    except Exception:
+        return err_payload("file_id must be a uuid", "BAD_ARGS")
+
+    content, err = read_feature_content(ctx, fid)
+    if err:
+        return err_payload(f"file not found: {err}", "NOT_FOUND")
+
+    if not node_id:
+        node_id = next_node_id(content, "jewelry_coronet")
+
+    node = build_coronet_node(
+        node_id=node_id,
+        stone_diameter=float(stone_diameter),
+        prong_count=pc,
+        crown_height=float(crown_height),
+        taper=tap,
+        wire_gauge=wg,
+    )
+
+    _, nid, err = append_feature_node(ctx, fid, node)
+    if err:
+        return err_payload(err, "ERROR")
+
+    return ok_payload({
+        "file_id": file_id_str,
+        "id": nid,
+        "op": "jewelry_coronet",
+        "stone_diameter": float(stone_diameter),
+        "prong_count": pc,
+        "_base_diameter": node["_base_diameter"],
+        "_tip_diameter": node["_tip_diameter"],
+    })

@@ -65,6 +65,9 @@ from kerf_cad_core.jewelry.settings import (
     # v3 ToolSpec objects
     jewelry_prong_variant_spec,
     jewelry_head_gallery_spec,
+    jewelry_under_bezel_spec,
+    jewelry_peg_setting_spec,
+    jewelry_coronet_spec,
     # Runners
     run_jewelry_create_prong_head,
     run_jewelry_create_bezel,
@@ -81,9 +84,11 @@ from kerf_cad_core.jewelry.settings import (
     run_jewelry_create_illusion,
     run_jewelry_create_invisible,
     # v3 runners
-    # v3 runners
     run_jewelry_create_prong_variant,
     run_jewelry_create_head_gallery,
+    run_jewelry_create_under_bezel,
+    run_jewelry_create_peg_setting,
+    run_jewelry_create_coronet,
     # Pure-Python helpers
     build_prong_head_node,
     build_bezel_node,
@@ -100,9 +105,11 @@ from kerf_cad_core.jewelry.settings import (
     build_illusion_node,
     build_invisible_node,
     # v3 helpers
-    # v3 helpers
     build_prong_variant_node,
     build_head_gallery_node,
+    build_under_bezel_node,
+    build_peg_setting_node,
+    build_coronet_node,
     _compute_pave_grid,
     _compute_cluster_positions,
 )
@@ -3592,3 +3599,568 @@ class TestHeadGalleryRunner:
         )
         assert result.get("code") == "NOT_FOUND"
 
+
+# ============================================================================
+# v3 — Under-bezel (ToolSpec + geometry + runner)
+# ============================================================================
+
+class TestUnderBezelSpec:
+    def test_name(self):
+        assert jewelry_under_bezel_spec.name == "jewelry_create_under_bezel"
+
+    def test_required_fields(self):
+        req = jewelry_under_bezel_spec.input_schema["required"]
+        for f in ["file_id", "stone_diameter", "wall_thickness", "collet_height", "base_diameter", "base_thickness"]:
+            assert f in req
+
+    def test_optional_id_not_required(self):
+        req = jewelry_under_bezel_spec.input_schema["required"]
+        assert "id" not in req
+
+
+class TestUnderBezelGeometry:
+    def _make_node(self, **kw):
+        defaults = dict(
+            node_id="ub-1",
+            stone_diameter=6.5,
+            wall_thickness=0.5,
+            collet_height=2.0,
+            base_diameter=8.0,
+            base_thickness=0.4,
+        )
+        defaults.update(kw)
+        return build_under_bezel_node(**defaults)
+
+    def test_op_field(self):
+        node = self._make_node()
+        assert node["op"] == "jewelry_under_bezel"
+
+    def test_outer_diameter(self):
+        node = self._make_node(stone_diameter=6.5, wall_thickness=0.5)
+        assert math.isclose(node["_outer_diameter"], 6.5 + 2 * 0.5, rel_tol=1e-5)
+
+    def test_collet_volume_positive(self):
+        node = self._make_node()
+        assert node["_collet_volume_approx"] > 0
+
+    def test_collet_volume_math(self):
+        node = self._make_node(stone_diameter=6.0, wall_thickness=0.4, collet_height=1.5)
+        r_outer = (6.0 + 2 * 0.4) / 2.0
+        r_inner = 6.0 / 2.0
+        expected = math.pi * (r_outer ** 2 - r_inner ** 2) * 1.5
+        assert math.isclose(node["_collet_volume_approx"], round(expected, 4), rel_tol=1e-4)
+
+
+class TestUnderBezelRunner:
+    def test_success(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_under_bezel, ctx, fid,
+            stone_diameter=6.5,
+            wall_thickness=0.5,
+            collet_height=2.0,
+            base_diameter=8.0,
+            base_thickness=0.4,
+        )
+        assert result.get("error") is None
+        assert result["op"] == "jewelry_under_bezel"
+
+    def test_node_appended(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_under_bezel, ctx, fid,
+            stone_diameter=5.0, wall_thickness=0.4,
+            collet_height=1.8, base_diameter=6.5, base_thickness=0.3,
+        )
+        node = get_last_node(store)
+        assert node["op"] == "jewelry_under_bezel"
+
+    def test_node_id_auto_generated(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_under_bezel, ctx, fid,
+            stone_diameter=5.0, wall_thickness=0.4,
+            collet_height=1.8, base_diameter=6.5, base_thickness=0.3,
+        )
+        node = get_last_node(store)
+        assert node["id"].startswith("jewelry_under_bezel-")
+
+    def test_base_diameter_too_small_rejected(self):
+        ctx, _, fid = make_ctx()
+        # base_diameter must be >= stone_diameter + 2*wall_thickness = 6.5 + 1.0 = 7.5
+        result = call_tool(
+            run_jewelry_create_under_bezel, ctx, fid,
+            stone_diameter=6.5, wall_thickness=0.5,
+            collet_height=2.0, base_diameter=7.0, base_thickness=0.4,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_zero_collet_height_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_under_bezel, ctx, fid,
+            stone_diameter=6.5, wall_thickness=0.5,
+            collet_height=0, base_diameter=8.0, base_thickness=0.4,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_negative_stone_diameter_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_under_bezel, ctx, fid,
+            stone_diameter=-1.0, wall_thickness=0.5,
+            collet_height=2.0, base_diameter=8.0, base_thickness=0.4,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_non_uuid_file_id_rejected(self):
+        ctx, _, _ = make_ctx()
+        result = call_tool(
+            run_jewelry_create_under_bezel, ctx, "bad",
+            stone_diameter=6.5, wall_thickness=0.5,
+            collet_height=2.0, base_diameter=8.0, base_thickness=0.4,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_missing_file_not_found(self):
+        ctx, _, fid = make_ctx(kind="NOT_FOUND")
+        result = call_tool(
+            run_jewelry_create_under_bezel, ctx, fid,
+            stone_diameter=6.5, wall_thickness=0.5,
+            collet_height=2.0, base_diameter=8.0, base_thickness=0.4,
+        )
+        assert result.get("code") == "NOT_FOUND"
+
+
+# ============================================================================
+# v3 — Peg setting (ToolSpec + geometry + runner)
+# ============================================================================
+
+class TestPegSettingSpec:
+    def test_name(self):
+        assert jewelry_peg_setting_spec.name == "jewelry_create_peg_setting"
+
+    def test_required_fields(self):
+        req = jewelry_peg_setting_spec.input_schema["required"]
+        for f in ["file_id", "stone_diameter", "peg_diameter", "peg_length", "base_diameter", "base_thickness"]:
+            assert f in req
+
+    def test_optional_id_not_required(self):
+        req = jewelry_peg_setting_spec.input_schema["required"]
+        assert "id" not in req
+
+
+class TestPegSettingGeometry:
+    def _make_node(self, **kw):
+        defaults = dict(
+            node_id="ps-1",
+            stone_diameter=4.0,
+            peg_diameter=1.5,
+            peg_length=6.0,
+            base_diameter=3.0,
+            base_thickness=0.5,
+        )
+        defaults.update(kw)
+        return build_peg_setting_node(**defaults)
+
+    def test_op_field(self):
+        node = self._make_node()
+        assert node["op"] == "jewelry_peg_setting"
+
+    def test_cup_depth(self):
+        node = self._make_node(stone_diameter=5.0)
+        assert math.isclose(node["_cup_depth"], 5.0 * 0.2, rel_tol=1e-5)
+
+    def test_peg_aspect_ratio(self):
+        node = self._make_node(peg_diameter=1.5, peg_length=6.0)
+        assert math.isclose(node["_peg_aspect_ratio"], 6.0 / 1.5, rel_tol=1e-5)
+
+    def test_all_params_stored(self):
+        node = self._make_node()
+        assert node["stone_diameter"] == 4.0
+        assert node["peg_diameter"] == 1.5
+        assert node["peg_length"] == 6.0
+        assert node["base_diameter"] == 3.0
+        assert node["base_thickness"] == 0.5
+
+
+class TestPegSettingRunner:
+    def test_success(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_peg_setting, ctx, fid,
+            stone_diameter=4.0,
+            peg_diameter=1.5,
+            peg_length=6.0,
+            base_diameter=3.0,
+            base_thickness=0.5,
+        )
+        assert result.get("error") is None
+        assert result["op"] == "jewelry_peg_setting"
+
+    def test_node_appended(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_peg_setting, ctx, fid,
+            stone_diameter=3.5, peg_diameter=1.2,
+            peg_length=5.0, base_diameter=2.5, base_thickness=0.4,
+        )
+        node = get_last_node(store)
+        assert node["op"] == "jewelry_peg_setting"
+
+    def test_node_id_auto_generated(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_peg_setting, ctx, fid,
+            stone_diameter=4.0, peg_diameter=1.5,
+            peg_length=6.0, base_diameter=3.0, base_thickness=0.5,
+        )
+        node = get_last_node(store)
+        assert node["id"].startswith("jewelry_peg_setting-")
+
+    def test_explicit_id(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_peg_setting, ctx, fid,
+            stone_diameter=4.0, peg_diameter=1.5,
+            peg_length=6.0, base_diameter=3.0, base_thickness=0.5,
+            id="stud-peg-1",
+        )
+        node = get_last_node(store)
+        assert node["id"] == "stud-peg-1"
+
+    def test_base_smaller_than_peg_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_peg_setting, ctx, fid,
+            stone_diameter=4.0, peg_diameter=2.5,
+            peg_length=6.0, base_diameter=1.5, base_thickness=0.5,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_zero_peg_length_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_peg_setting, ctx, fid,
+            stone_diameter=4.0, peg_diameter=1.5,
+            peg_length=0, base_diameter=3.0, base_thickness=0.5,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_zero_stone_diameter_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_peg_setting, ctx, fid,
+            stone_diameter=0, peg_diameter=1.5,
+            peg_length=6.0, base_diameter=3.0, base_thickness=0.5,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_non_uuid_file_id_rejected(self):
+        ctx, _, _ = make_ctx()
+        result = call_tool(
+            run_jewelry_create_peg_setting, ctx, "not-a-uuid",
+            stone_diameter=4.0, peg_diameter=1.5,
+            peg_length=6.0, base_diameter=3.0, base_thickness=0.5,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_missing_file_not_found(self):
+        ctx, _, fid = make_ctx(kind="NOT_FOUND")
+        result = call_tool(
+            run_jewelry_create_peg_setting, ctx, fid,
+            stone_diameter=4.0, peg_diameter=1.5,
+            peg_length=6.0, base_diameter=3.0, base_thickness=0.5,
+        )
+        assert result.get("code") == "NOT_FOUND"
+
+
+# ============================================================================
+# v3 — Crown / coronet setting (ToolSpec + geometry + runner)
+# ============================================================================
+
+class TestCoronetSpec:
+    def test_name(self):
+        assert jewelry_coronet_spec.name == "jewelry_create_coronet"
+
+    def test_required_fields(self):
+        req = jewelry_coronet_spec.input_schema["required"]
+        for f in ["file_id", "stone_diameter", "prong_count", "crown_height", "taper", "wire_gauge"]:
+            assert f in req
+
+    def test_optional_id_not_required(self):
+        req = jewelry_coronet_spec.input_schema["required"]
+        assert "id" not in req
+
+
+class TestCoronetGeometry:
+    def _make_node(self, **kw):
+        defaults = dict(
+            node_id="cor-1",
+            stone_diameter=7.0,
+            prong_count=6,
+            crown_height=3.5,
+            taper=0.3,
+            wire_gauge=1.1,
+        )
+        defaults.update(kw)
+        return build_coronet_node(**defaults)
+
+    def test_op_field(self):
+        node = self._make_node()
+        assert node["op"] == "jewelry_coronet"
+
+    def test_base_diameter(self):
+        node = self._make_node(stone_diameter=7.0, wire_gauge=1.1)
+        assert math.isclose(node["_base_diameter"], 7.0 + 2 * 1.1, rel_tol=1e-5)
+
+    def test_tip_diameter_less_than_base(self):
+        node = self._make_node(taper=0.3)
+        assert node["_tip_diameter"] < node["_base_diameter"]
+
+    def test_tip_diameter_not_below_stone(self):
+        # Taper is clamped so tip can't shrink below stone_diameter.
+        node = self._make_node(stone_diameter=7.0, wire_gauge=0.5, taper=0.4)
+        assert node["_tip_diameter"] >= node["stone_diameter"]
+
+    def test_prong_pitch_6_prong(self):
+        node = self._make_node(prong_count=6)
+        assert math.isclose(node["_prong_pitch_deg"], 60.0, rel_tol=1e-5)
+
+    def test_prong_pitch_8_prong(self):
+        node = self._make_node(prong_count=8)
+        assert math.isclose(node["_prong_pitch_deg"], 45.0, rel_tol=1e-5)
+
+    def test_zero_taper_allowed(self):
+        node = self._make_node(taper=0.0)
+        # base == tip when taper=0 (clamped at stone_diameter)
+        assert math.isclose(node["_base_diameter"], node["_tip_diameter"], rel_tol=1e-5)
+
+    def test_all_params_stored(self):
+        node = self._make_node()
+        assert node["prong_count"] == 6
+        assert node["taper"] == 0.3
+        assert node["wire_gauge"] == 1.1
+
+
+class TestCoronetRunner:
+    def test_success(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_coronet, ctx, fid,
+            stone_diameter=7.0,
+            prong_count=6,
+            crown_height=3.5,
+            taper=0.3,
+            wire_gauge=1.1,
+        )
+        assert result.get("error") is None
+        assert result["op"] == "jewelry_coronet"
+        assert result["prong_count"] == 6
+
+    def test_node_appended(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_coronet, ctx, fid,
+            stone_diameter=6.0, prong_count=8,
+            crown_height=3.0, taper=0.2, wire_gauge=1.0,
+        )
+        node = get_last_node(store)
+        assert node["op"] == "jewelry_coronet"
+        assert node["prong_count"] == 8
+
+    def test_node_id_auto_generated(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_coronet, ctx, fid,
+            stone_diameter=7.0, prong_count=6,
+            crown_height=3.5, taper=0.3, wire_gauge=1.1,
+        )
+        node = get_last_node(store)
+        assert node["id"].startswith("jewelry_coronet-")
+
+    def test_explicit_id(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_coronet, ctx, fid,
+            stone_diameter=7.0, prong_count=6,
+            crown_height=3.5, taper=0.3, wire_gauge=1.1,
+            id="coronet-vintage-1",
+        )
+        node = get_last_node(store)
+        assert node["id"] == "coronet-vintage-1"
+
+    def test_prong_count_below_3_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_coronet, ctx, fid,
+            stone_diameter=7.0, prong_count=2,
+            crown_height=3.5, taper=0.3, wire_gauge=1.1,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_negative_taper_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_coronet, ctx, fid,
+            stone_diameter=7.0, prong_count=6,
+            crown_height=3.5, taper=-0.5, wire_gauge=1.1,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_taper_ge_wire_gauge_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_coronet, ctx, fid,
+            stone_diameter=7.0, prong_count=6,
+            crown_height=3.5, taper=1.1, wire_gauge=1.1,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_zero_crown_height_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_coronet, ctx, fid,
+            stone_diameter=7.0, prong_count=6,
+            crown_height=0, taper=0.3, wire_gauge=1.1,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_zero_stone_diameter_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_coronet, ctx, fid,
+            stone_diameter=0, prong_count=6,
+            crown_height=3.5, taper=0.3, wire_gauge=1.1,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_non_uuid_file_id_rejected(self):
+        ctx, _, _ = make_ctx()
+        result = call_tool(
+            run_jewelry_create_coronet, ctx, "nope",
+            stone_diameter=7.0, prong_count=6,
+            crown_height=3.5, taper=0.3, wire_gauge=1.1,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_missing_file_not_found(self):
+        ctx, _, fid = make_ctx(kind="NOT_FOUND")
+        result = call_tool(
+            run_jewelry_create_coronet, ctx, fid,
+            stone_diameter=7.0, prong_count=6,
+            crown_height=3.5, taper=0.3, wire_gauge=1.1,
+        )
+        assert result.get("code") == "NOT_FOUND"
+
+    def test_zero_taper_accepted(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_coronet, ctx, fid,
+            stone_diameter=7.0, prong_count=10,
+            crown_height=4.0, taper=0.0, wire_gauge=1.2,
+        )
+        assert result.get("error") is None
+        node = get_last_node(store)
+        assert node["taper"] == 0.0
+
+    def test_base_and_tip_diameters_in_result(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_coronet, ctx, fid,
+            stone_diameter=7.0, prong_count=6,
+            crown_height=3.5, taper=0.3, wire_gauge=1.1,
+        )
+        assert "_base_diameter" in result
+        assert "_tip_diameter" in result
+
+
+# ============================================================================
+# OCC-gated tests — v3 settings
+# ============================================================================
+
+@skip_no_occ
+class TestV3OCC:
+    """Smoke tests: use node-spec derived dimensions to build trivial OCCT
+    cylinders, verifying that node geometry hints are numerically reasonable
+    so the worker's primitive ops will succeed."""
+
+    def test_occ_prong_variant_outer_cylinder(self):
+        from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeCylinder  # type: ignore
+        from OCC.Core.gp import gp_Pnt, gp_Ax2, gp_Dir  # type: ignore
+
+        node = build_prong_variant_node(
+            node_id="occ-pv-1",
+            variant="claw_prong",
+            stone_diameter=6.5,
+            prong_count=6,
+            wire_gauge=1.0,
+            prong_height=2.5,
+        )
+        ax = gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1))
+        cyl = BRepPrimAPI_MakeCylinder(ax, node["_head_outer_diameter"] / 2.0, node["prong_height"])
+        assert not cyl.Shape().IsNull()
+
+    def test_occ_head_gallery_cylinder(self):
+        from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeCylinder  # type: ignore
+        from OCC.Core.gp import gp_Pnt, gp_Ax2, gp_Dir  # type: ignore
+
+        node = build_head_gallery_node(
+            node_id="occ-hg-1",
+            head_diameter=9.0,
+            head_height=3.0,
+            gallery_height=1.5,
+            gallery_style="scalloped",
+            motif_pitch=1.2,
+        )
+        ax = gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1))
+        cyl = BRepPrimAPI_MakeCylinder(ax, node["_gallery_outer_diameter"] / 2.0, node["head_height"])
+        assert not cyl.Shape().IsNull()
+
+    def test_occ_under_bezel_annular_cylinder(self):
+        from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeCylinder  # type: ignore
+        from OCC.Core.gp import gp_Pnt, gp_Ax2, gp_Dir  # type: ignore
+
+        node = build_under_bezel_node(
+            node_id="occ-ub-1",
+            stone_diameter=6.5,
+            wall_thickness=0.5,
+            collet_height=2.0,
+            base_diameter=8.0,
+            base_thickness=0.4,
+        )
+        ax = gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1))
+        cyl = BRepPrimAPI_MakeCylinder(ax, node["_outer_diameter"] / 2.0, node["collet_height"])
+        assert not cyl.Shape().IsNull()
+
+    def test_occ_peg_setting_cylinder(self):
+        from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeCylinder  # type: ignore
+        from OCC.Core.gp import gp_Pnt, gp_Ax2, gp_Dir  # type: ignore
+
+        node = build_peg_setting_node(
+            node_id="occ-ps-1",
+            stone_diameter=4.0,
+            peg_diameter=1.5,
+            peg_length=6.0,
+            base_diameter=3.0,
+            base_thickness=0.5,
+        )
+        ax = gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1))
+        cyl = BRepPrimAPI_MakeCylinder(ax, node["peg_diameter"] / 2.0, node["peg_length"])
+        assert not cyl.Shape().IsNull()
+
+    def test_occ_coronet_cylinder(self):
+        from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeCylinder  # type: ignore
+        from OCC.Core.gp import gp_Pnt, gp_Ax2, gp_Dir  # type: ignore
+
+        node = build_coronet_node(
+            node_id="occ-cor-1",
+            stone_diameter=7.0,
+            prong_count=6,
+            crown_height=3.5,
+            taper=0.3,
+            wire_gauge=1.1,
+        )
+        ax = gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1))
+        cyl = BRepPrimAPI_MakeCylinder(ax, node["_base_diameter"] / 2.0, node["crown_height"])
+        assert not cyl.Shape().IsNull()

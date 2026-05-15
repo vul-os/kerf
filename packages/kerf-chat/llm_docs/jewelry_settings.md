@@ -809,3 +809,142 @@ Result node op: `jewelry_head_gallery`. Fuse onto a shank with a boolean union.
 
 ---
 
+## `jewelry_create_under_bezel`
+
+Generates a sub-collet (under-bezel) that elevates a stone above the shank.
+
+### How it works
+
+A short annular collet of inner bore = `stone_diameter` and wall thickness
+= `wall_thickness` rises to `collet_height`.  A flat base disc of
+`base_diameter` × `base_thickness` extends outward at the foot for soldering
+onto the shank.  Use as secondary support beneath bezels, halos, or any
+setting that needs the stone raised higher.
+
+`base_diameter` must be >= `stone_diameter + 2 × wall_thickness`.
+
+### Parameters
+
+| Parameter         | Required | Notes                                                              |
+|-------------------|----------|--------------------------------------------------------------------|
+| `file_id`         | yes      | Target `.feature` file uuid                                        |
+| `stone_diameter`  | yes      | Stone girdle diameter in mm                                        |
+| `wall_thickness`  | yes      | Collet wall thickness in mm (typical 0.3–0.8)                     |
+| `collet_height`   | yes      | Height of the collet tube in mm                                    |
+| `base_diameter`   | yes      | Base disc diameter in mm (>= stone_diameter + 2 × wall_thickness) |
+| `base_thickness`  | yes      | Base disc thickness in mm                                          |
+| `id`              | no       | Explicit node id                                                   |
+
+### Worked example — under-bezel for a bezel-set oval
+
+```json
+{
+  "file_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "stone_diameter": 9.0,
+  "wall_thickness": 0.5,
+  "collet_height": 2.5,
+  "base_diameter": 11.0,
+  "base_thickness": 0.4
+}
+```
+
+Result node op: `jewelry_under_bezel`. Fuse onto a shank; place a bezel node
+directly on top.
+
+---
+
+## `jewelry_create_peg_setting`
+
+Generates a peg (post) setting for earrings and pendants.
+
+### How it works
+
+A cylindrical post of `peg_diameter` × `peg_length` has a shallow cup at its
+top (inner diameter = `stone_diameter`) that holds the stone with adhesive or
+a retaining ledge.  An optional base disc of `base_diameter` × `base_thickness`
+at the foot of the post solders into an earring back or pendant finding.
+
+`base_diameter` must be >= `peg_diameter`.
+
+### Parameters
+
+| Parameter         | Required | Notes                                               |
+|-------------------|----------|-----------------------------------------------------|
+| `file_id`         | yes      | Target `.feature` file uuid                         |
+| `stone_diameter`  | yes      | Stone girdle diameter in mm (sets the cup size)     |
+| `peg_diameter`    | yes      | Post diameter in mm                                 |
+| `peg_length`      | yes      | Post height in mm                                   |
+| `base_diameter`   | yes      | Soldering foot diameter in mm (>= peg_diameter)     |
+| `base_thickness`  | yes      | Soldering foot thickness in mm                      |
+| `id`              | no       | Explicit node id                                    |
+
+### Worked example — stud-earring peg for a 4 mm stone
+
+```json
+{
+  "file_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "stone_diameter": 4.0,
+  "peg_diameter": 1.5,
+  "peg_length": 6.0,
+  "base_diameter": 3.0,
+  "base_thickness": 0.5
+}
+```
+
+Result node op: `jewelry_peg_setting`. Combine with an ear-post finding.
+
+---
+
+## `jewelry_create_coronet`
+
+Generates a crown (coronet) setting — a vintage-look ring of graduated prongs
+that lean inward to form a regal dome.
+
+### How it works
+
+1. `prong_count` prong wires (diameter = `wire_gauge`) are evenly distributed
+   around the stone and rise to `crown_height`.
+2. Each prong tapers inward by `taper` mm over its height so the tips lean
+   over the stone (typical `taper` 0.2–0.6 mm for the classic coronet silhouette;
+   `taper = 0` gives straight prongs like a plain prong head).
+3. `taper` must be < `wire_gauge` so prong tips remain geometrically solid.
+4. A low cylinder base (height ≈ `crown_height × 0.25`) forms the prong
+   footings; boolean-fuse onto a shank to complete the ring.
+
+### Parameters
+
+| Parameter         | Required | Notes                                                         |
+|-------------------|----------|---------------------------------------------------------------|
+| `file_id`         | yes      | Target `.feature` file uuid                                   |
+| `stone_diameter`  | yes      | Stone girdle diameter in mm                                   |
+| `prong_count`     | yes      | Number of prongs (>= 3; typical 6, 8, or 10)                 |
+| `crown_height`    | yes      | Height the prongs rise above the girdle plane in mm           |
+| `taper`           | yes      | Inward lean of prong tips in mm (0 = straight; must be < `wire_gauge`) |
+| `wire_gauge`      | yes      | Prong wire diameter in mm (typical 0.8–1.5)                  |
+| `id`              | no       | Explicit node id                                              |
+
+### Worked example — 8-prong Victorian coronet
+
+```json
+{
+  "file_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "stone_diameter": 7.0,
+  "prong_count": 8,
+  "crown_height": 4.0,
+  "taper": 0.4,
+  "wire_gauge": 1.0
+}
+```
+
+Result node op: `jewelry_coronet`. Boolean-fuse onto a shank.
+
+---
+
+## FeatureView inspector entries — deferred
+
+The five new settings (`jewelry_prong_variant`, `jewelry_head_gallery`,
+`jewelry_under_bezel`, `jewelry_peg_setting`, `jewelry_coronet`) do **not**
+yet have FeatureView inspector panel entries (`src/components/` is out of
+scope for this agent).  Add inspector cards for each in a follow-up task,
+following the pattern of the existing `JewelryProngHeadPanel` and
+`JewelryBezelPanel` components.

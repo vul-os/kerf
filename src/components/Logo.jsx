@@ -15,14 +15,11 @@ export function LogoMark({ size = 28, className = '', title = 'kerf' }) {
       shapeRendering="geometricPrecision"
     >
       <title>{title}</title>
-      {/* Dark rounded background */}
-      <rect width="32" height="32" rx="6" fill="#0a0b0d" />
-      {/* Vertical stem of the K */}
+      {/* K glyph only — transparent so it sits inline on any surface.
+          Geometry matches public/favicon.svg exactly. */}
       <rect x="7" y="6" width="3.5" height="20" fill="currentColor" />
-      {/* Upper diagonal arm: stem top-right → upper-right corner */}
-      <polygon points="10.5,16 10.5,6 25,6" fill="currentColor" />
-      {/* Lower diagonal arm: stem mid-right → lower-right corner */}
-      <polygon points="10.5,16 25,26 10.5,26" fill="currentColor" />
+      <polygon points="10.5,16 26,6 26,13" fill="currentColor" />
+      <polygon points="10.5,16 26,19 26,26" fill="currentColor" />
     </svg>
   )
 }

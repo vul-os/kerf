@@ -41,18 +41,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy monorepo pyproject + all plugin packages.
 COPY pyproject.toml ./
 COPY packages/ ./packages/
-COPY backend/ ./backend/
 
-# Install the selected persona.
+# Install the selected persona (deps resolve from pyproject extras).
 RUN pip install --no-cache-dir -e ".[$KERF_PERSONA]"
-RUN pip install --no-cache-dir -r backend/requirements.txt
 
 # Embed the compiled frontend.
 COPY --from=frontend /app/dist /app/dist
 
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8080
-ENV PYTHONPATH=/app/backend
 ENV KERF_FRONTEND_DIST=/app/dist
 
 EXPOSE 8080

@@ -23,11 +23,13 @@ async def register(app: "FastAPI", ctx):
     from kerf_imports.kicad import router as kicad_router
     from kerf_imports.kicad_library import router as kicad_library_router
     from kerf_imports.rhino3dm_route import router as rhino3dm_router
+    from kerf_imports.dxf.route import router as dxf_router
 
     app.include_router(freecad_router, tags=["imports"])
     app.include_router(kicad_router, tags=["imports"])
     app.include_router(kicad_library_router, tags=["imports"])
     app.include_router(rhino3dm_router, tags=["imports"])
+    app.include_router(dxf_router, tags=["imports"])
 
     # ── LLM tools ────────────────────────────────────────────────────────
     provides = []
@@ -78,6 +80,7 @@ def _register_tools(ctx, provides: list) -> None:
     tool_modules = [
         "kerf_imports.tools.import_3dm",
         "kerf_imports.tools.import_freecad",
+        "kerf_imports.tools.import_dxf",
         "kerf_imports.tools.subd",
         "kerf_imports.tools.mesh",
         "kerf_imports.tools.curve_ops",

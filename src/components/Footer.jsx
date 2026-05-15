@@ -63,11 +63,10 @@ export default function Footer() {
               href={GITHUB_URL}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-2 self-start rounded-md border border-ink-800 bg-ink-900/60 px-2.5 py-1.5 text-xs text-ink-300 hover:border-ink-700 hover:text-ink-100 transition-colors"
+              aria-label="GitHub"
+              className="inline-flex items-center self-start rounded-md border border-ink-800 bg-ink-900/60 p-1.5 text-ink-300 hover:border-ink-700 hover:text-ink-100 transition-colors"
             >
-              <Github size={13} />
-              {/* open-source pitch: invite contributors */}
-              <span className="font-mono">Open source — contributors welcome</span>
+              <Github size={16} />
             </a>
           </div>
 

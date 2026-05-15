@@ -1,0 +1,33 @@
+name: Publish kerf-sdk-go
+
+on:
+  push:
+    tags:
+      - 'sdk-go-v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Tag check
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          version="${tag#sdk-go-}"
+          echo "Publishing github.com/kerf-sh/kerf-sdk-go@${version}"
+          # Go modules use the repo tag directly — no separate registry push needed.
+          # pkg.go.dev picks up the module automatically on the first import after the tag.
+
+      - name: Smoke build
+        run: cd packages/kerf-sdk-go && go build ./...
+
+      - name: Vet
+        run: cd packages/kerf-sdk-go && go vet ./...
+
+      - name: Test
+        run: cd packages/kerf-sdk-go && go test ./...

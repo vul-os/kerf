@@ -31,6 +31,10 @@ COPY vite.config.js index.html ./
 COPY src/ ./src/
 COPY public/ ./public/
 COPY scripts/ ./scripts/
+# build-docs-manifest.mjs (run by `npm run build`) walks docs/ and
+# packages/*/llm_docs/*.md — without these the /docs manifest is empty.
+COPY docs/ ./docs/
+COPY packages/ ./packages/
 COPY postcss.config.* tailwind.config.* eslint.config.* ./
 RUN npm run build
 

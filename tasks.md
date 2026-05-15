@@ -1,19 +1,91 @@
-# Kerf — Task backlog
+# Kerf — Task backlog (money/reach-prioritized)
 
 **[`ROADMAP.md`](./ROADMAP.md) = strategy** (why / what / priority order).
 **This file = execution.** Each `### T-<n>` below is sized so a **single
 Sonnet agent can complete it in one isolated-worktree run**: bounded scope,
-clear target files, a concrete Definition of Done. The autonomous agent loop
-pulls from here top-down within a tier.
+clear target files, a concrete Definition of Done.
+
+## The prioritization lens
+
+The roadmap orders by *leverage / credibility per unit work*. This backlog
+re-orders the **same committed work** by a sharper, money-and-reach lens so
+the autonomous Sonnet loop always pulls the highest-value task next:
+
+> **rank ≈ (people covered) × (sectors covered) × (revenue / willingness-to-pay) ÷ effort**
+
+Two tiers drive the ranking:
+
+- **Tier A — persona unlock (revenue).** Flips a *whole persona* from
+  "cannot ship their deliverable" → "can". Clearest willingness-to-pay: a
+  professional who literally cannot deliver without it will pay for it.
+- **Tier B — cross-sector multiplier (reach / funnel).** Helps *every*
+  sector at once and grows the top of funnel (more evaluators, lower
+  cold-start, stronger conversion surface).
+
+Within a tier, ties break on **effort** (cheaper-and-already-mostly-built
+wins) and **P-tier** (the roadmap's leverage order).
 
 Status glyphs match the roadmap: `🔴 not started` · `🚧 in flight` ·
-`✅ shipped`. Tiers (P0→P3) mirror the roadmap exactly.
+`✅ shipped`. **Priority** (P0–P3) on each task mirrors the roadmap exactly;
+**Tier** (A/B) is the money/reach classification used for ordering.
+
+---
+
+## Execution order (money/reach-ranked) — pull top-down
+
+This ordered list is **authoritative**. The detailed task bodies are grouped
+by tier below for reference, but the agent loop pulls in *this* sequence.
+
+| # | Task | Tier | Money/reach justification (people × sectors × revenue ÷ effort) |
+|---|---|---|---|
+| 1 | **T-9** Gerber RS-274X writer | A | First step that starts flipping the **electronic engineer** persona from 🔴 *cannot manufacture* → can. ECAD is a P0 spine persona with a large, paying professional workforce; design side is already KiCad-class so this single output unlocks all of it. Highest revenue-per-effort: one persona, hard willingness-to-pay (no fab = no product). |
+| 2 | **T-10** Excellon drill writer | A | Completes the second mandatory fab artifact for the same ECAD persona. Cheap (pairs with T-9 in the same package) and a hard gate — a board with no drill file is unmanufacturable. |
+| 3 | **T-11** Pick-and-place + fab BOM | A | Third fab artifact; assembly houses require P&P + fab BOM. Reuses the shipped BOM rollup → low effort, same high-value persona. |
+| 4 | **T-12** IPC-2581 / ODB++ + fab zip bundle | A | The *actual* deliverable a fab house ingests — this is the moment the ECAD persona crosses 🔴→✅. Completes the single biggest P0 credibility blocker; large paying persona fully unlocked. |
+| 5 | **T-20**→**T-24** Jewelry worker ops (`opGemstone`…`opRingShank`, end-to-end ring) | A | Flips the **jewelry CAD** persona from "shipped-but-dead" → usable. Build cost is *already paid* (Python toolkit + UI + `.gem` migration all shipped); only the JS worker wiring remains → extraordinary revenue-per-effort. High-margin niche, distinct paying segment. Sequenced 5a–5e. |
+| 6 | **T-5** DXF reader | A | First step of the **one feature that unlocks THREE personas at once** — drafter + architect + automotive (DWG/DXF is the linchpin for all three; only a narrow `.draft`→DXF-R12 writer exists). 3 big paying personas × 1 feature = top reach-weighted revenue. |
+| 7 | **T-6** DXF entity-map → `.sketch`/`.drawing` | A | Makes the DXF read path actually usable (drafter + architect can *open* industry files). Completes the inbound half of the 3-persona unlock. |
+| 8 | **T-7** General DXF writer | A | The supplier-exchange / homologation deliverable for drafter + mechanical + automotive — outbound half of the 3-persona unlock; generalizes existing R12 writer (lower effort than from-zero). |
+| 9 | **T-50' / T-NEW-PRIV** Paid-tier private-by-default | A | Classic paid conversion lever: privacy. Touches *every* cloud persona's willingness-to-pay (private projects is the #1 reason hobbyists upgrade). Tiny, isolated change keyed off billing buckets → very high revenue-per-effort. Self-hosted N/A. |
+| 10 | **T-1**→**T-4** Sheet metal (flange→unfold→flat-pattern→bend-table) | A | Biggest single mechanical sub-need and BIW stamping for **automotive** — two large paying personas. Bigger effort (4 sequenced sub-tasks) so it ranks just below the cheaper persona-unlocks, but it is a hard P0 mechanical/automotive credibility gap. Sequenced 10a–10d. |
+| 11 | **T-8** DWG read via ODA/libredwg bridge | A | Extends the 3-persona DXF unlock to true **DWG** (architecture/automotive run on DWG, not just DXF). Depends on the DXF path; bridge-eval effort, hence after the cheaper wins. |
+| 12 | **T-40**→**T-45** Workshop README workstream (schema → AI-gen → cover → public page → publish UX → tests) | B | Repositions Workshop from Thingiverse image-gallery → **GitHub-for-parametric-CAD**: every published project becomes a discoverable, forkable, AI-documented asset. Single biggest top-of-funnel multiplier across *all* sectors simultaneously; compounds SEO + fork conversion. Sequenced 12a–12f. |
+| 13 | **T-46** KiCad parts seed via `kerf-parts` | B | Populates the just-built parts pipeline for **electronics** (huge) — turns an empty library into a cold-start killer for the same large ECAD persona just unlocked by fab output. Reach + funnel across electronics. |
+| 14 | **T-34** kerf-partsgen: standard fastener families | B | Populates the mechanical side of the library (author-once-then-enumerate) — cold-start killer across **all mechanical** sectors; zero-token enumeration → cheap, broad reach. |
+| 15 | **T-47** Jewelry generated-parts render check | B | Closes the parts-library loop for **jewelry** (depends on jewelry worker-ops) — ensures the now-usable jewelry niche also has a populated, renderable library. |
+| 16 | **T-48** Education / maker on-ramp | B | Biggest *raw reach* + mission (ROADMAP §2): polished simple-parametric + cut-list/flat-pack path + on-ramp; slicing + CAM already shipped. Grows the widest possible top-of-funnel for the smallest incremental effort. |
+| 17 | **T-13**→**T-14** Persistent face-naming boolean hardening | A | Protects *every* persona's revenue: a topo-naming failure under booleans breaks the product for everyone. Not a new unlock (hence not top), but a high-leverage correctness moat across all sectors. Sequenced 17a–17b. |
+| 18 | **T-15**→**T-16** Large-assembly perf (harness → LOD/lazy-load) | A | Unblocks mechanical + architect + automotive at scale (1000s–10,000s of parts; full-vehicle DMU). Cross-persona; harness-first defines the budget before the loader. Sequenced 18a–18b. |
+| 19 | **T-31** ECAD 3D board STEP export | A | Deepens the freshly-unlocked ECAD persona into MCAD-ECAD co-design (the cross-project PCB-as-part path consumes it) — extends revenue from a persona already converting. |
+| 20 | **T-37** Surface-boolean robustness on dense NURBS | A | Reliability moat for **jewelry + automotive** organic models — protects the jewelry revenue just unlocked and the Class-A automotive path. |
+| 21 | **T-35** Class-A zebra / reflection-line slice | A | The cheap, no-WASM Class-A credibility win for **automotive** — visible quality signal that converts automotive evaluators; low effort (shader-side). |
+| 22 | **T-25**→**T-26** Weldments (member → cut list) | A | Converts the **mechanical** persona deeper (structural fabrication + cut list). Sequenced 22a–22b. |
+| 23 | **T-27** GD&T-from-model callouts | A | Mechanical + automotive correctness/standards depth (frames already render; model→callout link is the gap) — standards features are *more* important under an LLM. |
+| 24 | **T-28**→**T-29** IFC import Tier 2 (openings/MEP → families/schedules) | A | Deepens the **architect** persona (interop with the real BIM ecosystem). Sequenced 24a–24b. |
+| 25 | **T-30** Parametric family editor (Revit moat) | A | Architect-persona depth + a recognized competitive moat. |
+| 26 | **T-32** kerf-parts: complete bolts adapter | B | Further populates the mechanical/ECAD parts ecosystem (scaffold-stage adapter → working). Reach multiplier. |
+| 27 | **T-33** kerf-parts: complete freecad-library adapter | B | Same parts-ecosystem reach multiplier for the mechanical side. |
+| 28 | **T-36** 3D wiring harness route-through-DMU primitive | A | Automotive + ECAD depth (today only 2D WireViz) — opens a new deliverable for two personas already on the path. |
+| 29 | **T-50** FEM nonlinear (plasticity) path | A | First step of the broad simulation pillar (mechanical + automotive); P2 — moat depth, not a P0 unlock, hence ranked here. |
+| 30 | **T-51** Cross-discipline clash detection | B | Cross-sector (architect + mechanical) platform multiplier; P2. |
+| 31 | **T-52** Scan-to-CAD point-cloud + primitive fit | B | High-leverage cross-cutting reverse-engineering seed (mechanical/architecture/automotive/medical); P2. |
+| 32 | **T-53** Nesting / cut-optimization for sheet/laser | B | Cross-sector fabrication multiplier; consumes sheet-metal flat patterns; P2. |
+| 33 | **T-70** Civil engine seed (CRS + TIN terrain) | B | Highest raw societal importance, engine-gated → P3; proof-of-"we do everything" seed. |
+| 34 | **T-71** Marine NURBS hull-fairing seed | B | NURBS-reachable long-tail vertical; P3 proof seed. |
+
+> Sub-tasks within a sequenced group (e.g. 5a–5e, 10a–10d, 12a–12f) keep
+> their `Depends-on` chain; the loop completes a group's prerequisites in
+> order before the next ranked group.
+
+---
 
 **How to add a task:** copy the template, give it the next free `T-<n>`,
-place it under the tier that matches its roadmap line, fill every field, and
-split anything bigger than ~one agent-run into sequenced sub-tasks with
-`Depends-on`. A new uncovered sector → a P3 task + a P3 line in the roadmap.
-Keep this file and the roadmap in sync when priorities change.
+fill **every** field (including **Tier** + **Money/reach rationale**), then
+splice it into the ranked execution-order table above by the
+people × sectors × revenue ÷ effort logic. Split anything bigger than ~one
+agent-run into sequenced sub-tasks with `Depends-on`. A new uncovered sector
+→ a P3 task + a P3 line in the roadmap. Keep this file and the roadmap in
+sync when priorities change.
 
 **Policy:** Advanced cross-cutting capabilities (ROADMAP §3.5) and long-term
 horizon sectors (§6) are intentionally NOT enumerated as tasks here until
@@ -23,8 +95,9 @@ Template:
 
 ```
 ### T-<n> <title>
+- **Tier:** A | B
+- **Money/reach rationale:** <which & how-many personas/sectors unlocked + revenue logic>
 - **Priority:** P<0-3>
-- **Persona/sector:** <who this unblocks>
 - **Status:** 🔴 not started
 - **Scope:** <what + why, 2-4 sentences>
 - **Target files/packages:** <paths>
@@ -34,11 +107,263 @@ Template:
 
 ---
 
-## P0 — credibility blockers
+## Tier A — persona unlocks (revenue)
+
+### T-9 Gerber/fab: RS-274X writer
+- **Tier:** A
+- **Money/reach rationale:** Unlocks the **electronic engineer** persona
+  (1 large paying professional workforce; 1 sector — ECAD). Design side is
+  already KiCad-class, so this is the first artifact toward flipping a P0
+  persona from 🔴 *cannot manufacture* → can. Hard willingness-to-pay: no
+  fab output means no shippable product.
+- **Priority:** P0
+- **Status:** 🔴 not started
+- **Scope:** CircuitJSON → Gerber RS-274X per copper/mask/silk layer
+  (aperture definitions, flashes, draws, polygon pours). This is the single
+  biggest credibility blocker for the ECAD persona.
+- **Target files/packages:** `packages/kerf-electronics/src/kerf_electronics/
+  fab/` (new `gerber.py`), `tools/fab.py` (`export_gerber` LLM tool),
+  `packages/kerf-electronics/llm_docs/fab.md`.
+- **Definition of Done:** known board → Gerber that parses with a
+  third-party Gerber parser in tests (or a hermetic structural assertion);
+  per-layer file set; pytest.
+- **Depends-on:** none
+
+### T-10 Gerber/fab: Excellon drill writer
+- **Tier:** A
+- **Money/reach rationale:** Second mandatory fab artifact for the same
+  ECAD persona. Cheap (same package as T-9), hard gate — a board with no
+  drill file cannot be manufactured.
+- **Priority:** P0
+- **Status:** 🔴 not started
+- **Scope:** CircuitJSON pad/via holes → Excellon drill file (tool table,
+  plated/non-plated, drill hits). Pairs with T-9 in the fab package.
+- **Target files/packages:** `packages/kerf-electronics/src/kerf_electronics/
+  fab/excellon.py`.
+- **Definition of Done:** tool table matches distinct hole sizes; hit count
+  equals pad/via count; pytest with a fixture board.
+- **Depends-on:** T-9
+
+### T-11 Gerber/fab: pick-and-place + fab BOM
+- **Tier:** A
+- **Money/reach rationale:** Third fab artifact (assembly houses require
+  P&P + fab BOM) for the ECAD persona. Reuses the shipped BOM rollup → low
+  effort, same high-value persona.
+- **Priority:** P0
+- **Status:** 🔴 not started
+- **Scope:** Centroid/rotation pick-and-place CSV (top/bottom) + fab BOM
+  CSV (refdes, value, footprint, distributor). Reuse the existing BOM rollup.
+- **Target files/packages:** `packages/kerf-electronics/src/kerf_electronics/
+  fab/pnp.py`, `fab_bom.py`.
+- **Definition of Done:** P&P rows = placed components with correct
+  side/rotation; fab BOM groups by value+footprint; pytest.
+- **Depends-on:** T-9
+
+### T-12 Gerber/fab: IPC-2581 / ODB++ + fab zip bundle
+- **Tier:** A
+- **Money/reach rationale:** The *actual* deliverable a fab house ingests —
+  the moment the **electronic engineer** persona crosses 🔴→✅. Completes
+  the single biggest P0 credibility blocker; a large paying persona is fully
+  unlocked.
+- **Priority:** P0
+- **Status:** 🔴 not started
+- **Scope:** Single `export_fab_package` tool that bundles T-9/T-10/T-11
+  outputs + an IPC-2581 XML (ODB++ optional) into one downloadable zip — the
+  actual deliverable a fab house ingests.
+- **Target files/packages:** `packages/kerf-electronics/src/kerf_electronics/
+  fab/ipc2581.py`, `tools/fab.py`, `PCBView.jsx` "Export fab package" button.
+- **Definition of Done:** zip contains Gerbers + drill + P&P + BOM +
+  IPC-2581; IPC-2581 validates against the schema in a test.
+- **Depends-on:** T-9, T-10, T-11
+
+### T-20 Jewelry worker op: `opGemstone`
+- **Tier:** A
+- **Money/reach rationale:** Flips the **jewelry CAD** persona from
+  shipped-but-dead → usable (1 high-margin niche persona). Build cost is
+  already paid (Python toolkit + UI + `.gem` migration shipped); only the JS
+  worker wiring remains → extraordinary revenue-per-effort. Sub-task 5a.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Wire the `opGemstone` handler in the OCCT worker so the
+  shipped `kerf_cad_core.jewelry.gemstones` node specs render the 7 cuts.
+  This is the existing tracked jewelry-render work — split per op so each
+  fits one agent run.
+- **Target files/packages:** `src/lib/occtWorker.js` (`opGemstone`, wired
+  into both `evaluateTree` ≈L3136 and `evaluateToFinalShape` ≈L3546),
+  vitest in `src/__tests__/`.
+- **Definition of Done:** gemstone node from `.gem`/`.feature` produces a
+  tessellated mesh; round/brilliant facet count assertion; vitest dispatch.
+- **Depends-on:** none
+
+### T-21 Jewelry worker op: `opGemSeat`
+- **Tier:** A
+- **Money/reach rationale:** Same jewelry persona unlock (sub-task 5b);
+  build cost already paid, only wiring remains.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Wire `opGemSeat` (seat/bearing cutter from
+  `kerf_cad_core.jewelry.gem_seat`).
+- **Target files/packages:** `src/lib/occtWorker.js`, vitest.
+- **Definition of Done:** seat node renders; cut-against-shank produces a
+  valid solid; vitest.
+- **Depends-on:** T-20
+
+### T-22 Jewelry worker ops: prong head + bezel
+- **Tier:** A
+- **Money/reach rationale:** Same jewelry persona unlock (sub-task 5c);
+  wiring-only against a shipped Python toolkit.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Wire `opJewelryProngHead` and `opJewelryBezel` (from
+  `kerf_cad_core.jewelry.settings`).
+- **Target files/packages:** `src/lib/occtWorker.js`, vitest.
+- **Definition of Done:** both ops render; prong count matches the spec;
+  vitest dispatch for each.
+- **Depends-on:** T-21
+
+### T-23 Jewelry worker ops: channel + pavé
+- **Tier:** A
+- **Money/reach rationale:** Same jewelry persona unlock (sub-task 5d);
+  wiring-only.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Wire `opJewelryChannel` and `opJewelryPave` (auto-array on a
+  surface).
+- **Target files/packages:** `src/lib/occtWorker.js`, vitest.
+- **Definition of Done:** pavé array places N stones on a target surface;
+  channel rail renders; vitest.
+- **Depends-on:** T-22
+
+### T-24 Jewelry worker op: `opRingShank` + end-to-end ring
+- **Tier:** A
+- **Money/reach rationale:** Completes the jewelry persona unlock
+  (sub-task 5e) — a full assembled ring with metal-cost is the persona's
+  end deliverable. Highest single revenue-per-effort step of the group:
+  flips a fully-built-but-dead niche to revenue-generating.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Wire `opRingShank` (from `kerf_cad_core.jewelry.ring`, 7 shank
+  profiles + sizer) and add an end-to-end test: shank + seat + prongs +
+  stone renders as one assembled ring, with metal-cost panel populated.
+- **Target files/packages:** `src/lib/occtWorker.js`,
+  `src/__tests__/jewelryRingIntegration.test.js` (WASM-gated).
+- **Definition of Done:** full ring renders; metal-weight/cost computed;
+  WASM-gated integration test.
+- **Depends-on:** T-23
+
+### T-5 DWG/DXF: DXF reader (entities → Kerf primitives)
+- **Tier:** A
+- **Money/reach rationale:** First step of the **one feature that unlocks
+  THREE big personas** — drafter + architect + automotive (3 sectors, large
+  combined workforce). DWG/DXF is the linchpin for all three; only a narrow
+  `.draft`→DXF-R12 *writer* exists, so this is general drawing/model
+  exchange, not from-zero. Top reach-weighted revenue.
+- **Priority:** P0
+- **Status:** 🔴 not started
+- **Scope:** Pure-Python DXF (R12/2000+) reader: LINE/LWPOLYLINE/CIRCLE/ARC/
+  TEXT/INSERT → an intermediate entity model. Read is currently absent
+  entirely (only a narrow `.draft`→DXF-R12 *writer* exists).
+- **Target files/packages:** `packages/kerf-imports/src/kerf_imports/`
+  (new `dxf/` package: `reader.py`, `entities.py`).
+- **Definition of Done:** parses committed fixture DXFs into the entity
+  model; pytest covering each supported entity + an INSERT/BLOCK.
+- **Depends-on:** none
+
+### T-6 DWG/DXF: entity map → `.sketch` / `.drawing`
+- **Tier:** A
+- **Money/reach rationale:** Makes the inbound DXF path usable — drafter +
+  architect can *open* industry files. Completes the inbound half of the
+  3-persona unlock.
+- **Priority:** P0
+- **Status:** 🔴 not started
+- **Scope:** Map T-5's entity model onto Kerf's `.sketch` Geom2 (closed
+  loops) and `.drawing` (annotations/dimensions) JSON; an `import_dxf` LLM
+  tool + pyworker route; FileTree/menu wiring.
+- **Target files/packages:** `packages/kerf-imports/src/kerf_imports/dxf/`,
+  `packages/kerf-imports/src/kerf_imports/tools/import_dxf.py`,
+  `src/lib/api.js`, `packages/kerf-imports/llm_docs/import_dxf.md`.
+- **Definition of Done:** fixture DXF → valid `.sketch` with closed loops;
+  pytest + the standard import-pipeline integration test.
+- **Depends-on:** T-5
+
+### T-7 DWG/DXF: general DXF writer (drawings + sketches)
+- **Tier:** A
+- **Money/reach rationale:** The supplier-exchange / homologation
+  deliverable for drafter + mechanical + automotive — outbound half of the
+  3-persona unlock. Generalizes the existing R12 writer (lower effort than
+  from-zero).
+- **Priority:** P0
+- **Status:** 🔴 not started
+- **Scope:** Generalize the existing `.draft`→DXF-R12 writer to export any
+  `.drawing` (multi-sheet, dimensions, GD&T frames, hatching) and `.sketch`
+  to DXF. This is the supplier-exchange / homologation deliverable.
+- **Target files/packages:** `packages/kerf-imports/src/kerf_imports/dxf/
+  writer.py`, an `export_dxf` LLM tool, doc page.
+- **Definition of Done:** `.drawing` with dimensions + GD&T → DXF that
+  re-reads through T-5 with entities preserved; pytest round-trip.
+- **Depends-on:** T-5
+
+### T-90 Privacy: paid-tier projects default to private (cloud)
+- **Tier:** A
+- **Money/reach rationale:** Privacy is a classic paid conversion lever —
+  it raises willingness-to-pay across **every cloud persona** (private
+  projects is the single most common reason hobbyists upgrade to a paid
+  tier). Tiny isolated change keyed off the existing billing buckets → very
+  high revenue-per-effort. **Self-hosted: N/A** (no Workshop, no public
+  concept) — explicitly do no work on the self-hosted path.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** In **cloud mode**, a paid-tier user's newly created projects
+  default to `visibility='private'`; free-tier cloud users keep the current
+  public-spirited default (Workshop free-sharing ethos). The `projects`
+  table already has `visibility` (`private`/`unlisted`/`public`, default
+  `private` — migration 001); the change is the **create-project default**
+  being chosen by billing tier rather than a hard constant, plus the UI
+  default in the create dialog. Workshop publish must remain an **explicit
+  opt-in** regardless of tier (today `POST /api/workshop/publish` sets
+  `visibility='public'` owner-only, idempotent — leave that gated and
+  explicit; do not auto-publish anything).
+- **Target files/packages:** `packages/kerf-api/src/kerf_api/routes.py`
+  (`create_project` ≈L857: choose default visibility from the user's
+  billing tier), bucket/tier lookup via
+  `packages/kerf-billing/src/kerf_billing/buckets.py` /
+  `packages/kerf-cloud/src/kerf_cloud/` (paid vs free), create-project UI
+  default in `src/` (project-create dialog). No self-hosted code path.
+- **Definition of Done:** in cloud mode a simulated paid-tier user's
+  created project is `private` by default and a free-tier user's is the
+  prior default; Workshop publish still requires the explicit endpoint and
+  is unaffected; self-hosted/local path unchanged (asserted in a test);
+  pytest for the tier→default mapping.
+- **Depends-on:** none
+
+### T-91 Privacy default: test coverage + UI copy
+- **Tier:** A
+- **Money/reach rationale:** Guards the revenue lever from regression and
+  makes the value legible to the user (the "your projects are private"
+  signal is itself a conversion message). Same every-cloud-persona reach as
+  T-90.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Add the end-to-end + UI test coverage and the user-facing copy
+  for T-90: paid → private default, free → existing default, self-hosted
+  unaffected, Workshop publish still explicit. Surface a small "private by
+  default (paid)" hint in the create-project dialog.
+- **Target files/packages:** `packages/kerf-api/tests/` (visibility-default
+  cases), `src/__tests__/` or Playwright (create-dialog default + copy),
+  create-project dialog component in `src/`.
+- **Definition of Done:** tests cover all four matrix cells (paid/free ×
+  cloud/self-hosted) + the explicit-publish invariant; the create dialog
+  shows the tier-appropriate default and copy; green in CI.
+- **Depends-on:** T-90
 
 ### T-1 Sheet metal: flange op + `.feature` schema
+- **Tier:** A
+- **Money/reach rationale:** Sheet metal is the **biggest single mechanical
+  sub-need** and BIW stamping for **automotive** — two large paying
+  personas, one P0 capability. First sub-task (10a) of the 4-step group;
+  bigger total effort than the cheaper persona-unlocks, hence ranked just
+  below them.
 - **Priority:** P0
-- **Persona/sector:** Mechanical, Automotive (P0-3)
 - **Status:** 🔴 not started
 - **Scope:** Introduce a `sheet_metal_flange` feature node: base-face +
   edge + flange length + bend angle + bend radius + k-factor. This is the
@@ -55,8 +380,11 @@ Template:
 - **Depends-on:** none
 
 ### T-2 Sheet metal: bend / unfold solver
+- **Tier:** A
+- **Money/reach rationale:** Same mechanical + automotive unlock
+  (sub-task 10b); the neutral-axis unfold math is the core of the
+  flat-pattern deliverable both personas need.
 - **Priority:** P0
-- **Persona/sector:** Mechanical, Automotive (P0-3)
 - **Status:** 🔴 not started
 - **Scope:** Given a folded sheet-metal body produced by T-1, compute the
   neutral-axis unfold (k-factor / bend-allowance) and produce the unfolded
@@ -70,8 +398,11 @@ Template:
 - **Depends-on:** T-1
 
 ### T-3 Sheet metal: flat-pattern export (DXF stub + 2D outline)
+- **Tier:** A
+- **Money/reach rationale:** Same mechanical + automotive unlock
+  (sub-task 10c); the flat pattern is the literal manufacturing handoff for
+  sheet-metal parts.
 - **Priority:** P0
-- **Persona/sector:** Mechanical, Automotive (P0-3)
 - **Status:** 🔴 not started
 - **Scope:** Emit a `.flatpattern` document (2D polyline outline + bend
   lines + bend-direction annotations) from T-2's unfolded body. Reuse the
@@ -85,8 +416,11 @@ Template:
 - **Depends-on:** T-2
 
 ### T-4 Sheet metal: bend table + tests
+- **Tier:** A
+- **Money/reach rationale:** Completes the mechanical sheet-metal unlock
+  (sub-task 10d) — production shops require per-material/thickness bend
+  tables, not a single k-factor.
 - **Priority:** P0
-- **Persona/sector:** Mechanical (P0-3)
 - **Status:** 🔴 not started
 - **Scope:** Add a per-material/thickness bend-table (`.bendtable` data or
   rows in the material DB) so flange/unfold pick allowance from a table
@@ -97,49 +431,13 @@ Template:
   present; integration test fold→unfold→flat with a real bend table.
 - **Depends-on:** T-3
 
-### T-5 DWG/DXF: DXF reader (entities → Kerf primitives)
-- **Priority:** P0
-- **Persona/sector:** Architect, Drafter, Mechanical, Automotive (P0-2)
-- **Status:** 🔴 not started
-- **Scope:** Pure-Python DXF (R12/2000+) reader: LINE/LWPOLYLINE/CIRCLE/ARC/
-  TEXT/INSERT → an intermediate entity model. Read is currently absent
-  entirely (only a narrow `.draft`→DXF-R12 *writer* exists).
-- **Target files/packages:** `packages/kerf-imports/src/kerf_imports/`
-  (new `dxf/` package: `reader.py`, `entities.py`).
-- **Definition of Done:** parses committed fixture DXFs into the entity
-  model; pytest covering each supported entity + an INSERT/BLOCK.
-- **Depends-on:** none
-
-### T-6 DWG/DXF: entity map → `.sketch` / `.drawing`
-- **Priority:** P0
-- **Persona/sector:** Architect, Drafter (P0-2)
-- **Status:** 🔴 not started
-- **Scope:** Map T-5's entity model onto Kerf's `.sketch` Geom2 (closed
-  loops) and `.drawing` (annotations/dimensions) JSON; an `import_dxf` LLM
-  tool + pyworker route; FileTree/menu wiring.
-- **Target files/packages:** `packages/kerf-imports/src/kerf_imports/dxf/`,
-  `packages/kerf-imports/src/kerf_imports/tools/import_dxf.py`,
-  `src/lib/api.js`, `packages/kerf-imports/llm_docs/import_dxf.md`.
-- **Definition of Done:** fixture DXF → valid `.sketch` with closed loops;
-  pytest + the standard import-pipeline integration test.
-- **Depends-on:** T-5
-
-### T-7 DWG/DXF: general DXF writer (drawings + sketches)
-- **Priority:** P0
-- **Persona/sector:** Drafter, Mechanical, Automotive (P0-2)
-- **Status:** 🔴 not started
-- **Scope:** Generalize the existing `.draft`→DXF-R12 writer to export any
-  `.drawing` (multi-sheet, dimensions, GD&T frames, hatching) and `.sketch`
-  to DXF. This is the supplier-exchange / homologation deliverable.
-- **Target files/packages:** `packages/kerf-imports/src/kerf_imports/dxf/
-  writer.py`, an `export_dxf` LLM tool, doc page.
-- **Definition of Done:** `.drawing` with dimensions + GD&T → DXF that
-  re-reads through T-5 with entities preserved; pytest round-trip.
-- **Depends-on:** T-5
-
 ### T-8 DWG/DXF: DWG read via ODA/libredwg bridge (eval)
+- **Tier:** A
+- **Money/reach rationale:** Extends the 3-persona DXF unlock to true
+  **DWG** — architecture and automotive run on DWG, not just DXF, so this
+  closes the last gap of the biggest reach-weighted revenue feature.
+  Bridge-eval effort, hence after the cheaper wins.
 - **Priority:** P0
-- **Persona/sector:** Architect (P0-2)
 - **Status:** 🔴 not started
 - **Scope:** Spike + implement DWG→DXF conversion via a subprocess bridge
   (libredwg or ODA File Converter), graceful-degradation when the binary is
@@ -152,61 +450,13 @@ Template:
   the subprocess.
 - **Depends-on:** T-6
 
-### T-9 Gerber/fab: RS-274X writer
-- **Priority:** P0
-- **Persona/sector:** ECAD (P0-1)
-- **Status:** 🔴 not started
-- **Scope:** CircuitJSON → Gerber RS-274X per copper/mask/silk layer
-  (aperture definitions, flashes, draws, polygon pours). This is the single
-  biggest credibility blocker for the ECAD persona.
-- **Target files/packages:** `packages/kerf-electronics/src/kerf_electronics/
-  fab/` (new `gerber.py`), `tools/fab.py` (`export_gerber` LLM tool),
-  `packages/kerf-electronics/llm_docs/fab.md`.
-- **Definition of Done:** known board → Gerber that parses with a
-  third-party Gerber parser in tests (or a hermetic structural assertion);
-  per-layer file set; pytest.
-- **Depends-on:** none
-
-### T-10 Gerber/fab: Excellon drill writer
-- **Priority:** P0
-- **Persona/sector:** ECAD (P0-1)
-- **Status:** 🔴 not started
-- **Scope:** CircuitJSON pad/via holes → Excellon drill file (tool table,
-  plated/non-plated, drill hits). Pairs with T-9 in the fab package.
-- **Target files/packages:** `packages/kerf-electronics/src/kerf_electronics/
-  fab/excellon.py`.
-- **Definition of Done:** tool table matches distinct hole sizes; hit count
-  equals pad/via count; pytest with a fixture board.
-- **Depends-on:** T-9
-
-### T-11 Gerber/fab: pick-and-place + fab BOM
-- **Priority:** P0
-- **Persona/sector:** ECAD (P0-1)
-- **Status:** 🔴 not started
-- **Scope:** Centroid/rotation pick-and-place CSV (top/bottom) + fab BOM
-  CSV (refdes, value, footprint, distributor). Reuse the existing BOM rollup.
-- **Target files/packages:** `packages/kerf-electronics/src/kerf_electronics/
-  fab/pnp.py`, `fab_bom.py`.
-- **Definition of Done:** P&P rows = placed components with correct
-  side/rotation; fab BOM groups by value+footprint; pytest.
-- **Depends-on:** T-9
-
-### T-12 Gerber/fab: IPC-2581 / ODB++ + fab zip bundle
-- **Priority:** P0
-- **Persona/sector:** ECAD (P0-1)
-- **Status:** 🔴 not started
-- **Scope:** Single `export_fab_package` tool that bundles T-9/T-10/T-11
-  outputs + an IPC-2581 XML (ODB++ optional) into one downloadable zip — the
-  actual deliverable a fab house ingests.
-- **Target files/packages:** `packages/kerf-electronics/src/kerf_electronics/
-  fab/ipc2581.py`, `tools/fab.py`, `PCBView.jsx` "Export fab package" button.
-- **Definition of Done:** zip contains Gerbers + drill + P&P + BOM +
-  IPC-2581; IPC-2581 validates against the schema in a test.
-- **Depends-on:** T-9, T-10, T-11
-
 ### T-13 Persistent face naming: boolean-heavy regression corpus
+- **Tier:** A
+- **Money/reach rationale:** Protects *every* persona's revenue — a
+  topo-naming failure under booleans breaks the chat-driven core for all
+  sectors at once. Not a new unlock (hence not top-ranked), but a
+  cross-sector correctness moat.
 - **Priority:** P0
-- **Persona/sector:** All / chat-driven core (P0-4)
 - **Status:** 🔴 not started
 - **Scope:** Build a regression corpus of boolean-heavy `.feature` models
   (cut/fuse/common chains, pattern-then-fillet, sketch-edit-then-reeval) and
@@ -218,8 +468,11 @@ Template:
 - **Depends-on:** none
 
 ### T-14 Persistent face naming: boundary-face naming on booleans
+- **Tier:** A
+- **Money/reach rationale:** Same all-persona correctness moat; closes the
+  open question in the persistent-face-naming plan so booleans are safe for
+  every sector.
 - **Priority:** P0
-- **Persona/sector:** All / chat-driven core (P0-4)
 - **Status:** 🔴 not started
 - **Scope:** Implement deterministic naming for faces *created by* boolean
   ops (the open question in `docs/plans/persistent-face-naming.md`) using
@@ -230,8 +483,11 @@ Template:
 - **Depends-on:** T-13
 
 ### T-15 Large-assembly perf harness + measured ceiling
+- **Tier:** A
+- **Money/reach rationale:** Unblocks mechanical + architect + automotive
+  at scale (3 personas) — full-vehicle DMU (10,000s of parts) is the
+  extreme case. Harness-first defines the budget before any loader work.
 - **Priority:** P0
-- **Persona/sector:** Mechanical, Architect, Automotive (P0-5)
 - **Status:** 🔴 not started
 - **Scope:** A generator that builds synthetic N-part assemblies (100 →
   10,000) and a harness that measures load + render + interaction time,
@@ -244,8 +500,11 @@ Template:
 - **Depends-on:** none
 
 ### T-16 Large-assembly: LOD / lazy-load loader
+- **Tier:** A
+- **Money/reach rationale:** Same 3-persona scale unlock; raises the
+  measured ceiling so large assemblies stop disqualifying Kerf in minute
+  one for mechanical/architect/automotive.
 - **Priority:** P0
-- **Persona/sector:** Mechanical, Architect, Automotive (P0-5)
 - **Status:** 🔴 not started
 - **Scope:** Bounding-box/proxy LOD + lazy mesh fetch for assembly
   components beyond a count threshold, driven by the T-15 budget.
@@ -254,149 +513,13 @@ Template:
   target factor at 10k parts; vitest for the LOD-selection logic.
 - **Depends-on:** T-15
 
----
-
-## P1 — depth that converts evaluators
-
-### T-20 Jewelry worker op: `opGemstone`
-- **Priority:** P1
-- **Persona/sector:** Jewelry (P1-2)
-- **Status:** 🔴 not started
-- **Scope:** Wire the `opGemstone` handler in the OCCT worker so the
-  shipped `kerf_cad_core.jewelry.gemstones` node specs render the 7 cuts.
-  This is the existing tracked jewelry-render work — split per op so each
-  fits one agent run.
-- **Target files/packages:** `src/lib/occtWorker.js` (`opGemstone`, wired
-  into both evaluators), vitest in `src/__tests__/`.
-- **Definition of Done:** gemstone node from `.gem`/`.feature` produces a
-  tessellated mesh; round/brilliant facet count assertion; vitest dispatch.
-- **Depends-on:** none
-
-### T-21 Jewelry worker op: `opGemSeat`
-- **Priority:** P1
-- **Persona/sector:** Jewelry (P1-2)
-- **Status:** 🔴 not started
-- **Scope:** Wire `opGemSeat` (seat/bearing cutter from
-  `kerf_cad_core.jewelry.gem_seat`).
-- **Target files/packages:** `src/lib/occtWorker.js`, vitest.
-- **Definition of Done:** seat node renders; cut-against-shank produces a
-  valid solid; vitest.
-- **Depends-on:** T-20
-
-### T-22 Jewelry worker ops: prong head + bezel
-- **Priority:** P1
-- **Persona/sector:** Jewelry (P1-2)
-- **Status:** 🔴 not started
-- **Scope:** Wire `opJewelryProngHead` and `opJewelryBezel` (from
-  `kerf_cad_core.jewelry.settings`).
-- **Target files/packages:** `src/lib/occtWorker.js`, vitest.
-- **Definition of Done:** both ops render; prong count matches the spec;
-  vitest dispatch for each.
-- **Depends-on:** T-21
-
-### T-23 Jewelry worker ops: channel + pavé
-- **Priority:** P1
-- **Persona/sector:** Jewelry (P1-2)
-- **Status:** 🔴 not started
-- **Scope:** Wire `opJewelryChannel` and `opJewelryPave` (auto-array on a
-  surface).
-- **Target files/packages:** `src/lib/occtWorker.js`, vitest.
-- **Definition of Done:** pavé array places N stones on a target surface;
-  channel rail renders; vitest.
-- **Depends-on:** T-22
-
-### T-24 Jewelry worker op: `opRingShank` + end-to-end ring
-- **Priority:** P1
-- **Persona/sector:** Jewelry (P1-2)
-- **Status:** 🔴 not started
-- **Scope:** Wire `opRingShank` (from `kerf_cad_core.jewelry.ring`, 7 shank
-  profiles + sizer) and add an end-to-end test: shank + seat + prongs +
-  stone renders as one assembled ring, with metal-cost panel populated.
-- **Target files/packages:** `src/lib/occtWorker.js`,
-  `src/__tests__/jewelryRingIntegration.test.js` (WASM-gated).
-- **Definition of Done:** full ring renders; metal-weight/cost computed;
-  WASM-gated integration test.
-- **Depends-on:** T-23
-
-### T-25 Weldments: structural member op
-- **Priority:** P1
-- **Persona/sector:** Mechanical (P1-3)
-- **Status:** 🔴 not started
-- **Scope:** `weldment_member` feature: a profile (from a standard-section
-  table) swept along selected sketch path segments, with trim-at-joint.
-- **Target files/packages:** `packages/kerf-cad-core/src/kerf_cad_core/
-  weldment.py`, `src/lib/occtWorker.js` (`opWeldmentMember`), FeatureView,
-  doc page.
-- **Definition of Done:** members along a 3-segment path with mitred
-  joints; pytest schema + vitest dispatch.
-- **Depends-on:** none
-
-### T-26 Weldments: cut list
-- **Priority:** P1
-- **Persona/sector:** Mechanical (P1-3)
-- **Status:** 🔴 not started
-- **Scope:** Roll up weldment members into a cut list (profile, length,
-  qty, angle) reusing the BOM rollup pattern.
-- **Target files/packages:** `packages/kerf-cad-core/src/kerf_cad_core/
-  weldment.py`, a cut-list view.
-- **Definition of Done:** cut list groups identical members; CSV export;
-  pytest.
-- **Depends-on:** T-25
-
-### T-27 GD&T-from-model: model-driven datum + tolerance callouts
-- **Priority:** P1
-- **Persona/sector:** Mechanical, Automotive (P1-3)
-- **Status:** 🔴 not started
-- **Scope:** Attach datums + geometric tolerances to model faces/edges and
-  have the drawing engine place the GD&T frame automatically on projected
-  views (frames already render; the model→callout link is the gap).
-- **Target files/packages:** `.feature` schema (datum/tolerance slots),
-  drawing projection code, LLM tool + doc.
-- **Definition of Done:** a toleranced model face produces a positioned
-  GD&T frame on its drawing view; pytest + vitest.
-- **Depends-on:** none
-
-### T-28 IFC import Tier 2: openings + MEP
-- **Priority:** P1
-- **Persona/sector:** Architect (P1-4)
-- **Status:** 🔴 not started
-- **Scope:** Extend `kerf_bim.import_ifc` (Tier 1 today) to parse
-  `IfcOpeningElement` (windows/doors) and `IfcDistributionElement` (MEP)
-  into `.bim` JSON.
-- **Target files/packages:** `packages/kerf-bim/src/kerf_bim/import_ifc/`
-  (new `openings.py`, `mep.py`), parser wiring.
-- **Definition of Done:** fixture IFC with openings + MEP imports
-  correctly; hermetic-mock pytest like the Tier-1 suite.
-- **Depends-on:** none
-
-### T-29 IFC import Tier 2: families + schedules + views
-- **Priority:** P1
-- **Persona/sector:** Architect (P1-4)
-- **Status:** 🔴 not started
-- **Scope:** Parse IFC type objects → `.family.json`, quantity sets →
-  `.schedule.json`, plan/section context → `.view.json`.
-- **Target files/packages:** `packages/kerf-bim/src/kerf_bim/import_ifc/`
-  (`families.py`, `schedules.py`).
-- **Definition of Done:** fixture IFC produces valid family/schedule JSON;
-  pytest.
-- **Depends-on:** T-28
-
-### T-30 Parametric family editor (Revit moat)
-- **Priority:** P1
-- **Persona/sector:** Architect (P1-4)
-- **Status:** 🔴 not started
-- **Scope:** A `.family.json`-authoring flow where parameters drive nested
-  geometry (extends the shipped `.family` data model into a true parametric
-  editor with constraints + flex test).
-- **Target files/packages:** `packages/kerf-bim/src/kerf_bim/tools/
-  family.py`, `src/lib/family.js`, editor.
-- **Definition of Done:** a parametric column family flexes correctly
-  across parameter sets; pytest + vitest "flex" test.
-- **Depends-on:** none
-
 ### T-31 ECAD: 3D board STEP export
+- **Tier:** A
+- **Money/reach rationale:** Deepens the freshly-unlocked **electronic
+  engineer** persona into MCAD-ECAD co-design (the cross-project
+  PCB-as-part path consumes it) — extends revenue from a persona already
+  converting after the fab-output unlock.
 - **Priority:** P1
-- **Persona/sector:** ECAD (P1-1)
 - **Status:** 🔴 not started
 - **Scope:** CircuitJSON board + component 3D models → a STEP assembly for
   MCAD-ECAD co-design (the cross-project PCB-as-part path consumes it).
@@ -406,47 +529,28 @@ Template:
   one STEP that reloads; pytest (OCC-gated).
 - **Depends-on:** none
 
-### T-32 kerf-parts: complete bolts adapter
+### T-37 Surface-boolean robustness on dense NURBS
+- **Tier:** A
+- **Money/reach rationale:** Reliability moat for **jewelry + automotive**
+  (2 personas) — protects the jewelry revenue just unlocked (T-20…T-24) and
+  the Class-A automotive path; organic models must survive booleans.
 - **Priority:** P1
-- **Persona/sector:** Mechanical / ECAD ecosystem (P1-1)
 - **Status:** 🔴 not started
-- **Scope:** Finish the scaffold-stage BOLTS adapter
-  (`adapters/bolts.py`) so BOLTS fasteners convert into native library
-  parts through the MIT-clean fetch/convert pipeline.
-- **Target files/packages:** `packages/kerf-parts/src/kerf_parts/adapters/
-  bolts.py`, tests.
-- **Definition of Done:** a pinned BOLTS fixture converts to ≥1 valid
-  `kind='part'` file with provenance; pytest (no committed third-party data).
-- **Depends-on:** none
-
-### T-33 kerf-parts: complete freecad-library adapter
-- **Priority:** P1
-- **Persona/sector:** Mechanical ecosystem (P1-1)
-- **Status:** 🔴 not started
-- **Scope:** Finish the scaffold-stage FreeCAD-library adapter
-  (`adapters/freecad_library.py`).
-- **Target files/packages:** `packages/kerf-parts/src/kerf_parts/adapters/
-  freecad_library.py`, tests.
-- **Definition of Done:** a pinned fixture converts to valid native parts;
-  pytest.
-- **Depends-on:** none
-
-### T-34 kerf-partsgen: author standard fastener families
-- **Priority:** P1
-- **Persona/sector:** Mechanical ecosystem (P1-1)
-- **Status:** 🔴 not started
-- **Scope:** Add parametric generators for the next standard families
-  (ISO 4762 socket-head cap screw, ISO 4032 hex nut, DIN 125 washer) using
-  the author-once-then-enumerate framework. One family per agent run.
-- **Target files/packages:** `packages/kerf-partsgen/src/kerf_partsgen/
-  generators/`, `verify.py` fixtures.
-- **Definition of Done:** each generator enumerates its full SIZES table
-  deterministically (zero tokens) and passes `verify.py` geometry checks.
+- **Scope:** Eliminate runtime escalation paths in `opSurfaceBoolean` so
+  dense organic NURBS survive booleans reliably (fuzzy-value tuning,
+  ShapeFix pre-pass strategy, deterministic fallback ordering).
+- **Target files/packages:** `src/lib/occtWorker.js` (`opSurfaceBoolean`),
+  `src/lib/occtBridge.js`, WASM-gated integration tests.
+- **Definition of Done:** a dense-NURBS boolean corpus passes without the
+  C1-T10 escalation; WASM-gated integration test green in CI.
 - **Depends-on:** none
 
 ### T-35 Class-A: zebra / reflection-line analysis (the shippable slice)
+- **Tier:** A
+- **Money/reach rationale:** The cheap, no-WASM Class-A credibility win for
+  the **automotive** persona — a visible surface-quality signal that
+  converts automotive evaluators. Low effort (shader-side only).
 - **Priority:** P1
-- **Persona/sector:** Automotive (P1-6)
 - **Status:** 🔴 not started
 - **Scope:** Environment-map / stripe shader on the tessellated NURBS
   surface in the existing Three.js viewport — the cheap, no-WASM Class-A
@@ -459,9 +563,103 @@ Template:
   no OCCT/WASM dependency.
 - **Depends-on:** none
 
-### T-36 3D wiring harness: route-through-DMU primitive
+### T-25 Weldments: structural member op
+- **Tier:** A
+- **Money/reach rationale:** Converts the **mechanical** persona deeper
+  (structural fabrication is a common mechanical deliverable). Sub-task 22a.
 - **Priority:** P1
-- **Persona/sector:** Automotive, ECAD (P1-7)
+- **Status:** 🔴 not started
+- **Scope:** `weldment_member` feature: a profile (from a standard-section
+  table) swept along selected sketch path segments, with trim-at-joint.
+- **Target files/packages:** `packages/kerf-cad-core/src/kerf_cad_core/
+  weldment.py`, `src/lib/occtWorker.js` (`opWeldmentMember`), FeatureView,
+  doc page.
+- **Definition of Done:** members along a 3-segment path with mitred
+  joints; pytest schema + vitest dispatch.
+- **Depends-on:** none
+
+### T-26 Weldments: cut list
+- **Tier:** A
+- **Money/reach rationale:** Completes the mechanical weldments deliverable
+  (sub-task 22b) — a cut list is the fabrication handoff.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Roll up weldment members into a cut list (profile, length,
+  qty, angle) reusing the BOM rollup pattern.
+- **Target files/packages:** `packages/kerf-cad-core/src/kerf_cad_core/
+  weldment.py`, a cut-list view.
+- **Definition of Done:** cut list groups identical members; CSV export;
+  pytest.
+- **Depends-on:** T-25
+
+### T-27 GD&T-from-model: model-driven datum + tolerance callouts
+- **Tier:** A
+- **Money/reach rationale:** Mechanical + automotive correctness/standards
+  depth (2 personas) — frames already render; the model→callout link is the
+  gap. Standards features are *more* important under an LLM, not less.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Attach datums + geometric tolerances to model faces/edges and
+  have the drawing engine place the GD&T frame automatically on projected
+  views (frames already render; the model→callout link is the gap).
+- **Target files/packages:** `.feature` schema (datum/tolerance slots),
+  drawing projection code, LLM tool + doc.
+- **Definition of Done:** a toleranced model face produces a positioned
+  GD&T frame on its drawing view; pytest + vitest.
+- **Depends-on:** none
+
+### T-28 IFC import Tier 2: openings + MEP
+- **Tier:** A
+- **Money/reach rationale:** Deepens the **architect** persona — interop
+  with the real BIM ecosystem (openings + MEP) is a hard requirement for
+  professional adoption. Sub-task 24a.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Extend `kerf_bim.import_ifc` (Tier 1 today) to parse
+  `IfcOpeningElement` (windows/doors) and `IfcDistributionElement` (MEP)
+  into `.bim` JSON.
+- **Target files/packages:** `packages/kerf-bim/src/kerf_bim/import_ifc/`
+  (new `openings.py`, `mep.py`), parser wiring.
+- **Definition of Done:** fixture IFC with openings + MEP imports
+  correctly; hermetic-mock pytest like the Tier-1 suite.
+- **Depends-on:** none
+
+### T-29 IFC import Tier 2: families + schedules + views
+- **Tier:** A
+- **Money/reach rationale:** Same architect-persona depth (sub-task 24b) —
+  families/schedules/views complete BIM round-trip.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Parse IFC type objects → `.family.json`, quantity sets →
+  `.schedule.json`, plan/section context → `.view.json`.
+- **Target files/packages:** `packages/kerf-bim/src/kerf_bim/import_ifc/`
+  (`families.py`, `schedules.py`).
+- **Definition of Done:** fixture IFC produces valid family/schedule JSON;
+  pytest.
+- **Depends-on:** T-28
+
+### T-30 Parametric family editor (Revit moat)
+- **Tier:** A
+- **Money/reach rationale:** Architect-persona depth + a recognized
+  competitive moat (Revit's signature capability) — a strong conversion
+  argument for the architect segment.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** A `.family.json`-authoring flow where parameters drive nested
+  geometry (extends the shipped `.family` data model into a true parametric
+  editor with constraints + flex test).
+- **Target files/packages:** `packages/kerf-bim/src/kerf_bim/tools/
+  family.py`, `src/lib/family.js`, editor.
+- **Definition of Done:** a parametric column family flexes correctly
+  across parameter sets; pytest + vitest "flex" test.
+- **Depends-on:** none
+
+### T-36 3D wiring harness: route-through-DMU primitive
+- **Tier:** A
+- **Money/reach rationale:** Automotive + ECAD depth (2 personas) — today
+  only 2D WireViz exists; a 3D harness opens a new deliverable for two
+  personas already on the path.
+- **Priority:** P1
 - **Status:** 🔴 not started
 - **Scope:** A `harness_segment` op that routes a bundle along a 3D path
   with diameter from a wire list — the primitive 3D harness needs (today
@@ -472,26 +670,12 @@ Template:
   diameter; length computed; pytest + vitest.
 - **Depends-on:** none
 
-### T-37 Surface-boolean robustness on dense NURBS
-- **Priority:** P1
-- **Persona/sector:** Jewelry, Automotive (P1-5)
-- **Status:** 🔴 not started
-- **Scope:** Eliminate runtime escalation paths in `opSurfaceBoolean` so
-  dense organic NURBS survive booleans reliably (fuzzy-value tuning,
-  ShapeFix pre-pass strategy, deterministic fallback ordering).
-- **Target files/packages:** `src/lib/occtWorker.js` (`opSurfaceBoolean`),
-  `src/lib/occtBridge.js`, WASM-gated integration tests.
-- **Definition of Done:** a dense-NURBS boolean corpus passes without the
-  C1-T10 escalation; WASM-gated integration test green in CI.
-- **Depends-on:** none
-
----
-
-## P2 — moats / breadth (representative starters)
-
 ### T-50 FEM: nonlinear material (plasticity) path
+- **Tier:** A
+- **Money/reach rationale:** First step of the broad simulation pillar
+  (mechanical + automotive). P2 — moat depth rather than a P0 persona
+  unlock, hence ranked below the P0/P1 conversion tasks.
 - **Priority:** P2
-- **Persona/sector:** Mechanical, Automotive (P2 sim)
 - **Status:** 🔴 not started
 - **Scope:** Add a nonlinear (J2 plasticity) `analysis_type` to the FEM
   solver (today the verified enum is `linear_static | modal | thermal`
@@ -502,9 +686,246 @@ Template:
   elastic-plastic reference within tolerance; engine-absent → sentinel.
 - **Depends-on:** none
 
+---
+
+## Tier B — cross-sector multipliers (reach / funnel)
+
+### T-40 Workshop README: schema (`readme` markdown field + migration)
+- **Tier:** B
+- **Money/reach rationale:** First step of repositioning Workshop from a
+  Thingiverse-style image gallery into **GitHub-for-parametric-CAD** —
+  benefits *every* sector simultaneously (more discoverable, forkable,
+  documented assets ⇒ more SEO, more evaluators, more fork→convert). The
+  largest single top-of-funnel multiplier. Sub-task 12a.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Add a `readme` markdown field to the workshop publish/project
+  record via a new numbered migration (current highest is
+  `060_kind_gem.sql`, so `061_workshop_readme.sql`), following the
+  numbered-migration convention in
+  `packages/kerf-core/src/kerf_core/db/migrations/`. Schema only; no
+  generation or rendering yet.
+- **Target files/packages:**
+  `packages/kerf-core/src/kerf_core/db/migrations/061_workshop_readme.sql`
+  (new), any read/write of the project/workshop record in
+  `packages/kerf-api/src/kerf_api/routes.py` that must round-trip the field.
+- **Definition of Done:** migration applies cleanly forward; the publish
+  record persists and returns a `readme` string; pytest asserting
+  round-trip; existing workshop tests still green.
+- **Depends-on:** none
+
+### T-41 Workshop README: AI auto-generate on publish + regenerate action
+- **Tier:** B
+- **Money/reach rationale:** Makes every published project self-documenting
+  with zero author effort — the core of the GitHub-for-CAD repositioning;
+  cross-sector funnel + fork conversion. Sub-task 12b.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** On Workshop publish, AI-generate the README (default on)
+  composed from project params + BOM + the `kerf_parts` provenance/part
+  attribution block + a fork/edit guide + license, via the existing LLM
+  tool path; store it in the T-40 field. Add an explicit "regenerate"
+  action. (Decisions are LOCKED: AI-generated-on-publish is the default.)
+- **Target files/packages:** workshop-publish handler in
+  `packages/kerf-api/src/kerf_api/routes.py` (the `POST /api/workshop/
+  publish` path ≈L4880), the LLM tool path
+  (`packages/kerf-chat/`), README composition helper.
+- **Definition of Done:** publishing a fixture project produces a stored
+  README containing params + BOM + part attribution + fork guide + license
+  sections; "regenerate" replaces it; mocked-LLM pytest (no live model
+  call).
+- **Depends-on:** T-40
+
+### T-42 Workshop README: auto-rendered hero cover; gallery becomes optional
+- **Tier:** B
+- **Money/reach rationale:** A consistent auto-rendered hero per project
+  makes the browse grid look like a curated catalog with zero author
+  effort — raises perceived quality and click-through across all sectors.
+  Sub-task 12c.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** On publish, auto-render a hero cover image via `kerf-render`
+  and store it as the project's cover; the `project_workshop_images`
+  gallery (migrations 052/055) becomes **optional**, not required.
+  (Decisions LOCKED: auto-rendered cover + optional gallery.)
+- **Target files/packages:** workshop-publish handler in
+  `packages/kerf-api/src/kerf_api/routes.py`, `packages/kerf-render/src/
+  kerf_render/` (render invocation), cover storage key on the project/
+  workshop record.
+- **Definition of Done:** publish produces a stored auto-cover; publish
+  succeeds with zero gallery images; render-unavailable degrades gracefully
+  to the existing auto-captured thumbnail fallback; pytest (mocked render).
+- **Depends-on:** T-40
+
+### T-43 Workshop README: public page (README-primary, XSS-safe render)
+- **Tier:** B
+- **Money/reach rationale:** The public-facing surface where the funnel
+  actually converts — README-primary layout + auto-cover browse grid is
+  the GitHub-for-CAD experience an evaluator from any sector lands on.
+  Sub-task 12d.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Rebuild the public Workshop page so README is primary
+  (sanitized / XSS-safe markdown render), the auto-rendered cover drives
+  the browse grid, and the gallery is an *optional* secondary section.
+  (Decisions LOCKED: README primary + auto-cover grid + optional gallery.)
+- **Target files/packages:** `src/cloud/Workshop.jsx`,
+  `src/cloud/WorkshopListing.jsx` (browse grid uses auto-cover; README
+  primary; optional secondary gallery; sanitized markdown renderer).
+- **Definition of Done:** a published project renders README primary with
+  cover; a hostile markdown/HTML fixture is sanitized (no script
+  execution); browse grid shows auto-cover; gallery section hidden when
+  empty; vitest for the sanitizer + layout.
+- **Depends-on:** T-41, T-42
+
+### T-44 Workshop README: PublishButton/flow UX (preview/edit + regenerate)
+- **Tier:** B
+- **Money/reach rationale:** Lowers publish friction (gallery no longer
+  mandatory) and gives authors confidence in the AI README — directly
+  increases publish rate across every sector. Sub-task 12e.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Update the publish flow: README preview/edit + a "regenerate
+  with AI" action; gallery upload is no longer mandatory. (Decisions
+  LOCKED: gallery optional, AI-README default.)
+- **Target files/packages:** `src/cloud/PublishButton.jsx` (README
+  preview/edit, regenerate action, gallery optional).
+- **Definition of Done:** publish completes with no gallery images; README
+  preview shows the AI draft, is editable, and "regenerate" re-fetches;
+  vitest for the flow states.
+- **Depends-on:** T-41
+
+### T-45 Workshop README: tests (schema, XSS, render fallback, mocked LLM)
+- **Tier:** B
+- **Money/reach rationale:** Locks the funnel-multiplier in against
+  regression (a broken Workshop page silently kills the top of funnel for
+  every sector). Sub-task 12f.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Consolidated test pass for the Workshop README workstream:
+  schema round-trip, markdown XSS sanitization, render-fallback when
+  `kerf-render` is unavailable, and mocked-LLM auto-generation.
+- **Target files/packages:** `packages/kerf-api/tests/` (schema + auto-gen
+  with mocked LLM + render fallback), `src/__tests__/` (XSS sanitizer +
+  README-primary layout).
+- **Definition of Done:** all four test areas green in CI; XSS fixture
+  proves no script execution; render-absent path proves graceful fallback;
+  LLM is mocked (no live call).
+- **Depends-on:** T-40, T-41, T-42, T-43
+
+### T-46 Parts-library: seed KiCad libraries via `kerf-parts`
+- **Tier:** B
+- **Money/reach rationale:** Turns the just-built parts pipeline into a
+  *populated* electronics library — a cold-start killer for the **ECAD**
+  persona (huge) right after the fab-output unlock makes ECAD shippable. An
+  empty library is a silent conversion killer; this fixes it at scale.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Run/seed KiCad symbol+footprint libraries through the
+  MIT-clean `kerf-parts` fetch/convert pipeline (the `kicad.py` adapter is
+  the most complete) so the electronics parts library ships populated.
+- **Target files/packages:** `packages/kerf-parts/src/kerf_parts/adapters/
+  kicad.py`, seed/run path, tests (pinned fixture, no committed
+  third-party data).
+- **Definition of Done:** a pinned KiCad-lib fixture converts to ≥1 valid
+  `kind='part'` file with provenance; the seed path is reproducible and
+  documented; pytest with no committed third-party data.
+- **Depends-on:** none
+
+### T-34 kerf-partsgen: author standard fastener families
+- **Tier:** B
+- **Money/reach rationale:** Populates the **mechanical** side of the
+  library via author-once-then-enumerate — a cold-start killer across *all*
+  mechanical sectors; zero-token enumeration ⇒ very cheap, very broad
+  reach.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Add parametric generators for the next standard families
+  (ISO 4762 socket-head cap screw, ISO 4032 hex nut, DIN 125 washer) using
+  the author-once-then-enumerate framework. One family per agent run.
+- **Target files/packages:** `packages/kerf-partsgen/src/kerf_partsgen/
+  generators/`, `verify.py` fixtures.
+- **Definition of Done:** each generator enumerates its full SIZES table
+  deterministically (zero tokens) and passes `verify.py` geometry checks.
+- **Depends-on:** none
+
+### T-47 Parts-library: jewelry generated-parts render check
+- **Tier:** B
+- **Money/reach rationale:** Closes the parts-library loop for the
+  now-usable **jewelry** persona — ensures jewelry generated parts actually
+  render in the library, so the high-margin niche has a populated catalog
+  too.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Verify (and fix as needed) that jewelry parts generated via
+  the toolkit render correctly as library parts now that the jewelry worker
+  ops are wired (T-20…T-24) — a render-path / library-integration check,
+  not new geometry.
+- **Target files/packages:** `packages/kerf-parts/` and/or
+  `packages/kerf-cad-core/src/kerf_cad_core/jewelry/`, library render path,
+  integration test.
+- **Definition of Done:** a generated jewelry part appears in the library
+  and renders via the wired worker ops; integration test (WASM-gated where
+  applicable).
+- **Depends-on:** T-24
+
+### T-48 Education / maker on-ramp: simple-parametric + cut-list / flat-pack path
+- **Tier:** B
+- **Money/reach rationale:** Biggest *raw reach* + the mission persona
+  (ROADMAP §2 — largest workforce, democratizing design). Slicing + CAM are
+  already shipped, so a polished simple-parametric + cut-list/flat-pack
+  path + clear on-ramp grows the widest possible top-of-funnel for the
+  smallest incremental effort.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Polish the simple-parametric + cut-list / flat-pack path and
+  add a clear on-ramp for the education/maker/hobbyist persona: a guided
+  "design a part / enclosure / furniture piece + get a cut list" flow that
+  leans on the shipped slicing (`packages/kerf-slicing`) and CAM
+  (`packages/kerf-cam`).
+- **Target files/packages:** simple-parametric + cut-list path in `src/`
+  and `packages/kerf-cad-core/`, an on-ramp entry surface, LLM doc page.
+- **Definition of Done:** a maker can go from a parametric prompt to a
+  printable/CNC-able part **and** a flat-pack cut list in the guided flow;
+  the cut list exports; pytest/vitest covering the cut-list math + flow.
+- **Depends-on:** none
+
+### T-32 kerf-parts: complete bolts adapter
+- **Tier:** B
+- **Money/reach rationale:** Further populates the mechanical/ECAD parts
+  ecosystem (scaffold-stage BOLTS adapter → working) — a reach multiplier
+  that lowers cold-start across mechanical sectors.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Finish the scaffold-stage BOLTS adapter
+  (`adapters/bolts.py`) so BOLTS fasteners convert into native library
+  parts through the MIT-clean fetch/convert pipeline.
+- **Target files/packages:** `packages/kerf-parts/src/kerf_parts/adapters/
+  bolts.py`, tests.
+- **Definition of Done:** a pinned BOLTS fixture converts to ≥1 valid
+  `kind='part'` file with provenance; pytest (no committed third-party data).
+- **Depends-on:** none
+
+### T-33 kerf-parts: complete freecad-library adapter
+- **Tier:** B
+- **Money/reach rationale:** Same parts-ecosystem reach multiplier for the
+  mechanical side (scaffold-stage FreeCAD-library adapter → working).
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Finish the scaffold-stage FreeCAD-library adapter
+  (`adapters/freecad_library.py`).
+- **Target files/packages:** `packages/kerf-parts/src/kerf_parts/adapters/
+  freecad_library.py`, tests.
+- **Definition of Done:** a pinned fixture converts to valid native parts;
+  pytest.
+- **Depends-on:** none
+
 ### T-51 Clash detection across disciplines
+- **Tier:** B
+- **Money/reach rationale:** Cross-sector platform multiplier (architect +
+  mechanical) — a coordination capability that helps any multi-discipline
+  project. P2.
 - **Priority:** P2
-- **Persona/sector:** Architect, Mechanical (P2)
 - **Status:** 🔴 not started
 - **Scope:** Pairwise interference check across assembly components /
   IFC elements, producing a clash report.
@@ -514,8 +935,11 @@ Template:
 - **Depends-on:** none
 
 ### T-52 Scan-to-CAD: point-cloud ingest + primitive fit
+- **Tier:** B
+- **Money/reach rationale:** High-leverage cross-cutting reverse-
+  engineering seed — touches mechanical, architecture, automotive, and
+  medical at once. P2.
 - **Priority:** P2
-- **Persona/sector:** Reverse engineering (cross-cutting, P2)
 - **Status:** 🔴 not started
 - **Scope:** Ingest a point cloud (PLY/E57 subset) and fit basic
   primitives (plane/cylinder/sphere) — the high-leverage reverse-engineering
@@ -526,8 +950,11 @@ Template:
 - **Depends-on:** none
 
 ### T-53 Nesting / cut-optimization for sheet/laser
+- **Tier:** B
+- **Money/reach rationale:** Cross-sector fabrication multiplier (one
+  solver serves laser/waterjet/plasma/wood/sheet); consumes the sheet-metal
+  flat patterns. P2.
 - **Priority:** P2
-- **Persona/sector:** Fabrication (P2)
 - **Status:** 🔴 not started
 - **Scope:** 2D part nesting (bin-packing with rotation) for laser/waterjet
   cut sheets; consumes sheet-metal flat patterns.
@@ -536,17 +963,13 @@ Template:
   utilization; pytest on the packing math.
 - **Depends-on:** T-3
 
----
-
-## P3 — long-tail verticals (representative starters)
-
-P3 is the proof that "we do everything." Do not enumerate the whole tail
-here — add tasks as a sector is picked up. Each P3 task also gets/uses a P3
-line in the roadmap. Two representative seeds:
-
 ### T-70 Civil engine seed: geospatial CRS + TIN terrain
+- **Tier:** B
+- **Money/reach rationale:** Highest raw societal importance
+  (water/sanitation/roads, esp. developing world) but engine-gated → P3.
+  This is the proof-of-"we do everything" civil seed; reach is long-term,
+  hence ranked at the tail.
 - **Priority:** P3
-- **Persona/sector:** Civil (P3 — distinct engine)
 - **Status:** 🔴 not started
 - **Scope:** The foundational *distinct* civil engine: a coordinate
   reference system module (EPSG transform via pyproj) + a TIN terrain model
@@ -560,8 +983,11 @@ line in the roadmap. Two representative seeds:
 - **Depends-on:** none
 
 ### T-71 Marine: NURBS hull-fairing seed
+- **Tier:** B
+- **Money/reach rationale:** NURBS-reachable long-tail vertical — close to
+  Kerf's existing NURBS strength, so a cheap P3 proof seed that broadens
+  sector coverage.
 - **Priority:** P3
-- **Persona/sector:** Marine / naval architecture (P3 — NURBS-reachable)
 - **Status:** 🔴 not started
 - **Scope:** A hull-surface fairing helper that builds a lofted hull from
   station offsets and reports fairness via the existing curvature-comb

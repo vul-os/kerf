@@ -67,6 +67,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.springs.tools",
     "kerf_cad_core.piping.tools",
     "kerf_cad_core.hvac.tools",
+    "kerf_cad_core.turning.tools",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

@@ -21,7 +21,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "cd tests/e2e && npm test",
+    "test:e2e:ui": "cd tests/e2e && npm run test:ui"
   },
   "dependencies": {
     "@jscad/modeling": "^2.12.1",

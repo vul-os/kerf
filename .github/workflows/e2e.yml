@@ -1,0 +1,128 @@
+name: E2E tests
+
+# Runs on every PR and on pushes to the two long-lived branches.
+# The job spins up a fresh Postgres service container, installs all deps,
+# boots kerf-server on :8081 with KERF_LOCAL_MODE=true (no sign-in needed),
+# and runs the Playwright suite against a Vite dev server on :5174.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - refactor
+      - main
+
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "22"
+  # Vite port used by the frontend during tests (separate from dev :5173)
+  E2E_VITE_PORT: "5174"
+  # Backend port (separate from dev :8080)
+  E2E_API_PORT: "8081"
+  # DB name for this job
+  E2E_DB: kerf_e2e
+
+jobs:
+  playwright:
+    name: Playwright E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: ${{ env.E2E_DB }}
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        # Wait until Postgres is ready before the job steps start.
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------------
+      # Python
+      # -----------------------------------------------------------------------
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Python dependencies (full persona)
+        run: |
+          pip install --quiet -e ".[full]" 2>/dev/null || \
+            for d in packages/kerf-*/; do pip install --quiet -e "$d"; done
+
+      # -----------------------------------------------------------------------
+      # Database migrations
+      # -----------------------------------------------------------------------
+      - name: Run DB migrations
+        env:
+          KERF_DATABASE_URL: postgres://postgres:postgres@localhost:5432/${{ env.E2E_DB }}
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          python -m kerf_core.db.migrations.runner
+
+      # -----------------------------------------------------------------------
+      # Node / frontend
+      # -----------------------------------------------------------------------
+      - name: Set up Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install root npm dependencies
+        run: npm ci
+
+      - name: Install e2e npm dependencies
+        run: cd tests/e2e && npm ci
+
+      - name: Install Playwright Chromium browser
+        run: cd tests/e2e && npx playwright install --with-deps chromium
+
+      # -----------------------------------------------------------------------
+      # Run tests
+      # -----------------------------------------------------------------------
+      - name: Run Playwright E2E tests
+        env:
+          CI: "true"
+          KERF_LOCAL_MODE: "true"
+          KERF_DATABASE_URL: postgres://postgres:postgres@localhost:5432/${{ env.E2E_DB }}
+          # Tell the playwright.config.ts webServer commands which ports to use.
+          # The playwright.config.ts picks these up directly via the hardcoded
+          # port values (:8081 / :5174); we also export them here for clarity.
+          E2E_BASE_URL: http://localhost:${{ env.E2E_VITE_PORT }}
+          E2E_API_URL: http://localhost:${{ env.E2E_API_PORT }}
+          VITE_API_URL: http://localhost:${{ env.E2E_API_PORT }}
+        run: cd tests/e2e && npm test
+
+      # -----------------------------------------------------------------------
+      # Artefacts (always uploaded so failures are debuggable)
+      # -----------------------------------------------------------------------
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: tests/e2e/playwright-report/
+          retention-days: 7
+
+      - name: Upload failure artefacts (screenshots + videos + traces)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-failures
+          path: tests/e2e/test-results/
+          retention-days: 7

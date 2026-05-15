@@ -550,6 +550,56 @@ const FEATURE_KINDS = [
       { key: 'through_hole',         kind: 'boolean', label: 'Through-hole for light' },
     ],
   },
+  // Ring shank builder: swept band along the finger circle.
+  // Size is auto-converted to inner diameter; profile/shoulder control
+  // the cross-section shape and how the band meets the setting.
+  {
+    op: 'ring_shank',
+    label: 'Ring Shank',
+    icon: Circle,
+    defaults: {
+      ring_size: 7,
+      system: 'us',
+      band_width: 4.0,
+      thickness: 1.8,
+      profile: 'comfort_fit',
+      taper_ratio: 1.0,
+      shoulder_style: 'plain',
+    },
+    caption: (
+      'Parametric ring band swept along the finger circle. ' +
+      'Profile controls the cross-section shape; shoulder_style controls ' +
+      'how the band meets a head/setting (plain, cathedral, split_shank, bypass). ' +
+      'All dimensions in mm; ring_size auto-converts to inner diameter.'
+    ),
+    fields: [
+      { key: 'ring_size', kind: 'number', label: 'Ring size', min: 0 },
+      { key: 'system', kind: 'select', label: 'Size system', options: [
+        { value: 'us',  label: 'US (0–16)' },
+        { value: 'uk',  label: 'UK / AU (A–Z+)' },
+        { value: 'eu',  label: 'EU (circumference mm)' },
+        { value: 'jp',  label: 'JP (1–30)' },
+      ] },
+      { key: 'band_width', kind: 'number', label: 'Band width (mm)', min: 0.1, step: 0.5 },
+      { key: 'thickness',  kind: 'number', label: 'Wall thickness (mm)', min: 0.1, step: 0.1 },
+      { key: 'profile', kind: 'select', label: 'Profile', options: [
+        { value: 'comfort_fit', label: 'Comfort fit (rounded inside)' },
+        { value: 'd_shape',     label: 'D-shape (flat outside)' },
+        { value: 'flat',        label: 'Flat' },
+        { value: 'half_round',  label: 'Half round' },
+        { value: 'knife_edge',  label: 'Knife edge' },
+        { value: 'euro',        label: 'Euro (square-ish)' },
+        { value: 'tapered',     label: 'Tapered' },
+      ] },
+      { key: 'taper_ratio', kind: 'number', label: 'Taper ratio (1=uniform)', min: 0.1, max: 1.0, step: 0.05 },
+      { key: 'shoulder_style', kind: 'select', label: 'Shoulder style', options: [
+        { value: 'plain',       label: 'Plain' },
+        { value: 'cathedral',   label: 'Cathedral' },
+        { value: 'split_shank', label: 'Split shank' },
+        { value: 'bypass',      label: 'Bypass' },
+      ] },
+    ],
+  },
 ]
 
 const KIND_BY_OP = Object.fromEntries(FEATURE_KINDS.map((k) => [k.op, k]))
@@ -559,7 +609,7 @@ const FEATURE_CATEGORIES = [
   { id: 'modify',   label: 'Modify',        ops: ['fillet', 'chamfer', 'shell', 'push_pull', 'variable_radius_fillet', 'to_solid', 'boolean', 'section', 'quad_remesh'] },
   { id: 'pattern',  label: 'Pattern',       ops: ['linear_pattern', 'polar_pattern', 'mirror_pattern'] },
   { id: 'surface',  label: 'Surfacing',     ops: ['sweep1', 'sweep2', 'loft', 'network_srf', 'blend_srf', 'surface_boolean', 'surface_curvature_combs'] },
-  { id: 'jewelry',  label: 'Jewelry',       ops: ['gemstone', 'gem_seat'] },
+  { id: 'jewelry',  label: 'Jewelry',       ops: ['gemstone', 'gem_seat', 'ring_shank'] },
 ]
 
 const DEBOUNCE_MS = 300

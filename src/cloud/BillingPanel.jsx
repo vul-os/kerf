@@ -13,12 +13,13 @@
 // API failures surface as inline error banners (no toast library).
 
 import { useEffect, useMemo, useState } from 'react'
-import { AlertCircle, ArrowUpRight, CreditCard, Loader2, RefreshCw } from 'lucide-react'
+import { AlertCircle, ArrowUpRight, CreditCard, Info, Loader2, RefreshCw } from 'lucide-react'
 import Card, { CardHeader, CardBody } from '../components/Card.jsx'
 import Button from '../components/Button.jsx'
 import Input from '../components/Input.jsx'
 import { ApiError } from '../lib/api.js'
 import { getBillingMe, topUp } from './api.js'
+import { useCloudConfig } from './useCloudConfig.js'
 
 const PRESET_USD = [5, 10, 25, 50, 100]
 
@@ -85,6 +86,7 @@ function EmptyRow({ cols, label }) {
 }
 
 export function BillingPanel() {
+  const { cloudBeta } = useCloudConfig()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -210,46 +212,60 @@ export function BillingPanel() {
             </div>
           </CardHeader>
           <CardBody>
-            <form onSubmit={onTopUp} className="flex flex-col gap-3">
-              <div className="flex flex-wrap gap-2">
-                {PRESET_USD.map((v) => (
-                  <button
-                    type="button"
-                    key={v}
-                    onClick={() => setAmount(v)}
-                    className={`h-8 px-3 rounded-md text-xs font-medium border transition-colors ${
-                      Number(amount) === v
-                        ? 'bg-kerf-300 text-ink-950 border-kerf-300'
-                        : 'bg-ink-800 text-ink-100 border-ink-700 hover:bg-ink-700'
-                    }`}
-                  >
-                    ${v}
-                  </button>
-                ))}
+            {cloudBeta && (
+              <div className="flex items-start gap-2 rounded-lg border border-ink-600 bg-ink-800/60 px-3 py-2 text-xs text-ink-400 mb-3">
+                <Info size={14} className="mt-0.5 shrink-0 text-ink-500" />
+                <span>Billing disabled during beta — everyone is on Free.</span>
               </div>
-              <Input
-                label="Amount (USD)"
-                type="number"
-                inputMode="decimal"
-                min="1"
-                step="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                hint={
-                  zarPreview != null
-                    ? `${fmtUSD(amount)} (≈ ${fmtZAR(zarPreview)} @ R${fxRate.toFixed(2)}/USD)`
-                    : 'Charged in ZAR via Paystack at the live FX rate.'
-                }
-              />
-              <ErrorBanner message={topupError} />
-              <Button type="submit" variant="primary" disabled={submitting}>
-                {submitting ? (
-                  <><Loader2 size={16} className="animate-spin" /> Redirecting…</>
-                ) : (
-                  <><CreditCard size={16} /> Top up {fmtUSD(amount)}<ArrowUpRight size={14} /></>
-                )}
-              </Button>
-            </form>
+            )}
+            <fieldset disabled={cloudBeta} className="contents">
+              <form
+                onSubmit={cloudBeta ? (e) => e.preventDefault() : onTopUp}
+                className={`flex flex-col gap-3 ${cloudBeta ? 'opacity-50 pointer-events-none select-none' : ''}`}
+                aria-disabled={cloudBeta}
+              >
+                <div className="flex flex-wrap gap-2">
+                  {PRESET_USD.map((v) => (
+                    <button
+                      type="button"
+                      key={v}
+                      onClick={() => !cloudBeta && setAmount(v)}
+                      disabled={cloudBeta}
+                      className={`h-8 px-3 rounded-md text-xs font-medium border transition-colors ${
+                        Number(amount) === v
+                          ? 'bg-kerf-300 text-ink-950 border-kerf-300'
+                          : 'bg-ink-800 text-ink-100 border-ink-700 hover:bg-ink-700'
+                      } disabled:cursor-not-allowed`}
+                    >
+                      ${v}
+                    </button>
+                  ))}
+                </div>
+                <Input
+                  label="Amount (USD)"
+                  type="number"
+                  inputMode="decimal"
+                  min="1"
+                  step="0.01"
+                  value={amount}
+                  disabled={cloudBeta}
+                  onChange={(e) => !cloudBeta && setAmount(e.target.value)}
+                  hint={
+                    zarPreview != null
+                      ? `${fmtUSD(amount)} (≈ ${fmtZAR(zarPreview)} @ R${fxRate.toFixed(2)}/USD)`
+                      : 'Charged in ZAR via Paystack at the live FX rate.'
+                  }
+                />
+                {!cloudBeta && <ErrorBanner message={topupError} />}
+                <Button type="submit" variant="primary" disabled={submitting || cloudBeta}>
+                  {submitting ? (
+                    <><Loader2 size={16} className="animate-spin" /> Redirecting…</>
+                  ) : (
+                    <><CreditCard size={16} /> Top up {fmtUSD(amount)}<ArrowUpRight size={14} /></>
+                  )}
+                </Button>
+              </form>
+            </fieldset>
           </CardBody>
         </Card>
       </div>

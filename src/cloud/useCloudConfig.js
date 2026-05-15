@@ -6,14 +6,28 @@
 // Shape returned by /api/config (per docs/architecture.md):
 //   {
 //     cloud_enabled: bool,
+//     cloud_beta?: bool,        // billing disabled during beta (everyone Free)
 //     google_client_id?: string,
 //     paystack_public_key?: string,
 //   }
+//
+// cloudBeta is true when VITE_CLOUD_BETA is set at build time OR when the
+// backend reports cloud_beta: true. Either signal is sufficient. When
+// cloudBeta is true and cloudEnabled is true, billing/tier-change controls
+// are visibly disabled — all product features remain accessible.
 
 import { useEffect } from 'react'
 import { create } from 'zustand'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
+
+// Read the build-time env flag once. Truthy string values ("1", "true",
+// "yes") activate beta mode even before /api/config responds.
+const VITE_CLOUD_BETA = (() => {
+  const v = import.meta.env.VITE_CLOUD_BETA
+  if (!v) return false
+  return ['1', 'true', 'yes'].includes(String(v).toLowerCase())
+})()
 
 const DEFAULTS = {
   ready: false,
@@ -23,6 +37,9 @@ const DEFAULTS = {
   // server-side defaults. The cloud build always overrides via the
   // /api/config response.
   localMode: true,
+  // cloudBeta: billing-disabled mode. Defaults to the build-time flag so
+  // the UI reflects it immediately (before the first /api/config response).
+  cloudBeta: VITE_CLOUD_BETA,
   googleClientId: '',
   paystackPublicKey: '',
 }
@@ -47,6 +64,10 @@ const useStore = create((set, get) => ({
           // login screen". Fall back to !cloud_enabled when the
           // backend hasn't surfaced the flag yet (older binary).
           localMode: data.local_mode != null ? !!data.local_mode : !data.cloud_enabled,
+          // cloudBeta: either the build-time env flag OR the backend flag
+          // (whichever is truthy wins — beta can't be disabled by the backend
+          // once the build-time flag is set).
+          cloudBeta: VITE_CLOUD_BETA || !!data.cloud_beta,
           googleClientId: data.google_client_id || '',
           paystackPublicKey: data.paystack_public_key || '',
           _inflight: null,
@@ -73,6 +94,7 @@ export function useCloudConfig() {
     ready: state.ready,
     cloudEnabled: state.cloudEnabled,
     localMode: state.localMode,
+    cloudBeta: state.cloudBeta,
     googleClientId: state.googleClientId,
     paystackPublicKey: state.paystackPublicKey,
   }

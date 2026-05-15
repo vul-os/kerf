@@ -15,6 +15,7 @@ import { useEffect, useState } from 'react'
 import { HardDrive, Cpu, Info } from 'lucide-react'
 import Card, { CardHeader, CardBody } from '../components/Card.jsx'
 import { getPricing } from './api.js'
+import { useCloudConfig } from './useCloudConfig.js'
 
 // Placeholder rate card. USD per million tokens, already inclusive of the
 // 20% markup over provider cost.
@@ -40,6 +41,7 @@ function fmtPerMTok(n) {
 }
 
 export function PlanSelector() {
+  const { cloudBeta } = useCloudConfig()
   const [pricing, setPricing] = useState(FALLBACK_PRICING)
   const [usingFallback, setUsingFallback] = useState(true)
 
@@ -69,6 +71,19 @@ export function PlanSelector() {
           you generate and storage you keep.
         </p>
       </header>
+
+      {cloudBeta && (
+        <Card>
+          <CardBody className="flex items-start gap-3">
+            <Info size={16} className="mt-0.5 text-amber-400 shrink-0" />
+            <p className="text-sm text-ink-200">
+              <span className="font-semibold text-amber-300">Cloud Beta:</span> Billing is
+              disabled — everyone is on the Free tier. The rate card below is shown for
+              reference and will apply when billing goes live.
+            </p>
+          </CardBody>
+        </Card>
+      )}
 
       <Card>
         <CardBody className="flex items-start gap-3">

@@ -2,13 +2,14 @@
 route.py — FastAPI routes for FreeCAD import.
 
 POST /import-freecad-project
-    Full T1+T3+T4+T5 pipeline.  Accepts a .FCStd binary upload.
-    Returns::
+    Full T1+T3+T4+T5 pipeline + Tier 2 (Spreadsheet, TechDraw, Materials).
+    Accepts a .FCStd binary upload.  Returns::
 
         {
           "created_files": [
             {
-              "kind": "sketch" | "feature" | "assembly",
+              "kind": "sketch" | "feature" | "assembly" | "equations"
+                      | "drawing" | "material",
               "name": "Sketch.sketch",
               "placeholder_id": null,
               "freecad_name": "Sketch",
@@ -22,7 +23,10 @@ POST /import-freecad-project
             "features_lifted": N,
             "brep_blobs_lifted": N,
             "constraints_translated": N,
-            "constraints_dropped": N
+            "constraints_dropped": N,
+            "spreadsheets": N,
+            "drawings": N,
+            "materials": N
           },
           "warnings": [ "...", ... ],
           "import_folder": "/freecad_import"
@@ -45,6 +49,9 @@ from kerf_imports.freecad.types import FCStdParseError, FCStdUnsupportedVersionE
 from kerf_imports.freecad.sketch import translate_sketch
 from kerf_imports.freecad.features import build_metadata_tree
 from kerf_imports.freecad.assembly import build_assembly
+from kerf_imports.freecad.spreadsheet import translate_spreadsheet
+from kerf_imports.freecad.techdraw import translate_drawpage
+from kerf_imports.freecad.materials import translate_material
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +59,7 @@ router = APIRouter()
 
 
 # ---------------------------------------------------------------------------
-# POST /import-freecad-project — full T1+T3+T4+T5 pipeline
+# POST /import-freecad-project — full T1+T3+T4+T5 + Tier 2 pipeline
 # ---------------------------------------------------------------------------
 
 @router.post("/import-freecad-project")
@@ -66,6 +73,9 @@ async def import_freecad_project(
     Does not persist anything to the database — that is the LLM tool's job
     (T7).  Returns the full structured response so the caller can insert
     files in PG.
+
+    Tier 2 additions over T1: Spreadsheet::Sheet → .equations,
+    TechDraw::DrawPage → .drawing, App::MaterialObject → .material.
     """
     if not file.filename.lower().endswith((".fcstd", ".fcstd")):
         raise HTTPException(
@@ -179,6 +189,84 @@ async def import_freecad_project(
             "payload": assembly_payload,
         })
 
+    # ── Tier 2: Spreadsheet → .equations ─────────────────────────────────────
+    sheet_objects = doc.objects_by_type("Spreadsheet::Sheet")
+    spreadsheets_translated = 0
+
+    for sheet_obj in sheet_objects:
+        try:
+            eq_payload = translate_spreadsheet(sheet_obj)
+        except Exception as exc:
+            warnings.append(
+                f"spreadsheet '{sheet_obj.name}': translation failed — {exc}"
+            )
+            continue
+
+        warnings.extend(eq_payload.get("warnings") or [])
+        sheet_label = sheet_obj.label or sheet_obj.name
+        filename = f"{sheet_label}.equations"
+        spreadsheets_translated += 1
+
+        created_files.append({
+            "kind": "equations",
+            "name": filename,
+            "freecad_name": sheet_obj.name,
+            "placeholder_id": None,
+            "payload": eq_payload,
+        })
+
+    # ── Tier 2: TechDraw DrawPage → .drawing ─────────────────────────────────
+    page_objects = doc.objects_by_type("TechDraw::DrawPage")
+    drawings_translated = 0
+
+    for page_obj in page_objects:
+        try:
+            drawing_payload = translate_drawpage(page_obj, doc)
+        except Exception as exc:
+            warnings.append(
+                f"TechDraw page '{page_obj.name}': translation failed — {exc}"
+            )
+            continue
+
+        warnings.extend(drawing_payload.get("warnings") or [])
+        page_label = page_obj.label or page_obj.name
+        filename = f"{page_label}.drawing"
+        drawings_translated += 1
+
+        created_files.append({
+            "kind": "drawing",
+            "name": filename,
+            "freecad_name": page_obj.name,
+            "placeholder_id": None,
+            "payload": drawing_payload,
+        })
+
+    # ── Tier 2: App::MaterialObject → .material ───────────────────────────────
+    material_objects = doc.objects_by_type("App::MaterialObject")
+    materials_translated = 0
+
+    for mat_obj in material_objects:
+        try:
+            mat_payload = translate_material(mat_obj)
+        except Exception as exc:
+            warnings.append(
+                f"material '{mat_obj.name}': translation failed — {exc}"
+            )
+            continue
+
+        warnings.extend(mat_payload.get("warnings") or [])
+        mat_label = mat_obj.label or mat_obj.name
+        filename = f"{mat_label}.material"
+        materials_translated += 1
+
+        created_files.append({
+            "kind": "material",
+            "name": filename,
+            "freecad_name": mat_obj.name,
+            "placeholder_id": None,
+            "payload": mat_payload,
+        })
+
     # ── Stats ─────────────────────────────────────────────────────────────────
     bodies = doc.objects_by_type("PartDesign::Body")
     features_lifted = sum(
@@ -198,6 +286,9 @@ async def import_freecad_project(
         "brep_blobs_lifted": brep_blobs_lifted,
         "constraints_translated": constraints_translated,
         "constraints_dropped": constraints_dropped,
+        "spreadsheets": spreadsheets_translated,
+        "drawings": drawings_translated,
+        "materials": materials_translated,
     }
 
     return {

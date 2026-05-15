@@ -34,6 +34,9 @@ import_freecad_project_spec = ToolSpec(
         "Creates one .feature file per PartDesign::Body, one .sketch per "
         "Sketcher::SketchObject, an .assembly if there is more than one body, "
         "and lifts the cached BRep blobs from the archive losslessly. "
+        "Tier 2 additions: Spreadsheet::Sheet → .equations (named cell "
+        "parameters), TechDraw::DrawPage → .drawing (projected views), and "
+        "App::MaterialObject → .material (density, modulus, color, etc.). "
         "The imported feature-tree metadata is read-only — geometry is the "
         "lifted BRep, not a recompute. Returns the list of created files and "
         "translation warnings."
@@ -152,6 +155,9 @@ async def import_freecad_project(ctx: ProjectCtx, args: bytes) -> str:
         "feature": "feature",
         "sketch": "sketch",
         "assembly": "assembly",
+        "equations": "equations",
+        "drawing": "drawing",
+        "material": "material",
         "file": "file",
     }
 

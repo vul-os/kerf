@@ -30,6 +30,7 @@ import pytest
 from kerf_cad_core.jewelry.gemstones import (
     GEMSTONE_CUTS,
     GEMSTONE_DENSITIES,
+    GEM_CATALOG,
     carat_from_mm,
     mm_from_carat,
     gemstone_proportions,
@@ -37,6 +38,8 @@ from kerf_cad_core.jewelry.gemstones import (
     run_jewelry_create_gemstone,
     jewelry_gem_report_spec,
     run_jewelry_gem_report,
+    jewelry_gem_catalog_spec,
+    run_jewelry_gem_catalog,
 )
 
 
@@ -1047,3 +1050,445 @@ class TestGemReportErrors:
         )
         loop.close()
         assert json.loads(raw).get("code") == "BAD_ARGS"
+
+
+# ---------------------------------------------------------------------------
+# New step / mixed cuts (fourth slice): portuguese, ceylon, flanders,
+# square_emerald
+# ---------------------------------------------------------------------------
+
+STEP_MIXED_CUTS = ["portuguese", "ceylon", "flanders", "square_emerald"]
+
+STEP_MIXED_FAMILIES = {
+    "portuguese":    "round_brilliant",
+    "ceylon":        "emerald",
+    "flanders":      "princess",
+    "square_emerald":"emerald",
+}
+
+
+class TestStepMixedCutsRegistry:
+    def test_all_new_step_mixed_cuts_in_gemstone_cuts(self):
+        for cut in STEP_MIXED_CUTS:
+            assert cut in GEMSTONE_CUTS, f"{cut!r} missing from GEMSTONE_CUTS"
+
+    def test_total_count_at_least_30(self):
+        """26 original + 4 new = at least 30 cuts."""
+        assert len(GEMSTONE_CUTS) >= 30
+
+    def test_new_cuts_in_carat_ref(self):
+        from kerf_cad_core.jewelry.gemstones import _CARAT_REF
+        for cut in STEP_MIXED_CUTS:
+            assert cut in _CARAT_REF, f"{cut!r} missing from _CARAT_REF"
+
+    def test_new_cuts_in_cut_defaults(self):
+        from kerf_cad_core.jewelry.gemstones import _CUT_DEFAULTS
+        for cut in STEP_MIXED_CUTS:
+            assert cut in _CUT_DEFAULTS, f"{cut!r} missing from _CUT_DEFAULTS"
+
+
+class TestStepMixedCutsProportions:
+    @pytest.mark.parametrize("cut", STEP_MIXED_CUTS)
+    def test_valid_proportions(self, cut):
+        props = gemstone_proportions(cut, diameter_mm=5.0)
+        assert props.diameter_mm == pytest.approx(5.0)
+        assert 0 <= props.table_pct < 100
+        assert 0 < props.crown_angle_deg < 90
+        assert 0 < props.pavilion_angle_deg < 90
+        assert props.girdle_pct > 0
+        assert props.total_depth_pct > 0
+        assert 0 < props.aspect_ratio <= 1.0
+
+    @pytest.mark.parametrize("cut", STEP_MIXED_CUTS)
+    def test_total_depth_is_sum(self, cut):
+        props = gemstone_proportions(cut, diameter_mm=5.0)
+        expected = props.crown_height_pct + props.girdle_pct + props.pavilion_depth_pct
+        assert props.total_depth_pct == pytest.approx(expected, rel=1e-6)
+
+    @pytest.mark.parametrize("cut", STEP_MIXED_CUTS)
+    def test_carat_round_trip(self, cut):
+        for dim in [3.0, 5.0, 8.0]:
+            ct = carat_from_mm(cut, dim)
+            back = mm_from_carat(cut, ct)
+            assert back == pytest.approx(dim, rel=1e-9), (
+                f"{cut}: round-trip failed for dim={dim}"
+            )
+
+    @pytest.mark.parametrize("cut", STEP_MIXED_CUTS)
+    def test_facet_family_in_extras(self, cut):
+        props = gemstone_proportions(cut, diameter_mm=5.0)
+        assert "facet_family" in props.extras, (
+            f"{cut!r}: missing facet_family in extras"
+        )
+        expected = STEP_MIXED_FAMILIES[cut]
+        assert props.extras["facet_family"] == expected, (
+            f"{cut!r}: expected facet_family={expected!r}, "
+            f"got {props.extras['facet_family']!r}"
+        )
+
+    @pytest.mark.parametrize("cut", STEP_MIXED_CUTS)
+    def test_tool_succeeds(self, cut):
+        ctx, store, fid = make_ctx()
+        result = run_tool(ctx, fid, cut=cut, diameter_mm=5.0)
+        assert result.get("error") is None, f"{cut}: {result}"
+        assert result["op"] == "gemstone"
+        assert result["cut"] == cut
+        assert result["carat_approx"] > 0
+
+    def test_portuguese_has_step_rows_crown(self):
+        props = gemstone_proportions("portuguese", diameter_mm=6.5)
+        assert "step_rows_crown" in props.extras
+        assert props.extras["step_rows_crown"] >= 3
+        assert props.aspect_ratio == pytest.approx(1.0)  # circular
+
+    def test_ceylon_brilliant_crown_step_pavilion(self):
+        props = gemstone_proportions("ceylon", diameter_mm=6.5)
+        assert props.extras.get("brilliant_crown") is True
+        assert "step_rows" in props.extras
+        assert props.extras.get("facet_family") == "emerald"
+        # Rectangular: aspect_ratio < 1
+        assert props.aspect_ratio < 1.0
+
+    def test_flanders_square_light_corner(self):
+        props = gemstone_proportions("flanders", diameter_mm=5.5)
+        assert props.aspect_ratio == pytest.approx(1.0)  # square
+        assert "corner_cut_ratio" in props.extras
+        # Light corner crop: less than princess (0) or asscher (0.20)
+        assert props.extras["corner_cut_ratio"] < 0.10
+        assert props.extras.get("facet_family") == "princess"
+
+    def test_square_emerald_is_square_and_step(self):
+        props = gemstone_proportions("square_emerald", diameter_mm=5.5)
+        assert props.aspect_ratio == pytest.approx(1.0)  # square
+        assert props.extras.get("step_rows") == 3
+        assert "corner_cut_ratio" in props.extras
+        assert props.extras.get("facet_family") == "emerald"
+
+    def test_square_emerald_vs_asscher_corner_cut(self):
+        """square_emerald has a lighter corner cut than asscher."""
+        sq_props = gemstone_proportions("square_emerald", diameter_mm=5.5)
+        asscher_props = gemstone_proportions("asscher", diameter_mm=5.5)
+        assert sq_props.extras["corner_cut_ratio"] < asscher_props.extras["corner_cut_ratio"]
+
+
+# ---------------------------------------------------------------------------
+# Gem catalog
+# ---------------------------------------------------------------------------
+
+class TestGemCatalogTable:
+    REQUIRED_GEMS = [
+        "diamond", "ruby", "sapphire", "emerald", "amethyst", "aquamarine",
+        "topaz", "garnet", "peridot", "citrine", "tanzanite", "opal",
+        "pearl", "turquoise", "tourmaline", "spinel", "morganite",
+    ]
+
+    def test_required_gems_in_catalog(self):
+        for gem in self.REQUIRED_GEMS:
+            assert gem in GEM_CATALOG, f"Missing gem {gem!r} in GEM_CATALOG"
+
+    def test_all_entries_have_required_keys(self):
+        required_keys = {"months", "mohs", "ri", "density", "common_cuts", "colour_range"}
+        for gem, entry in GEM_CATALOG.items():
+            missing = required_keys - entry.keys()
+            assert not missing, f"Gem {gem!r} missing keys: {missing}"
+
+    def test_months_are_valid(self):
+        for gem, entry in GEM_CATALOG.items():
+            for m in entry["months"]:
+                assert 1 <= m <= 12, f"Gem {gem!r} has invalid month {m}"
+
+    def test_mohs_positive(self):
+        for gem, entry in GEM_CATALOG.items():
+            h = entry["mohs"]
+            if isinstance(h, tuple):
+                assert h[0] > 0 and h[1] >= h[0], f"Gem {gem!r} bad mohs {h}"
+            else:
+                assert h > 0, f"Gem {gem!r} bad mohs {h}"
+
+    def test_ri_positive(self):
+        for gem, entry in GEM_CATALOG.items():
+            ri = entry["ri"]
+            if isinstance(ri, tuple):
+                assert ri[0] > 0 and ri[1] >= ri[0], f"Gem {gem!r} bad ri {ri}"
+            else:
+                assert ri > 0, f"Gem {gem!r} bad ri {ri}"
+
+    def test_density_consistent_with_gemstone_densities(self):
+        """Catalog density should match GEMSTONE_DENSITIES for gems in both tables."""
+        for gem in GEM_CATALOG:
+            if gem in GEMSTONE_DENSITIES:
+                cat_density = GEM_CATALOG[gem]["density"]
+                sg_density = GEMSTONE_DENSITIES[gem]
+                assert abs(cat_density - sg_density) < 0.05, (
+                    f"Density mismatch for {gem!r}: catalog={cat_density}, "
+                    f"GEMSTONE_DENSITIES={sg_density}"
+                )
+
+    def test_common_cuts_are_valid(self):
+        """All common_cuts entries should be recognised gemstone cuts."""
+        for gem, entry in GEM_CATALOG.items():
+            for cut in entry["common_cuts"]:
+                assert cut in GEMSTONE_CUTS, (
+                    f"Gem {gem!r} has unknown cut {cut!r}"
+                )
+
+    def test_colour_range_is_nonempty_string(self):
+        for gem, entry in GEM_CATALOG.items():
+            assert isinstance(entry["colour_range"], str)
+            assert len(entry["colour_range"]) > 5, f"Gem {gem!r} colour_range too short"
+
+    # Spot-checks for specific birth months
+    def test_april_is_diamond(self):
+        april_gems = [g for g, e in GEM_CATALOG.items() if 4 in e["months"]]
+        assert "diamond" in april_gems
+
+    def test_july_is_ruby(self):
+        july_gems = [g for g, e in GEM_CATALOG.items() if 7 in e["months"]]
+        assert "ruby" in july_gems
+
+    def test_may_is_emerald(self):
+        may_gems = [g for g, e in GEM_CATALOG.items() if 5 in e["months"]]
+        assert "emerald" in may_gems
+
+    def test_september_is_sapphire(self):
+        sept_gems = [g for g, e in GEM_CATALOG.items() if 9 in e["months"]]
+        assert "sapphire" in sept_gems
+
+    def test_morganite_has_no_birth_month(self):
+        """Morganite has no traditional birth month."""
+        assert GEM_CATALOG["morganite"]["months"] == []
+
+
+class TestGemCatalogLookup:
+    """Tests for _catalog_lookup helper (via the public tool)."""
+
+    def _ctx(self):
+        ctx, _, _ = make_ctx()
+        return ctx
+
+    def _catalog(self, ctx, query):
+        loop = asyncio.new_event_loop()
+        try:
+            raw = loop.run_until_complete(
+                run_jewelry_gem_catalog(ctx, json.dumps({"query": query}).encode())
+            )
+        finally:
+            loop.close()
+        return json.loads(raw)
+
+    def test_lookup_by_name_exact(self):
+        ctx = self._ctx()
+        result = self._catalog(ctx, "ruby")
+        assert result.get("error") is None, result
+        assert result["count"] == 1
+        assert result["results"][0]["gem"] == "ruby"
+
+    def test_lookup_case_insensitive(self):
+        ctx = self._ctx()
+        result = self._catalog(ctx, "Ruby")
+        assert result.get("error") is None, result
+        assert result["results"][0]["gem"] == "ruby"
+
+    def test_lookup_by_month_name(self):
+        ctx = self._ctx()
+        result = self._catalog(ctx, "july")
+        assert result.get("error") is None, result
+        gems = [r["gem"] for r in result["results"]]
+        assert "ruby" in gems
+
+    def test_lookup_by_month_name_mixed_case(self):
+        ctx = self._ctx()
+        result = self._catalog(ctx, "April")
+        assert result.get("error") is None, result
+        gems = [r["gem"] for r in result["results"]]
+        assert "diamond" in gems
+
+    def test_lookup_by_month_number(self):
+        ctx = self._ctx()
+        result = self._catalog(ctx, "9")
+        assert result.get("error") is None, result
+        gems = [r["gem"] for r in result["results"]]
+        assert "sapphire" in gems
+
+    def test_lookup_by_month_number_zero_padded(self):
+        ctx = self._ctx()
+        result = self._catalog(ctx, "04")
+        assert result.get("error") is None, result
+        gems = [r["gem"] for r in result["results"]]
+        assert "diamond" in gems
+
+    def test_lookup_december_multiple_gems(self):
+        """December has multiple birthstones (tanzanite, turquoise, zircon)."""
+        ctx = self._ctx()
+        result = self._catalog(ctx, "december")
+        assert result.get("error") is None, result
+        gems = [r["gem"] for r in result["results"]]
+        assert len(gems) >= 2  # at least tanzanite + turquoise
+
+    def test_lookup_result_fields(self):
+        ctx = self._ctx()
+        result = self._catalog(ctx, "diamond")
+        r = result["results"][0]
+        for field in ("gem", "birth_months", "mohs_hardness", "refractive_index",
+                      "density_g_cm3", "common_cuts", "colour_range", "supported_cuts"):
+            assert field in r, f"Missing field: {field!r}"
+
+    def test_lookup_supported_cuts_subset_of_gemstone_cuts(self):
+        ctx = self._ctx()
+        result = self._catalog(ctx, "ruby")
+        r = result["results"][0]
+        for cut in r["supported_cuts"]:
+            assert cut in GEMSTONE_CUTS
+
+    def test_lookup_density_matches_gemstone_densities(self):
+        ctx = self._ctx()
+        result = self._catalog(ctx, "ruby")
+        r = result["results"][0]
+        assert r["density_g_cm3"] == pytest.approx(GEMSTONE_DENSITIES["ruby"], abs=0.01)
+
+    def test_unknown_query_returns_not_found(self):
+        ctx = self._ctx()
+        result = self._catalog(ctx, "unobtainium_xyzzy")
+        assert result.get("code") == "NOT_FOUND"
+
+    def test_empty_query_returns_bad_args(self):
+        ctx = self._ctx()
+        loop = asyncio.new_event_loop()
+        try:
+            raw = loop.run_until_complete(
+                run_jewelry_gem_catalog(ctx, json.dumps({"query": ""}).encode())
+            )
+        finally:
+            loop.close()
+        assert json.loads(raw).get("code") == "BAD_ARGS"
+
+    def test_missing_query_returns_bad_args(self):
+        ctx = self._ctx()
+        loop = asyncio.new_event_loop()
+        try:
+            raw = loop.run_until_complete(
+                run_jewelry_gem_catalog(ctx, json.dumps({}).encode())
+            )
+        finally:
+            loop.close()
+        assert json.loads(raw).get("code") == "BAD_ARGS"
+
+    def test_invalid_json_returns_bad_args(self):
+        ctx = self._ctx()
+        loop = asyncio.new_event_loop()
+        try:
+            raw = loop.run_until_complete(
+                run_jewelry_gem_catalog(ctx, b"not json")
+            )
+        finally:
+            loop.close()
+        assert json.loads(raw).get("code") == "BAD_ARGS"
+
+    def test_catalog_spec_name(self):
+        assert jewelry_gem_catalog_spec.name == "jewelry_gem_catalog"
+
+    def test_catalog_spec_required_fields(self):
+        req = jewelry_gem_catalog_spec.input_schema.get("required", [])
+        assert "query" in req
+
+    def test_catalog_spec_no_file_id(self):
+        req = jewelry_gem_catalog_spec.input_schema.get("required", [])
+        assert "file_id" not in req
+
+
+# ---------------------------------------------------------------------------
+# gem_report 4Cs extensions (back-compat: existing fields still present)
+# ---------------------------------------------------------------------------
+
+class TestGemReport4CsExtensions:
+    """Extended fields in jewelry_gem_report are additive and back-compat."""
+
+    def _ctx(self):
+        ctx, _, _ = make_ctx()
+        return ctx
+
+    def test_existing_fields_still_present(self):
+        """All fields from v1 report schema are still returned."""
+        ctx = self._ctx()
+        result = run_report(ctx, cut="round_brilliant", carat=1.0)
+        for field in (
+            "cut", "facet_family", "material",
+            "spread_mm", "width_mm", "depth_mm", "carat_est",
+            "table_pct", "total_depth_pct", "crown_height_pct",
+            "pavilion_depth_pct", "girdle_pct",
+            "crown_angle_deg", "pavilion_angle_deg",
+            "aspect_ratio", "lw_ratio",
+            "proportion_grade",
+        ):
+            assert field in result, f"Back-compat field missing: {field!r}"
+
+    def test_new_4cs_fields_present(self):
+        """New 4Cs fields are present in report."""
+        ctx = self._ctx()
+        result = run_report(ctx, cut="round_brilliant", carat=1.0)
+        assert "colour_scale_hint" in result
+        assert "clarity_hint" in result
+        assert "recommended_setting" in result
+
+    def test_colour_scale_hint_is_string(self):
+        ctx = self._ctx()
+        result = run_report(ctx, cut="round_brilliant", carat=1.0)
+        assert isinstance(result["colour_scale_hint"], str)
+        assert len(result["colour_scale_hint"]) > 10
+
+    def test_colour_scale_hint_says_estimate(self):
+        ctx = self._ctx()
+        result = run_report(ctx, cut="round_brilliant", carat=1.0)
+        # Must be labelled as estimate, not a lab grade
+        assert "estimate" in result["colour_scale_hint"].lower()
+
+    def test_clarity_hint_is_string(self):
+        ctx = self._ctx()
+        result = run_report(ctx, cut="round_brilliant", carat=1.0)
+        assert isinstance(result["clarity_hint"], str)
+        assert len(result["clarity_hint"]) > 10
+
+    def test_clarity_hint_says_estimate(self):
+        ctx = self._ctx()
+        result = run_report(ctx, cut="round_brilliant", carat=1.0)
+        assert "estimate" in result["clarity_hint"].lower()
+
+    def test_recommended_setting_is_string(self):
+        ctx = self._ctx()
+        result = run_report(ctx, cut="round_brilliant", carat=1.0)
+        assert isinstance(result["recommended_setting"], str)
+        assert len(result["recommended_setting"]) > 5
+
+    def test_step_cut_clarity_hint_mentions_step(self):
+        """Step cuts should mention higher clarity requirement."""
+        ctx = self._ctx()
+        result = run_report(ctx, cut="emerald", diameter_mm=7.0)
+        assert "step" in result["clarity_hint"].lower()
+
+    def test_coloured_stone_colour_hint_differs_from_diamond(self):
+        ctx = self._ctx()
+        r_diamond = run_report(ctx, cut="round_brilliant", diameter_mm=6.5)
+        r_ruby    = run_report(ctx, cut="oval", diameter_mm=7.0, material="ruby")
+        # Diamond uses D-Z scale hint; coloured stone uses hue/saturation hint
+        assert r_diamond["colour_scale_hint"] != r_ruby["colour_scale_hint"]
+
+    def test_melee_setting_mentions_channel_or_pave(self):
+        ctx = self._ctx()
+        result = run_report(ctx, cut="round_brilliant", diameter_mm=2.5)
+        setting = result["recommended_setting"].lower()
+        assert "channel" in setting or "pavé" in setting or "pave" in setting
+
+    def test_large_stone_setting_mentions_secure(self):
+        ctx = self._ctx()
+        result = run_report(ctx, cut="oval", diameter_mm=12.0)
+        setting = result["recommended_setting"].lower()
+        assert "large" in setting or "secure" in setting or "prong" in setting
+
+    @pytest.mark.parametrize("cut", list(GEMSTONE_CUTS))
+    def test_all_cuts_have_4cs_fields(self, cut):
+        ctx = self._ctx()
+        result = run_report(ctx, cut=cut, diameter_mm=5.0)
+        assert result.get("error") is None, f"{cut}: {result}"
+        assert "colour_scale_hint" in result
+        assert "clarity_hint" in result
+        assert "recommended_setting" in result

@@ -1,12 +1,9 @@
 """
 kerf-cad-core plugin entry point.
 
-This plugin registers NO HTTP routes — it is a library plugin.  Its sole
-purpose is to make OCC helpers available to other plugins and to report its
-availability via ``/health/capabilities``.
-
-It also registers CAD-core LLM tools (feature_cut_from_sketch, etc.) into
-the tool registry so the chat agent can invoke them.
+Registers the ``POST /run-quad-remesh`` HTTP route and CAD-core LLM tools
+(feature_cut_from_sketch, cam_layered, quad_remesh, etc.) into the tool
+registry so the chat agent can invoke them.
 
 Entry-point (pyproject.toml):
     [project.entry-points."kerf.plugins"]
@@ -29,6 +26,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.cam_layered",
     "kerf_cad_core.extrude_sketch_to_jscad",
     "kerf_cad_core.surfacing",
+    "kerf_cad_core.quad_remesh",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────
@@ -81,9 +79,9 @@ _PROVIDES_FULL = [
 async def register(app, ctx: "PluginContext") -> "PluginManifest":
     """Plugin entry-point.
 
-    Does not mount any routes.  Returns a manifest advertising which CAD
-    capabilities are available (empty list when pythonOCC is not installed so
-    /health/capabilities shows "cad-core dormant").
+    Mounts the quad-remesh HTTP route and returns a manifest advertising
+    which CAD capabilities are available (empty list when pythonOCC is not
+    installed so /health/capabilities shows "cad-core dormant").
     """
     if _OCC_AVAILABLE:
         provides = _PROVIDES_FULL
@@ -94,6 +92,13 @@ async def register(app, ctx: "PluginContext") -> "PluginManifest":
             "kerf-cad-core: pythonOCC not installed — plugin dormant. "
             "Install: conda install -c conda-forge pythonocc-core"
         )
+
+    # ── Mount HTTP routes ─────────────────────────────────────────────────
+    try:
+        from kerf_cad_core.routes import router as cad_router
+        app.include_router(cad_router, tags=["cad-core"])
+    except Exception as _route_err:  # pragma: no cover
+        logger.warning("kerf-cad-core: could not mount routes: %s", _route_err)
 
     # ── Register LLM tools ────────────────────────────────────────────────
     _register_tools()

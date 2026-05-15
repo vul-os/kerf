@@ -165,6 +165,26 @@ async def load_user_billing(pool, user_id: str) -> UserBilling:
     )
 
 
+async def is_paid_user(conn, user_id: str) -> bool:
+    """Return True iff the user has a positive credit balance (i.e. is on a
+    paid plan).  Used to pick the default project visibility in cloud mode.
+
+    A user with ``credits_usd > 0`` has topped up at least once — that is the
+    single source of truth for "paid" in the three-bucket model.  Users with
+    zero credits (including those who have never topped up) are free-tier.
+
+    ``conn`` must be an open asyncpg connection (not a pool); the caller is
+    expected to already hold one for the enclosing transaction.
+    """
+    row = await conn.fetchrow(
+        "SELECT credits_usd FROM cloud_user_balances WHERE user_id = $1",
+        user_id,
+    )
+    if row is None:
+        return False
+    return float(row["credits_usd"]) > 0
+
+
 async def load_model_info(pool, provider: str, model_id: str) -> Optional[ModelInfo]:
     """Minimal model_prices read — just provider + id + cheap flag."""
     async with pool.acquire() as conn:

@@ -890,8 +890,20 @@ async def create_project(request: Request, payload: dict = Depends(require_auth)
             starter_content = ""
             starter_kind = "circuit"
 
+        # ── Default visibility: cloud paid → private, cloud free → public,
+        #    self-hosted → private (Workshop concept doesn't exist there).
+        default_visibility = "private"
+        if settings.cloud_enabled:
+            try:
+                from kerf_billing.buckets import is_paid_user as _is_paid_user
+                if not await _is_paid_user(conn, user_id):
+                    default_visibility = "public"
+            except Exception:
+                # Billing module absent or DB error — stay safe with private.
+                pass
+
         async with conn.transaction():
-            project = await projects_queries.create_project(conn, ws_id, name, req.description, "private", tags)
+            project = await projects_queries.create_project(conn, ws_id, name, req.description, default_visibility, tags)
 
             if starter_content:
                 await files_queries.create_file(conn, project["id"], starter, starter_kind, None, starter_content)

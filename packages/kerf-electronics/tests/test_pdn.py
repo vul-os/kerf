@@ -605,7 +605,7 @@ class TestToolPdnIrDrop:
             pdn_ir_drop,
             segments=[{"node_a": "A", "node_b": "B", "resistance_ohms": 1.0}],
         )
-        assert result["ok"] is False
+        assert "error" in result
 
     @pytest.mark.asyncio
     async def test_missing_segments_returns_error(self):
@@ -613,7 +613,7 @@ class TestToolPdnIrDrop:
             pdn_ir_drop,
             nodes=[{"node_id": "VDD", "is_source": True, "voltage_v": 3.3}],
         )
-        assert result["ok"] is False
+        assert "error" in result
 
     @pytest.mark.asyncio
     async def test_pass_fail_in_result(self):
@@ -651,7 +651,7 @@ class TestToolPdnIrDrop:
     async def test_invalid_json_returns_error(self):
         raw = b"not json"
         res = json.loads(await pdn_ir_drop(None, raw))
-        assert res["ok"] is False
+        assert "error" in res
 
 
 class TestToolPdnTargetImpedance:
@@ -696,7 +696,7 @@ class TestToolPdnTargetImpedance:
             cap_esl_h=1e-9,
             frequency_hz=100e6,
         )
-        assert result["ok"] is False
+        assert "error" in result
 
     @pytest.mark.asyncio
     async def test_missing_param_returns_error(self):
@@ -709,7 +709,7 @@ class TestToolPdnTargetImpedance:
             cap_esl_h=1e-9,
             frequency_hz=100e6,
         )
-        assert result["ok"] is False
+        assert "error" in result
 
 
 class TestToolPdnReport:
@@ -765,7 +765,7 @@ class TestToolPdnReport:
     @pytest.mark.asyncio
     async def test_no_data_returns_error(self):
         result = await call(pdn_report)
-        assert result["ok"] is False
+        assert "error" in result
 
 
 # ── Restore sys.modules so the kerf_chat stub does not leak into other test

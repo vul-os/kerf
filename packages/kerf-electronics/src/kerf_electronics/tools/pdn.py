@@ -231,6 +231,7 @@ async def pdn_ir_drop(ctx: Any, args: bytes) -> str:
         return err_payload(result.error, "ANALYSIS_ERROR")
 
     return ok_payload({
+        "ok": True,
         "source_node_id": result.source_node_id,
         "source_voltage_v": result.source_voltage_v,
         "all_node_voltages": result.all_node_voltages,
@@ -325,6 +326,7 @@ async def pdn_target_impedance_tool(ctx: Any, args: bytes) -> str:
         return err_payload(str(e), "BAD_ARGS")
 
     return ok_payload({
+        "ok": True,
         "vdd_v": vdd,
         "ripple_fraction": ripple,
         "i_transient_a": i_trans,
@@ -471,7 +473,7 @@ async def pdn_report(ctx: Any, args: bytes) -> str:
             "BAD_ARGS",
         )
 
-    return ok_payload(report)
+    return ok_payload({"ok": True, **report})
 
 
 # ── TOOLS registry (consumed by plugin._register_tools) ──────────────────────

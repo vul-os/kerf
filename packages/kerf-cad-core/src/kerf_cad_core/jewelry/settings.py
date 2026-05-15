@@ -1,7 +1,7 @@
 """
 kerf_cad_core.jewelry.settings — Parametric stone setting generators.
 
-Eleven setting types, each with:
+Fourteen setting types, each with:
   1. A pure-Python geometry helper that returns a node-spec dict (no OCCT
      required — the dict is consumed by the OCCT worker's opJewelry* handlers).
   2. An LLM tool (ToolSpec + @register runner) following the exact pattern
@@ -20,6 +20,9 @@ three_stone  — center + two graduated side-stone seats on a shared base.
 cluster      — N small stones grouped to read as one large stone.
 bar          — stones held between parallel metal bars (no prongs between stones).
 bead_grain   — stones held by raised metal beads cut up from the surface.
+gypsy_pave   — flush-set stones with engraved star/bright-cut accents.
+illusion     — faceted metal plate around a small stone to make it look larger.
+invisible    — stones with grooved girdles held on a hidden rail.
 
 Geometry approach (shared)
 --------------------------
@@ -2161,3 +2164,523 @@ async def run_jewelry_create_bead_grain(ctx: ProjectCtx, args: bytes) -> str:
     })
 
 
+# ---------------------------------------------------------------------------
+# Gypsy-pavé / star setting
+# ---------------------------------------------------------------------------
+
+_STAR_RAY_MIN = 4
+
+
+def build_gypsy_pave_node(
+    node_id: str,
+    stone_diameter: float,
+    seat_depth: float,
+    star_ray_count: int,
+) -> dict:
+    """
+    Compute the gypsy-pavé (star setting) node spec.
+
+    The worker's opJewelryGypsyPave builds:
+      - A flush-set stone seat of diameter `stone_diameter` and depth
+        `seat_depth` (the stone sits flush with the metal surface, as in a
+        standard flush/gypsy setting).
+      - `star_ray_count` bright-cut engraved rays radiating from the stone's
+        girdle edge outward across the surrounding metal, creating a decorative
+        star or sunburst pattern that catches light and visually enlarges the
+        stone.
+
+    This is also called a "star setting" or "bright-cut star" in the trade.
+
+    Derived hints:
+      _ray_pitch_deg — angular pitch between adjacent rays = 360 / star_ray_count.
+      _seat_radius   — stone_diameter / 2.
+    """
+    ray_pitch_deg = 360.0 / star_ray_count if star_ray_count > 0 else 0.0
+    seat_radius = stone_diameter / 2.0
+
+    return {
+        "id": node_id,
+        "op": "jewelry_gypsy_pave",
+        "stone_diameter": stone_diameter,
+        "seat_depth": seat_depth,
+        "star_ray_count": star_ray_count,
+        "_ray_pitch_deg": round(ray_pitch_deg, 4),
+        "_seat_radius": round(seat_radius, 4),
+    }
+
+
+jewelry_gypsy_pave_spec = ToolSpec(
+    name="jewelry_create_gypsy_pave",
+    description=(
+        "Append a `jewelry_gypsy_pave` node to a `.feature` file. "
+        "Generates a gypsy-pavé (star setting) — a flush-set stone with "
+        "bright-cut engraved rays radiating outward from the stone's edge "
+        "across the surrounding metal surface. "
+        "The stone sits flush (its table level with the metal) and the "
+        "`star_ray_count` V-cut rays create a decorative star or sunburst "
+        "halo that catches light. Also called 'star setting' or 'bright-cut "
+        "star'. Minimum ray count: 4. "
+        "Output: node spec consumed by opJewelryGypsyPave."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_id": {
+                "type": "string",
+                "description": "Target .feature file id (uuid).",
+            },
+            "stone_diameter": {
+                "type": "number",
+                "description": "Girdle diameter of the stone in mm.",
+            },
+            "seat_depth": {
+                "type": "number",
+                "description": "Depth of the flush seat in mm (typically 60–80% of stone depth).",
+            },
+            "star_ray_count": {
+                "type": "integer",
+                "description": (
+                    "Number of engraved star rays radiating from the stone. "
+                    "Must be >= 4. Typical: 6, 8, 12."
+                ),
+            },
+            "id": {
+                "type": "string",
+                "description": "Optional explicit node id.",
+            },
+        },
+        "required": ["file_id", "stone_diameter", "seat_depth", "star_ray_count"],
+    },
+)
+
+
+@register(jewelry_gypsy_pave_spec, write=True)
+async def run_jewelry_create_gypsy_pave(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    file_id_str = a.get("file_id", "").strip()
+    stone_diameter = a.get("stone_diameter")
+    seat_depth = a.get("seat_depth")
+    star_ray_count = a.get("star_ray_count")
+    node_id = a.get("id", "").strip()
+
+    if not file_id_str:
+        return err_payload("file_id is required", "BAD_ARGS")
+
+    for fname, fval in [
+        ("stone_diameter", stone_diameter),
+        ("seat_depth", seat_depth),
+    ]:
+        err = _positive(fname, fval)
+        if err:
+            return err_payload(err, "BAD_ARGS")
+
+    try:
+        src = int(star_ray_count)
+    except (TypeError, ValueError):
+        return err_payload("star_ray_count must be an integer", "BAD_ARGS")
+    if src < _STAR_RAY_MIN:
+        return err_payload(
+            f"star_ray_count must be >= {_STAR_RAY_MIN}; got {src}", "BAD_ARGS"
+        )
+
+    try:
+        fid = uuid.UUID(file_id_str)
+    except Exception:
+        return err_payload("file_id must be a uuid", "BAD_ARGS")
+
+    content, err = read_feature_content(ctx, fid)
+    if err:
+        return err_payload(f"file not found: {err}", "NOT_FOUND")
+
+    if not node_id:
+        node_id = next_node_id(content, "jewelry_gypsy_pave")
+
+    node = build_gypsy_pave_node(
+        node_id=node_id,
+        stone_diameter=float(stone_diameter),
+        seat_depth=float(seat_depth),
+        star_ray_count=src,
+    )
+
+    _, nid, err = append_feature_node(ctx, fid, node)
+    if err:
+        return err_payload(err, "ERROR")
+
+    return ok_payload({
+        "file_id": file_id_str,
+        "id": nid,
+        "op": "jewelry_gypsy_pave",
+        "stone_diameter": float(stone_diameter),
+        "star_ray_count": src,
+        "_ray_pitch_deg": node["_ray_pitch_deg"],
+    })
+
+
+# ---------------------------------------------------------------------------
+# Illusion / miracle-plate setting
+# ---------------------------------------------------------------------------
+
+_ILLUSION_FACET_MIN = 4
+
+
+def build_illusion_node(
+    node_id: str,
+    stone_diameter: float,
+    plate_diameter: float,
+    facet_count: int,
+) -> dict:
+    """
+    Compute the illusion-setting node spec.
+
+    The worker's opJewelryIllusion builds:
+      - A stone seat of diameter `stone_diameter` at the centre.
+      - A polished metal "miracle plate" of diameter `plate_diameter`
+        surrounding the stone.  The plate is faceted with `facet_count` flat
+        mirror-polished faces arranged radially so they reflect light similarly
+        to the stone's own facets, making the small stone appear larger.
+
+    The plate_diameter must be > stone_diameter.
+
+    Derived hints:
+      _plate_wall_width — radial width of the plate surround =
+                          (plate_diameter - stone_diameter) / 2.
+      _facet_pitch_deg  — angular pitch between adjacent plate facets =
+                          360 / facet_count.
+    """
+    plate_wall_width = (plate_diameter - stone_diameter) / 2.0
+    facet_pitch_deg = 360.0 / facet_count if facet_count > 0 else 0.0
+
+    return {
+        "id": node_id,
+        "op": "jewelry_illusion",
+        "stone_diameter": stone_diameter,
+        "plate_diameter": plate_diameter,
+        "facet_count": facet_count,
+        "_plate_wall_width": round(plate_wall_width, 4),
+        "_facet_pitch_deg": round(facet_pitch_deg, 4),
+    }
+
+
+jewelry_illusion_spec = ToolSpec(
+    name="jewelry_create_illusion",
+    description=(
+        "Append a `jewelry_illusion` node to a `.feature` file. "
+        "Generates an illusion (miracle-plate) setting — a small stone set at "
+        "the centre of a larger polished metal plate whose faceted surface "
+        "reflects light like the stone itself, creating the visual illusion that "
+        "the stone is the size of the plate. "
+        "The plate (`plate_diameter`) must be larger than `stone_diameter`. "
+        "The plate surface is divided into `facet_count` radial mirror-polished "
+        "faces (minimum 4). "
+        "Output: node spec consumed by opJewelryIllusion."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_id": {
+                "type": "string",
+                "description": "Target .feature file id (uuid).",
+            },
+            "stone_diameter": {
+                "type": "number",
+                "description": "Girdle diameter of the actual stone in mm.",
+            },
+            "plate_diameter": {
+                "type": "number",
+                "description": (
+                    "Outer diameter of the illusion plate in mm. "
+                    "Must be > stone_diameter."
+                ),
+            },
+            "facet_count": {
+                "type": "integer",
+                "description": (
+                    "Number of radial mirror facets on the plate surround. "
+                    "Must be >= 4. Typical: 8, 12, 16."
+                ),
+            },
+            "id": {
+                "type": "string",
+                "description": "Optional explicit node id.",
+            },
+        },
+        "required": ["file_id", "stone_diameter", "plate_diameter", "facet_count"],
+    },
+)
+
+
+@register(jewelry_illusion_spec, write=True)
+async def run_jewelry_create_illusion(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    file_id_str = a.get("file_id", "").strip()
+    stone_diameter = a.get("stone_diameter")
+    plate_diameter = a.get("plate_diameter")
+    facet_count = a.get("facet_count")
+    node_id = a.get("id", "").strip()
+
+    if not file_id_str:
+        return err_payload("file_id is required", "BAD_ARGS")
+
+    for fname, fval in [
+        ("stone_diameter", stone_diameter),
+        ("plate_diameter", plate_diameter),
+    ]:
+        err = _positive(fname, fval)
+        if err:
+            return err_payload(err, "BAD_ARGS")
+
+    try:
+        fc = int(facet_count)
+    except (TypeError, ValueError):
+        return err_payload("facet_count must be an integer", "BAD_ARGS")
+    if fc < _ILLUSION_FACET_MIN:
+        return err_payload(
+            f"facet_count must be >= {_ILLUSION_FACET_MIN}; got {fc}", "BAD_ARGS"
+        )
+
+    try:
+        sd = float(stone_diameter)
+        pd = float(plate_diameter)
+    except (TypeError, ValueError):
+        return err_payload("stone_diameter and plate_diameter must be numbers", "BAD_ARGS")
+
+    if pd <= sd:
+        return err_payload(
+            f"plate_diameter ({pd}) must be greater than stone_diameter ({sd})",
+            "BAD_ARGS",
+        )
+
+    try:
+        fid = uuid.UUID(file_id_str)
+    except Exception:
+        return err_payload("file_id must be a uuid", "BAD_ARGS")
+
+    content, err = read_feature_content(ctx, fid)
+    if err:
+        return err_payload(f"file not found: {err}", "NOT_FOUND")
+
+    if not node_id:
+        node_id = next_node_id(content, "jewelry_illusion")
+
+    node = build_illusion_node(
+        node_id=node_id,
+        stone_diameter=sd,
+        plate_diameter=pd,
+        facet_count=fc,
+    )
+
+    _, nid, err = append_feature_node(ctx, fid, node)
+    if err:
+        return err_payload(err, "ERROR")
+
+    return ok_payload({
+        "file_id": file_id_str,
+        "id": nid,
+        "op": "jewelry_illusion",
+        "stone_diameter": sd,
+        "plate_diameter": pd,
+        "facet_count": fc,
+        "_plate_wall_width": node["_plate_wall_width"],
+    })
+
+
+# ---------------------------------------------------------------------------
+# Invisible setting
+# ---------------------------------------------------------------------------
+
+_INVISIBLE_ROWS_MIN = 1
+_INVISIBLE_COLS_MIN = 1
+
+
+def build_invisible_node(
+    node_id: str,
+    stone_size: float,
+    rail_width: float,
+    rail_height: float,
+    grid_rows: int,
+    grid_cols: int,
+) -> dict:
+    """
+    Compute the invisible-setting node spec.
+
+    The worker's opJewelryInvisible builds:
+      - A hidden rail framework (a grid of crossed metal rails) sized for a
+        `grid_rows` × `grid_cols` array of princess/square-cut stones of
+        `stone_size`.  Rail cross-section is `rail_width` × `rail_height`.
+      - Each stone has a grooved girdle that slides onto the rails; no metal
+        is visible between adjacent stones from above (hence "invisible").
+      - The evaluate result includes `seat_positions` — a list of {row, col,
+        x, y} dicts for downstream boolean-cut stone pockets.
+
+    Derived hints:
+      _total_width  — overall X extent of the setting = grid_cols * stone_size.
+      _total_height — overall Y extent = grid_rows * stone_size.
+      _stone_count  — grid_rows * grid_cols.
+    """
+    total_width = grid_cols * stone_size
+    total_height = grid_rows * stone_size
+    stone_count = grid_rows * grid_cols
+
+    # Build seat position grid in the local XY plane.
+    seats = []
+    for r in range(grid_rows):
+        for c in range(grid_cols):
+            x = c * stone_size + stone_size / 2.0
+            y = r * stone_size + stone_size / 2.0
+            seats.append({"row": r, "col": c, "x": round(x, 4), "y": round(y, 4)})
+
+    return {
+        "id": node_id,
+        "op": "jewelry_invisible",
+        "stone_size": stone_size,
+        "rail_width": rail_width,
+        "rail_height": rail_height,
+        "grid_rows": grid_rows,
+        "grid_cols": grid_cols,
+        "seat_positions": seats,
+        "_total_width": round(total_width, 4),
+        "_total_height": round(total_height, 4),
+        "_stone_count": stone_count,
+    }
+
+
+jewelry_invisible_spec = ToolSpec(
+    name="jewelry_create_invisible",
+    description=(
+        "Append a `jewelry_invisible` node to a `.feature` file. "
+        "Generates an invisible setting — a `grid_rows` × `grid_cols` array of "
+        "princess (square) or calibrated stones held on a concealed rail "
+        "framework with no visible metal between adjacent stones. "
+        "Each stone's girdle has a groove that fits over the crossed rails; from "
+        "above the stones appear as a continuous, metal-free surface. "
+        "Rail geometry is defined by `rail_width` and `rail_height`. "
+        "The evaluate result includes `seat_positions` for downstream boolean "
+        "stone-pocket cutting. "
+        "Output: node spec consumed by opJewelryInvisible."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_id": {
+                "type": "string",
+                "description": "Target .feature file id (uuid).",
+            },
+            "stone_size": {
+                "type": "number",
+                "description": "Side length (diameter) of each square stone in mm.",
+            },
+            "rail_width": {
+                "type": "number",
+                "description": "Width of each hidden rail in mm (typical 0.2–0.5).",
+            },
+            "rail_height": {
+                "type": "number",
+                "description": "Height (thickness) of each rail in mm (typical 0.5–1.5).",
+            },
+            "grid_rows": {
+                "type": "integer",
+                "description": "Number of stone rows in the grid. Must be >= 1.",
+            },
+            "grid_cols": {
+                "type": "integer",
+                "description": "Number of stone columns in the grid. Must be >= 1.",
+            },
+            "id": {
+                "type": "string",
+                "description": "Optional explicit node id.",
+            },
+        },
+        "required": ["file_id", "stone_size", "rail_width", "rail_height", "grid_rows", "grid_cols"],
+    },
+)
+
+
+@register(jewelry_invisible_spec, write=True)
+async def run_jewelry_create_invisible(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    file_id_str = a.get("file_id", "").strip()
+    stone_size = a.get("stone_size")
+    rail_width = a.get("rail_width")
+    rail_height = a.get("rail_height")
+    grid_rows = a.get("grid_rows")
+    grid_cols = a.get("grid_cols")
+    node_id = a.get("id", "").strip()
+
+    if not file_id_str:
+        return err_payload("file_id is required", "BAD_ARGS")
+
+    for fname, fval in [
+        ("stone_size", stone_size),
+        ("rail_width", rail_width),
+        ("rail_height", rail_height),
+    ]:
+        err = _positive(fname, fval)
+        if err:
+            return err_payload(err, "BAD_ARGS")
+
+    try:
+        rows = int(grid_rows)
+    except (TypeError, ValueError):
+        return err_payload("grid_rows must be an integer", "BAD_ARGS")
+    if rows < _INVISIBLE_ROWS_MIN:
+        return err_payload(
+            f"grid_rows must be >= {_INVISIBLE_ROWS_MIN}; got {rows}", "BAD_ARGS"
+        )
+
+    try:
+        cols = int(grid_cols)
+    except (TypeError, ValueError):
+        return err_payload("grid_cols must be an integer", "BAD_ARGS")
+    if cols < _INVISIBLE_COLS_MIN:
+        return err_payload(
+            f"grid_cols must be >= {_INVISIBLE_COLS_MIN}; got {cols}", "BAD_ARGS"
+        )
+
+    try:
+        fid = uuid.UUID(file_id_str)
+    except Exception:
+        return err_payload("file_id must be a uuid", "BAD_ARGS")
+
+    content, err = read_feature_content(ctx, fid)
+    if err:
+        return err_payload(f"file not found: {err}", "NOT_FOUND")
+
+    if not node_id:
+        node_id = next_node_id(content, "jewelry_invisible")
+
+    node = build_invisible_node(
+        node_id=node_id,
+        stone_size=float(stone_size),
+        rail_width=float(rail_width),
+        rail_height=float(rail_height),
+        grid_rows=rows,
+        grid_cols=cols,
+    )
+
+    _, nid, err = append_feature_node(ctx, fid, node)
+    if err:
+        return err_payload(err, "ERROR")
+
+    return ok_payload({
+        "file_id": file_id_str,
+        "id": nid,
+        "op": "jewelry_invisible",
+        "stone_size": float(stone_size),
+        "grid_rows": rows,
+        "grid_cols": cols,
+        "_stone_count": node["_stone_count"],
+        "_total_width": node["_total_width"],
+        "_total_height": node["_total_height"],
+    })

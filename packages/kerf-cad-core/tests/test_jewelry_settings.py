@@ -59,6 +59,9 @@ from kerf_cad_core.jewelry.settings import (
     jewelry_cluster_spec,
     jewelry_bar_spec,
     jewelry_bead_grain_spec,
+    jewelry_gypsy_pave_spec,
+    jewelry_illusion_spec,
+    jewelry_invisible_spec,
     # Runners
     run_jewelry_create_prong_head,
     run_jewelry_create_bezel,
@@ -71,6 +74,9 @@ from kerf_cad_core.jewelry.settings import (
     run_jewelry_create_cluster,
     run_jewelry_create_bar,
     run_jewelry_create_bead_grain,
+    run_jewelry_create_gypsy_pave,
+    run_jewelry_create_illusion,
+    run_jewelry_create_invisible,
     # Pure-Python helpers
     build_prong_head_node,
     build_bezel_node,
@@ -83,6 +89,9 @@ from kerf_cad_core.jewelry.settings import (
     build_cluster_node,
     build_bar_node,
     build_bead_grain_node,
+    build_gypsy_pave_node,
+    build_illusion_node,
+    build_invisible_node,
     _compute_pave_grid,
     _compute_cluster_positions,
 )
@@ -2368,3 +2377,777 @@ class TestBeadGrainRunner:
 # Gypsy-pavé (star setting) — ToolSpec schema
 # ============================================================================
 
+class TestGypsyPaveSpec:
+    def test_name(self):
+        assert jewelry_gypsy_pave_spec.name == "jewelry_create_gypsy_pave"
+
+    def test_required_fields(self):
+        req = jewelry_gypsy_pave_spec.input_schema["required"]
+        for f in ["file_id", "stone_diameter", "seat_depth", "star_ray_count"]:
+            assert f in req
+
+    def test_id_not_required(self):
+        assert "id" not in jewelry_gypsy_pave_spec.input_schema["required"]
+
+
+# ============================================================================
+# Gypsy-pavé (star setting) — geometry math
+# ============================================================================
+
+class TestGypsyPaveGeometry:
+    def test_ray_pitch_deg_formula(self):
+        node = build_gypsy_pave_node(
+            node_id="gp-1",
+            stone_diameter=2.0,
+            seat_depth=1.2,
+            star_ray_count=8,
+        )
+        assert math.isclose(node["_ray_pitch_deg"], 360.0 / 8, rel_tol=1e-5)
+
+    def test_seat_radius_formula(self):
+        node = build_gypsy_pave_node(
+            node_id="gp-2",
+            stone_diameter=4.0,
+            seat_depth=1.8,
+            star_ray_count=6,
+        )
+        assert math.isclose(node["_seat_radius"], 2.0, rel_tol=1e-9)
+
+    def test_op_field(self):
+        node = build_gypsy_pave_node(
+            node_id="gp-3",
+            stone_diameter=3.0, seat_depth=1.5, star_ray_count=12,
+        )
+        assert node["op"] == "jewelry_gypsy_pave"
+
+    def test_all_params_stored(self):
+        node = build_gypsy_pave_node(
+            node_id="gp-4",
+            stone_diameter=2.5,
+            seat_depth=1.3,
+            star_ray_count=6,
+        )
+        assert node["stone_diameter"] == 2.5
+        assert node["seat_depth"] == 1.3
+        assert node["star_ray_count"] == 6
+
+
+# ============================================================================
+# Gypsy-pavé (star setting) — LLM tool runner
+# ============================================================================
+
+class TestGypsyPaveRunner:
+    def test_success(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_gypsy_pave, ctx, fid,
+            stone_diameter=2.5,
+            seat_depth=1.4,
+            star_ray_count=8,
+        )
+        assert result.get("error") is None, result
+        assert result["op"] == "jewelry_gypsy_pave"
+        assert result["star_ray_count"] == 8
+
+    def test_node_stored(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_gypsy_pave, ctx, fid,
+            stone_diameter=2.5, seat_depth=1.4, star_ray_count=6,
+        )
+        node = get_last_node(store)
+        assert node["op"] == "jewelry_gypsy_pave"
+        assert node["stone_diameter"] == 2.5
+
+    def test_node_id_auto(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_gypsy_pave, ctx, fid,
+            stone_diameter=2.5, seat_depth=1.4, star_ray_count=6,
+        )
+        node = get_last_node(store)
+        assert node["id"].startswith("jewelry_gypsy_pave-")
+
+    def test_explicit_node_id(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_gypsy_pave, ctx, fid,
+            stone_diameter=2.5, seat_depth=1.4, star_ray_count=6,
+            id="my-star",
+        )
+        node = get_last_node(store)
+        assert node["id"] == "my-star"
+
+    def test_ray_count_lt_4_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_gypsy_pave, ctx, fid,
+            stone_diameter=2.5, seat_depth=1.4, star_ray_count=3,
+        )
+        assert result.get("code") == "BAD_ARGS"
+        assert "star_ray_count" in result.get("error", "")
+
+    def test_ray_count_zero_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_gypsy_pave, ctx, fid,
+            stone_diameter=2.5, seat_depth=1.4, star_ray_count=0,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_zero_stone_diameter_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_gypsy_pave, ctx, fid,
+            stone_diameter=0, seat_depth=1.4, star_ray_count=6,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_negative_seat_depth_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_gypsy_pave, ctx, fid,
+            stone_diameter=2.5, seat_depth=-0.5, star_ray_count=6,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_ray_pitch_in_result(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_gypsy_pave, ctx, fid,
+            stone_diameter=2.5, seat_depth=1.4, star_ray_count=6,
+        )
+        assert "_ray_pitch_deg" in result
+        assert math.isclose(result["_ray_pitch_deg"], 60.0, rel_tol=1e-5)
+
+    def test_missing_file_not_found(self):
+        ctx, _, fid = make_ctx(kind="NOT_FOUND")
+        result = call_tool(
+            run_jewelry_create_gypsy_pave, ctx, fid,
+            stone_diameter=2.5, seat_depth=1.4, star_ray_count=6,
+        )
+        assert result.get("code") == "NOT_FOUND"
+
+    def test_invalid_json_rejected(self):
+        ctx, _, _ = make_ctx()
+        raw = run_sync(run_jewelry_create_gypsy_pave(ctx, b"bad"))
+        result = json.loads(raw)
+        assert result.get("code") == "BAD_ARGS"
+
+    @pytest.mark.parametrize("rays", [4, 6, 8, 12, 16])
+    def test_various_ray_counts_accepted(self, rays):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_gypsy_pave, ctx, fid,
+            stone_diameter=2.5, seat_depth=1.4, star_ray_count=rays,
+        )
+        assert result.get("error") is None, f"rays={rays}: {result}"
+
+
+# ============================================================================
+# Illusion / miracle-plate setting — ToolSpec schema
+# ============================================================================
+
+class TestIllusionSpec:
+    def test_name(self):
+        assert jewelry_illusion_spec.name == "jewelry_create_illusion"
+
+    def test_required_fields(self):
+        req = jewelry_illusion_spec.input_schema["required"]
+        for f in ["file_id", "stone_diameter", "plate_diameter", "facet_count"]:
+            assert f in req
+
+    def test_id_not_required(self):
+        assert "id" not in jewelry_illusion_spec.input_schema["required"]
+
+
+# ============================================================================
+# Illusion / miracle-plate setting — geometry math
+# ============================================================================
+
+class TestIllusionGeometry:
+    def test_plate_wall_width_formula(self):
+        node = build_illusion_node(
+            node_id="il-1",
+            stone_diameter=3.0,
+            plate_diameter=6.0,
+            facet_count=8,
+        )
+        expected = (6.0 - 3.0) / 2.0
+        assert math.isclose(node["_plate_wall_width"], expected, rel_tol=1e-9)
+
+    def test_facet_pitch_deg_formula(self):
+        node = build_illusion_node(
+            node_id="il-2",
+            stone_diameter=2.0,
+            plate_diameter=5.0,
+            facet_count=12,
+        )
+        assert math.isclose(node["_facet_pitch_deg"], 360.0 / 12, rel_tol=1e-5)
+
+    def test_op_field(self):
+        node = build_illusion_node(
+            node_id="il-3",
+            stone_diameter=2.0, plate_diameter=4.5, facet_count=8,
+        )
+        assert node["op"] == "jewelry_illusion"
+
+    def test_all_params_stored(self):
+        node = build_illusion_node(
+            node_id="il-4",
+            stone_diameter=2.5,
+            plate_diameter=5.5,
+            facet_count=10,
+        )
+        assert node["stone_diameter"] == 2.5
+        assert node["plate_diameter"] == 5.5
+        assert node["facet_count"] == 10
+
+    def test_plate_wall_width_positive(self):
+        node = build_illusion_node(
+            node_id="il-5",
+            stone_diameter=1.5, plate_diameter=4.0, facet_count=6,
+        )
+        assert node["_plate_wall_width"] > 0
+
+
+# ============================================================================
+# Illusion / miracle-plate setting — LLM tool runner
+# ============================================================================
+
+class TestIllusionRunner:
+    def test_success(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_illusion, ctx, fid,
+            stone_diameter=2.5,
+            plate_diameter=5.0,
+            facet_count=8,
+        )
+        assert result.get("error") is None, result
+        assert result["op"] == "jewelry_illusion"
+        assert result["facet_count"] == 8
+
+    def test_node_stored(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_illusion, ctx, fid,
+            stone_diameter=2.5, plate_diameter=5.0, facet_count=8,
+        )
+        node = get_last_node(store)
+        assert node["op"] == "jewelry_illusion"
+        assert node["stone_diameter"] == 2.5
+        assert node["plate_diameter"] == 5.0
+
+    def test_node_id_auto(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_illusion, ctx, fid,
+            stone_diameter=2.5, plate_diameter=5.0, facet_count=8,
+        )
+        node = get_last_node(store)
+        assert node["id"].startswith("jewelry_illusion-")
+
+    def test_plate_not_larger_than_stone_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_illusion, ctx, fid,
+            stone_diameter=5.0, plate_diameter=4.0,  # plate < stone
+            facet_count=8,
+        )
+        assert result.get("code") == "BAD_ARGS"
+        assert "plate_diameter" in result.get("error", "")
+
+    def test_plate_equal_to_stone_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_illusion, ctx, fid,
+            stone_diameter=4.0, plate_diameter=4.0,  # equal, not larger
+            facet_count=8,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_facet_count_lt_4_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_illusion, ctx, fid,
+            stone_diameter=2.5, plate_diameter=5.0, facet_count=3,
+        )
+        assert result.get("code") == "BAD_ARGS"
+        assert "facet_count" in result.get("error", "")
+
+    def test_zero_stone_diameter_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_illusion, ctx, fid,
+            stone_diameter=0, plate_diameter=5.0, facet_count=8,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_plate_wall_width_in_result(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_illusion, ctx, fid,
+            stone_diameter=2.0, plate_diameter=6.0, facet_count=8,
+        )
+        assert "_plate_wall_width" in result
+        assert math.isclose(result["_plate_wall_width"], (6.0 - 2.0) / 2.0, rel_tol=1e-5)
+
+    def test_missing_file_not_found(self):
+        ctx, _, fid = make_ctx(kind="NOT_FOUND")
+        result = call_tool(
+            run_jewelry_create_illusion, ctx, fid,
+            stone_diameter=2.5, plate_diameter=5.0, facet_count=8,
+        )
+        assert result.get("code") == "NOT_FOUND"
+
+    def test_invalid_json_rejected(self):
+        ctx, _, _ = make_ctx()
+        raw = run_sync(run_jewelry_create_illusion(ctx, b"not json"))
+        result = json.loads(raw)
+        assert result.get("code") == "BAD_ARGS"
+
+    @pytest.mark.parametrize("facets", [4, 8, 12, 16])
+    def test_various_facet_counts_accepted(self, facets):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_illusion, ctx, fid,
+            stone_diameter=2.0, plate_diameter=5.0, facet_count=facets,
+        )
+        assert result.get("error") is None, f"facets={facets}: {result}"
+
+
+# ============================================================================
+# Invisible setting — ToolSpec schema
+# ============================================================================
+
+class TestInvisibleSpec:
+    def test_name(self):
+        assert jewelry_invisible_spec.name == "jewelry_create_invisible"
+
+    def test_required_fields(self):
+        req = jewelry_invisible_spec.input_schema["required"]
+        for f in ["file_id", "stone_size", "rail_width", "rail_height", "grid_rows", "grid_cols"]:
+            assert f in req
+
+    def test_id_not_required(self):
+        assert "id" not in jewelry_invisible_spec.input_schema["required"]
+
+
+# ============================================================================
+# Invisible setting — geometry math
+# ============================================================================
+
+class TestInvisibleGeometry:
+    def test_total_width_formula(self):
+        node = build_invisible_node(
+            node_id="inv-1",
+            stone_size=3.0,
+            rail_width=0.3,
+            rail_height=0.8,
+            grid_rows=2,
+            grid_cols=4,
+        )
+        assert math.isclose(node["_total_width"], 4 * 3.0, rel_tol=1e-9)
+
+    def test_total_height_formula(self):
+        node = build_invisible_node(
+            node_id="inv-2",
+            stone_size=3.0,
+            rail_width=0.3,
+            rail_height=0.8,
+            grid_rows=2,
+            grid_cols=4,
+        )
+        assert math.isclose(node["_total_height"], 2 * 3.0, rel_tol=1e-9)
+
+    def test_stone_count_formula(self):
+        node = build_invisible_node(
+            node_id="inv-3",
+            stone_size=2.5,
+            rail_width=0.25,
+            rail_height=0.7,
+            grid_rows=3,
+            grid_cols=3,
+        )
+        assert node["_stone_count"] == 9
+
+    def test_seat_positions_count(self):
+        rows, cols = 2, 3
+        node = build_invisible_node(
+            node_id="inv-4",
+            stone_size=2.5,
+            rail_width=0.25,
+            rail_height=0.7,
+            grid_rows=rows,
+            grid_cols=cols,
+        )
+        assert len(node["seat_positions"]) == rows * cols
+
+    def test_seat_positions_row_col_fields(self):
+        node = build_invisible_node(
+            node_id="inv-5",
+            stone_size=3.0,
+            rail_width=0.3,
+            rail_height=0.8,
+            grid_rows=2,
+            grid_cols=2,
+        )
+        for seat in node["seat_positions"]:
+            assert "row" in seat
+            assert "col" in seat
+            assert "x" in seat
+            assert "y" in seat
+
+    def test_seat_x_y_centred_in_cell(self):
+        ss = 4.0
+        node = build_invisible_node(
+            node_id="inv-6",
+            stone_size=ss,
+            rail_width=0.3,
+            rail_height=0.8,
+            grid_rows=1,
+            grid_cols=2,
+        )
+        seats = {(s["row"], s["col"]): s for s in node["seat_positions"]}
+        # First stone: col=0 → x = 0 * ss + ss/2 = 2.0
+        assert math.isclose(seats[(0, 0)]["x"], ss / 2.0, rel_tol=1e-9)
+        # Second stone: col=1 → x = 1 * ss + ss/2 = 6.0
+        assert math.isclose(seats[(0, 1)]["x"], ss + ss / 2.0, rel_tol=1e-9)
+
+    def test_op_field(self):
+        node = build_invisible_node(
+            node_id="inv-7",
+            stone_size=3.0, rail_width=0.3, rail_height=0.8,
+            grid_rows=2, grid_cols=2,
+        )
+        assert node["op"] == "jewelry_invisible"
+
+    def test_all_params_stored(self):
+        node = build_invisible_node(
+            node_id="inv-8",
+            stone_size=3.0,
+            rail_width=0.35,
+            rail_height=0.9,
+            grid_rows=3,
+            grid_cols=4,
+        )
+        assert node["stone_size"] == 3.0
+        assert node["rail_width"] == 0.35
+        assert node["rail_height"] == 0.9
+        assert node["grid_rows"] == 3
+        assert node["grid_cols"] == 4
+
+
+# ============================================================================
+# Invisible setting — LLM tool runner
+# ============================================================================
+
+class TestInvisibleRunner:
+    def test_success(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_invisible, ctx, fid,
+            stone_size=3.0,
+            rail_width=0.3,
+            rail_height=0.8,
+            grid_rows=2,
+            grid_cols=3,
+        )
+        assert result.get("error") is None, result
+        assert result["op"] == "jewelry_invisible"
+        assert result["grid_rows"] == 2
+        assert result["grid_cols"] == 3
+        assert result["_stone_count"] == 6
+
+    def test_node_stored(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_invisible, ctx, fid,
+            stone_size=3.0, rail_width=0.3, rail_height=0.8,
+            grid_rows=2, grid_cols=3,
+        )
+        node = get_last_node(store)
+        assert node["op"] == "jewelry_invisible"
+        assert node["stone_size"] == 3.0
+        assert isinstance(node["seat_positions"], list)
+        assert len(node["seat_positions"]) == 6
+
+    def test_node_id_auto(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_invisible, ctx, fid,
+            stone_size=3.0, rail_width=0.3, rail_height=0.8,
+            grid_rows=2, grid_cols=2,
+        )
+        node = get_last_node(store)
+        assert node["id"].startswith("jewelry_invisible-")
+
+    def test_explicit_node_id(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_invisible, ctx, fid,
+            stone_size=3.0, rail_width=0.3, rail_height=0.8,
+            grid_rows=2, grid_cols=2,
+            id="my-invisible",
+        )
+        node = get_last_node(store)
+        assert node["id"] == "my-invisible"
+
+    def test_zero_stone_size_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_invisible, ctx, fid,
+            stone_size=0, rail_width=0.3, rail_height=0.8,
+            grid_rows=2, grid_cols=2,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_zero_grid_rows_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_invisible, ctx, fid,
+            stone_size=3.0, rail_width=0.3, rail_height=0.8,
+            grid_rows=0, grid_cols=2,
+        )
+        assert result.get("code") == "BAD_ARGS"
+        assert "grid_rows" in result.get("error", "")
+
+    def test_zero_grid_cols_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_invisible, ctx, fid,
+            stone_size=3.0, rail_width=0.3, rail_height=0.8,
+            grid_rows=2, grid_cols=0,
+        )
+        assert result.get("code") == "BAD_ARGS"
+        assert "grid_cols" in result.get("error", "")
+
+    def test_negative_rail_width_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_invisible, ctx, fid,
+            stone_size=3.0, rail_width=-0.1, rail_height=0.8,
+            grid_rows=2, grid_cols=2,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_non_integer_grid_rows_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_invisible, ctx, fid,
+            stone_size=3.0, rail_width=0.3, rail_height=0.8,
+            grid_rows="two", grid_cols=2,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_non_integer_grid_cols_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_invisible, ctx, fid,
+            stone_size=3.0, rail_width=0.3, rail_height=0.8,
+            grid_rows=2, grid_cols="three",
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_total_dimensions_in_result(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_invisible, ctx, fid,
+            stone_size=3.0, rail_width=0.3, rail_height=0.8,
+            grid_rows=2, grid_cols=4,
+        )
+        assert "_total_width" in result
+        assert "_total_height" in result
+        assert math.isclose(result["_total_width"], 4 * 3.0, rel_tol=1e-5)
+        assert math.isclose(result["_total_height"], 2 * 3.0, rel_tol=1e-5)
+
+    def test_1x1_grid_accepted(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_invisible, ctx, fid,
+            stone_size=3.0, rail_width=0.3, rail_height=0.8,
+            grid_rows=1, grid_cols=1,
+        )
+        assert result.get("error") is None, result
+        assert result["_stone_count"] == 1
+
+    def test_missing_file_not_found(self):
+        ctx, _, fid = make_ctx(kind="NOT_FOUND")
+        result = call_tool(
+            run_jewelry_create_invisible, ctx, fid,
+            stone_size=3.0, rail_width=0.3, rail_height=0.8,
+            grid_rows=2, grid_cols=2,
+        )
+        assert result.get("code") == "NOT_FOUND"
+
+    def test_invalid_json_rejected(self):
+        ctx, _, _ = make_ctx()
+        raw = run_sync(run_jewelry_create_invisible(ctx, b"not json"))
+        result = json.loads(raw)
+        assert result.get("code") == "BAD_ARGS"
+
+    @pytest.mark.parametrize("rows,cols", [(1, 1), (1, 4), (2, 2), (3, 3), (4, 5)])
+    def test_various_grid_sizes_accepted(self, rows, cols):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_invisible, ctx, fid,
+            stone_size=3.0, rail_width=0.3, rail_height=0.8,
+            grid_rows=rows, grid_cols=cols,
+        )
+        assert result.get("error") is None, f"rows={rows}, cols={cols}: {result}"
+        assert result["_stone_count"] == rows * cols
+
+
+# ============================================================================
+# All new settings coexist in the same feature file
+# ============================================================================
+
+class TestNewSettingsCoexist:
+    def test_all_five_new_settings_in_one_file(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_bar, ctx, fid,
+            stone_diameter=2.5, bar_width=0.6, bar_height=0.8,
+            stone_count=5, pitch=2.9,
+        )
+        call_tool(
+            run_jewelry_create_bead_grain, ctx, fid,
+            stone_diameter=2.0, bead_count_per_stone=3,
+            bead_diameter=0.5, field_layout="line",
+        )
+        call_tool(
+            run_jewelry_create_gypsy_pave, ctx, fid,
+            stone_diameter=2.5, seat_depth=1.4, star_ray_count=6,
+        )
+        call_tool(
+            run_jewelry_create_illusion, ctx, fid,
+            stone_diameter=2.5, plate_diameter=5.0, facet_count=8,
+        )
+        call_tool(
+            run_jewelry_create_invisible, ctx, fid,
+            stone_size=3.0, rail_width=0.3, rail_height=0.8,
+            grid_rows=2, grid_cols=3,
+        )
+        doc = json.loads(store["content"])
+        ops = [n["op"] for n in doc["features"]]
+        assert "jewelry_bar" in ops
+        assert "jewelry_bead_grain" in ops
+        assert "jewelry_gypsy_pave" in ops
+        assert "jewelry_illusion" in ops
+        assert "jewelry_invisible" in ops
+
+    @pytest.mark.parametrize("count", [1, 3, 7, 12, 19])
+    def test_various_stone_counts_accepted(self, count):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_cluster, ctx, fid,
+            cluster_diameter=10.0, stone_size=1.5, stone_count=count, dome_height=1.0,
+        )
+        assert result.get("error") is None, f"count={count}: {result}"
+
+
+# ============================================================================
+# Cross-style node coexistence — new styles integrate with existing
+# ============================================================================
+
+class TestAllStylesCoexist:
+    def test_all_nine_styles_in_same_file(self):
+        ctx, store, fid = make_ctx()
+        call_tool(run_jewelry_create_prong_head, ctx, fid,
+                  stone_diameter=6.5, prong_count=6, prong_wire_diameter=1.0, prong_height=2.0)
+        call_tool(run_jewelry_create_bezel, ctx, fid,
+                  stone_diameter=6.5, wall_thickness=0.5, bezel_height=3.0, bearing_ledge_height=1.5)
+        call_tool(run_jewelry_create_channel, ctx, fid,
+                  stone_diameter=2.5, stone_count=5, stone_spacing=3.0,
+                  rail_height=1.5, rail_thickness=0.5, floor_thickness=0.4)
+        call_tool(run_jewelry_pave_array, ctx, fid,
+                  region_width=10.0, region_height=10.0,
+                  stone_diameter=1.5, stone_spacing=0.2, edge_margin=0.5)
+        call_tool(run_jewelry_create_tension, ctx, fid,
+                  stone_diameter=6.5, band_thickness=3.0, gap=5.8,
+                  rail_width=0.5, rail_depth=0.3)
+        call_tool(run_jewelry_create_flush, ctx, fid,
+                  stone_diameter=3.5, seat_depth=1.8, bevel_width=0.2, bevel_angle_deg=45.0)
+        call_tool(run_jewelry_create_halo, ctx, fid,
+                  center_diameter=6.5, halo_stone_size=1.2, halo_stone_count=18,
+                  halo_gap=0.15, halo_metal_width=0.4)
+        call_tool(run_jewelry_create_three_stone, ctx, fid,
+                  center_diameter=6.5, side_diameter=4.0, stone_spacing=0.2, base_height=1.5)
+        call_tool(run_jewelry_create_cluster, ctx, fid,
+                  cluster_diameter=10.0, stone_size=1.5, stone_count=7, dome_height=1.0)
+
+        doc = json.loads(store["content"])
+        ops = [n["op"] for n in doc["features"]]
+        expected_ops = [
+            "jewelry_prong_head",
+            "jewelry_bezel",
+            "jewelry_channel",
+            "jewelry_pave",
+            "jewelry_tension",
+            "jewelry_flush",
+            "jewelry_halo",
+            "jewelry_three_stone",
+            "jewelry_cluster",
+        ]
+        assert ops == expected_ops, f"ops mismatch: {ops}"
+
+
+# ============================================================================
+# OCC-gated: new styles
+# ============================================================================
+
+@skip_no_occ
+class TestOccNewStyles:
+    """OCC-gated: smoke-test node specs for new setting types via BRepPrimAPI."""
+
+    def test_occ_tension_band_cylinder(self):
+        from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeCylinder  # type: ignore
+        from OCC.Core.gp import gp_Pnt, gp_Ax2, gp_Dir  # type: ignore
+
+        node = build_tension_node(
+            node_id="occ-t-1",
+            stone_diameter=6.5, band_thickness=3.0, gap=5.5,
+            rail_width=0.5, rail_depth=0.3,
+        )
+        # Build a cylinder representing the band cross-section.
+        ax = gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1))
+        cyl = BRepPrimAPI_MakeCylinder(ax, node["_seat_radius"], node["band_thickness"])
+        assert not cyl.Shape().IsNull()
+
+    def test_occ_flush_seat_cylinder(self):
+        from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeCylinder  # type: ignore
+        from OCC.Core.gp import gp_Pnt, gp_Ax2, gp_Dir  # type: ignore
+
+        node = build_flush_node(
+            node_id="occ-f-1",
+            stone_diameter=3.5, seat_depth=1.8, bevel_width=0.2, bevel_angle_deg=45.0,
+        )
+        ax = gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1))
+        cyl = BRepPrimAPI_MakeCylinder(ax, node["stone_diameter"] / 2.0, node["seat_depth"])
+        assert not cyl.Shape().IsNull()
+
+    def test_occ_halo_outer_cylinder(self):
+        from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeCylinder  # type: ignore
+        from OCC.Core.gp import gp_Pnt, gp_Ax2, gp_Dir  # type: ignore
+
+        node = build_halo_node(
+            node_id="occ-h-1",
+            center_diameter=6.5, halo_stone_size=1.2, halo_stone_count=18,
+            halo_gap=0.15, halo_metal_width=0.4,
+        )
+        ax = gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1))
+        cyl = BRepPrimAPI_MakeCylinder(ax, node["_halo_outer_diameter"] / 2.0, 2.0)
+        assert not cyl.Shape().IsNull()
+
+    def test_occ_cluster_dome_cylinder(self):
+        from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeCylinder  # type: ignore
+        from OCC.Core.gp import gp_Pnt, gp_Ax2, gp_Dir  # type: ignore
+
+        node = build_cluster_node(
+            node_id="occ-cl-1",
+            cluster_diameter=10.0, stone_size=1.5, stone_count=7, dome_height=1.2,
+        )
+        ax = gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1))
+        cyl = BRepPrimAPI_MakeCylinder(ax, node["cluster_diameter"] / 2.0, node["dome_height"])
+        assert not cyl.Shape().IsNull()

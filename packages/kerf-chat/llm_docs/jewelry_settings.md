@@ -1,6 +1,6 @@
 # Jewelry setting generators
 
-Eleven LLM tools create parametric stone-setting solids as `.feature` nodes.
+Fourteen LLM tools create parametric stone-setting solids as `.feature` nodes.
 Each tool appends a node to an existing `.feature` file; the OCCT worker
 evaluates the node and returns a `TopoDS_Solid` (or placement data for array
 settings like pavé, halo, and cluster).
@@ -565,3 +565,141 @@ Result node op: `jewelry_bead_grain`.
 
 ---
 
+## `jewelry_create_gypsy_pave`
+
+Generates a gypsy-pavé (star setting) — a flush-set stone with bright-cut
+engraved rays radiating outward from the stone edge across the surrounding metal.
+
+### How it works
+
+1. A flush seat of `stone_diameter` × `seat_depth` is drilled into the metal
+   (stone sits level with the surface).
+2. `star_ray_count` V-cut bright-cut rays radiate outward from the stone's girdle
+   edge, creating a decorative star or sunburst halo. Also called "star setting"
+   or "bright-cut star" in the trade.
+
+Constraint: `star_ray_count` ≥ 4.
+
+Derived node hints:
+- `_ray_pitch_deg` = 360 / `star_ray_count`.
+- `_seat_radius` = `stone_diameter` / 2.
+
+### Parameters
+
+| Parameter        | Required | Notes                                                              |
+|------------------|----------|--------------------------------------------------------------------|
+| `file_id`        | yes      | Target `.feature` file uuid                                        |
+| `stone_diameter` | yes      | Stone girdle diameter in mm                                        |
+| `seat_depth`     | yes      | Flush seat depth in mm (typically 60–80% of stone depth)           |
+| `star_ray_count` | yes      | Number of engraved rays (≥ 4). Typical: 6, 8, 12                  |
+| `id`             | no       | Explicit node id                                                   |
+
+### Worked example
+
+```json
+{
+  "file_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "stone_diameter": 2.5,
+  "seat_depth": 1.4,
+  "star_ray_count": 8
+}
+```
+
+Result node op: `jewelry_gypsy_pave`. Pair with a boolean cut against the parent
+metal body.
+
+---
+
+## `jewelry_create_illusion`
+
+Generates an illusion (miracle-plate) setting — a small stone surrounded by a
+larger faceted metal plate that creates the visual illusion of a bigger stone.
+
+### How it works
+
+1. A stone seat of `stone_diameter` is placed at the centre.
+2. A polished metal plate of `plate_diameter` surrounds the stone. The plate
+   annular surface is divided into `facet_count` radial mirror-polished faces
+   that reflect light similarly to the stone's own facets.
+3. `plate_diameter` must be > `stone_diameter`.
+
+Constraint: `facet_count` ≥ 4.
+
+Derived node hints:
+- `_plate_wall_width` = (`plate_diameter` − `stone_diameter`) / 2.
+- `_facet_pitch_deg` = 360 / `facet_count`.
+
+### Parameters
+
+| Parameter        | Required | Notes                                                              |
+|------------------|----------|--------------------------------------------------------------------|
+| `file_id`        | yes      | Target `.feature` file uuid                                        |
+| `stone_diameter` | yes      | Actual stone girdle diameter in mm                                 |
+| `plate_diameter` | yes      | Outer diameter of the illusion plate in mm. Must be > `stone_diameter` |
+| `facet_count`    | yes      | Number of radial plate facets (≥ 4). Typical: 8, 12, 16           |
+| `id`             | no       | Explicit node id                                                   |
+
+### Worked example
+
+```json
+{
+  "file_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "stone_diameter": 2.5,
+  "plate_diameter": 5.0,
+  "facet_count": 12
+}
+```
+
+Result node op: `jewelry_illusion`. A 2.5 mm stone visually reads as 5 mm.
+
+---
+
+## `jewelry_create_invisible`
+
+Generates an invisible setting — a grid of princess (square) stones held on a
+concealed rail framework with no visible metal between adjacent stones.
+
+### How it works
+
+1. A `grid_rows` × `grid_cols` array of square stones of `stone_size` is laid
+   out in a rectangular grid.
+2. Crossed metal rails of `rail_width` × `rail_height` are hidden underneath;
+   each stone's girdle has a groove that slides onto the rails. From above the
+   stones appear as a continuous, metal-free surface.
+3. The evaluate result includes `seat_positions` — a list of {row, col, x, y}
+   dicts for downstream boolean stone-pocket cutting.
+
+Constraints: `grid_rows` ≥ 1, `grid_cols` ≥ 1.
+
+Derived node hints:
+- `_total_width` = `grid_cols × stone_size`.
+- `_total_height` = `grid_rows × stone_size`.
+- `_stone_count` = `grid_rows × grid_cols`.
+
+### Parameters
+
+| Parameter    | Required | Notes                                                              |
+|--------------|----------|--------------------------------------------------------------------|
+| `file_id`    | yes      | Target `.feature` file uuid                                        |
+| `stone_size` | yes      | Side length of each square stone in mm                             |
+| `rail_width` | yes      | Width of each hidden rail in mm (typical 0.2–0.5)                  |
+| `rail_height`| yes      | Height (thickness) of each rail in mm (typical 0.5–1.5)            |
+| `grid_rows`  | yes      | Number of stone rows (≥ 1)                                         |
+| `grid_cols`  | yes      | Number of stone columns (≥ 1)                                      |
+| `id`         | no       | Explicit node id                                                   |
+
+### Worked example — 2×4 invisible-set princess ring top
+
+```json
+{
+  "file_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "stone_size": 3.0,
+  "rail_width": 0.3,
+  "rail_height": 0.8,
+  "grid_rows": 2,
+  "grid_cols": 4
+}
+```
+
+Result node op: `jewelry_invisible`. Total setting footprint: 12 × 6 mm,
+8 stones. `seat_positions` lists all 8 stone pockets for downstream cutting.

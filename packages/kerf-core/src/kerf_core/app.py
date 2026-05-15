@@ -118,10 +118,12 @@ def _mount_frontend(app: FastAPI) -> None:
 
     @app.get("/{full_path:path}", include_in_schema=False)
     async def spa_fallback(full_path: str):
-        # API routes are matched first by FastAPI's router; this catches
-        # everything else and serves the SPA shell so React Router can
-        # handle client-side routes.
-        if full_path.startswith(("api/", "auth/", "v1/", "health", "healthz")):
+        # Real backend routes (incl. /auth/google/*, /auth/github/login/*)
+        # are registered before this fallback and match first. Unmatched
+        # api/v1/health paths should 404 as JSON (API clients expect that);
+        # but /auth/* also contains *client* routes like /auth/callback
+        # (the post-OAuth landing page) which must get the SPA shell.
+        if full_path.startswith(("api/", "v1/", "health", "healthz")):
             return JSONResponse({"detail": "Not Found"}, status_code=404)
         target = dist_path / full_path
         if full_path and target.is_file():

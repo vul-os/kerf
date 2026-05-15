@@ -47,8 +47,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY pyproject.toml ./
 COPY packages/ ./packages/
 
-# Install the selected persona (deps resolve from pyproject extras).
-RUN pip install --no-cache-dir -e ".[$KERF_PERSONA]"
+# Install the selected persona with uv: the kerf-* deps in each extra are
+# local workspace members ([tool.uv.sources] … { workspace = true }); plain
+# pip can't resolve them, uv does.
+RUN pip install --no-cache-dir uv
+RUN uv pip install --system --no-cache -e ".[$KERF_PERSONA]"
 
 # Embed the compiled frontend.
 COPY --from=frontend /app/dist /app/dist

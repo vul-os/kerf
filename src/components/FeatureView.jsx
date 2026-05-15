@@ -463,6 +463,111 @@ const FEATURE_KINDS = [
       { key: 'align_to_boundary',   kind: 'boolean', label: 'Align to boundary' },
     ],
   },
+  // Jewelry settings — prong head, bezel, channel, pavé.
+  // Stone setting generators for production jewelry CAD workflows.
+  {
+    op: 'jewelry_prong_head',
+    label: 'Prong Head',
+    icon: Circle,
+    defaults: {
+      stone_diameter: 6.5,
+      prong_count: 6,
+      prong_wire_diameter: 1.0,
+      prong_height: 2.0,
+      head_style: 'standard',
+      basket_rail_count: 1,
+      seat_angle_deg: 15,
+    },
+    fields: [
+      { key: 'stone_diameter',      kind: 'number', label: 'Stone diameter (mm)',      min: 0.1, step: 0.1 },
+      { key: 'prong_count',         kind: 'select', label: 'Prong count', options: [
+        { value: 4, label: '4-prong' },
+        { value: 6, label: '6-prong' },
+      ] },
+      { key: 'prong_wire_diameter', kind: 'number', label: 'Prong wire dia. (mm)',     min: 0.1, step: 0.05 },
+      { key: 'prong_height',        kind: 'number', label: 'Prong height (mm)',        min: 0.1, step: 0.1 },
+      { key: 'head_style',          kind: 'select', label: 'Head style', options: [
+        { value: 'standard',  label: 'Standard' },
+        { value: 'basket',    label: 'Basket' },
+        { value: 'trellis',   label: 'Trellis' },
+        { value: 'cathedral', label: 'Cathedral' },
+      ] },
+      { key: 'basket_rail_count', kind: 'number', label: 'Basket rail count', min: 0, step: 1 },
+      { key: 'seat_angle_deg',    kind: 'number', label: 'Seat angle (°)',    min: 1, max: 45, step: 1 },
+    ],
+  },
+  {
+    op: 'jewelry_bezel',
+    label: 'Bezel',
+    icon: Circle,
+    defaults: {
+      stone_diameter: 6.5,
+      wall_thickness: 0.5,
+      bezel_height: 3.0,
+      bearing_ledge_height: 1.2,
+      bezel_style: 'full',
+      partial_opening_deg: 60,
+      taper_angle_deg: 0,
+    },
+    fields: [
+      { key: 'stone_diameter',       kind: 'number', label: 'Stone diameter (mm)',    min: 0.1, step: 0.1 },
+      { key: 'wall_thickness',       kind: 'number', label: 'Wall thickness (mm)',    min: 0.1, step: 0.05 },
+      { key: 'bezel_height',         kind: 'number', label: 'Bezel height (mm)',      min: 0.1, step: 0.1 },
+      { key: 'bearing_ledge_height', kind: 'number', label: 'Bearing ledge ht. (mm)', min: 0.05, step: 0.05 },
+      { key: 'bezel_style',          kind: 'select', label: 'Style', options: [
+        { value: 'full',    label: 'Full' },
+        { value: 'partial', label: 'Partial' },
+        { value: 'collet',  label: 'Collet' },
+        { value: 'tapered', label: 'Tapered' },
+      ] },
+      { key: 'partial_opening_deg', kind: 'number', label: 'Opening angle (°)', min: 1, max: 359, step: 5,
+        showWhen: (n) => n.bezel_style === 'partial' },
+      { key: 'taper_angle_deg', kind: 'number', label: 'Taper angle (°)', min: 0, max: 30, step: 1,
+        showWhen: (n) => n.bezel_style === 'tapered' || n.bezel_style === 'collet' },
+    ],
+  },
+  {
+    op: 'jewelry_channel',
+    label: 'Channel',
+    icon: Layers,
+    defaults: {
+      stone_diameter: 2.5,
+      stone_count: 7,
+      stone_spacing: 2.8,
+      rail_height: 1.5,
+      rail_thickness: 0.5,
+      floor_thickness: 0.4,
+    },
+    fields: [
+      { key: 'stone_diameter',  kind: 'number', label: 'Stone diameter (mm)', min: 0.1, step: 0.1 },
+      { key: 'stone_count',     kind: 'number', label: 'Stone count',         min: 1, step: 1 },
+      { key: 'stone_spacing',   kind: 'number', label: 'C-to-C spacing (mm)', min: 0.1, step: 0.05 },
+      { key: 'rail_height',     kind: 'number', label: 'Rail height (mm)',    min: 0.1, step: 0.1 },
+      { key: 'rail_thickness',  kind: 'number', label: 'Rail thickness (mm)', min: 0.1, step: 0.05 },
+      { key: 'floor_thickness', kind: 'number', label: 'Floor thickness (mm)', min: 0.1, step: 0.05 },
+    ],
+  },
+  {
+    op: 'jewelry_pave',
+    label: 'Pavé Array',
+    icon: LayoutGrid,
+    defaults: {
+      region_width: 10.0,
+      region_height: 10.0,
+      stone_diameter: 1.5,
+      stone_spacing: 0.2,
+      edge_margin: 0.5,
+      surface_normal: [0, 0, 1],
+      surface_origin: [0, 0, 0],
+    },
+    fields: [
+      { key: 'region_width',   kind: 'number', label: 'Region width (mm)',   min: 0.1, step: 0.5 },
+      { key: 'region_height',  kind: 'number', label: 'Region height (mm)',  min: 0.1, step: 0.5 },
+      { key: 'stone_diameter', kind: 'number', label: 'Stone diameter (mm)', min: 0.1, step: 0.05 },
+      { key: 'stone_spacing',  kind: 'number', label: 'Stone spacing (mm)',  min: 0, step: 0.05 },
+      { key: 'edge_margin',    kind: 'number', label: 'Edge margin (mm)',    min: 0, step: 0.1 },
+    ],
+  },
   // NURBS Phase 4 C4 — curvature comb overlay (visualisation-only).
   // GeomAbs_G3 doesn't exist in stock OCCT — overlay lets users EYEBALL
   // G3 continuity at face junctions instead of enforcing it algorithmically.
@@ -609,7 +714,7 @@ const FEATURE_CATEGORIES = [
   { id: 'modify',   label: 'Modify',        ops: ['fillet', 'chamfer', 'shell', 'push_pull', 'variable_radius_fillet', 'to_solid', 'boolean', 'section', 'quad_remesh'] },
   { id: 'pattern',  label: 'Pattern',       ops: ['linear_pattern', 'polar_pattern', 'mirror_pattern'] },
   { id: 'surface',  label: 'Surfacing',     ops: ['sweep1', 'sweep2', 'loft', 'network_srf', 'blend_srf', 'surface_boolean', 'surface_curvature_combs'] },
-  { id: 'jewelry',  label: 'Jewelry',       ops: ['gemstone', 'gem_seat', 'ring_shank'] },
+  { id: 'jewelry',  label: 'Jewelry',       ops: ['gemstone', 'gem_seat', 'ring_shank', 'jewelry_prong_head', 'jewelry_bezel', 'jewelry_channel', 'jewelry_pave'] },
 ]
 
 const DEBOUNCE_MS = 300

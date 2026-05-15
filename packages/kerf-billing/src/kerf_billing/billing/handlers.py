@@ -7,6 +7,10 @@ from typing import Optional
 from fastapi import Request, HTTPException
 from fastapi.responses import JSONResponse
 
+# >>> CLOUD-BETA (remove post-launch): drop this import when beta.py is deleted.
+from kerf_billing.billing.beta import payments_disabled
+# <<< CLOUD-BETA
+
 
 logger = logging.getLogger(__name__)
 
@@ -32,12 +36,14 @@ class Handlers:
         if not uid:
             return JSONResponse(status_code=401, content={"error": "unauthorized"})
 
+        # >>> CLOUD-BETA (remove post-launch): delete this block.
         # Defense-in-depth: reject payment attempts when cloud beta is active.
-        if getattr(self.cfg, "cloud_beta", False):
+        if payments_disabled(self.cfg):
             return JSONResponse(
                 status_code=403,
                 content={"error": "billing disabled in beta — everyone is on Free"},
             )
+        # <<< CLOUD-BETA
 
         try:
             body = await request.json()

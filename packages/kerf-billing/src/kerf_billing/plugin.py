@@ -9,6 +9,10 @@ from fastapi import FastAPI
 
 from kerf_core.plugin import PluginManifest
 
+# >>> CLOUD-BETA (remove post-launch): drop this import when beta.py is deleted.
+from kerf_billing.billing.beta import payments_disabled
+# <<< CLOUD-BETA
+
 PLUGIN_DEPENDS = ["kerf-auth"]
 
 
@@ -21,6 +25,26 @@ async def register(app: FastAPI, ctx) -> PluginManifest:
             provides=[],
             depends=["kerf-auth"],
         )
+
+    # >>> CLOUD-BETA (remove post-launch): delete this block; always mount
+    # the full Paystack router and init Paystack unconditionally below.
+    settings = getattr(ctx, "settings", None) or getattr(ctx, "cfg", None)
+    if payments_disabled(settings):
+        from kerf_billing.routes import router_beta_inert
+        app.include_router(router_beta_inert, prefix="/api", tags=["billing"])
+        ctx.logger.info(
+            "kerf-billing: cloud_beta=True — Paystack routes inert (503), "
+            "no PaystackClient constructed"
+        )
+        return PluginManifest(
+            name="kerf-billing",
+            version="0.1.0",
+            # >>> CLOUD-BETA (remove post-launch): restore "billing.paystack" below.
+            provides=["billing.buckets"],
+            # <<< CLOUD-BETA
+            depends=["kerf-auth"],
+        )
+    # <<< CLOUD-BETA
 
     from kerf_billing.routes import router
     app.include_router(router, prefix="/api", tags=["billing"])

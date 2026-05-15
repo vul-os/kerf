@@ -12,6 +12,9 @@ from kerf_core.dependencies import require_auth
 
 from kerf_billing.billing.paystack import PaystackClient
 from kerf_billing.billing.handlers import Handlers as BillingHandlers
+# >>> CLOUD-BETA (remove post-launch): drop this import when beta.py is deleted.
+from kerf_billing.billing.beta import payments_disabled
+# <<< CLOUD-BETA
 from kerf_cloud.fx import Fetcher
 
 
@@ -81,12 +84,14 @@ async def topup(
     if not uid:
         raise HTTPException(status_code=401, detail="unauthorized")
 
+    # >>> CLOUD-BETA (remove post-launch): delete this block.
     # Defense-in-depth: reject payment attempts when cloud beta is active.
-    if settings.cloud_beta:
+    if payments_disabled(settings):
         raise HTTPException(
             status_code=403,
             detail="billing disabled in beta — everyone is on Free",
         )
+    # <<< CLOUD-BETA
 
     handlers = _get_billing_handlers()
     if not handlers:
@@ -372,3 +377,39 @@ def _parse_time_or_default(s: Optional[str], default: datetime) -> datetime:
         return datetime.strptime(s, "%Y-%m-%d")
     except ValueError:
         return default
+
+
+# >>> CLOUD-BETA (remove post-launch): delete router_beta_inert and all
+# references to it.  The billing routes (topup, webhook) should always be
+# live once cloud-beta is over.
+router_beta_inert = APIRouter()
+
+_BETA_503 = JSONResponse(
+    status_code=503,
+    content={"error": "billing disabled in beta — everyone is on Free"},
+)
+
+
+@router_beta_inert.post("/billing/topup")
+async def _beta_topup(request: Request):
+    """Charge endpoint — inert during cloud-beta."""
+    return _BETA_503
+
+
+@router_beta_inert.post("/billing/webhook")
+async def _beta_webhook(request: Request):
+    """Paystack webhook — inert during cloud-beta; always acks with 503."""
+    return _BETA_503
+
+
+@router_beta_inert.get("/billing/me")
+async def _beta_me(payload: dict = Depends(require_auth)):
+    """Balance/invoice endpoint — still served during beta (read-only)."""
+    return {"credits_usd": 0.0, "recent_invoices": [], "recent_usage": []}
+
+
+@router_beta_inert.get("/billing/usage")
+async def _beta_usage(payload: dict = Depends(require_auth)):
+    """Usage endpoint — still served during beta (read-only, empty)."""
+    return {"events": [], "from": None, "to": None}
+# <<< CLOUD-BETA

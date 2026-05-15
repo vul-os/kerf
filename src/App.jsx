@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import Landing from './routes/Landing.jsx'
 import JewelryDomainPage from './routes/domains/Jewelry.jsx'
 import Architecture from './routes/domains/Architecture.jsx'
+import Automotive from './routes/domains/Automotive.jsx'
 import Pricing from './routes/Pricing.jsx'
 import Roadmap from './routes/Roadmap.jsx'
 import DocsHome from './routes/Docs/index.jsx'
@@ -125,6 +126,7 @@ export default function App() {
       <Route path="/auth/callback" element={<AuthCallback />} />
       {cloudEnabled && <Route path="/pricing" element={<Pricing />} />}
       <Route path="/roadmap" element={<Roadmap />} />
+      <Route path="/domains/automotive" element={<Automotive />} />
       <Route path="/docs" element={<DocsHome />} />
       <Route path="/docs/:slug" element={<DocsArticle />} />
       <Route path="/domains/electronics" element={<Electronics />} />

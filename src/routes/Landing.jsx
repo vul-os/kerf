@@ -60,6 +60,7 @@ import Header from '../components/Header.jsx'
 import Footer from '../components/Footer.jsx'
 import Button from '../components/Button.jsx'
 import { useCloudConfig } from '../cloud/useCloudConfig.js'
+import DomainSpotlights from '../components/landing/DomainSpotlights.jsx'
 import {
   HeroIllustration,
   JscadIllustration,
@@ -1375,6 +1376,7 @@ export default function Landing() {
       <PipelineDivider />
       <PerDomain />
       <CapabilityTour />
+      <DomainSpotlights />
       <Compare />
       <ChatLoop />
       <RecentlyShipped />

@@ -334,7 +334,7 @@ async def google_start(request: Request):
         path="/",
         httponly=True,
         samesite="lax",
-        maxage=600,
+        max_age=600,
     )
     return response
 

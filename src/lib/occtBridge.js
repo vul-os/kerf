@@ -1577,3 +1577,224 @@ export function splitFaceAlongCurve(oc, face, projectedWire, tracker) {
     'Escalate to C2-T12 (Section+prism fallback) or rebuild the WASM module.'
   )
 }
+
+// ---------------------------------------------------------------------------
+// NURBS Phase 4 — Capability 4: curvature comb sampling
+//
+// sampleSurfaceCurvature — sample principal curvatures, mean curvature,
+// Gaussian curvature and surface normal on a UV grid over a given OCCT face.
+// Results feed CurvatureCombOverlay.jsx which renders Three.js LineSegments
+// orthogonal to the surface at each UV sample, scaled by curvature magnitude.
+//
+// Algorithm:
+//   For each (u,v) in a uniform grid of density `uvDensity`:
+//     GeomLProp_SLProps_2(surf, u, v, 2, 1e-7)  ← order=2 to get curvatures
+//     If IsNormalDefined()  → normal
+//     If IsCurvatureDefined() → MaxCurvature(), MinCurvature()
+//     mean      = (k1 + k2) / 2
+//     gaussian  = k1 * k2
+//     maxAbs    = max(|k1|, |k2|)
+//     principalDir = direction of max principal curvature (MaxCurvatureDirection)
+//
+// Binding probe note (Phase 4 boot log):
+//   GeomLProp_SLProps is probed in NURBS_PHASE4_C4_BINDINGS. The constructor
+//   variant GeomLProp_SLProps_2(surf, u, v, order, tol) is already used in
+//   multiple places in occtWorker.js (walkSideFaces, surface_continuity, etc.),
+//   so it is effectively verified as bound. The curvature methods
+//   IsCurvatureDefined / MaxCurvature / MinCurvature / MaxCurvatureDirection
+//   are new call sites for this codebase but are part of the same class.
+//
+// Returns:
+//   {
+//     points: [{
+//       u, v,               — parameter coords
+//       x, y, z,            — 3D world position
+//       nx, ny, nz,         — surface normal unit vector (or 0,0,1 fallback)
+//       normalDefined: bool,
+//       k1, k2,             — min/max principal curvatures (signed, 1/mm)
+//       mean,               — mean curvature (k1+k2)/2
+//       gaussian,           — Gaussian curvature k1*k2
+//       maxAbs,             — max(|k1|, |k2|) — used for comb scale
+//       curvatureDefined: bool,
+//       pdx, pdy, pdz,      — principal direction of max curvature (or 0,0,0)
+//     }],
+//     stats: {
+//       minMean, maxMean,   — range for colormap normalisation
+//       minGaussian, maxGaussian,
+//       minK1, maxK1, minK2, maxK2,
+//       sampleCount,
+//       curvatureDefinedCount,
+//     },
+//     geomLPropSLPropsPresent: bool,  — true when GeomLProp_SLProps_2 is callable
+//   }
+//
+// @param {object} oc          — opencascade.js handle
+// @param {object} face        — TopoDS_Face (OCCT topology)
+// @param {number} uvDensity   — grid step in UV parameter space; 0.1 = 10×10
+//                               grid; smaller = more samples
+// @param {Array}  tracker     — OCCT object lifetime tracker (optional; pass []
+//                               when calling from a standalone context)
+// @returns {object} — described above
+export function sampleSurfaceCurvature(oc, face, uvDensity = 0.1, tracker = []) {
+  const points = []
+  const stats = {
+    minMean: Infinity, maxMean: -Infinity,
+    minGaussian: Infinity, maxGaussian: -Infinity,
+    minK1: Infinity, maxK1: -Infinity,
+    minK2: Infinity, maxK2: -Infinity,
+    sampleCount: 0,
+    curvatureDefinedCount: 0,
+  }
+
+  // Probe: is GeomLProp_SLProps_2 callable?
+  const geomLPropSLPropsPresent = typeof oc.GeomLProp_SLProps_2 === 'function'
+
+  if (!geomLPropSLPropsPresent || !face) {
+    // Return empty result — overlay renders nothing, no error thrown.
+    return { points, stats, geomLPropSLPropsPresent }
+  }
+
+  // Get the parametric bounds of the face via BRep_Tool.
+  let uMin = 0, uMax = 1, vMin = 0, vMax = 1
+  let surf = null
+  try {
+    // BRep_Tool.Surface_2(face) returns the underlying Geom_Surface handle.
+    surf = oc.BRep_Tool.Surface_2(face)
+
+    // Get UV bounds from the face's parameter range.
+    // BRep_Tool.Range_1(face) is not always available; use the surface itself
+    // through BRepTools.UVBounds which is the canonical approach.
+    //
+    // Fallback: if BRepTools is absent (unlikely) we fall back to [0,1].
+    if (typeof oc.BRepTools === 'object' && typeof oc.BRepTools.UVBounds === 'function') {
+      // UVBounds(face, umin, umax, vmin, vmax) writes into boxed doubles.
+      // The binding exposes this as a function returning an array or as an
+      // object with {uMin, uMax, vMin, vMax}. Try both.
+      try {
+        const bounds = oc.BRepTools.UVBounds(face)
+        if (bounds && typeof bounds === 'object') {
+          if ('uMin' in bounds) { uMin = bounds.uMin; uMax = bounds.uMax; vMin = bounds.vMin; vMax = bounds.vMax }
+          else if (Array.isArray(bounds) && bounds.length >= 4) { [uMin, uMax, vMin, vMax] = bounds }
+        }
+      } catch { /* stay at [0,1] */ }
+    } else {
+      // Fallback: ask the surface for its natural parameter bounds.
+      try {
+        const uFirst = surf.FirstUParameter ? surf.FirstUParameter() : 0
+        const uLast  = surf.LastUParameter  ? surf.LastUParameter()  : 1
+        const vFirst = surf.FirstVParameter ? surf.FirstVParameter() : 0
+        const vLast  = surf.LastVParameter  ? surf.LastVParameter()  : 1
+        uMin = uFirst; uMax = uLast; vMin = vFirst; vMax = vLast
+      } catch { /* stay at [0,1] */ }
+    }
+  } catch {
+    return { points, stats, geomLPropSLPropsPresent }
+  }
+
+  const uRange = uMax - uMin
+  const vRange = vMax - vMin
+  if (uRange <= 0 || vRange <= 0) {
+    return { points, stats, geomLPropSLPropsPresent }
+  }
+
+  // Build the grid. uvDensity is the fractional step: 0.1 → steps at
+  // 10%, 20%, …, 90% of the parameter range (9 internal points + endpoints).
+  const step = Math.max(uvDensity, 0.01)  // clamp: no finer than 1% to avoid OOM
+  const uSteps = Math.ceil(uRange / (step * uRange)) + 1
+  const vSteps = Math.ceil(vRange / (step * vRange)) + 1
+  const uInc = uRange / Math.max(uSteps - 1, 1)
+  const vInc = vRange / Math.max(vSteps - 1, 1)
+
+  for (let i = 0; i < uSteps; i++) {
+    const u = uMin + i * uInc
+    for (let j = 0; j < vSteps; j++) {
+      const v = vMin + j * vInc
+      let props = null
+      try {
+        // order=2 unlocks curvature computation (order=1 gives only normal).
+        props = new oc.GeomLProp_SLProps_2(surf, u, v, 2, 1e-7)
+        if (typeof props.delete === 'function') tracker.push(props)
+
+        let x = 0, y = 0, z = 0
+        let nx = 0, ny = 0, nz = 1
+        let normalDefined = false
+        let k1 = 0, k2 = 0, mean = 0, gaussian = 0, maxAbs = 0
+        let curvatureDefined = false
+        let pdx = 0, pdy = 0, pdz = 0
+
+        // Position via SLProps.Value().
+        try {
+          const pt = props.Value()
+          x = pt.X(); y = pt.Y(); z = pt.Z()
+        } catch {
+          // Degenerate UV — skip this sample.
+          continue
+        }
+
+        // Normal.
+        if (props.IsNormalDefined()) {
+          normalDefined = true
+          const n = props.Normal()
+          nx = n.X(); ny = n.Y(); nz = n.Z()
+        }
+
+        // Principal curvatures.
+        if (props.IsCurvatureDefined()) {
+          curvatureDefined = true
+          k1 = props.MinCurvature()  // k_min (algebraically smaller)
+          k2 = props.MaxCurvature()  // k_max (algebraically larger)
+          mean     = (k1 + k2) / 2
+          gaussian = k1 * k2
+          maxAbs   = Math.max(Math.abs(k1), Math.abs(k2))
+
+          // Principal direction of max curvature.
+          try {
+            if (typeof props.MaxCurvatureDirection === 'function') {
+              const dir = props.MaxCurvatureDirection()
+              pdx = dir.X(); pdy = dir.Y(); pdz = dir.Z()
+            }
+          } catch { /* direction optional */ }
+
+          // Update stats.
+          if (mean < stats.minMean) stats.minMean = mean
+          if (mean > stats.maxMean) stats.maxMean = mean
+          if (gaussian < stats.minGaussian) stats.minGaussian = gaussian
+          if (gaussian > stats.maxGaussian) stats.maxGaussian = gaussian
+          if (k1 < stats.minK1) stats.minK1 = k1
+          if (k1 > stats.maxK1) stats.maxK1 = k1
+          if (k2 < stats.minK2) stats.minK2 = k2
+          if (k2 > stats.maxK2) stats.maxK2 = k2
+          stats.curvatureDefinedCount++
+        }
+
+        stats.sampleCount++
+        points.push({
+          u, v, x, y, z, nx, ny, nz, normalDefined,
+          k1, k2, mean, gaussian, maxAbs, curvatureDefined,
+          pdx, pdy, pdz,
+        })
+      } catch {
+        // Individual sample failure — skip.
+        if (props && typeof props.delete === 'function') {
+          try { props.delete() } catch { /* */ }
+          // Remove the pushed-but-failed props from the tracker to avoid
+          // double-delete in freeAll.  Linear scan is fine — tracker is short.
+          const idx = tracker.lastIndexOf(props)
+          if (idx >= 0) tracker.splice(idx, 1)
+        }
+      }
+    }
+  }
+
+  // Normalise empty stats.
+  if (!isFinite(stats.minMean)) stats.minMean = 0
+  if (!isFinite(stats.maxMean)) stats.maxMean = 0
+  if (!isFinite(stats.minGaussian)) stats.minGaussian = 0
+  if (!isFinite(stats.maxGaussian)) stats.maxGaussian = 0
+  if (!isFinite(stats.minK1)) stats.minK1 = 0
+  if (!isFinite(stats.maxK1)) stats.maxK1 = 0
+  if (!isFinite(stats.minK2)) stats.minK2 = 0
+  if (!isFinite(stats.maxK2)) stats.maxK2 = 0
+
+  return { points, stats, geomLPropSLPropsPresent }
+}

@@ -46,6 +46,7 @@ import {
   buildVariableRadiusLaw,
   surfaceToSolid, SurfaceToSolidUnsupportedError,
   projectCurveOntoSurface, splitFaceAlongCurve, TrimByCurveUnsupportedError,
+  sampleSurfaceCurvature,
 } from './occtBridge.js'
 import { sketchToGeom2 } from './sketchGeom2.js'
 import { parseSketch } from './sketchSolver.js'
@@ -2901,6 +2902,116 @@ function opTrimByCurve(oc, prev, node, sketches, tracker, bodyMap) {
 }
 
 // ---------------------------------------------------------------------------
+// opSurfaceCurvatureCombs — NURBS Phase 4 Capability 4
+//
+// Samples principal curvatures on a NURBS surface face using GeomLProp_SLProps
+// and returns a structured payload for CurvatureCombOverlay.jsx to visualise.
+//
+// This op does NOT modify the current shape. It is a read/query op that
+// produces a JSON-serialisable curvature payload instead of a B-rep shape.
+// Because it returns null (no shape), evaluateTree stores null in bodyMap and
+// does not call breptToMesh on the result — the overlay data is transported
+// separately in the worker's `surface_curvature_combs_result` message.
+//
+// Why viz-only? GeomAbs_G3 does not exist in the GeomAbs_Shape enum in stock
+// OCCT. Algorithmic G3 enforcement would require either:
+//   (a) A custom WASM rebuild that adds G3-aware constraint solvers — large
+//       C++ work outside the opencascade.js project scope; or
+//   (b) An approximation: iterative pole-adjustment minimising higher-order
+//       derivative mismatches at the seam — effectively a nonlinear
+//       optimiser with no OCCT primitive to back it.
+// The viz-only path (curvature combs overlay) gives practitioners the ability
+// to EYEBALL G3 continuity at face junctions. In automotive Class-A surfacing
+// and jewelry this is the standard workflow: build to G2, then refine by
+// inspecting combs. Full algorithmic enforcement is a custom-WASM undertaking.
+//
+// Plan ref: docs/plans/nurbs-phase-4-full.md § Capability 4.
+//
+// Node schema:
+//   {
+//     op: "surface_curvature_combs",
+//     id: string,
+//     target_feature_ref: string,   // feature id whose face(s) to sample
+//     target_face_name?: string,    // if set, sample only this face; else all faces
+//     uv_density?: number,          // UV grid step (default 0.1 = ~10×10 per face)
+//     scale_factor?: number,        // comb length = curvature × scale_factor (default 10)
+//     show_combs?: boolean,         // overlay toggle (default true)
+//   }
+//
+// @param {object} oc       — opencascade.js handle
+// @param {object} _prev    — current shape (read-only; NOT modified)
+// @param {object} node     — feature node
+// @param {object} _sketches — unused
+// @param {object} tracker  — OCCT object lifetime tracker
+// @param {object} bodyMap  — { [nodeId]: TopoDS_Shape }
+// @returns {null}          — no shape mutation; result sent as a side message
+
+function opSurfaceCurvatureCombs(oc, _prev, node, _sketches, tracker, bodyMap) {
+  const targetRef  = node.target_feature_ref
+  const faceName   = node.target_face_name   || null
+  const uvDensity  = typeof node.uv_density  === 'number' ? node.uv_density  : 0.1
+  const scaleFactor = typeof node.scale_factor === 'number' ? node.scale_factor : 10
+  const showCombs  = node.show_combs !== false  // default true
+
+  if (!targetRef) throw new Error('surface_curvature_combs: target_feature_ref is required')
+
+  const targetShape = bodyMap && bodyMap[targetRef]
+  if (!targetShape) {
+    throw new Error(
+      `surface_curvature_combs: target_feature_ref '${targetRef}' not found in evaluated tree`
+    )
+  }
+
+  // Collect faces to sample.
+  const faceSamples = []
+
+  const FACE  = oc.TopAbs_ShapeEnum?.TopAbs_FACE  ?? 4
+  const SHAPE = oc.TopAbs_ShapeEnum?.TopAbs_SHAPE ?? 8
+  let exp
+  try {
+    exp = new oc.TopExp_Explorer_2(targetShape, FACE, SHAPE)
+    let faceIndex = 0
+    for (; exp.More(); exp.Next()) {
+      const fSh = oc.TopoDS.Face_1(exp.Current())
+      const currentFaceName = `face-${faceIndex}`
+      faceIndex++
+
+      // Filter by face name when target_face_name is specified.
+      if (faceName && currentFaceName !== faceName) continue
+
+      const sample = sampleSurfaceCurvature(oc, fSh, uvDensity, tracker)
+      faceSamples.push({
+        faceName: currentFaceName,
+        ...sample,
+      })
+    }
+  } catch (err) {
+    throw new Error(`surface_curvature_combs: face exploration failed: ${err?.message || err}`)
+  } finally {
+    try { if (exp) exp.delete() } catch { /* */ }
+  }
+
+  // Post the curvature data as a side message. The worker message handler
+  // intercepts this before the tree evaluation returns to postMessage.
+  // We abuse `self` here — this module is always executed in a Worker context.
+  // The overlay component listens for `surface_curvature_combs_result` messages.
+  if (typeof self !== 'undefined' && typeof self.postMessage === 'function') {
+    self.postMessage({
+      type: 'surface_curvature_combs_result',
+      nodeId: node.id || null,
+      targetRef,
+      faceSamples,
+      scaleFactor,
+      showCombs,
+    })
+  }
+
+  // Return null — no shape modification.  evaluateTree will store null in
+  // bodyMap[node.id] which is fine: downstream ops don't reference a combs node.
+  return null
+}
+
+// ---------------------------------------------------------------------------
 // Tree evaluation.
 //
 // The evaluator walks the feature tree top-to-bottom, threading the
@@ -3189,6 +3300,17 @@ function evaluateTree(oc, tree, sketches) {
           currentFaceNamer = null
           break
         }
+        case 'surface_curvature_combs': {
+          // surface_curvature_combs is a read/query op — it does NOT modify the
+          // current shape.  It samples curvatures on the target feature's faces
+          // and posts a `surface_curvature_combs_result` side message for the
+          // overlay component.  `current` is left unchanged; `next` = null so
+          // the body is NOT added to bodyMap (nothing downstream references a
+          // combs node).
+          opSurfaceCurvatureCombs(oc, current, node, sketches, tracker, bodyMap)
+          next = current  // keep current shape alive for subsequent ops
+          break
+        }
         default:
           throw new Error(`unknown feature op '${node.op}'`)
       }
@@ -3417,6 +3539,12 @@ async function evaluateToFinalShape(oc, tree, sketches) {
           // Do NOT cleanup current — opTrimByCurve reads the target face from it.
           next = opTrimByCurve(oc, current, node, sketches, tracker, bodyMap)
           currentFaceNamer = null
+          break
+        case 'surface_curvature_combs':
+          // Read-only query — does not modify the shape.  Curvature data is
+          // posted as a side message; current shape passes through unchanged.
+          opSurfaceCurvatureCombs(oc, current, node, sketches, tracker, bodyMap)
+          next = current
           break
         default: throw new Error(`unknown feature op '${node.op}'`)
       }

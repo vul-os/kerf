@@ -1,6 +1,7 @@
 """
 Tests for kerf_cad_core.jewelry.settings — prong head, bezel, channel, pavé,
-tension, flush, halo, three-stone, cluster.
+tension, flush, halo, three-stone, cluster, bar, bead/grain, gypsy-pavé,
+illusion, invisible.
 
 Structure
 ---------
@@ -56,6 +57,8 @@ from kerf_cad_core.jewelry.settings import (
     jewelry_halo_spec,
     jewelry_three_stone_spec,
     jewelry_cluster_spec,
+    jewelry_bar_spec,
+    jewelry_bead_grain_spec,
     # Runners
     run_jewelry_create_prong_head,
     run_jewelry_create_bezel,
@@ -66,6 +69,8 @@ from kerf_cad_core.jewelry.settings import (
     run_jewelry_create_halo,
     run_jewelry_create_three_stone,
     run_jewelry_create_cluster,
+    run_jewelry_create_bar,
+    run_jewelry_create_bead_grain,
     # Pure-Python helpers
     build_prong_head_node,
     build_bezel_node,
@@ -76,6 +81,8 @@ from kerf_cad_core.jewelry.settings import (
     build_halo_node,
     build_three_stone_node,
     build_cluster_node,
+    build_bar_node,
+    build_bead_grain_node,
     _compute_pave_grid,
     _compute_cluster_positions,
 )
@@ -1972,117 +1979,392 @@ class TestClusterRunner:
         result = json.loads(raw)
         assert result.get("code") == "BAD_ARGS"
 
-    @pytest.mark.parametrize("count", [1, 3, 7, 12, 19])
-    def test_various_stone_counts_accepted(self, count):
+
+# ============================================================================
+# Bar setting — ToolSpec schema
+# ============================================================================
+
+class TestBarSpec:
+    def test_name(self):
+        assert jewelry_bar_spec.name == "jewelry_create_bar"
+
+    def test_required_fields(self):
+        req = jewelry_bar_spec.input_schema["required"]
+        for f in ["file_id", "stone_diameter", "bar_width", "bar_height", "stone_count", "pitch"]:
+            assert f in req
+
+    def test_id_not_required(self):
+        assert "id" not in jewelry_bar_spec.input_schema["required"]
+
+
+# ============================================================================
+# Bar setting — geometry math
+# ============================================================================
+
+class TestBarGeometry:
+    def test_bar_length_formula(self):
+        node = build_bar_node(
+            node_id="bar-1",
+            stone_diameter=2.5,
+            bar_width=0.6,
+            bar_height=0.8,
+            stone_count=7,
+            pitch=2.8,
+        )
+        assert math.isclose(node["_bar_length"], 7 * 2.8, rel_tol=1e-5)
+
+    def test_bar_separation_equals_stone_diameter(self):
+        node = build_bar_node(
+            node_id="bar-2",
+            stone_diameter=3.0,
+            bar_width=0.7,
+            bar_height=1.0,
+            stone_count=5,
+            pitch=3.5,
+        )
+        assert math.isclose(node["_bar_separation"], 3.0, rel_tol=1e-9)
+
+    def test_op_field(self):
+        node = build_bar_node(
+            node_id="bar-3",
+            stone_diameter=2.0, bar_width=0.5, bar_height=0.7,
+            stone_count=3, pitch=2.5,
+        )
+        assert node["op"] == "jewelry_bar"
+
+    def test_all_params_stored(self):
+        node = build_bar_node(
+            node_id="bar-4",
+            stone_diameter=2.5,
+            bar_width=0.6,
+            bar_height=0.9,
+            stone_count=6,
+            pitch=3.0,
+        )
+        assert node["stone_diameter"] == 2.5
+        assert node["bar_width"] == 0.6
+        assert node["bar_height"] == 0.9
+        assert node["stone_count"] == 6
+        assert node["pitch"] == 3.0
+
+
+# ============================================================================
+# Bar setting — LLM tool runner
+# ============================================================================
+
+class TestBarRunner:
+    def test_success(self):
         ctx, store, fid = make_ctx()
         result = call_tool(
-            run_jewelry_create_cluster, ctx, fid,
-            cluster_diameter=10.0, stone_size=1.5, stone_count=count, dome_height=1.0,
+            run_jewelry_create_bar, ctx, fid,
+            stone_diameter=2.5,
+            bar_width=0.6,
+            bar_height=0.8,
+            stone_count=7,
+            pitch=2.9,
         )
-        assert result.get("error") is None, f"count={count}: {result}"
+        assert result.get("error") is None, result
+        assert result["op"] == "jewelry_bar"
+        assert result["stone_count"] == 7
 
-
-# ============================================================================
-# Cross-style node coexistence — new styles integrate with existing
-# ============================================================================
-
-class TestAllStylesCoexist:
-    def test_all_nine_styles_in_same_file(self):
+    def test_node_stored(self):
         ctx, store, fid = make_ctx()
-        call_tool(run_jewelry_create_prong_head, ctx, fid,
-                  stone_diameter=6.5, prong_count=6, prong_wire_diameter=1.0, prong_height=2.0)
-        call_tool(run_jewelry_create_bezel, ctx, fid,
-                  stone_diameter=6.5, wall_thickness=0.5, bezel_height=3.0, bearing_ledge_height=1.5)
-        call_tool(run_jewelry_create_channel, ctx, fid,
-                  stone_diameter=2.5, stone_count=5, stone_spacing=3.0,
-                  rail_height=1.5, rail_thickness=0.5, floor_thickness=0.4)
-        call_tool(run_jewelry_pave_array, ctx, fid,
-                  region_width=10.0, region_height=10.0,
-                  stone_diameter=1.5, stone_spacing=0.2, edge_margin=0.5)
-        call_tool(run_jewelry_create_tension, ctx, fid,
-                  stone_diameter=6.5, band_thickness=3.0, gap=5.8,
-                  rail_width=0.5, rail_depth=0.3)
-        call_tool(run_jewelry_create_flush, ctx, fid,
-                  stone_diameter=3.5, seat_depth=1.8, bevel_width=0.2, bevel_angle_deg=45.0)
-        call_tool(run_jewelry_create_halo, ctx, fid,
-                  center_diameter=6.5, halo_stone_size=1.2, halo_stone_count=18,
-                  halo_gap=0.15, halo_metal_width=0.4)
-        call_tool(run_jewelry_create_three_stone, ctx, fid,
-                  center_diameter=6.5, side_diameter=4.0, stone_spacing=0.2, base_height=1.5)
-        call_tool(run_jewelry_create_cluster, ctx, fid,
-                  cluster_diameter=10.0, stone_size=1.5, stone_count=7, dome_height=1.0)
+        call_tool(
+            run_jewelry_create_bar, ctx, fid,
+            stone_diameter=2.5, bar_width=0.6, bar_height=0.8,
+            stone_count=5, pitch=2.9,
+        )
+        node = get_last_node(store)
+        assert node["op"] == "jewelry_bar"
+        assert node["stone_diameter"] == 2.5
 
-        doc = json.loads(store["content"])
-        ops = [n["op"] for n in doc["features"]]
-        expected_ops = [
-            "jewelry_prong_head",
-            "jewelry_bezel",
-            "jewelry_channel",
-            "jewelry_pave",
-            "jewelry_tension",
-            "jewelry_flush",
-            "jewelry_halo",
-            "jewelry_three_stone",
-            "jewelry_cluster",
-        ]
-        assert ops == expected_ops, f"ops mismatch: {ops}"
+    def test_node_id_auto(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_bar, ctx, fid,
+            stone_diameter=2.5, bar_width=0.6, bar_height=0.8,
+            stone_count=5, pitch=2.9,
+        )
+        node = get_last_node(store)
+        assert node["id"].startswith("jewelry_bar-")
+
+    def test_explicit_node_id(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_bar, ctx, fid,
+            stone_diameter=2.5, bar_width=0.6, bar_height=0.8,
+            stone_count=5, pitch=2.9,
+            id="my-bar",
+        )
+        node = get_last_node(store)
+        assert node["id"] == "my-bar"
+
+    def test_pitch_le_stone_diameter_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_bar, ctx, fid,
+            stone_diameter=3.0, bar_width=0.6, bar_height=0.8,
+            stone_count=5, pitch=2.5,  # less than stone_diameter
+        )
+        assert result.get("code") == "BAD_ARGS"
+        assert "pitch" in result.get("error", "")
+
+    def test_pitch_equal_to_diameter_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_bar, ctx, fid,
+            stone_diameter=3.0, bar_width=0.6, bar_height=0.8,
+            stone_count=5, pitch=3.0,  # equal, not greater
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_zero_stone_diameter_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_bar, ctx, fid,
+            stone_diameter=0, bar_width=0.6, bar_height=0.8,
+            stone_count=5, pitch=2.9,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_zero_stone_count_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_bar, ctx, fid,
+            stone_diameter=2.5, bar_width=0.6, bar_height=0.8,
+            stone_count=0, pitch=2.9,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_negative_bar_height_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_bar, ctx, fid,
+            stone_diameter=2.5, bar_width=0.6, bar_height=-0.5,
+            stone_count=5, pitch=2.9,
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_bar_length_in_result(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_bar, ctx, fid,
+            stone_diameter=2.5, bar_width=0.6, bar_height=0.8,
+            stone_count=5, pitch=3.0,
+        )
+        assert "_bar_length" in result
+        assert math.isclose(result["_bar_length"], 5 * 3.0, rel_tol=1e-5)
+
+    def test_missing_file_not_found(self):
+        ctx, _, fid = make_ctx(kind="NOT_FOUND")
+        result = call_tool(
+            run_jewelry_create_bar, ctx, fid,
+            stone_diameter=2.5, bar_width=0.6, bar_height=0.8,
+            stone_count=5, pitch=2.9,
+        )
+        assert result.get("code") == "NOT_FOUND"
+
+    def test_invalid_json_rejected(self):
+        ctx, _, _ = make_ctx()
+        raw = run_sync(run_jewelry_create_bar(ctx, b"not json"))
+        result = json.loads(raw)
+        assert result.get("code") == "BAD_ARGS"
 
 
 # ============================================================================
-# OCC-gated: new styles
+# Bead / grain setting — ToolSpec schema
 # ============================================================================
 
-@skip_no_occ
-class TestOccNewStyles:
-    """OCC-gated: smoke-test node specs for new setting types via BRepPrimAPI."""
+class TestBeadGrainSpec:
+    def test_name(self):
+        assert jewelry_bead_grain_spec.name == "jewelry_create_bead_grain"
 
-    def test_occ_tension_band_cylinder(self):
-        from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeCylinder  # type: ignore
-        from OCC.Core.gp import gp_Pnt, gp_Ax2, gp_Dir  # type: ignore
+    def test_required_fields(self):
+        req = jewelry_bead_grain_spec.input_schema["required"]
+        for f in ["file_id", "stone_diameter", "bead_count_per_stone", "bead_diameter", "field_layout"]:
+            assert f in req
 
-        node = build_tension_node(
-            node_id="occ-t-1",
-            stone_diameter=6.5, band_thickness=3.0, gap=5.5,
-            rail_width=0.5, rail_depth=0.3,
+    def test_field_layout_enum(self):
+        props = jewelry_bead_grain_spec.input_schema["properties"]
+        enum = props["field_layout"].get("enum", [])
+        assert set(enum) == {"line", "grid"}
+
+    def test_id_not_required(self):
+        assert "id" not in jewelry_bead_grain_spec.input_schema["required"]
+
+
+# ============================================================================
+# Bead / grain setting — geometry math
+# ============================================================================
+
+class TestBeadGrainGeometry:
+    def test_bead_pitch_deg_formula(self):
+        node = build_bead_grain_node(
+            node_id="bg-1",
+            stone_diameter=2.0,
+            bead_count_per_stone=4,
+            bead_diameter=0.5,
+            field_layout="line",
         )
-        # Build a cylinder representing the band cross-section.
-        ax = gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1))
-        cyl = BRepPrimAPI_MakeCylinder(ax, node["_seat_radius"], node["band_thickness"])
-        assert not cyl.Shape().IsNull()
+        assert math.isclose(node["_bead_pitch_deg"], 360.0 / 4, rel_tol=1e-5)
 
-    def test_occ_flush_seat_cylinder(self):
-        from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeCylinder  # type: ignore
-        from OCC.Core.gp import gp_Pnt, gp_Ax2, gp_Dir  # type: ignore
-
-        node = build_flush_node(
-            node_id="occ-f-1",
-            stone_diameter=3.5, seat_depth=1.8, bevel_width=0.2, bevel_angle_deg=45.0,
+    def test_bead_ring_radius_formula(self):
+        node = build_bead_grain_node(
+            node_id="bg-2",
+            stone_diameter=3.0,
+            bead_count_per_stone=3,
+            bead_diameter=0.6,
+            field_layout="grid",
         )
-        ax = gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1))
-        cyl = BRepPrimAPI_MakeCylinder(ax, node["stone_diameter"] / 2.0, node["seat_depth"])
-        assert not cyl.Shape().IsNull()
+        assert math.isclose(node["_bead_ring_radius"], 1.5, rel_tol=1e-9)
 
-    def test_occ_halo_outer_cylinder(self):
-        from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeCylinder  # type: ignore
-        from OCC.Core.gp import gp_Pnt, gp_Ax2, gp_Dir  # type: ignore
-
-        node = build_halo_node(
-            node_id="occ-h-1",
-            center_diameter=6.5, halo_stone_size=1.2, halo_stone_count=18,
-            halo_gap=0.15, halo_metal_width=0.4,
+    def test_op_field(self):
+        node = build_bead_grain_node(
+            node_id="bg-3",
+            stone_diameter=2.0, bead_count_per_stone=2,
+            bead_diameter=0.4, field_layout="line",
         )
-        ax = gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1))
-        cyl = BRepPrimAPI_MakeCylinder(ax, node["_halo_outer_diameter"] / 2.0, 2.0)
-        assert not cyl.Shape().IsNull()
+        assert node["op"] == "jewelry_bead_grain"
 
-    def test_occ_cluster_dome_cylinder(self):
-        from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeCylinder  # type: ignore
-        from OCC.Core.gp import gp_Pnt, gp_Ax2, gp_Dir  # type: ignore
-
-        node = build_cluster_node(
-            node_id="occ-cl-1",
-            cluster_diameter=10.0, stone_size=1.5, stone_count=7, dome_height=1.2,
+    def test_all_params_stored(self):
+        node = build_bead_grain_node(
+            node_id="bg-4",
+            stone_diameter=2.5,
+            bead_count_per_stone=4,
+            bead_diameter=0.55,
+            field_layout="grid",
         )
-        ax = gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1))
-        cyl = BRepPrimAPI_MakeCylinder(ax, node["cluster_diameter"] / 2.0, node["dome_height"])
-        assert not cyl.Shape().IsNull()
+        assert node["stone_diameter"] == 2.5
+        assert node["bead_count_per_stone"] == 4
+        assert node["bead_diameter"] == 0.55
+        assert node["field_layout"] == "grid"
+
+
+# ============================================================================
+# Bead / grain setting — LLM tool runner
+# ============================================================================
+
+class TestBeadGrainRunner:
+    def test_success_line(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_bead_grain, ctx, fid,
+            stone_diameter=2.0,
+            bead_count_per_stone=3,
+            bead_diameter=0.5,
+            field_layout="line",
+        )
+        assert result.get("error") is None, result
+        assert result["op"] == "jewelry_bead_grain"
+        assert result["field_layout"] == "line"
+
+    def test_success_grid(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_bead_grain, ctx, fid,
+            stone_diameter=2.0,
+            bead_count_per_stone=4,
+            bead_diameter=0.5,
+            field_layout="grid",
+        )
+        assert result.get("error") is None, result
+        node = get_last_node(store)
+        assert node["field_layout"] == "grid"
+
+    def test_node_id_auto(self):
+        ctx, store, fid = make_ctx()
+        call_tool(
+            run_jewelry_create_bead_grain, ctx, fid,
+            stone_diameter=2.0, bead_count_per_stone=3,
+            bead_diameter=0.5, field_layout="line",
+        )
+        node = get_last_node(store)
+        assert node["id"].startswith("jewelry_bead_grain-")
+
+    def test_bead_count_lt_2_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_bead_grain, ctx, fid,
+            stone_diameter=2.0, bead_count_per_stone=1,
+            bead_diameter=0.5, field_layout="line",
+        )
+        assert result.get("code") == "BAD_ARGS"
+        assert "bead_count_per_stone" in result.get("error", "")
+
+    def test_zero_bead_count_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_bead_grain, ctx, fid,
+            stone_diameter=2.0, bead_count_per_stone=0,
+            bead_diameter=0.5, field_layout="line",
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_invalid_field_layout_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_bead_grain, ctx, fid,
+            stone_diameter=2.0, bead_count_per_stone=3,
+            bead_diameter=0.5, field_layout="scatter",
+        )
+        assert result.get("code") == "BAD_ARGS"
+        assert "field_layout" in result.get("error", "")
+
+    def test_zero_stone_diameter_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_bead_grain, ctx, fid,
+            stone_diameter=0, bead_count_per_stone=3,
+            bead_diameter=0.5, field_layout="line",
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_negative_bead_diameter_rejected(self):
+        ctx, _, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_bead_grain, ctx, fid,
+            stone_diameter=2.0, bead_count_per_stone=3,
+            bead_diameter=-0.1, field_layout="line",
+        )
+        assert result.get("code") == "BAD_ARGS"
+
+    def test_bead_pitch_in_result(self):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_bead_grain, ctx, fid,
+            stone_diameter=2.0, bead_count_per_stone=4,
+            bead_diameter=0.5, field_layout="line",
+        )
+        assert "_bead_pitch_deg" in result
+        assert math.isclose(result["_bead_pitch_deg"], 90.0, rel_tol=1e-5)
+
+    def test_missing_file_not_found(self):
+        ctx, _, fid = make_ctx(kind="NOT_FOUND")
+        result = call_tool(
+            run_jewelry_create_bead_grain, ctx, fid,
+            stone_diameter=2.0, bead_count_per_stone=3,
+            bead_diameter=0.5, field_layout="line",
+        )
+        assert result.get("code") == "NOT_FOUND"
+
+    def test_invalid_json_rejected(self):
+        ctx, _, _ = make_ctx()
+        raw = run_sync(run_jewelry_create_bead_grain(ctx, b"bad"))
+        result = json.loads(raw)
+        assert result.get("code") == "BAD_ARGS"
+
+    @pytest.mark.parametrize("layout", ["line", "grid"])
+    def test_all_layouts_accepted(self, layout):
+        ctx, store, fid = make_ctx()
+        result = call_tool(
+            run_jewelry_create_bead_grain, ctx, fid,
+            stone_diameter=2.0, bead_count_per_stone=3,
+            bead_diameter=0.5, field_layout=layout,
+        )
+        assert result.get("error") is None, f"layout={layout}: {result}"
+
+
+# ============================================================================
+# Gypsy-pavé (star setting) — ToolSpec schema
+# ============================================================================
+

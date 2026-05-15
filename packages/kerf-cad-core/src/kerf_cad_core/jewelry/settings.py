@@ -1,7 +1,7 @@
 """
 kerf_cad_core.jewelry.settings — Parametric stone setting generators.
 
-Nine setting types, each with:
+Eleven setting types, each with:
   1. A pure-Python geometry helper that returns a node-spec dict (no OCCT
      required — the dict is consumed by the OCCT worker's opJewelry* handlers).
   2. An LLM tool (ToolSpec + @register runner) following the exact pattern
@@ -18,6 +18,8 @@ flush        — stone set into a drilled seat flush with the metal surface.
 halo         — center stone seat ringed by a pavé/accent halo.
 three_stone  — center + two graduated side-stone seats on a shared base.
 cluster      — N small stones grouped to read as one large stone.
+bar          — stones held between parallel metal bars (no prongs between stones).
+bead_grain   — stones held by raised metal beads cut up from the surface.
 
 Geometry approach (shared)
 --------------------------
@@ -1797,3 +1799,365 @@ async def run_jewelry_create_cluster(ctx: ProjectCtx, args: bytes) -> str:
         "cluster_diameter": float(cluster_diameter),
         "_placement_radius": node["_placement_radius"],
     })
+
+
+# ---------------------------------------------------------------------------
+# Bar setting
+# ---------------------------------------------------------------------------
+
+_VALID_BAR_LAYOUTS = {"linear", "arc"}
+
+
+def build_bar_node(
+    node_id: str,
+    stone_diameter: float,
+    bar_width: float,
+    bar_height: float,
+    stone_count: int,
+    pitch: float,
+) -> dict:
+    """
+    Compute the bar-setting node spec.
+
+    The worker's opJewelryBar builds:
+      - `stone_count` stone seats of diameter `stone_diameter` spaced at
+        `pitch` centre-to-centre along the X-axis.
+      - Two parallel metal bars of width `bar_width` and height `bar_height`
+        running along either side of the stone row (no prongs between stones).
+        The bars grip each stone's girdle at the sides; the stone faces remain
+        fully exposed.
+
+    Derived hints:
+      _bar_length   — total length of each bar = stone_count * pitch.
+      _bar_separation — inner face-to-face separation = stone_diameter (bars
+                         just clear the stone girdle; the worker adds 0.05 mm
+                         per side for fit clearance).
+    """
+    bar_length = stone_count * pitch
+    bar_separation = stone_diameter
+
+    return {
+        "id": node_id,
+        "op": "jewelry_bar",
+        "stone_diameter": stone_diameter,
+        "bar_width": bar_width,
+        "bar_height": bar_height,
+        "stone_count": stone_count,
+        "pitch": pitch,
+        "_bar_length": round(bar_length, 4),
+        "_bar_separation": round(bar_separation, 4),
+    }
+
+
+jewelry_bar_spec = ToolSpec(
+    name="jewelry_create_bar",
+    description=(
+        "Append a `jewelry_bar` node to a `.feature` file. "
+        "Generates a bar setting — two parallel metal bars running along either "
+        "side of a row of `stone_count` calibrated stones of `stone_diameter`, "
+        "spaced at `pitch` centre-to-centre. "
+        "Unlike a channel setting there are NO prongs between stones: each stone "
+        "is gripped along its full girdle by the bars alone, creating a clean "
+        "uninterrupted look popular in men's bands and eternity rings. "
+        "The bars have cross-section `bar_width` × `bar_height`. "
+        "Constraint: pitch must be greater than stone_diameter. "
+        "Output: a TopoDS_Solid pair of bars with stone seat cutouts."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_id": {
+                "type": "string",
+                "description": "Target .feature file id (uuid).",
+            },
+            "stone_diameter": {
+                "type": "number",
+                "description": "Girdle diameter of each stone in mm.",
+            },
+            "bar_width": {
+                "type": "number",
+                "description": "Width of each metal bar in mm (typical 0.4–1.0).",
+            },
+            "bar_height": {
+                "type": "number",
+                "description": "Height of each metal bar above the stone seat in mm (typical 0.5–1.2).",
+            },
+            "stone_count": {
+                "type": "integer",
+                "description": "Number of stones in the bar row. Must be >= 1.",
+            },
+            "pitch": {
+                "type": "number",
+                "description": (
+                    "Centre-to-centre distance between adjacent stones in mm. "
+                    "Must be > stone_diameter."
+                ),
+            },
+            "id": {
+                "type": "string",
+                "description": "Optional explicit node id.",
+            },
+        },
+        "required": ["file_id", "stone_diameter", "bar_width", "bar_height", "stone_count", "pitch"],
+    },
+)
+
+
+@register(jewelry_bar_spec, write=True)
+async def run_jewelry_create_bar(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    file_id_str = a.get("file_id", "").strip()
+    stone_diameter = a.get("stone_diameter")
+    bar_width = a.get("bar_width")
+    bar_height = a.get("bar_height")
+    stone_count = a.get("stone_count")
+    pitch = a.get("pitch")
+    node_id = a.get("id", "").strip()
+
+    if not file_id_str:
+        return err_payload("file_id is required", "BAD_ARGS")
+
+    for fname, fval in [
+        ("stone_diameter", stone_diameter),
+        ("bar_width", bar_width),
+        ("bar_height", bar_height),
+        ("pitch", pitch),
+    ]:
+        err = _positive(fname, fval)
+        if err:
+            return err_payload(err, "BAD_ARGS")
+
+    try:
+        sc = int(stone_count)
+    except (TypeError, ValueError):
+        return err_payload("stone_count must be an integer", "BAD_ARGS")
+    if sc < 1:
+        return err_payload(f"stone_count must be >= 1; got {sc}", "BAD_ARGS")
+
+    try:
+        sd = float(stone_diameter)
+        pt = float(pitch)
+    except (TypeError, ValueError):
+        return err_payload("stone_diameter and pitch must be numbers", "BAD_ARGS")
+
+    if pt <= sd:
+        return err_payload(
+            f"pitch ({pt}) must be greater than stone_diameter ({sd}) to prevent overlap",
+            "BAD_ARGS",
+        )
+
+    try:
+        fid = uuid.UUID(file_id_str)
+    except Exception:
+        return err_payload("file_id must be a uuid", "BAD_ARGS")
+
+    content, err = read_feature_content(ctx, fid)
+    if err:
+        return err_payload(f"file not found: {err}", "NOT_FOUND")
+
+    if not node_id:
+        node_id = next_node_id(content, "jewelry_bar")
+
+    node = build_bar_node(
+        node_id=node_id,
+        stone_diameter=sd,
+        bar_width=float(bar_width),
+        bar_height=float(bar_height),
+        stone_count=sc,
+        pitch=pt,
+    )
+
+    _, nid, err = append_feature_node(ctx, fid, node)
+    if err:
+        return err_payload(err, "ERROR")
+
+    return ok_payload({
+        "file_id": file_id_str,
+        "id": nid,
+        "op": "jewelry_bar",
+        "stone_count": sc,
+        "stone_diameter": sd,
+        "_bar_length": node["_bar_length"],
+    })
+
+
+# ---------------------------------------------------------------------------
+# Bead / grain setting
+# ---------------------------------------------------------------------------
+
+_VALID_BEAD_LAYOUTS = {"line", "grid"}
+
+
+def build_bead_grain_node(
+    node_id: str,
+    stone_diameter: float,
+    bead_count_per_stone: int,
+    bead_diameter: float,
+    field_layout: str,
+) -> dict:
+    """
+    Compute the bead/grain-setting node spec.
+
+    The worker's opJewelryBeadGrain builds:
+      - A drilled stone seat of diameter `stone_diameter` sunk into the metal
+        surface (similar to a flush seat).
+      - `bead_count_per_stone` raised metal beads of diameter `bead_diameter`
+        cut up from the surrounding surface and pushed over the stone's girdle
+        to retain it.  Beads are spaced evenly around the stone.
+      - For `field_layout='line'`: stones are arranged in a single row.
+      - For `field_layout='grid'`: stones are arranged in a rectangular grid;
+        pitch is derived from stone_diameter and bead geometry.
+
+    Derived hints:
+      _bead_pitch_deg   — angular pitch between adjacent beads around one stone.
+      _bead_ring_radius — radius of the bead circle around the stone = stone_diameter/2.
+    """
+    bead_pitch_deg = 360.0 / bead_count_per_stone if bead_count_per_stone > 0 else 0.0
+    bead_ring_radius = stone_diameter / 2.0
+
+    return {
+        "id": node_id,
+        "op": "jewelry_bead_grain",
+        "stone_diameter": stone_diameter,
+        "bead_count_per_stone": bead_count_per_stone,
+        "bead_diameter": bead_diameter,
+        "field_layout": field_layout,
+        "_bead_pitch_deg": round(bead_pitch_deg, 4),
+        "_bead_ring_radius": round(bead_ring_radius, 4),
+    }
+
+
+jewelry_bead_grain_spec = ToolSpec(
+    name="jewelry_create_bead_grain",
+    description=(
+        "Append a `jewelry_bead_grain` node to a `.feature` file. "
+        "Generates a bead (grain) setting where each stone is held by small "
+        "raised metal beads that are cut up from the surrounding metal surface "
+        "and pushed over the stone's girdle. "
+        "Parameters control the stone diameter, the number of beads per stone "
+        "(`bead_count_per_stone`, minimum 2), the bead diameter, and the "
+        "overall field layout (`line` for a single row or `grid` for a "
+        "rectangular array). "
+        "Output: node spec consumed by opJewelryBeadGrain. Combines with a "
+        "gem-seat boolean cut for the stone pocket."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_id": {
+                "type": "string",
+                "description": "Target .feature file id (uuid).",
+            },
+            "stone_diameter": {
+                "type": "number",
+                "description": "Girdle diameter of each stone in mm.",
+            },
+            "bead_count_per_stone": {
+                "type": "integer",
+                "description": (
+                    "Number of raised beads retaining each stone. Must be >= 2. "
+                    "Typical values: 2 (tight inline), 3, 4."
+                ),
+            },
+            "bead_diameter": {
+                "type": "number",
+                "description": "Diameter of each raised bead in mm (typical 0.3–0.8).",
+            },
+            "field_layout": {
+                "type": "string",
+                "enum": ["line", "grid"],
+                "description": (
+                    "'line' — single row of stones. "
+                    "'grid' — rectangular array of stones."
+                ),
+            },
+            "id": {
+                "type": "string",
+                "description": "Optional explicit node id.",
+            },
+        },
+        "required": ["file_id", "stone_diameter", "bead_count_per_stone", "bead_diameter", "field_layout"],
+    },
+)
+
+
+@register(jewelry_bead_grain_spec, write=True)
+async def run_jewelry_create_bead_grain(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    file_id_str = a.get("file_id", "").strip()
+    stone_diameter = a.get("stone_diameter")
+    bead_count_per_stone = a.get("bead_count_per_stone")
+    bead_diameter = a.get("bead_diameter")
+    field_layout = a.get("field_layout", "line")
+    node_id = a.get("id", "").strip()
+
+    if not file_id_str:
+        return err_payload("file_id is required", "BAD_ARGS")
+
+    for fname, fval in [
+        ("stone_diameter", stone_diameter),
+        ("bead_diameter", bead_diameter),
+    ]:
+        err = _positive(fname, fval)
+        if err:
+            return err_payload(err, "BAD_ARGS")
+
+    try:
+        bcp = int(bead_count_per_stone)
+    except (TypeError, ValueError):
+        return err_payload("bead_count_per_stone must be an integer", "BAD_ARGS")
+    if bcp < 2:
+        return err_payload(
+            f"bead_count_per_stone must be >= 2; got {bcp}", "BAD_ARGS"
+        )
+
+    field_layout_clean = (field_layout or "line").strip().lower()
+    if field_layout_clean not in _VALID_BEAD_LAYOUTS:
+        return err_payload(
+            f"field_layout must be one of {sorted(_VALID_BEAD_LAYOUTS)}; got {field_layout!r}",
+            "BAD_ARGS",
+        )
+
+    try:
+        fid = uuid.UUID(file_id_str)
+    except Exception:
+        return err_payload("file_id must be a uuid", "BAD_ARGS")
+
+    content, err = read_feature_content(ctx, fid)
+    if err:
+        return err_payload(f"file not found: {err}", "NOT_FOUND")
+
+    if not node_id:
+        node_id = next_node_id(content, "jewelry_bead_grain")
+
+    node = build_bead_grain_node(
+        node_id=node_id,
+        stone_diameter=float(stone_diameter),
+        bead_count_per_stone=bcp,
+        bead_diameter=float(bead_diameter),
+        field_layout=field_layout_clean,
+    )
+
+    _, nid, err = append_feature_node(ctx, fid, node)
+    if err:
+        return err_payload(err, "ERROR")
+
+    return ok_payload({
+        "file_id": file_id_str,
+        "id": nid,
+        "op": "jewelry_bead_grain",
+        "stone_diameter": float(stone_diameter),
+        "bead_count_per_stone": bcp,
+        "field_layout": field_layout_clean,
+        "_bead_pitch_deg": node["_bead_pitch_deg"],
+    })
+
+

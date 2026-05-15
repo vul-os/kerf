@@ -1,6 +1,6 @@
 # Jewelry setting generators
 
-Nine LLM tools create parametric stone-setting solids as `.feature` nodes.
+Eleven LLM tools create parametric stone-setting solids as `.feature` nodes.
 Each tool appends a node to an existing `.feature` file; the OCCT worker
 evaluates the node and returns a `TopoDS_Solid` (or placement data for array
 settings like pavé, halo, and cluster).
@@ -465,3 +465,103 @@ Derived node hints:
 
 Result node op: `jewelry_cluster`. The evaluate result includes `seat_positions`
 (XYZ on the dome surface) for downstream seat-cutting.
+
+---
+
+## `jewelry_create_bar`
+
+Generates a bar setting — two parallel metal bars running along either side of
+a row of calibrated stones with no prongs between the stones.
+
+### How it works
+
+1. `stone_count` stone seats of `stone_diameter` are spaced at `pitch`
+   centre-to-centre along the X-axis.
+2. Two metal bars of cross-section `bar_width` × `bar_height` run along either
+   side of the row.  The bars grip each stone's girdle; no individual prong
+   separates adjacent stones, giving a clean, uninterrupted look popular in
+   men's bands and eternity rings.
+3. Bar inner face-to-face separation = `stone_diameter` (the worker adds
+   0.05 mm per side for fit clearance).
+
+Constraint: `pitch` > `stone_diameter`.
+
+Derived node hints:
+- `_bar_length` = `stone_count × pitch`.
+- `_bar_separation` = `stone_diameter`.
+
+### Parameters
+
+| Parameter        | Required | Notes                                                               |
+|------------------|----------|---------------------------------------------------------------------|
+| `file_id`        | yes      | Target `.feature` file uuid                                         |
+| `stone_diameter` | yes      | Stone girdle diameter in mm                                         |
+| `bar_width`      | yes      | Width of each metal bar in mm (typical 0.4–1.0)                    |
+| `bar_height`     | yes      | Height of each bar above the stone seat in mm (typical 0.5–1.2)    |
+| `stone_count`    | yes      | Number of stones in the row (≥ 1)                                   |
+| `pitch`          | yes      | Centre-to-centre spacing in mm. Must be > `stone_diameter`          |
+| `id`             | no       | Explicit node id                                                    |
+
+### Worked example — 5-stone bar-set eternity band segment
+
+```json
+{
+  "file_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "stone_diameter": 2.5,
+  "bar_width": 0.6,
+  "bar_height": 0.9,
+  "stone_count": 5,
+  "pitch": 2.9
+}
+```
+
+Result node op: `jewelry_bar`. Bar length = 5 × 2.9 = 14.5 mm.
+
+---
+
+## `jewelry_create_bead_grain`
+
+Generates a bead (grain) setting where each stone is held by small raised metal
+beads cut up from the surrounding surface.
+
+### How it works
+
+1. Each stone is drilled into a seat of `stone_diameter`.
+2. `bead_count_per_stone` metal beads of `bead_diameter` are raised from the
+   surrounding metal and pushed over the stone's girdle edge to retain it.
+   Beads are evenly spaced around each stone.
+3. `field_layout` controls the multi-stone arrangement:
+   - **`line`** — a single linear row of stones.
+   - **`grid`** — a rectangular array of stones.
+
+Derived node hints:
+- `_bead_pitch_deg` = 360 / `bead_count_per_stone`.
+- `_bead_ring_radius` = `stone_diameter` / 2.
+
+### Parameters
+
+| Parameter              | Required | Notes                                                         |
+|------------------------|----------|---------------------------------------------------------------|
+| `file_id`              | yes      | Target `.feature` file uuid                                   |
+| `stone_diameter`       | yes      | Stone girdle diameter in mm                                   |
+| `bead_count_per_stone` | yes      | Beads per stone (≥ 2). Typical: 2, 3, 4                      |
+| `bead_diameter`        | yes      | Diameter of each raised bead in mm (typical 0.3–0.8)         |
+| `field_layout`         | yes      | `"line"` or `"grid"`                                         |
+| `id`                   | no       | Explicit node id                                              |
+
+### Worked example
+
+```json
+{
+  "file_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "stone_diameter": 2.0,
+  "bead_count_per_stone": 4,
+  "bead_diameter": 0.5,
+  "field_layout": "grid"
+}
+```
+
+Result node op: `jewelry_bead_grain`.
+
+---
+

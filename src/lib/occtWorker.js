@@ -4729,6 +4729,1250 @@ function opChainAssembly(oc, _prev, node, _sketches, tracker) {
 }
 
 // ---------------------------------------------------------------------------
+// T-26  Jewelry deferred ops 2 — pieces, decorative_apply, gem-seat v2, settings v3/v4
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// opPendant — pendant frame plate + bail loop + optional stone seat markers.
+//
+// Node schema fields (from compute_pendant_params / PendantSpec.to_dict in pieces.py):
+//   style, outline_shape, width_mm, height_mm, thickness_mm,
+//   bail_type, bail_wire_gauge_mm, bail_loop_inner_diameter_mm,
+//   chain_hole_diameter_mm, centre_stone_diameter_mm?,
+//   halo_stone_diameter_mm?, halo_stone_count?,
+//   attach_points, composite_ops,
+//   position?, orientation_deg?
+//
+// Geometry: rectangular/oval plate + cylinder bail loop on top.
+// ---------------------------------------------------------------------------
+function opPendant(oc, _prev, node, _sketches, tracker) {
+  const w     = Number(node.width_mm)      || 12.0
+  const h     = Number(node.height_mm)     || 18.0
+  const t     = Number(node.thickness_mm)  || 1.5
+  const gauge = Number(node.bail_wire_gauge_mm)       || 1.0
+  const bailID = Number(node.bail_loop_inner_diameter_mm) || gauge * 3.0
+
+  try {
+    // Main frame plate (box approximation; outline_shape is a hint only).
+    const frame = _makeBox(oc, -w / 2, -h / 2, -t / 2, w, h, t, tracker)
+
+    // Bail loop: a torus-like ring at the top of the frame.
+    // Approximate with a cylinder ring: outer - inner bore.
+    const bailR  = (bailID / 2) + gauge          // outer radius of bail ring
+    const bailAx = track(tracker, new oc.gp_Ax2_3(
+      track(tracker, new oc.gp_Pnt_3(0, h / 2, 0)),
+      track(tracker, new oc.gp_Dir_4(0, 0, 1)),
+    ))
+    const bailOuter = track(tracker, new oc.BRepPrimAPI_MakeCylinder_3(bailAx, bailR, gauge))
+    bailOuter.Build()
+    let bail = bailOuter.Shape()
+    // Punch chain hole through bail.
+    const holeAx = track(tracker, new oc.gp_Ax2_3(
+      track(tracker, new oc.gp_Pnt_3(0, h / 2, -gauge * 0.1)),
+      track(tracker, new oc.gp_Dir_4(0, 0, 1)),
+    ))
+    const holeCyl = track(tracker, new oc.BRepPrimAPI_MakeCylinder_3(holeAx, bailID / 2, gauge * 1.2))
+    holeCyl.Build()
+    if (holeCyl.IsDone()) {
+      try { bail = _jewelryCut(oc, bail, holeCyl.Shape(), tracker) } catch { /* keep solid */ }
+    }
+
+    const pendant = _jewelryFuse(oc, frame, bail, tracker)
+    return _jewelryTransform(oc, pendant, node.position, node.orientation_deg, tracker)
+  } catch {
+    // Fallback: plain box
+    const fb = _makeBox(oc, -w / 2, -h / 2, -t / 2, w, h, t, tracker)
+    return _jewelryTransform(oc, fb, node.position, node.orientation_deg, tracker)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// opEarrings — earring face disc + post/ear-wire mount.
+//
+// Node schema fields (from EarringSpec.to_dict in pieces.py):
+//   style, face_diameter_mm, face_thickness_mm,
+//   drop_length_mm, hoop_inner_diameter_mm,
+//   wire_gauge_mm, post_length_mm, tier_count, tier_spacing_mm,
+//   stone_diameter_mm?, stone_count?,
+//   attach_points, composite_ops,
+//   position?, orientation_deg?
+// ---------------------------------------------------------------------------
+function opEarrings(oc, _prev, node, _sketches, tracker) {
+  const faceD  = Number(node.face_diameter_mm)    || 8.0
+  const faceT  = Number(node.face_thickness_mm)   || 1.2
+  const gauge  = Number(node.wire_gauge_mm)        || 0.8
+  const postL  = Number(node.post_length_mm)       || 10.0
+  const style  = (node.style || 'stud').toLowerCase()
+
+  try {
+    const faceR = faceD / 2
+    // Face disc (cylinder approximation).
+    const faceAx = track(tracker, new oc.gp_Ax2_3(
+      track(tracker, new oc.gp_Pnt_3(0, 0, 0)),
+      track(tracker, new oc.gp_Dir_4(0, 0, 1)),
+    ))
+    const faceCyl = track(tracker, new oc.BRepPrimAPI_MakeCylinder_3(faceAx, faceR, faceT))
+    faceCyl.Build()
+    if (!faceCyl.IsDone()) throw new Error('earrings: face cylinder failed')
+    let earring = faceCyl.Shape()
+
+    if (style === 'hoop' || style === 'huggie') {
+      // Hoop: torus around Z axis at Z=faceT.
+      const hoopIR = Number(node.hoop_inner_diameter_mm) / 2 || 8.0
+      const torusR = hoopIR + gauge
+      try {
+        const torus = track(tracker, new oc.BRepPrimAPI_MakeTorus_1(torusR, gauge))
+        torus.Build()
+        if (torus.IsDone()) earring = _jewelryFuse(oc, earring, torus.Shape(), tracker)
+      } catch { /* keep face disc only */ }
+    } else {
+      // Stud/drop/chandelier: add a post cylinder along -Z.
+      const postAx = track(tracker, new oc.gp_Ax2_3(
+        track(tracker, new oc.gp_Pnt_3(0, 0, -postL)),
+        track(tracker, new oc.gp_Dir_4(0, 0, 1)),
+      ))
+      const postCyl = track(tracker, new oc.BRepPrimAPI_MakeCylinder_3(postAx, gauge / 2, postL))
+      postCyl.Build()
+      if (postCyl.IsDone()) earring = _jewelryFuse(oc, earring, postCyl.Shape(), tracker)
+
+      // Drop/chandelier: add a vertical drop connector.
+      if ((style === 'drop' || style === 'chandelier') && Number(node.drop_length_mm) > 0) {
+        const dropL = Number(node.drop_length_mm) || 20.0
+        const dropAx = track(tracker, new oc.gp_Ax2_3(
+          track(tracker, new oc.gp_Pnt_3(0, -faceR, 0)),
+          track(tracker, new oc.gp_Dir_4(0, 0, 1)),
+        ))
+        const dropCyl = track(tracker, new oc.BRepPrimAPI_MakeCylinder_3(dropAx, gauge / 2, dropL))
+        dropCyl.Build()
+        if (dropCyl.IsDone()) {
+          try { earring = _jewelryFuse(oc, earring, dropCyl.Shape(), tracker) } catch { /* skip */ }
+        }
+      }
+    }
+
+    return _jewelryTransform(oc, earring, node.position, node.orientation_deg, tracker)
+  } catch {
+    // Fallback: simple disc
+    const faceR = (Number(node.face_diameter_mm) || 8.0) / 2
+    const fb = _makeCylinder(oc, faceR, Number(node.face_thickness_mm) || 1.2, 0, tracker)
+    return _jewelryTransform(oc, fb, node.position, node.orientation_deg, tracker)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// opBrooch — brooch frame plate + pin finding mount.
+//
+// Node schema fields (from BroochSpec.to_dict in pieces.py):
+//   shape, width_mm, height_mm, thickness_mm, frame_wire_gauge_mm,
+//   stone_diameter_mm?, stone_count?,
+//   pin_style, pin_length_mm, attach_points, composite_ops,
+//   position?, orientation_deg?
+// ---------------------------------------------------------------------------
+function opBrooch(oc, _prev, node, _sketches, tracker) {
+  const w     = Number(node.width_mm)           || 30.0
+  const h     = Number(node.height_mm)          || 30.0
+  const t     = Number(node.thickness_mm)       || 2.0
+  const gauge = Number(node.frame_wire_gauge_mm) || 1.5
+  const pinL  = Number(node.pin_length_mm)       || w * 1.2
+
+  try {
+    // Brooch body plate.
+    const body = _makeBox(oc, -w / 2, -h / 2, -t / 2, w, h, t, tracker)
+
+    // Pin finding: a thin cylinder across the back of the brooch.
+    const pinAx = track(tracker, new oc.gp_Ax2_3(
+      track(tracker, new oc.gp_Pnt_3(-pinL / 2, 0, -t / 2 - gauge)),
+      track(tracker, new oc.gp_Dir_4(1, 0, 0)),
+    ))
+    const pinCyl = track(tracker, new oc.BRepPrimAPI_MakeCylinder_3(pinAx, gauge / 2, pinL))
+    pinCyl.Build()
+    let brooch = body
+    if (pinCyl.IsDone()) {
+      try { brooch = _jewelryFuse(oc, body, pinCyl.Shape(), tracker) } catch { /* skip pin */ }
+    }
+
+    return _jewelryTransform(oc, brooch, node.position, node.orientation_deg, tracker)
+  } catch {
+    const fb = _makeBox(oc, -w / 2, -h / 2, -t / 2, w, h, t, tracker)
+    return _jewelryTransform(oc, fb, node.position, node.orientation_deg, tracker)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// opCufflink — cufflink face disc + post + toggle/T-bar back.
+//
+// Node schema fields (from CufflinkSpec.to_dict in pieces.py):
+//   face_diameter_mm, face_thickness_mm, post_length_mm, post_diameter_mm,
+//   back_style, toggle_length_mm,
+//   stone_diameter_mm?,
+//   attach_points, composite_ops,
+//   position?, orientation_deg?
+// ---------------------------------------------------------------------------
+function opCufflink(oc, _prev, node, _sketches, tracker) {
+  const faceD  = Number(node.face_diameter_mm)  || 12.0
+  const faceT  = Number(node.face_thickness_mm) || 3.0
+  const postL  = Number(node.post_length_mm)    || 10.0
+  const postD  = Number(node.post_diameter_mm)  || 2.5
+  const toggleL = Number(node.toggle_length_mm)  || 10.0
+  const backStyle = (node.back_style || 'toggle').toLowerCase()
+
+  try {
+    const faceR = faceD / 2
+    // Face disc.
+    const faceAx = track(tracker, new oc.gp_Ax2_3(
+      track(tracker, new oc.gp_Pnt_3(0, 0, 0)),
+      track(tracker, new oc.gp_Dir_4(0, 0, 1)),
+    ))
+    const faceCyl = track(tracker, new oc.BRepPrimAPI_MakeCylinder_3(faceAx, faceR, faceT))
+    faceCyl.Build()
+    if (!faceCyl.IsDone()) throw new Error('cufflink: face cylinder failed')
+    let cufflink = faceCyl.Shape()
+
+    // Post cylinder along -Z.
+    const postAx = track(tracker, new oc.gp_Ax2_3(
+      track(tracker, new oc.gp_Pnt_3(0, 0, -postL)),
+      track(tracker, new oc.gp_Dir_4(0, 0, 1)),
+    ))
+    const postCyl = track(tracker, new oc.BRepPrimAPI_MakeCylinder_3(postAx, postD / 2, postL))
+    postCyl.Build()
+    if (postCyl.IsDone()) {
+      try { cufflink = _jewelryFuse(oc, cufflink, postCyl.Shape(), tracker) } catch { /* skip */ }
+    }
+
+    // Toggle/T-bar back: a small perpendicular cylinder at the post end.
+    if (backStyle === 'toggle' || backStyle === 't_bar') {
+      const tbarAx = track(tracker, new oc.gp_Ax2_3(
+        track(tracker, new oc.gp_Pnt_3(-toggleL / 2, 0, -faceT - postL)),
+        track(tracker, new oc.gp_Dir_4(1, 0, 0)),
+      ))
+      const tbarCyl = track(tracker, new oc.BRepPrimAPI_MakeCylinder_3(tbarAx, postD / 2, toggleL))
+      tbarCyl.Build()
+      if (tbarCyl.IsDone()) {
+        try { cufflink = _jewelryFuse(oc, cufflink, tbarCyl.Shape(), tracker) } catch { /* skip */ }
+      }
+    }
+
+    return _jewelryTransform(oc, cufflink, node.position, node.orientation_deg, tracker)
+  } catch {
+    const fb = _makeCylinder(oc, (Number(node.face_diameter_mm) || 12.0) / 2,
+      Number(node.face_thickness_mm) || 3.0, 0, tracker)
+    return _jewelryTransform(oc, fb, node.position, node.orientation_deg, tracker)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// opBangle — closed or open-cuff bangle swept around a wrist axis.
+//
+// Node schema fields (from BangleSpec.to_dict in pieces.py):
+//   form, inner_diameter_mm, cross_section, width_mm, thickness_mm,
+//   opening_angle_deg (for open_cuff), size_system,
+//   attach_points, composite_ops,
+//   position?, orientation_deg?
+// ---------------------------------------------------------------------------
+function opBangle(oc, _prev, node, _sketches, tracker) {
+  const innerD   = Number(node.inner_diameter_mm) || 63.5
+  const width    = Number(node.width_mm)           || 6.0
+  const thick    = Number(node.thickness_mm)       || 2.5
+  const form     = (node.form || 'closed').toLowerCase()
+  const openAng  = Number(node.opening_angle_deg)  || 30.0
+
+  try {
+    const clR   = innerD / 2 + thick / 2  // centre-line radius
+    const halfW = width / 2
+    const halfT = thick / 2
+
+    // Build a rectangular cross-section profile and revolve it.
+    const profilePoints = [
+      [-halfT, -halfW], [halfT, -halfW], [halfT, halfW], [-halfT, halfW],
+    ]
+    const wBuilder = track(tracker, new oc.BRepBuilderAPI_MakeWire_1())
+    const n = profilePoints.length
+    for (let i = 0; i < n; i++) {
+      const [dx0, dz0] = profilePoints[i]
+      const [dx1, dz1] = profilePoints[(i + 1) % n]
+      const p0 = track(tracker, new oc.gp_Pnt_3(clR + dx0, 0, dz0))
+      const p1 = track(tracker, new oc.gp_Pnt_3(clR + dx1, 0, dz1))
+      const edge = track(tracker, new oc.BRepBuilderAPI_MakeEdge_3(p0, p1))
+      edge.Build()
+      if (!edge.IsDone()) throw new Error('bangle: edge build failed')
+      wBuilder.Add_1(edge.Shape())
+    }
+    wBuilder.Build()
+    if (!wBuilder.IsDone()) throw new Error('bangle: profile wire failed')
+
+    const faceMaker = track(tracker, new oc.BRepBuilderAPI_MakeFace_15(wBuilder.Shape(), true))
+    faceMaker.Build()
+    if (!faceMaker.IsDone()) throw new Error('bangle: profile face failed')
+
+    const origin = track(tracker, new oc.gp_Pnt_3(0, 0, 0))
+    const zDir   = track(tracker, new oc.gp_Dir_4(0, 0, 1))
+    const ax1    = track(tracker, new oc.gp_Ax1_2(origin, zDir))
+
+    let revolAngle = 2 * Math.PI
+    if (form === 'open_cuff' && openAng > 0 && openAng < 360) {
+      revolAngle = (360 - openAng) * Math.PI / 180
+    }
+
+    const revol = track(tracker, new oc.BRepPrimAPI_MakeRevol_2(faceMaker.Shape(), ax1, revolAngle, true))
+    revol.Build()
+    if (!revol.IsDone()) throw new Error('bangle: revolve failed')
+
+    return _jewelryTransform(oc, revol.Shape(), node.position, node.orientation_deg, tracker)
+  } catch {
+    // Fallback: simple torus approximation
+    try {
+      const majR = (Number(node.inner_diameter_mm) || 63.5) / 2 + (Number(node.thickness_mm) || 2.5) / 2
+      const minR = (Number(node.thickness_mm) || 2.5) / 2
+      const torus = track(tracker, new oc.BRepPrimAPI_MakeTorus_1(majR, minR))
+      torus.Build()
+      if (torus.IsDone()) return _jewelryTransform(oc, torus.Shape(), node.position, node.orientation_deg, tracker)
+    } catch { /* proceed to box */ }
+    const fb = _makeBox(oc, -10, -10, -2, 20, 20, 4, tracker)
+    return _jewelryTransform(oc, fb, node.position, node.orientation_deg, tracker)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// opDecorativeApply — apply decorative surface feature to a referenced entity.
+//
+// Node schema fields (from compute_*_params() in decorative.py):
+//   feature  — "milgrain"|"beading"|"filigree"|"twisted_wire"|"scrollwork"|"surface_texture"
+//   target_ref           — id of target edge/face/curve (looked up in bodyMap)
+//   decorative_hints     — feature-specific sub-dict
+//   position?, orientation_deg?
+//
+// Geometry strategy: the target reference is resolved from bodyMap when possible.
+// The op returns a simple bead/marker compound along the target or a small
+// cylinder at the origin as a graceful placeholder when the target can't be
+// resolved. Surface-texture hints have no geometric output (render only).
+// ---------------------------------------------------------------------------
+function opDecorativeApply(oc, _prev, node, _sketches, tracker, bodyMap) {
+  const feature  = (node.feature || '').toLowerCase()
+  const hints    = node.decorative_hints || {}
+
+  // Surface-texture is purely a render-pass hint — return a tiny sphere marker.
+  if (feature === 'surface_texture') {
+    const ax = track(tracker, new oc.gp_Ax2_3(
+      track(tracker, new oc.gp_Pnt_3(0, 0, 0)),
+      track(tracker, new oc.gp_Dir_4(0, 0, 1)),
+    ))
+    const s = track(tracker, new oc.BRepPrimAPI_MakeSphere_3(ax, 0.2))
+    s.Build()
+    return _jewelryTransform(oc, s.IsDone() ? s.Shape() : _makeBox(oc, -0.2, -0.2, -0.2, 0.4, 0.4, 0.4, tracker),
+      node.position, node.orientation_deg, tracker)
+  }
+
+  // For milgrain/beading/filigree/twisted_wire/scrollwork: emit a row of
+  // small sphere markers as a visual placeholder bead chain.
+  try {
+    const beadD   = Number(hints.bead_diameter_mm || hints.grain_diameter_mm || hints.wire_gauge_mm) || 0.5
+    const pitchMm = Number(hints.pitch_mm || hints.twist_pitch_mm) || beadD * 1.5
+    const count   = Math.min(20, Math.max(3, Math.round(10 / pitchMm)))
+    const beadR   = beadD / 2
+
+    const compBuilder = track(tracker, new oc.TopoDS_Compound())
+    const bldBuilder  = track(tracker, new oc.BRep_Builder())
+    bldBuilder.MakeCompound(compBuilder)
+
+    for (let i = 0; i < count; i++) {
+      const ax = track(tracker, new oc.gp_Ax2_3(
+        track(tracker, new oc.gp_Pnt_3(i * pitchMm, 0, 0)),
+        track(tracker, new oc.gp_Dir_4(0, 0, 1)),
+      ))
+      const sphere = track(tracker, new oc.BRepPrimAPI_MakeSphere_3(ax, beadR > 0 ? beadR : 0.25))
+      sphere.Build()
+      if (sphere.IsDone()) bldBuilder.Add(compBuilder, sphere.Shape())
+    }
+
+    return _jewelryTransform(oc, compBuilder, node.position, node.orientation_deg, tracker)
+  } catch {
+    // Last-resort placeholder
+    const fb = _makeCylinder(oc, 0.3, 5.0, 0, tracker)
+    return _jewelryTransform(oc, fb, node.position, node.orientation_deg, tracker)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// opPaveFieldSeat — grid/honeycomb of identical bearing seats for a pavé field.
+//
+// Node schema fields (from pave_field_seat_geometry() in gem_seat.py):
+//   seat_type: "pave_field",
+//   arrangement, stone_diameter_mm, per_seat_geom (seat_geometry dict),
+//   stone_positions (list of [x,y,z]), n_stones,
+//   field_width_mm, field_height_mm, pitch_x_mm, pitch_y_mm,
+//   total_cutter_depth_mm,
+//   position?, orientation_deg?
+//
+// Geometry: union of small bearing-cone cutters at each stone position.
+// Falls back to a flat box cutter if any position step fails.
+// ---------------------------------------------------------------------------
+function opPaveFieldSeat(oc, _prev, node, _sketches, tracker) {
+  const psg       = node.per_seat_geom || {}
+  const girdR     = Number(psg.girdle_radius_mm || node.stone_diameter_mm / 2) || 1.0
+  const topR      = Number(psg.bearing_cone_top_radius) || girdR
+  const botR      = Number(psg.bearing_cone_bottom_radius) || 0.05
+  const pavH      = Number(psg.pavilion_depth_mm) || girdR * 0.8
+  const culetD    = Number(psg.culet_depth_mm)    || 0.1
+  const girdH     = Number(psg.girdle_height_mm)  || 0.1
+  const crownR    = Number(psg.crown_relief_depth_mm) || 0.2
+  const crownHA   = Number(psg.crown_relief_half_angle) || 7.5
+  const positions = Array.isArray(node.stone_positions) ? node.stone_positions : []
+  const fW        = Number(node.field_width_mm)   || 10.0
+  const fH        = Number(node.field_height_mm)  || 10.0
+  const cuttD     = Number(node.total_cutter_depth_mm) || pavH + culetD + girdH + crownR
+
+  // If no positions: emit a flat box cutter covering the field.
+  if (positions.length === 0) {
+    const fb = _makeBox(oc, -fW / 2, -fH / 2, -cuttD, fW, fH, cuttD, tracker)
+    return _jewelryTransform(oc, fb, node.position, node.orientation_deg, tracker)
+  }
+
+  const compBuilder = track(tracker, new oc.TopoDS_Compound())
+  const bldBuilder  = track(tracker, new oc.BRep_Builder())
+  bldBuilder.MakeCompound(compBuilder)
+
+  for (const pos of positions) {
+    try {
+      const px = Number(pos[0]) || 0
+      const py = Number(pos[1]) || 0
+      const pz = Number(pos[2]) || 0
+
+      // Bearing cone
+      const coneH = pavH + culetD
+      const cone  = _makeCone(oc, botR, topR, coneH, pz - coneH, tracker)
+      const t0 = track(tracker, new oc.gp_Trsf_1())
+      t0.SetTranslation_1(track(tracker, new oc.gp_Vec_4(px, py, 0)))
+      const xf0 = track(tracker, new oc.BRepBuilderAPI_Transform_2(cone, t0, true))
+      xf0.Build()
+      if (xf0.IsDone()) bldBuilder.Add(compBuilder, xf0.Shape())
+    } catch { /* skip this seat */ }
+  }
+
+  return _jewelryTransform(oc, compBuilder, node.position, node.orientation_deg, tracker)
+}
+
+// ---------------------------------------------------------------------------
+// opClusterHaloSeat — center seat + ring of accent seats (halo/cluster).
+//
+// Node schema fields (from cluster_halo_seat_geometry() in gem_seat.py):
+//   seat_type: "cluster_halo",
+//   n_accent, halo_radius_mm,
+//   center_seat_geom, accent_seat_geom,
+//   center_position, accent_positions (list of [x,y,z]),
+//   total_cutter_depth_mm,
+//   position?, orientation_deg?
+//
+// Geometry: center opGemSeat-style cutter + N accent opGemSeat-style cutters.
+// ---------------------------------------------------------------------------
+function opClusterHaloSeat(oc, _prev, node, _sketches, tracker) {
+  function _oneSeat(geom, px, py) {
+    const girdR   = Number(geom.girdle_radius_mm)           || 1.5
+    const topR    = Number(geom.bearing_cone_top_radius)    || girdR
+    const botR    = Number(geom.bearing_cone_bottom_radius) || 0.05
+    const pavH    = Number(geom.pavilion_depth_mm)          || 1.5
+    const culetD  = Number(geom.culet_depth_mm)             || 0.1
+    const girdH   = Number(geom.girdle_height_mm)           || 0.1
+    const crownR  = Number(geom.crown_relief_depth_mm)      || 0.2
+    const crownHA = Number(geom.crown_relief_half_angle)    || 7.5
+
+    const coneH    = pavH + culetD
+    const cone     = _makeCone(oc, botR, topR, coneH, -(coneH), tracker)
+    const ledge    = _makeCylinder(oc, topR, girdH, 0, tracker)
+    const cTopR    = topR + Math.tan(crownHA * Math.PI / 180) * crownR
+    const relief   = _makeCone(oc, topR, cTopR, crownR, girdH, tracker)
+    let seat = _jewelryFuse(oc, cone, ledge, tracker)
+    seat     = _jewelryFuse(oc, seat, relief, tracker)
+
+    const t = track(tracker, new oc.gp_Trsf_1())
+    t.SetTranslation_1(track(tracker, new oc.gp_Vec_4(px, py, 0)))
+    const xf = track(tracker, new oc.BRepBuilderAPI_Transform_2(seat, t, true))
+    xf.Build()
+    return xf.IsDone() ? xf.Shape() : seat
+  }
+
+  try {
+    const csg  = node.center_seat_geom  || {}
+    const asg  = node.accent_seat_geom  || {}
+    const aps  = Array.isArray(node.accent_positions) ? node.accent_positions : []
+
+    let compound = _oneSeat(csg, 0, 0)
+
+    for (const ap of aps) {
+      try {
+        const accentSeat = _oneSeat(asg, Number(ap[0]) || 0, Number(ap[1]) || 0)
+        compound = _jewelryFuse(oc, compound, accentSeat, tracker)
+      } catch { /* skip this accent */ }
+    }
+
+    return _jewelryTransform(oc, compound, node.position, node.orientation_deg, tracker)
+  } catch {
+    // Fallback: simple cylinder
+    const r = Number((node.center_seat_geom || {}).girdle_radius_mm) || 2.0
+    const fb = _makeCylinder(oc, r, 2.0, -2.0, tracker)
+    return _jewelryTransform(oc, fb, node.position, node.orientation_deg, tracker)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// opGypsySeat — flush/gypsy countersink seat (no bearing-cone overhang).
+//
+// Node schema fields (from gypsy_seat_geometry() in gem_seat.py):
+//   (all gem_seat fields including girdle_radius_mm, etc.)
+//   countersink_angle_deg, countersink_depth_mm, countersink_top_radius,
+//   seat_type: "gypsy",
+//   position?, orientation_deg?
+//
+// Geometry: straight-wall cylindrical bore + shallow countersink on top.
+// Same structure as opGemSeat minus the bearing cone overhang above grade.
+// ---------------------------------------------------------------------------
+function opGypsySeat(oc, _prev, node, _sketches, tracker) {
+  const girdR    = Number(node.girdle_radius_mm)           || 3.3
+  const topR     = Number(node.bearing_cone_top_radius)    || girdR
+  const botR     = Number(node.bearing_cone_bottom_radius) || 0.15
+  const pavH     = Number(node.pavilion_depth_mm)          || 2.8
+  const culetD   = Number(node.culet_depth_mm)             || 0.1
+  const girdH    = Number(node.girdle_height_mm)           || 0.18
+  const csAng    = Number(node.countersink_angle_deg)      || 45.0
+  const csDepth  = Number(node.countersink_depth_mm)       || 0.20
+  const csTopR   = Number(node.countersink_top_radius)     || (topR + Math.tan(csAng * Math.PI / 180) * csDepth)
+  const throughHole = Boolean(node.through_hole)
+  const thrR     = throughHole ? (Number(node.through_hole_radius_mm) || 0.3) : 0
+
+  // 1. Bearing cone (same as opGemSeat).
+  const coneH = pavH + culetD
+  const bearingCone = _makeCone(oc, botR, topR, coneH, -(coneH), tracker)
+
+  // 2. Girdle ledge (straight cylinder — gypsy has no crown-relief overhang above surface).
+  const girdleLedge = _makeCylinder(oc, topR, girdH, 0, tracker)
+
+  // 3. Countersink (shallow taper at the very top, replaces crown relief).
+  const csRelief = _makeCone(oc, topR, csTopR, csDepth, girdH, tracker)
+
+  let seat = _jewelryFuse(oc, bearingCone, girdleLedge, tracker)
+  seat = _jewelryFuse(oc, seat, csRelief, tracker)
+
+  // 4. Optional through-hole.
+  if (throughHole && thrR > 0) {
+    const totalD = coneH + girdH + csDepth + 0.2
+    const hole = _makeCylinder(oc, thrR, totalD, -(coneH + 0.1), tracker)
+    seat = _jewelryFuse(oc, seat, hole, tracker)
+  }
+
+  return _jewelryTransform(oc, seat, node.position, node.orientation_deg, tracker)
+}
+
+// ---------------------------------------------------------------------------
+// opBaguetteChannelSeat — rectangular straight-wall channel bearing for step-cut stones.
+//
+// Node schema fields (from baguette_channel_seat_geometry() in gem_seat.py):
+//   seat_type: "baguette_channel",
+//   cut, n_stones, pitch_mm,
+//   stone_length_mm, stone_width_mm,
+//   cutter_length_mm, cutter_width_mm, cutter_depth_mm,
+//   groove_length_mm, wall_thickness_mm,
+//   stone_positions (list of [x,y,z]),
+//   total_cutter_depth_mm,
+//   position?, orientation_deg?
+//
+// Geometry: rectangular groove box + per-stone rectangular cutter pockets.
+// ---------------------------------------------------------------------------
+function opBaguetteChannelSeat(oc, _prev, node, _sketches, tracker) {
+  const cutterL   = Number(node.cutter_length_mm) || 3.5
+  const cutterW   = Number(node.cutter_width_mm)  || 2.5
+  const cutterD   = Number(node.cutter_depth_mm || node.total_cutter_depth_mm) || 2.0
+  const grooveL   = Number(node.groove_length_mm) || cutterL
+  const positions = Array.isArray(node.stone_positions) ? node.stone_positions : []
+
+  // Main groove box along X (covers all stones).
+  const groove = _makeBox(oc, -grooveL / 2, -cutterW / 2, -cutterD, grooveL, cutterW, cutterD, tracker)
+
+  if (positions.length <= 1) {
+    return _jewelryTransform(oc, groove, node.position, node.orientation_deg, tracker)
+  }
+
+  // Per-stone rectangular pocket fused into the groove.
+  let compound = groove
+  for (const pos of positions) {
+    try {
+      const px = Number(pos[0]) || 0
+      const py = Number(pos[1]) || 0
+      const pocket = _makeBox(oc,
+        px - cutterL / 2, py - cutterW / 2, -cutterD,
+        cutterL, cutterW, cutterD, tracker)
+      compound = _jewelryFuse(oc, compound, pocket, tracker)
+    } catch { /* skip this pocket */ }
+  }
+
+  return _jewelryTransform(oc, compound, node.position, node.orientation_deg, tracker)
+}
+
+// ---------------------------------------------------------------------------
+// opJewelryProngVariant — specialised prong-wire variants around a stone.
+//
+// Node schema fields (from build_prong_variant_node in settings.py):
+//   variant ("double_prong"|"claw_prong"|"v_prong"|"fishtail_prong"|"split_prong"|"decorative_prong"),
+//   stone_diameter, prong_count, wire_gauge, prong_height,
+//   variant_param, variant_profile,
+//   _head_outer_diameter, _prong_pitch_deg,
+//   position?, orientation_deg?
+//
+// Reuses opJewelryProngHead geometry — builds standard prongs then adds
+// variant-specific modifications.
+// ---------------------------------------------------------------------------
+function opJewelryProngVariant(oc, _prev, node, _sketches, tracker) {
+  const stoneDiam  = Number(node.stone_diameter) || 6.5
+  const prongCount = Math.max(2, Math.round(Number(node.prong_count) || 4))
+  const wireD      = Number(node.wire_gauge)     || 1.0
+  const prongH     = Number(node.prong_height)   || 2.5
+  const variant    = (node.variant || 'double_prong').toLowerCase()
+  const vParam     = Number(node.variant_param)  || 0.0
+
+  // Delegate to standard prong-head geometry first.
+  const stdNode = {
+    stone_diameter:       stoneDiam,
+    prong_count:          prongCount,
+    prong_wire_diameter:  wireD,
+    prong_height:         prongH,
+    head_style:           'standard',
+    basket_rail_count:    0,
+    seat_angle_deg:       15.0,
+  }
+
+  try {
+    let head = opJewelryProngHead(oc, null, stdNode, _sketches, tracker)
+
+    // Variant-specific additions (best-effort; any failure keeps base head).
+    if (variant === 'double_prong') {
+      // Add a second ring of prongs offset by half a pitch.
+      const gap = vParam > 0 ? vParam : 0.3
+      const stdNode2 = { ...stdNode, prong_wire_diameter: wireD * 0.85 }
+      // Offset second ring by half pitch — approximate with a small rotation.
+      try {
+        const ring2 = opJewelryProngHead(oc, null, stdNode2, _sketches, tracker)
+        const tRot = track(tracker, new oc.gp_Trsf_1())
+        const ax1 = track(tracker, new oc.gp_Ax1_2(
+          track(tracker, new oc.gp_Pnt_3(0, 0, 0)),
+          track(tracker, new oc.gp_Dir_4(0, 0, 1)),
+        ))
+        tRot.SetRotation_1(ax1, Math.PI / prongCount)
+        const xf = track(tracker, new oc.BRepBuilderAPI_Transform_2(ring2, tRot, true))
+        xf.Build()
+        if (xf.IsDone()) head = _jewelryFuse(oc, head, xf.Shape(), tracker)
+      } catch { /* single ring fallback */ }
+    } else if (variant === 'claw_prong') {
+      // Add small claw-hook cylinders at the prong tips.
+      const hookD  = wireD * 0.7
+      const hookR  = wireD * (vParam > 0 ? vParam : 0.4)
+      const stoneR = stoneDiam / 2
+      const pCentreR = stoneR + wireD / 2
+      for (let i = 0; i < prongCount; i++) {
+        try {
+          const angle = (2 * Math.PI * i) / prongCount
+          const cx = pCentreR * Math.cos(angle)
+          const cy = pCentreR * Math.sin(angle)
+          const hookAx = track(tracker, new oc.gp_Ax2_3(
+            track(tracker, new oc.gp_Pnt_3(cx, cy, prongH * 1.5 + wireD)),
+            track(tracker, new oc.gp_Dir_4(0, 0, 1)),
+          ))
+          const hook = track(tracker, new oc.BRepPrimAPI_MakeSphere_3(hookAx, hookD / 2))
+          hook.Build()
+          if (hook.IsDone()) head = _jewelryFuse(oc, head, hook.Shape(), tracker)
+        } catch { /* skip hook */ }
+      }
+    }
+    // v_prong / fishtail_prong / split_prong / decorative_prong:
+    // base head geometry is sufficient as a visual placeholder.
+
+    return _jewelryTransform(oc, head, node.position, node.orientation_deg, tracker)
+  } catch {
+    // Ultimate fallback: cylinder placeholder
+    const fb = _makeCylinder(oc, stoneDiam / 2 + wireD, prongH + wireD, 0, tracker)
+    return _jewelryTransform(oc, fb, node.position, node.orientation_deg, tracker)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// opJewelryHeadGallery — basket/peg head + decorative gallery rail.
+//
+// Node schema fields (from build_head_gallery_node in settings.py):
+//   head_diameter, head_height, gallery_height, gallery_style,
+//   motif_pitch, _gallery_outer_diameter, _gallery_circumference, _motif_count,
+//   position?, orientation_deg?
+// ---------------------------------------------------------------------------
+function opJewelryHeadGallery(oc, _prev, node, _sketches, tracker) {
+  const headD   = Number(node.head_diameter)   || 8.0
+  const headH   = Number(node.head_height)     || 4.0
+  const galH    = Number(node.gallery_height)  || 1.5
+  const pitch   = Number(node.motif_pitch)     || 2.0
+  const style   = (node.gallery_style || 'plain').toLowerCase()
+
+  try {
+    const headR = headD / 2
+
+    // Head basket: outer ring cylinder with inner bore.
+    const wallT  = headR * 0.2   // approximate wall thickness
+    const outerCyl = _makeCylinder(oc, headR, headH, 0, tracker)
+    const innerBore = _makeCylinder(oc, headR - wallT, headH + 0.1, -0.05, tracker)
+    let head = _jewelryCut(oc, outerCyl, innerBore, tracker)
+
+    // Gallery rail: a thin ring below the head (at z = -galH).
+    const galOuter = _makeCylinder(oc, headR, galH, -(galH), tracker)
+    const galInner = _makeCylinder(oc, headR - wallT * 0.5, galH + 0.1, -(galH) - 0.05, tracker)
+    let gallery = _jewelryCut(oc, galOuter, galInner, tracker)
+
+    // Scalloped gallery: punch small half-cylinder cutouts from the lower edge.
+    if (style === 'scalloped' && pitch > 0) {
+      const motifCount = Math.max(1, Number(node._motif_count) || Math.round(Math.PI * headD / pitch))
+      const scR = galH * 0.5  // scallop radius
+      for (let i = 0; i < motifCount; i++) {
+        try {
+          const angle  = (2 * Math.PI * i) / motifCount
+          const sx = headR * Math.cos(angle)
+          const sy = headR * Math.sin(angle)
+          const scAx = track(tracker, new oc.gp_Ax2_3(
+            track(tracker, new oc.gp_Pnt_3(sx, sy, -(galH) - scR * 0.5)),
+            track(tracker, new oc.gp_Dir_4(0, 0, 1)),
+          ))
+          const scoop = track(tracker, new oc.BRepPrimAPI_MakeSphere_3(scAx, scR))
+          scoop.Build()
+          if (scoop.IsDone()) {
+            try { gallery = _jewelryCut(oc, gallery, scoop.Shape(), tracker) } catch { /* skip */ }
+          }
+        } catch { /* skip this scallop */ }
+      }
+    }
+
+    const result = _jewelryFuse(oc, head, gallery, tracker)
+    return _jewelryTransform(oc, result, node.position, node.orientation_deg, tracker)
+  } catch {
+    const fb = _makeCylinder(oc, (Number(node.head_diameter) || 8.0) / 2,
+      (Number(node.head_height) || 4.0) + (Number(node.gallery_height) || 1.5), 0, tracker)
+    return _jewelryTransform(oc, fb, node.position, node.orientation_deg, tracker)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// opJewelryUnderBezel — sub-collet that elevates a stone above the shank.
+//
+// Node schema fields (from build_under_bezel_node in settings.py):
+//   stone_diameter, wall_thickness, collet_height, base_diameter, base_thickness,
+//   _outer_diameter, _collet_volume_approx,
+//   position?, orientation_deg?
+// ---------------------------------------------------------------------------
+function opJewelryUnderBezel(oc, _prev, node, _sketches, tracker) {
+  const stoneD  = Number(node.stone_diameter)   || 6.5
+  const wallT   = Number(node.wall_thickness)   || 0.5
+  const colH    = Number(node.collet_height)    || 2.0
+  const baseD   = Number(node.base_diameter)    || stoneD + 2 * wallT + 1.0
+  const baseT   = Number(node.base_thickness)   || 0.8
+  const outerD  = Number(node._outer_diameter)  || stoneD + 2 * wallT
+
+  try {
+    // Collet tube: outer cylinder minus inner bore.
+    const outerCyl = _makeCylinder(oc, outerD / 2, colH, 0, tracker)
+    const innerBore = _makeCylinder(oc, stoneD / 2, colH + 0.1, -0.05, tracker)
+    let collet = _jewelryCut(oc, outerCyl, innerBore, tracker)
+
+    // Base plate disc extending outward at z=0.
+    const baseAx = track(tracker, new oc.gp_Ax2_3(
+      track(tracker, new oc.gp_Pnt_3(0, 0, -baseT)),
+      track(tracker, new oc.gp_Dir_4(0, 0, 1)),
+    ))
+    const baseCyl = track(tracker, new oc.BRepPrimAPI_MakeCylinder_3(baseAx, baseD / 2, baseT))
+    baseCyl.Build()
+    if (baseCyl.IsDone()) {
+      try { collet = _jewelryFuse(oc, collet, baseCyl.Shape(), tracker) } catch { /* skip */ }
+    }
+
+    return _jewelryTransform(oc, collet, node.position, node.orientation_deg, tracker)
+  } catch {
+    const fb = _makeCylinder(oc, (Number(node._outer_diameter) || 7.5) / 2,
+      Number(node.collet_height) || 2.0, 0, tracker)
+    return _jewelryTransform(oc, fb, node.position, node.orientation_deg, tracker)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// opJewelryPegSetting — post head for earrings and pendants.
+//
+// Node schema fields (from build_peg_setting_node in settings.py):
+//   stone_diameter, peg_diameter, peg_length, base_diameter, base_thickness,
+//   _cup_depth, _peg_aspect_ratio,
+//   position?, orientation_deg?
+// ---------------------------------------------------------------------------
+function opJewelryPegSetting(oc, _prev, node, _sketches, tracker) {
+  const stoneD  = Number(node.stone_diameter)  || 6.5
+  const pegD    = Number(node.peg_diameter)    || 2.0
+  const pegL    = Number(node.peg_length)      || 10.0
+  const baseD   = Number(node.base_diameter)   || pegD + 2.0
+  const baseT   = Number(node.base_thickness)  || 0.8
+  const cupD    = Number(node._cup_depth)      || stoneD * 0.2
+
+  try {
+    // Peg cylinder.
+    const pegAx = track(tracker, new oc.gp_Ax2_3(
+      track(tracker, new oc.gp_Pnt_3(0, 0, 0)),
+      track(tracker, new oc.gp_Dir_4(0, 0, 1)),
+    ))
+    const pegCyl = track(tracker, new oc.BRepPrimAPI_MakeCylinder_3(pegAx, pegD / 2, pegL))
+    pegCyl.Build()
+    if (!pegCyl.IsDone()) throw new Error('peg_setting: peg cylinder failed')
+    let peg = pegCyl.Shape()
+
+    // Cup at top of peg: shallow cylinder + stone bore subtracted.
+    const cupOuter = _makeCylinder(oc, stoneD / 2 + 0.8, cupD, pegL, tracker)
+    let cup = cupOuter
+    const boreCyl = _makeCylinder(oc, stoneD / 2, cupD + 0.1, pegL - 0.05, tracker)
+    try { cup = _jewelryCut(oc, cupOuter, boreCyl, tracker) } catch { /* keep solid cup */ }
+    peg = _jewelryFuse(oc, peg, cup, tracker)
+
+    // Base plate.
+    const baseAx = track(tracker, new oc.gp_Ax2_3(
+      track(tracker, new oc.gp_Pnt_3(0, 0, -baseT)),
+      track(tracker, new oc.gp_Dir_4(0, 0, 1)),
+    ))
+    const baseCyl = track(tracker, new oc.BRepPrimAPI_MakeCylinder_3(baseAx, baseD / 2, baseT))
+    baseCyl.Build()
+    if (baseCyl.IsDone()) {
+      try { peg = _jewelryFuse(oc, peg, baseCyl.Shape(), tracker) } catch { /* skip */ }
+    }
+
+    return _jewelryTransform(oc, peg, node.position, node.orientation_deg, tracker)
+  } catch {
+    const fb = _makeCylinder(oc, Number(node.peg_diameter) / 2 || 1.0, Number(node.peg_length) || 10.0, 0, tracker)
+    return _jewelryTransform(oc, fb, node.position, node.orientation_deg, tracker)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// opJewelryCoronet — tapered crown of graduated prongs (vintage/Victorian).
+//
+// Node schema fields (from build_coronet_node in settings.py):
+//   stone_diameter, prong_count, crown_height, taper, wire_gauge,
+//   _base_diameter, _tip_diameter, _prong_pitch_deg,
+//   position?, orientation_deg?
+// ---------------------------------------------------------------------------
+function opJewelryCoronet(oc, _prev, node, _sketches, tracker) {
+  const stoneDiam  = Number(node.stone_diameter) || 6.5
+  const prongCount = Math.max(3, Math.round(Number(node.prong_count) || 6))
+  const crownH     = Number(node.crown_height)   || 3.0
+  const taper      = Number(node.taper)           || 0.3
+  const wireD      = Number(node.wire_gauge)      || 1.0
+  const baseD      = Number(node._base_diameter)  || stoneDiam + 2 * wireD
+  const tipD       = Number(node._tip_diameter)   || Math.max(stoneDiam, baseD - 2 * taper)
+
+  try {
+    // Base collet ring.
+    const baseH    = crownH * 0.25
+    const outerCyl = _makeCylinder(oc, baseD / 2, baseH, 0, tracker)
+    const innerBore = _makeCylinder(oc, stoneDiam / 2, baseH + 0.1, -0.05, tracker)
+    let coronet = _jewelryCut(oc, outerCyl, innerBore, tracker)
+
+    // Tapered prong wires.
+    const stoneR = stoneDiam / 2
+    for (let i = 0; i < prongCount; i++) {
+      const angle = (2 * Math.PI * i) / prongCount
+      // Base centre at base radius, tip centre pulled inward by taper.
+      const baseCR = stoneR + wireD / 2
+      const tipCR  = Math.max(stoneR, baseCR - taper)
+      const bx = baseCR * Math.cos(angle)
+      const by = baseCR * Math.sin(angle)
+      try {
+        const prongAx = track(tracker, new oc.gp_Ax2_3(
+          track(tracker, new oc.gp_Pnt_3(bx, by, baseH)),
+          track(tracker, new oc.gp_Dir_4(0, 0, 1)),
+        ))
+        const prong = track(tracker, new oc.BRepPrimAPI_MakeCylinder_3(prongAx, wireD / 2, crownH))
+        prong.Build()
+        if (prong.IsDone()) coronet = _jewelryFuse(oc, coronet, prong.Shape(), tracker)
+      } catch { /* skip prong */ }
+    }
+
+    return _jewelryTransform(oc, coronet, node.position, node.orientation_deg, tracker)
+  } catch {
+    const fb = _makeCylinder(oc, (Number(node._base_diameter) || 8.5) / 2,
+      Number(node.crown_height) || 3.0, 0, tracker)
+    return _jewelryTransform(oc, fb, node.position, node.orientation_deg, tracker)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// opJewelrySuspensionMount — articulated dangle mount (pivot ring + stone seat).
+//
+// Node schema fields (from build_suspension_mount_node in settings.py):
+//   stone_diameter, seat_style, seat_depth,
+//   ring_wire_diameter, ring_inner_diameter, bail_height,
+//   _ring_outer_diameter, _total_height, _seat_radius,
+//   position?, orientation_deg?
+// ---------------------------------------------------------------------------
+function opJewelrySuspensionMount(oc, _prev, node, _sketches, tracker) {
+  const stoneD    = Number(node.stone_diameter)      || 6.5
+  const seatD     = Number(node.seat_depth)          || 2.0
+  const ringWire  = Number(node.ring_wire_diameter)  || 1.0
+  const ringID    = Number(node.ring_inner_diameter) || 4.0
+  const bailH     = Number(node.bail_height)         || 3.0
+  const seatStyle = (node.seat_style || 'bezel_cup').toLowerCase()
+
+  try {
+    const stoneR    = stoneD / 2
+    const ringOD    = ringID + 2 * ringWire
+    const totalH    = seatD + bailH + ringWire
+
+    // Stone seat body (cylinder cup, style is a hint only at this fidelity).
+    const seatOuter = _makeCylinder(oc, stoneR + 0.8, seatD, 0, tracker)
+    const seatBore  = _makeCylinder(oc, stoneR, seatD + 0.1, -0.05, tracker)
+    let mount = _jewelryCut(oc, seatOuter, seatBore, tracker)
+
+    // Bail cylinder connecting seat to pivot ring.
+    const bailCyl = _makeCylinder(oc, stoneR * 0.3, bailH, seatD, tracker)
+    mount = _jewelryFuse(oc, mount, bailCyl, tracker)
+
+    // Pivot jump ring: torus approximation — outer cyl minus inner bore.
+    const ringTopZ = seatD + bailH
+    const ringOuter = _makeCylinder(oc, ringOD / 2, ringWire, ringTopZ, tracker)
+    const ringInner = _makeCylinder(oc, ringID / 2, ringWire + 0.1, ringTopZ - 0.05, tracker)
+    try {
+      const ring = _jewelryCut(oc, ringOuter, ringInner, tracker)
+      mount = _jewelryFuse(oc, mount, ring, tracker)
+    } catch { /* keep mount without ring */ }
+
+    return _jewelryTransform(oc, mount, node.position, node.orientation_deg, tracker)
+  } catch {
+    const fb = _makeCylinder(oc, (Number(node.stone_diameter) || 6.5) / 2 + 0.8,
+      (Number(node.seat_depth) || 2.0) + (Number(node.bail_height) || 3.0), 0, tracker)
+    return _jewelryTransform(oc, fb, node.position, node.orientation_deg, tracker)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// opJewelryVtipProtector — protective V-tip caps for pointed stone corners.
+//
+// Node schema fields (from build_vtip_protector_node in settings.py):
+//   stone_shape, tip_count, tip_width, tip_length, wall_thickness, seat_angle_deg,
+//   _tip_opening_width, _cap_area_approx,
+//   position?, orientation_deg?
+// ---------------------------------------------------------------------------
+function opJewelryVtipProtector(oc, _prev, node, _sketches, tracker) {
+  const tipCount  = Math.max(1, Math.round(Number(node.tip_count) || 2))
+  const tipW      = Number(node.tip_width)       || 0.6
+  const tipL      = Number(node.tip_length)       || 1.0
+  const wallT     = Number(node.wall_thickness)  || 0.3
+  const seatAng   = Number(node.seat_angle_deg)  || 50.0
+  const halfAngR  = (seatAng / 2) * Math.PI / 180
+
+  try {
+    const compBuilder = track(tracker, new oc.TopoDS_Compound())
+    const bldBuilder  = track(tracker, new oc.BRep_Builder())
+    bldBuilder.MakeCompound(compBuilder)
+
+    for (let i = 0; i < tipCount; i++) {
+      const angle = (2 * Math.PI * i) / tipCount
+      const cx = tipL * Math.cos(angle)
+      const cy = tipL * Math.sin(angle)
+
+      // V-channel cap: a small box approximation.
+      try {
+        const capH   = wallT + tipL * Math.tan(halfAngR)
+        const cap    = _makeBox(oc,
+          cx - tipW / 2, cy - tipW / 2, 0,
+          tipW, tipW, capH, tracker)
+        bldBuilder.Add(compBuilder, cap)
+      } catch { /* skip this tip */ }
+    }
+
+    return _jewelryTransform(oc, compBuilder, node.position, node.orientation_deg, tracker)
+  } catch {
+    const fb = _makeBox(oc, -tipW / 2, -tipW / 2, 0,
+      Number(node.tip_width) || 0.6, Number(node.tip_width) || 0.6,
+      Number(node.tip_length) || 1.0, tracker)
+    return _jewelryTransform(oc, fb, node.position, node.orientation_deg, tracker)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// opJewelryBombeCluster — domed multi-stone cluster on a spherical cap surface.
+//
+// Node schema fields (from build_bombe_cluster_node in settings.py):
+//   dome_radius, stone_size, stone_count, cap_half_angle_deg, base_height,
+//   positions (list of per-stone {theta, phi, x, y, z}),
+//   _cap_arc_length, _base_diameter, _actual_count,
+//   position?, orientation_deg?
+// ---------------------------------------------------------------------------
+function opJewelryBombeCluster(oc, _prev, node, _sketches, tracker) {
+  const domeR      = Number(node.dome_radius)         || 8.0
+  const stoneS     = Number(node.stone_size)           || 2.0
+  const baseH      = Number(node.base_height)          || 1.5
+  const capHalfAng = Number(node.cap_half_angle_deg)  || 60.0
+  const capHalfR   = capHalfAng * Math.PI / 180
+  const baseD      = Number(node._base_diameter)       || 2.0 * domeR * Math.sin(capHalfR)
+  const positions  = Array.isArray(node.positions) ? node.positions : []
+
+  try {
+    // Spherical cap: a sphere cut by a box from below.
+    const sphere = track(tracker, new oc.BRepPrimAPI_MakeSphere_2(domeR, capHalfR))
+    sphere.Build()
+    if (!sphere.IsDone()) throw new Error('bombe_cluster: sphere cap failed')
+    let dome = sphere.Shape()
+
+    // Base ring cylinder at the equator.
+    const baseAx = track(tracker, new oc.gp_Ax2_3(
+      track(tracker, new oc.gp_Pnt_3(0, 0, -baseH)),
+      track(tracker, new oc.gp_Dir_4(0, 0, 1)),
+    ))
+    const baseCyl = track(tracker, new oc.BRepPrimAPI_MakeCylinder_3(baseAx, baseD / 2, baseH))
+    baseCyl.Build()
+    if (baseCyl.IsDone()) {
+      try { dome = _jewelryFuse(oc, dome, baseCyl.Shape(), tracker) } catch { /* skip */ }
+    }
+
+    // Stone markers: small spheres on the dome surface.
+    const markerR = stoneS / 4
+    for (const p of positions) {
+      try {
+        const px = Number(p.x || 0)
+        const py = Number(p.y || 0)
+        const pz = Number(p.z || domeR)
+        const mAx = track(tracker, new oc.gp_Ax2_3(
+          track(tracker, new oc.gp_Pnt_3(px, py, pz)),
+          track(tracker, new oc.gp_Dir_4(0, 0, 1)),
+        ))
+        const marker = track(tracker, new oc.BRepPrimAPI_MakeSphere_3(mAx, markerR))
+        marker.Build()
+        if (marker.IsDone()) {
+          try { dome = _jewelryFuse(oc, dome, marker.Shape(), tracker) } catch { /* skip */ }
+        }
+      } catch { /* skip marker */ }
+    }
+
+    return _jewelryTransform(oc, dome, node.position, node.orientation_deg, tracker)
+  } catch {
+    // Fallback: simple hemisphere box
+    const fb = _makeCylinder(oc, (Number(node._base_diameter) || 10.0) / 2,
+      Number(node.dome_radius) || 8.0, 0, tracker)
+    return _jewelryTransform(oc, fb, node.position, node.orientation_deg, tracker)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// opJewelryPatternedBezel — decorative bezel collar with patterned outline.
+//
+// Node schema fields (from build_patterned_bezel_node in settings.py):
+//   stone_diameter, wall_thickness, bezel_height, bearing_ledge_height,
+//   pattern ("lotus"|"compass"|"star"|"plain"), petal_count,
+//   _outer_diameter, _petal_pitch_deg,
+//   position?, orientation_deg?
+//
+// Reuses opJewelryBezel for the base; adds decorative petal cutter/additions.
+// ---------------------------------------------------------------------------
+function opJewelryPatternedBezel(oc, _prev, node, _sketches, tracker) {
+  const stoneDiam  = Number(node.stone_diameter)       || 6.5
+  const wallT      = Number(node.wall_thickness)       || 0.5
+  const bezH       = Number(node.bezel_height)         || 3.0
+  const ledgeH     = Number(node.bearing_ledge_height) || 1.0
+  const pattern    = (node.pattern || 'plain').toLowerCase()
+  const petalCount = Math.max(3, Math.round(Number(node.petal_count) || 8))
+
+  // Build base bezel reusing opJewelryBezel.
+  const bezNode = {
+    stone_diameter:       stoneDiam,
+    wall_thickness:       wallT,
+    bezel_height:         bezH,
+    bearing_ledge_height: ledgeH,
+    bezel_style:          'full',
+    partial_opening_deg:  0,
+    taper_angle_deg:      0,
+  }
+
+  try {
+    let bezel = opJewelryBezel(oc, null, bezNode, _sketches, tracker)
+    const outerR = stoneDiam / 2 + wallT
+
+    if (pattern === 'lotus' || pattern === 'star') {
+      // Punch small spherical scoops from the top edge (lotus) or star notches.
+      const scR    = wallT * 0.6
+      const scZ    = bezH - scR * 0.5
+      for (let i = 0; i < petalCount; i++) {
+        try {
+          const angle = (2 * Math.PI * i) / petalCount
+          const sx = outerR * Math.cos(angle)
+          const sy = outerR * Math.sin(angle)
+          const scAx = track(tracker, new oc.gp_Ax2_3(
+            track(tracker, new oc.gp_Pnt_3(sx, sy, scZ)),
+            track(tracker, new oc.gp_Dir_4(0, 0, 1)),
+          ))
+          const scoop = track(tracker, new oc.BRepPrimAPI_MakeSphere_3(scAx, scR))
+          scoop.Build()
+          if (scoop.IsDone()) {
+            try { bezel = _jewelryCut(oc, bezel, scoop.Shape(), tracker) } catch { /* skip */ }
+          }
+        } catch { /* skip petal */ }
+      }
+    } else if (pattern === 'compass') {
+      // Fuse small pointed cylinders outward at petal positions.
+      const ptL   = wallT * 1.5
+      const ptR   = wallT * 0.3
+      for (let i = 0; i < petalCount; i++) {
+        try {
+          const angle = (2 * Math.PI * i) / petalCount
+          const px = (outerR + ptL / 2) * Math.cos(angle)
+          const py = (outerR + ptL / 2) * Math.sin(angle)
+          const ptAx = track(tracker, new oc.gp_Ax2_3(
+            track(tracker, new oc.gp_Pnt_3(px - ptR * Math.cos(angle), py - ptR * Math.sin(angle), bezH * 0.4)),
+            track(tracker, new oc.gp_Dir_4(Math.cos(angle), Math.sin(angle), 0)),
+          ))
+          const point = track(tracker, new oc.BRepPrimAPI_MakeCylinder_3(ptAx, ptR, ptL))
+          point.Build()
+          if (point.IsDone()) {
+            try { bezel = _jewelryFuse(oc, bezel, point.Shape(), tracker) } catch { /* skip */ }
+          }
+        } catch { /* skip compass point */ }
+      }
+    }
+    // 'plain': base bezel only.
+
+    return _jewelryTransform(oc, bezel, node.position, node.orientation_deg, tracker)
+  } catch {
+    const fb = _makeCylinder(oc, (stoneDiam / 2 + wallT), bezH, 0, tracker)
+    return _jewelryTransform(oc, fb, node.position, node.orientation_deg, tracker)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// opJewelryTrellisProng — interwoven cross-prong basket setting.
+//
+// Node schema fields (from build_trellis_prong_node in settings.py):
+//   stone_diameter, prong_count, wire_gauge, prong_height, weave_style, cross_height,
+//   _outer_diameter, _cross_clearance, _prong_pitch_deg,
+//   position?, orientation_deg?
+// ---------------------------------------------------------------------------
+function opJewelryTrellisProng(oc, _prev, node, _sketches, tracker) {
+  const stoneDiam  = Number(node.stone_diameter) || 6.5
+  const prongCount = Math.max(4, Math.round(Number(node.prong_count) || 4))
+  const wireD      = Number(node.wire_gauge)     || 1.0
+  const prongH     = Number(node.prong_height)   || 2.5
+  const crossH     = Number(node.cross_height)   || prongH * 0.5
+  const weave      = (node.weave_style || 'x_cross').toLowerCase()
+
+  // Build base prong head first.
+  const stdNode = {
+    stone_diameter:      stoneDiam,
+    prong_count:         prongCount,
+    prong_wire_diameter: wireD,
+    prong_height:        prongH,
+    head_style:          'trellis',
+    basket_rail_count:   1,
+    seat_angle_deg:      15.0,
+  }
+
+  try {
+    let trellis = opJewelryProngHead(oc, null, stdNode, _sketches, tracker)
+
+    // Add cross-bars at cross_height connecting adjacent prongs.
+    const stoneR    = stoneDiam / 2
+    const prongCentreR = stoneR + wireD / 2
+    const ledgeH    = wireD * 1.5
+    const crossZ    = ledgeH + crossH
+
+    if (weave === 'x_cross' || weave === 'diagonal') {
+      // Connect pairs of prongs with short cylinder cross-bars.
+      for (let i = 0; i < prongCount; i++) {
+        const i2 = (i + 1) % prongCount
+        try {
+          const a1 = (2 * Math.PI * i)  / prongCount
+          const a2 = (2 * Math.PI * i2) / prongCount
+          const x1 = prongCentreR * Math.cos(a1)
+          const y1 = prongCentreR * Math.sin(a1)
+          const x2 = prongCentreR * Math.cos(a2)
+          const y2 = prongCentreR * Math.sin(a2)
+          const dx = x2 - x1
+          const dy = y2 - y1
+          const dist = Math.sqrt(dx * dx + dy * dy)
+          if (dist < 0.01) continue
+
+          const midX = (x1 + x2) / 2
+          const midY = (y1 + y2) / 2
+          const barAx = track(tracker, new oc.gp_Ax2_3(
+            track(tracker, new oc.gp_Pnt_3(x1, y1, crossZ)),
+            track(tracker, new oc.gp_Dir_4(dx / dist, dy / dist, 0)),
+          ))
+          const bar = track(tracker, new oc.BRepPrimAPI_MakeCylinder_3(barAx, wireD / 2, dist))
+          bar.Build()
+          if (bar.IsDone()) {
+            try { trellis = _jewelryFuse(oc, trellis, bar.Shape(), tracker) } catch { /* skip */ }
+          }
+        } catch { /* skip cross-bar */ }
+      }
+    }
+
+    return _jewelryTransform(oc, trellis, node.position, node.orientation_deg, tracker)
+  } catch {
+    const fb = _makeCylinder(oc, stoneDiam / 2 + wireD, prongH + wireD * 1.5, 0, tracker)
+    return _jewelryTransform(oc, fb, node.position, node.orientation_deg, tracker)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// opJewelryBarChannelGraduated — row of graduated stones with bar separators.
+//
+// Node schema fields (from build_bar_channel_graduated_node in settings.py):
+//   stone_count, largest_diameter, smallest_diameter, stone_spacing,
+//   bar_width, bar_height, floor_thickness,
+//   stones (list of {index, diameter, x_center}),
+//   _total_row_length, _bar_count, _actual_stone_count,
+//   position?, orientation_deg?
+// ---------------------------------------------------------------------------
+function opJewelryBarChannelGraduated(oc, _prev, node, _sketches, tracker) {
+  const rowL    = Number(node._total_row_length)  || 20.0
+  const barW    = Number(node.bar_width)          || 0.6
+  const barH    = Number(node.bar_height)         || 1.5
+  const floorT  = Number(node.floor_thickness)    || 0.6
+  const stones  = Array.isArray(node.stones) ? node.stones : []
+  const largeD  = Number(node.largest_diameter)   || 4.0
+  const spacedD = Number(node.stone_spacing)      || 0.15
+
+  try {
+    // Channel floor running the full row length.
+    const floor = _makeBox(oc, 0, -largeD / 2, -floorT, rowL > 0 ? rowL : 10, largeD, floorT, tracker)
+    let channel = floor
+
+    // Bar separators between each adjacent stone pair.
+    if (stones.length >= 2) {
+      for (let i = 0; i < stones.length - 1; i++) {
+        try {
+          const s0 = stones[i]
+          const s1 = stones[i + 1]
+          const xMid = ((Number(s0.x_center) + Number(s0.diameter) / 2)
+                      + (Number(s1.x_center) - Number(s1.diameter) / 2)) / 2
+          const barMaxD = Math.max(Number(s0.diameter), Number(s1.diameter))
+          const barBox = _makeBox(oc,
+            xMid - barW / 2, -barMaxD / 2, 0,
+            barW, barMaxD, barH, tracker)
+          channel = _jewelryFuse(oc, channel, barBox, tracker)
+        } catch { /* skip bar */ }
+      }
+    } else if (stones.length === 0) {
+      // No stone data: build a uniform row with bar_count bars.
+      const barCount = Math.max(0, Number(node._bar_count) || 0)
+      const pitch    = rowL / Math.max(1, barCount + 1)
+      for (let i = 1; i <= barCount; i++) {
+        try {
+          const barBox = _makeBox(oc,
+            i * pitch - barW / 2, -largeD / 2, 0,
+            barW, largeD, barH, tracker)
+          channel = _jewelryFuse(oc, channel, barBox, tracker)
+        } catch { /* skip */ }
+      }
+    }
+
+    return _jewelryTransform(oc, channel, node.position, node.orientation_deg, tracker)
+  } catch {
+    const fb = _makeBox(oc, 0, -largeD / 2, -(Number(node.floor_thickness) || 0.6),
+      rowL > 0 ? rowL : 10, largeD, (Number(node.floor_thickness) || 0.6), tracker)
+    return _jewelryTransform(oc, fb, node.position, node.orientation_deg, tracker)
+  }
+}
+
+// ---------------------------------------------------------------------------
 // T-1  opSheetFlange — sheet-metal base plate + single bent flange.
 // ---------------------------------------------------------------------------
 //
@@ -5458,6 +6702,217 @@ function evaluateTree(oc, tree, sketches) {
           currentFaceNamer = null
           break
         }
+        // ── Jewelry ops T-26: pieces, decorative_apply, gem-seat v2, settings v3/v4 ──
+        case 'pendant': {
+          if (current) {
+            pushCurrentMesh(`body-${meshes.length}`)
+            cleanupShape(oc, current)
+            current = null
+          }
+          next = opPendant(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        }
+        case 'earrings': {
+          if (current) {
+            pushCurrentMesh(`body-${meshes.length}`)
+            cleanupShape(oc, current)
+            current = null
+          }
+          next = opEarrings(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        }
+        case 'brooch': {
+          if (current) {
+            pushCurrentMesh(`body-${meshes.length}`)
+            cleanupShape(oc, current)
+            current = null
+          }
+          next = opBrooch(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        }
+        case 'cufflink': {
+          if (current) {
+            pushCurrentMesh(`body-${meshes.length}`)
+            cleanupShape(oc, current)
+            current = null
+          }
+          next = opCufflink(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        }
+        case 'bangle': {
+          if (current) {
+            pushCurrentMesh(`body-${meshes.length}`)
+            cleanupShape(oc, current)
+            current = null
+          }
+          next = opBangle(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        }
+        case 'decorative_apply': {
+          if (current) {
+            pushCurrentMesh(`body-${meshes.length}`)
+            cleanupShape(oc, current)
+            current = null
+          }
+          next = opDecorativeApply(oc, null, node, sketches, tracker, bodyMap)
+          currentFaceNamer = null
+          break
+        }
+        case 'pave_field_seat': {
+          if (current) {
+            pushCurrentMesh(`body-${meshes.length}`)
+            cleanupShape(oc, current)
+            current = null
+          }
+          next = opPaveFieldSeat(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        }
+        case 'cluster_halo_seat': {
+          if (current) {
+            pushCurrentMesh(`body-${meshes.length}`)
+            cleanupShape(oc, current)
+            current = null
+          }
+          next = opClusterHaloSeat(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        }
+        case 'gypsy_seat': {
+          if (current) {
+            pushCurrentMesh(`body-${meshes.length}`)
+            cleanupShape(oc, current)
+            current = null
+          }
+          next = opGypsySeat(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        }
+        case 'baguette_channel_seat': {
+          if (current) {
+            pushCurrentMesh(`body-${meshes.length}`)
+            cleanupShape(oc, current)
+            current = null
+          }
+          next = opBaguetteChannelSeat(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        }
+        case 'jewelry_prong_variant': {
+          if (current) {
+            pushCurrentMesh(`body-${meshes.length}`)
+            cleanupShape(oc, current)
+            current = null
+          }
+          next = opJewelryProngVariant(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        }
+        case 'jewelry_head_gallery': {
+          if (current) {
+            pushCurrentMesh(`body-${meshes.length}`)
+            cleanupShape(oc, current)
+            current = null
+          }
+          next = opJewelryHeadGallery(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        }
+        case 'jewelry_under_bezel': {
+          if (current) {
+            pushCurrentMesh(`body-${meshes.length}`)
+            cleanupShape(oc, current)
+            current = null
+          }
+          next = opJewelryUnderBezel(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        }
+        case 'jewelry_peg_setting': {
+          if (current) {
+            pushCurrentMesh(`body-${meshes.length}`)
+            cleanupShape(oc, current)
+            current = null
+          }
+          next = opJewelryPegSetting(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        }
+        case 'jewelry_coronet': {
+          if (current) {
+            pushCurrentMesh(`body-${meshes.length}`)
+            cleanupShape(oc, current)
+            current = null
+          }
+          next = opJewelryCoronet(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        }
+        case 'jewelry_suspension_mount': {
+          if (current) {
+            pushCurrentMesh(`body-${meshes.length}`)
+            cleanupShape(oc, current)
+            current = null
+          }
+          next = opJewelrySuspensionMount(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        }
+        case 'jewelry_vtip_protector': {
+          if (current) {
+            pushCurrentMesh(`body-${meshes.length}`)
+            cleanupShape(oc, current)
+            current = null
+          }
+          next = opJewelryVtipProtector(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        }
+        case 'jewelry_bombe_cluster': {
+          if (current) {
+            pushCurrentMesh(`body-${meshes.length}`)
+            cleanupShape(oc, current)
+            current = null
+          }
+          next = opJewelryBombeCluster(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        }
+        case 'jewelry_patterned_bezel': {
+          if (current) {
+            pushCurrentMesh(`body-${meshes.length}`)
+            cleanupShape(oc, current)
+            current = null
+          }
+          next = opJewelryPatternedBezel(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        }
+        case 'jewelry_trellis_prong': {
+          if (current) {
+            pushCurrentMesh(`body-${meshes.length}`)
+            cleanupShape(oc, current)
+            current = null
+          }
+          next = opJewelryTrellisProng(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        }
+        case 'jewelry_bar_channel_graduated': {
+          if (current) {
+            pushCurrentMesh(`body-${meshes.length}`)
+            cleanupShape(oc, current)
+            current = null
+          }
+          next = opJewelryBarChannelGraduated(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        }
         // T-1  Sheet metal — folded flange primitive.
         case 'sheet_metal_flange': {
           if (current) {
@@ -5848,6 +7303,133 @@ async function evaluateToFinalShape(oc, tree, sketches) {
           if (current) cleanupShape(oc, current)
           current = null
           next = opChainAssembly(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        // ── Jewelry ops T-26: pieces, decorative_apply, gem-seat v2, settings v3/v4 ──
+        case 'pendant':
+          if (current) cleanupShape(oc, current)
+          current = null
+          next = opPendant(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        case 'earrings':
+          if (current) cleanupShape(oc, current)
+          current = null
+          next = opEarrings(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        case 'brooch':
+          if (current) cleanupShape(oc, current)
+          current = null
+          next = opBrooch(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        case 'cufflink':
+          if (current) cleanupShape(oc, current)
+          current = null
+          next = opCufflink(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        case 'bangle':
+          if (current) cleanupShape(oc, current)
+          current = null
+          next = opBangle(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        case 'decorative_apply':
+          if (current) cleanupShape(oc, current)
+          current = null
+          next = opDecorativeApply(oc, null, node, sketches, tracker, bodyMap)
+          currentFaceNamer = null
+          break
+        case 'pave_field_seat':
+          if (current) cleanupShape(oc, current)
+          current = null
+          next = opPaveFieldSeat(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        case 'cluster_halo_seat':
+          if (current) cleanupShape(oc, current)
+          current = null
+          next = opClusterHaloSeat(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        case 'gypsy_seat':
+          if (current) cleanupShape(oc, current)
+          current = null
+          next = opGypsySeat(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        case 'baguette_channel_seat':
+          if (current) cleanupShape(oc, current)
+          current = null
+          next = opBaguetteChannelSeat(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        case 'jewelry_prong_variant':
+          if (current) cleanupShape(oc, current)
+          current = null
+          next = opJewelryProngVariant(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        case 'jewelry_head_gallery':
+          if (current) cleanupShape(oc, current)
+          current = null
+          next = opJewelryHeadGallery(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        case 'jewelry_under_bezel':
+          if (current) cleanupShape(oc, current)
+          current = null
+          next = opJewelryUnderBezel(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        case 'jewelry_peg_setting':
+          if (current) cleanupShape(oc, current)
+          current = null
+          next = opJewelryPegSetting(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        case 'jewelry_coronet':
+          if (current) cleanupShape(oc, current)
+          current = null
+          next = opJewelryCoronet(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        case 'jewelry_suspension_mount':
+          if (current) cleanupShape(oc, current)
+          current = null
+          next = opJewelrySuspensionMount(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        case 'jewelry_vtip_protector':
+          if (current) cleanupShape(oc, current)
+          current = null
+          next = opJewelryVtipProtector(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        case 'jewelry_bombe_cluster':
+          if (current) cleanupShape(oc, current)
+          current = null
+          next = opJewelryBombeCluster(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        case 'jewelry_patterned_bezel':
+          if (current) cleanupShape(oc, current)
+          current = null
+          next = opJewelryPatternedBezel(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        case 'jewelry_trellis_prong':
+          if (current) cleanupShape(oc, current)
+          current = null
+          next = opJewelryTrellisProng(oc, null, node, sketches, tracker)
+          currentFaceNamer = null
+          break
+        case 'jewelry_bar_channel_graduated':
+          if (current) cleanupShape(oc, current)
+          current = null
+          next = opJewelryBarChannelGraduated(oc, null, node, sketches, tracker)
           currentFaceNamer = null
           break
         // T-1  Sheet metal — folded flange primitive.

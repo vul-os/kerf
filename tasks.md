@@ -15,6 +15,10 @@ split anything bigger than ~one agent-run into sequenced sub-tasks with
 `Depends-on`. A new uncovered sector → a P3 task + a P3 line in the roadmap.
 Keep this file and the roadmap in sync when priorities change.
 
+**Policy:** Advanced cross-cutting capabilities (ROADMAP §3.5) and long-term
+horizon sectors (§6) are intentionally NOT enumerated as tasks here until
+promoted to near-term P0/P1.
+
 Template:
 
 ```

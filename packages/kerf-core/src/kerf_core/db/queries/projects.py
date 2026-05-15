@@ -79,6 +79,8 @@ async def update_project(
     visibility: Optional[str] = None,
     tags: Optional[List[str]] = None,
     thumbnail_storage_key: Optional[str] = None,
+    readme: Optional[str] = None,
+    cover_storage_key: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     updates = []
     params = [project_id]
@@ -109,6 +111,18 @@ async def update_project(
         params.append(thumbnail_storage_key)
         param_idx += 1
         updates.append("thumbnail_updated_at = now()")
+
+    if readme is not None:
+        updates.append(f"readme = ${param_idx}")
+        params.append(readme)
+        param_idx += 1
+        updates.append("readme_generated_at = now()")
+
+    if cover_storage_key is not None:
+        updates.append(f"cover_storage_key = ${param_idx}")
+        params.append(cover_storage_key)
+        param_idx += 1
+        updates.append("cover_generated_at = now()")
 
     if not updates:
         return await get_project(conn, project_id)

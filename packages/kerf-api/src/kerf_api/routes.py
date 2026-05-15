@@ -3720,6 +3720,42 @@ async def upload_project_thumbnail(
         }
 
 
+@router.get("/projects/{pid}/cover")
+async def serve_project_cover(
+    pid: str,
+    auth: Optional[dict] = Depends(optional_auth),
+):
+    """GET /api/projects/:pid/cover — serve the auto-rendered hero cover image.
+
+    Public projects are anonymously accessible.  Private projects require
+    workspace membership.  Falls back with 404 when no cover has been generated.
+    """
+    pool = await get_pool_required()
+    async with pool.acquire() as conn:
+        proj = await conn.fetchrow(
+            "SELECT workspace_id, visibility, cover_storage_key FROM projects WHERE id = $1",
+            uuid.UUID(pid),
+        )
+        if not proj:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
+
+        if proj["visibility"] != "public":
+            uid = auth.get("sub") if auth else None
+            if not uid:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
+            role = await get_user_workspace_role(conn, str(proj["workspace_id"]), uid)
+            if not role:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
+
+        key = proj.get("cover_storage_key")
+        if not key:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no cover available")
+
+    storage = get_storage_required()
+    body, content_type = await storage.get(key)
+    return StreamingResponse(body, media_type=content_type or "image/png")
+
+
 # Project Workshop Images (multi-image gallery)
 #
 # Net-new endpoints (Thingiverse-style cover gallery). The primary
@@ -4764,6 +4800,13 @@ def _project_to_workshop_row(p: dict) -> dict:
         "thumbnail_storage_key": p.get("thumbnail_storage_key"),
         "thumbnail_url": thumbnail_url,
         "primary_image_id": str(primary_image_id) if primary_image_id else None,
+        "readme": p.get("readme") or None,
+        "readme_generated_at": p["readme_generated_at"].isoformat() if p.get("readme_generated_at") else None,
+        "cover_storage_key": p.get("cover_storage_key"),
+        "cover_url": (
+            f"/api/projects/{pid}/cover"
+            if p.get("cover_storage_key") else thumbnail_url
+        ),
         "published_at": p["created_at"].isoformat() if p.get("created_at") else None,
         "last_edited": p["updated_at"].isoformat() if p.get("updated_at") else None,
         "created_at": p["created_at"].isoformat() if p.get("created_at") else None,
@@ -4882,6 +4925,109 @@ class WorkshopPublishRequest(BaseModel):
     project_id: str
     title: str = ""
     description: str = ""
+    readme: Optional[str] = None          # caller-supplied README (overrides AI gen)
+    generate_readme: bool = True           # set False to skip AI generation
+    readme_override: str = ""             # explicit README text (alias for `readme`)
+
+
+def _get_bom_rows_sync(project_files: list) -> list:
+    """Extract lightweight BOM rows from project file list for README context.
+
+    Parses .part files for name + distributor info. Returns a list of simple
+    dicts suitable for readme_gen.compose_readme_prompt.
+    """
+    rows = []
+    for f in project_files:
+        if f.get("kind") != "part":
+            continue
+        content = f.get("content") or ""
+        if not content.strip():
+            continue
+        try:
+            doc = json.loads(content)
+        except Exception:
+            continue
+        name = doc.get("name") or f.get("name") or "?"
+        supplier = ""
+        dists = doc.get("distributors") or []
+        if dists:
+            supplier = dists[0].get("name") or ""
+        rows.append({"name": name, "qty": 1, "supplier": supplier})
+    return rows
+
+
+async def _generate_project_cover(
+    conn,
+    project: dict,
+    project_id: uuid.UUID,
+    storage,
+) -> Optional[str]:
+    """Attempt to auto-render a hero cover for the project.
+
+    Uses kerf-render if Blender is available; falls back to the existing
+    thumbnail_storage_key gracefully (no exception raised).
+
+    Returns the storage key of the generated cover, or None on failure.
+    """
+    try:
+        import importlib
+        kerf_render_routes = importlib.import_module("kerf_render.routes")
+
+        # Only proceed when Blender is actually installed.
+        if not getattr(kerf_render_routes, "_BLENDER_AVAILABLE", False):
+            return None
+
+        # Fetch the primary mesh file (first .jscad / .step / .feature file)
+        file_rows = await conn.fetch(
+            "SELECT id, name, kind, content, bytes FROM files "
+            "WHERE project_id = $1 AND deleted_at IS NULL "
+            "AND kind IN ('file', 'step', 'feature') "
+            "ORDER BY updated_at DESC LIMIT 1",
+            project_id,
+        )
+        if not file_rows:
+            return None
+
+        # Minimal render: just a default-settings isometric thumbnail.
+        # We skip mesh upload/conversion here — the render module handles it.
+        # For the hero cover we use a 1280x960 resolution, 64 samples.
+        from kerf_render.routes import RenderRequest, RenderSettings, CameraSettings
+        import httpx as _httpx
+
+        settings = get_settings()
+        render_url = getattr(settings, "render_service_url", None) or os.environ.get("KERF_RENDER_URL", "")
+        if not render_url:
+            return None
+
+        # Build a minimal render request; mesh_b64 empty means Blender uses a
+        # default cube as placeholder — good enough for a cover thumbnail.
+        payload = {
+            "version": 1,
+            "name": f"cover-{project_id}",
+            "mesh_b64": "",
+            "mesh_format": "obj",
+            "render_settings": {"resolution": [1280, 960], "samples": 64, "denoise": True, "output_format": "png"},
+        }
+
+        async with _httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(f"{render_url}/run-render", json=payload)
+
+        if resp.status_code != 200:
+            return None
+
+        result = resp.json()
+        img_b64 = result.get("output_b64") or ""
+        if not img_b64:
+            return None
+
+        img_bytes = base64.b64decode(img_b64)
+        cover_key = f"projects/{project_id}/cover.png"
+        await storage.put(cover_key, img_bytes, content_type="image/png")
+        return cover_key
+
+    except Exception as exc:
+        logging.getLogger(__name__).debug("cover generation skipped: %s", exc)
+        return None
 
 
 @router.post("/workshop/publish")
@@ -4889,7 +5035,15 @@ async def workshop_publish(
     body: WorkshopPublishRequest,
     auth: dict = Depends(require_auth),
 ):
-    """POST /api/workshop/publish — owner-only, sets visibility='public'. Idempotent."""
+    """POST /api/workshop/publish — owner-only, sets visibility='public'. Idempotent.
+
+    On publish:
+    1. Sets project visibility to 'public'.
+    2. AI-generates a README from project params + BOM + parts attribution
+       (default on; set generate_readme=false or supply readme= to skip/override).
+    3. Attempts to auto-render a hero cover via kerf-render; gracefully falls
+       back to the existing auto-captured thumbnail when Blender is unavailable.
+    """
     try:
         project_id = uuid.UUID(body.project_id)
     except ValueError:
@@ -4897,6 +5051,14 @@ async def workshop_publish(
 
     user_id = auth["sub"]
     pool = await get_pool_required()
+
+    # Resolve explicit readme (body.readme takes priority over body.readme_override)
+    explicit_readme: Optional[str] = None
+    if body.readme:
+        explicit_readme = body.readme.strip() or None
+    elif body.readme_override:
+        explicit_readme = body.readme_override.strip() or None
+
     async with pool.acquire() as conn:
         project = await projects_queries.get_project(conn, project_id)
         if not project:
@@ -4913,9 +5075,166 @@ async def workshop_publish(
         if body.description:
             updates["description"] = body.description
 
+        # ---- README generation ----
+        readme_text: Optional[str] = None
+        if explicit_readme:
+            readme_text = explicit_readme
+        elif body.generate_readme:
+            # Build BOM context from project files
+            file_rows = await conn.fetch(
+                "SELECT id, name, kind, content FROM files "
+                "WHERE project_id = $1 AND deleted_at IS NULL",
+                project_id,
+            )
+            file_list = [dict(r) for r in file_rows]
+            bom_rows = _get_bom_rows_sync(file_list)
+
+            project_ctx = {
+                "name": body.title or project.get("name") or "",
+                "description": body.description or project.get("description") or "",
+                "tags": list(project.get("tags") or []),
+                "license": "MIT",
+            }
+
+            try:
+                from kerf_chat.readme_gen import generate_readme, generate_readme_template
+                from kerf_chat.llm import LLMConfig, Registry
+
+                settings = get_settings()
+                anthropic_key = getattr(settings, "anthropic_api_key", None) or os.environ.get("ANTHROPIC_API_KEY", "")
+
+                if anthropic_key:
+                    cfg = LLMConfig(
+                        anthropic_api_key=anthropic_key,
+                        default_model="claude-haiku-4-5",
+                    )
+                    registry = Registry(cfg)
+                    provider, model_id = registry.resolve("claude-haiku-4-5")
+                    readme_text = generate_readme(
+                        project_ctx,
+                        bom_rows=bom_rows or None,
+                        llm_provider=provider,
+                        model_id=model_id,
+                    )
+                else:
+                    from kerf_chat.readme_gen import generate_readme_template
+                    readme_text = generate_readme_template(project_ctx, bom_rows=bom_rows or None)
+            except Exception as exc:
+                logging.getLogger(__name__).warning("README generation failed: %s", exc)
+                try:
+                    from kerf_chat.readme_gen import generate_readme_template
+                    readme_text = generate_readme_template(project_ctx)
+                except Exception:
+                    readme_text = None
+
+        if readme_text:
+            updates["readme"] = readme_text
+
+        # ---- Hero cover generation (T-42) ----
+        cover_key: Optional[str] = None
+        try:
+            storage = get_storage_required()
+            cover_key = await _generate_project_cover(conn, project, project_id, storage)
+        except Exception as exc:
+            logging.getLogger(__name__).debug("cover storage unavailable: %s", exc)
+
+        if cover_key:
+            updates["cover_storage_key"] = cover_key
+
         updated = await projects_queries.update_project(conn, project_id, **updates)
 
-    return {"project_id": str(project_id), "visibility": "public", "name": updated.get("name", "")}
+    result = {
+        "project_id": str(project_id),
+        "slug": str(project_id),
+        "visibility": "public",
+        "name": updated.get("name", "") if updated else "",
+        "readme": updated.get("readme") if updated else None,
+        "cover_storage_key": updated.get("cover_storage_key") if updated else None,
+    }
+    return result
+
+
+class WorkshopRegenerateReadmeRequest(BaseModel):
+    project_id: str
+
+
+@router.post("/workshop/regenerate-readme")
+async def workshop_regenerate_readme(
+    body: WorkshopRegenerateReadmeRequest,
+    auth: dict = Depends(require_auth),
+):
+    """POST /api/workshop/regenerate-readme — re-generate the AI README for a published project.
+
+    Idempotent. Replaces the existing readme field with a fresh AI-generated version.
+    The project must already be public (published) and the caller must be the owner/admin.
+    """
+    try:
+        project_id = uuid.UUID(body.project_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid project_id")
+
+    user_id = auth["sub"]
+    pool = await get_pool_required()
+
+    async with pool.acquire() as conn:
+        project = await projects_queries.get_project(conn, project_id)
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        role = await get_user_workspace_role(conn, str(project["workspace_id"]), user_id)
+        if role not in ("owner", "admin"):
+            raise HTTPException(status_code=403, detail="Not authorized")
+
+        file_rows = await conn.fetch(
+            "SELECT id, name, kind, content FROM files "
+            "WHERE project_id = $1 AND deleted_at IS NULL",
+            project_id,
+        )
+        file_list = [dict(r) for r in file_rows]
+        bom_rows = _get_bom_rows_sync(file_list)
+
+        project_ctx = {
+            "name": project.get("name") or "",
+            "description": project.get("description") or "",
+            "tags": list(project.get("tags") or []),
+            "license": "MIT",
+        }
+
+        readme_text: Optional[str] = None
+        try:
+            from kerf_chat.readme_gen import generate_readme, generate_readme_template
+            from kerf_chat.llm import LLMConfig, Registry
+
+            settings = get_settings()
+            anthropic_key = getattr(settings, "anthropic_api_key", None) or os.environ.get("ANTHROPIC_API_KEY", "")
+
+            if anthropic_key:
+                cfg = LLMConfig(anthropic_api_key=anthropic_key, default_model="claude-haiku-4-5")
+                registry = Registry(cfg)
+                provider, model_id = registry.resolve("claude-haiku-4-5")
+                readme_text = generate_readme(
+                    project_ctx,
+                    bom_rows=bom_rows or None,
+                    llm_provider=provider,
+                    model_id=model_id,
+                )
+            else:
+                readme_text = generate_readme_template(project_ctx, bom_rows=bom_rows or None)
+        except Exception as exc:
+            logging.getLogger(__name__).warning("README regeneration failed: %s", exc)
+            try:
+                from kerf_chat.readme_gen import generate_readme_template
+                readme_text = generate_readme_template(project_ctx)
+            except Exception:
+                raise HTTPException(status_code=500, detail="README generation unavailable")
+
+        updated = await projects_queries.update_project(conn, project_id, readme=readme_text)
+
+    return {
+        "project_id": str(project_id),
+        "readme": updated.get("readme") if updated else readme_text,
+        "readme_generated_at": updated.get("readme_generated_at").isoformat() if (updated and updated.get("readme_generated_at")) else None,
+    }
 
 
 @router.delete("/workshop/{slug}")

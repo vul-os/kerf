@@ -134,14 +134,28 @@ export const workshop = {
 
   // POST /api/workshop/publish — owner-only. Idempotent: republishing
   // an already-listed project just updates title/description.
-  publish({ projectId, title, description }) {
+  // `readme` may be a string to supply an explicit README (overrides AI gen).
+  // `generateReadme` defaults to true; pass false to skip AI generation.
+  publish({ projectId, title, description, readme, generateReadme = true }) {
     return request('/api/workshop/publish', {
       method: 'POST',
       body: {
         project_id: projectId,
         title: title || '',
         description: description || '',
+        ...(readme != null ? { readme } : {}),
+        generate_readme: generateReadme,
       },
+    })
+  },
+
+  // POST /api/workshop/regenerate-readme — owner-only. Replaces the stored
+  // README with a freshly AI-generated version. Returns {project_id, readme,
+  // readme_generated_at}.
+  regenerateReadme(projectId) {
+    return request('/api/workshop/regenerate-readme', {
+      method: 'POST',
+      body: { project_id: projectId },
     })
   },
 

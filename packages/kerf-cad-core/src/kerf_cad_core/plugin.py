@@ -55,6 +55,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.marine.tools",
     "kerf_cad_core.scan.tools",
     "kerf_cad_core.gdt_callouts.tools",
+    "kerf_cad_core.family.tools",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

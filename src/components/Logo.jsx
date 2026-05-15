@@ -1,12 +1,6 @@
 /**
- * Kerf brand mark.
- *
- * The mark is a solid block bisected by a diagonal saw kerf:
- * the lower-right half is shifted perpendicular to the cut so the
- * kerf gap is visible. It is the literal thing the product is named for.
- *
- * Both halves render in `currentColor` — wrap in a text-color utility
- * (e.g. `text-kerf-300`) and the gap inherits whatever surface it sits on.
+ * Kerf brand mark — yellow K on dark rounded background.
+ * currentColor lets callers tint via text-* utilities.
  */
 
 export function LogoMark({ size = 28, className = '', title = 'kerf' }) {
@@ -21,10 +15,14 @@ export function LogoMark({ size = 28, className = '', title = 'kerf' }) {
       shapeRendering="geometricPrecision"
     >
       <title>{title}</title>
-      {/* Upper-left half of the cut block */}
-      <path d="M5 5 H24 L5 24 Z" fill="currentColor" />
-      {/* Lower-right half, offset (+3,+3) along the perpendicular so the kerf line is visible */}
-      <path d="M27 8 V27 H8 Z" fill="currentColor" />
+      {/* Dark rounded background */}
+      <rect width="32" height="32" rx="6" fill="#0a0b0d" />
+      {/* Vertical stem of the K */}
+      <rect x="7" y="6" width="3.5" height="20" fill="currentColor" />
+      {/* Upper diagonal arm: stem top-right → upper-right corner */}
+      <polygon points="10.5,16 10.5,6 25,6" fill="currentColor" />
+      {/* Lower diagonal arm: stem mid-right → lower-right corner */}
+      <polygon points="10.5,16 25,26 10.5,26" fill="currentColor" />
     </svg>
   )
 }

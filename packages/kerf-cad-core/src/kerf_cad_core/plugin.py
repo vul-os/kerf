@@ -62,6 +62,10 @@ _TOOL_MODULES = [
     "kerf_cad_core.arch.spaces_tools",
     "kerf_cad_core.civil.hydraulics_tools",
     "kerf_cad_core.tolstack.tools",
+    "kerf_cad_core.kinematics.tools",
+    "kerf_cad_core.fea.tools",
+    "kerf_cad_core.springs.tools",
+    "kerf_cad_core.piping.tools",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

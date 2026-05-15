@@ -652,12 +652,16 @@ async def google_callback(request: Request):
                         display = "My"
                 await create_personal_workspace(conn, str(user["id"]), display)
 
-        access_token_jwt, _ = await issue_tokens(conn, str(user["id"]))
+        access_token_jwt, refresh_token_jwt = await issue_tokens(conn, str(user["id"]))
 
         frontend = settings.cors_origin
         if frontend == "*":
             frontend = "http://localhost:5173"
-        dest = f"{frontend}/auth/callback?access_token={access_token_jwt}"
+        dest = (
+            f"{frontend}/auth/callback"
+            f"?access_token={access_token_jwt}"
+            f"&refresh_token={refresh_token_jwt}"
+        )
 
         response = Response(status_code=status.HTTP_302_FOUND)
         response.headers["Location"] = dest

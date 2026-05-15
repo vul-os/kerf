@@ -3,7 +3,7 @@ import {
   ChevronDown, ChevronRight,
   FileCode, Folder, FolderOpen, Layers,
   FilePlus, FolderPlus, Plus, Trash2, Box, Upload, Ruler, PenTool, X, RefreshCw,
-  Package, Cylinder, CircuitBoard, Loader2, AlertCircle, Variable, FileBox, Cable, Scissors, Wrench, SquareCode,
+  Package, Cylinder, CircuitBoard, Loader2, AlertCircle, Variable, FileBox, Cable, Scissors, Wrench, SquareCode, Grid3x3,
 } from 'lucide-react'
 import { useWorkspace } from '../store/workspace.js'
 import { FreeCADImportDialog, isFCStdFile } from './FreeCADImport.jsx'
@@ -43,7 +43,8 @@ function KindIcon({ kind, name, open }) {
   if (kind === 'section') return <Scissors size={14} className={`${cls} text-violet-300`} />
   if (kind === 'cam_layered') return <Layers size={14} className={`${cls} text-teal-300`} />
   if (kind === 'tool') return <Wrench size={14} className={`${cls} text-kerf-300`} />
-  if (kind === 'plc_st') return <SquareCode size={14} className={`${cls} text-lime-300`} />
+  if (kind === 'plc_st')   return <SquareCode size={14} className={`${cls} text-lime-300`} />
+  if (kind === 'quadmesh') return <Grid3x3 size={14} className={`${cls} text-indigo-300`} />
   if (kind === 'step-ref') return (
     <span className="relative flex-shrink-0 inline-flex items-center">
       <Box size={14} className="text-cyan-edge" />
@@ -382,13 +383,14 @@ const KIND_ROWS = {
   cam_layered: { icon: Layers,      label: 'Layered CAM',   hint: 'Stacked Z-slice contours for layered milling',  color: 'text-teal-300' },
   tool:        { icon: Wrench,      label: 'Tool',          hint: 'CNC tool definition for CAM (.tool)',           color: 'text-kerf-300' },
   plc_st:      { icon: SquareCode,  label: 'PLC Prog',      hint: 'IEC 61131-3 Structured Text (.plc.st)',         color: 'text-lime-300' },
+  quadmesh:    { icon: Grid3x3,    label: 'Quad Mesh',     hint: 'Quad-dominant remesh via Instant Meshes (.quadmesh)', color: 'text-indigo-300' },
 }
 
 // Canonical menu order: folder + generic file first (basic primitives),
 // followed by domain-specific kinds in roughly mechanical → drawings →
 // library → electronics order. The `step` and `jscad` aliases are
 // import-only / synthetic and intentionally absent here.
-const KIND_ORDER = ['folder', 'file', 'sketch', 'assembly', 'drawing', 'feature', 'section', 'cam_layered', 'part', 'circuit', 'equations', 'wiring', 'tool', 'plc_st']
+const KIND_ORDER = ['folder', 'file', 'sketch', 'assembly', 'drawing', 'feature', 'section', 'cam_layered', 'part', 'circuit', 'equations', 'wiring', 'tool', 'plc_st', 'quadmesh']
 
 // CreateMenu — single "+ New" dropdown that replaces the row of icon
 // buttons in the FileTree header. Shows the full union of canonical

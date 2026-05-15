@@ -17,8 +17,10 @@
 #
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Stage 1: build the Vite SPA.
-FROM node:22-alpine AS frontend
+# Stage 1: build the Vite SPA. Debian-slim (glibc), not alpine — sharp +
+# rolldown ship glibc native bindings; alpine/musl breaks the build. This
+# stage is discarded (only /app/dist is copied into the final image).
+FROM node:22-slim AS frontend
 WORKDIR /app
 COPY package.json package-lock.json* ./
 # npm install (not ci): sharp/libvips pull platform-specific optional deps

@@ -38,12 +38,21 @@ validate clearance math without OCC.
 
 Advanced seat types
 -------------------
-channel_seat_geometry()   — continuous bearing groove for a row of N stones
-bezel_seat_geometry()     — inner bearing ledge for a bezel/collet setting
-fishtail_seat_geometry()  — accent seat with bright-cut facet geometry hint
-multi_stone_seat_geometry() — shared base seat for graduated stone arrangement
-fancy_cut_girdle_profile()  — compute the outline parameters for a non-round
-                              girdle shape (oval/marquise/pear/emerald/cushion)
+channel_seat_geometry()       — continuous bearing groove for a row of N stones
+bezel_seat_geometry()         — inner bearing ledge for a bezel/collet setting
+fishtail_seat_geometry()      — accent seat with bright-cut facet geometry hint
+multi_stone_seat_geometry()   — shared base seat for graduated stone arrangement
+fancy_cut_girdle_profile()    — compute the outline parameters for a non-round
+                                girdle shape (oval/marquise/pear/emerald/cushion)
+pave_field_seat_geometry()    — grid/honeycomb of small bearing seats for pavé fields
+cluster_halo_seat_geometry()  — ring of accent seats around a center seat (halo/cluster)
+gypsy_seat_geometry()         — flush/gypsy countersink seat (no bearing cone overhang)
+baguette_channel_seat_geometry() — rectangular straight-wall bearing for step-cut stones
+
+Seat depth/angle presets
+------------------------
+BEARING_PRESETS — named presets (tight/standard/deep) providing girdle clearance
+                  and bearing angle overrides as an optional convenience parameter.
 
 LLM-facing tools
 ----------------
@@ -52,6 +61,10 @@ LLM-facing tools
   jewelry_cut_bezel_seat            — bezel / collet seat
   jewelry_cut_fishtail_seat         — bright-cut accent seat
   jewelry_cut_multi_stone_seat      — graduated multi-stone shared seat
+  jewelry_cut_pave_field_seat       — pavé field: grid/honeycomb of bearing seats
+  jewelry_cut_cluster_halo_seat     — halo/cluster ring of accent seats
+  jewelry_cut_gypsy_seat            — gypsy/flush countersink seat
+  jewelry_cut_baguette_channel_seat — rectangular bearing for step-cut stones
 """
 
 from __future__ import annotations
@@ -657,6 +670,544 @@ def multi_stone_seat_geometry(
         "side_pitch_mm":         round(side_pitch_mm, 4),
         "seat_type":             "multi_stone",
         "total_cutter_depth_mm": round(total_depth, 4),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Seat depth / angle presets
+# ---------------------------------------------------------------------------
+
+#: Named bearing presets that adjust girdle clearance and pavilion angle bias.
+#: Each preset maps to a dict of keyword overrides accepted by seat_geometry()
+#: and the new geometry helpers.  The ``tight`` preset is used for bezel/pavé
+#: work where minimal play is desired; ``deep`` gives extra pavilion room for
+#: high-crown stones.
+BEARING_PRESETS: dict = {
+    "tight": {
+        "girdle_clearance_mm": 0.03,
+        "culet_clearance_mm":  0.06,
+        "seat_allowance_mm":   0.01,
+        "crown_relief_mm":     0.20,
+    },
+    "standard": {
+        "girdle_clearance_mm": 0.05,
+        "culet_clearance_mm":  0.10,
+        "seat_allowance_mm":   0.02,
+        "crown_relief_mm":     0.30,
+    },
+    "deep": {
+        "girdle_clearance_mm": 0.07,
+        "culet_clearance_mm":  0.15,
+        "seat_allowance_mm":   0.03,
+        "crown_relief_mm":     0.40,
+    },
+}
+
+_VALID_PRESETS = frozenset(BEARING_PRESETS)
+
+
+def _apply_preset(kwargs: dict, preset_name: Optional[str]) -> dict:
+    """Return a copy of ``kwargs`` with preset overrides applied.
+
+    If ``preset_name`` is None or empty the original kwargs are returned
+    unchanged.  Explicit values in ``kwargs`` always win over the preset —
+    the preset only fills in keys that the caller did *not* provide.
+    """
+    if not preset_name:
+        return kwargs
+    if preset_name not in BEARING_PRESETS:
+        raise ValueError(
+            f"Unknown bearing preset {preset_name!r}. "
+            f"Valid presets: {sorted(_VALID_PRESETS)}"
+        )
+    merged = dict(BEARING_PRESETS[preset_name])
+    merged.update(kwargs)   # caller values win
+    return merged
+
+
+# ---------------------------------------------------------------------------
+# Pavé-field seat geometry
+# ---------------------------------------------------------------------------
+
+def pave_field_seat_geometry(
+    cut: str,
+    diameter_mm: float,
+    *,
+    field_width_mm: float,
+    field_height_mm: float,
+    arrangement: str = "grid",          # "grid" | "honeycomb"
+    min_spacing_mm: float = 0.30,
+    edge_margin_mm: float = 0.25,
+    pavilion_angle_deg: float,
+    pavilion_depth_pct: float,
+    girdle_pct: float,
+    crown_angle_deg: float,
+    girdle_clearance_mm: float = 0.04,
+    culet_clearance_mm: float = 0.08,
+    seat_allowance_mm: float = 0.02,
+    crown_relief_mm: float = 0.25,
+    preset: Optional[str] = None,
+) -> dict:
+    """Compute a grid or honeycomb arrangement of identical bearing seats.
+
+    Used for pavé fields — a rectangular region is packed with small bearing
+    seats.  Returns the positions of every stone centre plus a single per-seat
+    geometry dict (all seats are identical).
+
+    Parameters
+    ----------
+    cut, diameter_mm   : per-stone cut and primary dimension
+    field_width_mm     : total width of the field region (X extent, mm)
+    field_height_mm    : total height of the field region (Y extent, mm)
+    arrangement        : "grid" (regular orthogonal) or "honeycomb" (hex-offset)
+    min_spacing_mm     : minimum metal between adjacent seat edges (mm)
+    edge_margin_mm     : minimum clearance from field boundary to nearest seat (mm)
+    preset             : optional named bearing preset; overridden by explicit args
+    Other params       : same as seat_geometry()
+
+    Returns
+    -------
+    dict with keys:
+        seat_type            — "pave_field"
+        arrangement          — as provided
+        stone_diameter_mm    — as provided
+        per_seat_geom        — seat_geometry() dict for a single seat
+        stone_positions      — list of [x, y, z] positions (z=0)
+        n_stones             — number of stones placed
+        field_width_mm       — as provided
+        field_height_mm      — as provided
+        pitch_x_mm           — centre-to-centre X spacing used
+        pitch_y_mm           — centre-to-centre Y spacing used
+        min_spacing_mm       — as provided
+        edge_margin_mm       — as provided
+        total_cutter_depth_mm— depth of a single seat cutter
+    """
+    if field_width_mm <= 0:
+        raise ValueError("field_width_mm must be positive")
+    if field_height_mm <= 0:
+        raise ValueError("field_height_mm must be positive")
+    if min_spacing_mm < 0:
+        raise ValueError("min_spacing_mm must be >= 0")
+    if edge_margin_mm < 0:
+        raise ValueError("edge_margin_mm must be >= 0")
+    if arrangement not in ("grid", "honeycomb"):
+        raise ValueError("arrangement must be 'grid' or 'honeycomb'")
+
+    kw = _apply_preset({
+        "girdle_clearance_mm": girdle_clearance_mm,
+        "culet_clearance_mm":  culet_clearance_mm,
+        "seat_allowance_mm":   seat_allowance_mm,
+        "crown_relief_mm":     crown_relief_mm,
+    }, preset)
+
+    sp = seat_geometry(
+        cut=cut,
+        diameter_mm=diameter_mm,
+        pavilion_angle_deg=pavilion_angle_deg,
+        pavilion_depth_pct=pavilion_depth_pct,
+        girdle_pct=girdle_pct,
+        crown_angle_deg=crown_angle_deg,
+        **kw,
+    )
+
+    # Centre-to-centre pitch = stone diameter + min_spacing
+    pitch_x = diameter_mm + min_spacing_mm
+    pitch_y = diameter_mm + min_spacing_mm
+
+    # The usable area is the field minus the edge margin on all sides
+    usable_w = field_width_mm  - 2.0 * edge_margin_mm
+    usable_h = field_height_mm - 2.0 * edge_margin_mm
+
+    if usable_w < diameter_mm or usable_h < diameter_mm:
+        # Region too small for even one stone — return empty
+        return {
+            "seat_type":             "pave_field",
+            "arrangement":           arrangement,
+            "stone_diameter_mm":     round(diameter_mm, 4),
+            "per_seat_geom":         sp,
+            "stone_positions":       [],
+            "n_stones":              0,
+            "field_width_mm":        round(field_width_mm, 4),
+            "field_height_mm":       round(field_height_mm, 4),
+            "pitch_x_mm":            round(pitch_x, 4),
+            "pitch_y_mm":            round(pitch_y, 4),
+            "min_spacing_mm":        round(min_spacing_mm, 4),
+            "edge_margin_mm":        round(edge_margin_mm, 4),
+            "total_cutter_depth_mm": sp["total_cutter_depth_mm"],
+        }
+
+    # Number of columns and rows that fit
+    n_cols = max(1, int(usable_w / pitch_x) + 1)
+    n_rows = max(1, int(usable_h / pitch_y) + 1)
+
+    # Actual spread of stones; keep centred in the field
+    actual_span_x = (n_cols - 1) * pitch_x
+    actual_span_y = (n_rows - 1) * pitch_y
+
+    # Clip if overflowing due to rounding
+    while n_cols > 1 and actual_span_x > usable_w + 1e-9:
+        n_cols -= 1
+        actual_span_x = (n_cols - 1) * pitch_x
+    while n_rows > 1 and actual_span_y > usable_h + 1e-9:
+        n_rows -= 1
+        actual_span_y = (n_rows - 1) * pitch_y
+
+    origin_x = -actual_span_x / 2.0
+    origin_y = -actual_span_y / 2.0
+
+    positions = []
+    for row in range(n_rows):
+        y = round(origin_y + row * pitch_y, 6)
+        x_offset = (pitch_x / 2.0) if (arrangement == "honeycomb" and row % 2 == 1) else 0.0
+        for col in range(n_cols):
+            x = round(origin_x + col * pitch_x + x_offset, 6)
+            positions.append([x, y, 0.0])
+
+    return {
+        "seat_type":             "pave_field",
+        "arrangement":           arrangement,
+        "stone_diameter_mm":     round(diameter_mm, 4),
+        "per_seat_geom":         sp,
+        "stone_positions":       positions,
+        "n_stones":              len(positions),
+        "field_width_mm":        round(field_width_mm, 4),
+        "field_height_mm":       round(field_height_mm, 4),
+        "pitch_x_mm":            round(pitch_x, 4),
+        "pitch_y_mm":            round(pitch_y, 4),
+        "min_spacing_mm":        round(min_spacing_mm, 4),
+        "edge_margin_mm":        round(edge_margin_mm, 4),
+        "total_cutter_depth_mm": sp["total_cutter_depth_mm"],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Cluster / halo seat ring geometry
+# ---------------------------------------------------------------------------
+
+def cluster_halo_seat_geometry(
+    cut: str,
+    diameter_mm: float,
+    *,
+    center_cut: str,
+    center_diameter_mm: float,
+    n_accent: int,
+    halo_radius_mm: float,
+    pavilion_angle_deg: float,
+    pavilion_depth_pct: float,
+    girdle_pct: float,
+    crown_angle_deg: float,
+    center_pavilion_angle_deg: float,
+    center_pavilion_depth_pct: float,
+    center_girdle_pct: float,
+    center_crown_angle_deg: float,
+    girdle_clearance_mm: float = 0.04,
+    culet_clearance_mm: float = 0.08,
+    seat_allowance_mm: float = 0.02,
+    crown_relief_mm: float = 0.25,
+    start_angle_deg: float = 0.0,
+    preset: Optional[str] = None,
+) -> dict:
+    """Compute a center seat surrounded by a ring of equally-spaced accent seats.
+
+    The center stone sits at the origin; ``n_accent`` accent seats are arranged
+    in a circle of radius ``halo_radius_mm`` around it.  This is the geometry
+    backbone for halo and cluster settings.
+
+    Parameters
+    ----------
+    cut, diameter_mm           : accent stone cut and girdle diameter
+    center_cut, center_diameter_mm : center stone cut and girdle diameter
+    n_accent                   : number of accent stones in the ring (>= 3)
+    halo_radius_mm             : centre-to-centre radius from center stone to
+                                 accent stones (must exceed sum of radii + min gap)
+    start_angle_deg            : angular offset for the first accent stone (deg)
+    preset                     : optional named bearing preset
+
+    Returns
+    -------
+    dict with keys:
+        seat_type              — "cluster_halo"
+        n_accent               — as provided
+        halo_radius_mm         — as provided
+        center_seat_geom       — seat_geometry dict for center stone
+        accent_seat_geom       — seat_geometry dict for each accent stone (identical)
+        center_position        — [0.0, 0.0, 0.0]
+        accent_positions       — list of n_accent [x, y, z] positions
+        accent_angular_step_deg— 360/n_accent
+        start_angle_deg        — as provided
+        total_cutter_depth_mm  — max of center and accent seat depths
+    """
+    if n_accent < 3:
+        raise ValueError("n_accent must be >= 3")
+    if halo_radius_mm <= 0:
+        raise ValueError("halo_radius_mm must be positive")
+
+    kw = _apply_preset({
+        "girdle_clearance_mm": girdle_clearance_mm,
+        "culet_clearance_mm":  culet_clearance_mm,
+        "seat_allowance_mm":   seat_allowance_mm,
+        "crown_relief_mm":     crown_relief_mm,
+    }, preset)
+
+    center_geom = seat_geometry(
+        cut=center_cut,
+        diameter_mm=center_diameter_mm,
+        pavilion_angle_deg=center_pavilion_angle_deg,
+        pavilion_depth_pct=center_pavilion_depth_pct,
+        girdle_pct=center_girdle_pct,
+        crown_angle_deg=center_crown_angle_deg,
+        **kw,
+    )
+
+    accent_geom = seat_geometry(
+        cut=cut,
+        diameter_mm=diameter_mm,
+        pavilion_angle_deg=pavilion_angle_deg,
+        pavilion_depth_pct=pavilion_depth_pct,
+        girdle_pct=girdle_pct,
+        crown_angle_deg=crown_angle_deg,
+        **kw,
+    )
+
+    angular_step = 360.0 / n_accent
+    accent_positions = []
+    for i in range(n_accent):
+        angle_rad = math.radians(start_angle_deg + i * angular_step)
+        x = round(halo_radius_mm * math.cos(angle_rad), 6)
+        y = round(halo_radius_mm * math.sin(angle_rad), 6)
+        accent_positions.append([x, y, 0.0])
+
+    total_depth = max(
+        center_geom["total_cutter_depth_mm"],
+        accent_geom["total_cutter_depth_mm"],
+    )
+
+    return {
+        "seat_type":               "cluster_halo",
+        "n_accent":                n_accent,
+        "halo_radius_mm":          round(halo_radius_mm, 4),
+        "center_seat_geom":        center_geom,
+        "accent_seat_geom":        accent_geom,
+        "center_position":         [0.0, 0.0, 0.0],
+        "accent_positions":        accent_positions,
+        "accent_angular_step_deg": round(angular_step, 4),
+        "start_angle_deg":         round(start_angle_deg, 4),
+        "total_cutter_depth_mm":   round(total_depth, 4),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Gypsy / flush seat geometry
+# ---------------------------------------------------------------------------
+
+def gypsy_seat_geometry(
+    cut: str,
+    diameter_mm: float,
+    *,
+    pavilion_angle_deg: float,
+    pavilion_depth_pct: float,
+    girdle_pct: float,
+    crown_angle_deg: float,
+    girdle_clearance_mm: float = 0.03,
+    culet_clearance_mm: float = 0.10,
+    seat_allowance_mm: float = 0.02,
+    countersink_angle_deg: float = 45.0,
+    countersink_depth_mm: float = 0.20,
+    through_hole: bool = False,
+    through_hole_radius_mm: Optional[float] = None,
+    girdle_profile: Optional[dict] = None,
+    preset: Optional[str] = None,
+) -> dict:
+    """Compute geometry for a gypsy / flush-set seat.
+
+    A gypsy seat is a straight cylindrical bore whose top is flush with the
+    metal surface.  The girdle of the stone sits at the surface level; there
+    is no bearing-cone overhang above the metal.  A shallow countersink at the
+    top of the bore admits the lower crown facets.
+
+    Compared to a standard seat_geometry(), the ``crown_relief_mm`` is replaced
+    by a ``countersink_angle_deg`` / ``countersink_depth_mm`` pair, and the
+    girdle ledge is coincident with the surface (no crown relief overhang).
+
+    Parameters
+    ----------
+    countersink_angle_deg : half-angle of the top countersink taper (degrees)
+    countersink_depth_mm  : axial depth of the countersink (mm)
+    preset                : optional named bearing preset
+
+    Returns
+    -------
+    seat_geometry() dict plus:
+        countersink_angle_deg  — as provided
+        countersink_depth_mm   — as provided
+        countersink_top_radius — outer radius of countersink at surface
+        seat_type              — "gypsy"
+    Note: crown_relief_depth_mm and crown_relief_half_angle are still present
+    (set to countersink values) for worker compatibility.
+    """
+    kw = _apply_preset({
+        "girdle_clearance_mm": girdle_clearance_mm,
+        "culet_clearance_mm":  culet_clearance_mm,
+        "seat_allowance_mm":   seat_allowance_mm,
+    }, preset)
+    # Gypsy uses countersink_depth_mm in place of crown_relief_mm; strip it
+    # from the merged kw so there is no duplicate-keyword collision below.
+    kw.pop("crown_relief_mm", None)
+
+    # Gypsy seats use the countersink in place of crown relief; pass the
+    # countersink depth as crown_relief_mm so total_cutter_depth_mm is correct.
+    sp = seat_geometry(
+        cut=cut,
+        diameter_mm=diameter_mm,
+        pavilion_angle_deg=pavilion_angle_deg,
+        pavilion_depth_pct=pavilion_depth_pct,
+        girdle_pct=girdle_pct,
+        crown_angle_deg=crown_angle_deg,
+        crown_relief_mm=countersink_depth_mm,
+        through_hole=through_hole,
+        through_hole_radius_mm=through_hole_radius_mm,
+        girdle_profile=girdle_profile,
+        **kw,
+    )
+
+    # The countersink top radius: the bore radius at surface level is the
+    # girdle radius; the countersink widens it slightly by the taper reach.
+    cs_reach = countersink_depth_mm * math.tan(math.radians(countersink_angle_deg))
+    cs_top_r = sp["girdle_radius_mm"] + cs_reach
+
+    sp.update({
+        "countersink_angle_deg":  round(countersink_angle_deg, 3),
+        "countersink_depth_mm":   round(countersink_depth_mm, 4),
+        "countersink_top_radius": round(cs_top_r, 4),
+        "seat_type":              "gypsy",
+    })
+    return sp
+
+
+# ---------------------------------------------------------------------------
+# Baguette / trap channel seat geometry (rectangular bearing)
+# ---------------------------------------------------------------------------
+
+def baguette_channel_seat_geometry(
+    cut: str,
+    length_mm: float,
+    width_mm: float,
+    *,
+    n_stones: int,
+    pitch_mm: float,
+    pavilion_depth_mm: float,
+    girdle_clearance_mm: float = 0.05,
+    culet_clearance_mm: float = 0.10,
+    seat_allowance_mm: float = 0.02,
+    wall_thickness_mm: float = 0.20,
+    start_position: Optional[list] = None,
+    axis_direction: Optional[list] = None,
+    preset: Optional[str] = None,
+) -> dict:
+    """Compute geometry for a rectangular straight-wall channel bearing.
+
+    Baguette and trap-cut stones have rectangular girdles.  This seat uses a
+    prismatic (rectangular cross-section) cutter rather than the circular/conical
+    profile of a brilliant bearing groove.
+
+    The cutter cross-section is:
+      width = ``width_mm`` + 2 * ``girdle_clearance_mm``
+      length = ``length_mm`` + 2 * ``girdle_clearance_mm``
+      depth  = ``pavilion_depth_mm`` + ``culet_clearance_mm`` + ``seat_allowance_mm``
+
+    The groove is swept along ``axis_direction`` at ``pitch_mm`` per stone.
+
+    Parameters
+    ----------
+    cut          : gemstone cut name (baguette / trap for metadata; proportions
+                   are overridden by length_mm / width_mm / pavilion_depth_mm)
+    length_mm    : stone long axis dimension (mm)
+    width_mm     : stone short axis dimension (mm)
+    n_stones     : number of stones in the channel (>= 1)
+    pitch_mm     : centre-to-centre spacing (must exceed length_mm)
+    pavilion_depth_mm : depth of the pavilion (mm)
+    wall_thickness_mm : minimum metal wall between groove and channel face (mm)
+    start_position    : [x, y, z] of first stone centre (default [0, 0, 0])
+    axis_direction    : [dx, dy, dz] unit vector along the row (default [1, 0, 0])
+    preset            : optional named bearing preset
+
+    Returns
+    -------
+    dict with keys:
+        seat_type              — "baguette_channel"
+        cut                    — as provided
+        n_stones               — as provided
+        pitch_mm               — as provided
+        stone_length_mm        — long axis with clearance applied
+        stone_width_mm         — short axis with clearance applied
+        cutter_length_mm       — long axis of cutter (length + 2*clearance)
+        cutter_width_mm        — short axis of cutter (width + 2*clearance)
+        cutter_depth_mm        — total depth of cutter
+        groove_length_mm       — full sweep length
+        wall_thickness_mm      — as provided
+        stone_positions        — list of n_stones [x, y, z]
+        total_cutter_depth_mm  — alias of cutter_depth_mm
+    """
+    if n_stones < 1:
+        raise ValueError("n_stones must be >= 1")
+    if pitch_mm <= length_mm:
+        raise ValueError(
+            f"pitch_mm ({pitch_mm}) must exceed stone length_mm ({length_mm})"
+        )
+    if length_mm <= 0:
+        raise ValueError("length_mm must be positive")
+    if width_mm <= 0:
+        raise ValueError("width_mm must be positive")
+    if pavilion_depth_mm <= 0:
+        raise ValueError("pavilion_depth_mm must be positive")
+
+    kw = _apply_preset({
+        "girdle_clearance_mm": girdle_clearance_mm,
+        "culet_clearance_mm":  culet_clearance_mm,
+        "seat_allowance_mm":   seat_allowance_mm,
+    }, preset)
+
+    gc  = kw["girdle_clearance_mm"]
+    cc  = kw["culet_clearance_mm"]
+    sa  = kw["seat_allowance_mm"]
+
+    cutter_l = length_mm + 2.0 * gc
+    cutter_w = width_mm  + 2.0 * gc
+    cutter_d = pavilion_depth_mm + cc + sa
+
+    # Stone positions
+    start = list(start_position) if start_position else [0.0, 0.0, 0.0]
+    axis  = list(axis_direction)  if axis_direction  else [1.0, 0.0, 0.0]
+    mag   = math.sqrt(sum(v * v for v in axis))
+    if mag < 1e-9:
+        raise ValueError("axis_direction must be a non-zero vector")
+    axis = [v / mag for v in axis]
+
+    positions = []
+    for i in range(n_stones):
+        offset = i * pitch_mm
+        pos = [round(start[j] + axis[j] * offset, 6) for j in range(3)]
+        positions.append(pos)
+
+    groove_length = (n_stones - 1) * pitch_mm + cutter_l
+
+    return {
+        "seat_type":             "baguette_channel",
+        "cut":                   cut,
+        "n_stones":              n_stones,
+        "pitch_mm":              round(pitch_mm, 4),
+        "stone_length_mm":       round(length_mm, 4),
+        "stone_width_mm":        round(width_mm, 4),
+        "cutter_length_mm":      round(cutter_l, 4),
+        "cutter_width_mm":       round(cutter_w, 4),
+        "cutter_depth_mm":       round(cutter_d, 4),
+        "groove_length_mm":      round(groove_length, 4),
+        "wall_thickness_mm":     round(wall_thickness_mm, 4),
+        "stone_positions":       positions,
+        "total_cutter_depth_mm": round(cutter_d, 4),
+        "girdle_clearance_mm":   round(gc, 4),
+        "culet_clearance_mm":    round(cc, 4),
+        "seat_allowance_mm":     round(sa, 4),
     }
 
 
@@ -1834,6 +2385,908 @@ async def run_jewelry_cut_multi_stone_seat(ctx: ProjectCtx, args: bytes) -> str:
         "n_side_stones":         n_side,
         "total_cutter_depth_mm": geom["total_cutter_depth_mm"],
         "side_positions":        geom["side_positions"],
+    }
+
+    return _append_and_auto_cut(ctx, fid, seat_node, a.get("auto_cut_host_id", "").strip(), result)
+
+
+# ---------------------------------------------------------------------------
+# LLM tool: jewelry_cut_pave_field_seat
+# ---------------------------------------------------------------------------
+
+jewelry_cut_pave_field_seat_spec = ToolSpec(
+    name="jewelry_cut_pave_field_seat",
+    description=(
+        "Append a `pave_field_seat` node to a `.feature` file. "
+        "Generates a grid or honeycomb arrangement of small identical bearing seats "
+        "across a rectangular region for pavé-field settings. "
+        "Returns all stone positions and a single per-seat geometry dict. "
+        "Use `arrangement='honeycomb'` for the classic offset-row pavé look. "
+        "Positions are centred in the field (origin at field centre). "
+        "Use auto_cut_host_id to immediately chain a boolean cut for all seats. "
+        "Note: the OCCT worker will receive all positions and the per-seat geometry; "
+        "the union of all seat cutters is subtracted from the host."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_id": {"type": "string", "description": "Target .feature file id (uuid)."},
+            "cut": {
+                "type": "string",
+                "enum": sorted(GEMSTONE_CUTS),
+                "description": "Gemstone cut for all pavé stones (usually round_brilliant).",
+            },
+            "carat": {"type": "number", "description": "Stone weight (carats). Provide carat OR diameter_mm."},
+            "diameter_mm": {"type": "number", "description": "Stone primary dimension (mm). Provide diameter_mm OR carat."},
+            "field_width_mm": {
+                "type": "number",
+                "description": "Width (X extent) of the pavé field region (mm).",
+            },
+            "field_height_mm": {
+                "type": "number",
+                "description": "Height (Y extent) of the pavé field region (mm).",
+            },
+            "arrangement": {
+                "type": "string",
+                "enum": ["grid", "honeycomb"],
+                "description": "Row arrangement: 'grid' (regular) or 'honeycomb' (alternating offset). Default 'grid'.",
+            },
+            "min_spacing_mm": {
+                "type": "number",
+                "description": "Minimum metal between adjacent seat edges (mm). Default 0.30.",
+            },
+            "edge_margin_mm": {
+                "type": "number",
+                "description": "Minimum clearance from field boundary to nearest seat edge (mm). Default 0.25.",
+            },
+            "preset": {
+                "type": "string",
+                "enum": sorted(_VALID_PRESETS),
+                "description": (
+                    "Named bearing preset controlling clearances. "
+                    "'tight' (0.03 girdle / 0.20 crown), "
+                    "'standard' (0.05 / 0.30), "
+                    "'deep' (0.07 / 0.40). "
+                    "Explicit clearance params override preset values."
+                ),
+            },
+            "girdle_clearance_mm": {"type": "number", "description": "Radial clearance (mm). Default 0.04."},
+            "culet_clearance_mm":  {"type": "number", "description": "Depth below pavilion tip (mm). Default 0.08."},
+            "seat_allowance_mm":   {"type": "number", "description": "Axial ledge allowance (mm). Default 0.02."},
+            "crown_relief_mm":     {"type": "number", "description": "Crown countersink depth (mm). Default 0.25."},
+            "position": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "[x,y,z] offset applied to all stone positions. Default [0,0,0].",
+            },
+            "orientation_deg": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "[rx,ry,rz] field orientation Euler angles. Default [0,0,0].",
+            },
+            "auto_cut_host_id": {"type": "string", "description": "Host node id to subtract all seats from."},
+            "id": {"type": "string", "description": "Optional explicit node id."},
+        },
+        "required": ["file_id", "cut", "field_width_mm", "field_height_mm"],
+    },
+)
+
+
+@register(jewelry_cut_pave_field_seat_spec, write=True)
+async def run_jewelry_cut_pave_field_seat(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    file_id_str = a.get("file_id", "").strip()
+    cut         = a.get("cut", "").strip()
+    carat       = a.get("carat", None)
+    diam_mm     = a.get("diameter_mm", None)
+
+    if not file_id_str:
+        return err_payload("file_id is required", "BAD_ARGS")
+    if not cut:
+        return err_payload("cut is required", "BAD_ARGS")
+    if cut not in GEMSTONE_CUTS:
+        return err_payload(f"Unknown cut {cut!r}. Valid cuts: {sorted(GEMSTONE_CUTS)}", "BAD_ARGS")
+    if carat is not None and diam_mm is not None:
+        return err_payload("Provide carat OR diameter_mm, not both", "BAD_ARGS")
+    if carat is None and diam_mm is None:
+        return err_payload("One of carat or diameter_mm is required", "BAD_ARGS")
+    if carat is not None:
+        try:
+            carat = float(carat)
+        except Exception:
+            return err_payload("carat must be a number", "BAD_ARGS")
+        if carat <= 0:
+            return err_payload("carat must be positive", "BAD_ARGS")
+    if diam_mm is not None:
+        try:
+            diam_mm = float(diam_mm)
+        except Exception:
+            return err_payload("diameter_mm must be a number", "BAD_ARGS")
+        if diam_mm <= 0:
+            return err_payload("diameter_mm must be positive", "BAD_ARGS")
+
+    try:
+        field_w = float(a.get("field_width_mm", 0))
+    except Exception:
+        return err_payload("field_width_mm must be a number", "BAD_ARGS")
+    if field_w <= 0:
+        return err_payload("field_width_mm must be positive", "BAD_ARGS")
+
+    try:
+        field_h = float(a.get("field_height_mm", 0))
+    except Exception:
+        return err_payload("field_height_mm must be a number", "BAD_ARGS")
+    if field_h <= 0:
+        return err_payload("field_height_mm must be positive", "BAD_ARGS")
+
+    arrangement = a.get("arrangement", "grid")
+    if arrangement not in ("grid", "honeycomb"):
+        return err_payload("arrangement must be 'grid' or 'honeycomb'", "BAD_ARGS")
+
+    preset = a.get("preset", None)
+    if preset is not None and preset not in _VALID_PRESETS:
+        return err_payload(
+            f"Unknown preset {preset!r}. Valid: {sorted(_VALID_PRESETS)}", "BAD_ARGS"
+        )
+
+    clearance_err = _validate_clearances(a)
+    if clearance_err:
+        return clearance_err
+
+    try:
+        min_spacing = float(a.get("min_spacing_mm", 0.30))
+    except Exception:
+        return err_payload("min_spacing_mm must be a number", "BAD_ARGS")
+    if min_spacing < 0:
+        return err_payload("min_spacing_mm must be >= 0", "BAD_ARGS")
+
+    try:
+        edge_margin = float(a.get("edge_margin_mm", 0.25))
+    except Exception:
+        return err_payload("edge_margin_mm must be a number", "BAD_ARGS")
+    if edge_margin < 0:
+        return err_payload("edge_margin_mm must be >= 0", "BAD_ARGS")
+
+    try:
+        fid = uuid.UUID(file_id_str)
+    except Exception:
+        return err_payload("file_id must be a uuid", "BAD_ARGS")
+
+    content, err = read_feature_content(ctx, fid)
+    if err:
+        return err_payload(f"file not found: {err}", "NOT_FOUND")
+
+    props, perr = _resolve_props(cut, carat, diam_mm)
+    if perr:
+        return perr
+
+    # Build explicit clearance kwargs (only pass keys caller provided,
+    # let preset and defaults handle the rest)
+    clearance_kw: dict = {}
+    for name, default in (
+        ("girdle_clearance_mm", 0.04),
+        ("culet_clearance_mm",  0.08),
+        ("seat_allowance_mm",   0.02),
+        ("crown_relief_mm",     0.25),
+    ):
+        if name in a:
+            clearance_kw[name] = float(a[name])
+        else:
+            clearance_kw[name] = default
+
+    try:
+        geom = pave_field_seat_geometry(
+            cut=cut,
+            diameter_mm=props.diameter_mm,
+            field_width_mm=field_w,
+            field_height_mm=field_h,
+            arrangement=arrangement,
+            min_spacing_mm=min_spacing,
+            edge_margin_mm=edge_margin,
+            pavilion_angle_deg=props.pavilion_angle_deg,
+            pavilion_depth_pct=props.pavilion_depth_pct,
+            girdle_pct=props.girdle_pct,
+            crown_angle_deg=props.crown_angle_deg,
+            preset=preset,
+            **clearance_kw,
+        )
+    except ValueError as e:
+        return err_payload(str(e), "BAD_ARGS")
+
+    node_id = a.get("id", "").strip() or next_node_id(content, "pave_field_seat")
+
+    seat_node: dict = {
+        "id":  node_id,
+        "op":  "pave_field_seat",
+        "cut": cut,
+        **geom,
+    }
+    if a.get("position") is not None:
+        seat_node["position"] = a["position"]
+    if a.get("orientation_deg") is not None:
+        seat_node["orientation_deg"] = a["orientation_deg"]
+
+    result: dict = {
+        "file_id":               file_id_str,
+        "op":                    "pave_field_seat",
+        "cut":                   cut,
+        "n_stones":              geom["n_stones"],
+        "arrangement":           arrangement,
+        "total_cutter_depth_mm": geom["total_cutter_depth_mm"],
+    }
+
+    return _append_and_auto_cut(ctx, fid, seat_node, a.get("auto_cut_host_id", "").strip(), result)
+
+
+# ---------------------------------------------------------------------------
+# LLM tool: jewelry_cut_cluster_halo_seat
+# ---------------------------------------------------------------------------
+
+jewelry_cut_cluster_halo_seat_spec = ToolSpec(
+    name="jewelry_cut_cluster_halo_seat",
+    description=(
+        "Append a `cluster_halo_seat` node to a `.feature` file. "
+        "Generates a center-stone seat surrounded by a ring of equally-spaced "
+        "accent seats at a given radius and count (halo / cluster setting). "
+        "Center and accent stones can have different cuts and sizes. "
+        "All accent seats are identical and placed at angles 360/n_accent apart. "
+        "Use start_angle_deg to rotate the ring. "
+        "Use auto_cut_host_id to immediately subtract all seats from the host."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_id": {"type": "string", "description": "Target .feature file id (uuid)."},
+            # Center stone
+            "center_cut": {
+                "type": "string",
+                "enum": sorted(GEMSTONE_CUTS),
+                "description": "Cut of the center stone.",
+            },
+            "center_carat": {"type": "number", "description": "Center stone weight (carats). Provide center_carat OR center_diameter_mm."},
+            "center_diameter_mm": {"type": "number", "description": "Center stone primary dimension (mm). Provide center_diameter_mm OR center_carat."},
+            # Accent stones
+            "accent_cut": {
+                "type": "string",
+                "enum": sorted(GEMSTONE_CUTS),
+                "description": "Cut of accent (halo) stones (usually round_brilliant).",
+            },
+            "accent_carat": {"type": "number", "description": "Accent stone weight (carats). Provide accent_carat OR accent_diameter_mm."},
+            "accent_diameter_mm": {"type": "number", "description": "Accent stone primary dimension (mm). Provide accent_diameter_mm OR accent_carat."},
+            "n_accent": {
+                "type": "integer",
+                "minimum": 3,
+                "description": "Number of accent stones in the ring (>= 3).",
+            },
+            "halo_radius_mm": {
+                "type": "number",
+                "description": "Centre-to-centre radius from center stone to accent stones (mm).",
+            },
+            "start_angle_deg": {
+                "type": "number",
+                "description": "Angular offset (degrees) for the first accent stone. Default 0.",
+            },
+            "preset": {
+                "type": "string",
+                "enum": sorted(_VALID_PRESETS),
+                "description": "Named bearing preset. See jewelry_cut_pave_field_seat for values.",
+            },
+            "position": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "[x,y,z] center stone position. Default [0,0,0].",
+            },
+            "orientation_deg": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "[rx,ry,rz] Euler angles. Default [0,0,0].",
+            },
+            "girdle_clearance_mm": {"type": "number", "description": "Radial clearance (mm). Default 0.04."},
+            "culet_clearance_mm":  {"type": "number", "description": "Depth below pavilion tip (mm). Default 0.08."},
+            "seat_allowance_mm":   {"type": "number", "description": "Axial ledge allowance (mm). Default 0.02."},
+            "crown_relief_mm":     {"type": "number", "description": "Crown countersink depth (mm). Default 0.25."},
+            "auto_cut_host_id": {"type": "string", "description": "Host node id to subtract all seats from."},
+            "id": {"type": "string", "description": "Optional explicit node id."},
+        },
+        "required": ["file_id", "center_cut", "accent_cut", "n_accent", "halo_radius_mm"],
+    },
+)
+
+
+@register(jewelry_cut_cluster_halo_seat_spec, write=True)
+async def run_jewelry_cut_cluster_halo_seat(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    file_id_str = a.get("file_id", "").strip()
+    if not file_id_str:
+        return err_payload("file_id is required", "BAD_ARGS")
+
+    center_cut = a.get("center_cut", "").strip()
+    if not center_cut:
+        return err_payload("center_cut is required", "BAD_ARGS")
+    if center_cut not in GEMSTONE_CUTS:
+        return err_payload(f"Unknown center_cut {center_cut!r}", "BAD_ARGS")
+
+    accent_cut = a.get("accent_cut", "").strip()
+    if not accent_cut:
+        return err_payload("accent_cut is required", "BAD_ARGS")
+    if accent_cut not in GEMSTONE_CUTS:
+        return err_payload(f"Unknown accent_cut {accent_cut!r}", "BAD_ARGS")
+
+    # Center stone sizing
+    center_carat = a.get("center_carat", None)
+    center_diam  = a.get("center_diameter_mm", None)
+    if center_carat is not None and center_diam is not None:
+        return err_payload("Provide center_carat OR center_diameter_mm, not both", "BAD_ARGS")
+    if center_carat is None and center_diam is None:
+        return err_payload("One of center_carat or center_diameter_mm is required", "BAD_ARGS")
+    if center_carat is not None:
+        try:
+            center_carat = float(center_carat)
+        except Exception:
+            return err_payload("center_carat must be a number", "BAD_ARGS")
+        if center_carat <= 0:
+            return err_payload("center_carat must be positive", "BAD_ARGS")
+    if center_diam is not None:
+        try:
+            center_diam = float(center_diam)
+        except Exception:
+            return err_payload("center_diameter_mm must be a number", "BAD_ARGS")
+        if center_diam <= 0:
+            return err_payload("center_diameter_mm must be positive", "BAD_ARGS")
+
+    # Accent stone sizing
+    accent_carat = a.get("accent_carat", None)
+    accent_diam  = a.get("accent_diameter_mm", None)
+    if accent_carat is not None and accent_diam is not None:
+        return err_payload("Provide accent_carat OR accent_diameter_mm, not both", "BAD_ARGS")
+    if accent_carat is None and accent_diam is None:
+        return err_payload("One of accent_carat or accent_diameter_mm is required", "BAD_ARGS")
+    if accent_carat is not None:
+        try:
+            accent_carat = float(accent_carat)
+        except Exception:
+            return err_payload("accent_carat must be a number", "BAD_ARGS")
+        if accent_carat <= 0:
+            return err_payload("accent_carat must be positive", "BAD_ARGS")
+    if accent_diam is not None:
+        try:
+            accent_diam = float(accent_diam)
+        except Exception:
+            return err_payload("accent_diameter_mm must be a number", "BAD_ARGS")
+        if accent_diam <= 0:
+            return err_payload("accent_diameter_mm must be positive", "BAD_ARGS")
+
+    try:
+        n_accent = int(a.get("n_accent", 0))
+    except Exception:
+        return err_payload("n_accent must be an integer", "BAD_ARGS")
+    if n_accent < 3:
+        return err_payload("n_accent must be >= 3", "BAD_ARGS")
+
+    try:
+        halo_radius = float(a.get("halo_radius_mm", 0))
+    except Exception:
+        return err_payload("halo_radius_mm must be a number", "BAD_ARGS")
+    if halo_radius <= 0:
+        return err_payload("halo_radius_mm must be positive", "BAD_ARGS")
+
+    start_angle = float(a.get("start_angle_deg", 0.0))
+
+    preset = a.get("preset", None)
+    if preset is not None and preset not in _VALID_PRESETS:
+        return err_payload(f"Unknown preset {preset!r}. Valid: {sorted(_VALID_PRESETS)}", "BAD_ARGS")
+
+    clearance_err = _validate_clearances(a)
+    if clearance_err:
+        return clearance_err
+
+    try:
+        fid = uuid.UUID(file_id_str)
+    except Exception:
+        return err_payload("file_id must be a uuid", "BAD_ARGS")
+
+    content, err = read_feature_content(ctx, fid)
+    if err:
+        return err_payload(f"file not found: {err}", "NOT_FOUND")
+
+    center_props, perr = _resolve_props(center_cut, center_carat, center_diam)
+    if perr:
+        return perr
+    accent_props, perr2 = _resolve_props(accent_cut, accent_carat, accent_diam)
+    if perr2:
+        return perr2
+
+    clearance_kw: dict = {}
+    for name, default in (
+        ("girdle_clearance_mm", 0.04),
+        ("culet_clearance_mm",  0.08),
+        ("seat_allowance_mm",   0.02),
+        ("crown_relief_mm",     0.25),
+    ):
+        clearance_kw[name] = float(a[name]) if name in a else default
+
+    try:
+        geom = cluster_halo_seat_geometry(
+            cut=accent_cut,
+            diameter_mm=accent_props.diameter_mm,
+            center_cut=center_cut,
+            center_diameter_mm=center_props.diameter_mm,
+            n_accent=n_accent,
+            halo_radius_mm=halo_radius,
+            pavilion_angle_deg=accent_props.pavilion_angle_deg,
+            pavilion_depth_pct=accent_props.pavilion_depth_pct,
+            girdle_pct=accent_props.girdle_pct,
+            crown_angle_deg=accent_props.crown_angle_deg,
+            center_pavilion_angle_deg=center_props.pavilion_angle_deg,
+            center_pavilion_depth_pct=center_props.pavilion_depth_pct,
+            center_girdle_pct=center_props.girdle_pct,
+            center_crown_angle_deg=center_props.crown_angle_deg,
+            start_angle_deg=start_angle,
+            preset=preset,
+            **clearance_kw,
+        )
+    except ValueError as e:
+        return err_payload(str(e), "BAD_ARGS")
+
+    node_id = a.get("id", "").strip() or next_node_id(content, "cluster_halo_seat")
+
+    seat_node: dict = {
+        "id":           node_id,
+        "op":           "cluster_halo_seat",
+        "center_cut":   center_cut,
+        "accent_cut":   accent_cut,
+        **geom,
+    }
+    if a.get("position") is not None:
+        seat_node["position"] = a["position"]
+    if a.get("orientation_deg") is not None:
+        seat_node["orientation_deg"] = a["orientation_deg"]
+
+    result: dict = {
+        "file_id":               file_id_str,
+        "op":                    "cluster_halo_seat",
+        "center_cut":            center_cut,
+        "accent_cut":            accent_cut,
+        "n_accent":              n_accent,
+        "halo_radius_mm":        halo_radius,
+        "total_cutter_depth_mm": geom["total_cutter_depth_mm"],
+        "accent_positions":      geom["accent_positions"],
+    }
+
+    return _append_and_auto_cut(ctx, fid, seat_node, a.get("auto_cut_host_id", "").strip(), result)
+
+
+# ---------------------------------------------------------------------------
+# LLM tool: jewelry_cut_gypsy_seat
+# ---------------------------------------------------------------------------
+
+jewelry_cut_gypsy_seat_spec = ToolSpec(
+    name="jewelry_cut_gypsy_seat",
+    description=(
+        "Append a `gypsy_seat` node to a `.feature` file. "
+        "Generates a flush / gypsy-set countersink seat — the stone's girdle sits "
+        "at the metal surface with no bearing cone overhang above. "
+        "The cutter is a straight cylinder with a shallow countersink at the top "
+        "to accept the lower crown facets. "
+        "Unlike jewelry_cut_gem_seat, there is no crown relief overhang above the metal. "
+        "Use for gypsy settings, burnish settings, and tube-set stones. "
+        "Use auto_cut_host_id to immediately subtract the seat from the host solid."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_id": {"type": "string", "description": "Target .feature file id (uuid)."},
+            "cut": {
+                "type": "string",
+                "enum": sorted(GEMSTONE_CUTS),
+                "description": "Gemstone cut.",
+            },
+            "carat": {"type": "number", "description": "Stone weight (carats). Provide carat OR diameter_mm."},
+            "diameter_mm": {"type": "number", "description": "Stone primary dimension (mm). Provide diameter_mm OR carat."},
+            "countersink_angle_deg": {
+                "type": "number",
+                "description": "Half-angle of the top countersink taper (degrees). Default 45.",
+            },
+            "countersink_depth_mm": {
+                "type": "number",
+                "description": "Axial depth of the countersink (mm). Default 0.20.",
+            },
+            "through_hole": {"type": "boolean", "description": "Add through-hole. Default false."},
+            "through_hole_radius_mm": {"type": "number", "description": "Through-hole radius (mm)."},
+            "preset": {
+                "type": "string",
+                "enum": sorted(_VALID_PRESETS),
+                "description": "Named bearing preset. See jewelry_cut_pave_field_seat for values.",
+            },
+            "position": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "[x,y,z] seat centre. Default [0,0,0].",
+            },
+            "orientation_deg": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "[rx,ry,rz] Euler angles. Default [0,0,0].",
+            },
+            "girdle_clearance_mm": {"type": "number", "description": "Radial clearance (mm). Default 0.03."},
+            "culet_clearance_mm":  {"type": "number", "description": "Depth below pavilion tip (mm). Default 0.10."},
+            "seat_allowance_mm":   {"type": "number", "description": "Axial ledge allowance (mm). Default 0.02."},
+            "auto_cut_host_id": {"type": "string", "description": "Host node id to subtract the seat from."},
+            "id": {"type": "string", "description": "Optional explicit node id."},
+        },
+        "required": ["file_id", "cut"],
+    },
+)
+
+
+@register(jewelry_cut_gypsy_seat_spec, write=True)
+async def run_jewelry_cut_gypsy_seat(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    file_id_str = a.get("file_id", "").strip()
+    cut         = a.get("cut", "").strip()
+    carat       = a.get("carat", None)
+    diam_mm     = a.get("diameter_mm", None)
+
+    if not file_id_str:
+        return err_payload("file_id is required", "BAD_ARGS")
+    if not cut:
+        return err_payload("cut is required", "BAD_ARGS")
+    if cut not in GEMSTONE_CUTS:
+        return err_payload(f"Unknown cut {cut!r}. Valid cuts: {sorted(GEMSTONE_CUTS)}", "BAD_ARGS")
+    if carat is not None and diam_mm is not None:
+        return err_payload("Provide carat OR diameter_mm, not both", "BAD_ARGS")
+    if carat is None and diam_mm is None:
+        return err_payload("One of carat or diameter_mm is required", "BAD_ARGS")
+    if carat is not None:
+        try:
+            carat = float(carat)
+        except Exception:
+            return err_payload("carat must be a number", "BAD_ARGS")
+        if carat <= 0:
+            return err_payload("carat must be positive", "BAD_ARGS")
+    if diam_mm is not None:
+        try:
+            diam_mm = float(diam_mm)
+        except Exception:
+            return err_payload("diameter_mm must be a number", "BAD_ARGS")
+        if diam_mm <= 0:
+            return err_payload("diameter_mm must be positive", "BAD_ARGS")
+
+    cs_angle = float(a.get("countersink_angle_deg", 45.0))
+    if cs_angle <= 0:
+        return err_payload("countersink_angle_deg must be positive", "BAD_ARGS")
+
+    cs_depth = float(a.get("countersink_depth_mm", 0.20))
+    if cs_depth < 0:
+        return err_payload("countersink_depth_mm must be >= 0", "BAD_ARGS")
+
+    through_hole = bool(a.get("through_hole", False))
+    thr = a.get("through_hole_radius_mm", None)
+    if thr is not None:
+        try:
+            thr = float(thr)
+        except Exception:
+            return err_payload("through_hole_radius_mm must be a number", "BAD_ARGS")
+        if thr <= 0:
+            return err_payload("through_hole_radius_mm must be positive", "BAD_ARGS")
+
+    preset = a.get("preset", None)
+    if preset is not None and preset not in _VALID_PRESETS:
+        return err_payload(f"Unknown preset {preset!r}. Valid: {sorted(_VALID_PRESETS)}", "BAD_ARGS")
+
+    # Validate clearances (crown_relief_mm not used here — gypsy uses countersink instead)
+    for name in ("girdle_clearance_mm", "culet_clearance_mm", "seat_allowance_mm"):
+        val = a.get(name)
+        if val is None:
+            continue
+        try:
+            val = float(val)
+        except Exception:
+            return err_payload(f"{name} must be a number", "BAD_ARGS")
+        if val < 0:
+            return err_payload(f"{name} must be >= 0", "BAD_ARGS")
+
+    try:
+        fid = uuid.UUID(file_id_str)
+    except Exception:
+        return err_payload("file_id must be a uuid", "BAD_ARGS")
+
+    content, err = read_feature_content(ctx, fid)
+    if err:
+        return err_payload(f"file not found: {err}", "NOT_FOUND")
+
+    props, perr = _resolve_props(cut, carat, diam_mm)
+    if perr:
+        return perr
+
+    # Fancy-cut girdle profile for non-round cuts
+    gp = None
+    if cut != "round_brilliant":
+        gp = fancy_cut_girdle_profile(
+            cut,
+            props.diameter_mm,
+            girdle_clearance_mm=float(a.get("girdle_clearance_mm", 0.03)),
+        )
+
+    clearance_kw: dict = {}
+    for name, default in (
+        ("girdle_clearance_mm", 0.03),
+        ("culet_clearance_mm",  0.10),
+        ("seat_allowance_mm",   0.02),
+    ):
+        clearance_kw[name] = float(a[name]) if name in a else default
+
+    try:
+        geom = gypsy_seat_geometry(
+            cut=cut,
+            diameter_mm=props.diameter_mm,
+            pavilion_angle_deg=props.pavilion_angle_deg,
+            pavilion_depth_pct=props.pavilion_depth_pct,
+            girdle_pct=props.girdle_pct,
+            crown_angle_deg=props.crown_angle_deg,
+            countersink_angle_deg=cs_angle,
+            countersink_depth_mm=cs_depth,
+            through_hole=through_hole,
+            through_hole_radius_mm=thr,
+            girdle_profile=gp,
+            preset=preset,
+            **clearance_kw,
+        )
+    except ValueError as e:
+        return err_payload(str(e), "BAD_ARGS")
+
+    node_id = a.get("id", "").strip() or next_node_id(content, "gypsy_seat")
+
+    seat_node: dict = {
+        "id":  node_id,
+        "op":  "gypsy_seat",
+        "cut": cut,
+        **geom,
+    }
+    if a.get("position") is not None:
+        seat_node["position"] = a["position"]
+    if a.get("orientation_deg") is not None:
+        seat_node["orientation_deg"] = a["orientation_deg"]
+
+    result: dict = {
+        "file_id":                file_id_str,
+        "op":                     "gypsy_seat",
+        "cut":                    cut,
+        "diameter_mm":            props.diameter_mm,
+        "total_cutter_depth_mm":  geom["total_cutter_depth_mm"],
+        "countersink_angle_deg":  geom["countersink_angle_deg"],
+        "countersink_depth_mm":   geom["countersink_depth_mm"],
+        "countersink_top_radius": geom["countersink_top_radius"],
+    }
+
+    return _append_and_auto_cut(ctx, fid, seat_node, a.get("auto_cut_host_id", "").strip(), result)
+
+
+# ---------------------------------------------------------------------------
+# LLM tool: jewelry_cut_baguette_channel_seat
+# ---------------------------------------------------------------------------
+
+jewelry_cut_baguette_channel_seat_spec = ToolSpec(
+    name="jewelry_cut_baguette_channel_seat",
+    description=(
+        "Append a `baguette_channel_seat` node to a `.feature` file. "
+        "Generates a rectangular straight-wall bearing groove for step-cut stones "
+        "(baguette, trap/trapezoid, carré). Unlike the round channel_seat which uses "
+        "a circular bearing cone, this cutter is a prismatic rectangular slot — "
+        "the correct bearing profile for rectangular/square girdles. "
+        "Provide stone dimensions directly as length_mm and width_mm (no cut-derived "
+        "proportions; step-cut pavilions are shallow and user-measured). "
+        "pitch_mm must exceed length_mm. "
+        "Use auto_cut_host_id to immediately subtract the groove from the host solid."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_id": {"type": "string", "description": "Target .feature file id (uuid)."},
+            "cut": {
+                "type": "string",
+                "enum": sorted(GEMSTONE_CUTS),
+                "description": "Gemstone cut (usually baguette, emerald, or princess for metadata).",
+            },
+            "length_mm": {
+                "type": "number",
+                "description": "Stone long-axis dimension (mm). Required.",
+            },
+            "width_mm": {
+                "type": "number",
+                "description": "Stone short-axis dimension (mm). Required.",
+            },
+            "pavilion_depth_mm": {
+                "type": "number",
+                "description": "Pavilion depth (mm). Required (step-cuts have shallow pavilions).",
+            },
+            "n_stones": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Number of stones in the channel.",
+            },
+            "pitch_mm": {
+                "type": "number",
+                "description": "Centre-to-centre spacing (mm). Must exceed length_mm.",
+            },
+            "wall_thickness_mm": {
+                "type": "number",
+                "description": "Minimum metal wall between groove and channel face (mm). Default 0.20.",
+            },
+            "position": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "[x,y,z] centre of first stone. Default [0,0,0].",
+            },
+            "axis_direction": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "[dx,dy,dz] row direction. Default [1,0,0].",
+            },
+            "orientation_deg": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "[rx,ry,rz] groove orientation. Default [0,0,0].",
+            },
+            "preset": {
+                "type": "string",
+                "enum": sorted(_VALID_PRESETS),
+                "description": "Named bearing preset. See jewelry_cut_pave_field_seat for values.",
+            },
+            "girdle_clearance_mm": {"type": "number", "description": "Radial clearance (mm). Default 0.05."},
+            "culet_clearance_mm":  {"type": "number", "description": "Depth below pavilion (mm). Default 0.10."},
+            "seat_allowance_mm":   {"type": "number", "description": "Axial ledge allowance (mm). Default 0.02."},
+            "auto_cut_host_id": {"type": "string", "description": "Host node id to subtract the groove from."},
+            "id": {"type": "string", "description": "Optional explicit node id."},
+        },
+        "required": ["file_id", "cut", "length_mm", "width_mm", "pavilion_depth_mm", "n_stones", "pitch_mm"],
+    },
+)
+
+
+@register(jewelry_cut_baguette_channel_seat_spec, write=True)
+async def run_jewelry_cut_baguette_channel_seat(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    file_id_str = a.get("file_id", "").strip()
+    cut         = a.get("cut", "").strip()
+
+    if not file_id_str:
+        return err_payload("file_id is required", "BAD_ARGS")
+    if not cut:
+        return err_payload("cut is required", "BAD_ARGS")
+    if cut not in GEMSTONE_CUTS:
+        return err_payload(f"Unknown cut {cut!r}. Valid cuts: {sorted(GEMSTONE_CUTS)}", "BAD_ARGS")
+
+    try:
+        length_mm = float(a.get("length_mm", 0))
+    except Exception:
+        return err_payload("length_mm must be a number", "BAD_ARGS")
+    if length_mm <= 0:
+        return err_payload("length_mm must be positive", "BAD_ARGS")
+
+    try:
+        width_mm = float(a.get("width_mm", 0))
+    except Exception:
+        return err_payload("width_mm must be a number", "BAD_ARGS")
+    if width_mm <= 0:
+        return err_payload("width_mm must be positive", "BAD_ARGS")
+
+    try:
+        pav_depth = float(a.get("pavilion_depth_mm", 0))
+    except Exception:
+        return err_payload("pavilion_depth_mm must be a number", "BAD_ARGS")
+    if pav_depth <= 0:
+        return err_payload("pavilion_depth_mm must be positive", "BAD_ARGS")
+
+    try:
+        n_stones = int(a.get("n_stones", 0))
+    except Exception:
+        return err_payload("n_stones must be an integer", "BAD_ARGS")
+    if n_stones < 1:
+        return err_payload("n_stones must be >= 1", "BAD_ARGS")
+
+    try:
+        pitch_mm = float(a.get("pitch_mm", 0))
+    except Exception:
+        return err_payload("pitch_mm must be a number", "BAD_ARGS")
+    if pitch_mm <= 0:
+        return err_payload("pitch_mm must be positive", "BAD_ARGS")
+
+    # Spacing validation (pitch > length_mm) — done by geometry fn but also
+    # surface a helpful message here
+    if pitch_mm <= length_mm:
+        return err_payload(
+            f"pitch_mm ({pitch_mm}) must exceed stone length_mm ({length_mm})", "BAD_ARGS"
+        )
+
+    preset = a.get("preset", None)
+    if preset is not None and preset not in _VALID_PRESETS:
+        return err_payload(f"Unknown preset {preset!r}. Valid: {sorted(_VALID_PRESETS)}", "BAD_ARGS")
+
+    for name in ("girdle_clearance_mm", "culet_clearance_mm", "seat_allowance_mm"):
+        val = a.get(name)
+        if val is None:
+            continue
+        try:
+            val = float(val)
+        except Exception:
+            return err_payload(f"{name} must be a number", "BAD_ARGS")
+        if val < 0:
+            return err_payload(f"{name} must be >= 0", "BAD_ARGS")
+
+    wall_thickness = float(a.get("wall_thickness_mm", 0.20))
+    if wall_thickness < 0:
+        return err_payload("wall_thickness_mm must be >= 0", "BAD_ARGS")
+
+    try:
+        fid = uuid.UUID(file_id_str)
+    except Exception:
+        return err_payload("file_id must be a uuid", "BAD_ARGS")
+
+    content, err = read_feature_content(ctx, fid)
+    if err:
+        return err_payload(f"file not found: {err}", "NOT_FOUND")
+
+    clearance_kw: dict = {}
+    for name, default in (
+        ("girdle_clearance_mm", 0.05),
+        ("culet_clearance_mm",  0.10),
+        ("seat_allowance_mm",   0.02),
+    ):
+        clearance_kw[name] = float(a[name]) if name in a else default
+
+    try:
+        geom = baguette_channel_seat_geometry(
+            cut=cut,
+            length_mm=length_mm,
+            width_mm=width_mm,
+            n_stones=n_stones,
+            pitch_mm=pitch_mm,
+            pavilion_depth_mm=pav_depth,
+            wall_thickness_mm=wall_thickness,
+            start_position=a.get("position", None),
+            axis_direction=a.get("axis_direction", None),
+            preset=preset,
+            **clearance_kw,
+        )
+    except ValueError as e:
+        return err_payload(str(e), "BAD_ARGS")
+
+    node_id = a.get("id", "").strip() or next_node_id(content, "baguette_channel_seat")
+
+    seat_node: dict = {
+        "id":  node_id,
+        "op":  "baguette_channel_seat",
+        "cut": cut,
+        **geom,
+    }
+    if a.get("orientation_deg") is not None:
+        seat_node["orientation_deg"] = a["orientation_deg"]
+
+    result: dict = {
+        "file_id":               file_id_str,
+        "op":                    "baguette_channel_seat",
+        "cut":                   cut,
+        "n_stones":              n_stones,
+        "groove_length_mm":      geom["groove_length_mm"],
+        "total_cutter_depth_mm": geom["total_cutter_depth_mm"],
+        "stone_positions":       geom["stone_positions"],
     }
 
     return _append_and_auto_cut(ctx, fid, seat_node, a.get("auto_cut_host_id", "").strip(), result)

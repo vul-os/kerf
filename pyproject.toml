@@ -137,6 +137,7 @@ members = [
     "packages/kerf-render",
     "packages/kerf-workers",
     "packages/kerf-parts",
+    "packages/kerf-partsgen",
 ]
 
 [tool.uv.sources]
@@ -161,6 +162,7 @@ kerf-imports = { workspace = true }
 kerf-render = { workspace = true }
 kerf-workers = { workspace = true }
 kerf-parts = { workspace = true }
+kerf-partsgen = { workspace = true }
 
 [tool.pytest.ini_options]
 # Auto-discover tests from every plugin package and from the legacy backend/
@@ -188,7 +190,7 @@ testpaths = [
     "packages/kerf-render/tests",
     "packages/kerf-workers/tests",
     "packages/kerf-parts/tests",
-
+    "packages/kerf-partsgen/tests",
 ]
 asyncio_mode = "auto"
 # importlib mode lets multiple plugin tests/ dirs coexist without conflicting

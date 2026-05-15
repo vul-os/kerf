@@ -54,6 +54,10 @@ kerf.toml
 # Only kerf-parts code + parts-sources.toml + LICENSES.md are committed.
 /.parts-cache/
 
+# kerf-partsgen generated parts — reproducible from committed generators
+# with zero tokens; never committed (see packages/kerf-partsgen/LICENSES.md)
+/.parts-out/
+
 # Python
 __pycache__/
 *.py[cod]

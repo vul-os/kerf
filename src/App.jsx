@@ -20,6 +20,7 @@ import WorkspaceMembers from './routes/WorkspaceMembers.jsx'
 import AdminDistributors from './routes/AdminDistributors.jsx'
 import AdminPublishers from './routes/AdminPublishers.jsx'
 import ProtectedRoute from './routes/ProtectedRoute.jsx'
+import Electronics from './routes/domains/Electronics.jsx'
 import ShortcutsModal from './components/ShortcutsModal.jsx'
 import { useAuth } from './store/auth.js'
 import { api } from './lib/api.js'
@@ -118,6 +119,7 @@ export default function App() {
       <Route path="/roadmap" element={<Roadmap />} />
       <Route path="/docs" element={<DocsHome />} />
       <Route path="/docs/:slug" element={<DocsArticle />} />
+      <Route path="/electronics" element={<Electronics />} />
       {cloudEnabled && <Route path="/workshop" element={<Workshop />} />}
       {cloudEnabled && (
         <Route path="/workshop/:slug" element={<WorkshopListing />} />

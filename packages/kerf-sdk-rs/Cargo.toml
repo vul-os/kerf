@@ -1,0 +1,24 @@
+[package]
+name = "kerf-sdk"
+version = "0.1.0"
+edition = "2021"
+description = "Rust SDK for Kerf — chat-driven CAD platform"
+license = "MIT"
+repository = "https://github.com/kerf-sh/kerf"
+homepage = "https://kerf.sh"
+documentation = "https://docs.rs/kerf-sdk"
+keywords = ["cad", "json-rpc", "client", "kerf"]
+categories = ["api-bindings"]
+readme = "README.md"
+
+[dependencies]
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+
+[dev-dependencies]
+wiremock = "0.6"
+tokio-test = "0.4"

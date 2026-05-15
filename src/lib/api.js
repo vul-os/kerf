@@ -587,6 +587,36 @@ export const api = {
       method: 'POST',
       body: params,
     }),
+
+  // ---- Jewelry full quote ----
+  // Full jeweller's quote: metal casting + stone line items + labour/setting/
+  // finishing + markup. The backend /jewelry/metal-cost endpoint handles the
+  // metal weight and comparison table; stone/labour/markup are computed
+  // client-side by jewelryQuoteLocal() in JewelryCostPanel.jsx and stitched
+  // into the final result. This method sends all params so the backend can
+  // compute the metal cost portion; unknown params are silently ignored.
+  //
+  // Signature:
+  //   jewelryQuote(projectId, {
+  //     volume_mm3, metal, density_g_cm3?,
+  //     metal_price_per_gram?,  price_preset?,
+  //     casting_allowance_pct?,
+  //     stones?: [{ cut, carat?, mm?, price_per_carat, count?, note? }, ...],
+  //     bench_hours?, hourly_rate?,
+  //     setting_type?, setting_fee_per_stone?,
+  //     finishing_type?, finishing_cost?,
+  //     markup_pct?,
+  //     compare_metals?, compare_prices?,
+  //   }) → { estimate, comparison? }
+  //
+  // The returned `estimate` will be the casting_cost schema (legacy mode)
+  // from the backend; JewelryCostPanel augments it with stone/labour/markup
+  // to produce the full_quote result on the client.
+  jewelryQuote: (projectId, params) =>
+    request(`/api/projects/${projectId}/jewelry/metal-cost`, {
+      method: 'POST',
+      body: params,
+    }),
 }
 
 // ---------------------------------------------------------------------------

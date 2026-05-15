@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kerf-parts"
+version = "0.1.0"
+description = "Contributor pipeline: fetch + convert pinned open-source CAD parts into Kerf's library (MIT; no data bundled)"
+requires-python = ">=3.11"
+# Pure stdlib + git subprocess. KiCad conversion reuses kerf-imports
+# (which optionally needs kiutils); kerf-core is needed only by the DB
+# seed step. Both are workspace siblings, not heavy new deps.
+dependencies = []
+
+[project.optional-dependencies]
+seed = ["kerf-core", "kerf-imports"]
+
+[project.scripts]
+kerf-parts-fetch = "kerf_parts.fetch:main"
+kerf-seed-parts = "kerf_parts.seed:main"
+
+# Contributor tooling — deliberately NOT a kerf.plugins runtime entry point.
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kerf_parts"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

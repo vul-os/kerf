@@ -1,0 +1,89 @@
+# parts-sources.toml — upstream open-source CAD parts manifest for kerf-parts.
+#
+# This file is the ONLY description of third-party parts repositories that
+# Kerf knows about. It is committed. The DATA those repositories contain is
+# NEVER committed — `kerf-parts fetch` clones each one into the gitignored
+# `<repo_root>/.parts-cache/<name>/` and the seed step converts it into the
+# (also gitignored) local Parts Library. See packages/kerf-parts/LICENSES.md.
+#
+# ---------------------------------------------------------------------------
+# HOW TO BUMP A PIN
+# ---------------------------------------------------------------------------
+# Every source is pinned to a specific upstream tag/ref for reproducibility.
+# To move a source to a newer upstream release:
+#   1. Find the new stable tag upstream, e.g.
+#        git ls-remote --tags <git_url>
+#   2. Edit that source's `ref` below to the new tag.
+#   3. Re-run `kerf-parts fetch --only <name>` (it will re-clone at the pin)
+#      then `kerf-seed-parts`.
+#   4. Commit ONLY this manifest change (never the cache / generated output).
+# A contributor can also override a pin for a single run without editing this
+# file:  `kerf-parts fetch --ref kicad-symbols=9.0.10`
+#
+# ---------------------------------------------------------------------------
+# FIELDS (per [[source]] entry)
+# ---------------------------------------------------------------------------
+#   name     unique short id; also the cache subdir name
+#   git_url  clone URL (https; no credentials)
+#   ref      pinned tag or branch (see "HOW TO BUMP A PIN")
+#   license  SPDX-ish identifier of the upstream data license
+#   format   what the cloned tree contains (informational)
+#   adapter  registry key -> kerf_parts.adapters callable
+#   heavy    true => multi-GB; skipped unless `--heavy` is passed
+# ---------------------------------------------------------------------------
+
+manifest_version = 1
+
+[[source]]
+name = "kicad-symbols"
+git_url = "https://gitlab.com/kicad/libraries/kicad-symbols.git"
+# GitHub mirror (use if GitLab is blocked): https://github.com/KiCad/kicad-symbols.git
+ref = "9.0.9"
+license = "CC-BY-SA-4.0 WITH KiCad-Library-Exception"
+format = "kicad-sym"
+adapter = "kicad"
+heavy = false
+
+[[source]]
+name = "kicad-footprints"
+git_url = "https://gitlab.com/kicad/libraries/kicad-footprints.git"
+# GitHub mirror: https://github.com/KiCad/kicad-footprints.git
+ref = "9.0.9"
+license = "CC-BY-SA-4.0 WITH KiCad-Library-Exception"
+format = "kicad-mod"
+adapter = "kicad"
+heavy = false
+
+[[source]]
+name = "kicad-packages3D"
+git_url = "https://gitlab.com/kicad/libraries/kicad-packages3D.git"
+# GitHub mirror: https://github.com/KiCad/kicad-packages3D.git
+# Multi-GB STEP/WRL 3D models. Opt-in only: pass `--heavy` to fetch.
+ref = "9.0.9"
+license = "CC-BY-SA-4.0 WITH KiCad-Library-Exception"
+format = "step-wrl"
+adapter = "kicad3d"
+heavy = true
+
+[[source]]
+name = "bolts"
+git_url = "https://github.com/boltsparts/BOLTS.git"
+ref = "v0.4.1"
+license = "LGPL-2.1-or-later"
+format = "bolts-blt"
+adapter = "bolts"
+heavy = false
+
+[[source]]
+name = "freecad-library"
+git_url = "https://github.com/FreeCAD/FreeCAD-library.git"
+# CAVEAT: this upstream publishes NO release tags — only the `master`
+# branch. The pin is therefore a moving branch, not an immutable tag.
+# When upstream starts tagging, switch `ref` to that tag for true
+# reproducibility. Until then a contributor wanting byte-stable output
+# should override with a commit SHA: `--ref freecad-library=<sha>`.
+ref = "master"
+license = "CC0-1.0 / LGPL-2.1-or-later (mixed; see LICENSES.md)"
+format = "freecad-fcstd-step"
+adapter = "freecad_library"
+heavy = false

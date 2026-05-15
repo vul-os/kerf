@@ -30,17 +30,37 @@ from kerf_cad_core.jewelry.ring import (
     _VALID_PROFILES,
     _VALID_SHOULDER_STYLES,
     _VALID_SYSTEMS,
+    _VALID_ETERNITY_COVERAGES,
+    _VALID_ETERNITY_SETTINGS,
+    _VALID_SIGNET_FACE_SHAPES,
+    _VALID_STACKING_PROFILES,
     _id_mm_to_circumference,
     _validate_width_profile,
     compute_shank_params,
+    compute_eternity_band_params,
+    compute_signet_ring_params,
+    compute_stacking_band_params,
+    compute_contoured_band_params,
     jewelry_create_ring_shank_spec,
     jewelry_ring_size_to_diameter_spec,
+    jewelry_create_eternity_band_spec,
+    jewelry_create_signet_ring_spec,
+    jewelry_create_stacking_band_set_spec,
+    jewelry_create_contoured_band_spec,
     ring_diameter_to_size,
     ring_size_to_diameter,
     run_jewelry_create_ring_shank,
     run_jewelry_ring_size_to_diameter,
+    run_jewelry_create_eternity_band,
+    run_jewelry_create_signet_ring,
+    run_jewelry_create_stacking_band_set,
+    run_jewelry_create_contoured_band,
     EngravingSpec,
     SizingBeadSpec,
+    EternityBandSpec,
+    SignetRingSpec,
+    StackingBandSpec,
+    ContouredBandSpec,
 )
 
 _PI = math.pi
@@ -1304,6 +1324,1095 @@ pytestmark_occ = pytest.mark.skipif(
     not _OCC,
     reason="pythonOCC not installed; install with: conda install -c conda-forge pythonocc-core"
 )
+
+
+# ===========================================================================
+# v3 Eternity Band
+# ===========================================================================
+
+class TestEternityBandSpec:
+    """Unit tests for EternityBandSpec dataclass."""
+
+    def test_defaults_valid(self):
+        spec = EternityBandSpec(ring_size=7)
+        id_mm = ring_size_to_diameter("us", 7)
+        d = spec.to_dict(id_mm)
+        assert d["coverage"] == "full"
+        assert d["coverage_deg"] == 360.0
+        assert d["setting_style"] == "channel"
+        assert d["stone_diameter_mm"] == 2.0
+        assert d["stone_count_auto"] is True
+
+    def test_auto_stone_count_full(self):
+        """Full coverage: stone count ≈ circumference / pitch."""
+        id_mm = ring_size_to_diameter("us", 7)
+        spec = EternityBandSpec(ring_size=7, stone_diameter_mm=2.0, stone_spacing_mm=0.1)
+        count = spec.auto_stone_count(id_mm)
+        pitch = 2.0 + 0.1
+        arc_length = _PI * id_mm
+        expected = max(1, round(arc_length / pitch))
+        assert count == expected
+
+    def test_auto_stone_count_half(self):
+        """Half coverage arc is π × r (half of full circle)."""
+        id_mm = ring_size_to_diameter("us", 7)
+        spec = EternityBandSpec(ring_size=7, stone_diameter_mm=2.0,
+                                coverage="half", stone_spacing_mm=0.0)
+        full_spec = EternityBandSpec(ring_size=7, stone_diameter_mm=2.0,
+                                     coverage="full", stone_spacing_mm=0.0)
+        half_count = spec.auto_stone_count(id_mm)
+        full_count = full_spec.auto_stone_count(id_mm)
+        # half coverage should give roughly half as many stones
+        assert half_count <= full_count
+
+    def test_auto_stone_count_three_quarter(self):
+        id_mm = ring_size_to_diameter("us", 7)
+        spec = EternityBandSpec(ring_size=7, stone_diameter_mm=2.0,
+                                coverage="three_quarter", stone_spacing_mm=0.1)
+        count = spec.auto_stone_count(id_mm)
+        pitch = 2.1
+        arc_length = _PI * id_mm * 0.75
+        expected = max(1, round(arc_length / pitch))
+        assert count == expected
+
+    def test_explicit_stone_count_stored(self):
+        spec = EternityBandSpec(ring_size=7, stone_diameter_mm=2.0, stone_count=18)
+        id_mm = ring_size_to_diameter("us", 7)
+        d = spec.to_dict(id_mm)
+        assert d["stone_count"] == 18
+        assert d["stone_count_auto"] is False
+
+    def test_band_width_auto_from_stone_diameter(self):
+        """Default band_width = stone_diameter + 0.6."""
+        spec = EternityBandSpec(ring_size=7, stone_diameter_mm=2.5)
+        id_mm = ring_size_to_diameter("us", 7)
+        d = spec.to_dict(id_mm)
+        assert abs(d["band_width_mm"] - (2.5 + 0.6)) < 0.01
+
+    def test_band_width_explicit(self):
+        spec = EternityBandSpec(ring_size=7, stone_diameter_mm=2.0, band_width_mm=5.0)
+        id_mm = ring_size_to_diameter("us", 7)
+        d = spec.to_dict(id_mm)
+        assert d["band_width_mm"] == 5.0
+
+    def test_invalid_stone_diameter_raises(self):
+        spec = EternityBandSpec(ring_size=7, stone_diameter_mm=0.0)
+        with pytest.raises(ValueError, match="stone_diameter_mm"):
+            spec.validate(ring_size_to_diameter("us", 7))
+
+    def test_invalid_coverage_raises(self):
+        spec = EternityBandSpec(ring_size=7, coverage="quarter")
+        with pytest.raises(ValueError, match="coverage"):
+            spec.validate(ring_size_to_diameter("us", 7))
+
+    def test_invalid_setting_style_raises(self):
+        spec = EternityBandSpec(ring_size=7, setting_style="bezel")
+        with pytest.raises(ValueError, match="setting_style"):
+            spec.validate(ring_size_to_diameter("us", 7))
+
+    def test_band_width_less_than_stone_raises(self):
+        spec = EternityBandSpec(ring_size=7, stone_diameter_mm=3.0, band_width_mm=2.0)
+        with pytest.raises(ValueError, match="band_width_mm"):
+            spec.validate(ring_size_to_diameter("us", 7))
+
+    def test_zero_thickness_raises(self):
+        spec = EternityBandSpec(ring_size=7, thickness_mm=0.0)
+        with pytest.raises(ValueError, match="thickness_mm"):
+            spec.validate(ring_size_to_diameter("us", 7))
+
+    def test_negative_spacing_raises(self):
+        spec = EternityBandSpec(ring_size=7, stone_spacing_mm=-0.1)
+        with pytest.raises(ValueError, match="stone_spacing_mm"):
+            spec.validate(ring_size_to_diameter("us", 7))
+
+    def test_stone_count_zero_raises(self):
+        spec = EternityBandSpec(ring_size=7, stone_count=0)
+        with pytest.raises(ValueError, match="stone_count"):
+            spec.validate(ring_size_to_diameter("us", 7))
+
+    def test_arc_length_in_dict(self):
+        id_mm = ring_size_to_diameter("us", 7)
+        spec = EternityBandSpec(ring_size=7, coverage="half")
+        d = spec.to_dict(id_mm)
+        expected_arc = _PI * id_mm * 0.5
+        assert abs(d["arc_length_mm"] - expected_arc) < 0.01
+
+    def test_all_coverages_valid(self):
+        id_mm = ring_size_to_diameter("us", 7)
+        for cov in _VALID_ETERNITY_COVERAGES:
+            spec = EternityBandSpec(ring_size=7, coverage=cov)
+            d = spec.to_dict(id_mm)
+            assert d["coverage"] == cov
+
+    def test_all_setting_styles_valid(self):
+        id_mm = ring_size_to_diameter("us", 7)
+        for ss in _VALID_ETERNITY_SETTINGS:
+            spec = EternityBandSpec(ring_size=7, setting_style=ss)
+            d = spec.to_dict(id_mm)
+            assert d["setting_style"] == ss
+
+
+class TestComputeEternityBandParams:
+    def test_basic_us7_full(self):
+        p = compute_eternity_band_params(7, "us")
+        assert abs(p["inner_diameter_mm"] - 17.32) < 0.01
+        assert p["coverage"] == "full"
+        assert p["stone_count"] >= 1
+        assert p["stone_count_auto"] is True
+
+    def test_explicit_stone_count(self):
+        p = compute_eternity_band_params(7, "us", stone_count=20)
+        assert p["stone_count"] == 20
+        assert p["stone_count_auto"] is False
+
+    def test_outer_diameter_formula(self):
+        p = compute_eternity_band_params(7, "us", thickness_mm=1.2)
+        assert abs(p["outer_diameter_mm"] - (p["inner_diameter_mm"] + 2 * 1.2)) < 0.001
+
+    def test_circumference_formula(self):
+        p = compute_eternity_band_params(7, "us")
+        assert abs(p["circumference_mm"] - _PI * p["inner_diameter_mm"]) < 1e-3
+
+    def test_uk_size(self):
+        p = compute_eternity_band_params("N", "uk")
+        assert p["inner_diameter_mm"] > 0
+
+    def test_invalid_coverage_raises(self):
+        with pytest.raises(ValueError, match="coverage"):
+            compute_eternity_band_params(7, "us", coverage="none")
+
+    def test_invalid_setting_style_raises(self):
+        with pytest.raises(ValueError, match="setting_style"):
+            compute_eternity_band_params(7, "us", setting_style="bar")
+
+    def test_pave_setting_stored(self):
+        p = compute_eternity_band_params(7, "us", setting_style="pave")
+        assert p["setting_style"] == "pave"
+
+    def test_size_system_stored(self):
+        p = compute_eternity_band_params(7, "us")
+        assert p["size_system"] == "us"
+        assert p["ring_size"] == 7
+
+    def test_stone_pitch_is_diam_plus_spacing(self):
+        p = compute_eternity_band_params(7, "us", stone_diameter_mm=2.0,
+                                          stone_spacing_mm=0.2)
+        assert abs(p["stone_pitch_mm"] - 2.2) < 0.001
+
+
+class TestEternityBandTool:
+    def _run(self, ctx, fid, **kwargs):
+        args = {"file_id": str(fid), **kwargs}
+        return run_tool_sync(
+            run_jewelry_create_eternity_band(ctx, json.dumps(args).encode())
+        )
+
+    def test_basic_accepted(self):
+        ctx, store, fid = make_ctx()
+        r = self._run(ctx, fid, ring_size=7)
+        assert "error" not in r, f"Unexpected error: {r}"
+        assert r["op"] == "eternity_band"
+        doc = json.loads(store["content"])
+        assert doc["features"][0]["op"] == "eternity_band"
+
+    def test_node_id_generated(self):
+        ctx, store, fid = make_ctx()
+        r = self._run(ctx, fid, ring_size=7)
+        assert r["id"].startswith("eternity_band-")
+
+    def test_explicit_node_id(self):
+        ctx, store, fid = make_ctx()
+        r = self._run(ctx, fid, ring_size=7, id="eter-custom")
+        assert r["id"] == "eter-custom"
+
+    def test_all_coverages_accepted(self):
+        for cov in _VALID_ETERNITY_COVERAGES:
+            ctx, store, fid = make_ctx()
+            r = self._run(ctx, fid, ring_size=7, coverage=cov)
+            assert "error" not in r, f"Coverage {cov!r}: {r}"
+
+    def test_all_setting_styles_accepted(self):
+        for ss in _VALID_ETERNITY_SETTINGS:
+            ctx, store, fid = make_ctx()
+            r = self._run(ctx, fid, ring_size=7, setting_style=ss)
+            assert "error" not in r, f"Setting {ss!r}: {r}"
+
+    def test_explicit_stone_count_stored(self):
+        ctx, store, fid = make_ctx()
+        self._run(ctx, fid, ring_size=7, stone_count=15)
+        doc = json.loads(store["content"])
+        assert doc["features"][0]["stone_count"] == 15
+
+    def test_auto_stone_count_positive(self):
+        ctx, store, fid = make_ctx()
+        r = self._run(ctx, fid, ring_size=7)
+        assert r["stone_count"] >= 1
+
+    def test_invalid_coverage_bad_args(self):
+        ctx, _, fid = make_ctx()
+        r = self._run(ctx, fid, ring_size=7, coverage="quarter")
+        assert "error" in r
+
+    def test_invalid_setting_style_bad_args(self):
+        ctx, _, fid = make_ctx()
+        r = self._run(ctx, fid, ring_size=7, setting_style="bezel")
+        assert "error" in r
+
+    def test_missing_file_id_bad_args(self):
+        ctx, _, _ = make_ctx()
+        r = run_tool_sync(
+            run_jewelry_create_eternity_band(
+                ctx, json.dumps({"ring_size": 7}).encode()
+            )
+        )
+        assert "error" in r
+
+    def test_missing_ring_size_bad_args(self):
+        ctx, _, fid = make_ctx()
+        r = run_tool_sync(
+            run_jewelry_create_eternity_band(
+                ctx, json.dumps({"file_id": str(fid)}).encode()
+            )
+        )
+        assert "error" in r
+
+    def test_invalid_file_id_bad_args(self):
+        ctx, _, _ = make_ctx()
+        r = run_tool_sync(
+            run_jewelry_create_eternity_band(
+                ctx, json.dumps({"file_id": "not-uuid", "ring_size": 7}).encode()
+            )
+        )
+        assert "error" in r
+
+    def test_non_feature_file_not_found(self):
+        ctx, store, fid = make_ctx()
+        store["kind"] = "sketch"
+        r = self._run(ctx, fid, ring_size=7)
+        assert "error" in r
+
+    def test_band_width_in_response(self):
+        ctx, store, fid = make_ctx()
+        r = self._run(ctx, fid, ring_size=7, stone_diameter_mm=2.0)
+        assert r["band_width_mm"] >= 2.0
+
+    def test_second_node_increments_id(self):
+        ctx, store, fid = make_ctx()
+        self._run(ctx, fid, ring_size=7)
+        r2 = self._run(ctx, fid, ring_size=8)
+        assert r2["id"] == "eternity_band-2"
+
+    def test_spec_required_fields(self):
+        req = set(jewelry_create_eternity_band_spec.input_schema["required"])
+        assert "file_id" in req
+        assert "ring_size" in req
+
+    def test_spec_coverage_enum(self):
+        props = jewelry_create_eternity_band_spec.input_schema["properties"]
+        assert set(props["coverage"]["enum"]) == _VALID_ETERNITY_COVERAGES
+
+    def test_spec_setting_style_enum(self):
+        props = jewelry_create_eternity_band_spec.input_schema["properties"]
+        assert set(props["setting_style"]["enum"]) == _VALID_ETERNITY_SETTINGS
+
+    def test_stone_count_math_correct_full(self):
+        """Full-coverage stone count must equal auto_stone_count result."""
+        id_mm = ring_size_to_diameter("us", 7)
+        spec = EternityBandSpec(ring_size=7, stone_diameter_mm=2.0, stone_spacing_mm=0.1)
+        expected = spec.auto_stone_count(id_mm)
+        ctx, store, fid = make_ctx()
+        r = self._run(ctx, fid, ring_size=7, stone_diameter_mm=2.0, stone_spacing_mm=0.1)
+        assert r["stone_count"] == expected
+
+
+# ===========================================================================
+# v3 Signet Ring
+# ===========================================================================
+
+class TestSignetRingSpec:
+    def test_defaults_valid(self):
+        spec = SignetRingSpec(ring_size=7)
+        id_mm = ring_size_to_diameter("us", 7)
+        d = spec.to_dict(id_mm)
+        assert d["face_shape"] == "oval"
+        assert d["face_length_mm"] == 12.0
+        assert d["face_width_mm"] == 10.0
+        assert d["face_height_mm"] == 3.0
+        assert d["intaglio_depth_mm"] == 0.0
+        assert "engraving" not in d
+
+    def test_all_face_shapes_valid(self):
+        id_mm = ring_size_to_diameter("us", 7)
+        for shape in _VALID_SIGNET_FACE_SHAPES:
+            spec = SignetRingSpec(ring_size=7, face_shape=shape)
+            d = spec.to_dict(id_mm)
+            assert d["face_shape"] == shape
+
+    def test_face_area_flat(self):
+        spec = SignetRingSpec(ring_size=7, face_shape="flat",
+                              face_length_mm=10.0, face_width_mm=8.0)
+        id_mm = ring_size_to_diameter("us", 7)
+        d = spec.to_dict(id_mm)
+        assert abs(d["face_area_mm2"] - 80.0) < 0.01
+
+    def test_face_area_oval(self):
+        spec = SignetRingSpec(ring_size=7, face_shape="oval",
+                              face_length_mm=10.0, face_width_mm=8.0)
+        id_mm = ring_size_to_diameter("us", 7)
+        d = spec.to_dict(id_mm)
+        expected = _PI * 5.0 * 4.0
+        assert abs(d["face_area_mm2"] - expected) < 0.01
+
+    def test_face_area_cushion(self):
+        spec = SignetRingSpec(ring_size=7, face_shape="cushion",
+                              face_length_mm=10.0, face_width_mm=8.0)
+        id_mm = ring_size_to_diameter("us", 7)
+        d = spec.to_dict(id_mm)
+        expected = 10.0 * 8.0 * 0.9
+        assert abs(d["face_area_mm2"] - expected) < 0.01
+
+    def test_intaglio_depth_stored(self):
+        spec = SignetRingSpec(ring_size=7, intaglio_depth_mm=0.5, face_height_mm=3.0)
+        id_mm = ring_size_to_diameter("us", 7)
+        d = spec.to_dict(id_mm)
+        assert d["intaglio_depth_mm"] == 0.5
+
+    def test_engraving_stored(self):
+        eng = EngravingSpec(text="WM")
+        spec = SignetRingSpec(ring_size=7, engraving=eng)
+        id_mm = ring_size_to_diameter("us", 7)
+        d = spec.to_dict(id_mm)
+        assert "engraving" in d
+        assert d["engraving"]["text"] == "WM"
+
+    def test_invalid_face_shape_raises(self):
+        spec = SignetRingSpec(ring_size=7, face_shape="round")
+        with pytest.raises(ValueError, match="face_shape"):
+            spec.validate()
+
+    def test_zero_face_length_raises(self):
+        spec = SignetRingSpec(ring_size=7, face_length_mm=0.0)
+        with pytest.raises(ValueError, match="face_length_mm"):
+            spec.validate()
+
+    def test_zero_face_width_raises(self):
+        spec = SignetRingSpec(ring_size=7, face_width_mm=0.0)
+        with pytest.raises(ValueError, match="face_width_mm"):
+            spec.validate()
+
+    def test_zero_face_height_raises(self):
+        spec = SignetRingSpec(ring_size=7, face_height_mm=0.0)
+        with pytest.raises(ValueError, match="face_height_mm"):
+            spec.validate()
+
+    def test_negative_intaglio_raises(self):
+        spec = SignetRingSpec(ring_size=7, intaglio_depth_mm=-0.1)
+        with pytest.raises(ValueError, match="intaglio_depth_mm"):
+            spec.validate()
+
+    def test_intaglio_exceeds_height_raises(self):
+        spec = SignetRingSpec(ring_size=7, intaglio_depth_mm=3.0, face_height_mm=3.0)
+        with pytest.raises(ValueError, match="intaglio_depth_mm"):
+            spec.validate()
+
+    def test_invalid_shoulder_style_raises(self):
+        spec = SignetRingSpec(ring_size=7, shoulder_style="prong")
+        with pytest.raises(ValueError, match="shoulder_style"):
+            spec.validate()
+
+    def test_shoulder_hints_in_compute(self):
+        p = compute_signet_ring_params(7, "us", shoulder_style="cathedral")
+        assert "shoulder_hints" in p
+        assert p["shoulder_hints"]["type"] == "cathedral"
+
+
+class TestComputeSignetRingParams:
+    def test_basic_us7(self):
+        p = compute_signet_ring_params(7, "us")
+        assert abs(p["inner_diameter_mm"] - 17.32) < 0.01
+        assert p["face_shape"] == "oval"
+
+    def test_outer_diameter(self):
+        p = compute_signet_ring_params(7, "us", thickness_mm=1.8)
+        assert abs(p["outer_diameter_mm"] - (p["inner_diameter_mm"] + 2 * 1.8)) < 0.001
+
+    def test_face_dims_stored(self):
+        p = compute_signet_ring_params(7, "us", face_length_mm=14.0, face_width_mm=12.0,
+                                       face_height_mm=4.0)
+        assert p["face_length_mm"] == 14.0
+        assert p["face_width_mm"] == 12.0
+        assert p["face_height_mm"] == 4.0
+
+    def test_all_face_shapes_accepted(self):
+        for shape in _VALID_SIGNET_FACE_SHAPES:
+            p = compute_signet_ring_params(7, "us", face_shape=shape)
+            assert p["face_shape"] == shape
+
+    def test_all_shoulder_styles_accepted(self):
+        for ss in _VALID_SHOULDER_STYLES:
+            p = compute_signet_ring_params(7, "us", shoulder_style=ss)
+            assert p["shoulder_hints"]["type"] == ss
+
+    def test_intaglio_stored(self):
+        p = compute_signet_ring_params(7, "us", intaglio_depth_mm=0.8, face_height_mm=3.0)
+        assert p["intaglio_depth_mm"] == 0.8
+
+    def test_size_system_stored(self):
+        p = compute_signet_ring_params(7, "us")
+        assert p["size_system"] == "us"
+
+
+class TestSignetRingTool:
+    def _run(self, ctx, fid, **kwargs):
+        args = {"file_id": str(fid), **kwargs}
+        return run_tool_sync(
+            run_jewelry_create_signet_ring(ctx, json.dumps(args).encode())
+        )
+
+    def test_basic_accepted(self):
+        ctx, store, fid = make_ctx()
+        r = self._run(ctx, fid, ring_size=7)
+        assert "error" not in r, f"Unexpected error: {r}"
+        assert r["op"] == "signet_ring"
+
+    def test_node_id_generated(self):
+        ctx, store, fid = make_ctx()
+        r = self._run(ctx, fid, ring_size=7)
+        assert r["id"].startswith("signet_ring-")
+
+    def test_all_face_shapes_accepted(self):
+        for shape in _VALID_SIGNET_FACE_SHAPES:
+            ctx, store, fid = make_ctx()
+            r = self._run(ctx, fid, ring_size=7, face_shape=shape)
+            assert "error" not in r, f"Face shape {shape!r}: {r}"
+
+    def test_engraving_stored(self):
+        ctx, store, fid = make_ctx()
+        self._run(ctx, fid, ring_size=7, engraving={"text": "WM", "depth_mm": 0.3})
+        doc = json.loads(store["content"])
+        assert doc["features"][0]["engraving"]["text"] == "WM"
+
+    def test_intaglio_depth_stored(self):
+        ctx, store, fid = make_ctx()
+        self._run(ctx, fid, ring_size=7, intaglio_depth_mm=0.5, face_height_mm=4.0)
+        doc = json.loads(store["content"])
+        assert doc["features"][0]["intaglio_depth_mm"] == 0.5
+
+    def test_invalid_face_shape_bad_args(self):
+        ctx, _, fid = make_ctx()
+        r = self._run(ctx, fid, ring_size=7, face_shape="round")
+        assert "error" in r
+
+    def test_invalid_shoulder_bad_args(self):
+        ctx, _, fid = make_ctx()
+        r = self._run(ctx, fid, ring_size=7, shoulder_style="prong")
+        assert "error" in r
+
+    def test_intaglio_exceeds_height_bad_args(self):
+        ctx, _, fid = make_ctx()
+        r = self._run(ctx, fid, ring_size=7, intaglio_depth_mm=5.0, face_height_mm=3.0)
+        assert "error" in r
+
+    def test_missing_ring_size_bad_args(self):
+        ctx, _, fid = make_ctx()
+        r = run_tool_sync(
+            run_jewelry_create_signet_ring(
+                ctx, json.dumps({"file_id": str(fid)}).encode()
+            )
+        )
+        assert "error" in r
+
+    def test_non_feature_file_not_found(self):
+        ctx, store, fid = make_ctx()
+        store["kind"] = "sketch"
+        r = self._run(ctx, fid, ring_size=7)
+        assert "error" in r
+
+    def test_spec_required_fields(self):
+        req = set(jewelry_create_signet_ring_spec.input_schema["required"])
+        assert "file_id" in req
+        assert "ring_size" in req
+
+    def test_spec_face_shape_enum(self):
+        props = jewelry_create_signet_ring_spec.input_schema["properties"]
+        assert set(props["face_shape"]["enum"]) == _VALID_SIGNET_FACE_SHAPES
+
+    def test_node_contains_face_dims(self):
+        ctx, store, fid = make_ctx()
+        self._run(ctx, fid, ring_size=7, face_length_mm=14.0, face_width_mm=11.0,
+                  face_height_mm=4.0)
+        doc = json.loads(store["content"])
+        node = doc["features"][0]
+        assert node["face_length_mm"] == 14.0
+        assert node["face_width_mm"] == 11.0
+        assert node["face_height_mm"] == 4.0
+
+
+# ===========================================================================
+# v3 Stacking Band Set
+# ===========================================================================
+
+class TestStackingBandSpec:
+    def test_defaults_valid(self):
+        spec = StackingBandSpec(ring_size=7)
+        id_mm = ring_size_to_diameter("us", 7)
+        d = spec.to_dict(id_mm)
+        assert d["band_count"] == 3
+        assert d["band_width_mm"] == 2.0
+        assert d["thickness_mm"] == 1.4
+        assert d["profile"] == "flat"
+        assert d["include_wishbone"] is False
+
+    def test_band_list_length(self):
+        spec = StackingBandSpec(ring_size=7, band_count=4)
+        id_mm = ring_size_to_diameter("us", 7)
+        d = spec.to_dict(id_mm)
+        assert len(d["bands"]) == 4
+
+    def test_band_offsets_correct(self):
+        """Each band offset = index × (band_width + gap)."""
+        spec = StackingBandSpec(ring_size=7, band_count=3,
+                                band_width_mm=2.0, nest_gap_mm=0.2)
+        id_mm = ring_size_to_diameter("us", 7)
+        d = spec.to_dict(id_mm)
+        pitch = 2.2
+        for i, b in enumerate(d["bands"]):
+            assert abs(b["offset_mm"] - i * pitch) < 0.001
+
+    def test_total_span_formula(self):
+        spec = StackingBandSpec(ring_size=7, band_count=3,
+                                band_width_mm=2.0, nest_gap_mm=0.1)
+        id_mm = ring_size_to_diameter("us", 7)
+        d = spec.to_dict(id_mm)
+        expected = 2.1 * 3 - 0.1
+        assert abs(d["total_span_mm"] - expected) < 0.001
+
+    def test_wishbone_stored(self):
+        spec = StackingBandSpec(ring_size=7, include_wishbone=True,
+                                wishbone_notch_depth_mm=0.9, thickness_mm=1.8)
+        id_mm = ring_size_to_diameter("us", 7)
+        d = spec.to_dict(id_mm)
+        assert d["include_wishbone"] is True
+        assert d["wishbone_notch_depth_mm"] == 0.9
+
+    def test_wishbone_not_set_no_key(self):
+        spec = StackingBandSpec(ring_size=7)
+        id_mm = ring_size_to_diameter("us", 7)
+        d = spec.to_dict(id_mm)
+        assert "wishbone_notch_depth_mm" not in d
+
+    def test_solitaire_node_id_stored(self):
+        spec = StackingBandSpec(ring_size=7, solitaire_node_id="ring_shank-1")
+        id_mm = ring_size_to_diameter("us", 7)
+        d = spec.to_dict(id_mm)
+        assert d["solitaire_node_id"] == "ring_shank-1"
+
+    def test_per_band_profiles_stored(self):
+        profiles = ["flat", "half_round", "knife_edge"]
+        spec = StackingBandSpec(ring_size=7, band_count=3, per_band_profiles=profiles)
+        id_mm = ring_size_to_diameter("us", 7)
+        d = spec.to_dict(id_mm)
+        assert d["per_band_profiles"] == profiles
+        for i, b in enumerate(d["bands"]):
+            assert b["profile"] == profiles[i]
+
+    def test_invalid_band_count_zero_raises(self):
+        spec = StackingBandSpec(ring_size=7, band_count=0)
+        with pytest.raises(ValueError, match="band_count"):
+            spec.validate()
+
+    def test_invalid_band_count_over_raises(self):
+        spec = StackingBandSpec(ring_size=7, band_count=9)
+        with pytest.raises(ValueError, match="band_count"):
+            spec.validate()
+
+    def test_zero_band_width_raises(self):
+        spec = StackingBandSpec(ring_size=7, band_width_mm=0.0)
+        with pytest.raises(ValueError, match="band_width_mm"):
+            spec.validate()
+
+    def test_zero_thickness_raises(self):
+        spec = StackingBandSpec(ring_size=7, thickness_mm=0.0)
+        with pytest.raises(ValueError, match="thickness_mm"):
+            spec.validate()
+
+    def test_invalid_profile_raises(self):
+        spec = StackingBandSpec(ring_size=7, profile="bombe")
+        with pytest.raises(ValueError, match="profile"):
+            spec.validate()
+
+    def test_negative_gap_raises(self):
+        spec = StackingBandSpec(ring_size=7, nest_gap_mm=-0.1)
+        with pytest.raises(ValueError, match="nest_gap_mm"):
+            spec.validate()
+
+    def test_wishbone_zero_notch_depth_raises(self):
+        spec = StackingBandSpec(ring_size=7, include_wishbone=True,
+                                wishbone_notch_depth_mm=0.0)
+        with pytest.raises(ValueError, match="wishbone_notch_depth_mm"):
+            spec.validate()
+
+    def test_wishbone_notch_exceeds_thickness_raises(self):
+        spec = StackingBandSpec(ring_size=7, include_wishbone=True,
+                                thickness_mm=1.4, wishbone_notch_depth_mm=1.5)
+        with pytest.raises(ValueError, match="wishbone_notch_depth_mm"):
+            spec.validate()
+
+    def test_per_band_profiles_wrong_length_raises(self):
+        spec = StackingBandSpec(ring_size=7, band_count=3,
+                                per_band_profiles=["flat", "half_round"])
+        with pytest.raises(ValueError, match="per_band_profiles"):
+            spec.validate()
+
+    def test_per_band_profiles_invalid_profile_raises(self):
+        spec = StackingBandSpec(ring_size=7, band_count=2,
+                                per_band_profiles=["flat", "bombe"])
+        with pytest.raises(ValueError, match="per_band_profiles"):
+            spec.validate()
+
+    def test_all_valid_profiles_accepted(self):
+        id_mm = ring_size_to_diameter("us", 7)
+        for p in _VALID_STACKING_PROFILES:
+            spec = StackingBandSpec(ring_size=7, profile=p)
+            d = spec.to_dict(id_mm)
+            assert d["profile"] == p
+
+
+class TestComputeStackingBandParams:
+    def test_basic_us7(self):
+        p = compute_stacking_band_params(7, "us")
+        assert abs(p["inner_diameter_mm"] - 17.32) < 0.01
+        assert p["band_count"] == 3
+
+    def test_band_count_stored(self):
+        p = compute_stacking_band_params(7, "us", band_count=5)
+        assert p["band_count"] == 5
+        assert len(p["bands"]) == 5
+
+    def test_total_span_correct(self):
+        p = compute_stacking_band_params(7, "us", band_count=3,
+                                          band_width_mm=2.0, nest_gap_mm=0.1)
+        expected = 2.1 * 3 - 0.1
+        assert abs(p["total_span_mm"] - expected) < 0.001
+
+    def test_wishbone_included(self):
+        p = compute_stacking_band_params(7, "us", include_wishbone=True,
+                                          thickness_mm=1.8,
+                                          wishbone_notch_depth_mm=0.8)
+        assert p["include_wishbone"] is True
+        assert p["wishbone_notch_depth_mm"] == 0.8
+
+    def test_outer_diameter(self):
+        p = compute_stacking_band_params(7, "us", thickness_mm=1.4)
+        assert abs(p["outer_diameter_mm"] - (p["inner_diameter_mm"] + 2 * 1.4)) < 0.001
+
+    def test_size_system_stored(self):
+        p = compute_stacking_band_params(7, "us")
+        assert p["size_system"] == "us"
+
+
+class TestStackingBandTool:
+    def _run(self, ctx, fid, **kwargs):
+        args = {"file_id": str(fid), **kwargs}
+        return run_tool_sync(
+            run_jewelry_create_stacking_band_set(ctx, json.dumps(args).encode())
+        )
+
+    def test_basic_accepted(self):
+        ctx, store, fid = make_ctx()
+        r = self._run(ctx, fid, ring_size=7)
+        assert "error" not in r, f"Unexpected error: {r}"
+        assert r["op"] == "stacking_band_set"
+
+    def test_node_id_generated(self):
+        ctx, store, fid = make_ctx()
+        r = self._run(ctx, fid, ring_size=7)
+        assert r["id"].startswith("stacking_band_set-")
+
+    def test_band_count_in_response(self):
+        ctx, store, fid = make_ctx()
+        r = self._run(ctx, fid, ring_size=7, band_count=5)
+        assert r["band_count"] == 5
+
+    def test_total_span_in_response(self):
+        ctx, store, fid = make_ctx()
+        r = self._run(ctx, fid, ring_size=7, band_count=3,
+                      band_width_mm=2.0, nest_gap_mm=0.1)
+        expected = 2.1 * 3 - 0.1
+        assert abs(r["total_span_mm"] - expected) < 0.001
+
+    def test_wishbone_stored(self):
+        ctx, store, fid = make_ctx()
+        self._run(ctx, fid, ring_size=7, include_wishbone=True,
+                  thickness_mm=1.8, wishbone_notch_depth_mm=0.8)
+        doc = json.loads(store["content"])
+        node = doc["features"][0]
+        assert node["include_wishbone"] is True
+        assert node["wishbone_notch_depth_mm"] == 0.8
+
+    def test_solitaire_node_id_stored(self):
+        ctx, store, fid = make_ctx()
+        self._run(ctx, fid, ring_size=7, solitaire_node_id="ring_shank-1")
+        doc = json.loads(store["content"])
+        assert doc["features"][0]["solitaire_node_id"] == "ring_shank-1"
+
+    def test_invalid_profile_bad_args(self):
+        ctx, _, fid = make_ctx()
+        r = self._run(ctx, fid, ring_size=7, profile="bombe")
+        assert "error" in r
+
+    def test_band_count_over_limit_bad_args(self):
+        ctx, _, fid = make_ctx()
+        r = self._run(ctx, fid, ring_size=7, band_count=9)
+        assert "error" in r
+
+    def test_band_count_zero_bad_args(self):
+        ctx, _, fid = make_ctx()
+        r = self._run(ctx, fid, ring_size=7, band_count=0)
+        assert "error" in r
+
+    def test_missing_ring_size_bad_args(self):
+        ctx, _, fid = make_ctx()
+        r = run_tool_sync(
+            run_jewelry_create_stacking_band_set(
+                ctx, json.dumps({"file_id": str(fid)}).encode()
+            )
+        )
+        assert "error" in r
+
+    def test_non_feature_file_not_found(self):
+        ctx, store, fid = make_ctx()
+        store["kind"] = "sketch"
+        r = self._run(ctx, fid, ring_size=7)
+        assert "error" in r
+
+    def test_spec_required_fields(self):
+        req = set(jewelry_create_stacking_band_set_spec.input_schema["required"])
+        assert "file_id" in req
+        assert "ring_size" in req
+
+    def test_spec_profile_enum_subset_valid(self):
+        props = jewelry_create_stacking_band_set_spec.input_schema["properties"]
+        enum_set = set(props["profile"]["enum"])
+        assert enum_set == _VALID_STACKING_PROFILES
+
+    def test_all_valid_profiles_accepted_by_tool(self):
+        for p in _VALID_STACKING_PROFILES:
+            ctx, store, fid = make_ctx()
+            r = self._run(ctx, fid, ring_size=7, profile=p)
+            assert "error" not in r, f"Profile {p!r}: {r}"
+
+    def test_bands_array_in_node(self):
+        ctx, store, fid = make_ctx()
+        self._run(ctx, fid, ring_size=7, band_count=4)
+        doc = json.loads(store["content"])
+        bands = doc["features"][0]["bands"]
+        assert len(bands) == 4
+        for i, b in enumerate(bands):
+            assert b["index"] == i
+
+
+# ===========================================================================
+# v3 Contoured Band
+# ===========================================================================
+
+class TestContouredBandSpec:
+    def test_defaults_valid(self):
+        spec = ContouredBandSpec(ring_size=7)
+        id_mm = ring_size_to_diameter("us", 7)
+        d = spec.to_dict(id_mm)
+        assert d["notch_depth_mm"] == 1.2
+        assert d["notch_width_mm"] == 3.0
+        assert d["match_radius_mm"] == 10.5
+        assert d["contour_style"] == "curved"
+        assert d["profile"] == "flat"
+
+    def test_contour_hints_in_dict(self):
+        spec = ContouredBandSpec(ring_size=7)
+        id_mm = ring_size_to_diameter("us", 7)
+        d = spec.to_dict(id_mm)
+        ch = d["contour_hints"]
+        assert ch["type"] == "curved"
+        assert ch["notch_depth_mm"] == 1.2
+        assert ch["match_radius_mm"] == 10.5
+        assert ch["notch_half_angle_deg"] > 0
+
+    def test_notch_half_angle_formula(self):
+        """notch_half_angle_deg = asin(notch_width/2 / match_radius)."""
+        notch_width = 4.0
+        match_radius = 10.5
+        spec = ContouredBandSpec(ring_size=7, notch_width_mm=notch_width,
+                                 match_radius_mm=match_radius,
+                                 band_width_mm=5.0)
+        id_mm = ring_size_to_diameter("us", 7)
+        d = spec.to_dict(id_mm)
+        expected = math.degrees(math.asin(notch_width / 2.0 / match_radius))
+        assert abs(d["contour_hints"]["notch_half_angle_deg"] - expected) < 0.001
+
+    def test_notched_style(self):
+        spec = ContouredBandSpec(ring_size=7, contour_style="notched")
+        id_mm = ring_size_to_diameter("us", 7)
+        d = spec.to_dict(id_mm)
+        assert d["contour_style"] == "notched"
+        assert d["contour_hints"]["type"] == "notched"
+
+    def test_engagement_ring_node_id_stored(self):
+        spec = ContouredBandSpec(ring_size=7, engagement_ring_node_id="ring_shank-1")
+        id_mm = ring_size_to_diameter("us", 7)
+        d = spec.to_dict(id_mm)
+        assert d["engagement_ring_node_id"] == "ring_shank-1"
+
+    def test_no_engagement_node_no_key(self):
+        spec = ContouredBandSpec(ring_size=7)
+        id_mm = ring_size_to_diameter("us", 7)
+        d = spec.to_dict(id_mm)
+        assert "engagement_ring_node_id" not in d
+
+    def test_zero_notch_depth_raises(self):
+        spec = ContouredBandSpec(ring_size=7, notch_depth_mm=0.0)
+        with pytest.raises(ValueError, match="notch_depth_mm"):
+            spec.validate()
+
+    def test_zero_notch_width_raises(self):
+        spec = ContouredBandSpec(ring_size=7, notch_width_mm=0.0)
+        with pytest.raises(ValueError, match="notch_width_mm"):
+            spec.validate()
+
+    def test_notch_width_exceeds_band_width_raises(self):
+        spec = ContouredBandSpec(ring_size=7, notch_width_mm=5.0, band_width_mm=3.5)
+        with pytest.raises(ValueError, match="notch_width_mm"):
+            spec.validate()
+
+    def test_zero_match_radius_raises(self):
+        spec = ContouredBandSpec(ring_size=7, match_radius_mm=0.0)
+        with pytest.raises(ValueError, match="match_radius_mm"):
+            spec.validate()
+
+    def test_invalid_contour_style_raises(self):
+        spec = ContouredBandSpec(ring_size=7, contour_style="v_notch")
+        with pytest.raises(ValueError, match="contour_style"):
+            spec.validate()
+
+    def test_zero_band_width_raises(self):
+        spec = ContouredBandSpec(ring_size=7, band_width_mm=0.0)
+        with pytest.raises(ValueError, match="band_width_mm"):
+            spec.validate()
+
+    def test_zero_thickness_raises(self):
+        spec = ContouredBandSpec(ring_size=7, thickness_mm=0.0)
+        with pytest.raises(ValueError, match="thickness_mm"):
+            spec.validate()
+
+    def test_notch_depth_exceeds_thickness_raises(self):
+        spec = ContouredBandSpec(ring_size=7, notch_depth_mm=2.0, thickness_mm=1.6)
+        with pytest.raises(ValueError, match="notch_depth_mm"):
+            spec.validate()
+
+    def test_invalid_base_profile_raises(self):
+        spec = ContouredBandSpec(ring_size=7, profile="hammered")
+        with pytest.raises(ValueError, match="profile"):
+            spec.validate()
+
+    def test_invalid_shoulder_style_raises(self):
+        spec = ContouredBandSpec(ring_size=7, shoulder_style="prong")
+        with pytest.raises(ValueError, match="shoulder_style"):
+            spec.validate()
+
+
+class TestComputeContouredBandParams:
+    def test_basic_us7(self):
+        p = compute_contoured_band_params(7, "us")
+        assert abs(p["inner_diameter_mm"] - 17.32) < 0.01
+        assert p["contour_style"] == "curved"
+
+    def test_outer_diameter(self):
+        p = compute_contoured_band_params(7, "us", thickness_mm=1.6)
+        assert abs(p["outer_diameter_mm"] - (p["inner_diameter_mm"] + 2 * 1.6)) < 0.001
+
+    def test_contour_hints_present(self):
+        p = compute_contoured_band_params(7, "us")
+        assert "contour_hints" in p
+        ch = p["contour_hints"]
+        assert ch["type"] == "curved"
+        assert ch["notch_half_angle_deg"] > 0
+
+    def test_all_contour_styles(self):
+        for style in ["curved", "notched"]:
+            p = compute_contoured_band_params(7, "us", contour_style=style)
+            assert p["contour_style"] == style
+
+    def test_all_base_profiles_accepted(self):
+        for pr in ["flat", "half_round", "comfort_fit", "d_shape", "euro"]:
+            p = compute_contoured_band_params(7, "us", profile=pr)
+            assert p["profile"] == pr
+
+    def test_shoulder_hints_present(self):
+        p = compute_contoured_band_params(7, "us", shoulder_style="cathedral")
+        assert "shoulder_hints" in p
+        assert p["shoulder_hints"]["type"] == "cathedral"
+
+    def test_notched_style_stored(self):
+        p = compute_contoured_band_params(7, "us", contour_style="notched")
+        assert p["contour_hints"]["type"] == "notched"
+
+    def test_size_system_stored(self):
+        p = compute_contoured_band_params(7, "us")
+        assert p["size_system"] == "us"
+
+
+class TestContouredBandTool:
+    def _run(self, ctx, fid, **kwargs):
+        args = {"file_id": str(fid), **kwargs}
+        return run_tool_sync(
+            run_jewelry_create_contoured_band(ctx, json.dumps(args).encode())
+        )
+
+    def test_basic_accepted(self):
+        ctx, store, fid = make_ctx()
+        r = self._run(ctx, fid, ring_size=7)
+        assert "error" not in r, f"Unexpected error: {r}"
+        assert r["op"] == "contoured_band"
+
+    def test_node_id_generated(self):
+        ctx, store, fid = make_ctx()
+        r = self._run(ctx, fid, ring_size=7)
+        assert r["id"].startswith("contoured_band-")
+
+    def test_all_contour_styles_accepted(self):
+        for style in ["curved", "notched"]:
+            ctx, store, fid = make_ctx()
+            r = self._run(ctx, fid, ring_size=7, contour_style=style)
+            assert "error" not in r, f"Style {style!r}: {r}"
+
+    def test_all_base_profiles_accepted(self):
+        for pr in ["flat", "half_round", "comfort_fit", "d_shape", "euro"]:
+            ctx, store, fid = make_ctx()
+            r = self._run(ctx, fid, ring_size=7, profile=pr)
+            assert "error" not in r, f"Profile {pr!r}: {r}"
+
+    def test_engagement_ring_node_id_stored(self):
+        ctx, store, fid = make_ctx()
+        self._run(ctx, fid, ring_size=7, engagement_ring_node_id="ring_shank-1")
+        doc = json.loads(store["content"])
+        assert doc["features"][0]["engagement_ring_node_id"] == "ring_shank-1"
+
+    def test_contour_hints_in_node(self):
+        ctx, store, fid = make_ctx()
+        self._run(ctx, fid, ring_size=7)
+        doc = json.loads(store["content"])
+        node = doc["features"][0]
+        assert "contour_hints" in node
+        assert node["contour_hints"]["notch_half_angle_deg"] > 0
+
+    def test_invalid_contour_style_bad_args(self):
+        ctx, _, fid = make_ctx()
+        r = self._run(ctx, fid, ring_size=7, contour_style="v_notch")
+        assert "error" in r
+
+    def test_invalid_profile_bad_args(self):
+        ctx, _, fid = make_ctx()
+        r = self._run(ctx, fid, ring_size=7, profile="hammered")
+        assert "error" in r
+
+    def test_notch_exceeds_thickness_bad_args(self):
+        ctx, _, fid = make_ctx()
+        r = self._run(ctx, fid, ring_size=7, notch_depth_mm=3.0, thickness_mm=1.6)
+        assert "error" in r
+
+    def test_notch_width_exceeds_band_width_bad_args(self):
+        ctx, _, fid = make_ctx()
+        r = self._run(ctx, fid, ring_size=7, notch_width_mm=5.0, band_width_mm=3.5)
+        assert "error" in r
+
+    def test_missing_ring_size_bad_args(self):
+        ctx, _, fid = make_ctx()
+        r = run_tool_sync(
+            run_jewelry_create_contoured_band(
+                ctx, json.dumps({"file_id": str(fid)}).encode()
+            )
+        )
+        assert "error" in r
+
+    def test_non_feature_file_not_found(self):
+        ctx, store, fid = make_ctx()
+        store["kind"] = "sketch"
+        r = self._run(ctx, fid, ring_size=7)
+        assert "error" in r
+
+    def test_second_node_increments_id(self):
+        ctx, store, fid = make_ctx()
+        self._run(ctx, fid, ring_size=7)
+        r2 = self._run(ctx, fid, ring_size=7)
+        assert r2["id"] == "contoured_band-2"
+
+    def test_spec_required_fields(self):
+        req = set(jewelry_create_contoured_band_spec.input_schema["required"])
+        assert "file_id" in req
+        assert "ring_size" in req
+
+    def test_spec_contour_style_enum(self):
+        props = jewelry_create_contoured_band_spec.input_schema["properties"]
+        assert set(props["contour_style"]["enum"]) == {"curved", "notched"}
+
+
+# ===========================================================================
+# v3 Cross-type tests
+# ===========================================================================
+
+class TestV3NodeIdIsolation:
+    """Verify that each v3 op type gets its own ID sequence."""
+
+    def test_different_op_ids_dont_collide(self):
+        """eternity_band and signet_ring each start at -1."""
+        ctx, store, fid = make_ctx()
+        args_e = {"file_id": str(fid), "ring_size": 7}
+        run_tool_sync(run_jewelry_create_eternity_band(ctx, json.dumps(args_e).encode()))
+        args_s = {"file_id": str(fid), "ring_size": 7}
+        run_tool_sync(run_jewelry_create_signet_ring(ctx, json.dumps(args_s).encode()))
+        doc = json.loads(store["content"])
+        ids = [f["id"] for f in doc["features"]]
+        assert "eternity_band-1" in ids
+        assert "signet_ring-1" in ids
+
+    def test_mixed_v2_v3_ids_independent(self):
+        """ring_shank and eternity_band have independent sequences."""
+        ctx, store, fid = make_ctx()
+        r1 = run_tool_sync(run_jewelry_create_ring_shank(
+            ctx, json.dumps({"file_id": str(fid), "ring_size": 7}).encode()
+        ))
+        r2 = run_tool_sync(run_jewelry_create_eternity_band(
+            ctx, json.dumps({"file_id": str(fid), "ring_size": 7}).encode()
+        ))
+        assert r1["id"] == "ring_shank-1"
+        assert r2["id"] == "eternity_band-1"
+
+
+class TestV3SizeSystems:
+    """All v3 tools accept all ring-size systems."""
+
+    def _check_tool(self, runner, ctx, fid, ring_size, system, **kwargs):
+        args = {"file_id": str(fid), "ring_size": ring_size, "system": system, **kwargs}
+        return run_tool_sync(runner(ctx, json.dumps(args).encode()))
+
+    def test_eternity_uk_size(self):
+        ctx, store, fid = make_ctx()
+        r = self._check_tool(run_jewelry_create_eternity_band, ctx, fid, "N", "uk")
+        assert "error" not in r
+
+    def test_signet_eu_size(self):
+        ctx, store, fid = make_ctx()
+        r = self._check_tool(run_jewelry_create_signet_ring, ctx, fid, 54, "eu")
+        assert "error" not in r
+
+    def test_stacking_jp_size(self):
+        ctx, store, fid = make_ctx()
+        r = self._check_tool(run_jewelry_create_stacking_band_set, ctx, fid, 13, "jp")
+        assert "error" not in r
+
+    def test_contoured_au_size(self):
+        ctx, store, fid = make_ctx()
+        r = self._check_tool(run_jewelry_create_contoured_band, ctx, fid, "P", "au")
+        assert "error" not in r
 
 
 @pytestmark_occ

@@ -2,12 +2,16 @@
 
 ## Overview
 
-Two LLM tools for jewelry ring-band CAD:
+Six LLM tools for jewelry ring-band CAD:
 
 | Tool | Purpose |
 |------|---------|
 | `jewelry_ring_size_to_diameter` | Convert ring size ↔ inner diameter (mm) |
 | `jewelry_create_ring_shank` | Append a `ring_shank` node to a `.feature` file |
+| `jewelry_create_eternity_band` | Append an `eternity_band` node — full/half/three-quarter stone band |
+| `jewelry_create_signet_ring` | Append a `signet_ring` node — engravable seal face + shank |
+| `jewelry_create_stacking_band_set` | Append a `stacking_band_set` node — N thin stacking bands + optional wishbone |
+| `jewelry_create_contoured_band` | Append a `contoured_band` node — curved/notched top to hug an engagement ring |
 
 ---
 
@@ -415,3 +419,239 @@ Response:
 | width_profile | 2–10 floats, each in (0, 1] |
 
 Error code `BAD_ARGS` is returned for all constraint violations.
+
+---
+
+## v3 Ring Types
+
+### `jewelry_create_eternity_band` — eternity / anniversary band
+
+Full-circle (or half / three-quarter) band set with equal stones around the circumference.
+Stone count is auto-derived from ring circumference and stone pitch unless explicitly set.
+
+**Node op**: `eternity_band`
+
+```json
+{
+  "file_id": "<uuid>",
+  "ring_size": 7,
+  "system": "us",
+  "stone_diameter_mm": 2.0,
+  "coverage": "full",
+  "setting_style": "channel",
+  "thickness_mm": 1.2,
+  "stone_spacing_mm": 0.1
+}
+```
+
+**Response fields**: `stone_count`, `stone_count_auto`, `coverage_deg`, `arc_length_mm`,
+`stone_pitch_mm`, `band_width_mm`, `setting_style`.
+
+#### Coverage options
+
+| `coverage` | Arc | Degrees |
+|-----------|-----|---------|
+| `full` | 360° (all around) | 360 |
+| `three_quarter` | ¾ of the band | 270 |
+| `half` | Top half only | 180 |
+
+#### Setting styles
+
+| `setting_style` | Description |
+|----------------|-------------|
+| `channel` | Stones sit in a channel cut between two metal rails |
+| `shared_prong` | Adjacent stones share common prong claws |
+| `pave` | Micro-pavé; stones packed close with minimal metal visibility |
+
+#### Stone-count auto-derivation
+
+```
+arc_length = π × inner_diameter × coverage_fraction
+pitch      = stone_diameter + stone_spacing
+stone_count = round(arc_length / pitch)   # ≥ 1
+```
+
+#### Validation rules
+
+| Parameter | Constraint |
+|-----------|-----------|
+| `stone_diameter_mm` | > 0 mm |
+| `coverage` | full / half / three_quarter |
+| `setting_style` | channel / shared_prong / pave |
+| `band_width_mm` | ≥ stone_diameter_mm (auto = stone_diam + 0.6 mm) |
+| `thickness_mm` | > 0 mm (default 1.2) |
+| `stone_spacing_mm` | ≥ 0 mm (default 0.1) |
+| `stone_count` | ≥ 1 if specified; else auto |
+
+---
+
+### `jewelry_create_signet_ring` — signet ring
+
+Flat / oval / cushion engravable seal face fused to the ring shank. Intaglio/relief
+engraving depth is a geometry hint for the occtWorker.
+
+**Node op**: `signet_ring`
+
+```json
+{
+  "file_id": "<uuid>",
+  "ring_size": 7,
+  "system": "us",
+  "face_shape": "oval",
+  "face_length_mm": 12.0,
+  "face_width_mm": 10.0,
+  "face_height_mm": 3.0,
+  "intaglio_depth_mm": 0.5,
+  "engraving": { "text": "WM", "depth_mm": 0.3 },
+  "shoulder_style": "plain"
+}
+```
+
+**Response fields**: `face_shape`, `face_length_mm`, `face_width_mm`, `face_height_mm`,
+`face_area_mm2`, `intaglio_depth_mm`, `shoulder_hints`, optional `engraving`.
+
+#### Face shapes
+
+| `face_shape` | Description | Area formula |
+|-------------|-------------|--------------|
+| `flat` | Rectangle / flat plate | length × width |
+| `oval` | Ellipse | π × (length/2) × (width/2) |
+| `cushion` | Rounded square/rectangle | length × width × 0.9 |
+
+#### Validation rules
+
+| Parameter | Constraint |
+|-----------|-----------|
+| `face_shape` | flat / oval / cushion |
+| `face_length_mm` | > 0 mm (default 12.0) |
+| `face_width_mm` | > 0 mm (default 10.0) |
+| `face_height_mm` | > 0 mm (default 3.0) |
+| `intaglio_depth_mm` | ≥ 0; < face_height_mm (default 0) |
+| `band_width_mm` | > 0 mm (default 4.0) |
+| `thickness_mm` | > 0 mm (default 1.8) |
+| `shoulder_style` | plain / cathedral / split_shank / bypass |
+| `engraving` | same constraints as ring_shank engraving |
+
+---
+
+### `jewelry_create_stacking_band_set` — stacking / nesting set
+
+Generates N thin stacking bands that sit side-by-side on the finger with a controlled
+nest gap. Optionally includes a contour/wishbone band that nests against a solitaire.
+
+**Node op**: `stacking_band_set`
+
+```json
+{
+  "file_id": "<uuid>",
+  "ring_size": 7,
+  "system": "us",
+  "band_count": 3,
+  "band_width_mm": 2.0,
+  "thickness_mm": 1.4,
+  "profile": "flat",
+  "nest_gap_mm": 0.1,
+  "include_wishbone": true,
+  "wishbone_notch_depth_mm": 0.8,
+  "solitaire_node_id": "ring_shank-1"
+}
+```
+
+**Response fields**: `band_count`, `band_width_mm`, `thickness_mm`, `total_span_mm`,
+`bands` (array with per-band index, profile, offset_mm), `include_wishbone`,
+optional `wishbone_notch_depth_mm`, `solitaire_node_id`, `per_band_profiles`.
+
+#### Total span formula
+
+```
+pitch      = band_width + nest_gap
+total_span = pitch × band_count − nest_gap
+```
+
+#### Valid stacking profiles
+
+`flat`, `half_round`, `knife_edge`, `euro`, `comfort_fit`, `d_shape`,
+`cigar_band`, `concave`.
+
+#### Validation rules
+
+| Parameter | Constraint |
+|-----------|-----------|
+| `band_count` | 1–8 (default 3) |
+| `band_width_mm` | > 0 mm (default 2.0) |
+| `thickness_mm` | > 0 mm (default 1.4) |
+| `profile` | see valid stacking profiles above |
+| `nest_gap_mm` | ≥ 0 mm (default 0.1) |
+| `wishbone_notch_depth_mm` | > 0; < thickness_mm (required when include_wishbone=true) |
+| `per_band_profiles` | list of band_count valid stacking profiles |
+
+---
+
+### `jewelry_create_contoured_band` — contoured / shadow band
+
+A wedding / shadow band whose top profile is cut to hug the underside of an engagement ring.
+`contour_style="curved"` produces a smooth concave arc; `"notched"` produces a V/U notch.
+
+**Node op**: `contoured_band`
+
+```json
+{
+  "file_id": "<uuid>",
+  "ring_size": 7,
+  "system": "us",
+  "notch_depth_mm": 1.2,
+  "notch_width_mm": 3.0,
+  "match_radius_mm": 10.5,
+  "contour_style": "curved",
+  "band_width_mm": 3.5,
+  "thickness_mm": 1.6,
+  "profile": "flat",
+  "shoulder_style": "plain",
+  "engagement_ring_node_id": "ring_shank-1"
+}
+```
+
+**Response fields**: `inner_diameter_mm`, `outer_diameter_mm`, `notch_depth_mm`,
+`notch_width_mm`, `match_radius_mm`, `contour_style`, `contour_hints` (with
+`notch_half_angle_deg` = arc half-angle of the notch at match radius),
+`shoulder_hints`, optional `engagement_ring_node_id`.
+
+#### Contour hints sub-object
+
+```json
+{
+  "contour_hints": {
+    "type": "curved",
+    "notch_depth_mm": 1.2,
+    "notch_width_mm": 3.0,
+    "match_radius_mm": 10.5,
+    "notch_half_angle_deg": 8.21
+  }
+}
+```
+
+`notch_half_angle_deg = asin(notch_width / 2 / match_radius)` — used by the
+occtWorker to construct the concave cutter arc.
+
+#### Matching an engagement ring
+
+Set `match_radius_mm` = engagement ring `outer_diameter_mm / 2` for a perfect shadow fit.
+Supply `engagement_ring_node_id` to let the occtWorker resolve the exact profile from
+the referenced node.
+
+#### Valid base profiles for contoured band
+
+`flat`, `half_round`, `comfort_fit`, `d_shape`, `euro`.
+
+#### Validation rules
+
+| Parameter | Constraint |
+|-----------|-----------|
+| `notch_depth_mm` | > 0; < thickness_mm (default 1.2) |
+| `notch_width_mm` | > 0; ≤ band_width_mm (default 3.0) |
+| `match_radius_mm` | > 0 mm (default 10.5) |
+| `contour_style` | curved / notched (default curved) |
+| `band_width_mm` | > 0 mm (default 3.5) |
+| `thickness_mm` | > 0 mm (default 1.6) |
+| `profile` | see valid base profiles above |
+| `shoulder_style` | plain / cathedral / split_shank / bypass |

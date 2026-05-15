@@ -1,44 +1,61 @@
 // PublishButton — toolbar drop-in for the editor.
 //
-// Caller hands us a `project` (id + name + visibility, at minimum). On
-// click, we open a tiny modal collecting title and description, POST to
-// /api/workshop/publish, then navigate the user into the freshly
-// minted listing. If the project is already listed, the same button
-// flips to "Unpublish" and shows a confirm dialog instead.
+// T-44: updated publish flow:
+//   - README preview / edit with "Regenerate with AI" action.
+//   - Gallery upload is now OPTIONAL (not required to publish).
+//   - On publish, the backend AI-generates a README by default; the author
+//     can view and edit the draft before submitting.
 //
-// We discover the existing listing by trying GET /api/workshop/list
-// for the current user's projects on mount — but that would be wasteful
-// for the editor toolbar. Instead, the parent passes the (optional)
-// `existingSlug` if it already knows about it, otherwise we just
-// optimistically treat the project as un-listed and let the publish
-// endpoint handle idempotency.
+// Caller hands us a `project` (id + name + visibility, at minimum). On
+// click, we open a modal collecting title, description, and an optional
+// README override, then POST to /api/workshop/publish. If the project is
+// already listed, the button shows "Unpublish" instead.
 
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertCircle, Globe, Loader2, RotateCcw, X } from 'lucide-react'
+import {
+  AlertCircle,
+  BookOpen,
+  ChevronDown,
+  ChevronUp,
+  Globe,
+  Loader2,
+  RefreshCw,
+  RotateCcw,
+  Sparkles,
+  X,
+} from 'lucide-react'
 import Button from '../components/Button.jsx'
 import Input, { Textarea } from '../components/Input.jsx'
 import WorkshopImageGallery from '../components/WorkshopImageGallery.jsx'
 import { api, ApiError } from '../lib/api.js'
 import { workshop } from './api.js'
 
-// PublishModal accepts an optional `captureSnapshot` async function from the
-// Editor. When provided, "Refresh thumbnail" calls it to re-snap the current
-// view and upload to projects/:pid/thumbnail.
+// PublishModal — collect title/description/readme, then POST /workshop/publish.
+// captureSnapshot: optional async () => Blob|null (from Editor currentViewRef).
 function PublishModal({ open, onClose, project, onPublished, captureSnapshot }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [readmeDraft, setReadmeDraft] = useState(null)   // null = use AI default
+  const [readmeEditing, setReadmeEditing] = useState(false)
+  const [readmeExpanded, setReadmeExpanded] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
   const [thumbRefreshing, setThumbRefreshing] = useState(false)
   const [thumbToast, setThumbToast] = useState(null)
+  const [generating, setGenerating] = useState(false)
+  const [generateError, setGenerateError] = useState(null)
   const toastTimerRef = useRef(null)
 
   useEffect(() => {
     if (!open) return
     setTitle(project?.name || '')
     setDescription(project?.description || '')
+    setReadmeDraft(null)
+    setReadmeEditing(false)
+    setReadmeExpanded(false)
     setError(null)
+    setGenerateError(null)
     setSubmitting(false)
     setThumbToast(null)
   }, [open, project?.id, project?.name, project?.description])
@@ -61,6 +78,26 @@ function PublishModal({ open, onClose, project, onPublished, captureSnapshot }) 
     }
   }
 
+  // Fetch an AI-generated README preview before final publish.
+  // We call /workshop/regenerate-readme on the project — this requires the
+  // project to already exist (it always does by the time Publish is clicked).
+  // The pre-generated draft is stored locally in readmeDraft; on submit it is
+  // sent as the explicit readme= override so the backend doesn't regenerate.
+  const onPreviewReadme = async () => {
+    if (!project?.id || generating) return
+    setGenerating(true)
+    setGenerateError(null)
+    try {
+      const res = await workshop.regenerateReadme(project.id)
+      setReadmeDraft(res.readme || '')
+      setReadmeExpanded(true)
+    } catch (err) {
+      setGenerateError(err instanceof ApiError ? err.message : 'Could not generate README.')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
   if (!open) return null
 
   const onSubmit = async (e) => {
@@ -73,6 +110,9 @@ function PublishModal({ open, onClose, project, onPublished, captureSnapshot }) 
         projectId: project.id,
         title: title.trim() || project?.name || '',
         description: description.trim(),
+        // If the user edited or previewed the README, send it explicitly so the
+        // backend skips re-generation. Otherwise let the backend AI-generate it.
+        ...(readmeDraft != null ? { readme: readmeDraft, generateReadme: false } : {}),
       })
       onPublished(res)
     } catch (err) {
@@ -82,6 +122,7 @@ function PublishModal({ open, onClose, project, onPublished, captureSnapshot }) 
   }
 
   const willBePrivate = project?.visibility === 'private'
+  const hasReadmeDraft = readmeDraft != null
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center px-4">
@@ -122,11 +163,91 @@ function PublishModal({ open, onClose, project, onPublished, captureSnapshot }) 
           />
           <Textarea
             label="Description"
-            rows={4}
+            rows={3}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="What is it? Who's it for?"
           />
+
+          {/* ---- README section ---- */}
+          <div className="flex flex-col gap-2 rounded-lg border border-ink-800 bg-ink-950/40 p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-medium text-ink-200">
+                <BookOpen size={13} className="text-kerf-300" />
+                README
+                <span className="font-mono text-[10px] text-kerf-300 bg-kerf-300/10 border border-kerf-300/20 rounded px-1.5 py-0.5">
+                  AI-generated on publish
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {hasReadmeDraft && (
+                  <button
+                    type="button"
+                    onClick={() => setReadmeEditing((v) => !v)}
+                    className="text-xs text-ink-400 hover:text-ink-200 flex items-center gap-1"
+                  >
+                    {readmeEditing ? 'Done editing' : 'Edit'}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={onPreviewReadme}
+                  disabled={generating}
+                  className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded bg-ink-800 border border-ink-700 text-ink-200 hover:bg-ink-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {generating
+                    ? <><Loader2 size={11} className="animate-spin" /> Generating…</>
+                    : hasReadmeDraft
+                      ? <><RefreshCw size={11} /> Regenerate</>
+                      : <><Sparkles size={11} /> Preview README</>}
+                </button>
+                {hasReadmeDraft && (
+                  <button
+                    type="button"
+                    onClick={() => setReadmeExpanded((v) => !v)}
+                    className="text-ink-400 hover:text-ink-200"
+                    aria-label={readmeExpanded ? 'Collapse README' : 'Expand README'}
+                  >
+                    {readmeExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {generateError && (
+              <div className="flex items-start gap-2 rounded border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-[11px] text-red-200">
+                <AlertCircle size={12} className="mt-0.5 shrink-0" />
+                <span>{generateError}</span>
+              </div>
+            )}
+
+            {!hasReadmeDraft && (
+              <p className="text-[11px] text-ink-500">
+                A README will be auto-generated from your project parameters, BOM, and parts on publish.
+                Click &ldquo;Preview README&rdquo; to see and edit the draft first.
+              </p>
+            )}
+
+            {hasReadmeDraft && readmeExpanded && (
+              readmeEditing ? (
+                <Textarea
+                  rows={12}
+                  value={readmeDraft}
+                  onChange={(e) => setReadmeDraft(e.target.value)}
+                  className="font-mono text-xs"
+                  aria-label="README editor"
+                />
+              ) : (
+                <div className="max-h-48 overflow-y-auto rounded bg-ink-900 border border-ink-800 p-3">
+                  <pre className="text-[11px] text-ink-300 whitespace-pre-wrap font-mono leading-relaxed">
+                    {readmeDraft}
+                  </pre>
+                </div>
+              )
+            )}
+          </div>
+
+          {/* ---- Thumbnail & gallery (gallery is optional) ---- */}
           {project?.id && (
             <div className="pt-1 flex flex-col gap-3">
               {captureSnapshot && (
@@ -146,9 +267,16 @@ function PublishModal({ open, onClose, project, onPublished, captureSnapshot }) 
                   )}
                 </div>
               )}
-              <WorkshopImageGallery projectId={project.id} />
+              {/* Gallery is optional — no "required" label or validation */}
+              <div>
+                <p className="text-xs text-ink-400 mb-2">
+                  Gallery images <span className="text-ink-600">(optional)</span>
+                </p>
+                <WorkshopImageGallery projectId={project.id} />
+              </div>
             </div>
           )}
+
           {error && (
             <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
               <AlertCircle size={14} className="mt-0.5 shrink-0" />
@@ -199,10 +327,11 @@ export function PublishButton({ project, existingSlug, onChange, size = 'sm', va
   if (!project?.id) return null
 
   const onPublished = (res) => {
-    setSlug(res.slug)
+    const newSlug = res.slug || res.project_id
+    setSlug(newSlug)
     setOpen(false)
-    onChange?.({ slug: res.slug, listed: true })
-    navigate(`/workshop/${res.slug}`)
+    onChange?.({ slug: newSlug, listed: true })
+    navigate(`/workshop/${newSlug}`)
   }
 
   const onUnpublish = async () => {

@@ -1,5 +1,9 @@
 // WorkshopListing — public detail page at /workshop/:slug.
 //
+// T-43: README is now the primary content surface.  The auto-rendered hero
+// cover (cover_url) drives the hero image; the gallery carousel is an
+// optional secondary section shown only when images exist.
+//
 // Anyone can view. Logged-in callers get a working like button and a
 // fork button; the latter pops a tiny confirm dialog and on success
 // navigates the user into their fresh copy under /projects/:id.
@@ -9,16 +13,21 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import {
   AlertCircle,
   ArrowLeft,
+  BookOpen,
   ChevronLeft,
   ChevronRight,
   GitFork,
   Heart,
+  Images,
   Loader2,
+  RefreshCw,
   Sparkles,
   FileText,
   Clock,
   Star,
 } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import Layout from '../components/Layout.jsx'
 import Card from '../components/Card.jsx'
 import Button from '../components/Button.jsx'
@@ -26,6 +35,7 @@ import Input from '../components/Input.jsx'
 import { api, ApiError } from '../lib/api.js'
 import { useAuth } from '../store/auth.js'
 import { workshop } from './api.js'
+import { ALLOWED_ELEMENTS, urlTransformer } from '../lib/markdownSanitize.js'
 
 function bytesHuman(n) {
   const v = Number(n)
@@ -128,36 +138,18 @@ function ForkDialog({ open, onClose, listing, onForked }) {
   )
 }
 
-// ImageCarousel — gallery viewer for project_workshop_images. Falls
-// back to the single thumbnail_url when no gallery images exist so the
-// detail page never renders a blank hero. Cycles via prev/next + thumbnail
-// strip; arrow keys are intentionally not wired (we share the focus
-// surface with the rest of the page).
-//
-// Slide ordering: pinned-primary first, then sort_order (already enforced
-// by the list endpoint's ORDER BY is_primary desc, sort_order asc),
-// then the auto-captured fallback appended only when no gallery exists.
-function ImageCarousel({ slides, fallbackUrl }) {
-  // The list endpoint already orders primary first. When there are gallery
-  // images we never show the auto-thumbnail (primary gallery or first slide
-  // covers it). Only fall back to the auto-thumbnail when the gallery is empty.
-  const list = slides && slides.length > 0
-    ? slides
-    : (fallbackUrl ? [{ url: fallbackUrl, caption: null, _fallback: true }] : [])
+// ImageCarousel — optional secondary gallery. Shown only when gallery images
+// exist. Falls back gracefully to nothing when empty (the hero cover handles
+// the primary visual on the listing page).
+function ImageCarousel({ slides }) {
   const [idx, setIdx] = useState(0)
 
   useEffect(() => { setIdx(0) }, [slides?.length])
 
-  if (list.length === 0) {
-    return (
-      <div className="aspect-[16/10] w-full grid place-items-center bg-gradient-to-br from-ink-800 via-ink-850 to-ink-900">
-        <Sparkles size={36} className="text-kerf-300/60" />
-      </div>
-    )
-  }
+  if (!slides || slides.length === 0) return null
 
-  const active = list[Math.min(idx, list.length - 1)]
-  const go = (delta) => setIdx((i) => (i + delta + list.length) % list.length)
+  const active = slides[Math.min(idx, slides.length - 1)]
+  const go = (delta) => setIdx((i) => (i + delta + slides.length) % slides.length)
 
   return (
     <div className="flex flex-col">
@@ -167,7 +159,7 @@ function ImageCarousel({ slides, fallbackUrl }) {
           alt={active.caption || ''}
           className="w-full h-full object-cover"
         />
-        {list.length > 1 && (
+        {slides.length > 1 && (
           <>
             <button
               type="button"
@@ -186,11 +178,10 @@ function ImageCarousel({ slides, fallbackUrl }) {
               <ChevronRight size={18} />
             </button>
             <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-ink-950/70 text-[10px] font-mono text-ink-200">
-              {idx + 1} / {list.length}
+              {idx + 1} / {slides.length}
             </div>
           </>
         )}
-        {/* Primary badge — shown on the active slide when it's pinned */}
         {active.is_primary && (
           <div className="absolute top-2 left-2 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-400/20 border border-amber-400/40 text-[10px] font-mono text-amber-300">
             <Star size={9} className="fill-current" /> Primary
@@ -202,9 +193,9 @@ function ImageCarousel({ slides, fallbackUrl }) {
           </div>
         )}
       </div>
-      {list.length > 1 && (
+      {slides.length > 1 && (
         <div className="flex gap-1.5 overflow-x-auto px-2 py-2 bg-ink-900/60">
-          {list.map((s, i) => (
+          {slides.map((s, i) => (
             <button
               key={s.id || s.url}
               type="button"
@@ -229,6 +220,38 @@ function ImageCarousel({ slides, fallbackUrl }) {
   )
 }
 
+// WorkshopReadmeBody — XSS-safe markdown renderer for the Workshop README.
+// Uses react-markdown with a strict element allowlist and URL transformer.
+// No raw HTML passthrough (rehype-raw is intentionally NOT used).
+function WorkshopReadmeBody({ markdown }) {
+  if (!markdown || !markdown.trim()) {
+    return (
+      <p className="text-sm text-ink-500 italic">No README provided.</p>
+    )
+  }
+  return (
+    <div
+      className="prose prose-invert prose-sm max-w-none
+        prose-headings:font-display prose-headings:tracking-tight
+        prose-h1:text-2xl prose-h2:text-lg prose-h3:text-base
+        prose-code:bg-ink-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-[12px]
+        prose-pre:bg-ink-950 prose-pre:border prose-pre:border-ink-800
+        prose-a:text-kerf-300 prose-a:no-underline hover:prose-a:underline
+        prose-blockquote:border-kerf-300/30 prose-blockquote:text-ink-400
+        prose-table:text-xs"
+      data-testid="workshop-readme-body"
+    >
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        allowedElements={ALLOWED_ELEMENTS}
+        urlTransform={urlTransformer}
+      >
+        {markdown}
+      </ReactMarkdown>
+    </div>
+  )
+}
+
 export function WorkshopListing() {
   const { slug } = useParams()
   const navigate = useNavigate()
@@ -241,6 +264,9 @@ export function WorkshopListing() {
   const [likeBusy, setLikeBusy] = useState(false)
   const [forkOpen, setForkOpen] = useState(false)
   const [galleryImages, setGalleryImages] = useState([])
+  const [activeTab, setActiveTab] = useState('readme')
+  const [regenerating, setRegenerating] = useState(false)
+  const [regenError, setRegenError] = useState(null)
 
   useEffect(() => {
     let cancelled = false
@@ -252,8 +278,6 @@ export function WorkshopListing() {
         if (cancelled) return
         setListing(resp)
         setError(null)
-        // Fetch the multi-image gallery in parallel — failures here are
-        // non-fatal (the carousel falls back to the single thumbnail).
         const pid = resp?.project_id
         if (pid) {
           api.workshopImages.list(pid).then((g) => {
@@ -314,11 +338,28 @@ export function WorkshopListing() {
     }
   }
 
+  const onRegenerateReadme = async () => {
+    if (!isOwner || !listing?.project_id || regenerating) return
+    setRegenerating(true)
+    setRegenError(null)
+    try {
+      const res = await workshop.regenerateReadme(listing.project_id)
+      setListing((l) => ({ ...l, readme: res.readme, readme_generated_at: res.readme_generated_at }))
+    } catch (err) {
+      setRegenError(err instanceof ApiError ? err.message : 'Regeneration failed.')
+    } finally {
+      setRegenerating(false)
+    }
+  }
+
   const author = listing?.author
   const authorInitials = useMemo(
     () => (author?.name || '?').slice(0, 2).toUpperCase(),
     [author?.name],
   )
+
+  const hasGallery = galleryImages.length > 0
+  const heroUrl = listing?.cover_url || listing?.thumbnail_url
 
   return (
     <Layout>
@@ -353,23 +394,99 @@ export function WorkshopListing() {
 
       {listing && !loading && !error && (
         <div className="grid lg:grid-cols-3 gap-6">
+          {/* ---- Main column ---- */}
           <div className="lg:col-span-2 flex flex-col gap-6">
-            <Card className="overflow-hidden">
-              <ImageCarousel slides={galleryImages} fallbackUrl={listing.thumbnail_url} />
-            </Card>
+            {/* Hero cover — auto-rendered or auto-captured thumbnail fallback */}
+            {heroUrl && (
+              <Card className="overflow-hidden">
+                <div className="aspect-[16/9] bg-ink-800">
+                  <img
+                    src={heroUrl}
+                    alt={listing.title}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </Card>
+            )}
 
-            <Card className="p-6">
-              <h1 className="font-display text-2xl sm:text-3xl font-semibold tracking-tight">
-                {listing.title}
-              </h1>
-              <div className="mt-4 prose prose-invert max-w-none text-sm text-ink-200 whitespace-pre-wrap">
-                {listing.description?.trim() || (
-                  <p className="text-ink-500 italic">No description provided.</p>
+            {/* Tab bar: README (primary) | Gallery (optional, hidden when empty) */}
+            <div className="flex items-center gap-1 border-b border-ink-800">
+              <button
+                type="button"
+                onClick={() => setActiveTab('readme')}
+                className={[
+                  'inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors',
+                  activeTab === 'readme'
+                    ? 'border-kerf-300 text-kerf-300'
+                    : 'border-transparent text-ink-400 hover:text-ink-200',
+                ].join(' ')}
+              >
+                <BookOpen size={13} /> README
+              </button>
+              {hasGallery && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('gallery')}
+                  className={[
+                    'inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors',
+                    activeTab === 'gallery'
+                      ? 'border-kerf-300 text-kerf-300'
+                      : 'border-transparent text-ink-400 hover:text-ink-200',
+                  ].join(' ')}
+                >
+                  <Images size={13} /> Gallery ({galleryImages.length})
+                </button>
+              )}
+            </div>
+
+            {/* README panel */}
+            {activeTab === 'readme' && (
+              <Card className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h1 className="font-display text-2xl sm:text-3xl font-semibold tracking-tight">
+                    {listing.title}
+                  </h1>
+                  {isOwner && (
+                    <button
+                      type="button"
+                      onClick={onRegenerateReadme}
+                      disabled={regenerating}
+                      title="Regenerate README with AI"
+                      className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded bg-ink-800 border border-ink-700 text-ink-300 hover:text-ink-100 hover:bg-ink-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {regenerating
+                        ? <><Loader2 size={12} className="animate-spin" /> Generating…</>
+                        : <><RefreshCw size={12} /> Regenerate</>}
+                    </button>
+                  )}
+                </div>
+
+                {regenError && (
+                  <div className="mb-4 flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                    <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                    <span>{regenError}</span>
+                  </div>
                 )}
-              </div>
-            </Card>
+
+                <WorkshopReadmeBody markdown={listing.readme} />
+
+                {listing.readme_generated_at && (
+                  <p className="mt-4 text-[10px] font-mono text-ink-600">
+                    AI-generated · {relativeTime(listing.readme_generated_at)}
+                  </p>
+                )}
+              </Card>
+            )}
+
+            {/* Gallery panel — optional secondary section */}
+            {activeTab === 'gallery' && hasGallery && (
+              <Card className="overflow-hidden">
+                <ImageCarousel slides={galleryImages} />
+              </Card>
+            )}
           </div>
 
+          {/* ---- Sidebar ---- */}
           <div className="flex flex-col gap-4">
             <Card className="p-5">
               <div className="flex items-center gap-3">
@@ -390,9 +507,6 @@ export function WorkshopListing() {
                   </p>
                   <p className="text-sm font-medium text-ink-100 truncate flex items-center gap-1.5">
                     <span className="truncate">{author?.name || 'unknown'}</span>
-                    {/* Library Phase 3 — verified-publisher badge.
-                        Field is only present when the API payload
-                        carries it; rendering is a no-op otherwise. */}
                     {author?.is_verified_publisher && (
                       <span
                         title="Verified publisher"

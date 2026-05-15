@@ -81,6 +81,9 @@ function ListingCard({ listing, signedIn, onLikeToggle, busyLike }) {
   // hint at the project's domain. Falls through silently for older
   // listings that have no tags yet.
   const tags = Array.isArray(listing.tags) ? listing.tags.slice(0, 2) : []
+  // T-43: cover_url (auto-rendered hero) takes priority over thumbnail_url
+  // (auto-captured editor snapshot); both fall back to the placeholder icon.
+  const cardImageUrl = listing.cover_url || listing.thumbnail_url
   return (
     <Card className="group overflow-hidden hover:border-ink-700 transition-colors">
       <Link
@@ -88,9 +91,9 @@ function ListingCard({ listing, signedIn, onLikeToggle, busyLike }) {
         className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/40 rounded-xl"
       >
         <div className="relative aspect-[4/3] bg-ink-800 overflow-hidden">
-          {listing.thumbnail_url ? (
+          {cardImageUrl ? (
             <img
-              src={listing.thumbnail_url}
+              src={cardImageUrl}
               alt={listing.title}
               className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
               loading="lazy"

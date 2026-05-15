@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Landing from './routes/Landing.jsx'
+import JewelryDomainPage from './routes/domains/Jewelry.jsx'
 import Pricing from './routes/Pricing.jsx'
 import Roadmap from './routes/Roadmap.jsx'
 import DocsHome from './routes/Docs/index.jsx'
@@ -121,6 +122,7 @@ export default function App() {
       {cloudEnabled && (
         <Route path="/workshop/:slug" element={<WorkshopListing />} />
       )}
+      <Route path="/jewelry" element={<JewelryDomainPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route path="/profile" element={<Profile />} />

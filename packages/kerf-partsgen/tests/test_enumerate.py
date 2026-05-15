@@ -84,6 +84,58 @@ def test_reference_generators_enumerate_clean(tmp_path):
         assert fr.passed == len(fr.variants) >= 10
 
 
+@needs_kernel
+def test_t34_fastener_families_enumerate_clean(tmp_path):
+    """T-34: ISO 4762 socket-head cap screw, ISO 4032 hex nut and DIN 125
+    plain washer each enumerate their full SIZES table with zero failures
+    and produce a non-empty STEP artifact per size."""
+    expected_sizes = {
+        "iso_4762_socket_head_cap_screw": 10,
+        "iso_4032_hex_nut": 10,
+        "din_125_plain_washer": 15,
+    }
+    for fam, min_sizes in expected_sizes.items():
+        fr = enumerate_family(fam, str(tmp_path), domain="mechanical")
+        assert fr.error == "", f"{fam}: {fr.error}"
+        assert fr.failed == 0, [
+            (v.size, v.reasons) for v in fr.variants if v.status == "FAIL"
+        ]
+        assert fr.passed == len(fr.variants) >= min_sizes, (
+            f"{fam}: expected >= {min_sizes} variants, got {fr.passed}"
+        )
+        # Every passing variant must have produced a non-empty STEP file.
+        for v in fr.variants:
+            step = os.path.join(v.artifact_dir, "part.step")
+            assert os.path.isfile(step) and os.path.getsize(step) > 0, (
+                f"{fam}/{v.size}: STEP artifact missing or empty"
+            )
+
+
+@needs_kernel
+def test_t34_sizes_contract():
+    """Each T-34 generator satisfies the loader contract and carries the
+    expected number of unique, named sizes (hermetic — no kernel needed for
+    the loader half; the @needs_kernel is for the build() call below)."""
+    from kerf_partsgen.loader import load_family
+
+    checks = [
+        ("iso_4762_socket_head_cap_screw", 10),
+        ("iso_4032_hex_nut", 10),
+        ("din_125_plain_washer", 15),
+    ]
+    for fam_id, expected_count in checks:
+        g = load_family(fam_id)
+        assert len(g.sizes) == expected_count, (
+            f"{fam_id}: expected {expected_count} sizes, got {len(g.sizes)}"
+        )
+        sizes = [r["size"] for r in g.sizes]
+        assert len(sizes) == len(set(sizes)), f"{fam_id}: duplicate size keys"
+        # Spot-check: every row has params and expect sub-dicts.
+        for row in g.sizes:
+            assert "params" in row, f"{fam_id}/{row['size']}: missing params"
+            assert "expect" in row, f"{fam_id}/{row['size']}: missing expect"
+
+
 def test_gate_flags_invalid_solid_without_kernel():
     """Gate logic is pure: a non-valid GeneratedPart FAILs regardless of
     kernel availability (keeps this assertion hermetic everywhere)."""

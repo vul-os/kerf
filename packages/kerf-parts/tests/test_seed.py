@@ -38,6 +38,43 @@ def test_write_notice_into_gitignored_generated_dir(tmp_path):
     assert "v0.4.1" in text
 
 
+def test_notice_regenerated_from_embedded_attribution(tmp_path):
+    """The side NOTICE file must be rendered from the SAME structured
+    attribution blocks embedded in the parts (single source of truth) so the
+    two can never diverge.
+    """
+    from kerf_parts.model import KerfPart
+
+    part = KerfPart(name="R", category="electronic")
+    part.metadata = {
+        "attribution": {
+            "source_project": "kicad-symbols",
+            "source_url": "https://gitlab.com/kicad/libraries/kicad-symbols.git",
+            "upstream_commit": "deadbeefcafe",
+            "license": "CC-BY-SA-4.0 WITH KiCad-Library-Exception",
+            "original_author": "Ada Lovelace <ada@analytical.engine>",
+            "contributors": ["Ada Lovelace <ada@analytical.engine>"],
+        },
+        "attribution_text": "Part from kicad-symbols ...",
+    }
+    generated = tmp_path / GENERATED_DIRNAME
+    out = write_notice(generated, SRCS, [part])
+    text = out.read_text(encoding="utf-8")
+    # The per-part section came straight from the embedded block.
+    assert "Per-part original authorship" in text
+    assert "Ada Lovelace <ada@analytical.engine>" in text
+    assert "deadbeefcafe" in text
+    assert "NOT redistributed by Kerf" in text
+
+
+def test_write_notice_without_parts_still_renders(tmp_path):
+    # Scaffold-only / pre-conversion runs: manifest summary only, no crash.
+    out = write_notice(tmp_path / GENERATED_DIRNAME, SRCS)
+    text = out.read_text(encoding="utf-8")
+    assert "kicad-symbols" in text
+    assert "Per-part original authorship" not in text
+
+
 def test_convert_sources_skips_missing_cache(tmp_path):
     logs = []
     parts = convert_sources(SRCS, tmp_path, log=logs.append)

@@ -93,6 +93,55 @@ def test_to_part_doc_is_native_part_json(kiutils_available):
     assert doc["schematic_symbol"]["entry_name"] == "R"
 
 
+def test_every_emitted_part_has_non_empty_attribution(kiutils_available):
+    """The key requirement: every part the KiCad adapter emits against the
+    real fixtures carries a non-empty embedded ``attribution`` block with at
+    least original_author + source_url. The fixtures dir is NOT its own git
+    clone (it lives inside the Kerf repo), so the provenance chain MUST fall
+    back to the manifest rather than misattributing to the enclosing repo —
+    but it is still never blank.
+    """
+    _require(kiutils_available)
+    parts = adapt(SRC, FIXTURES)
+    assert parts
+    required = {
+        "source_project", "source_url", "upstream_commit", "license",
+        "original_author", "contributors", "source_file", "retrieved_at",
+    }
+    for p in parts:
+        a = p.metadata.get("attribution")
+        assert a, f"{p.name}: missing attribution block"
+        assert required <= set(a), f"{p.name}: attribution missing {required - set(a)}"
+        assert a["original_author"], f"{p.name}: blank original_author is a bug"
+        assert a["source_url"], f"{p.name}: blank source_url is a bug"
+        assert a["source_project"] == "kicad-symbols"
+        assert isinstance(a["contributors"], list)
+        assert p.metadata.get("attribution_text"), f"{p.name}: no attribution_text"
+        # fixtures aren't their own clone -> manifest fallback, never the
+        # Kerf repo's authorship.
+        assert a["author_source"] == "manifest-fallback"
+        assert a["source_url"] == SRC.git_url
+        # source_file points at the real originating upstream path.
+        if p.schematic_symbol is not None:
+            assert a["source_file"].endswith(".kicad_sym")
+        if p.pcb_footprint is not None:
+            assert a["source_file"].endswith(".kicad_mod")
+        # round-trips into the canonical .part JSON
+        doc = p.to_part_doc()
+        assert doc["metadata"]["attribution"]["original_author"]
+
+
+def test_in_file_generator_recorded_as_extra_signal(kiutils_available):
+    _require(kiutils_available)
+    parts = adapt(SRC, FIXTURES)
+    sym = next(p for p in parts if p.schematic_symbol is not None)
+    meta = sym.metadata["attribution"].get("in_file_metadata") or {}
+    # KiCad fixtures carry a (generator ...) token; it's recorded but is
+    # NEVER the author.
+    assert meta.get("generator")
+    assert sym.metadata["attribution"]["original_author"] != meta["generator"]
+
+
 def test_conversion_is_deterministic(kiutils_available):
     _require(kiutils_available)
     h1 = sorted(p.ensure_hash() for p in adapt(SRC, FIXTURES))

@@ -90,11 +90,52 @@ manifest change.
 | Manifest + pinning + per-source ref override | **done** |
 | Fetcher (clone/refresh/skip, `--only/--heavy/--cache-dir/--ref`) | **done** |
 | KiCad symbols + footprints adapter | **done** — reuses `kerf_imports.kicad_library`, no reparsing |
+| Automatic embedded per-part attribution (provenance) | **done** — see below |
 | Seed into system `Parts Library` project (idempotent, hash-incremental) | **done** |
-| Gitignored attribution NOTICE | **done** |
+| Gitignored attribution NOTICE (regenerated from the embedded data) | **done** |
 | `kicad-packages3D` (3D bodies) | intentionally no-op at seed time (refs only); fetch wired |
 | `bolts` adapter | **scaffold** — fetch wired, conversion is a documented TODO |
 | `freecad-library` adapter | **scaffold** — fetch + file discovery wired; conversion reuses `kerf_imports.freecad` (TODO) |
+
+## Automatic attribution (provenance)
+
+Every part Kerf ingests **automatically states its original author** —
+derived from the cloned upstream git repo, never typed by hand. A structured
+`attribution` block is embedded in **every** emitted part's `kind='part'`
+JSON `metadata` (so it travels with the part into Workshop / library / BOM),
+alongside a one-line human `attribution_text`. The single reusable extractor
+is [`provenance.py`](./src/kerf_parts/provenance.py); every adapter (real and
+scaffold) goes through it — no adapter parses `git log` itself and no part
+can be emitted without provenance.
+
+`attribution` fields:
+
+| field | source |
+| --- | --- |
+| `source_project` / `manifest_url` / `upstream_ref` / `license` / `license_url` | the `parts-sources.toml` manifest |
+| `source_url` | the clone's `git remote get-url origin` (reconciled with the manifest) |
+| `upstream_commit` | the clone's real `git rev-parse HEAD` (falls back to the pinned ref) |
+| `source_file` | the exact upstream file the part derives from, relative to the clone |
+| `original_author` / `original_author_date` | the file's **creating** commit (`git log --diff-filter=A --follow -- <file>`) |
+| `contributors` | every distinct `%an <%ae>` that touched that file, deduped |
+| `last_author` / `last_author_date` | the most recent commit for that file |
+| `author_source` | which rung of the fallback chain produced the author |
+| `history_truncated` | true if a shallow clone couldn't be deepened |
+| `in_file_metadata` | extra signal only (e.g. KiCad `(generator ...)`) — never the sole author |
+| `retrieved_at` | UTC ISO-8601 timestamp of this run |
+
+**Fallback chain** (a blank author is a bug): per-file git author →
+repo `AUTHORS`/`CONTRIBUTORS`/`LICENSE` copyright holder → manifest
+`source_project` + `license` with `original_author: "unknown — see source
+repository"`.
+
+**Shallow-clone caveat:** the fetcher clones `--depth 1`, which would
+truncate per-file history and wrongly blame the pinned-ref committer as the
+"original author". Before scoping `git log` to a file, the provenance helper
+runs `git fetch --unshallow` (falling back to repeated `--deepen`). If the
+repo genuinely can't be deepened (offline), the per-file result is flagged
+`history_truncated` and the chain falls back to repo/manifest authorship
+rather than emitting a misleading author.
 
 ## Tests
 

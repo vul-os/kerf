@@ -53,6 +53,11 @@ import { parseSketch } from './sketchSolver.js'
 import {
   buildFaceNamesForExtrude,
   buildFaceNamesForRevolve,
+  buildFaceNamesForPattern,
+  buildFaceNamesForMirror,
+  buildFaceNamesForSweep,
+  buildFaceNamesForLoft,
+  traceBooleanResult,
   nameOpOutput,
 } from './faceNaming.js'
 import { resolveFaceRef } from './faceRef.js'
@@ -2210,6 +2215,107 @@ function makePushPullNamer(oc, builder, inputShape, nodeId, faceNormal, prevFace
   }
 }
 
+/**
+ * Build a namer closure for boolean ops (Cut / Fuse / Common).
+ *
+ * Uses traceBooleanResult from faceNaming.js which queries Modified/Generated
+ * callbacks on the builder to inherit parent face names from operands A and B.
+ *
+ * `faceNamesA` and `faceNamesB` are the face-name maps for operand shapes at
+ * the time of the boolean.  They are snapshot-captured to avoid mutation.
+ *
+ * @param {object}   oc
+ * @param {object}   builder     - BRepAlgoAPI_Cut_3 / Fuse_3 / Common_3 after Build()
+ * @param {object}   shapeA      - TopoDS_Shape for operand A (before the op)
+ * @param {object}   shapeB      - TopoDS_Shape for operand B (before the op)
+ * @param {string}   nodeId
+ * @param {string}   opKind      - 'cut' | 'fuse' | 'common'
+ * @param {Record<number,string>} faceNamesA - faceIndex → name for A
+ * @param {Record<number,string>} faceNamesB - faceIndex → name for B
+ * @returns {(oc_:object, shape:object) => Record<string,string>}
+ */
+function makeBooleanNamer(oc, builder, shapeA, shapeB, nodeId, opKind, faceNamesA, faceNamesB) {
+  const snapA = { ...faceNamesA }
+  const snapB = { ...faceNamesB }
+  // Build a combined input shape from A+B so extractModifiedMap has a single
+  // "input shape" to walk.  We use a BRep_Builder compound to collect both.
+  // This mirrors how OCCT reports Modified/Generated against the individual
+  // operands on the concrete BRepAlgoAPI_* classes.
+  //
+  // Since extractModifiedMap walks a single inputShape, we need to either
+  // (a) call it twice (once per operand) and merge, or (b) build a compound.
+  // We choose (a) — simpler and avoids OCCT compound construction here.
+  const aCount = Object.keys(snapA).length
+
+  return (_oc, outputShape) => {
+    try {
+      // Build two ModifiedMaps — one per operand — then merge them.
+      const modMapA = extractModifiedMap(_oc, builder, shapeA, outputShape)
+      const modMapB = extractModifiedMap(_oc, builder, shapeB, outputShape)
+
+      // Offset B's input indices by aCount so they don't collide with A's.
+      const mergedModified = { ...modMapA.modified }
+      for (const [bIdxStr, outIndices] of Object.entries(modMapB.modified || {})) {
+        mergedModified[String(Number(bIdxStr) + aCount)] = outIndices
+      }
+
+      // generated: union of both sets (output faces that are genuinely new).
+      const generatedSet = new Set([
+        ...(modMapA.generated || []),
+        ...(modMapB.generated || []),
+      ])
+      // A face cannot be both generated and modified — keep only truly new ones.
+      for (const outIndices of Object.values(mergedModified)) {
+        for (const oi of (outIndices || [])) generatedSet.delete(oi)
+      }
+
+      const mergedMap = {
+        modified: mergedModified,
+        generated: [...generatedSet],
+        deletedInputs: new Set([
+          ...(modMapA.deletedInputs || []),
+          ...([...(modMapB.deletedInputs || [])].map((i) => i + aCount)),
+        ]),
+      }
+
+      const newFaces = extractFaceDescriptors(_oc, outputShape, {})
+      return traceBooleanResult(nodeId, opKind, snapA, snapB, newFaces, mergedMap)
+    } catch {
+      return {}
+    }
+  }
+}
+
+/**
+ * Build a namer closure for sweep1 / sweep2 ops (T6).
+ *
+ * @param {string}   nodeId
+ * @returns {(oc_:object, shape:object) => Record<string,string>}
+ */
+function makeSweepNamer(nodeId) {
+  return (_oc, shape) => {
+    try {
+      const descs = extractFaceDescriptors(_oc, shape, {})
+      return buildFaceNamesForSweep(nodeId, descs, null, null)
+    } catch { return {} }
+  }
+}
+
+/**
+ * Build a namer closure for loft ops (T6).
+ *
+ * @param {string}   nodeId
+ * @returns {(oc_:object, shape:object) => Record<string,string>}
+ */
+function makeLoftNamer(nodeId) {
+  return (_oc, shape) => {
+    try {
+      const descs = extractFaceDescriptors(_oc, shape, {})
+      return buildFaceNamesForLoft(nodeId, descs, null, null)
+    } catch { return {} }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // NURBS booleans v1 — T2: to_solid worker handler
 // ---------------------------------------------------------------------------
@@ -2339,7 +2445,7 @@ function _isEmptyShape(oc, shape) {
  * Node schema:
  *   { op: "boolean", id, target_a_id, target_b_id, kind: "cut"|"fuse"|"common" }
  */
-function opBoolean(oc, _prev, node, _sketches, tracker, bodyMap) {
+function opBoolean(oc, _prev, node, _sketches, tracker, bodyMap, builderRef) {
   const aId = node.target_a_id
   const bId = node.target_b_id
   if (!aId) throw new Error('boolean: target_a_id is required')
@@ -2398,6 +2504,8 @@ function opBoolean(oc, _prev, node, _sketches, tracker, bodyMap) {
       `boolean: ${node.kind} produced an empty result (operands may not intersect)`
     )
   }
+  // T3: expose the builder for the face-naming namer closure.
+  if (builderRef) builderRef.builder = algo
   return result
 }
 
@@ -3040,6 +3148,10 @@ function evaluateTree(oc, tree, sketches) {
   // opBoolean and opToSolid can look up arbitrary earlier results by id.
   // Entries are ALIASES of the in-flight `current`; never double-free them.
   const bodyMap = {}
+  // bodyFaceNamers: { [nodeId]: (oc, shape) => Record<string,string> }
+  // Parallel to bodyMap — stores the face namer for each body so boolean ops
+  // (T3) can resolve operand face names at namer-call time.
+  const bodyFaceNamers = {}
 
   // Helper: push the current shape as a mesh entry, including faceNames.
   function pushCurrentMesh(bodyId) {
@@ -3166,9 +3278,54 @@ function evaluateTree(oc, tree, sketches) {
         }
         case 'hole':         next = opHole(oc, current, node, sketches, tracker); break
         case 'hole_pattern': next = opHolePattern(oc, current, node, sketches, tracker); break
-        case 'linear_pattern': next = opLinearPattern(oc, current, node, sketches, tracker); break
-        case 'polar_pattern':  next = opPolarPattern(oc, current, node, sketches, tracker); break
-        case 'mirror_pattern': next = opMirrorPattern(oc, current, node, sketches, tracker); break
+        case 'linear_pattern': {
+          // T4: propagate seed face names to each instance with index prefix.
+          let linPatSeedNames = {}
+          try { if (currentFaceNamer) linPatSeedNames = currentFaceNamer(oc, current) || {} } catch { /* */ }
+          const linPatNodeId = node.id || node.op
+          const linPatCount = Math.max(1, Math.floor(Number(node.count) || 1))
+          const linPatSeedFaceCount = Object.keys(linPatSeedNames).length
+          const linPatSeedSnap = { ...linPatSeedNames }
+          next = opLinearPattern(oc, current, node, sketches, tracker)
+          currentFaceNamer = (_oc, shape) => {
+            try {
+              const descs = extractFaceDescriptors(_oc, shape, {})
+              return buildFaceNamesForPattern(linPatNodeId, linPatCount, linPatSeedSnap, descs, linPatSeedFaceCount)
+            } catch { return {} }
+          }
+          break
+        }
+        case 'polar_pattern': {
+          let polPatSeedNames = {}
+          try { if (currentFaceNamer) polPatSeedNames = currentFaceNamer(oc, current) || {} } catch { /* */ }
+          const polPatNodeId = node.id || node.op
+          const polPatCount = Math.max(1, Math.floor(Number(node.count) || 1))
+          const polPatSeedFaceCount = Object.keys(polPatSeedNames).length
+          const polPatSeedSnap = { ...polPatSeedNames }
+          next = opPolarPattern(oc, current, node, sketches, tracker)
+          currentFaceNamer = (_oc, shape) => {
+            try {
+              const descs = extractFaceDescriptors(_oc, shape, {})
+              return buildFaceNamesForPattern(polPatNodeId, polPatCount, polPatSeedSnap, descs, polPatSeedFaceCount)
+            } catch { return {} }
+          }
+          break
+        }
+        case 'mirror_pattern': {
+          let mirPatSeedNames = {}
+          try { if (currentFaceNamer) mirPatSeedNames = currentFaceNamer(oc, current) || {} } catch { /* */ }
+          const mirPatNodeId = node.id || node.op
+          const mirPatSeedFaceCount = Object.keys(mirPatSeedNames).length
+          const mirPatSeedSnap = { ...mirPatSeedNames }
+          next = opMirrorPattern(oc, current, node, sketches, tracker)
+          currentFaceNamer = (_oc, shape) => {
+            try {
+              const descs = extractFaceDescriptors(_oc, shape, {})
+              return buildFaceNamesForMirror(mirPatNodeId, mirPatSeedSnap, descs, mirPatSeedFaceCount)
+            } catch { return {} }
+          }
+          break
+        }
         case 'push_pull': {
           const ppNodeId = node.id || node.op
           let ppPrevNames = {}
@@ -3194,24 +3351,27 @@ function evaluateTree(oc, tree, sketches) {
           }
           break
         }
-        case 'sweep1':
+        case 'sweep1': {
           if (current) {
             pushCurrentMesh(`body-${meshes.length}`)
             cleanupShape(oc, current)
             current = null
           }
           next = opSweep1(oc, null, node, sketches, tracker)
-          currentFaceNamer = null  // sweep face names deferred to T1.5
+          // T6: sweep face naming (start_cap / end_cap / swept).
+          currentFaceNamer = makeSweepNamer(node.id || node.op)
           break
-        case 'sweep2':
+        }
+        case 'sweep2': {
           if (current) {
             pushCurrentMesh(`body-${meshes.length}`)
             cleanupShape(oc, current)
             current = null
           }
           next = opSweep2(oc, null, node, sketches, tracker)
-          currentFaceNamer = null
+          currentFaceNamer = makeSweepNamer(node.id || node.op)
           break
+        }
         case 'network_srf':
           if (current) {
             pushCurrentMesh(`body-${meshes.length}`)
@@ -3233,15 +3393,17 @@ function evaluateTree(oc, tree, sketches) {
           next = opBlendSrf(oc, current, node, sketches, tracker)
           currentFaceNamer = null
           break
-        case 'loft':
+        case 'loft': {
           if (current) {
             pushCurrentMesh(`body-${meshes.length}`)
             cleanupShape(oc, current)
             current = null
           }
           next = opLoft(oc, null, node, sketches, tracker)
-          currentFaceNamer = null
+          // T6: loft face naming (start_cap / end_cap / lofted).
+          currentFaceNamer = makeLoftNamer(node.id || node.op)
           break
+        }
         case 'variable_radius_fillet':
           next = opVariableRadiusFillet(oc, current, node, sketches, tracker)
           break
@@ -3259,8 +3421,32 @@ function evaluateTree(oc, tree, sketches) {
             cleanupShape(oc, current)
             current = null
           }
-          next = opBoolean(oc, null, node, sketches, tracker, bodyMap)
-          currentFaceNamer = null
+          // T3: boolean face naming — resolve operand names from bodyMap namers.
+          const boolNodeId = node.id || node.op
+          const boolKind = node.kind || 'cut'
+          const boolShapeA = bodyMap[node.target_a_id]
+          const boolShapeB = bodyMap[node.target_b_id]
+          let boolNamesA = {}, boolNamesB = {}
+          const boolRef = {}
+          next = opBoolean(oc, null, node, sketches, tracker, bodyMap, boolRef)
+          // Resolve operand face names from their respective namers if available.
+          // bodyFaceNamers is maintained below.
+          try {
+            if (bodyFaceNamers[node.target_a_id] && boolShapeA) {
+              boolNamesA = bodyFaceNamers[node.target_a_id](oc, boolShapeA) || {}
+            }
+            if (bodyFaceNamers[node.target_b_id] && boolShapeB) {
+              boolNamesB = bodyFaceNamers[node.target_b_id](oc, boolShapeB) || {}
+            }
+          } catch { /* silently degrade */ }
+          if (boolRef.builder && boolShapeA && boolShapeB) {
+            currentFaceNamer = makeBooleanNamer(
+              oc, boolRef.builder, boolShapeA, boolShapeB,
+              boolNodeId, boolKind, boolNamesA, boolNamesB,
+            )
+          } else {
+            currentFaceNamer = null
+          }
           break
         }
         case 'surface_boolean': {
@@ -3328,7 +3514,11 @@ function evaluateTree(oc, tree, sketches) {
     currentTrack = next
     // Populate bodyMap so later ops (boolean, to_solid-with-target) can look
     // up this node's result by id. Stored as alias — never delete here.
-    if (node.id && next) bodyMap[node.id] = next
+    if (node.id && next) {
+      bodyMap[node.id] = next
+      // T3: also store the current namer so boolean ops can resolve face names.
+      if (currentFaceNamer) bodyFaceNamers[node.id] = currentFaceNamer
+    }
   }
   if (current) {
     pushCurrentMesh(`body-${meshes.length}`)
@@ -3359,6 +3549,8 @@ async function evaluateToFinalShape(oc, tree, sketches) {
   let currentFaceNamer = null
   // bodyMap mirrors evaluateTree's map so opBoolean can resolve operands by id.
   const bodyMap = {}
+  // bodyFaceNamers: T3 — stores face namer per body so boolean ops can resolve operand names.
+  const bodyFaceNamers = {}
   for (const raw of tree || []) {
     let _faceNames = {}
     if (current && currentFaceNamer) {
@@ -3456,9 +3648,53 @@ async function evaluateToFinalShape(oc, tree, sketches) {
         }
         case 'hole':         next = opHole(oc, current, node, sketches, tracker); break
         case 'hole_pattern': next = opHolePattern(oc, current, node, sketches, tracker); break
-        case 'linear_pattern': next = opLinearPattern(oc, current, node, sketches, tracker); break
-        case 'polar_pattern':  next = opPolarPattern(oc, current, node, sketches, tracker); break
-        case 'mirror_pattern': next = opMirrorPattern(oc, current, node, sketches, tracker); break
+        case 'linear_pattern': {
+          let linPatSeedNames2 = {}
+          try { if (currentFaceNamer) linPatSeedNames2 = currentFaceNamer(oc, current) || {} } catch { /* */ }
+          const linPatNodeId2 = node.id || node.op
+          const linPatCount2 = Math.max(1, Math.floor(Number(node.count) || 1))
+          const linPatSeedFaceCount2 = Object.keys(linPatSeedNames2).length
+          const linPatSeedSnap2 = { ...linPatSeedNames2 }
+          next = opLinearPattern(oc, current, node, sketches, tracker)
+          currentFaceNamer = (_oc, shape) => {
+            try {
+              const descs = extractFaceDescriptors(_oc, shape, {})
+              return buildFaceNamesForPattern(linPatNodeId2, linPatCount2, linPatSeedSnap2, descs, linPatSeedFaceCount2)
+            } catch { return {} }
+          }
+          break
+        }
+        case 'polar_pattern': {
+          let polPatSeedNames2 = {}
+          try { if (currentFaceNamer) polPatSeedNames2 = currentFaceNamer(oc, current) || {} } catch { /* */ }
+          const polPatNodeId2 = node.id || node.op
+          const polPatCount2 = Math.max(1, Math.floor(Number(node.count) || 1))
+          const polPatSeedFaceCount2 = Object.keys(polPatSeedNames2).length
+          const polPatSeedSnap2 = { ...polPatSeedNames2 }
+          next = opPolarPattern(oc, current, node, sketches, tracker)
+          currentFaceNamer = (_oc, shape) => {
+            try {
+              const descs = extractFaceDescriptors(_oc, shape, {})
+              return buildFaceNamesForPattern(polPatNodeId2, polPatCount2, polPatSeedSnap2, descs, polPatSeedFaceCount2)
+            } catch { return {} }
+          }
+          break
+        }
+        case 'mirror_pattern': {
+          let mirPatSeedNames2 = {}
+          try { if (currentFaceNamer) mirPatSeedNames2 = currentFaceNamer(oc, current) || {} } catch { /* */ }
+          const mirPatNodeId2 = node.id || node.op
+          const mirPatSeedFaceCount2 = Object.keys(mirPatSeedNames2).length
+          const mirPatSeedSnap2 = { ...mirPatSeedNames2 }
+          next = opMirrorPattern(oc, current, node, sketches, tracker)
+          currentFaceNamer = (_oc, shape) => {
+            try {
+              const descs = extractFaceDescriptors(_oc, shape, {})
+              return buildFaceNamesForMirror(mirPatNodeId2, mirPatSeedSnap2, descs, mirPatSeedFaceCount2)
+            } catch { return {} }
+          }
+          break
+        }
         case 'push_pull': {
           const ppNodeId2 = node.id || node.op
           let ppPrevNames2 = {}
@@ -3488,13 +3724,13 @@ async function evaluateToFinalShape(oc, tree, sketches) {
           if (current) cleanupShape(oc, current)
           current = null
           next = opSweep1(oc, null, node, sketches, tracker)
-          currentFaceNamer = null  // sweep face names deferred to T1.5
+          currentFaceNamer = makeSweepNamer(node.id || node.op)
           break
         case 'sweep2':
           if (current) cleanupShape(oc, current)
           current = null
           next = opSweep2(oc, null, node, sketches, tracker)
-          currentFaceNamer = null
+          currentFaceNamer = makeSweepNamer(node.id || node.op)
           break
         case 'network_srf':
           if (current) cleanupShape(oc, current)
@@ -3510,18 +3746,40 @@ async function evaluateToFinalShape(oc, tree, sketches) {
           if (current) cleanupShape(oc, current)
           current = null
           next = opLoft(oc, null, node, sketches, tracker)
-          currentFaceNamer = null
+          currentFaceNamer = makeLoftNamer(node.id || node.op)
           break
         case 'variable_radius_fillet':
           next = opVariableRadiusFillet(oc, current, node, sketches, tracker); break
         case 'to_solid':
           next = opToSolid(oc, current, node, sketches, tracker); break
-        case 'boolean':
+        case 'boolean': {
           if (current) cleanupShape(oc, current)
           current = null
-          next = opBoolean(oc, null, node, sketches, tracker, bodyMap)
-          currentFaceNamer = null
+          const boolNodeId2 = node.id || node.op
+          const boolKind2 = node.kind || 'cut'
+          const boolShapeA2 = bodyMap[node.target_a_id]
+          const boolShapeB2 = bodyMap[node.target_b_id]
+          let boolNamesA2 = {}, boolNamesB2 = {}
+          const boolRef2 = {}
+          next = opBoolean(oc, null, node, sketches, tracker, bodyMap, boolRef2)
+          try {
+            if (bodyFaceNamers[node.target_a_id] && boolShapeA2) {
+              boolNamesA2 = bodyFaceNamers[node.target_a_id](oc, boolShapeA2) || {}
+            }
+            if (bodyFaceNamers[node.target_b_id] && boolShapeB2) {
+              boolNamesB2 = bodyFaceNamers[node.target_b_id](oc, boolShapeB2) || {}
+            }
+          } catch { /* */ }
+          if (boolRef2.builder && boolShapeA2 && boolShapeB2) {
+            currentFaceNamer = makeBooleanNamer(
+              oc, boolRef2.builder, boolShapeA2, boolShapeB2,
+              boolNodeId2, boolKind2, boolNamesA2, boolNamesB2,
+            )
+          } else {
+            currentFaceNamer = null
+          }
           break
+        }
         case 'surface_boolean':
           if (current) cleanupShape(oc, current)
           current = null
@@ -3555,7 +3813,10 @@ async function evaluateToFinalShape(oc, tree, sketches) {
     if (current && current !== next) cleanupShape(oc, current)
     current = next
     // Populate bodyMap for subsequent ops that reference this node by id.
-    if (node.id && next) bodyMap[node.id] = next
+    if (node.id && next) {
+      bodyMap[node.id] = next
+      if (currentFaceNamer) bodyFaceNamers[node.id] = currentFaceNamer
+    }
   }
   freeAll(tracker)
   return { shape: current, faceNamer: currentFaceNamer }

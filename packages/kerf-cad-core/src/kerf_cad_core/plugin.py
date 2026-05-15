@@ -33,6 +33,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.jewelry.ring",
     "kerf_cad_core.jewelry.tool_metal_cost",
     "kerf_cad_core.jewelry.chain",
+    "kerf_cad_core.jewelry.findings",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

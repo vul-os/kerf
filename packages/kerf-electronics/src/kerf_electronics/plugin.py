@@ -124,6 +124,7 @@ def _register_tools(ctx, provides: list) -> None:
         "kerf_electronics.tools.bom_cost",
         "kerf_electronics.tools.flex_stackup",
         "kerf_electronics.tools.eye",
+        "kerf_electronics.tools.thermal",
     ]
 
     for module_path in tool_modules:

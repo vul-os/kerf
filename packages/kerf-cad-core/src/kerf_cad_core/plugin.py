@@ -69,6 +69,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.hvac.tools",
     "kerf_cad_core.turning.tools",
     "kerf_cad_core.steelconn.tools",
+    "kerf_cad_core.pressvessel.tools",
+    "kerf_cad_core.fasteners.tools",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

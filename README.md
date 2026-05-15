@@ -161,7 +161,8 @@ Full schema: see [`kerf.example.toml`](./kerf.example.toml).
 | 📋 NURBS Phase 4 — surface-direct booleans + trim-by-curve + matchSrf + G3 | in flight |
 | 📋 PLC structured text (`.plc.st` via IEC 61131-3 + OpenPLC) | next |
 | 📋 Slicing — cross-section + CNC layered + 3D-print G-code | next |
-| 📋 SubD modelling / Grasshopper node graph / Quad remesher | planned |
+| ✅ Quad remesher (Instant Meshes, optional binary) | shipped |
+| 📋 SubD modelling / Grasshopper node graph | planned |
 
 The full ROADMAP — shipped, in-flight, next, planned — is in [ROADMAP.md](./ROADMAP.md).
 

@@ -176,6 +176,10 @@ export default function AssemblyEditor({
       [`${side}_component_id`]: ref.component_id,
       [`${side}_feature`]: ref.feature,
       [`${side}_feature_id`]: ref.feature_id,
+      // T5: dual-write persistent face/edge name alongside the legacy integer id.
+      // feature_name is undefined when not yet available (old mates); the form
+      // handles that gracefully by falling back to feature_id for display.
+      [`${side}_feature_name`]: ref.feature_name ?? ref.feature_id,
     }))
     setPickingFor(null)
     onMatePickConsumed?.()

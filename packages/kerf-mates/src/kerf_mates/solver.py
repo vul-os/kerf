@@ -322,7 +322,10 @@ def solve_assembly(
                     continue
 
                 feature = ref.get("feature", "face")
-                feature_id = ref.get("feature_id", "")
+                # T5: prefer persistent feature_name over legacy feature_id.
+                # feature_name is present on mates created after T5; older mates
+                # only have feature_id. Both are kept for backwards compat.
+                feature_id = ref.get("feature_name") or ref.get("feature_id", "")
 
                 entity_id = f"{comp_id}_{ref_key}_{mate['id']}"
 

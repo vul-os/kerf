@@ -26,9 +26,11 @@ const EMPTY_FORM = {
   a_component_id: '',
   a_feature: 'face',
   a_feature_id: '',
+  a_feature_name: '',  // T5: persistent face name (dual-write alongside feature_id)
   b_component_id: '',
   b_feature: 'face',
   b_feature_id: '',
+  b_feature_name: '',  // T5: persistent face name
   value: '',
   unit: 'mm',
 }
@@ -71,6 +73,7 @@ export default function MatesPanel({
 
   useEffect(() => {
     if (!pendingPickForm) return
+    // T5: merge pick result including face_name when present.
     setForm((f) => ({ ...f, ...pendingPickForm }))
     onPendingPickFormConsumed?.()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -82,10 +85,28 @@ export default function MatesPanel({
 
   function handleAdd() {
     if (!form.a_component_id || !form.a_feature_id || !form.b_component_id || !form.b_feature_id) return
+    // T5: dual-write face_name (persistent) + feature_id (legacy fallback).
+    const refA = {
+      component_id: form.a_component_id,
+      feature: form.a_feature,
+      feature_id: form.a_feature_id,
+    }
+    const refB = {
+      component_id: form.b_component_id,
+      feature: form.b_feature,
+      feature_id: form.b_feature_id,
+    }
+    // T5: pass feature_name (persistent) to parseMateRef for dual-write.
+    if (form.a_feature_name && form.a_feature_name !== form.a_feature_id) {
+      refA.feature_name = form.a_feature_name
+    }
+    if (form.b_feature_name && form.b_feature_name !== form.b_feature_id) {
+      refB.feature_name = form.b_feature_name
+    }
     const mate = {
       type: form.type,
-      a: { component_id: form.a_component_id, feature: form.a_feature, feature_id: form.a_feature_id },
-      b: { component_id: form.b_component_id, feature: form.b_feature, feature_id: form.b_feature_id },
+      a: refA,
+      b: refB,
     }
     if (DIMENSIONAL.has(form.type) && form.value !== '') {
       mate.value = parseFloat(form.value) || 0
@@ -147,9 +168,9 @@ export default function MatesPanel({
             <div key={m.id} className="flex items-center gap-2 bg-ink-900 rounded px-2 py-1.5 border border-ink-800">
               <span className="text-[10px] uppercase tracking-wider text-kerf-300 font-medium w-20 shrink-0">{m.type}</span>
               <span className="text-[10px] text-ink-400 flex-1 truncate">
-                {m.a?.component_id || '?'}<span className="text-ink-600">.</span>{m.a?.feature_id || '?'}
+                {m.a?.component_id || '?'}<span className="text-ink-600">.</span>{m.a?.feature_name || m.a?.feature_id || '?'}
                 <span className="text-ink-600 mx-1">→</span>
-                {m.b?.component_id || '?'}<span className="text-ink-600">.</span>{m.b?.feature_id || '?'}
+                {m.b?.component_id || '?'}<span className="text-ink-600">.</span>{m.b?.feature_name || m.b?.feature_id || '?'}
                 {m.value != null && <span className="ml-1 text-ink-500">= {m.value} {m.unit || ''}</span>}
               </span>
               <button

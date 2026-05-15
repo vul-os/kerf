@@ -70,10 +70,18 @@ async def register(app, ctx: "PluginContext") -> "PluginManifest":
 
             workers_registry = getattr(ctx, "workers", None)
             if workers_registry is not None:
-                workers_registry.register(
-                    "auto_tess",
-                    factory=AutoTessWorker,
+                _auto_tess_worker = AutoTessWorker(
+                    pool=ctx.pool,
+                    storage_getter=lambda: ctx.storage,
+                    pyworker_url=getattr(
+                        ctx.config, "pyworker_url", "http://localhost:8090"
+                    ),
                 )
+
+                async def _auto_tess_factory():
+                    return _auto_tess_worker
+
+                workers_registry.register("auto_tess", _auto_tess_factory)
                 logger.info("kerf-tess: AutoTessWorker registered")
             else:
                 logger.warning(

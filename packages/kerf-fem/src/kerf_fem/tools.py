@@ -154,3 +154,184 @@ async def run_fem_job_status(ctx: ProjectCtx, args: bytes) -> str:
         resp["error"] = row["error"]
 
     return ok_payload(resp)
+
+
+# ---------------------------------------------------------------------------
+# fem_nonlinear_bar  — uniaxial J2 isotropic-hardening bar
+# ---------------------------------------------------------------------------
+
+fem_nonlinear_bar_spec = ToolSpec(
+    name="fem_nonlinear_bar",
+    description=(
+        "Simulate a uniaxial bar under incremental loading using J2 "
+        "isotropic-hardening plasticity (von Mises return mapping). "
+        "Returns stress, strain, and plastic-strain history per load step. "
+        "Useful for material-point / coupon-level nonlinear material verification."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "E": {
+                "type": "number",
+                "description": "Young's modulus [Pa]",
+            },
+            "sigma_y0": {
+                "type": "number",
+                "description": "Initial yield stress [Pa]",
+            },
+            "H": {
+                "type": "number",
+                "description": "Isotropic hardening modulus [Pa]. Use 0 for perfect plasticity.",
+            },
+            "load_steps": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": (
+                    "Sequence of target values for each load step. "
+                    "If force_controlled=false (default) these are total strain targets; "
+                    "if force_controlled=true these are stress targets."
+                ),
+            },
+            "force_controlled": {
+                "type": "boolean",
+                "description": "If true, load_steps are stress targets; otherwise strain targets.",
+                "default": False,
+            },
+            "max_iter": {
+                "type": "integer",
+                "description": "Max Newton iterations per step (default 50).",
+                "default": 50,
+            },
+            "tol": {
+                "type": "number",
+                "description": "Relative convergence tolerance (default 1e-10).",
+                "default": 1e-10,
+            },
+        },
+        "required": ["E", "sigma_y0", "H", "load_steps"],
+    },
+)
+
+
+@register(fem_nonlinear_bar_spec)
+async def run_fem_nonlinear_bar(ctx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    E = a.get("E")
+    sigma_y0 = a.get("sigma_y0")
+    H = a.get("H")
+    load_steps = a.get("load_steps")
+
+    if E is None or sigma_y0 is None or H is None or load_steps is None:
+        return err_payload("E, sigma_y0, H, load_steps are required", "BAD_ARGS")
+    if not isinstance(load_steps, list):
+        return err_payload("load_steps must be a list", "BAD_ARGS")
+
+    from kerf_fem.nonlinear_bar import run_nonlinear_bar
+
+    result = run_nonlinear_bar(
+        E=float(E),
+        sigma_y0=float(sigma_y0),
+        H=float(H),
+        load_steps=[float(v) for v in load_steps],
+        force_controlled=bool(a.get("force_controlled", False)),
+        max_iter=int(a.get("max_iter", 50)),
+        tol=float(a.get("tol", 1e-10)),
+    )
+    return ok_payload(result)
+
+
+# ---------------------------------------------------------------------------
+# fem_truss_plastic  — small-strain 2-D truss with per-element plasticity
+# ---------------------------------------------------------------------------
+
+fem_truss_plastic_spec = ToolSpec(
+    name="fem_truss_plastic",
+    description=(
+        "Nonlinear quasi-static analysis of a 2-D pin-jointed truss with "
+        "J2 isotropic-hardening plasticity per bar element. "
+        "Incremental load stepping + Newton-Raphson global equilibrium. "
+        "Returns per-step displacements, element stresses, and plastic strains."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "nodes": {
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 2,
+                    "maxItems": 2,
+                },
+                "description": "List of [x, y] node coordinates [m].",
+            },
+            "elements": {
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "minItems": 2,
+                    "maxItems": 2,
+                },
+                "description": "List of [node_i, node_j] element connectivity (0-based).",
+            },
+            "E": {"type": "number", "description": "Young's modulus [Pa]"},
+            "area": {"type": "number", "description": "Cross-sectional area [m²]"},
+            "sigma_y0": {"type": "number", "description": "Initial yield stress [Pa]"},
+            "H": {"type": "number", "description": "Isotropic hardening modulus [Pa]"},
+            "load_steps": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "forces": {
+                            "type": "object",
+                            "description": "Map of node_index (string) → [Fx, Fy] [N]",
+                        },
+                        "fixed_dofs": {
+                            "type": "array",
+                            "items": {"type": "integer"},
+                            "description": "DOF indices to fix (2*node for x, 2*node+1 for y).",
+                        },
+                    },
+                },
+                "description": "Sequence of load steps; BCs taken from first step.",
+            },
+            "max_iter": {"type": "integer", "default": 50},
+            "tol": {"type": "number", "default": 1e-8},
+        },
+        "required": ["nodes", "elements", "E", "area", "sigma_y0", "H", "load_steps"],
+    },
+)
+
+
+@register(fem_truss_plastic_spec)
+async def run_fem_truss_plastic(ctx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    required = ["nodes", "elements", "E", "area", "sigma_y0", "H", "load_steps"]
+    for key in required:
+        if a.get(key) is None:
+            return err_payload(f"{key} is required", "BAD_ARGS")
+
+    from kerf_fem.nonlinear_bar import run_truss_plastic
+
+    result = run_truss_plastic(
+        nodes=[tuple(n) for n in a["nodes"]],
+        elements=[tuple(e) for e in a["elements"]],
+        E=float(a["E"]),
+        area=float(a["area"]),
+        sigma_y0=float(a["sigma_y0"]),
+        H=float(a["H"]),
+        load_steps=a["load_steps"],
+        max_iter=int(a.get("max_iter", 50)),
+        tol=float(a.get("tol", 1e-8)),
+    )
+    return ok_payload(result)

@@ -47,9 +47,13 @@ async def register(app: FastAPI, ctx):
     from kerf_fem.tools import (
         fem_run_spec, run_fem_run,
         fem_job_status_spec, run_fem_job_status,
+        fem_nonlinear_bar_spec, run_fem_nonlinear_bar,
+        fem_truss_plastic_spec, run_fem_truss_plastic,
     )
     ctx.tools.register("fem_run", fem_run_spec, run_fem_run)
     ctx.tools.register("fem_job_status", fem_job_status_spec, run_fem_job_status)
+    ctx.tools.register("fem_nonlinear_bar", fem_nonlinear_bar_spec, run_fem_nonlinear_bar)
+    ctx.tools.register("fem_truss_plastic", fem_truss_plastic_spec, run_fem_truss_plastic)
 
     # Register background worker
     from kerf_fem.worker import FEMWorker
@@ -65,7 +69,8 @@ async def register(app: FastAPI, ctx):
     ctx.workers.register("fem", _fem_factory)
 
     # Build `provides` list based on available deps
-    provides = []
+    # fem.nonlinear is pure-Python — always available
+    provides = ["fem.nonlinear"]
     if _DOLFINX_AVAILABLE:
         provides.append("fem.linear-static")
         provides.append("fem.thermal")

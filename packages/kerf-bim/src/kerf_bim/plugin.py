@@ -59,6 +59,7 @@ def _register_tools(ctx, provides: list) -> None:
         ("kerf_bim.tools.mep", "bim.mep"),
         ("kerf_bim.tools.curtain_wall", "bim.curtain-wall"),
         ("kerf_bim.tools.element_types", "bim.element-types"),
+        ("kerf_bim.tools.import_ifc", "bim.ifc-import"),
     ]
 
     for module_path, capability in tool_modules:

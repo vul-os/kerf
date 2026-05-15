@@ -536,6 +536,19 @@ export const api = {
       },
     }),
 
+  // ---- IFC import ----
+  // Import a .ifc file into a project as a .bim architecture file.
+  // Returns { created_file, stats, warnings, import_folder }.
+  importIFC: (projectId, fileBlobId, opts = {}) =>
+    request(`/api/projects/${projectId}/imports/ifc`, {
+      method: 'POST',
+      body: {
+        file_blob_id: fileBlobId,
+        import_folder: opts.importFolder ?? '/ifc_import',
+        mode: opts.mode ?? 'project',
+      },
+    }),
+
   // ---- Wiring diagram render ----
   // POSTs to the kerf-api thin handler which forwards to pyworker /run-wireviz.
   // Returns { svg: string|null, warnings: string[] }.

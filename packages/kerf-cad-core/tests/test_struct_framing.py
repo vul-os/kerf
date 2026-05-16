@@ -264,9 +264,99 @@ def test_get_section_ub_356():
     assert sec.family == "UB"
 
 def test_get_section_w14x68():
+    # CORRECTED: prior assertion expected 576.5e6 which was a catalog bug.
+    # AISC Steel Construction Manual 15th ed., Table 1-1: W14x68 Ix = 722 in⁴.
+    # 722 in⁴ × 25.4⁴ mm⁴/in⁴ = 3.005e8 mm⁴.
     sec = get_section("W14x68")
     assert sec is not None
-    assert sec.Ix_mm4 == pytest.approx(576.5e6)
+    assert sec.Ix_mm4 == pytest.approx(722.0 * 25.4 ** 4, rel=1e-3)
+
+
+# ===========================================================================
+# 5b. AISC / Euronorm catalog reference cases (citable published tables)
+# ===========================================================================
+
+class TestCatalogReferenceValues:
+    """Each value cross-checked against a citable published section table."""
+
+    IN4 = 25.4 ** 4          # mm⁴ per in⁴
+    IN2 = 645.16             # mm² per in²
+    LBFT = 1.4881639         # kg/m per lb/ft
+
+    def test_aisc_W8x31(self):
+        # AISC SCM 15th ed. Table 1-1: W8x31 — A=9.13 in², Ix=110 in⁴,
+        # Iy=37.1 in⁴, 31 lb/ft.
+        s = get_section("W8x31")
+        assert s.A_mm2 == pytest.approx(9.13 * self.IN2, rel=5e-3)
+        assert s.Ix_mm4 == pytest.approx(110.0 * self.IN4, rel=5e-3)
+        assert s.Iy_mm4 == pytest.approx(37.1 * self.IN4, rel=5e-3)
+        assert s.mass_kg_m == pytest.approx(31.0 * self.LBFT, rel=5e-3)
+
+    def test_aisc_W12x50(self):
+        # AISC SCM 15th ed.: W12x50 — A=14.6 in², Ix=391 in⁴, Iy=56.3 in⁴.
+        s = get_section("W12x50")
+        assert s.Ix_mm4 == pytest.approx(391.0 * self.IN4, rel=5e-3)
+        assert s.Iy_mm4 == pytest.approx(56.3 * self.IN4, rel=5e-3)
+        assert s.mass_kg_m == pytest.approx(50.0 * self.LBFT, rel=5e-3)
+
+    def test_aisc_W14x68_full(self):
+        # AISC SCM 15th ed.: W14x68 — A=20.0 in², Ix=722 in⁴, Iy=121 in⁴.
+        s = get_section("W14x68")
+        assert s.A_mm2 == pytest.approx(20.0 * self.IN2, rel=5e-3)
+        assert s.Ix_mm4 == pytest.approx(722.0 * self.IN4, rel=5e-3)
+        assert s.Iy_mm4 == pytest.approx(121.0 * self.IN4, rel=5e-3)
+
+    def test_euronorm_IPE200(self):
+        # Euronorm EN 10034 / ArcelorMittal sections book: IPE200 —
+        # A=28.5 cm², Iy(strong)=1943 cm⁴, Iz(weak)=142.4 cm⁴, 22.4 kg/m.
+        s = get_section("IPE200")
+        assert s.A_mm2 == pytest.approx(28.5e2, rel=5e-3)
+        assert s.Ix_mm4 == pytest.approx(1943e4, rel=5e-3)
+        assert s.Iy_mm4 == pytest.approx(142.4e4, rel=5e-3)
+        assert s.mass_kg_m == pytest.approx(22.4, rel=5e-3)
+
+    def test_euronorm_IPE360(self):
+        # EN 10034: IPE360 — A=72.7 cm², Iy=16270 cm⁴, Iz=1043 cm⁴, 57.1 kg/m.
+        s = get_section("IPE360")
+        assert s.Ix_mm4 == pytest.approx(16270e4, rel=5e-3)
+        assert s.Iy_mm4 == pytest.approx(1043e4, rel=5e-3)
+        assert s.mass_kg_m == pytest.approx(57.1, rel=5e-3)
+
+    def test_euronorm_HEA300(self):
+        # EN 53-62: HEA300 — A=112.5 cm², Iy=18260 cm⁴, Iz=6310 cm⁴, 88.3 kg/m.
+        s = get_section("HEA300")
+        assert s.A_mm2 == pytest.approx(112.5e2, rel=5e-3)
+        assert s.Ix_mm4 == pytest.approx(18260e4, rel=5e-3)
+        assert s.Iy_mm4 == pytest.approx(6310e4, rel=5e-3)
+
+    def test_euronorm_HEA400(self):
+        # EN 53-62: HEA400 — A=159 cm², Iy=45070 cm⁴, 124.8 kg/m.
+        s = get_section("HEA400")
+        assert s.A_mm2 == pytest.approx(159.0e2, rel=5e-3)
+        assert s.Ix_mm4 == pytest.approx(45070e4, rel=3e-3)
+        assert s.mass_kg_m == pytest.approx(124.8, rel=5e-3)
+
+    def test_bs_UB356x171x51(self):
+        # BS 4-1 / SCI Blue Book: UB356x171x51 — A=64.9 cm², Ix=14140 cm⁴,
+        # Iy=968 cm⁴, 51.0 kg/m.
+        s = get_section("UB356x171x51")
+        assert s.A_mm2 == pytest.approx(64.9e2, rel=5e-3)
+        assert s.Ix_mm4 == pytest.approx(14110e4, rel=5e-3)
+        assert s.mass_kg_m == pytest.approx(51.0, rel=5e-3)
+
+    def test_mass_consistency_column(self):
+        # Column mass = length(m) × section mass(kg/m). HEA300 @ 3.5 m
+        # → 3.5 × 88.3 = 309.05 kg (textbook BOM arithmetic).
+        from kerf_cad_core.struct.grid import GridPoint, Level
+        s = get_section("HEA300")
+        col = Column(
+            id="C1", grid_label="A/1",
+            grid_point=GridPoint(label="A/1", x_mm=0.0, y_mm=0.0),
+            section=s,
+            base_level=Level(name="G", elevation_mm=0.0),
+            top_level=Level(name="L1", elevation_mm=3500.0),
+        )
+        assert col.mass_kg == pytest.approx(3.5 * 88.3, rel=1e-9)
 
 def test_get_section_unknown_returns_none():
     assert get_section("INVALID_SECTION") is None

@@ -102,10 +102,12 @@ class SteelSection:
 #   UB 203x133x25: A=3230 mm², Ix=28.5e6 mm⁴, Iy=3.56e6 mm⁴, 25.1 kg/m
 #   UB 356x171x51: A=6490 mm², Ix=141.1e6 mm⁴, Iy=12.06e6 mm⁴, 51.0 kg/m
 #
-# W sections: AISC W-shapes (metric equivalent dimensions)
-#   W8x31:  A=5880 mm², Ix=86.9e6 mm⁴, Iy=18.4e6 mm⁴, 46.1 kg/m
-#   W12x50: A=9480 mm², Ix=286.6e6 mm⁴, Iy=52.5e6 mm⁴, 74.3 kg/m
-#   W14x68: A=12900 mm², Ix=576.5e6 mm⁴, Iy=125.0e6 mm⁴, 101.2 kg/m
+# W sections: AISC Steel Construction Manual, 15th ed., Table 1-1 (W-shapes),
+# converted to SI (1 in⁴ = 25.4⁴ mm⁴ = 416231.426 mm⁴; 1 in² = 645.16 mm²;
+# 1 lb/ft = 1.4881639 kg/m):
+#   W8x31:  A=9.13 in²,  Ix=110 in⁴, Iy=37.1 in⁴ → A=5890, Ix=45.79e6, Iy=15.44e6, 46.1 kg/m
+#   W12x50: A=14.6 in²,  Ix=391 in⁴, Iy=56.3 in⁴ → A=9419, Ix=162.7e6, Iy=23.43e6, 74.4 kg/m
+#   W14x68: A=20.0 in²,  Ix=722 in⁴, Iy=121 in⁴  → A=12903, Ix=300.5e6, Iy=50.36e6, 101.2 kg/m
 # ---------------------------------------------------------------------------
 
 SECTION_CATALOG: dict[str, SteelSection] = {s.name: s for s in [
@@ -122,9 +124,9 @@ SECTION_CATALOG: dict[str, SteelSection] = {s.name: s for s in [
     SteelSection("UB203x133x25", "UB",  3230.0,  28.5e6,   3.56e6,  25.1),
     SteelSection("UB356x171x51", "UB",  6490.0, 141.1e6,  12.06e6,  51.0),
     # ── W (AISC, metric equivalents) ─────────────────────────────────────────
-    SteelSection("W8x31",   "W",   5880.0,  86.9e6,   18.4e6,   46.1),
-    SteelSection("W12x50",  "W",   9480.0, 286.6e6,   52.5e6,   74.3),
-    SteelSection("W14x68",  "W",  12900.0, 576.5e6,  125.0e6,  101.2),
+    SteelSection("W8x31",   "W",   5890.0,  45.79e6,  15.44e6,  46.1),
+    SteelSection("W12x50",  "W",   9419.0, 162.7e6,   23.43e6,  74.4),
+    SteelSection("W14x68",  "W",  12903.0, 300.5e6,   50.36e6, 101.2),
 ]}
 
 

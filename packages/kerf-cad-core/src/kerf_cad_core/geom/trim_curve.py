@@ -183,10 +183,49 @@ def _project_point_to_uv(
     max_iter: int = _MAX_NEWTON_ITER,
     tol: float = 1e-6,
 ) -> Optional[Tuple[float, float]]:
-    """Newton iteration to find (u, v) such that surface(u, v) is closest to point.
+    """Find (u, v) such that surface(u, v) is closest to ``point``.
 
-    Returns (u, v) on convergence, or None if the iteration diverges or leaves
-    the UV domain.
+    Delegates to the kernel-grade ``geom.inversion.closest_point_surface``
+    (GK-07): analytic, rational-correct first/second partials, coarse-grid
+    seeding and a multi-seed global fallback that escapes the local-minimum
+    traps the previous finite-difference Newton iteration was prone to.
+
+    Signature and contract are preserved exactly: returns ``(u, v)`` clamped
+    into the surface's parameter domain, or ``None`` if the projection
+    cannot be placed in-domain (matching the historical "diverges or leaves
+    the UV domain" behaviour).  ``u_init`` / ``v_init`` / ``max_iter`` are
+    accepted for API compatibility; the global solver no longer needs the
+    seed but a thin fallback to the original local Newton is retained should
+    the kernel solver be unavailable.
+    """
+    try:
+        from kerf_cad_core.geom.inversion import closest_point_surface
+
+        u, v, _foot, _dist = closest_point_surface(surface, point)
+        if _uv_in_domain(u, v, surface):
+            return (float(u), float(v))
+        return None
+    except Exception:
+        # Defensive thin adapter: fall back to the original FD local Newton
+        # so behaviour is never worse than before the delegation.
+        return _project_point_to_uv_local_newton(
+            surface, point, u_init, v_init, max_iter=max_iter, tol=tol,
+        )
+
+
+def _project_point_to_uv_local_newton(
+    surface: NurbsSurface,
+    point: np.ndarray,
+    u_init: float,
+    v_init: float,
+    *,
+    max_iter: int = _MAX_NEWTON_ITER,
+    tol: float = 1e-6,
+) -> Optional[Tuple[float, float]]:
+    """Original finite-difference local Newton (retained as a safety net).
+
+    Returns (u, v) on convergence, or None if the iteration diverges or
+    leaves the UV domain.
     """
     u_min, u_max, v_min, v_max = _uv_domain(surface)
     u = float(np.clip(u_init, u_min, u_max))

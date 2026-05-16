@@ -25,7 +25,7 @@ Capabilities
   gvf_profile_type     — M/S/C/H/A classification per Chow
   gvf_direct_step      — water-surface profile (direct-step method)
   best_hydraulic_section — dimensions of most-efficient section
-  weir_broad_crested   — Q = Cd·L·H^(3/2)
+  weir_broad_crested   — Q = Cd·(2/3)·√(2g/3)·L·H^(3/2)  (Chow critical flow)
   weir_sharp_crested   — Q = (2/3)·Cd·L·√(2g)·H^(3/2)
   weir_vnotch          — Q = (8/15)·Cd·tan(θ/2)·√(2g)·H^(5/2)
   culvert_control      — inlet vs outlet control, capacity
@@ -1070,40 +1070,49 @@ def best_hydraulic_section(
 def weir_broad_crested(
     head_m: float,
     crest_length_m: float,
-    Cd: float = 0.848,
+    Cd: float = 0.93,
 ) -> dict[str, Any]:
-    """Broad-crested weir discharge: Q = Cd · L · H^(3/2).
+    """Broad-crested weir discharge (Chow 1959; Henderson 1966).
 
-    The coefficient Cd = 0.848 corresponds to the theoretical value
-    (2/3)·√(2g/3) · 1 ≈ 1.705 when Cd is the full-form coefficient, but
-    the standard compact form Q = Cd·L·H^(3/2) uses Cd ≈ 1.7 (SI) or
-    the dimensionless form Q = Cd·L·√(2g)·(2/3)^(3/2)·H^(3/2).
+    Critical-flow theory over a broad crest gives
 
-    Here the *dimensionless* Cd is used; the default 0.848 gives the
-    standard Q = 1.705 · L · H^(3/2) form.
+        Q = Cd · (2/3)·√(2g/3) · L · H^(3/2)
+          = Cd · 1.705 · L · H^(3/2)         (SI, g = 9.80665 m/s²)
 
-    Returns {ok, discharge_m3s, head_m, crest_length_m, Cd}
+    where ``Cd`` is the *dimensionless* discharge coefficient (≈ 0.85–0.97
+    for a well-rounded broad-crested weir; Henderson Table 6-1).  The
+    coefficient 1.705 = (2/3)·√(2g/3) is the ideal critical-flow factor.
+
+    A previous implementation used ``Q = Cd · L · H^(3/2)`` directly,
+    dropping the 1.705 factor entirely.  With its old default Cd=0.848 it
+    under-predicted discharge by ~2× versus Chow.  The factor is now
+    included so a physical dimensionless Cd gives the correct discharge.
+
+    The ``discharge_coefficient_Cd_full`` field reports the lumped
+    coefficient C = Cd·1.705 for the classic ``Q = C·L·H^(3/2)`` form.
+
+    Returns {ok, discharge_m3s, head_m, crest_length_m, Cd,
+             discharge_coefficient_Cd_full, formula}
     """
     if head_m <= 0.0:
         return {"ok": False, "reason": "head_m must be > 0"}
     if crest_length_m <= 0.0:
         return {"ok": False, "reason": "crest_length_m must be > 0"}
-    if Cd <= 0.0 or Cd > 3.0:
-        return {"ok": False, "reason": "Cd must be in (0, 3.0]"}
+    if Cd <= 0.0 or Cd > 1.0:
+        return {"ok": False, "reason": "Cd (dimensionless) must be in (0, 1.0]"}
 
-    # Q = Cd * (2/3) * sqrt(2g/3) * L * H^(3/2)
-    # Numerical: sqrt(2*9.80665/3) = sqrt(6.5378) = 2.557
-    # (2/3) * 2.557 * Cd = 1.705 * Cd  (default Cd=1.0 gives classic form)
-    # BUT the task says dimensionless Cd: Q = Cd * L * H^(3/2) with Cd≈1.7
-    # To keep both modes: use Q = Cd * L * H^1.5  directly (Cd absorbs √(2g) terms)
-    Q = Cd * crest_length_m * (head_m ** 1.5)
+    # Ideal critical-flow factor: (2/3)·√(2g/3)  ≈ 1.7046 (SI)
+    C_ideal = (2.0 / 3.0) * math.sqrt(2.0 * _G / 3.0)
+    C_full = Cd * C_ideal
+    Q = C_full * crest_length_m * (head_m ** 1.5)
     return {
         "ok": True,
         "discharge_m3s": Q,
         "head_m": head_m,
         "crest_length_m": crest_length_m,
         "Cd": Cd,
-        "formula": "Q = Cd * L * H^(3/2)",
+        "discharge_coefficient_Cd_full": C_full,
+        "formula": "Q = Cd * (2/3) * sqrt(2g/3) * L * H^(3/2)",
     }
 
 

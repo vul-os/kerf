@@ -642,17 +642,20 @@ _broad_weir_spec = ToolSpec(
     description=(
         "Compute discharge over a broad-crested (overflow) weir.\n"
         "\n"
-        "Formula: Q = Cd · L · H^(3/2)\n"
+        "Formula: Q = Cd · (2/3)·√(2g/3) · L · H^(3/2) = Cd · 1.705 · L · H^(3/2)\n"
         "  L  — crest length (m)\n"
         "  H  — head above crest (m)\n"
-        "  Cd — discharge coefficient (default 1.7, SI; range typically 1.5–1.8)\n"
+        "  Cd — DIMENSIONLESS discharge coefficient (default 0.93; "
+        "range ≈ 0.85–0.97)\n"
         "\n"
         "The broad-crested weir acts as a critical-flow control; Cd accounts for "
-        "approach velocity, geometry, and submergence.\n"
+        "approach velocity, geometry, and submergence. The 1.705 factor is the "
+        "ideal critical-flow coefficient (2/3)·√(2g/3).\n"
         "\n"
-        "Returns discharge_m3s, head_m, crest_length_m, Cd.\n"
+        "Returns discharge_m3s, head_m, crest_length_m, Cd, "
+        "discharge_coefficient_Cd_full.\n"
         "\n"
-        "Reference: Henderson (1966) §6-2; BS EN ISO 4374."
+        "Reference: Chow (1959); Henderson (1966) §6-2; BS EN ISO 4374."
     ),
     input_schema={
         "type": "object",
@@ -661,7 +664,7 @@ _broad_weir_spec = ToolSpec(
             "crest_length_m": {"type": "number", "description": "Weir crest length (m), > 0."},
             "Cd": {
                 "type": "number",
-                "description": "Discharge coefficient (default 1.7, SI form Q=Cd·L·H^1.5). Range 1.5–2.2 typical.",
+                "description": "Dimensionless discharge coefficient (default 0.93). Range ≈ 0.85–0.97.",
             },
         },
         "required": ["head_m", "crest_length_m"],

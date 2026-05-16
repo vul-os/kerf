@@ -626,19 +626,46 @@ class TestBestHydraulicSection:
 
 class TestWeirBroadCrested:
 
-    def test_formula(self):
-        """Q = Cd * L * H^1.5."""
-        H, L, Cd = 0.5, 3.0, 1.7
+    def test_formula_chow_critical_flow(self):
+        """Chow (1959): Q = Cd·(2/3)·√(2g/3)·L·H^(3/2).
+
+        The ideal critical-flow coefficient (2/3)·√(2g/3) = 1.7046 (SI).
+        """
+        H, L, Cd = 0.5, 3.0, 0.93
         result = weir_broad_crested(H, L, Cd)
         assert result["ok"]
-        Q_expected = Cd * L * H ** 1.5
+        C_ideal = (2.0 / 3.0) * math.sqrt(2.0 * _G / 3.0)
+        Q_expected = Cd * C_ideal * L * H ** 1.5
         assert abs(result["discharge_m3s"] - Q_expected) < STRICT
+        assert abs(C_ideal - 1.7046) < 1e-3
+
+    def test_ideal_weir_chow_reference(self):
+        """Chow Ex.: ideal broad-crested weir (Cd=1.0), L=1 m, H=1 m →
+        Q = 1.705 m³/s (the textbook ideal critical-flow result)."""
+        result = weir_broad_crested(1.0, 1.0, 1.0)
+        assert result["ok"]
+        assert abs(result["discharge_m3s"] - 1.7046) < 1e-2
+
+    def test_henderson_typical_coefficient(self):
+        """Henderson (1966) §6-2: a real broad-crested weir with
+        Cd≈0.85, L=4 m, H=0.6 m → Q = 0.85·1.705·4·0.6^1.5 ≈ 2.694 m³/s."""
+        result = weir_broad_crested(0.6, 4.0, 0.85)
+        assert result["ok"]
+        Q_expected = 0.85 * 1.7046 * 4.0 * 0.6 ** 1.5
+        assert abs(result["discharge_m3s"] - Q_expected) < 1e-2
+        # Lumped coefficient C = Cd·1.705 reported for classic form
+        assert abs(result["discharge_coefficient_Cd_full"] - 0.85 * 1.7046) < 1e-3
 
     def test_head_sensitivity(self):
         """Q ∝ H^1.5: doubling H multiplies Q by 2^1.5."""
-        Q1 = weir_broad_crested(1.0, 2.0, 1.7)["discharge_m3s"]
-        Q2 = weir_broad_crested(2.0, 2.0, 1.7)["discharge_m3s"]
+        Q1 = weir_broad_crested(1.0, 2.0, 0.93)["discharge_m3s"]
+        Q2 = weir_broad_crested(2.0, 2.0, 0.93)["discharge_m3s"]
         assert abs(Q2 / Q1 - 2.0 ** 1.5) < 1e-9
+
+    def test_dimensionless_Cd_above_one_rejected(self):
+        """Cd is now strictly the dimensionless coefficient (0, 1]."""
+        result = weir_broad_crested(0.5, 3.0, 1.7)
+        assert result["ok"] is False
 
     def test_invalid_head_returns_error(self):
         result = weir_broad_crested(-0.1, 1.0)

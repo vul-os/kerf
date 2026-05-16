@@ -144,6 +144,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.elevator.tools",
     "kerf_cad_core.lighting.tools",
     "kerf_cad_core.crane.tools",
+    "kerf_cad_core.elecpower.tools",
+    "kerf_cad_core.plumbing.tools",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

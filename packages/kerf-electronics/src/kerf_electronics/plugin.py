@@ -128,6 +128,7 @@ def _register_tools(ctx, provides: list) -> None:
         "kerf_electronics.emc.tools",
         "kerf_electronics.battery.tools",
         "kerf_electronics.rfmatch.tools",
+        "kerf_electronics.afilter.tools",
     ]
 
     for module_path in tool_modules:

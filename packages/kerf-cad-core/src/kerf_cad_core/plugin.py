@@ -179,6 +179,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.jewelry.print_presets",
     "kerf_cad_core.jewelry.tech_drawing",
     "kerf_cad_core.jewelry.cam_wax",
+    "kerf_cad_core.jewelry.filigree_advanced",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

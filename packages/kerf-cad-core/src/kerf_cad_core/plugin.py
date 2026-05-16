@@ -173,6 +173,12 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.match_srf",
     "kerf_cad_core.geom.intersection",
     "kerf_cad_core.jewelry.bezel_auto",
+    "kerf_cad_core.jewelry.plating",
+    "kerf_cad_core.jewelry.gem_cert",
+    "kerf_cad_core.jewelry.bas_relief",
+    "kerf_cad_core.jewelry.print_presets",
+    "kerf_cad_core.jewelry.tech_drawing",
+    "kerf_cad_core.jewelry.cam_wax",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

@@ -171,6 +171,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.jewelry.hollowing",
     "kerf_cad_core.jewelry.engraving",
     "kerf_cad_core.geom.match_srf",
+    "kerf_cad_core.geom.intersection",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

@@ -603,3 +603,88 @@ class TestShaftExternalReferences:
         tau = F / (0.008 * 0.045)
         assert r["shear_stress_Pa"] == pytest.approx(tau, rel=1e-9)
         assert r["key_width_mm"] == 8 and r["key_height_mm"] == 7
+
+
+class TestShaftExternalReferencesII:
+    """Independent worked examples — Hamrock 'Fundamentals of Machine
+    Elements' 3rd ed., Budynas/Shigley 10th ed., ASME B106.1M-1985,
+    Rao 'Mechanical Vibrations' 5th ed., ISO 281:2007."""
+
+    def test_de_goodman_combined_closed_form(self):
+        # Shigley Eq. (7-7) DE-Goodman, alternating bending + steady torque,
+        # Kf=Kfs=1: d = [ (32 n)/(π Se) · √(M² + ¾ T²) ]^(1/3).
+        # M=300 N·m, T=400 N·m, Se=150 MPa, n=2.0 (design factor).
+        M, T, Se, n = 300.0, 400.0, 150e6, 2.0
+        r = _ref_shaft_diameter(M, T, Se, method="DE-Goodman", safety_factor=n)
+        d_exp = ((32.0 * n / (math.pi * Se))
+                 * math.sqrt(M ** 2 + 0.75 * T ** 2)) ** (1.0 / 3.0)
+        assert r["diameter_m"] == pytest.approx(d_exp, rel=1e-12)
+
+    def test_de_goodman_kf_kfs_separately(self):
+        # Shigley Eq. (7-7): notch factors enter as (Kf·M) and (Kfs·T)
+        # *inside* the von-Mises radical, not as a scalar multiplier.
+        # Kf=1.8, Kfs=1.4, M=250 N·m, T=350 N·m, Se=120 MPa.
+        M, T, Se, Kf, Kfs = 250.0, 350.0, 120e6, 1.8, 1.4
+        r = _ref_shaft_diameter(M, T, Se, method="DE-Goodman", Kf=Kf, Kfs=Kfs)
+        d_exp = ((32.0 / (math.pi * Se))
+                 * math.sqrt((Kf * M) ** 2 + 0.75 * (Kfs * T) ** 2)) ** (1 / 3)
+        assert r["diameter_m"] == pytest.approx(d_exp, rel=1e-12)
+
+    def test_max_shear_pure_bending_asme(self):
+        # ASME B106 Tresca, pure bending (T=0): the max-shear criterion
+        # reduces to d³ = 32 M /(π σ_b) since √(M²+0)·2/σ = 32M/(πσ).
+        # M=500 N·m, σ_allow=140 MPa.
+        M, sig = 500.0, 140e6
+        r = _ref_shaft_diameter(M, 0.0, sig, method="max-shear")
+        d_exp = (32.0 * M / (math.pi * sig)) ** (1.0 / 3.0)
+        assert r["diameter_m"] == pytest.approx(d_exp, rel=1e-12)
+
+    def test_bearing_l10_hamrock_ball(self):
+        # Hamrock 'Fundamentals of Machine Elements' Ch.13 worked example:
+        # deep-groove ball, C=33.2 kN, P=1.8 kN → L10=(C/P)³=6274.75 Mrev.
+        r = _ref_bearing_l10(33200.0, 1800.0, 1.0, "ball")
+        assert r["L10_rev"] == pytest.approx((33200.0 / 1800.0) ** 3, rel=1e-12)
+        assert r["L10_rev"] == pytest.approx(6274.7544582, rel=1e-6)
+
+    def test_bearing_l10_hours_skf_500h(self):
+        # SKF / ISO 281: L10h = L10·1e6/(60 n). C=26 kN, P=4 kN, n=2000 rpm,
+        # ball p=3 → L10=(6.5)³=274.625 Mrev; L10h=274.625e6/(60·2000)=2288.5 h.
+        r = _ref_bearing_l10(26000.0, 4000.0, 2000.0, "ball")
+        assert r["L10_hours"] == pytest.approx((6.5 ** 3) * 1e6 / (60.0 * 2000.0), rel=1e-9)
+        assert r["L10_hours"] == pytest.approx(2288.5417, rel=1e-4)
+
+    def test_critical_speed_steel_shaft_rao_numeric(self):
+        # Rao §8-6 simply-supported steel shaft, d=40 mm, L=1.5 m,
+        # E=207 GPa, ρ=7800 kg/m³. ω₁ = π² √(EI/(mL⁴)).
+        d, L, E, rho = 0.040, 1.5, 207e9, 7800.0
+        I = math.pi * d ** 4 / 64.0
+        m = rho * math.pi * d ** 2 / 4.0
+        r = _ref_shaft_crit(L, m, E, I, supports="simply-supported")
+        w_exp = math.pi ** 2 * math.sqrt(E * I / (m * L ** 4))
+        assert r["omega_rad_s"] == pytest.approx(w_exp, rel=1e-12)
+        # n_rpm = ω·60/2π
+        assert r["n_rpm"] == pytest.approx(w_exp * 60.0 / (2.0 * math.pi), rel=1e-12)
+
+    def test_critical_speed_ff_over_ss_ratio(self):
+        # Rao §8-6: for the same beam, ω_ff/ω_ss = (4.730041/π)² = 2.2667.
+        d, L, E, rho = 0.030, 1.0, 200e9, 7850.0
+        I = math.pi * d ** 4 / 64.0
+        m = rho * math.pi * d ** 2 / 4.0
+        ss = _ref_shaft_crit(L, m, E, I, supports="simply-supported")
+        ff = _ref_shaft_crit(L, m, E, I, supports="fixed-fixed")
+        assert ff["omega_rad_s"] / ss["omega_rad_s"] == pytest.approx(
+            (4.73004074 / math.pi) ** 2, rel=1e-6)
+
+    def test_key_bearing_stress_shigley_8_9(self):
+        # Shigley §8-9 bearing (compressive) stress on key: σ = F/((h/2)·L),
+        # F = 2T/d.  d=50 mm falls in the ANSI B17.1 band (44,50] → key 14×9,
+        # default length L = 1.5·d = 75 mm.  T=600 N·m.
+        r = _ref_key_size(50.0, 600.0, "steel_1045")
+        assert r["ok"]
+        assert r["key_width_mm"] == 14 and r["key_height_mm"] == 9
+        assert r["key_length_mm"] == pytest.approx(1.5 * 50.0, rel=1e-12)
+        h_m = r["key_height_mm"] * 1e-3
+        L_m = r["key_length_mm"] * 1e-3
+        F = 2.0 * 600.0 / 0.050
+        sig_c = F / ((h_m / 2.0) * L_m)
+        assert r["bearing_stress_Pa"] == pytest.approx(sig_c, rel=1e-9)

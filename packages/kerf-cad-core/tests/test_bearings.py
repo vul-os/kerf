@@ -785,3 +785,79 @@ class TestBearingsExternalReferences:
         r = _ref_lim_speed(50.0, 10000.0, "ball")
         assert r["ndm"] == pytest.approx(500000.0, rel=1e-12)
         assert r["ndm_limit"] == pytest.approx(600000.0, rel=1e-12)
+
+
+class TestBearingsExternalReferencesII:
+    """Independent worked examples — Hamrock 'Fundamentals of Machine
+    Elements' Ch.13, SKF General Catalogue, ISO 281:2007, ISO 76:2006,
+    Shigley 10th ed. §11."""
+
+    def test_rating_life_hamrock_ball(self):
+        # Hamrock Ch.13: deep-groove ball, C=33.2 kN, P=1.8 kN, p=3.
+        # L10 = (33200/1800)^3 = 6274.754 Mrev.
+        r = _ref_rating_life(33200.0, 1800.0, "ball")
+        assert r["L10_rev"] == pytest.approx(6274.7544582, rel=1e-6)
+
+    def test_rating_life_roller_10over3(self):
+        # ISO 281 §5: roller exponent p = 10/3 (not 3). C=60 kN, P=12 kN
+        # → L10 = 5^(10/3) = 213.747 Mrev.
+        r = _ref_rating_life(60000.0, 12000.0, "roller")
+        assert r["L10_rev"] == pytest.approx(5.0 ** (10.0 / 3.0), rel=1e-12)
+        assert r["L10_rev"] == pytest.approx(213.74722, rel=1e-4)
+
+    def test_rating_life_hours_skf(self):
+        # SKF / ISO 281: L10h = L10·1e6/(60 n). C=35.1 kN, P=7 kN ball,
+        # n=3000 rpm. L10=(5.0142857)^3, L10h = L10·1e6/(60·3000).
+        C, P, n = 35100.0, 7000.0, 3000.0
+        r = _ref_rating_life(C, P, "ball", n_rpm=n)
+        L10 = (C / P) ** 3
+        assert r["L10_hours"] == pytest.approx(L10 * 1e6 / (60.0 * n), rel=1e-9)
+
+    def test_equivalent_load_pure_thrust_dgbb(self):
+        # ISO 281 §5: deep-groove ball under pure axial (Fr=0). With C0 set
+        # so Fa/C0=0.056 → e=0.26, X=0.56, Y=1.71. P = 0·X + 1.71·Fa.
+        # Fr=0, Fa=2000 N, C0 = 2000/0.056.
+        C0 = 2000.0 / 0.056
+        r = _ref_eq_load(0.0, 2000.0, "ball", C0=C0)
+        assert r["Y"] == pytest.approx(1.71, rel=1e-6)
+        # P must be at least Fr (=0) and equal X·Fr+Y·Fa.
+        assert r["P_N"] == pytest.approx(0.56 * 0.0 + 1.71 * 2000.0, rel=1e-9)
+
+    def test_equivalent_load_below_e_is_radial(self):
+        # ISO 281: when Fa/Fr ≤ e the equivalent load is P = Fr (X=1,Y=0).
+        # Fr=4000 N, Fa=200 N → Fa/Fr=0.05 ≤ e≈0.19 for small Fa/C0.
+        r = _ref_eq_load(4000.0, 200.0, "ball", C0=50000.0)
+        assert r["X"] == pytest.approx(1.0, rel=1e-12)
+        assert r["Y"] == pytest.approx(0.0, abs=1e-12)
+        assert r["P_N"] == pytest.approx(4000.0, rel=1e-12)
+
+    def test_static_safety_iso76_marginal_warn(self):
+        # ISO 76: s0 = C0/P0. C0=18 kN, P0=15 kN → s0=1.2 < 1.5 marginal:
+        # must emit the "1.5" vibration/shock warning.
+        r = _ref_static(18000.0, 15000.0)
+        assert r["s0"] == pytest.approx(1.2, rel=1e-12)
+        assert any("1.5" in w for w in r["warnings"])
+
+    def test_adjusted_life_a23_scaling(self):
+        # ISO 281: Lna = a1·a23·L10. Doubling a23 doubles Lna exactly.
+        base = _ref_adj_life(20000.0, 4000.0, 1500.0, "ball", a1=1.0, a23=1.0)
+        dbl = _ref_adj_life(20000.0, 4000.0, 1500.0, "ball", a1=1.0, a23=2.0)
+        assert dbl["Lna_rev"] == pytest.approx(2.0 * base["Lna_rev"], rel=1e-12)
+        assert dbl["Lna_hours"] == pytest.approx(2.0 * base["Lna_hours"], rel=1e-12)
+
+    def test_required_capacity_roundtrip_roller(self):
+        # ISO 281 inverse for roller p=10/3: C = P·(L10h·60·n/1e6)^(1/p).
+        # Round-trip through rating_life must recover Lh.
+        P, n, Lh = 8000.0, 750.0, 40000.0
+        rc = _ref_req_cap(P, n, Lh, "roller")
+        back = _ref_rating_life(rc["C_required_N"], P, "roller", n_rpm=n)
+        assert back["L10_hours"] == pytest.approx(Lh, rel=1e-6)
+
+    def test_limiting_speed_roller_limit(self):
+        # SKF: cylindrical-roller grease n·dm limit = 300000 mm·rpm
+        # (half the ball limit). dm=80 mm, n=5000 rpm → 400000 > 300000.
+        r = _ref_lim_speed(80.0, 5000.0, "roller")
+        assert r["ndm"] == pytest.approx(400000.0, rel=1e-12)
+        assert r["ndm_limit"] == pytest.approx(300000.0, rel=1e-12)
+        assert r["utilisation"] == pytest.approx(400000.0 / 300000.0, rel=1e-12)
+        assert any("exceeds limit" in w for w in r["warnings"])

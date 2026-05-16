@@ -750,3 +750,86 @@ class TestGearStrengthExternalReferences:
         r = _ref_life(1e8, hardness_HB=250.0)
         assert r["YN"] == pytest.approx(1.3558 * (1e8 ** -0.0178), rel=1e-9)
         assert r["ZN"] == pytest.approx(1.4488 * (1e8 ** -0.023), rel=1e-9)
+
+
+class TestGearStrengthExternalReferencesII:
+    """Independent worked examples — Shigley 10th ed. §§14-2..14-5,
+    AGMA 2001-D04, Norton 'Machine Design' 5th ed. Ch.11."""
+
+    def test_kv_agma_eq_14_28_qv5(self):
+        # AGMA 2001-D04 Eq (14-28): Qv=5 (commercial hobbed), Vt=900 ft/min.
+        # B=0.25(12-5)^(2/3)=0.91500, A=50+56(1-B)=54.760.
+        r = _ref_kv(900.0, 5)
+        B = 0.25 * (12 - 5) ** (2.0 / 3.0)
+        A = 50.0 + 56.0 * (1.0 - B)
+        assert r["B"] == pytest.approx(B, rel=1e-12)
+        assert r["A"] == pytest.approx(A, rel=1e-12)
+        assert r["Kv"] == pytest.approx(((A + math.sqrt(900.0)) / A) ** B, rel=1e-12)
+
+    def test_kv_monotonic_in_velocity(self):
+        # AGMA Eq (14-28): for fixed Qv, Kv is strictly increasing in Vt
+        # (higher pitch-line speed → larger dynamic amplification).
+        lo = _ref_kv(300.0, 8)["Kv"]
+        hi = _ref_kv(1500.0, 8)["Kv"]
+        assert hi > lo > 1.0
+
+    def test_bending_stress_shigley_ex14_4_form(self):
+        # Shigley Ex 14-4 form (English, Eq 14-15):
+        # σ = Wt·Ko·Kv·Ks·Pd·Km·KB/(b·J).
+        # Wt=653 lbf, Pd=8, b=1.5 in, J=0.345, Kv=1.404, Km=1.18, others 1.
+        r = _ref_sigma_b(653.0, 1.0, 1.404, 1.0, 1.18, 1.0, 1.5, 8.0, 0.345,
+                         metric=False)
+        exp = 653.0 * 1.404 * 8.0 * 1.18 / (1.5 * 0.345)
+        assert r["sigma_t"] == pytest.approx(exp, rel=1e-12)
+        assert r["unit"] == "psi"
+
+    def test_contact_stress_english_cp2300(self):
+        # AGMA/Shigley Eq (14-16) English, steel/steel Cp=2300 √psi:
+        # σc = Cp·√(Wt·Ko·Kv·Ks·Km/(dp·b·I)).
+        r = _ref_sigma_c(653.0, 1.0, 1.404, 1.0, 1.18, 2300.0, 2.5, 1.5, 0.0876,
+                         metric=False)
+        exp = 2300.0 * math.sqrt(653.0 * 1.404 * 1.18 / (2.5 * 1.5 * 0.0876))
+        assert r["sigma_c"] == pytest.approx(exp, rel=1e-12)
+        assert r["unit"] == "psi"
+
+    def test_geometry_factor_I_external_mg1(self):
+        # Norton Eq (12.22): equal-size external spur pair (mG=1), φ=20°:
+        # I = (cosφ·sinφ)/(2·1) · 1/(1+1) = cosφ·sinφ/4.
+        r = _ref_I(24, 24, 0.0, pressure_angle_deg=20.0)
+        phi = math.radians(20.0)
+        assert r["I"] == pytest.approx(math.cos(phi) * math.sin(phi) / 4.0, rel=1e-9)
+        assert r["m_G"] == pytest.approx(1.0, rel=1e-12)
+
+    def test_geometry_factor_I_25deg_pressure_angle(self):
+        # AGMA: 25° pressure-angle spur pair gives larger I than 20°
+        # (sin·cos product peaks near 45°, rises from 20° toward 25°).
+        i20 = _ref_I(20, 60, 0.0, pressure_angle_deg=20.0)["I"]
+        i25 = _ref_I(20, 60, 0.0, pressure_angle_deg=25.0)["I"]
+        phi = math.radians(25.0)
+        mg = 3.0
+        exp25 = math.cos(phi) * math.sin(phi) / 2.0 * (mg / (mg + 1.0))
+        assert i25 == pytest.approx(exp25, rel=1e-9)
+        assert i25 > i20
+
+    def test_safety_factors_reliability_KR(self):
+        # AGMA 2001-D04 §4.1: σ_all = St·YN/(KT·KR). KR=1.25 (99% reliab.)
+        # reduces allowable and hence SF by exactly 1/1.25.
+        base = _ref_sf(300.0, 1000.0, 450.0, 1550.0, YN=1.0, ZN=1.0, K_R=1.0)
+        kr = _ref_sf(300.0, 1000.0, 450.0, 1550.0, YN=1.0, ZN=1.0, K_R=1.25)
+        assert kr["SF"] == pytest.approx(base["SF"] / 1.25, rel=1e-12)
+        assert kr["SH"] == pytest.approx(base["SH"] / 1.25, rel=1e-12)
+
+    def test_service_life_low_cycle_branch(self):
+        # AGMA Fig 14-14 low-cycle branch (1e3 ≤ N < 3e6):
+        # YN = 2.3194 N^-0.0538. N=1e4 → YN=2.3194·1e4^-0.0538.
+        r = _ref_life(1e4, hardness_HB=300.0)
+        assert r["YN"] == pytest.approx(2.3194 * (1e4 ** -0.0538), rel=1e-9)
+        # ZN uses the standard 1.4488 N^-0.023 for N ≥ 1e4.
+        assert r["ZN"] == pytest.approx(1.4488 * (1e4 ** -0.023), rel=1e-9)
+
+    def test_service_life_long_life_plateau(self):
+        # AGMA: beyond 1e10 cycles YN/ZN reach the conservative ~0.9 floor.
+        r = _ref_life(5e10, hardness_HB=300.0)
+        assert r["YN"] == pytest.approx(0.9, rel=1e-9)
+        assert r["ZN"] == pytest.approx(0.9, rel=1e-9)
+        assert r["regime"] == "long_life"

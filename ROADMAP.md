@@ -91,7 +91,7 @@ importance, sits at P3: it is engine-gated, not low-value.
 | **Civil engineer** | Survey/terrain → alignment/corridor → grading + plan-and-profile sheets | 🔴 cannot | Essentially **nothing** civil-specific. Needs *distinct engines* (geospatial CRS, TIN/terrain, alignment/corridor solver, hydraulics, earthwork, LandXML/IFC-4.3-infra) — not feature-adds on the B-rep kernel. In the roadmap at **P3** with each engine named honestly — highest raw societal importance (water/sanitation/roads, esp. developing world); engine-gated, hence P3 not low-value. |
 | **Drafter** | Multi-sheet 2D production drawing, exchanged as DWG/DXF | 🚧 partial | TechDraw-flavored drawings shipped (multi-sheet, dimensions, GD&T frames, section hatching, leaders/balloons, centerlines). **DWG/DXF** is the linchpin (shared with architect). One narrow `.draft`→DXF-R12 *write* exists but is not general drawing/model exchange. |
 | **Jewelry CAD designer** | Rendered/printable ring or setting with stones placed and metal-weight/cost | 🚧 partial | Toolkit shipped (`kerf_cad_core.jewelry.{gemstones,gem_seat,settings,ring,metal_cost}` — 7 cuts, prong/bezel/channel/pavé, US/UK/EU/JP sizer + 7 shank profiles, casting-cost, FeatureView inspectors, `.gem` kind migration 060). Gap: the OCCT JS worker `op*` handlers are **not yet wired**, so geometry does not render. |
-| **Automotive engineer** | Class-A bodyside / component + DMU + supplier exchange | 🔴 cannot | Transfers: NURBS surfacing, FEM, 5-axis CAM. Gaps: Class-A (C2/G2 max, no G3; curvature combs are viz-only; **no zebra/reflection**), BIW stamping (= sheet metal), 3D harness (2D WireViz only), crash/NVH/CFD/durability (FEM is linear-static/modal/thermal only), full-vehicle DMU. See [docs/plans/automotive.md](./docs/plans/automotive.md). |
+| **Automotive engineer** | Class-A bodyside / component + DMU + supplier exchange | 🔴 cannot | Transfers: NURBS surfacing, FEM, 5-axis CAM. Gaps: Class-A (C2/G2 max, no G3; curvature combs are viz-only; zebra/reflection-line viz shipped — shader-side, viewport toggle), BIW stamping (= sheet metal), 3D harness (2D WireViz only), crash/NVH/CFD/durability (FEM is linear-static/modal/thermal only), full-vehicle DMU. See [docs/plans/automotive.md](./docs/plans/automotive.md). |
 | **Education / maker / hobbyist** | A printable / CNC-able functional part, enclosure, or furniture piece + cut list | 🚧 partial | Largest reach + strongest mission (democratizing design); 3D-print slicing (`packages/kerf-slicing`, CuraEngine) + 3/5-axis CAM (`packages/kerf-cam`) shipped. Needs the simple-parametric + cut-list / flat-pack path polished and a clear on-ramp. |
 
 ---
@@ -121,8 +121,8 @@ disqualifies Kerf in minute one.
 | P1-2 | Jewelry | **OCCT JS worker `op*` handlers** for the shipped jewelry toolkit (`opGemstone`/`opGemSeat`/`opJewelryProngHead`/`opJewelryBezel`/`opJewelryChannel`/`opJewelryPave`/`opRingShank`) — node specs written, geometry won't render until wired in `src/lib/occtWorker.js`. Ties to backlog task. | 🚧 in flight |
 | P1-3 | Mechanical | Weldments (structural members + cut lists); **GD&T-from-model** on drawings (drawing engine + GD&T frames exist; model-driven callouts do not). | 🔴 not started |
 | P1-4 | Architect | Parametric family editor; IFC import **Tier 2** (families / MEP / schedules / openings — Tier 1 only today); construction-doc detailing (dimensioned plans/sections, revision clouds, sheet-set mgmt). | 🔴 not started |
-| P1-5 | Jewelry · **Automotive** | Surface-boolean robustness on dense NURBS — eliminate runtime escalation paths so organic models survive booleans reliably. | 🔴 not started |
-| P1-6 | **Automotive** | **Class-A surfacing.** Today: sweep/network/blend + `surface_continuity` (C0–C2 / G0–G2, no G3) + curvature-comb *visualization* only. Ship the **zebra / reflection-line** slice (shader-side, no WASM rebuild). Algorithmic G3 needs custom WASM (`GeomAbs_G3` absent in stock OCCT — verified) and stays deferred. | 🔴 not started |
+| P1-5 | Jewelry · **Automotive** | Surface-boolean robustness on dense NURBS — eliminate runtime escalation paths so organic models survive booleans reliably. Bounded 2-step retry ladder (`_MAX_ATTEMPTS=2`), V-column self-intersection check added, dense-NURBS near-tangent warning, `_build_tolerance_ladder` as single escalation source, `attempts` in return dict. 39-case regression corpus covering dense grids, sliver, near-tangent organic, jewelry shapes (thin bezel wall, prong-into-shank). | ✅ shipped |
+| P1-6 | **Automotive** | **Class-A surfacing.** sweep/network/blend + `surface_continuity` (C0–C2 / G0–G2, no G3) + curvature-comb *visualization* + **zebra / reflection-line viewport toggle** (shader-side `ShaderMaterial`, no WASM rebuild). Algorithmic G3 structurally impossible in stock OCCT (`GeomAbs_G3` absent — verified) and stays deferred. | ✅ shipped |
 | P1-7 | **Automotive** · ECAD | **3D in-vehicle wiring harness** — route through the DMU, bundle/segment/connector libs, formboard flatten, length/gauge/voltage-drop. Today only 2D WireViz `.wiring` diagrams. | 🔴 not started |
 
 ### P2 — moats / breadth (tracked, not urgent)
@@ -281,10 +281,13 @@ roadmap no longer narrates it.
 - **Tolerance stack-up** ✅ — worst-case/RSS/Monte-Carlo + auto chain-walk.
 - **2D drawings (TechDraw-flavored)** ✅ — multi-sheet, dimensions, GD&T
   frames, section hatching, leaders/balloons, centerlines, snap.
-- **NURBS surfacing (Phase 4)** 🚧 — sweep1/2/network/blend +
-  `surface_continuity` (C0–C2/G0–G2). v1 surface booleans + Capability 1
-  (robust surface-direct boolean) + curvature-comb viz shipped; Capability 2
-  trim-by-curve in flight; algorithmic G3 deferred (custom WASM).
+- **NURBS surfacing (Phase 4)** ✅ — sweep1/2/network/blend/loft +
+  `surface_continuity` (C0–C2/G0–G2) + Capability 1 robust surface-direct
+  boolean (`feature_surface_boolean`) + Capability 2 trim-by-curve
+  (`feature_trim_by_curve`) + Capability 4 curvature-comb viz
+  (`feature_surface_curvature_combs`) + zebra / reflection-line viewport
+  toggle (shader-side, no WASM rebuild). Algorithmic G3 deferred (stock
+  OCCT structurally cannot enforce `GeomAbs_G3`).
   → `docs/plans/nurbs-phase-4-full.md`, `nurbs-booleans-v1.md`.
 - **Rhino parity** ✅ — 3DM I/O, SubD (Catmull-Clark), quad remesh, mesh
   tools, layers/display, parametric `.graph`, render output, curve depth,

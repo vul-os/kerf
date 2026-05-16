@@ -9,18 +9,25 @@ This module is distinct from:
 
 Formulas and references
 -----------------------
-IPC-2152 (2009) current-carrying capacity
-    The IPC-2152 standard replaces the older IPC-2221 empirical curves with a
-    more accurate model derived from convection-cooled test coupons.
+IPC trace current-carrying capacity
+    The closed-form base model is the widely-cited IPC-2221(B) Eq. 6-4
+    charts equation (also reproduced in IPC-2152 Annex / Saturn PCB
+    Toolkit).  IPC-2152 (2009) refined the underlying test data, but the
+    IPC-2221 power-law remains the standard analytical form and is used
+    here with the IPC-2152 correction factors layered on top.
 
-    Steady-state current for a trace:
+    Steady-state current for a trace (IPC-2221B Eq.):
         I [A] = k_0 × ΔT^b × A_mil²^c
     where A_mil² = cross-sectional area in mil² (width_mil × thickness_mil),
     ΔT = allowable temperature rise above ambient [°C].
 
-    IPC-2152 Table 6-1 (air-cooled, no ground plane adjacent):
+    IPC-2221B coefficients (air-cooled, no ground plane adjacent):
         External copper:  k_0 = 0.048, b = 0.44,  c = 0.725
         Internal copper:  k_0 = 0.024, b = 0.44,  c = 0.725
+        (internal = exactly half of external — IPC-2221B derating).
+    Reference (Saturn PCB Toolkit / IPC-2221B): a 100 mil-wide, 1 oz
+    external trace at ΔT = 10 °C carries ≈ 4.7 A; 1 A at ΔT = 10 °C
+    needs ≈ 12–13 mil (≈ 0.30 mm) of 1 oz external copper.
 
     Correction factors (IPC-2152 §6.2):
         Copper-weight (oz/ft²) correction: from regression of IPC-2152 Fig. 6-1

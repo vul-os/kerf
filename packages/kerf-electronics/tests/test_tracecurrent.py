@@ -689,3 +689,85 @@ class TestLlmToolHandlers:
         data = json.loads(raw)
         # Real registry err_payload: {"error": ..., "code": ...}; stub: {"ok": False, ...}
         assert data.get("ok") is False or "error" in data
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Externally-citable reference cases (IPC-2221B / IEC 60228 / NIST)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestExternalReferenceCases:
+    """Cross-checks against IPC-2221B and material-property standards."""
+
+    def test_ref_ipc2221_100mil_1oz_dt10_ext_4p7a(self):
+        # IPC-2221B Eq. (Saturn PCB Toolkit reference): a 100 mil-wide,
+        # 1 oz external trace at ΔT = 10 °C carries ≈ 4.7 A.
+        r = ipc2152_trace_current(width_mm=2.54, copper_oz=1.0,
+                                  delta_t_c=10.0, layer="external")
+        assert 4.5 < r["current_a"] < 4.9
+
+    def test_ref_ipc2221_internal_is_half_external(self):
+        # IPC-2221B: internal-layer derating is exactly k=0.024 vs
+        # external k=0.048 → internal capacity = ½ external.
+        ext = ipc2152_trace_current(width_mm=2.54, copper_oz=1.0,
+                                    delta_t_c=10.0, layer="external")
+        intl = ipc2152_trace_current(width_mm=2.54, copper_oz=1.0,
+                                     delta_t_c=10.0, layer="internal")
+        # Exactly 0.5 analytically (k=0.024 vs 0.048); the small residual
+        # is solely the 4-decimal rounding of the returned current.
+        assert abs(intl["current_a"] / ext["current_a"] - 0.5) < 1e-4
+
+    def test_ref_ipc2221_1a_dt10_ext_needs_12mil(self):
+        # IPC-2221B reference: 1 A at ΔT = 10 °C on 1 oz external
+        # copper requires ≈ 12–13 mil ≈ 0.30 mm width.
+        r = required_trace_width(current_a=1.0, copper_oz=1.0,
+                                 delta_t_c=10.0, layer="external")
+        assert 0.27 < r["width_mm"] < 0.34
+
+    def test_ref_ipc2221_dt_exponent_044(self):
+        # IPC-2221B exponent b = 0.44 on ΔT: doubling ΔT scales the
+        # base current by 2^0.44 = 1.357.
+        r10 = ipc2152_trace_current(width_mm=1.0, copper_oz=1.0,
+                                    delta_t_c=10.0, layer="external")
+        r20 = ipc2152_trace_current(width_mm=1.0, copper_oz=1.0,
+                                    delta_t_c=20.0, layer="external")
+        ratio = r20["current_base_a"] / r10["current_base_a"]
+        assert abs(ratio - 2.0 ** 0.44) < 0.005
+
+    def test_ref_ipc2221_area_exponent_0725(self):
+        # IPC-2221B exponent c = 0.725 on cross-section: doubling area
+        # (via width) scales base current by 2^0.725 = 1.653.
+        r1 = ipc2152_trace_current(width_mm=1.0, copper_oz=1.0,
+                                   delta_t_c=10.0, layer="external")
+        r2 = ipc2152_trace_current(width_mm=2.0, copper_oz=1.0,
+                                   delta_t_c=10.0, layer="external")
+        assert abs(r2["current_base_a"] / r1["current_base_a"]
+                   - 2.0 ** 0.725) < 0.005
+
+    def test_ref_iec60228_copper_resistivity(self):
+        # IEC 60228 annealed copper ρ20 = 1.724e-8 Ω·m: a 10 mm-long,
+        # 0.25 mm-wide, 1 oz (34.8 µm) trace at 20 °C → R = ρL/A.
+        r = trace_resistance(length_mm=10.0, width_mm=0.25,
+                             copper_oz=1.0, temp_c=20.0)
+        expected = 1.724e-8 * 0.010 / (0.25e-3 * 34.8e-6)
+        assert abs(r["resistance_ohm"] - expected) / expected < 0.01
+
+    def test_ref_nist_copper_tempco(self):
+        # NIST Cu temperature coefficient α = 3.93e-3 /°C: resistance
+        # at 100 °C is (1 + α·80)× the 20 °C value.
+        r20 = trace_resistance(length_mm=10.0, width_mm=0.25,
+                               copper_oz=1.0, temp_c=20.0)
+        r100 = trace_resistance(length_mm=10.0, width_mm=0.25,
+                                copper_oz=1.0, temp_c=100.0)
+        assert abs(r100["resistance_ohm"] / r20["resistance_ohm"]
+                   - (1.0 + 3.93e-3 * 80.0)) < 0.01
+
+    def test_ref_copper_weight_1oz_is_34p8um(self):
+        # IPC: 1 oz/ft² copper = 34.8 µm = 0.0348 mm (1.378 mil) — the
+        # universal PCB copper-weight conversion.
+        assert abs(_OZ_TO_MM - 0.0348) < 1e-9
+
+    def test_ref_sheet_resistance_1oz_copper(self):
+        # 1 oz copper sheet resistance Rs = ρ/t = 1.724e-8/34.8e-6 ≈
+        # 0.495 mΩ/sq at 20 °C (classic PCB design-rule figure).
+        r = plane_sheet_resistance(copper_oz=1.0, temp_c=20.0)
+        assert abs(r["sheet_resistance_ohm_sq"] * 1e3 - 0.495) < 0.02

@@ -85,8 +85,15 @@ from typing import Any
 # Air density at standard conditions (0.075 lb/ft³ @ 70 °F, sea level)
 _AIR_RHO_LB_FT3 = 0.075
 
-# 1 in. w.g. = 5.18864 lb/ft²
-_IN_WG_PER_LB_FT2 = 1.0 / 5.18864
+# Gravitational conversion constant gc = 32.174 lbm·ft/(lbf·s²).
+# Required to convert ρ·V²/2 (ρ in lbm/ft³, V in ft/s — i.e. poundal-based)
+# into a true force-based pressure in lbf/ft².  Omitting it inflates the
+# Darcy-Weisbach pressure loss by ~32×.
+_GC_LBM_FT_LBF_S2 = 32.174
+
+# 1 in. w.g. = 5.20233 lbf/ft²  (internally consistent with the
+# 1 in. w.g. = 249.089 Pa conversion used elsewhere: 249.089 / 47.880259).
+_IN_WG_PER_LB_FT2 = 1.0 / 5.20233
 
 # Sensible heat factor for standard air: Q = 1.08 × CFM × ΔT  (BTU/h)
 # where 1.08 = 60 min/hr × 0.075 lb/ft³ × 0.24 BTU/(lb·°F)
@@ -427,8 +434,10 @@ def duct_friction_loss(
 
     f = _friction_factor(re, eps_ft, d_ft)
 
-    # Darcy-Weisbach: ΔP = f × (L/D) × ½ρV² (lb/ft²)
-    dP_lb_ft2 = f * (L_ft / d_ft) * _AIR_RHO_LB_FT3 * v_fps ** 2 / 2.0
+    # Darcy-Weisbach: ΔP = f × (L/D) × ρV² / (2·g_c)   [lbf/ft²]
+    # g_c converts the poundal-based ρV²/2 term (ρ in lbm/ft³, V in ft/s)
+    # to a force-based pressure in lbf/ft².
+    dP_lb_ft2 = f * (L_ft / d_ft) * _AIR_RHO_LB_FT3 * v_fps ** 2 / (2.0 * _GC_LBM_FT_LBF_S2)
     dP_in_wg = dP_lb_ft2 * _IN_WG_PER_LB_FT2
     # Convert in. w.g. to Pa (1 in. w.g. = 249.089 Pa)
     dP_Pa = dP_in_wg * 249.089
@@ -599,8 +608,8 @@ def size_duct_equal_friction(
         v_fps = cfm_v / (area_ft2 * 60.0)
         re = v_fps * d_ft / _AIR_NU_FT2_S
         f = _friction_factor(re, eps_ft, d_ft)
-        # ΔP per foot = f / D × ρ × V² / 2 (lb/ft²/ft)
-        dP_per_ft_lb = f / d_ft * _AIR_RHO_LB_FT3 * v_fps ** 2 / 2.0
+        # ΔP per foot = f / D × ρ × V² / (2·g_c)  [lbf/ft²/ft]
+        dP_per_ft_lb = f / d_ft * _AIR_RHO_LB_FT3 * v_fps ** 2 / (2.0 * _GC_LBM_FT_LBF_S2)
         dP_per_ft_in_wg = dP_per_ft_lb * _IN_WG_PER_LB_FT2
         return dP_per_ft_in_wg * 100.0
 

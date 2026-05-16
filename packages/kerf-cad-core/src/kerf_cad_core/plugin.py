@@ -131,6 +131,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.vacuum.tools",
     "kerf_cad_core.windturbine.tools",
     "kerf_cad_core.hydroturbine.tools",
+    "kerf_cad_core.forming.tools",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

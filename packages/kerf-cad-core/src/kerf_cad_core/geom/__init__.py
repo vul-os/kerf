@@ -55,6 +55,16 @@ from kerf_cad_core.geom.surface_boolean_robust import (
     surface_boolean_robust,
 )
 
+from kerf_cad_core.geom.brep_build import (
+    BuildError,
+    surface_to_face,
+    surfaces_to_shell,
+    closed_shell_to_solid,
+    box_to_body,
+    cylinder_to_body,
+    sphere_to_body,
+)
+
 __all__ = [
     "NurbsCurve",
     "NurbsSurface",
@@ -93,4 +103,11 @@ __all__ = [
     "compute_blend_surface_isocurves",
     "surface_health_check",
     "surface_boolean_robust",
+    "BuildError",
+    "surface_to_face",
+    "surfaces_to_shell",
+    "closed_shell_to_solid",
+    "box_to_body",
+    "cylinder_to_body",
+    "sphere_to_body",
 ]

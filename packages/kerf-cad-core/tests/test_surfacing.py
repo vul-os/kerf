@@ -177,8 +177,11 @@ def test_nurbs_curve_derivative():
     deriv = line.derivative(0.5, order=1)
 
     assert deriv.shape == (3,)
-    expected = np.array([1.0, 1.0, 0.0]) / np.sqrt(2)
-    assert np.allclose(deriv, expected, atol=0.1)
+    # True (un-normalised) derivative of the degree-1 line from (0,0,0) to
+    # (1,1,0) is the constant tangent [1,1,0]. (Pre-GK-03 this wrongly
+    # asserted the unit-normalised [1,1,0]/√2 — that assertion encoded the bug.)
+    expected = np.array([1.0, 1.0, 0.0])
+    assert np.allclose(deriv, expected, atol=1e-9)
 
 
 if __name__ == "__main__":

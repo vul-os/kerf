@@ -195,6 +195,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.jewelry.repair",
     "kerf_cad_core.jewelry.appraisal",
     "kerf_cad_core.jewelry.stringing",
+    "kerf_cad_core.jewelry.watch",
+    "kerf_cad_core.procsim.toolpath_verify",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

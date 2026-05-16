@@ -608,14 +608,21 @@ def lateral_earth_pressure(
         z_p_base = H_val / 3.0
 
     else:  # coulomb
-        # Coulomb Ka (vertical wall, horizontal backfill):
-        # Ka = sin²(90+φ) / [sin²(90) × sin(90-δ) × (1 + √(sin(φ+δ)sin(φ)/sin(90-δ)))²]
-        # Simplified standard Coulomb formula for vertical wall (α=90°), β=0 backfill:
-        #   Ka = sin²(φ) / [cos(δ) × (1 + √(sin(φ+δ)sin(φ)/cos(δ)))²]
-        # Meyerhof / standard form:
+        # Coulomb active coefficient — vertical wall (α=90°), horizontal
+        # backfill (β=0).  The general Coulomb expression
+        #   Ka = sin²(α+φ) /
+        #        [ sin²α·sin(α−δ)·(1 + √(sin(φ+δ)sin(φ−β) /
+        #                              (sin(α−δ)sin(α+β))))² ]
+        # reduces, for α=90° and β=0, to the standard form
+        #   Ka = cos²φ /
+        #        [ cos δ·(1 + √(sin(φ+δ)·sin φ / cos δ))² ]
+        # Reference: Das, "Principles of Geotechnical Engineering", 9th ed.,
+        # §13.7 (Coulomb's active earth pressure); Bowles §11.
+        # NOTE: the previous implementation used sin²φ in the numerator,
+        # which underestimated Ka by ~3× (non-conservative for wall design).
 
         def _coulomb_Ka(phi_r: float, delta_r: float) -> float:
-            num = math.sin(phi_r) ** 2
+            num = math.cos(phi_r) ** 2
             sqt_arg = (math.sin(phi_r + delta_r) * math.sin(phi_r)) / math.cos(delta_r)
             if sqt_arg < 0:
                 sqt_arg = 0.0
@@ -623,13 +630,10 @@ def lateral_earth_pressure(
             return num / max(denom, 1e-12)
 
         def _coulomb_Kp(phi_r: float, delta_r: float) -> float:
-            num = math.sin(math.pi - phi_r) ** 2  # sin(180-φ) = sin(φ)
-            num = math.sin(phi_r) ** 2
-            sqt_arg = (math.sin(phi_r + delta_r) * math.sin(phi_r)) / math.cos(delta_r)
-            if sqt_arg < 0:
-                sqt_arg = 0.0
-            # Kp = sin²(φ) × cos²(δ) / (cos(δ)(1 - √(...)))²  — use Rankine for Kp
-            # Coulomb Kp is typically overestimated; use Rankine for conservative Kp
+            # Coulomb passive coefficient is well known to overestimate Kp for
+            # δ > φ/3 (plane-failure-surface assumption).  Use the Rankine
+            # passive value, which is conservative for design.
+            # Reference: Das §13.9 (Coulomb passive pressure caveat).
             Kp_rank = math.tan(math.pi / 4.0 + phi_r / 2.0) ** 2
             return Kp_rank
 

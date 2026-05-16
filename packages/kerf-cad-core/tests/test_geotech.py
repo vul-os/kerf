@@ -512,6 +512,140 @@ class TestPileAxialCapacity:
 
 
 # ===========================================================================
+# 6b. CITABLE REFERENCE CASES — known numeric answers from textbooks
+# ---------------------------------------------------------------------------
+# Each case cites a specific source. Bearing-capacity factors use the
+# Meyerhof Nc/Nq + Vesic Nγ = 2(Nq+1)tanφ formulation, which is the
+# standard tabulated set in:
+#   Das, B.M. "Principles of Geotechnical Engineering", 9th ed., Table 3.3
+#   Bowles, J.E. "Foundation Analysis and Design", 5th ed., Table 4-4
+#   Vesic, A.S. (1973) "Analysis of ultimate loads of shallow foundations"
+# ===========================================================================
+
+class TestCitableReferenceCases:
+
+    REL2 = 1e-3  # 0.1 % — accommodates rounding in published tables
+
+    def test_bcf_phi30_das_table_3_3(self):
+        """Das 9th ed. Table 3.3 / Bowles Table 4-4: φ=30° →
+        Nc=30.14, Nq=18.40, Nγ(Vesic)=22.40."""
+        res = bearing_capacity(c=0.0, phi_deg=30.0, gamma=18.0, Df=1.0, B=1.0)
+        assert res["ok"] is True
+        assert abs(res["Nc"] - 30.14) / 30.14 < self.REL2
+        assert abs(res["Nq"] - 18.40) / 18.40 < self.REL2
+        assert abs(res["Ngamma"] - 22.40) / 22.40 < self.REL2
+
+    def test_bcf_phi20_das_table_3_3(self):
+        """Das 9th ed. Table 3.3: φ=20° → Nc=14.83, Nq=6.40, Nγ=5.39."""
+        res = bearing_capacity(c=0.0, phi_deg=20.0, gamma=18.0, Df=1.0, B=1.0)
+        assert res["ok"] is True
+        assert abs(res["Nc"] - 14.83) / 14.83 < self.REL2
+        assert abs(res["Nq"] - 6.40) / 6.40 < self.REL2
+        assert abs(res["Ngamma"] - 5.39) / 5.39 < self.REL2
+
+    def test_bcf_phi40_das_table_3_3(self):
+        """Das 9th ed. Table 3.3: φ=40° → Nc=75.31, Nq=64.20, Nγ=109.41."""
+        res = bearing_capacity(c=0.0, phi_deg=40.0, gamma=18.0, Df=1.0, B=1.0)
+        assert res["ok"] is True
+        assert abs(res["Nc"] - 75.31) / 75.31 < self.REL2
+        assert abs(res["Nq"] - 64.20) / 64.20 < self.REL2
+        assert abs(res["Ngamma"] - 109.41) / 109.41 < self.REL2
+
+    def test_bearing_phi0_undrained_clay_prandtl(self):
+        """Undrained clay (φ=0): q_ult = c·Nc + q with Nc = 5.14 (= π+2),
+        the Prandtl exact bearing-capacity limit (Das §3.3, Eq. 3.21).
+        c=50 kPa, γ=18, Df=1 m, strip → q_ult = 50·5.14 + 18·1 = 275 kPa."""
+        res = bearing_capacity(c=50.0, phi_deg=0.0, gamma=18.0, Df=1.0,
+                               B=2.0, foundation_type="strip")
+        assert res["ok"] is True
+        q_ult_exp = 50.0 * 5.14 + 18.0 * 1.0  # Nγ term = 0 for φ=0
+        assert abs(res["q_ult_kPa"] - q_ult_exp) / q_ult_exp < 2e-3
+
+    def test_rankine_ka_phi30_exact_one_third(self):
+        """Rankine active coefficient: Ka = tan²(45−φ/2). For φ=30°,
+        Ka = tan²30° = 1/3 exactly (Das §13.5, classic result)."""
+        res = lateral_earth_pressure(18.0, 5.0, 30.0, method="rankine")
+        assert res["ok"] is True
+        assert abs(res["Ka"] - 1.0 / 3.0) < 1e-9
+        assert abs(res["Kp"] - 3.0) < 1e-9  # Kp = 1/Ka = 3
+
+    def test_rankine_active_thrust_das_example(self):
+        """Dry cohesionless backfill, γ=18 kN/m³, H=5 m, φ=30°.
+        Pa = ½·Ka·γ·H² = ½·(1/3)·18·25 = 75.0 kN/m acting at H/3 = 1.667 m
+        above the base (Das §13.5 worked example)."""
+        res = lateral_earth_pressure(18.0, 5.0, 30.0, method="rankine")
+        assert res["ok"] is True
+        assert abs(res["Pa_kN_m"] - 75.0) / 75.0 < 1e-6
+        assert abs(res["Pa_z_m"] - 5.0 / 3.0) / (5.0 / 3.0) < 1e-6
+
+    def test_coulomb_ka_phi30_delta20_das(self):
+        """Coulomb active coefficient, vertical wall, level backfill,
+        φ=30°, δ=20°: Ka = cos²φ / [cosδ·(1+√(sin(φ+δ)sinφ/cosδ))²]
+        = 0.2973 (Das, "Principles of Geotechnical Engineering",
+        §13.7 Coulomb's active pressure)."""
+        res = lateral_earth_pressure(18.0, 5.0, 30.0, method="coulomb",
+                                     delta_deg=20.0)
+        assert res["ok"] is True
+        assert abs(res["Ka"] - 0.29731) / 0.29731 < 1e-3
+
+    def test_coulomb_ka_delta_zero_reduces_to_rankine(self):
+        """With δ=0 the Coulomb active coefficient must collapse to the
+        Rankine value Ka = tan²(45−φ/2) (Das §13.7 limiting case).
+        For φ=35°: Ka_Rankine = tan²(27.5°) = 0.2710."""
+        phi = 35.0
+        res = lateral_earth_pressure(18.0, 5.0, phi, method="coulomb",
+                                     delta_deg=0.0)
+        assert res["ok"] is True
+        Ka_rankine = math.tan(math.radians(45.0 - phi / 2.0)) ** 2
+        assert abs(res["Ka"] - Ka_rankine) / Ka_rankine < 1e-6
+
+    def test_consolidation_settlement_das_example(self):
+        """One-dimensional primary consolidation (Das §11, Eq. 11.x):
+        Sc = Cc/(1+e0)·H·log10(σ'v/σ'v0).
+        Cc=0.4, e0=1.2, H=5 m, σ'v0=100 kPa, σ'v=200 kPa →
+        Sc = 0.4/2.2·5·log10(2) = 0.27366 m (273.7 mm)."""
+        res = settlement(200.0, 0.4, 1.2, 5.0, sigma_v0=100.0)
+        assert res["ok"] is True
+        assert abs(res["settlement_m"] - 0.273664) / 0.273664 < 1e-4
+        assert abs(res["settlement_mm"] - 273.664) / 273.664 < 1e-4
+
+    def test_immediate_settlement_boussinesq(self):
+        """Elastic immediate settlement Si = q·B·(1−ν²)/Es
+        (Das §10, flexible-footing Boussinesq form).
+        q=100 kPa, B=2 m, ν=0.3, Es=20 000 kPa →
+        Si = 100·2·(1−0.09)/20000 = 0.0091 m."""
+        res = settlement(100.0, 20000.0, 0.3, 2.0,
+                         settlement_type="immediate")
+        assert res["ok"] is True
+        assert abs(res["settlement_m"] - 0.0091) / 0.0091 < 1e-6
+
+    def test_infinite_slope_dry_cohesionless_das(self):
+        """Infinite slope, dry cohesionless: FS = tanφ/tanβ
+        (Das §15, Eq. for infinite slope without seepage).
+        φ=30°, β=20° → FS = tan30/tan20 = 1.5866."""
+        res = slope_stability_infinite(18.0, 0.0, 30.0, 3.0, 20.0)
+        assert res["ok"] is True
+        FS_exp = math.tan(math.radians(30.0)) / math.tan(math.radians(20.0))
+        assert abs(res["FS"] - FS_exp) / FS_exp < 1e-9
+        assert abs(res["FS"] - 1.586257) / 1.586257 < 1e-4
+
+    def test_pile_alpha_method_das_example(self):
+        """α-method pile capacity (Das §12 / API RP 2GEO):
+        Qs = α·fs·perimeter·L, Qp = qp·A_tip.
+        0.4 m dia pile: perimeter=π·0.4, A_tip=π·0.4²/4, fs=50 kPa,
+        qp=450 kPa, L=15 m, α=0.7 →
+        Qs = 0.7·50·1.25664·15 = 659.73 kN,
+        Qp = 450·0.125664 = 56.55 kN, Q_ult = 716.28 kN."""
+        perim = math.pi * 0.4
+        a_tip = math.pi / 4.0 * 0.4 ** 2
+        res = pile_axial_capacity(perim, a_tip, 50.0, 450.0, 15.0, alpha=0.7)
+        assert res["ok"] is True
+        assert abs(res["Qs_kN"] - 659.734) / 659.734 < 1e-4
+        assert abs(res["Qp_kN"] - 56.549) / 56.549 < 1e-4
+        assert abs(res["Q_ult_kN"] - 716.283) / 716.283 < 1e-4
+
+
+# ===========================================================================
 # 7. LLM tool wrappers
 # ===========================================================================
 

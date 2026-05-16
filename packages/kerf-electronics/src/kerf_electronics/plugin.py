@@ -133,6 +133,7 @@ def _register_tools(ctx, provides: list) -> None:
         "kerf_electronics.motordrive.tools",
         "kerf_electronics.powerconv.tools",
         "kerf_electronics.dsp.tools",
+        "kerf_electronics.oscillator.tools",
     ]
 
     for module_path in tool_modules:

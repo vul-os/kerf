@@ -128,6 +128,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.boiler.tools",
     "kerf_cad_core.spillway.tools",
     "kerf_cad_core.refrigeration.tools",
+    "kerf_cad_core.vacuum.tools",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

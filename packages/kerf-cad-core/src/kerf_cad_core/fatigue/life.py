@@ -937,25 +937,27 @@ def miner_damage(
 
 
 # ---------------------------------------------------------------------------
-# 7. rainflow_count — ASTM E1049 three-point stack algorithm
+# 7. rainflow_count — ASTM E1049-85 four-point rainflow algorithm
 # ---------------------------------------------------------------------------
 
 def rainflow_count(history: list[float]) -> dict:
     """
-    ASTM E1049 rainflow cycle counting (three-point stack algorithm).
+    ASTM E1049-85(2017) rainflow cycle counting (four-point algorithm).
 
     Counts fatigue cycles from a stress/strain time history using the
-    ASTM E1049-85 stack-based algorithm.  The history is first reduced to
-    its turning points (peaks and valleys) before counting.
+    ASTM E1049-85 §5.4.4 four-point stack-based algorithm.  The history is
+    first reduced to its turning points (peaks and valleys) before counting.
 
-    Algorithm outline (Amzallag et al. 1994 / ASTM E1049 §5.4.4):
+    Algorithm outline (ASTM E1049-85 §5.4.4; Dowling §9.9):
       1. Reduce history to turning points (peaks and valleys).
-      2. Process turning points into a stack.  For each new point appended
-         to the stack, check the last three values (X0, X1, X2):
-           R1 = |X1 − X0|, R2 = |X2 − X1|
-           if R2 >= R1: count cycle with range R1, mean=(X0+X1)/2;
-                        remove the consumed pair from the stack.
-         Continue checking after each removal until no more can be extracted.
+      2. Process turning points into a stack.  Whenever the stack holds at
+         least four points (A, B, C, D, oldest→newest), form the ranges
+           Y = |B − C|   (interior candidate cycle)
+           X = |C − D|   (most-recent range)
+         If X >= Y the interior range Y is a closed full cycle: count it
+         (count=1.0, mean=(B+C)/2) and remove the two interior points B and
+         C, keeping A and D so the outer envelope can close future cycles.
+         Repeat until no further cycle can be closed.
       3. Remaining stack entries form residual half-cycles (count=0.5 each).
 
     Parameters
@@ -1048,44 +1050,62 @@ def _extract_turning_points(pts: list[float]) -> list[float]:
 
 def _rainflow_three_point(tp: list[float]) -> list[tuple[float, float, float]]:
     """
-    ASTM E1049 three-point stack algorithm.
+    ASTM E1049-85(2017) §5.4.4 four-point rainflow cycle-counting algorithm.
 
-    Returns a list of (range, mean, count) tuples where:
-      count = 1.0 for full cycles (inner pair fully enclosed by outer sequence)
-      count = 0.5 for residual half-cycles from the final stack
+    The history (already reduced to turning points) is fed point-by-point onto
+    a stack.  Whenever the stack holds at least four points the algorithm
+    examines the two most-recent ranges:
 
-    Reference: Amzallag et al. (1994) "Standardization of the rainflow counting
-    method for fatigue analysis", Int. J. Fatigue 16(4):287-293.
+        Y = |B − C|   (range formed by the second-and-third newest points)
+        X = |C − D|   (range formed by the two newest points)
+
+    where the top four stack entries are A, B, C, D.  If ``X >= Y`` the inner
+    range Y is a *closed* full cycle: it is counted (count = 1.0) and the two
+    interior points B and C are removed from the stack so the outer points can
+    pair with future turning points.  Otherwise no cycle can yet be closed and
+    the next turning point is read.
+
+    After the history is exhausted the points remaining on the stack form the
+    residual reversals; each consecutive pair is counted as a half cycle
+    (count = 0.5).  This is exactly the standard ASTM E1049 treatment and
+    matches the reference implementation in Dowling §9.9 and the canonical
+    ASTM E1049-85 worked example.
+
+    Returns a list of (range, mean, count) tuples.
+
+    References
+    ----------
+    ASTM E1049-85(2017) §5.4.4 (four-point method)
+    Dowling, N.E. "Mechanical Behavior of Materials", 4th ed., §9.9
+    Amzallag et al. (1994) Int. J. Fatigue 16(4):287-293.
     """
     stack: list[float] = []
     cycles: list[tuple[float, float, float]] = []
 
     for x in tp:
         stack.append(x)
-        # Repeatedly try to extract from the top of the stack
-        while len(stack) >= 3:
-            X0, X1, X2 = stack[-3], stack[-2], stack[-1]
-            R1 = abs(X1 - X0)   # range of candidate cycle
-            R2 = abs(X2 - X1)   # range of next segment
-            if R2 >= R1:
-                mean = (X0 + X1) / 2.0
-                if len(stack) == 3:
-                    # Sequence start — half-cycle (no outer enclosure)
-                    cycles.append((R1, mean, 0.5))
-                    del stack[-2]   # remove the middle point X1
-                else:
-                    # Full cycle: X0 and X1 are enclosed by outer points
-                    cycles.append((R1, mean, 1.0))
-                    del stack[-3]   # remove X0
-                    del stack[-2]   # remove X1 (now index -2 after X0 removed)
+        # Close every full cycle that the new point makes possible.
+        while len(stack) >= 4:
+            # Top four points (oldest → newest): A, B, C, D
+            _A, B, C, D = stack[-4], stack[-3], stack[-2], stack[-1]
+            Y = abs(B - C)   # candidate (interior) cycle range
+            X = abs(C - D)   # most-recent range
+            if X >= Y and Y > 0:
+                # Inner range Y is fully enclosed → one closed full cycle.
+                cycles.append((Y, (B + C) / 2.0, 1.0))
+                # Remove the two interior points B and C; keep A and D so the
+                # outer envelope can continue to close future cycles.
+                del stack[-3]   # remove B
+                del stack[-2]   # remove C (index -2 after B removed)
             else:
-                break   # can't extract more until the next turning point arrives
+                break   # nothing closable until the next turning point
 
-    # Remaining stack entries form residual half-cycles
+    # Residual reversals: each consecutive remaining pair is a half cycle.
     for i in range(len(stack) - 1):
         R = abs(stack[i + 1] - stack[i])
         mean = (stack[i] + stack[i + 1]) / 2.0
-        cycles.append((R, mean, 0.5))
+        if R > 0:
+            cycles.append((R, mean, 0.5))
 
     return cycles
 

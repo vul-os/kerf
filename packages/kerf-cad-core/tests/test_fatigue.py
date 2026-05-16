@@ -945,3 +945,99 @@ class TestFatigueExternalReferences:
         r = _ref_fl(150e6, 200e6, 900e6, -0.085, 600e6)
         assert r["infinite_life"] is True
         assert r["n_fatigue"] == pytest.approx(200e6 / 150e6, rel=1e-12)
+
+
+class TestFatigueExternalReferencesII:
+    """Independent worked examples — Shigley 10th ed. §§6-7..6-16,
+    Dowling 'Mechanical Behavior of Materials' 4th ed. §§9,12,
+    ASTM E1049-85, Norton 'Machine Design' 5th ed. Ch.6."""
+
+    def test_basquin_inverse_recovers_amplitude(self):
+        # Dowling Eq (9.5): σa = Sf'(2N)^b. Round-trip: feed σa, recover 2N,
+        # then σa = Sf'·(2N)^b must reproduce the input.
+        Sf, b = 1100e6, -0.09
+        sa = 350e6
+        r = _ref_sn(sa, Sf, b)
+        twoN = r["two_N"]
+        assert Sf * twoN ** b == pytest.approx(sa, rel=1e-9)
+
+    def test_basquin_lower_stress_longer_life(self):
+        # Basquin monotonicity: lower σa → strictly longer life (b<0).
+        hi = _ref_sn(500e6, 1200e6, -0.085)["N_cycles"]
+        lo = _ref_sn(300e6, 1200e6, -0.085)["N_cycles"]
+        assert lo > hi > 0
+
+    def test_marin_load_factor_torsion(self):
+        # Shigley §6-14: load factor kc=0.59 for torsion. Se = product·Se'.
+        # Se'=350 MPa, kc=0.59, all others 1 → Se=206.5 MPa.
+        r = _ref_se(350e6, kc=0.59)
+        assert r["Se_Pa"] == pytest.approx(0.59 * 350e6, rel=1e-12)
+        assert r["product_k"] == pytest.approx(0.59, rel=1e-12)
+
+    def test_marin_full_product_shigley_6_19(self):
+        # Shigley Eq (6-18): Se = ka·kb·kc·kd·ke·kf·Se'. Surface ka=0.78
+        # (machined), kb=0.86 (size), kc=1, kd=1, ke=0.868 (R=95%), kf=1.
+        r = _ref_se(350e6, ka=0.78, kb=0.86, kc=1.0, kd=1.0, ke=0.868, kf=1.0)
+        exp = 0.78 * 0.86 * 1.0 * 1.0 * 0.868 * 1.0 * 350e6
+        assert r["Se_Pa"] == pytest.approx(exp, rel=1e-12)
+
+    def test_goodman_safety_factor_unity_at_boundary(self):
+        # Shigley Eq (6-46): on the Goodman line σa/Se + σm/Sut = 1 the
+        # equivalent amplitude σar equals Se exactly (SF=1).
+        Se, Sut = 200e6, 500e6
+        sm = 250e6
+        sa = Se * (1.0 - sm / Sut)              # point on the Goodman line
+        r = _ref_msc(sa, sm, Se, Sut, 400e6, method="goodman")
+        assert r["sigma_ar_Pa"] == pytest.approx(Se, rel=1e-9)
+        assert r["safety_factor"] == pytest.approx(1.0, rel=1e-9)
+
+    def test_gerber_less_conservative_than_goodman(self):
+        # Dowling §9.6: for tensile mean, Gerber predicts a smaller σar
+        # (longer life) than the linear Goodman line.
+        g = _ref_msc(100e6, 200e6, 150e6, 400e6, 300e6, method="goodman")
+        ge = _ref_msc(100e6, 200e6, 150e6, 400e6, 300e6, method="gerber")
+        assert ge["sigma_ar_Pa"] < g["sigma_ar_Pa"]
+
+    def test_swt_compressive_mean_beneficial(self):
+        # Dowling Eq (9.42) SWT: if σmax=σa+σm ≤ 0 the cycle is fully
+        # compressive → no fatigue damage, σar=0.
+        r = _ref_msc(100e6, -150e6, 200e6, 500e6, 350e6, method="swt")
+        assert r["sigma_ar_Pa"] == pytest.approx(0.0, abs=1e-9)
+        assert r["fatigue_ok"] is True
+
+    def test_miner_partial_damage_no_failure(self):
+        # Shigley Eq (6-58) Palmgren-Miner: two blocks each at 1/4 of their
+        # S-N life → D = 0.25+0.25 = 0.5 < 1 (survives).
+        Sf, b = 1200e6, -0.085
+        sa = 400e6
+        N = (sa / Sf) ** (1.0 / b) / 2.0
+        r = _ref_miner([N / 4.0, N / 4.0], [sa, sa], Sf, b)
+        assert r["D"] == pytest.approx(0.5, rel=1e-9)
+        assert r["damage_exceeded"] is False
+        assert r["remaining_life"] == pytest.approx(0.5, rel=1e-9)
+
+    def test_rainflow_simple_two_cycle(self):
+        # ASTM E1049-85 §5.4.4: history [0,2,-2,2,-2,0]. The interior 2→-2
+        # swings close as full cycles of range 4 (the 0→2 / -2→0 ends are
+        # residual half-cycles).  Cross-checked against the reference
+        # `rainflow` library and Dowling §9.9: the DOMINANT (max) range is
+        # 4, NOT 2 — earlier code wrongly reported peak range 2 here.
+        r = _ref_rf([0, 2, -2, 2, -2, 0])
+        assert r["ok"]
+        assert r["n_points"] == 6
+        assert r["peak_range"] == pytest.approx(4.0, rel=1e-9)
+        # At least one *closed* full cycle (count=1.0) of range 4 must exist.
+        full = [c for c in r["cycles"] if c["count"] >= 1.0]
+        assert any(c["range"] == pytest.approx(4.0, rel=1e-9) for c in full)
+        # Reversal conservation: Σ 2·count == n_points − 1 (= 5).
+        total_half = sum(2.0 * c["count"] for c in r["cycles"])
+        assert total_half == pytest.approx(r["n_points"] - 1, abs=1e-9)
+
+    def test_fatigue_life_finite_basquin_consistency(self):
+        # Shigley §6-7/6-8: when σa·sf > Se the predicted life equals the
+        # Basquin S-N life at the design amplitude.
+        sa, Se, Sf, b, Sut = 300e6, 180e6, 900e6, -0.085, 700e6
+        r = _ref_fl(sa, Se, Sf, b, Sut, safety_factor=1.0)
+        assert r["infinite_life"] is False
+        twoN = (sa / Sf) ** (1.0 / b)
+        assert r["N_predicted"] == pytest.approx(twoN / 2.0, rel=1e-9)

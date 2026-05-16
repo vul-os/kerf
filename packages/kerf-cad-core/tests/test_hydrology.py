@@ -560,8 +560,118 @@ def test_storm_sewer_pipe_size_invalid_slope():
     assert result["ok"] is False
 
 
+# ===========================================================================
+# CITABLE TR-55 / NEH-630 / Kirpich reference cases
+#
+# Values cross-checked against:
+#   - USDA SCS (1986) TR-55 "Urban Hydrology for Small Watersheds"
+#   - USDA NRCS NEH Part 630, Ch. 10 (2004) — runoff curve number method
+#   - Kirpich, Z.P. (1940), Civil Engineering 10(6)
+#   - ASCE/EWRI 45-05 — Rational Method
+#
+# These confirm two defect fixes:
+#   (1) the cfs/mi²/in → m³/s·km⁻²·mm⁻¹ conversion was ~10× too large,
+#       inflating scs_peak_flow by an order of magnitude;
+#   (2) the TR-55 Eq. 3-3 sheet-flow coefficient was 0.091 instead of the
+#       canonical 0.007 (English form), inflating sheet travel time ~13×.
+# ===========================================================================
+
+def test_scs_runoff_depth_neh630_cn75_5in():
+    """NEH-630 / TR-55: CN = 75, P = 5 in (127 mm).
+    S = 1000/75 − 10 = 3.333 in = 84.667 mm; Ia = 0.2S.
+    Q = (P−Ia)²/(P−Ia+S) → 2.45 in ≈ 62.21 mm (TR-55 tabulated)."""
+    r = scs_runoff_depth(P_mm=127.0, CN=75.0)
+    assert r["ok"] is True
+    assert abs(r["S_mm"] - 84.667) < 0.01
+    assert abs(r["Q_mm"] / 25.4 - 2.45) < 0.01      # 2.45 in
+    assert abs(r["Q_mm"] - 62.21) < 0.05
+
+
+def test_scs_runoff_depth_neh630_cn80_6in():
+    """NEH-630: CN = 80, P = 6 in (152.4 mm).
+    S = 1000/80 − 10 = 2.5 in = 63.5 mm.
+    Q = 3.78 in ≈ 96.04 mm (NEH-630 worked example)."""
+    r = scs_runoff_depth(P_mm=152.4, CN=80.0)
+    assert r["ok"] is True
+    assert abs(r["S_mm"] - 63.5) < 0.01
+    assert abs(r["Q_mm"] / 25.4 - 3.78) < 0.01      # 3.78 in
+    assert abs(r["Q_mm"] - 96.04) < 0.05
+
+
+def test_rational_method_asce_si_form():
+    """ASCE/EWRI 45-05 Rational Method, SI form Q = C·i·A/360
+    (C dimensionless, i in mm/hr, A in ha → Q in m³/s).
+    C = 0.90, i = 100 mm/hr, A = 5 ha → Q = 1.25 m³/s exactly."""
+    r = rational_peak_flow(C=0.90, i_mm_hr=100.0, A_ha=5.0)
+    assert r["ok"] is True
+    assert abs(r["Q_m3s"] - 1.25) < 1e-6
+
+
+def test_kirpich_1940_original_form():
+    """Kirpich (1940) SI form tc[min] = 0.0195·L^0.77·S^−0.385.
+    A Kirpich-class watershed L = 609.6 m (2000 ft), S = 0.0182
+    gives tc ≈ 12.7 min (the original paper's small-watershed range)."""
+    L = 609.6
+    S = 0.0182
+    H = S * L
+    tc_expected = 0.0195 * (L ** 0.77) * (S ** -0.385)
+    r = time_of_concentration("kirpich", L_m=L, H_m=H)
+    assert r["ok"] is True
+    assert abs(r["tc_min"] - tc_expected) < 0.01
+    assert abs(r["tc_min"] - 12.72) < 0.1
+
+
+def test_tr55_scs_peak_flow_order_of_magnitude():
+    """TR-55 Ch.4 graphical peak method.  CN = 75, A = 1.012 km² (250 ac),
+    tc = 1.5 hr, P = 6 in (152.4 mm).  The peak discharge must be in the
+    TR-55 published order (~250–300 cfs ≈ 7–9 m³/s), NOT ~10× that — the
+    pre-fix conversion constant gave ≈ 2600 cfs."""
+    r = scs_peak_flow(CN=75.0, A_km2=1.012, tc_hr=1.5, P_mm=152.4)
+    assert r["ok"] is True
+    Qp_cfs = r["Qp_m3s"] / 0.0283168
+    assert 150.0 < Qp_cfs < 450.0
+    # runoff depth must be the NEH-630 value (3.28 in for CN75/P6in
+    # → here Q_mm consistent with scs_runoff_depth)
+    assert r["Q_mm"] > 0.0
+
+
+def test_tr55_sheet_flow_coefficient_worksheet3():
+    """TR-55 (SCS 1986) Worksheet 3 sheet-flow example:
+    n = 0.24, L = 100 ft (30.48 m), P2 = 3.6 in (91.44 mm), s = 0.005.
+    Canonical Eq. 3-3 (0.007 coefficient) → Tt ≈ 0.39 hr.  The pre-fix
+    0.091 coefficient gave ≈ 5 hr (≈13× too large)."""
+    r = time_of_concentration(
+        "sheet_shallow_channel",
+        sheet_length_m=30.48, sheet_n=0.24,
+        sheet_P2_mm=91.44, sheet_slope=0.005,
+        shallow_length_m=1.0, shallow_slope=0.01,
+        shallow_cover="paved_gutter",
+        channel_length_m=1.0, channel_slope=0.01,
+        channel_area_m2=1.0, channel_wetted_perim_m=4.0, channel_n=0.05,
+    )
+    assert r["ok"] is True, r
+    assert abs(r["tt_sheet_hr"] - 0.390) < 0.01
+
+
+def test_tr55_unit_conversion_constant_exact():
+    """TR-55 Appendix B: 1 cfs/mi²/in = 0.0283168/2.589988/25.4
+    = 4.30440e-4 m³/s·km⁻²·mm⁻¹ (exact unit algebra)."""
+    from kerf_cad_core.hydrology.runoff import _CFS_PER_MI2_IN_TO_M3S_KM2_MM
+    expected = 0.0283168 / 2.589988 / 25.4
+    assert abs(_CFS_PER_MI2_IN_TO_M3S_KM2_MM - expected) < 1e-12
+    assert abs(_CFS_PER_MI2_IN_TO_M3S_KM2_MM - 4.30440e-4) < 1e-8
+
+
+def test_idf_intensity_formula_exact():
+    """IDF i = a/(t+b)^c.  a = 2000, b = 10, c = 0.8, t = 30 min
+    → i = 2000 / 40^0.8 ≈ 104.564 mm/hr (closed form)."""
+    r = idf_intensity(duration_min=30.0, a=2000.0, b=10.0, c=0.8)
+    assert r["ok"] is True
+    assert abs(r["intensity_mm_hr"] - 2000.0 / 40.0 ** 0.8) < 1e-3
+
+
 # ---------------------------------------------------------------------------
-# 35. plugin._TOOL_MODULES includes hydrology.tools
+# plugin._TOOL_MODULES includes hydrology.tools
 # ---------------------------------------------------------------------------
 
 def test_plugin_tool_modules_includes_hydrology():

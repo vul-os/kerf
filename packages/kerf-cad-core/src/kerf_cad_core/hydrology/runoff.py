@@ -299,8 +299,14 @@ def scs_runoff_depth(P_mm: float, CN: float) -> dict:
 
 # TR-55 unit-peak-discharge (qu) lookup by Ia/P ratio (0.10, 0.20, 0.30, 0.35, 0.40, 0.45, 0.50)
 # at tc from 0.1 to 2.0 hr.  qu in m³/s per km² per mm of runoff depth (converted from cfs/mi²/in).
-# Conversion: 1 cfs/mi²/in = 4.329e-3 m³/s·km²⁻¹·mm⁻¹  (Appendix B, TR-55)
-_CFS_PER_MI2_IN_TO_M3S_KM2_MM = 4.329e-3
+# Conversion (TR-55 Appendix B):
+#   1 cfs   = 0.0283168 m³/s
+#   1 mi²   = 2.589988 km²
+#   1 in    = 25.4 mm
+#   1 cfs/mi²/in = 0.0283168 / 2.589988 / 25.4 = 4.30440e-4  m³/s·km⁻²·mm⁻¹
+# A prior value of 4.329e-3 was ~10× too large and inflated scs_peak_flow
+# discharge by an order of magnitude.
+_CFS_PER_MI2_IN_TO_M3S_KM2_MM = 0.0283168 / 2.589988 / 25.4
 
 # TR-55 Table B-1/B-2 unit peak discharges (cfs / mi² / in)  [Ia/P = 0.10 columns only]
 # tc_hr → qu (cfs/mi²/in) for Ia/P = 0.10 and Ia/P = 0.30
@@ -562,13 +568,16 @@ def _sheet_shallow_channel_tc(
             f"sheet_length_m = {s1_L:.1f} m exceeds the TR-55 recommended maximum "
             "of ~100 m (300 ft) for the sheet-flow equation."
         )
-    # TR-55 Eq. 3-3 (SI adaptation):
-    #   tt [hr] = 0.091 × (n × L)^0.8 / (P2_mm/25.4)^0.5 / S^0.4
-    # P2 must be in inches for the standard constant; convert
+    # TR-55 (SCS 1986) Eq. 3-3, canonical English form:
+    #   Tt [hr] = 0.007 × (n × L)^0.8 / (P2^0.5 × s^0.4)
+    # with L in feet, P2 (2-yr 24-hr rainfall) in inches, s in ft/ft.
+    # The inputs are SI here, so convert L → ft and P2 → in and apply the
+    # standard 0.007 coefficient.  (A prior 0.091 coefficient combined with
+    # the same ft/in conversion over-predicted sheet-flow travel time by
+    # ~13×.)
     P2_in = s1_P2 / 25.4
-    # L in feet for standard constant; convert
     L_ft = s1_L / 0.3048
-    tt_sheet_hr = 0.091 * ((s1_n * L_ft) ** 0.8) / (P2_in ** 0.5) / (s1_S ** 0.4)
+    tt_sheet_hr = 0.007 * ((s1_n * L_ft) ** 0.8) / (P2_in ** 0.5) / (s1_S ** 0.4)
 
     # --- Segment 2: Shallow concentrated flow ---
     e2 = (_guard_positive("shallow_length_m", shallow_length_m) or

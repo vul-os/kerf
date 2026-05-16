@@ -108,11 +108,15 @@ def plant_power(
 # 2. Turbine-type selection via specific speed Ns (dimensionless IEC)
 # ---------------------------------------------------------------------------
 
-# Specific speed bands (dimensionless IEC, Ns = n·√Q / H^(3/4), ω in rad/s)
-# Source: Warnick (1984) Table 3-1 + IEC 60193 + engineering textbooks
+# Specific speed bands (true dimensionless IEC,
+#   Ns = ω·√Q / (g·H)^(3/4),  ω in rad/s, g = 9.81 m/s²)
+# Source: Warnick (1984) Table 3-1 + IEC 60193 + Çengel & Cimbala §14.
 #
-# Note: "dimensionless" specific speed Ns uses ω(rad/s), Q(m³/s), H(m).
-# The old US "Nq" or "Ns_US" (n_rpm × √Q_gpm / H_ft^(5/4)) differs; we use SI.
+# Note: the dimensionless specific speed MUST include g so the result is
+# genuinely unit-free (the (g·H)^(3/4) group has units that cancel ω·√Q).
+# An earlier implementation omitted g, producing a dimensional number
+# ~5.7× larger that did not fall inside these standard bands — corrected.
+# The old US "Nq"/"Ns_US" (n_rpm·√Q_gpm / H_ft^(5/4)) differs; we use SI.
 #
 # SI dimensionless Ns ranges (approximate):
 #   Pelton:    0.005–0.07
@@ -143,9 +147,14 @@ _HEAD_GUIDE = {
 
 
 def _specific_speed_si(n_rpm: float, Q: float, H: float) -> float:
-    """IEC dimensionless specific speed Ns = ω·√Q / H^(3/4)."""
+    """True IEC dimensionless specific speed Ns = ω·√Q / (g·H)^(3/4).
+
+    ω in rad/s, Q in m³/s, H in m, g = 9.81 m/s². Including g makes the
+    quantity genuinely unit-free and consistent with the Warnick/IEC
+    turbine-type bands defined above.
+    """
     omega = n_rpm * 2.0 * math.pi / 60.0
-    return omega * math.sqrt(Q) / H ** 0.75
+    return omega * math.sqrt(Q) / (_G * H) ** 0.75
 
 
 def turbine_type_selection(
@@ -217,7 +226,8 @@ def turbine_type_selection(
 
     if not matched:
         warnings.append(
-            f"Ns={Ns:.4f} (SI dimensionless) is outside all standard turbine bands. "
+            f"Ns={Ns:.4f} (true SI dimensionless ω√Q/(gH)^¾) is outside all "
+            "standard turbine bands. "
             "Check runner speed or consider custom design."
         )
         primary = "Unknown"
@@ -790,7 +800,9 @@ def thoma_cavitation(
                   negative = runner submerged
 
     Critical sigma (Thoma, empirical, Gordon 1999 / IEC 60193):
-        σ_crit ≈ 6.55e-6 × Ns^2.5    (SI Ns = dimensionless specific speed)
+        σ_crit ≈ 4.7383e-4 × Ns^2.5  (true dimensionless Ns = ω√Q/(gH)^¾;
+        the 4.7383e-4 coefficient is the 6.55e-6 Gordon constant rescaled
+        by g^(0.75·2.5)=72.34 so σ_crit is invariant to the g-inclusion fix)
         or if Ns not available, falls back to turbine-type typical:
             Francis:  0.05–0.30  (σ_crit ≈ 0.10 at mid-range Ns)
             Kaplan:   0.20–0.60
@@ -836,8 +848,10 @@ def thoma_cavitation(
     sigma_crit: float
     if n_rpm is not None and Q is not None and n_rpm > 0 and Q > 0:
         Ns = _specific_speed_si(n_rpm, Q, H_net)
-        # Gordon (1999) empirical fit:  σ_crit ≈ 6.55e-6 × Ns^2.5
-        sigma_crit = 6.55e-6 * Ns ** 2.5
+        # Gordon (1999) empirical fit. Original constant 6.55e-6 was tied to
+        # the dimensional ω√Q/H^¾; rescaled by g^(0.75·2.5)=72.34 so σ_crit
+        # is unchanged now that Ns is the true dimensionless ω√Q/(gH)^¾.
+        sigma_crit = 4.7382796491812660e-4 * Ns ** 2.5
         sigma_crit = max(sigma_crit, 0.02)  # floor
     else:
         _sigma_defaults = {

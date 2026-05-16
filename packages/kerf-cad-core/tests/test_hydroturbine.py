@@ -193,24 +193,44 @@ class TestTurbineTypeSelection:
         assert res["Ns"] is not None
         assert res["Ns"] > 0
 
-    def test_ns_pelton_range(self):
-        """Ns in Pelton band → type Pelton."""
-        # Pelton band: Ns ≈ 0.005–0.07
-        # Ns = ω·√Q / H^(3/4); pick n=375 rpm (ω=39.3), Q=0.5, H=500
-        # Ns = 39.3·0.707 / 500^0.75 = 27.8 / 105.7 ≈ 0.263 → too high for Pelton
-        # Use smaller Q: Q=0.05, H=500
-        # Ns = 39.3·0.2236 / 105.7 = 8.8/105.7 ≈ 0.083 → Turgo
-        # Use n=100 rpm (ω=10.47), Q=0.05, H=500
-        # Ns = 10.47·0.2236 / 105.7 = 2.34/105.7 ≈ 0.022 → Pelton
-        n = 100.0
-        Q = 0.05
-        H = 500.0
+    def test_ns_true_dimensionless_includes_g(self):
+        """Ns must be the true dimensionless ω·√Q / (g·H)^(3/4)
+        (Warnick 1984 / IEC 60193; Çengel & Cimbala §14).
+
+        The earlier code omitted g, producing a number ~5.7× too large
+        that fell outside the standard turbine bands for realistic units.
+        """
+        n, Q, H = 375.0, 2.0, 200.0
         omega = n * 2.0 * math.pi / 60.0
-        Ns = omega * math.sqrt(Q) / H ** 0.75
-        assert Ns < 0.07  # confirm we're in Pelton band
+        g = 9.81
+        Ns_expected = omega * math.sqrt(Q) / (g * H) ** 0.75
         res = turbine_type_selection(H_net=H, Q=Q, n_rpm=n)
         assert res["ok"] is True
-        assert res["turbine_type"] == "Pelton"
+        assert abs(res["Ns"] - Ns_expected) / Ns_expected < 1e-6
+
+    def test_ns_pelton_realistic(self):
+        """Realistic high-head Pelton (n=500 rpm, Q=0.5 m³/s, H=400 m)
+        → Ns* ≈ 0.075, inside the Warnick Pelton/Turgo band → Pelton."""
+        res = turbine_type_selection(H_net=400.0, Q=0.5, n_rpm=500.0)
+        assert res["ok"] is True
+        assert abs(res["Ns"] - 0.0747) < 5e-3
+        assert res["turbine_type"] in ("Pelton", "Turgo")
+
+    def test_ns_francis_realistic(self):
+        """Realistic medium-head Francis (n=300 rpm, Q=10 m³/s, H=50 m)
+        → Ns* ≈ 0.95, inside the Warnick Francis band (0.18–1.2)."""
+        res = turbine_type_selection(H_net=50.0, Q=10.0, n_rpm=300.0)
+        assert res["ok"] is True
+        assert abs(res["Ns"] - 0.953) < 1e-2
+        assert res["turbine_type"] == "Francis"
+
+    def test_ns_kaplan_realistic(self):
+        """Realistic low-head Kaplan (n=150 rpm, Q=50 m³/s, H=10 m)
+        → Ns* ≈ 3.56, inside the Warnick Kaplan band (0.7–3.5 / Bulb)."""
+        res = turbine_type_selection(H_net=10.0, Q=50.0, n_rpm=150.0)
+        assert res["ok"] is True
+        assert abs(res["Ns"] - 3.563) < 1e-2
+        assert res["turbine_type"] in ("Kaplan", "Bulb")
 
     def test_zero_head_returns_error(self):
         assert turbine_type_selection(0.0, 5.0)["ok"] is False

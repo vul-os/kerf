@@ -185,6 +185,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.dfm.checks",
     "kerf_cad_core.cam_wizard.stock_setup",
     "kerf_cad_core.drawings.auto_dimension",
+    "kerf_cad_core.mbd.tools",
+    "kerf_cad_core.afr.recognize",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

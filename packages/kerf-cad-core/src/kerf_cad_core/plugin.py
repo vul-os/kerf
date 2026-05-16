@@ -122,6 +122,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.cmm.tools",
     "kerf_cad_core.fiveaxis.tools",
     "kerf_cad_core.dynamics.tools",
+    "kerf_cad_core.tank.tools",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

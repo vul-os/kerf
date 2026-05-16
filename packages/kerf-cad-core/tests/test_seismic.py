@@ -620,6 +620,89 @@ class TestSdofSpectralDisplacement:
 
 
 # ===========================================================================
+# 9b. ASCE 7 worked-example reference cases (citable known answers)
+# ===========================================================================
+
+class TestASCE7ReferenceCases:
+    """Each assertion checks a specific ASCE 7-16/22 value or worked example."""
+
+    def test_site_D_Ss1p5_S1_0p6(self):
+        # ASCE 7-16 Tables 11.4-1/2 at Site D: Ss=1.5 → Fa=1.0;
+        # S1=0.6 → Fv=1.7.  SMS=1.5, SM1=1.02, SDS=1.0, SD1=0.68.
+        r = site_coefficients(1.5, 0.6, "D")
+        assert r["Fa"] == pytest.approx(1.0)
+        assert r["Fv"] == pytest.approx(1.7)
+        assert r["SDS"] == pytest.approx(1.0, abs=5e-4)
+        assert r["SD1"] == pytest.approx(0.68, abs=5e-4)
+
+    def test_site_E_Fa_at_Ss_0p75_is_1p2(self):
+        # ASCE 7-16 Table 11.4-1, Site E, Ss=0.75 → Fa = 1.2
+        # (was a catalog bug returning 1.3).
+        r = site_coefficients(0.75, 0.10, "E")
+        assert r["ok"] is True
+        assert r["Fa"] == pytest.approx(1.2)
+
+    def test_site_C_Fv_floor_1p4_at_S1_0p6(self):
+        # ASCE 7-16 Table 11.4-2, Site C, S1≥0.6 → Fv = 1.4.
+        r = site_coefficients(1.0, 0.6, "C")
+        assert r["Fv"] == pytest.approx(1.4)
+
+    def test_design_spectrum_regions(self):
+        # ASCE 7 §11.4.5 Eqs 11.4-5..11.4-7. SDS=1.0, SD1=0.6, TL=8.
+        # T0=0.12, Ts=0.6.  Sa(0)=0.4·SDS=0.4; Sa(Ts)=SDS=1.0;
+        # Sa(1.0)=SD1/T=0.6; Sa(10)=SD1·TL/T²=0.6·8/100=0.048.
+        assert design_spectrum(0.0, 1.0, 0.6, TL=8.0)["Sa_g"] == pytest.approx(0.4)
+        assert design_spectrum(0.6, 1.0, 0.6, TL=8.0)["Sa_g"] == pytest.approx(1.0)
+        assert design_spectrum(1.0, 1.0, 0.6, TL=8.0)["Sa_g"] == pytest.approx(0.6)
+        assert design_spectrum(10.0, 1.0, 0.6, TL=8.0)["Sa_g"] == pytest.approx(0.048)
+
+    def test_Ta_steel_moment_frame_SI(self):
+        # ASCE 7 Table 12.8-2 (SI): steel MRF Ct=0.0724, x=0.8.
+        # hn=30 m → Ta = 0.0724·30^0.8 = 1.100 s.
+        r = approximate_period(30.0, "steel_moment")
+        assert r["Ta_s"] == pytest.approx(0.0724 * 30.0 ** 0.8, rel=1e-4)
+
+    def test_Ta_other_system(self):
+        # ASCE 7 Table 12.8-2 (SI): "all other" Ct=0.0488, x=0.75.
+        r = approximate_period(20.0, "other")
+        assert r["Ta_s"] == pytest.approx(0.0488 * 20.0 ** 0.75, rel=1e-4)
+
+    def test_Cs_cap_governs_long_T(self):
+        # ASCE 7 §12.8.1.1: SDS=1.0, SD1=0.68, T=0.8, R=8, Ie=1, TL=8.
+        # Cs_basic=SDS/(R/Ie)=0.125; cap=SD1/(T·R/Ie)=0.68/6.4=0.10625<basic.
+        r = seismic_response_coefficient(1.0, 0.68, 0.8, 8.0, 1.0, TL=8.0)
+        assert r["Cs"] == pytest.approx(0.68 / (0.8 * 8.0), rel=1e-6)
+        assert r["cap_governs"] is True
+
+    def test_Cs_floor_minimum_0p044(self):
+        # ASCE 7 Eq 12.8-5: Cs ≥ 0.044·SDS·Ie ≥ 0.01.
+        # SDS=0.3, Ie=1 → floor = 0.044·0.3 = 0.0132.
+        r = seismic_response_coefficient(0.3, 0.05, 3.0, 8.0, 1.0, TL=8.0)
+        assert r["Cs_floor"] == pytest.approx(max(0.044 * 0.3 * 1.0, 0.01))
+
+    def test_Cs_S1_floor_when_S1_ge_0p6(self):
+        # ASCE 7 Eq 12.8-6: where S1≥0.6g, Cs ≥ 0.5·S1/(R/Ie).
+        # S1=0.75, R=8, Ie=1 → 0.5·0.75/8 = 0.046875.
+        r = seismic_response_coefficient(1.0, 0.6, 2.0, 8.0, 1.0, TL=8.0, S1=0.75)
+        assert r["Cs_floor"] == pytest.approx(0.5 * 0.75 / 8.0)
+
+    def test_vertical_distribution_k_exponent(self):
+        # ASCE 7 §12.8.3: k=1 for T≤0.5; k=2 for T≥2.5; linear between.
+        r1 = vertical_distribution(1000.0, [100, 100], [3.0, 6.0], 0.4)
+        assert r1["k"] == pytest.approx(1.0)
+        r2 = vertical_distribution(1000.0, [100, 100], [3.0, 6.0], 3.0)
+        assert r2["k"] == pytest.approx(2.0)
+        r3 = vertical_distribution(1000.0, [100, 100], [3.0, 6.0], 1.5)
+        assert r3["k"] == pytest.approx(1.0 + (1.5 - 0.5) / 2.0)
+
+    def test_sdof_spectral_displacement_formula(self):
+        # Chopra, Dynamics of Structures: Sd = Sa·g·T²/(4π²).
+        # Sa=0.5 g, T=1.0 s → Sd = 0.5·9.80665·1/(4π²) = 0.12423 m.
+        r = sdof_spectral_displacement(0.5, 1.0)
+        assert r["Sd_m"] == pytest.approx(0.5 * 9.80665 / (4.0 * math.pi ** 2), rel=1e-5)
+
+
+# ===========================================================================
 # 10. LLM Tool wrapper tests
 # ===========================================================================
 

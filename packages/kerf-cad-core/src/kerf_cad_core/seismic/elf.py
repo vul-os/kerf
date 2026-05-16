@@ -100,7 +100,9 @@ _FA_TABLE: dict[str, tuple[float, ...]] = {
     "B": (0.9,  0.9,  0.9,  0.9,  0.9,  0.9),
     "C": (1.3,  1.3,  1.2,  1.2,  1.2,  1.2),
     "D": (1.6,  1.4,  1.2,  1.1,  1.0,  1.0),
-    "E": (2.4,  1.7,  1.3,  (None),  (None),  (None)),  # type: ignore[misc]
+    # ASCE 7-16 Table 11.4-1 Site E: 2.4, 1.7, 1.2, then §11.4.8
+    # site-specific analysis required for Ss ≥ 1.0g.
+    "E": (2.4,  1.7,  1.2,  (None),  (None),  (None)),  # type: ignore[misc]
 }
 
 _FV_S1_BREAKPOINTS = (0.10, 0.20, 0.30, 0.40, 0.50, 0.60)

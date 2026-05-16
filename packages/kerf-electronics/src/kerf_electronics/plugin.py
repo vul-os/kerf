@@ -154,6 +154,7 @@ def _register_tools(ctx, provides: list) -> None:
         "kerf_electronics.schematic.capture",
         "kerf_electronics.emc_wizard",
         "kerf_electronics.sim_corner",
+        "kerf_electronics.thermal_board",
     ]
 
     for module_path in tool_modules:

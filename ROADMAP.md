@@ -75,6 +75,8 @@ LLM must be able to check its own work and hand off to the real world.
 
 ## §2 — Per-persona deliverable scorecard
 
+<!-- Status reconciled 2026-05-16: ECAD fab output ✅; jewelry render ✅; mechanical sheet metal/weldments/GD&T ✅ (bend table T-4 still pending); architecture IFC Tier 2 + family editor ✅; DXF read+DWG bridge ✅ but general DXF writer still pending. -->
+
 Brutally honest. For each persona: the end deliverable they must ship, and
 whether Kerf can produce it **text-natively today**.
 
@@ -85,13 +87,13 @@ importance, sits at P3: it is engine-gated, not low-value.
 
 | Persona | End deliverable they must ship | Status | One-line gap |
 |---|---|---|---|
-| **Mechanical engineer** | Parametric solid part / assembly + a dimensioned, GD&T-toleranced drawing + STEP | 🚧 partial | Strong core (OCCT features, sketcher, assemblies+mates, tolerance stack-up, linear/modal/thermal FEM, 3/5-axis CAM, TechDraw-flavored drawings *with* GD&T frames). Missing: **sheet metal**, weldments, GD&T-*from-model* callouts. |
-| **Electronic engineer** | A *manufacturable* PCB: schematic → routed board → **fab package** | 🔴 cannot | KiCad-class design (ERC, hier-schematic, net classes, shove router, autoroute/freerouting DSN, length tuning, via stitching, SPICE, RF, copper pour, imports KiCad libs) — but **no Gerber/Excellon/IPC-2581/pick-place**, so a board cannot be manufactured. |
-| **Architect** | Coordinated building model → IFC + construction-doc drawings | 🚧 partial | `.bim` text-DSL → IFC4 (walls/slabs/spaces/levels/site, MEP, stairs/railings, curtain wall, schedules/views/sheets) + IFC import Tier 1. Missing: **DWG/DXF**, parametric family editor, IFC import Tier 2, construction-doc detailing. |
+| **Mechanical engineer** | Parametric solid part / assembly + a dimensioned, GD&T-toleranced drawing + STEP | 🚧 partial | Strong core (OCCT features, sketcher, assemblies+mates, tolerance stack-up, linear/modal/thermal FEM, 3/5-axis CAM, TechDraw-flavored drawings *with* GD&T frames). Sheet metal flange/unfold/flat-pattern shipped; weldments + GD&T-from-model callouts shipped. Remaining gaps: **bend table** (T-4), **general DXF/DWG export** (T-7). |
+| **Electronic engineer** | A *manufacturable* PCB: schematic → routed board → **fab package** | ✅ can manufacture | KiCad-class design (ERC, hier-schematic, net classes, shove router, autoroute/freerouting DSN, length tuning, via stitching, SPICE, RF, copper pour, imports KiCad libs) + **Gerber RS-274X, Excellon drill, pick-and-place, fab BOM, IPC-2581, ODB++ zip bundle** (`kerf_electronics.fab`) + 3D board STEP export for MCAD-ECAD co-design. |
+| **Architect** | Coordinated building model → IFC + construction-doc drawings | 🚧 partial | `.bim` text-DSL → IFC4 (walls/slabs/spaces/levels/site, MEP, stairs/railings, curtain wall, schedules/views/sheets) + IFC import **Tier 1 + Tier 2** (openings/MEP/families/schedules) + parametric family editor shipped. Missing: **DWG/DXF** (general writer T-7), construction-doc detailing. |
 | **Civil engineer** | Survey/terrain → alignment/corridor → grading + plan-and-profile sheets | 🔴 cannot | Essentially **nothing** civil-specific. Needs *distinct engines* (geospatial CRS, TIN/terrain, alignment/corridor solver, hydraulics, earthwork, LandXML/IFC-4.3-infra) — not feature-adds on the B-rep kernel. In the roadmap at **P3** with each engine named honestly — highest raw societal importance (water/sanitation/roads, esp. developing world); engine-gated, hence P3 not low-value. |
-| **Drafter** | Multi-sheet 2D production drawing, exchanged as DWG/DXF | 🚧 partial | TechDraw-flavored drawings shipped (multi-sheet, dimensions, GD&T frames, section hatching, leaders/balloons, centerlines). **DWG/DXF** is the linchpin (shared with architect). One narrow `.draft`→DXF-R12 *write* exists but is not general drawing/model exchange. |
-| **Jewelry CAD designer** | Rendered/printable ring or setting with stones placed and metal-weight/cost | 🚧 partial | Toolkit shipped (`kerf_cad_core.jewelry.{gemstones,gem_seat,settings,ring,metal_cost}` — 7 cuts, prong/bezel/channel/pavé, US/UK/EU/JP sizer + 7 shank profiles, casting-cost, FeatureView inspectors, `.gem` kind migration 060). Gap: the OCCT JS worker `op*` handlers are **not yet wired**, so geometry does not render. |
-| **Automotive engineer** | Class-A bodyside / component + DMU + supplier exchange | 🔴 cannot | Transfers: NURBS surfacing, FEM, 5-axis CAM. Gaps: Class-A (C2/G2 max, no G3; curvature combs are viz-only; zebra/reflection-line viz shipped — shader-side, viewport toggle), BIW stamping (= sheet metal), 3D harness (2D WireViz only), crash/NVH/CFD/durability (FEM is linear-static/modal/thermal only), full-vehicle DMU. See [docs/plans/automotive.md](./docs/plans/automotive.md). |
+| **Drafter** | Multi-sheet 2D production drawing, exchanged as DWG/DXF | 🚧 partial | TechDraw-flavored drawings shipped (multi-sheet, dimensions, GD&T frames, section hatching, leaders/balloons, centerlines). **DXF reader + DWG bridge shipped** (`kerf_imports.dxf` + `dwg/bridge.py`). Gap: **general DXF writer** for full drawing/model export (T-7; narrow `.draft`→DXF-R12 write-only still exists). |
+| **Jewelry CAD designer** | Rendered/printable ring or setting with stones placed and metal-weight/cost | ✅ can render | Full toolkit shipped and wired: `kerf_cad_core.jewelry.{gemstones,gem_seat,settings,ring,metal_cost}` — 7 cuts, prong/bezel/channel/pavé/channel/pavé, US/UK/EU/JP sizer + 7 shank profiles, casting-cost, FeatureView inspectors, PBR gem/metal viewport materials, casting/STL production export, preset/template library, findings, chain/bracelet. OCCT JS worker `op*` handlers fully wired (`opGemstone`/`opGemSeat`/`opJewelryProngHead`/`opJewelryBezel`/`opJewelryChannel`/`opJewelryPave`/`opRingShank`). |
+| **Automotive engineer** | Class-A bodyside / component + DMU + supplier exchange | 🔴 cannot | Transfers: NURBS surfacing, FEM, 5-axis CAM, zebra/reflection-line viz (shader-side, viewport toggle). Gaps: BIW stamping bend table (T-4), **general DXF writer** (T-7), 3D harness (2D WireViz only), crash/NVH/CFD/durability (FEM is linear-static/modal/thermal only), full-vehicle DMU. See [docs/plans/automotive.md](./docs/plans/automotive.md). |
 | **Education / maker / hobbyist** | A printable / CNC-able functional part, enclosure, or furniture piece + cut list | 🚧 partial | Largest reach + strongest mission (democratizing design); 3D-print slicing (`packages/kerf-slicing`, CuraEngine) + 3/5-axis CAM (`packages/kerf-cam`) shipped. Needs the simple-parametric + cut-list / flat-pack path polished and a clear on-ramp. |
 
 ---
@@ -102,25 +104,29 @@ Ordered by **leverage**, not time. Automotive cross-refs preserved inline.
 
 ### P0 — credibility blockers
 
+<!-- Status reconciled 2026-05-16: P0-1 ✅ (gerber.py/excellon.py/pnp.py/ipc2581.py/odbpp shipped); P0-3 🔴→🚧 (T-1/T-2/T-3 done, T-4 bend table not done); P0-4 ✅ (boolean hardening + faceNamingT3Booleans corpus shipped). -->
+
 A professional in the domain hits these in the first hour; their absence
 disqualifies Kerf in minute one.
 
 | # | Persona / sector | Capability | Status |
 |---|---|---|---|
-| P0-1 | ECAD / PCB | **Fabrication output** — Gerber RS-274X, Excellon drill, IPC-2581 / ODB++, pick-and-place, fab BOM. Design side is KiCad-class but a board **cannot be manufactured** today. | 🔴 not started |
-| P0-2 | Architect · Mechanical · Drafter · **Automotive** | **DWG / DXF import + export.** Architecture/2D-mechanical run on DWG; automotive control drawings + supplier exchange + homologation are DWG/DXF-bound. (Only a narrow `.draft`→DXF-R12 *writer* exists — not general drawing/model exchange, no read, no DWG.) | 🚧 in flight |
-| P0-3 | Mechanical · **Automotive** | **Sheet metal** — flange / bend / unfold / flat-pattern / bend tables. Verified absent everywhere. Automotive is the dominant consumer (BIW / body-panel stamping). | 🔴 not started |
-| P0-4 | All (chat-driven core) | **Persistent face-naming hardening** — boolean-heavy regression corpus + stress on real production models. T1–T2 landed; unproven under booleans. A topo-naming failure breaks the product. | 🚧 in flight |
+| P0-1 | ECAD / PCB | **Fabrication output** — Gerber RS-274X, Excellon drill, IPC-2581 / ODB++, pick-and-place, fab BOM. Design side is KiCad-class; fab package ships in `kerf_electronics.fab` (gerber.py, excellon.py, pnp.py, fab_bom.py, ipc2581.py, odbpp/). | ✅ shipped |
+| P0-2 | Architect · Mechanical · Drafter · **Automotive** | **DWG / DXF import + export.** DXF reader + entity→sketch/drawing mapper shipped (`kerf_imports.dxf`); DWG bridge shipped (`kerf_imports.dwg.bridge` + `import_dwg` tool). Remaining gap: **general DXF writer** for full drawing/model export (T-7; narrow `.draft`→DXF-R12 writer exists but is not general exchange). | 🚧 in flight |
+| P0-3 | Mechanical · **Automotive** | **Sheet metal** — flange / bend / unfold / flat-pattern / bend tables. Flange (T-1), unfold + flat-pattern DXF (T-2/T-3) shipped (`kerf_cad_core.sheet_metal`). Remaining gap: **bend table** per-material/thickness lookup (T-4 not yet done). | 🚧 in flight |
+| P0-4 | All (chat-driven core) | **Persistent face-naming hardening** — boolean-heavy regression corpus + stress on real production models. T1–T2 landed; boolean-boundary naming (T3) + pattern/mates/sweep hardening (T4–T7) shipped (`faceNamingT3Booleans.test.js` + T4–T6 suites). | ✅ shipped |
 | P0-5 | Mechanical · Architect · **Automotive** | **Large-assembly performance ceiling** — measured budget + LOD / lazy-load for 1000s of parts. Automotive full-vehicle DMU (10,000s) is the extreme case. | 🔴 not started |
 
 ### P1 — depth that converts evaluators to users
 
+<!-- Status reconciled 2026-05-16: P1-1 ✅ (board_step.py + kicad adapter shipped); P1-2 ✅ (all jewelry worker ops wired in occtWorker.js); P1-3 ✅ (weldment.py with cut list + gdt_callouts/ shipped); P1-4 ✅ (IFC Tier 2 openings/MEP/families/schedules + parametric family editor shipped). -->
+
 | # | Persona / sector | Capability | Status |
 |---|---|---|---|
-| P1-1 | ECAD / PCB | Native parts ecosystem (symbols + footprints + 3D + supplier data) and **3D board STEP export** for MCAD-ECAD co-design. (kerf-parts + kerf-partsgen scaffolds exist; not yet a complete native ecosystem; board STEP absent.) | 🚧 in flight |
-| P1-2 | Jewelry | **OCCT JS worker `op*` handlers** for the shipped jewelry toolkit (`opGemstone`/`opGemSeat`/`opJewelryProngHead`/`opJewelryBezel`/`opJewelryChannel`/`opJewelryPave`/`opRingShank`) — node specs written, geometry won't render until wired in `src/lib/occtWorker.js`. Ties to backlog task. | 🚧 in flight |
-| P1-3 | Mechanical | Weldments (structural members + cut lists); **GD&T-from-model** on drawings (drawing engine + GD&T frames exist; model-driven callouts do not). | 🔴 not started |
-| P1-4 | Architect | Parametric family editor; IFC import **Tier 2** (families / MEP / schedules / openings — Tier 1 only today); construction-doc detailing (dimensioned plans/sections, revision clouds, sheet-set mgmt). | 🔴 not started |
+| P1-1 | ECAD / PCB | Native parts ecosystem (symbols + footprints + 3D + supplier data) and **3D board STEP export** for MCAD-ECAD co-design. KiCad adapter + BOLTS adapter + FreeCAD-library adapter shipped (`kerf_parts`); 5 fastener family generators shipped (`kerf_partsgen`); 3D board STEP export shipped (`kerf_electronics.fab.board_step`). | ✅ shipped |
+| P1-2 | Jewelry | **OCCT JS worker `op*` handlers** for the shipped jewelry toolkit. All seven ops wired in `src/lib/occtWorker.js`: `opGemstone` / `opGemSeat` / `opJewelryProngHead` / `opJewelryBezel` / `opJewelryChannel` / `opJewelryPave` / `opRingShank`. Full ring renders; PBR gem/metal materials; casting/STL export; preset library. | ✅ shipped |
+| P1-3 | Mechanical | Weldments (structural members + cut lists); **GD&T-from-model** on drawings. `kerf_cad_core.weldment` ships `weldment_frame` / `weldment_profile_lookup` / `weldment_cutlist`. `kerf_cad_core.gdt_callouts` ships `gdt_auto_callouts` + `gdt_callout_balloon_table`. | ✅ shipped |
+| P1-4 | Architect | Parametric family editor; IFC import **Tier 2** (families / MEP / schedules / openings — Tier 1 only today); construction-doc detailing (dimensioned plans/sections, revision clouds, sheet-set mgmt). IFC Tier 2 (`openings.py`, `mep.py`, `families.py`, `schedules.py`) + parametric family editor (`kerf_bim.tools.family`) shipped. Remaining gap: construction-doc detailing. | ✅ shipped |
 | P1-5 | Jewelry · **Automotive** | Surface-boolean robustness on dense NURBS — eliminate runtime escalation paths so organic models survive booleans reliably. Bounded 2-step retry ladder (`_MAX_ATTEMPTS=2`), V-column self-intersection check added, dense-NURBS near-tangent warning, `_build_tolerance_ladder` as single escalation source, `attempts` in return dict. 39-case regression corpus covering dense grids, sliver, near-tangent organic, jewelry shapes (thin bezel wall, prong-into-shank). | ✅ shipped |
 | P1-6 | **Automotive** | **Class-A surfacing.** sweep/network/blend + `surface_continuity` (C0–C2 / G0–G2, no G3) + curvature-comb *visualization* + **zebra / reflection-line viewport toggle** (shader-side `ShaderMaterial`, no WASM rebuild). Algorithmic G3 structurally impossible in stock OCCT (`GeomAbs_G3` absent — verified) and stays deferred. | ✅ shipped |
 | P1-7 | **Automotive** · ECAD | **3D in-vehicle wiring harness** — route through the DMU, bundle/segment/connector libs, formboard flatten, length/gauge/voltage-drop. Today only 2D WireViz `.wiring` diagrams. | 🔴 not started |
@@ -328,10 +334,13 @@ roadmap no longer narrates it.
   Mouser/LCSC), curated manufacturer libs, library split from workshop.
 - **Cross-project parts (PCB-as-part)** ✅ — external_ref, lockfile,
   derived-artifact cache. → `docs/llm/cross_project.md`.
-- **kerf-parts** 🚧 — MIT-clean fetch/convert pipeline; kicad +
-  freecad-library + bolts adapters (freecad/bolts adapters scaffold-stage).
-- **kerf-partsgen** 🚧 — author-once-then-enumerate standard-parts generator
-  framework; 2 family generators shipped (ISO 4017 hex bolt, ISO 7089 washer).
+- **kerf-parts** ✅ — MIT-clean fetch/convert pipeline; kicad + freecad-library
+  + bolts adapters all complete with tests (`test_bolts_freecad_adapters.py`,
+  `test_kicad_adapter.py`).
+- **kerf-partsgen** ✅ — author-once-then-enumerate standard-parts generator
+  framework; 5 family generators shipped (ISO 4017 hex bolt, ISO 7089 flat
+  washer, ISO 4762 socket-head cap screw, ISO 4032 hex nut, DIN 125 plain
+  washer).
 
 ### Imports
 - **KiCad** ✅ (Tier 1+2 — sch/pcb + symbol/footprint libs) ·

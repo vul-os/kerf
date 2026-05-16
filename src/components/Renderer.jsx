@@ -11,6 +11,7 @@ import { cullByFrustum, setUserVisible, frustumCullEnabled } from '../lib/frustu
 import { planInstances, instancingEnabled } from '../lib/instancingPlan.js'
 import { createZebraMaterial } from '../lib/zebraMaterial.js'
 import { recordTurntable as _recordTurntable } from '../lib/turntableRender.js'
+import { attachDfmOverlay, detachDfmOverlay, refreshDfm } from '../lib/dfmOverlay.js'
 import { renderHeroSet as _renderHeroSet } from '../lib/heroRender.js'
 
 const PALETTE = [0xc9a96b, 0x6b9bc9, 0xc96b89, 0x89c96b, 0xc9b86b, 0x9b6bc9]
@@ -731,6 +732,8 @@ function Renderer({
       return _recordTurntable(s.scene, s.camera, s.renderer, opts)
     },
     renderHeroSet: (opts = {}) => { const s = stateRef.current; if (!s) return Promise.resolve({ stills: [], turntable: [] }); return _renderHeroSet(s.scene, s.camera, s.renderer, opts) },
+    /** Paint DFM issue markers in the viewport. Pass null/[] to clear. */
+    setDfmIssues: (issues) => { const s = stateRef.current; if (!s) return; issues?.length ? attachDfmOverlay(s.scene, s.camera, s.renderer, issues) : detachDfmOverlay() },
   }), [])
 
   // HUD shows the prop-driven selection if present, else the last clicked id.

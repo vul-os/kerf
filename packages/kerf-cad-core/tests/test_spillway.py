@@ -764,3 +764,48 @@ class TestAuthoritativeReferences:
         assert abs(r["normal_depth_m"] - 0.391) < 5e-3
         assert abs(r["terminal_velocity_m_s"] - 10.23) < 0.1
         assert r["froude_number"] > 1.0
+
+    def test_usbr_basin_type_bands(self):
+        # USBR (1977) stilling-basin selection bands:
+        #   Fr1<1.7 undular; 1.7–2.5 Type IV; 2.5–4.5 Type II; ≥4.5 Type III.
+        expect = {1.3: "undular", 2.0: "IV", 3.5: "II", 6.0: "III"}
+        for fr, want in expect.items():
+            y1, W = 0.5, 4.0
+            Q = y1 * W * (fr * math.sqrt(_G * y1))
+            r = stilling_basin(upstream_depth_m=y1, flow_m3s=Q,
+                               chute_width_m=W, tailwater_depth_m=0.0)
+            assert r["ok"]
+            assert r["basin_type"] == want, (fr, r["basin_type"])
+
+    def test_wes_ogee_downstream_power_law_exponent(self):
+        # USBR (1977) Fig. 9-7 / USACE EM 1110-2-1603 standard WES crest:
+        # downstream quadrant y/Hd = −0.5·(x/Hd)^1.85.  Check exact value
+        # at the farthest downstream point.
+        Hd = 2.0
+        r = ogee_crest_profile(design_head_m=Hd, n_downstream=10)
+        assert r["ok"]
+        last = [p for p in r["profile"] if p["x_m"] > 0][-1]
+        x = last["x_m"]
+        assert abs(last["y_m"] - (-0.5 * Hd * (x / Hd) ** 1.85)) < 1e-4
+
+    def test_puls_level_pool_attenuation(self):
+        # Modified-Puls (Chaudhry 2008 §10-4): a reservoir always attenuates
+        # the flood peak (Q_peak_out ≤ Q_peak_in) and delays it.
+        times = [0, 3600, 7200, 10800, 14400, 18000]
+        flows = [0, 50, 100, 80, 40, 0]
+        sd = [(float(S), S / 18000.0) for S in range(0, 2_000_001, 100_000)]
+        r = flood_routing_puls(inflow_hydrograph=list(zip(times, flows)),
+                               storage_discharge_pairs=sd, dt_s=3600.0)
+        assert r["ok"]
+        assert r["peak_outflow_m3s"] <= 100.0
+        assert r["attenuation_m3s"] > 0.0
+        assert r["peak_outflow_time_s"] >= 7200.0  # delayed past inflow peak
+
+    def test_energy_dissipation_toe_velocity_torricelli(self):
+        # Frictionless toe velocity V_toe = √(2g·(H_up − y_ds)) (Torricelli /
+        # energy conservation, USBR energy-dissipator design).
+        # H_up=15 m, y_ds=1 m → V_toe = √(2·9.81·14) ≈ 16.574 m/s.
+        r = energy_dissipation(upstream_head_m=15.0, downstream_depth_m=1.0,
+                               flow_m3s=30.0, basin_width_m=5.0)
+        assert r["ok"]
+        assert abs(r["velocity_at_toe_m_s"] - math.sqrt(2 * _G * 14.0)) < 1e-2

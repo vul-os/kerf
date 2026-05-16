@@ -785,7 +785,112 @@ class TestMicroHydroQuick:
 
 
 # ===========================================================================
-# 16. LLM tool wrappers
+# 16. Authoritative external-reference cases (citable, numeric answers)
+# ===========================================================================
+
+class TestAuthoritativeReferences:
+    """Cross-checks vs published worked results with known numeric answers.
+
+    Sources:
+      Warnick, C.C. (1984) Hydropower Engineering — turbine power,
+        Joukowsky / Allievi-Michaud surge, Pelton jet, runaway.
+      Çengel & Cimbala, Fluid Mechanics 4th ed. Ch.14 — P = ρ·g·Q·H·η.
+      IEC 60193:1999 — dimensionless specific speed ω·√Q/(g·H)^¾.
+      Gordon, J.L. (1999) Can. J. Civ. Eng. 26 — Thoma cavitation.
+      Barlow thin-wall pressure-vessel formula (penstock shell).
+    """
+
+    def test_cengel_plant_power(self):
+        # Çengel & Cimbala §14: P_shaft = ρ·g·Q·H·η.
+        # Q=10 m³/s, H=50 m, η=0.88, ρ=1000 → 4316.4 kW.
+        r = plant_power(10.0, 50.0, eta=0.88)
+        assert r["ok"]
+        assert abs(r["P_shaft_kW"] - 4316.4) < 0.1
+
+    def test_warnick_joukowsky_head_rise(self):
+        # Warnick (1984): ΔH = a·V/g.  a=1200 m/s, V=3 m/s, g=9.81
+        # → ΔH ≈ 366.97 m; ΔP = ρ·a·V = 3.60 MPa.
+        r = water_hammer_joukowsky(V=3.0, a_wave=1200.0)
+        assert r["ok"]
+        assert abs(r["dP_Pa"] - 3.6e6) < 1.0
+        assert abs(r["dH_m"] - 366.972) < 0.01
+
+    def test_warnick_allievi_michaud_slow(self):
+        # Michaud slow-closure surge ΔH = 2·L·V/(g·T_close).
+        # L=500 m, V=3 m/s, T=60 s → ΔH ≈ 5.097 m (regime 'slow').
+        r = water_hammer_allievi(H_static=200.0, V=3.0, a_wave=1200.0,
+                                 L=500.0, T_close=60.0)
+        assert r["ok"]
+        assert r["regime"] == "slow"
+        assert abs(r["dH_max_m"] - 5.0968) < 0.01
+
+    def test_allievi_rapid_is_joukowsky_limit(self):
+        # Rapid closure (T_close ≤ 2L/a) → Joukowsky limit ΔH = a·V/g.
+        # a=1200, V=3 → 366.97 m.
+        r = water_hammer_allievi(H_static=200.0, V=3.0, a_wave=1200.0,
+                                 L=500.0, T_close=0.5)
+        assert r["ok"]
+        assert r["regime"] == "rapid"
+        assert abs(r["dH_max_m"] - 366.972) < 0.01
+
+    def test_warnick_pelton_jet_velocity(self):
+        # Pelton free jet V_jet = Cv·√(2·g·H_net); optimal u/V_jet ≈ 0.46.
+        # Cv=0.97, H=400 m → V_jet ≈ 85.931 m/s.
+        r = pelton_jet_sizing(H_net=400.0, Q=0.5, Cv=0.97)
+        assert r["ok"]
+        assert abs(r["V_jet_m_s"] - 85.931) < 0.01
+        assert abs(r["u_opt_m_s"] / r["V_jet_m_s"] - 0.46) < 1e-9
+
+    def test_barlow_penstock_wall_thickness(self):
+        # Barlow thin-wall: t = P·D / (2·σ_allow·e).
+        # D=0.8 m, P=2 MPa, σ=120 MPa, e=0.85 → t_calc ≈ 7.843 mm.
+        r = penstock_wall_thickness(0.8, 2e6, sigma_allow_Pa=120e6,
+                                    weld_efficiency=0.85)
+        assert r["ok"]
+        assert abs(r["t_calc_mm"] - 7.8431) < 1e-3
+
+    def test_iec_dimensionless_specific_speed(self):
+        # IEC 60193 / Warnick: Ns = ω·√Q / (g·H)^¾ (true dimensionless).
+        # n=300 rpm, Q=10 m³/s, H=50 m → Ns ≈ 0.953 (Francis band).
+        r = turbine_type_selection(H_net=50.0, Q=10.0, n_rpm=300.0)
+        assert r["ok"]
+        assert abs(r["Ns"] - 0.9532) < 1e-3
+        assert r["turbine_type"] == "Francis"
+
+    def test_synchronous_speed_120f_over_p(self):
+        # Generator synchronous speed n_s = 120·f / p.  A runner at exactly
+        # 500 rpm on a 50 Hz grid matches p=12 poles (120·50/12 = 500).
+        r = synchronous_speed_poles(n_runner_rpm=500.0, f_hz=50.0)
+        assert r["ok"]
+        assert abs(r["n_sync_lower_rpm"] - 500.0) < 1e-9
+        assert r["poles_lower"] == 12
+
+    def test_gordon_thoma_sigma_plant(self):
+        # Gordon (1999): plant cavitation number
+        # σ_plant = (H_atm − H_vapor − H_s)/H_net.  P_atm=101325 Pa,
+        # P_v=2338 Pa, ρ=1000, H_s=2 m, H_net=100 m → σ_plant ≈ 0.0809.
+        r = thoma_cavitation(H_net=100.0, H_s=2.0, P_atm_Pa=101325.0,
+                             P_vapor_Pa=2338.0, rho=1000.0)
+        assert r["ok"]
+        assert abs(r["sigma_plant"] - 0.0809) < 1e-3
+
+    def test_economic_penstock_diameter(self):
+        # Economic penstock D = √(4·Q/(π·V)).  Q=3 m³/s, V=3.5 m/s
+        # → D ≈ 1.045 m (continuity).
+        r = penstock_diameter(3.0, V_economic=3.5)
+        assert r["ok"]
+        assert abs(r["D_m"] - 1.0447) < 1e-3
+
+    def test_darcy_weisbach_penstock_friction(self):
+        # Darcy-Weisbach h_f = f·(L/D)·V²/(2g).  Q=2 m³/s, D=0.6 m,
+        # L=500 m, f=0.015 → V=7.074 m/s, h_f ≈ 31.878 m.
+        r = penstock_friction_loss(Q=2.0, D=0.6, L=500.0, f=0.015)
+        assert r["ok"]
+        assert abs(r["h_f_m"] - 31.8776) < 1e-2
+
+
+# ===========================================================================
+# 17. LLM tool wrappers
 # ===========================================================================
 
 class TestToolWrappers:

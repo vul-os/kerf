@@ -821,7 +821,115 @@ class TestSurgeChokeMargin:
 
 
 # ===========================================================================
-# 13. LLM tool wrappers
+# 13. Authoritative external-reference cases (citable, numeric answers)
+# ===========================================================================
+
+class TestAuthoritativeReferences:
+    """Cross-checks vs Dixon & Hall worked-example templates with known
+    numeric answers.
+
+    Source: Dixon, S.L. & Hall, C.A. (2014) Fluid Mechanics and
+    Thermodynamics of Turbomachinery, 7th ed.
+      §1.3 Euler equation; §1.4 affinity laws; §1.5 specific speed/diameter;
+      §2.3 polytropic efficiency; §3.2–3.5 axial velocity triangles, de
+      Haller, degree of reaction; §7.2/7.21 centrifugal slip
+      (Stanitz 1952, Wiesner 1967).
+    """
+
+    def test_euler_work_dixon_1_3(self):
+        # Dixon §1.3: W = U·ΔCθ.  U=200 m/s, ΔCθ=80 m/s → 16 000 J/kg.
+        r = euler_work(200.0, 80.0)
+        assert r["ok"] is True
+        assert abs(r["W_specific"] - 16000.0) < 1e-9
+
+    def test_axial_whirl_and_work_dixon_3_2(self):
+        # Dixon §3.2: axial inlet (α1=0), Cθ2 = Ca·tan α2.
+        # Ca=150 m/s, α2=30° → Cθ2 = 86.6025 m/s; W = U·Cθ2 = 17 320.5 J/kg.
+        r = velocity_triangles_axial(200.0, 150.0, 0.0, 30.0)
+        assert r["ok"] is True
+        assert abs(r["Ctheta2_m_s"] - 86.6025) < 1e-3
+        assert abs(r["W_specific"] - 17320.508) < 1e-2
+
+    def test_de_haller_dixon_3_3(self):
+        # Dixon §3.3 de Haller number W2/W1.  U=200, Ca=150, α1=0, α2=30°
+        # → W1=250 m/s, W2=188.04 m/s, W2/W1 ≈ 0.7522 (> 0.72, no stall).
+        r = axial_stage(U=200.0, Ca=150.0, alpha1_deg=0.0, alpha2_deg=30.0)
+        assert r["ok"] is True
+        assert abs(r["velocity_triangles"]["W1_m_s"] - 250.0) < 1e-6
+        assert abs(r["de_haller"] - 0.75216) < 1e-4
+
+    def test_centrifugal_ideal_whirl_dixon_7_2(self):
+        # Dixon §7.2: Cθ2_ideal = U2 + Cr2·tan β2 (β2 signed, from radial).
+        # U2=300, Cr2=50, β2=−30° → 271.1325 m/s.
+        r = velocity_triangles_centrifugal(300.0, 50.0, beta2_deg=-30.0,
+                                           slip_factor=1.0)
+        assert r["ok"] is True
+        assert abs(r["Ctheta2_ideal_m_s"] - 271.1325) < 1e-3
+
+    def test_stanitz_slip_dixon_7_21b(self):
+        # Stanitz 1952 / Dixon Eq. 7.21b: σ = 1 − 0.63π/Z.
+        # Z=8 → σ = 0.752597.
+        r = centrifugal_impeller(n_rpm=1450.0, D2_m=0.30, b2_m=0.025,
+                                 D1_tip_m=0.15, D1_hub_m=0.06,
+                                 beta2_deg=-30.0, Z=8, slip_model="stanitz")
+        assert r["ok"] is True
+        assert abs(r["slip_factor"] - (1.0 - 0.63 * math.pi / 8)) < 1e-9
+        assert abs(r["slip_factor"] - 0.752597) < 1e-5
+
+    def test_wiesner_slip_dixon_7_21(self):
+        # Wiesner 1967 / Dixon Eq. 7.21: σ = 1 − √(cos|β2|)/Z^0.7
+        # (β2 from radial).  Z=20, β2=−30° → σ ≈ 0.885701.
+        r = centrifugal_impeller(n_rpm=1450.0, D2_m=0.30, b2_m=0.025,
+                                 D1_tip_m=0.15, D1_hub_m=0.06,
+                                 beta2_deg=-30.0, Z=20, slip_model="wiesner")
+        assert r["ok"] is True
+        sigma_exp = 1.0 - math.sqrt(math.cos(math.radians(30.0))) / 20 ** 0.7
+        assert abs(r["slip_factor"] - sigma_exp) < 1e-9
+        assert abs(r["slip_factor"] - 0.885701) < 1e-5
+
+    def test_specific_speed_diameter_dixon_1_5(self):
+        # Dixon §1.5: Ω_s = ω·√Q/(gH)^¾, Δ_s = D·(gH)^¼/√Q.
+        # Q=0.05, gH=200, ω=150, D=0.3 → Ω_s ≈ 0.630672, Δ_s ≈ 5.045378.
+        r = specific_speed_diameter(0.05, 200.0, 150.0, D=0.3)
+        assert r["ok"] is True
+        assert abs(r["Omega_s"] - 0.630672) < 1e-5
+        assert abs(r["Delta_s"] - 5.045378) < 1e-5
+
+    def test_degree_of_reaction_dixon_3_5(self):
+        # Dixon §3.5: R = 1 − (Cθ1+Cθ2)/(2U).  Cθ1=50, Cθ2=150, U=200
+        # → R = 0.5 (50% reaction).
+        r = degree_of_reaction(50.0, 150.0, 200.0)
+        assert r["ok"] is True
+        assert abs(r["R"] - 0.5) < 1e-12
+
+    def test_affinity_laws_dixon_1_4(self):
+        # Dixon §1.4 affinity: Q∝n, H∝n², P∝n³.  1450→1750 rpm.
+        r = fan_affinity(2.0, 50.0, 5000.0, 1450.0, 1750.0)
+        assert r["ok"] is True
+        assert abs(r["Q2"] - 2.0 * 1750.0 / 1450.0) < 1e-6
+        assert abs(r["H2"] - 50.0 * (1750.0 / 1450.0) ** 2) < 1e-4
+        assert abs(r["P2"] - 5000.0 * (1750.0 / 1450.0) ** 3) < 1e-2
+
+    def test_isentropic_and_polytropic_efficiency_dixon_2_3(self):
+        # Dixon §2.3.  Compressor η_is = W_is/W_a = 100000/120000 = 0.8333.
+        # η_p = [(γ−1)/γ]/[(n−1)/n], γ=1.4, n=1.6 → 0.761905.
+        r = stage_efficiency(120000.0, 100000.0, polytropic_n=1.6,
+                             gamma=1.4, stage_type="compressor")
+        assert r["ok"] is True
+        assert abs(r["eta_isentropic"] - 100000.0 / 120000.0) < 1e-6
+        assert abs(r["eta_polytropic"] - 0.761905) < 1e-5
+
+    def test_surge_choke_margin_definitions(self):
+        # SM = (φ_op−φ_surge)/φ_op, CM = (φ_choke−φ_op)/φ_op (Dixon §5.9).
+        # φ_op=0.5, φ_surge=0.3, φ_choke=0.9 → SM=0.4, CM=0.8.
+        r = surge_choke_margin(phi_op=0.5, phi_surge=0.3, phi_choke=0.9)
+        assert r["ok"] is True
+        assert abs(r["surge_margin"] - 0.4) < 1e-9
+        assert abs(r["choke_margin"] - 0.8) < 1e-9
+
+
+# ===========================================================================
+# 14. LLM tool wrappers
 # ===========================================================================
 
 class TestToolWrappers:

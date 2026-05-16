@@ -433,17 +433,21 @@ def bolt_bearing_capacity(
     t_m = float(t) * 1e-3
     d_m = float(d) * 1e-3
 
+    # AISC 360-22 J3.10:
+    #  (a) deformation a design consideration: Rn = 1.2·lc·t·Fu ≤ 2.4·d·t·Fu
+    #  (b) deformation NOT a consideration:    Rn = 1.5·lc·t·Fu ≤ 3.0·d·t·Fu
     bearing_factor = 2.4 if deformation_controlled else 3.0
+    clear_factor = 1.2 if deformation_controlled else 1.5
     Rn_deform = bearing_factor * d_m * t_m * float(Fu) * n_bolts  # N
 
     governing_ls = f"bearing deformation-controlled (AISC J3.10): {bearing_factor}dtFu"
 
     if lc is not None:
         lc_m = float(lc) * 1e-3
-        Rn_clear = 1.2 * lc_m * t_m * float(Fu) * n_bolts
+        Rn_clear = clear_factor * lc_m * t_m * float(Fu) * n_bolts
         if Rn_clear < Rn_deform:
             Rn = Rn_clear
-            governing_ls = "bearing clear-distance (AISC J3.10): 1.2lc·t·Fu"
+            governing_ls = f"bearing clear-distance (AISC J3.10): {clear_factor}lc·t·Fu"
         else:
             Rn = Rn_deform
     else:

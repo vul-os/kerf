@@ -643,6 +643,104 @@ class TestBasePlateBearing:
 
 
 # ===========================================================================
+# 10b. AISC worked-example reference cases (citable known answers)
+# ===========================================================================
+
+class TestAISCReferenceCases:
+    """Each assertion checks a specific AISC 360-22 / AISC Manual / Segui value."""
+
+    KSI = 6.894757e6      # Pa per ksi
+    KIP = 4448.222        # N per kip
+
+    def test_segui_bolt_shear_7_8_A325N(self):
+        # Segui, Steel Design 5th ed. / AISC Manual Table 7-1:
+        # 7/8" A325-N bolt, Fnv = 54 ksi → Rn = 32.5 kip, φRn = 24.4 kip.
+        Ab = math.pi / 4.0 * (0.875 * 25.4) ** 2  # mm²
+        r = bolt_shear_capacity(Ab, 54.0 * self.KSI, 1, method="LRFD")
+        assert r["ok"] is True
+        assert abs(r["Rn_N"] / self.KIP - 32.5) < 0.2
+        assert abs(r["capacity_N"] / self.KIP - 24.4) < 0.2
+
+    def test_aisc_bearing_deformation_controlled(self):
+        # AISC J3-6a: Rn = 2.4·d·t·Fu.  3/4" bolt, 3/8" plate, Fu = 58 ksi (A36)
+        # → 2.4·0.75·0.375·58 = 39.15 kip.
+        d = 0.75 * 25.4
+        t = 0.375 * 25.4
+        r = bolt_bearing_capacity(58.0 * self.KSI, t, d, 1)
+        assert abs(r["Rn_N"] / self.KIP - 39.15) < 0.1
+
+    def test_aisc_J3_10_no_deformation_uses_1_5_and_3_0(self):
+        # AISC J3-6c (deformation NOT a design consideration):
+        # Rn = 1.5·lc·t·Fu ≤ 3.0·d·t·Fu.  Verify the clear-distance branch
+        # uses 1.5 (this was the fixed defect — was hardcoded 1.2).
+        d = 0.75 * 25.4
+        t = 0.375 * 25.4
+        lc = 0.5 * d   # small → clear-distance governs
+        Fu = 58.0 * self.KSI
+        r = bolt_bearing_capacity(Fu, t, d, 1, lc=lc,
+                                  deformation_controlled=False)
+        assert r["ok"] is True
+        assert "clear-distance" in r["limit_state"]
+        expected = 1.5 * (lc * 1e-3) * (t * 1e-3) * Fu
+        assert abs(r["Rn_N"] - expected) / expected < REL
+        # And the deformation upper bound must use 3.0 not 2.4
+        r2 = bolt_bearing_capacity(Fu, t, d, 1, deformation_controlled=False)
+        assert abs(r2["Rn_N"] - 3.0 * (d * 1e-3) * (t * 1e-3) * Fu) / r2["Rn_N"] < REL
+
+    def test_aisc_block_shear_min_governs(self):
+        # AISC J4-5: Rn = 0.6·Fu·Anv + Ubs·Fu·Ant  (≤ 0.6·Fy·Agv + Ubs·Fu·Ant).
+        # Fu=65 ksi, Fy=50 ksi, Agv=4.5 in², Anv=2.8 in², Ant=1.2 in², Ubs=1.0.
+        Fu = 65.0 * self.KSI
+        Fy = 50.0 * self.KSI
+        Agv = 4.5 * 645.16
+        Anv = 2.8 * 645.16
+        Ant = 1.2 * 645.16
+        r = block_shear_capacity(Fu, Fy, Agv, Anv, Ant, Ubs=1.0)
+        Rn1 = 0.6 * Fu * Anv * 1e-6 + 1.0 * Fu * Ant * 1e-6
+        Rn2 = 0.6 * Fy * Agv * 1e-6 + 1.0 * Fu * Ant * 1e-6
+        assert abs(r["Rn_N"] - min(Rn1, Rn2)) / min(Rn1, Rn2) < REL
+
+    def test_aisc_fillet_weld_longitudinal_nominal(self):
+        # AISC J2-4: Fnw = 0.60·Fexx for θ=0.  1/4" (D=4) E70 weld, 1 in long
+        # → nominal 0.6·70·0.707·0.25 = 7.42 kip/in.
+        r = fillet_weld_capacity(4.0, 25.4, 70.0 * self.KSI, angle_deg=0.0)
+        assert r["ok"] is True
+        assert abs(r["Rn_N"] / self.KIP - 7.42) < 0.05
+        assert abs(r["directional_factor"] - 1.0) < REL
+
+    def test_aisc_fillet_weld_transverse_factor_1_5(self):
+        # AISC J2-4: transverse weld (θ=90°) directional factor = 1.5.
+        r = fillet_weld_capacity(4.0, 25.4, 70.0 * self.KSI, angle_deg=90.0)
+        assert abs(r["directional_factor"] - 1.5) < REL
+
+    def test_slip_critical_AISC_J3_8(self):
+        # AISC J3-4: Rn = μ·Du·hf·Tb·ns.  Class B (μ=0.50), Du=1.13,
+        # 7/8" A325 Tb = 39 kip = 173.5 kN, STD holes (hf=1.0), 1 slip plane.
+        Tb = 39.0 * self.KIP
+        r = slip_critical_capacity(0.50, Tb, 1, 1, hole_factor=1.0)
+        expected = 0.50 * 1.13 * 1.0 * Tb * 1 * 1
+        assert abs(r["Rn_N"] - expected) / expected < REL
+
+    def test_bolt_tension_AISC_table_J3_2(self):
+        # AISC Table J3.2: A325 Fnt = 90 ksi.  7/8" bolt Ab = 0.601 in².
+        # Rn = 90·0.601 = 54.1 kip.
+        Ab = math.pi / 4.0 * (0.875 * 25.4) ** 2
+        r = bolt_tension_capacity(Ab, 90.0 * self.KSI, 1)
+        assert abs(r["Rn_N"] / self.KIP - 54.1) < 0.3
+
+    def test_base_plate_AISC_J8_phi_0_65(self):
+        # AISC J8 / ACI 318: LRFD φc = 0.65 on Pp = 0.85·f'c·A1.
+        fpc = 0.85 * 28e6
+        r = base_plate_bearing(500e3, 300.0, 300.0, fpc, method="LRFD")
+        assert abs(r["fp_allow_Pa"] - 0.65 * fpc) / (0.65 * fpc) < REL
+
+    def test_electrode_E70_strength(self):
+        # AWS A5.1: E70xx classification strength = 70 ksi.
+        r = electrode_strength("E70")
+        assert abs(r["Fexx_ksi"] - 70.0) < 0.5
+
+
+# ===========================================================================
 # 11. LLM tool wrappers
 # ===========================================================================
 

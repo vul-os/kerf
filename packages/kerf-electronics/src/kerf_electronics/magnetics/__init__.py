@@ -1,0 +1,46 @@
+# kerf-electronics magnetics sub-package.
+# Power transformer & inductor magnetics design (area-product, Kg, Steinmetz, Dowell).
+# Distinct from powerconv/ (converter topology), gatedrive/, pdn/, motordrive/.
+from kerf_electronics.magnetics.design import (
+    core_select_ap,
+    core_select_kg,
+    transformer_primary_turns,
+    inductor_turns,
+    turns_ratio,
+    gap_length,
+    awg_from_current,
+    skin_depth,
+    dowell_ac_factor,
+    steinmetz_core_loss,
+    copper_loss,
+    total_loss,
+    temperature_rise,
+    flyback_transformer,
+    forward_transformer,
+    push_pull_transformer,
+    leakage_inductance_estimate,
+    saturation_check,
+    window_utilization,
+)
+
+__all__ = [
+    "core_select_ap",
+    "core_select_kg",
+    "transformer_primary_turns",
+    "inductor_turns",
+    "turns_ratio",
+    "gap_length",
+    "awg_from_current",
+    "skin_depth",
+    "dowell_ac_factor",
+    "steinmetz_core_loss",
+    "copper_loss",
+    "total_loss",
+    "temperature_rise",
+    "flyback_transformer",
+    "forward_transformer",
+    "push_pull_transformer",
+    "leakage_inductance_estimate",
+    "saturation_check",
+    "window_utilization",
+]

@@ -103,22 +103,46 @@ class TestHunterDemandGpm:
         assert abs(r["demand_gpm"] - 3.0) < 0.1
 
     def test_flush_tank_10fu(self):
-        """Hunter table: 10 FU flush-tank → 14.6 gpm."""
+        """IPC Appendix E Table E103.3(2) / NBS BMS65 Table 1: 10 FU → 13.7 gpm."""
         r = hunter_demand_gpm(10)
         assert r["ok"] is True
-        assert abs(r["demand_gpm"] - 14.6) < 0.5
+        assert abs(r["demand_gpm"] - 13.7) < 0.5
 
     def test_flush_tank_100fu(self):
-        """Hunter table: 100 FU flush-tank → 50.0 gpm."""
+        """IPC Appendix E Table E103.3(2): 100 FU flush-tank → 37 gpm."""
         r = hunter_demand_gpm(100)
         assert r["ok"] is True
-        assert abs(r["demand_gpm"] - 50.0) < 1.0
+        assert abs(r["demand_gpm"] - 37.0) < 1.0
+
+    def test_flush_tank_200fu(self):
+        """IPC Appendix E Table E103.3(2): 200 FU flush-tank → 55 gpm."""
+        r = hunter_demand_gpm(200)
+        assert r["ok"] is True
+        assert abs(r["demand_gpm"] - 55.0) < 1.0
+
+    def test_flush_tank_500fu(self):
+        """IPC Appendix E Table E103.3(2): 500 FU flush-tank → 100 gpm."""
+        r = hunter_demand_gpm(500)
+        assert r["ok"] is True
+        assert abs(r["demand_gpm"] - 100.0) < 2.0
+
+    def test_flush_tank_1000fu(self):
+        """IPC Appendix E Table E103.3(2): 1000 FU flush-tank → 162 gpm."""
+        r = hunter_demand_gpm(1000)
+        assert r["ok"] is True
+        assert abs(r["demand_gpm"] - 162.0) < 3.0
 
     def test_flush_valve_10fu(self):
-        """Hunter flush-valve: 10 FU → 23.0 gpm."""
+        """IPC Appendix E Table E103.3(3): flush-valve 10 FU → 22.5 gpm."""
         r = hunter_demand_gpm(10, system_type="flush_valve")
         assert r["ok"] is True
-        assert abs(r["demand_gpm"] - 23.0) < 1.0
+        assert abs(r["demand_gpm"] - 22.5) < 1.0
+
+    def test_flush_valve_100fu(self):
+        """IPC Appendix E Table E103.3(3): flush-valve 100 FU → 70 gpm."""
+        r = hunter_demand_gpm(100, system_type="flush_valve")
+        assert r["ok"] is True
+        assert abs(r["demand_gpm"] - 70.0) < 2.0
 
     def test_flush_valve_higher_than_tank(self):
         """Flush-valve demand always > flush-tank demand for same FU."""
@@ -127,10 +151,10 @@ class TestHunterDemandGpm:
         assert r_fv["demand_gpm"] > r_ft["demand_gpm"]
 
     def test_interpolation_midpoint(self):
-        """Linear interpolation between 8 FU (12.8) and 10 FU (14.6): 9 FU ≈ 13.7."""
+        """Linear interpolation between 8 FU (12.3) and 10 FU (13.7): 9 FU ≈ 13.0."""
         r = hunter_demand_gpm(9)
         assert r["ok"] is True
-        assert abs(r["demand_gpm"] - 13.7) < 0.5
+        assert abs(r["demand_gpm"] - 13.0) < 0.5
 
     def test_invalid_fu_zero(self):
         r = hunter_demand_gpm(0)

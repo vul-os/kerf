@@ -106,6 +106,7 @@ def _register_tools(ctx, provides: list) -> None:
         "kerf_imports.parasolid_reader",
         "kerf_imports.dxf_writer",
         "kerf_imports.qif_reader",
+        "kerf_imports.ibis_reader",
     ]
 
     for module_path in tool_modules:

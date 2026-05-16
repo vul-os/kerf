@@ -101,6 +101,7 @@ def _register_tools(ctx, provides: list) -> None:
         "kerf_imports.tools.feature_rib",
         "kerf_imports.tools.sheet_revisions",
         "kerf_imports.tools.import_dwg",
+        "kerf_imports.heal",
     ]
 
     for module_path in tool_modules:

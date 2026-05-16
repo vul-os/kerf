@@ -55,6 +55,8 @@ from kerf_cad_core.flowmeter.measure import (
     parshall_flume,
     rotameter_scale,
     turndown_ratio,
+    _rhg_orifice_C,
+    _expansibility_orifice,
 )
 from kerf_cad_core.flowmeter.tools import (
     run_dp_meter,
@@ -812,3 +814,152 @@ class TestToolWrappers:
             p1_kpa=600.0, pv_kpa=3.5, pc_kpa=22089.0
         )))
         _err_tool(raw)
+
+
+# ===========================================================================
+# 16. CITABLE EXTERNAL-REFERENCE CASES — known numeric answers
+# ===========================================================================
+#
+# Cross-checked against ISO 5167 / ISA / API 520 / API 526 worked examples
+# with hand-computable answers.  SAFETY-relevant: PRV orifice sizing.
+#
+# Sources
+# -------
+# [ISO5167-1] ISO 5167-1:2003 — Reader–Harris/Gallagher Cd Eq.(1),
+#             expansibility Eq.(11), permanent loss (1−β¹·⁹)/(1+β¹·⁹).
+# [ISO5167-4] ISO 5167-4:2003 — venturi Cd ≈ 0.985, ~7 % permanent loss.
+# [ISA]       ISA-75.01.01 / IEC 60534-2-1 — Kv/Cv definition, FF Eq.(13).
+# [API520]    API 520 Part I, 9th ed. — steam Napier Eq.(12).
+# [API526]    API 526, 7th ed. — effective orifice areas (D…T).
+# [ISO1438]   ISO 1438 — thin-plate weirs.
+# [USBR]      US Bureau of Reclamation — Parshall-flume free-flow eq.
+# ===========================================================================
+
+class TestCitableReferenceCases:
+
+    def test_ref_rhg_discharge_coeff_iso5167(self):
+        """[ISO5167-1 Eq.(1)] Reader–Harris/Gallagher Cd, D & D/2 taps.
+        Anchor values (β, Re_D)→Cd, weakly Re-dependent, ~0.60 region:
+          β=0.6, Re=1e6 → 0.60696
+          β=0.5, Re=1e6 → 0.60255
+          β=0.2, Re=1e6 → 0.59627  (low-β limit ≈ 0.5961+0.0261β²−0.216β⁸)
+        """
+        assert _rhg_orifice_C(0.6, 1e6) == pytest.approx(0.60696, abs=1e-4)
+        assert _rhg_orifice_C(0.5, 1e6) == pytest.approx(0.60255, abs=1e-4)
+        assert _rhg_orifice_C(0.2, 1e6) == pytest.approx(0.59627, abs=1e-4)
+
+    def test_ref_expansibility_iso5167_eq11(self):
+        """[ISO5167-1 Eq.(11)] ε = 1 − (0.351+0.256β⁴+0.93β⁸)·
+        [1 − (1−x)^(1/κ)].  β=0.5, x=ΔP/p1=0.2, κ=1.4 → ε = 0.945393.
+        """
+        eps = _expansibility_orifice(0.5, 0.2, 1.0, 1.4)
+        b4, b8 = 0.5 ** 4, 0.5 ** 8
+        hand = 1.0 - (0.351 + 0.256 * b4 + 0.93 * b8) * (
+            1.0 - (1.0 - 0.2) ** (1.0 / 1.4))
+        assert eps == pytest.approx(hand, rel=1e-12)
+        assert eps == pytest.approx(0.945393, abs=1e-5)
+
+    def test_ref_orifice_permanent_loss_iso5167(self):
+        """[ISO5167-1] Orifice permanent loss ratio = (1−β¹·⁹)/(1+β¹·⁹).
+        β=0.6 → 0.45047 of the measured differential pressure.
+        """
+        res = dp_meter("orifice", pipe_d_m=0.1, beta=0.6,
+                       dp_pa=10000.0, rho_kg_m3=1000.0)
+        assert res["ok"] is True
+        ratio = (1.0 - 0.6 ** 1.9) / (1.0 + 0.6 ** 1.9)
+        assert res["permanent_pressure_loss_pa"] / 10000.0 == pytest.approx(
+            ratio, rel=1e-9)
+        assert ratio == pytest.approx(0.45047, abs=1e-5)
+
+    def test_ref_venturi_discharge_coeff_iso5167_4(self):
+        """[ISO5167-4] Classical venturi Cd ≈ 0.985; permanent loss ≈ 7 %
+        of ΔP (≈ 93 % pressure recovery, much better than an orifice)."""
+        res = dp_meter("venturi", pipe_d_m=0.1, beta=0.5,
+                       dp_pa=5000.0, rho_kg_m3=1000.0)
+        assert res["ok"] is True
+        assert res["Cd"] == pytest.approx(0.985, abs=1e-9)
+        assert res["permanent_pressure_loss_pa"] / 5000.0 == pytest.approx(
+            0.07, abs=1e-9)
+
+    def test_ref_control_valve_liquid_isa_kv_definition(self):
+        """[ISA/IEC] Defining Kv: Q[m³/h] water (SG=1) at 1 bar → Kv=Q.
+        10 m³/h at ΔP=1 bar (100 kPa), SG=1 → Kv=10.0, Cv=Kv·1.1561=11.561.
+        FF = 0.96−0.28√(pv/pc) = 0.96−0.28√(2/22120) = 0.957338.
+        """
+        res = control_valve_liquid(q_m3h=10.0, rho_kg_m3=1000.0,
+                                   dp_kpa=100.0, p1_kpa=600.0,
+                                   pv_kpa=2.0, pc_kpa=22120.0, FL=0.9)
+        assert res["ok"] is True
+        assert res["Kv"] == pytest.approx(10.0, rel=1e-9)
+        assert res["Cv"] == pytest.approx(11.561, rel=1e-4)
+        assert res["FF"] == pytest.approx(0.957338, abs=1e-6)
+
+    def test_ref_api526_effective_orifice_areas(self):
+        """[API526 Table 1] Effective orifice areas (in²): D=0.110,
+        J=1.287, P=6.380.  A 1.0 in² requirement → letter 'J' (next-up)."""
+        from kerf_cad_core.flowmeter.measure import (
+            _API526_ORIFICE, _api526_designation)
+        IN2 = 6.4516e-4
+        assert _API526_ORIFICE["D"] / IN2 == pytest.approx(0.110, rel=1e-9)
+        assert _API526_ORIFICE["J"] / IN2 == pytest.approx(1.287, rel=1e-9)
+        assert _API526_ORIFICE["P"] / IN2 == pytest.approx(6.380, rel=1e-9)
+        assert _api526_designation(1.0 * IN2) == "J"
+
+    def test_ref_prv_steam_napier_api520(self):
+        """[API520 Eq.(12)] Steam PRV area A = W/(51.45·kd·P1·ksh·kb·kn).
+        q=1 kg/s → W=7936.64 lb/hr; p_set=1 MPa, 10 % overpressure,
+        P1=1.1·1e6·1.45038e-4 psia; kd=0.975 → A = 0.99168 in².
+        """
+        res = prv_steam(q_kg_s=1.0, p_set_pa=1.0e6)
+        assert res["ok"] is True
+        P1_psia = 1.0e6 * 1.10 * 1.45038e-4
+        W_lbhr = 1.0 * 7936.64
+        A_hand = W_lbhr / (51.45 * 0.975 * P1_psia * 1.0 * 1.0 * 1.0)
+        assert res["area_in2"] == pytest.approx(A_hand, rel=1e-9)
+        assert res["area_in2"] == pytest.approx(0.99168, abs=1e-4)
+
+    def test_ref_pitot_velocity_incompressible(self):
+        """[Bernoulli] Pitot v = Cp·√(2·ΔP/ρ).  ΔP=612.5 Pa, air ρ=1.225,
+        Cp=1.0 → v = √(2·612.5/1.225) = 31.62278 m/s.
+        """
+        res = pitot_velocity(dp_pa=612.5, rho_kg_m3=1.225)
+        assert res["ok"] is True
+        assert res["velocity_m_s"] == pytest.approx(
+            math.sqrt(2.0 * 612.5 / 1.225), rel=1e-12)
+        assert res["velocity_m_s"] == pytest.approx(31.62278, abs=1e-4)
+
+    def test_ref_v_notch_weir_iso1438(self):
+        """[ISO1438] 90° V-notch Q = (8/15)·Cd·√(2g)·tan(θ/2)·H^2.5.
+        Cd=0.578, H=0.20 m, g=9.80665 → Q = 0.02442176 m³/s.
+        """
+        res = v_notch_weir(H_m=0.20, theta_deg=90.0, Cd=0.578)
+        assert res["ok"] is True
+        g = 9.80665
+        hand = (8.0 / 15.0) * 0.578 * math.sqrt(2.0 * g) * \
+            math.tan(math.radians(45.0)) * 0.20 ** 2.5
+        assert res["qv_m3_s"] == pytest.approx(hand, rel=1e-12)
+        assert res["qv_m3_s"] == pytest.approx(0.02442176, abs=1e-7)
+
+    def test_ref_rectangular_weir_francis(self):
+        """[Francis] Suppressed rectangular weir Q = (2/3)·Cd·√(2g)·L·H^1.5.
+        Cd=0.623, L=1.5 m, H=0.25 m, n=0 → Q = 0.34488428 m³/s.
+        """
+        res = rectangular_weir(H_m=0.25, L_m=1.5, Cd=0.623,
+                               end_contractions=0)
+        assert res["ok"] is True
+        g = 9.80665
+        hand = (2.0 / 3.0) * 0.623 * math.sqrt(2.0 * g) * 1.5 * 0.25 ** 1.5
+        assert res["qv_m3_s"] == pytest.approx(hand, rel=1e-12)
+        assert res["qv_m3_s"] == pytest.approx(0.34488428, abs=1e-7)
+
+    def test_ref_parshall_flume_usbr(self):
+        """[USBR] 1 ft (0.305 m) Parshall flume: Q = C·Ha^n,
+        C=0.29114, n=1.522.  Ha=0.40 m → Q = 0.07218338 m³/s.
+        """
+        res = parshall_flume(Ha_m=0.40, throat_w_m=0.305)
+        assert res["ok"] is True
+        assert res["C"] == pytest.approx(0.29114, rel=1e-9)
+        assert res["n"] == pytest.approx(1.522, rel=1e-9)
+        assert res["qv_m3_s"] == pytest.approx(0.29114 * 0.40 ** 1.522,
+                                               rel=1e-12)
+        assert res["qv_m3_s"] == pytest.approx(0.07218338, abs=1e-7)

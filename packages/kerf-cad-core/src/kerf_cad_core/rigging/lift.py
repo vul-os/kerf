@@ -1170,8 +1170,9 @@ def spreader_beam_check(
     bending_stress = M_Nm * 1e3 / S_mm3  # MPa
 
     # Conservative axial (compression): P_axial ≈ W/2 (slings at 45°)
+    # σ_axial = P[N] / A[mm²]  →  N/mm² = MPa directly (no scale factor).
     P_axial_N = W_N / 2.0
-    axial_stress = P_axial_N / A_mm2 * 1e-3  # MPa (N/mm² = MPa)
+    axial_stress = P_axial_N / A_mm2  # MPa (N/mm² ≡ MPa)
 
     combined = bending_stress + axial_stress
     allow = float(Fy_MPa) / float(design_factor)

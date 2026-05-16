@@ -693,3 +693,100 @@ class TestCraneRadiusInterpolate:
         res = crane_radius_interpolate(7.0, self._TABLE)
         assert res["ok"] is True
         assert abs(res["capacity_t"] - 34.0) < 1e-9
+
+
+# ===========================================================================
+# Externally-citable reference cases (production-confidence validation)
+# Cross-checked against:
+#   - ASME B30.9-2021 "Slings" — sling load-angle factor 1/sinθ
+#   - ASME B30.26-2020 "Rigging Hardware" — shackle / eyebolt angular WLL
+#   - Crosby / LEEA rigging handbooks — unequal-leg & spreader hand-calcs
+# Each case carries a hand-computed numeric answer in the comment.
+# ===========================================================================
+
+class TestRiggingExternalReferences:
+    """Validated vs ASME B30.9 / B30.26 and rigging-handbook hand-calcs."""
+
+    def test_sling_load_angle_factor_ASME_B30_9(self):
+        # ASME B30.9: tension per leg = (W/n)/sin θ, θ from horizontal.
+        # 2 legs, θ=60°, 2000 kg → LAF=1/sin60°=1.154701.
+        r = sling_tension(2000.0, 60.0, n_legs=2)
+        laf = 1.0 / math.sin(math.radians(60.0))
+        assert r["load_angle_factor"] == pytest.approx(laf, rel=1e-12)
+        assert r["load_angle_factor"] == pytest.approx(1.154701, rel=1e-6)
+        W_kN = 2000.0 * _G / 1000.0
+        assert r["tension_per_leg_kN"] == pytest.approx((W_kN / 2.0) * laf, rel=1e-9)
+        assert r["tension_per_leg_kN"] == pytest.approx(11.323744, rel=1e-5)
+
+    def test_sling_60deg_horizontal_doubles_vs_vertical(self):
+        # ASME B30.9 classic: a single sling at 30° from horizontal carries
+        # 1/sin30° = 2.0× the vertical-hitch tension.
+        r30 = sling_tension(1000.0, 30.0, n_legs=1)
+        r90 = sling_tension(1000.0, 90.0, n_legs=1)
+        assert r30["load_angle_factor"] == pytest.approx(2.0, rel=1e-12)
+        assert r30["tension_per_leg_kN"] == pytest.approx(
+            2.0 * r90["tension_per_leg_kN"], rel=1e-12
+        )
+
+    def test_sling_derate_45_from_vertical_ASME(self):
+        # ASME B30.9 published sling-angle reduction chart: at 45° from
+        # vertical the WLL factor is the tabulated 0.707 (= cos45° to the
+        # 3-decimal precision printed on rigging charts).
+        r = sling_wll_derate(10000.0, 45.0, hardware_type="sling")
+        assert r["derate_factor"] == pytest.approx(0.707, rel=1e-9)
+        assert r["derate_factor"] == pytest.approx(
+            math.cos(math.radians(45.0)), abs=1.0e-3
+        )
+        assert r["derated_wll_kg"] == pytest.approx(7070.0, rel=1e-9)
+
+    def test_sling_derate_30_from_vertical_ASME(self):
+        # ASME B30.9 chart: 30° from vertical → 0.866 (= cos30°, 3-dp).
+        r = sling_wll_derate(10000.0, 30.0, hardware_type="sling")
+        assert r["derate_factor"] == pytest.approx(0.866, rel=1e-9)
+        assert r["derate_factor"] == pytest.approx(
+            math.cos(math.radians(30.0)), abs=1.0e-3
+        )
+
+    def test_shackle_offplane_45_ASME_B30_26(self):
+        # ASME B30.26: shackle off-plane loading at 45° → 0.75 WLL factor.
+        r = sling_wll_derate(5000.0, 45.0, hardware_type="shackle")
+        assert r["derate_factor"] == pytest.approx(0.75, rel=1e-12)
+        assert r["derated_wll_kg"] == pytest.approx(3750.0, rel=1e-9)
+
+    def test_eyebolt_45_from_axis_severe_derate_B30_26(self):
+        # ASME B30.26 / Crosby: a shoulder eyebolt loaded at 45° from its
+        # axis is derated to 0.25 of the on-axis WLL.
+        r = sling_wll_derate(1000.0, 45.0, hardware_type="eyebolt")
+        assert r["derate_factor"] == pytest.approx(0.25, rel=1e-12)
+        assert r["derated_wll_kg"] == pytest.approx(250.0, rel=1e-9)
+
+    def test_spreader_beam_simple_bending_handcalc(self):
+        # Simply-supported spreader, central point load: M = WL/4,
+        # σ_b = M/S, σ_axial = (W/2)/A  (both in MPa — N & mm² units).
+        # SHS 200×200×10: A=7600 mm², S=458533.33 mm³.
+        # 10 t, 4 m → σ_b=213.870 MPa, σ_axial=6.4517 MPa.
+        r = spreader_beam_check(10000.0, 4.0,
+                                section="tube_square_200x200x10")
+        A = 200.0 ** 2 - 180.0 ** 2
+        I = (200.0 ** 4 - 180.0 ** 4) / 12.0
+        S = I / 100.0
+        W_N = 10000.0 * _G
+        M = W_N * 4.0 / 4.0
+        assert r["area_mm2"] == pytest.approx(A, rel=1e-9)
+        assert r["S_mm3"] == pytest.approx(S, rel=1e-9)
+        assert r["bending_stress_MPa"] == pytest.approx(M * 1e3 / S, rel=1e-9)
+        assert r["bending_stress_MPa"] == pytest.approx(213.86995, rel=1e-5)
+        # Regression: axial stress must be in MPa (no spurious 1e-3 factor).
+        assert r["axial_stress_MPa"] == pytest.approx((W_N / 2.0) / A, rel=1e-9)
+        assert r["axial_stress_MPa"] == pytest.approx(6.451743, rel=1e-5)
+        assert r["combined_stress_MPa"] == pytest.approx(
+            r["bending_stress_MPa"] + r["axial_stress_MPa"], rel=1e-12
+        )
+
+    def test_two_equal_legs_share_equally(self):
+        # LEEA / ASME B30.9: two equal-length legs at a symmetric pick
+        # share the load 50/50.
+        r = multi_leg_share(4000.0, [3.0, 3.0])
+        assert r["ok"] is True
+        assert r["leg_loads_kg"][0] == pytest.approx(2000.0, rel=1e-9)
+        assert r["leg_loads_kg"][1] == pytest.approx(2000.0, rel=1e-9)

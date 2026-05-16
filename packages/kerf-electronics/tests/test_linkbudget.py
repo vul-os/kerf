@@ -880,3 +880,86 @@ class TestLLMTools:
         )
         assert res["ok"] is True
         assert res["osnr_db"] > 20.0
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Externally-citable reference cases (authoritative published numbers)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestExternalReferenceCases:
+    """Cross-checks against numeric values published in citable sources."""
+
+    def test_ref_friis_fspl_1ghz_1km_92db(self):
+        # Standard Friis FSPL: 32.44 + 20log10(f_MHz) + 20log10(d_km).
+        # 1 GHz over 1 km → 92.45 dB (textbook reference, e.g. Pozar
+        # "Microwave Engineering" / Rappaport "Wireless Comms" Eq. 4.6).
+        r = fspl_db(freq_hz=1e9, distance_m=1000.0)
+        assert abs(r["fspl_db"] - 92.45) < 0.05
+
+    def test_ref_friis_fspl_2400mhz_100m(self):
+        # Rappaport Eq. 4.6: 2.4 GHz over 100 m → 80.05 dB.
+        r = fspl_db(freq_hz=2.4e9, distance_m=100.0)
+        assert abs(r["fspl_db"] - 80.05) < 0.05
+
+    def test_ref_thermal_noise_floor_minus174_dbm_hz(self):
+        # Johnson-Nyquist: kT0B at T0=290 K, 1 Hz = −204 dBW/Hz =
+        # −174 dBm/Hz (universal RF reference, e.g. Pozar §10).
+        r = thermal_noise_floor_dbw(1.0, temp_k=290.0)
+        assert abs(r["noise_dbw"] - (-203.98)) < 0.1
+
+    def test_ref_bpsk_ber_at_9p6db_is_1e5(self):
+        # Sklar, "Digital Communications" 2nd ed. Fig 3.x / Proakis:
+        # coherent BPSK requires Eb/N0 ≈ 9.6 dB for BER = 1e-5.
+        ebno = 10.0 ** (9.6 / 10.0)
+        ber = ber_bpsk(ebno)
+        assert 7e-6 < ber < 1.3e-5
+
+    def test_ref_bpsk_ber_at_6p8db_is_1e3(self):
+        # Sklar BPSK reference: Eb/N0 ≈ 6.8 dB → BER ≈ 1e-3.
+        ebno = 10.0 ** (6.8 / 10.0)
+        ber = ber_bpsk(ebno)
+        assert 7e-4 < ber < 1.4e-3
+
+    def test_ref_qpsk_equals_bpsk_per_bit(self):
+        # Proakis: Gray-coded QPSK has the same per-bit BER as BPSK.
+        for db in (4.0, 8.0, 10.0):
+            ebno = 10.0 ** (db / 10.0)
+            assert abs(ber_qpsk(ebno) - ber_bpsk(ebno)) < 1e-12
+
+    def test_ref_16qam_ber_1e6_at_14p5db(self):
+        # Proakis 5e Eq. 4.3-30 / Goldsmith Eq. 6.23: 16-QAM reaches
+        # BER ≈ 1e-6 at Eb/N0 ≈ 14.5 dB.  (Pre-fix code used a 6×
+        # coefficient and gave ≈7e-12 here — ~3 dB too optimistic.)
+        ebno = 10.0 ** (14.5 / 10.0)
+        ber = ber_qam(ebno, 16)
+        assert 3e-7 < ber < 3e-6
+
+    def test_ref_4qam_reduces_to_qpsk(self):
+        # M=4 QAM must reduce exactly to QPSK/BPSK BER = Q(sqrt(2·Eb/N0)).
+        for db in (0.0, 5.0, 9.6):
+            ebno = 10.0 ** (db / 10.0)
+            assert abs(ber_qam(ebno, 4) - ber_bpsk(ebno)) < 1e-12
+
+    def test_ref_64qam_ber_1e6_near_18p8db(self):
+        # Goldsmith Eq. 6.23: 64-QAM reaches BER ≈ 1e-6 at Eb/N0 ≈ 18.8 dB.
+        ebno = 10.0 ** (18.8 / 10.0)
+        ber = ber_qam(ebno, 64)
+        assert 3e-7 < ber < 4e-6
+
+    def test_ref_friis_noise_cascade_4p6db(self):
+        # Friis cascade formula F = F1 + (F2−1)/G1 (Friis 1944; Pozar
+        # §10.5).  NF1=3 dB, G1=10 dB, NF2=10 dB → NF_total = 4.62 dB.
+        r = noise_figure_cascade(nf_db_list=[3.0, 10.0],
+                                 gain_db_list=[10.0, 20.0])
+        assert abs(r["nf_cascade_db"] - 4.62) < 0.05
+
+    def test_ref_shannon_capacity_1mhz_30db(self):
+        # Shannon-Hartley C = B·log2(1+SNR): 1 MHz at 30 dB SNR →
+        # 9.967 Mbps (textbook, Proakis / Sklar Ch. 3).
+        r = shannon_capacity(1e6, 30.0)
+        assert abs(r["capacity_bps"] / 1e6 - 9.967) < 0.01
+
+    def test_ref_erfc_matches_libm(self):
+        # A&S 7.1.26: max |error| < 1.5e-7 vs the true erfc.
+        for x in (0.0, 0.5, 1.0, 1.5, 2.0):
+            assert abs(_erfc(x) - math.erfc(x)) < 1.5e-7

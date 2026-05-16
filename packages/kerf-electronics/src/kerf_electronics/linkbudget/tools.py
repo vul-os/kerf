@@ -393,7 +393,8 @@ _BER_QAM_SPEC = ToolSpec(
     name="linkbudget_ber_qam",
     description=(
         "Compute approximate BER for Gray-coded M-QAM at a given Eb/N0.\n\n"
-        "BER ≈ (4/log2(M)) × (1−1/sqrt(M)) × Q(sqrt(6×log2(M)×Eb/N0/(M−1)))\n\n"
+        "BER ≈ (4/log2(M)) × (1−1/sqrt(M)) × Q(sqrt(3×log2(M)×Eb/N0/(M−1)))\n"
+        "  [Proakis 5e Eq.4.3-30 / Goldsmith Eq.6.23]\n\n"
         "Input: { eb_n0_db, m }\n"
         "Returns: { ok, ber, eb_n0_db, m }"
     ),

@@ -52,7 +52,8 @@ Eb/N0 (energy per bit to noise spectral density):
 Required Eb/N0 for target BER (using Q-function / erfc approximation):
     BPSK:   BER = Q(sqrt(2×Eb/N0))  =  0.5×erfc(sqrt(Eb/N0))
     QPSK:   BER = Q(sqrt(2×Eb/N0))  (same as BPSK per bit)
-    M-QAM:  BER ≈ (4/log2(M)) × (1−1/sqrt(M)) × Q(sqrt(6×Eb/N0×log2(M)/(M−1)))
+    M-QAM:  BER ≈ (4/log2(M)) × (1−1/sqrt(M)) × Q(sqrt(3×Eb/N0×log2(M)/(M−1)))
+            [Proakis 5e Eq.4.3-30 / Goldsmith Eq.6.23 — reduces to QPSK at M=4]
     M-PSK:  BER ≈ (2/log2(M)) × Q(sqrt(2×log2(M)×Eb/N0) × sin(π/M))
 
 Q-function implemented numerically via erfc:
@@ -685,14 +686,20 @@ def ber_qam(eb_n0_linear: float, m: int) -> float:
     """
     Approximate BER for Gray-coded M-QAM (square constellation, M = 4,16,64,256,...).
 
-    BER ≈ (4/log2(M)) × (1 − 1/sqrt(M)) × Q(sqrt(6 × log2(M) × Eb/N0 / (M−1)))
+    Proakis, "Digital Communications" 5th ed. Eq. 4.3-30; Goldsmith,
+    "Wireless Communications" Eq. 6.23 (Eb/N0 form):
+        BER ≈ (4/k)(1 − 1/sqrt(M)) × Q( sqrt( 3·k·(Eb/N0) / (M−1) ) )
+        where k = log2(M).
+    For M=4 this reduces exactly to the QPSK/BPSK BER Q(sqrt(2·Eb/N0)).
+    Reference points (Proakis/Goldsmith): 16-QAM hits BER ≈ 1e-6 at
+    Eb/N0 ≈ 14.5 dB; 64-QAM at ≈ 18.8 dB.
     """
     if m < 4 or (m & (m - 1)) != 0:
         raise ValueError(f"M must be a power of 2 and >= 4, got {m}")
     k = math.log2(m)
     if eb_n0_linear <= 0:
         return 1.0
-    snr_per_dim = math.sqrt(6.0 * k * eb_n0_linear / (m - 1))
+    snr_per_dim = math.sqrt(3.0 * k * eb_n0_linear / (m - 1))
     return (4.0 / k) * (1.0 - 1.0 / math.sqrt(m)) * _q_func(snr_per_dim)
 
 

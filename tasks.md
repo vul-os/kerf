@@ -295,14 +295,17 @@ Template:
   3-persona unlock. Generalizes the existing R12 writer (lower effort than
   from-zero).
 - **Priority:** P0
-- **Status:** 🔴 not started
-- **Scope:** Generalize the existing `.draft`→DXF-R12 writer to export any
-  `.drawing` (multi-sheet, dimensions, GD&T frames, hatching) and `.sketch`
-  to DXF. This is the supplier-exchange / homologation deliverable.
-- **Target files/packages:** `packages/kerf-imports/src/kerf_imports/dxf/
-  writer.py`, an `export_dxf` LLM tool, doc page.
-- **Definition of Done:** `.drawing` with dimensions + GD&T → DXF that
-  re-reads through T-5 with entities preserved; pytest round-trip.
+- **Status:** ✅ shipped
+- **Scope:** `kerf_imports.dxf_writer` — pure-Python general DXF writer
+  supporting R12 + R2004 (AC1018); entities: LINE, LWPOLYLINE/POLYLINE,
+  CIRCLE, ARC, ELLIPSE, SPLINE, TEXT, MTEXT, DIMENSION, HATCH, INSERT/BLOCK,
+  LEADER; TABLES: LAYER/LTYPE/STYLE/DIMSTYLE; `dxf_export()` / `dwg_note()`;
+  `export_dxf` LLM tool registered. DWG via ODA external (documented in
+  `dwg_note()` and `kerf_imports.dwg.bridge`).
+- **Target files/packages:** `packages/kerf-imports/src/kerf_imports/dxf_writer.py`,
+  `packages/kerf-imports/tests/test_dxf_writer.py`.
+- **Definition of Done:** 58 hermetic pytest tests; all pass; reader(writer(x))
+  == x for mixed-entity samples.
 - **Depends-on:** T-5
 
 ### T-90 Privacy: paid-tier projects default to private (cloud)

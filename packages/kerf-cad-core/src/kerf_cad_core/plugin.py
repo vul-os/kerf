@@ -93,6 +93,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.acoustics.tools",
     "kerf_cad_core.bearings.tools",
     "kerf_cad_core.thermocycle.tools",
+    "kerf_cad_core.robotics.tools",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

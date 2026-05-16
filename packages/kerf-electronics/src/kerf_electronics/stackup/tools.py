@@ -746,10 +746,10 @@ _DIEL_LOSS_SPEC = ToolSpec(
     name="stackup_dielectric_loss",
     description=(
         "Compute dielectric (loss-tangent) attenuation [dB/mm] vs frequency.\n\n"
-        "Model (Wadell §3.5):\n"
-        "  αd = 27.3 × (er(er_eff−1)/(er_eff(er−1))) × tan_d × f_GHz / c_mm_ns\n\n"
+        "Model (Wadell §3.5-12 / Pozar Eq. 3.30):\n"
+        "  αd = 27.3 × (er/√er_eff)(er_eff−1)/(er−1) × tan_d × f_GHz / c_mm_ns\n\n"
         "For stripline (er_eff = er):\n"
-        "  αd = 27.3 × tan_d × f_GHz / 299.792 dB/mm\n\n"
+        "  αd = 27.3 × √er × tan_d × f_GHz / 299.792 dB/mm\n\n"
         "Typical FR-4 tan_d = 0.020 at 1 GHz.\n\n"
         "Input: { freq_hz, er, er_eff, tan_d }\n"
         "Returns: { ok, freq_hz, er, er_eff, tan_d, alpha_d_db_per_mm }"

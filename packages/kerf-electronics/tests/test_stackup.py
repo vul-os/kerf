@@ -904,3 +904,86 @@ class TestToolHandlers:
         r_str = asyncio.get_event_loop().run_until_complete(_bad())
         r = json.loads(r_str)
         assert r.get("ok") is False or "error" in r
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Externally-citable reference cases (Wadell / IPC-2141A / Pozar)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestExternalReferenceCases:
+    """Cross-checks against Wadell "Transmission Line Design Handbook",
+    IPC-2141A, and Pozar "Microwave Engineering"."""
+
+    def test_ref_wadell_microstrip_u2_er4_z0_51ohm(self):
+        # Wadell §3.4 Hammerstad: W/H=2, εr=4, T→0 → εr_eff ≈ 3.07,
+        # Z0 ≈ 51 Ω (classic worked value reproduced by every tool).
+        r = microstrip_z0(W_mm=2.0, H_mm=1.0, er=4.0, T_mm=0.0)
+        assert abs(r["er_eff"] - 3.067) < 0.01
+        assert abs(r["Z0"] - 51.0) < 1.0
+
+    def test_ref_fr4_50ohm_microstrip_geometry(self):
+        # IPC-2141A / Wadell: a 50 Ω microstrip on FR-4 (εr=4.3,
+        # H=10 mil=0.254 mm, 1 oz Cu) has W ≈ 18-20 mil ≈ 0.5 mm and
+        # εr_eff ≈ 3.3 (the universal "50 Ω on FR4" datum).
+        r = microstrip_z0(W_mm=0.5, H_mm=0.254, er=4.3, T_mm=0.035)
+        assert 47.0 < r["Z0"] < 53.0
+        assert 3.1 < r["er_eff"] < 3.5
+
+    def test_ref_stripline_internal_50ohm(self):
+        # Wadell §4.3 / IPC-2141A eq. 2-1: a symmetric stripline in
+        # εr=4.3, B=0.5 mm, W≈0.15 mm is ≈ 50 Ω.
+        r = stripline_z0_symmetric(W_mm=0.15, B_mm=0.5, er=4.3, T_mm=0.035)
+        assert 47.0 < r["Z0"] < 56.0
+
+    def test_ref_propagation_delay_free_space(self):
+        # Td = sqrt(εr_eff)/c: in vacuum (εr_eff=1) → 3.3356 ps/mm =
+        # 3.3356 ns/m (universal speed-of-light reciprocal).
+        r = propagation_delay_ps_per_mm(1.0)
+        assert abs(r["Td_ps_per_mm"] - 3.33564) < 1e-3
+        assert abs(r["Td_ns_per_m"] - 3.3356) < 1e-3
+
+    def test_ref_propagation_delay_fr4_170ps_per_inch(self):
+        # FR-4 stripline εr_eff≈4 → Td ≈ 6.67 ps/mm ≈ 169 ps/inch,
+        # the canonical PCB rule-of-thumb (Johnson & Graham "High-Speed
+        # Digital Design").
+        r = propagation_delay_ps_per_mm(4.0)
+        assert abs(r["Td_ps_per_mm"] * 25.4 - 169.4) < 1.0
+
+    def test_ref_guided_wavelength_1ghz_vacuum(self):
+        # λ = c/(f·√εr_eff): 1 GHz in vacuum → 299.79 mm.
+        r = wavelength_mm(1e9, 1.0)
+        assert abs(r["wavelength_mm"] - 299.79) < 0.1
+
+    def test_ref_copper_skin_depth_1ghz_2um(self):
+        # Skin depth δ = sqrt(ρ/(π·f·µ0)): copper at 1 GHz → ≈ 2.09 µm
+        # (textbook RF reference, Pozar §1.7).
+        r = conductor_loss_db_per_mm(freq_hz=1e9, W_mm=0.3, Z0=50.0)
+        assert abs(r["skin_depth_um"] - 2.09) < 0.05
+
+    def test_ref_copper_surface_resistance_1ghz(self):
+        # Surface resistance Rs = sqrt(π·f·µ0·ρ): copper at 1 GHz →
+        # ≈ 8.25 mΩ/sq (universal RF datum, Pozar Table).
+        r = conductor_loss_db_per_mm(freq_hz=1e9, W_mm=0.3, Z0=50.0)
+        assert abs(r["Rs_ohm_sq"] * 1e3 - 8.25) < 0.05
+
+    def test_ref_dielectric_loss_stripline_pozar(self):
+        # Pozar Eq. 3.30 (homogeneous TEM line): εr=4, tanδ=0.02,
+        # 1 GHz → α_d ≈ 0.0036 dB/mm ≈ 0.093 dB/inch.  (Pre-fix code
+        # used εr/εr_eff instead of εr/√εr_eff and gave half this.)
+        r = dielectric_loss_db_per_mm(freq_hz=1e9, er=4.0, er_eff=4.0,
+                                      tan_d=0.02)
+        assert abs(r["alpha_d_db_per_mm"] - 0.003643) < 1e-4
+        assert abs(r["alpha_d_db_per_mm"] * 25.4 - 0.0925) < 0.005
+
+    def test_ref_dielectric_loss_microstrip_pozar(self):
+        # Pozar Eq. 3.30 microstrip filling factor: εr=4.3, εr_eff=3.3,
+        # tanδ=0.02, 1 GHz → α_d ≈ 0.00300 dB/mm.
+        r = dielectric_loss_db_per_mm(freq_hz=1e9, er=4.3, er_eff=3.3,
+                                      tan_d=0.02)
+        assert abs(r["alpha_d_db_per_mm"] - 0.003005) < 1e-4
+
+    def test_ref_1oz_copper_thickness_35um(self):
+        # IPC: 1 oz/ft² copper = 34.8 µm ≈ 0.035 mm.
+        r = copper_weight_to_thickness_mm(1.0)
+        t = r.get("thickness_mm", r.get("thickness"))
+        assert abs(t - 0.0348) < 0.001

@@ -1305,13 +1305,16 @@ def dielectric_loss_db_per_mm(
         alpha_d [Np/m] = (pi * f * sqrt(er_eff) * tan_d) / c
                        * er / er_eff * (er_eff - 1) / (er - 1)
 
-    Simplified for microstrip (Wadell §3.5):
-        alpha_d [dB/mm] = 27.3 * er * (er_eff - 1) / (er_eff * (er - 1)) * tan_d
-                          * f_GHz / c_GHz
-    where c_GHz = 299.792 mm/ns = speed of light in GHz-mm units.
+    Microstrip (Wadell §3.5 Eq. 3.5-12 / Pozar "Microwave Engineering"
+    Eq. 3.30 — TEM α_d = k0·tanδ/2 with the microstrip filling factor):
+        alpha_d [dB/mm] = 27.3 * (er / sqrt(er_eff)) * (er_eff - 1)/(er - 1)
+                          * tan_d * f_GHz / c_GHz
+    where 27.3 = π·8.686 (Np→dB) and c_GHz = 299.792 mm/ns.
 
-    For stripline (er_eff = er):
-        alpha_d [dB/mm] = 27.3 * tan_d * f_GHz / c_mm_ns
+    For stripline (er_eff = er) this reduces to the homogeneous-line
+    Pozar form:
+        alpha_d [dB/mm] = 27.3 * sqrt(er) * tan_d * f_GHz / c_GHz
+    e.g. εr=4, tanδ=0.02, 1 GHz → ≈ 0.0036 dB/mm (≈ 0.093 dB/inch).
 
     Parameters
     ----------
@@ -1344,8 +1347,11 @@ def dielectric_loss_db_per_mm(
         # Free space (degenerate): alpha_d = 0
         alpha_d = 0.0
     else:
-        # Wadell §3.5 filling factor
-        filling = er * (er_eff - 1.0) / (er_eff * (er - 1.0))
+        # Wadell §3.5-12 / Pozar Eq. 3.30 filling factor.
+        # NOTE: the εr_eff term is sqrt(εr_eff), NOT εr_eff — for a
+        # homogeneous (stripline) line this collapses to the exact
+        # Pozar TEM result α_d = k0·sqrt(εr)·tanδ/2.
+        filling = (er / math.sqrt(er_eff)) * (er_eff - 1.0) / (er - 1.0)
         alpha_d = 27.3 * filling * tan_d * f_ghz / c_ghz_mm
 
     return {
@@ -1355,7 +1361,7 @@ def dielectric_loss_db_per_mm(
         "er_eff": er_eff,
         "tan_d": tan_d,
         "alpha_d_db_per_mm": round(alpha_d, 10),
-        "formula": "Wadell §3.5: alpha_d = 27.3 * (er*(er_eff-1)/(er_eff*(er-1))) * tan_d * f/c",
+        "formula": "Wadell §3.5-12 / Pozar Eq.3.30: alpha_d = 27.3 * (er/sqrt(er_eff)) * (er_eff-1)/(er-1) * tan_d * f/c",
     }
 
 

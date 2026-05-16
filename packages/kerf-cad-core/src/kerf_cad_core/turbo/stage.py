@@ -1041,8 +1041,14 @@ def centrifugal_impeller(
         Gravitational acceleration (m/s²). Default 9.80665.
     slip_model : str
         Slip model: "stanitz" (default) or "wiesner" or "provided".
-        "stanitz": σ = 1 − π·sin(β2) / Z  (Stanitz approximation)
-        "wiesner":  σ = 1 − √(sin|β2|) / Z^0.7
+        With β2 measured from the radial (meridional) direction:
+        "stanitz": σ = 1 − 0.63·π / Z   (Stanitz 1952; Dixon 7th ed.
+                   Eq. 7.21b — radial-bladed approximation, weak β
+                   dependence, valid −80° ≤ β2 ≤ 0).
+        "wiesner": σ = 1 − √(cos|β2|) / Z^0.7  (Wiesner 1967; Dixon
+                   7th ed. Eq. 7.21 — β2 from radial, so the blade angle
+                   from the tangent is 90°−|β2| and the standard
+                   √(sin β_tangent) becomes √(cos|β2_radial|)).
         (Negative beta2 denotes backward sweep; |β2| used.)
 
     Returns
@@ -1069,9 +1075,10 @@ def centrifugal_impeller(
     This is a rough first estimate; proper NPSH requires cavitation
     number analysis and empirical correction.
 
-    Slip factor (Stanitz):
-        σ = 1 − (π · sin|β2|) / Z
-    This applies for β2 in the range [−20°, −70°] (backward sweep).
+    Slip factor (Stanitz, Dixon 7th ed. Eq. 7.21b):
+        σ = 1 − 0.63·π / Z
+    Approximately independent of blade angle; valid −80° ≤ β2 ≤ 0
+    (β2 from radial).  Wiesner (Eq. 7.21): σ = 1 − √(cos|β2|)/Z^0.7.
 
     Continuity at exit:
         Q = π · D2 · b2 · Cr2
@@ -1139,11 +1146,16 @@ def centrifugal_impeller(
     U2 = omega * D2 / 2.0
     U1_tip = omega * D1t / 2.0
 
-    # Slip factor
+    # Slip factor (β2 measured from radial; b2_rad = |β2| in radians)
     if slip_model_s == "stanitz":
-        sigma = 1.0 - (math.pi * math.sin(b2_rad)) / Z_int
+        # Stanitz 1952 / Dixon 7th ed. Eq. 7.21b: σ = 1 − 0.63π/Z
+        # (radial-bladed approximation, weak blade-angle dependence)
+        sigma = 1.0 - 0.63 * math.pi / Z_int
     elif slip_model_s == "wiesner":
-        sigma = 1.0 - math.sqrt(math.sin(b2_rad)) / Z_int**0.7
+        # Wiesner 1967 / Dixon Eq. 7.21: σ = 1 − √(sin β2_tangent)/Z^0.7.
+        # β2 here is from radial, so β2_tangent = 90°−|β2| and
+        # sin(β2_tangent) = cos|β2|.
+        sigma = 1.0 - math.sqrt(math.cos(b2_rad)) / Z_int**0.7
     else:
         sigma = 0.9  # 'provided' uses a placeholder — user should use velocity_triangles_centrifugal
 

@@ -558,26 +558,47 @@ class TestCentrifugalImpeller:
         assert res["ok"] is True
         assert abs(res["U2_m_s"] - U2_expected) < 1e-9
 
-    def test_stanitz_slip_factor(self):
-        """Stanitz slip: σ = 1 − (π·sin|β2|) / Z."""
-        beta2, Z = -30.0, 8
-        b2_rad = abs(math.radians(beta2))
-        sigma_expected = 1.0 - (math.pi * math.sin(b2_rad)) / Z
-        sigma_expected = max(0.0, min(sigma_expected, 1.0))
+    def test_stanitz_slip_factor_dixon(self):
+        """Stanitz 1952 / Dixon 7th ed. Eq. 7.21b: σ = 1 − 0.63π/Z.
+
+        Authoritative: the Stanitz slip factor is essentially independent
+        of blade angle. For Z = 8 → σ = 1 − 0.63π/8 = 0.7526. (The earlier
+        σ = 1 − π·sin|β2|/Z form wrongly gave σ = 1 for radial blades.)
+        """
+        Z = 8
+        sigma_expected = 1.0 - 0.63 * math.pi / Z  # 0.75260
         res = centrifugal_impeller(
             n_rpm=1450.0, D2_m=0.30, b2_m=0.025,
             D1_tip_m=0.15, D1_hub_m=0.06,
-            beta2_deg=beta2, Z=Z, slip_model="stanitz",
+            beta2_deg=-30.0, Z=Z, slip_model="stanitz",
         )
         assert res["ok"] is True
         assert abs(res["slip_factor"] - sigma_expected) < 1e-9
+        assert abs(res["slip_factor"] - 0.75260) < 1e-4
 
-    def test_wiesner_slip_factor(self):
-        """Wiesner slip: σ = 1 − √(sin|β2|) / Z^0.7."""
-        beta2, Z = -30.0, 8
+    def test_stanitz_radial_blades_has_slip(self):
+        """Radial blades (β2 = 0 from radial) must still have substantial
+        slip per Stanitz (σ = 1 − 0.63π/Z), not σ = 1 (no slip)."""
+        Z = 20
+        res = centrifugal_impeller(
+            n_rpm=1450.0, D2_m=0.30, b2_m=0.025,
+            D1_tip_m=0.15, D1_hub_m=0.06,
+            beta2_deg=0.0, Z=Z, slip_model="stanitz",
+        )
+        assert res["ok"] is True
+        assert abs(res["slip_factor"] - (1.0 - 0.63 * math.pi / Z)) < 1e-9
+        assert res["slip_factor"] < 0.95  # NOT 1.0 — radial impellers slip
+
+    def test_wiesner_slip_factor_dixon(self):
+        """Wiesner 1967 / Dixon Eq. 7.21: σ = 1 − √(cos|β2|)/Z^0.7
+        with β2 measured from radial (β2_tangent = 90°−|β2|, so
+        √(sin β2_tangent) = √(cos|β2_radial|)).
+
+        Z = 20, β2 = −30° (from radial) → σ ≈ 0.886.
+        """
+        beta2, Z = -30.0, 20
         b2_rad = abs(math.radians(beta2))
-        sigma_expected = 1.0 - math.sqrt(math.sin(b2_rad)) / Z**0.7
-        sigma_expected = max(0.0, min(sigma_expected, 1.0))
+        sigma_expected = 1.0 - math.sqrt(math.cos(b2_rad)) / Z**0.7
         res = centrifugal_impeller(
             n_rpm=1450.0, D2_m=0.30, b2_m=0.025,
             D1_tip_m=0.15, D1_hub_m=0.06,
@@ -585,6 +606,7 @@ class TestCentrifugalImpeller:
         )
         assert res["ok"] is True
         assert abs(res["slip_factor"] - sigma_expected) < 1e-9
+        assert abs(res["slip_factor"] - 0.8857) < 1e-3
 
     def test_npsh_inception_positive(self):
         """NPSH inception estimate must be > 0."""

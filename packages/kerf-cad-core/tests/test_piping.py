@@ -751,3 +751,88 @@ class TestToolWrappers:
             L_x=3.0, L_y=4.0, E=200e9, D_o=0.1143, t=6.02e-3
         )))
         _err_tool(raw)
+
+
+# ===========================================================================
+# REFERENCE CASES — asserted against citable known answers
+#   ASME B31.3 Eq. (3a)            — pressure-design wall thickness
+#   Crane TP-410 / Darcy-Weisbach  — incompressible flow
+#   Hagen-Poiseuille (closed form) — laminar exactness anchor
+# 1 psi = 6894.757 Pa, 1 in = 0.0254 m.
+# ===========================================================================
+
+PSI = 6894.757
+IN = 0.0254
+
+
+class TestReferenceCases:
+
+    def test_ref_b31_3_eq3a_nps8(self):
+        """ASME B31.3 §304.1.2 Eq.(3a): t = P·D/(2(S·E·W + P·Y)).
+        NPS 8 (D=8.625 in), P=2000 psi, S=20000 psi, E=W=1, Y=0.4:
+          t = 2000·8.625 / (2(20000 + 2000·0.4))
+            = 17250 / 41600 = 0.41466 in = 10.532 mm.
+        """
+        res = required_wall_thickness(
+            P=2000 * PSI, D=8.625 * IN, S=20000 * PSI, E=1.0, W=1.0, Y=0.4)
+        assert res["ok"] is True
+        t_in = res["t_design_m"] / IN
+        assert abs(t_in - 0.41466) < 1e-4, f"t={t_in} in (expect 0.41466)"
+
+    def test_ref_b31_3_corrosion_and_mill(self):
+        """Eq.(3a) gross wall = t_m/(1 - c_mill) + c_corr.
+        12.5% mill under-tolerance (ASTM A106) + 3 mm CA on the NPS8 case:
+          t_req = 0.0105324/(1-0.125) + 0.003 = 0.0150370 m.
+        """
+        res = required_wall_thickness(
+            P=2000 * PSI, D=8.625 * IN, S=20000 * PSI,
+            c_corr=0.003, c_mill=0.125)
+        assert abs(res["t_required_m"] - 0.0150370) < 5e-6
+
+    def test_ref_hagen_poiseuille_laminar_exact(self):
+        """Laminar Darcy-Weisbach must reduce exactly to Hagen-Poiseuille:
+        ΔP = 128·μ·L·Q/(π·D⁴).
+        Oil ρ=900, μ=0.1 Pa·s, D=0.05 m, V=0.5 m/s, L=10 m → Re=225,
+        f=64/Re=0.28444, ΔP = 6400 Pa exactly.
+        """
+        D_i, V = 0.05, 0.5
+        Q = V * math.pi / 4.0 * D_i ** 2
+        res = pressure_drop(Q=Q, rho=900.0, mu=0.1, D_i=D_i, L=10.0,
+                            roughness=0.0)
+        assert res["flow_regime"] == "laminar"
+        assert abs(res["Re"] - 225.0) < 1e-6
+        assert abs(res["friction_factor"] - 64.0 / 225.0) < 1e-9
+        assert abs(res["dP_Pa"] - 6400.0) < 1e-6
+
+    def test_ref_colebrook_turbulent_moody(self):
+        """Colebrook-White anchor (Moody chart): water D=0.1 m, V=2 m/s,
+        ρ=1000, μ=1e-3 → Re=2.0e5; ε=46 µm (commercial steel) →
+        Darcy f ≈ 0.01861 (matches Moody chart / Swamee-Jain ~1%).
+        """
+        D_i, V = 0.1, 2.0
+        Q = V * math.pi / 4.0 * D_i ** 2
+        res = pressure_drop(Q=Q, rho=1000.0, mu=1e-3, D_i=D_i, L=1.0,
+                            roughness=46e-6)
+        assert abs(res["Re"] - 2.0e5) < 1.0
+        assert abs(res["friction_factor"] - 0.018613) < 5e-4
+
+    def test_ref_thermal_expansion_carbon_steel(self):
+        """Free thermal growth ΔL = L·α·ΔT.  Carbon steel α=11.7e-6 /°C,
+        L=30 m, 20→200 °C (ΔT=180):  ΔL = 30·11.7e-6·180 = 0.06318 m.
+        """
+        res = thermal_expansion(L=30.0, alpha=11.7e-6,
+                                T_install=20.0, T_operating=200.0)
+        assert abs(res["delta_L_m"] - 0.06318) < 1e-6
+
+    def test_ref_pipe_section_properties_nps6_sch40(self):
+        """Hollow circular section (ASME B36.10M NPS 6 Sch 40):
+        D_o=168.3 mm, wall=7.11 mm → D_i=154.08 mm.
+          I = π/64·(D_o⁴ - D_i⁴) = 1.1716e-5 m⁴
+          Z = I/(D_o/2) = 1.3923e-4 m³  (matches steel-pipe tables).
+        """
+        Do, w = 0.1683, 0.00711
+        res = allowable_span(
+            D_o=Do, D_i=Do - 2 * w, rho_pipe=7850.0, rho_fluid=1000.0,
+            E=200e9, S_allow=138e6)
+        assert abs(res["I_m4"] - 1.1716e-5) / 1.1716e-5 < 2e-3
+        assert abs(res["Z_m3"] - 1.3923e-4) / 1.3923e-4 < 2e-3

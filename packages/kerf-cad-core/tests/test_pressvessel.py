@@ -658,3 +658,83 @@ class TestToolWrappers:
         ctx = _ctx()
         raw = _run(run_pv_hydrostatic_test_pressure(ctx, _args(S_test=138e6)))
         _err_tool(raw)
+
+
+# ===========================================================================
+# REFERENCE CASES — asserted against citable ASME BPVC VIII-1 known answers
+# Source: ASME BPVC Section VIII Division 1; Megyesy "Pressure Vessel
+# Handbook" 14th ed. worked examples (US-customary, converted to SI).
+# 1 psi = 6894.757 Pa, 1 in = 0.0254 m.
+# ===========================================================================
+
+PSI = 6894.757
+IN = 0.0254
+
+
+class TestReferenceCasesASME:
+
+    def test_ref_ug27_circ_megyesy_example(self):
+        """ASME VIII-1 UG-27(c)(1) classic worked example:
+        P=100 psi, R=48 in, S=17500 psi, E=1.0
+          t = P·R/(S·E - 0.6·P) = 100·48/(17500 - 60)
+            = 4800/17440 = 0.27523 in.
+        """
+        res = cylindrical_shell_thickness(
+            P=100 * PSI, R=48 * IN, S=17500 * PSI, E=1.0, c=0.0)
+        assert res["ok"] is True
+        t_in = res["t_circ_m"] / IN
+        assert abs(t_in - 0.27523) < 1e-4, f"t={t_in} in (expect 0.27523)"
+
+    def test_ref_ug27_long_stress_half_of_hoop(self):
+        """UG-27(c)(2): longitudinal t = P·R/(2·S·E + 0.4·P).
+        P=100 psi, R=48 in, S=17500 psi → t = 4800/(35000+40)=0.13700 in.
+        """
+        res = cylindrical_shell_thickness(
+            P=100 * PSI, R=48 * IN, S=17500 * PSI, E=1.0)
+        t_long_in = res["t_long_m"] / IN
+        assert abs(t_long_in - 0.13700) < 1e-4, f"t_long={t_long_in} in"
+
+    def test_ref_ug32f_hemispherical_head(self):
+        """UG-32(f) hemispherical head: t = P·R/(2·S·E - 0.2·P).
+        P=100 psi, R=48 in, S=17500 psi
+          t = 4800/(35000-20) = 0.13718 in.
+        """
+        res = spherical_head_thickness(
+            P=100 * PSI, R=48 * IN, S=17500 * PSI, E=1.0)
+        t_in = res["t_required_m"] / IN
+        assert abs(t_in - 0.13718) < 1e-4, f"t={t_in} in (expect 0.13718)"
+
+    def test_ref_ug32d_2to1_ellipsoidal_head(self):
+        """UG-32(d) 2:1 ellipsoidal head: t = P·D/(2·S·E - 0.2·P).
+        P=100 psi, D=96 in, S=17500 psi
+          t = 9600/(35000-20) = 0.27436 in.
+        """
+        res = ellipsoidal_head_thickness(
+            P=100 * PSI, D=96 * IN, S=17500 * PSI, E=1.0)
+        t_in = res["t_required_m"] / IN
+        assert abs(t_in - 0.27436) < 1e-4, f"t={t_in} in (expect 0.27436)"
+
+    def test_ref_ug32e_torispherical_head(self):
+        """UG-32(e) standard F&D (L=D) head: t = 0.885·P·L/(S·E - 0.1·P).
+        P=100 psi, D=L=96 in, S=17500 psi
+          t = 0.885·100·96/(17500-10) = 8496/17490 = 0.48576 in.
+        """
+        res = torispherical_head_thickness(
+            P=100 * PSI, D=96 * IN, S=17500 * PSI, E=1.0)
+        t_in = res["t_required_m"] / IN
+        assert abs(t_in - 0.48576) < 1e-3, f"t={t_in} in (expect 0.48576)"
+
+    def test_ref_ug99b_hydrostatic_test_factor(self):
+        """UG-99(b): standard hydrostatic test = 1.3 × MAWP (equal stresses).
+        MAWP = 150 psi → P_test = 195 psi.
+        """
+        res = hydrostatic_test_pressure(MAWP=150 * PSI)
+        assert abs(res["P_test_Pa"] / PSI - 195.0) < 1e-3
+
+    def test_ref_mawp_inverse_consistency(self):
+        """UG-27 inverse: MAWP = S·E·t/(R + 0.6·t).
+        S=17500 psi, t=0.27523 in, R=48 in (from circ example) → ≈100 psi.
+        """
+        res = mawp_cylindrical(
+            t=0.27523 * IN, R=48 * IN, S=17500 * PSI, E=1.0, c=0.0)
+        assert abs(res["MAWP_Pa"] / PSI - 100.0) < 0.1

@@ -915,3 +915,74 @@ class TestToolWrappers:
             D_shell=15.0, t_shell=0.020, d_nozzle=0.2, t_nozzle=0.012
         )))
         _err_tool(raw)
+
+
+# ===========================================================================
+# REFERENCE CASES — asserted against citable known answers
+#   API Std 650 13th ed.  §5.6.3.1 (1-foot), §5.9.7.1 (wind girder)
+#   API Std 2000 7th ed.  §5 emergency fire venting Q = 3.091·A^0.82
+#   Housner / API 650 Annex E seismic; classical wind dynamic pressure
+# ===========================================================================
+
+class TestReferenceCases:
+
+    def test_ref_api650_1foot_handcalc(self):
+        """API 650 §5.6.3.1 (1-foot), metric form
+        t[mm] = 4.9·D·(H-0.3)·G / Sd[MPa].
+        D=30 m, H=14 m, G=1.0, Sd=159 MPa:
+          t_d = 4.9·30·13.7·1.0 / 159 = 12.666 mm.
+        """
+        res = shell_course_thickness(
+            D=30.0, H=14.0, G=1.0, Sd=159e6, St=171e6, c=0.0)
+        assert res["ok"] is True
+        assert abs(res["t_design_m"] * 1e3 - 12.666) < 1e-3
+
+    def test_ref_api650_hydrotest_course(self):
+        """API 650 §5.6.3.1 hydrotest: t_t[mm] = 4.9·D·(H-0.3)/St[MPa].
+        D=30 m, H=14 m, St=171 MPa → t_t = 4.9·30·13.7/171 = 11.777 mm.
+        """
+        res = shell_course_thickness(D=30.0, H=14.0, G=1.0, Sd=159e6, St=171e6)
+        assert abs(res["t_hydro_m"] * 1e3 - 11.777) < 1e-3
+
+    def test_ref_api650_wind_girder_Z(self):
+        """API 650 §5.9.7.1 (SI): Z = 0.0001·D²·H·(V/190)², V in km/h.
+        D=20 m, H=12 m, V=45 m/s=162 km/h:
+          Z = 0.0001·400·12·(162/190)² = 0.348951 m³.
+        """
+        res = wind_girder_section_modulus(
+            D=20.0, t_shell=0.008, V_wind_m_s=45.0, H_shell=12.0)
+        assert res["ok"] is True
+        assert abs(res["Z_required_m3"] - 0.348951) < 1e-5
+
+    def test_ref_api2000_emergency_fire_venting(self):
+        """API 2000 7th ed. fire case (SI): Q = 3.091·A_w^0.82 [m³/h air].
+        A_w = 100 m²  →  Q = 3.091·100^0.82 = 134.927 m³/h.
+        """
+        res = venting_emergency(V_tank_m3=500.0, wetted_area_m2=100.0)
+        assert res["ok"] is True
+        assert abs(res["Q_emergency_m3_h"] - 134.927) < 1e-2
+
+    def test_ref_wind_overturning_dynamic_pressure(self):
+        """Classical wind overturning: q = ½ρV², resultant at H/2.
+        ρ=1.225, V=45 m/s, Cf=0.7, D=15 m, H=12 m:
+          q = 1240.3125 Pa ; M_wind = q·Cf·D·H·(H/2) = 937 676 N·m.
+        """
+        res = overturning_stability(
+            D=15.0, H_shell=12.0, W_total_N=1e6, V_wind_m_s=45.0, Cf=0.7)
+        assert abs(res["q_Pa"] - 1240.3125) < 1e-3
+        assert abs(res["M_wind_Nm"] - 937676.25) < 1.0
+
+    def test_ref_seismic_total_liquid_mass(self):
+        """Annex E total contained mass m = ρ·(π/4)·D²·H.
+        Water ρ=1000, D=15 m, H=10 m → m = 1 767 145.87 kg.
+        """
+        res = seismic_annex_e(D=15.0, H_liquid=10.0, rho_liquid=1000.0)
+        assert res["ok"] is True
+        assert abs(res["m_total_kg"] - 1_767_145.87) < 1.0
+
+    def test_ref_api650_min_shell_table_5_6a(self):
+        """API 650 Table 5.6a (metric) nominal-diameter minimum thickness:
+        D ≤ 15 m → 5 mm; D > 60 m → 10 mm.
+        """
+        assert minimum_shell_thickness(D=12.0)["t_min_mm"] == pytest.approx(5.0)
+        assert minimum_shell_thickness(D=80.0)["t_min_mm"] == pytest.approx(10.0)

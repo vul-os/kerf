@@ -903,3 +903,73 @@ class TestVibrationExternalReferences:
         wn = 100.0 / r_ratio
         assert r["k_N_per_m"] == pytest.approx(100.0 * wn ** 2, rel=1e-9)
         assert r["TR_actual"] == pytest.approx(0.1, rel=1e-9)
+
+
+class TestVibrationCitedNumericReferences:
+    """
+    Production-confidence numeric reference cases with KNOWN closed-form
+    answers, each independently hand-verified against the cited source
+    (Rao "Mechanical Vibrations" 5th ed.; Thomson 5th ed.; Inman 4th ed.).
+    """
+
+    def test_natural_frequency_known_value_rao_2_1(self):
+        # Rao §2-1: ωn = √(k/m). k = 4000 N/m, m = 10 kg
+        #  → ωn = √400 = 20.0 rad/s exactly; fn = 20/(2π) = 3.18310 Hz.
+        r = _ref_wn(10.0, 4000.0)
+        assert r["omega_n"] == pytest.approx(20.0, rel=1e-12)
+        assert r["fn_hz"] == pytest.approx(20.0 / (2.0 * math.pi), rel=1e-12)
+
+    def test_magnification_at_resonance_known_value_inman_2_1(self):
+        # Inman §2.1: at r = 1, M = 1/(2ζ). ζ = 0.05 → M = 10.0 exactly.
+        r = _ref_mag(0.05, 1.0)
+        assert r["M"] == pytest.approx(10.0, rel=1e-12)
+
+    def test_transmissibility_undamped_known_value_thomson_3(self):
+        # Thomson §3: undamped TR = 1/|r²−1|. r = 3 → TR = 1/8 = 0.125 exactly.
+        r = _ref_tr(0.0, 3.0)
+        assert r["TR"] == pytest.approx(0.125, rel=1e-12)
+        assert r["isolating"] is True
+
+    def test_2dof_symmetric_known_eigenvalues_rao_5_3(self):
+        # Rao §5-3: symmetric chain m1=m2=m, k1=k2=k3=k →
+        #   ω1 = √(k/m), ω2 = √(3k/m).  m = 2 kg, k = 200 N/m
+        #   → ω1 = √100 = 10.0, ω2 = √300 = 17.3205080757 rad/s.
+        r = _ref_2dof(2.0, 2.0, 200.0, 200.0, 200.0)
+        assert r["omega_1"] == pytest.approx(10.0, rel=1e-9)
+        assert r["omega_2"] == pytest.approx(math.sqrt(300.0), rel=1e-9)
+
+    def test_beam_simply_supported_known_value_rao_8_6(self):
+        # Rao §8-6: SS beam mode 1, βL = π, ωn = π²·√(EI/(μL⁴)).
+        # L=2 m, μ=5 kg/m, E=210 GPa, I=2e-6 m⁴
+        #  → ωn = π²·√(210e9·2e-6/(5·16)) = 715.12078 rad/s.
+        r = _ref_beam(1, 2.0, 5.0, 210e9, 2e-6, bc="simply-supported")
+        exp = math.pi ** 2 * math.sqrt(210e9 * 2e-6 / (5.0 * 2.0 ** 4))
+        assert r["omega_n"] == pytest.approx(exp, rel=1e-12)
+        assert r["omega_n"] == pytest.approx(715.1207785601764, rel=1e-9)
+
+    def test_beam_cantilever_known_value_thomson_8_6(self):
+        # Thomson §8.6: cantilever mode 1, βL = 1.87510407,
+        #   ωn = (βL)²·√(EI/(μL⁴)).
+        # L=1 m, μ=10 kg/m, E=200 GPa, I=1e-6 m⁴ → ωn = 497.23965 rad/s.
+        r = _ref_beam(1, 1.0, 10.0, 200e9, 1e-6, bc="cantilever")
+        bl = 1.87510407
+        exp = bl ** 2 * math.sqrt(200e9 * 1e-6 / (10.0 * 1.0 ** 4))
+        assert r["omega_n"] == pytest.approx(exp, rel=1e-9)
+        assert r["omega_n"] == pytest.approx(497.23964850550294, rel=1e-9)
+
+    def test_log_decrement_known_value_rao_2_7(self):
+        # Rao §2-7: one cycle with x1/xn = e → δ = 1 exactly,
+        #   ζ = δ/√(4π²+δ²) = 1/√(4π²+1) = 0.157176725…
+        r = _ref_logdec(math.e, 1.0, 1)
+        assert r["delta"] == pytest.approx(1.0, rel=1e-12)
+        assert r["zeta"] == pytest.approx(1.0 / math.sqrt(4.0 * math.pi ** 2 + 1.0), rel=1e-12)
+
+    def test_shaft_whirl_single_disk_known_value_rao_8_8(self):
+        # Rao §8-8 Rayleigh: single disk at midspan,
+        #   y = m g L³/(48 EI),  ωcr = √(g/y).
+        # m=8 kg, L=2 m, E=200 GPa, I=4e-6 m⁴ → ωcr = 774.5967 rad/s.
+        g = 9.80665
+        y = 8.0 * g * 2.0 ** 3 / (48.0 * 200e9 * 4e-6)
+        r = shaft_whirl_rayleigh([1.0], [8.0], 200e9, 4e-6, span_m=2.0)
+        assert r["omega_cr"] == pytest.approx(math.sqrt(g / y), rel=1e-9)
+        assert r["omega_cr"] == pytest.approx(774.5966692414834, rel=1e-9)

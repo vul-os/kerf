@@ -778,3 +778,71 @@ class TestDynamicsExternalReferences:
         # Hibbeler §21-5: M = I·ωs·ωp (perpendicular axes).
         r = _ref_gyro(0.5, 200.0, 2.0)
         assert r["M_gyro"] == pytest.approx(0.5 * 200.0 * 2.0, rel=1e-12)
+
+
+from kerf_cad_core.dynamics.rigidbody import (  # noqa: E402
+    static_balance as _ref_statbal,
+    shaking_force_secondary as _ref_shake2,
+)
+
+
+class TestDynamicsCitedNumericReferences:
+    """
+    Production-confidence numeric reference cases with KNOWN closed-form
+    answers, each independently hand-verified against the cited source
+    (Beer & Johnston 12th ed.; Hibbeler 14th ed.; ISO 1940-1:2003;
+    Norton "Design of Machinery" 5th ed.).
+    """
+
+    def test_direct_impact_known_value_beer_13_13(self):
+        # Beer §13.13: m1=2, v1=10, m2=3, v2=0, e=0.8.
+        #   v1' = [2·10 − 3·0.8·10]/5 = −4/5 = −0.8 m/s
+        #   v2' = [2·10 + 2·0.8·10]/5 = 36/5 =  7.2 m/s
+        r = _ref_impact(2.0, 10.0, 3.0, 0.0, 0.8)
+        assert r["v1_prime"] == pytest.approx(-0.8, rel=1e-12)
+        assert r["v2_prime"] == pytest.approx(7.2, rel=1e-12)
+
+    def test_perfectly_plastic_common_velocity_beer_13_12(self):
+        # Beer §13.12: e=0 → common velocity v = (m1v1+m2v2)/(m1+m2).
+        #   m1=4, v1=12, m2=2, v2=−3 → v = (48−6)/6 = 7.0 m/s.
+        r = _ref_impact(4.0, 12.0, 2.0, -3.0, 0.0)
+        assert r["v1_prime"] == pytest.approx(7.0, rel=1e-12)
+        assert r["v2_prime"] == pytest.approx(7.0, rel=1e-12)
+
+    def test_projectile_range_known_value_hibbeler_12_6(self):
+        # Hibbeler §12-6: R = v0²·sin(2θ)/g.
+        #   v0=25, θ=30°, g=9.80665 → R = 625·sin60°/9.80665 = 55.193759 m.
+        r = _ref_proj(25.0, 30.0, 0.0)
+        assert r["range_m"] == pytest.approx(625.0 * math.sin(math.radians(60.0)) / 9.80665, rel=1e-12)
+        assert r["range_m"] == pytest.approx(55.19375906810931, rel=1e-9)
+
+    def test_flywheel_sizing_known_value_shigley_16_61(self):
+        # Shigley Eq (16-61): I = ΔE/(ω²·Cs).
+        #   ΔE=5000 J, ω=150 rad/s, Cs=0.05 → I = 5000/(22500·0.05) = 4.4444 kg·m².
+        r = _ref_fly(5000.0, 150.0, 0.05)
+        assert r["I_required"] == pytest.approx(5000.0 / (150.0 ** 2 * 0.05), rel=1e-12)
+        assert r["I_required"] == pytest.approx(4.444444444444445, rel=1e-12)
+
+    def test_iso1940_permissible_known_value_iso_1940_1_table(self):
+        # ISO 1940-1 §4: e_per = G/ω;  U_per = e_per·m_rotor[g].
+        #   G2.5, ω = 314.159265 rad/s (3000 rpm), m = 15 kg
+        #   → e_per = 2.5/314.159265 = 0.00795775 mm
+        #     U_per = 0.00795775·15000 = 119.3662 g·mm.
+        r = _ref_iso1940(50.0, 15.0, 314.159265, grade="G2.5")
+        assert r["eper_permissible_mm"] == pytest.approx(2.5 / 314.159265, rel=1e-12)
+        assert r["U_permissible_g_mm"] == pytest.approx((2.5 / 314.159265) * 15000.0, rel=1e-9)
+
+    def test_static_balance_three_at_120deg_zero_resultant(self):
+        # Hibbeler §22 / theory of machines: three equal m·r vectors at
+        # 0°, 120°, 240° sum to zero (balanced) → resultant_mr ≈ 0.
+        r = _ref_statbal([1.0, 1.0, 1.0], [1.0, 1.0, 1.0], [0.0, 120.0, 240.0])
+        assert r["ok"]
+        assert r["resultant_mr"] == pytest.approx(0.0, abs=1e-9)
+
+    def test_secondary_shaking_force_known_value_norton_13_6(self):
+        # Norton §13.6: F_s = m·r·ω²·cos(2θ)/n, n = L/r.
+        #   m=2 kg, r=0.05 m, ω=100 rad/s, n=4, θ=0 → cos0=1
+        #   → F_s = 2·0.05·100²·1/4 = 250.0 N.
+        r = _ref_shake2(2.0, 0.05, 100.0, 4.0, 0.0)
+        assert r["F_secondary"] == pytest.approx(2.0 * 0.05 * 100.0 ** 2 / 4.0, rel=1e-12)
+        assert r["F_secondary"] == pytest.approx(250.0, rel=1e-12)

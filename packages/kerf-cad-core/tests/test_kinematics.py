@@ -657,3 +657,94 @@ class TestKinematicsExternalReferences:
         # Norton §8.2 SHM: y = (h/2)(1−cos(πθ/β)); at θ=β/2 → h/2.
         r = _ref_harm(20.0, 90.0, 45.0, rise=True)
         assert r["displacement"] == pytest.approx(20.0 / 2.0, rel=1e-9)
+
+
+class TestKinematicsCitedNumericReferences:
+    """
+    Production-confidence numeric reference cases with KNOWN closed-form
+    answers, each independently hand-verified against the cited source
+    (Norton "Design of Machinery" 5th ed.; Shigley & Uicker "Theory of
+    Machines & Mechanisms" 4th ed.).
+
+    Includes a regression case for the slider-crank acceleration, which
+    was previously computed with an incorrect time-derivative and is now
+    fixed to the exact Shigley/Norton closed form.
+    """
+
+    def test_grashof_crank_rocker_known_norton_2_15(self):
+        # Norton §2.15: links {2,7,8,9}: S=2, L=9, P+Q=7+8=15 ≥ S+L=11
+        #   → Grashof; shortest is the crank (r2) → crank-rocker.
+        r = _ref_grashof(8.0, 2.0, 9.0, 7.0)
+        assert r["grashof"] is True
+        assert r["type"] == "crank-rocker"
+
+    def test_slider_crank_position_known_value_norton_13_4(self):
+        # Norton §13.4: x_B = r·cosθ + √(l²−r²·sin²θ).
+        #   r=0.04, l=0.16, θ=60° → x_B = 0.176204994 m  (hand value).
+        r = _ref_slider(0.04, 0.16, 60.0)
+        x = 0.04 * math.cos(math.radians(60.0)) + math.sqrt(0.16 ** 2 - 0.04 ** 2 * math.sin(math.radians(60.0)) ** 2)
+        assert r["x_B"] == pytest.approx(x, rel=1e-12)
+        assert r["x_B"] == pytest.approx(0.17620499351813312, rel=1e-9)
+
+    def test_slider_crank_acceleration_tdc_known_norton_13_4(self):
+        # Norton §13.4 / Shigley-Uicker §2.4: at TDC (θ=0) the exact slider
+        # acceleration reduces to a_B = −r·ω²·(1 + 1/n), n = l/r.
+        #   r=0.04, l=0.16 (n=4), ω=120 rad/s
+        #   → a_B = −0.04·120²·(1 + 0.25) = −720.0 m/s²  (exact).
+        r = _ref_slider(0.04, 0.16, 0.0, omega_rad_s=120.0)
+        n = 0.16 / 0.04
+        assert r["a_B"] == pytest.approx(-0.04 * 120.0 ** 2 * (1.0 + 1.0 / n), rel=1e-12)
+        assert r["a_B"] == pytest.approx(-720.0, rel=1e-12)
+
+    def test_slider_crank_acceleration_exact_closed_form_regression(self):
+        # Regression: a_B must equal the exact analytic derivative of v_B
+        # at a general angle (θ=90°), cross-checked by the independent
+        # closed-form a_B = −rα·sinθ − rω²·cosθ − r²·d/dt(g/R).
+        # r=0.04, l=0.16, ω=120, α=0 → a_B = +148.722560 m/s² (hand value).
+        def aB(r, l, td, w, a):
+            t = math.radians(td)
+            s, c = math.sin(t), math.cos(t)
+            R = math.sqrt(l * l - r * r * s * s)
+            f = s * c
+            g = w * f
+            gd = a * f + w * math.cos(2.0 * t) * w
+            Rd = -r * r * s * c * w / R
+            return -r * a * s - r * w * w * c - r * r * (gd * R - g * Rd) / (R * R)
+
+        r = _ref_slider(0.04, 0.16, 90.0, omega_rad_s=120.0)
+        assert r["a_B"] == pytest.approx(aB(0.04, 0.16, 90.0, 120.0, 0.0), rel=1e-9)
+        assert r["a_B"] == pytest.approx(148.72256049436476, rel=1e-9)
+
+    def test_transmission_angle_known_value_norton_3_4(self):
+        # Norton §3.4: cos μ = (r3²+r4²−BD²)/(2 r3 r4),
+        #   BD² = r1²+r2²−2 r1 r2 cos θ2.
+        # r1=10, r2=4, r3=12, r4=8, θ2=90° → BD²=116,
+        #   cos μ = (144+64−116)/192 = 0.479166…, μ = 61.36901°.
+        r = _ref_tmu(10.0, 4.0, 12.0, 8.0, 90.0)
+        assert r["mu_deg"] == pytest.approx(math.degrees(math.acos((144.0 + 64.0 - 116.0) / 192.0)), rel=1e-12)
+        assert r["mu_deg"] == pytest.approx(61.36901016307566, rel=1e-9)
+
+    def test_cam_cycloidal_quarter_point_known_value_norton_8_3(self):
+        # Norton §8.3 cycloidal: y = h·[ξ − sin(2πξ)/(2π)], ξ=θ/β.
+        #   h=20, β=90°, θ=22.5° (ξ=0.25)
+        #   → y = 20·(0.25 − sin(π/2)/(2π)) = 1.81690114 (hand value).
+        r = _ref_cyc(20.0, 90.0, 22.5, rise=True)
+        y = 20.0 * (0.25 - math.sin(2.0 * math.pi * 0.25) / (2.0 * math.pi))
+        assert r["displacement"] == pytest.approx(y, rel=1e-12)
+        assert r["displacement"] == pytest.approx(1.816901138162093, rel=1e-9)
+
+    def test_cam_cycloidal_peak_velocity_known_value(self):
+        # Norton §8.3: cycloidal peak velocity at ξ=0.5 is dy/dθ = 2h/β
+        #   h=20, β=π/2 rad → 2·20/(π/2) = 25.46479089 (hand value).
+        r = _ref_cyc(20.0, 90.0, 45.0, rise=True)
+        beta = math.radians(90.0)
+        assert r["velocity_per_omega"] == pytest.approx(2.0 * 20.0 / beta, rel=1e-12)
+        assert r["velocity_per_omega"] == pytest.approx(25.464790894703256, rel=1e-9)
+
+    def test_cam_harmonic_peak_accel_known_value_norton_8_2(self):
+        # Norton §8.2 SHM: peak |y''| at θ=0 is π²h/(2β²).
+        #   h=20, β=π/2 rad → π²·20/(2·(π/2)²) = 40.0 (exact).
+        r = _ref_harm(20.0, 90.0, 0.0, rise=True)
+        beta = math.radians(90.0)
+        assert r["acceleration_per_omega2"] == pytest.approx(math.pi ** 2 * 20.0 / (2.0 * beta ** 2), rel=1e-12)
+        assert r["acceleration_per_omega2"] == pytest.approx(40.0, rel=1e-12)

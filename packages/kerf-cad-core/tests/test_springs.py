@@ -730,3 +730,82 @@ class TestSpringsExternalReferences:
         assert r["ok"]
         assert r["P_flat_N"] > 0 and math.isfinite(r["P_flat_N"])
         assert r["alpha_factor"] > 0
+
+
+class TestSpringsCitedNumericReferences:
+    """
+    Production-confidence numeric reference cases with KNOWN closed-form
+    answers, each cross-checked by an independent hand calculation against
+    the cited source equation (Shigley 10th ed.; Almen-László / DIN 2092).
+    """
+
+    def test_compression_rate_known_value_shigley_10_9(self):
+        # Shigley Eq (10-9): k = d⁴G/(8 D³ Na).
+        # Music-wire steel G = 81.7 GPa (Shigley Table 10-5),
+        # d = 2.0 mm, D = 20.0 mm (C = 10), Na = 10.
+        # Hand calc: k = (2e-3)^4·81.7e9 / (8·(20e-3)^3·10)
+        #              = 81.7e9·1.6e-14 / (8·8e-6·10)
+        #              = 1.3072e-3 / 6.4e-4 = 2042.5 N/m  (exact).
+        r = _ref_hc(0.002, 0.020, 10.0, 81.7e9)
+        assert r["ok"]
+        assert r["rate_N_per_m"] == pytest.approx(2042.5, rel=1e-9)
+        assert r["C"] == pytest.approx(10.0, rel=1e-12)
+
+    def test_compression_wahl_known_value_C10_shigley_10_5(self):
+        # Shigley Eq (10-5): Kw = (4C−1)/(4C−4) + 0.615/C.
+        # For C = 10: Kw = 39/36 + 0.0615 = 1.083333… + 0.0615
+        #               = 1.1448333…  (hand value).
+        r = _ref_hc(0.002, 0.020, 10.0, 81.7e9)
+        assert r["Kw"] == pytest.approx(1.1448333333333333, rel=1e-12)
+
+    def test_compression_shear_stress_known_value_shigley_10_7(self):
+        # Shigley Eq (10-7): τ = Kw·8 F D/(π d³).
+        # d=2mm, D=20mm, C=10, F=100 N, Kw=1.14483333…
+        # τ = 1.14483333·8·100·0.020 / (π·(0.002)^3)
+        #   = 18.3173333 / (2.513274123e-8) = 7.288235e8 Pa ≈ 728.82 MPa.
+        r = _ref_hc(0.002, 0.020, 10.0, 81.7e9, Fm=100.0, Fa=0.0)
+        assert r["shear_stress_max_Pa"] == pytest.approx(728823536.0654861, rel=1e-9)
+
+    def test_extension_KB_known_value_C8_shigley_10_34(self):
+        # Shigley Eq (10-34): KB = (4C²−C−1)/(4C(C−1)).
+        # C = 8: (256−8−1)/(4·8·7) = 247/224 = 1.102678571…
+        r = _ref_he(0.003, 0.024, 12.0, 79.3e9)
+        assert r["KB"] == pytest.approx(247.0 / 224.0, rel=1e-12)
+
+    def test_torsion_rate_per_rad_known_value_shigley_10_53(self):
+        # Shigley §10-12: angular rate per radian k' = E d⁴/(64·2π·D·Na).
+        # d=3mm, D=30mm, Na=8, E=200 GPa.
+        # per_rev = 200e9·(3e-3)^4/(64·0.030·8) = 1.0546875 N·m/turn (exact)
+        # per_rad = per_rev/(2π)               = 0.167858729… N·m/rad.
+        r = _ref_ts(0.003, 0.030, 8.0, 200e9)
+        assert r["rate_Nm_per_rev"] == pytest.approx(1.0546875, rel=1e-12)
+        assert r["rate_Nm_per_rad"] == pytest.approx(1.0546875 / (2.0 * math.pi), rel=1e-12)
+
+    def test_torsion_bending_stress_known_value_C10(self):
+        # Shigley §10-12: σ = Ki·32 T/(π d³); Ki = (4C²−C−1)/(4C(C−1)).
+        # C=10 → Ki = 389/360 = 1.080555…; d=3mm, T=5 N·m.
+        # σ = 1.080555·32·5/(π·(0.003)^3) = 172.8889 / 8.4823e-8 = 2.0382e9 Pa.
+        r = _ref_ts(0.003, 0.030, 8.0, 200e9, torque_Nm=5.0)
+        Ki = 389.0 / 360.0
+        assert r["curvature_correction_Ki"] == pytest.approx(Ki, rel=1e-12)
+        assert r["bending_stress_Pa"] == pytest.approx(Ki * 32.0 * 5.0 / (math.pi * 0.003 ** 3), rel=1e-12)
+
+    def test_belleville_load_matches_canonical_almen_laszlo(self):
+        # Almen-László / DIN 2092 / Shigley Eq (10-56..10-58):
+        #   P(δ) = 4E/(1−ν²) · δ/(α·De²) · [(h0−δ)(h0−δ/2)·t + t³]
+        #   α    = (6/π)·(R−1)²/(ln R·R²),  R = De/Di.
+        # Independent canonical recomputation must match the module to 1e-9.
+        De, Di, t, h0, E, nu = 0.050, 0.025, 0.002, 0.0015, 200e9, 0.3
+        R = De / Di
+        lnR = math.log(R)
+        alpha = (6.0 / math.pi) * (R - 1.0) ** 2 / (lnR * R ** 2)
+
+        def P_canon(delta):
+            return (4.0 * E / (1.0 - nu ** 2)) * (delta / (alpha * De ** 2)) * (
+                (h0 - delta) * (h0 - delta / 2.0) * t + t ** 3
+            )
+
+        r = _ref_bw(De, Di, t, h0, E, nu, delta_target=h0 / 2.0)
+        assert r["alpha_factor"] == pytest.approx(alpha, rel=1e-12)
+        assert r["P_flat_N"] == pytest.approx(P_canon(h0), rel=1e-9)
+        assert r["P_at_delta_target_N"] == pytest.approx(P_canon(h0 / 2.0), rel=1e-9)

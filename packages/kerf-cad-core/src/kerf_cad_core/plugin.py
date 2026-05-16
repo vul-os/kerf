@@ -200,7 +200,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.procsim.forming_sim",
     "kerf_cad_core.procsim.weld_distortion",
     "kerf_cad_core.jewelry.mount_finder",
-    "kerf_cad_core.jewelry.enamel",
+    "kerf_cad_core.jewelry.cad_qc",
+    "kerf_cad_core.jewelry.wax_carving",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

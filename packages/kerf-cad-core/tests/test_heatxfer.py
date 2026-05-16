@@ -957,3 +957,144 @@ class TestToolWrappers:
             T_h_in=380.0, T_h_out=320.0, T_c_in=290.0, T_c_out=340.0, A=2.0
         )))
         _err_response(raw)
+
+
+# ===========================================================================
+# 17. CITABLE REFERENCE CASES — known numeric answers from the literature
+#
+# Each case below has an answer that can be cross-checked against a published
+# worked example or an exact analytic closed form. These are the
+# production-confidence anchors for the heatxfer module.
+#
+# Primary reference:
+#   Incropera, F.P., DeWitt, D.P., Bergman, T.L., Lavine, A.S.,
+#   "Fundamentals of Heat and Mass Transfer", 6th/7th ed., Wiley.
+# ===========================================================================
+
+class TestCitableReferenceCases:
+
+    def test_ref_cylindrical_shell_analytic_closed_form(self):
+        """Incropera eq. 3.27 closed form (analytic truth).
+
+        Pipe insulation: r_i=0.05 m, r_o=0.10 m, k=0.05 W/m·K, L=1 m,
+        T_i=400 K, T_o=200 K.
+            q = 2π k L ΔT / ln(r_o/r_i)
+              = 2π(0.05)(1)(200) / ln(2) = 90.6472 W
+        """
+        res = cylindrical_shell(0.05, 0.10, 0.05, 400.0, 200.0, 1.0)
+        assert res["ok"] is True
+        q_exact = 2.0 * math.pi * 0.05 * 1.0 * 200.0 / math.log(2.0)
+        assert q_exact == pytest.approx(90.6472, abs=1e-3)
+        assert res["Q_W"] == pytest.approx(q_exact, rel=1e-9)
+
+    def test_ref_spherical_shell_analytic_closed_form(self):
+        """Incropera eq. 3.35 closed form (analytic truth).
+
+        r_i=0.05 m, r_o=0.10 m, k=10 W/m·K, ΔT=200 K.
+            q = 4π k r_i r_o ΔT / (r_o - r_i)
+              = 4π(10)(0.05)(0.10)(200) / 0.05 = 2513.2741 W
+        """
+        res = spherical_shell(0.05, 0.10, 10.0, 500.0, 300.0)
+        assert res["ok"] is True
+        q_exact = 4.0 * math.pi * 10.0 * 0.05 * 0.10 * 200.0 / 0.05
+        assert q_exact == pytest.approx(2513.2741, abs=1e-2)
+        assert res["Q_W"] == pytest.approx(q_exact, rel=1e-9)
+
+    def test_ref_churchill_bernstein_incropera_ex_7_7(self):
+        """Incropera Example 7.7 (cross-flow over a cylinder).
+
+        Air over a circular cylinder: Re_D ≈ 6071, Pr ≈ 0.7.
+        Churchill-Bernstein gives Nu_D ≈ 40.6 (Incropera 6th ed Ex 7.7).
+        """
+        res = nusselt_cylinder_churchill_bernstein(6071.0, 0.7)
+        assert res["ok"] is True
+        assert res["Nu"] == pytest.approx(40.6, abs=0.5)
+
+    def test_ref_natural_convection_vplate_incropera_ex_9_2(self):
+        """Incropera Example 9.2 (free convection, vertical plate).
+
+        Ra_L ≈ 1.813e9, Pr ≈ 0.69. Churchill-Chu composite ('all')
+        correlation yields Nu_L ≈ 147 (Incropera 6th ed Ex 9.2).
+        """
+        res = nusselt_natural_vertical_plate(1.813e9, 0.69, regime="all")
+        assert res["ok"] is True
+        assert res["Nu"] == pytest.approx(147.0, abs=1.5)
+
+    def test_ref_effectiveness_ntu_counterflow_Cr0(self):
+        """ε-NTU analytic truth: Cr→0 (phase-change side) counterflow.
+
+        For Cr = 0, ε = 1 - exp(-NTU) for all arrangements
+        (Incropera Table 11.4). NTU=1 → ε = 1 - e⁻¹ = 0.632121.
+        """
+        res = effectiveness_ntu(1000.0, 1.0e12, 1.0, flow="counter")
+        assert res["ok"] is True
+        assert res["epsilon"] == pytest.approx(1.0 - math.exp(-1.0), rel=1e-4)
+
+    def test_ref_effectiveness_ntu_counterflow_Cr1(self):
+        """ε-NTU analytic truth: Cr=1 counterflow (Incropera 11.29a).
+
+        ε = NTU / (1 + NTU). NTU=2 → ε = 2/3 = 0.666667.
+        """
+        res = effectiveness_ntu(1500.0, 1500.0, 2.0, flow="counter")
+        assert res["ok"] is True
+        assert res["epsilon"] == pytest.approx(2.0 / 3.0, rel=1e-9)
+
+    def test_ref_lmtd_balanced_counterflow_analytic(self):
+        """LMTD analytic truth: balanced counterflow ΔT1 = ΔT2.
+
+        When the two terminal ΔT are equal, ΔT_lm = ΔT (l'Hôpital limit).
+        T_h_in=400, T_h_out=350, T_c_in=300, T_c_out=350:
+            ΔT1 = 400-350 = 50, ΔT2 = 350-300 = 50  → LMTD = 50 K
+            Q = U A LMTD = 200·1·50 = 10000 W.
+        """
+        res = lmtd_heat_exchanger(400.0, 350.0, 300.0, 350.0, 200.0, 1.0,
+                                  flow="counter")
+        assert res["ok"] is True
+        assert res["LMTD_K"] == pytest.approx(50.0, abs=1e-9)
+        assert res["Q_W"] == pytest.approx(10000.0, rel=1e-9)
+
+    def test_ref_lumped_capacitance_one_time_constant(self):
+        """Lumped-capacitance analytic truth (Incropera §5.3).
+
+        At t = τ, θ = (T-T∞)/(Ti-T∞) = e⁻¹ = 0.367879.
+        Ti=400 K, T∞=300 K → T(τ) = 300 + 100·e⁻¹ = 336.788 K.
+        """
+        # Choose params so τ is exactly known: τ = ρ V cp / (h A_s)
+        rho, V, cp, h, A_s = 1000.0, 1e-3, 1000.0, 100.0, 1.0
+        tau = rho * V * cp / (h * A_s)  # = 10 s
+        res = lumped_capacitance(T_i=400.0, T_inf=300.0, h=h, A_s=A_s,
+                                 rho=rho, V=V, c_p=cp, t=tau)
+        assert res["ok"] is True
+        assert res["tau_s"] == pytest.approx(tau, rel=1e-9)
+        assert res["theta"] == pytest.approx(math.exp(-1.0), rel=1e-9)
+        assert res["T_t_K"] == pytest.approx(300.0 + 100.0 * math.exp(-1.0),
+                                             rel=1e-9)
+
+    def test_ref_dittus_boelter_textbook_form(self):
+        """Dittus-Boelter exact form check (Incropera eq. 8.60).
+
+        Re_D=10000, Pr=0.707 (air), heating (n=0.4):
+            Nu = 0.023·10000^0.8·0.707^0.4 = 31.732
+        """
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            res = nusselt_pipe_dittus_boelter(10000.0, 0.707, heating=True)
+        assert res["ok"] is True
+        nu_exact = 0.023 * 10000.0 ** 0.8 * 0.707 ** 0.4
+        assert nu_exact == pytest.approx(31.732, abs=1e-2)
+        assert res["Nu"] == pytest.approx(nu_exact, rel=1e-9)
+
+    def test_ref_fin_efficiency_known_mLc(self):
+        """Straight-fin efficiency analytic truth (Incropera eq. 3.86).
+
+        η_f = tanh(mL_c)/(mL_c). For mL_c = 1: η_f = tanh(1) = 0.761594.
+        Pick L,t,k,h so that m·L = 1 exactly:
+            m = sqrt(2h/(k·t)); choose 2h/(k·t) = 1 → m = 1, L_c = 1.
+        h=50, k=100, t=2·h/k = 1.0 → m = sqrt(2·50/(100·1)) = 1.0; L=1.
+        """
+        res = fin_efficiency_straight(L=1.0, t=1.0, k=100.0, h=50.0,
+                                      tip="adiabatic")
+        assert res["ok"] is True
+        assert res["mL_c"] == pytest.approx(1.0, rel=1e-9)
+        assert res["eta_f"] == pytest.approx(math.tanh(1.0), rel=1e-9)
+        assert res["eta_f"] == pytest.approx(0.7615942, abs=1e-6)

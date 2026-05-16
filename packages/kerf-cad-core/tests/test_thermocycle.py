@@ -946,3 +946,131 @@ class TestToolWrappers:
         ctx = _ctx()
         raw = _run(run_refrigeration_cop(ctx, _args(Q_L=5000.0, W_in=2000.0, mode="bad")))
         _err_response(raw)
+
+
+# ===========================================================================
+# 17. CITABLE REFERENCE CASES — known numeric answers from the literature
+#
+# Cross-checked against published worked examples (cold-air-standard, k=1.4)
+# from Cengel & Boles, "Thermodynamics: An Engineering Approach", 8th ed.
+# (results agree to the precision quoted in the text), plus exact analytic
+# closed forms for the Carnot / isentropic relations.
+# ===========================================================================
+
+class TestCitableReferenceCases:
+
+    def test_ref_otto_cengel_ex_9_2(self):
+        """Cengel 8th ed Example 9-2 (air-standard Otto), cold-air-standard.
+
+        r = 8, k = 1.4. Cold-air-standard thermal efficiency:
+            η_th = 1 - 1/r^(k-1) = 1 - 1/8^0.4 = 0.5647 (56.5%)
+        Cengel reports η_th = 0.565. T2 = T1·r^(k-1) = 290·8^0.4 = 666.25 K.
+        """
+        res = otto_cycle(r=8.0, T1=290.0, T3=1500.0)
+        assert res["ok"] is True
+        assert res["eta_otto"] == pytest.approx(0.5647, abs=1e-3)
+        assert res["T2"] == pytest.approx(666.25, abs=0.5)
+
+    def test_ref_diesel_cengel_ex_9_4(self):
+        """Cengel 8th ed Example 9-4 (air-standard Diesel), cold-air-standard.
+
+        r = 18, r_c = 2, k = 1.4:
+            η_th = 1 - (r_c^k - 1)/(k·r^(k-1)·(r_c-1))
+                 = 1 - (2^1.4-1)/(1.4·18^0.4·1) = 0.6316 (≈ 63.1%)
+        Cengel reports η_th ≈ 0.631.
+        """
+        res = diesel_cycle(r=18.0, r_c=2.0, T1=300.0)
+        assert res["ok"] is True
+        assert res["eta_diesel"] == pytest.approx(0.6316, abs=2e-3)
+
+    def test_ref_brayton_cengel_ex_9_5(self):
+        """Cengel 8th ed Example 9-5 (ideal Brayton), cold-air-standard.
+
+        r_p = 8, T1 = 300 K, T3 = 1300 K, k = 1.4:
+            η_th = 1 - 1/r_p^((k-1)/k) = 1 - 1/8^0.2857 = 0.448 (44.8%)
+            T2s = 300·8^0.2857 = 543.43 K  (Cengel: T2 ≈ 540 K)
+        """
+        res = brayton_cycle(r_p=8.0, T1=300.0, T3=1300.0)
+        assert res["ok"] is True
+        assert res["eta_brayton"] == pytest.approx(0.448, abs=1e-3)
+        assert res["T2s"] == pytest.approx(543.43, abs=0.5)
+
+    def test_ref_carnot_efficiency_analytic(self):
+        """Carnot analytic truth (Cengel §6-8): η = 1 - T_L/T_H.
+
+        T_H = 900 K, T_L = 300 K → η = 1 - 300/900 = 0.66667.
+        """
+        res = carnot_efficiency(900.0, 300.0)
+        assert res["ok"] is True
+        assert res["eta_carnot"] == pytest.approx(2.0 / 3.0, rel=1e-9)
+
+    def test_ref_carnot_cop_refrigeration_analytic(self):
+        """Reverse-Carnot COP_R analytic truth (Cengel §6-9).
+
+        COP_R = T_L/(T_H - T_L). T_L=250 K, T_H=300 K → COP_R = 5.0.
+        """
+        res = carnot_cop_refrigeration(300.0, 250.0)
+        assert res["ok"] is True
+        assert res["COP_R"] == pytest.approx(5.0, rel=1e-9)
+
+    def test_ref_carnot_cop_heat_pump_analytic(self):
+        """Reverse-Carnot COP_HP analytic truth (Cengel §6-9).
+
+        COP_HP = T_H/(T_H - T_L) = COP_R + 1.
+        T_L=250 K, T_H=300 K → COP_HP = 6.0.
+        """
+        res = carnot_cop_heat_pump(300.0, 250.0)
+        assert res["ok"] is True
+        assert res["COP_HP"] == pytest.approx(6.0, rel=1e-9)
+
+    def test_ref_isentropic_compression_air(self):
+        """Isentropic ideal-gas relation analytic truth (Cengel eq. 7-49).
+
+        Air 100 kPa, 300 K compressed to 800 kPa, k=1.4:
+            T2 = T1·(p2/p1)^((k-1)/k) = 300·8^0.2857 = 543.43 K
+        """
+        res = isentropic_process(300.0, 100_000.0, 800_000.0)
+        assert res["ok"] is True
+        T2_exact = 300.0 * 8.0 ** (0.4 / 1.4)
+        assert T2_exact == pytest.approx(543.43, abs=0.5)
+        assert res["T2"] == pytest.approx(T2_exact, rel=1e-9)
+
+    def test_ref_isobaric_air_q_known(self):
+        """Constant-pressure heat addition (Cengel §4-5), air cp=1.005 kJ/kg·K.
+
+        Heating air 300 K → 600 K at constant p:
+            q = cp·ΔT = 1005·300 = 301500 J/kg = 301.5 kJ/kg.
+        First law: q = Δu + w with w = R·ΔT, R = 287 J/kg·K.
+        """
+        res = isobaric_process(300.0, 600.0)
+        assert res["ok"] is True
+        assert res["q_J_kg"] == pytest.approx(301_500.0, rel=1e-6)
+        assert res["w_J_kg"] == pytest.approx(287.0 * 300.0, rel=1e-3)
+        assert res["q_J_kg"] == pytest.approx(
+            res["delta_u_J_kg"] + res["w_J_kg"], rel=1e-9
+        )
+
+    def test_ref_otto_carnot_bounded(self):
+        """Physical sanity (2nd law): Otto η must not exceed Carnot limit.
+
+        Cengel §9-3: air-standard Otto efficiency is always below the
+        Carnot efficiency between the same temperature extremes.
+        """
+        res = otto_cycle(r=8.0, T1=300.0, T3=1500.0)
+        assert res["ok"] is True
+        eta_carnot = 1.0 - 300.0 / 1500.0
+        assert res["eta_otto"] < eta_carnot
+
+    def test_ref_brayton_with_efficiencies_cengel_ex_9_6(self):
+        """Cengel 8th ed Example 9-6 (non-ideal Brayton).
+
+        r_p=8, T1=300 K, T3=1300 K, η_c=0.80, η_t=0.85, k=1.4.
+        Cengel reports net cycle thermal efficiency ≈ 0.266 (26.6%).
+        Verify the model lands in the documented band and below ideal.
+        """
+        ideal = brayton_cycle(r_p=8.0, T1=300.0, T3=1300.0)
+        real = brayton_cycle(r_p=8.0, T1=300.0, T3=1300.0,
+                             eta_c=0.80, eta_t=0.85)
+        assert ideal["ok"] is True and real["ok"] is True
+        assert real["eta_brayton"] == pytest.approx(0.266, abs=0.03)
+        assert real["eta_brayton"] < ideal["eta_brayton"]

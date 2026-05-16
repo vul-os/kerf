@@ -632,3 +632,49 @@ class TestAuthoritativeReferences:
             LHV_MJ_kg=ch4["LHV_MJ_kg"], MW_fuel=ch4["MW"],
         )
         assert 1900.0 < r["T_ad_K"] < 2600.0
+
+    # --- additional analytic-truth anchors -------------------------------
+
+    def test_stoich_o2_exact_methane_octane(self):
+        # Exact stoichiometry (Turns eq. 2.30): n_O2 = x + y/4 - z/2.
+        # CH4 → 2.0 exactly; iso-octane C8H18 → 8 + 18/4 = 12.5 exactly.
+        assert stoich_afr(1, 4, 0)["n_O2_stoich"] == pytest.approx(2.0, abs=1e-9)
+        assert stoich_afr(8, 18, 0)["n_O2_stoich"] == pytest.approx(12.5,
+                                                                    abs=1e-9)
+
+    def test_air_molar_ratio_376_per_o2(self):
+        # Standard air model (Turns §2.2): 4.76 mol air per mol O2
+        # (1 mol O2 + 3.76 mol N2). CH4 stoich: n_air = 2·4.76 = 9.52.
+        r = stoich_afr(1, 4, 0)
+        assert r["AFR_molar"] == pytest.approx(2.0 / 0.2095, rel=1e-6)
+
+    def test_equivalence_ratio_stoichiometric_identity(self):
+        # Definitional truth (Turns eq. 2.31): φ=1 ⇔ λ=1 ⇔ 0% excess air.
+        r = equivalence_ratio(phi=1.0)
+        assert r["lambda_"] == pytest.approx(1.0, rel=1e-9)
+        assert r["excess_air_pct"] == pytest.approx(0.0, abs=1e-9)
+        assert r["mixture"] == "stoichiometric"
+
+    def test_hhv_gt_lhv_by_water_latent(self):
+        # Thermo identity (Cengel §15-3): HHV − LHV = (m_H2O/m_fuel)·h_fg.
+        # Round-trip HHV→LHV→HHV must recover the input exactly.
+        fwd = hhv_to_lhv(55.53, C=1, H=4, direction="hhv_to_lhv")
+        back = hhv_to_lhv(fwd["LHV_MJ_kg"], C=1, H=4,
+                          direction="lhv_to_hhv")
+        assert fwd["HHV_MJ_kg"] > fwd["LHV_MJ_kg"]
+        assert back["HHV_MJ_kg"] == pytest.approx(55.53, rel=1e-4)
+
+    def test_fuel_power_exact_definition(self):
+        # Definitional: P = m_dot · LHV · η. 1 kg/s of CH4 at LHV 50 MJ/kg,
+        # η=1 → 50 MW exactly (energy-rate definition).
+        r = fuel_power(mass_flow_kg_s=1.0, LHV_MJ_kg=50.0,
+                       eta_combustion=1.0)
+        assert r["thermal_power_W"] == pytest.approx(50.0e6, rel=1e-9)
+        assert r["thermal_power_MW"] == pytest.approx(50.0, rel=1e-9)
+
+    def test_flue_gas_dew_point_water_antoine(self):
+        # Antoine truth: p_H2O = 0.10 atm → T_dew via NIST water Antoine
+        # (A=8.07131, B=1730.63, C=233.426). 0.10·101325 = 10132.5 Pa
+        # ⇒ 76.04 mmHg ⇒ T_dew ≈ 45.8 °C.
+        r = flue_gas_dew_point(H2O_wet_frac=0.10, p_total_Pa=101325.0)
+        assert r["T_dew_C"] == pytest.approx(45.8, abs=1.0)

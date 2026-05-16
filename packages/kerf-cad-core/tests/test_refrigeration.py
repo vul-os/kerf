@@ -669,3 +669,109 @@ class TestToolErrors:
                           defrost_duration_min=30.0)  # missing defrost_cycles_per_day
         ))
         _err_response(raw)
+
+
+# ===========================================================================
+# 13. CITABLE REFERENCE CASES — known numeric answers from the literature
+#
+# Saturation-pressure anchors cross-checked against the published NIST
+# WebBook / ASHRAE Fundamentals Handbook 2021 calibration points used to
+# fit the per-refrigerant Antoine constants (see cycle.py docstring), plus
+# the exact ASHRAE ton-of-refrigeration definition and analytic COP bounds.
+# ===========================================================================
+
+class TestCitableReferenceCases:
+
+    def test_ref_R134a_sat_pressure_0C_NIST(self):
+        """NIST WebBook: R134a P_sat at 0°C ≈ 292.80 kPa.
+
+        The Antoine constants are two-point fitted to this exact value.
+        """
+        r = saturation_pressure(0.0, "R134a")
+        assert r["ok"] is True
+        assert r["P_sat_Pa"] / 1000.0 == pytest.approx(292.80, rel=0.005)
+
+    def test_ref_R134a_sat_pressure_40C_NIST(self):
+        """NIST WebBook: R134a P_sat at 40°C ≈ 1017.0 kPa."""
+        r = saturation_pressure(40.0, "R134a")
+        assert r["ok"] is True
+        assert r["P_sat_Pa"] / 1000.0 == pytest.approx(1017.0, rel=0.005)
+
+    def test_ref_R717_ammonia_sat_pressure_0C_ASHRAE(self):
+        """ASHRAE / NIST: R717 (ammonia) P_sat at 0°C ≈ 429.44 kPa."""
+        r = saturation_pressure(0.0, "R717")
+        assert r["ok"] is True
+        assert r["P_sat_Pa"] / 1000.0 == pytest.approx(429.44, rel=0.005)
+
+    def test_ref_R744_CO2_sat_pressure_minus20C_NIST(self):
+        """NIST WebBook: R744 (CO₂) P_sat at −20°C ≈ 1969.1 kPa."""
+        r = saturation_pressure(-20.0, "R744")
+        assert r["ok"] is True
+        assert r["P_sat_Pa"] / 1000.0 == pytest.approx(1969.1, rel=0.005)
+
+    def test_ref_R290_propane_sat_pressure_0C_NIST(self):
+        """NIST WebBook: R290 (propane) P_sat at 0°C ≈ 473.9 kPa."""
+        r = saturation_pressure(0.0, "R290")
+        assert r["ok"] is True
+        assert r["P_sat_Pa"] / 1000.0 == pytest.approx(473.9, rel=0.005)
+
+    def test_ref_R410A_sat_pressure_40C_ASHRAE(self):
+        """ASHRAE: R410A P_sat at 40°C ≈ 2419.0 kPa."""
+        r = saturation_pressure(40.0, "R410A")
+        assert r["ok"] is True
+        assert r["P_sat_Pa"] / 1000.0 == pytest.approx(2419.0, rel=0.005)
+
+    def test_ref_ton_of_refrigeration_ASHRAE_definition(self):
+        """ASHRAE definition: 1 TR = 3516.853 W = 12,000 BTU/h exactly.
+
+        Standard refrigeration-engineering constant.
+        """
+        r = tons_of_refrigeration(capacity_TR=1.0)
+        assert r["ok"] is True
+        assert r["capacity_W"] == pytest.approx(3516.853, rel=1e-6)
+        assert r["capacity_BTUh"] == pytest.approx(12_000.0, rel=2e-3)
+
+    def test_ref_single_stage_COP_below_reverse_carnot(self):
+        """2nd-law bound (Cengel §11-2): real cycle COP < reverse-Carnot COP.
+
+        R134a, T_evap=-10°C (263.15 K), T_cond=40°C (313.15 K):
+            COP_Carnot,R = T_L/(T_H-T_L) = 263.15/50 = 5.263.
+        The modelled single-stage COP_cooling must be positive and below
+        this thermodynamic ceiling.
+        """
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            r = single_stage_cycle(-10.0, 40.0, 10_000.0, "R134a",
+                                    eta_isentropic=1.0)
+        assert r["ok"] is True
+        cop_carnot = 263.15 / (313.15 - 263.15)
+        assert 0.0 < r["COP_cooling"] < cop_carnot
+
+    def test_ref_single_stage_first_law_energy_balance(self):
+        """First law (Cengel §11-2): Q_cond = Q_evap + W_compressor exactly.
+
+        Holds for every standard vapor-compression cycle.
+        """
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            r = single_stage_cycle(-10.0, 40.0, 10_000.0, "R134a")
+        assert r["ok"] is True
+        assert r["Q_cond_W"] == pytest.approx(
+            r["Q_evap_W"] + r["W_compressor_W"], rel=1e-9
+        )
+        assert r["COP_heating"] == pytest.approx(
+            r["COP_cooling"] + 1.0, rel=1e-9
+        )
+
+    def test_ref_sat_temperature_inverse_exact(self):
+        """Antoine inverse is the exact analytic inverse of the forward fit.
+
+        _sat_temperature(_sat_pressure(T)) == T to machine precision for
+        every supported refrigerant (closed-form invertibility check).
+        """
+        for name in SUPPORTED_REFRIGERANTS:
+            ref = _REFRIGERANT_DATA[name]
+            for T_K in (240.0, 270.0, 300.0):
+                P = _sat_pressure(T_K, ref)
+                T_back = _sat_temperature(P, ref)
+                assert T_back == pytest.approx(T_K, abs=1e-6)

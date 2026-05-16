@@ -59,6 +59,17 @@ import math
 import warnings
 from typing import Any
 
+__all__ = [
+    "reduced_stiffness",
+    "transform_Q",
+    "abd_matrix",
+    "laminate_response",
+    "ply_stresses_strains",
+    "failure_indices",
+    "laminate_engineering_moduli",
+    "first_ply_failure_load",
+]
+
 
 # ---------------------------------------------------------------------------
 # Internal helpers

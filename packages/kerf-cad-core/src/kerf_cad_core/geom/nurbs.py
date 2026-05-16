@@ -8,12 +8,22 @@ class NurbsCurve:
     degree: int
     control_points: np.ndarray
     knots: np.ndarray
+    # Optional per-control-point weights for rational NURBS.  ``None`` means a
+    # non-rational (polynomial) B-spline (all weights = 1).  Control points are
+    # always stored in *Cartesian* (un-projected) form so existing callers that
+    # read ``control_points`` as plain XYZ keep working unchanged; the weight
+    # vector is kept separate.
+    weights: Optional[np.ndarray] = None
 
     def __post_init__(self):
         if self.control_points.ndim == 1:
             self.control_points = self.control_points.reshape(-1, 1)
         if self.knots.ndim != 1:
             raise ValueError("Knots must be 1D array")
+        if self.weights is not None:
+            self.weights = np.asarray(self.weights, dtype=float).ravel()
+            if self.weights.shape[0] != self.control_points.shape[0]:
+                raise ValueError("weights length must match control_points")
 
     @property
     def num_control_points(self) -> int:
@@ -22,6 +32,10 @@ class NurbsCurve:
     @property
     def num_knots(self) -> int:
         return len(self.knots)
+
+    @property
+    def is_rational(self) -> bool:
+        return self.weights is not None and not np.allclose(self.weights, 1.0)
 
     def evaluate(self, u: float) -> np.ndarray:
         return de_boor(self, u)
@@ -37,12 +51,19 @@ class NurbsSurface:
     control_points: np.ndarray
     knots_u: np.ndarray
     knots_v: np.ndarray
+    # Optional (nu x nv) weight grid for rational NURBS surfaces.  ``None``
+    # means non-rational.  Control points stay Cartesian (see NurbsCurve).
+    weights: Optional[np.ndarray] = None
 
     def __post_init__(self):
         if self.control_points.ndim != 3:
             raise ValueError("Control points must be 3D array (nu x nv x dim)")
         if self.knots_u.ndim != 1 or self.knots_v.ndim != 1:
             raise ValueError("Knots must be 1D arrays")
+        if self.weights is not None:
+            self.weights = np.asarray(self.weights, dtype=float)
+            if self.weights.shape != self.control_points.shape[:2]:
+                raise ValueError("weights shape must be (nu, nv)")
 
     @property
     def num_control_points_u(self) -> int:
@@ -52,8 +73,15 @@ class NurbsSurface:
     def num_control_points_v(self) -> int:
         return self.control_points.shape[1]
 
+    @property
+    def is_rational(self) -> bool:
+        return self.weights is not None and not np.allclose(self.weights, 1.0)
+
     def evaluate(self, u: float, v: float) -> np.ndarray:
         return surface_evaluate(self, u, v)
+
+    def derivative(self, u: float, v: float, ku: int = 1, kv: int = 0) -> np.ndarray:
+        return surface_derivative(self, u, v, ku, kv)
 
 
 def find_span(n: int, degree: int, u: float, knots: np.ndarray) -> int:
@@ -76,96 +104,367 @@ def find_span(n: int, degree: int, u: float, knots: np.ndarray) -> int:
     return mid
 
 
-def basis_functions(i: int, u: float, degree: int, knots: np.ndarray) -> np.ndarray:
-    n = len(knots) - degree - 1
+# ---------------------------------------------------------------------------
+# GK-01 — Correct, unified Cox-de Boor B-spline core
+# ---------------------------------------------------------------------------
+#
+# The previous ``basis_functions`` used an index-shifting recurrence that does
+# not implement the triangular Cox-de Boor relation correctly (only N[0] is
+# trustworthy for degree > 1).  This was documented in
+# ``geom/intersection.py`` which carries its own correct ``_basis_fns``.
+# We now host the single correct implementation here; every evaluator (curve,
+# surface, rational) and the analytic derivative routines delegate to it.
+
+
+def _basis_funcs(span: int, u: float, degree: int, knots: np.ndarray) -> np.ndarray:
+    """The (degree+1) non-zero B-spline basis functions at *u*.
+
+    Standard triangular Cox-de Boor recurrence (Piegl & Tiller, Alg. A2.2).
+    Returns ``N[0..degree]`` with ``N[j] = N_{span-degree+j, degree}(u)``.
+    This is the canonical, correct implementation; it is numerically identical
+    to the known-good ``intersection._basis_fns``.
+    """
     N = np.zeros(degree + 1)
     N[0] = 1.0
+    left = np.zeros(degree + 1)
+    right = np.zeros(degree + 1)
+    for j in range(1, degree + 1):
+        left[j] = u - knots[span + 1 - j]
+        right[j] = knots[span + j] - u
+        saved = 0.0
+        for r in range(j):
+            denom = right[r + 1] + left[j - r]
+            temp = N[r] / denom if abs(denom) > 1e-15 else 0.0
+            N[r] = saved + right[r + 1] * temp
+            saved = left[j - r] * temp
+        N[j] = saved
+    return N
 
-    for k in range(1, degree + 1):
-        denom_prev = 0.0
-        for j in range(k):
-            denom = knots[i + j + 1] - knots[i + j]
-            if denom != 0.0:
-                val = N[j] / denom * (u - knots[i + j])
-            else:
-                val = 0.0
-            N[j] = N[j + 1] if j + 1 <= k - 1 else 0.0
-            N[j] += val
 
-    return N[:degree + 1]
+def basis_functions(i: int, u: float, degree: int, knots: np.ndarray) -> np.ndarray:
+    """Backwards-compatible alias for the corrected basis-function evaluator.
+
+    Historic call sites passed the knot *span* as ``i`` (see
+    ``intersection._nurbs_surface_eval`` parity), which is exactly the
+    convention used by :func:`_basis_funcs`.
+    """
+    return _basis_funcs(i, float(u), degree, knots)
+
+
+def _basis_funcs_derivs(span: int, u: float, degree: int,
+                        knots: np.ndarray, n_der: int) -> np.ndarray:
+    """Basis functions and their derivatives up to order *n_der*.
+
+    Piegl & Tiller, Algorithm A2.3.  Returns array ``ders`` of shape
+    ``(n_der+1, degree+1)`` where ``ders[k, j]`` is the k-th derivative of the
+    basis function ``N_{span-degree+j, degree}`` at *u*.
+    """
+    ndu = np.zeros((degree + 1, degree + 1))
+    ndu[0, 0] = 1.0
+    left = np.zeros(degree + 1)
+    right = np.zeros(degree + 1)
+    for j in range(1, degree + 1):
+        left[j] = u - knots[span + 1 - j]
+        right[j] = knots[span + j] - u
+        saved = 0.0
+        for r in range(j):
+            ndu[j, r] = right[r + 1] + left[j - r]
+            denom = ndu[j, r]
+            temp = ndu[r, j - 1] / denom if abs(denom) > 1e-15 else 0.0
+            ndu[r, j] = saved + right[r + 1] * temp
+            saved = left[j - r] * temp
+        ndu[j, j] = saved
+
+    ders = np.zeros((n_der + 1, degree + 1))
+    for j in range(degree + 1):
+        ders[0, j] = ndu[j, degree]
+
+    a = np.zeros((2, degree + 1))
+    for r in range(degree + 1):
+        s1, s2 = 0, 1
+        a[0, 0] = 1.0
+        for k in range(1, n_der + 1):
+            d = 0.0
+            rk = r - k
+            pk = degree - k
+            if r >= k:
+                a[s2, 0] = a[s1, 0] / ndu[pk + 1, rk] if abs(ndu[pk + 1, rk]) > 1e-15 else 0.0
+                d = a[s2, 0] * ndu[rk, pk]
+            j1 = 1 if rk >= -1 else -rk
+            j2 = k - 1 if (r - 1) <= pk else degree - r
+            for j in range(j1, j2 + 1):
+                denom = ndu[pk + 1, rk + j]
+                a[s2, j] = (a[s1, j] - a[s1, j - 1]) / denom if abs(denom) > 1e-15 else 0.0
+                d += a[s2, j] * ndu[rk + j, pk]
+            if r <= pk:
+                denom = ndu[pk + 1, r]
+                a[s2, k] = -a[s1, k - 1] / denom if abs(denom) > 1e-15 else 0.0
+                d += a[s2, k] * ndu[r, pk]
+            ders[k, r] = d
+            s1, s2 = s2, s1
+
+    fac = float(degree)
+    for k in range(1, n_der + 1):
+        for j in range(degree + 1):
+            ders[k, j] *= fac
+        fac *= float(degree - k)
+    return ders
+
+
+def _curve_weights(curve: NurbsCurve) -> Optional[np.ndarray]:
+    if curve.weights is None:
+        return None
+    return curve.weights
 
 
 def de_boor(curve: NurbsCurve, u: float) -> np.ndarray:
+    """Evaluate a (rational) NURBS curve at *u*.
+
+    Non-rational curves use plain de Boor on the control points.  Rational
+    curves are evaluated by running the algorithm on homogeneous coordinates
+    ``(w*P, w)`` and projecting back, which is the exact rational result.
+    """
     degree = curve.degree
     n = curve.num_control_points - 1
     p = degree
+    u = float(u)
 
     span = find_span(n, p, u, curve.knots)
-    U = curve.knots
+    N = _basis_funcs(span, u, p, curve.knots)
     P = curve.control_points
+    w = _curve_weights(curve)
 
-    d = [P[span - p + j] for j in range(p + 1)]
-
-    for k in range(1, p + 1):
-        for j in range(p, k - 1, -1):
-            idx_j = span - p + j
-            idx_j_minus_k = span - p + j - k
-            denom = U[idx_j + 1] - U[idx_j_minus_k]
-            if denom == 0.0:
-                coeff = 0.0
-            else:
-                coeff = (u - U[idx_j_minus_k]) / denom
-            d[j] = (1 - coeff) * d[j - 1] + coeff * d[j]
-
-    return d[p]
+    dim = P.shape[1]
+    num = np.zeros(dim)
+    den = 0.0
+    for j in range(p + 1):
+        idx = span - p + j
+        wj = 1.0 if w is None else float(w[idx])
+        num += N[j] * wj * P[idx]
+        den += N[j] * wj
+    if abs(den) < 1e-300:
+        return num
+    return num / den
 
 
 def curve_derivative(curve: NurbsCurve, u: float, order: int = 1) -> np.ndarray:
+    """GK-03 — TRUE (un-normalised), rational-correct curve derivative.
+
+    Returns the genuine *order*-th derivative C^(order)(u).  The historic
+    implementation incorrectly L2-normalised the first derivative, which broke
+    every consumer that needed the actual derivative magnitude (arc length,
+    curvature, Newton steps).  This now returns the exact derivative.
+
+    For rational curves the quotient rule on homogeneous coordinates
+    (Piegl & Tiller, Eq. 4.8) is applied so the result is rational-correct.
+    """
+    from math import comb
+
     degree = curve.degree
     n = curve.num_control_points - 1
+    dim = curve.control_points.shape[1]
+    u = float(u)
 
+    if order < 0:
+        raise ValueError("order must be >= 0")
     if order > degree:
-        return np.zeros(curve.control_points.shape[1])
+        return np.zeros(dim)
 
     span = find_span(n, degree, u, curve.knots)
+    ders_N = _basis_funcs_derivs(span, u, degree, curve.knots, order)
     P = curve.control_points
-    k = order
+    w = _curve_weights(curve)
 
-    PK = np.zeros((k + 1, degree + 1, curve.control_points.shape[1]))
-    for j in range(degree + 1):
-        PK[0, j] = P[span - degree + j]
+    # Homogeneous derivatives A^(k) (numerator) and w^(k) (denominator).
+    A = np.zeros((order + 1, dim))
+    wd = np.zeros(order + 1)
+    for k in range(order + 1):
+        for j in range(degree + 1):
+            idx = span - degree + j
+            wj = 1.0 if w is None else float(w[idx])
+            A[k] += ders_N[k, j] * wj * P[idx]
+            wd[k] += ders_N[k, j] * wj
 
-    for k_idx in range(1, k + 1):
-        for i in range(degree - k_idx + 1):
-            denom = curve.knots[span + i + 1] - curve.knots[span + i]
-            if denom != 0.0:
-                factor = k_idx / denom
-                PK[k_idx, i] = factor * (PK[k_idx - 1, i + 1] - PK[k_idx - 1, i])
-            else:
-                PK[k_idx, i] = np.zeros(curve.control_points.shape[1])
+    if w is None:
+        # Non-rational: A^(order) is already the true derivative.
+        return A[order]
 
-    deriv = PK[k, 0]
-    norm = np.linalg.norm(deriv)
-    if norm > 1e-10:
-        deriv = deriv / norm
-    return deriv
+    # Rational quotient rule: C^(k) = (A^(k) - sum C(k,i) w^(i) C^(k-i)) / w
+    C = np.zeros((order + 1, dim))
+    for k in range(order + 1):
+        v = A[k].copy()
+        for i in range(1, k + 1):
+            v = v - comb(k, i) * wd[i] * C[k - i]
+        C[k] = v / wd[0] if abs(wd[0]) > 1e-300 else v
+    return C[order]
+
+
+# Backwards-compatible name retained for any external caller that wanted the
+# rational derivative explicitly (it is now the same correct routine).
+def rational_curve_derivative(curve: NurbsCurve, u: float, order: int = 1) -> np.ndarray:
+    return curve_derivative(curve, u, order)
+
+
+# ---------------------------------------------------------------------------
+# GK-01 — single canonical surface evaluator (rational, weight-aware)
+# ---------------------------------------------------------------------------
 
 
 def surface_evaluate(surf: NurbsSurface, u: float, v: float) -> np.ndarray:
-    span_u = find_span(surf.num_control_points_u - 1, surf.degree_u, u, surf.knots_u)
-    span_v = find_span(surf.num_control_points_v - 1, surf.degree_v, v, surf.knots_v)
+    """Evaluate a (rational) NURBS surface at *(u, v)*.
 
-    Nu = basis_functions(span_u, u, surf.degree_u, surf.knots_u)
-    Nv = basis_functions(span_v, v, surf.degree_v, surf.knots_v)
+    Single canonical evaluator using the correct tensor-product Cox-de Boor
+    basis.  For non-rational surfaces this is numerically identical to the
+    known-good ``intersection._nurbs_surface_eval``.  For rational surfaces
+    (``surf.weights`` provided) the standard
+    ``Σ N_i N_j w_ij P_ij / Σ N_i N_j w_ij`` projection is applied.
+    """
+    u = float(u)
+    v = float(v)
+    n_u = surf.num_control_points_u - 1
+    n_v = surf.num_control_points_v - 1
+    span_u = find_span(n_u, surf.degree_u, u, surf.knots_u)
+    span_v = find_span(n_v, surf.degree_v, v, surf.knots_v)
 
-    result = np.zeros(surf.control_points.shape[2])
+    Nu = _basis_funcs(span_u, u, surf.degree_u, surf.knots_u)
+    Nv = _basis_funcs(span_v, v, surf.degree_v, surf.knots_v)
+
+    P = surf.control_points
+    W = surf.weights
+    dim = P.shape[2]
+    num = np.zeros(dim)
+    den = 0.0
     for i in range(surf.degree_u + 1):
+        idx_i = span_u - surf.degree_u + i
         for j in range(surf.degree_v + 1):
-            idx_i = span_u - surf.degree_u + i
             idx_j = span_v - surf.degree_v + j
-            result += Nu[i] * Nv[j] * surf.control_points[idx_i, idx_j]
+            wij = 1.0 if W is None else float(W[idx_i, idx_j])
+            coef = Nu[i] * Nv[j] * wij
+            num += coef * P[idx_i, idx_j]
+            den += coef
+    if W is None:
+        return num
+    if abs(den) < 1e-300:
+        return num
+    return num / den
 
-    return result
+
+# ---------------------------------------------------------------------------
+# GK-02 — Analytic surface derivatives + unit normal (rational-correct)
+# ---------------------------------------------------------------------------
+
+
+def surface_derivatives(surf: NurbsSurface, u: float, v: float,
+                        d: int = 2) -> np.ndarray:
+    """All partial derivatives S^(k,l) up to total order *d*.
+
+    Piegl & Tiller Algorithm A3.6 (B-spline tensor product) followed by the
+    rational quotient rule Algorithm A4.4 when ``surf.weights`` is present.
+
+    Returns an array ``SKL`` of shape ``(d+1, d+1, dim)`` where
+    ``SKL[k, l]`` is ``∂^{k+l} S / ∂u^k ∂v^l`` (entries with
+    ``k+l > d`` are zero).  The result is the *true* (un-normalised)
+    derivative and is rational-exact.
+    """
+    from math import comb
+
+    u = float(u)
+    v = float(v)
+    pu, pv = surf.degree_u, surf.degree_v
+    n_u = surf.num_control_points_u - 1
+    n_v = surf.num_control_points_v - 1
+    P = surf.control_points
+    W = surf.weights
+    dim = P.shape[2]
+
+    du = min(d, pu)
+    dv = min(d, pv)
+
+    span_u = find_span(n_u, pu, u, surf.knots_u)
+    span_v = find_span(n_v, pv, v, surf.knots_v)
+    ders_u = _basis_funcs_derivs(span_u, u, pu, surf.knots_u, du)
+    ders_v = _basis_funcs_derivs(span_v, v, pv, surf.knots_v, dv)
+
+    # Homogeneous derivative table A^(k,l) (numerator) and w^(k,l).
+    A = np.zeros((d + 1, d + 1, dim))
+    Wd = np.zeros((d + 1, d + 1))
+    for k in range(du + 1):
+        for l in range(dv + 1):
+            tmp_num = np.zeros(dim)
+            tmp_den = 0.0
+            for i in range(pu + 1):
+                idx_i = span_u - pu + i
+                for j in range(pv + 1):
+                    idx_j = span_v - pv + j
+                    wij = 1.0 if W is None else float(W[idx_i, idx_j])
+                    c = ders_u[k, i] * ders_v[l, j] * wij
+                    tmp_num += c * P[idx_i, idx_j]
+                    tmp_den += c
+            A[k, l] = tmp_num
+            Wd[k, l] = tmp_den
+
+    if W is None:
+        return A
+
+    # Rational quotient rule (Piegl & Tiller, Alg. A4.4).
+    SKL = np.zeros((d + 1, d + 1, dim))
+    for k in range(du + 1):
+        for l in range(dv + 1):
+            if k + l > d:
+                continue
+            v_ = A[k, l].copy()
+            for j in range(1, l + 1):
+                v_ = v_ - comb(l, j) * Wd[0, j] * SKL[k, l - j]
+            for i in range(1, k + 1):
+                v_ = v_ - comb(k, i) * Wd[i, 0] * SKL[k - i, l]
+                v2 = np.zeros(dim)
+                for j in range(1, l + 1):
+                    v2 = v2 + comb(l, j) * Wd[i, j] * SKL[k - i, l - j]
+                v_ = v_ - comb(k, i) * v2
+            SKL[k, l] = v_ / Wd[0, 0] if abs(Wd[0, 0]) > 1e-300 else v_
+    return SKL
+
+
+def surface_derivative(surf: NurbsSurface, u: float, v: float,
+                       ku: int = 1, kv: int = 0) -> np.ndarray:
+    """Mixed partial ∂^{ku+kv} S / ∂u^{ku} ∂v^{kv} at *(u, v)*.
+
+    Analytic (replaces the old finite-difference path).  Rational-correct.
+    """
+    if ku < 0 or kv < 0:
+        raise ValueError("derivative orders must be >= 0")
+    d = ku + kv
+    SKL = surface_derivatives(surf, u, v, d=max(1, d))
+    return SKL[ku, kv]
+
+
+def surface_normal(surf: NurbsSurface, u: float, v: float) -> np.ndarray:
+    """Unit surface normal n = (S_u x S_v) / |S_u x S_v| at *(u, v)*.
+
+    Uses the analytic first partials.  Falls back to a nearby parameter if the
+    cross product is degenerate (e.g. at a pole) so the result is still a
+    sensible unit vector.
+    """
+    SKL = surface_derivatives(surf, u, v, d=1)
+    su = SKL[1, 0][:3]
+    sv = SKL[0, 1][:3]
+    nrm = np.cross(su, sv)
+    mag = np.linalg.norm(nrm)
+    if mag > 1e-12:
+        return nrm / mag
+    # Degenerate (pole / coincident partials): nudge parameters and retry.
+    u0, u1 = float(surf.knots_u[surf.degree_u]), float(surf.knots_u[-surf.degree_u - 1])
+    v0, v1 = float(surf.knots_v[surf.degree_v]), float(surf.knots_v[-surf.degree_v - 1])
+    eps_u = (u1 - u0) * 1e-4 + 1e-9
+    eps_v = (v1 - v0) * 1e-4 + 1e-9
+    uu = min(max(u + eps_u, u0), u1)
+    vv = min(max(v + eps_v, v0), v1)
+    SKL2 = surface_derivatives(surf, uu, vv, d=1)
+    nrm = np.cross(SKL2[1, 0][:3], SKL2[0, 1][:3])
+    mag = np.linalg.norm(nrm)
+    if mag > 1e-12:
+        return nrm / mag
+    return np.array([0.0, 0.0, 1.0])
 
 
 def knot_insertion(curve: NurbsCurve, u: float, num_insertions: int = 1) -> NurbsCurve:
@@ -318,31 +617,188 @@ def direction(p1: np.ndarray, p2: np.ndarray, p3: np.ndarray) -> float:
     return np.cross(p2 - p1, p3 - p1)
 
 
-def make_circle_nurbs(center: np.ndarray, radius: float, num_control_points: int = 9) -> NurbsCurve:
-    if num_control_points < 3:
-        num_control_points = 3
-    if num_control_points % 2 == 0:
-        num_control_points += 1
+# ---------------------------------------------------------------------------
+# GK-04 — Exact rational quadratic circle / arc / ellipse
+# ---------------------------------------------------------------------------
 
-    degree = 2
-    n = num_control_points - 1
-    num_knots = n + degree + 1
 
-    control_points = np.zeros((num_control_points, 3))
-    knots = np.zeros(num_knots)
+def make_circle_nurbs(center: np.ndarray, radius: float,
+                       num_control_points: int = 9,
+                       x_axis: Optional[np.ndarray] = None,
+                       y_axis: Optional[np.ndarray] = None) -> NurbsCurve:
+    """Exact full circle as the standard rational quadratic 9-point NURBS.
 
-    angle_step = 2 * np.pi / (num_control_points - 1)
-    for i in range(num_control_points):
-        angle = i * angle_step
-        control_points[i] = center + radius * np.array([np.cos(angle), np.sin(angle), 0])
+    Four quadratic rational Bezier segments (Piegl & Tiller §7.5).  Control
+    points are the on-circle quadrant points and the square-corner shoulder
+    points; weights are ``[1, √2/2, 1, √2/2, 1, √2/2, 1, √2/2, 1]`` with
+    knot vector ``[0,0,0, ¼,¼, ½,½, ¾,¾, 1,1,1]``.  The curve is the *exact*
+    circle: every point is at distance ``radius`` from ``center`` and the
+    curve closes exactly (C(0) == C(1)).
 
-    knots[0:degree + 1] = 0.0
-    knots[-degree - 1:] = 1.0
+    The ``num_control_points`` argument is retained for signature
+    compatibility but is always the 9-point exact construction (any other
+    value would only yield an approximate polygonal "circle").
+    """
+    center = np.asarray(center, dtype=float).ravel()
+    if center.shape[0] < 3:
+        center = np.concatenate([center, np.zeros(3 - center.shape[0])])
+    center = center[:3]
 
-    internal_knots = np.linspace(0, 1, num_knots - 2 * (degree + 1) + 2)[1:-1]
-    knots[degree + 1:-degree - 1] = internal_knots
+    if x_axis is None:
+        x_axis = np.array([1.0, 0.0, 0.0])
+    if y_axis is None:
+        y_axis = np.array([0.0, 1.0, 0.0])
+    X = np.asarray(x_axis, dtype=float).ravel()[:3]
+    Y = np.asarray(y_axis, dtype=float).ravel()[:3]
+    X = X / (np.linalg.norm(X) + 1e-300)
+    Y = Y / (np.linalg.norm(Y) + 1e-300)
 
-    return NurbsCurve(degree=degree, control_points=control_points, knots=knots)
+    r = float(radius)
+    s = np.sqrt(2.0) / 2.0
+
+    # Local-frame offsets: quadrant points at radius r, shoulder points at the
+    # square corners (distance r in each axis ⇒ the rational curve passes
+    # exactly through the quadrant points).
+    offs = [
+        ( r,  0.0),
+        ( r,  r),
+        ( 0.0,  r),
+        (-r,  r),
+        (-r,  0.0),
+        (-r, -r),
+        ( 0.0, -r),
+        ( r, -r),
+        ( r,  0.0),
+    ]
+    cps = np.array([center + a * X + b * Y for (a, b) in offs])
+    weights = np.array([1.0, s, 1.0, s, 1.0, s, 1.0, s, 1.0])
+    knots = np.array([0.0, 0.0, 0.0,
+                      0.25, 0.25, 0.5, 0.5, 0.75, 0.75,
+                      1.0, 1.0, 1.0])
+    return NurbsCurve(degree=2, control_points=cps, knots=knots, weights=weights)
+
+
+def make_arc_nurbs(center: np.ndarray, radius: float,
+                    start_angle: float, end_angle: float,
+                    x_axis: Optional[np.ndarray] = None,
+                    y_axis: Optional[np.ndarray] = None) -> NurbsCurve:
+    """Exact rational quadratic circular arc on ``[start_angle, end_angle]``.
+
+    Implements the multi-segment rational arc of Piegl & Tiller §7.3
+    (Algorithm A7.1): split the sweep into ``ceil(Δθ / 90°)`` segments, each
+    an exact rational quadratic Bezier.  Every sampled point lies on the
+    circle of the given ``radius`` to machine precision and the arc subtends
+    exactly ``end_angle - start_angle``.
+    """
+    center = np.asarray(center, dtype=float).ravel()
+    if center.shape[0] < 3:
+        center = np.concatenate([center, np.zeros(3 - center.shape[0])])
+    center = center[:3]
+
+    if x_axis is None:
+        x_axis = np.array([1.0, 0.0, 0.0])
+    if y_axis is None:
+        y_axis = np.array([0.0, 1.0, 0.0])
+    X = np.asarray(x_axis, dtype=float).ravel()[:3]
+    Y = np.asarray(y_axis, dtype=float).ravel()[:3]
+    X = X / (np.linalg.norm(X) + 1e-300)
+    Y = Y / (np.linalg.norm(Y) + 1e-300)
+
+    r = float(radius)
+    theta = float(end_angle) - float(start_angle)
+    if abs(theta) < 1e-14:
+        raise ValueError("arc sweep must be non-zero")
+
+    n_seg = int(np.ceil(abs(theta) / (np.pi / 2.0) - 1e-12))
+    n_seg = max(1, n_seg)
+    dtheta = theta / n_seg
+    w_mid = np.cos(abs(dtheta) / 2.0)  # interior (shoulder) weight
+
+    def P(ang):
+        return center + r * (np.cos(ang) * X + np.sin(ang) * Y)
+
+    def T(ang):
+        # unit tangent direction (d/dθ of P)
+        return -np.sin(ang) * X + np.cos(ang) * Y
+
+    cps = [P(float(start_angle))]
+    weights = [1.0]
+    a0 = float(start_angle)
+    for k in range(n_seg):
+        a1 = a0 + dtheta
+        p0 = P(a0)
+        p2 = P(a1)
+        t0 = T(a0)
+        t2 = T(a1)
+        # Intersection of the two end tangents = the shoulder control point.
+        # Solve p0 + alpha t0 = p2 - beta t2 in the local 2D frame.
+        M = np.array([
+            [np.dot(t0, X), -np.dot(t2, X)],
+            [np.dot(t0, Y), -np.dot(t2, Y)],
+        ])
+        rhs = np.array([
+            np.dot(p2 - p0, X),
+            np.dot(p2 - p0, Y),
+        ])
+        try:
+            alpha = np.linalg.solve(M, rhs)[0]
+        except np.linalg.LinAlgError:
+            alpha = 0.0
+        shoulder = p0 + alpha * t0
+        cps.append(shoulder)
+        weights.append(w_mid)
+        cps.append(p2)
+        weights.append(1.0)
+        a0 = a1
+
+    cps = np.array(cps)
+    weights = np.array(weights)
+
+    # Clamped degree-2 knot vector: triple at ends, double at each interior
+    # segment boundary, parameterised uniformly on [0, 1].
+    knots = [0.0, 0.0, 0.0]
+    for k in range(1, n_seg):
+        t = k / n_seg
+        knots += [t, t]
+    knots += [1.0, 1.0, 1.0]
+    return NurbsCurve(degree=2, control_points=cps,
+                      knots=np.array(knots, dtype=float), weights=weights)
+
+
+def make_ellipse_nurbs(center: np.ndarray, a: float, b: float,
+                        x_axis: Optional[np.ndarray] = None,
+                        y_axis: Optional[np.ndarray] = None) -> NurbsCurve:
+    """Exact full ellipse as a rational quadratic 9-point NURBS.
+
+    Built by anisotropically scaling the unit circle's control net by the
+    semi-axes ``a`` (along ``x_axis``) and ``b`` (along ``y_axis``).  The
+    weight vector is the circle's; a rational quadratic NURBS is closed under
+    affine maps, so the result is the *exact* ellipse
+    ``(x/a)² + (y/b)² = 1``.
+    """
+    circ = make_circle_nurbs(center, 1.0, x_axis=x_axis, y_axis=y_axis)
+    center = np.asarray(center, dtype=float).ravel()
+    if center.shape[0] < 3:
+        center = np.concatenate([center, np.zeros(3 - center.shape[0])])
+    center = center[:3]
+
+    if x_axis is None:
+        x_axis = np.array([1.0, 0.0, 0.0])
+    if y_axis is None:
+        y_axis = np.array([0.0, 1.0, 0.0])
+    X = np.asarray(x_axis, dtype=float).ravel()[:3]
+    Y = np.asarray(y_axis, dtype=float).ravel()[:3]
+    X = X / (np.linalg.norm(X) + 1e-300)
+    Y = Y / (np.linalg.norm(Y) + 1e-300)
+
+    new_cps = np.zeros_like(circ.control_points)
+    for i, cp in enumerate(circ.control_points):
+        local = cp - center
+        u = np.dot(local, X)
+        w = np.dot(local, Y)
+        new_cps[i] = center + (float(a) * u) * X + (float(b) * w) * Y
+    return NurbsCurve(degree=2, control_points=new_cps,
+                      knots=circ.knots.copy(), weights=circ.weights.copy())
 
 
 def make_line_nurbs(p1: np.ndarray, p2: np.ndarray) -> NurbsCurve:
@@ -374,6 +830,11 @@ def nurbs_to_occt_curve(curve: NurbsCurve):
         for i in range(num_knots):
             mults.SetValue(i + 1, 1)
 
+        if curve.weights is not None:
+            warr = TColStd_Array1OfReal(1, num_poles)
+            for i, wv in enumerate(curve.weights):
+                warr.SetValue(i + 1, float(wv))
+            return Geom_BSplineCurve(poles, warr, knots, mults, degree, False)
         return Geom_BSplineCurve(poles, knots, mults, degree, False)
     except ImportError:
         return None

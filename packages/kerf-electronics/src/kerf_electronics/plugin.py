@@ -140,6 +140,7 @@ def _register_tools(ctx, provides: list) -> None:
         "kerf_electronics.gatedrive.tools",
         "kerf_electronics.linkbudget.tools",
         "kerf_electronics.dataconv.tools",
+        "kerf_electronics.elecsafety.tools",
     ]
 
     for module_path in tool_modules:

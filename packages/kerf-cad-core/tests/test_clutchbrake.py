@@ -650,6 +650,7 @@ from kerf_cad_core.clutchbrake.design import (  # noqa: E402
     cone_clutch_torque as _ref_cone,
     band_brake_torque as _ref_band,
     disc_brake_torque as _ref_caliper,
+    drum_brake_torque as _ref_drum,
     engagement_energy as _ref_energy,
 )
 
@@ -719,3 +720,63 @@ class TestClutchBrakeExternalReferences:
         r = _ref_cone(2000.0, 0.3, 0.08, 0.05, 12.0, method="uniform-pressure")
         rm = (2.0 / 3.0) * (0.08 ** 3 - 0.05 ** 3) / (0.08 ** 2 - 0.05 ** 2)
         assert r["r_mean_m"] == pytest.approx(rm, rel=1e-12)
+
+    # ----- Drum brake long-shoe (Shigley 10th ed., §16-3) -------------------
+    # Closed-form moments for a sinusoidal pressure distribution
+    #   p(θ) = p_max·sinθ / sin θ_a  with pivot at distance a from drum centre:
+    #     M_N = (p_max·b·r·a / sin θ_a)·[θ/2 − sin2θ/4]_{θ1}^{θ2}   (Eq 16-2)
+    #     M_f = (μ·p_max·b·r / sin θ_a)·[−r·cosθ − (a/2)sin²θ]       (Eq 16-3)
+    #     T   = (μ·p_max·b·r² / sin θ_a)·(cosθ1 − cosθ2)             (Eq 16-6)
+
+    @staticmethod
+    def _shigley_drum(r, b, mu, pa, t1_deg, t2_deg, a):
+        th1 = math.radians(t1_deg)
+        th2 = math.radians(t2_deg)
+        tha = math.radians(90.0)
+        sin_a = math.sin(tha) if th1 <= tha <= th2 else max(math.sin(th1), math.sin(th2))
+        k = pa * b * r / sin_a
+        m_n = k * a * ((th2 / 2 - math.sin(2 * th2) / 4)
+                       - (th1 / 2 - math.sin(2 * th1) / 4))
+        ff = lambda t: -r * math.cos(t) - (a / 2.0) * math.sin(t) ** 2  # noqa: E731
+        m_f = k * mu * (ff(th2) - ff(th1))
+        T = k * mu * r * (math.cos(th1) - math.cos(th2))
+        return m_n, m_f, T
+
+    def test_drum_long_shoe_moments_shigley_16_3(self):
+        # Shigley §16-3 long-shoe closed form, p_max at θ=90° (in arc).
+        r, b, mu, pa, t1, t2, a = 0.150, 0.032, 0.32, 1.0e6, 0.0, 126.0, 0.165
+        m_n, m_f, T = self._shigley_drum(r, b, mu, pa, t1, t2, a)
+        res = _ref_drum(r, b, mu, pa, t1, t2, a, shoe_type="leading")
+        assert res["M_n"] == pytest.approx(m_n, rel=1e-9)
+        assert res["M_f"] == pytest.approx(m_f, rel=1e-9)
+        assert res["torque_Nm"] == pytest.approx(T, rel=1e-9)
+        # Hand value: M_N ≈ 1059.16 N·m (positive — not self-locking).
+        assert res["M_n"] == pytest.approx(1059.159, rel=1e-4)
+        assert res["torque_Nm"] == pytest.approx(365.826, rel=1e-4)
+
+    def test_drum_normal_moment_positive_at_theta1_zero(self):
+        # Regression: with θ1=0 the normal-force moment must remain > 0
+        # (the legacy r-based integral gave a spurious negative M_n → false
+        # self-lock). Shigley Eq 16-2 ∝ a·∫sin²θ ≥ 0.
+        res = _ref_drum(0.15, 0.04, 0.35, 1.0e6, 0.0, 120.0, 0.15, shoe_type="leading")
+        assert res["M_n"] > 0.0
+        assert math.isfinite(res["actuating_F_N"])
+        assert res["actuating_F_N"] > 0.0
+
+    def test_drum_pivot_near_centre_limit(self):
+        # Shigley §16-3 limit: as a→0 (pivot toward drum centre) M_N→0 and
+        # M_f → brake torque T. Use a small pivot offset (a>0 is required by
+        # the API) to verify the limiting behaviour.
+        a = 1.0e-6
+        res = _ref_drum(0.20, 0.05, 0.30, 8.0e5, 10.0, 75.0, a, shoe_type="trailing")
+        # M_N ∝ a → vanishes as a→0; M_f → brake torque T.
+        assert abs(res["M_n"]) < 1e-2
+        assert res["M_n"] < res["M_f"] * 1e-3
+        assert res["M_f"] == pytest.approx(res["torque_Nm"], rel=1e-4)
+
+    def test_drum_self_energizing_reduces_actuation(self):
+        # Shigley Eqs 16-4/16-5: leading F·c = M_n−M_f < trailing M_n+M_f.
+        rl = _ref_drum(0.15, 0.04, 0.30, 1.0e6, 10.0, 120.0, 0.18, shoe_type="leading")
+        rt = _ref_drum(0.15, 0.04, 0.30, 1.0e6, 10.0, 120.0, 0.18, shoe_type="trailing")
+        assert rl["torque_Nm"] == pytest.approx(rt["torque_Nm"], rel=1e-12)
+        assert rl["actuating_F_N"] < rt["actuating_F_N"]

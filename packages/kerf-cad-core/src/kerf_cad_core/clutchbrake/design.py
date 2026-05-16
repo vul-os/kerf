@@ -482,7 +482,7 @@ def drum_brake_torque(
 ) -> dict:
     """
     Drum brake braking torque using the long-shoe (distributed pressure)
-    Shigley §16-8 formulation.
+    Shigley §16-3 formulation (Shigley 10th ed., Eqs 16-2, 16-3, 16-6).
 
     The contact pressure distribution is assumed:
         p(θ) = p_max × sin(θ) / sin(θ_max)
@@ -565,49 +565,47 @@ def drum_brake_torque(
     th_max_p = math.radians(90.0)
     sin_theta_max = math.sin(th_max_p) if th1 <= th_max_p <= th2 else max(math.sin(th1), math.sin(th2))
 
-    # Shigley Eq (16-18..16-22):
-    # M_n = b * r * p_max / sin_theta_max × [r/2*(θ2-θ1 - sin2θ2/2+sin2θ1/2) - a*(cosθ1-cosθ2)]
-    # M_f = b * r * p_max * mu / sin_theta_max × [r*(cosθ1-cosθ2) + a/2*(cos2θ2-cos2θ1) ... ]
-    # Torque: T = b * r² * p_max * mu / sin_theta_max * (cosθ1 - cosθ2)
-
-    # Normal moment integral: ∫(r*sin θ - a*sin²θ... )
-    # Using Shigley 16th ed Table 16-3 integrals:
-    # I_N = ∫[θ1..θ2] sin θ (r sin θ - a sin θ cos θ... ) ...
-    # Exact Shigley §16-8 for geometry where pivot is at distance a below drum centre:
-    # M_n = (p_max * b * r / sin_theta_max) * [r/2*(θ2-θ1) - r/4*(sin2θ2-sin2θ1) - a*(cosθ1-cosθ2) ... ]
-    # This is the moment of normal forces about the pivot.
-
-    # Using Shigley Eqs 16-18 and 16-19 (standard long-shoe formulation):
-    # For a shoe with pivot at distance `a` from drum centre (perpendicular),
-    # the shoe face at drum radius r:
-    # Normal force moment about pivot:
-    #   M_n = (p_max * b * r / sin_theta_max) * INT1
-    #   INT1 = integral of sin(θ) * (r*sin(θ) - a) * ...
-    # Using the simplified form for pivot directly below drum centre:
-    #   M_n = (p_max * b * r / sin_theta_max) * [r*(θ2-θ1)/2 - r*(sin2θ2-sin2θ1)/4 - a*(cosθ1-cosθ2)]
-    # Friction moment:
-    #   M_f = (p_max * b * r * mu / sin_theta_max) * [r*(cosθ1-cosθ2) - a*(cos2θ2-cos2θ1)/2 ... ]
-    #   Simplified: M_f = (p_max*b*r*mu/sin_theta_max)*[r*(cosθ1-cosθ2) + a/2*(cos(2θ2)-cos(2θ1))]
+    # Shigley's Mechanical Engineering Design, 10th ed., §16-3,
+    # Eqs (16-2), (16-3), (16-4) — internal/external long-shoe drum brake
+    # with pivot at perpendicular distance `a` from the drum centre and a
+    # sinusoidal pressure distribution  p(θ) = p_max · sin θ / sin θ_a.
+    #
+    #   Moment of the normal forces about the pivot (Shigley Eq 16-2):
+    #     M_N = (p_max · b · r · a / sin θ_a) · ∫[θ1,θ2] sin²θ dθ
+    #         = (p_max · b · r · a / sin θ_a) · [θ/2 − sin 2θ / 4]_{θ1}^{θ2}
+    #
+    #   Moment of the friction forces about the pivot (Shigley Eq 16-3):
+    #     M_f = (μ · p_max · b · r / sin θ_a) · ∫[θ1,θ2] sin θ (r − a cos θ) dθ
+    #         = (μ · p_max · b · r / sin θ_a) · [−r cos θ − (a/2) sin²θ]_{θ1}^{θ2}
+    #
+    #   Brake torque about the drum centre (Shigley Eq 16-6):
+    #     T = (μ · p_max · b · r² / sin θ_a) · (cos θ1 − cos θ2)
+    #
+    # Degenerate check: with a = 0 (pivot at drum centre) M_N → 0 and
+    # M_f → T, as expected physically.
 
     pmax_b_r = p_max * b * r / sin_theta_max
 
-    # Normal moment integral (Shigley Eq 16-18 terms, pivot at distance a below drum center):
-    INT_n = (r / 2.0 * (th2 - th1)
-             - r / 4.0 * (math.sin(2 * th2) - math.sin(2 * th1))
-             - a * (math.cos(th1) - math.cos(th2)))
-    M_n = pmax_b_r * INT_n
+    # ∫ sin²θ dθ = θ/2 − sin(2θ)/4   (Shigley Eq 16-2 normal-force moment)
+    int_sin2 = ((th2 / 2.0 - math.sin(2.0 * th2) / 4.0)
+                - (th1 / 2.0 - math.sin(2.0 * th1) / 4.0))
+    M_n = pmax_b_r * a * int_sin2
 
-    # Friction moment integral (Shigley Eq 16-19):
-    INT_f = (r * (math.cos(th1) - math.cos(th2))
-             + a / 2.0 * (math.cos(2 * th2) - math.cos(2 * th1)))
-    M_f = pmax_b_r * mu * INT_f
+    # ∫ sin θ (r − a cos θ) dθ = [−r cos θ − (a/2) sin²θ]
+    #   (Shigley Eq 16-3 friction-force moment about the pivot)
+    def _Ff(t: float) -> float:
+        return -r * math.cos(t) - (a / 2.0) * math.sin(t) ** 2
 
-    # Torque (Shigley Eq 16-20):
+    M_f = pmax_b_r * mu * (_Ff(th2) - _Ff(th1))
+
+    # Torque (Shigley Eq 16-6):
     T = pmax_b_r * mu * r * (math.cos(th1) - math.cos(th2))
 
-    # Actuating force (Shigley Eq 16-21/16-22):
-    # Leading shoe: F * c = M_n - M_f (c = moment arm of actuating force, taken = a)
-    # Trailing shoe: F * c = M_n + M_f
+    # Actuating force (Shigley Eqs 16-4 / 16-5):
+    # Self-energizing (leading) shoe:  F · c = M_n - M_f
+    # Self-de-energizing (trailing):   F · c = M_n + M_f
+    # c = moment arm of the actuating force about the pivot; the standard
+    # textbook assumption c = a (actuator acts at the pivot offset).
     c = a  # actuating force arm = pivot distance (standard assumption)
 
     if stype == "leading":

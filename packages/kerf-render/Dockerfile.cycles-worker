@@ -1,0 +1,140 @@
+# ── Kerf Cycles Worker ────────────────────────────────────────────────────────
+#
+# Standalone render worker that calls Blender Cycles on behalf of a
+# self-hosted Kerf API.  Supports both GPU (CUDA) and CPU-only execution.
+#
+# Build args:
+#   GPU=true   (default) — base image carries CUDA runtime libs
+#   GPU=false             — plain Ubuntu 22.04; no CUDA dependency
+#
+# Build examples:
+#   docker build -f packages/kerf-render/Dockerfile.cycles-worker \
+#       --build-arg GPU=true  -t kerf/cycles-worker:gpu  .
+#   docker build -f packages/kerf-render/Dockerfile.cycles-worker \
+#       --build-arg GPU=false -t kerf/cycles-worker:cpu  .
+#
+# Run:
+#   docker run --gpus all \
+#       -e KERF_API_URL=https://my-kerf.example.com \
+#       -e KERF_API_TOKEN=<token> \
+#       kerf/cycles-worker:gpu
+#
+# BYO-Blender (skip the bundled install, use a host-mounted Blender):
+#   docker run -v /host/blender:/opt/blender:ro \
+#       -e KERF_BLENDER_PATH=/opt/blender/blender \
+#       -e KERF_API_URL=https://my-kerf.example.com \
+#       kerf/cycles-worker:cpu
+#
+# ─────────────────────────────────────────────────────────────────────────────
+
+ARG GPU=true
+
+# ── GPU base ──────────────────────────────────────────────────────────────────
+# nvidia/cuda:12.3.0-runtime-ubuntu22.04 bundles the CUDA runtime so Blender
+# Cycles can use OptiX / CUDA compute without a full toolkit install.
+FROM nvidia/cuda:12.3.0-runtime-ubuntu22.04 AS base-gpu
+
+# ── CPU-only base ─────────────────────────────────────────────────────────────
+# Plain Ubuntu 22.04 — no CUDA, smaller image.  Blender will fall back to
+# CPU rendering automatically.
+FROM ubuntu:22.04 AS base-cpu
+
+# ── Active base (selected by --build-arg GPU=true|false) ─────────────────────
+# shellcheck shell=bash
+FROM base-${GPU} AS base
+
+# ── System deps + Blender 4.x ────────────────────────────────────────────────
+#
+# Blender install strategy: download the official Linux tarball from
+# https://download.blender.org/release/ — the apt packages in Ubuntu 22.04
+# repos ship Blender 3.x which lacks Cycles 4.0 dispersion support.
+# We pin to 4.1.1 (latest stable at time of writing); update BLENDER_VER to
+# upgrade.  The tarball is ~300 MB; the final image layer is shared between
+# builds via Docker layer caching.
+#
+# To audit the checksum:
+#   sha256sum blender-4.1.1-linux-x64.tar.xz
+# (value recorded below; update when bumping version)
+#
+ARG BLENDER_VER=4.1.1
+ARG BLENDER_SHA256=SKIP
+# Set BLENDER_SHA256 to the official value to enable verification:
+#   ARG BLENDER_SHA256=<hex>
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        # Blender runtime deps (minimal set for headless -b mode)
+        libxi6 \
+        libxrender1 \
+        libgl1 \
+        libglib2.0-0 \
+        libsm6 \
+        libxext6 \
+        libxxf86vm1 \
+        libx11-6 \
+        # download + extract
+        curl \
+        xz-utils \
+        # Python toolchain for kerf-render install
+        python3.11 \
+        python3.11-venv \
+        python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Download Blender tarball
+RUN BLENDER_ARCHIVE="blender-${BLENDER_VER}-linux-x64.tar.xz" && \
+    BLENDER_URL="https://download.blender.org/release/Blender4.1/${BLENDER_ARCHIVE}" && \
+    curl -fsSL "${BLENDER_URL}" -o "/tmp/${BLENDER_ARCHIVE}" && \
+    if [ "${BLENDER_SHA256}" != "SKIP" ]; then \
+        echo "${BLENDER_SHA256}  /tmp/${BLENDER_ARCHIVE}" | sha256sum -c -; \
+    fi && \
+    tar -xJf "/tmp/${BLENDER_ARCHIVE}" -C /opt && \
+    mv "/opt/blender-${BLENDER_VER}-linux-x64" /opt/blender && \
+    ln -s /opt/blender/blender /usr/local/bin/blender && \
+    rm "/tmp/${BLENDER_ARCHIVE}"
+
+# ── Python deps + kerf-render ─────────────────────────────────────────────────
+#
+# We install into the system Python using uv (fast resolver) so the entrypoint
+# `python -m kerf_render.cycles_worker` resolves correctly.
+#
+# The monorepo pyproject.toml is at the root; kerf-render is a workspace member.
+# We copy only what's needed for the render + core packages so that changes
+# to other plugins don't bust this layer.
+#
+COPY pyproject.toml README.md ./
+COPY packages/kerf-render/  ./packages/kerf-render/
+COPY packages/kerf-core/    ./packages/kerf-core/
+
+RUN pip install --no-cache-dir uv && \
+    uv pip install --system --no-cache \
+        "packages/kerf-render" \
+        "packages/kerf-core" \
+        httpx
+
+# ── Non-root user ─────────────────────────────────────────────────────────────
+RUN groupadd -r kerf && useradd -r -g kerf -s /bin/bash kerf
+
+WORKDIR /workspace
+RUN chown kerf:kerf /workspace
+
+# ── Copy entrypoint ───────────────────────────────────────────────────────────
+COPY packages/kerf-render/entrypoint.sh /usr/local/bin/kerf-cycles-entrypoint
+RUN chmod +x /usr/local/bin/kerf-cycles-entrypoint
+
+USER kerf
+
+# ── Environment defaults ──────────────────────────────────────────────────────
+# Override these at runtime with -e or in a .env file.
+ENV KERF_BLENDER_PATH=""
+ENV KERF_API_URL=""
+ENV KERF_API_TOKEN=""
+ENV KERF_WORKER_CONCURRENCY="1"
+ENV PYTHONUNBUFFERED=1
+
+# ── Health + entry ────────────────────────────────────────────────────────────
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD python3 -c "import kerf_render; print('ok')" || exit 1
+
+ENTRYPOINT ["/usr/local/bin/kerf-cycles-entrypoint"]

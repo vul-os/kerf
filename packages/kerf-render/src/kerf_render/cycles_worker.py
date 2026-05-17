@@ -248,6 +248,48 @@ def _run_blender(
 
 
 # ---------------------------------------------------------------------------
+# BYO-Blender resolution (T-106e self-host docker contract)
+# ---------------------------------------------------------------------------
+
+
+def resolve_blender_bin() -> str:
+    """Return the Blender binary to invoke, honouring self-host env vars.
+
+    Precedence: ``KERF_BLENDER_BIN`` (exported by the container
+    ``entrypoint.sh``) > ``KERF_BLENDER_PATH`` (operator-supplied BYO
+    path) > the bare ``"blender"`` command resolved from ``PATH``.
+    Empty-string values are ignored so an exported-but-empty var does not
+    shadow the fallback (paths with spaces are returned verbatim).
+    """
+    for var in ("KERF_BLENDER_BIN", "KERF_BLENDER_PATH"):
+        val = os.environ.get(var)
+        if val:
+            return val
+    return "blender"
+
+
+def run_blender(
+    script_path: str,
+    blender_bin: Optional[str] = None,
+) -> subprocess.CompletedProcess:
+    """Invoke Blender headlessly to execute ``script_path``.
+
+    This is the entry point the self-host docker image (T-106e) uses to
+    shell out to a bundled or BYO Blender.  ``blender_bin`` overrides
+    resolution; when ``None`` it is resolved via
+    :func:`resolve_blender_bin`.  Output is captured so the caller can
+    surface Blender errors; a finite timeout guards against hung renders.
+    """
+    bin_ = blender_bin or resolve_blender_bin()
+    return subprocess.run(
+        [bin_, "-b", "--python", script_path, "-noaudio"],
+        capture_output=True,
+        text=True,
+        timeout=600,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Blender script injection — tile-progress wrapper
 # ---------------------------------------------------------------------------
 
@@ -737,4 +779,6 @@ __all__ = [
     "CyclesWorkerConfig",
     "CyclesWorker",
     "compute_cache_key",
+    "resolve_blender_bin",
+    "run_blender",
 ]

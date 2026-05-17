@@ -14,34 +14,37 @@ kind values
   "frame_crush"  : 2-D lumped frame: bar elements with lumped mass at nodes;
                    crash into rigid wall.
 
-Integration scheme: central-difference explicit (leapfrog).
+Integration scheme: central-difference explicit (velocity Verlet / leapfrog).
 
   Start-up (n=0):
       Compute a[0] from initial x[0], v[0].
       v[1/2]   = v[0]   + a[0] * dt/2        (half-step velocity)
 
   Each step n = 0, 1, ...:
-      x[n+1]   = x[n]   + v[n+1/2] * dt      (position update)
-      a[n]     = F(x[n]) / m                  (acceleration at n)
-      v[n+3/2] = v[n+1/2] + a[n] * dt        (velocity update)
+      x[n+1]   = x[n]   + v[n+1/2] * dt      (position update FIRST)
+      a[n+1]   = F(x[n+1]) / m               (acceleration at NEW position)
+      v[n+3/2] = v[n+1/2] + a[n+1] * dt      (velocity update)
 
-  KE is computed using the mid-step velocity v[n+1/2] (before position update)
-  immediately after position update — it represents KE at step n.
+  This is the standard Belytschko/LS-DYNA explicit scheme: position first,
+  then forces at the new position, then velocity update.
 
-  Internal energy accumulation:
-      IE[n+1] = IE[n] + F_int(x[n]) · (x[n+1] - x[n])
+  Full-step (output) velocity:
+      v_full[n+1] = 0.5 * (v[n+1/2] + v[n+3/2])
 
-  This is the standard Belytschko/Hughes central-difference explicit scheme.
+  This gives the correct energy-conserving velocity for output.
 
 CFL stable time-step: dt = safety * L_min / c, c = sqrt(E/rho).
 For spring-mass: dt = safety * 2 / omega_max, omega_max = sqrt(k_eff_max / m_min).
+Wall penalty spring also enters CFL: omega_wall = sqrt(k_wall / m_node).
 
 Energy accounting
 -----------------
-  KE[n]  = 0.5 * sum(m_i * v_i[n+1/2]^2)    — mid-step velocity
-  IE[n]  += F_int[n] · dx[n]                  — incremental internal work
-  CE[n]  += |F_contact[n] · dx[n]|             — contact dissipation
-  For undamped elastic, elastic |ΔE_total / E_ref| < 1%
+  KE[n]  = 0.5 * sum(m_i * v_full_i[n]^2)    — full-step velocity
+  IE[n]  = sum over springs of (elastic PE + plastic dissipation)
+           elastic PE  = 0.5 * k * eps_e^2   (instantaneous)
+           plastic diss = sum of sigma_y * |d_eps_p|  (cumulative)
+  CE[n]  = sum over contact nodes of 0.5 * k_wall * gap^2  (instantaneous)
+  For undamped elastic, |ΔE_total / E_ref| < 1%
 
 Never raises; returns {"ok": False, "reason": ...} on error.
 Pure-Python — no numpy/scipy.
@@ -145,10 +148,11 @@ class _Spring1D:
 
     Spring force = k * (elastic_elongation),  capped by yield surface.
     eps_p accumulates plastic elongation.
+    W_plastic accumulates plastic dissipation energy (for IE accounting).
     Cowper-Symonds: effective yield = sy0 * (1 + (strain_rate/C)^(1/p))
     """
 
-    __slots__ = ("ki", "kj", "k", "sy0", "H", "C", "p", "eps_p")
+    __slots__ = ("ki", "kj", "k", "sy0", "H", "C", "p", "eps_p", "W_plastic")
 
     def __init__(self, ki: int, kj: int, k: float,
                  sy0: float = 1e30, H: float = 0.0,
@@ -160,13 +164,14 @@ class _Spring1D:
         self.H = H
         self.C = C
         self.p = p
-        self.eps_p = 0.0   # accumulated plastic elongation
+        self.eps_p = 0.0      # accumulated plastic elongation
+        self.W_plastic = 0.0  # cumulative plastic dissipation energy
 
     def force(self, x: list[float], v_half: list[float],
               dt: float) -> float:
         """
-        Return axial force on node kj (positive = tension pulling kj in + direction).
-        Updates plastic state in place.
+        Return axial force (positive = tension).
+        Updates plastic state and W_plastic in place.
         """
         delta_u = x[self.kj] - x[self.ki]          # total elongation
         delta_u_dot = v_half[self.kj] - v_half[self.ki]  # elongation rate
@@ -186,8 +191,15 @@ class _Spring1D:
         else:
             sign_f = _sign(f_trial)
             delta_lambda = (abs(f_trial) - fy) / (self.k + self.H)
+            self.W_plastic += fy * delta_lambda   # plastic dissipation
             self.eps_p += delta_lambda * sign_f
             return sign_f * fy
+
+    def elastic_pe(self, x: list[float]) -> float:
+        """Instantaneous elastic potential energy stored in this spring."""
+        delta_u = x[self.kj] - x[self.ki]
+        eps_e = delta_u - self.eps_p
+        return 0.5 * self.k * eps_e * eps_e
 
 
 # ===========================================================================
@@ -235,10 +247,21 @@ def _solve_spring_mass(
 
     # CFL time step: omega_max = sqrt(k_eff / m) for connected nodes
     # k_eff at node i = sum of springs attached to i
+    # Also include wall penalty spring stiffness in CFL.
     k_eff = [0.0] * N
     for sp in springs:
         k_eff[sp.ki] += sp.k
         k_eff[sp.kj] += sp.k
+
+    # Wall config
+    wall_pos = None
+    wall_penalty = 1e10
+    if wall_cfg:
+        wall_pos = float(wall_cfg.get("pos", 1e30))
+        wall_penalty = float(wall_cfg.get("penalty", 1e10))
+        # Include wall penalty in CFL: treat it as an additional spring
+        for i in free:
+            k_eff[i] += wall_penalty
 
     dt = float("inf")
     for i in free:
@@ -257,7 +280,7 @@ def _solve_spring_mass(
 
     # Initial conditions
     x = [0.0] * N
-    v = [0.0] * N   # current full-step velocity (used for startup half-step)
+    v = [0.0] * N   # full-step velocity at t=0
     if init_vel_raw:
         for i, vi in enumerate(init_vel_raw):
             if i < N:
@@ -267,22 +290,15 @@ def _solve_spring_mass(
         if d < N:
             v[d] = 0.0
 
-    # Wall config
-    wall_pos = None
-    wall_penalty = 1e10
-    if wall_cfg:
-        wall_pos = float(wall_cfg.get("pos", 1e30))
-        wall_penalty = float(wall_cfg.get("penalty", 1e10))
-
-    def _spring_forces(x_cur: list[float],
-                       v_cur: list[float]) -> list[float]:
+    def _spring_forces_only(x_cur: list[float],
+                            v_cur: list[float]) -> list[float]:
         """
         Compute nodal spring forces without advancing plastic state.
-        Returns list of length N.
+        Used for start-up acceleration only.
+        Returns list of length N (internal forces only, no wall).
         """
         f = [0.0] * N
         for sp in springs:
-            # Temporarily compute force without advancing state
             delta_u = x_cur[sp.kj] - x_cur[sp.ki]
             delta_u_dot = v_cur[sp.kj] - v_cur[sp.ki]
             f_trial = sp.k * (delta_u - sp.eps_p)
@@ -290,14 +306,8 @@ def _solve_spring_mass(
             if sp.C > 0.0:
                 fy = fy * (1.0 + (abs(delta_u_dot) / sp.C) ** (1.0 / sp.p))
             f_sp = f_trial if abs(f_trial) <= fy else _sign(f_trial) * fy
-            # Spring tension (f_sp > 0) pulls ki toward kj and kj toward ki
             f[sp.ki] += f_sp
             f[sp.kj] -= f_sp
-        if wall_pos is not None:
-            for i in free:
-                gap = x_cur[i] - wall_pos
-                if gap > 0.0:
-                    f[i] += -wall_penalty * gap
         return f
 
     def _advance_springs(x_cur: list[float],
@@ -309,97 +319,116 @@ def _solve_spring_mass(
         f = [0.0] * N
         for sp in springs:
             f_sp = sp.force(x_cur, v_cur, dt)
-            # Spring tension (f_sp > 0) pulls ki toward kj and kj toward ki
             f[sp.ki] += f_sp
             f[sp.kj] -= f_sp
         return f
 
     # -----------------------------------------------------------------------
     # Start-up half-step: v[1/2] = v[0] + a[0] * dt/2
+    # Forces at x[0] (which is zero — no initial deformation assumed)
     # -----------------------------------------------------------------------
-    f0 = _spring_forces(x, v)
+    f_startup = _spring_forces_only(x, v)
     a0 = [0.0] * N
+    if wall_pos is not None:
+        for i in free:
+            gap = x[i] - wall_pos
+            if gap > 0.0:
+                f_startup[i] += -wall_penalty * gap
     for i in free:
-        a0[i] = f0[i] / masses[i]
+        a0[i] = f_startup[i] / masses[i]
 
-    # v_half = v[0] + a[0]*dt/2
     v_half = [v[i] + a0[i] * dt * 0.5 for i in range(N)]
     for d in fixed_nodes:
         if d < N:
             v_half[d] = 0.0
 
     # -----------------------------------------------------------------------
-    # Energy at step 0
-    # KE uses v_half = v[1/2]
-    # IE = 0 at t=0
+    # Energy at step 0:
+    # KE[0] = 0.5 * m * v[0]^2  (full-step initial velocity)
+    # IE[0] = elastic PE at x[0] (zero, since x[0]=0 for all nodes)
+    # CE[0] = contact PE at x[0] (zero, since no nodes in contact at start)
     # -----------------------------------------------------------------------
-    KE0 = sum(0.5 * masses[i] * v_half[i] ** 2 for i in free)
+    KE0 = sum(0.5 * masses[i] * v[i] ** 2 for i in free)
+    IE0 = sum(sp.elastic_pe(x) + sp.W_plastic for sp in springs)
+    CE0 = 0.0
+    if wall_pos is not None:
+        for i in free:
+            gap = x[i] - wall_pos
+            if gap > 0.0:
+                CE0 += 0.5 * wall_penalty * gap * gap
 
     t_hist = [0.0]
     x_hist = [x[:]]
-    v_hist = [v_half[:]]
+    v_hist = [v_half[:]]     # store half-step velocities for trajectory output
     KE_hist = [KE0]
-    IE_hist = [0.0]
-    CE_hist = [0.0]
+    IE_hist = [IE0]
+    CE_hist = [CE0]
 
-    IE = 0.0
-    CE = 0.0
     t = 0.0
 
     # -----------------------------------------------------------------------
-    # Time-stepping loop
+    # Time-stepping loop  (Belytschko/LS-DYNA standard order):
+    #   1. x[n+1] = x[n] + v[n+1/2] * dt      (position update FIRST)
+    #   2. f = f_int(x[n+1]) + f_con(x[n+1])  (forces at NEW position)
+    #   3. a[n+1] = f / m
+    #   4. v[n+3/2] = v[n+1/2] + a[n+1] * dt  (velocity update)
+    #   5. v_full = 0.5 * (v[n+1/2] + v[n+3/2])  (full-step output velocity)
+    #   6. KE  = 0.5*m*v_full^2
+    #   7. IE  = elastic PE + cumulative plastic dissipation
+    #   8. CE  = instantaneous contact penalty spring PE
     # -----------------------------------------------------------------------
     for _step in range(n_steps):
-        # Internal forces at x[n] (advance plastic state)
-        f_int = _advance_springs(x, v_half)
+        v_half_before = v_half  # v[n+1/2]
 
-        # Contact forces at x[n]
-        f_con = [0.0] * N
-        if wall_pos is not None:
-            for i in free:
-                gap = x[i] - wall_pos
-                if gap > 0.0:
-                    f_con[i] = -wall_penalty * gap
-
-        # Total force
-        f_tot = [f_int[i] + f_con[i] for i in range(N)]
-
-        # Acceleration a[n] = f[n] / m
-        a = [0.0] * N
-        for i in free:
-            a[i] = f_tot[i] / masses[i]
-
-        # Position update: x[n+1] = x[n] + v[n+1/2] * dt
+        # Step 1: position update
         x_new = [x[i] + v_half[i] * dt for i in range(N)]
         for d in fixed_nodes:
             if d < N:
                 x_new[d] = 0.0
 
-        # --- Energy accounting ---
-        # dIE = F_int[n] · (x[n+1] - x[n])
-        # Sign convention: F_int here is the resisting force vector on each node
-        # Work done by spring forces on the system (going into stored energy)
-        dx = [x_new[i] - x[i] for i in range(N)]
-        dIE = -sum(f_int[i] * dx[i] for i in range(N))
-        IE += dIE
+        # Step 2: forces at NEW position
+        f_int = _advance_springs(x_new, v_half)   # advance plastic state
 
-        # Contact energy: work done against the penalty spring
-        # penalty force is restorative (-penalty*gap), so work into contact = -F_con·dx
-        dCE = -sum(f_con[i] * dx[i] for i in range(N))
-        CE += dCE
+        f_con = [0.0] * N
+        if wall_pos is not None:
+            for i in free:
+                gap = x_new[i] - wall_pos
+                if gap > 0.0:
+                    f_con[i] = -wall_penalty * gap
 
-        # Velocity update: v[n+3/2] = v[n+1/2] + a[n] * dt
+        f_tot = [f_int[i] + f_con[i] for i in range(N)]
+
+        # Step 3: acceleration
+        a = [0.0] * N
+        for i in free:
+            a[i] = f_tot[i] / masses[i]
+
+        # Step 4: velocity update
         v_half_new = [v_half[i] + a[i] * dt for i in range(N)]
         for d in fixed_nodes:
             if d < N:
                 v_half_new[d] = 0.0
 
+        # Step 5: full-step output velocity
+        v_full = [0.5 * (v_half_before[i] + v_half_new[i]) for i in range(N)]
+
+        # Step 6: KE at full-step velocity
+        KE = sum(0.5 * masses[i] * v_full[i] ** 2 for i in free)
+
+        # Step 7: IE = instantaneous elastic PE + cumulative plastic dissipation
+        IE = sum(sp.elastic_pe(x_new) + sp.W_plastic for sp in springs)
+
+        # Step 8: CE = instantaneous contact penalty PE
+        CE = 0.0
+        if wall_pos is not None:
+            for i in free:
+                gap = x_new[i] - wall_pos
+                if gap > 0.0:
+                    CE += 0.5 * wall_penalty * gap * gap
+
         x = x_new
         v_half = v_half_new
         t += dt
-
-        # KE at v[n+3/2]
-        KE = sum(0.5 * masses[i] * v_half[i] ** 2 for i in free)
 
         t_hist.append(t)
         x_hist.append(x[:])
@@ -408,9 +437,9 @@ def _solve_spring_mass(
         IE_hist.append(IE)
         CE_hist.append(CE)
 
-    # Energy conservation error
-    E_initial = KE_hist[0] + IE_hist[0]
-    E_final = KE_hist[-1] + IE_hist[-1]
+    # Energy conservation error (elastic only: KE + IE + CE)
+    E_initial = KE_hist[0] + IE_hist[0] + CE_hist[0]
+    E_final = KE_hist[-1] + IE_hist[-1] + CE_hist[-1]
     E_scale = max(abs(E_initial), abs(E_final), 1e-30)
     energy_error = abs(E_final - E_initial) / E_scale
 
@@ -520,6 +549,15 @@ def _solve_bar_wave(
                 f[inode] += impulse_force
         return f
 
+    # Helper: elastic PE of the whole bar at displacement x_cur
+    def _bar_elastic_pe(x_cur: list[float]) -> float:
+        pe = 0.0
+        for e in range(n_elem):
+            ni, nj = e, e + 1
+            du = x_cur[nj] - x_cur[ni]
+            pe += 0.5 * bar_k * du * du
+        return pe
+
     # Start-up: a[0] from f_int[x=0] + f_ext[t=0]
     f_int0 = _bar_internal_forces(x)
     f_ext0 = _ext_force(0.0)
@@ -531,50 +569,62 @@ def _solve_bar_wave(
     for d in fixed_dofs:
         v_half[d] = 0.0
 
-    KE0 = sum(0.5 * masses[i] * v_half[i] ** 2 for i in free)
+    # Initial energy: KE at v[0] (full-step), IE at x[0]=0
+    KE0 = sum(0.5 * masses[i] * v[i] ** 2 for i in free)
+    IE0 = _bar_elastic_pe(x)
 
     t_hist = [0.0]
     x_hist = [x[:]]
     v_hist = [v_half[:]]
     KE_hist = [KE0]
-    IE_hist = [0.0]
+    IE_hist = [IE0]
     CE_hist = [0.0]
 
-    IE = 0.0
+    # Track external work input (from impulse forces) for energy error check
+    W_ext = 0.0
     t = 0.0
     warnings_list: list[str] = []
 
     for _step in range(n_steps):
-        f_int = _bar_internal_forces(x)
-        f_ext = _ext_force(t)
+        v_half_before = v_half  # v[n+1/2]
 
-        f_tot = [f_int[i] + f_ext[i] for i in range(n_nodes)]
-
-        a = [0.0] * n_nodes
-        for i in free:
-            a[i] = f_tot[i] / masses[i]
-
-        # Position update
-        x_prev = x[:]
+        # Step 1: position update FIRST
         x_new = [x[i] + v_half[i] * dt for i in range(n_nodes)]
         for d in fixed_dofs:
             x_new[d] = 0.0
 
-        # Internal energy: work done against internal forces
-        dx = [x_new[i] - x_prev[i] for i in range(n_nodes)]
-        dIE = -sum(f_int[i] * dx[i] for i in range(n_nodes))
-        IE += dIE
+        # Step 2: forces at NEW position
+        f_int = _bar_internal_forces(x_new)
+        f_ext = _ext_force(t)   # external force still at current t
 
-        # Velocity update
+        f_tot = [f_int[i] + f_ext[i] for i in range(n_nodes)]
+
+        # Track external work input
+        dx = [x_new[i] - x[i] for i in range(n_nodes)]
+        W_ext += sum(f_ext[i] * dx[i] for i in range(n_nodes))
+
+        # Step 3: acceleration
+        a = [0.0] * n_nodes
+        for i in free:
+            a[i] = f_tot[i] / masses[i]
+
+        # Step 4: velocity update
         v_half_new = [v_half[i] + a[i] * dt for i in range(n_nodes)]
         for d in fixed_dofs:
             v_half_new[d] = 0.0
 
+        # Step 5: full-step output velocity
+        v_full = [0.5 * (v_half_before[i] + v_half_new[i]) for i in range(n_nodes)]
+
+        # Step 6: KE at full-step velocity
+        KE = sum(0.5 * masses[i] * v_full[i] ** 2 for i in free)
+
+        # Step 7: IE = instantaneous elastic PE of the bar
+        IE = _bar_elastic_pe(x_new)
+
         x = x_new
         v_half = v_half_new
         t += dt
-
-        KE = sum(0.5 * masses[i] * v_half[i] ** 2 for i in free)
 
         t_hist.append(t)
         x_hist.append(x[:])
@@ -585,8 +635,9 @@ def _solve_bar_wave(
 
     E_initial = KE_hist[0] + IE_hist[0]
     E_final = KE_hist[-1] + IE_hist[-1]
-    E_scale = max(abs(E_initial), abs(E_final), 1e-30)
-    energy_error = abs(E_final - E_initial) / E_scale
+    # For the bar wave test with impulse, account for external work
+    E_scale = max(abs(E_initial + W_ext), abs(E_final), 1e-30)
+    energy_error = abs(E_final - (E_initial + W_ext)) / E_scale
 
     return {
         "ok": True,
@@ -728,8 +779,29 @@ def _solve_frame_crush(
             node_masses[bar.ni] += m_elem * 0.5
             node_masses[bar.nj] += m_elem * 0.5
 
-    # CFL
+    # Wall config (needed before CFL so penalty enters dt calculation)
+    wall_pos = None
+    wall_penalty = 1e10
+    wall_axis = 0  # 0 = x-direction, 1 = y-direction
+    if wall_cfg:
+        wall_pos = float(wall_cfg.get("pos", 1e30))
+        wall_penalty = float(wall_cfg.get("penalty", 1e10))
+        wall_axis = int(wall_cfg.get("axis", 0))
+
+    # CFL: include wall penalty spring stiffness
     dt = _cfl_dt(L_min, E, rho, safety)
+    if wall_pos is not None:
+        # Find minimum mass among free nodes touching potential contact direction
+        m_min_free = float("inf")
+        for nm in node_masses:
+            if nm > 0.0 and nm < m_min_free:
+                m_min_free = nm
+        if m_min_free < float("inf"):
+            omega_wall = math.sqrt(wall_penalty / m_min_free)
+            dt_wall = safety * 2.0 / omega_wall
+            if dt_wall < dt:
+                dt = dt_wall
+
     n_steps = max(1, int(math.ceil(duration / dt)))
     dt = duration / n_steps
 
@@ -750,15 +822,6 @@ def _solve_frame_crush(
         vel_val = float(entry[1])
         if 0 <= dof_idx < n_dofs and dof_idx not in fixed_dofs:
             v[dof_idx] = vel_val
-
-    # Wall
-    wall_pos = None
-    wall_penalty = 1e10
-    wall_axis = 0  # 0 = x-direction, 1 = y-direction
-    if wall_cfg:
-        wall_pos = float(wall_cfg.get("pos", 1e30))
-        wall_penalty = float(wall_cfg.get("penalty", 1e10))
-        wall_axis = int(wall_cfg.get("axis", 0))
 
     def _frame_int_forces(x_cur: list[float]) -> list[float]:
         f = [0.0] * n_dofs
@@ -788,6 +851,45 @@ def _solve_frame_crush(
                 f[axis_dof] += -wall_penalty * gap
         return f
 
+    def _wall_contact_pe(x_cur: list[float]) -> float:
+        """Instantaneous contact penalty spring potential energy."""
+        pe = 0.0
+        if wall_pos is None:
+            return pe
+        for node_i in range(n_nodes):
+            axis_dof = 2 * node_i + wall_axis
+            if axis_dof in fixed_dofs:
+                continue
+            if wall_axis == 0:
+                coord = node_X[node_i] + x_cur[2 * node_i]
+            else:
+                coord = node_Y[node_i] + x_cur[2 * node_i + 1]
+            gap = coord - wall_pos
+            if gap > 0.0:
+                pe += 0.5 * wall_penalty * gap * gap
+        return pe
+
+    def _frame_elastic_pe(x_cur: list[float]) -> float:
+        """Instantaneous elastic PE of all bar elements (no plasticity for frame_crush)."""
+        pe = 0.0
+        for bar in bars:
+            ni, nj = bar.ni, bar.nj
+            xi = node_X[ni] + x_cur[2 * ni]
+            yi = node_Y[ni] + x_cur[2 * ni + 1]
+            xj = node_X[nj] + x_cur[2 * nj]
+            yj = node_Y[nj] + x_cur[2 * nj + 1]
+            dxd = xj - xi
+            dyd = yj - yi
+            Ld = math.sqrt(dxd * dxd + dyd * dyd)
+            if Ld < 1e-14:
+                continue
+            eps_total = (Ld - bar.L0) / bar.L0
+            eps_e = eps_total - bar.eps_p
+            sigma_e = bar.E * eps_e
+            # Elastic PE = 0.5 * sigma_e * eps_e * A * L0
+            pe += 0.5 * sigma_e * eps_e * bar.A * bar.L0
+        return pe
+
     # Start-up
     f_int0 = _frame_int_forces(x)
     f_wal0 = _wall_forces(x)
@@ -801,54 +903,64 @@ def _solve_frame_crush(
         if d < n_dofs:
             v_half[d] = 0.0
 
-    KE0 = sum(0.5 * dof_masses[i] * v_half[i] ** 2
+    # Initial energy: KE at v[0], IE at x[0], CE at x[0]
+    KE0 = sum(0.5 * dof_masses[i] * v[i] ** 2
               for i in free_dofs if dof_masses[i] > 0.0)
+    IE0 = _frame_elastic_pe(x)
+    CE0 = _wall_contact_pe(x)
 
     t_hist = [0.0]
     x_hist = [x[:]]
     v_hist = [v_half[:]]
     KE_hist = [KE0]
-    IE_hist = [0.0]
-    CE_hist = [0.0]
+    IE_hist = [IE0]
+    CE_hist = [CE0]
 
-    IE = 0.0
-    CE = 0.0
     t = 0.0
 
     for _step in range(n_steps):
-        f_int = _frame_int_forces(x)
-        f_wal = _wall_forces(x)
+        v_half_before = v_half  # v[n+1/2]
 
-        f_tot = [f_int[i] + f_wal[i] for i in range(n_dofs)]
-
-        a = [0.0] * n_dofs
-        for i in free_dofs:
-            if dof_masses[i] > 0.0:
-                a[i] = f_tot[i] / dof_masses[i]
-
-        x_prev = x[:]
+        # Step 1: position update FIRST
         x_new = [x[i] + v_half[i] * dt for i in range(n_dofs)]
         for d in fixed_dofs:
             if d < n_dofs:
                 x_new[d] = 0.0
 
-        dx = [x_new[i] - x_prev[i] for i in range(n_dofs)]
-        dIE = -sum(f_int[i] * dx[i] for i in range(n_dofs))
-        IE += dIE
-        dCE = -sum(f_wal[i] * dx[i] for i in range(n_dofs))
-        CE += dCE
+        # Step 2: forces at NEW position
+        f_int = _frame_int_forces(x_new)
+        f_wal = _wall_forces(x_new)
 
+        f_tot = [f_int[i] + f_wal[i] for i in range(n_dofs)]
+
+        # Step 3: acceleration
+        a = [0.0] * n_dofs
+        for i in free_dofs:
+            if dof_masses[i] > 0.0:
+                a[i] = f_tot[i] / dof_masses[i]
+
+        # Step 4: velocity update
         v_half_new = [v_half[i] + a[i] * dt for i in range(n_dofs)]
         for d in fixed_dofs:
             if d < n_dofs:
                 v_half_new[d] = 0.0
 
+        # Step 5: full-step output velocity
+        v_full = [0.5 * (v_half_before[i] + v_half_new[i]) for i in range(n_dofs)]
+
+        # Step 6: KE at full-step velocity
+        KE = sum(0.5 * dof_masses[i] * v_full[i] ** 2
+                 for i in free_dofs if dof_masses[i] > 0.0)
+
+        # Step 7: IE = instantaneous elastic PE of bars
+        IE = _frame_elastic_pe(x_new)
+
+        # Step 8: CE = instantaneous contact PE
+        CE = _wall_contact_pe(x_new)
+
         x = x_new
         v_half = v_half_new
         t += dt
-
-        KE = sum(0.5 * dof_masses[i] * v_half[i] ** 2
-                 for i in free_dofs if dof_masses[i] > 0.0)
 
         t_hist.append(t)
         x_hist.append(x[:])
@@ -857,8 +969,8 @@ def _solve_frame_crush(
         IE_hist.append(IE)
         CE_hist.append(CE)
 
-    E_initial = KE_hist[0] + IE_hist[0]
-    E_final = KE_hist[-1] + IE_hist[-1]
+    E_initial = KE_hist[0] + IE_hist[0] + CE_hist[0]
+    E_final = KE_hist[-1] + IE_hist[-1] + CE_hist[-1]
     E_scale = max(abs(E_initial), abs(E_final), 1e-30)
     energy_error = abs(E_final - E_initial) / E_scale
 

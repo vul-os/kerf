@@ -1092,6 +1092,13 @@ export const useWorkspace = create((set, get) => ({
       part: 'untitled.part',
       circuit: 'untitled.circuit.tsx',
       feature: 'untitled.feature',
+      equations: 'params.equations',
+      section: 'untitled.section',
+      cam_layered: 'untitled.cam',
+      tool: 'untitled.tool',
+      plc_st: 'untitled.plc.st',
+      quadmesh: 'untitled.quadmesh',
+      wiring: 'untitled.wiring',
     }
     let seedContent = ''
     if (kind === 'assembly') seedContent = '{"components":[]}'
@@ -1101,7 +1108,12 @@ export const useWorkspace = create((set, get) => ({
     else if (kind === 'circuit') seedContent = DEFAULT_CIRCUIT
     else if (kind === 'feature') seedContent = '{"features":[]}'
     else if (kind === 'equations') seedContent = JSON.stringify({ version: 1, params: [] }, null, 2)
-    if (!defaults.equations) defaults.equations = 'params.equations'
+    else if (kind === 'section') seedContent = '{"version":1,"plane":"XY","curves":[]}'
+    else if (kind === 'cam_layered') seedContent = '{"version":1,"layers":[]}'
+    else if (kind === 'tool') seedContent = '{"version":1,"tools":[]}'
+    else if (kind === 'plc_st') seedContent = '(* New PLC program — IEC 61131-3 Structured Text *)\n'
+    else if (kind === 'quadmesh') seedContent = '{"version":1,"vertices":[],"quads":[],"triangles":[],"stats":{}}'
+    else if (kind === 'wiring') seedContent = 'connectors:\n\ncables:\n\nconnections:\n'
     try {
       const created = await api.createFile(projectId, {
         name: defaults[kind] || 'untitled',

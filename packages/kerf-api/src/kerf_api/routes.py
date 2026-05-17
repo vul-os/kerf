@@ -1326,6 +1326,19 @@ class CreateFileRequest(BaseModel):
     content: Optional[str] = None
 
 
+# Canonical file-kind allow-list. MUST stay in sync with the
+# files_kind_check DB constraint (latest migration: 061_kind_wiring.sql)
+# and the FileTree "+ New" menu KIND_ORDER. Module-level so tests can
+# import and assert the menu set is a subset.
+FILE_KINDS = (
+    "file", "folder", "assembly", "step", "drawing", "sketch", "part",
+    "feature", "circuit", "equations", "material", "simulation", "script",
+    "step-ref", "assembly_lock", "canvas", "schedule", "view", "sheet",
+    "duct", "pipe", "conduit", "subd", "mesh", "render", "section",
+    "cam_layered", "tool", "plc_st", "quadmesh", "print", "gem", "wiring",
+)
+
+
 @router.post("/projects/{pid}/files")
 async def create_file(pid: str, req: CreateFileRequest, payload: dict = Depends(require_auth)):
     user_id = payload.get("sub")
@@ -1343,8 +1356,7 @@ async def create_file(pid: str, req: CreateFileRequest, payload: dict = Depends(
         if not req.name:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="name is required")
 
-        valid_kinds = ("file", "folder", "assembly", "drawing", "sketch", "part", "feature", "circuit", "equations", "script", "fem", "cam")
-        if req.kind not in valid_kinds:
+        if req.kind not in FILE_KINDS:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid kind")
 
         content = req.content or ""

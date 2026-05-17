@@ -1,0 +1,50 @@
+name: Publish kerf-sdk (PyPI)
+
+# Publishes packages/kerf-sdk to PyPI via OIDC Trusted Publishing — no
+# API token is stored anywhere. Fires on sdk-py-v* tags (parallel to the
+# Rust SDK's sdk-rs-v* scheme). These tags do NOT match release.yml's
+# `v*` trigger, so a SDK release never kicks off the Docker release.
+#
+# One-time PyPI setup (pending publisher — works before the project
+# exists, independent of any PyPI organization):
+#   https://pypi.org/manage/account/publishing/
+#     PyPI Project Name : kerf-sdk
+#     Owner             : kerf-sh
+#     Repository name   : kerf
+#     Workflow name     : publish-sdk-py.yml
+#     Environment name  : (leave blank)
+#
+# Cut a release:
+#   git tag sdk-py-v0.1.0 && git push origin sdk-py-v0.1.0
+
+on:
+  push:
+    tags:
+      - 'sdk-py-v*'
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Build + publish kerf-sdk to PyPI
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # required for PyPI Trusted Publishing (OIDC)
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build sdist + wheel
+        run: |
+          python -m pip install --upgrade build
+          python -m build packages/kerf-sdk --outdir packages/kerf-sdk/dist
+
+      - name: Publish to PyPI (Trusted Publishing / OIDC)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: packages/kerf-sdk/dist

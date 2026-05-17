@@ -5,6 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "kerf-parts"
 version = "0.1.0"
+license = { text = "MIT" }
 description = "Contributor pipeline: fetch + convert pinned open-source CAD parts into Kerf's library (MIT; no data bundled)"
 requires-python = ">=3.11"
 # Pure stdlib + git subprocess. KiCad conversion reuses kerf-imports

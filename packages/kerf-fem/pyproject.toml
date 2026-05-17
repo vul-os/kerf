@@ -5,6 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "kerf-fem"
 version = "0.1.0"
+license = { text = "MIT" }
 description = "Finite-element analysis plugin for Kerf"
 requires-python = ">=3.11"
 dependencies = [

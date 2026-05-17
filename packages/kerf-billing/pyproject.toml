@@ -7,7 +7,7 @@ name = "kerf-billing"
 version = "0.1.0"
 description = "Kerf billing plugin: Paystack payments (cloud-only)"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+license = { text = "LicenseRef-Kerf-Cloud" }
 dependencies = [
     "fastapi>=0.111.0",
     "asyncpg>=0.29.0",

@@ -4,8 +4,8 @@ Kerf Cloud — Proprietary License
 Copyright (c) 2026 Imran Paruk. All rights reserved.
 
 This license applies to:
-  - all files under packages/kerf-cloud/**
-  - all files under packages/kerf-billing/**
+  - all files under this directory (cloud/**)
+  - all files under backend/cloud/**
   - all files under src/cloud/**
 
 These files are NOT covered by the MIT license at the repository root.

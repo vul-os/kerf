@@ -5,6 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "kerf-cam"
 version = "0.1.0"
+license = { text = "MIT" }
 description = "CAM toolpath-generation plugin for Kerf"
 requires-python = ">=3.11"
 dependencies = [

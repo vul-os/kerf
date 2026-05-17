@@ -7,7 +7,7 @@ name = "kerf-cloud"
 version = "0.1.0"
 description = "Kerf cloud plugin: git, GitHub OAuth, workshop (cloud-only)"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+license = { text = "LicenseRef-Kerf-Cloud" }
 dependencies = [
     "fastapi>=0.111.0",
     "asyncpg>=0.29.0",

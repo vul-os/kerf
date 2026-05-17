@@ -1,29 +1,56 @@
 /**
- * signup.spec.ts — sign-up + sign-in flow (cloud mode only).
+ * signup.spec.ts — sign-up + sign-in flow (cloud project).
  *
- * These tests only apply when KERF_LOCAL_MODE is NOT set (cloud build).
- * In local mode the app auto-bootstraps a singleton user and the /signup
- * route redirects immediately to /projects, making these assertions vacuous.
- *
- * TODO: wire up a real cloud-mode e2e environment (separate DATABASE_URL,
- * SMTP stub, etc.) then remove the skip.
+ * Runs under the Playwright `cloud` project, which boots a CLOUD_ENABLED
+ * kerf-server (no local singleton auto-login) so the real /signup and
+ * /login pages exist. Register returns tokens immediately (no email
+ * verification gate), then the app navigates to /projects.
  */
 
-import { test } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
+
+function uniqueEmail(tag: string) {
+  return `e2e-${tag}-${Date.now()}-${Math.floor(Math.random() * 1e4)}@kerf.test`
+}
+
+const PASSWORD = 'e2e-passw0rd!'
+
+async function expectProjectsPage(page: Page) {
+  // After auth the app navigates to /projects then redirects to the
+  // workspace-scoped /w/:slug/projects — assert on the UI, not the URL.
+  await expect(
+    page.getByRole('heading', { name: 'Projects' }),
+  ).toBeVisible({ timeout: 20_000 })
+}
 
 test.describe('Signup / signin (cloud mode)', () => {
-  test.skip(
-    !process.env.KERF_CLOUD_MODE,
-    'signup tests require KERF_CLOUD_MODE=true — skipped in local mode',
-  )
-
   test('fill signup form and redirect to /projects', async ({ page }) => {
+    const email = uniqueEmail('signup')
     await page.goto('/signup')
-    // TODO: implement
+
+    await page.getByLabel('Name').fill('E2E Tester')
+    await page.getByLabel('Email').fill(email)
+    await page.getByLabel('Password').fill(PASSWORD)
+    await page.getByRole('button', { name: 'Create account' }).click()
+
+    await expectProjectsPage(page)
   })
 
-  test('login with existing credentials and redirect to /projects', async ({ page }) => {
+  test('login with existing credentials and redirect to /projects', async ({
+    page,
+  }) => {
+    // Seed a user via the API (proxied through Vite → cloud backend).
+    const email = uniqueEmail('login')
+    const res = await page.request.post('/auth/register', {
+      data: { email, password: PASSWORD, name: 'E2E Login' },
+    })
+    expect(res.status()).toBe(201)
+
     await page.goto('/login')
-    // TODO: implement
+    await page.getByLabel('Email').fill(email)
+    await page.getByLabel('Password').fill(PASSWORD)
+    await page.getByRole('button', { name: 'Sign in' }).click()
+
+    await expectProjectsPage(page)
   })
 })

@@ -49,6 +49,32 @@ export default defineConfig({
     navigationTimeout: 30_000,
   },
 
+  // Two project profiles against two server stacks:
+  //   local — LOCAL_MODE singleton auto-login (:5174 → :8081)
+  //   cloud — CLOUD_ENABLED, real signup/login + Workshop/Library (:5175 → :8082)
+  // Specs that need the public auth surface / cloud features run under
+  // `cloud`; everything else under `local`.
+  projects: [
+    {
+      name: 'local',
+      testIgnore: [
+        '**/signup.spec.ts',
+        '**/library.spec.ts',
+        '**/workshop.spec.ts',
+      ],
+      use: { baseURL: 'http://localhost:5174' },
+    },
+    {
+      name: 'cloud',
+      testMatch: [
+        '**/signup.spec.ts',
+        '**/library.spec.ts',
+        '**/workshop.spec.ts',
+      ],
+      use: { baseURL: 'http://localhost:5175' },
+    },
+  ],
+
   // webServer boots a throwaway Vite dev server + kerf-server. If you
   // already have servers running on these ports (local dev) Playwright will
   // reuse them instead of starting new ones (reuseExistingServer=true when
@@ -88,6 +114,38 @@ export default defineConfig({
         'npx vite --port 5174 --host localhost',
       cwd: '../..',
       url: 'http://localhost:5174',
+      timeout: 60_000,
+      reuseExistingServer: !process.env.CI,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+    {
+      // Cloud backend on :8082 — CLOUD_ENABLED, no local auto-login, so the
+      // real /signup + /login surface and Workshop/Library routes exist.
+      // CLOUD_BETA=true keeps billing dormant (no Paystack needed for e2e).
+      command:
+        'KERF_PORT=8082 KERF_LOCAL_MODE=false LOCAL_MODE=false ' +
+        'CLOUD_ENABLED=true KERF_CLOUD_ENABLED=true ' +
+        'CLOUD_BETA=true KERF_CLOUD_BETA=true ' +
+        'CORS_ORIGIN=http://localhost:5175 ' +
+        (process.env.DATABASE_URL
+          ? `KERF_DATABASE_URL=${process.env.DATABASE_URL} ` +
+            `DATABASE_URL=${process.env.DATABASE_URL} `
+          : '') +
+        'python -m kerf_core --port 8082',
+      url: 'http://localhost:8082/health',
+      timeout: 60_000,
+      reuseExistingServer: !process.env.CI,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+    {
+      // Cloud frontend: Vite on :5175 (proxies /api + /auth to :8082)
+      command:
+        'VITE_API_URL=http://localhost:8082 ' +
+        'npx vite --port 5175 --host localhost',
+      cwd: '../..',
+      url: 'http://localhost:5175',
       timeout: 60_000,
       reuseExistingServer: !process.env.CI,
       stdout: 'pipe',

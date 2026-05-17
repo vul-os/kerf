@@ -1065,7 +1065,7 @@ const DrawingView = forwardRef(function DrawingView({
   }, [tool, annotations, clientToMm, setAnnDraft])
 
   return (
-    <div className="w-full h-full bg-ink-950 overflow-hidden relative">
+    <div className="w-full h-full max-w-full bg-ink-950 overflow-hidden relative">
       <svg
         ref={svgRef}
         width="100%"
@@ -1085,6 +1085,8 @@ const DrawingView = forwardRef(function DrawingView({
           cursor: tool !== 'pointer' ? 'crosshair' : (spaceHeld ? 'grab' : 'default'),
           touchAction: 'none',
           background: '#1c2030',
+          display: 'block',
+          maxWidth: '100%',
         }}
       >
         {/* Marker for arrowheads on dimension lines. */}
@@ -1420,51 +1422,75 @@ const DrawingView = forwardRef(function DrawingView({
       )}
 
       {/* Hint chip at the bottom — explains the current tool's flow. */}
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-md bg-ink-900/85 border border-ink-700 text-[11px] font-mono text-kerf-300 backdrop-blur shadow-lg">
+      <div
+        className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-md bg-ink-900/85 border border-ink-700 text-[11px] font-mono text-kerf-300 backdrop-blur shadow-lg pointer-events-none whitespace-nowrap overflow-hidden text-ellipsis max-w-[calc(100%-6rem)]"
+        aria-live="polite"
+        aria-atomic="true"
+      >
         {toolHint(tool, draft, measure, annDraft, dcLeaderDraft, dimChainDraft)}
       </div>
 
       {/* Sheet tab bar — bottom edge. Only renders when there's more than one
-          sheet OR when a sheet handler is wired (so a single-sheet drawing
-          can still surface the "+ New sheet" button). */}
+          sheet OR when a sheet handler is wired. On < sm the tabs collapse
+          to a native <select> to prevent horizontal overflow. */}
       {(sheets.length > 1 || onAddSheet) && (
-        <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center gap-1 px-3 py-1.5 bg-ink-900/85 border-t border-ink-700 backdrop-blur text-[11px]">
-          {sheets.map((s, i) => (
-            <button
-              key={s.id || i}
-              type="button"
-              onClick={() => onSelectSheet?.(i)}
-              onDoubleClick={() => {
-                if (sheets.length > 1 && confirm(`Delete sheet ${i + 1}?`)) onRemoveSheet?.(i)
-              }}
-              title={s.frame?.title || `Sheet ${i + 1}`}
-              className={`px-2 py-0.5 rounded font-mono transition-colors ${
-                i === sheetIdx
-                  ? 'bg-kerf-300 text-ink-950'
-                  : 'bg-ink-800 text-ink-300 hover:bg-ink-700 hover:text-kerf-300 border border-ink-700'
-              }`}
-            >
-              {s.frame?.title?.slice(0, 24) || `Sheet ${i + 1}`}
-            </button>
-          ))}
+        <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center gap-1 px-3 py-1.5 bg-ink-900/85 border-t border-ink-700 backdrop-blur text-[11px] overflow-hidden">
+          {/* Mobile dropdown (< sm) */}
+          <select
+            className="sm:hidden flex-1 min-w-0 h-7 bg-ink-800 border border-ink-700 rounded px-2 text-[11px] font-mono text-ink-200 focus-visible:ring-2 focus-visible:ring-kerf-300 focus-visible:outline-none"
+            value={sheetIdx}
+            onChange={(e) => onSelectSheet?.(Number(e.target.value))}
+            aria-label="Select sheet"
+          >
+            {sheets.map((s, i) => (
+              <option key={s.id || i} value={i}>
+                {s.frame?.title?.slice(0, 24) || `Sheet ${i + 1}`}
+              </option>
+            ))}
+          </select>
+          {/* Tablet and wider: scrollable tab strip */}
+          <div className="hidden sm:flex items-center gap-1 flex-1 min-w-0 overflow-x-auto scrollbar-none">
+            {sheets.map((s, i) => (
+              <button
+                key={s.id || i}
+                type="button"
+                onClick={() => onSelectSheet?.(i)}
+                onDoubleClick={() => {
+                  if (sheets.length > 1 && confirm(`Delete sheet ${i + 1}?`)) onRemoveSheet?.(i)
+                }}
+                title={s.frame?.title || `Sheet ${i + 1}`}
+                aria-label={`Sheet ${i + 1}${s.frame?.title ? `: ${s.frame.title}` : ''}`}
+                aria-pressed={i === sheetIdx}
+                className={`px-2 py-0.5 rounded font-mono transition-colors flex-shrink-0 focus-visible:ring-2 focus-visible:ring-kerf-300 focus-visible:outline-none ${
+                  i === sheetIdx
+                    ? 'bg-kerf-300 text-ink-950'
+                    : 'bg-ink-800 text-ink-300 hover:bg-ink-700 hover:text-kerf-300 border border-ink-700'
+                }`}
+              >
+                {s.frame?.title?.slice(0, 24) || `Sheet ${i + 1}`}
+              </button>
+            ))}
+          </div>
           {onAddSheet && (
             <button
               type="button"
               onClick={() => onAddSheet?.()}
+              aria-label="Add new sheet"
               title="New sheet"
-              className="ml-1 p-1 rounded bg-ink-800 text-ink-400 hover:text-kerf-300 hover:bg-ink-700 border border-ink-700"
+              className="ml-1 flex-shrink-0 p-1 rounded bg-ink-800 text-ink-400 hover:text-kerf-300 hover:bg-ink-700 border border-ink-700 focus-visible:ring-2 focus-visible:ring-kerf-300 focus-visible:outline-none"
             >
-              <Plus size={11} />
+              <Plus size={11} aria-hidden="true" />
             </button>
           )}
           {sheets.length > 1 && (
             <button
               type="button"
               onClick={() => onRemoveSheet?.(sheetIdx)}
+              aria-label="Delete current sheet"
               title="Delete this sheet"
-              className="ml-1 p-1 rounded bg-ink-800 text-ink-400 hover:text-amber-300 hover:bg-ink-700 border border-ink-700"
+              className="ml-1 flex-shrink-0 p-1 rounded bg-ink-800 text-ink-400 hover:text-amber-300 hover:bg-ink-700 border border-ink-700 focus-visible:ring-2 focus-visible:ring-kerf-300 focus-visible:outline-none"
             >
-              <XIcon size={11} />
+              <XIcon size={11} aria-hidden="true" />
             </button>
           )}
         </div>
@@ -2046,8 +2072,8 @@ function AnnotationGlyph({ ann, selected, onSelect, onDragStart, onHandleDown })
   const sw = ann.width ?? ANN_DEFAULT_WIDTH
   const dashed = ann.dashed ? '2,1.5' : undefined
   const cursor = 'pointer'
+  // Use Pointer Events so touch and stylus initiate drags correctly.
   const onMouseDown = (e) => {
-    // Only initiate drag on left button.
     if (e.button !== 0) return
     onDragStart?.(e)
   }
@@ -2056,7 +2082,7 @@ function AnnotationGlyph({ ann, selected, onSelect, onDragStart, onHandleDown })
     const fs = ann.fontSize || ANN_DEFAULT_TEXT_SIZE
     const color = ann.color || stroke
     return (
-      <g style={{ cursor }} onClick={onSelect} onMouseDown={onMouseDown}>
+      <g style={{ cursor }} onClick={onSelect} onPointerDown={onMouseDown}>
         <text
           x={ann.x} y={ann.y}
           fontSize={fs} fill={color}
@@ -2078,7 +2104,7 @@ function AnnotationGlyph({ ann, selected, onSelect, onDragStart, onHandleDown })
     const labelDx = side === 'left' ? -1 : 1
     const anchor = side === 'left' ? 'end' : 'start'
     return (
-      <g style={{ cursor }} onClick={onSelect} onMouseDown={onMouseDown}>
+      <g style={{ cursor }} onClick={onSelect} onPointerDown={onMouseDown}>
         <line x1={f.x} y1={f.y} x2={t.x} y2={t.y}
               stroke={stroke} strokeWidth={sw}
               vectorEffect="non-scaling-stroke"
@@ -2103,7 +2129,7 @@ function AnnotationGlyph({ ann, selected, onSelect, onDragStart, onHandleDown })
   if (ann.kind === 'polyline') {
     const pts = (ann.points || []).map((p) => `${p.x},${p.y}`).join(' ')
     return (
-      <g style={{ cursor }} onClick={onSelect} onMouseDown={onMouseDown}>
+      <g style={{ cursor }} onClick={onSelect} onPointerDown={onMouseDown}>
         <polyline
           points={pts}
           fill="none"
@@ -2124,7 +2150,7 @@ function AnnotationGlyph({ ann, selected, onSelect, onDragStart, onHandleDown })
     const x = ann.x ?? 0, y = ann.y ?? 0
     const w = ann.width ?? 0, h = ann.height ?? 0
     return (
-      <g style={{ cursor }} onClick={onSelect} onMouseDown={onMouseDown}>
+      <g style={{ cursor }} onClick={onSelect} onPointerDown={onMouseDown}>
         <rect x={x} y={y} width={w} height={h}
               fill={ann.fill || 'none'}
               stroke={stroke}
@@ -2145,7 +2171,7 @@ function AnnotationGlyph({ ann, selected, onSelect, onDragStart, onHandleDown })
   if (ann.kind === 'circle') {
     const cx = ann.cx ?? 0, cy = ann.cy ?? 0, r = ann.r ?? 0
     return (
-      <g style={{ cursor }} onClick={onSelect} onMouseDown={onMouseDown}>
+      <g style={{ cursor }} onClick={onSelect} onPointerDown={onMouseDown}>
         <circle cx={cx} cy={cy} r={r}
                 fill={ann.fill || 'none'}
                 stroke={stroke}
@@ -2173,7 +2199,7 @@ function AnnotationGlyph({ ann, selected, onSelect, onDragStart, onHandleDown })
     const w = Math.max(4, text.length * fs * 0.55) + padX * 2
     const h = fs + padY * 2
     return (
-      <g style={{ cursor }} onClick={onSelect} onMouseDown={onMouseDown}>
+      <g style={{ cursor }} onClick={onSelect} onPointerDown={onMouseDown}>
         <rect x={ann.x} y={ann.y - fs * 0.85} width={w} height={h}
           fill="rgba(255,253,235,0.9)" stroke={stroke} strokeWidth={0.25}
           vectorEffect="non-scaling-stroke" />
@@ -2189,7 +2215,7 @@ function AnnotationGlyph({ ann, selected, onSelect, onDragStart, onHandleDown })
     const num = String(ann.number ?? ann.text ?? '?')
     const r = ann.r || 4.5
     return (
-      <g style={{ cursor }} onClick={onSelect} onMouseDown={onMouseDown}>
+      <g style={{ cursor }} onClick={onSelect} onPointerDown={onMouseDown}>
         {ann.leader && (
           <line
             x1={ann.leader.x} y1={ann.leader.y}
@@ -2309,13 +2335,15 @@ function ScaleBar({ frame, sheetW, sheetH, views }) {
 }
 
 function Handle({ cx, cy, onMouseDown }) {
+  // Use onPointerDown so touch and stylus also work for handle drags.
   return (
     <rect
       x={cx - 0.9} y={cy - 0.9} width={1.8} height={1.8}
       fill={ANN_HANDLE_FILL} stroke={ANN_HANDLE_STROKE}
       strokeWidth={0.2} vectorEffect="non-scaling-stroke"
+      aria-hidden="true"
       style={{ cursor: 'grab' }}
-      onMouseDown={onMouseDown}
+      onPointerDown={onMouseDown}
     />
   )
 }
@@ -2517,18 +2545,26 @@ function InlineTextInput({ textInput, containerRef, onCommit, onCancel }) {
   }, [containerRef, textInput.screenLeft, textInput.screenTop])
 
   if (!pos) return null
+  const labelMap = {
+    leader: 'Leader annotation text',
+    'dc-leader': 'Leader annotation text',
+    'rich-text': 'Rich text annotation',
+    note: 'Note annotation text',
+    text: 'Text annotation',
+  }
   return (
     <input
       ref={inputRef}
       value={val}
+      aria-label={labelMap[textInput.kind] || 'Annotation text'}
       onChange={(e) => setVal(e.target.value)}
       onKeyDown={(e) => {
         if (e.key === 'Enter') onCommit(val)
         else if (e.key === 'Escape') onCancel()
       }}
       onBlur={() => onCommit(val)}
-      placeholder={textInput.kind === 'leader' ? 'leader text…' : 'text…'}
-      className="absolute z-20 px-1.5 py-0.5 text-xs font-mono bg-ink-950/95 border border-kerf-300 text-kerf-300 outline-none rounded"
+      placeholder={textInput.kind === 'leader' || textInput.kind === 'dc-leader' ? 'leader text…' : 'text…'}
+      className="absolute z-20 px-1.5 py-0.5 text-xs font-mono bg-ink-950/95 border border-kerf-300 text-kerf-300 rounded focus-visible:ring-2 focus-visible:ring-kerf-300 focus-visible:outline-none"
       style={{
         left: `${pos.left}px`,
         top: `${pos.top}px`,
@@ -2897,18 +2933,31 @@ function HatchPopover({ onApply, onCancel }) {
   const [patternId, setPatternId] = useState(HATCH_PATTERNS[0].id)
   const [scale, setScale] = useState(1)
   const [angle, setAngle] = useState(45)
+  const firstRef = useRef(null)
+
+  useEffect(() => {
+    firstRef.current?.focus()
+    function onKey(e) { if (e.key === 'Escape') onCancel() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onCancel])
+
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="hatch-popover-title"
       className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 p-4 rounded-lg shadow-xl border border-ink-600 bg-ink-900 text-kerf-200 text-[12px] font-mono"
       style={{ minWidth: 260 }}
     >
-      <div className="font-semibold text-kerf-300 mb-3">Hatch pattern</div>
+      <div id="hatch-popover-title" className="font-semibold text-kerf-300 mb-3">Hatch pattern</div>
       <label className="block mb-2">
         <span className="text-ink-400 text-[11px] uppercase tracking-wide">Pattern</span>
         <select
+          ref={firstRef}
           value={patternId}
           onChange={(e) => setPatternId(e.target.value)}
-          className="mt-1 block w-full bg-ink-800 border border-ink-600 rounded px-2 py-1 text-kerf-200"
+          className="mt-1 block w-full h-8 bg-ink-900 border border-ink-800 rounded px-2 text-kerf-200 focus-visible:ring-2 focus-visible:ring-kerf-300 focus-visible:outline-none"
         >
           {HATCH_PATTERNS.map((p) => (
             <option key={p.id} value={p.id}>{p.name}</option>
@@ -2921,7 +2970,7 @@ function HatchPopover({ onApply, onCancel }) {
           type="number" min={0.1} max={10} step={0.1}
           value={scale}
           onChange={(e) => setScale(parseFloat(e.target.value) || 1)}
-          className="mt-1 block w-full bg-ink-800 border border-ink-600 rounded px-2 py-1 text-kerf-200"
+          className="mt-1 block w-full h-8 bg-ink-900 border border-ink-800 rounded px-2 text-kerf-200 focus-visible:ring-2 focus-visible:ring-kerf-300 focus-visible:outline-none"
         />
       </label>
       <label className="block mb-3">
@@ -2930,19 +2979,19 @@ function HatchPopover({ onApply, onCancel }) {
           type="number" min={-180} max={180} step={5}
           value={angle}
           onChange={(e) => setAngle(parseFloat(e.target.value) ?? 45)}
-          className="mt-1 block w-full bg-ink-800 border border-ink-600 rounded px-2 py-1 text-kerf-200"
+          className="mt-1 block w-full h-8 bg-ink-900 border border-ink-800 rounded px-2 text-kerf-200 focus-visible:ring-2 focus-visible:ring-kerf-300 focus-visible:outline-none"
         />
       </label>
       <div className="flex gap-2 justify-end">
         <button
           type="button"
           onClick={onCancel}
-          className="px-3 py-1 rounded bg-ink-800 border border-ink-600 text-ink-300 hover:text-kerf-300"
+          className="px-3 py-1 rounded bg-ink-800 border border-ink-600 text-ink-300 hover:text-kerf-300 focus-visible:ring-2 focus-visible:ring-kerf-300 focus-visible:outline-none"
         >Cancel</button>
         <button
           type="button"
           onClick={() => onApply({ patternId, scale, angle })}
-          className="px-3 py-1 rounded bg-kerf-300 text-ink-950 font-semibold hover:bg-kerf-200"
+          className="px-3 py-1 rounded bg-kerf-300 text-ink-950 font-semibold hover:bg-kerf-200 focus-visible:ring-2 focus-visible:ring-ink-950 focus-visible:outline-none"
         >Apply</button>
       </div>
     </div>

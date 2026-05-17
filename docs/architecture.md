@@ -280,6 +280,64 @@ loop; B-rep is unbeatable when you need precision and edge ops a mesh can't.
 The planned [Sketch → JSCAD workflow](./plans/sketch-to-jscad.md) closes the
 gap for users who want JSCAD's programmability with dimension-driven 2D input.
 
+### Pure-Python geometry kernel (`kerf-cad-core/geom/`)
+
+Sitting beneath the `.feature` pipeline is a pure-Python B-rep/NURBS kernel
+in `packages/kerf-cad-core/src/kerf_cad_core/geom/`. It owns:
+
+- **Validated B-rep topology** (`brep.py`): a full `Vertex → Edge → Coedge →
+  Loop → Face → Shell → Solid → Body` hierarchy with per-entity tolerances.
+  Every `Body` can be interrogated with `validate_body`, which enforces the
+  generalised Euler–Poincaré formula (`V − E + F − H − 2(S − G) = 0`),
+  2-manifold closure (each closed-shell edge used by exactly two coedges of
+  opposite orientation), CCW/CW loop orientation relative to the oriented
+  surface normal, tolerance monotonicity, and no dangling or duplicate
+  coedges.
+- **Euler operators** (`mvfs / mev / mef / kemr / kfmrh` + inverses): each
+  mutates `(V, E, F, L, S, G)` by a delta that leaves the Euler–Poincaré
+  residual at zero. `EulerError` is raised on misuse.
+- **Analytic primitive surfaces**: `Plane`, `CylinderSurface`,
+  `SphereSurface`, `TorusSurface`, `Line3`, `CircleArc3` — geometry adapters
+  that satisfy the opaque curve/surface contract (`evaluate(t)` /
+  `evaluate(u, v)` + `normal(u, v)`). NURBS curves and surfaces from
+  `nurbs.py` satisfy the same contract directly.
+- **Exact rational primitive B-reps** (`brep_build.py`): `box_to_body`,
+  `cylinder_to_body`, `sphere_to_body`, `torus_to_body` — validated at
+  construction time via `BuildError`.
+- **Hardened SSI and closest-point** (`intersection.py`, `inversion.py`):
+  surface–surface intersection via subdivision + Newton marching; curve and
+  surface closest-point projection (`closest_point_curve`,
+  `closest_point_surface`) used by fillets, offset surfaces, and trim.
+- **Tolerant booleans** (`boolean.py`): `body_union` / `body_difference` /
+  `body_intersection` on closed solid `Body` instances. The current
+  implementation covers axis-aligned planar+planar, axis-aligned
+  planar+cylindrical, and sphere+sphere combinations — general
+  NURBS/NURBS imprint is roadmap follow-up. Every boolean result is
+  asserted `validate_body`-clean before return.
+- **G1/G2 fillets and blends** (`fillet_solid.py`): `fillet_solid_edge`
+  replaces a B-rep edge with a rolling-ball fillet face (cylindrical for
+  planar+planar, toroidal for planar+cylindrical) sewn back into a
+  validated `Body`. Supported contracts: convex planar+planar and
+  planar+cylindrical cap-rim edges; non-convex and general NURBS edges
+  return `{"ok": False, "reason": "…"}` rather than emitting an invalid
+  body.
+- **Parametric feature DAG with persistent face IDs** (`history/dag.py`,
+  `history/persistent_naming.py`): the `FeatureDAG` orchestrates
+  incremental re-evaluation — `set_param` + `regenerate` re-evaluates
+  only invalidated features in topological order. Persistent face/edge
+  identity uses a `feature_id::role::fingerprint` scheme: roles are
+  purely structural labels (e.g. `face:+X`, `face:cap_bottom`,
+  `face:boundary:0`) that survive parameter edits. A downstream fillet
+  referencing the top face of a box continues to resolve correctly after
+  the box's height changes.
+
+**What this is not**: the kernel is a robust foundation, not a complete
+Parasolid replacement. Boolean inputs must currently satisfy the axis-aligned
+analytic contract; chamfers are planar-face only; free-form NURBS/NURBS
+booleans and general-edge fillets are roadmap items. The OCCT path (via
+pythonOCC on the server or `occt-import-js` in the browser) remains the
+route for arbitrary STEP geometry and advanced surface operations.
+
 ## Migrations
 
 `packages/kerf-core/src/kerf_core/db/migrations/` holds SQL migration scripts

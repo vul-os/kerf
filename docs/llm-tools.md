@@ -114,6 +114,15 @@ and surface/curve operations. Features are stored as JSON nodes in
 `.feature` files; each node carries a `type`, a set of references to
 sketch geometry or existing features, and domain-specific parameters.
 
+> **Kernel note for tool authors**: the feature tools above edit the JSON
+> feature tree and trigger server-side evaluation. The actual geometry
+> evaluation (B-rep topology, booleans, fillets, face naming) happens inside
+> `kerf-cad-core/geom/` — a pure-Python library that is *not* exposed as LLM
+> tools. Do not add `ctx.tools.register(...)` calls that wrap kernel internals
+> directly; the correct pattern is a feature-node tool that the evaluator
+> dispatches through the `FeatureDAG`. See `docs/architecture.md §Pure-Python
+> geometry kernel` for what the kernel owns.
+
 `feature_pad` · `feature_pocket` · `feature_revolve` · `feature_fillet` · `feature_chamfer` · `feature_shell` · `feature_sweep1` · `feature_sweep2` · `feature_network_srf` · `feature_blend_srf` · `feature_draft` · `feature_rib` · `feature_mirror` · `feature_helix` · `feature_multi_transform` · `push_pull` · `rotate_face` · `surface_continuity` · `curve_project_to_surface` · `curve_intersect` · `curve_blend` · `curve_match` · `curve_offset_3d` · `polyline_to_nurbs` · `simplify_curve`
 
 ### Editing features
@@ -398,7 +407,7 @@ folder + restart the server.
 |-------------------|---------------------------------------------------------------------------|
 | `kerf-api`        | `file_ops`, `object_ops`, `scaffold`, `revisions`, `configurations`, `equations`, `validation` |
 | `kerf-chat`       | `docs` (search_kerf_docs)                                                  |
-| `kerf-cad-core`   | sketch + surfacing helpers (library, not LLM tools)                        |
+| `kerf-cad-core`   | **library only — no `@register` LLM tools**. The `geom/` sub-package is a pure-Python B-rep/NURBS kernel (topology, Euler operators, validated booleans, G1/G2 fillets, closest-point, SSI, parametric feature DAG with persistent face naming). Other plugins (`kerf-imports`, `kerf-electronics`, etc.) import from it directly; the LLM never calls into it via the tool registry. |
 | `kerf-imports`    | `import_3dm`, `subd`, `mesh`, `curve_ops`, `draft`, `inspection`, `graph`, `feature_helix`, `drawings` |
 | `kerf-bim`        | `bim`, `bim_categories`, `family`, `schedule`, `view`, `sheet`, `stairs`, `railings`, `mep`, `curtain_wall` |
 | `kerf-electronics`| `erc`, `buses`, `net_classes`, `length_tuning`, `via_stitching`, `shove_router`, `pad_overrides`, `hier_schematic`, `routing`, `pour`, `pcb_drc`, `pcb_layer_tools`, `autoroute`, `rf`, `spice` |

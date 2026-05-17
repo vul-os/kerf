@@ -31,7 +31,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any
 
-from kerf_chat.tools.registry import ToolSpec, err_payload, ok_payload, register
+from kerf_electronics._compat import ToolSpec, err_payload, ok_payload, register
 
 # ---------------------------------------------------------------------------
 # Import the existing ERC engine without modifying erc.py

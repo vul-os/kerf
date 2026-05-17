@@ -45,7 +45,7 @@ import json
 import math
 from typing import Any
 
-from kerf_chat.tools.registry import ToolSpec, err_payload, ok_payload, register
+from kerf_electronics._compat import ToolSpec, err_payload, ok_payload, register
 
 # ---------------------------------------------------------------------------
 # LCG random-number generator (deterministic, seed-controllable)

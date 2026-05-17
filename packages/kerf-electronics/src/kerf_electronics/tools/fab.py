@@ -23,7 +23,7 @@ import tempfile
 import zipfile
 from typing import Any
 
-from kerf_chat.tools.registry import ToolSpec, err_payload, ok_payload, register
+from kerf_electronics._compat import ToolSpec, err_payload, ok_payload, register
 
 from kerf_electronics.fab.gerber import export_gerber
 from kerf_electronics.fab.excellon import export_excellon

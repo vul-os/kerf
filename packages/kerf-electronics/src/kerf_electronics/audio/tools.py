@@ -33,7 +33,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from kerf_chat.tools.registry import ToolSpec, err_payload, ok_payload, register
+from kerf_electronics._compat import ToolSpec, err_payload, ok_payload, register
 from kerf_electronics.audio.design import (
     amp_class_a,
     amp_class_ab,

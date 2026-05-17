@@ -58,7 +58,7 @@ import json
 import zipfile
 from typing import Any
 
-from kerf_chat.tools.registry import ToolSpec, err_payload, ok_payload, register
+from kerf_electronics._compat import ToolSpec, err_payload, ok_payload, register
 
 from kerf_electronics.fab.fab_bom import export_fab_bom, _extract_bom_rows, _render_csv
 from kerf_electronics.fab.pnp import export_pnp

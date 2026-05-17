@@ -61,7 +61,7 @@ import json
 from datetime import datetime, timezone
 from typing import Any
 
-from kerf_chat.tools.registry import ToolSpec, err_payload, ok_payload, register
+from kerf_electronics._compat import ToolSpec, err_payload, ok_payload, register
 
 # Reuse board_step geometry extraction — do NOT re-derive.
 from kerf_electronics.fab.board_step import (

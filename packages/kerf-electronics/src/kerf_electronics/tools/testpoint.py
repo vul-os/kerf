@@ -37,7 +37,7 @@ import json
 import math
 from typing import Any
 
-from kerf_chat.tools.registry import ToolSpec, err_payload, ok_payload, register
+from kerf_electronics._compat import ToolSpec, err_payload, ok_payload, register
 
 # Reuse extraction from ipc_netlist — single source of truth for pad/via parsing
 from kerf_electronics.tools.ipc_netlist import _collect_net_points, _NetPoint

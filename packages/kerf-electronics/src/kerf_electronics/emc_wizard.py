@@ -40,7 +40,7 @@ import math
 import warnings
 from typing import Any, Dict, List, Optional
 
-from kerf_chat.tools.registry import ToolSpec, err_payload, ok_payload, register
+from kerf_electronics._compat import ToolSpec, err_payload, ok_payload, register
 from kerf_electronics.emc.estimate import (
     emission_margin_db,
     near_field_crosstalk,

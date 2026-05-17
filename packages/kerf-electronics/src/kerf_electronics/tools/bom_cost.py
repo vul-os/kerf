@@ -41,7 +41,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from kerf_chat.tools.registry import ToolSpec, err_payload, ok_payload, register
+from kerf_electronics._compat import ToolSpec, err_payload, ok_payload, register
 
 from kerf_electronics.dfm import run_dfm_checks, score_dfm
 
@@ -543,7 +543,7 @@ async def run_bom_sourcing_risk(ctx: Any, args: bytes) -> str:
 # The plugin loader calls ctx.tools.register(name, spec, handler) for each.
 # We re-export the tuples from the @register decorator's Registry list.
 
-from kerf_chat.tools.registry import Registry as _Registry
+from kerf_electronics._compat import Registry as _Registry
 
 # Build TOOLS by inspecting the last three entries we just registered.
 # This mirrors the pattern used in other tool modules.

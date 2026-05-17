@@ -40,13 +40,18 @@ html, body, #root {
   height: 100%;
 }
 
-/* Defensive h-scroll guard: clip any rogue child that exceeds viewport width
-   (e.g. absolute-positioned decorative blurs / glows with negative offsets).
-   `overflow-x: clip` is used instead of `hidden` so it doesn't kill
-   `position: sticky` on the header.
-   Applied to all three top-level boxes — `html`, `body`, and `#root` — so the
-   guard is unambiguous in Safari/WebKit, which can otherwise honour `clip` on
-   only one of them when `height: 100%` is set. */
+/* Defensive h-scroll guard. Three layers because Safari/WebKit can defeat
+   any single one when `height: 100%` is set on the same element:
+   1. `max-width: 100vw` on body — makes overflow physically impossible
+      regardless of any rogue absolute / fixed-width child.
+   2. `overflow-x: clip` on html + body + #root — clips paint of any
+      rogue descendant. `clip` (not `hidden`) so `position: sticky` on
+      the header still works (sticky needs a non-clipping scroll
+      ancestor; html keeps overflow-y default → scrolls fine).
+   3. The body `max-width` covers older Safari that ignores `clip`. */
+body {
+  max-width: 100vw;
+}
 html, body, #root {
   overflow-x: clip;
 }

@@ -89,11 +89,6 @@ export default function Footer() {
             </Item>
           </Col>
 
-          <Col title="Legal">
-            <Item to="/docs/terms">Terms</Item>
-            <Item to="/docs/privacy">Privacy</Item>
-            <Item to="/docs/license">License</Item>
-          </Col>
         </div>
 
         {/* bottom strip */}

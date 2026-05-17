@@ -90,7 +90,7 @@ function UserMenu({ user, onLogout, currentWorkspaceSlug, cloudEnabled }) {
               to="/profile"
               role="menuitem"
               onClick={() => setOpen(false)}
-              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-100 hover:bg-ink-800/80"
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-100 hover:bg-ink-800/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/50"
             >
               <UserCog size={14} className="text-ink-300" />
               Profile
@@ -106,7 +106,7 @@ function UserMenu({ user, onLogout, currentWorkspaceSlug, cloudEnabled }) {
                 to={`/w/${currentWorkspaceSlug}/members`}
                 role="menuitem"
                 onClick={() => setOpen(false)}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-100 hover:bg-ink-800/80"
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-100 hover:bg-ink-800/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/50"
               >
                 <Users size={14} className="text-ink-300" />
                 Members
@@ -115,7 +115,7 @@ function UserMenu({ user, onLogout, currentWorkspaceSlug, cloudEnabled }) {
                 to={`/w/${currentWorkspaceSlug}/settings`}
                 role="menuitem"
                 onClick={() => setOpen(false)}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-100 hover:bg-ink-800/80"
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-100 hover:bg-ink-800/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/50"
               >
                 <Settings size={14} className="text-ink-300" />
                 Settings
@@ -126,7 +126,7 @@ function UserMenu({ user, onLogout, currentWorkspaceSlug, cloudEnabled }) {
                     to="/billing"
                     role="menuitem"
                     onClick={() => setOpen(false)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-100 hover:bg-ink-800/80"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-100 hover:bg-ink-800/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/50"
                   >
                     <CreditCard size={14} className="text-ink-300" />
                     Billing
@@ -141,7 +141,7 @@ function UserMenu({ user, onLogout, currentWorkspaceSlug, cloudEnabled }) {
               type="button"
               role="menuitem"
               onClick={() => { setOpen(false); onLogout() }}
-              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-100 hover:bg-ink-800/80"
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-100 hover:bg-ink-800/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/50"
             >
               <LogOut size={14} className="text-ink-300" />
               Sign out
@@ -222,19 +222,19 @@ export default function Layout({ children, wide = false, padded = true }) {
             >
               <Link
                 to="/docs"
-                className="text-xs text-ink-300 hover:text-ink-100 px-2 py-1 rounded-md hover:bg-ink-800/80 transition-colors"
+                className="text-xs text-ink-300 hover:text-ink-100 px-2 py-1 rounded-md hover:bg-ink-800/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/50"
               >
                 Docs
               </Link>
               <Link
                 to="/compare"
-                className="text-xs text-ink-300 hover:text-ink-100 px-2 py-1 rounded-md hover:bg-ink-800/80 transition-colors"
+                className="text-xs text-ink-300 hover:text-ink-100 px-2 py-1 rounded-md hover:bg-ink-800/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/50"
               >
                 Compare
               </Link>
               <Link
                 to="/roadmap"
-                className="text-xs text-ink-300 hover:text-ink-100 px-2 py-1 rounded-md hover:bg-ink-800/80 transition-colors"
+                className="text-xs text-ink-300 hover:text-ink-100 px-2 py-1 rounded-md hover:bg-ink-800/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/50"
               >
                 Roadmap
               </Link>
@@ -246,13 +246,13 @@ export default function Layout({ children, wide = false, padded = true }) {
               <nav className="hidden sm:flex items-center gap-1 mr-1">
                 <Link
                   to="/workshop"
-                  className="text-xs text-ink-300 hover:text-ink-100 px-2 py-1 rounded-md hover:bg-ink-800/80 transition-colors"
+                  className="text-xs text-ink-300 hover:text-ink-100 px-2 py-1 rounded-md hover:bg-ink-800/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/50"
                 >
                   Workshop
                 </Link>
                 <Link
                   to="/library"
-                  className="text-xs text-ink-300 hover:text-ink-100 px-2 py-1 rounded-md hover:bg-ink-800/80 transition-colors"
+                  className="text-xs text-ink-300 hover:text-ink-100 px-2 py-1 rounded-md hover:bg-ink-800/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/50"
                 >
                   Library
                 </Link>

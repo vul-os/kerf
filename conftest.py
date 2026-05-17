@@ -5,10 +5,32 @@
 2. Install a test-only compatibility shim: ``tools.X`` resolves to the
    canonical plugin module that owns X. This lets legacy tests written
    against the pre-plugin layout keep working without rewriting them.
+3. Restore pre-3.10 ``asyncio.get_event_loop()`` semantics in the test
+   process so the ~110 test files that use the legacy
+   ``get_event_loop().run_until_complete(...)`` pattern keep working under
+   Python 3.13 (which removed the implicit loop auto-create). Production
+   code is unaffected — conftest.py is loaded only by pytest.
 """
+import asyncio
 import os
 import sys
 import types
+
+
+# (3) asyncio compatibility shim for the test process.
+_orig_get_event_loop = asyncio.get_event_loop
+
+
+def _get_event_loop_compat():
+    try:
+        return _orig_get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        return loop
+
+
+asyncio.get_event_loop = _get_event_loop_compat
 
 
 _REPO_ROOT = os.path.dirname(os.path.abspath(__file__))

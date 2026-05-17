@@ -510,3 +510,22 @@ class TestCurve:
     def test_elevation_stored(self):
         c = Curve(points=[np.array([0.0, 0.0, 5.0])], elevation=5.0)
         assert c.elevation == 5.0
+
+
+# ---------------------------------------------------------------------------
+# T11 — surface_area > plan_area for sloped surface; elevation outside mesh
+# ---------------------------------------------------------------------------
+
+class TestSlopedSurfaceArea:
+    def test_sloped_surface_area_exceeds_plan_area(self):
+        """On a non-flat surface the 3-D TIN area must exceed the plan area."""
+        ts = _linear_slope_x(dz_per_m=0.1, size=100.0)
+        sa = ts.surface_area()
+        pa = ts.plan_area()
+        assert sa > pa, f"3-D area {sa:.2f} should exceed plan area {pa:.2f}"
+
+    def test_elevation_outside_mesh_returns_none(self):
+        """elevation_at() returns None for points outside the TIN."""
+        ts = _flat_100x100(z=10.0)
+        z = ts.elevation_at(200.0, 200.0)
+        assert z is None, f"Expected None for point outside mesh, got {z}"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Kerf one-line installer.
 #
-#   curl -fsSL https://kerf.app/install.sh | bash
+#   curl -fsSL https://kerf.sh/install.sh | bash
 #
 # What it does:
 #   1. Detects OS + arch.

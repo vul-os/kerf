@@ -1,5 +1,5 @@
 /**
- * kerf-sdk — TypeScript SDK for Kerf (https://kerf.app).
+ * kerf-sdk — TypeScript SDK for Kerf (https://kerf.sh).
  *
  * Quickstart:
  *   import { fromEnv } from 'kerf-sdk'
@@ -20,7 +20,7 @@ import { Kerf } from "./client.js";
 /** Create a Kerf client with an explicit token and server URL. */
 export function connect(
   token: string,
-  baseUrl = "https://kerf.app",
+  baseUrl = "https://kerf.sh",
 ): Kerf {
   return new Kerf(token, baseUrl);
 }

@@ -1,5 +1,5 @@
 """
-kerf — Python SDK for Kerf (https://kerf.app).
+kerf — Python SDK for Kerf (https://kerf.sh).
 
 Quickstart:
     import kerf
@@ -16,7 +16,7 @@ from .client import Kerf, KerfError
 __all__ = ["connect", "from_env", "Kerf", "KerfError"]
 
 
-def connect(token: str, base_url: str = "https://kerf.app") -> Kerf:
+def connect(token: str, base_url: str = "https://kerf.sh") -> Kerf:
     """Create a Kerf client with an explicit token and server URL."""
     return Kerf(token=token, base_url=base_url)
 

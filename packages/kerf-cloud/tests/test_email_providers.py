@@ -28,7 +28,7 @@ def _settings(**overrides):
     """Build a minimal settings-like object."""
     defaults = dict(
         email_provider="smtp",
-        email_from="noreply@kerf.app",
+        email_from="noreply@kerf.sh",
         resend_api_key="",
         ses_region="",
         ses_access_key_id="",
@@ -138,7 +138,7 @@ def test_resend_sends_correct_request():
     cfg = _settings(
         email_provider="resend",
         resend_api_key="re_test_abc",
-        email_from="kerf <noreply@kerf.app>",
+        email_from="kerf <noreply@kerf.sh>",
     )
 
     mock_resp = MagicMock()
@@ -178,7 +178,7 @@ def test_resend_omits_text_when_not_provided():
     cfg = _settings(
         email_provider="resend",
         resend_api_key="re_test_abc",
-        email_from="noreply@kerf.app",
+        email_from="noreply@kerf.sh",
     )
 
     mock_resp = MagicMock()
@@ -262,7 +262,7 @@ def test_ses_calls_send_email_with_correct_args():
         ses_region="us-east-1",
         ses_access_key_id="AKID",
         ses_secret_access_key="secret",
-        email_from="kerf <noreply@kerf.app>",
+        email_from="kerf <noreply@kerf.sh>",
     )
 
     with patch("boto3.Session", return_value=mock_session):
@@ -335,22 +335,22 @@ def test_smtp_sends_message(monkeypatch):
 
     cfg = _settings(
         email_provider="smtp",
-        smtp_host="mail.kerf.app",
+        smtp_host="mail.kerf.sh",
         smtp_port=587,
         smtp_username="user",
         smtp_password="pass",
-        email_from="noreply@kerf.app",
+        email_from="noreply@kerf.sh",
     )
 
     with patch("smtplib.SMTP", fake_smtp):
         send_email("u@e.com", "Subject", "<p>Body</p>", settings=cfg)
 
-    assert sent["addr"] == "mail.kerf.app:587"
+    assert sent["addr"] == "mail.kerf.sh:587"
     mock_smtp.starttls.assert_called_once()
     mock_smtp.login.assert_called_once_with("user", "pass")
     mock_smtp.sendmail.assert_called_once()
     args = mock_smtp.sendmail.call_args[0]
-    assert args[0] == "noreply@kerf.app"
+    assert args[0] == "noreply@kerf.sh"
     assert args[1] == ["u@e.com"]
 
 
@@ -365,7 +365,7 @@ def test_smtp_skips_login_when_no_user(monkeypatch):
         smtp_port=25,
         smtp_username="",
         smtp_password="",
-        email_from="noreply@kerf.app",
+        email_from="noreply@kerf.sh",
     )
 
     with patch("smtplib.SMTP", return_value=mock_smtp):

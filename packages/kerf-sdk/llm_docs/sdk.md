@@ -22,10 +22,10 @@ The SDK authenticates with a long-lived opaque API token (`kerf_sk_*`). Generate
 
 ```bash
 export KERF_API_TOKEN="kerf_sk_yourtokenhere"
-export KERF_API_URL="https://kerf.app"   # default; omit for cloud
+export KERF_API_URL="https://kerf.sh"   # default; omit for cloud
 ```
 
-`load_token()` and `load_url()` in `kerf.auth` read these environment variables. `KERF_API_URL` defaults to `https://kerf.app` if unset.
+`load_token()` and `load_url()` in `kerf.auth` read these environment variables. `KERF_API_URL` defaults to `https://kerf.sh` if unset.
 
 ---
 

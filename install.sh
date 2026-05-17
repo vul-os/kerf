@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # install.sh — Kerf installer
 #
-# Usage (latest):  curl -fsSL https://kerf.app/install.sh | sh
+# Usage (latest):  curl -fsSL https://kerf.sh/install.sh | sh
 # Usage (pinned):  curl -fsSL https://github.com/kerf-sh/kerf/releases/download/v0.1.0/kerf-install-v0.1.0.sh | sh
 #
 # Checks Docker + Postgres, pulls ghcr.io/kerf-sh/kerf:<version>,
@@ -169,7 +169,7 @@ print_next_steps() {
   printf "         -e KERF_CONFIG=/config/config.toml \\\n"
   printf "         -v \"%s:/config:ro\" %s\n\n" "$CONFIG_DIR" "$KERF_IMAGE"
   printf "  4. Open http://localhost:8080\n\n"
-  printf "  Docs: https://kerf.app/docs\n"
+  printf "  Docs: https://kerf.sh/docs\n"
 }
 
 # ── Main ───────────────────────────────────────────────────────────────────

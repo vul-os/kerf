@@ -13,7 +13,7 @@ import kerf
 from kerf.client import Kerf, KerfError
 
 
-BASE = "https://kerf.app"
+BASE = "https://kerf.sh"
 TOKEN = "kerf_sk_testtoken123"
 
 

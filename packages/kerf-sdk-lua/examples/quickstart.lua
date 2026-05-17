@@ -6,7 +6,7 @@
 --   luarocks install kerf-sdk
 --
 -- Auth: export KERF_API_TOKEN=kerf_sk_...
---       export KERF_API_URL=https://kerf.app   # optional default
+--       export KERF_API_URL=https://kerf.sh   # optional default
 
 local kerf = require "kerf"
 

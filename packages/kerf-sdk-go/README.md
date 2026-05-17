@@ -1,6 +1,6 @@
 # kerf-sdk-go
 
-Go SDK for [Kerf](https://kerf.app) — the parametric CAD platform.
+Go SDK for [Kerf](https://kerf.sh) — the parametric CAD platform.
 
 ## Install
 
@@ -57,13 +57,13 @@ Set environment variables before running:
 
 ```bash
 export KERF_API_TOKEN=kerf_sk_...
-export KERF_API_URL=https://kerf.app   # optional, this is the default
+export KERF_API_URL=https://kerf.sh   # optional, this is the default
 ```
 
 Or construct with explicit values:
 
 ```go
-k := kerf.New("https://kerf.app", "kerf_sk_...")
+k := kerf.New("https://kerf.sh", "kerf_sk_...")
 ```
 
 ## Namespaces

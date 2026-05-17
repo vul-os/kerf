@@ -1,6 +1,6 @@
 # Privacy Policy
 
-This page covers the **hosted** Kerf service at `kerf.app`. If you're running
+This page covers the **hosted** Kerf service at `kerf.sh`. If you're running
 Kerf locally (`KERF_LOCAL_MODE=1`), none of this applies — your data stays on
 your machine and we've got nothing on you.
 

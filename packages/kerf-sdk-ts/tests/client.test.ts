@@ -8,7 +8,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { connect, fromEnv, KerfError } from "../src/index.js";
 
-const BASE = "https://kerf.app";
+const BASE = "https://kerf.sh";
 const TOKEN = "kerf_sk_testtoken123";
 
 /** Build a minimal successful fetch mock returning `result`. */

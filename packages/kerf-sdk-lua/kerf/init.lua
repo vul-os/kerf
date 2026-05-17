@@ -1,4 +1,4 @@
---- kerf — Lua SDK for Kerf (https://kerf.app).
+--- kerf — Lua SDK for Kerf (https://kerf.sh).
 --
 -- Quickstart:
 --   local kerf = require "kerf"
@@ -16,7 +16,7 @@ local Configurations = require "kerf.configurations"
 local Revisions      = require "kerf.revisions"
 local Docs           = require "kerf.docs"
 
-local DEFAULT_URL = "https://kerf.app"
+local DEFAULT_URL = "https://kerf.sh"
 
 local M = {}
 
@@ -53,7 +53,7 @@ end
 --- connect(opts) -> handle
 -- Creates a Kerf client with explicit credentials.
 -- opts = { api_url = "...", api_token = "kerf_sk_..." }
--- api_url defaults to "https://kerf.app".
+-- api_url defaults to "https://kerf.sh".
 function M.connect(opts)
   assert(type(opts) == "table", "kerf.connect: expected opts table")
   local url   = (opts.api_url or DEFAULT_URL):gsub("/+$", "")

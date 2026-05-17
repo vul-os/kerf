@@ -259,7 +259,7 @@ function RunLocallyChip() {
       </div>
       <p className="text-[10px] text-ink-500 pl-5">
         Python 3.11+ · Postgres · or{' '}
-        <code className="text-ink-400">curl kerf.app/install.sh | sh</code>
+        <code className="text-ink-400">curl kerf.sh/install.sh | sh</code>
       </p>
     </div>
   )

@@ -1,6 +1,6 @@
 # kerf-sdk
 
-Python SDK for [Kerf](https://kerf.app) — automate your CAD/EDA projects over HTTP/JSON-RPC.
+Python SDK for [Kerf](https://kerf.sh) — automate your CAD/EDA projects over HTTP/JSON-RPC.
 
 ## Install
 
@@ -14,7 +14,7 @@ Generate an API token from your workspace settings (`/w/<slug>/settings` → API
 
 ```bash
 export KERF_API_TOKEN=kerf_sk_...
-export KERF_API_URL=https://kerf.app   # default; omit for cloud
+export KERF_API_URL=https://kerf.sh   # default; omit for cloud
 ```
 
 ## Quickstart

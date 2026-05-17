@@ -1,6 +1,6 @@
 # kerf-sdk-lua
 
-Lua SDK for [Kerf](https://kerf.app) — the parametric CAD platform.
+Lua SDK for [Kerf](https://kerf.sh) — the parametric CAD platform.
 
 ## Install
 
@@ -30,13 +30,13 @@ end
 
 ```bash
 export KERF_API_TOKEN=kerf_sk_...
-export KERF_API_URL=https://kerf.app   # optional, this is the default
+export KERF_API_URL=https://kerf.sh   # optional, this is the default
 ```
 
 Or construct explicitly:
 
 ```lua
-local k = kerf.connect({ api_url = "https://kerf.app", api_token = "kerf_sk_..." })
+local k = kerf.connect({ api_url = "https://kerf.sh", api_token = "kerf_sk_..." })
 ```
 
 ## Namespaces

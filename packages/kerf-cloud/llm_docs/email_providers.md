@@ -17,7 +17,7 @@ Set `EMAIL_PROVIDER` to one of:
 Always set `EMAIL_FROM` to the default "From" address, e.g.:
 
 ```
-EMAIL_FROM=Kerf <noreply@kerf.app>
+EMAIL_FROM=Kerf <noreply@kerf.sh>
 ```
 
 ## Environment variables
@@ -27,7 +27,7 @@ EMAIL_FROM=Kerf <noreply@kerf.app>
 EMAIL_PROVIDER=smtp
 
 # Default From address
-EMAIL_FROM=Kerf <noreply@kerf.app>
+EMAIL_FROM=Kerf <noreply@kerf.sh>
 
 # Resend
 RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxx

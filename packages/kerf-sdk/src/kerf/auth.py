@@ -1,6 +1,6 @@
 import os
 
-DEFAULT_URL = "https://kerf.app"
+DEFAULT_URL = "https://kerf.sh"
 
 
 def load_token() -> str:

@@ -13,7 +13,7 @@ You can:
 - **Redistribute it.** Bundle Kerf into your own product, or run it as a
   service for your customers.
 - **Sell it.** You don't owe us a cut. Charge whatever you like.
-- **Self-host the cloud.** The code that runs `kerf.app` is in the same public
+- **Self-host the cloud.** The code that runs `kerf.sh` is in the same public
   repo, under the same license. If you want to operate your own hosted Kerf,
   you can.
 

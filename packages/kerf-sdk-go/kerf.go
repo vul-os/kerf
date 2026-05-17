@@ -1,4 +1,4 @@
-// Package kerf is the Go SDK for Kerf (https://kerf.app).
+// Package kerf is the Go SDK for Kerf (https://kerf.sh).
 //
 // Quickstart:
 //
@@ -27,7 +27,7 @@ import (
 	"github.com/kerf-sh/kerf-sdk-go/revisions"
 )
 
-const defaultAPIURL = "https://kerf.app"
+const defaultAPIURL = "https://kerf.sh"
 
 // Client is the top-level Kerf SDK client.
 // Construct with New or FromEnv; then use the sub-package clients directly.
@@ -47,7 +47,7 @@ type Client struct {
 }
 
 // New constructs a Client with an explicit API URL and token.
-// apiURL defaults to "https://kerf.app" when empty.
+// apiURL defaults to "https://kerf.sh" when empty.
 func New(apiURL, apiToken string) *Client {
 	if apiURL == "" {
 		apiURL = defaultAPIURL

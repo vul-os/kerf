@@ -101,7 +101,7 @@ class Settings(BaseSettings):
     # ---------------------------------------------------------------------------
     # Transactional email — provider selection + credentials.
     # email_provider: "smtp" (default, no regression) | "resend" | "ses"
-    # email_from: default From address, e.g. "Kerf <noreply@kerf.app>"
+    # email_from: default From address, e.g. "Kerf <noreply@kerf.sh>"
     # ---------------------------------------------------------------------------
     email_provider: str = "smtp"
     email_from: str = ""

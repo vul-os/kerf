@@ -22,7 +22,7 @@ Generate an API token from your workspace settings
 
 ```sh
 export KERF_API_TOKEN=kerf_sk_...
-export KERF_API_URL=https://kerf.app   # omit to use the default cloud URL
+export KERF_API_URL=https://kerf.sh   # omit to use the default cloud URL
 ```
 
 For a local server:
@@ -197,7 +197,7 @@ protocol is identical; see [v1-rpc.md](./v1-rpc.md) for the full spec.
 The SDK works against both OSS self-hosted instances and the hosted cloud at
 kerf.sh. The only difference is the `KERF_API_URL`:
 
-- Cloud: `https://kerf.app` (default when `KERF_API_URL` is unset)
+- Cloud: `https://kerf.sh` (default when `KERF_API_URL` is unset)
 - Local: `http://localhost:8080`
 - Self-hosted: your server's URL
 

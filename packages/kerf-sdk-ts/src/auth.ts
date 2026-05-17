@@ -2,10 +2,10 @@
  * Env-var loading for Kerf SDK auth.
  *
  * KERF_API_TOKEN — required; must start with kerf_sk_
- * KERF_API_URL   — optional; defaults to https://kerf.app
+ * KERF_API_URL   — optional; defaults to https://kerf.sh
  */
 
-export const DEFAULT_URL = "https://kerf.app";
+export const DEFAULT_URL = "https://kerf.sh";
 
 export function loadToken(): string {
   const token = (process.env["KERF_API_TOKEN"] ?? "").trim();

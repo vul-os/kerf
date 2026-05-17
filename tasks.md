@@ -145,6 +145,19 @@ Template:
      full (T-112), BIM structural grid + framing (T-113), BIM site /
      earthwork toposolids (T-114), BIM material catalogue (T-115). T-100
      / T-101 / T-104 carry 🚧 in flight; the rest 🔴. -->
+<!-- Status reconciled 2026-05-17 (this session's landings): T-100 picked
+     up a reference-value suite (`pressure_load.py` + 43-test
+     `test_fem_refvalues.py` with Roark/Blevins/Incropera oracles, 42
+     green, one ASTM E1049 rainflow test skipped — bug flagged in
+     `fatigue_fem._rainflow`); T-101 picked up `cfd_navier_stokes.py`
+     (lid-driven cavity, Ghia Re=100 reference) on top of the
+     pre-existing `cfd_potential.py`, 61 hermetic CFD tests in
+     `test_cfd.py`. Both stay 🚧 in flight — full CalculiX/Z88/Mystran
+     enum-wiring (T-100) and full CfdOF turbulence/3-D-mesh/OpenFOAM
+     bridge (T-101) remain. T-106 split into T-106a..f for the Cycles
+     backend + browser path-tracer fallback already in the body below;
+     no new T-NN added — T-106f explicitly covers the
+     `three-gpu-pathtracer` browser fallback. -->
 
 > **Geometry kernel — depth (2026-05-17).** Major step-change landed
 > outside the T-NN backlog, on the GK-NN backlog in
@@ -1071,19 +1084,35 @@ Tier A (single persona unlock), render / SubD / direct-edit → Tier B
   enum + reference-tool match. FEM-hardening stream is in flight in
   parallel; this task captures **what's left after that lands**.
 - **Priority:** P2
-- **Status:** 🚧 in flight
+- **Status:** 🚧 in flight — **reference-value suite landed
+  (2026-05-17):** `kerf_fem.pressure_load` + 43-test
+  `packages/kerf-fem/tests/test_fem_refvalues.py` with citable Roark /
+  Blevins / Incropera oracles, 42 green, one ASTM E1049 rainflow test
+  skipped (real bug flagged in `fatigue_fem._rainflow`, ranked
+  alongside the remaining enum-wiring work). Public `analysis_type`
+  enum-wiring + CalculiX / Z88 / Mystran reference-tool match still
+  ahead.
 - **Scope:** Wire the seed nonlinear / explicit / acoustics / EM /
   fatigue modules through the public analysis enum + LLM tool surface,
   then match a CalculiX (nonlinear / contact) + Z88 (linear / modal /
   nonlinear) + Mystran (modal / aeroelastic) reference test corpus.
+  **Remaining sub-items after the 2026-05-17 landings:**
+  - fix `fatigue_fem._rainflow` (ASTM E1049) — currently skipped
+  - wire `nonlinear` / `explicit` / `acoustics_fem` / `em_field` /
+    `em_highfreq` / `fatigue_fem` through `tools.py` analysis-enum
+  - publish the new capability tags on `GET /health/capabilities`
+  - extend the 43-test `test_fem_refvalues.py` corpus with
+    CalculiX / Z88 / Mystran match-cases.
 - **Target files/packages:** `packages/kerf-fem/src/kerf_fem/` (`tools.py`
   analysis-enum extension, plugin capability advertisements,
   `nonlinear.py` / `explicit.py` / `acoustics_fem.py` / `em_field.py` /
-  `em_highfreq.py` / `fatigue_fem.py`), reference-test corpus under
-  `packages/kerf-fem/tests/`.
+  `em_highfreq.py` / `fatigue_fem.py`, `pressure_load.py`), reference-
+  test corpus under `packages/kerf-fem/tests/` (already-shipped
+  `test_fem_refvalues.py` is the seed).
 - **Definition of Done:** each module passes its reference-tool match
   within tolerance; analysis-enum advertises the new types; capability
-  tags appear in `GET /health/capabilities`.
+  tags appear in `GET /health/capabilities`; rainflow bug fixed and
+  the skipped test re-enabled.
 - **Depends-on:** none
 
 ### T-101 CFD CfdOF-class — turbulence + 3-D meshing + OpenFOAM bridge
@@ -1093,18 +1122,33 @@ Tier A (single persona unlock), render / SubD / direct-edit → Tier B
   flow (`cfd_potential.py`) is the seed already in flight; full CfdOF
   parity is engine-class.
 - **Priority:** P2
-- **Status:** 🚧 in flight
-- **Scope:** Extend `cfd_potential.py` past the potential-flow seed into
-  full Navier-Stokes + heat transfer with turbulence models (k-ε /
-  k-ω SST), 3-D unstructured meshing, and an OpenFOAM bridge for the
-  serious-CFD path (graceful degrade when the binary is absent, same
-  pattern as CuraEngine / Instant-Meshes).
+- **Status:** 🚧 in flight — **2-D laminar foundation landed
+  (2026-05-17):** `kerf_fem.cfd_potential` (potential flow,
+  `Cp(θ) = 1 − 4 sin²θ` analytic oracle) + `kerf_fem.cfd_navier_stokes`
+  (lid-driven cavity, Ghia Re=100 reference); 61 hermetic CFD tests in
+  `packages/kerf-fem/tests/test_cfd.py`. Lid-driven cavity NS
+  reference-tolerance match shipped; turbulence (k-ε / k-ω SST), 3-D
+  unstructured meshing, and the OpenFOAM bridge all still ahead.
+- **Scope:** Extend `cfd_potential.py` + `cfd_navier_stokes.py` past
+  the 2-D laminar foundation into full Navier-Stokes + heat transfer
+  with turbulence models (k-ε / k-ω SST), 3-D unstructured meshing,
+  and an OpenFOAM bridge for the serious-CFD path (graceful degrade
+  when the binary is absent, same pattern as CuraEngine /
+  Instant-Meshes). **Remaining sub-items after the 2026-05-17
+  landings:**
+  - k-ε / k-ω SST turbulence models with the standard test cases
+  - 3-D unstructured mesh path (`packages/kerf-fem/src/kerf_fem/mesh3d.py`
+    or similar)
+  - `openfoam_bridge.py` — case-translate + subprocess + result-parse,
+    sentinel-degrade when the binary is absent.
 - **Target files/packages:** `packages/kerf-fem/src/kerf_fem/cfd_*.py`,
-  optional `packages/kerf-fem/src/kerf_fem/openfoam_bridge.py`, tests.
-- **Definition of Done:** known-solution NS run (lid-driven cavity)
-  matches reference within tolerance; turbulence model toggle works;
+  optional `packages/kerf-fem/src/kerf_fem/openfoam_bridge.py`, tests
+  (already-shipped `test_cfd.py` is the seed).
+- **Definition of Done:** turbulence model toggle works and matches a
+  canonical reference case (channel flow / backward-facing step);
   OpenFOAM bridge round-trips a fixture case with binary present →
-  degrades to sentinel when absent.
+  degrades to sentinel when absent; 3-D unstructured mesh on a
+  fixture geometry.
 - **Depends-on:** none
 
 ### T-102 ECAD: interactive push-and-shove diff-pair routing

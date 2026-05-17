@@ -2,6 +2,20 @@ import numpy as np
 from kerf_cad_core.geom.nurbs import NurbsCurve, NurbsSurface
 
 
+# ---------------------------------------------------------------------------
+# GK-24/GK-25 — Verified G1/G2 blend public re-export
+# ---------------------------------------------------------------------------
+#
+# The verified G1/G2 blend strip and curvature-comb continuity oracle live
+# in ``surface_fillet.py`` (next to the rolling-ball fillet machinery). We
+# re-export them here so consumers reaching for "blend_srf" find them.
+
+from kerf_cad_core.geom.surface_fillet import (  # noqa: E402
+    curvature_comb_continuity_residual,
+    surface_blend_g1_g2,
+)
+
+
 def blend_srf(surf1: NurbsSurface, surf2: NurbsSurface,
               curve1: NurbsCurve, curve2: NurbsCurve,
               blend_dist: float) -> NurbsSurface:

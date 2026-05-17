@@ -108,6 +108,27 @@ Template:
 ---
 
 <!-- Status reconciled 2026-05-16: T-1/T-2/T-3/T-5/T-6/T-7/T-8/T-9/T-10/T-11/T-12/T-13/T-14/T-20–T-27/T-28/T-29/T-30/T-31/T-32/T-33/T-34/T-35/T-37/T-40–T-46/T-90/T-91 flipped 🔴→✅. Left 🔴: T-4 (bend table), T-15/T-16 (large-assembly harness/LOD), T-36 (3D harness), T-47/T-48/T-50/T-51/T-52/T-53/T-70/T-71. -->
+<!-- Status reconciled 2026-05-17 (geometry kernel — depth): the GK-NN
+     backlog in docs/plans/geometry-kernel-roadmap.md (separate from this
+     T-NN file) had its P0 (robustness foundation) + P1 (5 streams) + P3
+     keystone (parametric history DAG + persistent face/edge naming) all
+     land in packages/kerf-cad-core/src/kerf_cad_core/geom/. 620 hermetic
+     kernel tests green (counts verified via `pytest --collect-only` per
+     file in the plan). P2 (pure-Python STEP/IGES + SubD↔NURBS + mesh→NURBS
+     autosurface + 2D region boolean) is the next ranked GK-NN focus and
+     surfaces above T-50/T-51/T-52/T-53/T-70/T-71 in opus-spine priority. -->
+
+> **Geometry kernel — depth (2026-05-17).** Major step-change landed
+> outside the T-NN backlog, on the GK-NN backlog in
+> [`docs/plans/geometry-kernel-roadmap.md`](./docs/plans/geometry-kernel-roadmap.md):
+> validated B-rep topology, tolerant pure-Python solid booleans, G1/G2
+> fillets that trim + sew, edge chamfer, surface/curve/loop offsets,
+> Coons patches, hardened SSI (rational-weight bug fix), closest-point,
+> and a parametric history DAG with persistent face/edge naming. The
+> opus spine continues there next, **on P2 (interop fidelity: pure-Python
+> STEP/IGES + SubD↔NURBS + mesh→NURBS autosurface + 2D region boolean)**.
+> Pull from that file's §4 between T-NN runs when an opus slot is free —
+> kernel-depth wins compound under every persona at once.
 
 ## Tier A — persona unlocks (revenue)
 

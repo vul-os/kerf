@@ -12,6 +12,67 @@ The authoritative source for what's shipped vs in-flight is
 See `🔮 planned` rows in [ROADMAP.md](./ROADMAP.md). The v0.2 milestone
 focus is in [docs/plans/v0.2-milestone.md](./docs/plans/v0.2-milestone.md).
 
+### 2026-05-17 — Geometry kernel step-change + ship-gate landed
+
+Pure-Python B-rep/NURBS kernel jumped from *Rhino-width construction
+verbs, no topology binding, no closest-point, sampling-grade SSI, every
+boolean delegated to OCCT* to a real math-depth moat. All in
+`packages/kerf-cad-core/src/kerf_cad_core/geom/`.
+
+- **B-rep topology keystone wired** — `brep.py` (1 312 LOC) +
+  `brep_build.py` (833 LOC). The frozen `BREP_CONTRACT.md` model
+  (`Body → Solid → Shell → Face → Loop → Coedge → Edge → Vertex`, nine
+  Euler operators, generalised Euler–Poincaré invariant) now guards
+  real geometry: every analytic-verb builder ends with `validate_body`.
+- **Tolerant pure-Python solid booleans** — `sew.py` (386 LOC) +
+  `boolean.py` (1 195 LOC). Face-imprint via SSI, regularised
+  cut / fuse / common over the analytic primitive matrix, tolerance-
+  monotonic merge, `validate_body`-clean 2-manifold result with no OCCT.
+- **Parametric history DAG with persistent face/edge naming** — new
+  `geom/history/` (1 962 LOC). Three-part
+  `feature_id::role::fingerprint` selectors survive parameter edits —
+  a downstream fillet still targets the *semantically same* edge after
+  its upstream box is resized. Evaluators wired for box / cylinder /
+  sphere / boolean / chamfer / fillet.
+- **G1 / G2 surface fillet + edge chamfer that trim + sew** —
+  `fillet_solid.py` (1 631 LOC) + `chamfer.py` (1 040 LOC). G2
+  cross-sections, verified curvature continuity, planar+planar and
+  planar+cylindrical edge contracts.
+- **Surface / curve / loop offsets with exact-distance oracles** —
+  `offset.py` (877 LOC). Concentric circle, parallel plane, sphere
+  r → r+d analytic oracles.
+- **Coons patches** — `coons.py` (519 LOC). Boundary interpolation
+  exact to `1e-12`.
+- **Closest-point / point-inversion** — `inversion.py` (629 LOC).
+  Piegl 6.1 with analytic first + second partials on rational
+  surfaces. The foundational primitive snapping/projection/deviation/
+  SSI seeding/fitting/draft analysis builds on.
+- **Hardened SSI** — `intersection.py` rebuilt with loop-detection,
+  tangential-branch detection, small-loop guard, analytic line/quadric
+  specialisations. **Rational-weight bug fixed** along the way.
+- **FCC Part 15 Class B EMC reference-distance fix** — emc wizard
+  limits were ~10.46 dB too low against the published Class B mask;
+  corrected at the reference-distance derivation (commit ca9e651).
+- **Conftest plugin-name collision fix** — empty
+  `tests/__init__.py` files in billing / pricing / plc were blocking
+  whole-suite collection; removed (commit e663c64).
+- **Python 3.13 asyncio compat** — restored pre-3.10
+  `asyncio.get_event_loop()` semantics in the test process so the
+  ship-gate runs on 3.13 (commit 775b178).
+- **Ship-gate suite — 1 649 fail → 0 fail.** Full repo collection:
+  **23 902 tests**. Of these the listed kernel ship-gate files —
+  `test_brep_topology` (51), `test_euler_invariants` (63),
+  `test_brep_build` (43), `test_boolean_solid` (36), `test_chamfer`
+  (30), `test_fillet_blend_g2` (53), `test_offset` (33), `test_coons`
+  (49), `test_surface_analysis_refvalues` (46), `test_nurbs_correctness`
+  (44), `test_inversion` (42), `test_ssi_robust` (37),
+  `test_curve_toolkit_exact` (46), `test_history_dag` (47) — total
+  **620 hermetic analytic-oracle-asserted tests**, all green. Counts
+  verified via `pytest --collect-only`, not estimated.
+
+Plan + per-task `GK-NN` checklist (P2 interop is next):
+[`docs/plans/geometry-kernel-roadmap.md`](./docs/plans/geometry-kernel-roadmap.md).
+
 ## [0.1.0] — 2026-05-15
 
 Initial public release. The core platform across mechanical, electronics,

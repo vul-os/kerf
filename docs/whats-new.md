@@ -2,6 +2,26 @@
 
 Recent features shipped to Kerf. See [ROADMAP.md](https://github.com/kerf-sh/kerf/blob/main/ROADMAP.md) for the full list and status of every item.
 
+## Sprint — mid-May 2026 — geometry kernel step-change
+
+The pure-Python geometry kernel went from "approximate circles, broken or
+delegated booleans, no parametric history" to a real math-depth moat: every
+analytic builder now emits a topologically validated solid; cut / fuse /
+common booleans run in pure Python with a tolerance-aware shell sewer and
+return a watertight 2-manifold body; edges fillet with verified G1/G2
+continuity and chamfer with constant / asymmetric / variable widths; surface,
+curve, and loop offsets land with exact-distance oracles; the closest-point
+primitive everything else builds on is in place; surface–surface intersection
+is hardened (with a long-standing rational-weight bug fixed); and the kernel
+now carries an in-process parametric **history DAG** with persistent face /
+edge naming — so editing an upstream parameter regenerates the downstream
+fillet against the *semantically same* edge, not a different one. **620
+hermetic analytic-oracle-asserted kernel tests are green; the full repository
+collects 23 902 tests, ship-gate clean.** Detail and the next P2 (pure-Python
+STEP/IGES + SubD↔NURBS + mesh→NURBS autosurface + 2D region boolean) step
+live in
+[`docs/plans/geometry-kernel-roadmap.md`](./plans/geometry-kernel-roadmap.md).
+
 ## Sprint — May 2026
 
 ### Plugin architecture + monorepo

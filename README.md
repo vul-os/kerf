@@ -158,10 +158,10 @@ Full schema: see [`kerf.example.toml`](./kerf.example.toml).
 | Persistent face naming (sketch-anchored + topo-hash fallback; survives upstream sketch edits) | ✅ |
 | 5-axis CAM v1 (constant-tilt finishing + 3+2 indexed) | ✅ |
 | Wiring / harness diagrams (`.wiring` via WireViz YAML → SVG) | ✅ |
+| Quad remesher (Instant Meshes, optional binary) | ✅ |
 | 📋 NURBS Phase 4 — surface-direct booleans + trim-by-curve + matchSrf + G3 | in flight |
 | 📋 PLC structured text (`.plc.st` via IEC 61131-3 + OpenPLC) | next |
 | 📋 Slicing — cross-section + CNC layered + 3D-print G-code | next |
-| ✅ Quad remesher (Instant Meshes, optional binary) | shipped |
 | 📋 SubD modelling / Grasshopper node graph | planned |
 
 The full ROADMAP — shipped, in-flight, next, planned — is in [ROADMAP.md](./ROADMAP.md).

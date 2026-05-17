@@ -28,7 +28,7 @@ async def register(app, ctx) -> PluginManifest:
 
 ## Price refresh worker (`kerf_pricing.worker.PricingRefreshWorker`)
 
-A background worker that periodically fetches live per-token pricing from LLM providers via the LiteLLM pricing API and writes them to the `model_prices` table. The refresh also applies the cheap-tier eligible flag.
+A background worker that periodically fetches live per-token pricing from LLM providers via the provider pricing API and writes them to the `model_prices` table. The refresh also applies the cheap-tier eligible flag.
 
 Refresh interval is configurable. The worker is only started when `not ctx.local_mode`.
 
@@ -73,9 +73,9 @@ Currency: displayed in USD, settled in the configured settlement currency (defau
 
 ---
 
-## LiteLLM client (`kerf_pricing.litellm_client`)
+## Pricing client (`kerf_pricing.litellm_client`)
 
-Wraps the LiteLLM pricing endpoint to fetch `{provider, model_id, input_cost_per_mtok, output_cost_per_mtok}` for all known models. The `refresh` module translates this into DB upserts with the cheap-tier flag applied.
+Wraps the provider pricing API to fetch `{provider, model_id, input_cost_per_mtok, output_cost_per_mtok}` for all known models. The `refresh` module translates this into DB upserts with the cheap-tier flag applied.
 
 ---
 

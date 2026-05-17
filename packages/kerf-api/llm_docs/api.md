@@ -35,7 +35,7 @@ Each module exposes `<name>_spec` (a `ToolSpec`) and `run_<name>` (an async hand
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| GET | `/api/config` | None | Server-side feature flags for the frontend (`cloud_enabled`, `local_mode`, OAuth availability, Paystack public key). No secrets. |
+| GET | `/api/config` | None | Server-side feature flags for the frontend (`cloud_enabled`, `local_mode`, OAuth availability, payments-provider public key). No secrets. |
 
 ### Users / Me
 

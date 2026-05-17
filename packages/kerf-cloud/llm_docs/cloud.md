@@ -35,8 +35,8 @@ async def register(app, ctx) -> PluginManifest:
 
 | Method | Path | Description |
 |---|---|---|
-| POST | `/api/projects/{id}/git/init` | Initialise a bare git repo for the project (S3-backed via `S3GitStorer`) |
-| POST | `/api/projects/{id}/git/import` | Import from a GitHub URL (clone → store in S3) |
+| POST | `/api/projects/{id}/git/init` | Initialise a bare git repo for the project (object-storage-backed via `ObjectGitStorer`) |
+| POST | `/api/projects/{id}/git/import` | Import from a GitHub URL (clone → store in object storage) |
 | POST | `/api/projects/{id}/git/connect` | Connect to an existing GitHub repo (owner/repo) |
 | POST | `/api/projects/{id}/git/commit` | Commit current project state to the git backend |
 | POST | `/api/projects/{id}/git/push` | Push local git state to GitHub (requires installation token) |
@@ -67,12 +67,12 @@ Private key is stored as base64 in `CLOUD_GITHUB_PRIVATE_KEY_B64` and never logg
 
 ### Git storage architecture
 
-The git backend uses `S3GitStorer` from `kerf_core.storage.git_storer`:
+The git backend uses `ObjectGitStorer` from `kerf_core.storage.git_storer`:
 
-1. Each project has a bare git repo at `<S3_PREFIX>/git/<project_id>/`
+1. Each project has a bare git repo under `<STORAGE_PREFIX>/git/<project_id>/`
 2. To work with the repo: `clone_to_local(tmp_dir)` → modify → `push_from_local(tmp_dir)`
 3. Objects upload in order: pack files → loose objects → refs (reader-safe ordering)
-4. Optimistic concurrency via a sentinel `_marker` S3 object; concurrent pushers receive `StorerConcurrencyError`
+4. Optimistic concurrency via a sentinel `_marker` object; concurrent pushers receive `StorerConcurrencyError`
 
 This model was chosen to support large STEP / binary CAD file workflows without per-object overhead.
 
@@ -147,7 +147,7 @@ The sweep worker periodically calls `reload()` to pick up new credentials withou
 
 Transactional email via a pluggable provider abstraction. See `packages/kerf-cloud/llm_docs/email_providers.md` for the provider-level docs.
 
-Provider is selected by `EMAIL_PROVIDER` config: `smtp` (default), `resend`, `ses`.
+Provider is selected by `EMAIL_PROVIDER` config. See `packages/kerf-cloud/llm_docs/email_providers.md` for the full provider list and configuration.
 
 ---
 

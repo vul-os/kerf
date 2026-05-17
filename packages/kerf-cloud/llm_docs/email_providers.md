@@ -8,11 +8,11 @@ working with no changes.
 
 Set `EMAIL_PROVIDER` to one of:
 
-| Value    | Description                          | Required credentials            |
-|----------|--------------------------------------|---------------------------------|
-| `smtp`   | Any SMTP relay (default)             | `SMTP_HOST`, `SMTP_PORT`        |
-| `resend` | Resend HTTP API                      | `RESEND_API_KEY`                |
-| `ses`    | AWS SES v2 (requires `boto3`)        | `SES_REGION` (+ optional keys)  |
+| Value    | Description                                              | Required credentials            |
+|----------|----------------------------------------------------------|---------------------------------|
+| `smtp`   | Any SMTP relay (default)                                 | `SMTP_HOST`, `SMTP_PORT`        |
+| `resend` | Transactional email HTTP API provider                    | `RESEND_API_KEY`                |
+| `ses`    | Cloud email service (v2, requires `boto3`)               | `SES_REGION` (+ optional keys)  |
 
 Always set `EMAIL_FROM` to the default "From" address, e.g.:
 
@@ -59,16 +59,16 @@ send_email(
 )
 ```
 
-## SES and boto3
+## Cloud email service (`ses`) and boto3
 
-The SES path requires `boto3`.  It is an optional dependency — if `boto3` is not
+The `ses` path requires `boto3`.  It is an optional dependency — if `boto3` is not
 installed, `send_email` raises a clear `ImportError` explaining how to install it.
 
 ```
 pip install boto3
 ```
 
-When running on AWS (EC2, ECS, Lambda) with an IAM role, leave
+When running on a cloud host with an IAM instance role, leave
 `SES_ACCESS_KEY_ID` and `SES_SECRET_ACCESS_KEY` unset; `boto3` will pick up the
 instance credentials automatically.
 

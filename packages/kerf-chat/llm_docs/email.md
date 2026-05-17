@@ -43,7 +43,7 @@ the database, or the operator's `/admin/email` page.
 | `welcome`                  | Cloud-only, after `POST /auth/register` succeeds         | Welcome to kerf                               |
 | `password_reset`           | After `POST /auth/password-reset/request`                | Reset your kerf password                      |
 | `password_reset_complete`  | After the reset link is consumed                         | Your kerf password was changed                |
-| `billing_receipt`          | Paystack `charge.success` webhook, after credit applied  | Receipt for your top-up · kerf                |
+| `billing_receipt`          | Payments provider `charge.success` webhook, after credit applied  | Receipt for your top-up · kerf                |
 | `low_balance`              | Token debit drops balance below $1, max 1×/24h           | Your balance is running low · kerf            |
 | `github_linked`            | `/auth/github/callback` after token storage              | GitHub linked to your kerf account            |
 | `workshop_published`       | First `POST /api/workshop/publish` for a project         | Your project is live on kerf Workshop · kerf  |
@@ -100,5 +100,5 @@ notifications would spam the author.
   table above is canonical.
 - If the user asks how to make sure receipts go to a different address,
   the answer is: the receipt goes to the account email; change the
-  account email in profile settings (or use Paystack's per-customer
-  email override on the next top-up if email changes are out of band).
+  account email in profile settings (or use the payments provider's
+  per-customer email override on the next top-up if email changes are out of band).

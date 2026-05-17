@@ -21,6 +21,20 @@
 // camera's screen plane to get a 2D screen-direction, then dot the cursor
 // pixel-delta with that direction and divide by the projected length to get
 // world units. Identical idea to the push/pull projection in FeatureRenderer.
+//
+// Input handling — Pointer Events with `setPointerCapture` (T-C3): the
+// component listens for `pointerdown` on the canvas, captures the pointer
+// on the event target, and listens for `pointermove`/`pointerup`/
+// `pointercancel` on the captured element. Pointer capture is the key
+// affordance for touch: it guarantees we keep getting move events even
+// when the finger leaves the (tiny) handle hitbox mid-drag. Touch
+// pointers also use a wider screen-space hit threshold (~18px, ~1.75× the
+// effective mouse hit threshold) by fanning out a small ring of raycasts
+// around the pointer; mouse pointers keep the legacy single-raycast hit
+// test for byte-for-byte unchanged behaviour. Synthetic mouse events that
+// browsers emit after a touch sequence are suppressed via
+// `touch-action: none` plus a capture-phase mouse-event swallower while
+// a touch drag is active.
 
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
@@ -313,9 +327,27 @@ export default function Gumball({ getThreeContext, meshes }) {
 
     // Pointer interactions — register on the domElement so OrbitControls
     // can still receive its events when we don't claim the gesture.
+    //
+    // T-C3: Pointer Events with setPointerCapture for reliable finger drags.
+    // When the finger leaves a small handle hitbox mid-drag, pointer capture
+    // ensures we keep receiving pointermove on the captured element so the
+    // gesture survives. Mouse pointers (pointerType === 'mouse') use the
+    // same code path with a tight hit threshold; touch pointers use a wider
+    // hit threshold (~18px, ~1.75× the mouse pickbox) so finger-sized targets
+    // can grab the small spheres / thin rings reliably.
     const raycaster = new THREE.Raycaster()
     raycaster.params.Line = { threshold: 0.5 }
     const pointer = new THREE.Vector2()
+
+    // Hit thresholds in screen pixels.
+    //   * MOUSE: 0px — single raycast at the exact pointer; preserves the
+    //     legacy mouse hit behaviour exactly.
+    //   * TOUCH: 18px — fan of raycasts at the center + 4 cardinal offsets,
+    //     so finger-size taps grab the small spheres / rings. 18px ≈ 1.75×
+    //     the visible-handle pixel size at a typical viewing distance, and
+    //     aligns with platform "minimum touch target" guidance.
+    const MOUSE_HIT_THRESHOLD_PX = 0
+    const TOUCH_HIT_THRESHOLD_PX = 18
 
     function pointerFromEvent(ev) {
       const rect = domElement.getBoundingClientRect()
@@ -323,10 +355,42 @@ export default function Gumball({ getThreeContext, meshes }) {
       pointer.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1
     }
 
-    function pickHandle() {
+    function intersectHandlesAtNdc(ndcX, ndcY) {
+      pointer.x = ndcX; pointer.y = ndcY
       raycaster.setFromCamera(pointer, camera)
       const targets = handles.map((h) => h.object)
-      const hits = raycaster.intersectObjects(targets, false)
+      return raycaster.intersectObjects(targets, false)
+    }
+
+    // Pick a handle under the cursor. For touch pointers, fan out a small
+    // ring of raycasts so a finger landing near (but not exactly on) a
+    // tiny handle still acquires it. For mouse pointers, single raycast
+    // at the exact pixel — identical to legacy behaviour.
+    function pickHandle(pointerType) {
+      const rect = domElement.getBoundingClientRect()
+      // Center raycast (used by both mouse and touch).
+      raycaster.setFromCamera(pointer, camera)
+      const targets = handles.map((h) => h.object)
+      let hits = raycaster.intersectObjects(targets, false)
+      const threshold = pointerType === 'touch'
+        ? TOUCH_HIT_THRESHOLD_PX
+        : MOUSE_HIT_THRESHOLD_PX
+      if (hits.length === 0 && threshold > 0 && rect.width > 0 && rect.height > 0) {
+        // Fan-out: 4 cardinal offsets at the threshold radius. Stop at the
+        // first non-empty hit list so closer handles win.
+        const offsets = [
+          [threshold, 0], [-threshold, 0],
+          [0, threshold], [0, -threshold],
+        ]
+        const cx = pointer.x
+        const cy = pointer.y
+        for (const [ox, oy] of offsets) {
+          const ndcDx = (ox / rect.width) * 2
+          const ndcDy = -(oy / rect.height) * 2
+          const fanHits = intersectHandlesAtNdc(cx + ndcDx, cy + ndcDy)
+          if (fanHits.length > 0) { hits = fanHits; break }
+        }
+      }
       if (hits.length === 0) return null
       const h = hits[0].object.userData
       return handles.find((x) => x.kind === h.kind && x.axisId === h.axisId) || null
@@ -352,12 +416,37 @@ export default function Gumball({ getThreeContext, meshes }) {
       if (overlay) overlay.style.display = 'none'
     }
 
+    // Saved touch-action so we can restore it on unmount. We force
+    // `touch-action: none` while the gumball is mounted so the browser
+    // doesn't steal touch gestures (scroll/zoom) before we see them, and
+    // doesn't fire synthetic mouse events after touch sequences (which
+    // would otherwise double-fire any mouse-side OrbitControls handlers).
+    const prevTouchAction = domElement.style.touchAction
+    domElement.style.touchAction = 'none'
+
+    // Track the captured pointerId so pointermove from unrelated pointers
+    // (e.g. a second finger landing during a drag) doesn't disturb us.
+    let activePointerId = null
+    let captureTarget = null
+
     function onDown(ev) {
+      // Only primary button for mouse; touch/pen always count.
+      if (ev.pointerType === 'mouse' && ev.button !== 0) return
       pointerFromEvent(ev)
-      const handle = pickHandle()
+      const handle = pickHandle(ev.pointerType)
       if (!handle) return
       ev.preventDefault()
       ev.stopPropagation()
+      // Capture the pointer so we keep getting pointermove even when the
+      // finger leaves the small handle hitbox — the key fix that makes
+      // finger drag of a gumball handle reliable on touch.
+      try {
+        ev.target.setPointerCapture(ev.pointerId)
+        captureTarget = ev.target
+      } catch (_e) {
+        captureTarget = null
+      }
+      activePointerId = ev.pointerId
       // Suppress orbit during drag.
       controls.enabled = false
       dragRef.current = {
@@ -378,13 +467,19 @@ export default function Gumball({ getThreeContext, meshes }) {
         distance: 0,
         angleRad: 0,
       }
-      window.addEventListener('mousemove', onMove)
-      window.addEventListener('mouseup', onUp)
+      // Listen on the captured target so we get events even when the
+      // pointer leaves the gumball handle hitbox. Fall back to window for
+      // legacy/jsdom environments that don't implement pointer capture.
+      const target = captureTarget || window
+      target.addEventListener('pointermove', onMove)
+      target.addEventListener('pointerup', onUp)
+      target.addEventListener('pointercancel', onUp)
     }
 
     function onMove(ev) {
       const drag = dragRef.current
       if (!drag) return
+      if (activePointerId != null && ev.pointerId !== activePointerId) return
       const dxp = ev.clientX - drag.startX
       const dyp = ev.clientY - drag.startY
       if (drag.handle.kind === 'translate') {
@@ -404,10 +499,22 @@ export default function Gumball({ getThreeContext, meshes }) {
       }
     }
 
-    function onUp() {
+    function detachDragListeners() {
+      const target = captureTarget || window
+      target.removeEventListener('pointermove', onMove)
+      target.removeEventListener('pointerup', onUp)
+      target.removeEventListener('pointercancel', onUp)
+    }
+
+    function onUp(ev) {
       const drag = dragRef.current
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
+      if (ev && activePointerId != null && ev.pointerId !== activePointerId) return
+      detachDragListeners()
+      if (captureTarget && activePointerId != null) {
+        try { captureTarget.releasePointerCapture(activePointerId) } catch (_e) { /* ignore */ }
+      }
+      captureTarget = null
+      activePointerId = null
       controls.enabled = true
       hideOverlay()
       dragRef.current = null
@@ -459,12 +566,28 @@ export default function Gumball({ getThreeContext, meshes }) {
       }
     }
 
-    domElement.addEventListener('mousedown', onDown)
+    // Swallow the synthetic mouse events some browsers still emit after a
+    // touch sequence even with `touch-action: none`. We only consume them
+    // while we're holding a touch-originated drag; for normal mouse use,
+    // these listeners short-circuit immediately (no active pointer).
+    function suppressSyntheticMouse(ev) {
+      if (activePointerId == null) return
+      ev.preventDefault()
+      ev.stopPropagation()
+    }
+
+    domElement.addEventListener('pointerdown', onDown)
+    domElement.addEventListener('mousedown', suppressSyntheticMouse, true)
+    domElement.addEventListener('mousemove', suppressSyntheticMouse, true)
+    domElement.addEventListener('mouseup', suppressSyntheticMouse, true)
 
     return () => {
-      domElement.removeEventListener('mousedown', onDown)
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
+      domElement.removeEventListener('pointerdown', onDown)
+      domElement.removeEventListener('mousedown', suppressSyntheticMouse, true)
+      domElement.removeEventListener('mousemove', suppressSyntheticMouse, true)
+      domElement.removeEventListener('mouseup', suppressSyntheticMouse, true)
+      detachDragListeners()
+      domElement.style.touchAction = prevTouchAction
       scene.remove(group)
       group.traverse((o) => {
         o.geometry?.dispose?.()
@@ -672,16 +795,52 @@ function mountEdgeMode({
   const raycaster = new THREE.Raycaster()
   const pointer = new THREE.Vector2()
 
+  // T-C3: edge-mode mirrors face-mode's pointer-event + setPointerCapture
+  // strategy. Touch pointers expand the hit threshold (~18px ≈ 1.75× the
+  // mouse default) by fanning the raycast around the cursor; mouse keeps
+  // a single raycast for byte-for-byte unchanged behaviour.
+  const MOUSE_HIT_THRESHOLD_PX = 0
+  const TOUCH_HIT_THRESHOLD_PX = 18
+
+  const prevTouchAction = domElement.style.touchAction
+  domElement.style.touchAction = 'none'
+
+  let activePointerId = null
+  let captureTarget = null
+
   function pointerFromEvent(ev) {
     const rect = domElement.getBoundingClientRect()
     pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1
     pointer.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1
   }
 
-  function pickHandle() {
+  function pickHandleAtNdc(ndcX, ndcY) {
+    pointer.x = ndcX; pointer.y = ndcY
     raycaster.setFromCamera(pointer, camera)
-    const hits = raycaster.intersectObject(pick, false)
-    return hits.length > 0
+    return raycaster.intersectObject(pick, false).length > 0
+  }
+
+  function pickHandle(pointerType) {
+    raycaster.setFromCamera(pointer, camera)
+    if (raycaster.intersectObject(pick, false).length > 0) return true
+    const threshold = pointerType === 'touch'
+      ? TOUCH_HIT_THRESHOLD_PX
+      : MOUSE_HIT_THRESHOLD_PX
+    if (threshold <= 0) return false
+    const rect = domElement.getBoundingClientRect()
+    if (rect.width <= 0 || rect.height <= 0) return false
+    const cx = pointer.x
+    const cy = pointer.y
+    const offsets = [
+      [threshold, 0], [-threshold, 0],
+      [0, threshold], [0, -threshold],
+    ]
+    for (const [ox, oy] of offsets) {
+      const ndcDx = (ox / rect.width) * 2
+      const ndcDy = -(oy / rect.height) * 2
+      if (pickHandleAtNdc(cx + ndcDx, cy + ndcDy)) return true
+    }
+    return false
   }
 
   function showOverlay(text, screenXY) {
@@ -693,10 +852,18 @@ function mountEdgeMode({
   function hideOverlay() { overlay.style.display = 'none' }
 
   function onDown(ev) {
+    if (ev.pointerType === 'mouse' && ev.button !== 0) return
     pointerFromEvent(ev)
-    if (!pickHandle()) return
+    if (!pickHandle(ev.pointerType)) return
     ev.preventDefault()
     ev.stopPropagation()
+    try {
+      ev.target.setPointerCapture(ev.pointerId)
+      captureTarget = ev.target
+    } catch (_e) {
+      captureTarget = null
+    }
+    activePointerId = ev.pointerId
     controls.enabled = false
     dragRef.current = {
       startX: ev.clientX,
@@ -707,13 +874,16 @@ function mountEdgeMode({
       edgeId,
       radius: 0,
     }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
+    const target = captureTarget || window
+    target.addEventListener('pointermove', onMove)
+    target.addEventListener('pointerup', onUp)
+    target.addEventListener('pointercancel', onUp)
   }
 
   function onMove(ev) {
     const drag = dragRef.current
     if (!drag) return
+    if (activePointerId != null && ev.pointerId !== activePointerId) return
     const dxp = ev.clientX - drag.startX
     const dyp = ev.clientY - drag.startY
     const rect = domElement.getBoundingClientRect()
@@ -730,10 +900,22 @@ function mountEdgeMode({
     showOverlay(`r ${r.toFixed(2)} mm`, [ev.clientX, ev.clientY])
   }
 
-  function onUp() {
+  function detachDragListeners() {
+    const target = captureTarget || window
+    target.removeEventListener('pointermove', onMove)
+    target.removeEventListener('pointerup', onUp)
+    target.removeEventListener('pointercancel', onUp)
+  }
+
+  function onUp(ev) {
     const drag = dragRef.current
-    window.removeEventListener('mousemove', onMove)
-    window.removeEventListener('mouseup', onUp)
+    if (ev && activePointerId != null && ev.pointerId !== activePointerId) return
+    detachDragListeners()
+    if (captureTarget && activePointerId != null) {
+      try { captureTarget.releasePointerCapture(activePointerId) } catch (_e) { /* ignore */ }
+    }
+    captureTarget = null
+    activePointerId = null
     controls.enabled = true
     hideOverlay()
     ring.visible = false
@@ -754,13 +936,25 @@ function mountEdgeMode({
     }))
   }
 
-  domElement.addEventListener('mousedown', onDown)
+  function suppressSyntheticMouse(ev) {
+    if (activePointerId == null) return
+    ev.preventDefault()
+    ev.stopPropagation()
+  }
+
+  domElement.addEventListener('pointerdown', onDown)
+  domElement.addEventListener('mousedown', suppressSyntheticMouse, true)
+  domElement.addEventListener('mousemove', suppressSyntheticMouse, true)
+  domElement.addEventListener('mouseup', suppressSyntheticMouse, true)
 
   return () => {
     if (rafId) cancelAnimationFrame(rafId)
-    domElement.removeEventListener('mousedown', onDown)
-    window.removeEventListener('mousemove', onMove)
-    window.removeEventListener('mouseup', onUp)
+    domElement.removeEventListener('pointerdown', onDown)
+    domElement.removeEventListener('mousedown', suppressSyntheticMouse, true)
+    domElement.removeEventListener('mousemove', suppressSyntheticMouse, true)
+    domElement.removeEventListener('mouseup', suppressSyntheticMouse, true)
+    detachDragListeners()
+    domElement.style.touchAction = prevTouchAction
     scene.remove(group)
     group.traverse((o) => {
       o.geometry?.dispose?.()

@@ -108,7 +108,7 @@ const TABLE = [
     competitor: `${WEAK} Basic 2D constraints; not a parametric history sketcher`,
     kerf: `${GOOD} Sketcher v2 — full parametric constraints` },
   { group: 'Primary capability', feature: 'Parametric history DAG',
-    competitor: `${WEAK} Limited; no true feature history (that is Inventor)',
+    competitor: `${WEAK} Limited; no true feature history (that is Inventor)`,
     kerf: `${GOOD} Feature DAG + persistent face naming (Phase 4)` },
 
   // 2D drafting toolset

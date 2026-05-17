@@ -17,7 +17,11 @@ import { makeCompareMeta, PAGES } from '../routes/compare/compareMeta.js'
 /* -------------------------------------------------------------------------- */
 
 describe('makeCompareMeta', () => {
-  const slugs = ['freecad', 'kicad', 'rhino', 'revit', 'fusion']
+  const slugs = [
+    'freecad', 'kicad', 'rhino', 'revit', 'fusion',
+    'solidworks', 'onshape', 'altium', 'matrixgold', 'blender',
+    'autocad', 'inventor', 'civil3d', 'max3ds',
+  ]
 
   slugs.forEach((slug) => {
     it(`${slug}: title ≤60 chars`, () => {
@@ -64,16 +68,17 @@ describe('makeCompareMeta', () => {
 /* -------------------------------------------------------------------------- */
 
 describe('PAGES registry', () => {
-  it('contains exactly 5 entries', () => {
-    expect(Object.keys(PAGES)).toHaveLength(5)
+  it('contains exactly 14 entries', () => {
+    expect(Object.keys(PAGES)).toHaveLength(14)
   })
 
-  it('contains freecad, kicad, rhino, revit, fusion', () => {
-    expect(PAGES).toHaveProperty('freecad')
-    expect(PAGES).toHaveProperty('kicad')
-    expect(PAGES).toHaveProperty('rhino')
-    expect(PAGES).toHaveProperty('revit')
-    expect(PAGES).toHaveProperty('fusion')
+  it('contains all 14 slugs', () => {
+    const expected = [
+      'freecad', 'kicad', 'rhino', 'revit', 'fusion',
+      'solidworks', 'onshape', 'altium', 'matrixgold', 'blender',
+      'autocad', 'inventor', 'civil3d', 'max3ds',
+    ]
+    expected.forEach((slug) => expect(PAGES).toHaveProperty(slug))
   })
 })
 

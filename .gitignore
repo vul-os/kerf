@@ -72,6 +72,10 @@ __pycache__/
 venv/
 env/
 
+# Playwright e2e generated artifacts
+tests/e2e/test-results/
+tests/e2e/playwright-report/
+
 # Misc
 .cache/
 

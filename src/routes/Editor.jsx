@@ -213,6 +213,82 @@ function Build3DDropdown({ sketch, sketchName, onBuild, disabled }) {
   )
 }
 
+// ---------------------------------------------------------------------------
+// TopBarMoreMenu — T-L2 priority+ overflow menu for the Editor top-bar.
+//
+// Visible only at widths where the inline button row has had to elide
+// lower-priority actions (i.e. < xl in the current breakpoint mapping). The
+// caller passes `children` — those are the same action <button>s that
+// appear inline, each with their own breakpoint-conditional visibility
+// class (`inline-flex md:hidden` / `inline-flex lg:hidden` / etc.). When
+// the popup mounts, only the ones not visible inline at the current width
+// remain visible inside the popup, which is the priority+ pattern.
+//
+// Accessibility: button has `aria-haspopup` + `aria-expanded`; popup has
+// `role="menu"`. Esc closes; click-outside closes; the host wires
+// `role="menuitem"` onto each child via the menu-item recipe applied
+// inline below.
+// ---------------------------------------------------------------------------
+function TopBarMoreMenu({ children }) {
+  const [open, setOpen] = useState(false)
+  const wrapRef = useRef(null)
+  const buttonRef = useRef(null)
+  useEffect(() => {
+    if (!open) return
+    function onDoc(e) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false)
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') {
+        setOpen(false)
+        // Return focus to the trigger so keyboard users land back on a
+        // tabbable element.
+        buttonRef.current?.focus?.()
+      }
+    }
+    window.addEventListener('mousedown', onDoc)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('mousedown', onDoc)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+  // T-L2 visibility gate: the More button is itself hidden at ≥ xl since
+  // every action is visible inline at that breakpoint. The popup adopts
+  // dark-surface tokens consistent with the rest of the editor chrome.
+  return (
+    <div ref={wrapRef} className="relative xl:hidden">
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-label="More actions"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title="More actions"
+        className="p-1.5 rounded hover:bg-ink-800 text-ink-300 hover:text-kerf-300"
+      >
+        <MoreHorizontal size={14} />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          aria-label="More actions"
+          className="absolute right-0 top-full mt-1 z-40 min-w-[180px] bg-ink-900 border border-ink-700 rounded-md shadow-xl py-1"
+          onClick={(e) => {
+            // Click on a menu item bubbles up — close the popup after the
+            // child action's onClick fires.
+            const t = e.target
+            if (t && t.closest && t.closest('[role="menuitem"]')) setOpen(false)
+          }}
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
 const AUTOSAVE_MS = 500
 // Re-eval debounce, scaled by file size. Small files feel snappy at 250ms;
 // very large files spend most of that window evaluating, so we stretch the
@@ -1131,12 +1207,29 @@ export default function Editor() {
 
         <SaveIndicator status={saveStatus} />
 
+        {/* ---------- T-L2 Priority+ icon row ----------
+            Visibility classes (priority highest → lowest):
+              - Undo / Redo: always visible (P1, primary editing).
+              - History: visible ≥ md (P2, hidden < 768px → overflow).
+              - Activity: visible ≥ md (P3, hidden < 768px → overflow).
+              - Git: visible ≥ lg (P4, hidden < 1024px → overflow).
+              - Export: always visible (own dropdown — keep accessible).
+              - Refresh thumbnail: visible ≥ xl (P5, hidden < 1280px → overflow).
+              - Publish: always visible (cloud CTA).
+              - Chat toggle: always visible (primary navigation).
+            At ≥ xl every action is inline; the overflow More menu auto-
+            hides (`xl:hidden` inside TopBarMoreMenu). Down to 768px the
+            inline row never overflows because the lowest-priority items
+            have been moved into the popup. Every icon-only button has an
+            explicit `aria-label`.
+        */}
         <button
           type="button"
           onClick={() => w.undoLastRevision()}
           disabled={!w.currentFileId}
           title="Undo (Cmd+Z)"
-          className="p-1.5 rounded hover:bg-ink-800 text-ink-300 hover:text-kerf-300 disabled:opacity-40 disabled:hover:bg-transparent"
+          aria-label="Undo"
+          className="inline-flex p-1.5 rounded hover:bg-ink-800 text-ink-300 hover:text-kerf-300 disabled:opacity-40 disabled:hover:bg-transparent"
         >
           <Undo2 size={14} />
         </button>
@@ -1145,7 +1238,8 @@ export default function Editor() {
           onClick={() => w.redoRevision()}
           disabled={!w.currentFileId || (w.redoStack?.length ?? 0) === 0}
           title="Redo (Cmd+Shift+Z)"
-          className="p-1.5 rounded hover:bg-ink-800 text-ink-300 hover:text-kerf-300 disabled:opacity-40 disabled:hover:bg-transparent"
+          aria-label="Redo"
+          className="inline-flex p-1.5 rounded hover:bg-ink-800 text-ink-300 hover:text-kerf-300 disabled:opacity-40 disabled:hover:bg-transparent"
         >
           <Redo2 size={14} />
         </button>
@@ -1154,7 +1248,8 @@ export default function Editor() {
           onClick={() => w.openRevisionDrawer()}
           disabled={!w.currentFileId}
           title="History"
-          className="p-1.5 rounded hover:bg-ink-800 text-ink-300 hover:text-kerf-300 disabled:opacity-40 disabled:hover:bg-transparent"
+          aria-label="Revision history"
+          className="hidden md:inline-flex p-1.5 rounded hover:bg-ink-800 text-ink-300 hover:text-kerf-300 disabled:opacity-40 disabled:hover:bg-transparent"
         >
           <History size={14} />
         </button>
@@ -1164,7 +1259,8 @@ export default function Editor() {
           onClick={() => w.openActivity()}
           disabled={!projectId}
           title="Activity"
-          className="p-1.5 rounded hover:bg-ink-800 text-ink-300 hover:text-kerf-300 disabled:opacity-40 disabled:hover:bg-transparent"
+          aria-label="Activity timeline"
+          className="hidden md:inline-flex p-1.5 rounded hover:bg-ink-800 text-ink-300 hover:text-kerf-300 disabled:opacity-40 disabled:hover:bg-transparent"
         >
           <Clock size={14} />
         </button>
@@ -1175,7 +1271,8 @@ export default function Editor() {
             onClick={() => w.openGitPanel()}
             disabled={!projectId}
             title="Git"
-            className="p-1.5 rounded hover:bg-ink-800 text-ink-300 hover:text-kerf-300 disabled:opacity-40 disabled:hover:bg-transparent"
+            aria-label="Git panel"
+            className="hidden lg:inline-flex p-1.5 rounded hover:bg-ink-800 text-ink-300 hover:text-kerf-300 disabled:opacity-40 disabled:hover:bg-transparent"
           >
             <GitBranch size={14} />
           </button>
@@ -1207,14 +1304,14 @@ export default function Editor() {
                   setThumbRefreshing(false)
                 }
               }}
-              className="p-1.5 rounded hover:bg-ink-800 text-ink-300 hover:text-kerf-300 disabled:opacity-40 disabled:hover:bg-transparent"
+              className="hidden xl:inline-flex p-1.5 rounded hover:bg-ink-800 text-ink-300 hover:text-kerf-300 disabled:opacity-40 disabled:hover:bg-transparent"
             >
               {thumbRefreshing
                 ? <Loader2 size={14} className="animate-spin" />
                 : <RotateCcw size={14} />}
             </button>
             {thumbToast && (
-              <span className="text-[11px] font-mono text-emerald-400 whitespace-nowrap">
+              <span className="hidden sm:inline text-[11px] font-mono text-emerald-400 whitespace-nowrap">
                 {thumbToast}
               </span>
             )}
@@ -1240,10 +1337,85 @@ export default function Editor() {
           title={chatCollapsed ? 'Open chat' : 'Hide chat'}
           aria-label={chatCollapsed ? 'Open chat panel' : 'Hide chat panel'}
           aria-expanded={!chatCollapsed || chatDrawerOpen}
-          className={`p-1.5 rounded hover:bg-ink-800 ${chatCollapsed ? 'text-ink-300 hover:text-kerf-300' : 'text-kerf-300'}`}
+          className={`inline-flex p-1.5 rounded hover:bg-ink-800 ${chatCollapsed ? 'text-ink-300 hover:text-kerf-300' : 'text-kerf-300'}`}
         >
           {chatCollapsed ? <PanelRightOpen size={14} /> : <PanelRightClose size={14} />}
         </button>
+
+        {/* ---------- T-L2 Overflow menu ----------
+            Mirrors the actions hidden in the inline row at narrower widths.
+            Each menu item has the inverse visibility class so it shows up
+            only when the corresponding inline button is hidden:
+              - History / Activity → `inline-flex md:hidden`
+              - Git → `inline-flex lg:hidden` (cloud-only)
+              - Refresh thumbnail → `inline-flex xl:hidden` (cloud-only)
+            Auto-closes on item click (handled in TopBarMoreMenu). The
+            host TopBarMoreMenu wrapper is itself `xl:hidden` so the menu
+            disappears entirely at ≥1280px. */}
+        <TopBarMoreMenu>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => w.openRevisionDrawer()}
+            disabled={!w.currentFileId}
+            className="inline-flex md:hidden w-full items-center gap-2 px-3 py-1.5 text-xs text-ink-100 hover:bg-ink-700 text-left disabled:opacity-40"
+          >
+            <History size={12} className="text-ink-400" />
+            <span>Revision history</span>
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => w.openActivity()}
+            disabled={!projectId}
+            className="inline-flex md:hidden w-full items-center gap-2 px-3 py-1.5 text-xs text-ink-100 hover:bg-ink-700 text-left disabled:opacity-40"
+          >
+            <Clock size={12} className="text-ink-400" />
+            <span>Activity timeline</span>
+          </button>
+          {cloudEnabled && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => w.openGitPanel()}
+              disabled={!projectId}
+              className="inline-flex lg:hidden w-full items-center gap-2 px-3 py-1.5 text-xs text-ink-100 hover:bg-ink-700 text-left disabled:opacity-40"
+            >
+              <GitBranch size={12} className="text-ink-400" />
+              <span>Git panel</span>
+            </button>
+          )}
+          {cloudEnabled && w.project && (
+            <button
+              type="button"
+              role="menuitem"
+              disabled={thumbRefreshing || !currentViewRef.current}
+              onClick={async () => {
+                if (thumbRefreshing || !projectId) return
+                setThumbRefreshing(true)
+                try {
+                  const blob = await captureSnapshotFn({ size: 512, quality: 0.7 })
+                  if (blob) {
+                    await api.uploadProjectThumbnail(projectId, blob)
+                    if (thumbToastTimerRef.current) clearTimeout(thumbToastTimerRef.current)
+                    setThumbToast('Thumbnail updated')
+                    thumbToastTimerRef.current = setTimeout(() => setThumbToast(null), 3000)
+                  }
+                } catch (err) {
+                  console.warn('[Editor] manual thumbnail refresh failed', err)
+                } finally {
+                  setThumbRefreshing(false)
+                }
+              }}
+              className="inline-flex xl:hidden w-full items-center gap-2 px-3 py-1.5 text-xs text-ink-100 hover:bg-ink-700 text-left disabled:opacity-40"
+            >
+              {thumbRefreshing
+                ? <Loader2 size={12} className="animate-spin text-ink-400" />
+                : <RotateCcw size={12} className="text-ink-400" />}
+              <span>Refresh thumbnail</span>
+            </button>
+          )}
+        </TopBarMoreMenu>
 
         <button
           type="button"

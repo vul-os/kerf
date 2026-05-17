@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ChevronDown, LogOut, User as UserIcon, Settings, CreditCard, Activity, UserCog, Users } from 'lucide-react'
+import { ChevronDown, LogOut, User as UserIcon, Settings, CreditCard, UserCog, Users } from 'lucide-react'
 import clsx from 'clsx'
 import { LogoWordmark } from './Logo.jsx'
 import WorkspaceSwitcher from './WorkspaceSwitcher.jsx'
@@ -130,15 +130,6 @@ function UserMenu({ user, onLogout, currentWorkspaceSlug, cloudEnabled }) {
                   >
                     <CreditCard size={14} className="text-ink-300" />
                     Billing
-                  </Link>
-                  <Link
-                    to="/usage"
-                    role="menuitem"
-                    onClick={() => setOpen(false)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-100 hover:bg-ink-800/80"
-                  >
-                    <Activity size={14} className="text-ink-300" />
-                    Usage
                   </Link>
                 </>
               )}

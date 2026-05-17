@@ -207,8 +207,10 @@ function ArticleBody({ entry, prev, next, userGroup }) {
         </nav>
       </article>
 
-      {/* Right-rail TOC, only on >= xl */}
-      <aside className="hidden xl:block w-[240px] shrink-0 px-6 py-12">
+      {/* Right-rail TOC, only on >= xl. Allow shrinking with a min-width so the
+          row doesn't overflow at the xl breakpoint when sidebar+article+toc
+          sum is right at 1280px. */}
+      <aside className="hidden xl:block w-[240px] min-w-[180px] shrink px-6 py-12 min-w-0">
         <TOC headings={headings} containerRef={articleRef} />
       </aside>
     </>

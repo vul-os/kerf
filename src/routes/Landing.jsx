@@ -190,13 +190,13 @@ function Hero() {
             </ul>
           </div>
 
-          <div className="relative hidden md:block">
+          <div className="relative hidden md:block overflow-hidden rounded-[2rem] p-6 -m-6">
             <div className="relative rounded-2xl border border-ink-800 bg-ink-900/40 backdrop-blur shadow-2xl shadow-black/60 overflow-hidden aspect-[3/2]">
               <HeroIllustration className="block w-full h-full" />
             </div>
             <div
               aria-hidden
-              className="absolute -inset-6 -z-10 rounded-[2rem] bg-kerf-300/[0.05] blur-3xl"
+              className="absolute inset-0 -z-10 rounded-[2rem] bg-kerf-300/[0.05] blur-3xl"
             />
             {/* small floating chips around the hero illustration to read at a glance */}
             <FloatingChip className="hidden lg:flex absolute -top-3 -left-4" icon={Sparkles} label="LLM tool surface" />

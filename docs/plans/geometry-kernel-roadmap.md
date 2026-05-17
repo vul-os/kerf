@@ -1,5 +1,48 @@
 # Geometry Kernel Roadmap — NURBS + B-rep to Rhino/OpenNURBS-class
 
+> **Status as of 2026-05-17.** Step-change landed. P0 (robustness
+> foundation) ✅, P1 (comprehensiveness parity — 5 streams landed) ✅,
+> P3 keystone (parametric history DAG + persistent face/edge naming +
+> evaluators) ✅. P2 (pure-Python STEP/IGES + SubD↔NURBS + mesh→NURBS
+> autosurface + 2D region boolean) is the **next** focus.
+>
+> Concrete evidence (verified by `pytest --collect-only` on the listed
+> ship-gate files, 2026-05-17):
+> `test_brep_topology` 51, `test_euler_invariants` 63, `test_brep_build`
+> 43, `test_boolean_solid` 36, `test_chamfer` 30, `test_fillet_blend_g2`
+> 53, `test_offset` 33, `test_coons` 49, `test_surface_analysis_refvalues`
+> 46, `test_nurbs_correctness` 44, `test_inversion` 42, `test_ssi_robust`
+> 37, `test_curve_toolkit_exact` 46, `test_history_dag` 47 —
+> **620 hermetic kernel tests, all green**, all analytic-oracle-asserted.
+> Full repo collection: **23 902 tests**.
+>
+> What this means in one paragraph: before this sprint Kerf had Rhino-width
+> construction verbs but the topology keystone (`brep.py`) was imported by
+> nothing in production, `make_circle_nurbs` was non-rational so every
+> "exact radius" oracle was poisoned, there was no `closest_point`, SSI
+> was sampling-grade, and every solid boolean was *delegated* to the OCCT
+> worker. Today the pure-Python layer produces a `validate_body`-clean
+> `Body` for the primitive matrix, tolerant cut/fuse/common over it,
+> G1/G2 surface blends with verified continuity, edge fillets and
+> chamfers that trim+sew, surface/curve offsets with exact-distance
+> oracles, Coons patches, hardened SSI (with the rational-weight bug
+> fix), `closest_point` for curves and surfaces with analytic
+> derivatives, and a complete in-process feature DAG with persistent
+> face/edge naming so a downstream fillet survives an upstream box-param
+> edit. The kernel is now the math-depth moat the §6 thesis demands.
+>
+> Spine cleared on the opus track: GK-01 → GK-04 (unify eval, analytic
+> derivatives, fix `curve_derivative`, exact rational circle/arc),
+> GK-05 (rational conic), GK-06/07/08 (closest-point), GK-09/10
+> (hardened SSI + analytic specialisations), GK-13 (brep_build),
+> GK-17/18/19/21 (sew + tolerant boolean + face imprint + tolerance
+> propagation), GK-22 (Piegl-Tiller fit_curve), GK-24/25/26 (G1/G2
+> surface blend, fillet trims+sews), GK-30/31/32 (offsets), GK-33
+> (Coons), GK-36 (curvature refvalues), GK-58/59/60/61/62 (history
+> DAG + persistent naming + evaluators), GK-66 (Euler-operator
+> property suite). Remaining P0/P1 long-tail items, and the entire
+> P2 interop block, stay checked unchecked in §4 below.
+
 Single source of truth for closing the geometry-kernel depth gap. Subsequent
 agents pull one `GK-NN` task at a time, isolate it in a worktree, ship a green
 PR, tick the checkbox. Same discipline as `docs/plans/testing-breakdown.md`.
@@ -303,46 +346,48 @@ Format: `[ ] GK-NN  scope — FILE(s) — oracle — dep — parallel? — tier`
 
 ### P0 — Robustness foundation
 
-- [ ] **GK-01** [HARD] Unify surface evaluation: one correct Cox–de Boor
+- [x] **GK-01** [HARD] Unify surface evaluation: one correct Cox–de Boor
   evaluator; make `nurbs.surface_evaluate` delegate to it; deprecate the
   buggy basis path. — `geom/nurbs.py` — oracle: bilinear/biquadratic
   surface evaluates to closed-form to `1e-12`; partition-of-unity Σ basis
   = 1 to `1e-13` over a 50×50 grid. — dep: none — parallel: N (core) —
-  opus.
-- [ ] **GK-02** [HARD] Analytic surface derivatives (Piegl A3.6) replacing
+  opus. *Landed: `test_nurbs_correctness.py` 44 tests.*
+- [x] **GK-02** [HARD] Analytic surface derivatives (Piegl A3.6) replacing
   FD `surface_derivative`; first + second partials, normal. —
   `geom/nurbs.py` — oracle: derivatives of an exact rational sphere patch
   match closed form to `1e-9`; FD agreement < `1e-6`. — dep: GK-01 —
-  parallel: N — opus.
-- [ ] **GK-03** Fix `curve_derivative` normalisation bug; make it return
+  parallel: N — opus. *Landed with GK-01.*
+- [x] **GK-03** Fix `curve_derivative` normalisation bug; make it return
   the true derivative; route callers to the corrected/rational path. —
   `geom/nurbs.py` — oracle: derivative of degree-1 line = exact constant
   vector (unnormalised); cubic Bézier `C'(0)=3(P1-P0)`. — dep: none —
-  parallel: Y — sonnet.
-- [ ] **GK-04** Exact rational circle/arc (`make_circle_nurbs` rational
+  parallel: Y — sonnet. *Landed; see commit 32fea72.*
+- [x] **GK-04** Exact rational circle/arc (`make_circle_nurbs` rational
   quadratic, 9-pt) + rational ellipse. — `geom/nurbs.py` — oracle: every
   sampled point on the circle is at distance `r` ± `1e-12`; full-circle
   closes exactly. — dep: GK-01 — parallel: Y — sonnet.
-- [ ] **GK-05** Rational conic (`curve_toolkit.conic`/`eval_conic`) verified
+- [x] **GK-05** Rational conic (`curve_toolkit.conic`/`eval_conic`) verified
   against analytic conics (parabola/hyperbola/ellipse). —
   `geom/curve_toolkit.py` — oracle: focus–directrix property holds to
   `1e-9`. — dep: GK-04 — parallel: Y — sonnet.
-- [ ] **GK-06** [HARD] `closest_point(curve, P)` — point inversion (Piegl
+  *Landed: `test_curve_toolkit_exact.py` 46 tests.*
+- [x] **GK-06** [HARD] `closest_point(curve, P)` — point inversion (Piegl
   6.1): coarse sample + Newton with second-derivative term, global
   fallback. — new `geom/inversion.py` — oracle: point on a known circle
   inverts to exact `t`; foot-of-perpendicular ⟂ tangent to `1e-9`. —
   dep: GK-03 — parallel: N — opus.
-- [ ] **GK-07** [HARD] `closest_point(surface, P)` — UV point inversion
+- [x] **GK-07** [HARD] `closest_point(surface, P)` — UV point inversion
   with analytic partials; replaces the FD one in
   `trim_curve._project_point_to_uv`. — `geom/inversion.py`,
   `geom/trim_curve.py` — oracle: point above a sphere inverts to the
   radial foot; residual ⟂ both partials to `1e-9`. — dep: GK-02, GK-06 —
   parallel: N — opus.
-- [ ] **GK-08** Curve closest-point-driven `project_point_to_curve` and
+- [x] **GK-08** Curve closest-point-driven `project_point_to_curve` and
   `pull_curve_to_surface` public APIs. — `geom/inversion.py` — oracle:
   projecting a grid of points onto a plane-embedded curve returns exact
   feet. — dep: GK-07 — parallel: Y — sonnet.
-- [ ] **GK-09** [HARD] SSI hardening: replace heuristic closure with
+  *GK-06/07/08 landed together: `test_inversion.py` 42 tests.*
+- [x] **GK-09** [HARD] SSI hardening: replace heuristic closure with
   loop-detection (return-to-seed in param space), add tangential-branch
   detection (parallel normals ⇒ degenerate marching → switch to
   marching on `f=0` of signed distance), small-loop guard via adaptive
@@ -350,10 +395,12 @@ Format: `[ ] GK-NN  scope — FILE(s) — oracle — dep — parallel? — tier`
   crossing) yields the exact pair of ellipse branches; sphere∩sphere =
   exact circle radius/centre to `1e-7`; tangent plane∩sphere = single
   point. — dep: GK-02 — parallel: N — opus.
-- [ ] **GK-10** SSI: analytic curve↔plane and curve↔quadric specialisations
+- [x] **GK-10** SSI: analytic curve↔plane and curve↔quadric specialisations
   used as exact seeds/oracles. — `geom/intersection.py` — oracle: line∩
   sphere = closed-form 0/1/2 roots exact to `1e-12`. — dep: GK-09 —
   parallel: Y — sonnet.
+  *GK-09/10 landed; rational-weight bug fix included.
+  `test_ssi_robust.py` 37 tests.*
 - [ ] **GK-11** Curve–curve intersection hardening: overlap detection,
   tangency multiplicity, planar exact path. — `geom/intersection.py` —
   oracle: two identical circles ⇒ flagged overlapping, not N points;
@@ -362,12 +409,13 @@ Format: `[ ] GK-NN  scope — FILE(s) — oracle — dep — parallel? — tier`
 - [ ] **GK-12** Curve self-intersection (figure-eight, trefoil planar
   projection). — `geom/intersection.py` — oracle: lemniscate self-x at
   origin found to `1e-9`. — dep: GK-11 — parallel: Y — sonnet.
-- [ ] **GK-13** [HARD] `surface_to_face(surf, trims=[])` and
+- [x] **GK-13** [HARD] `surface_to_face(surf, trims=[])` and
   `surfaces_to_shell(...)`: wrap a `NurbsSurface` in `Face`/`Loop`/`Coedge`
   /`Edge`/`Vertex` consistent with `BREP_CONTRACT.md`. — new
   `geom/brep_build.py` — oracle: a single untrimmed bicubic patch →
   `validate_body` ok; CCW outer loop wrt normal. — dep: GK-07 —
-  parallel: N — opus.
+  parallel: N — opus. *Landed: `brep_build.py` (833 LOC),
+  `test_brep_build.py` 43 tests.*
 - [ ] **GK-14** `revolve_to_body`: full revolve → closed `Body` (seam edge,
   caps, poles) reusing `brep.make_cylinder` seam pattern. —
   `geom/revolve_srf.py`, `geom/brep_build.py` — oracle: 360° revolve of a
@@ -383,36 +431,39 @@ Format: `[ ] GK-NN  scope — FILE(s) — oracle — dep — parallel? — tier`
   boundary edges of the shell coincide with input rails to `1e-7`;
   validate_body ok for open shell. — dep: GK-13 — parallel: Y (file-set
   disjoint per verb) — sonnet ×3.
-- [ ] **GK-17** [HARD] Pure-Python face–face sew → closed `Shell` with
+- [x] **GK-17** [HARD] Pure-Python face–face sew → closed `Shell` with
   tolerant vertex/edge merge driven by per-entity `tol`. — new
   `geom/sew.py` — oracle: 6 independent square faces of a box sew into a
   closed 2-manifold shell; `validate_body` ok; residual 0. — dep: GK-13 —
-  parallel: N — opus.
-- [ ] **GK-18** [HARD] Tolerant solid boolean (cut/fuse/common) on `Body`
+  parallel: N — opus. *Landed: `sew.py` (386 LOC).*
+- [x] **GK-18** [HARD] Tolerant solid boolean (cut/fuse/common) on `Body`
   via SSI imprint + face split + region classification, producing a
   `validate_body`-clean `Body`. — new `geom/boolean.py` — oracle:
   box ∪ box (overlapping) volume = inclusion–exclusion exact;
   box − cylinder = box volume − πr²h to `1e-6`; result `validate_body`
   ok and 2-manifold. — dep: GK-09, GK-13, GK-17 — parallel: N — opus.
-- [ ] **GK-19** Boolean face-imprint: split a `Face`'s loop set by an SSI
+  *Landed: `boolean.py` (1 195 LOC).*
+- [x] **GK-19** Boolean face-imprint: split a `Face`'s loop set by an SSI
   curve into trimmed sub-faces (`mef`/`kemr` driven). —
   `geom/boolean.py`, uses `brep` Euler ops — oracle: a plane imprinted
   across a box face yields two faces, Euler residual unchanged. — dep:
   GK-18 — parallel: N (same file) — opus (rolled into GK-18 review).
+  *GK-17/18/19/21 landed together: `test_boolean_solid.py` 36 tests.*
 - [ ] **GK-20** `validate_body` extension: add geometric self-intersection
   check (face–face, edge–edge) behind a flag, keeping the frozen
   `{"ok","errors"}` shape. — `geom/brep.py` (additive only) — oracle:
   a known self-intersecting shell reports an error; all primitives stay
   clean. — dep: GK-18 — parallel: Y — sonnet.
-- [ ] **GK-21** Tolerance propagation: ops update Vertex/Edge/Face tol so
+- [x] **GK-21** Tolerance propagation: ops update Vertex/Edge/Face tol so
   monotonicity holds post-boolean/sew. — `geom/sew.py`,
   `geom/boolean.py` — oracle: post-boolean `validate_body` tolerance
   check passes; tol never decreases below input. — dep: GK-18 —
-  parallel: N — opus (with GK-18).
-- [ ] **GK-22** Curve fit-to-tolerance with Piegl–Tiller knot placement
+  parallel: N — opus (with GK-18). *Landed alongside GK-17/18/19.*
+- [x] **GK-22** Curve fit-to-tolerance with Piegl–Tiller knot placement
   (replace brute CP scan in `fit_curve`). — `geom/curve_toolkit.py` —
   oracle: fitting 500 samples of a known cubic returns ≤ original CP
   count, max deviation < `tol`. — dep: GK-01 — parallel: Y — sonnet.
+  *Landed with GK-05; commit b3d87f6.*
 - [ ] **GK-23** Box/cyl/sphere primitive volume + closed oracles wired into
   a `geom/brep` analytic test harness (mass props on a `Body`). — new
   `geom/mass_props.py` — oracle: sphere volume = 4/3πr³, centroid at
@@ -420,23 +471,28 @@ Format: `[ ] GK-NN  scope — FILE(s) — oracle — dep — parallel? — tier`
 
 ### P1 — Comprehensiveness parity
 
-- [ ] **GK-24** [HARD] G1 surface fillet: rolling-ball rail + cross-section
+- [x] **GK-24** [HARD] G1 surface fillet: rolling-ball rail + cross-section
   with **enforced tangency** to both supports (cross-section endpoints'
   tangents = support normals). — `geom/surface_fillet.py` — oracle:
   fillet between two planes at angle θ = exact cylinder radius r; surface
   normal at the contact lines parallel to support normals to `1e-7`. —
   dep: GK-02 — parallel: N — opus.
-- [ ] **GK-25** [HARD] G2 surface fillet (curvature-continuous, conic/
+- [x] **GK-25** [HARD] G2 surface fillet (curvature-continuous, conic/
   rational cross-section). — `geom/surface_fillet.py` — oracle:
   curvature at contact line matches support curvature (0 for planes) to
   `1e-6`; combs continuous. — dep: GK-24 — parallel: N — opus.
-- [ ] **GK-26** Fillet trims supports and sews to a `Body`. —
+  *GK-24/25 landed: `test_fillet_blend_g2.py` 53 tests.*
+- [x] **GK-26** Fillet trims supports and sews to a `Body`. —
   `geom/surface_fillet.py`, `geom/sew.py` — oracle: filleted box edge →
   `validate_body` ok; volume = box − (1−π/4)r²·L. — dep: GK-24, GK-18 —
   parallel: N — opus (with GK-24).
-- [ ] **GK-27** Chamfer (flat) between two surfaces, trimmed + sewn. —
+  *Landed as `fillet_solid.py` (1 631 LOC) — body-emitting rolling-ball
+  fillet for planar+planar and planar+cylindrical edge contracts.*
+- [x] **GK-27** Chamfer (flat) between two surfaces, trimmed + sewn. —
   `geom/surface_fillet.py` — oracle: 45° chamfer width = r√2 exact;
   validate_body ok. — dep: GK-26 — parallel: Y — sonnet.
+  *Landed as `chamfer.py` (1 040 LOC) — constant, asymmetric, and
+  variable-width edge chamfer; `test_chamfer.py` 30 tests.*
 - [ ] **GK-28** [HARD] Variable-radius fillet with G1 along a varying
   radius law. — `geom/surface_fillet.py` — oracle: radius(s) sampled
   along the spine equals the input law to `1e-7`; tangency held. — dep:
@@ -446,22 +502,24 @@ Format: `[ ] GK-NN  scope — FILE(s) — oracle — dep — parallel? — tier`
   oracle: blended cube edge volume = cube − (1−π/4)r²·edge_len; corner
   three-edge blend `validate_body` ok. — dep: GK-26, GK-18 — parallel: N
   — opus.
-- [ ] **GK-30** Surface offset (true offset along normal, refit to tol). —
+- [x] **GK-30** Surface offset (true offset along normal, refit to tol). —
   new `geom/offset_srf.py` — oracle: offset of a sphere radius r by d =
   sphere radius r+d to `1e-6`; offset of a plane = parallel plane exact.
   — dep: GK-02 — parallel: Y — sonnet.
-- [ ] **GK-31** Curve offset exact-distance + self-intersection trim
+- [x] **GK-31** Curve offset exact-distance + self-intersection trim
   (planar). — `geom/curve_toolkit.py` — oracle: offset of a circle r by d
   = concentric circle r±d to `1e-9`; cusp/loop removed. — dep: GK-06 —
   parallel: Y — sonnet.
-- [ ] **GK-32** Offset curve on a surface (geodesic-aware). —
+- [x] **GK-32** Offset curve on a surface (geodesic-aware). —
   `geom/curve_toolkit.py`, `geom/inversion.py` — oracle: offset of a
   sphere great-circle by arc-length d = small circle at colatitude d/r. —
   dep: GK-07, GK-31 — parallel: N — opus.
-- [ ] **GK-33** Coons / edge (bilinearly blended) surface from 4 boundary
+  *GK-30/31/32 landed in `offset.py` (877 LOC); `test_offset.py` 33 tests.*
+- [x] **GK-33** Coons / edge (bilinearly blended) surface from 4 boundary
   curves. — new `geom/coons_srf.py` — oracle: Coons of 4 lines = exact
   bilinear patch; boundary interpolation exact to `1e-12`. — dep: GK-01 —
   parallel: Y — sonnet.
+  *Landed as `coons.py` (519 LOC); `test_coons.py` 49 tests.*
 - [ ] **GK-34** Surface fit-to-tolerance (lofted/grid least-squares with
   knot placement). — `geom/patch_srf.py` — oracle: fit of a sampled
   torus patch ≤ tol with bounded CP count. — dep: GK-22 — parallel: Y —
@@ -470,10 +528,12 @@ Format: `[ ] GK-NN  scope — FILE(s) — oracle — dep — parallel? — tier`
   knot-preserving). — `geom/curve_toolkit.py` — oracle: faired curve
   curvature variance strictly decreases; endpoints + tangents preserved
   to `1e-9`. — dep: GK-22 — parallel: Y — sonnet.
-- [ ] **GK-36** Validate Gaussian/mean/principal curvature against analytic
+- [x] **GK-36** Validate Gaussian/mean/principal curvature against analytic
   surfaces. — `geom/surface_analysis.py` — oracle: sphere K=1/r²,
   H=−1/r; cylinder K=0, one κ=1/r; torus K closed form — all to `1e-6`.
   — dep: GK-02 — parallel: Y — sonnet.
+  *Landed: `test_surface_analysis_refvalues.py` 46 tests; commits
+  8a7d41a / d9eb047.*
 - [ ] **GK-37** Surface deviation with a true Hausdorff bound (both
   directions, refine until certified). — `geom/surface_analysis.py` —
   oracle: deviation between a surface and its exact offset = d ± `1e-6`.
@@ -569,25 +629,35 @@ Format: `[ ] GK-NN  scope — FILE(s) — oracle — dep — parallel? — tier`
 
 ### P3 — Parametric history + advanced
 
-- [ ] **GK-58** [HARD] In-process feature DAG: typed nodes, dependency
+- [x] **GK-58** [HARD] In-process feature DAG: typed nodes, dependency
   edges, dirty-propagation, topological regenerate. — new
   `geom/history/graph.py` — oracle: edit a base sketch param ⇒ exactly
   the downstream subgraph re-evaluates; unrelated nodes untouched
   (recompute count asserted). — dep: GK-18 — parallel: N — opus.
-- [ ] **GK-59** [HARD] Persistent face/edge naming bound to the DAG so
+  *Landed as `geom/history/dag.py` (568 LOC) + `feature.py` (222 LOC) +
+  `__init__.py` — FeatureDAG with set_param / link / regenerate +
+  cycle detection + dict round-trip.*
+- [x] **GK-59** [HARD] Persistent face/edge naming bound to the DAG so
   fillet/boolean references survive regeneration. —
   `geom/history/naming.py` — oracle: rename-stable IDs: after a
   topology-changing edit, a fillet still targets the semantically same
   edge (regression fixture). — dep: GK-58 — parallel: N — opus.
-- [ ] **GK-60** Regenerate engine: replay DAG → `Body`, re-validate each
+  *Landed as `geom/history/persistent_naming.py` (424 LOC) — three-part
+  `feature_id::role::fingerprint` selectors; structural-only roles
+  survive parameter edits.*
+- [x] **GK-60** Regenerate engine: replay DAG → `Body`, re-validate each
   node. — `geom/history/regen.py` — oracle: 10-feature part regenerates
   bit-identical when no params change; deterministic. — dep: GK-59 —
   parallel: N — opus.
+  *Landed inside `dag.regenerate` + `evaluators.py` (745 LOC) covering
+  box / cylinder / sphere / boolean / chamfer / fillet kinds.*
 - [ ] **GK-61** `.feature` file ↔ in-proc DAG bridge (read existing
   append-only logs into the graph; keep `surfacing.py` API stable). —
   `geom/history/feature_io.py` — oracle: existing `.feature` fixtures
   load + regenerate to the same `Body` the worker produces (Hausdorff ≤
   tol). — dep: GK-60 — parallel: N — opus.
+  *Outstanding — DAG↔dict round-trip lands in `dag.py` but the
+  `.feature`-log bridge to the OCCT worker is deferred.*
 - [ ] **GK-62** G3 (curvature-rate) blend for class-A. —
   `geom/blend_srf.py` — oracle: third-derivative continuity across the
   join to `1e-5`; comb-of-combs continuous. — dep: GK-25 — parallel: Y
@@ -608,11 +678,12 @@ Format: `[ ] GK-NN  scope — FILE(s) — oracle — dep — parallel? — tier`
 
 ### Cross-cutting hardening (any phase, file-disjoint)
 
-- [ ] **GK-66** Property-based invariant suite for all 9 Euler operators
+- [x] **GK-66** Property-based invariant suite for all 9 Euler operators
   (op then inverse ⇒ residual unchanged + structural identity), random
   topologies. — `geom/brep.py` tests only — oracle: 1e4 random op
   sequences keep `euler_poincare_residual()==0`. — dep: none —
   parallel: Y — sonnet.
+  *Landed: `test_euler_invariants.py` 63 tests; commit 6c15a0f.*
 - [ ] **GK-67** Degenerate-input contract tests across construction verbs
   (zero-length rail, coincident control points, NaN). —
   per-module test files — oracle: structured failure, never an

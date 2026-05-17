@@ -160,7 +160,27 @@ function Renderer({
 
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true
+    // T-C1: dampingFactor=0.08 chosen to feel responsive without overshoot
+    // on both mouse-drag orbit and pinch-zoom inertia.  Lower → smoother but
+    // laggy on small finger gestures; higher → snappier but jitter on pinch.
     controls.dampingFactor = 0.08
+    // T-C1: explicit touch mapping so we don't depend on OrbitControls'
+    // implicit defaults — one finger orbits, two fingers pinch-zoom AND pan
+    // simultaneously (DOLLY_PAN).  Desktop mouse mapping (LEFT=ROTATE,
+    // RIGHT=PAN, MIDDLE=DOLLY, wheel=zoom) is left untouched: we do NOT
+    // assign `controls.mouseButtons`, so OrbitControls' defaults stand.
+    controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }
+    controls.enableZoom = true
+    controls.enablePan = true
+    // screenSpacePanning=true makes two-finger pan move parallel to the
+    // screen plane — the intuitive expectation on touch.  Mouse right-drag
+    // pan inherits the same setting; users still get correct WYSIWYG
+    // panning relative to the view plane.
+    controls.screenSpacePanning = true
+    // Suppress browser pinch-zoom / scroll gestures on the canvas so they
+    // route through OrbitControls / our pointer handlers instead.  Also
+    // prevents synthetic mouse events from being dispatched after a tap.
+    renderer.domElement.style.touchAction = 'none'
 
     // Layered groups so each mode can show/hide its aux geometry independently.
     const meshGroup = new THREE.Group()
@@ -231,26 +251,75 @@ function Renderer({
     const ro = new ResizeObserver(applySize)
     ro.observe(mount)
 
-    // ---- Hover: highlight face / edge / vertex under the cursor ----
-    function onMove(ev) {
+    // T-C2: tap-vs-drag threshold (px) measured in CSS pixels.  Movement
+    // beyond this between pointerdown and pointerup is treated as a drag
+    // (orbit / pan / pinch) and suppresses the pick.  6 px chosen to
+    // tolerate finger jitter on touch / shaky-hand mouse drift but stay
+    // well under the smallest UI target (~24 px CSS).
+    const TAP_DRAG_PX = 6
+    // T-C2: long-press duration (ms) for touch-equivalent "shift-add".
+    // 500 ms is the de-facto mobile long-press threshold (matches Android
+    // text-selection, iOS context menu).  Movement >TAP_DRAG_PX or a
+    // second pointer cancels the timer.
+    const LONG_PRESS_MS = 500
+
+    // Active pointer state.  We only pick on the primary pointer; secondary
+    // pointers (multi-touch pinch/pan) are intentionally ignored by the
+    // pick path — they belong to OrbitControls.
+    let primaryPointerId = null
+    let downX = 0
+    let downY = 0
+    let downShift = false
+    let movedBeyondThreshold = false
+    let longPressTimer = null
+    let longPressFired = false
+    let activePointerCount = 0
+
+    function cancelLongPress() {
+      if (longPressTimer !== null) {
+        clearTimeout(longPressTimer)
+        longPressTimer = null
+      }
+    }
+
+    function setPointerFromEvent(ev) {
+      const rect = renderer.domElement.getBoundingClientRect()
+      pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1
+      pointer.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1
+    }
+
+    // Run hover only for mouse / pen — there's no hover state on touch.
+    function onPointerMove(ev) {
+      // Track movement on the primary pointer (used for tap-vs-drag decision).
+      if (ev.pointerId === primaryPointerId) {
+        const dx = ev.clientX - downX
+        const dy = ev.clientY - downY
+        if (Math.hypot(dx, dy) > TAP_DRAG_PX) {
+          movedBeyondThreshold = true
+          cancelLongPress()
+        }
+      }
+
+      // Skip hover for touch — touch has no concept of hover, and running
+      // raycasts during a drag is wasted work that fights OrbitControls.
+      if (ev.pointerType === 'touch') return
+
       const m = modeRef.current
       if (m === 'object') {
-        // Reset hover overlay.
         clearHoverOverlay(stateRef.current)
         return
       }
-      const rect = renderer.domElement.getBoundingClientRect()
-      pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1
-      pointer.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1
+      setPointerFromEvent(ev)
       raycaster.setFromCamera(pointer, camera)
       pickFeature(stateRef.current, raycaster, m, /*hover*/ true)
     }
-    // ---- Click: dispatch object pick OR feature pick ----
-    function onClick(ev) {
+
+    // Dispatch a pick at the current pointer position.  `shiftAdd` is true
+    // when the user signalled add-to-selection (mouse shift held, or touch
+    // long-press fired).
+    function dispatchPick(ev, shiftAdd) {
       const m = modeRef.current
-      const rect = renderer.domElement.getBoundingClientRect()
-      pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1
-      pointer.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1
+      setPointerFromEvent(ev)
       raycaster.setFromCamera(pointer, camera)
 
       if (m === 'object') {
@@ -277,14 +346,90 @@ function Renderer({
       // Feature mode → call onPickFeature with whatever's under the cursor.
       const hit = pickFeature(stateRef.current, raycaster, m, /*hover*/ false)
       if (hit && onPickFeatureRef.current) {
-        onPickFeatureRef.current(hit.partId, hit.kind, hit.featureId, ev.shiftKey)
+        onPickFeatureRef.current(hit.partId, hit.kind, hit.featureId, shiftAdd)
       } else if (!hit && onPickFeatureRef.current) {
         // Click in empty space + non-shift → clear selection.
-        if (!ev.shiftKey) onPickFeatureRef.current(null, null, null, false)
+        if (!shiftAdd) onPickFeatureRef.current(null, null, null, false)
       }
     }
-    renderer.domElement.addEventListener('mousemove', onMove)
-    renderer.domElement.addEventListener('click', onClick)
+
+    function onPointerDown(ev) {
+      activePointerCount += 1
+      // Multi-touch: a second pointer means pinch/pan — cancel any pending
+      // pick + long-press.  Note: OrbitControls handles its own multi-touch
+      // gesture state via the DOM element directly.
+      if (activePointerCount > 1) {
+        primaryPointerId = null
+        cancelLongPress()
+        movedBeyondThreshold = true // also kills any latent tap dispatch
+        return
+      }
+      // Only the primary mouse button starts a pick.  Right / middle drag
+      // is OrbitControls pan/dolly territory; pen barrel buttons fall
+      // through too (we only pick on the contact tip).
+      if (ev.pointerType === 'mouse' && ev.button !== 0) return
+
+      primaryPointerId = ev.pointerId
+      downX = ev.clientX
+      downY = ev.clientY
+      downShift = !!ev.shiftKey
+      movedBeyondThreshold = false
+      longPressFired = false
+      cancelLongPress()
+
+      // Long-press only makes sense for touch.  Mouse has shift-click already.
+      if (ev.pointerType === 'touch') {
+        longPressTimer = setTimeout(() => {
+          longPressTimer = null
+          if (!movedBeyondThreshold && primaryPointerId === ev.pointerId) {
+            longPressFired = true
+            // Fire pick immediately on long-press so the user gets feedback
+            // without having to lift their finger.  We DO NOT clear the
+            // primaryPointerId here: pointerup still runs but is a no-op
+            // for the pick path (longPressFired short-circuits it).
+            dispatchPick(ev, /*shiftAdd*/ true)
+          }
+        }, LONG_PRESS_MS)
+      }
+    }
+
+    function onPointerUp(ev) {
+      activePointerCount = Math.max(0, activePointerCount - 1)
+      cancelLongPress()
+      if (ev.pointerId !== primaryPointerId) return
+      primaryPointerId = null
+
+      // Long-press already fired the pick on the down-stroke — don't fire again.
+      if (longPressFired) {
+        longPressFired = false
+        return
+      }
+      // Drag beyond threshold → OrbitControls handled it; no pick.
+      if (movedBeyondThreshold) return
+      // Multi-touch session that resolved (activePointerCount went >1 then
+      // back to 0): movedBeyondThreshold was set on the second down, so we
+      // never reach here in that case.
+
+      // Mouse: preserve byte-for-byte the prior `click` handler semantics
+      // (used `ev.shiftKey` at the click event).  Pointerup's shiftKey is
+      // the equivalent.  Touch: downShift is always false (no shift key);
+      // long-press is the touch path for add-to-selection.
+      const shiftAdd = ev.pointerType === 'mouse' ? !!ev.shiftKey : downShift
+      dispatchPick(ev, shiftAdd)
+    }
+
+    function onPointerCancel(ev) {
+      activePointerCount = Math.max(0, activePointerCount - 1)
+      if (ev.pointerId === primaryPointerId) {
+        primaryPointerId = null
+        cancelLongPress()
+      }
+    }
+
+    renderer.domElement.addEventListener('pointermove', onPointerMove)
+    renderer.domElement.addEventListener('pointerdown', onPointerDown)
+    renderer.domElement.addEventListener('pointerup', onPointerUp)
+    renderer.domElement.addEventListener('pointercancel', onPointerCancel)
 
     stateRef.current = {
       renderer, scene, camera, controls,
@@ -308,8 +453,11 @@ function Renderer({
     return () => {
       running = false
       ro.disconnect()
-      renderer.domElement.removeEventListener('mousemove', onMove)
-      renderer.domElement.removeEventListener('click', onClick)
+      cancelLongPress()
+      renderer.domElement.removeEventListener('pointermove', onPointerMove)
+      renderer.domElement.removeEventListener('pointerdown', onPointerDown)
+      renderer.domElement.removeEventListener('pointerup', onPointerUp)
+      renderer.domElement.removeEventListener('pointercancel', onPointerCancel)
       disposeAll(stateRef.current)
       controls.dispose()
       renderer.dispose()

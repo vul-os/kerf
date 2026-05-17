@@ -61,6 +61,7 @@ import Footer from '../components/Footer.jsx'
 import Button from '../components/Button.jsx'
 import { useCloudConfig } from '../cloud/useCloudConfig.js'
 import DomainSpotlights from '../components/landing/DomainSpotlights.jsx'
+import KernelDepth from '../components/landing/KernelDepth.jsx'
 import {
   HeroIllustration,
   JscadIllustration,
@@ -105,9 +106,12 @@ function Hero() {
       <div className="relative mx-auto max-w-7xl px-6 pt-14 pb-16 sm:pt-16 lg:pt-20 lg:pb-20">
         <div className="grid lg:grid-cols-[1fr_1.15fr] gap-8 lg:gap-12 items-center">
           <div>
-            <span className="inline-flex items-center gap-2 rounded-full border border-ink-800 bg-ink-900/70 backdrop-blur px-3 py-1 text-xs text-ink-300 font-mono">
+            <span
+              className="inline-flex items-center gap-2 rounded-full border border-ink-800 bg-ink-900/70 backdrop-blur px-3 py-1 text-xs text-ink-300 font-mono"
+              aria-label="Verticals and licence summary"
+            >
               <span className="w-1.5 h-1.5 rounded-full bg-kerf-300 animate-pulse" />
-              open source · mech · electronics · architecture
+              open source · jewelry · mech · electronic
             </span>
 
             <h1 className="mt-4 font-display text-[2.6rem] sm:text-5xl lg:text-[4.25rem] font-semibold tracking-[-0.03em] leading-[1.02]">
@@ -120,13 +124,14 @@ function Hero() {
                   className="absolute left-0 right-0 -bottom-2 h-2.5 bg-kerf-300/15 -skew-x-12 rounded-sm"
                 />
               </span>{' '}
-              engineering output.
+              geometry kernel underneath.
             </h1>
 
             <p className="mt-4 text-lg text-ink-300 leading-relaxed max-w-xl">
-              Sketch with constraints, draft B-rep features, lay out PCBs,
-              compile IFC buildings, run FEM, and post G-code — all from
-              chat, all in one workspace, all backed by real open kernels.{' '}
+              Three verticals in one workspace — jewelry, mechanical,
+              electronic — sitting on a validated B-rep + NURBS kernel with a
+              parametric history DAG. Parametric edits survive across fillets
+              and booleans via persistent face IDs.{' '}
               <Link
                 to="/docs/whats-new"
                 className="text-kerf-300 underline underline-offset-2 hover:text-kerf-200 transition-colors"
@@ -134,6 +139,21 @@ function Hero() {
                 See what shipped →
               </Link>
             </p>
+
+            <ul
+              className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2 max-w-xl text-[11px] font-mono text-ink-400"
+              aria-label="Per-vertical capability summary"
+            >
+              <li className="rounded-md border border-ink-800 bg-ink-900/50 px-2.5 py-1.5">
+                <span className="text-kerf-300">jewelry</span> · 40 modules
+              </li>
+              <li className="rounded-md border border-ink-800 bg-ink-900/50 px-2.5 py-1.5">
+                <span className="text-kerf-300">mech</span> · weld · forming · AM · moldflow · CAM
+              </li>
+              <li className="rounded-md border border-ink-800 bg-ink-900/50 px-2.5 py-1.5">
+                <span className="text-kerf-300">electronic</span> · SI · EMC · PDN · thermal
+              </li>
+            </ul>
 
             <div className="mt-5 flex flex-wrap items-center gap-3">
               <Button as={Link} to="/signup" variant="primary" size="lg">
@@ -147,7 +167,14 @@ function Hero() {
 
             <RunLocallyChip />
 
-            <ul className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-ink-400 font-mono">
+            <ul
+              className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-ink-400 font-mono"
+              aria-label="Quiet credibility footnotes"
+            >
+              <li className="flex items-center gap-1.5">
+                <span className="w-1 h-1 rounded-full bg-ink-500" />
+                620 kernel tests · analytic-oracle verified
+              </li>
               <li className="flex items-center gap-1.5">
                 <span className="w-1 h-1 rounded-full bg-ink-500" />
                 MIT licensed
@@ -159,10 +186,6 @@ function Hero() {
               <li className="flex items-center gap-1.5">
                 <span className="w-1 h-1 rounded-full bg-ink-500" />
                 no card required
-              </li>
-              <li className="flex items-center gap-1.5">
-                <span className="w-1 h-1 rounded-full bg-ink-500" />
-                open source
               </li>
             </ul>
           </div>
@@ -273,7 +296,6 @@ function LogoStrip() {
   // hood, not vapor logos. Pure typographic, low-key.
   const items = [
     'JSCAD',
-    'OpenCascade',
     'tscircuit',
     'planegcs',
     'FEniCSx',
@@ -307,7 +329,7 @@ function LogoStrip() {
 /* -------------------------------------------------------------------------- */
 
 const OUTPUT_FORMATS = [
-  { label: 'STEP', sub: 'OCCT B-rep' },
+  { label: 'STEP', sub: 'validated B-rep' },
   { label: 'STL · 3MF', sub: 'mesh export' },
   { label: 'IFC4', sub: 'BIM' },
   { label: 'gerber', sub: 'PCB fab' },
@@ -369,8 +391,8 @@ const CAPABILITY_GROUPS = [
   {
     id: 'mech',
     eyebrow: 'Mechanical · code-first CAD',
-    title: 'JSCAD, OCCT B-rep, and a real sketcher.',
-    body: 'Code-first parametric geometry, real solid-modeling parity with FreeCAD/SolidWorks, and a constraints-solved 2D sketcher that drives every feature.',
+    title: 'JSCAD, validated B-rep, and a real sketcher.',
+    body: 'Code-first parametric geometry, real solid-modeling parity with FreeCAD/SolidWorks, and a constraints-solved 2D sketcher that drives every feature. Process-sim suite alongside: weld, forming, AM, moldflow, CAM.',
     cards: [
       {
         icon: Code2,
@@ -380,8 +402,8 @@ const CAPABILITY_GROUPS = [
       },
       {
         icon: Layers,
-        title: 'OCCT B-rep features',
-        body: 'Pad, Pocket, Revolve, Fillet, Chamfer, Shell, Hole, Draft, Sweep (corrected-Frenet mode), symmetric Loft, plus NURBS surfacing (sweep2 / network / blend) and direct face/edge gumballs.',
+        title: 'Validated B-rep features',
+        body: 'Pad, Pocket, Revolve, Fillet (G1/G2), Chamfer, Shell, Hole, Draft, Sweep (corrected-Frenet mode), symmetric Loft, plus NURBS surfacing (sweep2 / network / blend) and direct face/edge gumballs. Persistent face IDs survive parameter edits.',
         Illustration: FeatureTreeIllustration,
       },
       {
@@ -445,8 +467,8 @@ const CAPABILITY_GROUPS = [
   {
     id: 'electronics',
     eyebrow: 'Electronics · schematic to gerber',
-    title: 'PCB design with autorouting and real simulation.',
-    body: 'tscircuit-powered TSX schematics, full layer stack and manual routing, FreeRouting autoroute, SPICE simulation via ngspice, and RF analysis via scikit-rf — all cross-linked to mechanical assemblies.',
+    title: 'PCB design with SI / EMC / PDN / thermal pre-compliance.',
+    body: 'tscircuit-powered TSX schematics, full layer stack and manual routing, FreeRouting autoroute, SPICE simulation via ngspice, RF/S-parameters via scikit-rf, plus signal-integrity, EMC, PDN, and thermal pre-compliance checks in one tool — all cross-linked to mechanical assemblies.',
     cards: [
       {
         icon: CircuitBoard,
@@ -638,7 +660,7 @@ const DOMAINS = [
   {
     icon: Gem,
     label: 'Jewelry',
-    sub: 'NURBS surfaces, ring sizers, stone settings',
+    sub: '40 modules · ring/shank/seat/setting libraries',
     href: '/domains/jewelry',
     color: 'text-pink-400',
     bg: 'bg-pink-400/10 border-pink-400/30 group-hover:bg-pink-400/20',
@@ -646,15 +668,15 @@ const DOMAINS = [
   {
     icon: Settings2,
     label: 'Mechanical',
-    sub: 'B-rep features, assemblies, FEM on the way',
+    sub: 'B-rep features · weld · forming · AM · moldflow · CAM',
     href: '/domains/mechanical',
     color: 'text-cyan-400',
     bg: 'bg-cyan-400/10 border-cyan-400/30 group-hover:bg-cyan-400/20',
   },
   {
     icon: CircuitBoard,
-    label: 'Electronics',
-    sub: 'tscircuit schematics, PCB layout, 3D preview',
+    label: 'Electronic',
+    sub: 'SI · EMC · PDN · thermal pre-compliance in one tool',
     href: '/domains/electronics',
     color: 'text-emerald-400',
     bg: 'bg-emerald-400/10 border-emerald-400/30 group-hover:bg-emerald-400/20',
@@ -1376,6 +1398,7 @@ export default function Landing() {
       <OutputStrip />
       <PipelineDivider />
       <PerDomain />
+      <KernelDepth />
       <CapabilityTour />
       <DomainSpotlights />
       <Compare />

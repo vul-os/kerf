@@ -61,6 +61,7 @@ def _register_tools(ctx, provides: list) -> None:
         ("kerf_bim.tools.element_types", "bim.element-types"),
         ("kerf_bim.tools.import_ifc", "bim.ifc-import"),
         ("kerf_bim.tools.export_ifc", "bim.ifc-export"),
+        ("kerf_bim.tools.family_library", "bim.family-library"),
     ]
 
     for module_path, capability in tool_modules:

@@ -1,6 +1,11 @@
 /**
  * CategoryMatrix.jsx — horizontally-scrollable feature matrix that compares
- * every competitor in a category side-by-side against Kerf.
+ * Kerf side-by-side against every competitor in a category.
+ *
+ * Column order: **Feature → Kerf → competitors…**. Kerf is the first data
+ * column so the reader's eye lands on Kerf first; competitors trail. The
+ * Kerf column is also `position: sticky` to the left of the competitors
+ * so it stays visible while the user scrolls the matrix horizontally.
  *
  * Each row's cell values are derived from the per-CAD <CompareTable> data
  * on the individual /compare/<slug> pages — this component does not author
@@ -8,7 +13,7 @@
  *
  * Props:
  *   category    — short label, e.g. "Mechanical"; rendered in aria-label.
- *   competitors — [{ slug, label }] in display order (left of the Kerf column).
+ *   competitors — [{ slug, label }] in display order (right of the Kerf column).
  *   features    — [{ group, name, cells: { [slug]: string, kerf: string } }]
  *                 cells are the same glyph-prefixed short strings used in
  *                 the per-CAD tables (e.g. "✅ FCC §15.109").
@@ -30,7 +35,8 @@ export default function CategoryMatrix({ category, competitors, features }) {
 
   // Sized so each competitor column gets a comfortable text width even on
   // tiny phones — the wrapper handles horizontal scroll past 720px.
-  const minWidth = 360 + competitors.length * 180 + 200 // feature col + comp cols + kerf
+  // Layout: Feature (220px) + Kerf (200px, sticky) + N competitors (180px each).
+  const minWidth = 220 + 200 + competitors.length * 180
 
   return (
     <div className="-mx-6 sm:mx-0">
@@ -49,10 +55,21 @@ export default function CategoryMatrix({ category, competitors, features }) {
             <tr className="border-b border-ink-800 bg-ink-900/70">
               <th
                 scope="col"
-                className="text-left px-4 py-3 font-mono text-[11px] uppercase tracking-wider text-ink-400 sticky left-0 bg-ink-900/95 backdrop-blur-sm z-10"
+                className="text-left px-4 py-3 font-mono text-[11px] uppercase tracking-wider text-ink-400 sticky left-0 bg-ink-900/95 backdrop-blur-sm z-20"
                 style={{ minWidth: '220px' }}
               >
                 Feature
+              </th>
+              {/* Kerf column FIRST so the user always sees Kerf's verdict
+                  before the competitor's. Sticky-positioned to remain in
+                  view as the matrix scrolls horizontally past wider
+                  competitor sets. */}
+              <th
+                scope="col"
+                className="text-left px-4 py-3 font-mono text-[11px] uppercase tracking-wider text-kerf-300 sticky left-[220px] bg-kerf-300/[0.06] backdrop-blur-sm z-10 border-l-2 border-kerf-300/40"
+                style={{ minWidth: '200px' }}
+              >
+                Kerf
               </th>
               {competitors.map((c) => (
                 <th
@@ -74,13 +91,6 @@ export default function CategoryMatrix({ category, competitors, features }) {
                   </Link>
                 </th>
               ))}
-              <th
-                scope="col"
-                className="text-left px-4 py-3 font-mono text-[11px] uppercase tracking-wider text-kerf-300"
-                style={{ minWidth: '200px' }}
-              >
-                Kerf
-              </th>
             </tr>
           </thead>
           <tbody>
@@ -101,7 +111,8 @@ export default function CategoryMatrix({ category, competitors, features }) {
 }
 
 function MatrixRow({ row, index, showGroup, competitors }) {
-  const colSpan = competitors.length + 2 // feature + comps + kerf
+  const colSpan = competitors.length + 2 // feature + kerf + comps
+  const stripe = index % 2 === 0 ? 'bg-transparent' : 'bg-ink-900/20'
   return (
     <>
       {showGroup && (
@@ -116,17 +127,27 @@ function MatrixRow({ row, index, showGroup, competitors }) {
       )}
       <tr
         className={
-          'border-b border-ink-800/50 transition-colors hover:bg-ink-900/30 ' +
-          (index % 2 === 0 ? 'bg-transparent' : 'bg-ink-900/20')
+          'border-b border-ink-800/50 transition-colors hover:bg-ink-900/30 ' + stripe
         }
       >
         <th
           scope="row"
-          className="px-4 py-3 text-ink-200 font-medium align-top text-left sticky left-0 bg-ink-950/90 backdrop-blur-sm"
+          className={
+            'px-4 py-3 text-ink-200 font-medium align-top text-left sticky left-0 backdrop-blur-sm z-10 ' +
+            (index % 2 === 0 ? 'bg-ink-950/90' : 'bg-ink-900/95')
+          }
           style={{ minWidth: '220px' }}
         >
           {row.name}
         </th>
+        {/* Kerf cell sits IMMEDIATELY after the feature label — first data
+            column, sticky so it stays visible while competitors scroll.
+            Tinted with brand yellow so it reads as the anchor. */}
+        <td
+          className="px-4 py-3 text-ink-100 align-top text-xs leading-relaxed sticky left-[220px] backdrop-blur-sm z-10 border-l-2 border-kerf-300/40 bg-kerf-300/[0.04]"
+        >
+          {row.cells.kerf}
+        </td>
         {competitors.map((c) => (
           <td
             key={c.slug}
@@ -135,9 +156,6 @@ function MatrixRow({ row, index, showGroup, competitors }) {
             {row.cells[c.slug] ?? <span className="text-ink-600">—</span>}
           </td>
         ))}
-        <td className="px-4 py-3 text-ink-300 align-top text-xs leading-relaxed">
-          {row.cells.kerf}
-        </td>
       </tr>
     </>
   )

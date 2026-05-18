@@ -7,8 +7,10 @@ kerf serve       Self-host path: requires Postgres.  Fails fast if DB is missing
                  or unreachable.
 kerf hydrate     Resolve LFS pointer stubs → real bytes from Kerf cloud storage.
 kerf pull-blobs  Alias for kerf hydrate (plain-git-clone context).
-
-Future subcommands (T-127, T-128): kerf sync, kerf export, kerf import.
+kerf sync        Two-way folder mirror between a local directory and a cloud
+                 project (T-127).
+kerf export      Download a project as a self-contained ZIP archive (T-128).
+kerf import      Create a new project from a kerf export ZIP archive (T-128).
 """
 
 from __future__ import annotations
@@ -53,6 +55,33 @@ def _cmd_login(args: argparse.Namespace) -> int:
 def _cmd_hydrate(args: argparse.Namespace) -> int:
     from kerf_cli.hydrate import cmd_hydrate  # noqa: PLC0415
     return cmd_hydrate(args)
+
+
+# ---------------------------------------------------------------------------
+# sync
+# ---------------------------------------------------------------------------
+
+def _cmd_sync(args: argparse.Namespace) -> int:
+    from kerf_cli.sync import cmd_sync  # noqa: PLC0415
+    return cmd_sync(args)
+
+
+# ---------------------------------------------------------------------------
+# export
+# ---------------------------------------------------------------------------
+
+def _cmd_export(args: argparse.Namespace) -> int:
+    from kerf_cli.portability import cmd_export  # noqa: PLC0415
+    return cmd_export(args)
+
+
+# ---------------------------------------------------------------------------
+# import
+# ---------------------------------------------------------------------------
+
+def _cmd_import(args: argparse.Namespace) -> int:
+    from kerf_cli.portability import cmd_import  # noqa: PLC0415
+    return cmd_import(args)
 
 
 # ---------------------------------------------------------------------------
@@ -175,6 +204,15 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_hydrate_parser(sub, "hydrate", alias=False)
     _add_hydrate_parser(sub, "pull-blobs", alias=True)
 
+    # ---- sync ----
+    _add_sync_parser(sub)
+
+    # ---- export ----
+    _add_export_parser(sub)
+
+    # ---- import ----
+    _add_import_parser(sub)
+
     return parser
 
 
@@ -260,6 +298,161 @@ def _add_hydrate_parser(
         help="Re-fetch and overwrite files that appear already hydrated.",
     )
     p.set_defaults(func=_cmd_hydrate)
+
+
+# ---------------------------------------------------------------------------
+# sync parser
+# ---------------------------------------------------------------------------
+
+def _add_sync_parser(
+    sub: argparse._SubParsersAction,  # type: ignore[type-arg]
+) -> None:
+    """Register the `sync` sub-parser."""
+    p = sub.add_parser(
+        "sync",
+        help="Two-way mirror between a local directory and a cloud project",
+        description=(
+            "Pull remote files to the local directory and push local changes\n"
+            "back to the cloud project.  Change detection uses server-side\n"
+            "updated_at vs local mtime (last-write-wins).  LFS pointer stubs\n"
+            "are hydrated implicitly after pulling.\n\n"
+            "A file deleted locally is NOT auto-deleted on the server — a\n"
+            "warning is printed instead (safe default).\n\n"
+            "KERF_API_URL / KERF_API_TOKEN or `kerf login` credentials are\n"
+            "used for authentication."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument(
+        "project_id",
+        metavar="project-id",
+        help="Kerf project UUID.",
+    )
+    p.add_argument(
+        "local_dir",
+        metavar="local-dir",
+        help="Local directory to sync with the project.",
+    )
+    p.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="List the actions that would be taken without applying them.",
+    )
+    p.add_argument(
+        "--url",
+        default="",
+        metavar="URL",
+        help="Override the API endpoint (default: $KERF_API_URL or https://app.kerf.io).",
+    )
+    p.add_argument(
+        "--token",
+        default="",
+        metavar="TOKEN",
+        help="API token (kerf_sk_…).  $KERF_API_TOKEN is preferred.",
+    )
+    p.set_defaults(func=_cmd_sync)
+
+
+# ---------------------------------------------------------------------------
+# export parser
+# ---------------------------------------------------------------------------
+
+def _add_export_parser(
+    sub: argparse._SubParsersAction,  # type: ignore[type-arg]
+) -> None:
+    """Register the `export` sub-parser."""
+    p = sub.add_parser(
+        "export",
+        help="Download a project as a self-contained ZIP archive",
+        description=(
+            "Call GET /api/projects/{id}/export and write the resulting ZIP\n"
+            "archive to disk.  The archive contains all project files plus a\n"
+            "kerf-manifest.json index.\n\n"
+            "KERF_API_URL / KERF_API_TOKEN or `kerf login` credentials are\n"
+            "used for authentication."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument(
+        "project_id",
+        metavar="project-id",
+        help="Kerf project UUID.",
+    )
+    p.add_argument(
+        "-o", "--output",
+        default="",
+        metavar="FILE",
+        help=(
+            "Output file path.  Defaults to <slug>-<short-id>.zip as returned\n"
+            "by the server Content-Disposition header, or <short-id>.zip."
+        ),
+    )
+    p.add_argument(
+        "--url",
+        default="",
+        metavar="URL",
+        help="Override the API endpoint (default: $KERF_API_URL or https://app.kerf.io).",
+    )
+    p.add_argument(
+        "--token",
+        default="",
+        metavar="TOKEN",
+        help="API token (kerf_sk_…).  $KERF_API_TOKEN is preferred.",
+    )
+    p.set_defaults(func=_cmd_export)
+
+
+# ---------------------------------------------------------------------------
+# import parser
+# ---------------------------------------------------------------------------
+
+def _add_import_parser(
+    sub: argparse._SubParsersAction,  # type: ignore[type-arg]
+) -> None:
+    """Register the `import` sub-parser."""
+    p = sub.add_parser(
+        "import",
+        help="Create a new project from a kerf export ZIP archive",
+        description=(
+            "Read a ZIP archive produced by `kerf export`, create a new project\n"
+            "via POST /api/projects, then upload each file.  The round-trip\n"
+            "export → import produces identical file content.\n\n"
+            "Note: a bulk POST /api/projects/import endpoint does not yet exist\n"
+            "on the server; files are uploaded individually via the existing\n"
+            "POST /api/projects/{id}/files endpoint.\n\n"
+            "KERF_API_URL / KERF_API_TOKEN or `kerf login` credentials are\n"
+            "used for authentication."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument(
+        "archive",
+        metavar="archive",
+        help="Path to the ZIP archive (produced by `kerf export`).",
+    )
+    p.add_argument(
+        "--name",
+        default="",
+        metavar="NAME",
+        help=(
+            "Project name for the newly created project.  Defaults to the\n"
+            "name stored in kerf-manifest.json, or the archive filename stem."
+        ),
+    )
+    p.add_argument(
+        "--url",
+        default="",
+        metavar="URL",
+        help="Override the API endpoint (default: $KERF_API_URL or https://app.kerf.io).",
+    )
+    p.add_argument(
+        "--token",
+        default="",
+        metavar="TOKEN",
+        help="API token (kerf_sk_…).  $KERF_API_TOKEN is preferred.",
+    )
+    p.set_defaults(func=_cmd_import)
 
 
 # ---------------------------------------------------------------------------

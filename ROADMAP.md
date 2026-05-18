@@ -426,6 +426,50 @@ this concrete plan and the tickets in [`tasks.md`](./tasks.md).
 
 ---
 
+### §3.5c — Aerospace depth — flight + structures + space
+
+We have aerospace-adjacent pieces shipped: Mystran NASTRAN bridge (T-100g) handles
+structural / modal / aeroelastic FEM, OpenFOAM bridge (T-101d) + k-ω SST (T-101b)
+handle viscous CFD, composites (T-173) ships drape/CLT/failure-seed, STEP AP203/214
+(T-156/T-157) is the canonical aerospace interchange. The honest gap: **everything between
+the structure and the trajectory** — the layer where engineers actually design wings,
+plan launches, size engines, control spacecraft attitude.
+
+Top 10 gaps closing this gap (P1, in flight as agent work):
+
+| # | Gap | Why it matters |
+|---|-----|----------------|
+| 1 | **Vortex-lattice / panel-method aero (VLM, XFOIL-class)** | Wing design, polars, lift-distributions; the bread-and-butter low-speed aero solver |
+| 2 | **Aeroelasticity / flutter (NASTRAN p-k method, doublet-lattice)** | Aircraft cert blocker — must clear flutter speed before flight |
+| 3 | **Airfoil library** (NACA 4/5-digit gen + UIUC Selig DB, ~1500 airfoils) | First click of any aero design |
+| 4 | **6-DOF flight dynamics** + ISA atmosphere | Aircraft/rocket trajectory, autopilot, control derivatives |
+| 5 | **Orbital mechanics** (Kepler/Lambert/Hohmann + J2/J3 perturbations) | Sat/spacecraft missions, launch trajectory |
+| 6 | **Rocket propulsion / NASA CEA** (chemical-equilibrium engine perf) | Liquid + solid + hybrid engine design |
+| 7 | **Composite laminate failure depth** (Tsai-Wu, Tsai-Hill, interlaminar shear) | Composite cert path — extends T-173 |
+| 8 | **Aerospace materials DB** (7075-T6, Ti-6Al-4V, Inconel 718, CFRP prepreg) | Stress + thermal + fatigue inputs |
+| 9 | **Spacecraft ADCS** (quaternion attitude + reaction wheels + magnetorquers) | Smallsat / cubesat customer base |
+| 10 | **Spacecraft thermal control** (radiative network, view factors, solar flux) | Smallsat / cubesat thermal design |
+
+Tracked-but-not-yet-prioritised aerospace gaps (kept honest):
+- **DO-178C / DO-254** certification doc artefacts (software / hardware)
+- **Aerospace fasteners** (Hi-Lok, Cherry, NAS/MS/AS standards)
+- **Heat-shield / ablation** for re-entry
+- **Aero-acoustics** (FW-H equation, engine noise)
+- **Aircraft conceptual sizing** (Raymer / Roskam methods)
+- **Stability derivatives** (Cl_α, Cn_β, Cm_α, control-effectiveness tables)
+- **CFD visualisation** (streamlines, shock detection, vortex-core extraction)
+
+These tracked-only items move to P1 when there's a documented customer pull. Until then they sit in §6 long-term horizon — visible, not invented work.
+
+The cluster mostly lives in a new `packages/kerf-aero/` package, with depth extensions
+flowing back into `kerf-composites` (T-173) and `kerf-cad-core/materials/` (T-115/T-214).
+ngspice already covers analog/RF (electronics). The convergence framing: tscircuit/atopile
+designs the avionics PCB → kerf-firmware (T-225..T-230) flashes the autopilot →
+kerf-aero/flight_dynamics simulates the trajectory the autopilot will fly. **One project,
+many layers** — the same moat shape as electronics/firmware/motion.
+
+---
+
 ## §4 — Shipped ledger (condensed)
 
 One line per shipped capability. Detail lives in the linked plan/doc — the

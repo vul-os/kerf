@@ -27,6 +27,16 @@ import {
   HardHat,
   Package,
   Github,
+  Wind,
+  Stethoscope,
+  Telescope,
+  Clock,
+  Workflow,
+  Box,
+  Layers,
+  Anchor,
+  Mountain,
+  TreePine,
 } from 'lucide-react'
 import Header from '../../components/Header.jsx'
 import Footer from '../../components/Footer.jsx'
@@ -39,9 +49,9 @@ const GITHUB_URL = 'https://github.com/kerf-sh/kerf'
 /* -------------------------------------------------------------------------- */
 
 export const DOMAINS_META = {
-  title: 'CAD domains — jewelry to electronics — Kerf',
+  title: 'CAD domains — jewelry to aerospace — Kerf',
   description:
-    'One chat-driven, open-source CAD tool across jewelry, mechanical, electronics, architecture and automotive — with civil and product design in progress.',
+    'One chat-driven, open-source CAD tool across 14 disciplines: jewelry, mechanical, electronics, architecture, automotive, civil, composites, dental, optics, horology, piping, packaging, mold, marine, and woodworking.',
   canonicalUrl: 'https://kerf.sh/domains',
   ogImage: 'https://kerf.sh/og/domains.png',
 }
@@ -107,9 +117,99 @@ export const DOMAINS = [
     Icon: HardHat,
     accent: 'kerf-300',
     blurb:
-      'Structural sketcher, IFC/DXF interchange and drawings already serve infrastructure work. A dedicated page is on the roadmap.',
-    to: '/roadmap',
+      'TR-55 hydrology, Coulomb geotech, AASHTO pavement, surveying traverses, and IFC/DXF interchange for civil and infrastructure engineers.',
+    to: '/domains/civil',
+    status: 'live',
+  },
+  {
+    slug: 'composites',
+    name: 'Aerospace Composites',
+    Icon: Wind,
+    accent: 'kerf-300',
+    blurb:
+      'Ply layup, CLT ABD solver, Tsai-Wu / Hashin failure criteria, drape simulation, and cure cycle planning for structural composites.',
+    to: '/domains/composites',
+    status: 'live',
+  },
+  {
+    slug: 'dental',
+    name: 'Dental CAD',
+    Icon: Stethoscope,
+    accent: 'magenta-edge',
+    blurb:
+      'Crown and bridge design, surgical guide authoring, aligner staging, and milling output for dental labs and clinics.',
+    to: '/domains/dental',
+    status: 'live',
+  },
+  {
+    slug: 'optics',
+    name: 'Optics / Lens Design',
+    Icon: Telescope,
+    accent: 'cyan-edge',
+    blurb:
+      'Sequential ray tracing, Zemax-compatible prescriptions, optical tolerancing, and opto-mechanical STEP integration.',
+    to: '/domains/optics',
+    status: 'live',
+  },
+  {
+    slug: 'horology',
+    name: 'Horology / Watchmaking',
+    Icon: Clock,
+    accent: 'kerf-300',
+    blurb:
+      'Escapement geometry, gear-train synthesis, mainspring curves, and parametric watch-case design for watchmakers.',
+    to: '/domains/horology',
+    status: 'live',
+  },
+  {
+    slug: 'piping',
+    name: 'Piping / P&ID',
+    Icon: Workflow,
+    accent: 'cyan-edge',
+    blurb:
+      'ISO 10628 P&ID symbols, 3D isometric routing, ASME B31.3 stress analysis, and line-list export for process engineers.',
+    to: '/domains/piping',
+    status: 'live',
+  },
+  {
+    slug: 'packaging',
+    name: 'Packaging / Dieline',
+    Icon: Box,
+    accent: 'magenta-edge',
+    blurb:
+      'ECMA / FEFCO dieline templates, 3D fold simulation, blank nesting, and DXF output for structural packaging designers.',
+    to: '/domains/packaging',
+    status: 'live',
+  },
+  {
+    slug: 'mold',
+    name: 'Mold / Injection',
+    Icon: Layers,
+    accent: 'kerf-300',
+    blurb:
+      'Core/cavity split, mold base wizards, gate and runner design, cooling channels, and fill simulation for injection molding.',
+    to: '/domains/mold',
+    status: 'live',
+  },
+  {
+    slug: 'woodworking',
+    name: 'Woodworking',
+    Icon: TreePine,
+    accent: 'kerf-300',
+    blurb:
+      'Parametric joinery, cabinet designer, CNC router toolpaths, and sheet-goods nesting. Module in development.',
+    to: '/domains/woodworking',
     status: 'in-progress',
+  },
+  {
+    slug: 'marine',
+    name: 'Marine / Naval',
+    Icon: Anchor,
+    accent: 'cyan-edge',
+    blurb:
+      'Hull-form design, hydrostatics, resistance prediction, structural scantlings, and outfit routing for naval architects.',
+    to: '/domains/marine',
+    status: 'live',
   },
   {
     slug: 'product',
@@ -379,8 +479,8 @@ function DomainGrid() {
             Every domain Kerf covers.
           </h2>
           <p className="mt-3 text-ink-300 leading-relaxed">
-            Five disciplines have a dedicated page today. Civil and product
-            design have real capability and a dedicated page on the roadmap.
+            Fourteen disciplines have a dedicated page today. Woodworking and
+            product design are in development with pages already live.
           </p>
         </div>
 

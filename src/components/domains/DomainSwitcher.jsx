@@ -12,13 +12,23 @@
  */
 import { Link } from 'react-router-dom'
 
-/* The five domains that have a dedicated /domains/<slug> page. */
+/* All domains that have a dedicated /domains/<slug> page. */
 export const DOMAIN_TABS = [
   { slug: 'jewelry', label: 'Jewelry' },
   { slug: 'mechanical', label: 'Mechanical' },
   { slug: 'electronics', label: 'Electronics' },
   { slug: 'architecture', label: 'Architecture' },
   { slug: 'automotive', label: 'Automotive' },
+  { slug: 'civil', label: 'Civil' },
+  { slug: 'composites', label: 'Composites' },
+  { slug: 'dental', label: 'Dental' },
+  { slug: 'optics', label: 'Optics' },
+  { slug: 'horology', label: 'Horology' },
+  { slug: 'piping', label: 'Piping' },
+  { slug: 'packaging', label: 'Packaging' },
+  { slug: 'mold', label: 'Mold' },
+  { slug: 'woodworking', label: 'Woodworking' },
+  { slug: 'marine', label: 'Marine' },
 ]
 
 /**

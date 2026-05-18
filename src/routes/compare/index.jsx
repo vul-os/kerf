@@ -32,6 +32,15 @@ import {
   Mountain,
   Film,
   Sparkles,
+  Wind,
+  Stethoscope,
+  Telescope,
+  Clock,
+  Workflow,
+  Layers,
+  Anchor,
+  HardHat,
+  TreePine,
 } from 'lucide-react'
 import Header from '../../components/Header.jsx'
 import Footer from '../../components/Footer.jsx'
@@ -177,6 +186,108 @@ const CARDS = [
     tagline: 'Archviz & game-art DCC',
     blurb:
       "3ds Max with Arnold / V-Ray / Corona is the archviz + game-art standard. We document the render-depth gap and where Kerf's engineering-CAD workflow earns its place.",
+  },
+
+  // — New sectors (T-182)
+  {
+    slug: 'composites-domain',
+    icon: Wind,
+    label: 'Aerospace Composites',
+    category: 'Composites',
+    tagline: 'Ply layup, CLT solver, drape simulation',
+    blurb:
+      "Kerf's composites module covers ply layup, CLT/ABD analysis, drape simulation, failure criteria, and cure cycle planning — in one MIT-licensed workspace.",
+    domainHref: '/domains/composites',
+  },
+  {
+    slug: 'dental-domain',
+    icon: Stethoscope,
+    label: 'Dental CAD',
+    category: 'Dental',
+    tagline: 'Crowns, surgical guides, aligner staging',
+    blurb:
+      "Kerf's dental module designs crowns, bridges, surgical guides, and clear aligner stages — on the same OCCT kernel as the mechanical vertical.",
+    domainHref: '/domains/dental',
+  },
+  {
+    slug: 'optics-domain',
+    icon: Telescope,
+    label: 'Optics / Lens Design',
+    category: 'Optics',
+    tagline: 'Ray tracing, Zemax-compatible prescriptions',
+    blurb:
+      "Kerf's optics module covers sequential ray tracing, Zemax .zmx import, optical tolerancing, and opto-mechanical STEP integration.",
+    domainHref: '/domains/optics',
+  },
+  {
+    slug: 'horology-domain',
+    icon: Clock,
+    label: 'Horology / Watchmaking',
+    category: 'Horology',
+    tagline: 'Escapement, gear-train synthesis, watch case',
+    blurb:
+      "Kerf's horology module covers Swiss lever escapement geometry, involute gear-train synthesis, mainspring curves, and parametric watch-case design.",
+    domainHref: '/domains/horology',
+  },
+  {
+    slug: 'piping-domain',
+    icon: Workflow,
+    label: 'Piping / P&ID',
+    category: 'Piping',
+    tagline: 'ISO 10628 P&ID, isometric, ASME B31.3',
+    blurb:
+      "Kerf's piping module covers ISO 10628 P&ID authoring, 3D isometric routing, ASME B31.3 stress analysis, and material take-off for process engineers.",
+    domainHref: '/domains/piping',
+  },
+  {
+    slug: 'packaging-domain',
+    icon: Box,
+    label: 'Packaging / Dieline',
+    category: 'Packaging',
+    tagline: 'ECMA dielines, fold simulation, blank nesting',
+    blurb:
+      "Kerf's packaging module covers ECMA/FEFCO dieline templates, 3D fold simulation, structural performance analysis, and DXF output for cutting tables.",
+    domainHref: '/domains/packaging',
+  },
+  {
+    slug: 'mold-domain',
+    icon: Layers,
+    label: 'Mold / Injection',
+    category: 'Mold',
+    tagline: 'Core/cavity split, gating, fill simulation',
+    blurb:
+      "Kerf's mold module covers core/cavity split, mold base wizards, gate and runner design, cooling channel routing, and fill/pack simulation.",
+    domainHref: '/domains/mold',
+  },
+  {
+    slug: 'woodworking-domain',
+    icon: TreePine,
+    label: 'Woodworking',
+    category: 'Woodworking',
+    tagline: 'Joinery, cabinet design, CNC routing (coming soon)',
+    blurb:
+      "Kerf's woodworking module will cover parametric joinery, cabinet design, CNC router toolpaths, and sheet-goods nesting. In development.",
+    domainHref: '/domains/woodworking',
+  },
+  {
+    slug: 'marine-domain',
+    icon: Anchor,
+    label: 'Marine / Naval',
+    category: 'Marine',
+    tagline: 'Hull form, hydrostatics, resistance, scantlings',
+    blurb:
+      "Kerf's marine module covers NURBS hull-form design, hydrostatics, resistance prediction, structural scantlings, and outfit routing for naval architects.",
+    domainHref: '/domains/marine',
+  },
+  {
+    slug: 'civil-domain',
+    icon: HardHat,
+    label: 'Civil Engineering',
+    category: 'Civil',
+    tagline: 'Hydrology, geotech, pavement, IFC interchange',
+    blurb:
+      "Kerf's civil module covers TR-55 hydrology, Coulomb/Rankine geotech, AASHTO pavement design, surveying traverses, and IFC/DXF interchange.",
+    domainHref: '/domains/civil',
   },
 ]
 
@@ -1089,18 +1200,72 @@ const CATEGORY_SECTIONS = [
       "2D drafting and the .dwg ecosystem. Kerf is 3D-first parametric — we cover the overlap on the dedicated page.",
     /* singleton — no matrix, just the card */
   },
+  {
+    key: 'Composites',
+    blurb:
+      'Structural composites design — ply layup, CLT analysis, drape simulation, failure criteria, and cure cycle planning.',
+  },
+  {
+    key: 'Dental',
+    blurb:
+      'Dental CAD — crown and bridge design, surgical guide authoring, aligner staging, and milling output.',
+  },
+  {
+    key: 'Optics',
+    blurb:
+      'Optical design — sequential ray tracing, Zemax-compatible prescriptions, optical tolerancing, and opto-mechanical integration.',
+  },
+  {
+    key: 'Horology',
+    blurb:
+      'Horology and watchmaking — escapement geometry, gear-train synthesis, mainspring curves, and watch-case design.',
+  },
+  {
+    key: 'Piping',
+    blurb:
+      'Piping and P&ID — ISO 10628 symbol authoring, 3D isometric routing, ASME B31.3 stress analysis, and material take-off.',
+  },
+  {
+    key: 'Packaging',
+    blurb:
+      'Structural packaging — ECMA/FEFCO dieline templates, 3D fold simulation, blank nesting, and DXF output for cutting tables.',
+  },
+  {
+    key: 'Mold',
+    blurb:
+      'Injection mold design — core/cavity split, mold base wizards, gate and runner layout, cooling channels, and fill simulation.',
+  },
+  {
+    key: 'Woodworking',
+    blurb:
+      'Woodworking — parametric joinery, cabinet and furniture design, CNC router toolpaths, and sheet-goods nesting (in development).',
+  },
+  {
+    key: 'Marine',
+    blurb:
+      'Marine and naval architecture — hull-form design, hydrostatics, resistance prediction, structural scantlings, and outfit routing.',
+  },
+  {
+    key: 'Civil',
+    blurb:
+      'Civil engineering — TR-55 hydrology, geotechnical analysis, AASHTO pavement design, surveying traverses, and IFC/DXF interchange.',
+  },
 ]
 
 /* -------------------------------------------------------------------------- */
 /* Card (visual preserved from previous hub)                                  */
 /* -------------------------------------------------------------------------- */
 
-function CompareCard({ slug, icon: Icon, label, tagline, blurb }) {
+function CompareCard({ slug, icon: Icon, label, tagline, blurb, domainHref }) {
+  const href = domainHref ?? `/compare/${slug}`
+  const ariaLabel = domainHref
+    ? `Explore Kerf ${label} domain`
+    : `Read full Kerf vs ${label} comparison`
   return (
     <Link
-      to={`/compare/${slug}`}
+      to={href}
       className="group relative flex flex-col rounded-2xl border border-ink-800 bg-ink-900/40 p-5 sm:p-6 hover:border-ink-700 hover:bg-ink-900/70 transition-colors"
-      aria-label={`Read full Kerf vs ${label} comparison`}
+      aria-label={ariaLabel}
     >
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-center gap-3">
@@ -1109,7 +1274,7 @@ function CompareCard({ slug, icon: Icon, label, tagline, blurb }) {
           </span>
           <div>
             <h3 className="font-display text-base font-semibold tracking-tight text-ink-100">
-              Kerf vs {label}
+              {domainHref ? `Kerf ${label}` : `Kerf vs ${label}`}
             </h3>
             <p className="text-xs text-ink-400 font-mono mt-0.5">{tagline}</p>
           </div>

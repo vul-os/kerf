@@ -62,6 +62,17 @@ const AutocadPage = lazy(() => import('./routes/compare/Autocad.jsx'))
 const InventorPage = lazy(() => import('./routes/compare/Inventor.jsx'))
 const Civil3dPage = lazy(() => import('./routes/compare/Civil3d.jsx'))
 const Max3dsPage = lazy(() => import('./routes/compare/Max3ds.jsx'))
+// New sector domain pages (T-182)
+const CompositesPage = lazy(() => import('./routes/domains/Composites.jsx'))
+const DentalPage = lazy(() => import('./routes/domains/Dental.jsx'))
+const OpticsPage = lazy(() => import('./routes/domains/Optics.jsx'))
+const HorologyPage = lazy(() => import('./routes/domains/Horology.jsx'))
+const PipingPage = lazy(() => import('./routes/domains/Piping.jsx'))
+const PackagingPage = lazy(() => import('./routes/domains/Packaging.jsx'))
+const MoldPage = lazy(() => import('./routes/domains/Mold.jsx'))
+const WoodworkingPage = lazy(() => import('./routes/domains/Woodworking.jsx'))
+const MarinePage = lazy(() => import('./routes/domains/Marine.jsx'))
+const CivilPage = lazy(() => import('./routes/domains/Civil.jsx'))
 
 // Cloud surface — these come from the cloud/ open-core split and may be
 // stubs on OSS builds. useCloudConfig stays eager (we need it before any
@@ -201,6 +212,16 @@ export default function App() {
       <Route path="/jewelry-configurator" element={<JewelryConfigurator />} />
       <Route path="/share/:token" element={<JewelryShare />} />
       <Route path="/domains/architecture" element={<Architecture />} />
+      <Route path="/domains/composites" element={<CompositesPage />} />
+      <Route path="/domains/dental" element={<DentalPage />} />
+      <Route path="/domains/optics" element={<OpticsPage />} />
+      <Route path="/domains/horology" element={<HorologyPage />} />
+      <Route path="/domains/piping" element={<PipingPage />} />
+      <Route path="/domains/packaging" element={<PackagingPage />} />
+      <Route path="/domains/mold" element={<MoldPage />} />
+      <Route path="/domains/woodworking" element={<WoodworkingPage />} />
+      <Route path="/domains/marine" element={<MarinePage />} />
+      <Route path="/domains/civil" element={<CivilPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route path="/profile" element={<Profile />} />

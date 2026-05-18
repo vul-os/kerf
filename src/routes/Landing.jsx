@@ -54,6 +54,14 @@ import {
   Gem,
   Settings2,
   ChevronRight,
+  Wind,
+  Stethoscope,
+  Telescope,
+  Clock,
+  Box,
+  Anchor,
+  HardHat,
+  TreePine,
 } from 'lucide-react'
 import { useState } from 'react'
 import Header from '../components/Header.jsx'
@@ -684,7 +692,7 @@ const DOMAINS = [
   },
   {
     icon: CircuitBoard,
-    label: 'Electronic',
+    label: 'Electronics',
     sub: 'SI · EMC · PDN · thermal pre-compliance in one tool',
     href: '/domains/electronics',
     color: 'text-emerald-400',
@@ -697,6 +705,86 @@ const DOMAINS = [
     href: '/domains/architecture',
     color: 'text-violet-400',
     bg: 'bg-violet-400/10 border-violet-400/30 group-hover:bg-violet-400/20',
+  },
+  {
+    icon: Wind,
+    label: 'Composites',
+    sub: 'Ply layup · CLT solver · drape · cure cycle',
+    href: '/domains/composites',
+    color: 'text-yellow-400',
+    bg: 'bg-yellow-400/10 border-yellow-400/30 group-hover:bg-yellow-400/20',
+  },
+  {
+    icon: Stethoscope,
+    label: 'Dental',
+    sub: 'Crowns · surgical guides · aligner staging',
+    href: '/domains/dental',
+    color: 'text-rose-400',
+    bg: 'bg-rose-400/10 border-rose-400/30 group-hover:bg-rose-400/20',
+  },
+  {
+    icon: Telescope,
+    label: 'Optics',
+    sub: 'Ray tracing · Zemax import · opto-mechanical STEP',
+    href: '/domains/optics',
+    color: 'text-sky-400',
+    bg: 'bg-sky-400/10 border-sky-400/30 group-hover:bg-sky-400/20',
+  },
+  {
+    icon: Clock,
+    label: 'Horology',
+    sub: 'Escapement · gear train · mainspring · watch case',
+    href: '/domains/horology',
+    color: 'text-amber-400',
+    bg: 'bg-amber-400/10 border-amber-400/30 group-hover:bg-amber-400/20',
+  },
+  {
+    icon: Workflow,
+    label: 'Piping / P&ID',
+    sub: 'ISO 10628 · isometric · ASME B31.3 stress',
+    href: '/domains/piping',
+    color: 'text-teal-400',
+    bg: 'bg-teal-400/10 border-teal-400/30 group-hover:bg-teal-400/20',
+  },
+  {
+    icon: Box,
+    label: 'Packaging',
+    sub: 'ECMA dielines · fold sim · blank nesting · DXF',
+    href: '/domains/packaging',
+    color: 'text-orange-400',
+    bg: 'bg-orange-400/10 border-orange-400/30 group-hover:bg-orange-400/20',
+  },
+  {
+    icon: Layers,
+    label: 'Mold / Injection',
+    sub: 'Core/cavity · mold base · gating · moldflow',
+    href: '/domains/mold',
+    color: 'text-indigo-400',
+    bg: 'bg-indigo-400/10 border-indigo-400/30 group-hover:bg-indigo-400/20',
+  },
+  {
+    icon: TreePine,
+    label: 'Woodworking',
+    sub: 'Joinery · cabinet designer · CNC routing · cut list',
+    href: '/domains/woodworking',
+    color: 'text-lime-400',
+    bg: 'bg-lime-400/10 border-lime-400/30 group-hover:bg-lime-400/20',
+  },
+  {
+    icon: Anchor,
+    label: 'Marine / Naval',
+    sub: 'Hull form · hydrostatics · resistance · scantlings',
+    href: '/domains/marine',
+    color: 'text-blue-400',
+    bg: 'bg-blue-400/10 border-blue-400/30 group-hover:bg-blue-400/20',
+  },
+  {
+    icon: HardHat,
+    label: 'Civil',
+    sub: 'Hydrology · geotech · pavement · IFC interchange',
+    href: '/domains/civil',
+    color: 'text-stone-400',
+    bg: 'bg-stone-400/10 border-stone-400/30 group-hover:bg-stone-400/20',
   },
 ]
 
@@ -715,7 +803,7 @@ function PerDomain() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-4">
           {DOMAINS.map((d) => (
             <Link
               key={d.label}

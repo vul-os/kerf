@@ -3460,7 +3460,7 @@ User-requested 2026-05-18 — improve tscircuit editing (wires, placement, ratsn
 - **Tier:** A
 - **Money/reach rationale:** the tscircuit canvas already renders the board (T-77 family); the gap is *editing* — users currently cannot drag a wire to nudge it around a part. Closes a daily-driver hole for the electronics persona.
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** add a wire-drag interaction mode to `src/components/CircuitCanvas*` (find by grep). On wire-drag: hit-test the wire segment, capture pointer, update the segment's anchor points, re-emit the patched Circuit JSON. Right-click on a wire opens a context menu: "delete · convert to bus · pin to grid · re-route". Frontend only (the Circuit JSON layer is already round-trippable).
 - **Target files/packages:** `src/components/CircuitCanvas/wireEdit.js` (NEW), `src/components/CircuitCanvas/ContextMenu.jsx` (NEW), wire into the existing canvas component (additive only), vitest.
 - **Definition of Done:** dragging a wire updates its routing and the Circuit JSON; right-click menu actions all work; vitest on the pure helpers; `npm run build` clean.
@@ -3480,7 +3480,7 @@ User-requested 2026-05-18 — improve tscircuit editing (wires, placement, ratsn
 - **Tier:** A
 - **Money/reach rationale:** ratsnest (unrouted-net guide lines) + a live design-rule check (clearance / acid-trap / via-in-pad) are the two visual feedback layers that turn a PCB editor from "viewer" into "tool". KiCad has both — tscircuit's renderer doesn't.
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** compute ratsnest in pure Python (`packages/kerf-electronics/src/kerf_electronics/ratsnest.py`) — minimum-spanning-tree over each net's pad positions; frontend overlays the airline segments. DRC: clearance check (pad-to-pad, pad-to-trace, trace-to-trace), unconnected pads, missing footprint. Frontend renders DRC violations as red highlights on the offending features.
 - **Target files/packages:** `packages/kerf-electronics/src/kerf_electronics/ratsnest.py` (NEW), `packages/kerf-electronics/src/kerf_electronics/drc.py` (NEW), `packages/kerf-electronics/tests/test_ratsnest.py` + `test_drc.py`, `src/components/CircuitCanvas/RatsnestLayer.jsx` (NEW), `src/components/CircuitCanvas/DRCOverlay.jsx` (NEW).
 - **Definition of Done:** ratsnest tree connects every net's pads with minimum total length (analytic MST oracle); DRC fires on a known-violating fixture; frontend overlay renders; pytest + vitest green.
@@ -3490,7 +3490,7 @@ User-requested 2026-05-18 — improve tscircuit editing (wires, placement, ratsn
 - **Tier:** A
 - **Money/reach rationale:** today when the LLM emits Circuit JSON in chat (e.g. `make_circuit` tool result), it shows as raw text — the user has to copy/paste into a file to see it. A native viewer turns every chat message into a live preview, hugely amplifying the LLM-electronics loop.
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** in the chat message renderer (grep `src/components/Chat*`), detect Circuit JSON in code-blocks (`json` fence with a tscircuit shape — heuristic: top-level `circuit_json` key or array of objects with `type: "source_component"|"pcb_*"|"schematic_*"`). Render an inline `<CircuitCanvasMini>` (read-only, no editing) below the code block. One-click "Open in editor" button writes it to a new file in the project.
 - **Target files/packages:** `src/components/Chat/CircuitJsonPreview.jsx` (NEW), `src/lib/detectCircuitJson.js` (NEW), wire into the chat message renderer (additive only). Vitest.
 - **Definition of Done:** chat messages containing Circuit JSON render an inline preview; "Open in editor" creates a new project file; vitest detects + non-detects; `npm run build` clean.
@@ -3500,7 +3500,7 @@ User-requested 2026-05-18 — improve tscircuit editing (wires, placement, ratsn
 - **Tier:** B
 - **Money/reach rationale:** Circuit JSON is tscircuit's intermediate; KiCad netlist is the industry exchange. A robust bidirectional bridge means both authoring paths (tscircuit JSX + atopile-as-of-T-194) land on the same fabricable artefact and users can take the design to any house.
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** `packages/kerf-electronics/src/kerf_electronics/kicad_io.py` (NEW) — write Circuit JSON → KiCad `.kicad_pcb` + `.kicad_sch` (v6/v7 format) and read back. The "write" path is the priority (export to fabrication); the "read" path is the bonus (import an existing KiCad project into Kerf). Pytest oracle: round-trip a synthetic 2-resistor Circuit JSON through KiCad export + re-import → node count + net count + footprint refs preserved.
 - **Target files/packages:** `packages/kerf-electronics/src/kerf_electronics/kicad_io.py`, `packages/kerf-electronics/tests/test_kicad_io.py`, fixtures dir.
 - **Definition of Done:** Circuit JSON → KiCad → Circuit JSON round-trip preserves nodes/nets/footprints; pytest green; `npm run build` clean.
@@ -3510,7 +3510,7 @@ User-requested 2026-05-18 — improve tscircuit editing (wires, placement, ratsn
 - **Tier:** A
 - **Money/reach rationale:** atopile (textual, code-like electronics authoring) is the fastest-growing alt-flow to tscircuit. Adding it gives Kerf a SECOND authoring surface that both compile to the same Circuit JSON / KiCad netlist — broadens the funnel to firmware/embedded engineers who think in code, not schematics.
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** `packages/kerf-electronics/src/kerf_electronics/atopile/parser.py` — pure-Python parser for the atopile `.ato` syntax (modules, components, connections, units, parameters); emit an AST. Mirror the subset documented at atopile.io as of 2025. Tokenizer + LR/PEG parser (no external deps; hand-rolled).
 - **Target files/packages:** `packages/kerf-electronics/src/kerf_electronics/atopile/parser.py` (NEW), `packages/kerf-electronics/src/kerf_electronics/atopile/ast.py` (NEW dataclass tree), `packages/kerf-electronics/tests/test_atopile_parser.py` + a fixtures dir with 4–5 small `.ato` files (resistor, voltage-divider, RC-filter, LED-driver).
 - **Definition of Done:** all 4 fixtures parse to a non-empty AST; AST nodes carry source-location info; pytest oracles assert connection counts; `npm run build` clean.

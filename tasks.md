@@ -3947,7 +3947,7 @@ User-direction 2026-05-18: the existing `kerf-firmware` (T-130) is a thin `pio` 
 ### T-237 GDS-II reader/writer — pure Python, KLayout-shape data model
 - **Tier:** A
 - **Priority:** P2
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** pure-Python reader/writer for **GDS-II** — the standard binary IC-layout interchange format. Spec is well-documented (Cadence GDS-II Stream Format spec, public). Implements the record-by-record stream format: HEADER, BGNLIB, LIBNAME, UNITS, BGNSTR, STRNAME, BOUNDARY, PATH, SREF, AREF, TEXT, LAYER, DATATYPE, XY, ENDEL, ENDSTR, ENDLIB. Data model mirrors KLayout's `Cell` / `Shape` / `Polygon` / `Path` / `Text` / `Box` so we can interoperate with KLayout-the-tool when present without depending on it at runtime. Pure Python; no `klayout` package dependency.
 - **Target files/packages:** `packages/kerf-silicon/src/kerf_silicon/layout/__init__.py` (NEW), `packages/kerf-silicon/src/kerf_silicon/layout/gds/__init__.py` (NEW), `packages/kerf-silicon/src/kerf_silicon/layout/gds/reader.py` (NEW), `packages/kerf-silicon/src/kerf_silicon/layout/gds/writer.py` (NEW), `packages/kerf-silicon/src/kerf_silicon/layout/gds/records.py` (NEW — record-tag constants + struct layouts), `packages/kerf-silicon/src/kerf_silicon/layout/shapes.py` (NEW — `Cell` / `Polygon` / `Path` / `Text` / `Box` dataclasses, KLayout-shape parity), `packages/kerf-silicon/tests/test_gds_io.py` (NEW), `packages/kerf-silicon/tests/fixtures/gds/inverter_sky130.gds` (NEW — small KLayout-exported sample), `packages/kerf-silicon/tests/fixtures/gds/and2_sky130.gds` (NEW).
 - **Definition of Done:** the SKY130 inverter `.gds` round-trips byte-stable through reader→writer (modulo trailing pad bytes that GDS-II tolerates); cell/polygon/layer counts match KLayout's reported counts on the same files; a 1000-polygon synthetic fixture round-trips in < 1 s; pytest oracles; `npm run build` clean.
@@ -3974,7 +3974,7 @@ User-direction 2026-05-18: the existing `kerf-firmware` (T-130) is a thin `pio` 
 ### T-240 LEF (Library Exchange Format) reader — standard-cell abstracts
 - **Tier:** A
 - **Priority:** P2
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** pure-Python reader for **LEF** (Library Exchange Format) — the standard-cell + macro abstract format consumed by OpenROAD. Two flavours: **technology LEF** (process layers, design rules) and **cell LEF** (per-cell pin abstracts, obstructions, sizes). Spec is the public Cadence LEF/DEF Language Reference. Reader produces dataclass trees; integrates with the T-239 PDK so `from kerf_silicon.pdk import sky130; sky130.cells` returns the parsed cell library. No writer in v1 (OpenROAD generates LEF; we read).
 - **Target files/packages:** `packages/kerf-silicon/src/kerf_silicon/layout/lef/__init__.py` (NEW), `packages/kerf-silicon/src/kerf_silicon/layout/lef/reader.py` (NEW), `packages/kerf-silicon/src/kerf_silicon/layout/lef/ast.py` (NEW), `packages/kerf-silicon/tests/test_lef.py` (NEW), `packages/kerf-silicon/tests/fixtures/lef/sky130_fd_sc_hd.tech.lef` (NEW — slim subset, ~50 layers), `packages/kerf-silicon/tests/fixtures/lef/sky130_fd_sc_hd.cells.lef` (NEW — slim subset, ~20 cells).
 - **Definition of Done:** technology LEF parses ≥ 50 layers with the expected `LAYER li1 TYPE ROUTING` shape; cell LEF parses ≥ 20 cells with at least `sky130_fd_sc_hd__inv_1` / `sky130_fd_sc_hd__nand2_1` / `sky130_fd_sc_hd__dfxtp_1` present and pin counts matching the oracle; the inverter cell has the expected `WIDTH`/`HEIGHT` values; pytest oracles; `npm run build` clean.

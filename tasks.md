@@ -1144,7 +1144,7 @@ Tiering follows the same money/reach rule: BIM / FEM / CFD / ECAD depth →
 Tier A (single persona unlock), render / SubD / direct-edit → Tier B
 (cross-sector multiplier).
 
-### T-100 FEM matching CalculiX / Z88 / Mystran depth
+### T-100 FEM matching CalculiX / Z88 / Mystran depth (epic — split into T-100a..h)
 - **Tier:** A
 - **Money/reach rationale:** Mechanical + automotive simulation depth
   (2 personas). Seed modules (`nonlinear`, `explicit`, `acoustics_fem`,
@@ -1153,71 +1153,48 @@ Tier A (single persona unlock), render / SubD / direct-edit → Tier B
   enum + reference-tool match. FEM-hardening stream is in flight in
   parallel; this task captures **what's left after that lands**.
 - **Priority:** P2
-- **Status:** 🚧 in flight — **reference-value suite landed
-  (2026-05-17):** `kerf_fem.pressure_load` + 43-test
-  `packages/kerf-fem/tests/test_fem_refvalues.py` with citable Roark /
-  Blevins / Incropera oracles, 42 green, one ASTM E1049 rainflow test
-  skipped (real bug flagged in `fatigue_fem._rainflow`, ranked
-  alongside the remaining enum-wiring work). Public `analysis_type`
-  enum-wiring + CalculiX / Z88 / Mystran reference-tool match still
-  ahead.
+- **Status:** 🚧 umbrella — split into bounded sub-tasks **T-100a..h**.
+  Reference-value suite landed (2026-05-17): `kerf_fem.pressure_load` +
+  43-test `test_fem_refvalues.py` with Roark / Blevins / Incropera
+  oracles, 42 green, one ASTM E1049 rainflow test skipped (real bug
+  flagged in `fatigue_fem._rainflow`). Public `analysis_type` enum-wiring
+  + CalculiX / Z88 / Mystran reference-tool match decomposed below.
 - **Scope:** Wire the seed nonlinear / explicit / acoustics / EM /
   fatigue modules through the public analysis enum + LLM tool surface,
   then match a CalculiX (nonlinear / contact) + Z88 (linear / modal /
   nonlinear) + Mystran (modal / aeroelastic) reference test corpus.
-  **Remaining sub-items after the 2026-05-17 landings:**
-  - fix `fatigue_fem._rainflow` (ASTM E1049) — currently skipped
-  - wire `nonlinear` / `explicit` / `acoustics_fem` / `em_field` /
-    `em_highfreq` / `fatigue_fem` through `tools.py` analysis-enum
-  - publish the new capability tags on `GET /health/capabilities`
-  - extend the 43-test `test_fem_refvalues.py` corpus with
-    CalculiX / Z88 / Mystran match-cases.
+  CalculiX / Z88 / Mystran are invoked as subprocesses with graceful
+  degrade when the binary is absent (same pattern as CuraEngine).
 - **Target files/packages:** `packages/kerf-fem/src/kerf_fem/` (`tools.py`
   analysis-enum extension, plugin capability advertisements,
   `nonlinear.py` / `explicit.py` / `acoustics_fem.py` / `em_field.py` /
   `em_highfreq.py` / `fatigue_fem.py`, `pressure_load.py`), reference-
-  test corpus under `packages/kerf-fem/tests/` (already-shipped
-  `test_fem_refvalues.py` is the seed).
-- **Definition of Done:** each module passes its reference-tool match
-  within tolerance; analysis-enum advertises the new types; capability
-  tags appear in `GET /health/capabilities`; rainflow bug fixed and
-  the skipped test re-enabled.
+  test corpus under `packages/kerf-fem/tests/`.
+- **Definition of Done:** rolled up from T-100a..h.
 - **Depends-on:** none
 
-### T-101 CFD CfdOF-class — turbulence + 3-D meshing + OpenFOAM bridge
+### T-101 CFD CfdOF-class — turbulence + 3-D meshing + OpenFOAM bridge (epic — split into T-101a..f)
 - **Tier:** A
 - **Money/reach rationale:** Mechanical + automotive + aerospace
   simulation depth (3 personas, P2 — moat depth not P0 unlock). Potential
   flow (`cfd_potential.py`) is the seed already in flight; full CfdOF
   parity is engine-class.
 - **Priority:** P2
-- **Status:** 🚧 in flight — **2-D laminar foundation landed
-  (2026-05-17):** `kerf_fem.cfd_potential` (potential flow,
-  `Cp(θ) = 1 − 4 sin²θ` analytic oracle) + `kerf_fem.cfd_navier_stokes`
-  (lid-driven cavity, Ghia Re=100 reference); 61 hermetic CFD tests in
-  `packages/kerf-fem/tests/test_cfd.py`. Lid-driven cavity NS
-  reference-tolerance match shipped; turbulence (k-ε / k-ω SST), 3-D
-  unstructured meshing, and the OpenFOAM bridge all still ahead.
-- **Scope:** Extend `cfd_potential.py` + `cfd_navier_stokes.py` past
-  the 2-D laminar foundation into full Navier-Stokes + heat transfer
-  with turbulence models (k-ε / k-ω SST), 3-D unstructured meshing,
-  and an OpenFOAM bridge for the serious-CFD path (graceful degrade
-  when the binary is absent, same pattern as CuraEngine /
-  Instant-Meshes). **Remaining sub-items after the 2026-05-17
-  landings:**
-  - k-ε / k-ω SST turbulence models with the standard test cases
-  - 3-D unstructured mesh path (`packages/kerf-fem/src/kerf_fem/mesh3d.py`
-    or similar)
-  - `openfoam_bridge.py` — case-translate + subprocess + result-parse,
-    sentinel-degrade when the binary is absent.
+- **Status:** 🚧 umbrella — split into bounded sub-tasks **T-101a..f**.
+  2-D laminar foundation landed (2026-05-17): `kerf_fem.cfd_potential`
+  (potential flow, `Cp(θ)=1−4sin²θ` analytic oracle) +
+  `kerf_fem.cfd_navier_stokes` (lid-driven cavity, Ghia Re=100 reference);
+  61 hermetic CFD tests in `test_cfd.py`. Turbulence models, 3-D meshing,
+  and OpenFOAM bridge decomposed below.
+- **Scope:** Extend past the 2-D laminar foundation into full
+  Navier-Stokes + heat transfer with turbulence models (k-ε / k-ω SST),
+  3-D unstructured meshing, and an OpenFOAM bridge (graceful degrade when
+  the binary is absent — same pattern as CuraEngine). OpenFOAM is invoked
+  as a subprocess; the solver is unmodified.
 - **Target files/packages:** `packages/kerf-fem/src/kerf_fem/cfd_*.py`,
-  optional `packages/kerf-fem/src/kerf_fem/openfoam_bridge.py`, tests
-  (already-shipped `test_cfd.py` is the seed).
-- **Definition of Done:** turbulence model toggle works and matches a
-  canonical reference case (channel flow / backward-facing step);
-  OpenFOAM bridge round-trips a fixture case with binary present →
-  degrades to sentinel when absent; 3-D unstructured mesh on a
-  fixture geometry.
+  `packages/kerf-fem/src/kerf_fem/openfoam_bridge.py`, tests (`test_cfd.py`
+  is the seed).
+- **Definition of Done:** rolled up from T-101a..f.
 - **Depends-on:** none
 
 ### T-102 ECAD: interactive push-and-shove diff-pair routing
@@ -2807,4 +2784,447 @@ frontend tasks (T-147/T-148) serialize behind other frontend work.
   bounds with utilization label; vitest on layout math; build clean.
   UI change — needs user dev verification.
 - **Depends-on:** T-53
+
+---
+
+## FEM epic sub-tasks (T-100a … T-100h)
+
+Decomposition of the T-100 umbrella. Each sub-task is a single isolated-worktree
+Sonnet run. CalculiX / Z88 / Mystran are subprocess-invoked and unmodified;
+graceful degrade when the binary is absent (same pattern as CuraEngine).
+
+### T-100a Fix `fatigue_fem._rainflow` ASTM E1049 bug (skipped test)
+- **Tier:** A
+- **Money/reach rationale:** Mechanical + automotive fatigue analysis (2 personas). The ASTM E1049 rainflow test is the only failing case in the 43-test reference-value suite; it must be green before fatigue_fem ships as a public analysis type.
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** Diagnose and fix the `fatigue_fem._rainflow` implementation so it matches the ASTM E1049 4-point rainflow-counting algorithm. Re-enable the previously skipped test in `test_fem_refvalues.py`. Pure Python; no external solver needed. One function, one test.
+- **Target files/packages:** `packages/kerf-fem/src/kerf_fem/fatigue_fem.py` (`_rainflow`), `packages/kerf-fem/tests/test_fem_refvalues.py` (unskip the ASTM E1049 case).
+- **Definition of Done:** the previously skipped test passes; the fix matches the ASTM E1049 counting table (cycles, ranges, means) to the documented tolerance; no other tests regressed; pytest green.
+- **Depends-on:** none
+
+### T-100b Wire `nonlinear` + `explicit` through the public analysis enum
+- **Tier:** A
+- **Money/reach rationale:** Mechanical + automotive nonlinear / crash analysis. The seed modules exist; they are invisible to the LLM tool surface until wired through `tools.py`.
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** Extend `packages/kerf-fem/src/kerf_fem/tools.py` `analysis_type` enum to accept `nonlinear` and `explicit`. Route each type to the corresponding seed module (`nonlinear.py`, `explicit.py`). Publish capability tags in `GET /health/capabilities`. Add analytic reference tests: nonlinear cantilever yielding (compare elastic-plastic tip deflection to analytical J2 plasticity solution); explicit impact pulse (kinetic-energy conservation to 1%). Binary-absent → graceful sentinel.
+- **Target files/packages:** `packages/kerf-fem/src/kerf_fem/tools.py`, `nonlinear.py`, `explicit.py`, `packages/kerf-fem/tests/test_fem_refvalues.py` (extend).
+- **Definition of Done:** `run_fem(analysis_type='nonlinear', ...)` and `run_fem(analysis_type='explicit', ...)` execute when the solver binary is present; graceful sentinel when absent; capability tags in `/health/capabilities`; reference tests green; pytest.
+- **Depends-on:** T-100a
+
+### T-100c Wire `acoustics_fem` + `em_field` + `em_highfreq` through the enum
+- **Tier:** A
+- **Money/reach rationale:** Mechanical + electronics simulation depth (vibro-acoustics, EM shielding, RF PCB — 2+ personas). Three seed modules wired in one task (they share the same enum-extension pattern as T-100b).
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** Extend `tools.py` enum for `acoustics_fem`, `em_field`, `em_highfreq`. Route to seed modules. Publish capability tags. Reference tests: `acoustics_fem` — room-mode frequency for a rectangular cavity vs analytic formula; `em_field` — E-field in a parallel-plate capacitor vs V/d; `em_highfreq` — resonant frequency of a rectangular waveguide TE10 mode vs analytic formula. Each: binary-absent → sentinel.
+- **Target files/packages:** `packages/kerf-fem/src/kerf_fem/tools.py`, `acoustics_fem.py`, `em_field.py`, `em_highfreq.py`, `packages/kerf-fem/tests/test_fem_refvalues.py` (extend).
+- **Definition of Done:** all three analysis types run with binary present, sentinel with absent; capability tags published; three analytic-oracle reference tests green; pytest.
+- **Depends-on:** T-100b
+
+### T-100d Wire `fatigue_fem` through the enum + full ASTM/BS7608 corpus
+- **Tier:** A
+- **Money/reach rationale:** Mechanical + automotive fatigue life analysis. Completing fatigue_fem wiring unlocks durability/life estimates — a key simulation type for both personas.
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** Extend `tools.py` enum for `fatigue` / `fatigue_fem`. Route to the fixed `fatigue_fem.py` (after T-100a). Add reference tests: S-N Wöhler curve fatigue life estimate for a steel specimen vs the BS 7608 / Miner's rule table (cite the specific table). Publish capability tag. Binary-absent → sentinel.
+- **Target files/packages:** `packages/kerf-fem/src/kerf_fem/tools.py`, `fatigue_fem.py`, `packages/kerf-fem/tests/test_fem_refvalues.py` (extend).
+- **Definition of Done:** `run_fem(analysis_type='fatigue', ...)` executes; BS 7608 reference case matches to ±10%; capability tag published; pytest green.
+- **Depends-on:** T-100a, T-100b
+
+### T-100e CalculiX subprocess bridge + nonlinear contact reference corpus
+- **Tier:** A
+- **Money/reach rationale:** CalculiX is the reference nonlinear / contact solver for mechanical simulation depth (G-1 gap). The bridge lets Kerf hand off a complex nonlinear case to CalculiX when FEniCSx/internal is insufficient.
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** A `calculix_bridge.py` module that translates a `KeRFJob` to CalculiX `.inp` format, invokes the `ccx` binary as a subprocess, parses the `.frd` result file, and maps results back to the Kerf result schema. Graceful sentinel when `ccx` is absent. Reference tests: a Hertzian contact case (two spheres) — peak pressure vs analytic Hertz formula; a nonlinear plasticity case — tip deflection vs analytic result. Mock the subprocess call for hermetic CI.
+- **Target files/packages:** `packages/kerf-fem/src/kerf_fem/calculix_bridge.py` (new), `packages/kerf-fem/tests/test_calculix_bridge.py` (mocked).
+- **Definition of Done:** bridge translates a fixture job to `.inp`, parses `.frd` result; mock-subprocess test green; real-binary path documented; sentinel when absent; Hertz contact reference test green (with real binary in manual test, mocked in CI).
+- **Depends-on:** T-100b
+
+### T-100f Z88 subprocess bridge + modal / nonlinear reference corpus
+- **Tier:** A
+- **Money/reach rationale:** Z88Aurora is the reference for free/open-source linear + modal + nonlinear FEM (G-1 gap). A Z88 bridge gives Kerf a validated secondary solver for cross-checking results.
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** A `z88_bridge.py` module that translates a `KeRFJob` to Z88 format (`.z88i1`/`.z88i2`), invokes the `z88r` binary as subprocess, parses the output, maps back. Graceful sentinel when absent. Reference test: a simply-supported beam modal (first natural frequency vs analytic Euler-Bernoulli). Mock the subprocess for hermetic CI.
+- **Target files/packages:** `packages/kerf-fem/src/kerf_fem/z88_bridge.py` (new), `packages/kerf-fem/tests/test_z88_bridge.py` (mocked).
+- **Definition of Done:** bridge translates job → Z88 format, parses result; mock test green; sentinel when absent; modal reference frequency matches analytic to 1%.
+- **Depends-on:** T-100b
+
+### T-100g Mystran subprocess bridge + modal / aeroelastic reference corpus
+- **Tier:** A
+- **Money/reach rationale:** Mystran is the open-source Nastran-class solver for modal and aeroelastic analysis — a key gap for aerospace + automotive NVH. Bridge lets Kerf delegate complex aeroelastic cases.
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** A `mystran_bridge.py` module that translates a `KeRFJob` to Nastran-format BDF (Mystran accepts standard Nastran BDF), invokes the `mystran` binary as subprocess, parses the `.F06` output, maps results back. Graceful sentinel when absent. Reference test: a cantilever plate first-mode frequency vs analytic thin-plate formula.
+- **Target files/packages:** `packages/kerf-fem/src/kerf_fem/mystran_bridge.py` (new), `packages/kerf-fem/tests/test_mystran_bridge.py` (mocked).
+- **Definition of Done:** BDF translation correct for a fixture job; mock test green; sentinel when absent; first-mode reference frequency matches to 2%.
+- **Depends-on:** T-100b
+
+### T-100h FEM capability advertiser + LLM tool surface for all types
+- **Tier:** A
+- **Money/reach rationale:** The full FEM analysis suite is worthless if the LLM cannot discover and invoke it. This task makes every wired analysis type accessible from the chat interface.
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** Extend `GET /health/capabilities` to advertise all active FEM analysis types (from T-100b/c/d). Update the `run_fem` LLM tool description and JSON schema so the LLM can enumerate available types and their required parameters. Add an `explain_fem_result` LLM tool that renders a plain-language summary of the result (displacement, stress, frequency, cycles) with citable values. Update `packages/kerf-fem/llm_docs/fem.md`.
+- **Target files/packages:** `packages/kerf-fem/src/kerf_fem/tools.py` (LLM tool surface), `packages/kerf-fem/llm_docs/fem.md`, `packages/kerf-api/` health endpoint, `packages/kerf-fem/tests/` (LLM tool dispatch tests).
+- **Definition of Done:** `/health/capabilities` lists all wired types; `run_fem` tool accepts and routes all types; `explain_fem_result` produces a readable summary; LLM doc updated; dispatch tests green; pytest.
+- **Depends-on:** T-100b, T-100c, T-100d
+
+---
+
+## CFD epic sub-tasks (T-101a … T-101f)
+
+Decomposition of the T-101 umbrella. OpenFOAM is subprocess-invoked and unmodified;
+graceful degrade when absent. All pure-Python solver work is hermetically testable
+with analytic oracles.
+
+### T-101a k-ε turbulence model with channel-flow reference oracle
+- **Tier:** A
+- **Money/reach rationale:** Turbulence modelling is the single biggest gap between the landed 2-D laminar foundation and CfdOF-class capability. Channel flow is the canonical k-ε validation case.
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** Implement the standard two-equation k-ε model (`cfd_ke.py`) with wall functions. Reference test: fully-developed turbulent channel flow (Re=10 000) — mean velocity profile vs the law-of-the-wall (u+ vs y+ in log region, slope κ=0.41, B=5.5) to within 5%. Pure Python + NumPy; no external solver. Analytic oracle only.
+- **Target files/packages:** `packages/kerf-fem/src/kerf_fem/cfd_ke.py` (new), `packages/kerf-fem/tests/test_cfd.py` (extend).
+- **Definition of Done:** log-law region of the velocity profile matches the analytic wall law to 5%; y+ placement is in the log-layer; pytest analytic oracle; hermetic (no external binary).
+- **Depends-on:** none
+
+### T-101b k-ω SST turbulence model with backward-facing step reference
+- **Tier:** A
+- **Money/reach rationale:** k-ω SST is the industry-standard model for adverse pressure gradients (airfoils, external aero). Backward-facing step (Driver & Seegmiller) is the canonical SST reference case.
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** Implement the k-ω SST model (`cfd_kw_sst.py`) blending k-ω near-wall and k-ε in freestream. Reference test: backward-facing step reattachment length — computed vs experimental Driver & Seegmiller data (reattachment at ~7h step heights ± 15%). Analytic-oracle approximation based on the published correlation.
+- **Target files/packages:** `packages/kerf-fem/src/kerf_fem/cfd_kw_sst.py` (new), `packages/kerf-fem/tests/test_cfd.py` (extend).
+- **Definition of Done:** reattachment length within 15% of the Driver & Seegmiller reference; wall shear stress sign change at the correct location; pytest; no external binary.
+- **Depends-on:** T-101a
+
+### T-101c 3-D unstructured mesh generator seed
+- **Tier:** A
+- **Money/reach rationale:** 3-D meshing is the prerequisite for any real-world CFD case (all practical flows are 3-D). Without a 3-D mesh, the solver depth above cannot be applied to real geometry.
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** A `mesh3d.py` module that generates a structured hex or unstructured tet mesh around a simple geometry (box, sphere, cylinder) using a pure-Python Delaunay tet algorithm (or a thin wrapper around the `tetgen` binary with graceful degrade when absent). Output: a `Mesh3D` dataclass (vertices, elements, boundary-face tags). Reference test: tet mesh of a unit sphere — element count, minimum quality metric (Jacobian > 0 for all elements), and boundary face normals point outward.
+- **Target files/packages:** `packages/kerf-fem/src/kerf_fem/mesh3d.py` (new), `packages/kerf-fem/tests/test_mesh3d.py` (new).
+- **Definition of Done:** unit sphere produces a valid tet mesh with no inverted elements; boundary normals point outward; Jacobian > 0 everywhere; tetgen-absent → graceful sentinel; pytest.
+- **Depends-on:** none
+
+### T-101d OpenFOAM bridge — case translation + subprocess + result parse
+- **Tier:** A
+- **Money/reach rationale:** OpenFOAM is the reference open-source CFD solver for serious 3-D turbulent flows (automotive aerodynamics, building wind load, duct flow). Bridging it gives Kerf CfdOF-class capability for those use-cases.
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** `openfoam_bridge.py` — translate a `CFDJob` (geometry + boundary conditions + turbulence model + solver settings) to an OpenFOAM case directory structure (constant/, system/, 0/), invoke `blockMesh` + `simpleFoam` (or `rhoPimpleFoam`) as subprocesses, parse the `postProcessing/` result files, map back to the Kerf result schema. Graceful sentinel when the `simpleFoam` binary is absent. Mock the subprocess for hermetic CI. Reference test: lid-driven cavity at Re=1000 with the OpenFOAM path — compare u-velocity profile vs Ghia Re=1000 data (same oracle as the existing `cfd_navier_stokes.py` test but via the OF bridge).
+- **Target files/packages:** `packages/kerf-fem/src/kerf_fem/openfoam_bridge.py` (new), `packages/kerf-fem/tests/test_openfoam_bridge.py` (mocked subprocess).
+- **Definition of Done:** case directory written correctly; mock-subprocess test green; sentinel when absent; lid-driven cavity reference velocity profile matches to 5% with real binary in a manual test; pytest.
+- **Depends-on:** T-101c
+
+### T-101e CFD LLM tool surface + `analysis_type` enum extension
+- **Tier:** A
+- **Money/reach rationale:** Same rationale as T-100h — the CFD solver depth is invisible to the LLM until properly surfaced.
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** Extend the `run_cfd` LLM tool (or add one if absent) to accept `turbulence_model` (`ke` / `kw_sst` / `laminar`) and `solver` (`internal` / `openfoam`). Publish CFD capability tags in `GET /health/capabilities`. Add an `explain_cfd_result` LLM tool that summarises Cp, drag coefficient, wall shear stress in plain language. Update `packages/kerf-fem/llm_docs/cfd.md`.
+- **Target files/packages:** `packages/kerf-fem/src/kerf_fem/tools.py` (extend or add `run_cfd`), `packages/kerf-fem/llm_docs/cfd.md`, health endpoint, `packages/kerf-fem/tests/` (dispatch tests).
+- **Definition of Done:** `run_cfd` routes to k-ε, k-ω SST, and OpenFOAM paths; `/health/capabilities` lists CFD types; `explain_cfd_result` readable summary; doc updated; dispatch tests green; pytest.
+- **Depends-on:** T-101a, T-101b, T-101d
+
+### T-101f CFD heat transfer — conjugate heat transfer + buoyancy-driven flow
+- **Tier:** A
+- **Money/reach rationale:** Thermal-CFD (electronics cooling, HVAC duct, building natural ventilation) is the most common CFD use-case outside aero. Adds heat transfer to the turbulent solver chain, covering electronics + architecture personas in addition to mechanical + automotive.
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** Extend `cfd_navier_stokes.py` (or add `cfd_heat.py`) with the energy equation and buoyancy forcing (Boussinesq approximation). Reference test: differentially-heated vertical cavity (de Vahl Davis benchmark, Ra=10^4) — Nusselt number on the hot wall vs the published de Vahl Davis value (Nu≈2.243 ± 0.005). Pure Python; analytic oracle; no external binary.
+- **Target files/packages:** `packages/kerf-fem/src/kerf_fem/cfd_heat.py` (new or extend), `packages/kerf-fem/tests/test_cfd.py` (extend).
+- **Definition of Done:** de Vahl Davis Nu on hot wall within 2% of the published reference; temperature field has correct hot/cold wall gradient; pytest analytic oracle; hermetic.
+- **Depends-on:** T-101a
+
+---
+
+## Geometry kernel P2 interop — T-NN tracking (T-156 … T-159)
+
+The GK-NN backlog in `docs/plans/geometry-kernel-roadmap.md` tracks the detailed
+kernel tasks. These T-NN entries cover the **P2 interop block** — the "next focus"
+items called out in the kernel roadmap and ROADMAP §4 (pure-Python STEP/IGES,
+SubD↔NURBS, mesh→NURBS autosurface, 2D region boolean) — giving them slots in the
+main execution-order table. Each corresponds to GK-NN items; the GK file remains
+the detailed spec; these T-NN entries are the execution-queue handles.
+
+### T-156 GK P2: pure-Python STEP AP203/214 B-rep reader (GK-47)
+- **Tier:** B
+- **Money/reach rationale:** STEP is the universal mechanical exchange format. A pure-Python STEP reader decouples interop fidelity from OCCT, makes round-trip tests hermetic, and reduces the hard OCCT coupling for every persona. Cross-sector reach.
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** Pure-Python `geom/io/step_read.py` — parse STEP AP203/214 `ADVANCED_BREP_SHAPE_REPRESENTATION` into a `validate_body`-clean `Body`. Bounded to the primitive + filleted-box matrix initially. Opus-class task (GK-47 in the kernel plan); run as an isolated worktree on the opus spine. No OCCT; no external binaries; hermetic tests.
+- **Target files/packages:** `packages/kerf-cad-core/src/kerf_cad_core/geom/io/step_read.py` (new), `packages/kerf-cad-core/tests/test_step_io.py` (new).
+- **Definition of Done:** read a STEP box (OCCT-exported fixture), `validate_body` ok, vertices match to `1e-9`; pytest hermetic (fixture file committed, no OCCT call in the test); ties GK-47.
+- **Depends-on:** none
+
+### T-157 GK P2: pure-Python STEP AP214 B-rep writer (GK-48)
+- **Tier:** B
+- **Money/reach rationale:** STEP writer closes the round-trip, enabling in-process Hausdorff oracle tests that currently require OCCT. Cross-sector interop depth.
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** Pure-Python `geom/io/step_write.py` — emit a `Body` as STEP AP214. Write→read round-trip Hausdorff ≤ `1e-7` on box/cyl/sphere/filleted-box matrix. Opus-class task (GK-48). No OCCT; no external binaries; hermetic tests.
+- **Target files/packages:** `packages/kerf-cad-core/src/kerf_cad_core/geom/io/step_write.py` (new), `packages/kerf-cad-core/tests/test_step_io.py` (extend).
+- **Definition of Done:** write→read round-trip Hausdorff ≤ `1e-7` on the primitive + filleted-box matrix; pytest hermetic; ties GK-48.
+- **Depends-on:** T-156
+
+### T-158 GK P2: SubD cage → watertight NURBS Body bridge (GK-52/53)
+- **Tier:** B
+- **Money/reach rationale:** SubD↔NURBS is the missing bridge for jewelry (organic shapes), industrial design, and marine hull fairing — cross-sector quality signal that incumbents gate behind premium licenses.
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** `geom/subd.py` extension — Catmull-Clark limit-surface → bicubic NURBS patch per quad face, sew patches into a watertight `Body` (extraordinary-point handling via a local G1 patch). Also the reverse: NURBS `Body` → SubD cage. Opus-class (GK-52/53); limit-surface deviation from Stam evaluation ≤ `1e-6`. No OCCT; hermetic tests.
+- **Target files/packages:** `packages/kerf-cad-core/src/kerf_cad_core/geom/subd.py` (extend), `geom/brep_build.py` / `geom/sew.py` (reuse), `packages/kerf-cad-core/tests/test_subd_nurbs.py` (new).
+- **Definition of Done:** SubD cube → smooth `validate_body`-clean NURBS body; limit-surface deviation ≤ `1e-6` vs Stam; reverse round-trip for a cube returns original cage to `1e-7`; pytest; ties GK-52/53.
+- **Depends-on:** none
+
+### T-159 GK P2: 2D region boolean on planar curve loops (GK-56/57)
+- **Tier:** B
+- **Money/reach rationale:** 2D region boolean (sketch-driven solid extrude/pocket without OCCT) is the key enabler for a pure-Python parametric workflow that operates without the OCCT worker. Unlocks the full in-process sketch→solid path.
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** `geom/region2d.py` — union/diff/intersection on planar closed curve loops with holes → `Face` with inner loops; then `extrude_to_body` with holes (washer, etc.). Reference: square − circle area = 1 − πr² exact; extruded washer volume = π(R²−r²)h exact; `validate_body` ok (genus per hole). Ties GK-56/57.
+- **Target files/packages:** `packages/kerf-cad-core/src/kerf_cad_core/geom/region2d.py` (new), `geom/brep_build.py` (reuse), `packages/kerf-cad-core/tests/test_region2d.py` (new).
+- **Definition of Done:** square−circle area exact; extruded washer `validate_body` ok and volume exact; loop orientation CCW/CW per contract; pytest; ties GK-56/57.
+- **Depends-on:** none
+
+---
+
+## P2 cross-cutting capabilities — new tasks (T-160 … T-164)
+
+Unticketed P2 ROADMAP ambitions. Each is a moat-depth or platform-multiplier
+item that has no task yet. Not P0/P1 blockers, but important for competitive
+depth and listed in ROADMAP §3 P2 / §3.5.
+
+### T-160 Real-time multi-user collaboration (operational transform / CRDT)
+- **Tier:** B
+- **Money/reach rationale:** Real-time collaboration is a top conversion argument for professional teams (mechanical/architecture/ECAD). Every sector benefits simultaneously — pure platform multiplier. Justifies Pro/Enterprise tier uplift. P2 moat.
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** Implement a real-time collaborative editing layer for parametric files (`.feature`, `.bim`, `.circuit.tsx`, `.sketch`) using a CRDT or OT approach. Each connected user sees others' edits in near-real-time. Conflicts resolve deterministically without lock-out. Presence indicators (cursor / selection) are a UX bonus but not the gate. Scope: text-native file kinds first (`.sketch`, `.equations`); binary/OCCT-evaluated files deferred to a follow-on. Backend: Postgres LISTEN/NOTIFY or a lightweight WebSocket broadcast per project. Frontend: merge received ops into the live editor state.
+- **Target files/packages:** `packages/kerf-api/src/kerf_api/routes.py` (WebSocket collaboration endpoint), `packages/kerf-core/src/kerf_core/collab/` (new — OT/CRDT engine), `src/lib/collabClient.js` (new), `src/components/FileEditor.jsx` (op-merge wiring), tests.
+- **Definition of Done:** two simulated users editing the same `.sketch` file concurrently converge to a consistent state (no lost edits, no divergence) after a simulated network round-trip; conflict resolution is deterministic; pytest + vitest on the merge logic.
+- **Depends-on:** none
+
+### T-161 GD&T / PMI model-based definition + homologation documentation
+- **Tier:** A
+- **Money/reach rationale:** GD&T MBD (product and manufacturing information embedded in the 3D model) is required for aerospace, automotive, and defence homologation. Mechanical + automotive personas (2 large paying workforces). GD&T frames already render; this task adds the standards-compliant MBD layer.
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** Extend the shipped GD&T callout system (T-27) into a full model-based definition package: (a) 3D tolerance annotations attached to `Body` faces/edges (not just drawings) readable as a structured MBD dataset; (b) `export_qif` LLM tool emitting a QIF (Quality Information Framework) XML containing all PMI annotations, suitable for CMM import; (c) a homologation document generator that extracts all datums + tolerances from the model and emits a structured report (PDF-ready via a templating step). Builds on the shipped `kerf_cad_core.gdt_callouts`.
+- **Target files/packages:** `packages/kerf-cad-core/src/kerf_cad_core/gdt_callouts/` (extend to 3D MBD), `packages/kerf-cad-core/src/kerf_cad_core/mbd.py` (new — MBD dataset), `packages/kerf-imports/src/kerf_imports/qif_writer.py` (new — QIF export), `packages/kerf-cad-core/llm_docs/mbd.md` (new), tests.
+- **Definition of Done:** a model with datums + tolerances exports a valid QIF XML (validate against QIF schema); the homologation report lists all annotations in order; pytest with fixture model.
+- **Depends-on:** T-27
+
+### T-162 Generative / topology optimization — manufacturing constraints + multi-load (production-grade)
+- **Tier:** A
+- **Money/reach rationale:** Basic SIMP topo-opt is shipped (`packages/kerf-topo`). Production-grade generative design (manufacturing-constrained, multi-load-case, multi-objective, lattice-infill) is the moat item for mechanical + automotive (2 personas, ROADMAP §3.5). High AI-native leverage: the LLM frames objectives + constraints in text.
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** Extend `packages/kerf-topo` beyond the basic single-objective SIMP with: (a) manufacturing constraints — minimum member size, draw direction, symmetry planes; (b) multi-load-case envelope optimization (worst-case compliance over N load cases); (c) multi-objective Pareto front (stiffness vs mass vs manufacturability); (d) lattice-infill grading (variable density lattice inside the topology boundary). Each is additive to the FEniCSx SIMP core; do not rewrite the solver, extend it. Reference tests: compliance minimization with minimum-member-size constraint must produce a result with no features thinner than the specified minimum (verify via a thickness map). Cite ROADMAP §3.5 "production-grade" distinction from the basic shipped version.
+- **Target files/packages:** `packages/kerf-topo/src/kerf_topo/` (constraints module, multi-load module, lattice module), `packages/kerf-topo/tests/` (extend).
+- **Definition of Done:** multi-load optimization runs on 2+ load cases and produces a compliance envelope; minimum-member-size constraint produces verifiably thicker features; Pareto front returns 3+ non-dominated designs; lattice infill grading verified by density histogram; pytest with analytic or fixture-based references.
+- **Depends-on:** none
+
+### T-163 Robotics cell / kinematics / motion simulation seed
+- **Tier:** A
+- **Money/reach rationale:** Robotics programming (offline path generation, cell simulation, kinematics) is a growing manufacturing workforce segment with high AI-native fit (robot programs are text). 5-axis CAM (`packages/kerf-cam`) is an adjacent, reusable path-gen base. P2 moat (ROADMAP §3 P2).
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** Seed `packages/kerf-robotics/` with: (a) a `RobotCell` data model (6-DOF serial robot with DH parameters, workspace, joint limits, end-effector); (b) forward kinematics (FK) and inverse kinematics (IK, analytic 6-DOF solution for common arm families: ABB, KUKA, Fanuc); (c) trajectory planning (point-to-point, linear, spline) with collision-free path via swept-volume check against a simple scene; (d) offline program generation for ABB RAPID / KUKA KRL / Fanuc LS. Reference tests: FK of a known configuration vs analytic; IK solve → FK round-trip to `1e-6`; RAPID output parses structurally. No simulation GUI in this task — numeric/programmatic only.
+- **Target files/packages:** `packages/kerf-robotics/src/kerf_robotics/` (new package — `robot.py`, `kinematics.py`, `trajectory.py`, `codegen/rapid.py`, `codegen/krl.py`, `codegen/fanuc_ls.py`), `packages/kerf-robotics/tests/` (new), migration for `robot_cell` kind, `packages/kerf-robotics/llm_docs/robotics.md`.
+- **Definition of Done:** FK/IK round-trip exact to `1e-6`; trajectory from A to B is collision-free against a simple box obstacle; RAPID/KRL/LS output are structurally valid programs; pytest analytic oracles.
+- **Depends-on:** none
+
+### T-164 1D system simulation seed — Modelica-compatible equation-based solver
+- **Tier:** A
+- **Money/reach rationale:** 1D system simulation (thermal / hydraulic / electrical / control networks) covers mechanical, electronics, and automotive ECU personas. Modelica is a declarative text-native language — the highest AI-native fit of any physics domain. ROADMAP §3.5 item; not yet ticketed. P2 moat.
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** Seed `packages/kerf-sysmodel/` with: (a) a Modelica subset parser (`.mo` files — equations, components, connectors, basic standard library stubs: Electrical, Mechanical.Translational, Thermal); (b) a DAE (differential-algebraic equation) solver using `scipy.integrate.solve_ivp` with index reduction; (c) result visualisation via a `plot_sysmodel_result` LLM tool (time-series output); (d) an `explain_sysmodel_result` tool. Reference tests: RC circuit step response — time constant τ=RC exact; spring-mass-damper natural frequency vs analytic formula. No full MSL standard library — seed the subset needed for the reference tests only; `graceful-degrade` when `scipy` is absent. Cite `casadi` or `assimulo` as optional heavy-solver backends for the follow-on.
+- **Target files/packages:** `packages/kerf-sysmodel/src/kerf_sysmodel/` (new — `parser.py`, `dae_solver.py`, `tools.py`), `packages/kerf-sysmodel/tests/` (new), `packages/kerf-sysmodel/llm_docs/sysmodel.md`.
+- **Definition of Done:** RC circuit and spring-mass-damper references pass; DAE solver handles the reference models; Modelica-subset `.mo` file parses and simulates; `plot_sysmodel_result` returns a time-series dict; pytest analytic oracles; scipy-absent → sentinel.
+- **Depends-on:** none
+
+---
+
+## P3 sector seeds — new tasks (T-165 … T-181)
+
+Each is a proof-of-"we do everything" P3 seed: one bounded agent run that stands
+up the minimal engine, data model, LLM tool, and analytic-oracle test for a new
+sector. Establishes the foothold; deeper depth tasks follow in the same T-NN series.
+
+### T-165 Plastics / injection-mold tooling seed
+- **Tier:** A
+- **Money/reach rationale:** Injection molding is one of the most common manufactured-parts workflows (mechanical + industrial design). Parting-surface + draft + rib design rules are rule-native — high AI-native fit.
+- **Priority:** P3
+- **Status:** 🔴 not started
+- **Scope:** Seed `packages/kerf-mold/` with: a `MoldDesign` data model (core/cavity, parting surface, ejector pins, gate location); a draft-analysis tool (reuse `surface_analysis.draft_angle_analysis` already shipped); a `check_moldability` LLM tool that checks minimum draft angle per face, maximum wall thickness uniformity, and parting-surface continuity; a `generate_parting_surface` helper that extends the parting line to a flat or ruled surface. Reference test: a simple box part → parting surface is flat and passes the draft-angle check.
+- **Target files/packages:** `packages/kerf-mold/src/kerf_mold/` (new — `mold.py`, `tools.py`), `packages/kerf-mold/tests/` (new), `packages/kerf-mold/llm_docs/mold.md`, migration for `mold` kind.
+- **Definition of Done:** a fixture box part generates a flat parting surface; `check_moldability` flags a zero-draft face; `generate_parting_surface` produces a ruled extension; pytest.
+- **Depends-on:** none
+
+### T-166 Packaging / dieline (folding carton + corrugated) seed
+- **Tier:** B
+- **Money/reach rationale:** Packaging design (folding carton, corrugated box) is a very large design workforce (retail, FMCG). Dieline is a flat-pattern problem — close to Kerf's sheet-metal unfold strength (T-2/T-3 shipped).
+- **Priority:** P3
+- **Status:** 🔴 not started
+- **Scope:** Seed `packages/kerf-packaging/` with: a `Dieline` data model (panel + fold + cut + score lines on a 2D flat layout); parametric dieline generators for ECMA standard boxes (C-series RSC, A-series tray, B-series display); a `dieline_to_dxf` export reusing the shipped DXF writer (T-7); a `fold_dieline` 3D preview that sweeps panels along fold lines into a 3D carton shape. Reference test: ECMA C02 RSC box dimensions match standard; fold produces a closed 3D carton; DXF export round-trips.
+- **Target files/packages:** `packages/kerf-packaging/src/kerf_packaging/` (new — `dieline.py`, `ecma_generators.py`, `fold.py`, `tools.py`), `packages/kerf-packaging/tests/`, `packages/kerf-packaging/llm_docs/packaging.md`, migration for `dieline` kind.
+- **Definition of Done:** ECMA C02 generator produces correct panel dimensions; fold preview is a closed 3D shape; DXF round-trips; pytest.
+- **Depends-on:** T-7
+
+### T-167 Piping / P&ID / plant design seed
+- **Tier:** A
+- **Money/reach rationale:** Process piping + P&ID are a very large industrial engineering workforce (chemical, oil & gas, pharma). P&ID is symbol + connection = text-native. P3.
+- **Priority:** P3
+- **Status:** 🔴 not started
+- **Scope:** Seed `packages/kerf-piping/` with: a P&ID data model (instrument symbols, pipes, valves, vessels, tags per ISA 5.1 standard); a `piping_isometric` 3D route helper (orthogonal routing between equipment nozzles with standard pipe schedule elbow/tee library); a `pid_diagram` 2D layout exporter (DXF or SVG, symbols per ISA 5.1); an `import_pid` LLM tool that parses a text-format P&ID specification into the data model. Reference test: a simple 3-component loop (pump → vessel → HX) routes isometrically, produces correct elbow counts, and exports to DXF.
+- **Target files/packages:** `packages/kerf-piping/src/kerf_piping/` (new — `pid.py`, `isometric.py`, `symbols.py`, `tools.py`), tests, llm_docs, migration for `pid` kind.
+- **Definition of Done:** 3-component loop routes and produces the correct elbow/tee count; DXF export opens; `import_pid` round-trips a text spec; pytest.
+- **Depends-on:** T-7
+
+### T-168 Woodworking / furniture / joinery + cut list seed
+- **Tier:** B
+- **Money/reach rationale:** Woodworking / furniture design is a very large maker + small-business workforce (education, hobbyist, furniture makers). Cut list is the key deliverable. Close to Kerf's sheet-metal + nesting strength.
+- **Priority:** P3
+- **Status:** 🔴 not started
+- **Scope:** Seed `packages/kerf-woodworking/` with: a `WoodJoint` data model (mortise-and-tenon, dovetail, box joint, biscuit, pocket-screw, dowel — parametric per joint type); a `furniture_cutlist` tool that enumerates all solid parts into a cut list (species, thickness, width, length, qty, grain direction) from an assembly; a `joinery_feature` op that adds the correct geometry to mating parts; a `flat_pack_dieline` path for flat-pack furniture (reuse T-3 flat pattern + T-53 nesting). Reference test: a 4-leg table cut list has the correct part count + dimensions; mortise-and-tenon joint geometry is valid (tenon fits mortise with correct clearance).
+- **Target files/packages:** `packages/kerf-woodworking/src/kerf_woodworking/` (new — `joints.py`, `cutlist.py`, `tools.py`), tests, llm_docs, migration for `woodwork` kind.
+- **Definition of Done:** table cut list correct; M&T joint geometry passes clearance check; flat-pack path produces a DXF; pytest.
+- **Depends-on:** T-3, T-53
+
+### T-169 Optics / lens design seed (ray-trace paraxial model)
+- **Tier:** B
+- **Money/reach rationale:** Optical design (lens systems, telescopes, camera optics, illumination) is a niche but high-value technical workforce. Paraxial ray tracing is pure math — extremely AI-native. P3 / ROADMAP §3 scientific.
+- **Priority:** P3
+- **Status:** 🔴 not started
+- **Scope:** Seed `packages/kerf-optics/` with: a paraxial ray-transfer matrix (ABCD) model for multi-element thin-lens systems; a `trace_ray` LLM tool that traces a ray (or a bundle) through a lens system and returns spot size / focal length / aberration measures; a `lens_system` data model (element list: lens / mirror / aperture / detector); first-order aberration (Seidel coefficients). Reference tests: single thin lens — image distance matches 1/f = 1/do + 1/di exact; two-lens telephoto — EFL exact. No WASM / GPU; pure Python.
+- **Target files/packages:** `packages/kerf-optics/src/kerf_optics/` (new — `ray_transfer.py`, `lens_system.py`, `tools.py`), tests, llm_docs, migration for `optics` kind.
+- **Definition of Done:** thin-lens image distance exact; two-lens EFL exact; `trace_ray` returns spot diagram; pytest analytic oracles.
+- **Depends-on:** none
+
+### T-170 Watchmaking / horology seed (partsgen-reachable)
+- **Tier:** B
+- **Money/reach rationale:** Watchmaking is a high-margin niche (jewelry-adjacent) and partsgen-reachable (escapements, gear trains, springs are parametric). Strong AI-native fit: tolerances + counts are rule-driven.
+- **Priority:** P3
+- **Status:** 🔴 not started
+- **Scope:** Seed `packages/kerf-horology/` via `kerf-partsgen` pattern: parametric generators for Swiss lever escapement (escape wheel + pallet fork), gear train (wheel + pinion, module + tooth count), mainspring barrel. A `train_calculator` LLM tool that given target frequency + power reserve computes the gear-train ratios. Reference test: lever escapement escape wheel + pallet geometry generates valid involute tooth profiles; train_calculator ratio for 3 Hz + 48-hour reserve matches expected wheel-count solution.
+- **Target files/packages:** `packages/kerf-partsgen/src/kerf_partsgen/generators/horology/` (new), `packages/kerf-horology/` (thin wrapper + tools), tests, llm_docs.
+- **Definition of Done:** escape wheel + pallet fork geometry renders; tooth profile passes involute check; train_calculator produces correct ratio; pytest.
+- **Depends-on:** none
+
+### T-171 Dental CAD seed (crown + aligner + guide)
+- **Tier:** A
+- **Money/reach rationale:** Dental CAD (crowns, bridges, aligners, surgical guides) is a large and fast-growing clinical market with strong AI-fit (anatomy models are parametric once segmented). High-margin niche.
+- **Priority:** P3
+- **Status:** 🔴 not started
+- **Scope:** Seed `packages/kerf-dental/` with: a tooth-anatomy data model (crown, root, arch); a `crown_design` tool that produces a parametric crown surface from a margin line + opposing tooth profile; a `surgical_guide` helper that places a drill guide on a jaw model at specified implant angles; DICOM-to-mesh ingest (thin wrapper around `pydicom` + marching cubes, graceful degrade when absent). Reference test: a fixture crown margin line → a closed crown surface that passes `validate_body`; drill guide placement at specified angulation matches within 0.1°.
+- **Target files/packages:** `packages/kerf-dental/src/kerf_dental/` (new — `crown.py`, `guide.py`, `dicom_ingest.py`, `tools.py`), tests, llm_docs, migration for `dental` kind.
+- **Definition of Done:** crown surface is `validate_body`-clean; guide placement angle within 0.1°; DICOM ingest degrades gracefully when `pydicom` absent; pytest.
+- **Depends-on:** none
+
+### T-172 Marine / naval architecture depth (hydrostatics + stability)
+- **Tier:** B
+- **Money/reach rationale:** T-71 seeded hull fairing. This task adds the hydrostatics + stability analysis that a naval architect actually needs: displacement, metacentric height (GM), righting lever (GZ) curve, trim + heel. High technical value on top of the NURBS seed.
+- **Priority:** P3
+- **Status:** 🔴 not started
+- **Scope:** Extend `packages/kerf-cad-core/` (or a new `packages/kerf-naval/`) with: a `HullHydrostatics` module that computes displacement, LCB, VCB, BM, GM, and the GZ righting-lever curve at a series of heel angles via numerical integration over the hull surface; a `stability_report` LLM tool that summarises IMO A.749 criteria (minimum GM, GZ area, max GZ angle). Reference tests: a prismatic hull of known length/beam/draft → displacement = ρgV exact; rectangular barge GM = B²/12d exact.
+- **Target files/packages:** `packages/kerf-naval/src/kerf_naval/hydrostatics.py` (new), `packages/kerf-naval/src/kerf_naval/stability.py` (new), `packages/kerf-naval/tests/`, `packages/kerf-naval/llm_docs/naval.md`.
+- **Definition of Done:** prismatic hull displacement exact; rectangular barge GM exact; GZ curve has correct sign change at the angle of vanishing stability; pytest analytic oracles.
+- **Depends-on:** T-71
+
+### T-173 Aerospace composites ply/layup seed
+- **Tier:** A
+- **Money/reach rationale:** Composites design (aerospace, wind, automotive) is a large high-value workforce. Ply-book / laminate analysis is rule-native and AI-native. P3 / ROADMAP §3.
+- **Priority:** P3
+- **Status:** 🔴 not started
+- **Scope:** Seed `packages/kerf-composites/` with: a `LaminateLayup` data model (ply sequence, fibre orientation, material, thickness per ply); Classical Laminate Theory (CLT) solver for in-plane stiffness (A, B, D matrices) and failure analysis (Tsai-Wu, Tsai-Hill criteria); a `layup_analysis` LLM tool; drape simulation (simple flat-to-surface geodesic mapping). Reference tests: [0/90/0] symmetric laminate A-matrix vs analytic CLT formula; Tsai-Wu failure index for a known load case vs hand-calculated.
+- **Target files/packages:** `packages/kerf-composites/src/kerf_composites/` (new — `layup.py`, `clt.py`, `failure.py`, `drape.py`, `tools.py`), tests, llm_docs, migration for `layup` kind.
+- **Definition of Done:** A-matrix exact vs CLT formula; Tsai-Wu failure index matches hand-calc to 1%; drape map produces a flat→surface mapping; pytest analytic oracles.
+- **Depends-on:** none
+
+### T-174 Civil engine depth: horizontal/vertical alignment + corridor (G-1 next step)
+- **Tier:** B
+- **Money/reach rationale:** T-70 seeded CRS + TIN. The next civil engine increment is alignment (horizontal / vertical / corridor) — the core civil engineering workflow for roads and rail. P3 distinct engine.
+- **Priority:** P3
+- **Status:** 🔴 not started
+- **Scope:** Extend `packages/kerf-civil/` with: a `HorizontalAlignment` model (tangent, circular arc, spiral / clothoid transition) and a `VerticalAlignment` model (grade lines + vertical parabolic curves); a `Corridor` that sweeps the cross-section assembly (carriageway, berm, ditch) along the alignment and computes cut/fill volumes via the prismatoid formula; a `plan_and_profile_sheet` exporter (DXF plan + profile sheets). Reference tests: a horizontal curve of known radius → arc length exact; a corridor over a fixture TIN → cut volume matches prismatoid formula.
+- **Target files/packages:** `packages/kerf-civil/src/kerf_civil/alignment.py` (new), `corridor.py` (new), `plan_profile.py` (new), tests, llm_docs.
+- **Definition of Done:** arc length exact; corridor volume matches prismatoid to 1%; DXF plan-and-profile opens correctly; pytest.
+- **Depends-on:** T-70
+
+### T-175 Interior / space-planning / FF&E seed
+- **Tier:** B
+- **Money/reach rationale:** Interior design / space planning / FF&E scheduling is a large workforce closely tied to the architect persona (Revit/SketchUp/AutoCAD market). High AI-native fit: spatial rules + fixture schedules are text.
+- **Priority:** P3
+- **Status:** 🔴 not started
+- **Scope:** Seed `packages/kerf-interior/` with: a `SpacePlan` data model (rooms, furniture items, clearances, circulation paths); a `place_furniture` LLM tool that places FF&E from a catalogue respecting clearances and accessibility codes (ADA min turning circle); a `room_schedule` generator (area, occupancy, finish, fixture count); an `import_ff_e_catalogue` tool (CSV/JSON catalogue ingest). Reference test: a 4m × 5m bedroom with a king bed + wardrobe + desk passes ADA clearance check.
+- **Target files/packages:** `packages/kerf-interior/src/kerf_interior/` (new — `spaceplan.py`, `furniture.py`, `schedule.py`, `tools.py`), tests, llm_docs, migration for `spaceplan` kind.
+- **Definition of Done:** bedroom layout passes ADA clearance check; room schedule generates correct area + fixture count; fixture CSV catalogue ingests; pytest.
+- **Depends-on:** none
+
+### T-176 Structural RC / steel + rebar design seed
+- **Tier:** A
+- **Money/reach rationale:** Structural engineering (RC and steel design) is a very large and well-paying professional workforce (architects + structural engineers, both personas). Code-compliance is rule-native — high AI-native fit.
+- **Priority:** P3
+- **Status:** 🔴 not started
+- **Scope:** Seed `packages/kerf-structural/` with: a `BeamDesign` tool that checks an RC or steel beam for bending, shear, and deflection per ACI 318 (RC) or AISC 360 (steel); a `ColumnDesign` tool for buckling + combined loading; a `rebar_layout` generator that places rebar in an RC section per ACI 318 cover/spacing rules; a `connection_check` for a bolted/welded steel connection per AISC. Reference tests: simply-supported RC beam under UDL — bending moment = wL²/8 exact; ACI 318 rebar placement passes the minimum cover check.
+- **Target files/packages:** `packages/kerf-structural/src/kerf_structural/` (new — `beam.py`, `column.py`, `rebar.py`, `connection.py`, `tools.py`), tests, llm_docs, migration for `structural` kind.
+- **Definition of Done:** bending moment exact; ACI cover check passes for a valid layout and fails for an invalid one; steel beam shear check matches AISC LRFD formula; pytest analytic oracles.
+- **Depends-on:** none
+
+### T-177 Energy / daylight / acoustic analysis seed (BIM integration)
+- **Tier:** B
+- **Money/reach rationale:** Energy + daylight + acoustic analysis are increasingly mandatory in building design (building codes, LEED/BREEAM certification). Architecture persona depth; bridges to the BIM substrate.
+- **Priority:** P3
+- **Status:** 🔴 not started
+- **Scope:** Seed `packages/kerf-building-performance/` with: (a) an energy analysis stub that computes simplified UA-value heat loss for a building envelope from IFC materials + areas (compare to a reference ASHRAE 90.1 U-value limit); (b) a daylight factor (DF) calculator for a room using the BRE split-flux method; (c) a room acoustics RT60 estimator (Sabine formula + Eyring correction). Each as an LLM tool. Reference tests: DF for a room with a known window area matches BRE formula; RT60 for a concrete room matches Sabine to 5%.
+- **Target files/packages:** `packages/kerf-building-performance/src/kerf_building_performance/` (new — `energy.py`, `daylight.py`, `acoustics.py`, `tools.py`), tests, llm_docs.
+- **Definition of Done:** DF matches BRE formula; RT60 matches Sabine to 5%; UA heat-loss flags a below-code envelope; pytest analytic oracles.
+- **Depends-on:** none
+
+### T-178 Landscape / site design seed
+- **Tier:** B
+- **Money/reach rationale:** Landscape architecture + site design is a distinct design discipline with its own tools (Vectorworks Landmark, AutoCAD Civil 3D landscape). Bridges T-70 civil TIN + BIM site (T-114).
+- **Priority:** P3
+- **Status:** 🔴 not started
+- **Scope:** Seed `packages/kerf-landscape/` with: a `LandscapePlan` data model (planting zones, paths, grading contours, irrigation zones, hardscape areas); a `plant_schedule` generator (species, qty, size, location); a `grading_plan` tool that generates cut/fill contours from a design surface over a T-70 TIN terrain; an `irrigation_layout` helper (emitter placement + flow calculation). Reference test: a simple graded park site → cut/fill volume matches the T-70 prismatoid; plant schedule counts match the layout.
+- **Target files/packages:** `packages/kerf-landscape/src/kerf_landscape/` (new), tests, llm_docs, migration for `landscape` kind.
+- **Definition of Done:** grading cut/fill matches prismatoid; plant schedule count matches layout; irrigation total flow adds up; pytest.
+- **Depends-on:** T-70
+
+### T-179 Apparel / pattern-making seed (2D flat + seam allowance)
+- **Tier:** B
+- **Money/reach rationale:** Apparel pattern-making is one of the world's largest design workforces. Pattern-making is a 2D flat-geometry problem (parametric + rules) with a drape simulation extension. P3 / ROADMAP §3 soft-goods.
+- **Priority:** P3
+- **Status:** 🔴 not started
+- **Scope:** Seed `packages/kerf-apparel/` with: a `Sewing_Pattern` data model (panels, seam lines, grain lines, notches, seam allowance); parametric pattern generators for a basic bodice block + sleeve block + trouser block (size grading from measurements); a `grade_pattern` tool that scales from one size to another; a `seam_allowance_offset` tool (reuse the shipped `offset.py` curve-offset with self-intersection trim); a `pattern_marker` tool that bins panels into a fabric roll width (reuse T-53 nesting). Reference test: bodice block for a given bust measurement generates correct dart position per standard block formula; seam offset at the correct distance.
+- **Target files/packages:** `packages/kerf-apparel/src/kerf_apparel/` (new — `pattern.py`, `blocks.py`, `grading.py`, `tools.py`), tests, llm_docs, migration for `pattern` kind.
+- **Definition of Done:** bodice dart position matches standard formula; seam offset distance exact; marker bins panels within roll width; pytest.
+- **Depends-on:** T-53
+
+### T-180 Microfluidics / MEMS design seed
+- **Tier:** B
+- **Money/reach rationale:** Microfluidics / MEMS is a high-value niche (lab-on-chip, medical diagnostics, sensors). Channel design + fabrication rules are text-native. P3 / ROADMAP §3 scientific/niche.
+- **Priority:** P3
+- **Status:** 🔴 not started
+- **Scope:** Seed `packages/kerf-microfluidics/` with: a `MicrofluidicChip` data model (channels, chambers, inlets/outlets, electrodes, heaters — dimensions in µm); a `channel_flow` tool that computes pressure drop and flow resistance for a rectangular microchannel via the Hagen-Poiseuille formula (and the aspect-ratio correction for rectangular cross-sections); a `mixer_design` helper for passive T-mixer + serpentine mixer geometries; a `fabrication_check` tool that verifies minimum feature size + aspect ratio against soft-lithography design rules. Reference tests: Hagen-Poiseuille pressure drop for a rectangular 100 µm × 50 µm × 10 mm channel vs analytic formula.
+- **Target files/packages:** `packages/kerf-microfluidics/src/kerf_microfluidics/` (new — `chip.py`, `flow.py`, `mixer.py`, `fab_check.py`, `tools.py`), tests, llm_docs, migration for `microfluidics` kind.
+- **Definition of Done:** channel pressure drop matches Hagen-Poiseuille to 1%; aspect-ratio correction within 2%; fab check flags a too-narrow feature; pytest analytic oracles.
+- **Depends-on:** none
+
+### T-181 HVAC duct fabrication seed
+- **Tier:** B
+- **Money/reach rationale:** HVAC duct fabrication (sheet-metal ductwork for commercial buildings) bridges the BIM (T-113/T-114) and sheet-metal (T-1..T-4) substrates. Large fabrication workforce; duct fitting geometry is rule-native.
+- **Priority:** P3
+- **Status:** 🔴 not started
+- **Scope:** Seed `packages/kerf-hvac/` with: a `DuctSystem` data model (rectangular/round/oval ducts, fittings — elbow, reducer, tee, cap, flex connector); a `duct_sizing` LLM tool (velocity method: select duct size for a target airflow + max velocity, citing ASHRAE duct-design guidelines); a `duct_flat_pattern` that generates the sheet-metal flat pattern for standard fittings (rectangular elbow, reducer) reusing the T-2/T-3 unfold path; a `pressure_loss` calculator (major friction loss + minor losses for fittings via ASHRAE HVAC Fundamentals coefficients). Reference tests: pressure drop for a straight rectangular duct matches Darcy-Weisbach formula; reducer flat pattern has the correct developed length.
+- **Target files/packages:** `packages/kerf-hvac/src/kerf_hvac/` (new — `duct.py`, `sizing.py`, `flat_pattern.py`, `pressure.py`, `tools.py`), tests, llm_docs, migration for `duct` kind.
+- **Definition of Done:** Darcy-Weisbach pressure drop matches to 1%; reducer flat pattern has correct developed length (analytic); duct sizing for a fixture flow produces a valid dimension; pytest analytic oracles.
+- **Depends-on:** T-3
 

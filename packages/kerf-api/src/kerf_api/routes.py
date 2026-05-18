@@ -3909,6 +3909,46 @@ async def serve_project_cover(
     return StreamingResponse(body, media_type=content_type or "image/png")
 
 
+@router.get("/projects/{pid}/thumbnail")
+async def serve_project_thumbnail(
+    pid: str,
+    auth: Optional[dict] = Depends(optional_auth),
+):
+    """GET /api/projects/:pid/thumbnail — serve the auto-captured editor
+    thumbnail (all project kinds).
+
+    This GET route was MISSING entirely — only the POST existed — so
+    every thumbnail_url (project lists + Workshop cards) 404'd. Mirrors
+    serve_project_cover: public projects are anonymously accessible
+    (Workshop), private require workspace membership, 404 when none
+    captured yet.
+    """
+    pool = await get_pool_required()
+    async with pool.acquire() as conn:
+        proj = await conn.fetchrow(
+            "SELECT workspace_id, visibility, thumbnail_storage_key FROM projects WHERE id = $1",
+            uuid.UUID(pid),
+        )
+        if not proj:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
+
+        if proj["visibility"] != "public":
+            uid = auth.get("sub") if auth else None
+            if not uid:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
+            role = await get_user_workspace_role(conn, str(proj["workspace_id"]), uid)
+            if not role:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
+
+        key = proj.get("thumbnail_storage_key")
+        if not key:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no thumbnail available")
+
+    storage = get_storage_required()
+    body, content_type = await storage.get(key)
+    return StreamingResponse(body, media_type=content_type or "image/jpeg")
+
+
 # Project Workshop Images (multi-image gallery)
 #
 # Net-new endpoints (Thingiverse-style cover gallery). The primary

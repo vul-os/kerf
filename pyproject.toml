@@ -27,9 +27,16 @@ description = "Chat-driven CAD/EDA/BIM platform — meta package"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-dependencies = []
+# kerf-cli is the front-door: `pip install kerf` puts `kerf` on PATH.
+dependencies = ["kerf-cli>=0.1.0"]
 
 [project.optional-dependencies]
+
+# `pip install 'kerf[server]'` — self-host install: CLI + full runtime stack.
+# Delegates to kerf-cli[server] so the dep list is defined in one place.
+server = [
+    "kerf-cli[server]>=0.1.0",
+]
 
 api-only = [
     "kerf-core",

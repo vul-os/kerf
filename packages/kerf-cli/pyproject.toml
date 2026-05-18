@@ -15,8 +15,14 @@ classifiers = ["License :: OSI Approved :: MIT License"]
 dependencies = []
 
 [project.optional-dependencies]
+# [server] pulls the full runtime stack required by `kerf serve`.
+# Keep in sync with root pyproject.toml [server] extra.
 server = [
     "kerf-core>=0.1.0",
+    "kerf-api>=0.1.0",
+    "kerf-auth>=0.1.0",
+    "kerf-billing>=0.1.0",
+    "kerf-cloud>=0.1.0",
     "asyncpg>=0.29.0",
     "uvicorn[standard]>=0.29.0",
 ]

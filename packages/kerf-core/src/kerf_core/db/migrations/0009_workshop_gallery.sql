@@ -83,13 +83,3 @@ alter table projects
     add column if not exists readme_generated_at  timestamptz,
     add column if not exists cover_storage_key    text,
     add column if not exists cover_generated_at   timestamptz;
-
--- Fork lineage. POST /workshop/:slug/fork clones a project but never
--- recorded where it came from, so the Workshop fork counter was always
--- 0. Track the source so forks_count can be computed. on delete set
--- null: deleting the source must not cascade-delete its forks.
-alter table projects
-    add column if not exists forked_from_project_id uuid
-        references projects(id) on delete set null;
-create index if not exists projects_forked_from_idx
-    on projects(forked_from_project_id);

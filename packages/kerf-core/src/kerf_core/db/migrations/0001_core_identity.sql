@@ -20,6 +20,7 @@ create table if not exists users (
     avatar_url text not null default '',
     account_role text not null default 'user' check (account_role in ('user','admin','system')),
     is_system boolean not null default false,
+    email_verified boolean not null default false,
     created_at timestamptz not null default now()
 );
 create index if not exists users_account_role_idx on users(account_role);
@@ -34,16 +35,36 @@ create table if not exists refresh_tokens (
 );
 create index if not exists refresh_tokens_user_id_idx on refresh_tokens(user_id);
 
+-- Single-use, expiring tokens for email verification and password
+-- reset. token_hash stores sha256(token); the raw token only ever
+-- lives in the emailed link. used_at marks consumption (single use).
+create table if not exists email_tokens (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid not null references users(id) on delete cascade,
+    kind text not null check (kind in ('verify','reset')),
+    token_hash text unique not null,
+    expires_at timestamptz not null,
+    used_at timestamptz,
+    created_at timestamptz not null default now()
+);
+create index if not exists email_tokens_user_id_idx on email_tokens(user_id);
+create index if not exists email_tokens_token_hash_idx on email_tokens(token_hash);
+
 create table if not exists projects (
     id uuid primary key default gen_random_uuid(),
     workspace_id uuid not null,
     name text not null,
     description text not null default '',
     visibility text not null default 'private' check (visibility in ('private','unlisted','public')),
+    -- Workshop fork lineage: which public project this was forked from
+    -- (null = original). on delete set null so deleting the source
+    -- never cascade-deletes its forks.
+    forked_from_project_id uuid references projects(id) on delete set null,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()
 );
 create index if not exists projects_workspace_id_idx on projects(workspace_id);
+create index if not exists projects_forked_from_idx on projects(forked_from_project_id);
 
 create table if not exists share_links (
     id uuid primary key default gen_random_uuid(),

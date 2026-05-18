@@ -15,7 +15,7 @@ import kerf_core.db.queries.projects as proj_q
 
 _MIG = (
     pathlib.Path(api_routes.__file__).parents[3]
-    / "kerf-core/src/kerf_core/db/migrations/0009_workshop_gallery.sql"
+    / "kerf-core/src/kerf_core/db/migrations/0001_core_identity.sql"
 )
 
 

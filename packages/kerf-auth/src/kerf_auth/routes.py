@@ -3,7 +3,9 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import secrets
+import uuid
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -12,6 +14,7 @@ import bcrypt
 import httpx
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Cookie
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from urllib.parse import urlencode, urlparse
 
@@ -64,6 +67,51 @@ def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
+log = logging.getLogger("kerf.auth.email")
+
+# Token lifetimes for the emailed links.
+VERIFY_TOKEN_TTL = timedelta(hours=48)
+RESET_TOKEN_TTL = timedelta(hours=1)
+
+
+def _app_url() -> str:
+    return (settings.cors_origin or "https://app.kerf.sh").rstrip("/")
+
+
+async def _create_email_token(conn, user_id: str, kind: str, ttl: timedelta) -> str:
+    """Mint a single-use token; only the sha256 hash is stored."""
+    raw = secrets.token_urlsafe(32)
+    await conn.execute(
+        """
+        INSERT INTO email_tokens (user_id, kind, token_hash, expires_at)
+        VALUES ($1, $2, $3, $4)
+        """,
+        user_id, kind, hash_token(raw),
+        datetime.utcnow() + ttl,
+    )
+    return raw
+
+
+def _send_email(template: str, to: str, data: dict) -> None:
+    """Render + send a transactional email.
+
+    Previously every send was wrapped in a bare `except: pass`, so a
+    misconfigured provider produced zero emails AND zero signal. Failures
+    must never break the calling auth flow, but they MUST be logged.
+    """
+    try:
+        from kerf_cloud.email.providers import send_email as _provider_send
+        from kerf_cloud.email.templates import renderer as _renderer
+
+        msg = _renderer.render(template, to, data)
+        _provider_send(
+            to=to, subject=msg.Subject, html=msg.HTML, text=msg.Text,
+            settings=settings,
+        )
+    except Exception as e:  # noqa: BLE001 — must not break the auth flow
+        log.warning("email send failed: template=%s to=%s err=%s", template, to, e)
+
+
 class UserResponse(BaseModel):
     id: str
     email: str
@@ -71,6 +119,7 @@ class UserResponse(BaseModel):
     avatar_url: str
     account_role: str
     is_system: bool
+    email_verified: bool = False
     created_at: datetime
 
 
@@ -106,6 +155,15 @@ class RefreshRequest(BaseModel):
 
 class CreateTokenRequest(BaseModel):
     name: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    password: str
 
 
 class TokenResponse(BaseModel):
@@ -160,6 +218,7 @@ def user_to_response(user: dict) -> UserResponse:
         avatar_url=user["avatar_url"] or "",
         account_role=user["account_role"],
         is_system=user["is_system"],
+        email_verified=bool(dict(user).get("email_verified", False)),
         created_at=user["created_at"],
     )
 
@@ -203,29 +262,23 @@ async def register(req: RegisterRequest, response: Response):
         access_token, refresh_token = await issue_tokens(conn, str(user["id"]))
         default_ws, _ = await get_default_workspace(conn, str(user["id"]))
 
-        # Fire-and-forget onboarding welcome email via kerf-cloud provider layer.
-        # Wrapped in try/except so a misconfigured mailer never blocks signup.
+        # Onboarding: welcome + email verification (soft — the account is
+        # usable immediately; the UI shows an unverified banner). Token
+        # created in the same connection; sends log on failure but never
+        # block signup.
+        app_url = _app_url()
+        _send_email("welcome", email, {"Name": display_name, "AppURL": app_url})
         try:
-            from kerf_cloud.email.providers import send_email
-            from kerf_cloud.email.templates import renderer as _email_renderer
-
-            _msg = _email_renderer.render(
-                "welcome",
-                email,
-                {
-                    "Name": display_name,
-                    "AppURL": settings.cors_origin or "https://app.kerf.sh",
-                },
+            verify_token = await _create_email_token(
+                conn, str(user["id"]), "verify", VERIFY_TOKEN_TTL,
             )
-            send_email(
-                to=email,
-                subject=_msg.Subject,
-                html=_msg.HTML,
-                text=_msg.Text,
-                settings=settings,
-            )
-        except Exception:
-            pass  # email failure must never fail registration
+            _send_email("verify_email", email, {
+                "Name": display_name,
+                "AppURL": app_url,
+                "VerifyURL": f"{app_url}/api/auth/verify-email?token={verify_token}",
+            })
+        except Exception as e:  # noqa: BLE001
+            log.warning("verification email setup failed for %s: %s", email, e)
 
         response.status_code = status.HTTP_201_CREATED
         return AuthResponse(
@@ -267,6 +320,133 @@ async def login(req: LoginRequest):
             user=user_to_response(user),
             default_workspace=workspace_to_response(default_ws) if default_ws else None,
         )
+
+
+@router.get("/verify-email")
+async def verify_email(token: str = ""):
+    """Consume an email-verification token, then redirect into the app."""
+    app_url = _app_url()
+    if token:
+        pool = await get_pool_required()
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT id, user_id FROM email_tokens
+                WHERE token_hash = $1 AND kind = 'verify'
+                  AND used_at IS NULL AND expires_at > now()
+                """,
+                hash_token(token),
+            )
+            if row:
+                async with conn.transaction():
+                    await conn.execute(
+                        "UPDATE users SET email_verified = true WHERE id = $1",
+                        row["user_id"],
+                    )
+                    await conn.execute(
+                        "UPDATE email_tokens SET used_at = now() WHERE id = $1",
+                        row["id"],
+                    )
+                return RedirectResponse(f"{app_url}/projects?verified=1", status_code=302)
+    return RedirectResponse(f"{app_url}/?verify=invalid", status_code=302)
+
+
+@router.post("/request-verification")
+async def request_verification(payload: dict = Depends(require_auth)):
+    """Re-send the verification email for the signed-in user."""
+    uid = payload.get("sub")
+    if not uid:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unauthorized")
+    pool = await get_pool_required()
+    async with pool.acquire() as conn:
+        user = await users_queries.get_user(conn, uuid.UUID(uid))
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user not found")
+        if dict(user).get("email_verified"):
+            return {"status": "already_verified"}
+        token = await _create_email_token(conn, str(user["id"]), "verify", VERIFY_TOKEN_TTL)
+    app_url = _app_url()
+    _send_email("verify_email", user["email"], {
+        "Name": user["name"] or user["email"],
+        "AppURL": app_url,
+        "VerifyURL": f"{app_url}/api/auth/verify-email?token={token}",
+    })
+    return {"status": "sent"}
+
+
+@router.post("/forgot-password")
+async def forgot_password(req: ForgotPasswordRequest):
+    """Always 200 — never reveal whether an email is registered. Sends a
+    reset link only when the email maps to a password account."""
+    email = req.email.strip().lower()
+    if email:
+        pool = await get_pool_required()
+        async with pool.acquire() as conn:
+            user = await users_queries.get_user_by_email(conn, email)
+            if user and user.get("password_hash"):
+                token = await _create_email_token(
+                    conn, str(user["id"]), "reset", RESET_TOKEN_TTL,
+                )
+                app_url = _app_url()
+                _send_email("password_reset", email, {
+                    "Name": user["name"] or email,
+                    "AppURL": app_url,
+                    "ResetURL": f"{app_url}/reset-password?token={token}",
+                })
+    return {"status": "ok"}
+
+
+@router.post("/reset-password", response_model=AuthResponse)
+async def reset_password(req: ResetPasswordRequest, response: Response):
+    if not req.token or len(req.password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="token and a password of at least 8 characters are required",
+        )
+    pool = await get_pool_required()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT id, user_id FROM email_tokens
+            WHERE token_hash = $1 AND kind = 'reset'
+              AND used_at IS NULL AND expires_at > now()
+            """,
+            hash_token(req.token),
+        )
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="invalid or expired reset link",
+            )
+        new_hash = hash_password(req.password)
+        async with conn.transaction():
+            await conn.execute(
+                "UPDATE users SET password_hash = $1 WHERE id = $2",
+                new_hash, row["user_id"],
+            )
+            await conn.execute(
+                "UPDATE email_tokens SET used_at = now() WHERE id = $1",
+                row["id"],
+            )
+            # Security: a password reset invalidates all existing sessions.
+            await conn.execute(
+                "UPDATE refresh_tokens SET revoked_at = now() "
+                "WHERE user_id = $1 AND revoked_at IS NULL",
+                row["user_id"],
+            )
+        user = await users_queries.get_user(conn, row["user_id"])
+        access_token, refresh_token = await issue_tokens(conn, str(user["id"]))
+        default_ws, _ = await get_default_workspace(conn, str(user["id"]))
+    _send_email("password_reset_complete", user["email"], {
+        "Name": user["name"] or user["email"],
+        "AppURL": _app_url(),
+    })
+    return AuthResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        user=user_to_response(user),
+        default_workspace=workspace_to_response(default_ws) if default_ws else None,
+    )
 
 
 @router.post("/refresh", response_model=AuthResponse)

@@ -306,5 +306,13 @@ class GitLabProvider(GitSyncProvider):
             except ValueError as exc:
                 result["token_valid"] = False
                 result["token_error"] = str(exc)
+            except httpx.TransportError as exc:
+                # Network-level failure (DNS error, connection refused, timeout).
+                # Surface cleanly rather than propagating a raw httpx exception.
+                logger.warning(
+                    "gitlab_provider.status: network error verifying token: %s", exc
+                )
+                result["token_valid"] = False
+                result["token_error"] = f"network error: {exc}"
 
         return result

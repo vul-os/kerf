@@ -20,6 +20,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional
 
+import httpx
+
 from kerf_cloud.git_providers.base import GitSyncProvider
 from kerf_cloud.github_app import (
     app_jwt,
@@ -185,7 +187,17 @@ class GitHubProvider(GitSyncProvider):
             )
 
         # Obtain a fresh (or cached) installation access token.
-        token = await self.get_installation_token(int(installation_id))
+        # httpx.HTTPStatusError (e.g. 401 Unauthorized) and httpx.TransportError
+        # (network failure) are re-raised as ValueError so callers receive a
+        # clean, provider-agnostic error rather than a raw httpx exception.
+        try:
+            token = await self.get_installation_token(int(installation_id))
+        except httpx.HTTPStatusError as exc:
+            raise ValueError(
+                f"GitHub token acquisition failed: HTTP {exc.response.status_code}"
+            ) from exc
+        except httpx.TransportError as exc:
+            raise ValueError(f"GitHub token acquisition failed: network error: {exc}") from exc
 
         remote_url = (
             f"https://x-access-token:{token}@github.com"
@@ -218,7 +230,14 @@ class GitHubProvider(GitSyncProvider):
                 "pull() requires installation_id, github_owner, github_repo"
             )
 
-        token = await self.get_installation_token(int(installation_id))
+        try:
+            token = await self.get_installation_token(int(installation_id))
+        except httpx.HTTPStatusError as exc:
+            raise ValueError(
+                f"GitHub token acquisition failed: HTTP {exc.response.status_code}"
+            ) from exc
+        except httpx.TransportError as exc:
+            raise ValueError(f"GitHub token acquisition failed: network error: {exc}") from exc
 
         remote_url = (
             f"https://x-access-token:{token}@github.com"

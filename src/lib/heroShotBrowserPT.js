@@ -23,7 +23,11 @@
  * a clear Error so the panel can fall back to the rasterised snapshot.
  */
 
-import { WebGLPathTracer } from 'three-gpu-pathtracer'
+// `three-gpu-pathtracer` is an OPTIONAL in-browser path-tracer. Its three.js
+// peer range (>=0.180) conflicts with the pinned three ^0.160, so it is NOT a
+// hard dependency; it is dynamically imported below (vite-ignored) so the
+// production build never resolves it and the feature degrades cleanly when
+// the package is absent.
 
 /* Resolve { renderer, scene, camera } from the various ref shapes the
  * Renderer component may expose. Kept defensive on purpose — the panel is
@@ -88,6 +92,16 @@ export async function renderBrowserPT({
   }
 
   const totalSamples = Math.max(1, Math.floor(samples))
+
+  let WebGLPathTracer
+  try {
+    ;({ WebGLPathTracer } = await import(/* @vite-ignore */ 'three-gpu-pathtracer'))
+  } catch {
+    throw new Error(
+      'heroShotBrowserPT: in-browser path tracer unavailable ' +
+        '(optional three-gpu-pathtracer not installed)',
+    )
+  }
 
   const tracer = new WebGLPathTracer(renderer)
   tracer.filterGlossyFactor = 0.5

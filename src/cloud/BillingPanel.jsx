@@ -13,13 +13,45 @@
 // API failures surface as inline error banners (no toast library).
 
 import { useEffect, useMemo, useState } from 'react'
-import { AlertCircle, ArrowUpRight, CreditCard, Info, Loader2, RefreshCw } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { AlertCircle, ArrowLeft, ArrowUpRight, CreditCard, Cpu, HardDrive, Info, Loader2, RefreshCw } from 'lucide-react'
+import Layout from '../components/Layout.jsx'
 import Card, { CardHeader, CardBody } from '../components/Card.jsx'
 import Button from '../components/Button.jsx'
 import Input from '../components/Input.jsx'
 import { ApiError } from '../lib/api.js'
-import { getBillingMe, topUp } from './api.js'
+import { getBillingMe, getUsage, topUp } from './api.js'
 import { useCloudConfig } from './useCloudConfig.js'
+
+// Defensive client-side rollup — used only if the backend response
+// predates the `summary` field. Mirrors kerf-billing _summarize_usage:
+// storage = moved bytes / storage-ish kind; token/model = compute.
+export function deriveSummary(events) {
+  const byModel = new Map()
+  let compute = 0, storage = 0, other = 0
+  for (const ev of events || []) {
+    const cost = Number(ev?.usd_cost ?? ev?.cost_usd) || 0
+    const inTok = Number(ev?.input_tokens) || 0
+    const outTok = Number(ev?.output_tokens) || 0
+    const bytes = Number(ev?.bytes_delta) || 0
+    const kind = String(ev?.kind || '').toLowerCase()
+    const model = ev?.model || null
+    if (bytes !== 0 || kind.includes('storage') || kind.includes('bytes')) storage += cost
+    else if (inTok || outTok || model || ['chat', 'compute', 'llm', 'completion'].includes(kind)) compute += cost
+    else other += cost
+    const key = model || '—'
+    const agg = byModel.get(key) || { model, input_tokens: 0, output_tokens: 0, usd_cost: 0, count: 0 }
+    agg.input_tokens += inTok
+    agg.output_tokens += outTok
+    agg.usd_cost += cost
+    agg.count += 1
+    byModel.set(key, agg)
+  }
+  return {
+    by_model: [...byModel.values()].sort((a, b) => b.usd_cost - a.usd_cost),
+    by_category: { compute_usd: compute, storage_usd: storage, other_usd: other, total_usd: compute + storage + other },
+  }
+}
 
 const PRESET_USD = [5, 10, 25, 50, 100]
 
@@ -87,7 +119,9 @@ function EmptyRow({ cols, label }) {
 
 export function BillingPanel() {
   const { cloudBeta } = useCloudConfig()
+  const navigate = useNavigate()
   const [data, setData] = useState(null)
+  const [usage, setUsage] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -116,8 +150,17 @@ export function BillingPanel() {
         setError(err instanceof ApiError ? err.message : 'Could not load billing info.')
         setLoading(false)
       })
+    // Usage breakdown is supplementary — its failure must not blank the page.
+    getUsage()
+      .then((u) => { if (!cancelled) setUsage(u) })
+      .catch((err) => { console.warn('[BillingPanel] getUsage failed', err) })
     return () => { cancelled = true }
   }, [reloadTick])
+
+  const summary = useMemo(() => {
+    if (usage?.summary && Array.isArray(usage.summary.by_model)) return usage.summary
+    return deriveSummary(usage?.events || data?.recent_usage || [])
+  }, [usage, data])
 
   const fxRate = Number(data?.fx_rate) || 0
   const balance = Number(data?.credits_usd) || 0
@@ -155,10 +198,18 @@ export function BillingPanel() {
   }
 
   const invoices = data?.recent_invoices || []
-  const usage = data?.recent_usage || []
+  const recentUsage = data?.recent_usage || []
 
   return (
+    <Layout>
     <div className="mx-auto max-w-5xl px-6 py-10 flex flex-col gap-6 text-ink-100">
+      <button
+        type="button"
+        onClick={() => navigate(-1)}
+        className="inline-flex items-center gap-1.5 self-start text-xs text-ink-400 hover:text-kerf-300 transition-colors"
+      >
+        <ArrowLeft size={14} /> Back to project
+      </button>
       <header className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-2xl font-semibold tracking-tight">Billing</h1>
@@ -307,6 +358,63 @@ export function BillingPanel() {
         </div>
       </Card>
 
+      {/* Usage breakdown — per-model + storage/compute split */}
+      <Card>
+        <CardHeader>
+          <div className="text-[10px] uppercase tracking-widest font-mono text-ink-400">
+            Usage breakdown {usage?.from && <span className="text-ink-500 normal-case tracking-normal">· {fmtDate(usage.from)} → {fmtDate(usage.to)}</span>}
+          </div>
+        </CardHeader>
+        <CardBody>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+            <div className="rounded-lg border border-ink-700 bg-ink-850/60 px-3 py-2">
+              <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide font-mono text-ink-400"><Cpu size={12} /> Compute</div>
+              <div className="text-lg font-semibold mt-1">{fmtUSD(summary.by_category.compute_usd)}</div>
+            </div>
+            <div className="rounded-lg border border-ink-700 bg-ink-850/60 px-3 py-2">
+              <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide font-mono text-ink-400"><HardDrive size={12} /> Storage</div>
+              <div className="text-lg font-semibold mt-1">{fmtUSD(summary.by_category.storage_usd)}</div>
+            </div>
+            <div className="rounded-lg border border-ink-700 bg-ink-850/60 px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wide font-mono text-ink-400">Other</div>
+              <div className="text-lg font-semibold mt-1">{fmtUSD(summary.by_category.other_usd)}</div>
+            </div>
+            <div className="rounded-lg border border-kerf-300/40 bg-kerf-300/10 px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wide font-mono text-kerf-300/80">Total</div>
+              <div className="text-lg font-semibold mt-1 text-kerf-300">{fmtUSD(summary.by_category.total_usd)}</div>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left text-[10px] uppercase tracking-widest font-mono text-ink-400 border-y border-ink-800">
+                <tr>
+                  <th className="px-4 py-2 font-medium">Model</th>
+                  <th className="px-4 py-2 font-medium text-right">Input tok</th>
+                  <th className="px-4 py-2 font-medium text-right">Output tok</th>
+                  <th className="px-4 py-2 font-medium text-right">Events</th>
+                  <th className="px-4 py-2 font-medium text-right">Cost</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-ink-800">
+                {summary.by_model.length === 0 ? (
+                  <EmptyRow cols={5} label={loading ? 'Loading…' : 'No usage in this period.'} />
+                ) : (
+                  summary.by_model.map((m, i) => (
+                    <tr key={m.model || `none-${i}`} className="hover:bg-ink-850/50">
+                      <td className="px-4 py-2.5 font-mono text-xs text-ink-200 truncate max-w-[220px]">{m.model || '—'}</td>
+                      <td className="px-4 py-2.5 font-mono text-right text-ink-300">{(m.input_tokens || 0).toLocaleString()}</td>
+                      <td className="px-4 py-2.5 font-mono text-right text-ink-300">{(m.output_tokens || 0).toLocaleString()}</td>
+                      <td className="px-4 py-2.5 font-mono text-right text-ink-400">{m.count || 0}</td>
+                      <td className="px-4 py-2.5 font-mono text-right">{fmtUSD(m.usd_cost)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardBody>
+      </Card>
+
       {/* Usage */}
       <Card>
         <CardHeader>
@@ -325,10 +433,10 @@ export function BillingPanel() {
               </tr>
             </thead>
             <tbody className="divide-y divide-ink-800">
-              {usage.length === 0 ? (
+              {recentUsage.length === 0 ? (
                 <EmptyRow cols={4} label={loading ? 'Loading…' : 'No usage recorded yet.'} />
               ) : (
-                usage.map((u, i) => (
+                recentUsage.map((u, i) => (
                   <tr key={u.id || i} className="hover:bg-ink-850/50">
                     <td className="px-5 py-3 text-ink-200">{fmtDate(u.created_at || u.date)}</td>
                     <td className="px-5 py-3">
@@ -346,6 +454,7 @@ export function BillingPanel() {
         </div>
       </Card>
     </div>
+    </Layout>
   )
 }
 

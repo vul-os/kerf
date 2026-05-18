@@ -1,0 +1,214 @@
+# OCCT Phase 4 — T-104 decomposition (internal)
+
+> **Internal planning doc.** `docs/plans/**` is excluded from the user
+> docs viewer. This is the breakdown rationale for splitting the long-tail
+> epic **T-104 "Kernel G3 + NURBS Phase 4 trim-by-curve + class-A
+> leading"** into bounded single-Sonnet-agent sub-tasks **T-104a..h**,
+> the same way the render epic was split into T-106a..f.
+>
+> Decomposed at HEAD `384f401`. Authoritative current-state sources read
+> for grounding: `tasks.md` `### T-104` / `### T-106a..f`,
+> `docs/plans/geometry-kernel-roadmap.md`,
+> `docs/plans/nurbs-phase-4-full.md`, and the live kernel code under
+> `packages/kerf-cad-core/src/kerf_cad_core/geom/` +
+> `kerf_cad_core/surfacing.py`.
+
+---
+
+## 1. Why split it
+
+T-104 as written is a single Tier-A P1 epic that bundles three
+independently-shippable workstreams plus one structurally-impossible
+ask:
+
+1. **Trim-by-curve / imprint** — pure-Python face split by an SSI /
+   projected curve (roadmap `GK-40`, plus a worker-side fallback).
+2. **Class-A leading** — the surface-quality *workflow* (curvature
+   combs + zebra + G-continuity acceptance gate; roadmap
+   `GK-38`/`GK-64`).
+3. **Algorithmic G3** — third-derivative-continuous blends. **This is
+   the trap.** Stock OCCT *cannot* enforce G3: `GeomAbs_G3` does not
+   exist in the `GeomAbs_Shape` enum (confirmed in
+   `surfacing.py:1096-1100` and `nurbs-phase-4-full.md:5-6,41-42`).
+   What *is* achievable is (a) a **pure-Python NURBS** G3 blend in
+   `geom/blend_srf.py` (roadmap `GK-62`, no OCCT involved — pure math,
+   so the impossibility does not apply to the Kerf pure-Python layer)
+   and (b) the **already-shipped visualization** path (eyeball G3 via
+   curvature combs). We must NOT write a sub-task that demands stock
+   OCCT enforce G3 — that is the structurally-impossible item to flag.
+
+Each of these is a different file-set, a different oracle, and a
+different risk profile. Bundled, no single Sonnet agent can land it in
+one isolated-worktree run. Split, every piece is bounded, analytically
+oracled, and sequenced foundations-first.
+
+---
+
+## 2. Current kernel state (verified at 384f401)
+
+| Area | What exists today | Gap T-104 must close |
+|---|---|---|
+| **Pure-Py G1/G2 blend** | `surface_fillet.py:surface_blend_g1_g2` builds a cubic NURBS blend strip; `curvature_comb_continuity_residual` is the analytic G1/G2 residual oracle (cross-tangent ‖t_b×t_s‖ for G1, principal-curvature delta for G2). Re-exported via `blend_srf.py`. | No **G3** (curvature-rate / third-derivative) residual or enforcement. `blend_srf.g2_blend_point` is a fake additive nudge — not curvature-continuous. The *verified* path is `surface_blend_g1_g2`. |
+| **Trim-by-curve** | `geom/trim_curve.py:trim_face` is pure-Python **UV-domain validation only** — it projects a polyline, checks divisibility, returns a `TrimCurve`; it does **not** perform a B-rep split (docstring lines 446-449). The actual split is `surfacing.py:feature_trim_by_curve` → OCCT worker `opTrimByCurve` (`BRepFeat_SplitShape` / `BRepProj_Projection`). C2-T12 Section+prism fallback is **unbuilt**. | No pure-Python `Face`→split-`Face` that emits a `validate_body`-clean trimmed face (this is roadmap `GK-40`, still `[ ]`). |
+| **Face imprint** | `geom/boolean.py` GK-19 imprints an SSI curve into a `Face` via `mef`/`kemr` — but **only for the analytic primitive matrix** (axis-aligned box / world-axis cylinder / sphere; docstring lines 9-44). General NURBS face imprint raises `unsupported-input`. | Generalise imprint to a **projected/SSI curve on an arbitrary NURBS `Face`** (the GK-40 building block). |
+| **Curvature combs** | `surfacing.py:feature_surface_curvature_combs` — worker samples `GeomLProp_SLProps`, `CurvatureCombOverlay.jsx` renders. Shipped. Explicitly **visualization-only**; G3 is "eyeball it". | No *numeric exported comb-of-combs* (curvature-rate) oracle in pure-Python; no class-A acceptance gate that consumes it. |
+| **Zebra / reflection lines** | `surface_analysis.py:zebra_stripe` returns a scalar intensity at one (u,v). No analyser that detects stripe-tangent discontinuity across a join; no overlay. (roadmap `GK-38` still `[ ]`.) | A zebra/reflection-line *continuity analyser* with a G1/G2-break oracle. |
+| **Edge continuity report** | `surface_analysis.py:edge_continuity_report` reports **G0/G1/G2 only** (position / normal-angle / mean-curvature delta). | Extend with a **G3 (curvature-rate) residual** column for the pure-Python class-A gate; add the analytic third-derivative oracle. (roadmap `GK-62`/`GK-64`.) |
+| **Class-A harness** | None. roadmap `GK-64` (curvature combs + zebra + G-continuity report on a reference A-surface fixture) is unbuilt. | The acceptance harness + leading workflow that flags hot-spots. |
+
+**Bottom line.** The verified pure-Python continuity machinery tops out
+at **G2** (`surface_blend_g1_g2` + `curvature_comb_continuity_residual`).
+Trim-by-curve has a worker path but **no pure-Python B-rep split**.
+There is **no** zebra analyser, **no** class-A gate, and G3 is
+visualization-only on the OCCT side.
+
+---
+
+## 3. The structural-impossibility call-outs (read this before writing scopes)
+
+These are baked into the sub-task scopes/DoDs so no agent burns a run
+chasing them:
+
+1. **Algorithmic G3 in stock OCCT is impossible.** `GeomAbs_G3` is
+   absent from the `GeomAbs_Shape` enum. No OCCT API (`BRepFilletAPI`,
+   `GeomFill`, `ShapeUpgrade`, `GeomConvert`) can *enforce* or *report*
+   G3. **Any sub-task touching OCCT for G3 must be visualization /
+   approximation only** (eyeball via combs — already shipped). This is
+   flagged on **T-104f** and **T-104g**.
+
+2. **G3 *is* achievable in the pure-Python NURBS layer.** Third-
+   derivative continuity of two NURBS surfaces meeting at a seam is
+   closed-form math (homogeneous quotient rule, `nurbs.py`'s analytic
+   derivatives from GK-02). The Kerf pure-Python kernel is *not* OCCT,
+   so the OCCT enum limitation does not bind it. T-104b/T-104c deliver
+   the **pure-Python** algorithmic G3 (roadmap `GK-62`). DoD oracle is
+   analytic (third-derivative residual `< 1e-5` across a known join,
+   comb-of-combs continuous), exactly matching `GK-62`.
+
+3. **Pure-Python trimmed-solid round-trip is bounded but real.** GK-40
+   (trim face by SSI curve) is a known long-tail item but it is *pure
+   math* on top of the already-landed SSI (GK-09) + closest-point
+   (GK-07) + brep_build (GK-13) + `boolean.py` imprint (GK-19). It is
+   bounded for one agent if scoped to **plane / cylinder / sphere
+   carrier surfaces** (the same analytic matrix `boolean.py` already
+   supports) — *not* arbitrary NURBS×NURBS, which stays delegated to
+   the OCCT worker. T-104d is scoped to that matrix; the general
+   NURBS×NURBS trim explicitly stays on the OCCT worker path
+   (`feature_trim_by_curve`) and is **out of T-104's pure-Python
+   scope** — documented, not attempted.
+
+4. **The OCCT worker trim fallback (C2-T12 Section+prism) is JS/WASM
+   worker code**, not kernel. It is *out of scope* for T-104's
+   pure-Python sub-tasks (and would collide with worker-owning agents);
+   T-104e covers only the **pure-Python validation + side-selection
+   contract** that the worker consumes, plus wiring the pure-Python
+   `GK-40` result as the in-process answer when the carrier is in the
+   analytic matrix (OCCT worker stays the fallback for everything else).
+
+---
+
+## 4. Sub-task dependency graph
+
+```
+        T-104a  (G3 residual oracle — pure-Python, foundation)
+           |
+           v
+        T-104b  (pure-Python G3 blend strip — geom/blend_srf.py rebuild)
+           |
+           v
+        T-104c  (G3 trims/sews to a Body — bounded matrix)
+           |                                   \
+           |                                    \
+   T-104d  (GK-40 pure-Py trim-by-curve,         \
+            plane/cyl/sphere carrier matrix)      \
+           |                                       \
+           v                                        v
+   T-104e  (trim side-selection + validation     T-104f  (zebra / reflection-
+            contract; wire GK-40 in-proc)                 line continuity analyser)
+                                                          |
+                                                          v
+                                                  T-104g  (class-A acceptance
+                                                           harness: combs+zebra+
+                                                           G0..G3 gate)
+                                                          |
+                                                          v
+                                                  T-104h  (class-A *leading*
+                                                           workflow — hot-spot
+                                                           flagging surface)
+
+Foundations first:  T-104a → T-104b → T-104c   (the algorithmic-G3 spine, opus-grade math but each bounded)
+Parallelisable:      T-104d (after GK-40 deps already landed) ‖ T-104f (after T-104a)
+Gate + workflow:     T-104g depends on T-104a + T-104f ;  T-104h depends on T-104g
+Worker contract:     T-104e depends on T-104c + T-104d
+```
+
+`Depends-on` uses **T-104** ids only where the dependency is *within
+this epic*; where a sub-task builds on already-landed roadmap items
+(GK-02 analytic derivatives, GK-07 closest-point, GK-09 SSI, GK-13
+brep_build, GK-19 imprint, GK-24/25 G1/G2 blend) that is noted in the
+Scope, not as a blocking `Depends-on` (those are shipped at 384f401).
+
+---
+
+## 5. Money / reach ranking (why this order)
+
+T-104 is Tier-A P1 because it serves **two high-value personas**
+(automotive Class-A surfacing, jewelry Class-A surfacing) and is the
+kernel-depth opus-spine moat the §6 geometry-kernel thesis demands.
+Within the split:
+
+1. **T-104a/b/c (algorithmic G3 spine)** rank highest: this is the
+   *only genuinely-new kernel capability* in the epic and the headline
+   "G3" deliverable. Pure-Python, so it is real (not the OCCT
+   eyeball-only path). Foundations — everything class-A leans on the
+   residual oracle.
+2. **T-104d/e (pure-Python trim-by-curve)** next: closes the GK-40
+   long-tail and removes a hard OCCT coupling for the bounded analytic
+   matrix; directly serves the jewelry "cut a stone-setting window"
+   and automotive panel-trim workflows.
+3. **T-104f/g/h (zebra + class-A gate + leading)** close the
+   *workflow* gap — the deliverable users actually see ("flag the
+   hot-spots on my fender"). Lower kernel-depth but high persona reach;
+   sequenced last because the gate consumes the G3 residual oracle from
+   T-104a.
+
+---
+
+## 6. Out of scope for T-104 (documented, not attempted)
+
+- General **NURBS×NURBS** trim-by-curve and boolean imprint — stays on
+  the OCCT worker (`feature_trim_by_curve` / `run_feature_boolean`).
+  T-104's pure-Python trim is bounded to the plane/cyl/sphere carrier
+  matrix `boolean.py` already supports.
+- The **C2-T12 Section+prism JS/WASM worker fallback** — worker code,
+  owned elsewhere, would collide with concurrent agents.
+- **OCCT algorithmic G3** — structurally impossible; the shipped
+  visualization path is the OCCT answer and is not re-opened.
+- `src/routes/compare`, `docs/*.md` capability pages, migrations,
+  kerf-cli — owned by other concurrent agents this session.
+- Parasolid/ACIS, GPU/native geometry — non-goals at every phase
+  (geometry-kernel-roadmap §6).
+
+---
+
+## 7. Mapping to the geometry-kernel roadmap
+
+| T-104 sub-task | roadmap GK item(s) | roadmap status at 384f401 |
+|---|---|---|
+| T-104a | GK-62 (oracle half), GK-65 (comb numeric) | `[ ]` |
+| T-104b | GK-62 (blend half) | `[ ]` |
+| T-104c | GK-62 + GK-26-style trim/sew pattern | `[ ]` |
+| T-104d | **GK-40** (trim face by SSI curve) | `[ ]` (opus) |
+| T-104e | GK-40 wiring + GK-71 façade note | `[ ]` |
+| T-104f | **GK-38** (zebra / reflection-line) | `[ ]` |
+| T-104g | **GK-64** (class-A acceptance harness) | `[ ]` |
+| T-104h | GK-64 follow-on (leading workflow) | new (product layer) |
+
+These remain the single source of truth in
+`geometry-kernel-roadmap.md`; T-104a..h are the *task-board* face of
+the same work, sized for the ship-gate agent loop. Closing a T-104
+sub-task should also tick its GK checkbox.
+
+---
+
+STATUS: COMPLETE — T-104 decomposed into T-104a..h, appended to tasks.md.

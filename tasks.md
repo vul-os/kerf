@@ -1257,14 +1257,23 @@ Tier A (single persona unlock), render / SubD / direct-edit → Tier B
   to CircuitJSON; pytest with no committed third-party data.
 - **Depends-on:** none
 
-### T-104 Kernel G3 + NURBS Phase 4 trim-by-curve + class-A leading
+### T-104 Kernel G3 + NURBS Phase 4 trim-by-curve + class-A leading (epic — split into T-104a..h)
 - **Tier:** A
 - **Money/reach rationale:** Automotive + jewelry Class-A surfacing
   depth (2 personas). G3 curvature combs partially shipped (#100);
   imprint (GK-19) + class-A leading still to go. Kernel-side depth →
   opus-spine; cross-sector reach via the surfacing path.
 - **Priority:** P1
-- **Status:** 🚧 in flight
+- **Status:** 🚧 umbrella — split into bounded sub-tasks **T-104a..h**
+  (same shape as T-106a..f). Decomposition rationale, current kernel
+  state, dependency graph + the structural-impossibility call-outs in
+  `docs/plans/occt-phase4.md`. **Honest scope line:** algorithmic G3 is
+  *impossible on stock OCCT* (`GeomAbs_G3` absent from the
+  `GeomAbs_Shape` enum) — the OCCT answer is the already-shipped
+  *visualization-only* curvature-comb path; the genuinely-new G3 here is
+  **pure-Python NURBS** (T-104a/b/c, roadmap GK-62, not OCCT-gated).
+  General NURBS×NURBS trim stays delegated to the OCCT worker; T-104's
+  pure-Python trim is bounded to the plane/cyl/sphere carrier matrix.
 - **Scope:** Extend the Phase-4 NURBS surfacing path past the shipped
   C0–C2 / G0–G2 + curvature combs into algorithmic G3 (custom-WASM
   required — stock OCCT cannot enforce `GeomAbs_G3`), full trim-by-curve
@@ -1273,10 +1282,226 @@ Tier A (single persona unlock), render / SubD / direct-edit → Tier B
 - **Target files/packages:** `packages/kerf-cad-core/src/kerf_cad_core/
   geom/` (G3 helpers, trim-by-curve, leading), tests; aligns with
   `docs/plans/geometry-kernel-roadmap.md` GK-NN slots.
-- **Definition of Done:** G3 enforced across a blend / sweep + analytic
-  oracle; trim-by-curve produces a valid trimmed face; leading workflow
-  flags hot-spots on a class-A test surface; pytest.
+- **Definition of Done:** rolled up from T-104a..h.
 - **Depends-on:** none
+
+### T-104a G3 (curvature-rate) continuity residual oracle — pure-Python
+- **Tier:** A
+- **Money/reach rationale:** Foundation for the entire algorithmic-G3
+  spine and the class-A acceptance gate (automotive + jewelry Class-A,
+  2 personas). The single highest-leverage gate in the epic — every
+  later G3/class-A sub-task asserts against this oracle.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Add a pure-Python **G3 residual** to the existing
+  continuity machinery (sibling to
+  `surface_fillet.curvature_comb_continuity_residual`, which today
+  tops out at G1/G2). Compute the cross-boundary **curvature-rate**
+  (third-derivative / dκ/ds) at sampled seam points using the analytic
+  rational derivatives already landed in `nurbs.py` (GK-02) — NOT
+  finite differences. This is pure NURBS math: the stock-OCCT
+  `GeomAbs_G3` impossibility does **not** apply to the pure-Python
+  layer (see `docs/plans/occt-phase4.md` §3). Also export a numeric
+  curvature comb-of-combs (GK-65) value so the gate and tests share
+  one definition. No OCCT, no worker, no UI.
+- **Target files/packages:** `packages/kerf-cad-core/src/kerf_cad_core/
+  geom/surface_fillet.py` (extend the residual fn; additive only),
+  `geom/blend_srf.py` (re-export), `packages/kerf-cad-core/tests/`.
+- **Definition of Done:** for two surfaces analytically known to meet
+  G3 at a seam, the residual is `< 1e-5`; for a deliberately G2-only
+  (curvature-rate-discontinuous) join the residual is reported large;
+  comb-of-combs magnitude on a circle/cylinder = analytic dκ/ds to
+  `1e-9`; pytest with closed-form oracles only; ties roadmap GK-62
+  (oracle half) + GK-65.
+- **Depends-on:** none
+
+### T-104b Pure-Python G3 blend strip — rebuild blend_srf G2/G3 path
+- **Tier:** A
+- **Money/reach rationale:** The headline *new kernel capability* of
+  the epic — a real curvature-continuous→curvature-rate-continuous
+  NURBS blend (Class-A surfacing for automotive + jewelry). Today
+  `blend_srf.g2_blend_point` is a fake additive nudge; this delivers
+  the genuine pure-Python G3 the OCCT path structurally cannot.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Rebuild the blend-strip constructor so it can enforce
+  **G3** between two NURBS surfaces along a shared-edge descriptor
+  (extend the verified `surface_fillet.surface_blend_g1_g2` pattern to
+  a higher-degree-in-v strip with enough inner control rows to satisfy
+  position + tangent + curvature + curvature-rate at both seams).
+  Delete / quarantine the bogus `blend_srf.g2_blend_point` additive
+  nudge. Pure-Python NURBS only — no OCCT, no worker. Validate every
+  result against the T-104a residual oracle.
+- **Target files/packages:** `packages/kerf-cad-core/src/kerf_cad_core/
+  geom/blend_srf.py` (rebuild G2/G3 path),
+  `geom/surface_fillet.py` (shared helpers; additive),
+  `packages/kerf-cad-core/tests/`.
+- **Definition of Done:** a G3 blend between two known surfaces passes
+  the T-104a residual (`< 1e-5`) at every sampled seam point; G1/G2
+  residuals also satisfied; boundary interpolation exact to `1e-9`;
+  pytest analytic oracles; ties roadmap GK-62 (blend half).
+- **Depends-on:** T-104a
+
+### T-104c G3 blend trims + sews supports to a Body (bounded matrix)
+- **Tier:** A
+- **Money/reach rationale:** Makes the G3 blend a *usable solid* rather
+  than a bare surface — the deliverable a jewelry/automotive user
+  actually consumes (filleted/blended Class-A body, not a loose patch).
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Trim the two support surfaces back to the G3 blend's seam
+  curves and sew blend+supports into a `validate_body`-clean `Body`,
+  following the **already-landed** GK-26 (`fillet_solid.py`) +
+  `sew.py` + `boolean.py` imprint pattern. Bounded — restrict support
+  inputs to the **plane / world-axis cylinder / sphere** carrier
+  matrix `boolean.py` already supports (docstring lines 9-44); raise
+  `unsupported-input` for arbitrary NURBS×NURBS (that stays on the
+  OCCT worker; see `docs/plans/occt-phase4.md` §6). Pure-Python only.
+- **Target files/packages:** `packages/kerf-cad-core/src/kerf_cad_core/
+  geom/blend_srf.py` (body-emitting entrypoint),
+  `geom/sew.py` / `geom/fillet_solid.py` (reuse, additive),
+  `packages/kerf-cad-core/tests/`.
+- **Definition of Done:** G3 blend across a planar-pair / planar-cyl
+  edge → `validate_body` ok and 2-manifold; volume matches the
+  closed-form expectation to `1e-6`; non-matrix input returns a
+  structured `unsupported-input`, never an invalid `Body`; pytest.
+- **Depends-on:** T-104b
+
+### T-104d Pure-Python trim-by-curve (GK-40) — analytic carrier matrix
+- **Tier:** A
+- **Money/reach rationale:** Closes the GK-40 long-tail and removes a
+  hard OCCT coupling for the bounded matrix — directly serves the
+  jewelry "cut a stone-setting window into a shank" and automotive
+  panel-trim workflows; testable in-process (no WASM).
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Pure-Python **trim face by a projected / SSI curve**:
+  given a `Face` whose surface is in the analytic carrier matrix
+  (plane / world-axis cylinder / sphere) and a 3D cutter curve, build
+  the seam via the **already-landed** SSI (GK-09) + closest-point
+  pullback (GK-07), imprint it into the face's loop set generalising
+  the GK-19 `boolean.py` `mef`/`kemr` split, and keep the requested
+  side — emitting a `validate_body`-clean trimmed `Face`/`Body`. This
+  replaces the FD-projection-only `trim_curve.trim_face` *for the
+  matrix*; arbitrary NURBS×NURBS explicitly stays delegated to the
+  OCCT worker (`feature_trim_by_curve`) and is out of scope (see
+  `docs/plans/occt-phase4.md` §3.3/§6). Pure-Python; no worker; no UI.
+- **Target files/packages:** `packages/kerf-cad-core/src/kerf_cad_core/
+  geom/trim_curve.py` (pure-Py split path; keep existing API),
+  `geom/boolean.py` (reuse imprint helpers; additive),
+  `packages/kerf-cad-core/tests/`.
+- **Definition of Done:** trimming a plane by a cylinder yields the
+  exact circular boundary loop to `1e-7` and a `validate_body`-clean
+  trimmed face; keep-side selects the correct region; non-matrix
+  carrier returns a structured `unsupported-input` (not an exception,
+  not an invalid body); pytest analytic oracles; ties roadmap GK-40.
+- **Depends-on:** T-104c
+
+### T-104e Trim side-selection + validation contract; in-proc wiring
+- **Tier:** A
+- **Money/reach rationale:** Makes T-104d's pure-Python trim the
+  *default in-process answer* for the bounded matrix (instant, no
+  WASM round-trip), with the OCCT worker correctly retained as the
+  fallback for everything else — the testability + decoupling win.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Harden the **side-selection heuristic** (area / point-in-
+  region, mirroring `boolean.py` region classification) and the
+  validation contract that the existing `surfacing.feature_trim_by_
+  curve` worker path already documents (`keep_side`
+  positive/negative). Wire the T-104d pure-Python result as the
+  in-process answer **when the carrier is in the analytic matrix**;
+  fall through to the existing OCCT-worker path otherwise (invert
+  today's "worker is the only path" only for the matrix). Add the
+  `geom/__init__.py` façade export + docstring the pure-Py vs OCCT
+  split (GK-71-style). Do **not** touch JS/WASM worker code or the
+  C2-T12 Section+prism fallback (out of scope, owned elsewhere).
+- **Target files/packages:** `packages/kerf-cad-core/src/kerf_cad_core/
+  geom/trim_curve.py`, `geom/__init__.py` (façade export),
+  `packages/kerf-cad-core/src/kerf_cad_core/surfacing.py` (in-proc
+  dispatch guard only — no worker/JS edits),
+  `packages/kerf-cad-core/tests/`.
+- **Definition of Done:** a matrix-carrier trim resolves in-process
+  with the correct side and no worker call; a non-matrix carrier still
+  routes to the OCCT worker unchanged; existing trim tests still pass;
+  import-surface snapshot test green; pytest.
+- **Depends-on:** T-104c, T-104d
+
+### T-104f Zebra / reflection-line continuity analyser (GK-38)
+- **Tier:** A
+- **Money/reach rationale:** Zebra is *the* Class-A inspection idiom
+  (Alias/ICEM/Rhino). Cross-sector reach: automotive A-surface review
+  + jewelry highlight inspection (2 personas). Parallelisable with
+  the trim spine.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Promote the single-point `surface_analysis.zebra_stripe`
+  scalar into a **continuity analyser**: sample reflection-line /
+  zebra stripes across a shared edge between two surfaces and detect
+  stripe-tangent discontinuity (G1 break) and stripe-curvature
+  discontinuity (G2 break), reusing the analytic partials from GK-02.
+  Numeric output only (the rendered overlay is shipped elsewhere as
+  the worker `surface_curvature_combs` viz path — do not touch UI/
+  worker). Pure-Python; analytic oracle.
+- **Target files/packages:** `packages/kerf-cad-core/src/kerf_cad_core/
+  geom/surface_analysis.py` (additive analyser fn),
+  `packages/kerf-cad-core/tests/`.
+- **Definition of Done:** zebra stripes report continuous across a
+  constructed G1 join and a detected tangent-discontinuity across a
+  G0 join; result is deterministic and analytically oracled (no
+  "looks plausible"); pytest; ties roadmap GK-38.
+- **Depends-on:** T-104a
+
+### T-104g Class-A acceptance harness — combs + zebra + G0..G3 gate
+- **Tier:** A
+- **Money/reach rationale:** The acceptance gate a Class-A shop runs
+  before sign-off — turns the kernel depth into a checkable deliverable
+  for both target personas. Consumes the T-104a residual + T-104f
+  analyser.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** A pure-Python class-A acceptance harness that runs
+  curvature combs + the T-104f zebra analyser + a **G0/G1/G2/G3**
+  continuity report (extend `surface_analysis.edge_continuity_report`,
+  which today stops at G2, with the T-104a G3 residual column) on a
+  reference A-surface fixture, and returns a structured pass/fail per
+  gate. A deliberately G0 (or G2-only) variant of the fixture must
+  fail the corresponding gate. Pure-Python; analytic; no UI/worker.
+- **Target files/packages:** `packages/kerf-cad-core/src/kerf_cad_core/
+  geom/surface_analysis.py` (G3 column + harness; additive),
+  `packages/kerf-cad-core/tests/` (reference + degraded fixtures).
+- **Definition of Done:** the good A-surface fixture passes all gates;
+  the G0 variant fails the G1 gate and the G2-only variant fails the
+  G3 gate, each with the documented numeric residual; pytest closed-
+  form oracles; ties roadmap GK-64.
+- **Depends-on:** T-104a, T-104f
+
+### T-104h Class-A *leading* workflow — hot-spot flagging surface
+- **Tier:** A
+- **Money/reach rationale:** The user-facing payoff of the whole epic:
+  "flag the hot-spots on my fender / bezel." The product-layer cap on
+  the Class-A kernel depth; closes the original T-104 "class-A leading
+  workflow flags hot-spots" DoD.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** A pure-Python *leading* pass that consumes the T-104g
+  harness output and produces a structured **hot-spot map** over a
+  surface: per-(u,v) classification of curvature-rate spikes /
+  reflection-line kinks / G-continuity violations, ranked, with the
+  worst regions flagged for the surfacing operator. Output is a
+  serialisable diagnostic object (the rendered overlay is the already-
+  shipped worker comb path — do not touch UI/worker). Pure-Python;
+  deterministic; analytic oracle on a synthetic surface with a known
+  injected defect.
+- **Target files/packages:** `packages/kerf-cad-core/src/kerf_cad_core/
+  geom/surface_analysis.py` (leading pass; additive),
+  `packages/kerf-cad-core/tests/`.
+- **Definition of Done:** on a synthetic Class-A test surface with a
+  deliberately injected curvature-rate hot-spot, the leading pass
+  flags exactly that region as the worst and a clean surface produces
+  an empty hot-spot set; deterministic; pytest analytic oracle;
+  closes the original T-104 leading-workflow DoD.
+- **Depends-on:** T-104g
 
 ### T-105 SubD authoring with creases + edit workflow
 - **Tier:** B

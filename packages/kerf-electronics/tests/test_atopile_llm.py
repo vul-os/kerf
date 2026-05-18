@@ -99,15 +99,15 @@ class TestVoltageDivider:
 
     def test_has_vin_net(self):
         src = make_atopile("voltage divider")
-        assert "net vin" in src
+        assert "signal vin" in src
 
     def test_has_vout_net(self):
         src = make_atopile("voltage divider")
-        assert "net vout" in src
+        assert "signal vout" in src
 
     def test_has_gnd_net(self):
         src = make_atopile("voltage divider")
-        assert "net gnd" in src
+        assert "signal gnd" in src
 
     def test_module_block(self):
         src = make_atopile("voltage divider")
@@ -172,15 +172,15 @@ class TestRCLowPass:
 
     def test_vin_net(self):
         src = make_atopile("RC low-pass 10kHz")
-        assert "net vin" in src
+        assert "signal vin" in src
 
     def test_vout_net(self):
         src = make_atopile("RC low-pass 10kHz")
-        assert "net vout" in src
+        assert "signal vout" in src
 
     def test_gnd_net(self):
         src = make_atopile("RC low-pass 10kHz")
-        assert "net gnd" in src
+        assert "signal gnd" in src
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -220,11 +220,11 @@ class TestLEDDriver:
 
     def test_vcc_net(self):
         src = make_atopile("LED driver 20mA")
-        assert "net vcc" in src
+        assert "signal vcc" in src
 
     def test_gnd_net(self):
         src = make_atopile("LED driver 20mA")
-        assert "net gnd" in src
+        assert "signal gnd" in src
 
     def test_10ma_resistor_300_ohm(self):
         """R = (5V - 2V) / 0.01A = 300 Ω."""
@@ -253,11 +253,11 @@ class TestPullUp:
 
     def test_signal_net(self):
         src = make_atopile("pull-up resistor 10kΩ")
-        assert "net signal" in src
+        assert "signal sig" in src
 
     def test_vcc_net(self):
         src = make_atopile("pull-up resistor 10kΩ")
-        assert "net vcc" in src
+        assert "signal vcc" in src
 
     def test_r1_new_resistor(self):
         src = make_atopile("pull-up resistor 4.7kΩ")

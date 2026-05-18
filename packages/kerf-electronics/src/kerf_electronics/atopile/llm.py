@@ -131,22 +131,23 @@ def _fmt_eng(value: float, unit: str) -> str:
 #       ...
 #
 #   module Bar:
+#       signal vin
 #       r1 = new Resistor
 #       r1.value = "10kΩ"
 #       r1.footprint = "..."
-#       net vin ~ r1.p1
+#       r1.p1 ~ vin
 #       ...
 #
 # We validate that:
 #   1. There is at least one `module` or `component` block.
 #   2. All `new` assignments follow `<ident> = new <Type>`.
 #   3. Attribute assignments follow `<ident>.<attr> = "..."`.
-#   4. Net connections follow `net <name> ~ <ref>.<pin>`.
+#   4. Connections follow `<ref>.<pin> ~ <name>` (dotted-name ~ name).
 
 _ATO_MODULE_RE = re.compile(r"^\s*(module|component)\s+\w+\s*:", re.MULTILINE)
 _ATO_NEW_RE = re.compile(r"^\s*\w+\s*=\s*new\s+\w+", re.MULTILINE)
 _ATO_ATTR_RE = re.compile(r'^\s*\w+\.\w+\s*=\s*"[^"]*"', re.MULTILINE)
-_ATO_NET_RE = re.compile(r"^\s*net\s+\w+\s*~\s*\w+\.\w+", re.MULTILINE)
+_ATO_NET_RE = re.compile(r"^\s*\w+\.\w+\s*~\s*\w+", re.MULTILINE)
 
 
 def _validate_ato(source: str) -> None:
@@ -179,6 +180,10 @@ def _voltage_divider() -> str:
     return '''\
 # Voltage divider: vin → r1 → vout → r2 → gnd
 module VoltageDivider:
+    signal vin
+    signal vout
+    signal gnd
+
     r1 = new Resistor
     r1.value = "10kΩ"
     r1.footprint = "R_0402"
@@ -187,10 +192,10 @@ module VoltageDivider:
     r2.value = "10kΩ"
     r2.footprint = "R_0402"
 
-    net vin ~ r1.p1
-    net vout ~ r1.p2
-    net vout ~ r2.p1
-    net gnd ~ r2.p2
+    r1.p1 ~ vin
+    r1.p2 ~ vout
+    r2.p1 ~ vout
+    r2.p2 ~ gnd
 '''
 
 
@@ -204,6 +209,9 @@ def _rc_lowpass(fc_hz: float, label: str) -> str:
 # RC low-pass filter  fc = {label}  (R={r_str}, C={c_str})
 module RCLowPass:
     # cutoff_frequency = "{label}"
+    signal vin
+    signal vout
+    signal gnd
 
     r1 = new Resistor
     r1.value = "{r_str}"
@@ -213,10 +221,10 @@ module RCLowPass:
     c1.value = "{c_str}"
     c1.footprint = "C_0402"
 
-    net vin ~ r1.p1
-    net vout ~ r1.p2
-    net vout ~ c1.p1
-    net gnd ~ c1.p2
+    r1.p1 ~ vin
+    r1.p2 ~ vout
+    c1.p1 ~ vout
+    c1.p2 ~ gnd
 '''
 
 
@@ -231,6 +239,8 @@ def _led_driver(i_led_a: float, label: str) -> str:
 # R = (5V - 2V) / {label} = {r_str}
 module LEDDriver:
     # led_current = "{label}"
+    signal vcc
+    signal gnd
 
     r1 = new Resistor
     r1.value = "{r_str}"
@@ -240,9 +250,9 @@ module LEDDriver:
     led1.value = "LED_RED"
     led1.footprint = "LED_0603"
 
-    net vcc ~ r1.p1
-    net r1.p2 ~ led1.anode
-    net gnd ~ led1.cathode
+    r1.p1 ~ vcc
+    r1.p2 ~ led1.anode
+    led1.cathode ~ gnd
 '''
 
 
@@ -251,12 +261,15 @@ def _pullup(r_ohm: float, label: str) -> str:
     return f'''\
 # Pull-up resistor  {label}  between signal and VCC
 module PullUp:
+    signal vcc
+    signal sig
+
     r1 = new Resistor
     r1.value = "{r_str}"
     r1.footprint = "R_0402"
 
-    net vcc ~ r1.p1
-    net signal ~ r1.p2
+    r1.p1 ~ vcc
+    r1.p2 ~ sig
 '''
 
 

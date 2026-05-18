@@ -1,0 +1,65 @@
+{
+  "provider": "jlcpcb",
+  "parts": [
+    {
+      "lcsc_id": "C25076",
+      "mfr_part": "RC0603FR-0710KL",
+      "manufacturer": "YAGEO",
+      "part_type": "Resistor",
+      "value": "10k",
+      "value_ohms": 10000.0,
+      "package": "0603",
+      "footprint": "R_0603_1608Metric",
+      "datasheet_url": "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf",
+      "stock": 50000,
+      "price_usd": 0.012,
+      "tolerance": "1%",
+      "power_rating_w": 0.1
+    },
+    {
+      "lcsc_id": "C26022",
+      "mfr_part": "RC0805FR-071KL",
+      "manufacturer": "YAGEO",
+      "part_type": "Resistor",
+      "value": "1k",
+      "value_ohms": 1000.0,
+      "package": "0805",
+      "footprint": "R_0805_2012Metric",
+      "datasheet_url": "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf",
+      "stock": 40000,
+      "price_usd": 0.015,
+      "tolerance": "1%",
+      "power_rating_w": 0.125
+    },
+    {
+      "lcsc_id": "C49678",
+      "mfr_part": "CL21B104KBCNNNC",
+      "manufacturer": "Samsung Electro-Mechanics",
+      "part_type": "Capacitor",
+      "value": "100n",
+      "value_ohms": null,
+      "package": "0805",
+      "footprint": "C_0805_2012Metric",
+      "datasheet_url": "https://product.samsungsem.com/mlcc/CL21B104KBCNNNC.do",
+      "stock": 60000,
+      "price_usd": 0.01,
+      "tolerance": "10%",
+      "voltage_rating_v": 50
+    },
+    {
+      "lcsc_id": "C1525",
+      "mfr_part": "CL10B104KB8NNNC",
+      "manufacturer": "Samsung Electro-Mechanics",
+      "part_type": "Capacitor",
+      "value": "100n",
+      "value_ohms": null,
+      "package": "0402",
+      "footprint": "C_0402_1005Metric",
+      "datasheet_url": "https://product.samsungsem.com/mlcc/CL10B104KB8NNNC.do",
+      "stock": 80000,
+      "price_usd": 0.007,
+      "tolerance": "10%",
+      "voltage_rating_v": 10
+    }
+  ]
+}

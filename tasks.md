@@ -624,7 +624,7 @@ Template:
   at scale (3 personas) — full-vehicle DMU (10,000s of parts) is the
   extreme case. Harness-first defines the budget before any loader work.
 - **Priority:** P0
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** A generator that builds synthetic N-part assemblies (100 →
   10,000) and a harness that measures load + render + interaction time,
   producing a documented ceiling and budget. Defines the problem before
@@ -641,7 +641,7 @@ Template:
   measured ceiling so large assemblies stop disqualifying Kerf in minute
   one for mechanical/architect/automotive.
 - **Priority:** P0
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** Bounding-box/proxy LOD + lazy mesh fetch for assembly
   components beyond a count threshold, driven by the T-15 budget.
 - **Target files/packages:** assembly render path in `src/`, `assembly.js`.

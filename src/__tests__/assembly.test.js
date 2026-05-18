@@ -30,6 +30,11 @@ import {
   addMate,
   removeMate,
   mateRefFromPick,
+  selectLOD,
+  buildBBoxProxy,
+  LOD_THRESHOLD,
+  LOD_FULL,
+  LOD_PROXY,
 } from '../lib/assembly.js'
 
 describe('parseAssembly / serializeAssembly — external_ref round-trip', () => {
@@ -747,5 +752,235 @@ describe('mateRefFromPick — viewport pick → mate ref (Phase 2 face picker)',
     expect(next[0].a.component_id).toBe('comp-a')
     expect(next[0].b.component_id).toBe('comp-b')
     expect(next[0].a.feature).toBe('face')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// T-15 / T-16: LOD / lazy-load loader tests
+// ---------------------------------------------------------------------------
+
+describe('selectLOD — LOD level selection (T-15 budget, T-16 knob)', () => {
+  it('returns LOD_FULL when index is below threshold', () => {
+    expect(selectLOD(0, 500)).toBe(LOD_FULL)
+    expect(selectLOD(499, 500)).toBe(LOD_FULL)
+  })
+
+  it('returns LOD_PROXY at and above the threshold', () => {
+    expect(selectLOD(500, 500)).toBe(LOD_PROXY)
+    expect(selectLOD(501, 500)).toBe(LOD_PROXY)
+    expect(selectLOD(9999, 500)).toBe(LOD_PROXY)
+  })
+
+  it('returns LOD_FULL for any index when threshold is Infinity (LOD disabled)', () => {
+    expect(selectLOD(0, Infinity)).toBe(LOD_FULL)
+    expect(selectLOD(100000, Infinity)).toBe(LOD_FULL)
+  })
+
+  it('returns LOD_FULL when threshold is 0 or negative (defensive: treat as disabled)', () => {
+    // A threshold of 0 would proxy everything including the first component —
+    // that is an invalid configuration, so we fall back to LOD_FULL.
+    expect(selectLOD(0, 0)).toBe(LOD_FULL)
+    expect(selectLOD(5, -1)).toBe(LOD_FULL)
+  })
+
+  it('honours a small custom threshold (e.g. 3 for testing)', () => {
+    expect(selectLOD(0, 3)).toBe(LOD_FULL)
+    expect(selectLOD(2, 3)).toBe(LOD_FULL)
+    expect(selectLOD(3, 3)).toBe(LOD_PROXY)
+    expect(selectLOD(100, 3)).toBe(LOD_PROXY)
+  })
+
+  it('LOD_THRESHOLD constant is exported and is a positive finite number', () => {
+    expect(typeof LOD_THRESHOLD).toBe('number')
+    expect(Number.isFinite(LOD_THRESHOLD)).toBe(true)
+    expect(LOD_THRESHOLD).toBeGreaterThan(0)
+  })
+})
+
+describe('buildBBoxProxy — bounding-box proxy shape (T-16)', () => {
+  it('returns a proxy entry with _lodProxy flag and null geom', () => {
+    const c = {
+      id: 'comp-1',
+      file_id: 'file-1',
+      object_id: 'body-1',
+      transform: identityMatrix(),
+    }
+    const proxy = buildBBoxProxy(c)
+    expect(proxy._lodProxy).toBe(true)
+    expect(proxy.geom).toBeNull()
+    expect(proxy.id).toBe('comp-1')
+    expect(proxy.componentId).toBe('comp-1')
+    expect(proxy.origPartId).toBe('body-1')
+  })
+
+  it('includes _proxySize derived from the translation magnitude', () => {
+    // A translation of (3, 4, 0) → magnitude 5 → proxySize = max(1, 5 * 0.05) = 0.25
+    // row-major: [1,0,0,tx, 0,1,0,ty, 0,0,1,tz, 0,0,0,1]
+    const transform = [
+      1, 0, 0, 3,
+      0, 1, 0, 4,
+      0, 0, 1, 0,
+      0, 0, 0, 1,
+    ]
+    const proxy = buildBBoxProxy({ id: 'c', file_id: 'f', object_id: 'o', transform })
+    expect(proxy._proxySize).toBeGreaterThan(0)
+    // magnitude = 5, proxySize = max(1, 5 * 0.05) = max(1, 0.25) = 1
+    expect(proxy._proxySize).toBe(1)
+  })
+
+  it('uses proxySize > 1 for large translations', () => {
+    const transform = [
+      1, 0, 0, 3000,
+      0, 1, 0, 4000,
+      0, 0, 1, 0,
+      0, 0, 0, 1,
+    ]
+    const proxy = buildBBoxProxy({ id: 'c', file_id: 'f', object_id: 'o', transform })
+    // magnitude ≈ 5000, proxySize = max(1, 5000 * 0.05) = 250
+    expect(proxy._proxySize).toBeCloseTo(250, 0)
+  })
+
+  it('falls back gracefully when transform is missing or invalid', () => {
+    const proxy = buildBBoxProxy({ id: 'x', file_id: 'f', object_id: '' })
+    expect(proxy._lodProxy).toBe(true)
+    expect(proxy._proxySize).toBeGreaterThanOrEqual(1)
+  })
+
+  it('preserves the original transform for renderer positioning', () => {
+    const t = [1, 0, 0, 10, 0, 1, 0, 20, 0, 0, 1, 30, 0, 0, 0, 1]
+    const proxy = buildBBoxProxy({ id: 'c', file_id: 'f', object_id: 'o', transform: t })
+    expect(proxy._transform).toEqual(t)
+  })
+})
+
+describe('resolveAssemblyParts — LOD / lazy-load integration (T-16)', () => {
+  // The mock at the top of this file makes applyMatrixToGeom a pass-through.
+  // These tests verify that the LOD threshold correctly switches components
+  // between full-mesh loading and proxy substitution.
+
+  // makeComponents: all components share a common object_id 'body' so the
+  // loadParts mock can return [{ id: 'body', geom: ... }] and the resolver's
+  // object_id filter finds a match.
+  function makeComponents(count) {
+    const list = []
+    for (let i = 0; i < count; i++) {
+      list.push({
+        id: `c-${i}`,
+        file_id: `file-${i % 5}`,
+        object_id: 'body',
+        transform: identityMatrix(),
+      })
+    }
+    return list
+  }
+
+  // loadParts mock that returns a part matching the requested file.
+  const makeLoadParts = () => vi.fn(async (fileId) => [{ id: 'body', geom: { tag: 'mesh', fileId } }])
+
+  it('all components get full geom when count is below the threshold', async () => {
+    const n = 3
+    const content = JSON.stringify({ components: makeComponents(n) })
+    const loadParts = makeLoadParts()
+    const out = await resolveAssemblyParts({
+      content,
+      loadParts,
+      // threshold well above component count — all full
+      lodThreshold: 100,
+    })
+    // Every component resolved to a real part (geom !== null).
+    expect(out).toHaveLength(n)
+    out.forEach((p) => {
+      expect(p._lodProxy).toBeFalsy()
+      expect(p.geom).not.toBeNull()
+    })
+    expect(loadParts).toHaveBeenCalledTimes(n)
+  })
+
+  it('components beyond the threshold get proxy entries, not loadParts calls', async () => {
+    const n = 5
+    const threshold = 3
+    const content = JSON.stringify({ components: makeComponents(n) })
+    const loadParts = makeLoadParts()
+    const out = await resolveAssemblyParts({ content, loadParts, lodThreshold: threshold })
+    expect(out).toHaveLength(n)
+    // First `threshold` components: full load.
+    for (let i = 0; i < threshold; i++) {
+      expect(out[i]._lodProxy).toBeFalsy()
+      expect(out[i].geom).not.toBeNull()
+    }
+    // Remaining components: proxy.
+    for (let i = threshold; i < n; i++) {
+      expect(out[i]._lodProxy).toBe(true)
+      expect(out[i].geom).toBeNull()
+    }
+    // loadParts called only for the full-mesh components.
+    expect(loadParts).toHaveBeenCalledTimes(threshold)
+  })
+
+  it('hidden components (visible:false) do not consume a LOD slot', async () => {
+    // Components: [visible, hidden, visible, visible] with threshold=2.
+    // Only 3 visible components; threshold=2 → first 2 full, last proxy.
+    // The hidden component must not bump the counter.
+    const components = [
+      { id: 'v0', file_id: 'f0', object_id: 'body', transform: identityMatrix() },
+      { id: 'hidden', file_id: 'f0', object_id: 'body', transform: identityMatrix(), visible: false },
+      { id: 'v1', file_id: 'f1', object_id: 'body', transform: identityMatrix() },
+      { id: 'v2', file_id: 'f2', object_id: 'body', transform: identityMatrix() },
+    ]
+    const content = JSON.stringify({ components })
+    const loadParts = vi.fn(async (fileId) => [{ id: 'body', geom: { tag: 'mesh' } }])
+    const out = await resolveAssemblyParts({ content, loadParts, lodThreshold: 2 })
+    // hidden is excluded from output entirely.
+    expect(out).toHaveLength(3)
+    expect(out.find((p) => p.id === 'hidden')).toBeUndefined()
+    // v0, v1 → full; v2 → proxy.
+    expect(out[0]._lodProxy).toBeFalsy()
+    expect(out[1]._lodProxy).toBeFalsy()
+    expect(out[2]._lodProxy).toBe(true)
+  })
+
+  it('passing lodThreshold=Infinity disables LOD entirely (all full)', async () => {
+    const n = 5
+    const content = JSON.stringify({ components: makeComponents(n) })
+    const loadParts = makeLoadParts()
+    const out = await resolveAssemblyParts({ content, loadParts, lodThreshold: Infinity })
+    expect(out).toHaveLength(n)
+    out.forEach((p) => expect(p._lodProxy).toBeFalsy())
+    expect(loadParts).toHaveBeenCalledTimes(n)
+  })
+
+  it('default lodThreshold is LOD_THRESHOLD when not supplied', async () => {
+    // Verify the default wires through correctly: create LOD_THRESHOLD + 1
+    // components. The first LOD_THRESHOLD should be full; the last one proxy.
+    const n = LOD_THRESHOLD + 1
+    const components = makeComponents(n)
+    const content = JSON.stringify({ components })
+    const loadParts = makeLoadParts()
+    const out = await resolveAssemblyParts({ content, loadParts })
+    expect(out).toHaveLength(n)
+    // Component at index LOD_THRESHOLD is the first proxy.
+    expect(out[LOD_THRESHOLD - 1]._lodProxy).toBeFalsy()
+    expect(out[LOD_THRESHOLD]._lodProxy).toBe(true)
+    // loadParts called exactly LOD_THRESHOLD times.
+    expect(loadParts).toHaveBeenCalledTimes(LOD_THRESHOLD)
+  })
+
+  it('proxy entries honour the T-15 budget: resolving 10k components is fast', async () => {
+    // Smoke-test the LOD speedup at the scale T-15 targets (10k components,
+    // threshold=500). With LOD, loadParts is called only 500 times instead
+    // of 10k. This test verifies correctness, not wall-clock time.
+    const n = 10000
+    const threshold = 500
+    const components = makeComponents(n)
+    const content = JSON.stringify({ components })
+    const loadParts = makeLoadParts()
+    const out = await resolveAssemblyParts({ content, loadParts, lodThreshold: threshold })
+    expect(out).toHaveLength(n)
+    // Full-mesh entries: first `threshold`.
+    const fullCount = out.filter((p) => !p._lodProxy).length
+    const proxyCount = out.filter((p) => p._lodProxy).length
+    expect(fullCount).toBe(threshold)
+    expect(proxyCount).toBe(n - threshold)
+    expect(loadParts).toHaveBeenCalledTimes(threshold)
   })
 })

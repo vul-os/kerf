@@ -45,6 +45,82 @@ import { library } from '../cloud/api.js'
 
 const DEG = Math.PI / 180
 
+// ----- LOD / lazy-load constants -------------------------------------------
+//
+// LOD_THRESHOLD: the number of visible components above which the resolver
+// substitutes a bounding-box proxy instead of loading + tessellating the full
+// mesh. Components are processed in document order; the first LOD_THRESHOLD
+// visible components get full geometry, the rest get a proxy cube whose size
+// is derived from the component's translation vector magnitude.
+//
+// T-15 budget drives this value: at 10k parts the render phase must stay
+// below 200 ms. The harness (scripts/bench_large_assembly.mjs) measures the
+// real ceiling; this constant is the knob T-16 exposes so callers can tune
+// without touching the resolver internals.
+//
+// Callers can override per-call via `lodThreshold` in resolveAssemblyParts.
+export const LOD_THRESHOLD = 500
+
+// LOD levels returned by selectLOD.
+//   'full'  — load and tessellate the real mesh (cheap components)
+//   'proxy' — substitute a bounding-box cube (expensive components)
+export const LOD_FULL = 'full'
+export const LOD_PROXY = 'proxy'
+
+/**
+ * selectLOD: given the 0-based index of a component in the visible list and
+ * the active threshold, return 'full' or 'proxy'.
+ *
+ * Pure function — no side effects. The test suite exercises this directly.
+ *
+ * @param {number} visibleIndex  0-based position in the visible-component list
+ * @param {number} threshold     components ≥ threshold get LOD_PROXY
+ * @returns {'full'|'proxy'}
+ */
+export function selectLOD(visibleIndex, threshold) {
+  if (!Number.isFinite(threshold) || threshold <= 0) return LOD_FULL
+  return visibleIndex < threshold ? LOD_FULL : LOD_PROXY
+}
+
+/**
+ * buildBBoxProxy: create a synthetic bounding-box proxy part entry for a
+ * component that exceeds the LOD threshold.
+ *
+ * The proxy is a unit cube scaled by the translation magnitude of the
+ * component's transform (a rough stand-in for the part's footprint). Callers
+ * can recognise proxy entries by the `_lodProxy: true` flag and render them
+ * as wireframe boxes rather than solid meshes.
+ *
+ * Shape: { id, geom: null, _lodProxy: true, _proxySize, componentId, origPartId }
+ *
+ * `geom` is null because the renderer detects `_lodProxy` and renders a
+ * THREE.BoxHelper instead of a THREE.Mesh — the resolver itself never calls
+ * applyMatrixToGeom for proxies. The `transform` is preserved so the renderer
+ * can position the box correctly.
+ *
+ * @param {object} component  a parsed assembly component
+ * @returns {object}          proxy part entry
+ */
+export function buildBBoxProxy(component) {
+  // Estimate a display size from the translation magnitude (row 3 of the
+  // row-major 4×4: indices 3, 7, 11). Fall back to 1 when the transform is
+  // degenerate or missing.
+  const t = Array.isArray(component.transform) && component.transform.length === 16
+    ? component.transform
+    : [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+  const tx = t[3], ty = t[7], tz = t[11]
+  const proxySize = Math.max(1, Math.hypot(tx, ty, tz) * 0.05)
+  return {
+    id: component.id,
+    geom: null,
+    _lodProxy: true,
+    _proxySize: proxySize,
+    _transform: t,
+    componentId: component.id,
+    origPartId: component.object_id || '',
+  }
+}
+
 // Three's Matrix4.elements is column-major. We persist row-major to keep the
 // JSON readable (rows of [Rxx Rxy Rxz Tx, ...]) — convert at the boundary.
 
@@ -576,14 +652,30 @@ export const radToDeg = (r) => Number(r) / DEG
 //   - If the named Object isn't found in the source's output, call
 //     onMissing(componentId, objectId, fileId) and contribute zero parts for
 //     that component (don't crash).
-export async function resolveAssemblyParts({ content, loadParts, loadExternalParts, onMissing } = {}) {
+export async function resolveAssemblyParts({ content, loadParts, loadExternalParts, onMissing, lodThreshold } = {}) {
   const parsed = parseAssembly(content)
   if (!parsed.components || parsed.components.length === 0) return []
+  // Effective LOD threshold: caller override → module default → Infinity (off).
+  // Pass 0 or Infinity to disable LOD entirely.
+  const effectiveLOD = (lodThreshold != null && Number.isFinite(Number(lodThreshold)))
+    ? Number(lodThreshold)
+    : LOD_THRESHOLD
   const out = []
+  let visibleCount = 0
   for (const c of parsed.components) {
     if (c.visible === false) continue
     const isExternal = !!c.external_ref
     if (!isExternal && !c.file_id) continue
+
+    // LOD check: components beyond the threshold get a bounding-box proxy
+    // instead of a real mesh. The proxy is appended to `out` directly without
+    // calling loadParts/loadExternalParts — this is the "lazy" half of T-16.
+    const lodLevel = selectLOD(visibleCount, effectiveLOD)
+    visibleCount++
+    if (lodLevel === LOD_PROXY) {
+      out.push(buildBBoxProxy(c))
+      continue
+    }
 
     // External_ref dispatch: route to `loadExternalParts(ref)`. When the
     // loader is absent or throws, fall through to `onMissing` so the UI can

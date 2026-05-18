@@ -2797,7 +2797,7 @@ graceful degrade when the binary is absent (same pattern as CuraEngine).
 - **Tier:** A
 - **Money/reach rationale:** Mechanical + automotive fatigue analysis (2 personas). The ASTM E1049 rainflow test is the only failing case in the 43-test reference-value suite; it must be green before fatigue_fem ships as a public analysis type.
 - **Priority:** P2
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped (already landed pre-session 5f84916; marker reconciled)
 - **Scope:** Diagnose and fix the `fatigue_fem._rainflow` implementation so it matches the ASTM E1049 4-point rainflow-counting algorithm. Re-enable the previously skipped test in `test_fem_refvalues.py`. Pure Python; no external solver needed. One function, one test.
 - **Target files/packages:** `packages/kerf-fem/src/kerf_fem/fatigue_fem.py` (`_rainflow`), `packages/kerf-fem/tests/test_fem_refvalues.py` (unskip the ASTM E1049 case).
 - **Definition of Done:** the previously skipped test passes; the fix matches the ASTM E1049 counting table (cycles, ranges, means) to the documented tolerance; no other tests regressed; pytest green.

@@ -278,12 +278,10 @@ export function WorkshopListing() {
         if (cancelled) return
         setListing(resp)
         setError(null)
-        const pid = resp?.project_id
-        if (pid) {
-          api.workshopImages.list(pid).then((g) => {
-            if (!cancelled) setGalleryImages(g?.images || [])
-          }).catch(() => {})
-        }
+        // Files-in-repo: gallery images come from the listing payload
+        // (image files under the project's `workshop/` folder), not a
+        // separate DB-gallery fetch.
+        setGalleryImages(Array.isArray(resp?.images) ? resp.images : [])
       })
       .catch((err) => {
         if (cancelled) return
@@ -407,6 +405,18 @@ export function WorkshopListing() {
                   />
                 </div>
               </Card>
+            )}
+
+            {/* Files-in-repo 3D model: a designated workshop model file
+                opens in the editor's reliable 3D viewer. */}
+            {listing?.model_file_id && listing?.project_id && (
+              <Link
+                to={`/projects/${listing.project_id}/files/${listing.model_file_id}`}
+                className="inline-flex items-center gap-2 self-start px-3 py-1.5 rounded-lg border border-kerf-300/40 bg-kerf-300/10 text-xs text-kerf-200 hover:bg-kerf-300/20 transition-colors"
+              >
+                <GitFork size={13} className="rotate-90" />
+                View 3D model{listing.model_name ? ` · ${listing.model_name}` : ''}
+              </Link>
             )}
 
             {/* Tab bar: README (primary) | Gallery (optional, hidden when empty) */}

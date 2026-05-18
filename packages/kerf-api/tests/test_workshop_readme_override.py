@@ -45,8 +45,7 @@ def _call(readme_col, readme_file_content):
         patch("kerf_api.routes.get_pool_required", AsyncMock(return_value=pool)),
         patch("kerf_api.routes.projects_queries.get_public_project",
               AsyncMock(return_value=proj)),
-        patch("kerf_api.routes._enrich_with_primary_images",
-              AsyncMock(return_value=[proj])),
+        patch("kerf_api.routes._attach_workshop_media", AsyncMock(return_value=None)),
     ]
     for cm in cms:
         cm.start()

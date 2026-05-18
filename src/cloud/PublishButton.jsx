@@ -27,7 +27,6 @@ import {
 } from 'lucide-react'
 import Button from '../components/Button.jsx'
 import Input, { Textarea } from '../components/Input.jsx'
-import WorkshopImageGallery from '../components/WorkshopImageGallery.jsx'
 import { api, ApiError } from '../lib/api.js'
 import { workshop } from './api.js'
 
@@ -267,12 +266,19 @@ function PublishModal({ open, onClose, project, onPublished, captureSnapshot }) 
                   )}
                 </div>
               )}
-              {/* Gallery is optional — no "required" label or validation */}
+              {/* Files-in-repo: gallery + 3D model come from the project
+                  itself (GitHub-style), not a separate uploader. */}
               <div>
                 <p className="text-xs text-ink-400 mb-2">
-                  Gallery images <span className="text-ink-600">(optional)</span>
+                  Gallery &amp; 3D <span className="text-ink-600">(optional)</span>
                 </p>
-                <WorkshopImageGallery projectId={project.id} />
+                <p className="text-[11px] leading-relaxed text-ink-500 rounded-lg border border-ink-800 bg-ink-900/50 px-3 py-2">
+                  Add a <code className="text-ink-300">workshop/</code> folder
+                  to this project: image files there show in the gallery, and a
+                  model file (e.g. <code className="text-ink-300">workshop.jscad</code>)
+                  becomes the 3D view. A <code className="text-ink-300">cover.png</code>
+                  overrides the auto-generated cover.
+                </p>
               </div>
             </div>
           )}

@@ -3,49 +3,12 @@
 -- Original migrations folded into this file are delimited below;
 -- SQL is byte-exact and applied in the original order.
 
--- ════════════ folded: 052_project_workshop_images.sql ════════════
-
--- project_workshop_images: Thingiverse-style multi-image gallery
--- attached to a project for Workshop publishing. Complements the
--- existing single thumbnail_storage_key (auto-captured from the editor);
--- gallery images are uploader-curated cover art.
---
--- Caps enforced at upload time in kerf-api:
---   * 10 images per project
---   * 5 MB per image
---   * JPEG / PNG / WebP only
-
-create table if not exists project_workshop_images (
-    id              uuid primary key default gen_random_uuid(),
-    project_id      uuid not null references projects(id) on delete cascade,
-    sort_order      integer not null default 0,
-    storage_key     text not null,
-    caption         text,
-    width_px        integer,
-    height_px       integer,
-    bytes           integer,
-    created_at      timestamptz not null default now()
-);
-
-create index if not exists project_workshop_images_project_idx
-    on project_workshop_images(project_id, sort_order);
-
--- ════════════ folded: 055_workshop_primary_image.sql ════════════
-
--- Add is_primary flag to project_workshop_images.
--- At most one image per project may be primary (enforced via partial
--- unique index). When is_primary = true the image is used as the
--- project tile + Workshop browse-grid thumbnail instead of the
--- auto-captured thumbnail_storage_key; the auto-capture becomes a
--- fallback shown only when no gallery image is pinned.
-
-alter table project_workshop_images
-  add column if not exists is_primary boolean not null default false;
-
--- Partial unique index: at most one primary per project.
-create unique index if not exists workshop_images_primary_uniq
-  on project_workshop_images(project_id)
-  where is_primary;
+-- Workshop media is now files-in-repo (GitHub-style): images live as
+-- files under a project `workshop/` folder and the cover is a repo
+-- cover.* file (with the auto-generated thumbnail as the default).
+-- The old DB-backed `project_workshop_images` gallery was retired —
+-- since DBs are reset, the table is simply dropped from this baseline
+-- rather than left as dead schema.
 
 -- ════════════ folded: 061_user_github_id.sql ════════════
 

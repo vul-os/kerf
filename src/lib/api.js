@@ -200,43 +200,8 @@ export const api = {
     return res.json()
   },
 
-  // ---- Workshop Gallery Images ----
-  // Multi-image gallery on a project, separate from the single auto-
-  // captured `thumbnail_storage_key`. Drives the Workshop publish flow's
-  // cover-art picker + the public listing's image carousel.
-  workshopImages: {
-    list: (pid) => request(`/api/projects/${pid}/workshop-images`),
-    upload: async (pid, file, caption) => {
-      const fd = new FormData()
-      fd.append('file', file)
-      if (caption) fd.append('caption', caption)
-      const url = `${API_URL}/api/projects/${pid}/workshop-images`
-      const token = useAuth.getState().accessToken
-      const headers = {}
-      if (token) headers.authorization = `Bearer ${token}`
-      let res = await fetch(url, { method: 'POST', headers, body: fd })
-      if (res.status === 401 && useAuth.getState().refreshToken) {
-        try {
-          const newToken = await refreshAccessToken()
-          headers.authorization = `Bearer ${newToken}`
-          res = await fetch(url, { method: 'POST', headers, body: fd })
-        } catch { /* fall through */ }
-      }
-      if (!res.ok) {
-        const text = await res.text().catch(() => '')
-        throw new ApiError(res.status, text || res.statusText)
-      }
-      return res.json()
-    },
-    remove: (pid, id) =>
-      request(`/api/projects/${pid}/workshop-images/${id}`, { method: 'DELETE' }),
-    update: (pid, id, patch) =>
-      request(`/api/projects/${pid}/workshop-images/${id}`, { method: 'PATCH', body: patch }),
-    // Toggle this image as the gallery primary.  Calling it on the already-
-    // primary image unpins it (toggle semantics — matches the backend).
-    setPrimary: (pid, id) =>
-      request(`/api/projects/${pid}/workshop-images/${id}/set-primary`, { method: 'POST' }),
-  },
+  // Workshop gallery is files-in-repo now (image files under a project
+  // `workshop/` folder); the old DB-gallery endpoints were retired.
 
   // ---- Files / Assemblies ----
   listFiles: (projectId) => request(`/api/projects/${projectId}/files`),

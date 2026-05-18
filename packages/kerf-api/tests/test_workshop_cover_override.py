@@ -45,8 +45,7 @@ def _call(cover_col, readme_file, cover_file):
         patch("kerf_api.routes.get_pool_required", AsyncMock(return_value=pool)),
         patch("kerf_api.routes.projects_queries.get_public_project",
               AsyncMock(return_value=proj)),
-        patch("kerf_api.routes._enrich_with_primary_images",
-              AsyncMock(return_value=[proj])),
+        patch("kerf_api.routes._attach_workshop_media", AsyncMock(return_value=None)),
     ]
     for cm in cms:
         cm.start()
@@ -86,8 +85,7 @@ def test_generated_cover_still_emits_cover_url_without_override_lookup():
         patch("kerf_api.routes.get_pool_required", AsyncMock(return_value=pool)),
         patch("kerf_api.routes.projects_queries.get_public_project",
               AsyncMock(return_value=proj)),
-        patch("kerf_api.routes._enrich_with_primary_images",
-              AsyncMock(return_value=[proj])),
+        patch("kerf_api.routes._attach_workshop_media", AsyncMock(return_value=None)),
     ]
     for cm in cms:
         cm.start()

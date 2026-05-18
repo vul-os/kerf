@@ -1319,7 +1319,7 @@ Tier A (single persona unlock), render / SubD / direct-edit → Tier B
 ### T-106a Scene translator + materials mapping (Kerf Body → Blender Cycles)
 - **Tier:** B
 - **Priority:** P2
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped (already landed pre-session bf1b4be/2b17161/5f8ffe1; reconciled)
 - **Scope:** Translate a Kerf scene (Body topology + camera + lights +
   materials) into Blender format. Path: export Kerf Body via glTF →
   import in Blender via `bpy.ops.import_scene.gltf` → map Kerf PBR

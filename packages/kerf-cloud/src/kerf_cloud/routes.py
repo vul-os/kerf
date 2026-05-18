@@ -19,7 +19,12 @@ from kerf_core.db.connection import get_pool_required
 from kerf_core.dependencies import require_auth
 from kerf_core.storage import get_storage_required
 from kerf_core.storage.s3 import S3Storage
-from kerf_core.storage.git_storer import S3GitStorer, StorerConcurrencyError
+from kerf_core.storage.git_storer import (
+    S3GitStorer,
+    StorerConcurrencyError,
+    resolve_project_repo,
+)
+from kerf_core.storage.materialize import FileEntry, materialize_and_commit
 from kerf_core.utils.encrypt import encrypt_secret, decrypt_secret
 from kerf_cloud.github_app import app_jwt as _gh_app_jwt, installation_token as _gh_installation_token, install_url as _gh_install_url
 
@@ -106,6 +111,62 @@ async def project_name(ctx, project_id: str) -> str:
             project_id,
         )
         return row["name"] if row else ""
+
+
+async def _project_workspace_id(conn, project_id) -> Optional[str]:
+    """The owning workspace id (recorded as first-uploader for dedup billing)."""
+    return await conn.fetchval(
+        "SELECT workspace_id FROM projects WHERE id = $1",
+        project_id,
+    )
+
+
+async def _collect_file_entries(conn, project_id) -> list[FileEntry]:
+    """Materialize the project's current file tree into ``FileEntry`` list.
+
+    Repo-relative POSIX paths are reconstructed by walking ``parent_id`` so
+    nested folders survive into the git tree. ``content`` is the file's exact
+    bytes: from the inline ``content`` column, or (when offloaded) fetched
+    once from the object store so ``materialize_and_commit`` can re-classify
+    and re-key it content-addressed (no duplication — same oid → same key).
+    """
+    rows = await conn.fetch(
+        "SELECT id, parent_id, name, kind, content, storage_key "
+        "FROM files WHERE project_id = $1 AND deleted_at IS NULL",
+        project_id,
+    )
+    by_id = {r["id"]: r for r in rows}
+
+    def _full_path(row) -> str:
+        segs = [row["name"]]
+        seen = set()
+        cur = row["parent_id"]
+        while cur is not None and cur not in seen:
+            seen.add(cur)
+            parent = by_id.get(cur)
+            if parent is None:
+                break
+            segs.append(parent["name"])
+            cur = parent["parent_id"]
+        return "/".join(reversed(segs))
+
+    storage = get_storage_required()
+    entries: list[FileEntry] = []
+    for r in rows:
+        if r["kind"] == "folder":
+            continue
+        if r["storage_key"]:
+            stream, _ct = await storage.get(r["storage_key"])
+            try:
+                content = stream.read()
+            finally:
+                close = getattr(stream, "close", None)
+                if callable(close):
+                    close()
+        else:
+            content = (r["content"] or "").encode("utf-8")
+        entries.append(FileEntry(path=_full_path(r), content=content))
+    return entries
 
 
 @router.post("/projects/{pid}/git/init")
@@ -362,7 +423,10 @@ async def git_commit(
     if not message:
         raise HTTPException(status_code=400, detail="message is required")
 
-    branch = body.get("branch", "").strip()
+    branch = (body.get("branch", "") or "").strip() or "main"
+
+    storage_inst = get_storage_required()
+    loc = resolve_project_repo(pid, storage_inst)
 
     pool = await get_pool_required()
     async with pool.acquire() as conn:
@@ -373,27 +437,201 @@ async def git_commit(
         if not user_row:
             raise HTTPException(status_code=400, detail="user not found")
 
-        sha = secrets.token_hex(20)
+        ws_id = await _project_workspace_id(conn, pid)
+        entries = await _collect_file_entries(conn, pid)
+
+        # If the canonical repo lives in S3, hydrate the server-local working
+        # copy first so the new commit chains onto existing history. (Local
+        # backend: the repo dir IS canonical — nothing to clone.)
+        if loc.s3_prefix is not None:
+            if not isinstance(storage_inst, S3Storage):
+                raise HTTPException(
+                    status_code=503,
+                    detail="git commit requires S3 storage backend for this project",
+                )
+            storer = S3GitStorer(storage_inst, storage_inst.bucket, loc.s3_prefix)
+            try:
+                await asyncio.get_event_loop().run_in_executor(
+                    None, storer.clone_to_local, loc.repo_dir
+                )
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+
+        # ── Ordering: git + blob ledger FIRST, cloud_git_commits LAST ──
+        # materialize_and_commit writes the content-addressed blobs, the
+        # blob_objects/blob_refs ledger, then the real git commit. Only after
+        # that durable commit succeeds do we append the cloud_git_commits
+        # row. A crash between the two can at worst leave a real commit with
+        # no cloud_git_commits row (re-derivable from refs / a retry) — it can
+        # NEVER leave cloud_git_commits pointing at a sha that does not exist
+        # in the repo. The ledger is therefore never ahead of git.
+        try:
+            mat = await materialize_and_commit(
+                repo_dir=loc.repo_dir,
+                files=entries,
+                project_id=pid,
+                workspace_id=ws_id,
+                storage=storage_inst,
+                db_conn=conn,
+                message=message,
+                author_name=user_row["name"] or "Kerf",
+                author_email=user_row["email"] or "noreply@kerf.dev",
+                branch=branch,
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"commit failed: {e}")
+
+        sha = mat.commit_sha
+
+        # Push the working copy back to the canonical S3 store (refs LAST).
+        if loc.s3_prefix is not None:
+            try:
+                await asyncio.get_event_loop().run_in_executor(
+                    None, storer.push_from_local, loc.repo_dir
+                )
+            except StorerConcurrencyError as e:
+                raise HTTPException(status_code=409, detail=str(e))
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
 
         await conn.execute(
             """
             INSERT INTO cloud_git_commits (project_id, sha, message, author_name, author_email, branch)
             VALUES ($1, $2, $3, $4, $5, $6)
             """,
-            pid, sha, message, user_row["name"], user_row["email"], branch or "main",
+            pid, sha, message, user_row["name"], user_row["email"], branch,
         )
 
-        if branch:
-            await conn.execute(
-                """
-                UPDATE cloud_git_branches SET head_sha = $3 WHERE project_id = $1 AND name = $2
-                """,
-                pid, branch, sha,
-            )
+        await conn.execute(
+            """
+            UPDATE cloud_git_branches SET head_sha = $3 WHERE project_id = $1 AND name = $2
+            """,
+            pid, branch, sha,
+        )
+        await conn.execute(
+            """
+            UPDATE cloud_git_repos SET head_sha = $2 WHERE project_id = $1
+            """,
+            pid, sha,
+        )
 
     return {
         "sha": sha,
-        "branch": branch or "main",
+        "branch": branch,
+        "tree_sha": mat.tree_sha,
+        "blobs": mat.blobs,
+        "inlined": mat.inlined,
+    }
+
+
+@router.post("/projects/{pid}/git/fork")
+async def git_fork(
+    request: Request,
+    payload: dict = Depends(require_auth),
+    pid: Optional[str] = None,
+):
+    """Cheap-fork the project's git repo into ``target_project_id``.
+
+    The fork gets its OWN bare repo (its own refs/objects, independent
+    history) but every offloaded large file is shared by reference: the
+    object store is content-addressed (``blobs/<oid>``), so we copy NO blob
+    bytes — we only add ``blob_refs`` rows for the fork pointing at the same
+    oids the source already wrote. Near-zero marginal storage for the Nth
+    fork of a STEP-heavy project, which is the commercial point of T-125.
+
+    Ordering note: the git object copy happens before the blob_refs inserts;
+    a crash mid-way leaves only extra/absent ref rows (idempotent on retry,
+    GC-safe) and never a ref to a missing object.
+    """
+    user_id = payload.get("sub")
+    await require_editor(request, pid, user_id)
+
+    body = await request.json()
+    target_project_id = (body.get("target_project_id", "") or "").strip()
+    if not target_project_id:
+        raise HTTPException(status_code=400, detail="target_project_id is required")
+
+    # Caller must also be able to write the fork target.
+    await require_editor(request, target_project_id, user_id)
+
+    storage_inst = get_storage_required()
+    src_loc = resolve_project_repo(pid, storage_inst)
+    dst_loc = resolve_project_repo(target_project_id, storage_inst)
+
+    def _copy_repo(src_dir: str, dst_dir: str) -> None:
+        # A bare repo is a self-contained directory tree. Copying it gives
+        # the fork its own refs/objects; the LFS pointers inside the tree
+        # still resolve to the SAME content-addressed object-store keys, so
+        # no blob bytes are duplicated.
+        import shutil
+
+        if not os.path.isdir(src_dir):
+            raise FileNotFoundError(f"source repo not found: {src_dir}")
+        if os.path.isdir(dst_dir):
+            shutil.rmtree(dst_dir)
+        shutil.copytree(src_dir, dst_dir)
+
+    pool = await get_pool_required()
+    async with pool.acquire() as conn:
+        # Hydrate the source working copy from S3 if that is canonical.
+        if src_loc.s3_prefix is not None:
+            if not isinstance(storage_inst, S3Storage):
+                raise HTTPException(
+                    status_code=503,
+                    detail="git fork requires S3 storage backend for this project",
+                )
+            src_storer = S3GitStorer(
+                storage_inst, storage_inst.bucket, src_loc.s3_prefix
+            )
+            await asyncio.get_event_loop().run_in_executor(
+                None, src_storer.clone_to_local, src_loc.repo_dir
+            )
+
+        try:
+            await asyncio.get_event_loop().run_in_executor(
+                None, _copy_repo, src_loc.repo_dir, dst_loc.repo_dir
+            )
+        except FileNotFoundError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+        # Share objects by reference: add a blob_refs row for the fork at
+        # every (oid, path) the source already references. No storage.put,
+        # no second byte-copy. Idempotent via ON CONFLICT.
+        src_refs = await conn.fetch(
+            "SELECT oid, path FROM blob_refs WHERE project_id = $1", pid
+        )
+        for r in src_refs:
+            await conn.execute(
+                """
+                INSERT INTO blob_refs (oid, project_id, path)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (oid, project_id, path) DO NOTHING
+                """,
+                r["oid"], target_project_id, r["path"],
+            )
+
+        # Push the fork's own repo to its canonical S3 prefix.
+        if dst_loc.s3_prefix is not None:
+            dst_storer = S3GitStorer(
+                storage_inst, storage_inst.bucket, dst_loc.s3_prefix
+            )
+            try:
+                await asyncio.get_event_loop().run_in_executor(
+                    None, dst_storer.push_from_local, dst_loc.repo_dir
+                )
+            except StorerConcurrencyError as e:
+                raise HTTPException(status_code=409, detail=str(e))
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+
+    return {
+        "source_project_id": pid,
+        "target_project_id": target_project_id,
+        "shared_objects": len(src_refs),
     }
 
 

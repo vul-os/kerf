@@ -1,4 +1,9 @@
 from .base import Storage, PutResult
+from .git_storer import (
+    ProjectRepoLocation,
+    project_git_prefix,
+    resolve_project_repo,
+)
 from .local import LocalStorage
 from .s3 import S3Storage
 
@@ -35,4 +40,13 @@ def create_storage(
     raise ValueError(f"Unknown storage backend: {backend} (expected local|s3|filesystem)")
 
 
-__all__ = ["Storage", "PutResult", "LocalStorage", "S3Storage", "create_storage"]
+__all__ = [
+    "Storage",
+    "PutResult",
+    "LocalStorage",
+    "S3Storage",
+    "create_storage",
+    "ProjectRepoLocation",
+    "project_git_prefix",
+    "resolve_project_repo",
+]

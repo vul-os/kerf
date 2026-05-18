@@ -40,7 +40,9 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
+import tempfile
 import time
+from dataclasses import dataclass
 from typing import Iterable
 
 import pygit2
@@ -53,9 +55,83 @@ _BATCH_DELETE_MAX = 1000
 # Sentinel object whose ETag is used for optimistic concurrency.
 _MARKER_NAME = "_marker"
 
+# Object-store key prefix under which a project's bare git repo lives. The
+# `{pid}` segment is the project UUID; this is the single source of truth for
+# both the S3 prefix and the on-disk working-copy path so the cloud-git
+# handlers and the materialize spine never disagree about repo location.
+_PROJECT_GIT_PREFIX_TMPL = "workspaces/{pid}/git"
+
 
 class StorerConcurrencyError(RuntimeError):
     """Raised when a push lost an optimistic-concurrency race."""
+
+
+@dataclass(frozen=True)
+class ProjectRepoLocation:
+    """Where a project's bare git repo lives.
+
+    ``repo_dir`` is a filesystem path to the (bare) repo that ``pygit2`` /
+    ``materialize_and_commit`` operate on directly. For the local storage
+    backend this *is* the canonical home; for S3 it is a server-local working
+    copy that ``S3GitStorer`` syncs to/from ``s3_prefix``.
+
+    ``s3_prefix`` is the object-store key prefix (``workspaces/{pid}/git``)
+    used by ``S3GitStorer``; ``None`` for the local backend (nothing to sync
+    through S3 — the on-disk layout is already git-native).
+    """
+
+    repo_dir: str
+    s3_prefix: str | None
+
+
+def project_git_prefix(project_id) -> str:
+    """Canonical object-store key prefix for a project's bare git repo.
+
+    A pure function of the project id so the commit handler, the
+    push/pull/fork paths and any future GC all agree on one location.
+    """
+    return _PROJECT_GIT_PREFIX_TMPL.format(pid=project_id)
+
+
+def resolve_project_repo(
+    project_id,
+    storage,
+    *,
+    local_root: str | None = None,
+) -> ProjectRepoLocation:
+    """Resolve the on-disk repo dir (and S3 prefix, if any) for a project.
+
+    The repo-location seam the materialize INTEGRATION NOTE calls for: a
+    single resolver the cloud-git handler threads its ``Storage`` backend
+    through so it never has to know whether the repo is filesystem-native
+    (local install) or an S3-synced working copy (hosted).
+
+    * ``LocalStorage`` — the bare repo lives *inside* the storage root under
+      ``workspaces/{pid}/git`` (same shape as the S3 prefix), so it sits
+      next to that project's content-addressed blobs and survives process
+      restarts. ``s3_prefix`` is ``None``: nothing to sync.
+    * ``S3Storage`` — the canonical repo is the S3 prefix
+      ``workspaces/{pid}/git``; ``repo_dir`` is a stable server-local
+      working copy (under ``local_root`` or a temp dir) that the caller
+      clones into / pushes from via ``S3GitStorer``.
+    """
+    prefix = project_git_prefix(project_id)
+
+    root = getattr(storage, "root", None)
+    if root is not None:
+        # LocalStorage exposes ``root`` (a resolved Path). Keep the repo
+        # inside it so blobs + refs share one durable directory tree.
+        return ProjectRepoLocation(
+            repo_dir=os.path.join(str(root), *prefix.split("/")),
+            s3_prefix=None,
+        )
+
+    # S3-backed: canonical store is the prefix; repo_dir is a working copy.
+    base = local_root or os.path.join(
+        tempfile.gettempdir(), "kerf-git-worktrees"
+    )
+    repo_dir = os.path.join(base, str(project_id) + ".git")
+    return ProjectRepoLocation(repo_dir=repo_dir, s3_prefix=prefix)
 
 
 class S3GitStorer:
@@ -67,6 +143,15 @@ class S3GitStorer:
     @classmethod
     def from_s3storage(cls, s3storage, repo_prefix: str) -> "S3GitStorer":
         return cls(s3storage, s3storage.bucket, repo_prefix)
+
+    @classmethod
+    def for_project(cls, s3storage, project_id) -> "S3GitStorer":
+        """Construct the storer for a project using the repo-location seam.
+
+        Single call-site for the ``workspaces/{pid}/git`` prefix so the
+        push/pull/fork handlers cannot drift from each other.
+        """
+        return cls(s3storage, s3storage.bucket, project_git_prefix(project_id))
 
     def _s3_key(self, rel_path: str) -> str:
         return f"{self._prefix}/{rel_path}".replace("\\", "/")

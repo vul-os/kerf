@@ -55,3 +55,13 @@ def _register_tools(ctx, provides: list) -> None:
         provides.append("wiring.svg")
     except Exception as exc:
         logger.warning("kerf-wiring: failed to load run_wireviz tool: %s", exc)
+
+    try:
+        from kerf_wiring.tools.route_harness_3d import (
+            route_harness_3d_spec,
+            route_harness_3d,
+        )
+        ctx.tools.register("route_harness_3d", route_harness_3d_spec, route_harness_3d)
+        provides.append("wiring.harness3d")
+    except Exception as exc:
+        logger.warning("kerf-wiring: failed to load route_harness_3d tool: %s", exc)

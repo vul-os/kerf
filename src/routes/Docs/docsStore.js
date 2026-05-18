@@ -43,10 +43,34 @@ export const useDocs = create((set, get) => ({
   },
 }))
 
-function flattenManifest(manifest) {
+// The v2 manifest emits BOTH shapes: a grouped sidebar projection
+// (`groups[].items`, intentionally WITHOUT `body` — and including Domains
+// route-links that are not articles) and a flat list (`items`/`entries`, the
+// COMPLETE records *with* `body`). Article rendering reads `entry.body`, so the
+// flat list is the source of truth here; the sidebar consumes `manifest.groups`
+// separately via groupTaxonomy. The previous implementation walked `groups`
+// first and marked every slug seen, so the body-bearing flat entries were all
+// skipped — every article rendered blank. Prefer the flat list; fall back to
+// group items only for a true legacy grouped-only manifest (no flat list).
+export function flattenManifest(manifest) {
   if (!manifest) return []
   const out = []
   const seen = new Set()
+
+  const flat = Array.isArray(manifest.items)
+    ? manifest.items
+    : Array.isArray(manifest.entries)
+      ? manifest.entries
+      : null
+  if (flat) {
+    for (const e of flat) {
+      if (!e || !e.slug || seen.has(e.slug)) continue
+      seen.add(e.slug)
+      out.push(e)
+    }
+    return out
+  }
+
   if (Array.isArray(manifest.groups)) {
     for (const g of manifest.groups) {
       for (const item of g.items || []) {
@@ -54,13 +78,6 @@ function flattenManifest(manifest) {
         seen.add(item.slug)
         out.push({ ...item, group: item.group || g.label })
       }
-    }
-  }
-  if (Array.isArray(manifest.entries)) {
-    for (const e of manifest.entries) {
-      if (!e || !e.slug || seen.has(e.slug)) continue
-      seen.add(e.slug)
-      out.push(e)
     }
   }
   return out

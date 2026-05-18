@@ -1013,7 +1013,7 @@ Template:
   path + clear on-ramp grows the widest possible top-of-funnel for the
   smallest incremental effort.
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped (integrated this session)
 - **Scope:** Polish the simple-parametric + cut-list / flat-pack path and
   add a clear on-ramp for the education/maker/hobbyist persona: a guided
   "design a part / enclosure / furniture piece + get a cut list" flow that

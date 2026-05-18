@@ -3,7 +3,7 @@ import {
   ChevronDown, ChevronRight,
   FileCode, Folder, FolderOpen, Layers,
   FilePlus, FolderPlus, Plus, Trash2, Box, Upload, Ruler, PenTool, X, RefreshCw,
-  Package, Cylinder, CircuitBoard, Loader2, AlertCircle, Variable, FileBox, Cable, Scissors, Wrench, SquareCode, Grid3x3, Printer,
+  Package, Cylinder, CircuitBoard, Loader2, AlertCircle, Variable, FileBox, Cable, Scissors, Wrench, SquareCode, Grid3x3, Printer, Search,
 } from 'lucide-react'
 import { useWorkspace } from '../store/workspace.js'
 import { FreeCADImportDialog, isFCStdFile } from './FreeCADImport.jsx'
@@ -396,99 +396,166 @@ const KIND_ROWS = {
 // import-only / synthetic and intentionally absent here.
 const KIND_ORDER = ['folder', 'file', 'sketch', 'assembly', 'drawing', 'feature', 'section', 'cam_layered', 'part', 'circuit', 'equations', 'wiring', 'tool', 'plc_st', 'quadmesh']
 
-// CreateMenu — single "+ New" dropdown that replaces the row of icon
-// buttons in the FileTree header. Shows the full union of canonical
-// kinds; STEP import is appended as a separate row. Closes on
-// click-outside / Escape.
-function CreateMenu({ onCreate, openImportPicker, openKicadPicker, openFreecadPicker }) {
-  const [open, setOpen] = useState(false)
-  const wrapRef = useRef(null)
-  const visibleKinds = KIND_ORDER
+// Import entries shown alongside the create-kinds in the New file dialog.
+const IMPORT_ROWS = [
+  { id: '__step',    icon: Upload,       label: 'Upload STEP',   hint: 'Import binary CAD (.step / .stp)', color: 'text-cyan-edge' },
+  { id: '__kicad',   icon: CircuitBoard, label: 'Import KiCad',  hint: '.kicad_sch / .kicad_pcb',          color: 'text-cyan-edge' },
+  { id: '__freecad', icon: FileBox,      label: 'Import FreeCAD', hint: '.FCStd — FreeCAD 0.19+',          color: 'text-orange-300' },
+]
 
-  useEffect(() => {
-    if (!open) return
-    const onDoc = (e) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false)
-    }
-    const onKey = (e) => { if (e.key === 'Escape') setOpen(false) }
-    window.addEventListener('mousedown', onDoc)
-    window.addEventListener('keydown', onKey)
-    return () => {
-      window.removeEventListener('mousedown', onDoc)
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [open])
-
-  const pick = (action) => {
-    setOpen(false)
-    setTimeout(action, 0)
-  }
-
-  return (
-    <div ref={wrapRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-ink-200 hover:text-kerf-300 hover:bg-ink-800 border border-ink-700 hover:border-ink-600"
-        title="Create a new file or folder, or import a STEP file"
-      >
-        <Plus size={12} />
-        <span>New</span>
-        <ChevronDown size={11} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-      {open && (
-        <div
-          className="absolute right-0 top-full mt-1 z-40 min-w-[220px] bg-ink-850 border border-ink-700 rounded-md shadow-lg py-1"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {visibleKinds.map((kind, i) => {
-            const row = KIND_ROWS[kind]
-            // Insert a separator after the last basic (folder/file) entry
-            // when transitioning to the domain-specific kinds — preserves
-            // the visual grouping the menu had pre-refactor.
-            const isBasic = kind === 'file' || kind === 'folder'
-            const prevBasic = i > 0 && (visibleKinds[i - 1] === 'file' || visibleKinds[i - 1] === 'folder')
-            const showSeparator = !isBasic && prevBasic
-            return (
-              <span key={kind}>
-                {showSeparator && <div className="my-1 border-t border-ink-800" />}
-                <CreateRow
-                  icon={row.icon}
-                  label={row.label}
-                  hint={row.hint}
-                  color={row.color}
-                  onClick={() => pick(() => onCreate?.(null, kind))}
-                />
-              </span>
-            )
-          })}
-          <div className="my-1 border-t border-ink-800" />
-          <CreateRow icon={Upload} label="Upload STEP" hint="import binary CAD" color="text-cyan-edge"
-            onClick={() => pick(() => openImportPicker?.())} />
-          <CreateRow icon={CircuitBoard} label="Import KiCad" hint=".kicad_sch / .kicad_pcb" color="text-cyan-edge"
-            onClick={() => pick(() => openKicadPicker?.())} />
-          <CreateRow icon={FileBox} label="Import FreeCAD" hint=".FCStd — FreeCAD 0.19+" color="text-orange-300"
-            onClick={() => pick(() => openFreecadPicker?.())} />
-        </div>
-      )}
-    </div>
-  )
-}
-
-function CreateRow({ icon: Icon, label, hint, color = 'text-ink-200', onClick }) {
+// CreateCard — one selectable tile in the New file dialog grid.
+function CreateCard({ icon: Icon, label, hint, color = 'text-ink-200', onClick }) {
   return (
     <button
       type="button"
       onClick={onClick}
       title={hint ? `${label} — ${hint}` : label}
-      className="w-full flex items-start gap-2.5 px-3 py-1.5 text-left hover:bg-ink-800 group"
+      className="flex flex-col items-start gap-1 rounded-xl border border-ink-800 bg-ink-950/30 p-3 text-left transition-colors hover:border-ink-600 hover:bg-ink-800/40 min-h-[72px]"
     >
-      <Icon size={14} className={`mt-0.5 ${color}`} />
-      <span className="flex-1 min-w-0">
-        <span className="block text-[12px] text-ink-100 group-hover:text-kerf-200">{label}</span>
-        {hint && <span className="block text-[10px] text-ink-400 leading-tight">{hint}</span>}
+      <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-ink-100">
+        <Icon size={14} className={color} />
+        {label}
       </span>
+      {hint && <span className="text-[10px] leading-snug text-ink-400">{hint}</span>}
     </button>
+  )
+}
+
+// CreateMenu — "+ New" opens a friendly, searchable, responsive dialog
+// (replaces the long dropdown). Every canonical kind is offered as a
+// card plus an Import group; type to filter. Escape / backdrop closes.
+function CreateMenu({ onCreate, openImportPicker, openKicadPicker, openFreecadPicker }) {
+  const [open, setOpen] = useState(false)
+  const [q, setQ] = useState('')
+  const searchRef = useRef(null)
+
+  useEffect(() => {
+    if (!open) { setQ(''); return }
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false) }
+    window.addEventListener('keydown', onKey)
+    const t = setTimeout(() => searchRef.current?.focus(), 30)
+    return () => { window.removeEventListener('keydown', onKey); clearTimeout(t) }
+  }, [open])
+
+  const close = () => setOpen(false)
+  const pick = (action) => { setOpen(false); setTimeout(action, 0) }
+
+  const ql = q.trim().toLowerCase()
+  const match = (label, hint) =>
+    !ql || label.toLowerCase().includes(ql) || (hint || '').toLowerCase().includes(ql)
+
+  const kinds = KIND_ORDER.filter((k) => {
+    const r = KIND_ROWS[k]
+    return r && match(r.label, r.hint)
+  })
+  const imports = IMPORT_ROWS.filter((r) => match(r.label, r.hint))
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-ink-200 hover:text-kerf-300 hover:bg-ink-800 border border-ink-700 hover:border-ink-600"
+        title="Create a new file or folder, or import CAD"
+      >
+        <Plus size={12} />
+        <span>New</span>
+      </button>
+      {open && (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="New file"
+        >
+          <div
+            className="absolute inset-0 bg-ink-950/80 backdrop-blur-sm"
+            onClick={close}
+            aria-hidden
+          />
+          <div className="relative w-full max-w-xl bg-ink-900 border border-ink-800 rounded-2xl shadow-2xl shadow-black/50 flex flex-col max-h-[80vh]">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-ink-800">
+              <h2 className="font-display text-lg font-semibold tracking-tight">New file</h2>
+              <button
+                type="button"
+                onClick={close}
+                className="text-ink-400 hover:text-ink-100 transition-colors"
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="px-5 pt-4">
+              <div className="flex items-center gap-2 h-9 px-2.5 rounded-lg border border-ink-800 bg-ink-950/40 focus-within:border-kerf-300/40">
+                <Search size={13} className="shrink-0 text-ink-500" />
+                <input
+                  ref={searchRef}
+                  type="text"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Search file types…"
+                  className="flex-1 bg-transparent outline-none text-[13px] text-ink-100 placeholder:text-ink-500"
+                />
+              </div>
+            </div>
+            <div className="px-5 py-4 overflow-y-auto">
+              {kinds.length > 0 && (
+                <>
+                  <p className="mb-2 text-[11px] font-mono uppercase tracking-wider text-ink-500">
+                    Create
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {kinds.map((k) => {
+                      const r = KIND_ROWS[k]
+                      return (
+                        <CreateCard
+                          key={k}
+                          icon={r.icon}
+                          label={r.label}
+                          hint={r.hint}
+                          color={r.color}
+                          onClick={() => pick(() => onCreate?.(null, k))}
+                        />
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+              {imports.length > 0 && (
+                <>
+                  <p className="mb-2 mt-5 text-[11px] font-mono uppercase tracking-wider text-ink-500">
+                    Import
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {imports.map((r) => {
+                      const act =
+                        r.id === '__step' ? openImportPicker
+                        : r.id === '__kicad' ? openKicadPicker
+                        : openFreecadPicker
+                      return (
+                        <CreateCard
+                          key={r.id}
+                          icon={r.icon}
+                          label={r.label}
+                          hint={r.hint}
+                          color={r.color}
+                          onClick={() => pick(() => act?.())}
+                        />
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+              {kinds.length === 0 && imports.length === 0 && (
+                <p className="py-6 text-center text-[12px] text-ink-500">
+                  No file types match “{q}”.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 

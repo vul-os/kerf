@@ -53,6 +53,57 @@ create table if not exists cloud_user_balances (
     credits_usd numeric(12, 4) not null default 0
 );
 
+-- ── cloud_invoices + cloud_debit_balance(): the Paystack top-up ledger and
+--    the credit accountant.  Both are *used* by kerf-billing
+--    (billing/handlers.py, billing/webhooks.py, routes.py) and kerf-cloud
+--    (usage.py) but were never created by any migration — the billing test
+--    suite asserts SQL strings against a fake recording pool, so the gap
+--    never surfaced in CI.  On a real fresh/reset DB every top-up and every
+--    metered debit 500s ("relation cloud_invoices does not exist").  Folded
+--    in here as clean baseline DDL.
+--
+-- cloud_invoices: one row per Paystack transaction. `reference` is the
+-- client-visible uuid that the webhook reconciles against; status walks
+-- pending → success | abandoned. amounts: USD is the billed currency,
+-- ZAR is what Paystack settles, fx_rate is the spread-adjusted rate used.
+-- paystack_response stores the raw verified webhook body for audit.
+create table if not exists cloud_invoices (
+    id                uuid primary key default gen_random_uuid(),
+    user_id           uuid not null references users(id) on delete cascade,
+    reference         text not null unique,
+    status            text not null default 'pending'
+                          check (status in ('pending','success','abandoned')),
+    amount_usd        numeric(12, 4) not null,
+    amount_zar        numeric(12, 4) not null,
+    fx_rate           numeric(12, 6) not null,
+    paystack_response jsonb,
+    paid_at           timestamptz,
+    created_at        timestamptz not null default now()
+);
+create index if not exists cloud_invoices_user_idx
+    on cloud_invoices(user_id, created_at desc);
+create index if not exists cloud_invoices_reference_idx
+    on cloud_invoices(reference);
+
+-- cloud_debit_balance(user, amount): the credit accountant.  Subtracts
+-- `amount` USD from the user's credit balance, upserting the row at
+-- `-amount` when the user has no balance row yet (registers them in debit).
+-- A negative `amount` therefore CREDITS — that is exactly how the Paystack
+-- success path tops a user up: cloud_debit_balance(uid, -amount_usd).  This
+-- is byte-for-byte the inline upsert documented in kerf-billing/spend.py
+-- (which open-codes the same SQL so it works on a fresh OSS DB).  Returns
+-- the resulting balance; all callers invoke it via `SELECT` and ignore it.
+create or replace function cloud_debit_balance(p_user_id uuid, p_amount numeric)
+returns numeric
+language sql
+as $$
+    insert into cloud_user_balances (user_id, credits_usd)
+    values (p_user_id, -p_amount)
+    on conflict (user_id) do update
+        set credits_usd = cloud_user_balances.credits_usd - p_amount
+    returning credits_usd;
+$$;
+
 -- ── api_tokens: pre-existing (migration 025).  Asserted-only.
 
 -- ─────────────────────────────────────────────────────────────────────

@@ -88,6 +88,7 @@ const SLUG_TO_GROUP = {
   'billing-and-credits': 'cloud',
   'account-and-auth':    'cloud',
   'file-revisions':      'cloud',
+  'saving-your-work':    'cloud',
   'local-self-host':     'cloud',
   'cloud':               'cloud',
   'cloud-operator':      'cloud',

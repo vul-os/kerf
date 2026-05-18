@@ -225,6 +225,22 @@ export default function Settings() {
           </div>
         </section>
 
+        {/* ── T-187 additive block — do not edit existing sections above ── */}
+        <section>
+          <h2 className="text-sm font-semibold text-ink-100 mb-1">Data &amp; saving</h2>
+          <p className="text-xs text-ink-400 mb-2">
+            Kerf protects your work at three independent layers: local stash, server
+            autosave, and git commits.
+          </p>
+          <a
+            href="/docs/saving-your-work"
+            className="inline-flex items-center gap-1 text-xs text-kerf-300 hover:underline underline-offset-2"
+          >
+            How saving works →
+          </a>
+        </section>
+        {/* ── end T-187 block ── */}
+
         {/* Danger zone */}
         <section className="border border-red-400/30 rounded-md p-4 bg-red-400/5">
           <h2 className="text-sm font-semibold text-red-300 mb-1 flex items-center gap-2">

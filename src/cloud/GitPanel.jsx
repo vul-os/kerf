@@ -558,6 +558,14 @@ function EmptyState({ githubLogin, onInit, onConnect }) {
             back upstream.
           </p>
         )}
+        {/* ── T-187 additive block — do not edit existing JSX above ── */}
+        <a
+          href="/docs/saving-your-work"
+          className="mt-4 inline-flex items-center gap-1 text-[10px] text-kerf-300/70 hover:text-kerf-300 underline-offset-2 hover:underline"
+        >
+          How saving works — L1 · L2 · L3
+        </a>
+        {/* ── end T-187 block ── */}
       </div>
     </div>
   )

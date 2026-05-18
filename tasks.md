@@ -1124,7 +1124,7 @@ Template:
   Kerf's existing NURBS strength, so a cheap P3 proof seed that broadens
   sector coverage.
 - **Priority:** P3
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped (integrated this session)
 - **Scope:** A hull-surface fairing helper that builds a lofted hull from
   station offsets and reports fairness via the existing curvature-comb
   infra — close to Kerf's NURBS strength, hence a good early P3 pick.

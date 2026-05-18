@@ -5125,7 +5125,25 @@ async def workshop_get(
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
         enriched = await _enrich_with_primary_images(conn, [project])
-        project = enriched[0]
+        project = dict(enriched[0])
+
+        # Workshop convention (files-in-repo = source of truth): a
+        # project README.md file overrides the DB `readme` column. The
+        # auto-generated thumbnail/cover stay the DEFAULT; a repo file
+        # overrides it. Resolved on the detail path only (single
+        # project) — the browse grid keeps the cheap generated default.
+        readme_row = await conn.fetchrow(
+            """
+            SELECT content FROM files
+            WHERE project_id = $1 AND lower(name) = 'readme.md'
+              AND kind = 'file' AND deleted_at IS NULL
+            ORDER BY (parent_id IS NULL) DESC, updated_at DESC
+            LIMIT 1
+            """,
+            project_id,
+        )
+        if readme_row and (readme_row["content"] or "").strip():
+            project["readme"] = readme_row["content"]
 
     return _project_to_workshop_row(project)
 

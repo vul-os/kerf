@@ -2986,7 +2986,7 @@ the detailed spec; these T-NN entries are the execution-queue handles.
 - **Tier:** B
 - **Money/reach rationale:** 2D region boolean (sketch-driven solid extrude/pocket without OCCT) is the key enabler for a pure-Python parametric workflow that operates without the OCCT worker. Unlocks the full in-process sketch→solid path.
 - **Priority:** P2
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** `geom/region2d.py` — union/diff/intersection on planar closed curve loops with holes → `Face` with inner loops; then `extrude_to_body` with holes (washer, etc.). Reference: square − circle area = 1 − πr² exact; extruded washer volume = π(R²−r²)h exact; `validate_body` ok (genus per hole). Ties GK-56/57.
 - **Target files/packages:** `packages/kerf-cad-core/src/kerf_cad_core/geom/region2d.py` (new), `geom/brep_build.py` (reuse), `packages/kerf-cad-core/tests/test_region2d.py` (new).
 - **Definition of Done:** square−circle area exact; extruded washer `validate_body` ok and volume exact; loop orientation CCW/CW per contract; pytest; ties GK-56/57.
@@ -3786,7 +3786,7 @@ User-direction 2026-05-18: "look at open-source ladder logic with nice UI/UX, st
 ### T-220 PLCopen XML reader/writer — canonical IEC 61131-3 file format
 - **Tier:** A
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** pure-Python reader/writer for **PLCopen XML** (the IEC standard interchange format used by Beremiz, Codesys, OpenPLC). Each `.plc` project is a PLCopen XML doc containing one or more **POU**s (Program Organization Units) in **LD**, **ST**, **FBD**, or **IL** form. The reader produces a Python AST (dataclasses); the writer round-trips. Standardise on `.plc` extension for the whole project and `.iec` for single POUs. Folder kind: `plc` (already in files_kind_check union as `plc_ld` + `plc_st` — keep both but treat a `.plc` file as a `plc_project` kind).
 - **Target files/packages:** `packages/kerf-plc/src/kerf_plc/plcopen/__init__.py` (NEW), `packages/kerf-plc/src/kerf_plc/plcopen/reader.py` (NEW), `packages/kerf-plc/src/kerf_plc/plcopen/writer.py` (NEW), `packages/kerf-plc/src/kerf_plc/plcopen/ast.py` (NEW), `packages/kerf-plc/tests/test_plcopen.py` (NEW), `packages/kerf-plc/tests/fixtures/blinker.plc` (NEW), `packages/kerf-plc/tests/fixtures/conveyor.plc` (NEW).
 - **Definition of Done:** Beremiz / OpenPLC's own example projects (`blinker.xml`, `traffic-light.xml`) round-trip byte-stable; pytest oracles on POU/Variable/Rung/Contact counts; `npm run build` clean.
@@ -3795,7 +3795,7 @@ User-direction 2026-05-18: "look at open-source ladder logic with nice UI/UX, st
 ### T-221 Ladder visual editor — SVG canvas + drag-place contacts/coils
 - **Tier:** A
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** web-based ladder diagram (LD) editor: SVG canvas, left+right rails, rungs added on click, drag-place: normally-open contact, normally-closed contact, output coil, set/reset coil, rising-edge contact, function-block (TON timer, CTU counter). Right-click to delete; left-click on a contact opens an inline name editor. Round-trips through the T-220 PLCopen XML reader/writer. Reuses existing `kerf-plc/ld/renderer.py` and `schema.py` where possible.
 - **Target files/packages:** `src/components/LadderEditor.jsx` (NEW), `src/components/LadderEditor.test.jsx` (NEW), `src/lib/ladderCanvas.js` (NEW pure-logic — rung/contact placement + collision math), `src/lib/ladderCanvas.test.js` (NEW vitest).
 - **Definition of Done:** drag any contact/coil onto the canvas, edit its variable name, save → PLCopen XML round-trips clean; right-click delete works; vitest on the placement-collision math; `npm run build` clean.
@@ -3813,7 +3813,7 @@ User-direction 2026-05-18: "look at open-source ladder logic with nice UI/UX, st
 ### T-223 IEC 61131-3 scan-cycle simulator (LD + ST)
 - **Tier:** A
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** pure-Python scan-cycle simulator. One **tick** = (1) read inputs, (2) execute POU(s) — ladder rungs left→right or ST statements top→down, (3) write outputs. Default tick = 1 ms. Supports the standard function blocks: **TON** (on-delay timer), **TOF** (off-delay timer), **CTU/CTD** (up/down counter), **R_TRIG/F_TRIG** (rising/falling edge), **RS/SR** (set-reset flip-flop). Inputs/outputs are externally injectable; the simulator publishes a state-trace per tick.
 - **Target files/packages:** `packages/kerf-plc/src/kerf_plc/simulator/__init__.py` (NEW), `packages/kerf-plc/src/kerf_plc/simulator/scan.py` (NEW), `packages/kerf-plc/src/kerf_plc/simulator/function_blocks.py` (NEW), `packages/kerf-plc/src/kerf_plc/simulator/state.py` (NEW), `packages/kerf-plc/tests/test_simulator.py` (NEW).
 - **Definition of Done:** blinker.plc (TON-driven 1 Hz square wave) runs 5 s of simulated time → exact pulse count = 10; CTU counts edges correctly; F_TRIG fires once per falling edge; pytest analytic oracles; `npm run build` clean.
@@ -3822,7 +3822,7 @@ User-direction 2026-05-18: "look at open-source ladder logic with nice UI/UX, st
 ### T-224 PLC HMI tester panel — inputs / outputs / state-trace timeline
 - **Tier:** A
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** React side-panel that runs a loaded `.plc` project against the T-223 simulator: input rows with toggle / momentary-button / numeric-spinner; output rows with lamps + numeric readouts; play/pause/step buttons; a time-series chart of inputs/outputs over the last N ticks. One-click loadbacking of `blinker.plc` and `conveyor.plc` fixtures from T-220.
 - **Target files/packages:** `src/components/PlcHmiTester.jsx` (NEW), `src/components/PlcHmiTester.test.jsx` (NEW), `src/lib/plcSimBridge.js` (NEW — fetch wrapper around a `/plc/sim/step` backend route), `src/lib/plcSimBridge.test.js` (NEW), `packages/kerf-api/src/kerf_api/routes_plc_sim.py` (NEW HTTP route around T-223), `packages/kerf-api/tests/test_routes_plc_sim.py` (NEW).
 - **Definition of Done:** loading blinker.plc → output coil pulses on the trace at the expected period; toggling an input flips outputs deterministically; pytest + vitest oracles; `npm run build` clean.

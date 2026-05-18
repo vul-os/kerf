@@ -5595,14 +5595,16 @@ async def workshop_fork(
         new_project_id = uuid.uuid4()
         await conn.execute(
             """
-            INSERT INTO projects (id, workspace_id, name, description, visibility, tags, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, 'private', $5, now(), now())
+            INSERT INTO projects (id, workspace_id, name, description, visibility, tags,
+                                  forked_from_project_id, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, 'private', $5, $6, now(), now())
             """,
             new_project_id,
             workspace["id"],
             fork_name,
             source.get("description", ""),
             list(source.get("tags") or []),
+            source_project_id,
         )
 
         # copy non-deleted files

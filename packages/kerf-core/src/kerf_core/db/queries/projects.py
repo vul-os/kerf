@@ -200,6 +200,7 @@ async def list_public_projects(
             w.name  AS workspace_name,
             u.name  AS author_name,
             COALESCE(lc.likes_count, 0) AS likes_count,
+            COALESCE(fk.forks_count, 0) AS forks_count,
             {liked_expr} AS liked_by_me
         FROM projects p
         JOIN workspaces w ON w.id = p.workspace_id
@@ -209,6 +210,12 @@ async def list_public_projects(
             FROM workshop_likes
             GROUP BY project_id
         ) lc ON lc.project_id = p.id
+        LEFT JOIN (
+            SELECT forked_from_project_id AS project_id, COUNT(*) AS forks_count
+            FROM projects
+            WHERE forked_from_project_id IS NOT NULL
+            GROUP BY forked_from_project_id
+        ) fk ON fk.project_id = p.id
         {where_clause}
         {order_clause}
         LIMIT {limit_placeholder} OFFSET {offset_placeholder}
@@ -234,6 +241,7 @@ async def get_public_project(
                 w.name  AS workspace_name,
                 u.name  AS author_name,
                 COALESCE(lc.likes_count, 0) AS likes_count,
+                COALESCE(fk.forks_count, 0) AS forks_count,
                 {liked_expr} AS liked_by_me
             FROM projects p
             JOIN workspaces w ON w.id = p.workspace_id
@@ -243,6 +251,12 @@ async def get_public_project(
                 FROM workshop_likes
                 GROUP BY project_id
             ) lc ON lc.project_id = p.id
+            LEFT JOIN (
+                SELECT forked_from_project_id AS project_id, COUNT(*) AS forks_count
+                FROM projects
+                WHERE forked_from_project_id IS NOT NULL
+                GROUP BY forked_from_project_id
+            ) fk ON fk.project_id = p.id
             WHERE p.id = $1 AND p.visibility = 'public'
             """,
             project_id,
@@ -257,6 +271,7 @@ async def get_public_project(
                 w.name  AS workspace_name,
                 u.name  AS author_name,
                 COALESCE(lc.likes_count, 0) AS likes_count,
+                COALESCE(fk.forks_count, 0) AS forks_count,
                 FALSE AS liked_by_me
             FROM projects p
             JOIN workspaces w ON w.id = p.workspace_id
@@ -266,6 +281,12 @@ async def get_public_project(
                 FROM workshop_likes
                 GROUP BY project_id
             ) lc ON lc.project_id = p.id
+            LEFT JOIN (
+                SELECT forked_from_project_id AS project_id, COUNT(*) AS forks_count
+                FROM projects
+                WHERE forked_from_project_id IS NOT NULL
+                GROUP BY forked_from_project_id
+            ) fk ON fk.project_id = p.id
             WHERE p.id = $1 AND p.visibility = 'public'
             """,
             project_id,

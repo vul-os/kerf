@@ -75,6 +75,11 @@ def _unconfigured_settings():
     s.cloud_github_app_id = ""
     s.github_private_key_pem = ""
     s.cloud_github_app_slug = "kerf-app"
+    # GitLabProvider (T-145) is now registered; neutralize its env gate so
+    # MagicMock auto-attrs don't make gitlab appear configured here.
+    s.cloud_gitlab_app_id = ""
+    s.cloud_gitlab_app_secret = ""
+    s.cloud_gitlab_host = ""
     return s
 
 
@@ -276,7 +281,10 @@ class TestGitProviderConnect:
         registry = _build_default_registry(_configured_settings())
 
         req = MagicMock()
-        req.json = AsyncMock(return_value={"provider": "gitlab"})
+        # 'gitlab' is now a real registered provider (T-145) — use a
+        # genuinely unknown name for the 404 path (matches the sibling
+        # disconnect test).
+        req.json = AsyncMock(return_value={"provider": "bitbucket"})
         req.body = AsyncMock(return_value=b"x")
 
         ps = _patches(db_conn, uid=str(uid), registry=registry)

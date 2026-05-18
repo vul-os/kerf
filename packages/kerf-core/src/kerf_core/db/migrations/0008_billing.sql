@@ -50,7 +50,7 @@ create index if not exists model_prices_cheap_tier on model_prices(cheap_tier_el
 --    that never ran the cloud bootstrap), create a sane empty shape.
 create table if not exists cloud_user_balances (
     user_id     uuid primary key references users(id) on delete cascade,
-    credits_usd numeric(12, 4) not null default 0
+    credits_usd numeric(12, 6) not null default 0
 );
 
 -- ── cloud_invoices + cloud_debit_balance(): the Paystack top-up ledger and

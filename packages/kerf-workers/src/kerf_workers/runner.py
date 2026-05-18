@@ -33,6 +33,27 @@ def _maybe_compaction_worker(pool, cloud_enabled: bool, local_mode: bool, count:
         return []
 
 
+# ── PricingRefreshWorker (model_prices from LiteLLM; lazy dep) ──────────────
+
+def _maybe_pricing_worker(pool):
+    """One PricingRefreshWorker — refreshes model_prices from LiteLLM at
+    boot then daily. Runs in every mode: the chat model dropdown and
+    billing both read model_prices, and a fresh/reset DB is EMPTY until
+    this runs (was never wired into the harness → no models / no
+    up-to-date pricing). Lazy import so a missing kerf-pricing doesn't
+    break the worker set.
+    """
+    try:
+        from kerf_pricing.worker import PricingRefreshWorker  # type: ignore
+        return [PricingRefreshWorker(pool)]
+    except ImportError:
+        logger.warning("kerf-workers: kerf_pricing not installed; skipping PricingRefreshWorker")
+        return []
+    except Exception:
+        logger.exception("kerf-workers: failed to create PricingRefreshWorker")
+        return []
+
+
 class DummyStorage:
     async def get(self, key: str):
         raise NotImplementedError("storage not configured")
@@ -143,6 +164,9 @@ def _build_workers(
                                  pyworker_url=pyworker_url, timeout=cam_timeout))
     # CompactionWorker: cloud-tier only; _maybe_compaction_worker gates it.
     workers.extend(_maybe_compaction_worker(pool, cloud_enabled, local_mode, compaction_count))
+    # PricingRefreshWorker: keeps model_prices current (boot + daily) so
+    # the chat model dropdown + billing work.
+    workers.extend(_maybe_pricing_worker(pool))
     return workers
 
 

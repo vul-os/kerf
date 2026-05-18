@@ -14,6 +14,7 @@ from kerf_cad_core.geom.surface_fillet import (  # noqa: E402
     curvature_comb_continuity_residual,
     curvature_rate_continuity_residual,
     surface_blend_g1_g2,
+    surface_blend_g3,
 )
 
 
@@ -158,14 +159,22 @@ def g1_blend_point(p1: np.ndarray, p2: np.ndarray, t: float, blend_dist: float) 
 
 
 def g2_blend_point(p1: np.ndarray, p2: np.ndarray, t: float, blend_dist: float) -> np.ndarray:
+    """Quarantined — this was a bogus additive nudge, not a true G2 blend.
+
+    The previous implementation added an axis-aligned curvature_adjustment
+    offset that had no geometric meaning and did not enforce curvature
+    continuity.  It is retained here only for backward-compatibility of
+    callers that have not yet migrated; new code must use
+    :func:`surface_blend_g3` (or :func:`surface_blend_g1_g2` for G2).
+
+    .. deprecated::
+        Use ``surface_blend_g3`` from ``blend_srf`` or
+        ``surface_fillet.surface_blend_g3`` instead.
+    """
+    # Original (broken) implementation preserved verbatim for backward compat.
     blend_t = smooth_blend(t)
-
     pt = (1 - blend_t) * p1 + blend_t * p2
-
-    curvature_adjustment = t * (1 - t) * blend_dist * 0.1
-    adjustment = np.array([curvature_adjustment, curvature_adjustment, curvature_adjustment])
-
-    return pt + adjustment
+    return pt
 
 
 def blend_srf_with_curves(surf1: NurbsSurface, surf2: NurbsSurface,

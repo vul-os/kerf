@@ -3645,7 +3645,7 @@ User reported 2026-05-18: adding a "Sun" light in the Render panel has zero visi
 ### T-207 HDRI sky preset library — clear / overcast / sunset / studio / night
 - **Tier:** B
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** curate 5 royalty-free 1-2K HDRIs (clear, overcast, sunset, studio, night) and wire them as one-click presets in `SkySettings.jsx` (T-205) under the `hdri` mode. Apply via the existing PMREM environment path. Each preset names its source/license inline.
 - **Target files/packages:** `public/hdri/` (NEW assets), `src/lib/hdriPresets.js` (NEW), `src/components/HdriPicker.jsx` (NEW), small additive change in `Renderer.jsx` to swap the environment from the picker. Vitest for the pure-logic list.
 - **Definition of Done:** picking each preset swaps the env map within ~1 s; PBR materials respond to each; vitest on the preset registry; `npm run build` clean.

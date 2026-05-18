@@ -1106,7 +1106,7 @@ Template:
   This is the proof-of-"we do everything" civil seed; reach is long-term,
   hence ranked at the tail.
 - **Priority:** P3
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped (integrated this session)
 - **Scope:** The foundational *distinct* civil engine: a coordinate
   reference system module (EPSG transform via pyproj) + a TIN terrain model
   from survey points with contour extraction. Civil is **not** a feature-add

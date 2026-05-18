@@ -113,6 +113,12 @@ const SLUG_TO_GROUP = {
   'troubleshooting':     'develop',
   'releasing':           'develop',
 
+  // Domains / specialised packages
+  'silicon':             'reference',
+  'firmware':            'reference',
+  'aerospace':           'reference',
+  'plc':                 'reference',
+
   // What's new
   'whats-new':           'whats-new',
 }

@@ -3014,7 +3014,7 @@ depth and listed in ROADMAP §3 P2 / §3.5.
 - **Tier:** A
 - **Money/reach rationale:** GD&T MBD (product and manufacturing information embedded in the 3D model) is required for aerospace, automotive, and defence homologation. Mechanical + automotive personas (2 large paying workforces). GD&T frames already render; this task adds the standards-compliant MBD layer.
 - **Priority:** P2
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** Extend the shipped GD&T callout system (T-27) into a full model-based definition package: (a) 3D tolerance annotations attached to `Body` faces/edges (not just drawings) readable as a structured MBD dataset; (b) `export_qif` LLM tool emitting a QIF (Quality Information Framework) XML containing all PMI annotations, suitable for CMM import; (c) a homologation document generator that extracts all datums + tolerances from the model and emits a structured report (PDF-ready via a templating step). Builds on the shipped `kerf_cad_core.gdt_callouts`.
 - **Target files/packages:** `packages/kerf-cad-core/src/kerf_cad_core/gdt_callouts/` (extend to 3D MBD), `packages/kerf-cad-core/src/kerf_cad_core/mbd.py` (new — MBD dataset), `packages/kerf-imports/src/kerf_imports/qif_writer.py` (new — QIF export), `packages/kerf-cad-core/llm_docs/mbd.md` (new), tests.
 - **Definition of Done:** a model with datums + tolerances exports a valid QIF XML (validate against QIF schema); the homologation report lists all annotations in order; pytest with fixture model.
@@ -3044,7 +3044,7 @@ depth and listed in ROADMAP §3 P2 / §3.5.
 - **Tier:** A
 - **Money/reach rationale:** 1D system simulation (thermal / hydraulic / electrical / control networks) covers mechanical, electronics, and automotive ECU personas. Modelica is a declarative text-native language — the highest AI-native fit of any physics domain. ROADMAP §3.5 item; not yet ticketed. P2 moat.
 - **Priority:** P2
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** Seed `packages/kerf-sysmodel/` with: (a) a Modelica subset parser (`.mo` files — equations, components, connectors, basic standard library stubs: Electrical, Mechanical.Translational, Thermal); (b) a DAE (differential-algebraic equation) solver using `scipy.integrate.solve_ivp` with index reduction; (c) result visualisation via a `plot_sysmodel_result` LLM tool (time-series output); (d) an `explain_sysmodel_result` tool. Reference tests: RC circuit step response — time constant τ=RC exact; spring-mass-damper natural frequency vs analytic formula. No full MSL standard library — seed the subset needed for the reference tests only; `graceful-degrade` when `scipy` is absent. Cite `casadi` or `assimulo` as optional heavy-solver backends for the follow-on.
 - **Target files/packages:** `packages/kerf-sysmodel/src/kerf_sysmodel/` (new — `parser.py`, `dae_solver.py`, `tools.py`), `packages/kerf-sysmodel/tests/` (new), `packages/kerf-sysmodel/llm_docs/sysmodel.md`.
 - **Definition of Done:** RC circuit and spring-mass-damper references pass; DAE solver handles the reference models; Modelica-subset `.mo` file parses and simulates; `plot_sysmodel_result` returns a time-series dict; pytest analytic oracles; scipy-absent → sentinel.
@@ -3132,7 +3132,7 @@ sector. Establishes the foothold; deeper depth tasks follow in the same T-NN ser
 - **Tier:** B
 - **Money/reach rationale:** T-71 seeded hull fairing. This task adds the hydrostatics + stability analysis that a naval architect actually needs: displacement, metacentric height (GM), righting lever (GZ) curve, trim + heel. High technical value on top of the NURBS seed.
 - **Priority:** P3
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** Extend `packages/kerf-cad-core/` (or a new `packages/kerf-naval/`) with: a `HullHydrostatics` module that computes displacement, LCB, VCB, BM, GM, and the GZ righting-lever curve at a series of heel angles via numerical integration over the hull surface; a `stability_report` LLM tool that summarises IMO A.749 criteria (minimum GM, GZ area, max GZ angle). Reference tests: a prismatic hull of known length/beam/draft → displacement = ρgV exact; rectangular barge GM = B²/12d exact.
 - **Target files/packages:** `packages/kerf-naval/src/kerf_naval/hydrostatics.py` (new), `packages/kerf-naval/src/kerf_naval/stability.py` (new), `packages/kerf-naval/tests/`, `packages/kerf-naval/llm_docs/naval.md`.
 - **Definition of Done:** prismatic hull displacement exact; rectangular barge GM exact; GZ curve has correct sign change at the angle of vanishing stability; pytest analytic oracles.
@@ -3152,7 +3152,7 @@ sector. Establishes the foothold; deeper depth tasks follow in the same T-NN ser
 - **Tier:** B
 - **Money/reach rationale:** T-70 seeded CRS + TIN. The next civil engine increment is alignment (horizontal / vertical / corridor) — the core civil engineering workflow for roads and rail. P3 distinct engine.
 - **Priority:** P3
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** Extend `packages/kerf-civil/` with: a `HorizontalAlignment` model (tangent, circular arc, spiral / clothoid transition) and a `VerticalAlignment` model (grade lines + vertical parabolic curves); a `Corridor` that sweeps the cross-section assembly (carriageway, berm, ditch) along the alignment and computes cut/fill volumes via the prismatoid formula; a `plan_and_profile_sheet` exporter (DXF plan + profile sheets). Reference tests: a horizontal curve of known radius → arc length exact; a corridor over a fixture TIN → cut volume matches prismatoid formula.
 - **Target files/packages:** `packages/kerf-civil/src/kerf_civil/alignment.py` (new), `corridor.py` (new), `plan_profile.py` (new), tests, llm_docs.
 - **Definition of Done:** arc length exact; corridor volume matches prismatoid to 1%; DXF plan-and-profile opens correctly; pytest.
@@ -3162,7 +3162,7 @@ sector. Establishes the foothold; deeper depth tasks follow in the same T-NN ser
 - **Tier:** B
 - **Money/reach rationale:** Interior design / space planning / FF&E scheduling is a large workforce closely tied to the architect persona (Revit/SketchUp/AutoCAD market). High AI-native fit: spatial rules + fixture schedules are text.
 - **Priority:** P3
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** Seed `packages/kerf-interior/` with: a `SpacePlan` data model (rooms, furniture items, clearances, circulation paths); a `place_furniture` LLM tool that places FF&E from a catalogue respecting clearances and accessibility codes (ADA min turning circle); a `room_schedule` generator (area, occupancy, finish, fixture count); an `import_ff_e_catalogue` tool (CSV/JSON catalogue ingest). Reference test: a 4m × 5m bedroom with a king bed + wardrobe + desk passes ADA clearance check.
 - **Target files/packages:** `packages/kerf-interior/src/kerf_interior/` (new — `spaceplan.py`, `furniture.py`, `schedule.py`, `tools.py`), tests, llm_docs, migration for `spaceplan` kind.
 - **Definition of Done:** bedroom layout passes ADA clearance check; room schedule generates correct area + fixture count; fixture CSV catalogue ingests; pytest.
@@ -3172,7 +3172,7 @@ sector. Establishes the foothold; deeper depth tasks follow in the same T-NN ser
 - **Tier:** A
 - **Money/reach rationale:** Structural engineering (RC and steel design) is a very large and well-paying professional workforce (architects + structural engineers, both personas). Code-compliance is rule-native — high AI-native fit.
 - **Priority:** P3
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** Seed `packages/kerf-structural/` with: a `BeamDesign` tool that checks an RC or steel beam for bending, shear, and deflection per ACI 318 (RC) or AISC 360 (steel); a `ColumnDesign` tool for buckling + combined loading; a `rebar_layout` generator that places rebar in an RC section per ACI 318 cover/spacing rules; a `connection_check` for a bolted/welded steel connection per AISC. Reference tests: simply-supported RC beam under UDL — bending moment = wL²/8 exact; ACI 318 rebar placement passes the minimum cover check.
 - **Target files/packages:** `packages/kerf-structural/src/kerf_structural/` (new — `beam.py`, `column.py`, `rebar.py`, `connection.py`, `tools.py`), tests, llm_docs, migration for `structural` kind.
 - **Definition of Done:** bending moment exact; ACI cover check passes for a valid layout and fails for an invalid one; steel beam shear check matches AISC LRFD formula; pytest analytic oracles.
@@ -3182,7 +3182,7 @@ sector. Establishes the foothold; deeper depth tasks follow in the same T-NN ser
 - **Tier:** B
 - **Money/reach rationale:** Energy + daylight + acoustic analysis are increasingly mandatory in building design (building codes, LEED/BREEAM certification). Architecture persona depth; bridges to the BIM substrate.
 - **Priority:** P3
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** Seed `packages/kerf-building-performance/` with: (a) an energy analysis stub that computes simplified UA-value heat loss for a building envelope from IFC materials + areas (compare to a reference ASHRAE 90.1 U-value limit); (b) a daylight factor (DF) calculator for a room using the BRE split-flux method; (c) a room acoustics RT60 estimator (Sabine formula + Eyring correction). Each as an LLM tool. Reference tests: DF for a room with a known window area matches BRE formula; RT60 for a concrete room matches Sabine to 5%.
 - **Target files/packages:** `packages/kerf-building-performance/src/kerf_building_performance/` (new — `energy.py`, `daylight.py`, `acoustics.py`, `tools.py`), tests, llm_docs.
 - **Definition of Done:** DF matches BRE formula; RT60 matches Sabine to 5%; UA heat-loss flags a below-code envelope; pytest analytic oracles.
@@ -3192,7 +3192,7 @@ sector. Establishes the foothold; deeper depth tasks follow in the same T-NN ser
 - **Tier:** B
 - **Money/reach rationale:** Landscape architecture + site design is a distinct design discipline with its own tools (Vectorworks Landmark, AutoCAD Civil 3D landscape). Bridges T-70 civil TIN + BIM site (T-114).
 - **Priority:** P3
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** Seed `packages/kerf-landscape/` with: a `LandscapePlan` data model (planting zones, paths, grading contours, irrigation zones, hardscape areas); a `plant_schedule` generator (species, qty, size, location); a `grading_plan` tool that generates cut/fill contours from a design surface over a T-70 TIN terrain; an `irrigation_layout` helper (emitter placement + flow calculation). Reference test: a simple graded park site → cut/fill volume matches the T-70 prismatoid; plant schedule counts match the layout.
 - **Target files/packages:** `packages/kerf-landscape/src/kerf_landscape/` (new), tests, llm_docs, migration for `landscape` kind.
 - **Definition of Done:** grading cut/fill matches prismatoid; plant schedule count matches layout; irrigation total flow adds up; pytest.
@@ -3202,7 +3202,7 @@ sector. Establishes the foothold; deeper depth tasks follow in the same T-NN ser
 - **Tier:** B
 - **Money/reach rationale:** Apparel pattern-making is one of the world's largest design workforces. Pattern-making is a 2D flat-geometry problem (parametric + rules) with a drape simulation extension. P3 / ROADMAP §3 soft-goods.
 - **Priority:** P3
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** Seed `packages/kerf-apparel/` with: a `Sewing_Pattern` data model (panels, seam lines, grain lines, notches, seam allowance); parametric pattern generators for a basic bodice block + sleeve block + trouser block (size grading from measurements); a `grade_pattern` tool that scales from one size to another; a `seam_allowance_offset` tool (reuse the shipped `offset.py` curve-offset with self-intersection trim); a `pattern_marker` tool that bins panels into a fabric roll width (reuse T-53 nesting). Reference test: bodice block for a given bust measurement generates correct dart position per standard block formula; seam offset at the correct distance.
 - **Target files/packages:** `packages/kerf-apparel/src/kerf_apparel/` (new — `pattern.py`, `blocks.py`, `grading.py`, `tools.py`), tests, llm_docs, migration for `pattern` kind.
 - **Definition of Done:** bodice dart position matches standard formula; seam offset distance exact; marker bins panels within roll width; pytest.
@@ -3212,7 +3212,7 @@ sector. Establishes the foothold; deeper depth tasks follow in the same T-NN ser
 - **Tier:** B
 - **Money/reach rationale:** Microfluidics / MEMS is a high-value niche (lab-on-chip, medical diagnostics, sensors). Channel design + fabrication rules are text-native. P3 / ROADMAP §3 scientific/niche.
 - **Priority:** P3
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** Seed `packages/kerf-microfluidics/` with: a `MicrofluidicChip` data model (channels, chambers, inlets/outlets, electrodes, heaters — dimensions in µm); a `channel_flow` tool that computes pressure drop and flow resistance for a rectangular microchannel via the Hagen-Poiseuille formula (and the aspect-ratio correction for rectangular cross-sections); a `mixer_design` helper for passive T-mixer + serpentine mixer geometries; a `fabrication_check` tool that verifies minimum feature size + aspect ratio against soft-lithography design rules. Reference tests: Hagen-Poiseuille pressure drop for a rectangular 100 µm × 50 µm × 10 mm channel vs analytic formula.
 - **Target files/packages:** `packages/kerf-microfluidics/src/kerf_microfluidics/` (new — `chip.py`, `flow.py`, `mixer.py`, `fab_check.py`, `tools.py`), tests, llm_docs, migration for `microfluidics` kind.
 - **Definition of Done:** channel pressure drop matches Hagen-Poiseuille to 1%; aspect-ratio correction within 2%; fab check flags a too-narrow feature; pytest analytic oracles.

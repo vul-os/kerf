@@ -88,6 +88,22 @@ by tier below for reference, but the agent loop pulls in *this* sequence.
 | 48 | **T-107** Direct + parametric history coexistence | B | Cross-sector authoring depth (Fusion / Inventor / Onshape class); Kerf is feature-tree primary. |
 | 49 | **T-105** SubD authoring with creases + edit workflow | B | Cross-sector (jewelry / industrial-design / character / marine hull) authoring depth; `subd.py` + quad-remesh shipped, no creation/edit workflow. |
 | 50 | **T-106** Render caustics + dispersion solver | B | Cross-sector presentation depth (jewelry / automotive / architecture). PBR + HDRI + bloom shipped this session; no Cycles / V-Ray / Enscape / KeyShot-class caustic transport. |
+| 51 | **T-116** Text/code file plain-highlight | B | P0 cross-sector UX: every persona that edits `.py .js .ts .c .cpp .h .json .yaml .md` etc. in the file tree gets an editable plain-text view with basic syntax classes today; full language servers later. Zero-dependency, high-value signal; unblocks firmware + scripting personas. |
+| 52 | **T-117** Phase-1 safety net — quota tests (kerf_free / kerf_paid / byo) | A | Platform correctness: billing quota enforcement is a revenue gate; tests must cover all three billing buckets before any launch. P0. |
+| 53 | **T-118** Phase-1 safety net — billing collection with simulated clock | A | Platform correctness: billing collection logic was blocked by the missing `cloud_invoices` DDL (now fixed in 1c1127b); simulated-clock tests verify debit / invoice / grace-period state machine. P0. |
+| 54 | **T-119** Phase-1 safety net — FX tests (USD display / ZAR settle) | A | Platform correctness: exchange-rate markup and currency display are revenue-critical; tests must catch drift. P0. |
+| 55 | **T-120** Phase-1 safety net — API smoke suite | B | Platform health: a one-file hermetic smoke suite that hits the critical happy-path API endpoints (create project / file / chat / export) so a fresh DB + deploy is verified in <60 s. P0. |
+| 56 | **T-121** Phase-1 safety net — security suite (IDOR / authz / token) | A | Platform correctness: IDOR, workspace authz cross-tenant, token single-use + expiry — table-stakes before any public launch. P0. |
+| 57 | **T-122** Phase-1 safety net — harness + loop scripts (loop_local.sh / loop_dev.sh) | B | Platform correctness: one unified test harness that drives the Phase-1 suite locally and against a dev Neon DB; agents and CI both use it. P0. |
+| 58 | **T-123** Export / materialize spine — file-tree materialization + large-file autodetect | A | P0/P1 foundational: the `GET /projects/{pid}/export` route already exists (~L3622); extend it to autodetect inline (`files.content`) vs stored (`files.storage_key`) files, emit a manifest, and produce a correct zip/tar. This is the single shared spine under sync / import / git. |
+| 59 | **T-124** Git-as-substrate — content-vs-storage_key large-file autodetect + Tigris blob/pointer | A | P1 core: NOT valid UTF-8 OR size > ~1 MiB (configurable) → write blob to Tigris S3 (sha256-addressed), commit a tiny pointer file in git. Forks share blobs via content-addressed dedup. Extend the existing `files.content` / `files.storage_key` seam; do not add a new one. |
+| 60 | **T-125** Git-as-substrate — shared server-side object store + cheap forks | A | P1 core: every cloud project is a hosted git repo; implement/wire the shared git object store so forked projects share large-file blobs with near-zero marginal storage. Standard `git clone` works: yields source + pointer stubs. |
+| 61 | **T-126** Mode-agnostic client — `pip install kerf` + `kerf serve` self-host | B | P1 platform: `pip install kerf` = thin cloud client (KERF_API_URL default = cloud). `pip install 'kerf[server]'` + `kerf serve` = self-host. Self-host requires Postgres (documented BYO one-liner); `kerf serve` fails fast with a clear actionable error (prints the `docker run postgres` one-liner) when DATABASE_URL is missing or unreachable. No embedded/auto-provisioned Postgres. |
+| 62 | **T-127** `kerf sync` — two-way folder mirror (cloud ↔ local) | A | P1 platform: `kerf sync <project-id> ./local-dir` — pull/push changed files between a cloud project and a local folder. Anti-lock-in pillar; builds on the T-123 materialize spine. |
+| 63 | **T-128** `kerf export` / `kerf import` — zip/tar plain tree portability | B | P1 platform: `kerf export` emits a self-contained zip/tar of the project file tree (source + pointer stubs for large files); `kerf import` reconstitutes a project from such an archive. Symmetric cloud/local = anti-lock-in. Builds on T-123. |
+| 64 | **T-129** Ladder logic / PLC — IEC 61131-3 LD editor (complements `plc_st`) | A | P2 sector depth: extends the existing `plc_st` (ST/MATIEC) kind to LD (Ladder Diagram) — the most widely used PLC language in manufacturing. Adds a ladder rung editor + MATIEC LD lint + IEC 61131-3 export. Unlocks the PLC/automation engineer segment. |
+| 65 | **T-130** Embedded/firmware programming — broader extensions + PlatformIO-reference toolchain | A | P2 sector depth: `.ino`/`.uno` (Arduino), `.c`/`.cpp`/`.h` (general embedded), plus PlatformIO as the reference integration model (board manifest, build targets, upload/monitor). Complements T-116 (plain highlight) and T-129 (PLC). Unlocks the embedded/firmware engineer segment. |
+| 66 | **T-131** Fully-local / offline desktop — PGlite WASM-Postgres spike + Tauri (P3, demand-gated) | B | P3 post-launch: spike PGlite (WASM Postgres) + a Tauri shell as the path to a fully-local/offline desktop app. **Explicitly NOT a launch pillar.** Only begin when there is validated demand signal; zero-dependency self-host (T-126) comes first. |
 
 > Sub-tasks within a sequenced group (e.g. 5a–5e, 10a–10d, 12a–12f) keep
 > their `Depends-on` chain; the loop completes a group's prerequisites in
@@ -158,6 +174,53 @@ Template:
      backend + browser path-tracer fallback already in the body below;
      no new T-NN added — T-106f explicitly covers the
      `three-gpu-pathtracer` browser fallback. -->
+<!-- Status reconciled 2026-05-18 (planning session — architecture decisions):
+     Added T-116..T-131 for the directions resolved in the 2026-05-18
+     planning session. Decisions captured:
+     (1) Version-control substrate: every cloud project is a hosted git repo;
+         files.content (small/textual/source) live in git; large/binary files
+         AUTO-DETECTED via the existing files.content vs files.storage_key seam
+         (predicate: NOT valid UTF-8 OR size > ~1 MiB configurable) → Tigris
+         S3 sha256-addressed blob + pointer committed in git; forks share blobs
+         (content-addressed dedup) + shared server-side git object store →
+         near-zero-marginal-cost forks; standard git clone works.
+         REJECTED: Git LFS (heavy ops/UX; our autodetect + shared object store
+         already gives clone + cheap forks; LFS optional later only for
+         pathological repos).
+     (2) Install/runtime: one mode-agnostic client; ONLY difference is
+         KERF_API_URL+token. pip install kerf = thin client defaults to cloud.
+         pip install 'kerf[server]' + kerf serve = self-host; Postgres REQUIRED
+         and NOT embedded/auto-provisioned; kerf serve fails fast with the BYO
+         docker one-liner when DATABASE_URL is missing/unreachable.
+         REJECTED: SQLite for local (forks SQL dialect forever); embedded/
+         auto-provisioned Postgres (unnecessary + cross-platform maintenance
+         liability); Electron bundling server+Postgres (hides infra).
+     (3) Local sync + portability: kerf sync (two-way folder mirror), kerf
+         export / kerf import (zip/tar plain tree), symmetric cloud/local =
+         anti-lock-in. GET /projects/{pid}/export (~L3622) already exists —
+         extend, don't duplicate; materialize spine is the foundational layer.
+     In-flight state captured:
+     - dc2f2e4 docs viewer fix (flattenManifest dropped article bodies) ✅
+     - 1c1127b billing schema fix (cloud_invoices + cloud_debit_balance()
+       missing from ALL migrations; folded into 0008 baseline) ✅
+       NOTE: dev Neon schema must be drop+recreated on next deploy.
+     - Phase-1 safety net 🚧 paused: (1) docs bug ✅; (2) seed_dev.py paused;
+       (3) quota tests T-117; (4) billing collection T-118; (5) FX tests T-119;
+       (6) API smoke T-120; (7) security suite T-121; (8) harness T-122.
+     New tasks:
+     T-116 text/code plain-highlight P0 🔴;
+     T-117 quota tests P0 🔴; T-118 billing collection/clock P0 🔴;
+     T-119 FX tests P0 🔴; T-120 API smoke P0 🔴; T-121 security suite P0 🔴;
+     T-122 harness+loop scripts P0 🔴;
+     T-123 export/materialize spine P0 🔴;
+     T-124 git-as-substrate large-file autodetect+Tigris blob P1 🔴;
+     T-125 git-as-substrate shared object store+cheap forks P1 🔴;
+     T-126 mode-agnostic client pip install P1 🔴;
+     T-127 kerf sync two-way mirror P1 🔴;
+     T-128 kerf export/import zip/tar P1 🔴;
+     T-129 ladder logic / PLC IEC 61131-3 LD P2 🔴;
+     T-130 embedded/firmware + PlatformIO toolchain P2 🔴;
+     T-131 fully-local desktop PGlite+Tauri P3 🔴. -->
 
 > **Geometry kernel — depth (2026-05-17).** Major step-change landed
 > outside the T-NN backlog, on the GK-NN backlog in
@@ -1523,3 +1586,487 @@ Tier A (single persona unlock), render / SubD / direct-edit → Tier B
 - **Definition of Done:** a wall with a catalogued material renders
   via the PBR hero path + IFC round-trips its `IfcMaterial`; pytest.
 - **Depends-on:** none
+
+---
+
+## Phase-1 safety net + platform infrastructure (T-116 … T-128)
+
+Tasks surfaced in the 2026-05-18 planning session. P0 items (T-116..T-123)
+unblock safe launch and correct billing; P1 items (T-124..T-128) build the
+version-control + install + sync platform spine. Decisions and rejections
+are captured in the 2026-05-18 status comment above.
+
+### T-116 Text/code file plain-highlight (editable viewer for common extensions)
+- **Tier:** B
+- **Money/reach rationale:** Every persona that touches source code,
+  config, or documentation files benefits — firmware engineers
+  (`.c .cpp .h .ino`), electronics (`.json .yaml`), scripting
+  (`.py .js .ts`), BIM (`.md`), and plain text everywhere. Zero
+  dependency (CSS class tokens only for now); highest cross-persona
+  breadth per unit of effort. Unblocks the firmware/embedded segment
+  as a readable first step.
+- **Priority:** P0
+- **Status:** 🔴 not started
+- **Scope:** In the file editor / viewer, detect files whose `kind` or
+  extension matches the plain-highlight set (`.txt .md .c .cpp .h .hpp
+  .py .js .ts .json .yaml .yml .toml .ini .cfg .sh .ino .uno .ld .v
+  .vhd` and similar) and render them as editable plain text with a
+  lightweight syntax-class tokenizer (no LSP, no WASM). The UI should
+  show a CodeMirror or equivalent plain editor with basic token
+  colouring; full language intelligence (LSP) is a later task.
+  **Decision:** plain highlighting now; per-language syntax servers
+  later.
+- **Target files/packages:** `src/components/FileEditor.jsx` (or the
+  relevant editor component), extension→mode mapping table in
+  `src/lib/editorModes.js` (new or extend existing), a lightweight
+  tokenizer import (e.g. `@codemirror/lang-*` basic packs already in
+  the bundle or a pure-regex fallback), `src/__tests__/` vitest.
+- **Definition of Done:** opening a `.py`, `.c`, `.json`, `.md`, and
+  `.sh` file in the editor shows coloured tokens (at minimum: keywords,
+  strings, comments); the file is editable and round-trips through the
+  existing save path; no new WASM dependency; vitest asserting the
+  extension→mode mapping covers every listed extension.
+- **Depends-on:** none
+
+### T-117 Phase-1 safety net — quota tests (kerf_free / kerf_paid / byo)
+- **Tier:** A
+- **Money/reach rationale:** Billing quota enforcement is a direct
+  revenue gate — a quota bug lets free users consume paid resources
+  or blocks paying users. Affects all cloud personas. P0 platform
+  correctness.
+- **Priority:** P0
+- **Status:** 🔴 not started
+- **Scope:** Hermetic pytest suite covering all three billing buckets:
+  `kerf_free` (cheap-models-only enforcement), `kerf_paid` (credits,
+  any model, debit path), `byo` (own key, zero billing, no quota
+  check). Each bucket gets a request-dispatch test asserting the
+  correct quota response. Use the existing fake-pool pattern; no live
+  model calls.
+- **Target files/packages:** `packages/kerf-billing/tests/
+  test_quota.py` (new), `packages/kerf-billing/src/kerf_billing/
+  buckets.py` (extend if needed), `packages/kerf-chat/src/
+  kerf_chat/` (LLM dispatch path quota gate).
+- **Definition of Done:** `kerf_free` request for a non-cheap model
+  returns the quota sentinel; `kerf_paid` request for any model
+  decrements credits and returns success; `byo` request bypasses
+  billing and returns success; all three green in CI with no live
+  calls.
+- **Depends-on:** none
+
+### T-118 Phase-1 safety net — billing collection with simulated clock
+- **Tier:** A
+- **Money/reach rationale:** Billing collection correctness is a hard
+  revenue requirement — missed or double-collected invoices directly
+  hit revenue. Blocked previously by the missing `cloud_invoices` DDL
+  (fixed in commit 1c1127b); that fix is now in HEAD.
+- **Priority:** P0
+- **Status:** 🔴 not started
+- **Scope:** Pytest suite for the billing collection state machine
+  using a simulated wall clock: advance the clock through billing
+  cycle boundaries and assert that `cloud_invoices` rows are created,
+  `cloud_debit_balance()` is decremented, grace-period transitions
+  fire correctly, and a zero-balance account is suspended at the right
+  moment. Fake-pool; no live Stripe/Paystack calls.
+- **Target files/packages:** `packages/kerf-billing/tests/
+  test_collection.py` (new), `packages/kerf-billing/src/kerf_billing/
+  collection.py` (billing collection logic), `packages/kerf-cloud/
+  src/kerf_cloud/` (cloud billing wire),
+  `packages/kerf-core/src/kerf_core/db/migrations/0008_*.sql`
+  (baseline now contains `cloud_invoices` + `cloud_debit_balance()`).
+- **Definition of Done:** debit/invoice/grace/suspend state machine
+  transitions verified at T+0, T+billing_interval, T+grace_end;
+  `cloud_debit_balance()` matches expected value at each step; all
+  green in CI with no live payment-processor calls.
+- **Depends-on:** none
+
+### T-119 Phase-1 safety net — FX tests (USD display / ZAR settle)
+- **Tier:** A
+- **Money/reach rationale:** USD-display / ZAR-settle with a 20% FX
+  markup is the live pricing model; a silent FX drift bug directly
+  loses or overcharges revenue. P0 platform correctness.
+- **Priority:** P0
+- **Status:** 🔴 not started
+- **Scope:** Hermetic pytest suite asserting: (a) the USD→ZAR
+  conversion applies the documented 20% markup correctly; (b) display
+  amounts are always in USD regardless of settlement currency; (c) the
+  FX rate lookup degrades gracefully (cached fallback) when the rate
+  API is unreachable; (d) rounding is deterministic (no floating-point
+  drift across Python versions).
+- **Target files/packages:** `packages/kerf-billing/tests/test_fx.py`
+  (new), `packages/kerf-billing/src/kerf_billing/fx.py` (FX logic),
+  pinned fixture exchange-rate for hermetic tests.
+- **Definition of Done:** all four assertions green; FX rate API
+  mocked (no live HTTP); no floating-point drift on the pinned
+  fixture.
+- **Depends-on:** none
+
+### T-120 Phase-1 safety net — API smoke suite
+- **Tier:** B
+- **Money/reach rationale:** A broken happy-path (create project /
+  upload file / send chat / export) silently kills every persona's
+  experience before anyone notices. One fast hermetic smoke suite
+  catches regressions on any fresh deploy. Cross-sector platform
+  health.
+- **Priority:** P0
+- **Status:** 🔴 not started
+- **Scope:** A single-file pytest smoke suite
+  (`packages/kerf-api/tests/test_smoke.py`) that hits the critical
+  happy-path endpoints in order: bootstrap-local auth → create
+  workspace → create project → create file → list files → send chat
+  message (mocked LLM) → GET /projects/{pid}/export. Uses the
+  existing test-app fixture; no live cloud, no live LLM. Must
+  complete in under 60 seconds.
+- **Target files/packages:** `packages/kerf-api/tests/test_smoke.py`
+  (new), existing `conftest.py` app fixture.
+- **Definition of Done:** all seven smoke steps green; LLM mocked;
+  export returns a valid zip with at least one file; full suite runs
+  in < 60 s.
+- **Depends-on:** none
+
+### T-121 Phase-1 safety net — security suite (IDOR / authz / token)
+- **Tier:** A
+- **Money/reach rationale:** IDOR and cross-tenant authz failures are
+  table-stakes security for any SaaS — a single exploit here is a
+  company-ending event before launch. Token single-use + expiry are
+  required by the auth spec (password-reset tokens in particular).
+  Affects every cloud persona.
+- **Priority:** P0
+- **Status:** 🔴 not started
+- **Scope:** Hermetic pytest security suite covering: (a) IDOR — user
+  A cannot GET/PUT/DELETE user B's project, file, or workspace; (b)
+  cross-workspace authz — workspace member cannot access a project in
+  a different workspace; (c) token single-use — a used password-reset
+  / email-verification token is rejected on a second use; (d) token
+  expiry — an expired token is rejected; (e) bootstrap-local auth is
+  blocked in cloud mode.
+- **Target files/packages:** `packages/kerf-api/tests/
+  test_security.py` (new), existing auth / project / workspace routes
+  in `packages/kerf-api/src/kerf_api/routes.py`.
+- **Definition of Done:** all five assertion categories green in CI;
+  each negative case returns the expected 403/404 (not a 500); no
+  live external calls.
+- **Depends-on:** none
+
+### T-122 Phase-1 safety net — harness + loop_local.sh / loop_dev.sh
+- **Tier:** B
+- **Money/reach rationale:** A unified test harness that any agent or
+  CI job can invoke is a force-multiplier for the entire Phase-1
+  safety-net suite — without it, the individual tests pass in
+  isolation but regressions slip through on real deploys. Cross-
+  sector platform health.
+- **Priority:** P0
+- **Status:** 🔴 not started
+- **Scope:** Two thin shell scripts:
+  `scripts/loop_local.sh` — runs the full Phase-1 suite (T-117..T-121
+  + T-120 smoke) against a local Postgres (`postgres://pc@localhost:
+  5432/kerf?sslmode=disable` or `DATABASE_URL` env override);
+  `scripts/loop_dev.sh` — same suite against the dev Neon URL from
+  `KERF_DEV_DATABASE_URL`. Both scripts: set up a clean schema (drop +
+  recreate via `0008` baseline migration), run pytest with the
+  relevant test globs, print a pass/fail summary. Neither script
+  commits data or mutates prod.
+- **Target files/packages:** `scripts/loop_local.sh` (new),
+  `scripts/loop_dev.sh` (new), `packages/kerf-api/tests/conftest.py`
+  (extend DB-URL injection if needed).
+- **Definition of Done:** `./scripts/loop_local.sh` runs cleanly on a
+  fresh local DB and prints PASS for all Phase-1 tests; `loop_dev.sh`
+  parameterises the DB URL without hardcoding; both scripts are
+  executable and documented with a one-line usage comment at the top.
+- **Depends-on:** T-117, T-118, T-119, T-120, T-121
+
+### T-123 Export / materialize spine — file-tree materialization + large-file autodetect
+- **Tier:** A
+- **Money/reach rationale:** The export/materialize spine is the
+  shared foundation under `kerf sync`, `kerf export`/`kerf import`,
+  and git-as-substrate (T-124, T-125, T-127, T-128). Without it each
+  of those builds its own ad-hoc file-tree walk. Gets anti-lock-in
+  correct once, reused by every platform persona. P0 foundational.
+- **Priority:** P0
+- **Status:** 🔴 not started
+- **Scope:** Extend the existing `GET /projects/{pid}/export` route
+  (≈L3622 in `packages/kerf-api/src/kerf_api/routes.py`) — do NOT
+  create a duplicate route — to: (a) autodetect inline vs stored files
+  via the existing `files.content` / `files.storage_key` seam:
+  `files.content` is present → inline, served directly; `files.
+  storage_key` is set → fetch from Tigris, include in zip; (b) emit a
+  `manifest.json` inside the zip listing each file's path, kind,
+  sha256, and whether it was inline or storage-keyed; (c) handle the
+  500MB cap that already exists. The large-file autodetect predicate
+  (NOT valid UTF-8 OR size > ~1 MiB) is implemented here as a helper
+  used by the write path too — the same predicate gates T-124.
+- **Target files/packages:**
+  `packages/kerf-api/src/kerf_api/routes.py` (extend
+  `export_project` ≈L3622), new helper
+  `packages/kerf-api/src/kerf_api/export_helpers.py` (autodetect
+  predicate + manifest builder), `packages/kerf-api/tests/
+  test_export.py` (extend or new).
+- **Definition of Done:** exporting a project with a mix of inline
+  and storage-keyed files produces a zip containing: all inline files
+  at their correct paths, pointer stubs for storage-keyed files,
+  and a valid `manifest.json`; the autodetect predicate correctly
+  classifies a UTF-8 text file, a >1 MiB binary, and a <1 MiB binary;
+  pytest green; existing export tests still green.
+- **Depends-on:** none
+
+### T-124 Git-as-substrate — content-vs-storage_key large-file autodetect + Tigris blob/pointer
+- **Tier:** A
+- **Money/reach rationale:** The auto-detection mechanism is what
+  makes every cloud project a true git repo without manual LFS
+  configuration — critical for the mechanical/ECAD/BIM personas whose
+  projects contain large STEP / binary files alongside source code.
+  Enables standard `git clone` to work. P1 platform spine. **Rejected
+  alternative:** Git LFS — heavy ops/UX; our autodetect + shared
+  object store already gives standard clone + cheap forks; LFS is
+  optional later only for pathological repos.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** On every file write/commit, run the autodetect predicate
+  from T-123 (NOT valid UTF-8 OR size > ~1 MiB configurable via
+  `KERF_LARGE_FILE_THRESHOLD_BYTES` env, default 1 MiB). If large:
+  compute sha256, write content to Tigris S3 under
+  `blobs/{sha256[:2]}/{sha256}` (content-addressed, idempotent),
+  set `files.storage_key = sha256`, commit a pointer file
+  `{filename}.kerf-ptr` in git containing `kerf-ptr v1\nsha256:
+  {sha256}\nsize:{n}\n`. If small: write content inline, commit the
+  file directly. The pointer format is intentionally minimal and
+  human-readable. Forks share blobs automatically (same sha256 →
+  same Tigris key).
+- **Target files/packages:** `packages/kerf-api/src/kerf_api/
+  routes.py` (file-write path), `packages/kerf-api/src/kerf_api/
+  export_helpers.py` (T-123 autodetect predicate — reuse), new
+  `packages/kerf-cloud/src/kerf_cloud/blob_store.py` (Tigris write/
+  read), `packages/kerf-core/src/kerf_core/db/migrations/` (add
+  `content_sha256` column to `files` if not present), tests.
+- **Definition of Done:** writing a >1 MiB binary file → `storage_key`
+  set, blob in Tigris, pointer committed in git; writing a small UTF-8
+  file → `files.content` set, file committed directly; round-trip
+  (write → export via T-123 → verify content) passes; dedup verified
+  (same content written twice → one Tigris object); pytest with a
+  mocked Tigris client.
+- **Depends-on:** T-123
+
+### T-125 Git-as-substrate — shared server-side object store + cheap forks + `git clone` interop
+- **Tier:** A
+- **Money/reach rationale:** Cheap forks (near-zero marginal storage
+  for the second and Nth fork of a project with large STEP files) are
+  the core commercial proposition of the platform's version-control
+  layer. Standard `git clone` working is a table-stakes requirement
+  for any developer-facing CAD platform.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Wire the shared server-side git object store (the cloud
+  git Storer already exists — see MEMORY cloud_git_storer_motivation)
+  so that when a project is forked the new git repo shares pack
+  objects with the original rather than duplicating them. On `git
+  clone`, the server serves source files directly and pointer stubs
+  for large files (the pointer content from T-124); a `kerf sync` or
+  `kerf export --hydrate` step fetches the large-file blobs from
+  Tigris. Document the clone + hydrate workflow in
+  `docs/llm/git.md`.
+- **Target files/packages:** `packages/kerf-cloud/src/kerf_cloud/
+  git_storer.py` (extend fork path to share object store),
+  `packages/kerf-api/src/kerf_api/routes.py` (fork endpoint),
+  `docs/llm/git.md` (extend with clone + hydrate workflow), tests.
+- **Definition of Done:** forking a project with a large-file pointer
+  does not copy the Tigris blob (dedup verified by blob-store mock);
+  `git clone` of the project repo yields source files + pointer stubs;
+  a `kerf export --hydrate` on the clone directory resolves the
+  pointers to their full content; pytest.
+- **Depends-on:** T-124
+
+### T-126 Mode-agnostic client — `pip install kerf` (cloud default) + `kerf serve` self-host (Postgres-required)
+- **Tier:** B
+- **Money/reach rationale:** A clean pip install story is the primary
+  acquisition funnel for every non-browser persona (scripting, SDK,
+  self-hosted enterprise). Self-host with a well-documented BYO-
+  Postgres path unlocks the on-premise / air-gapped segment with
+  zero marginal infrastructure cost. **Rejected alternatives:**
+  SQLite for local (forks the SQL dialect forever); embedded/auto-
+  provisioned Postgres (unnecessary + cross-platform maintenance
+  liability); Electron bundling server+Postgres (hides infra).
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Restructure the Python package so: `pip install kerf`
+  installs the thin client (no server deps, `KERF_API_URL` defaults
+  to `https://app.kerf.io`); `pip install 'kerf[server]'` installs
+  the full server extras (FastAPI, asyncpg, all plugin packages);
+  `kerf serve` starts the server and **fails fast** with a clear
+  actionable error message — printing the exact `docker run postgres`
+  one-liner — when `DATABASE_URL` is missing or unreachable. The
+  error message must be actionable without reading the docs. No
+  embedded or auto-provisioned Postgres. Document the self-host
+  path in `docs/local-self-host.md` (extend existing).
+- **Target files/packages:** `packages/kerf-server/pyproject.toml`
+  or the root `pyproject.toml` (optional `[server]` extra),
+  `packages/kerf-server/src/kerf_server/cli.py` (`kerf serve` entry
+  point + startup check), `docs/local-self-host.md` (extend),
+  pytest for the startup-failure message.
+- **Definition of Done:** `pip install kerf` succeeds with no server
+  deps installed; `kerf serve` with no `DATABASE_URL` prints the
+  docker one-liner error and exits non-zero; `kerf serve` with a
+  valid `DATABASE_URL` starts and passes the T-120 smoke suite;
+  self-host docs are accurate and complete; pytest for the error
+  path.
+- **Depends-on:** T-120
+
+### T-127 `kerf sync` — two-way folder mirror (cloud ↔ local)
+- **Tier:** A
+- **Money/reach rationale:** Two-way sync is the primary anti-lock-in
+  guarantee for professional personas (mechanical engineers, architects,
+  firmware engineers) who work locally in their existing toolchain and
+  want cloud backup / collaboration. It is the most direct answer to
+  "can I get my files out?" — which is the single biggest objection
+  to any SaaS CAD tool.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** `kerf sync <project-id> <local-dir>` — pull changed
+  files from the cloud project to the local directory and push local
+  changes back up. Change detection: server-side `updated_at` vs
+  local mtime; conflict resolution: last-write-wins with a `--dry-run`
+  flag that prints the diff without applying. Large files are
+  handled via the T-124 pointer mechanism: pulling a pointer file
+  triggers a Tigris fetch; pushing a large file triggers the T-124
+  blob write. Builds directly on the T-123 materialize spine.
+- **Target files/packages:** `packages/kerf-server/src/kerf_server/
+  cli.py` (new `sync` subcommand), `packages/kerf-api/src/kerf_api/
+  routes.py` (add `GET /projects/{pid}/files/changed-since?ts=` or
+  extend the list-files endpoint), new `packages/kerf-server/src/
+  kerf_server/sync.py` (sync engine), tests.
+- **Definition of Done:** `kerf sync` pulls a new file created in
+  the cloud to the local dir; pushes a locally-created file to the
+  cloud; `--dry-run` prints the diff without mutating either side;
+  a file deleted locally is not automatically deleted on the server
+  (safe default, warn only); large-file pointer round-trips via T-124;
+  pytest + integration test against the test-app fixture.
+- **Depends-on:** T-123, T-124
+
+### T-128 `kerf export` / `kerf import` — zip/tar plain-tree portability
+- **Tier:** B
+- **Money/reach rationale:** The export/import symmetry is the final
+  anti-lock-in pillar — a user can always extract a complete plain-
+  file-tree archive of their project, carry it elsewhere, or
+  reconstitute it on a different Kerf instance. Low effort (builds on
+  T-123). Needed by every persona who values data portability.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** `kerf export <project-id> [--output file.zip]` — calls
+  the T-123 export route and writes the zip/tar to disk; `kerf import
+  <file.zip> [--project-name name]` — POST the archive to
+  `POST /projects/import` (new route) which unpacks the manifest,
+  creates the project, writes each file (large files auto-detected via
+  T-124 predicate and stored to Tigris). Both commands work in cloud
+  mode (`KERF_API_URL` = cloud) and self-host mode.
+- **Target files/packages:** `packages/kerf-server/src/kerf_server/
+  cli.py` (new `export` + `import` subcommands), `packages/kerf-api/
+  src/kerf_api/routes.py` (new `POST /projects/import`), tests.
+- **Definition of Done:** `kerf export` produces a zip that contains
+  all source files + pointer stubs + manifest.json; `kerf import` of
+  that zip reconstitutes the project with all files present; a round-
+  trip export → import produces identical file content; pytest.
+- **Depends-on:** T-123, T-124
+
+---
+
+## Sector depth — embedded/firmware + PLC (T-129 … T-130)
+
+### T-129 Ladder logic / PLC — IEC 61131-3 LD editor (complements `plc_st`)
+- **Tier:** A
+- **Money/reach rationale:** PLC / automation engineers are a large
+  manufacturing-sector workforce. The existing `plc_st` kind covers
+  IEC 61131-3 Structured Text; Ladder Diagram (LD) is the dominant
+  language on the shop floor (Siemens, Allen-Bradley, Omron).
+  Adding LD completes the IEC 61131-3 authoring story and unlocks the
+  automation/OT segment. Complements, does not replace, `plc_st`.
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** A new `plc_ld` file kind with: a rung-based text schema
+  (contacts, coils, timers, counters, function blocks as JSON/YAML);
+  a SVG-based ladder viewer/editor (rungs rendered as the standard LD
+  symbol set); MATIEC LD lint (MATIEC already used for ST); IEC
+  61131-3 XML export (`*.xwl` or IEC-compliant XML). LLM tool
+  `create_ladder_rung` + doc.
+- **Target files/packages:** `packages/kerf-plc/src/kerf_plc/ld/`
+  (new: `schema.py`, `renderer.py`, `lint.py`, `export.py`),
+  `src/components/` (new `LadderView.jsx` or extend PLCView),
+  migration for `plc_ld` kind,
+  `packages/kerf-plc/llm_docs/ladder.md`.
+- **Definition of Done:** a fixture LD program with a normally-open
+  contact + timer + coil renders correctly as SVG rungs; MATIEC lint
+  passes on a valid rung and catches a wiring error; IEC XML export
+  round-trips; LLM tool creates a new rung given a text description;
+  pytest + vitest.
+- **Depends-on:** none
+
+### T-130 Embedded/firmware programming — broader extensions + PlatformIO-reference toolchain
+- **Tier:** A
+- **Money/reach rationale:** Embedded/firmware engineers are a large
+  workforce (IoT, industrial, automotive ECU, consumer electronics).
+  T-116 gives them a readable editor; this task gives them a build +
+  flash + monitor loop. PlatformIO is the reference model: board
+  manifest, multi-framework support (Arduino, ESP-IDF, Zephyr, Mbed),
+  build targets, serial monitor. Unlocks the embedded/firmware
+  engineer persona end-to-end.
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** Introduce a `firmware` project type (or extend the
+  existing scripting path) with: a `platformio.ini`-compatible board
+  manifest (`boards.json`); a `build_firmware` LLM tool that invokes
+  PlatformIO Core CLI (graceful degrade when absent — same pattern as
+  CuraEngine); a serial monitor UI for flash + monitor; a dependency
+  on T-116 (plain highlight covers `.ino .cpp .h .c`). PlatformIO Core
+  CLI is invoked as a subprocess; the tool degrades to a
+  "install PlatformIO" hint when the binary is absent.
+- **Target files/packages:** new `packages/kerf-firmware/` (or
+  extend `packages/kerf-scripting/`): `build.py`, `boards.py`,
+  `monitor.py`; `src/components/FirmwareView.jsx` (build log + serial
+  monitor panel); `packages/kerf-chat/llm_docs/firmware.md`;
+  migration for `firmware` kind.
+- **Definition of Done:** a fixture Arduino Blink sketch (`main.ino`)
+  is compiled via PlatformIO Core CLI (binary present in CI or mocked)
+  and produces an ELF + hex artefact; the build log streams to the
+  FirmwareView panel; binary absent → sentinel + install-hint printed;
+  LLM tool `build_firmware` documented and tested; pytest (mocked CLI)
+  + vitest (panel states).
+- **Depends-on:** T-116
+
+---
+
+## Long-tail platform (T-131)
+
+### T-131 Fully-local / offline desktop — PGlite WASM-Postgres spike + Tauri (P3, demand-gated)
+- **Tier:** B
+- **Money/reach rationale:** A fully-local/offline desktop app
+  (no server, no network, everything in-browser via WASM Postgres)
+  is a potential unlock for air-gapped / offline / privacy-first
+  personas. **Explicitly NOT a launch pillar** — ranked P3, demand-
+  gated. The T-126 zero-dependency self-host path (BYO Postgres) is
+  the correct near-term local story and is simpler, cheaper, and
+  already covers the enterprise on-premise segment. This task begins
+  only when there is validated demand signal for a no-server-process
+  experience.
+  **Rejected alternatives for the near-term local story:** embedded/
+  auto-provisioned Postgres (unnecessary + maintenance liability);
+  SQLite (forks SQL dialect forever); Electron bundling
+  server+Postgres (hides infra, strictly worse than this spike).
+- **Priority:** P3
+- **Status:** 🔴 not started
+- **Scope:** A time-boxed spike (one agent run): integrate
+  `@electric-sql/pglite` (WASM Postgres) into a Vite browser build
+  and verify that the Kerf schema migrations run cleanly against it;
+  spike a minimal Tauri shell that wraps the Vite SPA. The spike
+  deliverable is a documented feasibility report
+  (`docs/plans/local-desktop-spike.md`) listing: migration
+  compatibility, known schema / SQL dialect gaps, binary-size delta,
+  and a recommended path forward (or a "not yet feasible" finding).
+  No production code changes in this task.
+- **Target files/packages:** `docs/plans/local-desktop-spike.md`
+  (new, spike report), a throwaway `scripts/pglite_spike.mjs`
+  (Vite + PGlite migration runner, not committed to main if the
+  spike fails), `package.json` (add `@electric-sql/pglite` as a
+  devDependency only, behind a feature flag).
+- **Definition of Done:** spike report written and committed;
+  report states clearly whether the Kerf baseline migration runs
+  cleanly in PGlite; known incompatibilities (e.g. unsupported
+  extensions, missing pg functions) are enumerated; Tauri shell
+  feasibility assessed; a go/no-go recommendation is present.
+- **Depends-on:** T-126

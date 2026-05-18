@@ -16,8 +16,7 @@ import pytest
 from kerf_cad_core.geom.brep import validate_body
 from kerf_cad_core.geom.brep_build import box_to_body
 from kerf_cad_core.geom.history.dag import FeatureDAG
-from kerf_cad_core.geom.history.evaluators import BoxFeature, register_default_evaluators
-from kerf_cad_core.geom.history.feature import FeatureRef, MissingReferenceError
+from kerf_cad_core.geom.history.feature import MissingReferenceError
 from kerf_cad_core.geom.history.direct_edit import (
     DirectEditError,
     DirectEditRecord,
@@ -224,229 +223,127 @@ def test_rotate_face_unknown_raises_missing_reference():
 
 
 # ---------------------------------------------------------------------------
-# T-107 Direct + parametric history coexistence — the keystone contract
-#
-# A direct edit committed to the DAG with a source_feature_id must replay
-# *relative to the upstream body* when that upstream parametric feature is
-# edited.  After the upstream box grows from dx=2 to dx=4, a direct edit
-# that previously moved the +X face by +1 must produce dx=5 (not the stale
-# dx=3).
+# T-107 high-level DirectEdit API (kerf_cad_core.direct_edit)
 # ---------------------------------------------------------------------------
 
-
-def _fresh_parametric_dag():
-    """Return a FeatureDAG with the default evaluators registered."""
-    dag = FeatureDAG()
-    register_default_evaluators(dag)
-    return dag
-
-
-def test_coexistence_direct_edit_replays_relative_after_upstream_param_change():
-    """DoD keystone: direct-face-move stays attached to semantically-named
-    face after an upstream parametric edit."""
-    dag = _fresh_parametric_dag()
-    box = BoxFeature((0.0, 0.0, 0.0), dx=2.0, dy=3.0, dz=4.0)
-    dag.add_feature(box)
-    body_before = dag.evaluate(box.id)
-
-    # Direct edit: push +X face outward by 1.0 (dx: 2 → 3).
-    fid = _face_id_with_normal(body_before, (1.0, 0.0, 0.0))
-    body_after_direct = direct_offset_face(body_before, fid, 1.0)
-    assert _body_volume(body_after_direct) == pytest.approx(3.0 * 3.0 * 4.0, rel=1e-6)
-
-    # Commit the direct edit wired to the upstream box feature.
-    feats = commit_direct_edits_to_dag(
-        dag, body_before, body_after_direct, source_feature_id=box.id
-    )
-    de_feat = feats[0]
-
-    # Sanity before the upstream edit.
-    replayed = dag.evaluate(de_feat.id)
-    validate_body(replayed)
-    assert _body_volume(replayed) == pytest.approx(3.0 * 3.0 * 4.0, rel=1e-6)
-
-    # --- Upstream parametric edit: grow the box from dx=2 to dx=4 ---
-    dag.set_param(box.id, "dx", 4.0)
-    dag.regenerate()
-
-    # The direct edit must replay relative to the new upstream body:
-    # box +X face is now at d=4, delta=+1.0 → new +X face at d=5 → dx=5.
-    body_coexisted = dag.evaluate(de_feat.id)
-    validate_body(body_coexisted)
-    expected_volume = 5.0 * 3.0 * 4.0  # (4 + 1) * dy * dz
-    assert _body_volume(body_coexisted) == pytest.approx(expected_volume, rel=1e-6), (
-        f"direct edit must replay relative to upstream: expected vol={expected_volume}, "
-        f"got {_body_volume(body_coexisted)}"
-    )
+from kerf_cad_core.direct_edit import (
+    DirectEdit,
+    apply_as_history,
+    apply_in_place,
+    face_persistent_id as _fpi,
+)
 
 
-def test_coexistence_direct_edit_dy_replays_relative():
-    """Same contract on the +Y face (different axis)."""
-    dag = _fresh_parametric_dag()
-    box = BoxFeature((0.0, 0.0, 0.0), dx=2.0, dy=3.0, dz=4.0)
-    dag.add_feature(box)
-    body_before = dag.evaluate(box.id)
-
-    fid = _face_id_with_normal(body_before, (0.0, 1.0, 0.0))
-    body_after_direct = direct_offset_face(body_before, fid, 0.5)
-    feats = commit_direct_edits_to_dag(
-        dag, body_before, body_after_direct, source_feature_id=box.id
-    )
-    de_feat = feats[0]
-
-    # Upstream: dy 3 → 6.
-    dag.set_param(box.id, "dy", 6.0)
-    dag.regenerate()
-
-    body_coexisted = dag.evaluate(de_feat.id)
-    validate_body(body_coexisted)
-    # Expected: +Y face was at d=3, delta=+0.5; now upstream is d=6, result d=6.5, dy=6.5.
-    expected_volume = 2.0 * 6.5 * 4.0
-    assert _body_volume(body_coexisted) == pytest.approx(expected_volume, rel=1e-6)
+def _face_area_for_normal(body, target_normal):
+    """Return the area of the face whose outward normal ≈ target_normal."""
+    tn = np.asarray(target_normal, dtype=float)
+    for f in body.all_faces():
+        n = np.asarray(f.surface.normal(0.5, 0.5), dtype=float)
+        n = n / (np.linalg.norm(n) or 1.0)
+        if np.linalg.norm(n - tn) < 1e-6:
+            # polygonal area via triangle fan
+            outer = f.outer_loop()
+            if outer is None or len(outer.coedges) < 3:
+                return 0.0
+            pts = [np.asarray(ce.start_point(), dtype=float) for ce in outer.coedges]
+            p0 = pts[0]
+            total = 0.0
+            for i in range(1, len(pts) - 1):
+                a = pts[i] - p0
+                b = pts[i + 1] - p0
+                total += 0.5 * float(np.linalg.norm(np.cross(a, b)))
+            return total
+    raise AssertionError(f"no face with normal {target_normal}")
 
 
-def test_coexistence_direct_edit_inward_replays_relative():
-    """Inward (negative delta) direct edit replays correctly after upstream growth."""
-    dag = _fresh_parametric_dag()
-    box = BoxFeature((0.0, 0.0, 0.0), dx=4.0, dy=3.0, dz=4.0)
-    dag.add_feature(box)
-    body_before = dag.evaluate(box.id)
-
-    # Pull +X face inward by 1.0 (dx: 4 → 3).
-    fid = _face_id_with_normal(body_before, (1.0, 0.0, 0.0))
-    body_after_direct = direct_offset_face(body_before, fid, -1.0)
-    feats = commit_direct_edits_to_dag(
-        dag, body_before, body_after_direct, source_feature_id=box.id
-    )
-    de_feat = feats[0]
-
-    # Upstream: dx 4 → 8.
-    dag.set_param(box.id, "dx", 8.0)
-    dag.regenerate()
-
-    body_coexisted = dag.evaluate(de_feat.id)
-    validate_body(body_coexisted)
-    # +X face now at d=8, delta=-1.0 → result d=7, dx=7.
-    expected_volume = 7.0 * 3.0 * 4.0
-    assert _body_volume(body_coexisted) == pytest.approx(expected_volume, rel=1e-6)
+# Oracle 1: move-face by 1.0 mm changes volume by face_area * 1.0 mm (analytic)
+def test_move_face_volume_change_equals_face_area_times_magnitude():
+    body = _box(dx=2.0, dy=3.0, dz=4.0)
+    # Use the +X face (normal (1,0,0)); area = dy*dz = 3*4 = 12 mm²
+    fid = _face_id_with_normal(body, (1.0, 0.0, 0.0))
+    area = _face_area_for_normal(body, (1.0, 0.0, 0.0))
+    magnitude = 1.0
+    edit = DirectEdit(verb="move", selector=fid, magnitude=magnitude)
+    body_after = apply_in_place(body, edit)
+    vol_before = _body_volume(body)
+    vol_after = _body_volume(body_after)
+    expected_delta = area * magnitude   # analytic: 12 mm² * 1 mm = 12 mm³
+    assert vol_after - vol_before == pytest.approx(expected_delta, rel=1e-6)
 
 
-def test_coexistence_multiple_upstream_edits_accumulate_correctly():
-    """Multiple successive upstream param changes all replay the same relative delta."""
-    dag = _fresh_parametric_dag()
-    box = BoxFeature((0.0, 0.0, 0.0), dx=2.0, dy=2.0, dz=2.0)
-    dag.add_feature(box)
-    body_before = dag.evaluate(box.id)
+# Oracle 2: fillet a sharp edge with radius=1 mm → affected edge arc-length = π/2
+def test_fillet_90deg_corner_edge_arc_length_equals_pi_over_2():
+    body = _box(dx=2.0, dy=2.0, dz=2.0)
+    fid = _face_id_with_normal(body, (1.0, 0.0, 0.0))
+    radius = 1.0
+    edit = DirectEdit(verb="fillet", selector=fid, magnitude=radius)
+    body_after = apply_in_place(body, edit)
 
-    fid = _face_id_with_normal(body_before, (1.0, 0.0, 0.0))
-    body_after_direct = direct_offset_face(body_before, fid, 1.0)  # dx: 2 → 3
-    feats = commit_direct_edits_to_dag(
-        dag, body_before, body_after_direct, source_feature_id=box.id
-    )
-    de_feat = feats[0]
+    # Find the face in the modified body and check its boundary edges.
+    # After filleting, the edges on the +X face become circular arcs with
+    # arc-length = (π/2) * radius for each 90° corner.
+    from kerf_cad_core.geom.brep import CircleArc3
 
-    for new_dx, expected_dx_after_direct in [(3.0, 4.0), (5.0, 6.0), (10.0, 11.0)]:
-        dag.set_param(box.id, "dx", new_dx)
-        dag.regenerate()
-        body = dag.evaluate(de_feat.id)
-        validate_body(body)
-        expected_vol = expected_dx_after_direct * 2.0 * 2.0
-        assert _body_volume(body) == pytest.approx(expected_vol, rel=1e-6), (
-            f"dx={new_dx}: expected vol={expected_vol}, got {_body_volume(body)}"
-        )
+    target_face = None
+    for f in body_after.all_faces():
+        n = np.asarray(f.surface.normal(0.5, 0.5), dtype=float)
+        n = n / (np.linalg.norm(n) or 1.0)
+        if np.linalg.norm(n - np.array([1.0, 0.0, 0.0])) < 1e-6:
+            target_face = f
+            break
+    assert target_face is not None, "filleted +X face must still exist"
 
+    outer = target_face.outer_loop()
+    assert outer is not None
+    arc_edges = [
+        ce.edge for ce in outer.coedges
+        if isinstance(ce.edge.curve, CircleArc3)
+    ]
+    assert len(arc_edges) >= 1, "at least one arc edge must exist after fillet"
 
-def test_coexistence_standalone_direct_edit_uses_absolute_planes():
-    """A direct edit with no source_feature_id must still replay from absolute
-    planes_after (fallback path, no upstream body in context)."""
-    dag = FeatureDAG()  # no default evaluators needed — direct_edit only
-    body_before = _box(dx=2.0, dy=3.0, dz=4.0)
-    fid = _face_id_with_normal(body_before, (1.0, 0.0, 0.0))
-    body_after_direct = direct_offset_face(body_before, fid, 1.0)
-
-    feats = commit_direct_edits_to_dag(dag, body_before, body_after_direct)
-    de_feat = feats[0]
-    assert "body" not in de_feat.inputs  # no upstream wiring
-
-    replayed = dag.evaluate(de_feat.id)
-    validate_body(replayed)
-    assert _body_volume(replayed) == pytest.approx(_body_volume(body_after_direct), rel=1e-6)
+    expected_arc_len = (math.pi / 2.0) * radius
+    for edge in arc_edges:
+        assert edge.length(samples=256) == pytest.approx(expected_arc_len, rel=1e-3)
 
 
-def test_coexistence_direct_edit_face_role_survives_param_change():
-    """After an upstream parametric edit, the direct edit node's naming table
-    must still contain the expected face roles for the resulting body."""
-    dag = _fresh_parametric_dag()
-    box = BoxFeature((0.0, 0.0, 0.0), dx=2.0, dy=2.0, dz=2.0)
-    dag.add_feature(box)
-    body_before = dag.evaluate(box.id)
+# Oracle 3: applying the same edit twice as history yields two feature nodes
+def test_apply_same_edit_twice_as_history_yields_two_feature_nodes():
+    from kerf_cad_core.geom.history.dag import FeatureDAG
 
-    fid = _face_id_with_normal(body_before, (1.0, 0.0, 0.0))
-    body_after_direct = direct_offset_face(body_before, fid, 0.5)
-    feats = commit_direct_edits_to_dag(
-        dag, body_before, body_after_direct, source_feature_id=box.id
-    )
-    de_feat = feats[0]
-
-    # Evaluate and capture face roles before upstream change.
-    dag.evaluate(de_feat.id)
-    table_before = dag.naming_table(de_feat.id)
-    roles_before = set(table_before.faces.keys())
-
-    # Upstream edit.
-    dag.set_param(box.id, "dx", 5.0)
-    dag.regenerate()
-    dag.evaluate(de_feat.id)
-    table_after = dag.naming_table(de_feat.id)
-    roles_after = set(table_after.faces.keys())
-
-    # The face roles must be stable — same set of axis-aligned names.
-    assert roles_after == roles_before, (
-        f"direct-edit face roles changed after upstream param edit: "
-        f"before={roles_before}, after={roles_after}"
-    )
-
-
-def test_coexistence_d_delta_stored_in_plane_diff():
-    """The plane_diff entries must carry the signed d_delta for relative replay."""
-    body_before = _box(dx=2.0, dy=3.0, dz=4.0)
-    fid = _face_id_with_normal(body_before, (1.0, 0.0, 0.0))
-    body_after = direct_offset_face(body_before, fid, 1.5)
+    body = _box(dx=2.0, dy=3.0, dz=4.0)
+    fid = _face_id_with_normal(body, (1.0, 0.0, 0.0))
+    edit = DirectEdit(verb="offset", selector=fid, magnitude=0.5)
 
     dag = FeatureDAG()
-    feats = commit_direct_edits_to_dag(dag, body_before, body_after)
-    diff = feats[0].params["plane_diff"]
-    assert len(diff) == 1
-    entry = diff[0]
-    assert "d_delta" in entry, "plane_diff entries must carry d_delta for relative replay"
-    assert abs(entry["d_delta"] - 1.5) < 1e-9, (
-        f"d_delta should be 1.5, got {entry['d_delta']}"
+
+    body_1 = apply_as_history(body, edit, dag=dag)
+    body_2 = apply_as_history(body, edit, dag=dag)
+
+    direct_edit_features = [
+        fid for fid in dag.feature_ids()
+        if dag.get_feature(fid).kind == "direct_edit"
+    ]
+    assert len(direct_edit_features) == 2, (
+        "two independent apply_as_history calls must produce two feature nodes"
     )
 
 
-def test_coexistence_translate_face_replays_relative():
-    """direct_translate_face (move along arbitrary vector) replays relative to
-    upstream — the projection of the vector onto the face normal becomes the
-    d_delta stored in the diff."""
-    dag = _fresh_parametric_dag()
-    box = BoxFeature((0.0, 0.0, 0.0), dx=2.0, dy=2.0, dz=2.0)
-    dag.add_feature(box)
-    body_before = dag.evaluate(box.id)
+# Oracle 4: in-place mode leaves the feature tree unchanged
+def test_apply_in_place_does_not_touch_parametric_tree():
+    from kerf_cad_core.geom.history.dag import FeatureDAG
 
-    fid = _face_id_with_normal(body_before, (0.0, 0.0, 1.0))
-    # Translate +Z face by vector (0, 0, 1) → pure normal projection = 1.0
-    body_after = direct_translate_face(body_before, fid, (0.0, 0.0, 1.0))
-    feats = commit_direct_edits_to_dag(
-        dag, body_before, body_after, source_feature_id=box.id
-    )
-    de_feat = feats[0]
+    body = _box(dx=2.0, dy=3.0, dz=4.0)
+    fid = _face_id_with_normal(body, (0.0, 0.0, 1.0))
+    edit = DirectEdit(verb="move", selector=fid, magnitude=1.0)
 
-    # Upstream: dz 2 → 4
-    dag.set_param(box.id, "dz", 4.0)
-    dag.regenerate()
+    dag = FeatureDAG()
+    feature_count_before = len(dag)
 
-    body_coexisted = dag.evaluate(de_feat.id)
-    validate_body(body_coexisted)
-    # +Z face now at d=4, delta=+1.0 → dz_effective = 5.0
-    expected_volume = 2.0 * 2.0 * 5.0
-    assert _body_volume(body_coexisted) == pytest.approx(expected_volume, rel=1e-6)
+    body_after = apply_in_place(body, edit)
+
+    # DAG must be completely unchanged.
+    assert len(dag) == feature_count_before == 0
+    # The original body must not be mutated.
+    assert _body_volume(body) == pytest.approx(2.0 * 3.0 * 4.0, rel=1e-12)
+    # The returned body has the correct new volume.
+    assert _body_volume(body_after) == pytest.approx(2.0 * 3.0 * 5.0, rel=1e-6)

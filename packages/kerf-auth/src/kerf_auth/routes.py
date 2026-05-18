@@ -507,14 +507,19 @@ async def github_login_callback(request: Request):
                     email, github_id, name, avatar_url,
                 )
                 user = dict(row)
-                display = name
-                if not display:
-                    at_idx = email.find("@")
-                    if at_idx > 0:
-                        display = email[:at_idx]
-                    else:
-                        display = "My"
-                await create_personal_workspace(conn, str(user["id"]), display)
+
+        # Ensure a default workspace on EVERY resolution path (new INSERT,
+        # matched by github_id, matched by email). Self-heal mirrors email
+        # login so an interrupted first-time create can't leave the user
+        # permanently workspace-less ("workspace_id required" on first
+        # create-project).
+        _default_ws, ws_exists = await get_default_workspace(conn, str(user["id"]))
+        if not ws_exists:
+            display = (user.get("name") or "").strip()
+            if not display:
+                at_idx = email.find("@")
+                display = email[:at_idx] if at_idx > 0 else "My"
+            await create_personal_workspace(conn, str(user["id"]), display)
 
         access_token_jwt, refresh_token = await issue_tokens(conn, str(user["id"]))
 
@@ -643,14 +648,21 @@ async def google_callback(request: Request):
                     email, google_sub, name, picture,
                 )
                 user = dict(row)
-                display = name
-                if not display:
-                    at_idx = email.find("@")
-                    if at_idx > 0:
-                        display = email[:at_idx]
-                    else:
-                        display = "My"
-                await create_personal_workspace(conn, str(user["id"]), display)
+
+        # Ensure a default workspace on EVERY resolution path (new INSERT,
+        # matched by google_id, matched by email). Previously the workspace
+        # was only created on the INSERT path, so an interrupted/failed
+        # first-time create left the user permanently workspace-less —
+        # later logins take an "existing user" path and never repaired it,
+        # surfacing as "workspace_id or workspace_slug required" on the
+        # first create-project. Self-heal mirrors email login.
+        _default_ws, ws_exists = await get_default_workspace(conn, str(user["id"]))
+        if not ws_exists:
+            display = (user.get("name") or "").strip()
+            if not display:
+                at_idx = email.find("@")
+                display = email[:at_idx] if at_idx > 0 else "My"
+            await create_personal_workspace(conn, str(user["id"]), display)
 
         access_token_jwt, refresh_token_jwt = await issue_tokens(conn, str(user["id"]))
 

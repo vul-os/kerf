@@ -224,10 +224,27 @@ class TestGithubLoginCallback:
     def setup_method(self):
         self._settings_patcher = patch("kerf_auth.routes.settings", FAKE_SETTINGS)
         self._settings_patcher.start()
+        # The callback now self-heals a missing default workspace on every
+        # resolution path. These happy-path tests assert session/redirect,
+        # not the workspace bootstrap, so neutralise it here (it has its
+        # own dedicated suite in test_oauth_workspace_bootstrap.py) and
+        # keep their conn.fetchrow sequences valid.
+        self._gdw_patcher = patch(
+            "kerf_auth.routes.get_default_workspace",
+            AsyncMock(return_value=(FAKE_WORKSPACE_ROW, True)),
+        )
+        self._cpw_patcher = patch(
+            "kerf_auth.routes.create_personal_workspace",
+            AsyncMock(return_value=FAKE_WORKSPACE_ROW),
+        )
+        self._gdw_patcher.start()
+        self._cpw_patcher.start()
         self.app = _make_app()
         self.client = TestClient(self.app, follow_redirects=False)
 
     def teardown_method(self):
+        self._cpw_patcher.stop()
+        self._gdw_patcher.stop()
         self._settings_patcher.stop()
 
     def _start_and_extract_state(self):

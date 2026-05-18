@@ -1,8 +1,17 @@
-# fly.io worker app config.
+# fly.io worker app config — OPTIONAL (separation path).
 #
-# Deploy via `flyctl deploy --config fly.worker.toml --app kerf-workers`.
-# No public HTTP service; fly manages lifecycle via internal health
-# probes. The image is the same one built from the root Dockerfile.
+# By default workers run in-process inside the engine app (see fly.toml
+# KERF_INPROCESS_WORKERS=true): one instance group, scales together.
+#
+# To split workers onto their own machines later (no code change):
+#   1. flyctl secrets set KERF_INPROCESS_WORKERS=false --app <engine app>
+#      (e.g. kerf-prod / kerf-dev) and redeploy it — engine now HTTP-only.
+#   2. flyctl apps create kerf-workers   # or kerf-dev-workers
+#   3. flyctl deploy --config fly.worker.toml --app kerf-workers
+#      (deploy-fly.sh auto-includes it once the app exists).
+# Same image as the root Dockerfile; this runs kerf_workers.runner,
+# which shares _build_workers() with the in-process path — no drift.
+# No public HTTP service; fly manages lifecycle via internal probes.
 
 app = "kerf-workers"
 primary_region = "fra"

@@ -17,9 +17,13 @@
 # Prereqs:
 #   - flyctl installed and logged in (flyctl auth login)
 #   - .env.main exists (cp .env.z.example .env.main) — or .env.dev for --dev
-#   - fly apps created (one-time):
-#       MAIN: flyctl apps create kerf && flyctl apps create kerf-workers
-#       DEV:  flyctl apps create kerf-dev && flyctl apps create kerf-dev-workers
+#   - fly app created (one-time): one app per env (workers run
+#     in-process — see fly.toml KERF_INPROCESS_WORKERS):
+#       MAIN: flyctl apps create kerf-prod
+#       DEV:  flyctl apps create kerf-dev
+#     The separate worker app (kerf-workers / kerf-dev-workers) is
+#     OPTIONAL — create it only to split workers out later; this script
+#     auto-deploys it whenever it exists (see fly.worker.toml).
 
 set -euo pipefail
 
@@ -161,8 +165,21 @@ push_secrets() {
   echo "  ✓ ${#args[@]} secrets staged on $app"
 }
 
+# Workers run in-process inside the engine app by default
+# (fly.toml KERF_INPROCESS_WORKERS=true), so there is normally NO
+# separate worker app — one instance group that scales together.
+# Only touch the worker app if it actually exists (the separation
+# path) and --app-only wasn't passed. Creating it later auto-enables
+# this with no script change.
+DEPLOY_WORKERS=false
+if [[ "$APP_ONLY" != "true" ]] && flyctl status --app "$WORKER_APP_NAME" >/dev/null 2>&1; then
+  DEPLOY_WORKERS=true
+else
+  echo "▸ workers: in-process (no separate '$WORKER_APP_NAME' app) — skipping worker deploy"
+fi
+
 push_secrets "$APP_NAME"
-if [[ "$APP_ONLY" != "true" ]]; then
+if [[ "$DEPLOY_WORKERS" == "true" ]]; then
   push_secrets "$WORKER_APP_NAME"
 fi
 
@@ -175,7 +192,7 @@ fi
 echo "▸ deploying app: $APP_NAME"
 flyctl deploy --config fly.toml --app "$APP_NAME" --remote-only
 
-if [[ "$APP_ONLY" != "true" ]]; then
+if [[ "$DEPLOY_WORKERS" == "true" ]]; then
   echo "▸ deploying workers: $WORKER_APP_NAME"
   flyctl deploy --config fly.worker.toml --app "$WORKER_APP_NAME" --remote-only
 fi
@@ -187,6 +204,6 @@ flyctl ssh console --app "$APP_NAME" \
 
 echo ""
 echo "✓ ${ENV_NAME} deploy complete."
-echo "  app:    https://$(flyctl info --app "$APP_NAME" --json | python -c 'import json,sys;print(json.load(sys.stdin)["Hostname"])')"
+echo "  app:    https://${APP_NAME}.fly.dev  (or the custom domain mapped via flyctl certs)"
 echo "  status: flyctl status --app $APP_NAME"
 echo "  logs:   flyctl logs --app $APP_NAME"

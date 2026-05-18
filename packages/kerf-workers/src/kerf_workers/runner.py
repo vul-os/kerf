@@ -64,57 +64,19 @@ async def start_all_workers(
     cloud_enabled: bool = False,
     local_mode: bool = True,
 ):
-    pyworker_url = os.getenv("PYWORKER_URL", "http://localhost:8090")
-
     own_pool = pool is None
     if own_pool:
         pool = await create_pool()
 
-    workers = []
-
-    for i in range(fem_count):
-        workers.append(
-            FEMWorker(
-                pool=pool,
-                storage_getter=storage_getter,
-                pyworker_url=pyworker_url,
-                timeout=fem_timeout,
-            )
-        )
-
-    for i in range(sim_count):
-        workers.append(
-            SPICEWorker(
-                pool=pool,
-                storage_getter=storage_getter,
-                pyworker_url=pyworker_url,
-                timeout=sim_timeout,
-            )
-        )
-
-    # tess_count and auto_tess_count both use AutoTessWorker (canonical since kerf-tess refactor)
-    for i in range(tess_count + auto_tess_count):
-        workers.append(
-            AutoTessWorker(
-                pool=pool,
-                storage_getter=storage_getter,
-                pyworker_url=pyworker_url,
-                timeout=tess_timeout,
-            )
-        )
-
-    for i in range(cam_count):
-        workers.append(
-            CAMWorker(
-                pool=pool,
-                storage_getter=storage_getter,
-                pyworker_url=pyworker_url,
-                timeout=cam_timeout,
-            )
-        )
-
-    # CompactionWorker: cloud-tier only. _maybe_compaction_worker guards the gate.
-    workers.extend(_maybe_compaction_worker(pool, cloud_enabled, local_mode, compaction_count))
+    workers = _build_workers(
+        pool, storage_getter,
+        fem_count=fem_count, sim_count=sim_count, tess_count=tess_count,
+        cam_count=cam_count, auto_tess_count=auto_tess_count,
+        compaction_count=compaction_count,
+        fem_timeout=fem_timeout, sim_timeout=sim_timeout,
+        tess_timeout=tess_timeout, cam_timeout=cam_timeout,
+        cloud_enabled=cloud_enabled, local_mode=local_mode,
+    )
 
     if not workers:
         logger.info("no workers configured")
@@ -144,6 +106,99 @@ async def start_all_workers(
 
     if own_pool:
         await pool.close()
+
+
+def _build_workers(
+    pool: asyncpg.Pool,
+    storage_getter,
+    *,
+    fem_count: int = 1,
+    sim_count: int = 1,
+    tess_count: int = 1,
+    cam_count: int = 0,
+    auto_tess_count: int = 0,
+    compaction_count: int = 1,
+    fem_timeout: int = 300,
+    sim_timeout: int = 300,
+    tess_timeout: int = 300,
+    cam_timeout: int = 300,
+    cloud_enabled: bool = False,
+    local_mode: bool = True,
+) -> list:
+    """Construct the configured worker instances (no lifecycle)."""
+    pyworker_url = os.getenv("PYWORKER_URL", "http://localhost:8090")
+    workers: list = []
+    for _ in range(fem_count):
+        workers.append(FEMWorker(pool=pool, storage_getter=storage_getter,
+                                 pyworker_url=pyworker_url, timeout=fem_timeout))
+    for _ in range(sim_count):
+        workers.append(SPICEWorker(pool=pool, storage_getter=storage_getter,
+                                   pyworker_url=pyworker_url, timeout=sim_timeout))
+    # tess_count and auto_tess_count both use AutoTessWorker.
+    for _ in range(tess_count + auto_tess_count):
+        workers.append(AutoTessWorker(pool=pool, storage_getter=storage_getter,
+                                      pyworker_url=pyworker_url, timeout=tess_timeout))
+    for _ in range(cam_count):
+        workers.append(CAMWorker(pool=pool, storage_getter=storage_getter,
+                                 pyworker_url=pyworker_url, timeout=cam_timeout))
+    # CompactionWorker: cloud-tier only; _maybe_compaction_worker gates it.
+    workers.extend(_maybe_compaction_worker(pool, cloud_enabled, local_mode, compaction_count))
+    return workers
+
+
+class InProcessWorkers:
+    """Run the worker harness inside the API process.
+
+    Lets one app instance serve HTTP *and* drain the job queues, so
+    scaling the app scales workers — no separate worker app/machine.
+    Unlike start_all_workers() this installs NO OS signal handlers: the
+    host process (uvicorn) owns SIGTERM/SIGINT; the FastAPI lifespan
+    drives shutdown via aclose().
+    """
+
+    def __init__(self, task, stop_event, workers):
+        self._task = task
+        self._stop_event = stop_event
+        self._workers = workers
+
+    @classmethod
+    async def start(cls, pool: asyncpg.Pool, storage_getter, **kwargs) -> "InProcessWorkers":
+        workers = _build_workers(pool, storage_getter, **kwargs)
+        if not workers:
+            logger.info("inprocess workers: none configured")
+            return cls(None, None, [])
+        logger.info("inprocess workers: starting %d", len(workers))
+        stop_event = asyncio.Event()
+
+        async def _run():
+            try:
+                async with asyncio.TaskGroup() as tg:
+                    for w in workers:
+                        tg.create_task(w.run(tg))
+                    await stop_event.wait()
+                    for w in workers:
+                        w.stop()
+            except asyncio.CancelledError:
+                for w in workers:
+                    w.stop()
+                raise
+
+        return cls(asyncio.create_task(_run()), stop_event, workers)
+
+    async def aclose(self, timeout: float = 30.0) -> None:
+        if self._stop_event is not None:
+            self._stop_event.set()
+        if self._task is None:
+            return
+        try:
+            await asyncio.wait_for(self._task, timeout=timeout)
+        except asyncio.TimeoutError:
+            logger.warning("inprocess workers: stop timed out; cancelled")
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            logger.exception("inprocess workers: error during shutdown")
+        logger.info("inprocess workers: stopped")
 
 
 async def run_workers():

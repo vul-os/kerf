@@ -1,8 +1,10 @@
-# fly.io app config — single-image app (frontend + API + light workers).
+# fly.io app config — ONE app per env (kerf-dev / kerf-prod).
 #
-# For heavy worker isolation (FEM, topo, autoroute), see fly.worker.toml
-# which deploys a separate `kerf-worker` fly app sharing the same image
-# but running with --workers-only and no public HTTP service.
+# Each machine runs the engine (frontend + API) AND the worker harness
+# together in-process (KERF_INPROCESS_WORKERS), so there is a single
+# instance group: scaling the app scales workers too. No separate
+# worker app. Starts at 1 machine (min_machines_running) to keep cost
+# low and autoscales on HTTP concurrency (auto_start/auto_stop_machines).
 #
 # Primary: fra (Frankfurt). The global app name "kerf" is taken on
 # fly.io, so the production app is "kerf-prod"; the public domain
@@ -25,6 +27,12 @@ primary_region = "fra"
   KERF_STORAGE_S3_ENDPOINT = "https://fly.storage.tigris.dev"
   KERF_STORAGE_S3_REGION = "auto"
   CLOUD_ENABLED = "true"
+  # Run the worker harness in-process (engine + workers co-located).
+  # To SEPARATE workers later: set this to "false" here (or
+  # `flyctl secrets set KERF_INPROCESS_WORKERS=false --app <app>`),
+  # then deploy the standalone worker app from fly.worker.toml. No code
+  # change — both paths share kerf_workers.runner._build_workers.
+  KERF_INPROCESS_WORKERS = "true"
   # Postgres (Neon or fly.io managed) — set DATABASE_URL via secret.
 
 # Secrets to set (via `flyctl secrets set KEY=value`):

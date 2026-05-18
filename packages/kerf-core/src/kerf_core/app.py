@@ -72,7 +72,10 @@ def create_app(config: Config | None = None, config_path: str = "") -> FastAPI:
         # registration order, so mounting the frontend earlier would
         # shadow every plugin API route with the SPA fallback.
         _mount_frontend(app)
+        worker_handle = await _maybe_start_inprocess_workers(app)
         yield
+        if worker_handle is not None:
+            await worker_handle.aclose()
         pool = getattr(app.state, "pool", None)
         if pool is not None:
             await pool.close()
@@ -100,6 +103,45 @@ def create_app(config: Config | None = None, config_path: str = "") -> FastAPI:
     # (see lifespan above) so the SPA catch-all doesn't shadow /api/*.
 
     return app
+
+
+async def _maybe_start_inprocess_workers(app: FastAPI):
+    """Co-locate the worker harness in the API process.
+
+    When KERF_INPROCESS_WORKERS is truthy (the hosted single-app deploy:
+    one machine runs engine + workers, so scaling the app scales
+    workers) the worker harness runs as background tasks sharing this
+    process's DB pool and storage. Failing to start workers must NOT
+    prevent the API from booting — log and continue.
+    """
+    flag = os.getenv("KERF_INPROCESS_WORKERS", "").strip().lower()
+    if flag not in ("1", "true", "yes"):
+        return None
+    pool = getattr(app.state, "pool", None)
+    if pool is None:
+        logger.warning("inprocess_workers_skipped_no_pool")
+        return None
+    try:
+        from kerf_workers.runner import InProcessWorkers
+
+        cloud_enabled = os.getenv("CLOUD_ENABLED", "false").lower() in ("1", "true", "yes")
+        local_mode = os.getenv("LOCAL_MODE", "true").lower() in ("1", "true", "yes")
+        handle = await InProcessWorkers.start(
+            pool=pool,
+            storage_getter=lambda: getattr(app.state, "storage", None),
+            fem_count=int(os.getenv("FEM_WORKERS", "1")),
+            sim_count=int(os.getenv("SIM_WORKERS", "1")),
+            tess_count=int(os.getenv("TESS_WORKERS", "1")),
+            cam_count=int(os.getenv("CAM_WORKERS", "0")),
+            compaction_count=int(os.getenv("COMPACTION_WORKERS", "1")),
+            cloud_enabled=cloud_enabled,
+            local_mode=local_mode,
+        )
+        logger.info("inprocess_workers_started")
+        return handle
+    except Exception as exc:
+        logger.warning("inprocess_workers_failed", error=str(exc))
+        return None
 
 
 def _mount_frontend(app: FastAPI) -> None:

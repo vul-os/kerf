@@ -30,10 +30,11 @@ def _project(readme_col):
 
 def _call(readme_col, readme_file_content):
     conn = AsyncMock()
-    conn.fetchrow = AsyncMock(
-        return_value=({"content": readme_file_content}
-                      if readme_file_content is not None else None)
-    )
+    # workshop_get calls fetchrow twice: README first, then a cover.*
+    # override lookup (project has no generated cover here). The cover
+    # lookup must return None so only the README override is exercised.
+    readme_row = {"content": readme_file_content} if readme_file_content is not None else None
+    conn.fetchrow = AsyncMock(side_effect=[readme_row, None])
     pool = MagicMock()
     pool.acquire = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)

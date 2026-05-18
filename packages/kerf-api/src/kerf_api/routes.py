@@ -3918,7 +3918,22 @@ async def serve_project_cover(
             if not role:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
 
-        key = proj.get("cover_storage_key")
+        # Workshop convention (files-in-repo): a project file named
+        # cover.{png,jpg,jpeg,webp,gif} overrides the auto-generated cover.
+        # The generated cover stays the DEFAULT — the repo file only wins
+        # when present. Resolved here so the public URL stays stable.
+        override = await conn.fetchrow(
+            """
+            SELECT storage_key FROM files
+            WHERE project_id = $1 AND kind = 'file' AND deleted_at IS NULL
+              AND storage_key IS NOT NULL
+              AND lower(name) IN ('cover.png','cover.jpg','cover.jpeg','cover.webp','cover.gif')
+            ORDER BY (parent_id IS NULL) DESC, updated_at DESC
+            LIMIT 1
+            """,
+            uuid.UUID(pid),
+        )
+        key = (override["storage_key"] if override else None) or proj.get("cover_storage_key")
         if not key:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no cover available")
 
@@ -5153,6 +5168,26 @@ async def workshop_get(
         )
         if readme_row and (readme_row["content"] or "").strip():
             project["readme"] = readme_row["content"]
+
+        # Cover override: a repo cover.* file beats the auto-generated
+        # cover (which stays the default). serve_project_cover resolves
+        # the actual bytes; here we only need cover_storage_key to be
+        # truthy so _project_to_workshop_row emits the /cover URL even
+        # for a project that never had an auto cover generated.
+        if not project.get("cover_storage_key"):
+            cover_file = await conn.fetchrow(
+                """
+                SELECT storage_key FROM files
+                WHERE project_id = $1 AND kind = 'file' AND deleted_at IS NULL
+                  AND storage_key IS NOT NULL
+                  AND lower(name) IN ('cover.png','cover.jpg','cover.jpeg','cover.webp','cover.gif')
+                ORDER BY (parent_id IS NULL) DESC, updated_at DESC
+                LIMIT 1
+                """,
+                project_id,
+            )
+            if cover_file and cover_file["storage_key"]:
+                project["cover_storage_key"] = cover_file["storage_key"]
 
     return _project_to_workshop_row(project)
 

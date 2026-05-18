@@ -15,6 +15,14 @@ import unittest
 import xml.etree.ElementTree as ET
 import zipfile
 
+# Load kerf_chat.tools.registry BEFORE importing the electronics tools module
+# so that the _compat.register decorator mirrors tool registrations into the
+# canonical registry (mirror only fires if the module is already in sys.modules).
+try:
+    import kerf_chat.tools.registry  # noqa: F401
+except ImportError:
+    pass
+
 # Import the tools module at module level so @register decorators fire
 # and the tools appear in the Registry (same pattern as test_pcb_drc.py)
 import kerf_electronics.tools.fab  # noqa: F401

@@ -3754,7 +3754,7 @@ User-direction 2026-05-18: "look at Blender and other CADs, I want variety of re
 ### T-217 Material editor panel — live PBR slider preview
 - **Tier:** B
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** a side-panel material editor that exposes the full MeshPhysicalMaterial knob set (base_color, metalness, roughness, ior, transmission, clearcoat, sheen, anisotropy, subsurface) with sliders + live preview sphere. Loads a material from T-115 (BIM) or T-214 (general PBR) and lets the user fork+save.
 - **Target files/packages:** `src/components/MaterialEditor.jsx` (NEW), `src/components/MaterialEditor.test.jsx` (NEW), `src/lib/materialPreviewSphere.js` (NEW), `src/lib/materialPreviewSphere.test.js` (NEW)
 - **Definition of Done:** sliders update the preview sphere in real-time; "Save as…" creates a new material entry; vitest oracles on the slider→material math; `npm run build` clean.
@@ -3880,7 +3880,7 @@ User-direction 2026-05-18: the existing `kerf-firmware` (T-130) is a thin `pio` 
 ### T-230 LLM tool `make_arduino_sketch(spec)` + `kerf.fw.json` project manifest schema
 - **Tier:** A
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** the LLM-facing surface for the new firmware track. (1) Define `kerf.fw.json` — a JSON project manifest with `{ board, framework, sources[], libraries[{name, version}], upload: {port?, baud?}, monitor: {baud?, line_ending?} }`, schema published in `packages/kerf-firmware/llm_docs/firmware.md`. Interconvertible with `platformio.ini` via a one-way `kerf fw import-pio platformio.ini` converter for migration. (2) `make_arduino_sketch(spec)` LLM tool that takes a natural-language spec (`"blink an LED on pin 13 at 1 Hz on an Arduino UNO"`) + an optional pin map, emits `main.ino` + a `kerf.fw.json`, resolves library dependencies via T-226, and (when toolchain is present) compiles via T-227 returning the artefact paths. (3) Sister tool `lint_arduino_sketch(path)` runs a fast syntactic check via the gcc preprocessor in `-E` mode without linking (catches missing headers / typos before a full build). (4) Add file kinds `firmware_project` (for `.fw.json` / `kerf.fw.json`) — `firmware` already exists in `files_kind_check`; the `.ino` / `.uno` / `.c` / `.cpp` / `.h` files keep `kind='file'` and use the T-116 text-highlight path.
 - **Target files/packages:** `packages/kerf-firmware/src/kerf_firmware/manifest_fw_json.py` (NEW — `kerf.fw.json` schema + validator), `packages/kerf-firmware/src/kerf_firmware/tools/make_sketch.py` (NEW — LLM tool), `packages/kerf-firmware/src/kerf_firmware/tools/lint_sketch.py` (NEW), `packages/kerf-firmware/src/kerf_firmware/tools/import_pio.py` (NEW — one-way `platformio.ini` → `kerf.fw.json` converter), `packages/kerf-firmware/llm_docs/firmware.md` (NEW — schema + tool usage), `packages/kerf-firmware/tests/test_manifest_fw_json.py` (NEW), `packages/kerf-firmware/tests/test_make_sketch.py` (NEW), `packages/kerf-firmware/tests/test_import_pio.py` (NEW — round-trip on Blink, BluePill, ESP32 sample `platformio.ini`).
 - **Definition of Done:** `make_arduino_sketch("blink an LED on pin 13 at 1 Hz on an Arduino UNO")` emits a valid `kerf.fw.json` + a `main.ino` that compiles with `avr-gcc` (when present; sentinel when absent); `lint_arduino_sketch` flags a missing-header source as `errored=true` with a clear gcc-preprocessor message; import: a 10-line `platformio.ini` converts to a `kerf.fw.json` whose `board`+`framework`+`libraries` match by string equality; `llm_docs/firmware.md` linted by the existing doc-manifest builder; pytest + vitest oracles; `npm run build` clean.
@@ -3929,7 +3929,7 @@ User-direction 2026-05-18: the existing `kerf-firmware` (T-130) is a thin `pio` 
 ### T-235 GHDL VHDL simulator subprocess bridge
 - **Tier:** A
 - **Priority:** P2
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** subprocess wrapper around **GHDL v6.x** (the GCC/LLVM-backed VHDL simulator). Takes a `.vhd` test-bench + design under test, runs `ghdl -a` (analyse), `ghdl -e` (elaborate), `ghdl -r` (run) with `--vcd=<out>` and `--stop-time=<time>`. Parses GHDL's compile-error format into structured `{file, line, severity, message}` records. Missing-binary path returns sentinel + install hint (`apt install ghdl` / `brew install ghdl`).
 - **Target files/packages:** `packages/kerf-silicon/src/kerf_silicon/vhdl/ghdl_bridge.py` (NEW), `packages/kerf-silicon/src/kerf_silicon/vhdl/ghdl_errors.py` (NEW — error parser), `packages/kerf-silicon/tests/test_ghdl_bridge.py` (NEW — subprocess mocked + a real-ghdl integration test gated on tool presence), `packages/kerf-silicon/tests/fixtures/vhdl_sim/counter4_tb.vhd` (NEW), `packages/kerf-silicon/tests/fixtures/vhdl_sim/expected_counter4.vcd` (NEW — golden VCD).
 - **Definition of Done:** with mocked subprocess, the wrapper invokes `ghdl -a`/`-e`/`-r` in order with the correct flags; with real GHDL on `$PATH`, the counter4 test-bench produces a VCD whose value-changes match the golden snapshot byte-for-byte (modulo timestamp); compile-error parser extracts at least 5 fields from a known-bad fixture; missing-ghdl returns sentinel; pytest oracles; `npm run build` clean.

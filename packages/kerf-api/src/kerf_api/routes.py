@@ -41,6 +41,7 @@ from kerf_core.db.queries import library as library_queries
 from kerf_core.db.queries import workshop_likes as workshop_likes_queries
 from kerf_core.dependencies import require_auth, optional_auth
 from kerf_core.storage import get_storage_required
+from kerf_core.storage.materialize import blob_storage_key
 from kerf_chat import llm as llm_module
 from kerf_chat.tools.executor import execute as tools_execute, specs as tools_specs
 from kerf_core.utils.context import ProjectCtx
@@ -4154,6 +4155,77 @@ async def serve_workshop_media(
     storage = get_storage_required()
     body, content_type = await storage.get(key)
     return StreamingResponse(body, media_type=content_type or "image/png")
+
+
+# ── Project-scoped blob serve (kerf hydrate backend, T-140) ─────────────────
+# Streams a content-addressed object that the project actually references.
+# Auth + visibility: mirrors serve_project_cover exactly —
+#   public project  → anonymous access OK
+#   private project → workspace membership required (else 404 to avoid info leak)
+# 404 when:
+#   • project does not exist
+#   • blob_refs has no (oid, project_id) row   → cross-project or phantom oid
+#   • object is not in storage
+@router.get("/projects/{pid}/blobs/{oid}")
+async def serve_project_blob(
+    pid: str,
+    oid: str,
+    auth: Optional[dict] = Depends(optional_auth),
+):
+    """GET /api/projects/:pid/blobs/:oid — stream a content-addressed object.
+
+    The oid must be referenced by the project (a ``blob_refs`` row exists for
+    ``(oid, project_id)``).  Returns 404 for any oid the project does not own,
+    preventing cross-project data access without leaking information about
+    other projects' blobs.
+
+    Visibility rules are identical to ``serve_project_cover``:
+      * public project → anonymous callers may download
+      * private project → caller must be a workspace member
+    """
+    try:
+        proj_uuid = uuid.UUID(pid)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
+
+    pool = await get_pool_required()
+    async with pool.acquire() as conn:
+        proj = await conn.fetchrow(
+            "SELECT workspace_id, visibility FROM projects WHERE id = $1",
+            proj_uuid,
+        )
+        if not proj:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
+
+        if proj["visibility"] != "public":
+            uid = auth.get("sub") if auth else None
+            if not uid:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="authentication required",
+                )
+            role = await get_user_workspace_role(conn, str(proj["workspace_id"]), uid)
+            if not role:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
+
+        # Verify the project actually references this oid; prevents cross-project
+        # access even when the caller is a member of a different workspace.
+        ref_exists = await conn.fetchval(
+            "SELECT 1 FROM blob_refs WHERE oid = $1 AND project_id = $2 LIMIT 1",
+            oid,
+            proj_uuid,
+        )
+        if not ref_exists:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
+
+    storage = get_storage_required()
+    key = blob_storage_key(oid)
+    try:
+        body, content_type = await storage.get(key)
+    except (FileNotFoundError, KeyError):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
+    return StreamingResponse(body, media_type=content_type or "application/octet-stream")
+
 
 # Avatar (avatar.go)
 

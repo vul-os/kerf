@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kerf-apparel"
+version = "0.1.0"
+license = { text = "MIT" }
+classifiers = ["License :: OSI Approved :: MIT License"]
+description = "Apparel / pattern-making plugin for Kerf — 2D flat patterns, seam allowance, grading, and marker making"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "pydantic",
+]
+
+[project.entry-points."kerf.plugins"]
+apparel = "kerf_apparel.plugin:register"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kerf_apparel"]

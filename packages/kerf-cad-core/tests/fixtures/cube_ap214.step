@@ -1,0 +1,215 @@
+ISO-10303-21;
+HEADER;
+FILE_DESCRIPTION(('Kerf unit cube fixture — AP214'),'2;1');
+FILE_NAME('cube_ap214.step','2024-01-01T00:00:00',('Kerf'),('Kerf'),
+  'kerf-cad-core test fixture','kerf-cad-core','');
+FILE_SCHEMA(('AUTOMOTIVE_DESIGN { 1 0 10303 214 1 1 1 1 }'));
+ENDSEC;
+DATA;
+/* -------- PRODUCT CONTEXT -------- */
+#1 = APPLICATION_PROTOCOL_DEFINITION('international standard',
+  'automotive_design',2000,#2);
+#2 = APPLICATION_CONTEXT('automotive design');
+#3 = PRODUCT_DEFINITION_CONTEXT('part definition',#2,'design');
+#4 = PRODUCT_DEFINITION_FORMATION('','',#5);
+#5 = PRODUCT('cube','unit cube','unit cube for testing',(#6));
+#6 = PRODUCT_CONTEXT('',#2,'mechanical');
+#7 = PRODUCT_DEFINITION('design','',#4,#3);
+
+/* -------- SHAPE REPRESENTATION -------- */
+#8 = SHAPE_DEFINITION_REPRESENTATION(#9,#10);
+#9 = PRODUCT_DEFINITION_SHAPE('','',#7);
+#10 = ADVANCED_BREP_SHAPE_REPRESENTATION('',(#11),#12);
+#11 = MANIFOLD_SOLID_BREP('cube',#13);
+#12 = (
+  GEOMETRIC_REPRESENTATION_CONTEXT(3)
+  GLOBAL_UNCERTAINTY_ASSIGNED_CONTEXT((#14))
+  GLOBAL_UNIT_ASSIGNED_CONTEXT((#15,#16,#17))
+  REPRESENTATION_CONTEXT('Context #1','3D Context with UNIT and UNCERTAINTY')
+);
+#13 = CLOSED_SHELL('',(#100,#200,#300,#400,#500,#600));
+#14 = UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE(1.E-07),#15,
+  'distance_accuracy_value','Confusion accuracy');
+#15 = (
+  LENGTH_UNIT()
+  NAMED_UNIT(*)
+  SI_UNIT(.MILLI.,.METRE.)
+);
+#16 = (
+  NAMED_UNIT(*)
+  PLANE_ANGLE_UNIT()
+  SI_UNIT($,.RADIAN.)
+);
+#17 = (
+  NAMED_UNIT(*)
+  SI_UNIT($,.STERADIAN.)
+  SOLID_ANGLE_UNIT()
+);
+
+/* ---- 8 vertices of the unit cube [0,1]^3 ---- */
+/* V0=(0,0,0)  V1=(1,0,0)  V2=(1,1,0)  V3=(0,1,0)  */
+/* V4=(0,0,1)  V5=(1,0,1)  V6=(1,1,1)  V7=(0,1,1)  */
+#20 = CARTESIAN_POINT('',(0.,0.,0.));
+#21 = CARTESIAN_POINT('',(1.,0.,0.));
+#22 = CARTESIAN_POINT('',(1.,1.,0.));
+#23 = CARTESIAN_POINT('',(0.,1.,0.));
+#24 = CARTESIAN_POINT('',(0.,0.,1.));
+#25 = CARTESIAN_POINT('',(1.,0.,1.));
+#26 = CARTESIAN_POINT('',(1.,1.,1.));
+#27 = CARTESIAN_POINT('',(0.,1.,1.));
+
+#30 = VERTEX_POINT('V0',#20);
+#31 = VERTEX_POINT('V1',#21);
+#32 = VERTEX_POINT('V2',#22);
+#33 = VERTEX_POINT('V3',#23);
+#34 = VERTEX_POINT('V4',#24);
+#35 = VERTEX_POINT('V5',#25);
+#36 = VERTEX_POINT('V6',#26);
+#37 = VERTEX_POINT('V7',#27);
+
+/* ---- 12 edges ---- */
+/* bottom: E0=V0-V1 E1=V1-V2 E2=V2-V3 E3=V3-V0 */
+/* top:    E4=V4-V5 E5=V5-V6 E6=V6-V7 E7=V7-V4 */
+/* vert:   E8=V0-V4 E9=V1-V5 E10=V2-V6 E11=V3-V7 */
+
+/* Edge directions (line geometry) */
+#40 = DIRECTION('',(1.,0.,0.));
+#41 = DIRECTION('',(0.,1.,0.));
+#42 = DIRECTION('',(1.,0.,0.));
+#43 = DIRECTION('',(-1.,0.,0.));
+#44 = DIRECTION('',(1.,0.,0.));
+#45 = DIRECTION('',(0.,1.,0.));
+#46 = DIRECTION('',(1.,0.,0.));
+#47 = DIRECTION('',(-1.,0.,0.));
+#48 = DIRECTION('',(0.,0.,1.));
+#49 = DIRECTION('',(0.,0.,1.));
+#50 = DIRECTION('',(0.,0.,1.));
+#51 = DIRECTION('',(0.,0.,1.));
+
+#60 = AXIS2_PLACEMENT_3D('',#20,DIRECTION('',(0.,0.,1.)),#40);
+#61 = AXIS2_PLACEMENT_3D('',#21,DIRECTION('',(0.,0.,1.)),#41);
+#62 = AXIS2_PLACEMENT_3D('',#22,DIRECTION('',(0.,0.,1.)),#43);
+#63 = AXIS2_PLACEMENT_3D('',#23,DIRECTION('',(0.,0.,1.)),#43);
+#64 = AXIS2_PLACEMENT_3D('',#24,DIRECTION('',(0.,0.,1.)),#44);
+#65 = AXIS2_PLACEMENT_3D('',#25,DIRECTION('',(0.,0.,1.)),#45);
+#66 = AXIS2_PLACEMENT_3D('',#26,DIRECTION('',(0.,0.,1.)),#46);
+#67 = AXIS2_PLACEMENT_3D('',#27,DIRECTION('',(0.,0.,1.)),#47);
+#68 = AXIS2_PLACEMENT_3D('',#20,DIRECTION('',(1.,0.,0.)),#48);
+#69 = AXIS2_PLACEMENT_3D('',#21,DIRECTION('',(1.,0.,0.)),#49);
+#70 = AXIS2_PLACEMENT_3D('',#22,DIRECTION('',(1.,0.,0.)),#50);
+#71 = AXIS2_PLACEMENT_3D('',#23,DIRECTION('',(1.,0.,0.)),#51);
+
+/* LINE = (origin, direction-vector) */
+#80 = LINE('',#20,VECTOR('',DIRECTION('',(1.,0.,0.)),1.));
+#81 = LINE('',#21,VECTOR('',DIRECTION('',(0.,1.,0.)),1.));
+#82 = LINE('',#22,VECTOR('',DIRECTION('',(-1.,0.,0.)),1.));
+#83 = LINE('',#23,VECTOR('',DIRECTION('',(0.,-1.,0.)),1.));
+#84 = LINE('',#24,VECTOR('',DIRECTION('',(1.,0.,0.)),1.));
+#85 = LINE('',#25,VECTOR('',DIRECTION('',(0.,1.,0.)),1.));
+#86 = LINE('',#26,VECTOR('',DIRECTION('',(-1.,0.,0.)),1.));
+#87 = LINE('',#27,VECTOR('',DIRECTION('',(0.,-1.,0.)),1.));
+#88 = LINE('',#20,VECTOR('',DIRECTION('',(0.,0.,1.)),1.));
+#89 = LINE('',#21,VECTOR('',DIRECTION('',(0.,0.,1.)),1.));
+#90 = LINE('',#22,VECTOR('',DIRECTION('',(0.,0.,1.)),1.));
+#91 = LINE('',#23,VECTOR('',DIRECTION('',(0.,0.,1.)),1.));
+
+/* EDGE_CURVE: name, v_start, v_end, geom, same_sense */
+#700 = EDGE_CURVE('E0',#30,#31,#80,.T.);
+#701 = EDGE_CURVE('E1',#31,#32,#81,.T.);
+#702 = EDGE_CURVE('E2',#32,#33,#82,.T.);
+#703 = EDGE_CURVE('E3',#33,#30,#83,.T.);
+#704 = EDGE_CURVE('E4',#34,#35,#84,.T.);
+#705 = EDGE_CURVE('E5',#35,#36,#85,.T.);
+#706 = EDGE_CURVE('E6',#36,#37,#86,.T.);
+#707 = EDGE_CURVE('E7',#37,#34,#87,.T.);
+#708 = EDGE_CURVE('E8',#30,#34,#88,.T.);
+#709 = EDGE_CURVE('E9',#31,#35,#89,.T.);
+#710 = EDGE_CURVE('E10',#32,#36,#90,.T.);
+#711 = EDGE_CURVE('E11',#33,#37,#91,.T.);
+
+/* ========================================================
+   FACES
+   Face orientations: outer normal pointing outward.
+   Each ORIENTED_EDGE: edge_ref, v_start($), v_end($), edge_curve, orient
+   ======================================================== */
+
+/* ---- FACE #100: BOTTOM  z=0, normal (0,0,-1) ---- */
+/* Outer loop: V0→V3→V2→V1 (CCW when viewed from -Z) */
+/* i.e. E3 fwd: V3→V0  reversed as V0→V3
+        E2 fwd: V2→V3  reversed as V3→V2  ... use reversed senses */
+/* loop: V0 -E0rev→ V1? No. Let's be explicit:
+   Going CCW from outside (normal -Z means we look from below):
+   V0→V3 (E3 reversed), V3→V2 (E2 reversed), V2→V1 (E1 reversed), V1→V0 (E0 reversed) */
+#800 = ORIENTED_EDGE('',*,*,#703,.F.);
+#801 = ORIENTED_EDGE('',*,*,#702,.F.);
+#802 = ORIENTED_EDGE('',*,*,#701,.F.);
+#803 = ORIENTED_EDGE('',*,*,#700,.F.);
+#810 = EDGE_LOOP('',(#800,#801,#802,#803));
+#811 = FACE_OUTER_BOUND('',#810,.T.);
+#820 = PLANE('',AXIS2_PLACEMENT_3D('',#20,DIRECTION('',(0.,0.,-1.)),
+  DIRECTION('',(1.,0.,0.))));
+#100 = ADVANCED_FACE('bottom',(#811),#820,.F.);
+
+/* ---- FACE #200: TOP  z=1, normal (0,0,+1) ---- */
+/* loop: V4→V5→V6→V7 */
+#830 = ORIENTED_EDGE('',*,*,#704,.T.);
+#831 = ORIENTED_EDGE('',*,*,#705,.T.);
+#832 = ORIENTED_EDGE('',*,*,#706,.T.);
+#833 = ORIENTED_EDGE('',*,*,#707,.T.);
+#840 = EDGE_LOOP('',(#830,#831,#832,#833));
+#841 = FACE_OUTER_BOUND('',#840,.T.);
+#850 = PLANE('',AXIS2_PLACEMENT_3D('',#24,DIRECTION('',(0.,0.,1.)),
+  DIRECTION('',(1.,0.,0.))));
+#200 = ADVANCED_FACE('top',(#841),#850,.T.);
+
+/* ---- FACE #300: FRONT  y=0, normal (0,-1,0) ---- */
+/* loop: V0→V1→V5→V4 (CCW from -Y) */
+#860 = ORIENTED_EDGE('',*,*,#700,.T.);
+#861 = ORIENTED_EDGE('',*,*,#709,.T.);
+#862 = ORIENTED_EDGE('',*,*,#704,.F.);
+#863 = ORIENTED_EDGE('',*,*,#708,.F.);
+#870 = EDGE_LOOP('',(#860,#861,#862,#863));
+#871 = FACE_OUTER_BOUND('',#870,.T.);
+#880 = PLANE('',AXIS2_PLACEMENT_3D('',#20,DIRECTION('',(0.,-1.,0.)),
+  DIRECTION('',(1.,0.,0.))));
+#300 = ADVANCED_FACE('front',(#871),#880,.T.);
+
+/* ---- FACE #400: RIGHT  x=1, normal (+1,0,0) ---- */
+/* loop: V1→V2→V6→V5 (CCW from +X) */
+#890 = ORIENTED_EDGE('',*,*,#701,.T.);
+#891 = ORIENTED_EDGE('',*,*,#710,.T.);
+#892 = ORIENTED_EDGE('',*,*,#705,.F.);
+#893 = ORIENTED_EDGE('',*,*,#709,.F.);
+#900 = EDGE_LOOP('',(#890,#891,#892,#893));
+#901 = FACE_OUTER_BOUND('',#900,.T.);
+#910 = PLANE('',AXIS2_PLACEMENT_3D('',#21,DIRECTION('',(1.,0.,0.)),
+  DIRECTION('',(0.,1.,0.))));
+#400 = ADVANCED_FACE('right',(#901),#910,.T.);
+
+/* ---- FACE #500: BACK  y=1, normal (0,+1,0) ---- */
+/* loop: V2→V3→V7→V6 (CCW from +Y) */
+#920 = ORIENTED_EDGE('',*,*,#702,.T.);
+#921 = ORIENTED_EDGE('',*,*,#711,.T.);
+#922 = ORIENTED_EDGE('',*,*,#706,.F.);
+#923 = ORIENTED_EDGE('',*,*,#710,.F.);
+#930 = EDGE_LOOP('',(#920,#921,#922,#923));
+#931 = FACE_OUTER_BOUND('',#930,.T.);
+#940 = PLANE('',AXIS2_PLACEMENT_3D('',#22,DIRECTION('',(0.,1.,0.)),
+  DIRECTION('',(0.,0.,1.))));
+#500 = ADVANCED_FACE('back',(#931),#940,.T.);
+
+/* ---- FACE #600: LEFT  x=0, normal (-1,0,0) ---- */
+/* loop: V0→V4→V7→V3→V0 (CCW from -X) */
+/* E8 .T. = V0→V4, E7 .F. = V4→V7, E11 .F. = V7→V3, E3 .T. = V3→V0 */
+#950 = ORIENTED_EDGE('',*,*,#708,.T.);
+#951 = ORIENTED_EDGE('',*,*,#707,.F.);
+#952 = ORIENTED_EDGE('',*,*,#711,.F.);
+#953 = ORIENTED_EDGE('',*,*,#703,.T.);
+#960 = EDGE_LOOP('',(#950,#951,#952,#953));
+#961 = FACE_OUTER_BOUND('',#960,.T.);
+#970 = PLANE('',AXIS2_PLACEMENT_3D('',#20,DIRECTION('',(-1.,0.,0.)),
+  DIRECTION('',(0.,0.,1.))));
+#600 = ADVANCED_FACE('left',(#961),#970,.T.);
+
+ENDSEC;
+END-ISO-10303-21;

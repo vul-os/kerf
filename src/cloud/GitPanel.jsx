@@ -21,6 +21,16 @@ import CommitDialog from './CommitDialog.jsx'
 import MergeDialog from './MergeDialog.jsx'
 import DiffViewer from './DiffViewer.jsx'
 import GitConnectDialog from './GitConnectDialog.jsx'
+import {
+  assignLanes,
+  edgePath,
+  railX,
+  ROW_H,
+  RAIL_W,
+  DOT_R,
+  SIDE_PAD,
+  NARROW_PX,
+} from '../lib/gitGraph.js'
 
 const shortSha = (s) => (s || '').slice(0, 7)
 
@@ -113,234 +123,11 @@ function BranchSelector({ branches, current, onSelect, onNewBranch, disabled }) 
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Multi-lane lattice
+// Multi-lane lattice — layout constants and pure helpers are imported from
+// src/lib/gitGraph.js so they can be unit-tested without a DOM.
+// See that module for full algorithmic documentation and the server-side
+// note about the missing `parent_shas` field on the current /git/log endpoint.
 // ─────────────────────────────────────────────────────────────────────────
-
-const ROW_H = 28          // px per commit row
-const RAIL_W = 18         // px per rail column
-const DOT_R = 5           // commit dot radius
-const SIDE_PAD = 10       // left padding inside the SVG before rail 0
-const NARROW_PX = 300     // below this, fall back to single-lane stack
-
-// Kerf-flavoured lane palette. Stable across renders by hash(branchName).
-// First slot is reserved for the default branch (typically "main").
-const LANE_COLORS = [
-  '#5BB0FF', // blue (default branch)
-  '#6CD7B7', // teal
-  '#E89A6F', // warm orange
-  '#C896E8', // soft purple
-  '#F0D86F', // amber
-  '#7FE89A', // green
-  '#E86F95', // pink
-  '#9FA8B5', // cool grey
-]
-
-// Cheap stable hash — only used for branch-name → palette index.
-function hashStr(s) {
-  let h = 0
-  for (let i = 0; i < s.length; i++) {
-    h = ((h << 5) - h + s.charCodeAt(i)) | 0
-  }
-  return Math.abs(h)
-}
-
-// Pick a palette colour for a given branch name. The default branch always
-// gets slot 0 (the kerf blue); everything else hashes into slots 1..N.
-function colorForBranch(name, defaultBranch) {
-  if (!name) return LANE_COLORS[7]
-  if (defaultBranch && name === defaultBranch) return LANE_COLORS[0]
-  const idx = 1 + (hashStr(name) % (LANE_COLORS.length - 1))
-  return LANE_COLORS[idx]
-}
-
-// Lane assignment (greedy, top-down). Given commits sorted newest-first and
-// the branch list, walk rows top → bottom and place each commit on a rail:
-//
-//   1. Rails are seeded from branch HEADs. The default branch goes on rail 0;
-//      remaining branches sort alphabetically so the layout is deterministic.
-//   2. For each commit:
-//        - It claims the leftmost rail currently mapped to its sha (if any).
-//          When several branches converge on the same commit, the leftmost
-//          rail wins — matches the user-visible "default branch eats the
-//          merge point" intuition.
-//        - If no rail is mapped to it yet (ancestor we haven't seen), it
-//          spawns a new rail at the right edge.
-//        - Its first parent inherits its rail.
-//        - Subsequent parents (merge commits) either reuse a rail already
-//          mapped to that parent, or spawn a new rail.
-//   3. After each row we compact: any rail whose mapped sha doesn't appear in
-//      the remaining commits AND wasn't just consumed gets retired so we
-//      don't drag empty trails for the rest of history.
-//
-// Limitations (not handled in v1):
-//   - Octopus merges (>2 parents): only the first two parents are wired up.
-//   - Pagination: lanes that descend from commits below our 50-row window
-//     simply terminate at the bottom of the visible graph.
-function assignLanes(commits, branches, currentBranch) {
-  const defaultBranch = branches.find((b) => b.is_default)?.name || ''
-  // Stable branch ordering: default first, then alphabetical.
-  const orderedBranches = [...branches].sort((a, b) => {
-    if (a.is_default) return -1
-    if (b.is_default) return 1
-    return a.name.localeCompare(b.name)
-  })
-
-  // Future-lookup: which row-index does each sha sit at? Used to retire dead
-  // rails (a rail whose mapped sha never appears below this row is dead).
-  const rowOf = new Map()
-  commits.forEach((c, i) => { if (!rowOf.has(c.sha)) rowOf.set(c.sha, i) })
-
-  // rails[i] = { sha: <expected-sha-on-this-rail> | null, color, branch }.
-  // null sha = retired slot (kept around so rails to the right don't shift).
-  const rails = []
-  // Branch tip metadata so we can render the branch chip on its head row.
-  const tips = [] // { sha, branch, isDefault, isHead, color, rail }
-
-  for (const b of orderedBranches) {
-    const color = colorForBranch(b.name, defaultBranch)
-    const rail = rails.length
-    rails.push({ sha: b.head_sha || null, color, branch: b.name })
-    tips.push({
-      sha: b.head_sha,
-      branch: b.name,
-      isDefault: !!b.is_default,
-      isHead: b.name === currentBranch,
-      color,
-      rail,
-    })
-  }
-
-  // Allocate or reuse a rail for `sha`. Prefers leftmost existing match.
-  const findRailFor = (sha) => {
-    for (let i = 0; i < rails.length; i++) {
-      if (rails[i].sha === sha) return i
-    }
-    return -1
-  }
-  const claimRail = (sha, color, branch) => {
-    // Try a retired slot before extending the rail count.
-    for (let i = 0; i < rails.length; i++) {
-      if (rails[i].sha == null) {
-        rails[i] = { sha, color, branch }
-        return i
-      }
-    }
-    rails.push({ sha, color, branch })
-    return rails.length - 1
-  }
-
-  const rows = [] // per-commit: { rail, color, parents:[{rail,color}], rails:<snapshot> }
-
-  for (let i = 0; i < commits.length; i++) {
-    const c = commits[i]
-    const parents = c.parent_shas || []
-
-    // Snapshot of rail state at the *top* of this row (i.e. before we resolve
-    // the commit). We use this to draw vertical pass-through lines for rails
-    // that don't terminate at this commit.
-    const snapshot = rails.map((r) => (r ? { ...r } : null))
-
-    // 1. Find this commit's rail. If multiple rails point at it, pick leftmost.
-    let rail = findRailFor(c.sha)
-    let color = rail >= 0 ? rails[rail].color : null
-    let branchName = rail >= 0 ? rails[rail].branch : null
-    if (rail < 0) {
-      // Orphan commit (older than every branch tip we know about, or below
-      // the visible window). Park it on a fresh rail with its parent's
-      // hashed colour as a best guess.
-      color = LANE_COLORS[7]
-      branchName = ''
-      rail = claimRail(c.sha, color, branchName)
-    }
-
-    // 2. Any *other* rails currently pointing at this commit collapse into
-    //    `rail` (they were redundant pointers from sibling branches that
-    //    happen to share this ancestor). Mark them as terminating here so
-    //    we draw a converging edge.
-    const incomingRails = [rail]
-    for (let j = 0; j < rails.length; j++) {
-      if (j === rail) continue
-      if (rails[j] && rails[j].sha === c.sha) {
-        incomingRails.push(j)
-        rails[j] = { sha: null, color: rails[j].color, branch: rails[j].branch }
-      }
-    }
-
-    // 3. Wire up parents.
-    //    First parent inherits this rail. Second parent (merge) takes its
-    //    own rail, reusing an existing match if possible.
-    //    Octopus parents (>2) are dropped — see file-level note.
-    const parentRails = []
-    if (parents.length === 0) {
-      // Root commit — rail terminates here.
-      rails[rail] = { sha: null, color, branch: branchName }
-    } else {
-      // First parent on the same rail.
-      const p0 = parents[0]
-      rails[rail] = { sha: p0, color, branch: branchName }
-      parentRails.push({ rail, color })
-
-      if (parents.length >= 2) {
-        const p1 = parents[1]
-        let pRail = findRailFor(p1)
-        if (pRail < 0) {
-          // Spawn a new rail for the merged-in branch. Inherit a colour from
-          // any branch tip that lands on this parent eventually; fallback to
-          // a hashed shade of grey.
-          pRail = claimRail(p1, LANE_COLORS[(rails.length) % LANE_COLORS.length], '')
-        }
-        parentRails.push({ rail: pRail, color: rails[pRail].color })
-      }
-    }
-
-    // 4. Compaction. If a rail's expected sha never appears in the remaining
-    //    commits, retire it now. Cheap O(rails) per row.
-    for (let j = 0; j < rails.length; j++) {
-      const r = rails[j]
-      if (r && r.sha && !rowOf.has(r.sha)) {
-        rails[j] = { sha: null, color: r.color, branch: r.branch }
-      }
-    }
-    // Trim trailing retired rails so the SVG width stays tight.
-    while (rails.length && rails[rails.length - 1].sha == null) {
-      rails.pop()
-    }
-
-    rows.push({
-      rail, color, branch: branchName,
-      parents: parentRails,
-      isMerge: parents.length >= 2,
-      incomingRails,
-      snapshot, // rails-at-top-of-row, used for drawing pass-throughs
-    })
-  }
-
-  // Width budget: high-water mark of rails seen during the walk.
-  let railCount = 0
-  for (const r of rows) {
-    railCount = Math.max(railCount, r.snapshot.length, r.rail + 1)
-    for (const p of r.parents) railCount = Math.max(railCount, p.rail + 1)
-  }
-
-  return { rows, tips, railCount, defaultBranch }
-}
-
-// Project a rail index to the SVG x-coord (centre of the rail column).
-const railX = (rail) => SIDE_PAD + rail * RAIL_W + RAIL_W / 2
-
-// Build an edge path from (rail0, y0) to (rail1, y1). Straight line if the
-// rails match, otherwise a vertical-then-curve-then-vertical Bézier so the
-// switch reads as a smooth swoop instead of a hard L-bend.
-function edgePath(rail0, y0, rail1, y1) {
-  const x0 = railX(rail0)
-  const x1 = railX(rail1)
-  if (rail0 === rail1) return `M ${x0} ${y0} L ${x1} ${y1}`
-  // Mid-Y control points: place them halfway between the rows so the
-  // S-curve hits its inflection at the midpoint and rails read as columns
-  // for as much vertical space as possible.
-  const my = (y0 + y1) / 2
-  return `M ${x0} ${y0} C ${x0} ${my}, ${x1} ${my}, ${x1} ${y1}`
-}
 
 function GitGraph({ rows, tips, railCount, commits, selectedSha, onPick }) {
   const width = SIDE_PAD * 2 + railCount * RAIL_W

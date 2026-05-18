@@ -68,6 +68,32 @@ async def register(app: FastAPI, ctx) -> PluginManifest:
                 "kerf-billing: failed to register BillingResetWorker: %s", exc
             )
 
+        # ── BlobGCWorker — storage GC sweep (T-136).
+        # Dry-run by default; physical deletes require BLOB_GC_DRY_RUN=false
+        # AND a GitReachabilityOracle wired in.
+        try:
+            from kerf_billing.blob_gc import BlobGCWorker, _dry_run_from_env
+
+            storage = getattr(ctx, "storage", None)
+            if storage is not None:
+                async def _gc_factory():
+                    return BlobGCWorker(
+                        pool=ctx.pool,
+                        storage=storage,
+                        dry_run=_dry_run_from_env(),
+                    )
+
+                workers_registry.register("blob_gc", _gc_factory)
+                ctx.logger.info("kerf-billing: BlobGCWorker registered")
+            else:
+                ctx.logger.warning(
+                    "kerf-billing: BlobGCWorker skipped — ctx.storage is None"
+                )
+        except Exception as exc:
+            ctx.logger.warning(
+                "kerf-billing: failed to register BlobGCWorker: %s", exc
+            )
+
     return PluginManifest(
         name="kerf-billing",
         version="0.1.0",

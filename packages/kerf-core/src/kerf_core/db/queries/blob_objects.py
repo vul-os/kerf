@@ -52,12 +52,28 @@ async def drop_ref(
     project_id: uuid.UUID,
     path: str,
 ) -> None:
-    """Remove a single (oid, project_id, path) reference row."""
+    """Remove a single (oid, project_id, path) reference row.
+
+    When removing this ref causes the ref-count to reach zero, stamps
+    ``blob_objects.last_unref_at`` with the current time.  The GC sweep
+    worker uses this as the start of the 72-hour grace window.
+    """
     await conn.execute(
         "DELETE FROM blob_refs WHERE oid = $1 AND project_id = $2 AND path = $3",
         oid,
         project_id,
         path,
+    )
+    # Stamp last_unref_at if this was the final ref for the oid.
+    await conn.execute(
+        """
+        UPDATE blob_objects
+        SET last_unref_at = now()
+        WHERE oid = $1
+          AND last_unref_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM blob_refs WHERE oid = $1)
+        """,
+        oid,
     )
 
 

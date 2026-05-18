@@ -1462,7 +1462,7 @@ Tier A (single persona unlock), render / SubD / direct-edit → Tier B
   SolidWorks / Onshape. A real joint library is a conversion lever for
   the mechanical engineer persona deep in assembly authoring.
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped (integrated this session)
 - **Scope:** Add rigid / revolute / slider / cam / gear / pin-slot
   joint types to `kerf-mates` with motion ranges + drives + limits;
   wire each into the existing mate solver.

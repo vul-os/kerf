@@ -2359,3 +2359,116 @@ Intentionally unused to keep T-139+ stable.
   testable; build clean. NOTE: UI change — needs user dev verification
   per the UI-polish loop convention.
 - **Depends-on:** none
+
+---
+
+## Git UX + multi-provider sync (T-144 … T-149)
+
+Surfaced 2026-05-18. **Architecture (reaffirmed):** Kerf's hosted git is
+ALWAYS the system of record; GitHub/GitLab are an *optional additional
+sync/mirror*, each env-gated (GitHub app keys exist now; wire GitLab too —
+gracefully disabled until its keys are set). Goal: a git-graph panel + a
+git settings UI to pick the provider, robust + tested. Dependency-ordered;
+frontend tasks (T-147/T-148) serialize behind other frontend work.
+
+### T-144 Git external-sync provider abstraction
+- **Tier:** A
+- **Money/reach rationale:** the seam everything else hangs off; lets a
+  second provider plug in without forking the sync path. Keeps "our git
+  is SoR; external = optional mirror" explicit.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** extract the existing GitHub-app push/pull into a
+  `GitSyncProvider` interface (`name`, `is_configured(settings)`,
+  `connect/disconnect`, `push(repo)`, `pull(repo)`, `status`). Implement
+  `GitHubProvider` = current behaviour. Availability is env-gated
+  (GitHub app settings present → available). Our cloud git commit/fork
+  path (T-125) is untouched — provider is additive mirror only.
+- **Target files/packages:** `packages/kerf-cloud/` — `github_app.py`
+  + a new `git_providers/` module + routes glue. No migration.
+- **Definition of Done:** GitHub sync behaves exactly as before but
+  through the provider interface; `is_configured` false → provider
+  absent, no errors; unit tests for the interface + GitHub provider.
+- **Depends-on:** T-125
+
+### T-145 GitLab provider implementation
+- **Tier:** A
+- **Money/reach rationale:** doubles the addressable "sync to my forge"
+  audience; GitLab is the dominant self-hosted forge in enterprise.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** `GitLabProvider` (OAuth app or PAT; push/pull mirror) +
+  `cloud_gitlab_*` settings. Keys absent now → provider reports
+  unconfigured and is hidden; code path still exercised by tests with
+  injected fakes. If a token table is needed, fold it CLEAN-BASELINE
+  into the appropriate migration (sole-migration-owner; coordinate —
+  do not add an alter shim).
+- **Target files/packages:** `packages/kerf-cloud/git_providers/gitlab.py`
+  + settings; migration only if required (clean baseline).
+- **Definition of Done:** GitLab provider push/pull works against a
+  faked GitLab API; unconfigured → cleanly disabled; tests green;
+  migration (if any) resets clean, 0 back-stamped.
+- **Depends-on:** T-144
+
+### T-146 Git provider settings API
+- **Tier:** B
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** endpoints to list env-available providers, connect/
+  disconnect a project's external mirror, and report sync status —
+  copy must make clear Kerf git is always retained; this only toggles
+  an additional mirror. Gated: never expose a provider whose app isn't
+  configured.
+- **Target files/packages:** `packages/kerf-cloud/` routes + tests.
+- **Definition of Done:** API lists only configured providers;
+  connect/disconnect/status work; unauth + cross-tenant rejected;
+  tests green.
+- **Depends-on:** T-144
+
+### T-147 Frontend — Git Settings UI (choose provider)
+- **Tier:** B
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** a Git settings surface (in the Git panel) to pick/connect
+  GitHub or GitLab — only providers the backend reports as configured
+  are shown; clear "our git is always kept" framing; show sync status.
+  Frontend only.
+- **Target files/packages:** `src/cloud/` git settings component +
+  wiring.
+- **Definition of Done:** only configured providers offered; connect/
+  status reflected; vitest on logic; build clean. UI change — needs
+  user dev verification.
+- **Depends-on:** T-146, T-148
+
+### T-148 Frontend — Git panel as a git graph
+- **Tier:** A
+- **Money/reach rationale:** the headline UX ask — a real commit-graph
+  view (branches/commits DAG) instead of the minimal panel; makes the
+  cloud-git substrate legible and trustworthy.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** render a commit graph in the Git panel from the cloud-git
+  data (`cloud_git_commits`/`cloud_git_branches`, landed via T-125/
+  T-141) — branch lanes, commit nodes, messages, HEAD. Builds on the
+  T-142 inline-panel layout. Frontend only.
+- **Target files/packages:** `src/cloud/GitPanel.jsx` + a new graph
+  component + the git data hook; a server list endpoint only if one is
+  missing (document, don't overreach).
+- **Definition of Done:** panel shows a correct commit/branch graph
+  for a project with history; empty-repo safe; vitest on the graph
+  layout logic; build clean. UI change — needs user dev verification.
+- **Depends-on:** T-142
+
+### T-149 Robust multi-provider sync — E2E + hardening
+- **Tier:** A
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** end-to-end coverage: Kerf git is SoR; pushing/pulling an
+  optional GitHub *and* GitLab mirror; env-gating; auth failure,
+  network error, partial-sync, and re-sync idempotency are robust and
+  surfaced. Simulated providers (no live tokens needed).
+- **Target files/packages:** `packages/kerf-cloud/tests/` + any
+  hardening in the provider modules.
+- **Definition of Done:** both providers’ happy + failure paths tested
+  with fakes; our-git-untouched invariant asserted; suite green.
+- **Depends-on:** T-144, T-145, T-146

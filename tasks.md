@@ -3004,7 +3004,7 @@ depth and listed in ROADMAP §3 P2 / §3.5.
 - **Tier:** B
 - **Money/reach rationale:** Real-time collaboration is a top conversion argument for professional teams (mechanical/architecture/ECAD). Every sector benefits simultaneously — pure platform multiplier. Justifies Pro/Enterprise tier uplift. P2 moat.
 - **Priority:** P2
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** Implement a real-time collaborative editing layer for parametric files (`.feature`, `.bim`, `.circuit.tsx`, `.sketch`) using a CRDT or OT approach. Each connected user sees others' edits in near-real-time. Conflicts resolve deterministically without lock-out. Presence indicators (cursor / selection) are a UX bonus but not the gate. Scope: text-native file kinds first (`.sketch`, `.equations`); binary/OCCT-evaluated files deferred to a follow-on. Backend: Postgres LISTEN/NOTIFY or a lightweight WebSocket broadcast per project. Frontend: merge received ops into the live editor state.
 - **Target files/packages:** `packages/kerf-api/src/kerf_api/routes.py` (WebSocket collaboration endpoint), `packages/kerf-core/src/kerf_core/collab/` (new — OT/CRDT engine), `src/lib/collabClient.js` (new), `src/components/FileEditor.jsx` (op-merge wiring), tests.
 - **Definition of Done:** two simulated users editing the same `.sketch` file concurrently converge to a consistent state (no lost edits, no divergence) after a simulated network round-trip; conflict resolution is deterministic; pytest + vitest on the merge logic.
@@ -3520,7 +3520,7 @@ User-requested 2026-05-18 — improve tscircuit editing (wires, placement, ratsn
 - **Tier:** A
 - **Money/reach rationale:** parsing is the seed; compiling is the value. Once atopile AST → Circuit JSON works, every atopile file is renderable in Kerf's tscircuit canvas + exportable via T-193 to KiCad.
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** `packages/kerf-electronics/src/kerf_electronics/atopile/compile.py` — walk the AST, resolve modules, expand parameters, emit Circuit JSON. Use the existing footprint catalogue from `@tscircuit/footprinter` (read its index via a small Python adapter, OR shell out to node — discuss in the agent's commit message). KiCad netlist emission is delegated to T-193's `kicad_io.py` (consume its writer; do NOT modify it).
 - **Target files/packages:** `packages/kerf-electronics/src/kerf_electronics/atopile/compile.py`, `packages/kerf-electronics/tests/test_atopile_compile.py`.
 - **Definition of Done:** voltage-divider fixture compiles to Circuit JSON with 2 resistors + 3 nets; LED-driver compiles to working netlist; round-trip via T-193 to KiCad preserves topology; pytest green.

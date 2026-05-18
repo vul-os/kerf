@@ -491,24 +491,13 @@ class TestCommitSpendKerfFree:
 class TestCommitSpendKerfPaid:
     """KerfPaid path: debits credits_usd, writes usage_events with payer='kerf_paid'.
 
-    BUG REPORT (T-117):
-    ``_commit_paid`` in ``spend.py`` uses the SQL literal ``-$2`` (unary minus
-    on an asyncpg positional parameter).  asyncpg cannot resolve the operator
-    overload for ``- unknown`` without an explicit type cast, so the balance
-    debit INSERT always raises ``AmbiguousFunctionError``.  Fix: change
-    ``VALUES ($1, -$2)`` → ``VALUES ($1, -$2::numeric)`` in spend.py.
-    The two tests below are marked xfail to document the bug; remove the
-    xfail decorator once spend.py is patched.
+    Regression guard (T-117 / T-141): ``_commit_paid`` previously used the
+    SQL literal ``-$2`` (unary minus on an untyped asyncpg parameter), which
+    raised ``AmbiguousFunctionError`` so the KerfPaid debit never executed.
+    Fixed in spend.py to ``VALUES ($1, -$2::numeric)``; these tests now
+    assert the debit really happens.
     """
 
-    @pytest.mark.xfail(
-        reason=(
-            "BUG spend.py _commit_paid: `VALUES ($1, -$2)` triggers "
-            "asyncpg AmbiguousFunctionError — needs `VALUES ($1, -$2::numeric)`. "
-            "T-117 enforcement gap."
-        ),
-        strict=True,
-    )
     async def test_credits_debited_and_event_written(self):
         _db_required()
         pool = await _pool()
@@ -572,14 +561,6 @@ class TestCommitSpendKerfPaid:
                 await conn.execute("DELETE FROM users WHERE id = $1", user_id)
             await pool.close()
 
-    @pytest.mark.xfail(
-        reason=(
-            "BUG spend.py _commit_paid: `VALUES ($1, -$2)` triggers "
-            "asyncpg AmbiguousFunctionError — needs `VALUES ($1, -$2::numeric)`. "
-            "T-117 enforcement gap."
-        ),
-        strict=True,
-    )
     async def test_paid_debit_via_cloud_debit_balance_function(self):
         """The cloud_debit_balance() stored function and the inline upsert
         in _commit_paid produce identical semantics — verify both paths

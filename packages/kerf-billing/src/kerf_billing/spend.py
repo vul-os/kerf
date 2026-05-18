@@ -181,7 +181,7 @@ async def _commit_paid(
             await conn.execute(
                 """
                 INSERT INTO cloud_user_balances (user_id, credits_usd)
-                VALUES ($1, -$2)
+                VALUES ($1, -$2::numeric)
                 ON CONFLICT (user_id) DO UPDATE
                 SET credits_usd = cloud_user_balances.credits_usd - $2
                 """,

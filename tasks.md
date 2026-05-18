@@ -3236,7 +3236,7 @@ sector. Establishes the foothold; deeper depth tasks follow in the same T-NN ser
   until it appears on the Landing page + the Domains hub. Top-of-funnel
   discoverability for the entire feature sweep.
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** add the newly-shipped sectors to `src/routes/Landing.jsx`
   and the Domains hub/pages (`src/routes/domains/`) in the SAME style as
   the existing domains (Mechanical/Electronics/Architecture/Jewelry/

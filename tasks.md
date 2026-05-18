@@ -1460,7 +1460,7 @@ Tier A (single persona unlock), render / SubD / direct-edit → Tier B
   the Class-A kernel depth; closes the original T-104 "class-A leading
   workflow flags hot-spots" DoD.
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** A pure-Python *leading* pass that consumes the T-104g
   harness output and produces a structured **hot-spot map** over a
   surface: per-(u,v) classification of curvature-rate spikes /
@@ -2966,7 +2966,7 @@ the detailed spec; these T-NN entries are the execution-queue handles.
 - **Tier:** B
 - **Money/reach rationale:** STEP writer closes the round-trip, enabling in-process Hausdorff oracle tests that currently require OCCT. Cross-sector interop depth.
 - **Priority:** P2
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** Pure-Python `geom/io/step_write.py` — emit a `Body` as STEP AP214. Write→read round-trip Hausdorff ≤ `1e-7` on box/cyl/sphere/filleted-box matrix. Opus-class task (GK-48). No OCCT; no external binaries; hermetic tests.
 - **Target files/packages:** `packages/kerf-cad-core/src/kerf_cad_core/geom/io/step_write.py` (new), `packages/kerf-cad-core/tests/test_step_io.py` (extend).
 - **Definition of Done:** write→read round-trip Hausdorff ≤ `1e-7` on the primitive + filleted-box matrix; pytest hermetic; ties GK-48.

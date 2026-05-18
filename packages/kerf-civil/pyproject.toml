@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kerf-civil"
+version = "0.1.0"
+license = { text = "MIT" }
+classifiers = ["License :: OSI Approved :: MIT License"]
+description = "Civil engineering plugin for Kerf — geospatial CRS + TIN terrain"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy",
+    "scipy",
+]
+
+[project.optional-dependencies]
+crs = [
+    "pyproj>=3.6",
+]
+
+[project.entry-points."kerf.plugins"]
+civil = "kerf_civil.plugin:register"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kerf_civil"]

@@ -2231,3 +2231,111 @@ layer required); T-135 / T-136 / T-137 are design records.
   the stub→bytes resolution flow, the optional filter, and the exact
   user-facing messages for the not-yet-hydrated state.
 - **Depends-on:** T-132
+
+---
+
+## CLI packaging + storage follow-ups + billing/migration cleanup (T-138 … T-141)
+
+Surfaced 2026-05-18 while landing T-124..T-137. T-141 is P0 (money/schema
+correctness — real bugs found by the test wave); the rest are P1.
+
+### T-138 — (reserved / skipped)
+Intentionally unused to keep T-139+ stable.
+
+### T-139 kerf-cli packaging integration into the monorepo
+- **Tier:** B
+- **Money/reach rationale:** the install story (`pip install kerf` /
+  `pipx install kerf` / `pip install 'kerf[server]'`) is the front door
+  for every self-host + cloud-client user; it must actually work from a
+  clean machine, not just as a workspace stub.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** make `packages/kerf-cli` a first-class workspace member:
+  verify the `kerf` console entry installs onto PATH from a clean
+  `pip install kerf`; the `[server]` extra pulls every required
+  `kerf-*` runtime package (kerf-core/api/auth/billing/cloud) with
+  correct version pins; root `pyproject.toml` workspace + build wiring;
+  a clean-venv smoke (`pip install -e`, `kerf --help`, `kerf serve`
+  fail-fast). Canonical docs command is `pipx install kerf`.
+- **Target files/packages:** `packages/kerf-cli/pyproject.toml`, root
+  `pyproject.toml`, a clean-install smoke test.
+- **Definition of Done:** fresh venv `pip install` (thin) and
+  `pip install '.[server]'` both yield a working `kerf` on PATH;
+  `kerf serve` fail-fast verified; smoke test green.
+- **Depends-on:** T-126
+
+### T-140 project-scoped blob-serve endpoint (`kerf hydrate` backend)
+- **Tier:** A
+- **Money/reach rationale:** `kerf hydrate` (T-137) is built but 404s —
+  the documented `GET /api/projects/{id}/blobs/{oid}` route does not
+  exist server-side, so the anti-lock-in hydrate flow is non-functional
+  end-to-end until this lands.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** add an authed, ownership-checked `GET
+  /api/projects/{pid}/blobs/{oid}` to kerf-api that streams the
+  content-addressed object (via `blob_storage_key`) for an oid the
+  project actually references (`blob_refs`); 404 otherwise. Mirror the
+  existing cover/workshop-media visibility rules.
+- **Target files/packages:** `packages/kerf-api/src/kerf_api/routes.py`
+  + a test.
+- **Definition of Done:** referenced oid → 200 + correct bytes;
+  unreferenced/cross-project oid → 404; unauth → 401; `kerf hydrate`
+  resolves against it; pytest green.
+- **Depends-on:** T-125, T-134, T-137
+
+### T-141 billing/migration correctness cleanup (coordinated, sole owner)
+- **Tier:** A
+- **Money/reach rationale:** three real production bugs + a clean-
+  baseline violation found by the T-117/T-118/T-125/T-136 wave. Money
+  correctness — must be fixed as one coordinated pass with exclusive DB
+  access (requires a schema reset) before further storage work.
+- **Priority:** P0
+- **Status:** 🚧 in progress (parent-owned, sequential — DB now free)
+- **Scope:** (a) `kerf_billing/spend.py` `_commit_paid`
+  `VALUES ($1, -$2)` → `-$2::numeric` (KerfPaid debit currently raises
+  AmbiguousFunctionError and never executes) + flip the 2
+  `xfail(strict)` tests in `test_quota.py` to real asserts; (b) fold
+  T-136's `last_unref_at` into `0011_blob_ledger.sql`'s `blob_objects`
+  CREATE TABLE, DELETE the `0012_blob_gc_last_unref_at.sql`
+  add-column shim, then integrate T-136's GC module/queries/plugin/
+  tests (from commit `9dfff29`, minus the shim); (c)
+  `cloud_user_balances.credits_usd` `numeric(12,4)` → `numeric(12,6)`
+  in the 0008 baseline so storage debits stop truncating; (d) add the
+  missing `cloud_git_repos`/`cloud_git_commits`/`cloud_git_branches`
+  clean-baseline migration (T-125's handler depends on them; they have
+  no migration in-tree). After edits: DROP SCHEMA + re-run runner →
+  assert all migrations applied, 0 back-stamped; run the full
+  billing/storage suites green.
+- **Target files/packages:** `packages/kerf-billing/src/kerf_billing/spend.py`,
+  `packages/kerf-billing/tests/test_quota.py`,
+  `packages/kerf-core/.../migrations/0008_billing.sql` + `0011_blob_ledger.sql`
+  (+ delete `0012_*`), a new `cloud_git` baseline migration,
+  `kerf_core/db/queries/blob_objects.py`, `kerf_billing/blob_gc.py`
+  + registration + tests (from 9dfff29).
+- **Definition of Done:** fresh schema reset → all migrations, 0 back-
+  stamped; `test_quota.py` fully green (no xfail); storage debit keeps
+  6dp; `cloud_git_*` tables present; T-136 GC tests green; no
+  `alter table add column` shim remains.
+- **Depends-on:** T-117, T-118, T-125, T-136 (work product 9dfff29)
+
+### T-142 Git panel does not react to collapse like the chat panel
+- **Tier:** B
+- **Money/reach rationale:** user-reported UX bug (2026-05-18, flagged
+  **priority**). The Git side panel ignores the collapse/expand
+  interaction that the Chat panel handles correctly — inconsistent,
+  feels broken, hurts the core editor experience every git user hits.
+- **Priority:** P0
+- **Status:** 🔴 not started
+- **Scope:** find how the Chat panel implements collapse/expand (the
+  correct reference — state, animation, width persistence, the
+  panel/layout store) and apply the same behavior to the Git panel so
+  collapsing/expanding it is identical to Chat. Frontend only (`src/`).
+- **Target files/packages:** `src/` editor panel/layout components
+  (the Git view + Chat view + shared panel/collapse state).
+- **Definition of Done:** collapsing/expanding the Git panel behaves
+  identically to Chat (toggle, animation, persisted width); vitest on
+  the shared logic where testable. NOTE: cannot be browser-tested by an
+  agent — needs user verification on dev (one change, then confirm),
+  per the UI-polish loop convention.
+- **Depends-on:** none

@@ -383,15 +383,21 @@ class AnthropicProvider(Provider):
                 messages.append({"role": m.role, "content": m.content})
             i += 1
 
-        response = client.messages.create(
+        # Only send temperature when explicitly set (>0). Passing
+        # temperature=None serializes to JSON null, which Anthropic now
+        # rejects with 400 "temperature: Input should be a valid number"
+        # — that broke chat for every model.
+        _kw = dict(
             model=req.model,
             system=system_param,
             max_tokens=max_tokens,
-            temperature=req.temperature if req.temperature > 0 else None,
             messages=messages,
             tools=tools,
             tool_choice=tool_choice,
         )
+        if req.temperature > 0:
+            _kw["temperature"] = req.temperature
+        response = client.messages.create(**_kw)
 
         text_parts = []
         tool_calls = []
@@ -466,12 +472,15 @@ class OpenAIProvider(Provider):
             extra_body["tools"] = tools
             if req.tool_choice and req.tool_choice != "auto":
                 extra_body["tool_choice"] = req.tool_choice
+        # Omit temperature unless set (None → null is rejected by some
+        # providers; see the Anthropic note above).
+        if req.temperature > 0:
+            extra_body["temperature"] = req.temperature
 
         response = client.chat.completions.create(
             model=req.model,
             messages=messages,
             max_tokens=req.max_tokens if req.max_tokens > 0 else None,
-            temperature=req.temperature if req.temperature > 0 else None,
             **extra_body,
         )
 
@@ -544,12 +553,15 @@ class MoonshotProvider(Provider):
         extra_body = {}
         if tools:
             extra_body["tools"] = tools
+        # Omit temperature unless set (None → null is rejected by some
+        # providers; see the Anthropic note above).
+        if req.temperature > 0:
+            extra_body["temperature"] = req.temperature
 
         response = client.chat.completions.create(
             model=req.model,
             messages=messages,
             max_tokens=req.max_tokens if req.max_tokens > 0 else None,
-            temperature=req.temperature if req.temperature > 0 else None,
             **extra_body,
         )
 

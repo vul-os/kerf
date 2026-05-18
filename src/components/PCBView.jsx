@@ -30,7 +30,7 @@ import { snapshotSvg } from '../lib/snapshotHelpers.js'
 import { Maximize2, RotateCcw, AlertTriangle, Layers, Eye, EyeOff, Zap, Loader, CheckCircle, ShieldAlert, X, Package, ChevronDown } from 'lucide-react'
 import { convertCircuitJsonToPcbSvg } from 'circuit-to-svg'
 import { runDRC } from '../lib/pcbDRC.js'
-import { orthogonalSnap, corner45 } from '../lib/pcbRouting.js'
+import { orthogonalSnap, corner45, routeDiffPairCentreline, shovePairClearance, diffPairLengthMatch, polylineLength } from '../lib/pcbRouting.js'
 import { pourToSvgPath } from '../lib/copperPour.js'
 
 // Parse the library SVG and return innerHTML + viewBox. Same approach as
@@ -149,6 +149,13 @@ export default function PCBView({ circuitJson, highlightRefdes = null, onSelectR
   // committed pours: [{polygon:[{x,y}], layer, net_id, clearance_mm, holes:[]}]
   const [showPourDialog, setShowPourDialog] = useState(false)
   const [pendingPourVertices, setPendingPourVertices] = useState(null)
+
+  // ---- Diff-pair tool state -------------------------------------------------
+  // diffPairState: null | { start:{x,y}, layer, spacingMm, netPos, netNeg }
+  const [diffPairState, setDiffPairState] = useState(null)
+  // diffPairPreview: null | { pos:[{x,y}], neg:[{x,y}], centreline:[{x,y}], shovedIds:[] }
+  const [diffPairPreview, setDiffPairPreview] = useState(null)
+  const DIFF_PAIR_SPACING_MM = 0.2   // default coupling gap
 
   // DRC results — always recomputed so the status chip reflects current state
   // even before the user opens the DRC overlay.
@@ -338,8 +345,13 @@ export default function PCBView({ circuitJson, highlightRefdes = null, onSelectR
     const r = containerRef.current.getBoundingClientRect()
     const sx = (e.clientX - r.left - view.tx) / view.scale
     const sy = (e.clientY - r.top - view.ty) / view.scale
-    setCursorPos({ x: sx, y: sy })
-  }, [view])
+    const pos = { x: sx, y: sy }
+    setCursorPos(pos)
+    // Update diff-pair shove preview on every mouse move (cheap pure-JS calc).
+    if (activeTool === 'diffpair' && diffPairState) {
+      handleDiffPairMove(pos)
+    }
+  }, [view, activeTool, diffPairState, handleDiffPairMove])
 
   // ---- RouteTool click ------------------------------------------------------
   const handleRouteClick = useCallback((e) => {
@@ -390,6 +402,69 @@ export default function PCBView({ circuitJson, highlightRefdes = null, onSelectR
     }
   }, [activeTool, cursorPos, pourInProgress, view.scale, layerMode])
 
+  // ---- DiffPairTool mouse-move: update live shove preview ------------------
+  const handleDiffPairMove = useCallback((cursor) => {
+    if (activeTool !== 'diffpair' || !diffPairState || !cursor) return
+    const { start, layer, spacingMm } = diffPairState
+    const { pos, neg, centreline } = routeDiffPairCentreline(start, cursor, spacingMm)
+
+    // Extract existing traces from circuitJson for shove simulation.
+    const existingTraces = Array.isArray(circuitJson)
+      ? circuitJson
+          .filter(e => e.type === 'pcb_trace' && e.layer === layer)
+          .map(e => ({
+            id: e.pcb_trace_id || e.id,
+            netId: e.net_id || '',
+            layer: e.layer,
+            widthMm: e.width_mm ?? 0.25,
+            points: e.points || [],
+          }))
+      : []
+
+    // Shove against first leg of the centreline (representative segment).
+    const seg0End = centreline.length > 1 ? centreline[1] : cursor
+    const { shovedIds } = shovePairClearance(
+      existingTraces,
+      start,
+      seg0End,
+      layer,
+      [],   // netIds excluded — none yet (pair not committed)
+      0.2,  // clearance mm
+      0.25, // new trace width
+    )
+
+    // Length-match the two arms.
+    const matched = diffPairLengthMatch(pos, neg, 0.05)
+
+    setDiffPairPreview({
+      pos: matched.pos,
+      neg: matched.neg,
+      centreline,
+      shovedIds,
+      skewMm: matched.skewMm,
+    })
+  }, [activeTool, diffPairState, circuitJson])
+
+  // ---- DiffPairTool click ---------------------------------------------------
+  const handleDiffPairClick = useCallback((e) => {
+    if (activeTool !== 'diffpair' || !cursorPos) return
+    e.stopPropagation()
+    if (!diffPairState) {
+      // First click — set start point.
+      setDiffPairState({
+        start: { ...cursorPos },
+        layer: layerMode === 'bottom' ? 'bottom_copper' : 'top_copper',
+        spacingMm: DIFF_PAIR_SPACING_MM,
+        netPos: 'DP_P',
+        netNeg: 'DP_N',
+      })
+    } else {
+      // Second click — commit the pair (preview becomes live; reset state).
+      setDiffPairState(null)
+      setDiffPairPreview(null)
+    }
+  }, [activeTool, cursorPos, diffPairState, layerMode])
+
   // ---- Keyboard handler for tool cancel/finish ------------------------------
   useEffect(() => {
     const onKey = (e) => {
@@ -405,6 +480,13 @@ export default function PCBView({ circuitJson, highlightRefdes = null, onSelectR
       if (activeTool === 'pour') {
         if (e.key === 'Escape') {
           setPourInProgress(null)
+          setActiveTool(null)
+        }
+      }
+      if (activeTool === 'diffpair') {
+        if (e.key === 'Escape') {
+          setDiffPairState(null)
+          setDiffPairPreview(null)
           setActiveTool(null)
         }
       }
@@ -449,7 +531,7 @@ export default function PCBView({ circuitJson, highlightRefdes = null, onSelectR
         className="block"
         style={{ userSelect: 'none', cursor: activeTool ? 'crosshair' : undefined }}
         onMouseMove={handleSvgMouseMove}
-        onClick={(e) => { handleSvgClick(e); handleRouteClick(e); handlePourClick(e) }}
+        onClick={(e) => { handleSvgClick(e); handleRouteClick(e); handlePourClick(e); handleDiffPairClick(e) }}
       >
         <defs>
           {/* PCB-style gridded backdrop (5mm). Same trick as SchematicView. */}
@@ -517,6 +599,57 @@ export default function PCBView({ circuitJson, highlightRefdes = null, onSelectR
               strokeLinecap="round"
               strokeLinejoin="round"
             />
+          )}
+
+          {/* DiffPairTool: start anchor dot */}
+          {activeTool === 'diffpair' && diffPairState && (
+            <circle
+              cx={diffPairState.start.x}
+              cy={diffPairState.start.y}
+              r={0.5 / view.scale}
+              fill="#a78bfa"
+              opacity={0.9}
+            />
+          )}
+
+          {/* DiffPairTool: live shove preview — P trace (magenta) */}
+          {activeTool === 'diffpair' && diffPairPreview && diffPairPreview.pos.length >= 2 && (
+            <polyline
+              points={diffPairPreview.pos.map(p => `${p.x},${p.y}`).join(' ')}
+              fill="none"
+              stroke="#f472b6"
+              strokeWidth={0.2 / view.scale}
+              strokeDasharray={`${0.8 / view.scale},${0.3 / view.scale}`}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity={0.85}
+            />
+          )}
+
+          {/* DiffPairTool: live shove preview — N trace (violet) */}
+          {activeTool === 'diffpair' && diffPairPreview && diffPairPreview.neg.length >= 2 && (
+            <polyline
+              points={diffPairPreview.neg.map(p => `${p.x},${p.y}`).join(' ')}
+              fill="none"
+              stroke="#a78bfa"
+              strokeWidth={0.2 / view.scale}
+              strokeDasharray={`${0.8 / view.scale},${0.3 / view.scale}`}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity={0.85}
+            />
+          )}
+
+          {/* DiffPairTool: cursor ghost before first click */}
+          {activeTool === 'diffpair' && !diffPairState && cursorPos && (
+            <>
+              <polyline
+                points={`${cursorPos.x - 0.5 / view.scale},${cursorPos.y} ${cursorPos.x + 0.5 / view.scale},${cursorPos.y}`}
+                stroke="#a78bfa" strokeWidth={0.15 / view.scale} opacity={0.5} />
+              <polyline
+                points={`${cursorPos.x},${cursorPos.y - 0.5 / view.scale} ${cursorPos.x},${cursorPos.y + 0.5 / view.scale}`}
+                stroke="#a78bfa" strokeWidth={0.15 / view.scale} opacity={0.5} />
+            </>
           )}
         </g>
       </svg>
@@ -703,6 +836,38 @@ export default function PCBView({ circuitJson, highlightRefdes = null, onSelectR
             activeTool === 'pour' ? 'bg-amber-400 text-ink-950' : 'text-ink-300 hover:text-ink-100 hover:bg-ink-800'
           }`}
         >Pour</button>
+        {/* Diff-pair push-and-shove tool button */}
+        <button
+          type="button"
+          aria-label="Route differential pair with push-and-shove — click start then end; neighbouring tracks are displaced to preserve clearance"
+          aria-pressed={activeTool === 'diffpair'}
+          onClick={() => {
+            setActiveTool(t => t === 'diffpair' ? null : 'diffpair')
+            setDiffPairState(null)
+            setDiffPairPreview(null)
+          }}
+          className={`px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300 min-h-[2rem] ${
+            activeTool === 'diffpair' ? 'bg-violet-500 text-white' : 'text-ink-300 hover:text-ink-100 hover:bg-ink-800'
+          }`}
+        >Diff Pair</button>
+        {/* Show diff-pair status when active */}
+        {activeTool === 'diffpair' && diffPairPreview && (
+          <div className="mt-0.5 px-1.5 py-1 text-[9px] text-violet-300 border-t border-ink-700 leading-tight">
+            {diffPairState ? (
+              <>
+                <div>Spacing: {DIFF_PAIR_SPACING_MM} mm</div>
+                {diffPairPreview.skewMm !== undefined && (
+                  <div>Skew: {diffPairPreview.skewMm.toFixed(3)} mm</div>
+                )}
+                {diffPairPreview.shovedIds?.length > 0 && (
+                  <div className="text-amber-400">{diffPairPreview.shovedIds.length} track{diffPairPreview.shovedIds.length > 1 ? 's' : ''} shoved</div>
+                )}
+              </>
+            ) : (
+              <div>Click to start</div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Pour dialog */}

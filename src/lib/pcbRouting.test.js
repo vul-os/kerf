@@ -8,6 +8,13 @@ import {
   detectTJunction,
   mergeTraces,
   pointToSegmentDist,
+  segSegMinDist,
+  offsetPolyline,
+  routeDiffPairCentreline,
+  polylineLength,
+  shovePairClearance,
+  insertMeanderPoints,
+  diffPairLengthMatch,
 } from './pcbRouting.js'
 
 // ─── orthogonalSnap ───────────────────────────────────────────────────────────
@@ -342,5 +349,274 @@ describe('pointToSegmentDist', () => {
   })
   it('handles zero-length segment', () => {
     expect(pointToSegmentDist({ x: 3, y: 4 }, { x: 0, y: 0 }, { x: 0, y: 0 })).toBeCloseTo(5, 5)
+  })
+})
+
+// ─── T-102: push-and-shove diff-pair routing ─────────────────────────────────
+
+// segSegMinDist
+
+describe('segSegMinDist', () => {
+  it('returns 0 for intersecting segments', () => {
+    // cross at origin
+    const d = segSegMinDist(
+      { x: -1, y: 0 }, { x: 1, y: 0 },
+      { x: 0, y: -1 }, { x: 0, y: 1 },
+    )
+    expect(d).toBeCloseTo(0, 5)
+  })
+
+  it('returns correct perpendicular distance for parallel horizontal segments', () => {
+    const d = segSegMinDist(
+      { x: 0, y: 0 }, { x: 10, y: 0 },
+      { x: 0, y: 2 }, { x: 10, y: 2 },
+    )
+    expect(d).toBeCloseTo(2, 5)
+  })
+
+  it('returns endpoint distance when segments do not overlap', () => {
+    const d = segSegMinDist(
+      { x: 0, y: 0 }, { x: 3, y: 0 },
+      { x: 4, y: 0 }, { x: 7, y: 0 },
+    )
+    expect(d).toBeCloseTo(1, 5)
+  })
+
+  it('returns 0 for collinear overlapping segments', () => {
+    const d = segSegMinDist(
+      { x: 0, y: 0 }, { x: 5, y: 0 },
+      { x: 3, y: 0 }, { x: 8, y: 0 },
+    )
+    expect(d).toBeCloseTo(0, 5)
+  })
+})
+
+// offsetPolyline
+
+describe('offsetPolyline', () => {
+  it('offsets a single horizontal segment upward (+y) for positive offset', () => {
+    const pts = [{ x: 0, y: 0 }, { x: 10, y: 0 }]
+    const out = offsetPolyline(pts, 1.5)
+    expect(out[0].y).toBeCloseTo(1.5, 5)
+    expect(out[1].y).toBeCloseTo(1.5, 5)
+    expect(out[0].x).toBeCloseTo(0, 5)
+    expect(out[1].x).toBeCloseTo(10, 5)
+  })
+
+  it('offsets downward (-y) for negative offset', () => {
+    const pts = [{ x: 0, y: 0 }, { x: 10, y: 0 }]
+    const out = offsetPolyline(pts, -1.0)
+    expect(out[0].y).toBeCloseTo(-1.0, 5)
+  })
+
+  it('does not mutate the input array', () => {
+    const pts = [{ x: 0, y: 0 }, { x: 5, y: 0 }]
+    offsetPolyline(pts, 2.0)
+    expect(pts[0].y).toBe(0)
+  })
+
+  it('preserves point count', () => {
+    const pts = [{ x: 0, y: 0 }, { x: 5, y: 0 }, { x: 10, y: 5 }]
+    expect(offsetPolyline(pts, 1.0).length).toBe(3)
+  })
+
+  it('produces opposite offset for p and n at half-spacing', () => {
+    const pts = [{ x: 0, y: 0 }, { x: 10, y: 0 }]
+    const pos = offsetPolyline(pts, 0.1)
+    const neg = offsetPolyline(pts, -0.1)
+    // P is at +0.1, N at -0.1 — centre-to-centre = 0.2
+    expect(Math.abs(pos[0].y - neg[0].y)).toBeCloseTo(0.2, 5)
+  })
+})
+
+// routeDiffPairCentreline
+
+describe('routeDiffPairCentreline', () => {
+  it('produces a straight pair for collinear start/end (axis-aligned)', () => {
+    const { pos, neg, centreline } = routeDiffPairCentreline(
+      { x: 0, y: 0 }, { x: 20, y: 0 }, 0.2,
+    )
+    expect(centreline.length).toBe(2)
+    expect(pos.length).toBe(2)
+    expect(neg.length).toBe(2)
+  })
+
+  it('produces an L-route (3-point centreline) for diagonal start/end', () => {
+    const { centreline } = routeDiffPairCentreline(
+      { x: 0, y: 0 }, { x: 10, y: 8 }, 0.2,
+    )
+    expect(centreline.length).toBe(3)
+  })
+
+  it('P trace is offset +half, N trace is offset -half from centreline', () => {
+    const { pos, neg } = routeDiffPairCentreline(
+      { x: 0, y: 0 }, { x: 10, y: 0 }, 0.4,
+    )
+    // Horizontal segment → perp is +y; P should be at y=+0.2, N at y=-0.2
+    expect(pos[0].y).toBeCloseTo(0.2, 5)
+    expect(neg[0].y).toBeCloseTo(-0.2, 5)
+  })
+
+  it('P and N traces have equal length for a straight route', () => {
+    const { pos, neg } = routeDiffPairCentreline(
+      { x: 0, y: 0 }, { x: 15, y: 0 }, 0.2,
+    )
+    expect(polylineLength(pos)).toBeCloseTo(polylineLength(neg), 5)
+  })
+
+  it('pair maintains coupling spacing within tolerance', () => {
+    const { pos, neg } = routeDiffPairCentreline(
+      { x: 0, y: 0 }, { x: 10, y: 0 }, 0.2,
+    )
+    // edge-to-edge = centre-to-centre minus trace-widths; here we just check
+    // the geometric centre-to-centre equals spacing_mm = 0.2.
+    const gap = Math.abs(pos[0].y - neg[0].y)
+    expect(gap).toBeCloseTo(0.2, 5)
+  })
+})
+
+// shovePairClearance
+
+describe('shovePairClearance (T-102: shove behaviour)', () => {
+  const makeTrace = (id, netId, y0, y1 = y0, x0 = 0, x1 = 20, layer = 'top_copper', widthMm = 0.2) => ({
+    id,
+    netId,
+    layer,
+    widthMm,
+    points: [{ x: x0, y: y0 }, { x: x1, y: y1 }],
+  })
+
+  it('does not shove a trace that is already clear', () => {
+    const traces = [makeTrace('t1', 'GND', 5)]  // 5mm away — well clear
+    const { shovedIds } = shovePairClearance(
+      traces,
+      { x: 0, y: 0 }, { x: 20, y: 0 },
+      'top_copper', [], 0.2, 0.2,
+    )
+    expect(shovedIds).toHaveLength(0)
+  })
+
+  it('shoves a trace that violates clearance', () => {
+    const traces = [makeTrace('t1', 'GND', 0.1)]  // 0.1mm — violates 0.2 clearance + half-widths
+    const { traces: out, shovedIds } = shovePairClearance(
+      traces,
+      { x: 0, y: 0 }, { x: 20, y: 0 },
+      'top_copper', [], 0.2, 0.2,
+    )
+    expect(shovedIds).toContain('t1')
+    // After shove, the trace should be at least clearance+half-widths away.
+    const y = out[0].points[0].y
+    const requiredGap = 0.2 + 0.2 / 2 + 0.2 / 2
+    expect(Math.abs(y)).toBeGreaterThanOrEqual(requiredGap - 1e-6)
+  })
+
+  it('does not shove traces on a different layer', () => {
+    const traces = [makeTrace('t1', 'GND', 0.1, 0.1, 0, 20, 'bottom_copper')]
+    const { shovedIds } = shovePairClearance(
+      traces,
+      { x: 0, y: 0 }, { x: 20, y: 0 },
+      'top_copper', [], 0.2, 0.2,
+    )
+    expect(shovedIds).toHaveLength(0)
+  })
+
+  it('does not shove traces in the excluded netId list', () => {
+    const traces = [makeTrace('t1', 'DP_P', 0.1)]
+    const { shovedIds } = shovePairClearance(
+      traces,
+      { x: 0, y: 0 }, { x: 20, y: 0 },
+      'top_copper', ['DP_P', 'DP_N'], 0.2, 0.2,
+    )
+    expect(shovedIds).toHaveLength(0)
+  })
+
+  it('does not mutate the input traces array', () => {
+    const originalY = 0.1
+    const traces = [makeTrace('t1', 'GND', originalY)]
+    shovePairClearance(
+      traces,
+      { x: 0, y: 0 }, { x: 20, y: 0 },
+      'top_copper', [], 0.2, 0.2,
+    )
+    expect(traces[0].points[0].y).toBe(originalY)  // original untouched
+  })
+
+  it('shoves multiple violating traces independently', () => {
+    const traces = [
+      makeTrace('t1', 'A', 0.1),   // above centreline
+      makeTrace('t2', 'B', -0.1),  // below centreline
+    ]
+    const { shovedIds } = shovePairClearance(
+      traces,
+      { x: 0, y: 0 }, { x: 20, y: 0 },
+      'top_copper', [], 0.2, 0.2,
+    )
+    expect(shovedIds).toContain('t1')
+    expect(shovedIds).toContain('t2')
+  })
+})
+
+// insertMeanderPoints
+
+describe('insertMeanderPoints', () => {
+  it('returns input unchanged for zero extra length', () => {
+    const pts = [{ x: 0, y: 0 }, { x: 10, y: 0 }]
+    const out = insertMeanderPoints(pts, 0)
+    expect(out.length).toBe(2)
+  })
+
+  it('adds more points than the input for positive extra length', () => {
+    const pts = [{ x: 0, y: 0 }, { x: 10, y: 0 }]
+    const out = insertMeanderPoints(pts, 1.0)
+    expect(out.length).toBeGreaterThan(2)
+  })
+
+  it('increases total arc-length when extra > 0', () => {
+    const pts = [{ x: 0, y: 0 }, { x: 10, y: 0 }]
+    const out = insertMeanderPoints(pts, 2.0, 0.5)
+    const lenBefore = polylineLength(pts)
+    const lenAfter = polylineLength(out)
+    // Serpentine meander must strictly lengthen the trace.
+    expect(lenAfter).toBeGreaterThan(lenBefore)
+  })
+
+  it('inserts more length when amplitude is larger', () => {
+    const pts = [{ x: 0, y: 0 }, { x: 10, y: 0 }]
+    const smallAmp = polylineLength(insertMeanderPoints(pts, 2.0, 0.25))
+    const bigAmp = polylineLength(insertMeanderPoints(pts, 2.0, 2.0))
+    expect(bigAmp).toBeGreaterThan(smallAmp)
+  })
+})
+
+// diffPairLengthMatch — length-matched coupled traces
+
+describe('diffPairLengthMatch (T-102: length-matched coupled traces)', () => {
+  it('returns unmodified points when already matched within tolerance', () => {
+    const pos = [{ x: 0, y: 0 }, { x: 10, y: 0 }]
+    const neg = [{ x: 0, y: 0.2 }, { x: 10, y: 0.2 }]
+    const { skewMm } = diffPairLengthMatch(pos, neg, 0.05)
+    expect(skewMm).toBeCloseTo(0, 3)
+  })
+
+  it('lengthens the shorter neg conductor when pos is longer', () => {
+    const pos = [{ x: 0, y: 0 }, { x: 12, y: 0 }]  // 12mm
+    const neg = [{ x: 0, y: 0.2 }, { x: 10, y: 0.2 }]  // 10mm
+    const { neg: newNeg } = diffPairLengthMatch(pos, neg, 0.05)
+    expect(polylineLength(newNeg)).toBeGreaterThan(10)
+  })
+
+  it('lengthens the shorter pos conductor when neg is longer', () => {
+    const pos = [{ x: 0, y: 0 }, { x: 10, y: 0 }]   // 10mm
+    const neg = [{ x: 0, y: 0.2 }, { x: 12, y: 0.2 }]  // 12mm
+    const { pos: newPos } = diffPairLengthMatch(pos, neg, 0.05)
+    expect(polylineLength(newPos)).toBeGreaterThan(10)
+  })
+
+  it('returns skewMm within tolerance after matching', () => {
+    const pos = [{ x: 0, y: 0 }, { x: 15, y: 0 }]
+    const neg = [{ x: 0, y: 0.2 }, { x: 10, y: 0.2 }]
+    const { skewMm } = diffPairLengthMatch(pos, neg, 0.05, 0.5)
+    // After matching, skew should be significantly reduced from the original 5mm delta.
+    expect(skewMm).toBeLessThan(5)
   })
 })

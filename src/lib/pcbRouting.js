@@ -9,6 +9,316 @@ function dist2(a, b) {
   return Math.sqrt(dx * dx + dy * dy)
 }
 
+// ─── segSegMinDist ─────────────────────────────────────────────────────────────
+
+/**
+ * Minimum distance between two line segments [a1,a2] and [b1,b2].
+ * Returns 0 when they intersect.
+ *
+ * @param {{x:number,y:number}} a1
+ * @param {{x:number,y:number}} a2
+ * @param {{x:number,y:number}} b1
+ * @param {{x:number,y:number}} b2
+ * @returns {number}
+ */
+export function segSegMinDist(a1, a2, b1, b2) {
+  const dx1 = a2.x - a1.x, dy1 = a2.y - a1.y
+  const dx2 = b2.x - b1.x, dy2 = b2.y - b1.y
+  const cx = b1.x - a1.x, cy = b1.y - a1.y
+  const len1sq = dx1 * dx1 + dy1 * dy1
+  const len2sq = dx2 * dx2 + dy2 * dy2
+
+  function ptSegDist(p, a, b) {
+    const ddx = b.x - a.x, ddy = b.y - a.y
+    const lsq = ddx * ddx + ddy * ddy
+    if (lsq === 0) return dist2(p, a)
+    const t = Math.max(0, Math.min(1, ((p.x - a.x) * ddx + (p.y - a.y) * ddy) / lsq))
+    return dist2(p, { x: a.x + t * ddx, y: a.y + t * ddy })
+  }
+
+  if (len1sq === 0 && len2sq === 0) return dist2(a1, b1)
+  if (len1sq === 0) return ptSegDist(a1, b1, b2)
+  if (len2sq === 0) return ptSegDist(b1, a1, a2)
+
+  const det = dx1 * dy2 - dy1 * dx2
+  if (Math.abs(det) > 1e-12) {
+    const t = (cx * dy2 - cy * dx2) / det
+    const u = (cx * dy1 - cy * dx1) / det
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1) return 0
+  }
+
+  return Math.min(
+    ptSegDist(a1, b1, b2),
+    ptSegDist(a2, b1, b2),
+    ptSegDist(b1, a1, a2),
+    ptSegDist(b2, a1, a2),
+  )
+}
+
+// ─── diff-pair geometry ───────────────────────────────────────────────────────
+
+/**
+ * Offset a polyline of {x,y} points perpendicularly by `offset` mm.
+ * Uses the CCW perpendicular of each segment; at corners the offset vector is
+ * the average of the two adjacent normals (miter approximation).
+ *
+ * @param {Array<{x:number,y:number}>} points
+ * @param {number} offset   positive = CCW (left), negative = CW (right)
+ * @returns {Array<{x:number,y:number}>}
+ */
+export function offsetPolyline(points, offset) {
+  const n = points.length
+  if (n < 2) return points.map(p => ({ ...p }))
+
+  // Per-segment perpendicular unit vectors (CCW)
+  const perps = []
+  for (let i = 0; i < n - 1; i++) {
+    const dx = points[i + 1].x - points[i].x
+    const dy = points[i + 1].y - points[i].y
+    const len = Math.sqrt(dx * dx + dy * dy) || 1
+    perps.push({ x: -dy / len, y: dx / len })
+  }
+
+  return points.map((pt, i) => {
+    let px, py
+    if (i === 0) {
+      px = perps[0].x; py = perps[0].y
+    } else if (i === n - 1) {
+      px = perps[n - 2].x; py = perps[n - 2].y
+    } else {
+      px = (perps[i - 1].x + perps[i].x) / 2
+      py = (perps[i - 1].y + perps[i].y) / 2
+      const mag = Math.sqrt(px * px + py * py) || 1
+      px /= mag; py /= mag
+    }
+    return { x: pt.x + px * offset, y: pt.y + py * offset }
+  })
+}
+
+/**
+ * Route a differential pair from `start` to `end` along a centreline path.
+ * Returns `{ pos, neg }` — two arrays of {x,y} points for P and N conductors.
+ *
+ * The centreline is constructed as an L-route (horizontal-first then vertical)
+ * when start and end are not collinear, giving deterministic geometry.
+ *
+ * @param {{x:number,y:number}} start
+ * @param {{x:number,y:number}} end
+ * @param {number} spacingMm  edge-to-edge coupling gap in mm
+ * @returns {{ pos: Array<{x,y}>, neg: Array<{x,y}>, centreline: Array<{x,y}> }}
+ */
+export function routeDiffPairCentreline(start, end, spacingMm) {
+  const half = spacingMm / 2
+  const dx = end.x - start.x
+  const dy = end.y - start.y
+
+  let centreline
+  if (Math.abs(dx) < 1e-9 || Math.abs(dy) < 1e-9) {
+    centreline = [{ ...start }, { ...end }]
+  } else {
+    centreline = [{ ...start }, { x: end.x, y: start.y }, { ...end }]
+  }
+
+  return {
+    pos: offsetPolyline(centreline, +half),
+    neg: offsetPolyline(centreline, -half),
+    centreline,
+  }
+}
+
+/**
+ * Compute total polyline arc-length for an array of {x,y} points.
+ *
+ * @param {Array<{x:number,y:number}>} pts
+ * @returns {number} length in mm
+ */
+export function polylineLength(pts) {
+  let len = 0
+  for (let i = 1; i < pts.length; i++) len += dist2(pts[i - 1], pts[i])
+  return len
+}
+
+/**
+ * Shove existing traces to respect `clearanceMm` + half-width of each side
+ * when a new diff-pair segment is being dragged through the board.
+ *
+ * Only traces on the same `layer` and different `netId` are displaced.
+ * The shove translates each offending trace perpendicularly away from the
+ * new centreline by the penetration distance (up to `maxPasses` iterations
+ * to handle cascading shoves).
+ *
+ * @param {Array<{id:string, netId:string, layer:string, widthMm:number, points:Array<{x,y}>}>} traces
+ * @param {{x:number,y:number}} segStart  new segment start (centreline)
+ * @param {{x:number,y:number}} segEnd    new segment end (centreline)
+ * @param {string} layer
+ * @param {string[]} diffPairNetIds  [netPos, netNeg] — excluded from shove
+ * @param {number} clearanceMm
+ * @param {number} newWidthMm       half-widths of the new P and N traces
+ * @param {number} [maxPasses=4]
+ * @returns {{ traces: Array<object>, shovedIds: string[] }}
+ */
+export function shovePairClearance(
+  traces,
+  segStart,
+  segEnd,
+  layer,
+  diffPairNetIds,
+  clearanceMm,
+  newWidthMm,
+  maxPasses = 4,
+) {
+  // Deep-clone so callers' arrays are not mutated.
+  let working = traces.map(t => ({ ...t, points: t.points.map(p => ({ ...p })) }))
+  const shovedIds = []
+
+  for (let pass = 0; pass < maxPasses; pass++) {
+    let changed = false
+
+    for (let i = 0; i < working.length; i++) {
+      const tr = working[i]
+      if (tr.layer !== layer) continue
+      if (diffPairNetIds.includes(tr.netId)) continue
+
+      const trWidth = tr.widthMm ?? 0.25
+      const requiredGap = clearanceMm + newWidthMm / 2 + trWidth / 2
+
+      // Check every segment of the trace against the new segment.
+      const pts = tr.points
+      let minDist = Infinity
+      for (let k = 0; k < pts.length - 1; k++) {
+        const d = segSegMinDist(segStart, segEnd, pts[k], pts[k + 1])
+        if (d < minDist) minDist = d
+      }
+
+      if (minDist >= requiredGap - 1e-9) continue
+
+      const penetration = requiredGap - minDist
+
+      // Shove perpendicular to new segment.
+      const dx = segEnd.x - segStart.x
+      const dy = segEnd.y - segStart.y
+      const len = Math.sqrt(dx * dx + dy * dy) || 1
+      const px = -dy / len   // CCW perp
+      const py = dx / len
+
+      // Determine which side of the new segment the trace centre sits.
+      const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length
+      const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length
+      const mx = (segStart.x + segEnd.x) / 2
+      const my = (segStart.y + segEnd.y) / 2
+      const sign = ((cx - mx) * px + (cy - my) * py) >= 0 ? 1 : -1
+
+      const shoveX = px * sign * penetration
+      const shoveY = py * sign * penetration
+
+      working[i] = {
+        ...tr,
+        points: tr.points.map(p => ({ x: p.x + shoveX, y: p.y + shoveY })),
+      }
+      if (!shovedIds.includes(tr.id)) shovedIds.push(tr.id)
+      changed = true
+    }
+
+    if (!changed) break
+  }
+
+  return { traces: working, shovedIds }
+}
+
+/**
+ * Adjust the length of a diff-pair arm (array of points) by inserting a
+ * one-tooth serpentine meander on the longest segment.  Adds approximately
+ * `extraMm` mm of arc length.
+ *
+ * @param {Array<{x:number,y:number}>} pts
+ * @param {number} extraMm
+ * @param {number} [amplitude=0.5]  meander half-width in mm
+ * @returns {Array<{x:number,y:number}>}
+ */
+export function insertMeanderPoints(pts, extraMm, amplitude = 0.5) {
+  if (!pts || pts.length < 2 || extraMm < 1e-6) return pts
+
+  // Find longest segment.
+  let bestI = 0, bestLen = 0
+  for (let i = 0; i < pts.length - 1; i++) {
+    const l = dist2(pts[i], pts[i + 1])
+    if (l > bestLen) { bestLen = l; bestI = i }
+  }
+
+  const a = pts[bestI], b = pts[bestI + 1]
+  const dx = b.x - a.x, dy = b.y - a.y
+  const segLen = Math.sqrt(dx * dx + dy * dy) || 1
+  const ux = dx / segLen, uy = dy / segLen
+  const px = -uy, py = ux   // CCW perp
+
+  const extraPerTooth = 2 * amplitude
+  const nTeeth = Math.max(1, Math.ceil(extraMm / extraPerTooth))
+
+  const newPts = [{ ...a }]
+  let sign = 1
+  for (let i = 0; i < nTeeth; i++) {
+    const t0 = i / nTeeth
+    const t1 = (i + 0.5) / nTeeth
+    const t2 = (i + 1) / nTeeth
+    // start of tooth
+    newPts.push({
+      x: a.x + ux * segLen * t0, y: a.y + uy * segLen * t0,
+    })
+    // peak
+    newPts.push({
+      x: a.x + ux * segLen * t1 + px * amplitude * sign,
+      y: a.y + uy * segLen * t1 + py * amplitude * sign,
+    })
+    // end of tooth
+    newPts.push({
+      x: a.x + ux * segLen * t2, y: a.y + uy * segLen * t2,
+    })
+    sign = -sign
+  }
+  newPts.push({ ...b })
+
+  // Deduplicate within 1e-9.
+  const deduped = [newPts[0]]
+  for (let i = 1; i < newPts.length; i++) {
+    if (dist2(deduped[deduped.length - 1], newPts[i]) > 1e-9) deduped.push(newPts[i])
+  }
+
+  return [...pts.slice(0, bestI), ...deduped, ...pts.slice(bestI + 2)]
+}
+
+/**
+ * Length-match two diff-pair arms so |lenPos − lenNeg| ≤ skewToleranceMm.
+ * Inserts a serpentine on the shorter arm.
+ *
+ * @param {Array<{x,y}>} posPoints
+ * @param {Array<{x,y}>} negPoints
+ * @param {number} [skewToleranceMm=0.05]
+ * @param {number} [amplitude=0.5]
+ * @returns {{ pos: Array<{x,y}>, neg: Array<{x,y}>, skewMm: number }}
+ */
+export function diffPairLengthMatch(posPoints, negPoints, skewToleranceMm = 0.05, amplitude = 0.5) {
+  const lenPos = polylineLength(posPoints)
+  const lenNeg = polylineLength(negPoints)
+  let pos = posPoints, neg = negPoints
+
+  const delta = lenPos - lenNeg
+  if (Math.abs(delta) > skewToleranceMm) {
+    if (delta > 0) {
+      // pos is longer — lengthen neg
+      neg = insertMeanderPoints(neg, delta, amplitude)
+    } else {
+      // neg is longer — lengthen pos
+      pos = insertMeanderPoints(pos, -delta, amplitude)
+    }
+  }
+
+  return {
+    pos,
+    neg,
+    skewMm: Math.abs(polylineLength(pos) - polylineLength(neg)),
+  }
+}
+
 function ptEq(a, b, tol = 1e-9) {
   return Math.abs(a.x - b.x) <= tol && Math.abs(a.y - b.y) <= tol
 }

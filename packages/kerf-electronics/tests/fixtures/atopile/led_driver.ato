@@ -1,0 +1,17 @@
+import Resistor from "generics/resistors.ato"
+import LED from "generics/leds.ato"
+
+module LEDDriver:
+    signal vcc
+    signal gnd
+    signal ctrl
+
+    r1 = new Resistor
+    r1.value = 330ohm
+
+    led1 = new LED
+    led1.color = "red"
+
+    r1.p1 ~ vcc
+    r1.p2 ~ led1.anode
+    led1.cathode ~ gnd

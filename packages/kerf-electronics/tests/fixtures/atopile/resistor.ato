@@ -1,0 +1,6 @@
+import Resistor from "generics/resistors.ato"
+
+component Resistor:
+    pin p1
+    pin p2
+    signal value

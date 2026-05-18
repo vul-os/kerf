@@ -1,0 +1,14 @@
+import Resistor from "generics/resistors.ato"
+
+module VoltageDivider:
+    signal vin
+    signal vout
+    signal gnd
+    r1 = new Resistor
+    r1.value = 10kohm
+    r2 = new Resistor
+    r2.value = 1kohm
+    r1.p1 ~ vin
+    r1.p2 ~ vout
+    r2.p1 ~ vout
+    r2.p2 ~ gnd

@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import { Sun, SlidersHorizontal, Check, ChevronDown } from 'lucide-react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { Line2 } from 'three/examples/jsm/lines/Line2.js'
@@ -182,6 +183,12 @@ function Renderer({
   // to the background by default — full HDRI bg can look noisy for everyday
   // viewport editing.
   const [hdriBackground, setHdriBackground] = useState(false)
+  // "Daylight": one strong directional sun + minimal fill/ambient, vs
+  // the default balanced studio 3-point rig.
+  const [daylight, setDaylight] = useState(false)
+  // The render-controls dropdown (Daylight / Zebra / Bloom / HDRI bg)
+  // replaces the old scattered floating toggle buttons.
+  const [renderMenuOpen, setRenderMenuOpen] = useState(false)
   // Hero-shot capture in-flight flag so we can dim the chrome while the
   // upscale + blob encode is running.  Pure UX cue, no rendering effect.
   // Hero-shot capture in-flight flag. Set by doCaptureHeroShot; the
@@ -1009,6 +1016,26 @@ function Renderer({
     }
   }, [hdriBackground])
 
+  // ----- Daylight lighting mode -----
+  // Default rig: balanced 3-point (ambient 0.25, white key 2.2, cool
+  // fill 0.8). Daylight: a single dominant warm sun with crisp shadows
+  // and the fill/ambient pulled right down — a hard, outdoor look.
+  useEffect(() => {
+    const s = stateRef.current
+    if (!s || !s.key) return
+    if (daylight) {
+      s.key.color.setHex(0xfff2dd)
+      s.key.intensity = 4.4
+      if (s.ambient) s.ambient.intensity = 0.08
+      if (s.fill) s.fill.intensity = 0.12
+    } else {
+      s.key.color.setHex(0xffffff)
+      s.key.intensity = 2.2
+      if (s.ambient) s.ambient.intensity = 0.25
+      if (s.fill) s.fill.intensity = 0.8
+    }
+  }, [daylight])
+
   // ----- Selection overlays + leader line -----
   useEffect(() => {
     const s = stateRef.current
@@ -1356,73 +1383,89 @@ function Renderer({
           {mode} mode · click to pick · shift+click to add
         </div>
       )}
-      {/* Zebra / reflection-line toggle — top-right corner of the viewport */}
-      <button
-        type="button"
-        onClick={() => setZebraOn((v) => !v)}
-        title="Toggle zebra / reflection lines (Class-A surface analysis)"
-        className={`absolute top-3 right-3 z-10 px-2 py-1 rounded text-[11px] font-mono transition-colors ${
-          zebraOn
-            ? 'bg-kerf-300 text-ink-950 border border-kerf-300'
-            : 'bg-ink-900/80 text-ink-300 border border-ink-700 hover:text-kerf-300 hover:border-kerf-300/50 backdrop-blur'
-        }`}
-      >
-        Zebra
-      </button>
+      {/* Standalone exposure control — top-right, on its own, with a sun
+          icon. (Was a cramped "EV" pill stacked among toggle buttons.) */}
+      <div className="absolute top-3 right-3 z-10 flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-ink-900/85 border border-ink-700 backdrop-blur shadow-lg shadow-black/30">
+        <Sun size={13} className="text-kerf-300/90" />
+        <label
+          className="text-[10px] uppercase tracking-wider font-mono text-ink-400"
+          htmlFor="kerf-exposure-slider"
+        >
+          Exposure
+        </label>
+        <input
+          id="kerf-exposure-slider"
+          type="range"
+          min="0.2"
+          max="2.0"
+          step="0.05"
+          value={exposure}
+          onChange={(e) => setExposure(parseFloat(e.target.value) || DEFAULT_EXPOSURE)}
+          title="Tone-mapping exposure (ACES filmic)"
+          className="w-24 accent-kerf-300"
+        />
+        <span className="text-[10px] font-mono text-ink-300 w-8 text-right tabular-nums">
+          {exposure.toFixed(2)}
+        </span>
+      </div>
 
-      {/* PBR / hero-shot toolbar.
-          Lives in the top-right under the Zebra button.  Surfaces:
-            • Hero button — invokes the imperative captureHeroShot() and
-              triggers a PNG download.  This is the one-click marketing
-              shot the task brief calls out.
-            • Bloom toggle — gates UnrealBloomPass.  Visible state lets
-              users opt out if gemstone bloom is heavier than they want
-              (auto-off on prefers-reduced-motion).
-            • HDRI bg toggle — only meaningful for hero shots; cycles
-              scene.background between the studio gradient and the
-              env-map texture.
-            • Exposure slider — direct write to
-              renderer.toneMappingExposure.  Range 0.2…2.0, default 1.0. */}
-      <div className="absolute top-12 right-3 z-10 flex flex-col gap-1.5 items-end">
-        <div className="flex items-center gap-1 px-2 py-1 rounded bg-ink-900/80 border border-ink-700 backdrop-blur">
-          <label className="text-[10px] font-mono text-ink-400" htmlFor="kerf-exposure-slider">EV</label>
-          <input
-            id="kerf-exposure-slider"
-            type="range"
-            min="0.2"
-            max="2.0"
-            step="0.05"
-            value={exposure}
-            onChange={(e) => setExposure(parseFloat(e.target.value) || DEFAULT_EXPOSURE)}
-            title="Tone-mapping exposure (ACES filmic)"
-            className="w-20 accent-kerf-300"
+      {/* Render-types dropdown — one tidy menu replacing the old
+          scattered floating Zebra / Bloom / HDRI toggle buttons. */}
+      <div className="absolute top-14 right-3 z-10">
+        <button
+          type="button"
+          onClick={() => setRenderMenuOpen((v) => !v)}
+          title="Render options"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-ink-900/85 border border-ink-700 text-[11px] font-mono text-ink-300 hover:text-kerf-300 hover:border-kerf-300/50 backdrop-blur shadow-lg shadow-black/30"
+        >
+          <SlidersHorizontal size={13} />
+          Render
+          <ChevronDown
+            size={12}
+            className={`text-ink-500 transition-transform ${renderMenuOpen ? 'rotate-180' : ''}`}
           />
-          <span className="text-[10px] font-mono text-ink-300 w-8 text-right">{exposure.toFixed(2)}</span>
-        </div>
-        <button
-          type="button"
-          onClick={() => setBloomOn((v) => !v)}
-          title="Toggle bloom (gem highlights). Auto-off on prefers-reduced-motion."
-          className={`px-2 py-1 rounded text-[11px] font-mono transition-colors ${
-            bloomOn
-              ? 'bg-kerf-300 text-ink-950 border border-kerf-300'
-              : 'bg-ink-900/80 text-ink-300 border border-ink-700 hover:text-kerf-300 hover:border-kerf-300/50 backdrop-blur'
-          }`}
-        >
-          Bloom
         </button>
-        <button
-          type="button"
-          onClick={() => setHdriBackground((v) => !v)}
-          title="Show the HDRI environment map as the scene background (best for hero shots)"
-          className={`px-2 py-1 rounded text-[11px] font-mono transition-colors ${
-            hdriBackground
-              ? 'bg-kerf-300 text-ink-950 border border-kerf-300'
-              : 'bg-ink-900/80 text-ink-300 border border-ink-700 hover:text-kerf-300 hover:border-kerf-300/50 backdrop-blur'
-          }`}
-        >
-          HDRI bg
-        </button>
+        {renderMenuOpen && (
+          <>
+            <div
+              className="fixed inset-0 z-0"
+              onClick={() => setRenderMenuOpen(false)}
+              aria-hidden
+            />
+            <div className="absolute right-0 mt-1.5 z-10 w-52 rounded-lg border border-ink-700 bg-ink-900 shadow-2xl shadow-black/50 overflow-hidden">
+              <div className="px-3 py-1.5 border-b border-ink-800 text-[10px] uppercase tracking-wider text-ink-500 font-semibold">
+                Render mode
+              </div>
+              {[
+                { on: daylight, set: () => setDaylight((v) => !v), label: 'Daylight', hint: 'Single strong sun' },
+                { on: zebraOn, set: () => setZebraOn((v) => !v), label: 'Zebra', hint: 'Class-A surface lines' },
+                { on: bloomOn, set: () => setBloomOn((v) => !v), label: 'Bloom', hint: 'Gem / edge glow' },
+                { on: hdriBackground, set: () => setHdriBackground((v) => !v), label: 'HDRI background', hint: 'Env map as backdrop' },
+              ].map((it) => (
+                <button
+                  key={it.label}
+                  type="button"
+                  onClick={it.set}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-ink-800"
+                >
+                  <span
+                    className={`grid place-items-center w-4 h-4 rounded border flex-shrink-0 ${
+                      it.on
+                        ? 'bg-kerf-300 border-kerf-300 text-ink-950'
+                        : 'border-ink-600 text-transparent'
+                    }`}
+                  >
+                    <Check size={11} strokeWidth={3} />
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[12px] text-ink-100">{it.label}</span>
+                    <span className="block text-[10px] text-ink-500">{it.hint}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   )

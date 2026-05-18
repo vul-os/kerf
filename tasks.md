@@ -1300,7 +1300,7 @@ Tier A (single persona unlock), render / SubD / direct-edit → Tier B
   `blend_srf.g2_blend_point` is a fake additive nudge; this delivers
   the genuine pure-Python G3 the OCCT path structurally cannot.
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped (integrated this session)
 - **Scope:** Rebuild the blend-strip constructor so it can enforce
   **G3** between two NURBS surfaces along a shared-edge descriptor
   (extend the verified `surface_fillet.surface_blend_g1_g2` pattern to

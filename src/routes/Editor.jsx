@@ -1601,21 +1601,6 @@ export default function Editor() {
                 </div>
               )}
             </div>
-          ) : scriptFile ? (
-            <div className="flex-1 min-h-0 relative">
-              <ScriptEditor
-                content={w.currentFileContent}
-                fileName={w.currentFile?.name}
-                file={w.currentFile}
-                onChange={(v) => w.editContent(v)}
-              />
-              {w.toast && (
-                <div className="absolute bottom-3 right-3 z-20 px-3 py-2 rounded-md bg-ink-900 border border-kerf-300/60 text-kerf-300 text-xs shadow-xl"
-                  onClick={() => w.dismissToast()}>
-                  {w.toast}
-                </div>
-              )}
-            </div>
           ) : toleranceFile ? (
             <div className="flex-1 min-h-0 relative">
               <ToleranceView
@@ -2044,7 +2029,7 @@ export default function Editor() {
             <div className="flex items-center justify-between px-3 py-1.5 bg-ink-900 border-b border-ink-800 text-[11px] text-ink-400">
               <span className="font-mono">{w.currentFile?.name || '(no file)'}</span>
               <span className="text-ink-500">
-                {stepFile ? 'STEP (binary)' : assemblyFile ? 'Assembly' : 'JSCAD'}
+                {stepFile ? 'STEP (binary)' : assemblyFile ? 'Assembly' : scriptFile ? 'Script' : 'JSCAD'}
               </span>
             </div>
             <div className="flex-1 min-h-0">
@@ -2069,6 +2054,13 @@ export default function Editor() {
                   }}
                   matePickResult={matePickResult}
                   onMatePickConsumed={() => setMatePickResult(null)}
+                />
+              ) : scriptFile ? (
+                <ScriptEditor
+                  content={w.currentFileContent}
+                  fileName={w.currentFile?.name}
+                  file={w.currentFile}
+                  onChange={(v) => w.editContent(v)}
                 />
               ) : (
                 <CodeEditor

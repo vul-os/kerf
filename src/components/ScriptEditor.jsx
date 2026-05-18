@@ -11,7 +11,7 @@
 //   - Monaco language mode based on file extension (typescript | python)
 
 import Editor from '@monaco-editor/react'
-import { AlertTriangle, Code, Terminal } from 'lucide-react'
+import { Code, Terminal } from 'lucide-react'
 
 const MONACO_OPTIONS = {
   readOnly: false,
@@ -60,47 +60,28 @@ export default function ScriptEditor({ content, fileName, file, onChange }) {
         </span>
       </div>
 
-      {isPython ? (
-        <div className="px-4 py-3 border-b border-ink-800 bg-cyan-950/20 flex-shrink-0">
-          <div className="flex items-start gap-2 text-[11px] text-cyan-200">
-            <Terminal size={12} className="text-cyan-400 shrink-0 mt-0.5" />
-            <div>
-              <div className="font-medium text-cyan-300">
-                Run on your machine via kerf-sdk
-              </div>
-              <div className="text-cyan-200/70 mt-0.5 space-y-1">
-                <div>
-                  Edit in your own IDE, then run against this workspace over HTTP/JSON-RPC:
-                </div>
-                <code className="block font-mono text-[10px] text-cyan-100 bg-cyan-950/40 rounded px-2 py-1 mt-1 whitespace-pre">
-                  {`pip install kerf-sdk\nkerf run ${fileName || 'script.script.py'} --project <project-id>`}
-                </code>
-                <div className="text-cyan-200/60">
-                  Works against local install (<span className="font-mono">localhost:8080</span>) or cloud.
-                </div>
-              </div>
+      <div className="px-4 py-3 border-b border-ink-800 bg-ink-900/40 flex-shrink-0">
+        <div className="flex items-start gap-2 text-[11px] text-ink-300">
+          <Terminal size={12} className="text-kerf-300 shrink-0 mt-0.5" />
+          <div className="space-y-1 min-w-0">
+            <div className="font-medium text-ink-100">
+              Editable here · runs via the Kerf SDK on your machine
+            </div>
+            <div className="text-ink-400">
+              Type and it saves with the project. Scripts execute through
+              the SDK (not the browser) — drive this workspace over
+              HTTP/JSON-RPC:
+            </div>
+            <code className="block font-mono text-[10px] text-kerf-200 bg-ink-950/60 rounded px-2 py-1 whitespace-pre">
+              {`pip install kerf-sdk\nkerf run ${fileName || (isPython ? 'script.script.py' : 'script.script.ts')} --project <project-id>`}
+            </code>
+            <div className="text-ink-500">
+              The 3D model renders in the viewport above — this script
+              edits alongside it.
             </div>
           </div>
         </div>
-      ) : (
-        <div className="px-4 py-3 border-b border-ink-800 bg-amber-950/20 flex-shrink-0">
-          <div className="flex items-start gap-2 text-[11px] text-amber-200">
-            <AlertTriangle size={12} className="text-amber-400 shrink-0 mt-0.5" />
-            <div>
-              <div className="font-medium text-amber-300">
-                In-app script editing is read-only — automate with the Python SDK
-              </div>
-              <div className="text-amber-200/70 mt-0.5">
-                Scripting runs on your machine, not in the browser:
-                {' '}<span className="font-mono">pip install kerf-sdk</span>, then
-                drive this instance over HTTP/JSON-RPC. The in-app
-                {' '}<span className="font-mono">.script</span> kind round-trips
-                and stores fine but is intentionally a read-only stub here.
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
 
       <div className="flex-1 min-h-0">
         <Editor

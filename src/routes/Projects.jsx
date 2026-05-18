@@ -16,7 +16,6 @@ import {
   Tag,
   X,
 } from 'lucide-react'
-import { FreeCADImportDialog } from '../components/FreeCADImport.jsx'
 import clsx from 'clsx'
 import Layout from '../components/Layout.jsx'
 import Card from '../components/Card.jsx'
@@ -918,10 +917,6 @@ export default function Projects() {
   const [renameOf, setRenameOf] = useState(null)
   const [deleteOf, setDeleteOf] = useState(null)
   const [shareOf, setShareOf] = useState(null)
-  const [showFreecadImport, setShowFreecadImport] = useState(false)
-  // projectId for FreeCAD import: a new project is created first via
-  // api.createProject, then the import dialog receives the new id.
-  const [freecadTargetProjectId, setFreecadTargetProjectId] = useState(null)
 
   // Hydrate workspace list once; pick a default; keep URL slug in sync with the
   // store. The bare /projects URL redirects to /w/<current>/projects below.
@@ -945,11 +940,16 @@ export default function Projects() {
   const activeWorkspaceId = activeWorkspace?.id || null
 
   useEffect(() => {
-    if (!activeWorkspaceId) { setProjects([]); return }
+    // Don't render blank when the workspace hasn't resolved yet (right
+    // after sign-in / create-project, before the workspace store
+    // hydrates). listProjects() with no id returns ALL of the user's
+    // projects, so the list is never empty just because
+    // activeWorkspaceId is momentarily null; it refetches scoped once
+    // the workspace resolves.
     let cancelled = false
     setProjects(null)
     api
-      .listProjects(activeWorkspaceId)
+      .listProjects(activeWorkspaceId || undefined)
       .then((list) => {
         if (cancelled) return
         const arr = Array.isArray(list) ? list : []
@@ -971,33 +971,6 @@ export default function Projects() {
   const onCreated = (project) => {
     setShowNew(false)
     navigate(`/projects/${project.id}`)
-  }
-
-  // Opens the FreeCAD import dialog. Creates a blank project first so the
-  // import has a target. On success navigates to the new project.
-  async function openFreecadImport() {
-    if (!activeWorkspaceId) return
-    try {
-      const project = await api.createProject({
-        workspace_id: activeWorkspaceId,
-        name: 'FreeCAD import',
-        description: 'Imported from .FCStd',
-        tags: ['mechanical'],
-        starter: 'blank',
-      })
-      setProjects((prev) => [project, ...(prev || [])])
-      setFreecadTargetProjectId(project.id)
-      setShowFreecadImport(true)
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not create project for import.')
-    }
-  }
-
-  function onFreecadImported(result) {
-    setShowFreecadImport(false)
-    if (freecadTargetProjectId) {
-      navigate(`/projects/${freecadTargetProjectId}`)
-    }
   }
 
   const onRenamed = (updated) => {
@@ -1024,14 +997,6 @@ export default function Projects() {
           </h1>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            title="Imports FreeCAD 0.19+ files (.FCStd) — features lifted as read-only, BRep solid editable"
-            onClick={openFreecadImport}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium border-ink-700 text-ink-200 hover:border-ink-600 hover:bg-ink-800/60 transition-colors"
-          >
-            Import FreeCAD
-          </button>
           <Button variant="primary" size="md" onClick={() => setShowNew(true)}>
             <Plus size={14} />
             New project
@@ -1098,12 +1063,6 @@ export default function Projects() {
           onClose={() => setShareOf(null)}
         />
       )}
-      <FreeCADImportDialog
-        projectId={freecadTargetProjectId}
-        open={showFreecadImport}
-        onClose={() => setShowFreecadImport(false)}
-        onImported={onFreecadImported}
-      />
     </Layout>
   )
 }

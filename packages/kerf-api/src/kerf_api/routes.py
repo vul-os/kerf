@@ -4939,11 +4939,18 @@ def _project_to_workshop_row(p: dict) -> dict:
         "workspace_slug": p.get("workspace_slug", ""),
         "workspace_name": p.get("workspace_name", ""),
         "author_name": p.get("author_name", ""),
+        # A Workshop project belongs to its WORKSPACE, not a person —
+        # show the workspace as the author identity. id stays the
+        # publishing user (ownership checks like isOwner depend on it);
+        # user_name is kept so the UI can still show "both" if desired.
         "author": {
             "id": str(p["author_id"]) if p.get("author_id") else None,
-            "name": p.get("author_name") or p.get("workspace_name", ""),
+            "name": p.get("workspace_name") or p.get("author_name") or "unknown",
             "avatar_url": p.get("author_avatar_url"),
             "is_verified_publisher": bool(p.get("is_verified_publisher", False)),
+            "workspace_name": p.get("workspace_name") or "",
+            "workspace_slug": p.get("workspace_slug") or "",
+            "user_name": p.get("author_name") or "",
         },
         "likes_count": int(p.get("likes_count") or 0),
         "liked_by_me": bool(p.get("liked_by_me", False)),

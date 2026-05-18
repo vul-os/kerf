@@ -1441,7 +1441,11 @@ FILE_KINDS = (
     "step-ref", "assembly_lock", "canvas", "schedule", "view", "sheet",
     "duct", "pipe", "conduit", "subd", "mesh", "render", "section",
     "cam_layered", "tool", "plc_st", "plc_ld", "quadmesh", "print", "gem", "wiring",
-    "firmware",
+    "firmware", "mold", "pid", "optics", "layup", "dental",
+    # T-248: silicon / EDA / firmware file kinds
+    "hdl_vhdl", "hdl_verilog", "spice_netlist", "gds_layout", "oasis_layout",
+    "lef_lib", "def_design", "liberty_lib", "silicon_flow", "silicon_pdk",
+    "firmware_project",
 )
 
 

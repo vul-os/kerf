@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kerf-horology"
+version = "0.1.0"
+license = { text = "MIT" }
+classifiers = ["License :: OSI Approved :: MIT License"]
+description = "Watchmaking / horology plugin for Kerf — Swiss lever escapement, gear train, mainspring barrel"
+requires-python = ">=3.11"
+dependencies = [
+    "kerf-partsgen",
+]
+
+[project.entry-points."kerf.plugins"]
+horology = "kerf_horology.plugin:register"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kerf_horology"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -75,6 +75,12 @@ from kerf_cad_core.geom.subd_authoring import (
     subd_set_crease,
     to_subd_surface,
 )
+# T-104e: pure-Python trim side-selection + validation contract.
+from kerf_cad_core.geom.trim_validation import (
+    AmbiguousPoint,
+    select_side,
+    validate_body_post_trim,
+)
 
 __all__ = [
     "NurbsCurve",
@@ -129,4 +135,7 @@ __all__ = [
     "subd_loop_cut",
     "subd_set_crease",
     "to_subd_surface",
+    "AmbiguousPoint",
+    "select_side",
+    "validate_body_post_trim",
 ]

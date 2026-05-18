@@ -65,6 +65,17 @@ from kerf_cad_core.geom.brep_build import (
     sphere_to_body,
 )
 
+from kerf_cad_core.geom.subd_authoring import (
+    SubDCage,
+    SubDSurface,
+    create_subd_primitive,
+    subd_extrude,
+    subd_bevel,
+    subd_loop_cut,
+    subd_set_crease,
+    to_subd_surface,
+)
+
 __all__ = [
     "NurbsCurve",
     "NurbsSurface",
@@ -110,4 +121,12 @@ __all__ = [
     "box_to_body",
     "cylinder_to_body",
     "sphere_to_body",
+    "SubDCage",
+    "SubDSurface",
+    "create_subd_primitive",
+    "subd_extrude",
+    "subd_bevel",
+    "subd_loop_cut",
+    "subd_set_crease",
+    "to_subd_surface",
 ]

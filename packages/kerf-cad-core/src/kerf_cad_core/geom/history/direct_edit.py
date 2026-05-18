@@ -571,8 +571,8 @@ def commit_direct_edits_to_dag(
         zip(planes_before, planes_after)
     ):
         n_delta = float(np.linalg.norm(na - nb))
-        d_delta = abs(da - db)
-        if n_delta > 1e-9 or d_delta > 1e-9:
+        d_delta_signed = float(da - db)
+        if n_delta > 1e-9 or abs(d_delta_signed) > 1e-9:
             diff.append(
                 {
                     "plane_index": idx,
@@ -580,11 +580,19 @@ def commit_direct_edits_to_dag(
                     "d_before": round(float(db), 9),
                     "normal_after": [round(float(x), 9) for x in na],
                     "d_after": round(float(da), 9),
+                    # Signed offset along the face normal — used for relative
+                    # replay when the upstream body is re-evaluated after a
+                    # parametric edit.  The upstream plane is identified by
+                    # matching its unit normal within _NORMAL_MATCH_TOL.
+                    "d_delta": round(float(d_delta_signed), 9),
                 }
             )
 
     # Build a feature params snapshot: planes_after is sufficient for
-    # re-evaluation (it encodes the full body geometry).
+    # re-evaluation when there is no upstream body (standalone direct edit).
+    # When an upstream FeatureRef is wired, the evaluator uses the relative
+    # d_delta entries instead so that the direct edit replays correctly after
+    # parametric changes upstream.
     planes_after_serialised = [
         {
             "normal": [round(float(x), 9) for x in n],
@@ -611,8 +619,86 @@ def commit_direct_edits_to_dag(
     return [feat]
 
 
+_NORMAL_MATCH_TOL = 1e-4
+
+
+def _apply_plane_deltas_to_upstream(
+    upstream_body: Any,
+    plane_diff: List[Dict[str, Any]],
+) -> Any:
+    """Apply relative plane deltas to an upstream body.
+
+    For each entry in ``plane_diff`` (which records a signed ``d_delta``
+    along the face normal), we find the matching plane on the upstream body
+    by comparing unit normals, then shift its ``d`` value by ``d_delta``.
+
+    This is the coexistence replay strategy: when the upstream parametric
+    feature changed (e.g., the box grew), we apply the same *relative*
+    offset that the user specified, rather than snapping to the stale
+    absolute geometry stored in ``planes_after``.
+
+    Falls back to ``None`` if:
+    * The upstream body is non-planar (``UnsupportedBodyError``).
+    * A changed normal direction is not present in the upstream body
+      (the face was eliminated by the parametric edit).
+    In those cases the caller should fall back to ``planes_after``.
+    """
+    try:
+        planes = _body_to_planes(upstream_body)
+    except UnsupportedBodyError:
+        return None
+
+    # Index upstream planes by rounded unit normal for fast lookup.
+    up_by_normal: Dict[Tuple[float, ...], int] = {}
+    for idx, (n, _d) in enumerate(planes):
+        key = tuple(round(float(x), 5) for x in n)
+        up_by_normal[key] = idx
+
+    working = list(planes)  # mutable copy: list of (n, d)
+    for entry in plane_diff:
+        na = np.asarray(entry["normal_after"], dtype=float)
+        na = _unit(na)
+        d_delta = float(entry["d_delta"])
+        # Match by normal_after first; if missing, try normal_before.
+        for normal_candidate in (na, np.asarray(entry["normal_before"], dtype=float)):
+            normal_candidate = _unit(normal_candidate)
+            key = tuple(round(float(x), 5) for x in normal_candidate)
+            if key in up_by_normal:
+                idx = up_by_normal[key]
+                n_cur, d_cur = working[idx]
+                working[idx] = (n_cur, d_cur + d_delta)
+                break
+        # If neither normal is in the upstream body, bail out; the caller
+        # will fall back to absolute planes_after.
+        else:
+            return None
+
+    try:
+        return _planes_to_box_body(working)
+    except DirectEditError:
+        return None
+
+
 def _register_direct_edit_evaluator(dag: Any) -> None:
-    """Register the ``"direct_edit"`` evaluator on ``dag`` if not present."""
+    """Register the ``"direct_edit"`` evaluator on ``dag`` if not present.
+
+    Coexistence replay strategy
+    ---------------------------
+    * When the feature has a wired upstream ``body`` input (i.e., it was
+      committed with a ``source_feature_id``), the evaluator attempts a
+      *relative* replay: it takes the upstream body's current planes and
+      applies the stored ``d_delta`` offsets to the matching face normals.
+      This preserves the direct edit's intent (e.g., "move the +X face
+      outward by 1 mm") even after the upstream parametric feature changed
+      the box dimensions.
+    * If the relative replay fails (non-planar upstream, or a changed face
+      normal is no longer present), the evaluator falls back to the
+      absolute ``planes_after`` snapshot — this is the safe degradation
+      that avoids a crash while surfacing that the direct edit may no
+      longer be geometrically correct.
+    * When there is no upstream body (standalone direct edit), the
+      absolute ``planes_after`` snapshot is always used.
+    """
     if "direct_edit" in dag.evaluators():
         return
 
@@ -620,12 +706,23 @@ def _register_direct_edit_evaluator(dag: Any) -> None:
         from kerf_cad_core.geom.history.dag import EvaluationResult
         from kerf_cad_core.geom.history.persistent_naming import NamingTable
 
-        planes_after = feature.params["planes_after"]
-        planes = [
-            (np.asarray(p["normal"], dtype=float), float(p["d"]))
-            for p in planes_after
-        ]
-        body = _planes_to_box_body(planes)
+        # Attempt relative replay if an upstream body is available.
+        upstream_body = ctx.upstream_bodies.get("body")
+        plane_diff = feature.params.get("plane_diff", [])
+        body: Optional[Any] = None
+
+        if upstream_body is not None and plane_diff:
+            body = _apply_plane_deltas_to_upstream(upstream_body, plane_diff)
+
+        if body is None:
+            # Absolute fallback: use the planes_after snapshot directly.
+            planes_after = feature.params["planes_after"]
+            planes = [
+                (np.asarray(p["normal"], dtype=float), float(p["d"]))
+                for p in planes_after
+            ]
+            body = _planes_to_box_body(planes)
+
         table = NamingTable(feature_id=feature.id)
         for f in body.all_faces():
             role = face_role_for_box_planar(f)

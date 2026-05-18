@@ -3228,3 +3228,24 @@ sector. Establishes the foothold; deeper depth tasks follow in the same T-NN ser
 - **Definition of Done:** Darcy-Weisbach pressure drop matches to 1%; reducer flat pattern has correct developed length (analytic); duct sizing for a fixture flow produces a valid dimension; pytest analytic oracles.
 - **Depends-on:** T-3
 
+### T-182 Landing + Domains pages — surface the new sectors
+- **Tier:** B
+- **Money/reach rationale:** every new domain shipped this session
+  (aerospace composites, dental, optics, horology, piping, packaging,
+  mold/plastics, civil, marine, woodworking, …) is invisible to visitors
+  until it appears on the Landing page + the Domains hub. Top-of-funnel
+  discoverability for the entire feature sweep.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** add the newly-shipped sectors to `src/routes/Landing.jsx`
+  and the Domains hub/pages (`src/routes/domains/`) in the SAME style as
+  the existing domains (Mechanical/Electronics/Architecture/Jewelry/
+  Automotive) — cards/links + per-domain blurbs as the existing pattern
+  dictates. Frontend only.
+- **Target files/packages:** `src/routes/Landing.jsx`,
+  `src/routes/domains/` (+ `groupTaxonomy.js`/nav if needed), vitest.
+- **Definition of Done:** Landing + Domains list every shipped sector;
+  vitest on any pure helper; `npm run build` clean. UI change — needs
+  user dev verification.
+- **Depends-on:** the sector seeds (T-165..T-181) landed
+

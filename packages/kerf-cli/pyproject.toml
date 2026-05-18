@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kerf-cli"
+version = "0.1.0"
+description = "Kerf CLI — thin client (kerf login) + self-host entrypoint (kerf serve)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+classifiers = ["License :: OSI Approved :: MIT License"]
+
+# Thin-client deps only — no server stack required for `pip install kerf-cli`
+dependencies = []
+
+[project.optional-dependencies]
+server = [
+    "kerf-core>=0.1.0",
+    "asyncpg>=0.29.0",
+    "uvicorn[standard]>=0.29.0",
+]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+]
+
+[project.scripts]
+kerf = "kerf_cli.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kerf_cli"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

@@ -119,6 +119,7 @@ bypass-selection = true
 
 [tool.uv.workspace]
 members = [
+    "packages/kerf-cli",
     "packages/kerf-core",
     "packages/kerf-sdk",
     "packages/kerf-auth",
@@ -144,6 +145,7 @@ members = [
 ]
 
 [tool.uv.sources]
+kerf-cli = { workspace = true }
 kerf-core = { workspace = true }
 kerf-sdk = { workspace = true }
 kerf-auth = { workspace = true }
@@ -172,7 +174,7 @@ kerf-partsgen = { workspace = true }
 # tree (which still hosts shared tools/ / workers/ / utils/ used by plugins
 # until the next migration pass).
 testpaths = [
-    
+    "packages/kerf-cli/tests",
     "packages/kerf-core/tests",
     "packages/kerf-auth/tests",
     "packages/kerf-api/tests",

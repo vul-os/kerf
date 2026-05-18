@@ -858,7 +858,7 @@ export function GitPanel({ projectId, onClose }) {
   const empty = repoState === 'absent'
 
   return (
-    <div className="absolute top-12 right-0 bottom-0 w-96 z-30 bg-ink-900 border-l border-ink-800 shadow-2xl flex flex-col">
+    <div className="h-full bg-ink-900 flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between h-10 px-3 border-b border-ink-800 flex-shrink-0">
         <div className="flex items-center gap-2 text-xs font-medium text-ink-200 uppercase tracking-wider">

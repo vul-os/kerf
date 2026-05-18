@@ -51,6 +51,7 @@ import { distance, formatDistance } from '../lib/measure.js'
 import { extractDisplayGeometryFromParts } from '../lib/femDisplacement.js'
 import { exportSvg, exportPng, exportPdf } from '../lib/svgExport.js'
 import { api } from '../lib/api.js'
+import { readCollapsed, writeCollapsed, editorGridCols, CHAT_COLLAPSE_KEY, GIT_COLLAPSE_KEY } from '../lib/panelCollapse.js'
 import { mateRefFromPick, parseAssembly } from '../lib/assembly.js'
 import { _internalLoops } from '../lib/sketchGeom2.js'
 import FileEditor from '../components/FileEditor.jsx'
@@ -837,9 +838,8 @@ export default function Editor() {
   }
 
   const [showShare, setShowShare] = useState(false)
-  const [chatCollapsed, setChatCollapsed] = useState(() => {
-    try { return localStorage.getItem('kerf:chatCollapsed') === '1' } catch { return false }
-  })
+  const [chatCollapsed, setChatCollapsed] = useState(() => readCollapsed(CHAT_COLLAPSE_KEY, false))
+  const [gitCollapsed, setGitCollapsed] = useState(() => readCollapsed(GIT_COLLAPSE_KEY, true))
   // ----- Responsive drawer state -----
   // T-L1: on < md (phone) the file-tree and chat collapse into off-canvas
   // drawers; on md ≤ width < lg (tablet) the file-tree is a drawer and chat is
@@ -932,9 +932,8 @@ export default function Editor() {
   const captureSnapshotFn = useCallback(async (opts) => {
     return currentViewRef.current?.snapshot?.(opts || { size: 512, quality: 0.7 }) ?? null
   }, [])
-  useEffect(() => {
-    try { localStorage.setItem('kerf:chatCollapsed', chatCollapsed ? '1' : '0') } catch {}
-  }, [chatCollapsed])
+  useEffect(() => { writeCollapsed(CHAT_COLLAPSE_KEY, chatCollapsed) }, [chatCollapsed])
+  useEffect(() => { writeCollapsed(GIT_COLLAPSE_KEY, gitCollapsed) }, [gitCollapsed])
   const { cloudEnabled } = useCloudConfig()
 
   const editorErrors = useMemo(
@@ -1274,11 +1273,12 @@ export default function Editor() {
         {cloudEnabled && (
           <button
             type="button"
-            onClick={() => w.openGitPanel()}
+            onClick={() => setGitCollapsed((v) => !v)}
             disabled={!projectId}
-            title="Git"
-            aria-label="Git panel"
-            className="hidden lg:inline-flex p-1.5 rounded hover:bg-ink-800 text-ink-300 hover:text-kerf-300 disabled:opacity-40 disabled:hover:bg-transparent"
+            title={gitCollapsed ? 'Open Git panel' : 'Hide Git panel'}
+            aria-label={gitCollapsed ? 'Open Git panel' : 'Hide Git panel'}
+            aria-expanded={!gitCollapsed}
+            className={`hidden lg:inline-flex p-1.5 rounded hover:bg-ink-800 disabled:opacity-40 disabled:hover:bg-transparent ${gitCollapsed ? 'text-ink-300 hover:text-kerf-300' : 'text-kerf-300'}`}
           >
             <GitBranch size={14} />
           </button>
@@ -1383,12 +1383,12 @@ export default function Editor() {
             <button
               type="button"
               role="menuitem"
-              onClick={() => w.openGitPanel()}
+              onClick={() => setGitCollapsed((v) => !v)}
               disabled={!projectId}
               className="inline-flex lg:hidden w-full items-center gap-2 px-3 py-1.5 text-xs text-ink-100 hover:bg-ink-700 text-left disabled:opacity-40"
             >
               <GitBranch size={12} className="text-ink-400" />
-              <span>Git panel</span>
+              <span>{gitCollapsed ? 'Open Git panel' : 'Hide Git panel'}</span>
             </button>
           )}
           {cloudEnabled && w.project && (
@@ -1455,7 +1455,7 @@ export default function Editor() {
             are kept separate so neither interferes with the other.
           - < md: same as md — canvas only, both panes as drawers.
           The `relative` here anchors the `fixed`-positioned drawers below. */}
-      <div className={`flex-1 grid min-h-0 relative grid-cols-1 ${chatCollapsed ? 'lg:grid-cols-[240px_1fr]' : 'lg:grid-cols-[240px_1fr_380px]'}`}>
+      <div className={`flex-1 grid min-h-0 relative grid-cols-1 lg:grid-cols-[${editorGridCols(chatCollapsed, gitCollapsed)}]`}>
         {/* Left: file tree (top) + objects panel (bottom).
             ≥ lg: inline aside, occupies the first grid column.
             < lg: hidden (drawer instance below renders the same content). */}
@@ -2123,6 +2123,15 @@ export default function Editor() {
             />
           </aside>
         )}
+
+        {/* Right: Git panel — inline aside, same collapse/expand mechanism as Chat.
+            Only rendered when cloudEnabled; hidden entirely when collapsed so
+            the grid column collapses and the canvas expands into the space. */}
+        {cloudEnabled && !gitCollapsed && projectId && (
+          <aside className="hidden lg:block min-h-0 overflow-hidden border-l border-ink-800">
+            <GitPanel projectId={projectId} onClose={() => setGitCollapsed(true)} />
+          </aside>
+        )}
       </div>
 
       {/* ---------- Off-canvas drawers (< lg only) ----------
@@ -2272,10 +2281,6 @@ export default function Editor() {
           onRestore={(id) => w.restoreRevision(id)}
           onClose={() => w.closeRevisionDrawer()}
         />
-      )}
-
-      {cloudEnabled && w.gitOpen && projectId && (
-        <GitPanel projectId={projectId} onClose={() => w.closeGitPanel()} />
       )}
 
       {projectId && (

@@ -12,6 +12,7 @@ from kerf_cad_core.geom.nurbs import NurbsCurve, NurbsSurface
 
 from kerf_cad_core.geom.surface_fillet import (  # noqa: E402
     curvature_comb_continuity_residual,
+    curvature_rate_continuity_residual,
     surface_blend_g1_g2,
 )
 

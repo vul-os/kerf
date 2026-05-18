@@ -404,7 +404,7 @@ function PipelineDivider() {
 /* Section: Capability tour                                                    */
 /* -------------------------------------------------------------------------- */
 
-const CAPABILITY_GROUPS = [
+export const CAPABILITY_GROUPS = [
   {
     id: 'mech',
     eyebrow: 'Mechanical · code-first CAD',
@@ -485,7 +485,8 @@ const CAPABILITY_GROUPS = [
     id: 'electronics',
     eyebrow: 'Electronics · schematic to gerber',
     title: 'PCB design with SI / EMC / PDN / thermal pre-compliance.',
-    body: 'tscircuit-powered TSX schematics, full layer stack and manual routing, FreeRouting autoroute, SPICE simulation via ngspice, RF/S-parameters via scikit-rf, plus signal-integrity, EMC, PDN, and thermal pre-compliance checks in one tool — all cross-linked to mechanical assemblies.',
+    tagline: 'Two authoring styles, one fabrication target.',
+    body: 'atopile (.ato) for code-first parametric circuits and tscircuit (.tsx) for visual-first JSX authoring — both compile to the same CircuitJSON and gerber outputs. Full layer stack and manual routing, FreeRouting autoroute, SPICE simulation via ngspice, RF/S-parameters via scikit-rf, plus signal-integrity, EMC, PDN, and thermal pre-compliance checks in one tool — all cross-linked to mechanical assemblies.',
     cards: [
       {
         icon: CircuitBoard,
@@ -614,6 +615,11 @@ function CapabilityGroup({ group }) {
         <h3 className="mt-1.5 font-display text-2xl sm:text-3xl font-semibold tracking-[-0.02em] text-ink-100">
           {group.title}
         </h3>
+        {group.tagline && (
+          <p className="mt-1 text-sm font-semibold text-kerf-300 tracking-tight">
+            {group.tagline}
+          </p>
+        )}
         <p className="mt-2 text-sm text-ink-300 leading-relaxed">{group.body}</p>
       </div>
 

@@ -3572,7 +3572,7 @@ User-direction 2026-05-18: ship the "two authoring styles, one fabrication targe
 ### T-200 Shared Circuit JSON preview pane (both editors)
 - **Tier:** A
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** A single `<CircuitPreviewPane circuitJson={…} />` component both the atopile editor (T-196) and the tscircuit-JSX editor mount. Reuses the `circuit-to-svg` rendering path already wired in `CircuitJsonPreview.jsx` (T-192). Visual parity = no UX confusion.
 - **Target files/packages:** `src/components/CircuitPreviewPane.jsx` (NEW), `src/components/CircuitPreviewPane.test.jsx` (NEW vitest). TODO comments for parent integration into the two editor hosts.
 - **Definition of Done:** the component renders identically for a Circuit JSON whether the source was atopile-compiled or tscircuit-emitted; pan/zoom works; vitest renders without errors; `npm run build` clean.
@@ -3599,7 +3599,7 @@ User-direction 2026-05-18: ship the "two authoring styles, one fabrication targe
 ### T-203 Landing-page Electronics section — pair messaging
 - **Tier:** B
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** Surface BOTH authoring styles equally on the Electronics-section of `src/routes/Landing.jsx`. New tagline near the Electronics card: "Two authoring styles, one fabrication target." Mention atopile + tscircuit by name with file-extension hints. Add a small `public/docs/electronics-authoring.md` (or similar — check `public/docs-manifest.json` source) that explains the pair from the user's standpoint.
 - **Target files/packages:** `src/routes/Landing.jsx` (additive — DO NOT remove existing sectors), `public/docs/electronics-authoring.md` (NEW; DO NOT commit `public/docs-manifest.json`), tests assert the tagline text appears in the Electronics card.
 - **Definition of Done:** Landing's Electronics section names both authoring styles; doc renders in the in-app docs viewer; vitest; `npm run build` clean.

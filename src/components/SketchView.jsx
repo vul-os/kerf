@@ -1201,8 +1201,10 @@ export default function SketchView({
 
   return (
     <div className="h-full flex bg-ink-950 text-ink-100 min-h-0 relative" ref={containerRef}>
-      {/* Left palette */}
-      <div className="w-10 sm:w-12 flex-shrink-0 flex flex-col items-center py-2 gap-1 border-r border-ink-800 overflow-y-auto">
+      {/* Left palette — widened with a thin, gutter-stable scrollbar so
+          the long tool list isn't a cramped 40px strip with a chunky
+          default scrollbar clipping the icons. */}
+      <div className="w-12 sm:w-14 flex-shrink-0 flex flex-col items-center py-2 gap-1 border-r border-ink-800 overflow-y-auto [scrollbar-width:thin] [scrollbar-gutter:stable] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-ink-700">
         {TOOLS.map((t) => (
           <ToolButton key={t.id} tool={t} active={tool === t.id} onClick={() => { setTool(t.id); setPendingPoints([]) }} />
         ))}

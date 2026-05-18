@@ -3660,3 +3660,73 @@ User reported 2026-05-18: adding a "Sun" light in the Render panel has zero visi
 - **Definition of Done:** each light type renders its correct gizmo at the right position/direction; clicking the gizmo highlights the corresponding entry in the Render panel list; vitest on gizmo-geometry helpers; `npm run build` clean.
 - **Depends-on:** T-204
 
+
+## Render variety — styles / post-fx / IES / cameras / studios (T-209 … T-213)
+
+User-direction 2026-05-18: "look at Blender and other CADs, I want variety of rendering options and different lighting options." Survey across **Blender** (Eevee + Cycles), **KeyShot**, **Fusion 360** (in-canvas + Render), **SOLIDWORKS Visualize**, **Onshape**, **Rhino Cycles**. Five things every modern CAD/render tool ships that we don't:
+
+### T-209 Render-style presets — Realistic / Cel / Wireframe / Hidden-line / Sketch / Blueprint
+- **Tier:** A
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** non-photorealistic render (NPR) modes. Six presets:
+  1. **Realistic** — current PBR pipeline (default)
+  2. **Cel-shaded** — quantised lambert + outline pass
+  3. **Wireframe** — line-only, edges only
+  4. **Hidden-line** — front-facing wireframe + dashed back lines (architectural cliché)
+  5. **Sketch** — pencil/hand-drawn NPR using a screen-space hatching shader
+  6. **Blueprint** — white-on-blue technical-drawing style with constant edge weights
+  All implemented as post-processing passes (no per-mesh shader swap). Picker UI in the Render dropdown.
+- **Target files/packages:** `src/lib/renderStyles.js` (NEW), `src/components/RenderStylePicker.jsx` (NEW), additive into `Renderer.jsx`; vitest on the style registry.
+- **Definition of Done:** all six styles switchable live; current PBR is the default and looks identical to before; vitest; `npm run build` clean.
+- **Depends-on:** none
+
+### T-210 Post-effects stack — bloom, DoF, vignette, grain, SSAO, chromatic aberration
+- **Tier:** A
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** extend the current EffectComposer pipeline (bloom is shipped) with **depth-of-field** (Bokeh, focal-distance slider), **vignette** (corner-darkening), **film grain** (animated noise), **SSAO** (screen-space ambient occlusion — already in three-mesh-bvh ecosystem), and **chromatic aberration** (lens dispersion). Each effect toggleable; sliders for the salient parameter (DoF focal-distance + aperture; SSAO radius + intensity). One unified "Post" panel in the Render dropdown.
+- **Target files/packages:** `src/lib/postEffects.js` (NEW), `src/components/PostEffectsPanel.jsx` (NEW), additive into `Renderer.jsx`; vitest on the pure-logic toggles and parameter clamping.
+- **Definition of Done:** each effect can be toggled live; DoF focal-distance picker uses a small reticle in the viewport; vitest; `npm run build` clean.
+- **Depends-on:** none
+
+### T-211 IES light profiles library — architectural lighting realism
+- **Tier:** B
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** support **IES photometric profiles** (industry-standard `.ies` files). Add a "Photometric" light kind to `doc.lights[]` carrying an IES filename + intensity. Three.js has `IESLoader` from examples. Ship 12+ curated free profiles (covering downlight, wall-wash, batwing, narrow-spot, flood). Per-light picker UI with a small polar-plot preview.
+- **Target files/packages:** `src/lib/iesLoader.js` (NEW — wrap three's IESLoader), `src/lib/iesPresets.js` (NEW — 12 profile catalogue), `public/ies/*.ies` (NEW assets), `src/components/IesProfilePicker.jsx` (NEW). Vitest on the preset catalogue + a polar-plot sampler.
+- **Definition of Done:** assigning an IES profile to a point/spot light produces the characteristic photometric distribution; preset picker swaps profiles live; vitest; `npm run build` clean.
+- **Depends-on:** T-204
+
+### T-212 Camera lens variety — perspective, ortho, fisheye, two-point, panoramic 360
+- **Tier:** B
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** camera-projection switcher. Five modes:
+  1. **Perspective** (current default)
+  2. **Orthographic** (engineering / drawings)
+  3. **Two-point perspective** (architectural — verticals stay vertical)
+  4. **Fisheye** (`THREE.CubeCamera` + shader projection — 180°)
+  5. **Panoramic 360** (full-sphere — for hero render only, slow)
+  Plus a **focal-length slider** (mm) and **sensor size selector** (full-frame, APS-C, 35mm cinema) that drive the perspective FOV with photographer-friendly numbers.
+- **Target files/packages:** `src/lib/cameraProjections.js` (NEW), `src/components/CameraLensPicker.jsx` (NEW), additive into `Renderer.jsx`. Vitest on the focal-length → FOV math (standard formula `FOV = 2·atan(sensor / (2·focal))`).
+- **Definition of Done:** switching projection swaps the camera without losing the orbit target; focal-length slider produces the analytic FOV to 1e-6; vitest; `npm run build` clean.
+- **Depends-on:** none
+
+### T-213 Studio-lighting preset library — 3-point / 4-point / butterfly / Rembrandt / ring / softbox
+- **Tier:** B
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** one-click lighting rigs that populate `doc.lights[]` with a complete preset. Six presets:
+  1. **Three-point** (key + fill + back) — already in `presetThreePointLighting` (kept)
+  2. **Four-point** (key + fill + back + kicker)
+  3. **Butterfly** (overhead key + low fill — beauty/portrait)
+  4. **Rembrandt** (45° key + low fill — moody / sculpture)
+  5. **Ring light** (single ring around the camera — jewelry / product)
+  6. **Softbox** (large rect area light overhead, 45° — product / catalogue)
+  Picker UI in the Render dropdown; each preset clears+repopulates `doc.lights`.
+- **Target files/packages:** extend `src/lib/render.js` (additive — DO NOT touch `presetThreePointLighting`), `src/components/StudioLightingPicker.jsx` (NEW). Vitest on each preset's light count + position.
+- **Definition of Done:** applying any preset visibly relights the scene (depends on T-204 wire-up); pickers swap presets cleanly; vitest oracles on light positions; `npm run build` clean.
+- **Depends-on:** T-204
+

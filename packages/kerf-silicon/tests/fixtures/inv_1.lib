@@ -1,0 +1,89 @@
+/* sky130_fd_sc_hd — standard-cell liberty excerpt
+ * Process corner : tt (typical/typical)
+ * Temperature    : 25 °C
+ * Voltage        : 1.80 V
+ *
+ * This is a minimal fixture used by the kerf-silicon test-suite.
+ * Values are representative but not normative.
+ */
+
+library (sky130_fd_sc_hd__tt_025C_1v80) {
+
+    /* ---------- technology / global attributes ---------- */
+    technology (cmos);
+    delay_model : table_lookup;
+    nom_process : 1.0;
+    nom_temperature : 25.0;
+    nom_voltage : 1.8;
+
+    /* ---------- operating conditions ---------- */
+    operating_conditions (sky130_fd_sc_hd__tt_025C_1v80) {
+        process     : 1.0;
+        temperature : 25.0;
+        voltage     : 1.8;
+    }
+
+    /* ---------- lookup-table templates ---------- */
+    lu_table_template (delay_template) {
+        variable_1 : input_net_transition;
+        variable_2 : total_output_net_capacitance;
+        index_1 ("0.01, 0.1, 0.5");
+        index_2 ("0.001, 0.01, 0.1");
+    }
+
+    /* ---------- cells ---------- */
+    cell (sky130_fd_sc_hd__inv_1) {
+        area : 4.6;
+        cell_leakage_power : 0.00314;
+
+        /* --- input pin A --- */
+        pin (A) {
+            direction  : input;
+            capacitance : 0.0023;
+            max_capacitance : 0.5;
+        } /* end pin A */
+
+        /* --- output pin Y --- */
+        pin (Y) {
+            direction : output;
+            function  : "!A";
+
+            timing () {
+                related_pin   : "A";
+                timing_type   : combinational;
+                timing_sense  : negative_unate;
+
+                /* rising edge of Y (= falling edge of A) */
+                cell_rise (delay_template) {
+                    values ( \
+                        "0.100, 0.200, 0.300", \
+                        "0.150, 0.250, 0.350", \
+                        "0.200, 0.300, 0.400"  \
+                    );
+                }
+
+                /* falling edge of Y (= rising edge of A) */
+                cell_fall (delay_template) {
+                    values ( \
+                        "0.080, 0.160, 0.240", \
+                        "0.120, 0.200, 0.280", \
+                        "0.160, 0.240, 0.320"  \
+                    );
+                }
+
+                rise_transition (delay_template) {
+                    values ("0.01, 0.05, 0.10",
+                            "0.02, 0.06, 0.12",
+                            "0.03, 0.07, 0.14");
+                }
+
+                fall_transition (delay_template) {
+                    values ("0.008, 0.04, 0.08",
+                            "0.012, 0.05, 0.10",
+                            "0.016, 0.06, 0.12");
+                }
+            } /* end timing */
+        } /* end pin Y */
+    } /* end cell inv_1 */
+
+} /* end library */

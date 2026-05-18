@@ -47,6 +47,17 @@ function KindIcon({ kind, name, open }) {
   if (kind === 'quadmesh') return <Grid3x3 size={14} className={`${cls} text-indigo-300`} />
   if (kind === 'atopile') return <Cpu size={14} className={`${cls} text-violet-400`} />
   if (kind === 'print') return <Printer size={14} className={`${cls} text-orange-300`} />
+  if (kind === 'hdl_vhdl')       return <Cpu size={14} className={`${cls} text-purple-300`} />
+  if (kind === 'hdl_verilog')    return <Cpu size={14} className={`${cls} text-purple-300`} />
+  if (kind === 'spice_netlist')  return <Zap size={14} className={`${cls} text-yellow-300`} />
+  if (kind === 'gds_layout')     return <Layers size={14} className={`${cls} text-pink-300`} />
+  if (kind === 'oasis_layout')   return <Layers size={14} className={`${cls} text-pink-300`} />
+  if (kind === 'lef_lib')        return <Database size={14} className={`${cls} text-sky-300`} />
+  if (kind === 'def_design')     return <Network size={14} className={`${cls} text-sky-300`} />
+  if (kind === 'liberty_lib')    return <Database size={14} className={`${cls} text-sky-300`} />
+  if (kind === 'silicon_flow')   return <Cpu size={14} className={`${cls} text-rose-300`} />
+  if (kind === 'silicon_pdk')    return <HardDrive size={14} className={`${cls} text-rose-300`} />
+  if (kind === 'firmware_project') return <Microchip size={14} className={`${cls} text-green-300`} />
   if (kind === 'step-ref') return (
     <span className="relative flex-shrink-0 inline-flex items-center">
       <Box size={14} className="text-cyan-edge" />
@@ -95,6 +106,33 @@ function KindIcon({ kind, name, open }) {
   }
   if (lower.endsWith('.print')) {
     return <Printer size={14} className={`${cls} text-orange-300`} />
+  }
+  if (lower.endsWith('.vhd') || lower.endsWith('.vhdl')) {
+    return <Cpu size={14} className={`${cls} text-purple-300`} />
+  }
+  if (lower.endsWith('.v') || lower.endsWith('.sv')) {
+    return <Cpu size={14} className={`${cls} text-purple-300`} />
+  }
+  if (lower.endsWith('.spice') || lower.endsWith('.cir')) {
+    return <Zap size={14} className={`${cls} text-yellow-300`} />
+  }
+  if (lower.endsWith('.gds')) {
+    return <Layers size={14} className={`${cls} text-pink-300`} />
+  }
+  if (lower.endsWith('.oas')) {
+    return <Layers size={14} className={`${cls} text-pink-300`} />
+  }
+  if (lower.endsWith('.lef')) {
+    return <Database size={14} className={`${cls} text-sky-300`} />
+  }
+  if (lower.endsWith('.def')) {
+    return <Network size={14} className={`${cls} text-sky-300`} />
+  }
+  if (lower.endsWith('.pdk')) {
+    return <HardDrive size={14} className={`${cls} text-rose-300`} />
+  }
+  if (lower.endsWith('.fw.json') || lower.endsWith('.openlane')) {
+    return <Microchip size={14} className={`${cls} text-green-300`} />
   }
   return <FileCode size={14} className={`${cls} text-ink-200`} />
 }

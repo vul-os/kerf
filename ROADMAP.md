@@ -313,6 +313,117 @@ promoted to near-term P0/P1.
 | **Robotics / offline programming** | RoboDK, Process Simulate | Robot-cell simulation + path generation. Toolpaths and robot programs are text — naturally AI-native. Verified absent; 5-axis CAM (`packages/kerf-cam` `five_axis/`) is an adjacent, reusable path-gen base. | 🔴 not started |
 | **Nesting / cut & material optimization** | (sheet / textile / wood / stone nesting) | Cross-cutting, high-leverage packing/optimization shared by laser/waterjet/plasma, woodworking, apparel, and stone — one solver serves many sectors. Verified absent. | 🔴 not started |
 
+### §3.5a — Firmware / embedded as a direct-gcc orchestrator (the layer that *drives* the PCB)
+
+The existing `kerf-firmware` (T-130) is a thin PlatformIO Core CLI subprocess
+wrapper. It works, but it has two structural problems we want to leave behind:
+(1) it puts the entire build behind a third-party CLI we do not control, and
+(2) `platformio.ini` is a different file format from the rest of Kerf, which
+is JSON-everywhere. The replacement direction — **decided 2026-05-18** — is to
+write our own thin **direct-gcc orchestrator** that subprocesses the
+cross-compilers themselves (`avr-gcc`, `arm-none-eabi-gcc`, `xtensa-esp32-gcc`,
+`riscv-none-elf-gcc`), the same pattern as our CalculiX / Z88 / Mystran
+bridges. PlatformIO's **library registry** (a public REST API at
+`api.registry.platformio.org/v3`) and Arduino's `library_index.json` stay —
+they are the ecosystem — but we stop subprocessing `pio`.
+
+The strategic frame: **Kerf already does the PCB.** Adding firmware closes the
+loop end-to-end — a single project authored in chat designs the schematic,
+routes the board, generates the Gerbers, **and writes the firmware that runs
+on the MCU it just designed.** When mechanism actuators land (P2), the same
+project also simulates the actuator that the firmware drives. **One project,
+multiple layers** — that is the moat no incumbent tool offers because no
+incumbent tool sits across mechanical / electronic / firmware / simulation at
+once. Tickets T-225..T-230 in [`tasks.md`](./tasks.md) scope the rebuild.
+
+**Why direct-gcc, not `subprocess pio`:**
+
+- The library registry is a *public REST API*, not a CLI: we can call
+  `https://api.registry.platformio.org/v3/libraries` and Arduino's
+  `library_index.json` directly. Library packaging is well-documented
+  (`library.json` / `library.properties`), so we parse manifests ourselves.
+- Toolchains are stock cross-`gcc` binaries we can fetch (or bake into a
+  Docker layer in the cloud) — the same operational pattern we already run
+  for CalculiX / Z88 / Mystran / Blender Cycles. No `pio` runtime needed.
+- We own a JSON project manifest (`kerf.fw.json`) interconvertible with
+  `platformio.ini`, but **JSON-everywhere matches the rest of Kerf** —
+  `equations`, `configurations`, `feature`, `wiring`, `plc` are all
+  JSON-native. The LLM edits one schema family, not two.
+- Cleaner separation of "what is the build" (our orchestrator) from
+  "what is the toolchain" (vendor gcc). When ESP-IDF or Zephyr matters,
+  we add an orchestrator profile; we never ship someone else's CLI.
+
+| Capability | Reference | Status |
+|---|---|---|
+| **Board catalogue** mirroring ~200 popular boards (Arduino UNO/Nano/Mega, Teensy 3.x/4.x, STM32 BluePill/Nucleo, ESP8266/ESP32 family, RP2040, AVR/ATtiny, SAMD21/SAMD51, nRF52, ESP32-C3/S3 RISC-V) with MCU / arch / flash / RAM / pin-map metadata | PlatformIO `boards.json` | 🔴 not started (T-225) |
+| **Library registry HTTP client** — PlatformIO v3 + Arduino library_index.json + content-addressed cache that dedups libraries across user projects (same pattern as Git LFS) | api.registry.platformio.org/v3 | 🔴 not started (T-225, T-226) |
+| **Direct-gcc build orchestrator** — per-architecture build profiles, subprocess `avr-gcc` / `arm-none-eabi-gcc` / `xtensa-esp32-gcc` / `riscv-none-elf-gcc` | CalculiX/Z88-pattern subprocess bridge | 🔴 not started (T-227) |
+| **Upload wrappers** — `avrdude`, `esptool.py`, `stm32flash`, `bossac`. Local CLI only (needs physical USB) — cloud surfaces a "this requires the local Kerf CLI" hint | avrdude/esptool/stm32flash | 🔴 not started (T-228) |
+| **Serial monitor** — pyserial in the local CLI, WebSerial in the browser when supported | pyserial / WebSerial API | 🔴 not started (T-229) |
+| **LLM tool `make_arduino_sketch(spec)`** + `kerf.fw.json` schema | new | 🔴 not started (T-230) |
+
+### §3.5b — Silicon / EDA / VHDL — open-source full-flow chip design
+
+**Strategic bet:** ~80 % of the silicon-design flow is now open source, but no
+one has assembled it into a **cloud-native, AI-native, browser-accessible**
+tool. We do. This is the same move we made on electronics (we are KiCad-class
+in a browser, chat-driven) one layer deeper into the stack — the **physical
+fabrication** layer of the device. We compete directly with Cadence Virtuoso,
+Mentor Calibre, and Synopsys Design Compiler — tools that cost ~$1 M / seat /
+year and are gatekept behind university and corporate licences. The
+open-source primitives that make this reachable in 2026:
+
+- **VHDL** (IEEE 1076) → **GHDL** v6.0 — the only mature open VHDL simulator,
+  GCC/LLVM-backed, fast.
+- **Verilog / SystemVerilog** (IEEE 1364 / 1800) → **Verilator** v5 (compiled,
+  ~100× faster than interpreted) for production sims + **Icarus Verilog** for
+  the long tail of behavioural constructs Verilator does not cover.
+- **Modern Python-embedded HDL** → **Amaranth HDL** (formerly nMigen) for
+  designs authored *in the LLM substrate*: Python that elaborates to Verilog.
+  Amaranth is exceptional AI-fit — Python is what the LLM writes natively.
+  We also recognise Chisel (Scala) and SpinalHDL (Scala) — supported via
+  import, not as our primary authoring path.
+- **Synthesis** → **Yosys** (ISC) — RTL → gate-level netlist. Production-grade,
+  used in every open-flow tape-out to date.
+- **Place & route + full RTL→GDS-II** → **OpenROAD** + **OpenLane / OpenROAD
+  Flow**. Tape-out-proven in **600+ silicon-ready tape-outs** on Skywater 130 nm
+  and GlobalFoundries 180 nm via the Efabless MPW programme.
+- **PDK** (process design kit) → **Skywater SKY130** (the world's first true
+  open PDK), **GF180MCU**, **IHP SG13G2 130 nm BiCMOS** (newer, analog-
+  friendly). All Apache-licensed.
+- **Mixed-signal SPICE** → **ngspice** (already used inside `kerf-electronics`)
+  + **Xyce** for larger circuits. Extends straight from board-level into
+  device-level.
+- **Layout viewer / editor** → **KLayout** — Python-scriptable GDS-II + OASIS
+  + CIF + DXF reader/editor; we adopt its data model for our in-browser
+  viewer (SVG / Canvas; no `klayout` GUI in the browser, but a thin reader
+  that emits the same Python AST KLayout exposes).
+- **Formats**: `.gds` / `.oas` (mask layout), `.lef` / `.def` (standard-cell
+  abstract + design exchange), `.lib` (Liberty timing characterisation),
+  `.v` / `.sv` / `.vhd` / `.vhdl` (HDL source), `.spice` / `.cir` (netlists).
+  All append cleanly to `files_kind_check` in a single deferred migration.
+
+**Phasing.** Three phases, each independently usable. Phase 1 is a real
+front-end (RTL editing + behavioural simulation + sub-process bridges to
+production tools), Phase 2 is a real back-end (layout, PDK, RTL → GDS-II),
+Phase 3 is the verification + characterisation depth that distinguishes
+"educational" from "tape-out-ready." Tickets T-231..T-248 cover all three.
+
+| Phase | Tickets | Capability | Status |
+|---|---|---|---|
+| **Phase 1 — RTL front-end** | T-231..T-236 | Pure-Python VHDL + Verilog lexer/parser, behavioural VHDL event-driven scheduler with delta cycles, Yosys subprocess bridge, GHDL subprocess bridge, ngspice mixed-signal extension. Educational + small-design tape-out path. | 🔴 not started |
+| **Phase 2 — Layout back-end** | T-237..T-242 | GDS-II reader/writer (pure Python; KLayout-shape data model), in-browser layout viewer (SVG/Canvas — no klayout GUI), Skywater 130 nm PDK integration, LEF/DEF reader, Liberty (`.lib`) reader, OpenROAD/OpenLane subprocess flow producing real GDS-II from RTL. | 🔴 not started |
+| **Phase 3 — Verification + characterisation** | T-243..T-248 | Schematic→mask flow, DRC engine, LVS (layout-vs-schematic), parasitic extraction, photolithography mask generation, characterisation for a target PDK node. | 🔴 not started |
+
+The competitive frame is *not* "we replace Virtuoso in 18 months" — it is
+"we are the only browser-accessible chat-driven RTL-to-GDS-II tool" the
+moment Phase 1 + Phase 2 land. That alone is a defensible moat for the
+education / hobbyist / startup-tape-out segment (Tiny Tapeout, Efabless
+MPWs, university courses) that is impossible to address with desktop
+licensed tools. Phase 3 promotes us to credibility-with-Industry. P3 already
+lists "IC / VLSI layout" as a long-tail sector; that line is now elevated by
+this concrete plan and the tickets in [`tasks.md`](./tasks.md).
+
 ---
 
 ## §4 — Shipped ledger (condensed)

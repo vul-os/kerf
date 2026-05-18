@@ -2013,7 +2013,7 @@ are captured in the 2026-05-18 status comment above.
   build targets, serial monitor. Unlocks the embedded/firmware
   engineer persona end-to-end.
 - **Priority:** P2
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped (T-130)
 - **Scope:** Introduce a `firmware` project type (or extend the
   existing scripting path) with: a `platformio.ini`-compatible board
   manifest (`boards.json`); a `build_firmware` LLM tool that invokes

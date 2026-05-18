@@ -324,10 +324,19 @@ async def update_me(req: UpdateMeRequest, payload: dict = Depends(require_auth))
 
 @router.get("/models")
 async def list_models():
+    # Current Anthropic model IDs the LLM registry can resolve. The old
+    # value hard-coded deprecated 2025-05-14 IDs (chat picked an
+    # unresolvable model) AND the frontend ModelPicker hid itself, so
+    # there was effectively no model dropdown. `label` is what
+    # ChatPanel renders.
     return {
         "models": [
-            {"id": "claude-sonnet-4-20250514", "name": "Claude Sonnet 4"},
-            {"id": "claude-opus-4-20250514", "name": "Claude Opus 4"},
+            {"id": "claude-opus-4-7", "name": "Claude Opus 4.7",
+             "label": "Claude Opus 4.7", "provider": "anthropic"},
+            {"id": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6",
+             "label": "Claude Sonnet 4.6", "provider": "anthropic"},
+            {"id": "claude-haiku-4-5-20251001", "name": "Claude Haiku 4.5",
+             "label": "Claude Haiku 4.5", "provider": "anthropic"},
         ]
     }
 

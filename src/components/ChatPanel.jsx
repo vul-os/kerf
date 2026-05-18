@@ -692,7 +692,14 @@ const ChatPanel = forwardRef(function ChatPanel({
   useEffect(() => {
     let cancelled = false
     api.listModels()
-      .then((list) => { if (!cancelled) setModels(Array.isArray(list) ? list : []) })
+      .then((list) => {
+        if (cancelled) return
+        // /api/models returns { models: [...] }; tolerate a bare array
+        // too. Treating the object as non-array gave models=[] →
+        // ModelPicker rendered null → no model dropdown at all.
+        const arr = Array.isArray(list) ? list : (list?.models || [])
+        setModels(arr)
+      })
       .catch(() => { if (!cancelled) setModels([]) })
     return () => { cancelled = true }
   }, [])

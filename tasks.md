@@ -1436,7 +1436,7 @@ Tier A (single persona unlock), render / SubD / direct-edit → Tier B
   for both target personas. Consumes the T-104a residual + T-104f
   analyser.
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** A pure-Python class-A acceptance harness that runs
   curvature combs + the T-104f zebra analyser + a **G0/G1/G2/G3**
   continuity report (extend `surface_analysis.edge_continuity_report`,
@@ -3062,7 +3062,7 @@ sector. Establishes the foothold; deeper depth tasks follow in the same T-NN ser
 - **Tier:** A
 - **Money/reach rationale:** Injection molding is one of the most common manufactured-parts workflows (mechanical + industrial design). Parting-surface + draft + rib design rules are rule-native — high AI-native fit.
 - **Priority:** P3
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** Seed `packages/kerf-mold/` with: a `MoldDesign` data model (core/cavity, parting surface, ejector pins, gate location); a draft-analysis tool (reuse `surface_analysis.draft_angle_analysis` already shipped); a `check_moldability` LLM tool that checks minimum draft angle per face, maximum wall thickness uniformity, and parting-surface continuity; a `generate_parting_surface` helper that extends the parting line to a flat or ruled surface. Reference test: a simple box part → parting surface is flat and passes the draft-angle check.
 - **Target files/packages:** `packages/kerf-mold/src/kerf_mold/` (new — `mold.py`, `tools.py`), `packages/kerf-mold/tests/` (new), `packages/kerf-mold/llm_docs/mold.md`, migration for `mold` kind.
 - **Definition of Done:** a fixture box part generates a flat parting surface; `check_moldability` flags a zero-draft face; `generate_parting_surface` produces a ruled extension; pytest.
@@ -3082,7 +3082,7 @@ sector. Establishes the foothold; deeper depth tasks follow in the same T-NN ser
 - **Tier:** A
 - **Money/reach rationale:** Process piping + P&ID are a very large industrial engineering workforce (chemical, oil & gas, pharma). P&ID is symbol + connection = text-native. P3.
 - **Priority:** P3
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** Seed `packages/kerf-piping/` with: a P&ID data model (instrument symbols, pipes, valves, vessels, tags per ISA 5.1 standard); a `piping_isometric` 3D route helper (orthogonal routing between equipment nozzles with standard pipe schedule elbow/tee library); a `pid_diagram` 2D layout exporter (DXF or SVG, symbols per ISA 5.1); an `import_pid` LLM tool that parses a text-format P&ID specification into the data model. Reference test: a simple 3-component loop (pump → vessel → HX) routes isometrically, produces correct elbow counts, and exports to DXF.
 - **Target files/packages:** `packages/kerf-piping/src/kerf_piping/` (new — `pid.py`, `isometric.py`, `symbols.py`, `tools.py`), tests, llm_docs, migration for `pid` kind.
 - **Definition of Done:** 3-component loop routes and produces the correct elbow/tee count; DXF export opens; `import_pid` round-trips a text spec; pytest.
@@ -3102,7 +3102,7 @@ sector. Establishes the foothold; deeper depth tasks follow in the same T-NN ser
 - **Tier:** B
 - **Money/reach rationale:** Optical design (lens systems, telescopes, camera optics, illumination) is a niche but high-value technical workforce. Paraxial ray tracing is pure math — extremely AI-native. P3 / ROADMAP §3 scientific.
 - **Priority:** P3
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** Seed `packages/kerf-optics/` with: a paraxial ray-transfer matrix (ABCD) model for multi-element thin-lens systems; a `trace_ray` LLM tool that traces a ray (or a bundle) through a lens system and returns spot size / focal length / aberration measures; a `lens_system` data model (element list: lens / mirror / aperture / detector); first-order aberration (Seidel coefficients). Reference tests: single thin lens — image distance matches 1/f = 1/do + 1/di exact; two-lens telephoto — EFL exact. No WASM / GPU; pure Python.
 - **Target files/packages:** `packages/kerf-optics/src/kerf_optics/` (new — `ray_transfer.py`, `lens_system.py`, `tools.py`), tests, llm_docs, migration for `optics` kind.
 - **Definition of Done:** thin-lens image distance exact; two-lens EFL exact; `trace_ray` returns spot diagram; pytest analytic oracles.
@@ -3112,7 +3112,7 @@ sector. Establishes the foothold; deeper depth tasks follow in the same T-NN ser
 - **Tier:** B
 - **Money/reach rationale:** Watchmaking is a high-margin niche (jewelry-adjacent) and partsgen-reachable (escapements, gear trains, springs are parametric). Strong AI-native fit: tolerances + counts are rule-driven.
 - **Priority:** P3
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** Seed `packages/kerf-horology/` via `kerf-partsgen` pattern: parametric generators for Swiss lever escapement (escape wheel + pallet fork), gear train (wheel + pinion, module + tooth count), mainspring barrel. A `train_calculator` LLM tool that given target frequency + power reserve computes the gear-train ratios. Reference test: lever escapement escape wheel + pallet geometry generates valid involute tooth profiles; train_calculator ratio for 3 Hz + 48-hour reserve matches expected wheel-count solution.
 - **Target files/packages:** `packages/kerf-partsgen/src/kerf_partsgen/generators/horology/` (new), `packages/kerf-horology/` (thin wrapper + tools), tests, llm_docs.
 - **Definition of Done:** escape wheel + pallet fork geometry renders; tooth profile passes involute check; train_calculator produces correct ratio; pytest.
@@ -3122,7 +3122,7 @@ sector. Establishes the foothold; deeper depth tasks follow in the same T-NN ser
 - **Tier:** A
 - **Money/reach rationale:** Dental CAD (crowns, bridges, aligners, surgical guides) is a large and fast-growing clinical market with strong AI-fit (anatomy models are parametric once segmented). High-margin niche.
 - **Priority:** P3
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** Seed `packages/kerf-dental/` with: a tooth-anatomy data model (crown, root, arch); a `crown_design` tool that produces a parametric crown surface from a margin line + opposing tooth profile; a `surgical_guide` helper that places a drill guide on a jaw model at specified implant angles; DICOM-to-mesh ingest (thin wrapper around `pydicom` + marching cubes, graceful degrade when absent). Reference test: a fixture crown margin line → a closed crown surface that passes `validate_body`; drill guide placement at specified angulation matches within 0.1°.
 - **Target files/packages:** `packages/kerf-dental/src/kerf_dental/` (new — `crown.py`, `guide.py`, `dicom_ingest.py`, `tools.py`), tests, llm_docs, migration for `dental` kind.
 - **Definition of Done:** crown surface is `validate_body`-clean; guide placement angle within 0.1°; DICOM ingest degrades gracefully when `pydicom` absent; pytest.
@@ -3142,7 +3142,7 @@ sector. Establishes the foothold; deeper depth tasks follow in the same T-NN ser
 - **Tier:** A
 - **Money/reach rationale:** Composites design (aerospace, wind, automotive) is a large high-value workforce. Ply-book / laminate analysis is rule-native and AI-native. P3 / ROADMAP §3.
 - **Priority:** P3
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** Seed `packages/kerf-composites/` with: a `LaminateLayup` data model (ply sequence, fibre orientation, material, thickness per ply); Classical Laminate Theory (CLT) solver for in-plane stiffness (A, B, D matrices) and failure analysis (Tsai-Wu, Tsai-Hill criteria); a `layup_analysis` LLM tool; drape simulation (simple flat-to-surface geodesic mapping). Reference tests: [0/90/0] symmetric laminate A-matrix vs analytic CLT formula; Tsai-Wu failure index for a known load case vs hand-calculated.
 - **Target files/packages:** `packages/kerf-composites/src/kerf_composites/` (new — `layup.py`, `clt.py`, `failure.py`, `drape.py`, `tools.py`), tests, llm_docs, migration for `layup` kind.
 - **Definition of Done:** A-matrix exact vs CLT formula; Tsai-Wu failure index matches hand-calc to 1%; drape map produces a flat→surface mapping; pytest analytic oracles.

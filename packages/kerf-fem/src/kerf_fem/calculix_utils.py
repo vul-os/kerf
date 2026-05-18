@@ -42,6 +42,8 @@ def run_static_analysis(mesh_path: str, material_props: dict,
         return _run_calculix_modal(mesh_path, material_props, boundary_conditions)
     elif analysis_type == "thermal":
         return _run_calculix_thermal(mesh_path, material_props, boundary_conditions, loads)
+    elif analysis_type == "nonlinear_plastic":
+        return _run_calculix_nonlinear_plastic(mesh_path, material_props, boundary_conditions, loads)
     else:
         raise ValueError(f"unknown analysis_type: {analysis_type}")
 
@@ -522,5 +524,249 @@ def _run_calculix_thermal(mesh_path: str, material_props: dict,
     return {
         "temperatures": [],
         "warnings": ["CalculiX thermal analysis not yet implemented"],
+        "errors": [],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Nonlinear plastic (J2 isotropic-hardening) deck writer
+# ---------------------------------------------------------------------------
+
+def _write_plastic(inp_lines: list, sigma_y0: float, hardening_pairs: list) -> None:
+    """
+    Append *PLASTIC block for J2 isotropic-hardening.
+
+    hardening_pairs : list of (stress, plastic_strain) tuples that define the
+                      hardening curve.  A bilinear curve is constructed from
+                      sigma_y0 and the hardening modulus H.
+    """
+    inp_lines.extend([
+        "*PLASTIC",
+    ])
+    for stress, eps_p in hardening_pairs:
+        inp_lines.append(f"{stress:.6g},{eps_p:.6g}")
+
+
+def build_nonlinear_plastic_inp(
+    nodes: list,
+    elements: list,
+    material_props: dict,
+    boundary_conditions: list,
+    loads: list,
+    *,
+    n_increments: int = 10,
+    time_period: float = 1.0,
+    elem_type_map: dict | None = None,
+) -> str:
+    """
+    Build a CalculiX *NLGEOM nonlinear-static INP deck for J2 isotropic-hardening
+    plasticity.
+
+    Parameters
+    ----------
+    nodes           : list of [x, y, z] node coordinates
+    elements        : list of (eid, etype_str, [node_ids]) tuples
+    material_props  : dict with keys E, nu, rho, sigma_y0, H, [yield_strength]
+    boundary_conditions, loads : same schema as the linear-static path
+    n_increments    : number of load increments for *STATIC
+    time_period     : total pseudo-time (always 1.0 for proportional loading)
+    elem_type_map   : override element type mapping (default tetra→C3D4)
+
+    Returns
+    -------
+    INP deck as a string ready to be written to analysis.inp.
+    """
+    if elem_type_map is None:
+        elem_type_map = {"tetra": "C3D4", "triangle": "CPS3"}
+
+    E = material_props["E"]
+    nu = material_props["nu"]
+    rho = material_props.get("rho", 7850.0)
+    sigma_y0 = material_props.get("sigma_y0", 250e6)
+    H = material_props.get("H", 0.0)          # hardening modulus [Pa]
+
+    # Bilinear hardening curve: (σ_y0, 0), (σ_y0 + H * ε_ref, ε_ref)
+    # ε_ref = 0.1 gives a reasonably extended curve.  CalculiX interpolates linearly.
+    eps_ref = 0.1
+    hardening_pairs = [
+        (sigma_y0, 0.0),
+        (sigma_y0 + H * eps_ref, eps_ref),
+    ]
+
+    inp = []
+    inp.append("*HEADING")
+    inp.append("CalculiX nonlinear-plastic analysis (J2 isotropic hardening)")
+
+    _write_nodes_and_elements(inp, nodes, elements, elem_type_map)
+
+    # Material with plasticity
+    inp.extend([
+        "**",
+        "*MATERIAL,NAME=MAT",
+        "*ELASTIC",
+        f"{E:.6g},{nu:.6g}",
+        "*DENSITY",
+        f"{rho:.6g}",
+    ])
+    _write_plastic(inp, sigma_y0, hardening_pairs)
+    inp.extend([
+        "*SOLID SECTION,ELSET=Eall,MATERIAL=MAT",
+        "",
+    ])
+
+    # Build face node-sets from all referenced face tags in BCs
+    all_tags = []
+    for bc in boundary_conditions:
+        all_tags.extend(bc.get("face_tags", []))
+    face_sets = _build_face_node_sets(nodes, elements, all_tags)
+    for tag, (set_name, node_ids) in face_sets.items():
+        inp.append(f"*NSET,NSET={set_name}")
+        inp.append(",".join(str(n) for n in node_ids))
+
+    # NLGEOM step — nonlinear geometry + material nonlinearity
+    dt_init = time_period / n_increments
+    inp.extend([
+        "**",
+        "*STEP,NAME=NonlinearPlastic,NLGEOM",
+        f"*STATIC,{dt_init:.6g},{time_period:.6g}",
+        "**",
+    ])
+
+    # Boundary conditions (fixed DOFs)
+    for bc in boundary_conditions:
+        if bc["type"] == "fixed":
+            for tag in bc.get("face_tags", []):
+                if tag in face_sets:
+                    set_name = face_sets[tag][0]
+                    inp.append("*BOUNDARY")
+                    inp.append(f"{set_name},1,3,0.0")
+
+    # Loads
+    for load in (loads or []):
+        if load["type"] in ("pressure", "force"):
+            inp.append("*CLOAD")
+            node_id = 1
+            inp.append(f"{node_id},3,{load['value']}")
+
+    inp.extend([
+        "*NODE FILE",
+        "U",
+        "*EL FILE",
+        "S,PEEQ",
+        "*END STEP",
+    ])
+    return "\n".join(inp)
+
+
+def parse_nonlinear_plastic_dat(dat_path: Path) -> dict:
+    """
+    Parse CalculiX .dat output for a nonlinear-plastic run.
+
+    Returns a dict with:
+        displacements   : list of [ux, uy, uz] per node
+        stresses        : list of {"von_mises", "sx", "sy", "sz", "peeq"} per element
+    (PEEQ = equivalent plastic strain, written when *EL FILE includes PEEQ)
+    """
+    if not dat_path.exists():
+        return {"error": f"CalculiX .dat file not found: {dat_path}"}
+
+    content = dat_path.read_text(errors="replace")
+
+    # Reuse the static parser for displacement / stress blocks
+    base = _parse_dat_static(dat_path)
+    displacements = base.get("displacements", [])
+    stresses = base.get("stresses", [])
+
+    # Parse PEEQ (equivalent plastic strain) if present in the .dat
+    peeq_values: list[float] = []
+    peeq_match = re.search(
+        r"EQUIVALENT\s+PLASTIC\s+STRAIN(.*?)(?=\n\s*\n|\Z)",
+        content, re.DOTALL | re.IGNORECASE
+    )
+    if peeq_match:
+        for line in peeq_match.group(1).splitlines():
+            parts = line.split()
+            if len(parts) >= 2 and parts[0].isdigit():
+                try:
+                    peeq_values.append(float(parts[1]))
+                except ValueError:
+                    pass
+
+    # Enrich stress dicts with PEEQ where available
+    for i, s in enumerate(stresses):
+        s["peeq"] = peeq_values[i] if i < len(peeq_values) else 0.0
+
+    return {"displacements": displacements, "stresses": stresses}
+
+
+def _run_calculix_nonlinear_plastic(mesh_path: str, material_props: dict,
+                                    boundary_conditions: list, loads: list) -> dict:
+    """
+    Run a J2 isotropic-hardening nonlinear-plastic analysis via CalculiX.
+
+    Returns the same schema as _run_calculix_static plus a `peeq_max` field
+    (maximum equivalent plastic strain across all integration points).
+    """
+    import meshio
+
+    msh = meshio.read(mesh_path)
+    nodes = msh.points
+
+    elements = []
+    elem_id = 1
+    elem_type_map = {"tetra": "C3D4", "triangle": "CPS3"}
+    for cell_block in msh.cells:
+        if cell_block.type in elem_type_map:
+            for row in cell_block.data:
+                elem_nodes = [int(n) + 1 for n in row]
+                elements.append((elem_id, cell_block.type, elem_nodes))
+                elem_id += 1
+
+    inp_text = build_nonlinear_plastic_inp(
+        nodes, elements, material_props, boundary_conditions, loads,
+        elem_type_map=elem_type_map,
+    )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmpdir = Path(tmp)
+        inp_path = tmpdir / "analysis.inp"
+        inp_path.write_text(inp_text)
+
+        proc = _run_ccx(tmpdir)
+        if proc.returncode != 0:
+            raise RuntimeError(f"CalculiX failed (code {proc.returncode}): {proc.stderr[:1000]}")
+
+        dat_path = tmpdir / "analysis.dat"
+        parsed = parse_nonlinear_plastic_dat(dat_path)
+        if "error" in parsed:
+            raise RuntimeError(parsed["error"])
+
+    displacements = parsed.get("displacements", [])
+    stresses = parsed.get("stresses", [])
+
+    max_disp = max(
+        (math.sqrt(d[0]**2 + d[1]**2 + d[2]**2) for d in displacements),
+        default=0.0,
+    )
+    max_stress = max((s["von_mises"] for s in stresses), default=0.0)
+    peeq_max = max((s.get("peeq", 0.0) for s in stresses), default=0.0)
+    yield_strength = material_props.get("yield_strength", material_props.get("sigma_y0", 250e6))
+    fos = yield_strength / max_stress if max_stress > 0 else float("inf")
+
+    node_displacements = [
+        {"ux": d[0], "uy": d[1], "uz": d[2],
+         "mag": math.sqrt(d[0]**2 + d[1]**2 + d[2]**2)}
+        for d in displacements
+    ]
+
+    return {
+        "max_vonmises_stress": max_stress,
+        "max_displacement": max_disp,
+        "peeq_max": peeq_max,
+        "fos": fos,
+        "node_displacements": node_displacements,
+        "displacements": [math.sqrt(d[0]**2 + d[1]**2 + d[2]**2) for d in displacements],
+        "stresses": [s["von_mises"] for s in stresses],
+        "warnings": [],
         "errors": [],
     }

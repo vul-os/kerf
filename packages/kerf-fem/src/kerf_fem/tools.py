@@ -53,7 +53,7 @@ fem_run_spec = ToolSpec(
             },
             "mesh_size": {"type": "number"},
             "solver": {"type": "string", "enum": ["fenicsx", "calculix"]},
-            "analysis_type": {"type": "string", "enum": ["linear_static", "modal", "thermal"]},
+            "analysis_type": {"type": "string", "enum": ["linear_static", "modal", "thermal", "nonlinear_plastic"]},
         },
         "required": ["file_id", "material_props", "boundary_conditions", "loads"],
     },

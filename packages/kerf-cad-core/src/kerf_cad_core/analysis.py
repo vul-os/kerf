@@ -169,6 +169,22 @@ class AnalysisType(str, Enum):
     """
 
     # ------------------------------------------------------------------
+    # CFD members — T-101e
+    # ------------------------------------------------------------------
+
+    cfd = "cfd"
+    """Generic incompressible CFD (laminar/turbulent, no heat or multiphase)."""
+
+    cfd_thermal = "cfd_thermal"
+    """Coupled fluid-thermal CFD (conjugate heat transfer + buoyancy)."""
+
+    cfd_turbulent = "cfd_turbulent"
+    """Turbulent CFD (k-ε / k-ω SST / Spalart-Allmaras closures)."""
+
+    cfd_multiphase = "cfd_multiphase"
+    """Multiphase CFD (VOF / Eulerian-Eulerian)."""
+
+    # ------------------------------------------------------------------
     # Capability descriptor
     # ------------------------------------------------------------------
 
@@ -191,6 +207,10 @@ _REQUIRES: dict[AnalysisType, FrozenSet[str]] = {
     AnalysisType.em_field:          frozenset({"em_solver_lowfreq", "vector_potential"}),
     AnalysisType.em_highfreq:       frozenset({"em_solver_fullwave", "pml_boundary"}),
     AnalysisType.fatigue_fem:       frozenset({"linear_solver", "fatigue_postprocessor"}),
+    AnalysisType.cfd:               frozenset({"kerf_cfd.solver"}),
+    AnalysisType.cfd_thermal:       frozenset({"kerf_cfd.solver", "kerf_cfd.heat_transfer"}),
+    AnalysisType.cfd_turbulent:     frozenset({"kerf_cfd.solver", "kerf_cfd.turbulence"}),
+    AnalysisType.cfd_multiphase:    frozenset({"kerf_cfd.solver", "kerf_cfd.multiphase"}),
 }
 
 __all__ = ["AnalysisType"]

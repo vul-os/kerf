@@ -1498,7 +1498,7 @@ Tier A (single persona unlock), render / SubD / direct-edit → Tier B
   family catalog is a cold-start killer once T-109 lands. Empty
   library = silent conversion killer.
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped (integrated this session)
 - **Scope:** Seed a curated parametric-family library across walls /
   doors / windows / structural sections / MEP fixtures using the same
   MIT-clean fetch/convert pattern as `kerf-parts`. Pinned, reproducible.
@@ -1515,7 +1515,7 @@ Tier A (single persona unlock), render / SubD / direct-edit → Tier B
   with layers, parametric door / window types, sloped slabs) are the
   reference.
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped (integrated this session)
 - **Scope:** Promote the basic wall / door / window / slab primitives
   to fully parametric: compound layered walls, parametric door /
   window types with hardware, sloped + cranked slabs with edge profiles.
@@ -1531,7 +1531,7 @@ Tier A (single persona unlock), render / SubD / direct-edit → Tier B
   shipped; full Revit-class stair / ramp authoring (multi-flight,
   winders, code-compliant rise / run, ramps with landings) is the gap.
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped (integrated this session)
 - **Scope:** Multi-flight stair authoring with winders, code-compliant
   rise / run checks, monolithic + assembled construction; ramps with
   landings + handrails.
@@ -1548,7 +1548,7 @@ Tier A (single persona unlock), render / SubD / direct-edit → Tier B
   Tekla Structures class is the reference (axis grid + beam / column
   framing + connections + member rebar).
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped (integrated this session)
 - **Scope:** A `.grid` axis-grid primitive + framing layout that snaps
   beams / columns to grid intersections + connection nodes + rebar
   attachment. Reuses the shipped weldments member primitive where
@@ -1565,7 +1565,7 @@ Tier A (single persona unlock), render / SubD / direct-edit → Tier B
   (2 personas). Basic site only today; Revit toposolids + Civil 3D
   cut/fill is the reference. Bridges to the P3 civil seed (T-70).
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped (integrated this session)
 - **Scope:** A toposolid type from point cloud / TIN + cut/fill
   earthwork report. Reuses the T-70 civil TIN engine when present;
   standalone seed otherwise.
@@ -1581,7 +1581,7 @@ Tier A (single persona unlock), render / SubD / direct-edit → Tier B
   Generic PBR shipped (this session), but no BIM-bound material library
   (Revit's "Materials with Appearance" / Enscape-class).
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped (integrated this session)
 - **Scope:** A `material.bim.json` catalogue with thermal / fire /
   acoustic + render-appearance (PBR map set + IOR) properties; tie
   each material to IFC `IfcMaterial` round-trip + the shipped PBR

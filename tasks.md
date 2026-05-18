@@ -3590,7 +3590,7 @@ User-direction 2026-05-18: ship the "two authoring styles, one fabrication targe
 ### T-202 Comparison page — "tscircuit vs atopile" personas
 - **Tier:** B
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** A `src/routes/compare/TscircuitVsAtopile.jsx` page that lays out the two authoring styles side-by-side. Two columns ("Visual-first" vs "Code-first"); same Circuit JSON example rendered as JSX on the left and `.ato` on the right; "Both produce KiCad" callout below. No "winner"; both are first-class. Add it to the existing compare-page registry (`src/routes/compare/index.jsx`) — additive only.
 - **Target files/packages:** `src/routes/compare/TscircuitVsAtopile.jsx` (NEW), `src/routes/compare/TscircuitVsAtopile.test.jsx` (NEW vitest), append the route + nav entry in `src/routes/compare/index.jsx` (additive, do not delete existing entries).
 - **Definition of Done:** the page renders at `/compare/tscircuit-vs-atopile`; both code examples are visible; "Both produce KiCad" callout present; vitest; `npm run build` clean.
@@ -3636,7 +3636,7 @@ User reported 2026-05-18: adding a "Sun" light in the Render panel has zero visi
 ### T-206 Volumetric / billboard cloud layer
 - **Tier:** B
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** add an opt-in cloud layer to the procedural sky from T-205. Cloud "kinds": `none`, `scattered`, `overcast`, `storm`. Implementation can be billboard-quad-based (cheap; sample noise → opacity) — full volumetric is out of scope. Cloud opacity + density expose two sliders in `SkySettings`.
 - **Target files/packages:** `src/lib/clouds.js` (NEW), `src/components/CloudLayer.jsx` (NEW — declarative Three.js cloud-quad component), vitest.
 - **Definition of Done:** scattered clouds visible against the procedural sky; sliders update density without re-mounting; vitest on the noise sampler; `npm run build` clean.
@@ -3654,7 +3654,7 @@ User reported 2026-05-18: adding a "Sun" light in the Render panel has zero visi
 ### T-208 In-viewport light gizmos (sun arrow, area rect, point sphere, spot cone)
 - **Tier:** B
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** render a small Three.js gizmo per `doc.lights[]` entry inside the viewport so the user SEES what they're editing. Sun → arrow + circle at the world origin; area → outlined rect; point → wire-sphere; spot → cone. Click-to-select binds the gizmo to the editing panel.
 - **Target files/packages:** `src/components/LightGizmos.jsx` (NEW), additive into `Renderer.jsx`. Vitest on the pure-helpers that build gizmo geometry; gate the gizmo overlay behind a per-doc `show_gizmos` flag (default true).
 - **Definition of Done:** each light type renders its correct gizmo at the right position/direction; clicking the gizmo highlights the corresponding entry in the Render panel list; vitest on gizmo-geometry helpers; `npm run build` clean.
@@ -3684,7 +3684,7 @@ User-direction 2026-05-18: "look at Blender and other CADs, I want variety of re
 ### T-210 Post-effects stack — bloom, DoF, vignette, grain, SSAO, chromatic aberration
 - **Tier:** A
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped
 - **Scope:** extend the current EffectComposer pipeline (bloom is shipped) with **depth-of-field** (Bokeh, focal-distance slider), **vignette** (corner-darkening), **film grain** (animated noise), **SSAO** (screen-space ambient occlusion — already in three-mesh-bvh ecosystem), and **chromatic aberration** (lens dispersion). Each effect toggleable; sliders for the salient parameter (DoF focal-distance + aperture; SSAO radius + intensity). One unified "Post" panel in the Render dropdown.
 - **Target files/packages:** `src/lib/postEffects.js` (NEW), `src/components/PostEffectsPanel.jsx` (NEW), additive into `Renderer.jsx`; vitest on the pure-logic toggles and parameter clamping.
 - **Definition of Done:** each effect can be toggled live; DoF focal-distance picker uses a small reticle in the viewport; vitest; `npm run build` clean.

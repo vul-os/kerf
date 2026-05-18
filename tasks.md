@@ -812,7 +812,7 @@ Template:
   (mechanical + automotive). P2 — moat depth rather than a P0 persona
   unlock, hence ranked below the P0/P1 conversion tasks.
 - **Priority:** P2
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped (integrated this session)
 - **Scope:** Add a nonlinear (J2 plasticity) `analysis_type` to the FEM
   solver (today the verified enum is `linear_static | modal | thermal`
   only). First step of the broader nonlinear/crash/fatigue line.

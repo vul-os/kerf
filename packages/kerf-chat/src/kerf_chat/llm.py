@@ -339,10 +339,14 @@ class AnthropicProvider(Provider):
 
         tool_choice = None
         if tools:
+            # Anthropic requires tool_choice to be an OBJECT, not the bare
+            # strings "auto"/"none" — passing "auto" yields HTTP 400
+            # "tool_choice: Input should be an object" (every opus chat
+            # turn failed with this).
             if req.tool_choice in ("", "auto"):
-                tool_choice = "auto"
+                tool_choice = {"type": "auto"}
             elif req.tool_choice == "none":
-                tool_choice = "none"
+                tool_choice = {"type": "none"}
             else:
                 tool_choice = {"type": "tool", "name": req.tool_choice}
 

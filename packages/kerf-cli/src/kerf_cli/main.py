@@ -2,9 +2,11 @@
 
 Subcommands
 -----------
-kerf login   Store API token + server URL in ~/.config/kerf/credentials.
-kerf serve   Self-host path: requires Postgres.  Fails fast if DB is missing
-             or unreachable.
+kerf login       Store API token + server URL in ~/.config/kerf/credentials.
+kerf serve       Self-host path: requires Postgres.  Fails fast if DB is missing
+                 or unreachable.
+kerf hydrate     Resolve LFS pointer stubs → real bytes from Kerf cloud storage.
+kerf pull-blobs  Alias for kerf hydrate (plain-git-clone context).
 
 Future subcommands (T-127, T-128): kerf sync, kerf export, kerf import.
 """
@@ -42,6 +44,15 @@ def _cmd_login(args: argparse.Namespace) -> int:
     print(f"  API URL : {api_url}")
     print(f"  Token   : {api_token[:8]}{'*' * max(0, len(api_token) - 8)}")
     return 0
+
+
+# ---------------------------------------------------------------------------
+# hydrate / pull-blobs
+# ---------------------------------------------------------------------------
+
+def _cmd_hydrate(args: argparse.Namespace) -> int:
+    from kerf_cli.hydrate import cmd_hydrate  # noqa: PLC0415
+    return cmd_hydrate(args)
 
 
 # ---------------------------------------------------------------------------
@@ -160,7 +171,95 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     serve_p.set_defaults(func=_cmd_serve)
 
+    # ---- hydrate (+ pull-blobs alias) ----
+    _add_hydrate_parser(sub, "hydrate", alias=False)
+    _add_hydrate_parser(sub, "pull-blobs", alias=True)
+
     return parser
+
+
+def _add_hydrate_parser(
+    sub: argparse._SubParsersAction,  # type: ignore[type-arg]
+    name: str,
+    *,
+    alias: bool,
+) -> None:
+    """Register a hydrate (or pull-blobs alias) sub-parser onto *sub*."""
+    desc_prefix = (
+        "Resolve Git-LFS format pointer stubs to real bytes by fetching blobs\n"
+        "from Kerf cloud storage.  Idempotent — already-hydrated files are skipped\n"
+        "unless --force is given.\n\n"
+    )
+    if alias:
+        desc_extra = (
+            "This is an alias for `kerf hydrate`.  Use this spelling when the\n"
+            "context is an explicit plain-git clone."
+        )
+    else:
+        desc_extra = (
+            "Run after a plain `git clone` to materialise all large files that\n"
+            "were stored as LFS-format pointer stubs."
+        )
+
+    p = sub.add_parser(
+        name,
+        help=(
+            "Fetch real bytes for LFS pointer stubs"
+            if not alias
+            else "Alias for `kerf hydrate`"
+        ),
+        description=desc_prefix + desc_extra,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument(
+        "paths",
+        nargs="*",
+        metavar="path|glob",
+        help=(
+            "File paths or glob patterns to scan (default: entire working tree)."
+        ),
+    )
+    p.add_argument(
+        "--project",
+        default="",
+        metavar="ID",
+        help=(
+            "Kerf project UUID.  Inferred from .kerf/project or the git remote "
+            "URL if omitted."
+        ),
+    )
+    p.add_argument(
+        "--url",
+        default="",
+        metavar="URL",
+        help="Override the API endpoint (default: $KERF_API_URL or https://app.kerf.io).",
+    )
+    p.add_argument(
+        "--token",
+        default="",
+        metavar="TOKEN",
+        help="API token (kerf_sk_…).  $KERF_API_TOKEN is preferred.",
+    )
+    p.add_argument(
+        "--concurrency",
+        type=int,
+        default=4,
+        metavar="N",
+        help="Parallel blob fetches (default: 4).",
+    )
+    p.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="List pointer stubs that would be fetched without writing any bytes.",
+    )
+    p.add_argument(
+        "--force",
+        action="store_true",
+        default=False,
+        help="Re-fetch and overwrite files that appear already hydrated.",
+    )
+    p.set_defaults(func=_cmd_hydrate)
 
 
 # ---------------------------------------------------------------------------

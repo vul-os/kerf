@@ -1091,7 +1091,7 @@ Template:
   solver serves laser/waterjet/plasma/wood/sheet); consumes the sheet-metal
   flat patterns. P2.
 - **Priority:** P2
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped (integrated this session)
 - **Scope:** 2D part nesting (bin-packing with rotation) for laser/waterjet
   cut sheets; consumes sheet-metal flat patterns.
 - **Target files/packages:** new module + tool + layout view.
@@ -1226,7 +1226,7 @@ Tier A (single persona unlock), render / SubD / direct-edit → Tier B
   push-and-shove; Kerf has length tuning only. A visible UX-class quality
   signal that converts ECAD evaluators after the fab-output unlock.
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped (integrated this session)
 - **Scope:** An interactive router that displaces neighbouring tracks
   out of the way as the user drags a new diff-pair, preserving net
   classes / clearance / length-match constraints. Builds on the shipped
@@ -1479,7 +1479,7 @@ Tier A (single persona unlock), render / SubD / direct-edit → Tier B
   family **authoring** is the gap. Strong conversion lever for the
   architect segment.
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped (integrated this session)
 - **Scope:** A `.family.json` authoring UX where the user defines
   parameters → constraint-driven nested geometry, with a flex panel
   that exercises parameter sets. Extends the first-pass family editor
@@ -1984,7 +1984,7 @@ are captured in the 2026-05-18 status comment above.
   Adding LD completes the IEC 61131-3 authoring story and unlocks the
   automation/OT segment. Complements, does not replace, `plc_st`.
 - **Priority:** P2
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped (integrated this session)
 - **Scope:** A new `plc_ld` file kind with: a rung-based text schema
   (contacts, coils, timers, counters, function blocks as JSON/YAML);
   a SVG-based ladder viewer/editor (rungs rendered as the standard LD
@@ -2569,4 +2569,17 @@ frontend tasks (T-147/T-148) serialize behind other frontend work.
   loop maintenance task — re-open whenever new flagged baseline edits
   accumulate.
 - **Depends-on:** (whenever DB is free of agents)
+
+### T-155 Nesting layout view (T-53 follow-up, frontend)
+- **Tier:** B
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** SVG/canvas layout view rendering the T-53 nest result
+  (sheet + placed parts + utilization). Frontend; deferred from T-53
+  (out of that task's Python-package scope).
+- **Target files/packages:** `src/` nesting layout component + vitest.
+- **Definition of Done:** a nest result renders parts within sheet
+  bounds with utilization label; vitest on layout math; build clean.
+  UI change — needs user dev verification.
+- **Depends-on:** T-53
 

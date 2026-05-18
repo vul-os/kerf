@@ -44,6 +44,12 @@ from kerf_cad_core.fatigue.life import (
     rainflow_count,
     fatigue_life,
 )
+from kerf_cad_core.fatigue.sn_corpus import (
+    SNcurve,
+    SN_CORPUS,
+    get_curve,
+    list_curves,
+)
 
 __all__ = [
     "sn_cycles",
@@ -54,4 +60,9 @@ __all__ = [
     "miner_damage",
     "rainflow_count",
     "fatigue_life",
+    # S-N corpus (T-100d)
+    "SNcurve",
+    "SN_CORPUS",
+    "get_curve",
+    "list_curves",
 ]

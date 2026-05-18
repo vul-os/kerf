@@ -2,6 +2,12 @@ import math
 from dataclasses import dataclass
 from typing import Any
 
+# Joint types that are handled analytically in joints.py;
+# their constraint residuals are computed via the joint's solve() method.
+_JOINT_MATE_TYPES = frozenset({
+    "rigid", "revolute", "slider", "cam", "gear", "pin_slot",
+})
+
 IDENTITY_4X4 = (1.0, 0.0, 0.0, 0.0,
                 0.0, 1.0, 0.0, 0.0,
                 0.0, 0.0, 1.0, 0.0,
@@ -173,6 +179,13 @@ class GeometricConstraintSolver:
             dist = vec3_distance(e_a.position, e_b.position)
             return dist
 
+        elif c.mate_type in _JOINT_MATE_TYPES:
+            # Joint constraints are solved analytically in joints.py;
+            # here we return zero residual so the gradient-descent loop
+            # treats them as satisfied.  The joint kinematics are computed
+            # separately via solve_joints() / the add_joint tool.
+            return 0.0
+
         return 0.0
 
     def _to_mm(self, value: float, unit: str) -> float:
@@ -301,6 +314,8 @@ def solve_assembly(
     components: list[dict[str, Any]],
     mates: list[dict[str, Any]],
     fixed_component_id: str | None = None,
+    joints: list[dict[str, Any]] | None = None,
+    drives: dict[str, float] | None = None,
 ) -> dict[str, Any]:
     entities: list[Entity] = []
     constraints: list[MateConstraint] = []
@@ -380,6 +395,12 @@ def solve_assembly(
         original_transform = extract_transform(comp)
         component_transforms[comp_id] = list(original_transform)
 
+    # Solve joints analytically (separate from the mate constraint solver)
+    joint_results: dict[str, Any] = {}
+    if joints:
+        from kerf_mates.joints import solve_joints as _solve_joints
+        joint_results = _solve_joints(joints, drives)
+
     return {
         "solved": result.solved,
         "iterations": result.iterations,
@@ -387,4 +408,5 @@ def solve_assembly(
         "tolerance_stackup": tolerance_results,
         "residuals": result.residuals,
         "error": result.error,
+        "joint_results": joint_results,
     }

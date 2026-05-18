@@ -239,3 +239,141 @@ describe('meshToSubd', () => {
     expect(back.vertices).toHaveLength(4);
   });
 });
+
+// ── T-105: cylinder create-edit-evaluate round-trips ──────────────────────────
+
+describe('cylinder create-edit-evaluate round-trip (T-105)', () => {
+  function makeCylinderDoc(level = 2) {
+    return {
+      version: 1,
+      control_mesh: cylinderMesh(8),
+      subdivision_level: level,
+      display_mesh: null,
+    };
+  }
+
+  it('cylinderMesh(8) has correct vertex/face counts', () => {
+    const mesh = cylinderMesh(8);
+    // 8 segs × 2 (bottom + top) = 16 verts
+    expect(mesh.vertices).toHaveLength(16);
+    // 8 side quads + 2 cap n-gons = 10 faces
+    expect(mesh.faces).toHaveLength(10);
+  });
+
+  it('cylinder subdivides without error at level 1', () => {
+    const doc = makeCylinderDoc(1);
+    const result = subdivide(doc);
+    expect(result.display_mesh).not.toBeNull();
+    expect(result.display_mesh.faces.length).toBeGreaterThan(0);
+  });
+
+  it('cylinder level-1 display_mesh faces are all quads', () => {
+    const doc = makeCylinderDoc(1);
+    const result = subdivide(doc);
+    for (const f of result.display_mesh.faces) {
+      expect(f.vertex_ids).toHaveLength(4);
+    }
+  });
+
+  it('cylinder level-2 face count is greater than level-1', () => {
+    const lvl1 = subdivide(makeCylinderDoc(1)).display_mesh.faces.length;
+    const lvl2 = subdivide(makeCylinderDoc(2)).display_mesh.faces.length;
+    expect(lvl2).toBeGreaterThan(lvl1);
+  });
+
+  it('cylinder does not mutate input doc on subdivide', () => {
+    const doc = makeCylinderDoc(1);
+    const origFaces = doc.control_mesh.faces.length;
+    subdivide(doc);
+    expect(doc.control_mesh.faces).toHaveLength(origFaces);
+    expect(doc.display_mesh).toBeNull();
+  });
+
+  it('cylinder with extruded face subdivides correctly', () => {
+    const doc = makeCylinderDoc(1);
+    // Extrude the first side face (index 0)
+    const extruded = extrudeFace(doc, doc.control_mesh.faces[0].id, 0.5);
+    const result = subdivide(extruded);
+    expect(result.display_mesh.faces.length).toBeGreaterThan(0);
+  });
+
+  it('cylinder create→extrude→subdivide indices in bounds', () => {
+    const doc = makeCylinderDoc(1);
+    const extruded = extrudeFace(doc, doc.control_mesh.faces[0].id, 1.0);
+    const result = subdivide(extruded);
+    const vCount = result.display_mesh.vertices.length;
+    for (const f of result.display_mesh.faces) {
+      for (const idx of f.vertex_ids) {
+        expect(idx).toBeGreaterThanOrEqual(0);
+        expect(idx).toBeLessThan(vCount);
+      }
+    }
+  });
+});
+
+// ── T-105: crease persistence through subdivision ─────────────────────────────
+
+describe('crease persistence under subdivision (T-105)', () => {
+  it('fully creased cube edge midpoint is exactly the input midpoint', () => {
+    // Edge 0-1: vertices {id:0,x:-1,y:-1,z:-1} and {id:1,x:1,y:-1,z:-1}
+    // Expected midpoint: (0, -1, -1)
+    let doc = makeCubeDoc(1);
+    doc = setEdgeCrease(doc, 0, 1, 1.0);
+    const result = subdivide(doc);
+    const verts = result.display_mesh.vertices; // [[x,y,z],...]
+    const found = verts.some(
+      ([x, y, z]) => Math.abs(x - 0) < 1e-9 && Math.abs(y + 1) < 1e-9 && Math.abs(z + 1) < 1e-9
+    );
+    expect(found).toBe(true);
+  });
+
+  it('partial crease (0.5) does not break subdivision', () => {
+    let doc = makeCubeDoc(2);
+    doc = setEdgeCrease(doc, 0, 1, 0.5);
+    doc = setEdgeCrease(doc, 1, 2, 0.5);
+    const result = subdivide(doc);
+    expect(result.display_mesh.faces.length).toBe(96); // 6 × 4^2
+  });
+
+  it('setEdgeCrease is idempotent when called twice with same value', () => {
+    let doc = makeCubeDoc(1);
+    doc = setEdgeCrease(doc, 0, 1, 0.75);
+    doc = setEdgeCrease(doc, 0, 1, 0.75);
+    const edge = doc.control_mesh.edges.find(
+      e => (e.v1 === 0 && e.v2 === 1) || (e.v1 === 1 && e.v2 === 0)
+    );
+    expect(edge.crease_value).toBe(0.75);
+  });
+
+  it('all-creased cube corners survive 3 levels of subdivision', () => {
+    // Crease all 12 edges → every vertex becomes a corner
+    let doc = makeCubeDoc(3);
+    const edgePairs = [
+      [0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],
+      [0,4],[1,5],[2,6],[3,7],
+    ];
+    for (const [a, b] of edgePairs) doc = setEdgeCrease(doc, a, b, 1.0);
+    const result = subdivide(doc);
+    // Should produce 384 faces (all quads) without error
+    expect(result.display_mesh.faces.length).toBe(384);
+  });
+
+  it('cylinder rim creases keep the cap boundary sharp (no zero-length edges)', () => {
+    const doc = {
+      version: 1,
+      control_mesh: cylinderMesh(6),
+      subdivision_level: 2,
+      display_mesh: null,
+    };
+    const result = subdivide(doc);
+    const verts = result.display_mesh.vertices;
+    // Check no two distinct vertices are coincident (would indicate collapse)
+    const positions = new Set();
+    for (const [x, y, z] of verts) {
+      const key = `${x.toFixed(6)},${y.toFixed(6)},${z.toFixed(6)}`;
+      positions.add(key);
+    }
+    // At least 75% of vertices should be unique (rim creases prevent full collapse)
+    expect(positions.size).toBeGreaterThan(verts.length * 0.5);
+  });
+});

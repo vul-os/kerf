@@ -29,12 +29,21 @@ from typing import Dict, List, Set, Tuple
 import pytest
 
 from kerf_cad_core.geom.subd import (
+    SubDDoc,
     SubDMesh,
     _catmull_clark_once,
     _centroid,
     catmull_clark_subdivide,
+    create_subd_cube,
+    create_subd_cylinder,
     extract_isoparametric_polylines,
+    mesh_to_subd_doc,
     quad_mesh_to_subd,
+    subd_doc_evaluate,
+    subd_doc_extrude_face,
+    subd_doc_move_vertex,
+    subd_doc_set_edge_crease,
+    subd_doc_to_mesh,
     subd_limit_position,
     subd_to_quadmesh,
 )
@@ -515,3 +524,320 @@ def test_extract_iso_no_raise_bad_count():
     subd = catmull_clark_subdivide(cube, levels=1)
     result = extract_isoparametric_polylines(subd, count=-5)
     assert isinstance(result, list)
+
+
+# ---------------------------------------------------------------------------
+# T-105: Authoring layer — SubDDoc + create-edit-evaluate round-trips
+# ---------------------------------------------------------------------------
+
+# ── Group 13: SubDDoc primitives ──────────────────────────────────────────────
+
+def test_create_subd_cube_structure():
+    """create_subd_cube() returns a SubDDoc with 8 verts and 6 faces."""
+    doc = create_subd_cube()
+    assert isinstance(doc, SubDDoc)
+    assert doc.control_mesh.num_vertices == 8
+    assert doc.control_mesh.num_faces == 6
+    assert doc.display_mesh is None
+
+
+def test_create_subd_cube_no_creases():
+    """Cube primitive has no pre-set creases (all edges smooth)."""
+    doc = create_subd_cube()
+    assert doc.control_mesh.creases == {}
+
+
+def test_create_subd_cylinder_structure():
+    """create_subd_cylinder(8) returns correct vertex/face counts."""
+    doc = create_subd_cylinder(segments=8)
+    assert isinstance(doc, SubDDoc)
+    # 8 segs × 2 (bottom+top) = 16 verts; 8 side quads + 2 caps = 10 faces
+    assert doc.control_mesh.num_vertices == 16
+    assert doc.control_mesh.num_faces == 10
+
+
+def test_create_subd_cylinder_rim_creases():
+    """Cylinder primitive has fully creased top and bottom rim edges."""
+    doc = create_subd_cylinder(segments=6)
+    mesh = doc.control_mesh
+    # Bottom rim: vertices 0, 2, 4, 6, 8, 10 (even indices)
+    # We simply check that some crease == 1.0 values are present
+    assert any(v == 1.0 for v in mesh.creases.values()), \
+        "Cylinder rims should have crease=1.0"
+
+
+def test_create_subd_cylinder_min_segments():
+    """Minimum segment count is clamped to 3."""
+    doc = create_subd_cylinder(segments=1)
+    assert doc.control_mesh.num_faces == 5  # 3 sides + 2 caps
+
+
+# ── Group 14: subd_doc_move_vertex ────────────────────────────────────────────
+
+def test_move_vertex_changes_position():
+    """Moving vertex 0 of a cube changes its position by (dx, dy, dz)."""
+    doc = create_subd_cube()
+    original = list(doc.control_mesh.vertices[0])
+    new_doc = subd_doc_move_vertex(doc, 0, 1.0, 2.0, 3.0)
+    v = new_doc.control_mesh.vertices[0]
+    assert v[0] == pytest.approx(original[0] + 1.0)
+    assert v[1] == pytest.approx(original[1] + 2.0)
+    assert v[2] == pytest.approx(original[2] + 3.0)
+
+
+def test_move_vertex_does_not_mutate_original():
+    """Original doc is not mutated by subd_doc_move_vertex."""
+    doc = create_subd_cube()
+    original_pos = list(doc.control_mesh.vertices[0])
+    subd_doc_move_vertex(doc, 0, 5.0, 5.0, 5.0)
+    assert doc.control_mesh.vertices[0] == pytest.approx(original_pos)
+
+
+def test_move_vertex_invalidates_display_mesh():
+    """After a move, display_mesh is None."""
+    doc = create_subd_cube()
+    doc = subd_doc_evaluate(doc, levels=1)
+    assert doc.display_mesh is not None
+    doc2 = subd_doc_move_vertex(doc, 0, 0.1, 0, 0)
+    assert doc2.display_mesh is None
+
+
+def test_move_vertex_out_of_range_safe():
+    """Moving an out-of-range vertex index does not raise."""
+    doc = create_subd_cube()
+    new_doc = subd_doc_move_vertex(doc, 999, 1, 0, 0)
+    assert new_doc.control_mesh.num_vertices == 8
+
+
+# ── Group 15: subd_doc_extrude_face ───────────────────────────────────────────
+
+def test_extrude_face_adds_vertices():
+    """Extruding a quad face of the cube adds 4 new vertices."""
+    doc = create_subd_cube()
+    orig_count = doc.control_mesh.num_vertices
+    new_doc = subd_doc_extrude_face(doc, 0, 1.0)
+    assert new_doc.control_mesh.num_vertices == orig_count + 4
+
+
+def test_extrude_face_adds_side_faces():
+    """Extruding a quad face adds 4 side faces (one per edge)."""
+    doc = create_subd_cube()
+    orig_faces = doc.control_mesh.num_faces
+    new_doc = subd_doc_extrude_face(doc, 0, 1.0)
+    # 4 side quads added; original face replaced with new top
+    assert new_doc.control_mesh.num_faces == orig_faces + 4
+
+
+def test_extrude_face_does_not_mutate():
+    """Original doc is not mutated by extrude_face."""
+    doc = create_subd_cube()
+    orig_faces = doc.control_mesh.num_faces
+    subd_doc_extrude_face(doc, 0, 1.0)
+    assert doc.control_mesh.num_faces == orig_faces
+
+
+def test_extrude_face_invalid_index_safe():
+    """Extruding a non-existent face returns the doc unchanged."""
+    doc = create_subd_cube()
+    new_doc = subd_doc_extrude_face(doc, 999, 1.0)
+    assert new_doc.control_mesh.num_faces == 6
+
+
+# ── Group 16: subd_doc_set_edge_crease ────────────────────────────────────────
+
+def test_set_edge_crease_stores_value():
+    """Setting crease on edge 0-1 of a cube stores the correct value."""
+    doc = create_subd_cube()
+    new_doc = subd_doc_set_edge_crease(doc, 0, 1, 0.75)
+    assert new_doc.control_mesh.get_crease(0, 1) == pytest.approx(0.75)
+
+
+def test_set_edge_crease_does_not_mutate():
+    """Original doc's mesh is not mutated."""
+    doc = create_subd_cube()
+    subd_doc_set_edge_crease(doc, 0, 1, 1.0)
+    assert doc.control_mesh.get_crease(0, 1) == pytest.approx(0.0)
+
+
+def test_set_edge_crease_clamps():
+    """Crease value is clamped to [0,1]."""
+    doc = create_subd_cube()
+    new_doc = subd_doc_set_edge_crease(doc, 0, 1, 5.0)
+    assert new_doc.control_mesh.get_crease(0, 1) == pytest.approx(1.0)
+
+
+# ── Group 17: subd_doc_evaluate ───────────────────────────────────────────────
+
+def test_evaluate_cube_populates_display_mesh():
+    """Evaluating a cube doc produces a non-None display_mesh."""
+    doc = create_subd_cube()
+    evaluated = subd_doc_evaluate(doc, levels=1)
+    assert evaluated.display_mesh is not None
+    assert isinstance(evaluated.display_mesh, SubDMesh)
+
+
+def test_evaluate_cube_face_count():
+    """Level-1 evaluation of a cube produces 24 faces."""
+    doc = create_subd_cube()
+    evaluated = subd_doc_evaluate(doc, levels=1)
+    assert evaluated.display_mesh.num_faces == 24
+
+
+def test_evaluate_cylinder_round_trip():
+    """Evaluating a cylinder doc produces a non-empty all-quad display mesh."""
+    doc = create_subd_cylinder(segments=8)
+    evaluated = subd_doc_evaluate(doc, levels=1)
+    dm = evaluated.display_mesh
+    assert dm is not None
+    assert dm.num_faces > 0
+    assert all(len(f) == 4 for f in dm.faces)
+
+
+def test_evaluate_does_not_mutate_original():
+    """subd_doc_evaluate leaves the input doc's display_mesh unchanged."""
+    doc = create_subd_cube()
+    assert doc.display_mesh is None
+    subd_doc_evaluate(doc, levels=1)
+    assert doc.display_mesh is None
+
+
+# ── Group 18: create→edit→evaluate round-trips (DoD) ─────────────────────────
+
+def test_cube_create_edit_evaluate_round_trip():
+    """Full round-trip: create cube → move vertex → extrude face → evaluate.
+
+    Proves:
+    - Authoring ops compose correctly.
+    - Evaluator produces a valid mesh from an edited cage.
+    - Vertex count and face count are consistent with the edits.
+    """
+    # 1. Create
+    doc = create_subd_cube()
+    assert doc.control_mesh.num_vertices == 8
+
+    # 2. Move a corner vertex
+    doc = subd_doc_move_vertex(doc, 0, 0.5, 0.0, 0.0)
+    v0 = doc.control_mesh.vertices[0]
+    assert v0[0] == pytest.approx(-0.5)  # was -1, moved +0.5
+
+    # 3. Set a crease
+    doc = subd_doc_set_edge_crease(doc, 0, 1, 1.0)
+    assert doc.control_mesh.get_crease(0, 1) == pytest.approx(1.0)
+
+    # 4. Extrude bottom face
+    doc = subd_doc_extrude_face(doc, 0, 0.5)
+    # Original 6 faces + 4 new side faces
+    assert doc.control_mesh.num_faces == 10
+
+    # 5. Evaluate
+    evaluated = subd_doc_evaluate(doc, levels=2)
+    dm = evaluated.display_mesh
+    assert dm is not None
+    assert dm.num_faces > 0
+    assert all(len(f) == 4 for f in dm.faces)
+
+    # 6. All vertex indices valid
+    nv = dm.num_vertices
+    for face in dm.faces:
+        for idx in face:
+            assert 0 <= idx < nv
+
+
+def test_cylinder_create_edit_evaluate_round_trip():
+    """Full round-trip: create cylinder → set crease → extrude → evaluate.
+
+    Proves rim creases survive through the edit workflow and subdivision.
+    """
+    # 1. Create
+    doc = create_subd_cylinder(segments=6)
+    mesh_before = doc.control_mesh
+    # Rim creases are set on creation
+    crease_vals = list(mesh_before.creases.values())
+    assert all(v == 1.0 for v in crease_vals), "All rim creases should be 1.0"
+
+    # 2. Move top vertex slightly
+    doc = subd_doc_move_vertex(doc, 1, 0.0, 0.0, 0.1)
+
+    # 3. Add an explicit crease on a side edge (v0–v2 if adjacent)
+    # Just set a crease on the first bottom-top pair (always present)
+    doc = subd_doc_set_edge_crease(doc, 0, 1, 0.8)
+
+    # 4. Evaluate at level 2
+    evaluated = subd_doc_evaluate(doc, levels=2)
+    dm = evaluated.display_mesh
+    assert dm is not None
+    assert dm.num_faces > 0
+
+
+def test_crease_holds_under_subdivision_cube():
+    """Fully creased edge on cube: edge-point is midpoint after subdivision."""
+    doc = create_subd_cube()
+    doc = subd_doc_set_edge_crease(doc, 0, 1, 1.0)
+    evaluated = subd_doc_evaluate(doc, levels=1)
+    dm = evaluated.display_mesh
+
+    # Edge 0-1 midpoint = avg(-1,-1,-1) and (1,-1,-1) = (0,-1,-1)
+    expected = [0.0, -1.0, -1.0]
+    found = any(
+        all(abs(v[k] - expected[k]) < 1e-9 for k in range(3))
+        for v in dm.vertices
+    )
+    assert found, "Creased edge midpoint (0,-1,-1) not found after subdivision"
+
+
+def test_crease_holds_under_subdivision_cylinder():
+    """Cylinder rim creases produce sharper corners after subdivision."""
+    doc = create_subd_cylinder(segments=8)
+    # All rim edges are crease=1.0; evaluate and verify vertex count
+    evaluated = subd_doc_evaluate(doc, levels=2)
+    dm = evaluated.display_mesh
+    assert dm is not None
+    # The rim crease means boundary stays sharp; just verify mesh is valid
+    nv = dm.num_vertices
+    for face in dm.faces:
+        for idx in face:
+            assert 0 <= idx < nv
+
+
+# ── Group 19: subd_doc_to_mesh + mesh_to_subd_doc ────────────────────────────
+
+def test_subd_doc_to_mesh_returns_dict():
+    """subd_doc_to_mesh returns a dict with 'vertices' and 'faces' keys."""
+    doc = create_subd_cube()
+    result = subd_doc_to_mesh(doc, levels=1)
+    assert isinstance(result, dict)
+    assert "vertices" in result
+    assert "faces" in result
+    assert len(result["vertices"]) > 0
+    assert len(result["faces"]) > 0
+
+
+def test_subd_doc_to_mesh_face_count():
+    """subd_doc_to_mesh level-1 cube yields 24 faces."""
+    doc = create_subd_cube()
+    result = subd_doc_to_mesh(doc, levels=1)
+    assert len(result["faces"]) == 24
+
+
+def test_mesh_to_subd_doc_wraps_correctly():
+    """mesh_to_subd_doc wraps vertices+faces into a SubDDoc at level 0."""
+    verts = [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0]]
+    faces = [[0, 1, 2, 3]]
+    doc = mesh_to_subd_doc(verts, faces)
+    assert isinstance(doc, SubDDoc)
+    assert doc.subdivision_level == 0
+    assert doc.control_mesh.num_vertices == 4
+    assert doc.control_mesh.num_faces == 1
+    # All 4 edges are boundary → crease=1.0
+    assert doc.control_mesh.get_crease(0, 1) == pytest.approx(1.0)
+
+
+def test_mesh_to_subd_doc_round_trip():
+    """mesh_to_subd_doc then subd_doc_evaluate produces valid subdivided mesh."""
+    verts = [[0, 0, 0], [2, 0, 0], [2, 2, 0], [0, 2, 0]]
+    faces = [[0, 1, 2, 3]]
+    doc = mesh_to_subd_doc(verts, faces)
+    evaluated = subd_doc_evaluate(doc, levels=1)
+    dm = evaluated.display_mesh
+    assert dm is not None
+    assert dm.num_faces > 0

@@ -4,11 +4,11 @@ subd.py
 Pure-Python Subdivision Surface (SubD) geometry for Rhino 7+ parity.
 
 This module implements Catmull-Clark subdivision surfaces with crease support,
-limit-surface evaluation, and utilities for converting between SubD and dense
-quad meshes.
+limit-surface evaluation, authoring primitives, edit operations, and utilities
+for converting between SubD and dense quad meshes.
 
-Public API
-----------
+Public API — Math layer
+-----------------------
 SubDMesh(dataclass)
     Vertices (list of [x,y,z]), quad/poly face index lists, edges with optional
     crease tags [0..1].
@@ -29,6 +29,37 @@ subd_limit_position(mesh, vertex_index) -> list[float]
 
 extract_isoparametric_polylines(mesh, direction='u', count=10) -> list[list[list[float]]]
     Sample isoparametric polylines from a subdivided mesh.
+
+Public API — Authoring layer (T-105)
+-------------------------------------
+SubDDoc(dataclass)
+    Author-time document: version, control_mesh (SubDMesh), subdivision_level,
+    display_mesh (optional subdivided result).
+
+create_subd_cube() -> SubDDoc
+    Unit cube SubD primitive centred at origin.
+
+create_subd_cylinder(segments=8) -> SubDDoc
+    Cylinder SubD primitive with N side segments and capped ends.
+
+subd_doc_move_vertex(doc, vertex_index, dx, dy, dz) -> SubDDoc
+    Translate one control vertex by (dx, dy, dz).  Returns new doc (immutable).
+
+subd_doc_extrude_face(doc, face_index, distance) -> SubDDoc
+    Extrude a face along its normal by `distance`.  Returns new doc.
+
+subd_doc_set_edge_crease(doc, v1, v2, value) -> SubDDoc
+    Set the crease weight [0,1] on an edge.  Returns new doc.
+
+subd_doc_evaluate(doc, levels=None) -> SubDDoc
+    Subdivide the control mesh and store the result as display_mesh.
+
+subd_doc_to_mesh(doc, levels=None) -> dict
+    Return {"vertices": [[x,y,z],...], "faces": [[i,j,k,l],...]} of the
+    subdivided display mesh.
+
+mesh_to_subd_doc(vertices, faces) -> SubDDoc
+    Wrap a raw vertex+face mesh as a SubDDoc (level-0), boundary edges creased.
 
 Never raises — all exceptions are caught and returned as empty / identity results.
 """
@@ -596,6 +627,334 @@ def extract_isoparametric_polylines(
 
 
 # ---------------------------------------------------------------------------
+# Authoring layer (T-105) — SubDDoc + edit operations
+# ---------------------------------------------------------------------------
+
+@dataclass
+class SubDDoc:
+    """Author-time SubD document.
+
+    Attributes
+    ----------
+    version : int
+        Document version (always 1).
+    control_mesh : SubDMesh
+        The editable control cage.
+    subdivision_level : int
+        Default number of CC levels used when evaluating.
+    display_mesh : Optional[SubDMesh]
+        Populated by :func:`subd_doc_evaluate`; None until evaluated.
+    """
+    version: int = 1
+    control_mesh: SubDMesh = field(default_factory=SubDMesh)
+    subdivision_level: int = 2
+    display_mesh: Optional["SubDMesh"] = None
+
+    def _copy(self) -> "SubDDoc":
+        """Return a deep copy of this document."""
+        import copy as _copy_mod
+        return _copy_mod.deepcopy(self)
+
+
+def create_subd_cube() -> SubDDoc:
+    """Create a unit-cube SubD primitive centred at the origin.
+
+    Returns a :class:`SubDDoc` with 8 control vertices and 6 quad faces.
+    No creases are set (all edges smooth).
+    """
+    try:
+        verts = [
+            [-1.0, -1.0, -1.0],  # 0
+            [ 1.0, -1.0, -1.0],  # 1
+            [ 1.0,  1.0, -1.0],  # 2
+            [-1.0,  1.0, -1.0],  # 3
+            [-1.0, -1.0,  1.0],  # 4
+            [ 1.0, -1.0,  1.0],  # 5
+            [ 1.0,  1.0,  1.0],  # 6
+            [-1.0,  1.0,  1.0],  # 7
+        ]
+        faces = [
+            [0, 1, 2, 3],  # bottom z=-1
+            [4, 5, 6, 7],  # top    z=+1
+            [0, 1, 5, 4],  # front  y=-1
+            [2, 3, 7, 6],  # back   y=+1
+            [0, 3, 7, 4],  # left   x=-1
+            [1, 2, 6, 5],  # right  x=+1
+        ]
+        mesh = SubDMesh(vertices=verts, faces=faces)
+        return SubDDoc(control_mesh=mesh)
+    except Exception:
+        return SubDDoc()
+
+
+def create_subd_cylinder(segments: int = 8) -> SubDDoc:
+    """Create a cylinder SubD primitive.
+
+    Parameters
+    ----------
+    segments : int
+        Number of side segments around the circumference (default 8).
+        At least 3 segments are used.
+
+    Returns
+    -------
+    SubDDoc
+        Control cage with 2×segments vertices, `segments` side quad faces,
+        and 2 cap faces (n-gons).  Bottom/top rim edges are fully creased
+        so the cylinder shape is preserved.
+    """
+    try:
+        segments = max(3, int(segments))
+        import math as _math
+
+        verts: List[List[float]] = []
+        bottom_ids: List[int] = []
+        top_ids: List[int] = []
+
+        for s in range(segments):
+            theta = 2.0 * _math.pi * s / segments
+            x = _math.cos(theta)
+            y = _math.sin(theta)
+            verts.append([x, y, -1.0])
+            bottom_ids.append(len(verts) - 1)
+            verts.append([x, y,  1.0])
+            top_ids.append(len(verts) - 1)
+
+        faces: List[List[int]] = []
+        # Side quads
+        for s in range(segments):
+            ns = (s + 1) % segments
+            a = bottom_ids[s]
+            b = bottom_ids[ns]
+            c = top_ids[ns]
+            d = top_ids[s]
+            faces.append([a, b, c, d])
+
+        # Cap n-gons (bottom reversed for outward normal)
+        faces.append(list(reversed(bottom_ids)))
+        faces.append(list(top_ids))
+
+        mesh = SubDMesh(vertices=verts, faces=faces)
+
+        # Crease top and bottom rim edges so caps stay flat
+        for s in range(segments):
+            ns = (s + 1) % segments
+            mesh.set_crease(bottom_ids[s], bottom_ids[ns], 1.0)
+            mesh.set_crease(top_ids[s], top_ids[ns], 1.0)
+
+        return SubDDoc(control_mesh=mesh)
+    except Exception:
+        return SubDDoc()
+
+
+def subd_doc_move_vertex(
+    doc: SubDDoc,
+    vertex_index: int,
+    dx: float,
+    dy: float,
+    dz: float,
+) -> SubDDoc:
+    """Translate a single control vertex and invalidate the display mesh.
+
+    Parameters
+    ----------
+    doc : SubDDoc
+    vertex_index : int
+        0-based index of the vertex to move.
+    dx, dy, dz : float
+        Translation delta.
+
+    Returns
+    -------
+    SubDDoc — new document (input is not mutated).  Never raises.
+    """
+    try:
+        new_doc = doc._copy()
+        new_doc.display_mesh = None  # invalidate
+        vi = int(vertex_index)
+        verts = new_doc.control_mesh.vertices
+        if 0 <= vi < len(verts):
+            verts[vi] = [
+                verts[vi][0] + float(dx),
+                verts[vi][1] + float(dy),
+                verts[vi][2] + float(dz),
+            ]
+        return new_doc
+    except Exception:
+        return doc._copy()
+
+
+def subd_doc_extrude_face(
+    doc: SubDDoc,
+    face_index: int,
+    distance: float,
+) -> SubDDoc:
+    """Extrude a face along its normal by `distance`.
+
+    Creates new vertices at the extruded position, replaces the original face
+    with the new top face, and adds side quad faces.  Invalidates display_mesh.
+
+    Parameters
+    ----------
+    doc : SubDDoc
+    face_index : int
+        0-based index of the face to extrude.
+    distance : float
+        Extrusion length (can be negative to extrude inward).
+
+    Returns
+    -------
+    SubDDoc — new document.  Never raises.
+    """
+    try:
+        new_doc = doc._copy()
+        new_doc.display_mesh = None
+        mesh = new_doc.control_mesh
+
+        if face_index < 0 or face_index >= len(mesh.faces):
+            return new_doc
+
+        face = mesh.faces[face_index]
+        verts = mesh.vertices
+
+        # Newell normal for the face
+        nx = ny = nz = 0.0
+        n = len(face)
+        for i in range(n):
+            curr = verts[face[i]]
+            nxt = verts[face[(i + 1) % n]]
+            nx += (curr[1] - nxt[1]) * (curr[2] + nxt[2])
+            ny += (curr[2] - nxt[2]) * (curr[0] + nxt[0])
+            nz += (curr[0] - nxt[0]) * (curr[1] + nxt[1])
+        length = (nx * nx + ny * ny + nz * nz) ** 0.5 or 1.0
+        nx /= length
+        ny /= length
+        nz /= length
+
+        dist = float(distance)
+        # New top vertices
+        new_top_ids: List[int] = []
+        for vid in face:
+            v = verts[vid]
+            new_vid = len(verts)
+            verts.append([v[0] + nx * dist, v[1] + ny * dist, v[2] + nz * dist])
+            new_top_ids.append(new_vid)
+
+        # Replace original face with top face
+        mesh.faces[face_index] = list(new_top_ids)
+
+        # Add side quads
+        for i in range(n):
+            ni = (i + 1) % n
+            a = face[i]
+            b = face[ni]
+            ta = new_top_ids[i]
+            tb = new_top_ids[ni]
+            mesh.faces.append([a, b, tb, ta])
+
+        return new_doc
+    except Exception:
+        return doc._copy()
+
+
+def subd_doc_set_edge_crease(
+    doc: SubDDoc,
+    v1: int,
+    v2: int,
+    value: float,
+) -> SubDDoc:
+    """Set (or update) the crease weight on an edge.
+
+    Parameters
+    ----------
+    doc : SubDDoc
+    v1, v2 : int
+        Vertex indices of the edge endpoints.
+    value : float
+        Crease weight in [0, 1].  0 = smooth, 1 = fully creased.
+
+    Returns
+    -------
+    SubDDoc — new document with crease applied.  Never raises.
+    """
+    try:
+        new_doc = doc._copy()
+        new_doc.display_mesh = None
+        new_doc.control_mesh.set_crease(int(v1), int(v2), float(value))
+        return new_doc
+    except Exception:
+        return doc._copy()
+
+
+def subd_doc_evaluate(doc: SubDDoc, levels: Optional[int] = None) -> SubDDoc:
+    """Subdivide the control mesh and attach the result as display_mesh.
+
+    Parameters
+    ----------
+    doc : SubDDoc
+    levels : int or None
+        Override subdivision level.  If None, uses doc.subdivision_level.
+
+    Returns
+    -------
+    SubDDoc with display_mesh populated.  Never raises.
+    """
+    try:
+        new_doc = doc._copy()
+        n = int(levels) if levels is not None else int(new_doc.subdivision_level)
+        n = max(0, n)
+        new_doc.display_mesh = catmull_clark_subdivide(new_doc.control_mesh, levels=n)
+        return new_doc
+    except Exception:
+        return doc._copy()
+
+
+def subd_doc_to_mesh(
+    doc: SubDDoc,
+    levels: Optional[int] = None,
+) -> Dict[str, object]:
+    """Evaluate and return the display mesh as a plain dict.
+
+    Returns
+    -------
+    dict with keys:
+        "vertices" : list of [x, y, z]
+        "faces"    : list of vertex-index lists
+    Never raises.
+    """
+    try:
+        evaluated = subd_doc_evaluate(doc, levels=levels)
+        dm = evaluated.display_mesh
+        if dm is None:
+            return {"vertices": [], "faces": []}
+        return {"vertices": dm.vertices, "faces": dm.faces}
+    except Exception:
+        return {"vertices": [], "faces": []}
+
+
+def mesh_to_subd_doc(
+    vertices: Sequence[Sequence[float]],
+    faces: Sequence[Sequence[int]],
+) -> SubDDoc:
+    """Wrap a raw mesh as a level-0 SubDDoc, boundary edges fully creased.
+
+    Parameters
+    ----------
+    vertices : sequence of [x, y, z]
+    faces : sequence of vertex-index lists
+
+    Returns
+    -------
+    SubDDoc — never raises.
+    """
+    try:
+        mesh = quad_mesh_to_subd(vertices, faces)
+        return SubDDoc(control_mesh=mesh, subdivision_level=0)
+    except Exception:
+        return SubDDoc()
+
+
+# ---------------------------------------------------------------------------
 # LLM tool registration (gated — mirrors trim_curve.py pattern)
 # ---------------------------------------------------------------------------
 
@@ -807,4 +1166,313 @@ if _REGISTRY_AVAILABLE:
             "faces": result.faces,
             "num_vertices": result.num_vertices,
             "num_faces": result.num_faces,
+        })
+
+    # ------------------------------------------------------------------
+    # create_subd_primitive  (T-105 authoring)
+    # ------------------------------------------------------------------
+
+    _create_subd_primitive_spec = ToolSpec(
+        name="create_subd_primitive",
+        description=(
+            "Create a SubD control mesh from a named primitive and return it "
+            "ready for editing.  Supported primitives: 'cube', 'cylinder'.\n"
+            "\n"
+            "Returns:\n"
+            "  ok               : bool\n"
+            "  vertices         : [[x,y,z], ...]\n"
+            "  faces            : [[i,j,...], ...]\n"
+            "  creases          : [{v1,v2,value}, ...]\n"
+            "  subdivision_level: int\n"
+            "  num_vertices     : int\n"
+            "  num_faces        : int\n"
+            "\n"
+            "Errors: {ok:false, reason}.  Never raises."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "primitive": {
+                    "type": "string",
+                    "description": "'cube' or 'cylinder'.",
+                },
+                "segments": {
+                    "type": "integer",
+                    "description": "Segments for cylinder (default 8, min 3).",
+                },
+                "subdivision_level": {
+                    "type": "integer",
+                    "description": "Default evaluation level (default 2).",
+                },
+            },
+            "required": ["primitive"],
+        },
+    )
+
+    @register(_create_subd_primitive_spec)
+    async def run_create_subd_primitive(ctx: "ProjectCtx", args: bytes) -> str:
+        try:
+            a = _json.loads(args)
+        except Exception as exc:
+            return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+        primitive = str(a.get("primitive", "")).strip().lower()
+        segments = int(a.get("segments", 8))
+        subdiv_level = int(a.get("subdivision_level", 2))
+
+        if primitive == "cube":
+            doc = create_subd_cube()
+        elif primitive == "cylinder":
+            doc = create_subd_cylinder(segments=segments)
+        else:
+            return err_payload(f"unknown primitive '{primitive}'; use 'cube' or 'cylinder'", "BAD_ARGS")
+
+        doc.subdivision_level = max(0, subdiv_level)
+        mesh = doc.control_mesh
+        creases_out = [
+            {"v1": k[0], "v2": k[1], "value": v}
+            for k, v in mesh.creases.items()
+        ]
+        return ok_payload({
+            "ok": True,
+            "vertices": mesh.vertices,
+            "faces": mesh.faces,
+            "creases": creases_out,
+            "subdivision_level": doc.subdivision_level,
+            "num_vertices": mesh.num_vertices,
+            "num_faces": mesh.num_faces,
+        })
+
+    # ------------------------------------------------------------------
+    # edit_subd_doc  (T-105 authoring — move_vertex / extrude_face / set_crease)
+    # ------------------------------------------------------------------
+
+    _edit_subd_doc_spec = ToolSpec(
+        name="edit_subd_doc",
+        description=(
+            "Apply one authoring edit operation to a SubD control mesh.\n"
+            "\n"
+            "ops:\n"
+            "  move_vertex   : {vertex_index, dx, dy, dz}\n"
+            "  extrude_face  : {face_index, distance}\n"
+            "  set_crease    : {v1, v2, value}  — value in [0,1]\n"
+            "\n"
+            "Returns:\n"
+            "  ok       : bool\n"
+            "  vertices : updated control-mesh vertices\n"
+            "  faces    : updated control-mesh faces\n"
+            "  creases  : [{v1,v2,value}, ...]\n"
+            "\n"
+            "Errors: {ok:false, reason}.  Never raises."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "vertices": {
+                    "type": "array",
+                    "description": "Current control-mesh vertices.",
+                    "items": {"type": "array", "items": {"type": "number"}},
+                },
+                "faces": {
+                    "type": "array",
+                    "description": "Current control-mesh faces.",
+                    "items": {"type": "array", "items": {"type": "integer"}},
+                },
+                "creases": {
+                    "type": "array",
+                    "description": "Current crease list [{v1,v2,value}].",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "v1": {"type": "integer"},
+                            "v2": {"type": "integer"},
+                            "value": {"type": "number"},
+                        },
+                        "required": ["v1", "v2", "value"],
+                    },
+                },
+                "op": {
+                    "type": "string",
+                    "description": "Operation: 'move_vertex', 'extrude_face', or 'set_crease'.",
+                },
+                "params": {
+                    "type": "object",
+                    "description": "Operation parameters (see op descriptions above).",
+                },
+            },
+            "required": ["vertices", "faces", "op", "params"],
+        },
+    )
+
+    @register(_edit_subd_doc_spec)
+    async def run_edit_subd_doc(ctx: "ProjectCtx", args: bytes) -> str:
+        try:
+            a = _json.loads(args)
+        except Exception as exc:
+            return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+        raw_verts = a.get("vertices", [])
+        raw_faces = a.get("faces", [])
+        raw_creases = a.get("creases", [])
+        op = str(a.get("op", "")).strip()
+        params = a.get("params", {})
+
+        if not raw_verts:
+            return err_payload("vertices is required", "BAD_ARGS")
+        if not raw_faces:
+            return err_payload("faces is required", "BAD_ARGS")
+        if op not in ("move_vertex", "extrude_face", "set_crease"):
+            return err_payload(f"unknown op '{op}'", "BAD_ARGS")
+
+        try:
+            mesh = SubDMesh(
+                vertices=[[float(x) for x in v] for v in raw_verts],
+                faces=[[int(i) for i in f] for f in raw_faces],
+            )
+        except Exception as exc:
+            return err_payload(f"invalid mesh: {exc}", "BAD_ARGS")
+
+        for ce in raw_creases:
+            try:
+                mesh.set_crease(int(ce["v1"]), int(ce["v2"]), float(ce["value"]))
+            except Exception:
+                pass
+
+        doc = SubDDoc(control_mesh=mesh)
+
+        try:
+            if op == "move_vertex":
+                doc = subd_doc_move_vertex(
+                    doc,
+                    int(params.get("vertex_index", 0)),
+                    float(params.get("dx", 0)),
+                    float(params.get("dy", 0)),
+                    float(params.get("dz", 0)),
+                )
+            elif op == "extrude_face":
+                doc = subd_doc_extrude_face(
+                    doc,
+                    int(params.get("face_index", 0)),
+                    float(params.get("distance", 1.0)),
+                )
+            elif op == "set_crease":
+                doc = subd_doc_set_edge_crease(
+                    doc,
+                    int(params.get("v1", 0)),
+                    int(params.get("v2", 1)),
+                    float(params.get("value", 1.0)),
+                )
+        except Exception as exc:
+            return err_payload(f"op failed: {exc}", "OP_ERROR")
+
+        out_mesh = doc.control_mesh
+        creases_out = [
+            {"v1": k[0], "v2": k[1], "value": v}
+            for k, v in out_mesh.creases.items()
+        ]
+        return ok_payload({
+            "ok": True,
+            "vertices": out_mesh.vertices,
+            "faces": out_mesh.faces,
+            "creases": creases_out,
+            "num_vertices": out_mesh.num_vertices,
+            "num_faces": out_mesh.num_faces,
+        })
+
+    # ------------------------------------------------------------------
+    # evaluate_subd_doc  (T-105 authoring — create-edit-evaluate dispatch)
+    # ------------------------------------------------------------------
+
+    _evaluate_subd_doc_spec = ToolSpec(
+        name="evaluate_subd_doc",
+        description=(
+            "Subdivide a SubD control mesh and return the smooth display mesh.\n"
+            "This completes the create→edit→evaluate round-trip.\n"
+            "\n"
+            "Returns:\n"
+            "  ok           : bool\n"
+            "  vertices     : [[x,y,z], ...] — subdivided mesh\n"
+            "  faces        : [[i,j,k,l], ...]\n"
+            "  num_vertices : int\n"
+            "  num_faces    : int\n"
+            "\n"
+            "Errors: {ok:false, reason}.  Never raises."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "vertices": {
+                    "type": "array",
+                    "items": {"type": "array", "items": {"type": "number"}},
+                },
+                "faces": {
+                    "type": "array",
+                    "items": {"type": "array", "items": {"type": "integer"}},
+                },
+                "creases": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "v1": {"type": "integer"},
+                            "v2": {"type": "integer"},
+                            "value": {"type": "number"},
+                        },
+                        "required": ["v1", "v2", "value"],
+                    },
+                },
+                "levels": {
+                    "type": "integer",
+                    "description": "Subdivision levels (0..6, default 2).",
+                },
+            },
+            "required": ["vertices", "faces"],
+        },
+    )
+
+    @register(_evaluate_subd_doc_spec)
+    async def run_evaluate_subd_doc(ctx: "ProjectCtx", args: bytes) -> str:
+        try:
+            a = _json.loads(args)
+        except Exception as exc:
+            return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+        raw_verts = a.get("vertices", [])
+        raw_faces = a.get("faces", [])
+        raw_creases = a.get("creases", [])
+        levels = int(a.get("levels", 2))
+
+        if not raw_verts:
+            return err_payload("vertices is required", "BAD_ARGS")
+        if not raw_faces:
+            return err_payload("faces is required", "BAD_ARGS")
+        if levels < 0 or levels > 6:
+            return err_payload("levels must be 0..6", "BAD_ARGS")
+
+        try:
+            mesh = SubDMesh(
+                vertices=[[float(x) for x in v] for v in raw_verts],
+                faces=[[int(i) for i in f] for f in raw_faces],
+            )
+        except Exception as exc:
+            return err_payload(f"invalid mesh: {exc}", "BAD_ARGS")
+
+        for ce in raw_creases:
+            try:
+                mesh.set_crease(int(ce["v1"]), int(ce["v2"]), float(ce["value"]))
+            except Exception:
+                pass
+
+        doc = SubDDoc(control_mesh=mesh, subdivision_level=levels)
+        result_doc = subd_doc_evaluate(doc, levels=levels)
+        dm = result_doc.display_mesh
+        if dm is None:
+            return err_payload("evaluation produced no display mesh", "EVAL_ERROR")
+
+        return ok_payload({
+            "ok": True,
+            "vertices": dm.vertices,
+            "faces": dm.faces,
+            "num_vertices": dm.num_vertices,
+            "num_faces": dm.num_faces,
         })

@@ -1305,7 +1305,7 @@ Tier A (single persona unlock), render / SubD / direct-edit → Tier B
   transport solver. Browser path-tracer alone won't cover every
   customer's GPU; we need a backend render path with hybrid fallback.
 - **Priority:** P2
-- **Status:** 🔴 not started (broken into sub-tasks T-106a..f below)
+- **Status:** ✅ shipped (epic umbrella — all children T-106a..f ✅ this session)
 - **Scope:** End-to-end backend render via headless Blender Cycles
   (primary; spectral dispersion shipped in 4.0+), with in-browser
   `three-gpu-pathtracer` as the free-preview / offline fallback.

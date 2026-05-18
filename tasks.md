@@ -2544,7 +2544,7 @@ frontend tasks (T-147/T-148) serialize behind other frontend work.
 ### T-153 occtWorker tube-sweep for 3D wiring harness (T-36 follow-up)
 - **Tier:** B
 - **Priority:** P2
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped this session (needs user dev verification — Web Worker geometry)
 - **Scope:** consume `kerf_wiring.harness3d.HarnessSegment` (waypoints +
   bundle_diameter_mm) in `src/lib/occtWorker.js` to render the harness as
   an OCCT tube-sweep along the polyline. Frontend/JS — deferred from T-36

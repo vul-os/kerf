@@ -535,6 +535,78 @@ export const CAPABILITY_GROUPS = [
     ],
   },
   {
+    id: 'silicon',
+    eyebrow: 'Silicon · IC / ASIC design',
+    tagline: 'From RTL to GDS-II in a conversation.',
+    title: 'RTL synthesis, PnR, DRC/LVS, and GDS-II — open PDKs.',
+    body: 'Full RTL-to-GDS-II flow via Yosys, OpenROAD, Magic, Netgen and KLayout. Sky130 and GF180MCU PDKs bundled. Static timing via OpenSTA. FPGA bitstream for iCE40 and ECP5 via nextpnr. Post-layout SPICE with SPEF annotation.',
+    cards: [
+      {
+        icon: Cpu,
+        title: 'RTL synthesis (Yosys)',
+        body: 'Synthesise Verilog/SystemVerilog to a gate netlist. Technology mapping for Sky130, GF180MCU and nextpnr-compatible FPGA targets. Synth report surfaced in chat.',
+      },
+      {
+        icon: Activity,
+        title: 'Place & route (OpenROAD)',
+        body: 'Floorplan, placement, CTS and global/detailed routing. DEF/LEF round-trip. SDC/UPF constraints authored and applied in the same chat session.',
+      },
+      {
+        icon: CircuitBoard,
+        title: 'DRC + LVS + GDS-II',
+        body: 'DRC and LVS via Magic + Netgen. Sky130B and GF180MCU rule decks bundled. Final GDS-II stream via KLayout — submit-ready for CMP / Efabless shuttle.',
+      },
+    ],
+  },
+  {
+    id: 'firmware',
+    eyebrow: 'Firmware · Embedded systems',
+    tagline: 'From bare metal to .hex in a conversation.',
+    title: 'C / C++ / Rust on ARM + RISC-V — .hex/.elf out.',
+    body: 'arm-none-eabi-gcc, cargo cross, FreeRTOS, Zephyr, cppcheck, clang-tidy, OpenOCD/pyOCD flash and debug — all wired through the chat loop. Linker scripts, peripheral HAL scaffolding, MCUboot OTA. .hex and .elf are universal; load them on any debugger.',
+    cards: [
+      {
+        icon: Cpu,
+        title: 'Build + static analysis',
+        body: 'arm-none-eabi-gcc and cargo cross for ARM Cortex-M and RISC-V targets. cppcheck + clang-tidy on every build turn. MISRA-C 2012 advisory subset via cppcheck addons.',
+      },
+      {
+        icon: Code2,
+        title: 'RTOS scaffolding',
+        body: 'FreeRTOS task / queue / semaphore / timer scaffolding generated in chat. Zephyr DTS and Kconfig authoring with LLM-aware binding schema. West build wired end-to-end.',
+      },
+      {
+        icon: Terminal,
+        title: 'Flash + debug (OpenOCD)',
+        body: 'OpenOCD and pyOCD flash and SWD/JTAG debug. GDB server through the chat loop: set breakpoints, inspect memory and registers — all from a conversation.',
+      },
+    ],
+  },
+  {
+    id: 'aerospace',
+    eyebrow: 'Aerospace · Structural engineering',
+    tagline: 'From airframe sketch to STEP and Mystran in a conversation.',
+    title: 'Parametric airframes, FEM, composites — STEP/Mystran out.',
+    body: 'Parametric wing, fuselage and control surfaces. FEM via FEniCSx with Mystran BDF export. Composites lay-up (CFRP/GFRP) with ABD matrix and draping simulation. CFD mesh prep for SU2 and OpenFOAM. GD&T per AS9100/Y14.5. STEP AP242 out.',
+    cards: [
+      {
+        icon: Activity,
+        title: 'Structural FEM + Mystran',
+        body: 'Linear static and modal FEM via FEniCSx (shell / beam / solid). Mystran BDF deck generation with GRID, CQUAD4, MAT1/MAT8, PSHELL, SPC and LOAD sections. Margin of safety computed automatically.',
+      },
+      {
+        icon: Layers,
+        title: 'Composites lay-up',
+        body: 'Ply stack-up per zone: fibre angle, thickness, material. Laminate ABD matrix computed analytically. Interlaminar shear checks. Draping simulation flags manufacturability issues.',
+      },
+      {
+        icon: Workflow,
+        title: 'STEP AP242 + CFD prep',
+        body: 'STEP AP214/AP242 with PMI via OpenCascade. SU2 config and OpenFOAM blockMesh/snappyHexMesh generation from STEP geometry. GD&T per AS9100 Rev D on TechDraw sheets.',
+      },
+    ],
+  },
+  {
     id: 'sharing',
     eyebrow: 'Library · Workshop · Cloud · SDK',
     title: 'Open sharing, curated parts, real git, scriptable.',

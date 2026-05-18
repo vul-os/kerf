@@ -221,6 +221,36 @@ export const DOMAINS = [
     to: '/roadmap',
     status: 'in-progress',
   },
+  {
+    slug: 'silicon',
+    name: 'Silicon / IC Design',
+    Icon: Cpu,
+    accent: 'kerf-300',
+    blurb:
+      'Full RTL-to-GDS-II: Yosys synthesis, OpenROAD PnR, DRC/LVS with Magic + Netgen, STA, SPEF parasitics. Sky130 and GF180MCU PDKs bundled.',
+    to: '/domains/silicon',
+    status: 'live',
+  },
+  {
+    slug: 'firmware',
+    name: 'Embedded Firmware',
+    Icon: Terminal,
+    accent: 'cyan-edge',
+    blurb:
+      'C / C++ / Rust on ARM Cortex-M and RISC-V. FreeRTOS, Zephyr, cppcheck, OpenOCD flash and debug — .hex and .elf out.',
+    to: '/domains/firmware',
+    status: 'live',
+  },
+  {
+    slug: 'aerospace',
+    name: 'Aerospace Structural',
+    Icon: Activity,
+    accent: 'kerf-300',
+    blurb:
+      'Parametric airframes, FEM via FEniCSx + Mystran, composites lay-up, CFD mesh prep, GD&T per AS9100. STEP AP242 and Mystran BDF out.',
+    to: '/domains/aerospace',
+    status: 'live',
+  },
 ]
 
 /* -------------------------------------------------------------------------- */

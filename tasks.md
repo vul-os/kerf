@@ -3451,3 +3451,107 @@ must be in place".
   byte totals; pytest green; docs section added.
 - **Depends-on:** T-125, T-145, T-150
 
+
+## Electronics authoring depth (T-189 … T-198)
+
+User-requested 2026-05-18 — improve tscircuit editing (wires, placement, ratsnest, footprints, viewer-on-LLM-output) AND add atopile as a peer textual authoring path. Convergence: atopile compiles → KiCad netlist → Circuit JSON; tscircuit also targets Circuit JSON; KiCad / Circuit JSON is the shared canonical form; tscircuit's web renderer is the viewer for both.
+
+### T-189 tscircuit wire-routing — interactive editor wire drag + nudge
+- **Tier:** A
+- **Money/reach rationale:** the tscircuit canvas already renders the board (T-77 family); the gap is *editing* — users currently cannot drag a wire to nudge it around a part. Closes a daily-driver hole for the electronics persona.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** add a wire-drag interaction mode to `src/components/CircuitCanvas*` (find by grep). On wire-drag: hit-test the wire segment, capture pointer, update the segment's anchor points, re-emit the patched Circuit JSON. Right-click on a wire opens a context menu: "delete · convert to bus · pin to grid · re-route". Frontend only (the Circuit JSON layer is already round-trippable).
+- **Target files/packages:** `src/components/CircuitCanvas/wireEdit.js` (NEW), `src/components/CircuitCanvas/ContextMenu.jsx` (NEW), wire into the existing canvas component (additive only), vitest.
+- **Definition of Done:** dragging a wire updates its routing and the Circuit JSON; right-click menu actions all work; vitest on the pure helpers; `npm run build` clean.
+- **Depends-on:** none
+
+### T-190 tscircuit footprint placement — drag/snap/rotate library parts
+- **Tier:** A
+- **Money/reach rationale:** placing parts is the second-most-common operation after wiring; today users have to author tscircuit JSX. A direct-manipulation footprint placer matches the KiCad / Altium / EasyEDA expectation and removes a major friction point.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** sidebar component library (read from `@tscircuit/footprinter`'s catalogue); drag a footprint onto the canvas → ghost preview with the bounding box + pad outlines → drop emits a `source_component` + `pcb_component` + `schematic_component` triplet into the Circuit JSON. Rotation via `R` key (90° increments). Snap to a configurable grid (default 0.5 mm). Multi-select + group move.
+- **Target files/packages:** `src/components/CircuitCanvas/FootprintLibrary.jsx` (NEW), `src/components/CircuitCanvas/PlacementMode.jsx` (NEW), `src/lib/circuitJsonPatch.js` (NEW — additive Circuit JSON mutation helpers), vitest.
+- **Definition of Done:** drag any `@tscircuit/footprinter`-known footprint onto the canvas, rotate it, move it, undo — Circuit JSON round-trips clean; vitest; `npm run build` clean.
+- **Depends-on:** T-189 (shared canvas helpers)
+
+### T-191 tscircuit ratsnest + DRC live overlay
+- **Tier:** A
+- **Money/reach rationale:** ratsnest (unrouted-net guide lines) + a live design-rule check (clearance / acid-trap / via-in-pad) are the two visual feedback layers that turn a PCB editor from "viewer" into "tool". KiCad has both — tscircuit's renderer doesn't.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** compute ratsnest in pure Python (`packages/kerf-electronics/src/kerf_electronics/ratsnest.py`) — minimum-spanning-tree over each net's pad positions; frontend overlays the airline segments. DRC: clearance check (pad-to-pad, pad-to-trace, trace-to-trace), unconnected pads, missing footprint. Frontend renders DRC violations as red highlights on the offending features.
+- **Target files/packages:** `packages/kerf-electronics/src/kerf_electronics/ratsnest.py` (NEW), `packages/kerf-electronics/src/kerf_electronics/drc.py` (NEW), `packages/kerf-electronics/tests/test_ratsnest.py` + `test_drc.py`, `src/components/CircuitCanvas/RatsnestLayer.jsx` (NEW), `src/components/CircuitCanvas/DRCOverlay.jsx` (NEW).
+- **Definition of Done:** ratsnest tree connects every net's pads with minimum total length (analytic MST oracle); DRC fires on a known-violating fixture; frontend overlay renders; pytest + vitest green.
+- **Depends-on:** none
+
+### T-192 tscircuit LLM-output viewer — render any Circuit JSON the chat returns
+- **Tier:** A
+- **Money/reach rationale:** today when the LLM emits Circuit JSON in chat (e.g. `make_circuit` tool result), it shows as raw text — the user has to copy/paste into a file to see it. A native viewer turns every chat message into a live preview, hugely amplifying the LLM-electronics loop.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** in the chat message renderer (grep `src/components/Chat*`), detect Circuit JSON in code-blocks (`json` fence with a tscircuit shape — heuristic: top-level `circuit_json` key or array of objects with `type: "source_component"|"pcb_*"|"schematic_*"`). Render an inline `<CircuitCanvasMini>` (read-only, no editing) below the code block. One-click "Open in editor" button writes it to a new file in the project.
+- **Target files/packages:** `src/components/Chat/CircuitJsonPreview.jsx` (NEW), `src/lib/detectCircuitJson.js` (NEW), wire into the chat message renderer (additive only). Vitest.
+- **Definition of Done:** chat messages containing Circuit JSON render an inline preview; "Open in editor" creates a new project file; vitest detects + non-detects; `npm run build` clean.
+- **Depends-on:** none
+
+### T-193 tscircuit ↔ KiCad / Circuit-JSON canonical-form bridge
+- **Tier:** B
+- **Money/reach rationale:** Circuit JSON is tscircuit's intermediate; KiCad netlist is the industry exchange. A robust bidirectional bridge means both authoring paths (tscircuit JSX + atopile-as-of-T-194) land on the same fabricable artefact and users can take the design to any house.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** `packages/kerf-electronics/src/kerf_electronics/kicad_io.py` (NEW) — write Circuit JSON → KiCad `.kicad_pcb` + `.kicad_sch` (v6/v7 format) and read back. The "write" path is the priority (export to fabrication); the "read" path is the bonus (import an existing KiCad project into Kerf). Pytest oracle: round-trip a synthetic 2-resistor Circuit JSON through KiCad export + re-import → node count + net count + footprint refs preserved.
+- **Target files/packages:** `packages/kerf-electronics/src/kerf_electronics/kicad_io.py`, `packages/kerf-electronics/tests/test_kicad_io.py`, fixtures dir.
+- **Definition of Done:** Circuit JSON → KiCad → Circuit JSON round-trip preserves nodes/nets/footprints; pytest green; `npm run build` clean.
+- **Depends-on:** none
+
+### T-194 atopile parser + AST — pure-Python read of `.ato` source
+- **Tier:** A
+- **Money/reach rationale:** atopile (textual, code-like electronics authoring) is the fastest-growing alt-flow to tscircuit. Adding it gives Kerf a SECOND authoring surface that both compile to the same Circuit JSON / KiCad netlist — broadens the funnel to firmware/embedded engineers who think in code, not schematics.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** `packages/kerf-electronics/src/kerf_electronics/atopile/parser.py` — pure-Python parser for the atopile `.ato` syntax (modules, components, connections, units, parameters); emit an AST. Mirror the subset documented at atopile.io as of 2025. Tokenizer + LR/PEG parser (no external deps; hand-rolled).
+- **Target files/packages:** `packages/kerf-electronics/src/kerf_electronics/atopile/parser.py` (NEW), `packages/kerf-electronics/src/kerf_electronics/atopile/ast.py` (NEW dataclass tree), `packages/kerf-electronics/tests/test_atopile_parser.py` + a fixtures dir with 4–5 small `.ato` files (resistor, voltage-divider, RC-filter, LED-driver).
+- **Definition of Done:** all 4 fixtures parse to a non-empty AST; AST nodes carry source-location info; pytest oracles assert connection counts; `npm run build` clean.
+- **Depends-on:** none
+
+### T-195 atopile → Circuit JSON / KiCad compiler
+- **Tier:** A
+- **Money/reach rationale:** parsing is the seed; compiling is the value. Once atopile AST → Circuit JSON works, every atopile file is renderable in Kerf's tscircuit canvas + exportable via T-193 to KiCad.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** `packages/kerf-electronics/src/kerf_electronics/atopile/compile.py` — walk the AST, resolve modules, expand parameters, emit Circuit JSON. Use the existing footprint catalogue from `@tscircuit/footprinter` (read its index via a small Python adapter, OR shell out to node — discuss in the agent's commit message). KiCad netlist emission is delegated to T-193's `kicad_io.py` (consume its writer; do NOT modify it).
+- **Target files/packages:** `packages/kerf-electronics/src/kerf_electronics/atopile/compile.py`, `packages/kerf-electronics/tests/test_atopile_compile.py`.
+- **Definition of Done:** voltage-divider fixture compiles to Circuit JSON with 2 resistors + 3 nets; LED-driver compiles to working netlist; round-trip via T-193 to KiCad preserves topology; pytest green.
+- **Depends-on:** T-194, T-193
+
+### T-196 atopile editor + viewer in the IDE
+- **Tier:** A
+- **Money/reach rationale:** authoring needs an editor surface. A Monaco panel for `.ato` files + the live Circuit JSON canvas alongside (read-only mirror of T-189/T-190's canvas) gives atopile users the same loop as tscircuit users.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Monaco language-mode for `.ato` (tokenizer + syntax highlighting; no LSP yet). A split-pane editor: text on the left, live `<CircuitCanvasMini>` on the right showing the compiled Circuit JSON; debounced recompile on edit. Errors in the text panel show a red squiggle (from T-194 parser errors).
+- **Target files/packages:** `src/components/AtopileEditor.jsx` (NEW), `src/lib/atopileMonacoLanguage.js` (NEW), `src/lib/atopileCompileBridge.js` (NEW — calls the backend compile endpoint), API route to expose T-195's compiler over HTTP.
+- **Definition of Done:** editing a `.ato` file in the IDE shows live syntax highlight + a live Circuit JSON preview; error squiggles on a deliberately broken sample; vitest on pure helpers; `npm run build` clean.
+- **Depends-on:** T-194, T-195
+
+### T-197 atopile component-library bridge — JLCPCB / SnapEDA / Octopart
+- **Tier:** B
+- **Money/reach rationale:** atopile's value compounds when components resolve to real parts on real distributors. Bridge into the existing distributor surface (T-49 family) so an `.ato` module declaring `R1 = Resistor(value=10k)` resolves to a real JLCPCB / DigiKey part with footprint.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** extend `packages/kerf-electronics/src/kerf_electronics/atopile/library.py` (NEW) — given an atopile `Component(...)` declaration, query the existing distributor catalogue (kerf-cloud or local cache), return the best-match `mfr_part + footprint + datasheet_url`. Bind into the T-195 compiler so the emitted Circuit JSON carries real distributor refs.
+- **Target files/packages:** `packages/kerf-electronics/src/kerf_electronics/atopile/library.py`, `packages/kerf-electronics/tests/test_atopile_library.py`.
+- **Definition of Done:** voltage-divider with `value=10k, package=0603` resolves to a real JLCPCB part (mocked in tests via fixture); fallback to "unresolved" warning when no match; pytest green.
+- **Depends-on:** T-195
+
+### T-198 atopile LLM authoring — generate `.ato` from a prompt
+- **Tier:** B
+- **Money/reach rationale:** code-first electronics + LLM ≈ Cursor-for-PCB. The LLM emits `.ato`, the user previews the compiled Circuit JSON (T-196), iterates. Closes the "tell me what you want, get a working PCB" loop.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** add an LLM tool `make_atopile` to the existing tool registry — input: textual spec ("voltage divider, 10k+1k, 5V in, 0.45V out") → output: a `.ato` source string. Validate via T-194 parser before returning. The LLM tool docs (`llm_docs/atopile.md`) live in `kerf-electronics`.
+- **Target files/packages:** `packages/kerf-electronics/src/kerf_electronics/atopile/llm.py`, `packages/kerf-electronics/llm_docs/atopile.md`, `packages/kerf-electronics/tests/test_atopile_llm.py`.
+- **Definition of Done:** `make_atopile("voltage divider")` returns a parseable `.ato`; `make_atopile("RC low-pass 10kHz cutoff")` returns parseable + the cutoff value embedded as a parameter; pytest green.
+- **Depends-on:** T-194

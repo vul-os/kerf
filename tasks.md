@@ -1360,7 +1360,7 @@ Tier A (single persona unlock), render / SubD / direct-edit → Tier B
 ### T-106c Hero-render UX panel (browser-side)
 - **Tier:** B
 - **Priority:** P2
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped this session (T-106d/render tables in 0010 await T-154 reset; UI needs dev verify)
 - **Scope:** Viewport "Hero Render" button + quality picker
   (Draft 256 / Standard 1024 / Hero 4096 / Cinema 16384 samples),
   progress bar with tile preview streaming, PNG + EXR download,
@@ -1378,7 +1378,7 @@ Tier A (single persona unlock), render / SubD / direct-edit → Tier B
 ### T-106d Pricing meter (GPU-seconds → kerf_paid credits)
 - **Tier:** B
 - **Priority:** P2
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped this session (T-106d/render tables in 0010 await T-154 reset; UI needs dev verify)
 - **Scope:** Wire the cycles_worker's GPU-seconds consumption into
   `kerf-billing` as a metered draw against `kerf_paid` credits.
   Quality presets map to credit costs (Draft ≈ 0.5 / Standard ≈ 2 /
@@ -1396,7 +1396,7 @@ Tier A (single persona unlock), render / SubD / direct-edit → Tier B
 ### T-106e Self-host docker image + BYO Blender path
 - **Tier:** B
 - **Priority:** P2
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped this session (T-106d/render tables in 0010 await T-154 reset; UI needs dev verify)
 - **Scope:** Containerised `cycles-worker` (Dockerfile + entrypoint)
   so a self-hosted user runs the worker on their own GPU box (no
   cloud bill). Plus a BYO-Blender alternative where the user points
@@ -1416,7 +1416,7 @@ Tier A (single persona unlock), render / SubD / direct-edit → Tier B
 ### T-106f In-browser path-tracer fallback (`three-gpu-pathtracer`)
 - **Tier:** B
 - **Priority:** P2
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped this session (T-106d/render tables in 0010 await T-154 reset; UI needs dev verify)
 - **Scope:** Integrate the MIT-licensed `three-gpu-pathtracer` into
   `src/lib/heroShot.js` as a fallback / free preview path. Reuses
   the existing scene graph + PMREM HDRI + ACES tonemap. Progressive

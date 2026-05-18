@@ -3605,3 +3605,58 @@ User-direction 2026-05-18: ship the "two authoring styles, one fabrication targe
 - **Definition of Done:** Landing's Electronics section names both authoring styles; doc renders in the in-app docs viewer; vitest; `npm run build` clean.
 - **Depends-on:** none
 
+
+## Render scene Blender-parity (T-204 … T-208) — sun, sky, clouds, gizmos
+
+User reported 2026-05-18: adding a "Sun" light in the Render panel has zero visible effect at any angle. Root cause: `RenderView.jsx` writes `doc.lights[]` metadata but `Renderer.jsx` ignores it — it renders four hard-coded directional lights. The data layer + UI exist; the scene-graph application is missing. Wider goal: parity with Blender's sun + sky + cloud presets so the in-viewport look matches what the user picks.
+
+### T-204 Wire `doc.lights[]` into the live Three.js scene (FIX)
+- **Tier:** A
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** consume `doc.lights[]` from `src/lib/render.js` inside `src/components/Renderer.jsx`. Each entry becomes the corresponding `THREE.*Light`:
+  - `sun` → `DirectionalLight` (use `direction[]` to set position from target); enable shadow casting when the light's `cast_shadow` flag is true.
+  - `area` → `RectAreaLight` (needs `RectAreaLightUniformsLib.init()` once at scene setup).
+  - `point` → `PointLight`.
+  - `spot` → `SpotLight` (use `direction[]` for target).
+  Add a small effect ref tracking the spawned lights so they're disposed and recreated when `doc.lights` changes. Preserve the existing hard-coded key/fill/bounce/rim as the **default rig** only when `doc.lights` is empty.
+- **Target files/packages:** `src/components/Renderer.jsx` (additive — DO NOT remove the existing lights; gate them behind `doc.lights.length === 0`), `src/lib/applyDocLightsToScene.js` (NEW pure-logic helper), vitest.
+- **Definition of Done:** adding a sun via the Render panel moves the highlight on the model when direction changes; switching `kind` between sun/area/point/spot updates the scene; vitest renders the helper without errors; `npm run build` clean.
+- **Depends-on:** none
+
+### T-205 Procedural sky + sun-position atmospheric scattering
+- **Tier:** B
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** add a `<Sky>` background option using `three/examples/jsm/objects/Sky.js`. Two new doc-level settings: `sky.kind ∈ {none|procedural|hdri}` and `sky.sun_position {elevation_deg, azimuth_deg}`. When procedural, the sun light's direction syncs from `sky.sun_position` (one source of truth). Picker UI in the Render dropdown alongside the existing Daylight toggle.
+- **Target files/packages:** `src/lib/sky.js` (NEW), `src/components/SkySettings.jsx` (NEW), additive into `src/components/Renderer.jsx` and `src/components/RenderView.jsx` (no deletion); vitest on the pure-logic.
+- **Definition of Done:** changing sun elevation/azimuth animates the sky colour + sun-light direction together; vitest on the elevation→direction math; `npm run build` clean.
+- **Depends-on:** T-204
+
+### T-206 Volumetric / billboard cloud layer
+- **Tier:** B
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** add an opt-in cloud layer to the procedural sky from T-205. Cloud "kinds": `none`, `scattered`, `overcast`, `storm`. Implementation can be billboard-quad-based (cheap; sample noise → opacity) — full volumetric is out of scope. Cloud opacity + density expose two sliders in `SkySettings`.
+- **Target files/packages:** `src/lib/clouds.js` (NEW), `src/components/CloudLayer.jsx` (NEW — declarative Three.js cloud-quad component), vitest.
+- **Definition of Done:** scattered clouds visible against the procedural sky; sliders update density without re-mounting; vitest on the noise sampler; `npm run build` clean.
+- **Depends-on:** T-205
+
+### T-207 HDRI sky preset library — clear / overcast / sunset / studio / night
+- **Tier:** B
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** curate 5 royalty-free 1-2K HDRIs (clear, overcast, sunset, studio, night) and wire them as one-click presets in `SkySettings.jsx` (T-205) under the `hdri` mode. Apply via the existing PMREM environment path. Each preset names its source/license inline.
+- **Target files/packages:** `public/hdri/` (NEW assets), `src/lib/hdriPresets.js` (NEW), `src/components/HdriPicker.jsx` (NEW), small additive change in `Renderer.jsx` to swap the environment from the picker. Vitest for the pure-logic list.
+- **Definition of Done:** picking each preset swaps the env map within ~1 s; PBR materials respond to each; vitest on the preset registry; `npm run build` clean.
+- **Depends-on:** T-205
+
+### T-208 In-viewport light gizmos (sun arrow, area rect, point sphere, spot cone)
+- **Tier:** B
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** render a small Three.js gizmo per `doc.lights[]` entry inside the viewport so the user SEES what they're editing. Sun → arrow + circle at the world origin; area → outlined rect; point → wire-sphere; spot → cone. Click-to-select binds the gizmo to the editing panel.
+- **Target files/packages:** `src/components/LightGizmos.jsx` (NEW), additive into `Renderer.jsx`. Vitest on the pure-helpers that build gizmo geometry; gate the gizmo overlay behind a per-doc `show_gizmos` flag (default true).
+- **Definition of Done:** each light type renders its correct gizmo at the right position/direction; clicking the gizmo highlights the corresponding entry in the Render panel list; vitest on gizmo-geometry helpers; `npm run build` clean.
+- **Depends-on:** T-204
+

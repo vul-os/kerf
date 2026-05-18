@@ -1411,7 +1411,7 @@ Tier A (single persona unlock), render / SubD / direct-edit → Tier B
   + jewelry highlight inspection (2 personas). Parallelisable with
   the trim spine.
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped (integrated this session)
 - **Scope:** Promote the single-point `surface_analysis.zebra_stripe`
   scalar into a **continuity analyser**: sample reflection-line /
   zebra stripes across a shared edge between two surfaces and detect

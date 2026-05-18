@@ -1441,6 +1441,7 @@ FILE_KINDS = (
     "step-ref", "assembly_lock", "canvas", "schedule", "view", "sheet",
     "duct", "pipe", "conduit", "subd", "mesh", "render", "section",
     "cam_layered", "tool", "plc_st", "plc_ld", "quadmesh", "print", "gem", "wiring",
+    "firmware",
 )
 
 

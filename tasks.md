@@ -2495,3 +2495,26 @@ frontend tasks (T-147/T-148) serialize behind other frontend work.
   unreferenced + unreachable + past-grace oids; still inert unless the
   opt-in flag is set; tests green.
 - **Depends-on:** T-125, T-136
+
+### T-151 cloud_git_commits parent tracking → real merge graph
+- **Tier:** B
+- **Money/reach rationale:** T-148's commit-graph renders as a linear
+  chain because `cloud_git_commits` stores no parent relationships and
+  `/projects/{pid}/git/log` returns no `parent_shas`; merge lanes only
+  appear once parents are recorded. Small, completes the git-graph UX.
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** add parent tracking to `cloud_git_commits` (clean-baseline:
+  a `parent_shas text[]` column folded into `0012_cloud_git.sql`, NOT
+  an alter shim); record real parents in the materialize/commit handler
+  (pygit2 commit parents); expose `parent_shas` in the `/git/log`
+  response. **SOLO migration task** — requires a DROP SCHEMA reset, so
+  run it when NO other agent is using the shared DB; verify all
+  migrations apply, 0 back-stamped.
+- **Target files/packages:** `0012_cloud_git.sql`,
+  `packages/kerf-cloud/src/kerf_cloud/routes.py` (commit handler +
+  /git/log), tests. T-148's `gitGraph.js` already consumes `parent_shas`.
+- **Definition of Done:** commits store parents; `/git/log` returns
+  `parent_shas`; a merge commit renders with a merge lane; schema reset
+  clean, 0 back-stamped; tests green.
+- **Depends-on:** T-125, T-148

@@ -1,0 +1,24 @@
+{
+  "name": "ArduinoJson",
+  "version": "6.21.3",
+  "description": "A simple and efficient JSON library for embedded C++.",
+  "keywords": "JSON, parsing, serialization",
+  "authors": {
+    "name": "Benoit Blanchon",
+    "url": "https://arduinojson.org/",
+    "email": "blog@bblanchon.fr"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bblanchon/ArduinoJson.git"
+  },
+  "homepage": "https://arduinojson.org/",
+  "export": {
+    "include": "src"
+  },
+  "license": "MIT",
+  "frameworks": ["arduino", "espidf"],
+  "platforms": ["*"],
+  "headers": ["ArduinoJson.h"],
+  "dependencies": {}
+}

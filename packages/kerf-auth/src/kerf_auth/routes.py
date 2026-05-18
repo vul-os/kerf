@@ -6,7 +6,7 @@ import json
 import logging
 import secrets
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import asyncpg
@@ -87,7 +87,7 @@ async def _create_email_token(conn, user_id: str, kind: str, ttl: timedelta) -> 
         VALUES ($1, $2, $3, $4)
         """,
         user_id, kind, hash_token(raw),
-        datetime.utcnow() + ttl,
+        datetime.now(timezone.utc) + ttl,
     )
     return raw
 
@@ -205,7 +205,7 @@ async def issue_tokens(conn: asyncpg.Connection, user_id: str) -> tuple[str, str
     access_token, _ = generate_access_token(user_id)
     refresh_token = generate_refresh_token()
     refresh_hash = hash_token(refresh_token)
-    expires_at = datetime.utcnow() + timedelta(days=settings.jwt_refresh_ttl_days)
+    expires_at = datetime.now(timezone.utc) + timedelta(days=settings.jwt_refresh_ttl_days)
     await rt_queries.create_refresh_token(conn, user_id, refresh_hash, expires_at)
     return access_token, refresh_token
 

@@ -205,6 +205,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.jewelry.wax_carving",
     "kerf_cad_core.jewelry.family_ring",
     "kerf_cad_core.jewelry.enamel",
+    "kerf_cad_core.simple_parametric.tools",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

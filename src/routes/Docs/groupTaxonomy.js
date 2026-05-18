@@ -81,6 +81,7 @@ export const USER_GROUPS = [
     label: 'Workflows',
     key: 'workflows',
     slugs: [
+      'maker-workflow',
       'jewelry-workflow',
       'mechanical-workflow',
       'electronic-workflow',

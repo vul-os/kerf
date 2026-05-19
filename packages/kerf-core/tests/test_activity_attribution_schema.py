@@ -58,12 +58,24 @@ def test_projects_has_created_by_column():
     )
 
 
+def test_files_has_created_by_column():
+    """Activity feed 'file_created' / 'file_deleted' rows used to render
+    as 'Someone created main.jscad' because the SQL hardcoded
+    user_id := NULL. After folding files.created_by into baseline 0001,
+    the activity attribution shows the real user's name."""
+    body = _table_block("files")
+    assert re.search(r"created_by\s+uuid\s+references\s+users\(id\)", body, re.I), (
+        "files.created_by must be present and reference users(id)"
+    )
+
+
 def test_attribution_columns_have_indexes():
     # Activity feed orders by created_at DESC and joins users; the per-user
     # filter benefits from indexes on the FK columns.
     assert "chat_messages_user_id_idx" in _BASELINE
     assert "chat_threads_created_by_idx" in _BASELINE
     assert "projects_created_by_idx" in _BASELINE
+    assert "files_created_by_idx" in _BASELINE
 
 
 def test_no_alter_table_add_column_shims_for_attribution():

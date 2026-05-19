@@ -18,11 +18,12 @@ async def create_file(
     mime_type: Optional[str] = None,
     size: Optional[int] = None,
     extension: Optional[str] = None,
+    created_by: Optional[uuid.UUID] = None,
 ) -> Dict[str, Any]:
     row = await conn.fetchrow(
         """
-        INSERT INTO files (project_id, parent_id, name, kind, content, storage_key, mime_type, size, extension)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        INSERT INTO files (project_id, parent_id, name, kind, content, storage_key, mime_type, size, extension, created_by)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING *
         """,
         project_id,
@@ -34,6 +35,7 @@ async def create_file(
         mime_type,
         size,
         extension,
+        created_by,
     )
     return dict(row)
 

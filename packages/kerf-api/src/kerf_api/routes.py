@@ -1050,7 +1050,10 @@ async def create_project(req: CreateProjectRequest, payload: dict = Depends(requ
             )
 
             if starter_name and starter_content:
-                await files_queries.create_file(conn, project["id"], starter_name, starter_kind, None, starter_content)
+                await files_queries.create_file(
+                    conn, project["id"], starter_name, starter_kind, None, starter_content,
+                    created_by=payload.get("sub"),
+                )
 
     # Auto-init cloud git repo for every new project (cloud only).
     # Failure is non-fatal: the user can always retry via the git panel.
@@ -1484,7 +1487,8 @@ async def create_file(pid: str, req: CreateFileRequest, payload: dict = Depends(
         content = req.content or ""
 
         f = await files_queries.create_file(
-            conn, pid, req.name, req.kind, req.parent_id, content, None, None, None, req.extension
+            conn, pid, req.name, req.kind, req.parent_id, content, None, None, None, req.extension,
+            created_by=user_id,
         )
 
         f = dict(f)
@@ -2461,12 +2465,15 @@ async def get_project_activity(
 
                 UNION ALL
 
-                -- (b) file_created: files that are not soft-deleted, keyed on files.created_at
+                -- (b) file_created: files that are not soft-deleted, keyed on files.created_at.
+                -- user comes from files.created_by (folded into baseline 0001) so
+                -- the activity row attributes "<user> created main.jscad" instead
+                -- of "Someone created main.jscad".
                 SELECT
                     'file_created'::text   AS kind,
                     NULL::text             AS source,
                     f.created_at           AS created_at,
-                    NULL::uuid             AS user_id,
+                    f.created_by           AS user_id,
                     f.id                   AS file_id,
                     f.name                 AS file_name,
                     NULL::uuid             AS thread_id,
@@ -2478,12 +2485,14 @@ async def get_project_activity(
 
                 UNION ALL
 
-                -- (c) file_deleted: files that have been soft-deleted
+                -- (c) file_deleted: files that have been soft-deleted.
+                -- The deleter isn't tracked separately; attribute to the
+                -- file's original creator (better than "Someone deleted …").
                 SELECT
                     'file_deleted'::text   AS kind,
                     NULL::text             AS source,
                     f.deleted_at           AS created_at,
-                    NULL::uuid             AS user_id,
+                    f.created_by           AS user_id,
                     f.id                   AS file_id,
                     f.name                 AS file_name,
                     NULL::uuid             AS thread_id,

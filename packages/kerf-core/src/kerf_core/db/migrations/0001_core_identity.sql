@@ -169,6 +169,12 @@ create table if not exists files (
     mesh_storage_key text,
     -- folded from 029_script_extension.sql (0005)
     extension text,
+    -- Activity feed attribution: who created the file. Without this, the
+    -- 'file_created' / 'file_deleted' activity events rendered as
+    -- "Someone created main.jscad" because the SQL had to hardcode
+    -- user_id := NULL. on delete set null preserves history if the
+    -- user is later deleted (becomes anon).
+    created_by uuid references users(id) on delete set null,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()
 );
@@ -177,6 +183,7 @@ create index if not exists files_parent_id_idx on files(parent_id);
 create index if not exists files_storage_key_idx on files(storage_key);
 create index if not exists files_deleted_at_idx on files(deleted_at);
 create index if not exists files_extension_idx on files(extension);
+create index if not exists files_created_by_idx on files(created_by);
 
 create table if not exists file_revisions (
     id uuid primary key default gen_random_uuid(),

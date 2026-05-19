@@ -101,29 +101,14 @@ describe('compare page modules import without error', () => {
   })
 
   it('compare/Freecad.jsx has a default export', async () => {
+    // Freecad.jsx is retained for its shared sub-component exports
+    // (Section, Li, CompareTable, FairnessNote, etc.) used by the hub
+    // page and the compound JSX pages (KerfVs*.jsx).
     const mod = await import('../routes/compare/Freecad.jsx')
     expect(typeof mod.default).toBe('function')
   })
-
-  it('compare/Kicad.jsx has a default export', async () => {
-    const mod = await import('../routes/compare/Kicad.jsx')
-    expect(typeof mod.default).toBe('function')
-  })
-
-  it('compare/Rhino.jsx has a default export', async () => {
-    const mod = await import('../routes/compare/Rhino.jsx')
-    expect(typeof mod.default).toBe('function')
-  })
-
-  it('compare/Revit.jsx has a default export', async () => {
-    const mod = await import('../routes/compare/Revit.jsx')
-    expect(typeof mod.default).toBe('function')
-  })
-
-  it('compare/Fusion.jsx has a default export', async () => {
-    const mod = await import('../routes/compare/Fusion.jsx')
-    expect(typeof mod.default).toBe('function')
-  })
+  // Note: Kicad.jsx, Rhino.jsx, Revit.jsx, Fusion.jsx have been migrated
+  // to public/compare/*.md files and their JSX files deleted.
 })
 
 /* -------------------------------------------------------------------------- */
@@ -166,13 +151,10 @@ describe('Freecad.jsx shared exports', () => {
 describe('fairness affordance', () => {
   // Static ?raw imports (one per file) keep Vite's dynamic-import-vars
   // analyser happy; each resolves to the file source as a string.
+  // Only Freecad.jsx is kept (shared sub-components); all others migrated to .md.
   const sources = {
     'index.jsx': () => import('../routes/compare/index.jsx?raw'),
     'Freecad.jsx': () => import('../routes/compare/Freecad.jsx?raw'),
-    'Kicad.jsx': () => import('../routes/compare/Kicad.jsx?raw'),
-    'Rhino.jsx': () => import('../routes/compare/Rhino.jsx?raw'),
-    'Revit.jsx': () => import('../routes/compare/Revit.jsx?raw'),
-    'Fusion.jsx': () => import('../routes/compare/Fusion.jsx?raw'),
   }
 
   Object.entries(sources).forEach(([file, load]) => {

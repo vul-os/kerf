@@ -40,20 +40,9 @@ import { parseCompareMd } from '../../lib/compareMdParser.js'
  * TODO: Remove entries from this map as each slug is migrated to .md.
  */
 const LEGACY_PAGES = {
-  freecad:    lazy(() => import('./Freecad.jsx')),
-  fusion:     lazy(() => import('./Fusion.jsx')),
-  kicad:      lazy(() => import('./Kicad.jsx')),
-  solidworks: lazy(() => import('./Solidworks.jsx')),
-  onshape:    lazy(() => import('./Onshape.jsx')),
-  inventor:   lazy(() => import('./Inventor.jsx')),
-  autocad:    lazy(() => import('./Autocad.jsx')),
-  altium:     lazy(() => import('./Altium.jsx')),
-  revit:      lazy(() => import('./Revit.jsx')),
-  civil3d:    lazy(() => import('./Civil3d.jsx')),
-  rhino:      lazy(() => import('./Rhino.jsx')),
-  matrixgold: lazy(() => import('./MatrixGold.jsx')),
-  blender:    lazy(() => import('./Blender.jsx')),
-  max3ds:     lazy(() => import('./Max3ds.jsx')),
+  // All slugs have been migrated to .md files under public/compare/.
+  // Freecad.jsx is kept for its shared sub-component exports (Section, Li,
+  // CompareTable, FairnessNote, etc.) used by Freecad.jsx imports elsewhere.
 }
 
 /* -------------------------------------------------------------------------- */

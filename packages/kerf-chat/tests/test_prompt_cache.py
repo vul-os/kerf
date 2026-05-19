@@ -543,12 +543,13 @@ def test_moonshot_provider_not_affected(stub_with_cache):
 # ===========================================================================
 
 def test_gemini_provider_not_affected():
-    """Gemini provider should work unmodified; no cache_control involved."""
-    genai_stub = types.ModuleType("google.generativeai")
+    """Gemini provider works on the modern `google.genai` SDK; no
+    cache_control is involved on the Gemini path (Anthropic-only)."""
 
     @dataclass
     class _Part:
         text: str = "gemini"
+        function_call: object = None
 
     @dataclass
     class _Content:
@@ -557,41 +558,73 @@ def test_gemini_provider_not_affected():
     @dataclass
     class _Candidate:
         content: _Content = field(default_factory=_Content)
+        finish_reason: object = None
 
     @dataclass
     class _GeminiResponse:
         candidates: list = field(default_factory=lambda: [_Candidate()])
+        usage_metadata: object = field(default_factory=lambda: types.SimpleNamespace(
+            prompt_token_count=0, candidates_token_count=0,
+        ))
 
-    class _GenerativeModel:
-        def __init__(self, model_name, **kwargs):
-            pass
+    fake_types = types.ModuleType("google.genai.types")
 
-        def generate_content(self, *args, **kwargs):
+    class _Part_:
+        def __init__(self, **kw):
+            for k, v in kw.items():
+                setattr(self, k, v)
+
+        @classmethod
+        def from_text(cls, text):
+            p = cls()
+            p.text = text
+            return p
+
+    class _Content_:
+        def __init__(self, role, parts):
+            self.role = role
+            self.parts = parts
+
+    class _GenerateContentConfig:
+        def __init__(self, **kw):
+            for k, v in kw.items():
+                setattr(self, k, v)
+
+    fake_types.Part = _Part_
+    fake_types.Content = _Content_
+    fake_types.FunctionCall = lambda **kw: types.SimpleNamespace(**kw)
+    fake_types.FunctionResponse = lambda **kw: types.SimpleNamespace(**kw)
+    fake_types.FunctionDeclaration = lambda **kw: types.SimpleNamespace(**kw)
+    fake_types.Tool = lambda **kw: types.SimpleNamespace(**kw)
+    fake_types.GenerateContentConfig = _GenerateContentConfig
+
+    class _Models:
+        def generate_content(self, **kwargs):
             return _GeminiResponse()
 
-    genai_stub.GenerativeModel = _GenerativeModel
-    genai_stub.configure = lambda **kwargs: None
+    class _Client:
+        def __init__(self, **kwargs):
+            self.models = _Models()
 
-    class _types:
-        class GenerationConfig:
-            def __init__(self, **kwargs):
-                pass
-
-    genai_stub.types = _types
+    fake_genai = types.ModuleType("google.genai")
+    fake_genai.Client = _Client
+    fake_genai.types = fake_types
 
     google_stub = types.ModuleType("google")
-    google_stub.generativeai = genai_stub
+    google_stub.genai = fake_genai
     sys.modules["google"] = google_stub
-    sys.modules["google.generativeai"] = genai_stub
+    sys.modules["google.genai"] = fake_genai
+    sys.modules["google.genai.types"] = fake_types
 
     try:
         from kerf_chat.llm import GeminiProvider
         provider = GeminiProvider("gemini_key")
-        result = provider.complete(_simple_req(model="gemini-2.5-flash"))
+        result = provider.complete(_simple_req(model="gemini-3-flash-preview"))
         assert result.content == "gemini"
     finally:
         sys.modules.pop("google", None)
-        sys.modules.pop("google.generativeai", None)
+        sys.modules.pop("google.genai", None)
+        sys.modules.pop("google.genai.types", None)
 
 
 # ===========================================================================

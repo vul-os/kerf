@@ -925,99 +925,276 @@ class MoonshotProvider(Provider):
 
 
 class GeminiProvider(Provider):
+    """Google Gemini via the modern `google-genai` SDK.
+
+    Migrated 2026-05-19 from the deprecated `google-generativeai`
+    package. The old SDK printed a FutureWarning on every import and
+    used different APIs (GenerativeModel constructor + module-level
+    `configure`); the new SDK is client-shaped:
+
+        client = genai.Client(api_key=...)
+        client.models.generate_content(model=..., contents=...,
+            config=types.GenerateContentConfig(...))
+
+    Message format:
+      - `contents` is a list of `types.Content` objects
+      - each Content has role ∈ {"user", "model"} + a list of Parts
+      - a Part is `types.Part.from_text(text)` for text, or
+        `types.Part(function_call=...)` for assistant tool calls, or
+        `types.Part(function_response=...)` for tool results
+
+    Tools:
+      - `types.Tool(function_declarations=[...FunctionDeclaration...])`
+    """
+
     def __init__(self, api_key: str):
         self.api_key = api_key
 
     def name(self) -> str:
         return "gemini"
 
-    def complete(self, req: CompleteRequest) -> CompleteResponse:
-        import google.generativeai as genai
+    # ── Shared request-building helpers ─────────────────────────────────
 
-        genai.configure(api_key=self.api_key)
+    def _build_request_args(self, req: CompleteRequest):
+        """Translate a Kerf CompleteRequest into the kwargs the genai
+        Client expects. Returns (contents, config) where `config` is a
+        `types.GenerateContentConfig` instance (or None) and `contents`
+        is a list of `types.Content` objects.
 
-        # google-generativeai ≥0.8 takes `system_instruction` on the
-        # GenerativeModel CONSTRUCTOR — passing it to generate_content()
-        # raises TypeError (broke every Gemini call on dev). Move it
-        # here so the call below stays SDK-clean.
-        model = genai.GenerativeModel(
-            req.model,
-            system_instruction=req.system if req.system else None,
-        )
+        Pulled out of complete() / stream() so both share the same wire
+        contract — the previous bifurcation was where Gemini regressions
+        landed.
+        """
+        from google import genai
+        from google.genai import types
 
         contents = []
         for m in req.messages:
             if m.role == "user":
-                contents.append({"role": "user", "parts": [m.content]})
+                contents.append(types.Content(
+                    role="user",
+                    parts=[types.Part.from_text(text=m.content)],
+                ))
             elif m.role == "assistant":
                 parts = []
                 if m.content.strip():
-                    parts.append(m.content)
+                    parts.append(types.Part.from_text(text=m.content))
                 for tc in m.tool_calls:
-                    parts.append({
-                        "function_call": {
-                            "name": tc.name,
-                            "args": json.loads(tc.arguments_json) if tc.arguments_json.strip() else {},
-                        }
-                    })
-                contents.append({"role": "model", "parts": parts})
+                    args = json.loads(tc.arguments_json) if tc.arguments_json.strip() else {}
+                    parts.append(types.Part(
+                        function_call=types.FunctionCall(name=tc.name, args=args),
+                    ))
+                contents.append(types.Content(role="model", parts=parts))
             elif m.role == "tool":
-                for tc in m.tool_calls:
-                    contents.append({
-                        "role": "user",
-                        "parts": [{
-                            "function_response": {
-                                "name": tc.name,
-                                "response": {"result": m.content},
-                            }
-                        }]
-                    })
+                # In the genai SDK, function_response parts go in a user-
+                # role Content turn. tool_call_id maps to the original
+                # function name (Gemini doesn't track call ids the way
+                # Anthropic does, so we use the name; the upstream
+                # routing layer correlates by order).
+                contents.append(types.Content(
+                    role="user",
+                    parts=[types.Part(
+                        function_response=types.FunctionResponse(
+                            name=m.tool_call_id or "unknown",
+                            response={"result": m.content},
+                        ),
+                    )],
+                ))
 
-        tools = None
+        # Tool catalog → FunctionDeclaration list inside one Tool.
+        tool_objs = None
         if req.tools:
-            tools = [{
-                "function_declarations": [
-                    {
-                        "name": t.name,
-                        "description": t.description,
-                        "parameters": t.input_schema or {"type": "object", "properties": {}},
-                    }
-                    for t in req.tools
-                ]
-            }]
+            decls = [
+                types.FunctionDeclaration(
+                    name=t.name,
+                    description=t.description,
+                    parameters=t.input_schema or {"type": "object", "properties": {}},
+                )
+                for t in req.tools
+            ]
+            tool_objs = [types.Tool(function_declarations=decls)]
 
-        generation_config = {}
+        config_kwargs: dict[str, Any] = {}
+        if req.system:
+            config_kwargs["system_instruction"] = req.system
+        if tool_objs is not None:
+            config_kwargs["tools"] = tool_objs
         if req.max_tokens > 0:
-            generation_config["max_output_tokens"] = req.max_tokens
+            config_kwargs["max_output_tokens"] = req.max_tokens
         if req.temperature > 0:
-            generation_config["temperature"] = req.temperature
+            config_kwargs["temperature"] = req.temperature
 
-        response = model.generate_content(
-            contents,
-            tools=tools,
-            generation_config=genai.types.GenerationConfig(**generation_config) if generation_config else None,
+        config = (
+            types.GenerateContentConfig(**config_kwargs)
+            if config_kwargs else None
+        )
+        return contents, config
+
+    @staticmethod
+    def _parse_response_parts(candidate) -> tuple[list[str], list[ToolCall]]:
+        """Extract text + function_calls from a single genai response
+        candidate. Skips empty parts so we never emit empty deltas."""
+        text_parts: list[str] = []
+        tool_calls: list[ToolCall] = []
+        if not getattr(candidate, "content", None):
+            return text_parts, tool_calls
+        for part in candidate.content.parts or []:
+            text = getattr(part, "text", None)
+            fc = getattr(part, "function_call", None)
+            if text:
+                text_parts.append(text)
+            if fc and fc.name:
+                args = dict(fc.args) if fc.args else {}
+                tool_calls.append(ToolCall(
+                    id=f"call_{hash((fc.name, str(args))) % 1000000}",
+                    name=fc.name,
+                    arguments_json=json.dumps(args),
+                ))
+        return text_parts, tool_calls
+
+    # ── Non-streaming path ──────────────────────────────────────────────
+
+    def complete(self, req: CompleteRequest) -> CompleteResponse:
+        from google import genai
+        client = genai.Client(api_key=self.api_key)
+
+        contents, config = self._build_request_args(req)
+
+        response = client.models.generate_content(
+            model=req.model,
+            contents=contents,
+            config=config,
         )
 
-        text_parts = []
-        tool_calls = []
+        text_parts: list[str] = []
+        tool_calls: list[ToolCall] = []
+        for candidate in (response.candidates or []):
+            tp, tcs = self._parse_response_parts(candidate)
+            text_parts.extend(tp)
+            tool_calls.extend(tcs)
 
-        for candidate in response.candidates:
-            for part in candidate.content.parts:
-                if hasattr(part, "text") and part.text:
-                    text_parts.append(part.text)
-                elif hasattr(part, "function_call") and part.function_call:
-                    fc = part.function_call
-                    tool_calls.append(ToolCall(
-                        id=f"call_{hash((fc.name, str(fc.args))) % 1000000}",
-                        name=fc.name,
-                        arguments_json=json.dumps(dict(fc.args)),
-                    ))
+        # finish_reason: 1 = STOP, 2 = MAX_TOKENS, 3 = SAFETY, 5 = OTHER, etc.
+        finish = None
+        if response.candidates:
+            finish = getattr(response.candidates[0], "finish_reason", None)
+        stop_reason = "tool_use" if tool_calls else "stop"
+        if finish and str(finish).endswith("MAX_TOKENS"):
+            stop_reason = "length"
+
+        usage = getattr(response, "usage_metadata", None)
+        input_tokens = getattr(usage, "prompt_token_count", 0) if usage else 0
+        output_tokens = getattr(usage, "candidates_token_count", 0) if usage else 0
 
         return CompleteResponse(
             content="".join(text_parts),
             tool_calls=tool_calls,
-            stop_reason="stop" if response.candidates else "length",
+            stop_reason=stop_reason,
             model_used=req.model,
-            input_tokens=0,
-            output_tokens=0,
+            input_tokens=input_tokens or 0,
+            output_tokens=output_tokens or 0,
+        )
+
+    # ── Streaming path ──────────────────────────────────────────────────
+
+    async def stream(self, req: CompleteRequest) -> AsyncIterator[StreamEvent]:  # type: ignore[override]
+        """True streaming via genai's generate_content_stream. Emits the
+        same Kerf-native StreamEvent shape as AnthropicProvider.stream():
+        assistant_text_delta / tool_use_start / tool_use_complete /
+        assistant_done."""
+        from google import genai
+        client = genai.Client(api_key=self.api_key)
+
+        contents, config = self._build_request_args(req)
+
+        # Accumulators that survive across chunks.
+        emitted_tool_starts: set[str] = set()
+        last_input_tokens = 0
+        last_output_tokens = 0
+        last_finish = None
+
+        # genai's stream iterator is sync — call it on a worker thread
+        # and pump chunks into an async queue to keep the FastAPI event
+        # loop responsive.
+        import asyncio
+        import queue as _queue
+        chunk_q: asyncio.Queue = asyncio.Queue()
+        loop = asyncio.get_event_loop()
+        _SENTINEL = object()
+
+        def _pump():
+            try:
+                for chunk in client.models.generate_content_stream(
+                    model=req.model,
+                    contents=contents,
+                    config=config,
+                ):
+                    asyncio.run_coroutine_threadsafe(chunk_q.put(chunk), loop)
+            except Exception as e:  # surface to the consumer
+                asyncio.run_coroutine_threadsafe(chunk_q.put(e), loop)
+            finally:
+                asyncio.run_coroutine_threadsafe(chunk_q.put(_SENTINEL), loop)
+
+        import threading
+        t = threading.Thread(target=_pump, daemon=True)
+        t.start()
+
+        while True:
+            chunk = await chunk_q.get()
+            if chunk is _SENTINEL:
+                break
+            if isinstance(chunk, Exception):
+                raise chunk
+
+            # Token usage rolls forward.
+            usage = getattr(chunk, "usage_metadata", None)
+            if usage:
+                last_input_tokens = getattr(usage, "prompt_token_count", last_input_tokens) or last_input_tokens
+                last_output_tokens = getattr(usage, "candidates_token_count", last_output_tokens) or last_output_tokens
+
+            for candidate in (chunk.candidates or []):
+                last_finish = getattr(candidate, "finish_reason", last_finish)
+                if not getattr(candidate, "content", None):
+                    continue
+                for part in candidate.content.parts or []:
+                    text = getattr(part, "text", None)
+                    fc = getattr(part, "function_call", None)
+                    if text:
+                        yield StreamEvent(
+                            type="assistant_text_delta",
+                            data={"text": text},
+                        )
+                    if fc and fc.name:
+                        # genai streams tool calls atomically — start +
+                        # complete in one chunk. Emit both so the
+                        # frontend's chip flow renders the same way as
+                        # the Anthropic path.
+                        args = dict(fc.args) if fc.args else {}
+                        tid_key = f"call_{hash((fc.name, str(args))) % 1000000}"
+                        if tid_key not in emitted_tool_starts:
+                            emitted_tool_starts.add(tid_key)
+                            yield StreamEvent(
+                                type="tool_use_start",
+                                data={"tool_use_id": tid_key, "name": fc.name},
+                            )
+                        yield StreamEvent(
+                            type="tool_use_complete",
+                            data={
+                                "tool_use_id": tid_key,
+                                "name": fc.name,
+                                "input": args,
+                            },
+                        )
+
+        stop_reason = (
+            "tool_use" if emitted_tool_starts
+            else ("length" if last_finish and str(last_finish).endswith("MAX_TOKENS") else "stop")
+        )
+        yield StreamEvent(
+            type="assistant_done",
+            data={
+                "stop_reason": stop_reason,
+                "input_tokens": last_input_tokens or 0,
+                "output_tokens": last_output_tokens or 0,
+                "model": req.model,
+            },
         )

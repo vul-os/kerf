@@ -650,6 +650,98 @@ export const CAPABILITY_GROUPS = [
       },
     ],
   },
+  {
+    id: 'plc',
+    eyebrow: 'PLC · industrial automation',
+    title: 'IEC 61131-3 in a single conversation.',
+    body: 'Ladder logic, Function Block Diagram, Structured Text, Sequential Function Charts, I/O wiring diagrams and HMI layout — all chat-driven, all version-controlled, all MIT-licensed. Export to PLCopen XML for Siemens TIA Portal, Rockwell Studio 5000, or any IEC 61131-3 runtime.',
+    cards: [
+      {
+        icon: Workflow,
+        title: 'Ladder logic & FBD',
+        body: 'Author Ladder Diagram and Function Block Diagram programs in chat. Auto-verify rung continuity, coil conflicts, and timer/counter wiring before export.',
+      },
+      {
+        icon: Code2,
+        title: 'Structured Text & SFC',
+        body: 'Write and review ST programs and Sequential Function Charts. Static type checking, scan-cycle analysis, and LLM-assisted refactoring of legacy code.',
+      },
+      {
+        icon: Layers,
+        title: 'I/O wiring & HMI',
+        body: 'Generate I/O wiring diagrams from tag databases. Layout HMI screens and SCADA faceplates. Export to vendor-neutral PLCopen XML.',
+      },
+    ],
+  },
+  {
+    id: 'motion',
+    eyebrow: 'Motion simulation · kinematics',
+    title: 'Rigid-body dynamics to robot trajectory.',
+    body: 'Describe the mechanism; Kerf assembles the constraint graph, solves the dynamics, and visualises the result in real time. Cam profiles, gear trains, and ROS2-compatible trajectory YAML export included.',
+    cards: [
+      {
+        icon: Cog,
+        title: 'Rigid-body dynamics',
+        body: 'Assemble mechanisms from joints, links, and mass properties. Solve forward and inverse kinematics. Animate the timeline and export joint-angle CSV for controller validation.',
+      },
+      {
+        icon: Layers,
+        title: 'Cam profiles & gear trains',
+        body: 'Generate cam profiles from follower motion laws (cycloidal, polynomial, harmonic). Model spur, helical, bevel, and epicyclic gear trains with undercutting checks.',
+      },
+      {
+        icon: Activity,
+        title: 'Robot trajectory planning',
+        body: 'Define waypoints and interpolate joint trajectories. Check reach, singularities, and joint-limit violations. Export ROS2-compatible trajectory YAML.',
+      },
+    ],
+  },
+  {
+    id: 'femcfd',
+    eyebrow: 'FEM · CFD simulation',
+    title: 'Structural, thermal, fluid — one chain.',
+    body: 'Linear static and modal FEM via FEniCSx, steady-state and transient thermal, and incompressible CFD via OpenFOAM — all in a single conversation. Results export as VTK and XDMF for ParaView post-processing.',
+    cards: [
+      {
+        icon: Activity,
+        title: 'Structural FEM',
+        body: 'Linear static and modal analysis via FEniCSx. Multi-body bonded contact. Deformed-shape 3D overlay with von Mises stress colouring. CalculiX for cross-validation.',
+      },
+      {
+        icon: Layers,
+        title: 'Thermal analysis',
+        body: 'Steady-state and transient heat transfer with convection and radiation BCs. Coupled thermo-structural runs. VTK export for ParaView.',
+      },
+      {
+        icon: Cog,
+        title: 'CFD — incompressible flow',
+        body: 'OpenFOAM-backed incompressible Navier-Stokes. k-ε and k-ω SST turbulence. Residual monitoring streamed into chat. Pressure and velocity fields in the viewport.',
+      },
+    ],
+  },
+  {
+    id: 'textiles',
+    eyebrow: 'Textiles · apparel design',
+    title: 'Pattern drafting to cut file in one chat.',
+    body: 'Describe the garment; Kerf drafts the blocks, grades across sizes using ASTM or EN 13402 rules, applies seam allowances, and generates DXF cut files ready for your plotter. Fabric drape simulation included.',
+    cards: [
+      {
+        icon: Scissors,
+        title: 'Pattern drafting & grading',
+        body: 'Draft bodice, sleeve, trouser, and skirt blocks from measurements or size charts. Grade across a size run with notches and grain lines included.',
+      },
+      {
+        icon: Layers,
+        title: 'Seam allowances & markers',
+        body: 'Apply seam allowances per edge with corner mitring. Generate nesting markers for fabric efficiency with lay plan export.',
+      },
+      {
+        icon: Activity,
+        title: 'Fabric drape simulation',
+        body: 'Mass-spring cloth simulation for drape preview on parametric dress forms. Adjust fabric weight and stiffness; see gathering and drape in the 3D viewport before cutting.',
+      },
+    ],
+  },
 ]
 
 function CapabilityTour() {

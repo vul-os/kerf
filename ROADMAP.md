@@ -122,6 +122,32 @@ architecture-independent and gate trust for *every* persona at once; the
 offline desktop app sits at the lowest tier as a post-launch, demand-gated
 bet.
 
+### §1.5.1 — Storage hygiene + comprehensive Git UX (P0, in flight 2026-05-19)
+
+Commitment (1) above says "the version-control story is two complementary
+layers — fine-grained automatic file history *and* deliberate, shareable
+commits". This sub-section commits the **UX** that makes those two layers
+clean and non-confusing for the user:
+
+- **`file_revisions` becomes invisible plumbing.** It still backs Cmd+Z /
+  Cmd+Shift+Z and cross-session crash recovery, but the user never sees a
+  "revision history" list as a feature. Right-drawer's just-added History
+  tab is removed; the activity feed stops showing keystroke `'edit'` rows.
+- **Git is the only user-facing history surface.** The Git tab in the
+  unified right drawer becomes comprehensive: commit graph, per-commit
+  diff viewer, staged-changes view with per-file diff before commit,
+  branch picker with ahead/behind, push/pull state badges, GitHub/GitLab
+  sync (just wired in `2119293`).
+- **Storage hygiene — users can purge revisions to free space.** Behind a
+  loud confirmation ("I have committed everything I want to keep to git"),
+  a purge endpoint deletes the per-keystroke revision noise while keeping
+  the most recent N per file as a safety net. Git commits are unaffected
+  — that's the safety net.
+
+These tasks (**T-300 → T-306** in [tasks.md](./tasks.md)) are P0 and run
+**now**, parallel across 5 Sonnet agents. They turn the platform-spine
+commitment into the actual UX users will touch on every project.
+
 ---
 
 ## §2 — Per-persona deliverable scorecard

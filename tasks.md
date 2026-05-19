@@ -145,6 +145,163 @@ Template:
 
 ---
 
+## Tier A — Storage hygiene + comprehensive Git UX (P0, 2026-05-19)
+
+These tasks together complete the **"git is the user-facing history surface;
+file_revisions is invisible plumbing"** model. After this workstream lands,
+the only history UI a user sees is the Git tab (commits / branches / diffs /
+graph); `file_revisions` keeps backing Cmd+Z but never appears as a feature.
+Sequenced for parallel execution across 5 Sonnet agents.
+
+### T-300 Drop History tab from right drawer; preserve Cmd+Z plumbing
+
+🔴 not started · **Tier A · P0**
+
+- **Why:** Right drawer just gained a History tab on top of `file_revisions`.
+  With git becoming the user-facing snapshot story, this surface is
+  redundant. Cmd+Z / Cmd+Shift+Z still drive `file_revisions` underneath,
+  but as invisible plumbing — the user never sees a revision list as a feature.
+- **Target files:** `src/routes/Editor.jsx`, `src/store/workspace.js`,
+  `src/__tests__/rightDrawer.test.jsx`.
+- **Definition of Done:**
+  - Editor.jsx removes the History tab + its body render
+  - `openRevisionDrawer` / `closeRevisionDrawer` become no-ops or remap to nothing
+  - Topbar Undo / Redo + Cmd+Z keyboard shortcut still work against `file_revisions`
+  - rightDrawer test pinned: Chat/Activity/Git tabs present, History absent
+- **Effort:** S
+- **Depends-on:** none
+
+### T-301 Activity feed: hide keystroke-level edits
+
+🔴 not started · **Tier A · P0**
+
+- **Why:** With file_revisions invisible, the activity feed should stop
+  spamming per-keystroke `'edit'` rows. Keep meaningful tool/llm/restore
+  edits; drop bare `source='user'` keystroke noise.
+- **Target files:** `packages/kerf-api/src/kerf_api/routes.py` (activity SQL),
+  `packages/kerf-api/tests/test_activity_route.py`.
+- **Definition of Done:**
+  - Activity SQL UNION clause for `'edit'` rows filters `source <> 'user'`
+    (keep `llm`, `tool`, `restore` — those are meaningful assistant actions)
+  - Regression test: 30 `source='user'` edits produce 0 activity rows;
+    `source='llm'` / `source='tool'` still appear
+- **Effort:** S
+- **Depends-on:** none
+
+### T-302 Revisions: size estimator endpoint + Git-tab badge
+
+🔴 not started · **Tier A · P0**
+
+- **Why:** Before a destructive purge (T-303), users need to see how much
+  space file_revisions are taking. A small read-only endpoint + UI badge
+  satisfies this and ships independently.
+- **Target files:** `packages/kerf-api/src/kerf_api/routes.py`,
+  `src/lib/api.js`, `src/cloud/GitPanel.jsx`.
+- **Definition of Done:**
+  - `GET /api/projects/{pid}/revisions/size` returns
+    `{total_bytes, revision_count, by_file: [{file_id, file_name, bytes, count}]}`
+  - Uses `pg_column_size(content_gz)` + `octet_length(content)` to estimate
+  - Auth + workspace-role check
+  - `src/lib/api.js` adds `getRevisionsSize(projectId)`
+  - GitPanel.jsx renders an unobtrusive badge: "Revision history: 4.2 MB across
+    230 revisions [Manage…]"
+  - Backend route test + frontend render test
+- **Effort:** S
+- **Depends-on:** none
+
+### T-303 Revisions: purge endpoint + confirmation modal
+
+🔴 not started · **Tier A · P0**
+
+- **Why:** Users want to free DB space after their work is committed to
+  git. Must be loud and safe — purging is unrecoverable, so the modal
+  must require an "Everything I want to keep is committed" confirmation.
+- **Target files:**
+  - `packages/kerf-core/src/kerf_core/revisions.py` (purge helper)
+  - `packages/kerf-api/src/kerf_api/routes.py` (DELETE route)
+  - `src/components/PurgeRevisionsModal.jsx` (new)
+  - `src/cloud/GitPanel.jsx` (open-modal wiring)
+- **Definition of Done:**
+  - `purge_project_revisions(pool, project_id, keep_last_per_file=5)` keeps
+    most recent N revisions per file as a safety net; deletes the rest +
+    nullifies any storage blobs they owned
+  - `DELETE /api/projects/{pid}/revisions?keep_last=N&confirm=PURGE`
+    rejects without `confirm=PURGE` (defence-in-depth)
+  - require_editor (owners/editors only)
+  - Modal shows pre-purge size (from T-302), requires
+    "[ ] I have committed everything I want to keep" checkbox, big red button
+  - Post-purge toast: "Freed 4.2 MB. Git commits are unaffected."
+  - Backend tests: keeps the keep_last per file, rejects without confirm,
+    requires editor role
+- **Effort:** M
+- **Depends-on:** T-302 (uses the size badge to open the modal)
+
+### T-304 Git: commit graph + per-commit diff viewer
+
+🔴 not started · **Tier A · P0**
+
+- **Why:** Comprehensive git UX starts with a clear visual of branches /
+  merges and a way to inspect what each commit changed.
+- **Target files:**
+  - `src/cloud/GitGraph.jsx` (new)
+  - `src/cloud/CommitDiffViewer.jsx` (new)
+  - `src/cloud/GitPanel.jsx` (swap bare commit list)
+  - `packages/kerf-api/src/kerf_api/routes_git_diff.py` (already exists;
+    confirm or add per-commit diff endpoint)
+- **Definition of Done:**
+  - GitGraph renders SVG with lanes per branch, commits as circles,
+    merge as connecting line; reads `gitCommits` + `gitBranches` from store
+  - `GET /api/projects/{pid}/git/commits/{sha}/diff` returns
+    `{files: [{path, status, additions, deletions, hunks?}]}`
+  - CommitDiffViewer is a modal opened by clicking a commit in the graph
+  - Tests: graph render, diff fetch, modal interaction
+- **Effort:** M-L
+- **Depends-on:** none
+
+### T-305 Git: staged-changes view + per-file diff before commit
+
+🔴 not started · **Tier A · P0**
+
+- **Why:** Today the Git tab has a bare "commit message + commit" button.
+  Users want to SEE what's changing before they commit — diff per file.
+- **Target files:**
+  - `src/cloud/StagedChanges.jsx` (new)
+  - `src/cloud/GitPanel.jsx` (top-of-tab section)
+  - `packages/kerf-api/src/kerf_api/routes.py` (new `/git/status`)
+- **Definition of Done:**
+  - `GET /api/projects/{pid}/git/status` returns
+    `{changed_files: [{path, status: 'added'|'modified'|'deleted', additions, deletions}]}`
+    by diffing live `files` table state vs latest commit tree
+  - StagedChanges renders the list with click-to-expand per-file diff
+  - GitPanel shows "Staged changes (3 files)" section above the commit input;
+    commit button label updates as the count changes
+  - Tests: backend route + StagedChanges render
+- **Effort:** M
+- **Depends-on:** none (but lands cleanly next to T-304)
+
+### T-306 Git: branch picker + push/pull state polish
+
+🔴 not started · **Tier A · P0**
+
+- **Why:** The branch picker is a flat dropdown today. Add visual cues for
+  diverging commits, sync state, "create new branch" affordance.
+- **Target files:**
+  - `src/cloud/BranchPicker.jsx` (new)
+  - `src/cloud/GitPanel.jsx` (swap existing branch element)
+  - `packages/kerf-cloud/src/kerf_cloud/routes.py` (extend `/git/branches`)
+- **Definition of Done:**
+  - BranchPicker dropdown: current branch with check; per-branch
+    ahead-by-N / behind-by-N when remote is configured; inline
+    "Create new branch"; "Delete branch" (with confirm) on non-current
+  - Backend: `/git/branches` returns `{name, head_sha, is_default, ahead, behind}`
+    when remote is configured (pygit2 calc)
+  - Push / Pull buttons show "synced" / "N ahead" / "N behind" badges
+  - Tests: branch list shape, picker interaction
+- **Effort:** M
+- **Depends-on:** none (lands cleanly next to T-304, T-305)
+
+---
+
 <!-- Status reconciled 2026-05-16: T-1/T-2/T-3/T-5/T-6/T-7/T-8/T-9/T-10/T-11/T-12/T-13/T-14/T-20–T-27/T-28/T-29/T-30/T-31/T-32/T-33/T-34/T-35/T-37/T-40–T-46/T-90/T-91 flipped 🔴→✅. Left 🔴: T-4 (bend table), T-15/T-16 (large-assembly harness/LOD), T-36 (3D harness), T-47/T-48/T-50/T-51/T-52/T-53/T-70/T-71. -->
 <!-- Status reconciled 2026-05-17 (geometry kernel — depth): the GK-NN
      backlog in docs/plans/geometry-kernel-roadmap.md (separate from this

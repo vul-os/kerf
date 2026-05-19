@@ -520,6 +520,30 @@ frontend, not a backend-only shipment.
 
 ---
 
+### §3.5e — Textiles / fashion / soft-goods (T-281..T-286)
+
+T-179 shipped the 2D pattern-making seed (blocks + seam allowance + grading
++ marker). The full textile-design layer rides on top of that with weave/
+knit pattern generators, drape simulation (leveraging the kerf-motion RK4
+integrator from T-163), dye-sublimation + screen-print art alignment,
+production-scale cut-room nesting, e-textile / smart-textile integration
+(conductive thread routing + PCB-fabric transition), and a curated 50+
+textile materials catalogue with sustainability metrics (LCA / GOTS /
+OEKO-TEX / Bluesign).
+
+Why this is a kerf-shape unlock and not a generic CAD feature: the
+**LLM-native chat surface** can take a brief like "design a pleated
+midi-skirt for a model with these measurements, in organic cotton,
+heat-bondable with conductive thread for LED hem" and walk through all six
+layers (pattern → drape → print art → cut room → e-textile routing →
+sustainability score) in one conversation, producing the cut files, the
+sub PCB design (via the existing electronics stack), and a sustainability
+report at the end. Most CAD competitors require 4-5 separate tools.
+
+P2 — sequenced after the §3.5d wire-up debt closes.
+
+---
+
 ## §4 — Shipped ledger (condensed)
 
 One line per shipped capability. Detail lives in the linked plan/doc — the

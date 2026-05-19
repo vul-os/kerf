@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Share2, Save, Loader2, ArrowLeft, Check, History, X, RotateCcw, Undo2, Redo2, GitBranch, MessageSquare, PanelRightClose, PanelRightOpen, PanelLeftOpen, PanelLeftClose, Plus, Box, SlidersHorizontal, ChevronDown, ArrowRight, RotateCw, MoreHorizontal, Activity as ActivityIcon, LogOut, UserCog, Settings, CreditCard, Users } from 'lucide-react'
+import { Share2, Save, Loader2, ArrowLeft, Check, X, RotateCcw, Undo2, Redo2, GitBranch, MessageSquare, PanelRightClose, PanelRightOpen, PanelLeftOpen, PanelLeftClose, Plus, Box, SlidersHorizontal, ChevronDown, ArrowRight, RotateCw, MoreHorizontal, Activity as ActivityIcon, LogOut, UserCog, Settings, CreditCard, Users } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { LogoWordmark } from '../components/Logo.jsx'
 import FileTree from '../components/FileTree.jsx'
@@ -42,7 +42,6 @@ import QuadMeshView from '../components/QuadMeshView.jsx'
 import PrintSliceView from '../components/PrintSliceView.jsx'
 import ConfigurationsPanel from '../components/ConfigurationsPanel.jsx'
 import ActivityTimeline from '../components/ActivityTimeline.jsx'
-import RevisionDrawerPanel from '../components/RevisionDrawer.jsx'
 import { useWorkspace, loadFilePartsForProject } from '../store/workspace.js'
 import { useWorkspaces } from '../store/workspaces.js'
 import { useAuth } from '../store/auth.js'
@@ -2399,20 +2398,6 @@ export default function Editor() {
                 <GitBranch size={12} /> Git
               </button>
             )}
-            {w.currentFileId && (
-              <button
-                type="button"
-                data-testid="right-drawer-tab-history"
-                onClick={() => setRightDrawerTab('history')}
-                className={`flex items-center gap-1.5 px-4 h-10 text-[11px] uppercase tracking-wider font-medium border-b-2 transition-colors ${
-                  rightDrawer.tab === 'history'
-                    ? 'border-kerf-300 text-kerf-300'
-                    : 'border-transparent text-ink-400 hover:text-ink-200'
-                }`}
-              >
-                <History size={12} /> History
-              </button>
-            )}
             <div className="flex-1" />
             <button
               type="button"
@@ -2451,14 +2436,6 @@ export default function Editor() {
             {rightDrawer.tab === 'git' && cloudEnabled && projectId && (
               <GitPanel
                 projectId={projectId}
-                onClose={() => closeRightDrawer()}
-              />
-            )}
-            {rightDrawer.tab === 'history' && w.currentFileId && (
-              <RevisionDrawerPanel
-                revisions={w.revisions}
-                loading={w.loadingRevisions}
-                onRestore={(id) => w.restoreRevision(id)}
                 onClose={() => closeRightDrawer()}
               />
             )}

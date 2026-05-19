@@ -2457,6 +2457,7 @@ async def get_project_activity(
                 FROM file_revisions fr
                 JOIN files f ON f.id = fr.file_id
                 WHERE f.project_id = $1
+                  AND fr.source IN ('llm', 'tool', 'restore')
 
                 UNION ALL
 

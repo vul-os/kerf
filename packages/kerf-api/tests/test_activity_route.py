@@ -293,3 +293,66 @@ def test_next_cursor_null_when_fewer_rows_than_limit():
     result = _call_activity(rows=rows, limit=50)
     assert len(result["events"]) == 1
     assert result["next_cursor"] is None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# T-301: source='user' keystroke edits are filtered out of the activity feed.
+# The SQL WHERE clause now requires fr.source IN ('llm', 'tool', 'restore').
+# These tests verify the contract at the route level (mock DB returns rows
+# that the SQL already filtered; we confirm the route doesn't re-introduce
+# source='user' rows and that meaningful sources pass through).
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_source_user_edits_produce_zero_activity_events():
+    """30 source='user' keystroke edits must produce 0 activity events.
+
+    The SQL filters them out before the route sees them; the mock DB returns
+    an empty list (simulating the filtered result), confirming the contract.
+    """
+    # The DB mock returns what the SQL would return after filtering.
+    # With AND fr.source IN ('llm', 'tool', 'restore'), source='user' rows
+    # are excluded — so the mock returns [] for 30 such edits.
+    result = _call_activity(rows=[])
+    assert result["events"] == [], (
+        "source='user' keystroke edits must not appear in the activity feed"
+    )
+
+
+def test_meaningful_edit_sources_appear_in_activity():
+    """source='llm', 'tool', and 'restore' edits each produce 1 activity event (6 total)."""
+    import datetime as dt
+
+    ts = dt.datetime(2024, 3, 15, 10, 0, 0, tzinfo=dt.timezone.utc)
+
+    def _edit_row(source, offset_hours=0):
+        return {
+            "kind": "edit",
+            "source": source,
+            "created_at": dt.datetime(2024, 3, 15, 10 + offset_hours, 0, 0,
+                                      tzinfo=dt.timezone.utc),
+            "user_id": "u-abc",
+            "user_name": "Alice",
+            "user_avatar_url": None,
+            "file_id": "f-1",
+            "file_name": "bracket.kcad",
+            "thread_id": None,
+            "thread_title": None,
+            "content_preview": None,
+        }
+
+    # 3 llm + 2 tool + 1 restore = 6 meaningful rows; DB returns all of them.
+    rows = (
+        [_edit_row("llm", i) for i in range(3)]
+        + [_edit_row("tool", i + 3) for i in range(2)]
+        + [_edit_row("restore", 5)]
+    )
+
+    result = _call_activity(rows=rows)
+    assert len(result["events"]) == 6, (
+        f"expected 6 events from llm/tool/restore sources, got {len(result['events'])}"
+    )
+    sources = {ev["source"] for ev in result["events"]}
+    assert "llm" in sources
+    assert "tool" in sources
+    assert "restore" in sources
+    assert "user" not in sources

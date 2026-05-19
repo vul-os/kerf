@@ -392,9 +392,17 @@ class AnthropicProvider(Provider):
             system=system_param,
             max_tokens=max_tokens,
             messages=messages,
-            tools=tools,
-            tool_choice=tool_choice,
         )
+        # Same defensive omission for tools/tool_choice. The auto-title and
+        # readme-gen paths call provider.complete() with NO tools — sending
+        # tool_choice=None would serialize as JSON null and Anthropic now
+        # rejects that with 400 "tool_choice: Input should be an object",
+        # which broke auto-title every first message and surfaced to users
+        # as "temporary server-side issue preventing file reads and writes".
+        if tools:
+            _kw["tools"] = tools
+        if tool_choice is not None:
+            _kw["tool_choice"] = tool_choice
         if req.temperature > 0:
             _kw["temperature"] = req.temperature
         response = client.messages.create(**_kw)

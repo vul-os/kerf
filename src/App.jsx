@@ -46,22 +46,13 @@ const JewelryConfigurator = lazy(() => import('./routes/JewelryConfigurator.jsx'
 const JewelryShare = lazy(() => import('./routes/JewelryShare.jsx'))
 const Electronics = lazy(() => import('./routes/domains/Electronics.jsx'))
 const CompareHub = lazy(() => import('./routes/compare/index.jsx'))
-const FreecadPage = lazy(() => import('./routes/compare/Freecad.jsx'))
-const KicadPage = lazy(() => import('./routes/compare/Kicad.jsx'))
-const RhinoPage = lazy(() => import('./routes/compare/Rhino.jsx'))
-const RevitPage = lazy(() => import('./routes/compare/Revit.jsx'))
-const FusionPage = lazy(() => import('./routes/compare/Fusion.jsx'))
-// New compare pages landed in the refactor branch (May 2026). These slot in
-// alongside the original five — same shape, separate chunks.
-const SolidworksPage = lazy(() => import('./routes/compare/Solidworks.jsx'))
-const OnshapePage = lazy(() => import('./routes/compare/Onshape.jsx'))
-const AltiumPage = lazy(() => import('./routes/compare/Altium.jsx'))
-const MatrixGoldPage = lazy(() => import('./routes/compare/MatrixGold.jsx'))
-const BlenderPage = lazy(() => import('./routes/compare/Blender.jsx'))
-const AutocadPage = lazy(() => import('./routes/compare/Autocad.jsx'))
-const InventorPage = lazy(() => import('./routes/compare/Inventor.jsx'))
-const Civil3dPage = lazy(() => import('./routes/compare/Civil3d.jsx'))
-const Max3dsPage = lazy(() => import('./routes/compare/Max3ds.jsx'))
+// All per-vendor compare pages (Freecad, Kicad, Rhino, Revit, Fusion,
+// Solidworks, Onshape, Altium, MatrixGold, Blender, Autocad, Inventor,
+// Civil3d, Max3ds) were migrated from JSX → markdown in commit 80fa444.
+// CompareMdRoute now handles every /compare/:slug — fetches the .md
+// from public/compare/, parses, and renders. Freecad.jsx is kept as it
+// exports shared sub-components (Section, CompareTable, etc.) consumed
+// by index.jsx and the KerfVs* compound pages.
 const CompareMdRoute = lazy(() => import('./routes/compare/CompareMdRoute.jsx'))
 // New sector domain pages (T-182)
 const CompositesPage = lazy(() => import('./routes/domains/Composites.jsx'))
@@ -198,20 +189,10 @@ export default function App() {
       <Route path="/domains/electronics" element={<Electronics />} />
       <Route path="/domains/mechanical" element={<Mechanical />} />
       <Route path="/compare" element={<CompareHub />} />
-      <Route path="/compare/freecad" element={<FreecadPage />} />
-      <Route path="/compare/kicad" element={<KicadPage />} />
-      <Route path="/compare/rhino" element={<RhinoPage />} />
-      <Route path="/compare/revit" element={<RevitPage />} />
-      <Route path="/compare/fusion" element={<FusionPage />} />
-      <Route path="/compare/solidworks" element={<SolidworksPage />} />
-      <Route path="/compare/onshape" element={<OnshapePage />} />
-      <Route path="/compare/altium" element={<AltiumPage />} />
-      <Route path="/compare/matrixgold" element={<MatrixGoldPage />} />
-      <Route path="/compare/blender" element={<BlenderPage />} />
-      <Route path="/compare/autocad" element={<AutocadPage />} />
-      <Route path="/compare/inventor" element={<InventorPage />} />
-      <Route path="/compare/civil3d" element={<Civil3dPage />} />
-      <Route path="/compare/max3ds" element={<Max3dsPage />} />
+      {/* All explicit /compare/<vendor> routes collapsed into the
+          markdown-driven catch-all (commit 80fa444). CompareMdRoute
+          fetches the .md from public/compare/ and renders <CompareMd>
+          via the `/compare/:slug` route registered below. */}
       {/* Markdown-driven compare pages — falls through to legacy JSX if a .md is missing */}
       <Route path="/compare/:slug" element={<CompareMdRoute />} />
       {cloudEnabled && <Route path="/workshop" element={<Workshop />} />}

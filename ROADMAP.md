@@ -148,6 +148,21 @@ These tasks (**T-300 → T-306** in [tasks.md](./tasks.md)) are P0 and run
 **now**, parallel across 5 Sonnet agents. They turn the platform-spine
 commitment into the actual UX users will touch on every project.
 
+**Wave 2 (2026-05-19, parallel × 3):** clean baseline migrations + collapse
+the chat tool surface + wire IndexedDB crash recovery (already-built code,
+unwired).
+
+- **T-307** Fold every `alter table` / `drop` in the 12 baseline
+  migrations back into the originating `create table` — single source
+  of truth = the CREATE TABLE literal.
+- **T-308** Tool-architecture collapse: 30+ narrow tools (`cam.run`,
+  `fem.*`, `electronics.*`, …) → ~12 sharp tools (`read_file`,
+  `write_file`, `edit_file`, `create_file(kind=…)`, `run_compute(engine=…)`,
+  …) — per the [claude-code-guide research](./docs/architecture/runtime-state-audit.md)
+  on Claude Code's actual tool design.
+- **T-309** IndexedDB `localStash` crash-recovery is built but never
+  wired from any editor — close the gap the runtime-state audit flagged.
+
 ---
 
 ## §2 — Per-persona deliverable scorecard

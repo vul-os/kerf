@@ -279,6 +279,125 @@ Sequenced for parallel execution across 5 Sonnet agents.
 - **Effort:** M
 - **Depends-on:** none (but lands cleanly next to T-304)
 
+### T-307 Clean baseline migrations: fold all alter/drop into CREATE TABLE
+
+🔴 not started · **Tier A · P0**
+
+- **Why:** The 12 consolidated migrations still carry dozens of
+  `alter table … add column`, `alter table … drop constraint`, and
+  `alter table … drop column` shims. The "DBs are reset on deploy"
+  contract means none of those alters are reachable from a fresh schema
+  — they're noise that confuses readers and silently breaks the
+  "single source of truth = the CREATE TABLE literal" rule. Audit each
+  file and fold every alter back into the original CREATE TABLE that
+  owns the table; remove drop-column / drop-constraint shims entirely
+  (they were undoing earlier mistakes in an older migration set that
+  no longer exists in this codebase).
+- **Target files:** `packages/kerf-core/src/kerf_core/db/migrations/*.sql`
+  (all 12 files).
+- **Definition of Done:**
+  - `grep -nE "^\s*(alter table|drop table|drop column|drop index|drop constraint)" packages/kerf-core/src/kerf_core/db/migrations/*.sql` returns ZERO matches
+  - Every column added by a prior `alter table add column` is present in
+    the relevant `create table if not exists` block at the file where the
+    table is originally created
+  - For each table, find the originating CREATE TABLE and fold every
+    subsequent `add column` into it (handle the column-order carefully
+    — append at the end before `created_at`/`updated_at` so the diff is
+    readable)
+  - `drop constraint` + `add constraint` pairs collapse into the single
+    final constraint inside the CREATE TABLE block
+  - Run `python -m kerf_core.db.migrations.runner` against a fresh
+    schema (the deploy-time path) and assert all 12 migrations apply
+    cleanly + zero errors
+  - Existing baseline tests (`test_activity_attribution_schema.py`,
+    `test_files_version_column.py`, `test_chat_messages_is_error_column.py`,
+    etc.) continue to pass — those tests look at the CREATE TABLE block
+    and will catch fold mistakes
+  - New test `test_migrations_no_alter_drop.py` pins the
+    grep-returns-zero invariant
+- **Effort:** L (mechanical but careful; one file at a time)
+- **Depends-on:** none (pure refactor)
+
+### T-308 Tool-architecture collapse: 30+ narrow → ~12 sharp tools
+
+🔴 not started · **Tier A · P0**
+
+- **Why:** Per the claude-code-guide research (in
+  `docs/architecture/runtime-state-audit.md` followups), Claude Code
+  ships ~10 generic tools that compose. Kerf currently registers 30+
+  per-plugin narrow tools (cam.run, fem.*, render.*, electronics.*, plc.*,
+  silicon.* …). Each extra tool is system-prompt tokens, decision
+  surface, and a failure point (numpy/OCC missing → load failures).
+  Collapse into ~12 sharp tools:
+    - **File ops:** read_file, write_file, edit_file, list_files,
+      search_files (one Glob/Grep-style)
+    - **Scaffolding:** create_file (replaces create_sketch / create_part
+      / create_feature / create_circuit / create_assembly /
+      create_drawing — single tool with `kind` arg + Anthropic JSON
+      Schema enum)
+    - **Compute:** run_compute (single tool, `engine` arg dispatches
+      to fem / cfd / spice / cam / render / topo) + poll_compute
+    - **Docs:** search_kerf_docs (stays)
+    - **Geometry queries:** describe_part (single read-only inspector
+      for any kind)
+  All existing tool *implementations* stay; only their *registration
+  surface* collapses.
+- **Target files:**
+  - `packages/kerf-chat/src/kerf_chat/llm.py` (the CATALOG of tool specs)
+  - Every plugin's tool registration site (`packages/*/src/*/plugin.py`)
+  - `packages/kerf-api/src/kerf_api/routes.py` (the dispatch loop in
+    `_run_tool` or equivalent) — single dispatcher reads the new
+    arg-shape and routes to the underlying implementation
+- **Definition of Done:**
+  - `tool_choice`/`tools` array sent to Anthropic has ≤ 14 entries
+    (allow some headroom; today's count >30)
+  - All existing tool integration tests still pass (the underlying
+    implementations are unchanged; only the dispatcher contract changes)
+  - New test `test_tool_surface_size.py` pins the upper bound
+  - Documentation update: `docs/architecture/tool-surface.md` lists the
+    12 final tools + the engine-arg enum for the unified dispatchers
+- **Effort:** L
+- **Depends-on:** none (frontend chat UI is unchanged — it just receives
+  fewer tool_use blocks; same render path)
+
+### T-309 IndexedDB localStash wiring (crash-recovery for unsaved edits)
+
+🔴 not started · **Tier A · P0**
+
+- **Why:** Per the architecture audit (`docs/architecture/runtime-state-audit.md`),
+  the localStash infrastructure (`src/lib/localStash.js` + auto-save
+  scheduler + dirty-store) is fully built and unit-tested — but
+  **never called from any editor**. Editors call `api.updateFile()`
+  directly, bypassing IDB. Crash-tab recovery doesn't work today even
+  though all the code exists. Wire it.
+- **Target files:**
+  - `src/lib/localStash.js` (fix the wrong-arity `flush()` bug — line 90
+    calls `stash(workspaceId, filePath)` with 2 args expecting bytes
+    back; the function is write-only)
+  - `src/lib/autosaveScheduler.js` (the orphan scheduler)
+  - `src/store/workspace.js` — `saveFile` / `markDirty` paths call
+    `stash` on every edit; `flushDirty` runs on a debounce and pushes
+    to the server
+  - `src/main.jsx` — `reconcile()` on startup checks IDB for
+    unflushed entries and either pushes them OR prompts the user
+    ("You have unsaved changes from a previous session — restore?")
+  - Editor mount/unmount: register on dirty, deregister on unmount
+- **Definition of Done:**
+  - Type 5 keystrokes, close the tab without saving, reopen → editor
+    restores the 5 keystrokes from IDB (or prompts "Restore unsaved
+    changes?")
+  - `dirtyStore.count` reflects the actual pending IDB entries
+  - `flush()` arity bug fixed: `localStash` exposes a `getBytes(workspaceId, path)`
+    read function paired with the write-only `stash()`
+  - Tests: `localStash.test.js`, `autosaveScheduler.test.js`,
+    `dirtyStore.test.js`, plus a new integration test
+    `editorAutosave.test.jsx` that simulates an unload + reopen
+  - Architecture audit's "gap" bullet for IndexedDB save is closed
+- **Effort:** M
+- **Depends-on:** none
+
+---
+
 ### T-306 Git: branch picker + push/pull state polish
 
 🔴 not started · **Tier A · P0**

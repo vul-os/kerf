@@ -204,7 +204,9 @@ export function GitProviderSettings({ projectId, onClose }) {
         )
         setProviders([])
       } else {
-        setProviders(Array.isArray(provRes?.providers) ? provRes.providers : [])
+        // Normalise: backend may return plain strings or {id, name} objects.
+        const raw = Array.isArray(provRes?.providers) ? provRes.providers : []
+        setProviders(raw.map((p) => (typeof p === 'string' ? { id: p, name: p } : p)))
       }
       if (statusRes && !statusRes._error) {
         setStatus(statusRes)
@@ -226,7 +228,10 @@ export function GitProviderSettings({ projectId, onClose }) {
     setDisconnecting(true)
     setActionError(null)
     try {
-      const res = await git.providerDisconnect(projectId)
+      // Pass the currently-connected provider id so the backend knows which
+      // mirror to clear. Falls back to undefined (disconnect all) if unknown.
+      const connectedId = status?.provider || status?.provider_id || undefined
+      const res = await git.providerDisconnect(projectId, connectedId)
       setStatus(res)
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : 'Disconnect failed.')
@@ -318,7 +323,8 @@ export function GitProviderSettings({ projectId, onClose }) {
               </h4>
               <ul className="space-y-1.5">
                 {providers.map((p) => {
-                  const isActive = isConnected && status.provider_id === p.id
+                  // Backend returns "provider" (not "provider_id") in status rows
+                  const isActive = isConnected && (status.provider === p.id || status.provider_id === p.id)
                   return (
                     <li
                       key={p.id}

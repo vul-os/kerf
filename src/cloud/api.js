@@ -483,20 +483,21 @@ export const git = {
     request(`/api/projects/${encodeURIComponent(projectId)}/git/provider/status`),
 
   // POST /projects/:pid/git/provider/connect
-  // body: { provider_id, remote_url }
-  // → { connected: true, provider_id, remote_url, kerf_git_retained, note }
+  // body: { provider, remote_url }  — backend parses remote_url into owner/repo etc.
+  // → { kerf_git_retained, note, provider, remote_url?, github_owner?, … }
   providerConnect: (projectId, providerId, remoteUrl) =>
     request(
       `/api/projects/${encodeURIComponent(projectId)}/git/provider/connect`,
-      { method: 'POST', body: { provider_id: providerId, remote_url: remoteUrl } },
+      { method: 'POST', body: { provider: providerId, remote_url: remoteUrl } },
     ),
 
   // POST /projects/:pid/git/provider/disconnect
-  // → { connected: false, kerf_git_retained: true, note }
-  providerDisconnect: (projectId) =>
+  // body: { provider }  (omit to disconnect all mirrors)
+  // → { disconnected: true, kerf_git_retained: true, note }
+  providerDisconnect: (projectId, providerId) =>
     request(
       `/api/projects/${encodeURIComponent(projectId)}/git/provider/disconnect`,
-      { method: 'POST' },
+      { method: 'POST', body: providerId ? { provider: providerId } : {} },
     ),
 }
 

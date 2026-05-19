@@ -189,7 +189,9 @@ class TestListGitProviders:
         with patch("kerf_cloud.routes._provider_registry", return_value=registry):
             result = run(routes.list_git_providers(payload={"sub": "uid-1"}))
 
-        assert "github" in result["providers"]
+        # providers is now [{id, name}, …] — check by id field.
+        provider_ids = [p["id"] if isinstance(p, dict) else p for p in result["providers"]]
+        assert "github" in provider_ids
 
     def test_excludes_unconfigured_providers(self):
         from kerf_cloud.git_providers.registry import _build_default_registry

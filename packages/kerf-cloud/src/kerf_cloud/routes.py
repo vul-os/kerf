@@ -924,8 +924,11 @@ async def github_auth_callback(request: Request):
         )
 
         async with httpx.AsyncClient() as client:
+            # GET /user with an installation token returns the bot/app user.
+            # We use it only to populate github_login for display; failures
+            # are tolerated — the installation_id is what matters for auth.
             user_resp = await client.get(
-                "https://api.github.com/installation/token",
+                "https://api.github.com/user",
                 headers={"Authorization": f"Bearer {inst_token}", "Accept": "application/vnd.github+json"},
             )
             # Fall back gracefully if this endpoint isn't accessible
@@ -996,6 +999,64 @@ _KERF_GIT_NOTE = (
 )
 
 
+def _parse_remote_url(provider_name: str, url: str) -> dict:
+    """Extract structured connect kwargs from a bare remote URL.
+
+    This lets callers (frontend ConnectForm) pass a single ``remote_url``
+    instead of knowing the provider-specific field names.
+
+    For ``github``:  https://github.com/owner/repo[.git]
+                     git@github.com:owner/repo[.git]
+                     owner/repo shorthand
+      → {github_owner, github_repo}
+
+    For ``gitlab``:  https://gitlab.com/namespace/project[.git]
+                     https://gitlab.corp.internal/ns/proj[.git]
+      → {gitlab_namespace, gitlab_project, gitlab_host?}
+
+    If parsing fails the raw URL is returned as-is under the provider's
+    first expected key so the backend can surface a descriptive 400.
+    """
+    import re
+
+    url = url.strip().rstrip("/")
+    if not url:
+        return {}
+
+    if provider_name == "github":
+        # SSH: git@github.com:owner/repo
+        m = re.match(r"^git@github\.com:([^/]+)/([^/]+?)(?:\.git)?$", url, re.I)
+        if m:
+            return {"github_owner": m.group(1), "github_repo": m.group(2)}
+        # HTTPS: https://github.com/owner/repo[/...] — use search because the
+        # string starts with "https://" which re.match would require to anchor.
+        m = re.search(r"github\.com/([^/]+)/([^/]+?)(?:\.git)?(?:/.*)?$", url, re.I)
+        if m:
+            return {"github_owner": m.group(1), "github_repo": m.group(2)}
+        # shorthand owner/repo
+        m = re.match(r"^([^/\s]+)/([^/\s]+?)(?:\.git)?$", url)
+        if m:
+            return {"github_owner": m.group(1), "github_repo": m.group(2)}
+        return {"github_owner": url, "github_repo": ""}
+
+    if provider_name == "gitlab":
+        m = re.match(r"^(https?://[^/]+)/([^/]+)/([^/]+?)(?:\.git)?$", url, re.I)
+        if m:
+            host, ns, proj = m.group(1), m.group(2), m.group(3)
+            result: dict = {"gitlab_namespace": ns, "gitlab_project": proj}
+            if "gitlab.com" not in host.lower():
+                result["gitlab_host"] = host
+            return result
+        # Bare namespace/project shorthand
+        m = re.match(r"^([^/\s]+)/([^/\s]+?)(?:\.git)?$", url)
+        if m:
+            return {"gitlab_namespace": m.group(1), "gitlab_project": m.group(2)}
+        return {"gitlab_namespace": url, "gitlab_project": ""}
+
+    # Unknown provider: return the URL verbatim so the provider raises 400
+    return {"remote_url": url}
+
+
 def _provider_registry():
     """Return the default ProviderRegistry built from current settings."""
     from kerf_cloud.git_providers.registry import _build_default_registry
@@ -1013,8 +1074,11 @@ async def list_git_providers(
     """
     registry = _provider_registry()
     names = registry.available_names()
+    # Return objects with `id` (and friendly `name`) so the frontend can treat
+    # providers consistently as {id, name} items rather than plain strings.
+    providers = [{"id": n, "name": n.capitalize()} for n in names]
     return {
-        "providers": names,
+        "providers": providers,
         "note": _KERF_GIT_NOTE,
     }
 
@@ -1041,7 +1105,9 @@ async def git_provider_connect(
     await require_editor(request, pid, user_id)
 
     body = await request.json()
-    provider_name = (body.get("provider") or "").strip()
+    # Accept both "provider" and "provider_id" for forward-compat with the
+    # frontend api.js helper that previously sent provider_id.
+    provider_name = (body.get("provider") or body.get("provider_id") or "").strip()
     if not provider_name:
         raise HTTPException(status_code=400, detail="provider is required")
 
@@ -1054,7 +1120,13 @@ async def git_provider_connect(
             detail=f"provider '{provider_name}' is not available (not configured or unknown)",
         )
 
-    kwargs = {k: v for k, v in body.items() if k != "provider"}
+    # Build kwargs: strip the routing keys, then expand a bare remote_url into
+    # provider-specific structured fields so callers can pass either form.
+    kwargs = {k: v for k, v in body.items() if k not in ("provider", "provider_id")}
+    raw_url = kwargs.pop("remote_url", "") or ""
+    if raw_url and not (kwargs.get("github_owner") or kwargs.get("gitlab_namespace")):
+        kwargs.update(_parse_remote_url(provider_name, raw_url))
+
     try:
         result = await provider.connect(pid, **kwargs)
     except ValueError as exc:
@@ -1081,24 +1153,40 @@ async def git_provider_disconnect(
     await require_editor(request, pid, user_id)
 
     body = await request.json() if (await request.body()) else {}
-    provider_name = (body.get("provider") or "").strip()
-    if not provider_name:
-        raise HTTPException(status_code=400, detail="provider is required")
+    # Accept both "provider" and "provider_id" for forward-compat.
+    provider_name = (body.get("provider") or body.get("provider_id") or "").strip()
 
     pool = await get_pool_required()
     registry = _provider_registry()
-    provider = registry.get(provider_name, pool=pool)
-    if provider is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"provider '{provider_name}' is not available (not configured or unknown)",
-        )
 
-    kwargs = {k: v for k, v in body.items() if k != "provider"}
-    try:
-        await provider.disconnect(pid, **kwargs)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+    if provider_name:
+        provider = registry.get(provider_name, pool=pool)
+        if provider is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"provider '{provider_name}' is not available (not configured or unknown)",
+            )
+        providers_to_disconnect = [provider]
+    else:
+        # No provider specified: disconnect all configured mirrors for this project.
+        providers_to_disconnect = list(registry.configured_providers(pool=pool))
+        if not providers_to_disconnect:
+            # Nothing to disconnect; return success with a "none configured" note.
+            return {
+                "provider": None,
+                "project_id": pid,
+                "disconnected": True,
+                "kerf_git_retained": True,
+                "note": _KERF_GIT_NOTE,
+            }
+        provider_name = ",".join(p.name for p in providers_to_disconnect)
+
+    kwargs = {k: v for k, v in body.items() if k not in ("provider", "provider_id")}
+    for prov in providers_to_disconnect:
+        try:
+            await prov.disconnect(pid, **kwargs)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
 
     return {
         "provider": provider_name,

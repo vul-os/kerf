@@ -62,6 +62,7 @@ const AutocadPage = lazy(() => import('./routes/compare/Autocad.jsx'))
 const InventorPage = lazy(() => import('./routes/compare/Inventor.jsx'))
 const Civil3dPage = lazy(() => import('./routes/compare/Civil3d.jsx'))
 const Max3dsPage = lazy(() => import('./routes/compare/Max3ds.jsx'))
+const CompareMdRoute = lazy(() => import('./routes/compare/CompareMdRoute.jsx'))
 // New sector domain pages (T-182)
 const CompositesPage = lazy(() => import('./routes/domains/Composites.jsx'))
 const DentalPage = lazy(() => import('./routes/domains/Dental.jsx'))
@@ -207,6 +208,8 @@ export default function App() {
       <Route path="/compare/inventor" element={<InventorPage />} />
       <Route path="/compare/civil3d" element={<Civil3dPage />} />
       <Route path="/compare/max3ds" element={<Max3dsPage />} />
+      {/* Markdown-driven compare pages — falls through to legacy JSX if a .md is missing */}
+      <Route path="/compare/:slug" element={<CompareMdRoute />} />
       {cloudEnabled && <Route path="/workshop" element={<Workshop />} />}
       {cloudEnabled && (
         <Route path="/workshop/:slug" element={<WorkshopListing />} />

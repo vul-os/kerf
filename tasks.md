@@ -4356,3 +4356,62 @@ User-direction 2026-05-18: the existing `kerf-firmware` (T-130) is a thin `pio` 
 - **Target files/packages:** `src/components/CommandPalette.jsx` (NEW), `src/components/CommandPalette.test.jsx` (NEW — vitest with mocked manifest + keyboard events), `src/lib/commandPaletteIndex.js` (NEW — builds the indexed entries from the docs manifest + the file-kinds enum + the route table), `src/lib/commandPaletteIndex.test.js` (NEW — vitest on the index builder), `src/lib/fuzzyMatch.js` (NEW — small fuzzy-match helper, ranked scoring), `src/lib/fuzzyMatch.test.js` (NEW), `src/App.jsx` (edit — mount the CommandPalette globally + the Cmd-K keydown listener), `src/components/Header.jsx` (edit — surface a small "Cmd-K" affordance in the top bar so users know it exists).
 - **Definition of Done:** pressing `Cmd-K` opens the palette over any route; typing `vhdl` ranks "Create new VHDL file" first; typing `gds` ranks "Open LayoutViewer" or the GDS-II docs page in the top 3; typing `roadmap` jumps to `/roadmap`; the palette closes on `Escape`; the fuzzy-match scoring oracle: a single-char typo (`/sliicon` vs `silicon`) still ranks the correct entry in the top 3; vitest oracles on the index builder + the fuzzy scorer + the keyboard handler; `npm run build` clean.
 - **Depends-on:** T-248, T-277, T-278
+
+## Textiles / Fashion / Soft-goods (T-281 … T-286)
+
+User-direction 2026-05-19. Extends T-179 (apparel pattern-making) with deeper textile-specific tooling: woven/knit pattern generators, drape simulation, dye-sublimation art alignment, cut-room nesting at production scale, smart-textile / e-textile integration.
+
+### T-281 Textile weave + knit pattern generators
+- **Tier:** B
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** parametric generators for textile structures — plain weave, twill (2/1 right-hand, etc.), satin, jacquard pattern from a draft; knit structures jersey/rib/interlock with tuck/miss/loop stitches; full draft + treadle + tie-up notation. Pure-Python; outputs both vector geometry + a tile-able raster for previews.
+- **Target files/packages:** `packages/kerf-textiles/` (NEW package — pyproject.toml, src/kerf_textiles/{weave,knit,draft,export}.py, tests, llm_docs).
+- **Definition of Done:** plain-weave float-length analysis matches the analytic formula; 2/1 twill produces the canonical diagonal stagger; jersey-knit stitch density matches `gauge·courses` to 1%; draft notation round-trips through writer/reader; pytest analytic oracles.
+- **Depends-on:** none
+
+### T-282 Drape / cloth-simulation seed
+- **Tier:** B
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** mass-spring cloth model on a textile mesh; gravity + air drag + collision against a body or table; uses kerf-motion's RK4 integrator (T-163). Settle to static drape under gravity for visualisation; export the draped mesh as STEP / glTF for rendering.
+- **Target files/packages:** `packages/kerf-textiles/src/kerf_textiles/drape.py`, `packages/kerf-textiles/src/kerf_textiles/mass_spring.py`, tests with analytic oracles (a square cloth pinned at 2 corners droops with a catenary shape — verify max-sag formula).
+- **Definition of Done:** catenary droop matches analytic to 5%; cloth settles to static within N steps; pytest analytic oracles.
+- **Depends-on:** T-163 (kerf-motion RK4 integrator)
+
+### T-283 Dye-sublimation + screen-print art alignment
+- **Tier:** B
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** take a 3D garment + a 2D artwork file, produce the pre-distorted print-ready file with bleed + registration marks for dye-sub (continuous tone) or screen-print (spot colour separation). Mesh-unwrap the garment, project the artwork, output PNG/PDF per panel.
+- **Target files/packages:** `packages/kerf-textiles/src/kerf_textiles/sublimation.py`, `packages/kerf-textiles/src/kerf_textiles/screen_print.py`, tests.
+- **Definition of Done:** unwrap a cylinder→PNG round-trip preserves area to 1%; bleed margin is the expected width; pytest.
+- **Depends-on:** T-281
+
+### T-284 Production-scale cut-room nesting
+- **Tier:** B
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** extends T-179's marker-making with production-grade No-Fit-Polygon nesting on multiple fabric rolls of varying widths; supports grain-line constraints + ply-direction. Reuses kerf-cad-core.nesting if available; otherwise pure-Python NFP.
+- **Target files/packages:** `packages/kerf-textiles/src/kerf_textiles/cut_room.py`, tests.
+- **Definition of Done:** marker utilisation on a known input ≥ 80%; grain-line constraint honoured; pytest oracles.
+- **Depends-on:** T-179
+
+### T-285 E-textile / smart-textile design
+- **Tier:** B
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** integrate conductive thread routing on a garment pattern; pair with kerf-electronics PCB design for the rigid controller + flex transition. Resistance + heating calc for resistive yarns; LED-fabric layout (Adafruit Flora-class).
+- **Target files/packages:** `packages/kerf-textiles/src/kerf_textiles/etextiles.py`, tests.
+- **Definition of Done:** resistive heating calc matches I²R to 1%; LED-fabric layout has correct serial+parallel current; pytest.
+- **Depends-on:** T-281, T-191 (tscircuit ratsnest)
+
+### T-286 Textile material catalogue + sustainability metrics
+- **Tier:** B
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** curated catalogue of 50+ textile materials: cotton (organic/conventional), polyester (virgin/recycled), wool, silk, linen, viscose, lyocell, nylon, hemp, leather (full-grain/PU). Each entry: density (g/m²), tensile strength, elongation, water consumption (L/kg), CO₂ footprint (kg CO₂e/kg), biodegradability, certifications (GOTS, OEKO-TEX, Bluesign).
+- **Target files/packages:** `packages/kerf-textiles/src/kerf_textiles/materials.py`, `packages/kerf-textiles/src/kerf_textiles/sustainability.py`, tests.
+- **Definition of Done:** 50+ entries; lookup by category; LCA sustainability score for a garment from its material mix; pytest oracles.
+- **Depends-on:** none
+

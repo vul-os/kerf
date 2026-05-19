@@ -7,12 +7,97 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { IDBFactory } from 'fake-indexeddb'
-import { stash, markFlushed, listDirty, reconcile, _resetForTest, _setIDBFactory } from './localStash.js'
+import { stash, markFlushed, listDirty, reconcile, getBytes, listUnflushed, _resetForTest, _setIDBFactory } from './localStash.js'
 
 beforeEach(() => {
   // Each test gets its own in-memory IDB database — no leakage.
   _resetForTest()
   _setIDBFactory(new IDBFactory())
+})
+
+// ── getBytes ──────────────────────────────────────────────────────────────────
+
+describe('getBytes', () => {
+  it('returns the last-stashed bytes for a path', async () => {
+    await stash('ws-1', 'src/main.ks', new Uint8Array([10, 20, 30]))
+    const bytes = await getBytes('ws-1', 'src/main.ks')
+    expect(bytes).toEqual(new Uint8Array([10, 20, 30]))
+  })
+
+  it('returns null for a never-stashed path', async () => {
+    const bytes = await getBytes('ws-1', 'nonexistent.ks')
+    expect(bytes).toBeNull()
+  })
+
+  it('returns the latest bytes after an overwrite', async () => {
+    await stash('ws-1', 'a.ks', new Uint8Array([1]))
+    await stash('ws-1', 'a.ks', new Uint8Array([99]))
+    const bytes = await getBytes('ws-1', 'a.ks')
+    expect(bytes).toEqual(new Uint8Array([99]))
+  })
+
+  it('returns bytes even after the entry has been marked flushed', async () => {
+    await stash('ws-1', 'main.ks', new Uint8Array([5, 6]))
+    await markFlushed('ws-1', 'main.ks')
+    // getBytes reads the raw value regardless of flushed flag.
+    const bytes = await getBytes('ws-1', 'main.ks')
+    expect(bytes).toEqual(new Uint8Array([5, 6]))
+  })
+})
+
+// ── listUnflushed ─────────────────────────────────────────────────────────────
+
+describe('listUnflushed', () => {
+  it('returns pending entries for the given workspace', async () => {
+    await stash('ws-1', 'a.ks', new Uint8Array([1]))
+    await stash('ws-1', 'b.ks', new Uint8Array([2]))
+    const pending = await listUnflushed('ws-1')
+    expect(pending).toHaveLength(2)
+    const paths = pending.map(e => e.path).sort()
+    expect(paths).toEqual(['a.ks', 'b.ks'])
+  })
+
+  it('does not include flushed entries', async () => {
+    await stash('ws-1', 'a.ks', new Uint8Array([1]))
+    await stash('ws-1', 'b.ks', new Uint8Array([2]))
+    await markFlushed('ws-1', 'a.ks')
+    const pending = await listUnflushed('ws-1')
+    expect(pending).toHaveLength(1)
+    expect(pending[0].path).toBe('b.ks')
+  })
+
+  it('does not include entries for other workspaces', async () => {
+    await stash('ws-1', 'a.ks', new Uint8Array([1]))
+    await stash('ws-2', 'b.ks', new Uint8Array([2]))
+    const pending = await listUnflushed('ws-1')
+    expect(pending).toHaveLength(1)
+    expect(pending[0].path).toBe('a.ks')
+  })
+
+  it('returns an empty array when nothing is pending', async () => {
+    const pending = await listUnflushed('ws-1')
+    expect(pending).toHaveLength(0)
+  })
+
+  it('returns entries sorted ascending by stash time', async () => {
+    // Stash with a small delay to get distinct mtimes.
+    await stash('ws-1', 'c.ks', new Uint8Array([3]))
+    await new Promise(r => setTimeout(r, 5))
+    await stash('ws-1', 'a.ks', new Uint8Array([1]))
+    await new Promise(r => setTimeout(r, 5))
+    await stash('ws-1', 'b.ks', new Uint8Array([2]))
+
+    const pending = await listUnflushed('ws-1')
+    expect(pending.map(e => e.path)).toEqual(['c.ks', 'a.ks', 'b.ks'])
+  })
+
+  it('each entry includes { path, bytes, stashed_at }', async () => {
+    await stash('ws-1', 'x.ks', new Uint8Array([42]))
+    const [entry] = await listUnflushed('ws-1')
+    expect(entry.path).toBe('x.ks')
+    expect(entry.bytes).toEqual(new Uint8Array([42]))
+    expect(typeof entry.stashed_at).toBe('number')
+  })
 })
 
 // ── stash + listDirty round-trip ─────────────────────────────────────────────

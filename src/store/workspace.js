@@ -33,6 +33,8 @@ import { sketchToGeom2 } from '../lib/sketchGeom2.js'
 import { meshCache } from '../lib/meshCache.js'
 import { subdToBufferGeometry, meshDocToBufferGeometry } from '../lib/subdToBufferGeometry.js'
 import { git as gitApi } from '../cloud/api.js'
+import { stash as l1Stash, markFlushed as l1MarkFlushed } from '../lib/localStash.js'
+import { markDirty as schedulerMarkDirty } from '../lib/autosaveScheduler.js'
 
 // Prune the IndexedDB mesh cache on first store import (i.e. app start). Best-
 // effort: any failure is silently swallowed so a corrupted DB can't keep the
@@ -983,6 +985,13 @@ export const useWorkspace = create((set, get) => ({
 
   editContent: (text) => {
     set({ currentFileContent: text, dirty: true })
+    // Wire L1 IDB stash: persist bytes immediately so a hard close can't lose
+    // unsaved work.  The autosave scheduler fires the debounced server flush.
+    const { projectId, currentFileId } = get()
+    if (projectId && currentFileId && text != null) {
+      const bytes = new TextEncoder().encode(text)
+      schedulerMarkDirty(projectId, currentFileId, bytes)
+    }
   },
 
   // Update the open assembly's JSON content. Used by the AssemblyEditor on
@@ -992,6 +1001,11 @@ export const useWorkspace = create((set, get) => ({
   editAssemblyContent: async (text, { skipReresolve = false } = {}) => {
     const { projectId, currentFileId } = get()
     set({ currentFileContent: text, dirty: true, parsedAssembly: parseAssembly(text) })
+    // Wire L1 stash for assembly edits (same path as editContent).
+    if (projectId && currentFileId && text != null) {
+      const bytes = new TextEncoder().encode(text)
+      schedulerMarkDirty(projectId, currentFileId, bytes)
+    }
     if (skipReresolve || !projectId || !currentFileId) return
     try {
       const parts = await resolveAssemblyParts(get, projectId, text)
@@ -1053,6 +1067,8 @@ export const useWorkspace = create((set, get) => ({
         currentFile: updated,
         files: s.files.map((f) => f.id === updated.id ? { ...f, ...updated, content: undefined } : f),
       }))
+      // Mark the L1 IDB entry as flushed now that the server accepted the save.
+      l1MarkFlushed(projectId, currentFileId).catch(() => {/* non-fatal */})
       // If we just saved an `.equations` file, refresh the cached scope so the
       // next JSCAD/feature/sketch evaluation picks up the new values.
       if (currentFile && (currentFile.kind === 'equations' ||

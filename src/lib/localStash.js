@@ -108,6 +108,59 @@ export async function markFlushed(workspaceId, filePath) {
 }
 
 /**
+ * Read back the bytes last stashed for a given (workspaceId, filePath) pair.
+ * Returns null if no entry exists or the entry has been flushed.
+ */
+export async function getBytes(workspaceId, filePath) {
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly')
+    const req = tx.objectStore(STORE_NAME).get(key(workspaceId, filePath))
+    req.onsuccess = () => {
+      const value = req.result
+      resolve(value ? value.bytes : null)
+    }
+    req.onerror = () => reject(req.error)
+  })
+}
+
+/**
+ * Return all unflushed entries for a specific workspace.
+ * Returns an array of { path, bytes, stashed_at }, sorted ascending by stash time.
+ */
+export async function listUnflushed(workspaceId) {
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly')
+    const store = tx.objectStore(STORE_NAME)
+    const results = []
+    const req = store.openCursor()
+    req.onsuccess = (e) => {
+      const cursor = e.target.result
+      if (!cursor) {
+        // Sort ascending by stash time before returning.
+        results.sort((a, b) => a.stashed_at - b.stashed_at)
+        resolve(results)
+        return
+      }
+      const k = cursor.key
+      const slashIdx = k.indexOf('/')
+      const entryWorkspaceId = k.slice(0, slashIdx)
+      const value = cursor.value
+      if (entryWorkspaceId === workspaceId && value.flushedToL2 === false) {
+        results.push({
+          path: k.slice(slashIdx + 1),
+          bytes: value.bytes,
+          stashed_at: value.mtime,
+        })
+      }
+      cursor.continue()
+    }
+    req.onerror = () => reject(req.error)
+  })
+}
+
+/**
  * Return all stash entries that have not yet been flushed to L2.
  * Returns an array of { workspaceId, filePath, bytes, mtime }.
  */

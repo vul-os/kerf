@@ -1,12 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-// ── Mock T-183 siblings (not present in this worktree yet) ─────────────────
+// ── Mock localStash ────────────────────────────────────────────────────────
 
 const mockStash = vi.fn()
+const mockGetBytes = vi.fn()
 const mockMarkFlushed = vi.fn()
 
 vi.mock('./localStash', () => ({
   stash: (...args) => mockStash(...args),
+  getBytes: (...args) => mockGetBytes(...args),
   markFlushed: (...args) => mockMarkFlushed(...args),
 }))
 
@@ -57,10 +59,12 @@ function mockFetchNetworkError() {
 beforeEach(() => {
   vi.useFakeTimers()
   mockStash.mockReset()
+  mockGetBytes.mockReset()
   mockMarkFlushed.mockReset()
   _resetForTesting()
-  // Default: stash returns some bytes, fetch succeeds
-  mockStash.mockResolvedValue(new Uint8Array([1, 2, 3]))
+  // Default: stash is a fire-and-forget write; getBytes returns some bytes; fetch succeeds
+  mockStash.mockResolvedValue(undefined)
+  mockGetBytes.mockResolvedValue(new Uint8Array([1, 2, 3]))
   mockFetchOk()
 })
 
@@ -74,7 +78,7 @@ describe('autosaveScheduler — idle 2 s triggers flush', () => {
   it('flushes after 2 s of inactivity', async () => {
     const { log, cleanup } = collectEvents(['dirty', 'saving', 'saved'])
 
-    markDirty(WS, FILE)
+    markDirty(WS, FILE, new Uint8Array([1, 2, 3]))
     expect(log).toEqual(['dirty'])
 
     // Advance past idle delay
@@ -88,9 +92,9 @@ describe('autosaveScheduler — idle 2 s triggers flush', () => {
   it('resets idle timer on subsequent markDirty calls (debounce)', async () => {
     const { log, cleanup } = collectEvents(['saving'])
 
-    markDirty(WS, FILE)
+    markDirty(WS, FILE, new Uint8Array([1, 2, 3]))
     await vi.advanceTimersByTimeAsync(1_000)
-    markDirty(WS, FILE) // reset
+    markDirty(WS, FILE, new Uint8Array([1, 2, 3])) // reset
     await vi.advanceTimersByTimeAsync(1_000)
     // Still only 2 s total from second call — not yet flushed (1 s remaining)
     expect(log).toHaveLength(0)
@@ -107,14 +111,14 @@ describe('autosaveScheduler — continuous edits trigger 30 s hard flush', () =>
 
     // Keep resetting the idle timer every second for 29 s
     for (let i = 0; i < 29; i++) {
-      markDirty(WS, FILE)
+      markDirty(WS, FILE, new Uint8Array([1, 2, 3]))
       await vi.advanceTimersByTimeAsync(1_000)
     }
     // 29 s in — idle timer not yet fired, hard timer not yet fired
     expect(log).toHaveLength(0)
 
     // Advance 1 more second → 30 s → hard timer fires
-    markDirty(WS, FILE)
+    markDirty(WS, FILE, new Uint8Array([1, 2, 3]))
     await vi.advanceTimersByTimeAsync(1_001)
 
     // Hard flush should have happened
@@ -129,7 +133,7 @@ describe('autosaveScheduler — failure path', () => {
     mockFetchErr()
     const { log, cleanup } = collectEvents(['saving', 'saved', 'error'])
 
-    markDirty(WS, FILE)
+    markDirty(WS, FILE, new Uint8Array([1, 2, 3]))
     await vi.advanceTimersByTimeAsync(2_000) // idle flush fires
 
     expect(log).toEqual(['saving', 'error'])
@@ -149,7 +153,7 @@ describe('autosaveScheduler — failure path', () => {
     mockFetchNetworkError()
     const { log, cleanup } = collectEvents(['saving', 'error'])
 
-    markDirty(WS, FILE)
+    markDirty(WS, FILE, new Uint8Array([1, 2, 3]))
     await vi.advanceTimersByTimeAsync(2_000)
 
     expect(log).toEqual(['saving', 'error'])
@@ -161,7 +165,7 @@ describe('autosaveScheduler — failure path', () => {
     // Fail repeatedly and check backoff grows but caps
     mockFetchErr()
 
-    markDirty(WS, FILE)
+    markDirty(WS, FILE, new Uint8Array([1, 2, 3]))
     await vi.advanceTimersByTimeAsync(2_000) // first flush → error → backoff 2 s
 
     // First retry at +2 s
@@ -188,7 +192,7 @@ describe('autosaveScheduler — success path', () => {
   it('emits saving then saved in order, and calls markFlushed exactly once', async () => {
     const { log, cleanup } = collectEvents(['saving', 'saved'])
 
-    markDirty(WS, FILE)
+    markDirty(WS, FILE, new Uint8Array([1, 2, 3]))
     await vi.advanceTimersByTimeAsync(2_000)
 
     expect(log).toEqual(['saving', 'saved'])
@@ -197,11 +201,20 @@ describe('autosaveScheduler — success path', () => {
     cleanup()
   })
 
-  it('passes workspaceId and filePath to stash', async () => {
-    markDirty(WS, FILE)
+  it('reads bytes via getBytes when flushing to server', async () => {
+    markDirty(WS, FILE, new Uint8Array([1, 2, 3]))
     await vi.advanceTimersByTimeAsync(2_000)
 
-    expect(mockStash).toHaveBeenCalledWith(WS, FILE)
+    expect(mockGetBytes).toHaveBeenCalledWith(WS, FILE)
+  })
+
+  it('stash is called with bytes on markDirty', async () => {
+    const bytes = new Uint8Array([7, 8, 9])
+    markDirty(WS, FILE, bytes)
+    // Allow the fire-and-forget stash promise to settle.
+    await Promise.resolve()
+
+    expect(mockStash).toHaveBeenCalledWith(WS, FILE, bytes)
   })
 })
 
@@ -220,7 +233,7 @@ describe('autosaveScheduler — queued edit during in-flight flush', () => {
 
     const { log, cleanup } = collectEvents(['saving', 'saved', 'dirty'])
 
-    markDirty(WS, FILE)
+    markDirty(WS, FILE, new Uint8Array([1, 2, 3]))
     // Advance past idle delay to start the in-flight flush
     await vi.advanceTimersByTimeAsync(2_000)
 
@@ -229,9 +242,9 @@ describe('autosaveScheduler — queued edit during in-flight flush', () => {
     expect(log.filter(e => e === 'saving')).toHaveLength(1)
 
     // markDirty while in-flight — should queue exactly one follow-up (not three)
-    markDirty(WS, FILE)
-    markDirty(WS, FILE)
-    markDirty(WS, FILE)
+    markDirty(WS, FILE, new Uint8Array([1, 2, 3]))
+    markDirty(WS, FILE, new Uint8Array([1, 2, 3]))
+    markDirty(WS, FILE, new Uint8Array([1, 2, 3]))
 
     // Resolve the first in-flight fetch — triggers handleFlushSuccess + scheduleIdle
     resolveFetch()
@@ -250,6 +263,40 @@ describe('autosaveScheduler — queued edit during in-flight flush', () => {
     expect(log.filter(e => e === 'saved')).toHaveLength(2)
     expect(log.filter(e => e === 'saving')).toHaveLength(2)
     expect(mockMarkFlushed).toHaveBeenCalledTimes(2)
+    cleanup()
+  })
+})
+
+describe('autosaveScheduler — arity-bug regression (T-309)', () => {
+  it('flush() uses getBytes() not stash(); does not crash with wrong arity', async () => {
+    // This is the regression guard: the old code called stash(ws, file) with 2
+    // args expecting bytes back — which always returned undefined, causing the
+    // fetch body to be undefined and network errors.
+    // The fix: flush() calls getBytes(ws, file) instead.
+
+    markDirty(WS, FILE, new Uint8Array([42]))
+    await vi.advanceTimersByTimeAsync(2_000)
+
+    // getBytes must have been called (not stash) to read bytes for the server.
+    expect(mockGetBytes).toHaveBeenCalledWith(WS, FILE)
+    // fetch must have been called — confirms no early exit from undefined bytes.
+    expect(global.fetch).toHaveBeenCalledOnce()
+  })
+
+  it('multiple markDirty calls debounce: only one flush fires after idle period', async () => {
+    const { log, cleanup } = collectEvents(['saving'])
+
+    markDirty(WS, FILE, new Uint8Array([1]))
+    markDirty(WS, FILE, new Uint8Array([2]))
+    markDirty(WS, FILE, new Uint8Array([3]))
+
+    // No flush yet
+    expect(log).toHaveLength(0)
+
+    await vi.advanceTimersByTimeAsync(2_000)
+
+    // Exactly one saving event — debounce collapsed the three calls.
+    expect(log.filter(e => e === 'saving')).toHaveLength(1)
     cleanup()
   })
 })

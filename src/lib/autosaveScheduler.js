@@ -18,7 +18,7 @@
 // exactly one follow-up flush (not multiple) and fire it after the current
 // settles.
 
-import { stash, markFlushed } from './localStash'
+import { stash, getBytes, markFlushed } from './localStash'
 import { autosaveStatus } from './autosaveStatusEvents'
 
 const IDLE_DELAY_MS   = 2_000
@@ -87,10 +87,16 @@ async function flush(workspaceId, filePath) {
 
   let bytes
   try {
-    bytes = await stash(workspaceId, filePath)
+    bytes = await getBytes(workspaceId, filePath)
   } catch (err) {
     state.inFlight = false
     handleFlushError(workspaceId, filePath, state)
+    return
+  }
+
+  // Nothing stashed yet (race: markDirty fired before stash wrote to IDB).
+  if (bytes == null) {
+    state.inFlight = false
     return
   }
 
@@ -165,12 +171,22 @@ function ensureHardTimer(workspaceId, filePath, state) {
 }
 
 /**
- * markDirty(workspaceId, filePath)
+ * markDirty(workspaceId, filePath, bytes)
  *
- * Call this on every editor change. Thread-safe (single-threaded JS); idempotent
- * when called rapidly — only the last idle timer survives.
+ * Call this on every editor change, passing the current content as bytes.
+ * Writes to the L1 IDB stash immediately (fire-and-forget), then schedules
+ * the debounced flush to the server.
+ *
+ * Thread-safe (single-threaded JS); idempotent when called rapidly — only
+ * the last idle timer survives.
  */
-export function markDirty(workspaceId, filePath) {
+export function markDirty(workspaceId, filePath, bytes) {
+  // Write to IDB immediately so the bytes survive a hard close.
+  // Fire-and-forget: failures are non-fatal (scheduler retries from IDB).
+  if (bytes != null) {
+    stash(workspaceId, filePath, bytes).catch(() => {/* non-fatal */})
+  }
+
   const state = getOrInit(workspaceId, filePath)
 
   autosaveStatus.emit('dirty', { workspaceId, filePath })

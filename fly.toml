@@ -19,6 +19,17 @@ primary_region = "fra"
   [build.args]
     KERF_PERSONA = "full"
 
+# release_command runs ONCE in a one-off VM before the new app version
+# starts taking traffic. Migrations MUST land here, not after `flyctl
+# deploy` — otherwise the new machine boots its in-process workers
+# (KERF_INPROCESS_WORKERS=true) and they immediately poll fem_jobs /
+# sim_jobs / step_tessellation_jobs / model_prices, crashing with
+# UndefinedTableError until the post-deploy migration step catches up
+# tens of seconds later. The git panel (and any other endpoint that
+# reads from a yet-to-be-created table) returns 500 in that window.
+[deploy]
+  release_command = "python -m kerf_core.db.migrations.runner"
+
 [env]
   KERF_PORT = "8080"
   KERF_FRONTEND_DIST = "/app/dist"

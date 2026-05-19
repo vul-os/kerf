@@ -197,10 +197,14 @@ if [[ "$DEPLOY_WORKERS" == "true" ]]; then
   flyctl deploy --config fly.worker.toml --app "$WORKER_APP_NAME" --remote-only
 fi
 
-# ── Run migrations ───────────────────────────────────────────────────────────
-echo "▸ running database migrations"
-flyctl ssh console --app "$APP_NAME" \
-  -C "python -m kerf_core.db.migrations.runner $DATABASE_URL"
+# Migrations now run in Fly's `[deploy] release_command` (fly.toml),
+# which executes in a one-off VM BEFORE the new app version starts
+# taking traffic — fixing the race where in-process workers crashed
+# on UndefinedTableError because they polled fem_jobs / sim_jobs /
+# step_tessellation_jobs / model_prices before this ssh-console
+# command could land. flyctl deploy above already triggered the
+# release; no further action needed.
+echo "▸ migrations ran via Fly release_command (see fly.toml)"
 
 echo ""
 echo "✓ ${ENV_NAME} deploy complete."

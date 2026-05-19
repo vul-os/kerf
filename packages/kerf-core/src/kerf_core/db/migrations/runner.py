@@ -13,6 +13,7 @@ stamped, so genuinely-new migrations still run while old ones don't
 re-execute. Real (non-duplicate) errors still abort the deploy.
 """
 import asyncio
+import os
 import sys
 from pathlib import Path
 
@@ -85,7 +86,15 @@ async def run_migrations(database_url: str):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python -m kerf_core.db.migrations.runner <database_url>")
+    # Accept the DSN either as argv[1] (legacy explicit path used by
+    # scripts/deploy-fly.sh's ssh-console invocation) or via $DATABASE_URL
+    # (used by Fly's `[deploy] release_command`, which can't substitute
+    # secrets into the command string itself — it has to read env).
+    dsn = sys.argv[1] if len(sys.argv) >= 2 else os.environ.get("DATABASE_URL")
+    if not dsn:
+        print(
+            "Usage: python -m kerf_core.db.migrations.runner [<database_url>]\n"
+            "       Or set DATABASE_URL in the environment."
+        )
         sys.exit(1)
-    asyncio.run(run_migrations(sys.argv[1]))
+    asyncio.run(run_migrations(dsn))

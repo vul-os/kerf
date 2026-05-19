@@ -58,6 +58,7 @@ import { mateRefFromPick, parseAssembly } from '../lib/assembly.js'
 import { _internalLoops } from '../lib/sketchGeom2.js'
 import FileEditor from '../components/FileEditor.jsx'
 import { isTextCodeFile } from '../lib/editorModes.js'
+import UnsavedRestoreBanner from '../components/UnsavedRestoreBanner.jsx'
 
 // ---------------------------------------------------------------------------
 // Build3DDropdown — toolbar dropdown in the sketch header that scaffolds a
@@ -693,7 +694,14 @@ export default function Editor() {
 
   // ----- Project lifecycle -----
   useEffect(() => {
-    if (projectId) w.loadProject(projectId)
+    if (projectId) {
+      w.loadProject(projectId).then(() => {
+        // After files load, check IDB for any unflushed entries from a previous
+        // session and surface the UnsavedRestoreBanner. This is intentionally
+        // USER-INITIATED — the banner asks before replaying anything.
+        w.loadUnsavedEntries()
+      })
+    }
     return () => {
       // Cancel any in-flight JSCAD evaluations so a slow eval from the
       // closing project can't write into the next project's parts state.
@@ -1626,6 +1634,10 @@ export default function Editor() {
 
         {/* Center: renderer + editor (or full-bleed DrawingView/SketchView for special kinds) */}
         <main id="editor-center" className="flex flex-col min-w-0 min-h-0 relative">
+          {/* Crash-recovery banner — shown when IDB has unflushed entries from a
+              previous session. The user chooses Restore or Discard; no silent
+              auto-replay. Separate from ConflictBanner (T-302 live OCC conflicts). */}
+          <UnsavedRestoreBanner />
           {/* Configurations / variants — small chrome above the editor that
               picks the active config for the open file. Only rendered for
               file kinds that support configurations (Part / Feature /

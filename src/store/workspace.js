@@ -33,7 +33,7 @@ import { sketchToGeom2 } from '../lib/sketchGeom2.js'
 import { meshCache } from '../lib/meshCache.js'
 import { subdToBufferGeometry, meshDocToBufferGeometry } from '../lib/subdToBufferGeometry.js'
 import { git as gitApi } from '../cloud/api.js'
-import { stash as l1Stash, markFlushed as l1MarkFlushed } from '../lib/localStash.js'
+import { stash as l1Stash, markFlushed as l1MarkFlushed, listUnflushed as l1ListUnflushed } from '../lib/localStash.js'
 import { markDirty as schedulerMarkDirty } from '../lib/autosaveScheduler.js'
 
 // Prune the IndexedDB mesh cache on first store import (i.e. app start). Best-
@@ -332,6 +332,12 @@ const initial = {
   // Cleared when the user reloads or dismisses the banner.
   // Shape: { file_id, current_version, current_content_preview } | null
   conflictFile: null,
+
+  // Crash-recovery banner slice (T-309 follow-up).
+  // Populated by loadUnsavedEntries() on project mount. Each entry:
+  //   { path, bytes, stashed_at, _error? }
+  // The UnsavedRestoreBanner renders this slice and drives Restore / Discard.
+  unsavedEntries: [],
 }
 
 // Tolerant JSON parse for drawing content. Empty/blank → defaults.
@@ -1808,6 +1814,77 @@ export const useWorkspace = create((set, get) => ({
           : m),
       }))
     }
+  },
+
+  // ---- Crash-recovery (unsaved restore) actions ----
+
+  /**
+   * Load unflushed IDB entries for the current project into the store slice.
+   * Called after files load on project mount. Must be USER-INITIATED — do not
+   * call from main.jsx or any code that runs before the user has a chance to
+   * see the prompt.
+   */
+  loadUnsavedEntries: async () => {
+    const { projectId } = get()
+    if (!projectId) return
+    try {
+      const entries = await l1ListUnflushed(projectId)
+      set({ unsavedEntries: entries })
+    } catch {
+      // Non-fatal: if IDB is unavailable, just silently skip.
+    }
+  },
+
+  /**
+   * Restore all unsaved entries to the server via PATCH.
+   * On per-entry success: calls markFlushed and removes from the slice.
+   * On per-entry failure: sets _error on the entry and leaves it in the slice.
+   */
+  restoreUnsavedEntries: async () => {
+    const { projectId, unsavedEntries } = get()
+    if (!projectId || unsavedEntries.length === 0) return
+
+    const results = await Promise.allSettled(
+      unsavedEntries.map(async (entry) => {
+        try {
+          // Decode bytes to string (file content is always UTF-8 text).
+          const content = new TextDecoder().decode(entry.bytes)
+          await api.updateFile(projectId, entry.path, { content })
+          await l1MarkFlushed(projectId, entry.path)
+          return { path: entry.path, ok: true }
+        } catch (err) {
+          // 409 = OCC conflict — server has newer version.
+          const hint = err?.status === 409
+            ? 'Server has newer version — reload to merge'
+            : (err?.message || 'Failed to restore')
+          return { path: entry.path, ok: false, error: hint }
+        }
+      }),
+    )
+
+    // Keep only the entries that failed; attach _error to each.
+    set((s) => ({
+      unsavedEntries: s.unsavedEntries.reduce((acc, entry) => {
+        const result = results.find((r) => r.value?.path === entry.path)
+        if (result?.value?.ok) return acc  // Successfully restored — remove
+        const errorMsg = result?.value?.error || 'Failed to restore'
+        return [...acc, { ...entry, _error: errorMsg }]
+      }, []),
+    }))
+  },
+
+  /**
+   * Discard all unsaved entries — mark them flushed in IDB (treated as
+   * intentionally abandoned) and clear the store slice.
+   */
+  discardUnsavedEntries: async () => {
+    const { projectId, unsavedEntries } = get()
+    if (!projectId || unsavedEntries.length === 0) return
+    // Mark all as flushed in IDB (best-effort; non-fatal if any fail).
+    await Promise.allSettled(
+      unsavedEntries.map((e) => l1MarkFlushed(projectId, e.path)),
+    )
+    set({ unsavedEntries: [] })
   },
 
   reset: () => {

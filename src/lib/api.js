@@ -1,4 +1,5 @@
 import { useAuth } from '../store/auth.js'
+import { toast } from '../components/ToastBus.jsx'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
@@ -93,6 +94,21 @@ async function request(
   }
 
   if (raw) return res
+
+  if (res.status === 429) {
+    const text = await res.text()
+    let retryAfter = null
+    try {
+      const body = JSON.parse(text)
+      retryAfter = body.retry_after ?? null
+    } catch { /* ignore */ }
+    const msg = retryAfter != null
+      ? `Too many requests — try again in ${retryAfter} seconds`
+      : 'Too many requests — please slow down'
+    toast.error(msg)
+    throw new ApiError(429, 'rate limit exceeded')
+  }
+
   if (!res.ok) {
     const text = await res.text()
     let msg = text

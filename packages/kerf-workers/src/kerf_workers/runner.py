@@ -54,6 +54,22 @@ def _maybe_pricing_worker(pool):
         return []
 
 
+def _maybe_rate_limit_gc_worker(pool):
+    """One RateLimitGCWorker — prunes rate_limit_buckets rows every 15 min.
+
+    Lazy import so a missing kerf-core doesn't hard-fail the worker set.
+    """
+    try:
+        from kerf_core.workers.rate_limit_gc_worker import RateLimitGCWorker  # type: ignore
+        return [RateLimitGCWorker(pool)]
+    except ImportError:
+        logger.warning("kerf-workers: kerf_core not installed; skipping RateLimitGCWorker")
+        return []
+    except Exception:
+        logger.exception("kerf-workers: failed to create RateLimitGCWorker")
+        return []
+
+
 class DummyStorage:
     async def get(self, key: str):
         raise NotImplementedError("storage not configured")
@@ -167,6 +183,8 @@ def _build_workers(
     # PricingRefreshWorker: keeps model_prices current (boot + daily) so
     # the chat model dropdown + billing work.
     workers.extend(_maybe_pricing_worker(pool))
+    # RateLimitGCWorker: prunes rate_limit_buckets rows older than 24h.
+    workers.extend(_maybe_rate_limit_gc_worker(pool))
     return workers
 
 

@@ -24,7 +24,7 @@ from kerf_core.db.queries import users as users_queries
 from kerf_core.db.queries import workspaces as workspaces_queries
 from kerf_core.db.queries import refresh_tokens as rt_queries
 from kerf_core.db.queries import api_tokens as api_tokens_queries
-from kerf_core.dependencies import require_auth
+from kerf_core.dependencies import require_auth, rate_limit
 
 router = APIRouter()
 api_tokens_router = APIRouter()
@@ -234,7 +234,12 @@ def workspace_to_response(ws: dict) -> WorkspaceResponse:
 
 
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
-async def register(req: RegisterRequest, response: Response):
+async def register(
+    req: RegisterRequest,
+    response: Response,
+    request: Request,
+    _rl: None = Depends(rate_limit(max_per_window=5, window_seconds=3600, key_prefix="auth:register")),
+):
     pool = await get_pool_required()
     async with pool.acquire() as conn:
         email = req.email.strip().lower()
@@ -290,7 +295,11 @@ async def register(req: RegisterRequest, response: Response):
 
 
 @router.post("/login", response_model=AuthResponse)
-async def login(req: LoginRequest):
+async def login(
+    req: LoginRequest,
+    request: Request,
+    _rl: None = Depends(rate_limit(max_per_window=10, window_seconds=60, key_prefix="auth:login")),
+):
     pool = await get_pool_required()
     async with pool.acquire() as conn:
         email = req.email.strip().lower()

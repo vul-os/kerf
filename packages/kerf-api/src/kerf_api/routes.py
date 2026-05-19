@@ -39,7 +39,7 @@ from kerf_core.db.queries import usage_events as usage_queries
 from kerf_core.db.queries import upload_sessions as uploads_queries
 from kerf_core.db.queries import library as library_queries
 from kerf_core.db.queries import workshop_likes as workshop_likes_queries
-from kerf_core.dependencies import require_auth, optional_auth
+from kerf_core.dependencies import require_auth, optional_auth, rate_limit
 from kerf_core.storage import get_storage_required
 from kerf_core.storage.materialize import blob_storage_key
 from kerf_chat import llm as llm_module
@@ -2836,7 +2836,13 @@ async def _auto_title_thread(tid: str, user_content: str, assistant_content: str
 
 
 @router.post("/projects/{pid}/threads/{tid}/messages")
-async def post_message(pid: str, tid: str, req: PostMessageRequest, payload: dict = Depends(require_auth)):
+async def post_message(
+    pid: str,
+    tid: str,
+    req: PostMessageRequest,
+    payload: dict = Depends(require_auth),
+    _rl: None = Depends(rate_limit(max_per_window=30, window_seconds=60, key_prefix="api:messages")),
+):
     user_id = payload.get("sub")
 
     pool = await get_pool_required()
@@ -6293,3 +6299,66 @@ async def jewelry_metal_cost(pid: str, request: Request, payload: dict = Depends
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# Part photo upload (T-310: rate-limited)
+# ---------------------------------------------------------------------------
+
+@router.post("/projects/{pid}/files/{fid}/photos", status_code=201)
+async def upload_part_photo(
+    pid: str,
+    fid: str,
+    file: UploadFile,
+    request: Request,
+    payload: dict = Depends(require_auth),
+    _rl: None = Depends(rate_limit(max_per_window=60, window_seconds=60, key_prefix="api:photos")),
+):
+    """Upload a photo for a library Part file.
+
+    Stores the raw bytes under a storage key and appends the key to the
+    Part's ``photos`` array in the JSON content. The first photo is
+    auto-promoted as the primary photo.
+
+    Returns ``{"storage_key": "<key>", "photos": [...]}``.
+    """
+    user_id = payload.get("sub")
+
+    pool = await get_pool_required()
+    async with pool.acquire() as conn:
+        ws_id = await project_workspace_id(pid)
+        if not ws_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
+        role = await get_user_workspace_role(conn, ws_id, user_id)
+        if not role or role == "viewer":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="viewer cannot upload photos")
+
+        row = await conn.fetchrow(
+            "SELECT id, kind, content FROM files WHERE id = $1 AND project_id = $2 AND deleted_at IS NULL",
+            fid, pid,
+        )
+        if not row:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="file not found")
+
+    storage_inst = get_storage_required()
+    content_bytes = await file.read()
+    ext = (file.filename or "photo.jpg").rsplit(".", 1)[-1].lower()
+    storage_key = f"photos/{pid}/{fid}/{uuid.uuid4()}.{ext}"
+    await storage_inst.put(storage_key, content_bytes, content_type=file.content_type or "image/jpeg")
+
+    async with pool.acquire() as conn:
+        # Parse existing content JSON; append new photo key.
+        try:
+            content_obj = json.loads(row["content"] or "{}")
+        except Exception:
+            content_obj = {}
+        photos = content_obj.get("photos") or []
+        photos.append(storage_key)
+        content_obj["photos"] = photos
+        await conn.execute(
+            "UPDATE files SET content = $1, updated_at = now() WHERE id = $2",
+            json.dumps(content_obj),
+            fid,
+        )
+
+    return {"storage_key": storage_key, "photos": photos}

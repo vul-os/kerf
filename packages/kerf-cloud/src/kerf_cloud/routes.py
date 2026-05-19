@@ -885,6 +885,11 @@ async def git_push(
     user_id = payload.get("sub")
     await require_editor(request, pid, user_id)
 
+    # Rate-limit by project_id (10 pushes / 60 s per project).
+    from kerf_core.rate_limit import enforce as _rl_enforce
+    pool = await get_pool_required()
+    await _rl_enforce(pool, f"cloud:git_push:{pid}", max_per_window=10, window_seconds=60)
+
     storage_inst = get_storage_required()
     if not isinstance(storage_inst, S3Storage):
         raise HTTPException(status_code=503, detail='git push requires S3 storage backend')

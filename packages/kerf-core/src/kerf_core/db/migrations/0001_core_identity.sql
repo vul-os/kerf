@@ -274,3 +274,19 @@ create index if not exists dental_cases_project_id_idx
     on dental_cases(project_id);
 create index if not exists dental_cases_treatment_idx
     on dental_cases(treatment);
+
+-- ════════════ rate_limit_buckets (T-310) ════════════
+-- Sliding-window counter keyed on caller (user_id or IP) + endpoint name.
+-- Each window_start is a window_seconds-rounded timestamp; INSERT ... ON
+-- CONFLICT DO UPDATE increments atomically. Multi-machine safe — state
+-- lives in Postgres. See packages/kerf-core/src/kerf_core/rate_limit.py
+-- for the helper and packages/kerf-core/tests/test_rate_limit.py for
+-- behaviour.
+create table if not exists rate_limit_buckets (
+    bucket_key   text not null,
+    window_start timestamptz not null,
+    count        integer not null default 0,
+    primary key (bucket_key, window_start)
+);
+create index if not exists rate_limit_buckets_window_idx
+    on rate_limit_buckets(window_start);

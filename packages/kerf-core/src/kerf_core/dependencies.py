@@ -117,3 +117,60 @@ async def get_token_scopes(request: Request) -> list[str]:
 def has_scope(request: Request, required: str) -> bool:
     scopes = getattr(request.state, "scopes", [])
     return required in scopes
+
+
+def rate_limit(
+    max_per_window: int,
+    window_seconds: int = 60,
+    key_prefix: str = "",
+) -> "callable":
+    """Build a FastAPI dependency that enforces a rate limit.
+
+    Key composition: ``f"{key_prefix}:{user_id_or_ip}"``.
+
+    Use after ``require_auth`` so ``user_id`` is available when the caller
+    is authenticated. For unauthenticated endpoints (login, register) the
+    key falls back to the client IP.
+
+    Example::
+
+        @router.post("/auth/login")
+        async def login(
+            req: LoginRequest,
+            _: None = Depends(rate_limit(10, 60, "auth:login")),
+        ):
+            ...
+    """
+    from fastapi import Request
+
+    async def _dep(request: Request) -> None:
+        from kerf_core.db.connection import get_pool_required
+        from kerf_core.rate_limit import enforce
+
+        # Try authenticated user_id first; fall back to client IP.
+        user_id: Optional[str] = None
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            try:
+                token = auth_header[7:]
+                if not token.startswith(API_TOKEN_PREFIX):
+                    payload = decode_jwt(token)
+                    user_id = payload.get("sub")
+            except HTTPException:
+                pass
+
+        if user_id:
+            caller = user_id
+        else:
+            # X-Forwarded-For is set by Fly.io / nginx; fall back to direct IP.
+            forwarded = request.headers.get("X-Forwarded-For", "")
+            caller = forwarded.split(",")[0].strip() if forwarded else (
+                request.client.host if request.client else "unknown"
+            )
+
+        bucket = f"{key_prefix}:{caller}" if key_prefix else caller
+
+        pool = await get_pool_required()
+        await enforce(pool, bucket, max_per_window, window_seconds)
+
+    return _dep

@@ -40,6 +40,8 @@ import {
   Cpu,
   Terminal,
   Activity,
+  Scissors,
+  Zap,
 } from 'lucide-react'
 import Header from '../../components/Header.jsx'
 import Footer from '../../components/Footer.jsx'
@@ -252,6 +254,46 @@ export const DOMAINS = [
     blurb:
       'Parametric airframes, FEM via FEniCSx + Mystran, composites lay-up, CFD mesh prep, GD&T per AS9100. STEP AP242 and Mystran BDF out.',
     to: '/domains/aerospace',
+    status: 'live',
+  },
+  {
+    slug: 'plc',
+    name: 'PLC / Industrial Automation',
+    Icon: Zap,
+    accent: 'kerf-300',
+    blurb:
+      'Ladder logic, FBD, Structured Text and SFC programs. I/O wiring diagrams, HMI faceplates, scan-cycle analysis. PLCopen XML export for Siemens TIA Portal and Rockwell Studio 5000.',
+    to: '/domains/plc',
+    status: 'live',
+  },
+  {
+    slug: 'motion',
+    name: 'Motion Simulation',
+    Icon: Cog,
+    accent: 'cyan-edge',
+    blurb:
+      'Rigid-body dynamics, cam profiles, gear trains, robot trajectory planning. Joint-angle CSV and ROS2-compatible YAML out.',
+    to: '/domains/motion',
+    status: 'live',
+  },
+  {
+    slug: 'femcfd',
+    name: 'FEM / CFD Simulation',
+    Icon: Activity,
+    accent: 'kerf-300',
+    blurb:
+      'Linear-static and modal FEM via FEniCSx, transient thermal, incompressible CFD via OpenFOAM. VTK + XDMF for ParaView.',
+    to: '/domains/femcfd',
+    status: 'live',
+  },
+  {
+    slug: 'textiles',
+    name: 'Textiles / Apparel Design',
+    Icon: Scissors,
+    accent: 'magenta-edge',
+    blurb:
+      'Pattern drafting, ASTM / EN 13402 size grading, seam allowances, nesting markers, mass-spring fabric drape sim. DXF cut files out.',
+    to: '/domains/textiles',
     status: 'live',
   },
 ]

@@ -406,6 +406,23 @@ function PipelineDivider() {
 /* Section: Capability tour                                                    */
 /* -------------------------------------------------------------------------- */
 
+// Map of capability-group id → /domains/<slug> deep-link target. Used by
+// CapabilityGroup to render a "Read more" link for groups that have a
+// dedicated domain page. The literal URLs also make Landing.jsx the
+// canonical source-of-truth for which sectors have a live domain page —
+// the source-text route-presence tests in
+// src/routes/__tests__/landing.{silicon,firmware,aerospace}.test.js and
+// src/routes/__tests__/domains.new-sectors.test.js scan this file.
+export const DOMAIN_HREFS = {
+  silicon:  '/domains/silicon',
+  firmware: '/domains/firmware',
+  aerospace:'/domains/aerospace',
+  plc:      '/domains/plc',
+  motion:   '/domains/motion',
+  femcfd:   '/domains/femcfd',
+  textiles: '/domains/textiles',
+}
+
 export const CAPABILITY_GROUPS = [
   {
     id: 'mech',
@@ -772,6 +789,7 @@ function CapabilityTour() {
 }
 
 function CapabilityGroup({ group }) {
+  const domainHref = DOMAIN_HREFS[group.id]
   return (
     <div>
       <div className="mb-5 max-w-3xl">
@@ -787,6 +805,15 @@ function CapabilityGroup({ group }) {
           </p>
         )}
         <p className="mt-2 text-sm text-ink-300 leading-relaxed">{group.body}</p>
+        {domainHref && (
+          <Link
+            to={domainHref}
+            className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-kerf-300 hover:text-kerf-200 transition-colors"
+          >
+            Deep-dive on the {group.id} page
+            <ArrowRight size={13} />
+          </Link>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

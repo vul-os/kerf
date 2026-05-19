@@ -52,6 +52,10 @@ describe('DOMAIN_TABS', () => {
       'silicon',
       'firmware',
       'aerospace',
+      'plc',
+      'motion',
+      'femcfd',
+      'textiles',
     ])
   })
 

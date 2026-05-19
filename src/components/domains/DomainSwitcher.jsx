@@ -32,6 +32,10 @@ export const DOMAIN_TABS = [
   { slug: 'silicon', label: 'Silicon' },
   { slug: 'firmware', label: 'Firmware' },
   { slug: 'aerospace', label: 'Aerospace' },
+  { slug: 'plc', label: 'PLC' },
+  { slug: 'motion', label: 'Motion' },
+  { slug: 'femcfd', label: 'FEM/CFD' },
+  { slug: 'textiles', label: 'Textiles' },
 ]
 
 /**

@@ -362,7 +362,7 @@ Sequenced for parallel execution across 5 Sonnet agents.
 
 ### T-310 Distributed rate limiting (Postgres-first, Redis later)
 
-🔴 not started · **Tier A · P0**
+✅ shipped (2026-05-19) · **Tier A · P0**
 
 - **Why:** Public-SaaS Kerf bills credits per LLM call and proxies
   Anthropic tokens. Without rate limiting, a single user (malicious or

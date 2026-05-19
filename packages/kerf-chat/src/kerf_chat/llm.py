@@ -263,8 +263,14 @@ CATALOG = [
     {"id": "kimi-k2-0905-preview", "provider": "moonshot", "label": "Kimi K2", "context_window": 256_000},
     {"id": "moonshot-v1-128k", "provider": "moonshot", "label": "Moonshot v1 128k", "context_window": 128_000},
     {"id": "moonshot-v1-32k", "provider": "moonshot", "label": "Moonshot v1 32k", "context_window": 32_000},
+    # Gemini — keep 2.5 line + the latest 3-series previews. cheap_tier.py
+    # also lists these glob patterns ("gemini-3-flash-*") for billing-bucket
+    # routing; the catalog here is what the chat picker / /api/models shows.
+    {"id": "gemini-3-pro-preview", "provider": "gemini", "label": "Gemini 3 Pro (preview)", "context_window": 2_000_000},
+    {"id": "gemini-3-flash-preview", "provider": "gemini", "label": "Gemini 3 Flash (preview)", "context_window": 1_000_000},
     {"id": "gemini-2.5-pro", "provider": "gemini", "label": "Gemini 2.5 Pro", "context_window": 2_000_000},
     {"id": "gemini-2.5-flash", "provider": "gemini", "label": "Gemini 2.5 Flash", "context_window": 1_000_000},
+    {"id": "gemini-2.5-flash-lite", "provider": "gemini", "label": "Gemini 2.5 Flash Lite", "context_window": 1_000_000},
 ]
 
 
@@ -616,12 +622,25 @@ class AnthropicProvider(Provider):
             for event in stream:
                 etype = type(event).__name__
 
-                if etype == "MessageStartEvent":
+                # The Anthropic SDK (≥ 0.39) emits events with the literal
+                # class names `RawMessageStartEvent`, `RawContentBlockStartEvent`,
+                # `RawContentBlockDeltaEvent`, `ParsedContentBlockStopEvent`,
+                # `RawMessageDeltaEvent`, `ParsedMessageStopEvent`, etc. The
+                # previous match (against un-prefixed names) silently fell
+                # through for EVERY event, so this method yielded nothing
+                # and the route saw stop_reason=tool_use with zero tool calls
+                # captured — surface symptom: "blank chat head" with no
+                # tools executed (see scripts/e2e_chat_probe.py output).
+                # Also tolerate both the higher-level helper events (TextEvent,
+                # InputJsonEvent) emitted alongside the raw deltas, and the
+                # un-prefixed legacy names in case an older SDK is in use.
+
+                if etype in ("RawMessageStartEvent", "MessageStartEvent"):
                     # Capture input tokens from message_start usage
                     if hasattr(event, "message") and hasattr(event.message, "usage"):
                         input_tokens = getattr(event.message.usage, "input_tokens", 0) or 0
 
-                elif etype == "ContentBlockStartEvent":
+                elif etype in ("RawContentBlockStartEvent", "ContentBlockStartEvent"):
                     block = event.content_block
                     if block.type == "text":
                         current_block_type = "text"
@@ -638,14 +657,15 @@ class AnthropicProvider(Provider):
                             data={"tool_use_id": block.id, "name": block.name},
                         )
 
-                elif etype == "ContentBlockDeltaEvent":
+                elif etype in ("RawContentBlockDeltaEvent", "ContentBlockDeltaEvent"):
                     delta = event.delta
-                    if current_block_type == "text" and delta.type == "text_delta":
+                    dtype = getattr(delta, "type", None)
+                    if current_block_type == "text" and dtype == "text_delta":
                         yield StreamEvent(
                             type="assistant_text_delta",
                             data={"text": delta.text},
                         )
-                    elif current_block_type == "tool_use" and delta.type == "input_json_delta":
+                    elif current_block_type == "tool_use" and dtype == "input_json_delta":
                         current_tool_input_parts.append(delta.partial_json)
                         yield StreamEvent(
                             type="tool_use_input_delta",
@@ -655,7 +675,11 @@ class AnthropicProvider(Provider):
                             },
                         )
 
-                elif etype == "ContentBlockStopEvent":
+                elif etype in (
+                    "RawContentBlockStopEvent",
+                    "ContentBlockStopEvent",
+                    "ParsedContentBlockStopEvent",
+                ):
                     if current_block_type == "tool_use" and current_tool_id is not None:
                         assembled = "".join(current_tool_input_parts)
                         try:
@@ -672,12 +696,20 @@ class AnthropicProvider(Provider):
                         )
                     current_block_type = None
 
-                elif etype == "MessageDeltaEvent":
+                elif etype in ("RawMessageDeltaEvent", "MessageDeltaEvent"):
                     if hasattr(event, "usage"):
                         output_tokens = getattr(event.usage, "output_tokens", 0) or 0
 
-                elif etype == "MessageStopEvent":
+                elif etype in (
+                    "RawMessageStopEvent",
+                    "MessageStopEvent",
+                    "ParsedMessageStopEvent",
+                ):
                     pass  # handled via get_final_message below
+
+                # `TextEvent` / `InputJsonEvent` / etc. are higher-level
+                # helpers emitted alongside the Raw events — we already
+                # forwarded the Raw delta above, so skip them silently.
 
             # Retrieve final stop_reason + token counts from the accumulated message.
             try:

@@ -6,12 +6,14 @@
 -- ════════════ folded: 031_cloud_github_tokens.sql ════════════
 
 CREATE TABLE IF NOT EXISTS cloud_github_tokens (
-    user_id         uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    access_token_encrypted bytea NOT NULL,
-    scope           text NOT NULL DEFAULT '',
-    github_user_id  bigint,
-    github_login    text NOT NULL DEFAULT '',
-    updated_at      timestamptz NOT NULL DEFAULT now()
+    user_id                 uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    access_token_encrypted  bytea NOT NULL DEFAULT ''::bytea,
+    scope                   text NOT NULL DEFAULT '',
+    github_user_id          bigint,
+    github_login            text NOT NULL DEFAULT '',
+    -- folded from 063_github_installation.sql (0010): GitHub App installation ID
+    github_installation_id  bigint,
+    updated_at              timestamptz NOT NULL DEFAULT now()
 );
 
 -- ════════════ folded: 032_workshop_likes.sql ════════════

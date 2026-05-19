@@ -56,11 +56,8 @@ create unique index if not exists sim_jobs_file_id_unique
     where status in ('queued','running');
 
 -- ════════════ folded: 029_script_extension.sql ════════════
-
--- Add `extension` column to files for scripting variants.
-
-alter table files add column if not exists extension text;
-create index if not exists files_extension_idx on files(extension);
+-- files.extension folded into CREATE TABLE files in 0001_core_identity.sql.
+-- files_extension_idx created inline with CREATE TABLE in 0001.
 
 -- ════════════ folded: 030_cam_jobs.sql ════════════
 

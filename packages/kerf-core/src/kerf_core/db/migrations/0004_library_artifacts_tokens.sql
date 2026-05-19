@@ -40,6 +40,9 @@ create table if not exists step_tessellation_jobs (
     mesh_storage_key text,
     started_at timestamptz,
     finished_at timestamptz,
+    -- folded from 047_step_tess_input_spec.sql (0007)
+    input_spec jsonb,
+    content_sha256 text,
     created_at timestamptz not null default now()
 );
 
@@ -50,18 +53,20 @@ create index if not exists step_tessellation_jobs_status_idx
 create unique index if not exists step_tessellation_jobs_file_id_unique
     on step_tessellation_jobs(file_id);
 
-alter table files add column if not exists mesh_storage_key text;
+-- files.mesh_storage_key folded into CREATE TABLE files in 0001_core_identity.sql.
 
 -- ════════════ folded: 024_derived_artifacts.sql ════════════
 
 -- Cross-project derived-artifact cache.
+-- derived_kind check updated to include 'step_mesh' (folded from
+-- 047_step_tess_input_spec.sql in 0007_step_tess_revision_finalize.sql).
 
 create table if not exists derived_artifacts (
     id uuid primary key default gen_random_uuid(),
     source_file_id uuid not null references files(id) on delete cascade,
     content_sha256 text not null,
     derived_kind text not null
-        check (derived_kind in ('jscad_mesh', 'sketch_geom2', 'circuit_board_3d')),
+        check (derived_kind in ('jscad_mesh', 'sketch_geom2', 'circuit_board_3d', 'step_mesh')),
     payload bytea not null,
     payload_size_bytes int not null default 0,
     created_at timestamptz not null default now(),
@@ -86,6 +91,10 @@ create table if not exists api_tokens (
     scopes      jsonb not null default '["workspace:member-role"]',
     last_used_at timestamptz,
     revoked_at  timestamptz,
+    -- folded from 051_billing_buckets.sql (0008): per-token daily spend cap
+    max_spend_per_day_usd numeric(10, 2) not null default 50.00,
+    spend_today_usd       numeric(10, 4) not null default 0.00,
+    spend_today_date      date           not null default current_date,
     created_at  timestamptz not null default now()
 );
 create index if not exists api_tokens_workspace_idx on api_tokens(workspace_id);

@@ -22,22 +22,12 @@ create index if not exists distributor_credentials_enabled_idx
     on distributor_credentials(enabled) where enabled = true;
 
 -- ════════════ folded: 005_project_type.sql ════════════
-
--- project_type: forward-compatible enum gating which renderer/LLM tools/file
--- kinds a project surfaces.
-
-alter table projects
-    add column if not exists project_type text not null default 'mechanical'
-    check (project_type in ('mechanical','electronics','architecture','jewelry'));
-
-create index if not exists projects_project_type_idx on projects(project_type);
+-- project_type column added here and dropped in 015_project_tags (0003);
+-- final projects shape has no project_type — omitted from baseline.
 
 -- ════════════ folded: 006_project_thumbnails.sql ════════════
-
--- project_thumbnails: cached 3D preview rendered client-side on save.
-
-alter table projects add column if not exists thumbnail_storage_key text;
-alter table projects add column if not exists thumbnail_updated_at timestamptz;
+-- thumbnail_storage_key and thumbnail_updated_at folded into
+-- CREATE TABLE projects in 0001_core_identity.sql.
 
 -- ════════════ folded: 007_usage_events.sql ════════════
 
@@ -53,6 +43,8 @@ create table if not exists usage_events (
     output_tokens int not null default 0,
     bytes_delta bigint not null default 0,
     usd_cost numeric(12, 6) not null default 0,
+    -- folded from 051_billing_buckets.sql (0008)
+    payer text not null default 'kerf_paid',
     created_at timestamptz not null default now()
 );
 create index if not exists usage_events_user_id_idx on usage_events(user_id, created_at desc);
@@ -84,8 +76,4 @@ create index if not exists upload_sessions_project_id_expires_idx on upload_sess
 create index if not exists upload_sessions_sha256_idx on upload_sessions(project_id, sha256);
 
 -- ════════════ folded: 009_library_v15.sql ════════════
-
--- Library v1.5 — verified-publisher curation flag.
-
-alter table users add column if not exists is_verified_publisher boolean not null default false;
-create index if not exists users_is_verified_publisher_idx on users(is_verified_publisher) where is_verified_publisher = true;
+-- is_verified_publisher folded into CREATE TABLE users in 0001_core_identity.sql.

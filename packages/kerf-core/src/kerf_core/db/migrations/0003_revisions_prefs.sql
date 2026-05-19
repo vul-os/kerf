@@ -4,62 +4,24 @@
 -- SQL is byte-exact and applied in the original order.
 
 -- ════════════ folded: 013_revision_diffs.sql ════════════
-
--- Phase 4: diff-based + compressed revisions.
-
-alter table file_revisions
-    add column if not exists kind text not null default 'base'
-        check (kind in ('base', 'diff'));
-
-alter table file_revisions
-    add column if not exists content_gz bytea;
-
-alter table file_revisions
-    add column if not exists parent_revision_id uuid
-        references file_revisions(id) on delete set null;
-
-alter table file_revisions
-    add column if not exists content_preview text;
-
-create index if not exists file_revisions_file_id_kind_idx
-    on file_revisions(file_id, kind);
+-- kind, content_gz, parent_revision_id, content_preview folded into
+-- CREATE TABLE file_revisions in 0001_core_identity.sql.
 
 -- ════════════ folded: 014_drop_jewelry_type.sql ════════════
-
--- Drop the 'jewelry' project_type.
-
-update projects set project_type = 'mechanical' where project_type = 'jewelry';
-
-alter table projects drop constraint if exists projects_project_type_check;
-alter table projects add constraint projects_project_type_check
-    check (project_type in ('mechanical','electronics','architecture'));
+-- project_type constraint update — project_type dropped entirely in 015;
+-- omitted from baseline (no column in final schema).
 
 -- ════════════ folded: 015_project_tags.sql ════════════
-
--- Drop the project_type enum; replace with free-form `tags TEXT[]`.
-
-alter table projects add column tags text[] not null default '{}';
-update projects set tags = array[project_type] where project_type is not null;
-alter table projects drop constraint if exists projects_project_type_check;
-alter table projects drop column project_type;
-create index if not exists projects_tags_gin_idx on projects using gin (tags);
+-- tags column folded into CREATE TABLE projects in 0001_core_identity.sql;
+-- project_type column was transient (added 005, dropped here) — omitted.
+-- projects_tags_gin_idx created inline with CREATE TABLE in 0001.
 
 -- ════════════ folded: 016_user_avatar_storage.sql ════════════
-
--- User avatars: storage_key tracks the blob.
-
-alter table users add column if not exists avatar_storage_key text;
-alter table users add column if not exists avatar_updated_at timestamptz;
+-- avatar_storage_key and avatar_updated_at folded into
+-- CREATE TABLE users in 0001_core_identity.sql.
 
 -- ════════════ folded: 017_user_preferences.sql ════════════
-
--- Per-user UI preferences.
-
-alter table users add column preferences jsonb not null default '{}'::jsonb;
+-- preferences folded into CREATE TABLE users in 0001_core_identity.sql.
 
 -- ════════════ folded: 018_revision_sha256.sql ════════════
-
--- Phase 4 hardening: chain-corruption detection.
-
-alter table file_revisions
-    add column if not exists content_sha256 bytea;
+-- content_sha256 folded into CREATE TABLE file_revisions in 0001_core_identity.sql.

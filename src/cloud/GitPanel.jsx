@@ -21,7 +21,7 @@ import { git, githubOAuth } from './api.js'
 import GitProviderSettings from './GitProviderSettings.jsx'
 import CommitDialog from './CommitDialog.jsx'
 import MergeDialog from './MergeDialog.jsx'
-import DiffViewer from './DiffViewer.jsx'
+import CommitDiffViewer from './CommitDiffViewer.jsx'
 import GitConnectDialog from './GitConnectDialog.jsx'
 import {
   assignLanes,
@@ -840,9 +840,12 @@ export function GitPanel({ projectId, onClose }) {
           onLinkGithub={onLinkGithub}
         />
       )}
-      {diffSha && (
-        <DiffViewer projectId={projectId} sha={diffSha} onClose={() => setDiffSha(null)} />
-      )}
+      <CommitDiffViewer
+        open={!!diffSha}
+        sha={diffSha}
+        projectId={projectId}
+        onClose={() => setDiffSha(null)}
+      />
       {showPurge && (
         <PurgeRevisionsModal
           open={showPurge}

@@ -791,6 +791,160 @@ async def git_pull(
     return {"status": "pulled", "local_dir": local_dir, "branch": branch}
 
 
+@router.get("/projects/{pid}/git/commits/{sha}/diff")
+async def git_commit_diff(
+    request: Request,
+    payload: dict = Depends(require_auth),
+    pid: Optional[str] = None,
+    sha: Optional[str] = None,
+):
+    """Return a per-file JSON diff for commit *sha* within project *pid*.
+
+    Response shape::
+
+        {
+          "sha": "...",
+          "files": [
+            {
+              "path": "src/foo.py",
+              "status": "modified",
+              "additions": 12,
+              "deletions": 3,
+              "hunks": "--- a/...\\n+++ b/...\\n@@ ..."
+            }
+          ]
+        }
+
+    ``hunks`` is the unified diff text capped at 50 KB; binary files carry
+    ``hunks: null``.  ``status`` is one of "added" / "modified" / "deleted" /
+    "renamed".
+    """
+    import asyncio as _asyncio
+    from kerf_core.storage.diff import unified_text_diff, is_binary_content
+    from kerf_core.storage.git_storer import resolve_project_repo
+
+    user_id = payload.get("sub")
+    await require_role(request, pid, user_id)
+
+    storage = get_storage_required()
+    loc = resolve_project_repo(pid, storage)
+
+    def _diff_sync(repo_dir: str, commit_sha: str):
+        try:
+            repo = pygit2.Repository(repo_dir)
+        except (pygit2.GitError, KeyError) as exc:
+            raise FileNotFoundError(f"no git repo at {repo_dir!r}: {exc}") from exc
+
+        try:
+            commit_obj = repo.revparse_single(commit_sha)
+        except KeyError:
+            raise KeyError(f"commit {commit_sha!r} not found")
+
+        if not isinstance(commit_obj, pygit2.Commit):
+            commit_obj = commit_obj.peel(pygit2.Commit)
+
+        new_tree = commit_obj.tree
+        old_tree = commit_obj.parents[0].tree if commit_obj.parents else None
+
+        results = []
+
+        if old_tree is None:
+            # Root commit — every file is "added"
+            def _walk(tree, prefix=""):
+                for entry in tree:
+                    name = f"{prefix}/{entry.name}" if prefix else entry.name
+                    obj = repo[entry.id]
+                    if isinstance(obj, pygit2.Tree):
+                        yield from _walk(obj, name)
+                    else:
+                        yield name, bytes(obj.data)
+
+            for path, raw in _walk(new_tree):
+                binary = is_binary_content(raw)
+                lines = raw.splitlines() if not binary else []
+                add_count = len(lines)
+                if binary:
+                    hunks = None
+                else:
+                    hunks = unified_text_diff(b"", raw, fromfile=path, tofile=path)
+                    if len(hunks.encode()) > 50_000:
+                        hunks = hunks[:50_000]
+                results.append({
+                    "path": path,
+                    "status": "added",
+                    "additions": add_count,
+                    "deletions": 0,
+                    "hunks": hunks,
+                })
+        else:
+            diff = old_tree.diff_to_tree(new_tree)
+            for patch in diff:
+                delta = patch.delta
+                status_flag = delta.status
+                if status_flag == pygit2.GIT_DELTA_ADDED:
+                    status = "added"
+                elif status_flag == pygit2.GIT_DELTA_DELETED:
+                    status = "deleted"
+                elif status_flag == pygit2.GIT_DELTA_RENAMED:
+                    status = "renamed"
+                else:
+                    status = "modified"
+
+                path = delta.new_file.path or delta.old_file.path
+
+                raw_old: Optional[bytes] = None
+                raw_new: Optional[bytes] = None
+
+                if delta.old_file.id and str(delta.old_file.id) != "0" * 40:
+                    try:
+                        raw_old = bytes(repo[delta.old_file.id].data)
+                    except Exception:
+                        pass
+
+                if delta.new_file.id and str(delta.new_file.id) != "0" * 40:
+                    try:
+                        raw_new = bytes(repo[delta.new_file.id].data)
+                    except Exception:
+                        pass
+
+                representative = raw_new if raw_new is not None else raw_old
+                binary = representative is not None and is_binary_content(representative)
+
+                if binary:
+                    hunks = None
+                    add_count = 0
+                    del_count = 0
+                else:
+                    old_bytes = raw_old if raw_old is not None else b""
+                    new_bytes = raw_new if raw_new is not None else b""
+                    hunks = unified_text_diff(old_bytes, new_bytes, fromfile=path, tofile=path)
+                    if len(hunks.encode()) > 50_000:
+                        hunks = hunks[:50_000]
+                    add_lines = [l for l in hunks.splitlines() if l.startswith("+") and not l.startswith("+++")]
+                    del_lines = [l for l in hunks.splitlines() if l.startswith("-") and not l.startswith("---")]
+                    add_count = len(add_lines)
+                    del_count = len(del_lines)
+
+                results.append({
+                    "path": path,
+                    "status": status,
+                    "additions": add_count,
+                    "deletions": del_count,
+                    "hunks": hunks,
+                })
+
+        return results
+
+    try:
+        files = await _asyncio.get_event_loop().run_in_executor(None, _diff_sync, loc.repo_dir, sha)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="git repo not found")
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"commit {sha!r} not found")
+
+    return {"sha": sha, "files": files}
+
+
 @router.get("/projects/{pid}/git/diff/{sha}")
 async def git_diff(
     request: Request,

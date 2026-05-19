@@ -465,6 +465,11 @@ export const git = {
     return res.text()
   },
 
+  // GET /commits/:sha/diff — per-file JSON diff for a commit.
+  // Returns { sha, files: [{ path, status, additions, deletions, hunks }] }
+  commitDiff: (projectId, sha) =>
+    request(`/api/projects/${projectId}/git/commits/${encodeURIComponent(sha)}/diff`),
+
   // DELETE /repo — tear down the repo and clear the link.
   deleteRepo: (projectId) =>
     request(`/api/projects/${projectId}/git/repo`, { method: 'DELETE' }),

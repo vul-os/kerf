@@ -3432,6 +3432,75 @@ async def restore_revision(pid: str, fid: str, rid: str, request: Request, paylo
         return {"status": "restored"}
 
 
+@router.get("/projects/{pid}/revisions/size")
+async def get_revisions_size(pid: str, payload: dict = Depends(require_auth)):
+    """Return the estimated storage used by file_revisions for a project.
+
+    Response shape::
+
+        {
+            "total_bytes": 4321567,
+            "revision_count": 230,
+            "by_file": [
+                {"file_id": "uuid", "file_name": "main.jscad", "bytes": 1234567, "count": 87},
+                ...
+            ]
+        }
+
+    Byte estimates use ``pg_column_size(content_gz)`` for the gzip column and
+    ``octet_length(content)`` for the text column (both NULL-safe via COALESCE).
+    Results are ordered descending by bytes (largest file first).
+    """
+    user_id = payload.get("sub")
+
+    pool = await get_pool_required()
+    async with pool.acquire() as conn:
+        ws_id = await project_workspace_id(pid)
+        if not ws_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
+
+        role = await get_user_workspace_role(conn, ws_id, user_id)
+        if not role:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
+
+        rows = await conn.fetch(
+            """
+            SELECT
+                f.id                                              AS file_id,
+                f.name                                           AS file_name,
+                COALESCE(SUM(
+                    COALESCE(pg_column_size(fr.content_gz), 0) +
+                    COALESCE(octet_length(fr.content), 0)
+                ), 0)                                            AS bytes,
+                COUNT(fr.id)                                     AS count
+            FROM files f
+            LEFT JOIN file_revisions fr ON fr.file_id = f.id
+            WHERE f.project_id = $1
+            GROUP BY f.id, f.name
+            ORDER BY bytes DESC
+            """,
+            pid,
+        )
+
+        by_file = [
+            {
+                "file_id": str(row["file_id"]),
+                "file_name": row["file_name"],
+                "bytes": int(row["bytes"]),
+                "count": int(row["count"]),
+            }
+            for row in rows
+        ]
+        total_bytes = sum(item["bytes"] for item in by_file)
+        revision_count = sum(item["count"] for item in by_file)
+
+        return {
+            "total_bytes": total_bytes,
+            "revision_count": revision_count,
+            "by_file": by_file,
+        }
+
+
 @router.get("/blobs/{path:path}")
 async def serve_blob(request: Request, payload: dict = Depends(require_auth)):
     user_id = payload.get("sub")

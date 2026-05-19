@@ -15,7 +15,7 @@ import {
 import Button from '../components/Button.jsx'
 import { useAuth } from '../store/auth.js'
 import { useWorkspace } from '../store/workspace.js'
-import { ApiError } from '../lib/api.js'
+import { api, ApiError } from '../lib/api.js'
 import { git, githubOAuth } from './api.js'
 import GitProviderSettings from './GitProviderSettings.jsx'
 import CommitDialog from './CommitDialog.jsx'
@@ -34,6 +34,13 @@ import {
 } from '../lib/gitGraph.js'
 
 const shortSha = (s) => (s || '').slice(0, 7)
+
+function formatBytes(bytes) {
+  if (bytes >= 1073741824) return `${(bytes / 1073741824).toFixed(1)} GB`
+  if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(1)} MB`
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${bytes} B`
+}
 
 function relativeTime(iso) {
   if (!iso) return ''
@@ -594,9 +601,23 @@ export function GitPanel({ projectId, onClose }) {
   const [showSettings, setShowSettings] = useState(false)
   const [diffSha, setDiffSha] = useState(null)
   const [busy, setBusy] = useState(null) // 'push' | 'pull' | 'newBranch'
+  const [revSize, setRevSize] = useState(null) // {total_bytes, revision_count}
+
+  const loadRevSize = useCallback(async () => {
+    if (!projectId) return
+    try {
+      const data = await api.getRevisionsSize(projectId)
+      setRevSize(data)
+    } catch {
+      // non-critical — badge simply won't render
+    }
+  }, [projectId])
 
   useEffect(() => {
-    if (projectId) loadGitState()
+    if (projectId) {
+      loadGitState()
+      loadRevSize()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId])
 
@@ -705,6 +726,30 @@ export function GitPanel({ projectId, onClose }) {
         </div>
       )}
 
+      {/* Revision storage badge */}
+      {!empty && revSize && revSize.revision_count > 0 && (
+        <div className="flex items-center justify-between px-3 py-1.5 border-b border-ink-800 bg-ink-850/40">
+          <span className="text-[10px] text-ink-400">
+            Revision history:{' '}
+            <span className="text-ink-300">{formatBytes(revSize.total_bytes)}</span>
+            {' '}across{' '}
+            <span className="text-ink-300">{revSize.revision_count}</span>
+            {' '}revisions
+          </span>
+          <button
+            type="button"
+            data-testid="open-purge-modal"
+            onClick={() => {
+              // eslint-disable-next-line no-console
+              console.log('TODO: open purge modal (T-303)')
+            }}
+            className="text-[10px] text-kerf-300/70 hover:text-kerf-300 underline underline-offset-2 shrink-0 ml-2"
+          >
+            Manage…
+          </button>
+        </div>
+      )}
+
       {/* Body */}
       <div className="flex-1 overflow-y-auto min-h-0">
         {error && (
@@ -769,7 +814,7 @@ export function GitPanel({ projectId, onClose }) {
           branch={branch}
           branches={branches}
           onClose={() => setShowCommit(false)}
-          onCommitted={async () => { setShowCommit(false); await loadGitState() }}
+          onCommitted={async () => { setShowCommit(false); await loadGitState(); await loadRevSize() }}
         />
       )}
       {showMerge && (

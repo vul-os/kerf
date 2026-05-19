@@ -436,6 +436,8 @@ export const api = {
   },
 
   // ---- File revisions (per-file undo history) ----
+  getRevisionsSize: (projectId) =>
+    request(`/api/projects/${projectId}/revisions/size`),
   listRevisions: (projectId, fileId, limit) =>
     request(`/api/projects/${projectId}/files/${fileId}/revisions${limit ? `?limit=${limit}` : ''}`),
   getRevision: (projectId, fileId, revisionId) =>

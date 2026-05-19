@@ -105,11 +105,14 @@ GitHub sync connects a Kerf project to a GitHub repository so that commits can b
 
 ### Connecting a GitHub account
 
-1. Navigate to **Settings → GitHub** in the app.
-2. Click **Connect GitHub** — this starts the OAuth flow via `GET /auth/github/start` (scope `repo`).
-3. After authorising in GitHub, you are redirected back and your token is stored encrypted at rest.
+The GitHub connect flow is fully wired end-to-end. You connect directly from the Git panel — no external settings page required.
 
-To disconnect: `DELETE /auth/github`
+1. Open the **Git panel** in the editor.
+2. Click **Connect GitHub** in the panel footer.
+3. You are redirected to GitHub to authorise Kerf (scope: `repo`).
+4. After authorising, you are redirected back. Your encrypted access token is stored and push/pull buttons become active.
+
+To disconnect: click **Disconnect GitHub** in the Git panel, or call `DELETE /auth/github`.
 
 ### Connecting a repo to a project
 
@@ -172,10 +175,12 @@ token (PAT) with `read_repository` + `write_repository` scopes.
 
 ### Connecting a GitLab account
 
-1. Navigate to **Settings → GitLab** in the app.
-2. Paste your GitLab personal access token and the GitLab instance URL
-   (defaults to `https://gitlab.com`).
-3. Your token is stored encrypted at rest (AES-GCM, same as GitHub).
+The GitLab connect flow is also wired directly from the Git panel.
+
+1. Open the **Git panel** in the editor.
+2. Click **Connect GitLab** in the panel footer.
+3. Paste your GitLab personal access token and the instance URL (defaults to `https://gitlab.com`).
+4. Your token is stored encrypted at rest (AES-GCM, same as GitHub).
 
 ### Connecting a GitLab repo to a project
 
@@ -192,7 +197,9 @@ Push and pull work identically to the GitHub path.
 
 ## Related pages
 
-- [file-revisions.md](./file-revisions.md) — the OSS per-file undo layer
-- [projects.md](./projects.md) — project model
-- [account-and-auth.md](./account-and-auth.md) — GitHub OAuth for sign-in vs for repo connect
-- [cloud-features.md](./cloud-features.md) — why git is cloud-only by nature
+- [commit-and-branches.md](/docs/commit-and-branches) — staged changes view, commit graph, and branch picker in the Git panel
+- [auto-git-init.md](/docs/auto-git-init) — every project is a git repo from creation
+- [file-revisions.md](/docs/file-revisions) — the OSS per-file undo layer
+- [projects.md](/docs/projects) — project model
+- [account-and-auth.md](/docs/account-and-auth) — GitHub OAuth for sign-in vs for repo connect
+- [cloud-features.md](/docs/cloud-features) — why git is cloud-only by nature

@@ -92,6 +92,13 @@ const SLUG_TO_GROUP = {
   'local-self-host':     'cloud',
   'cloud':               'cloud',
   'cloud-operator':      'cloud',
+  // New: shipped features (T-302..T-310 + auto-git-init)
+  'save-and-recovery':   'cloud',
+  'concurrent-editing':  'cloud',
+  'commit-and-branches': 'cloud',
+  'purge-revisions':     'cloud',
+  'rate-limiting':       'cloud',
+  'auto-git-init':       'cloud',
 
   // Reference
   'architecture':               'reference',

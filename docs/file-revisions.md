@@ -2,6 +2,8 @@
 
 Every text file in Kerf has automatic, fine-grained version history. This is an OSS feature — it is present in every install, cloud or self-hosted, with no configuration required.
 
+`file_revisions` is **invisible plumbing** — it runs automatically behind every save. You interact with it through the History drawer and Cmd+Z; you never need to manage it directly for normal use. For crash recovery and the load-time Restore banner, see [save-and-recovery.md](/docs/save-and-recovery). For the cloud git layer (named commits, branches, GitHub sync), see the [Git tab documentation](/docs/commit-and-branches).
+
 ---
 
 ## How it works
@@ -130,6 +132,10 @@ Lowering this trims on the next write to each file. Raising it keeps more histor
 
 ## Related pages
 
-- [projects.md](./projects.md) — project and file model
-- [github-sync.md](./github-sync.md) — deliberate git commits (cloud)
-- [local-self-host.md](./local-self-host.md) — self-hosted maintenance commands
+- [save-and-recovery.md](/docs/save-and-recovery) — crash recovery, IndexedDB autosave, and the load-time Restore banner
+- [concurrent-editing.md](/docs/concurrent-editing) — OCC conflict detection and the "Someone else edited this file" banner
+- [purge-revisions.md](/docs/purge-revisions) — trimming old revision rows to reclaim storage
+- [commit-and-branches.md](/docs/commit-and-branches) — deliberate git commits and the Git tab
+- [projects.md](/docs/projects) — project and file model
+- [github-sync.md](/docs/github-sync) — deliberate git commits (cloud)
+- [local-self-host.md](/docs/local-self-host) — self-hosted maintenance commands

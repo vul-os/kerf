@@ -95,6 +95,7 @@ create table if not exists files (
     storage_key text,
     mime_type text,
     size bigint,
+    version bigint not null default 1,
     deleted_at timestamptz,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()

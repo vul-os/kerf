@@ -324,6 +324,12 @@ const initial = {
   // NOTE: cross-file invalidation agent (depGraph.js) should adopt this cache
   // rather than building a separate parse pass — see Task 5 coordination note.
   jscadSketchLinks: new Map(),
+
+  // OCC (Optimistic Concurrency Control) conflict state.
+  // Set when a PATCH /files/:id returns 409 (version mismatch).
+  // Cleared when the user reloads or dismisses the banner.
+  // Shape: { file_id, current_version, current_content_preview } | null
+  conflictFile: null,
 }
 
 // Tolerant JSON parse for drawing content. Empty/blank → defaults.
@@ -1034,10 +1040,16 @@ export const useWorkspace = create((set, get) => ({
     }
     set({ saving: true })
     try {
-      const updated = await api.updateFile(projectId, currentFileId, { content: currentFileContent })
+      // Include the version we last read so the server can detect conflicts.
+      const patch = { content: currentFileContent }
+      if (currentFile?.version != null) {
+        patch.expected_version = currentFile.version
+      }
+      const updated = await api.updateFile(projectId, currentFileId, patch)
       set((s) => ({
         saving: false,
         dirty: false,
+        conflictFile: null,
         currentFile: updated,
         files: s.files.map((f) => f.id === updated.id ? { ...f, ...updated, content: undefined } : f),
       }))
@@ -1048,6 +1060,23 @@ export const useWorkspace = create((set, get) => ({
         try { await get().refreshEquationsCache() } catch { /* tolerate */ }
       }
     } catch (err) {
+      // 409 = version conflict: someone else edited this file.
+      if (err?.status === 409) {
+        let detail = {}
+        try {
+          const parsed = JSON.parse(err.message)
+          detail = parsed.detail || parsed
+        } catch { /* message is not JSON — detail stays empty */ }
+        set({
+          saving: false,
+          conflictFile: {
+            file_id: currentFileId,
+            current_version: detail.current_version ?? null,
+            current_content_preview: detail.current_content_preview ?? '',
+          },
+        })
+        return
+      }
       set({ saving: false, loadError: err?.message || String(err) })
     }
   },

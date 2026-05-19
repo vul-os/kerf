@@ -1510,7 +1510,7 @@ async def get_file(pid: str, fid: str, request: Request, payload: dict = Depends
         row = await conn.fetchrow(
             """
             SELECT f.id, f.project_id, f.parent_id, f.name, f.kind, f.extension, f.content,
-                   f.storage_key, f.mime_type, f.size, f.mesh_storage_key,
+                   f.storage_key, f.mime_type, f.size, f.mesh_storage_key, f.version,
                    j.status as tessellation_status,
                    f.created_at, f.updated_at
             FROM files f
@@ -1533,6 +1533,10 @@ class UpdateFileRequest(BaseModel):
     extension: Optional[str] = None
     content: Optional[str] = None
     parent_id: Optional[str] = None
+    expected_version: Optional[int] = None
+
+
+_IDEMPOTENCY_WINDOW_SECS = 5
 
 
 @router.patch("/projects/{pid}/files/{fid}")
@@ -1549,13 +1553,86 @@ async def update_file(pid: str, fid: str, req: UpdateFileRequest, payload: dict 
         if not role or role == "viewer":
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="viewer cannot edit files")
 
-        f = await files_queries.update_file(
-            conn, fid,
-            name=req.name,
-            content=req.content,
-            parent_id=req.parent_id,
-            extension=req.extension,
-        )
+        # OCC: If content is being updated and expected_version was supplied,
+        # check for a version mismatch before writing.
+        if req.content is not None and req.expected_version is not None:
+            current_row = await conn.fetchrow(
+                "SELECT version, content FROM files WHERE id = $1 AND project_id = $2 AND deleted_at IS NULL",
+                fid, pid,
+            )
+            if not current_row:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="file not found")
+            if current_row["version"] != req.expected_version:
+                # Return conflict with enough info for the client to show a banner.
+                content_preview = (current_row["content"] or "")[:200]
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        "current_version": current_row["version"],
+                        "current_content_preview": content_preview,
+                        "message": "File was modified by another session. Reload before saving.",
+                    },
+                )
+
+        # Idempotency: identical content re-submitted within the window does
+        # NOT bump version. Compare content_sha256 of the most recent revision.
+        bump_version = req.content is not None
+        if req.content is not None:
+            new_sha = compute_content_sha(req.content)
+            recent = await conn.fetchrow(
+                """
+                SELECT content_sha256 FROM file_revisions
+                WHERE file_id = $1
+                  AND created_at >= now() - ($2 * interval '1 second')
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                fid, _IDEMPOTENCY_WINDOW_SECS,
+            )
+            if recent and recent["content_sha256"] is not None:
+                # content_sha256 may be stored as bytes/memoryview or hex text
+                stored = recent["content_sha256"]
+                if isinstance(stored, memoryview):
+                    stored = bytes(stored).hex()
+                elif isinstance(stored, bytes):
+                    stored = stored.hex()
+                if stored == new_sha:
+                    bump_version = False
+
+        if bump_version:
+            # Atomically increment version and update content.
+            f = await conn.fetchrow(
+                """
+                UPDATE files
+                SET content = $2,
+                    version = version + 1,
+                    updated_at = now()
+                WHERE id = $1 AND deleted_at IS NULL
+                RETURNING *
+                """,
+                fid, req.content,
+            )
+            if not f:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="file not found")
+            f = dict(f)
+            # Apply any other non-content field changes on top.
+            if req.name is not None or req.parent_id is not None or req.extension is not None:
+                f2 = await files_queries.update_file(
+                    conn, fid,
+                    name=req.name,
+                    parent_id=req.parent_id,
+                    extension=req.extension,
+                )
+                if f2:
+                    f = dict(f2)
+        else:
+            f = await files_queries.update_file(
+                conn, fid,
+                name=req.name,
+                content=req.content,
+                parent_id=req.parent_id,
+                extension=req.extension,
+            )
 
         if not f:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="file not found")

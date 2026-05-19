@@ -3501,6 +3501,50 @@ async def get_revisions_size(pid: str, payload: dict = Depends(require_auth)):
         }
 
 
+@router.delete("/projects/{pid}/revisions")
+async def purge_project_revisions_route(
+    pid: str,
+    payload: dict = Depends(require_auth),
+    keep_last: int = 5,
+    confirm: str = "",
+):
+    """Purge old file_revisions for a project, keeping the most recent N per file.
+
+    Requires:
+      - confirm=PURGE query param (defence-in-depth)
+      - keep_last >= 1 (always keep at least one revision per file)
+      - Editor or owner role (not viewer)
+
+    Returns {removed_rows, freed_bytes}.
+    """
+    user_id = payload.get("sub")
+
+    if confirm != "PURGE":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="confirm param must equal 'PURGE'",
+        )
+    if keep_last < 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="keep_last must be >= 1",
+        )
+
+    pool = await get_pool_required()
+    async with pool.acquire() as conn:
+        ws_id = await project_workspace_id(pid)
+        if not ws_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
+
+        role = await get_user_workspace_role(conn, ws_id, user_id)
+        if not role or role == "viewer":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="viewer cannot purge revisions")
+
+    from kerf_core.revisions import purge_project_revisions as _purge
+    result = await _purge(pool, pid, keep_last_per_file=keep_last)
+    return result
+
+
 @router.get("/blobs/{path:path}")
 async def serve_blob(request: Request, payload: dict = Depends(require_auth)):
     user_id = payload.get("sub")

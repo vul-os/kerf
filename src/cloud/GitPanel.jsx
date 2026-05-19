@@ -13,6 +13,7 @@ import {
   Plus, RefreshCw, Settings, Trash2,
 } from 'lucide-react'
 import Button from '../components/Button.jsx'
+import PurgeRevisionsModal from '../components/PurgeRevisionsModal.jsx'
 import { useAuth } from '../store/auth.js'
 import { useWorkspace } from '../store/workspace.js'
 import { api, ApiError } from '../lib/api.js'
@@ -599,9 +600,12 @@ export function GitPanel({ projectId, onClose }) {
   const [showMerge, setShowMerge] = useState(false)
   const [showConnect, setShowConnect] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showPurge, setShowPurge] = useState(false)
   const [diffSha, setDiffSha] = useState(null)
   const [busy, setBusy] = useState(null) // 'push' | 'pull' | 'newBranch'
-  const [revSize, setRevSize] = useState(null) // {total_bytes, revision_count}
+  // Single revisions-size state for both the badge (T-302) and the
+  // purge modal (T-303). `loadRevSize` is reused after commit + after purge.
+  const [revSize, setRevSize] = useState(null) // {total_bytes, revision_count, by_file}
 
   const loadRevSize = useCallback(async () => {
     if (!projectId) return
@@ -726,7 +730,9 @@ export function GitPanel({ projectId, onClose }) {
         </div>
       )}
 
-      {/* Revision storage badge */}
+      {/* Revision-history badge (T-302) + purge entry (T-303).
+          Single render — the duplicate footer copy that was added in
+          T-303's branch was collapsed at cherry-pick time. */}
       {!empty && revSize && revSize.revision_count > 0 && (
         <div className="flex items-center justify-between px-3 py-1.5 border-b border-ink-800 bg-ink-850/40">
           <span className="text-[10px] text-ink-400">
@@ -739,10 +745,7 @@ export function GitPanel({ projectId, onClose }) {
           <button
             type="button"
             data-testid="open-purge-modal"
-            onClick={() => {
-              // eslint-disable-next-line no-console
-              console.log('TODO: open purge modal (T-303)')
-            }}
+            onClick={() => setShowPurge(true)}
             className="text-[10px] text-kerf-300/70 hover:text-kerf-300 underline underline-offset-2 shrink-0 ml-2"
           >
             Manage…
@@ -787,24 +790,26 @@ export function GitPanel({ projectId, onClose }) {
 
       {/* Footer / actions */}
       {!empty && (
-        <div className="flex items-center gap-1 px-2 py-2 border-t border-ink-800 flex-shrink-0">
-          <Button size="sm" variant="primary" onClick={() => setShowCommit(true)} className="flex-1">
-            <GitCommit size={13} /> Commit
-          </Button>
-          <Button size="sm" variant="secondary" onClick={onPull} disabled={busy === 'pull'} title="Pull">
-            {busy === 'pull' ? <Loader2 size={13} className="animate-spin" /> : <ArrowDownToLine size={13} />}
-          </Button>
-          <Button size="sm" variant="secondary" onClick={onPush} disabled={busy === 'push'} title="Push">
-            {busy === 'push' ? <Loader2 size={13} className="animate-spin" /> : <ArrowUpFromLine size={13} />}
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setShowMerge(true)} title="Merge">
-            <GitMerge size={13} />
-          </Button>
-          <MoreMenu
-            githubLinked={!!githubLogin}
-            onDelete={onDelete}
-            onUnlinkGithub={onUnlinkGithub}
-          />
+        <div className="flex flex-col border-t border-ink-800 flex-shrink-0">
+          <div className="flex items-center gap-1 px-2 py-2">
+            <Button size="sm" variant="primary" onClick={() => setShowCommit(true)} className="flex-1">
+              <GitCommit size={13} /> Commit
+            </Button>
+            <Button size="sm" variant="secondary" onClick={onPull} disabled={busy === 'pull'} title="Pull">
+              {busy === 'pull' ? <Loader2 size={13} className="animate-spin" /> : <ArrowDownToLine size={13} />}
+            </Button>
+            <Button size="sm" variant="secondary" onClick={onPush} disabled={busy === 'push'} title="Push">
+              {busy === 'push' ? <Loader2 size={13} className="animate-spin" /> : <ArrowUpFromLine size={13} />}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setShowMerge(true)} title="Merge">
+              <GitMerge size={13} />
+            </Button>
+            <MoreMenu
+              githubLinked={!!githubLogin}
+              onDelete={onDelete}
+              onUnlinkGithub={onUnlinkGithub}
+            />
+          </div>
         </div>
       )}
 
@@ -837,6 +842,18 @@ export function GitPanel({ projectId, onClose }) {
       )}
       {diffSha && (
         <DiffViewer projectId={projectId} sha={diffSha} onClose={() => setDiffSha(null)} />
+      )}
+      {showPurge && (
+        <PurgeRevisionsModal
+          open={showPurge}
+          onClose={() => {
+            setShowPurge(false)
+            // Refresh the badge after a successful purge.
+            loadRevSize()
+          }}
+          projectId={projectId}
+          currentSize={revSize}
+        />
       )}
     </div>
   )

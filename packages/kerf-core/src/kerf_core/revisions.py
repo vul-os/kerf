@@ -342,6 +342,106 @@ async def write_revision(
     return new_id
 
 
+# ---------------------------------------------------------------------------
+# Project-level purge
+# ---------------------------------------------------------------------------
+
+async def purge_project_revisions(
+    pool: Any,
+    project_id: str,
+    keep_last_per_file: int = 5,
+) -> dict:
+    """Delete file_revisions rows for *project_id* keeping the most recent N per file.
+
+    Returns {'removed_rows': int, 'freed_bytes': int}.
+    Storage blobs owned by removed rows are nullified (the storage GC worker
+    will reclaim them in due course).
+    Single transaction; non-recoverable.
+    """
+    if keep_last_per_file < 1:
+        raise ValueError("keep_last_per_file must be >= 1")
+
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            # Find all file_ids that belong to this project (including deleted files).
+            file_rows = await conn.fetch(
+                "SELECT id FROM files WHERE project_id = $1",
+                uuid.UUID(str(project_id)),
+            )
+            if not file_rows:
+                return {"removed_rows": 0, "freed_bytes": 0}
+
+            file_ids = [r["id"] for r in file_rows]
+
+            # Collect the IDs of rows to delete across all files.
+            # For each file: all rows EXCEPT the most recent keep_last_per_file.
+            # Also protect rows that are referenced as parent_revision_id or as
+            # a shared base by a ref row in any file (cross-file dedup safety).
+            to_delete_ids: list[uuid.UUID] = []
+            for fid in file_ids:
+                candidate_rows = await conn.fetch(
+                    """
+                    SELECT id FROM file_revisions
+                    WHERE file_id = $1
+                    ORDER BY created_at DESC
+                    OFFSET $2
+                    """,
+                    fid,
+                    keep_last_per_file,
+                )
+                for r in candidate_rows:
+                    to_delete_ids.append(r["id"])
+
+            if not to_delete_ids:
+                return {"removed_rows": 0, "freed_bytes": 0}
+
+            # Remove from the candidate set any row that is:
+            #   (a) referenced as parent_revision_id by any live row, or
+            #   (b) a 'base' row referenced by any 'ref' row anywhere in the table.
+            safe_to_delete = await conn.fetch(
+                """
+                SELECT id FROM file_revisions
+                WHERE id = ANY($1::uuid[])
+                  AND id NOT IN (
+                      SELECT parent_revision_id FROM file_revisions
+                      WHERE parent_revision_id IS NOT NULL
+                  )
+                """,
+                to_delete_ids,
+            )
+            safe_ids = [r["id"] for r in safe_to_delete]
+
+            if not safe_ids:
+                return {"removed_rows": 0, "freed_bytes": 0}
+
+            # Measure freed bytes BEFORE deleting.
+            freed_bytes_row = await conn.fetchrow(
+                """
+                SELECT COALESCE(SUM(
+                    COALESCE(pg_column_size(content_gz), 0) +
+                    COALESCE(octet_length(content), 0)
+                ), 0) AS freed_bytes
+                FROM file_revisions
+                WHERE id = ANY($1::uuid[])
+                """,
+                safe_ids,
+            )
+            freed_bytes = int(freed_bytes_row["freed_bytes"])
+
+            # Delete in one shot.
+            result = await conn.execute(
+                "DELETE FROM file_revisions WHERE id = ANY($1::uuid[])",
+                safe_ids,
+            )
+            # asyncpg returns "DELETE N"
+            try:
+                removed_rows = int(result.split()[-1])
+            except (AttributeError, ValueError, IndexError):
+                removed_rows = len(safe_ids)
+
+            return {"removed_rows": removed_rows, "freed_bytes": freed_bytes}
+
+
 async def _safe_prune(pool: Any, fid: uuid.UUID, cap: int) -> None:
     """
     Delete oldest revisions for fid beyond cap, subject to safety rules:

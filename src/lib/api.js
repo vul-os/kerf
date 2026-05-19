@@ -450,6 +450,20 @@ export const api = {
   restoreRevision: (projectId, fileId, revisionId) =>
     request(`/api/projects/${projectId}/files/${fileId}/restore/${revisionId}`, { method: 'POST' }),
 
+  // Get total storage estimate for a project's file_revisions.
+  // Returns {total_bytes, revision_count, by_file: [{file_id, file_name, bytes, count}]}
+  getRevisionsSize: (projectId) =>
+    request(`/api/projects/${projectId}/revisions/size`),
+
+  // Purge old per-keystroke revision history for a project.
+  // keepLast: number of most-recent revisions to retain per file (min 1).
+  // Returns {removed_rows, freed_bytes}.
+  purgeRevisions: (projectId, { keepLast = 5 } = {}) =>
+    request(
+      `/api/projects/${projectId}/revisions?keep_last=${encodeURIComponent(keepLast)}&confirm=PURGE`,
+      { method: 'DELETE' },
+    ),
+
   // ---- Avatar ----
   // Upload a new avatar from the user's local picker. The backend
   // resizes server-side (256x256, JPEG q=85) and returns the updated

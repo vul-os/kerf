@@ -180,6 +180,41 @@ async def _collect_file_entries(conn, project_id) -> list[FileEntry]:
     return entries
 
 
+async def ensure_git_repo(pool, project_id: str) -> dict:
+    """Idempotently create a cloud_git_repos row for *project_id*.
+
+    Returns the repo record (project_id, default_branch, head_sha).
+    Safe to call multiple times — a no-op when the repo already exists.
+    This is the shared body used by both the POST /git/init handler
+    and the automatic init triggered at project-creation time.
+    """
+    async with pool.acquire() as conn:
+        existing = await conn.fetchrow(
+            "SELECT * FROM cloud_git_repos WHERE project_id = $1",
+            project_id,
+        )
+        if existing:
+            return {
+                "project_id": project_id,
+                "default_branch": existing["default_branch"],
+                "head_sha": existing.get("head_sha", ""),
+            }
+
+        await conn.execute(
+            """
+            INSERT INTO cloud_git_repos (project_id, default_branch, head_sha)
+            VALUES ($1, 'main', '')
+            """,
+            project_id,
+        )
+
+    return {
+        "project_id": project_id,
+        "default_branch": "main",
+        "head_sha": "",
+    }
+
+
 @router.post("/projects/{pid}/git/init")
 async def git_init(
     request: Request,
@@ -190,31 +225,7 @@ async def git_init(
     uid = await require_editor(request, pid, user_id)
 
     pool = await get_pool_required()
-    async with pool.acquire() as conn:
-        existing = await conn.fetchrow(
-            "SELECT * FROM cloud_git_repos WHERE project_id = $1",
-            pid,
-        )
-        if existing:
-            return {
-                "project_id": pid,
-                "default_branch": existing["default_branch"],
-                "head_sha": existing.get("head_sha", ""),
-            }
-
-        await conn.execute(
-            """
-            INSERT INTO cloud_git_repos (project_id, default_branch, head_sha)
-            VALUES ($1, 'main', '')
-            """,
-            pid,
-        )
-
-    return {
-        "project_id": pid,
-        "default_branch": "main",
-        "head_sha": "",
-    }
+    return await ensure_git_repo(pool, pid)
 
 
 @router.post("/projects/{pid}/git/import")

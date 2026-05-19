@@ -70,11 +70,13 @@ def test_no_alter_table_add_column_shims_for_attribution():
     """Per CLAUDE.md / memory: NEVER add the columns via `alter table add
     column`. They must be folded into the CREATE TABLE literal. This guard
     catches the easy mistake of slipping in a follow-on migration."""
-    # The columns are added; the bug we're guarding against is doing it
-    # via alter-table elsewhere instead of folding here.
+    # Single-statement check: an `alter table <T> add column …<attr>` where
+    # the column body is on the same statement (i.e., no semicolon between
+    # ALTER TABLE and the attribution column name). The previous regex was
+    # too greedy across multi-statement files.
     forbidden_pat = re.compile(
-        r"alter\s+table\s+(chat_messages|chat_threads|projects)\s+add\s+column"
-        r".*?(user_id|created_by)",
+        r"alter\s+table\s+(chat_messages|chat_threads|projects)\s+"
+        r"add\s+column[^;]{0,120}?\b(user_id|created_by)\b",
         re.I | re.S,
     )
     migrations_dir = pathlib.Path(__file__).resolve().parents[1] / "src/kerf_core/db/migrations"

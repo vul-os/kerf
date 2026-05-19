@@ -137,6 +137,10 @@ create index if not exists chat_threads_created_by_idx on chat_threads(created_b
 -- chat_messages.user_id: who sent this message. Only meaningful for
 -- role='user' rows; assistant/tool rows leave it null. Activity feed
 -- joins through this to render "<user> asked …" preview rows.
+-- chat_messages.is_error: true when a tool execution failed server-side.
+-- The LLM transport layer forwards this flag into the Anthropic
+-- tool_result block so the model sees the failure instead of a blank
+-- success result.
 create table if not exists chat_messages (
     id uuid primary key default gen_random_uuid(),
     thread_id uuid not null references chat_threads(id) on delete cascade,
@@ -147,6 +151,7 @@ create table if not exists chat_messages (
     tool_call_id text,
     model text,
     user_id uuid references users(id) on delete set null,
+    is_error boolean not null default false,
     created_at timestamptz not null default now()
 );
 create index if not exists chat_messages_thread_id_idx on chat_messages(thread_id);

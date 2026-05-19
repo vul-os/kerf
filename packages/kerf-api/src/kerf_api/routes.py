@@ -1052,10 +1052,19 @@ async def create_project(req: CreateProjectRequest, payload: dict = Depends(requ
             if starter_name and starter_content:
                 await files_queries.create_file(conn, project["id"], starter_name, starter_kind, None, starter_content)
 
-        return {
-            **project,
-            "my_role": role if role == "owner" else "editor",
-        }
+    # Auto-init cloud git repo for every new project (cloud only).
+    # Failure is non-fatal: the user can always retry via the git panel.
+    if settings.cloud_enabled:
+        try:
+            from kerf_cloud.routes import ensure_git_repo
+            await ensure_git_repo(pool, str(project["id"]))
+        except Exception as _git_exc:
+            _logger.warning(f"auto git init for project {project['id']}: {_git_exc}")
+
+    return {
+        **project,
+        "my_role": role if role == "owner" else "editor",
+    }
 
 
 @router.get("/projects/{pid}")
@@ -2647,14 +2656,14 @@ async def _insert_assistant_message(conn, tid: str, content: str, model_id: str,
     return dict(row)
 
 
-async def _insert_tool_message(conn, tid: str, tool_call_id: str, content: str) -> dict:
+async def _insert_tool_message(conn, tid: str, tool_call_id: str, content: str, is_error: bool = False) -> dict:
     row = await conn.fetchrow(
         """
-        INSERT INTO chat_messages (thread_id, role, content, part_refs, tool_call_id)
-        VALUES ($1, 'tool', $2, '[]'::jsonb, $3)
+        INSERT INTO chat_messages (thread_id, role, content, part_refs, tool_call_id, is_error)
+        VALUES ($1, 'tool', $2, '[]'::jsonb, $3, $4)
         RETURNING *
         """,
-        tid, content, tool_call_id,
+        tid, content, tool_call_id, is_error,
     )
     return dict(row)
 
@@ -2662,7 +2671,7 @@ async def _insert_tool_message(conn, tid: str, tool_call_id: str, content: str) 
 async def _load_llm_history(conn, thread_id: str, exclude_id: str) -> list:
     rows = await conn.fetch(
         """
-        SELECT role, content, tool_calls, tool_call_id
+        SELECT role, content, tool_calls, tool_call_id, is_error
         FROM chat_messages
         WHERE thread_id = $1 AND id <> $2
         ORDER BY created_at ASC
@@ -2678,6 +2687,8 @@ async def _load_llm_history(conn, thread_id: str, exclude_id: str) -> list:
         msg = llm_module.Message(role=role, content=content)
         if tc_id:
             msg.tool_call_id = str(tc_id)
+        if row["is_error"]:
+            msg.is_error = True
         if tc_raw and tc_raw not in ("null", "[]", b"null", b"[]"):
             try:
                 arr = json.loads(tc_raw) if isinstance(tc_raw, (str, bytes)) else tc_raw
@@ -3022,15 +3033,29 @@ async def post_message(pid: str, tid: str, req: PostMessageRequest, payload: dic
 
         # Execute each tool call
         for tc in resp.tool_calls:
-            result = await tools_execute(proj_ctx, tc.name, tc.arguments_json.encode())
+            tool_is_error = False
+            try:
+                result = await tools_execute(proj_ctx, tc.name, tc.arguments_json.encode())
+                # Detect error payloads returned by the executor
+                # (err_payload returns {"error": ..., "code": ...}).
+                try:
+                    _parsed = json.loads(result)
+                    if isinstance(_parsed, dict) and "error" in _parsed and "code" in _parsed:
+                        tool_is_error = True
+                except Exception:
+                    pass
+            except Exception as tool_exc:
+                result = json.dumps({"error": str(tool_exc), "code": "ERROR"})
+                tool_is_error = True
             async with pool.acquire() as conn:
-                tm = await _insert_tool_message(conn, tid, tc.id, result)
+                tm = await _insert_tool_message(conn, tid, tc.id, result, is_error=tool_is_error)
             tm["tool_name"] = tc.name
             tool_msgs.append(tm)
             history_msgs.append(llm_module.Message(
                 role="tool",
                 content=result,
                 tool_call_id=tc.id,
+                is_error=tool_is_error,
             ))
 
         if iteration == _MAX_AGENT_ITERATIONS - 1:

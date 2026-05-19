@@ -133,6 +133,7 @@ class Message:
     content: str
     tool_calls: list[ToolCall] = field(default_factory=list)
     tool_call_id: str = ""
+    is_error: bool = False
 
 
 @dataclass
@@ -358,11 +359,14 @@ class AnthropicProvider(Provider):
                 tool_blocks = []
                 while i < len(req.messages) and req.messages[i].role == "tool":
                     tm = req.messages[i]
-                    tool_blocks.append({
+                    block: dict[str, Any] = {
                         "type": "tool_result",
                         "tool_use_id": tm.tool_call_id,
                         "content": tm.content,
-                    })
+                    }
+                    if tm.is_error:
+                        block["is_error"] = True
+                    tool_blocks.append(block)
                     i += 1
                 messages.append({"role": "user", "content": tool_blocks})
                 continue

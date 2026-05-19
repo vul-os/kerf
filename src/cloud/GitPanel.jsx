@@ -19,7 +19,6 @@ import { useWorkspace } from '../store/workspace.js'
 import { api, ApiError } from '../lib/api.js'
 import { git, githubOAuth } from './api.js'
 import GitProviderSettings from './GitProviderSettings.jsx'
-import CommitDialog from './CommitDialog.jsx'
 import MergeDialog from './MergeDialog.jsx'
 import CommitDiffViewer from './CommitDiffViewer.jsx'
 import GitConnectDialog from './GitConnectDialog.jsx'
@@ -598,9 +597,6 @@ export function GitPanel({ projectId, onClose }) {
   const gitDelete = useWorkspace((s) => s.gitDelete)
   const dismissError = useWorkspace((s) => s.dismissGitError)
 
-  // showCommit is kept for compatibility but StagedChanges now owns the
-  // inline commit input; this dialog is only reachable via external callers.
-  const [showCommit, setShowCommit] = useState(false) // eslint-disable-line no-unused-vars
   const [showMerge, setShowMerge] = useState(false)
   const [showConnect, setShowConnect] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
@@ -880,15 +876,6 @@ export function GitPanel({ projectId, onClose }) {
         </div>
       )}
 
-      {showCommit && (
-        <CommitDialog
-          projectId={projectId}
-          branch={branch}
-          branches={branches}
-          onClose={() => setShowCommit(false)}
-          onCommitted={async () => { setShowCommit(false); await loadGitState(); await loadRevSize() }}
-        />
-      )}
       {showMerge && (
         <MergeDialog
           projectId={projectId}

@@ -9,7 +9,7 @@ export default function JewelryIllustration({ className = '', size = 120 }) {
       viewBox="0 0 120 120"
       fill="none"
       className={className}
-      aria-hidden="true"
+      aria-label="Jewelry gemstone facet ring" role="img"
     >
       {/* Ring shank — elliptical cross-section */}
       <ellipse cx="60" cy="92" rx="28" ry="12" stroke="currentColor" strokeWidth="1.3" className="stroke-kerf-300" />

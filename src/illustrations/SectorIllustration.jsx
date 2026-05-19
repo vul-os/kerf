@@ -26,7 +26,7 @@ import TextilesIllustration from './textiles.jsx'
 import CivilIllustration from './civil.jsx'
 
 /** Map of sector key → component */
-const SECTOR_MAP = {
+const MAP = {
   mechanical: MechanicalIllustration,
   electronics: ElectronicsIllustration,
   architecture: ArchitectureIllustration,
@@ -51,7 +51,7 @@ const SECTOR_MAP = {
  * when no match is found.
  */
 export default function SectorIllustration({ sector, className = '', size = 120 }) {
-  const Component = SECTOR_MAP[sector]
+  const Component = MAP[sector]
 
   if (!Component) {
     // Graceful fallback — empty viewBox-preserved SVG

@@ -9,7 +9,7 @@ export default function ElectronicsIllustration({ className = '', size = 120 }) 
       viewBox="0 0 120 120"
       fill="none"
       className={className}
-      aria-hidden="true"
+      aria-label="Electronics PCB trace components" role="img"
     >
       {/* PCB board outline */}
       <rect x="8" y="8" width="104" height="104" rx="4" stroke="currentColor" strokeWidth="1.2" opacity="0.3" />

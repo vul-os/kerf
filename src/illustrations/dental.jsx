@@ -9,7 +9,7 @@ export default function DentalIllustration({ className = '', size = 120 }) {
       viewBox="0 0 120 120"
       fill="none"
       className={className}
-      aria-hidden="true"
+      aria-label="Dental tooth crown" role="img"
     >
       {/* Tooth body — molar cross-section */}
       {/* Crown (enamel outline) */}

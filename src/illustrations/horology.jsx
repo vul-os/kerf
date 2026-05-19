@@ -9,7 +9,7 @@ export default function HorologyIllustration({ className = '', size = 120 }) {
       viewBox="0 0 120 120"
       fill="none"
       className={className}
-      aria-hidden="true"
+      aria-label="Horology escapement gear train" role="img"
     >
       {/* Escape wheel */}
       <circle cx="45" cy="65" r="28" stroke="currentColor" strokeWidth="1" className="stroke-kerf-300" opacity="0.3" />

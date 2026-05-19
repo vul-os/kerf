@@ -9,7 +9,7 @@ export default function WoodworkingIllustration({ className = '', size = 120 }) 
       viewBox="0 0 120 120"
       fill="none"
       className={className}
-      aria-hidden="true"
+      aria-label="Woodworking dovetail joint" role="img"
     >
       {/* Tail board (horizontal piece) */}
       {/* Board face */}

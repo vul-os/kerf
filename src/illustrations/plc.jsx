@@ -9,7 +9,7 @@ export default function PLCIllustration({ className = '', size = 120 }) {
       viewBox="0 0 120 120"
       fill="none"
       className={className}
-      aria-hidden="true"
+      aria-label="PLC ladder rung contact coil" role="img"
     >
       {/* Left power rail */}
       <line x1="15" y1="15" x2="15" y2="105" stroke="currentColor" strokeWidth="2.5" className="stroke-kerf-300" />

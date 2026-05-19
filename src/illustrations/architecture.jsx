@@ -9,7 +9,7 @@ export default function ArchitectureIllustration({ className = '', size = 120 })
       viewBox="0 0 120 120"
       fill="none"
       className={className}
-      aria-hidden="true"
+      aria-label="Architecture wall door window" role="img"
     >
       {/* Isometric floor plane */}
       <path d="M60 90 L10 65 L60 40 L110 65 Z" stroke="currentColor" strokeWidth="0.8" opacity="0.2" />

@@ -9,7 +9,7 @@ export default function CivilIllustration({ className = '', size = 120 }) {
       viewBox="0 0 120 120"
       fill="none"
       className={className}
-      aria-hidden="true"
+      aria-label="Civil bridge truss alignment" role="img"
     >
       {/* Road alignment (plan view strip) */}
       <rect x="8" y="88" width="104" height="20" rx="2" stroke="currentColor" strokeWidth="0.8" className="stroke-kerf-300" opacity="0.3" />

@@ -9,7 +9,7 @@ export default function MarineIllustration({ className = '', size = 120 }) {
       viewBox="0 0 120 120"
       fill="none"
       className={className}
-      aria-hidden="true"
+      aria-label="Marine hull cross-section waterline" role="img"
     >
       {/* Hull cross-section (midship frame) */}
       <path

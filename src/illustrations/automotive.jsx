@@ -9,7 +9,7 @@ export default function AutomotiveIllustration({ className = '', size = 120 }) {
       viewBox="0 0 120 120"
       fill="none"
       className={className}
-      aria-hidden="true"
+      aria-label="Automotive class-A surface zebra" role="img"
     >
       {/* Body surface silhouette — side profile spline */}
       <path

@@ -9,7 +9,7 @@ export default function MechanicalIllustration({ className = '', size = 120 }) {
       viewBox="0 0 120 120"
       fill="none"
       className={className}
-      aria-hidden="true"
+      aria-label="Mechanical sketcher gear extrude" role="img"
     >
       {/* Sketch construction lines */}
       <line x1="10" y1="10" x2="60" y2="10" stroke="currentColor" strokeWidth="0.5" strokeDasharray="3 2" className="stroke-kerf-300" opacity="0.5" />

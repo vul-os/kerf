@@ -9,7 +9,7 @@ export default function AerospaceIllustration({ className = '', size = 120 }) {
       viewBox="0 0 120 120"
       fill="none"
       className={className}
-      aria-hidden="true"
+      aria-label="Aerospace airfoil orbit ellipse" role="img"
     >
       {/* Orbit ellipse */}
       <ellipse cx="60" cy="62" rx="48" ry="28" stroke="currentColor" strokeWidth="0.8" className="stroke-kerf-300" opacity="0.4" strokeDasharray="4 3" />

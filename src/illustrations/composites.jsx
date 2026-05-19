@@ -9,7 +9,7 @@ export default function CompositesIllustration({ className = '', size = 120 }) {
       viewBox="0 0 120 120"
       fill="none"
       className={className}
-      aria-hidden="true"
+      aria-label="Composite ply stack-up fiber" role="img"
     >
       {/* Stack of plies — isometric-ish stack */}
       {/* Ply 5 (bottom) — 90° */}

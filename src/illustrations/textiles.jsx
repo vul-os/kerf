@@ -9,7 +9,7 @@ export default function TextilesIllustration({ className = '', size = 120 }) {
       viewBox="0 0 120 120"
       fill="none"
       className={className}
-      aria-hidden="true"
+      aria-label="Textile woven fabric needle" role="img"
     >
       {/* Woven fabric grid — plain weave pattern */}
       {/* Warp threads (vertical) */}

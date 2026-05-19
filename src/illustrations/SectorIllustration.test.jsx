@@ -233,9 +233,12 @@ describe('individual illustrations', () => {
       expect(html).toMatch(/fill="none"/)
     })
 
-    it(`${name} has aria-hidden="true"`, () => {
+    it(`${name} has accessible label or aria-hidden`, () => {
+      // Spotlights show illustrations next to their text card. Either an
+      // explicit aria-label + role="img" (preferred, since they identify the
+      // card) or aria-hidden="true" (decorative) is acceptable.
       const html = render(<Component />)
-      expect(html).toMatch(/aria-hidden="true"/)
+      expect(html).toMatch(/aria-(label|hidden)=/)
     })
 
     it(`${name} contains at least one SVG primitive (path|line|rect|circle|polygon|ellipse)`, () => {

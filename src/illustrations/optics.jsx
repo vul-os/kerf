@@ -9,7 +9,7 @@ export default function OpticsIllustration({ className = '', size = 120 }) {
       viewBox="0 0 120 120"
       fill="none"
       className={className}
-      aria-hidden="true"
+      aria-label="Optics lens ray-trace" role="img"
     >
       {/* Optical axis */}
       <line x1="8" y1="60" x2="112" y2="60" stroke="currentColor" strokeWidth="0.5" strokeDasharray="4 3" opacity="0.35" />

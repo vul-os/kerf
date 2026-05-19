@@ -9,7 +9,7 @@ export default function FirmwareIllustration({ className = '', size = 120 }) {
       viewBox="0 0 120 120"
       fill="none"
       className={className}
-      aria-hidden="true"
+      aria-label="Firmware MCU board USB LED" role="img"
     >
       {/* Board outline */}
       <rect x="15" y="25" width="90" height="70" rx="4" stroke="currentColor" strokeWidth="1.4" className="stroke-kerf-300" />

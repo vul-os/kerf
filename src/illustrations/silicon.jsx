@@ -9,7 +9,7 @@ export default function SiliconIllustration({ className = '', size = 120 }) {
       viewBox="0 0 120 120"
       fill="none"
       className={className}
-      aria-hidden="true"
+      aria-label="Silicon die floorplan standard cells" role="img"
     >
       {/* Die outline */}
       <rect x="10" y="10" width="100" height="100" rx="2" stroke="currentColor" strokeWidth="1.5" className="stroke-kerf-300" />

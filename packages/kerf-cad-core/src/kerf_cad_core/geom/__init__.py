@@ -240,6 +240,12 @@ from kerf_cad_core.geom.subd_to_nurbs import (
     nurbs_to_subd_cage,
 )
 
+# GK-74: bridge two open boundary edge loops with a quad strip.
+from kerf_cad_core.geom.bridge_loops import (
+    BridgeResult,
+    bridge_loops,
+)
+
 __all__ = [
     "NurbsCurve",
     "NurbsSurface",
@@ -385,4 +391,7 @@ __all__ = [
     "blend_edge",
     "blend_edges",
     "blend_corner_vertex",
+    # GK-74
+    "BridgeResult",
+    "bridge_loops",
 ]

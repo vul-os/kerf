@@ -744,7 +744,7 @@ in `geom/__init__.py`.
   planar quad yields outer quad of area A, inner of area
   (sqrt(A) - 2g)², area-preserving ring count + sealed topology. — dep:
   GK-18 — parallel: Y — sonnet.
-- [ ] **GK-74** Bridge edge loops (SubD + B-rep): connect two open
+- [x] **GK-74** Bridge edge loops (SubD + B-rep): connect two open
   boundary loops of equal vertex count with a quad strip; auto-match by
   closest-vertex; handle twist correction. — `geom/bridge_loops.py` —
   oracle: bridge two coaxial circles of N segments → N quads, watertight

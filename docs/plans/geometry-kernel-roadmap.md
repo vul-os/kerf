@@ -836,7 +836,7 @@ in `geom/__init__.py`.
   `geom/sheet_metal.py` — oracle: bend a sheet 90° at r=1, t=2,
   K=0.4 → unfold yields flat length L = 2·flange + π·(r+K·t)/2 ±
   tol. — dep: GK-46 — parallel: N — opus.
-- [ ] **GK-92** Draft analysis overlay (angle to pull direction):
+- [x] **GK-92** Draft analysis overlay (angle to pull direction):
   per-face draft angle vs a pull direction, with positive/negative/
   vertical thresholds and a colour-coded face map. —
   `geom/surface_analysis.py` — oracle: cylinder pulled along its

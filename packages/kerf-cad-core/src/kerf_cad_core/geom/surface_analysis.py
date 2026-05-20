@@ -3114,3 +3114,218 @@ def isocurve_curvature_comb(
             "normals": [], "tips": [],
             "reason": str(exc),
         }
+
+
+# ---------------------------------------------------------------------------
+# GK-92: Draft analysis overlay — angle to pull direction (Body-level)
+# ---------------------------------------------------------------------------
+
+_DRAFT_FD_H: float = 1e-6
+_DRAFT_GRID: int = 5   # UV sample count per axis per face
+
+
+def _body_face_normal(face: "object", nu: int = _DRAFT_GRID, nv: int = _DRAFT_GRID) -> np.ndarray:
+    """Return the area-weighted average unit normal for *face*.
+
+    Samples *nu x nv* UV grid points and averages the outward normals,
+    weighting by the parametric area element magnitude so that non-uniform
+    parametrisations are handled correctly.
+
+    Works for analytic surfaces (Plane, CylinderSurface, SphereSurface …)
+    with a ``.normal()`` method, and for NurbsSurface and any surface with
+    only ``.evaluate()``.
+    """
+    srf = face.surface  # type: ignore[attr-defined]
+
+    # Determine parametric domain -------------------------------------------
+    # Analytic primitives have known natural domains; generic = unit square.
+    try:
+        from kerf_cad_core.geom.brep import Plane, CylinderSurface, SphereSurface
+        if isinstance(srf, Plane):
+            u_lo, u_hi, v_lo, v_hi = 0.0, 1.0, 0.0, 1.0
+        elif isinstance(srf, CylinderSurface):
+            u_lo, u_hi = 0.0, 2.0 * math.pi
+            v_lo, v_hi = 0.0, 1.0
+        elif isinstance(srf, SphereSurface):
+            u_lo, u_hi = 0.0, 2.0 * math.pi
+            v_lo, v_hi = -math.pi / 2.0, math.pi / 2.0
+        else:
+            raise TypeError
+    except (TypeError, ImportError):
+        u_lo, u_hi, v_lo, v_hi = 0.0, 1.0, 0.0, 1.0
+
+    us = np.linspace(u_lo, u_hi, nu)
+    vs = np.linspace(v_lo, v_hi, nv)
+
+    weighted_sum = np.zeros(3, dtype=float)
+
+    for u in us:
+        for v in vs:
+            uf, vf = float(u), float(v)
+            # Compute area-element via finite difference, then outward normal
+            p = np.asarray(srf.evaluate(uf, vf), dtype=float)[:3]
+            if hasattr(srf, "normal"):
+                raw_n = np.asarray(srf.normal(uf, vf), dtype=float)[:3]
+                nrm = float(np.linalg.norm(raw_n))
+                unit_n = raw_n / nrm if nrm > 1e-15 else raw_n
+                # area element: derive from FD for weighting
+                pu = np.asarray(srf.evaluate(uf + _DRAFT_FD_H, vf), dtype=float)[:3]
+                pv = np.asarray(srf.evaluate(uf, vf + _DRAFT_FD_H), dtype=float)[:3]
+                N_fd = np.cross((pu - p) / _DRAFT_FD_H, (pv - p) / _DRAFT_FD_H)
+                area_w = float(np.linalg.norm(N_fd))
+                if area_w < 1e-30:
+                    area_w = 1.0
+                weight_dir = unit_n
+            else:
+                pu = np.asarray(srf.evaluate(uf + _DRAFT_FD_H, vf), dtype=float)[:3]
+                pv = np.asarray(srf.evaluate(uf, vf + _DRAFT_FD_H), dtype=float)[:3]
+                N_fd = np.cross((pu - p) / _DRAFT_FD_H, (pv - p) / _DRAFT_FD_H)
+                area_w = float(np.linalg.norm(N_fd))
+                if area_w < 1e-30:
+                    area_w = 1.0
+                weight_dir = N_fd / area_w
+
+            # Respect face orientation (flips outward sign)
+            orient = getattr(face, "orientation", True)
+            if not orient:
+                weight_dir = -weight_dir
+
+            weighted_sum += area_w * weight_dir
+
+    total_w = float(np.linalg.norm(weighted_sum))
+    if total_w < 1e-15:
+        return np.array([0.0, 0.0, 1.0])
+    return weighted_sum / total_w
+
+
+def draft_analysis(
+    body: "object",
+    pull_direction: "Union[Sequence[float], np.ndarray]",
+    *,
+    positive_threshold_deg: float = 3.0,
+    negative_threshold_deg: float = -3.0,
+) -> dict:
+    """Draft analysis overlay — per-face draft angle relative to a pull direction.
+
+    GK-92
+    -----
+    For injection-moulding / die-casting / forging feasibility: every face of
+    *body* is classified by its draft angle (the angle between the face's
+    outward normal and the pull direction vector).
+
+    Draft angle convention (matches ``draft_angle()`` scalar function above):
+
+        draft = arcsin(n_hat · pull_hat)   [degrees]
+
+    * +90°: face directly faces the pull direction (top cap of a cylinder
+      pulled along its axis).
+    * 0°:   face normal is perpendicular to pull (side wall — "parting plane").
+    * −90°: face opposes the pull direction (undercut, or bottom cap).
+
+    Parameters
+    ----------
+    body:
+        A ``kerf_cad_core.geom.brep.Body`` (or any object with an
+        ``all_faces()`` method returning ``Face`` objects with ``.id`` and
+        ``.surface`` attributes).
+    pull_direction:
+        3-vector giving the demould pull direction (need not be unit length).
+    positive_threshold_deg:
+        Faces with draft > this value are classified "positive" (green).
+        Default 3°.
+    negative_threshold_deg:
+        Faces with draft < this value are classified "negative" (red).
+        Default −3°.
+
+    Returns
+    -------
+    dict with keys:
+
+    ``per_face_angles`` : dict {face_id (int) -> draft_angle (float, degrees)}
+    ``positive_faces``  : list[int]  face_ids with draft > positive_threshold
+    ``negative_faces``  : list[int]  face_ids with draft < negative_threshold
+    ``vertical_faces``  : list[int]  face_ids between the two thresholds
+    ``face_colours``    : dict {face_id (int) -> (r, g, b) tuple of floats in [0,1]}
+        Green  (0, 1, 0)   — positive draft
+        Red    (1, 0, 0)   — negative draft / undercut
+        Yellow (1, 1, 0)   — vertical / parting-plane zone
+
+    All angles are in degrees (float).  The function never raises; on error it
+    returns ``{"ok": False, "reason": str}``.
+    """
+    try:
+        pull = np.asarray(pull_direction, dtype=float).ravel()[:3]
+        pull_nrm = float(np.linalg.norm(pull))
+        if pull_nrm < 1e-15:
+            return {
+                "ok": False,
+                "reason": "pull_direction is a zero vector",
+                "per_face_angles": {},
+                "positive_faces": [],
+                "negative_faces": [],
+                "vertical_faces": [],
+                "face_colours": {},
+            }
+        pull_hat = pull / pull_nrm
+
+        pos_thr = float(positive_threshold_deg)
+        neg_thr = float(negative_threshold_deg)
+        if neg_thr >= pos_thr:
+            return {
+                "ok": False,
+                "reason": (
+                    f"negative_threshold_deg ({neg_thr}) must be strictly less "
+                    f"than positive_threshold_deg ({pos_thr})"
+                ),
+                "per_face_angles": {},
+                "positive_faces": [],
+                "negative_faces": [],
+                "vertical_faces": [],
+                "face_colours": {},
+            }
+
+        faces = list(body.all_faces())  # type: ignore[attr-defined]
+
+        per_face_angles: dict = {}
+        positive_faces: list = []
+        negative_faces: list = []
+        vertical_faces: list = []
+        face_colours: dict = {}
+
+        for face in faces:
+            fid = face.id  # type: ignore[attr-defined]
+            n_hat = _body_face_normal(face)
+            cos_a = float(np.clip(np.dot(n_hat, pull_hat), -1.0, 1.0))
+            angle_deg = math.degrees(math.asin(cos_a))
+
+            per_face_angles[fid] = angle_deg
+
+            if angle_deg > pos_thr:
+                positive_faces.append(fid)
+                face_colours[fid] = (0.0, 1.0, 0.0)   # green
+            elif angle_deg < neg_thr:
+                negative_faces.append(fid)
+                face_colours[fid] = (1.0, 0.0, 0.0)   # red
+            else:
+                vertical_faces.append(fid)
+                face_colours[fid] = (1.0, 1.0, 0.0)   # yellow
+
+        return {
+            "ok": True,
+            "reason": "",
+            "per_face_angles": per_face_angles,
+            "positive_faces": positive_faces,
+            "negative_faces": negative_faces,
+            "vertical_faces": vertical_faces,
+            "face_colours": face_colours,
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "reason": str(exc),
+            "per_face_angles": {},
+            "positive_faces": [],
+            "negative_faces": [],
+            "vertical_faces": [],
+            "face_colours": {},
+        }

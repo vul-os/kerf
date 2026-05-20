@@ -110,7 +110,7 @@ noted.
   File: `packages/kerf-cad-core/tests/test_feature_mech_sheet_metal_roundtrip.py`
   Success: 25 part shapes; folded area ≈ unfolded area within k-factor tolerance; bend allowance correct vs DIN 6935.
 
-- [ ] T-18 Mech: feature ops (boss-with-draft / cut-from-sketch / hole-pattern / loft / sweep / section)
+- [x] T-18 Mech: feature ops (boss-with-draft / cut-from-sketch / hole-pattern / loft / sweep / section)
   Scope: every feature_*.py file in `kerf-cad-core` root, chained.
   File: `packages/kerf-cad-core/tests/test_feature_mech_feature_ops_chain.py`
   Success: 25 5-op chains; face naming stable across rebuild; persistent IDs after boolean.

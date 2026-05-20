@@ -5012,7 +5012,7 @@ User-direction 2026-05-18: the existing `kerf-firmware` (T-130) is a thin `pio` 
 ### T-252 Clock-tree synthesis (CTS) seed
 - **Tier:** A
 - **Priority:** P3
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped (2026-05-20)
 - **Scope:** pure-Python **clock-tree synthesis** seed that takes a placed netlist (T-242 floorplan output) + a set of clock sinks (registers in the netlist) + a target skew bound, and builds a buffered clock tree minimising skew. v1 algorithm = **H-tree** (recursive midpoint-split of the bounding box, buffer inserted at each branching point); a buffer-sizing pass uses Liberty (T-241) `cell_rise`/`cell_fall` to pick the smallest buffer cell whose drive strength meets the per-segment capacitance budget. Emits an updated netlist + a per-sink skew report. v1 ignores process variation; OCV-aware CTS deferred. This is **seed-quality** — production tape-outs would use OpenROAD's TritonCTS for this stage; the seed lets us reason about clock topology without that dependency.
 - **Target files/packages:** `packages/kerf-silicon/src/kerf_silicon/cts/__init__.py` (NEW), `packages/kerf-silicon/src/kerf_silicon/cts/htree.py` (NEW — recursive midpoint-split algorithm), `packages/kerf-silicon/src/kerf_silicon/cts/buffer_sizing.py` (NEW — Liberty-driven buffer-cell selection), `packages/kerf-silicon/src/kerf_silicon/cts/skew_report.py` (NEW), `packages/kerf-silicon/tests/test_cts.py` (NEW), `packages/kerf-silicon/tests/fixtures/cts/counter4_placed.netlist.json` (NEW — placed netlist with 4 register sinks).
 - **Definition of Done:** the counter4 placed fixture (4 register sinks at known coordinates) produces an H-tree with exactly 2 levels of branching + 3 buffers inserted; reported max-skew between any two sinks ≤ 50 ps; choosing a smaller drive-strength buffer than the per-segment cap budget surfaces a "violation: cap budget exceeded" report (negative-path test); pytest oracles; `npm run build` clean.
@@ -5182,7 +5182,7 @@ User-direction 2026-05-18: the existing `kerf-firmware` (T-130) is a thin `pio` 
 ### T-270 Heat-shield / ablation model (re-entry)
 - **Tier:** A
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped (2026-05-20)
 - **Scope:** **re-entry heat-shield / ablation** solver: 1-D transient heat conduction through a multi-layer TPS (thermal-protection-system) stack with a moving ablation front. Inputs: stack composition (e.g., PICA-X 50 mm + LI-900 backshell + Al-alloy structure), incoming heat flux time-history (typically from a re-entry trajectory simulation — uses the shipped `kerf-aero/flight_dynamics` + `orbital` modules), ablator material properties (density, specific heat, conductivity, heat of ablation, char-layer thickness rate). Outputs: surface-temperature time-history, recession-depth time-history, bondline temperature, total ablated mass. v1 = 1-D + isotropic ablator; 3-D + anisotropic char structure deferred. Reference oracles: published PICA-X stagnation-point cases from the Stardust SRC (Sample Return Capsule) literature.
 - **Target files/packages:** `packages/kerf-aero/src/kerf_aero/reentry/__init__.py` (NEW), `packages/kerf-aero/src/kerf_aero/reentry/ablation.py` (NEW — 1-D moving-front solver), `packages/kerf-aero/src/kerf_aero/reentry/tps_stack.py` (NEW — multi-layer stack composition), `packages/kerf-aero/src/kerf_aero/reentry/materials.py` (NEW — PICA, LI-900, AVCOAT, Carbon-Carbon, SLA-561V), `packages/kerf-aero/src/kerf_aero/reentry/heat_flux_trajectory.py` (NEW — couples to flight_dynamics), `packages/kerf-aero/tests/test_reentry_ablation.py` (NEW), `packages/kerf-aero/tests/fixtures/reentry/stardust_pica_x.json` (NEW), `packages/kerf-aero/tests/fixtures/reentry/stardust_pica_x_expected.json` (NEW — Stardust SRC published recession depth ~5 mm).
 - **Definition of Done:** Stardust SRC stagnation-point fixture returns peak surface-temp within ±10 % of the published 2700 K; total recession-depth matches the published ~5 mm within ±20 %; bondline temperature stays below 250 °C (the structural limit) — a clear safety-margin oracle; 1-D conduction matches an analytic constant-flux semi-infinite-slab solution at t=10 s without ablation; pytest analytic + reference oracles; `npm run build` clean.
@@ -5289,7 +5289,7 @@ User-direction 2026-05-19. Extends T-179 (apparel pattern-making) with deeper te
 ### T-281 Textile weave + knit pattern generators
 - **Tier:** B
 - **Priority:** P2
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped (2026-05-20)
 - **Scope:** parametric generators for textile structures — plain weave, twill (2/1 right-hand, etc.), satin, jacquard pattern from a draft; knit structures jersey/rib/interlock with tuck/miss/loop stitches; full draft + treadle + tie-up notation. Pure-Python; outputs both vector geometry + a tile-able raster for previews.
 - **Target files/packages:** `packages/kerf-textiles/` (NEW package — pyproject.toml, src/kerf_textiles/{weave,knit,draft,export}.py, tests, llm_docs).
 - **Definition of Done:** plain-weave float-length analysis matches the analytic formula; 2/1 twill produces the canonical diagonal stagger; jersey-knit stitch density matches `gauge·courses` to 1%; draft notation round-trips through writer/reader; pytest analytic oracles.

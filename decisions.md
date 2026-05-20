@@ -532,3 +532,16 @@ End of 16-fire 30-min cadence.
 
 
 
+
+## 2026-05-20 — Loop resumed at 3 agents/wave (budget-flaky)
+
+- **Context:** 5-agent wave had 1 budget failure ('usage credits required'). Goal: complete ALL tasks.md. ~67 atomic agent-jobs left across ~23 waves.
+- **Decision:** Drop to 3 agents/wave (smaller blast radius, fewer simultaneous long-context reads → fewer budget failures). Budget-failed tasks auto-requeue. Serialize kerf-mates tasks (T-108/T-329/T-333) one-per-wave to avoid same-package collision. XL tasks (T-323/325/327/330/331/332) get split into sub-tasks before pulling. Epics T-100/101/104/106 pulled last.
+- **Why:** Observed 5-wide hits the quota edge on long-context agents; 3-wide landed 4/5 last time. Smaller waves = higher land rate.
+- **Reversibility:** Each task is new-files-only; revert by SHA.
+
+## 2026-05-20 — Cadence change: 4 agents/wave, 15-min wake
+
+- **Decision:** Per user, switch to batches of 4 Sonnet agents with a 15-min wake cadence (delaySeconds=900), loop until tasks.md is complete. Wave 1 (T-270/T-252/T-281/T-261) landed 4/4 — the 4-wide + small-context-read discipline avoids the budget failures the 5-wide wave hit.
+- **Why:** User directive; 4-wide landed cleanly where 5-wide lost one to the usage cap.
+- **Reversibility:** new-files-only tasks; revert by SHA.

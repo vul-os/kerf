@@ -664,7 +664,7 @@ Format: `[ ] GK-NN  scope — FILE(s) — oracle — dep — parallel? — tier`
   load + regenerate to the same `Body` the worker produces (Hausdorff ≤
   tol). — dep: GK-60 — parallel: N — opus.
   *Landed: feature_io.py, 70 tests.*
-- [ ] **GK-62** G3 (curvature-rate) blend for class-A. —
+- [x] **GK-62** G3 (curvature-rate) blend for class-A. —
   `geom/blend_srf.py` — oracle: third-derivative continuity across the
   join to `1e-5`; comb-of-combs continuous. — dep: GK-25 — parallel: Y
   — sonnet.

@@ -175,7 +175,7 @@ __all__ = [
     "gordon_network_srf",
     "blend_srf",
     "blend_srf_g1",
-    "blend_srf_g2",
+    "blend_srf_g2","blend_srf_g3",
     "blend_srf_with_curves",
     "blend_srf_fillet",
     "validate_surface_blend",

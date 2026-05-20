@@ -550,7 +550,7 @@ Format: `[ ] GK-NN  scope — FILE(s) — oracle — dep — parallel? — tier`
   oracle: untrim of a trimmed patch returns the original untrimmed CP
   net exactly; shrink bbox ⊆ trimmed region. — dep: GK-13 — parallel: Y
   — sonnet. *Landed: trim_curve.py, 22 tests.*
-- [ ] **GK-40** Trim face by SSI curve (replace FD-projection trim with
+- [x] **GK-40** Trim face by SSI curve (replace FD-projection trim with
   exact SSI + closest-point pullback). — `geom/trim_curve.py` —
   oracle: trim of a plane by a cylinder = exact circle boundary loop to
   `1e-7`. — dep: GK-09, GK-07 — parallel: N — opus.

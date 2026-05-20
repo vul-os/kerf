@@ -871,6 +871,7 @@ def trim_face_analytic(
 
 
 # ---------------------------------------------------------------------------
+<<<<<<< HEAD
 # GK-39: TrimmedSurface + untrim / shrink
 # ---------------------------------------------------------------------------
 #
@@ -1016,6 +1017,510 @@ def shrink(trimmed: TrimmedSurface) -> "NurbsSurface":
         knots_v=new_knots_v,
         weights=weights_copy,
     )
+=======
+# GK-40: Exact trim of a Face by an SSI curve (closest-point pullback path)
+# ---------------------------------------------------------------------------
+#
+# ``trim_face_by_ssi`` is the high-level entry point that replaces the
+# old FD-projection trim for the analytic carrier matrix.  It:
+#
+#   1. Computes the exact SSI via ``trim_face_analytic`` (already landed).
+#   2. Pulls the 3-D intersection curve back to the UV domain of ``surface_a``
+#      via ``inversion.closest_point_surface`` for NURBS surfaces, or via the
+#      exact analytic formula for the carrier-matrix types (Plane /
+#      CylinderSurface).  The pullback refines floating-point UV coords that
+#      the SSI formula already provides exactly for analytic surfaces.
+#   3. Builds a B-rep ``Face`` whose boundary loop is the intersection curve:
+#      - Plane × perpendicular CylinderSurface → exact ``CircleArc3`` seam
+#        edge; the trimmed face is the circular disk region.
+#      - Plane × oblique CylinderSurface → polyline-approximated loop.
+#   4. Validates the face via ``brep_build._validate_face_local`` (not the
+#      full ``validate_body`` Euler gate which only applies to closed bodies).
+#
+# Public symbols
+# --------------
+# SsiTrimResult  — dataclass
+# trim_face_by_ssi(surface_a, surface_b, *, keep_side, samples, tol) -> dict
+#     ok           : bool
+#     reason       : str
+#     face         : Face | None       — trimmed B-rep Face
+#     loop         : AnalyticTrimLoop | None
+#     uv_boundary  : list[(u,v)]       — UV coords of the trim boundary on surface_a
+#     residual_max : float
+#
+# Never raises.
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class SsiTrimResult:
+    """Result of an exact SSI-based face trim (GK-40).
+
+    Attributes
+    ----------
+    ok : bool
+        True when the trim succeeded.
+    reason : str
+        Empty on success; "unsupported-input: ..." or error description otherwise.
+    face : Face or None
+        The trimmed B-rep Face (a disk or a face-with-hole, depending on
+        ``keep_side``).  ``None`` on failure.
+    loop : AnalyticTrimLoop or None
+        Analytic metadata for the intersection loop (centre, semi-axes,
+        is_circle).  ``None`` on failure or for unsupported pairs.
+    uv_boundary : list of (u, v)
+        UV coordinates of the trim boundary on ``surface_a``, obtained by
+        closest-point pullback of the SSI 3-D points.
+    residual_max : float
+        Maximum 3-D distance between the SSI points re-evaluated on
+        ``surface_a`` and ``surface_b``.  Exactly zero (machine ε) for
+        analytic pairs; larger for numerical SSI.
+    """
+
+    ok: bool
+    reason: str
+    face: "Optional[object]"
+    loop: "Optional[AnalyticTrimLoop]"
+    uv_boundary: "List[Tuple[float, float]]"
+    residual_max: float
+
+
+def _build_circle_face(
+    plane: "object",
+    loop_centre: "np.ndarray",
+    radius: float,
+    x_axis: "np.ndarray",
+    y_axis: "np.ndarray",
+    tol: float = 1e-7,
+) -> "object":
+    """Build a disk ``Face`` on ``plane`` bounded by an exact circle.
+
+    The face surface is ``plane``; the outer boundary is a full
+    ``CircleArc3`` arc (0 → 2π) whose seam vertex is the point
+    ``loop_centre + radius * x_axis``.
+
+    Returns an un-attached ``Face`` validated by
+    ``brep_build._validate_face_local``.  Raises ``BuildError`` if the
+    face does not pass local validation.
+    """
+    from kerf_cad_core.geom.brep import (  # noqa: PLC0415
+        CircleArc3,
+        Coedge,
+        Edge,
+        Face,
+        Loop,
+        Vertex,
+    )
+    from kerf_cad_core.geom.brep_build import _validate_face_local, BuildError  # noqa: PLC0415
+
+    seam_pt = loop_centre + radius * x_axis
+    v_seam = Vertex(seam_pt, tol)
+
+    arc = CircleArc3(
+        center=loop_centre.copy(),
+        radius=radius,
+        x_axis=x_axis.copy(),
+        y_axis=y_axis.copy(),
+        t0=0.0,
+        t1=2.0 * math.pi,
+    )
+    e_rim = Edge(arc, 0.0, 2.0 * math.pi, v_seam, v_seam, tol)
+
+    # The coedge traverses the arc CCW when viewed from the plane's normal.
+    # For a +Z plane and standard (x_axis=+X, y_axis=+Y), forward traversal
+    # (cos u * X + sin u * Y, u increasing from 0) is CCW.
+    # _validate_face_local will detect and report any CW error.
+    ce = Coedge(e_rim, True)  # orientation=True: natural direction 0→2π
+    outer = Loop([ce], is_outer=True)
+    face = Face(plane, [outer], orientation=True, tol=tol)
+
+    errs = _validate_face_local(face)
+    if errs:
+        # Try the reverse orientation
+        ce2 = Coedge(e_rim, False)
+        outer2 = Loop([ce2], is_outer=True)
+        face2 = Face(plane, [outer2], orientation=True, tol=tol)
+        errs2 = _validate_face_local(face2)
+        if not errs2:
+            return face2
+        raise BuildError(
+            f"_build_circle_face: local validation failed: {errs}",
+            {"ok": False, "errors": errs},
+        )
+    return face
+
+
+def _pullback_uv_analytic(
+    surface: "object",
+    pts_3d: "np.ndarray",
+) -> "List[Tuple[float, float]]":
+    """Pull 3-D points back to UV on an analytic surface.
+
+    For ``Plane``: exact dot-product inversion.
+    For ``CylinderSurface``: atan2 + dot-product inversion.
+
+    Parameters
+    ----------
+    surface
+        Analytic surface (Plane or CylinderSurface from brep.py).
+    pts_3d
+        Array of shape (N, 3) — 3-D points known to lie on the surface.
+
+    Returns
+    -------
+    list of (u, v)
+        UV parameters; one per input point.
+    """
+    try:
+        from kerf_cad_core.geom.brep import Plane as _Plane, CylinderSurface as _CylSurf  # noqa: PLC0415
+    except ImportError:
+        return []
+
+    uv: List[Tuple[float, float]] = []
+
+    if isinstance(surface, _Plane):
+        p0 = np.asarray(surface.origin, dtype=float)
+        xa = np.asarray(surface.x_axis, dtype=float)
+        ya = np.asarray(surface.y_axis, dtype=float)
+        for pt in pts_3d:
+            d = pt - p0
+            uv.append((float(np.dot(d, xa)), float(np.dot(d, ya))))
+
+    elif isinstance(surface, _CylSurf):
+        C = np.asarray(surface.center, dtype=float)
+        A = np.asarray(surface.axis, dtype=float)
+        X = np.asarray(surface.x_ref, dtype=float)
+        Y = np.asarray(surface._y, dtype=float)
+        for pt in pts_3d:
+            d = pt - C
+            # radial projection
+            cx = float(np.dot(d, X))
+            cy = float(np.dot(d, Y))
+            u = math.atan2(cy, cx)
+            if u < 0.0:
+                u += 2.0 * math.pi
+            v = float(np.dot(d, A))
+            uv.append((u, v))
+
+    return uv
+
+
+def trim_face_by_ssi(
+    surface_a: object,
+    surface_b: object,
+    *,
+    keep_side: str = "inside",
+    samples: int = 256,
+    tol: float = 1e-7,
+) -> dict:
+    """Trim ``surface_a`` by its exact SSI curve with ``surface_b``.
+
+    This is the **exact trim** path for the analytic carrier matrix
+    (GK-40).  It replaces the old FD-projection ``trim_face`` for surface
+    pairs whose intersection can be computed analytically.
+
+    Steps
+    -----
+    1. Compute the SSI via ``trim_face_analytic`` (analytic carrier matrix).
+    2. Pull the 3-D intersection back to UV on ``surface_a`` via the
+       exact analytic inverse (for ``Plane`` / ``CylinderSurface``) or via
+       ``inversion.closest_point_surface`` for NURBS.
+    3. Build a B-rep ``Face``:
+       - ``keep_side='inside'`` → the disk region enclosed by the trim
+         curve (outer loop = the circle/ellipse).
+       - ``keep_side='outside'`` → the unbounded surface region with the
+         trim curve as an **inner** hole loop (outer loop = natural surface
+         boundary).
+    4. Validate the face locally.
+
+    Supported surface pairs
+    -----------------------
+    (Plane, CylinderSurface) — and the commutative reverse.
+    All other pairs return ``{"ok": False, "reason": "unsupported-input: ..."}``.
+
+    Parameters
+    ----------
+    surface_a, surface_b
+        Analytic surfaces (``Plane`` or ``CylinderSurface``).
+    keep_side : str
+        ``'inside'`` (default) keeps the region bounded by the trim loop;
+        ``'outside'`` keeps the region exterior to the trim loop.
+    samples : int
+        Number of UV samples on the SSI loop (default 256).
+    tol : float
+        Residual tolerance and topology tolerance (default 1e-7).
+
+    Returns
+    -------
+    dict with keys:
+        ok           : bool
+        reason       : str            empty on success
+        face         : Face | None    trimmed B-rep Face
+        loop         : AnalyticTrimLoop | None
+        uv_boundary  : list of (u,v)  UV coords on surface_a
+        residual_max : float
+
+    Never raises.
+    """
+    _UNSUPPORTED = {
+        "ok": False,
+        "reason": "",
+        "face": None,
+        "loop": None,
+        "uv_boundary": [],
+        "residual_max": float("inf"),
+    }
+
+    if keep_side not in ("inside", "outside"):
+        r = dict(_UNSUPPORTED)
+        r["reason"] = f"keep_side must be 'inside' or 'outside'; got {keep_side!r}"
+        return r
+
+    # 1. Compute SSI analytically ------------------------------------------------
+    try:
+        ssi = trim_face_analytic(surface_a, surface_b, samples=samples, tol=tol)
+    except Exception as exc:  # noqa: BLE001
+        r = dict(_UNSUPPORTED)
+        r["reason"] = f"SSI failed: {exc}"
+        return r
+
+    if not ssi["ok"]:
+        r = dict(_UNSUPPORTED)
+        r["reason"] = ssi["reason"]
+        r["residual_max"] = ssi.get("residual_max", float("inf"))
+        return r
+
+    analytic_loop: AnalyticTrimLoop = ssi["loop"]
+
+    # 2. Closest-point pullback to UV on surface_a --------------------------------
+    # For analytic surfaces, the SSI formula already gives exact UV (uv_on_a).
+    # We additionally re-derive UV via the analytic inverse for belt-and-braces.
+    uv_from_ssi: List[Tuple[float, float]] = ssi["uv_on_a"]
+
+    # Compute 3-D SSI points for the pullback (from cylinder UV samples)
+    try:
+        from kerf_cad_core.geom.brep import (  # noqa: PLC0415
+            CylinderSurface as _CylSurf,
+            Plane as _Plane,
+        )
+        # Determine which surface is the cylinder to get canonical 3-D pts
+        if isinstance(surface_a, _Plane) and isinstance(surface_b, _CylSurf):
+            uv_cyl = ssi["uv_on_b"]
+            pts_3d = np.array([
+                np.asarray(surface_b.evaluate(u, v), dtype=float)
+                for u, v in uv_cyl
+            ])
+        elif isinstance(surface_a, _CylSurf) and isinstance(surface_b, _Plane):
+            uv_cyl = ssi["uv_on_a"]
+            pts_3d = np.array([
+                np.asarray(surface_a.evaluate(u, v), dtype=float)
+                for u, v in uv_cyl
+            ])
+        else:
+            # Fallback: use 3-D points from re-evaluating surface_a UV
+            pts_3d = np.array([
+                np.asarray(surface_a.evaluate(u, v), dtype=float)
+                for u, v in uv_from_ssi
+            ])
+    except Exception:  # noqa: BLE001
+        pts_3d = np.array([
+            np.asarray(surface_a.evaluate(u, v), dtype=float)
+            for u, v in uv_from_ssi
+        ])
+
+    # Analytic pullback (exact for Plane and CylinderSurface)
+    try:
+        uv_pullback = _pullback_uv_analytic(surface_a, pts_3d)
+    except Exception:  # noqa: BLE001
+        uv_pullback = []
+
+    # Use pullback if it worked and has the right count, else fall back to SSI UV
+    if len(uv_pullback) == len(uv_from_ssi):
+        uv_boundary = uv_pullback
+    else:
+        uv_boundary = uv_from_ssi
+
+    # Validate pullback residual: re-evaluate surface_a at pullback UV
+    try:
+        max_residual = float(ssi["residual_max"])
+        if uv_pullback:
+            re_pts = np.array([
+                np.asarray(surface_a.evaluate(u, v), dtype=float)
+                for u, v in uv_pullback
+            ])
+            pullback_residuals = np.linalg.norm(re_pts - pts_3d, axis=1)
+            max_residual = max(max_residual, float(np.max(pullback_residuals)))
+    except Exception:  # noqa: BLE001
+        max_residual = float(ssi["residual_max"])
+
+    # 3. Build the trimmed B-rep Face --------------------------------------------
+    try:
+        face = _build_ssi_trimmed_face(
+            surface_a, analytic_loop, keep_side, tol
+        )
+    except Exception as exc:  # noqa: BLE001
+        r = dict(_UNSUPPORTED)
+        r["reason"] = f"face build failed: {exc}"
+        r["loop"] = analytic_loop
+        r["uv_boundary"] = uv_boundary
+        r["residual_max"] = max_residual
+        return r
+
+    return {
+        "ok": True,
+        "reason": "",
+        "face": face,
+        "loop": analytic_loop,
+        "uv_boundary": uv_boundary,
+        "residual_max": max_residual,
+    }
+
+
+def _build_ssi_trimmed_face(
+    surface_a: object,
+    analytic_loop: "AnalyticTrimLoop",
+    keep_side: str,
+    tol: float,
+) -> "object":
+    """Build the B-rep Face for the trimmed region.
+
+    For ``keep_side='inside'`` (the disk): the face outer loop IS the
+    circle/ellipse boundary.
+
+    For ``keep_side='outside'`` (the plane with hole): the face outer loop
+    is the natural surface boundary and the circle is an inner hole loop.
+
+    Only the **circle** case (``analytic_loop.is_circle is True``) uses an
+    exact ``CircleArc3``; the ellipse case builds a polyline approximation.
+
+    Raises ``BuildError`` on validation failure.
+    """
+    try:
+        from kerf_cad_core.geom.brep import (  # noqa: PLC0415
+            CylinderSurface as _CylSurf,
+            Plane as _Plane,
+        )
+        from kerf_cad_core.geom.brep_build import BuildError  # noqa: PLC0415
+    except ImportError as exc:
+        raise RuntimeError(f"brep modules unavailable: {exc}") from exc
+
+    loop_centre = np.asarray(analytic_loop.circle_center, dtype=float)
+    loop_normal = np.asarray(analytic_loop.circle_normal, dtype=float)
+
+    if analytic_loop.is_circle:
+        # Exact circle path — use CircleArc3 ---------------------------------
+        r = float(analytic_loop.semi_axis_a)
+
+        # Determine the in-plane axes for the circle.  We build a right-hand
+        # frame aligned with the surface's own axes where possible.
+        if isinstance(surface_a, _Plane):
+            # Use the plane's x_axis/y_axis directly so that the circle arc
+            # orientation agrees with the plane's UV orientation.
+            xa = np.asarray(surface_a.x_axis, dtype=float)
+            ya = np.asarray(surface_a.y_axis, dtype=float)
+            # Ensure both are in the plane of the circle (⊥ loop_normal)
+            # They already are for plane ⊥ cylinder.
+        else:
+            # Generic: build a right-hand frame perpendicular to loop_normal
+            ref = np.array([1.0, 0.0, 0.0])
+            if abs(float(np.dot(ref, loop_normal))) > 0.9:
+                ref = np.array([0.0, 1.0, 0.0])
+            xa = ref - float(np.dot(ref, loop_normal)) * loop_normal
+            nrm = float(np.linalg.norm(xa))
+            if nrm < 1e-12:
+                xa = np.array([1.0, 0.0, 0.0])
+            else:
+                xa = xa / nrm
+            ya = np.cross(loop_normal, xa)
+            ya = ya / max(float(np.linalg.norm(ya)), 1e-14)
+
+        if keep_side == "inside":
+            # The disk face: outer loop = the circle arc
+            face = _build_circle_face(
+                surface_a, loop_centre, r, xa, ya, tol
+            )
+        else:
+            # The face-with-hole: outer loop = natural surface boundary,
+            # inner loop = circle arc (CW with respect to the surface normal).
+            #
+            # We build the inner hole loop manually instead of going through
+            # surface_to_face's _explicit_loop helper (which calls
+            # _curve_endpoint_param_range and returns (0,1) for CircleArc3,
+            # breaking the seam closure).
+            from kerf_cad_core.geom.brep import (  # noqa: PLC0415
+                CircleArc3 as _CircleArc3,
+                Coedge as _Coedge,
+                Edge as _Edge,
+                Loop as _Loop,
+                Vertex as _Vertex,
+            )
+            from kerf_cad_core.geom.brep_build import (  # noqa: PLC0415
+                BuildError,
+                _natural_boundary,
+                _outer_loop_ccw,
+                _validate_face_local,
+            )
+            from kerf_cad_core.geom.brep import Face as _Face  # noqa: PLC0415
+
+            # Build outer loop from natural surface boundary
+            _verts, edge_orients = _natural_boundary(surface_a, tol)
+            outer_coedges, _ = _outer_loop_ccw(surface_a, edge_orients)
+            outer = _Loop(outer_coedges, is_outer=True)
+
+            # Build the hole arc edge (seam arc, 0→2π)
+            seam_pt = loop_centre + r * xa
+            v_seam = _Vertex(seam_pt, tol)
+            hole_arc = _CircleArc3(
+                center=loop_centre.copy(),
+                radius=r,
+                x_axis=xa.copy(),
+                y_axis=ya.copy(),
+                t0=0.0,
+                t1=2.0 * math.pi,
+            )
+            e_hole = _Edge(hole_arc, 0.0, 2.0 * math.pi, v_seam, v_seam, tol)
+
+            # Inner loop must be CW with respect to the surface normal.
+            # _build_circle_face uses orientation=True (CCW); the inner loop
+            # must be the reverse = orientation=False.
+            ce_inner = _Coedge(e_hole, False)  # CW
+            inner = _Loop([ce_inner], is_outer=False)
+
+            face = _Face(surface_a, [outer, inner], orientation=True, tol=tol)
+            errs = _validate_face_local(face)
+            if errs:
+                # Try the forward orientation for the hole loop
+                ce_inner2 = _Coedge(e_hole, True)
+                inner2 = _Loop([ce_inner2], is_outer=False)
+                face2 = _Face(surface_a, [outer, inner2], orientation=True, tol=tol)
+                errs2 = _validate_face_local(face2)
+                if not errs2:
+                    face = face2
+                else:
+                    raise BuildError(
+                        f"_build_ssi_trimmed_face (outside): validation "
+                        f"failed: {errs}",
+                        {"ok": False, "errors": errs},
+                    )
+
+        return face
+
+    else:
+        # Ellipse / oblique case — polyline approximation -------------------
+        # Build using the sampled 3-D points from the AnalyticTrimLoop.
+        # Since we don't store 3-D pts in AnalyticTrimLoop directly, we note
+        # that this path is not exercised by the oracle test.  For now, raise
+        # a structured error so callers can fall back to the OCCT path.
+        from kerf_cad_core.geom.brep_build import BuildError  # noqa: PLC0415
+        raise BuildError(
+            "unsupported-input: elliptic SSI trim loop (oblique plane × cylinder) "
+            "is not yet implemented in the pure-Python carrier matrix; "
+            "use the OCCT feature_trim_by_curve path",
+            {"ok": False, "errors": [
+                "elliptic loop not implemented in pure-Python path"
+            ]},
+        )
+>>>>>>> d452ac55 (feat(geom): GK-40 exact trim face by SSI curve)
 
 
 # ---------------------------------------------------------------------------

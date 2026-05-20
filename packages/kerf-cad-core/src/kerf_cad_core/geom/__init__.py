@@ -90,6 +90,10 @@ from kerf_cad_core.geom.trim_validation import (
 
 # GK-39: untrim / shrink trimmed surface.
 from kerf_cad_core.geom.trim_curve import (
+    trim_face_by_ssi,
+    trim_face_analytic,
+    SsiTrimResult,
+    AnalyticTrimLoop,
     TrimmedSurface,
     untrim,
     shrink,
@@ -197,6 +201,7 @@ __all__ = [
     "select_side",
     "validate_body_post_trim",
     "TrimmedSurface",
+    "trim_face_by_ssi","trim_face_analytic","SsiTrimResult","AnalyticTrimLoop",
     "untrim",
     "shrink",
     "fair_curve",

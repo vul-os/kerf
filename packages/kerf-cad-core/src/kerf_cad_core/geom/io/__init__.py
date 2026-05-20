@@ -4,6 +4,7 @@ Modules
 -------
 iges        IGES 144 trimmed-surface reader/writer (GK-49).
 step_read   Pure-Python STEP AP203/214 B-rep reader (GK-47).
+step_write  Pure-Python STEP AP214 B-rep writer (GK-48).
 """
 from kerf_cad_core.geom.io.iges import (
     IgesReadError,
@@ -16,6 +17,10 @@ from kerf_cad_core.geom.io.step_read import (
     read_step,
     StepReadError,
 )
+from kerf_cad_core.geom.io.step_write import (
+    write_step,
+    StepWriteError,
+)
 
 __all__ = [
     "IgesReadError",
@@ -25,4 +30,6 @@ __all__ = [
     "read_iges",
     "read_step",
     "StepReadError",
+    "write_step",
+    "StepWriteError",
 ]

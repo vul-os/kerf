@@ -777,7 +777,7 @@ in `geom/__init__.py`.
   `geom/io/obj.py` — oracle: write→read round-trip preserves V, F,
   group names; MTL lookup resolves diffuse/colour. — dep: GK-21 —
   parallel: Y — sonnet.
-- [ ] **GK-81** STL read (binary + ASCII) — verify writer already
+- [x] **GK-81** STL read (binary + ASCII) — verify writer already
   exists; add reader and round-trip oracle. — `geom/io/stl.py` —
   oracle: write a body to STL, read back triangles == original mesh
   triangulation ± vertex-merge tolerance. — dep: GK-21 — parallel: Y —

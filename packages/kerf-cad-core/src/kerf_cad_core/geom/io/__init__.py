@@ -7,7 +7,11 @@ step_read   Pure-Python STEP AP203/214 B-rep reader (GK-47).
 step_write  Pure-Python STEP AP214 B-rep writer (GK-48).
 threemf     3MF read/write (sealed manifold + materials + colour + thumbnail) (GK-78).
 gltf        glTF 2.0 / GLB mesh + PBR materials reader/writer (GK-79).
+<<<<<<< HEAD
 obj         Wavefront OBJ mesh + groups + mtllib reader/writer (GK-80).
+=======
+stl         STL read (binary + ASCII) + write (GK-81).
+>>>>>>> dbb81639 (feat(geom): GK-81 STL read (binary + ASCII) + write verify)
 """
 from kerf_cad_core.geom.io.iges import (
     IgesReadError,
@@ -38,12 +42,21 @@ from kerf_cad_core.geom.io.gltf import (
     GltfReadError,
     GltfWriteError,
 )
+<<<<<<< HEAD
 # GK-80: Wavefront OBJ read + write
 from kerf_cad_core.geom.io.obj import (
     read_obj,
     write_obj,
     ObjReadError,
     ObjWriteError,
+=======
+# GK-81: STL read (binary + ASCII) + write
+from kerf_cad_core.geom.io.stl import (
+    read_stl,
+    write_stl,
+    StlReadError,
+    StlWriteError,
+>>>>>>> dbb81639 (feat(geom): GK-81 STL read (binary + ASCII) + write verify)
 )
 
 __all__ = [
@@ -66,9 +79,17 @@ __all__ = [
     "write_gltf",
     "GltfReadError",
     "GltfWriteError",
+<<<<<<< HEAD
     # GK-80
     "read_obj",
     "write_obj",
     "ObjReadError",
     "ObjWriteError",
+=======
+    # GK-81
+    "read_stl",
+    "write_stl",
+    "StlReadError",
+    "StlWriteError",
+>>>>>>> dbb81639 (feat(geom): GK-81 STL read (binary + ASCII) + write verify)
 ]

@@ -203,6 +203,7 @@ testpaths = [
     "packages/kerf-workers/tests",
     "packages/kerf-parts/tests",
     "packages/kerf-partsgen/tests",
+    "tests/perf",
 ]
 asyncio_mode = "auto"
 # importlib mode lets multiple plugin tests/ dirs coexist without conflicting

@@ -5340,3 +5340,23 @@ User-direction 2026-05-19. Extends T-179 (apparel pattern-making) with deeper te
 - **Definition of Done:** 50+ entries; lookup by category; LCA sustainability score for a garment from its material mix; pytest oracles.
 - **Depends-on:** none
 
+## Viewport performance (T-320)
+
+### T-320 Large-assembly LOD + lazy-load + perf harness
+- **Tier:** A
+- **Priority:** P0
+- **Status:** ✅ shipped (2026-05-20) · **Tier A · P0**
+- **Scope:** Angular-size LOD pipeline (`src/lib/lod.js`), frustum-cull + prefetch lazy-load manager (`src/lib/assemblyLoader.js`), quadric-edge-collapse decimation thin wrapper (`packages/kerf-cad-core/src/kerf_cad_core/mesh_decimate.py`), Python perf harness for N ∈ {100,1k,5k,10k} (`scripts/perf_assembly.py`), pytest + vitest oracle suite.
+- **Target files/packages:**
+  - `src/lib/lod.js` — LOD pipeline (angular-size threshold + QEM decimation)
+  - `src/lib/assemblyLoader.js` — lazy-load: frustum-cull + N-component prefetch window
+  - `packages/kerf-cad-core/src/kerf_cad_core/mesh_decimate.py` — `decimate_to_ratio` QEM wrapper
+  - `scripts/perf_assembly.py` — perf harness: parse+LOD-select at 4 scales; modelled FPS (no GPU)
+  - `tests/perf/test_large_assembly.py` — pytest: mesh_decimate ~10% reduction + bbox; frustum/prefetch; LOD selection; harness at all scales
+  - `src/lib/lod.test.js` — vitest: decimation, buildLODProxy, angularSize, selectLOD
+  - `src/lib/assemblyLoader.test.js` — vitest: frustum-cull, prefetch, eviction, factory
+- **Definition of Done:**
+  - VERIFIED (headless): mesh_decimate ~10% triangle reduction + bbox preservation; frustum-cull + prefetch (parts outside frustum+window not loaded); LOD proxy swap below angular-size threshold; perf harness runs at {100,1k,5k,10k}; pytest 29 passed; vitest 38 passed; `npm run build` clean.
+  - MODELLED (no GPU): fps_proxy / fps_full estimated from 500 Mtri/s budget + 0.03 ms/draw-call overhead — documented in `scripts/perf_assembly.py`.
+- **Depends-on:** T-15, T-16
+

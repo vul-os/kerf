@@ -559,3 +559,15 @@ End of 16-fire 30-min cadence.
 - No migrations / no frontend delta this wave → no redeploy.
 - T-266 (turbulent Cd closure) still running. Completed worktrees auto-/pending-cleanup.
 - Remaining open: strategic spine T-320/322/323/324/325/327/328/329/330/331/332/333; domain T-285/286; T-131 parked.
+
+## 2026-05-20 — Strategic spine COMPLETE
+- All actionable T-320..T-333 spine tasks shipped on main (HEAD 83db455d):
+  T-320 LOD, T-322 export/import, T-323 3D harness, T-324 sync, T-325 1D-systems,
+  T-326 mfg-sim, T-327 AFR v1, T-328 KBE rules, T-329 3D tolerance, T-330 PLM,
+  T-331 multi-CAD v1, T-332 reverse-eng v1, T-333 mechanism synthesis, T-334 LCA.
+  Plus depth: T-257 Caravel, T-265 USB drivers, T-266 XFOIL Cd, T-281..286 textiles.
+- Migration kind-enum: eco, sysml, system, harness folded INLINE (no alter shim); FILE_KINDS in parity; drift-guard green.
+- Broad sweep: 800 passed (exit 0). npm build clean.
+- Remaining 🔴 are all deferred/parked: T-131 (P3 offline-desktop, demand-gated), T-327b/T-331b/T-332b (v2 follow-ups).
+- All agent worktrees swept clean.
+- Final: dev deploy (bnh7cpz80) + e2e_chat_probe smoke pending.

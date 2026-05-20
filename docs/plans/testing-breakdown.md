@@ -90,7 +90,7 @@ noted.
   File: `packages/kerf-cad-core/tests/test_feature_jewelry_cost_quote.py`
   Success: 25 SKUs × metal × spot prices; total = metal + casting + setting + finishing ±0.01; FX handling correct.
 
-- [ ] T-14 Jewelry: PBR materials (gem + metal)
+- [x] T-14 Jewelry: PBR materials (gem + metal)
   Scope: viewport material assignment + render hand-off (`packages/kerf-render` integration).
   File: `packages/kerf-render/tests/test_feature_jewelry_pbr.py`
   Success: 25 material assignments; correct dispersion / IOR / metal Fresnel parameters reach render payload.

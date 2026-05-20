@@ -1550,6 +1550,8 @@ FILE_KINDS = (
     "hdl_vhdl", "hdl_verilog", "spice_netlist", "gds_layout", "oasis_layout",
     "lef_lib", "def_design", "liberty_lib", "silicon_flow", "silicon_pdk",
     "firmware_project",
+    # T-330: PLM depth — ECO (Engineering Change Order) and SysML-light trace
+    "eco", "sysml",
 )
 
 

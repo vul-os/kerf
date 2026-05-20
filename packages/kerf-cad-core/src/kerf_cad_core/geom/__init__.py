@@ -105,6 +105,8 @@ from kerf_cad_core.geom.intersection import (
 )
 # GK-34: surface fit-to-tolerance (lofted/grid least-squares + knot placement)
 from kerf_cad_core.geom.patch_srf import fit_surface
+# GK-12: curve self-intersection
+from kerf_cad_core.geom.intersection import curve_self_intersect
 # GK-49: IGES 144 trimmed-surface reader/writer
 from kerf_cad_core.geom.io.iges import (
     write_iges,
@@ -184,6 +186,8 @@ __all__ = [
     "surface_surface_intersect",
     # GK-34
     "fit_surface",
+    # GK-12
+    "curve_self_intersect",
     # GK-49
     "write_iges",
     "read_iges",

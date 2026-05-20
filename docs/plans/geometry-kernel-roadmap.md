@@ -407,7 +407,7 @@ Format: `[ ] GK-NN  scope — FILE(s) — oracle — dep — parallel? — tier`
   tangent circles ⇒ exactly one point. — dep: GK-06 — parallel: Y (after
   GK-09 lands marching helpers) — sonnet.
   *Landed: intersection.py, 25 tests.*
-- [ ] **GK-12** Curve self-intersection (figure-eight, trefoil planar
+- [x] **GK-12** Curve self-intersection (figure-eight, trefoil planar
   projection). — `geom/intersection.py` — oracle: lemniscate self-x at
   origin found to `1e-9`. — dep: GK-11 — parallel: Y — sonnet.
 - [x] **GK-13** [HARD] `surface_to_face(surf, trims=[])` and

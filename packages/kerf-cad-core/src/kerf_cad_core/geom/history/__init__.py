@@ -52,6 +52,13 @@ from kerf_cad_core.geom.history.evaluators import (
     SphereFeature,
     register_default_evaluators,
 )
+from kerf_cad_core.geom.history.feature_io import (
+    SUPPORTED_OPS,
+    FeatureLogError,
+    body_from_feature_log,
+    dag_to_feature_log,
+    load_feature_log,
+)
 
 __all__ = [
     # feature
@@ -76,4 +83,10 @@ __all__ = [
     "ChamferEdgeFeature",
     "FilletEdgeFeature",
     "register_default_evaluators",
+    # feature_io (GK-61)
+    "SUPPORTED_OPS",
+    "FeatureLogError",
+    "load_feature_log",
+    "body_from_feature_log",
+    "dag_to_feature_log",
 ]

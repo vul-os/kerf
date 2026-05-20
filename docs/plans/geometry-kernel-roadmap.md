@@ -657,13 +657,12 @@ Format: `[ ] GK-NN  scope — FILE(s) — oracle — dep — parallel? — tier`
   parallel: N — opus.
   *Landed inside `dag.regenerate` + `evaluators.py` (745 LOC) covering
   box / cylinder / sphere / boolean / chamfer / fillet kinds.*
-- [ ] **GK-61** `.feature` file ↔ in-proc DAG bridge (read existing
+- [x] **GK-61** `.feature` file ↔ in-proc DAG bridge (read existing
   append-only logs into the graph; keep `surfacing.py` API stable). —
   `geom/history/feature_io.py` — oracle: existing `.feature` fixtures
   load + regenerate to the same `Body` the worker produces (Hausdorff ≤
   tol). — dep: GK-60 — parallel: N — opus.
-  *Outstanding — DAG↔dict round-trip lands in `dag.py` but the
-  `.feature`-log bridge to the OCCT worker is deferred.*
+  *Landed: feature_io.py, 70 tests.*
 - [ ] **GK-62** G3 (curvature-rate) blend for class-A. —
   `geom/blend_srf.py` — oracle: third-derivative continuity across the
   join to `1e-5`; comb-of-combs continuous. — dep: GK-25 — parallel: Y

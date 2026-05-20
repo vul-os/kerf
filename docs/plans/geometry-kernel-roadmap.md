@@ -668,7 +668,7 @@ Format: `[ ] GK-NN  scope — FILE(s) — oracle — dep — parallel? — tier`
   `geom/blend_srf.py` — oracle: third-derivative continuity across the
   join to `1e-5`; comb-of-combs continuous. — dep: GK-25 — parallel: Y
   — sonnet.
-- [ ] **GK-63** Deviation-driven adaptive refinement (refine CP net until
+- [x] **GK-63** Deviation-driven adaptive refinement (refine CP net until
   certified Hausdorff ≤ tol). — `geom/surface_analysis.py` — oracle:
   refined approximation of a torus certified ≤ tol with minimal knots.
   — dep: GK-37 — parallel: Y — sonnet.

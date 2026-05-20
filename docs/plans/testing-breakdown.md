@@ -125,7 +125,7 @@ noted.
   File: `packages/kerf-cad-core/tests/test_feature_mech_weldment.py`
   Success: 25 frame layouts; member length, miter angle, cut volume vs analytic; weld seam topology.
 
-- [ ] T-21 Mech: thread features (cut + boss)
+- [x] T-21 Mech: thread features (cut + boss)
   Scope: `feature_thread.py` + `thread_specs.py` ISO/UNF/UNC.
   File: `packages/kerf-cad-core/tests/test_feature_mech_threads.py`
   Success: 25 thread specs; pitch/diameter match catalog; engagement length vs DIN/ASME.

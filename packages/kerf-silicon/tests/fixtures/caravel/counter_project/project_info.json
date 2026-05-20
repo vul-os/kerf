@@ -1,0 +1,9 @@
+{
+    "project": {
+        "title": "32-bit Caravel Counter",
+        "author": "Kerf Test Fixture",
+        "description": "A simple 32-bit free-running counter wired to the Caravel interface.",
+        "top_module": "user_counter",
+        "language": "Verilog"
+    }
+}

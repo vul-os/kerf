@@ -755,7 +755,7 @@ in `geom/__init__.py`.
   `geom/hole_feature.py` — oracle: through-hole on box reduces volume
   by π r² h ± tol; counterbore subtracts both cylinders; csink subtracts
   cylinder + cone. — dep: GK-18 — parallel: Y — sonnet.
-- [ ] **GK-76** Wall-thickness map: sample N rays from inside the body,
+- [x] **GK-76** Wall-thickness map: sample N rays from inside the body,
   return min wall thickness + per-face min map + heatmap-ready array.
   Critical printability gate for jewelry. — `geom/wall_thickness.py` —
   oracle: hollowed sphere of wall t returns min ≈ t ± tol on every

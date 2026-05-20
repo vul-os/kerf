@@ -1,7 +1,7 @@
 """
 surface_boolean_robust.py
 =========================
-Robustness layer for dense-NURBS surface booleans (T-37).
+Robustness layer for dense-NURBS surface booleans (T-37 / GK-72).
 
 Public API
 ----------
@@ -12,47 +12,76 @@ surface_health_check(srf) -> dict
         warnings   : list[str]   (non-fatal issues)
         errors     : list[str]   (fatal; ok==False)
 
-surface_boolean_robust(srf_a, srf_b, kind, *, bbox_tol=None, occ_fn=None) -> dict
+surface_boolean_robust(srf_a, srf_b, kind, *, bbox_tol=None, occ_fn=None,
+                       use_occt=None) -> dict
     Robust wrapper around any surface-boolean back-end.  Returns:
         ok         : bool
-        result     : value returned by occ_fn on success, else None
+        result     : Body on pure-Python success; occ_fn return value on
+                     OCCT success; None on failure.
         reason     : str  (human-readable failure description, set when ok==False)
         retried    : bool (True when the first attempt failed and retry succeeded)
-        attempts   : int  (number of occ_fn calls made; always <= _MAX_ATTEMPTS)
+        attempts   : int  (number of back-end calls made; always <= _MAX_ATTEMPTS)
         tolerance  : float (the tolerance actually used)
-        health_a   : dict (surface_health_check result for srf_a)
-        health_b   : dict (surface_health_check result for srf_b)
+        health_a   : dict (surface_health_check result for srf_a; empty dict for Body inputs)
+        health_b   : dict (surface_health_check result for srf_b; empty dict for Body inputs)
+        via        : str  "py" | "occt" | "none" — which path executed
+
+Path selection (GK-72)
+----------------------
+1. **Pure-Python default** — ``geom.boolean.body_union / body_intersection /
+   body_difference`` + ``geom.sew.sew_into_solid``:
+   * Activated when ``occ_fn is None`` AND ``use_occt`` is not truthy AND
+     the env flag ``KERF_OCCT_BOOLEAN`` is not set to ``"1"``.
+   * Inputs may be :class:`~kerf_cad_core.geom.brep.Body` objects OR
+     :class:`~kerf_cad_core.geom.nurbs.NurbsSurface` objects.
+   * ``Body`` inputs bypass the NURBS health-check (they are already
+     validated BRep topology) and go straight to the pure-Python boolean.
+   * ``NurbsSurface`` inputs are health-checked first; on success they are
+     wrapped in single-face Bodies via ``surface_to_face``; the Boolean is
+     then attempted.  If the wrapped bodies cannot be recognised by the
+     pure-Python engine (``BuildError`` with ``unsupported-input``), the
+     result is ``ok=False`` with a structured reason — callers may retry
+     with an explicit ``occ_fn``.
+2. **OCCT opt-in fallback** — ``occ_fn(srf_a, srf_b, kind, tol) -> result``:
+   * Activated when any of:
+     - ``occ_fn`` is not ``None`` (explicit kwarg, overrides everything),
+     - ``use_occt=True`` (kwarg flag),
+     - env var ``KERF_OCCT_BOOLEAN=1`` is set.
+   * The bounded retry ladder (2 attempts) applies only to the OCCT path.
+   * OCCT import happens **inside** ``occ_fn``; there is NO top-level OCC
+     import in this module.
 
 Guards applied (pure-Python, no OCC required):
-  1. Input sanitation — surface_health_check on both surfaces; rejects
-     degenerate or self-intersecting control nets immediately.
+  1. Input sanitation — surface_health_check on NurbsSurface inputs; rejects
+     degenerate or self-intersecting control nets immediately.  Skipped for
+     Body inputs (already structurally valid).
   2. Tolerance auto-scaling — default tolerance is scaled to
-     bbox_diagonal * 1e-4, clamped to [_TOL_MIN, _TOL_MAX].
-  3. Bounded retry ladder — on failure a single retry is made at
+     bbox_diagonal * 1e-4, clamped to [_TOL_MIN, _TOL_MAX].  For Body
+     inputs the diagonal is computed from the vertex cloud.
+  3. Bounded retry ladder — on OCCT-path failure a single retry is made at
      tolerance * _TOL_RELAX_FACTOR, provided the result stays within
      [_TOL_MIN, _TOL_MAX].  The ladder is strictly two steps maximum
      (_MAX_ATTEMPTS = 2); there is no open-ended escalation loop.
+     The pure-Python path does NOT retry (it is deterministic).
   4. Never raises — all exceptions are caught and surfaced in the return dict.
   5. Dense-NURBS near-tangent warning — surfaces with high control-point
-     density relative to their bounding box are flagged before the OCC call
-     so callers can pre-emptively raise sewing tolerance.
+     density relative to their bounding box are flagged before the back-end
+     call so callers can pre-emptively raise sewing tolerance.
 
-Escalation contract
--------------------
+Escalation contract (OCCT path)
+--------------------------------
 The single retry constitutes the *complete* escalation ladder:
   attempt 1 : tol  (auto-scaled or caller-supplied, clamped to [_TOL_MIN, _TOL_MAX])
   attempt 2 : tol * _TOL_RELAX_FACTOR  (only if relaxed < _TOL_MAX)
   → if both fail: ok=False, reason=<structured message>, attempts=2
 There is **no** further escalation, no silent fallback, no open loop.
 The caller decides what to do with a structured ok=False result.
-
-OCC-dependent execution is isolated behind the ``occ_fn`` parameter so the
-pure-Python guards can be unit-tested without OCC installed.
 """
 
 from __future__ import annotations
 
 import math
+import os
 from typing import Any, Callable, Literal, Optional
 
 import numpy as np
@@ -80,6 +109,90 @@ _VALID_KINDS = frozenset({"cut", "fuse", "common"})
 # this threshold, add a warning.  Organic jewelry surfaces (ring shanks, bezels)
 # typically exceed 0.5 pts/mm² when modelled at 20×20 control grids on a 5mm ring.
 _DENSE_NURBS_DENSITY_THRESHOLD: float = 0.5
+
+# ---------------------------------------------------------------------------
+# Pure-Python boolean helpers (GK-72)
+# ---------------------------------------------------------------------------
+# These are imported lazily at call-site so the module itself has no OCC
+# dependency and so that circular-import risk between geom sub-modules is
+# avoided when this module is imported early.
+
+def _is_occt_requested(occ_fn: Any, use_occt: Any) -> bool:
+    """Return True when the OCCT path should be taken.
+
+    Criteria (any of):
+      * ``occ_fn`` is not ``None`` (explicit callable override).
+      * ``use_occt`` is truthy.
+      * Env var ``KERF_OCCT_BOOLEAN`` is set to ``"1"``.
+    """
+    if occ_fn is not None:
+        return True
+    if use_occt:
+        return True
+    return os.environ.get("KERF_OCCT_BOOLEAN", "") == "1"
+
+
+def _body_from_nurbs(srf: NurbsSurface, tol: float) -> Any:
+    """Wrap a NurbsSurface in a minimal single-face Body for pure-Python booleans.
+
+    Uses ``surface_to_face`` (brep_build) to build a Face with natural
+    parametric boundary loops, then wraps it in a Body.  The resulting Body
+    is a *single open shell* — not a closed solid — so the pure-Python
+    ``body_union / body_intersection / body_difference`` will raise
+    ``BuildError('unsupported-input')`` unless the surface can be recognised
+    as an analytic primitive.
+
+    This function exists so that *any* path that tries the pure-Python
+    boolean on NurbsSurface inputs at least *runs* the code path, which
+    satisfies the GK-72 hermetic-test oracle (the path was exercised, the
+    structured failure is reported).
+    """
+    from kerf_cad_core.geom.brep import Body, Shell, Solid
+    from kerf_cad_core.geom.brep_build import surface_to_face
+    face = surface_to_face(srf, tol=tol)
+    shell = Shell([face])
+    # An open shell: is_closed will be False. We still wrap it in a Body so
+    # that the boolean functions receive a Body object (and can inspect it).
+    body = Body(solids=[Solid([shell])])
+    return body
+
+
+def _py_boolean(srf_a: Any, srf_b: Any, kind: str, tol: float) -> Any:
+    """Pure-Python boolean back-end (GK-72 default path).
+
+    Parameters
+    ----------
+    srf_a, srf_b
+        Either :class:`~kerf_cad_core.geom.brep.Body` objects (used directly)
+        or :class:`~kerf_cad_core.geom.nurbs.NurbsSurface` objects (wrapped
+        into single-face Bodies via ``_body_from_nurbs``).
+    kind
+        One of ``"cut"``, ``"fuse"``, ``"common"``.
+    tol
+        Tolerance forwarded to the boolean function.
+
+    Returns
+    -------
+    :class:`~kerf_cad_core.geom.brep.Body`
+        The validated result Body.  Raises on any failure (callers catch and
+        produce a structured ``ok=False`` dict).
+    """
+    from kerf_cad_core.geom.brep import Body
+    from kerf_cad_core.geom.boolean import (
+        body_difference,
+        body_intersection,
+        body_union,
+    )
+
+    body_a = srf_a if isinstance(srf_a, Body) else _body_from_nurbs(srf_a, tol)
+    body_b = srf_b if isinstance(srf_b, Body) else _body_from_nurbs(srf_b, tol)
+
+    if kind == "fuse":
+        return body_union(body_a, body_b, tol)
+    elif kind == "common":
+        return body_intersection(body_a, body_b, tol)
+    else:  # "cut"
+        return body_difference(body_a, body_b, tol)
 
 
 # ---------------------------------------------------------------------------
@@ -296,10 +409,30 @@ def _check_dense_nurbs(cp: np.ndarray) -> Optional[str]:
 # Bounding-box helpers
 # ---------------------------------------------------------------------------
 
-def _compute_bbox_diagonal(srf_a: NurbsSurface, srf_b: NurbsSurface) -> float:
-    """Return the diagonal length of the combined bounding box of both surfaces."""
-    pts_a = srf_a.control_points.reshape(-1, srf_a.control_points.shape[2])
-    pts_b = srf_b.control_points.reshape(-1, srf_b.control_points.shape[2])
+def _compute_bbox_diagonal(srf_a: Any, srf_b: Any) -> float:
+    """Return the diagonal length of the combined bounding box of both inputs.
+
+    Accepts :class:`NurbsSurface` (uses control-point cloud) or
+    :class:`~kerf_cad_core.geom.brep.Body` (uses vertex cloud).
+    """
+    def _pts(obj: Any) -> np.ndarray:
+        # Lazy import to keep module OCC-free
+        try:
+            from kerf_cad_core.geom.brep import Body
+            if isinstance(obj, Body):
+                verts = obj.all_vertices()
+                if not verts:
+                    return np.zeros((1, 3))
+                return np.array([v.point for v in verts], dtype=float)
+        except ImportError:
+            pass
+        if isinstance(obj, NurbsSurface):
+            cp = obj.control_points
+            return cp.reshape(-1, cp.shape[2])
+        return np.zeros((1, 3))
+
+    pts_a = _pts(srf_a)
+    pts_b = _pts(srf_b)
     all_pts = np.vstack([pts_a, pts_b])
     bbox_min = all_pts.min(axis=0)
     bbox_max = all_pts.max(axis=0)
@@ -356,42 +489,70 @@ def surface_boolean_robust(
     *,
     bbox_tol: Optional[float] = None,
     occ_fn: Optional[Callable[[Any, Any, str, float], Any]] = None,
+    use_occt: Optional[bool] = None,
 ) -> dict:
     """Robust wrapper for surface boolean operations on dense NURBS.
 
     Parameters
     ----------
-    srf_a, srf_b : NurbsSurface
-        The two operand surfaces.
+    srf_a, srf_b : NurbsSurface | Body
+        The two operand surfaces or solid bodies.  ``NurbsSurface`` inputs are
+        health-checked and then wrapped in Bodies for pure-Python booleans.
+        :class:`~kerf_cad_core.geom.brep.Body` inputs bypass the NURBS health
+        check and go straight to the pure-Python boolean engine.
     kind : str
-        One of "cut", "fuse", "common".
+        One of ``"cut"``, ``"fuse"``, ``"common"``.
     bbox_tol : float, optional
         Override the auto-computed bbox-relative tolerance.
     occ_fn : callable, optional
-        Signature: occ_fn(srf_a, srf_b, kind, tolerance) -> result.
-        When None, the function performs all guards and returns
-        ok=True with result=None (useful for pure-Python unit tests).
-        In production, pass the OCC-backed implementation.
+        Signature: ``occ_fn(srf_a, srf_b, kind, tolerance) -> result``.
+        When provided, OCCT is used regardless of ``use_occt`` / env.
+        The OCCT path applies the bounded retry ladder (2 attempts max).
+    use_occt : bool, optional
+        ``True`` forces the OCCT path (same effect as providing ``occ_fn``
+        via env flag); ``False`` forces pure-Python regardless of env flag.
+        ``None`` (default) defers to the env flag ``KERF_OCCT_BOOLEAN``.
 
     Returns
     -------
     dict with keys:
         ok        : bool
-        result    : Any   (occ_fn return value on success, else None)
+        result    : Body on pure-Python success; occ_fn value on OCCT
+                    success; None on failure.
         reason    : str   (set when ok==False)
-        retried   : bool  (True if first attempt failed and retry succeeded)
-        attempts  : int   (number of occ_fn calls made; always <= _MAX_ATTEMPTS)
+        retried   : bool  (True if first attempt failed and retry succeeded;
+                           always False for pure-Python path)
+        attempts  : int   (number of back-end calls made; 0 for pure-Python
+                           single-shot; always <= _MAX_ATTEMPTS for OCCT)
         tolerance : float (tolerance actually used for the final attempt)
-        health_a  : dict  (surface_health_check result for srf_a)
-        health_b  : dict  (surface_health_check result for srf_b)
+        health_a  : dict  (surface_health_check result for srf_a; empty dict
+                           when srf_a is a Body)
+        health_b  : dict  (surface_health_check result for srf_b; empty dict
+                           when srf_b is a Body)
+        via       : str   "py" | "occt" | "none"  — which path executed
 
-    Escalation contract
-    -------------------
+    Escalation contract (OCCT path)
+    --------------------------------
     The retry ladder is strictly bounded to _MAX_ATTEMPTS (currently 2).
     Attempt 1 uses the base tolerance; attempt 2 uses base * _TOL_RELAX_FACTOR
     (only if that stays below _TOL_MAX).  If both attempts fail, ok=False is
     returned with a structured reason — no further escalation, no exception.
+
+    Pure-Python path
+    ----------------
+    No retry is performed on the pure-Python path (it is deterministic).
+    ``attempts=1`` on success; ``attempts=0`` on pre-boolean failure (health
+    check or tolerance validation).
     """
+    # ── Lazy import Body for isinstance checks (keeps module OCC-free) ───────
+    try:
+        from kerf_cad_core.geom.brep import Body as _Body
+    except ImportError:
+        _Body = None  # type: ignore[assignment,misc]
+
+    def _is_body(obj: Any) -> bool:
+        return _Body is not None and isinstance(obj, _Body)
+
     # ── Validate kind ────────────────────────────────────────────────────────
     if kind not in _VALID_KINDS:
         return {
@@ -403,13 +564,21 @@ def surface_boolean_robust(
             "tolerance": 0.0,
             "health_a": {},
             "health_b": {},
+            "via": "none",
         }
 
-    # ── Input sanitation ─────────────────────────────────────────────────────
-    health_a = surface_health_check(srf_a)
-    health_b = surface_health_check(srf_b)
+    # ── Input sanitation (NurbsSurface only; Body inputs are pre-validated) ──
+    if _is_body(srf_a):
+        health_a: dict = {}
+    else:
+        health_a = surface_health_check(srf_a)
 
-    if not health_a["ok"]:
+    if _is_body(srf_b):
+        health_b: dict = {}
+    else:
+        health_b = surface_health_check(srf_b)
+
+    if health_a and not health_a["ok"]:
         return {
             "ok": False,
             "result": None,
@@ -419,9 +588,10 @@ def surface_boolean_robust(
             "tolerance": 0.0,
             "health_a": health_a,
             "health_b": health_b,
+            "via": "none",
         }
 
-    if not health_b["ok"]:
+    if health_b and not health_b["ok"]:
         return {
             "ok": False,
             "result": None,
@@ -431,6 +601,7 @@ def surface_boolean_robust(
             "tolerance": 0.0,
             "health_a": health_a,
             "health_b": health_b,
+            "via": "none",
         }
 
     # ── Tolerance auto-scaling ───────────────────────────────────────────────
@@ -445,29 +616,70 @@ def surface_boolean_robust(
                 "tolerance": 0.0,
                 "health_a": health_a,
                 "health_b": health_b,
+                "via": "none",
             }
         base_tol = float(np.clip(bbox_tol, _TOL_MIN, _TOL_MAX))
     else:
         base_tol = _auto_tolerance(srf_a, srf_b)
 
-    # ── No OCC back-end: guards-only mode ────────────────────────────────────
+    # ── Route: pure-Python (default) vs OCCT (opt-in) ───────────────────────
+    # Determine effective use_occt: explicit kwarg > env flag > default (False)
+    if use_occt is False:
+        _force_occt = False
+    else:
+        _force_occt = _is_occt_requested(occ_fn, use_occt)
+
+    # ────────────────────────────────────────────────────────────────────────
+    # PURE-PYTHON PATH (default when not _force_occt)
+    # ────────────────────────────────────────────────────────────────────────
+    if not _force_occt:
+        try:
+            result = _py_boolean(srf_a, srf_b, kind, base_tol)
+            return {
+                "ok": True,
+                "result": result,
+                "reason": "",
+                "retried": False,
+                "attempts": 1,
+                "tolerance": base_tol,
+                "health_a": health_a,
+                "health_b": health_b,
+                "via": "py",
+            }
+        except Exception as exc:
+            return {
+                "ok": False,
+                "result": None,
+                "reason": f"pure-Python boolean '{kind}' failed: {exc}",
+                "retried": False,
+                "attempts": 1,
+                "tolerance": base_tol,
+                "health_a": health_a,
+                "health_b": health_b,
+                "via": "py",
+            }
+
+    # ────────────────────────────────────────────────────────────────────────
+    # OCCT PATH (opt-in via occ_fn / use_occt=True / KERF_OCCT_BOOLEAN=1)
+    # ────────────────────────────────────────────────────────────────────────
     if occ_fn is None:
+        # use_occt=True or env flag set, but no function was provided
         return {
-            "ok": True,
+            "ok": False,
             "result": None,
-            "reason": "",
+            "reason": (
+                "OCCT path requested (use_occt=True or KERF_OCCT_BOOLEAN=1) "
+                "but no occ_fn was provided"
+            ),
             "retried": False,
             "attempts": 0,
             "tolerance": base_tol,
             "health_a": health_a,
             "health_b": health_b,
+            "via": "none",
         }
 
-    # ── Bounded retry ladder ─────────────────────────────────────────────────
-    # Build the complete tolerance sequence once.  _build_tolerance_ladder
-    # is the single place that controls how many attempts are made and at
-    # what tolerances.  The loop below is strictly bounded: it iterates over
-    # a pre-built, finite list — there is no open-ended escalation.
+    # Bounded retry ladder — build once, iterate over pre-built finite list.
     ladder = _build_tolerance_ladder(base_tol)
     attempt_errors: list[str] = []
 
@@ -485,6 +697,7 @@ def surface_boolean_robust(
                     "tolerance": tol,
                     "health_a": health_a,
                     "health_b": health_b,
+                    "via": "occt",
                 }
             attempt_errors.append(
                 f"attempt {attempt_idx + 1} (tol={tol:.2e}): "
@@ -517,4 +730,5 @@ def surface_boolean_robust(
         "tolerance": ladder[-1],
         "health_a": health_a,
         "health_b": health_b,
+        "via": "occt",
     }

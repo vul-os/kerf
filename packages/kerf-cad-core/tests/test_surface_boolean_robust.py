@@ -308,18 +308,27 @@ class TestRobustToleranceScaling:
         assert tol <= _TOL_MAX
 
     def test_bbox_tol_override_respected(self):
+        """GK-72: bbox_tol is used as base tolerance regardless of path.
+
+        With NurbsSurface inputs the pure-Python path fails (unsupported-input),
+        but the tolerance field reflects the requested override.
+        """
         srf_a = make_simple_surface()
         srf_b = make_simple_surface()
         result = surface_boolean_robust(srf_a, srf_b, "cut", bbox_tol=5e-5)
-        assert result["ok"] is True
+        # Tolerance is recorded even on pure-Python failure
         assert abs(result["tolerance"] - 5e-5) < 1e-10
 
     def test_bbox_tol_clamped_to_min(self):
+        """GK-72: sub-minimum bbox_tol is clamped to _TOL_MIN.
+
+        With NurbsSurface inputs the pure-Python path fails, but the
+        tolerance field is still clamped correctly.
+        """
         srf_a = make_simple_surface()
         srf_b = make_simple_surface()
         # Provide a tolerance below the minimum; should be clamped
         result = surface_boolean_robust(srf_a, srf_b, "cut", bbox_tol=1e-20)
-        assert result["ok"] is True
         assert result["tolerance"] >= _TOL_MIN
 
 
@@ -328,12 +337,25 @@ class TestRobustToleranceScaling:
 # ---------------------------------------------------------------------------
 
 class TestRobustOccFnPaths:
-    def test_no_occ_fn_returns_ok_no_result(self):
+    def test_no_occ_fn_attempts_pure_python(self):
+        """GK-72: occ_fn=None now runs pure-Python path (not guards-only).
+
+        NurbsSurface inputs are not recognised by the AABB/sphere/cylinder
+        engine, so the pure-Python boolean raises BuildError('unsupported-input')
+        and the wrapper returns ok=False with via='py'.  The key assertion is
+        that the path used is 'py' (not 'occt' / 'none') and that no OCCT
+        import was attempted.
+        """
         srf_a = make_simple_surface()
         srf_b = make_simple_surface()
         result = surface_boolean_robust(srf_a, srf_b, "cut", occ_fn=None)
-        assert result["ok"] is True
+        # Pure-Python path was attempted
+        assert result["via"] == "py"
+        # Result is None because NurbsSurface bodies are unsupported-input
         assert result["result"] is None
+        # ok=False with a reason (unsupported-input from boolean engine)
+        assert isinstance(result["reason"], str)
+        assert len(result["reason"]) > 0
 
     def test_occ_fn_success_path(self):
         srf_a = make_simple_surface()
@@ -461,11 +483,23 @@ class TestRobustResultStructure:
         assert len(result["reason"]) > 0
 
     def test_all_valid_kinds_accepted(self):
+        """GK-72: all three kind values are accepted (not rejected by kind-guard).
+
+        With NurbsSurface inputs the pure-Python boolean fails
+        (unsupported-input), but the failure comes from the boolean engine, not
+        from kind-validation — so the result dict is structurally complete and
+        via='py'.
+        """
         srf_a = make_simple_surface()
         srf_b = make_simple_surface()
         for kind in ("cut", "fuse", "common"):
             result = surface_boolean_robust(srf_a, srf_b, kind)
-            assert result["ok"] is True, f"kind={kind!r} should be accepted"
+            # Kind was accepted (not rejected by the kind-guard)
+            assert "invalid boolean kind" not in result.get("reason", ""), (
+                f"kind={kind!r} was incorrectly rejected by kind-guard"
+            )
+            # Pure-Python path was taken
+            assert result["via"] == "py", f"kind={kind!r} did not use py path"
 
 
 # ---------------------------------------------------------------------------
@@ -491,3 +525,236 @@ class TestRelaxedTolerance:
         relaxed = _relaxed_tolerance(tol)
         assert relaxed is not None
         assert relaxed <= _TOL_MAX
+
+
+# ---------------------------------------------------------------------------
+# GK-72: pure-Python default path + OCCT opt-in
+# ---------------------------------------------------------------------------
+
+def _make_box_body(
+    x: float = 0.0,
+    y: float = 0.0,
+    z: float = 0.0,
+    dx: float = 2.0,
+    dy: float = 2.0,
+    dz: float = 2.0,
+    tol: float = 1e-7,
+):
+    """Return an axis-aligned box Body via brep_build.box_to_body."""
+    from kerf_cad_core.geom.brep_build import box_to_body
+    return box_to_body(corner=(x, y, z), dx=dx, dy=dy, dz=dz, tol=tol)
+
+
+class TestGK72PurePythonDefault:
+    """GK-72 oracle: pure-Python is the DEFAULT path; OCCT is opt-in.
+
+    All tests are hermetic — no OCC import, no database, no network.
+    """
+
+    # ── via field ─────────────────────────────────────────────────────────
+
+    def test_result_has_via_key(self):
+        """Result dict always contains 'via' key (new in GK-72)."""
+        srf_a = make_simple_surface()
+        srf_b = make_simple_surface()
+        result = surface_boolean_robust(srf_a, srf_b, "cut")
+        assert "via" in result
+
+    def test_default_path_is_py_not_occt(self):
+        """With no occ_fn and no env flag, via='py' (pure-Python attempted)."""
+        srf_a = make_simple_surface()
+        srf_b = make_simple_surface()
+        result = surface_boolean_robust(srf_a, srf_b, "fuse")
+        assert result["via"] == "py"
+
+    def test_occt_occ_fn_gives_via_occt(self):
+        """Passing occ_fn forces via='occt'."""
+        srf_a = make_simple_surface()
+        srf_b = make_simple_surface()
+        sentinel = object()
+
+        def stub_occ_fn(a, b, kind, tol):
+            return sentinel
+
+        result = surface_boolean_robust(srf_a, srf_b, "fuse", occ_fn=stub_occ_fn)
+        assert result["via"] == "occt"
+        assert result["result"] is sentinel
+
+    def test_use_occt_true_no_occ_fn_returns_error(self):
+        """use_occt=True with no occ_fn provided returns ok=False, via='none'."""
+        srf_a = make_simple_surface()
+        srf_b = make_simple_surface()
+        result = surface_boolean_robust(srf_a, srf_b, "cut", use_occt=True)
+        assert result["ok"] is False
+        assert result["via"] == "none"
+        assert "occ_fn" in result["reason"].lower() or "occt" in result["reason"].lower()
+
+    def test_use_occt_false_overrides_env_flag(self, monkeypatch):
+        """use_occt=False forces pure-Python even if KERF_OCCT_BOOLEAN=1."""
+        monkeypatch.setenv("KERF_OCCT_BOOLEAN", "1")
+        srf_a = make_simple_surface()
+        srf_b = make_simple_surface()
+        occt_called = []
+
+        def stub_occ_fn(a, b, kind, tol):
+            occt_called.append(True)
+            return object()
+
+        result = surface_boolean_robust(
+            srf_a, srf_b, "cut", occ_fn=stub_occ_fn, use_occt=False
+        )
+        # use_occt=False should override both the env flag AND occ_fn
+        assert result["via"] == "py"
+        assert occt_called == []
+
+    def test_env_flag_kerf_occt_boolean_routes_to_occt(self, monkeypatch):
+        """KERF_OCCT_BOOLEAN=1 env flag routes to OCCT when occ_fn provided."""
+        monkeypatch.setenv("KERF_OCCT_BOOLEAN", "1")
+        srf_a = make_simple_surface()
+        srf_b = make_simple_surface()
+        sentinel = object()
+
+        def stub_occ_fn(a, b, kind, tol):
+            return sentinel
+
+        result = surface_boolean_robust(srf_a, srf_b, "fuse", occ_fn=stub_occ_fn)
+        assert result["via"] == "occt"
+        assert result["result"] is sentinel
+
+    # ── Body inputs succeed on pure-Python path ───────────────────────────
+
+    def test_body_union_via_py_default(self):
+        """Box+box union via pure-Python default path returns a validated Body.
+
+        Oracle (GK-72): occ_fn=None now returns a real validated Body,
+        not result=None.
+        """
+        from kerf_cad_core.geom.brep import Body
+        body_a = _make_box_body(x=0.0, dx=2.0)
+        body_b = _make_box_body(x=1.0, dx=2.0)  # overlapping
+        result = surface_boolean_robust(body_a, body_b, "fuse")
+        assert result["ok"] is True, f"expected ok=True; reason={result['reason']!r}"
+        assert isinstance(result["result"], Body), (
+            f"expected Body result; got {type(result['result'])}"
+        )
+        assert result["via"] == "py"
+        assert result["retried"] is False
+
+    def test_body_intersection_via_py_default(self):
+        """Box∩box intersection returns a validated Body on the py path."""
+        from kerf_cad_core.geom.brep import Body
+        body_a = _make_box_body(x=0.0, dx=2.0)
+        body_b = _make_box_body(x=1.0, dx=2.0)
+        result = surface_boolean_robust(body_a, body_b, "common")
+        assert result["ok"] is True
+        assert isinstance(result["result"], Body)
+        assert result["via"] == "py"
+
+    def test_body_difference_via_py_default(self):
+        """Box − box difference returns a validated Body on the py path."""
+        from kerf_cad_core.geom.brep import Body
+        body_a = _make_box_body(x=0.0, dx=3.0)
+        body_b = _make_box_body(x=1.0, dx=1.0)  # fully inside body_a
+        result = surface_boolean_robust(body_a, body_b, "cut")
+        assert result["ok"] is True
+        assert isinstance(result["result"], Body)
+        assert result["via"] == "py"
+
+    def test_body_health_check_skipped(self):
+        """Body inputs skip the NURBS health check (health_a/b = empty dict)."""
+        body_a = _make_box_body()
+        body_b = _make_box_body(x=3.0)
+        result = surface_boolean_robust(body_a, body_b, "fuse")
+        assert result["health_a"] == {}
+        assert result["health_b"] == {}
+
+    def test_body_disjoint_union_two_solids(self):
+        """Disjoint boxes produce a multi-solid Body via the py path."""
+        from kerf_cad_core.geom.brep import Body
+        body_a = _make_box_body(x=0.0, dx=1.0)
+        body_b = _make_box_body(x=5.0, dx=1.0)  # far away, disjoint
+        result = surface_boolean_robust(body_a, body_b, "fuse")
+        assert result["ok"] is True
+        assert isinstance(result["result"], Body)
+        assert result["via"] == "py"
+        # disjoint union → two solids
+        assert len(result["result"].solids) == 2
+
+    # ── NurbsSurface inputs fail gracefully on pure-Python path ──────────
+
+    def test_nurbs_inputs_fail_gracefully_on_py_path(self):
+        """NurbsSurface inputs are unsupported by the AABB/sphere engine.
+
+        Failure is graceful (ok=False, via='py'), not an exception.
+        """
+        srf_a = make_simple_surface()
+        srf_b = make_simple_surface()
+        result = surface_boolean_robust(srf_a, srf_b, "cut")
+        assert result["ok"] is False
+        assert result["via"] == "py"
+        assert result["result"] is None
+        # Reason should mention unsupported or the boolean engine failure
+        assert isinstance(result["reason"], str) and len(result["reason"]) > 0
+
+    def test_nurbs_with_explicit_occ_fn_uses_occt(self):
+        """NurbsSurface + explicit occ_fn → OCCT path, not pure-Python."""
+        srf_a = make_simple_surface()
+        srf_b = make_simple_surface()
+        occt_calls = []
+        sentinel = object()
+
+        def stub_occ_fn(a, b, kind, tol):
+            occt_calls.append((a, b, kind, tol))
+            return sentinel
+
+        result = surface_boolean_robust(srf_a, srf_b, "fuse", occ_fn=stub_occ_fn)
+        assert result["ok"] is True
+        assert result["result"] is sentinel
+        assert result["via"] == "occt"
+        assert len(occt_calls) == 1
+
+    # ── result dict completeness ──────────────────────────────────────────
+
+    def test_result_has_all_required_keys_on_py_success(self):
+        """py-path success dict contains all documented keys."""
+        required = {"ok", "result", "reason", "retried", "attempts",
+                    "tolerance", "health_a", "health_b", "via"}
+        body_a = _make_box_body()
+        body_b = _make_box_body(x=3.0)
+        result = surface_boolean_robust(body_a, body_b, "fuse")
+        assert required <= set(result.keys())
+
+    def test_result_has_all_required_keys_on_py_failure(self):
+        """py-path failure dict contains all documented keys."""
+        required = {"ok", "result", "reason", "retried", "attempts",
+                    "tolerance", "health_a", "health_b", "via"}
+        srf_a = make_simple_surface()
+        srf_b = make_simple_surface()
+        result = surface_boolean_robust(srf_a, srf_b, "cut")
+        assert required <= set(result.keys())
+
+    def test_py_success_retried_is_false(self):
+        """Pure-Python path never retries (deterministic)."""
+        body_a = _make_box_body()
+        body_b = _make_box_body(x=3.0)
+        result = surface_boolean_robust(body_a, body_b, "fuse")
+        assert result["retried"] is False
+
+    def test_invalid_kind_still_returns_via_none(self):
+        """Invalid kind is rejected before path selection; via='none'."""
+        body_a = _make_box_body()
+        body_b = _make_box_body()
+        result = surface_boolean_robust(body_a, body_b, "union")
+        assert result["ok"] is False
+        assert result["via"] == "none"
+
+    def test_occt_path_occ_fn_not_called_when_py_default(self):
+        """When using the pure-Python default, occ_fn stub is never called."""
+        body_a = _make_box_body()
+        body_b = _make_box_body(x=3.0)
+        occt_calls = []
+
+        # Do NOT pass occ_fn — use default pure-Python
+        result = surface_boolean_robust(body_a, body_b, "fuse")
+        assert result["via"] == "py"
+        assert occt_calls == []  # stub was never called

@@ -180,7 +180,7 @@ noted.
   File: `packages/kerf-electronics/tests/test_feature_pcb_netlist_erc.py`
   Success: 25 schematics; ERC catches floating-input / power-conflict / multi-driver classes; netlist round-trip.
 
-- [ ] T-32 Electronic: footprint / symbol library management
+- [x] T-32 Electronic: footprint / symbol library management
   Scope: `kerf-electronics/tools/` library CRUD + version pinning.
   File: `packages/kerf-electronics/tests/test_feature_pcb_lib_mgmt.py`
   Success: 25 lib operations; symbol-footprint binding integrity; LCSC / Octopart manifest stub.

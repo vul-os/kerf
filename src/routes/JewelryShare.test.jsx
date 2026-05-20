@@ -4,7 +4,7 @@
  * Tests the pure-logic helpers exported from JewelryShare.jsx.
  * No DOM rendering required — we exercise formatMetal, formatPiece,
  * formatFinish, buildSpecRows, validateComment, validateApproval,
- * and the default export component shape.
+ * detectWebGL, and the default export component shape.
  *
  * Coverage areas:
  *   1.  formatMetal — known keys
@@ -37,9 +37,16 @@
  *  28.  buildSpecRows — full metadata all rows present
  *  29.  buildSpecRows — partial metadata only present rows
  *  30.  buildSpecRows — total zero formats as $0.00
+ *  31.  detectWebGL — returns a boolean
+ *  32.  detectWebGL — returns false in Node (no document)
+ *  33.  detectWebGL — returns false when createElement throws
+ *  34.  detectWebGL — returns false when getContext returns null
+ *  35.  detectWebGL — returns false when context has no createBuffer
+ *  36.  detectWebGL — returns true when real WebGL context available
+ *  37.  detectWebGL — falls back to webgl1 when webgl2 unavailable
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 import {
   formatMetal,
   formatPiece,
@@ -47,6 +54,7 @@ import {
   buildSpecRows,
   validateComment,
   validateApproval,
+  detectWebGL,
 } from './JewelryShare.jsx'
 import JewelryShare from './JewelryShare.jsx'
 
@@ -322,5 +330,97 @@ describe('validateApproval', () => {
 describe('JewelryShare component', () => {
   it('default export is a function', () => {
     expect(typeof JewelryShare).toBe('function')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 31–37. detectWebGL — T-J1 local WebGL guard
+//
+// Tests patch globalThis.document directly so they work in both Node (no
+// jsdom) and jsdom environments without vi.spyOn issues.
+// ---------------------------------------------------------------------------
+
+describe('detectWebGL', () => {
+  afterEach(() => {
+    // Restore is handled per-test via finally blocks.
+  })
+
+  it('returns a boolean', () => {
+    // In a Node test environment (no real GPU/canvas) this returns false.
+    // In a browser it may return true or false.  Either way it must be boolean.
+    expect(typeof detectWebGL()).toBe('boolean')
+  })
+
+  it('returns false in a Node environment without document', () => {
+    // The vitest config has no jsdom, so document is undefined in this suite.
+    // If jsdom is present the environment already provides document; skip.
+    if (typeof globalThis.document !== 'undefined') return
+    expect(detectWebGL()).toBe(false)
+  })
+
+  it('returns false when document.createElement throws', () => {
+    const origDoc = globalThis.document
+    globalThis.document = {
+      createElement: () => { throw new Error('no canvas') },
+    }
+    try {
+      expect(detectWebGL()).toBe(false)
+    } finally {
+      globalThis.document = origDoc
+    }
+  })
+
+  it('returns false when getContext returns null for all contexts', () => {
+    const origDoc = globalThis.document
+    globalThis.document = {
+      createElement: () => ({ getContext: () => null }),
+    }
+    try {
+      expect(detectWebGL()).toBe(false)
+    } finally {
+      globalThis.document = origDoc
+    }
+  })
+
+  it('returns false when context object has no createBuffer method', () => {
+    const origDoc = globalThis.document
+    globalThis.document = {
+      createElement: () => ({ getContext: () => ({}) }),
+    }
+    try {
+      expect(detectWebGL()).toBe(false)
+    } finally {
+      globalThis.document = origDoc
+    }
+  })
+
+  it('returns true when a WebGL2 context with createBuffer is available', () => {
+    const origDoc = globalThis.document
+    const fakeCtx = { createBuffer: () => {} }
+    globalThis.document = {
+      createElement: () => ({
+        getContext: (type) => (type === 'webgl2' ? fakeCtx : null),
+      }),
+    }
+    try {
+      expect(detectWebGL()).toBe(true)
+    } finally {
+      globalThis.document = origDoc
+    }
+  })
+
+  it('falls back to webgl1 when webgl2 is unavailable', () => {
+    const origDoc = globalThis.document
+    const fakeCtx = { createBuffer: () => {} }
+    globalThis.document = {
+      createElement: () => ({
+        getContext: (type) => (type === 'webgl' ? fakeCtx : null),
+      }),
+    }
+    try {
+      expect(detectWebGL()).toBe(true)
+    } finally {
+      globalThis.document = origDoc
+    }
   })
 })

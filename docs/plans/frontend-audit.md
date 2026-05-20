@@ -240,7 +240,7 @@ Each task ≈1–3h sonnet unless `[HARD]`. Always isolate in a worktree.
 
 ### Group J — Share
 
-- [ ] **T-J1 JewelryShare submit + 3D fallback states**
+- [x] **T-J1 JewelryShare submit + 3D fallback states**
   Scope: add submitting/success/error feedback to the approve + comment forms; show a fallback when the 3D preview can't initialise (lean on T-C4 detection if landed, else local guard).
   Files: `src/routes/JewelryShare.jsx`.
   Success: customers get clear feedback on approve/comment; no blank 3D box on unsupported devices.

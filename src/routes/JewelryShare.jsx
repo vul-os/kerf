@@ -16,7 +16,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
-import { Gem, CheckCircle, AlertTriangle, MessageCircle, ThumbsUp, RefreshCw } from 'lucide-react'
+import { Gem, CheckCircle, AlertTriangle, MessageCircle, ThumbsUp, RefreshCw, MonitorX } from 'lucide-react'
 import { api } from '../lib/api.js'
 
 // ---------------------------------------------------------------------------
@@ -104,6 +104,28 @@ export function validateApproval(name) {
   return null
 }
 
+/**
+ * detectWebGL — returns true when WebGL (1 or 2) is available in this browser.
+ * Used as a local 3D-fallback guard while T-C4 detection is not yet landed.
+ * Safe to call in SSR-like / non-DOM environments: returns false if
+ * document.createElement is unavailable or throws.
+ */
+export function detectWebGL() {
+  try {
+    if (typeof globalThis.document === 'undefined') return false
+    const canvas = globalThis.document.createElement('canvas')
+    const ctx =
+      canvas.getContext('webgl2') ||
+      canvas.getContext('webgl') ||
+      canvas.getContext('experimental-webgl')
+    if (!ctx) return false
+    // Confirm it is a real WebGLRenderingContext, not a stub
+    return typeof ctx.createBuffer === 'function'
+  } catch {
+    return false
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
@@ -173,6 +195,9 @@ export default function JewelryShare() {
   const [loading, setLoading]     = useState(true)
   const [shareInfo, setShareInfo] = useState(null)
   const [error, setError]         = useState(null) // 'expired' | 'notfound' | 'error'
+
+  // 3D availability — evaluated once on mount (local guard; T-C4 not yet landed)
+  const [webGLAvailable] = useState(() => detectWebGL())
 
   // Comment form
   const [commentName, setCommentName]   = useState('')
@@ -330,16 +355,32 @@ export default function JewelryShare() {
 
       <div className="max-w-3xl mx-auto px-4 py-8 sm:py-12 space-y-8">
 
-        {/* 3-D preview placeholder (real app: mount <Renderer> with read-only meshes) */}
+        {/* 3-D preview — shows fallback when WebGL is unavailable */}
         <div
           className="w-full aspect-video rounded-2xl bg-ink-900 border border-ink-800 flex items-center justify-center"
           aria-label="3D preview"
           data-testid="preview-area"
         >
-          <div className="flex flex-col items-center gap-3 text-ink-600">
-            <Gem size={32} />
-            <span className="text-sm">3D preview</span>
-          </div>
+          {webGLAvailable ? (
+            /* Real app: mount <Renderer> with read-only meshes here */
+            <div className="flex flex-col items-center gap-3 text-ink-600" aria-hidden="true">
+              <Gem size={32} />
+              <span className="text-sm">3D preview</span>
+            </div>
+          ) : (
+            <div
+              className="flex flex-col items-center gap-3 text-ink-500 px-6 text-center"
+              role="status"
+              aria-live="polite"
+              data-testid="preview-fallback"
+            >
+              <MonitorX size={32} className="text-ink-600" />
+              <p className="text-sm font-medium text-ink-400">3D preview unavailable</p>
+              <p className="text-xs text-ink-600 max-w-xs">
+                Your browser or device does not support WebGL. The design specifications below show all details.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Spec table */}
@@ -371,19 +412,25 @@ export default function JewelryShare() {
               Leave a comment
             </h2>
             {commentDone && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-sm text-emerald-300 mb-4">
+              <div
+                role="status"
+                aria-live="polite"
+                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-sm text-emerald-300 mb-4"
+                data-testid="comment-success"
+              >
                 <CheckCircle size={14} />
                 Comment submitted.
               </div>
             )}
-            <form onSubmit={handleComment} className="space-y-3">
+            <form onSubmit={handleComment} className="space-y-3" aria-label="Leave a comment form">
               <input
                 type="text"
                 value={commentName}
                 onChange={(e) => setCommentName(e.target.value)}
                 placeholder="Your name"
                 aria-label="Your name"
-                className="w-full bg-ink-900 border border-ink-700 rounded-xl px-4 py-2.5 text-sm text-ink-100 placeholder-ink-600 focus:outline-none focus:border-kerf-400"
+                disabled={commenting}
+                className="w-full bg-ink-900 border border-ink-700 rounded-xl px-4 py-2.5 text-sm text-ink-100 placeholder-ink-600 focus:outline-none focus:border-kerf-400 disabled:opacity-60"
               />
               <textarea
                 value={commentBody}
@@ -391,10 +438,16 @@ export default function JewelryShare() {
                 placeholder="Write your comment…"
                 aria-label="Comment body"
                 rows={3}
-                className="w-full bg-ink-900 border border-ink-700 rounded-xl px-4 py-2.5 text-sm text-ink-100 placeholder-ink-600 focus:outline-none focus:border-kerf-400 resize-none"
+                disabled={commenting}
+                className="w-full bg-ink-900 border border-ink-700 rounded-xl px-4 py-2.5 text-sm text-ink-100 placeholder-ink-600 focus:outline-none focus:border-kerf-400 resize-none disabled:opacity-60"
               />
               {commentError && (
-                <div className="flex items-center gap-2 text-xs text-amber-400">
+                <div
+                  role="alert"
+                  aria-live="assertive"
+                  className="flex items-center gap-2 text-xs text-amber-400"
+                  data-testid="comment-error"
+                >
                   <AlertTriangle size={12} />
                   {commentError}
                 </div>
@@ -402,9 +455,12 @@ export default function JewelryShare() {
               <button
                 type="submit"
                 disabled={commenting}
+                aria-busy={commenting}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-kerf-300 text-ink-950 text-sm font-medium hover:bg-kerf-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {commenting ? <RefreshCw size={13} className="animate-spin" /> : <MessageCircle size={13} />}
+                {commenting
+                  ? <RefreshCw size={13} className="animate-spin" aria-hidden="true" />
+                  : <MessageCircle size={13} aria-hidden="true" />}
                 {commenting ? 'Submitting…' : 'Submit comment'}
               </button>
             </form>
@@ -418,12 +474,17 @@ export default function JewelryShare() {
               Approve design
             </h2>
             {(approveDone || alreadyApproved) ? (
-              <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-sm text-emerald-300">
+              <div
+                role="status"
+                aria-live="polite"
+                className="flex items-center gap-2 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-sm text-emerald-300"
+                data-testid="approve-success"
+              >
                 <CheckCircle size={15} />
                 {approveDone ? 'Design approved — your jeweller has been notified.' : 'Design already approved.'}
               </div>
             ) : (
-              <form onSubmit={handleApprove} className="space-y-3">
+              <form onSubmit={handleApprove} className="space-y-3" aria-label="Approve design form">
                 <p className="text-sm text-ink-400">
                   Approving confirms you are happy with this design and authorises the jeweller to proceed.
                 </p>
@@ -433,10 +494,16 @@ export default function JewelryShare() {
                   onChange={(e) => setApproveName(e.target.value)}
                   placeholder="Your full name (acts as signature)"
                   aria-label="Approval name"
-                  className="w-full bg-ink-900 border border-ink-700 rounded-xl px-4 py-2.5 text-sm text-ink-100 placeholder-ink-600 focus:outline-none focus:border-kerf-400"
+                  disabled={approving}
+                  className="w-full bg-ink-900 border border-ink-700 rounded-xl px-4 py-2.5 text-sm text-ink-100 placeholder-ink-600 focus:outline-none focus:border-kerf-400 disabled:opacity-60"
                 />
                 {approveError && (
-                  <div className="flex items-center gap-2 text-xs text-amber-400">
+                  <div
+                    role="alert"
+                    aria-live="assertive"
+                    className="flex items-center gap-2 text-xs text-amber-400"
+                    data-testid="approve-error"
+                  >
                     <AlertTriangle size={12} />
                     {approveError}
                   </div>
@@ -444,9 +511,12 @@ export default function JewelryShare() {
                 <button
                   type="submit"
                   disabled={approving}
+                  aria-busy={approving}
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  {approving ? <RefreshCw size={13} className="animate-spin" /> : <ThumbsUp size={13} />}
+                  {approving
+                    ? <RefreshCw size={13} className="animate-spin" aria-hidden="true" />
+                    : <ThumbsUp size={13} aria-hidden="true" />}
                   {approving ? 'Approving…' : 'Approve design'}
                 </button>
               </form>

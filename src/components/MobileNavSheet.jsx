@@ -29,6 +29,7 @@
 
 import { useEffect, useRef } from 'react'
 import clsx from 'clsx'
+import usePrefersReducedMotion from '../lib/usePrefersReducedMotion.js'
 
 export default function MobileNavSheet({
   open,
@@ -38,6 +39,7 @@ export default function MobileNavSheet({
   children,
 }) {
   const panelRef = useRef(null)
+  const reduced = usePrefersReducedMotion()
 
   // Close on Escape key.
   useEffect(() => {
@@ -80,7 +82,7 @@ export default function MobileNavSheet({
         onClick={onClose}
         className={clsx(
           'fixed inset-0 z-40 bg-ink-950/60 backdrop-blur-sm',
-          'transition-opacity duration-300',
+          !reduced && 'transition-opacity duration-300',
           open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
         )}
       />
@@ -99,8 +101,10 @@ export default function MobileNavSheet({
           'rounded-t-2xl shadow-2xl',
           'max-h-[85dvh] overflow-y-auto',
           // Slide-up / slide-down animation via translate.
-          'transition-transform duration-300 ease-out',
-          open ? 'translate-y-0' : 'translate-y-full',
+          // When reduced motion is on, skip the slide and use visibility instead.
+          !reduced && 'transition-transform duration-300 ease-out',
+          !reduced && (open ? 'translate-y-0' : 'translate-y-full'),
+          reduced && (open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'),
           className,
         )}
       >

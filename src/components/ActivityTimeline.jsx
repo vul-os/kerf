@@ -19,6 +19,7 @@ import {
   Loader2, MessageSquare, Plus, RefreshCw, Sparkles, Trash2, Wrench,
 } from 'lucide-react'
 import { useWorkspace } from '../store/workspace.js'
+import usePrefersReducedMotion from '../lib/usePrefersReducedMotion.js'
 
 // ─────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -245,6 +246,7 @@ export default function ActivityTimeline({ projectId, open, onClose }) {
   const loading = useWorkspace((s) => s.activityLoading)
   const error = useWorkspace((s) => s.activityError)
   const nextCursor = useWorkspace((s) => s.activityNextCursor)
+  const reduced = usePrefersReducedMotion()
 
   // First-page fetch on open. We deliberately re-load when the user re-opens
   // the panel after closing it (rather than only on first ever mount), so
@@ -301,7 +303,7 @@ export default function ActivityTimeline({ projectId, open, onClose }) {
         {loading && events.length === 0 ? (
           <div className="p-3 space-y-2">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-12 rounded bg-ink-850 animate-pulse" />
+              <div key={i} className={`h-12 rounded bg-ink-850 ${reduced ? '' : 'animate-pulse'}`} />
             ))}
           </div>
         ) : !loading && events.length === 0 && !error ? (

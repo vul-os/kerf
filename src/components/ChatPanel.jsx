@@ -12,6 +12,7 @@ import rehypeHighlight from 'rehype-highlight'
 import PartChip from './PartChip.jsx'
 import { api } from '../lib/api.js'
 import { useWorkspace } from '../store/workspace.js'
+import usePrefersReducedMotion from '../lib/usePrefersReducedMotion.js'
 
 const PROVIDER_LABELS = {
   anthropic: 'Anthropic',
@@ -862,6 +863,7 @@ const ChatPanel = forwardRef(function ChatPanel({
   const [models, setModels] = useState([])
   const setThreadModel = useWorkspace((s) => s.setThreadModel)
   const [pendingModel, setPendingModel] = useState(null)
+  const reduced = usePrefersReducedMotion()
 
   useEffect(() => {
     let cancelled = false
@@ -972,8 +974,8 @@ const ChatPanel = forwardRef(function ChatPanel({
             <div className="flex items-center gap-2 text-[11px] text-ink-400">
               {showThinking && (
                 <>
-                  <Sparkles size={11} className="text-kerf-300 animate-pulse" />
-                  <span className="animate-pulse">Kerf is thinking…</span>
+                  <Sparkles size={11} className={reduced ? 'text-kerf-300' : 'text-kerf-300 animate-pulse'} />
+                  <span className={reduced ? undefined : 'animate-pulse'}>Kerf is thinking…</span>
                 </>
               )}
               {onCancelStream && (

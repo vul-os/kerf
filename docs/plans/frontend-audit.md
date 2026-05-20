@@ -284,7 +284,7 @@ Each task ≈1–3h sonnet unless `[HARD]`. Always isolate in a worktree.
   Files: `src/components/Layout.jsx`, `src/App.jsx` (+ `src/cloud/UsageWidget.jsx` if wiring the route).
   Success: no menu item navigates to a non-existent route (currently bounces to `/`).
 
-- [ ] **T-L6 prefers-reduced-motion guard**
+- [x] **T-L6 prefers-reduced-motion guard**
   Scope: add a global `@media (prefers-reduced-motion: reduce)` rule in `src/index.css` that neutralises `animate-*`/`transition`/`animate-pulse`; spot-check the heavy spinners/pulses still convey state.
   Files: `src/index.css`.
   Success: with reduced-motion on, animations are suppressed app-wide without breaking loading affordances.

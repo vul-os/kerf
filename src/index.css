@@ -91,3 +91,50 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--color-ink-600); border-radius: 5px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--color-ink-500); }
 ::-webkit-scrollbar-track { background: transparent; }
+
+/* ── Reduced-motion: neutralise non-essential animations app-wide ───────────
+ *
+ * When the OS/browser signals `prefers-reduced-motion: reduce` we:
+ *   • Collapse all CSS transitions to instant (duration → 0).
+ *   • Stop Tailwind animate-* keyframe animations (except animate-spin which
+ *     is used for loading spinners; those keep a drastically slowed 2s cycle
+ *     so users can still perceive that work is in progress).
+ *   • Freeze animate-pulse (skeleton loaders) — the opacity stays at 1 so
+ *     skeleton blocks remain visible without flashing.
+ *   • Freeze animate-bounce / animate-ping (purely decorative).
+ *
+ * Loading spinners (animate-spin) are intentionally kept active at a slower
+ * rate — they convey functional state (network request in progress) not
+ * decoration, so disabling them entirely would harm usability.
+ *
+ * Components that drive motion via JS (usePrefersReducedMotion hook) also
+ * read this media feature and skip their inline transition classes.           */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Loading spinners: keep spinning but much slower — still conveys "busy". */
+  .animate-spin {
+    animation-duration: 2s !important;
+    animation-iteration-count: infinite !important;
+  }
+
+  /* Skeleton pulse: freeze at full opacity so content is visible. */
+  .animate-pulse {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+
+  /* Purely decorative animations — stop completely. */
+  .animate-bounce,
+  .animate-ping {
+    animation: none !important;
+  }
+}

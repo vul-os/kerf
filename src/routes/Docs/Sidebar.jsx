@@ -13,6 +13,7 @@ import clsx from 'clsx'
 import { useDocs } from './docsStore.js'
 import { search } from './searchIndex.js'
 import { buildSidebarGroups } from './groupTaxonomy.js'
+import usePrefersReducedMotion from '../../lib/usePrefersReducedMotion.js'
 
 // 280px column with four stacked sections:
 //   1. Brand row + close-on-mobile button
@@ -39,6 +40,7 @@ export default function Sidebar({ drawerOpen = false, onDrawerClose }) {
   const { status, index, manifest } = useDocs()
   const inputRef = useRef(null)
   const drawerRef = useRef(null)
+  const reduced = usePrefersReducedMotion()
   const [query, setQuery] = useState('')
   const location = useLocation()
   const activeSlug = location.pathname.startsWith('/docs/')
@@ -305,7 +307,8 @@ export default function Sidebar({ drawerOpen = false, onDrawerClose }) {
         {/* Backdrop */}
         <div
           className={clsx(
-            'lg:hidden fixed inset-0 z-30 bg-black/40 transition-opacity duration-200',
+            'lg:hidden fixed inset-0 z-30 bg-black/40',
+            !reduced && 'transition-opacity duration-200',
             drawerOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
           )}
           aria-hidden="true"
@@ -320,7 +323,7 @@ export default function Sidebar({ drawerOpen = false, onDrawerClose }) {
           aria-label="Docs navigation"
           className={clsx(
             'lg:hidden fixed inset-y-0 left-0 z-40 w-72 bg-ink-900 flex flex-col',
-            'transition-transform duration-200 ease-in-out',
+            !reduced && 'transition-transform duration-200 ease-in-out',
             drawerOpen ? 'translate-x-0' : '-translate-x-full',
           )}
         >

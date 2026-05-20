@@ -105,6 +105,13 @@ from kerf_cad_core.geom.intersection import (
 )
 # GK-34: surface fit-to-tolerance (lofted/grid least-squares + knot placement)
 from kerf_cad_core.geom.patch_srf import fit_surface
+# GK-49: IGES 144 trimmed-surface reader/writer
+from kerf_cad_core.geom.io.iges import (
+    write_iges,
+    read_iges,
+    IgesReadError,
+    IgesWriteError,
+)
 
 __all__ = [
     "NurbsCurve",
@@ -177,4 +184,9 @@ __all__ = [
     "surface_surface_intersect",
     # GK-34
     "fit_surface",
+    # GK-49
+    "write_iges",
+    "read_iges",
+    "IgesReadError",
+    "IgesWriteError",
 ]

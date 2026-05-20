@@ -591,7 +591,7 @@ Format: `[ ] GK-NN  scope — FILE(s) — oracle — dep — parallel? — tier`
   new `geom/io/step_write.py` — oracle: write→read round-trip Hausdorff
   ≤ `1e-7` on box/cyl/sphere/filleted-box. — dep: GK-47 — parallel: N
   — opus.
-- [ ] **GK-49** IGES 144 (trimmed surface) reader/writer (subset). —
+- [x] **GK-49** IGES 144 (trimmed surface) reader/writer (subset). —
   new `geom/io/iges.py` — oracle: round-trip a trimmed plane, boundary
   loop Hausdorff ≤ `1e-6`. — dep: GK-13 — parallel: Y — sonnet.
 - [x] **GK-50** 3DM (OpenNURBS) export via `rhino3dm` (mirror of existing

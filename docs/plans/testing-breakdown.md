@@ -160,7 +160,7 @@ noted.
   File: `packages/kerf-electronics/tests/test_feature_pcb_fab_output_roundtrip.py`
   Success: 25 boards (1–8 layers); DRC clean; Gerber RS-274X passes lint; Excellon drills coincident; IPC-2581 round-trips.
 
-- [ ] T-28 Electronic: routing — autoroute + push-shove + RF + pour + diffpair
+- [x] T-28 Electronic: routing — autoroute + push-shove + RF + pour + diffpair
   Scope: `freerouting/` + `routes_*` modules + `kerf-electronics/routes_autoroute.py`.
   File: `packages/kerf-electronics/tests/test_feature_pcb_routing_complete.py`
   Success: 25 boards (mixed digital + RF + diff-pair); 100% net completion; length matching ±2%; copper-pour DRC clean.

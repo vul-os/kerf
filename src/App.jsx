@@ -72,6 +72,7 @@ const PLCPage = lazy(() => import('./routes/domains/PLC.jsx'))
 const MotionSimPage = lazy(() => import('./routes/domains/MotionSim.jsx'))
 const FemCfdPage = lazy(() => import('./routes/domains/FemCfd.jsx'))
 const TextilesPage = lazy(() => import('./routes/domains/Textiles.jsx'))
+const NotFound = lazy(() => import('./routes/NotFound.jsx'))
 
 // Cloud surface — these come from the cloud/ open-core split and may be
 // stubs on OSS builds. useCloudConfig stays eager (we need it before any
@@ -238,7 +239,7 @@ export default function App() {
         {cloudEnabled && <Route path="/billing" element={<BillingPanel />} />}
       </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
     </Suspense>
     </>

@@ -124,7 +124,7 @@ Each task ≈1–3h sonnet unless `[HARD]`. Always isolate in a worktree.
   Files: `src/routes/ProtectedRoute.jsx`, `src/routes/Login.jsx`.
   Success: deep-link to a protected page while logged out shows context, not a bare login.
 
-- [ ] **T-A3 Add a real 404 / catch-all page**
+- [x] **T-A3 Add a real 404 / catch-all page**
   Scope: replace `<Route path="*" element={<Navigate to="/" replace />}/>` with a lightweight NotFound route (logo, "Page not found", home link) so mistyped/dead URLs don't silently bounce.
   Files: `src/App.jsx` (+ new `src/routes/NotFound.jsx`).
   Success: unknown URL renders a 404 page; existing redirects (localShortcut etc.) unaffected.

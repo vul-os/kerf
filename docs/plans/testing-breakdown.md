@@ -220,7 +220,7 @@ noted.
   File: `packages/kerf-slicing/tests/test_feature_print_slice.py`
   Success: 25 parts; gcode generated; layer time estimate; volume check (within ±2% of solid mesh).
 
-- [ ] T-40 FEM: linear static end-to-end
+- [x] T-40 FEM: linear static end-to-end
   Scope: `kerf-fem/calculix_utils.py` + `fenicsx_utils.py` + `nonlinear_bar.py`.
   File: `packages/kerf-fem/tests/test_feature_fem_linear_static.py`
   Success: 25 canonical problems (cantilever, plate, etc.); displacement / stress match analytic ±2%.

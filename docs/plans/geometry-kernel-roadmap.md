@@ -805,7 +805,7 @@ in `geom/__init__.py`.
   oracle: imported body with intentionally-introduced 1e-9 sliver
   → simplify removes it, validate_body passes. — dep: GK-21 —
   parallel: N — opus.
-- [ ] **GK-86** Replace face / surface swap: swap the underlying
+- [x] **GK-86** Replace face / surface swap: swap the underlying
   surface of one face in a Body for a new compatible surface; re-sew
   adjacent faces. — `geom/replace_face.py` — oracle: replace a planar
   face with an equivalent NURBS plane → topology unchanged, volume

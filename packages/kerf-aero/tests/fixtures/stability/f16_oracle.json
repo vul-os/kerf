@@ -1,0 +1,33 @@
+{
+  "_comment": "F-16A stability derivative oracle. Source: NASA TM-80123 (Nguyen et al., 1979) 'Simulator Study of Stall/Post-Stall Characteristics of a Fighter Airplane with Relaxed Longitudinal Stability'. Cn_beta at 0.2 Mach, sea level, alpha=5 deg.",
+  "aircraft": "F-16A",
+  "flight_condition": {
+    "mach": 0.20,
+    "altitude_m": 0,
+    "alpha_deg": 5.0,
+    "beta_deg": 0.0
+  },
+  "geometry": {
+    "wing_span_m": 9.45,
+    "wing_root_chord_m": 4.78,
+    "wing_tip_chord_m": 1.07,
+    "wing_sweep_le_deg": 40.0,
+    "htail_span_m": 5.58,
+    "htail_root_chord_m": 2.40,
+    "htail_moment_arm_m": 5.50,
+    "vtail_span_m": 2.44,
+    "vtail_root_chord_m": 2.90,
+    "vtail_moment_arm_m": 5.10,
+    "fuselage_length_m": 14.52,
+    "fuselage_max_width_m": 1.00,
+    "fuselage_max_height_m": 1.68
+  },
+  "oracle_values": {
+    "Cn_beta_per_rad": 0.12,
+    "Cn_beta_per_deg": 0.00209,
+    "Cn_beta_source": "NASA TM-80123, Table II, alpha=5 deg, M=0.2, sea level. Cn_beta = 0.12/rad linear range.",
+    "Cn_beta_tolerance_pct": 15,
+    "Cn_beta_range_per_rad": [0.102, 0.138],
+    "_note": "NASA TM-80123 tabulates Cn_beta_total = 0.12/rad for the F-16 at low alpha, including both vtail and fuselage contributions. The fuselage is destabilising (~-0.02/rad), vtail contributes ~+0.14/rad."
+  }
+}

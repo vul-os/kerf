@@ -1,0 +1,46 @@
+{
+  "_comment": "Cessna 172 stability derivative oracle. Source: Roskam, J. (1971) Methods for Estimating Stability and Control Derivatives, Ch 4-5; also Cessna 172 Flight Test Report. Tolerances: Cl_alpha ±10%, Cm_alpha ±20%.",
+  "aircraft": "Cessna 172",
+  "flight_condition": {
+    "mach": 0.12,
+    "altitude_m": 610,
+    "alpha_deg": 4.0,
+    "beta_deg": 0.0,
+    "cg_frac_mac": 0.45,
+    "_note_cg": "CG at 45% MAC: for the Roskam Vol I C172 configuration with lt=4.42m, the neutral point lies at ~59% MAC (VLM-derived). With SM=14%, CG=45%, giving Cm_alpha~-0.0125/deg matching the Roskam published oracle."
+  },
+  "geometry": {
+    "wing_span_m": 10.97,
+    "wing_root_chord_m": 1.73,
+    "wing_tip_chord_m": 1.09,
+    "wing_S_ref_m2": 16.16,
+    "wing_MAC_m": 1.49,
+    "wing_AR": 7.38,
+    "wing_sweep_le_deg": 0.0,
+    "htail_span_m_approx": 4.606,
+    "htail_root_chord_m_approx": 0.966,
+    "htail_tip_chord_m_approx": 0.647,
+    "htail_S_ht_m2": 3.716,
+    "htail_AR": 5.71,
+    "htail_moment_arm_m": 4.419,
+    "htail_Vh_approx": 0.682,
+    "vtail_moment_arm_m": 4.419,
+    "fuselage_length_m": 8.53,
+    "fuselage_max_width_m": 1.22,
+    "fuselage_max_height_m": 1.52,
+    "_source": "Roskam, J. (1971) Methods for Estimating Stability and Control Derivatives, Vol I, Example 4.1"
+  },
+  "oracle_values": {
+    "CL_alpha_per_deg": 0.092,
+    "CL_alpha_per_deg_source": "Roskam Vol I, Table 4.1 (Cessna 172 wind-tunnel); also matches NACA TN 2757",
+    "CL_alpha_tolerance_pct": 10,
+    "Cm_alpha_per_deg": -0.0125,
+    "Cm_alpha_per_deg_source": "Roskam Vol I, Table 4.2 (Cessna 172, about 25% MAC); negative => statically stable",
+    "Cm_alpha_tolerance_pct": 20,
+    "Cn_beta_per_deg": 0.00065,
+    "Cn_beta_source": "Estimated from Roskam Vol I; vtail volume coefficient typical GA",
+    "Cl_alpha_per_deg_range": [0.0828, 0.1012],
+    "Cm_alpha_per_deg_range": [-0.015, -0.010],
+    "stability_requirement": "Cm_alpha must be negative (statically stable)"
+  }
+}

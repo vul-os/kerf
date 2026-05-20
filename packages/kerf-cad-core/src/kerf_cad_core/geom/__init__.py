@@ -117,7 +117,7 @@ from kerf_cad_core.geom.io.iges import (
     IgesWriteError,
 )
 # GK-37: certified Hausdorff surface deviation
-from kerf_cad_core.geom.surface_analysis import hausdorff_deviation
+from kerf_cad_core.geom.surface_analysis import hausdorff_deviation, zebra_stripe, zebra_stripe_continuity_analyser
 # GK-47: STEP reader
 from kerf_cad_core.geom.io.step_read import read_step, StepReadError
 # GK-23: body mass properties
@@ -215,7 +215,7 @@ __all__ = [
     "IgesReadError",
     "IgesWriteError",
     # GK-37
-    "hausdorff_deviation",
+    "hausdorff_deviation","zebra_stripe","zebra_stripe_continuity_analyser",
     "read_step","StepReadError",
     # GK-23
     "body_mass_props",

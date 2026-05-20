@@ -542,7 +542,7 @@ Format: `[ ] GK-NN  scope — FILE(s) — oracle — dep — parallel? — tier`
   directions, refine until certified). — `geom/surface_analysis.py` —
   oracle: deviation between a surface and its exact offset = d ± `1e-6`.
   — dep: GK-07 — parallel: Y — sonnet. *Landed: surface_analysis.py, 18 tests.*
-- [ ] **GK-38** Zebra / reflection-line continuity analyser. —
+- [x] **GK-38** Zebra / reflection-line continuity analyser. —
   `geom/surface_analysis.py` — oracle: zebra stripes continuous across a
   G1 join, broken across a G0 join (stripe-tangent discontinuity
   detected). — dep: GK-36 — parallel: Y — sonnet.

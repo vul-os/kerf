@@ -195,7 +195,7 @@ noted.
   File: `packages/kerf-electronics/tests/test_feature_pcb_bom_variants.py`
   Success: 25 variant configurations; DNP filtering; cost roll-up against `kerf-parts` distributors.
 
-- [ ] T-35 Electronic: flex / rigid-flex stackup
+- [x] T-35 Electronic: flex / rigid-flex stackup
   Scope: `flex/` + `stackup/` controlled-impedance solver.
   File: `packages/kerf-electronics/tests/test_feature_pcb_flex_stackup.py`
   Success: 25 stackups; Zo / Zdiff vs IPC-2141 ±5%; bend-radius rule.

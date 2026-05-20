@@ -422,7 +422,7 @@ Format: `[ ] GK-NN  scope — FILE(s) — oracle — dep — parallel? — tier`
   `geom/revolve_srf.py`, `geom/brep_build.py` — oracle: 360° revolve of a
   segment offset from axis = `validate_body`-clean torus/cylinder; volume
   = analytic Pappus. — dep: GK-13 — parallel: Y — sonnet. *Landed: revolve_srf.py, brep_build.py, 35 tests.*
-- [ ] **GK-15** `extrude_to_body` (capped) from a closed planar curve. —
+- [x] **GK-15** `extrude_to_body` (capped) from a closed planar curve. —
   `geom/solid_features.py`, `geom/brep_build.py` — oracle: extruded unit
   square = box, V8/E12/F6, volume exact. — dep: GK-13 — parallel: Y —
   sonnet.

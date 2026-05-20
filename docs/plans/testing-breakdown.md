@@ -200,7 +200,7 @@ noted.
   File: `packages/kerf-electronics/tests/test_feature_pcb_flex_stackup.py`
   Success: 25 stackups; Zo / Zdiff vs IPC-2141 ±5%; bend-radius rule.
 
-- [ ] T-36 CAM 3-axis: post + tool DB integration
+- [x] T-36 CAM 3-axis: post + tool DB integration
   Scope: `kerf-cam/posts/` + `tool_db.py` chained with `cam_jobs`.
   File: `packages/kerf-cam/tests/test_feature_cam3_post_tooldb.py`
   Success: 25 toolpaths; valid G-code for fanuc/haas/mach3/grbl; tool-change blocks; feed/speed from DB.

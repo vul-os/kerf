@@ -45,7 +45,7 @@ noted.
   File: `packages/kerf-cad-core/tests/test_feature_jewelry_bangle.py`
   Success: 25 wrist sizes × profile combinations; inner perimeter accuracy ±0.1 mm; hinge/clasp variants pass clash check.
 
-- [ ] T-5 Jewelry: chain / bracelet
+- [x] T-5 Jewelry: chain / bracelet
   Scope: `chain.py` (curb, cable, byzantine, figaro, etc.), length sizing, clasp finding.
   File: `packages/kerf-cad-core/tests/test_feature_jewelry_chain.py`
   Success: 25 link styles × lengths; total length matches input ±1 link pitch; per-link non-intersection.

@@ -577,3 +577,9 @@ End of 16-fire 30-min cadence.
 - e2e_chat_probe against dev: VERDICT stream healthy — SSE streaming, 3 tool calls (list_files/read_file/write_file), 0 tool errors, main.jscad 1545 chars looks_box_shaped=True, stop=end_turn; project cleaned up.
 - Known nit: probe's DELETE /api/me returns 405 (pre-existing) → leftover disposable test user on dev; harmless.
 - tasks.md spine COMPLETE. Autonomous loop ended. Only parked T-131 (P3) + v2 deferrals (T-327b/T-331b/T-332b) remain.
+
+## 2026-05-20 — Kernel push wave 1 integrated, PAUSED at user request
+- Integrated to main (HEAD fa35c166): GK-39 untrim/shrink, GK-50 3DM export, GK-35 curve fairing, GK-11 curve-intersection hardening, GK-41 RMF sweeps, T-332b reverse-eng v2 (binary IO + noise + cone LM + torus). geom/__init__ conflicts resolved by union.
+- Roadmap: 34 done / 38 open.
+- STILL RUNNING (user said pause after here): GK-14 revolve_to_body (agent acfe205c), GK-37 surface Hausdorff deviation (agent ac6f81fa). Will integrate when they notify; NOT refilling/rescheduling.
+- Completed worktrees lock-held pending runtime reap; final sweep when GK-14/37 land.

@@ -435,7 +435,8 @@ class TestGK43NonRegression:
         s1 = _plane_surface()
         s2 = _plane_surface(origin=(0.0, 1.0, 0.0))
         result = blend_srf_g1(s1, s2, edge="v1_v0", blend_width=0.2)
-        assert isinstance(result, NurbsSurface)
+        assert result["ok"]
+        assert isinstance(result["blend_surface"], NurbsSurface)
 
     def test_blend_srf_g1_g3_coexist(self):
         """Both blend_srf_g1 and blend_srf_g3 importable and functional simultaneously."""
@@ -444,7 +445,8 @@ class TestGK43NonRegression:
         s2 = _plane_surface(origin=(0.0, 1.0, 0.0))
         r1 = blend_srf_g1(s1, s2, edge="v1_v0", blend_width=0.2)
         r3 = blend_srf_g3(s1, s2, edge1_idx=4, edge2_idx=0, blend_dist=0.2)
-        assert isinstance(r1, NurbsSurface)
+        assert r1["ok"]
+        assert isinstance(r1["blend_surface"], NurbsSurface)
         assert isinstance(r3, NurbsSurface)
         # G3 strip has more control rows than G1 strip
         assert r3.num_control_points_v == 8

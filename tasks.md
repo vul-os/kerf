@@ -763,7 +763,7 @@ estimates: **S** = ½ day, **M** = 1-2 days, **L** = 3-5 days, **XL** =
 
 ### T-328 Knowledge-based engineering — code-compliance / DriveWorks-class rules
 
-🔴 not started · **Tier A · P2**
+✅ shipped (2026-05-20) · **Tier A · P2**
 
 - **Why:** ROADMAP §3.5 — KBE rule engine driven by the model
   (Eurocode / AISC / ACI / ASME / ISO). Rules + standards are text,

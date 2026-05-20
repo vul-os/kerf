@@ -602,10 +602,11 @@ Format: `[ ] GK-NN  scope — FILE(s) — oracle — dep — parallel? — tier`
   importer). — `kerf-imports/.../import_3dm.py` sibling exporter —
   oracle: export→reimport CP nets identical to `1e-9`. — dep: GK-13 —
   parallel: Y — sonnet. *Landed: export_3dm.py, 25 tests.*
-- [ ] **GK-51** STEP read/write fuzz + fidelity harness (degenerate
+- [x] **GK-51** STEP read/write fuzz + fidelity harness (degenerate
   faces, seams, holes, multi-shell). — `geom/io/` tests — oracle:
   ≥30 fixtures round-trip with Hausdorff ≤ tol or a structured skip
   reason. — dep: GK-48 — parallel: Y — sonnet.
+  *Landed: test_step_fuzz.py, 59 tests (56 passed, 3 structured skips).*
 - [ ] **GK-52** [HARD] SubD cage → watertight NURBS `Body` (Catmull–Clark
   limit → bicubic faces, sewn, extraordinary-point handling). —
   `geom/subd.py`, `geom/brep_build.py`, `geom/sew.py` — oracle: subD

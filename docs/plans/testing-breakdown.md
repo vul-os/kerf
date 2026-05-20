@@ -120,7 +120,7 @@ noted.
   File: `packages/kerf-cad-core/tests/test_feature_mech_gdt.py`
   Success: 25 callout types (Y14.5); datum reference frames build correctly; round-trip into drawing JSON.
 
-- [ ] T-20 Mech: weldment profile library + cuts
+- [x] T-20 Mech: weldment profile library + cuts
   Scope: `weldment.py` + `weldment_profiles.py` (I-beam, channel, square tube) miter / cope cuts.
   File: `packages/kerf-cad-core/tests/test_feature_mech_weldment.py`
   Success: 25 frame layouts; member length, miter angle, cut volume vs analytic; weld seam topology.

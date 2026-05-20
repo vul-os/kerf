@@ -1,0 +1,22 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kerf-systems"
+version = "0.1.0"
+license = { text = "MIT" }
+classifiers = ["License :: OSI Approved :: MIT License"]
+description = "1D system simulation (Modelica-class DAE solver + component library) for Kerf"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "scipy",
+    "numpy",
+]
+
+[project.entry-points."kerf.plugins"]
+systems = "kerf_systems.plugin:register"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kerf_systems"]

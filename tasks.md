@@ -682,7 +682,7 @@ estimates: **S** = ½ day, **M** = 1-2 days, **L** = 3-5 days, **XL** =
 
 ### T-325 1D system simulation — Modelica / Amesim / Simulink class (sim pillar)
 
-🔴 not started · **Tier A · P1**
+✅ shipped (2026-05-20) · **Tier A · P1**
 
 - **Why:** ROADMAP §3.5 — lumped-parameter thermal / hydraulic /
   electrical / control networks. Modelica is **text**, a declarative

@@ -900,6 +900,42 @@ Deferred from T-332 v1 (shipped 2026-05-20).  Pick up any/all of:
 - **Freeform / Class-A surfaces** — NURBS patch fitting for unrecognised
   regions (depends on T-100 / T-101 NURBS surfacing).
 
+### T-327b Automatic Feature Recognition v2 — deferred sub-capabilities
+
+🔴 not started · **Tier A · P1**
+
+Deferred from T-327 v1 (shipped 2026-05-20). Pick up any/all of:
+
+- **Revolve / sweep / loft recognition** — extend the AAG matchers beyond the
+  11 prismatic/local features to swept solids.
+- **Pattern features** — linear / circular array detection (collapse repeated
+  feature instances into a single parametric pattern node).
+- **Real-STEP round-trip + Hausdorff oracle** — load a genuine `bracket.step`
+  via a headless OCCT loader, recognise → re-evaluate the feature tree → write
+  STEP back, and assert Hausdorff distance ≤ 1e-3 × bbox-diagonal against the
+  original B-rep. **Depends on headless OCCT bindings** being available at test
+  time (the v1 oracle is self-contained synthetic topology fixtures).
+- **Target files/packages:** `packages/kerf-cad-core/src/kerf_cad_core/afr/`
+  (extend `recognize.py`), `packages/kerf-cad-core/tests/test_afr.py`.
+- **Depends-on:** T-327 (shipped), OCCT bindings.
+
+### T-331b Multi-CAD interop v2 — JT / Parasolid / QIF readers
+
+🔴 not started · **Tier A · P1**
+
+Deferred from T-331 v1 (shipped 2026-05-20). Pick up any/all of:
+
+- **JT reader** (Siemens) — single-file CAD format, structured + faceted; at
+  minimum read the geometry + assembly tree.
+- **Parasolid bridge** (`.x_t` / `.x_b`) via pyOCCT — the Parasolid kernel is
+  closed, so ship the bridge with a documented "license required at runtime"
+  sentinel when the kernel is absent.
+- **QIF reader** — Quality Information Framework inspection plans → structured
+  annotations (extends the AP242 PMI work).
+- **Target files/packages:**
+  `packages/kerf-imports/src/kerf_imports/{jt,parasolid,qif}_reader.py` (new).
+- **Depends-on:** T-331 (shipped), OCCT / pyOCCT bindings for Parasolid.
+
 ### T-333 Mechanism synthesis — MotionGen / Adams class linkage / cam / gear synthesis
 
 ✅ shipped (2026-05-20) · **Tier A · P2**

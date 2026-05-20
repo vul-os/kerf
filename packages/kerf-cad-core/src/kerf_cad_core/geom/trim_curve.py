@@ -871,7 +871,6 @@ def trim_face_analytic(
 
 
 # ---------------------------------------------------------------------------
-<<<<<<< HEAD
 # GK-39: TrimmedSurface + untrim / shrink
 # ---------------------------------------------------------------------------
 #
@@ -1017,7 +1016,6 @@ def shrink(trimmed: TrimmedSurface) -> "NurbsSurface":
         knots_v=new_knots_v,
         weights=weights_copy,
     )
-=======
 # GK-40: Exact trim of a Face by an SSI curve (closest-point pullback path)
 # ---------------------------------------------------------------------------
 #
@@ -1520,7 +1518,6 @@ def _build_ssi_trimmed_face(
                 "elliptic loop not implemented in pure-Python path"
             ]},
         )
->>>>>>> d452ac55 (feat(geom): GK-40 exact trim face by SSI curve)
 
 
 # ---------------------------------------------------------------------------

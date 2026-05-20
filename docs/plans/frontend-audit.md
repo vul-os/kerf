@@ -114,7 +114,7 @@ Each task ≈1–3h sonnet unless `[HARD]`. Always isolate in a worktree.
 
 ### Group A — Auth
 
-- [ ] **T-A1 Announce auth errors to screen readers**
+- [x] **T-A1 Announce auth errors to screen readers**
   Scope: wrap the red error banners in Login/Signup (and AuthCallback failure path) in `role="alert"` + `aria-live="assertive"`; give AuthCallback a `role="status"` busy state with spinner.
   Files: `src/routes/Login.jsx`, `src/routes/Signup.jsx`, `src/routes/AuthCallback.jsx`.
   Success: VoiceOver/NVDA announces the error on submit failure; AuthCallback no longer a silent text-only frame.

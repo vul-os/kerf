@@ -571,3 +571,9 @@ End of 16-fire 30-min cadence.
 - Remaining 🔴 are all deferred/parked: T-131 (P3 offline-desktop, demand-gated), T-327b/T-331b/T-332b (v2 follow-ups).
 - All agent worktrees swept clean.
 - Final: dev deploy (bnh7cpz80) + e2e_chat_probe smoke pending.
+
+## 2026-05-20 — Final validation GREEN — loop ending
+- Dev deploy (bnh7cpz80) exit 0; migrations ran via Fly release_command (eco/sysml/system/harness kind-enum validated by a clean apply); app live at kerf-dev.fly.dev.
+- e2e_chat_probe against dev: VERDICT stream healthy — SSE streaming, 3 tool calls (list_files/read_file/write_file), 0 tool errors, main.jscad 1545 chars looks_box_shaped=True, stop=end_turn; project cleaned up.
+- Known nit: probe's DELETE /api/me returns 405 (pre-existing) → leftover disposable test user on dev; harmless.
+- tasks.md spine COMPLETE. Autonomous loop ended. Only parked T-131 (P3) + v2 deferrals (T-327b/T-331b/T-332b) remain.

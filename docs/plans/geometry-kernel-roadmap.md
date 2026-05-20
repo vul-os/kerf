@@ -401,11 +401,12 @@ Format: `[ ] GK-NN  scope — FILE(s) — oracle — dep — parallel? — tier`
   parallel: Y — sonnet.
   *GK-09/10 landed; rational-weight bug fix included.
   `test_ssi_robust.py` 37 tests.*
-- [ ] **GK-11** Curve–curve intersection hardening: overlap detection,
+- [x] **GK-11** Curve–curve intersection hardening: overlap detection,
   tangency multiplicity, planar exact path. — `geom/intersection.py` —
   oracle: two identical circles ⇒ flagged overlapping, not N points;
   tangent circles ⇒ exactly one point. — dep: GK-06 — parallel: Y (after
   GK-09 lands marching helpers) — sonnet.
+  *Landed: intersection.py, 25 tests.*
 - [ ] **GK-12** Curve self-intersection (figure-eight, trefoil planar
   projection). — `geom/intersection.py` — oracle: lemniscate self-x at
   origin found to `1e-9`. — dep: GK-11 — parallel: Y — sonnet.

@@ -93,6 +93,12 @@ from kerf_cad_core.geom.curve_toolkit import (
     fair_curve,
     curvature_variance,
 )
+# GK-11: curve-curve intersection hardening
+from kerf_cad_core.geom.intersection import (
+    curve_curve_intersect,
+    curve_surface_intersect,
+    surface_surface_intersect,
+)
 
 __all__ = [
     "NurbsCurve",
@@ -155,4 +161,8 @@ __all__ = [
     "shrink",
     "fair_curve",
     "curvature_variance",
+    # GK-11
+    "curve_curve_intersect",
+    "curve_surface_intersect",
+    "surface_surface_intersect",
 ]

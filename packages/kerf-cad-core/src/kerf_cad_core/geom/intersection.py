@@ -42,6 +42,13 @@ curve_curve_intersect(curve_a, curve_b, *, tol, samples_a, samples_b)
         point   : list[float, float, float]
     Never raises.  Duplicate hits closer than ``tol`` are merged.
 
+    GK-11 additions:
+      Overlap / coincidence: if both curves share a locus (e.g. identical
+      circles) returns [{"overlap": True}] — a single sentinel dict with no
+      "point" key — rather than a flood of discrete points.
+      Tangency multiplicity: tangent intersections (curves touch without
+      crossing) produce exactly ONE hit, not a numerically doubled pair.
+
 Implementation note
 -------------------
 The surface_evaluate function in geom/nurbs.py has a known limitation with its
@@ -1407,6 +1414,184 @@ def _newton_curve_curve(
 
 
 # ---------------------------------------------------------------------------
+# GK-11: curve-curve hardening helpers
+# ---------------------------------------------------------------------------
+
+# Overlap threshold: fraction of sampled points from curve_a that must lie
+# within tol_factor * tol of curve_b for an overlap verdict.
+_OVERLAP_FRACTION: float = 0.80
+_OVERLAP_SAMPLES: int = 32
+
+
+def _curve_tangent(curve: NurbsCurve, t: float) -> np.ndarray:
+    """Unit tangent vector of *curve* at parameter *t* (finite difference)."""
+    t_min, t_max = _curve_param_range(curve)
+    h = max(1e-7, (t_max - t_min) * 5e-5)
+    tp = min(t_max, t + h)
+    tm = max(t_min, t - h)
+    tang = (_curve_eval(curve, tp) - _curve_eval(curve, tm)) / (tp - tm + 1e-300)
+    nrm = np.linalg.norm(tang)
+    if nrm < 1e-15:
+        return np.array([1.0, 0.0, 0.0])
+    return tang / nrm
+
+
+def _detect_curve_overlap(
+    curve_a: NurbsCurve,
+    curve_b: NurbsCurve,
+    *,
+    tol: float,
+    n_samples: int = _OVERLAP_SAMPLES,
+    fraction: float = _OVERLAP_FRACTION,
+) -> bool:
+    """Return True when curve_a lies (almost entirely) on curve_b.
+
+    Strategy: sample *n_samples* evenly-spaced points on curve_a and check
+    what fraction of them is within *snap_tol* of the closest point on
+    curve_b (approximated by a very dense geometric sampling of curve_b).
+
+    *snap_tol* is chosen adaptively as ``max(tol, chord / n_dense)`` where
+    *chord* is the approximate arc-length of curve_b, so that the dense
+    grid is always fine enough to catch nearby probe points regardless of
+    the parameter-to-arc-length non-uniformity of the NURBS circle.
+
+    The caller-supplied *tol* acts as a lower bound on snap_tol; raising it
+    by ``* 100`` (done in the caller) handles machine-precision duplicates.
+    """
+    ta_min, ta_max = _curve_param_range(curve_a)
+    tb_min, tb_max = _curve_param_range(curve_b)
+
+    ta_probe = np.linspace(ta_min, ta_max, n_samples)
+    a_pts = np.array([_curve_eval(curve_a, float(t)) for t in ta_probe])
+
+    # Very dense sampling of curve_b for nearest-point approximation.
+    n_dense = n_samples * 16
+    tb_dense = np.linspace(tb_min, tb_max, n_dense)
+    b_pts_dense = np.array([_curve_eval(curve_b, float(t)) for t in tb_dense])
+
+    # Adaptive snap tolerance: ensure dense grid is fine enough.
+    # Estimate arc-length of curve_b from its sample chord lengths.
+    chord_b = float(np.sum(np.linalg.norm(np.diff(b_pts_dense, axis=0), axis=1)))
+    snap_tol = max(tol, chord_b / n_dense * 2.0)
+
+    on_b = 0
+    for pa in a_pts:
+        dists = np.linalg.norm(b_pts_dense - pa, axis=1)
+        if dists.min() <= snap_tol:
+            on_b += 1
+
+    return (on_b / n_samples) >= fraction
+
+
+def _is_tangent_intersection(
+    curve_a: NurbsCurve,
+    curve_b: NurbsCurve,
+    ta: float,
+    tb: float,
+) -> bool:
+    """Return True when the two curves are tangent at the intersection.
+
+    Tangency ⟺ the tangent vectors are (anti-)parallel, i.e. the sine of
+    the angle between them is near zero.
+    """
+    tan_a = _curve_tangent(curve_a, ta)
+    tan_b = _curve_tangent(curve_b, tb)
+    cross = np.cross(tan_a, tan_b)
+    sin_angle = np.linalg.norm(cross)
+    # Threshold ~0.3° — loose enough to tolerate FD perturbation near NURBS
+    # knots yet tight enough to distinguish genuine transversal crossings.
+    return sin_angle < 5e-3
+
+
+def _deduplicate_tangent_hits(
+    hits: List[dict],
+    curve_a: NurbsCurve,
+    curve_b: NurbsCurve,
+    tol: float,
+) -> List[dict]:
+    """Remove numerically-doubled points at tangent intersections.
+
+    At a tangent contact Newton sometimes converges to two nearby parameter
+    values that map to the same spatial point (one slightly above, one
+    slightly below the exact touch point).  This function:
+
+    1. Groups hits that are mutually close (within ``tangent_snap``).
+    2. For each group, if ANY pair within it is a tangent intersection,
+       the whole group is collapsed to its centroid hit.
+    3. Non-tangent, well-separated hits are left untouched.
+
+    ``tangent_snap`` is chosen as ``max(tol ** 0.4, tol * 1e5)`` which
+    for ``tol=1e-9`` gives ~2e-4 and for ``tol=1e-6`` gives ~4e-3 —
+    wide enough to catch numerically split tangent pairs, but narrow
+    enough not to absorb distinct intersection points (which must be
+    separated by the chord of the intersection locus, typically > 1e-2
+    for unit-scale geometry).
+    """
+    if len(hits) <= 1:
+        return hits
+
+    # Tangent-zone snap radius.
+    tangent_snap = max(tol ** 0.4, tol * 1e5)
+
+    # Group nearby hits.
+    groups: List[List[int]] = []
+    assigned = [False] * len(hits)
+    for i in range(len(hits)):
+        if assigned[i]:
+            continue
+        g = [i]
+        assigned[i] = True
+        pi = np.array(hits[i]["point"])
+        for j in range(i + 1, len(hits)):
+            if assigned[j]:
+                continue
+            pj = np.array(hits[j]["point"])
+            if np.linalg.norm(pi - pj) < tangent_snap:
+                g.append(j)
+                assigned[j] = True
+        groups.append(g)
+
+    result: List[dict] = []
+    for g in groups:
+        if len(g) == 1:
+            result.append(hits[g[0]])
+            continue
+
+        # Check if any pair within the group is a tangent intersection.
+        is_tangent_group = False
+        for idx in range(len(g)):
+            for jdx in range(idx + 1, len(g)):
+                hi = hits[g[idx]]
+                hj = hits[g[jdx]]
+                if _is_tangent_intersection(curve_a, curve_b,
+                                            hi["ta"], hi["tb"]):
+                    is_tangent_group = True
+                    break
+            if is_tangent_group:
+                break
+
+        if is_tangent_group:
+            # Collapse the group to its spatial centroid so that symmetric
+            # numerical jitter (e.g. +3e-5 / -3e-5 around the exact tangent
+            # point) averages out.  Keep the ta/tb from the member closest to
+            # the centroid.
+            pts = np.array([hits[k]["point"] for k in g])
+            centroid = pts.mean(axis=0)
+            best = min(g, key=lambda k: np.linalg.norm(
+                np.array(hits[k]["point"]) - centroid
+            ))
+            merged_hit = dict(hits[best])
+            merged_hit["point"] = centroid.tolist()
+            result.append(merged_hit)
+        else:
+            # Non-tangent group: keep all members.
+            for k in g:
+                result.append(hits[k])
+
+    return _merge_close_hits(result, tol)
+
+
+# ---------------------------------------------------------------------------
 # curve_curve_intersect
 # ---------------------------------------------------------------------------
 
@@ -1418,7 +1603,7 @@ def curve_curve_intersect(
     samples_a: int = _DEFAULT_SAMPLES_C,
     samples_b: int = _DEFAULT_SAMPLES_C,
 ) -> List[dict]:
-    """Find all intersection points between two NurbsCurves.
+    """Find all intersection points between two NurbsCurves (GK-11 hardened).
 
     Parameters
     ----------
@@ -1428,7 +1613,16 @@ def curve_curve_intersect(
 
     Returns
     -------
-    list of dict with keys: ta, tb, point.  Never raises.
+    list of dict.  Each dict has keys ``ta``, ``tb``, ``point`` for a
+    transversal or tangent intersection.
+
+    **Overlap flag**: when the two curves are coincident / share a
+    sub-segment, returns ``[{"overlap": True}]`` — a single-element list
+    with no ``point`` key — instead of a (potentially very long) list of
+    discrete intersection points.  Callers should check
+    ``result[0].get("overlap")`` before iterating over points.
+
+    Never raises.
     """
     try:
         return _curve_curve_intersect_impl(
@@ -1451,6 +1645,17 @@ def _curve_curve_intersect_impl(
         return []
     if not isinstance(curve_b, NurbsCurve):
         return []
+
+    # ------------------------------------------------------------------
+    # GK-11 (1): overlap / coincidence detection
+    # ------------------------------------------------------------------
+    # Use a generous tolerance for the overlap probe so that numerically
+    # close-but-not-identical curves (same circle, floating-point copies)
+    # are caught.  The threshold is 100× the Newton convergence tol.
+    overlap_tol = tol * 100.0
+    if (_detect_curve_overlap(curve_a, curve_b, tol=overlap_tol) and
+            _detect_curve_overlap(curve_b, curve_a, tol=overlap_tol)):
+        return [{"overlap": True}]
 
     sa = max(4, int(samples_a))
     sb = max(4, int(samples_b))
@@ -1489,7 +1694,16 @@ def _curve_curve_intersect_impl(
         pt = ((A + B) * 0.5).tolist()
         hits.append({"ta": ta_ref, "tb": tb_ref, "point": pt})
 
-    return _merge_close_hits(hits, tol)
+    # ------------------------------------------------------------------
+    # GK-11 (2): tangency multiplicity — collapse doubled tangent hits
+    # ------------------------------------------------------------------
+    # Pre-merge: collapse Newton duplicates (multiple candidates converging
+    # to the same physical point within a few times tol) before tangency check.
+    hits = _merge_close_hits(hits, tol * 5)
+
+    hits = _deduplicate_tangent_hits(hits, curve_a, curve_b, tol)
+
+    return hits
 
 
 # ---------------------------------------------------------------------------

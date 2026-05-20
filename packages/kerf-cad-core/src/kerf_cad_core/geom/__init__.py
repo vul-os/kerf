@@ -115,6 +115,8 @@ from kerf_cad_core.geom.io.iges import (
     IgesReadError,
     IgesWriteError,
 )
+# GK-23: body mass properties
+from kerf_cad_core.geom.mass_props import body_mass_props
 # GK-55: mesh boolean sealed-manifold
 from kerf_cad_core.geom.mesh_repair import mesh_boolean_sealed, boolean_volume_oracle
 # GK-56: 2D region boolean on planar curve loops
@@ -206,6 +208,8 @@ __all__ = [
     "read_iges",
     "IgesReadError",
     "IgesWriteError",
+    # GK-23
+    "body_mass_props",
     # GK-55
     "mesh_boolean_sealed","boolean_volume_oracle",
     # GK-56

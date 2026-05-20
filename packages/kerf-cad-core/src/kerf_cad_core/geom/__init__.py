@@ -67,6 +67,7 @@ from kerf_cad_core.geom.brep_build import (
     box_to_body,
     cylinder_to_body,
     sphere_to_body,
+    revolve_to_body,
 )
 
 from kerf_cad_core.geom.subd_authoring import (
@@ -164,6 +165,7 @@ __all__ = [
     "box_to_body",
     "cylinder_to_body",
     "sphere_to_body",
+    "revolve_to_body",
     "SubDCage",
     "SubDSurface",
     "create_subd_primitive",

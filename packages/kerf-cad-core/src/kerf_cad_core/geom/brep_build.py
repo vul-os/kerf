@@ -822,6 +822,317 @@ def sphere_to_body(
     return body
 
 
+def revolve_to_body(
+    profile: object,
+    axis_point: Sequence[float],
+    axis_dir: Sequence[float],
+    tol: float = 1e-7,
+) -> "Body":
+    """Build a closed ``Body`` from a full 360° revolve of a profile curve.
+
+    Reuses the ``make_cylinder`` seam topology pattern extended to an
+    arbitrary NURBS profile curve.  The profile is revolved around the axis
+    defined by *axis_point* / *axis_dir*.  Topology is chosen automatically:
+
+    * **Both endpoints off-axis** — cylinder topology: 2 seam vertices, 3
+      edges (2 rim circles + 1 seam line), 3 faces (lateral + 2 planar
+      caps), 1 shell, G=0.  ``V-E+F-H = 2-3+3-0 = 2 = 2(1-0)``.
+    * **Start endpoint on-axis (bottom pole)** — cone / half-dome: 2
+      vertices (pole + seam top), 2 edges (top rim circle + seam), 2 faces
+      (lateral + 1 cap), G=0.  ``V-E+F-H = 2-2+2-0 = 2 = 2(1-0)``.
+    * **End endpoint on-axis (top pole)** — symmetric mirror of above.
+    * **Both endpoints on-axis (spindle/sphere)** — 2 pole vertices, 1 seam
+      edge, 1 face, G=0.  ``V-E+F-H = 2-1+1-0 = 2 = 2(1-0)``.
+
+    The profile curve must expose:
+    * ``control_points`` — ``np.ndarray`` of shape ``(n, 3)`` or ``(n, 4)``
+    * ``degree`` — integer
+    * ``knots`` — ``np.ndarray``
+
+    Parameters
+    ----------
+    profile
+        A ``NurbsCurve`` (or any object with the three attributes above).
+    axis_point, axis_dir
+        Axis of revolution.  *axis_dir* need not be unit-length.
+    tol
+        Topological and geometric tolerance.
+
+    Returns
+    -------
+    Body
+        A validated closed ``Body``.
+
+    Raises
+    ------
+    BuildError
+        If ``validate_body`` fails on the produced body.
+    """
+    from kerf_cad_core.geom.revolve_srf import revolve_surface, evaluate_revolve
+
+    ax_pt = np.asarray(axis_point, dtype=float)
+    ax = _unit(np.asarray(axis_dir, dtype=float))
+
+    # ------------------------------------------------------------------
+    # 1. Build the lateral NURBS surface (full 360° revolve).
+    # ------------------------------------------------------------------
+    lateral_srf = revolve_surface(profile, ax_pt, ax, 0.0, 2.0 * math.pi, tol=tol)
+
+    # ------------------------------------------------------------------
+    # 2. Sample profile endpoints to determine geometry.
+    # ------------------------------------------------------------------
+    prof_cp = np.asarray(profile.control_points, dtype=float)
+    prof_knots = np.asarray(profile.knots, dtype=float)
+    prof_deg = int(profile.degree)
+    t_start = float(prof_knots[prof_deg])
+    t_end = float(prof_knots[-(prof_deg + 1)])
+
+    # Evaluate start/end of the profile (seam positions at v=0).
+    # evaluate_revolve at v=t_start/t_end, u=0 gives the seam points.
+    # But simpler: directly evaluate the profile's endpoints.
+    def _eval_profile(t: float) -> np.ndarray:
+        """Evaluate profile curve at parameter t."""
+        from kerf_cad_core.geom.nurbs import find_span
+        from kerf_cad_core.geom.revolve_srf import _basis_funcs
+
+        cp_raw = prof_cp
+        if cp_raw.shape[1] == 4:
+            w_col = cp_raw[:, 3]
+            xyz = cp_raw[:, :3]
+        else:
+            w_col = np.ones(cp_raw.shape[0])
+            xyz = cp_raw[:, :3]
+
+        n = cp_raw.shape[0]
+        span = find_span(n - 1, prof_deg, t, prof_knots)
+        N = _basis_funcs(span, t, prof_deg, prof_knots)
+        pt = np.zeros(3)
+        w = 0.0
+        for i in range(prof_deg + 1):
+            idx = span - prof_deg + i
+            pt += N[i] * w_col[idx] * xyz[idx]
+            w += N[i] * w_col[idx]
+        if abs(w) > 1e-15:
+            pt /= w
+        return pt
+
+    p_start = _eval_profile(t_start)  # bottom seam point (v=0 of revolve)
+    p_end = _eval_profile(t_end)      # top seam point (v=0 of revolve)
+
+    # Radii of start/end points from axis
+    def _radius(pt: np.ndarray) -> float:
+        d = pt - ax_pt
+        proj = float(np.dot(d, ax))
+        foot = ax_pt + proj * ax
+        return float(np.linalg.norm(pt - foot))
+
+    r_start = _radius(p_start)
+    r_end = _radius(p_end)
+    pole_start = r_start < tol * 10.0
+    pole_end = r_end < tol * 10.0
+
+    # ------------------------------------------------------------------
+    # 3. Build seam curve (the profile itself at u=0, i.e. the start
+    #    angle of the revolve maps v-parameter of the revolve surface
+    #    to points along the profile).
+    #
+    #    The seam runs from p_start to p_end in 3-D.
+    #    We model it as a _SurfaceIsoCurve on the lateral surface at u=0
+    #    (the lateral surface's knots_v spans t_start..t_end for u).
+    # ------------------------------------------------------------------
+
+    # Lateral surface param box: u in [0, 2pi], v in [t_start, t_end]
+    u_start = float(lateral_srf.knots_v[lateral_srf.degree_v])
+    u_end_v = float(lateral_srf.knots_v[-(lateral_srf.degree_v + 1)])
+    # Note: lateral_srf degree_u = profile.degree, degree_v = 2 (arc)
+    #       knots_u = profile.knots, knots_v = arc knot vector (0..1 or similar)
+    # The seam runs along knots_u at the boundary of the arc (v=0 in arc param).
+    # Evaluate the lateral surface at v_arc=u_start (seam, angle=0) varying u_prof.
+
+    class _SeamCurve:
+        """Isocurve of the lateral surface at the seam angle (v=v_arc_start)."""
+        def __init__(self, srf, v_fixed, t0, t1):
+            self._srf = srf
+            self._v = v_fixed
+            self.t0 = t0
+            self.t1 = t1
+
+        def evaluate(self, t: float) -> np.ndarray:
+            return evaluate_revolve(self._srf, t, self._v)
+
+    seam_crv = _SeamCurve(lateral_srf, u_start, t_start, t_end)
+
+    # ------------------------------------------------------------------
+    # 4. Build rim circle curves at start and end of profile.
+    # ------------------------------------------------------------------
+    # The revolve surface's knots_u are from the profile; we fix u=t_start
+    # or u=t_end and let v sweep 0..2pi (the arc dimension).
+    # We use the analytic CircleArc3 for the cap rims (more robust than
+    # isocurves since we know they are circles).
+
+    def _foot_and_radial(pt: np.ndarray):
+        d = pt - ax_pt
+        proj = float(np.dot(d, ax))
+        foot = ax_pt + proj * ax
+        radial = pt - foot
+        r = float(np.linalg.norm(radial))
+        return foot, radial, r
+
+    foot_s, radial_s, r_s = _foot_and_radial(p_start)
+    foot_e, radial_e, r_e = _foot_and_radial(p_end)
+
+    # x/y axes for each circle (derived from the radial direction at seam)
+    def _circle_axes(radial: np.ndarray, r: float):
+        if r > 1e-14:
+            x_ax = radial / r
+        else:
+            x_ax = _perp(ax)
+        y_ax = _unit(np.cross(ax, x_ax))
+        return x_ax, y_ax
+
+    xb, yb = _circle_axes(radial_s, r_s)
+    xt, yt = _circle_axes(radial_e, r_e)
+
+    # ------------------------------------------------------------------
+    # 5. Construct topology.
+    # ------------------------------------------------------------------
+    # We build the 4 standard cases:
+    #   (A) neither pole  → cylinder topology
+    #   (B) start pole    → top cone / half-dome
+    #   (C) end pole      → bottom cone / half-dome
+    #   (D) both poles    → spindle / football / sphere-like
+    # ------------------------------------------------------------------
+
+    if not pole_start and not pole_end:
+        # ── Case A: cylinder topology ─────────────────────────────────
+        # V=2, E=3, F=3, L=4 (lateral has 1 loop with 4 coedges)
+        # Euler: 2-3+3-1 = 1... wait, H = L-F = 4-3 = 1? No:
+        # L = total loops over all faces = 1 (lateral) + 1 (bot cap) + 1 (top cap) = 3
+        # H = L - F = 3 - 3 = 0
+        # V-E+F-H = 2-3+3-0 = 2 = 2*(1-0) ✓
+        # The lateral face loop has 4 coedges (bottom_circle, seam_fwd,
+        # top_circle_rev, seam_rev) — but L counts loops not coedges.
+
+        v_seam_b = Vertex(p_start, tol)
+        v_seam_t = Vertex(p_end, tol)
+
+        # Bottom rim circle: full circle from v_seam_b back to v_seam_b
+        bot_circle_crv = CircleArc3(foot_s, r_s, xb, yb, 0.0, 2 * math.pi)
+        e_bot = Edge(bot_circle_crv, 0.0, 2 * math.pi, v_seam_b, v_seam_b, tol)
+
+        # Top rim circle
+        top_circle_crv = CircleArc3(foot_e, r_e, xt, yt, 0.0, 2 * math.pi)
+        e_top = Edge(top_circle_crv, 0.0, 2 * math.pi, v_seam_t, v_seam_t, tol)
+
+        # Seam edge along the profile
+        e_seam = Edge(seam_crv, t_start, t_end, v_seam_b, v_seam_t, tol)
+
+        # Lateral face loop: bottom(+) → seam(+) → top(-) → seam(-)
+        lat_loop = Loop(
+            [
+                Coedge(e_bot, True),
+                Coedge(e_seam, True),
+                Coedge(e_top, False),
+                Coedge(e_seam, False),
+            ],
+            is_outer=True,
+        )
+        lat_face = Face(lateral_srf, [lat_loop], orientation=True, tol=tol)
+
+        # Bottom cap: disk at profile start
+        # The cap plane has outward normal pointing away from body interior.
+        # The bottom cap's outward normal points in -ax direction (downward).
+        bot_plane = Plane(origin=foot_s, x_axis=xb, y_axis=yb)
+        bot_loop = Loop([Coedge(e_bot, False)], is_outer=True)
+        bot_face = Face(bot_plane, [bot_loop], orientation=True, tol=tol)
+
+        # Top cap: outward normal in +ax direction.
+        top_plane = Plane(origin=foot_e, x_axis=xt, y_axis=-yt)
+        top_loop = Loop([Coedge(e_top, True)], is_outer=True)
+        top_face = Face(top_plane, [top_loop], orientation=True, tol=tol)
+
+        shell = Shell([lat_face, bot_face, top_face], is_closed=True)
+
+    elif pole_start and not pole_end:
+        # ── Case B: bottom pole ───────────────────────────────────────
+        # V=2 (pole_b + seam_t), E=2 (top rim + seam), F=2 (lateral + top cap)
+        # L=2 (1 loop per face), H=0, G=0
+        # V-E+F-H = 2-2+2-0 = 2 ✓
+        v_pole_b = Vertex(p_start, tol)
+        v_seam_t = Vertex(p_end, tol)
+
+        top_circle_crv = CircleArc3(foot_e, r_e, xt, yt, 0.0, 2 * math.pi)
+        e_top = Edge(top_circle_crv, 0.0, 2 * math.pi, v_seam_t, v_seam_t, tol)
+        e_seam = Edge(seam_crv, t_start, t_end, v_pole_b, v_seam_t, tol)
+
+        # Lateral face loop: seam(+) → top(-) → seam(-)
+        lat_loop = Loop(
+            [
+                Coedge(e_seam, True),
+                Coedge(e_top, False),
+                Coedge(e_seam, False),
+            ],
+            is_outer=True,
+        )
+        lat_face = Face(lateral_srf, [lat_loop], orientation=True, tol=tol)
+
+        top_plane = Plane(origin=foot_e, x_axis=xt, y_axis=-yt)
+        top_loop = Loop([Coedge(e_top, True)], is_outer=True)
+        top_face = Face(top_plane, [top_loop], orientation=True, tol=tol)
+
+        shell = Shell([lat_face, top_face], is_closed=True)
+
+    elif not pole_start and pole_end:
+        # ── Case C: top pole ──────────────────────────────────────────
+        # V=2 (seam_b + pole_t), E=2 (bottom rim + seam), F=2
+        # V-E+F-H = 2-2+2-0 = 2 ✓
+        v_seam_b = Vertex(p_start, tol)
+        v_pole_t = Vertex(p_end, tol)
+
+        bot_circle_crv = CircleArc3(foot_s, r_s, xb, yb, 0.0, 2 * math.pi)
+        e_bot = Edge(bot_circle_crv, 0.0, 2 * math.pi, v_seam_b, v_seam_b, tol)
+        e_seam = Edge(seam_crv, t_start, t_end, v_seam_b, v_pole_t, tol)
+
+        # Lateral face loop: bot(+) → seam(+) → seam(-)
+        lat_loop = Loop(
+            [
+                Coedge(e_bot, True),
+                Coedge(e_seam, True),
+                Coedge(e_seam, False),
+            ],
+            is_outer=True,
+        )
+        lat_face = Face(lateral_srf, [lat_loop], orientation=True, tol=tol)
+
+        bot_plane = Plane(origin=foot_s, x_axis=xb, y_axis=yb)
+        bot_loop = Loop([Coedge(e_bot, False)], is_outer=True)
+        bot_face = Face(bot_plane, [bot_loop], orientation=True, tol=tol)
+
+        shell = Shell([lat_face, bot_face], is_closed=True)
+
+    else:
+        # ── Case D: both poles (spindle) ──────────────────────────────
+        # V=2 (pole_b + pole_t), E=1 (seam), F=1, L=1, H=0, G=0
+        # V-E+F-H = 2-1+1-0 = 2 ✓  (same as sphere)
+        v_pole_b = Vertex(p_start, tol)
+        v_pole_t = Vertex(p_end, tol)
+        e_seam = Edge(seam_crv, t_start, t_end, v_pole_b, v_pole_t, tol)
+        lat_loop = Loop(
+            [Coedge(e_seam, True), Coedge(e_seam, False)],
+            is_outer=True,
+        )
+        lat_face = Face(lateral_srf, [lat_loop], orientation=True, tol=tol)
+        shell = Shell([lat_face], is_closed=True)
+
+    body = Body(solids=[Solid([shell])])
+    res = validate_body(body)
+    if not res["ok"]:
+        raise BuildError(
+            f"revolve_to_body produced invalid Body: {res['errors']}", res
+        )
+    return body
+
+
 __all__ = [
     "BuildError",
     "surface_to_face",
@@ -830,4 +1141,5 @@ __all__ = [
     "box_to_body",
     "cylinder_to_body",
     "sphere_to_body",
+    "revolve_to_body",
 ]

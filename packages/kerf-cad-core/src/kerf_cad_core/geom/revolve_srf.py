@@ -900,3 +900,38 @@ if _REGISTRY_AVAILABLE:
             "control_points": flat,
             "n_arc_segments": _arc_segment_count(_TWO_PI),
         })
+
+
+# ---------------------------------------------------------------------------
+# revolve_to_body  (topology: full 360° revolve → closed Body)
+# ---------------------------------------------------------------------------
+
+def revolve_to_body(
+    profile,
+    axis_point,
+    axis_dir,
+    tol: float = 1e-7,
+):
+    """Build a closed B-rep ``Body`` from a full 360° revolve of *profile*.
+
+    Delegates to :func:`kerf_cad_core.geom.brep_build.revolve_to_body`
+    which implements the full topology (seam edge, cap faces, pole
+    degeneracy) following the ``make_cylinder`` seam pattern.
+
+    Parameters
+    ----------
+    profile
+        A ``NurbsCurve`` with attributes ``control_points``, ``degree``,
+        and ``knots``.
+    axis_point, axis_dir
+        Axis of revolution (need not be unit-length).
+    tol
+        Topological / geometric tolerance (default 1e-7).
+
+    Returns
+    -------
+    Body
+        A validated, closed ``Body``.
+    """
+    from kerf_cad_core.geom.brep_build import revolve_to_body as _rtb
+    return _rtb(profile, axis_point, axis_dir, tol=tol)

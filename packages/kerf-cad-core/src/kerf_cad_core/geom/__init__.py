@@ -89,6 +89,13 @@ from kerf_cad_core.geom.trim_validation import (
     select_side,
     validate_body_post_trim,
 )
+# GK-44: match-surface analytic G1/G2 verification.
+from kerf_cad_core.geom.match_srf import (
+    MatchResult,
+    match_surface_edge,
+    verify_seam_g1_analytic,
+    verify_seam_g2_analytic,
+)
 
 # GK-39: untrim / shrink trimmed surface.
 from kerf_cad_core.geom.trim_curve import (
@@ -234,4 +241,6 @@ __all__ = [
     # GK-56
     "region_union","region_intersection","region_difference",
     "region_area","make_rect_loop","make_circle_loop",
+    # GK-44
+    "MatchResult","match_surface_edge","verify_seam_g1_analytic","verify_seam_g2_analytic",
 ]

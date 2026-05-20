@@ -664,3 +664,162 @@ class TestNonDestructive:
         r = match_surface_edge(tgt, "u0", src, "u0", "G0")
         assert r.ok
         assert r.modified_surface.control_points is not src.control_points
+
+
+# ---------------------------------------------------------------------------
+# Group 9: Analytic oracle -- flat patch matched to cylinder edge
+# GK-44: verify analytic G1 ≤ 1e-8, G2 ≤ 1e-7 for flat-to-cylinder seam.
+# ---------------------------------------------------------------------------
+
+from kerf_cad_core.geom.match_srf import verify_seam_g1_analytic, verify_seam_g2_analytic
+
+
+def _make_cylinder_surface(radius: float = 2.0, height: float = 1.0,
+                            nu: int = 5, nv: int = 3) -> NurbsSurface:
+    """NURBS approximation of a quarter-cylinder using cubic-in-u interpolation.
+
+    Parametric: S(u, v) = (R·cos(theta(u)), R·sin(theta(u)), v·H) where
+    theta ranges from 0 to pi/2 over the u domain.
+    """
+    thetas = [math.pi / 2 * i / (nu - 1) for i in range(nu)]
+    cp = np.zeros((nu, nv, 3))
+    for i, theta in enumerate(thetas):
+        for j, vf in enumerate(np.linspace(0.0, 1.0, nv)):
+            cp[i, j] = [radius * math.cos(theta),
+                        radius * math.sin(theta),
+                        vf * height]
+    return NurbsSurface(
+        degree_u=2, degree_v=1,
+        control_points=cp,
+        knots_u=_knots(nu, 2),
+        knots_v=_knots(nv, 1),
+    )
+
+
+def _make_flat_patch_at_cylinder_u1(radius: float = 2.0, height: float = 1.0,
+                                     nu: int = 5, nv: int = 3) -> NurbsSurface:
+    """Flat patch positioned so its u0 edge meets the cylinder's u1 edge.
+
+    The cylinder's u1 edge lies at theta=pi/2, i.e. x=0, y=R.  The flat
+    patch extends in the +x direction from y=R.
+    """
+    cp = np.zeros((nu, nv, 3))
+    for i in range(nu):
+        x_off = i / (nu - 1)
+        for j, vf in enumerate(np.linspace(0.0, 1.0, nv)):
+            cp[i, j] = [x_off, radius, vf * height]
+    return NurbsSurface(
+        degree_u=2, degree_v=1,
+        control_points=cp,
+        knots_u=_knots(nu, 2),
+        knots_v=_knots(nv, 1),
+    )
+
+
+class TestAnalyticOracle:
+    """GK-44 analytic oracle: flat patch matched to a cylinder edge."""
+
+    def test_g1_analytic_oracle_ok(self):
+        """G1 match completes successfully."""
+        cyl = _make_cylinder_surface()
+        flat = _make_flat_patch_at_cylinder_u1()
+        r = match_surface_edge(cyl, "u1", flat, "u0", "G1")
+        assert r.ok, f"G1 match failed: {r.reason}"
+
+    def test_g1_analytic_oracle_cross_tangent_le_1e8(self):
+        """After G1 match, cross-boundary tangent residual ≤ 1e-8."""
+        cyl = _make_cylinder_surface()
+        flat = _make_flat_patch_at_cylinder_u1()
+        r = match_surface_edge(cyl, "u1", flat, "u0", "G1")
+        assert r.ok
+        residual = verify_seam_g1_analytic(
+            r.modified_surface, "u0", cyl, "u1", samples=32
+        )
+        assert residual <= 1e-8, (
+            f"G1 cross-tangent residual {residual:.2e} exceeds 1e-8"
+        )
+
+    def test_g1_analytic_oracle_residual_much_smaller_than_unmatched(self):
+        """G1 residual after matching must be orders of magnitude below initial."""
+        cyl = _make_cylinder_surface()
+        flat = _make_flat_patch_at_cylinder_u1()
+        # Residual before matching (flat has horizontal tangents; cylinder has radial)
+        residual_before = verify_seam_g1_analytic(flat, "u0", cyl, "u1", samples=16)
+        r = match_surface_edge(cyl, "u1", flat, "u0", "G1")
+        residual_after = verify_seam_g1_analytic(
+            r.modified_surface, "u0", cyl, "u1", samples=16
+        )
+        # After matching the residual must be negligible
+        assert residual_after <= 1e-8
+        # And smaller than before (if pre-residual was measurable)
+        if residual_before > 1e-6:
+            assert residual_after < residual_before * 1e-4
+
+    def test_g2_analytic_oracle_ok(self):
+        """G2 match completes successfully."""
+        cyl = _make_cylinder_surface()
+        flat = _make_flat_patch_at_cylinder_u1()
+        r = match_surface_edge(cyl, "u1", flat, "u0", "G2")
+        assert r.ok, f"G2 match failed: {r.reason}"
+
+    def test_g2_analytic_oracle_curvature_le_1e7(self):
+        """After G2 match, normal-curvature residual ≤ 1e-7."""
+        cyl = _make_cylinder_surface()
+        flat = _make_flat_patch_at_cylinder_u1()
+        r = match_surface_edge(cyl, "u1", flat, "u0", "G2")
+        assert r.ok
+        residual = verify_seam_g2_analytic(
+            r.modified_surface, "u0", cyl, "u1", samples=32
+        )
+        assert residual <= 1e-7, (
+            f"G2 curvature residual {residual:.2e} exceeds 1e-7"
+        )
+
+    def test_g2_analytic_oracle_also_satisfies_g1(self):
+        """G2 match must also satisfy G1 (G1 ≤ 1e-8)."""
+        cyl = _make_cylinder_surface()
+        flat = _make_flat_patch_at_cylinder_u1()
+        r = match_surface_edge(cyl, "u1", flat, "u0", "G2")
+        assert r.ok
+        g1_res = verify_seam_g1_analytic(
+            r.modified_surface, "u0", cyl, "u1", samples=32
+        )
+        assert g1_res <= 1e-8, (
+            f"G2 match failed G1 oracle: cross-tangent {g1_res:.2e} > 1e-8"
+        )
+
+    def test_g2_analytic_oracle_g0_preserved(self):
+        """G2 match must also satisfy G0 (position deviation near machine-eps)."""
+        cyl = _make_cylinder_surface()
+        flat = _make_flat_patch_at_cylinder_u1()
+        r = match_surface_edge(cyl, "u1", flat, "u0", "G2")
+        assert r.ok
+        assert r.max_position_deviation < 1e-10
+
+    def test_verify_seam_g1_analytic_returns_float(self):
+        """verify_seam_g1_analytic must return a non-negative float."""
+        cyl = _make_cylinder_surface()
+        flat = _make_flat_patch_at_cylinder_u1()
+        val = verify_seam_g1_analytic(flat, "u0", cyl, "u1", samples=8)
+        assert isinstance(val, float)
+        assert val >= 0.0
+
+    def test_verify_seam_g2_analytic_returns_float(self):
+        """verify_seam_g2_analytic must return a non-negative float."""
+        cyl = _make_cylinder_surface()
+        flat = _make_flat_patch_at_cylinder_u1()
+        val = verify_seam_g2_analytic(flat, "u0", cyl, "u1", samples=8)
+        assert isinstance(val, float)
+        assert val >= 0.0
+
+    def test_verify_seam_g1_analytic_identical_surfaces(self):
+        """Identical surfaces must have zero G1 residual."""
+        surf = make_flat_surface()
+        val = verify_seam_g1_analytic(surf, "u0", surf, "u0", samples=8)
+        assert val < 1e-15
+
+    def test_verify_seam_g2_analytic_identical_surfaces(self):
+        """Identical surfaces must have zero G2 curvature residual."""
+        surf = make_curved_surface(amplitude=0.2)
+        val = verify_seam_g2_analytic(surf, "u0", surf, "u0", samples=8)
+        assert val < 1e-12

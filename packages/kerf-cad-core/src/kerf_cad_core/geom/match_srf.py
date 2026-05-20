@@ -100,7 +100,7 @@ from typing import Optional, Tuple
 
 import numpy as np
 
-from kerf_cad_core.geom.nurbs import NurbsSurface
+from kerf_cad_core.geom.nurbs import NurbsSurface, surface_derivatives, surface_normal
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -289,6 +289,434 @@ def _boundary_degree(surf: NurbsSurface, edge: str) -> int:
     if edge in ("u0", "u1"):
         return surf.degree_u
     return surf.degree_v
+
+
+# ---------------------------------------------------------------------------
+# Analytic boundary-derivative helpers (use surface_derivatives, not CPs)
+# ---------------------------------------------------------------------------
+
+def _edge_boundary_params(surf: NurbsSurface, edge: str) -> Tuple[float, float, float, float]:
+    """Return (u_seam, v_seam, t_min, t_max) for the given edge.
+
+    For "u0"/"u1" edges the along-edge parameter t runs over v; the
+    fixed (seam) parameter is u.  For "v0"/"v1" edges t runs over u.
+    """
+    u_min = float(surf.knots_u[surf.degree_u])
+    u_max = float(surf.knots_u[-surf.degree_u - 1])
+    v_min = float(surf.knots_v[surf.degree_v])
+    v_max = float(surf.knots_v[-surf.degree_v - 1])
+    if edge == "u0":
+        return u_min, None, v_min, v_max  # seam u=u_min, t in [v_min, v_max]
+    if edge == "u1":
+        return u_max, None, v_min, v_max  # seam u=u_max
+    if edge == "v0":
+        return None, v_min, u_min, u_max  # seam v=v_min, t in [u_min, u_max]
+    # v1
+    return None, v_max, u_min, u_max      # seam v=v_max
+
+
+def _analytic_cross_tangent(surf: NurbsSurface, edge: str, t: float) -> np.ndarray:
+    """Analytic cross-boundary tangent (dS/dn) at along-edge parameter *t*.
+
+    Uses ``surface_derivatives`` for exact derivative evaluation at the
+    boundary.  Returns a 3-component vector; caller handles normalisation.
+
+    For "u0"/"u1" edges the cross-boundary direction is u; for "v0"/"v1"
+    it is v.  The tangent is always in the *inward* direction (pointing
+    into the surface from the seam).
+    """
+    u_seam, v_seam, t_min, t_max = _edge_boundary_params(surf, edge)
+    # Clamp t to the domain
+    t_clamped = min(max(float(t), t_min), t_max)
+
+    if edge in ("u0", "u1"):
+        u = u_seam
+        v = t_clamped
+    else:
+        u = t_clamped
+        v = v_seam
+
+    SKL = surface_derivatives(surf, u, v, d=1)
+    if edge in ("u0", "u1"):
+        # Cross-boundary is d/du; inward for u0 is +u, for u1 is -u
+        raw = SKL[1, 0][:3]
+        return raw if edge == "u0" else -raw
+    else:
+        # Cross-boundary is d/dv; inward for v0 is +v, for v1 is -v
+        raw = SKL[0, 1][:3]
+        return raw if edge == "v0" else -raw
+
+
+def _analytic_cross_curvature(surf: NurbsSurface, edge: str, t: float) -> float:
+    """Analytic normal curvature in the cross-boundary direction at parameter *t*.
+
+    Returns κ = (S_nn · n) / |S_n|²  where 'n' denotes the cross-boundary
+    direction (u or v depending on *edge*) and 'n' in the curvature formula
+    is the unit surface normal.
+
+    Uses ``surface_derivatives`` with d=2 for exact curvature.
+    """
+    u_seam, v_seam, t_min, t_max = _edge_boundary_params(surf, edge)
+    t_clamped = min(max(float(t), t_min), t_max)
+
+    if edge in ("u0", "u1"):
+        u = u_seam
+        v = t_clamped
+    else:
+        u = t_clamped
+        v = v_seam
+
+    SKL = surface_derivatives(surf, u, v, d=2)
+    n_surf = surface_normal(surf, u, v)
+
+    if edge in ("u0", "u1"):
+        # Cross-boundary is d/du: tangent = SKL[1,0], second deriv = SKL[2,0]
+        tangent = SKL[1, 0][:3]
+        second = SKL[2, 0][:3]
+    else:
+        # Cross-boundary is d/dv: tangent = SKL[0,1], second deriv = SKL[0,2]
+        tangent = SKL[0, 1][:3]
+        second = SKL[0, 2][:3]
+
+    tan_sq = float(np.dot(tangent, tangent))
+    if tan_sq < 1e-30:
+        return 0.0
+    return float(np.dot(second, n_surf)) / tan_sq
+
+
+# ---------------------------------------------------------------------------
+# Core: G2 -- analytic version using normal curvature matching
+# ---------------------------------------------------------------------------
+
+def _boundary_second_deriv_coeff_A(surf: NurbsSurface, edge: str) -> float:
+    """Coefficient of CP[2] in the analytic second derivative at the boundary.
+
+    For a clamped B-spline of degree p with boundary knot spans h1 and h2:
+        S_cc(boundary) = A * CP[2] + B * CP[1] + C * CP[0]
+    where
+        A = p*(p-1) / (h1 * (h1 + h2))
+        C = p*(p-1) / h1²
+        B = -(A + C)
+
+    h1 is the first non-trivial knot span from the boundary;
+    h2 is the second.  For "u0"/"v0" these are the spans starting at the
+    left/bottom; for "u1"/"v1" they are from the right/top (mirrored).
+
+    Returns A.  Falls back to the approximate ``p*(p-1)/h1²`` value if the
+    second span is not available.
+    """
+    if edge in ("u0", "u1"):
+        knots = surf.knots_u
+        p = surf.degree_u
+    else:
+        knots = surf.knots_v
+        p = surf.degree_v
+
+    if p < 2:
+        return 0.0
+
+    if edge in ("u0", "v0"):
+        # left boundary: h1 = knots[p+1] - knots[p], h2 = knots[p+2] - knots[p+1]
+        h1 = float(knots[p + 1] - knots[p])
+        h2 = float(knots[p + 2] - knots[p + 1]) if len(knots) > p + 2 else h1
+    else:
+        # right boundary (u1/v1): mirror
+        h1 = float(knots[-(p + 1)] - knots[-(p + 2)])
+        h2 = float(knots[-(p + 2)] - knots[-(p + 3)]) if len(knots) > p + 2 else h1
+
+    if abs(h1) < 1e-15 or abs(h1 + h2) < 1e-15:
+        return 0.0
+    return float(p * (p - 1)) / (h1 * (h1 + h2))
+
+
+def _boundary_second_deriv_coeff_C(surf: NurbsSurface, edge: str) -> float:
+    """Coefficient of CP[0] in the analytic second derivative at the boundary.
+
+    C = p*(p-1) / h1²
+    """
+    if edge in ("u0", "u1"):
+        knots = surf.knots_u
+        p = surf.degree_u
+    else:
+        knots = surf.knots_v
+        p = surf.degree_v
+
+    if p < 2:
+        return 0.0
+
+    if edge in ("u0", "v0"):
+        h1 = float(knots[p + 1] - knots[p])
+    else:
+        h1 = float(knots[-(p + 1)] - knots[-(p + 2)])
+
+    if abs(h1) < 1e-15:
+        return 0.0
+    return float(p * (p - 1)) / (h1 ** 2)
+
+
+def _eval_cp_row_at_t(surf: NurbsSurface, edge: str, row_idx: int, t: float) -> np.ndarray:
+    """Evaluate the along-edge B-spline curve of a given inward row at parameter t.
+
+    For "u0"/"u1" edges the along-edge direction is v; for "v0"/"v1" it is u.
+    This evaluates the v-curve (or u-curve) formed by the row_idx-th CP row in
+    the cross-boundary direction at the along-edge parameter t.
+
+    This is required for the exact tensor-product formula:
+        S_cc(boundary, t) = A * P2_row(t) + B * P1_row(t) + C * P0_row(t)
+    """
+    from kerf_cad_core.geom.nurbs import NurbsCurve, de_boor
+    cp_row = _get_cp_row(surf, edge, row_idx)  # (n_col, dim)
+    dim = cp_row.shape[1]
+    if edge in ("u0", "u1"):
+        knots_along = surf.knots_v
+        degree_along = surf.degree_v
+    else:
+        knots_along = surf.knots_u
+        degree_along = surf.degree_u
+    curve = NurbsCurve(degree=degree_along,
+                       control_points=cp_row[:, :3],
+                       knots=knots_along)
+    val = de_boor(curve, float(t))
+    return np.asarray(val, dtype=float)[:3]
+
+
+def _apply_g2_analytic(source: NurbsSurface, source_edge: str,
+                       target: NurbsSurface, target_edge: str) -> None:
+    """Adjust the *third* CP row of source for G2 (normal curvature) continuity.
+
+    Uses the exact tensor-product B-spline formula for the cross-boundary
+    second derivative at the boundary:
+
+        S_cc(boundary, t) = A_src * P2_row(t) + B_src * P1_row(t) + C_src * P0_row(t)
+
+    where P_i_row(t) is the i-th cross-boundary control row evaluated as a
+    B-spline curve in the along-edge direction at parameter t.
+
+    For each along-edge control-point index k, evaluates all three rows at the
+    Greville abscissa t_k and applies an additive correction to CP[2][k] to
+    make the source normal curvature match the target's:
+
+        ΔP2_row(t_k) = (S_cc_desired(t_k) - S_cc_current(t_k)) / A_src
+
+    For identical source and target, S_cc_desired = S_cc_current, so the
+    correction is zero and CP[2] is unchanged to machine precision.
+    """
+    p_src = _boundary_degree(source, source_edge)
+    if p_src < 2:
+        return   # G2 on degree-1 surface is undefined -- silently skip
+
+    A_src = _boundary_second_deriv_coeff_A(source, source_edge)
+    C_src = _boundary_second_deriv_coeff_C(source, source_edge)
+    B_src = -(A_src + C_src)
+
+    if abs(A_src) < 1e-30:
+        # Degenerate -- fall back to legacy approach
+        _apply_g2(source, source_edge, target, target_edge)
+        return
+
+    n_col_src = _cp_col_count(source, source_edge)
+    dim = source.control_points.shape[2]
+
+    _, _, t_min_src, t_max_src = _edge_boundary_params(source, source_edge)
+    _, _, t_min_tgt, t_max_tgt = _edge_boundary_params(target, target_edge)
+    u_seam_src, v_seam_src, _, _ = _edge_boundary_params(source, source_edge)
+    u_seam_tgt, v_seam_tgt, _, _ = _edge_boundary_params(target, target_edge)
+
+    # Along-edge knots for the source (used to compute Greville abscissas)
+    if source_edge in ("u0", "u1"):
+        knots_along = source.knots_v
+        deg_along = source.degree_v
+    else:
+        knots_along = source.knots_u
+        deg_along = source.degree_u
+
+    # Greville abscissas for the along-edge direction: these are the
+    # parameter values at which CP[k] has its peak basis-function weight.
+    # t_k = mean of deg knots: (knots[k+1] + ... + knots[k+deg]) / deg
+    greville = []
+    for k in range(n_col_src):
+        if deg_along > 0:
+            t_k = float(np.mean(knots_along[k + 1: k + deg_along + 1]))
+        else:
+            t_k = t_min_src + (k / (n_col_src - 1)) * (t_max_src - t_min_src) if n_col_src > 1 else t_min_src
+        # Clamp to domain
+        t_k = min(max(t_k, t_min_src), t_max_src)
+        greville.append(t_k)
+
+    orig_row2 = _get_cp_row(source, source_edge, 2)
+    row2_new = orig_row2.copy()
+    span_src = _boundary_knot_span(source, source_edge)
+
+    for k in range(n_col_src):
+        t_src = greville[k]
+        # Map to target along-edge parameter (linear interpolation)
+        tk_norm = (t_src - t_min_src) / (t_max_src - t_min_src) if (t_max_src - t_min_src) > 1e-15 else 0.0
+        t_tgt = t_min_tgt + tk_norm * (t_max_tgt - t_min_tgt)
+
+        # Evaluate the source CP rows as B-spline curves at t_src.
+        # This is the key step: P_i_eval = the v-curve of row i at t_src.
+        P0_eval = _eval_cp_row_at_t(source, source_edge, 0, t_src)
+        P1_eval = _eval_cp_row_at_t(source, source_edge, 1, t_src)
+        P2_eval = _eval_cp_row_at_t(source, source_edge, 2, t_src)
+
+        # Current S_cc from the exact tensor-product formula:
+        S_cc_current = A_src * P2_eval + B_src * P1_eval + C_src * P0_eval
+
+        # Source cross-boundary tangent: S_c = A1 * (P1_eval - P0_eval) where
+        # A1 = p_src / h1 (from the first-derivative formula for B-splines at boundary)
+        # For the G1 tangent magnitude we use the surface_derivatives result directly.
+        if source_edge in ("u0", "u1"):
+            SKL_src = surface_derivatives(source, u_seam_src, t_src, d=1)
+            S_c_src = SKL_src[1, 0][:3]
+        else:
+            SKL_src = surface_derivatives(source, t_src, v_seam_src, d=1)
+            S_c_src = SKL_src[0, 1][:3]
+        S_c_sq = float(np.dot(S_c_src, S_c_src))
+
+        if S_c_sq < 1e-30:
+            continue
+
+        # Analytic target derivatives at seam
+        if target_edge in ("u0", "u1"):
+            SKL_tgt = surface_derivatives(target, u_seam_tgt, t_tgt, d=2)
+            S_cc_tgt = SKL_tgt[2, 0][:3]
+            S_c_tgt = SKL_tgt[1, 0][:3]
+        else:
+            SKL_tgt = surface_derivatives(target, t_tgt, v_seam_tgt, d=2)
+            S_cc_tgt = SKL_tgt[0, 2][:3]
+            S_c_tgt = SKL_tgt[0, 1][:3]
+
+        S_c_tgt_sq = float(np.dot(S_c_tgt, S_c_tgt))
+        if S_c_tgt_sq < 1e-30:
+            continue
+
+        # Target surface normal and normal curvature
+        if target_edge in ("u0", "u1"):
+            n_tgt_vec = surface_normal(target, u_seam_tgt, t_tgt)
+        else:
+            n_tgt_vec = surface_normal(target, t_tgt, v_seam_tgt)
+        kappa_tgt = float(np.dot(S_cc_tgt, n_tgt_vec)) / S_c_tgt_sq
+
+        # Source surface normal (after G1 the normals align)
+        if source_edge in ("u0", "u1"):
+            n_src_vec = surface_normal(source, u_seam_src, t_src)
+        else:
+            n_src_vec = surface_normal(source, t_src, v_seam_src)
+
+        # Decompose target S_cc into normal + tangential
+        S_cc_tgt_normal_part = float(np.dot(S_cc_tgt, n_tgt_vec)) * n_tgt_vec
+        S_cc_tgt_tangent_part = S_cc_tgt - S_cc_tgt_normal_part
+
+        # Required source S_cc at this parameter:
+        #   normal: κ_tgt * |S_c_src|²  * n̂_src
+        #   tangential: S_cc_tgt_tangent scaled for tangent magnitude ratio
+        tan_scale = S_c_sq / S_c_tgt_sq
+        S_cc_desired = (kappa_tgt * S_c_sq) * n_src_vec + S_cc_tgt_tangent_part * tan_scale
+
+        # Additive correction to P2_eval:
+        #   S_cc = A * P2_eval + (B * P1_eval + C * P0_eval)
+        #   => P2_eval_new = P2_eval_current + (S_cc_desired - S_cc_current) / A
+        delta_P2_eval = (S_cc_desired - S_cc_current) / A_src
+
+        # Apply correction to CP[2][k]:
+        row2_new[k, :3] = orig_row2[k, :3] + delta_P2_eval
+        if dim > 3:
+            row2_new[k, 3:] = orig_row2[k, 3:]
+
+    _set_cp_row(source, source_edge, 2, row2_new)
+
+
+# ---------------------------------------------------------------------------
+# Public analytic verification functions
+# ---------------------------------------------------------------------------
+
+def verify_seam_g1_analytic(
+    source: NurbsSurface,
+    source_edge: str,
+    target: NurbsSurface,
+    target_edge: str,
+    samples: int = 32,
+) -> float:
+    """Analytic G1 seam verification: max cross-product residual.
+
+    For each of ``samples`` positions along the seam, computes the cross-
+    product residual ``|| (t_src / |t_src|) × (t_tgt / |t_tgt|) ||`` using
+    true surface derivatives (``surface_derivatives``).  A value of zero
+    indicates exactly parallel cross-boundary tangents (G1 continuous).
+
+    Parameters
+    ----------
+    source, target : NurbsSurface
+    source_edge, target_edge : str  -- edge identifiers (``'u0'`` etc.)
+    samples : int  -- number of sample points along the seam
+
+    Returns
+    -------
+    float
+        Maximum G1 residual across all samples.  ≤ 1e-8 is considered
+        analytically G1 continuous.
+    """
+    _, _, t_min_src, t_max_src = _edge_boundary_params(source, source_edge)
+    _, _, t_min_tgt, t_max_tgt = _edge_boundary_params(target, target_edge)
+    n = max(2, samples)
+    max_residual = 0.0
+    for i in range(n):
+        tk = i / (n - 1) if n > 1 else 0.0
+        t_src = t_min_src + tk * (t_max_src - t_min_src)
+        t_tgt = t_min_tgt + tk * (t_max_tgt - t_min_tgt)
+        t_s = _analytic_cross_tangent(source, source_edge, t_src)
+        t_t = _analytic_cross_tangent(target, target_edge, t_tgt)
+        n_s = float(np.linalg.norm(t_s))
+        n_t = float(np.linalg.norm(t_t))
+        if n_s < 1e-15 or n_t < 1e-15:
+            continue
+        cross = np.cross(t_s / n_s, t_t / n_t)
+        residual = float(np.linalg.norm(cross))
+        if residual > max_residual:
+            max_residual = residual
+    return max_residual
+
+
+def verify_seam_g2_analytic(
+    source: NurbsSurface,
+    source_edge: str,
+    target: NurbsSurface,
+    target_edge: str,
+    samples: int = 32,
+) -> float:
+    """Analytic G2 seam verification: max normal-curvature difference.
+
+    For each of ``samples`` positions along the seam, computes
+    ``|κ_src − κ_tgt|`` where κ is the normal curvature in the
+    cross-boundary direction, evaluated via analytic ``surface_derivatives``.
+    A value of zero indicates matching curvature (G2 continuous).
+
+    Parameters
+    ----------
+    source, target : NurbsSurface
+    source_edge, target_edge : str  -- edge identifiers
+    samples : int  -- number of sample points along the seam
+
+    Returns
+    -------
+    float
+        Maximum G2 (normal curvature) residual.  ≤ 1e-7 is considered
+        analytically G2 continuous.
+    """
+    _, _, t_min_src, t_max_src = _edge_boundary_params(source, source_edge)
+    _, _, t_min_tgt, t_max_tgt = _edge_boundary_params(target, target_edge)
+    n = max(2, samples)
+    max_residual = 0.0
+    for i in range(n):
+        tk = i / (n - 1) if n > 1 else 0.0
+        t_src = t_min_src + tk * (t_max_src - t_min_src)
+        t_tgt = t_min_tgt + tk * (t_max_tgt - t_min_tgt)
+        k_src = _analytic_cross_curvature(source, source_edge, t_src)
+        k_tgt = _analytic_cross_curvature(target, target_edge, t_tgt)
+        diff = abs(k_src - k_tgt)
+        if diff > max_residual:
+            max_residual = diff
+    return max_residual
 
 
 # ---------------------------------------------------------------------------
@@ -713,10 +1141,10 @@ def match_surface_edge(
                 reason=f"G1 application failed: {exc}",
             )
 
-    # --- Apply G2 -----------------------------------------------------------
+    # --- Apply G2 (analytic normal-curvature matching) ----------------------
     if continuity == "G2":
         try:
-            _apply_g2(source_copy, source_edge, target_surface, target_edge)
+            _apply_g2_analytic(source_copy, source_edge, target_surface, target_edge)
         except Exception as exc:
             return MatchResult(
                 modified_surface=source_surface,
@@ -724,13 +1152,34 @@ def match_surface_edge(
                 reason=f"G2 application failed: {exc}",
             )
 
-    # --- Diagnostics --------------------------------------------------------
+    # --- Diagnostics (analytic for G1/G2; CP-based for G0) ------------------
     try:
-        max_pos, max_tan, max_cur = _compute_deviations(
+        # G0: always CP-based (boundary position deviation)
+        max_pos, _tan_cp, _cur_cp = _compute_deviations(
             source_copy, source_edge,
             target_surface, target_edge,
-            samples, continuity,
+            samples, "G0",
         )
+        # G1: analytic cross-product residual (radians-equivalent, via asin)
+        if continuity in ("G1", "G2"):
+            g1_res = verify_seam_g1_analytic(
+                source_copy, source_edge,
+                target_surface, target_edge,
+                samples=samples,
+            )
+            # Convert cross-product magnitude to angle in radians (asin for small angles)
+            max_tan = float(math.asin(min(g1_res, 1.0)))
+        else:
+            max_tan = math.nan
+        # G2: analytic normal curvature difference
+        if continuity == "G2":
+            max_cur = verify_seam_g2_analytic(
+                source_copy, source_edge,
+                target_surface, target_edge,
+                samples=samples,
+            )
+        else:
+            max_cur = math.nan
     except Exception:
         max_pos, max_tan, max_cur = math.nan, math.nan, math.nan
 

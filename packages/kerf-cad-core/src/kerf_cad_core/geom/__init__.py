@@ -489,4 +489,6 @@ __all__ = [
     "knife_face",
     # GK-86
     "replace_face",
+    # GK-88
+    "subd_loop_slide",
 ]

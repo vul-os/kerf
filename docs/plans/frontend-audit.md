@@ -180,7 +180,7 @@ Each task ≈1–3h sonnet unless `[HARD]`. Always isolate in a worktree.
   Files: `src/components/FeatureView.jsx`.
   Success: the feature tree and add menu are fully operable without a mouse.
 
-- [ ] **T-D2 Replace `role="button"` divs with real buttons**
+- [x] **T-D2 Replace `role="button"` divs with real buttons**
   Scope: swap the delete-feature `role="button"` div for a `<button>` (keeps `aria-label`); audit FeatureView for other clickable non-buttons.
   Files: `src/components/FeatureView.jsx`.
   Success: axe reports no "interactive role on non-interactive element"; Enter/Space works.

@@ -2446,14 +2446,14 @@ export default function FeatureView({
           `}
         >
           {/* Mobile handle — tap to close */}
-          <div
-            className="md:hidden flex justify-center py-2 cursor-pointer"
+          <button
+            type="button"
+            className="md:hidden flex justify-center py-2 w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/60 rounded-t-xl"
             onClick={() => setInspectorOpen(false)}
             aria-label="Close inspector"
-            role="button"
           >
             <span className="w-8 h-1 rounded-full bg-ink-600" aria-hidden="true" />
-          </div>
+          </button>
           {!selectedFeature ? (
             <div className="p-4 text-xs text-ink-500 italic">
               Select a feature in the timeline to edit its parameters.

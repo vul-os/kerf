@@ -5307,7 +5307,7 @@ User-direction 2026-05-19. Extends T-179 (apparel pattern-making) with deeper te
 ### T-283 Dye-sublimation + screen-print art alignment
 - **Tier:** B
 - **Priority:** P2
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped (2026-05-20)
 - **Scope:** take a 3D garment + a 2D artwork file, produce the pre-distorted print-ready file with bleed + registration marks for dye-sub (continuous tone) or screen-print (spot colour separation). Mesh-unwrap the garment, project the artwork, output PNG/PDF per panel.
 - **Target files/packages:** `packages/kerf-textiles/src/kerf_textiles/sublimation.py`, `packages/kerf-textiles/src/kerf_textiles/screen_print.py`, tests.
 - **Definition of Done:** unwrap a cylinder→PNG round-trip preserves area to 1%; bleed margin is the expected width; pytest.

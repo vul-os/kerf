@@ -83,6 +83,26 @@ from kerf_textiles.mass_spring import (
     PlanePrimitive,
     solve_step,
 )
+from kerf_textiles.sublimation import (
+    unwrap_cylinder,
+    project_artwork,
+    add_bleed,
+    add_registration_marks,
+    render_panel_png,
+    CylinderPanel,
+    BleedResult,
+    RegMarkResult,
+    SubliResult,
+)
+from kerf_textiles.screen_print import (
+    separate_spot_colours,
+    render_separations,
+    render_separations_pdf,
+    SpotColour,
+    SeparationResult,
+    PrintReadySeparation,
+    ScreenPrintResult,
+)
 
 __all__ = [
     # weave
@@ -123,4 +143,22 @@ __all__ = [
     "SpherePrimitive",
     "PlanePrimitive",
     "solve_step",
+    # sublimation
+    "unwrap_cylinder",
+    "project_artwork",
+    "add_bleed",
+    "add_registration_marks",
+    "render_panel_png",
+    "CylinderPanel",
+    "BleedResult",
+    "RegMarkResult",
+    "SubliResult",
+    # screen_print
+    "separate_spot_colours",
+    "render_separations",
+    "render_separations_pdf",
+    "SpotColour",
+    "SeparationResult",
+    "PrintReadySeparation",
+    "ScreenPrintResult",
 ]

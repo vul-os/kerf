@@ -65,7 +65,7 @@ noted.
   File: `packages/kerf-cad-core/tests/test_feature_jewelry_engraving.py`
   Success: 25 text/glyph permutations; engraved depth & font fidelity; UTF-8 + ligature stress cases.
 
-- [ ] T-9 Jewelry: hollowing (weight reduction)
+- [x] T-9 Jewelry: hollowing (weight reduction)
   Scope: `hollowing.py` shell with min-wall constraint.
   File: `packages/kerf-cad-core/tests/test_feature_jewelry_hollowing.py`
   Success: 25 part geometries; resulting solid has ≥ requested min wall everywhere; mass reduction within target ±3%.

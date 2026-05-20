@@ -94,6 +94,12 @@ _DEFAULT_MAX_STEPS: int = 2000
 _MAX_NEWTON_ITER: int = 40
 _MIN_BRANCH_PTS: int = 2
 
+# GK-69: condition-number threshold above which a Jacobian is treated as
+# near-singular and the solver falls back to least-squares / lstsq.
+# 1 / machine-eps ≈ 4.5e15; we use a conservative 1e10 so that genuinely
+# ill-conditioned tangent intersections are caught before they diverge.
+_COND_THRESHOLD: float = 1e10
+
 
 # ---------------------------------------------------------------------------
 # Correct NURBS evaluators
@@ -358,9 +364,14 @@ def _newton_curve_surface(
 
         # Jacobian columns: [dp_du, dp_dv, -dC_dt]  shape (3, 3)
         J = np.column_stack([dp_du, dp_dv, -dC_dt])
-        det = np.linalg.det(J)
-        if abs(det) < 1e-20:
-            # Fall back to pseudo-inverse
+        # GK-69: condition-number guard — near-singular Jacobian indicates a
+        # tangent intersection; fall back to lstsq (least-norm solution) so
+        # the step is as small as possible rather than diverging.
+        try:
+            cond = np.linalg.cond(J)
+        except np.linalg.LinAlgError:
+            cond = float("inf")
+        if not np.isfinite(cond) or cond > _COND_THRESHOLD:
             delta, *_ = np.linalg.lstsq(J, -F, rcond=None)
         else:
             delta = np.linalg.solve(J, -F)
@@ -532,12 +543,24 @@ def _newton_surf_surf_point(
 
         J = np.column_stack([dpA_du, dpA_dv, -dpB_du, -dpB_dv])  # (3, 4)
         # Least-norm: delta = J^T (J J^T)^-1 (-F)
+        # GK-69: condition-number guard on JJT.  Near-singular JJT (tangent
+        # or nearly-tangent surfaces) causes solve() to diverge; fall back to
+        # direct lstsq on J which is always stable.
         JJT = J @ J.T
         try:
-            lam = np.linalg.solve(JJT, -F)
+            cond_jjt = np.linalg.cond(JJT)
         except np.linalg.LinAlgError:
-            break
-        delta = J.T @ lam
+            cond_jjt = float("inf")
+        if not np.isfinite(cond_jjt) or cond_jjt > _COND_THRESHOLD:
+            # lstsq directly on J gives minimum-norm delta; equivalent to
+            # the pseudoinverse but without inverting JJT.
+            delta, *_ = np.linalg.lstsq(J, -F, rcond=None)
+        else:
+            try:
+                lam = np.linalg.solve(JJT, -F)
+            except np.linalg.LinAlgError:
+                break
+            delta = J.T @ lam
 
         uA_new = float(np.clip(uA + delta[0], uA_min, uA_max))
         vA_new = float(np.clip(vA + delta[1], vA_min, vA_max))
@@ -1401,11 +1424,23 @@ def _newton_curve_curve(
         J = np.column_stack([dA_dt, -dB_dt])
         JtJ = J.T @ J
         Jtf = J.T @ (-F)
-        det = JtJ[0, 0] * JtJ[1, 1] - JtJ[0, 1] * JtJ[1, 0]
-        if abs(det) < 1e-20:
-            break
-        delta_ta = (JtJ[1, 1] * Jtf[0] - JtJ[0, 1] * Jtf[1]) / det
-        delta_tb = (JtJ[0, 0] * Jtf[1] - JtJ[1, 0] * Jtf[0]) / det
+        # GK-69: condition-number guard on JtJ.  Parallel / near-tangent curves
+        # produce a near-singular normal-equations matrix; use lstsq fallback so
+        # we never diverge.  A break (return None) is wrong here because the
+        # residual might still converge via lstsq damping.
+        try:
+            cond_jtj = np.linalg.cond(JtJ)
+        except np.linalg.LinAlgError:
+            cond_jtj = float("inf")
+        if not np.isfinite(cond_jtj) or cond_jtj > _COND_THRESHOLD:
+            delta, *_ = np.linalg.lstsq(J, -F, rcond=None)
+            delta_ta, delta_tb = float(delta[0]), float(delta[1])
+        else:
+            det = JtJ[0, 0] * JtJ[1, 1] - JtJ[0, 1] * JtJ[1, 0]
+            if abs(det) < 1e-20:
+                break
+            delta_ta = (JtJ[1, 1] * Jtf[0] - JtJ[0, 1] * Jtf[1]) / det
+            delta_tb = (JtJ[0, 0] * Jtf[1] - JtJ[1, 0] * Jtf[0]) / det
 
         ta_new = float(np.clip(ta + delta_ta, ta_min, ta_max))
         tb_new = float(np.clip(tb + delta_tb, tb_min, tb_max))

@@ -73,6 +73,11 @@ _MAX_NEWTON_ITER: int = 80
 _COARSE_CURVE_SAMPLES: int = 200
 _COARSE_SURF_SAMPLES: int = 28
 
+# GK-69: condition-number threshold above which the 2-D Newton Jacobian is
+# considered near-singular (degenerate surface patch, e.g. a pole or seam),
+# and the solver falls back to lstsq rather than Cramer's rule.
+_COND_THRESHOLD: float = 1e10
+
 
 # ---------------------------------------------------------------------------
 # Cox-de Boor basis (replicated correctly; see intersection.py for the
@@ -484,14 +489,19 @@ def _newton_surface(s: NurbsSurface, P: np.ndarray, u0: float, v0: float,
         j12 = float(np.dot(Su, Sv)) + float(np.dot(r, Suv))
         j22 = float(np.dot(Sv, Sv)) + float(np.dot(r, Svv))
         det = j11 * j22 - j12 * j12
-        if abs(det) < _EPS:
-            # Steepest-descent fallback on the squared distance.
-            grad = np.array([f, g])
-            gn = float(np.linalg.norm(grad))
-            if gn < _EPS:
-                break
-            scale = 0.5 * min(u_max - u_min, v_max - v_min) / gn
-            du, dv = -scale * grad
+        # GK-69: condition-number guard on the 2x2 Jacobian.  A degenerate
+        # surface patch (pole, collapsed edge, seam) makes j11*j22 ≈ j12^2;
+        # Cramer's rule amplifies noise in that case.  Check the condition
+        # number and fall back to lstsq for near-singular systems.
+        J2 = np.array([[j11, j12], [j12, j22]])
+        try:
+            cond2 = np.linalg.cond(J2)
+        except np.linalg.LinAlgError:
+            cond2 = float("inf")
+        if not np.isfinite(cond2) or cond2 > _COND_THRESHOLD or abs(det) < _EPS:
+            # lstsq on the 2x2 system [j11 j12; j12 j22] * [du; dv] = [-f; -g]
+            sol, *_ = np.linalg.lstsq(J2, np.array([-f, -g]), rcond=None)
+            du, dv = float(sol[0]), float(sol[1])
         else:
             du = -(j22 * f - j12 * g) / det
             dv = -(j11 * g - j12 * f) / det

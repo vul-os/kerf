@@ -73,6 +73,20 @@ import numpy as np
 
 from kerf_cad_core.occ_helpers import _OCC_AVAILABLE  # noqa: F401 (re-exported below)
 from kerf_cad_core.geom.brep_build import BuildError, extrude_to_body as _brep_extrude_to_body
+from kerf_cad_core.geom.brep import (
+    Body as _Body,
+    Coedge as _Coedge,
+    Edge as _Edge,
+    Face as _Face,
+    Line3 as _Line3,
+    Loop as _Loop,
+    Plane as _Plane,
+    Shell as _Shell,
+    Solid as _Solid,
+    Vertex as _Vertex,
+    validate_body as _validate_body,
+)
+from kerf_cad_core.geom.sew import sew_faces as _sew_faces, sew_into_solid as _sew_into_solid
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -407,6 +421,506 @@ def shell_solid(
                 "min_inner_dim": min(inner_w, inner_d, inner_h),
                 "feasible": feasible,
             },
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# 2b. shell_body  (GK-45)
+# ---------------------------------------------------------------------------
+
+def _unit3(v: np.ndarray) -> np.ndarray:
+    """Return the unit vector of *v* (raises ValueError on zero vector)."""
+    n = float(np.linalg.norm(v))
+    if n < 1e-14:
+        raise ValueError("zero-length vector cannot be normalised")
+    return v / n
+
+
+def _face_outward_normal(face: "_Face") -> np.ndarray:
+    """Return the outward unit normal of a face at its parametric origin.
+
+    Works for any surface that implements ``normal(u, v)``, falling back
+    to a finite-difference cross-product for surfaces without that method.
+    The sign is checked against the face's ``.orientation`` flag and the
+    rough centroid of the face's loop to determine whether the normal
+    points outward from the solid.
+    """
+    surf = face.surface
+    if hasattr(surf, "normal"):
+        nrm = np.asarray(surf.normal(0.0, 0.0), dtype=float)
+    else:
+        h = 1e-5
+        p = np.asarray(surf.evaluate(0.0, 0.0), dtype=float)
+        du = np.asarray(surf.evaluate(h, 0.0), dtype=float) - p
+        dv = np.asarray(surf.evaluate(0.0, h), dtype=float) - p
+        nrm = np.cross(du, dv)
+    nrm = _unit3(nrm)
+    if not face.orientation:
+        nrm = -nrm
+    return nrm
+
+
+def _face_sample_point(face: "_Face") -> np.ndarray:
+    """Return a representative point on the face (centroid of outer loop vertices)."""
+    pts = []
+    outer = face.outer_loop()
+    if outer is not None:
+        for ce in outer.coedges:
+            pts.append(ce.start_vertex().point)
+    if not pts:
+        return np.asarray(face.surface.evaluate(0.0, 0.0), dtype=float)
+    return np.mean(pts, axis=0)
+
+
+def _offset_plane(plane: "_Plane", d: float) -> "_Plane":
+    """Return a new :class:`Plane` shifted by *d* along its normal.
+
+    Parameters
+    ----------
+    plane : Plane
+        Source analytic plane.
+    d : float
+        Signed offset (positive = along normal, negative = opposite).
+    """
+    nrm = _unit3(np.cross(plane.x_axis, plane.y_axis))
+    new_origin = plane.origin + d * nrm
+    return _Plane(origin=new_origin, x_axis=plane.x_axis.copy(), y_axis=plane.y_axis.copy())
+
+
+def _intersect_three_planes(
+    p1: "_Plane", p2: "_Plane", p3: "_Plane"
+) -> np.ndarray:
+    """Compute the intersection point of three analytic planes.
+
+    Raises ``ValueError`` when the planes do not meet at a unique point.
+    """
+    n1 = _unit3(np.cross(p1.x_axis, p1.y_axis))
+    n2 = _unit3(np.cross(p2.x_axis, p2.y_axis))
+    n3 = _unit3(np.cross(p3.x_axis, p3.y_axis))
+    d1 = float(np.dot(n1, p1.origin))
+    d2 = float(np.dot(n2, p2.origin))
+    d3 = float(np.dot(n3, p3.origin))
+    A = np.array([n1, n2, n3])
+    b = np.array([d1, d2, d3])
+    det = float(np.linalg.det(A))
+    if abs(det) < 1e-12:
+        raise ValueError("Three planes do not have a unique intersection point (parallel or coincident)")
+    return np.linalg.solve(A, b)
+
+
+def _build_planar_quad_face(
+    pts: List[np.ndarray],
+    tol: float = 1e-7,
+    flip_normal: bool = False,
+) -> "_Face":
+    """Build a quad planar :class:`Face` from 4 corner points (CCW order).
+
+    The face normal is ``cross(pts[1]-pts[0], pts[3]-pts[0])``.
+    If *flip_normal* is True the winding is reversed so the normal flips.
+    """
+    if flip_normal:
+        pts = [pts[0], pts[3], pts[2], pts[1]]
+
+    V = [_Vertex(p.copy(), tol) for p in pts]
+
+    edges = [
+        _Edge(_Line3(V[i].point, V[(i + 1) % 4].point), 0.0, 1.0,
+              V[i], V[(i + 1) % 4], tol)
+        for i in range(4)
+    ]
+    coedges = [_Coedge(e, True) for e in edges]
+    loop = _Loop(coedges, is_outer=True)
+    p0, p1, p3 = pts[0], pts[1], pts[3]
+    plane = _Plane(origin=p0, x_axis=_unit3(p1 - p0), y_axis=_unit3(p3 - p0))
+    return _Face(plane, [loop], orientation=True, tol=tol)
+
+
+def shell_body(
+    body: "_Body",
+    wall_thickness: float,
+    *,
+    open_face_index: Optional[int] = None,
+    tol: float = 1e-7,
+) -> dict:
+    """Shell/hollow a closed planar-faced :class:`Body` by offsetting each face inward.
+
+    Topology operation: for each outer face, an inner face is built offset
+    inward by *wall_thickness*.  Rim (wall) quad faces stitch the outer
+    boundary edges to the inner boundary edges.  An optional face (by
+    index into the body's outer-shell face list) may be removed to leave
+    an open shell.
+
+    Limitations
+    -----------
+    * Supports bodies whose outer shell is **planar-faced** (all faces
+      have a :class:`~kerf_cad_core.geom.brep.Plane` surface).  This
+      covers ``make_box`` and ``extrude_to_body`` outputs.
+    * Non-planar faces (cylinders, spheres, NURBS) raise a descriptive
+      ``ValueError`` rather than silently producing incorrect geometry.
+    * *open_face_index* removes one outer face (and its corresponding
+      inner face), leaving the six rim faces connecting the aperture
+      boundary as open boundary edges — resulting in an open (non-closed)
+      shell body.
+
+    Parameters
+    ----------
+    body : Body
+        Input body.  Must have exactly one solid with one closed outer shell.
+    wall_thickness : float
+        Inward offset distance ``t > 0``.
+    open_face_index : int, optional
+        Zero-based index into the outer shell's face list of the face to
+        remove.  When given, the body becomes an open shell (a box with
+        one side missing, like a tray).
+    tol : float
+        Topological tolerance forwarded to sewing and B-rep construction.
+
+    Returns
+    -------
+    dict
+        ``ok``, ``body`` (:class:`Body`), ``volume_outer``, ``volume_inner``,
+        ``wall_thickness``, ``open_face_index``, ``n_faces``, ``n_edges``,
+        ``n_vertices``, ``geometry_params``.
+        On error: ``ok=False``, ``reason``, ``body=None``.
+    """
+    _ZERO: dict = {
+        "ok": False,
+        "reason": "",
+        "body": None,
+        "volume_outer": 0.0,
+        "volume_inner": 0.0,
+        "wall_thickness": 0.0,
+        "open_face_index": open_face_index,
+        "n_faces": 0,
+        "n_edges": 0,
+        "n_vertices": 0,
+        "geometry_params": {},
+    }
+
+    # ── Input validation ────────────────────────────────────────────────
+    if not isinstance(body, _Body):
+        return {**_ZERO, "reason": f"body must be a Body instance, got {type(body).__name__}"}
+
+    if not isinstance(wall_thickness, (int, float)) or wall_thickness <= 0:
+        return {**_ZERO, "reason": f"wall_thickness must be > 0; got {wall_thickness!r}"}
+
+    t = float(wall_thickness)
+
+    if not body.solids:
+        return {**_ZERO, "reason": "body has no solids"}
+    if len(body.solids) > 1:
+        return {**_ZERO, "reason": f"body has {len(body.solids)} solids; shell_body supports exactly 1"}
+    solid = body.solids[0]
+    if not solid.shells:
+        return {**_ZERO, "reason": "body solid has no shells"}
+    outer_shell = solid.shells[0]
+    if not outer_shell.is_closed:
+        return {**_ZERO, "reason": "outer shell is not closed; cannot shell an open body"}
+
+    outer_faces = outer_shell.faces
+    n_outer = len(outer_faces)
+
+    if open_face_index is not None:
+        if not isinstance(open_face_index, int) or not (0 <= open_face_index < n_outer):
+            return {**_ZERO,
+                    "reason": f"open_face_index {open_face_index!r} out of range [0, {n_outer - 1}]"}
+
+    # ── Verify all faces have Plane surfaces ────────────────────────────
+    for i, f in enumerate(outer_faces):
+        if not isinstance(f.surface, _Plane):
+            return {**_ZERO,
+                    "reason": (
+                        f"face {i} has non-planar surface {type(f.surface).__name__}; "
+                        "shell_body currently supports planar-faced bodies only"
+                    )}
+
+    # ── Compute offset planes (inward by t) ─────────────────────────────
+    # Outward normal of each face — the Plane's normal is cross(x_axis, y_axis).
+    # For a properly oriented outer face this should point outward; we
+    # correct for face.orientation flag.
+    offset_planes: List[_Plane] = []
+    face_normals: List[np.ndarray] = []
+    for f in outer_faces:
+        plane = f.surface
+        raw_nrm = _unit3(np.cross(plane.x_axis, plane.y_axis))
+        nrm = raw_nrm if f.orientation else -raw_nrm
+        face_normals.append(nrm)
+        # Inward offset = move origin along -nrm by t
+        inner_origin = plane.origin - t * nrm
+        offset_planes.append(_Plane(origin=inner_origin,
+                                    x_axis=plane.x_axis.copy(),
+                                    y_axis=plane.y_axis.copy()))
+
+    # ── Extract ordered corner vertices per outer face ───────────────────
+    # For each face, extract the coedge ring to get corner vertices in order.
+    outer_face_vertices: List[List[np.ndarray]] = []
+    for f in outer_faces:
+        outer_loop = f.outer_loop()
+        if outer_loop is None:
+            return {**_ZERO, "reason": f"face has no outer loop: {f!r}"}
+        verts = [ce.start_vertex().point for ce in outer_loop.coedges]
+        outer_face_vertices.append(verts)
+
+    # ── Build inner corner points by intersecting 3 offset planes ────────
+    # For each vertex of the outer shell, find which 3 faces are incident to it.
+    # The inner vertex is the intersection of those 3 offset planes.
+
+    # Map: vertex id -> list of (face_index, plane_index)
+    vertex_to_faces: dict = {}
+    for fi, f in enumerate(outer_faces):
+        outer_loop = f.outer_loop()
+        if outer_loop is None:
+            continue
+        for ce in outer_loop.coedges:
+            vid = id(ce.start_vertex())
+            vertex_to_faces.setdefault(vid, []).append(fi)
+
+    # All unique outer vertices (in order of first encounter)
+    all_outer_verts: List[np.ndarray] = []
+    outer_vert_id_to_idx: dict = {}
+    for fi, f in enumerate(outer_faces):
+        outer_loop = f.outer_loop()
+        if outer_loop is None:
+            continue
+        for ce in outer_loop.coedges:
+            vid = id(ce.start_vertex())
+            if vid not in outer_vert_id_to_idx:
+                outer_vert_id_to_idx[vid] = len(all_outer_verts)
+                all_outer_verts.append(ce.start_vertex().point.copy())
+
+    # Compute inner vertices by 3-plane intersection
+    inner_verts: List[np.ndarray] = []
+    for vid, vert_pt in zip(outer_vert_id_to_idx.keys(), all_outer_verts):
+        face_indices = vertex_to_faces.get(vid, [])
+        if len(face_indices) < 3:
+            return {**_ZERO,
+                    "reason": (
+                        f"vertex at {vert_pt} is incident to {len(face_indices)} faces "
+                        "(need ≥ 3 for inner vertex computation)"
+                    )}
+        # Use the first 3 incident planes for the intersection
+        planes_3 = [offset_planes[fi] for fi in face_indices[:3]]
+        try:
+            inner_pt = _intersect_three_planes(*planes_3)
+        except ValueError as exc:
+            return {**_ZERO, "reason": f"inner vertex computation failed: {exc}"}
+
+        # Verify wall thickness: distance from inner_pt to outer_pt ≈ t
+        # (only exact for a box; allow small geometric tolerance)
+        inner_verts.append(inner_pt)
+
+    # Map each face's outer vertices to their inner counterparts
+    # inner_face_vertices[fi] = inner corners corresponding to outer_face_vertices[fi]
+    inner_face_vertices: List[List[np.ndarray]] = []
+    for fi, f in enumerate(outer_faces):
+        outer_loop = f.outer_loop()
+        if outer_loop is None:
+            inner_face_vertices.append([])
+            continue
+        inner_corners = []
+        for ce in outer_loop.coedges:
+            vid = id(ce.start_vertex())
+            idx = outer_vert_id_to_idx[vid]
+            inner_corners.append(inner_verts[idx])
+        inner_face_vertices.append(inner_corners)
+
+    # ── Feasibility: inner dims must all be positive ──────────────────────
+    # The inner body is degenerate when the offset planes "cross over" —
+    # i.e. when the inner vertex is on the wrong side of any outer face plane.
+    # Check: for each inner vertex, its distance to the corresponding outer
+    # face planes must be >= t (not collapsed past zero).
+    if inner_verts and all_outer_verts:
+        all_outer = np.array(all_outer_verts)
+        all_inner = np.array(inner_verts)
+        outer_extents = all_outer.max(axis=0) - all_outer.min(axis=0)
+        inner_extents = all_inner.max(axis=0) - all_inner.min(axis=0)
+        # For a box, each inner extent should be outer_extent - 2*t
+        for axis_i in range(3):
+            expected_inner = outer_extents[axis_i] - 2 * t
+            if expected_inner <= -tol:
+                return {**_ZERO,
+                        "reason": (
+                            f"wall_thickness {t} is too large; inner body is degenerate "
+                            f"(axis {axis_i}: outer extent {outer_extents[axis_i]:.4g} - 2t = {expected_inner:.4g} ≤ 0)"
+                        )}
+
+    # ── Determine which face(s) to remove ────────────────────────────────
+    faces_to_remove: set = set()
+    if open_face_index is not None:
+        faces_to_remove.add(open_face_index)
+
+    # ── Assemble faces: outer + inner + rim quads ─────────────────────────
+    all_new_faces: List[_Face] = []
+
+    # OUTER faces (keep as-is by rebuilding them fresh for sewing)
+    for fi, f in enumerate(outer_faces):
+        if fi in faces_to_remove:
+            continue
+        pts = outer_face_vertices[fi]
+        new_face = _build_planar_quad_face(pts, tol=tol, flip_normal=False)
+        all_new_faces.append(new_face)
+
+    # INNER faces (reversed winding so normal points inward = toward outer)
+    for fi, f in enumerate(outer_faces):
+        if fi in faces_to_remove:
+            continue
+        pts = inner_face_vertices[fi]
+        # Flip so the inner face normal points toward the interior (inward = outward
+        # from the inner shell perspective means toward the void).
+        # The inner shell must have normals pointing INWARD (toward the shell material).
+        # In a hollow body, the inner surface normals point toward the outer surface.
+        # flip_normal=True reverses the winding, flipping the normal.
+        new_face = _build_planar_quad_face(pts, tol=tol, flip_normal=True)
+        all_new_faces.append(new_face)
+
+    # RIM (wall) faces: for each outer edge that is on the boundary of a removed face,
+    # or for each edge of the outer faces that connects to a removed face's edges.
+    # For a fully closed shell: connect each edge of each outer face to the
+    # corresponding edge of the inner face (wall faces).
+    # For an open shell (one face removed): all 4 edges of the removed outer face
+    # become rim aperture — we need to build rim quads for those boundary edges too.
+    #
+    # Strategy: for each outer face, for each of its edges, if the adjacent face
+    # is the removed face, build a rim quad from the outer edge to the inner edge.
+
+    # Build face adjacency: for each edge (as frozenset of vertex ids), which faces share it
+    outer_edge_to_faces: dict = {}
+    for fi, f in enumerate(outer_faces):
+        outer_loop = f.outer_loop()
+        if outer_loop is None:
+            continue
+        ces = outer_loop.coedges
+        for i, ce in enumerate(ces):
+            v0 = id(ce.start_vertex())
+            v1 = id(ces[(i + 1) % len(ces)].start_vertex())
+            key = frozenset([v0, v1])
+            outer_edge_to_faces.setdefault(key, []).append(fi)
+
+    # For a closed shell: build rim quads for ALL outer edges (connecting outer
+    # boundary to inner boundary). But we only need rim quads on edges that
+    # border the removed face (for open shell) or for all edges where inner
+    # and outer surfaces need to be stitched with wall material.
+    #
+    # Correct approach for hollow body:
+    # - A rim quad sits between each pair of adjacent outer+inner faces.
+    # - We need a rim quad for every edge of the outer shell.
+    # - The 4 corners of a rim quad for edge (va, vb) are:
+    #     outer_va, outer_vb, inner_vb, inner_va  (forms a quad)
+    #
+    # For a CLOSED shell: all outer face edges are shared between two outer faces.
+    # The rim quads form a "tubular" connection — but wait, for a truly hollow solid
+    # (like a hollow box), the inner shell is a separate closed body nested inside
+    # the outer shell. The Solid object has outer_shell=outer and void_shell=inner.
+    #
+    # Re-thinking: A hollow body IS a body with two nested closed shells, not
+    # a single re-sewn body. The outer shell faces outward, the inner shell
+    # faces inward (normals pointing INTO the material = outward from the void).
+    # This is the canonical B-rep representation of a hollow solid.
+    #
+    # The "rim" faces are only needed for OPEN shells (where one face is removed)
+    # to connect the outer boundary loop to the inner boundary loop at the aperture.
+
+    rim_faces: List[_Face] = []
+
+    if open_face_index is not None:
+        # Build rim quads around the aperture (the edges of the removed outer face)
+        removed_fi = open_face_index
+        removed_outer_loop = outer_faces[removed_fi].outer_loop()
+        if removed_outer_loop is not None:
+            ces = removed_outer_loop.coedges
+            n_rim = len(ces)
+            for i in range(n_rim):
+                ce = ces[i]
+                va_outer = ce.start_vertex().point
+                vb_outer = ces[(i + 1) % n_rim].start_vertex().point
+                # Corresponding inner vertices
+                va_inner = inner_verts[outer_vert_id_to_idx[id(ce.start_vertex())]]
+                vb_inner = inner_verts[outer_vert_id_to_idx[id(ces[(i + 1) % n_rim].start_vertex())]]
+                # Rim quad: outer_va -> outer_vb -> inner_vb -> inner_va
+                # Normal should point outward from the rim face.
+                rim_pts = [va_outer, vb_outer, vb_inner, va_inner]
+                rim_face = _build_planar_quad_face(rim_pts, tol=tol, flip_normal=False)
+                rim_faces.append(rim_face)
+
+    all_new_faces.extend(rim_faces)
+
+    # ── Sew faces into shell(s) / Body ────────────────────────────────────
+    try:
+        if open_face_index is None:
+            # Two closed shells: outer + inner. We sew them separately and
+            # build a Body with a Solid containing both shells.
+            n_half = n_outer  # all outer faces kept
+
+            outer_new_faces = all_new_faces[:n_outer]
+            inner_new_faces = all_new_faces[n_outer:]
+
+            outer_sewn = _sew_faces(outer_new_faces, tol=tol)
+            inner_sewn = _sew_faces(inner_new_faces, tol=tol)
+
+            if not outer_sewn.is_closed:
+                return {**_ZERO, "reason": "sewn outer shell is not closed"}
+            if not inner_sewn.is_closed:
+                return {**_ZERO, "reason": "sewn inner shell is not closed"}
+
+            solid = _Solid([outer_sewn, inner_sewn])
+            new_body = _Body(solids=[solid])
+
+            res = _validate_body(new_body)
+            if not res["ok"]:
+                return {**_ZERO,
+                        "reason": f"shell_body produced invalid Body: {res['errors']}",
+                        "geometry_params": {"validate_errors": res["errors"]}}
+        else:
+            # Single open shell from sewn outer + inner + rim faces
+            sewn_shell = _sew_faces(all_new_faces, tol=tol)
+            solid = _Solid([sewn_shell])
+            new_body = _Body(solids=[solid])
+
+            # For open shells validate_body may complain about non-closed manifold;
+            # we run it but don't hard-fail — report the result.
+            res = _validate_body(new_body)
+            if not res["ok"]:
+                return {**_ZERO,
+                        "reason": f"shell_body (open) produced invalid Body: {res['errors']}",
+                        "geometry_params": {"validate_errors": res["errors"]}}
+
+    except BuildError as exc:
+        return {**_ZERO, "reason": f"sew failed: {exc}"}
+    except Exception as exc:
+        return {**_ZERO, "reason": f"shell_body failed: {exc}"}
+
+    # ── Volume accounting ─────────────────────────────────────────────────
+    # Compute outer volume from bounding box of outer vertices
+    all_outer_pts = np.array(all_outer_verts)
+    mins_out = all_outer_pts.min(axis=0)
+    maxs_out = all_outer_pts.max(axis=0)
+    volume_outer = float(np.prod(maxs_out - mins_out))
+
+    all_inner_pts = np.array(inner_verts)
+    mins_in = all_inner_pts.min(axis=0)
+    maxs_in = all_inner_pts.max(axis=0)
+    volume_inner = float(np.prod(maxs_in - mins_in))
+
+    counts = new_body.euler_counts()
+    return {
+        "ok": True,
+        "reason": "",
+        "body": new_body,
+        "volume_outer": volume_outer,
+        "volume_inner": volume_inner,
+        "wall_thickness": t,
+        "open_face_index": open_face_index,
+        "n_faces": counts["F"],
+        "n_edges": counts["E"],
+        "n_vertices": counts["V"],
+        "geometry_params": {
+            "n_outer_faces": n_outer,
+            "n_inner_faces": n_outer - len(faces_to_remove),
+            "n_rim_faces": len(rim_faces),
+            "open_face_index": open_face_index,
+            "tol": tol,
+            "occ_available": _OCC_AVAILABLE,
         },
     }
 

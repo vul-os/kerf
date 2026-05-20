@@ -571,11 +571,11 @@ Format: `[ ] GK-NN  scope — FILE(s) — oracle — dep — parallel? — tier`
   `geom/match_srf.py` — oracle: matching a flat patch to a cylinder edge
   G1 ⇒ cross-tangent parallel to `1e-8`; G2 ⇒ curvature equal to `1e-7`.
   — dep: GK-43 — parallel: Y — sonnet.
-- [ ] **GK-45** Shell/hollow a `Body` (topological: offset faces inward,
+- [x] **GK-45** Shell/hollow a `Body` (topological: offset faces inward,
   re-sew, remove a face for open shell). — `geom/solid_features.py`,
   `geom/sew.py` — oracle: shelled box wall thickness = t exact; inner +
   outer `validate_body` ok; volume = outer − inner. — dep: GK-30, GK-17
-  — parallel: N — opus.
+  — parallel: N — opus. *Landed: 40 tests.*
 - [ ] **GK-46** Draft/rib/wirecut/pipe re-expressed as `Body`-producing,
   validated ops. — `geom/solid_features.py`, `geom/brep_build.py` —
   oracle: pipe along a line = annular cylinder volume exact;

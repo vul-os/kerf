@@ -279,7 +279,7 @@ Each task ≈1–3h sonnet unless `[HARD]`. Always isolate in a worktree.
   Files: new `src/components/Toast.jsx`; `src/routes/Editor.jsx` (and grep other inline toasts).
   Success: toasts are announced; consistent placement/dismiss.
 
-- [ ] **T-L5 Fix `/usage` dead link**
+- [x] **T-L5 Fix `/usage` dead link**
   Scope: either add the `/usage` route mounting `UsageWidget` (cloud-gated, inside `ProtectedRoute`) or remove the `/usage` link from the Layout user menu.
   Files: `src/components/Layout.jsx`, `src/App.jsx` (+ `src/cloud/UsageWidget.jsx` if wiring the route).
   Success: no menu item navigates to a non-existent route (currently bounces to `/`).

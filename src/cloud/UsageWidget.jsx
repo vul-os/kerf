@@ -1,11 +1,15 @@
 // UsageWidget — compact balance + month-spend tile for header/sidebar.
 // Routes to /billing on top-up click; if you'd rather open a modal, swap
 // the Link for a button + your own dialog.
+//
+// UsagePage (default export) wraps UsageWidget in the app Layout for the
+// /usage route.
 
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Wallet, Plus, Loader2 } from 'lucide-react'
 import { getBillingMe } from './api.js'
+import Layout from '../components/Layout.jsx'
 
 function fmtUSD(n) {
   const v = Number(n)
@@ -73,4 +77,16 @@ export function UsageWidget({ to = '/billing', className = '' }) {
   )
 }
 
-export default UsageWidget
+// Full-page wrapper — mounted at /usage (cloud-gated, ProtectedRoute).
+export function UsagePage() {
+  return (
+    <Layout>
+      <div className="max-w-md">
+        <h1 className="text-xl font-semibold text-ink-100 mb-6">Usage</h1>
+        <UsageWidget to="/billing" />
+      </div>
+    </Layout>
+  )
+}
+
+export default UsagePage

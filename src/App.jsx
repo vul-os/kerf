@@ -90,6 +90,9 @@ const WorkshopListing = lazy(() =>
   import('./cloud/WorkshopListing.jsx').then((m) => ({ default: m.WorkshopListing })),
 )
 const AdminEmail = lazy(() => import('./cloud/AdminEmail.jsx'))
+const UsagePage = lazy(() =>
+  import('./cloud/UsageWidget.jsx').then((m) => ({ default: m.UsagePage })),
+)
 
 import { useAuth } from './store/auth.js'
 import { api } from './lib/api.js'
@@ -237,6 +240,7 @@ export default function App() {
         <Route path="/admin/publishers" element={<AdminPublishers />} />
         {cloudEnabled && <Route path="/admin/email" element={<AdminEmail />} />}
         {cloudEnabled && <Route path="/billing" element={<BillingPanel />} />}
+        {cloudEnabled && <Route path="/usage" element={<UsagePage />} />}
       </Route>
 
       <Route path="*" element={<NotFound />} />

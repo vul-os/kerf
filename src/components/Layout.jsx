@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ChevronDown, LogOut, User as UserIcon, Settings, CreditCard, UserCog, Users } from 'lucide-react'
+import { ChevronDown, LogOut, User as UserIcon, Settings, CreditCard, UserCog, Users, BarChart2 } from 'lucide-react'
 import clsx from 'clsx'
 import { LogoWordmark } from './Logo.jsx'
 import WorkspaceSwitcher from './WorkspaceSwitcher.jsx'
@@ -135,6 +135,15 @@ function UserMenu({ user, onLogout, currentWorkspaceSlug, cloudEnabled }) {
               </Link>
               {cloudEnabled && (
                 <>
+                  <Link
+                    to="/usage"
+                    role="menuitem"
+                    onClick={() => setOpen(false)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-100 hover:bg-ink-800/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/50"
+                  >
+                    <BarChart2 size={14} className="text-ink-300" />
+                    Usage
+                  </Link>
                   <Link
                     to="/billing"
                     role="menuitem"

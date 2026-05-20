@@ -42,6 +42,7 @@ from kerf_cad_core.geom.network_srf import (
     network_srf_from_cross_sections,
     approximate_network_srf,
     validate_curves_for_skinning,
+    gordon_network_srf,
 )
 
 from kerf_cad_core.geom.blend_srf import (
@@ -138,6 +139,7 @@ __all__ = [
     "network_srf_from_cross_sections",
     "approximate_network_srf",
     "validate_curves_for_skinning",
+    "gordon_network_srf",
     "blend_srf",
     "blend_srf_g1",
     "blend_srf_with_curves",

@@ -815,7 +815,7 @@ in `geom/__init__.py`.
   path rail. — `geom/pattern.py` — oracle: 4× circular pattern of a
   cylinder around an axis yields 4 disjoint bodies at correct angles
   ± tol. — dep: GK-18 — parallel: Y — sonnet.
-- [ ] **GK-88** Loop slide (SubD): move an edge loop along its
+- [x] **GK-88** Loop slide (SubD): move an edge loop along its
   adjacent faces (preserve tangency / topology). —
   `geom/subd_authoring.py` — oracle: loop-slide a box edge-loop by t
   along adjacent face → vertex positions move by t in face-tangent

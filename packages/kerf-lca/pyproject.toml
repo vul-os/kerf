@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kerf-lca"
+version = "0.1.0"
+license = { text = "MIT" }
+classifiers = ["License :: OSI Approved :: MIT License"]
+description = "Life Cycle Assessment (LCA) plugin for Kerf — embodied-carbon reporting against ICE v3"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.entry-points."kerf.plugins"]
+lca = "kerf_lca.plugin:register"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kerf_lca"]

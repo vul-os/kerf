@@ -1,0 +1,443 @@
+{
+  "_meta": {
+    "source": "Inventory of Carbon and Energy (ICE) v3.0, University of Bath",
+    "url": "https://circularecology.com/embodied-carbon-footprint-database.html",
+    "units": "kg CO2-eq per kg of material (cradle-to-gate unless noted)",
+    "notes": "Values are central/typical estimates. Use project-specific EPDs when available.",
+    "version": "3.0"
+  },
+  "materials": {
+    "steel_general": {
+      "label": "Steel (general, virgin)",
+      "embodied_carbon_kg_co2_per_kg": 1.80,
+      "recycled_content_pct": 0,
+      "recyclability_pct": 90,
+      "category": "metals",
+      "aliases": ["steel", "mild steel", "carbon steel"]
+    },
+    "steel_recycled": {
+      "label": "Steel (recycled / secondary)",
+      "embodied_carbon_kg_co2_per_kg": 0.46,
+      "recycled_content_pct": 100,
+      "recyclability_pct": 90,
+      "category": "metals",
+      "aliases": ["recycled steel", "secondary steel", "scrap steel"]
+    },
+    "steel_stainless": {
+      "label": "Stainless steel",
+      "embodied_carbon_kg_co2_per_kg": 6.15,
+      "recycled_content_pct": 60,
+      "recyclability_pct": 90,
+      "category": "metals",
+      "aliases": ["stainless", "stainless steel", "inox"]
+    },
+    "aluminium_primary": {
+      "label": "Aluminium (primary / virgin)",
+      "embodied_carbon_kg_co2_per_kg": 9.16,
+      "recycled_content_pct": 0,
+      "recyclability_pct": 95,
+      "category": "metals",
+      "aliases": ["aluminium", "aluminum", "primary aluminium", "virgin aluminium"]
+    },
+    "aluminium_recycled": {
+      "label": "Aluminium (recycled / secondary)",
+      "embodied_carbon_kg_co2_per_kg": 0.66,
+      "recycled_content_pct": 100,
+      "recyclability_pct": 95,
+      "category": "metals",
+      "aliases": ["recycled aluminium", "recycled aluminum", "secondary aluminium"]
+    },
+    "copper": {
+      "label": "Copper",
+      "embodied_carbon_kg_co2_per_kg": 3.81,
+      "recycled_content_pct": 37,
+      "recyclability_pct": 90,
+      "category": "metals",
+      "aliases": ["copper", "cu"]
+    },
+    "brass": {
+      "label": "Brass",
+      "embodied_carbon_kg_co2_per_kg": 3.50,
+      "recycled_content_pct": 50,
+      "recyclability_pct": 85,
+      "category": "metals",
+      "aliases": ["brass", "cu-zn"]
+    },
+    "bronze": {
+      "label": "Bronze",
+      "embodied_carbon_kg_co2_per_kg": 3.80,
+      "recycled_content_pct": 40,
+      "recyclability_pct": 85,
+      "category": "metals",
+      "aliases": ["bronze", "cu-sn"]
+    },
+    "zinc": {
+      "label": "Zinc",
+      "embodied_carbon_kg_co2_per_kg": 3.86,
+      "recycled_content_pct": 30,
+      "recyclability_pct": 80,
+      "category": "metals",
+      "aliases": ["zinc", "zn"]
+    },
+    "lead": {
+      "label": "Lead",
+      "embodied_carbon_kg_co2_per_kg": 1.57,
+      "recycled_content_pct": 60,
+      "recyclability_pct": 75,
+      "category": "metals",
+      "aliases": ["lead", "pb"]
+    },
+    "titanium": {
+      "label": "Titanium",
+      "embodied_carbon_kg_co2_per_kg": 35.00,
+      "recycled_content_pct": 5,
+      "recyclability_pct": 80,
+      "category": "metals",
+      "aliases": ["titanium", "ti", "ti-6al-4v"]
+    },
+    "nickel": {
+      "label": "Nickel",
+      "embodied_carbon_kg_co2_per_kg": 6.50,
+      "recycled_content_pct": 35,
+      "recyclability_pct": 80,
+      "category": "metals",
+      "aliases": ["nickel", "ni"]
+    },
+    "cast_iron": {
+      "label": "Cast iron",
+      "embodied_carbon_kg_co2_per_kg": 1.51,
+      "recycled_content_pct": 30,
+      "recyclability_pct": 80,
+      "category": "metals",
+      "aliases": ["cast iron", "grey iron", "ductile iron"]
+    },
+    "concrete_general": {
+      "label": "Concrete (general / OPC)",
+      "embodied_carbon_kg_co2_per_kg": 0.115,
+      "recycled_content_pct": 0,
+      "recyclability_pct": 20,
+      "category": "concrete_masonry",
+      "aliases": ["concrete", "opc concrete", "portland cement concrete"]
+    },
+    "concrete_high_strength": {
+      "label": "Concrete (high strength, C40+)",
+      "embodied_carbon_kg_co2_per_kg": 0.155,
+      "recycled_content_pct": 0,
+      "recyclability_pct": 20,
+      "category": "concrete_masonry",
+      "aliases": ["high strength concrete", "c40 concrete", "hsc"]
+    },
+    "cement": {
+      "label": "Cement (OPC)",
+      "embodied_carbon_kg_co2_per_kg": 0.83,
+      "recycled_content_pct": 0,
+      "recyclability_pct": 5,
+      "category": "concrete_masonry",
+      "aliases": ["cement", "opc", "portland cement"]
+    },
+    "brick_clay": {
+      "label": "Brick (clay / fired)",
+      "embodied_carbon_kg_co2_per_kg": 0.24,
+      "recycled_content_pct": 0,
+      "recyclability_pct": 70,
+      "category": "concrete_masonry",
+      "aliases": ["brick", "clay brick", "fired brick"]
+    },
+    "glass_flat": {
+      "label": "Glass (flat / float)",
+      "embodied_carbon_kg_co2_per_kg": 0.85,
+      "recycled_content_pct": 20,
+      "recyclability_pct": 60,
+      "category": "glass_ceramics",
+      "aliases": ["glass", "flat glass", "float glass", "window glass"]
+    },
+    "glass_toughened": {
+      "label": "Glass (toughened / tempered)",
+      "embodied_carbon_kg_co2_per_kg": 1.05,
+      "recycled_content_pct": 20,
+      "recyclability_pct": 55,
+      "category": "glass_ceramics",
+      "aliases": ["toughened glass", "tempered glass", "safety glass"]
+    },
+    "ceramic_general": {
+      "label": "Ceramic (general)",
+      "embodied_carbon_kg_co2_per_kg": 0.59,
+      "recycled_content_pct": 0,
+      "recyclability_pct": 10,
+      "category": "glass_ceramics",
+      "aliases": ["ceramic", "fired ceramic", "porcelain"]
+    },
+    "timber_softwood": {
+      "label": "Timber — softwood (kiln dried)",
+      "embodied_carbon_kg_co2_per_kg": 0.29,
+      "recycled_content_pct": 0,
+      "recyclability_pct": 85,
+      "category": "timber",
+      "aliases": ["timber", "softwood", "pine", "spruce", "fir", "wood"]
+    },
+    "timber_hardwood": {
+      "label": "Timber — hardwood (kiln dried)",
+      "embodied_carbon_kg_co2_per_kg": 0.31,
+      "recycled_content_pct": 0,
+      "recyclability_pct": 80,
+      "category": "timber",
+      "aliases": ["hardwood", "oak", "beech", "ash"]
+    },
+    "glulam": {
+      "label": "Glulam (glued laminated timber)",
+      "embodied_carbon_kg_co2_per_kg": 0.39,
+      "recycled_content_pct": 0,
+      "recyclability_pct": 60,
+      "category": "timber",
+      "aliases": ["glulam", "glued laminated timber", "engineered timber"]
+    },
+    "plywood": {
+      "label": "Plywood",
+      "embodied_carbon_kg_co2_per_kg": 0.81,
+      "recycled_content_pct": 0,
+      "recyclability_pct": 50,
+      "category": "timber",
+      "aliases": ["plywood", "ply"]
+    },
+    "mdf": {
+      "label": "MDF (medium density fibreboard)",
+      "embodied_carbon_kg_co2_per_kg": 0.72,
+      "recycled_content_pct": 60,
+      "recyclability_pct": 30,
+      "category": "timber",
+      "aliases": ["mdf", "medium density fibreboard", "fibreboard"]
+    },
+    "pvc": {
+      "label": "PVC (polyvinyl chloride)",
+      "embodied_carbon_kg_co2_per_kg": 2.41,
+      "recycled_content_pct": 10,
+      "recyclability_pct": 40,
+      "category": "plastics",
+      "aliases": ["pvc", "polyvinyl chloride", "vinyl"]
+    },
+    "hdpe": {
+      "label": "HDPE (high-density polyethylene)",
+      "embodied_carbon_kg_co2_per_kg": 1.57,
+      "recycled_content_pct": 5,
+      "recyclability_pct": 50,
+      "category": "plastics",
+      "aliases": ["hdpe", "high density polyethylene", "polyethylene hd"]
+    },
+    "ldpe": {
+      "label": "LDPE (low-density polyethylene)",
+      "embodied_carbon_kg_co2_per_kg": 1.92,
+      "recycled_content_pct": 5,
+      "recyclability_pct": 50,
+      "category": "plastics",
+      "aliases": ["ldpe", "low density polyethylene", "polyethylene ld"]
+    },
+    "polypropylene": {
+      "label": "Polypropylene (PP)",
+      "embodied_carbon_kg_co2_per_kg": 1.72,
+      "recycled_content_pct": 5,
+      "recyclability_pct": 55,
+      "category": "plastics",
+      "aliases": ["pp", "polypropylene"]
+    },
+    "polystyrene": {
+      "label": "Polystyrene (PS general)",
+      "embodied_carbon_kg_co2_per_kg": 2.50,
+      "recycled_content_pct": 0,
+      "recyclability_pct": 25,
+      "category": "plastics",
+      "aliases": ["ps", "polystyrene", "hips", "general purpose polystyrene"]
+    },
+    "eps": {
+      "label": "EPS (expanded polystyrene)",
+      "embodied_carbon_kg_co2_per_kg": 3.29,
+      "recycled_content_pct": 0,
+      "recyclability_pct": 20,
+      "category": "plastics",
+      "aliases": ["eps", "expanded polystyrene", "styrofoam"]
+    },
+    "abs": {
+      "label": "ABS (acrylonitrile butadiene styrene)",
+      "embodied_carbon_kg_co2_per_kg": 3.10,
+      "recycled_content_pct": 0,
+      "recyclability_pct": 30,
+      "category": "plastics",
+      "aliases": ["abs", "acrylonitrile butadiene styrene"]
+    },
+    "nylon": {
+      "label": "Nylon (PA6 / PA66)",
+      "embodied_carbon_kg_co2_per_kg": 7.91,
+      "recycled_content_pct": 0,
+      "recyclability_pct": 25,
+      "category": "plastics",
+      "aliases": ["nylon", "pa6", "pa66", "polyamide"]
+    },
+    "pet": {
+      "label": "PET (polyethylene terephthalate)",
+      "embodied_carbon_kg_co2_per_kg": 2.73,
+      "recycled_content_pct": 25,
+      "recyclability_pct": 60,
+      "category": "plastics",
+      "aliases": ["pet", "polyethylene terephthalate", "polyester"]
+    },
+    "ptfe": {
+      "label": "PTFE (polytetrafluoroethylene)",
+      "embodied_carbon_kg_co2_per_kg": 9.90,
+      "recycled_content_pct": 0,
+      "recyclability_pct": 10,
+      "category": "plastics",
+      "aliases": ["ptfe", "teflon", "polytetrafluoroethylene"]
+    },
+    "pc": {
+      "label": "Polycarbonate (PC)",
+      "embodied_carbon_kg_co2_per_kg": 5.50,
+      "recycled_content_pct": 0,
+      "recyclability_pct": 30,
+      "category": "plastics",
+      "aliases": ["pc", "polycarbonate"]
+    },
+    "pmma": {
+      "label": "PMMA (acrylic / Perspex)",
+      "embodied_carbon_kg_co2_per_kg": 3.50,
+      "recycled_content_pct": 0,
+      "recyclability_pct": 20,
+      "category": "plastics",
+      "aliases": ["pmma", "acrylic", "perspex", "plexiglass", "polymethyl methacrylate"]
+    },
+    "epoxy_resin": {
+      "label": "Epoxy resin",
+      "embodied_carbon_kg_co2_per_kg": 6.39,
+      "recycled_content_pct": 0,
+      "recyclability_pct": 10,
+      "category": "plastics",
+      "aliases": ["epoxy", "epoxy resin", "epoxy adhesive"]
+    },
+    "polyurethane_foam": {
+      "label": "Polyurethane foam",
+      "embodied_carbon_kg_co2_per_kg": 4.13,
+      "recycled_content_pct": 0,
+      "recyclability_pct": 15,
+      "category": "plastics",
+      "aliases": ["pu foam", "polyurethane foam", "pur"]
+    },
+    "carbon_fibre": {
+      "label": "Carbon fibre (CFRP / UD prepreg)",
+      "embodied_carbon_kg_co2_per_kg": 29.50,
+      "recycled_content_pct": 0,
+      "recyclability_pct": 15,
+      "category": "composites",
+      "aliases": ["carbon fibre", "carbon fiber", "cfrp", "carbon composite"]
+    },
+    "gfrp": {
+      "label": "Glass fibre reinforced polymer (GFRP)",
+      "embodied_carbon_kg_co2_per_kg": 3.12,
+      "recycled_content_pct": 0,
+      "recyclability_pct": 10,
+      "category": "composites",
+      "aliases": ["gfrp", "fibreglass", "fiberglass", "glass fibre composite"]
+    },
+    "gypsum_plasterboard": {
+      "label": "Gypsum plasterboard",
+      "embodied_carbon_kg_co2_per_kg": 0.38,
+      "recycled_content_pct": 10,
+      "recyclability_pct": 40,
+      "category": "minerals",
+      "aliases": ["plasterboard", "drywall", "gypsum board", "sheetrock"]
+    },
+    "mineral_wool": {
+      "label": "Mineral wool (rock / glass wool insulation)",
+      "embodied_carbon_kg_co2_per_kg": 1.28,
+      "recycled_content_pct": 30,
+      "recyclability_pct": 20,
+      "category": "minerals",
+      "aliases": ["mineral wool", "rockwool", "glass wool", "insulation"]
+    },
+    "sand": {
+      "label": "Sand / aggregate",
+      "embodied_carbon_kg_co2_per_kg": 0.0048,
+      "recycled_content_pct": 0,
+      "recyclability_pct": 80,
+      "category": "minerals",
+      "aliases": ["sand", "aggregate", "gravel", "crushed stone"]
+    },
+    "rubber_natural": {
+      "label": "Natural rubber",
+      "embodied_carbon_kg_co2_per_kg": 1.37,
+      "recycled_content_pct": 0,
+      "recyclability_pct": 30,
+      "category": "rubber",
+      "aliases": ["natural rubber", "rubber", "latex", "nr"]
+    },
+    "rubber_synthetic": {
+      "label": "Synthetic rubber (SBR/EPDM)",
+      "embodied_carbon_kg_co2_per_kg": 2.85,
+      "recycled_content_pct": 10,
+      "recyclability_pct": 30,
+      "category": "rubber",
+      "aliases": ["synthetic rubber", "sbr", "epdm", "neoprene"]
+    },
+    "cotton": {
+      "label": "Cotton (raw fibre)",
+      "embodied_carbon_kg_co2_per_kg": 1.80,
+      "recycled_content_pct": 10,
+      "recyclability_pct": 50,
+      "category": "textiles",
+      "aliases": ["cotton", "cotton fabric", "cotton fibre"]
+    },
+    "wool_natural": {
+      "label": "Wool (natural)",
+      "embodied_carbon_kg_co2_per_kg": 4.26,
+      "recycled_content_pct": 0,
+      "recyclability_pct": 60,
+      "category": "textiles",
+      "aliases": ["wool", "natural wool", "merino"]
+    },
+    "polyester_fibre": {
+      "label": "Polyester fibre / fabric",
+      "embodied_carbon_kg_co2_per_kg": 2.84,
+      "recycled_content_pct": 10,
+      "recyclability_pct": 30,
+      "category": "textiles",
+      "aliases": ["polyester", "polyester fabric", "polyester fibre"]
+    },
+    "paper_kraft": {
+      "label": "Paper (kraft / general)",
+      "embodied_carbon_kg_co2_per_kg": 1.00,
+      "recycled_content_pct": 30,
+      "recyclability_pct": 70,
+      "category": "paper",
+      "aliases": ["paper", "kraft paper", "cardboard"]
+    },
+    "cardboard": {
+      "label": "Cardboard / corrugated board",
+      "embodied_carbon_kg_co2_per_kg": 0.72,
+      "recycled_content_pct": 70,
+      "recyclability_pct": 80,
+      "category": "paper",
+      "aliases": ["cardboard", "corrugated cardboard", "corrugated board"]
+    },
+    "gold": {
+      "label": "Gold",
+      "embodied_carbon_kg_co2_per_kg": 39800.0,
+      "recycled_content_pct": 30,
+      "recyclability_pct": 95,
+      "category": "precious_metals",
+      "aliases": ["gold", "au"]
+    },
+    "silver": {
+      "label": "Silver",
+      "embodied_carbon_kg_co2_per_kg": 144.0,
+      "recycled_content_pct": 25,
+      "recyclability_pct": 90,
+      "category": "precious_metals",
+      "aliases": ["silver", "ag"]
+    },
+    "platinum": {
+      "label": "Platinum",
+      "embodied_carbon_kg_co2_per_kg": 12800.0,
+      "recycled_content_pct": 30,
+      "recyclability_pct": 95,
+      "category": "precious_metals",
+      "aliases": ["platinum", "pt"]
+    }
+  }
+}

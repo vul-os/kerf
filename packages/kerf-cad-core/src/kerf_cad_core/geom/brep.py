@@ -1096,12 +1096,18 @@ def kfmrh_inverse(solid: Solid, host_face: Face, ring: Loop,
 # ---------------------------------------------------------------------------
 
 
-def validate_body(body: Body, *, check_self_intersection: bool = False) -> dict:
+def validate_body(
+    body: Body,
+    *,
+    check_self_intersection: bool = False,
+    open: bool = False,
+) -> dict:
     """Structurally + geometrically validate a :class:`Body`.
 
     Returns ``{"ok": bool, "errors": [str, ...]}``. Checks performed:
 
-      1. Euler-Poincare residual is zero.
+      1. Euler-Poincare residual is zero.  *(Skipped when ``open=True`` —
+         open sheet bodies do not satisfy the closed-manifold E-P formula.)*
       2. Every loop is a closed coedge cycle (each coedge's end vertex
          coincides with the next coedge's start vertex within tol, and
          next/prev links are consistent).
@@ -1118,18 +1124,32 @@ def validate_body(body: Body, *, check_self_intersection: bool = False) -> dict:
          self-intersection: non-adjacent edge pairs and non-adjacent face
          pairs are tested for interior overlap. Default is ``False`` so
          that the existing (structural-only) behaviour is unchanged.
+
+    Parameters
+    ----------
+    body
+        The :class:`Body` to validate.
+    check_self_intersection
+        When ``True`` also run the geometric self-intersection check (§7).
+    open
+        When ``True`` skip the Euler–Poincaré residual check (§1) so that
+        open-sheet bodies (loft / sweep / network surfaces wrapped in an open
+        :class:`Shell`) are accepted.  All other structural checks (loop
+        closure, loop orientation, tolerance monotonicity, dangling edges)
+        still run.
     """
     errors: List[str] = []
 
     # --- 1. Euler-Poincare --------------------------------------------------
-    res = body.euler_poincare_residual()
-    if res != 0:
-        c = body.euler_counts()
-        errors.append(
-            f"euler-poincare residual {res} != 0 "
-            f"(V={c['V']} E={c['E']} F={c['F']} H={c['H']} "
-            f"S={c['S']} G={c['G']})"
-        )
+    if not open:
+        res = body.euler_poincare_residual()
+        if res != 0:
+            c = body.euler_counts()
+            errors.append(
+                f"euler-poincare residual {res} != 0 "
+                f"(V={c['V']} E={c['E']} F={c['F']} H={c['H']} "
+                f"S={c['S']} G={c['G']})"
+            )
 
     # --- 2. loop closure ----------------------------------------------------
     for lp in body.all_loops():

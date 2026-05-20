@@ -426,12 +426,12 @@ Format: `[ ] GK-NN  scope — FILE(s) — oracle — dep — parallel? — tier`
   `geom/solid_features.py`, `geom/brep_build.py` — oracle: extruded unit
   square = box, V8/E12/F6, volume exact. — dep: GK-13 — parallel: Y —
   sonnet.
-- [ ] **GK-16** `loft_to_body`/`sweep1_to_body`/`sweep2_to_body` emit a
+- [x] **GK-16** `loft_to_body`/`sweep1_to_body`/`sweep2_to_body` emit a
   `Shell` (open) with correct boundary loops. — `geom/network_srf.py`,
   `geom/sweep1.py`, `geom/sweep2.py`, `geom/brep_build.py` — oracle:
   boundary edges of the shell coincide with input rails to `1e-7`;
   validate_body ok for open shell. — dep: GK-13 — parallel: Y (file-set
-  disjoint per verb) — sonnet ×3.
+  disjoint per verb) — sonnet ×3. *Landed: 24 tests.*
 - [x] **GK-17** [HARD] Pure-Python face–face sew → closed `Shell` with
   tolerant vertex/edge merge driven by per-entity `tol`. — new
   `geom/sew.py` — oracle: 6 independent square faces of a box sew into a

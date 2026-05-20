@@ -1326,6 +1326,154 @@ def extrude_to_body(
     return body
 
 
+# ---------------------------------------------------------------------------
+# GK-16  loft / sweep1 / sweep2  →  open Shell Body
+# ---------------------------------------------------------------------------
+
+
+def _open_shell_body(surface: object, tol: float = 1e-7) -> Body:
+    """Wrap a single NURBS (or analytic) surface in an open Shell Body.
+
+    The boundary of the surface is taken from its natural parametric domain.
+    The returned Body contains one open Shell (``is_closed=False``) attached
+    to a *free-sheet* Solid (the convention used by existing open-shell tests,
+    e.g. ``test_validate_self_intersection``).
+
+    ``validate_body(body, open=True)`` is asserted clean before return.
+    """
+    face = surface_to_face(surface, tol=tol)
+    shell = Shell([face], is_closed=False)
+    solid = Solid([shell])
+    body = Body(solids=[solid])
+    res = validate_body(body, open=True)
+    if not res["ok"]:
+        raise BuildError(
+            f"_open_shell_body produced invalid open Body: {res['errors']}",
+            res,
+        )
+    return body
+
+
+def loft_to_body(
+    profiles: Sequence[object],
+    degree_u: int = 3,
+    tol: float = 1e-7,
+) -> Body:
+    """Loft a sequence of NURBS profile curves into an open Shell Body.
+
+    Each profile curve must have an ``evaluate(t)`` method and expose
+    ``control_points``, ``degree``, and ``knots`` attributes (i.e. be a
+    :class:`~kerf_cad_core.geom.nurbs.NurbsCurve`).
+
+    The produced Body contains one open Shell whose single face carries a
+    NurbsSurface interpolated through all profiles.  The natural boundary of
+    that surface (``v=v0`` / ``v=v1`` isocurves) coincides with the first and
+    last input profiles to within the sampling precision of the loft.
+
+    Parameters
+    ----------
+    profiles
+        Ordered sequence of ≥2 :class:`NurbsCurve` cross-sections.
+    degree_u
+        Degree in the *profile* (u) direction of the lofted surface.
+    tol
+        Topological tolerance.
+
+    Returns
+    -------
+    Body
+        A validated open-shell Body.  ``validate_body(body, open=True)`` is
+        ``True``.
+
+    Raises
+    ------
+    BuildError
+        If fewer than 2 profiles are supplied or if ``validate_body`` fails.
+    """
+    if len(profiles) < 2:
+        raise BuildError(
+            f"loft_to_body requires at least 2 profiles; got {len(profiles)}"
+        )
+    from kerf_cad_core.geom.network_srf import network_srf
+    # Cap degree to the number of profiles minus 1 to avoid a degenerate
+    # knot-vector collapse when fewer profiles than degree+1 are supplied.
+    capped_degree = min(degree_u, len(profiles) - 1)
+    surface = network_srf(list(profiles), degree_u=capped_degree)
+    return _open_shell_body(surface, tol=tol)
+
+
+def sweep1_to_body(
+    profile: object,
+    path: object,
+    tol: float = 1e-7,
+) -> Body:
+    """Sweep a NURBS profile along a NURBS path into an open Shell Body.
+
+    Uses the Wang 2008 rotation-minimising frame (:func:`sweep1`) to build a
+    NurbsSurface and wraps it in an open Shell Body.
+
+    The produced Shell's boundary isocurves along the *profile* direction
+    (``v=v0`` / ``v=v1``) correspond to the profile placed at the path start
+    and path end respectively; the *path* direction isocurves (``u=u0`` /
+    ``u=u1``) trace the path at the first and last control point of the
+    profile.
+
+    Parameters
+    ----------
+    profile
+        A :class:`NurbsCurve` for the cross-section.
+    path
+        A :class:`NurbsCurve` for the spine.
+    tol
+        Topological tolerance.
+
+    Returns
+    -------
+    Body
+        A validated open-shell Body.  ``validate_body(body, open=True)`` is
+        ``True``.
+    """
+    from kerf_cad_core.geom.sweep1 import sweep1
+    surface = sweep1(profile, path)
+    return _open_shell_body(surface, tol=tol)
+
+
+def sweep2_to_body(
+    profile: object,
+    rail1: object,
+    rail2: object,
+    tol: float = 1e-7,
+) -> Body:
+    """Sweep a NURBS profile between two NURBS rails into an open Shell Body.
+
+    Uses the Wang 2008 RMF two-rail sweep (:func:`sweep2`) to build a
+    NurbsSurface and wraps it in an open Shell Body.
+
+    The produced Shell's boundary isocurves in the *path* direction
+    (``v=v0`` / ``v=v1``) trace rail1 and rail2 at the profile start/end
+    parameters respectively.
+
+    Parameters
+    ----------
+    profile
+        A :class:`NurbsCurve` for the cross-section shape.
+    rail1, rail2
+        :class:`NurbsCurve` rails.  Both must have the same number of control
+        points.
+    tol
+        Topological tolerance.
+
+    Returns
+    -------
+    Body
+        A validated open-shell Body.  ``validate_body(body, open=True)`` is
+        ``True``.
+    """
+    from kerf_cad_core.geom.sweep2 import sweep2
+    surface = sweep2(profile, rail1, rail2)
+    return _open_shell_body(surface, tol=tol)
+
+
 __all__ = [
     "BuildError",
     "surface_to_face",
@@ -1335,4 +1483,7 @@ __all__ = [
     "cylinder_to_body",
     "sphere_to_body",
     "extrude_to_body",
+    "loft_to_body",
+    "sweep1_to_body",
+    "sweep2_to_body",
 ]

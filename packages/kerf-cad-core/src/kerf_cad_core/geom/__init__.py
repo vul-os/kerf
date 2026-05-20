@@ -71,6 +71,10 @@ from kerf_cad_core.geom.brep_build import (
     sphere_to_body,
     revolve_to_body,
     extrude_to_body,
+    # GK-16: loft / sweep1 / sweep2 → open Shell Body
+    loft_to_body,
+    sweep1_to_body,
+    sweep2_to_body,
 )
 
 from kerf_cad_core.geom.subd_authoring import (
@@ -208,6 +212,10 @@ __all__ = [
     "sphere_to_body",
     "revolve_to_body",
     "extrude_to_body",
+    # GK-16
+    "loft_to_body",
+    "sweep1_to_body",
+    "sweep2_to_body",
     "SubDCage",
     "SubDSurface",
     "create_subd_primitive",

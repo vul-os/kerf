@@ -1,0 +1,55 @@
+{
+  "design": "counter4",
+  "die_area": [100.0, 100.0],
+  "instances": [
+    {
+      "instance": "FF0",
+      "cell": "sky130_fd_sc_hd__dfxtp_1",
+      "type": "register",
+      "x": 10.0,
+      "y": 10.0,
+      "width": 8.0,
+      "height": 2.72,
+      "clock_pin": "CLK",
+      "input_cap_pf": 0.0023
+    },
+    {
+      "instance": "FF1",
+      "cell": "sky130_fd_sc_hd__dfxtp_1",
+      "type": "register",
+      "x": 80.0,
+      "y": 10.0,
+      "width": 8.0,
+      "height": 2.72,
+      "clock_pin": "CLK",
+      "input_cap_pf": 0.0023
+    },
+    {
+      "instance": "FF2",
+      "cell": "sky130_fd_sc_hd__dfxtp_1",
+      "type": "register",
+      "x": 10.0,
+      "y": 80.0,
+      "width": 8.0,
+      "height": 2.72,
+      "clock_pin": "CLK",
+      "input_cap_pf": 0.0023
+    },
+    {
+      "instance": "FF3",
+      "cell": "sky130_fd_sc_hd__dfxtp_1",
+      "type": "register",
+      "x": 80.0,
+      "y": 80.0,
+      "width": 8.0,
+      "height": 2.72,
+      "clock_pin": "CLK",
+      "input_cap_pf": 0.0023
+    }
+  ],
+  "clock_net": "CLK",
+  "clock_source": {
+    "x": 45.0,
+    "y": 45.0
+  }
+}

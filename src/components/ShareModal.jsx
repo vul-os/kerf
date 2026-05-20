@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
-import { X, Copy, Trash2, Link as LinkIcon, UserPlus, Check, Loader2 } from 'lucide-react'
+import { useState } from 'react'
+import { Copy, Trash2, Link as LinkIcon, UserPlus, Check, Loader2 } from 'lucide-react'
 import { api } from '../lib/api.js'
+import Modal from './Modal.jsx'
 
 const ROLES = ['viewer', 'editor', 'owner']
 const LINK_ROLES = ['viewer', 'editor']
@@ -285,39 +286,22 @@ function LinksTab({ projectId }) {
 export default function ShareModal({ projectId, onClose }) {
   const [tab, setTab] = useState('members')
 
-  useEffect(() => {
-    function onKey(e) { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
   return (
-    <div
-      className="fixed inset-0 z-50 bg-ink-950/70 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={onClose}
+    <Modal
+      open
+      onClose={onClose}
+      title="Share project"
+      widthClass="max-w-lg"
     >
-      <div
-        className="w-full max-w-lg bg-ink-900 border border-ink-700 rounded-xl shadow-2xl flex flex-col max-h-[80vh]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-ink-800">
-          <h2 className="text-base font-semibold text-ink-100">Share project</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1 rounded hover:bg-ink-800 text-ink-300 hover:text-ink-100"
-          >
-            <X size={16} />
-          </button>
-        </div>
+      <div className="-mx-5 -mt-5">
         <div className="px-4 border-b border-ink-800 flex gap-1">
           <Tab active={tab === 'members'} onClick={() => setTab('members')}>Members</Tab>
           <Tab active={tab === 'links'} onClick={() => setTab('links')}>Links</Tab>
         </div>
-        <div className="p-4 overflow-auto">
+        <div className="p-4 overflow-auto max-h-[60vh]">
           {tab === 'members' ? <MembersTab projectId={projectId} /> : <LinksTab projectId={projectId} />}
         </div>
       </div>
-    </div>
+    </Modal>
   )
 }

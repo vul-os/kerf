@@ -4,7 +4,8 @@
 // thing for users who don't know the shortcut yet.
 
 import { useEffect, useState } from 'react'
-import { Keyboard, X } from 'lucide-react'
+import { Keyboard } from 'lucide-react'
+import Modal from './Modal.jsx'
 
 const GROUPS = [
   {
@@ -93,18 +94,18 @@ function isTypingTarget(t) {
 
 export default function ShortcutsModal() {
   const [open, setOpen] = useState(false)
+
+  // `?` opens the modal; Esc is handled by the canonical Modal.
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === '?' && !e.metaKey && !e.ctrlKey && !e.altKey && !isTypingTarget(e.target)) {
         e.preventDefault()
         setOpen((v) => !v)
-        return
       }
-      if (e.key === 'Escape' && open) setOpen(false)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open])
+  }, [])
 
   return (
     <>
@@ -112,57 +113,47 @@ export default function ShortcutsModal() {
         type="button"
         onClick={() => setOpen(true)}
         title="Keyboard shortcuts (?)"
+        aria-label="Keyboard shortcuts"
         className="fixed bottom-3 right-3 z-30 w-7 h-7 rounded-full bg-ink-900/90 border border-ink-700 text-ink-300 hover:text-kerf-300 hover:border-kerf-300/40 backdrop-blur flex items-center justify-center text-xs"
       >
         ?
       </button>
-      {open && (
-        <div
-          className="fixed inset-0 z-50 bg-ink-950/70 backdrop-blur-sm flex items-start justify-center p-6 overflow-y-auto"
-          onClick={() => setOpen(false)}
-        >
-          <div
-            className="w-full max-w-3xl bg-ink-900 border border-ink-700 rounded-lg shadow-xl my-8"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-5 py-3 border-b border-ink-800">
-              <div className="flex items-center gap-2 text-ink-100">
-                <Keyboard size={15} />
-                <span className="text-sm font-semibold">Keyboard shortcuts</span>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Keyboard shortcuts"
+        widthClass="max-w-3xl"
+        footer={
+          <p className="text-[11px] text-ink-500 w-full text-left">
+            Press{' '}
+            <kbd className="font-mono px-1 py-0.5 bg-ink-950 border border-ink-700 rounded text-ink-300">?</kbd>
+            {' '}from anywhere to open this.{' '}
+            <kbd className="font-mono px-1 py-0.5 bg-ink-950 border border-ink-700 rounded text-ink-300">Esc</kbd>
+            {' '}to close.
+          </p>
+        }
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 -mt-1">
+          {GROUPS.map((g) => (
+            <div key={g.title}>
+              <div className="text-[11px] uppercase tracking-wide text-kerf-300 font-semibold mb-2 flex items-center gap-1.5">
+                {g.title === 'Global' && <Keyboard size={11} />}
+                {g.title}
               </div>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="text-ink-400 hover:text-kerf-300"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-              {GROUPS.map((g) => (
-                <div key={g.title}>
-                  <div className="text-[11px] uppercase tracking-wide text-kerf-300 font-semibold mb-2">
-                    {g.title}
+              <div className="space-y-1">
+                {g.rows.map(([kbd, desc]) => (
+                  <div key={kbd} className="flex items-baseline gap-3 text-xs">
+                    <kbd className="font-mono text-[11px] px-1.5 py-0.5 bg-ink-950 border border-ink-700 rounded text-ink-200 whitespace-nowrap">
+                      {kbd}
+                    </kbd>
+                    <span className="text-ink-300 flex-1">{desc}</span>
                   </div>
-                  <div className="space-y-1">
-                    {g.rows.map(([kbd, desc]) => (
-                      <div key={kbd} className="flex items-baseline gap-3 text-xs">
-                        <kbd className="font-mono text-[11px] px-1.5 py-0.5 bg-ink-950 border border-ink-700 rounded text-ink-200 whitespace-nowrap">
-                          {kbd}
-                        </kbd>
-                        <span className="text-ink-300 flex-1">{desc}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-            <div className="px-5 py-2 border-t border-ink-800 text-[11px] text-ink-500">
-              Press <kbd className="font-mono px-1 py-0.5 bg-ink-950 border border-ink-700 rounded text-ink-300">?</kbd> from anywhere to open this. <kbd className="font-mono px-1 py-0.5 bg-ink-950 border border-ink-700 rounded text-ink-300">Esc</kbd> to close.
-            </div>
-          </div>
+          ))}
         </div>
-      )}
+      </Modal>
     </>
   )
 }

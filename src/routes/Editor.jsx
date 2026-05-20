@@ -59,6 +59,7 @@ import { _internalLoops } from '../lib/sketchGeom2.js'
 import FileEditor from '../components/FileEditor.jsx'
 import { isTextCodeFile } from '../lib/editorModes.js'
 import UnsavedRestoreBanner from '../components/UnsavedRestoreBanner.jsx'
+import Modal from '../components/Modal.jsx'
 
 // ---------------------------------------------------------------------------
 // Build3DDropdown — toolbar dropdown in the sketch header that scaffolds a
@@ -82,72 +83,70 @@ function Build3DModal({ op, sketchName, onConfirm, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-ink-900 border border-ink-700 rounded-lg shadow-2xl w-80 p-4">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-medium text-ink-100">
-            {isRevolve ? 'Revolve sketch' : 'Extrude sketch'}
-          </span>
-          <button type="button" onClick={onClose} className="text-ink-400 hover:text-ink-200">
-            <X size={14} />
+    <Modal
+      open
+      onClose={onClose}
+      title={isRevolve ? 'Revolve sketch' : 'Extrude sketch'}
+      widthClass="max-w-xs"
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-1.5 rounded border border-ink-700 text-ink-400 text-xs hover:bg-ink-800"
+          >
+            Cancel
           </button>
-        </div>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          {isRevolve ? (
-            <label className="flex flex-col gap-1">
-              <span className="text-[11px] text-ink-400">Angle (degrees)</span>
-              <input
-                type="number"
-                min="1"
-                max="360"
-                step="1"
-                value={angle}
-                onChange={(e) => setAngle(e.target.value)}
-                className="bg-ink-800 border border-ink-700 rounded px-2 py-1 text-xs text-ink-100 outline-none focus:border-kerf-300/60"
-                autoFocus
-              />
-            </label>
-          ) : (
-            <label className="flex flex-col gap-1">
-              <span className="text-[11px] text-ink-400">Height (mm)</span>
-              <input
-                type="number"
-                min="0.01"
-                step="0.5"
-                value={height}
-                onChange={(e) => setHeight(e.target.value)}
-                className="bg-ink-800 border border-ink-700 rounded px-2 py-1 text-xs text-ink-100 outline-none focus:border-kerf-300/60"
-                autoFocus
-              />
-            </label>
-          )}
+          <button
+            type="submit"
+            form="build3d-form"
+            className="flex-1 py-1.5 rounded bg-kerf-300/15 border border-kerf-300/40 text-kerf-200 text-xs hover:bg-kerf-300/25"
+          >
+            Build 3D
+          </button>
+        </>
+      }
+    >
+      <form id="build3d-form" onSubmit={handleSubmit} className="flex flex-col gap-3">
+        {isRevolve ? (
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] text-ink-400">Output filename</span>
+            <span className="text-[11px] text-ink-400">Angle (degrees)</span>
             <input
-              type="text"
-              value={filename}
-              onChange={(e) => setFilename(e.target.value)}
-              className="bg-ink-800 border border-ink-700 rounded px-2 py-1 text-xs font-mono text-ink-100 outline-none focus:border-kerf-300/60"
+              type="number"
+              min="1"
+              max="360"
+              step="1"
+              value={angle}
+              onChange={(e) => setAngle(e.target.value)}
+              className="bg-ink-800 border border-ink-700 rounded px-2 py-1 text-xs text-ink-100 outline-none focus:border-kerf-300/60"
+              autoFocus
             />
           </label>
-          <div className="flex gap-2 mt-1">
-            <button
-              type="submit"
-              className="flex-1 py-1.5 rounded bg-kerf-300/15 border border-kerf-300/40 text-kerf-200 text-xs hover:bg-kerf-300/25"
-            >
-              Build 3D
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-1.5 rounded border border-ink-700 text-ink-400 text-xs hover:bg-ink-800"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        ) : (
+          <label className="flex flex-col gap-1">
+            <span className="text-[11px] text-ink-400">Height (mm)</span>
+            <input
+              type="number"
+              min="0.01"
+              step="0.5"
+              value={height}
+              onChange={(e) => setHeight(e.target.value)}
+              className="bg-ink-800 border border-ink-700 rounded px-2 py-1 text-xs text-ink-100 outline-none focus:border-kerf-300/60"
+              autoFocus
+            />
+          </label>
+        )}
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] text-ink-400">Output filename</span>
+          <input
+            type="text"
+            value={filename}
+            onChange={(e) => setFilename(e.target.value)}
+            className="bg-ink-800 border border-ink-700 rounded px-2 py-1 text-xs font-mono text-ink-100 outline-none focus:border-kerf-300/60"
+          />
+        </label>
+      </form>
+    </Modal>
   )
 }
 

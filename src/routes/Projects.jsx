@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import Layout from '../components/Layout.jsx'
+import Modal from '../components/Modal.jsx'
 import Card from '../components/Card.jsx'
 import Button from '../components/Button.jsx'
 import Input, { Textarea } from '../components/Input.jsx'
@@ -50,57 +51,6 @@ function relativeTime(iso) {
   const mo = Math.round(day / 30)
   if (mo < 12) return `${mo}mo ago`
   return `${Math.round(mo / 12)}y ago`
-}
-
-function Modal({ open, onClose, title, children, footer, widthClass = 'max-w-md' }) {
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e) => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open, onClose])
-
-  if (!open) return null
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center px-4">
-      <div
-        className="absolute inset-0 bg-ink-950/80 backdrop-blur-sm"
-        onClick={onClose}
-        aria-hidden
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="modal-title"
-        className={clsx(
-          'relative w-full bg-ink-900 border border-ink-800 rounded-2xl shadow-2xl shadow-black/50',
-          widthClass,
-        )}
-      >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-ink-800">
-          <h2 id="modal-title" className="font-display text-lg font-semibold tracking-tight">
-            {title}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-ink-400 hover:text-ink-100 transition-colors"
-            aria-label="Close"
-          >
-            <X size={16} />
-          </button>
-        </div>
-        <div className="p-5">{children}</div>
-        {footer && (
-          <div className="px-5 py-4 border-t border-ink-800 flex justify-end gap-2">
-            {footer}
-          </div>
-        )}
-      </div>
-    </div>
-  )
 }
 
 // TagsField — chip multi-select with free-text input. Active tags appear

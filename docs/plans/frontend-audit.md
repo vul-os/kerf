@@ -269,7 +269,7 @@ Each task ≈1–3h sonnet unless `[HARD]`. Always isolate in a worktree.
   Files: `src/routes/Editor.jsx`.
   Success: top bar never overflows down to ~768px; all actions reachable; every control has an SR name.
 
-- [ ] **T-L3 Canonical accessible Modal + retire ad-hoc ones**
+- [x] **T-L3 Canonical accessible Modal + retire ad-hoc ones**
   Scope: promote the `Projects.jsx` `Modal` (role=dialog + aria-modal + Esc + labelled + backdrop) into a shared `src/components/Modal.jsx`; refactor `ShareModal`, `ShortcutsModal`, and `Editor.jsx` `Build3DModal` to use it (focus trap + focus return + scroll lock).
   Files: new `src/components/Modal.jsx`; `src/components/ShareModal.jsx`, `src/components/ShortcutsModal.jsx`, `src/routes/Editor.jsx`, `src/routes/Projects.jsx`.
   Success: every modal traps focus, returns focus on close, is dialog-roled; one implementation.

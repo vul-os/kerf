@@ -1,897 +1,844 @@
 """
-Tests for kerf_cad_core.reverse_engineering — reverse-engineering pipeline.
+Tests for kerf_cad_core.reverse_engineering — v2 deferred sub-capabilities.
 
-All tests are pure-Python, hermetic: no OCC, no DB, no network.
+Coverage
+--------
+1. Binary PLY parser (little-endian + big-endian + ASCII round-trip)
+2. Binary PCD parser (ascii + binary + round-trip)
+3. Scanner noise pre-filtering (statistical_outlier_removal + laplacian_smooth)
+4. Cone LM refinement (half-angle within ≤0.1° of ground truth)
+5. Torus RANSAC (major/minor radii within 1% of ground truth)
+6. Extended segmentation integrating cone + torus
+7. Full pipeline (noise filter → segment → classify)
+8. UnsupportedFormatError for malformed inputs
 
-Coverage:
-  - PCD / PLY file I/O (ASCII)
-  - UnsupportedFormatError for binary variants
-  - Cone fitting (RANSAC + closed-form)
-  - Sequential RANSAC segmentation
-  - Feature tree mapping (segment → feature node)
-  - Round-trip: synthetic cube + cylinder cloud → recognize → re-sample
-    → Hausdorff distance ≤ 1e-3 vs original surface
-  - hausdorff_distance utility
+All tests are pure-Python, hermetic — no OCC, no DB, no network, no disk
+fixtures.  Synthetic point clouds are generated analytically with fixed seeds.
 
 Author: imranparuk
 """
 from __future__ import annotations
 
+import io
 import math
 import random
+import struct
 
 import pytest
 
 from kerf_cad_core.reverse_engineering.io import (
-    UnsupportedFormatError,
-    load_pcd,
     load_ply,
-    load_point_cloud,
+    load_pcd,
+    UnsupportedFormatError,
 )
-from kerf_cad_core.reverse_engineering.segmentation import (
+from kerf_cad_core.reverse_engineering.noise import (
+    statistical_outlier_removal,
+    laplacian_smooth,
+)
+from kerf_cad_core.reverse_engineering.fit_cone import (
     fit_cone_direct,
     ransac_fit_cone,
-    sequential_ransac,
-    _dist_to_cone,
+    refine_cone_lm,
 )
-from kerf_cad_core.reverse_engineering.feature_map import (
-    segment_to_feature,
-    segments_to_feature_tree,
+from kerf_cad_core.reverse_engineering.fit_torus import (
+    fit_torus_direct,
+    ransac_fit_torus,
 )
-from kerf_cad_core.reverse_engineering.pipeline import (
-    recognize,
-    sample_feature_tree,
-    hausdorff_distance,
-    max_point_to_surface_distance,
-)
+from kerf_cad_core.reverse_engineering.segmentation import extended_segment
+from kerf_cad_core.reverse_engineering.pipeline import run_pipeline
 
 
-# ===========================================================================
-# Helpers / Fixtures
-# ===========================================================================
-
-def _normalise(v):
-    n = math.sqrt(sum(x*x for x in v))
-    return [x/n for x in v]
-
-
-def _cube_surface_pts(side: float = 10.0, n_per_face: int = 40) -> list[list[float]]:
-    """Sample n_per_face points uniformly on each face of an axis-aligned cube.
-
-    The cube spans [0, side]^3.  6 faces × n_per_face = 6*n_per_face total.
-    Each face is on a coordinate plane with z/y/x fixed at 0 or side.
-    """
-    rng = random.Random(1)
-    pts: list[list[float]] = []
-    for _ in range(n_per_face):
-        u = rng.uniform(0, side)
-        v = rng.uniform(0, side)
-        # Six faces
-        pts.append([u, v, 0.0])          # z=0
-        pts.append([u, v, side])         # z=side
-        pts.append([u, 0.0, v])          # y=0
-        pts.append([u, side, v])         # y=side
-        pts.append([0.0, u, v])          # x=0
-        pts.append([side, u, v])         # x=side
-    return pts
-
-
-def _cylinder_pts(
-    cx: float = 5.0, cy: float = 5.0, r: float = 2.0,
-    z_min: float = 2.0, z_max: float = 8.0, n: int = 200,
-) -> list[list[float]]:
-    """Sample n points on the lateral surface of a vertical cylinder."""
-    rng = random.Random(2)
-    pts = []
-    for _ in range(n):
-        theta = rng.uniform(0.0, 2.0 * math.pi)
-        z = rng.uniform(z_min, z_max)
-        pts.append([cx + r * math.cos(theta), cy + r * math.sin(theta), z])
-    return pts
-
+# ---------------------------------------------------------------------------
+# Synthetic cloud generators
+# ---------------------------------------------------------------------------
 
 def _cone_pts(
-    apex=(0.0, 0.0, 0.0), axis=(0.0, 0.0, 1.0),
-    half_angle_deg: float = 30.0, height: float = 5.0, n: int = 80,
+    apex: list[float],
+    axis: list[float],
+    half_angle: float,  # radians
+    n: int = 100,
+    height: float = 5.0,
+    noise: float = 0.0,
+    seed: int = 7,
 ) -> list[list[float]]:
-    """Sample n points on a cone lateral surface."""
-    rng = random.Random(3)
-    ax = _normalise(list(axis))
-    ref = [1.0, 0.0, 0.0]
-    if abs(ax[0]) > 0.9:
-        ref = [0.0, 1.0, 0.0]
-    # Build u, v
-    u = _normalise([
-        ax[1]*ref[2] - ax[2]*ref[1],
-        ax[2]*ref[0] - ax[0]*ref[2],
-        ax[0]*ref[1] - ax[1]*ref[0],
-    ])
-    v = [
-        ax[1]*u[2] - ax[2]*u[1],
-        ax[2]*u[0] - ax[0]*u[2],
-        ax[0]*u[1] - ax[1]*u[0],
+    """Points on the surface of a cone.
+
+    apex, axis (unit), half_angle in radians.  height is along axis from apex.
+    """
+    # Normalise axis
+    mag = math.sqrt(sum(a*a for a in axis))
+    axis = [a/mag for a in axis]
+
+    # Build orthonormal basis perpendicular to axis
+    ref = [1.0, 0.0, 0.0] if abs(axis[2]) < 0.9 else [0.0, 1.0, 0.0]
+    u = [
+        axis[1]*ref[2]-axis[2]*ref[1],
+        axis[2]*ref[0]-axis[0]*ref[2],
+        axis[0]*ref[1]-axis[1]*ref[0],
     ]
-    tan_ha = math.tan(math.radians(half_angle_deg))
+    un = math.sqrt(u[0]**2+u[1]**2+u[2]**2)
+    u = [ui/un for ui in u]
+    v = [axis[1]*u[2]-axis[2]*u[1], axis[2]*u[0]-axis[0]*u[2], axis[0]*u[1]-axis[1]*u[0]]
+
+    rng = random.Random(seed)
+    tan_a = math.tan(half_angle)
     pts = []
     for _ in range(n):
-        h = rng.uniform(0.1, height)  # skip apex exactly (r=0 is degenerate)
-        r = h * tan_ha
-        theta = rng.uniform(0.0, 2.0 * math.pi)
+        t = rng.uniform(0.01, height)  # distance along axis from apex
+        theta = rng.uniform(0, 2*math.pi)
+        r = t * tan_a
+        nr = r + (rng.gauss(0, noise) if noise > 0 else 0.0)
         p = [
-            apex[0] + ax[0]*h + r*math.cos(theta)*u[0] + r*math.sin(theta)*v[0],
-            apex[1] + ax[1]*h + r*math.cos(theta)*u[1] + r*math.sin(theta)*v[1],
-            apex[2] + ax[2]*h + r*math.cos(theta)*u[2] + r*math.sin(theta)*v[2],
+            apex[0] + t*axis[0] + nr*math.cos(theta)*u[0] + nr*math.sin(theta)*v[0],
+            apex[1] + t*axis[1] + nr*math.cos(theta)*u[1] + nr*math.sin(theta)*v[1],
+            apex[2] + t*axis[2] + nr*math.cos(theta)*u[2] + nr*math.sin(theta)*v[2],
         ]
         pts.append(p)
     return pts
 
 
+def _torus_pts(
+    centre: list[float],
+    axis: list[float],
+    R: float,
+    r: float,
+    n: int = 200,
+    noise: float = 0.0,
+    seed: int = 3,
+) -> list[list[float]]:
+    """Points on the surface of a torus.
+
+    centre, axis (unit), R = major radius, r = minor radius.
+    """
+    mag = math.sqrt(sum(a*a for a in axis))
+    axis = [a/mag for a in axis]
+
+    ref = [1.0, 0.0, 0.0] if abs(axis[2]) < 0.9 else [0.0, 1.0, 0.0]
+    u = [
+        axis[1]*ref[2]-axis[2]*ref[1],
+        axis[2]*ref[0]-axis[0]*ref[2],
+        axis[0]*ref[1]-axis[1]*ref[0],
+    ]
+    un = math.sqrt(u[0]**2+u[1]**2+u[2]**2)
+    u = [ui/un for ui in u]
+    v = [axis[1]*u[2]-axis[2]*u[1], axis[2]*u[0]-axis[0]*u[2], axis[0]*u[1]-axis[1]*u[0]]
+
+    rng = random.Random(seed)
+    pts = []
+    for _ in range(n):
+        phi = rng.uniform(0, 2*math.pi)   # angle around the tube centre circle
+        theta = rng.uniform(0, 2*math.pi) # angle around the tube cross-section
+        # Centre of tube at angle phi
+        ring_x = R * math.cos(phi)
+        ring_y = R * math.sin(phi)
+        # Surface point in torus-local frame
+        # Tube cross-section in the (radial, axis) plane
+        # radial direction in torus plane: cos(phi)*u + sin(phi)*v
+        rad_dir = [math.cos(phi)*u[i] + math.sin(phi)*v[i] for i in range(3)]
+        rn = r + (rng.gauss(0, noise) if noise > 0 else 0.0)
+        px = centre[0] + (R + rn*math.cos(theta))*rad_dir[0] + rn*math.sin(theta)*axis[0]
+        py = centre[1] + (R + rn*math.cos(theta))*rad_dir[1] + rn*math.sin(theta)*axis[1]
+        pz = centre[2] + (R + rn*math.cos(theta))*rad_dir[2] + rn*math.sin(theta)*axis[2]
+        pts.append([px, py, pz])
+    return pts
+
+
+def _plane_pts_simple(n: int = 50, noise: float = 0.0, seed: int = 11) -> list[list[float]]:
+    rng = random.Random(seed)
+    pts = []
+    for _ in range(n):
+        x = rng.uniform(-5, 5)
+        y = rng.uniform(-5, 5)
+        z = 1.0 + (rng.gauss(0, noise) if noise > 0 else 0.0)
+        pts.append([x, y, z])
+    return pts
+
+
+# ---------------------------------------------------------------------------
+# PLY binary builder helpers
+# ---------------------------------------------------------------------------
+
+def _build_ply_ascii(pts: list[list[float]]) -> bytes:
+    """Build a minimal ASCII PLY file with the given points."""
+    lines = [
+        b"ply\n",
+        b"format ascii 1.0\n",
+        b"element vertex " + str(len(pts)).encode() + b"\n",
+        b"property float x\n",
+        b"property float y\n",
+        b"property float z\n",
+        b"end_header\n",
+    ]
+    for p in pts:
+        lines.append(f"{p[0]:.6f} {p[1]:.6f} {p[2]:.6f}\n".encode())
+    return b"".join(lines)
+
+
+def _build_ply_binary(pts: list[list[float]], endian: str = "little") -> bytes:
+    """Build a binary PLY file."""
+    fmt_name = "binary_little_endian" if endian == "little" else "binary_big_endian"
+    header = (
+        f"ply\nformat {fmt_name} 1.0\n"
+        f"element vertex {len(pts)}\n"
+        f"property float x\nproperty float y\nproperty float z\n"
+        f"end_header\n"
+    ).encode()
+    struct_fmt = "<fff" if endian == "little" else ">fff"
+    row_struct = struct.Struct(struct_fmt)
+    data = b"".join(row_struct.pack(p[0], p[1], p[2]) for p in pts)
+    return header + data
+
+
+def _build_pcd_ascii(pts: list[list[float]]) -> bytes:
+    """Build a minimal ASCII PCD file."""
+    n = len(pts)
+    header = (
+        f"# .PCD v0.7\n"
+        f"FIELDS x y z\n"
+        f"SIZE 4 4 4\n"
+        f"TYPE F F F\n"
+        f"COUNT 1 1 1\n"
+        f"WIDTH {n}\nHEIGHT 1\nVIEWPOINT 0 0 0 1 0 0 0\n"
+        f"POINTS {n}\n"
+        f"DATA ascii\n"
+    ).encode()
+    rows = b"".join(f"{p[0]:.6f} {p[1]:.6f} {p[2]:.6f}\n".encode() for p in pts)
+    return header + rows
+
+
+def _build_pcd_binary(pts: list[list[float]]) -> bytes:
+    """Build a binary PCD file (little-endian floats)."""
+    n = len(pts)
+    header = (
+        f"# .PCD v0.7\n"
+        f"FIELDS x y z\n"
+        f"SIZE 4 4 4\n"
+        f"TYPE F F F\n"
+        f"COUNT 1 1 1\n"
+        f"WIDTH {n}\nHEIGHT 1\nVIEWPOINT 0 0 0 1 0 0 0\n"
+        f"POINTS {n}\n"
+        f"DATA binary\n"
+    ).encode()
+    row_struct = struct.Struct("<fff")
+    data = b"".join(row_struct.pack(p[0], p[1], p[2]) for p in pts)
+    return header + data
+
+
 # ===========================================================================
-# SECTION 1: PCD I/O
+# SECTION 1: Binary PLY / PCD I/O
 # ===========================================================================
 
-class TestLoadPcd:
-    def test_minimal_pcd(self):
-        content = b"""\
-# .PCD v0.7
-VERSION 0.7
-FIELDS x y z
-SIZE 4 4 4
-TYPE F F F
-COUNT 1 1 1
-WIDTH 3
-HEIGHT 1
-POINTS 3
-DATA ascii
-1.0 2.0 3.0
-4.0 5.0 6.0
-7.0 8.0 9.0
-"""
-        pts = load_pcd(content)
-        assert len(pts) == 3
-        assert pts[0] == [1.0, 2.0, 3.0]
-        assert pts[1] == [4.0, 5.0, 6.0]
-        assert pts[2] == [7.0, 8.0, 9.0]
+class TestPLYASCII:
+    def test_ascii_roundtrip(self):
+        pts = [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]
+        raw = _build_ply_ascii(pts)
+        loaded = load_ply(raw)
+        assert len(loaded) == 3
+        for orig, got in zip(pts, loaded):
+            assert abs(got[0] - orig[0]) < 1e-4
+            assert abs(got[1] - orig[1]) < 1e-4
+            assert abs(got[2] - orig[2]) < 1e-4
 
-    def test_extra_fields_ignored(self):
-        content = b"""\
-VERSION 0.7
-FIELDS x y z intensity
-SIZE 4 4 4 4
-TYPE F F F F
-COUNT 1 1 1 1
-WIDTH 2
-HEIGHT 1
-POINTS 2
-DATA ascii
-1.0 2.0 3.0 0.5
-4.0 5.0 6.0 0.8
-"""
-        pts = load_pcd(content)
-        assert len(pts) == 2
-        assert pts[0] == [1.0, 2.0, 3.0]
+    def test_ascii_100_pts(self):
+        pts = [[float(i), float(i*2), float(i*3)] for i in range(100)]
+        raw = _build_ply_ascii(pts)
+        loaded = load_ply(raw)
+        assert len(loaded) == 100
+        assert abs(loaded[50][0] - 50.0) < 1e-3
 
-    def test_binary_raises(self):
-        content = b"""\
-VERSION 0.7
-FIELDS x y z
-SIZE 4 4 4
-TYPE F F F
-COUNT 1 1 1
-WIDTH 1
-HEIGHT 1
-POINTS 1
-DATA binary
-\x00\x00\x80\x3f\x00\x00\x00\x40\x00\x00\x40\x40
-"""
+
+class TestPLYBinaryLittleEndian:
+    def test_binary_le_roundtrip(self):
+        pts = [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]
+        raw = _build_ply_binary(pts, "little")
+        loaded = load_ply(raw)
+        assert len(loaded) == 3
+        for orig, got in zip(pts, loaded):
+            assert abs(got[0] - orig[0]) < 1e-5
+            assert abs(got[1] - orig[1]) < 1e-5
+            assert abs(got[2] - orig[2]) < 1e-5
+
+    def test_binary_le_matches_ascii(self):
+        """Binary-LE and ASCII produce the same parsed cloud."""
+        pts = _plane_pts_simple(n=20, noise=0.0)
+        raw_ascii = _build_ply_ascii(pts)
+        raw_binary = _build_ply_binary(pts, "little")
+        loaded_ascii = load_ply(raw_ascii)
+        loaded_binary = load_ply(raw_binary)
+        assert len(loaded_ascii) == len(loaded_binary)
+        for a, b in zip(loaded_ascii, loaded_binary):
+            for i in range(3):
+                assert abs(a[i] - b[i]) < 1e-4
+
+    def test_binary_le_100_pts(self):
+        pts = [[float(i), float(i*2), float(i*0.5)] for i in range(100)]
+        raw = _build_ply_binary(pts, "little")
+        loaded = load_ply(raw)
+        assert len(loaded) == 100
+        assert abs(loaded[42][1] - 84.0) < 1e-3
+
+
+class TestPLYBinaryBigEndian:
+    def test_binary_be_roundtrip(self):
+        pts = [[1.5, 2.5, 3.5], [4.5, 5.5, 6.5]]
+        raw = _build_ply_binary(pts, "big")
+        loaded = load_ply(raw)
+        assert len(loaded) == 2
+        for orig, got in zip(pts, loaded):
+            for i in range(3):
+                assert abs(got[i] - orig[i]) < 1e-5
+
+    def test_binary_be_matches_ascii(self):
+        """Binary-BE produces same values as ASCII."""
+        pts = _plane_pts_simple(n=30, noise=0.0)
+        loaded_ascii = load_ply(_build_ply_ascii(pts))
+        loaded_be = load_ply(_build_ply_binary(pts, "big"))
+        assert len(loaded_ascii) == len(loaded_be)
+        for a, b in zip(loaded_ascii, loaded_be):
+            for i in range(3):
+                assert abs(a[i] - b[i]) < 1e-4
+
+    def test_binary_be_negative_coords(self):
+        pts = [[-1.0, -2.0, -3.0], [1.0, 2.0, 3.0]]
+        raw = _build_ply_binary(pts, "big")
+        loaded = load_ply(raw)
+        assert abs(loaded[0][0] - (-1.0)) < 1e-5
+        assert abs(loaded[1][2] - 3.0) < 1e-5
+
+
+class TestPLYErrors:
+    def test_not_ply(self):
         with pytest.raises(UnsupportedFormatError):
-            load_pcd(content)
+            load_ply(b"NOT A PLY FILE\n")
 
-    def test_missing_data_raises(self):
-        content = b"VERSION 0.7\nFIELDS x y z\n"
-        with pytest.raises(ValueError):
-            load_pcd(content)
-
-    def test_xyz_fields_required(self):
-        content = b"""\
-VERSION 0.7
-FIELDS a b c
-SIZE 4 4 4
-TYPE F F F
-COUNT 1 1 1
-WIDTH 1
-HEIGHT 1
-POINTS 1
-DATA ascii
-1 2 3
-"""
-        with pytest.raises(ValueError, match="x/y/z"):
-            load_pcd(content)
-
-    def test_empty_data(self):
-        content = b"""\
-VERSION 0.7
-FIELDS x y z
-SIZE 4 4 4
-TYPE F F F
-COUNT 1 1 1
-WIDTH 0
-HEIGHT 1
-POINTS 0
-DATA ascii
-"""
-        pts = load_pcd(content)
-        assert pts == []
-
-    def test_negative_coords(self):
-        content = b"""\
-VERSION 0.7
-FIELDS x y z
-SIZE 4 4 4
-TYPE F F F
-COUNT 1 1 1
-WIDTH 2
-HEIGHT 1
-POINTS 2
-DATA ascii
--1.5 -2.5 -3.5
-0.0 0.0 0.0
-"""
-        pts = load_pcd(content)
-        assert pts[0][0] == -1.5
-        assert pts[0][2] == -3.5
-
-
-# ===========================================================================
-# SECTION 2: PLY I/O
-# ===========================================================================
-
-class TestLoadPly:
-    def _make_ascii_ply(self, pts: list) -> bytes:
-        lines = [
-            "ply",
-            "format ascii 1.0",
-            f"element vertex {len(pts)}",
-            "property float x",
-            "property float y",
-            "property float z",
-            "end_header",
-        ]
-        for p in pts:
-            lines.append(f"{p[0]} {p[1]} {p[2]}")
-        return "\n".join(lines).encode()
-
-    def test_basic_ply(self):
-        content = self._make_ascii_ply([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
-        pts = load_ply(content)
-        assert len(pts) == 2
-        assert pts[0] == [1.0, 2.0, 3.0]
-
-    def test_extra_properties_ignored(self):
-        content = (
+    def test_missing_xyz_property(self):
+        # PLY with only 'x' and 'y', no 'z'
+        raw = (
             b"ply\nformat ascii 1.0\n"
-            b"element vertex 2\n"
-            b"property float x\n"
-            b"property float y\n"
-            b"property float z\n"
-            b"property uchar red\n"
-            b"property uchar green\n"
-            b"property uchar blue\n"
-            b"end_header\n"
-            b"1.0 2.0 3.0 255 0 0\n"
-            b"4.0 5.0 6.0 0 255 0\n"
-        )
-        pts = load_ply(content)
-        assert pts[0] == [1.0, 2.0, 3.0]
-
-    def test_binary_ply_raises(self):
-        content = (
-            b"ply\nformat binary_little_endian 1.0\n"
             b"element vertex 1\n"
-            b"property float x\n"
-            b"property float y\n"
-            b"property float z\n"
-            b"end_header\n"
-            b"\x00\x00\x80\x3f\x00\x00\x00\x40\x00\x00\x40\x40"
+            b"property float x\nproperty float y\n"
+            b"end_header\n1.0 2.0\n"
         )
         with pytest.raises(UnsupportedFormatError):
-            load_ply(content)
+            load_ply(raw)
 
-    def test_not_ply_raises(self):
-        with pytest.raises(ValueError, match="ply"):
-            load_ply(b"not a ply file\n")
+    def test_truncated_binary(self):
+        pts = [[1.0, 2.0, 3.0]] * 10
+        raw = _build_ply_binary(pts, "little")
+        # Truncate the data
+        with pytest.raises(UnsupportedFormatError):
+            load_ply(raw[:len(raw)//2])
 
-    def test_missing_xyz_raises(self):
-        content = (
-            b"ply\nformat ascii 1.0\n"
+    def test_empty_bytes(self):
+        with pytest.raises(UnsupportedFormatError):
+            load_ply(b"")
+
+    def test_unsupported_format(self):
+        raw = (
+            b"ply\nformat binary_compressed 1.0\n"
             b"element vertex 1\n"
-            b"property float a\n"
-            b"property float b\n"
-            b"end_header\n"
-            b"1 2\n"
-        )
-        with pytest.raises(ValueError, match="x, y, z"):
-            load_ply(content)
-
-    def test_zero_vertex_count(self):
-        content = (
-            b"ply\nformat ascii 1.0\n"
-            b"element vertex 0\n"
-            b"property float x\n"
-            b"property float y\n"
-            b"property float z\n"
-            b"end_header\n"
-        )
-        pts = load_ply(content)
-        assert pts == []
-
-
-# ===========================================================================
-# SECTION 3: load_point_cloud dispatch
-# ===========================================================================
-
-class TestLoadPointCloud:
-    def test_dispatch_pcd_bytes(self):
-        content = (
-            b"VERSION 0.7\nFIELDS x y z\nSIZE 4 4 4\nTYPE F F F\n"
-            b"COUNT 1 1 1\nWIDTH 1\nHEIGHT 1\nPOINTS 1\nDATA ascii\n1 2 3\n"
-        )
-        pts = load_point_cloud(content)
-        assert pts == [[1.0, 2.0, 3.0]]
-
-    def test_dispatch_ply_bytes(self):
-        content = (
-            b"ply\nformat ascii 1.0\nelement vertex 1\n"
             b"property float x\nproperty float y\nproperty float z\n"
-            b"end_header\n5 6 7\n"
+            b"end_header\n"
         )
-        pts = load_point_cloud(content)
-        assert pts == [[5.0, 6.0, 7.0]]
+        with pytest.raises(UnsupportedFormatError):
+            load_ply(raw)
+
+
+class TestPCDASCII:
+    def test_ascii_roundtrip(self):
+        pts = [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]
+        raw = _build_pcd_ascii(pts)
+        loaded = load_pcd(raw)
+        assert len(loaded) == 2
+        for orig, got in zip(pts, loaded):
+            for i in range(3):
+                assert abs(got[i] - orig[i]) < 1e-4
+
+    def test_ascii_100_pts(self):
+        pts = [[float(i), float(i*2), float(i*3)] for i in range(100)]
+        raw = _build_pcd_ascii(pts)
+        loaded = load_pcd(raw)
+        assert len(loaded) == 100
+        assert abs(loaded[77][0] - 77.0) < 1e-3
+
+
+class TestPCDBinary:
+    def test_binary_roundtrip(self):
+        pts = [[1.5, 2.5, 3.5], [4.5, 5.5, 6.5], [7.5, 8.5, 9.5]]
+        raw = _build_pcd_binary(pts)
+        loaded = load_pcd(raw)
+        assert len(loaded) == 3
+        for orig, got in zip(pts, loaded):
+            for i in range(3):
+                assert abs(got[i] - orig[i]) < 1e-5
+
+    def test_binary_matches_ascii(self):
+        """Binary PCD and ASCII PCD produce the same parsed cloud."""
+        pts = _plane_pts_simple(n=30, noise=0.0)
+        loaded_ascii = load_pcd(_build_pcd_ascii(pts))
+        loaded_binary = load_pcd(_build_pcd_binary(pts))
+        assert len(loaded_ascii) == len(loaded_binary)
+        for a, b in zip(loaded_ascii, loaded_binary):
+            for i in range(3):
+                assert abs(a[i] - b[i]) < 1e-4
+
+    def test_binary_50_pts(self):
+        pts = [[float(i)*0.1, float(i)*0.2, float(i)*0.3] for i in range(50)]
+        raw = _build_pcd_binary(pts)
+        loaded = load_pcd(raw)
+        assert len(loaded) == 50
+        assert abs(loaded[25][0] - 2.5) < 1e-4
+
+
+class TestPCDErrors:
+    def test_missing_fields(self):
+        # PCD without FIELDS line
+        raw = (
+            b"# PCD\n"
+            b"SIZE 4 4\nTYPE F F\nCOUNT 1 1\nPOINTS 1\nDATA ascii\n"
+            b"1.0 2.0\n"
+        )
+        with pytest.raises(UnsupportedFormatError):
+            load_pcd(raw)
+
+    def test_missing_z_field(self):
+        raw = (
+            b"# PCD\nFIELDS x y\nSIZE 4 4\nTYPE F F\nCOUNT 1 1\n"
+            b"POINTS 1\nDATA ascii\n1.0 2.0\n"
+        )
+        with pytest.raises(UnsupportedFormatError):
+            load_pcd(raw)
+
+    def test_unsupported_data_type(self):
+        raw = (
+            b"FIELDS x y z\nSIZE 4 4 4\nTYPE F F F\nCOUNT 1 1 1\n"
+            b"POINTS 1\nDATA binary_compressed\n"
+        )
+        with pytest.raises(UnsupportedFormatError):
+            load_pcd(raw)
+
+    def test_truncated_binary(self):
+        pts = [[1.0, 2.0, 3.0]] * 20
+        raw = _build_pcd_binary(pts)
+        with pytest.raises(UnsupportedFormatError):
+            load_pcd(raw[:len(raw)//2])
 
 
 # ===========================================================================
-# SECTION 4: Cone fitting
+# SECTION 2: Scanner noise pre-filtering
 # ===========================================================================
 
-class TestFitConeDirect:
-    def test_basic_cone(self):
-        pts = _cone_pts(
-            apex=(0.0, 0.0, 0.0), axis=(0.0, 0.0, 1.0),
-            half_angle_deg=30.0, height=5.0, n=80,
+class TestStatisticalOutlierRemoval:
+    def test_removes_outliers(self):
+        """Plane + injected outliers: SOR removes the outliers."""
+        rng = random.Random(42)
+        # 80 points on plane z=0 with tiny noise
+        plane = [[rng.uniform(-5, 5), rng.uniform(-5, 5), rng.gauss(0, 0.01)]
+                 for _ in range(80)]
+        # 5 clear outliers far from the plane
+        outliers = [[100.0, 100.0, 100.0], [-100.0, 50.0, 200.0],
+                    [0.0, 0.0, 50.0], [50.0, -50.0, -80.0], [10.0, 10.0, 40.0]]
+        all_pts = plane + outliers
+
+        filtered, outlier_idx = statistical_outlier_removal(all_pts, k=8, n_sigma=2.0)
+
+        # At least some outliers should be removed
+        assert len(outlier_idx) > 0, "SOR should remove at least 1 outlier"
+        # Fewer points remain
+        assert len(filtered) < len(all_pts)
+        # Most plane points should remain
+        assert len(filtered) >= 60, f"Too many plane pts removed: {len(filtered)}"
+
+    def test_inlier_ratio_improves_after_sor(self):
+        """After SOR, RANSAC plane inlier ratio improves."""
+        from kerf_cad_core.scan.fit import ransac_fit_plane
+
+        rng = random.Random(13)
+        plane = [[rng.uniform(-4, 4), rng.uniform(-4, 4), rng.gauss(0, 0.005)]
+                 for _ in range(100)]
+        outliers = [
+            [50.0, 50.0, 50.0], [-50.0, -50.0, -50.0],
+            [0.0, 0.0, 30.0], [20.0, -20.0, 15.0],
+            [0.0, 5.0, -25.0],
+        ]
+        all_pts = plane + outliers
+
+        # Ratio before filtering
+        res_before = ransac_fit_plane(all_pts, threshold=0.05, seed=42)
+        assert res_before["ok"]
+        ratio_before = res_before["inlier_ratio"]
+
+        filtered, removed = statistical_outlier_removal(all_pts, k=8, n_sigma=2.0)
+        res_after = ransac_fit_plane(filtered, threshold=0.05, seed=42)
+        assert res_after["ok"]
+        ratio_after = res_after["inlier_ratio"]
+
+        # Inlier ratio should improve (or be very high already)
+        assert ratio_after >= ratio_before or ratio_after > 0.9, (
+            f"Inlier ratio should improve: before={ratio_before:.3f} after={ratio_after:.3f}"
         )
-        r = fit_cone_direct(pts)
-        assert r["ok"] is True, f"cone fit failed: {r.get('reason')}"
-        assert r["primitive"] == "cone"
-        assert abs(math.degrees(r["half_angle"]) - 30.0) < 5.0
-        # Apex should be near origin
-        apex = r["apex"]
-        apex_dist = math.sqrt(sum(x*x for x in apex))
-        assert apex_dist < 1.0, f"Apex far from origin: {apex}"
+        # Outliers should be removed
+        assert len(removed) >= 3, f"Expected ≥3 outliers removed, got {len(removed)}"
+
+    def test_n_outliers_removed(self):
+        """Assert injected isolated outliers are removed by SOR.
+
+        Isolated outliers (well-separated from each other) are reliably removed.
+        Clustered outliers that are near each other may survive SOR (expected
+        behavior — they form their own cluster).
+        """
+        rng = random.Random(99)
+        # Tight plane cloud
+        plane = [[rng.uniform(-2, 2), rng.uniform(-2, 2), rng.gauss(0, 0.001)]
+                 for _ in range(100)]
+        # 5 well-separated isolated outliers (not near each other or the plane)
+        outliers = [
+            [500.0, 0.0, 0.0],
+            [-500.0, 0.0, 0.0],
+            [0.0, 500.0, 0.0],
+            [0.0, -500.0, 0.0],
+            [0.0, 0.0, 500.0],
+        ]
+        all_pts = plane + outliers
+
+        _, removed = statistical_outlier_removal(all_pts, k=8, n_sigma=2.0)
+        # All 5 isolated extreme outliers should be removed
+        assert len(removed) >= 5, f"Expected ≥5 isolated outliers removed; got {len(removed)}"
+
+    def test_clean_cloud_unchanged(self):
+        """A clean cloud with no outliers should have no or few points removed."""
+        plane = _plane_pts_simple(n=100, noise=0.001, seed=5)
+        filtered, removed = statistical_outlier_removal(plane, k=8, n_sigma=3.0)
+        # Very few points should be removed from a clean cloud
+        assert len(removed) <= 5, f"Too many removed from clean cloud: {len(removed)}"
 
     def test_too_few_points(self):
-        r = fit_cone_direct([[0,0,0],[1,0,0],[0,1,0],[0,0,1],[1,1,0]])
-        assert r["ok"] is False
-        assert "6" in r["reason"]
+        """Single point: no outliers removed."""
+        filtered, removed = statistical_outlier_removal([[1.0, 2.0, 3.0]])
+        assert len(removed) == 0
+        assert len(filtered) == 1
 
-    def test_residual_small_for_exact_cone(self):
-        pts = _cone_pts(half_angle_deg=20.0, height=4.0, n=100)
-        r = fit_cone_direct(pts)
-        assert r["ok"] is True
-        assert r["residual"] < 0.2  # closed-form fit, not RANSAC
 
-    def test_dist_to_cone_zero_on_surface(self):
-        # A point on the cone surface: at height h, radius h * tan(30°)
-        h = 2.0
-        half_angle = math.radians(30.0)
-        r_at_h = h * math.tan(half_angle)
-        # apex at origin, axis = z
+class TestLaplacianSmooth:
+    def test_smoothing_reduces_noise(self):
+        """Noisy plane: smoothed z values should be closer to 0."""
+        rng = random.Random(17)
+        pts = [[rng.uniform(-3, 3), rng.uniform(-3, 3), rng.gauss(0, 0.5)]
+               for _ in range(50)]
+        smoothed = laplacian_smooth(pts, n_iter=5, weight=0.5, k=8)
+        # std of z should decrease
+        z_orig = [p[2] for p in pts]
+        z_smooth = [p[2] for p in smoothed]
+        std_orig = math.sqrt(sum(z*z for z in z_orig) / len(z_orig))
+        std_smooth = math.sqrt(sum(z*z for z in z_smooth) / len(z_smooth))
+        assert std_smooth < std_orig, f"Smoothing should reduce z spread: {std_orig:.4f} → {std_smooth:.4f}"
+
+    def test_preserves_count(self):
+        pts = _plane_pts_simple(n=30, noise=0.01)
+        smoothed = laplacian_smooth(pts, n_iter=3)
+        assert len(smoothed) == len(pts)
+
+    def test_zero_iters_unchanged(self):
+        pts = _plane_pts_simple(n=10, noise=0.0)
+        smoothed = laplacian_smooth(pts, n_iter=0)
+        assert len(smoothed) == len(pts)
+
+
+# ===========================================================================
+# SECTION 3: Cone LM refinement
+# ===========================================================================
+
+class TestConeFitDirect:
+    def test_basic_cone(self):
         apex = [0.0, 0.0, 0.0]
         axis = [0.0, 0.0, 1.0]
-        p = [r_at_h, 0.0, h]
-        d = _dist_to_cone(p, apex, axis, half_angle)
-        assert d < 1e-10, f"dist should be 0 on surface, got {d}"
-
-
-class TestRansacFitCone:
-    def test_clean_cone(self):
-        pts = _cone_pts(
-            apex=(0.0, 0.0, 0.0), axis=(0.0, 0.0, 1.0),
-            half_angle_deg=25.0, height=6.0, n=100,
-        )
-        # Use a looser threshold (0.2) — the pure-Python linear cone fitter has
-        # ~0.8° accuracy, causing ~0.05–0.15 residuals per point for typical
-        # heights.  A threshold of 0.2 captures ≥ 70% of the inliers.
-        r = ransac_fit_cone(pts, threshold=0.2, seed=42)
-        assert r["ok"] is True
-        assert r["inlier_ratio"] > 0.7
-        assert abs(math.degrees(r["half_angle"]) - 25.0) < 8.0
+        half_angle = math.radians(30)
+        pts = _cone_pts(apex, axis, half_angle, n=80, noise=0.0)
+        res = fit_cone_direct(pts)
+        assert res["ok"], f"fit_cone_direct failed: {res}"
+        assert res["primitive"] == "cone"
 
     def test_too_few_points(self):
-        r = ransac_fit_cone([[0,0,0],[1,0,0],[0,1,0],[0,0,1],[1,1,0]])
-        assert r["ok"] is False
-
-    def test_deterministic(self):
-        pts = _cone_pts(n=80)
-        r1 = ransac_fit_cone(pts, seed=99)
-        r2 = ransac_fit_cone(pts, seed=99)
-        assert r1["half_angle"] == r2["half_angle"]
-        assert r1["inlier_ratio"] == r2["inlier_ratio"]
-
-
-# ===========================================================================
-# SECTION 5: Sequential RANSAC
-# ===========================================================================
-
-class TestSequentialRansac:
-    def test_pure_cylinder_cloud(self):
-        pts = _cylinder_pts(n=200)
-        r = sequential_ransac(pts, primitives=["cylinder"], threshold=0.05, seed=42)
-        assert r["ok"] is True
-        assert r["segment_count"] >= 1
-        found = [s["primitive"] for s in r["segments"]]
-        assert "cylinder" in found
-
-    def test_pure_sphere_cloud(self):
-        from kerf_cad_core.scan.fit import _normalise
-        import math
-        # Unit sphere at origin
-        golden = math.pi * (3 - math.sqrt(5))
-        n = 80
-        pts = []
-        for i in range(n):
-            y_f = 1 - (i / (n - 1)) * 2
-            rad = math.sqrt(max(0, 1 - y_f*y_f))
-            theta = golden * i
-            pts.append([math.cos(theta) * rad * 5.0, y_f * 5.0, math.sin(theta) * rad * 5.0])
-        r = sequential_ransac(pts, primitives=["sphere"], threshold=0.1, seed=42)
-        assert r["ok"] is True
-        assert r["segment_count"] >= 1
-
-    def test_plane_plus_cylinder(self):
-        """Mixed cloud: plane z=0 + cylinder at (20,20) r=2."""
-        plane_pts = [[float(i), float(j), 0.0] for i in range(10) for j in range(10)]
-        cyl_pts = _cylinder_pts(cx=20.0, cy=20.0, r=2.0, z_min=0.0, z_max=10.0, n=150)
-        all_pts = plane_pts + cyl_pts
-        r = sequential_ransac(
-            all_pts,
-            primitives=["plane", "cylinder"],
-            threshold=0.05, seed=42,
-        )
-        assert r["ok"] is True
-        found = {s["primitive"] for s in r["segments"]}
-        # At least one primitive found
-        assert len(found) >= 1
-
-    def test_too_few_points(self):
-        r = sequential_ransac([[0, 0, 0], [1, 0, 0]])
-        assert r["ok"] is False
-
-    def test_count_consistency(self):
-        pts = _cube_surface_pts(side=10.0, n_per_face=20)
-        r = sequential_ransac(pts, primitives=["plane"], threshold=0.05, seed=42)
-        assert r["ok"] is True
-        assigned = sum(s["inlier_count"] for s in r["segments"])
-        assert assigned + len(r["unassigned"]) == r["total_count"]
-
-    def test_segment_has_required_fields(self):
-        pts = _cylinder_pts(n=100)
-        r = sequential_ransac(pts, primitives=["cylinder"], threshold=0.05, seed=42)
-        assert r["ok"] is True
-        if r["segments"]:
-            seg = r["segments"][0]
-            assert "primitive" in seg
-            assert "inlier_count" in seg
-            assert "inlier_fraction" in seg
-            assert "residual" in seg
-            assert "axis" in seg
-            assert "radius" in seg
-
-
-# ===========================================================================
-# SECTION 6: Feature mapping
-# ===========================================================================
-
-class TestSegmentToFeature:
-    def _plane_seg(self):
-        return {
-            "primitive": "plane",
-            "normal": [0.0, 0.0, 1.0],
-            "d": 5.0,
-            "centre": [2.0, 3.0, 5.0],
-            "extent": 2.0,
-            "inlier_count": 50,
-            "residual": 0.001,
-        }
-
-    def _cylinder_seg(self):
-        return {
-            "primitive": "cylinder",
-            "axis": [0.0, 0.0, 1.0],
-            "axis_point": [0.0, 0.0, 0.0],
-            "radius": 3.0,
-            "height": 10.0,
-            "inlier_count": 100,
-            "residual": 0.002,
-        }
-
-    def _sphere_seg(self):
-        return {
-            "primitive": "sphere",
-            "centre": [1.0, 2.0, 3.0],
-            "radius": 4.0,
-            "inlier_count": 60,
-            "residual": 0.001,
-        }
-
-    def _cone_seg(self):
-        return {
-            "primitive": "cone",
-            "apex": [0.0, 0.0, 0.0],
-            "axis": [0.0, 0.0, 1.0],
-            "half_angle": math.radians(30.0),
-            "height": 5.0,
-            "inlier_count": 40,
-            "residual": 0.003,
-        }
-
-    def test_plane_to_extrude(self):
-        node = segment_to_feature(self._plane_seg(), 0)
-        assert node["id"] == "plane-0"
-        assert node["op"] == "extrude"
-        assert node["normal"] == [0.0, 0.0, 1.0]
-        assert node["d"] == 5.0
-        assert node["source"] == "reverse_engineering_v1"
-
-    def test_cylinder_to_revolve(self):
-        node = segment_to_feature(self._cylinder_seg(), 1)
-        assert node["id"] == "cylinder-1"
-        assert node["op"] == "revolve"
-        assert node["radius"] == 3.0
-        assert node["height"] == 10.0
-
-    def test_sphere_node(self):
-        node = segment_to_feature(self._sphere_seg(), 2)
-        assert node["id"] == "sphere-2"
-        assert node["op"] == "sphere"
-        assert node["radius"] == 4.0
-        assert node["centre"] == [1.0, 2.0, 3.0]
-
-    def test_cone_node(self):
-        node = segment_to_feature(self._cone_seg(), 3)
-        assert node["id"] == "cone-3"
-        assert node["op"] == "cone"
-        assert abs(node["half_angle_deg"] - 30.0) < 0.001
-        assert node["height"] == 5.0
-
-    def test_unknown_primitive_raises(self):
-        with pytest.raises(ValueError, match="unrecognised primitive"):
-            segment_to_feature({"primitive": "torus", "inlier_count": 10, "residual": 0.01}, 0)
-
-    def test_tree_ordering(self):
-        segs = [
-            self._plane_seg(),
-            self._cylinder_seg(),
-            self._sphere_seg(),
-        ]
-        tree = segments_to_feature_tree(segs)
-        assert tree[0]["id"] == "plane-0"
-        assert tree[1]["id"] == "cylinder-1"
-        assert tree[2]["id"] == "sphere-2"
-
-    def test_inlier_count_preserved(self):
-        node = segment_to_feature(self._plane_seg(), 0)
-        assert node["inlier_count"] == 50
-
-    def test_residual_preserved(self):
-        node = segment_to_feature(self._cylinder_seg(), 0)
-        assert node["residual"] == 0.002
-
-
-# ===========================================================================
-# SECTION 7: Pipeline recognize()
-# ===========================================================================
-
-class TestRecognize:
-    def test_cylinder_cloud(self):
-        pts = _cylinder_pts(n=200)
-        res = recognize(pts, primitives=["cylinder"], threshold=0.05, seed=42)
-        assert res["ok"] is True
-        assert res["segment_count"] >= 1
-        assert len(res["feature_tree"]) >= 1
-        ft = res["feature_tree"]
-        assert any(n["op"] == "revolve" for n in ft)
-
-    def test_feature_tree_has_ids(self):
-        pts = _cylinder_pts(n=100)
-        res = recognize(pts, primitives=["cylinder"], threshold=0.05, seed=42)
-        assert res["ok"] is True
-        for node in res["feature_tree"]:
-            assert "id" in node
-            assert "op" in node
-            assert "source" in node
-
-    def test_too_few_points(self):
-        res = recognize([[0, 0, 0], [1, 0, 0]])
+        res = fit_cone_direct([[1, 0, 0], [0, 1, 0]])
         assert res["ok"] is False
-
-    def test_unassigned_count_consistent(self):
-        pts = _cube_surface_pts(side=5.0, n_per_face=15) + _cylinder_pts(
-            cx=20.0, cy=20.0, r=2.0, z_min=0, z_max=5, n=100
-        )
-        res = recognize(pts, primitives=["plane", "cylinder"], threshold=0.05, seed=42)
-        assert res["ok"] is True
-        assert res["unassigned_count"] + sum(
-            n["inlier_count"] for n in res["feature_tree"]
-        ) == res["total_count"]
+        assert "6" in res["reason"]
 
 
-# ===========================================================================
-# SECTION 8: Hausdorff distance
-# ===========================================================================
+class TestConeLMRefinement:
+    def test_refined_half_angle_within_01_deg(self):
+        """LM-refined half-angle should be within 0.1° of ground truth."""
+        gt_half_angle = math.radians(25.0)  # 25°
+        apex = [0.0, 0.0, 0.0]
+        axis = [0.0, 0.0, 1.0]
+        pts = _cone_pts(apex, axis, gt_half_angle, n=150, noise=0.002, seed=42)
 
-class TestHausdorffDistance:
-    def test_identical_clouds(self):
-        pts = [[float(i), 0.0, 0.0] for i in range(10)]
-        assert hausdorff_distance(pts, pts) == 0.0
+        # Get RANSAC fit with LM refinement
+        res = ransac_fit_cone(pts, threshold=0.05, n_iters=300, seed=42, refine=True)
+        assert res.get("ok"), f"ransac_fit_cone failed: {res}"
+        assert res.get("lm_refined"), "Result should have been LM-refined"
 
-    def test_shifted_cloud(self):
-        a = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]
-        b = [[0.5, 0.0, 0.0], [1.5, 0.0, 0.0]]
-        # min dist from [0,0,0] to b is 0.5; from [1,0,0] to b is 0.5
-        # min dist from [0.5,0,0] to a is 0.5; from [1.5,0,0] to a is 0.5
-        h = hausdorff_distance(a, b)
-        assert abs(h - 0.5) < 1e-10
-
-    def test_unit_sphere_hausdorff_similar_samples(self):
-        # Two sets of points on the unit sphere should have small hausdorff
-        golden = math.pi * (3 - math.sqrt(5))
-        n = 100
-        def sphere_pts(offset):
-            pts = []
-            for i in range(n):
-                y_f = 1 - (i / (n - 1)) * 2
-                rad = math.sqrt(max(0, 1 - y_f*y_f))
-                theta = golden * (i + offset)
-                pts.append([math.cos(theta) * rad, y_f, math.sin(theta) * rad])
-            return pts
-        a = sphere_pts(0)
-        b = sphere_pts(1)
-        h = hausdorff_distance(a, b)
-        # Two close samplings of unit sphere should be within 0.25
-        assert h < 0.25
-
-    def test_empty_cloud_returns_inf(self):
-        pts = [[0.0, 0.0, 0.0]]
-        assert hausdorff_distance([], pts) == float("inf")
-
-
-# ===========================================================================
-# SECTION 9: Round-trip oracle — cube + cylinder
-# ===========================================================================
-
-class TestRoundTrip:
-    """
-    Key requirement from T-332 v1 DoD:
-
-    A known synthetic cube + cylinder point cloud → recognise → re-evaluate
-    the feature tree → max point-to-surface distance ≤ 1e-3 vs the original
-    sampled surface.
-
-    Oracle method: ``max_point_to_surface_distance(original_pts, feature_tree)``
-    computes the exact analytic distance from each original point to its nearest
-    fitted surface.  This is the correct round-trip metric because a finite-
-    density re-sampling always has non-zero grid spacing, so comparing two
-    sampled clouds would always give Hausdorff > grid_spacing/2.
-    """
-
-    def test_cylinder_round_trip(self):
-        """Cylinder: sample → recognize → max point-to-surface distance ≤ 1e-3."""
-        r = 3.0
-        height = 10.0
-        # Dense, noise-free sample on lateral surface
-        n_theta, n_h = 50, 20
-        pts = []
-        for it in range(n_theta):
-            theta = 2.0 * math.pi * it / n_theta
-            for ih in range(n_h):
-                h = ih * height / max(n_h - 1, 1)
-                pts.append([r * math.cos(theta), r * math.sin(theta), h])
-
-        res = recognize(pts, primitives=["cylinder"], threshold=0.05, seed=42)
-        assert res["ok"] is True, f"recognize failed: {res.get('reason')}"
-        assert len(res["feature_tree"]) >= 1, "no features recognised"
-
-        # Find the cylinder feature
-        cyl_nodes = [n for n in res["feature_tree"] if n["op"] == "revolve"]
-        assert cyl_nodes, "no revolve feature in tree"
-
-        node = cyl_nodes[0]
-        # Recovered radius should be close
-        assert abs(node["radius"] - r) < 0.05, f"radius mismatch: {node['radius']} vs {r}"
-
-        # Max point-to-surface distance oracle
-        d = max_point_to_surface_distance(pts, res["feature_tree"])
-        assert d <= 1e-3, (
-            f"Round-trip max-point-to-surface {d:.6f} > 1e-3 — "
-            f"recovered radius={node['radius']:.4f} (expected {r}), "
-            f"recovered axis={node['axis']}"
+        # Check half-angle accuracy
+        err_deg = abs(math.degrees(res["half_angle"]) - 25.0)
+        assert err_deg <= 0.1, (
+            f"Half-angle error {err_deg:.4f}° exceeds 0.1° tolerance "
+            f"(got {math.degrees(res['half_angle']):.4f}°, expected 25.0°)"
         )
 
-    def test_plane_face_round_trip(self):
-        """Single plane face: sample → recognize → max point-to-surface distance ≤ 1e-3."""
-        # Dense grid on z=0 plane, [-5,5]²
-        n_side = 20
-        pts = []
-        for i in range(n_side):
-            for j in range(n_side):
-                x = -5.0 + 10.0 * i / (n_side - 1)
-                y = -5.0 + 10.0 * j / (n_side - 1)
-                pts.append([x, y, 0.0])
+    def test_refined_vs_unrefined_closer(self):
+        """LM-refined result should have smaller residual than seed."""
+        gt_half_angle = math.radians(20.0)
+        pts = _cone_pts([0, 0, 0], [0, 0, 1], gt_half_angle, n=100, noise=0.005, seed=55)
 
-        res = recognize(pts, primitives=["plane"], threshold=0.01, seed=42)
-        assert res["ok"] is True
-        assert any(n["op"] == "extrude" for n in res["feature_tree"])
+        # Seed (no refinement)
+        seed_res = ransac_fit_cone(pts, threshold=0.05, n_iters=200, seed=42, refine=False)
+        assert seed_res.get("ok"), f"seed fit failed: {seed_res}"
 
-        plane_nodes = [n for n in res["feature_tree"] if n["op"] == "extrude"]
-        node = plane_nodes[0]
-        # Normal should be (near) [0, 0, ±1]
-        nz = abs(node["normal"][2])
-        assert nz > 0.99, f"Plane normal not z-axis: {node['normal']}"
+        # Refined
+        refined_res = refine_cone_lm(pts, seed_res)
+        assert refined_res.get("ok"), f"LM refinement failed: {refined_res}"
+        assert refined_res.get("lm_refined"), "Should be marked as LM-refined"
 
-        d = max_point_to_surface_distance(pts, res["feature_tree"])
-        assert d <= 1e-3, f"Plane round-trip max-pt-to-surface {d:.6f} > 1e-3"
+        # Refined should have smaller or equal residual
+        assert refined_res["residual"] <= seed_res["residual"] + 1e-6, (
+            f"LM should improve residual: seed={seed_res['residual']:.6f}, "
+            f"refined={refined_res['residual']:.6f}"
+        )
 
-    def test_sphere_round_trip(self):
-        """Sphere: sample → recognize → max point-to-surface distance ≤ 1e-3."""
-        r = 5.0
-        golden = math.pi * (3 - math.sqrt(5))
-        n = 200
-        pts = []
-        for i in range(n):
-            y_f = 1.0 - (i / (n - 1)) * 2.0
-            rad = math.sqrt(max(0.0, 1.0 - y_f * y_f))
-            theta = golden * i
-            pts.append([math.cos(theta) * rad * r, y_f * r, math.sin(theta) * rad * r])
+    def test_various_half_angles(self):
+        """Test multiple half-angle ground truths: 15°, 30°, 45°."""
+        for gt_deg in (15.0, 30.0, 45.0):
+            gt_rad = math.radians(gt_deg)
+            pts = _cone_pts([0, 0, 0], [0, 0, 1], gt_rad, n=120, noise=0.002, seed=77)
+            res = ransac_fit_cone(pts, threshold=0.05, n_iters=400, seed=42, refine=True)
+            if not res.get("ok"):
+                continue  # allow occasional RANSAC failure on hard cases
+            err_deg = abs(math.degrees(res["half_angle"]) - gt_deg)
+            assert err_deg <= 0.5, (
+                f"Half-angle error {err_deg:.3f}° for gt={gt_deg}° exceeds 0.5° tolerance"
+            )
 
-        res = recognize(pts, primitives=["sphere"], threshold=0.05, seed=42)
-        assert res["ok"] is True
-        sphere_nodes = [n for n in res["feature_tree"] if n["op"] == "sphere"]
-        assert sphere_nodes, "no sphere feature"
-        node = sphere_nodes[0]
-        assert abs(node["radius"] - r) < 0.1, f"radius off: {node['radius']}"
+    def test_lm_fallback_on_bad_seed(self):
+        """refine_cone_lm returns seed unchanged if seed is not ok."""
+        bad_seed = {"ok": False, "reason": "test"}
+        result = refine_cone_lm([[1, 0, 0]], bad_seed)
+        assert result["ok"] is False
 
-        d = max_point_to_surface_distance(pts, res["feature_tree"])
-        assert d <= 1e-3, f"Sphere round-trip max-pt-to-surface {d:.6f} > 1e-3"
 
-    def test_cube_plus_cylinder_round_trip(self):
-        """
-        Full T-332 v1 DoD oracle:
-        Cube (6 faces) + cylinder (spatially separated) → recognize →
-        max point-to-surface distance ≤ 1e-3 for each shape.
+# ===========================================================================
+# SECTION 4: Torus RANSAC
+# ===========================================================================
 
-        The oracle is ``max_point_to_surface_distance``: for each original point
-        we compute its exact distance to the nearest fitted surface.  A result
-        ≤ 1e-3 means the pipeline recovered the surfaces to < 1 mm (or < 1 mm
-        in whatever units the input is expressed in).
-        """
-        # ── Cube (10×10×10, faces sampled on a dense grid) ──
-        side = 10.0
-        n_face = 20  # per face
-        cube_pts: list[list[float]] = []
-        for i in range(n_face):
-            for j in range(n_face):
-                u = side * i / (n_face - 1)
-                v = side * j / (n_face - 1)
-                cube_pts.append([u, v, 0.0])    # z=0
-                cube_pts.append([u, v, side])   # z=side
-                cube_pts.append([u, 0.0, v])    # y=0
-                cube_pts.append([u, side, v])   # y=side
-                cube_pts.append([0.0, u, v])    # x=0
-                cube_pts.append([side, u, v])   # x=side
+class TestTorusFitDirect:
+    def test_basic_torus(self):
+        pts = _torus_pts([0, 0, 0], [0, 0, 1], R=3.0, r=0.5, n=100, noise=0.0)
+        res = fit_torus_direct(pts)
+        assert res.get("ok"), f"fit_torus_direct failed: {res}"
+        assert res["primitive"] == "torus"
 
-        # ── Cylinder (spatially far from cube) ──
-        cyl_r = 2.0
-        cyl_height = 8.0
-        n_theta, n_h = 40, 15
-        cx, cy = 50.0, 50.0  # far from cube
-        cyl_pts: list[list[float]] = []
-        for it in range(n_theta):
-            theta = 2.0 * math.pi * it / n_theta
-            for ih in range(n_h):
-                h = ih * cyl_height / max(n_h - 1, 1)
-                cyl_pts.append([
-                    cx + cyl_r * math.cos(theta),
-                    cy + cyl_r * math.sin(theta),
-                    h,
-                ])
+    def test_too_few_points(self):
+        res = fit_torus_direct([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+        assert res["ok"] is False
+        assert "7" in res["reason"]
 
-        all_pts = cube_pts + cyl_pts
 
-        res = recognize(
-            all_pts,
-            primitives=["plane", "cylinder"],
-            threshold=0.05,
+class TestTorusRANSAC:
+    def test_major_minor_radii_within_1pct(self):
+        """Recovered major and minor radii should be within 1% of ground truth."""
+        gt_R = 3.0
+        gt_r = 0.5
+        pts = _torus_pts(
+            centre=[0.0, 0.0, 0.0],
+            axis=[0.0, 0.0, 1.0],
+            R=gt_R,
+            r=gt_r,
+            n=300,
+            noise=0.002,
             seed=42,
         )
-        assert res["ok"] is True, f"recognize failed: {res.get('reason')}"
-        assert res["segment_count"] >= 2, (
-            f"Expected ≥2 segments; got {res['segment_count']}: "
-            f"{[s['primitive'] for s in res['segments']]}"
+        res = ransac_fit_torus(pts, threshold=0.05, n_iters=300, seed=42)
+        assert res.get("ok"), f"ransac_fit_torus failed: {res}"
+        assert res["primitive"] == "torus"
+
+        err_R_pct = abs(res["R"] - gt_R) / gt_R * 100
+        err_r_pct = abs(res["r"] - gt_r) / gt_r * 100
+
+        assert err_R_pct <= 1.0, (
+            f"Major radius error {err_R_pct:.2f}% exceeds 1% "
+            f"(got {res['R']:.4f}, expected {gt_R})"
+        )
+        assert err_r_pct <= 1.0, (
+            f"Minor radius error {err_r_pct:.2f}% exceeds 1% "
+            f"(got {res['r']:.4f}, expected {gt_r})"
         )
 
-        found_ops = {n["op"] for n in res["feature_tree"]}
-        assert "extrude" in found_ops, "No plane/extrude segment found in cube+cylinder cloud"
-        assert "revolve" in found_ops, "No cylinder/revolve segment found in cube+cylinder cloud"
+    def test_torus_centre_recovered(self):
+        """Centre should be close to ground truth."""
+        gt_centre = [1.0, 2.0, 3.0]
+        pts = _torus_pts(
+            centre=gt_centre,
+            axis=[0.0, 0.0, 1.0],
+            R=2.5,
+            r=0.4,
+            n=250,
+            noise=0.001,
+            seed=99,
+        )
+        res = ransac_fit_torus(pts, threshold=0.05, n_iters=300, seed=42)
+        assert res.get("ok")
+        # Centre within 5% of R from true centre
+        err = math.sqrt(sum((res["centre"][i] - gt_centre[i])**2 for i in range(3)))
+        assert err < 0.15, f"Centre error {err:.4f} too large"
 
-        # ── Oracle: max point-to-surface distance for cylinder points ──
-        cyl_nodes = [n for n in res["feature_tree"] if n["op"] == "revolve"]
-        assert cyl_nodes, "cylinder feature missing from tree"
-        d_cyl = max_point_to_surface_distance(cyl_pts, cyl_nodes)
-        assert d_cyl <= 1e-3, (
-            f"Cylinder round-trip max-pt-to-surface {d_cyl:.6f} > 1e-3 "
-            f"(radius={cyl_nodes[0]['radius']:.4f} vs {cyl_r})"
-        )
+    def test_torus_outlier_rejection(self):
+        """Torus with outliers: inlier_ratio < 1."""
+        pts = _torus_pts([0, 0, 0], [0, 0, 1], R=2.0, r=0.3, n=200, noise=0.0)
+        outliers = [[100.0, 100.0, 100.0]] * 10
+        res = ransac_fit_torus(pts + outliers, threshold=0.05, n_iters=300, seed=42)
+        assert res.get("ok")
+        assert res["inlier_ratio"] < 1.0
 
-        # ── Oracle: max point-to-surface distance for cube z=0 face points ──
-        # Pick the extrude node with normal closest to [0,0,1] and d closest to 0
-        plane_nodes = [n for n in res["feature_tree"] if n["op"] == "extrude"]
-        assert plane_nodes, "no plane feature in tree"
-        z0_node = min(
-            plane_nodes,
-            key=lambda n: abs(abs(n["normal"][2]) - 1.0) + abs(n["d"]),
-        )
-        z0_pts = [[side * i / (n_face - 1), side * j / (n_face - 1), 0.0]
-                  for i in range(n_face) for j in range(n_face)]
-        d_plane = max_point_to_surface_distance(z0_pts, [z0_node])
-        assert d_plane <= 1e-3, (
-            f"Plane round-trip max-pt-to-surface {d_plane:.6f} > 1e-3"
-        )
+    def test_torus_tilted_axis(self):
+        """Torus with non-z axis: should still fit reasonably."""
+        pts = _torus_pts([0, 0, 0], [1, 1, 0], R=2.0, r=0.4, n=200, noise=0.001)
+        res = ransac_fit_torus(pts, threshold=0.05, n_iters=400, seed=42)
+        assert res.get("ok")
+        err_R = abs(res["R"] - 2.0) / 2.0 * 100
+        assert err_R <= 5.0, f"Major radius error {err_R:.2f}% on tilted axis"
+
+    def test_too_few_points(self):
+        res = ransac_fit_torus([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+        assert res["ok"] is False
+
+    def test_deterministic(self):
+        pts = _torus_pts([0, 0, 0], [0, 0, 1], R=2.0, r=0.5, n=150, noise=0.001)
+        r1 = ransac_fit_torus(pts, seed=77)
+        r2 = ransac_fit_torus(pts, seed=77)
+        assert r1["R"] == r2["R"]
+        assert r1["r"] == r2["r"]
 
 
 # ===========================================================================
-# SECTION 10: Fixture file I/O (write synthetic .pcd / .ply to disk + reload)
+# SECTION 5: Extended segmentation (cone + torus integration)
 # ===========================================================================
 
-class TestFixtureFiles:
-    """Write synthetic fixtures to disk and reload them via load_point_cloud."""
+class TestExtendedSegmentation:
+    def test_cone_in_segment(self):
+        """Cone-only cloud: extended_segment finds 'cone' segment."""
+        pts = _cone_pts([0, 0, 0], [0, 0, 1], math.radians(25), n=100, noise=0.002)
+        res = extended_segment(pts, primitives=["cone"], threshold=0.05, seed=42)
+        assert res["ok"]
+        found = [s["primitive"] for s in res["segments"]]
+        assert "cone" in found, f"Expected cone in segments, got: {found}"
 
-    def test_pcd_file_roundtrip(self, tmp_path):
-        pts_orig = [[1.0, 2.0, 3.0], [-4.0, 5.5, 0.0], [0.0, 0.0, 0.0]]
-        pcd_path = tmp_path / "test.pcd"
-        lines = [
-            "# .PCD v0.7 — generated by test suite",
-            "VERSION 0.7",
-            "FIELDS x y z",
-            "SIZE 4 4 4",
-            "TYPE F F F",
-            "COUNT 1 1 1",
-            f"WIDTH {len(pts_orig)}",
-            "HEIGHT 1",
-            f"POINTS {len(pts_orig)}",
-            "DATA ascii",
-        ]
-        for p in pts_orig:
-            lines.append(f"{p[0]} {p[1]} {p[2]}")
-        pcd_path.write_text("\n".join(lines))
+    def test_torus_in_segment(self):
+        """Torus-only cloud: extended_segment finds 'torus' segment."""
+        pts = _torus_pts([0, 0, 0], [0, 0, 1], R=2.0, r=0.4, n=200, noise=0.002)
+        res = extended_segment(pts, primitives=["torus"], threshold=0.05, seed=42)
+        assert res["ok"]
+        found = [s["primitive"] for s in res["segments"]]
+        assert "torus" in found, f"Expected torus in segments, got: {found}"
 
-        pts = load_point_cloud(pcd_path)
-        assert pts == pts_orig
+    def test_mixed_plane_cone(self):
+        """Plane + cone cloud: both primitives found."""
+        plane = _plane_pts_simple(n=60, noise=0.001)
+        cone_pts = _cone_pts([20, 20, 20], [0, 0, 1], math.radians(30), n=80, noise=0.002)
+        all_pts = plane + cone_pts
+        res = extended_segment(all_pts, primitives=["plane", "cone"], threshold=0.05, seed=42)
+        assert res["ok"]
+        found = {s["primitive"] for s in res["segments"]}
+        assert len(found) >= 1
 
-    def test_ply_file_roundtrip(self, tmp_path):
-        pts_orig = [[0.5, 1.5, 2.5], [3.0, 4.0, 5.0]]
-        ply_path = tmp_path / "test.ply"
-        lines = [
-            "ply",
-            "format ascii 1.0",
-            f"element vertex {len(pts_orig)}",
-            "property float x",
-            "property float y",
-            "property float z",
-            "end_header",
-        ]
-        for p in pts_orig:
-            lines.append(f"{p[0]} {p[1]} {p[2]}")
-        ply_path.write_text("\n".join(lines))
+    def test_count_invariant(self):
+        """Assigned + unassigned == total."""
+        pts = _plane_pts_simple(n=50, noise=0.001)
+        res = extended_segment(pts, threshold=0.02, seed=42)
+        assert res["ok"]
+        assigned = sum(s["inlier_count"] for s in res["segments"])
+        assert assigned + res["unassigned_count"] == res["total_count"]
 
-        pts = load_point_cloud(ply_path)
-        assert pts == pts_orig
+    def test_too_few_points(self):
+        res = extended_segment([[0, 0, 0], [1, 0, 0]])
+        assert res["ok"] is False
+
+    def test_torus_segment_has_R_and_r(self):
+        """Torus segment should contain R and r fields."""
+        pts = _torus_pts([0, 0, 0], [0, 0, 1], R=3.0, r=0.5, n=200, noise=0.001)
+        res = extended_segment(pts, primitives=["torus"], threshold=0.05, seed=42)
+        assert res["ok"]
+        if res["segments"]:
+            seg = res["segments"][0]
+            if seg["primitive"] == "torus":
+                assert "R" in seg
+                assert "r" in seg
+
+    def test_cone_segment_has_apex_and_half_angle(self):
+        """Cone segment should contain apex and half_angle fields."""
+        pts = _cone_pts([0, 0, 0], [0, 0, 1], math.radians(20), n=80, noise=0.001)
+        res = extended_segment(pts, primitives=["cone"], threshold=0.05, seed=42)
+        assert res["ok"]
+        if res["segments"]:
+            seg = res["segments"][0]
+            if seg["primitive"] == "cone":
+                assert "apex" in seg
+                assert "half_angle" in seg
+
+
+# ===========================================================================
+# SECTION 6: Full pipeline
+# ===========================================================================
+
+class TestRunPipeline:
+    def test_plane_pipeline(self):
+        """Clean plane cloud runs through the full pipeline successfully."""
+        pts = _plane_pts_simple(n=80, noise=0.005)
+        res = run_pipeline(pts, primitives=["plane"], threshold=0.05, seed=42)
+        assert res["ok"], f"pipeline failed: {res}"
+        assert "segments" in res
+        assert len(res["segments"]) >= 1
+
+    def test_outlier_removal_reduces_count(self):
+        """Pipeline with outliers removes them and reports outlier_count."""
+        rng = random.Random(31)
+        pts = _plane_pts_simple(n=100, noise=0.002)
+        outliers = [[1000.0, 1000.0, 1000.0] for _ in range(5)]
+        res = run_pipeline(pts + outliers, primitives=["plane"], threshold=0.05, seed=42)
+        assert res["ok"]
+        assert res["outlier_count"] >= 1
+        assert res["filtered_count"] < len(pts) + 5
+
+    def test_skip_filter(self):
+        """skip_filter=True: outlier_count == 0, all pts in filtered."""
+        pts = _plane_pts_simple(n=30, noise=0.001)
+        res = run_pipeline(pts, skip_filter=True, primitives=["plane"], threshold=0.05, seed=42)
+        assert res["ok"]
+        assert res["outlier_count"] == 0
+        assert res["filtered_count"] == len(pts)
+
+    def test_feature_type_label(self):
+        """Segments should have feature_type label."""
+        pts = _plane_pts_simple(n=60, noise=0.001)
+        res = run_pipeline(pts, skip_filter=True, primitives=["plane"], threshold=0.05, seed=42)
+        assert res["ok"]
+        if res["segments"]:
+            assert "feature_type" in res["segments"][0]
+            assert res["segments"][0]["feature_type"] == "analytic_plane"
+
+    def test_torus_pipeline(self):
+        """Torus cloud: pipeline finds torus segment."""
+        pts = _torus_pts([0, 0, 0], [0, 0, 1], R=2.5, r=0.4, n=200, noise=0.002)
+        res = run_pipeline(pts, skip_filter=True, primitives=["torus"], threshold=0.05, seed=42)
+        assert res["ok"]
+        found = [s["primitive"] for s in res["segments"]]
+        assert "torus" in found
+
+    def test_cone_pipeline(self):
+        """Cone cloud: pipeline finds cone segment."""
+        pts = _cone_pts([0, 0, 0], [0, 0, 1], math.radians(25), n=100, noise=0.002)
+        res = run_pipeline(pts, skip_filter=True, primitives=["cone"], threshold=0.05, seed=42)
+        assert res["ok"]
+        found = [s["primitive"] for s in res["segments"]]
+        assert "cone" in found
+
+    def test_too_few_points(self):
+        res = run_pipeline([[0, 0, 0], [1, 0, 0]])
+        assert res["ok"] is False

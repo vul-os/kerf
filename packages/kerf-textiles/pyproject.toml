@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kerf-textiles"
+version = "0.1.0"
+license = { text = "MIT" }
+classifiers = ["License :: OSI Approved :: MIT License"]
+description = "Textile weave + knit pattern generators for Kerf — plain weave, twill, satin, jacquard, jersey, rib, interlock"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "pydantic",
+]
+
+[project.entry-points."kerf.plugins"]
+textiles = "kerf_textiles.plugin:register"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kerf_textiles"]

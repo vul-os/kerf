@@ -1,0 +1,94 @@
+"""
+kerf_textiles
+=============
+Textile weave + knit pattern generators for Kerf.
+
+Supported structures
+--------------------
+Weave: plain, twill (N/M, RH/LH), satin, jacquard-from-draft
+Knit:  jersey, rib, interlock, custom stitch notation
+
+Quick start::
+
+    from kerf_textiles.weave import plain_weave, twill_weave, satin_weave
+    from kerf_textiles.knit import jersey_knit, rib_knit, interlock_knit
+    from kerf_textiles.draft import canonical_twill_draft, draft_to_dict, draft_from_dict
+    from kerf_textiles.export import weave_to_svg, draft_to_wif, draft_from_wif
+
+    pw = plain_weave()
+    tw = twill_weave(over=2, under=1, direction="RH")
+    sat = satin_weave(shafts=5, move=2)
+
+    jk = jersey_knit(needles=20, courses=20, gauge=5.0, courses_per_cm=7.0)
+    assert jk.density_stats["density_within_1pct"]
+
+    d = canonical_twill_draft(over=2, under=1)
+    d.validate()
+    wif = draft_to_wif(d)
+    d2 = draft_from_wif(wif)
+    assert d2.threading == d.threading
+"""
+
+__version__ = "0.1.0"
+
+from kerf_textiles.weave import (
+    plain_weave,
+    twill_weave,
+    satin_weave,
+    jacquard_from_draft,
+    WeaveResult,
+)
+from kerf_textiles.knit import (
+    jersey_knit,
+    rib_knit,
+    interlock_knit,
+    custom_knit,
+    KnitResult,
+)
+from kerf_textiles.draft import (
+    Draft,
+    draft_to_dict,
+    draft_from_dict,
+    canonical_plain_draft,
+    canonical_twill_draft,
+    canonical_satin_draft,
+)
+from kerf_textiles.export import (
+    weave_to_svg,
+    knit_to_svg,
+    draft_to_wif,
+    draft_from_wif,
+    matrix_to_csv,
+    weave_to_json,
+    knit_to_json,
+)
+
+__all__ = [
+    # weave
+    "plain_weave",
+    "twill_weave",
+    "satin_weave",
+    "jacquard_from_draft",
+    "WeaveResult",
+    # knit
+    "jersey_knit",
+    "rib_knit",
+    "interlock_knit",
+    "custom_knit",
+    "KnitResult",
+    # draft
+    "Draft",
+    "draft_to_dict",
+    "draft_from_dict",
+    "canonical_plain_draft",
+    "canonical_twill_draft",
+    "canonical_satin_draft",
+    # export
+    "weave_to_svg",
+    "knit_to_svg",
+    "draft_to_wif",
+    "draft_from_wif",
+    "matrix_to_csv",
+    "weave_to_json",
+    "knit_to_json",
+]

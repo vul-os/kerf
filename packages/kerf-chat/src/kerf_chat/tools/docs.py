@@ -71,6 +71,19 @@ async def run_search_kerf_docs(ctx: ProjectCtx, args: bytes) -> str:
 
 _doc_corpus_cache = None
 
+# Extra llm_docs directories contributed by other packages.
+# Each entry is (dir_path, url_prefix). Files are discovered with rglob("*.md")
+# so subdirectories (e.g. protocols/) are included automatically.
+_EXTRA_DOCS_DIRS: list[tuple[Path, str]] = []
+
+try:
+    import kerf_firmware as _kf
+    _fw_docs = Path(_kf.__file__).resolve().parent.parent.parent / "llm_docs"
+    if _fw_docs.is_dir():
+        _EXTRA_DOCS_DIRS.append((_fw_docs, "/docs/firmware"))
+except ImportError:
+    pass
+
 
 def doc_corpus() -> dict:
     global _doc_corpus_cache
@@ -92,6 +105,26 @@ def doc_corpus() -> dict:
                 "header_lower": headers.lower(),
                 "body_lower": body.lower(),
             }
+
+    # Index extra docs dirs (e.g. kerf-firmware/llm_docs/) including subdirectories.
+    for extra_dir, url_prefix in _EXTRA_DOCS_DIRS:
+        if not extra_dir.is_dir():
+            continue
+        for path in sorted(extra_dir.rglob("*.md")):
+            rel = path.relative_to(extra_dir)
+            key = f"{url_prefix}/{rel.as_posix()}"
+            body = path.read_text(encoding="utf-8")
+            h1 = _H1_RE.search(body)
+            title = h1.group(1).strip() if h1 else path.stem
+            headers = " ".join(m.group(1) for m in _HEADER_RE.finditer(body))
+            out[key] = {
+                "title": title,
+                "body": body,
+                "title_lower": title.lower(),
+                "header_lower": headers.lower(),
+                "body_lower": body.lower(),
+            }
+
     _doc_corpus_cache = out
     return _doc_corpus_cache
 

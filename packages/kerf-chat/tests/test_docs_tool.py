@@ -41,10 +41,12 @@ def test_corpus_non_empty():
     assert len(corpus) > 0, "doc corpus should have at least one page"
 
 
-def test_corpus_keys_use_docs_llm_prefix():
+def test_corpus_keys_use_docs_prefix():
+    # Keys must start with /docs/ — the exact sub-prefix depends on which plugin
+    # contributed the page (/docs/llm/ for kerf-chat, /docs/firmware/ for kerf-firmware).
     corpus = doc_corpus()
     for key in corpus:
-        assert key.startswith("/docs/llm/"), f"unexpected key format: {key}"
+        assert key.startswith("/docs/"), f"unexpected key format: {key}"
 
 
 def test_corpus_page_has_required_fields():

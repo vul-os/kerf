@@ -116,9 +116,11 @@ from kerf_cad_core.geom.trim_curve import (
     shrink,
 )
 # GK-35: energy-minimising, knot-preserving curve fairing
+# GK-65: curvature comb / porcupine numeric export
 from kerf_cad_core.geom.curve_toolkit import (
     fair_curve,
     curvature_variance,
+    curvature_comb,
 )
 # GK-11: curve-curve intersection hardening
 from kerf_cad_core.geom.intersection import (
@@ -141,7 +143,8 @@ from kerf_cad_core.geom.io.iges import (
 from kerf_cad_core.geom.surface_fillet import variable_radius_fillet_g1
 from kerf_cad_core.geom.surface_analysis import hausdorff_deviation, zebra_stripe, zebra_stripe_continuity_analyser
 # GK-63: deviation-driven adaptive surface refinement
-from kerf_cad_core.geom.surface_analysis import adaptive_refine_surface
+# GK-65: isocurve curvature comb
+from kerf_cad_core.geom.surface_analysis import adaptive_refine_surface, isocurve_curvature_comb
 # GK-47: STEP reader
 from kerf_cad_core.geom.io.step_read import read_step, StepReadError
 # GK-48: STEP writer
@@ -237,6 +240,7 @@ __all__ = [
     "shrink",
     "fair_curve",
     "curvature_variance",
+    "curvature_comb",
     # GK-11
     "curve_curve_intersect",
     "curve_surface_intersect",
@@ -255,6 +259,8 @@ __all__ = [
     "hausdorff_deviation","zebra_stripe","zebra_stripe_continuity_analyser",
     # GK-63
     "adaptive_refine_surface",
+    # GK-65
+    "isocurve_curvature_comb",
     "read_step","StepReadError",
     "write_step","StepWriteError",
     # GK-23

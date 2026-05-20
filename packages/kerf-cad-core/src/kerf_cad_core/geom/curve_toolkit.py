@@ -1241,6 +1241,127 @@ def interpolate_arc_chain(
 
 
 # ---------------------------------------------------------------------------
+# curvature_comb  (GK-65)
+# ---------------------------------------------------------------------------
+
+def curvature_comb(
+    curve: NurbsCurve,
+    num_samples: int = 50,
+    scale: float = 1.0,
+) -> dict:
+    """Sample curvature κ along a curve and emit comb (porcupine) vectors.
+
+    For each sample parameter u_i the function computes:
+      - The curve point  P(u_i)
+      - The unit normal  N(u_i)  (curvature normal in the osculating plane)
+      - The scalar curvature  κ(u_i) = |C'×C''| / |C'|³
+      - The comb spine point and the comb tip  P(u_i) + κ(u_i)·scale·N(u_i)
+
+    The curvature normal is obtained from the standard formula:
+        N_curv = (|C'|² C'' - (C'·C'') C') / |C'×C''|
+    which is the *signed* unit vector pointing toward the centre of curvature.
+    When κ = 0 (straight segment) the normal is set to the zero vector.
+
+    Parameters
+    ----------
+    curve      : NurbsCurve to analyse
+    num_samples: number of equally-spaced parameter samples (default 50)
+    scale      : multiplicative scale applied to κ for the comb tip offset
+                 (default 1.0; increase for visualisation)
+
+    Returns
+    -------
+    dict with keys:
+        ok         : bool
+        parameters : list[float]         parameter values u_i
+        points     : list[list[float]]   curve positions P(u_i)
+        kappas     : list[float]         scalar curvatures κ(u_i)
+        normals    : list[list[float]]   unit curvature normals N(u_i)
+        tips       : list[list[float]]   comb tips P(u_i) + κ·scale·N(u_i)
+        reason     : str                 set on error
+
+    Oracle guarantee
+    ----------------
+    For a circle of radius r, every κ(u_i) equals 1/r to within 1e-9.
+    """
+    from kerf_cad_core.geom.nurbs import curve_derivative
+
+    try:
+        u0 = float(curve.knots[curve.degree])
+        u1 = float(curve.knots[-(curve.degree + 1)])
+        n = max(2, int(num_samples))
+        us = np.linspace(u0, u1, n)
+
+        parameters: List[float] = []
+        points: List[List[float]] = []
+        kappas: List[float] = []
+        normals: List[List[float]] = []
+        tips: List[List[float]] = []
+
+        for u in us:
+            uf = float(u)
+            d1 = curve_derivative(curve, uf, order=1)
+            d2 = curve_derivative(curve, uf, order=2)
+
+            # Embed in 3-D for cross-product
+            dim = len(d1)
+            d1_3 = np.zeros(3)
+            d2_3 = np.zeros(3)
+            d1_3[:min(dim, 3)] = d1[:min(dim, 3)]
+            d2_3[:min(dim, 3)] = d2[:min(dim, 3)]
+
+            speed = float(np.linalg.norm(d1_3))
+            cross_vec = np.cross(d1_3, d2_3)
+            cross_mag = float(np.linalg.norm(cross_vec))
+
+            if speed < 1e-14:
+                kappa = 0.0
+                n_vec = np.zeros(dim)
+            else:
+                kappa = cross_mag / (speed ** 3)
+                # Curvature normal: component of C'' perpendicular to C'
+                # = (|C'|² C'' - (C'·C'') C') / (|C'|² * kappa * |C'|)
+                # Simplified: N = (C'' - (C''·T)T) / |C'' - (C''·T)T|  where T=C'/|C'|
+                t_unit = d1_3 / speed
+                d2_perp = d2_3 - float(np.dot(d2_3, t_unit)) * t_unit
+                d2_perp_mag = float(np.linalg.norm(d2_perp))
+                if d2_perp_mag < 1e-14:
+                    n_vec = np.zeros(dim)
+                else:
+                    n_unit_3d = d2_perp / d2_perp_mag
+                    n_vec = n_unit_3d[:dim]
+
+            pt = de_boor(curve, uf)
+            tip = pt + kappa * float(scale) * (n_vec if dim == len(pt) else np.zeros(len(pt)))
+
+            parameters.append(uf)
+            points.append(pt.tolist())
+            kappas.append(kappa)
+            normals.append(n_vec.tolist())
+            tips.append(tip.tolist())
+
+        return {
+            "ok": True,
+            "parameters": parameters,
+            "points": points,
+            "kappas": kappas,
+            "normals": normals,
+            "tips": tips,
+            "reason": "",
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "parameters": [],
+            "points": [],
+            "kappas": [],
+            "normals": [],
+            "tips": [],
+            "reason": str(exc),
+        }
+
+
+# ---------------------------------------------------------------------------
 # LLM tool registration
 # ---------------------------------------------------------------------------
 

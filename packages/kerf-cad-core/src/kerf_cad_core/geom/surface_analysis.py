@@ -2976,3 +2976,141 @@ def adaptive_refine_surface(
         "num_ctrl_v": current.num_control_points_v,
         "iterations": iterations,
     }
+
+
+# ---------------------------------------------------------------------------
+# isocurve_curvature_comb  (GK-65)
+# ---------------------------------------------------------------------------
+
+def isocurve_curvature_comb(
+    surface: NurbsSurface,
+    parameter: float,
+    direction: str = "u",
+    num_samples: int = 50,
+    scale: float = 1.0,
+) -> dict:
+    """Sample curvature κ along a surface isocurve and emit comb (porcupine) vectors.
+
+    Extracts the isocurve at the given fixed parameter, then computes the
+    curvature comb by finite-differencing the polyline to obtain first and
+    second derivatives, and applies the standard curvature formula.
+
+    Parameters
+    ----------
+    surface    : NurbsSurface
+    parameter  : fixed u (or v) parameter value
+    direction  : 'u' (fix u, vary v) or 'v' (fix v, vary u)
+    num_samples: number of sample points along the isocurve (default 50)
+    scale      : multiplicative scale applied to κ for the comb tip offset
+
+    Returns
+    -------
+    dict with keys:
+        ok         : bool
+        parameters : list[float]         varying parameter values
+        points     : list[list[float]]   isocurve positions
+        kappas     : list[float]         scalar curvatures κ
+        normals    : list[list[float]]   unit curvature normals
+        tips       : list[list[float]]   comb tips = point + κ·scale·normal
+        reason     : str
+
+    The curvature is computed analytically from surface derivatives, using the
+    standard formula κ = |C'×C''| / |C'|³ applied along the isocurve.
+    """
+    try:
+        from kerf_cad_core.geom.nurbs import surface_derivatives as _srf_ders
+
+        if not isinstance(surface, NurbsSurface):
+            return {
+                "ok": False,
+                "parameters": [], "points": [], "kappas": [],
+                "normals": [], "tips": [],
+                "reason": f"expected NurbsSurface, got {type(surface).__name__}",
+            }
+        if direction not in ("u", "v"):
+            return {
+                "ok": False,
+                "parameters": [], "points": [], "kappas": [],
+                "normals": [], "tips": [],
+                "reason": "direction must be 'u' or 'v'",
+            }
+
+        ns = max(2, int(num_samples))
+        u_min = float(surface.knots_u[0])
+        u_max = float(surface.knots_u[-1])
+        v_min = float(surface.knots_v[0])
+        v_max = float(surface.knots_v[-1])
+
+        if direction == "u":
+            fixed = float(np.clip(parameter, u_min, u_max))
+            varying_arr = np.linspace(v_min, v_max, ns)
+            # Along isocurve: varying parameter is v, fixed is u
+            # d/dv: SKL[0,1] = dS/dv,  d²/dv²: SKL[0,2] = d²S/dv²
+            def _d1_d2(t: float):
+                SKL = _srf_ders(surface, fixed, t, d=2)
+                return SKL[0, 1][:3].copy(), SKL[0, 2][:3].copy()
+            def _pt(t: float):
+                return _eval_surface(surface, fixed, t)[:3]
+        else:
+            fixed = float(np.clip(parameter, v_min, v_max))
+            varying_arr = np.linspace(u_min, u_max, ns)
+            # Along isocurve: varying parameter is u, fixed is v
+            # d/du: SKL[1,0] = dS/du,  d²/du²: SKL[2,0] = d²S/du²
+            def _d1_d2(t: float):
+                SKL = _srf_ders(surface, t, fixed, d=2)
+                return SKL[1, 0][:3].copy(), SKL[2, 0][:3].copy()
+            def _pt(t: float):
+                return _eval_surface(surface, t, fixed)[:3]
+
+        parameters_out: List[float] = []
+        points_out: List[List[float]] = []
+        kappas_out: List[float] = []
+        normals_out: List[List[float]] = []
+        tips_out: List[List[float]] = []
+
+        for t in varying_arr:
+            tf = float(t)
+            d1, d2 = _d1_d2(tf)
+            pt = _pt(tf)
+
+            speed = float(np.linalg.norm(d1))
+            cross_vec = np.cross(d1, d2)
+            cross_mag = float(np.linalg.norm(cross_vec))
+
+            if speed < 1e-14:
+                kappa = 0.0
+                n_vec = np.zeros(3)
+            else:
+                kappa = cross_mag / (speed ** 3)
+                t_unit = d1 / speed
+                d2_perp = d2 - float(np.dot(d2, t_unit)) * t_unit
+                d2_perp_mag = float(np.linalg.norm(d2_perp))
+                if d2_perp_mag < 1e-14:
+                    n_vec = np.zeros(3)
+                else:
+                    n_vec = d2_perp / d2_perp_mag
+
+            tip = pt + kappa * float(scale) * n_vec
+
+            parameters_out.append(tf)
+            points_out.append(pt.tolist())
+            kappas_out.append(kappa)
+            normals_out.append(n_vec.tolist())
+            tips_out.append(tip.tolist())
+
+        return {
+            "ok": True,
+            "parameters": parameters_out,
+            "points": points_out,
+            "kappas": kappas_out,
+            "normals": normals_out,
+            "tips": tips_out,
+            "reason": "",
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "parameters": [], "points": [], "kappas": [],
+            "normals": [], "tips": [],
+            "reason": str(exc),
+        }

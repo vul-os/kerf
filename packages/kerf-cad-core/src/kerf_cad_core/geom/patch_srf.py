@@ -747,6 +747,312 @@ def surface_from_grid(
 
 
 # ---------------------------------------------------------------------------
+# fit_surface  (GK-34)
+# ---------------------------------------------------------------------------
+
+def _pt_knots_surface(ts: np.ndarray, num_ctrl: int, degree: int) -> np.ndarray:
+    """Piegl–Tiller knot placement for the least-squares surface fitting case.
+
+    Mirror of curve_toolkit._pt_knots_from_params: given m+1 data parameters
+    ts[0..m] (chord-length, in [0,1]) and n+1 = num_ctrl control points,
+    uses P&T eq. 9.68 to place the n−p interior knots.
+    """
+    m = len(ts) - 1
+    n = num_ctrl - 1
+    p = degree
+    knots = np.zeros(n + p + 2)
+    knots[-(p + 1):] = 1.0
+    num_interior = n - p
+    if num_interior <= 0:
+        return knots
+    d = (m + 1) / (n - p + 1)
+    for j in range(1, num_interior + 1):
+        idx = int(j * d)
+        alpha = j * d - idx
+        idx = max(1, min(idx, m))
+        knots[p + j] = (1.0 - alpha) * ts[idx - 1] + alpha * ts[idx]
+    # Ensure monotonicity
+    for k in range(p + 1, len(knots) - p - 1):
+        knots[k] = max(knots[k], knots[k - 1])
+    return knots
+
+
+def _chord_params_2d(pts_grid: np.ndarray) -> tuple:
+    """Compute averaged chord-length parameters for an (m,n,3) point grid.
+
+    Returns (u_params, v_params) each of shape (m,) and (n,) respectively,
+    averaged across the grid rows/columns as per Piegl–Tiller §9.3.6.
+    """
+    m, n, _ = pts_grid.shape
+
+    # U-direction: average across the n columns
+    u_all = []
+    for j in range(n):
+        col = pts_grid[:, j, :3]
+        dists = np.linalg.norm(np.diff(col, axis=0), axis=1) ** 0.5
+        dists = np.maximum(dists, 1e-15)
+        total = dists.sum()
+        if total < 1e-14:
+            u_col = np.linspace(0.0, 1.0, m)
+        else:
+            u_col = np.concatenate([[0.0], np.cumsum(dists)]) / dists.sum()
+            u_col = np.concatenate([[0.0], np.cumsum(np.linalg.norm(
+                np.diff(col, axis=0), axis=1) ** 0.5)])
+            u_col /= max(u_col[-1], 1e-15)
+        u_all.append(u_col)
+    u_params = np.mean(u_all, axis=0)
+    u_params[0] = 0.0
+    u_params[-1] = 1.0
+
+    # V-direction: average across the m rows
+    v_all = []
+    for i in range(m):
+        row = pts_grid[i, :, :3]
+        dists = np.linalg.norm(np.diff(row, axis=0), axis=1) ** 0.5
+        dists = np.maximum(dists, 1e-15)
+        v_row = np.concatenate([[0.0], np.cumsum(dists)])
+        v_row /= max(v_row[-1], 1e-15)
+        v_all.append(v_row)
+    v_params = np.mean(v_all, axis=0)
+    v_params[0] = 0.0
+    v_params[-1] = 1.0
+
+    return u_params, v_params
+
+
+def _build_basis_matrix(params: np.ndarray, knots: np.ndarray,
+                        num_ctrl: int, degree: int) -> np.ndarray:
+    """Build least-squares collocation matrix B of shape (len(params), num_ctrl).
+
+    Row i contains the B-spline basis values N_{0,p}(t_i)...N_{n,p}(t_i).
+    """
+    m = len(params)
+    B = np.zeros((m, num_ctrl))
+    for row_i, t in enumerate(params):
+        t_c = float(np.clip(t, 0.0, 1.0))
+        span = _find_span(num_ctrl - 1, degree, t_c, knots)
+        Nvals = _basis_fns(span, t_c, degree, knots)
+        for k in range(degree + 1):
+            col = span - degree + k
+            if 0 <= col < num_ctrl:
+                B[row_i, col] = Nvals[k]
+    return B
+
+
+def _ls_solve(A: np.ndarray, rhs: np.ndarray) -> np.ndarray:
+    """Least-squares solve A @ x = rhs (multiple columns)."""
+    x, _, _, _ = np.linalg.lstsq(A, rhs, rcond=None)
+    return x
+
+
+def fit_surface(
+    points_grid: Sequence,
+    *,
+    degree_u: int = 3,
+    degree_v: int = 3,
+    tol: float = 1e-3,
+    max_ctrl_u: int = 32,
+    max_ctrl_v: int = 32,
+) -> dict:
+    """Least-squares NURBS surface fit to an ordered (m×n) point grid.
+
+    Mirrors the ``fit_curve`` strategy from ``geom/curve_toolkit.py`` (GK-22)
+    extended to surfaces.  Computes centripetal chord-length parameters in
+    both U and V, then uses Piegl–Tiller knot placement (P&T §9.4.1, eq. 9.68)
+    to build the B-spline least-squares system.
+
+    Control-point count is increased from ``degree+1`` in each direction,
+    independently, until ``max_deviation ≤ tol`` or ``max_ctrl`` is reached.
+    The U refinement loop runs first; then V is refined holding U fixed.
+
+    Parameters
+    ----------
+    points_grid : array-like, shape (m, n, 3)
+        Ordered m×n grid of 3D data points.  m ≥ degree_u+1, n ≥ degree_v+1.
+    degree_u, degree_v : int
+        B-spline degree in U and V (1–5).
+    tol : float
+        Target max deviation (Euclidean, same units as input points).
+    max_ctrl_u, max_ctrl_v : int
+        Maximum number of control points per direction.  Fitting stops here
+        even if tol is not achieved; the best-effort surface is returned
+        with ok=False.
+
+    Returns
+    -------
+    dict with keys:
+        ok             : bool
+        reason         : str   (non-empty when ok is False)
+        surface        : NurbsSurface (always present when valid input given)
+        max_deviation  : float
+        smoothing_energy : float  (always 0.0 — no regularisation)
+        num_ctrl_u     : int   (final CP count in U)
+        num_ctrl_v     : int   (final CP count in V)
+    """
+    # ── Input validation ──────────────────────────────────────────────────────
+    try:
+        pg = np.asarray(points_grid, dtype=float)
+    except Exception as exc:
+        return _err(f"invalid points_grid: {exc}")
+
+    if pg.ndim != 3 or pg.shape[2] < 3:
+        return _err(
+            f"points_grid must be shape (m, n, 3+); got {pg.shape}"
+        )
+
+    m, n, _ = pg.shape
+    degree_u = max(1, min(int(degree_u), 5))
+    degree_v = max(1, min(int(degree_v), 5))
+
+    if m < degree_u + 1:
+        return _err(
+            f"points_grid needs at least {degree_u + 1} rows for degree_u={degree_u}; got {m}"
+        )
+    if n < degree_v + 1:
+        return _err(
+            f"points_grid needs at least {degree_v + 1} cols for degree_v={degree_v}; got {n}"
+        )
+
+    max_ctrl_u = max(degree_u + 1, int(max_ctrl_u))
+    max_ctrl_v = max(degree_v + 1, int(max_ctrl_v))
+    if not (isinstance(tol, (int, float)) and tol > 0):
+        return _err(f"tol must be a positive number; got {tol!r}")
+
+    # ── Chord-length parameters ───────────────────────────────────────────────
+    u_params, v_params = _chord_params_2d(pg[:, :, :3])
+
+    # ── Helper: fit one axis (U or V) by least squares, return ctrl net ───────
+    def _fit_axis_u(nu_c: int) -> np.ndarray:
+        """Fit along U for each of the n V-columns.  Returns (nu_c, n, 3)."""
+        knots_u = _pt_knots_surface(u_params, nu_c, degree_u)
+        Bu = _build_basis_matrix(u_params, knots_u, nu_c, degree_u)
+        ctrl = np.zeros((nu_c, n, 3))
+        for j in range(n):
+            ctrl[:, j, :] = _ls_solve(Bu, pg[:, j, :3])
+        return ctrl, knots_u
+
+    def _fit_axis_v(ctrl_in: np.ndarray, nv_c: int) -> np.ndarray:
+        """Fit along V for each of the nu_c U-rows.  Returns (nu_c, nv_c, 3)."""
+        nu_c = ctrl_in.shape[0]
+        knots_v = _pt_knots_surface(v_params, nv_c, degree_v)
+        Bv = _build_basis_matrix(v_params, knots_v, nv_c, degree_v)
+        ctrl = np.zeros((nu_c, nv_c, 3))
+        for i in range(nu_c):
+            ctrl[i, :, :] = _ls_solve(Bv, ctrl_in[i, :, :3])
+        return ctrl, knots_v
+
+    def _max_dev(surface: NurbsSurface) -> float:
+        """Max deviation at every data-grid parameter node."""
+        max_d = 0.0
+        for i, u in enumerate(u_params):
+            for j, v in enumerate(v_params):
+                pt = _surf_eval(surface, float(u), float(v))
+                d = float(np.linalg.norm(pt - pg[i, j, :3]))
+                if d > max_d:
+                    max_d = d
+        return max_d
+
+    # ── Phase 1: refine U, hold V at its minimum ──────────────────────────────
+    best_surf = None
+    best_dev = float("inf")
+    best_nu = degree_u + 1
+    best_nv = degree_v + 1
+
+    for nu_c in range(degree_u + 1, min(max_ctrl_u + 1, m + 1)):
+        ctrl_u, knots_u = _fit_axis_u(nu_c)
+        nv_c = degree_v + 1
+        ctrl_final, knots_v = _fit_axis_v(ctrl_u, nv_c)
+        surf = NurbsSurface(
+            degree_u=degree_u, degree_v=degree_v,
+            control_points=ctrl_final,
+            knots_u=knots_u, knots_v=knots_v,
+        )
+        dev = _max_dev(surf)
+        if dev < best_dev:
+            best_dev = dev
+            best_surf = surf
+            best_nu = nu_c
+            best_nv = nv_c
+        if dev <= tol:
+            return {
+                "ok": True, "reason": "",
+                "surface": surf,
+                "max_deviation": dev,
+                "smoothing_energy": 0.0,
+                "num_ctrl_u": nu_c,
+                "num_ctrl_v": nv_c,
+            }
+
+    # ── Phase 2: U is at its best; now refine V ───────────────────────────────
+    ctrl_u_best, knots_u_best = _fit_axis_u(best_nu)
+
+    for nv_c in range(degree_v + 2, min(max_ctrl_v + 1, n + 1)):
+        ctrl_final, knots_v = _fit_axis_v(ctrl_u_best, nv_c)
+        surf = NurbsSurface(
+            degree_u=degree_u, degree_v=degree_v,
+            control_points=ctrl_final,
+            knots_u=knots_u_best, knots_v=knots_v,
+        )
+        dev = _max_dev(surf)
+        if dev < best_dev:
+            best_dev = dev
+            best_surf = surf
+            best_nu = best_nu
+            best_nv = nv_c
+        if dev <= tol:
+            return {
+                "ok": True, "reason": "",
+                "surface": surf,
+                "max_deviation": dev,
+                "smoothing_energy": 0.0,
+                "num_ctrl_u": best_nu,
+                "num_ctrl_v": nv_c,
+            }
+
+    # ── Phase 3: refine both axes jointly if still not converged ─────────────
+    for nu_c in range(best_nu + 1, min(max_ctrl_u + 1, m + 1)):
+        ctrl_u, knots_u = _fit_axis_u(nu_c)
+        for nv_c in range(best_nv + 1, min(max_ctrl_v + 1, n + 1)):
+            ctrl_final, knots_v = _fit_axis_v(ctrl_u, nv_c)
+            surf = NurbsSurface(
+                degree_u=degree_u, degree_v=degree_v,
+                control_points=ctrl_final,
+                knots_u=knots_u, knots_v=knots_v,
+            )
+            dev = _max_dev(surf)
+            if dev < best_dev:
+                best_dev = dev
+                best_surf = surf
+                best_nu = nu_c
+                best_nv = nv_c
+            if dev <= tol:
+                return {
+                    "ok": True, "reason": "",
+                    "surface": surf,
+                    "max_deviation": dev,
+                    "smoothing_energy": 0.0,
+                    "num_ctrl_u": nu_c,
+                    "num_ctrl_v": nv_c,
+                }
+
+    # Best effort
+    ok_final = best_dev <= tol
+    reason = "" if ok_final else (
+        f"tolerance {tol} not achieved; best deviation {best_dev:.4g} "
+        f"with ({best_nu} × {best_nv}) control points"
+    )
+    return {
+        "ok": ok_final,
+        "reason": reason,
+        "surface": best_surf,
+        "max_deviation": best_dev,
+        "smoothing_energy": 0.0,
+        "num_ctrl_u": best_nu,
+        "num_ctrl_v": best_nv,
+    }
+
+
+# ---------------------------------------------------------------------------
 # LLM tool registration
 # ---------------------------------------------------------------------------
 

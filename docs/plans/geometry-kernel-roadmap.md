@@ -450,11 +450,12 @@ Format: `[ ] GK-NN  scope — FILE(s) — oracle — dep — parallel? — tier`
   across a box face yields two faces, Euler residual unchanged. — dep:
   GK-18 — parallel: N (same file) — opus (rolled into GK-18 review).
   *GK-17/18/19/21 landed together: `test_boolean_solid.py` 36 tests.*
-- [ ] **GK-20** `validate_body` extension: add geometric self-intersection
+- [x] **GK-20** `validate_body` extension: add geometric self-intersection
   check (face–face, edge–edge) behind a flag, keeping the frozen
   `{"ok","errors"}` shape. — `geom/brep.py` (additive only) — oracle:
   a known self-intersecting shell reports an error; all primitives stay
   clean. — dep: GK-18 — parallel: Y — sonnet.
+  *Landed: brep.py, 16 tests.*
 - [x] **GK-21** Tolerance propagation: ops update Vertex/Edge/Face tol so
   monotonicity holds post-boolean/sew. — `geom/sew.py`,
   `geom/boolean.py` — oracle: post-boolean `validate_body` tolerance

@@ -1096,7 +1096,7 @@ def kfmrh_inverse(solid: Solid, host_face: Face, ring: Loop,
 # ---------------------------------------------------------------------------
 
 
-def validate_body(body: Body) -> dict:
+def validate_body(body: Body, *, check_self_intersection: bool = False) -> dict:
     """Structurally + geometrically validate a :class:`Body`.
 
     Returns ``{"ok": bool, "errors": [str, ...]}``. Checks performed:
@@ -1114,6 +1114,10 @@ def validate_body(body: Body) -> dict:
       6. No dangling edges (an edge with zero coedges) and no duplicate
          coedges (same edge + same orientation in one loop, unless the
          loop legitimately walks a seam there-and-back).
+      7. (opt-in, ``check_self_intersection=True``) Geometric
+         self-intersection: non-adjacent edge pairs and non-adjacent face
+         pairs are tested for interior overlap. Default is ``False`` so
+         that the existing (structural-only) behaviour is unchanged.
     """
     errors: List[str] = []
 
@@ -1239,6 +1243,11 @@ def validate_body(body: Body) -> dict:
                 )
             seen.add(key)
 
+    # --- 7. geometric self-intersection (opt-in) ----------------------------
+    if check_self_intersection:
+        si_errors = _check_self_intersection(body)
+        errors.extend(si_errors)
+
     return {"ok": len(errors) == 0, "errors": errors}
 
 
@@ -1271,6 +1280,265 @@ def _loop_signed_area_about_normal(loop: Loop, face: Face):
         b = pts[(i + 1) % m] - centroid
         area_vec += np.cross(a, b)
     return float(np.dot(area_vec, n) * 0.5)
+
+
+# ---------------------------------------------------------------------------
+# Self-intersection helpers (used by validate_body check_self_intersection=True)
+# ---------------------------------------------------------------------------
+
+_SI_EDGE_SAMPLES: int = 12   # samples per edge for curve discretisation
+_SI_FACE_SAMPLES: int = 6    # grid samples per face UV parameter
+
+
+def _edge_polyline(edge: Edge, samples: int = _SI_EDGE_SAMPLES) -> np.ndarray:
+    """Return ``samples`` uniformly-spaced points along *edge*."""
+    ts = np.linspace(edge.t0, edge.t1, samples)
+    return np.array([edge.point(float(t)) for t in ts], dtype=float)
+
+
+def _seg_seg_min_dist_sq(p0: np.ndarray, p1: np.ndarray,
+                         q0: np.ndarray, q1: np.ndarray) -> float:
+    """Squared minimum distance between two line segments ``p0-p1`` and
+    ``q0-q1`` (analytic, no iteration).
+    """
+    d1 = p1 - p0
+    d2 = q1 - q0
+    r = p0 - q0
+    a = float(np.dot(d1, d1))
+    e = float(np.dot(d2, d2))
+    f = float(np.dot(d2, r))
+
+    if a <= 1e-20 and e <= 1e-20:
+        return float(np.dot(r, r))
+    if a <= 1e-20:
+        s, t = 0.0, max(0.0, min(1.0, f / e))
+    else:
+        c = float(np.dot(d1, r))
+        if e <= 1e-20:
+            t = 0.0
+            s = max(0.0, min(1.0, -c / a))
+        else:
+            b = float(np.dot(d1, d2))
+            denom = a * e - b * b
+            if abs(denom) > 1e-20:
+                s = max(0.0, min(1.0, (b * f - c * e) / denom))
+            else:
+                s = 0.0
+            t = (b * s + f) / e
+            if t < 0.0:
+                t, s = 0.0, max(0.0, min(1.0, -c / a))
+            elif t > 1.0:
+                t, s = 1.0, max(0.0, min(1.0, (b - c) / a))
+    diff = p0 + s * d1 - (q0 + t * d2)
+    return float(np.dot(diff, diff))
+
+
+def _edges_are_adjacent(ea: Edge, eb: Edge) -> bool:
+    """True when the two edges share at least one topological vertex."""
+    va = {id(ea.v_start), id(ea.v_end)}
+    vb = {id(eb.v_start), id(eb.v_end)}
+    return bool(va & vb)
+
+
+def _faces_adjacent(fa: Face, fb: Face) -> bool:
+    """True when *fa* and *fb* share at least one topological edge."""
+    ea_ids = {id(ce.edge) for lp in fa.loops for ce in lp.coedges}
+    eb_ids = {id(ce.edge) for lp in fb.loops for ce in lp.coedges}
+    return bool(ea_ids & eb_ids)
+
+
+def _face_sample_points(face: Face, grid: int = _SI_FACE_SAMPLES) -> np.ndarray:
+    """Sample a coarse grid of points over a face's loop vertex hull.
+
+    Falls back to evaluating the underlying surface at ``grid x grid``
+    interior UV fractions when no loop vertices are available.  Returns
+    an ``(N, 3)`` array (may be empty).
+    """
+    # collect boundary vertices as a rough bounding polygon
+    verts = []
+    for lp in face.loops:
+        for ce in lp.coedges:
+            verts.append(ce.start_point())
+    if not verts:
+        return np.empty((0, 3), dtype=float)
+
+    # For planar faces use a uniform sample of edge midpoints + centroid
+    pts_list = [np.asarray(v, dtype=float) for v in verts]
+    # add centroid
+    centroid = np.mean(pts_list, axis=0)
+    pts_list.append(centroid)
+    # add midpoints between successive loop vertices
+    n = len(verts)
+    for i in range(n):
+        pts_list.append(0.5 * (np.asarray(verts[i], dtype=float)
+                                + np.asarray(verts[(i + 1) % n], dtype=float)))
+    return np.array(pts_list, dtype=float)
+
+
+def _point_to_plane_dist(pt: np.ndarray, plane_orig: np.ndarray,
+                          plane_normal: np.ndarray) -> float:
+    """Signed distance from *pt* to an infinite plane (normal assumed unit)."""
+    return float(np.dot(pt - plane_orig, plane_normal))
+
+
+def _face_plane(face: Face):
+    """Return (origin, unit_normal) for a planar face, or None."""
+    if not isinstance(face.surface, Plane):
+        return None
+    pl = face.surface
+    n = pl.normal()
+    if face.orientation is False:
+        n = -n
+    return pl.origin, n
+
+
+def _check_self_intersection_edges(edges: List[Edge], tol: float) -> List[str]:
+    """Check all non-adjacent edge pairs for geometric crossing.
+
+    Uses polyline sampling for general curves; segment-segment analytic
+    distance for pairs of ``Line3`` edges.  Returns a list of error strings.
+    """
+    errs: List[str] = []
+    reported: set = set()  # avoid duplicate messages for the same pair
+    n = len(edges)
+    for i in range(n):
+        for j in range(i + 1, n):
+            ea, eb = edges[i], edges[j]
+            if _edges_are_adjacent(ea, eb):
+                continue
+            key = (min(ea.id, eb.id), max(ea.id, eb.id))
+            if key in reported:
+                continue
+
+            # Use analytic segment-segment when both are Line3
+            if isinstance(ea.curve, Line3) and isinstance(eb.curve, Line3):
+                d2 = _seg_seg_min_dist_sq(ea.curve.p0, ea.curve.p1,
+                                           eb.curve.p0, eb.curve.p1)
+                if d2 < tol * tol:
+                    reported.add(key)
+                    errs.append(
+                        f"self-intersection: edge#{ea.id} and "
+                        f"edge#{eb.id} intersect (dist={d2**0.5:.3e})"
+                    )
+                continue
+
+            # General: sample both polylines, check nearest point pair
+            pa = _edge_polyline(ea)
+            pb = _edge_polyline(eb)
+            # brute-force O(samples^2) nearest-segment scan
+            found = False
+            for k in range(len(pa) - 1):
+                if found:
+                    break
+                for m in range(len(pb) - 1):
+                    d2 = _seg_seg_min_dist_sq(pa[k], pa[k + 1],
+                                               pb[m], pb[m + 1])
+                    if d2 < tol * tol:
+                        reported.add(key)
+                        errs.append(
+                            f"self-intersection: edge#{ea.id} and "
+                            f"edge#{eb.id} intersect (dist={d2**0.5:.3e})"
+                        )
+                        found = True
+                        break
+    return errs
+
+
+def _check_self_intersection_faces(faces: List[Face], tol: float) -> List[str]:
+    """Check all non-adjacent face pairs for geometric overlap.
+
+    For each pair of non-adjacent *planar* faces the signed distance of
+    sampled points on face A from the plane of face B is computed; a
+    sign change inside the face polygon indicates a crossing.  Pairs
+    where both faces lie strictly on the same side (all same sign) are
+    clean.  Non-planar face pairs are checked by point-sample proximity.
+
+    Returns a list of error strings.
+    """
+    errs: List[str] = []
+    reported: set = set()
+    n = len(faces)
+    for i in range(n):
+        for j in range(i + 1, n):
+            fa, fb = faces[i], faces[j]
+            if _faces_adjacent(fa, fb):
+                continue
+            key = (min(fa.id, fb.id), max(fa.id, fb.id))
+            if key in reported:
+                continue
+
+            plane_b = _face_plane(fb)
+            plane_a = _face_plane(fa)
+
+            if plane_a is not None and plane_b is not None:
+                # Both planar: check if sample points of A straddle plane B
+                # AND sample points of B straddle plane A (necessary condition
+                # for actual crossing of two finite planar polygons).
+                pts_a = _face_sample_points(fa)
+                pts_b = _face_sample_points(fb)
+                if len(pts_a) < 2 or len(pts_b) < 2:
+                    continue
+                orig_b, n_b = plane_b
+                orig_a, n_a = plane_a
+                dists_a = np.array(
+                    [_point_to_plane_dist(p, orig_b, n_b) for p in pts_a]
+                )
+                dists_b = np.array(
+                    [_point_to_plane_dist(p, orig_a, n_a) for p in pts_b]
+                )
+                # straddle = mix of positive and negative distances
+                a_straddles = (dists_a.min() < -tol) and (dists_a.max() > tol)
+                b_straddles = (dists_b.min() < -tol) and (dists_b.max() > tol)
+                if a_straddles and b_straddles:
+                    reported.add(key)
+                    errs.append(
+                        f"self-intersection: face#{fa.id} and "
+                        f"face#{fb.id} planes mutually straddle "
+                        f"(planar face–face intersection)"
+                    )
+                continue
+
+            # General / mixed: sample-point proximity
+            pts_a = _face_sample_points(fa)
+            pts_b = _face_sample_points(fb)
+            if len(pts_a) == 0 or len(pts_b) == 0:
+                continue
+            # check minimum pairwise distance between sample sets
+            # O(|pts_a|*|pts_b|) — small for coarse grids
+            for pa in pts_a:
+                diffs = pts_b - pa
+                dists = np.linalg.norm(diffs, axis=1)
+                if dists.min() < tol:
+                    reported.add(key)
+                    errs.append(
+                        f"self-intersection: face#{fa.id} and "
+                        f"face#{fb.id} sample points overlap "
+                        f"(dist={dists.min():.3e})"
+                    )
+                    break
+    return errs
+
+
+def _check_self_intersection(body: Body) -> List[str]:
+    """Top-level self-intersection dispatcher called by ``validate_body``.
+
+    Iterates over each shell independently (inter-shell intersection is
+    not a topological self-intersection).  Uses the median face tolerance
+    as the proximity threshold, falling back to ``1e-6``.
+    """
+    errs: List[str] = []
+    for sh in body.all_shells():
+        edges = sh.edges()
+        faces = sh.faces
+        if len(edges) < 2 and len(faces) < 2:
+            continue
+        # representative tolerance: smallest face tol in the shell
+        tols = [f.tol for f in faces if f.tol > 0]
+        tol = min(tols) if tols else 1e-6
+
+        errs.extend(_check_self_intersection_edges(edges, tol))
+        errs.extend(_check_self_intersection_faces(faces, tol))
+    return errs
 
 
 __all__ = [

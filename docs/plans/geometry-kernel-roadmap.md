@@ -810,7 +810,7 @@ in `geom/__init__.py`.
   adjacent faces. — `geom/replace_face.py` — oracle: replace a planar
   face with an equivalent NURBS plane → topology unchanged, volume
   within ε. — dep: GK-18 — parallel: Y — sonnet.
-- [ ] **GK-87** Pattern (linear / circular / path, kernel-level):
+- [x] **GK-87** Pattern (linear / circular / path, kernel-level):
   duplicate a sub-body or feature N times along a linear / circular /
   path rail. — `geom/pattern.py` — oracle: 4× circular pattern of a
   cylinder around an axis yields 4 disjoint bodies at correct angles

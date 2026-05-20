@@ -277,6 +277,12 @@ from kerf_cad_core.geom.io.stl import (
     StlReadError,
     StlWriteError,
 )
+# GK-87: pattern (linear / circular / path)
+from kerf_cad_core.geom.pattern import (
+    linear_pattern,
+    circular_pattern,
+    path_pattern,
+)
 
 from kerf_cad_core.geom.surface_offset import surface_offset
 
@@ -454,4 +460,8 @@ __all__ = [
     "StlWriteError",
     # GK-83
     "surface_offset",
+    # GK-87
+    "linear_pattern",
+    "circular_pattern",
+    "path_pattern",
 ]

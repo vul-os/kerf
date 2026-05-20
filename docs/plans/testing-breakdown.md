@@ -140,7 +140,7 @@ noted.
   File: `packages/kerf-cad-core/tests/test_feature_mech_fasteners.py`
   Success: 25 fastener specs; dimensions match standard; hole-pattern integration.
 
-- [ ] T-24 Mech: family parts (configurations)
+- [x] T-24 Mech: family parts (configurations)
   Scope: `family/` parametric family table → resolved instance.
   File: `packages/kerf-cad-core/tests/test_feature_mech_family.py`
   Success: 25 family rows; deterministic resolution; equation propagation.

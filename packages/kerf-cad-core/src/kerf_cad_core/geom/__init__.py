@@ -218,6 +218,8 @@ from kerf_cad_core.geom.boolean import (
     body_intersection,
     body_difference,
 )
+# GK-73: inset face (SubD + B-rep)
+from kerf_cad_core.geom.inset_face import inset_face, InsetResult
 # GK-76: wall-thickness map (printability gate)
 from kerf_cad_core.geom.wall_thickness import wall_thickness_map
 # GK-29: solid edge/corner blend (concave/convex; degree-3 cylinder/sphere faces)
@@ -253,6 +255,13 @@ from kerf_cad_core.geom.io.threemf import (
     write_threemf,
     ThreeMFReadError,
     ThreeMFWriteError,
+)
+# GK-79: glTF 2.0 / GLB read + write (mesh + PBR materials)
+from kerf_cad_core.geom.io.gltf import (
+    read_gltf,
+    write_gltf,
+    GltfReadError,
+    GltfWriteError,
 )
 
 __all__ = [
@@ -395,6 +404,8 @@ __all__ = [
     "NurbsToSubdError",
     "nurbs_body_to_subd_cage",
     "nurbs_to_subd_cage",
+    # GK-73
+    "inset_face","InsetResult",
     # GK-76
     "wall_thickness_map",
     # GK-29
@@ -410,4 +421,9 @@ __all__ = [
     "write_threemf",
     "ThreeMFReadError",
     "ThreeMFWriteError",
+    # GK-79
+    "read_gltf",
+    "write_gltf",
+    "GltfReadError",
+    "GltfWriteError",
 ]

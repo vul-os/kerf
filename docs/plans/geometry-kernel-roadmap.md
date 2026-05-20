@@ -616,7 +616,7 @@ Format: `[ ] GK-NN  scope — FILE(s) — oracle — dep — parallel? — tier`
   `geom/mesh_to_nurbs.py`, `geom/sew.py` — oracle: tessellated sphere →
   body within d of analytic sphere; `validate_body` ok. — dep: GK-34,
   GK-17 — parallel: N — opus.
-- [ ] **GK-55** Mesh boolean → sealed manifold guarantee + analytic
+- [x] **GK-55** Mesh boolean → sealed manifold guarantee + analytic
   volume oracle (harden existing `mesh_boolean`). — `geom/mesh_repair.py`
   — oracle: cube∪cube mesh volume = exact; result `is_closed` &
   `is_manifold`. — dep: none — parallel: Y — sonnet.

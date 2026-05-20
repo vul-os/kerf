@@ -591,10 +591,10 @@ Format: `[ ] GK-NN  scope — FILE(s) — oracle — dep — parallel? — tier`
 - [ ] **GK-49** IGES 144 (trimmed surface) reader/writer (subset). —
   new `geom/io/iges.py` — oracle: round-trip a trimmed plane, boundary
   loop Hausdorff ≤ `1e-6`. — dep: GK-13 — parallel: Y — sonnet.
-- [ ] **GK-50** 3DM (OpenNURBS) export via `rhino3dm` (mirror of existing
+- [x] **GK-50** 3DM (OpenNURBS) export via `rhino3dm` (mirror of existing
   importer). — `kerf-imports/.../import_3dm.py` sibling exporter —
   oracle: export→reimport CP nets identical to `1e-9`. — dep: GK-13 —
-  parallel: Y — sonnet.
+  parallel: Y — sonnet. *Landed: export_3dm.py, 25 tests.*
 - [ ] **GK-51** STEP read/write fuzz + fidelity harness (degenerate
   faces, seams, holes, multi-shell). — `geom/io/` tests — oracle:
   ≥30 fixtures round-trip with Hausdorff ≤ tol or a structured skip

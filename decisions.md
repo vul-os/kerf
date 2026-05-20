@@ -545,3 +545,17 @@ End of 16-fire 30-min cadence.
 - **Decision:** Per user, switch to batches of 4 Sonnet agents with a 15-min wake cadence (delaySeconds=900), loop until tasks.md is complete. Wave 1 (T-270/T-252/T-281/T-261) landed 4/4 — the 4-wide + small-context-read discipline avoids the budget failures the 5-wide wave hit.
 - **Why:** User directive; 4-wide landed cleanly where 5-wide lost one to the usage cap.
 - **Reversibility:** new-files-only tasks; revert by SHA.
+
+## 2026-05-20 — Wave 3 dispatch (5 Sonnet agents)
+- Resolved 2 failing T-321 tests (test-only): drift-guard regex now matches the inline `files.kind` check (T-307 folded away the named `files_kind_check` constraint). Commit a91897e1.
+- Flipped epic parents T-100/T-101/T-104 → ✅ (all sub-tasks a..h complete). Commit f4f73e9.
+- Confirmed T-326 + T-334 already ✅ shipped 2026-05-20.
+- Wave 3 base SHA f4f73e9; 5 worktree agents launched: T-266 (turbulent Cd closure), T-257 (Caravel harness), T-265 (USB class drivers), T-283 (print art alignment), T-284 (cut-room nesting).
+- Cadence: 15-min heartbeat; agents auto-notify on completion. Each: one commit, report SHA, parent cherry-picks by SHA.
+
+## 2026-05-20 — Wave 3 integration
+- T-283 (bee07605) + T-284 (40d445c5) landed directly on main via worktree runtime; T-257 (9e90fe84) + T-265 (1101c89b) cherry-picked (trivial CLI __init__ comment conflict resolved).
+- Verified on integrated main: caravel + usb suites 125 passed; textiles suites green in-agent.
+- No migrations / no frontend delta this wave → no redeploy.
+- T-266 (turbulent Cd closure) still running. Completed worktrees auto-/pending-cleanup.
+- Remaining open: strategic spine T-320/322/323/324/325/327/328/329/330/331/332/333; domain T-285/286; T-131 parked.

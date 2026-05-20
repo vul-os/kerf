@@ -711,11 +711,11 @@ Format: `[ ] GK-NN  scope — FILE(s) — oracle — dep — parallel? — tier`
   the primitive matrix) with regression thresholds. — test harness —
   oracle: SSI sphere∩sphere < N ms; boolean box−cyl < M ms (thresholds
   recorded, not absolute). — dep: GK-18 — parallel: Y — sonnet. *Landed: test_perf_budget.py, 16 tests.*
-- [ ] **GK-71** `geom/__init__.py` public surface: export the new
+- [x] **GK-71** `geom/__init__.py` public surface: export the new
   `closest_point`, `surface_to_face`, `sew`, `boolean`, `to_body`
   verbs as the stable façade; docstring the OCCT vs pure-Py split. —
   `geom/__init__.py` — oracle: import-surface snapshot test. — dep:
-  GK-18 — parallel: Y — sonnet.
+  GK-18 — parallel: Y — sonnet. *Landed: 22 tests.*
 - [ ] **GK-72** Wire pure-Python boolean/sew as the default in
   `surface_boolean_robust` with OCCT as the *fallback* `occ_fn` (invert
   today's "OCCT is the only path"). — `geom/surface_boolean_robust.py`,

@@ -1,4 +1,33 @@
-"""NURBS surface helpers for kerf-cad-core."""
+"""
+kerf_cad_core.geom — stable public façade for the geometry kernel.
+
+Architecture split
+------------------
+OCCT-backed (requires OCC runtime, wrapped via kerf_cad_core.geom.brep_build /
+boolean / sew):
+    surface_to_face, surfaces_to_shell, closed_shell_to_solid
+    *_to_body primitives (box, cylinder, sphere, revolve, extrude, loft, sweep1,
+        sweep2, extrude_face)
+    sew_faces, sew_into_solid
+    body_union, body_intersection, body_difference
+    shell_body, draft_body, rib_body, wirecut_body, pipe_body
+    surface_boolean_robust (OCCT primary path; pure-Python fallback in GK-72)
+    STEP / IGES I/O (read_step, write_step, read_iges, write_iges)
+
+Pure-Python (no OCCT dependency, hermetic):
+    NurbsCurve / NurbsSurface evaluation, knot insertion, degree elevation
+    closest_point_curve, closest_point_surface  (Newton inversion, GK-06/07)
+    curve / surface intersection (GK-11/12)
+    sweep1 / sweep2 / network_srf / blend_srf / patch_srf / coons
+    trim_curve / trim_validation
+    curve_toolkit (fairing, curvature comb)
+    surface_analysis (Hausdorff, zebra, adaptive refinement)
+    surface_fillet (variable-radius G1)
+    SubD authoring + SubD↔NURBS conversion (GK-52/53)
+    mesh utilities (mesh_autosurface, mesh_boolean_sealed)
+    region2d (2-D boolean on planar loops)
+    mass_props (body_mass_props)
+"""
 
 from kerf_cad_core.geom.nurbs import (
     NurbsCurve,
@@ -171,6 +200,24 @@ from kerf_cad_core.geom.region2d import (
     make_rect_loop,
     make_circle_loop,
 )
+# GK-06/07: point inversion (closest-point on curve / surface)
+from kerf_cad_core.geom.inversion import (
+    closest_point_curve,
+    closest_point_surface,
+    project_point_to_curve,
+    pull_curve_to_surface,
+)
+# GK-18: pure-Python sew (sew faces into shell / solid)
+from kerf_cad_core.geom.sew import (
+    sew_faces,
+    sew_into_solid,
+)
+# GK-18: pure-Python boolean (body union / intersection / difference)
+from kerf_cad_core.geom.boolean import (
+    body_union,
+    body_intersection,
+    body_difference,
+)
 # GK-52: SubD cage → watertight NURBS Body (Catmull-Clark limit surface)
 # GK-53: NURBS Body → SubD cage (reverse, quad-dominant)
 from kerf_cad_core.geom.subd_to_nurbs import (
@@ -302,6 +349,18 @@ __all__ = [
     "rib_body",
     "wirecut_body",
     "pipe_body",
+    # GK-06/07: closest-point / inversion
+    "closest_point_curve",
+    "closest_point_surface",
+    "project_point_to_curve",
+    "pull_curve_to_surface",
+    # GK-18: sew
+    "sew_faces",
+    "sew_into_solid",
+    # GK-18: boolean
+    "body_union",
+    "body_intersection",
+    "body_difference",
     # GK-52
     "SubdToNurbsError",
     "subd_limit_positions",

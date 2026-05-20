@@ -140,6 +140,8 @@ from kerf_cad_core.geom.io.step_read import read_step, StepReadError
 from kerf_cad_core.geom.io.step_write import write_step, StepWriteError
 # GK-23: body mass properties
 from kerf_cad_core.geom.mass_props import body_mass_props
+# GK-54: mesh -> NURBS autosurface
+from kerf_cad_core.geom.mesh_to_nurbs import mesh_autosurface
 # GK-55: mesh boolean sealed-manifold
 from kerf_cad_core.geom.mesh_repair import mesh_boolean_sealed, boolean_volume_oracle
 # GK-56: 2D region boolean on planar curve loops
@@ -243,6 +245,8 @@ __all__ = [
     "write_step","StepWriteError",
     # GK-23
     "body_mass_props",
+    # GK-54
+    "mesh_autosurface",
     # GK-55
     "mesh_boolean_sealed","boolean_volume_oracle",
     # GK-56

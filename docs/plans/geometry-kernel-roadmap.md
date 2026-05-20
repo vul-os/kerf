@@ -615,7 +615,7 @@ Format: `[ ] GK-NN  scope — FILE(s) — oracle — dep — parallel? — tier`
 - [ ] **GK-53** NURBS `Body` → SubD cage (reverse, quad-dominant). —
   `geom/subd.py` — oracle: round-trip subD→NURBS→subD on a cube returns
   the original cage to `1e-7`. — dep: GK-52 — parallel: N — opus.
-- [ ] **GK-54** [HARD] Mesh → NURBS autosurface to deviation tolerance as
+- [x] **GK-54** [HARD] Mesh → NURBS autosurface to deviation tolerance as
   a single sewn `Body` (segment → fit patches → sew). —
   `geom/mesh_to_nurbs.py`, `geom/sew.py` — oracle: tessellated sphere →
   body within d of analytic sphere; `validate_body` ok. — dep: GK-34,

@@ -199,7 +199,7 @@ Each task ≈1–3h sonnet unless `[HARD]`. Always isolate in a worktree.
   Files: `src/cloud/BillingPanel.jsx`.
   Success: tables scroll instead of clip on narrow widths; screen reader announces table purpose + column headers.
 
-- [ ] **T-F2 aria-live on Settings status messages + scan workspace routes**
+- [x] **T-F2 aria-live on Settings status messages + scan workspace routes**
   Scope: make `Inline` status messages in Settings polite live regions; quick pass over `WorkspaceSettings.jsx`/`WorkspaceMembers.jsx` for fixed widths / label gaps, log findings here.
   Files: `src/routes/Settings.jsx`, `src/routes/WorkspaceSettings.jsx`, `src/routes/WorkspaceMembers.jsx`.
   Success: save/error feedback announced; workspace routes have a status line in this doc.

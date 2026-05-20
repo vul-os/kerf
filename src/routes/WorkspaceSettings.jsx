@@ -226,12 +226,16 @@ export default function WorkspaceSettings() {
 
           <form className="flex flex-col gap-4" onSubmit={save}>
             {err && (
-              <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
-                <AlertCircle size={14} className="mt-0.5 shrink-0" />
+              <div role="alert" aria-live="assertive" className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                <AlertCircle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
                 <span>{err}</span>
               </div>
             )}
-            {msg && <div className="text-xs text-kerf-300">{msg}</div>}
+            {msg && (
+              <div role="status" aria-live="polite" className="text-xs text-kerf-300">
+                {msg}
+              </div>
+            )}
 
             <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} />
 

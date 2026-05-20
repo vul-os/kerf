@@ -299,5 +299,16 @@ function Inline({ msg }) {
   const cls = msg.kind === 'err' ? 'text-red-400'
     : msg.kind === 'ok' ? 'text-emerald-400'
     : 'text-ink-400'
-  return <span className={`text-[11px] ${cls}`}>{msg.text}</span>
+  if (msg.kind === 'err') {
+    return (
+      <span role="alert" aria-live="assertive" className={`text-[11px] ${cls}`}>
+        {msg.text}
+      </span>
+    )
+  }
+  return (
+    <span role="status" aria-live="polite" className={`text-[11px] ${cls}`}>
+      {msg.text}
+    </span>
+  )
 }

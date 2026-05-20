@@ -85,7 +85,7 @@ noted.
   File: `packages/kerf-cad-core/tests/test_feature_jewelry_casting_export.py`
   Success: 25 finished SKUs; manifold STL; sprue/runner attachment; volume matches solid model ±0.5%.
 
-- [ ] T-13 Jewelry: metal cost / full quote
+- [x] T-13 Jewelry: metal cost / full quote
   Scope: `metal_cost.py` + `tool_metal_cost.py` quote against `pieces.py` BOM.
   File: `packages/kerf-cad-core/tests/test_feature_jewelry_cost_quote.py`
   Success: 25 SKUs × metal × spot prices; total = metal + casting + setting + finishing ±0.01; FX handling correct.

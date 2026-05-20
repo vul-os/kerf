@@ -782,7 +782,7 @@ in `geom/__init__.py`.
   oracle: write a body to STL, read back triangles == original mesh
   triangulation ± vertex-merge tolerance. — dep: GK-21 — parallel: Y —
   sonnet.
-- [ ] **GK-82** Imprint (3D curve → new face edges): project a 3D curve
+- [x] **GK-82** Imprint (3D curve → new face edges): project a 3D curve
   onto a face, creating new edges that split the face along the
   projected path. Precondition for clean trim_face_by_3d_curve. —
   `geom/imprint.py` — oracle: imprint a great-circle on a sphere face

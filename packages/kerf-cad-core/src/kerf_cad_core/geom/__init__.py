@@ -303,6 +303,8 @@ from kerf_cad_core.geom.replace_face import replace_face
 from kerf_cad_core.geom.symmetry import detect_symmetry
 # GK-85: body simplify / heal (remove sub-tol faces/edges, weld verts, close gaps)
 from kerf_cad_core.geom.body_heal import simplify_body, heal_body
+# GK-82: imprint 3D curve on face → split face creating new edges
+from kerf_cad_core.geom.imprint import imprint_curve_on_face
 
 __all__ = [
     "NurbsCurve",
@@ -500,4 +502,6 @@ __all__ = [
     # GK-85
     "simplify_body",
     "heal_body",
+    # GK-82
+    "imprint_curve_on_face",
 ]

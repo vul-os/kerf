@@ -658,7 +658,7 @@ estimates: **S** = ½ day, **M** = 1-2 days, **L** = 3-5 days, **XL** =
 
 ### T-324 Local folder sync + cloud↔self-host portability (P1-10)
 
-🔴 not started · **Tier A · P1**
+✅ shipped (2026-05-20) · **Tier A · P1**
 
 - **Why:** ROADMAP §1.5 commitment 3 — `kerf sync` two-way folder
   mirror. Complements T-322's one-shot export/import with a live

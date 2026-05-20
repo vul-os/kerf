@@ -70,7 +70,7 @@ noted.
   File: `packages/kerf-cad-core/tests/test_feature_jewelry_hollowing.py`
   Success: 25 part geometries; resulting solid has ≥ requested min wall everywhere; mass reduction within target ±3%.
 
-- [ ] T-10 Jewelry: pavé wizard (stone array on surface)
+- [x] T-10 Jewelry: pavé wizard (stone array on surface)
   Scope: `pave_wizard.py` end-to-end (surface → stone array → seat array → prong array).
   File: `packages/kerf-cad-core/tests/test_feature_jewelry_pave.py`
   Success: 25 host surfaces × stone sizes; stones tangent to surface within ε; no inter-stone clash; share-prong logic.

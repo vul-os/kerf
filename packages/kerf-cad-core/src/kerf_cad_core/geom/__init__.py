@@ -285,6 +285,11 @@ from kerf_cad_core.geom.pattern import (
 )
 
 from kerf_cad_core.geom.surface_offset import surface_offset
+# GK-84: split body by plane / surface (no-fill cut)
+from kerf_cad_core.geom.split_body import (
+    split_body_by_plane,
+    split_body_by_surface,
+)
 
 __all__ = [
     "NurbsCurve",
@@ -464,4 +469,7 @@ __all__ = [
     "linear_pattern",
     "circular_pattern",
     "path_pattern",
+    # GK-84
+    "split_body_by_plane",
+    "split_body_by_surface",
 ]

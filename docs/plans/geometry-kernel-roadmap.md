@@ -793,7 +793,7 @@ in `geom/__init__.py`.
   surface normal; preserve UV. — `geom/surface_offset.py` — oracle:
   offset of a unit sphere by d yields a sphere of radius 1+d ± tol. —
   dep: GK-06 — parallel: Y — sonnet.
-- [ ] **GK-84** Split body by plane / by surface (no-fill cut): split a
+- [x] **GK-84** Split body by plane / by surface (no-fill cut): split a
   Body into N pieces along a cutting plane/surface; pieces are not
   filled (open shells), unlike boolean difference. —
   `geom/split_body.py` — oracle: split a box by its midplane → 2 open

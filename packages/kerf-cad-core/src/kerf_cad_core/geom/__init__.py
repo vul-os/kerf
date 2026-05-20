@@ -19,13 +19,16 @@ from kerf_cad_core.geom.nurbs import (
 
 from kerf_cad_core.geom.sweep1 import (
     sweep1,
+    sweep1_rmf,
     sweep1_with_twist,
     sweep1_variable_scale,
     profile_along_path,
+    compute_rmf_frames,
 )
 
 from kerf_cad_core.geom.sweep2 import (
     sweep2,
+    sweep2_rmf,
     sweep2_with_scaling,
     sweep2_with_twist,
     check_rail_compatibility,
@@ -116,10 +119,13 @@ __all__ = [
     "nurbs_to_occt_surface",
     "occt_surface_to_nurbs",
     "sweep1",
+    "sweep1_rmf",
     "sweep1_with_twist",
     "sweep1_variable_scale",
     "profile_along_path",
+    "compute_rmf_frames",
     "sweep2",
+    "sweep2_rmf",
     "sweep2_with_scaling",
     "sweep2_with_twist",
     "check_rail_compatibility",

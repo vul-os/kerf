@@ -1,8 +1,42 @@
+"""sweep2: two-rail sweep surface generation.
+
+Frame computation:
+- Legacy: compute_adaptive_frame — global world reference, can twist.
+- RMF (Wang 2008): imported from sweep1, propagated along the midline of
+  the two rails so that the frame is torsion-free.
+"""
 import numpy as np
 from kerf_cad_core.geom.nurbs import NurbsCurve, NurbsSurface
+from kerf_cad_core.geom.sweep1 import compute_rmf_frames
+
+
+def _midline_tangents(rail1: NurbsCurve, rail2: NurbsCurve,
+                      n: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Sample n points on each rail and compute midline points + tangents.
+
+    Returns (midpoints, tangents, params) each of shape (n, 3) / (n,).
+    """
+    ts = np.linspace(0.0, 1.0, n)
+    pts1 = np.array([rail1.evaluate(t) for t in ts])
+    pts2 = np.array([rail2.evaluate(t) for t in ts])
+    mids = 0.5 * (pts1 + pts2)
+
+    tangents = np.zeros_like(mids)
+    tangents[0] = mids[1] - mids[0]
+    tangents[-1] = mids[-1] - mids[-2]
+    tangents[1:-1] = mids[2:] - mids[:-2]
+
+    norms = np.linalg.norm(tangents, axis=1, keepdims=True)
+    norms = np.where(norms < 1e-15, 1.0, norms)
+    tangents = tangents / norms
+
+    return pts1, pts2, mids, tangents
 
 
 def sweep2(profile: NurbsCurve, rail1: NurbsCurve, rail2: NurbsCurve) -> NurbsSurface:
+    """Sweep *profile* between *rail1* and *rail2* using a rotation-minimising
+    frame (Wang 2008) propagated along the midline of the two rails.
+    """
     if profile.degree < 1 or rail1.degree < 1 or rail2.degree < 1:
         raise ValueError("Profile and rails must have degree >= 1")
 
@@ -15,39 +49,21 @@ def sweep2(profile: NurbsCurve, rail1: NurbsCurve, rail2: NurbsCurve) -> NurbsSu
     degree_u = profile.degree
     degree_v = max(rail1.degree, rail2.degree)
 
+    pts1, pts2, mids, tangents = _midline_tangents(rail1, rail2, num_path_pts)
+    rmf = compute_rmf_frames(tangents, points=mids)
+
     control_points = np.zeros((num_profile_pts, num_path_pts, 3))
 
     for i in range(num_path_pts):
-        p1 = rail1.control_points[i]
-        p2 = rail2.control_points[i]
-
-        tangent1 = rail1.derivative(rail1.knots[rail1.degree + i]) if i < len(rail1.knots) - rail1.degree - 1 else p1 - rail1.control_points[max(i - 1, 0)]
-        tangent2 = rail2.derivative(rail2.knots[rail2.degree + i]) if i < len(rail2.knots) - rail2.degree - 1 else p2 - rail2.control_points[max(i - 1, 0)]
-
-        if i > 0:
-            tangent1 = p1 - rail1.control_points[i - 1]
-            tangent2 = p2 - rail2.control_points[i - 1]
-        else:
-            tangent1 = rail1.control_points[1] - p1 if len(rail1.control_points) > 1 else np.array([1, 0, 0])
-            tangent2 = rail2.control_points[1] - p2 if len(rail2.control_points) > 1 else np.array([1, 0, 0])
-
-        tangent1 = tangent1 / (np.linalg.norm(tangent1) + 1e-10)
-        tangent2 = tangent2 / (np.linalg.norm(tangent2) + 1e-10)
-
-        rail_direction = p2 - p1
-        rail_direction = rail_direction / (np.linalg.norm(rail_direction) + 1e-10)
-
-        frame = compute_adaptive_frame(rail_direction, tangent1, tangent2)
+        p1 = pts1[i]
+        p2 = pts2[i]
+        frame = rmf[i]
 
         for j in range(num_profile_pts):
             profile_pt = profile.control_points[j]
-
             t = j / (num_profile_pts - 1) if num_profile_pts > 1 else 0.5
             base_pt = (1 - t) * p1 + t * p2
-
-            offset = frame @ profile_pt
-
-            world_pt = base_pt + offset
+            world_pt = base_pt + frame @ profile_pt
             control_points[j, i] = world_pt
 
     knots_u = profile.knots.copy()
@@ -96,8 +112,63 @@ def merge_knot_vectors(knot_vectors: list) -> np.ndarray:
     return merged
 
 
+def sweep2_rmf(
+    profile: NurbsCurve,
+    rail1: NurbsCurve,
+    rail2: NurbsCurve,
+    num_samples: int | None = None,
+    initial_normal: np.ndarray | None = None,
+) -> NurbsSurface:
+    """Public alias: sweep2 with explicit Wang 2008 RMF along the rail midline.
+
+    Parameters
+    ----------
+    profile, rail1, rail2 : NurbsCurve
+    num_samples : frame samples along rails; defaults to rail1.num_control_points.
+    initial_normal : optional seed normal for the first frame.
+    """
+    if profile.degree < 1 or rail1.degree < 1 or rail2.degree < 1:
+        raise ValueError("Profile and rails must have degree >= 1")
+
+    n = num_samples if num_samples is not None else rail1.num_control_points
+    n = max(n, 2)
+
+    pts1, pts2, mids, tangents = _midline_tangents(rail1, rail2, n)
+    rmf = compute_rmf_frames(tangents, initial_r=initial_normal, points=mids)
+
+    num_profile_pts = profile.num_control_points
+    control_points = np.zeros((num_profile_pts, n, 3))
+
+    for i in range(n):
+        p1 = pts1[i]
+        p2 = pts2[i]
+        frame = rmf[i]
+        for j in range(num_profile_pts):
+            t = j / (num_profile_pts - 1) if num_profile_pts > 1 else 0.5
+            base_pt = (1 - t) * p1 + t * p2
+            world_pt = base_pt + frame @ profile.control_points[j]
+            control_points[j, i] = world_pt
+
+    knots_u = profile.knots.copy()
+    degree_v = max(rail1.degree, rail2.degree)
+    knots_v = np.concatenate([
+        np.zeros(degree_v),
+        np.linspace(0.0, 1.0, n - degree_v + 1),
+        np.ones(degree_v),
+    ])
+
+    return NurbsSurface(
+        degree_u=profile.degree,
+        degree_v=degree_v,
+        control_points=control_points,
+        knots_u=knots_u,
+        knots_v=knots_v,
+    )
+
+
 def sweep2_with_scaling(profile: NurbsCurve, rail1: NurbsCurve, rail2: NurbsCurve,
                          scale1: float = 1.0, scale2: float = 1.0) -> NurbsSurface:
+    """Two-rail sweep with linearly-interpolated per-section scaling, using RMF."""
     if rail1.num_control_points != rail2.num_control_points:
         raise ValueError("Rail1 and Rail2 must have same number of control points")
 
@@ -107,43 +178,23 @@ def sweep2_with_scaling(profile: NurbsCurve, rail1: NurbsCurve, rail2: NurbsCurv
     degree_u = profile.degree
     degree_v = max(rail1.degree, rail2.degree)
 
+    pts1, pts2, mids, tangents = _midline_tangents(rail1, rail2, num_path_pts)
+    rmf = compute_rmf_frames(tangents, points=mids)
+
     control_points = np.zeros((num_profile_pts, num_path_pts, 3))
 
     for i in range(num_path_pts):
-        p1 = rail1.control_points[i]
-        p2 = rail2.control_points[i]
-
-        if i > 0:
-            tangent1 = p1 - rail1.control_points[i - 1]
-            tangent2 = p2 - rail2.control_points[i - 1]
-        else:
-            tangent1 = rail1.control_points[1] - p1 if len(rail1.control_points) > 1 else np.array([1, 0, 0])
-            tangent2 = rail2.control_points[1] - p2 if len(rail2.control_points) > 1 else np.array([1, 0, 0])
-
-        tangent1 = tangent1 / (np.linalg.norm(tangent1) + 1e-10)
-        tangent2 = tangent2 / (np.linalg.norm(tangent2) + 1e-10)
-
-        rail_direction = p2 - p1
-        rail_length = np.linalg.norm(rail_direction)
-        if rail_length > 1e-10:
-            rail_direction = rail_direction / rail_length
-        else:
-            rail_direction = np.array([1, 0, 0])
-
-        frame = compute_adaptive_frame(rail_direction, tangent1, tangent2)
+        p1 = pts1[i]
+        p2 = pts2[i]
+        frame = rmf[i]
 
         for j in range(num_profile_pts):
             profile_pt = profile.control_points[j]
-
             t = j / (num_profile_pts - 1) if num_profile_pts > 1 else 0.5
             scale = (1 - t) * scale1 + t * scale2
-
             base_pt = (1 - t) * p1 + t * p2
-
             scaled_profile_pt = profile_pt * scale
-            offset = frame @ scaled_profile_pt
-
-            world_pt = base_pt + offset
+            world_pt = base_pt + frame @ scaled_profile_pt
             control_points[j, i] = world_pt
 
     knots_u = profile.knots.copy()
@@ -160,6 +211,7 @@ def sweep2_with_scaling(profile: NurbsCurve, rail1: NurbsCurve, rail2: NurbsCurv
 
 def sweep2_with_twist(profile: NurbsCurve, rail1: NurbsCurve, rail2: NurbsCurve,
                       twist_per_unit: float = 0.0) -> NurbsSurface:
+    """Two-rail sweep with arc-length-proportional twist applied on top of RMF."""
     if rail1.num_control_points != rail2.num_control_points:
         raise ValueError("Rail1 and Rail2 must have same number of control points")
 
@@ -169,56 +221,31 @@ def sweep2_with_twist(profile: NurbsCurve, rail1: NurbsCurve, rail2: NurbsCurve,
     degree_u = profile.degree
     degree_v = max(rail1.degree, rail2.degree)
 
-    control_points = np.zeros((num_profile_pts, num_path_pts, 3))
+    pts1, pts2, mids, tangents = _midline_tangents(rail1, rail2, num_path_pts)
+    rmf = compute_rmf_frames(tangents, points=mids)
 
+    control_points = np.zeros((num_profile_pts, num_path_pts, 3))
     accumulated_twist = 0.0
-    prev_p1 = rail1.control_points[0]
-    prev_p2 = rail2.control_points[0]
 
     for i in range(num_path_pts):
-        p1 = rail1.control_points[i]
-        p2 = rail2.control_points[i]
+        p1 = pts1[i]
+        p2 = pts2[i]
+        frame = rmf[i]
+        t_vec = tangents[i]
 
         if i > 0:
-            path_segment = (p1 + p2) / 2 - (prev_p1 + prev_p2) / 2
-            segment_length = np.linalg.norm(path_segment)
+            segment_length = np.linalg.norm(mids[i] - mids[i - 1])
             accumulated_twist += twist_per_unit * segment_length
 
-        if i > 0:
-            tangent1 = p1 - rail1.control_points[i - 1]
-            tangent2 = p2 - rail2.control_points[i - 1]
-        else:
-            tangent1 = rail1.control_points[1] - p1 if len(rail1.control_points) > 1 else np.array([1, 0, 0])
-            tangent2 = rail2.control_points[1] - p2 if len(rail2.control_points) > 1 else np.array([1, 0, 0])
-
-        tangent1 = tangent1 / (np.linalg.norm(tangent1) + 1e-10)
-        tangent2 = tangent2 / (np.linalg.norm(tangent2) + 1e-10)
-
-        rail_direction = p2 - p1
-        rail_length = np.linalg.norm(rail_direction)
-        if rail_length > 1e-10:
-            rail_direction = rail_direction / rail_length
-        else:
-            rail_direction = np.array([1, 0, 0])
-
-        frame = compute_adaptive_frame(rail_direction, tangent1, tangent2)
-
-        twist_rotation = rotation_matrix_3d(rail_direction, accumulated_twist)
-        frame = frame @ twist_rotation
+        twist_rotation = rotation_matrix_3d(t_vec, accumulated_twist)
+        twisted_frame = frame @ twist_rotation
 
         for j in range(num_profile_pts):
             profile_pt = profile.control_points[j]
-
             t = j / (num_profile_pts - 1) if num_profile_pts > 1 else 0.5
             base_pt = (1 - t) * p1 + t * p2
-
-            offset = frame @ profile_pt
-
-            world_pt = base_pt + offset
+            world_pt = base_pt + twisted_frame @ profile_pt
             control_points[j, i] = world_pt
-
-        prev_p1 = p1
-        prev_p2 = p2
 
     knots_u = profile.knots.copy()
     knots_v = merge_knot_vectors([rail1.knots, rail2.knots])

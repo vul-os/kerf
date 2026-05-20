@@ -552,10 +552,10 @@ Format: `[ ] GK-NN  scope — FILE(s) — oracle — dep — parallel? — tier`
   exact SSI + closest-point pullback). — `geom/trim_curve.py` —
   oracle: trim of a plane by a cylinder = exact circle boundary loop to
   `1e-7`. — dep: GK-09, GK-07 — parallel: N — opus.
-- [ ] **GK-41** Rotation-minimising frame for sweep1/sweep2 (double-
+- [x] **GK-41** Rotation-minimising frame for sweep1/sweep2 (double-
   reflection, Wang 2008). — `geom/sweep1.py`, `geom/sweep2.py` —
   oracle: swept circle along a helix has zero accumulated twist
-  (frame torsion-free) to `1e-7`. — dep: GK-03 — parallel: Y — sonnet.
+  (frame torsion-free) to `1e-7`. — dep: GK-03 — parallel: Y — sonnet. *Landed: sweep1.py/sweep2.py, 20 tests.*
 - [ ] **GK-42** Network surface true Gordon/Coons-Gordon (interpolate both
   curve families). — `geom/network_srf.py` — oracle: network of two
   families of lines = exact bilinear/Gordon patch; both families

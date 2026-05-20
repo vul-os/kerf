@@ -105,7 +105,7 @@ noted.
   File: `packages/kerf-cad-core/tests/test_feature_jewelry_templates.py`
   Success: 25 templates; deterministic re-instantiation; parameter migration on schema bump.
 
-- [ ] T-17 Mech: sheet-metal flange → unfold round-trip
+- [x] T-17 Mech: sheet-metal flange → unfold round-trip
   Scope: `sheet_metal.py` flange T-1 ⇒ unfold T-2/T-3 ⇒ flat pattern.
   File: `packages/kerf-cad-core/tests/test_feature_mech_sheet_metal_roundtrip.py`
   Success: 25 part shapes; folded area ≈ unfolded area within k-factor tolerance; bend allowance correct vs DIN 6935.

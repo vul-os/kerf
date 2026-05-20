@@ -583,11 +583,13 @@ Format: `[ ] GK-NN  scope — FILE(s) — oracle — dep — parallel? — tier`
 
 ### P2 — Interop fidelity + SubD/mesh
 
-- [ ] **GK-47** [HARD] Pure-Python STEP AP203/214 B-rep reader
+- [x] **GK-47** [HARD] Pure-Python STEP AP203/214 B-rep reader
   (ADVANCED_BREP_SHAPE_REPRESENTATION → `Body`). — new
   `geom/io/step_read.py` — oracle: read a STEP box exported by OCCT,
   `validate_body` ok, vertices match to `1e-9`. — dep: GK-13 —
-  parallel: N — opus.
+  parallel: N — opus. *Landed: geom/io/step_read.py, 24 tests.
+  Deferred: B-spline edge geometry (chord fallback), BREP_WITH_VOIDS
+  void shells (outer only imported), CONICAL_SURFACE parametric accuracy.*
 - [ ] **GK-48** [HARD] Pure-Python STEP B-rep writer (`Body` → AP214). —
   new `geom/io/step_write.py` — oracle: write→read round-trip Hausdorff
   ≤ `1e-7` on box/cyl/sphere/filleted-box. — dep: GK-47 — parallel: N

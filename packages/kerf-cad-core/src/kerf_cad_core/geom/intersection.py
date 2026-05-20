@@ -42,12 +42,25 @@ curve_curve_intersect(curve_a, curve_b, *, tol, samples_a, samples_b)
         point   : list[float, float, float]
     Never raises.  Duplicate hits closer than ``tol`` are merged.
 
+<<<<<<< HEAD
     GK-11 additions:
       Overlap / coincidence: if both curves share a locus (e.g. identical
       circles) returns [{"overlap": True}] — a single sentinel dict with no
       "point" key — rather than a flood of discrete points.
       Tangency multiplicity: tangent intersections (curves touch without
       crossing) produce exactly ONE hit, not a numerically doubled pair.
+=======
+curve_self_intersect(curve, *, tol, samples)
+    -> list[dict]
+    Find all self-intersection points of a single NurbsCurve.  Splits the
+    curve into sub-segments, tests non-adjacent segment AABB pairs, and
+    refines each candidate via Newton iteration, excluding trivial
+    endpoint-adjacency.  Returns a list of dicts, each with:
+        ta      : float  -- smaller parameter at the self-intersection
+        tb      : float  -- larger parameter at the self-intersection
+        point   : list[float, float, float]
+    Never raises.  Duplicate hits closer than ``tol`` are merged.
+>>>>>>> 35d03880 (feat(geom): GK-12 curve self-intersection (lemniscate oracle))
 
 Implementation note
 -------------------
@@ -1704,6 +1717,120 @@ def _curve_curve_intersect_impl(
     hits = _deduplicate_tangent_hits(hits, curve_a, curve_b, tol)
 
     return hits
+
+
+# ---------------------------------------------------------------------------
+# GK-12 — Curve self-intersection
+# ---------------------------------------------------------------------------
+
+def curve_self_intersect(
+    curve: NurbsCurve,
+    *,
+    tol: float = _DEFAULT_TOL,
+    samples: int = _DEFAULT_SAMPLES_C,
+) -> List[dict]:
+    """Find all self-intersection points of a single NurbsCurve.
+
+    Strategy
+    --------
+    Subdivide the curve into ``samples`` equal-parameter segments and sample
+    the polyline.  For every pair of segments **(i, j)** with ``j >= i + 2``
+    (so adjacent segments sharing exactly one endpoint are excluded), test
+    whether their AABBs overlap.  For each overlapping pair, seed
+    ``_newton_curve_curve`` with the segment mid-parameters.  Points that
+    converge and whose residual is below ``tol`` are collected; near-duplicate
+    hits (closer than ``tol`` in 3-D) are merged before returning.
+
+    Adjacent-segment exclusion
+    --------------------------
+    Segments ``i`` and ``i+1`` share the sample point at index ``i+1``, which
+    would appear as a trivial "hit" at the shared endpoint.  Skipping pairs
+    with ``j < i + 2`` eliminates all such endpoint-adjacency false positives.
+    Additionally, after Newton refinement, any hit whose *parameter gap*
+    ``|ta - tb|`` is below a minimum threshold (indicating the two parameters
+    converged to the same location on the curve rather than two truly distinct
+    parameter values) is rejected.
+
+    Parameters
+    ----------
+    curve : NurbsCurve
+    tol : float
+        Spatial convergence tolerance and duplicate-merge radius.
+    samples : int
+        Number of curve subdivisions for AABB cull.
+
+    Returns
+    -------
+    list of dict with keys:
+
+        ta    : float  -- smaller parameter value of the self-intersection
+        tb    : float  -- larger parameter value of the self-intersection
+        point : list[float, float, float]
+
+    Never raises.
+    """
+    try:
+        return _curve_self_intersect_impl(curve, tol=tol, samples=samples)
+    except Exception:
+        return []
+
+
+def _curve_self_intersect_impl(
+    curve: NurbsCurve,
+    *,
+    tol: float,
+    samples: int,
+) -> List[dict]:
+    if not isinstance(curve, NurbsCurve):
+        return []
+
+    n = max(4, int(samples))
+    t_min, t_max = _curve_param_range(curve)
+    t_span = t_max - t_min
+
+    # Minimum parameter gap to distinguish two genuinely different parameter
+    # values from a spurious endpoint-adjacency convergence.
+    min_param_gap = t_span / (n * 4.0)
+
+    t_vals = np.linspace(t_min, t_max, n + 1)
+    pts = [_curve_eval(curve, float(t)) for t in t_vals]
+
+    # Pre-compute per-segment AABBs and mid-parameters.
+    seg_lo: List[np.ndarray] = []
+    seg_hi: List[np.ndarray] = []
+    seg_mid: List[float] = []
+    for i in range(n):
+        lo, hi = _aabb([pts[i], pts[i + 1]])
+        seg_lo.append(lo)
+        seg_hi.append(hi)
+        seg_mid.append(float((t_vals[i] + t_vals[i + 1]) * 0.5))
+
+    candidates: List[Tuple[float, float]] = []
+    for i in range(n):
+        for j in range(i + 2, n):  # skip adjacent (share endpoint at i+1)
+            if _aabb_overlap(seg_lo[i], seg_hi[i], seg_lo[j], seg_hi[j], tol * 10):
+                candidates.append((seg_mid[i], seg_mid[j]))
+
+    hits: List[dict] = []
+    for ta0, tb0 in candidates:
+        result = _newton_curve_curve(curve, curve, ta0, tb0, tol=tol)
+        if result is None:
+            continue
+        ta_ref, tb_ref = result
+        # Ensure ta <= tb for canonical ordering.
+        if ta_ref > tb_ref:
+            ta_ref, tb_ref = tb_ref, ta_ref
+        # Reject if the two parameters are too close (not a genuine double point).
+        if abs(tb_ref - ta_ref) < min_param_gap:
+            continue
+        A = _curve_eval(curve, ta_ref)
+        B = _curve_eval(curve, tb_ref)
+        if np.linalg.norm(A - B) > tol * 1e3:
+            continue
+        pt = ((A + B) * 0.5).tolist()
+        hits.append({"ta": ta_ref, "tb": tb_ref, "point": pt})
+
+    return _merge_close_hits(hits, tol)
 
 
 # ---------------------------------------------------------------------------

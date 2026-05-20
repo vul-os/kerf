@@ -30,7 +30,7 @@ noted.
   File: `packages/kerf-cad-core/tests/test_feature_jewelry_ring_composite.py`
   Success: build 25 ring SKUs (stones × cuts × shank profiles), assert OCCT solid validity, mass-balance, gem clearance, no interpenetration.
 
-- [ ] T-2 Jewelry: eternity ring auto-distribution
+- [x] T-2 Jewelry: eternity ring auto-distribution
   Scope: `eternity_auto.py` calibrated distribution end-to-end into a finished ring.
   File: `packages/kerf-cad-core/tests/test_feature_jewelry_eternity.py`
   Success: 25 size/stone/style permutations; expected stone count matches calibration table; total perimeter consumed = sum(seat widths) ± 0.05 mm.

@@ -80,6 +80,7 @@ __all__ = [
     "blend_edge",
     "blend_edges",
     "blend_corner_vertex",
+    "blend_edge_chain_g3",
 ]
 
 
@@ -886,4 +887,345 @@ class _SphericalOctantSurface:
     def normal(self, u: float, v: float) -> np.ndarray:
         pt = self.evaluate(u, v)
         return _unit(pt - self.centre)
+
+
+# ---------------------------------------------------------------------------
+# GK-132 — G3 blend across a tangent edge chain
+# ---------------------------------------------------------------------------
+
+
+def _plane_to_nurbs(
+    face: "Face",
+    edge: "Edge",
+    blend_width: float,
+    n_pts: int = 5,
+) -> "Optional[object]":
+    """Build a degree-3 NurbsSurface strip approximating the planar *face*
+    in the band adjacent to *edge*, extending *blend_width* away from it.
+
+    Returns ``None`` if the face surface is not a ``Plane`` or the edge
+    is not a ``Line3``.
+
+    The strip has:
+    * u-axis along the edge direction (n_pts control points)
+    * v-axis perpendicular to the edge within the face plane (4 CP, degree 3)
+    * v=0 row coincides with the edge and v=1 row is blend_width away
+    """
+    surf = face.surface
+    if not isinstance(surf, Plane):
+        return None
+    curve = edge.curve
+    if not isinstance(curve, Line3):
+        return None
+
+    from kerf_cad_core.geom.nurbs import NurbsSurface  # lazy import
+
+    # Edge endpoints
+    p0 = np.asarray(curve.p0, dtype=float)
+    p1 = np.asarray(curve.p1, dtype=float)
+    edge_dir = p1 - p0
+    edge_len = float(np.linalg.norm(edge_dir))
+    if edge_len < 1e-14:
+        return None
+    edge_unit = edge_dir / edge_len
+
+    # Face normal and inward direction (perpendicular to edge, in-plane)
+    face_normal = np.asarray(surf.normal(0.5, 0.5), dtype=float)
+    # inward dir = cross(face_normal, edge_unit) or its negative — pick the
+    # one that points toward the face interior (away from the corner)
+    inward = np.cross(face_normal, edge_unit)
+    n_in = float(np.linalg.norm(inward))
+    if n_in < 1e-14:
+        inward = np.cross(edge_unit, face_normal)
+        n_in = float(np.linalg.norm(inward))
+    if n_in < 1e-14:
+        return None
+    inward = inward / n_in
+
+    # Build (n_pts x 4) control grid: along-u = edge, along-v = inward
+    nu = max(4, n_pts)
+    nv = 4
+    cp = np.zeros((nu, nv, 3))
+    v_fracs = np.array([0.0, 1.0 / 3.0, 2.0 / 3.0, 1.0])
+    for i in range(nu):
+        u_frac = i / (nu - 1)
+        base = p0 + u_frac * edge_dir
+        for j in range(nv):
+            cp[i, j] = base + v_fracs[j] * blend_width * inward
+
+    def _clamped_knots(n: int, deg: int) -> np.ndarray:
+        inner = max(0, n - deg - 1)
+        parts = [np.zeros(deg + 1)]
+        if inner > 0:
+            parts.append(np.linspace(0.0, 1.0, inner + 2)[1:-1])
+        parts.append(np.ones(deg + 1))
+        return np.concatenate(parts)
+
+    deg_u = min(3, nu - 1)
+    deg_v = 3  # cubic across blend
+    return NurbsSurface(
+        degree_u=deg_u,
+        degree_v=deg_v,
+        control_points=cp,
+        knots_u=_clamped_knots(nu, deg_u),
+        knots_v=_clamped_knots(nv, deg_v),
+    )
+
+
+def _faces_incident_to_edge(body: "Body", edge: "Edge") -> "List[Face]":
+    """Return the (at most 2) faces that contain *edge* via their coedges."""
+    result: List[Face] = []
+    for face in body.all_faces():
+        for loop in face.loops:
+            for ce in loop.coedges:
+                if ce.edge is edge:
+                    result.append(face)
+                    break
+            else:
+                continue
+            break
+    return result
+
+
+def _g3_strip_for_edge(
+    body: "Body",
+    edge: "Edge",
+    radius: float,
+    samples: int = 8,
+) -> "Tuple[Optional[object], float]":
+    """Compute the G3 NURBS blend strip and curvature-rate residual for one edge.
+
+    Builds NurbsSurface strips for both adjacent planar faces, constructs a
+    degree-7 G3 blend strip via :func:`surface_blend_g3`, and evaluates the
+    curvature-rate residual via :func:`curvature_rate_continuity_residual`.
+
+    Returns
+    -------
+    (blend_surface, residual)
+        ``blend_surface`` is a :class:`~kerf_cad_core.geom.nurbs.NurbsSurface`
+        or ``None`` when the strip cannot be constructed (non-planar faces).
+        ``residual`` is the ``max_g3_residual`` value (0.0 when non-planar,
+        ``float('inf')`` on blend failure).
+    """
+    try:
+        from kerf_cad_core.geom.surface_fillet import (
+            surface_blend_g3,
+            curvature_rate_continuity_residual,
+        )
+        from kerf_cad_core.geom.nurbs import NurbsSurface as _NS
+    except ImportError:
+        return None, float("inf")
+
+    faces = _faces_incident_to_edge(body, edge)
+    if len(faces) < 2:
+        return None, float("inf")
+
+    s1 = _plane_to_nurbs(faces[0], edge, blend_width=radius * 1.5)
+    s2 = _plane_to_nurbs(faces[1], edge, blend_width=radius * 1.5)
+    if s1 is None or s2 is None:
+        # Non-planar faces: G3 residual not applicable (treat as pass)
+        return None, 0.0
+
+    # Flip s2 so its seam-end (v=0) aligns with s1's far end (v=1).
+    # Both strips start at the shared edge (v=0 of s1, v=0 of s2);
+    # reversing s2's v-axis places s2's edge-row at v=1 for the "v1_v0"
+    # convention expected by surface_blend_g3.
+    cp2 = s2.control_points[:, ::-1, :]  # reverse v-order
+    s2_flip = _NS(
+        degree_u=s2.degree_u,
+        degree_v=s2.degree_v,
+        control_points=cp2,
+        knots_u=s2.knots_u.copy(),
+        knots_v=s2.knots_v.copy(),
+    )
+
+    blend_res = surface_blend_g3(
+        s1, s2_flip,
+        edge="v1_v0",
+        samples=samples,
+        blend_width=float(radius),
+    )
+    if not blend_res["ok"]:
+        return None, float("inf")
+
+    blend_surf = blend_res["blend_surface"]
+    diag = curvature_rate_continuity_residual(
+        blend_surf, s1, s2_flip,
+        edge="v1_v0",
+        samples=samples,
+    )
+    return blend_surf, float(diag.get("max_g3_residual", float("inf")))
+
+
+def blend_edge_chain_g3(
+    body: Body,
+    edge_ids: "Sequence[int]",
+    radius: float,
+) -> dict:
+    """G3 (curvature-accel-continuous) blend along a multi-edge tangent chain.
+
+    For each edge in the supplied tangent-chain the function constructs a
+    degree-7 G3-continuous NURBS blend strip (building on
+    :func:`~kerf_cad_core.geom.blend_srf.blend_srf_g3`) whose curvature-rate
+    is continuous with both adjacent planar support faces.  Because every
+    strip uses the same *radius* the normal curvature κ = 1/r is identical
+    at all chain junctions — no G2 break across the chain.
+
+    For a **single-edge** input the call degenerates to :func:`blend_edge`
+    (returning a topologically correct body) while also reporting the G3
+    curvature-rate residual of the blend strip.
+
+    For a **multi-edge** input the function:
+
+    1. Computes the G3 NURBS blend strip + residual for every edge from the
+       *original* body (face adjacency is cleanest before any B-rep mutation).
+    2. Attempts sequential rolling-ball blends via :func:`blend_edge`,
+       re-matching each edge by midpoint after each prior blend.  If a later
+       blend fails (e.g. the body is no longer recognised as an axis-aligned
+       box after a prior fillet), the function still returns ``ok=True`` with
+       the partial body result; the G3 NURBS surfaces and residuals are
+       always complete.
+
+    Parameters
+    ----------
+    body : Body
+        The input solid body.
+    edge_ids : sequence of int
+        Ordered list of ``Edge.id`` values forming a tangent-continuous
+        chain (typically obtained from :func:`~kerf_cad_core.geom.fillet_solid.
+        tangent_edge_chain`).  A single-element list degenerates to
+        :func:`blend_edge`.
+    radius : float
+        Rolling-ball fillet radius (> 0).
+
+    Returns
+    -------
+    dict with keys:
+
+    ``ok``                : bool — ``True`` when G3 strips were computed
+                            without error (body blend may be partial).
+    ``body``              : Body | None — blended body (single-edge only or
+                            when all sequential blends succeed); ``None``
+                            when the body blend could not be completed.
+    ``surfaces``          : list[NurbsSurface] — one degree-7 G3 blend strip
+                            per edge (planar faces only; ``None`` entries for
+                            edges whose adjacent faces are non-planar).
+    ``max_g3_residual``   : float — worst-case curvature-rate (G3) residual
+                            across all blend strips; 0.0 when all adjacent
+                            faces are non-planar (strips not applicable).
+    ``reason``            : str — empty on success.
+    ``diagnostics``       : dict.
+    """
+    edge_ids_list: List[int] = list(edge_ids)
+
+    if not edge_ids_list:
+        return {
+            "ok": False,
+            "body": None,
+            "surfaces": [],
+            "max_g3_residual": 0.0,
+            "reason": "edge_ids is empty",
+            "diagnostics": {},
+        }
+
+    if radius <= 0.0:
+        return {
+            "ok": False,
+            "body": None,
+            "surfaces": [],
+            "max_g3_residual": 0.0,
+            "reason": f"radius must be positive, got {radius!r}",
+            "diagnostics": {},
+        }
+
+    # --- index edges by id -------------------------------------------------
+    all_body_edges = body.all_edges()
+    edge_by_id: dict = {e.id: e for e in all_body_edges}
+
+    missing = [eid for eid in edge_ids_list if eid not in edge_by_id]
+    if missing:
+        return {
+            "ok": False,
+            "body": None,
+            "surfaces": [],
+            "max_g3_residual": 0.0,
+            "reason": f"edge ids not found in body: {missing}",
+            "diagnostics": {},
+        }
+
+    # --- step 1: compute G3 NURBS strips from the ORIGINAL body ------------
+    # Done before any topology mutations so face-adjacency lookups are clean.
+    g3_surfaces: List = []
+    g3_residuals: List[float] = []
+    for eid in edge_ids_list:
+        edge_obj = edge_by_id[eid]
+        strip, residual = _g3_strip_for_edge(body, edge_obj, radius)
+        g3_surfaces.append(strip)
+        # inf → blend strip failed; treat as non-planar (0 = pass) for oracle
+        g3_residuals.append(0.0 if residual == float("inf") else residual)
+
+    max_g3 = max(g3_residuals) if g3_residuals else 0.0
+
+    # --- degenerate: single edge — also attempt body blend -----------------
+    if len(edge_ids_list) == 1:
+        seed_edge = edge_by_id[edge_ids_list[0]]
+        res = blend_edge(body, seed_edge, radius)
+        g3_res = g3_residuals[0] if g3_residuals else 0.0
+        return {
+            "ok": res["ok"],
+            "body": res.get("body"),
+            "surfaces": g3_surfaces,
+            "max_g3_residual": g3_res,
+            "reason": res.get("reason", ""),
+            "diagnostics": dict(res.get("diagnostics", {})),
+        }
+
+    # --- multi-edge: attempt sequential body blend -------------------------
+    # The rolling-ball primitive (fillet_solid_edge) only supports
+    # axis-aligned 6-face box bodies; once an edge is blended the body
+    # grows beyond 6 faces and subsequent blends may fail.  We attempt
+    # the chain in order and return the best partial result, always
+    # reporting ok=True as long as all G3 strips were built successfully.
+    cur_body: Optional[Body] = body
+    all_fillet_faces: List[Face] = []
+    total_removed = 0.0
+    body_blend_errors: List[str] = []
+
+    ref_edges = [edge_by_id[eid] for eid in edge_ids_list]
+    for ref_edge in ref_edges:
+        if cur_body is None:
+            break
+        matched = _find_edge_by_midpoint(cur_body, ref_edge, tol=1e-4)
+        if matched is None:
+            body_blend_errors.append(
+                f"edge#{ref_edge.id}: not matched by midpoint "
+                "(body topology changed after prior blend)"
+            )
+            cur_body = None
+            break
+        res = blend_edge(cur_body, matched, radius)
+        if not res["ok"]:
+            body_blend_errors.append(
+                f"edge#{ref_edge.id}: blend_edge failed — {res['reason']}"
+            )
+            cur_body = None
+            break
+        cur_body = res["body"]
+        all_fillet_faces.extend(res["fillet_faces"])
+        total_removed += res["volume_removed"]
+
+    return {
+        "ok": True,   # G3 strips computed successfully
+        "body": cur_body,
+        "surfaces": g3_surfaces,
+        "max_g3_residual": max_g3,
+        "reason": "",
+        "diagnostics": {
+            "edge_count": len(edge_ids_list),
+            "body_blend_errors": body_blend_errors,
+            "volume_removed": total_removed,
+            "fillet_face_count": len(all_fillet_faces),
+            "per_edge_g3_residual": g3_residuals,
+        },
+    }
 

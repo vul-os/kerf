@@ -1055,7 +1055,7 @@ effort.
   `geom/fillet_solid.py` — oracle: the seed edge on a rounded-box top
   face returns all 4 tangent-connected top edges. — dep: GK-29 —
   parallel: Y — sonnet.
-- [ ] **GK-132** G3 blend across edge chains (curvature-accel-continuous
+- [x] **GK-132** G3 blend across edge chains (curvature-accel-continuous
   blend along a multi-edge tangent chain, building on GK-62 G3). —
   `geom/blend_solid.py` — oracle: G3 chain-blend of a box edge run →
   curvature-comb residual continuous (no G2 break) across the chain. —

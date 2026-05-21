@@ -256,6 +256,7 @@ from kerf_cad_core.geom.blend_solid import (
     blend_edge,
     blend_edges,
     blend_corner_vertex,
+    blend_edge_chain_g3,
 )
 # GK-52: SubD cage → watertight NURBS Body (Catmull-Clark limit surface)
 # GK-53: NURBS Body → SubD cage (reverse, quad-dominant)
@@ -564,6 +565,8 @@ __all__ = [
     "blend_edge",
     "blend_edges",
     "blend_corner_vertex",
+    # GK-132
+    "blend_edge_chain_g3",
     # GK-74
     "BridgeResult",
     "bridge_loops",

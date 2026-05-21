@@ -365,7 +365,7 @@ noted.
   File: `packages/kerf-api/tests/test_feature_project_types.py`
   Success: 25 per-type new-project flows; correct seed kinds; default chat system prompt.
 
-- [ ] T-69 Validation / canonical reference modules (audit harness)
+- [x] T-69 Validation / canonical reference modules (audit harness)
   Scope: meta-test asserting every kerf-cad-core / kerf-electronics validation-tagged module has a citable-reference test row.
   File: `packages/kerf-cad-core/tests/test_feature_validation_audit.py`
   Success: enumerate validated modules from `tasks.md` (#162-#184); assert ≥1 reference-anchored test per module; ≥25 modules covered.

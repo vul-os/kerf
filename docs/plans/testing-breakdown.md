@@ -235,7 +235,7 @@ noted.
   File: `packages/kerf-cad-core/tests/test_feature_drawings.py`
   Success: 25 part-drawing pairs; HLR / hidden-line correct; dimensions auto; section view.
 
-- [ ] T-43 NURBS Phase 2/3 surface ops
+- [x] T-43 NURBS Phase 2/3 surface ops
   Scope: `geom/blend_srf.py` + `patch_srf.py` + `network_srf.py` + `sweep1.py` + `sweep2.py` + `revolve_srf.py`.
   File: `packages/kerf-cad-core/tests/test_feature_nurbs_surface_ops_phase23.py`
   Success: 25 surface constructions; tangency continuity (G1) along join edges; CV count sanity.

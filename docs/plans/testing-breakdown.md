@@ -275,7 +275,7 @@ noted.
   File: `packages/kerf-cad-core/tests/test_feature_arch_spaces.py`
   Success: 25 building programs; area / volume tallies; room adjacency graph.
 
-- [ ] T-51 Civil: alignment + earthwork + hydraulics
+- [x] T-51 Civil: alignment + earthwork + hydraulics
   Scope: `civil/alignment.py` + `earthwork.py` + `hydraulics.py`.
   File: `packages/kerf-cad-core/tests/test_feature_civil_alignment.py`
   Success: 25 highway / drainage scenarios; stationing, cut/fill volumes, Manning's-n flow match references ±2%.

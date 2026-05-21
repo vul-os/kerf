@@ -200,3 +200,131 @@ def parting_line(
                     parting_pts.append(pt)
 
     return parting_pts
+
+
+# ---------------------------------------------------------------------------
+# GK-121: undercut_faces
+# ---------------------------------------------------------------------------
+
+# Colour codes for the face-colour map (CSS / viewport compatible)
+_COLOUR_UNDERCUT = "#FF4444"   # red   — undercut (pull-direction blocked)
+_COLOUR_PARTING  = "#FFAA00"   # amber — near-zero draft (parting line region)
+_COLOUR_CLEAR    = "#44BB44"   # green — positive draft (clear of undercut)
+
+# Draft-angle threshold (radians): |dot| < sin(threshold_deg) → parting zone
+_PARTING_THRESHOLD_DEG: float = 3.0
+_PARTING_THRESHOLD_SIN: float = math.sin(math.radians(_PARTING_THRESHOLD_DEG))
+
+
+def undercut_faces(
+    body: object,
+    pull_direction: Union[Sequence[float], np.ndarray],
+    *,
+    n_samples: int = _GRID,
+) -> dict:
+    """Undercut-region detection for injection-moulding / die-casting.
+
+    GK-121
+    ------
+    A face is **undercut** if its outward normal opposes the pull direction
+    (draft angle < 0°): a mould half moving along *pull_direction* cannot
+    release the part because material overhangs the face.
+
+    The algorithm samples each face on an ``n_samples × n_samples`` UV grid,
+    computes the outward normal at every sample, and classifies the face by
+    the *worst-case* (most negative) draft dot-product across all samples.
+
+    Classification
+    ~~~~~~~~~~~~~~
+    * **undercut** — at least one sample has ``n · pull_hat < 0`` (any part of
+      the face opposes demould; it will lock the part in the mould).
+    * **parting** — all samples satisfy ``|n · pull_hat| < sin(3°)`` (near-zero
+      draft; treated as parting-surface region, not locked but borderline).
+    * **clear** — all samples have ``n · pull_hat ≥ 0`` and at least one
+      exceeds the parting threshold (positive draft; releases cleanly).
+
+    Parameters
+    ----------
+    body:
+        Any ``kerf_cad_core.geom.brep.Body`` (or duck-typed object with
+        ``all_faces()`` returning ``Face``-like objects with a ``.surface``
+        supporting ``.evaluate(u, v)`` and, optionally, ``.normal(u, v)``).
+    pull_direction:
+        3-vector giving the demould pull direction (need not be unit length).
+    n_samples:
+        UV grid resolution per axis per face.  Default 16.
+
+    Returns
+    -------
+    dict with keys:
+
+    ``undercut_face_ids`` : list[int]
+        IDs (``face.id``) of all undercut faces.
+    ``face_colours`` : dict[int, str]
+        ``{face_id: colour_hex}`` for **every** face in *body*.
+        Colour key: ``"#FF4444"`` undercut / ``"#FFAA00"`` parting /
+        ``"#44BB44"`` clear.
+    ``has_undercut`` : bool
+        ``True`` iff at least one face is undercut.
+
+    Raises
+    ------
+    ValueError
+        If *pull_direction* is a zero vector.
+
+    Notes
+    -----
+    * Pure-Python / NumPy only — no OCC runtime required (hermetic).
+    * Reuses the per-face UV sampling and outward-normal helpers from GK-118.
+    """
+    pull = np.asarray(pull_direction, dtype=float).ravel()[:3]
+    pull_nrm = float(np.linalg.norm(pull))
+    if pull_nrm < 1e-15:
+        raise ValueError("pull_direction must be a non-zero vector")
+    pull_hat = pull / pull_nrm
+
+    n = int(n_samples)
+    if n < 2:
+        n = 2
+
+    undercut_ids: List[int] = []
+    face_colours: dict = {}
+
+    for face in body.all_faces():  # type: ignore[attr-defined]
+        srf = face.surface  # type: ignore[attr-defined]
+        fid = face.id  # type: ignore[attr-defined]
+        u_lo, u_hi, v_lo, v_hi = _face_surface_domain(face)
+
+        us = np.linspace(u_lo, u_hi, n)
+        vs = np.linspace(v_lo, v_hi, n)
+
+        # Collect dot-products across all UV samples
+        min_dot = float("inf")
+        max_dot = float("-inf")
+
+        for i in range(n):
+            for j in range(n):
+                d = _dot_pull(face, srf, float(us[i]), float(vs[j]), pull_hat)
+                if d < min_dot:
+                    min_dot = d
+                if d > max_dot:
+                    max_dot = d
+
+        # Classify this face
+        if min_dot < 0.0:
+            # At least one sample opposes the pull → undercut
+            colour = _COLOUR_UNDERCUT
+            undercut_ids.append(fid)
+        elif max_dot < _PARTING_THRESHOLD_SIN:
+            # All samples near-zero draft → parting zone
+            colour = _COLOUR_PARTING
+        else:
+            colour = _COLOUR_CLEAR
+
+        face_colours[fid] = colour
+
+    return {
+        "undercut_face_ids": undercut_ids,
+        "face_colours": face_colours,
+        "has_undercut": len(undercut_ids) > 0,
+    }

@@ -1085,7 +1085,7 @@ is a deliberate non-goal (§6), not an oversight.
   for FEM hand-off). — `geom/tetmesh.py` — oracle: tet-mesh a unit cube →
   Σ tet volumes = 1 ± tol; all tets positive-oriented. — dep: GK-21 —
   parallel: N — opus.
-- [ ] **GK-137** Point-cloud → mesh reconstruction (ball-pivoting /
+- [x] **GK-137** Point-cloud → mesh reconstruction (ball-pivoting /
   Poisson-lite surface recovery). — `geom/recon.py` — oracle: sampled
   points on a sphere → reconstructed closed mesh whose Hausdorff to the
   analytic sphere < tol·r. — dep: GK-55 — parallel: N — opus.

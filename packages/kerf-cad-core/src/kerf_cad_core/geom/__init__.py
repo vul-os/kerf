@@ -663,6 +663,8 @@ __all__ = [
     # GK-134
     "push_pull_face",
     "move_face",
+    # GK-137
+    "reconstruct_mesh",
 ]
 
 # GK-122: interference / collision detection
@@ -694,3 +696,5 @@ from kerf_cad_core.geom.io.rhino3dm import (
 )
 # GK-134: direct modelling — push-pull / move-face
 from kerf_cad_core.geom.direct_edit import push_pull_face, move_face
+# GK-137: point-cloud → mesh reconstruction (ball-pivoting / Poisson-lite)
+from kerf_cad_core.geom.recon import reconstruct_mesh  # noqa: E402

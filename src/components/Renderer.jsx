@@ -1,5 +1,10 @@
+<<<<<<< HEAD
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { Sun, SlidersHorizontal, Check, ChevronDown, MonitorX } from 'lucide-react'
+=======
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import { Sun, SlidersHorizontal, Check, ChevronDown } from 'lucide-react'
+>>>>>>> fd0561b4 (feat(a11y): T-C5 canvas keyboard + SR affordance)
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { Line2 } from 'three/examples/jsm/lines/Line2.js'
@@ -146,6 +151,30 @@ function geometryFromFaceTriangles(triangles) {
   return g
 }
 
+// ── T-C5: Keyboard + SR affordance ──────────────────────────────────────────
+//
+// CANVAS_KEY_MAP maps KeyboardEvent.key values (lowercased) to semantic action
+// names.  Arrow keys orbit; +/=/- zoom; r resets the view.  Exported so tests
+// can assert the full mapping without importing the component itself.
+//
+// The handlers read THREE.js orbit-control state via stateRef; no React state
+// is mutated so the camera update is zero-render-lag.
+export const CANVAS_KEY_MAP = {
+  arrowup:    'orbitUp',
+  arrowdown:  'orbitDown',
+  arrowleft:  'orbitLeft',
+  arrowright: 'orbitRight',
+  '+':        'zoomIn',
+  '=':        'zoomIn',   // same physical key, no shift required
+  '-':        'zoomOut',
+  r:          'resetView',
+}
+
+// How many radians each arrow-key press nudges the orbit azimuth / polar angle.
+const KEY_ORBIT_STEP = 0.05   // ~3°
+// Multiplicative zoom factor per keypress (>1 = dolly in, <1 = out).
+const KEY_ZOOM_FACTOR = 0.9
+
 function Renderer({
   parts,
   selectedId,
@@ -215,6 +244,9 @@ function Renderer({
   // (invoked via the imperative captureHeroShot() ref) rather than a
   // floating viewport button.
   const [, setHeroBusy] = useState(false)
+  // T-C5: screen-reader announcer text.  Written on selection change and
+  // camera reset; picked up by the role="status" live region below.
+  const [srAnnounce, setSrAnnounce] = useState('')
   const modeRef = useRef(mode)
   const selectedFeaturesRef = useRef(selectedFeatures)
   const onPickFeatureRef = useRef(onPickFeature)
@@ -222,6 +254,66 @@ function Renderer({
   useEffect(() => { modeRef.current = mode }, [mode])
   useEffect(() => { selectedFeaturesRef.current = selectedFeatures }, [selectedFeatures])
   useEffect(() => { onPickFeatureRef.current = onPickFeature }, [onPickFeature])
+
+  // T-C5: announce selection changes to screen readers.
+  useEffect(() => {
+    const id = selectedId ?? null
+    if (id) {
+      setSrAnnounce(`Selected: ${id}`)
+    } else if (selectedFeatures.length > 0) {
+      setSrAnnounce(`Selected features: ${selectedFeatures.join(', ')}`)
+    } else {
+      setSrAnnounce('No selection')
+    }
+  }, [selectedId, selectedFeatures])
+
+  // T-C5: keyboard handler — arrow keys orbit, +/-/= zoom, R resets view.
+  // Fires on the focusable wrapper div so mouse/touch paths are unaffected.
+  const handleCanvasKeyDown = useCallback((e) => {
+    const s = stateRef.current
+    if (!s) return
+    const action = CANVAS_KEY_MAP[e.key.toLowerCase()]
+    if (!action) return
+    e.preventDefault()
+    const { camera, controls } = s
+    switch (action) {
+      case 'orbitUp':
+      case 'orbitDown':
+      case 'orbitLeft':
+      case 'orbitRight': {
+        // Compute the current spherical coords of the camera relative to
+        // the orbit target and nudge azimuth (left/right) or polar (up/down).
+        const offset = camera.position.clone().sub(controls.target)
+        const spherical = new THREE.Spherical().setFromVector3(offset)
+        if (action === 'orbitLeft')  spherical.theta -= KEY_ORBIT_STEP
+        if (action === 'orbitRight') spherical.theta += KEY_ORBIT_STEP
+        if (action === 'orbitUp')    spherical.phi   = Math.max(0.05, spherical.phi - KEY_ORBIT_STEP)
+        if (action === 'orbitDown')  spherical.phi   = Math.min(Math.PI - 0.05, spherical.phi + KEY_ORBIT_STEP)
+        offset.setFromSpherical(spherical)
+        camera.position.copy(controls.target).add(offset)
+        camera.lookAt(controls.target)
+        controls.update()
+        break
+      }
+      case 'zoomIn':
+      case 'zoomOut': {
+        const factor = action === 'zoomIn' ? KEY_ZOOM_FACTOR : 1 / KEY_ZOOM_FACTOR
+        const offset = camera.position.clone().sub(controls.target).multiplyScalar(factor)
+        camera.position.copy(controls.target).add(offset)
+        controls.update()
+        break
+      }
+      case 'resetView': {
+        // Trigger the same fit-to-parts logic used on first load by firing the
+        // controls.reset() call (restores the saved state from controls.saveState()).
+        controls.reset()
+        setSrAnnounce('View reset')
+        break
+      }
+      default:
+        break
+    }
+  }, [])
 
   // Build per-part topology lazily — `getTopologyLazy` returns a Map-shaped
   // object that defers `getTopology()` until the first `.get(partId)` call.
@@ -388,6 +480,8 @@ function Renderer({
     // pan inherits the same setting; users still get correct WYSIWYG
     // panning relative to the view plane.
     controls.screenSpacePanning = true
+    // T-C5: save the initial camera state so R-key reset can restore it.
+    controls.saveState()
     // Suppress browser pinch-zoom / scroll gestures on the canvas so they
     // route through OrbitControls / our pointer handlers instead.  Also
     // prevents synthetic mouse events from being dispatched after a tap.
@@ -1451,8 +1545,28 @@ function Renderer({
   }
 
   return (
-    <div className={`relative ${className}`}>
+    /* T-C5: role="application" + tabIndex={0} make the viewport reachable via
+       Tab and give it a keyboard-accessible name.  Arrow keys orbit, +/-/=
+       zoom, R resets.  The onKeyDown fires before OrbitControls' DOM listener
+       so we preventDefault on handled keys to stop page scroll. */
+    <div
+      className={`relative ${className}`}
+      role="application"
+      aria-label="3D viewport — arrow keys orbit, + / - zoom, R resets view"
+      tabIndex={0}
+      onKeyDown={handleCanvasKeyDown}
+    >
       <div ref={mountRef} className="absolute inset-0 overflow-hidden" />
+      {/* T-C5: visually-hidden live region announces selection + camera resets
+          to screen readers without disrupting the visual layout. */}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {srAnnounce}
+      </div>
       {leaderHtml && (
         <div
           className="absolute pointer-events-none px-1.5 py-0.5 rounded bg-kerf-300 text-ink-950 text-[10px] font-mono font-semibold shadow-md"

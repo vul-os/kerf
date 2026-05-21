@@ -168,7 +168,7 @@ Each task ≈1–3h sonnet unless `[HARD]`. Always isolate in a worktree.
   Files: `src/components/Renderer.jsx`.
   Success: browsers without WebGL (or after GPU reset) see an explanatory state, not a dead viewport.
 
-- [ ] **T-C5 Keyboard + SR affordance for the canvas**
+- [x] **T-C5 Keyboard + SR affordance for the canvas**
   Scope: make the canvas container focusable with an `aria-label`, add a visually-hidden hint, and basic arrow-key orbit nudge (small, optional) so the viewport isn't a total keyboard dead-zone.
   Files: `src/components/Renderer.jsx`.
   Success: Tab reaches the viewport with a name; arrows nudge the camera; no regression to mouse/touch.

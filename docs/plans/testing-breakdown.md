@@ -454,7 +454,7 @@ escalation}).
   File: `packages/kerf-core/tests/test_rls_file_revisions.py`
   Success: 12 cases — revision content of B's file not visible; restore-from-B refused.
 
-- [ ] T-83 RLS: chat_threads + chat_messages
+- [x] T-83 RLS: chat_threads + chat_messages
   Scope: cross-tenant on `chat_threads`, `chat_messages`.
   File: `packages/kerf-core/tests/test_rls_chat.py`
   Success: 12 cases — thread of B not listable / readable; cannot post into B's thread; tool_call_id forging refused.

@@ -413,10 +413,10 @@ variants, timing).
   File: `packages/kerf-auth/tests/test_pen_enumeration_timing.py`
   Success: 10 cases — response time delta < threshold; identical error text; identical email-sent UX.
 
-- [ ] T-77 API token scope + revocation
+- [x] T-77 API token scope + revocation
   Scope: `api_tokens` table — scope enforcement, revoke is immediate, token prefix lookup not vulnerable to side-channel.
   File: `packages/kerf-auth/tests/test_pen_api_tokens.py`
-  Success: 10 cases — out-of-scope call denied; revoked token denied within 1s; bcrypt-compare timing.
+  Success: 19 cases — out-of-scope call denied; revoked token denied within 1s; sha256 timing confirmed; cross-user isolation; SQL WHERE revoked_at IS NULL verified.
 
 - [ ] T-78 Share-link abuse
   Scope: `share_links` max_uses / expires_at / revoked_at; cannot escalate beyond role.

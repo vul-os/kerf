@@ -62,7 +62,11 @@ from kerf_cad_core.geom.io.ply import (
     PlyWriteError,
 )
 
+# GK-125: DXF read+write
+from kerf_cad_core.geom.io.dxf import read_dxf, write_dxf, DxfReadError, DxfWriteError
+
 __all__ = [
+    "read_dxf","write_dxf","DxfReadError","DxfWriteError",
     "IgesReadError",
     "IgesWriteError",
     "TrimmedSurface",

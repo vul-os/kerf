@@ -339,7 +339,11 @@ from kerf_cad_core.geom.sheet_metal import (
 # GK-118: parting line generation
 from kerf_cad_core.geom.mold import parting_line
 
+# GK-125: DXF read+write
+from kerf_cad_core.geom.io.dxf import read_dxf, write_dxf, DxfReadError, DxfWriteError
+
 __all__ = [
+    "read_dxf","write_dxf","DxfReadError","DxfWriteError",
     "parting_line",
     "NurbsCurve",
     "NurbsSurface",

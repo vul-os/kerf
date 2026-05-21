@@ -424,7 +424,7 @@ variants, timing).
   File: `packages/kerf-auth/tests/test_pen_share_links.py`
   Success: 10 cases — expired/exhausted/revoked refused; viewer cannot mutate; share-link cannot escape project boundary.
 
-- [ ] T-79 Workspace invite hijack
+- [x] T-79 Workspace invite hijack
   Scope: `workspace_invites` token random, bound to inviter+invitee email, single-use.
   File: `packages/kerf-auth/tests/test_pen_workspace_invites.py`
   Success: 10 cases — token reuse refused; email mismatch refused; role escalation via tampered invite refused.

@@ -696,19 +696,37 @@ async def delete_workspace(slug: str, request: Request, payload: dict = Depends(
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+class AcceptInviteRequest(BaseModel):
+    token: str
+
+
 @router.post("/workspaces/accept")
-async def accept_workspace_invite(request: Request, payload: dict = Depends(require_auth)):
+async def accept_workspace_invite(req: AcceptInviteRequest, payload: dict = Depends(require_auth)):
     user_id = payload.get("sub")
+
+    if not req.token:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="token is required")
 
     pool = await get_pool_required()
     async with pool.acquire() as conn:
         async with conn.transaction():
             row = await conn.fetchrow(
-                "SELECT id, workspace_id, role FROM workspace_invites WHERE token = $1",
-                token,
+                "SELECT id, workspace_id, email, role FROM workspace_invites WHERE token = $1",
+                req.token,
             )
             if not row:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="invite not found")
+
+            # Email-binding: the invite is bound to a specific invitee email.
+            # Verify the authenticated user's email matches the invite's email.
+            user_row = await conn.fetchrow(
+                "SELECT email FROM users WHERE id = $1", uuid.UUID(user_id)
+            )
+            if not user_row or user_row["email"].lower() != row["email"].lower():
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="invite is not for your account",
+                )
 
             await workspaces_queries.add_workspace_member(conn, row["workspace_id"], user_id, row["role"])
             await conn.execute("DELETE FROM workspace_invites WHERE id = $1", row["id"])

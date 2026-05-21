@@ -1060,7 +1060,7 @@ effort.
   `geom/blend_solid.py` — oracle: G3 chain-blend of a box edge run →
   curvature-comb residual continuous (no G2 break) across the chain. —
   dep: GK-62, GK-131 — parallel: N — opus.
-- [ ] **GK-133** Feature recognition (classify B-rep face clusters into
+- [x] **GK-133** Feature recognition (classify B-rep face clusters into
   hole / pocket / boss / fillet / chamfer on an imported Body). —
   `geom/feature_recognition.py` — oracle: a box with a drilled hole +
   filleted edge → recogniser reports 1 hole + 1 fillet feature with
@@ -1269,7 +1269,7 @@ layer (history/UI/CAM/FEM packages), not the geometry kernel.
 | Draft analysis | ✅ GK-92 |
 | Undercut detection | 🟡 GK-121 |
 | Symmetry detection | ✅ GK-93 |
-| Feature recognition | 🟡 GK-133 |
+| Feature recognition | ✅ GK-133 |
 
 ### E. SubD
 | Capability | Status |

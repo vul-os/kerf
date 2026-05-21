@@ -558,7 +558,7 @@ Postgres schema. ≥10 user-visible assertions per spec.
   File: `tests/e2e/specs/persona_billing.spec.ts`
   Success: usage tally matches API; BETA flag hides Pricing route; features still available.
 
-- [ ] T-102 E2E share-link viewer
+- [x] T-102 E2E share-link viewer
   Scope: owner creates viewer share-link → second browser opens → cannot mutate → expiry observed.
   File: `tests/e2e/specs/persona_share_link.spec.ts`
   Success: viewer sees project; mutate UI disabled; expired token redirects to login.

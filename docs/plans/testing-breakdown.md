@@ -260,7 +260,7 @@ noted.
   File: `packages/kerf-cad-core/tests/test_feature_face_name_stability_full.py`
   Success: 25 rebuild scenarios; names stable; rename-on-collision deterministic.
 
-- [ ] T-48 Imports: DXF + DWG + KiCad + FreeCAD + IFC + Rhino
+- [x] T-48 Imports: DXF + DWG + KiCad + FreeCAD + IFC + Rhino
   Scope: `kerf-imports/{dwg,dxf,freecad,kicad,kicad_library,rhino3dm_route}` + IFC import.
   File: `packages/kerf-imports/tests/test_feature_imports_roundtrip.py`
   Success: 25 fixture files covering all 6 importers; entity-count + bbox parity post-import.

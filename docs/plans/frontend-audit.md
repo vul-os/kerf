@@ -226,7 +226,7 @@ Each task ≈1–3h sonnet unless `[HARD]`. Always isolate in a worktree.
   - **Docs/index.jsx** — `<main>` landmark confirmed; hamburger with `aria-label="Open navigation"` confirmed; hero search `aria-label` confirmed.
   - **Docs/Article.jsx** — breadcrumb `aria-label="Breadcrumb"`, prev/next nav `aria-label`, `aria-current="page"` on breadcrumb current page, `AnchorButton` with `aria-label` all confirmed.
 
-- [ ] **T-H2 [HARD] Docs sidebar → responsive mobile drawer**
+- [x] **T-H2 [HARD] Docs sidebar → responsive mobile drawer**
   Scope: if the Docs sidebar is a fixed side column (confirm in T-H1), convert to a slide-in drawer < `lg` with a hamburger toggle, focus trap, Esc, and route-change auto-close, keeping desktop two-column intact.
   Files: `src/routes/Docs/index.jsx`, `src/routes/Docs/Sidebar.jsx`, `src/routes/Docs/Article.jsx`.
   Success: docs are navigable on a phone; desktop layout unchanged.

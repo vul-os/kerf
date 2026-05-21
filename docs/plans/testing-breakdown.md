@@ -474,7 +474,7 @@ escalation}).
   File: `packages/kerf-core/tests/test_rls_billing.py`
   Success: 12 cases — B's spend invisible; cannot insert credit for self; cannot mutate B's balance.
 
-- [ ] T-87 RLS: step_tessellation_jobs + cam_jobs + fem_jobs + sim_jobs
+- [x] T-87 RLS: step_tessellation_jobs + cam_jobs + fem_jobs + sim_jobs
   Scope: cross-tenant on worker job tables.
   File: `packages/kerf-core/tests/test_rls_jobs.py`
   Success: 12 cases — cannot enqueue against B's project; cannot read B's job outputs; status leak via id-guess refused.

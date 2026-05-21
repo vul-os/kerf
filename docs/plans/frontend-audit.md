@@ -163,7 +163,7 @@ Each task ≈1–3h sonnet unless `[HARD]`. Always isolate in a worktree.
   Files: `src/components/Gumball.jsx`.
   Success: translate/rotate/scale handles are draggable by finger; mouse path unchanged; `gumball.test.js` green.
 
-- [ ] **T-C4 WebGL-unavailable / context-lost fallback**
+- [x] **T-C4 WebGL-unavailable / context-lost fallback**
   Scope: detect failed WebGL context creation and `webglcontextlost`; render a graceful message panel instead of a blank/black canvas.
   Files: `src/components/Renderer.jsx`.
   Success: browsers without WebGL (or after GPU reset) see an explanatory state, not a dead viewport.

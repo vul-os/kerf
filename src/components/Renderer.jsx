@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
-import { Sun, SlidersHorizontal, Check, ChevronDown } from 'lucide-react'
+import { Sun, SlidersHorizontal, Check, ChevronDown, MonitorX } from 'lucide-react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { Line2 } from 'three/examples/jsm/lines/Line2.js'
@@ -34,6 +34,7 @@ import { renderHeroSet as _renderHeroSet } from '../lib/heroRender.js'
 import { captureHeroShot as _captureHeroShot } from '../lib/heroShot.js'
 import HeroRenderPanel from './HeroRenderPanel.jsx'
 import { applyDocLightsToScene } from '../lib/applyDocLightsToScene.js'
+import { detectWebGL } from '../lib/detectWebGL.js'
 
 const PALETTE = [0xc9a96b, 0x6b9bc9, 0xc96b89, 0x89c96b, 0xc9b86b, 0x9b6bc9]
 const HIGHLIGHT_EMISSIVE = 0x4d3c00 // kerf yellow tint
@@ -175,6 +176,13 @@ function Renderer({
 }, ref) {
   const mountRef = useRef(null)
   const stateRef = useRef(null) // holds three.js objects across renders
+  // T-C4: WebGL availability + context-lost state.
+  // webGLUnavailable is true when the host environment lacks WebGL or when the
+  // GPU resets and fires a `webglcontextlost` event.  We check at mount time
+  // (useState initialiser runs before any DOM work) and also listen for the
+  // context-lost event so a mid-session GPU reset shows the fallback panel
+  // rather than a silently dead/black canvas.
+  const [webGLUnavailable, setWebGLUnavailable] = useState(() => !detectWebGL())
   const [hudId, setHudId] = useState(null)
   const [leaderHtml, setLeaderHtml] = useState(null) // {x, y, text} screen coords
   const [zebraOn, setZebraOn] = useState(false)
@@ -225,6 +233,9 @@ function Renderer({
   useEffect(() => {
     const mount = mountRef.current
     if (!mount) return
+    // T-C4: bail out early when WebGL is unavailable — no Three.js objects
+    // are created, so there is nothing to dispose in the cleanup.
+    if (webGLUnavailable) return
 
     // preserveDrawingBuffer lets us read pixels via toBlob() even if a
     // browser repaint sneaks in between renderer.render() and the encode.
@@ -260,6 +271,17 @@ function Renderer({
     renderer.domElement.style.display = 'block'
     renderer.domElement.style.width = '100%'
     renderer.domElement.style.height = '100%'
+
+    // T-C4: context-lost handler — GPU resets (driver crash, Tab Throttling,
+    // mobile memory pressure) fire this event.  We prevent the default (which
+    // stops the browser from trying to restore the context automatically, since
+    // we can't sensibly recover mid-session) and flip the fallback flag so the
+    // React tree swaps the dead canvas for the explanatory status panel.
+    function onContextLost(ev) {
+      ev.preventDefault()
+      setWebGLUnavailable(true)
+    }
+    renderer.domElement.addEventListener('webglcontextlost', onContextLost)
 
     const scene = new THREE.Scene()
     // Soft studio gradient via Canvas2D → CanvasTexture.  This is the default
@@ -694,6 +716,7 @@ function Renderer({
       running = false
       ro.disconnect()
       cancelLongPress()
+      renderer.domElement.removeEventListener('webglcontextlost', onContextLost)
       renderer.domElement.removeEventListener('pointermove', onPointerMove)
       renderer.domElement.removeEventListener('pointerdown', onPointerDown)
       renderer.domElement.removeEventListener('pointerup', onPointerUp)
@@ -717,7 +740,10 @@ function Renderer({
       if (renderer.domElement.parentNode === mount) mount.removeChild(renderer.domElement)
       stateRef.current = null
     }
-  }, [])
+  // webGLUnavailable is in deps so if context-lost fires (setting it true) the
+  // effect re-runs: the early return at the top tears down and skips re-init.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [webGLUnavailable])
 
   // Keep onPick in a ref so the click handler always uses the latest.
   useEffect(() => {
@@ -1399,6 +1425,30 @@ function Renderer({
 
   // HUD shows the prop-driven selection if present, else the last clicked id.
   const displayedId = selectedId ?? hudId
+
+  // T-C4: WebGL-unavailable fallback panel.  Shown instead of the canvas
+  // when the browser lacks WebGL support OR when a `webglcontextlost` event
+  // fires (GPU reset / driver crash).  role=status + aria-live lets screen
+  // readers announce the change without the user having to navigate to it.
+  if (webGLUnavailable) {
+    return (
+      <div
+        className={`relative flex items-center justify-center bg-ink-900 ${className}`}
+        role="status"
+        aria-live="polite"
+        data-testid="renderer-webgl-fallback"
+      >
+        <div className="flex flex-col items-center gap-3 text-ink-500 px-6 text-center">
+          <MonitorX size={36} className="text-ink-600" aria-hidden="true" />
+          <p className="text-sm font-medium text-ink-400">3D viewport unavailable</p>
+          <p className="text-xs text-ink-600 max-w-xs">
+            Your browser or device does not support WebGL, or the GPU context
+            was lost. Try reloading the page or updating your graphics drivers.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className={`relative ${className}`}>

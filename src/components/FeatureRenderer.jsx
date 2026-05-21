@@ -41,10 +41,12 @@
 
 import { useEffect, useImperativeHandle, useRef, useState, forwardRef } from 'react'
 import * as THREE from 'three'
+import { MonitorX } from 'lucide-react'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { cullByFrustum, frustumCullEnabled } from '../lib/frustumCull.js'
 import { materialFor } from '../lib/jewelryMaterials.js'
+import { detectWebGL } from '../lib/detectWebGL.js'
 
 const BG_COLOR = 0x0f1115
 const HOVER_FACE = 0xffd633
@@ -75,6 +77,8 @@ const FeatureRenderer = forwardRef(function FeatureRenderer({
 }, ref) {
   const mountRef = useRef(null)
   const stateRef = useRef(null)
+  // T-C4: WebGL availability + context-lost flag (mirrors Renderer.jsx logic).
+  const [webGLUnavailable, setWebGLUnavailable] = useState(() => !detectWebGL())
   const [hoverInfo, setHoverInfo] = useState(null) // { kind, label }
   const pickModeRef = useRef(pickMode)
   const selectionRef = useRef(selection)
@@ -98,6 +102,8 @@ const FeatureRenderer = forwardRef(function FeatureRenderer({
   useEffect(() => {
     const mount = mountRef.current
     if (!mount) return
+    // T-C4: bail when WebGL is unavailable.
+    if (webGLUnavailable) return
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true })
     renderer.setPixelRatio(window.devicePixelRatio || 1)
     renderer.setClearColor(BG_COLOR, 1)
@@ -105,6 +111,13 @@ const FeatureRenderer = forwardRef(function FeatureRenderer({
     renderer.domElement.style.display = 'block'
     renderer.domElement.style.width = '100%'
     renderer.domElement.style.height = '100%'
+
+    // T-C4: context-lost → show fallback.
+    function onContextLost(ev) {
+      ev.preventDefault()
+      setWebGLUnavailable(true)
+    }
+    renderer.domElement.addEventListener('webglcontextlost', onContextLost)
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(BG_COLOR)
@@ -348,6 +361,7 @@ const FeatureRenderer = forwardRef(function FeatureRenderer({
     return () => {
       running = false
       ro.disconnect()
+      renderer.domElement.removeEventListener('webglcontextlost', onContextLost)
       renderer.domElement.removeEventListener('mousemove', onMove)
       renderer.domElement.removeEventListener('mousedown', onDown)
       window.removeEventListener('mouseup', onUp)
@@ -369,7 +383,8 @@ const FeatureRenderer = forwardRef(function FeatureRenderer({
       if (renderer.domElement.parentNode === mount) mount.removeChild(renderer.domElement)
       stateRef.current = null
     }
-  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [webGLUnavailable])
 
   // ----- Build / rebuild meshes when `meshes` changes -----
   useEffect(() => {
@@ -585,6 +600,27 @@ const FeatureRenderer = forwardRef(function FeatureRenderer({
   useImperativeHandle(ref, () => ({
     snapshot: () => stateRef.current?.renderer?.domElement?.toDataURL?.('image/png'),
   }), [])
+
+  // T-C4: WebGL fallback panel.
+  if (webGLUnavailable) {
+    return (
+      <div
+        className={`relative flex items-center justify-center bg-ink-900 ${className}`}
+        role="status"
+        aria-live="polite"
+        data-testid="feature-renderer-webgl-fallback"
+      >
+        <div className="flex flex-col items-center gap-3 text-ink-500 px-6 text-center">
+          <MonitorX size={36} className="text-ink-600" aria-hidden="true" />
+          <p className="text-sm font-medium text-ink-400">3D viewport unavailable</p>
+          <p className="text-xs text-ink-600 max-w-xs">
+            Your browser or device does not support WebGL, or the GPU context
+            was lost. Try reloading the page or updating your graphics drivers.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className={`relative ${className}`}>

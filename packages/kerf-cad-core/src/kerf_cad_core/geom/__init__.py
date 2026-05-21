@@ -329,7 +329,11 @@ from kerf_cad_core.geom.sheet_metal import (
     unfold_sheet,
 )
 
+# GK-118: parting line generation
+from kerf_cad_core.geom.mold import parting_line
+
 __all__ = [
+    "parting_line",
     "NurbsCurve",
     "NurbsSurface",
     "de_boor",

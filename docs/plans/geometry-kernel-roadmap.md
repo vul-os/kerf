@@ -945,7 +945,7 @@ effort.
   target triangle count / ratio). — `geom/mesh_repair.py` — oracle:
   decimate a 10k-tri sphere to 10% → manifold preserved, Hausdorff <
   tol·r. — dep: GK-55 — parallel: Y — sonnet.
-- [ ] **GK-110** Mesh repair: hole-fill, non-manifold-edge fix,
+- [x] **GK-110** Mesh repair: hole-fill, non-manifold-edge fix,
   duplicate-vertex weld, normal-consistency. — `geom/mesh_repair.py` —
   oracle: a sphere mesh with a deleted triangle → hole-filled to closed
   manifold (Euler χ=2). — dep: GK-55 — parallel: Y — sonnet.

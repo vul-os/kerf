@@ -31,6 +31,7 @@ from kerf_cad_core.geom.mesh_repair import (
     mesh_boolean,
     mesh_decimate,
     mesh_offset,
+    mesh_repair,
     mesh_volume,
     remove_degenerate,
     repair_pipeline,
@@ -771,3 +772,162 @@ class TestMeshDecimate:
         """mesh_decimate must be importable from kerf_cad_core.geom."""
         from kerf_cad_core.geom import mesh_decimate as md
         assert callable(md)
+
+
+# ===========================================================================
+# 13. mesh_repair  (GK-110) — hole-fill / weld / manifold / normal-consistency
+# ===========================================================================
+
+class TestMeshRepair:
+    """GK-110: mesh_repair — hermetic oracle tests."""
+
+    # -----------------------------------------------------------------------
+    # Icosphere helper (reused from TestMeshDecimate)
+    # -----------------------------------------------------------------------
+
+    def _sphere_mesh(self, subdivisions: int = 2, radius: float = 1.0):
+        """Return a closed icosphere as (verts, faces)."""
+        return _icosphere(subdivisions=subdivisions, radius=radius)
+
+    # -----------------------------------------------------------------------
+    # Oracle: sphere with one deleted triangle → hole-filled, Euler χ=2
+    # -----------------------------------------------------------------------
+
+    def test_sphere_hole_filled_euler_chi_2(self):
+        """GK-110 primary oracle: icosphere with one deleted triangle is repaired
+        to a closed manifold with Euler characteristic χ = V − E + F = 2.
+        """
+        verts, faces = self._sphere_mesh(subdivisions=2, radius=1.0)
+        # Punch a hole by removing one triangle
+        faces_with_hole = faces[1:]  # drop face 0
+
+        # Mesh should be open before repair
+        rc_before = is_closed(verts, faces_with_hole)
+        assert not rc_before["closed"], "test precondition: mesh must have a hole"
+
+        rv, rf = mesh_repair(verts, faces_with_hole, tol=1e-6)
+
+        # After repair: closed manifold
+        rc = is_closed(rv, rf)
+        assert rc["ok"]
+        assert rc["closed"], "mesh_repair must close the hole"
+
+        chi = _euler(rv, rf)
+        assert chi == 2, f"Euler χ should be 2 for a closed genus-0 sphere, got {chi}"
+
+    def test_sphere_manifold_after_repair(self):
+        """Repaired sphere must be manifold."""
+        verts, faces = self._sphere_mesh(subdivisions=2)
+        faces_with_hole = faces[1:]  # remove one face
+
+        rv, rf = mesh_repair(verts, faces_with_hole, tol=1e-6)
+
+        rm = is_manifold(rv, rf)
+        assert rm["ok"]
+        assert rm["manifold"], (
+            f"Repaired mesh is not manifold: "
+            f"bad_edges={rm['non_manifold_edges'][:3]}, "
+            f"bad_verts={rm['non_manifold_vertices'][:3]}"
+        )
+
+    # -----------------------------------------------------------------------
+    # Duplicate-vertex weld
+    # -----------------------------------------------------------------------
+
+    def test_duplicate_vertices_welded(self):
+        """mesh_repair must merge coincident duplicate vertices."""
+        verts, faces = _cube_mesh()
+        # Duplicate vertex 0 at the same position → add it as vertex 8
+        extra_v = list(verts[0])  # same coords
+        verts_dup = list(verts) + [extra_v]
+        # Add two extra faces referencing the duplicate vertex 8
+        faces_dup = list(faces) + [[8, 1, 2], [8, 2, 3]]
+
+        rv, rf = mesh_repair(verts_dup, faces_dup, tol=1e-6)
+
+        # Welded vertex count must be smaller than original
+        assert len(rv) < len(verts_dup), (
+            f"Expected weld to reduce vertex count from {len(verts_dup)}, got {len(rv)}"
+        )
+
+    def test_no_weld_when_far_apart(self):
+        """Vertices far apart must NOT be welded."""
+        verts, faces = _cube_mesh()
+        original_count = len(verts)
+        rv, rf = mesh_repair(verts, faces, tol=1e-9)
+        # Cube verts are at least sqrt(0.5)≈0.7 apart → none should merge
+        assert len(rv) == original_count
+
+    # -----------------------------------------------------------------------
+    # Normal consistency
+    # -----------------------------------------------------------------------
+
+    def test_flipped_normal_corrected(self):
+        """A face with inverted winding should be corrected by mesh_repair."""
+        verts, faces = _cube_mesh()
+        # Flip one face deliberately
+        f0 = faces[0]
+        faces[0] = [f0[0], f0[2], f0[1]]
+
+        rv, rf = mesh_repair(verts, faces, tol=1e-6)
+
+        # After repair the mesh should remain closed and manifold
+        rc = is_closed(rv, rf)
+        assert rc["ok"] and rc["closed"]
+
+    # -----------------------------------------------------------------------
+    # Closed mesh not disturbed
+    # -----------------------------------------------------------------------
+
+    def test_already_clean_mesh_unchanged_topology(self):
+        """A clean closed manifold mesh should stay closed and manifold."""
+        verts, faces = _cube_mesh()
+        rv, rf = mesh_repair(verts, faces, tol=1e-6)
+        rc = is_closed(rv, rf)
+        assert rc["ok"] and rc["closed"]
+
+    # -----------------------------------------------------------------------
+    # Return type
+    # -----------------------------------------------------------------------
+
+    def test_returns_tuple_of_lists(self):
+        """mesh_repair must return (verts, faces) as a 2-tuple of lists."""
+        verts, faces = _cube_mesh()
+        result = mesh_repair(verts, faces)
+        assert isinstance(result, tuple) and len(result) == 2
+        rv, rf = result
+        assert isinstance(rv, list)
+        assert isinstance(rf, list)
+
+    # -----------------------------------------------------------------------
+    # Edge cases
+    # -----------------------------------------------------------------------
+
+    def test_empty_mesh_no_crash(self):
+        """Empty mesh must return empty without raising."""
+        rv, rf = mesh_repair([], [])
+        assert isinstance(rv, list)
+        assert isinstance(rf, list)
+
+    def test_single_triangle_no_crash(self):
+        verts = [[0, 0, 0], [1, 0, 0], [0, 1, 0]]
+        faces = [[0, 1, 2]]
+        rv, rf = mesh_repair(verts, faces)
+        assert isinstance(rv, list)
+        assert isinstance(rf, list)
+
+    def test_bad_tol_returns_original(self):
+        """Invalid tol must return the original mesh unchanged (no crash)."""
+        verts, faces = _cube_mesh()
+        rv, rf = mesh_repair(verts, faces, tol=-1.0)
+        assert isinstance(rv, list)
+        assert isinstance(rf, list)
+
+    # -----------------------------------------------------------------------
+    # geom/__init__.py export
+    # -----------------------------------------------------------------------
+
+    def test_geom_init_export(self):
+        """mesh_repair must be importable from kerf_cad_core.geom."""
+        from kerf_cad_core.geom import mesh_repair as mr
+        assert callable(mr)

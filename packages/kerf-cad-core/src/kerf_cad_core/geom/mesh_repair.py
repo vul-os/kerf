@@ -1414,6 +1414,104 @@ def repair_pipeline(
 
 
 # ===========================================================================
+# mesh_repair  (GK-110) — tuple-returning full repair API
+# ===========================================================================
+
+def mesh_repair(
+    verts: Sequence,
+    faces: Sequence,
+    tol: float = 1e-6,
+) -> Tuple[List[Vert], List[Face]]:
+    """Repair a triangle mesh: weld duplicate vertices, fill holes, fix non-manifold
+    edges, and unify normals for consistency.
+
+    This is the GK-110 high-level repair entry point.  It runs the full pipeline:
+
+    1. **Weld** — merge vertices within *tol* of each other (duplicate-vertex fix).
+    2. **Unify normals** — BFS reorient so all face normals point consistently outward.
+    3. **Fill holes** — detect boundary loops and fan-triangulate each one.
+    4. **Remove degenerate** — drop zero-area / duplicate faces; this also implicitly
+       fixes non-manifold edges introduced by the hole-fill step.
+
+    After step 4 any edge that was shared by >2 faces is resolved by keeping only
+    the first 2 incident faces (non-manifold edge fix).
+
+    Parameters
+    ----------
+    verts : list of [x, y, z]
+        Vertex coordinates.
+    faces : list of [i, j, k]
+        Triangle face indices (0-based, CCW winding = outward normal).
+    tol : float, optional
+        Weld tolerance.  Vertices within this Euclidean distance are merged.
+        Default is 1e-6.
+
+    Returns
+    -------
+    (verts, faces) : Tuple[list, list]
+        Repaired mesh.  Returns the original mesh unchanged on any error so
+        callers never crash.
+
+    Raises
+    ------
+    Never raises — any failure silently returns the input mesh.
+    """
+    try:
+        if not isinstance(tol, (int, float)) or tol < 0:
+            # Bad tolerance — return original unchanged
+            vs, fs = _copy_mesh(verts, faces)
+            return vs, fs
+
+        err = _validate_mesh(verts, faces)
+        if err:
+            vs, fs = _copy_mesh(verts, faces)
+            return vs, fs
+
+        vs, fs = _copy_mesh(verts, faces)
+
+        # 1. Weld duplicate vertices
+        r = weld_vertices(vs, fs, tol=tol)
+        if r["ok"]:
+            vs, fs = r["verts"], r["faces"]
+
+        # 2. Unify face normals (BFS consistency)
+        r = unify_normals(vs, fs)
+        if r["ok"]:
+            vs, fs = r["verts"], r["faces"]
+
+        # 3. Fill boundary holes (fan triangulation)
+        r = fill_holes(vs, fs)
+        if r["ok"]:
+            vs, fs = r["verts"], r["faces"]
+
+        # 4. Remove zero-area / duplicate faces
+        r = remove_degenerate(vs, fs)
+        if r["ok"]:
+            vs, fs = r["verts"], r["faces"]
+
+        # 5. Non-manifold edge fix: keep only the first 2 faces per edge
+        ef = _edge_face_map(fs)
+        bad_edge_faces: Set[int] = set()
+        for edge, flist in ef.items():
+            if len(flist) > 2:
+                # Drop all but the first two faces sharing this edge
+                for fi in flist[2:]:
+                    bad_edge_faces.add(fi)
+        if bad_edge_faces:
+            fs = [f for i, f in enumerate(fs) if i not in bad_edge_faces]
+
+        return vs, fs
+
+    except Exception:
+        # Last-resort fallback
+        try:
+            vs2, fs2 = _copy_mesh(verts, faces)
+            return vs2, fs2
+        except Exception:
+            return list(verts), list(faces)
+
+
+# ===========================================================================
 # mesh_decimate  (GK-109) — simple tuple-returning QEM decimation API
 # ===========================================================================
 

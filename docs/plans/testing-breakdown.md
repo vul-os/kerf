@@ -315,7 +315,7 @@ noted.
   File: `packages/kerf-chat/tests/test_feature_chat_tool_roundtrip.py`
   Success: 25 chat turns invoking diverse tools; revisions append; assistant message references tool result.
 
-- [ ] T-59 Chat: prompt caching wire-up
+- [x] T-59 Chat: prompt caching wire-up
   Scope: Anthropic prompt-cache headers reach API; cache-hit metric recorded.
   File: `packages/kerf-chat/tests/test_feature_chat_prompt_cache.py`
   Success: 25 multi-turn sessions; first turn primes cache, subsequent turns hit; provider client mocked.

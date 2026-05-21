@@ -295,7 +295,7 @@ noted.
   File: `packages/kerf-wiring/tests/test_feature_wiring_harness.py`
   Success: 25 harness specs; SVG/JSON output; pinmap integrity vs source schematic.
 
-- [ ] T-55 Parts ingest + partsgen
+- [x] T-55 Parts ingest + partsgen
   Scope: `kerf-parts/seed.py` + `kerf-partsgen/generators/`.
   File: `packages/kerf-parts/tests/test_feature_parts_ingest_gen.py`
   Success: 25 part families (fasteners + connectors); manifest hash deterministic; auto-attribution present.

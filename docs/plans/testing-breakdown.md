@@ -230,7 +230,7 @@ noted.
   File: `packages/kerf-cad-core/tests/test_feature_sketcher_v2.py`
   Success: 25 sketches (incl. over-/under-constrained); solver converges; DOF report.
 
-- [ ] T-42 Drawings: project / dimension / annotate
+- [x] T-42 Drawings: project / dimension / annotate
   Scope: drawing-kind file generation (projection.test.js parity server side).
   File: `packages/kerf-cad-core/tests/test_feature_drawings.py`
   Success: 25 part-drawing pairs; HLR / hidden-line correct; dimensions auto; section view.

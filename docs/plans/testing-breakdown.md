@@ -340,7 +340,7 @@ noted.
   File: `packages/kerf-cloud/tests/test_feature_cloud_git.py`
   Success: 25 git operations (fetch / push / install / uninstall); installation token rotation; PEM keys not leaked.
 
-- [ ] T-64 Billing buckets (kerf_free / kerf_paid / byo)
+- [x] T-64 Billing buckets (kerf_free / kerf_paid / byo)
   Scope: `kerf-billing/buckets.py` + `spend.py` + `scheduler.py` cron close-out.
   File: `packages/kerf-billing/tests/test_feature_billing_buckets.py`
   Success: 25 usage scenarios across all three buckets; spend tally correct; cheap-models-only enforcement on kerf_free; BYO bypasses meter.

@@ -1952,3 +1952,110 @@ def split_composite(
             "total_length": right_length,
         },
     ]
+
+
+# ---------------------------------------------------------------------------
+# GK-99: Mid-curve (average of two NURBS curves)
+# ---------------------------------------------------------------------------
+
+def _make_curves_compatible(a: NurbsCurve, b: NurbsCurve):
+    """Return (a', b') with identical degree and knot vector (control-point-wise average ready).
+
+    Strategy:
+    1. Elevate degree of the lower-degree curve to match the higher.
+    2. Merge knot vectors: insert into each curve any knots the other has that
+       it does not (up to existing multiplicity).  After this both curves share
+       the same knot vector and therefore the same number of control points.
+    """
+    from kerf_cad_core.geom.nurbs import degree_elevation, knot_insertion
+
+    # --- Step 1: degree elevation ---
+    if a.degree < b.degree:
+        a = degree_elevation(a, b.degree)
+    elif b.degree < a.degree:
+        b = degree_elevation(b, a.degree)
+
+    degree = a.degree
+
+    # --- Step 2: merge knot vectors ---
+    # Normalise domain of both curves to [0, 1].
+    def _normalise_knots(crv: NurbsCurve) -> NurbsCurve:
+        k = crv.knots.copy().astype(float)
+        lo, hi = k[0], k[-1]
+        if abs(hi - lo) < 1e-14:
+            return crv
+        k = (k - lo) / (hi - lo)
+        return NurbsCurve(degree=crv.degree, control_points=crv.control_points.copy(), knots=k,
+                          weights=crv.weights)
+
+    a = _normalise_knots(a)
+    b = _normalise_knots(b)
+
+    # Collect internal (non-clamped) knots from each side
+    def _internal_knots(crv: NurbsCurve) -> np.ndarray:
+        k = crv.knots
+        d = crv.degree
+        return k[d + 1: -(d + 1)]
+
+    def _multiplicity(knots: np.ndarray, u: float, tol: float = 1e-10) -> int:
+        return int(np.sum(np.abs(knots - u) < tol))
+
+    def _insert_missing(crv: NurbsCurve, ref: NurbsCurve) -> NurbsCurve:
+        """Insert into *crv* every knot in *ref* that crv is missing (or has lower multiplicity)."""
+        ref_int = _internal_knots(ref)
+        if len(ref_int) == 0:
+            return crv
+        # Group by unique value
+        inserted = crv
+        visited = set()
+        for u in ref_int:
+            key = round(u, 12)
+            if key in visited:
+                continue
+            visited.add(key)
+            mult_ref = _multiplicity(ref.knots, u)
+            mult_cur = _multiplicity(inserted.knots, u)
+            times = mult_ref - mult_cur
+            if times > 0:
+                inserted = knot_insertion(inserted, u, times)
+        return inserted
+
+    a = _insert_missing(a, b)
+    b = _insert_missing(b, a)
+
+    return a, b
+
+
+def mid_curve(curve_a: NurbsCurve, curve_b: NurbsCurve) -> NurbsCurve:
+    """Return the mid-curve (CP-wise average) of two NURBS curves.
+
+    The two input curves are first made knot-compatible (degree elevation +
+    knot insertion so they share the same knot vector), then each pair of
+    corresponding control points is averaged.
+
+    Parameters
+    ----------
+    curve_a, curve_b:
+        Input NurbsCurve objects.  They may have different degrees, different
+        knot vectors, and different numbers of control points.
+
+    Returns
+    -------
+    NurbsCurve
+        A new curve whose control points are ``(P_a + P_b) / 2``.
+    """
+    a, b = _make_curves_compatible(curve_a, curve_b)
+    if a.control_points.shape != b.control_points.shape:
+        raise ValueError(
+            f"mid_curve: after compatibility pass CP counts differ: "
+            f"{a.control_points.shape} vs {b.control_points.shape}"
+        )
+    mid_pts = 0.5 * (a.control_points + b.control_points)
+    # Average weights if either side is rational
+    mid_weights = None
+    wa = a.weights if a.weights is not None else np.ones(len(a.control_points))
+    wb = b.weights if b.weights is not None else np.ones(len(b.control_points))
+    if a.weights is not None or b.weights is not None:
+        mid_weights = 0.5 * (wa + wb)
+    return NurbsCurve(degree=a.degree, control_points=mid_pts, knots=a.knots.copy(),
+                      weights=mid_weights)

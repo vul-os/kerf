@@ -1332,3 +1332,209 @@ if _REGISTRY_AVAILABLE:
             "degree_v": surf.degree_v,
             "max_deviation": result["max_deviation"],
         })
+
+
+# ---------------------------------------------------------------------------
+# GK-99: Mid-surface (CP-wise average of two NURBS surfaces)
+# ---------------------------------------------------------------------------
+
+def _normalise_surface_knots(srf: NurbsSurface) -> NurbsSurface:
+    """Re-scale both knot vectors to [0, 1]."""
+    def _norm(k: np.ndarray) -> np.ndarray:
+        lo, hi = k[0], k[-1]
+        if abs(hi - lo) < 1e-14:
+            return k.copy()
+        return (k - lo) / (hi - lo)
+
+    return NurbsSurface(
+        degree_u=srf.degree_u,
+        degree_v=srf.degree_v,
+        control_points=srf.control_points.copy(),
+        knots_u=_norm(srf.knots_u),
+        knots_v=_norm(srf.knots_v),
+        weights=srf.weights,
+    )
+
+
+def _surface_degree_elevate_u(srf: NurbsSurface, new_deg: int) -> NurbsSurface:
+    """Elevate degree in U by applying curve degree_elevation to every V-row."""
+    from kerf_cad_core.geom.nurbs import NurbsCurve, degree_elevation
+    if new_deg <= srf.degree_u:
+        return srf
+    nu, nv, dim = srf.control_points.shape
+    new_rows = []
+    new_knots_u = None
+    for j in range(nv):
+        col_pts = srf.control_points[:, j, :]
+        w_col = srf.weights[:, j] if srf.weights is not None else None
+        crv = NurbsCurve(degree=srf.degree_u, control_points=col_pts, knots=srf.knots_u,
+                         weights=w_col)
+        crv2 = degree_elevation(crv, new_deg)
+        new_rows.append(crv2.control_points)
+        if new_knots_u is None:
+            new_knots_u = crv2.knots
+    # Stack back: shape (nu', nv, dim)
+    new_cp = np.stack(new_rows, axis=1)  # (nu', nv, dim)
+    return NurbsSurface(degree_u=new_deg, degree_v=srf.degree_v,
+                        control_points=new_cp, knots_u=new_knots_u,
+                        knots_v=srf.knots_v.copy(), weights=None)
+
+
+def _surface_degree_elevate_v(srf: NurbsSurface, new_deg: int) -> NurbsSurface:
+    """Elevate degree in V by applying curve degree_elevation to every U-row."""
+    from kerf_cad_core.geom.nurbs import NurbsCurve, degree_elevation
+    if new_deg <= srf.degree_v:
+        return srf
+    nu, nv, dim = srf.control_points.shape
+    new_cols = []
+    new_knots_v = None
+    for i in range(nu):
+        row_pts = srf.control_points[i, :, :]
+        w_row = srf.weights[i, :] if srf.weights is not None else None
+        crv = NurbsCurve(degree=srf.degree_v, control_points=row_pts, knots=srf.knots_v,
+                         weights=w_row)
+        crv2 = degree_elevation(crv, new_deg)
+        new_cols.append(crv2.control_points)
+        if new_knots_v is None:
+            new_knots_v = crv2.knots
+    # Stack back: shape (nu, nv', dim)
+    new_cp = np.stack(new_cols, axis=0)  # (nu, nv', dim)
+    return NurbsSurface(degree_u=srf.degree_u, degree_v=new_deg,
+                        control_points=new_cp, knots_u=srf.knots_u.copy(),
+                        knots_v=new_knots_v, weights=None)
+
+
+def _surface_insert_knots_u(srf: NurbsSurface, u: float, times: int) -> NurbsSurface:
+    """Insert knot u in U direction *times* into all V-iso-rows."""
+    from kerf_cad_core.geom.nurbs import NurbsCurve, knot_insertion
+    nu, nv, dim = srf.control_points.shape
+    new_rows = []
+    new_knots_u = None
+    for j in range(nv):
+        col_pts = srf.control_points[:, j, :]
+        crv = NurbsCurve(degree=srf.degree_u, control_points=col_pts, knots=srf.knots_u)
+        crv2 = knot_insertion(crv, u, times)
+        new_rows.append(crv2.control_points)
+        if new_knots_u is None:
+            new_knots_u = crv2.knots
+    new_cp = np.stack(new_rows, axis=1)
+    return NurbsSurface(degree_u=srf.degree_u, degree_v=srf.degree_v,
+                        control_points=new_cp, knots_u=new_knots_u,
+                        knots_v=srf.knots_v.copy(), weights=None)
+
+
+def _surface_insert_knots_v(srf: NurbsSurface, v: float, times: int) -> NurbsSurface:
+    """Insert knot v in V direction *times* into all U-iso-rows."""
+    from kerf_cad_core.geom.nurbs import NurbsCurve, knot_insertion
+    nu, nv, dim = srf.control_points.shape
+    new_cols = []
+    new_knots_v = None
+    for i in range(nu):
+        row_pts = srf.control_points[i, :, :]
+        crv = NurbsCurve(degree=srf.degree_v, control_points=row_pts, knots=srf.knots_v)
+        crv2 = knot_insertion(crv, v, times)
+        new_cols.append(crv2.control_points)
+        if new_knots_v is None:
+            new_knots_v = crv2.knots
+    new_cp = np.stack(new_cols, axis=0)
+    return NurbsSurface(degree_u=srf.degree_u, degree_v=srf.degree_v,
+                        control_points=new_cp, knots_u=srf.knots_u.copy(),
+                        knots_v=new_knots_v, weights=None)
+
+
+def _make_surfaces_compatible(a: NurbsSurface, b: NurbsSurface):
+    """Return (a', b') sharing degree_u, degree_v, knots_u, knots_v."""
+    # Normalise knot domains to [0, 1]
+    a = _normalise_surface_knots(a)
+    b = _normalise_surface_knots(b)
+
+    # Match degrees in U then V
+    if a.degree_u < b.degree_u:
+        a = _surface_degree_elevate_u(a, b.degree_u)
+    elif b.degree_u < a.degree_u:
+        b = _surface_degree_elevate_u(b, a.degree_u)
+
+    if a.degree_v < b.degree_v:
+        a = _surface_degree_elevate_v(a, b.degree_v)
+    elif b.degree_v < a.degree_v:
+        b = _surface_degree_elevate_v(b, a.degree_v)
+
+    # Insert missing knots in U
+    def _mult(knots: np.ndarray, u: float, tol: float = 1e-10) -> int:
+        return int(np.sum(np.abs(knots - u) < tol))
+
+    def _internal(srf: NurbsSurface, axis: str) -> np.ndarray:
+        knots = srf.knots_u if axis == 'u' else srf.knots_v
+        deg = srf.degree_u if axis == 'u' else srf.degree_v
+        return knots[deg + 1: -(deg + 1)]
+
+    def _insert_u(s: NurbsSurface, ref: NurbsSurface) -> NurbsSurface:
+        visited: set = set()
+        for u in _internal(ref, 'u'):
+            key = round(u, 12)
+            if key in visited:
+                continue
+            visited.add(key)
+            times = _mult(ref.knots_u, u) - _mult(s.knots_u, u)
+            if times > 0:
+                s = _surface_insert_knots_u(s, u, times)
+        return s
+
+    def _insert_v(s: NurbsSurface, ref: NurbsSurface) -> NurbsSurface:
+        visited: set = set()
+        for v in _internal(ref, 'v'):
+            key = round(v, 12)
+            if key in visited:
+                continue
+            visited.add(key)
+            times = _mult(ref.knots_v, v) - _mult(s.knots_v, v)
+            if times > 0:
+                s = _surface_insert_knots_v(s, v, times)
+        return s
+
+    a = _insert_u(a, b)
+    b = _insert_u(b, a)
+    a = _insert_v(a, b)
+    b = _insert_v(b, a)
+
+    return a, b
+
+
+def mid_surface(surf_a: NurbsSurface, surf_b: NurbsSurface) -> NurbsSurface:
+    """Return the mid-surface (CP-wise average) of two NURBS surfaces.
+
+    The two input surfaces are first made knot-compatible (degree elevation +
+    knot insertion in both U and V so they share the same knot vectors), then
+    each pair of corresponding control points is averaged.
+
+    Parameters
+    ----------
+    surf_a, surf_b:
+        Input NurbsSurface objects.  They may have different degrees and knot
+        vectors but must share the same spatial dimension (typically 3).
+
+    Returns
+    -------
+    NurbsSurface
+        A new surface whose control points are ``(P_a + P_b) / 2``.
+    """
+    a, b = _make_surfaces_compatible(surf_a, surf_b)
+    if a.control_points.shape != b.control_points.shape:
+        raise ValueError(
+            f"mid_surface: after compatibility pass CP shapes differ: "
+            f"{a.control_points.shape} vs {b.control_points.shape}"
+        )
+    mid_cp = 0.5 * (a.control_points + b.control_points)
+    mid_weights = None
+    if a.weights is not None or b.weights is not None:
+        wa = a.weights if a.weights is not None else np.ones(a.control_points.shape[:2])
+        wb = b.weights if b.weights is not None else np.ones(b.control_points.shape[:2])
+        mid_weights = 0.5 * (wa + wb)
+    return NurbsSurface(
+        degree_u=a.degree_u,
+        degree_v=a.degree_v,
+        control_points=mid_cp,
+        knots_u=a.knots_u.copy(),
+        knots_v=a.knots_v.copy(),
+        weights=mid_weights,
+    )

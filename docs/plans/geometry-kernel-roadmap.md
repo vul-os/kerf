@@ -888,7 +888,7 @@ effort.
   Gauss quadrature; param↔length tables). — `geom/curve_toolkit.py` —
   oracle: length of a unit circle arc = r·θ ± tol; length of a line =
   |p1−p0|. — dep: GK-01 — parallel: Y — sonnet.
-- [ ] **GK-99** Mid-curve / mid-surface (average of two curves/surfaces;
+- [x] **GK-99** Mid-curve / mid-surface (average of two curves/surfaces;
   for symmetry spines + thin-wall mid-surface extraction). —
   `geom/curve_toolkit.py`, `geom/patch_srf.py` — oracle: mid-curve of two
   parallel lines is centred; mid-surface of two parallel planes lies

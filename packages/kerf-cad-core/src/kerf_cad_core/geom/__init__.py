@@ -155,6 +155,7 @@ from kerf_cad_core.geom.trim_curve import (
 # GK-35: energy-minimising, knot-preserving curve fairing
 # GK-65: curvature comb / porcupine numeric export
 # GK-98: arc-length parameterization + curve length
+# GK-99: mid-curve (average of two NURBS curves)
 # GK-100: composite curve (poly-NURBS chain + continuity tags)
 from kerf_cad_core.geom.curve_toolkit import (
     fair_curve,
@@ -162,6 +163,7 @@ from kerf_cad_core.geom.curve_toolkit import (
     curvature_comb,
     curve_length,
     arc_length_param,
+    mid_curve,
     composite_curve,
     split_composite,
 )
@@ -172,7 +174,8 @@ from kerf_cad_core.geom.intersection import (
     surface_surface_intersect,
 )
 # GK-34: surface fit-to-tolerance (lofted/grid least-squares + knot placement)
-from kerf_cad_core.geom.patch_srf import fit_surface
+# GK-99: mid-surface (average of two NURBS surfaces)
+from kerf_cad_core.geom.patch_srf import fit_surface, mid_surface
 # GK-12: curve self-intersection
 from kerf_cad_core.geom.intersection import curve_self_intersect
 # GK-49: IGES 144 trimmed-surface reader/writer
@@ -444,6 +447,8 @@ __all__ = [
     # GK-98
     "curve_length",
     "arc_length_param",
+    # GK-99
+    "mid_curve",
     # GK-100
     "composite_curve",
     "split_composite",
@@ -453,6 +458,8 @@ __all__ = [
     "surface_surface_intersect",
     # GK-34
     "fit_surface",
+    # GK-99
+    "mid_surface",
     # GK-12
     "curve_self_intersect",
     # GK-49

@@ -270,7 +270,7 @@ noted.
   File: `packages/kerf-bim/tests/test_feature_bim_ifc_roundtrip.py`
   Success: 25 IFC4 element families; round-trip preserves GlobalId, geometry, psets.
 
-- [ ] T-50 Architecture: spaces + primitives
+- [x] T-50 Architecture: spaces + primitives
   Scope: `arch/spaces.py` + `arch/primitives.py` end-to-end space program.
   File: `packages/kerf-cad-core/tests/test_feature_arch_spaces.py`
   Success: 25 building programs; area / volume tallies; room adjacency graph.

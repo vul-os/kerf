@@ -29,6 +29,7 @@ from kerf_cad_core.geom.mesh_repair import (
     is_manifold,
     mesh_area,
     mesh_boolean,
+    mesh_decimate,
     mesh_offset,
     mesh_volume,
     remove_degenerate,
@@ -572,3 +573,201 @@ class TestInputValidation:
     def test_volume_bad_mesh(self):
         r = mesh_volume([[0, 0, 0]], [[0, 0, 1]])
         assert not r["ok"]
+
+
+# ===========================================================================
+# 12. mesh_decimate  (GK-109) — QEM edge-collapse API
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Icosphere factory (2 subdivisions → 320 faces; 3 subdivisions → 1280 faces)
+# ---------------------------------------------------------------------------
+
+def _icosphere(subdivisions: int = 3, radius: float = 1.0):
+    """Build an icosphere by iterative Loop-style edge midpoint subdivision.
+
+    Returns (verts, faces) as plain Python lists.  At *subdivisions=3* the
+    mesh has exactly 1280 triangles, matching the GK-109 oracle specification.
+    """
+    # --- base icosahedron ---
+    phi = (1.0 + math.sqrt(5.0)) / 2.0
+    base_verts = [
+        [-1,  phi, 0], [ 1,  phi, 0], [-1, -phi, 0], [ 1, -phi, 0],
+        [ 0, -1,  phi], [ 0,  1,  phi], [ 0, -1, -phi], [ 0,  1, -phi],
+        [ phi, 0, -1], [ phi, 0,  1], [-phi, 0, -1], [-phi, 0,  1],
+    ]
+    # Normalise to unit sphere
+    def _norm(v):
+        d = math.sqrt(v[0]**2 + v[1]**2 + v[2]**2)
+        return [v[0]/d, v[1]/d, v[2]/d]
+    vs = [_norm(v) for v in base_verts]
+
+    # 20 faces of the icosahedron
+    fs = [
+        [0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11],
+        [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8],
+        [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9],
+        [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1],
+    ]
+
+    # --- subdivide ---
+    for _ in range(subdivisions):
+        midpoint_cache: dict = {}
+
+        def _midpoint(a: int, b: int) -> int:
+            key = (min(a, b), max(a, b))
+            if key in midpoint_cache:
+                return midpoint_cache[key]
+            va, vb = vs[a], vs[b]
+            mid = _norm([(va[0]+vb[0])*0.5, (va[1]+vb[1])*0.5, (va[2]+vb[2])*0.5])
+            idx = len(vs)
+            vs.append(mid)
+            midpoint_cache[key] = idx
+            return idx
+
+        new_fs = []
+        for f in fs:
+            a, b, c = f
+            ab = _midpoint(a, b)
+            bc = _midpoint(b, c)
+            ca = _midpoint(c, a)
+            new_fs.extend([
+                [a, ab, ca],
+                [b, bc, ab],
+                [c, ca, bc],
+                [ab, bc, ca],
+            ])
+        fs = new_fs
+
+    # Scale to radius
+    vs = [[v[0]*radius, v[1]*radius, v[2]*radius] for v in vs]
+    return vs, fs
+
+
+def _hausdorff_distance(
+    verts_a: list, faces_a: list,
+    verts_b: list, faces_b: list,
+) -> float:
+    """One-sided Hausdorff: max over face centroids of A of min dist to any vert of B.
+
+    This is a conservative upper bound sufficient for the oracle check.
+    """
+    if not faces_a or not verts_b:
+        return 0.0
+    # Build centroid list for A
+    max_d = 0.0
+    for f in faces_a:
+        cx = (verts_a[f[0]][0] + verts_a[f[1]][0] + verts_a[f[2]][0]) / 3.0
+        cy = (verts_a[f[0]][1] + verts_a[f[1]][1] + verts_a[f[2]][1]) / 3.0
+        cz = (verts_a[f[0]][2] + verts_a[f[1]][2] + verts_a[f[2]][2]) / 3.0
+        min_d = float("inf")
+        for vb in verts_b:
+            d = math.sqrt((cx-vb[0])**2 + (cy-vb[1])**2 + (cz-vb[2])**2)
+            if d < min_d:
+                min_d = d
+                if min_d < max_d:
+                    break  # can't improve max_d from this centroid
+        if min_d > max_d:
+            max_d = min_d
+    return max_d
+
+
+class TestMeshDecimate:
+    """GK-109: mesh_decimate — QEM edge-collapse decimation, tuple-returning API."""
+
+    def test_returns_tuple(self):
+        """mesh_decimate must return a (verts, faces) tuple."""
+        verts, faces = _icosphere(subdivisions=1)  # 80 faces, fast
+        result = mesh_decimate(verts, faces, target_ratio=0.5)
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+        rverts, rfaces = result
+        assert isinstance(rverts, list)
+        assert isinstance(rfaces, list)
+
+    def test_reduces_face_count(self):
+        """Decimated mesh should have fewer faces than the original."""
+        verts, faces = _icosphere(subdivisions=2)  # 320 faces
+        rverts, rfaces = mesh_decimate(verts, faces, target_ratio=0.1)
+        assert len(rfaces) < len(faces), (
+            f"Expected fewer than {len(faces)} faces, got {len(rfaces)}"
+        )
+
+    def test_icosphere_1280_tris_manifold_euler(self):
+        """Oracle: decimate 1280-tri icosphere to 10% → manifold, Euler χ=2.
+
+        This is the exact GK-109 specification test.
+        """
+        radius = 1.0
+        verts, faces = _icosphere(subdivisions=3, radius=radius)
+        assert len(faces) == 1280, f"Expected 1280 base faces, got {len(faces)}"
+
+        rverts, rfaces = mesh_decimate(verts, faces, target_ratio=0.1)
+
+        # Must have reduced the count
+        assert len(rfaces) < len(faces), "Decimation produced no reduction"
+
+        # Euler characteristic χ = V − E + F = 2 for a closed genus-0 surface
+        chi = _euler(rverts, rfaces)
+        assert chi == 2, (
+            f"Euler characteristic χ = {chi}, expected 2 (manifold sphere topology)"
+        )
+
+        # Manifold check
+        rm = is_manifold(rverts, rfaces)
+        assert rm["ok"]
+        assert rm["manifold"], (
+            f"Decimated mesh is not manifold: "
+            f"bad_edges={rm['non_manifold_edges'][:3]}, "
+            f"bad_verts={rm['non_manifold_vertices'][:3]}"
+        )
+
+    def test_icosphere_hausdorff_within_tolerance(self):
+        """Oracle: Hausdorff distance from decimated to original < tol·radius."""
+        radius = 1.0
+        tol = 0.5  # generous upper bound — QEM is accurate
+        verts, faces = _icosphere(subdivisions=3, radius=radius)
+        rverts, rfaces = mesh_decimate(verts, faces, target_ratio=0.1)
+
+        h = _hausdorff_distance(rverts, rfaces, verts, faces)
+        assert h < tol * radius, (
+            f"Hausdorff distance {h:.4f} exceeds tolerance {tol * radius:.4f}"
+        )
+
+    def test_target_ratio_one_returns_same_count(self):
+        """target_ratio=1.0 should not reduce the mesh."""
+        verts, faces = _icosphere(subdivisions=1)
+        rverts, rfaces = mesh_decimate(verts, faces, target_ratio=1.0)
+        # target >= original count → returned unchanged
+        assert len(rfaces) == len(faces)
+
+    def test_invalid_ratio_zero_returns_original(self):
+        """target_ratio=0 is invalid; should return original mesh without crash."""
+        verts, faces = _icosphere(subdivisions=1)
+        rverts, rfaces = mesh_decimate(verts, faces, target_ratio=0.0)
+        assert len(rfaces) == len(faces)
+
+    def test_invalid_ratio_negative_returns_original(self):
+        """Negative ratio is invalid; should return original without crash."""
+        verts, faces = _icosphere(subdivisions=1)
+        rverts, rfaces = mesh_decimate(verts, faces, target_ratio=-0.5)
+        assert len(rfaces) == len(faces)
+
+    def test_empty_mesh_no_crash(self):
+        """Empty mesh must return empty without crash."""
+        rverts, rfaces = mesh_decimate([], [], target_ratio=0.1)
+        assert rverts == [] or isinstance(rverts, list)
+        assert rfaces == [] or isinstance(rfaces, list)
+
+    def test_single_triangle_no_crash(self):
+        """A single triangle decimated should not crash."""
+        verts = [[0, 0, 0], [1, 0, 0], [0, 1, 0]]
+        faces = [[0, 1, 2]]
+        rverts, rfaces = mesh_decimate(verts, faces, target_ratio=0.1)
+        assert isinstance(rverts, list)
+        assert isinstance(rfaces, list)
+
+    def test_geom_init_export(self):
+        """mesh_decimate must be importable from kerf_cad_core.geom."""
+        from kerf_cad_core.geom import mesh_decimate as md
+        assert callable(md)

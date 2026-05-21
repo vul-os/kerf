@@ -1414,6 +1414,84 @@ def repair_pipeline(
 
 
 # ===========================================================================
+# mesh_decimate  (GK-109) — simple tuple-returning QEM decimation API
+# ===========================================================================
+
+def mesh_decimate(
+    verts: Sequence,
+    faces: Sequence,
+    target_ratio: float = 0.1,
+) -> Tuple[List[Vert], List[Face]]:
+    """Decimate a triangle mesh to *target_ratio* of its original face count.
+
+    Uses the quadric-error-metric (QEM) edge-collapse algorithm implemented in
+    :func:`decimate`.  Manifoldness is preserved: degenerate collapses (that
+    would produce non-manifold geometry) are detected and skipped.
+
+    Parameters
+    ----------
+    verts : list of [x, y, z]
+        Vertex coordinates.
+    faces : list of [i, j, k]
+        Triangle face indices (0-based, CCW winding = outward normal).
+    target_ratio : float, optional
+        Fraction of the original face count to target.  Must be in (0, 1].
+        Default is 0.1 (10 %).
+
+    Returns
+    -------
+    (verts, faces) : Tuple[list, list]
+        Decimated mesh.  Returns the original mesh unchanged on any error
+        (invalid inputs, already below target, etc.) so callers never crash.
+
+    Raises
+    ------
+    Never raises — any error silently returns the original mesh.
+
+    Notes
+    -----
+    * The algorithm is O(n²) per iteration and is intended for meshes up to
+      ~50 k triangles.  For production-scale meshes consider a compiled library.
+    * At very low target_ratios (< 1 %) the output may have fewer faces than
+      requested because some collapses are blocked to prevent degeneracy.
+    """
+    try:
+        if not isinstance(target_ratio, (int, float)) or not (0.0 < target_ratio <= 1.0):
+            # Bad ratio — return original unchanged
+            vs, fs = _copy_mesh(verts, faces)
+            return vs, fs
+
+        err = _validate_mesh(verts, faces)
+        if err:
+            vs, fs = _copy_mesh(verts, faces)
+            return vs, fs
+
+        vs, fs = _copy_mesh(verts, faces)
+        original_count = len(fs)
+        if original_count == 0:
+            return vs, fs
+
+        target_count = max(1, int(math.ceil(original_count * target_ratio)))
+        if target_count >= original_count:
+            return vs, fs
+
+        result = decimate(vs, fs, target_faces=target_count)
+        if not result["ok"]:
+            # Fall back to original
+            return vs, fs
+
+        return result["verts"], result["faces"]
+
+    except Exception:
+        # Last-resort fallback: return original
+        try:
+            vs2, fs2 = _copy_mesh(verts, faces)
+            return vs2, fs2
+        except Exception:
+            return list(verts), list(faces)
+
+
+# ===========================================================================
 # LLM tool registration (gated — graceful no-op when registry absent)
 # ===========================================================================
 

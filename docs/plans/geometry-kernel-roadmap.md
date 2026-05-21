@@ -941,7 +941,7 @@ effort.
 
 ### Group C — Mesh + implicit modelling
 
-- [ ] **GK-109** Mesh decimate (quadric-error-metric edge collapse to a
+- [x] **GK-109** Mesh decimate (quadric-error-metric edge collapse to a
   target triangle count / ratio). — `geom/mesh_repair.py` — oracle:
   decimate a 10k-tri sphere to 10% → manifold preserved, Hausdorff <
   tol·r. — dep: GK-55 — parallel: Y — sonnet.

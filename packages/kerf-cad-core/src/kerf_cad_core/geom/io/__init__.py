@@ -54,6 +54,13 @@ from kerf_cad_core.geom.io.stl import (
     StlReadError,
     StlWriteError,
 )
+# GK-126: PLY read + write (mesh + per-vertex colour; ASCII + binary)
+from kerf_cad_core.geom.io.ply import (
+    read_ply,
+    write_ply,
+    PlyReadError,
+    PlyWriteError,
+)
 
 __all__ = [
     "IgesReadError",
@@ -85,4 +92,9 @@ __all__ = [
     "write_stl",
     "StlReadError",
     "StlWriteError",
+    # GK-126
+    "read_ply",
+    "write_ply",
+    "PlyReadError",
+    "PlyWriteError",
 ]

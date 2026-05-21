@@ -292,6 +292,13 @@ from kerf_cad_core.geom.io.stl import (
     StlReadError,
     StlWriteError,
 )
+# GK-126: PLY read + write (mesh + per-vertex colour; ASCII + binary)
+from kerf_cad_core.geom.io.ply import (
+    read_ply,
+    write_ply,
+    PlyReadError,
+    PlyWriteError,
+)
 # GK-88: loop slide (SubD)
 from kerf_cad_core.geom.subd_authoring import subd_loop_slide, subd_edge_slide
 # GK-87: pattern (linear / circular / path)
@@ -514,6 +521,11 @@ __all__ = [
     "write_stl",
     "StlReadError",
     "StlWriteError",
+    # GK-126
+    "read_ply",
+    "write_ply",
+    "PlyReadError",
+    "PlyWriteError",
     # GK-96
     "reverse_curve","reverse_surface",
     # GK-83

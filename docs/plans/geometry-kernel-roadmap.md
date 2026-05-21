@@ -1026,7 +1026,7 @@ effort.
   splines, layers). — `geom/io/dxf.py` — oracle: write→read round-trip
   preserves entity count + layer names; a circle's radius survives. —
   dep: GK-49 — parallel: Y — sonnet.
-- [ ] **GK-126** PLY read + write (mesh + per-vertex colour + point
+- [x] **GK-126** PLY read + write (mesh + per-vertex colour + point
   cloud; ASCII + binary). — `geom/io/ply.py` — oracle: write→read
   round-trip preserves V, F, per-vertex colour. — dep: GK-21 —
   parallel: Y — sonnet.

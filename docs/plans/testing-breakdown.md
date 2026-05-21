@@ -393,7 +393,7 @@ variants, timing).
   File: `packages/kerf-auth/tests/test_pen_session_rotation.py`
   Success: 12 cases — rotation works, double-use of old refresh revokes family, expired refresh refused.
 
-- [ ] T-73 Password-reset token reuse
+- [x] T-73 Password-reset token reuse
   Scope: reset-token single-use, ≤30 min expiry, account-bound.
   File: `packages/kerf-auth/tests/test_pen_password_reset.py`
   Success: 12 cases — single-use enforced, expired refused, cross-account refused, reset invalidates existing sessions.

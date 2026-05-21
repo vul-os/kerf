@@ -71,7 +71,7 @@ log = logging.getLogger("kerf.auth.email")
 
 # Token lifetimes for the emailed links.
 VERIFY_TOKEN_TTL = timedelta(hours=48)
-RESET_TOKEN_TTL = timedelta(hours=1)
+RESET_TOKEN_TTL = timedelta(minutes=30)
 
 
 def _app_url() -> str:

@@ -148,7 +148,7 @@ Each task ≈1–3h sonnet unless `[HARD]`. Always isolate in a worktree.
 
 ### Group C — Viewport (Three.js)
 
-- [ ] **T-C1 [HARD] Touch orbit / pan / pinch-zoom parity in Renderer**
+- [x] **T-C1 [HARD] Touch orbit / pan / pinch-zoom parity in Renderer**
   Scope: explicitly configure `OrbitControls` `touches`/`enablePan`/`enableZoom`, tune pinch + two-finger pan damping, and ensure single-tap maps to the same pick path as `click` (add `pointerup` with movement threshold so drag ≠ pick). Desktop wheel/drag must remain unchanged.
   Files: `src/components/Renderer.jsx`.
   Success: on a touch device the model can be rotated, pinch-zoomed, two-finger-panned, and parts tapped to select; desktop behaviour byte-for-byte unchanged; existing renderer tests green.

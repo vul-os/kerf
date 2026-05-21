@@ -39,7 +39,7 @@ describe('3D render controls', () => {
   })
 
   it('exposure slider is standalone, relabelled, with a Sun icon', () => {
-    expect(src).toContain("import { Sun, SlidersHorizontal, Check, ChevronDown } from 'lucide-react'")
+    expect(src).toContain("import { Sun, SlidersHorizontal, Check, ChevronDown, MonitorX } from 'lucide-react'")
     expect(src).toContain('>\n          Exposure\n        </label>')
     expect(src).toContain('id="kerf-exposure-slider"')
   })

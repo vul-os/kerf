@@ -280,7 +280,7 @@ noted.
   File: `packages/kerf-cad-core/tests/test_feature_civil_alignment.py`
   Success: 25 highway / drainage scenarios; stationing, cut/fill volumes, Manning's-n flow match references ±2%.
 
-- [ ] T-52 Scan: point-cloud fit
+- [x] T-52 Scan: point-cloud fit
   Scope: `scan/fit.py` (plane/cyl/sphere/torus RANSAC).
   File: `packages/kerf-cad-core/tests/test_feature_scan_fit.py`
   Success: 25 synthetic clouds with noise; primitive recovery within ε; outlier rejection.

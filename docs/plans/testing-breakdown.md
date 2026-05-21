@@ -388,7 +388,7 @@ variants, timing).
   File: `packages/kerf-auth/tests/test_pen_jwt_replay_forgery.py`
   Success: 12 cases — none/HS256-via-RS256-pub/kid-traversal all rejected; revoked-token blacklist enforced.
 
-- [ ] T-72 Session expiry + token rotation
+- [x] T-72 Session expiry + token rotation
   Scope: refresh-token rotation (`refresh_tokens` table), reuse-detection forces re-auth.
   File: `packages/kerf-auth/tests/test_pen_session_rotation.py`
   Success: 12 cases — rotation works, double-use of old refresh revokes family, expired refresh refused.

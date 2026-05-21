@@ -215,7 +215,7 @@ noted.
   File: `packages/kerf-cad-core/tests/test_feature_cam_layered.py`
   Success: 25 part shapes; layer count, step-down, scallop within target; collision check.
 
-- [ ] T-39 Slicing: 3D-print Tier 1
+- [x] T-39 Slicing: 3D-print Tier 1
   Scope: `kerf-slicing/cura_runner.py` integration.
   File: `packages/kerf-slicing/tests/test_feature_print_slice.py`
   Success: 25 parts; gcode generated; layer time estimate; volume check (within ±2% of solid mesh).

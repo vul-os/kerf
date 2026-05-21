@@ -884,7 +884,7 @@ effort.
   [0,1], optional arc-length reparam, domain rescale. — `geom/nurbs.py` —
   oracle: normalized curve has knots in [0,1] and identical point set. —
   dep: GK-01 — parallel: Y — sonnet.
-- [ ] **GK-98** Arc-length parameterization + curve length (adaptive
+- [x] **GK-98** Arc-length parameterization + curve length (adaptive
   Gauss quadrature; param↔length tables). — `geom/curve_toolkit.py` —
   oracle: length of a unit circle arc = r·θ ± tol; length of a line =
   |p1−p0|. — dep: GK-01 — parallel: Y — sonnet.

@@ -1362,6 +1362,164 @@ def curvature_comb(
 
 
 # ---------------------------------------------------------------------------
+# curve_length  (GK-98)
+# ---------------------------------------------------------------------------
+
+def _curve_speed(curve: NurbsCurve, u: float) -> float:
+    """Return |C'(u)| — the speed (norm of first derivative) at parameter u."""
+    from kerf_cad_core.geom.nurbs import curve_derivative
+    d1 = curve_derivative(curve, u, order=1)
+    return float(np.linalg.norm(d1))
+
+
+def _gauss_legendre_quadrature(f, a: float, b: float, n: int = 5) -> float:
+    """Gauss–Legendre quadrature of f over [a, b] using n-point rule."""
+    pts, wts = np.polynomial.legendre.leggauss(n)
+    half = 0.5 * (b - a)
+    mid = 0.5 * (a + b)
+    return half * float(np.dot(wts, [f(mid + half * xi) for xi in pts]))
+
+
+def _adaptive_gauss(
+    f,
+    a: float,
+    b: float,
+    tol: float = 1e-9,
+    depth: int = 0,
+    max_depth: int = 40,
+) -> float:
+    """Adaptive Gauss–Legendre quadrature via recursive bisection.
+
+    Integrates f over [a, b].  Recursively bisects until the 5-point and
+    10-point estimates agree within ``tol`` or ``max_depth`` is reached.
+    """
+    mid = 0.5 * (a + b)
+    whole = _gauss_legendre_quadrature(f, a, b, n=10)
+    left = _gauss_legendre_quadrature(f, a, mid, n=5)
+    right = _gauss_legendre_quadrature(f, mid, b, n=5)
+    err = abs((left + right) - whole)
+    if err < tol or depth >= max_depth:
+        return left + right
+    return (
+        _adaptive_gauss(f, a, mid, tol=tol / 2, depth=depth + 1, max_depth=max_depth)
+        + _adaptive_gauss(f, mid, b, tol=tol / 2, depth=depth + 1, max_depth=max_depth)
+    )
+
+
+def curve_length(
+    curve: NurbsCurve,
+    t0: Optional[float] = None,
+    t1: Optional[float] = None,
+    tol: float = 1e-9,
+) -> float:
+    """Arc length of ``curve`` between parameters ``t0`` and ``t1``.
+
+    Uses adaptive Gauss–Legendre quadrature on |C'(u)| du.
+
+    Parameters
+    ----------
+    curve : NurbsCurve
+    t0    : start parameter (default: start of curve domain)
+    t1    : end parameter   (default: end of curve domain)
+    tol   : integration tolerance (default 1e-9)
+
+    Returns
+    -------
+    float : arc length ≥ 0
+    """
+    u0 = float(curve.knots[curve.degree])
+    u1 = float(curve.knots[-(curve.degree + 1)])
+    a = u0 if t0 is None else float(t0)
+    b = u1 if t1 is None else float(t1)
+    a = max(a, u0)
+    b = min(b, u1)
+    if b <= a:
+        return 0.0
+
+    def speed(u: float) -> float:
+        return _curve_speed(curve, u)
+
+    return _adaptive_gauss(speed, a, b, tol=tol)
+
+
+# ---------------------------------------------------------------------------
+# arc_length_param  (GK-98)
+# ---------------------------------------------------------------------------
+
+class _ArcLengthParam:
+    """Lookup table for arc-length ↔ parameter conversion.
+
+    Attributes / Methods
+    --------------------
+    length_at(t) -> float
+        Returns arc length from curve start to parameter t.
+    t_at_length(s) -> float
+        Returns parameter t such that arc length from start equals s.
+    total_length : float
+        Total arc length of the curve.
+    """
+
+    def __init__(
+        self,
+        curve: NurbsCurve,
+        n: int = 128,
+    ) -> None:
+        u0 = float(curve.knots[curve.degree])
+        u1 = float(curve.knots[-(curve.degree + 1)])
+        self._u0 = u0
+        self._u1 = u1
+
+        # Sample n+1 parameter values uniformly
+        self._params = np.linspace(u0, u1, n + 1)
+
+        # Build cumulative arc-length table using 5-point GL on each sub-interval
+        lengths = np.zeros(n + 1)
+        for i in range(n):
+            a = float(self._params[i])
+            b = float(self._params[i + 1])
+            lengths[i + 1] = lengths[i] + _gauss_legendre_quadrature(
+                lambda u, _a=a, _b=b: _curve_speed(curve, u), a, b, n=5
+            )
+
+        self._lengths = lengths
+        self.total_length: float = float(lengths[-1])
+
+    def length_at(self, t: float) -> float:
+        """Arc length from curve start to parameter ``t``."""
+        t = float(np.clip(t, self._u0, self._u1))
+        return float(np.interp(t, self._params, self._lengths))
+
+    def t_at_length(self, s: float) -> float:
+        """Parameter ``t`` such that arc length from start equals ``s``."""
+        s = float(np.clip(s, 0.0, self.total_length))
+        return float(np.interp(s, self._lengths, self._params))
+
+
+def arc_length_param(
+    curve: NurbsCurve,
+    n: int = 128,
+) -> _ArcLengthParam:
+    """Build arc-length parameterization lookup tables for ``curve``.
+
+    Samples the curve speed at ``n`` intervals using 5-point Gauss–Legendre
+    quadrature per interval to build cumulative arc-length tables.
+
+    Parameters
+    ----------
+    curve : NurbsCurve
+    n     : number of parameter sub-intervals (default 128)
+
+    Returns
+    -------
+    _ArcLengthParam instance with:
+        .length_at(t)    -> arc length from start to parameter t
+        .t_at_length(s)  -> parameter t for arc length s from start
+        .total_length    -> total arc length
+    """
+    return _ArcLengthParam(curve, n=n)
+
+
+# ---------------------------------------------------------------------------
 # LLM tool registration
 # ---------------------------------------------------------------------------
 

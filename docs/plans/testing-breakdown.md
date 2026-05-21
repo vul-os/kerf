@@ -528,7 +528,7 @@ Postgres schema. ≥10 user-visible assertions per spec.
   File: `tests/e2e/specs/persona_jewelry.spec.ts`
   Success: SKU built; PBR materials applied; cost panel populated; STL downloads & is manifold.
 
-- [ ] T-96 E2E mechanical persona
+- [x] T-96 E2E mechanical persona
   Scope: signup → new mech project → import FreeCAD fixture → chat "add 4 M4 holes on top face" → unfold sheet metal → drawing → PDF.
   File: `tests/e2e/specs/persona_mech.spec.ts`
   Success: feature tree shows hole pattern; unfold succeeds; drawing dimensions auto; PDF export downloads.

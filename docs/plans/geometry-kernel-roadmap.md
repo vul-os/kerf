@@ -1014,7 +1014,7 @@ effort.
   between two disjoint Bodies + witness points). — `geom/assembly.py` —
   oracle: two spheres centre-distance D radii r1,r2 → gap = D−r1−r2 ±
   tol. — dep: GK-06 — parallel: Y — sonnet.
-- [ ] **GK-124** Mate constraint solver (coincident / concentric /
+- [x] **GK-124** Mate constraint solver (coincident / concentric /
   distance / angle between selected faces or edges → rigid transform). —
   `geom/assembly.py` — oracle: concentric-mate two cylinders → axes
   collinear; distance-mate two planes → separation == target. — dep:

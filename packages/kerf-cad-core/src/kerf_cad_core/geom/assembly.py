@@ -1,5 +1,6 @@
 """GK-122: Interference / collision detection between two Body objects.
 GK-123: Clearance / minimum-gap analysis between two Body objects.
+GK-124: Mate constraint solver (coincident / concentric / distance / angle).
 
 Pure-Python implementation (no OCCT dependency). Uses :func:`body_intersection`
 (GK-18) to compute the overlapping region, then :func:`body_mass_props` to
@@ -296,3 +297,395 @@ def clearance(
         "witness_a": pts_a[ia].tolist(),
         "witness_b": pts_b[ib].tolist(),
     }
+
+
+# ---------------------------------------------------------------------------
+# GK-124: Mate constraint solver
+# ---------------------------------------------------------------------------
+
+_MATE_TYPES = frozenset({"coincident", "concentric", "distance", "angle"})
+
+
+def _unit3(v: np.ndarray) -> np.ndarray:
+    """Return a unit vector.  Raises ValueError for zero-length input."""
+    n = np.linalg.norm(v)
+    if n < 1e-14:
+        raise ValueError(f"Cannot normalise near-zero vector {v!r}")
+    return v / n
+
+
+def _rotation_matrix_from_axis_angle(axis: np.ndarray, angle: float) -> np.ndarray:
+    """Build a 3×3 rotation matrix via Rodrigues' formula.
+
+    Parameters
+    ----------
+    axis:
+        Unit rotation axis (3-vector).
+    angle:
+        Rotation angle in **radians**.
+
+    Returns
+    -------
+    np.ndarray of shape (3, 3).
+    """
+    c = math.cos(angle)
+    s = math.sin(angle)
+    t = 1.0 - c
+    x, y, z = float(axis[0]), float(axis[1]), float(axis[2])
+    return np.array(
+        [
+            [t * x * x + c,     t * x * y - s * z, t * x * z + s * y],
+            [t * x * y + s * z, t * y * y + c,     t * y * z - s * x],
+            [t * x * z - s * y, t * y * z + s * x, t * z * z + c    ],
+        ],
+        dtype=float,
+    )
+
+
+def _rotation_align_vectors(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """Return a 3×3 rotation matrix that rotates unit-vector *a* onto unit-vector *b*.
+
+    Uses the cross-product axis + acos angle approach with a special case for
+    anti-parallel vectors (rotate 180° about any perpendicular axis).
+    """
+    a = _unit3(a)
+    b = _unit3(b)
+    dot = float(np.dot(a, b))
+    # Already aligned — identity
+    if dot > 1.0 - 1e-12:
+        return np.eye(3, dtype=float)
+    # Anti-parallel — 180° about any perpendicular axis
+    if dot < -1.0 + 1e-12:
+        perp = _unit3(_perp_vec(a))
+        return _rotation_matrix_from_axis_angle(perp, math.pi)
+    axis = _unit3(np.cross(a, b))
+    angle = math.acos(max(-1.0, min(1.0, dot)))
+    return _rotation_matrix_from_axis_angle(axis, angle)
+
+
+def _perp_vec(v: np.ndarray) -> np.ndarray:
+    """Return an arbitrary vector perpendicular to *v* (not normalised)."""
+    if abs(float(v[0])) < 0.9:
+        return np.array([1.0, 0.0, 0.0]) - float(v[0]) * v
+    return np.array([0.0, 1.0, 0.0]) - float(v[1]) * v
+
+
+def _make_homogeneous(R: np.ndarray, t: np.ndarray) -> np.ndarray:
+    """Build a 4×4 column-vector homogeneous transform from R (3×3) and t (3,)."""
+    T = np.eye(4, dtype=float)
+    T[:3, :3] = R
+    T[:3, 3] = t
+    return T
+
+
+def _face_plane_info(face) -> Tuple[np.ndarray, np.ndarray]:
+    """Extract (centroid, normal) from a planar or analytic face.
+
+    * For a :class:`~kerf_cad_core.geom.brep.Plane` surface: use
+      ``origin`` and ``normal()``.
+    * For any other surface: sample the face at (u, v) = (0.5, 0.5) and
+      use the surface normal there.
+
+    Returns
+    -------
+    (centroid, normal) both as 1-D float arrays.
+    """
+    surf = face.surface
+    if isinstance(surf, Plane):
+        return np.asarray(surf.origin, dtype=float), _unit3(
+            np.asarray(surf.normal(), dtype=float)
+        )
+    # Generic: sample centre of UV domain
+    p = np.asarray(surf.evaluate(0.5, 0.5), dtype=float)
+    n = _unit3(np.asarray(surf.normal(0.5, 0.5), dtype=float))
+    return p, n
+
+
+def _face_cylinder_info(face) -> Tuple[np.ndarray, np.ndarray, float]:
+    """Extract (axis_point, axis_dir, radius) from a cylindrical face.
+
+    Parameters
+    ----------
+    face:
+        A B-rep :class:`~kerf_cad_core.geom.brep.Face` whose ``.surface``
+        is a :class:`~kerf_cad_core.geom.brep.CylinderSurface`.
+
+    Returns
+    -------
+    Tuple ``(center, axis, radius)`` where *center* is a point on the axis.
+
+    Raises
+    ------
+    ValueError
+        If the face surface is not a :class:`CylinderSurface`.
+    """
+    surf = face.surface
+    if not isinstance(surf, CylinderSurface):
+        raise ValueError(
+            f"Concentric mate requires CylinderSurface faces; got {type(surf).__name__}"
+        )
+    return (
+        np.asarray(surf.center, dtype=float),
+        _unit3(np.asarray(surf.axis, dtype=float)),
+        float(surf.radius),
+    )
+
+
+def _face_centroid(face) -> np.ndarray:
+    """Approximate the face centroid using B-rep vertex positions.
+
+    Falls back to the surface origin / centre if no vertices are available.
+    """
+    pts = []
+    for loop in face.loops:
+        for v in loop.vertices():
+            pts.append(np.asarray(v.point, dtype=float))
+    if pts:
+        return np.mean(pts, axis=0)
+    # Fallback: surface evaluate at (0.5, 0.5)
+    return np.asarray(face.surface.evaluate(0.5, 0.5), dtype=float)
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+
+def solve_mate(
+    body,
+    mate_type: str,
+    ref_a,
+    ref_b,
+    *,
+    distance: float = 0.0,
+    angle: float = 0.0,
+    tol: float = 1e-9,
+) -> dict:
+    """Compute the rigid transform that satisfies a geometric mate constraint.
+
+    Solves the constraint **without** modifying ``body`` in-place — callers
+    apply the returned transform as they see fit.
+
+    Parameters
+    ----------
+    body:
+        The :class:`~kerf_cad_core.geom.brep.Body` to be repositioned
+        (the *moving* part).  Only used for concentric mates where we need
+        to know which axis to move.
+    mate_type:
+        One of ``"coincident"``, ``"concentric"``, ``"distance"``,
+        ``"angle"``.
+    ref_a:
+        Reference geometry on the *fixed* part (a
+        :class:`~kerf_cad_core.geom.brep.Face`).
+    ref_b:
+        Reference geometry on *body* (a
+        :class:`~kerf_cad_core.geom.brep.Face`).
+    distance:
+        Target separation for ``"distance"`` mates (default ``0.0``).
+    angle:
+        Target angle in **radians** for ``"angle"`` mates (default ``0.0``).
+    tol:
+        Geometric tolerance (currently informational; not used to abort).
+
+    Returns
+    -------
+    dict with keys:
+
+    ``"transform"``
+        4×4 homogeneous transformation matrix (``np.ndarray``) to apply to
+        every point of ``body``.  Post-multiply column vectors:
+        ``p_new = T @ [x, y, z, 1]``.
+    ``"ok"``
+        ``True`` when a valid transform was found.
+    ``"error"``
+        Absent when ``ok`` is ``True``; an explanation string otherwise.
+
+    Raises
+    ------
+    ValueError
+        If *mate_type* is not one of the four supported values.
+
+    Notes
+    -----
+    * Pure-Python / NumPy — no OCCT dependency.
+    * Only rigid (isometric) transforms are produced; no scaling.
+
+    Examples
+    --------
+    Coincident face mate — face A at Z=0, face B at Z=2::
+
+        result = solve_mate(body_b, "coincident", face_a, face_b)
+        T = result["transform"]
+        # Apply T to every vertex of body_b → face B now touches face A.
+
+    Concentric cylinder mate::
+
+        result = solve_mate(body_b, "concentric", cyl_face_a, cyl_face_b)
+        T = result["transform"]
+        # After applying T, cylinder-B axis == cylinder-A axis.
+    """
+    if mate_type not in _MATE_TYPES:
+        raise ValueError(
+            f"Unknown mate_type {mate_type!r}; must be one of {sorted(_MATE_TYPES)}"
+        )
+
+    # ValueError propagates — it signals wrong geometry type (programmer error).
+    # Other unexpected exceptions are caught and returned as ok=False dicts.
+    try:
+        if mate_type == "coincident":
+            return _solve_coincident(ref_a, ref_b)
+        if mate_type == "concentric":
+            return _solve_concentric(ref_a, ref_b)
+        if mate_type == "distance":
+            return _solve_distance(ref_a, ref_b, distance)
+        # angle
+        return _solve_angle(ref_a, ref_b, angle)
+    except ValueError:
+        raise
+    except Exception as exc:  # pragma: no cover — surfaces malformed
+        return {"transform": np.eye(4, dtype=float), "ok": False, "error": str(exc)}
+
+
+# ---------------------------------------------------------------------------
+# Per-mate-type solvers
+# ---------------------------------------------------------------------------
+
+
+def _solve_coincident(ref_a, ref_b) -> dict:
+    """Move *body* so that ``ref_b`` face is flush against ``ref_a`` face.
+
+    Algorithm
+    ---------
+    1. Extract the centroid and outward normal of each face.
+    2. Build a rotation that aligns ``nB`` anti-parallel to ``nA``
+       (mating faces point toward each other).
+    3. Translate so that the centroid of the (rotated) ``ref_b`` lands on
+       the plane defined by ``ref_a``.
+
+    The resulting transform is:  ``T = Translate(t) @ Rotate(R)``
+    (i.e. first rotate, then translate).
+    """
+    cA, nA = _face_plane_info(ref_a)
+    cB, nB = _face_plane_info(ref_b)
+
+    # Rotate B's normal to be anti-parallel to A's normal (faces touch).
+    R = _rotation_align_vectors(nB, -nA)
+
+    # After rotation, where does cB land?
+    cB_rot = R @ cB
+
+    # Translate so that cB_rot lies in the plane (cA, nA):
+    # project along nA so the face is flush (zero offset)
+    proj = float(np.dot(cA - cB_rot, nA))
+    t = proj * nA
+
+    T = _make_homogeneous(R, t)
+    return {"transform": T, "ok": True}
+
+
+def _solve_concentric(ref_a, ref_b) -> dict:
+    """Align the cylinder axis of ``ref_b`` with the cylinder axis of ``ref_a``.
+
+    Algorithm
+    ---------
+    1. Extract ``(center_A, axis_A)`` and ``(center_B, axis_B)`` from the
+       cylindrical faces.
+    2. Rotate ``axis_B`` onto ``axis_A``.
+    3. After rotation, compute the translation that moves (rotated)
+       ``center_B`` onto the axis line of A:
+       ``t = center_A + proj * axis_A - R @ center_B``
+       where ``proj`` keeps the axial position as close as possible (no
+       unnecessary along-axis movement).
+
+    Analytic oracle: after applying the transform the distance from any point
+    on axis B to axis A is zero (axes are collinear).
+    """
+    cA, axA, _ = _face_cylinder_info(ref_a)
+    cB, axB, _ = _face_cylinder_info(ref_b)
+
+    # Align axes (accept both parallel and anti-parallel — same axis line).
+    dot = float(np.dot(axA, axB))
+    target = axA if dot >= 0.0 else -axA
+    R = _rotation_align_vectors(axB, target)
+
+    # Move rotated cB to lie on axis A (project onto axis to preserve axial pos).
+    cB_rot = R @ cB
+    # Closest point on axis A to cB_rot:
+    proj_scalar = float(np.dot(cB_rot - cA, axA))
+    closest_on_A = cA + proj_scalar * axA
+    t = closest_on_A - cB_rot
+
+    T = _make_homogeneous(R, t)
+    return {"transform": T, "ok": True}
+
+
+def _solve_distance(ref_a, ref_b, target_distance: float) -> dict:
+    """Translate ``body`` along the plane normal until the face separation
+    equals *target_distance*.
+
+    Algorithm
+    ---------
+    1. Extract ``(cA, nA)`` from the fixed plane (``ref_a``).
+    2. Extract ``cB`` from ``ref_b`` (only centroid needed; the normal is
+       only used if the face is not already parallel — but we always move
+       along ``nA``).
+    3. Current signed distance of cB from plane A:
+       ``d_current = dot(cB - cA, nA)``
+    4. Required additional translation along nA:
+       ``delta = target_distance - d_current``
+
+    Pure translation (no rotation); preserves body orientation.
+    """
+    cA, nA = _face_plane_info(ref_a)
+    cB = _face_centroid(ref_b)
+
+    d_current = float(np.dot(cB - cA, nA))
+    delta = target_distance - d_current
+    t = delta * nA
+
+    T = _make_homogeneous(np.eye(3, dtype=float), t)
+    return {"transform": T, "ok": True}
+
+
+def _solve_angle(ref_a, ref_b, target_angle_rad: float) -> dict:
+    """Rotate ``body`` about the intersection of the two face normals until
+    the dihedral angle between the faces equals *target_angle_rad*.
+
+    Algorithm
+    ---------
+    1. Extract normals ``nA`` and ``nB`` from the two faces.
+    2. The rotation axis is ``nA × nB`` (or any axis perpendicular to both
+       normals if they are parallel/anti-parallel).
+    3. Current angle between the normals:
+       ``theta_current = acos(clamp(dot(nA, nB), -1, 1))``
+    4. Required additional rotation:
+       ``delta_theta = target_angle_rad - theta_current``
+    5. Apply that rotation about the axis through ``cB`` (the centroid of
+       ``ref_b``) so the body pivots in-place.
+
+    The rotation centre is the centroid of ``ref_b`` (keeping that point
+    fixed minimises overall body displacement).
+    """
+    _, nA = _face_plane_info(ref_a)
+    cB, nB = _face_plane_info(ref_b)
+
+    dot_val = float(np.dot(nA, nB))
+    dot_clamped = max(-1.0, min(1.0, dot_val))
+    theta_current = math.acos(dot_clamped)
+    delta_theta = target_angle_rad - theta_current
+
+    # Rotation axis
+    cross = np.cross(nA, nB)
+    if np.linalg.norm(cross) < 1e-12:
+        # Normals are parallel/anti-parallel — choose any perpendicular axis.
+        cross = _perp_vec(nA)
+    axis = _unit3(cross)
+
+    R = _rotation_matrix_from_axis_angle(axis, delta_theta)
+
+    # Pivot about cB: T = Translate(cB) @ Rotate(R) @ Translate(-cB)
+    t = cB - R @ cB
+
+    T = _make_homogeneous(R, t)
+    return {"transform": T, "ok": True}

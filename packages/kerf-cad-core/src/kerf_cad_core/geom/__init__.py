@@ -644,6 +644,8 @@ __all__ = [
     "gyroid","schwarz_p","octet_truss","kelvin_cell",
     # GK-123
     "clearance",
+    # GK-124
+    "solve_mate",
     # GK-131
     "tangent_edge_chain",
     # GK-136
@@ -663,6 +665,8 @@ from kerf_cad_core.geom.sdf import body_sdf, sdf_sample, marching_cubes
 from kerf_cad_core.geom.lattice import gyroid, schwarz_p, octet_truss, kelvin_cell
 # GK-123: clearance / minimum-gap analysis
 from kerf_cad_core.geom.assembly import clearance  # noqa: E402
+# GK-124: mate constraint solver
+from kerf_cad_core.geom.assembly import solve_mate  # noqa: E402
 
 # GK-131: tangent-chain edge auto-select
 from kerf_cad_core.geom.fillet_solid import tangent_edge_chain

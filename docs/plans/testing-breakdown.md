@@ -360,7 +360,7 @@ noted.
   File: `packages/kerf-api/tests/test_feature_derived_artifacts.py`
   Success: 25 hit/miss/invalidate scenarios; correct lineage on source bump.
 
-- [ ] T-68 Project types (jewelry / mech / electronic / arch / civil)
+- [x] T-68 Project types (jewelry / mech / electronic / arch / civil)
   Scope: `mig 005` `project_type` + per-type defaults + tool-allow-list.
   File: `packages/kerf-api/tests/test_feature_project_types.py`
   Success: 25 per-type new-project flows; correct seed kinds; default chat system prompt.

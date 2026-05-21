@@ -494,7 +494,7 @@ escalation}).
   File: `packages/kerf-core/tests/test_rls_cloud_github_tokens.py`
   Success: 10 cases — installation token of B's not visible; cannot bind B's installation to A's project.
 
-- [ ] T-91 RLS: project_workshop_images + workshop_likes + workshop_readme
+- [x] T-91 RLS: project_workshop_images + workshop_likes + workshop_readme
   Scope: workshop assets — public read OK, write tenant-scoped.
   File: `packages/kerf-core/tests/test_rls_workshop.py`
   Success: 10 cases — public can read published; only owner can mutate / set primary / publish README.

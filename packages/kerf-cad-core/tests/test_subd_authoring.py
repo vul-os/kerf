@@ -30,6 +30,7 @@ from kerf_cad_core.geom.subd_authoring import (
     subd_extrude,
     subd_loop_cut,
     subd_set_crease,
+    subd_vertex_slide,
     to_subd_surface,
 )
 from kerf_cad_core.geom.subd import SubDMesh
@@ -594,3 +595,111 @@ def test_loop_cut_invalid_edge_id_no_raise():
     cage = create_subd_primitive("cube")
     result = subd_loop_cut(cage, [9999], t=0.5)
     assert isinstance(result, SubDCage)
+
+
+# ---------------------------------------------------------------------------
+# Group 11: subd_vertex_slide (GK-105)
+# ---------------------------------------------------------------------------
+
+def _make_simple_quad() -> SubDCage:
+    """Unit quad with vertices at corners."""
+    verts = [
+        [0.0, 0.0, 0.0],  # 0
+        [1.0, 0.0, 0.0],  # 1
+        [1.0, 1.0, 0.0],  # 2
+        [0.0, 1.0, 0.0],  # 3
+    ]
+    faces = [[0, 1, 2, 3]]
+    return SubDCage(vertices=verts, faces=faces)
+
+
+def _find_edge_between(cage: SubDCage, a: int, b: int) -> int:
+    for eid, (u, v) in enumerate(cage.cage_edges()):
+        if (u == a and v == b) or (u == b and v == a):
+            return eid
+    raise AssertionError(f"Edge ({a},{b}) not found")
+
+
+def test_vertex_slide_t0_identity():
+    """t=0 → vertex stays exactly in place."""
+    cage = _make_simple_quad()
+    eid = _find_edge_between(cage, 0, 1)
+    result = subd_vertex_slide(cage, 0, eid, t=0.0)
+    assert result.vertices[0] == cage.vertices[0]
+
+
+def test_vertex_slide_t1_lands_on_neighbour():
+    """t=1 → vertex coincides with the neighbour."""
+    cage = _make_simple_quad()
+    eid = _find_edge_between(cage, 0, 1)
+    result = subd_vertex_slide(cage, 0, eid, t=1.0)
+    assert result.vertices[0] == pytest.approx(cage.vertices[1])
+
+
+def test_vertex_slide_t05_midpoint():
+    """t=0.5 → vertex moves to midpoint between original and neighbour."""
+    cage = _make_simple_quad()
+    eid = _find_edge_between(cage, 0, 1)
+    result = subd_vertex_slide(cage, 0, eid, t=0.5)
+    expected = [
+        (cage.vertices[0][i] + cage.vertices[1][i]) / 2.0
+        for i in range(3)
+    ]
+    assert result.vertices[0] == pytest.approx(expected)
+
+
+def test_vertex_slide_topology_unchanged():
+    """Topology (V/E/F counts) must not change."""
+    cage = _make_simple_quad()
+    eid = _find_edge_between(cage, 0, 1)
+    result = subd_vertex_slide(cage, 0, eid, t=0.5)
+    assert result.num_vertices == cage.num_vertices
+    assert result.num_faces == cage.num_faces
+    assert len(result.cage_edges()) == len(cage.cage_edges())
+
+
+def test_vertex_slide_only_target_vertex_moves():
+    """Only the slid vertex changes; all others stay fixed."""
+    cage = _make_simple_quad()
+    eid = _find_edge_between(cage, 0, 1)
+    result = subd_vertex_slide(cage, 0, eid, t=0.7)
+    for vi in range(1, cage.num_vertices):
+        assert result.vertices[vi] == pytest.approx(cage.vertices[vi])
+
+
+def test_vertex_slide_cube_t1_on_edge():
+    """On a cube, slide a corner vertex fully to its neighbour along edge 0."""
+    cage = create_subd_primitive("cube")
+    edges = cage.cage_edges()
+    a, b = edges[0]
+    result = subd_vertex_slide(cage, a, 0, t=1.0)
+    assert result.vertices[a] == pytest.approx(cage.vertices[b])
+    assert result.num_vertices == cage.num_vertices
+    assert result.num_faces == cage.num_faces
+
+
+def test_vertex_slide_non_incident_edge_returns_copy():
+    """If edge_id is not incident on vertex_id, return a copy unchanged."""
+    cage = _make_simple_quad()
+    # Edge between vertices 2 and 3 is NOT incident on vertex 0
+    eid = _find_edge_between(cage, 2, 3)
+    result = subd_vertex_slide(cage, 0, eid, t=0.5)
+    assert result.vertices[0] == pytest.approx(cage.vertices[0])
+
+
+def test_vertex_slide_invalid_edge_no_raise():
+    cage = create_subd_primitive("cube")
+    result = subd_vertex_slide(cage, 0, 9999, t=0.5)
+    assert isinstance(result, SubDCage)
+
+
+def test_vertex_slide_invalid_vertex_no_raise():
+    cage = create_subd_primitive("cube")
+    result = subd_vertex_slide(cage, 9999, 0, t=0.5)
+    assert isinstance(result, SubDCage)
+
+
+def test_vertex_slide_exported_from_geom_init():
+    """subd_vertex_slide must be importable from kerf_cad_core.geom."""
+    from kerf_cad_core.geom import subd_vertex_slide as _fn  # noqa: F401
+    assert callable(_fn)

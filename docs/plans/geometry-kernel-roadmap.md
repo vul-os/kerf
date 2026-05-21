@@ -920,7 +920,7 @@ effort.
   one-edge sibling of GK-88 loop slide). — `geom/subd_authoring.py` —
   oracle: slide by t moves the edge endpoints t·len in the face-tangent
   dir; topology unchanged. — dep: GK-88 — parallel: Y — sonnet.
-- [ ] **GK-105** Vertex slide (move a vertex along one of its incident
+- [x] **GK-105** Vertex slide (move a vertex along one of its incident
   edges, t∈[0,1]). — `geom/subd_authoring.py` — oracle: t=1 lands the
   vertex on the neighbour; topology unchanged. — dep: GK-52 — parallel:
   Y — sonnet.

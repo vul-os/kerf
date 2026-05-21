@@ -1222,6 +1222,78 @@ def subd_set_crease(
 
 
 # ---------------------------------------------------------------------------
+# Public: subd_vertex_slide
+# ---------------------------------------------------------------------------
+
+def subd_vertex_slide(
+    cage: SubDCage,
+    vertex_id: int,
+    edge_id: int,
+    t: float,
+) -> SubDCage:
+    """Slide a vertex along one of its incident edges.
+
+    The vertex is linearly interpolated from its current position toward the
+    neighbour at the opposite end of the specified edge.  Topology (vertex
+    count, edge count, face count) is unchanged.
+
+    Parameters
+    ----------
+    cage : SubDCage
+        Source cage.
+    vertex_id : int
+        Index of the vertex to slide (into ``cage.vertices``).
+    edge_id : int
+        Index of an edge incident on ``vertex_id``, from ``cage.cage_edges()``.
+        The vertex will be slid toward the *other* endpoint of that edge.
+    t : float
+        Slide parameter in [0, 1].  ``t=0`` → identity (vertex stays put).
+        ``t=1`` → vertex coincides with the neighbour.  ``t=0.5`` → midpoint.
+
+    Returns
+    -------
+    SubDCage
+        New cage with updated vertex position and identical topology.
+        Never raises; returns a copy of the input cage on any error.
+    """
+    try:
+        t = float(t)
+        vid = int(vertex_id)
+        eid = int(edge_id)
+
+        if t == 0.0:
+            return _copy_cage(cage)
+
+        edges = cage.cage_edges()
+        if eid < 0 or eid >= len(edges):
+            return _copy_cage(cage)
+
+        a, b = edges[eid]
+        if a == vid:
+            neighbour = b
+        elif b == vid:
+            neighbour = a
+        else:
+            # edge_id is not incident on vertex_id
+            return _copy_cage(cage)
+
+        nv = len(cage.vertices)
+        if vid < 0 or vid >= nv or neighbour < 0 or neighbour >= nv:
+            return _copy_cage(cage)
+
+        result = _copy_cage(cage)
+        p = cage.vertices[vid]
+        q = cage.vertices[neighbour]
+        # lerp: new_pos = p + t*(q-p) = (1-t)*p + t*q
+        result.vertices[vid] = [
+            p[i] + t * (q[i] - p[i]) for i in range(len(p))
+        ]
+        return result
+    except Exception:
+        return _copy_cage(cage)
+
+
+# ---------------------------------------------------------------------------
 # Public: to_subd_surface
 # ---------------------------------------------------------------------------
 

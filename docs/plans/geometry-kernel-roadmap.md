@@ -1094,7 +1094,7 @@ is a deliberate non-goal (§6), not an oversight.
   whole-body continuity report). — `geom/surface_analysis.py` — oracle:
   a sewn-from-fillets body reports G1 across fillet seams, G0 across
   sharp edges. — dep: GK-44 — parallel: Y — sonnet.
-- [ ] **GK-139** Curve / surface extension (extend beyond the parametric
+- [x] **GK-139** Curve / surface extension (extend beyond the parametric
   domain by tangent (G1) or curvature (G2) continuation). —
   `geom/curve_toolkit.py`, `geom/patch_srf.py` — oracle: tangent-extend a
   line stays collinear; G2-extend an arc keeps the radius ± tol. — dep:

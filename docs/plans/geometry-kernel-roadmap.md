@@ -1050,7 +1050,7 @@ effort.
   closed ends, pitch + wire diameter + turns). — `geom/threads.py` —
   oracle: a coil of N turns, pitch p has free length ≈ N·p + end
   allowance ± tol. — dep: GK-77 — parallel: Y — sonnet.
-- [ ] **GK-131** Tangent-chain edge auto-select (given a seed edge, walk
+- [x] **GK-131** Tangent-chain edge auto-select (given a seed edge, walk
   the tangent-continuous edge run — precondition for chain fillets). —
   `geom/fillet_solid.py` — oracle: the seed edge on a rounded-box top
   face returns all 4 tangent-connected top edges. — dep: GK-29 —

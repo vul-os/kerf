@@ -634,6 +634,8 @@ __all__ = [
     "gyroid","schwarz_p","octet_truss","kelvin_cell",
     # GK-123
     "clearance",
+    # GK-131
+    "tangent_edge_chain",
 ]
 
 # GK-122: interference / collision detection
@@ -646,3 +648,6 @@ from kerf_cad_core.geom.sdf import body_sdf, sdf_sample
 from kerf_cad_core.geom.lattice import gyroid, schwarz_p, octet_truss, kelvin_cell
 # GK-123: clearance / minimum-gap analysis
 from kerf_cad_core.geom.assembly import clearance  # noqa: E402
+
+# GK-131: tangent-chain edge auto-select
+from kerf_cad_core.geom.fillet_solid import tangent_edge_chain

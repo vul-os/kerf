@@ -98,6 +98,7 @@ __all__ = [
     "fillet_solid_edge",
     "FilletResult",
     "edge_supported_contract",
+    "tangent_edge_chain",
 ]
 
 
@@ -1629,3 +1630,156 @@ def fillet_solid_edge(
         return _empty(str(exc))
     except Exception as exc:  # pragma: no cover - defensive
         return _empty(f"internal error: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# GK-131 — Tangent-chain edge auto-select
+# ---------------------------------------------------------------------------
+
+def _edge_tangent_at_vertex(edge: "Edge", vertex: "Vertex") -> np.ndarray:
+    """Return the unit tangent of *edge* pointing *away* from *vertex*.
+
+    For a straight line the tangent is constant.  For a NURBS or arc curve
+    we use a small finite-difference step at whichever parameter end
+    corresponds to *vertex*, then flip so the direction is always leaving
+    the vertex (i.e. heading into the edge's interior).
+
+    The tiny epsilon (1e-6) is smaller than any reasonable edge length yet
+    large enough to avoid float-truncation noise.
+    """
+    eps = 1e-6
+    at_start = vertex is edge.v_start
+    if at_start:
+        t_at = edge.t0
+        t_step = edge.t0 + eps * (edge.t1 - edge.t0)
+    else:
+        t_at = edge.t1
+        t_step = edge.t1 - eps * (edge.t1 - edge.t0)
+
+    # Prefer analytic derivative when the curve exposes one.
+    if hasattr(edge.curve, "derivative"):
+        raw = np.asarray(edge.curve.derivative(t_at, order=1), dtype=float)
+        if not at_start:
+            raw = -raw          # flip: pointing away from v_end
+    else:
+        p0 = np.asarray(edge.curve.evaluate(t_at), dtype=float)
+        p1 = np.asarray(edge.curve.evaluate(t_step), dtype=float)
+        raw = p1 - p0
+        if not at_start:
+            raw = -raw
+
+    norm = float(np.linalg.norm(raw))
+    if norm < 1e-14:  # pragma: no cover — degenerate edge guard
+        return raw
+    return raw / norm
+
+
+def tangent_edge_chain(
+    body: "Body",
+    seed_edge_id: int,
+    angle_tol_deg: float = 5.0,
+) -> "List[int]":
+    """Walk the tangent-continuous edge run that contains *seed_edge_id*.
+
+    Starting from the seed edge the algorithm fans out in both directions
+    along the chain.  At each end-vertex it collects every other edge that
+    shares the vertex and tests whether the outgoing tangent of the
+    candidate aligns with the incoming tangent of the current edge within
+    *angle_tol_deg* degrees.  Only edges whose tangent direction matches
+    within the tolerance (absolute angular difference ≤ angle_tol_deg) are
+    admitted; the walk stops at any vertex where no candidate qualifies.
+
+    Parameters
+    ----------
+    body:
+        A :class:`~kerf_cad_core.geom.brep.Body` to search.
+    seed_edge_id:
+        The integer ``Edge.id`` of the starting edge.  Raises
+        :class:`KeyError` if no edge with that id exists in *body*.
+    angle_tol_deg:
+        Maximum angle (degrees) between adjacent edge tangents for them to
+        be considered G1-continuous.  Default is 5 °.
+
+    Returns
+    -------
+    List[int]
+        Ordered list of edge ids in the tangent chain, including the seed.
+        The seed is always included even when it is isolated (a single-edge
+        chain on a sharp corner).
+    """
+    all_edges = body.all_edges()
+    # index by id
+    edge_by_id: dict = {e.id: e for e in all_edges}
+
+    if seed_edge_id not in edge_by_id:
+        raise KeyError(f"No edge with id={seed_edge_id} in body")
+
+    cos_tol = math.cos(math.radians(angle_tol_deg))
+
+    # Build a map: vertex id -> list of edges incident to that vertex.
+    vertex_to_edges: dict = {}
+    for e in all_edges:
+        for v in (e.v_start, e.v_end):
+            vertex_to_edges.setdefault(id(v), []).append(e)
+
+    seed = edge_by_id[seed_edge_id]
+    chain_ids: "List[int]" = [seed_edge_id]
+    visited: set = {seed_edge_id}
+
+    def _walk(current_edge: "Edge", from_vertex: "Vertex") -> None:
+        """Extend chain from *current_edge* at the end that is *from_vertex*.
+
+        *from_vertex* is the vertex we arrived at (i.e. the end we're
+        trying to continue *through*).  We look at all other edges that
+        touch *from_vertex* and pick the first one (if any) whose tangent
+        aligns with the current edge's incoming direction.
+        """
+        # Tangent of current_edge *arriving at* from_vertex.
+        # This is the opposite of "away from vertex" — we want the direction
+        # the current edge was heading when it reached from_vertex.
+        at_start = from_vertex is current_edge.v_start
+        if at_start:
+            # arriving at v_start means we traversed edge backwards
+            t_at = current_edge.t0
+            t_step = current_edge.t0 + 1e-6 * (current_edge.t1 - current_edge.t0)
+        else:
+            t_at = current_edge.t1
+            t_step = current_edge.t1 - 1e-6 * (current_edge.t1 - current_edge.t0)
+
+        if hasattr(current_edge.curve, "derivative"):
+            arriving = np.asarray(
+                current_edge.curve.derivative(t_at, order=1), dtype=float
+            )
+            if at_start:
+                arriving = -arriving   # arriving at t0 means coming from t1
+        else:
+            p_at = np.asarray(current_edge.curve.evaluate(t_at), dtype=float)
+            p_step = np.asarray(current_edge.curve.evaluate(t_step), dtype=float)
+            arriving = p_at - p_step if not at_start else p_step - p_at
+
+        n = float(np.linalg.norm(arriving))
+        if n > 1e-14:
+            arriving = arriving / n
+
+        candidates = vertex_to_edges.get(id(from_vertex), [])
+        for cand in candidates:
+            if cand.id in visited:
+                continue
+            # outgoing tangent of candidate (pointing away from from_vertex)
+            outgoing = _edge_tangent_at_vertex(cand, from_vertex)
+            dot = float(np.dot(arriving, outgoing))
+            if dot >= cos_tol:
+                visited.add(cand.id)
+                chain_ids.append(cand.id)
+                # continue from the other end of cand
+                next_vertex = (
+                    cand.v_end if (from_vertex is cand.v_start) else cand.v_start
+                )
+                _walk(cand, next_vertex)
+                break  # only one continuous continuation per end
+
+    # Walk from seed in both directions.
+    _walk(seed, seed.v_end)
+    _walk(seed, seed.v_start)
+
+    return chain_ids

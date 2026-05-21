@@ -297,6 +297,8 @@ from kerf_cad_core.geom.pattern import (
 )
 
 from kerf_cad_core.geom.surface_offset import surface_offset
+# GK-96: reverse curve/surface direction
+from kerf_cad_core.geom.nurbs import reverse_curve, reverse_surface
 # GK-84: split body by plane / surface (no-fill cut)
 from kerf_cad_core.geom.split_body import (
     split_body_by_plane,

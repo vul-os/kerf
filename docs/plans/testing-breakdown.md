@@ -444,7 +444,7 @@ escalation}).
   File: `packages/kerf-core/tests/test_rls_projects.py`
   Success: 12 cases — user A sees only own workspace projects; cannot set `workspace_id` to B's.
 
-- [ ] T-81 RLS: files
+- [x] T-81 RLS: files
   Scope: cross-tenant on `files`, including parent_id traversal.
   File: `packages/kerf-core/tests/test_rls_files.py`
   Success: 12 cases — reparent to other workspace refused; storage_key leak via select refused.

@@ -383,7 +383,7 @@ variants, timing).
   File: `packages/kerf-auth/tests/test_pen_password_lockout.py`
   Success: 12 cases — N-1 attempts allowed, Nth locks, unlock after window, lockout does NOT enumerate users by timing.
 
-- [ ] T-71 JWT replay + forgery
+- [x] T-71 JWT replay + forgery
   Scope: stolen access-token reuse after logout / rotation; alg=none, alg-confusion, kid-injection.
   File: `packages/kerf-auth/tests/test_pen_jwt_replay_forgery.py`
   Success: 12 cases — none/HS256-via-RS256-pub/kid-traversal all rejected; revoked-token blacklist enforced.

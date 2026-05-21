@@ -5445,7 +5445,7 @@ User-direction 2026-05-19. Extends T-179 (apparel pattern-making) with deeper te
 ### T-340 Kernel Phase 4 — SubD modeling depth + parametric wizards + interop
 - **Tier:** A
 - **Priority:** P0
-- **Status:** 🟡 open (2026-05-21) — kernel spine (GK-01..GK-72) complete; Phase 4 closes user-visible gaps
+- **Status:** 🟡 in progress (2026-05-21) — Phase 4 (GK-73..GK-93) COMPLETE; Phase 5 (GK-94..GK-133, 40 items) opened: Class-A analysis, curve/surface utilities, SubD depth, mesh+implicit (SDF/marching-cubes), lattice/TPMS generative, mould tooling, assembly mates/interference, DXF/PLY/3DM interop, gears/threads/springs, feature recognition
 - **Scope:** 21 GK items (GK-73..GK-93) covering Blender-style SubD authoring depth (inset face, bridge loops, loop slide, knife), parametric wizards every CAD ships (hole, helical sweep, n-rail sweep, pattern), robustness ops for imported geometry (body simplify/heal, split, replace face, imprint), printability analysis (wall-thickness map, draft analysis, symmetry detection), sheet metal bend/unfold, and round-trip mesh I/O (3MF, glTF/GLB, OBJ, STL reader). Listed in `docs/plans/geometry-kernel-roadmap.md` §4b. **Priority order is the listing order** — top-9 (GK-73..GK-81) are highest user-value × smallest effort, sonnet-parallel; later items unlock harder workflows. All pure-Python, additive to the public façade.
 - **Target files/packages:** see per-item `geom/<file>.py` references in roadmap §4b; tests live in `packages/kerf-cad-core/tests/`. Public exports added to `geom/__init__.py`.
 - **Definition of Done:**

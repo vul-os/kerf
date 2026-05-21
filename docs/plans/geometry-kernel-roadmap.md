@@ -850,6 +850,224 @@ in `geom/__init__.py`.
 
 ---
 
+## 4c. Phase 5 — Class-A depth, generative/implicit, manufacturing prep, assembly (GK-94 … GK-133)
+
+Added 2026-05-21 (second comprehensive audit). Phase 1-4 (GK-01..GK-93) is
+complete. Phase 5 is a *grounded* gap analysis against industry kernels
+(OCCT, Parasolid, ACIS, OpenSubdiv, CGAL, Rhino/Grasshopper, Blender) of
+what Kerf still lacks — **excluding** what already ships: `make2d`
+(hidden-line views), `section_contour`, `unroll_srf`, `offset` (curve),
+`chamfer`, `fillet_solid`, `leading` (Class-A hotspots), `zebra`,
+`curvature_comb`, `hausdorff_deviation`, `blocks` (instancing), `pattern`,
+`symmetry`, `wall_thickness`, `draft_analysis`. All pure-Python, additive
+to the public façade. **Priority order is listing order**; the top groups
+(curve/surface utilities, Class-A analysis) are highest value × smallest
+effort.
+
+### Group A — Class-A analysis + curve/surface utilities
+
+- [ ] **GK-94** Gaussian + mean curvature heatmap: per-(u,v) Gaussian K
+  and mean H curvature grids on a NurbsSurface, heatmap-ready arrays +
+  min/max. — `geom/surface_analysis.py` — oracle: sphere of radius r →
+  K = 1/r² everywhere, H = 1/r; plane → K = H = 0. — dep: GK-37 —
+  parallel: Y — sonnet.
+- [ ] **GK-95** Reflection-line + highlight-line analysis (distinct from
+  zebra): parallel light-line family reflected off the surface; isolate
+  C0/C1 break lines. — `geom/surface_analysis.py` — oracle: a G1-but-not-
+  G2 join shows a kinked highlight line; a single smooth patch shows
+  straight lines. — dep: GK-38 — parallel: Y — sonnet.
+- [ ] **GK-96** Reverse curve / reverse surface direction (flip
+  parameterization + normals, preserve geometry). — `geom/nurbs.py` —
+  oracle: reverse twice == identity; evaluate(reversed,t) ==
+  evaluate(orig,1−t). — dep: GK-01 — parallel: Y — sonnet.
+- [ ] **GK-97** Reparametrize curve/surface: normalize knot vectors to
+  [0,1], optional arc-length reparam, domain rescale. — `geom/nurbs.py` —
+  oracle: normalized curve has knots in [0,1] and identical point set. —
+  dep: GK-01 — parallel: Y — sonnet.
+- [ ] **GK-98** Arc-length parameterization + curve length (adaptive
+  Gauss quadrature; param↔length tables). — `geom/curve_toolkit.py` —
+  oracle: length of a unit circle arc = r·θ ± tol; length of a line =
+  |p1−p0|. — dep: GK-01 — parallel: Y — sonnet.
+- [ ] **GK-99** Mid-curve / mid-surface (average of two curves/surfaces;
+  for symmetry spines + thin-wall mid-surface extraction). —
+  `geom/curve_toolkit.py`, `geom/patch_srf.py` — oracle: mid-curve of two
+  parallel lines is centred; mid-surface of two parallel planes lies
+  halfway. — dep: GK-34 — parallel: Y — sonnet.
+- [ ] **GK-100** Composite curve (poly-NURBS chain with explicit
+  G0/G1/G2 continuity tags + join/split). — `geom/curve_toolkit.py` —
+  oracle: join two collinear segments → single G1 composite of correct
+  total length; split returns the originals. — dep: GK-01 — parallel: Y
+  — sonnet.
+- [ ] **GK-101** Curve-on-surface geodesic (shortest path between two
+  uv points on a NurbsSurface; iterative straightening). —
+  `geom/curve_toolkit.py` — oracle: geodesic on a plane is a straight
+  line; on a cylinder it is a helix segment of correct pitch. — dep:
+  GK-06 — parallel: N — opus.
+- [ ] **GK-102** Knot removal / minimal-CP refit (remove removable knots
+  within tol; shape-preserving curve simplification). — `geom/nurbs.py` —
+  oracle: a degree-elevated-then-reduced curve recovers the original CP
+  count ± tol. — dep: GK-01 — parallel: N — opus.
+- [ ] **GK-103** Text-on-curve / text-on-surface: glyph outlines (vector
+  font) laid along a curve or mapped onto a surface — engraving / jewelry
+  inscription. — `geom/curve_toolkit.py` — oracle: a single glyph's
+  closed outline area is preserved ± tol when mapped onto a plane; on a
+  cylinder it wraps without self-intersection. — dep: GK-100 —
+  parallel: Y — sonnet.
+
+### Group B — SubD depth (Blender / OpenSubdiv parity)
+
+- [ ] **GK-104** Edge slide (single edge along adjacent faces; the
+  one-edge sibling of GK-88 loop slide). — `geom/subd_authoring.py` —
+  oracle: slide by t moves the edge endpoints t·len in the face-tangent
+  dir; topology unchanged. — dep: GK-88 — parallel: Y — sonnet.
+- [ ] **GK-105** Vertex slide (move a vertex along one of its incident
+  edges, t∈[0,1]). — `geom/subd_authoring.py` — oracle: t=1 lands the
+  vertex on the neighbour; topology unchanged. — dep: GK-52 — parallel:
+  Y — sonnet.
+- [ ] **GK-106** Edge split at parameter (insert a vertex on an edge,
+  splitting incident faces). — `geom/subd_authoring.py` — oracle: split
+  a quad edge at t=0.5 → 2 new faces, V+1/E+? consistent with Euler. —
+  dep: GK-52 — parallel: Y — sonnet.
+- [ ] **GK-107** Bevel weight per edge (graded crease 0..1 driving the
+  limit surface tightness, distinct from binary crease). —
+  `geom/subd_authoring.py`, `geom/subd_to_nurbs.py` — oracle: weight 1.0
+  reproduces a hard crease; 0.0 reproduces the smooth limit. — dep:
+  GK-52 — parallel: Y — sonnet.
+- [ ] **GK-108** Loop subdivision scheme (triangle-mesh subdivision,
+  alternative to Catmull-Clark for tri-dominant cages). —
+  `geom/subd_authoring.py` — oracle: one Loop step on a tetra quadruples
+  faces; limit point matches the Loop stencil. — dep: GK-52 —
+  parallel: N — opus.
+
+### Group C — Mesh + implicit modelling
+
+- [ ] **GK-109** Mesh decimate (quadric-error-metric edge collapse to a
+  target triangle count / ratio). — `geom/mesh_repair.py` — oracle:
+  decimate a 10k-tri sphere to 10% → manifold preserved, Hausdorff <
+  tol·r. — dep: GK-55 — parallel: Y — sonnet.
+- [ ] **GK-110** Mesh repair: hole-fill, non-manifold-edge fix,
+  duplicate-vertex weld, normal-consistency. — `geom/mesh_repair.py` —
+  oracle: a sphere mesh with a deleted triangle → hole-filled to closed
+  manifold (Euler χ=2). — dep: GK-55 — parallel: Y — sonnet.
+- [ ] **GK-111** Mesh smoothing (Laplacian + Taubin λ|μ no-shrink). —
+  `geom/mesh_repair.py` — oracle: Taubin smoothing of a noisy sphere
+  reduces normal variance without shrinking the bounding radius > tol. —
+  dep: GK-55 — parallel: Y — sonnet.
+- [ ] **GK-112** Signed distance field (SDF) from a Body (sampled grid +
+  trilinear sampler). — `geom/sdf.py` — oracle: SDF of a unit sphere at
+  distance d from centre returns d−1 ± grid tol; sign flips inside. —
+  dep: GK-21 — parallel: Y — sonnet.
+- [ ] **GK-113** Marching cubes (SDF / scalar grid → watertight mesh). —
+  `geom/sdf.py` — oracle: marching-cubes of a sphere SDF → closed
+  manifold whose volume = 4/3πr³ ± grid tol. — dep: GK-112 —
+  parallel: N — opus.
+- [ ] **GK-114** Voxel boolean / CSG (union/intersect/difference on SDF
+  grids; robust booleans for messy meshes). — `geom/sdf.py` — oracle:
+  voxel-union of two overlapping spheres has volume = V1+V2−Voverlap ±
+  grid tol. — dep: GK-112 — parallel: N — opus.
+
+### Group D — Generative / lattice (jewelry + lightweighting)
+
+- [ ] **GK-115** Lattice unit-cell library: gyroid, Schwarz-P, octet
+  truss, Kelvin cell as parametric implicit / strut generators. —
+  `geom/lattice.py` — oracle: a gyroid cell evaluated at its implicit
+  zero-level is periodic; octet strut count per cell = 36. — dep:
+  GK-112 — parallel: Y — sonnet.
+- [ ] **GK-116** Lattice fill of a Body to a target relative density
+  (intersect lattice with body, trim to walls). — `geom/lattice.py` —
+  oracle: filling a box at 0.2 relative density yields a body whose
+  volume ≈ 0.2·box volume ± tol. — dep: GK-115, GK-114 — parallel: N —
+  opus.
+- [ ] **GK-117** TPMS implicit surface (triply-periodic minimal
+  surfaces) → meshed sheet at chosen thickness. — `geom/lattice.py` —
+  oracle: a Schwarz-P sheet of thickness t is closed-manifold and
+  periodic; mean curvature ≈ 0 on the mid-surface. — dep: GK-113 —
+  parallel: N — opus.
+
+### Group E — Manufacturing prep / mould tooling
+
+- [ ] **GK-118** Parting-line generation (silhouette w.r.t. a pull
+  direction → closed parting curve on a Body). — `geom/mold.py` —
+  oracle: parting line of a sphere pulled along Z is the equator ±
+  tol. — dep: GK-92 — parallel: Y — sonnet.
+- [ ] **GK-119** Cavity / core mould split (split a block around a part
+  along the parting surface → core + cavity halves). — `geom/mold.py` —
+  oracle: core ∪ cavity ∪ part = block volume ± tol; halves are
+  watertight. — dep: GK-118, GK-84 — parallel: N — opus.
+- [ ] **GK-120** Uniform body offset (grow/shrink a whole solid by signed
+  distance — casting shrinkage / machining stock). — `geom/solid_features.py`
+  — oracle: offsetting a sphere of r by d → validated body of radius r+d
+  ± tol. — dep: GK-45 — parallel: Y — sonnet.
+- [ ] **GK-121** Undercut-region detection (faces unreachable along a
+  pull direction → grouped undercut report + colour map). — `geom/mold.py`
+  — oracle: an overhang box reports its under-face as an undercut; a
+  draft-positive box reports none. — dep: GK-92 — parallel: Y — sonnet.
+
+### Group F — Assembly / interaction
+
+- [ ] **GK-122** Interference / collision detection between two Bodies
+  (boolean-intersection volume > tol + contact report). —
+  `geom/assembly.py` — oracle: two overlapping boxes report interference
+  volume = overlap; disjoint boxes report none. — dep: GK-18 —
+  parallel: Y — sonnet.
+- [ ] **GK-123** Clearance / minimum-gap analysis (closest distance
+  between two disjoint Bodies + witness points). — `geom/assembly.py` —
+  oracle: two spheres centre-distance D radii r1,r2 → gap = D−r1−r2 ±
+  tol. — dep: GK-06 — parallel: Y — sonnet.
+- [ ] **GK-124** Mate constraint solver (coincident / concentric /
+  distance / angle between selected faces or edges → rigid transform). —
+  `geom/assembly.py` — oracle: concentric-mate two cylinders → axes
+  collinear; distance-mate two planes → separation == target. — dep:
+  GK-23 — parallel: N — opus.
+
+### Group G — Interop (more formats)
+
+- [ ] **GK-125** DXF read + write (2D: lines, arcs, circles, polylines,
+  splines, layers). — `geom/io/dxf.py` — oracle: write→read round-trip
+  preserves entity count + layer names; a circle's radius survives. —
+  dep: GK-49 — parallel: Y — sonnet.
+- [ ] **GK-126** PLY read + write (mesh + per-vertex colour + point
+  cloud; ASCII + binary). — `geom/io/ply.py` — oracle: write→read
+  round-trip preserves V, F, per-vertex colour. — dep: GK-21 —
+  parallel: Y — sonnet.
+- [ ] **GK-127** 3DM (Rhino OpenNURBS) read (curves, surfaces, meshes,
+  layers — read-only). — `geom/io/rhino3dm.py` — oracle: read a known
+  3dm with one NURBS sphere → recovers a surface within ε of the
+  original. — dep: GK-47 — parallel: N — opus.
+
+### Group H — Mechanical primitives + B-rep depth
+
+- [ ] **GK-128** Gear tooth profile generator (involute + cycloid; spur
+  gear given module/teeth/pressure-angle → 2-D tooth + full wheel
+  curve). — `geom/gears.py` — oracle: involute base-circle radius =
+  pitch·cos(α); generated wheel has the requested tooth count. — dep:
+  GK-100 — parallel: Y — sonnet.
+- [ ] **GK-129** Helical thread profile (ISO metric / Acme cutting
+  profile swept helically into a screw). — `geom/threads.py` — oracle:
+  M6×1 thread → pitch 1 mm, crest-to-root depth = 0.6134·pitch ± tol. —
+  dep: GK-77 — parallel: Y — sonnet.
+- [ ] **GK-130** Spring / coil generator (helical sweep wrapper: open /
+  closed ends, pitch + wire diameter + turns). — `geom/threads.py` —
+  oracle: a coil of N turns, pitch p has free length ≈ N·p + end
+  allowance ± tol. — dep: GK-77 — parallel: Y — sonnet.
+- [ ] **GK-131** Tangent-chain edge auto-select (given a seed edge, walk
+  the tangent-continuous edge run — precondition for chain fillets). —
+  `geom/fillet_solid.py` — oracle: the seed edge on a rounded-box top
+  face returns all 4 tangent-connected top edges. — dep: GK-29 —
+  parallel: Y — sonnet.
+- [ ] **GK-132** G3 blend across edge chains (curvature-accel-continuous
+  blend along a multi-edge tangent chain, building on GK-62 G3). —
+  `geom/blend_solid.py` — oracle: G3 chain-blend of a box edge run →
+  curvature-comb residual continuous (no G2 break) across the chain. —
+  dep: GK-62, GK-131 — parallel: N — opus.
+- [ ] **GK-133** Feature recognition (classify B-rep face clusters into
+  hole / pocket / boss / fillet / chamfer on an imported Body). —
+  `geom/feature_recognition.py` — oracle: a box with a drilled hole +
+  filleted edge → recogniser reports 1 hole + 1 fillet feature with
+  correct face ids. — dep: GK-23 — parallel: N — opus.
+
+---
+
 ## 5. Parallelization plan
 
 The coupled numerical/topology core is **opus-owned and serialized** because

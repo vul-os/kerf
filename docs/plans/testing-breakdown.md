@@ -563,7 +563,7 @@ Postgres schema. ≥10 user-visible assertions per spec.
   File: `tests/e2e/specs/persona_share_link.spec.ts`
   Success: viewer sees project; mutate UI disabled; expired token redirects to login.
 
-- [ ] T-103 E2E workshop publish
+- [x] T-103 E2E workshop publish
   Scope: complete project → publish to workshop → gallery shows → like → README renders.
   File: `tests/e2e/specs/persona_workshop.spec.ts`
   Success: gallery card has primary image; README markdown safe-rendered; like count increments.

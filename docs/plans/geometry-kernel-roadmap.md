@@ -1022,7 +1022,7 @@ effort.
 
 ### Group G — Interop (more formats)
 
-- [ ] **GK-125** DXF read + write (2D: lines, arcs, circles, polylines,
+- [x] **GK-125** DXF read + write (2D: lines, arcs, circles, polylines,
   splines, layers). — `geom/io/dxf.py` — oracle: write→read round-trip
   preserves entity count + layer names; a circle's radius survives. —
   dep: GK-49 — parallel: Y — sonnet.

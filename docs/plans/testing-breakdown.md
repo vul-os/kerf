@@ -499,7 +499,7 @@ escalation}).
   File: `packages/kerf-core/tests/test_rls_workshop.py`
   Success: 10 cases — public can read published; only owner can mutate / set primary / publish README.
 
-- [ ] T-92 RLS: derived_artifacts
+- [x] T-92 RLS: derived_artifacts
   Scope: derived-artifact rows (mig 024) cross-tenant.
   File: `packages/kerf-core/tests/test_rls_derived_artifacts.py`
   Success: 10 cases — artifact of B not readable; lineage column cannot be forged.

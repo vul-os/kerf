@@ -830,7 +830,7 @@ in `geom/__init__.py`.
   station. — `geom/sweep_n.py` — oracle: 3-rail sweep of three
   parallel circles yields a cylinder of equivalent volume ± tol. —
   dep: GK-15, GK-16 — parallel: N — opus.
-- [ ] **GK-91** Sheet metal bend / unfold (K-factor + bend tables):
+- [x] **GK-91** Sheet metal bend / unfold (K-factor + bend tables):
   bend a planar sheet along a line at given angle / radius; unfold
   any bent sheet to flat pattern. K-factor lookup table. —
   `geom/sheet_metal.py` — oracle: bend a sheet 90° at r=1, t=2,

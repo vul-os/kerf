@@ -307,6 +307,13 @@ from kerf_cad_core.geom.body_heal import simplify_body, heal_body
 from kerf_cad_core.geom.imprint import imprint_curve_on_face
 # GK-90: N-rail sweep (3+ rails)
 from kerf_cad_core.geom.sweep_n import sweep_n
+# GK-91: sheet metal bend / unfold (K-factor + bend tables)
+from kerf_cad_core.geom.sheet_metal import (
+    K_FACTOR_TABLE,
+    bend_allowance,
+    bend_sheet,
+    unfold_sheet,
+)
 
 __all__ = [
     "NurbsCurve",
@@ -508,4 +515,9 @@ __all__ = [
     "imprint_curve_on_face",
     # GK-90
     "sweep_n",
+    # GK-91
+    "K_FACTOR_TABLE",
+    "bend_allowance",
+    "bend_sheet",
+    "unfold_sheet",
 ]

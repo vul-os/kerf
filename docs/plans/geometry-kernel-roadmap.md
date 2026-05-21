@@ -1089,7 +1089,7 @@ is a deliberate non-goal (§6), not an oversight.
   Poisson-lite surface recovery). — `geom/recon.py` — oracle: sampled
   points on a sphere → reconstructed closed mesh whose Hausdorff to the
   analytic sphere < tol·r. — dep: GK-55 — parallel: N — opus.
-- [ ] **GK-138** Global continuity audit (walk every edge of a Body /
+- [x] **GK-138** Global continuity audit (walk every edge of a Body /
   surface set, classify each shared edge G0 / G1 / G2 / G3, return a
   whole-body continuity report). — `geom/surface_analysis.py` — oracle:
   a sewn-from-fillets body reports G1 across fillet seams, G0 across

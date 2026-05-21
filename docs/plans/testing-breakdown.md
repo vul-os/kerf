@@ -403,7 +403,7 @@ variants, timing).
   File: `packages/kerf-auth/tests/test_pen_oauth_state_pkce.py`
   Success: 12 cases — missing/mismatched state rejected; PKCE downgrade rejected; CSRF on callback caught.
 
-- [ ] T-75 CSRF protection
+- [x] T-75 CSRF protection
   Scope: cookie-auth endpoints reject cross-origin POST without CSRF token.
   File: `packages/kerf-auth/tests/test_pen_csrf.py`
   Success: 10 cases — same-origin allowed, cross-origin / null-origin / sub-domain refused, SameSite enforcement.

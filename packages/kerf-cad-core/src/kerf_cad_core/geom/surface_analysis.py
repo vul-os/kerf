@@ -3445,3 +3445,272 @@ def curvature_heatmap(
             "h_min": float("nan"),
             "h_max": float("nan"),
         }
+
+
+# ---------------------------------------------------------------------------
+# GK-95: Reflection-line + highlight-line analysis
+# ---------------------------------------------------------------------------
+
+def reflection_lines(
+    surface: NurbsSurface,
+    light_dirs: Optional[List[Sequence[float]]] = None,
+    nu: int = 64,
+    nv: int = 64,
+) -> dict:
+    """Reflection-line and highlight-line analysis over a UV grid (GK-95).
+
+    Simulates a family of parallel light lines (infinite parallel lines at
+    infinity) reflected off the surface and observed from a fixed eye position.
+    Unlike zebra stripes (which only depend on the surface normal direction),
+    reflection lines depend on the curvature of the normal field — making
+    C1 breaks (G1 but not G2 joins) visible as *kinked* lines and C0 breaks
+    visible as *gapped* lines.
+
+    Algorithm
+    ---------
+    For each sample point P(u, v):
+
+    1. Compute the outward unit normal ``n`` from the first partials.
+    2. For each light direction L (unit vector from light to surface), compute
+       the mirror-reflection of L off the tangent plane::
+
+           R = L − 2·(L · n)·n
+
+       R is the direction the incoming ray L would bounce towards the eye.
+    3. The *highlight* (specular) intensity for a given eye direction ``eye``
+       is how close R is to eye::
+
+           highlight = max(0, R · eye)²
+
+       A family of *n_lines* evenly-spaced parallel highlight lines corresponds
+       to stripes in the scalar field::
+
+           stripe = 0.5 + 0.5·cos(n_lines·π·(R · up))
+
+       where ``up`` is a reference axis perpendicular to the light family
+       direction (default world-Z).
+
+    Discontinuity detection
+    -----------------------
+    The stripe field is computed on the ``nu × nv`` grid.  The per-pixel
+    gradient magnitude is estimated from finite differences of the stripe
+    values.  A C0 break produces an O(1) jump; a C1 break (kink) produces
+    a localised spike in the *second* finite-difference (curvature of the
+    stripe field).  These are reported as ``gradient_grid`` and
+    ``gradient2_grid`` (2-D arrays).
+
+    ``c0_break_mask`` flags cells where the stripe gradient exceeds
+    ``c0_tol = 3·median(gradient_grid)`` — i.e., cells whose gradient is
+    anomalously large relative to the smooth interior.
+
+    ``c1_break_mask`` flags cells where the second-order gradient exceeds
+    ``c1_tol = 3·median(gradient2_grid)`` — i.e., local curvature kinks in
+    the line family.
+
+    Parameters
+    ----------
+    surface:
+        A :class:`~kerf_cad_core.geom.nurbs.NurbsSurface` instance.
+    light_dirs:
+        List of light direction 3-vectors (from light toward surface, i.e.,
+        the incoming ray direction).  Each is normalised internally.  If
+        ``None``, defaults to a single overhead light ``[0, 0, -1]``.
+    nu, nv:
+        Number of sample points in U and V.  Clamped to [3, 200].
+
+    Returns
+    -------
+    dict with keys:
+
+    ``ok`` : bool
+        ``True`` on success.
+    ``reason`` : str
+        Empty on success; error description otherwise.
+    ``stripe_grids`` : list[numpy.ndarray]
+        One 2-D array of shape ``(nu, nv)`` per light direction — stripe
+        intensity in [0, 1] at each sample.  ``nan`` at degenerate points.
+    ``gradient_grid`` : numpy.ndarray, shape (nu, nv)
+        Magnitude of the finite-difference gradient of ``stripe_grids[0]``
+        (first light direction).  Proxy for line-density / C0 break indicator.
+    ``gradient2_grid`` : numpy.ndarray, shape (nu, nv)
+        Laplacian (sum of second finite differences) of ``stripe_grids[0]``.
+        Proxy for line-curvature / C1 break indicator.
+    ``c0_break_mask`` : numpy.ndarray of bool, shape (nu, nv)
+        True where ``gradient_grid > 3·median(gradient_grid)``.
+    ``c1_break_mask`` : numpy.ndarray of bool, shape (nu, nv)
+        True where ``abs(gradient2_grid) > 3·median(abs(gradient2_grid))``.
+    ``normal_grid`` : numpy.ndarray, shape (nu, nv, 3)
+        Unit normals at each sample (``nan``-filled at degenerate points).
+    ``us`` : numpy.ndarray, shape (nu,)
+        U parameter values of the sample grid.
+    ``vs`` : numpy.ndarray, shape (nv,)
+        V parameter values of the sample grid.
+
+    Notes
+    -----
+    Highlight lines are sensitive to *curvature continuity* (G2): a G1-but-
+    not-G2 join produces surfaces with the same normal at the seam but
+    different rates of change of the normal on either side — the reflected
+    line family bends differently on each patch, producing a visible *kink*
+    (C1 break in the stripe field) even though the surface itself looks
+    smooth.  This is the canonical quality-assurance test for Class-A
+    automotive surfaces.
+
+    References
+    ----------
+    Kaufmann, H. & Krasauskas, R., "Highlight lines for shape interrogation",
+    Computer-Aided Design 25(9) 1993, pp. 564–572.
+
+    Kos, G. & Várady, T., "Highlight lines for visual quality inspection",
+    Computer Aided Design 36(6) 2004, pp. 571–583.
+
+    Piegl & Tiller, *The NURBS Book*, 2nd ed., Springer 1997 — §6.1.
+    """
+    try:
+        nu, nv = _clamp_grid(nu, nv)
+        us, vs = _uv_grid(surface, nu, nv)
+
+        # Normalise light directions
+        _default_light = [[0.0, 0.0, -1.0]]
+        if light_dirs is None:
+            raw_lights = _default_light
+        else:
+            raw_lights = list(light_dirs) if light_dirs else _default_light
+
+        lights: List[np.ndarray] = []
+        for ld in raw_lights:
+            v = np.asarray(ld, dtype=float).ravel()[:3]
+            nrm = float(np.linalg.norm(v))
+            if nrm < 1e-15:
+                v = np.array([0.0, 0.0, -1.0])
+            else:
+                v = v / nrm
+            lights.append(v)
+
+        # Reference "up" axis for stripe phase — choose an axis not parallel
+        # to the first light direction so stripes are visible.
+        first_light = lights[0]
+        up_candidates = [
+            np.array([0.0, 1.0, 0.0]),
+            np.array([1.0, 0.0, 0.0]),
+            np.array([0.0, 0.0, 1.0]),
+        ]
+        stripe_up = up_candidates[0]
+        for cand in up_candidates:
+            if abs(float(np.dot(cand, first_light))) < 0.95:
+                stripe_up = cand
+                break
+
+        # Number of stripe lines in the family
+        n_lines = 8
+
+        # Allocate output grids
+        normal_grid = np.full((nu, nv, 3), float("nan"))
+        stripe_grids: List[np.ndarray] = [
+            np.full((nu, nv), float("nan")) for _ in lights
+        ]
+
+        for i, u in enumerate(us):
+            for j, v in enumerate(vs):
+                cd = _analytic_curvature_data(surface, float(u), float(v))
+                if cd is None:
+                    continue
+                n = cd["n"]  # unit outward normal, shape (3,)
+                normal_grid[i, j] = n
+
+                for k, L in enumerate(lights):
+                    # Mirror-reflect incoming ray L off the tangent plane:
+                    #   R = L − 2*(L · n)*n
+                    # (standard optical reflection formula — incoming ray
+                    #  direction convention: L points *toward* the surface,
+                    #  so R points *away* from the surface toward the eye)
+                    dot_Ln = float(np.dot(L, n))
+                    R = L - 2.0 * dot_Ln * n
+                    R_nrm = float(np.linalg.norm(R))
+                    if R_nrm > 1e-15:
+                        R = R / R_nrm
+                    # Stripe intensity: project reflected ray onto stripe_up
+                    phase = float(np.dot(R, stripe_up))
+                    stripe = 0.5 + 0.5 * math.cos(n_lines * math.pi * phase)
+                    stripe_grids[k][i, j] = stripe
+
+        # Finite-difference gradient of the first stripe grid (proxy for
+        # C0/C1 break detection)
+        s0 = stripe_grids[0].copy()
+
+        # Replace NaN with interpolated neighbours for gradient computation
+        # (keeps gradient finite at interior breaks while NaN propagates
+        #  only at truly degenerate boundary samples)
+        s0_filled = s0.copy()
+        nan_mask = ~np.isfinite(s0_filled)
+        if nan_mask.any() and (~nan_mask).any():
+            # Simple nearest-valid-neighbour fill using nanmean of 3x3 window
+            from scipy.ndimage import generic_filter  # type: ignore[import]
+            def _nanmean_fill(vals: np.ndarray) -> float:
+                finite = vals[np.isfinite(vals)]
+                return float(np.mean(finite)) if finite.size > 0 else 0.0
+            s0_filled = generic_filter(s0_filled, _nanmean_fill, size=3,
+                                       mode="nearest")
+            s0_filled[~np.isfinite(s0_filled)] = 0.0
+
+        # First-order gradient (central differences)
+        grad_u = np.gradient(s0_filled, axis=0)
+        grad_v = np.gradient(s0_filled, axis=1)
+        gradient_grid = np.sqrt(grad_u ** 2 + grad_v ** 2)
+
+        # Second-order (Laplacian)
+        grad2_u = np.gradient(grad_u, axis=0)
+        grad2_v = np.gradient(grad_v, axis=1)
+        gradient2_grid = grad2_u + grad2_v
+
+        # Restore NaN at degenerate samples
+        gradient_grid[nan_mask] = float("nan")
+        gradient2_grid[nan_mask] = float("nan")
+
+        # Break masks: threshold at 3× median of finite values
+        finite_g1 = gradient_grid[np.isfinite(gradient_grid)]
+        if finite_g1.size > 0:
+            thr_c0 = 3.0 * float(np.median(finite_g1))
+        else:
+            thr_c0 = float("inf")
+
+        finite_g2 = np.abs(gradient2_grid[np.isfinite(gradient2_grid)])
+        if finite_g2.size > 0:
+            thr_c1 = 3.0 * float(np.median(finite_g2))
+        else:
+            thr_c1 = float("inf")
+
+        c0_break_mask = np.isfinite(gradient_grid) & (gradient_grid > thr_c0)
+        c1_break_mask = (
+            np.isfinite(gradient2_grid)
+            & (np.abs(gradient2_grid) > thr_c1)
+        )
+
+        return {
+            "ok": True,
+            "reason": "",
+            "stripe_grids": stripe_grids,
+            "gradient_grid": gradient_grid,
+            "gradient2_grid": gradient2_grid,
+            "c0_break_mask": c0_break_mask,
+            "c1_break_mask": c1_break_mask,
+            "normal_grid": normal_grid,
+            "us": us,
+            "vs": vs,
+        }
+
+    except Exception as exc:
+        nu_c, nv_c = max(int(nu), _MIN_GRID), max(int(nv), _MIN_GRID)
+        empty = np.full((nu_c, nv_c), float("nan"))
+        return {
+            "ok": False,
+            "reason": str(exc),
+            "stripe_grids": [empty],
+            "gradient_grid": empty.copy(),
+            "gradient2_grid": empty.copy(),
+            "c0_break_mask": np.zeros((nu_c, nv_c), dtype=bool),
+            "c1_break_mask": np.zeros((nu_c, nv_c), dtype=bool),
+            "normal_grid": np.full((nu_c, nv_c, 3), float("nan")),
+            "us": np.linspace(0.0, 1.0, nu_c),
+            "vs": np.linspace(0.0, 1.0, nv_c),
+        }

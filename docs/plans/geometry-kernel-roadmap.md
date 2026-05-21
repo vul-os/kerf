@@ -871,7 +871,7 @@ effort.
   min/max. — `geom/surface_analysis.py` — oracle: sphere of radius r →
   K = 1/r² everywhere, H = 1/r; plane → K = H = 0. — dep: GK-37 —
   parallel: Y — sonnet.
-- [ ] **GK-95** Reflection-line + highlight-line analysis (distinct from
+- [x] **GK-95** Reflection-line + highlight-line analysis (distinct from
   zebra): parallel light-line family reflected off the surface; isolate
   C0/C1 break lines. — `geom/surface_analysis.py` — oracle: a G1-but-not-
   G2 join shows a kinked highlight line; a single smooth patch shows

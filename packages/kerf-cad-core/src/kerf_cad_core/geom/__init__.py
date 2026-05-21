@@ -187,6 +187,8 @@ from kerf_cad_core.geom.surface_analysis import hausdorff_deviation, zebra_strip
 from kerf_cad_core.geom.surface_analysis import adaptive_refine_surface, isocurve_curvature_comb
 # GK-92: draft analysis overlay (angle to pull direction)
 from kerf_cad_core.geom.surface_analysis import draft_analysis, curvature_heatmap
+# GK-95: reflection-line + highlight-line analysis
+from kerf_cad_core.geom.surface_analysis import reflection_lines
 # GK-47: STEP reader
 from kerf_cad_core.geom.io.step_read import read_step, StepReadError
 # GK-48: STEP writer
@@ -457,6 +459,8 @@ __all__ = [
     "isocurve_curvature_comb",
     # GK-92
     "draft_analysis","curvature_heatmap",
+    # GK-95
+    "reflection_lines",
     "read_step","StepReadError",
     "write_step","StepWriteError",
     # GK-23

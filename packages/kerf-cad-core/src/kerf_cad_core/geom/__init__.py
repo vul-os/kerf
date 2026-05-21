@@ -668,6 +668,8 @@ __all__ = [
     "gyroid","schwarz_p","octet_truss","kelvin_cell",
     # GK-116
     "lattice_fill",
+    # GK-117
+    "tpms_sheet",
     # GK-123
     "clearance",
     # GK-124
@@ -695,7 +697,8 @@ from kerf_cad_core.geom.sdf import body_sdf, sdf_sample, marching_cubes, voxel_u
 
 # GK-115: lattice unit-cell library (gyroid, Schwarz-P, octet truss, Kelvin cell)
 # GK-116: lattice fill of a Body to a target relative density
-from kerf_cad_core.geom.lattice import gyroid, schwarz_p, octet_truss, kelvin_cell, lattice_fill
+# GK-117: TPMS implicit sheet (triply-periodic minimal surface meshed at thickness)
+from kerf_cad_core.geom.lattice import gyroid, schwarz_p, octet_truss, kelvin_cell, lattice_fill, tpms_sheet
 # GK-123: clearance / minimum-gap analysis
 from kerf_cad_core.geom.assembly import clearance  # noqa: E402
 # GK-124: mate constraint solver

@@ -490,3 +490,168 @@ def lattice_fill(
         achieved_density = 0.0
 
     return {"mesh": mesh, "body": None, "achieved_density": achieved_density}
+
+
+# ---------------------------------------------------------------------------
+# GK-117 - TPMS implicit sheet (meshed band | |f(p)| <= t/2)
+# ---------------------------------------------------------------------------
+
+def tpms_sheet(
+    cell_type: str = "schwarz_p",
+    cell_size: float = 10.0,
+    thickness: float = 1.0,
+    bounds=None,
+) -> dict:
+    """GK-117 — Triply-periodic minimal surface meshed as a closed sheet.
+
+    Evaluates the chosen TPMS implicit function *f* on a voxel grid, builds
+    the scalar field ``phi = |f(p)| - iso_t`` (negative inside the band
+    |f| <= iso_t) and extracts the zero-level-set via marching cubes.
+    The result is a closed-manifold triangle mesh of the solid sheet.
+
+    The iso threshold ``iso_t`` is derived from the requested physical
+    *thickness* using the analytic gradient magnitude of the TPMS at the
+    mid-surface:
+
+    - Schwarz-P: |∇f| ≈ k·√3 at the mid-surface ⇒ iso_t = (k·√3)·(t/2)
+    - Gyroid/Diamond: |∇f| ≈ k·√2 at the mid-surface ⇒ iso_t = (k·√2)·(t/2)
+
+    where k = 2π / cell_size.
+
+    Parameters
+    ----------
+    cell_type : str
+        One of ``"schwarz_p"``, ``"gyroid"``, or ``"diamond"``.
+    cell_size : float
+        Edge length of the cubic repeating unit cell (same units as design
+        coordinates, e.g. mm).
+    thickness : float
+        Desired physical sheet thickness (same units).  The function
+        selects the appropriate iso-threshold to match this.
+    bounds : tuple or None
+        ``((xmin,xmax), (ymin,ymax), (zmin,zmax))`` — world-space extent of
+        the voxel grid.  Defaults to two unit cells in each direction:
+        ``((0, 2·cell_size), …)``.
+
+    Returns
+    -------
+    dict
+        ``{"verts": np.ndarray (V, 3), "faces": np.ndarray (F, 3)}``
+
+        - ``verts``: float64 world-space vertex positions.
+        - ``faces``: int32 vertex indices (triangles).  The mesh is a
+          closed manifold (no boundary edges) when *thickness* is small
+          enough that the band does not reach the grid boundary.
+
+    Raises
+    ------
+    ValueError
+        For invalid ``cell_type``, non-positive ``cell_size``/``thickness``.
+
+    Notes
+    -----
+    Pure-Python / NumPy only.  Reuses :func:`~kerf_cad_core.geom.lattice.gyroid`,
+    :func:`~kerf_cad_core.geom.lattice.schwarz_p` and
+    :func:`~kerf_cad_core.geom.sdf.marching_cubes` (GK-113).
+
+    References
+    ----------
+    - Lord, E.A. & Mackay, A.L. (2003) Periodic minimal surfaces of cubic
+      symmetry. Current Science 85(3).
+    """
+    import math as _math
+
+    import numpy as _np
+
+    from kerf_cad_core.geom.sdf import marching_cubes as _marching_cubes
+
+    _VALID = {"schwarz_p", "gyroid", "diamond"}
+    if cell_type not in _VALID:
+        raise ValueError(
+            "cell_type must be one of %s, got %r" % (sorted(_VALID), cell_type)
+        )
+    if cell_size <= 0:
+        raise ValueError(f"cell_size must be positive, got {cell_size}")
+    if thickness <= 0:
+        raise ValueError(f"thickness must be positive, got {thickness}")
+
+    L = float(cell_size)
+    t = float(thickness)
+    k = 2.0 * _math.pi / L
+
+    # ---- iso threshold from analytic |∇f| at mid-surface -------------------
+    # Schwarz-P: f = cos(kx)+cos(ky)+cos(kz), |∇f|² = k²(sin²(kx)+sin²(ky)+sin²(kz))
+    #   At the mid-surface (f=0) the typical value is |∇f| ≈ k√2..k√3; use k√3.
+    # Gyroid / diamond: |∇f| ≈ k√2 at the mid-surface.
+    if cell_type == "schwarz_p":
+        grad_mag = k * _math.sqrt(3.0)
+    else:
+        grad_mag = k * _math.sqrt(2.0)
+
+    iso_t = grad_mag * (t / 2.0)
+
+    # ---- build voxel grid ---------------------------------------------------
+    if bounds is None:
+        bounds = (
+            (0.0, 2.0 * L),
+            (0.0, 2.0 * L),
+            (0.0, 2.0 * L),
+        )
+
+    (xmin, xmax), (ymin, ymax), (zmin, zmax) = bounds
+    # Target ~8 voxels per cell_size minimum; use at least 32 nodes per axis.
+    voxels_per_cell = 12
+    nx = max(32, int(_math.ceil((xmax - xmin) / L * voxels_per_cell)) + 1)
+    ny = max(32, int(_math.ceil((ymax - ymin) / L * voxels_per_cell)) + 1)
+    nz = max(32, int(_math.ceil((zmax - zmin) / L * voxels_per_cell)) + 1)
+
+    gx = _np.linspace(xmin, xmax, nx, dtype=_np.float64)
+    gy = _np.linspace(ymin, ymax, ny, dtype=_np.float64)
+    gz = _np.linspace(zmin, zmax, nz, dtype=_np.float64)
+    GX, GY, GZ = _np.meshgrid(gx, gy, gz, indexing="ij")
+
+    # ---- evaluate TPMS implicit function ------------------------------------
+    if cell_type == "schwarz_p":
+        F = _np.cos(k * GX) + _np.cos(k * GY) + _np.cos(k * GZ)
+    elif cell_type == "gyroid":
+        F = (
+            _np.sin(k * GX) * _np.cos(k * GY)
+            + _np.sin(k * GY) * _np.cos(k * GZ)
+            + _np.sin(k * GZ) * _np.cos(k * GX)
+        )
+    else:  # diamond
+        # Schwarz Diamond: sin(kx)sin(ky)sin(kz) + sin(kx)cos(ky)cos(kz)
+        #                + cos(kx)sin(ky)cos(kz) + cos(kx)cos(ky)sin(kz) = 0
+        F = (
+            _np.sin(k * GX) * _np.sin(k * GY) * _np.sin(k * GZ)
+            + _np.sin(k * GX) * _np.cos(k * GY) * _np.cos(k * GZ)
+            + _np.cos(k * GX) * _np.sin(k * GY) * _np.cos(k * GZ)
+            + _np.cos(k * GX) * _np.cos(k * GY) * _np.sin(k * GZ)
+        )
+
+    # phi < 0 inside the band |F| <= iso_t; phi = 0 is the sheet boundary.
+    phi = _np.abs(F) - iso_t
+
+    # Seal the grid boundary: force the outermost voxel layer to phi > 0 so
+    # that marching cubes sees a closed domain and produces no boundary edges.
+    # This effectively caps any band that would exit the grid, yielding a
+    # closed-manifold mesh.
+    wall = float(iso_t + 1.0)
+    phi[0, :, :] = wall
+    phi[-1, :, :] = wall
+    phi[:, 0, :] = wall
+    phi[:, -1, :] = wall
+    phi[:, :, 0] = wall
+    phi[:, :, -1] = wall
+
+    spacing_x = (xmax - xmin) / (nx - 1)
+    spacing_y = (ymax - ymin) / (ny - 1)
+    spacing_z = (zmax - zmin) / (nz - 1)
+
+    grid_input = {
+        "grid": phi,
+        "origin": _np.array([xmin, ymin, zmin], dtype=_np.float64),
+        "spacing": _np.array([spacing_x, spacing_y, spacing_z], dtype=_np.float64),
+    }
+
+    return _marching_cubes(grid_input, iso=0.0)

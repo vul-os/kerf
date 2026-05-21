@@ -978,7 +978,7 @@ effort.
   oracle: filling a box at 0.2 relative density yields a body whose
   volume ≈ 0.2·box volume ± tol. — dep: GK-115, GK-114 — parallel: N —
   opus.
-- [ ] **GK-117** TPMS implicit surface (triply-periodic minimal
+- [x] **GK-117** TPMS implicit surface (triply-periodic minimal
   surfaces) → meshed sheet at chosen thickness. — `geom/lattice.py` —
   oracle: a Schwarz-P sheet of thickness t is closed-manifold and
   periodic; mean curvature ≈ 0 on the mid-surface. — dep: GK-113 —

@@ -43,6 +43,11 @@ subd_loop_slide(cage, edge_loop, t) -> SubDCage
     Slide an edge loop along its adjacent quad faces.  ``t`` in [-1, 1]
     where 0 = identity.  Topology (V/E/F) is unchanged.
 
+subd_edge_slide(cage, edge_id, t) -> SubDCage
+    Slide a single edge along its adjacent quad faces.  ``t`` in [-1, 1]
+    where 0 = identity.  The single-edge sibling of subd_loop_slide.
+    Topology (V/E/F) is unchanged.
+
 subd_set_crease(cage, edge_id, sharpness) -> SubDCage
     Assign a crease sharpness to an edge.  Sharpness 0 = smooth,
     ``math.inf`` = perfectly hard.  Returns a new cage (immutable-style).
@@ -919,6 +924,56 @@ def subd_loop_slide(
             verts[vi] = [cv[0] + dx, cv[1] + dy, cv[2] + dz]
 
         return result
+    except Exception:
+        return _copy_cage(cage)
+
+
+# ---------------------------------------------------------------------------
+# Public: subd_edge_slide
+# ---------------------------------------------------------------------------
+
+def subd_edge_slide(
+    cage: SubDCage,
+    edge_id: int,
+    t: float,
+) -> SubDCage:
+    """Slide a single edge along its adjacent quad faces.
+
+    This is the single-edge sibling of :func:`subd_loop_slide`.  Only the two
+    endpoints of the specified edge are moved; all other vertices remain in
+    place.  The same face-tangent logic as ``subd_loop_slide`` is used.
+
+    Parameters
+    ----------
+    cage : SubDCage
+        Source cage.  Must have at least some quad faces adjacent to the edge.
+    edge_id : int
+        Index of the edge to slide, from ``cage.cage_edges()``.
+    t : float
+        Slide parameter in [-1, 1].  ``t=0`` → identity (no movement).
+        ``t=+1`` → endpoint moves to the position of the parallel edge on the
+        +normal side.  ``t=-1`` → moves to the parallel edge on the -normal
+        side.
+
+    Returns
+    -------
+    SubDCage
+        New cage with updated vertex positions and identical topology.
+        Never raises; returns a copy of the input cage on any error.
+    """
+    try:
+        t = float(t)
+        if abs(t) < 1e-15:
+            return _copy_cage(cage)
+
+        edges = cage.cage_edges()
+        eid = int(edge_id)
+        if eid < 0 or eid >= len(edges):
+            return _copy_cage(cage)
+
+        a, b = edges[eid]
+        # Delegate to subd_loop_slide with a single-edge "loop"
+        return subd_loop_slide(cage, [eid], t)
     except Exception:
         return _copy_cage(cage)
 

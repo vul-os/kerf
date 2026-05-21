@@ -293,7 +293,7 @@ from kerf_cad_core.geom.io.stl import (
     StlWriteError,
 )
 # GK-88: loop slide (SubD)
-from kerf_cad_core.geom.subd_authoring import subd_loop_slide
+from kerf_cad_core.geom.subd_authoring import subd_loop_slide, subd_edge_slide
 # GK-87: pattern (linear / circular / path)
 from kerf_cad_core.geom.pattern import (
     linear_pattern,
@@ -527,6 +527,7 @@ __all__ = [
     "replace_face",
     # GK-88
     "subd_loop_slide",
+    "subd_edge_slide",
     # GK-93
     "detect_symmetry",
     # GK-85

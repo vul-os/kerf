@@ -377,6 +377,7 @@ from kerf_cad_core.geom.io.dxf import read_dxf, write_dxf, DxfReadError, DxfWrit
 from kerf_cad_core.geom.gears import involute_gear, cycloid_gear
 
 __all__ = [
+    "read_3dm","Rhino3dmReadError",
     "read_dxf","write_dxf","DxfReadError","DxfWriteError",
     "parting_line","undercut_faces","mold_split",
     "NurbsCurve",
@@ -669,10 +670,6 @@ from kerf_cad_core.geom.fillet_solid import tangent_edge_chain
 from kerf_cad_core.geom.tetmesh import tetrahedralize
 # GK-133: feature recognition (hole / pocket / boss / fillet / chamfer)
 from kerf_cad_core.geom.feature_recognition import recognize_features  # noqa: E402
-    # GK-127: 3DM (Rhino) read
-    "read_3dm",
-    "Rhino3dmReadError",
-]
 
 # GK-127: 3DM (Rhino OpenNURBS) read
 from kerf_cad_core.geom.io.rhino3dm import (

@@ -424,7 +424,9 @@ def lattice_fill(
     GX, GY, GZ = _np.meshgrid(gx, gy, gz, indexing="ij")
 
     if cell_type in ("gyroid", "schwarz_p"):
-        _ISO_SCALE = {"gyroid": _math.pi, "schwarz_p": 0.9 * _math.pi}
+        # Empirically calibrated: iso_t s.t. voxel fraction == relative_density.
+        # Gyroid: fraction(iso_t) ~ iso_t/1.55; Schwarz-P: fraction(iso_t) ~ iso_t/1.75.
+        _ISO_SCALE = {"gyroid": 1.55, "schwarz_p": 1.75}
         iso_t = relative_density * _ISO_SCALE[cell_type]
         k = 2.0 * _math.pi / cs
         if cell_type == "gyroid":

@@ -265,7 +265,7 @@ noted.
   File: `packages/kerf-imports/tests/test_feature_imports_roundtrip.py`
   Success: 25 fixture files covering all 6 importers; entity-count + bbox parity post-import.
 
-- [ ] T-49 BIM: IFC export Tier 1+2
+- [x] T-49 BIM: IFC export Tier 1+2
   Scope: `kerf-bim/export_ifc/` + `import_ifc/` round-trip.
   File: `packages/kerf-bim/tests/test_feature_bim_ifc_roundtrip.py`
   Success: 25 IFC4 element families; round-trip preserves GlobalId, geometry, psets.

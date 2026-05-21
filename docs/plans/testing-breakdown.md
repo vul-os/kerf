@@ -378,7 +378,7 @@ Real FastAPI app via `kerf-api` test client; SMTP / OAuth providers mocked.
 One task per attack class. Each ≥10 cases (boundary, baseline, attacker
 variants, timing).
 
-- [ ] T-70 Password lockout + rate-limit
+- [x] T-70 Password lockout + rate-limit
   Scope: login endpoint repeated failure → lockout window; per-IP & per-account.
   File: `packages/kerf-auth/tests/test_pen_password_lockout.py`
   Success: 12 cases — N-1 attempts allowed, Nth locks, unlock after window, lockout does NOT enumerate users by timing.

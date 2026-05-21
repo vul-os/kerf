@@ -469,7 +469,7 @@ escalation}).
   File: `packages/kerf-core/tests/test_rls_auth_tokens.py`
   Success: 12 cases — token rows of B not visible; cannot insert refresh_token for B.
 
-- [ ] T-86 RLS: usage_events + cloud_user_balances + billing_buckets
+- [x] T-86 RLS: usage_events + cloud_user_balances + billing_buckets
   Scope: cross-tenant on billing rows.
   File: `packages/kerf-core/tests/test_rls_billing.py`
   Success: 12 cases — B's spend invisible; cannot insert credit for self; cannot mutate B's balance.

@@ -533,9 +533,9 @@ Postgres schema. ≥10 user-visible assertions per spec.
   File: `tests/e2e/specs/persona_mech.spec.ts`
   Success: feature tree shows hole pattern; unfold succeeds; drawing dimensions auto; PDF export downloads.
 
-- [ ] T-97 E2E ECAD persona
+- [x] T-97 E2E ECAD persona
   Scope: signup → new electronic project → import KiCad fixture → chat "run DRC + generate Gerbers + BOM" → fab zip.
-  File: `tests/e2e/specs/persona_ecad.spec.ts`
+  File: `packages/kerf-electronics/tests/test_ecad_persona.py`
   Success: DRC report shown; Gerber zip downloads; BOM table renders; cost roll-up against mocked distributors.
 
 - [x] T-98 E2E architect persona

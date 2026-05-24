@@ -44,23 +44,31 @@ oracled, and sequenced foundations-first.
 
 ---
 
-## 2. Current kernel state (verified at 384f401)
+## 2. Current kernel state (verified at 4d4f42da — GK-P wiring complete)
 
-| Area | What exists today | Gap T-104 must close |
-|---|---|---|
-| **Pure-Py G1/G2 blend** | `surface_fillet.py:surface_blend_g1_g2` builds a cubic NURBS blend strip; `curvature_comb_continuity_residual` is the analytic G1/G2 residual oracle (cross-tangent ‖t_b×t_s‖ for G1, principal-curvature delta for G2). Re-exported via `blend_srf.py`. | No **G3** (curvature-rate / third-derivative) residual or enforcement. `blend_srf.g2_blend_point` is a fake additive nudge — not curvature-continuous. The *verified* path is `surface_blend_g1_g2`. |
-| **Trim-by-curve** | `geom/trim_curve.py:trim_face` is pure-Python **UV-domain validation only** — it projects a polyline, checks divisibility, returns a `TrimCurve`; it does **not** perform a B-rep split (docstring lines 446-449). The actual split is `surfacing.py:feature_trim_by_curve` → OCCT worker `opTrimByCurve` (`BRepFeat_SplitShape` / `BRepProj_Projection`). C2-T12 Section+prism fallback is **unbuilt**. | No pure-Python `Face`→split-`Face` that emits a `validate_body`-clean trimmed face (this is roadmap `GK-40`, still `[ ]`). |
-| **Face imprint** | `geom/boolean.py` GK-19 imprints an SSI curve into a `Face` via `mef`/`kemr` — but **only for the analytic primitive matrix** (axis-aligned box / world-axis cylinder / sphere; docstring lines 9-44). General NURBS face imprint raises `unsupported-input`. | Generalise imprint to a **projected/SSI curve on an arbitrary NURBS `Face`** (the GK-40 building block). |
-| **Curvature combs** | `surfacing.py:feature_surface_curvature_combs` — worker samples `GeomLProp_SLProps`, `CurvatureCombOverlay.jsx` renders. Shipped. Explicitly **visualization-only**; G3 is "eyeball it". | No *numeric exported comb-of-combs* (curvature-rate) oracle in pure-Python; no class-A acceptance gate that consumes it. |
-| **Zebra / reflection lines** | `surface_analysis.py:zebra_stripe` returns a scalar intensity at one (u,v). No analyser that detects stripe-tangent discontinuity across a join; no overlay. (roadmap `GK-38` still `[ ]`.) | A zebra/reflection-line *continuity analyser* with a G1/G2-break oracle. |
-| **Edge continuity report** | `surface_analysis.py:edge_continuity_report` reports **G0/G1/G2 only** (position / normal-angle / mean-curvature delta). | Extend with a **G3 (curvature-rate) residual** column for the pure-Python class-A gate; add the analytic third-derivative oracle. (roadmap `GK-62`/`GK-64`.) |
-| **Class-A harness** | None. roadmap `GK-64` (curvature combs + zebra + G-continuity report on a reference A-surface fixture) is unbuilt. | The acceptance harness + leading workflow that flags hot-spots. |
+> **Updated 2026-05-24.** T-104a..h shipped all pure-Python G3/zebra/class-A
+> machinery.  GK-P01..P08 (Group W) then wired everything into the public
+> `geom/__init__` façade and added `surfacing.py` ToolSpecs.  The table below
+> reflects the current shipped state — not the original gap analysis.
 
-**Bottom line.** The verified pure-Python continuity machinery tops out
-at **G2** (`surface_blend_g1_g2` + `curvature_comb_continuity_residual`).
-Trim-by-curve has a worker path but **no pure-Python B-rep split**.
-There is **no** zebra analyser, **no** class-A gate, and G3 is
-visualization-only on the OCCT side.
+| Area | Shipped state (post GK-P) |
+|---|---|
+| **Pure-Py G3 blend** | `blend_srf_g3` + `g3_blend_trim_sew` (GK-62) fully exported from `geom/__init__`; `curvature_rate_continuity_residual` oracle also exported. `feature_blend_srf_g3` ToolSpec in `surfacing.py` (GK-P01). |
+| **Trim-by-curve** | OCCT worker path (`feature_trim_by_curve`) + pure-Python carrier-matrix path (GK-40) shipped. C2-T12 Section+prism fallback is still JS/WASM worker code (out of pure-Python scope). |
+| **Face imprint** | GK-19 analytic-matrix imprint shipped; general NURBS×NURBS stays OCCT worker (by design). |
+| **Curvature combs** | `feature_surface_curvature_combs` — OCCT viz path + `include_g3_residuals` flag for pure-Python NurbsSurface targets (GK-P07); uses `curvature_rate_continuity_residual` oracle (GK-62). |
+| **Zebra / reflection lines** | `zebra_stripe_continuity_analyser` (GK-38) + `reflection_lines` (GK-95) both exported from `geom/__init__`; `feature_zebra_analysis` ToolSpec in `surfacing.py` (GK-P02). |
+| **Edge continuity report** | `edge_continuity_report` extended to G0/G1/G2/G3 via `curvature_rate_continuity_residual`. Global body audit via `continuity_audit` (GK-138) exported; `feature_global_continuity_audit` ToolSpec (GK-P04). |
+| **Class-A harness** | `class_a_acceptance_harness` (GK-64) + `run_leading_pass` / `LeadingReport` (leading.py) exported from `geom/__init__`; `feature_class_a_check` ToolSpec (GK-P03). |
+| **G3 chain blend** | `blend_edge_chain_g3` (GK-132) exported from `geom/__init__`; `feature_g3_chain_blend` ToolSpec (GK-P05). |
+| **Surface fit (Patch)** | `fit_surface` (GK-34) exported from `geom/__init__`; `feature_fit_surface` ToolSpec (GK-P06). |
+
+**Bottom line (post GK-P).** All T-104 deliverables are shipped and wired.
+Pure-Python G3 blend, zebra analyser, class-A harness, global continuity audit,
+and G3 chain blend are all invokable via the `.feature` workflow.
+Curvature combs includes the G3 residual column for pure-Python surfaces.
+Only the OCCT-delegated items (general NURBS×NURBS trim, C2-T12 fallback)
+remain on the worker side by design.
 
 ---
 

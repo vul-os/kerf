@@ -1223,7 +1223,7 @@ layer (history/UI/CAM/FEM packages), not the geometry kernel.
 | Sweep1 / Sweep2 / SweepN | ✅ GK-14/15/16/90 |
 | Loft / skin / revolve | ✅ |
 | Coons / patch / network / Gordon | ✅ GK-42 |
-| Blend G1 / G2 / G3 | ✅ GK-43/62 |
+| Blend G1 / G2 / G3 | ✅ GK-43/62 (G3 wired GK-P01) |
 | Variable-radius fillet (G1) | ✅ GK-28 |
 | Match-surface (G1/G2 verify) | ✅ GK-44 |
 | Offset / parallel surface | ✅ GK-83 |
@@ -1233,12 +1233,12 @@ layer (history/UI/CAM/FEM packages), not the geometry kernel.
 | Reverse direction | 🟡 GK-96 |
 | Extension (tangent / curvature) | 🟡 GK-139 |
 | Gaussian/mean curvature heatmap | 🟡 GK-94 |
-| Reflection / highlight lines | 🟡 GK-95 |
-| Zebra continuity | ✅ GK-38 |
+| Reflection / highlight lines | ✅ GK-95 (wired GK-P02) |
+| Zebra continuity | ✅ GK-38 (wired GK-P02) |
 | Adaptive refinement | ✅ GK-63 |
 | Hausdorff deviation | ✅ GK-37 |
-| Class-A hotspot report | ✅ (`leading.py`) |
-| Global continuity audit (whole body) | 🟡 GK-138 |
+| Class-A hotspot report | ✅ (`leading.py`, wired GK-P03) |
+| Global continuity audit (whole body) | ✅ GK-138 (wired GK-P04) |
 
 ### D. Solid B-rep
 | Capability | Status |
@@ -1263,7 +1263,7 @@ layer (history/UI/CAM/FEM packages), not the geometry kernel.
 | Whole-body offset (shrinkage/stock) | 🟡 GK-120 |
 | Direct edit (move-face / push-pull) | 🟡 GK-134 |
 | Tangent-chain edge select | 🟡 GK-131 |
-| G3 chain blend | 🟡 GK-132 |
+| G3 chain blend | ✅ GK-132 (wired GK-P05) |
 | Mass properties | ✅ GK-23 |
 | Wall thickness | ✅ GK-76 |
 | Draft analysis | ✅ GK-92 |

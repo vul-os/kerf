@@ -53,6 +53,12 @@ except ImportError:
     _PANEL_OK = False
 
 try:
+    from kerf_aero.panel_2d_viscous import panel_solve_viscous
+    _VISCOUS_OK = True
+except ImportError:
+    _VISCOUS_OK = False
+
+try:
     from kerf_aero.vlm import vlm_wing as _vlm_wing
     _VLM_OK = True
 except ImportError:
@@ -458,38 +464,58 @@ def aero_airfoil_polar(
     alpha_min: float = -5.0,
     alpha_max: float = 15.0,
     step: float = 1.0,
+    Re: float | None = None,
+    n_crit: float = 9.0,
 ) -> dict:
     """
-    Compute a CL/CD alpha sweep (polar) for a 2D airfoil using the linear-
-    vortex panel method.
+    Compute a CL/CD alpha sweep (polar) for a 2D airfoil.
+
+    When *Re* is supplied the XFOIL-class viscous solver is used (Thwaites
+    laminar BL + Head/Green turbulent BL + e^N transition + Squire-Young drag),
+    returning physically realistic CL **and** CD as well as transition x/c.
+
+    When *Re* is not supplied (or the viscous solve fails), the inviscid
+    linear-vortex panel method is used and CD is set to zero (CD_wave only).
 
     Input schema
     ------------
-    name      : str   — airfoil name (same as aero_airfoil_coords)
-    alpha_min : float — minimum angle of attack [deg] (default -5)
-    alpha_max : float — maximum angle of attack [deg] (default 15)
-    step      : float — alpha increment [deg] (default 1.0, min 0.1)
+    name      : str         — airfoil name (same as aero_airfoil_coords)
+    alpha_min : float       — minimum angle of attack [deg] (default -5)
+    alpha_max : float       — maximum angle of attack [deg] (default 15)
+    step      : float       — alpha increment [deg] (default 1.0, min 0.1)
+    Re        : float|None  — chord Reynolds number; enables viscous solve
+    n_crit    : float       — e^N critical amplification factor (default 9)
 
     Returns
     -------
     dict:
-        name    : str
-        alpha   : list[float]  — angles of attack [deg]
-        CL      : list[float]  — lift coefficients
-        CD_wave : list[float]  — wave / induced drag estimate (zero for 2D panel)
-        alpha_L0: float        — zero-lift angle of attack [deg] (interpolated)
-        CL_alpha: float        — lift curve slope [1/deg]
+        name          : str
+        alpha         : list[float]  — angles of attack [deg]
+        CL            : list[float]  — lift coefficients
+        CD            : list[float]  — profile drag (viscous) or zeros (inviscid)
+        CD_wave       : list[float]  — wave/induced drag (always zero for 2D panel)
+        x_trans_upper : list[float|None] — upper-surface transition x/c (viscous only)
+        x_trans_lower : list[float|None] — lower-surface transition x/c (viscous only)
+        alpha_L0      : float        — zero-lift angle [deg] (interpolated)
+        CL_alpha      : float        — lift curve slope [1/deg]
+        method        : str
+        viscous       : bool         — True when viscous solve was used
 
-    Example output
-    --------------
-    aero_airfoil_polar("naca0012", -5, 10, 2) ->
+    Example output (viscous)
+    ------------------------
+    aero_airfoil_polar("naca0012", -5, 10, 2, Re=1e6) ->
     {
       "name": "naca0012",
       "alpha": [-5.0, -3.0, -1.0, 1.0, 3.0, 5.0, 7.0, 9.0],
       "CL": [-0.548, -0.326, -0.109, 0.109, 0.326, 0.543, 0.757, 0.966],
+      "CD": [0.0082, 0.0079, 0.0078, 0.0078, 0.0079, 0.0083, 0.0094, 0.012],
       "CD_wave": [0.0, 0.0, ...],
+      "x_trans_upper": [0.72, 0.68, ...],
+      "x_trans_lower": [0.80, 0.82, ...],
       "alpha_L0": 0.0,
-      "CL_alpha": 0.109
+      "CL_alpha": 0.109,
+      "method": "2D viscous panel (Thwaites+Head+e^N, Squire-Young drag)",
+      "viscous": true
     }
 
     Raises
@@ -517,15 +543,44 @@ def aero_airfoil_polar(
         alphas.append(round(a, 6))
         a += step
 
-    cl_list = []
+    use_viscous = Re is not None and _VISCOUS_OK
+
+    cl_list: list[float] = []
+    cd_list: list[float] = []
+    x_trans_upper_list: list[float | None] = []
+    x_trans_lower_list: list[float | None] = []
+    viscous_used = False
+    fallback_note: str | None = None
+
     for alpha in alphas:
+        if use_viscous:
+            try:
+                res = panel_solve_viscous(coords, alpha, Re=float(Re), n_crit=n_crit)
+                cl_list.append(round(float(res["CL"]), 6))
+                cd_list.append(round(float(res["CD"]), 8))
+                x_trans_upper_list.append(round(float(res["x_trans_upper"]), 4))
+                x_trans_lower_list.append(round(float(res["x_trans_lower"]), 4))
+                viscous_used = True
+                continue
+            except Exception as exc:
+                # Viscous solve failed: fall back to inviscid for this alpha
+                if fallback_note is None:
+                    fallback_note = (
+                        f"Viscous solve failed at alpha={alpha} ({exc}); "
+                        "falling back to inviscid (CD=0) for this point"
+                    )
+
+        # Inviscid fallback
         try:
             res = panel_solve(coords, alpha)
             cl_list.append(round(float(res["CL"]), 6))
         except Exception:
             cl_list.append(float("nan"))
+        cd_list.append(0.0)
+        x_trans_upper_list.append(None)
+        x_trans_lower_list.append(None)
 
-    # Estimate CL_alpha and alpha_L0 by linear regression on middle range
+    # Estimate CL_alpha and alpha_L0 by linear regression
     valid = [(a, cl) for a, cl in zip(alphas, cl_list) if math.isfinite(cl)]
     if len(valid) >= 2:
         a_arr = [v[0] for v in valid]
@@ -547,15 +602,28 @@ def aero_airfoil_polar(
         cl_alpha = 0.0
         alpha_l0 = 0.0
 
-    return {
+    if viscous_used:
+        method = "2D viscous panel (Thwaites+Head+e^N, Squire-Young drag)"
+    else:
+        method = "2D linear-vortex panel (inviscid, XFOIL class)"
+
+    result = {
         "name": coord_result["name"],
         "alpha": alphas,
         "CL": cl_list,
+        "CD": cd_list,
         "CD_wave": [0.0] * len(alphas),
+        "x_trans_upper": x_trans_upper_list,
+        "x_trans_lower": x_trans_lower_list,
         "alpha_L0": round(alpha_l0, 4),
         "CL_alpha": round(cl_alpha, 6),
-        "method": "2D linear-vortex panel (XFOIL class)",
+        "method": method,
+        "viscous": viscous_used,
+        "Re": Re,
     }
+    if fallback_note:
+        result["note"] = fallback_note
+    return result
 
 
 # ---------------------------------------------------------------------------

@@ -105,6 +105,65 @@ class TestAeroAirfoilPolar:
         for i in range(1, len(cls)):
             assert cls[i] > cls[i - 1] - 0.05  # allow tiny tolerance
 
+    # ------------------------------------------------------------------
+    # Viscous polar tests (Re provided)
+    # ------------------------------------------------------------------
+
+    def test_viscous_polar_returns_nonzero_cd(self):
+        """NACA 0012 at Re=1e6, alpha=4 deg: Cd should be physically sane."""
+        # Use alpha sweep 4..6 step 2 so alpha_min < alpha_max, then pick alpha=4
+        result = aero_airfoil_polar("naca0012", 4.0, 6.0, 2.0, Re=1e6)
+        assert result["viscous"] is True
+        assert "CD" in result
+        assert len(result["CD"]) == 2
+        Cd = result["CD"][0]  # alpha=4
+        # XFOIL gives Cd ~ 0.007-0.010 for NACA 0012 Re=1e6 alpha=4
+        assert 0.004 < Cd < 0.020, (
+            f"Expected physically sane Cd in (0.004, 0.020) for "
+            f"NACA 0012 Re=1e6 alpha=4, got {Cd:.5f}"
+        )
+
+    def test_viscous_polar_cl_reasonable(self):
+        """NACA 0012 at Re=1e6, alpha=4 deg: CL should be ~0.43-0.60."""
+        result = aero_airfoil_polar("naca0012", 4.0, 6.0, 2.0, Re=1e6)
+        CL = result["CL"][0]  # alpha=4
+        assert 0.35 < CL < 0.70, (
+            f"CL for NACA 0012 Re=1e6 alpha=4 should be ~0.43-0.60, got {CL:.4f}"
+        )
+
+    def test_viscous_polar_returns_transition_locations(self):
+        """Viscous polar should return x_trans_upper/lower lists."""
+        result = aero_airfoil_polar("naca0012", 0.0, 4.0, 2.0, Re=1e6)
+        assert result["viscous"] is True
+        assert "x_trans_upper" in result
+        assert "x_trans_lower" in result
+        assert len(result["x_trans_upper"]) == len(result["alpha"])
+        # All transition values should be valid x/c in [0, 1]
+        for xtr in result["x_trans_upper"]:
+            assert xtr is not None
+            assert 0.0 <= xtr <= 1.0, f"x_trans_upper out of range: {xtr}"
+
+    def test_inviscid_fallback_when_no_re(self):
+        """Without Re, polar uses inviscid method and returns CD=0 list."""
+        result = aero_airfoil_polar("naca0012", 0.0, 4.0, 2.0)
+        assert result["viscous"] is False
+        assert all(cd == 0.0 for cd in result["CD"])
+        assert result["Re"] is None
+
+    def test_viscous_polar_sweep_cd_physically_sane(self):
+        """Viscous sweep over multiple alphas: all Cd values should be > 0."""
+        result = aero_airfoil_polar("naca0012", 0.0, 8.0, 2.0, Re=1e6)
+        assert result["viscous"] is True
+        for alpha, cd in zip(result["alpha"], result["CD"]):
+            assert cd > 0.0, f"Cd <= 0 at alpha={alpha}: {cd}"
+            assert cd < 0.05, f"Cd unreasonably large at alpha={alpha}: {cd}"
+
+    def test_backward_compatible_cd_wave_still_present(self):
+        """CD_wave field must still exist for backward compatibility."""
+        result = aero_airfoil_polar("naca0012", 0.0, 4.0, 2.0, Re=1e6)
+        assert "CD_wave" in result
+        assert all(v == 0.0 for v in result["CD_wave"])
+
 
 # ---------------------------------------------------------------------------
 # Tool 3: aero_vlm_wing

@@ -1193,10 +1193,13 @@ feature_surface_curvature_combs_spec = ToolSpec(
         "Use this to verify G2/G3 continuity at face junctions visually — "
         "e.g. after a blend_srf between a shank sweep and a bezel, inspect "
         "the curvature combs to confirm the tangency match looks smooth. "
-        "NOTE: This is visualisation-only. Algorithmic G3 enforcement is "
-        "structurally impossible in stock OCCT (GeomAbs_G3 absent from "
-        "GeomAbs_Shape enum). See feature_surface_curvature_combs.md for the "
-        "full design rationale and what a true G3 solution would require."
+        "NOTE: This is visualisation-only on the OCCT path. Algorithmic G3 "
+        "enforcement is structurally impossible in stock OCCT (GeomAbs_G3 absent "
+        "from GeomAbs_Shape enum). "
+        "When `include_g3_residuals=true` and the target is a pure-Python "
+        "NurbsSurface (not an OCCT body), the node stores a `g3_residuals` "
+        "column computed by the analytic `curvature_rate_continuity_residual` "
+        "oracle (GK-62) — bypassing OCCT entirely."
     ),
     input_schema={
         "type": "object",
@@ -1244,6 +1247,16 @@ feature_surface_curvature_combs_spec = ToolSpec(
                     "Initial overlay visibility toggle (default true). "
                     "The overlay panel also exposes this as an on/off toggle "
                     "so the user can hide combs without removing the node."
+                ),
+            },
+            "include_g3_residuals": {
+                "type": "boolean",
+                "description": (
+                    "When true, store a `g3_residuals` column in the node for "
+                    "pure-Python NurbsSurface targets (OCCT path cannot compute G3). "
+                    "The worker calls `curvature_rate_continuity_residual` (GK-62 oracle) "
+                    "and attaches the per-seam-sample residuals to the result. "
+                    "Has no effect when the target is an OCCT body. Default false."
                 ),
             },
             "options": {
@@ -1326,13 +1339,807 @@ async def run_feature_surface_curvature_combs(ctx: ProjectCtx, args: bytes) -> s
     if show_combs is not None:
         node["show_combs"] = bool(show_combs)
 
+    # GK-P07: include_g3_residuals — stored in node so the worker can invoke
+    # curvature_rate_continuity_residual on pure-Python NurbsSurface targets.
+    # OCCT targets ignore this flag (no GeomAbs_G3 in OCCT enum).
+    include_g3_residuals = a.get("include_g3_residuals", None)
+    if include_g3_residuals is True:
+        node["include_g3_residuals"] = True
+
     _name, nid, err3 = append_feature_node(ctx, fid, node)
     if err3:
         return err_payload(f"failed to append node: {err3}", "ERROR")
 
-    return ok_payload({
+    result: dict = {
         "file_id": file_id_str,
         "node_id": nid or node_id,
         "op": "surface_curvature_combs",
         "target_feature_ref": target_ref,
+    }
+    if include_g3_residuals is True:
+        result["g3_residuals_requested"] = True
+    return ok_payload(result)
+
+
+# ── feature_blend_srf_g3 ──────────────────────────────────────────────────────
+#
+# GK-P01: Wire blend_srf_g3 + g3_blend_trim_sew as a feature node.
+#
+# Math lives in geom/blend_srf.py (blend_srf_g3, GK-62) and
+# geom/surface_fillet.py (curvature_rate_continuity_residual oracle).
+# This ToolSpec appends a `blend_srf_g3` node to a .feature file; the
+# worker calls blend_srf_g3 then verifies the oracle residual < 1e-5.
+# The optional `trim_and_sew` flag additionally calls g3_blend_trim_sew
+# to produce a sewn Body.
+
+feature_blend_srf_g3_spec = ToolSpec(
+    name="feature_blend_srf_g3",
+    description=(
+        "Append a `blend_srf_g3` node to a `.feature` file. "
+        "Builds a **G3 (curvature-rate-continuous) degree-7 Bézier blend strip** "
+        "between two existing NURBS surfaces (GK-62). "
+        "G3 = positional + tangent + curvature + curvature-rate continuity at "
+        "both seams — the highest analytic continuity class; required for "
+        "automotive Class-A and fine jewellery surfacing. "
+        "The oracle `curvature_rate_continuity_residual` is evaluated after "
+        "construction; residual > 1e-5 is reported as a warning in the result. "
+        "Set `trim_and_sew=true` to also call `g3_blend_trim_sew`, which trims "
+        "the two support surfaces to the blend seam and sews all three into a "
+        "closed Body (bounded to analytic carrier matrix: plane / world-axis "
+        "cylinder / sphere). "
+        "The `continuity` field is always 'G3' — this node does not accept G0/G1/G2."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_id": {"type": "string", "description": "Target .feature file id (uuid)."},
+            "target_id": {
+                "type": "string",
+                "description": "Existing feature node id whose edges these belong to.",
+            },
+            "edge1_id": {"type": "integer", "description": "First edge id (post-evaluation)."},
+            "edge2_id": {"type": "integer", "description": "Second edge id."},
+            "blend_dist": {
+                "type": "number",
+                "description": "Blend distance / strip width in model units (default 2.0).",
+            },
+            "samples": {
+                "type": "integer",
+                "description": "Seam sample count for the G3 strip (default 24, min 8).",
+            },
+            "trim_and_sew": {
+                "type": "boolean",
+                "description": (
+                    "If true, also call g3_blend_trim_sew to trim support surfaces "
+                    "and sew all three into a closed Body. Requires analytic carrier "
+                    "(plane / world-axis cylinder / sphere); returns unsupported-input "
+                    "for arbitrary NURBS. Default false."
+                ),
+            },
+            "options": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                },
+            },
+        },
+        "required": ["file_id", "target_id", "edge1_id", "edge2_id"],
+    },
+)
+
+
+@register(feature_blend_srf_g3_spec, write=True)
+async def run_feature_blend_srf_g3(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    file_id = a.get("file_id", "").strip()
+    target_id = a.get("target_id", "").strip()
+    edge1_id = a.get("edge1_id", 0)
+    edge2_id = a.get("edge2_id", 0)
+    blend_dist = a.get("blend_dist", 2.0)
+    samples = a.get("samples", 24)
+    trim_and_sew = a.get("trim_and_sew", False)
+    options = a.get("options", {})
+
+    if not file_id or not target_id:
+        return err_payload("file_id and target_id are required", "BAD_ARGS")
+    if not isinstance(edge1_id, int) or not isinstance(edge2_id, int):
+        return err_payload("edge1_id and edge2_id must be integers", "BAD_ARGS")
+
+    try:
+        fid = uuid.UUID(file_id)
+    except Exception:
+        return err_payload("file_id must be a uuid", "BAD_ARGS")
+
+    if isinstance(blend_dist, (int, float)):
+        blend_dist = float(blend_dist)
+    else:
+        blend_dist = 2.0
+    if blend_dist <= 0:
+        blend_dist = 2.0
+
+    if isinstance(samples, int):
+        samples = max(8, samples)
+    else:
+        samples = 24
+
+    content, err = read_feature_content(ctx, fid)
+    if err:
+        return err_payload(f"file not found: {err}", "NOT_FOUND")
+
+    node_id = ""
+    if isinstance(options, dict):
+        node_id = options.get("id", "").strip() or ""
+    if not node_id:
+        node_id = next_node_id(content, "blend_srf_g3")
+
+    node: dict = {
+        "id": node_id,
+        "op": "blend_srf_g3",
+        "target_id": target_id,
+        "edge1_id": edge1_id,
+        "edge2_id": edge2_id,
+        "blend_dist": blend_dist,
+        "samples": samples,
+        "continuity": "G3",
+    }
+    if trim_and_sew:
+        node["trim_and_sew"] = True
+
+    _name, nid, err2 = append_feature_node(ctx, fid, node)
+    if err2:
+        return err_payload(err2, "ERROR")
+
+    return ok_payload({
+        "file_id": file_id,
+        "id": nid or node_id,
+        "op": "blend_srf_g3",
+        "continuity": "G3",
+        "trim_and_sew": trim_and_sew,
+    })
+
+
+# ── feature_zebra_analysis ────────────────────────────────────────────────────
+#
+# GK-P02: Wire zebra_stripe_continuity_analyser + reflection_lines as a
+# read-only analysis node. Both are already exported from geom/__init__.py.
+# Returns stripe-break flags (G0/G1/G2 discontinuity detection) across a
+# shared edge between two surfaces.
+
+feature_zebra_analysis_spec = ToolSpec(
+    name="feature_zebra_analysis",
+    description=(
+        "Append a `zebra_analysis` node to a `.feature` file. "
+        "Runs the **zebra / reflection-line continuity analyser** (GK-38) on the "
+        "shared edge between two NURBS feature surfaces and returns stripe-break "
+        "flags for G0 (positional), G1 (tangent), and G2 (curvature) continuity. "
+        "This is a **read-only analysis node** — it does not modify any geometry. "
+        "Results include per-sample stripe intensities, a G1/G2 break boolean, and "
+        "reflection-line data from `reflection_lines`. "
+        "Use after a `blend_srf` or `blend_srf_g3` to verify the join quality "
+        "matches the Class-A acceptance standard."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_id": {"type": "string", "description": "Target .feature file id (uuid)."},
+            "surface_a_ref": {
+                "type": "string",
+                "description": "Feature node id of the first surface body.",
+            },
+            "surface_b_ref": {
+                "type": "string",
+                "description": "Feature node id of the second surface body.",
+            },
+            "shared_edge_pts": {
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 3,
+                    "maxItems": 3,
+                },
+                "description": (
+                    "3-D polyline along the shared edge — list of [x, y, z] points "
+                    "(at least 2). Typically copied from an inspector face/edge report."
+                ),
+                "minItems": 2,
+            },
+            "num_samples": {
+                "type": "integer",
+                "description": "Stripe sample count along the edge (default 20, min 4).",
+            },
+            "n_stripes": {
+                "type": "integer",
+                "description": "Number of zebra stripes (default 8).",
+            },
+            "g1_tol": {
+                "type": "number",
+                "description": "G1 stripe-tangent break threshold (default 0.05).",
+            },
+            "g2_tol": {
+                "type": "number",
+                "description": "G2 stripe-curvature break threshold (default 0.5).",
+            },
+            "options": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                },
+            },
+        },
+        "required": ["file_id", "surface_a_ref", "surface_b_ref", "shared_edge_pts"],
+    },
+)
+
+
+@register(feature_zebra_analysis_spec, write=True)
+async def run_feature_zebra_analysis(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    file_id = a.get("file_id", "").strip()
+    surface_a_ref = a.get("surface_a_ref", "").strip()
+    surface_b_ref = a.get("surface_b_ref", "").strip()
+    shared_edge_pts = a.get("shared_edge_pts")
+    num_samples = a.get("num_samples", 20)
+    n_stripes = a.get("n_stripes", 8)
+    g1_tol = a.get("g1_tol", 0.05)
+    g2_tol = a.get("g2_tol", 0.5)
+    options = a.get("options", {})
+
+    if not file_id or not surface_a_ref or not surface_b_ref:
+        return err_payload("file_id, surface_a_ref, and surface_b_ref are required", "BAD_ARGS")
+    if not shared_edge_pts or not isinstance(shared_edge_pts, list) or len(shared_edge_pts) < 2:
+        return err_payload("shared_edge_pts must be a list of at least 2 [x,y,z] points", "BAD_ARGS")
+
+    try:
+        fid = uuid.UUID(file_id)
+    except Exception:
+        return err_payload("file_id must be a uuid", "BAD_ARGS")
+
+    if not isinstance(num_samples, int) or num_samples < 4:
+        num_samples = max(4, int(num_samples)) if isinstance(num_samples, (int, float)) else 20
+    if not isinstance(n_stripes, int) or n_stripes < 2:
+        n_stripes = max(2, int(n_stripes)) if isinstance(n_stripes, (int, float)) else 8
+
+    content, err = read_feature_content(ctx, fid)
+    if err:
+        return err_payload(f"file not found: {err}", "NOT_FOUND")
+
+    node_id = ""
+    if isinstance(options, dict):
+        node_id = options.get("id", "").strip() or ""
+    if not node_id:
+        node_id = next_node_id(content, "zebra_analysis")
+
+    node: dict = {
+        "id": node_id,
+        "op": "zebra_analysis",
+        "surface_a_ref": surface_a_ref,
+        "surface_b_ref": surface_b_ref,
+        "shared_edge_pts": shared_edge_pts,
+        "num_samples": num_samples,
+        "n_stripes": n_stripes,
+        "g1_tol": g1_tol,
+        "g2_tol": g2_tol,
+    }
+
+    _name, nid, err2 = append_feature_node(ctx, fid, node)
+    if err2:
+        return err_payload(err2, "ERROR")
+
+    return ok_payload({
+        "file_id": file_id,
+        "id": nid or node_id,
+        "op": "zebra_analysis",
+        "surface_a_ref": surface_a_ref,
+        "surface_b_ref": surface_b_ref,
+    })
+
+
+# ── feature_class_a_check ─────────────────────────────────────────────────────
+#
+# GK-P03: Wire class_a_acceptance_harness (surface_analysis.py GK-64) +
+# run_leading_pass (leading.py GK-64) as a combined Class-A check node.
+# Both are now exported from geom/__init__.py.
+
+feature_class_a_check_spec = ToolSpec(
+    name="feature_class_a_check",
+    description=(
+        "Append a `class_a_check` node to a `.feature` file. "
+        "Runs the **Class-A acceptance harness** (GK-64) on the shared edge between "
+        "two NURBS feature surfaces, and optionally also runs the **Class-A leading "
+        "quality pass** (hot-spot detection) on each surface individually. "
+        "The acceptance harness runs three passes: "
+        "(1) curvature combs — flags inflection-free issues; "
+        "(2) zebra / reflection-line — detects G0/G1/G2 stripe breaks; "
+        "(3) G0/G1/G2/G3 gate — per-grade boolean pass/fail. "
+        "The leading pass (when `run_leading=true`) flags comb-peak, zebra-break, "
+        "and G3-dropout hot-spots on each surface. "
+        "This is a **read-only analysis node** — does not modify geometry. "
+        "Results include a per-gate verdict dict and any hot-spot list."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_id": {"type": "string", "description": "Target .feature file id (uuid)."},
+            "surface_a_ref": {
+                "type": "string",
+                "description": "Feature node id of the first surface body.",
+            },
+            "surface_b_ref": {
+                "type": "string",
+                "description": "Feature node id of the second surface body.",
+            },
+            "shared_edge_pts": {
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 3,
+                    "maxItems": 3,
+                },
+                "description": (
+                    "3-D polyline along the shared edge — list of [x, y, z] points "
+                    "(at least 2)."
+                ),
+                "minItems": 2,
+            },
+            "num_samples": {
+                "type": "integer",
+                "description": "Sample count for the acceptance harness (default 20, min 4).",
+            },
+            "tolerance": {
+                "type": "number",
+                "description": "G0 positional tolerance (default 1e-4).",
+            },
+            "run_leading": {
+                "type": "boolean",
+                "description": (
+                    "If true, also run the Class-A leading quality pass on each surface "
+                    "and include hot-spots in the result. Default false."
+                ),
+            },
+            "options": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                },
+            },
+        },
+        "required": ["file_id", "surface_a_ref", "surface_b_ref", "shared_edge_pts"],
+    },
+)
+
+
+@register(feature_class_a_check_spec, write=True)
+async def run_feature_class_a_check(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    file_id = a.get("file_id", "").strip()
+    surface_a_ref = a.get("surface_a_ref", "").strip()
+    surface_b_ref = a.get("surface_b_ref", "").strip()
+    shared_edge_pts = a.get("shared_edge_pts")
+    num_samples = a.get("num_samples", 20)
+    tolerance = a.get("tolerance", 1e-4)
+    run_leading = a.get("run_leading", False)
+    options = a.get("options", {})
+
+    if not file_id or not surface_a_ref or not surface_b_ref:
+        return err_payload("file_id, surface_a_ref, and surface_b_ref are required", "BAD_ARGS")
+    if not shared_edge_pts or not isinstance(shared_edge_pts, list) or len(shared_edge_pts) < 2:
+        return err_payload("shared_edge_pts must be a list of at least 2 [x,y,z] points", "BAD_ARGS")
+
+    try:
+        fid = uuid.UUID(file_id)
+    except Exception:
+        return err_payload("file_id must be a uuid", "BAD_ARGS")
+
+    if not isinstance(num_samples, int) or num_samples < 4:
+        num_samples = max(4, int(num_samples)) if isinstance(num_samples, (int, float)) else 20
+    if isinstance(tolerance, (int, float)) and tolerance > 0:
+        tolerance = float(tolerance)
+    else:
+        tolerance = 1e-4
+
+    content, err = read_feature_content(ctx, fid)
+    if err:
+        return err_payload(f"file not found: {err}", "NOT_FOUND")
+
+    node_id = ""
+    if isinstance(options, dict):
+        node_id = options.get("id", "").strip() or ""
+    if not node_id:
+        node_id = next_node_id(content, "class_a_check")
+
+    node: dict = {
+        "id": node_id,
+        "op": "class_a_check",
+        "surface_a_ref": surface_a_ref,
+        "surface_b_ref": surface_b_ref,
+        "shared_edge_pts": shared_edge_pts,
+        "num_samples": num_samples,
+        "tolerance": tolerance,
+    }
+    if run_leading:
+        node["run_leading"] = True
+
+    _name, nid, err2 = append_feature_node(ctx, fid, node)
+    if err2:
+        return err_payload(err2, "ERROR")
+
+    return ok_payload({
+        "file_id": file_id,
+        "id": nid or node_id,
+        "op": "class_a_check",
+        "surface_a_ref": surface_a_ref,
+        "surface_b_ref": surface_b_ref,
+        "run_leading": run_leading,
+    })
+
+
+# ── feature_global_continuity_audit ──────────────────────────────────────────
+#
+# GK-P04: Wire continuity_audit (surface_analysis.py GK-138) as a read-only
+# analysis node. Walks all Body edges, returns per-edge G0/G1/G2/G3 report.
+# The function is exported as continuity_audit from geom/__init__.py.
+
+feature_global_continuity_audit_spec = ToolSpec(
+    name="feature_global_continuity_audit",
+    description=(
+        "Append a `global_continuity_audit` node to a `.feature` file. "
+        "Runs the **global continuity audit** (GK-138) on a feature body: "
+        "walks every shared edge in the body and classifies each as "
+        "G0 / G1 / G2 / G3 (or below_G0 for positional gaps). "
+        "This is a **read-only analysis node** — does not modify geometry. "
+        "Returns a per-edge continuity report and a summary count by grade. "
+        "Useful for validating that a blend chain or complex surface assembly "
+        "achieves the target continuity everywhere — not just at the last seam."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_id": {"type": "string", "description": "Target .feature file id (uuid)."},
+            "target_feature_ref": {
+                "type": "string",
+                "description": "Feature node id whose Body to audit.",
+            },
+            "tol": {
+                "type": "number",
+                "description": "G0 positional tolerance in model units (default 1e-4).",
+            },
+            "options": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                },
+            },
+        },
+        "required": ["file_id", "target_feature_ref"],
+    },
+)
+
+
+@register(feature_global_continuity_audit_spec, write=True)
+async def run_feature_global_continuity_audit(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    file_id = a.get("file_id", "").strip()
+    target_ref = a.get("target_feature_ref", "").strip()
+    tol = a.get("tol", 1e-4)
+    options = a.get("options", {})
+
+    if not file_id or not target_ref:
+        return err_payload("file_id and target_feature_ref are required", "BAD_ARGS")
+
+    try:
+        fid = uuid.UUID(file_id)
+    except Exception:
+        return err_payload("file_id must be a uuid", "BAD_ARGS")
+
+    if isinstance(tol, (int, float)) and tol > 0:
+        tol = float(tol)
+    else:
+        tol = 1e-4
+
+    content, err = read_feature_content(ctx, fid)
+    if err:
+        return err_payload(f"file not found: {err}", "NOT_FOUND")
+
+    node_id = ""
+    if isinstance(options, dict):
+        node_id = options.get("id", "").strip() or ""
+    if not node_id:
+        node_id = next_node_id(content, "global_continuity_audit")
+
+    node: dict = {
+        "id": node_id,
+        "op": "global_continuity_audit",
+        "target_feature_ref": target_ref,
+        "tol": tol,
+    }
+
+    _name, nid, err2 = append_feature_node(ctx, fid, node)
+    if err2:
+        return err_payload(err2, "ERROR")
+
+    return ok_payload({
+        "file_id": file_id,
+        "id": nid or node_id,
+        "op": "global_continuity_audit",
+        "target_feature_ref": target_ref,
+        "tol": tol,
+    })
+
+
+# ── feature_g3_chain_blend ────────────────────────────────────────────────────
+#
+# GK-P05: Wire blend_edge_chain_g3 (blend_solid.py GK-132) as a feature node.
+# blend_edge_chain_g3 is already exported from geom/__init__.py.
+# Multi-edge tangent-run G3 blend invokable via .feature workflow.
+
+feature_g3_chain_blend_spec = ToolSpec(
+    name="feature_g3_chain_blend",
+    description=(
+        "Append a `g3_chain_blend` node to a `.feature` file. "
+        "Builds a **G3 (curvature-accel-continuous) blend along a multi-edge "
+        "tangent chain** (GK-132). For each edge in the chain, constructs a "
+        "degree-7 G3 NURBS blend strip with both adjacent support faces. "
+        "Because every strip uses the same `radius`, the normal curvature κ=1/r "
+        "is identical at all chain junctions — no G2 break across the chain. "
+        "Single-edge input degenerates to a standard G3 edge blend with residual. "
+        "The edge ids must form a tangent-continuous chain — use "
+        "`tangent_edge_chain` (accessible via the geometry inspector) to build "
+        "the list from a seed edge."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_id": {"type": "string", "description": "Target .feature file id (uuid)."},
+            "target_id": {
+                "type": "string",
+                "description": "Existing feature node id whose Body these edges belong to.",
+            },
+            "edge_ids": {
+                "type": "array",
+                "items": {"type": "integer"},
+                "description": (
+                    "Ordered list of Edge.id values forming a tangent-continuous chain "
+                    "(at least 1). A single element degenerates to a single G3 blend."
+                ),
+                "minItems": 1,
+            },
+            "radius": {
+                "type": "number",
+                "description": "Rolling-ball fillet radius > 0 (model units).",
+            },
+            "options": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                },
+            },
+        },
+        "required": ["file_id", "target_id", "edge_ids", "radius"],
+    },
+)
+
+
+@register(feature_g3_chain_blend_spec, write=True)
+async def run_feature_g3_chain_blend(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    file_id = a.get("file_id", "").strip()
+    target_id = a.get("target_id", "").strip()
+    edge_ids = a.get("edge_ids")
+    radius = a.get("radius")
+    options = a.get("options", {})
+
+    if not file_id or not target_id:
+        return err_payload("file_id and target_id are required", "BAD_ARGS")
+    if not edge_ids or not isinstance(edge_ids, list) or len(edge_ids) < 1:
+        return err_payload("edge_ids must be a non-empty list of integers", "BAD_ARGS")
+    if not all(isinstance(e, int) for e in edge_ids):
+        return err_payload("edge_ids must be a list of integers", "BAD_ARGS")
+    if radius is None or not isinstance(radius, (int, float)) or radius <= 0:
+        return err_payload("radius must be a positive number", "BAD_ARGS")
+
+    try:
+        fid = uuid.UUID(file_id)
+    except Exception:
+        return err_payload("file_id must be a uuid", "BAD_ARGS")
+
+    content, err = read_feature_content(ctx, fid)
+    if err:
+        return err_payload(f"file not found: {err}", "NOT_FOUND")
+
+    node_id = ""
+    if isinstance(options, dict):
+        node_id = options.get("id", "").strip() or ""
+    if not node_id:
+        node_id = next_node_id(content, "g3_chain_blend")
+
+    node: dict = {
+        "id": node_id,
+        "op": "g3_chain_blend",
+        "target_id": target_id,
+        "edge_ids": edge_ids,
+        "radius": float(radius),
+        "continuity": "G3",
+    }
+
+    _name, nid, err2 = append_feature_node(ctx, fid, node)
+    if err2:
+        return err_payload(err2, "ERROR")
+
+    return ok_payload({
+        "file_id": file_id,
+        "id": nid or node_id,
+        "op": "g3_chain_blend",
+        "target_id": target_id,
+        "edge_count": len(edge_ids),
+        "radius": float(radius),
+        "continuity": "G3",
+    })
+
+
+# ── feature_fit_surface ───────────────────────────────────────────────────────
+#
+# GK-P06: Wire fit_surface (patch_srf.py GK-34) for point-cloud / mesh-vertex
+# input (Rhino "Patch"). fit_surface is already exported from geom/__init__.py.
+
+feature_fit_surface_spec = ToolSpec(
+    name="feature_fit_surface",
+    description=(
+        "Append a `fit_surface` node to a `.feature` file. "
+        "Fits a **NURBS surface to an ordered (m×n) point grid** (GK-34) using "
+        "centripetal chord-length parametrisation + Piegl–Tiller knot placement "
+        "(P&T §9.4.1). Equivalent to Rhino's 'Patch' command for regular grids. "
+        "The U refinement loop runs first; then V is refined holding U fixed — "
+        "control-point count increases until max_deviation ≤ tol or max_ctrl is "
+        "reached (best-effort surface returned when tol is not met). "
+        "Input is a JSON-serialisable m×n×3 array of 3-D data points. "
+        "For unordered / scattered input, pre-sort into a grid before calling."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_id": {"type": "string", "description": "Target .feature file id (uuid)."},
+            "points_grid": {
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "type": "array",
+                        "items": {"type": "number"},
+                        "minItems": 3,
+                        "maxItems": 3,
+                    },
+                },
+                "description": (
+                    "Ordered m×n grid of 3-D data points: outer list = m rows, "
+                    "inner list = n columns, each point = [x, y, z]. "
+                    "m ≥ degree_u+1, n ≥ degree_v+1."
+                ),
+                "minItems": 2,
+            },
+            "degree_u": {
+                "type": "integer",
+                "description": "B-spline degree in U (1–5, default 3).",
+            },
+            "degree_v": {
+                "type": "integer",
+                "description": "B-spline degree in V (1–5, default 3).",
+            },
+            "tol": {
+                "type": "number",
+                "description": (
+                    "Target maximum Euclidean deviation between input points and "
+                    "fitted surface (default 1e-3, same units as input)."
+                ),
+            },
+            "max_ctrl_u": {
+                "type": "integer",
+                "description": "Max control-point count in U (default 32).",
+            },
+            "max_ctrl_v": {
+                "type": "integer",
+                "description": "Max control-point count in V (default 32).",
+            },
+            "options": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                },
+            },
+        },
+        "required": ["file_id", "points_grid"],
+    },
+)
+
+
+@register(feature_fit_surface_spec, write=True)
+async def run_feature_fit_surface(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    file_id = a.get("file_id", "").strip()
+    points_grid = a.get("points_grid")
+    degree_u = a.get("degree_u", 3)
+    degree_v = a.get("degree_v", 3)
+    tol = a.get("tol", 1e-3)
+    max_ctrl_u = a.get("max_ctrl_u", 32)
+    max_ctrl_v = a.get("max_ctrl_v", 32)
+    options = a.get("options", {})
+
+    if not file_id:
+        return err_payload("file_id is required", "BAD_ARGS")
+    if not points_grid or not isinstance(points_grid, list) or len(points_grid) < 2:
+        return err_payload("points_grid must be a non-empty 2-D array", "BAD_ARGS")
+
+    try:
+        fid = uuid.UUID(file_id)
+    except Exception:
+        return err_payload("file_id must be a uuid", "BAD_ARGS")
+
+    if not isinstance(degree_u, int) or degree_u < 1 or degree_u > 5:
+        degree_u = 3
+    if not isinstance(degree_v, int) or degree_v < 1 or degree_v > 5:
+        degree_v = 3
+    if not isinstance(tol, (int, float)) or tol <= 0:
+        tol = 1e-3
+    if not isinstance(max_ctrl_u, int) or max_ctrl_u < 2:
+        max_ctrl_u = 32
+    if not isinstance(max_ctrl_v, int) or max_ctrl_v < 2:
+        max_ctrl_v = 32
+
+    content, err = read_feature_content(ctx, fid)
+    if err:
+        return err_payload(f"file not found: {err}", "NOT_FOUND")
+
+    node_id = ""
+    if isinstance(options, dict):
+        node_id = options.get("id", "").strip() or ""
+    if not node_id:
+        node_id = next_node_id(content, "fit_surface")
+
+    node: dict = {
+        "id": node_id,
+        "op": "fit_surface",
+        "points_grid": points_grid,
+        "degree_u": degree_u,
+        "degree_v": degree_v,
+        "tol": float(tol),
+        "max_ctrl_u": max_ctrl_u,
+        "max_ctrl_v": max_ctrl_v,
+    }
+
+    _name, nid, err2 = append_feature_node(ctx, fid, node)
+    if err2:
+        return err_payload(err2, "ERROR")
+
+    return ok_payload({
+        "file_id": file_id,
+        "id": nid or node_id,
+        "op": "fit_surface",
+        "degree_u": degree_u,
+        "degree_v": degree_v,
+        "tol": float(tol),
     })

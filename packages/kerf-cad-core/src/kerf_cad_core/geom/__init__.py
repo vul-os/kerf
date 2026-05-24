@@ -84,6 +84,8 @@ from kerf_cad_core.geom.blend_srf import (
     blend_srf_fillet,
     validate_surface_blend,
     compute_blend_surface_isocurves,
+    # GK-62: G3 trim+sew to Body
+    g3_blend_trim_sew,
 )
 
 from kerf_cad_core.geom.surface_boolean_robust import (
@@ -194,8 +196,16 @@ from kerf_cad_core.geom.io.iges import (
     IgesWriteError,
 )
 # GK-37: certified Hausdorff surface deviation
-from kerf_cad_core.geom.surface_fillet import variable_radius_fillet_g1
-from kerf_cad_core.geom.surface_analysis import hausdorff_deviation, zebra_stripe, zebra_stripe_continuity_analyser
+from kerf_cad_core.geom.surface_fillet import (
+    variable_radius_fillet_g1,
+    # GK-62: G3 curvature-rate residual oracle
+    curvature_rate_continuity_residual,
+)
+from kerf_cad_core.geom.surface_analysis import (
+    hausdorff_deviation, zebra_stripe, zebra_stripe_continuity_analyser,
+    # GK-64: Class-A acceptance harness
+    class_a_acceptance_harness,
+)
 # GK-63: deviation-driven adaptive surface refinement
 # GK-65: isocurve curvature comb
 from kerf_cad_core.geom.surface_analysis import adaptive_refine_surface, isocurve_curvature_comb
@@ -432,6 +442,8 @@ __all__ = [
     "blend_srf",
     "blend_srf_g1",
     "blend_srf_g2","blend_srf_g3",
+    # GK-62
+    "g3_blend_trim_sew",
     "blend_srf_with_curves",
     "blend_srf_fillet",
     "validate_surface_blend",
@@ -501,7 +513,11 @@ __all__ = [
     "IgesWriteError",
     # GK-37
     "variable_radius_fillet_g1",
+    # GK-62 oracle
+    "curvature_rate_continuity_residual",
     "hausdorff_deviation","zebra_stripe","zebra_stripe_continuity_analyser",
+    # GK-64
+    "class_a_acceptance_harness",
     # GK-63
     "adaptive_refine_surface",
     # GK-65
@@ -694,6 +710,9 @@ __all__ = [
     "move_face",
     # GK-137
     "reconstruct_mesh",
+    # GK-64: Class-A leading pass
+    "LeadingReport",
+    "run_leading_pass",
 ]
 
 # GK-122: interference / collision detection
@@ -733,3 +752,5 @@ from kerf_cad_core.geom.io.rhino3dm import (
 from kerf_cad_core.geom.direct_edit import push_pull_face, move_face
 # GK-137: point-cloud → mesh reconstruction (ball-pivoting / Poisson-lite)
 from kerf_cad_core.geom.recon import reconstruct_mesh  # noqa: E402
+# GK-64: Class-A leading quality pass (comb-peak + zebra-break + G3-dropout)
+from kerf_cad_core.geom.leading import LeadingReport, run_leading_pass

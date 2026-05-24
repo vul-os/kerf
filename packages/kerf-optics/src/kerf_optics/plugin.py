@@ -3,6 +3,7 @@ kerf-optics plugin entry-point.
 
 Registers:
   - LLM tools: optics_trace_ray, optics_lens_design
+  - LLM tools: gaussian_beam_propagate, gaussian_beam_focus
 """
 
 from __future__ import annotations
@@ -20,7 +21,18 @@ async def register(app: FastAPI, ctx):
     ctx.tools.register("optics_trace_ray", optics_trace_ray_spec, run_optics_trace_ray)
     ctx.tools.register("optics_lens_design", optics_lens_design_spec, run_optics_lens_design)
 
-    provides = ["optics.paraxial", "optics.abcd"]
+    from kerf_optics.gaussian_tools import (
+        gaussian_beam_propagate_spec, run_gaussian_beam_propagate,
+        gaussian_beam_focus_spec, run_gaussian_beam_focus,
+    )
+    ctx.tools.register(
+        "gaussian_beam_propagate", gaussian_beam_propagate_spec, run_gaussian_beam_propagate
+    )
+    ctx.tools.register(
+        "gaussian_beam_focus", gaussian_beam_focus_spec, run_gaussian_beam_focus
+    )
+
+    provides = ["optics.paraxial", "optics.abcd", "optics.gaussian"]
 
     try:
         from kerf_core.plugin import PluginManifest

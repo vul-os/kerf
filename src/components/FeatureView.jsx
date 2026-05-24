@@ -1829,15 +1829,335 @@ const FEATURE_KINDS = [
       { key: 'k_factor',        kind: 'number',  label: 'K-factor (0–1)',          min: 0.01, max: 0.99, step: 0.01 },
     ],
   },
+
+  // ── GK-P45: SubD/mesh authoring ops ────────────────────────────────────────
+
+  // subd_poke — centroid fan on a SubD cage face (GK-P20)
+  {
+    op: 'subd_poke',
+    label: 'SubD Poke',
+    icon: GitBranch,
+    caption: 'Poke a SubD cage face: insert a centroid vertex and fan the n-gon into n triangles.',
+    defaults: { target_id: '', face_id: 0 },
+    fields: [
+      { key: 'target_id', kind: 'feature_picker', label: 'SubD cage' },
+      { key: 'face_id',   kind: 'number',          label: 'Face index', min: 0, step: 1 },
+    ],
+  },
+
+  // subd_extrude_along — extrude SubD face along polyline (GK-P21)
+  {
+    op: 'subd_extrude_along',
+    label: 'SubD Extrude Along',
+    icon: Layers,
+    caption: 'Sweep a SubD cage face along a polyline spine. Side walls become quad faces.',
+    defaults: { target_id: '', face_id: 0, curve_pts: [[0,0,0],[0,0,10]] },
+    fields: [
+      { key: 'target_id',  kind: 'feature_picker', label: 'SubD cage' },
+      { key: 'face_id',    kind: 'number',          label: 'Face index', min: 0, step: 1 },
+    ],
+  },
+
+  // sculpt_brush — sculpt-brush stroke (grab/smooth/inflate) (GK-P27)
+  {
+    op: 'sculpt_brush',
+    label: 'Sculpt Brush',
+    icon: Move,
+    caption: 'Apply a sculpt-brush stroke to a SubD cage. Grab, smooth, or inflate vertices within the brush radius.',
+    defaults: {
+      target_id: '',
+      center: [0, 0, 0],
+      radius: 5.0,
+      falloff: 2.0,
+      strength: 0.5,
+      mode: 'grab',
+      direction: [0, 0, 1],
+    },
+    fields: [
+      { key: 'target_id', kind: 'feature_picker', label: 'SubD cage' },
+      { key: 'center[0]', kind: 'number', label: 'Brush centre X (mm)' },
+      { key: 'center[1]', kind: 'number', label: 'Brush centre Y (mm)' },
+      { key: 'center[2]', kind: 'number', label: 'Brush centre Z (mm)' },
+      { key: 'radius',    kind: 'number', label: 'Radius (mm)', min: 0.001 },
+      { key: 'falloff',   kind: 'number', label: 'Falloff exponent', min: 0.5, max: 8, step: 0.1 },
+      { key: 'strength',  kind: 'number', label: 'Strength', min: 0, max: 1, step: 0.05 },
+      { key: 'mode', kind: 'select', label: 'Mode', options: [
+        { value: 'grab',    label: 'Grab (translate)' },
+        { value: 'smooth',  label: 'Smooth (laplacian)' },
+        { value: 'inflate', label: 'Inflate (along normal)' },
+      ] },
+      { key: 'direction[0]', kind: 'number', label: 'Grab dir X', showWhen: (n) => n.mode === 'grab' },
+      { key: 'direction[1]', kind: 'number', label: 'Grab dir Y', showWhen: (n) => n.mode === 'grab' },
+      { key: 'direction[2]', kind: 'number', label: 'Grab dir Z', showWhen: (n) => n.mode === 'grab' },
+    ],
+  },
+
+  // multires_evaluate — MultiresStack evaluate + serialise (GK-P26)
+  {
+    op: 'multires_evaluate',
+    label: 'MultiRes Evaluate',
+    icon: Layers3,
+    caption: 'Evaluate a MultiresStack at a subdivision level, applying per-vertex displacement maps for sculpting.',
+    defaults: { target_id: '', level: 2, max_levels: 2, displacements: {} },
+    fields: [
+      { key: 'target_id',   kind: 'feature_picker', label: 'Base SubD cage' },
+      { key: 'level',       kind: 'number', label: 'Evaluate at level', min: 0, max: 6, step: 1 },
+      { key: 'max_levels',  kind: 'number', label: 'Max levels in stack', min: 1, max: 6, step: 1 },
+    ],
+  },
+
+  // ── GK-P46: mesh/implicit ops ───────────────────────────────────────────────
+
+  // sdf_csg — SDF CSG + marching cubes (GK-P22)
+  {
+    op: 'sdf_csg',
+    label: 'SDF CSG',
+    icon: Combine,
+    caption: 'Compose SDF primitives (sphere/box/cylinder) with CSG operators and extract a triangulated mesh via marching cubes.',
+    defaults: {
+      primitives: [{ type: 'sphere', id: 'a', cx: 0, cy: 0, cz: 0, r: 5 }],
+      operations: [],
+      bounds: [-10, -10, -10, 10, 10, 10],
+      resolution: 32,
+      isovalue: 0.0,
+    },
+    fields: [
+      { key: 'resolution', kind: 'number', label: 'Resolution (per axis)', min: 4, max: 128, step: 4 },
+      { key: 'isovalue',   kind: 'number', label: 'Iso-value', step: 0.01 },
+    ],
+  },
+
+  // uv_unwrap — LSCM UV unwrap (GK-P24)
+  {
+    op: 'uv_unwrap',
+    label: 'UV Unwrap',
+    icon: LayoutGrid,
+    caption: 'LSCM UV unwrap — computes a low-distortion (conformal) UV parametrization for a triangle mesh or SubD cage.',
+    defaults: { target_id: '', fixed_pins: [] },
+    fields: [
+      { key: 'target_id', kind: 'feature_picker', label: 'Mesh / SubD cage' },
+    ],
+  },
+
+  // isotropic_remesh — Botsch-Kobbelt isotropic remesh (GK-P23)
+  {
+    op: 'isotropic_remesh',
+    label: 'Isotropic Remesh',
+    icon: Grid3x3,
+    caption: 'Botsch-Kobbelt isotropic remesh: split, collapse, flip, and smooth toward a uniform target edge length.',
+    defaults: { target_id: '', target_edge_length: 1.0, iterations: 5 },
+    fields: [
+      { key: 'target_id',          kind: 'feature_picker', label: 'Mesh / SubD cage' },
+      { key: 'target_edge_length', kind: 'number',         label: 'Target edge length (mm)', min: 0.001 },
+      { key: 'iterations',         kind: 'number',         label: 'Iterations', min: 1, max: 20, step: 1 },
+    ],
+  },
+
+  // retopo_snap — snap retopo cage to reference mesh (GK-P25)
+  {
+    op: 'retopo_snap',
+    label: 'Retopo Snap',
+    icon: Crosshair,
+    caption: 'Snap a retopo cage to the nearest-point surface of a reference mesh. Draw a coarse cage then snap it to conform.',
+    defaults: { retopo_cage_id: '', source_mesh_id: '' },
+    fields: [
+      { key: 'retopo_cage_id',  kind: 'feature_picker', label: 'Retopo cage' },
+      { key: 'source_mesh_id', kind: 'feature_picker', label: 'Reference mesh / scan' },
+    ],
+  },
+
+  // ── GK-P47: surfacing additions ─────────────────────────────────────────────
+
+  // isophote_analysis — read-only isophote continuity analyser (GK-P11)
+  {
+    op: 'isophote_analysis',
+    label: 'Isophote Analysis',
+    icon: Aperture,
+    caption: (
+      'Read-only isophote / environment-map continuity analysis. ' +
+      'Detects G1 (tangent) discontinuities as isophote breaks. ' +
+      'Does NOT append a geometry node — analysis only.'
+    ),
+    defaults: { target_id: '', uv_grid: [48, 48], sphere_map_res: 16, light_dir: [0, 0, 1] },
+    fields: [
+      { key: 'target_id',      kind: 'feature_picker', label: 'NURBS surface node' },
+      { key: 'uv_grid[0]',     kind: 'number', label: 'UV grid U', min: 3, max: 200, step: 1 },
+      { key: 'uv_grid[1]',     kind: 'number', label: 'UV grid V', min: 3, max: 200, step: 1 },
+      { key: 'sphere_map_res', kind: 'number', label: 'Sphere-map bands', min: 2, max: 64, step: 1 },
+      { key: 'light_dir[0]',   kind: 'number', label: 'Light dir X', step: 0.1 },
+      { key: 'light_dir[1]',   kind: 'number', label: 'Light dir Y', step: 0.1 },
+      { key: 'light_dir[2]',   kind: 'number', label: 'Light dir Z', step: 0.1 },
+    ],
+  },
+
+  // ── GK-P48: construction verbs ──────────────────────────────────────────────
+
+  // hem_sheet — 180° hem fold (GK-P17)
+  {
+    op: 'hem_sheet',
+    label: 'Hem Sheet',
+    icon: Layers,
+    caption: '180° hem fold on a bent sheet-metal body (closed/open/teardrop). Stiffens edges and removes raw-cut burrs.',
+    defaults: { target_id: '', style: 'closed', gap: 0, k_factor: 0.44 },
+    fields: [
+      { key: 'target_id', kind: 'feature_picker', label: 'Bent sheet body' },
+      { key: 'style', kind: 'select', label: 'Hem style', options: [
+        { value: 'closed',   label: 'Closed (flat, gap=0)' },
+        { value: 'open',     label: 'Open (gap > 0)' },
+        { value: 'teardrop', label: 'Teardrop' },
+      ] },
+      { key: 'gap',      kind: 'number', label: 'Gap (mm)', min: 0, step: 0.1, showWhen: (n) => n.style !== 'closed' },
+      { key: 'radius',   kind: 'number', label: 'Hem radius (mm)', min: 0.001, step: 0.1 },
+      { key: 'k_factor', kind: 'number', label: 'K-factor', min: 0.01, max: 0.99, step: 0.01 },
+    ],
+  },
+
+  // jog_sheet — Z-offset jog (GK-P17)
+  {
+    op: 'jog_sheet',
+    label: 'Jog Sheet',
+    icon: SlidersHorizontal,
+    caption: 'Z-offset jog (two opposing bends) on a sheet-metal body. Shifts one panel up/down while keeping both panels parallel.',
+    defaults: { target_id: '', offset: 5.0, jog_angle_rad: 1.5708, radius: 1.0, k_factor: 0.44 },
+    fields: [
+      { key: 'target_id',     kind: 'feature_picker', label: 'Sheet-metal body' },
+      { key: 'offset',        kind: 'number', label: 'Z offset (mm)' },
+      { key: 'jog_angle_rad', kind: 'number', label: 'Jog angle (rad)', min: 0.01, max: 1.5708, step: 0.01 },
+      { key: 'radius',        kind: 'number', label: 'Bend radius (mm)', min: 0.001, step: 0.1 },
+      { key: 'k_factor',      kind: 'number', label: 'K-factor', min: 0.01, max: 0.99, step: 0.01 },
+    ],
+  },
+
+  // multi_flange — sequence of bends (GK-P17)
+  {
+    op: 'multi_flange',
+    label: 'Multi-Flange',
+    icon: Repeat,
+    caption: 'Apply a sequence of sheet-metal bends in one call. Each bend spec provides bend_line, angle_rad, and radius.',
+    defaults: {
+      target_id: '',
+      bend_specs: [{ bend_line: 20, angle_rad: 1.5708, radius: 1.0, k_factor: 0.4 }],
+    },
+    fields: [
+      { key: 'target_id', kind: 'feature_picker', label: 'Sheet-metal body' },
+    ],
+  },
+
+  // delete_face — remove a face (GK-P18)
+  {
+    op: 'delete_face',
+    label: 'Delete Face',
+    icon: Trash2,
+    caption: 'Remove a face from a body and heal the result. For planar bodies this always produces a closed solid.',
+    defaults: { target_id: '', face_id: 0, heal: true },
+    fields: [
+      { key: 'target_id', kind: 'feature_picker', label: 'Body' },
+      { key: 'face_id',   kind: 'number',          label: 'Face index', min: 0, step: 1 },
+      { key: 'heal',      kind: 'boolean',          label: 'Attempt heal' },
+    ],
+  },
+
+  // push_pull — push/pull non-planar face (GK-P18)
+  // Note: the existing 'push_pull' op in 'modify' category is the basic version;
+  // this one is tagged as a first-class feature node with target_id + face_id.
+  {
+    op: 'push_pull',
+    label: 'Push/Pull Face',
+    icon: Move,
+    caption: 'Offset a face along its outward normal. Positive = outward (add material), negative = inward (remove). Supports non-planar faces (GK-P18).',
+    defaults: { target_id: '', face_id: 0, distance: 5.0 },
+    fields: [
+      { key: 'target_id', kind: 'feature_picker', label: 'Body' },
+      { key: 'face_id',   kind: 'number',          label: 'Face index', min: 0, step: 1 },
+      { key: 'distance',  kind: 'number',           label: 'Distance (mm)', step: 0.5 },
+    ],
+  },
+
+  // gusset_plate — weldment gusset (GK-P19)
+  {
+    op: 'gusset_plate',
+    label: 'Gusset Plate',
+    icon: GitBranch,
+    caption: 'Insert a gusset-plate stiffener at a weldment joint vertex (triangle / rect / trapezoidal).',
+    defaults: {
+      target_id: '',
+      vertex_pos: [0, 0, 0],
+      thickness_mm: 6,
+      width_mm: 100,
+      height_mm: 100,
+      shape: 'triangle',
+      fillet_mm: 0,
+      material: 'steel',
+    },
+    fields: [
+      { key: 'target_id',    kind: 'feature_picker', label: 'Weldment frame' },
+      { key: 'vertex_pos[0]', kind: 'number', label: 'Vertex X (mm)' },
+      { key: 'vertex_pos[1]', kind: 'number', label: 'Vertex Y (mm)' },
+      { key: 'vertex_pos[2]', kind: 'number', label: 'Vertex Z (mm)' },
+      { key: 'thickness_mm', kind: 'number', label: 'Plate thickness (mm)', min: 0.1, step: 1 },
+      { key: 'width_mm',     kind: 'number', label: 'Width (mm)', min: 0.1, step: 5 },
+      { key: 'height_mm',    kind: 'number', label: 'Height (mm)', min: 0.1, step: 5 },
+      { key: 'shape', kind: 'select', label: 'Shape', options: [
+        { value: 'triangle',    label: 'Triangle (right-triangle)' },
+        { value: 'rect',        label: 'Rectangle' },
+        { value: 'trapezoidal', label: 'Trapezoidal' },
+      ] },
+      { key: 'fillet_mm', kind: 'number', label: 'Corner fillet (mm)', min: 0, step: 1 },
+    ],
+  },
+
+  // cope_notch — weldment cope / notch end-treatment (GK-P19)
+  {
+    op: 'cope_notch',
+    label: 'Cope / Notch',
+    icon: Scissors,
+    caption: 'Cope or notch end-treatment on a weldment member end. Cope = cut for passing member; notch = V/square corner cut.',
+    defaults: {
+      target_id: '',
+      member_index: 0,
+      end: 'start',
+      cope_style: 'none',
+      cope_depth_mm: 0,
+      cope_width_mm: 0,
+      notch_style: 'none',
+      notch_depth_mm: 0,
+      notch_width_mm: 0,
+      notch_angle_deg: 45,
+    },
+    fields: [
+      { key: 'target_id',    kind: 'feature_picker', label: 'Weldment frame' },
+      { key: 'member_index', kind: 'number', label: 'Member index', min: 0, step: 1 },
+      { key: 'end', kind: 'select', label: 'End', options: [
+        { value: 'start', label: 'Start end' },
+        { value: 'end',   label: 'End end' },
+      ] },
+      { key: 'cope_style', kind: 'select', label: 'Cope style', options: [
+        { value: 'none',   label: 'None' },
+        { value: 'square', label: 'Square' },
+        { value: 'radius', label: 'Radius (radiused corner)' },
+      ] },
+      { key: 'cope_depth_mm',  kind: 'number', label: 'Cope depth (mm)', min: 0, step: 1, showWhen: (n) => n.cope_style !== 'none' },
+      { key: 'cope_width_mm',  kind: 'number', label: 'Cope width (mm)', min: 0, step: 1, showWhen: (n) => n.cope_style !== 'none' },
+      { key: 'cope_radius_mm', kind: 'number', label: 'Cope radius (mm)', min: 0, step: 0.5, showWhen: (n) => n.cope_style === 'radius' },
+      { key: 'notch_style', kind: 'select', label: 'Notch style', options: [
+        { value: 'none',   label: 'None' },
+        { value: 'square', label: 'Square' },
+        { value: 'angle',  label: 'V-notch' },
+      ] },
+      { key: 'notch_depth_mm', kind: 'number', label: 'Notch depth (mm)', min: 0, step: 1, showWhen: (n) => n.notch_style !== 'none' },
+      { key: 'notch_width_mm', kind: 'number', label: 'Notch width (mm)', min: 0, step: 1, showWhen: (n) => n.notch_style !== 'none' },
+      { key: 'notch_angle_deg', kind: 'number', label: 'V-notch angle (°)', min: 5, max: 170, step: 5, showWhen: (n) => n.notch_style === 'angle' },
+    ],
+  },
 ]
 
 const KIND_BY_OP = Object.fromEntries(FEATURE_KINDS.map((k) => [k.op, k]))
 
 const FEATURE_CATEGORIES = [
   { id: 'sketch',   label: 'Sketch-based',  ops: ['pad', 'boss_with_draft', 'pocket', 'cut_from_sketch', 'revolve', 'hole', 'hole_pattern'] },
-  { id: 'modify',   label: 'Modify',        ops: ['fillet', 'chamfer', 'shell', 'push_pull', 'variable_radius_fillet', 'to_solid', 'boolean', 'section', 'quad_remesh'] },
+  { id: 'modify',   label: 'Modify',        ops: ['fillet', 'chamfer', 'shell', 'push_pull', 'variable_radius_fillet', 'to_solid', 'boolean', 'section', 'quad_remesh', 'delete_face', 'isotropic_remesh'] },
   { id: 'pattern',  label: 'Pattern',       ops: ['linear_pattern', 'polar_pattern', 'mirror_pattern'] },
-  { id: 'surface',  label: 'Surfacing',     ops: ['sweep1', 'sweep2', 'loft', 'network_srf', 'blend_srf', 'surface_boolean', 'trim_by_curve', 'surface_curvature_combs'] },
+  { id: 'surface',  label: 'Surfacing',     ops: ['sweep1', 'sweep2', 'loft', 'network_srf', 'blend_srf', 'surface_boolean', 'trim_by_curve', 'surface_curvature_combs', 'isophote_analysis', 'uv_unwrap'] },
   { id: 'jewelry',  label: 'Jewelry',       ops: [
     // Gemstones
     'gemstone',
@@ -1866,7 +2186,9 @@ const FEATURE_CATEGORIES = [
     // Decorative
     'decorative_apply',
   ] },
-  { id: 'sheetmetal', label: 'Sheet Metal', ops: ['sheet_metal_flange'] },
+  { id: 'sheetmetal', label: 'Sheet Metal', ops: ['sheet_metal_flange', 'hem_sheet', 'jog_sheet', 'multi_flange'] },
+  { id: 'subd',      label: 'SubD / Mesh',  ops: ['subd_poke', 'subd_extrude_along', 'sculpt_brush', 'multires_evaluate', 'sdf_csg', 'retopo_snap'] },
+  { id: 'weldment',  label: 'Weldment',     ops: ['gusset_plate', 'cope_notch'] },
 ]
 
 const DEBOUNCE_MS = 300

@@ -1,0 +1,64 @@
+# Koyeb worker service — OPTIONAL (separation path), mirrors fly.worker.toml.
+#
+# By default the engine service (koyeb.yaml) runs workers in-process
+# (KERF_INPROCESS_WORKERS=true). To split workers onto their own service:
+#   1. Set the engine service env: KERF_INPROCESS_WORKERS=false and redeploy.
+#   2. koyeb-cli service deploy --file koyeb.worker.yaml --app kerf-prod
+#
+# Same Dockerfile, no public HTTP. Internal-only, GPU workers go here.
+
+services:
+  - name: workers
+    type: WORKER         # no public route, Koyeb manages lifecycle internally
+    regions:
+      - fra
+
+    # CPU instance type for the harness/compaction/storage workers. GPU
+    # render workers run on a separate scaled-to-zero GPU instance —
+    # see koyeb.workers.gpu.yaml (to be authored once Cycles dispatch
+    # lands on Koyeb, T-409).
+    instance_types:
+      - type: large
+
+    scalings:
+      - min: 1
+        max: 2
+        # WORKER services don't autoscale on HTTP traffic. Set CPU/memory
+        # targets or scale manually until we have queue-depth metrics.
+        targets:
+          - average_cpus:
+              value: 70
+
+    docker:
+      image: kerf:engine    # same image as engine — entry-point selected
+                            # via KERF_WORKERS_ONLY=true.
+
+    envs:
+      - key: KERF_PORT
+        value: "8080"
+      - key: STORAGE_BACKEND
+        value: s3
+      - key: KERF_STORAGE_S3_ENDPOINT
+        value: https://fly.storage.tigris.dev
+      - key: KERF_STORAGE_S3_REGION
+        value: auto
+      - key: CLOUD_ENABLED
+        value: "true"
+      - key: KERF_WORKERS_ONLY
+        value: "true"
+      # Secrets — share with the engine app:
+      - key: DATABASE_URL
+        secret: database-url
+      - key: KERF_STORAGE_S3_BUCKET
+        secret: tigris-bucket
+      - key: KERF_STORAGE_S3_ACCESS_KEY
+        secret: tigris-access-key
+      - key: KERF_STORAGE_S3_SECRET_KEY
+        secret: tigris-secret-key
+      - key: LLM_ANTHROPIC_API_KEY
+        secret: llm-anthropic
+      - key: LLM_OPENAI_API_KEY
+        secret: llm-openai
+
+    # Worker command override (no HTTP, no /healthz):
+    docker_command: ["python", "-m", "kerf_workers.runner"]

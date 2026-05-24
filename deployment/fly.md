@@ -1,11 +1,14 @@
 # fly.io deployment
 
-> **This is the production deployment.** `kerf.sh` runs on fly.io using
-> the configuration in this guide — primary region JNB (Johannesburg),
-> Tigris for object storage, Neon for Postgres. The numbers in
-> [`billingmodel/projections.py`](../billingmodel/projections.py) are
-> based on this stack's real costs. Other deployment guides in this
-> directory are reference configurations for self-hosters.
+> **⚠ Deprecated for the hosted tier (2026-05-24).** `kerf.sh` is
+> migrating off Fly.io to Koyeb — Fly discontinued GPU instances which
+> we need for Cycles rendering and future ML-accel workloads. See
+> [`deployment/koyeb.md`](./koyeb.md) for the canonical hosted-tier guide
+> and [ROADMAP §7.1](../ROADMAP.md#71--flyio--koyeb-p0-2026-05-24).
+>
+> Fly **still works for self-hosters who only need CPU.** This guide is
+> kept as a reference for that path, and as warm-rollback documentation
+> during the Koyeb cutover window.
 
 Kerf deploys to fly.io as a **single image** containing the compiled
 Vite SPA + FastAPI + the chosen plugin persona. The app machine serves

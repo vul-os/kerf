@@ -1,7 +1,7 @@
 """Tests for kerf_render.pricing_meter (T-106d).
 
 Covers:
-- A10G 30-second render → expected USD cost
+- L4 30-second render → expected USD cost (Koyeb-grounded, 35% markup)
 - DB mock receives the correct workspace_id and amount
 - Free path: 0 gpu_seconds → no debit
 - Self-hosted path: KERF_RENDER_BILLING_DISABLED=1 → no debit
@@ -55,19 +55,31 @@ class _FakePool:
 # ---------------------------------------------------------------------------
 
 
-def test_a10g_rate():
-    assert gpu_rate("a10g") == pytest.approx(0.0006)
-    assert gpu_rate("A10G") == pytest.approx(0.0006)
+def test_l4_rate():
+    """L4 is the default Koyeb tier — grounded to $0.70/hr ÷ 3600."""
+    assert gpu_rate("l4") == pytest.approx(0.000194)
+    assert gpu_rate("L4") == pytest.approx(0.000194)
 
 
 def test_a100_rate():
-    assert gpu_rate("a100") == pytest.approx(0.0014)
-    assert gpu_rate("A100") == pytest.approx(0.0014)
+    """A100 80GB on Koyeb — $1.60/hr ÷ 3600."""
+    assert gpu_rate("a100") == pytest.approx(0.000444)
+    assert gpu_rate("A100") == pytest.approx(0.000444)
 
 
-def test_unknown_gpu_falls_back_to_a10g():
-    # Unknown model falls back to A10G (not zero — we must not under-bill).
-    assert gpu_rate("H100") == pytest.approx(GPU_RATES_USD_PER_SECOND["a10g"])
+def test_h100_rate():
+    """H100 on Koyeb — $2.50/hr ÷ 3600."""
+    assert gpu_rate("h100") == pytest.approx(0.000694)
+
+
+def test_a10g_alias_maps_to_l4():
+    """Back-compat: legacy 'a10g' callers must still resolve (mapped to L4)."""
+    assert gpu_rate("l4") == pytest.approx(GPU_RATES_USD_PER_SECOND["l4"])
+
+
+def test_unknown_gpu_falls_back_to_l4():
+    # Unknown model falls back to L4 (not zero — we must not under-bill).
+    assert gpu_rate("unknown_xyz") == pytest.approx(GPU_RATES_USD_PER_SECOND["l4"])
 
 
 # ---------------------------------------------------------------------------
@@ -75,34 +87,39 @@ def test_unknown_gpu_falls_back_to_a10g():
 # ---------------------------------------------------------------------------
 
 
-def test_compute_usd_cost_a10g_30s_no_markup():
-    """30 GPU-seconds on A10G at zero markup = bare COGS $0.018."""
-    cost = compute_usd_cost(30.0, "a10g", markup_pct=0)
-    assert cost == pytest.approx(0.018, rel=1e-9)
+def test_compute_usd_cost_l4_30s_no_markup():
+    """30 GPU-seconds on L4 at zero markup = bare COGS 30 × 0.000194 = $0.00582."""
+    cost = compute_usd_cost(30.0, "l4", markup_pct=0)
+    assert cost == pytest.approx(30.0 * 0.000194, rel=1e-9)
 
 
 def test_compute_usd_cost_a100_30s_no_markup():
-    """30 GPU-seconds on A100 at zero markup = bare COGS $0.042."""
+    """30 GPU-seconds on A100 at zero markup = 30 × 0.000444 = $0.01332."""
     cost = compute_usd_cost(30.0, "a100", markup_pct=0)
-    assert cost == pytest.approx(0.042, rel=1e-9)
+    assert cost == pytest.approx(30.0 * 0.000444, rel=1e-9)
 
 
 def test_compute_usd_cost_applies_markup():
-    """Default 20% markup: 30s A10G → 0.018 × 1.20 = $0.0216."""
-    cost = compute_usd_cost(30.0, "a10g")
-    assert cost == pytest.approx(0.018 * (1 + GPU_MARKUP_PCT / 100), rel=1e-9)
+    """Default 35% markup applied to L4 30s."""
+    expected = 30.0 * 0.000194 * (1 + GPU_MARKUP_PCT / 100)
+    assert compute_usd_cost(30.0, "l4") == pytest.approx(expected, rel=1e-9)
 
 
-def test_compute_usd_cost_explicit_markup():
-    """Explicit markup_pct=20 gives same result as the default."""
-    assert compute_usd_cost(30.0, "a10g", markup_pct=20) == pytest.approx(
-        compute_usd_cost(30.0, "a10g"), rel=1e-9
+def test_compute_usd_cost_default_markup_is_35():
+    """Post-Koyeb migration: default markup is 35%."""
+    assert GPU_MARKUP_PCT == pytest.approx(35.0)
+
+
+def test_compute_usd_cost_explicit_markup_matches_default():
+    """Explicit markup_pct=GPU_MARKUP_PCT gives same result as the default."""
+    assert compute_usd_cost(30.0, "l4", markup_pct=GPU_MARKUP_PCT) == pytest.approx(
+        compute_usd_cost(30.0, "l4"), rel=1e-9
     )
 
 
 def test_compute_usd_cost_zero_gpu_seconds():
-    assert compute_usd_cost(0.0, "a10g") == 0.0
-    assert compute_usd_cost(-1.0, "a10g") == 0.0
+    assert compute_usd_cost(0.0, "l4") == 0.0
+    assert compute_usd_cost(-1.0, "l4") == 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -111,13 +128,13 @@ def test_compute_usd_cost_zero_gpu_seconds():
 
 
 @pytest.mark.asyncio
-async def test_meter_render_job_a10g_30s_debits_correctly():
-    """30 GPU-seconds on A10G → COGS × 1.20 charged; DB execute called once."""
+async def test_meter_render_job_l4_30s_debits_correctly():
+    """30 GPU-seconds on L4 → COGS × (1+markup) charged; DB execute called once."""
     pool = _FakePool()
     workspace_id = str(uuid.uuid4())
 
-    expected = 0.018 * (1 + GPU_MARKUP_PCT / 100)  # 0.0216 at 20%
-    result = await meter_render_job(pool, workspace_id, 30.0, "a10g")
+    expected = 30.0 * 0.000194 * (1 + GPU_MARKUP_PCT / 100)
+    result = await meter_render_job(pool, workspace_id, 30.0, "l4")
 
     assert result["skipped"] is False
     assert result["skip_reason"] is None
@@ -137,7 +154,7 @@ async def test_meter_render_job_correct_workspace_id():
     pool = _FakePool()
     workspace_id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 
-    await meter_render_job(pool, workspace_id, 10.0, "a10g")
+    await meter_render_job(pool, workspace_id, 10.0, "l4")
 
     _, args = pool.conn.calls[0]
     assert args[0] == workspace_id
@@ -149,7 +166,7 @@ async def test_meter_render_job_writes_positive_debit():
     pool = _FakePool()
     workspace_id = str(uuid.uuid4())
 
-    await meter_render_job(pool, workspace_id, 60.0, "a10g")
+    await meter_render_job(pool, workspace_id, 60.0, "l4")
 
     _, args = pool.conn.calls[0]
     assert args[1] > 0, "debit amount must be positive"
@@ -166,7 +183,7 @@ async def test_meter_render_job_zero_gpu_seconds_no_debit():
     pool = _FakePool()
     workspace_id = str(uuid.uuid4())
 
-    result = await meter_render_job(pool, workspace_id, 0.0, "a10g")
+    result = await meter_render_job(pool, workspace_id, 0.0, "l4")
 
     assert result["charged_usd"] == 0.0
     assert result["skipped"] is True
@@ -181,7 +198,7 @@ async def test_meter_render_job_negative_gpu_seconds_no_debit():
     pool = _FakePool()
     workspace_id = str(uuid.uuid4())
 
-    result = await meter_render_job(pool, workspace_id, -5.0, "a10g")
+    result = await meter_render_job(pool, workspace_id, -5.0, "l4")
 
     assert result["charged_usd"] == 0.0
     assert result["skipped"] is True
@@ -202,7 +219,7 @@ async def test_meter_render_job_billing_disabled_env_var(monkeypatch):
     pool = _FakePool()
     workspace_id = str(uuid.uuid4())
 
-    result = await meter_render_job(pool, workspace_id, 30.0, "a10g")
+    result = await meter_render_job(pool, workspace_id, 30.0, "l4")
 
     assert result["charged_usd"] == 0.0
     assert result["skipped"] is True
@@ -218,8 +235,8 @@ async def test_meter_render_job_billing_disabled_not_set(monkeypatch):
     pool = _FakePool()
     workspace_id = str(uuid.uuid4())
 
-    expected = 0.018 * (1 + GPU_MARKUP_PCT / 100)
-    result = await meter_render_job(pool, workspace_id, 30.0, "a10g")
+    expected = 30.0 * 0.000194 * (1 + GPU_MARKUP_PCT / 100)
+    result = await meter_render_job(pool, workspace_id, 30.0, "l4")
 
     assert result["skipped"] is False
     assert result["charged_usd"] == pytest.approx(expected, rel=1e-9)
@@ -234,7 +251,7 @@ async def test_meter_render_job_billing_disabled_other_value(monkeypatch):
     pool = _FakePool()
     workspace_id = str(uuid.uuid4())
 
-    result = await meter_render_job(pool, workspace_id, 30.0, "a10g")
+    result = await meter_render_job(pool, workspace_id, 30.0, "l4")
 
     assert result["skipped"] is False
     assert len(pool.conn.calls) == 1
@@ -251,9 +268,9 @@ async def test_meter_render_job_with_job_id():
     workspace_id = str(uuid.uuid4())
     job_id = str(uuid.uuid4())
 
-    expected = 0.018 * (1 + GPU_MARKUP_PCT / 100)
+    expected = 30.0 * 0.000194 * (1 + GPU_MARKUP_PCT / 100)
     result = await meter_render_job(
-        pool, workspace_id, 30.0, "a10g", job_id=job_id
+        pool, workspace_id, 30.0, "l4", job_id=job_id
     )
 
     assert result["skipped"] is False

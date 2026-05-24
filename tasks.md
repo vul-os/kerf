@@ -5455,3 +5455,145 @@ User-direction 2026-05-19. Extends T-179 (apparel pattern-making) with deeper te
   - `npm run build` clean
 - **Depends-on:** GK-01..GK-72 (all kernel spine + long-tail) — complete
 
+---
+
+## Infrastructure migration — Fly.io → Koyeb (T-400 … T-410)
+
+ROADMAP § 7.1 ("Hosted infrastructure"). Fly.io discontinued GPU
+instances, blocking the Cycles render epic (and any future GPU-accel
+work). Koyeb sells the full GPU ladder (RTX-A4000 → H100) in Frankfurt,
+Washington and Singapore with per-second billing and the same Docker
+deploy model. All tasks are P0; the order is the order they should ship.
+
+### T-400 Ground GPU billing rates to Koyeb actuals
+- **Tier:** A
+- **Priority:** P0
+- **Status:** 🚧 in flight (2026-05-24)
+- **Scope:** Replace the placeholder Modal-tier numbers in `kerf-render.pricing_meter` with the real Koyeb hourly rates. Add SKUs for the full Koyeb ladder (rtx_a4000, l4, a6000, l40s, a100, a100_sxm, h100, h200) converted to USD/GPU-second. Lift `GPU_MARKUP_PCT` from 20% → 35% to absorb per-second billing variance + storage egress + autoscale buffer. Make `l4` the default (replaces `a10g`, similar 24GB tier).
+- **Target files:** `packages/kerf-render/src/kerf_render/pricing_meter.py`, `packages/kerf-render/tests/test_pricing_meter.py`, `packages/kerf-billing/src/kerf_billing/render_meter.py` (default-rate lookup), `packages/kerf-pricing/llm_docs/pricing.md`.
+- **Definition of Done:**
+  - GPU rate table grounded to live Koyeb pricing with provider URL cited in the docstring
+  - Tests assert the new defaults and ladder values exactly
+  - User-facing render-cost docs reflect Option-C hybrid (~2-3× drop in user price vs old Modal-tier rates)
+  - `pytest packages/kerf-render packages/kerf-billing packages/kerf-pricing -q` green
+
+### T-401 Billing-hole audit fan-out
+- **Tier:** A
+- **Priority:** P0
+- **Status:** ✅ shipped (2026-05-24) — report at [`docs/audits/billing-holes-2026-05-24.md`](docs/audits/billing-holes-2026-05-24.md). 6× P0, 9× P1, 7× P2 holes found. Headline: GPU renders and storage growth are both $0-revenue today because the meter calls are dead code and `user_id` is NULL in `render_jobs`. T-402 follow-ups required before Koyeb cutover.
+- **Scope:** Sonnet-agent fan-out (3 parallel, isolated worktrees) to find revenue leaks before we cut over. Each agent reads a slice of the billing surface and reports findings as a short markdown table — no code changes from the audit agents; this task is research only.
+  - **Agent 1 — spend paths:** every place chat/render/storage/compute COGS is incurred. Find paths that mutate state but DON'T call `kerf_billing.spend.commit_spend` / `cloud_debit_balance` / `render_meter.meter_render_job`.
+  - **Agent 2 — quota & abuse vectors:** `kerf_free` bucket bypass paths, retry storms, rate-limit gaps, free-tier loops, cheap-tier model masquerading.
+  - **Agent 3 — egress, storage, and BYO leaks:** unbilled outbound bandwidth, untracked storage growth, BYO-key paths that still hit our LLM keys.
+- **Target files:** read-only across `packages/kerf-billing/`, `packages/kerf-pricing/`, `packages/kerf-render/`, `packages/kerf-cloud/billing*`, `packages/kerf-api/`. Output: `docs/audits/billing-holes-2026-05-24.md` (a single consolidated report).
+- **Definition of Done:**
+  - Report exists with a prioritised P0/P1/P2 list of holes
+  - Each finding cites file:line, the leak vector, and the proposed fix shape
+  - Holes flagged P0 spawn T-402 follow-ups before cutover
+
+### T-402 Plug P0 holes from T-401
+- **Tier:** A
+- **Priority:** P0
+- **Status:** 🔴 not started (T-401 report landed, ready to start)
+- **Scope:** Plug the 6 P0 holes from [the audit](docs/audits/billing-holes-2026-05-24.md), grouped to minimise PR count:
+  1. **R1 + R2 + R8** — `kerf-render/queue_worker.py` calls `meter_render_job` after `mark_complete`; `_enqueue_render` threads `user_id` into the INSERT; `record_storage` helper added to `kerf_core.db.queries.usage_events`. Single PR, unblocks GPU + storage revenue together.
+  2. **R3** — register a `StorageBillingWorker` (or extend `BillingResetWorker`) to fire `monthly_storage_debit()` on a monthly tick with an idempotency guard.
+  3. **R5 + R6** — close the render-gate bypass: reuse the verified `user_id` inside `_run_billing_gate`, and pass an internal auth token from `_generate_project_cover`'s `httpx` call.
+  4. **R4** — unify the Gemini provider key across `kerf_chat` catalogue and `kerf_pricing.cheap_tier`. Add a snapshot test ensuring `is_cheap_tier(provider, model_id)` agrees with the catalogue's `cheap_tier_eligible` flag for every catalogue entry.
+- **Definition of Done:**
+  - All 6 R-IDs above ticked in [`docs/audits/billing-holes-2026-05-24.md`](docs/audits/billing-holes-2026-05-24.md)
+  - `pytest packages/kerf-render packages/kerf-billing packages/kerf-pricing packages/kerf-api packages/kerf-chat -q` green
+  - A render-completion integration test exists asserting `cloud_user_balances.credits_usd` decreased by the expected amount
+  - A storage-debit integration test exists asserting `monthly_storage_debit` runs on schedule
+
+### T-403 Author `koyeb.yaml` + `koyeb.worker.yaml`
+- **Tier:** A
+- **Priority:** P0
+- **Status:** 🔴 not started
+- **Scope:** Mirror `fly.toml` / `fly.worker.toml` 1:1 in Koyeb's config format. Same Dockerfile (no change), same env-var set, same Tigris S3 bindings, same pre-deploy migration command, same `/healthz` health-check. Default instance: `large` (4 vCPU, 4GB, 40GB SSD, $42.85/mo) — closest match to current `performance-2x`. Autoscale on requests (1 min, soft 200, hard 250).
+- **Target files:** new `koyeb.yaml`, `koyeb.worker.yaml`, `koyeb.dev.yaml`. Leave `fly.*.toml` in place for the duration of T-405 cutover.
+- **Definition of Done:**
+  - Files render via `koyeb-cli validate`
+  - Secrets list documented in a comment block, matches `fly.toml` exactly
+  - `KERF_INPROCESS_WORKERS=true` retained by default
+
+### T-404 `scripts/deploy-koyeb.sh`
+- **Tier:** A
+- **Priority:** P0
+- **Status:** 🔴 not started
+- **Scope:** New shell script mirroring `scripts/deploy-fly.sh`. Supports `--env dev|prod`, runs `koyeb-cli secrets sync` if needed, then `koyeb-cli deploy`. Wait for health-check pass before exit-0.
+- **Target files:** new `scripts/deploy-koyeb.sh` (executable).
+- **Definition of Done:**
+  - `bash -n scripts/deploy-koyeb.sh` clean
+  - Dry-run mode prints planned actions without executing
+  - Documented in `deployment/koyeb.md`
+
+### T-405 Smoke-test on `kerf-dev`, cut DNS, decommission Fly app
+- **Tier:** A
+- **Priority:** P0
+- **Status:** 🔴 not started (blocked on T-403, T-404)
+- **Scope:** Deploy `kerf-dev` to Koyeb. Run the e2e suite against the staging URL. Cut DNS for `kerf.sh` once green. Keep the Fly app running for 7 days as warm rollback; then `flyctl apps destroy`.
+- **Definition of Done:**
+  - e2e suite green against Koyeb staging
+  - DNS swapped
+  - Fly app destroyed; secrets purged from Fly console
+
+### T-406 Update references — code, config, scripts
+- **Tier:** A
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Sonnet fan-out (2 parallel, isolated worktrees) to replace `fly.io`, `fly.toml`, `flyctl`, `fly.storage.tigris.dev` mentions across:
+  - **Agent 1 — code/scripts/config:** `scripts/*`, `Dockerfile`, `packages/**/*.py` (esp. `kerf-cloud`), env-var defaults, `SECURITY.md`.
+  - **Agent 2 — docs:** `deployment/*.md`, `docs/architecture/*.md`, `decisions.md`, `CHANGELOG.md`. Add new `deployment/koyeb.md` as the canonical hosting doc. Mark `deployment/fly.md` deprecated (keep — Fly still works for CPU-only self-hosters).
+- **Definition of Done:**
+  - `git grep -i 'fly\\.io\\|flyctl\\|fly\\.toml'` returns only intentional historic references (CHANGELOG entries, the deprecated `deployment/fly.md`)
+  - `deployment/koyeb.md` covers env vars, secrets, GPU instance selection, autoscale config, monitoring
+
+### T-407 Update public-facing surfaces (Landing, README, ROADMAP)
+- **Tier:** A
+- **Priority:** P1
+- **Status:** 🔴 not started
+- **Scope:** Single-agent pass over public copy. The user's standing rule
+  (memory: `public_readme_scope`) is that we don't list cloud-internal
+  infra in public README/Landing — so the goal here is to **remove** Fly
+  mentions rather than swap them for Koyeb. Where the doc legitimately
+  needs to name the hosted infra (e.g. `SECURITY.md` data-flow), name
+  Koyeb succinctly.
+- **Target files:** `README.md`, `src/routes/Landing.jsx`, `ROADMAP.md` (rewrite the §7 entry into a single line in §4 once landed), `public/ROADMAP.md` (auto-regenerated from ROADMAP.md by predev).
+- **Definition of Done:** no Fly mentions on Landing or README; the
+  `SECURITY.md` data-flow names Koyeb (Frankfurt) accurately.
+
+### T-408 Break-even monitoring dashboard
+- **Tier:** B
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** Cheap monthly check we run by hand initially: a SQL view +
+  one-page admin route showing fixed cost (Koyeb invoice CSV, manually
+  uploaded once a month) vs realised gross margin from `usage_events`.
+  Goal is to make the break-even target from ROADMAP §7.1 visible.
+- **Definition of Done:** admin can answer "what's our margin this month"
+  in under one minute without spreadsheets.
+
+### T-409 GPU-SKU selection policy
+- **Tier:** B
+- **Priority:** P2
+- **Status:** 🔴 not started
+- **Scope:** When dispatching a Cycles render, today the worker picks an
+  arbitrary GPU. Add a small policy: small scene → rtx_a4000 / l4; medium → a6000 / l40s; large or photoreal → a100 / h100. Map from
+  estimated scene complexity (poly count, lights, samples). Falls back
+  to `l4` default if heuristic uncertain.
+- **Target files:** `packages/kerf-render/src/kerf_render/dispatch.py` (new module or extension), corresponding tests.
+- **Definition of Done:** unit tests cover three buckets (small/medium/large) and the fallback path.
+
+### T-410 Postgres on Koyeb (optional consolidation)
+- **Tier:** B
+- **Priority:** P3
+- **Status:** 🔴 not started
+- **Scope:** Optional — only if we want one less vendor. Koyeb has a
+  serverless Postgres SKU ($0.04/hr small = $29.76/mo) that maps cleanly
+  to Neon. Migration is a `pg_dump | pg_restore` plus a `DATABASE_URL`
+  swap. Keep Neon as a documented alternative — the engine is
+  Postgres-version-portable.
+- **Definition of Done:** decision recorded in `decisions.md` (keep Neon
+  OR move to Koyeb). If moved: dump/restore runbook in `deployment/koyeb.md`.
+

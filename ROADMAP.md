@@ -1036,6 +1036,56 @@ are nearer-term reachable; they are tracked there, not in this horizon table.*
 
 ---
 
+## §7 — Hosted infrastructure (operational, not feature scope)
+
+This section tracks decisions about *where* the hosted tier runs. It is
+deliberately separate from §1.5 (which is about portability and self-host)
+and from §3/§4 (which are about features). Self-host users never see any of
+this — the open-source binary keeps running on a single Postgres + the
+user's filesystem regardless of what we choose here.
+
+### §7.1 — Fly.io → Koyeb (P0, 2026-05-24)
+
+**Why.** Fly.io discontinued GPU instances. Cycles renders (and any future
+GPU-accelerated workload — FEM acceleration, ML-driven feature
+recognition, real-time tessellation) need a host that still sells GPU
+time. Koyeb sells the full GPU ladder (RTX-A4000 $0.50/hr → H100 $2.50/hr)
+in Frankfurt + Washington + Singapore, with per-second billing and the
+same Docker-image deploy model we already use.
+
+**Status.** 🚧 in flight — config + billing repricing in progress. See
+[`tasks.md`](./tasks.md) §"Infrastructure migration — Fly → Koyeb"
+(T-400…T-410).
+
+**Pricing impact.** Koyeb COGS is 3-4× cheaper than the Modal/Replicate
+rates currently baked into `kerf-render.pricing_meter`. We re-ground the
+GPU rate table to Koyeb's actual hourly price and lift the GPU markup
+from 20% → 35% to absorb per-second billing variance, storage egress and
+the operational buffer (autoscale headroom, monitoring, cold-start). Net
+result is a **2-3× drop in user-facing GPU render price** with healthy
+gross margin retained — see [pricing.md](packages/kerf-pricing/llm_docs/pricing.md).
+
+**Migration shape.**
+
+1. Author `koyeb.yaml` mirroring `fly.toml` (same Dockerfile, same env
+   var set, same Tigris S3 bindings — Tigris is external, keeps working).
+2. Move secrets via `koyeb secrets create` (1:1 with `flyctl secrets set`).
+3. Run release migrations as a Koyeb pre-deploy command (same content as
+   today's `flyctl deploy` release_command).
+4. Smoke-test `kerf-dev` on Koyeb in Frankfurt, cut DNS, decommission Fly
+   app. **No code change required** — the engine is portable Docker.
+
+**Break-even target.** With ~$120/mo fixed Koyeb spend (1× `large` engine
++ 1× `small` Postgres if we move off Neon) the hosted tier breaks even at
+~30 Studio ($9) or ~5 Pro ($29) seats — independent of any GPU render
+margin. GPU margin compounds break-even once render volume materialises.
+
+**Self-host guarantee.** Nothing in this migration changes the
+self-host story. Local binary continues to require only Postgres and the
+user's filesystem; no Koyeb dependency leaks into the open-core path.
+
+---
+
 ## How to contribute
 
 Pick a task from [`tasks.md`](./tasks.md) (sized for a single isolated agent

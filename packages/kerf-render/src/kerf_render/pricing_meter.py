@@ -24,15 +24,26 @@ straightforward.  Operators can override the defaults at import time by
 mutating :data:`GPU_RATES_USD_PER_SECOND` — the dict is module-level and
 looked up at call time, not at import time.
 
-+--------+----------------------+
-| model  | rate (USD / GPU-sec) |
-+========+======================+
-| A10G   | 0.0006               |
-+--------+----------------------+
-| A100   | 0.0014               |
-+--------+----------------------+
+Grounded to live Koyeb GPU pricing (https://www.koyeb.com/pricing, fetched
+2026-05-24) as part of the Fly.io → Koyeb migration (ROADMAP § 7.1, T-400).
+Numbers are hourly Koyeb COGS divided by 3600.
 
-Unknown GPU models fall back to the A10G rate.
++----------------+-------+-------+----------------------+
+| model key      | VRAM  | $/hr  | rate (USD / GPU-sec) |
++================+=======+=======+======================+
+| rtx_a4000      | 20 GB | 0.50  | 0.000139             |
+| l4 (default)   | 24 GB | 0.70  | 0.000194             |
+| a6000          | 48 GB | 0.75  | 0.000208             |
+| l40s           | 48 GB | 1.20  | 0.000333             |
+| a100           | 80 GB | 1.60  | 0.000444             |
+| a100_sxm       | 80 GB | 2.15  | 0.000597             |
+| rtx_pro_6000   | 96 GB | 2.20  | 0.000611             |
+| h100           | 80 GB | 2.50  | 0.000694             |
+| h200           |141 GB | 3.00  | 0.000833             |
++----------------+-------+-------+----------------------+
+
+Unknown GPU models fall back to the L4 rate — the entry-level Koyeb SKU
+that today serves as the default for Cycles render dispatch.
 
 Database contract
 -----------------
@@ -59,21 +70,36 @@ logger = logging.getLogger(__name__)
 
 #: Default GPU markup percentage (mirrors cloud_pricing_token_markup_pct).
 #: Operators may override this after import; the value is read at call time.
-GPU_MARKUP_PCT: float = 20.0
+#: Lifted from 20% → 35% with the Koyeb migration to absorb per-second
+#: billing variance, storage egress and the operational buffer
+#: (autoscale headroom, monitoring, cold-start). See ROADMAP § 7.1.
+GPU_MARKUP_PCT: float = 35.0
 
 # ---------------------------------------------------------------------------
-# GPU rate table (USD per GPU-second)
+# GPU rate table (USD per GPU-second) — grounded to Koyeb pricing 2026-05-24.
+# Source: https://www.koyeb.com/pricing  (rate = hourly $ / 3600)
 # ---------------------------------------------------------------------------
 
 #: Maps GPU model name (case-insensitive lookup key) to USD per GPU-second.
 #: Callers may extend or override this dict before calling meter_render_job.
 GPU_RATES_USD_PER_SECOND: dict[str, float] = {
-    "a10g": 0.0006,
-    "a100": 0.0014,
+    "rtx_a4000":    0.000139,  # 20 GB,  $0.50/hr — entry
+    "l4":           0.000194,  # 24 GB,  $0.70/hr — default
+    "a6000":        0.000208,  # 48 GB,  $0.75/hr
+    "l40s":         0.000333,  # 48 GB,  $1.20/hr
+    "a100":         0.000444,  # 80 GB,  $1.60/hr
+    "a100_sxm":     0.000597,  # 80 GB,  $2.15/hr — SXM interconnect
+    "rtx_pro_6000": 0.000611,  # 96 GB,  $2.20/hr
+    "h100":         0.000694,  # 80 GB,  $2.50/hr
+    "h200":         0.000833,  # 141 GB, $3.00/hr — top
+    # Back-compat aliases for the previous Modal-tier keys. Map to closest
+    # Koyeb SKU so existing callers and stored render rows keep resolving.
+    "a10g":         0.000194,  # → l4 (24 GB, same tier)
 }
 
 #: Fallback rate applied when the reported gpu_model is not in the table.
-_DEFAULT_GPU_RATE: float = GPU_RATES_USD_PER_SECOND["a10g"]
+#: L4 — the entry-level Koyeb SKU that serves as the Cycles default.
+_DEFAULT_GPU_RATE: float = GPU_RATES_USD_PER_SECOND["l4"]
 
 # ---------------------------------------------------------------------------
 # Env-var kill-switch
@@ -94,9 +120,9 @@ def _billing_disabled() -> bool:
 def gpu_rate(gpu_model: str) -> float:
     """Return the USD-per-GPU-second rate for *gpu_model*.
 
-    The lookup is case-insensitive.  Unknown models fall back to the A10G
-    (entry-level GPU) rate so we never under-bill an unrecognised hardware
-    type by accident.
+    The lookup is case-insensitive.  Unknown models fall back to the L4
+    (entry-level Koyeb GPU) rate so we never under-bill an unrecognised
+    hardware type by accident.
     """
     return GPU_RATES_USD_PER_SECOND.get(gpu_model.lower(), _DEFAULT_GPU_RATE)
 
@@ -110,8 +136,9 @@ def compute_usd_cost(
     """Return the billed USD cost for *gpu_seconds* on *gpu_model*.
 
     The billed amount is COGS × (1 + markup/100).  When *markup_pct* is
-    ``None`` the module-level :data:`GPU_MARKUP_PCT` is used (default 20%).
-    Pass ``markup_pct=0`` to get the bare COGS figure.
+    ``None`` the module-level :data:`GPU_MARKUP_PCT` is used (default 35%
+    post-Koyeb migration — see ROADMAP § 7.1).  Pass ``markup_pct=0`` to
+    get the bare COGS figure.
 
     Returns ``0.0`` when ``gpu_seconds <= 0`` (free / browser path).
     """
@@ -130,7 +157,7 @@ async def meter_render_job(
     pool,
     workspace_id: str,
     gpu_seconds: float,
-    gpu_model: str = "a10g",
+    gpu_model: str = "l4",
     *,
     job_id: Optional[str] = None,
     markup_pct: Optional[float] = None,

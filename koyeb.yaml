@@ -1,0 +1,106 @@
+# Koyeb service definition — replaces fly.toml after the Fly→Koyeb migration
+# (ROADMAP §7.1, T-403). One service per env (kerf-dev / kerf-prod).
+#
+# Apply with: koyeb-cli service deploy --file koyeb.yaml --app kerf-prod
+# (CLI flag equivalents live in scripts/deploy-koyeb.sh.)
+#
+# This file mirrors fly.toml 1:1: same Dockerfile, same env-var set, same
+# Tigris S3 bindings (Tigris is external to both Fly and Koyeb, so the
+# storage layer keeps working unchanged), same in-process worker model
+# (KERF_INPROCESS_WORKERS=true). To split workers onto their own service
+# later, see koyeb.worker.yaml.
+
+# App: one app per env. The app name is set at the CLI / dashboard
+# level (`koyeb-cli app create kerf-prod`); it isn't a field in the
+# service file. The service `name` below is the service within that app.
+
+services:
+  - name: engine
+    type: WEB
+    regions:
+      - fra        # Frankfurt — primary, matches current Fly setup
+      # Add more regions when traffic justifies — Koyeb pricing is per
+      # region-replica, so this is a deliberate cost knob, not autoscale.
+
+    instance_types:
+      - type: large   # 4 vCPU, 4 GB RAM, 40 GB SSD — $42.85/mo, closest
+                      # match to current Fly performance-2x.
+
+    scalings:
+      - min: 1
+        max: 4
+        targets:
+          - concurrent_requests:
+              value: 200    # matches current fly.toml soft_limit
+          # Add CPU/memory targets here later if we want belt-and-braces.
+
+    docker:
+      image: kerf:engine    # built+pushed by scripts/deploy-koyeb.sh.
+      # If you push to a private registry, set:
+      # image_registry_secret: my-registry-secret
+
+    ports:
+      - port: 8080
+        protocol: http
+
+    routes:
+      - path: /
+        port: 8080
+
+    health_checks:
+      - grace_period: 10        # seconds
+        interval: 30
+        timeout: 5
+        restart_limit: 3
+        http:
+          path: /healthz
+          port: 8080
+          method: GET
+
+    envs:
+      - key: KERF_PORT
+        value: "8080"
+      - key: KERF_FRONTEND_DIST
+        value: /app/dist
+      - key: STORAGE_BACKEND
+        value: s3
+      - key: KERF_STORAGE_S3_ENDPOINT
+        value: https://fly.storage.tigris.dev    # Tigris is external — keep
+      - key: KERF_STORAGE_S3_REGION
+        value: auto
+      - key: CLOUD_ENABLED
+        value: "true"
+      - key: KERF_INPROCESS_WORKERS
+        value: "true"
+      # Secrets — set via `koyeb-cli secrets create <NAME>`:
+      - key: DATABASE_URL
+        secret: database-url
+      - key: KERF_STORAGE_S3_BUCKET
+        secret: tigris-bucket
+      - key: KERF_STORAGE_S3_ACCESS_KEY
+        secret: tigris-access-key
+      - key: KERF_STORAGE_S3_SECRET_KEY
+        secret: tigris-secret-key
+      - key: CLOUD_PAYSTACK_SECRET_KEY
+        secret: paystack-secret-key
+      - key: CLOUD_PAYSTACK_PUBLIC_KEY
+        secret: paystack-public-key
+      - key: LLM_ANTHROPIC_API_KEY
+        secret: llm-anthropic
+      - key: LLM_OPENAI_API_KEY
+        secret: llm-openai
+      - key: LLM_GOOGLE_API_KEY
+        secret: llm-google
+      - key: LLM_DEEPSEEK_API_KEY
+        secret: llm-deepseek
+      - key: LLM_MINIMAX_API_KEY
+        secret: llm-minimax
+      - key: JWT_SECRET
+        secret: jwt-secret
+
+# Pre-deploy migration: Koyeb runs `pre_deploy_command` once before the
+# new revision takes traffic, same role as fly.toml's release_command.
+# Set via CLI flag when deploying:
+#   --pre-deploy-command "python -m kerf_core.db.migrations.runner"
+# (Pre-deploy isn't a top-level YAML key in the v1 schema; it's a
+# deployment-time argument. Keep this in deploy-koyeb.sh.)

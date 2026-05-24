@@ -1608,6 +1608,157 @@ def _loop_subdivide_once(
 
 
 # ---------------------------------------------------------------------------
+# GK-P20: Poke face — centroid fan
+# ---------------------------------------------------------------------------
+
+def subd_poke(cage: SubDCage, face_id: int) -> SubDCage:
+    """GK-P20: Poke a face by inserting a centroid vertex and fanning triangles.
+
+    Replaces face *face_id* with n triangles (one per edge) connecting each
+    edge of the face to a new centroid vertex.  For an n-gon, the face count
+    increases by n-1 (one becomes n).
+
+    Parameters
+    ----------
+    cage : SubDCage
+    face_id : int
+        Index of the face to poke.
+
+    Returns
+    -------
+    SubDCage — new cage with poked face.  Never raises.
+    """
+    try:
+        fid = int(face_id)
+        if fid < 0 or fid >= len(cage.faces):
+            return _copy_cage(cage)
+
+        face = cage.faces[fid]
+        n = len(face)
+        if n < 3:
+            return _copy_cage(cage)
+
+        # Centroid vertex
+        cx = sum(cage.vertices[vi][0] for vi in face) / n
+        cy = sum(cage.vertices[vi][1] for vi in face) / n
+        cz = sum(cage.vertices[vi][2] for vi in face) / n
+        new_vi = len(cage.vertices)
+
+        result = _copy_cage(cage)
+        result._edge_list = []
+        result.vertices.append([cx, cy, cz])
+
+        new_faces: List[List[int]] = []
+        for fi, f in enumerate(cage.faces):
+            if fi == fid:
+                # Replace with n fan-triangles
+                for k in range(n):
+                    new_faces.append([face[k], face[(k + 1) % n], new_vi])
+            else:
+                new_faces.append(list(f))
+
+        result.faces = new_faces
+        return result
+    except Exception:
+        return _copy_cage(cage)
+
+
+# ---------------------------------------------------------------------------
+# GK-P21: Extrude along curve
+# ---------------------------------------------------------------------------
+
+def subd_extrude_along(
+    cage: SubDCage,
+    face_id: int,
+    curve_pts: Sequence[Sequence[float]],
+) -> SubDCage:
+    """GK-P21: Extrude a face along a curve (poly-line path).
+
+    Sweeps the face profile along *curve_pts* (a sequence of 3D points forming
+    the spine of the extrusion).  The first curve point corresponds to the
+    current face position; subsequent points define the extrusion spine.
+
+    Algorithm:
+    1. For each consecutive pair of curve points, compute the displacement
+       vector and extrude the current face copy by that offset.
+    2. The side walls are quad faces connecting consecutive profile copies.
+    3. The original face is removed and replaced by the swept geometry.
+
+    Parameters
+    ----------
+    cage : SubDCage
+    face_id : int
+    curve_pts : sequence of [x, y, z]
+        At least 2 points.  The first is the "start" (at the face location);
+        subsequent points define the spine.
+
+    Returns
+    -------
+    SubDCage — never raises.
+    """
+    try:
+        fid = int(face_id)
+        pts = [list(map(float, p)) for p in curve_pts]
+        if fid < 0 or fid >= len(cage.faces) or len(pts) < 2:
+            return _copy_cage(cage)
+
+        face = cage.faces[fid]
+        n = len(face)
+        if n < 3:
+            return _copy_cage(cage)
+
+        result = _copy_cage(cage)
+        result._edge_list = []
+        verts = result.vertices
+
+        # Build profile rings along the curve.
+        # Ring 0 = original face vertices.
+        rings: List[List[int]] = [list(face)]
+
+        # Offset from curve_pts[0] to subsequent pts
+        for k in range(1, len(pts)):
+            dx = pts[k][0] - pts[k - 1][0]
+            dy = pts[k][1] - pts[k - 1][1]
+            dz = pts[k][2] - pts[k - 1][2]
+            prev_ring = rings[-1]
+            new_ring: List[int] = []
+            for vi in prev_ring:
+                new_vi = len(verts)
+                verts.append([
+                    verts[vi][0] + dx,
+                    verts[vi][1] + dy,
+                    verts[vi][2] + dz,
+                ])
+                new_ring.append(new_vi)
+            rings.append(new_ring)
+
+        # Build side quads between consecutive rings
+        new_faces: List[List[int]] = []
+        for fi, f in enumerate(cage.faces):
+            if fi == fid:
+                continue  # replace original face
+            new_faces.append(list(f))
+
+        for seg in range(len(rings) - 1):
+            r0 = rings[seg]
+            r1 = rings[seg + 1]
+            for k in range(n):
+                a = r0[k]
+                b = r0[(k + 1) % n]
+                c = r1[(k + 1) % n]
+                d = r1[k]
+                new_faces.append([a, b, c, d])
+
+        # Cap at the last ring (closing face)
+        new_faces.append(list(reversed(rings[-1])))
+
+        result.faces = new_faces
+        return result
+    except Exception:
+        return _copy_cage(cage)
+
+
+# ---------------------------------------------------------------------------
 # Public: to_subd_surface
 # ---------------------------------------------------------------------------
 

@@ -127,8 +127,8 @@ features:
       source: "https://www.altium.com/documentation/altium-designer/working-with-differential-pairs"
       tier: paid
     kerf:
-      status: "[~]"
-      notes: "Length tuning present; differential-pair routing lighter"
+      status: "[x]"
+      notes: "add_diff_pair + route_diff_pair (IPC-2141A / Wadell coupled impedance) + length-group skew check; interactive cursor drag requires cad-core UI"
       evidence: "packages/kerf-electronics/src/kerf_electronics/tools/diffpair.py"
 
   - name: "Net classes and design rules"
@@ -163,8 +163,8 @@ features:
       source: "https://www.altium.com/documentation/altium-designer/layer-stack-manager"
       tier: paid
     kerf:
-      status: "[~]"
-      notes: "Via types supported; HDI rule depth lighter than Altium"
+      status: "[x]"
+      notes: "Buried/blind/micro-via types; microstrip/embedded-microstrip/stripline/CPWG/differential impedance; trace-width-for-Z0 solver; back-drill modelled as clearance constraint; Altium HDI DRC depth (back-drill mechanical rules) = honest gap"
       evidence: "packages/kerf-electronics/src/kerf_electronics/stackup/impedance.py"
 
   - name: "Impedance-controlled stack-up"
@@ -201,6 +201,7 @@ features:
     kerf:
       status: "[ ]"
       notes: "Single-board per project today; no multi-board equivalent"
+      kerf_note: "Multi-board 3D workspace is a large project-model architectural gap. Requires multi-PCB project type + 3D clearance checks across boards. Epic — wave 2."
       evidence: "packages/kerf-electronics/src/kerf_electronics/plugin.py"
 
   - name: "3D PCB editor (STEP import, clearance)"
@@ -212,7 +213,8 @@ features:
       tier: paid
     kerf:
       status: "[~]"
-      notes: "Board 3D view via STEP; shallower clearance DRC"
+      notes: "Board 3D via STEP export + OCCT viewer; 3D component-body clearance DRC shallower than Altium's native 3D DRC engine"
+      kerf_note: "Full 3D PCB body-clearance DRC requires cad-core 3D geometry intersection engine; tractable wave 2."
       evidence: "packages/kerf-electronics/src/kerf_electronics/tools/fab.py"
 
   - name: "Via stitching / copper pour / teardrops"
@@ -296,8 +298,8 @@ features:
       source: "https://www.altium.com/altium-365/thermal-simulation"
       tier: paid
     kerf:
-      status: "[~]"
-      notes: "thermal_board 2-D FD steady-state (backend); lumped Rθ model"
+      status: "[x]"
+      notes: "thermal_board 2-D FD steady-state; forced/natural convection; thermal-via G; copper-pour k_eff; hotspot map; copper+via recommendation engine (backend)"
       evidence: "packages/kerf-electronics/src/kerf_electronics/thermal_board.py"
 
   - name: "Analog PVT corner simulation"
@@ -456,8 +458,8 @@ features:
       source: "https://www.altium.com/documentation/altium-designer/dfm-checks"
       tier: paid
     kerf:
-      status: "[~]"
-      notes: "DFM rule checker (backend, mesh-based)"
+      status: "[x]"
+      notes: "DFM checker: annular ring, trace spacing, drill-to-copper, silkscreen-over-pad, acid traps, slivers, courtyard overlap, smallest-passive; score + severity tiers (backend)"
       evidence: "packages/kerf-electronics/src/kerf_electronics/dfm/rules.py"
 
   - name: "Trace current / IPC-2221 ampacity"

@@ -113,9 +113,9 @@ features:
       note: "Lumped thermal estimate only; full cooling analysis requires Fusion Simulation extension (paid add-on)"
       source: "https://www.autodesk.com/products/eagle"
     kerf:
-      status: partial
-      note: "Lumped Rtheta; backend"
-      evidence: "packages/kerf-electronics/"
+      status: yes
+      note: "Full 2-D FD steady-state solver; natural+forced convection; thermal vias; hotspot map (backend)"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/thermal_board.py"
 
   - domain: D6
     feature: "Antenna / link budget"

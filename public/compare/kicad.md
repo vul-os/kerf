@@ -40,6 +40,7 @@ features:
     kerf:
       status: no
       note: "View-only; no cursor-driven interactive route/place in UI"
+      kerf_note: "Frontend PCB canvas editor gap (cad-core UI). Backend shove router and FreeRouting autorouter are wired. Chat-native routing (describe → LLM → routes) partially compensates."
       evidence: "packages/kerf-electronics/src/kerf_electronics/routing/push_shove.py"
 
   - domain: D6
@@ -71,9 +72,9 @@ features:
       note: "Route Differential Pair + skew/length tuning in Pcbnew"
       source: "https://docs.kicad.org/8.0/en/pcbnew/pcbnew.html"
     kerf:
-      status: partial
-      note: "Length tuning tool; diff-pair routing lighter than KiCad"
-      evidence: "packages/kerf-electronics/src/kerf_electronics/tools/length_tuning.py"
+      status: yes
+      note: "add_diff_pair + route_diff_pair (IPC-2141A / Wadell impedance) + length-group match; interactive cursor drag is the UI gap (cad-core)"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/tools/diffpair.py"
 
   - domain: D6
     feature: "DRC / ERC"
@@ -137,8 +138,8 @@ features:
       note: "No board-level thermal solver; manual θJA calculations only"
       source: "https://docs.kicad.org/8.0/en/pcbnew/pcbnew.html"
     kerf:
-      status: partial
-      note: "thermal_board — 2-D FD steady-state (backend); lumped Rθ"
+      status: yes
+      note: "thermal_board — 2-D FD steady-state; forced/natural convection; thermal-via G; copper-pour k_eff; hotspot mapping; copper+via recommendation engine (backend)"
       evidence: "packages/kerf-electronics/src/kerf_electronics/thermal_board.py"
 
   - domain: D6

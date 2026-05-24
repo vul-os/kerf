@@ -38,6 +38,7 @@ features:
     kerf:
       status: no
       note: "View-only; no cursor editing today"
+      kerf_note: "Frontend PCB canvas editor is the gap (cad-core UI); backend router and FreeRouting autorouter are already wired."
       evidence: "packages/kerf-electronics/pcb/"
 
   - domain: D6

@@ -5665,14 +5665,14 @@ verified but not reachable. Each task = export from `geom/__init__.py`
 
 ### Group A — Architectural geometry
 
-- **GK-P28** 🔴 B-rep → 2D auto-tessellate. Bridge OCCT `BRepMesh_IncrementalMesh` → `make2d.Make2DInput` so any B-rep part auto-generates hidden-line views without caller-supplied mesh. Size M. DoD: a B-rep solid yields a hidden-line drawing with no `part["mesh"]`.
-- **GK-P29** 🔴 Roof geometry generator (hip/gable/shed/mono-pitch) in `kerf-bim` → B-rep + `IfcRoof`. Size M.
-- **GK-P30** 🔴 Curtain-wall geometry — extend `kerf_bim/tools/curtain_wall.py` (JSON-only today) to emit swept mullion B-rep + panel solids from the grid. Size M.
-- **GK-P31** 🔴 Wall compound-layer offset — call `offset_loop` from `make_wall_instance` for per-layer face geometry (IFC material-layer-set + section fills). Size S.
-- **GK-P32** 🔴 Hatch-fill — `hatch_region(loop, pattern, angle, scale)` in `region2d.py` (ANSI31/concrete/brick tiling inside a 2D loop). Size S.
-- **GK-P33** 🔴 Section material-fill — wire `section_by_plane` loops → `hatch_region` with material-keyed patterns for filled section graphics. Depends GK-P32. Size S.
-- **GK-P34** 🔴 Toposolid B-rep — confirm/complete `kerf_bim/site.py Toposolid.to_brep()` produces a valid closed Body from the TIN; wire `cut_fill_volume`. Size S.
-- **GK-P35** 🔴 Corridor swept solid — `kerf_civil/corridor.py surface_points()` is viz-only; call `sweep_n`/`network_srf` on cross-section stations → swept road-body B-rep + volume + `IfcAlignmentProduct`. Size L.
+- **GK-P28** ✅ B-rep → 2D auto-tessellate. Bridge OCCT `BRepMesh_IncrementalMesh` → `make2d.Make2DInput` so any B-rep part auto-generates hidden-line views without caller-supplied mesh. Size M. DoD: a B-rep solid yields a hidden-line drawing with no `part["mesh"]`.
+- **GK-P29** ✅ Roof geometry generator (hip/gable/shed/mono-pitch) in `kerf-bim` → B-rep + `IfcRoof`. Size M.
+- **GK-P30** ✅ Curtain-wall geometry — extend `kerf_bim/tools/curtain_wall.py` (JSON-only today) to emit swept mullion B-rep + panel solids from the grid. Size M.
+- **GK-P31** ✅ Wall compound-layer offset — call `offset_loop` from `make_wall_instance` for per-layer face geometry (IFC material-layer-set + section fills). Size S.
+- **GK-P32** ✅ Hatch-fill — `hatch_region(loop, pattern, angle, scale)` in `region2d.py` (ANSI31/concrete/brick tiling inside a 2D loop). Size S.
+- **GK-P33** ✅ Section material-fill — wire `section_by_plane` loops → `hatch_region` with material-keyed patterns for filled section graphics. Depends GK-P32. Size S.
+- **GK-P34** ✅ Toposolid B-rep — confirm/complete `kerf_bim/site.py Toposolid.to_brep()` produces a valid closed Body from the TIN; wire `cut_fill_volume`. Size S.
+- **GK-P35** ✅ Corridor swept solid — `kerf_civil/corridor.py surface_points()` is viz-only; call `sweep_n`/`network_srf` on cross-section stations → swept road-body B-rep + volume + `IfcAlignmentProduct`. Size L.
 
 ### Group K — Sketcher (PlaneGCS WASM; flagged by every MCAD survey)
 

@@ -25,12 +25,21 @@ async def register(app: FastAPI, ctx):
         dental_crown_design_spec, run_dental_crown_design,
         dental_surgical_guide_spec, run_dental_surgical_guide,
         dental_dicom_ingest_spec, run_dental_dicom_ingest,
+        dental_denture_design_spec, run_dental_denture_design,
+        dental_stl_export_spec, run_dental_stl_export,
+        dental_register_scans_spec, run_dental_register_scans,
+        dental_deviation_map_spec, run_dental_deviation_map,
     )
     ctx.tools.register("dental_crown_design", dental_crown_design_spec, run_dental_crown_design)
     ctx.tools.register("dental_surgical_guide", dental_surgical_guide_spec, run_dental_surgical_guide)
     ctx.tools.register("dental_dicom_ingest", dental_dicom_ingest_spec, run_dental_dicom_ingest)
+    ctx.tools.register("dental_denture_design", dental_denture_design_spec, run_dental_denture_design)
+    ctx.tools.register("dental_stl_export", dental_stl_export_spec, run_dental_stl_export)
+    ctx.tools.register("dental_register_scans", dental_register_scans_spec, run_dental_register_scans)
+    ctx.tools.register("dental_deviation_map", dental_deviation_map_spec, run_dental_deviation_map)
 
-    provides = ["dental.crown", "dental.guide"]
+    provides = ["dental.crown", "dental.guide", "dental.denture", "dental.stl",
+                "dental.registration", "dental.deviation"]
     if _PYDICOM_AVAILABLE:
         provides.append("dental.dicom")
 

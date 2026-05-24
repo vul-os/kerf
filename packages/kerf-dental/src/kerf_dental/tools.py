@@ -422,3 +422,170 @@ async def run_dental_stl_export(args: dict[str, Any], ctx: "ProjectCtx") -> str:
         return ok_payload(payload)
     except Exception as exc:
         return err_payload(str(exc), "STL_EXPORT_ERROR")
+
+# dental_register_scans
+# ---------------------------------------------------------------------------
+
+dental_register_scans_spec = ToolSpec(
+    name="dental_register_scans",
+    description=(
+        "Align two intraoral scan meshes / point clouds into a common coordinate "
+        "frame using ICP (iterative closest point). Supports point-to-point "
+        "(Besl-McKay 1992) and point-to-plane (Chen-Medioni 1991) variants with "
+        "kd-tree nearest-neighbour and adaptive outlier rejection. "
+        "Returns the 4×4 rigid transform, RMS residual (mm), and convergence info."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "source": {
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 3,
+                    "maxItems": 3,
+                },
+                "description": "Source scan vertices (mm). Minimum 3 points.",
+                "minItems": 3,
+            },
+            "target": {
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 3,
+                    "maxItems": 3,
+                },
+                "description": "Target scan vertices (mm). Minimum 3 points.",
+                "minItems": 3,
+            },
+            "target_faces": {
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "minItems": 3,
+                    "maxItems": 3,
+                },
+                "description": "Triangle index array for the target mesh (enables point-to-plane normals).",
+            },
+            "method": {
+                "type": "string",
+                "enum": ["point_to_plane", "point_to_point"],
+                "description": "ICP variant. Default 'point_to_plane'.",
+            },
+            "max_iterations": {
+                "type": "integer",
+                "description": "Maximum ICP iterations. Default 100.",
+            },
+            "convergence_tol": {
+                "type": "number",
+                "description": "Convergence tolerance on ΔRMS (mm). Default 1e-6.",
+            },
+        },
+        "required": ["source", "target"],
+    },
+)
+
+
+async def run_dental_register_scans(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_dental.registration import register_scans
+        import numpy as np
+
+        tf = args.get("target_faces")
+        result = register_scans(
+            source=args["source"],
+            target=args["target"],
+            target_faces=tf,
+            method=args.get("method", "point_to_plane"),
+            max_iterations=int(args.get("max_iterations", 100)),
+            convergence_tol=float(args.get("convergence_tol", 1e-6)),
+        )
+        payload: dict[str, Any] = {
+            "rms_mm": round(result.rms_mm, 6),
+            "iterations": result.iterations,
+            "converged": result.converged,
+            "inlier_fraction": round(result.inlier_fraction, 4),
+            "rotation": result.rotation.tolist(),
+            "translation": result.translation.tolist(),
+            "transform": result.transform.tolist(),
+        }
+        return ok_payload(payload)
+    except Exception as exc:
+        return err_payload(str(exc), "REGISTER_SCANS_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# dental_deviation_map
+# ---------------------------------------------------------------------------
+
+dental_deviation_map_spec = ToolSpec(
+    name="dental_deviation_map",
+    description=(
+        "Compute per-vertex signed deviation of a source scan from a target "
+        "surface. Sign convention: positive = source proud of target, "
+        "negative = recessed. Requires source to already be in the target "
+        "coordinate frame (e.g. after dental_register_scans). "
+        "Returns RMS deviation, P95 deviation, mean signed deviation (mm)."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "source_vertices": {
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 3,
+                    "maxItems": 3,
+                },
+                "description": "Source vertices in target frame (mm).",
+                "minItems": 1,
+            },
+            "target_vertices": {
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 3,
+                    "maxItems": 3,
+                },
+                "description": "Target mesh vertices (mm).",
+                "minItems": 1,
+            },
+            "target_faces": {
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "minItems": 3,
+                    "maxItems": 3,
+                },
+                "description": "Triangle index array for the target mesh (enables signed distance).",
+            },
+        },
+        "required": ["source_vertices", "target_vertices"],
+    },
+)
+
+
+async def run_dental_deviation_map(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_dental.registration import deviation_map
+
+        result = deviation_map(
+            source_vertices=args["source_vertices"],
+            target_vertices=args["target_vertices"],
+            target_faces=args.get("target_faces"),
+        )
+        payload: dict[str, Any] = {
+            "rms_mm": round(result.rms_mm, 6),
+            "p95_mm": round(result.p95_mm, 6),
+            "mean_signed_mm": round(result.mean_signed_mm, 6),
+            "vertex_count": len(result.source_vertices),
+        }
+        return ok_payload(payload)
+    except Exception as exc:
+        return err_payload(str(exc), "DEVIATION_MAP_ERROR")

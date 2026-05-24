@@ -84,10 +84,10 @@ features:
       note: "Native TRIOS intraoral scanner + third-party IOS format support; open STL/PLY export"
       source: "https://www.3shape.com/en/software/trios-design-studio"
     kerf:
-      status: no
-      note: "No intraoral scanner integration."
-      kerf_note: "Epic gap: full IOS mesh registration pipeline (color-coded deviation map, multi-scan alignment, TRIOS/iTero/3M format parsers) is a multi-sprint feature. STL/PLY import for post-scan workflows is tractable but not yet wired."
-      evidence: ""
+      status: partial
+      note: "Multi-scan ICP registration (point-to-point + point-to-plane, Besl-McKay/Chen-Medioni) + signed per-vertex deviation map shipped."
+      kerf_note: "Registration core + deviation map shipped (kerf_dental.registration). Remaining epic: live scanner-hardware capture + proprietary TRIOS/iTero/3M format parsers."
+      evidence: "packages/kerf-dental/src/kerf_dental/registration.py"
   - domain: D13
     feature: "Lab management / manufacturing output"
     competitor:
@@ -153,7 +153,7 @@ features:
 | DICOM / CBCT ingest | Yes (backend) | Yes |
 | Full denture | Parametric arch mesh | Full fit-optimised design |
 | RPD / partial denture | Major connector mesh | Full RPD design |
-| Intraoral scanner | No (epic) | TRIOS native + IOS |
+| Intraoral scanner | Partial — ICP registration + deviation map | TRIOS native + IOS |
 | AI restoration proposals | No | 3Shape Automate (~90s) |
 | STL export | Yes (binary + ASCII) | Yes |
 | Dental mill post processor | No | Direct mill/printer integration |

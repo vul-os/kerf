@@ -203,7 +203,13 @@ class SubDCage:
         creases: Dict[Tuple[int, int], float] = {}
         for eid, sharp in self.sharpness.items():
             if 0 <= eid < len(edges):
-                clamped = 1.0 if (math.isinf(sharp) or sharp >= 1.0) else float(sharp)
+                # GK-P14: pass fractional sharpness > 1.0 through verbatim so
+                # the CC evaluator can decay it properly across N levels.
+                # Only clamp math.inf to a large finite value (10.0 is >> 6 levels).
+                if math.isinf(sharp):
+                    clamped = 10.0  # effectively infinite for <= 10 CC levels
+                else:
+                    clamped = max(0.0, float(sharp))
                 if clamped > 0.0:
                     creases[edges[eid]] = clamped
         # Bevel weights: weight w maps to sharpness w (in [0,1]).

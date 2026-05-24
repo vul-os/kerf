@@ -152,10 +152,12 @@ def test_subdmesh_set_crease():
 
 
 def test_subdmesh_crease_clamped():
+    # GK-P14: fractional sharpness > 1.0 is now allowed (OpenSubdiv semantics).
+    # Negative values are still clamped to 0.
     cube = make_cube()
-    cube.set_crease(0, 1, 2.5)   # should clamp to 1
-    assert cube.get_crease(0, 1) == pytest.approx(1.0)
-    cube.set_crease(0, 1, -0.5)  # should clamp to 0
+    cube.set_crease(0, 1, 2.5)   # fractional multi-level: stored as-is
+    assert cube.get_crease(0, 1) == pytest.approx(2.5)
+    cube.set_crease(0, 1, -0.5)  # still clamped to 0
     assert cube.get_crease(0, 1) == pytest.approx(0.0)
 
 
@@ -660,10 +662,13 @@ def test_set_edge_crease_does_not_mutate():
 
 
 def test_set_edge_crease_clamps():
-    """Crease value is clamped to [0,1]."""
+    """GK-P14: Crease values > 1.0 are stored as-is for fractional multi-level decay.
+    Negative values are still clamped to 0.
+    """
     doc = create_subd_cube()
     new_doc = subd_doc_set_edge_crease(doc, 0, 1, 5.0)
-    assert new_doc.control_mesh.get_crease(0, 1) == pytest.approx(1.0)
+    # GK-P14: 5.0 is a valid fractional crease (decays to 4.0 / 3.0 / 2.0 / 1.0 / 0.0 over 5 levels)
+    assert new_doc.control_mesh.get_crease(0, 1) == pytest.approx(5.0)
 
 
 # ── Group 17: subd_doc_evaluate ───────────────────────────────────────────────

@@ -108,7 +108,9 @@ class SubDMesh:
         return self.creases.get(self.edge_key(a, b), 0.0)
 
     def set_crease(self, a: int, b: int, value: float) -> None:
-        self.creases[self.edge_key(a, b)] = float(max(0.0, min(1.0, value)))
+        # GK-P14: allow fractional sharpness > 1.0 for multi-level decay.
+        # Only hard-clamp negative values to 0.0; positive values pass through.
+        self.creases[self.edge_key(a, b)] = float(max(0.0, value))
 
     def _build_adjacency(self) -> Tuple[
         Dict[Tuple[int, int], List[int]],   # edge -> [face_indices]
@@ -237,10 +239,16 @@ def _catmull_clark_once(mesh: SubDMesh) -> SubDMesh:
             crease = mesh.get_crease(a, b)
             adj_faces = edge_faces.get(key, [])
 
-            if crease >= 1.0 or len(adj_faces) != 2:
-                # Boundary or fully creased: use midpoint
+            if len(adj_faces) != 2:
+                # Boundary edge: always use midpoint
                 ep = mid
-            else:
+            elif crease >= 1.0:
+                # GK-P14: fully-creased edge (sharpness >= 1.0): use midpoint;
+                # sharpness for child edges will be crease - 1.0 (decay below).
+                ep = mid
+            elif crease > 0.0:
+                # GK-P14: fractional crease 0 < s < 1: blend smooth ↔ crease
+                # (OpenSubdiv: blend = s; s=0 → smooth, s→1 → crease midpoint)
                 fp1 = face_pts[adj_faces[0]]
                 fp2 = face_pts[adj_faces[1]]
                 face_avg = _centroid([fp1, fp2])
@@ -249,6 +257,14 @@ def _catmull_clark_once(mesh: SubDMesh) -> SubDMesh:
                     0.25,
                 )
                 ep = _lerp3(smooth, mid, crease)
+            else:
+                fp1 = face_pts[adj_faces[0]]
+                fp2 = face_pts[adj_faces[1]]
+                face_avg = _centroid([fp1, fp2])
+                ep = _scale3(
+                    _add3(_add3(va, vb), _scale3(face_avg, 2.0)),
+                    0.25,
+                )
 
             edge_pts.append(ep)
 
@@ -261,9 +277,21 @@ def _catmull_clark_once(mesh: SubDMesh) -> SubDMesh:
             adj_nbrs = vert_neighbors.get(vi, [])
             valence = len(adj_face_idxs)
 
-            # Count crease edges incident to this vertex
+            # Count crease edges incident to this vertex.
+            # GK-P14: edges with sharpness >= 1.0 are "hard crease" for
+            # vertex classification; fractional (0 < s < 1) edges are
+            # partially creased — treated as smooth for corner counting but
+            # their fractional influence is blended below.
             crease_nbrs = [nb for nb in adj_nbrs if mesh.get_crease(vi, nb) >= 1.0]
             num_creases = len(crease_nbrs)
+
+            # For fractional (0 < s < 1) creased edges, compute per-vertex
+            # blend weight: max fractional sharpness of incident edges in (0,1).
+            frac_crease_s = max(
+                (mesh.get_crease(vi, nb) for nb in adj_nbrs
+                 if 0.0 < mesh.get_crease(vi, nb) < 1.0),
+                default=0.0,
+            )
 
             if num_creases >= 2 or valence == 0:
                 # Corner vertex: stays put
@@ -291,13 +319,24 @@ def _catmull_clark_once(mesh: SubDMesh) -> SubDMesh:
                 mids = [_midpoint(v, verts[nb]) for nb in adj_nbrs]
                 R = _centroid(mids)
                 # (F + 2R + (n-3)P) / n
-                new_pos = _scale3(
+                smooth_pos = _scale3(
                     _add3(
                         _add3(F, _scale3(R, 2.0)),
                         _scale3(v, float(n - 3)),
                     ),
                     1.0 / n,
                 )
+                # GK-P14: if there are fractional-crease edges (0 < s < 1),
+                # blend between smooth and crease-vertex rule.
+                if frac_crease_s > 0.0:
+                    avg_mid = _centroid(mids)
+                    crease_pos = _add3(
+                        _scale3(v, 6.0 / 8.0),
+                        _scale3(avg_mid, 2.0 / 8.0),
+                    )
+                    new_pos = _lerp3(smooth_pos, crease_pos, frac_crease_s)
+                else:
+                    new_pos = smooth_pos
                 new_orig_verts.append(new_pos)
 
         # ------------------------------------------------------------------
@@ -319,7 +358,14 @@ def _catmull_clark_once(mesh: SubDMesh) -> SubDMesh:
                 new_faces.append([va_orig, ep_ab, face_pt_idx, ep_ca])
 
         # ------------------------------------------------------------------
-        # 5. Propagate creases (halve crease on each level if < 1)
+        # 5. Propagate creases — GK-P14: OpenSubdiv fractional-decay rule.
+        #
+        #    sharpness s at level k decays to max(0, s - 1) at level k+1.
+        #    Fractional residual frac = s - floor(s) in (0, 1) on the last
+        #    "semi-sharp" level; the child edges get sharpness frac so the
+        #    blend with the smooth rule carries the correct weight next level.
+        #    Fully-sharp edges (s >= 1) produce child sharpness s - 1.
+        #    Fully-smooth edges (s == 0) produce no crease entry.
         # ------------------------------------------------------------------
         new_creases: Dict[Tuple[int, int], float] = {}
         for key in all_edges:
@@ -328,8 +374,8 @@ def _catmull_clark_once(mesh: SubDMesh) -> SubDMesh:
                 continue
             a, b = key
             ep_idx = edge_index[key]
-            # New edges: orig_a -- edge_pt and edge_pt -- orig_b
-            new_c = c if c >= 1.0 else max(0.0, c - 0.5)
+            # OpenSubdiv decay: sharpness decreases by 1.0 per subdivision level
+            new_c = max(0.0, c - 1.0)
             if new_c > 0.0:
                 new_key_a = (min(a, ep_idx), max(a, ep_idx))
                 new_key_b = (min(b, ep_idx), max(b, ep_idx))

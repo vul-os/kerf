@@ -47,6 +47,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 import numpy as np
 
 from kerf_cad_core.geom.nurbs import NurbsSurface, find_span
+from kerf_cad_core.geom.brep import Vertex, Edge, Coedge, Loop, Line3
 
 # ---------------------------------------------------------------------------
 # Internal types
@@ -676,6 +677,155 @@ def _get_all_points(mesh_or_surface: Any) -> List[Point3]:
         return pts
     verts, _ = _unpack_mesh(mesh_or_surface)
     return [list(v)[:3] for v in verts]
+
+
+# ---------------------------------------------------------------------------
+# Section material-fill (GK-P33) — hatch_region wired to section loops
+# ---------------------------------------------------------------------------
+
+def _polyline_to_loop(polyline: Polyline, plane_normal: np.ndarray) -> Optional[Loop]:
+    """Convert a 3-D polyline to a :class:`Loop` of :class:`Line3` edges.
+
+    The polyline must be closed (first ≈ last point) or will be closed
+    automatically by connecting the last point to the first.
+
+    Parameters
+    ----------
+    polyline :
+        List of [x, y, z] points from ``section_by_plane``.
+    plane_normal :
+        Normal vector of the section plane (used to set the loop orientation
+        for the hatch-region plane detection).
+
+    Returns
+    -------
+    :class:`Loop` or ``None`` if the polyline has fewer than 3 distinct points.
+    """
+    pts = [np.asarray(p, dtype=float) for p in polyline]
+    # Drop repeated last point if it equals first
+    if len(pts) >= 2 and np.linalg.norm(pts[-1] - pts[0]) < 1e-9:
+        pts = pts[:-1]
+    if len(pts) < 3:
+        return None
+
+    coedges: List[Coedge] = []
+    n = len(pts)
+    for i in range(n):
+        p0, p1 = pts[i], pts[(i + 1) % n]
+        v0 = Vertex(point=p0)
+        v1 = Vertex(point=p1)
+        line = Line3(p0=p0, p1=p1)
+        edge = Edge(curve=line, t0=0.0, t1=1.0, v_start=v0, v_end=v1)
+        coedges.append(Coedge(edge=edge, orientation=True))
+    return Loop(coedges=coedges, is_outer=True)
+
+
+def section_fill(
+    mesh_or_surface: Any,
+    plane: Any,
+    material: str = "",
+    pattern: str = "",
+    angle: float = 45.0,
+    scale: float = 1.0,
+    *,
+    nu: int = 80,
+    nv: int = 80,
+) -> dict:
+    """Section a mesh/surface and fill the resulting loops with a hatch pattern.
+
+    This function chains ``section_by_plane`` → ``hatch_region`` so that the
+    section contour loops are hatched with the correct material pattern.
+
+    Parameters
+    ----------
+    mesh_or_surface :
+        Triangle mesh ``(verts, faces)`` or :class:`NurbsSurface`.
+    plane :
+        Plane specification accepted by ``section_by_plane``.
+    material :
+        BIM material identifier (e.g. ``"brick_clay"``).  When non-empty the
+        hatch pattern is derived from the material using
+        ``material_hatch_pattern()``.  Takes precedence over *pattern*.
+    pattern :
+        Explicit hatch pattern name (e.g. ``"ansi31"``).  Used when *material*
+        is empty.  Defaults to ``"ansi31"``.
+    angle :
+        Hatch line angle in degrees.  Default 45°.
+    scale :
+        Hatch spacing.  Default 1.0.
+    nu, nv :
+        UV resolution when sectioning a NurbsSurface.
+
+    Returns
+    -------
+    dict
+        ok          : bool
+        fills       : list of per-loop hatch dicts, each:
+                        loop_index  : int
+                        line_count  : int
+                        pattern     : str
+                        lines       : list of {"start": [u,v], "end": [u,v]}
+        loop_count  : int
+        plane_normal : [nx, ny, nz]
+        plane_d      : float
+        reason      : str (on failure)
+    """
+    try:
+        from kerf_cad_core.geom.region2d import hatch_region, material_hatch_pattern
+    except ImportError as exc:
+        return {"ok": False, "reason": f"region2d import failed: {exc}"}
+
+    # Step 1: section to get contour loops
+    sec = section_by_plane(mesh_or_surface, plane, nu=nu, nv=nv)
+    if not sec.get("ok"):
+        return sec
+
+    loops_3d: List[Polyline] = sec["loops"]
+    plane_normal = np.asarray(sec["plane_normal"], dtype=float)
+
+    # Resolve pattern
+    if material:
+        resolved_pattern = material_hatch_pattern(material)
+    else:
+        resolved_pattern = pattern if pattern else "ansi31"
+
+    fills = []
+    for loop_idx, polyline in enumerate(loops_3d):
+        # Convert polyline to Loop
+        loop = _polyline_to_loop(polyline, plane_normal)
+        if loop is None:
+            fills.append({
+                "loop_index": loop_idx,
+                "line_count": 0,
+                "pattern": resolved_pattern,
+                "lines": [],
+            })
+            continue
+
+        # Hatch the loop
+        hatch = hatch_region(
+            loop,
+            pattern=resolved_pattern,
+            angle=angle,
+            scale=scale,
+        )
+        fills.append({
+            "loop_index": loop_idx,
+            "line_count": len(hatch.lines),
+            "pattern": hatch.pattern,
+            "lines": [
+                {"start": list(ln.start), "end": list(ln.end)}
+                for ln in hatch.lines
+            ],
+        })
+
+    return {
+        "ok": True,
+        "fills": fills,
+        "loop_count": len(loops_3d),
+        "plane_normal": sec["plane_normal"],
+        "plane_d": sec["plane_d"],
+    }
 
 
 # ---------------------------------------------------------------------------

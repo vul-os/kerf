@@ -4,7 +4,7 @@ competitor: "Ansys Zemax OpticStudio"
 category: cad-sim
 left: kerf
 right: zemax
-hero_tagline: "The gold standard for optical design and tolerancing — versus an open-core CAD with ray tracing, Gaussian beam propagation, and acoustics."
+hero_tagline: "The gold standard for optical design and tolerancing — versus an open-core CAD with ray tracing, Gaussian beam propagation, physical-optics propagation, and acoustics."
 reviewed_at: 2026-05-24
 features:
   - domain: D12
@@ -85,10 +85,10 @@ features:
       note: "Physical optics propagation (POP); Mueller/Jones matrix polarisation; diffraction grating analysis"
       source: "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
     kerf:
-      status: partial
-      note: "MTF (modulation transfer function) via diffraction-limited circular-aperture formula (Goodman §6.4) and geometric Gaussian-spot approximation; spatial frequency curves up to diffraction cut-off (ν_c = 1/(λ·f/#)). No wave-optics propagation (BPM/POP), no polarisation (Jones/Mueller matrices), no diffraction grating."
-      kerf_note: "Full physical optics propagation (POP / BPM) is an epic: requires scalar diffraction integral or beam-propagation method across the full aperture — distinct physics from the ABCD paraxial model."
-      evidence: "packages/kerf-optics/src/kerf_optics/mtf.py"
+      status: yes
+      note: "Scalar physical-optics propagation (POP): angular-spectrum method (Goodman §3.10, exact near-field), Fresnel transfer-function (§4.2, paraxial), Fraunhofer far-field (§4.3, single FFT). Gaussian source, thin-lens quadratic phase, circular aperture. Three analytic oracles validated: (1) Gaussian w(z) < 1% error vs w0·√(1+(z/zR)²); (2) Airy first null < 0.1% error vs 1.22λf/D; (3) Parseval energy conservation < 0.1%. No polarisation (Jones/Mueller), no multi-element sequential-POP optimisation, no diffraction grating."
+      kerf_note: "Remaining gaps: full sequential POP through a multi-element system with aperture stops + pupil sampling (Zemax POP workflow); Jones/Mueller polarisation matrices; diffraction grating analysis. These are follow-on epics."
+      evidence: "packages/kerf-optics/src/kerf_optics/pop.py"
   - domain: D12
     feature: "Metalens design"
     competitor:
@@ -124,13 +124,13 @@ features:
 
 # Kerf vs Ansys Zemax OpticStudio
 
-Ansys Zemax OpticStudio (formerly Zemax OpticStudio, now owned by Ansys) is the global standard for optical system design and analysis. It combines sequential ray tracing for lens design with non-sequential ray tracing for illumination and stray light, physical optics for laser beam propagation, comprehensive tolerancing, and — since 2024 — multiphysics STOP analysis via integration with Ansys Mechanical and Fluent. It is used across imaging, defence optics, consumer electronics cameras, laser systems, and photonics. Kerf provides the core optical physics — ray transfer, Gaussian beam propagation, Seidel aberrations (S1–S5), non-sequential stray-light tracing, a full acoustics suite, optical tolerance analysis (sensitivity OAT + Monte Carlo), and MTF computation (diffraction-limited + geometric) — as backend tools accessible from Python or a chat prompt. It does not have OpticStudio's merit-function optimisation engine, inverse-sensitivity NEST workflow, or wave-optics POP toolset.
+Ansys Zemax OpticStudio (formerly Zemax OpticStudio, now owned by Ansys) is the global standard for optical system design and analysis. It combines sequential ray tracing for lens design with non-sequential ray tracing for illumination and stray light, physical optics for laser beam propagation, comprehensive tolerancing, and — since 2024 — multiphysics STOP analysis via integration with Ansys Mechanical and Fluent. It is used across imaging, defence optics, consumer electronics cameras, laser systems, and photonics. Kerf provides the core optical physics — ray transfer, Gaussian beam propagation, Seidel aberrations (S1–S5), non-sequential stray-light tracing, scalar physical-optics propagation (angular-spectrum + Fresnel/Fraunhofer), a full acoustics suite, optical tolerance analysis (sensitivity OAT + Monte Carlo), and MTF computation (diffraction-limited + geometric) — as backend tools accessible from Python or a chat prompt. It does not have OpticStudio's merit-function optimisation engine, inverse-sensitivity NEST workflow, Jones/Mueller polarisation matrices, or diffractive element (metalens/grating) design.
 
 ## Where OpticStudio is strong
 
 - **Lens design and optimisation.** OpticStudio's multi-parameter merit function optimiser, damped least squares, and global search algorithms are the reason optical engineers use it. You describe image quality targets, and OpticStudio finds a lens prescription. Kerf has no optimisation engine.
 - **Tolerancing.** OpticStudio's inverse sensitivity and NEST compound tolerancing workflow generates manufacturing tolerances backed by full statistical yield modelling. Kerf has sensitivity OAT and Monte Carlo tolerancing but no inverse sensitivity or NEST workflow.
-- **Wave optics / physical optics propagation (POP).** Diffraction-limited beam propagation, coherent wavefronts, and near-field/far-field analysis. Kerf has the diffraction-limited MTF formula (Goodman) and geometric MTF but no POP wavefront propagation.
+- **Full sequential POP through multi-element systems.** OpticStudio's POP engine propagates a coherent wavefront through a complete sequential lens prescription — tracking pupil sampling, aperture stops, and wavefront error at each surface. Kerf has the scalar POP physics (angular spectrum, Fresnel, Fraunhofer, Gaussian source, thin-lens phase, aperture) but not the full sequential-system integration with aberration pickup per element. No Jones/Mueller polarisation. No diffraction grating analysis.
 - **Metalens and diffractive elements.** OpticStudio 2026 R1 adds metalens fast mode for flat diffractive elements. Kerf has no diffractive element design (epic).
 - **STOP analysis (multiphysics).** Structural-Thermal-Optical Performance (STOP) analysis linking Mechanical + thermal FEA to optical degradation. Kerf has no coupled multiphysics optics analysis.
 - **Material database.** Schott, CDGM, Ohara, and custom glass catalogs; dispersion models (Sellmeier, Herzberger). Kerf has no glass catalog.
@@ -147,7 +147,7 @@ Ansys Zemax OpticStudio (formerly Zemax OpticStudio, now owned by Ansys) is the 
 
 - **No merit function / optimiser.** This is the central feature of OpticStudio. Without it, Kerf cannot do lens design in the OpticStudio sense (find a prescription that meets MTF targets).
 - **No inverse sensitivity or NEST compound tolerancing.** Kerf has sensitivity OAT and Monte Carlo; OpticStudio's inverse sensitivity workflow is more powerful for deriving tight-but-achievable tolerances from a performance target.
-- **No physical optics propagation (POP).** The MTF from diffraction-limited formula is correct for a perfect aperture; coherent wavefront propagation, near-field / far-field analysis, and the full POP engine are absent.
+- **No sequential multi-element POP.** Scalar POP is implemented (angular spectrum, Fresnel, Fraunhofer, Gaussian source, thin-lens, aperture) and validated against three closed-form oracles. What's absent is the sequential POP workflow: propagating through a full lens prescription with per-surface aberration pickup, pupil sampling, aperture stop tracing, and the OpticStudio merit-function coupling. No polarisation (Jones/Mueller). No diffraction gratings.
 - **No glass catalogue.** Kerf has no Sellmeier / Herzberger dispersion-model glass database (Schott, CDGM, Ohara).
 - **No STOP multiphysics.** Thermal and structural effects on optical performance are not coupled. Architecturally feasible (epic).
 - **Metalens / diffractive elements.** No phase-profile or RCWA-based simulation of nanostructured elements. Epic.
@@ -168,8 +168,9 @@ Ansys Zemax OpticStudio (formerly Zemax OpticStudio, now owned by Ansys) is the 
 | MTF (diffraction-limited) | Yes (circular aperture) | Yes |
 | MTF (geometric) | Yes (Gaussian spot) | Yes |
 | Gaussian beam propagation | Yes (backend, validated) | Yes (POP) |
-| Physical optics / POP | No (epic) | Yes |
-| Wave optics / diffraction | No (epic) | Yes |
+| Physical optics / POP (scalar ASM + Fresnel + Fraunhofer) | Yes (backend, validated) | Yes |
+| Sequential multi-element POP + pupil/STOP | No (partial epic) | Yes |
+| Wave optics / diffraction (polarisation, gratings) | No (epic) | Yes |
 | STOP multiphysics | No (epic) | Yes (Ansys integration) |
 | Metalens / diffractive | No (epic) | Yes (2026 R1) |
 | Acoustics | Yes (ISO 9613, RT60, SEA) | No |

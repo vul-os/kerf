@@ -1,3 +1,3 @@
-"Kerf Optics plugin — paraxial ray-transfer matrix (ABCD) lens design."
+"Kerf Optics plugin — paraxial ABCD lens design + physical-optics propagation (POP)."
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

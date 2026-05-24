@@ -139,3 +139,41 @@ create index if not exists user_provider_keys_user_idx
 -- users.prefer_byo folded into CREATE TABLE users in 0001_core_identity.sql.
 
 -- usage_events.payer folded into CREATE TABLE usage_events in 0002_project_ingestion.sql.
+
+-- ════════════ T-408: break-even margin view ════════════
+--
+-- monthly_margin: per-kind revenue + COGS rollup used by the admin
+-- break-even dashboard (GET /api/admin/margin).
+--
+-- Revenue semantics (matches spend.py):
+--   kerf_paid  → usd_cost is the marked-up billed amount (COGS * 1.20).
+--               revenue = usd_cost; cogs = usd_cost / 1.20.
+--   kerf_free  → usd_cost is raw COGS; absorbed by Kerf.
+--               revenue = 0; cogs = usd_cost.
+--   byo_*      → usd_cost = 0; zero revenue, zero COGS to Kerf.
+--               revenue = 0; cogs = 0.
+--
+-- gross_margin_usd = revenue_usd - cogs_usd
+-- (positive = Kerf keeps money; at steady state ~16.7% of kerf_paid spend).
+create or replace view monthly_margin as
+select
+    date_trunc('month', created_at)::date            as month,
+    kind,
+    -- revenue: only kerf_paid events generate billed revenue
+    sum(case when payer = 'kerf_paid' then usd_cost else 0 end)::numeric(14,6)
+                                                     as revenue_usd,
+    -- cogs: for kerf_paid events, back-calculate COGS = billed / 1.20;
+    --       for kerf_free events, usd_cost IS the COGS (no markup applied).
+    sum(case
+            when payer = 'kerf_paid' then usd_cost / 1.20
+            when payer = 'kerf_free' then usd_cost
+            else 0
+        end)::numeric(14,6)                          as cogs_usd,
+    -- gross margin = revenue − COGS
+    sum(case when payer = 'kerf_paid' then usd_cost - usd_cost / 1.20
+             when payer = 'kerf_free' then -usd_cost
+             else 0
+        end)::numeric(14,6)                          as gross_margin_usd,
+    count(*)                                         as event_count
+from usage_events
+group by date_trunc('month', created_at), kind;

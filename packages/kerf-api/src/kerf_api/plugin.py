@@ -43,6 +43,9 @@ async def register(app: FastAPI, ctx) -> PluginManifest:
     app.include_router(composites_router, prefix="/api", tags=["composites"])
     from kerf_api.routes_ota import router as ota_router
     app.include_router(ota_router, prefix="/api", tags=["ota"])
+    # T-408: break-even margin admin endpoint
+    from kerf_api.routes_admin_margin import router as admin_margin_router
+    app.include_router(admin_margin_router, prefix="/api", tags=["admin"])
 
     _register_tools(ctx)
 

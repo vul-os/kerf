@@ -41,6 +41,7 @@ const WorkspaceSettings = lazy(() => import('./routes/WorkspaceSettings.jsx'))
 const WorkspaceMembers = lazy(() => import('./routes/WorkspaceMembers.jsx'))
 const AdminDistributors = lazy(() => import('./routes/AdminDistributors.jsx'))
 const AdminPublishers = lazy(() => import('./routes/AdminPublishers.jsx'))
+const AdminMargin = lazy(() => import('./routes/AdminMargin.jsx'))
 const Mechanical = lazy(() => import('./routes/domains/Mechanical.jsx'))
 const JewelryConfigurator = lazy(() => import('./routes/JewelryConfigurator.jsx'))
 const JewelryShare = lazy(() => import('./routes/JewelryShare.jsx'))
@@ -239,6 +240,7 @@ export default function App() {
         {cloudEnabled && <Route path="/library/:slug" element={<LibraryPart />} />}
         <Route path="/admin/distributors" element={<AdminDistributors />} />
         <Route path="/admin/publishers" element={<AdminPublishers />} />
+        <Route path="/admin/margin" element={<AdminMargin />} />
         {cloudEnabled && <Route path="/admin/email" element={<AdminEmail />} />}
         {cloudEnabled && <Route path="/billing" element={<BillingPanel />} />}
         {cloudEnabled && <Route path="/usage" element={<UsagePage />} />}

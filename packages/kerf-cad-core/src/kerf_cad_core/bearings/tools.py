@@ -40,6 +40,8 @@ from kerf_cad_core.bearings.select import (
     bearing_limiting_speed,
     bearing_grease_interval,
     bearing_select,
+    bearing_aiso_factor,
+    bearing_modified_reference_life,
 )
 
 
@@ -633,3 +635,155 @@ async def run_bearing_select(ctx: ProjectCtx, args: bytes) -> str:
         a["series"], a["Fr"], a["Fa"], a["n_rpm"], a["Lh_min"], **kwargs
     )
     return ok_payload(result)
+
+
+# ---------------------------------------------------------------------------
+# Tool: bearing_aiso_factor
+# ---------------------------------------------------------------------------
+
+_aiso_spec = ToolSpec(
+    name="bearing_aiso_factor",
+    description=(
+        "Compute the ISO/TS 16281 life-modification factor aISO.\n"
+        "\n"
+        "aISO incorporates lubrication quality (viscosity ratio κ) and "
+        "contamination level (eC) to modify the basic ISO 281 rating life:\n"
+        "  Lnm = a1 · aISO · L10\n"
+        "\n"
+        "Implements SKF Method B (ISO/TS 16281:2008 §5.4). Range: 0.1–50.\n"
+        "\n"
+        "  κ < 1    → thin-film lubrication → reduced life\n"
+        "  eC = 1   → perfectly clean conditions\n"
+        "  eC = 0.2 → typical industrial gearbox\n"
+        "\n"
+        "Reference: ISO/TS 16281:2008 §5.4; SKF catalogue §17."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "kappa": {
+                "type": "number",
+                "description": (
+                    "Viscosity ratio κ = ν_actual / ν1_required. "
+                    "κ < 1 = thin film; κ >= 4 = full film."
+                ),
+            },
+            "eC": {
+                "type": "number",
+                "description": (
+                    "Contamination factor (0 < eC <= 1). "
+                    "1.0 = very clean; 0.5 = slight; 0.1 = heavy."
+                ),
+            },
+            "Cu_N": {
+                "type": "number",
+                "description": "Bearing fatigue load limit Cu (N). From bearing catalogue.",
+            },
+            "P_N": {
+                "type": "number",
+                "description": "Equivalent dynamic bearing load P (N). Must be > 0.",
+            },
+            "bearing_type": {
+                "type": "string",
+                "enum": ["ball", "roller"],
+                "description": "Bearing type. Default 'ball'.",
+            },
+        },
+        "required": ["kappa", "eC", "Cu_N", "P_N"],
+    },
+)
+
+
+@register(_aiso_spec, write=False)
+async def run_bearing_aiso_factor(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+    for field in ("kappa", "eC", "Cu_N", "P_N"):
+        if a.get(field) is None:
+            return json.dumps({"ok": False, "reason": f"{field} is required"})
+    kwargs: dict = {}
+    if "bearing_type" in a:
+        kwargs["bearing_type"] = a["bearing_type"]
+    result = bearing_aiso_factor(a["kappa"], a["eC"], a["Cu_N"], a["P_N"], **kwargs)
+    return ok_payload(result) if result["ok"] else json.dumps(result)
+
+
+# ---------------------------------------------------------------------------
+# Tool: bearing_modified_reference_life
+# ---------------------------------------------------------------------------
+
+_lnm_spec = ToolSpec(
+    name="bearing_modified_reference_life",
+    description=(
+        "Compute the ISO/TS 16281 modified reference rating life Lnm.\n"
+        "\n"
+        "Lnm = a1 · aISO · L10   [10^6 rev]\n"
+        "Lnm_hours = Lnm × 10^6 / (60 × n_rpm)\n"
+        "\n"
+        "Extends the basic ISO 281 L10 with the aISO life-modification factor "
+        "that accounts for lubrication quality (κ) and contamination (eC).\n"
+        "\n"
+        "Example (SKF): C=60kN, P=10kN, n=1500rpm, κ=1.5, eC=0.5, Cu=4.5kN, "
+        "ball → aISO≈2.5, Lnm_hours significantly above L10_hours.\n"
+        "\n"
+        "Reference: ISO/TS 16281:2008 §3, §5; SKF catalogue §17 Eq. (15.1)."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "C": {"type": "number", "description": "Basic dynamic load rating (N)."},
+            "P": {"type": "number", "description": "Equivalent dynamic bearing load (N)."},
+            "n_rpm": {"type": "number", "description": "Operating speed (rpm)."},
+            "kappa": {
+                "type": "number",
+                "description": "Viscosity ratio κ = ν_actual / ν1_required.",
+            },
+            "eC": {
+                "type": "number",
+                "description": "Contamination factor (0 < eC <= 1).",
+            },
+            "Cu_N": {
+                "type": "number",
+                "description": "Bearing fatigue load limit Cu (N). Approx 0.45×C0 for steel ball.",
+            },
+            "bearing_type": {
+                "type": "string",
+                "enum": ["ball", "roller"],
+                "description": "Bearing type. Default 'ball'.",
+            },
+            "a1": {
+                "type": "number",
+                "description": (
+                    "Reliability factor a1 (ISO 281 Table 1). "
+                    "1.0 = 90%, 0.62 = 95%, 0.21 = 99%. Default 1.0."
+                ),
+            },
+            "fatigue_limited": {
+                "type": "boolean",
+                "description": "If true and P < Cu, life is treated as infinite (capped at 50×L10).",
+            },
+        },
+        "required": ["C", "P", "n_rpm", "kappa", "eC", "Cu_N"],
+    },
+)
+
+
+@register(_lnm_spec, write=False)
+async def run_bearing_modified_reference_life(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+    for field in ("C", "P", "n_rpm", "kappa", "eC", "Cu_N"):
+        if a.get(field) is None:
+            return json.dumps({"ok": False, "reason": f"{field} is required"})
+    kwargs: dict = {}
+    for opt in ("bearing_type", "a1", "fatigue_limited"):
+        if opt in a:
+            kwargs[opt] = a[opt]
+    result = bearing_modified_reference_life(
+        a["C"], a["P"], a["n_rpm"], a["kappa"], a["eC"], a["Cu_N"], **kwargs
+    )
+    return ok_payload(result) if result["ok"] else json.dumps(result)

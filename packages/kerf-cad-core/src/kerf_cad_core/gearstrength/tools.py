@@ -595,3 +595,408 @@ async def run_agma_service_life(ctx: ProjectCtx, args: bytes) -> str:
         kwargs["gear_type"] = a["gear_type"]
     result = agma_service_life(a["N_cycles"], **kwargs)
     return ok_payload(result) if result["ok"] else json.dumps(result)
+
+
+# ---------------------------------------------------------------------------
+# ISO 6336 tools
+# ---------------------------------------------------------------------------
+
+from kerf_cad_core.gearstrength.iso6336 import (  # noqa: E402
+    iso6336_dynamic_factor,
+    iso6336_load_distribution_bending,
+    iso6336_geometry_factor_YF,
+    iso6336_helix_factor,
+    iso6336_zone_factor,
+    iso6336_elasticity_factor,
+    iso6336_contact_ratio_factor,
+    iso6336_bending_stress,
+    iso6336_contact_stress,
+    iso6336_safety_factors,
+)
+
+
+# ---------------------------------------------------------------------------
+# Tool: iso6336_dynamic_factor
+# ---------------------------------------------------------------------------
+
+_iso_dyn_spec = ToolSpec(
+    name="iso6336_dynamic_factor",
+    description=(
+        "Compute the ISO 6336-1:2019 dynamic factor Kv (Method B) for spur "
+        "or helical gears.\n"
+        "\n"
+        "Kv accounts for mesh-induced dynamic loads from pitch errors and "
+        "tooth elasticity. Method B uses pitch-line velocity and ISO quality "
+        "grade (1328-1). Sub/main-resonance/super-critical branches selected "
+        "automatically based on resonance speed estimate.\n"
+        "\n"
+        "Reference: ISO 6336-1:2019 §6.5 Method B, Eqs. (62)–(73)."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "v_ms": {"type": "number", "description": "Pitch-line velocity (m/s). Must be > 0."},
+            "z1": {"type": "number", "description": "Pinion tooth count. Must be >= 5."},
+            "m_n_mm": {"type": "number", "description": "Normal module (mm). Must be > 0."},
+            "quality": {"type": "number", "description": "ISO 1328-1 quality grade (4–12). Default 6."},
+            "bearing_distance_mm": {"type": "number", "description": "Bearing span (mm). Default 100."},
+            "pinion_shaft_dia_mm": {"type": "number", "description": "Shaft diameter (mm). Default 40."},
+        },
+        "required": ["v_ms", "z1", "m_n_mm"],
+    },
+)
+
+
+@register(_iso_dyn_spec, write=False)
+async def run_iso6336_dynamic_factor(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+    for f in ("v_ms", "z1", "m_n_mm"):
+        if a.get(f) is None:
+            return json.dumps({"ok": False, "reason": f"{f} is required"})
+    kwargs: dict = {}
+    for opt in ("quality", "bearing_distance_mm", "pinion_shaft_dia_mm"):
+        if opt in a:
+            kwargs[opt] = a[opt]
+    result = iso6336_dynamic_factor(a["v_ms"], a["z1"], a["m_n_mm"], **kwargs)
+    return ok_payload(result) if result["ok"] else json.dumps(result)
+
+
+# ---------------------------------------------------------------------------
+# Tool: iso6336_geometry_factor_YF
+# ---------------------------------------------------------------------------
+
+_iso_yf_spec = ToolSpec(
+    name="iso6336_geometry_factor_YF",
+    description=(
+        "Compute the ISO 6336-3:2019 tooth form factor YF (Method B) for "
+        "root bending strength.\n"
+        "\n"
+        "YF = (6·hFe/m_n · cos(alpha_Fen)) / (sFn/m_n)^2 · cos(alpha_n)\n"
+        "\n"
+        "Accounts for tooth geometry, profile shift, and basic rack parameters.\n"
+        "\n"
+        "Reference: ISO 6336-3:2019 §5.3, Eqs. (4)–(22)."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "z": {"type": "number", "description": "Number of teeth. Must be >= 5."},
+            "x": {"type": "number", "description": "Profile shift coefficient (−0.7 to +0.7)."},
+            "alpha_n_deg": {"type": "number", "description": "Normal pressure angle (degrees). Default 20."},
+            "haP_star": {"type": "number", "description": "Addendum coefficient (default 1.0)."},
+            "hfP_star": {"type": "number", "description": "Dedendum coefficient (default 1.25)."},
+            "rhoFP_star": {"type": "number", "description": "Root fillet radius coefficient (default 0.38)."},
+        },
+        "required": ["z", "x"],
+    },
+)
+
+
+@register(_iso_yf_spec, write=False)
+async def run_iso6336_geometry_factor_YF(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+    for f in ("z", "x"):
+        if a.get(f) is None:
+            return json.dumps({"ok": False, "reason": f"{f} is required"})
+    kwargs: dict = {}
+    for opt in ("alpha_n_deg", "haP_star", "hfP_star", "rhoFP_star"):
+        if opt in a:
+            kwargs[opt] = a[opt]
+    result = iso6336_geometry_factor_YF(a["z"], a["x"], **kwargs)
+    return ok_payload(result) if result["ok"] else json.dumps(result)
+
+
+# ---------------------------------------------------------------------------
+# Tool: iso6336_helix_factor
+# ---------------------------------------------------------------------------
+
+_iso_helix_spec = ToolSpec(
+    name="iso6336_helix_factor",
+    description=(
+        "Compute ISO 6336 helix factors Ybeta (bending, ISO 6336-3 §5.4) "
+        "and Zbeta (contact, ISO 6336-2 §5.3) from the reference helix angle.\n"
+        "\n"
+        "Ybeta = 1 − eps_beta·beta_b/120  (reduces bending stress for helical)\n"
+        "Zbeta = 1/sqrt(cos(beta))         (increases contact capacity)\n"
+        "\n"
+        "For spur gears (beta=0): Ybeta=1, Zbeta=1."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "beta_deg": {"type": "number", "description": "Helix angle (degrees). 0 = spur."},
+        },
+        "required": ["beta_deg"],
+    },
+)
+
+
+@register(_iso_helix_spec, write=False)
+async def run_iso6336_helix_factor(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+    if a.get("beta_deg") is None:
+        return json.dumps({"ok": False, "reason": "beta_deg is required"})
+    result = iso6336_helix_factor(a["beta_deg"])
+    return ok_payload(result) if result["ok"] else json.dumps(result)
+
+
+# ---------------------------------------------------------------------------
+# Tool: iso6336_zone_factor
+# ---------------------------------------------------------------------------
+
+_iso_zh_spec = ToolSpec(
+    name="iso6336_zone_factor",
+    description=(
+        "Compute the ISO 6336-2:2019 zone factor ZH for Hertzian contact "
+        "pressure at the pitch point.\n"
+        "\n"
+        "ZH = sqrt(2·cos(beta_b)·cos(alpha_wt)) / (cos²(alpha_t)·sin(alpha_wt))\n"
+        "\n"
+        "For steel spur gears with 20° pressure angle: ZH ≈ 2.495.\n"
+        "\n"
+        "Reference: ISO 6336-2:2019 §5.2, Eq. (4)."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "alpha_n_deg": {"type": "number", "description": "Normal pressure angle (degrees)."},
+            "beta_deg": {"type": "number", "description": "Helix angle (degrees). 0 = spur."},
+            "alpha_wt_deg": {"type": "number", "description": "Working transverse pressure angle (degrees; optional)."},
+            "z1": {"type": "number", "description": "Pinion tooth count (for profile-shift alpha_wt calc)."},
+            "z2": {"type": "number", "description": "Gear tooth count (for profile-shift alpha_wt calc)."},
+            "x1": {"type": "number", "description": "Pinion profile shift coefficient. Default 0."},
+            "x2": {"type": "number", "description": "Gear profile shift coefficient. Default 0."},
+        },
+        "required": ["alpha_n_deg", "beta_deg"],
+    },
+)
+
+
+@register(_iso_zh_spec, write=False)
+async def run_iso6336_zone_factor(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+    for f in ("alpha_n_deg", "beta_deg"):
+        if a.get(f) is None:
+            return json.dumps({"ok": False, "reason": f"{f} is required"})
+    kwargs: dict = {}
+    for opt in ("alpha_wt_deg", "z1", "z2", "x1", "x2"):
+        if opt in a:
+            kwargs[opt] = a[opt]
+    result = iso6336_zone_factor(a["alpha_n_deg"], a["beta_deg"], **kwargs)
+    return ok_payload(result) if result["ok"] else json.dumps(result)
+
+
+# ---------------------------------------------------------------------------
+# Tool: iso6336_elasticity_factor
+# ---------------------------------------------------------------------------
+
+_iso_ze_spec = ToolSpec(
+    name="iso6336_elasticity_factor",
+    description=(
+        "Compute ISO 6336-2:2019 elasticity factor ZE [sqrt(MPa)] for "
+        "Hertzian contact stress.\n"
+        "\n"
+        "ZE = sqrt(1 / (pi · ((1-nu1²)/E1 + (1-nu2²)/E2)))\n"
+        "\n"
+        "Steel/steel (E=206000 MPa, nu=0.3): ZE = 191 sqrt(MPa).\n"
+        "\n"
+        "Reference: ISO 6336-2:2019 §5.3, Eq. (7)."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "E1_MPa": {"type": "number", "description": "Young's modulus of pinion (MPa)."},
+            "nu1": {"type": "number", "description": "Poisson's ratio of pinion (0–0.5)."},
+            "E2_MPa": {"type": "number", "description": "Young's modulus of gear (MPa)."},
+            "nu2": {"type": "number", "description": "Poisson's ratio of gear (0–0.5)."},
+        },
+        "required": ["E1_MPa", "nu1", "E2_MPa", "nu2"],
+    },
+)
+
+
+@register(_iso_ze_spec, write=False)
+async def run_iso6336_elasticity_factor(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+    for f in ("E1_MPa", "nu1", "E2_MPa", "nu2"):
+        if a.get(f) is None:
+            return json.dumps({"ok": False, "reason": f"{f} is required"})
+    result = iso6336_elasticity_factor(a["E1_MPa"], a["nu1"], a["E2_MPa"], a["nu2"])
+    return ok_payload(result) if result["ok"] else json.dumps(result)
+
+
+# ---------------------------------------------------------------------------
+# Tool: iso6336_bending_stress
+# ---------------------------------------------------------------------------
+
+_iso_sf_spec = ToolSpec(
+    name="iso6336_bending_stress",
+    description=(
+        "Compute ISO 6336-3:2019 root bending stress sigma_F.\n"
+        "\n"
+        "sigma_F0 = Ft / (b·m_n) · YF · YS · Ybeta       [MPa, nominal]\n"
+        "sigma_F  = sigma_F0 · KA · Kv · KFbeta · KFalpha · Ydelta  [MPa]\n"
+        "\n"
+        "Requires pre-computed factors from iso6336_geometry_factor_YF, "
+        "iso6336_helix_factor, iso6336_dynamic_factor, and "
+        "iso6336_load_distribution_bending.\n"
+        "\n"
+        "Reference: ISO 6336-3:2019 §5, Eqs. (1)–(3)."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "Ft_N": {"type": "number", "description": "Tangential mesh force (N)."},
+            "b_mm": {"type": "number", "description": "Face width (mm)."},
+            "m_n_mm": {"type": "number", "description": "Normal module (mm)."},
+            "KA": {"type": "number", "description": "Application factor (>= 1)."},
+            "Kv": {"type": "number", "description": "Dynamic factor (>= 1)."},
+            "KFbeta": {"type": "number", "description": "Face load factor for bending (>= 1)."},
+            "KFalpha": {"type": "number", "description": "Transverse load factor for bending (>= 1)."},
+            "YF": {"type": "number", "description": "Tooth form factor from iso6336_geometry_factor_YF."},
+            "Ybeta": {"type": "number", "description": "Helix factor from iso6336_helix_factor."},
+            "YS": {"type": "number", "description": "Stress correction factor (default 1.0)."},
+            "Ydelta": {"type": "number", "description": "Notch sensitivity factor (default 1.0)."},
+        },
+        "required": ["Ft_N", "b_mm", "m_n_mm", "KA", "Kv", "KFbeta", "KFalpha", "YF", "Ybeta"],
+    },
+)
+
+
+@register(_iso_sf_spec, write=False)
+async def run_iso6336_bending_stress(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+    required = ("Ft_N", "b_mm", "m_n_mm", "KA", "Kv", "KFbeta", "KFalpha", "YF", "Ybeta")
+    for f in required:
+        if a.get(f) is None:
+            return json.dumps({"ok": False, "reason": f"{f} is required"})
+    kwargs: dict = {}
+    for opt in ("YS", "Ydelta"):
+        if opt in a:
+            kwargs[opt] = a[opt]
+    result = iso6336_bending_stress(
+        a["Ft_N"], a["b_mm"], a["m_n_mm"],
+        a["KA"], a["Kv"], a["KFbeta"], a["KFalpha"],
+        a["YF"], a["Ybeta"], **kwargs
+    )
+    return ok_payload(result) if result["ok"] else json.dumps(result)
+
+
+# ---------------------------------------------------------------------------
+# Tool: iso6336_contact_stress
+# ---------------------------------------------------------------------------
+
+_iso_sh_spec = ToolSpec(
+    name="iso6336_contact_stress",
+    description=(
+        "Compute ISO 6336-2:2019 pitting (contact) stress sigma_H.\n"
+        "\n"
+        "sigma_H0 = ZH·ZE·Zepsilon·Zbeta·sqrt(Ft/(b·d1)·(u+1)/u)  [MPa]\n"
+        "sigma_H  = sigma_H0 · sqrt(KA·Kv·KHbeta·KHalpha)          [MPa]\n"
+        "\n"
+        "Reference: ISO 6336-2:2019 §5, Eqs. (1)–(3)."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "Ft_N": {"type": "number", "description": "Tangential mesh force (N)."},
+            "b_mm": {"type": "number", "description": "Face width (mm)."},
+            "d1_mm": {"type": "number", "description": "Pinion reference diameter (mm)."},
+            "u": {"type": "number", "description": "Gear ratio z2/z1 (>= 1)."},
+            "KA": {"type": "number", "description": "Application factor."},
+            "Kv": {"type": "number", "description": "Dynamic factor."},
+            "KHbeta": {"type": "number", "description": "Face load factor for contact."},
+            "KHalpha": {"type": "number", "description": "Transverse load factor for contact."},
+            "ZH": {"type": "number", "description": "Zone factor from iso6336_zone_factor."},
+            "ZE": {"type": "number", "description": "Elasticity factor [sqrt(MPa)]."},
+            "Zepsilon": {"type": "number", "description": "Contact-ratio factor."},
+            "Zbeta": {"type": "number", "description": "Helix factor from iso6336_helix_factor."},
+        },
+        "required": ["Ft_N", "b_mm", "d1_mm", "u", "KA", "Kv", "KHbeta",
+                     "KHalpha", "ZH", "ZE", "Zepsilon", "Zbeta"],
+    },
+)
+
+
+@register(_iso_sh_spec, write=False)
+async def run_iso6336_contact_stress(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+    required = ("Ft_N", "b_mm", "d1_mm", "u", "KA", "Kv", "KHbeta",
+                "KHalpha", "ZH", "ZE", "Zepsilon", "Zbeta")
+    for f in required:
+        if a.get(f) is None:
+            return json.dumps({"ok": False, "reason": f"{f} is required"})
+    result = iso6336_contact_stress(
+        a["Ft_N"], a["b_mm"], a["d1_mm"], a["u"],
+        a["KA"], a["Kv"], a["KHbeta"], a["KHalpha"],
+        a["ZH"], a["ZE"], a["Zepsilon"], a["Zbeta"],
+    )
+    return ok_payload(result) if result["ok"] else json.dumps(result)
+
+
+# ---------------------------------------------------------------------------
+# Tool: iso6336_safety_factors
+# ---------------------------------------------------------------------------
+
+_iso_sf_safety_spec = ToolSpec(
+    name="iso6336_safety_factors",
+    description=(
+        "Compute ISO 6336 bending safety factor SF and pitting safety "
+        "factor SH.\n"
+        "\n"
+        "SF = sigma_FP / sigma_F   (>= 1.4 recommended)\n"
+        "SH = sigma_HP / sigma_H   (>= 1.2 recommended)\n"
+        "\n"
+        "The allowable stresses sigma_FP and sigma_HP must be computed from "
+        "ISO 6336-5 material data (sigma_FLim, sigma_HLim) times life factors "
+        "YNT, ZNT and safety minimums SF_min, SH_min.\n"
+        "\n"
+        "Reference: ISO 6336-1:2019 §4.1; ISO 6336-2:2019 §6; ISO 6336-3:2019 §6."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "sigma_F": {"type": "number", "description": "Working bending stress (MPa)."},
+            "sigma_H": {"type": "number", "description": "Working contact stress (MPa)."},
+            "sigma_FP": {"type": "number", "description": "Allowable bending stress (MPa)."},
+            "sigma_HP": {"type": "number", "description": "Allowable contact stress (MPa)."},
+        },
+        "required": ["sigma_F", "sigma_H", "sigma_FP", "sigma_HP"],
+    },
+)
+
+
+@register(_iso_sf_safety_spec, write=False)
+async def run_iso6336_safety_factors(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+    for f in ("sigma_F", "sigma_H", "sigma_FP", "sigma_HP"):
+        if a.get(f) is None:
+            return json.dumps({"ok": False, "reason": f"{f} is required"})
+    result = iso6336_safety_factors(
+        a["sigma_F"], a["sigma_H"], a["sigma_FP"], a["sigma_HP"]
+    )
+    return ok_payload(result) if result["ok"] else json.dumps(result)

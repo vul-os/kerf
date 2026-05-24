@@ -612,10 +612,28 @@ def fairing_report(rows: object) -> dict:
 # ---------------------------------------------------------------------------
 # Simpson's rule helpers
 # ---------------------------------------------------------------------------
+#
+# NOTE ON CANONICAL IMPLEMENTATION
+# ---------------------------------
+# The project's single-source-of-truth Simpson implementation for
+# *equally-spaced* ordinates lives in:
+#
+#     kerf_cad_core.navalarch.hydrostatics._simpsons_rule(ordinates, h)
+#
+# That function takes a flat list of ordinates and a common spacing h.
+#
+# The function below, _simpsons_rule(x, y), is a DISTINCT implementation
+# needed by marine/hull.py because hull offset tables use *unequally-spaced*
+# stations and waterlines.  It works with (position, value) pairs and uses
+# three-point Lagrange-integral coefficients to handle unequal spacing exactly.
+#
+# Callers outside this module that need simple equally-spaced integration
+# should import from kerf_cad_core.navalarch.hydrostatics instead.
+# ---------------------------------------------------------------------------
 
 def _simpsons_rule(x: list[float], y: list[float]) -> float:
     """
-    Composite Simpson's 1/3 rule for unevenly-spaced data.
+    Composite Simpson's 1/3 rule for unevenly-spaced (x, y) data.
 
     Each consecutive trio (x_i, x_{i+1}, x_{i+2}) is integrated using the
     three-point Lagrange-based Newton-Cotes formula for unequal spacing.
@@ -638,6 +656,9 @@ def _simpsons_rule(x: list[float], y: list[float]) -> float:
     [x_i, x_{i+2}] — derivation via substitution u = x - x_{i+1}.
 
     If n < 2 returns 0.0.  If n == 2, returns trapezoid area.
+
+    Note: for equally-spaced ordinates only, prefer the canonical implementation
+    in kerf_cad_core.navalarch.hydrostatics._simpsons_rule(ordinates, h).
     """
     n = len(x)
     if n < 2:

@@ -5,6 +5,9 @@ No DB, no network, no external packages required.
 from __future__ import annotations
 
 import math
+import sys
+import types
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
@@ -262,3 +265,95 @@ class TestCeaLite:
         """Missing 'propellant' field → 422 (Pydantic validation)."""
         r = client.post("/api/aero/propulsion/cea-lite", json={})
         assert r.status_code == 422
+
+    def test_method_field_present_lookup(self, client):
+        """Response always includes method field; lookup path returns 'lookup'."""
+        r = client.post("/api/aero/propulsion/cea-lite", json={"propellant": "lox/lh2"})
+        assert r.status_code == 200
+        body = r.json()
+        # rocketcea is not installed in this env, so method must be "lookup"
+        assert body["method"] in ("lookup", "rocketcea")
+
+
+# ===========================================================================
+# CEA-lite rocketcea path (mocked)
+# ===========================================================================
+
+class TestCeaLiteRocketceaPaths:
+    """Test both the rocketcea path (mocked) and the lookup fallback path."""
+
+    @pytest.fixture()
+    def client_fresh(self):
+        """Fresh TestClient backed by a freshly-imported router."""
+        app = FastAPI()
+        app.include_router(router, prefix="/api")
+        return TestClient(app)
+
+    def test_lookup_path_when_rocketcea_absent(self, client_fresh):
+        """When rocketcea is not importable, method='lookup' and warning present."""
+        # Ensure rocketcea is not importable for this test
+        with patch.dict(sys.modules, {"rocketcea": None, "rocketcea.cea_obj": None}):
+            r = client_fresh.post("/api/aero/propulsion/cea-lite", json={"propellant": "lox/rp1"})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["ok"] is True
+        assert body["method"] == "lookup"
+        assert "warning" in body
+        assert "rocketcea" in body["warning"].lower()
+
+    def test_rocketcea_path_when_package_present(self, client_fresh):
+        """When rocketcea IS importable, the real CEA_Obj path is taken: method='rocketcea'."""
+        # Build a minimal mock of rocketcea.cea_obj.CEA_Obj
+        mock_cea_instance = MagicMock()
+        mock_cea_instance.get_Isp.return_value = 442.7  # plausible LOX/LH2 Isp (s)
+
+        mock_cea_obj_cls = MagicMock(return_value=mock_cea_instance)
+
+        mock_cea_obj_module = types.ModuleType("rocketcea.cea_obj")
+        mock_cea_obj_module.CEA_Obj = mock_cea_obj_cls
+
+        mock_rocketcea_pkg = types.ModuleType("rocketcea")
+        mock_rocketcea_pkg.cea_obj = mock_cea_obj_module
+
+        with patch.dict(
+            sys.modules,
+            {
+                "rocketcea": mock_rocketcea_pkg,
+                "rocketcea.cea_obj": mock_cea_obj_module,
+            },
+        ):
+            r = client_fresh.post("/api/aero/propulsion/cea-lite", json={"propellant": "lox/lh2"})
+
+        assert r.status_code == 200
+        body = r.json()
+        assert body["ok"] is True
+        assert body["method"] == "rocketcea"
+        # Isp should come from our mock (442.7)
+        assert abs(body["isp_vac_s"] - 442.7) < 0.01
+        # CEA_Obj must have been constructed with correct JANNAF names
+        mock_cea_obj_cls.assert_called_once_with(oxName="LOX", fuelName="LH2")
+        # get_Isp called with Pc (psia), MR (O/F), eps (expansion ratio)
+        mock_cea_instance.get_Isp.assert_called_once()
+        call_kwargs = mock_cea_instance.get_Isp.call_args
+        assert call_kwargs.kwargs.get("Pc") == 1000.0 or call_kwargs.args[0] == 1000.0
+
+    def test_rocketcea_path_not_taken_for_solid(self, client_fresh):
+        """Solid/cold-gas propellants not in rocketcea map → always lookup."""
+        mock_cea_obj_cls = MagicMock()
+        mock_cea_obj_module = types.ModuleType("rocketcea.cea_obj")
+        mock_cea_obj_module.CEA_Obj = mock_cea_obj_cls
+        mock_rocketcea_pkg = types.ModuleType("rocketcea")
+        mock_rocketcea_pkg.cea_obj = mock_cea_obj_module
+
+        with patch.dict(
+            sys.modules,
+            {"rocketcea": mock_rocketcea_pkg, "rocketcea.cea_obj": mock_cea_obj_module},
+        ):
+            r = client_fresh.post("/api/aero/propulsion/cea-lite", json={"propellant": "solid/htpb"})
+
+        assert r.status_code == 200
+        body = r.json()
+        # solid/htpb has no rocketcea pair, so always lookup
+        assert body["method"] == "lookup"
+        # CEA_Obj should NOT have been constructed
+        mock_cea_obj_cls.assert_not_called()

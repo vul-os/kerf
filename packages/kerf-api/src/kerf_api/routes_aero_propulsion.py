@@ -95,6 +95,26 @@ def tsiolkovsky(req: TsiolkovskyRequest):
 # CEA-lite: approximate Isp from propellant combination
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# rocketcea propellant name mapping
+# Maps internal propellant key → (oxName, fuelName) as accepted by rocketcea's
+# CEA_Obj constructor.  Only bidirectional (ox+fuel) pairs are listed here;
+# monopropellants / cold-gas / solids are not supported by rocketcea and will
+# fall through to the lookup-table path even when rocketcea is present.
+# rocketcea name strings follow the JANNAF/CEA propellant catalogue.
+# ---------------------------------------------------------------------------
+_ROCKETCEA_MAP: dict[str, tuple[str, str]] = {
+    "lox/lh2":                   ("LOX", "LH2"),
+    "lox/rp1":                   ("LOX", "RP-1"),
+    "lox/ch4":                   ("LOX", "CH4"),
+    "n2o4/udmh":                 ("N2O4", "UDMH"),
+    "n2o4/monomethylhydrazine":  ("N2O4", "MMH"),
+    "h2o2/rp1":                  ("H2O2", "RP-1"),
+}
+
+# Default chamber pressure used for rocketcea calls (psia; 1000 psia ≈ 6.9 MPa)
+_CEA_Pc_PSIA: float = 1000.0
+
 # Reference values (vacuum Isp in seconds) from Sutton & Biblarz,
 # "Rocket Propulsion Elements", 9th ed., Table 5-5 / NASA CEA tabulations.
 # These are representative equilibrium values at O/F_opt, Pc=6.9 MPa, expanding to vacuum.
@@ -182,22 +202,83 @@ class CeaLiteRequest(BaseModel):
 def cea_lite(req: CeaLiteRequest):
     """CEA-lite: propellant Isp lookup + vacuum/sea-level correction.
 
-    This is a table-driven approximation, not a full CEA chemical equilibrium
-    solve.  For production use, wire up the cea-python or RocketCEA package
-    (returns {status:pending} if that package fails to import).
-    """
-    # Try real CEA first — graceful degradation on ImportError.
-    try:
-        import rocketcea  # noqa: F401
-        # If the package is present we'd invoke it here.  For now fall through
-        # to lite path regardless — the import proves availability.
-    except ImportError:
-        pass  # lite path below
+    When the ``rocketcea`` package is installed, the endpoint performs a real
+    NASA CEA chemical-equilibrium calculation via ``CEA_Obj``.  Otherwise it
+    falls back to a reference lookup table (Sutton & Biblarz, 9th ed.).
 
+    The ``method`` field in the response indicates which path was taken:
+      - ``"rocketcea"`` — full equilibrium solve
+      - ``"lookup"``    — static reference table
+    """
     key = req.propellant.strip().lower()
     # Normalise via alias map
     key = _ALIASES.get(key, key)
 
+    # ------------------------------------------------------------------
+    # Path 1: rocketcea high-fidelity CEA solve
+    # ------------------------------------------------------------------
+    rocketcea_pair = _ROCKETCEA_MAP.get(key)
+    if rocketcea_pair is not None:
+        try:
+            from rocketcea.cea_obj import CEA_Obj  # type: ignore[import]
+
+            ox_name, fuel_name = rocketcea_pair
+            cea = CEA_Obj(oxName=ox_name, fuelName=fuel_name)
+
+            # Use the table's optimal O/F as a default; caller may not supply one.
+            table_entry = _CEA_LITE_TABLE.get(key)
+            o_f_default = table_entry["o_f"] if table_entry else 2.5
+
+            eps = req.expansion_ratio  # nozzle area ratio
+
+            # get_Isp returns (IspVac, Cstar, Tc, MW, gamma) in imperial units.
+            # Pc in psia; MR = O/F mass ratio.
+            isp_vac_raw = cea.get_Isp(Pc=_CEA_Pc_PSIA, MR=o_f_default, eps=eps)
+
+            isp_vac = float(isp_vac_raw)
+
+            # Ambient correction (same simplified model as lookup path).
+            if req.altitude_m is None or req.altitude_m >= 80_000:
+                isp_effective = isp_vac
+                condition = "vacuum"
+            else:
+                try:
+                    from kerf_cad_core.aero.flow import isa_atmosphere  # type: ignore[import]
+                    atm = isa_atmosphere(min(req.altitude_m, 20_000.0))
+                    p_ratio = atm["p_Pa"] / 101325.0 if atm["ok"] else 1.0
+                except ImportError:
+                    p_ratio = max(0.0, 1.0 - req.altitude_m / 80_000.0)
+                isp_effective = isp_vac * (1.0 - 0.12 * p_ratio)
+                condition = f"altitude={req.altitude_m:.0f}m"
+
+            return {
+                "ok": True,
+                "method": "rocketcea",
+                "source": "rocketcea-cea-obj",
+                "propellant_key": key,
+                "ox_name": ox_name,
+                "fuel_name": fuel_name,
+                "Pc_psia": _CEA_Pc_PSIA,
+                "o_f": o_f_default,
+                "expansion_ratio": eps,
+                "isp_vac_s": round(isp_vac, 4),
+                "isp_effective_s": round(isp_effective, 2),
+                "o_f_optimal": o_f_default,
+                "condition": condition,
+                "notes": (
+                    f"Full NASA CEA equilibrium solve via rocketcea "
+                    f"(Pc={_CEA_Pc_PSIA} psia, eps={eps}, O/F={o_f_default})."
+                ),
+            }
+
+        except ImportError:
+            pass  # rocketcea not installed — fall through to lookup
+        except Exception as exc:
+            logger.warning("rocketcea CEA_Obj call failed (%s): falling back to lookup", exc)
+
+    # ------------------------------------------------------------------
+    # Path 2: static lookup-table fallback
+    # ------------------------------------------------------------------
     entry = _CEA_LITE_TABLE.get(key)
     if entry is None:
         available = sorted(_CEA_LITE_TABLE.keys())
@@ -232,6 +313,7 @@ def cea_lite(req: CeaLiteRequest):
 
     return {
         "ok": True,
+        "method": "lookup",
         "source": "cea-lite",
         "propellant_key": key,
         "isp_vac_s": isp_vac,

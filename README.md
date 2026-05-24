@@ -4,7 +4,7 @@
 
 # Kerf
 
-**Chat-driven CAD that produces real engineering output.**
+**Chat-driven, multi-discipline CAD across 14 engineering domains — mechanical, electronics, BIM, aerospace, silicon, civil, and more — MIT open-core.**
 
 JSCAD code · OpenCascade B-rep features · planegcs sketcher · tscircuit electronics · TechDraw drawings · assemblies · library + BOM · workshop sharing · workspace billing — with an LLM editing the source for you.
 
@@ -36,15 +36,36 @@ JSCAD code · OpenCascade B-rep features · planegcs sketcher · tscircuit elect
 
 ## What it is
 
-A single workspace for mechanical, electronics, drawings, and library parts — written entirely in code (JSCAD / `.feature` JSON / `.circuit.tsx` / `.sketch` / `.drawing`) so an LLM can read, diff, and edit it. Multi-domain projects via free-form tags. Browser-native. Local install or hosted at [kerf.sh](https://kerf.sh).
+A single workspace for 14 engineering domains — mechanical, electronics / PCB / silicon, structural / FEA, thermal / fluid / HVAC, aerospace / marine / space, manufacturing / CAM, civil / geotechnical, dynamics / controls, electrical / PLC / firmware, tolerancing / QA, optics / acoustics, jewelry, BIM, and cost / materials / LCA — written entirely in code (JSCAD / `.feature` JSON / `.circuit.tsx` / `.sketch` / `.drawing`) so an LLM can read, diff, and edit it. Multi-domain projects via free-form tags. Browser-native. Local install or hosted at [kerf.sh](https://kerf.sh).
 
 ## Why
 
 - **Code-first** — everything is text. Diffs, code review, branching, version control. The LLM doesn't have to "see" pixels — it edits source.
 - **Two real kernels** — JSCAD for fast iteration; OpenCascade B-rep (`.feature` files) for fillets / shells / lossless STEP export. Pick per file.
-- **Multi-domain** — mechanical assemblies and PCB schematics in the same project. Cross-reference a board outline from a mechanical Component.
+- **Multi-domain** — mechanical assemblies and PCB schematics in the same project. Cross-reference a board outline from a mechanical Component. Run structural code checks, CAM toolpaths, and CFD in the same chat session.
+- **Textbook-to-deep engines** — AISC 360-22 / ACI 318-19 / Eurocode EC2/3/5/8, IAPWS-IF97 steam, ISO 6336 gears, IBIS-AMI signal integrity, AC load-flow, analog PVT corner simulation, MITC4 plate FE, and more — all in the same open-source repo.
 - **Open source** — MIT for the core. The hosted-tier plugins (`kerf-billing`, `kerf-cloud`) are proprietary but separable; everything else self-hosts MIT.
 - **Local-first** — no telemetry, no phone-home. The hosted tier exists for convenience, not lock-in.
+
+## Coverage
+
+Kerf tracks feature parity against 14 professional CAD / CAE / EDA tools in [`docs/domain_depth.md`](./docs/domain_depth.md). That file is updated in the same PR as the corresponding code change and includes a checkbox-level audit of every shipped capability.
+
+Recent additions (2026-05-24):
+
+- **Structural codes** — full Eurocode EC2/3/5/8 + AISC 360-22 (members + connections) + ACI 318-19 (flexure / shear / PM / punching shear / torsion) + NDS 2018 timber + ASCE 7-22 (LRFD+ASD, ELF, RSA SRSS+CQC, Newmark time-history).
+- **Native FE** — MITC4 (Bathe-Dvorkin) plate/shell element with consistent mass + modal via inverse iteration; 2D/3D frame stiffness solver; geotech liquefaction (Seed-Idriss); multi-axial fatigue (Findley / SWT / Brown-Miller).
+- **Machine elements** — ISO 6336 gear rating (Method B), ISO/TS 16281 bearing aISO life modification, planetary gearbox (3 Willis modes + compound).
+- **Thermo-fluid** — IAPWS-IF97 steam properties (Regions 1/2/4, validated to <1e-3 vs reference tables), Bell-Delaware shell-and-tube HX, transient pipe-network (MOC waterhammer), ASHRAE CLTD/RTS transient cooling loads.
+- **Electronics depth** — IBIS-AMI signal integrity (Bergeron channel + PRBS eye), AC PDN impedance sweep, AC load-flow (Newton-Raphson, 3+5-bus validated), protection coordination (IEC 60255 + IEEE C37.112), arc-flash (IEEE 1584), photonics fibre link budget.
+- **Aero / marine / space** — 3D VLM with viscous strip drag + Prandtl-Glauert/Kármán-Tsien compressibility, strip-theory seakeeping RAOs (Wigley validated), Holtrop-Mennen naval resistance, multi-revolution Lambert (Izzo 2015), 6-DOF flight dynamics + ADCS.
+- **Manufacturing depth** — adaptive/trochoidal CAM (HSM), Taylor extended tool-life + Gilbert economics, moldflow Hele-Shaw front tracking (weld-line + air-trap), casting Chvorinov/risers/gating, NFP (Minkowski-sum) polygon nesting, sheet-metal bend table (K-factor/BD/spring-back).
+- **Verticals** — dental anatomic multi-cusp crown, horology Swiss escapement + mainspring + balance oscillator (isochronism), photovoltaic partial shading + bypass-diode IV + global MPPT.
+- **Tolerancing / QA** — 3D vector-loop tolerance stackup (6-DOF Jacobian), SPC charts (Shewhart/CUSUM/EWMA + Nelson/WECO rules), ISO 286 limits & fits.
+- **Optics / acoustics** — Gaussian beam (M², complex-q, ISO 11146-1), non-sequential ray tracing with Fresnel split (stray/ghost), wave acoustics (image-source IR + Schroeder RT60 + SEA), Seidel aberrations (corrected S5).
+- **Silicon** — analog PVT corner simulation (60 corners × Monte-Carlo mismatch, Pelgrom σ matched), full RTL-to-GDS flow (Yosys + OpenROAD + Magic/KLayout/STA).
+- **Materials + LCA** — Ashby database (~200 materials, Pareto frontier multi-objective selection), full ISO 14040/44 LCA (cradle/use/transport/EoL: GWP/AP/EP/HTP/water/PM2.5 + uncertainty).
+- **Compare matrices** — 14 of 30 reference CADs now have grounded D1-D14 feature matrices (741 rows total) sourced to vendor documentation: Fusion 360, SolidWorks, Onshape, FreeCAD, Rhino, KiCad, CATIA, Creo, NX, Inventor, AutoCAD, Altium, Revit, Blender.
 
 ## Install
 

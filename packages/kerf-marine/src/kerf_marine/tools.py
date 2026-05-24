@@ -1,11 +1,13 @@
 """
-kerf_marine LLM tools — hydrostatics + stability surface for the chat agent.
+kerf_marine LLM tools — hydrostatics + stability + seakeeping for the chat agent.
 
 Tools
 -----
 marine_hydrostatics     Compute displacement, KB, BM, GM, TPC, MCT1cm from offsets
 marine_stability_gz     Compute GZ righting arm curve (wall-sided or KN table)
 marine_box_barge        Quick analytic box-barge hydrostatics (no offset table needed)
+marine_seakeeping_rao   Compute heave/pitch/roll RAOs via strip theory (STF)
+marine_seakeeping_stats Compute significant motion amplitudes in irregular seas
 """
 
 from __future__ import annotations
@@ -239,3 +241,231 @@ async def run_marine_stability_gz(args: dict[str, Any], ctx: "ProjectCtx") -> st
         return ok_payload(payload)
     except Exception as exc:
         return err_payload(str(exc), "MARINE_GZ_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# marine_seakeeping_rao
+# ---------------------------------------------------------------------------
+
+marine_seakeeping_rao_spec = ToolSpec(
+    name="marine_seakeeping_rao",
+    description=(
+        "Compute heave, pitch, and roll Response Amplitude Operators (RAOs) "
+        "using Salvesen-Tuck-Faltinsen (STF) strip theory with Lewis-form sections. "
+        "\n\n"
+        "Provide hull sections as a list of [x_m, B_wl_m, T_s_m, A_s_m2] rows "
+        "(longitudinal position from aft, full waterline beam, local draft, section area). "
+        "Alternatively supply a Wigley hull via wigley_L/B/T parameters. "
+        "\n\n"
+        "Returns RAO amplitude and phase at each wave frequency for heave (m/m), "
+        "pitch (rad/m), and roll (rad/m). "
+        "\n\n"
+        "Approximations: Diffraction uses Haskind relation at zero speed (O(Fn) error). "
+        "Roll includes viscous damping fraction (default 5 % of critical)."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "sections": {
+                "type": "array",
+                "items": {"type": "array", "items": {"type": "number"}, "minItems": 4, "maxItems": 4},
+                "description": "List of [x_m, B_wl_m, T_s_m, A_s_m2] strip rows (aft to fwd).",
+            },
+            "wigley_L": {"type": "number", "description": "Wigley hull length (m) — alternative to sections."},
+            "wigley_B": {"type": "number", "description": "Wigley hull beam (m)."},
+            "wigley_T": {"type": "number", "description": "Wigley hull draft (m)."},
+            "wigley_n": {"type": "integer", "description": "Number of Wigley sections (default 21)."},
+            "displacement": {"type": "number", "description": "Ship displacement / mass (t)."},
+            "kyy": {"type": "number", "description": "Pitch radius of gyration (m). Default 0.25*L."},
+            "kxx": {"type": "number", "description": "Roll radius of gyration (m). Default 0.35*B."},
+            "lcg": {"type": "number", "description": "LCG from aft (m). Default midship."},
+            "kg": {"type": "number", "description": "KG above keel (m). Default T/2."},
+            "gm_transverse": {"type": "number", "description": "GM transverse (m). Default 1.0."},
+            "gm_longitudinal": {"type": "number", "description": "GML longitudinal (m). Default 100."},
+            "U": {"type": "number", "description": "Forward speed (m/s). Default 0."},
+            "mu_deg": {"type": "number", "description": "Heading (°): 180=head, 90=beam, 0=following. Default 180."},
+            "omega_list": {
+                "type": "array", "items": {"type": "number"},
+                "description": "List of wave frequencies (rad/s) to evaluate. Default: 0.2–2.5 in 20 steps.",
+            },
+            "roll_damping_fraction": {"type": "number", "description": "Viscous roll damping fraction (0–0.3). Default 0.05."},
+            "rho": {"type": "number", "description": "Water density t/m³. Default 1.025."},
+        },
+    },
+)
+
+
+async def run_marine_seakeeping_rao(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        import math
+        from kerf_marine.seakeeping import (
+            HullSection, compute_rao, wigley_hull_sections,
+        )
+        from kerf_marine.hydrostatics import RHO_SW
+
+        rho = float(args.get("rho", RHO_SW))
+
+        # Build sections
+        if "sections" in args:
+            raw = args["sections"]
+            sections = [HullSection(x=float(r[0]), B_wl=float(r[1]), T_s=float(r[2]), A_s=float(r[3])) for r in raw]
+        elif "wigley_L" in args and "wigley_B" in args and "wigley_T" in args:
+            L = float(args["wigley_L"])
+            B = float(args["wigley_B"])
+            T = float(args["wigley_T"])
+            n = int(args.get("wigley_n", 21))
+            sections = wigley_hull_sections(L, B, T, n)
+        else:
+            return err_payload("Provide 'sections' list or wigley_L/B/T parameters.", "MARINE_RAO_BAD_ARGS")
+
+        if not sections:
+            return err_payload("No hull sections provided.", "MARINE_RAO_BAD_ARGS")
+
+        L_hull = sections[-1].x - sections[0].x or 1.0
+        mid = (sections[0].x + sections[-1].x) / 2.0
+        B_mid = sections[len(sections) // 2].B_wl
+        T_typ = sections[len(sections) // 2].T_s
+
+        displacement = float(args.get("displacement", rho * L_hull * B_mid * T_typ * 0.67))
+        kyy = float(args.get("kyy", 0.25 * L_hull))
+        kxx = float(args.get("kxx", 0.35 * B_mid))
+        lcg = float(args.get("lcg", mid))
+        kg = float(args.get("kg", T_typ / 2.0))
+        gm_transverse = float(args.get("gm_transverse", 1.0))
+        gm_longitudinal = float(args.get("gm_longitudinal", 100.0))
+        U = float(args.get("U", 0.0))
+        mu_deg = float(args.get("mu_deg", 180.0))
+        roll_damp = float(args.get("roll_damping_fraction", 0.05))
+
+        if "omega_list" in args:
+            omegas = [float(o) for o in args["omega_list"]]
+        else:
+            omegas = [0.2 + i * (2.5 - 0.2) / 19 for i in range(20)]
+
+        results = []
+        for om in omegas:
+            r = compute_rao(
+                sections, om, displacement, kyy, kxx, lcg, kg,
+                gm_transverse, gm_longitudinal,
+                U=U, mu_deg=mu_deg,
+                roll_damping_fraction=roll_damp,
+                rho=rho,
+            )
+            results.append(r.as_dict())
+
+        return ok_payload({"rao_points": results, "n_sections": len(sections), "L_m": round(L_hull, 3)})
+    except Exception as exc:
+        return err_payload(str(exc), "MARINE_RAO_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# marine_seakeeping_stats
+# ---------------------------------------------------------------------------
+
+marine_seakeeping_stats_spec = ToolSpec(
+    name="marine_seakeeping_stats",
+    description=(
+        "Compute significant heave, pitch, and roll amplitudes in irregular seas "
+        "using STF strip theory + JONSWAP or Pierson-Moskowitz spectrum. "
+        "\n\n"
+        "Returns spectral moments m0/m2, significant amplitude (2√m0), "
+        "mean zero-crossing period, and most probable maximum in 100 wave cycles. "
+        "\n\n"
+        "Same hull input as marine_seakeeping_rao."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "sections": {
+                "type": "array",
+                "items": {"type": "array", "items": {"type": "number"}, "minItems": 4, "maxItems": 4},
+                "description": "List of [x_m, B_wl_m, T_s_m, A_s_m2] rows.",
+            },
+            "wigley_L": {"type": "number"},
+            "wigley_B": {"type": "number"},
+            "wigley_T": {"type": "number"},
+            "wigley_n": {"type": "integer"},
+            "displacement": {"type": "number", "description": "Ship mass (t)."},
+            "kyy": {"type": "number"},
+            "kxx": {"type": "number"},
+            "lcg": {"type": "number"},
+            "kg": {"type": "number"},
+            "gm_transverse": {"type": "number"},
+            "gm_longitudinal": {"type": "number"},
+            "Hs": {"type": "number", "description": "Significant wave height (m)."},
+            "Tp": {"type": "number", "description": "Peak wave period (s)."},
+            "U": {"type": "number", "description": "Forward speed (m/s). Default 0."},
+            "mu_deg": {"type": "number", "description": "Heading (°). Default 180."},
+            "spectrum": {"type": "string", "enum": ["jonswap", "pm"], "description": "Wave spectrum type. Default jonswap."},
+            "gamma": {"type": "number", "description": "JONSWAP peak factor. Default 3.3."},
+            "omega_min": {"type": "number", "description": "Min frequency (rad/s). Default 0.1."},
+            "omega_max": {"type": "number", "description": "Max frequency (rad/s). Default 3.0."},
+            "n_omega": {"type": "integer", "description": "Number of frequency points. Default 60."},
+            "roll_damping_fraction": {"type": "number"},
+            "rho": {"type": "number"},
+        },
+        "required": ["Hs", "Tp"],
+    },
+)
+
+
+async def run_marine_seakeeping_stats(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_marine.seakeeping import (
+            HullSection, compute_response_statistics, wigley_hull_sections,
+        )
+        from kerf_marine.hydrostatics import RHO_SW
+
+        rho = float(args.get("rho", RHO_SW))
+
+        if "sections" in args:
+            raw = args["sections"]
+            sections = [HullSection(x=float(r[0]), B_wl=float(r[1]), T_s=float(r[2]), A_s=float(r[3])) for r in raw]
+        elif "wigley_L" in args and "wigley_B" in args and "wigley_T" in args:
+            L = float(args["wigley_L"])
+            B = float(args["wigley_B"])
+            T = float(args["wigley_T"])
+            n = int(args.get("wigley_n", 21))
+            sections = wigley_hull_sections(L, B, T, n)
+        else:
+            return err_payload("Provide 'sections' or wigley_L/B/T.", "MARINE_STATS_BAD_ARGS")
+
+        L_hull = sections[-1].x - sections[0].x or 1.0
+        mid = (sections[0].x + sections[-1].x) / 2.0
+        B_mid = sections[len(sections) // 2].B_wl
+        T_typ = sections[len(sections) // 2].T_s
+
+        displacement = float(args.get("displacement", rho * L_hull * B_mid * T_typ * 0.67))
+        kyy = float(args.get("kyy", 0.25 * L_hull))
+        kxx = float(args.get("kxx", 0.35 * B_mid))
+        lcg = float(args.get("lcg", mid))
+        kg = float(args.get("kg", T_typ / 2.0))
+        gm_transverse = float(args.get("gm_transverse", 1.0))
+        gm_longitudinal = float(args.get("gm_longitudinal", 100.0))
+        Hs = float(args["Hs"])
+        Tp = float(args["Tp"])
+        U = float(args.get("U", 0.0))
+        mu_deg = float(args.get("mu_deg", 180.0))
+        spectrum = str(args.get("spectrum", "jonswap"))
+        gamma = float(args.get("gamma", 3.3))
+        omega_min = float(args.get("omega_min", 0.1))
+        omega_max = float(args.get("omega_max", 3.0))
+        n_omega = int(args.get("n_omega", 60))
+        roll_damp = float(args.get("roll_damping_fraction", 0.05))
+
+        stats = compute_response_statistics(
+            sections, displacement, kyy, kxx, lcg, kg,
+            gm_transverse, gm_longitudinal,
+            Hs=Hs, Tp=Tp, U=U, mu_deg=mu_deg,
+            spectrum=spectrum, gamma=gamma,
+            omega_min=omega_min, omega_max=omega_max, n_omega=n_omega,
+            roll_damping_fraction=roll_damp, rho=rho,
+        )
+
+        return ok_payload({
+            "Hs_input_m": Hs, "Tp_input_s": Tp,
+            "spectrum": spectrum,
+            "motions": [s.as_dict() for s in stats],
+        })
+    except Exception as exc:
+        return err_payload(str(exc), "MARINE_STATS_ERROR")

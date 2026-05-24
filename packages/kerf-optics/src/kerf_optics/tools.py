@@ -304,3 +304,222 @@ async def run_optics_lens_design(args: dict[str, Any], ctx: "ProjectCtx") -> str
 
     except Exception as exc:
         return err_payload(str(exc), "OPTICS_DESIGN_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# optics_tolerancing
+# ---------------------------------------------------------------------------
+
+optics_tolerancing_spec = ToolSpec(
+    name="optics_tolerancing",
+    description=(
+        "Optical tolerance analysis (sensitivity + Monte Carlo) for a multi-element "
+        "paraxial lens system.  Perturbs each tolerance parameter one-at-a-time (OAT) "
+        "and also runs Monte Carlo trials.  Merit function options: 'efl' (|EFL − target|), "
+        "'bfd' (|BFD − target|).  Returns per-parameter sensitivities, RSS budget, and "
+        "Monte Carlo statistics (mean, std, P05, P95, yield)."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "elements": {
+                "type": "array",
+                "description": "Lens system elements (same format as optics_trace_ray).",
+                "items": {"type": "object"},
+                "minItems": 1,
+            },
+            "tolerances": {
+                "type": "array",
+                "description": (
+                    "List of tolerance parameters. Each: "
+                    "{element_index: int, param_name: str, delta: float, "
+                    "nominal: float (optional), description: str (optional)}."
+                ),
+                "items": {"type": "object"},
+                "minItems": 1,
+            },
+            "merit_type": {
+                "type": "string",
+                "enum": ["efl", "bfd"],
+                "description": "Merit function: 'efl' or 'bfd'. Default 'efl'.",
+            },
+            "target_value": {
+                "type": "number",
+                "description": "Target value for the merit function (m). Default = nominal EFL.",
+            },
+            "n_mc_trials": {
+                "type": "integer",
+                "description": "Number of Monte Carlo trials. Default 500.",
+            },
+            "mc_distribution": {
+                "type": "string",
+                "enum": ["uniform", "normal"],
+                "description": "Monte Carlo distribution: 'uniform' (default) or 'normal' (±3σ).",
+            },
+            "mc_seed": {
+                "type": "integer",
+                "description": "Monte Carlo random seed. Default 42.",
+            },
+        },
+        "required": ["elements", "tolerances"],
+    },
+)
+
+
+async def run_optics_tolerancing(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_optics.lens_system import LensSystem
+        from kerf_optics.tolerancing import (
+            ToleranceParam,
+            sensitivity_analysis,
+            monte_carlo_tolerancing,
+            merit_efl,
+            merit_bfd,
+        )
+
+        # Build system
+        raw_elements = args["elements"]
+        from kerf_optics.tools import _build_element
+        elements = [_build_element(e) for e in raw_elements]
+        system = LensSystem(elements)
+
+        # Build tolerance params
+        raw_tols = args["tolerances"]
+        params = []
+        for t in raw_tols:
+            params.append(ToleranceParam(
+                element_index=int(t["element_index"]),
+                param_name=str(t["param_name"]),
+                nominal=float(t["nominal"]) if "nominal" in t else None,
+                delta=float(t["delta"]),
+                description=str(t.get("description", "")),
+            ))
+
+        # Merit function
+        merit_type = str(args.get("merit_type", "efl")).lower()
+        M = system.system_matrix()
+        C = M[1, 0]
+        nominal_efl = -1.0 / C if abs(C) > 1e-14 else 1.0
+        target = float(args.get("target_value", nominal_efl))
+
+        if merit_type == "efl":
+            merit_fn = merit_efl(target)
+        elif merit_type == "bfd":
+            merit_fn = merit_bfd(target)
+        else:
+            return err_payload(f"unknown merit_type: {merit_type!r}", "BAD_ARGS")
+
+        # Sensitivity
+        sens = sensitivity_analysis(system, params, merit_fn)
+
+        # Monte Carlo
+        n_mc = int(args.get("n_mc_trials", 500))
+        mc_dist = str(args.get("mc_distribution", "uniform"))
+        mc_seed = int(args.get("mc_seed", 42))
+        mc = monte_carlo_tolerancing(
+            system, params, merit_fn,
+            n_trials=n_mc, distribution=mc_dist, seed=mc_seed,
+        )
+
+        payload: dict[str, Any] = {
+            "merit_type": merit_type,
+            "target_value": target,
+            "merit_nominal": round(sens.merit_nominal, 8),
+            "rss_budget": round(sens.rss_budget, 8),
+            "sensitivity_table": [
+                {k: (round(v, 8) if isinstance(v, float) else v)
+                 for k, v in row.items()}
+                for row in sens.sensitivity_table()
+            ],
+            "monte_carlo": mc.summary(),
+        }
+        return ok_payload(payload)
+
+    except Exception as exc:
+        return err_payload(str(exc), "TOLERANCING_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# optics_mtf
+# ---------------------------------------------------------------------------
+
+optics_mtf_spec = ToolSpec(
+    name="optics_mtf",
+    description=(
+        "Compute the Modulation Transfer Function (MTF) for a paraxial lens system. "
+        "Returns the diffraction-limited MTF (circular aperture, incoherent) and the "
+        "geometric MTF (Gaussian spot approximation) as functions of spatial frequency "
+        "(line pairs/mm at the image plane).  Also reports the diffraction cut-off "
+        "frequency, f-number, wavelength, and RMS spot radius."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "elements": {
+                "type": "array",
+                "description": "Lens system elements (same format as optics_trace_ray).",
+                "items": {"type": "object"},
+                "minItems": 1,
+            },
+            "object_distance_m": {
+                "type": "number",
+                "description": "Object distance in metres (positive = real object). Default 1.0.",
+            },
+            "f_number": {
+                "type": "number",
+                "description": "Aperture f/# = focal_length / aperture_diameter. Default 4.0.",
+            },
+            "lambda_nm": {
+                "type": "number",
+                "description": "Wavelength in nanometres. Default 550 nm (green).",
+            },
+            "max_freq_lpmm": {
+                "type": "number",
+                "description": "Maximum spatial frequency in lp/mm for the output curve. "
+                               "Default: 1.2× diffraction cut-off.",
+            },
+            "n_freq_points": {
+                "type": "integer",
+                "description": "Number of spatial frequency points. Default 50.",
+            },
+        },
+        "required": ["elements"],
+    },
+)
+
+
+async def run_optics_mtf(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        import numpy as np_inner
+        from kerf_optics.lens_system import LensSystem
+        from kerf_optics.mtf import mtf_from_lens_system, diffraction_cutoff_lpmm
+        from kerf_optics.tools import _build_element
+
+        raw_elements = args["elements"]
+        elements = [_build_element(e) for e in raw_elements]
+        system = LensSystem(elements)
+
+        do = float(args.get("object_distance_m", 1.0))
+        f_num = float(args.get("f_number", 4.0))
+        lam = float(args.get("lambda_nm", 550.0))
+        n_pts = int(args.get("n_freq_points", 50))
+
+        nu_c = diffraction_cutoff_lpmm(f_num, lam)
+        max_freq = float(args.get("max_freq_lpmm", 1.2 * nu_c))
+        freqs = list(np_inner.linspace(0.0, max_freq, n_pts))
+
+        result = mtf_from_lens_system(
+            system,
+            object_distance_m=do,
+            f_number=f_num,
+            lambda_nm=lam,
+            spatial_freqs_lpmm=freqs,
+        )
+
+        payload: dict[str, Any] = result.to_dict()
+        payload["mtf_at_50lpmm"] = round(result.mtf_50lpmm, 6)
+        payload["mtf_at_100lpmm"] = round(result.mtf_100lpmm, 6)
+        return ok_payload(payload)
+
+    except Exception as exc:
+        return err_payload(str(exc), "MTF_ERROR")

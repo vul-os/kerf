@@ -215,24 +215,24 @@ Kerf does not currently import atopile projects natively, but a KiCad project ex
 
 ## Feature comparison table
 
-| Feature | atopile | tscircuit | Kerf (tscircuit) |
-|---------|---------|-----------|-----------------|
-| Language | atopile DSL | TypeScript / TSX | TSX (`.circuit.tsx`) |
-| Electrical type checking | Yes — compile-time | No | No (planned) |
-| Browser rendering | No | Yes | Yes (Web Worker) |
-| CLI toolchain | `ato` Python CLI | `tsci` npm CLI | Built into Kerf |
-| Gerber export | Via KiCad | Built-in | `tsci export` via kerf-electronics |
-| KiCad export | Native | Built-in | `kicad_export_project` |
-| KiCad import | Not needed | `kicad_to_tscircuit` | `kicad_import_project` |
-| SPICE simulation | Via KiCad | Planned | ngspice via `run_simulation` |
-| Autorouting | KiCad / Freerouting | Freerouting built-in | FreeRouting subprocess |
-| RF analysis | No | No | scikit-rf via `run_rf_study` |
-| Part library | atopile registry | `@tscircuit/footprinter` | Kerf library + DigiKey/Mouser |
-| BOM | Compiler output | `circuit-json` | Kerf BOM rollup |
-| LLM tool coverage | Limited | Extensive | 60+ electronics tools |
-| Revision history | Git (external) | Git (external) | Built-in (every save) |
-| HMI / firmware link | No | No | `.fw.config` linked_circuit |
-| Pricing | Open source | Open source | MIT open-core |
+| Kerf (tscircuit) | atopile | tscircuit | Feature |
+|-----------------|---------|-----------|---------|
+| TSX (`.circuit.tsx`) | atopile DSL | TypeScript / TSX | Language |
+| No (planned) | Yes — compile-time | No | Electrical type checking |
+| Yes (Web Worker) | No | Yes | Browser rendering |
+| Built into Kerf | `ato` Python CLI | `tsci` npm CLI | CLI toolchain |
+| `tsci export` via kerf-electronics | Via KiCad | Built-in | Gerber export |
+| `kicad_export_project` | Native | Built-in | KiCad export |
+| `kicad_import_project` | Not needed | `kicad_to_tscircuit` | KiCad import |
+| ngspice via `run_simulation` | Via KiCad | Planned | SPICE simulation |
+| FreeRouting subprocess | KiCad / Freerouting | Freerouting built-in | Autorouting |
+| scikit-rf via `run_rf_study` | No | No | RF analysis |
+| Kerf library + DigiKey/Mouser | atopile registry | `@tscircuit/footprinter` | Part library |
+| Kerf BOM rollup | Compiler output | `circuit-json` | BOM |
+| 60+ electronics tools | Limited | Extensive | LLM tool coverage |
+| Built-in (every save) | Git (external) | Git (external) | Revision history |
+| `.fw.config` linked_circuit | No | No | HMI / firmware link |
+| MIT open-core | Open source | Open source | Pricing |
 
 ---
 

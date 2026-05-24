@@ -18,6 +18,7 @@ import pytest
 
 from kerf_render.pricing_meter import (
     GPU_RATES_USD_PER_SECOND,
+    GPU_MARKUP_PCT,
     compute_usd_cost,
     gpu_rate,
     meter_render_job,
@@ -74,16 +75,29 @@ def test_unknown_gpu_falls_back_to_a10g():
 # ---------------------------------------------------------------------------
 
 
-def test_compute_usd_cost_a10g_30s():
-    """30 GPU-seconds on A10G should cost exactly 0.018 USD."""
-    cost = compute_usd_cost(30.0, "a10g")
+def test_compute_usd_cost_a10g_30s_no_markup():
+    """30 GPU-seconds on A10G at zero markup = bare COGS $0.018."""
+    cost = compute_usd_cost(30.0, "a10g", markup_pct=0)
     assert cost == pytest.approx(0.018, rel=1e-9)
 
 
-def test_compute_usd_cost_a100_30s():
-    """30 GPU-seconds on A100 should cost exactly 0.042 USD."""
-    cost = compute_usd_cost(30.0, "a100")
+def test_compute_usd_cost_a100_30s_no_markup():
+    """30 GPU-seconds on A100 at zero markup = bare COGS $0.042."""
+    cost = compute_usd_cost(30.0, "a100", markup_pct=0)
     assert cost == pytest.approx(0.042, rel=1e-9)
+
+
+def test_compute_usd_cost_applies_markup():
+    """Default 20% markup: 30s A10G → 0.018 × 1.20 = $0.0216."""
+    cost = compute_usd_cost(30.0, "a10g")
+    assert cost == pytest.approx(0.018 * (1 + GPU_MARKUP_PCT / 100), rel=1e-9)
+
+
+def test_compute_usd_cost_explicit_markup():
+    """Explicit markup_pct=20 gives same result as the default."""
+    assert compute_usd_cost(30.0, "a10g", markup_pct=20) == pytest.approx(
+        compute_usd_cost(30.0, "a10g"), rel=1e-9
+    )
 
 
 def test_compute_usd_cost_zero_gpu_seconds():
@@ -98,22 +112,23 @@ def test_compute_usd_cost_zero_gpu_seconds():
 
 @pytest.mark.asyncio
 async def test_meter_render_job_a10g_30s_debits_correctly():
-    """30 GPU-seconds on A10G → $0.018 charged; DB execute called once."""
+    """30 GPU-seconds on A10G → COGS × 1.20 charged; DB execute called once."""
     pool = _FakePool()
     workspace_id = str(uuid.uuid4())
 
+    expected = 0.018 * (1 + GPU_MARKUP_PCT / 100)  # 0.0216 at 20%
     result = await meter_render_job(pool, workspace_id, 30.0, "a10g")
 
     assert result["skipped"] is False
     assert result["skip_reason"] is None
-    assert result["charged_usd"] == pytest.approx(0.018, rel=1e-9)
+    assert result["charged_usd"] == pytest.approx(expected, rel=1e-9)
 
     # The DB connection should have received exactly one execute call.
     assert len(pool.conn.calls) == 1
     sql, args = pool.conn.calls[0]
     assert "cloud_debit_balance" in sql
     assert args[0] == workspace_id
-    assert args[1] == pytest.approx(0.018, rel=1e-9)
+    assert args[1] == pytest.approx(expected, rel=1e-9)
 
 
 @pytest.mark.asyncio
@@ -203,10 +218,11 @@ async def test_meter_render_job_billing_disabled_not_set(monkeypatch):
     pool = _FakePool()
     workspace_id = str(uuid.uuid4())
 
+    expected = 0.018 * (1 + GPU_MARKUP_PCT / 100)
     result = await meter_render_job(pool, workspace_id, 30.0, "a10g")
 
     assert result["skipped"] is False
-    assert result["charged_usd"] == pytest.approx(0.018, rel=1e-9)
+    assert result["charged_usd"] == pytest.approx(expected, rel=1e-9)
     assert len(pool.conn.calls) == 1
 
 
@@ -235,9 +251,10 @@ async def test_meter_render_job_with_job_id():
     workspace_id = str(uuid.uuid4())
     job_id = str(uuid.uuid4())
 
+    expected = 0.018 * (1 + GPU_MARKUP_PCT / 100)
     result = await meter_render_job(
         pool, workspace_id, 30.0, "a10g", job_id=job_id
     )
 
     assert result["skipped"] is False
-    assert result["charged_usd"] == pytest.approx(0.018, rel=1e-9)
+    assert result["charged_usd"] == pytest.approx(expected, rel=1e-9)

@@ -51,6 +51,17 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
+# GPU markup — mirrors cloud_pricing_token_markup_pct in Settings.
+# When non-zero, the billed amount = COGS × (1 + markup/100).
+# Overridable at runtime by mutating this module-level variable or by
+# passing markup_pct= explicitly to compute_usd_cost / meter_render_job.
+# ---------------------------------------------------------------------------
+
+#: Default GPU markup percentage (mirrors cloud_pricing_token_markup_pct).
+#: Operators may override this after import; the value is read at call time.
+GPU_MARKUP_PCT: float = 20.0
+
+# ---------------------------------------------------------------------------
 # GPU rate table (USD per GPU-second)
 # ---------------------------------------------------------------------------
 
@@ -90,14 +101,25 @@ def gpu_rate(gpu_model: str) -> float:
     return GPU_RATES_USD_PER_SECOND.get(gpu_model.lower(), _DEFAULT_GPU_RATE)
 
 
-def compute_usd_cost(gpu_seconds: float, gpu_model: str) -> float:
-    """Return the USD cost for *gpu_seconds* on *gpu_model*.
+def compute_usd_cost(
+    gpu_seconds: float,
+    gpu_model: str,
+    *,
+    markup_pct: Optional[float] = None,
+) -> float:
+    """Return the billed USD cost for *gpu_seconds* on *gpu_model*.
+
+    The billed amount is COGS × (1 + markup/100).  When *markup_pct* is
+    ``None`` the module-level :data:`GPU_MARKUP_PCT` is used (default 20%).
+    Pass ``markup_pct=0`` to get the bare COGS figure.
 
     Returns ``0.0`` when ``gpu_seconds <= 0`` (free / browser path).
     """
     if gpu_seconds <= 0:
         return 0.0
-    return gpu_seconds * gpu_rate(gpu_model)
+    cogs = gpu_seconds * gpu_rate(gpu_model)
+    pct = markup_pct if markup_pct is not None else GPU_MARKUP_PCT
+    return cogs * (1.0 + pct / 100.0)
 
 
 # ---------------------------------------------------------------------------
@@ -111,6 +133,7 @@ async def meter_render_job(
     gpu_model: str = "a10g",
     *,
     job_id: Optional[str] = None,
+    markup_pct: Optional[float] = None,
 ) -> dict:
     """Debit the workspace owner's kerf_paid balance for a completed render.
 
@@ -131,9 +154,12 @@ async def meter_render_job(
         GPU hardware identifier (e.g. ``"A10G"``, ``"A100"``).
         Case-insensitive; unknown values fall back to the A10G rate.
     job_id:
-        Optional render job UUID for logging / traceability.  Not written
-        to the DB by this function (that is handled by the caller or
-        ``kerf_billing.render_meter``).
+        Optional render job UUID for logging / traceability.  Also used as
+        the primary key when writing a ``usage_events`` row.
+    markup_pct:
+        GPU markup percentage to apply on top of COGS.  ``None`` uses the
+        module-level :data:`GPU_MARKUP_PCT` (default 20%).  Pass ``0`` to
+        charge bare COGS (useful for BYO / test scenarios).
 
     Returns
     -------
@@ -165,8 +191,8 @@ async def meter_render_job(
             "skip_reason": "billing_disabled",
         }
 
-    # ── Compute cost ─────────────────────────────────────────────────────────
-    cost_usd = compute_usd_cost(gpu_seconds, gpu_model)
+    # ── Compute cost (COGS × (1 + markup)) ───────────────────────────────────
+    cost_usd = compute_usd_cost(gpu_seconds, gpu_model, markup_pct=markup_pct)
 
     # ── Debit via cloud_debit_balance() ──────────────────────────────────────
     async with pool.acquire() as conn:
@@ -175,6 +201,10 @@ async def meter_render_job(
             workspace_id,
             cost_usd,
         )
+
+    # ── Emit gpu usage_events row (makes GPU spend visible on ledger) ─────────
+    if job_id and pool is not None:
+        await _record_gpu_usage_event(pool, workspace_id, job_id, gpu_seconds, cost_usd)
 
     logger.info(
         "%smeter_render_job: charged workspace=%s gpu_model=%s "
@@ -193,8 +223,39 @@ async def meter_render_job(
     }
 
 
+async def _record_gpu_usage_event(
+    pool,
+    user_id: str,
+    job_id: str,
+    gpu_seconds: float,
+    usd_cost: float,
+) -> None:
+    """Append a kind='gpu' row to usage_events (best-effort, fire-and-forget).
+
+    This makes GPU render spend visible alongside token/storage on the user-
+    facing billing dashboard, replacing the render-only ``render_usage_events``
+    table as the public ledger entry point.
+    """
+    try:
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO usage_events
+                    (id, user_id, kind, usd_cost, payer)
+                VALUES ($1, $2, 'gpu', $3, 'kerf_paid')
+                ON CONFLICT (id) DO NOTHING
+                """,
+                job_id,
+                user_id,
+                usd_cost,
+            )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("pricing_meter: failed to record gpu usage_event: %s", exc)
+
+
 __all__ = [
     "GPU_RATES_USD_PER_SECOND",
+    "GPU_MARKUP_PCT",
     "gpu_rate",
     "compute_usd_cost",
     "meter_render_job",

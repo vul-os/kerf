@@ -18,7 +18,9 @@ from kerf_pricing.render_presets import (
 )
 from kerf_billing.render_meter import (
     UnknownPresetError,
+    RenderGateDenied,
     charge_render,
+    gate_render_job,
     quote_render,
 )
 
@@ -84,6 +86,17 @@ class _Conn:
                 }
             )
             return
+        if "INSERT INTO usage_events" in q:
+            # kind='gpu' row for the shared billing ledger.
+            self.s["gpu_events"].append(
+                {
+                    "id": args[0], "user_id": args[1],
+                    "usd_cost": args[2],
+                }
+            )
+            return
+        if "SELECT cloud_user_balances" in q or "cloud_user_balances" in q:
+            return  # handled by fetchrow
         raise AssertionError(f"unexpected execute: {q}")
 
 
@@ -105,6 +118,7 @@ class FakePool:
             "cache": set(cache or ()),
             "quota": dict(quota or {}),
             "events": [],
+            "gpu_events": [],
         }
 
     def acquire(self):
@@ -113,6 +127,10 @@ class FakePool:
     @property
     def events(self):
         return self.state["events"]
+
+    @property
+    def gpu_events(self):
+        return self.state["gpu_events"]
 
     def balance(self, user):
         return self.state["balances"].get(user)
@@ -265,3 +283,122 @@ async def test_charge_unknown_preset_raises():
     pool = FakePool(balances={"u1": 100.0})
     with pytest.raises(UnknownPresetError):
         await charge_render(pool, "u1", "j", "nope", 1.0)
+
+
+# ---------------------------------------------------------------------------
+# charge_render — usage_events (kind='gpu') emission
+# ---------------------------------------------------------------------------
+
+
+async def test_charge_emits_gpu_usage_event():
+    """charge_render must emit a kind='gpu' row in usage_events on success."""
+    pool = FakePool(balances={"u1": 50.0})
+    res = await charge_render(pool, "u1", "jobX", "standard", 100.0)
+    assert res["ok"] is True
+    assert len(pool.gpu_events) == 1
+    ev = pool.gpu_events[0]
+    assert ev["id"] == "jobX"
+    assert ev["user_id"] == "u1"
+    assert ev["usd_cost"] == pytest.approx(2.0)
+
+
+async def test_charge_cache_hit_emits_zero_gpu_usage_event():
+    """Cache hits emit a zero-cost usage_events row."""
+    pool = FakePool(balances={"u1": 100.0}, cache={"ck"})
+    await charge_render(pool, "u1", "jobC", "hero", 0.0, cache_key="ck")
+    assert len(pool.gpu_events) == 1
+    assert pool.gpu_events[0]["usd_cost"] == 0.0
+
+
+# ---------------------------------------------------------------------------
+# gate_render_job
+# ---------------------------------------------------------------------------
+
+
+class _GateConn:
+    """Minimal asyncpg connection stub for gate_render_job tests.
+
+    Supports the three queries used by load_user_billing.
+    """
+
+    def __init__(self, credits_usd: float, prefer_byo: bool = False, providers=()):
+        self._credits = credits_usd
+        self._prefer_byo = prefer_byo
+        self._providers = providers
+
+    async def fetchrow(self, sql, *args):
+        q = " ".join(sql.split())
+        if "FROM cloud_user_balances" in q:
+            return {
+                "credits_usd": self._credits,
+                "free_tokens_in_remaining": 100_000,
+                "free_tokens_out_remaining": 20_000,
+            }
+        if "FROM users" in q:
+            return {"prefer_byo": self._prefer_byo}
+        raise AssertionError(f"unexpected fetchrow: {q}")
+
+    async def fetch(self, sql, *args):
+        q = " ".join(sql.split())
+        if "FROM user_provider_keys" in q:
+            return [{"provider": p} for p in self._providers]
+        raise AssertionError(f"unexpected fetch: {q}")
+
+
+class _GateAcquire:
+    def __init__(self, conn):
+        self._conn = conn
+
+    async def __aenter__(self):
+        return self._conn
+
+    async def __aexit__(self, *exc):
+        return False
+
+
+class GatePool:
+    def __init__(self, credits_usd: float, prefer_byo: bool = False, providers=()):
+        self._conn = _GateConn(credits_usd, prefer_byo, providers)
+
+    def acquire(self):
+        return _GateAcquire(self._conn)
+
+
+async def test_gate_billing_disabled_env_skips(monkeypatch):
+    """KERF_RENDER_BILLING_DISABLED=1 → gate silently permits (self-host)."""
+    monkeypatch.setenv("KERF_RENDER_BILLING_DISABLED", "1")
+    pool = GatePool(credits_usd=0.0)
+    await gate_render_job(pool, "u1", 60.0, usage_enabled=True)  # no error
+
+
+async def test_gate_usage_disabled_skips():
+    """usage_enabled=False → gate silently permits (local/OSS mode)."""
+    pool = GatePool(credits_usd=0.0)
+    await gate_render_job(pool, "u1", 60.0, usage_enabled=False)  # no error
+
+
+async def test_gate_free_tier_blocked(monkeypatch):
+    """A user with zero credits (free tier) is blocked with gpu_paid_only."""
+    monkeypatch.delenv("KERF_RENDER_BILLING_DISABLED", raising=False)
+    pool = GatePool(credits_usd=0.0)
+    with pytest.raises(RenderGateDenied) as exc_info:
+        await gate_render_job(pool, "u1", 60.0, usage_enabled=True)
+    assert exc_info.value.reason == "gpu_paid_only"
+
+
+async def test_gate_paid_sufficient_permits(monkeypatch):
+    """A user with enough credits passes the gate without error."""
+    monkeypatch.delenv("KERF_RENDER_BILLING_DISABLED", raising=False)
+    pool = GatePool(credits_usd=50.0)
+    await gate_render_job(pool, "u1", 60.0, usage_enabled=True)  # no error
+
+
+async def test_gate_insufficient_credits_blocked(monkeypatch):
+    """Paid user without enough credits gets insufficient_credits denial."""
+    monkeypatch.delenv("KERF_RENDER_BILLING_DISABLED", raising=False)
+    # 60 GPU-seconds × $0.0006 × 1.20 = $0.0432; user only has $0.01.
+    pool = GatePool(credits_usd=0.01)
+    with pytest.raises(RenderGateDenied) as exc_info:
+        await gate_render_job(pool, "u1", 60.0, usage_enabled=True)
+    assert exc_info.value.reason == "insufficient_credits"
+    assert exc_info.value.need_credits > 0

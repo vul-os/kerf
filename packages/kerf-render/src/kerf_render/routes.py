@@ -45,7 +45,7 @@ import textwrap
 import time
 import uuid
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional
 
@@ -54,6 +54,94 @@ from kerf_core.dependencies import require_auth
 router = APIRouter()
 
 _BLENDER_AVAILABLE = shutil.which("blender") is not None
+
+
+# ---------------------------------------------------------------------------
+# Billing gate helpers
+# ---------------------------------------------------------------------------
+
+def _get_settings():
+    """Lazy import to avoid circular-import at module load time."""
+    from kerf_core.config import get_settings
+    return get_settings()
+
+
+async def _optional_user_id(request: Request) -> Optional[str]:
+    """Extract user_id from Bearer JWT if present; return None otherwise."""
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return None
+    token = auth[7:]
+    try:
+        from kerf_core.dependencies import decode_jwt, API_TOKEN_PREFIX, _resolve_api_token
+        if token.startswith(API_TOKEN_PREFIX):
+            payload = await _resolve_api_token(request, token)
+        else:
+            payload = decode_jwt(token)
+        return payload.get("sub")
+    except Exception:
+        return None
+
+
+async def _run_billing_gate(user_id: Optional[str], est_gpu_seconds: float) -> None:
+    """Invoke gate_render_job when billing is cloud-enabled.
+
+    Skips silently when:
+    - KERF_RENDER_BILLING_DISABLED=1  (self-host kill-switch)
+    - usage_enabled=False in settings (local / OSS mode)
+    - user_id is None (unauthenticated local request)
+
+    Raises HTTP 402 on denial.
+    """
+    settings = _get_settings()
+    if not settings.usage_enabled:
+        return  # local / OSS — no billing gate
+    if user_id is None:
+        # No auth token: could be a local-only deploy.  Gate only when
+        # usage is enabled AND we have a user identity; otherwise allow.
+        return
+
+    try:
+        from kerf_billing.render_meter import gate_render_job, RenderGateDenied
+        from kerf_core.db.connection import get_pool_required
+        pool = await get_pool_required()
+        await gate_render_job(
+            pool,
+            user_id,
+            est_gpu_seconds,
+            usage_enabled=settings.usage_enabled,
+        )
+    except Exception as exc:
+        # Import the specific exception type to distinguish denial vs other errors.
+        try:
+            from kerf_billing.render_meter import RenderGateDenied
+        except ImportError:
+            RenderGateDenied = None  # type: ignore
+
+        if RenderGateDenied is not None and isinstance(exc, RenderGateDenied):
+            reason = exc.reason  # type: ignore[attr-defined]
+            if reason == "gpu_paid_only":
+                raise HTTPException(
+                    status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                    detail="GPU rendering requires a paid plan. Please upgrade to Studio or Pro.",
+                )
+            elif reason == "insufficient_credits":
+                need = getattr(exc, "need_credits", None)
+                detail = "Insufficient credits for GPU render."
+                if need is not None:
+                    detail += f" Add at least ${need:.2f} USD to continue."
+                raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail=detail)
+            else:
+                # gate_error or unknown — fail closed
+                raise HTTPException(
+                    status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                    detail="Render billing gate error. Please try again later.",
+                )
+        # Non-denial exception — fail closed (GPU is a direct cost)
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Render billing gate unavailable. Please try again later.",
+        )
 
 
 class CameraSettings(BaseModel):
@@ -280,6 +368,15 @@ async def run_render(req: RenderRequest, request: Request, _auth: dict = Depends
     Fallback (no pool wired): runs synchronously via the legacy subprocess
     path so existing standalone / test callers keep working.
     """
+    # --- Billing gate (BEFORE any dispatch; covers both async + sync) ----
+    # Estimate GPU-seconds from samples × pixel-ratio as a rough credit-check
+    # proxy (actual billing happens after the job completes in the worker).
+    rs = req.render_settings
+    pixels = (rs.resolution[0] * rs.resolution[1]) / (1920 * 1080)
+    est_gpu_seconds = max(5.0, rs.samples * pixels * 0.1)
+    user_id = await _optional_user_id(request)
+    await _run_billing_gate(user_id, est_gpu_seconds)
+
     # --- Attempt async job-queue path ------------------------------------
     pool = _get_pool(request)
     if pool is not None:

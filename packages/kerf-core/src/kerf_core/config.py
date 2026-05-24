@@ -76,6 +76,7 @@ class Settings(BaseSettings):
     cloud_fx_refresh_url: str = "https://api.exchangerate.host/latest?base=USD&symbols=ZAR"
     cloud_fx_spread_pct: float = 1.5
     cloud_pricing_token_markup_pct: float = 20.0
+    cloud_pricing_gpu_markup_pct: float = 20.0
     cloud_pricing_storage_usd_per_gb_month: float = 0.20
     cloud_pricing_free_storage_mb: int = 50
     cloud_git_prefix: str = "git"

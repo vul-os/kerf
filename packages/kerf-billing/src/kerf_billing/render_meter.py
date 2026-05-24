@@ -38,12 +38,39 @@ Database tables (created by kerf-cloud migrations, not this module):
 from __future__ import annotations
 
 import logging
+import os
 from typing import Optional
 
 from kerf_pricing.render_presets import RENDER_CREDIT_COST, VALID_PRESETS
+from kerf_billing.buckets import (
+    KerfFree,
+    KerfPaid,
+    Byo,
+    InsufficientCredits,
+    UserBilling,
+    ModelInfo,
+    pick_bucket,
+)
 
 
 logger = logging.getLogger(__name__)
+
+# ── Billing kill-switch (mirrors kerf_render.pricing_meter) ─────────────────
+_BILLING_DISABLED_VAR = "KERF_RENDER_BILLING_DISABLED"
+
+
+def _billing_disabled() -> bool:
+    """Return True when the self-host billing kill-switch is active."""
+    return os.environ.get(_BILLING_DISABLED_VAR, "").strip() == "1"
+
+
+# ── Synthetic ModelInfo for GPU renders ─────────────────────────────────────
+# GPU renders are never on the free cheap-tier — only kerf_paid or byo.
+_GPU_MODEL_INFO = ModelInfo(
+    provider="gpu",
+    model_id="gpu-render",
+    cheap_tier_eligible=False,
+)
 
 # Re-export the canonical cost table so callers only need to import this module.
 RENDER_CREDIT_COST = RENDER_CREDIT_COST  # noqa: F811  (re-export)
@@ -73,6 +100,112 @@ def _require_preset(preset: str) -> float:
     if preset not in RENDER_CREDIT_COST:
         raise UnknownPresetError(preset)
     return RENDER_CREDIT_COST[preset]
+
+
+# ── GPU gate ─────────────────────────────────────────────────────────────────
+
+class RenderGateDenied(Exception):
+    """Raised by :func:`gate_render_job` when a render must be blocked.
+
+    Attributes
+    ----------
+    reason : str
+        Human-readable explanation (``"gpu_paid_only"`` | ``"insufficient_credits"``).
+    need_credits : float | None
+        How many more USD credits the user needs, when reason is
+        ``"insufficient_credits"``.
+    """
+
+    def __init__(self, reason: str, need_credits: Optional[float] = None):
+        super().__init__(reason)
+        self.reason = reason
+        self.need_credits = need_credits
+
+
+async def gate_render_job(
+    pool,
+    user_id: str,
+    est_gpu_seconds: float,
+    *,
+    usage_enabled: bool = True,
+) -> None:
+    """Billing gate that MUST be called before a render job is dispatched.
+
+    Behaviour
+    ---------
+    * **Self-host / billing disabled** (``KERF_RENDER_BILLING_DISABLED=1``
+      *or* ``usage_enabled=False``): skips the gate entirely — no block,
+      no bill.  Self-host users own their own GPU.
+    * **kerf_free** bucket: GPU is paid-only.  Raises
+      :class:`RenderGateDenied` with ``reason="gpu_paid_only"``.
+    * **kerf_paid** with insufficient credits: raises
+      :class:`RenderGateDenied` with ``reason="insufficient_credits"``.
+    * **kerf_paid** with sufficient credits: returns normally (permit).
+    * **byo**: returns normally (user pays their own cloud bill).
+    * Any unexpected error inside the gate → re-raises as
+      :class:`RenderGateDenied` with ``reason="gate_error"`` (fail-closed,
+      since GPU is a direct cost we cannot absorb unknowns).
+
+    Parameters
+    ----------
+    pool:
+        asyncpg connection pool.
+    user_id:
+        Cloud user UUID.
+    est_gpu_seconds:
+        Estimated GPU wall-clock seconds for the job.  Used to compute the
+        estimated USD cost for the :func:`pick_bucket` call.
+    usage_enabled:
+        Mirror of ``settings.usage_enabled``.  When ``False`` (local /
+        OSS deploy), the gate is skipped entirely.
+    """
+    # ── Self-host / local-mode kill-switch ────────────────────────────────────
+    if _billing_disabled() or not usage_enabled:
+        logger.debug("gate_render_job: billing disabled — skipping gate")
+        return
+
+    try:
+        # Load current billing snapshot for this user.
+        from kerf_billing.buckets import load_user_billing  # local import to avoid cycle
+        user_billing = await load_user_billing(pool, user_id)
+
+        # Estimate cost using the A10G rate (conservative lower-bound; actual
+        # GPU type is resolved by the worker after dispatch).
+        from kerf_render.pricing_meter import GPU_RATES_USD_PER_SECOND, GPU_MARKUP_PCT
+        base_rate = GPU_RATES_USD_PER_SECOND.get("a10g", 0.0006)
+        est_cost_usd = est_gpu_seconds * base_rate * (1.0 + GPU_MARKUP_PCT / 100.0)
+
+        bucket = pick_bucket(user_billing, _GPU_MODEL_INFO, est_cost_usd)
+
+    except RenderGateDenied:
+        raise  # already formatted
+    except Exception as exc:
+        # Fail-closed: any gate error blocks the dispatch.
+        logger.error("gate_render_job: unexpected error for user=%s — blocking: %s", user_id, exc)
+        raise RenderGateDenied("gate_error") from exc
+
+    if isinstance(bucket, KerfFree):
+        # Free tier (cheap-tier model only path hit): GPU is paid-only.
+        # This path is unlikely given GPU renders are cheap_tier_eligible=False,
+        # but guard defensively.
+        logger.info("gate_render_job: blocked free-tier user=%s (gpu_paid_only)", user_id)
+        raise RenderGateDenied("gpu_paid_only")
+
+    if isinstance(bucket, InsufficientCredits):
+        # Distinguish zero-credit (free-tier) users from partial-credit users.
+        if user_billing.credits_usd <= 0:
+            logger.info("gate_render_job: blocked zero-credit user=%s (gpu_paid_only)", user_id)
+            raise RenderGateDenied("gpu_paid_only")
+        need = round(est_cost_usd - user_billing.credits_usd, 6)
+        logger.info(
+            "gate_render_job: blocked user=%s insufficient_credits "
+            "est_cost=%.4f balance=%.4f need=%.4f",
+            user_id, est_cost_usd, user_billing.credits_usd, need,
+        )
+        raise RenderGateDenied("insufficient_credits", need_credits=max(0.0, need))
+
+    # KerfPaid or Byo — permit.
+    logger.debug("gate_render_job: permitted user=%s bucket=%r", user_id, bucket)
 
 
 # ── Quote ────────────────────────────────────────────────────────────────────
@@ -337,7 +470,12 @@ async def _record_usage(
     pool, user_id: str, job_id: str,
     preset: str, gpu_seconds: float, credits_charged: float,
 ) -> None:
-    """Append a row to ``render_usage_events`` (fire-and-forget, best-effort)."""
+    """Append a row to ``render_usage_events`` AND ``usage_events`` (best-effort).
+
+    ``render_usage_events`` is the detailed COGS ledger used for GPU
+    reconciliation.  ``usage_events`` (kind='gpu') is the user-visible
+    dashboard ledger so render spend appears alongside token/storage charges.
+    """
     try:
         async with pool.acquire() as conn:
             await conn.execute(
@@ -350,4 +488,19 @@ async def _record_usage(
                 job_id, user_id, preset, gpu_seconds, credits_charged,
             )
     except Exception as exc:  # noqa: BLE001
-        logger.warning("render_meter: failed to record usage event: %s", exc)
+        logger.warning("render_meter: failed to record render_usage_event: %s", exc)
+
+    # Surface GPU spend in the shared usage_events ledger (kind='gpu').
+    try:
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO usage_events
+                    (id, user_id, kind, usd_cost, payer)
+                VALUES ($1, $2, 'gpu', $3, 'kerf_paid')
+                ON CONFLICT (id) DO NOTHING
+                """,
+                job_id, user_id, credits_charged,
+            )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("render_meter: failed to record gpu usage_event: %s", exc)

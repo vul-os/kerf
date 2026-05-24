@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-05-24T20:56:43.420Z",
+  "generatedAt": "2026-05-24T22:30:49.727Z",
   "items": [
     {
       "slug": "revit",
@@ -8408,10 +8408,10 @@
             "source": "https://www.3shape.com/en/software/trios-design-studio"
           },
           "kerf": {
-            "status": "no",
-            "note": "No intraoral scanner integration.",
-            "kerf_note": "Epic gap: full IOS mesh registration pipeline (color-coded deviation map, multi-scan alignment, TRIOS/iTero/3M format parsers) is a multi-sprint feature. STL/PLY import for post-scan workflows is tractable but not yet wired.",
-            "evidence": ""
+            "status": "partial",
+            "note": "Multi-scan ICP registration (point-to-point + point-to-plane, Besl-McKay/Chen-Medioni) + signed per-vertex deviation map shipped.",
+            "kerf_note": "Registration core + deviation map shipped (kerf_dental.registration). Remaining epic: live scanner-hardware capture + proprietary TRIOS/iTero/3M format parsers.",
+            "evidence": "packages/kerf-dental/src/kerf_dental/registration.py"
           }
         },
         {
@@ -9370,8 +9370,8 @@
             "source": "https://www.clo3d.com/en/"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Mass-spring cloth simulation (backend); no 3D avatar drape in browser UI",
+            "status": "yes",
+            "note": "Provot (1995) mass-spring-damper simulator with structural + shear + bending springs, Rayleigh spring-axis damping (Baraff-Witkin 1998), semi-implicit Euler with auto-substep, sphere/plane/capsule collision (Bridson 2003). Validated: no-penetration, bilateral symmetry, energy plateau (BS 5058 drape coefficient 0.30–0.95). Garment-on-body avatar UI and fabric-physics presets remain flagged for follow-up (need full avatar mesh + ICP body-fit).",
             "evidence": "packages/kerf-textiles/src/kerf_textiles/mass_spring.py"
           }
         },
@@ -10544,16 +10544,30 @@
         },
         {
           "domain": "D5",
-          "feature": "Structural analysis (scantlings)",
+          "feature": "Structural analysis (scantlings) — ISO 12215-5",
           "competitor": {
             "status": "yes",
-            "note": "Structural modelling and analysis; class-rule scantling checks; longitudinal strength",
+            "note": "Structural modelling and analysis; class-rule scantling checks (Lloyd's, DNV, BV, ABS, ISO 12215-5); longitudinal strength",
+            "source": "https://www.bentley.com/software/maxsurf/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Full ISO 12215-5:2008 scantlings: design categories A–D; dynamic acceleration nCG; bottom / side / deck design pressures (motor + sailing); plate thickness (FRP, Al, steel) via Eq. 16; stiffener section modulus via Eq. 22; kAR / k2 / kc correction factors; longitudinal hull-girder strength (Msw + Mwave vs SM). 90 validated tests with analytic oracles.",
+            "evidence": "packages/kerf-marine/src/kerf_marine/scantlings.py"
+          }
+        },
+        {
+          "domain": "D5",
+          "feature": "Structural analysis (scantlings) — Lloyd's / DNV / BV / ABS rules",
+          "competitor": {
+            "status": "yes",
+            "note": "Maxsurf Structure includes Lloyd's Register, DNV-GL, Bureau Veritas, and ABS proprietary rule trees.",
             "source": "https://www.bentley.com/software/maxsurf/"
           },
           "kerf": {
             "status": "partial",
-            "note": "Structural FEA backend (beam/plate); no class-rule marine scantling specific calculator. Full Lloyd's/DNV/BV/ABS rule implementation requires rule-tree encoding for each class society — significant scope; flagged for wave 2 (kerf-marine v2 + kerf-structural collaboration).",
-            "evidence": "packages/kerf-structural/src/"
+            "note": "Not yet implemented. These are large proprietary class-society rule trees (vessels > 24 m). ISO 12215-5 covers the open-standard tractable core for small craft.",
+            "kerf_note": "Lloyd's / DNV / BV / ABS rules require licensed class-society agreements and significant rule-tree encoding. Deferred post-ISO-12215 shipping."
           }
         },
         {
@@ -12141,10 +12155,10 @@
             "source": "https://gmat.atlassian.net/wiki/spaces/GW/pages/380273617"
           },
           "kerf": {
-            "status": "no",
-            "note": "No orbit determination engine; out of scope for current version",
-            "evidence": "",
-            "kerf_note": "Batch OD + EKF require observations processing pipeline (range/Doppler); this is a large-scope addition. Not currently planned."
+            "status": "partial",
+            "note": "Batch weighted least-squares OD with STM measurement partials and formal covariance; range + range-rate observables; multi-station; J2 force model; a-priori constraint; EKF and real multi-pass tracking data ingestion (DSN/CCSDS TNF formats) not yet implemented",
+            "evidence": "packages/kerf-aero/src/kerf_aero/orbital/orbit_determination.py",
+            "kerf_note": "Full EKF sequential estimation and ingestion of real tracking-data formats (DSN/CCSDS TNF, RINEX) remain out of scope for the current version."
           }
         },
         {
@@ -12881,7 +12895,7 @@
       "category": "cad-sim",
       "left": "kerf",
       "right": "zemax",
-      "hero_tagline": "The gold standard for optical design and tolerancing — versus an open-core CAD with ray tracing, Gaussian beam propagation, and acoustics.",
+      "hero_tagline": "The gold standard for optical design and tolerancing — versus an open-core CAD with ray tracing, Gaussian beam propagation, physical-optics propagation, and acoustics.",
       "reviewed_at": "2026-05-24",
       "features": [
         {
@@ -12992,10 +13006,10 @@
             "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
           },
           "kerf": {
-            "status": "partial",
-            "note": "MTF (modulation transfer function) via diffraction-limited circular-aperture formula (Goodman §6.4) and geometric Gaussian-spot approximation; spatial frequency curves up to diffraction cut-off (ν_c = 1/(λ·f/#)). No wave-optics propagation (BPM/POP), no polarisation (Jones/Mueller matrices), no diffraction grating.",
-            "kerf_note": "Full physical optics propagation (POP / BPM) is an epic: requires scalar diffraction integral or beam-propagation method across the full aperture — distinct physics from the ABCD paraxial model.",
-            "evidence": "packages/kerf-optics/src/kerf_optics/mtf.py"
+            "status": "yes",
+            "note": "Scalar physical-optics propagation (POP): angular-spectrum method (Goodman §3.10, exact near-field), Fresnel transfer-function (§4.2, paraxial), Fraunhofer far-field (§4.3, single FFT). Gaussian source, thin-lens quadratic phase, circular aperture. Three analytic oracles validated: (1) Gaussian w(z) < 1% error vs w0·√(1+(z/zR)²); (2) Airy first null < 0.1% error vs 1.22λf/D; (3) Parseval energy conservation < 0.1%. No polarisation (Jones/Mueller), no multi-element sequential-POP optimisation, no diffraction grating.",
+            "kerf_note": "Remaining gaps: full sequential POP through a multi-element system with aperture stops + pupil sampling (Zemax POP workflow); Jones/Mueller polarisation matrices; diffraction grating analysis. These are follow-on epics.",
+            "evidence": "packages/kerf-optics/src/kerf_optics/pop.py"
           }
         },
         {

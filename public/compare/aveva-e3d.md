@@ -15,8 +15,8 @@ features:
       source: "https://www.aveva.com/en/products/e3d-design/"
     kerf:
       status: partial
-      note: "Piping isometric/P&ID backend engine; no interactive 3D piping routing UI"
-      evidence: "packages/kerf-piping/src/kerf_piping/isometric.py"
+      note: "Spec-driven pipe class enforcement (ASME B36.10M/B31.3 Barlow wall check, material grade, pressure/temp limits); orthogonal isometric routing; no interactive 3D plant routing UI"
+      evidence: "packages/kerf-piping/src/kerf_piping/pipe_spec.py"
   - domain: D13
     feature: "Piping component catalogue"
     competitor:
@@ -25,7 +25,7 @@ features:
       source: "https://www.multisoftsystems.com/article/aveva-e3d-piping-the-future-of-intelligent-3d-plant-design"
     kerf:
       status: partial
-      note: "Piping symbols and P&ID component library (backend); no 3D component catalogue"
+      note: "P&ID component library (vessels, pumps, HX, valves, instruments with ISA 5.1 symbols); ASME B36.10M pipe size/schedule catalogue; ASME B16.9 elbow radius table; no 3D parametric fitting catalogue"
       evidence: "packages/kerf-piping/src/kerf_piping/symbols.py"
   - domain: D13
     feature: "Isometric drawing generation"
@@ -135,6 +135,7 @@ AVEVA E3D Design (formerly PDMS) is the dominant enterprise 3D plant design plat
 ## Where Kerf differs
 
 - **MIT open-core.** AVEVA E3D is enterprise-priced (multi-year site licences, not publicly listed). Kerf is MIT-licensed — free locally.
+- **Spec-driven pipe class enforcement.** Kerf's `pipe_spec.py` enforces ASME B36.10M wall thickness, ASME B31.3 Barlow minimum-wall calculation, material grade allowable stress, pressure/temperature class limits, and schedule selection — analogous to E3D's pipe class system but as a Python API.
 - **Structural + piping stress.** AVEVA E3D relies on third-party tools (Caesar II) for piping stress analysis. Kerf includes ASME VIII pressure vessel design, API 650 tank design, and full structural FEA natively.
 - **HVAC engineering calculations.** Kerf's HVAC engine performs SMACNA duct sizing and generates flat patterns. E3D routes HVAC ducts in 3D but does not do sizing calculations.
 - **Chat-native.** Kerf's LLM interface enables plain-language piping edits and P&ID generation. AVEVA E3D has added LLM-based assistance in 2026, but it is assistive rather than generative.
@@ -142,7 +143,7 @@ AVEVA E3D Design (formerly PDMS) is the dominant enterprise 3D plant design plat
 
 ## Honest gaps — where Kerf is behind today
 
-- **No 3D piping routing UI.** This is the core feature of E3D. Kerf has P&ID and isometric generation (backend) but no 3D intelligent routing in the browser.
+- **No 3D piping routing UI.** This is the core feature of E3D. Kerf has P&ID and isometric generation (backend) with spec-driven validation, but no interactive 3D routing in the browser.
 - **No multi-discipline plant model.** E3D's unified plant model with cross-discipline clash detection is the industry standard for large projects. Kerf's disciplines are separate.
 - **No laser scan / brownfield support.** Critical for retrofit and brownfield engineering.
 - **No enterprise project management.** Deliverable management, approvals, mark-ups, versioning for EPC projects — none of this is in Kerf.
@@ -154,6 +155,7 @@ AVEVA E3D Design (formerly PDMS) is the dominant enterprise 3D plant design plat
 | License | MIT open-core | Enterprise (bespoke pricing) |
 | Primary focus | Multi-domain engineering CAD | 3D plant / piping design |
 | 3D piping routing | No | Yes (rule-driven, spec-compliant) |
+| Pipe spec class enforcement | Yes (ASME B36.10M/B31.3 backend) | Yes (E3D pipe classes) |
 | P&ID authoring | Yes (backend) | Via AVEVA P&ID integration |
 | Isometric drawing generation | Yes (from P&ID, backend) | Yes (from 3D model, automated) |
 | Clash detection | Backend only | Yes (hard/soft/touch, real-time) |

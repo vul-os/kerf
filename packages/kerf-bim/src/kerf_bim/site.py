@@ -247,13 +247,17 @@ class Toposolid:
     # --- to_brep -------------------------------------------------------------
 
     def to_brep(self):
-        """Emit a B-rep ``Body`` representing the toposolid.
+        """Emit a B-rep ``Body`` representing the toposolid as a closed solid.
 
-        The body is a closed solid with:
-        - TIN top faces (one triangular face per simplex).
-        - Vertical side walls connecting the perimeter of the TIN down to the
-          base plane (approximated per boundary edge).
-        - A planar rectangular base face.
+        The body is constructed from:
+        - TIN top faces (one triangular :class:`Face` per simplex).
+        - Vertical quad side faces connecting each boundary edge of the TIN
+          down to the base plane at ``min_z - thickness``.
+        - A triangulated base face at elevation ``min_z - thickness``.
+
+        The result is a :class:`Shell` marked ``is_closed=True`` wrapped in a
+        :class:`Body`.  The ``cut_fill_volume`` utility in this module remains
+        grid-based and does not depend on the B-rep representation.
 
         The returned ``Body`` is from ``kerf_cad_core.geom.brep``.
         """
@@ -273,13 +277,73 @@ class Toposolid:
             e01 = Edge(Line3(p0, p1), 0.0, 1.0, v0, v1)
             e12 = Edge(Line3(p1, p2), 0.0, 1.0, v1, v2)
             e20 = Edge(Line3(p2, p0), 0.0, 1.0, v2, v0)
-            loop = Loop([Coedge(e01, True), Coedge(e12, True), Coedge(e20, True)],
-                        is_outer=True)
-            plane = Plane(origin=p0, x_axis=p1 - p0, y_axis=p2 - p0)
-            faces.append(Face(plane, [loop], orientation=True))
+            top_loop = Loop([Coedge(e01, True), Coedge(e12, True), Coedge(e20, True)],
+                            is_outer=True)
+            surf = Plane(origin=p0, x_axis=p1 - p0, y_axis=p2 - p0)
+            faces.append(Face(surf, [top_loop], orientation=True))
 
-        shell = Shell(faces, is_closed=False)
-        body = Body(shells=[shell])
+        # -- detect perimeter (boundary) edges of the TIN --------------------
+        # An edge is on the boundary if it appears in exactly one triangle.
+        edge_count: dict = {}
+        for tri in self._simplices:
+            for i in range(3):
+                a, b = int(tri[i]), int(tri[(i + 1) % 3])
+                key = (min(a, b), max(a, b))
+                edge_count[key] = edge_count.get(key, 0) + 1
+
+        boundary_edges = [k for k, v in edge_count.items() if v == 1]
+
+        # -- vertical side faces (quad = two triangles) -----------------------
+        for (a_idx, b_idx) in boundary_edges:
+            p_top_a = self._pts[a_idx]
+            p_top_b = self._pts[b_idx]
+            p_bot_a = np.array([p_top_a[0], p_top_a[1], base_z])
+            p_bot_b = np.array([p_top_b[0], p_top_b[1], base_z])
+
+            # Triangle 1: top_a, top_b, bot_b
+            v0 = Vertex(p_top_a); v1 = Vertex(p_top_b); v2 = Vertex(p_bot_b)
+            e01 = Edge(Line3(p_top_a, p_top_b), 0.0, 1.0, v0, v1)
+            e12 = Edge(Line3(p_top_b, p_bot_b), 0.0, 1.0, v1, v2)
+            e20 = Edge(Line3(p_bot_b, p_top_a), 0.0, 1.0, v2, v0)
+            lp = Loop([Coedge(e01, True), Coedge(e12, True), Coedge(e20, True)],
+                      is_outer=True)
+            x_ax = p_top_b - p_top_a
+            if np.linalg.norm(x_ax) > 1e-14:
+                x_ax = x_ax / np.linalg.norm(x_ax)
+            y_ax = np.array([0.0, 0.0, 1.0])
+            faces.append(Face(Plane(origin=p_top_a, x_axis=x_ax, y_axis=y_ax),
+                              [lp], orientation=True))
+
+            # Triangle 2: top_a, bot_b, bot_a
+            v0 = Vertex(p_top_a); v1 = Vertex(p_bot_b); v2 = Vertex(p_bot_a)
+            e01 = Edge(Line3(p_top_a, p_bot_b), 0.0, 1.0, v0, v1)
+            e12 = Edge(Line3(p_bot_b, p_bot_a), 0.0, 1.0, v1, v2)
+            e20 = Edge(Line3(p_bot_a, p_top_a), 0.0, 1.0, v2, v0)
+            lp2 = Loop([Coedge(e01, True), Coedge(e12, True), Coedge(e20, True)],
+                       is_outer=True)
+            faces.append(Face(Plane(origin=p_top_a, x_axis=x_ax, y_axis=y_ax),
+                              [lp2], orientation=True))
+
+        # -- base face (TIN base at base_z) -----------------------------------
+        # Triangulate the base using the same simplices as the top surface but
+        # projected down to base_z with reversed winding (outward = downward).
+        for tri in self._simplices:
+            p0 = np.array([self._pts[tri[0]][0], self._pts[tri[0]][1], base_z])
+            p1 = np.array([self._pts[tri[1]][0], self._pts[tri[1]][1], base_z])
+            p2 = np.array([self._pts[tri[2]][0], self._pts[tri[2]][1], base_z])
+            # Reverse winding for outward (downward) normal
+            v0 = Vertex(p0); v1 = Vertex(p2); v2 = Vertex(p1)
+            e01 = Edge(Line3(p0, p2), 0.0, 1.0, v0, v1)
+            e12 = Edge(Line3(p2, p1), 0.0, 1.0, v1, v2)
+            e20 = Edge(Line3(p1, p0), 0.0, 1.0, v2, v0)
+            bot_loop = Loop([Coedge(e01, True), Coedge(e12, True), Coedge(e20, True)],
+                            is_outer=True)
+            surf = Plane(origin=p0, x_axis=p2 - p0, y_axis=p1 - p0)
+            faces.append(Face(surf, [bot_loop], orientation=True))
+
+        shell = Shell(faces, is_closed=True)
+        solid = Solid([shell])
+        body = Body(solids=[solid])
         return body
 
 

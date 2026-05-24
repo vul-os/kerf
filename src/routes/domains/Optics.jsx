@@ -89,6 +89,7 @@ export default function Optics() {
       heroTags={['MIT licensed', 'Zemax .zmx import', 'Schott / CDGM glass catalogue', 'STEP export']}
       bullets={BULLETS}
       comparison={COMPARISON}
+      compareLinks={[{ slug: 'zemax', label: 'Ansys Zemax OpticStudio' }]}
     />
   )
 }

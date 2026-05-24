@@ -20,13 +20,59 @@ descriptive error payload instead so the frontend can surface a helpful message.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter
+import os
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, HTTPException, status
+
+from kerf_core.dependencies import require_auth
 
 router = APIRouter()
 
+_BAD_PATH_RESPONSE = {
+    "gcode": None,
+    "layer_count": 0,
+    "print_time_s": None,
+    "filament_mm": None,
+    "gcode_bytes": 0,
+    "warnings": ["'stl_path' must not be absolute or contain '..' traversal sequences"],
+    "error": "BAD_PATH",
+}
+
+
+def _get_storage_root() -> Path:
+    """Return the configured local storage root, resolved to an absolute path."""
+    try:
+        from kerf_core.config import get_settings
+        settings = get_settings()
+        root = getattr(settings, "local_storage_path", "./.kerf-storage")
+    except Exception:
+        root = "./.kerf-storage"
+    return Path(root).expanduser().resolve()
+
+
+def _assert_within_storage(path_str: str) -> Path:
+    """
+    Resolve path_str and assert it lives inside the configured storage root.
+
+    Raises HTTPException(400) when the path would escape the storage root.
+    Also rejects absolute paths that point outside storage, or any path
+    containing '..' that resolves outside the root.
+    """
+    storage_root = _get_storage_root()
+    resolved = Path(path_str).resolve()
+    try:
+        resolved.relative_to(storage_root)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"stl_path must be within the storage root ({storage_root})",
+        )
+    return resolved
+
 
 @router.post("/run-print-slice")
-async def run_print_slice_route(req: dict) -> dict:
+async def run_print_slice_route(req: dict, _auth: dict = Depends(require_auth)) -> dict:
     """Slice an STL file to G-code via CuraEngine subprocess."""
     stl_path = req.get("stl_path", "")
     settings = req.get("settings") or {}
@@ -41,6 +87,9 @@ async def run_print_slice_route(req: dict) -> dict:
             "warnings": ["'stl_path' must be a non-empty string"],
             "error": "BAD_ARGS",
         }
+
+    # Path confinement: reject traversal and paths outside storage root.
+    _assert_within_storage(stl_path)
 
     from kerf_slicing.cura_runner import (
         CuraEngineError,

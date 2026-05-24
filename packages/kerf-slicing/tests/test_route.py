@@ -77,6 +77,8 @@ def client():
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
+    from kerf_core.dependencies import require_auth
+
     # Re-inject stub so previous test modules can't strip it
     _inject_cura_stub()
     sys.modules.pop("kerf_slicing.routes", None)
@@ -84,6 +86,14 @@ def client():
     from kerf_slicing.routes import router
     app = FastAPI()
     app.include_router(router)
+
+    # Override auth: inject a fake authenticated user for all tests
+    app.dependency_overrides[require_auth] = lambda: {"sub": "test-user"}
+
+    # Patch storage root to the system temp dir so tmp_path files are allowed
+    import kerf_slicing.routes as _routes
+    _routes._get_storage_root = lambda: Path(tempfile.gettempdir()).resolve()
+
     return TestClient(app)
 
 
@@ -135,10 +145,16 @@ class TestRunPrintSliceRoute:
 
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
+        from kerf_core.dependencies import require_auth
         from kerf_slicing.routes import router
 
         app = FastAPI()
         app.include_router(router)
+        app.dependency_overrides[require_auth] = lambda: {"sub": "test-user"}
+
+        import kerf_slicing.routes as _routes
+        _routes._get_storage_root = lambda: Path(tempfile.gettempdir()).resolve()
+
         c = TestClient(app)
 
         resp = c.post("/run-print-slice", json={"stl_path": stl_file})
@@ -152,14 +168,22 @@ class TestRunPrintSliceRoute:
         _inject_cura_stub(succeed=True)
         sys.modules.pop("kerf_slicing.routes", None)
 
-    def test_missing_stl_file_returns_stl_not_found(self, client):
-        resp = client.post("/run-print-slice", json={
-            "stl_path": "/nonexistent/path/model.stl",
-        })
+    def test_missing_stl_file_returns_stl_not_found(self, client, tmp_path):
+        """A nonexistent path inside the storage root returns STL_NOT_FOUND."""
+        # Path must be inside storage root (system temp) to pass path confinement
+        nonexistent = str(tmp_path / "nonexistent_model.stl")
+        resp = client.post("/run-print-slice", json={"stl_path": nonexistent})
         assert resp.status_code == 200
         data = resp.json()
         assert data["gcode"] is None
         assert data["error"] == "STL_NOT_FOUND"
+
+    def test_path_outside_storage_root_returns_400(self, client):
+        """A path outside the storage root is rejected with 400."""
+        resp = client.post("/run-print-slice", json={
+            "stl_path": "/etc/passwd",
+        })
+        assert resp.status_code == 400
 
     def test_response_always_has_required_keys(self, client, stl_file):
         resp = client.post("/run-print-slice", json={"stl_path": stl_file})
@@ -177,3 +201,20 @@ class TestRunPrintSliceRoute:
         resp = client.post("/run-print-slice", json={"stl_path": 42})
         assert resp.status_code == 200
         assert resp.json()["error"] == "BAD_ARGS"
+
+    def test_unauthenticated_request_returns_401(self):
+        """Without auth override, the route returns 401."""
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        _inject_cura_stub()
+        sys.modules.pop("kerf_slicing.routes", None)
+        from kerf_slicing.routes import router
+
+        app = FastAPI()
+        app.include_router(router)
+        # No dependency_overrides — auth is enforced
+
+        c = TestClient(app, raise_server_exceptions=False)
+        resp = c.post("/run-print-slice", json={"stl_path": "/tmp/x.stl"})
+        assert resp.status_code == 401

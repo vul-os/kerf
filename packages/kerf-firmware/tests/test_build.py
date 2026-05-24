@@ -433,13 +433,17 @@ class TestRoutes:
     def test_build_route_pio_not_installed(self, monkeypatch):
         """Route returns PIO_NOT_INSTALLED when binary is absent."""
         import asyncio
+        import tempfile
 
         monkeypatch.setattr("shutil.which", lambda name: None)
         sys.modules.pop("kerf_firmware.build", None)
 
         from kerf_firmware.routes import firmware_build_route
+        import kerf_firmware.routes as _routes
 
-        import tempfile
+        # Patch storage root so the sketch_dir inside tempdir passes confinement
+        monkeypatch.setattr(_routes, "_get_storage_root", lambda: Path(tempfile.gettempdir()).resolve())
+
         with tempfile.TemporaryDirectory() as td:
             sketch_dir = Path(td) / "blink"
             sketch_dir.mkdir()

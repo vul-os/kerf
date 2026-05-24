@@ -30,13 +30,46 @@ operation that cannot be proxied through the cloud.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, HTTPException, status
+
+from kerf_core.dependencies import require_auth
 
 router = APIRouter()
 
 
+def _get_storage_root() -> Path:
+    """Return the configured local storage root, resolved to an absolute path."""
+    try:
+        from kerf_core.config import get_settings
+        settings = get_settings()
+        root = getattr(settings, "local_storage_path", "./.kerf-storage")
+    except Exception:
+        root = "./.kerf-storage"
+    return Path(root).expanduser().resolve()
+
+
+def _assert_within_storage(path_str: str, label: str = "path") -> Path:
+    """
+    Resolve path_str and assert it lives inside the configured storage root.
+
+    Raises HTTPException(400) when the path would escape the storage root.
+    """
+    storage_root = _get_storage_root()
+    resolved = Path(path_str).resolve()
+    try:
+        resolved.relative_to(storage_root)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{label} must be within the storage root ({storage_root})",
+        )
+    return resolved
+
+
 @router.post("/firmware/build")
-async def firmware_build_route(req: dict) -> dict:
+async def firmware_build_route(req: dict, _auth: dict = Depends(require_auth)) -> dict:
     """Compile a firmware sketch via the PlatformIO Core CLI subprocess."""
     sketch_dir = req.get("sketch_dir", "")
     board = req.get("board") or "uno"
@@ -46,6 +79,9 @@ async def firmware_build_route(req: dict) -> dict:
 
     if not sketch_dir or not isinstance(sketch_dir, str):
         return _err("'sketch_dir' must be a non-empty string", "BAD_ARGS")
+
+    # Path confinement: reject traversal and paths outside storage root.
+    _assert_within_storage(sketch_dir, "sketch_dir")
 
     from kerf_firmware.build import (
         FirmwareBuildError,
@@ -85,7 +121,7 @@ async def firmware_build_route(req: dict) -> dict:
 
 
 @router.post("/firmware/monitor")
-async def firmware_monitor_route(req: dict) -> dict:
+async def firmware_monitor_route(req: dict, _auth: dict = Depends(require_auth)) -> dict:
     """Open a PlatformIO serial monitor session."""
     port = req.get("port", "")
     baud = int(req.get("baud") or 9600)
@@ -134,7 +170,7 @@ def _debug_sentinel() -> dict:
 
 
 @router.post("/firmware/debug/attach")
-async def firmware_debug_attach_route(req: dict) -> dict:
+async def firmware_debug_attach_route(req: dict, _auth: dict = Depends(require_auth)) -> dict:
     """
     Attach to a target and return a live RTOS debug snapshot.
 
@@ -154,7 +190,7 @@ async def firmware_debug_attach_route(req: dict) -> dict:
 
 
 @router.get("/firmware/debug/snapshot")
-async def firmware_debug_snapshot_route() -> dict:
+async def firmware_debug_snapshot_route(_auth: dict = Depends(require_auth)) -> dict:
     """
     Return the last cached RTOS debug snapshot.
 

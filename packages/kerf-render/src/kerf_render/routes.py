@@ -37,9 +37,11 @@ import tempfile
 import textwrap
 import time
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional
+
+from kerf_core.dependencies import require_auth
 
 router = APIRouter()
 
@@ -259,7 +261,7 @@ def _build_blender_script(req: RenderRequest, mesh_path: str, output_path: str) 
 
 
 @router.post("/run-render")
-async def run_render(req: RenderRequest):
+async def run_render(req: RenderRequest, _auth: dict = Depends(require_auth)):
     """
     Run a Blender Cycles render from a .render scene description.
 

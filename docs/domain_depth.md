@@ -152,7 +152,7 @@ Genuinely deep; mostly exposed as LLM tools, no graphical panels.
 | Doublet-lattice / flutter | [x] (backend) | |
 | 6-DOF flight dynamics + stability derivs | [x] (backend) | |
 | Orbital (Kepler, J2/J3, Hohmann) | [x] | wired |
-| Lambert solver | [~] | single-rev only; **multi-rev raises NotImplementedError** |
+| Lambert solver | [x] | multi-rev (Lancaster-Blanchard / Izzo 2015); sub-mm propagation residual on N=1, N=2 |
 | Reentry / TPS | [x] | wired |
 | Propulsion (Tsiolkovsky/staging/CEA-lite) | [x] | wired |
 | Turbomachinery / wind-turbine BEM | [x] (backend) | |
@@ -249,8 +249,8 @@ PLC + firmware + wiring genuinely usable; power/solar backend-only.
 | Feature | Kerf | Notes |
 |---|---|---|
 | NEC power distribution + point-to-point SC | [x] (backend) | deep |
-| AC load-flow (Ybus / Newton-Raphson) | [ ] | |
-| Protection coordination (TCC) / arc-flash | [ ] | |
+| AC load-flow (Ybus / Newton-Raphson) | [x] (backend) | full polar-form NR (elecpower/loadflow.py); 3+5-bus validated |
+| Protection coordination (TCC) / arc-flash | [x] (backend) | IEEE C37.112 U1-U5 + IEEE 1584-2018 incident energy |
 | Solar PV system design | [x] (backend) | PVsyst-lite depth |
 | Wiring/harness (WireViz + 3D router) | [x] | WiringView wired |
 | PLC IEC 61131-3 (ST/Ladder/FB/motion) | [x] | ST editor + **live Ladder power-flow sim** wired |

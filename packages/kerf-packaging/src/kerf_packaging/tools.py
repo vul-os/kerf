@@ -258,3 +258,80 @@ async def run_packaging_fold_preview(args: dict[str, Any], ctx: "ProjectCtx") ->
         return ok_payload(payload)
     except Exception as exc:
         return err_payload(str(exc), "FOLD_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# packaging_bct_estimate
+# ---------------------------------------------------------------------------
+
+packaging_bct_estimate_spec = ToolSpec(
+    name="packaging_bct_estimate",
+    description=(
+        "Estimate Box Compression Test (BCT) strength for a Regular Slotted "
+        "Container (RSC) using the McKee formula (1963). "
+        "Returns BCT in Newtons and kgf, humidity-corrected, plus stacking "
+        "analysis if product weight is supplied. "
+        "McKee simplified: BCT = k · ECT · √(perimeter × height). "
+        "McKee full: BCT = k · ECT · (perimeter/4)^0.492 · height^0.508."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "ect_N_per_m": {
+                "type": "number",
+                "description": (
+                    "Edge Crush Test value of the board (N/m). "
+                    "Typical: B-flute≈2800, C-flute≈3200, BC-flute≈4500 N/m."
+                ),
+            },
+            "length": {"type": "number", "description": "Internal box length (mm)."},
+            "width":  {"type": "number", "description": "Internal box width (mm)."},
+            "depth":  {"type": "number", "description": "Box height under compression (mm)."},
+            "board_t": {
+                "type": "number",
+                "description": "Board caliper / thickness (mm). Default 4.5 mm (C-flute).",
+            },
+            "full_formula": {
+                "type": "boolean",
+                "description": "Use full McKee formula (α=0.492, β=0.508). Default false.",
+            },
+            "humidity": {
+                "type": "string",
+                "enum": ["dry", "normal", "humid", "wet"],
+                "description": (
+                    "Storage humidity: dry (<50% RH, ×1.00), normal (50–65%, ×0.90), "
+                    "humid (65–80%, ×0.75), wet (>80%, ×0.55). Default 'normal'."
+                ),
+            },
+            "load_kg": {
+                "type": "number",
+                "description": "Product weight per box (kg) for stacking analysis. Optional.",
+            },
+            "safety_factor": {
+                "type": "number",
+                "description": "Stacking safety factor (default 3.0). Typical: 2.0–4.0.",
+            },
+        },
+        "required": ["ect_N_per_m", "length", "width", "depth"],
+    },
+)
+
+
+async def run_packaging_bct_estimate(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_packaging.bct import bct_mckee, bct_to_dict
+
+        result = bct_mckee(
+            ect_N_per_m   = float(args["ect_N_per_m"]),
+            length_mm     = float(args["length"]),
+            width_mm      = float(args["width"]),
+            depth_mm      = float(args["depth"]),
+            board_t_mm    = float(args.get("board_t", 4.5)),
+            full_formula  = bool(args.get("full_formula", False)),
+            humidity      = str(args.get("humidity", "normal")),
+            load_kg       = float(args["load_kg"]) if "load_kg" in args else None,
+            safety_factor = float(args.get("safety_factor", 3.0)),
+        )
+        return ok_payload(bct_to_dict(result))
+    except Exception as exc:
+        return err_payload(str(exc), "BCT_ERROR")

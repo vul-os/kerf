@@ -54,9 +54,9 @@ features:
       note: "ArtiosCAD Preflight detects structural quality issues; no in-tool BCT solver"
       source: "https://www.esko.com/en/lp/artioscad/structural-design-software-features-old"
     kerf:
-      status: partial
-      note: "BCT estimation backend; no BCT UI panel yet"
-      evidence: "packages/kerf-packaging/src/kerf_packaging/tools.py"
+      status: yes
+      note: "McKee BCT solver (simplified + full-formula) with humidity correction and stacking analysis; packaging_bct_estimate LLM tool"
+      evidence: "packages/kerf-packaging/src/kerf_packaging/bct.py"
   - domain: D7
     feature: "Die-making integration / CNC output"
     competitor:
@@ -124,7 +124,7 @@ Esko ArtiosCAD is the structural packaging industry's dominant platform — with
 ## Where Kerf differs
 
 - **MIT open-core.** ArtiosCAD is proprietary; licensing is enterprise-priced (not publicly listed). Kerf is MIT-licensed — free locally, hosted credits from $9/mo.
-- **Structural performance (BCT).** Kerf includes a Box Compression Test (BCT) estimator in the backend engine — ArtiosCAD does not solve BCT natively (it leans on Esko's separate Taurus simulation for this).
+- **Structural performance (BCT).** Kerf's BCT solver implements the McKee (1963) formula — both simplified (BCT = k·ECT·√(b·h)) and full formula (α=0.492, β=0.508 exponents) — with humidity-correction factors (dry/normal/humid/wet) derived from TAPPI guidance and stacking analysis with configurable safety factors. ArtiosCAD does not solve BCT natively (it leans on Esko's separate Taurus simulation for this).
 - **Chat-native.** Describe a box in plain language: "A telescoping retail box for a 300 × 200 × 50 mm product in E-flute" and Kerf generates the ECMA dieline, nests blanks on a 1200 × 2400 mm sheet, and quotes material cost. ArtiosCAD has no LLM interface.
 - **Python automation API.** kerf-sdk on PyPI enables scripted dieline generation and nesting for automated packaging specification workflows. ArtiosCAD's scripting is Windows COM — not portable.
 - **Multi-domain workspace.** Packaging engineers designing integrated rigid-flex electronics for smart packaging can combine Kerf's dieline tools with its PCB schematic layer and firmware IDE in one project.
@@ -133,7 +133,7 @@ Esko ArtiosCAD is the structural packaging industry's dominant platform — with
 
 - **Prepress / artwork integration.** No graphic overlay, no 3D mockup with brand artwork, no pre-press round-trip. For artwork-structural-print convergence, ArtiosCAD + Esko Studio is unmatched.
 - **FEFCO long-tail styles.** ArtiosCAD's 400+ FEFCO/ECMA library dwarfs Kerf's current coverage of common styles.
-- **BCT UI.** BCT estimation exists in the backend but is not exposed in the browser UI yet.
+- **BCT browser UI.** BCT estimation is implemented in the backend and exposed as the ``packaging_bct_estimate`` LLM tool; a dedicated browser panel with visual stacking analysis is a frontend roadmap item.
 - **Converter-shop workflow.** ArtiosCAD has 30 years of workflow depth in converter operations — job tracking, delivery specification, die registration. Kerf has none of this.
 
 ## Side by side
@@ -145,7 +145,7 @@ Esko ArtiosCAD is the structural packaging industry's dominant platform — with
 | ECMA / FEFCO library | Common styles | Full FEFCO 12th Ed. (400+ styles) |
 | 3D fold simulation | Yes (backend) | Yes |
 | Blank nesting | Yes (backend) | Yes |
-| BCT structural analysis | Backend only | Not native (third-party) |
+| BCT structural analysis | McKee solver + humidity + stacking | Not native (third-party Taurus) |
 | Prepress / artwork | No | Full Esko ecosystem |
 | CNC / cutting table output | DXF layer-separated | Full post processors |
 | Chat / LLM editing | Chat-native | None |

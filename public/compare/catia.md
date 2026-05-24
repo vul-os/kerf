@@ -41,12 +41,12 @@ features:
   - domain: D1
     feature: Loft
     competitor: { status: yes, note: "Multi-section solid / loft in Part Design and GSD", source: "https://www.3ds.com/products/catia/part-design" }
-    kerf: { status: partial, note: "No guide-rail overload in binding", evidence: "packages/kerf-cad-core/src/kerf_cad_core/plugin.py" }
+    kerf: { status: yes, note: "Guide-rail overload wired (ThruSections.AddWire); ruled/closed/symmetric", evidence: "packages/kerf-cad-core/src/kerf_cad_core/feature_loft.py" }
 
   - domain: D1
     feature: NURBS surfacing (blend/network/patch)
     competitor: { status: yes, note: "FreeStyle Shaper + GSD — Class-A surfaces, G2/G3 continuity, curvature combs, highlight analysis; industry gold standard", source: "https://www.3ds.com/products/catia/freestyle" }
-    kerf: { status: partial, note: "Math complete; OCCT bindings unconfirmed at build", evidence: "packages/kerf-cad-core/src/kerf_cad_core/plugin.py" }
+    kerf: { status: partial, note: "blend/network/patch/match-srf + G3 + Class-A harness wired; not FreeStyle/GSD class-A depth", evidence: "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py" }
 
   - domain: D1
     feature: Assemblies — mates
@@ -61,7 +61,7 @@ features:
   - domain: D1
     feature: 2D drawings (views/dims/sections)
     competitor: { status: yes, note: "Drafting workbench — view generation, dimensions, sections, GD&T callouts", source: "https://www.3ds.com/products/catia/drafting" }
-    kerf: { status: partial, note: "Template-based, not live B-rep projection; no UI panel", evidence: "packages/kerf-cad-core/src/kerf_cad_core/plugin.py" }
+    kerf: { status: partial, note: "Live HLR projection (make2d) + auto-dim; no GD&T-placement UI", evidence: "packages/kerf-cad-core/src/kerf_cad_core/geom/make2d.py" }
 
   - domain: D1
     feature: GD&T on drawings / MBD / PMI
@@ -71,7 +71,7 @@ features:
   - domain: D1
     feature: Sheet metal
     competitor: { status: yes, note: "Generative Sheetmetal Design — flanges, rip, flat pattern, DXF", source: "https://www.3ds.com/products/catia/generative-sheetmetal-design" }
-    kerf: { status: partial, note: "Single flange + unfold + flat DXF; no hem/relief/jog/multi-flange", evidence: "packages/kerf-cad-core/src/kerf_cad_core/plugin.py" }
+    kerf: { status: yes, note: "Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief", evidence: "packages/kerf-cad-core/src/kerf_cad_core/construction_verbs_tools.py" }
 
   - domain: D1
     feature: Configurations / family variants
@@ -342,7 +342,7 @@ Finally, both acknowledge that assembly is central to real engineering. CATIA's 
 
 ## Where CATIA wins
 
-- **Class-A surface quality.** CATIA's FreeStyle and ICEM Surf workspaces, with their curvature-continuity tools (G2/G3 surface blends, highlight analysis, isophote visualisation), are the industry benchmark for automotive exterior surfacing. Kerf's NURBS Phase 4 is early and does not approach this.
+- **Class-A surface quality.** CATIA's FreeStyle and ICEM Surf workspaces, with their curvature-continuity tools (G2/G3 surface blends, highlight analysis, isophote visualisation), are the industry benchmark for automotive exterior surfacing. Kerf now ships G3 blends, match-surface, zebra/isophote/curvature-comb analysis and a Class-A continuity harness as wired ops, but its surfacing is far younger and does not approach FreeStyle/ICEM Surf depth.
 - **Kinematics and DMU.** CATIA's Digital Mock-Up (DMU) Kinematics workbench models complex mechanical linkages, cam followers, and multi-body motion with interference sweeps and envelope computation. Kerf has no kinematic simulation.
 - **Multi-physics CAE.** CATIA Simulation, together with SIMULIA Abaqus, provides structural, thermal, fatigue, and crash-analysis workflows that Kerf does not touch. For full-vehicle FEA sign-off, CATIA's ecosystem is irreplaceable.
 - **PLM and configuration management.** ENOVIA / 3DEXPERIENCE offers programme-level BOM management, change orders, effectivity, and configuration at a scale that Kerf's cloud git collaboration layer does not target.
@@ -357,8 +357,8 @@ Finally, both acknowledge that assembly is central to real engineering. CATIA's 
 | Offline / self-host | Full offline single binary | Windows + licence server required |
 | Parametric B-rep | OCCT feature tree | CATIA V5 / CGM kernel |
 | Constraint sketcher | Sketcher v2 | CATIA Sketcher (mature) |
-| Class-A surfacing | NURBS Phase 4 (early) | FreeStyle / ICEM Surf (industry gold standard) |
-| Sheet metal | Flange + unfold + flat-pattern DXF | Sheet Metal workbench (mature) |
+| Class-A surfacing | G3 blends + match-srf + zebra/isophote + Class-A harness (younger) | FreeStyle / ICEM Surf (industry gold standard) |
+| Sheet metal | Flange + hem + jog + multi-flange + unfold + flat DXF | Sheet Metal workbench (mature) |
 | Assembly | Assembly mates | Product Structure + Kinematics (mature) |
 | Kinematic simulation | Not yet | DMU Kinematics (mature) |
 | FEM / structural CAE | Not yet | SIMULIA / CATIA Simulation (deep) |

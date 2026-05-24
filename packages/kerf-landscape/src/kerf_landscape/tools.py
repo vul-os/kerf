@@ -333,3 +333,141 @@ async def run_landscape_retaining_wall(ctx: ProjectCtx, args: bytes) -> str:
     if not result.get("ok"):
         return err_payload(result.get("reason", "failed"), "ERROR")
     return ok_payload(result)
+
+
+# ---------------------------------------------------------------------------
+# landscape_irrigation_schedule
+# ---------------------------------------------------------------------------
+
+landscape_irrigation_spec = ToolSpec(
+    name="landscape_irrigation_schedule",
+    description=(
+        "Generate a weekly irrigation schedule from ETo demand and zone configuration. "
+        "Computes zone run times from precipitation rate and weekly ET, then assigns "
+        "sequential start times. Also provides Distribution Uniformity (DU) from "
+        "catch-can audit data. "
+        "Follows ASABE/ICC 802-2014 scheduling and Hunter Irrigation Design Manual."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "mode": {
+                "type": "string",
+                "enum": ["schedule", "head_spacing", "zone_flow", "audit"],
+                "description": (
+                    "Calculation mode: "
+                    "'schedule' — weekly run-time schedule, "
+                    "'head_spacing' — spacing and throw radius for a head type, "
+                    "'zone_flow' — peak flow demand and run time for a zone, "
+                    "'audit' — distribution uniformity from catch-can data."
+                ),
+            },
+            "zones": {
+                "type": "array",
+                "description": "Zones for 'schedule' mode: [{name, head_type, precip_rate_in_hr?, area_m2?}].",
+                "items": {"type": "object"},
+            },
+            "et_mm_per_week": {
+                "type": "number",
+                "description": "Reference ET [mm/week] for schedule mode (default 25).",
+            },
+            "days_per_week": {
+                "type": "integer",
+                "description": "Irrigation days per week for schedule mode (default 3).",
+            },
+            "controller_start_h": {
+                "type": "number",
+                "description": "Controller start hour 0–23 (default 5.0 = 5:00 AM).",
+            },
+            "head_type": {
+                "type": "string",
+                "enum": ["spray", "rotor", "drip", "bubbler"],
+                "description": "Head type for 'head_spacing' and 'zone_flow' modes.",
+            },
+            "wind_mph": {
+                "type": "number",
+                "description": "Design wind speed [mph] for 'head_spacing' mode (default 0).",
+            },
+            "head_count": {
+                "type": "integer",
+                "description": "Number of heads for 'zone_flow' mode.",
+            },
+            "gpm_per_head": {
+                "type": "number",
+                "description": "Flow per head [GPM] for 'zone_flow' mode (optional).",
+            },
+            "zone_area_m2": {
+                "type": "number",
+                "description": "Zone area [m²] for 'zone_flow' mode.",
+            },
+            "precip_rate_in_hr": {
+                "type": "number",
+                "description": "Zone precipitation rate [in/hr] for 'zone_flow' mode.",
+            },
+            "target_precip_in": {
+                "type": "number",
+                "description": "Target irrigation depth [in] for 'zone_flow' mode (default 1.0).",
+            },
+            "catch_can_readings": {
+                "type": "array",
+                "description": "Catch-can volumes [mL] for 'audit' mode (min 4).",
+                "items": {"type": "number"},
+            },
+        },
+        "required": ["mode"],
+    },
+)
+
+
+@register(landscape_irrigation_spec)
+async def run_landscape_irrigation(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    mode = a.get("mode")
+    if mode not in ("schedule", "head_spacing", "zone_flow", "audit"):
+        return err_payload("mode must be one of: schedule, head_spacing, zone_flow, audit", "BAD_ARGS")
+
+    from kerf_landscape.irrigation import (
+        head_spacing, zone_flow_demand, irrigation_schedule, water_audit,
+    )
+
+    if mode == "head_spacing":
+        ht = a.get("head_type", "spray")
+        wind = float(a.get("wind_mph", 0.0))
+        result = head_spacing(ht, wind)
+
+    elif mode == "zone_flow":
+        if a.get("head_count") is None:
+            return err_payload("head_count is required for zone_flow mode", "BAD_ARGS")
+        result = zone_flow_demand(
+            head_count=int(a["head_count"]),
+            head_type=str(a.get("head_type", "spray")),
+            gpm_per_head=float(a["gpm_per_head"]) if a.get("gpm_per_head") is not None else None,
+            zone_area_m2=float(a.get("zone_area_m2", 100.0)),
+            precip_rate_in_hr=float(a["precip_rate_in_hr"]) if a.get("precip_rate_in_hr") is not None else None,
+            target_precip_in=float(a.get("target_precip_in", 1.0)),
+        )
+
+    elif mode == "audit":
+        readings = a.get("catch_can_readings")
+        if not isinstance(readings, list):
+            return err_payload("catch_can_readings must be an array for audit mode", "BAD_ARGS")
+        result = water_audit(readings)
+
+    else:  # schedule
+        zones = a.get("zones")
+        if not isinstance(zones, list) or len(zones) == 0:
+            return err_payload("zones must be a non-empty array for schedule mode", "BAD_ARGS")
+        result = irrigation_schedule(
+            zones=zones,
+            controller_start_h=float(a.get("controller_start_h", 5.0)),
+            et_mm_per_week=float(a.get("et_mm_per_week", 25.0)),
+            days_per_week=int(a.get("days_per_week", 3)),
+        )
+
+    if not result.get("ok"):
+        return err_payload(result.get("reason", "failed"), "ERROR")
+    return ok_payload(result)

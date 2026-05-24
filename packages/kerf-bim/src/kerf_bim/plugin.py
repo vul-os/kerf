@@ -67,6 +67,7 @@ def _register_tools(ctx, provides: list) -> None:
         ("kerf_bim.tools.curtain_wall_geom", "bim.curtain-wall-geom"),
         ("kerf_bim.tools.drafting", "bim.drafting"),
         ("kerf_bim.tools.site_geometry", "bim.site-geometry"),
+        ("kerf_bim.tools.space", "bim.space"),
     ]
 
     for module_path, capability in tool_modules:

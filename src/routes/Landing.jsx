@@ -1203,26 +1203,49 @@ const SHIPPED = [
 ]
 
 function RecentlyShipped() {
+  const [data, setData] = useState({ status: 'loading', items: [], date: null })
+  useEffect(() => {
+    let cancelled = false
+    fetch('/roadmap-manifest.json')
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((m) => {
+        if (cancelled) return
+        const items = (m.latestDelta?.items || []).slice(0, 9)
+        setData({ status: 'ready', items, date: m.latestDelta?.date || null })
+      })
+      .catch(() => {
+        if (cancelled) return
+        // Graceful fallback: render the section with the static SHIPPED list.
+        setData({ status: 'fallback', items: SHIPPED, date: null })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const items = data.status === 'fallback' ? SHIPPED : data.items
+  const dateLabel = data.date ? ` (${data.date})` : ''
+
   return (
     <section className="relative border-t border-ink-900">
       <div className="mx-auto max-w-7xl px-6 py-12 lg:py-14">
         <div className="flex items-end justify-between mb-6 gap-6">
           <div className="max-w-2xl">
             <p className="font-mono text-xs uppercase tracking-[0.2em] text-kerf-300">
-              Recently shipped
+              Recently shipped{dateLabel}
             </p>
             <h2 className="mt-2 font-display text-3xl sm:text-4xl font-semibold tracking-[-0.02em]">
               Moving fast, in public.
             </h2>
             <p className="mt-3 text-ink-300 leading-relaxed">
-              Six highlights from the most recent sprint. The full list lives in{' '}
+              Auto-generated from{' '}
               <Link
-                to="/docs/whats-new"
+                to="/roadmap"
                 className="text-kerf-300 underline underline-offset-2 hover:text-kerf-200"
               >
-                What&apos;s New
-              </Link>
-              , and the long view in{' '}
+                /roadmap
+              </Link>{' '}
+              — the latest delta from{' '}
               <a
                 href={`${GITHUB_URL}/blob/main/ROADMAP.md`}
                 target="_blank"
@@ -1235,40 +1258,45 @@ function RecentlyShipped() {
             </p>
           </div>
           <Link
-            to="/docs/whats-new"
+            to="/roadmap"
             className="hidden sm:inline-flex items-center gap-1.5 text-sm text-ink-400 hover:text-ink-100 transition-colors"
           >
-            all updates
+            full roadmap
             <ArrowRight size={14} />
           </Link>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {SHIPPED.map((s) => (
-            <Link
-              key={s.title}
-              to={s.docHref}
-              className="group relative rounded-2xl border border-ink-800 bg-ink-900/40 p-5 hover:border-kerf-300/40 hover:bg-ink-900/70 transition-colors"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/10 border border-emerald-400/30 px-2 py-0.5 text-[10px] font-mono uppercase tracking-widest text-emerald-300">
-                  <Check size={10} strokeWidth={3} />
-                  shipped
-                </span>
-                <span className="inline-flex items-center rounded-full bg-ink-800/80 border border-ink-700 px-2 py-0.5 text-[10px] font-mono uppercase tracking-widest text-ink-400">
-                  {s.domain}
-                </span>
-              </div>
-              <h3 className="font-display text-lg font-semibold tracking-tight text-ink-100 mb-1.5 group-hover:text-kerf-200 transition-colors">
-                {s.title}
-              </h3>
-              <p className="text-sm text-ink-300 leading-relaxed">{s.body}</p>
-              <ArrowRight
-                size={14}
-                className="absolute right-5 bottom-5 text-ink-500 group-hover:text-kerf-300 group-hover:translate-x-0.5 transition-all"
-              />
-            </Link>
-          ))}
+          {items.map((s) => {
+            const href = s.docHref || '/roadmap'
+            return (
+              <Link
+                key={s.title}
+                to={href}
+                className="group relative rounded-2xl border border-ink-800 bg-ink-900/40 p-5 hover:border-kerf-300/40 hover:bg-ink-900/70 transition-colors"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/10 border border-emerald-400/30 px-2 py-0.5 text-[10px] font-mono uppercase tracking-widest text-emerald-300">
+                    <Check size={10} strokeWidth={3} />
+                    shipped
+                  </span>
+                  {s.domain && (
+                    <span className="inline-flex items-center rounded-full bg-ink-800/80 border border-ink-700 px-2 py-0.5 text-[10px] font-mono uppercase tracking-widest text-ink-400">
+                      {s.domain}
+                    </span>
+                  )}
+                </div>
+                <h3 className="font-display text-lg font-semibold tracking-tight text-ink-100 mb-1.5 group-hover:text-kerf-200 transition-colors">
+                  {s.title}
+                </h3>
+                <p className="text-sm text-ink-300 leading-relaxed line-clamp-4">{s.body}</p>
+                <ArrowRight
+                  size={14}
+                  className="absolute right-5 bottom-5 text-ink-500 group-hover:text-kerf-300 group-hover:translate-x-0.5 transition-all"
+                />
+              </Link>
+            )
+          })}
         </div>
       </div>
     </section>

@@ -614,6 +614,51 @@ note), `deployment/koyeb.md` (new canonical guide), `docs/terms.md`,
 `CHANGELOG.md`. See ROADMAP §7.1 for pricing projections and migration
 timeline.
 
+## ADR — Postgres host: keep Neon (defer Koyeb PG) (2026-05-24)
+
+**Context:** T-405 migrates the hosted tier engine from Fly.io to Koyeb.
+Koyeb also offers a serverless Postgres product, raising the question of
+whether to consolidate onto a single vendor by moving the DB at the same
+time as the engine.
+
+**Decision:** Keep Neon as the hosted-tier Postgres. Do not migrate to
+Koyeb's serverless Postgres for the T-405 cutover. Revisit post-cutover
+if the conditions below change.
+
+**Why keep Neon:**
+- **Zero migration risk on the cutover.** `DATABASE_URL` points at Neon
+  today; the Koyeb engine deployment reads it unchanged. Moving the DB
+  at the same time as the engine turns one risk event into two —
+  specifically a dump/restore window that interrupts writes during an
+  already-busy migration.
+- **Branching and PITR.** Neon's branch-per-PR workflow and
+  point-in-time restore are actively used for staging and incident
+  recovery. Koyeb's serverless PG does not provide equivalent
+  branching functionality.
+- **Cost.** Koyeb small PG ($0.04/hr ≈ $29.76/mo) saves one vendor
+  line item but costs a dump/restore operation against live data, plus
+  ongoing maintenance of Koyeb's PG upgrade cycle. The savings don't
+  justify the operational risk at this stage.
+- **Reversibility.** The engine is Postgres-version-portable. The
+  decision to switch vendors is not architecturally load-bearing —
+  changing `DATABASE_URL` is the entire migration. We can revisit at
+  any time without code changes.
+
+**Conditions to revisit:**
+- Neon pricing increases materially (or free-tier limits become
+  binding).
+- Koyeb adds branching / PITR to their serverless PG offering.
+- We want single-vendor billing and the operational window is low-risk
+  (e.g., during a planned maintenance window with low traffic).
+- We move to a self-managed Postgres on a dedicated Koyeb VM (avoids
+  the serverless cold-start risk entirely).
+
+**Dump/restore runbook** is documented in
+[`deployment/koyeb.md` — Postgres § "Optional future migration"](./deployment/koyeb.md)
+for IF/WHEN this is revisited.
+
+**Affected:** `decisions.md`, `deployment/koyeb.md`.
+
 ## 2026-05-20 — Kernel push wave 1 integrated, PAUSED at user request
 - Integrated to main (HEAD fa35c166): GK-39 untrim/shrink, GK-50 3DM export, GK-35 curve fairing, GK-11 curve-intersection hardening, GK-41 RMF sweeps, T-332b reverse-eng v2 (binary IO + noise + cone LM + torus). geom/__init__ conflicts resolved by union.
 - Roadmap: 34 done / 38 open.

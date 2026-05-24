@@ -72,16 +72,113 @@ That is independent of the engine host and unchanged by this migration.
 
 ## Postgres
 
-Use Neon (recommended — same as before, `DATABASE_URL` unchanged), or
-move to Koyeb's serverless Postgres for one less vendor:
+**Use Neon — this is the recommended path for the T-405 cutover.**
+`DATABASE_URL` already points at Neon; the Koyeb engine reads it
+unchanged. No migration is required.
+
+See [`decisions.md` — ADR Postgres host (2026-05-24)](../decisions.md)
+for the full rationale (Neon branching / PITR, zero cutover risk,
+reversibility).
+
+### Optional future migration to Koyeb PG
+
+> **Not required for the T-405 cutover.** Follow this runbook only if
+> you later decide to consolidate onto Koyeb's serverless Postgres —
+> for example, to simplify vendor billing or reduce round-trip latency
+> to the engine.
+
+**Prerequisites:**
 
 ```sh
-koyeb database create kerf-prod-db --instance-type small --region fra
-# Reads connection URL via `koyeb database describe`
+# Koyeb CLI authenticated
+koyeb whoami
+
+# pg_dump / pg_restore from the Postgres client tools matching your
+# Neon server version (Postgres 16 as of 2026-05-24):
+pg_dump --version   # must be 16.x
 ```
 
-Tracked in [`tasks.md` T-410](../tasks.md). Decision recorded in
-[`decisions.md`](../decisions.md) when made.
+**Step 1 — Provision Koyeb database:**
+
+```sh
+koyeb database create kerf-prod-db \
+  --instance-type small \
+  --region fra
+
+# Note the connection URL from the output:
+koyeb database describe kerf-prod-db
+# → copy the `connection_string` value
+export KOYEB_DB_URL="<connection_string from above>"
+```
+
+**Step 2 — Dump from Neon (offline-safe snapshot):**
+
+```sh
+# Read current DATABASE_URL from Koyeb secrets (or your .env):
+export NEON_DB_URL="$(koyeb secrets get database-url --value)"
+
+pg_dump \
+  --format=custom \
+  --no-acl \
+  --no-owner \
+  --compress=9 \
+  --file=kerf-prod-$(date +%Y%m%d).dump \
+  "$NEON_DB_URL"
+```
+
+> Choose a low-traffic window. The dump is consistent (uses a
+> transaction snapshot) but long-running writes during a large dump
+> can increase WAL pressure on Neon's free tier.
+
+**Step 3 — Restore into Koyeb PG:**
+
+```sh
+pg_restore \
+  --format=custom \
+  --no-acl \
+  --no-owner \
+  --jobs=4 \
+  --dbname="$KOYEB_DB_URL" \
+  kerf-prod-$(date +%Y%m%d).dump
+```
+
+**Step 4 — Verify row counts:**
+
+```sh
+psql "$KOYEB_DB_URL" -c "
+  SELECT relname AS table, n_live_tup AS rows
+  FROM pg_stat_user_tables
+  ORDER BY n_live_tup DESC
+  LIMIT 20;"
+```
+
+Cross-check the same query against `$NEON_DB_URL`. Row counts must
+match (within any rows written during the dump window).
+
+**Step 5 — Swap `DATABASE_URL` secret and redeploy:**
+
+```sh
+# Update the secret (creates a new version; old value is retained
+# in Koyeb secret history for rollback):
+koyeb secrets update database-url --value "$KOYEB_DB_URL"
+
+# Redeploy the engine service to pick up the new secret:
+koyeb services redeploy kerf-prod/engine
+```
+
+Smoke-test against the staging URL before cutting over production.
+
+**Step 6 — Rollback path (if needed):**
+
+```sh
+# Revert the secret to the Neon URL:
+koyeb secrets update database-url --value "$NEON_DB_URL"
+koyeb services redeploy kerf-prod/engine
+```
+
+Neon retains the original data unchanged — the dump/restore wrote to
+Koyeb PG only, so Neon is a clean rollback target until you explicitly
+delete it.
 
 ## GPU rendering
 

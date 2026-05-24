@@ -11,6 +11,7 @@ Default cache: ~/.cache/kerf/freerouting/FreeRouting.jar
 Requires: Java 17+
 """
 
+import hashlib
 import os
 import subprocess
 import tempfile
@@ -23,16 +24,68 @@ _JAR_URL = (
 _JAR_CACHE_DIR = Path.home() / ".cache" / "kerf" / "freerouting"
 _JAR_CACHE_PATH = _JAR_CACHE_DIR / "FreeRouting.jar"
 
+# TODO(supply-chain): Pin the SHA-256 of freerouting-1.9.0-executable.jar.
+# Obtain it by running:
+#   sha256sum freerouting-1.9.0-executable.jar
+# or (on macOS):
+#   shasum -a 256 freerouting-1.9.0-executable.jar
+# then replace the empty string below with the hex digest.
+# Version: freerouting-1.9.0
+EXPECTED_SHA256: str = ""  # TODO: fill with official hash for v1.9.0
+
+
+def _verify_jar_sha256(path: Path) -> None:
+    """Verify the downloaded JAR against EXPECTED_SHA256.
+
+    Raises RuntimeError if the digest does not match or if EXPECTED_SHA256 is
+    not yet pinned (empty string), to prevent running an unverified binary.
+    """
+    if not EXPECTED_SHA256:
+        raise RuntimeError(
+            "FreeRouting JAR integrity check not configured: EXPECTED_SHA256 is unset. "
+            "See TODO in freerouting.py — compute sha256 of "
+            "freerouting-1.9.0-executable.jar and pin it."
+        )
+    sha256 = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            sha256.update(chunk)
+    digest = sha256.hexdigest()
+    if digest != EXPECTED_SHA256:
+        path.unlink(missing_ok=True)
+        raise RuntimeError(
+            f"FreeRouting JAR SHA-256 mismatch for {path}:\n"
+            f"  expected: {EXPECTED_SHA256}\n"
+            f"  got:      {digest}\n"
+            "The downloaded file has been removed. "
+            "Verify the release and update EXPECTED_SHA256 if needed."
+        )
+
 
 def _download_jar(dest: Path) -> None:
-    """Download the FreeRouting JAR to dest. Raises RuntimeError on failure."""
+    """Download the FreeRouting JAR to dest and verify its SHA-256 integrity.
+
+    Raises RuntimeError on download failure or integrity mismatch.
+    The URL must be HTTPS (enforced by the constant _JAR_URL above).
+    """
     import urllib.request
+
+    if not _JAR_URL.startswith("https://"):
+        raise RuntimeError(
+            f"FreeRouting JAR URL is not HTTPS: {_JAR_URL!r}. "
+            "Refusing to download over an insecure connection."
+        )
 
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_suffix(".tmp")
     try:
         urllib.request.urlretrieve(_JAR_URL, str(tmp))
+        _verify_jar_sha256(tmp)
         tmp.rename(dest)
+    except RuntimeError:
+        if tmp.exists():
+            tmp.unlink(missing_ok=True)
+        raise
     except Exception as exc:
         if tmp.exists():
             tmp.unlink(missing_ok=True)

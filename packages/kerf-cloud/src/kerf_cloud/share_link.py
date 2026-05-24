@@ -47,6 +47,20 @@ _FALLBACK_SECRET = "kerf-share-dev-secret-change-in-prod"
 
 def _secret() -> bytes:
     raw = os.environ.get(_SIGN_KEY_ENV) or _FALLBACK_SECRET
+    if raw == _FALLBACK_SECRET:
+        # Check if we are in a production environment; refuse to operate with
+        # the dev-default HMAC secret to prevent token forgery in production.
+        _kerf_env = os.environ.get("ENV", os.environ.get("KERF_ENV", "local"))
+        try:
+            from kerf_core.config import is_production_env
+            _in_prod = is_production_env(_kerf_env)
+        except ImportError:
+            _in_prod = _kerf_env.lower() not in ("local", "dev", "development", "test")
+        if _in_prod:
+            raise RuntimeError(
+                f"FATAL: Running in env={_kerf_env!r} with dev-default KERF_SHARE_SECRET. "
+                "Set KERF_SHARE_SECRET to a production value."
+            )
     return raw.encode()
 
 

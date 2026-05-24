@@ -127,6 +127,19 @@ class Settings(BaseSettings):
     anthropic_prompt_cache: bool = True
 
     @model_validator(mode="after")
+    def _enforce_prod_secrets(self):
+        """Refuse to start in production with dev-default secrets."""
+        if self.env.lower() not in ("local", "dev", "development", "test"):
+            _DEV_JWT = "dev-secret-change-in-production"
+            _DEV_PEPPER = "dev-pepper"
+            if self.jwt_secret == _DEV_JWT or self.password_pepper == _DEV_PEPPER:
+                raise RuntimeError(
+                    f"FATAL: Running in env={self.env!r} with dev-default secrets. "
+                    "Set JWT_SECRET and PASSWORD_PEPPER to production values."
+                )
+        return self
+
+    @model_validator(mode="after")
     def _enforce_cloud_disables_local_mode(self):
         if self.cloud_enabled and self.local_mode:
             self.local_mode = False
@@ -176,6 +189,16 @@ class Settings(BaseSettings):
 
 # Public alias — kerf-core's contract expects ``Config``.
 Config = Settings
+
+
+def is_production_env(env: str) -> bool:
+    """Return True when *env* is not a recognised dev/test environment.
+
+    Dev-safe values: "local", "dev", "development", "test".
+    Any other value (e.g. "production", "staging", "prod") is treated as
+    production so that the fail-closed secret checks fire.
+    """
+    return env.lower() not in ("local", "dev", "development", "test")
 
 
 @lru_cache

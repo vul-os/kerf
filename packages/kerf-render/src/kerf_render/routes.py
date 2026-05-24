@@ -68,7 +68,8 @@ def _get_settings():
 
 async def _optional_user_id(request: Request) -> Optional[str]:
     """Extract user_id from Bearer JWT if present; return None otherwise."""
-    auth = request.headers.get("Authorization", "")
+    headers = getattr(request, "headers", None)
+    auth = headers.get("Authorization", "") if headers else ""
     if not auth.startswith("Bearer "):
         return None
     token = auth[7:]

@@ -49,9 +49,9 @@ features:
       note: "Loft with rails, centerline, point-to-section, area law"
       source: "https://help.autodesk.com/view/INVNTOR/2025/ENU/?guid=GUID-11AF0B14-A3D6-40B6-B4FD-E826FE2CE7BA"
     kerf:
-      status: partial
-      note: "No guide-rail overload in OCCT binding"
-      evidence: "packages/kerf-cad-core/src/kerf_cad_core"
+      status: yes
+      note: "Guide-rail overload wired (ThruSections.AddWire); ruled/closed/symmetric"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/feature_loft.py"
 
   - domain: D1
     feature: "Sheet metal"
@@ -60,9 +60,9 @@ features:
       note: "Full sheet metal workspace — flanges, hem, relief, jog, punch, flat pattern"
       source: "https://help.autodesk.com/view/INVNTOR/2025/ENU/?guid=GUID-E44E6EDD-6D9F-48DB-8826-72CCBA2F6588"
     kerf:
-      status: partial
-      note: "Single flange + unfold + flat-pattern DXF; no hem/jog/multi-flange"
-      evidence: "packages/kerf-cad-core/src/kerf_cad_core"
+      status: yes
+      note: "Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief/punch"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/construction_verbs_tools.py"
 
   - domain: D1
     feature: "NURBS surfacing (blend/network/patch)"
@@ -71,9 +71,9 @@ features:
       note: "Surface commands: stitch, sculpt, patch, loft surface (Inventor Professional)"
       source: "https://help.autodesk.com/view/INVNTOR/2025/ENU/?guid=GUID-F48B5A7E-5F85-4B64-B3E1-1B9CCFE11E2E"
     kerf:
-      status: partial
-      note: "Math complete; OCCT bindings unconfirmed at build"
-      evidence: "packages/kerf-cad-core/src/kerf_cad_core"
+      status: yes
+      note: "blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, feature_to_solid (sew) wired"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py"
 
   - domain: D1
     feature: "Assemblies — mates"
@@ -820,7 +820,7 @@ Autodesk Inventor is a top-tier professional mechanical CAD platform with roughl
 | Offline / self-host | ✅ Full offline | ✅ Full offline single-binary |
 | Parametric B-rep | ✅ ShapeManager feature tree (mature) | ✅ OCCT feature tree |
 | Constraint sketcher | ✅ Full parametric sketcher (2D + 3D) | ✅ Sketcher v2 — all major constraints |
-| Sheet metal | ✅ Full — flanges, punch/die, flat pattern | ✅ Flange + unfold + flat-pattern DXF |
+| Sheet metal | ✅ Full — flanges, punch/die, flat pattern | ✅ Flange + hem + jog + multi-flange + unfold + flat DXF |
 | Dynamic Simulation | ✅ Full multi-body dynamics | ❌ Not yet |
 | Stress Analysis (FEA) | ✅ In-box linear static FEA | ❌ Not yet |
 | Frame Generator | ✅ Structural frame design | ⚠️ Structural grid; no frame-generator |

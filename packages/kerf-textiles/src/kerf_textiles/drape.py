@@ -8,7 +8,7 @@ Quick start
 -----------
 ::
 
-    from kerf_textiles.drape import drape_simulate, drape_on_disc
+    from kerf_textiles.drape import drape_simulate, drape_on_disc, drape_over_sphere
 
     # Square cloth pinned at two top corners, hanging freely
     result = drape_simulate(
@@ -26,6 +26,13 @@ Quick start
     )
     print(dc_result.drape_coefficient)   # dimensionless, 0–1
 
+    # Square sheet draped over a sphere (physics validation)
+    sphere_result = drape_over_sphere(
+        cloth_size=0.8, sphere_radius=0.25,
+    )
+    print(sphere_result.no_penetration)   # True if settled penetration-free
+    print(sphere_result.energy_plateau)   # True if energy stabilised
+
 Drape coefficient (BS 5058 / ASTM D 4399)
 ------------------------------------------
 
@@ -42,6 +49,17 @@ DC ≈ 0.0  →  very limp (hangs close to vertical — projected area ≈ A_dis
 
 Published range for real textiles: 0.30 – 0.95.
 Stiffer fabric (higher k_bend) → higher DC.
+
+Sphere-drape validation (Bridson et al. 2003)
+---------------------------------------------
+A square sheet draped over a sphere should:
+  1. Settle to a stable equilibrium (energy reaches a plateau).
+  2. Have no particle inside the sphere (penetration-free).
+  3. Exhibit approximate bilateral symmetry if the cloth is symmetric.
+
+These three properties are the canonical numeric validation for a cloth
+simulator (see also Nealen et al. 2006, "Physically Based Deformable Models
+in Computer Graphics", EUROGRAPHICS survey).
 """
 
 from __future__ import annotations
@@ -54,12 +72,14 @@ from kerf_textiles.mass_spring import (
     ClothMesh,
     SpherePrimitive,
     PlanePrimitive,
+    CapsulePrimitive,
     solve_step,
     Vec3,
     _norm,
     _sub,
     _add,
     _scale,
+    _dot,
 )
 
 
@@ -111,7 +131,7 @@ def drape_simulate(
     velocity_damping: float = 0.98,
     pin_indices: list[tuple[int, int]] | None = None,
     pin_positions: dict[tuple[int, int], Vec3] | None = None,
-    colliders: list[SpherePrimitive | PlanePrimitive] | None = None,
+    colliders: list[SpherePrimitive | PlanePrimitive | CapsulePrimitive] | None = None,
     gravity: Vec3 = (0.0, -9.81, 0.0),
     steps: int = 3000,
     dt: float = 0.005,
@@ -465,3 +485,229 @@ def catenary_max_sag(span: float, total_length: float) -> float:
         a = a_new
 
     return a * (math.cosh(S / (2.0 * a)) - 1.0)
+
+
+# ---------------------------------------------------------------------------
+# Sphere-drape result
+# ---------------------------------------------------------------------------
+
+@dataclass
+class DrapeOverSphereResult:
+    """
+    Output of :func:`drape_over_sphere`.
+
+    Attributes
+    ----------
+    mesh : ClothMesh
+        Final settled cloth mesh.
+    max_penetration : float
+        Maximum penetration depth into the sphere among all particles
+        (positive = inside; 0.0 = penetration-free).
+    no_penetration : bool
+        True if no particle penetrates the sphere beyond 1% of the radius.
+    energy_history : list[float]
+        Total mechanical energy sampled every ``energy_sample_interval`` steps.
+    energy_plateau : bool
+        True if the energy tail (last 25% of samples) is non-increasing
+        within a 1% tolerance.
+    symmetry_error : float
+        RMS difference between the left-half and right-half y-positions of
+        the final cloth, measuring bilateral (X-mirror) symmetry.
+        Zero for a perfectly symmetric result.
+    converged : bool
+        True if RMS velocity dropped below *tol* before the step limit.
+    steps_taken : int
+        Actual number of outer integration steps executed.
+    sphere : SpherePrimitive
+        The sphere used as the collision body.
+    """
+    mesh: ClothMesh
+    max_penetration: float
+    no_penetration: bool
+    energy_history: list[float]
+    energy_plateau: bool
+    symmetry_error: float
+    converged: bool
+    steps_taken: int
+    sphere: SpherePrimitive
+
+
+# ---------------------------------------------------------------------------
+# Sphere-drape simulation
+# ---------------------------------------------------------------------------
+
+def drape_over_sphere(
+    cloth_size: float = 0.8,
+    sphere_radius: float = 0.25,
+    sphere_centre: Vec3 | None = None,
+    rows: int = 16,
+    cols: int = 16,
+    mass: float = 0.003,
+    k_structural: float = 80.0,
+    k_shear: float = 40.0,
+    k_bend: float = 4.0,
+    d_structural: float = 0.3,
+    d_shear: float = 0.15,
+    d_bend: float = 0.06,
+    velocity_damping: float = 0.96,
+    steps: int = 4000,
+    dt: float = 0.005,
+    tol: float = 5e-5,
+    energy_sample_interval: int = 100,
+    floor_margin: float = 2.0,
+) -> DrapeOverSphereResult:
+    """
+    Drape a square cloth sheet over a sphere and settle to equilibrium.
+
+    This is the canonical physics-validation scenario for cloth simulators
+    (Provot 1995, Bridson 2003, Nealen 2006):
+
+    * A square cloth is initialised flat in the XZ plane directly above
+      a sphere of given radius.
+    * Gravity pulls it downward; the sphere acts as a rigid collision body.
+    * The cloth settles around the sphere to a stable, penetration-free,
+      approximately symmetric drape.
+
+    Validation checks performed:
+    1. **No penetration**: all particles outside the sphere surface
+       (within 1% radius tolerance).
+    2. **Energy plateau**: total mechanical energy is non-increasing in the
+       tail of the simulation (energy stabilised = converged to equilibrium).
+    3. **Bilateral symmetry**: the X-mirror of the left half of the cloth
+       matches the right half within a small tolerance (RMS error reported).
+
+    Parameters
+    ----------
+    cloth_size : float
+        Side length of the square cloth (metres).  Default 0.8 m.
+    sphere_radius : float
+        Radius of the sphere (metres).  Default 0.25 m.
+    sphere_centre : Vec3, optional
+        Centre of the sphere.  Default: (0, -sphere_radius * 0.5, 0) so the
+        sphere top is at y = sphere_radius * 0.5, and the cloth starts at y = 0
+        directly above the sphere.
+    rows, cols : int
+        Cloth grid resolution.  Use even numbers for symmetric sampling.
+    mass : float
+        Per-particle mass (kg).
+    k_structural, k_shear, k_bend : float
+        Spring stiffnesses (N/m).  Lower k_bend → more drape, more folds.
+    d_structural, d_shear, d_bend : float
+        Spring-axis Rayleigh damping coefficients (N·s/m).
+    velocity_damping : float
+        Per-sub-step global velocity multiplier (≤ 1).
+    steps : int
+        Maximum outer integration steps.
+    dt : float
+        Outer time step (seconds).
+    tol : float
+        RMS velocity convergence tolerance (m/s).
+    energy_sample_interval : int
+        Record total energy every this many outer steps.
+    floor_margin : float
+        A floor plane is placed at sphere_centre.y - sphere_radius * floor_margin
+        to prevent particles from falling indefinitely.
+
+    Returns
+    -------
+    DrapeOverSphereResult
+    """
+    if sphere_centre is None:
+        # Top of sphere is at y = 0 (cloth starts flush above)
+        sphere_centre = (0.0, -sphere_radius, 0.0)
+
+    sphere = SpherePrimitive(centre=sphere_centre, radius=sphere_radius)
+
+    # Build cloth mesh — initial flat XZ plane at y = 0 (just above sphere top)
+    spacing = cloth_size / (max(rows, cols) - 1)
+    mesh = ClothMesh(
+        rows=rows,
+        cols=cols,
+        spacing=spacing,
+        mass=mass,
+        k_structural=k_structural,
+        k_shear=k_shear,
+        k_bend=k_bend,
+        d_structural=d_structural,
+        d_shear=d_shear,
+        d_bend=d_bend,
+    )
+
+    # Floor prevents infinite fall
+    floor_y = sphere_centre[1] - sphere_radius * floor_margin
+    floor = PlanePrimitive(height=floor_y)
+    colliders = [sphere, floor]
+
+    energy_history: list[float] = []
+    converged = False
+    step = 0
+
+    for step in range(1, steps + 1):
+        solve_step(
+            mesh, dt=dt,
+            gravity=(0.0, -9.81, 0.0),
+            velocity_damping=velocity_damping,
+            colliders=colliders,
+        )
+
+        if step % energy_sample_interval == 0:
+            energy_history.append(mesh.total_energy())
+
+        if step % 50 == 0:
+            rms_v = mesh.rms_velocity()
+            if rms_v < tol:
+                converged = True
+                break
+
+    # --- Penetration analysis -------------------------------------------
+    max_pen = 0.0
+    for p in mesh.positions:
+        d = _sub(p, sphere.centre)
+        dist = _norm(d)
+        pen = sphere.radius - dist  # positive = inside sphere
+        if pen > max_pen:
+            max_pen = pen
+
+    no_penetration = (max_pen <= sphere.radius * 0.01)
+
+    # --- Energy plateau check -------------------------------------------
+    # Last 25% of samples must be non-increasing within 1% tolerance.
+    energy_plateau = False
+    if len(energy_history) >= 8:
+        tail_start = len(energy_history) * 3 // 4
+        tail = energy_history[tail_start:]
+        violations = sum(
+            1 for i in range(1, len(tail))
+            if tail[i] > tail[i - 1] * 1.01
+        )
+        energy_plateau = (violations == 0)
+    elif len(energy_history) >= 2:
+        # Fewer samples: just check last two
+        energy_plateau = (energy_history[-1] <= energy_history[-2] * 1.01)
+
+    # --- Bilateral (X-mirror) symmetry check ----------------------------
+    # For each particle at column c, compare y-position with its mirror at
+    # column (cols - 1 - c).  An even grid is symmetric by construction.
+    sym_sq_sum = 0.0
+    sym_count = 0
+    for r in range(rows):
+        for c in range(cols // 2):
+            i = mesh._idx(r, c)
+            j = mesh._idx(r, cols - 1 - c)
+            yi = mesh.positions[i][1]
+            yj = mesh.positions[j][1]
+            sym_sq_sum += (yi - yj) ** 2
+            sym_count += 1
+    symmetry_error = math.sqrt(sym_sq_sum / sym_count) if sym_count > 0 else 0.0
+
+    return DrapeOverSphereResult(
+        mesh=mesh,
+        max_penetration=max_pen,
+        no_penetration=no_penetration,
+        energy_history=energy_history,
+        energy_plateau=energy_plateau,
+        symmetry_error=symmetry_error,
+        converged=converged,
+        steps_taken=step,
+        sphere=sphere,
+    )

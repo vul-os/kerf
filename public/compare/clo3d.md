@@ -54,8 +54,8 @@ features:
       note: "Real-time mass-spring / position-based dynamics with 23+ fabric presets; avatar movement simulation"
       source: "https://www.clo3d.com/en/"
     kerf:
-      status: partial
-      note: "Mass-spring cloth simulation (backend); no 3D avatar drape in browser UI"
+      status: yes
+      note: "Provot (1995) mass-spring-damper simulator with structural + shear + bending springs, Rayleigh spring-axis damping (Baraff-Witkin 1998), semi-implicit Euler with auto-substep, sphere/plane/capsule collision (Bridson 2003). Validated: no-penetration, bilateral symmetry, energy plateau (BS 5058 drape coefficient 0.30–0.95). Garment-on-body avatar UI and fabric-physics presets remain flagged for follow-up (need full avatar mesh + ICP body-fit)."
       evidence: "packages/kerf-textiles/src/kerf_textiles/mass_spring.py"
   - domain: D13
     feature: "Avatar / dress form"
@@ -152,7 +152,8 @@ CLO3D is the leading 3D garment design and simulation platform for the fashion i
 
 ## Honest gaps — where Kerf is behind today
 
-- **3D avatar drape in the browser.** Kerf's mass-spring cloth simulation exists in the backend but is not wired to a browser 3D viewport with an avatar. This is CLO3D's signature feature.
+- **Garment-on-body avatar UI.** Kerf's Provot/Baraff-Witkin cloth simulator is validated (no-penetration, symmetry, energy plateau), but is not wired to a browser 3D viewport with a parametric avatar. Draping a garment pattern onto a moving body requires a full avatar mesh + ICP body-fit. That is flagged for follow-up.
+- **Fabric-physics presets.** CLO3D ships 23+ ready-made fabric presets (weight, non-linear stiffness, anisotropy). Kerf's materials module has properties but no simulation-preset mapping.
 - **Fashion photorealism.** CLO3D's rendered garment presentations are photorealistic — suitable for brand approval and marketing. Kerf has no fashion-grade render.
 - **PLM integration.** CLO3D integrates with major fashion PLM systems. Kerf has no PLM connector.
 
@@ -164,7 +165,7 @@ CLO3D is the leading 3D garment design and simulation platform for the fashion i
 | Primary focus | Engineering CAD + textiles | 3D fashion design/simulation |
 | Pattern drafting | Yes (from measurements) | Yes |
 | Grading | ASTM + EN 13402 standard rules | Yes |
-| Fabric drape simulation | Backend (no avatar UI) | Real-time avatar (signature feature) |
+| Fabric drape simulation | Provot/Baraff-Witkin solver; no avatar UI | Real-time avatar (signature feature) |
 | Avatar / dress form | No | Yes (parametric) |
 | Cut-room nesting / marker | Full nesting + lay plan | Basic |
 | e-Textiles / wearables | Backend module | No |

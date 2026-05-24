@@ -12,6 +12,14 @@ The authoritative source for what's shipped vs in-flight is
 See `🔮 planned` rows in [ROADMAP.md](./ROADMAP.md). The v0.2 milestone
 focus is in [docs/plans/v0.2-milestone.md](./docs/plans/v0.2-milestone.md).
 
+### 2026-05-24 — Infrastructure: Fly.io → Koyeb migration
+
+- **Infrastructure** — hosted tier migrated from Fly.io to Koyeb. GPU
+  rendering unblocked (T4/A100 ladder now available). Frankfurt
+  data-centre retained for GDPR data-residency. No application code
+  changes — same Docker image, same env-var contract. See
+  [ROADMAP §7.1](./ROADMAP.md) and [deployment/koyeb.md](./deployment/koyeb.md).
+
 ### 2026-05-17 (later) — Compare hub matrices, scroll-to-top, CFD foundation, FEM ref-values
 
 Same date as the geometry-kernel step-change below; a second wave of

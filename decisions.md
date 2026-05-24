@@ -578,6 +578,42 @@ End of 16-fire 30-min cadence.
 - Known nit: probe's DELETE /api/me returns 405 (pre-existing) → leftover disposable test user on dev; harmless.
 - tasks.md spine COMPLETE. Autonomous loop ended. Only parked T-131 (P3) + v2 deferrals (T-327b/T-331b/T-332b) remain.
 
+## ADR — Move hosted tier from Fly.io to Koyeb (2026-05-24)
+
+**Context:** `kerf.sh` ran on Fly.io since launch. The FEM solver,
+topology optimisation, and planned Blender/Cycles render workers require
+GPU access. Fly.io removed GPU support from their platform, leaving the
+hosted tier without a path to GPU workloads.
+
+**Decision:** Migrate the hosted tier (`kerf.sh`) from Fly.io to Koyeb.
+Fly.io remains supported as a CPU-only self-host option and its
+documentation is kept (deprecated for GPU / hosted tier).
+
+**Why Koyeb:**
+- Full GPU ladder (T4 → A100) available on the same Docker-model
+  deployment workflow — no code changes, only a new provider config.
+- Frankfurt (`fra`) data-centre presence meets GDPR data-residency
+  requirements aligned with the existing Terms of Service.
+- Pricing is re-grounded in the ROADMAP §7.1 model; GPU-per-minute
+  billing is predictable.
+- Identical Docker semantics to Fly (push image → deploy) keeps the
+  migration portable with zero application changes.
+
+**Alternatives ruled out:**
+- **Stay on Fly (CPU-only)**: unblocks nothing for GPU rendering;
+  defers the problem.
+- **GCP Cloud Run + GPU**: more complex (Cloud Run GPU support is
+  preview-tier in the required regions); higher egress cost than Koyeb.
+- **AWS ECS Fargate + GPU**: P3/G4 Fargate GPU instances are expensive
+  and require an ECS-specific task-definition change; more operational
+  overhead than a Docker-only workflow.
+
+**Affected:** `deployment/README.md`, `deployment/fly.md` (deprecated
+note), `deployment/koyeb.md` (new canonical guide), `docs/terms.md`,
+`docs/architecture/rate-limiting.md`, `docs/architecture/runtime-state-audit.md`,
+`CHANGELOG.md`. See ROADMAP §7.1 for pricing projections and migration
+timeline.
+
 ## 2026-05-20 — Kernel push wave 1 integrated, PAUSED at user request
 - Integrated to main (HEAD fa35c166): GK-39 untrim/shrink, GK-50 3DM export, GK-35 curve fairing, GK-11 curve-intersection hardening, GK-41 RMF sweeps, T-332b reverse-eng v2 (binary IO + noise + cone LM + torus). geom/__init__ conflicts resolved by union.
 - Roadmap: 34 done / 38 open.

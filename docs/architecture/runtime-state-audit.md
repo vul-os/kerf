@@ -6,15 +6,19 @@ _Anchored at commit `ccb91c8` — 2026-05-19_
 
 ## Executive Summary
 
-- **Multi-machine Fly safety: YES (today).** `fly.toml` has `min_machines_running = 1`; in
-  practice only one machine is ever active. All persistent state lives in Postgres
+- **Multi-instance safety: YES (today).** All persistent state lives in Postgres
   (asyncpg pool) and Tigris S3; auth is stateless JWT. The one fire-and-forget
   `asyncio.create_task` (`_auto_title_thread`) writes to Postgres, so it is safe.
   No `lru_cache`, no module-level mutable dicts used as caches, no persistent
   WebSocket or SSE fan-out. **However**, the in-process `PresenceChannel` class in
   `kerf_cloud/collab/presence.py` is a single-machine pub/sub stub — it is not
-  wired to any HTTP endpoint yet, but it **will break** the moment a second machine
+  wired to any HTTP endpoint yet, but it **will break** the moment a second instance
   is added or presence is exposed.
+
+  > The original audit was written against the Fly.io deployment (`fly.toml`
+  > `min_machines_running = 1`). The hosted tier has since migrated to Koyeb
+  > (Frankfurt). The multi-instance safety analysis below remains valid for any
+  > horizontally-scaled container deployment.
 
 - **IndexedDB save status: IMPLEMENTED but not wired to editors.** `localStash`,
   `autosaveScheduler`, and `dirtyStore` are fully coded and tested. `reconcile()` is
@@ -40,9 +44,24 @@ _Anchored at commit `ccb91c8` — 2026-05-19_
 
 ---
 
-## 1 — Multi-machine Fly Safety
+## 1 — Multi-instance Safety
 
-### fly.toml audit
+### Koyeb service config (current hosted tier)
+
+Kerf runs on Koyeb with a single `web` service instance by default.
+Koyeb scales horizontally by adding replicas; the same multi-instance
+safety properties described below apply regardless of the number of
+replicas.
+
+Key Koyeb knobs to review when scaling:
+- **Replicas**: set via the Koyeb dashboard or `koyeb service update --replicas N`.
+- **Health check path**: `/healthz` — Koyeb routes traffic only to healthy instances.
+- **No sticky-session config by default**: requests are round-robined across
+  replicas. Do not rely on in-process state surviving across requests.
+
+### (Fly.io / deprecated) fly.toml audit
+
+> This section applies only to CPU-only self-hosted deployments still using Fly.
 
 ```toml
 [http_service]
@@ -97,29 +116,30 @@ as a stub: _"In production it would be backed by Redis pub/sub or a WebSocket fa
 
 ### Conclusion
 
-**Today: multi-machine safe.** All persistent state is in Postgres + Tigris S3.
+**Today: multi-instance safe.** All persistent state is in Postgres + Tigris S3.
 JWT tokens are stateless. There are no in-memory caches that differ between
-machines, no WebSocket fan-out, no SSE persistent connections.
+instances, no WebSocket fan-out, no SSE persistent connections.
 
-**Risk window:** If Fly's concurrency autoscaler fires (sustained > 200 req/s),
-a second machine may spin up. Requests will be round-robined without affinity.
-This is safe for current features, but the `auto_commit_loop` and `_sweep_loop`
-tasks will each run on every machine — wasted work, not corruption, because
-Postgres constraints make both idempotent.
+**Risk window:** If the Koyeb autoscaler adds a second replica (or if Fly's
+concurrency autoscaler fires on CPU-only self-host), requests will be
+round-robined without affinity. This is safe for current features, but the
+`auto_commit_loop` and `_sweep_loop` tasks will each run on every instance —
+wasted work, not corruption, because Postgres constraints make both idempotent.
 
 ### What would need to change for presence/cursor-sharing
 
-- `PresenceChannel` must be backed by **Redis pub/sub** (or Fly's Upstash Redis
-  addon) rather than an in-process dict.
+- `PresenceChannel` must be backed by **Redis pub/sub** (e.g. Upstash Redis, or
+  a managed Redis on Koyeb/Fly) rather than an in-process dict.
 - Presence events must be pushed to clients via a persistent transport. The
   current `StreamingResponse` usages are one-shot downloads, not SSE streams.
   Real-time delivery would require a new SSE or WebSocket endpoint on the server
   plus a frontend EventSource/WebSocket connection.
-- Until that transport exists, a second machine means cursor events are silently
-  dropped (they'd reach subscribers on the same machine only).
-- Fly sticky sessions (`fly-force-instance-id` header or session-affinity via
-  `fly-replay`) could be a short-term workaround if presence is collocated with
-  a long-lived SSE connection per user, but that breaks horizontal scale.
+- Until that transport exists, a second instance means cursor events are silently
+  dropped (they'd reach subscribers on the same instance only).
+- Sticky sessions (Koyeb session-affinity header, or Fly's `fly-force-instance-id`
+  for CPU-only Fly deployments) could be a short-term workaround if presence is
+  collocated with a long-lived SSE connection per user, but that breaks horizontal
+  scale.
 
 ---
 
@@ -298,11 +318,11 @@ absent.
 
 5. **Redis-back `PresenceChannel` before enabling presence** — when cursor-sharing
    is added, replace the in-process `_slots`/`_subscribers` dicts with a Redis
-   pub/sub channel keyed by `project_id`. Do this before the first multi-machine
-   Fly deploy (or before enabling auto-scale beyond 1 machine).
+   pub/sub channel keyed by `project_id`. Do this before enabling auto-scale
+   beyond 1 replica on Koyeb (or beyond 1 machine on CPU-only Fly deployments).
 
-6. **Duplicate auto_commit/sweep_loop work on multi-machine** — if/when
-   min_machines_running is raised above 1, consider a Postgres advisory lock
-   (or a dedicated single-machine worker via `fly.worker.toml`) to avoid N
-   machines each polling all workspaces every 60 s. Not a correctness issue
+6. **Duplicate auto_commit/sweep_loop work on multi-instance** — if/when replica
+   count is raised above 1 on Koyeb (or `min_machines_running` above 1 on Fly
+   for CPU-only deployments), consider a Postgres advisory lock to avoid N
+   instances each polling all workspaces every 60 s. Not a correctness issue
    today, but will become noisy at scale.

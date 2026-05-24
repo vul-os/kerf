@@ -1,19 +1,26 @@
 # Tigris storage
 
-[Tigris](https://www.tigrisdata.com/) is fly.io's S3-compatible storage
+[Tigris](https://www.tigrisdata.com/) is an S3-compatible object-storage
 service. Kerf uses it as the object-storage backend for project blobs,
 mesh tessellations, project thumbnails, and Workshop content.
 
+Tigris was originally developed as a fly.io-native service but is
+accessible via the public endpoint `fly.storage.tigris.dev` from
+**any host** — including Koyeb, GCP, and AWS. The endpoint hostname is
+the real public hostname; it is not Fly-specific.
+
 ## Why Tigris (vs Cloudflare R2 or AWS S3)
 
-- **fly-native anycast network** — zero egress between Kerf app machines
-  and Tigris. R2 zero-egress is global but the round trip is longer.
+- **Anycast network** — low-latency access from any region; zero egress
+  when used alongside fly.io (`jnb`/`fra` machines). From Koyeb Frankfurt,
+  Tigris Frankfurt-replicated objects are served with minimal round-trip.
 - **S3-compatible API** — drop-in for the existing `STORAGE_BACKEND=s3`
   path. No code changes.
 - **Multi-region by default** — Tigris replicates writes to multiple
-  fly regions automatically.
-- **Pricing**: ~$0.02/GB-month storage, $0/GB egress within fly. R2 is
-  $0.015/GB; AWS S3 is $0.023/GB plus $0.09/GB egress.
+  regions automatically.
+- **Pricing**: ~$0.02/GB-month storage, $0/GB egress within fly; egress
+  to external hosts at standard rates. R2 is $0.015/GB; AWS S3 is
+  $0.023/GB plus $0.09/GB egress.
 
 The model in `billingmodel/projections.py` uses $0.02/GB-mo for Tigris.
 
@@ -80,7 +87,7 @@ aws --endpoint-url=https://fly.storage.tigris.dev \
 - **Multipart upload threshold**: Kerf uses chunked uploads above ~50MB
   (see `kerf-api` chunked-upload helpers). Tigris fully supports S3
   multipart.
-- **Bucket count**: per fly.io org pricing — check the Tigris dashboard.
+- **Bucket count**: per Tigris org pricing — check the Tigris dashboard.
 
 ## Local dev
 
@@ -101,9 +108,11 @@ The `docker-compose.yml` includes a MinIO service for this.
 
 - **403 forbidden on upload**: check `KERF_STORAGE_S3_BUCKET` matches the
   exact bucket name (it's prefixed with a random suffix).
-- **Slow uploads from outside fly**: Tigris is optimized for fly-native
-  traffic. Uploads from external machines will go through Tigris's public
-  endpoint and may be slower than R2 from outside the fly network.
-- **Egress charges**: should always be $0 from inside fly. If you see
-  egress on the Tigris invoice, something is routing through the public
-  internet — check `KERF_STORAGE_S3_ENDPOINT` is the fly-internal URL.
+- **Upload latency from non-Fly hosts**: Tigris is highly optimized for
+  Fly-native traffic. From Koyeb or other external hosts, uploads go
+  through the public `fly.storage.tigris.dev` endpoint; latency is
+  comparable to R2 from outside the Fly network.
+- **Egress charges**: $0 from inside the Fly network. From Koyeb or
+  other external hosts, standard Tigris egress rates apply. If you see
+  unexpected egress, verify `KERF_STORAGE_S3_ENDPOINT` is set to
+  `https://fly.storage.tigris.dev`.

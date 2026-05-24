@@ -31,10 +31,18 @@ async def register(app: FastAPI, ctx) -> PluginManifest:
     app.include_router(aero_propulsion_router, prefix="/api", tags=["aero"])
     from kerf_api.routes_aero_atmosphere import router as aero_atmosphere_router
     app.include_router(aero_atmosphere_router, prefix="/api", tags=["aero"])
+    from kerf_api.routes_aero_airfoil import router as aero_airfoil_router
+    app.include_router(aero_airfoil_router, prefix="/api", tags=["aero"])
+    from kerf_api.routes_aero_orbit import router as aero_orbit_router
+    app.include_router(aero_orbit_router, prefix="/api", tags=["aero"])
     from kerf_api.routes_silicon_synth import router as silicon_synth_router
     app.include_router(silicon_synth_router, prefix="/api", tags=["silicon"])
+    from kerf_api.routes_silicon import router as silicon_router
+    app.include_router(silicon_router, prefix="/api", tags=["silicon"])
     from kerf_api.routes_composites import router as composites_router
     app.include_router(composites_router, prefix="/api", tags=["composites"])
+    from kerf_api.routes_ota import router as ota_router
+    app.include_router(ota_router, prefix="/api", tags=["ota"])
 
     _register_tools(ctx)
 

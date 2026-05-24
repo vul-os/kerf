@@ -213,22 +213,22 @@ class TestKeplerModule:
         assert 91 * 60 < T < 93 * 60
 
     def test_propagate_returns_correct_length(self):
-        from kerf_aero.orbital.kepler import OrbitalElements, propagate_kepler, R_EARTH_KM
+        from kerf_aero.orbital.kepler import OrbitalElements, propagate_orbit, R_EARTH_KM
         el = OrbitalElements(
             a=R_EARTH_KM + 400, e=0.0,
             i=math.radians(51.6), raan=0.0, argp=0.0, nu0=0.0,
         )
-        pts = propagate_kepler(el, 5500.0, n_steps=100)
+        pts = propagate_orbit(el, 5500.0, n_steps=100)
         assert len(pts) == 100
 
     def test_propagate_validates_e_lt_1(self):
-        from kerf_aero.orbital.kepler import OrbitalElements, propagate_kepler, R_EARTH_KM
+        from kerf_aero.orbital.kepler import OrbitalElements, propagate_orbit, R_EARTH_KM
         el = OrbitalElements(a=7000, e=1.0, i=0, raan=0, argp=0, nu0=0)
         with pytest.raises(ValueError):
-            propagate_kepler(el, 5000.0, 50)
+            propagate_orbit(el, 5000.0, 50)
 
     def test_propagate_validates_n_steps_gte_2(self):
-        from kerf_aero.orbital.kepler import OrbitalElements, propagate_kepler, R_EARTH_KM
+        from kerf_aero.orbital.kepler import OrbitalElements, propagate_orbit, R_EARTH_KM
         el = OrbitalElements(a=7000, e=0.0, i=0, raan=0, argp=0, nu0=0)
         with pytest.raises(ValueError):
-            propagate_kepler(el, 5000.0, n_steps=1)
+            propagate_orbit(el, 5000.0, n_steps=1)

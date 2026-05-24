@@ -15,7 +15,7 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 
-from kerf_aero.orbital.kepler import OrbitalElements, propagate_kepler
+from kerf_aero.orbital.kepler import KeplerianElements, elements_to_state, propagate_kepler
 
 router = APIRouter()
 
@@ -109,17 +109,22 @@ async def propagate_orbit(body: PropagateRequest) -> PropagateResponse:
 
     The computation is pure two-body Keplerian (no perturbations).
     """
-    elements = OrbitalElements(
+    elements = KeplerianElements(
         a=body.a,
         e=body.e,
         i=body.i,
         raan=body.raan,
         argp=body.argp,
-        nu0=body.nu0,
+        nu=body.nu0,
     )
 
     try:
-        points = propagate_kepler(elements, body.duration_s, body.n_steps)
+        dt = body.duration_s / (body.n_steps - 1)
+        r, v = elements_to_state(elements)
+        points: list[tuple[float, float, float]] = [(r[0], r[1], r[2])]
+        for _ in range(body.n_steps - 1):
+            r, v = propagate_kepler(r, v, dt)
+            points.append((r[0], r[1], r[2]))
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

@@ -369,3 +369,84 @@ def _rot_pqw_to_eci(raan: float, i: float, argp: float) -> np.ndarray:
         ],
     ])
     return R
+
+
+# ---------------------------------------------------------------------------
+# Public constants and compatibility aliases
+# ---------------------------------------------------------------------------
+
+#: Mean equatorial radius of the Earth [km] (WGS-84)
+R_EARTH_KM: float = 6_378.137
+
+
+@dataclass
+class OrbitalElements:
+    """Alias for :class:`KeplerianElements` using ``nu0`` instead of ``nu``.
+
+    Provided for API compatibility.  Internally maps ``nu0`` → ``nu`` when
+    converting to :class:`KeplerianElements`.
+    """
+
+    a: float
+    e: float
+    i: float
+    raan: float
+    argp: float
+    nu0: float
+
+    def to_keplerian(self) -> KeplerianElements:
+        """Return the equivalent :class:`KeplerianElements` instance."""
+        return KeplerianElements(
+            a=self.a,
+            e=self.e,
+            i=self.i,
+            raan=self.raan,
+            argp=self.argp,
+            nu=self.nu0,
+        )
+
+
+def propagate_orbit(
+    elements: "OrbitalElements | KeplerianElements",
+    duration_s: float,
+    n_steps: int = 200,
+    mu: float = MU_EARTH,
+) -> list[tuple[float, float, float]]:
+    """Propagate a Keplerian orbit and return an array of ECI position vectors.
+
+    Parameters
+    ----------
+    elements:
+        Orbital elements describing the initial state.  Both
+        :class:`OrbitalElements` (``nu0`` field) and
+        :class:`KeplerianElements` (``nu`` field) are accepted.
+    duration_s:
+        Total propagation duration in seconds.  Must be > 0.
+    n_steps:
+        Number of sample points to return (including start and end).
+        Must be ≥ 2.
+    mu:
+        Gravitational parameter [km³/s²].  Defaults to Earth.
+
+    Returns
+    -------
+    list of (x, y, z) tuples in kilometres (ECI frame).
+    """
+    if duration_s <= 0:
+        raise ValueError(f"duration_s must be positive, got {duration_s!r}")
+    if n_steps < 2:
+        raise ValueError(f"n_steps must be ≥ 2, got {n_steps!r}")
+    if isinstance(elements, OrbitalElements):
+        kep = elements.to_keplerian()
+    else:
+        kep = elements
+    if kep.e >= 1.0:
+        raise ValueError(f"eccentricity must be < 1 for elliptic orbits, got {kep.e!r}")
+
+    dt = duration_s / (n_steps - 1)
+    r, v = elements_to_state(kep, mu)
+    points: list[tuple[float, float, float]] = [(float(r[0]), float(r[1]), float(r[2]))]
+    for _ in range(n_steps - 1):
+        r, v = propagate_kepler(r, v, dt, mu)
+        points.append((float(r[0]), float(r[1]), float(r[2])))
+    return points

@@ -5647,10 +5647,10 @@ verified but not reachable. Each task = export from `geom/__init__.py`
 
 ### Group V — Construction verbs
 
-- **GK-P16** 🔴 Loft with guide rails (flagged by FreeCAD, Fusion, Onshape, Inventor, CATIA, Creo, NX, Rhino, Vectorworks). Add `guide_curves` to `network_srf.loft_surface`; route through `BRepOffsetAPI_ThruSections.AddWire()` in the OCCT worker; `sweep_n.py` pure-Python fallback. Wire into `surfacing.py:feature_loft`. Size M. DoD: lofted surface honours guide curves.
-- **GK-P17** 🔴 Sheet-metal hem, jog, multi-flange. `geom/sheet_metal.py` has only `bend_sheet`/`unfold_sheet`. Add `hem_sheet`, `jog_sheet`, `multi_flange` using existing K-factor helpers. Size M. DoD: each emits a valid unfoldable body.
-- **GK-P18** 🔴 Direct edit: non-planar push-pull + delete-face. `direct_edit.py:push_pull_face`/`move_face` are planar-only. Extend to curved faces via `BRepOffsetAPI_MakeOffsetShape`; add `delete_face` via `BRepTools_ReShape`. Size M. DoD: push-pull a cylindrical face; delete a face and heal.
-- **GK-P19** 🔴 Weldment gussets + cope/notch end-treatments. `weldment.py` has cut-list + miter/butt; add `gusset_plate()` + cope/notch modes to `compute_members()`. Size M. DoD: gusset + coped member emit valid solids and appear in the cut-list.
+- **GK-P16** ✅ Loft with guide rails (flagged by FreeCAD, Fusion, Onshape, Inventor, CATIA, Creo, NX, Rhino, Vectorworks). Add `guide_curves` to `network_srf.loft_surface`; route through `BRepOffsetAPI_ThruSections.AddWire()` in the OCCT worker; `sweep_n.py` pure-Python fallback. Wire into `surfacing.py:feature_loft`. Size M. DoD: lofted surface honours guide curves.
+- **GK-P17** ✅ Sheet-metal hem, jog, multi-flange. `geom/sheet_metal.py` has only `bend_sheet`/`unfold_sheet`. Add `hem_sheet`, `jog_sheet`, `multi_flange` using existing K-factor helpers. Size M. DoD: each emits a valid unfoldable body.
+- **GK-P18** ✅ Direct edit: non-planar push-pull + delete-face. `direct_edit.py:push_pull_face`/`move_face` are planar-only. Extend to curved faces via `BRepOffsetAPI_MakeOffsetShape`; add `delete_face` via `BRepTools_ReShape`. Size M. DoD: push-pull a cylindrical face; delete a face and heal.
+- **GK-P19** ✅ Weldment gussets + cope/notch end-treatments. `weldment.py` has cut-list + miter/butt; add `gusset_plate()` + cope/notch modes to `compute_members()`. Size M. DoD: gusset + coped member emit valid solids and appear in the cut-list.
 
 ### Group S — SubD / mesh / sculpt
 
@@ -5682,7 +5682,7 @@ verified but not reachable. Each task = export from `geom/__init__.py`
 
 ### Group I — Interop
 
-- **GK-P39** 🔴 3DM write into the kernel — add `write_3dm(body, path)` to `geom/io/rhino3dm.py` (write currently lives in `kerf-imports/export_3dm.py`, outside the kernel) with a read→write→read Hausdorff round-trip oracle; export from `geom/__init__.py`. Size M.
+- **GK-P39** ✅ 3DM write into the kernel — add `write_3dm(body, path)` to `geom/io/rhino3dm.py` (write currently lives in `kerf-imports/export_3dm.py`, outside the kernel) with a read→write→read Hausdorff round-trip oracle; export from `geom/__init__.py`. Size M.
 
 ### Parked — UI investments (NOT kernel gaps; track separately)
 

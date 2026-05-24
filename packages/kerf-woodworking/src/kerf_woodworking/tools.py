@@ -2,14 +2,19 @@
 
 Exposes the following tools to the Kerf LLM agent:
 
-    woodworking_mortise_tenon   — design a mortise-and-tenon joint
-    woodworking_dovetail        — design a dovetail joint
-    woodworking_finger_joint    — design a box / finger joint
-    woodworking_dowel           — design a dowel joint
-    woodworking_biscuit         — design a biscuit / plate joint
-    woodworking_pocket_screw    — design a pocket-screw joint
-    woodworking_cut_list        — generate an optimised cut list
-    woodworking_grain_check     — check grain direction on a joint descriptor
+    woodworking_mortise_tenon       — design a mortise-and-tenon joint
+    woodworking_dovetail            — design a dovetail joint
+    woodworking_finger_joint        — design a box / finger joint
+    woodworking_dowel               — design a dowel joint
+    woodworking_biscuit             — design a biscuit / plate joint
+    woodworking_pocket_screw        — design a pocket-screw joint
+    woodworking_cut_list            — generate an optimised cut list
+    woodworking_grain_check         — check grain direction on a joint descriptor
+    woodworking_hinge_cup_pattern   — generate hinge-cup bore positions
+    woodworking_shelf_pin_pattern   — generate shelf-pin bore positions
+    woodworking_drawer_runner_pattern — generate drawer runner bore positions
+    woodworking_euro_screw_pattern  — generate confirmat/Euro-screw bore positions
+    woodworking_handle_pattern      — generate handle/rail through-hole positions
 """
 
 from __future__ import annotations
@@ -33,6 +38,14 @@ from kerf_woodworking.cut_list import (
     optimise_cut_list,
 )
 from kerf_woodworking.grain import add_grain_meta, check_grain
+from kerf_woodworking.hardware_boring import (
+    hinge_cup_pattern,
+    shelf_pin_pattern,
+    drawer_runner_pattern,
+    euro_screw_pattern,
+    handle_pattern,
+    bore_pattern_to_dict,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -384,3 +397,232 @@ async def woodworking_grain_check(ctx: Any, args: bytes) -> str:
         return err_payload("joint must be an object", "BAD_ARGS")
     warnings = check_grain(joint)
     return ok_payload({"warnings": warnings})
+
+
+# ---------------------------------------------------------------------------
+# Tool: woodworking_hinge_cup_pattern
+# ---------------------------------------------------------------------------
+
+_hinge_cup_spec = ToolSpec(
+    name="woodworking_hinge_cup_pattern",
+    description=(
+        "Generate 35 mm hinge-cup and arm pilot-hole bore positions for a door panel. "
+        "Follows the 32 mm System and Blum Clip-Top / INSERTA specifications. "
+        "Returns hole centres (x, y), diameters, and depths for CNC machining."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "panel_height_mm": {"type": "number", "description": "Door height (mm)"},
+            "panel_width_mm":  {"type": "number", "description": "Door width (mm, default 600)"},
+            "panel_thickness_mm": {"type": "number", "description": "Door thickness (mm, default 18)"},
+            "overlay_mm":      {"type": "number", "description": "Overlay over carcase (mm, default 0 = full-inset)"},
+            "count":           {"type": "integer", "description": "Number of hinges (default 2)"},
+        },
+        "required": ["panel_height_mm"],
+    },
+)
+
+
+@register(_hinge_cup_spec, write=False)
+async def woodworking_hinge_cup_pattern(ctx: Any, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+    try:
+        pattern = hinge_cup_pattern(
+            panel_height_mm=float(a["panel_height_mm"]),
+            panel_width_mm=float(a.get("panel_width_mm", 600.0)),
+            panel_thickness_mm=float(a.get("panel_thickness_mm", 18.0)),
+            overlay_mm=float(a.get("overlay_mm", 0.0)),
+            count=int(a.get("count", 2)),
+        )
+    except (KeyError, TypeError, ValueError) as e:
+        return err_payload(str(e), "BAD_ARGS")
+    return ok_payload(bore_pattern_to_dict(pattern))
+
+
+# ---------------------------------------------------------------------------
+# Tool: woodworking_shelf_pin_pattern
+# ---------------------------------------------------------------------------
+
+_shelf_pin_spec = ToolSpec(
+    name="woodworking_shelf_pin_pattern",
+    description=(
+        "Generate 5 mm shelf-pin socket holes on a 32 mm pitch for a cabinet side panel. "
+        "Returns two rows of holes (front and rear) at the specified positions."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "panel_height_mm": {"type": "number", "description": "Cabinet side panel height (mm)"},
+            "panel_width_mm":  {"type": "number", "description": "Cabinet depth (mm, default 600)"},
+            "panel_thickness_mm": {"type": "number", "description": "Panel thickness (mm, default 18)"},
+            "num_positions":   {"type": "integer", "description": "Number of shelf-pin positions per row (default 10)"},
+            "start_y_mm":      {"type": "number", "description": "Y of first hole from bottom (mm, default 96)"},
+        },
+        "required": ["panel_height_mm"],
+    },
+)
+
+
+@register(_shelf_pin_spec, write=False)
+async def woodworking_shelf_pin_pattern(ctx: Any, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+    try:
+        pattern = shelf_pin_pattern(
+            panel_height_mm=float(a["panel_height_mm"]),
+            panel_width_mm=float(a.get("panel_width_mm", 600.0)),
+            panel_thickness_mm=float(a.get("panel_thickness_mm", 18.0)),
+            num_positions=int(a.get("num_positions", 10)),
+            start_y_mm=float(a.get("start_y_mm", 96.0)),
+        )
+    except (KeyError, TypeError, ValueError) as e:
+        return err_payload(str(e), "BAD_ARGS")
+    return ok_payload(bore_pattern_to_dict(pattern))
+
+
+# ---------------------------------------------------------------------------
+# Tool: woodworking_drawer_runner_pattern
+# ---------------------------------------------------------------------------
+
+_drawer_runner_spec = ToolSpec(
+    name="woodworking_drawer_runner_pattern",
+    description=(
+        "Generate drawer-runner pilot-hole positions on a cabinet side panel. "
+        "Supports undermount (Blum Movento / Tandem) and side-mount runner types."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "panel_height_mm":  {"type": "number", "description": "Cabinet side panel height (mm)"},
+            "drawer_height_mm": {"type": "number", "description": "Drawer box height (mm)"},
+            "panel_width_mm":   {"type": "number", "description": "Cabinet depth (mm, default 600)"},
+            "runner_type":      {"type": "string", "enum": ["undermount", "sidemount"],
+                                 "description": "Runner type (default 'undermount')"},
+            "num_drawers":      {"type": "integer", "description": "Number of drawers (default 1)"},
+        },
+        "required": ["panel_height_mm", "drawer_height_mm"],
+    },
+)
+
+
+@register(_drawer_runner_spec, write=False)
+async def woodworking_drawer_runner_pattern(ctx: Any, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+    try:
+        pattern = drawer_runner_pattern(
+            panel_height_mm=float(a["panel_height_mm"]),
+            drawer_height_mm=float(a["drawer_height_mm"]),
+            panel_width_mm=float(a.get("panel_width_mm", 600.0)),
+            runner_type=str(a.get("runner_type", "undermount")),
+            num_drawers=int(a.get("num_drawers", 1)),
+        )
+    except (KeyError, TypeError, ValueError) as e:
+        return err_payload(str(e), "BAD_ARGS")
+    return ok_payload(bore_pattern_to_dict(pattern))
+
+
+# ---------------------------------------------------------------------------
+# Tool: woodworking_euro_screw_pattern
+# ---------------------------------------------------------------------------
+
+_euro_screw_spec = ToolSpec(
+    name="woodworking_euro_screw_pattern",
+    description=(
+        "Generate Confirmat / Euro-screw face pilot-hole positions for RTA panel joints "
+        "(shelf-to-side or floor-to-side connections). "
+        "Returns 5 mm pilot holes on the face panel at the specified edge."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "panel_width_mm":  {"type": "number", "description": "Panel width (mm)"},
+            "panel_height_mm": {"type": "number", "description": "Panel height (mm)"},
+            "panel_thickness_mm": {"type": "number", "description": "Panel thickness (mm, default 18)"},
+            "edge":    {"type": "string", "enum": ["bottom", "top", "left", "right"],
+                        "description": "Which edge is being joined (default 'bottom')"},
+            "spacing_mm": {"type": "number", "description": "Screw spacing (mm, default 128)"},
+            "count":      {"type": "integer", "description": "Number of screws (default 2)"},
+        },
+        "required": ["panel_width_mm", "panel_height_mm"],
+    },
+)
+
+
+@register(_euro_screw_spec, write=False)
+async def woodworking_euro_screw_pattern(ctx: Any, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+    try:
+        pattern = euro_screw_pattern(
+            panel_width_mm=float(a["panel_width_mm"]),
+            panel_height_mm=float(a["panel_height_mm"]),
+            panel_thickness_mm=float(a.get("panel_thickness_mm", 18.0)),
+            edge=str(a.get("edge", "bottom")),
+            spacing_mm=float(a.get("spacing_mm", 128.0)),
+            count=int(a.get("count", 2)),
+        )
+    except (KeyError, TypeError, ValueError) as e:
+        return err_payload(str(e), "BAD_ARGS")
+    return ok_payload(bore_pattern_to_dict(pattern))
+
+
+# ---------------------------------------------------------------------------
+# Tool: woodworking_handle_pattern
+# ---------------------------------------------------------------------------
+
+_handle_spec = ToolSpec(
+    name="woodworking_handle_pattern",
+    description=(
+        "Generate handle / rail through-hole positions for a cabinet door or drawer front. "
+        "Supports horizontal and vertical handle orientations. "
+        "Common centre-to-centre spacings: 96, 128, 160, 192, 224, 256, 320 mm."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "panel_width_mm":  {"type": "number", "description": "Panel width (mm)"},
+            "panel_height_mm": {"type": "number", "description": "Panel height (mm)"},
+            "panel_thickness_mm": {"type": "number", "description": "Panel thickness (mm, default 18)"},
+            "centres_mm":      {"type": "number", "description": "Handle hole centres (mm, default 128)"},
+            "orientation":     {"type": "string", "enum": ["horizontal", "vertical"],
+                                "description": "Handle orientation (default 'horizontal')"},
+            "offset_from_edge_mm": {"type": "number",
+                                    "description": "Distance from chosen edge to hole (mm, default 40)"},
+            "edge":            {"type": "string", "enum": ["top", "bottom", "left", "right"],
+                                "description": "Edge the handle is near (default 'top')"},
+        },
+        "required": ["panel_width_mm", "panel_height_mm"],
+    },
+)
+
+
+@register(_handle_spec, write=False)
+async def woodworking_handle_pattern(ctx: Any, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+    try:
+        pattern = handle_pattern(
+            panel_width_mm=float(a["panel_width_mm"]),
+            panel_height_mm=float(a["panel_height_mm"]),
+            panel_thickness_mm=float(a.get("panel_thickness_mm", 18.0)),
+            centres_mm=float(a.get("centres_mm", 128.0)),
+            orientation=str(a.get("orientation", "horizontal")),
+            offset_from_edge_mm=float(a.get("offset_from_edge_mm", 40.0)),
+            edge=str(a.get("edge", "top")),
+        )
+    except (KeyError, TypeError, ValueError) as e:
+        return err_payload(str(e), "BAD_ARGS")
+    return ok_payload(bore_pattern_to_dict(pattern))

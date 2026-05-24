@@ -54,9 +54,9 @@ features:
       note: "Automatic hardware boring based on hardware brand and model; hardware requirements list"
       source: "https://www.mozaiksoftware.com/mozaik-products"
     kerf:
-      status: no
-      note: "No cabinet hardware boring automation"
-      evidence: ""
+      status: yes
+      note: "32 mm System bore-pattern generator: hinge cups (35 mm Blum-compatible), shelf-pin rows, undermount/sidemount drawer runner pilots, Euro-screw (confirmat), handle holes — all parametric with CNC-ready coordinates"
+      evidence: "packages/kerf-woodworking/src/kerf_woodworking/hardware_boring.py"
   - domain: D13
     feature: "Grain direction management"
     competitor:
@@ -119,7 +119,7 @@ Mozaik Software is a widely-used cabinet and woodworking shop management platfor
 - **Parametric cabinet libraries.** Face Frame, Frameless, and Wardrobe libraries with automatic hardware boring, material tracking, and machining updates when dimensions change. Kerf has no equivalent cabinet library.
 - **Room layout / floor plan.** Drag-and-drop floor plans and elevations for designing full kitchen/bathroom layouts. Kerf has no room layout UI.
 - **175+ CNC machine support.** Mozaik ships post processors for over 175 CNC router brands out of the box. Kerf outputs G-code for Fanuc/GRBL/LinuxCNC/Mach3 — a narrower but open set.
-- **Hardware boring automation.** Mozaik automatically places bore patterns based on hardware model and brand. Kerf has no hardware boring concept.
+- **Hardware brand catalogue.** Mozaik automatically places bore patterns by selecting hardware brand and SKU from a proprietary catalogue — you pick "Blum Clip-Top 110° overlay" and the bore coordinates appear. Kerf generates 32 mm System bore patterns parametrically; it does not have a hardware SKU catalogue with brand-specific lookup.
 - **Integrated pricing / estimating.** Cost updates live as the design changes — material, hardware, and labour together. Kerf's costing engine exists but is not wired to woodworking design.
 
 ## Where Kerf differs
@@ -127,14 +127,15 @@ Mozaik Software is a widely-used cabinet and woodworking shop management platfor
 - **MIT open-core.** Mozaik is subscription-priced: $125–$325/mo depending on tier. Kerf is MIT-licensed — free to self-host.
 - **Cross-platform.** Mozaik is Windows-only. Kerf runs in the browser on any OS.
 - **Multi-domain workspace.** A furniture designer can combine woodworking cut lists with Kerf's structural FEA, LCA, BOM, and electronics PCB tools in one project. Mozaik is single-domain.
-- **Chat-native.** Describe a cabinet in plain language and Kerf generates cut lists and joinery rules. Mozaik has no LLM interface.
-- **Python scripting.** kerf-sdk on PyPI for automated cut list generation from parametric dimensions. Mozaik has no Python API.
+- **Chat-native.** Describe a cabinet in plain language and Kerf generates cut lists, joinery rules, and bore patterns. Mozaik has no LLM interface.
+- **Python scripting.** kerf-sdk on PyPI for automated cut list and bore-pattern generation from parametric dimensions. Mozaik has no Python API.
+- **32 mm System hardware boring.** Kerf's ``woodworking_hinge_cup_pattern``, ``woodworking_shelf_pin_pattern``, ``woodworking_drawer_runner_pattern``, ``woodworking_euro_screw_pattern``, and ``woodworking_handle_pattern`` tools produce CNC-ready bore coordinates following the 32 mm System and Blum Clip-Top specifications. Mozaik's hardware boring is model-database driven with proprietary brand lookups; Kerf's is parametric and open.
 
 ## Honest gaps — where Kerf is behind today
 
 - **No cabinet room layout.** Kerf has no room/floor plan layout UI. For a cabinet shop that needs to show customers a full kitchen visualisation, Mozaik wins decisively.
 - **No parametric cabinet libraries.** The depth of Mozaik's Face Frame and Frameless libraries — with all the construction rules baked in — is not in Kerf.
-- **No hardware boring.** Automatic bore pattern placement for hinges, drawer slides, and shelf pins is absent.
+- **Hardware brand database.** Kerf's boring is based on the 32 mm System geometry; Mozaik links to specific hardware brand catalogues (Blum, Hettich, Salice) and auto-selects hole patterns by SKU. Kerf does not have a hardware SKU database.
 - **Pricing UI.** Kerf's costing engine exists but is not exposed as an interactive woodworking estimating tool.
 
 ## Side by side
@@ -147,7 +148,7 @@ Mozaik Software is a widely-used cabinet and woodworking shop management platfor
 | Parametric cabinet libraries | No | Face Frame / Frameless / Wardrobe |
 | Cut list | Yes (backend) | Yes |
 | CNC nesting + G-code | Yes (NFP nesting) | Yes (175+ machine posts) |
-| Hardware boring automation | No | Yes |
+| Hardware boring automation | 32 mm System (parametric) | Brand-database driven |
 | Grain direction | Yes (backend) | Yes |
 | Pricing / estimating | Backend only | Live estimating |
 | Cross-platform | Browser (any OS) | Windows only |

@@ -21,7 +21,7 @@ Both tools also acknowledge MCAD/ECAD integration: EAGLE was integrated into Fus
 
 - **Not discontinued.** EAGLE end-of-life is June 2026. Kerf is an actively developed tool. If you are on EAGLE today, you are in migration mode — Kerf is one of the destinations worth evaluating.
 - **In-box pre-compliance simulation.** EAGLE/Fusion Electronics provides basic DRC and SPICE simulation; signal integrity, EMC/EMI, PDN, and thermal analysis are extension-gated or not available. Kerf ships all four pre-compliance domains (SI: transmission-line, via stub, differential pair; EMC: common-mode, return-path gap, slot antenna; PDN: decap placement, target impedance, plane resonance; thermal: copper pour, via relief, hot-spot) without extension gating.
-- **MIT open-core, no subscription.** EAGLE's free tier was 2-layer / 80cm²; Pro was ~$100/yr. Fusion Electronics is bundled in Fusion 360 at ~$680/yr (non-commercial personal use is more restricted). Kerf is MIT-licensed — free locally with no layer or board-size restriction.
+- **MIT open-core, no subscription.** EAGLE's free tier was 2-layer / 80cm²; Pro was ~$100/yr. Fusion Electronics is bundled in Fusion 360 at ~$680/yr (as of May 2026; non-commercial personal use is more restricted). Kerf is MIT-licensed — free locally with no layer or board-size restriction.
 - **Richer fab output.** Kerf exports Gerber 274X, Excellon NC drill, IPC-2581, ODB++, and IPC-D-356A netlist. EAGLE/Fusion's base fab pack covers Gerber/NC but not IPC-2581 or ODB++.
 - **Multi-domain.** EAGLE was PCB-only. Fusion Electronics adds the MCAD link but keeps it within Autodesk's subscription. Kerf covers mechanical CAD, sheet metal, PCB, and pre-compliance simulation in a single MIT-licensed tool.
 
@@ -38,8 +38,8 @@ Both tools also acknowledge MCAD/ECAD integration: EAGLE was integrated into Fus
 | Feature | Kerf | Autodesk EAGLE / Fusion Electronics |
 |---|---|---|
 | Status | Active development | EAGLE EOL June 2026; migrated to Fusion Electronics |
-| License | MIT open-core | EAGLE proprietary (EOL); Fusion subscription ~$680/yr |
-| Cost | Free local; hosted credits | Fusion: ~$680/yr (non-commercial personal is limited) |
+| License | MIT open-core | EAGLE proprietary (EOL); Fusion subscription ~$680/yr (May 2026) |
+| Cost | Free local; hosted credits | Fusion: ~$680/yr (May 2026; non-commercial personal is limited) |
 | Schematic capture | Hierarchical schematic | Yes (EAGLE / Fusion Electronics) |
 | PCB layout | Yes | Yes |
 | Push-and-shove routing | Yes (shove router + FreeRouting) | Yes |

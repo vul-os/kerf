@@ -291,7 +291,7 @@ function Breadcrumb() {
 
 function FairnessNote() {
   return (
-    <div className="mt-12 rounded-xl border border-ink-700 bg-ink-900/50 px-5 py-4">
+    <div className="mt-12 rounded-xl border border-ink-700 bg-ink-900/50 px-5 py-4 space-y-3">
       <p className="text-sm text-ink-300 leading-relaxed">
         <span className="font-semibold text-ink-100">
           We try hard to keep these comparisons fair and current.
@@ -307,6 +307,13 @@ function FairnessNote() {
           open an issue on GitHub
         </a>{' '}
         and we will fix it.
+      </p>
+      <p className="text-xs text-ink-500 leading-relaxed">
+        Product and company names referenced on this page are trademarks of
+        their respective owners. Comparisons are for informational purposes
+        and do not imply endorsement. Pricing and feature claims reflect
+        publicly available information at the time of the last review shown
+        above and may have changed since.
       </p>
     </div>
   )

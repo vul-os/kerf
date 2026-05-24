@@ -11,13 +11,13 @@ order: 2
 
 # Kerf vs Autodesk Fusion 360
 
-Fusion 360 pioneered the idea of integrated CAD / CAM / CAE / PCB in a single cloud-connected workspace and has millions of users behind it. Kerf is the tool most similar to Fusion in shape — both cover multi-discipline engineering in one environment with cloud collaboration. Commercial use is ~US$680/yr; a restricted free personal tier exists (non-commercial, <US$1,000 annual revenue). The differences are in philosophy: Fusion is a closed subscription product with a polished decade-long track record; Kerf is MIT open-core, chat-native, and subscription-free. Below is an honest look at both.
+Fusion 360 pioneered the idea of integrated CAD / CAM / CAE / PCB in a single cloud-connected workspace and has millions of users behind it. Kerf is the tool most similar to Fusion in shape — both cover multi-discipline engineering in one environment with cloud collaboration. Commercial use is ~US$680/yr (as of May 2026); a restricted free personal tier exists (non-commercial, <US$1,000 annual revenue, as of May 2026). The differences are in philosophy: Fusion is a closed subscription product with a polished decade-long track record; Kerf is MIT open-core, chat-native, and subscription-free. Below is an honest look at both.
 
 ## Where Fusion 360 is strong
 
 - **Cloud-native + desktop in one.** Fusion is designed cloud-first — every project auto-saves to Autodesk's cloud, multi-user collaboration is baked in, and the same tool runs on Windows and macOS as a native desktop app.
 - **HSMWorks-lineage CAM.** The CAM workspace inherits HSMWorks' industry-tested toolpath engine with verified simulation, a broad post-processor library, and years of in-the-field machining validation. Kerf's CAM is younger.
-- **Cloud generative design.** Automated topology exploration across load cases using cloud compute — a flagship capability for lightweighting and lattice design. Kerf has nothing equivalent today.
+- **Cloud generative design.** Automated topology exploration across load cases using cloud compute — a flagship capability for lightweighting and lattice design. Kerf has no equivalent we're aware of today.
 - **T-spline sculpt workflow.** The Sculpt workspace gives direct freeform surface modelling with T-spline subdivision and crease support. Kerf's early NURBS Phase 4 does not match.
 - **Assembly motion study and interference detection.** Fusion provides motion studies, contact sets, and interference detection on top of its joint system. Kerf now matches the joint type set but does not yet ship motion study.
 - **FEM multi-physics depth.** Linear static and thermal FEM (extension / cloud-metered) with a mature solver validation record.
@@ -26,9 +26,9 @@ Fusion 360 pioneered the idea of integrated CAD / CAM / CAE / PCB in a single cl
 
 ## Where Kerf differs
 
-- **MIT open-core, no subscription.** Fusion charges ~US$680/yr; its free tier is non-commercial only. Kerf's full feature set is MIT-licensed — free locally with no revenue restriction, no seat fee, and no feature-gating.
-- **BYO LLM / BYO key.** Bring your own Anthropic or OpenAI API key and zero billing flows through Kerf — the `kerf_byo` tier routes all inference to your own account. Fusion has no configurable LLM.
-- **Chat-native workflow.** Describe a feature, constraint, routing rule, or simulation check in plain language; the LLM edits the feature-tree source backed by live doc-search. Fusion has no comparable LLM integration.
+- **MIT open-core, no subscription.** Fusion charges ~US$680/yr (as of May 2026); its free tier is non-commercial only. Kerf's full feature set is MIT-licensed — free locally with no revenue restriction, no seat fee, and no feature-gating.
+- **BYO LLM / BYO key.** Bring your own Anthropic or OpenAI API key and zero billing flows through Kerf — the `kerf_byo` tier routes all inference to your own account. Fusion has no configurable LLM we're aware of (as of May 2026).
+- **Chat-native workflow.** Describe a feature, constraint, routing rule, or simulation check in plain language; the LLM edits the feature-tree source backed by live doc-search. Fusion has no comparable LLM integration we're aware of (as of May 2026).
 - **True offline, fully open codebase.** `pip install 'kerf[server]'` + `kerf serve` with BYO Postgres — no Autodesk account, no limited-offline caveat. The full codebase is on GitHub under MIT.
 - **Pre-compliance electronics simulation — in-box.** Signal integrity, EMC/EMI, PDN, and PCB thermal are all included without extension or cloud-metering. Fusion gates these behind paid extensions.
 - **Richer in-box electronics fab output.** Gerber / Excellon / IPC-2581 / ODB++ / IPC-D-356A netlist and DRC with IPC-2221B A/B/C manufacturing presets — beyond Fusion Electronics' base fab pack.
@@ -51,8 +51,8 @@ Fusion 360 pioneered the idea of integrated CAD / CAM / CAE / PCB in a single cl
 | Feature | Fusion 360 | Kerf |
 |---|---|---|
 | License | ⚠️ Proprietary subscription | ✅ MIT open-core |
-| Cost | ⚠️ ~US$680/yr; startup ~$150/3yr | ✅ Free local; pay-as-you-go hosted |
-| Free tier | ⚠️ Personal-use only (<US$1k rev) | ✅ Full free local install, no revenue cap |
+| Cost | ⚠️ ~US$680/yr (May 2026); startup ~$150/3yr (May 2026) | ✅ Free local; pay-as-you-go hosted |
+| Free tier | ⚠️ Personal-use only (<US$1k rev, May 2026) | ✅ Full free local install, no revenue cap |
 | BYO LLM / model key | ❌ No | ✅ BYO key (kerf_byo bucket) |
 | Offline / self-host | ⚠️ Limited offline; many features cloud-tied | ✅ Full offline: pip install 'kerf[server]' |
 | OS support | ✅ Windows + macOS | ✅ Browser + Win/macOS/Linux binary |

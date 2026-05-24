@@ -11,7 +11,7 @@ order: 1
 
 # Kerf vs Revit
 
-Revit is the dominant BIM platform for architecture, engineering, and construction — a deep parametric family system, full MEP, Revit Structure, mature IFC interoperability, Navisworks clash coordination, and Autodesk Docs cloud worksharing, at roughly US$2,910/yr per seat on Windows. Kerf now ships parametric family authoring, expanded BIM elements (walls, doors, windows, slabs, stairs, ramps), site toposolids, a material catalogue, and cross-discipline clash detection — but full MEP, worksharing at AEC project scale, and Navisworks-class coordination are still ahead of Kerf. **Kerf is not a full BIM platform today**, and this page says so plainly.
+Revit is the dominant BIM platform for architecture, engineering, and construction — a deep parametric family system, full MEP, Revit Structure, mature IFC interoperability, Navisworks clash coordination, and Autodesk Docs cloud worksharing, at roughly US$2,910/yr per seat on Windows (as of May 2026). Kerf now ships parametric family authoring, expanded BIM elements (walls, doors, windows, slabs, stairs, ramps), site toposolids, a material catalogue, and cross-discipline clash detection — but full MEP, worksharing at AEC project scale, and Navisworks-class coordination are still ahead of Kerf. **Kerf is not a full BIM platform today**, and this page says so plainly.
 
 ## Where Revit is strong
 
@@ -26,7 +26,7 @@ Revit is the dominant BIM platform for architecture, engineering, and constructi
 
 ## Where Kerf differs
 
-- **MIT open-core, dramatically lower cost.** Revit is ~US$2,910/yr per seat and Windows-only. Kerf is MIT-licensed with a free local install via brew or curl on macOS/Linux/Windows, and pay-as-you-go hosted cloud — no per-seat subscription, no Autodesk account.
+- **MIT open-core, dramatically lower cost.** Revit is ~US$2,910/yr per seat and Windows-only (as of May 2026). Kerf is MIT-licensed with a free local install via brew or curl on macOS/Linux/Windows, and pay-as-you-go hosted cloud — no per-seat subscription, no Autodesk account.
 - **Chat-native workflow.** Describe a building element, layout change, or parametric constraint in plain language; the LLM edits the model source directly, backed by live doc-search.
 - **Mechanical + electronics in the same workspace.** Teams designing smart buildings, IoT devices, or electronic enclosures can work on PCB layout and mechanical B-rep without leaving Kerf — disciplines that require separate tools in a Revit-centred workflow.
 - **Multi-discipline under one licence.** Architectural, mechanical, electronics, and jewelry workflows share one workspace and one SDK interface — no per-discipline seat stacking.
@@ -48,7 +48,7 @@ Revit is the dominant BIM platform for architecture, engineering, and constructi
 | Feature | Revit | Kerf |
 |---|---|---|
 | License | ⚠️ Proprietary subscription | ✅ MIT open-core |
-| Cost | ⚠️ ~US$2,910/yr single-user | ✅ Free local; pay-as-you-go hosted |
+| Cost | ⚠️ ~US$2,910/yr single-user (May 2026) | ✅ Free local; pay-as-you-go hosted |
 | Platform | ⚠️ Windows only | ✅ Browser + Win/macOS/Linux binary |
 | Parametric family system | ✅ Deep family editor + shared params | ✅ Parametric .family.json — type/instance params, formulas |
 | Family library | ✅ Autodesk Content Library + vast third-party | ⚠️ Built-in parametric family catalog (smaller) |
@@ -64,6 +64,6 @@ Revit is the dominant BIM platform for architecture, engineering, and constructi
 | Sheets / views | ✅ Full sheet-set management | ✅ Multi-sheet drawings |
 | GD&T / tolerancing | ⚠️ Not a mechanical-tolerance tool | ✅ ASME Y14.5 GD&T (mechanical side) |
 | Electronics (same tool) | ❌ Separate tool required | ✅ Full EDA stack in same workspace |
-| Chat / LLM editing | ❌ None | ✅ Chat-native — edits source per turn |
+| Chat / LLM editing | ❌ No LLM interface we're aware of (as of May 2026) | ✅ Chat-native — edits source per turn |
 | Scripting / automation | ✅ pyRevit + Dynamo + Revit API | ✅ kerf-sdk on PyPI — HTTP/JSON-RPC |
 | AEC plugin ecosystem | ✅ Vast Autodesk App Store | ⚠️ Plugin API early-stage |

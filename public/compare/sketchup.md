@@ -22,7 +22,7 @@ Both tools are also used by non-traditional engineering users — hobbyists, mak
 - **Parametric history and constraints.** SketchUp is a direct modelling tool — there is no feature tree, no constraint sketcher, and no parametric history. Change a dimension and you re-model. Kerf's feature tree means a design intent is encoded: change a parameter and the downstream geometry updates.
 - **Engineering precision.** SketchUp is notoriously imprecise — its face-snapping geometry engine accumulates small errors that cause trouble in downstream fabrication. Kerf's OCCT B-rep kernel maintains exact geometric relationships with no approximation.
 - **Sheet metal, PCB, and multi-domain.** SketchUp is architecture and visualisation. Kerf covers mechanical sheet metal (flange/unfold/flat-pattern), PCB schematic and layout, pre-compliance electronics simulation, and scripting — none of which SketchUp touches.
-- **MIT open-core, no subscription.** SketchUp Pro costs ~$349/yr; SketchUp Studio with Scan Essentials and V-Ray is ~$699/yr. Kerf is MIT-licensed — free locally with no feature gating.
+- **MIT open-core, no subscription.** SketchUp Pro costs ~$349/yr; SketchUp Studio with Scan Essentials and V-Ray is ~$699/yr (as of May 2026). Kerf is MIT-licensed — free locally with no feature gating.
 - **Technical drawings.** Kerf produces associative multi-sheet technical drawings with GD&T, tolerances, and title blocks. SketchUp's LayOut tool produces presentation drawings but not standards-compliant engineering documents.
 
 ## Where SketchUp wins
@@ -38,7 +38,7 @@ Both tools are also used by non-traditional engineering users — hobbyists, mak
 | Feature | Kerf | Trimble SketchUp Pro |
 |---|---|---|
 | License | MIT open-core | Proprietary subscription |
-| Cost | Free local; hosted credits | ~$349/yr (Pro) / ~$699/yr (Studio) |
+| Cost | Free local; hosted credits | ~$349/yr (Pro) / ~$699/yr (Studio) (May 2026) |
 | Modelling paradigm | Parametric feature tree + sketcher | Direct push/pull (no feature history) |
 | Precision / tolerances | Exact B-rep (OCCT) | Approximate (face-inference, small-error accumulation) |
 | Constraint sketcher | Sketcher v2 | None |
@@ -46,7 +46,7 @@ Both tools are also used by non-traditional engineering users — hobbyists, mak
 | Technical drawings | Multi-sheet + GD&T | LayOut (presentation, not engineering standard) |
 | IFC export | IFC Tier 2 import | IFC export (Studio) |
 | PCB / electronics | In-box | Not applicable |
-| Chat / LLM editing | Chat-native | None |
+| Chat / LLM editing | Chat-native | None we're aware of (as of May 2026) |
 | Rendering | Basic PBR viewport | V-Ray (Studio), Enscape (plugin) |
 | Extension ecosystem | Early-stage | Massive (Extensions Warehouse) |
 | Community | Early-stage | Tens of millions of users |

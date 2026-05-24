@@ -19,11 +19,11 @@ Both tools also acknowledge multi-disciplinary reality. Creo spans mechanical, s
 
 ## Where Kerf wins
 
-- **MIT open-core, no subscription.** Creo Parametric starts at thousands of dollars per seat per year and escalates quickly with modules (Simulate, Advanced Assembly, Surfacing). Kerf's full feature set is MIT-licensed — free locally, no seat fee, no module gating.
-- **Chat-native workflow.** Describe a design change in plain language and the LLM edits the feature tree, backed by live doc-search so it does not hallucinate API surface. PTC has no LLM interface in Creo today.
+- **MIT open-core, no subscription.** Creo Parametric starts at thousands of dollars per seat per year (as of May 2026) and escalates quickly with modules (Simulate, Advanced Assembly, Surfacing). Kerf's full feature set is MIT-licensed — free locally, no seat fee, no module gating.
+- **Chat-native workflow.** Describe a design change in plain language and the LLM edits the feature tree, backed by live doc-search so it does not hallucinate API surface. No LLM interface in Creo has shipped to our knowledge (as of May 2026).
 - **In-box electronics.** Creo is a mechanical tool. Kerf ships PCB schematic, layout, pre-compliance simulation (SI/EMC/PDN/thermal), and full fab output without extension gating. For hardware products that include a PCB, Kerf is a single workspace.
 - **Single-binary install, all platforms.** A brew or curl install on macOS, Windows, or Linux gives a fully functional offline binary. Creo requires Windows and a PTC FlexNet licence server.
-- **BYO LLM key.** Bring your own Anthropic or OpenAI API key via the `kerf_byo` bucket. Creo has no configurable AI interface.
+- **BYO LLM key.** Bring your own Anthropic or OpenAI API key via the `kerf_byo` bucket. We're not aware of any configurable AI interface in Creo (as of May 2026).
 
 ## Where Creo wins
 
@@ -38,7 +38,7 @@ Both tools also acknowledge multi-disciplinary reality. Creo spans mechanical, s
 | Feature | Kerf | PTC Creo Parametric |
 |---|---|---|
 | License | MIT open-core | Proprietary subscription |
-| Cost | Free local; hosted credits | Thousands USD/seat/yr + modules |
+| Cost | Free local; hosted credits | Thousands USD/seat/yr + modules (May 2026) |
 | OS support | Win / macOS / Linux (browser + binary) | Windows only (desktop) |
 | B-rep kernel | Open CASCADE (OCCT) | PTC's Granite One kernel |
 | Parametric history | Feature DAG | Feature tree (industry pioneer) |
@@ -50,7 +50,7 @@ Both tools also acknowledge multi-disciplinary reality. Creo spans mechanical, s
 | Piping / cabling | Not yet | Piping + Cabling workbenches |
 | MBD / 3D annotation | GD&T drawings | Creo MBD + GD&T Advisor |
 | PCB / electronics | In-box (full stack + pre-compliance) | Not included |
-| Chat / LLM editing | Chat-native | None |
+| Chat / LLM editing | Chat-native | None known (as of May 2026) |
 | Python scripting | kerf-sdk on PyPI | Creo Toolkit (C++) / J-Link (Java) |
 | STEP export | Yes | Yes |
 | Open source | Yes (MIT) | No |

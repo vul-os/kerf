@@ -20,9 +20,9 @@ Both tools acknowledge that buildings include things other than architecture. Ar
 ## Where Kerf wins
 
 - **Engineering fabrication precision.** ArchiCAD models buildings to architectural precision — a wall has a thickness and material, not a manufacturing tolerance. Kerf models to manufacturing precision: exact B-rep, GD&T-annotated drawings, flat-pattern sheet metal, and CNC-ready output. Facade contractors and structural fabricators who need to manufacture components from the model need Kerf, not ArchiCAD.
-- **MIT open-core, no seat fee.** ArchiCAD licensing runs to thousands of dollars per seat per year (Solo and SME editions ~$180-250/mo; larger practice editions higher). Kerf is MIT-licensed — free locally.
+- **MIT open-core, no seat fee.** ArchiCAD licensing runs to thousands of dollars per seat per year (Solo and SME editions ~$180-250/mo as of May 2026; larger practice editions higher). Kerf is MIT-licensed — free locally.
 - **Electronics and multi-domain.** ArchiCAD is buildings only. Kerf covers PCB schematic and layout, pre-compliance simulation, and mechanical engineering in the same workspace — relevant for smart building components, automation panels, and building-integrated electronics.
-- **Chat-native workflow.** Describe a design change in plain language and the LLM edits the feature tree. ArchiCAD has no LLM interface.
+- **Chat-native workflow.** Describe a design change in plain language and the LLM edits the feature tree. ArchiCAD has no LLM interface we're aware of (as of May 2026).
 - **Python scripting API.** Kerf exposes a kerf-sdk on PyPI for HTTP/JSON-RPC automation. ArchiCAD's scripting is GDL (Geometric Description Language) — a proprietary domain-specific language with a much steeper learning curve.
 
 ## Where ArchiCAD wins
@@ -38,7 +38,7 @@ Both tools acknowledge that buildings include things other than architecture. Ar
 | Feature | Kerf | Graphisoft ArchiCAD |
 |---|---|---|
 | License | MIT open-core | Proprietary subscription |
-| Cost | Free local; hosted credits | ~$180-250+/seat/mo |
+| Cost | Free local; hosted credits | ~$180-250+/seat/mo (May 2026) |
 | Primary domain | Engineering CAD (multi-discipline) | Architectural BIM authoring |
 | Parametric model | Feature tree (mechanical) | Building elements (wall/slab/roof/etc.) |
 | IFC support | Tier 2 import | Full IFC authoring + export |
@@ -47,7 +47,7 @@ Both tools acknowledge that buildings include things other than architecture. Ar
 | PCB / electronics | In-box | Not applicable |
 | Energy simulation | Not yet | EnergyPlus / IDA ICE export |
 | Multi-user collaboration | Cloud git | BIMcloud Teamwork |
-| Chat / LLM editing | Chat-native | None |
+| Chat / LLM editing | Chat-native | None known (as of May 2026) |
 | Python scripting | kerf-sdk on PyPI | GDL (proprietary domain language) |
 | STEP export | Yes | Limited (via IFC) |
 | Open source | Yes (MIT) | No |

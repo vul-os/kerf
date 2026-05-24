@@ -11,7 +11,7 @@ order: 2
 
 # Kerf vs Civil 3D
 
-Autodesk Civil 3D is the industry-standard civil infrastructure design tool: corridor modelling (roads/highways/rail), alignments + profiles + cross-sections, dynamic TIN surfaces, pipe networks (gravity + pressure), parcels, point clouds, survey data integration, and plan production with sheet sets — all inside AutoCAD DWG. Available via the Autodesk AEC Collection (~US$4,150/yr). Kerf is NOT a Civil 3D replacement at production-civil-infrastructure scale. Civil 3D owns corridor/alignment/profile depth and pipe-network breadth. Kerf's civil-adjacent modules (hydrology, geotech, surveying, pavement, geodesy, earthworks) are useful for analysis work but do not approach Civil 3D's drafting or corridor depth.
+Autodesk Civil 3D is the industry-standard civil infrastructure design tool: corridor modelling (roads/highways/rail), alignments + profiles + cross-sections, dynamic TIN surfaces, pipe networks (gravity + pressure), parcels, point clouds, survey data integration, and plan production with sheet sets — all inside AutoCAD DWG. Available via the Autodesk AEC Collection (~US$4,150/yr as of May 2026). Kerf is NOT a Civil 3D replacement at production-civil-infrastructure scale. Civil 3D owns corridor/alignment/profile depth and pipe-network breadth. Kerf's civil-adjacent modules (hydrology, geotech, surveying, pavement, geodesy, earthworks) are useful for analysis work but do not approach Civil 3D's drafting or corridor depth.
 
 ## Where Civil 3D is strong
 
@@ -27,10 +27,10 @@ Autodesk Civil 3D is the industry-standard civil infrastructure design tool: cor
 
 ## Where Kerf differs
 
-- **MIT open-core, dramatically lower cost.** Civil 3D requires the AEC Collection at ~US$4,150/yr and is Windows-only. Kerf is MIT-licensed — free locally on Windows, macOS, and Linux.
+- **MIT open-core, dramatically lower cost.** Civil 3D requires the AEC Collection at ~US$4,150/yr (as of May 2026) and is Windows-only. Kerf is MIT-licensed — free locally on Windows, macOS, and Linux.
 - **Civil-adjacent analysis modules.** Kerf ships TR-55 hydrology (runoff, time of concentration), Coulomb/Rankine geotechnical analysis (earth pressure, bearing capacity), Vincenty-validated geodesy, ASCE 7 wind load and seismic response modules, and basic earthworks — useful for civil engineering calculations alongside design work.
 - **Multi-discipline in one workspace.** Civil 3D is a civil infrastructure tool. Kerf adds full EDA (PCB schematic + layout), OCCT mechanical CAD, jewelry tooling, and BIM-adjacent primitives in the same workspace — useful for infrastructure projects that involve embedded electronics or smart-city components.
-- **Chat-native workflow.** Describe an analysis setup, parameter change, or model query in plain language; the LLM edits the source backed by live doc-search. Civil 3D has no LLM integration.
+- **Chat-native workflow.** Describe an analysis setup, parameter change, or model query in plain language; the LLM edits the source backed by live doc-search. Civil 3D has no LLM integration we're aware of (as of May 2026).
 - **kerf-sdk Python scripting.** Automate analysis workflows and model manipulation from Python over HTTP/JSON-RPC on your own machine.
 - **Cross-platform.** Runs in the browser (hosted SaaS) or as a single binary on Windows, macOS, and Linux. Civil 3D is Windows-primary.
 
@@ -50,7 +50,7 @@ Autodesk Civil 3D is the industry-standard civil infrastructure design tool: cor
 | Feature | Civil 3D | Kerf |
 |---|---|---|
 | License | ⚠️ Proprietary subscription | ✅ MIT open-core |
-| Cost | ⚠️ AEC Collection ~US$4,150/yr | ✅ Free local; pay-as-you-go hosted |
+| Cost | ⚠️ AEC Collection ~US$4,150/yr (May 2026) | ✅ Free local; pay-as-you-go hosted |
 | Platform | ⚠️ Windows-primary | ✅ Browser + Win/macOS/Linux binary |
 | Corridor modelling (roads / rail) | ✅ Industry-standard — full assemblies / subassemblies | ❌ Not available |
 | Alignments + profiles + cross-sections | ✅ Full alignment/profile/section design | ❌ Not available |
@@ -69,5 +69,5 @@ Autodesk Civil 3D is the industry-standard civil infrastructure design tool: cor
 | Earthworks / cut-fill | ✅ Full earthwork volumes from corridor | ⚠️ Basic earthworks module |
 | Mechanical B-rep CAD | ⚠️ AutoCAD 3D solids (not parametric) | ✅ OCCT feature tree, sketcher, CAM |
 | Electronics (same tool) | ❌ Separate tool required | ✅ Full EDA stack in same workspace |
-| Chat / LLM editing | ❌ None | ✅ Chat-native — edits source per turn |
+| Chat / LLM editing | ❌ None known (as of May 2026) | ✅ Chat-native — edits source per turn |
 | Scripting | ✅ Civil 3D API (.NET / COM / Python via pyautocad) | ✅ kerf-sdk on PyPI — HTTP/JSON-RPC |

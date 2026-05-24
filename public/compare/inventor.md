@@ -11,7 +11,7 @@ order: 5
 
 # Kerf vs Autodesk Inventor
 
-Autodesk Inventor is a top-tier professional mechanical CAD platform with roughly 30 years of refinement and a dominant position in industrial manufacturing, aerospace, and automotive design. Inventor Professional subscription ~US$2,545/yr (single-user). Windows-only native desktop. It delivers comprehensive parametric part and assembly workflows, an integrated dynamic simulation environment with a full joint catalog, Frame Generator, Tube & Pipe, Cable & Harness, in-box Stress Analysis FEA, and deep Vault PDM integration. Kerf will not out-Inventor Inventor on assembly dynamics, large-assembly performance, or specialty MFG tooling — that is an honest statement.
+Autodesk Inventor is a top-tier professional mechanical CAD platform with roughly 30 years of refinement and a dominant position in industrial manufacturing, aerospace, and automotive design. Inventor Professional subscription ~US$2,545/yr (single-user, as of May 2026). Windows-only native desktop. It delivers comprehensive parametric part and assembly workflows, an integrated dynamic simulation environment with a full joint catalog, Frame Generator, Tube & Pipe, Cable & Harness, in-box Stress Analysis FEA, and deep Vault PDM integration. Kerf will not out-Inventor Inventor on assembly dynamics, large-assembly performance, or specialty MFG tooling — that is an honest statement.
 
 ## Where Inventor is strong
 
@@ -27,13 +27,13 @@ Autodesk Inventor is a top-tier professional mechanical CAD platform with roughl
 
 ## Where Kerf differs
 
-- **MIT open-core, no seat fee.** The full feature set is MIT-licensed and free to install locally. No ~$2,500/yr subscription, no subscription-only lock-in, no commercial-use restriction.
+- **MIT open-core, no seat fee.** The full feature set is MIT-licensed and free to install locally. No ~$2,500/yr subscription (as of May 2026), no subscription-only lock-in, no commercial-use restriction.
 - **Chat-native workflow and BYO LLM.** Describe a feature, sketch constraint, or assembly change in plain English; the model edits the feature-tree source per turn, backed by live doc-search. Bring your own Anthropic or compatible API key.
 - **CAM included in-box.** 3-axis CAM with tool DB and 5-axis 3+2 ship as part of the core product — no HSMWorks licence, no Fusion round-trip required.
 - **Cross-platform, browser + local binary.** Runs in the browser (hosted SaaS) or as a single local binary on Windows, macOS, and Linux. No Parallels, no dedicated Windows box.
 - **Full ECAD in one workspace — no add-in.** Hierarchical schematic, PCB layout, shove router, SPICE, IPC fab output, and the full pre-compliance simulation suite (SI, EMC, PDN, thermal) are built into the same workspace as the B-rep modeller.
 - **In-box process simulation for weld, forming, AM, and moldflow.** Inventor users who need weld or AM process simulation must reach for separate Autodesk products (Netfabb, Nastran). Kerf ships weld simulation, sheet-forming simulation, AM/SLA process simulation, and moldflow simulation in-box.
-- **40-module jewelry domain.** Ring v4, gemstones v2 (30 cuts), settings v3/v4, gem-seat v2, chain v2, findings, casting export — a professional jewelry vertical that has no Inventor counterpart.
+- **40-module jewelry domain.** Ring v4, gemstones v2 (30 cuts), settings v3/v4, gem-seat v2, chain v2, findings, casting export — a professional jewelry vertical that has no Inventor counterpart we're aware of (as of May 2026).
 - **Cloud git built in, no PDM server.** Every project gets fine-grained file revision history plus deliberate cloud-git commits with GitHub sync — no Vault server setup required.
 - **kerf-sdk Python scripting.** Automate B-rep, PCB, and jewelry workflows from a Python script on your own machine over HTTP/JSON-RPC.
 
@@ -53,7 +53,7 @@ Autodesk Inventor is a top-tier professional mechanical CAD platform with roughl
 | Feature | Autodesk Inventor | Kerf |
 |---|---|---|
 | License | ⚠️ Proprietary subscription | ✅ MIT open-core |
-| Cost | ⚠️ ~US$2,545/yr single-user | ✅ Free local; pay-as-you-go hosted |
+| Cost | ⚠️ ~US$2,545/yr single-user (May 2026) | ✅ Free local; pay-as-you-go hosted |
 | Platform | ⚠️ Windows only | ✅ Browser + Win/macOS/Linux binary |
 | Offline / self-host | ✅ Full offline | ✅ Full offline single-binary |
 | Parametric B-rep | ✅ ShapeManager feature tree (mature) | ✅ OCCT feature tree |

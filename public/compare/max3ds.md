@@ -38,7 +38,7 @@ order: 2
 - **Parametric feature history DAG.** The feature tree (pad, pocket, revolve, loft, fillet, draft) is a persistent directed acyclic graph. Editing an early feature regenerates all downstream geometry.
 - **Multi-discipline in one workspace.** Electronics (schematic + PCB + DRC + Gerber), jewelry (ring v4, gemstones v2, settings v3/v4, chain v2), 2D drawings, GD&T, CNC CAM, and architecture (IFC) share one environment.
 - **STEP / IGES / 3DM B-rep interop.** Manufacturing and supply-chain tooling expects B-rep geometry. Kerf reads and writes STEP and IGES; 3ds Max cannot.
-- **MIT open-core, with a hosted option.** The core is permissively MIT-licensed (3ds Max is a subscription product at ~$235/mo). A hosted SaaS version runs in the browser; a single binary installs locally on Windows, macOS, and Linux.
+- **MIT open-core, with a hosted option.** The core is permissively MIT-licensed (3ds Max is a subscription product at ~$235/mo as of May 2026). A hosted SaaS version runs in the browser; a single binary installs locally on Windows, macOS, and Linux.
 - **Chat-native workflow.** Describe a change in plain language; the LLM edits the feature tree directly, backed by live doc-search.
 
 ## Honest gaps — where 3ds Max wins
@@ -55,7 +55,7 @@ order: 2
 | Feature | 3ds Max | Kerf |
 |---|---|---|
 | License | ⚠️ Autodesk subscription | ✅ MIT open-core |
-| Cost | ⚠️ ~$235/mo or ~$1,875/yr | ✅ Free local binary; pay-as-you-go hosted |
+| Cost | ⚠️ ~$235/mo or ~$1,875/yr (May 2026) | ✅ Free local binary; pay-as-you-go hosted |
 | Platform | ⚠️ Windows desktop only | ✅ Browser + Win/macOS/Linux binary |
 | Hosted / cloud | ❌ Desktop only | ✅ Hosted SaaS + local install |
 | B-rep solid kernel | ⚠️ Mesh-first (Edit Poly) — no B-rep | ✅ OCCT B-rep — exact rational geometry |

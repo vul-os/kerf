@@ -11,12 +11,12 @@ order: 1
 
 # Kerf vs Rhino
 
-Rhino 8 — with the RhinoGold / Matrix lineage now consolidated into MatrixGold / CrossGems — is the professional reference for jewelry CAD and freeform NURBS design. It is a perpetual one-time licence (about US$995, not a subscription) with the industry-standard NURBS kernel and Grasshopper. Kerf has a strong, free jewelry foundation and integrated B-rep, electronics, and CAM — but Rhino's NURBS depth, Grasshopper ecosystem, and goldsmith-proven plugins are well ahead today. An honest look at both.
+Rhino 8 — with the RhinoGold / Matrix lineage now consolidated into MatrixGold / CrossGems — is the professional reference for jewelry CAD and freeform NURBS design. It is a perpetual one-time licence (about US$995 as of May 2026, not a subscription) with the industry-standard NURBS kernel and Grasshopper. Kerf has a strong, free jewelry foundation and integrated B-rep, electronics, and CAM — but Rhino's NURBS depth, Grasshopper ecosystem, and goldsmith-proven plugins are well ahead today. An honest look at both.
 
 ## Where Rhino is strong
 
 - **Class-leading NURBS kernel.** Rhino's surface engine is the industry reference for freeform work — jewelry, industrial design, naval architecture, aerospace — with production-proven G0–G3 continuity tools.
-- **Grasshopper visual scripting.** The gold standard for parametric 3D, with thousands of components spanning structural optimisation, pattern generation, and more. Kerf has no equivalent.
+- **Grasshopper visual scripting.** The gold standard for parametric 3D, with thousands of components spanning structural optimisation, pattern generation, and more. Kerf has no equivalent visual node environment as of May 2026.
 - **Deeply refined jewelry plugins.** MatrixGold / RhinoGold bring years of goldsmith-driven UX: ring builders, stone-setting and pavé wizards, sizing, wax-mill paths, and supplier catalogs.
 - **Perpetual licence, no subscription.** A one-time purchase that does not expire — a genuine ownership advantage over subscription CAD tools.
 - **SubD and ShrinkWrap.** Rhino 8's SubD (with creases) and ShrinkWrap give fast organic modelling and mesh-recovery workflows Kerf does not match.
@@ -25,7 +25,7 @@ Rhino 8 — with the RhinoGold / Matrix lineage now consolidated into MatrixGold
 
 ## Where Kerf differs
 
-- **MIT open-core, free to use.** Rhino is ~US$995 per seat and the jewelry plugins add more. Kerf's full jewelry workflow — ring v4, settings v3/v4, gemstones v2, chain v2, 31 templates — is MIT-licensed and free locally.
+- **MIT open-core, free to use.** Rhino is ~US$995 per seat (as of May 2026) and the jewelry plugins add more. Kerf's full jewelry workflow — ring v4, settings v3/v4, gemstones v2, chain v2, 31 templates — is MIT-licensed and free locally.
 - **Chat-native workflow.** Describe a change in plain language and the LLM edits the feature tree / JSCAD source with doc-search backing — no visual programming required.
 - **Integrated B-rep, electronics, drawings.** An OCCT parametric feature tree, a full EDA stack, multi-sheet drawings, and ASME Y14.5 GD&T are in the same workspace — disciplines Rhino needs separate plugins or tools for.
 - **Hosted option or local pip install.** Sign up and design in the browser, or `pip install kerf` locally — no platform-specific installer, no licence dongle.
@@ -46,7 +46,7 @@ Rhino 8 — with the RhinoGold / Matrix lineage now consolidated into MatrixGold
 | Feature | Rhino | Kerf |
 |---|---|---|
 | License | ⚠️ Proprietary; perpetual one-time buy | ✅ MIT open-core |
-| Cost | ⚠️ ~US$995 full / ~$595 upgrade; +plugin cost | ✅ Free local; pay-as-you-go hosted |
+| Cost | ⚠️ ~US$995 full / ~$595 upgrade; +plugin cost (May 2026) | ✅ Free local; pay-as-you-go hosted |
 | Subscription | ✅ Perpetual licence, no renewal | ✅ No seat subscription |
 | Platform | ⚠️ Windows + macOS desktop | ✅ Browser + single-binary local |
 | NURBS surfacing | ✅ Class-leading kernel (G0–G3) | ⚠️ NURBS Phase 4 — trim-by-curve, G3 combs (early) |
@@ -65,5 +65,5 @@ Rhino 8 — with the RhinoGold / Matrix lineage now consolidated into MatrixGold
 | 2D drawings / GD&T | ⚠️ Layout + annotation plugins | ✅ Multi-sheet drawings + ASME Y14.5 GD&T |
 | CNC CAM | ⚠️ Via RhinoCAM plugin | ✅ 3-axis CAM + tool DB; 5-axis 3+2 |
 | Electronics | ❌ Separate tool required | ✅ Full EDA stack in same workspace |
-| Chat / LLM editing | ❌ None | ✅ Chat-native — edits source per turn |
-| Hosted / cloud | ❌ Desktop only | ✅ Hosted SaaS + local install |
+| Chat / LLM editing | ❌ No LLM editing we're aware of (as of May 2026) | ✅ Chat-native — edits source per turn |
+| Hosted / cloud | ❌ Desktop only (no hosted option we're aware of, as of May 2026) | ✅ Hosted SaaS + local install |

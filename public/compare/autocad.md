@@ -11,7 +11,7 @@ order: 1
 
 # Kerf vs AutoCAD
 
-AutoCAD is a 40+ year incumbent — the tool that defined 2D drafting for architecture, engineering, and construction, and the originator of the .dwg format that is the de-facto exchange standard for 2D documentation. Subscription pricing is ~US$255/mo or ~US$2,030/yr. Kerf is NOT a drafting-first tool and is not positioned as an AutoCAD replacement for production AEC work. AutoCAD owns 2D drafting + .dwg; Kerf is a 3D parametric CAD with drawing export, multi-discipline scope, and a chat-native workflow. They solve different primary problems — the honest comparison is below.
+AutoCAD is a 40+ year incumbent — the tool that defined 2D drafting for architecture, engineering, and construction, and the originator of the .dwg format that is the de-facto exchange standard for 2D documentation. Subscription pricing is ~US$255/mo or ~US$2,030/yr (as of May 2026). Kerf is NOT a drafting-first tool and is not positioned as an AutoCAD replacement for production AEC work. AutoCAD owns 2D drafting + .dwg; Kerf is a 3D parametric CAD with drawing export, multi-discipline scope, and a chat-native workflow. They solve different primary problems — the honest comparison is below.
 
 **DWG interchange:** Kerf imports DWG (Tier 1 via libredwg bridge). Kerf does NOT export DWG natively — it writes DXF instead (same .dwg/.dxf family; broadly compatible with AutoCAD and AutoCAD LT).
 
@@ -28,11 +28,11 @@ AutoCAD is a 40+ year incumbent — the tool that defined 2D drafting for archit
 
 ## Where Kerf differs
 
-- **MIT open-core, dramatically lower cost.** AutoCAD is ~US$2,030/yr. Kerf is MIT-licensed — free locally on any OS, no Autodesk account, no seat subscription.
+- **MIT open-core, dramatically lower cost.** AutoCAD is ~US$2,030/yr (as of May 2026). Kerf is MIT-licensed — free locally on any OS, no Autodesk account, no seat subscription.
 - **3D parametric-first.** Kerf's OCCT feature tree (pad, pocket, revolve, loft), constraint sketcher, persistent face IDs, and assembly joints are a parametric CAD environment, not a 3D solid modeller added on top of a drafting engine.
 - **Chat-native workflow.** Describe a feature, constraint, or routing change in plain language; the LLM edits the source backed by live doc-search. AutoCAD has a limited AI Assist but no source-level LLM editing.
 - **Multi-discipline in one workspace.** Full EDA (schematic + PCB + DRC + Gerber / IPC-2581), jewelry tooling (ring v4, gemstones v2), mechanical CAD, and BIM-adjacent primitives — disciplines AutoCAD covers only through separate vertical products.
-- **BYO LLM / BYO key.** Bring your own Anthropic or OpenAI API key; zero billing flows through Kerf. AutoCAD has no configurable LLM.
+- **BYO LLM / BYO key.** Bring your own Anthropic or OpenAI API key; zero billing flows through Kerf. AutoCAD has no configurable LLM we're aware of (as of May 2026).
 - **In-box pre-compliance simulation.** SI, EMC, PDN, and PCB thermal analysis wizards ship in-box with no extension gating.
 - **Cross-platform.** Runs in the browser or as a single binary on Windows, macOS, and Linux. AutoCAD is Windows-primary (macOS version is feature-restricted).
 - **kerf-sdk Python scripting.** HTTP/JSON-RPC from your own machine — a first-class API interface.
@@ -52,7 +52,7 @@ AutoCAD is a 40+ year incumbent — the tool that defined 2D drafting for archit
 | Feature | AutoCAD | Kerf |
 |---|---|---|
 | License | ⚠️ Proprietary subscription | ✅ MIT open-core |
-| Cost | ⚠️ ~US$255/mo or ~US$2,030/yr | ✅ Free local; pay-as-you-go hosted |
+| Cost | ⚠️ ~US$255/mo or ~US$2,030/yr (May 2026) | ✅ Free local; pay-as-you-go hosted |
 | Platform | ⚠️ Windows primary; macOS (feature-restricted) | ✅ Browser + Win/macOS/Linux binary |
 | Design intent | ✅ 2D drafting-first with 3D modelling | ✅ 3D parametric-first with drawing export |
 | 2D drafting depth | ✅ Industry-defining: dynamic blocks, paper-space, dimension styles | ⚠️ Drawing views + dimensions; 2D is not primary |

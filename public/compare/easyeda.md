@@ -23,7 +23,7 @@ Both tools acknowledge that getting the PCB manufactured is the goal — not jus
 - **MIT open-core, no proprietary cloud lock-in.** EasyEDA is proprietary and cloud-hosted — your projects live on EasyEDA's servers. Kerf is MIT-licensed with a local binary option; you own your data.
 - **Richer fab output.** Kerf exports Gerber, Excellon, IPC-2581, ODB++, and IPC-D-356A netlist. EasyEDA exports Gerber and NC drill; IPC-2581 and ODB++ are not available.
 - **MCAD/ECAD integration.** EasyEDA has a 3D preview (basic) but no mechanical CAD integration. Kerf is co-resident mechanical + PCB: the board outline is the same geometry as the mechanical enclosure, with IDF and STEP export for the complete MCAD/ECAD handoff.
-- **Chat-native workflow.** Describe a routing rule, a via stack, or a schematic change in plain language and the LLM edits the PCB/schematic source. EasyEDA has no LLM interface.
+- **Chat-native workflow.** Describe a routing rule, a via stack, or a schematic change in plain language and the LLM edits the PCB/schematic source. EasyEDA has no LLM interface we're aware of (as of May 2026).
 
 ## Where EasyEDA wins
 
@@ -55,7 +55,7 @@ Both tools acknowledge that getting the PCB manufactured is the goal — not jus
 | PDN analysis | In-box | None |
 | PCB thermal | In-box | None |
 | MCAD/ECAD link | Co-resident + IDF + STEP | 3D preview only |
-| Chat / LLM editing | Chat-native | None |
+| Chat / LLM editing | Chat-native | None known (as of May 2026) |
 | Python scripting | kerf-sdk on PyPI | None |
 | Open source | Yes (MIT) | No |
 

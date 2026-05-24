@@ -71,6 +71,11 @@ export default function CompareLanding() {
             Each page credits every competitor's real strengths first, marks
             Kerf's gaps without spin, and links out to a full feature matrix.
           </p>
+          <p className="mt-3 text-xs text-ink-500 leading-relaxed max-w-2xl">
+            Product and company names referenced on these pages are trademarks
+            of their respective owners. Comparisons are for informational
+            purposes and do not imply endorsement.
+          </p>
         </div>
 
         {/* ── Search + filters ── */}

@@ -24,10 +24,10 @@ MatrixGold (Gemvision / Stuller) is the industry-standard professional jewelry C
 
 ## Where Kerf differs
 
-- **MIT open-core, free to use.** MatrixGold requires a per-seat cost (several thousand USD) plus a Rhino base licence. Kerf's full jewelry workflow is MIT-licensed and free locally — ring v4, settings v3/v4, gemstones v2 (30 cuts), chain v2, 31 ring templates, and the full retail module suite at no seat charge.
+- **MIT open-core, free to use.** MatrixGold requires a per-seat cost (several thousand USD, as of May 2026) plus a Rhino base licence. Kerf's full jewelry workflow is MIT-licensed and free locally — ring v4, settings v3/v4, gemstones v2 (30 cuts), chain v2, 31 ring templates, and the full retail module suite at no seat charge.
 - **Retail workflow features MatrixGold does not include.** Appraisal module, repair estimator, mount_finder, full cost/quote panel — workflow features designed for the jewelry retail counter that are out of scope for MatrixGold.
 - **Mechanical + electronics in the same workspace.** Kerf ships an OCCT B-rep modeller, PCB schematic, layout, and EDA workflow alongside the jewelry tools — no additional tool or licence required for product electronics embedded in jewelry (smart rings, NFC pendants, etc.).
-- **Chat-native workflow and BYO LLM.** Describe a setting change, ring modification, or rendering tweak in plain language; the LLM edits the source backed by live doc-search. MatrixGold has no LLM integration.
+- **Chat-native workflow and BYO LLM.** Describe a setting change, ring modification, or rendering tweak in plain language; the LLM edits the source backed by live doc-search. MatrixGold has no LLM integration we're aware of (as of May 2026).
 - **Milgrain, filigree, granulation, enamel, laser marking.** These decorative/surface modules ship in-box in Kerf — MatrixGold typically relies on manual mesh techniques or third-party add-ons.
 - **CAM included in-box.** 3-axis CAM + 5-axis 3+2 ship with Kerf's core product — no RhinoCAM plugin required.
 - **Cross-platform, browser + local binary.** MatrixGold is Windows-only. Kerf runs in the browser (hosted SaaS) or as a single binary on Windows, macOS, and Linux.
@@ -47,7 +47,7 @@ MatrixGold (Gemvision / Stuller) is the industry-standard professional jewelry C
 | Feature | MatrixGold | Kerf |
 |---|---|---|
 | License | ⚠️ Proprietary; per-seat subscription or perpetual | ✅ MIT open-core |
-| Cost | ⚠️ Several thousand USD per seat; Rhino base required | ✅ Free local; pay-as-you-go hosted |
+| Cost | ⚠️ Several thousand USD per seat (May 2026); Rhino base required | ✅ Free local; pay-as-you-go hosted |
 | Platform | ⚠️ Windows only | ✅ Browser + Win/macOS/Linux binary |
 | Hosted / browser option | ❌ Desktop only | ✅ Hosted SaaS + local install |
 | Goldsmith UX polish | ✅ 15+ years of jewelry-specific refinement | ⚠️ Functional, younger UX |

@@ -19,11 +19,11 @@ Both tools acknowledge that mechanical design does not stop at geometry: NX bund
 
 ## Where Kerf wins
 
-- **MIT open-core, no seat fee.** NX enterprise licensing runs to thousands of dollars per seat per year. Kerf is free locally and pay-as-you-go in the cloud. A startup or a student can run the full Kerf feature set without a purchase order.
-- **Chat-native design.** Describe what you want in plain English; the LLM edits the feature-tree source backed by live doc-search. NX has no LLM interface. For iterative design exploration, Kerf's conversational workflow is dramatically faster than menu-driven parametric editing.
+- **MIT open-core, no seat fee.** NX enterprise licensing runs to thousands of dollars per seat per year (as of May 2026). Kerf is free locally and pay-as-you-go in the cloud. A startup or a student can run the full Kerf feature set without a purchase order.
+- **Chat-native design.** Describe what you want in plain English; the LLM edits the feature-tree source backed by live doc-search. NX has no LLM interface we're aware of (as of May 2026). For iterative design exploration, Kerf's conversational workflow is dramatically faster than menu-driven parametric editing.
 - **In-box electronics.** NX is a pure mechanical/CAM/simulation tool. Kerf ships PCB schematic, layout, pre-compliance simulation (SI/EMC/PDN/thermal), and full fab output (Gerber/IPC-2581/ODB++) — all without extension gating. Multi-domain products that include a PCB are first-class Kerf projects.
 - **Open source / auditable.** The full Kerf codebase is MIT-licensed on GitHub. NX is proprietary and not auditable.
-- **BYO LLM.** Bring your own Anthropic or OpenAI API key via the `kerf_byo` bucket; zero billing flows through Kerf. NX has no AI interface at all.
+- **BYO LLM.** Bring your own Anthropic or OpenAI API key via the `kerf_byo` bucket; zero billing flows through Kerf. NX has no AI interface we're aware of (as of May 2026).
 
 ## Where NX wins
 
@@ -38,7 +38,7 @@ Both tools acknowledge that mechanical design does not stop at geometry: NX bund
 | Feature | Kerf | Siemens NX |
 |---|---|---|
 | License | MIT open-core | Proprietary enterprise (VAR) |
-| Cost | Free local; hosted credits | Thousands USD/seat/yr |
+| Cost | Free local; hosted credits | Thousands USD/seat/yr (May 2026) |
 | B-rep kernel | Open CASCADE (OCCT) | Parasolid |
 | Parametric history | Feature DAG | History tree + Synchronous Technology |
 | Direct editing | Limited | Synchronous Technology (mature) |

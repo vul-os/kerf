@@ -11,7 +11,7 @@ order: 4
 
 # Kerf vs Onshape
 
-Onshape (PTC) pioneered cloud-native parametric CAD and remains the benchmark for real-time multi-user collaboration in design — the ability for multiple engineers to edit the same model simultaneously in a browser is genuinely unmatched. It introduced version-controlled Documents, FeatureScript for custom parametric features, and a growing App Store for simulation and rendering. Subscriptions start at ~US$1,500/yr; the free tier allows public documents only. Kerf is the most natural peer comparison: cloud-friendly, browser-first, parametric. The honest picture is below.
+Onshape (PTC) pioneered cloud-native parametric CAD and remains the benchmark for real-time multi-user collaboration in design — the ability for multiple engineers to edit the same model simultaneously in a browser is genuinely unmatched. It introduced version-controlled Documents, FeatureScript for custom parametric features, and a growing App Store for simulation and rendering. Subscriptions start at ~US$1,500/yr (as of May 2026); the free tier allows public documents only. Kerf is the most natural peer comparison: cloud-friendly, browser-first, parametric. The honest picture is below.
 
 ## Where Onshape is strong
 
@@ -25,9 +25,9 @@ Onshape (PTC) pioneered cloud-native parametric CAD and remains the benchmark fo
 
 ## Where Kerf differs
 
-- **MIT open-core — no subscription, full offline.** Onshape requires a subscription starting at ~US$1,500/yr; the free tier allows public documents only. Kerf is MIT-licensed — install the binary locally (brew/curl) for free, no account required, no connectivity needed, no revenue cap.
+- **MIT open-core — no subscription, full offline.** Onshape requires a subscription starting at ~US$1,500/yr (as of May 2026); the free tier allows public documents only. Kerf is MIT-licensed — install the binary locally (brew/curl) for free, no account required, no connectivity needed, no revenue cap.
 - **Open kernel, not a proprietary DSL.** Onshape extends via FeatureScript, a language PTC controls. Kerf's parametric DAG is backed by the MIT-licensed kernel directly — the extensibility surface is open.
-- **Chat-native workflow with BYO LLM.** Describe a feature, constraint, or routing rule in plain language; the model edits the source backed by live doc-search. You can use Kerf's hosted models or bring your own API key — any OpenAI-compatible endpoint. Onshape has no LLM integration.
+- **Chat-native workflow with BYO LLM.** Describe a feature, constraint, or routing rule in plain language; the model edits the source backed by live doc-search. You can use Kerf's hosted models or bring your own API key — any OpenAI-compatible endpoint. Onshape has no LLM integration we're aware of (as of May 2026).
 - **Multi-discipline: mechanical + electronics + jewelry.** Onshape is mechanical CAD. Kerf adds a full EDA stack (hierarchical schematic, shove router, SPICE, DRC, Gerber / IPC-2581) and a jewelry domain (ring v4, gemstones v2 — 30 cuts, settings, chain v2) in the same workspace.
 - **620 analytic-oracle verified kernel tests.** The parametric and sketcher kernel ships with a verified test suite — results are checked against OCCT analytic ground truth.
 - **kerf-sdk Python scripting (out-of-process).** HTTP/JSON-RPC from your own machine — the same interface the LLM uses internally.
@@ -46,7 +46,7 @@ Onshape (PTC) pioneered cloud-native parametric CAD and remains the benchmark fo
 | Feature | Onshape | Kerf |
 |---|---|---|
 | License | ⚠️ Proprietary SaaS subscription | ✅ MIT open-core |
-| Cost | ⚠️ Standard ~US$1,500/yr; Professional ~US$2,100/yr | ✅ Free local; pay-as-you-go hosted |
+| Cost | ⚠️ Standard ~US$1,500/yr; Professional ~US$2,100/yr (May 2026) | ✅ Free local; pay-as-you-go hosted |
 | Free tier | ⚠️ Public documents only | ✅ Full free local install, private projects included |
 | Offline / self-host | ❌ Browser-only; requires connectivity | ✅ Full offline single-binary install |
 | Open source | ❌ Proprietary; data on PTC cloud | ✅ MIT — full codebase on GitHub |

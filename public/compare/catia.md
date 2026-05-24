@@ -21,9 +21,9 @@ Finally, both acknowledge that assembly is central to real engineering. CATIA's 
 
 ## Where Kerf wins
 
-- **MIT open-core, zero seat fee.** CATIA licensing starts in the thousands of dollars per seat per year and often requires VAR negotiation. Kerf is free locally under MIT — the full feature set runs on a laptop with a single binary install. Teams that cannot justify enterprise CAD spend can do real engineering work with Kerf immediately.
-- **Chat-native workflow.** Describe a design intent — "add a 3mm fillet to all concave edges" or "change the flange material to aluminium 6061 and recalculate the flat pattern" — and Kerf's LLM edits the feature tree directly, backed by doc-search so it does not invent surface. CATIA has no comparable natural-language interface.
-- **BYO LLM / BYO key.** Bring your own Anthropic or OpenAI API key; zero billing flows through Kerf in the `kerf_byo` tier. CATIA has no configurable LLM at all.
+- **MIT open-core, zero seat fee.** CATIA licensing starts in the thousands of dollars per seat per year (as of May 2026) and often requires VAR negotiation. Kerf is free locally under MIT — the full feature set runs on a laptop with a single binary install. Teams that cannot justify enterprise CAD spend can do real engineering work with Kerf immediately.
+- **Chat-native workflow.** Describe a design intent — "add a 3mm fillet to all concave edges" or "change the flange material to aluminium 6061 and recalculate the flat pattern" — and Kerf's LLM edits the feature tree directly, backed by doc-search so it does not invent surface. No comparable natural-language interface in CATIA has shipped to our knowledge (as of May 2026).
+- **BYO LLM / BYO key.** Bring your own Anthropic or OpenAI API key; zero billing flows through Kerf in the `kerf_byo` tier. We're not aware of any configurable LLM in CATIA (as of May 2026).
 - **In-box electronics.** CATIA is a pure mechanical tool at its core — PCB schematic, layout, pre-compliance simulation (SI/EMC/PDN/thermal), and fab output are not part of its base offering. Kerf ships all of these without extension gating.
 - **Single-binary offline install.** A brew or curl install produces a fully functional offline binary. CATIA requires Windows, a licence server, and a complex installer suite that takes hours. Kerf runs on macOS, Windows, and Linux.
 
@@ -40,7 +40,7 @@ Finally, both acknowledge that assembly is central to real engineering. CATIA's 
 | Feature | Kerf | CATIA (3DEXPERIENCE / V5) |
 |---|---|---|
 | License | MIT open-core | Proprietary enterprise (VAR, six-figure) |
-| Cost | Free local; pay-as-you-go hosted credits | Thousands USD/seat/yr |
+| Cost | Free local; pay-as-you-go hosted credits | Thousands USD/seat/yr (May 2026) |
 | Offline / self-host | Full offline single binary | Windows + licence server required |
 | Parametric B-rep | OCCT feature tree | CATIA V5 / CGM kernel |
 | Constraint sketcher | Sketcher v2 | CATIA Sketcher (mature) |
@@ -50,7 +50,7 @@ Finally, both acknowledge that assembly is central to real engineering. CATIA's 
 | Kinematic simulation | Not yet | DMU Kinematics (mature) |
 | FEM / structural CAE | Not yet | SIMULIA / CATIA Simulation (deep) |
 | PCB / electronics | In-box schematic + layout + pre-compliance | Not included (separate tools) |
-| Chat / LLM editing | Chat-native | None |
+| Chat / LLM editing | Chat-native | None known (as of May 2026) |
 | Python scripting | kerf-sdk on PyPI | CAA RADE (C++) |
 | STEP export | Yes | Yes |
 | BIM / IFC | IFC Tier 2 import | Limited |

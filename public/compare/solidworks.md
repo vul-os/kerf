@@ -11,7 +11,7 @@ order: 3
 
 # Kerf vs SOLIDWORKS
 
-SOLIDWORKS (Dassault Systèmes) is the dominant professional mechanical CAD platform with 30+ years of refinement, millions of seats, and the Parasolid kernel under the hood. Standard licence ~US$4,000 perpetual + ~$1,500/yr maintenance; subscription "SOLIDWORKS Connected" ~$2,200/yr. Windows-only native desktop; 3DExperience cloud overlay is a separate purchase. Kerf will not out-SOLIDWORKS SOLIDWORKS on assembly motion, FEM, or add-in breadth — that is an honest statement. Where Kerf differs is MIT open-core licensing, no Windows-only constraint, chat-native editing, no per-seat fee, and a multi-discipline workspace that unifies mechanical, electronics, and jewelry design without additional add-ins or subscriptions.
+SOLIDWORKS (Dassault Systèmes) is the dominant professional mechanical CAD platform with 30+ years of refinement, millions of seats, and the Parasolid kernel under the hood. Standard licence ~US$4,000 perpetual + ~$1,500/yr maintenance; subscription "SOLIDWORKS Connected" ~$2,200/yr (as of May 2026). Windows-only native desktop; 3DExperience cloud overlay is a separate purchase. Kerf will not out-SOLIDWORKS SOLIDWORKS on assembly motion, FEM, or add-in breadth — that is an honest statement. Where Kerf differs is MIT open-core licensing, no Windows-only constraint, chat-native editing, no per-seat fee, and a multi-discipline workspace that unifies mechanical, electronics, and jewelry design without additional add-ins or subscriptions.
 
 ## Where SOLIDWORKS is strong
 
@@ -31,7 +31,7 @@ SOLIDWORKS (Dassault Systèmes) is the dominant professional mechanical CAD plat
 - **CAM included in-box.** 3-axis CAM with tool DB and 5-axis 3+2 ship as part of the core product — no CAMWorks or HSMWorks add-in required.
 - **Cross-platform, browser + local binary.** Runs in the browser (hosted SaaS) or as a single local binary on Windows, macOS, and Linux. No Parallels, no dedicated Windows box.
 - **Full ECAD in one workspace — no add-in.** Hierarchical schematic, PCB layout, shove router, SPICE, IPC fab output, and the full pre-compliance simulation suite (SI, EMC, PDN, thermal) are built into the same workspace as the B-rep modeller, with no separate ECAD licence.
-- **40-module jewelry domain.** Ring v4, gemstones v2 (30 cuts), settings v3/v4, gem-seat v2, chain v2, findings, casting export, full cost panel, and PBR gem/metal viewport materials — a professional jewelry vertical that has no SOLIDWORKS counterpart.
+- **40-module jewelry domain.** Ring v4, gemstones v2 (30 cuts), settings v3/v4, gem-seat v2, chain v2, findings, casting export, full cost panel, and PBR gem/metal viewport materials — a professional jewelry vertical with no SOLIDWORKS counterpart we're aware of.
 - **Cloud git built in.** Every project gets fine-grained file revision history (undo) plus deliberate cloud-git commits with GitHub sync — no PDM server setup, no extra subscription.
 - **kerf-sdk Python scripting.** Automate B-rep, PCB, and jewelry workflows from a Python script on your own machine over HTTP/JSON-RPC.
 
@@ -50,7 +50,7 @@ SOLIDWORKS (Dassault Systèmes) is the dominant professional mechanical CAD plat
 | Feature | SOLIDWORKS | Kerf |
 |---|---|---|
 | License | ⚠️ Proprietary perpetual + maintenance or subscription | ✅ MIT open-core |
-| Cost | ⚠️ ~US$4,000 perpetual + ~$1,500/yr; or ~$2,200/yr Connected | ✅ Free local; pay-as-you-go hosted |
+| Cost | ⚠️ ~US$4,000 perpetual + ~$1,500/yr; or ~$2,200/yr Connected (May 2026) | ✅ Free local; pay-as-you-go hosted |
 | Platform | ⚠️ Windows only | ✅ Browser + Win/macOS/Linux binary |
 | Offline / self-host | ✅ Full offline (perpetual) | ✅ pip install 'kerf[server]' + kerf serve |
 | Parametric B-rep | ✅ Parasolid feature tree | ✅ OCCT feature tree |
@@ -67,9 +67,9 @@ SOLIDWORKS (Dassault Systèmes) is the dominant professional mechanical CAD plat
 | FEM / structural | ✅ SW Simulation (add-in) | ⚠️ Linear static + thermal; not full parity |
 | CFD | ✅ Flow Simulation (add-in) | ❌ Not yet |
 | Electronics / PCB | ⚠️ SOLIDWORKS PCB (Altium-derived, add-in) | ✅ Full hierarchical schematic + PCB layout in-box |
-| SI / EMC / PDN / thermal | ❌ External tools required | ✅ si_eye_wizard + emc_wizard + pdn_wizard + thermal_board in-box |
-| Jewelry tooling | ❌ None | ✅ 40-module jewelry suite |
-| Chat / LLM editing | ❌ None | ✅ Chat-native + BYO API key |
+| SI / EMC / PDN / thermal | ❌ No integrated equivalent we're aware of (as of May 2026) | ✅ si_eye_wizard + emc_wizard + pdn_wizard + thermal_board in-box |
+| Jewelry tooling | ❌ None we're aware of (as of May 2026) | ✅ 40-module jewelry suite |
+| Chat / LLM editing | ❌ No LLM editing shipped to our knowledge (as of May 2026) | ✅ Chat-native + BYO API key |
 | Scripting / API | ✅ SOLIDWORKS API (COM/VBA/C#) | ✅ kerf-sdk on PyPI — HTTP/JSON-RPC |
 | Multi-user cloud edit | ⚠️ 3DExperience (separate SaaS) | ✅ Cloud hosted + cloud-git sync |
 | Open source | ❌ Proprietary | ✅ MIT — full codebase on GitHub |

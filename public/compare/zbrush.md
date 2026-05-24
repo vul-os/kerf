@@ -23,7 +23,7 @@ Both tools can output geometry for 3D printing — ZBrush via STL/OBJ mesh expor
 - **Parametric history.** Change a ring size, and every downstream feature (seat depth, prong height, shank width at the gallery) updates automatically. ZBrush is non-parametric: changes require manual re-sculpting.
 - **Engineering fabrication output.** Kerf produces STEP, IGES, DXF, Gerber, IPC-2581 — formats that CNC machines, PCB fabs, and CAM systems consume natively. ZBrush produces mesh formats (OBJ, STL, GoZ) suited for 3D printing and rendering, not precision CNC machining.
 - **Multi-domain.** If your product has electronics — a smart ring, a connected device, a wearable — Kerf covers the PCB schematic, layout, and pre-compliance simulation in the same workspace. ZBrush is sculpting only.
-- **MIT open-core, no subscription.** ZBrush moved from a perpetual model to a subscription (Maxon One or ZBrush standalone ~$39.99/mo). Kerf is MIT-licensed — free locally.
+- **MIT open-core, no subscription.** ZBrush moved from a perpetual model to a subscription (Maxon One or ZBrush standalone ~$39.99/mo as of May 2026). Kerf is MIT-licensed — free locally.
 
 ## Where ZBrush wins
 
@@ -37,7 +37,7 @@ Both tools can output geometry for 3D printing — ZBrush via STL/OBJ mesh expor
 
 | Feature | Kerf | ZBrush (Maxon) |
 |---|---|---|
-| License | MIT open-core | Proprietary subscription (~$39.99/mo) |
+| License | MIT open-core | Proprietary subscription (~$39.99/mo, May 2026) |
 | Geometry type | Exact B-rep (NURBS/OCCT) | Polygon mesh (DynaMesh, subdivision) |
 | Parametric history | Feature DAG (fully parametric) | Non-parametric (brush-based) |
 | Organic sculpting | Not designed for this | Industry gold standard |
@@ -46,7 +46,7 @@ Both tools can output geometry for 3D printing — ZBrush via STL/OBJ mesh expor
 | STEP export | Yes | No (OBJ / STL / GoZ) |
 | 3D print output | Via STEP → mesh pipeline | Direct STL/OBJ/3MF export |
 | PCB / electronics | In-box | Not applicable |
-| Chat / LLM editing | Chat-native | None |
+| Chat / LLM editing | Chat-native | No LLM editing we're aware of (as of May 2026) |
 | FEM / simulation | Not yet | Not applicable |
 | CAM / CNC output | DXF / STEP for CNC | Not designed for CNC |
 | Rendering | Basic PBR viewport | KeyShot bridge, ZBrush BPR |

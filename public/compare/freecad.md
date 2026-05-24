@@ -29,7 +29,7 @@ FreeCAD reached 1.0 in November 2024 after ~20 years of development: a genuinely
 - **Electronics + mechanical in one workspace.** Kerf includes a full EDA stack — schematic, routing, DRC, Gerber / IPC-2581 fab pack — alongside B-rep CAD. FreeCAD offers only an IDF MCAD bridge to an external EDA tool.
 - **MIT open-core, with a hosted option.** The core is permissively MIT-licensed (FreeCAD is copyleft LGPL). A hosted SaaS version runs in the browser; a single binary installs locally via brew or curl.
 - **kerf-sdk on PyPI.** Python scripting over HTTP/JSON-RPC from your own machine — the same interface the LLM uses internally, so scripts are first-class and out-of-process rather than an embedded console.
-- **Jewelry built in.** Gemstones v2 (30 cuts), settings v3/v4, gem-seat v2, ring v4, chain v2, findings, casting export, and a 31-template library — a domain FreeCAD has no native tooling for.
+- **Jewelry built in.** Gemstones v2 (30 cuts), settings v3/v4, gem-seat v2, ring v4, chain v2, findings, casting export, and a 31-template library — a domain FreeCAD has no native tooling for, as far as we're aware (as of May 2026).
 - **GD&T to ASME Y14.5.** A full datum and tolerance framework, where FreeCAD's TechDraw offers comparatively basic annotation.
 - **Every project is a real git repo.** Projects are cloneable git repositories with large-file handling, near-free forks, optional GitHub or GitLab mirror, and CLI sync.
 - **Full mechanical joint system.** Rigid, revolute, slider, cam, gear, and pin-slot joints are all available, bringing Kerf's assembly depth much closer to FreeCAD's built-in Assembly workbench.

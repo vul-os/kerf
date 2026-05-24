@@ -30,9 +30,9 @@ KiCad 10.0 (March 2026) is a free, GPL-licensed, cross-platform EDA suite. It no
 
 - **MIT open-core vs GPL.** Kerf is permissively MIT-licensed — you can embed it in proprietary commercial products. KiCad's GPL has copyleft implications for products that link against it.
 - **Mechanical CAD in the same workspace.** KiCad requires a separate MCAD tool (FreeCAD, SolidWorks, etc.). Kerf ships an OCCT B-rep modeller, constraint sketcher, sheet metal, and CAM in the same workspace.
-- **Chat-native workflow.** Describe a routing rule, schematic change, or simulation setup in plain language; the LLM edits the source backed by live doc-search. KiCad has no LLM integration.
+- **Chat-native workflow.** Describe a routing rule, schematic change, or simulation setup in plain language; the LLM edits the source backed by live doc-search. KiCad has no LLM integration we're aware of (as of May 2026).
 - **Monte-Carlo SPICE corner analysis.** `sim_corner` runs min/typ/max parameter sweeps across process corners with yield estimation — beyond KiCad's baseline ngspice.
-- **SI / PDN / EMC pre-compliance wizards.** `si_eye_wizard`, `pdn_wizard`, `emc_wizard` (FCC §15.109 + CISPR 32), and `thermal_board` (2-D FD steady-state) — KiCad has no equivalent for these.
+- **SI / PDN / EMC pre-compliance wizards.** `si_eye_wizard`, `pdn_wizard`, `emc_wizard` (FCC §15.109 + CISPR 32), and `thermal_board` (2-D FD steady-state) — no comparable equivalents in KiCad as far as we're aware (as of May 2026).
 - **Jewelry and architecture in the same tool.** Kerf's multi-discipline scope spans electronics, mechanical, jewelry, and BIM-adjacent workflows in one workspace.
 - **kerf-sdk Python scripting.** HTTP/JSON-RPC from your own machine — the same interface the LLM uses internally.
 - **Hosted SaaS option.** Design in the browser without installing anything locally.

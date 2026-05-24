@@ -35,6 +35,39 @@ async def create_usage_event(
     return dict(row)
 
 
+async def record_storage(
+    conn: asyncpg.Connection,
+    user_id: str,
+    project_id: str,
+    bytes_delta: int,
+) -> Dict[str, Any]:
+    """Emit a kind='storage' usage_event for a file upload or deletion.
+
+    Parameters
+    ----------
+    conn:
+        An open asyncpg connection (typically acquired from a pool).
+    user_id:
+        UUID string of the authenticated user who triggered the storage change.
+    project_id:
+        UUID string of the project that owns the uploaded/deleted file.
+    bytes_delta:
+        Signed byte count: positive for uploads, negative for deletions.
+        Zero values are accepted but produce a no-op row (bytes_delta=0).
+
+    Returns
+    -------
+    dict — the inserted usage_events row.
+    """
+    return await create_usage_event(
+        conn,
+        user_id=uuid.UUID(user_id),
+        kind="storage",
+        project_id=uuid.UUID(project_id),
+        bytes_delta=bytes_delta,
+    )
+
+
 async def list_usage_events(
     conn: asyncpg.Connection,
     user_id: Optional[uuid.UUID] = None,

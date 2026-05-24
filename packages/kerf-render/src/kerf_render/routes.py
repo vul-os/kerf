@@ -381,7 +381,7 @@ async def run_render(req: RenderRequest, request: Request, _auth: dict = Depends
     # --- Attempt async job-queue path ------------------------------------
     pool = _get_pool(request)
     if pool is not None:
-        return await _enqueue_render(req, pool)
+        return await _enqueue_render(req, pool, user_id=user_id)
 
     # --- Legacy synchronous fallback (no pool wired) ----------------------
     return await _run_render_sync(req)
@@ -395,7 +395,7 @@ def _get_pool(request: Request):
         return None
 
 
-async def _enqueue_render(req: RenderRequest, pool) -> dict:
+async def _enqueue_render(req: RenderRequest, pool, *, user_id: Optional[str] = None) -> dict:
     """Insert a render_jobs row and return {job_id, status: queued}."""
     from kerf_render.job_lifecycle import submit_job
 
@@ -425,17 +425,21 @@ async def _enqueue_render(req: RenderRequest, pool) -> dict:
 
     # Persist payload in render_jobs.payload_json so the queue worker can
     # reconstruct the full request without refetching from the DB.
+    # user_id is stored so the queue worker can charge the correct workspace
+    # after the job completes (R1 billing fix — ROADMAP § 7.1, T-402).
+    uid_value = uuid.UUID(user_id) if user_id else None
     await pool.execute(
         """
         INSERT INTO render_jobs
             (id, user_id, scene_blob_hash, preset, status,
              samples_done, samples_total, payload_json, created_at, updated_at)
         VALUES
-            ($1, NULL, $2, $3, 'queued',
-             0, $4, $5, now(), now())
+            ($1, $2, $3, $4, 'queued',
+             0, $5, $6, now(), now())
         ON CONFLICT DO NOTHING
         """,
         job_id,
+        uid_value,
         scene_blob_hash,
         preset,
         PRESET_SAMPLES[preset],

@@ -15,6 +15,7 @@ import asyncio
 import json
 import os
 import uuid
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -41,11 +42,16 @@ class FakeRenderPool:
     async def execute(self, sql, *args):
         q = " ".join(sql.split())
         if "INSERT INTO render_jobs" in q:
-            # args: job_id, scene_blob_hash, preset, samples_total, payload_json
-            job_id, blob_hash, preset, samples_total, payload_json = args
+            if "payload_json" in q:
+                # args: job_id, user_id, scene_blob_hash, preset, samples_total, payload_json
+                job_id, user_id, blob_hash, preset, samples_total, payload_json = args
+            else:
+                # job_lifecycle.submit_job: job_id, user_id, scene_blob_hash, preset, samples_total
+                job_id, user_id, blob_hash, preset, samples_total = args
+                payload_json = None
             self.rows[str(job_id)] = {
                 "id": str(job_id),
-                "user_id": None,
+                "user_id": user_id,
                 "scene_blob_hash": blob_hash,
                 "preset": preset,
                 "status": "queued",
@@ -375,3 +381,210 @@ def test_local_subprocess_backend_unsupported_job_type():
 
     with pytest.raises(NotImplementedError):
         run(backend.submit("unknown_type", {}))
+
+
+# ---------------------------------------------------------------------------
+# R2: user_id is threaded through _enqueue_render and stored in render_jobs
+# ---------------------------------------------------------------------------
+
+
+def test_enqueue_render_stores_user_id():
+    """_enqueue_render must store the provided user_id in the render_jobs row."""
+    from kerf_render.routes import _enqueue_render, RenderRequest
+
+    pool = FakeRenderPool()
+    req = RenderRequest(scene_file_id="f_r2", mesh_b64="")
+    user_id = str(uuid.uuid4())
+
+    result = run(_enqueue_render(req, pool, user_id=user_id))
+    job_id = result["job_id"]
+
+    stored_uid = pool.rows[job_id]["user_id"]
+    # The pool stores the UUID object from pool.execute; convert to str for comparison.
+    assert str(stored_uid) == user_id
+
+
+def test_enqueue_render_null_user_id_when_not_provided():
+    """When no user_id is passed, the render_jobs row has user_id=NULL."""
+    from kerf_render.routes import _enqueue_render, RenderRequest
+
+    pool = FakeRenderPool()
+    req = RenderRequest(scene_file_id="f_r2_null", mesh_b64="")
+
+    result = run(_enqueue_render(req, pool))
+    job_id = result["job_id"]
+
+    assert pool.rows[job_id]["user_id"] is None
+
+
+# ---------------------------------------------------------------------------
+# R1: meter_render_job is called after mark_complete with gpu_seconds
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_queue_worker_calls_meter_on_success(monkeypatch):
+    """CyclesQueueWorker.run_one must call meter_render_job after a successful job."""
+    import asyncio
+    import json
+    from contextlib import asynccontextmanager
+
+    user_id = str(uuid.uuid4())
+    job_id = str(uuid.uuid4())
+
+    # Minimal fake pool that yields a queued job on first fetchrow, then
+    # acknowledges all UPDATE/execute calls.
+    class _MeterFakeConn:
+        def __init__(self):
+            self._done = False
+
+        async def fetchrow(self, sql, *args):
+            if not self._done:
+                # Return the queued job
+                return {
+                    "id": job_id,
+                    "user_id": uuid.UUID(user_id),
+                    "preset": "draft",
+                    "payload_json": json.dumps({"preset": "draft", "job_id": job_id}),
+                }
+            return None
+
+        async def execute(self, sql, *args):
+            return "UPDATE 1"
+
+        def transaction(self):
+            return _NullTxn()
+
+    class _NullTxn:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            pass
+
+    class _MeterFakePool:
+        def __init__(self):
+            self.conn = _MeterFakeConn()
+
+        @asynccontextmanager
+        async def acquire(self):
+            yield self.conn
+
+        async def execute(self, *a, **kw):
+            return "UPDATE 1"
+
+    meter_calls = []
+
+    async def fake_meter(pool, workspace_id, gpu_seconds, gpu_model="l4", *, job_id=None, **kw):
+        meter_calls.append({
+            "workspace_id": workspace_id,
+            "gpu_seconds": gpu_seconds,
+            "gpu_model": gpu_model,
+            "job_id": job_id,
+        })
+        return {"charged_usd": 0.01, "skipped": False, "skip_reason": None}
+
+    monkeypatch.setattr("kerf_render.queue_worker.meter_render_job", fake_meter)
+
+    # Stub mark_complete to a no-op.
+    monkeypatch.setattr(
+        "kerf_render.queue_worker.mark_complete",
+        AsyncMock(),
+    )
+
+    # Stub CyclesWorker.process_job to return a successful result.
+    from kerf_render.queue_worker import CyclesQueueWorker
+
+    pool = _MeterFakePool()
+    worker = CyclesQueueWorker.__new__(CyclesQueueWorker)
+    worker.pool = pool
+    worker.poll_interval = 1.0
+
+    # Provide a fake _worker that returns ok=True with gpu_seconds.
+    class FakeCyclesWorker:
+        def process_job(self, payload, progress_callback=None):
+            return {
+                "ok": True,
+                "signed_url": "https://cdn.example.com/render.png",
+                "gpu_seconds": 42.5,
+                "render_seconds": 42.5,
+                "gpu_model": "l4",
+            }
+
+    worker._worker = FakeCyclesWorker()
+
+    did_work = await worker.run_one()
+
+    assert did_work is True
+    assert len(meter_calls) == 1
+    assert meter_calls[0]["workspace_id"] == user_id
+    assert meter_calls[0]["gpu_seconds"] == pytest.approx(42.5)
+    assert meter_calls[0]["job_id"] == job_id
+
+
+@pytest.mark.asyncio
+async def test_queue_worker_skips_meter_when_no_user_id(monkeypatch):
+    """When job has no user_id, meter_render_job must NOT be called."""
+    import json
+    from contextlib import asynccontextmanager
+
+    job_id = str(uuid.uuid4())
+
+    class _NullTxn2:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            pass
+
+    class _NoUserConn:
+        async def fetchrow(self, sql, *args):
+            return {
+                "id": job_id,
+                "user_id": None,
+                "preset": "draft",
+                "payload_json": json.dumps({"preset": "draft", "job_id": job_id}),
+            }
+
+        async def execute(self, sql, *args):
+            return "UPDATE 1"
+
+        def transaction(self):
+            return _NullTxn2()
+
+    class _NoUserPool:
+        def __init__(self):
+            self.conn = _NoUserConn()
+
+        @asynccontextmanager
+        async def acquire(self):
+            yield self.conn
+
+        async def execute(self, *a, **kw):
+            return "UPDATE 1"
+
+    meter_calls = []
+
+    async def fake_meter(pool, workspace_id, gpu_seconds, gpu_model="l4", *, job_id=None, **kw):
+        meter_calls.append(workspace_id)
+        return {"charged_usd": 0.0, "skipped": True, "skip_reason": "no_user"}
+
+    monkeypatch.setattr("kerf_render.queue_worker.meter_render_job", fake_meter)
+    monkeypatch.setattr("kerf_render.queue_worker.mark_complete", AsyncMock())
+
+    from kerf_render.queue_worker import CyclesQueueWorker
+
+    pool = _NoUserPool()
+    worker = CyclesQueueWorker.__new__(CyclesQueueWorker)
+    worker.pool = pool
+    worker.poll_interval = 1.0
+
+    class FakeCyclesWorker:
+        def process_job(self, payload, progress_callback=None):
+            return {"ok": True, "signed_url": "", "gpu_seconds": 10.0, "render_seconds": 10.0}
+
+    worker._worker = FakeCyclesWorker()
+
+    await worker.run_one()
+
+    assert meter_calls == [], "meter must not be called when user_id is None"

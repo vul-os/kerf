@@ -41,6 +41,7 @@ from typing import Optional
 from kerf_workers.base import BaseWorker
 from kerf_render.cycles_worker import CyclesWorker, CyclesWorkerConfig, resolve_blender_bin
 from kerf_render.job_lifecycle import mark_complete, mark_failed, mark_rendering, update_progress
+from kerf_render.pricing_meter import meter_render_job
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +80,7 @@ class CyclesQueueWorker(BaseWorker):
             async with conn.transaction():
                 row = await conn.fetchrow(
                     """
-                    SELECT id, preset, payload_json
+                    SELECT id, user_id, preset, payload_json
                     FROM render_jobs
                     WHERE status = 'queued'
                     ORDER BY created_at ASC
@@ -91,6 +92,7 @@ class CyclesQueueWorker(BaseWorker):
                     return False
 
                 job_id = str(row["id"])
+                job_user_id = str(row["user_id"]) if row["user_id"] is not None else None
                 preset = row["preset"] or "standard"
                 payload_raw = row["payload_json"]
 
@@ -151,10 +153,29 @@ class CyclesQueueWorker(BaseWorker):
         if result.get("ok"):
             signed_url = result.get("signed_url", "")
             await mark_complete(self.pool, job_id, signed_url)
+            gpu_seconds = float(result.get("gpu_seconds") or result.get("render_seconds") or 0.0)
             logger.info(
                 "cycles_queue_worker: job=%s complete url=%s seconds=%.1f",
-                job_id, signed_url, result.get("render_seconds", 0.0),
+                job_id, signed_url, gpu_seconds,
             )
+            # Charge the workspace owner for GPU time consumed (R1 — T-402).
+            # Propagate failures so the caller marks the job as failed rather
+            # than silently under-billing (we would rather refund than miss a
+            # charge).
+            if job_user_id is not None:
+                gpu_model = result.get("gpu_model", "l4")
+                await meter_render_job(
+                    self.pool,
+                    job_user_id,
+                    gpu_seconds,
+                    gpu_model,
+                    job_id=job_id,
+                )
+            else:
+                logger.warning(
+                    "cycles_queue_worker: job=%s has no user_id — skipping billing",
+                    job_id,
+                )
         else:
             reason = result.get("reason", "unknown")
             stderr = result.get("stderr_tail", "")

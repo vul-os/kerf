@@ -569,6 +569,16 @@ class CyclesWorker:
         """
         t0 = time.monotonic()
 
+        # --- Select GPU SKU based on scene complexity --------------------
+        from kerf_render.dispatch import select_gpu_sku  # noqa: PLC0415
+        scene_metrics: Dict[str, Any] = {
+            k: job_dict[k]
+            for k in ("preset", "samples", "resolution", "poly_count", "light_count")
+            if k in job_dict
+        }
+        gpu_sku = select_gpu_sku(scene_metrics)
+        logger.debug("cycles_worker: selected gpu_sku=%s for job", gpu_sku)
+
         # --- Decode scene blob -------------------------------------------
         raw_blob = job_dict.get("scene_blob", b"")
         if isinstance(raw_blob, str):
@@ -605,6 +615,7 @@ class CyclesWorker:
                 "samples":        samples,
                 "from_cache":     True,
                 "render_seconds": 0.0,
+                "gpu_model":      gpu_sku,
             }
 
         # --- Translate scene blob → glTF + script -----------------------
@@ -646,8 +657,8 @@ class CyclesWorker:
         _cache_store(self.config, cache_key, signed_url)
 
         logger.info(
-            "cycles_worker: render complete key=%s preset=%s seconds=%.1f",
-            cache_key, preset, render_seconds,
+            "cycles_worker: render complete key=%s preset=%s seconds=%.1f gpu_sku=%s",
+            cache_key, preset, render_seconds, gpu_sku,
         )
 
         return {
@@ -657,6 +668,7 @@ class CyclesWorker:
             "samples":        samples,
             "from_cache":     False,
             "render_seconds": render_seconds,
+            "gpu_model":      gpu_sku,
         }
 
     # ------------------------------------------------------------------

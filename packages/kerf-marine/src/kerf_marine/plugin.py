@@ -2,7 +2,9 @@
 kerf-marine plugin entry-point.
 
 Registers:
-  - LLM tools: marine_hydrostatics, marine_box_barge, marine_stability_gz
+  - LLM tools: marine_hydrostatics, marine_box_barge, marine_stability_gz,
+               marine_seakeeping_rao, marine_seakeeping_stats,
+               marine_scantlings (ISO 12215-5)
 """
 
 from __future__ import annotations
@@ -17,6 +19,7 @@ async def register(app: FastAPI, ctx):
         marine_hydrostatics_spec, run_marine_hydrostatics,
         marine_box_barge_spec, run_marine_box_barge,
         marine_stability_gz_spec, run_marine_stability_gz,
+        marine_scantlings_spec, run_marine_scantlings,
     )
     from kerf_marine.holtrop_mennen import (
         holtrop_mennen_spec, run_holtrop_mennen,
@@ -41,19 +44,26 @@ async def register(app: FastAPI, ctx):
         holtrop_mennen_spec,
         run_holtrop_mennen,
     )
+    ctx.tools.register(
+        "marine_scantlings",
+        marine_scantlings_spec,
+        run_marine_scantlings,
+    )
 
     try:
         from kerf_core.plugin import PluginManifest
         return PluginManifest(
             name="marine",
             version="0.1.0",
-            provides=["marine.hydrostatics", "marine.stability", "marine.sections", "marine.resistance"],
+            provides=["marine.hydrostatics", "marine.stability", "marine.sections",
+                      "marine.resistance", "marine.scantlings"],
             depends=[],
         )
     except ImportError:
         return {
             "name": "marine",
             "version": "0.1.0",
-            "provides": ["marine.hydrostatics", "marine.stability", "marine.sections", "marine.resistance"],
+            "provides": ["marine.hydrostatics", "marine.stability", "marine.sections",
+                         "marine.resistance", "marine.scantlings"],
             "depends": [],
         }

@@ -1,4 +1,4 @@
-"kerf-marine: naval architecture plugin for Kerf — hydrostatics, stability, hull-section integration, seakeeping/RAOs."
+"kerf-marine: naval architecture plugin for Kerf — hydrostatics, stability, hull-section integration, seakeeping/RAOs, ISO 12215-5 scantlings."
 
 __version__ = "0.1.0"
 
@@ -16,7 +16,31 @@ from kerf_marine.seakeeping import (
     wigley_hull_sections,
 )
 
+from kerf_marine.scantlings import (
+    DesignCategory,
+    MaterialProps,
+    MATERIAL_E_GLASS_FRP,
+    MATERIAL_E_GLASS_EPOXY,
+    MATERIAL_AL5083,
+    MATERIAL_AL6061T6,
+    MATERIAL_STEEL_S235,
+    MATERIAL_STEEL_S355,
+    DesignPressures,
+    PlateResult,
+    StiffenerResult,
+    HullSectionProps,
+    LongStrengthResult,
+    ScantlingsReport,
+    design_pressures_motor_craft,
+    design_pressures_sailing_craft,
+    plate_thickness,
+    stiffener_section_modulus,
+    longitudinal_strength_check,
+    scantlings_report,
+)
+
 __all__ = [
+    # seakeeping
     "HullSection",
     "GlobalMatrices",
     "RAOResult",
@@ -28,4 +52,25 @@ __all__ = [
     "jonswap_spectrum",
     "pierson_moskowitz_spectrum",
     "wigley_hull_sections",
+    # scantlings
+    "DesignCategory",
+    "MaterialProps",
+    "MATERIAL_E_GLASS_FRP",
+    "MATERIAL_E_GLASS_EPOXY",
+    "MATERIAL_AL5083",
+    "MATERIAL_AL6061T6",
+    "MATERIAL_STEEL_S235",
+    "MATERIAL_STEEL_S355",
+    "DesignPressures",
+    "PlateResult",
+    "StiffenerResult",
+    "HullSectionProps",
+    "LongStrengthResult",
+    "ScantlingsReport",
+    "design_pressures_motor_craft",
+    "design_pressures_sailing_craft",
+    "plate_thickness",
+    "stiffener_section_modulus",
+    "longitudinal_strength_check",
+    "scantlings_report",
 ]

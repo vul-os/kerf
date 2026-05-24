@@ -58,15 +58,26 @@ features:
       note: "Seakeeping: heave/pitch/roll RAOs + added mass + damping (backend)"
       evidence: "packages/kerf-marine/src/kerf_marine/seakeeping.py"
   - domain: D5
-    feature: "Structural analysis (scantlings)"
+    feature: "Structural analysis (scantlings) — ISO 12215-5"
     competitor:
       status: yes
-      note: "Structural modelling and analysis; class-rule scantling checks; longitudinal strength"
+      note: "Structural modelling and analysis; class-rule scantling checks (Lloyd's, DNV, BV, ABS, ISO 12215-5); longitudinal strength"
+      source: "https://www.bentley.com/software/maxsurf/"
+    kerf:
+      status: yes
+      note: "Full ISO 12215-5:2008 scantlings: design categories A–D; dynamic acceleration nCG; bottom / side / deck design pressures (motor + sailing); plate thickness (FRP, Al, steel) via Eq. 16; stiffener section modulus via Eq. 22; kAR / k2 / kc correction factors; longitudinal hull-girder strength (Msw + Mwave vs SM). 90 validated tests with analytic oracles."
+      evidence: "packages/kerf-marine/src/kerf_marine/scantlings.py"
+
+  - domain: D5
+    feature: "Structural analysis (scantlings) — Lloyd's / DNV / BV / ABS rules"
+    competitor:
+      status: yes
+      note: "Maxsurf Structure includes Lloyd's Register, DNV-GL, Bureau Veritas, and ABS proprietary rule trees."
       source: "https://www.bentley.com/software/maxsurf/"
     kerf:
       status: partial
-      note: "Structural FEA backend (beam/plate); no class-rule marine scantling specific calculator. Full Lloyd's/DNV/BV/ABS rule implementation requires rule-tree encoding for each class society — significant scope; flagged for wave 2 (kerf-marine v2 + kerf-structural collaboration)."
-      evidence: "packages/kerf-structural/src/"
+      note: "Not yet implemented. These are large proprietary class-society rule trees (vessels > 24 m). ISO 12215-5 covers the open-standard tractable core for small craft."
+      kerf_note: "Lloyd's / DNV / BV / ABS rules require licensed class-society agreements and significant rule-tree encoding. Deferred post-ISO-12215 shipping."
   - domain: D5
     feature: "Sailing VPP"
     competitor:
@@ -119,7 +130,7 @@ Maxsurf (now part of Bentley Systems) is the integrated naval architecture suite
 - **Single model → all analyses.** Changes to the hull form propagate immediately to hydrostatics, stability curves, resistance, and seakeeping — all from one parametric 3D model. Kerf's engines are wired separately.
 - **Damage stability (probabilistic).** Full probabilistic damage stability to IMO SOLAS requirements — a regulatory requirement for most commercial vessels. Kerf's damage stability is simpler.
 - **Sailing VPP.** Maxsurf includes an integrated velocity prediction programme for sailing vessels. Kerf has no sailing VPP.
-- **Class-rule scantlings.** Longitudinal strength and structural analysis with class society rule checks. Kerf has general structural FEA but no marine class-rule scantling calculator.
+- **Proprietary class rules (Lloyd's, DNV, BV, ABS).** Maxsurf Structure includes the full proprietary rule trees for vessels above the ISO 12215-5 scope. Kerf ships ISO 12215-5 (small craft ≤ 24 m) but not the licensed multi-society rule trees.
 - **CAD interoperability.** Maxsurf reads and writes 3DM (Rhino), DGN (MicroStation), IGES, and DXF — the formats of the naval architecture supply chain. Kerf supports STEP and limited IGES.
 
 ## Where Kerf differs
@@ -127,13 +138,14 @@ Maxsurf (now part of Bentley Systems) is the integrated naval architecture suite
 - **MIT open-core.** Maxsurf is proprietary, subscription-priced (Bentley licensing). Kerf is MIT-licensed — free locally.
 - **Sailing VPP.** Kerf includes a full velocity prediction programme: ITTC 1957 frictional resistance, Delft-series residuary resistance, empirical sail polar (CL/CD vs AWA for main+jib), apparent-wind model, equilibrium solver, and polar generation across TWS/TWA sweeps with VMG optimisation.
 - **Multi-domain workspace.** Combine Kerf's marine engineering with structural FEA, thermal analysis, composites, and electronics in one project — typical for fast patrol vessels, autonomous surface vehicles, and naval platforms. Maxsurf is maritime-only.
-- **Chat-native.** Describe vessel parameters in plain language; Kerf runs hydrostatics and stability. Maxsurf has no LLM interface.
+- **ISO 12215-5 scantlings in the chat.** Full ISO 12215-5:2008 design-pressure → plate thickness → stiffener section modulus → longitudinal strength pipeline, usable as a single LLM tool call. Enter hull dimensions, get a structured JSON scantlings report.
+- **Chat-native.** Describe vessel parameters in plain language; Kerf runs hydrostatics, stability, resistance, seakeeping, and scantlings in one conversation. Maxsurf has no LLM interface.
 - **Python scripting.** kerf-sdk on PyPI for automated hull analysis workflows. Maxsurf scripting is limited.
 
 ## Honest gaps — where Kerf is behind today
 
 - **No parametric hull form modeller.** The core of Maxsurf — NURBS hull modelling with fairness and section generation — is absent in Kerf.
-- **No marine class-rule scantlings.** No Lloyd's, DNV, Bureau Veritas, or ABS rule-check for structural scantlings. Full class-rule encoding is a large scope item requiring kerf-marine v2 + kerf-structural collaboration.
+- **No Lloyd's / DNV / BV / ABS rules.** ISO 12215-5 (small craft ≤ 24 m) is shipped. Proprietary multi-society rule trees for commercial vessels are not licensed.
 - **Damage stability depth.** Maxsurf's probabilistic damage stability is more comprehensive than Kerf's implementation.
 - **No marine UI.** Kerf's entire marine engineering capability is backend/LLM-tool; there is no interactive naval architecture panel in the browser.
 
@@ -149,7 +161,8 @@ Maxsurf (now part of Bentley Systems) is the integrated naval architecture suite
 | Resistance prediction | Yes (Holtrop-Mennen, backend) | Yes |
 | Seakeeping / RAOs | Yes (backend) | Yes (radiation diffraction) |
 | Sailing VPP | Yes (ITTC+Delft+sail polar, backend) | Yes |
-| Structural / scantlings | General FEA (backend) | Class-rule specific |
+| Structural / scantlings — ISO 12215-5 | Yes (shipped 2026-05-24) | Yes |
+| Structural / scantlings — Lloyd's/DNV/BV/ABS | No (proprietary rules) | Yes |
 | Marine UI | None (backend only) | Full integrated GUI |
 | Chat / LLM editing | Chat-native | None |
 | Open source | Yes (MIT) | No |

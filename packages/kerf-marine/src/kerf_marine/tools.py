@@ -1,5 +1,5 @@
 """
-kerf_marine LLM tools — hydrostatics + stability + seakeeping for the chat agent.
+kerf_marine LLM tools — hydrostatics + stability + seakeeping + scantlings for the chat agent.
 
 Tools
 -----
@@ -8,6 +8,7 @@ marine_stability_gz     Compute GZ righting arm curve (wall-sided or KN table)
 marine_box_barge        Quick analytic box-barge hydrostatics (no offset table needed)
 marine_seakeeping_rao   Compute heave/pitch/roll RAOs via strip theory (STF)
 marine_seakeeping_stats Compute significant motion amplitudes in irregular seas
+marine_scantlings       ISO 12215-5 hull construction scantlings determination
 """
 
 from __future__ import annotations
@@ -469,3 +470,128 @@ async def run_marine_seakeeping_stats(args: dict[str, Any], ctx: "ProjectCtx") -
         })
     except Exception as exc:
         return err_payload(str(exc), "MARINE_STATS_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# marine_scantlings  (ISO 12215-5)
+# ---------------------------------------------------------------------------
+
+marine_scantlings_spec = ToolSpec(
+    name="marine_scantlings",
+    description=(
+        "ISO 12215-5:2008 hull construction scantlings for small craft (2.5–24 m). "
+        "\n\n"
+        "Computes: (1) design pressures for bottom / side / deck panels; "
+        "(2) minimum plate thickness for FRP, aluminium, or steel; "
+        "(3) minimum stiffener section modulus; "
+        "(4) optional longitudinal hull-girder strength check (Msw + Mwave vs SM). "
+        "\n\n"
+        "Design categories: A (ocean), B (offshore), C (inshore), D (sheltered). "
+        "Motor-craft uses dynamic acceleration nCG (V, deadrise). Sailing craft sets Pbm=0. "
+        "\n\n"
+        "Materials: 'frp_eglass' (E-glass/polyester), 'frp_epoxy' (E-glass/epoxy), "
+        "'al5083' (Al 5083-H116), 'al6061' (Al 6061-T6), 'steel_s235', 'steel_s355'. "
+        "\n\n"
+        "Reference: ISO 12215-5:2008 §8 (pressures), §11.4 (plating), §11.5 (stiffeners), "
+        "§12 + Annex C (longitudinal strength). "
+        "Larsson & Eliasson 'Principles of Yacht Design' §11."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "LWL":     {"type": "number", "description": "Waterline length (m)."},
+            "BWL":     {"type": "number", "description": "Waterline beam (m)."},
+            "mLDC":    {"type": "number", "description": "Loaded displacement mass (kg)."},
+            "V":       {"type": "number", "description": "Maximum speed in calm water (kn). Use 0 for sailing craft."},
+            "beta_04": {"type": "number", "description": "Deadrise angle at 0.4*LWL (°). Default 20."},
+            "b_mm":    {"type": "number", "description": "Panel short side (mm)."},
+            "l_mm":    {"type": "number", "description": "Panel long side (mm)."},
+            "lu_mm":   {"type": "number", "description": "Stiffener unsupported span (mm)."},
+            "s_mm":    {"type": "number", "description": "Stiffener spacing (mm)."},
+            "material": {
+                "type": "string",
+                "enum": ["frp_eglass", "frp_epoxy", "al5083", "al6061", "steel_s235", "steel_s355"],
+                "description": "Hull material.",
+            },
+            "category": {
+                "type": "string",
+                "enum": ["A", "B", "C", "D"],
+                "description": "ISO 12215-5 design category. Default 'A'.",
+            },
+            "zone": {
+                "type": "string",
+                "enum": ["bottom", "side", "deck"],
+                "description": "Hull zone for panel. Default 'bottom'.",
+            },
+            "is_sailing": {"type": "boolean", "description": "True for sailing craft. Default false."},
+            "z_mm":       {"type": "number", "description": "Panel crown / camber height (mm). Default 0."},
+            "Cb":         {"type": "number", "description": "Block coefficient (0–1). Default 0.6."},
+            # Hull section for longitudinal check (optional)
+            "section_A_deck":  {"type": "number", "description": "Hull section deck area (m²)."},
+            "section_A_keel":  {"type": "number", "description": "Hull section keel area (m²)."},
+            "section_d":       {"type": "number", "description": "Hull depth keel-to-deck (m)."},
+            "section_A_side":  {"type": "number", "description": "Side shell area per side (m²)."},
+            "section_d_mid":   {"type": "number", "description": "Side centroid above keel (m)."},
+        },
+        "required": ["LWL", "BWL", "mLDC", "b_mm", "l_mm", "lu_mm", "s_mm", "material"],
+    },
+)
+
+_MATERIAL_MAP = {
+    "frp_eglass": "MATERIAL_E_GLASS_FRP",
+    "frp_epoxy":  "MATERIAL_E_GLASS_EPOXY",
+    "al5083":     "MATERIAL_AL5083",
+    "al6061":     "MATERIAL_AL6061T6",
+    "steel_s235": "MATERIAL_STEEL_S235",
+    "steel_s355": "MATERIAL_STEEL_S355",
+}
+
+
+async def run_marine_scantlings(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        import kerf_marine.scantlings as sc
+
+        LWL    = float(args["LWL"])
+        BWL    = float(args["BWL"])
+        mLDC   = float(args["mLDC"])
+        V      = float(args.get("V", 0.0))
+        beta   = float(args.get("beta_04", 20.0))
+        b_mm   = float(args["b_mm"])
+        l_mm   = float(args["l_mm"])
+        lu_mm  = float(args["lu_mm"])
+        s_mm   = float(args["s_mm"])
+        z_mm   = float(args.get("z_mm", 0.0))
+        Cb     = float(args.get("Cb", 0.6))
+
+        mat_key = args.get("material", "al5083")
+        mat_attr = _MATERIAL_MAP.get(mat_key, "MATERIAL_AL5083")
+        material = getattr(sc, mat_attr)
+
+        cat_str = args.get("category", "A").upper()
+        category = sc.DesignCategory(cat_str)
+
+        zone       = str(args.get("zone", "bottom"))
+        is_sailing = bool(args.get("is_sailing", False))
+
+        # Optional hull section for longitudinal check
+        section = None
+        if all(k in args for k in ["section_A_deck", "section_A_keel", "section_d",
+                                    "section_A_side", "section_d_mid"]):
+            section = sc.HullSectionProps(
+                A_deck=float(args["section_A_deck"]),
+                A_keel=float(args["section_A_keel"]),
+                d=float(args["section_d"]),
+                A_side=float(args["section_A_side"]),
+                d_mid=float(args["section_d_mid"]),
+            )
+
+        report = sc.scantlings_report(
+            LWL=LWL, BWL=BWL, mLDC=mLDC, V=V, beta_04=beta,
+            b_mm=b_mm, l_mm=l_mm, lu_mm=lu_mm, s_mm=s_mm,
+            material=material, category=category,
+            zone=zone, section=section, Cb=Cb, z_mm=z_mm,
+            is_sailing=is_sailing,
+        )
+        return ok_payload(report.as_dict())
+    except Exception as exc:
+        return err_payload(str(exc), "MARINE_SCANTLINGS_ERROR")

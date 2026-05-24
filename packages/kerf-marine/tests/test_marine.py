@@ -1127,3 +1127,99 @@ class TestSeakeepingStatsTool:
         result = _run(run_marine_seakeeping_stats(args, FakeCtx()))
         data = json.loads(result)
         assert "error" in data
+
+
+# ===========================================================================
+# marine_scantlings LLM tool
+# ===========================================================================
+
+class TestMarineScantlingsTool:
+    def _base_args(self):
+        return {
+            "LWL": 10.0, "BWL": 3.2, "mLDC": 3500.0, "V": 25.0, "beta_04": 18.0,
+            "b_mm": 300.0, "l_mm": 600.0,
+            "lu_mm": 1200.0, "s_mm": 300.0,
+            "material": "al5083",
+            "category": "A",
+            "zone": "bottom",
+        }
+
+    def test_basic_call_returns_ok(self):
+        from kerf_marine.tools import run_marine_scantlings
+        result = _run(run_marine_scantlings(self._base_args(), FakeCtx()))
+        data = json.loads(result)
+        assert "error" not in data
+        assert "pressures" in data
+        assert "plate" in data
+        assert "stiffener" in data
+
+    def test_plate_thickness_positive(self):
+        from kerf_marine.tools import run_marine_scantlings
+        result = _run(run_marine_scantlings(self._base_args(), FakeCtx()))
+        data = json.loads(result)
+        assert data["plate"]["t_governing_mm"] > 0.0
+
+    def test_stiffener_SM_positive(self):
+        from kerf_marine.tools import run_marine_scantlings
+        result = _run(run_marine_scantlings(self._base_args(), FakeCtx()))
+        data = json.loads(result)
+        assert data["stiffener"]["SM_required_cm3"] > 0.0
+
+    def test_frp_material(self):
+        from kerf_marine.tools import run_marine_scantlings
+        args = {**self._base_args(), "material": "frp_eglass"}
+        result = _run(run_marine_scantlings(args, FakeCtx()))
+        data = json.loads(result)
+        assert "error" not in data
+        assert data["plate"]["material"] == "E-glass/polyester FRP"
+
+    def test_sailing_craft_zero_Pbm(self):
+        from kerf_marine.tools import run_marine_scantlings
+        args = {**self._base_args(), "is_sailing": True, "V": 0.0}
+        result = _run(run_marine_scantlings(args, FakeCtx()))
+        data = json.loads(result)
+        assert data["pressures"]["P_bottom_motor_kPa"] == pytest.approx(0.0)
+
+    def test_with_longitudinal_section(self):
+        from kerf_marine.tools import run_marine_scantlings
+        args = {
+            **self._base_args(),
+            "section_A_deck": 0.05, "section_A_keel": 0.05,
+            "section_d": 2.0, "section_A_side": 0.02, "section_d_mid": 1.0,
+            "Cb": 0.55,
+        }
+        result = _run(run_marine_scantlings(args, FakeCtx()))
+        data = json.loads(result)
+        assert "longitudinal_strength" in data
+        assert "passes" in data["longitudinal_strength"]
+
+    def test_deck_zone(self):
+        from kerf_marine.tools import run_marine_scantlings
+        args = {**self._base_args(), "zone": "deck"}
+        result = _run(run_marine_scantlings(args, FakeCtx()))
+        data = json.loads(result)
+        assert "error" not in data
+
+    def test_all_materials_ok(self):
+        from kerf_marine.tools import run_marine_scantlings
+        for mat in ["frp_eglass", "frp_epoxy", "al5083", "al6061", "steel_s235", "steel_s355"]:
+            args = {**self._base_args(), "material": mat}
+            result = _run(run_marine_scantlings(args, FakeCtx()))
+            data = json.loads(result)
+            assert "error" not in data, f"Failed for material={mat}: {data}"
+
+    def test_all_categories_ok(self):
+        from kerf_marine.tools import run_marine_scantlings
+        for cat in ["A", "B", "C", "D"]:
+            args = {**self._base_args(), "category": cat}
+            result = _run(run_marine_scantlings(args, FakeCtx()))
+            data = json.loads(result)
+            assert "error" not in data, f"Failed for category={cat}: {data}"
+
+    def test_category_A_higher_pressure_than_D(self):
+        from kerf_marine.tools import run_marine_scantlings
+        args_A = {**self._base_args(), "category": "A"}
+        args_D = {**self._base_args(), "category": "D"}
+        dA = json.loads(_run(run_marine_scantlings(args_A, FakeCtx())))
+        dD = json.loads(_run(run_marine_scantlings(args_D, FakeCtx())))
+        assert dA["pressures"]["P_bottom_kPa"] >= dD["pressures"]["P_bottom_kPa"]

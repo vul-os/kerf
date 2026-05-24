@@ -125,3 +125,30 @@ Directive: fix and run the billing model to account for GPU.
 Sequencing: Phase 7 (scalability) and the Phase 8/9 design depend on the
 scalability + compute-architecture + billing-model audits (read-only, run first).
 
+---
+
+## Phase 6 execution — autonomous build/test loop (started 2026-05-24 ~05:00)
+
+Mandate: run an ~8-hour self-paced loop driving `docs/domain_depth.md` toward
+completion — surface engines in the UI, close depth gaps, remove redundancy,
+fix security/correctness. Stop when the backlog is drained or 8 h elapse.
+
+**Status going in:** Phases 1–4, 7, 8, 9 integrated. Audit + `domain_depth.md`
+done. Remaining: the domain_depth Tier 1/2/3 backlog + GUARDS + sidebar.
+
+**Operating rules:**
+- ~5 Sonnet worktree agents at a time; integrate by SHA; refill on completion.
+- Disjoint file-sets per wave (one owner for chokepoints: Editor.jsx, App.jsx, kerf-api routes.py, kerf-workers runner.py).
+- Per-wave package tests must pass before integrate; periodic consolidated runs.
+- Update `domain_depth.md` checkboxes + tasks in the same pass as each feature.
+- Migrations folded into baseline (no ALTER shims). Never reset the shared DB.
+- **No `fly deploy` / GPU provisioning; no `git push`.**
+- UI cannot be visually QA'd here — UI features land with vitest + build green and are flagged for the user's visual sign-off (not claimed "perfect").
+
+**Wave order:** Tier 1 (UI surfacing, highest ROI) + Tier 3 (correctness, cheap)
+first, then Tier 2 (depth gaps), GUARDS alone last (touches many files).
+
+**Completion criteria:** domain_depth Tier 1 fully wired; Tier 3 fixes done;
+Tier 2 high-value items landed; GUARDS done; consolidated tests green; parity
+snapshot refreshed. Anything beyond 8 h is reported as remaining long-tail.
+

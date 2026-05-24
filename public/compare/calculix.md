@@ -5,6 +5,260 @@ category: cad-sim
 left: kerf
 right: calculix
 hero_tagline: "CalculiX runs the FEM — Kerf wraps it so structural analysis is as easy as describing the load case."
+reviewed_at: 2026-05-24
+features:
+  - domain: D2
+    feature: "FE — solid (tet/hex)"
+    competitor:
+      status: yes
+      note: "ccx solver; C3D4/C3D8/C3D10/C3D20 elements, linear + nonlinear"
+      source: "http://www.dhondt.de/ccx_2.21.pdf"
+    kerf:
+      status: yes
+      note: "CalculiX bridge"
+      evidence: "packages/kerf-fem/src/kerf_fem/calculix_bridge.py"
+
+  - domain: D2
+    feature: "Modal / buckling / nonlinear"
+    competitor:
+      status: yes
+      note: "FREQUENCY, BUCKLE, *NLGEOM, Riks arc-length steps"
+      source: "http://www.dhondt.de/ccx_2.21.pdf"
+    kerf:
+      status: yes
+      note: "consistent-mass modal, Riks, J2 plasticity"
+      evidence: "packages/kerf-fem/src/kerf_fem/calculix_bridge.py"
+
+  - domain: D2
+    feature: "FE — plate / shell (native)"
+    competitor:
+      status: yes
+      note: "S4, S4R, S8, S8R shell elements; *SHELL SECTION"
+      source: "http://www.dhondt.de/ccx_2.21.pdf"
+    kerf:
+      status: yes
+      note: "MITC4 Bathe-Dvorkin native; shell also via CalculiX bridge"
+      evidence: "packages/kerf-fem/src/kerf_fem/plate.py"
+
+  - domain: D2
+    feature: "FE — 1D beam / 2D truss (native)"
+    competitor:
+      status: yes
+      note: "B31, B32, T3D2, T3D3; *BEAM SECTION"
+      source: "http://www.dhondt.de/ccx_2.21.pdf"
+    kerf:
+      status: yes
+      note: "Hermite beam native; validated vs Roark"
+      evidence: "packages/kerf-fem/src/kerf_fem/beam.py"
+
+  - domain: D2
+    feature: "AISC 360-22 steel (members)"
+    competitor:
+      status: no
+      note: "solver only — no code-check post-processing"
+      source: "http://www.dhondt.de/ccx_2.21.pdf"
+    kerf:
+      status: yes
+      note: "full Ch. E/F/H/I, 50-section catalog"
+      evidence: "packages/kerf-structural/src/kerf_structural/aisc_member.py"
+
+  - domain: D2
+    feature: "ACI 318-19 concrete"
+    competitor:
+      status: no
+      note: "solver only — no RC code-check"
+      source: "http://www.dhondt.de/ccx_2.21.pdf"
+    kerf:
+      status: yes
+      note: "flexure/shear/PM/dev-length"
+      evidence: "packages/kerf-structural/src/kerf_structural/concrete.py"
+
+  - domain: D2
+    feature: "Eurocode design (EC2/3/5/8)"
+    competitor:
+      status: no
+      note: "solver only — no Eurocode post-processing"
+      source: "http://www.dhondt.de/ccx_2.21.pdf"
+    kerf:
+      status: yes
+      note: "EC2 concrete + EC3 steel + EC5 timber + EC8 seismic"
+      evidence: "packages/kerf-structural/src/kerf_structural/eurocode.py"
+
+  - domain: D2
+    feature: "ASCE 7-22 seismic"
+    competitor:
+      status: no
+      note: "solver only — no seismic code-check"
+      source: "http://www.dhondt.de/ccx_2.21.pdf"
+    kerf:
+      status: yes
+      note: "ELF + RSA (SRSS+CQC) + Newmark time-history"
+      evidence: "packages/kerf-structural/src/kerf_structural/seismic/rsa.py"
+
+  - domain: D2
+    feature: "ASCE 7-22 wind (MWFRS+C&C)"
+    competitor:
+      status: no
+      note: "solver only — no wind load generation"
+      source: "http://www.dhondt.de/ccx_2.21.pdf"
+    kerf:
+      status: yes
+      note: "MWFRS + C&C per ASCE 7-22"
+      evidence: "packages/kerf-structural/src/kerf_structural/wind.py"
+
+  - domain: D2
+    feature: "Fatigue (S-N, ε-N, rainflow)"
+    competitor:
+      status: partial
+      note: "stress output only; no built-in S-N cycle counting or damage"
+      source: "http://www.dhondt.de/ccx_2.21.pdf"
+    kerf:
+      status: yes
+      note: "S-N, ε-N, rainflow counting, Miner's rule"
+      evidence: "packages/kerf-structural/src/kerf_structural/fatigue.py"
+
+  - domain: D2
+    feature: "ASME VIII pressure vessel"
+    competitor:
+      status: no
+      note: "solver only — no ASME VIII code equations"
+      source: "http://www.dhondt.de/ccx_2.21.pdf"
+    kerf:
+      status: yes
+      note: "ASME VIII Div 1 thickness + nozzle + wind/seismic"
+      evidence: "packages/kerf-structural/src/kerf_structural/pressure_vessel.py"
+
+  - domain: D2
+    feature: "Frame stiffness assembly (2D/3D)"
+    competitor:
+      status: yes
+      note: "full 3D beam-column FEM; *STEP STATIC with NLGEOM"
+      source: "http://www.dhondt.de/ccx_2.21.pdf"
+    kerf:
+      status: yes
+      note: "2D+3D beam-column + ASCE 7 combos + story drift"
+      evidence: "packages/kerf-structural/src/kerf_structural/frame.py"
+
+  - domain: D2
+    feature: "API 650 tank"
+    competitor:
+      status: no
+      note: "solver only — no API 650 annular/shell design equations"
+      source: "http://www.dhondt.de/ccx_2.21.pdf"
+    kerf:
+      status: yes
+      note: "API 650 incl. seismic annex E"
+      evidence: "packages/kerf-structural/src/kerf_structural/api650.py"
+
+  - domain: D2
+    feature: "NDS 2018 timber"
+    competitor:
+      status: no
+      note: "solver only — no NDS code-check"
+      source: "http://www.dhondt.de/ccx_2.21.pdf"
+    kerf:
+      status: yes
+      note: "full NDS 2018 adjustment factors"
+      evidence: "packages/kerf-structural/src/kerf_structural/timber.py"
+
+  - domain: D2
+    feature: "AISC steel connections"
+    competitor:
+      status: no
+      note: "solver only — no connection design"
+      source: "http://www.dhondt.de/ccx_2.21.pdf"
+    kerf:
+      status: yes
+      note: "bolts/welds/base-plate, LRFD+ASD"
+      evidence: "packages/kerf-structural/src/kerf_structural/connections.py"
+
+  - domain: D1
+    feature: "Constraint sketcher (geo + dim)"
+    competitor:
+      status: no
+      note: "solver only — no CAD or sketcher"
+      source: "http://www.calculix.de/"
+    kerf:
+      status: yes
+      note: "PlaneGCS WASM; geo + dim constraints"
+      evidence: "src/components/Sketcher.jsx"
+
+  - domain: D1
+    feature: "B-rep booleans (general NURBS)"
+    competitor:
+      status: no
+      note: "no geometry kernel; pre-processor must supply mesh"
+      source: "http://www.calculix.de/"
+    kerf:
+      status: yes
+      note: "OCCT B-rep booleans"
+      evidence: "packages/kerf-occt/src/occt_bridge.py"
+
+  - domain: D1
+    feature: "Assemblies — mates"
+    competitor:
+      status: no
+      note: "no assembly or mate system"
+      source: "http://www.calculix.de/"
+    kerf:
+      status: yes
+      note: "coincident/concentric/parallel/+BOM panel"
+      evidence: "src/components/AssemblyView.jsx"
+
+  - domain: D7
+    feature: "3-axis CAM (profile/contour/pocket/face)"
+    competitor:
+      status: no
+      note: "FEA solver only — no CAM capability"
+      source: "http://www.calculix.de/"
+    kerf:
+      status: yes
+      note: "CAMView wired; opencamlib backend"
+      evidence: "src/components/CAMView.jsx"
+
+  - domain: D4
+    feature: "CFD"
+    competitor:
+      status: no
+      note: "structural/thermal FEA only; no fluid solver"
+      source: "http://www.dhondt.de/ccx_2.21.pdf"
+    kerf:
+      status: yes
+      note: "OpenFOAM bridge (needs install)"
+      evidence: "packages/kerf-cfd/src/kerf_cfd/openfoam_bridge.py"
+
+  - domain: D4
+    feature: "Thermo cycles (Rankine/Brayton/Otto)"
+    competitor:
+      status: no
+      note: "coupled thermo-mechanical only; no cycle analysis"
+      source: "http://www.dhondt.de/ccx_2.21.pdf"
+    kerf:
+      status: yes
+      note: "Rankine/Brayton/Otto/Diesel cycle analysis"
+      evidence: "packages/kerf-thermal/src/kerf_thermal/cycles.py"
+
+  - domain: D14
+    feature: "Material selection (Ashby)"
+    competitor:
+      status: no
+      note: "uses material cards for FEA; no Ashby selection logic"
+      source: "http://www.dhondt.de/ccx_2.21.pdf"
+    kerf:
+      status: yes
+      note: "200 materials, 14 families, Pareto frontier"
+      evidence: "packages/kerf-matsel/src/kerf_matsel/multi_objective.py"
+
+  - domain: D14
+    feature: "Should-cost (6 processes, Boothroyd-Dewhurst)"
+    competitor:
+      status: no
+      note: "no cost estimation capability"
+      source: "http://www.calculix.de/"
+    kerf:
+      status: yes
+      note: "6-process Boothroyd-Dewhurst should-cost"
+      evidence: "packages/kerf-cost/src/kerf_cost/should_cost.py"
 ---
 
 # Kerf + CalculiX

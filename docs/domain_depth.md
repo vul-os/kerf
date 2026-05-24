@@ -65,11 +65,12 @@ Strongest domain. PlaneGCS sketcher + full OCCT feature set are wired in-browser
 | B-rep booleans (general NURBS) | [x] | OCCT; **no graceful failure handling / fuzzy heal** |
 | NURBS surfacing (blend/network/patch) | [~] | math complete; OCCT bindings unconfirmed at build |
 | Assemblies — mates | [x] | wired (coincident/concentric/parallel/…); + BOM panel |
-| Assembly motion study / interference | [ ] | none |
-| 2D drawings (views/dims/sections) | [~] | template-based, not live B-rep projection; no UI panel |
-| GD&T on drawings / MBD / PMI | [~] | data model only; no UI |
-| Sheet metal | [~] | single flange + unfold + flat DXF; no hem/relief/jog/multi-flange |
-| Configurations / family variants | [x] | engine complete; **no UI panel** |
+| Assembly interference (clash) | [~] | backend OBB-SAT + BVH + tri-tri (clash/detect.py); **no UI panel** |
+| Assembly motion study | [ ] | none — planar MBD not wired to assembly solver |
+| 2D drawings (views/dims/sections) | [x] (backend) + [~] (UI) | live B-rep HLR projection (projectFileWithHLR) + auto-dimension; no GD&T-placement UI |
+| GD&T on drawings / MBD / PMI | [~] | data model + auto-propose only; no UI |
+| Sheet metal | [~] | single flange + unfold + flat DXF + bend table (K-factor/BD/spring-back); no hem/relief/jog/multi-flange |
+| Configurations / family variants | [x] | engine + ConfigurationsPanel.jsx wired in Editor.jsx |
 | Direct edit (push-pull) | [~] | planar only; no move/delete-face |
 | Persistent face naming | [~] | **two disconnected systems** (Python DAG vs OCCT `faceNaming.js`) |
 | Model units system | [ ] | kernel is unitless |
@@ -131,7 +132,7 @@ Calculators solid; fluid-property fidelity is the weak point.
 | HVAC duct sizing (SMACNA) | [x] (backend) | + flat-pattern |
 | Building loads | [x] (backend) | degree-day + CLTD/RTS transient (ASHRAE Ch.18) + Sol-air + fenestration (buildingenergy/transient.py) |
 | Pipe network (Hardy-Cross) | [x] (backend) | clean-water |
-| Steam/water properties | [~] (backend) | Antoine fit ±0.3K, **not IAPWS-IF97**; no superheated |
+| Steam/water properties | [x] (backend) | **IAPWS-IF97** Regions 1/2/4 (fluids/iapws_if97.py); h/v/s/cp validated to <1e-3 vs published reference tables |
 | Refrigerant properties | [~] (backend) | 2-point Antoine; no subcooled/superheated, no glide |
 | Thermo cycles (Rankine/Brayton/Otto) | [x] (backend) | |
 | Waterhammer (Joukowsky/MOC) | [x] (backend) | |

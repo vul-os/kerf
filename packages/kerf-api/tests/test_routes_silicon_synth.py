@@ -17,12 +17,14 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from kerf_api.routes_silicon_synth import router
+from kerf_core.dependencies import require_auth
 
 
 @pytest.fixture(scope="module")
 def client():
     app = FastAPI()
     app.include_router(router, prefix="/api")
+    app.dependency_overrides[require_auth] = lambda: {"sub": "test-user"}
     return TestClient(app)
 
 

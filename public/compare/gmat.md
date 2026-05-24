@@ -5,6 +5,205 @@ category: cad-sim
 left: kerf
 right: gmat
 hero_tagline: "GMAT plans the mission — Kerf designs the spacecraft hardware that executes it."
+reviewed_at: 2026-05-24
+features:
+  - domain: D5
+    feature: "Lambert problem (multi-rev)"
+    competitor:
+      status: yes
+      note: "GMAT built-in Lambert targeter (single- and multi-rev)"
+      source: "https://gmat.atlassian.net/wiki/spaces/GW/pages/380273241"
+    kerf:
+      status: yes
+      note: "Izzo 2015 multi-revolution"
+      evidence: "packages/kerf-aero/src/kerf_aero/orbital/lambert.py"
+
+  - domain: D5
+    feature: "Orbital (Kepler, J2/J3, Hohmann)"
+    competitor:
+      status: yes
+      note: "Keplerian, RK7/8, Adams-Bashforth-Moulton propagators"
+      source: "https://gmat.atlassian.net/wiki/spaces/GW/pages/380273275"
+    kerf:
+      status: yes
+      note: "Kepler + J2/J3 + Hohmann transfer"
+      evidence: "packages/kerf-aero/src/kerf_aero/orbital/kepler.py"
+
+  - domain: D5
+    feature: "Perturbation force models (J2–J6, lunar/solar gravity)"
+    competitor:
+      status: yes
+      note: "GGM02C Earth gravity, lunar/solar 3rd-body, point-mass ephemeris"
+      source: "https://gmat.atlassian.net/wiki/spaces/GW/pages/380273281"
+    kerf:
+      status: yes
+      note: "J2/J3/J4 + lunar/solar 3rd-body"
+      evidence: "packages/kerf-aero/src/kerf_aero/orbital/perturbations.py"
+
+  - domain: D5
+    feature: "Atmospheric drag (NRLMSISE-00 / Jacchia-Roberts)"
+    competitor:
+      status: yes
+      note: "NRLMSISE-00, Jacchia-Roberts, Exponential models; Cr/Cd configurable"
+      source: "https://gmat.atlassian.net/wiki/spaces/GW/pages/380273281"
+    kerf:
+      status: yes
+      note: "USSA76 + exponential drag; NRLMSISE not yet integrated"
+      evidence: "packages/kerf-aero/src/kerf_aero/flight_dynamics/atmosphere.py"
+
+  - domain: D5
+    feature: "Solar radiation pressure (SRP)"
+    competitor:
+      status: yes
+      note: "Dual-cone shadow + spherical SRP; Cr configurable"
+      source: "https://gmat.atlassian.net/wiki/spaces/GW/pages/380273281"
+    kerf:
+      status: partial
+      note: "SRP modelled in orbital perturbations; no dual-cone shadow"
+      evidence: "packages/kerf-aero/src/kerf_aero/orbital/perturbations.py"
+
+  - domain: D5
+    feature: "B-plane targeting"
+    competitor:
+      status: yes
+      note: "BdotT/BdotR/C3 B-plane targeting sequences"
+      source: "https://gmat.atlassian.net/wiki/spaces/GW/pages/380274219"
+    kerf:
+      status: no
+      note: "Lambert + Hohmann only; no B-plane solver"
+      evidence: ""
+
+  - domain: D5
+    feature: "Finite-burn manoeuvre modelling"
+    competitor:
+      status: yes
+      note: "FiniteBurn object with thrust + Isp; integrated over arc"
+      source: "https://gmat.atlassian.net/wiki/spaces/GW/pages/380273421"
+    kerf:
+      status: yes
+      note: "Finite burn via Tsiolkovsky staging engine"
+      evidence: "packages/kerf-aero/src/kerf_aero/propulsion/staging.py"
+
+  - domain: D5
+    feature: "Impulsive manoeuvre (delta-V)"
+    competitor:
+      status: yes
+      note: "ImpulsiveBurn + Maneuver command; VNB and inertial frames"
+      source: "https://gmat.atlassian.net/wiki/spaces/GW/pages/380273421"
+    kerf:
+      status: yes
+      note: "Impulsive delta-V via Hohmann / transfers engine"
+      evidence: "packages/kerf-aero/src/kerf_aero/orbital/transfers.py"
+
+  - domain: D5
+    feature: "Propulsion (Tsiolkovsky / staging / CEA thermochemistry)"
+    competitor:
+      status: partial
+      note: "Chemical thruster model (Isp, thrust, tank); no CEA thermochemistry"
+      source: "https://gmat.atlassian.net/wiki/spaces/GW/pages/380273421"
+    kerf:
+      status: yes
+      note: "Tsiolkovsky + multi-stage + CEA-lite thermochemistry"
+      evidence: "packages/kerf-aero/src/kerf_aero/propulsion/cea_lite.py"
+
+  - domain: D5
+    feature: "Orbit determination (batch least-squares + EKF)"
+    competitor:
+      status: yes
+      note: "BatchEstimator + ExtendedKalmanFilter; range/Doppler/TDRSS obs types"
+      source: "https://gmat.atlassian.net/wiki/spaces/GW/pages/380273617"
+    kerf:
+      status: no
+      note: "No orbit determination engine"
+      evidence: ""
+
+  - domain: D5
+    feature: "Monte Carlo dispersion analysis"
+    competitor:
+      status: yes
+      note: "Built-in Monte Carlo mission sequence with variable perturbation"
+      source: "https://gmat.atlassian.net/wiki/spaces/GW/pages/380274219"
+    kerf:
+      status: no
+      note: "No MC orbit dispersion tool"
+      evidence: ""
+
+  - domain: D5
+    feature: "State transition matrix (STM) propagation"
+    competitor:
+      status: yes
+      note: "A-matrix + STM propagation for covariance and targeting"
+      source: "https://gmat.atlassian.net/wiki/spaces/GW/pages/380273275"
+    kerf:
+      status: no
+      note: "No STM propagation"
+      evidence: ""
+
+  - domain: D5
+    feature: "Launch window / access / coverage analysis"
+    competitor:
+      status: yes
+      note: "ContactLocator, EclipseLocator, GroundStation access intervals"
+      source: "https://gmat.atlassian.net/wiki/spaces/GW/pages/380274213"
+    kerf:
+      status: no
+      note: "No coverage or contact-interval engine"
+      evidence: ""
+
+  - domain: D5
+    feature: "Attitude dynamics (nadir / Sun-pointing / spin-stabilised)"
+    competitor:
+      status: yes
+      note: "Spacecraft.Attitude: CoordinateSystemFixed, SpinStabilized, NadirPointing"
+      source: "https://gmat.atlassian.net/wiki/spaces/GW/pages/380273305"
+    kerf:
+      status: yes
+      note: "6-DOF attitude dynamics + stability derivatives"
+      evidence: "packages/kerf-aero/src/kerf_aero/flight_dynamics/sixdof.py"
+
+  - domain: D5
+    feature: "Libration point orbit design"
+    competitor:
+      status: yes
+      note: "CR3BP propagator; L1/L2/L4/L5 halo and Lissajous orbits"
+      source: "https://gmat.atlassian.net/wiki/spaces/GW/pages/380273275"
+    kerf:
+      status: no
+      note: "No three-body / libration point propagator"
+      evidence: ""
+
+  - domain: D5
+    feature: "Reentry / TPS analysis"
+    competitor:
+      status: yes
+      note: "Entry Interface conditions, aerocapture sequences"
+      source: "https://gmat.atlassian.net/wiki/spaces/GW/pages/380273289"
+    kerf:
+      status: yes
+      note: "Heat-flux trajectory + TPS stack sizing + ablation"
+      evidence: "packages/kerf-aero/src/kerf_aero/reentry/heat_flux_trajectory.py"
+
+  - domain: D5
+    feature: "3D trajectory visualisation"
+    competitor:
+      status: yes
+      note: "OpenGL OrbitView with solar system bodies, trajectory animation"
+      source: "https://gmat.atlassian.net/wiki/spaces/GW/pages/380274197"
+    kerf:
+      status: no
+      note: "General 3D viewport; no mission-specific trajectory animation"
+      evidence: ""
+
+  - domain: D5
+    feature: "MATLAB / Python scripting API"
+    competitor:
+      status: yes
+      note: "GMAT MATLAB interface + Python API (gmat.py); full object model exposed"
+      source: "https://github.com/nasa/GMAT/blob/master/doc/help/src/UsingGmatApi.xml"
+    kerf:
+      status: yes
+      note: "kerf-sdk on PyPI; JSON-RPC to all engines including aero/orbital"
+      evidence: "packages/kerf-aero/src/kerf_aero/plugin.py"
 ---
 
 # Kerf + NASA GMAT

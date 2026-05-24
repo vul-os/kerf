@@ -31,6 +31,12 @@ import Footer from '../../components/Footer.jsx'
 import Button from '../../components/Button.jsx'
 import DomainSwitcher from '../../components/domains/DomainSwitcher.jsx'
 import { JEWELRY_META, JEWELRY_FEATURES, buildJsonLd } from './jewelry.meta.js'
+import { LibraryIllustration, WorkshopIllustration } from '../../components/illustrations/index.js'
+
+export const HERO_ILLUSTRATION = LibraryIllustration
+export const CAPABILITY_ILLUSTRATIONS = [
+  { Illustration: WorkshopIllustration, caption: 'Workshop gem and finding library — parametric stone seats auto-seat from cut and carat.' },
+]
 
 const GITHUB_URL = 'https://github.com/kerf-sh/kerf'
 
@@ -145,57 +151,69 @@ function Hero() {
       </div>
 
       <div className="relative mx-auto max-w-7xl px-6 pt-14 pb-16 sm:pt-16 lg:pt-20 lg:pb-20">
-        <div className="max-w-3xl">
-          <span className="inline-flex items-center gap-2 rounded-full border border-ink-800 bg-ink-900/70 backdrop-blur px-3 py-1 text-xs text-ink-300 font-mono">
-            <Gem size={11} className="text-magenta-edge" />
-            jewelry domain · kerf
-          </span>
-
-          <h1 className="mt-4 font-display text-[2.6rem] sm:text-5xl lg:text-[4.25rem] font-semibold tracking-[-0.03em] leading-[1.02]">
-            Jewelry CAD
-            <br />
-            <span className="relative inline-block">
-              <span className="relative z-10 text-magenta-edge">that talks back</span>
-              <span
-                aria-hidden
-                className="absolute left-0 right-0 -bottom-2 h-2.5 bg-magenta-edge/10 -skew-x-12 rounded-sm"
-              />
+        <div className="grid lg:grid-cols-[1fr_1.1fr] gap-8 lg:gap-12 items-center">
+          <div>
+            <span className="inline-flex items-center gap-2 rounded-full border border-ink-800 bg-ink-900/70 backdrop-blur px-3 py-1 text-xs text-ink-300 font-mono">
+              <Gem size={11} className="text-magenta-edge" />
+              jewelry domain · kerf
             </span>
-            .
-          </h1>
 
-          <p className="mt-5 text-lg text-ink-300 leading-relaxed max-w-2xl">
-            Describe a ring, a halo cluster, or a full pendant in plain conversation.
-            Kerf translates each turn into parametric geometry — prong heads seat
-            themselves, baguette channels tile automatically, and the cost panel
-            updates in real time as you talk. No node graphs to wire, no macro
-            scripts to debug.
-          </p>
+            <h1 className="mt-4 font-display text-[2.6rem] sm:text-5xl lg:text-[4.25rem] font-semibold tracking-[-0.03em] leading-[1.02]">
+              Jewelry CAD
+              <br />
+              <span className="relative inline-block">
+                <span className="relative z-10 text-magenta-edge">that talks back</span>
+                <span
+                  aria-hidden
+                  className="absolute left-0 right-0 -bottom-2 h-2.5 bg-magenta-edge/10 -skew-x-12 rounded-sm"
+                />
+              </span>
+              .
+            </h1>
 
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <Button as={Link} to="/signup" variant="primary" size="lg">
-              Try it free
-              <ArrowRight size={16} />
-            </Button>
-            <Button as={Link} to="/docs/jewelry" variant="outline" size="lg">
-              See it design a ring
-            </Button>
+            <p className="mt-5 text-lg text-ink-300 leading-relaxed max-w-2xl">
+              Describe a ring, a halo cluster, or a full pendant in plain conversation.
+              Kerf translates each turn into parametric geometry — prong heads seat
+              themselves, baguette channels tile automatically, and the cost panel
+              updates in real time as you talk. No node graphs to wire, no macro
+              scripts to debug.
+            </p>
+
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <Button as={Link} to="/signup" variant="primary" size="lg">
+                Try it free
+                <ArrowRight size={16} />
+              </Button>
+              <Button as={Link} to="/docs/jewelry" variant="outline" size="lg">
+                See it design a ring
+              </Button>
+            </div>
+
+            <ul className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-ink-400 font-mono">
+              <li className="flex items-center gap-1.5">
+                <span className="w-1 h-1 rounded-full bg-ink-500" />
+                MIT open-core
+              </li>
+              <li className="flex items-center gap-1.5">
+                <span className="w-1 h-1 rounded-full bg-ink-500" />
+                30 gem cuts
+              </li>
+              <li className="flex items-center gap-1.5">
+                <span className="w-1 h-1 rounded-full bg-ink-500" />
+                no card required
+              </li>
+            </ul>
           </div>
 
-          <ul className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-ink-400 font-mono">
-            <li className="flex items-center gap-1.5">
-              <span className="w-1 h-1 rounded-full bg-ink-500" />
-              MIT open-core
-            </li>
-            <li className="flex items-center gap-1.5">
-              <span className="w-1 h-1 rounded-full bg-ink-500" />
-              30 gem cuts
-            </li>
-            <li className="flex items-center gap-1.5">
-              <span className="w-1 h-1 rounded-full bg-ink-500" />
-              no card required
-            </li>
-          </ul>
+          <div className="relative hidden md:block">
+            <div className="relative rounded-2xl border border-ink-800 bg-ink-900/40 backdrop-blur shadow-2xl shadow-black/60 overflow-hidden aspect-[16/10]">
+              <LibraryIllustration className="block w-full h-full" />
+            </div>
+            <div
+              aria-hidden
+              className="absolute -inset-6 -z-10 rounded-[2rem] bg-magenta-edge/[0.03] blur-3xl"
+            />
+          </div>
         </div>
       </div>
     </section>
@@ -682,6 +700,34 @@ function CTAStrip() {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Illustration strip                                                          */
+/* -------------------------------------------------------------------------- */
+
+function IllustrationStrip() {
+  return (
+    <section aria-label="In practice" className="relative border-t border-ink-900 bg-ink-950/40">
+      <div className="mx-auto max-w-7xl px-6 py-10 lg:py-12">
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-magenta-edge mb-6">In practice</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-2xl">
+          {CAPABILITY_ILLUSTRATIONS.map(({ Illustration, caption }, i) => (
+            <figure key={i} className="rounded-2xl border border-ink-800 bg-ink-900/30 overflow-hidden">
+              <div className="aspect-[16/10] bg-ink-950/60">
+                <Illustration className="block w-full h-full" />
+              </div>
+              {caption && (
+                <figcaption className="px-4 py-3 text-xs text-ink-400 font-mono leading-relaxed border-t border-ink-800/60">
+                  {caption}
+                </figcaption>
+              )}
+            </figure>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
 /* Page                                                                        */
 /* -------------------------------------------------------------------------- */
 
@@ -693,6 +739,7 @@ export default function JewelryDomainPage() {
       <Hero />
       <DomainSwitcher active="jewelry" />
       <FeatureGrid />
+      <IllustrationStrip />
       <ChatTranscript />
       <ComparisonTable />
       <OpenScriptable />

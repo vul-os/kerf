@@ -3,6 +3,9 @@
  */
 import DomainPage from './DomainPage.jsx'
 import * as meta from './dental.meta.js'
+import { ViewportScaleIllustration } from '../../components/illustrations/index.js'
+
+export const HERO_ILLUSTRATION = ViewportScaleIllustration
 
 const BULLETS = [
   {
@@ -67,6 +70,7 @@ export default function Dental() {
       slug="dental"
       accentColor="magenta-edge"
       domainName="dental"
+      heroIllustration={HERO_ILLUSTRATION}
       heroHeadline={
         <>
           Dental CAD from

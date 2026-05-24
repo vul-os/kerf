@@ -3,6 +3,12 @@
  */
 import DomainPage from './DomainPage.jsx'
 import * as meta from './mold.meta.js'
+import { WorkshopIllustration, CamIllustration } from '../../components/illustrations/index.js'
+
+export const HERO_ILLUSTRATION = WorkshopIllustration
+export const CAPABILITY_ILLUSTRATIONS = [
+  { Illustration: CamIllustration, caption: 'CAM toolpaths for core and cavity machining from the mold base.' },
+]
 
 const BULLETS = [
   {
@@ -67,6 +73,8 @@ export default function Mold() {
       slug="mold"
       accentColor="kerf-300"
       domainName="mold"
+      heroIllustration={HERO_ILLUSTRATION}
+      capabilityIllustrations={CAPABILITY_ILLUSTRATIONS}
       heroHeadline={
         <>
           Injection mold design from

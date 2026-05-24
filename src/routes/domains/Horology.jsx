@@ -3,6 +3,12 @@
  */
 import DomainPage from './DomainPage.jsx'
 import * as meta from './horology.meta.js'
+import { TolerancePlusMatesIllustration, FineGrainedUndoIllustration } from '../../components/illustrations/index.js'
+
+export const HERO_ILLUSTRATION = TolerancePlusMatesIllustration
+export const CAPABILITY_ILLUSTRATIONS = [
+  { Illustration: FineGrainedUndoIllustration, caption: 'Fine-grained revision history on every ply operation in the watch movement.' },
+]
 
 const BULLETS = [
   {
@@ -62,6 +68,8 @@ export default function Horology() {
       slug="horology"
       accentColor="kerf-300"
       domainName="horology"
+      heroIllustration={HERO_ILLUSTRATION}
+      capabilityIllustrations={CAPABILITY_ILLUSTRATIONS}
       heroHeadline={
         <>
           Watchmaking CAD from

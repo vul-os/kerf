@@ -38,6 +38,14 @@ import Footer from '../../components/Footer.jsx'
 import Button from '../../components/Button.jsx'
 import DomainSwitcher from '../../components/domains/DomainSwitcher.jsx'
 import { META_TITLE, META_DESCRIPTION, META_OG_IMAGE, META_URL, FEATURES, JSON_LD } from './mechanical.meta.js'
+import { FeatureTreeIllustration, JscadIllustration, SketcherIllustration, SketchToJscadIllustration } from '../../components/illustrations/index.js'
+
+export const HERO_ILLUSTRATION = FeatureTreeIllustration
+export const CAPABILITY_ILLUSTRATIONS = [
+  { Illustration: JscadIllustration, caption: 'JSCAD parametric solid — CSG boolean tree rendered in real time.' },
+  { Illustration: SketcherIllustration, caption: 'planegcs constraint solver — live DOF feedback as constraints are applied.' },
+  { Illustration: SketchToJscadIllustration, caption: 'Sketch profile extruded to solid via the feature tree.' },
+]
 
 const GITHUB_URL = 'https://github.com/kerf-sh/kerf'
 
@@ -802,6 +810,30 @@ function CTAStrip() {
 /* Page                                                                        */
 /* -------------------------------------------------------------------------- */
 
+function IllustrationStrip() {
+  return (
+    <section aria-label="In practice" className="relative border-t border-ink-900 bg-ink-950/40">
+      <div className="mx-auto max-w-7xl px-6 py-10 lg:py-12">
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-kerf-300 mb-6">In practice</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {CAPABILITY_ILLUSTRATIONS.map(({ Illustration, caption }, i) => (
+            <figure key={i} className="rounded-2xl border border-ink-800 bg-ink-900/30 overflow-hidden">
+              <div className="aspect-[16/10] bg-ink-950/60">
+                <Illustration className="block w-full h-full" />
+              </div>
+              {caption && (
+                <figcaption className="px-4 py-3 text-xs text-ink-400 font-mono leading-relaxed border-t border-ink-800/60">
+                  {caption}
+                </figcaption>
+              )}
+            </figure>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export default function Mechanical() {
   return (
     <div className="min-h-screen bg-ink-950 text-ink-100">
@@ -811,6 +843,7 @@ export default function Mechanical() {
         <Hero />
         <DomainSwitcher active="mechanical" />
         <CapabilityGrid />
+        <IllustrationStrip />
         <ChatTranscript />
         <ComparisonTable />
         <OpenAndScriptable />

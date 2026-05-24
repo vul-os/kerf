@@ -38,6 +38,13 @@ import Footer from '../../components/Footer.jsx'
 import Button from '../../components/Button.jsx'
 import DomainSwitcher from '../../components/domains/DomainSwitcher.jsx'
 import { ARCH_META, buildArchJsonLd } from './architecture.meta.js'
+import { BimIllustration, RevitParityIllustration, StairsMepIllustration } from '../../components/illustrations/index.js'
+
+export const HERO_ILLUSTRATION = BimIllustration
+export const CAPABILITY_ILLUSTRATIONS = [
+  { Illustration: RevitParityIllustration, caption: 'IFC Tier 2 import — Revit-compatible IFC 4 geometry lands as OCCT solids.' },
+  { Illustration: StairsMepIllustration, caption: 'StairView: parametric stair builder with code-compliant riser/tread geometry.' },
+]
 
 const GITHUB_URL = 'https://github.com/kerf-sh/kerf'
 
@@ -341,7 +348,8 @@ function Hero() {
     <section className="relative overflow-hidden">
       <HeroBackdrop />
       <div className="relative mx-auto max-w-7xl px-6 pt-14 pb-16 sm:pt-16 lg:pt-20 lg:pb-20">
-        <div className="max-w-3xl">
+        <div className="grid lg:grid-cols-[1fr_1.1fr] gap-8 lg:gap-12 items-center">
+          <div>
           <span className="inline-flex items-center gap-2 rounded-full border border-ink-800 bg-ink-900/70 backdrop-blur px-3 py-1 text-xs text-ink-300 font-mono">
             <span className="w-1.5 h-1.5 rounded-full bg-cyan-edge/80 animate-pulse" />
             Architecture &amp; Civil · early, honest, open
@@ -403,6 +411,17 @@ function Hero() {
               no card required
             </li>
           </ul>
+          </div>
+
+          <div className="relative hidden md:block">
+            <div className="relative rounded-2xl border border-ink-800 bg-ink-900/40 backdrop-blur shadow-2xl shadow-black/60 overflow-hidden aspect-[16/10]">
+              <BimIllustration className="block w-full h-full" />
+            </div>
+            <div
+              aria-hidden
+              className="absolute -inset-6 -z-10 rounded-[2rem] bg-cyan-edge/[0.04] blur-3xl"
+            />
+          </div>
         </div>
       </div>
     </section>
@@ -815,6 +834,30 @@ function CTAStrip() {
 /* Page                                                                        */
 /* -------------------------------------------------------------------------- */
 
+function IllustrationStrip() {
+  return (
+    <section aria-label="In practice" className="relative border-t border-ink-900 bg-ink-950/40">
+      <div className="mx-auto max-w-7xl px-6 py-10 lg:py-12">
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-cyan-edge mb-6">In practice</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          {CAPABILITY_ILLUSTRATIONS.map(({ Illustration, caption }, i) => (
+            <figure key={i} className="rounded-2xl border border-ink-800 bg-ink-900/30 overflow-hidden">
+              <div className="aspect-[16/10] bg-ink-950/60">
+                <Illustration className="block w-full h-full" />
+              </div>
+              {caption && (
+                <figcaption className="px-4 py-3 text-xs text-ink-400 font-mono leading-relaxed border-t border-ink-800/60">
+                  {caption}
+                </figcaption>
+              )}
+            </figure>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export default function Architecture() {
   return (
     <div className="min-h-screen bg-ink-950 text-ink-100">
@@ -823,6 +866,7 @@ export default function Architecture() {
       <Hero />
       <DomainSwitcher active="architecture" />
       <TodaySection />
+      <IllustrationStrip />
       <ChatSection />
       <RoadmapSection />
       <ComparisonSection />

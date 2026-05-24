@@ -3,6 +3,9 @@
  */
 import DomainPage from './DomainPage.jsx'
 import * as meta from './piping.meta.js'
+import { PipelineIllustration } from '../../components/illustrations/index.js'
+
+export const HERO_ILLUSTRATION = PipelineIllustration
 
 const BULLETS = [
   {
@@ -67,6 +70,7 @@ export default function Piping() {
       slug="piping"
       accentColor="cyan-edge"
       domainName="piping"
+      heroIllustration={HERO_ILLUSTRATION}
       heroHeadline={
         <>
           Piping & P&ID from

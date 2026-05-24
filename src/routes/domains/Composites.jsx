@@ -3,6 +3,12 @@
  */
 import DomainPage from './DomainPage.jsx'
 import * as meta from './composites.meta.js'
+import { ViewportScaleIllustration, FemIllustration } from '../../components/illustrations/index.js'
+
+export const HERO_ILLUSTRATION = ViewportScaleIllustration
+export const CAPABILITY_ILLUSTRATIONS = [
+  { Illustration: FemIllustration, caption: 'Interlaminar stress distribution from CLT + FEniCSx on a curved CFRP panel.' },
+]
 
 const BULLETS = [
   {
@@ -67,6 +73,8 @@ export default function Composites() {
       slug="composites"
       accentColor="kerf-300"
       domainName="composites"
+      heroIllustration={HERO_ILLUSTRATION}
+      capabilityIllustrations={CAPABILITY_ILLUSTRATIONS}
       heroHeadline={
         <>
           Aerospace composites that

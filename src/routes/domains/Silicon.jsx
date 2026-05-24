@@ -34,6 +34,13 @@ import Footer from '../../components/Footer.jsx'
 import Button from '../../components/Button.jsx'
 import DomainSwitcher from '../../components/domains/DomainSwitcher.jsx'
 import { TAGLINE } from './silicon.meta.js'
+import { CircuitIllustration, SpiceSimIllustration } from '../../components/illustrations/index.js'
+
+// Exported so tests and parent pages can reference the illustration mapping
+export const HERO_ILLUSTRATION = CircuitIllustration
+export const CAPABILITY_ILLUSTRATIONS = [
+  { Illustration: SpiceSimIllustration, caption: 'SPICE transient analysis of the analog IP block under PVT corner simulation.' },
+]
 
 const GITHUB_URL = 'https://github.com/kerf-sh/kerf'
 

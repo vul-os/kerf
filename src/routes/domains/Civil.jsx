@@ -3,6 +3,12 @@
  */
 import DomainPage from './DomainPage.jsx'
 import * as meta from './civil.meta.js'
+import { PipelineIllustration, DrawingIllustration } from '../../components/illustrations/index.js'
+
+export const HERO_ILLUSTRATION = PipelineIllustration
+export const CAPABILITY_ILLUSTRATIONS = [
+  { Illustration: DrawingIllustration, caption: 'Site plan DXF output from a TR-55 catchment analysis.' },
+]
 
 const BULLETS = [
   {
@@ -67,6 +73,8 @@ export default function Civil() {
       slug="civil"
       accentColor="kerf-300"
       domainName="civil"
+      heroIllustration={HERO_ILLUSTRATION}
+      capabilityIllustrations={CAPABILITY_ILLUSTRATIONS}
       heroHeadline={
         <>
           Civil engineering from

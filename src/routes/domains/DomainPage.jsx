@@ -1,7 +1,7 @@
 /**
  * DomainPage.jsx — Shared template for new-sector domain pages.
  *
- * Renders: Hero → Capability Grid → What-you-get bullets → CTA Strip.
+ * Renders: Hero → Capability Grid → Illustration Strip → What-you-get bullets → CTA Strip.
  *
  * Props:
  *   meta        — { META_TITLE, META_DESCRIPTION, META_OG_IMAGE, META_URL, FEATURES, JSON_LD }
@@ -10,6 +10,10 @@
  *   heroHeadline — JSX / string for the h1 span
  *   heroParagraph — string description for the hero
  *   heroTags    — [string] — metadata pill list below the CTA
+ *   heroIllustration — optional React component — rendered in hero right column (desktop) or
+ *                      below hero copy (mobile). Pass the component itself, e.g. FeatureTreeIllustration.
+ *   capabilityIllustrations — optional [{ Illustration: Component, caption: string }] — rendered
+ *                             as a 2- or 3-up grid between the Capability Grid and What-you-get section.
  *   comparison  — optional { products: [string], rows: [{feature, note, values}] }
  *   comingSoon  — if true, renders a "Coming soon" badge in the hero
  */
@@ -73,8 +77,9 @@ function DomainHead({ meta }) {
 /* Hero                                                                        */
 /* -------------------------------------------------------------------------- */
 
-function Hero({ headline, paragraph, tags, accentColor, comingSoon, slug }) {
+function Hero({ headline, paragraph, tags, accentColor, comingSoon, slug, heroIllustration: HeroIllustration }) {
   const accent = accentColor || 'kerf-300'
+  const hasIllustration = Boolean(HeroIllustration)
   return (
     <section aria-label="Hero" className="relative overflow-hidden">
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -100,48 +105,63 @@ function Hero({ headline, paragraph, tags, accentColor, comingSoon, slug }) {
       </div>
 
       <div className="relative mx-auto max-w-7xl px-6 pt-14 pb-16 sm:pt-16 lg:pt-20 lg:pb-20">
-        <div className="max-w-3xl">
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className={`inline-flex items-center gap-2 rounded-full border border-ink-800 bg-ink-900/70 backdrop-blur px-3 py-1 text-xs text-ink-300 font-mono`}>
-              <span aria-hidden className={`w-1.5 h-1.5 rounded-full bg-${accent} animate-pulse`} />
-              {slug} · open source
-            </span>
-            {comingSoon && (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-edge/40 bg-cyan-edge/10 px-3 py-1 text-xs font-mono text-cyan-300">
-                Coming soon
+        <div className={hasIllustration ? 'grid lg:grid-cols-[1fr_1.1fr] gap-8 lg:gap-12 items-center' : ''}>
+          <div className={hasIllustration ? '' : 'max-w-3xl'}>
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className={`inline-flex items-center gap-2 rounded-full border border-ink-800 bg-ink-900/70 backdrop-blur px-3 py-1 text-xs text-ink-300 font-mono`}>
+                <span aria-hidden className={`w-1.5 h-1.5 rounded-full bg-${accent} animate-pulse`} />
+                {slug} · open source
               </span>
+              {comingSoon && (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-edge/40 bg-cyan-edge/10 px-3 py-1 text-xs font-mono text-cyan-300">
+                  Coming soon
+                </span>
+              )}
+            </div>
+
+            <h1
+              className="mt-4 font-display text-[2.6rem] sm:text-5xl lg:text-[4rem] font-semibold tracking-[-0.03em] leading-[1.03]"
+            >
+              {headline}
+            </h1>
+
+            <p className="mt-5 text-lg text-ink-300 leading-relaxed max-w-2xl">
+              {paragraph}
+            </p>
+
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <Button as={Link} to="/signup" variant="primary" size="lg">
+                Start free
+                <ArrowRight size={16} />
+              </Button>
+              <Button as={Link} to={`/docs/${slug}`} variant="outline" size="lg">
+                Read the docs
+              </Button>
+            </div>
+
+            {tags && tags.length > 0 && (
+              <ul className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-ink-400 font-mono">
+                {tags.map((t) => (
+                  <li key={t} className="flex items-center gap-1.5">
+                    <span className="w-1 h-1 rounded-full bg-ink-500" />
+                    {t}
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
 
-          <h1
-            className="mt-4 font-display text-[2.6rem] sm:text-5xl lg:text-[4rem] font-semibold tracking-[-0.03em] leading-[1.03]"
-          >
-            {headline}
-          </h1>
-
-          <p className="mt-5 text-lg text-ink-300 leading-relaxed max-w-2xl">
-            {paragraph}
-          </p>
-
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <Button as={Link} to="/signup" variant="primary" size="lg">
-              Start free
-              <ArrowRight size={16} />
-            </Button>
-            <Button as={Link} to={`/docs/${slug}`} variant="outline" size="lg">
-              Read the docs
-            </Button>
-          </div>
-
-          {tags && tags.length > 0 && (
-            <ul className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-ink-400 font-mono">
-              {tags.map((t) => (
-                <li key={t} className="flex items-center gap-1.5">
-                  <span className="w-1 h-1 rounded-full bg-ink-500" />
-                  {t}
-                </li>
-              ))}
-            </ul>
+          {hasIllustration && (
+            <div className="relative">
+              {/* Mobile: show below copy; Desktop: show in right column */}
+              <div className="relative rounded-2xl border border-ink-800 bg-ink-900/40 backdrop-blur shadow-2xl shadow-black/60 overflow-hidden aspect-[16/10]">
+                <HeroIllustration className="block w-full h-full" />
+              </div>
+              <div
+                aria-hidden
+                className={`absolute -inset-6 -z-10 rounded-[2rem] bg-${accent}/[0.04] blur-3xl`}
+              />
+            </div>
           )}
         </div>
       </div>
@@ -195,6 +215,60 @@ function CapabilityGrid({ features, accentColor }) {
               </div>
               <p className="text-sm text-ink-300 leading-relaxed">{f.description}</p>
             </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* Illustration strip (capability illustrations grid)                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * CapabilityIllustrations — renders a 2- or 3-up grid of illustration cards
+ * between the Capability Grid and the What-you-get bullets.
+ *
+ * @param {Array<{Illustration: React.ComponentType, caption: string}>} items
+ * @param {string} accentColor
+ */
+function CapabilityIllustrations({ items, accentColor }) {
+  if (!items || items.length === 0) return null
+  const accent = accentColor || 'kerf-300'
+  const gridCols =
+    items.length === 1
+      ? 'grid-cols-1 max-w-lg mx-auto'
+      : items.length === 2
+      ? 'grid-cols-1 sm:grid-cols-2'
+      : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+  return (
+    <section
+      aria-labelledby="illustrations-heading"
+      className="relative border-t border-ink-900 bg-ink-950/40"
+    >
+      <div className="mx-auto max-w-7xl px-6 py-10 lg:py-12">
+        <p
+          id="illustrations-heading"
+          className={`font-mono text-xs uppercase tracking-[0.2em] text-${accent} mb-6`}
+        >
+          In practice
+        </p>
+        <div className={`grid ${gridCols} gap-5`}>
+          {items.map(({ Illustration, caption }, i) => (
+            <figure
+              key={i}
+              className="rounded-2xl border border-ink-800 bg-ink-900/30 overflow-hidden"
+            >
+              <div className="aspect-[16/10] bg-ink-950/60">
+                <Illustration className="block w-full h-full" />
+              </div>
+              {caption && (
+                <figcaption className="px-4 py-3 text-xs text-ink-400 font-mono leading-relaxed border-t border-ink-800/60">
+                  {caption}
+                </figcaption>
+              )}
+            </figure>
           ))}
         </div>
       </div>
@@ -376,6 +450,8 @@ export default function DomainPage({
   heroHeadline,
   heroParagraph,
   heroTags,
+  heroIllustration,
+  capabilityIllustrations,
   bullets,
   comparison,
   comingSoon,
@@ -393,9 +469,13 @@ export default function DomainPage({
           accentColor={accentColor}
           comingSoon={comingSoon}
           slug={slug}
+          heroIllustration={heroIllustration}
         />
         <DomainSwitcher active={slug} />
         <CapabilityGrid features={meta.FEATURES} accentColor={accentColor} />
+        {capabilityIllustrations && capabilityIllustrations.length > 0 && (
+          <CapabilityIllustrations items={capabilityIllustrations} accentColor={accentColor} />
+        )}
         {bullets && bullets.length > 0 && (
           <WhatYouGet bullets={bullets} accentColor={accentColor} />
         )}

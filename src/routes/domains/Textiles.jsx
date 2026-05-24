@@ -17,6 +17,9 @@ import Footer from '../../components/Footer.jsx'
 import Button from '../../components/Button.jsx'
 import DomainSwitcher from '../../components/domains/DomainSwitcher.jsx'
 import { meta } from './textiles.meta.js'
+import { SketcherIllustration } from '../../components/illustrations/index.js'
+
+export const HERO_ILLUSTRATION = SketcherIllustration
 
 const GITHUB_URL = 'https://github.com/kerf-sh/kerf'
 

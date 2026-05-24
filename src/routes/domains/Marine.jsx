@@ -3,6 +3,12 @@
  */
 import DomainPage from './DomainPage.jsx'
 import * as meta from './marine.meta.js'
+import { ScriptingIllustration, PipelineIllustration } from '../../components/illustrations/index.js'
+
+export const HERO_ILLUSTRATION = ScriptingIllustration
+export const CAPABILITY_ILLUSTRATIONS = [
+  { Illustration: PipelineIllustration, caption: 'Resistance curve from Holtrop-Mennen feeding propeller selection and shaft sizing.' },
+]
 
 const BULLETS = [
   {
@@ -67,6 +73,8 @@ export default function Marine() {
       slug="marine"
       accentColor="cyan-edge"
       domainName="marine"
+      heroIllustration={HERO_ILLUSTRATION}
+      capabilityIllustrations={CAPABILITY_ILLUSTRATIONS}
       heroHeadline={
         <>
           Naval architecture from

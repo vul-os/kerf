@@ -3,6 +3,9 @@
  */
 import DomainPage from './DomainPage.jsx'
 import * as meta from './packaging.meta.js'
+import { SketcherIllustration } from '../../components/illustrations/index.js'
+
+export const HERO_ILLUSTRATION = SketcherIllustration
 
 const BULLETS = [
   {
@@ -67,6 +70,7 @@ export default function Packaging() {
       slug="packaging"
       accentColor="magenta-edge"
       domainName="packaging"
+      heroIllustration={HERO_ILLUSTRATION}
       heroHeadline={
         <>
           Packaging design from

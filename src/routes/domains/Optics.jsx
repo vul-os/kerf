@@ -3,6 +3,9 @@
  */
 import DomainPage from './DomainPage.jsx'
 import * as meta from './optics.meta.js'
+import { ViewportScaleIllustration } from '../../components/illustrations/index.js'
+
+export const HERO_ILLUSTRATION = ViewportScaleIllustration
 
 const BULLETS = [
   {
@@ -67,6 +70,7 @@ export default function Optics() {
       slug="optics"
       accentColor="cyan-edge"
       domainName="optics"
+      heroIllustration={HERO_ILLUSTRATION}
       heroHeadline={
         <>
           Lens design from

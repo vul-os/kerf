@@ -4,6 +4,9 @@
  */
 import DomainPage from './DomainPage.jsx'
 import * as meta from './woodworking.meta.js'
+import { SketcherIllustration } from '../../components/illustrations/index.js'
+
+export const HERO_ILLUSTRATION = SketcherIllustration
 
 const BULLETS = [
   {
@@ -28,6 +31,7 @@ export default function Woodworking() {
       accentColor="kerf-300"
       domainName="woodworking"
       comingSoon
+      heroIllustration={HERO_ILLUSTRATION}
       heroHeadline={
         <>
           Woodworking CAD from

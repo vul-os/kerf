@@ -5551,7 +5551,7 @@ deploy model. All tasks are P0; the order is the order they should ship.
 ### T-406 Update references — code, config, scripts
 - **Tier:** A
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped (2026-05-24) — `03cb5038` (code/scripts/config: SECURITY.md, dependencies.py, loop scripts, e2e probe, release-command test rename) + `329b80f0` (deployment + architecture docs, new ADR, CHANGELOG). `billingmodel/projections.py` grounded to Koyeb `large` $0.0587/machine-hr (local — gitignored). Remaining fly refs are intentional (deprecated `fly.*` path for self-hosters, cross-references, X-Forwarded-For comment, CHANGELOG/ADR history).
 - **Scope:** Sonnet fan-out (2 parallel, isolated worktrees) to replace `fly.io`, `fly.toml`, `flyctl`, `fly.storage.tigris.dev` mentions across:
   - **Agent 1 — code/scripts/config:** `scripts/*`, `Dockerfile`, `packages/**/*.py` (esp. `kerf-cloud`), env-var defaults, `SECURITY.md`.
   - **Agent 2 — docs:** `deployment/*.md`, `docs/architecture/*.md`, `decisions.md`, `CHANGELOG.md`. Add new `deployment/koyeb.md` as the canonical hosting doc. Mark `deployment/fly.md` deprecated (keep — Fly still works for CPU-only self-hosters).
@@ -5562,7 +5562,7 @@ deploy model. All tasks are P0; the order is the order they should ship.
 ### T-407 Update public-facing surfaces (Landing, README, ROADMAP)
 - **Tier:** A
 - **Priority:** P1
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped (2026-05-24) — verified `README.md` and `src/routes/Landing.jsx` contain ZERO fly.io references at baseline; no change needed (public surfaces already infra-agnostic per [[public_readme_scope]]). Noted a separate standing-rule violation for follow-up: README still lists Paystack/bunny.net/S3GitStorer (cloud-internal) — out of this task's fly-only scope.
 - **Scope:** Single-agent pass over public copy. The user's standing rule
   (memory: `public_readme_scope`) is that we don't list cloud-internal
   infra in public README/Landing — so the goal here is to **remove** Fly
@@ -5576,7 +5576,7 @@ deploy model. All tasks are P0; the order is the order they should ship.
 ### T-408 Break-even monitoring dashboard
 - **Tier:** B
 - **Priority:** P2
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped (2026-05-24) — `5c5eb750`. `monthly_margin` SQL view (aggregates `usage_events` by month + kind), `GET /api/admin/margin?month=YYYY-MM` admin route (revenue − COGS, fixed-cost via `KERF_FIXED_COST_USD`, break-even seat count), `/admin/margin` frontend page. Registered via `kerf-api/plugin.py` (not routes.py).
 - **Scope:** Cheap monthly check we run by hand initially: a SQL view +
   one-page admin route showing fixed cost (Koyeb invoice CSV, manually
   uploaded once a month) vs realised gross margin from `usage_events`.
@@ -5587,7 +5587,7 @@ deploy model. All tasks are P0; the order is the order they should ship.
 ### T-409 GPU-SKU selection policy
 - **Tier:** B
 - **Priority:** P2
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped (2026-05-24) — `bfc1addd`. `kerf_render.dispatch.select_gpu_sku()` maps scene complexity → Koyeb SKU (preview→rtx_a4000, draft→l4, standard→a6000, hero→a100, cinema→h100, fallback→l4). Primary signal = preset name; explicit samples/resolution/poly/lights can only upgrade. Wired into `cycles_worker.process_job` → `gpu_model` → `meter_render_job`. R15 presign (the deferred half) shipped separately in `e2b529ba`.
 - **Scope:** When dispatching a Cycles render, today the worker picks an
   arbitrary GPU. Add a small policy: small scene → rtx_a4000 / l4; medium → a6000 / l40s; large or photoreal → a100 / h100. Map from
   estimated scene complexity (poly count, lights, samples). Falls back
@@ -5598,7 +5598,7 @@ deploy model. All tasks are P0; the order is the order they should ship.
 ### T-410 Postgres on Koyeb (optional consolidation)
 - **Tier:** B
 - **Priority:** P3
-- **Status:** 🔴 not started
+- **Status:** ✅ shipped (2026-05-24) — `32db4b54`. Decision: **keep Neon** (DATABASE_URL unchanged = zero cutover risk; Neon branching/PITR has no Koyeb equivalent; reversible). ADR in `decisions.md`; `pg_dump → koyeb database create → pg_restore → secret-swap` runbook in `deployment/koyeb.md` under "Optional future migration to Koyeb PG".
 - **Scope:** Optional — only if we want one less vendor. Koyeb has a
   serverless Postgres SKU ($0.04/hr small = $29.76/mo) that maps cleanly
   to Neon. Migration is a `pg_dump | pg_restore` plus a `DATABASE_URL`

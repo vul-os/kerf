@@ -18,10 +18,19 @@
 > R16, R17, R20, R21 → `ca795e1c`. (The three T-402b agent worktrees
 > chained, so the commits form a linear `d2a0d3a2 → ca795e1c → 40415932`
 > chain rather than three independent cherry-picks — verified each R-ID
-> applied exactly once, no duplication.) Deferred: **R13** (BYO key
-> save-validation — no save endpoint exists yet) and R15's
-> presign-instead-of-proxy (→ T-409). Scoped pytest at the 10-fail
+> applied exactly once, no duplication.) Scoped pytest at the 10-fail
 > baseline; vitest 9534/9534.
+>
+> **Final sweep — 2026-05-24 (same day): ALL findings now closed.**
+> - **R13** (BYO key save endpoint + provider validation) — built from
+>   scratch (`POST`/`DELETE /api/provider-keys`, validate-before-store,
+>   422 on bad key) → `e2b529ba`.
+> - **R15 presign** (the deferred half — 302 redirect to Tigris presigned
+>   URL when `STORAGE_BACKEND=s3`) → `e2b529ba`.
+> - Related platform follow-ups also shipped: T-408 margin dashboard
+>   (`5c5eb750`), T-409 GPU-SKU dispatch policy (`bfc1addd`), T-410
+>   Postgres-stays-Neon decision (`32db4b54`).
+> Nothing from this audit remains open.
 
 **Context.** Pre-Koyeb-cutover audit ([T-401 in `tasks.md`](../../tasks.md),
 [ROADMAP § 7.1](../../ROADMAP.md#71--flyio--koyeb-p0-2026-05-24)).

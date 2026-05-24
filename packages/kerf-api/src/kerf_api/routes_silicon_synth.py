@@ -11,16 +11,19 @@ Endpoint:
 from __future__ import annotations
 
 import logging
+import re
 import shutil
 import subprocess
 import tempfile
 import json
 import os
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import Optional
+
+from kerf_core.dependencies import require_auth
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +53,29 @@ class SynthRequest(BaseModel):
         default=True,
         description="Flatten design hierarchy before synthesis.",
     )
+
+
+_VERILOG_IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _validate_top(top: Optional[str]) -> Optional[str]:
+    """Validate top-level module name against Verilog simple-identifier rules.
+
+    Raises ``HTTPException(400)`` when the value is present but invalid.
+    The module name is interpolated into a Yosys script; Yosys supports a
+    ``shell`` command so an un-validated name is an RCE vector.
+    """
+    if top is None:
+        return None
+    if not _VERILOG_IDENT_RE.match(top):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Invalid top-level module name {top!r}: must match "
+                r"^[A-Za-z_][A-Za-z0-9_]*$ (Verilog simple identifier)."
+            ),
+        )
+    return top
 
 
 def _yosys_binary() -> Optional[str]:
@@ -159,7 +185,7 @@ def _parse_stat(stdout: str) -> dict:
 
 
 @router.post("/silicon/synth")
-def silicon_synth(req: SynthRequest):
+def silicon_synth(req: SynthRequest, payload: dict = Depends(require_auth)):
     """RTL synthesis via Yosys.
 
     Synthesises the supplied Verilog source using Yosys.  If `liberty` is
@@ -175,6 +201,9 @@ def silicon_synth(req: SynthRequest):
 
     Degrades to {status:"pending"} if Yosys is not installed.
     """
+    # Validate top-level module name before it reaches the Yosys script.
+    _validate_top(req.top)
+
     # Check for yowasp first (pure-Python Yosys)
     try:
         import yowasp_yosys  # noqa: F401

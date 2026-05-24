@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import shutil
 import subprocess
 import tempfile
@@ -38,6 +39,30 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 _YOSYS_AVAILABLE: Optional[bool] = None
+
+# ---------------------------------------------------------------------------
+# Input validation
+# ---------------------------------------------------------------------------
+
+_VERILOG_IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def validate_module_name(name: str) -> str:
+    """Validate *name* is a legal Verilog simple identifier.
+
+    Returns the name unchanged on success.
+    Raises ``ValueError`` with a descriptive message on failure.
+
+    This is the primary injection-prevention guard: the module name is
+    interpolated directly into the Yosys synthesis script, and Yosys supports
+    a ``shell`` command — so an un-validated name is an RCE vector.
+    """
+    if not isinstance(name, str) or not _VERILOG_IDENT_RE.match(name):
+        raise ValueError(
+            f"Invalid top-level module name {name!r}: must match "
+            r"^[A-Za-z_][A-Za-z0-9_]*$ (Verilog simple identifier)."
+        )
+    return name
 
 
 def _yosys_available() -> bool:
@@ -188,6 +213,8 @@ def synthesize(
         ``status="ok"``      on success.
         ``status="error"``   when Yosys exits non-zero.
     """
+    validate_module_name(top_module)
+
     if not _yosys_available():
         return SynthResult(
             status="pending",

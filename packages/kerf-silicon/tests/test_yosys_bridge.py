@@ -315,7 +315,63 @@ class TestErrorOnNonZeroExit:
 
 
 # ---------------------------------------------------------------------------
-# 5. Integration smoke test (skipped when yosys absent)
+# 5. Module-name injection / validation
+# ---------------------------------------------------------------------------
+
+class TestModuleNameValidation:
+    """validate_module_name must accept valid Verilog identifiers and reject
+    anything that could inject Yosys script commands."""
+
+    def test_valid_simple_name(self):
+        from kerf_silicon.bridges.yosys_bridge import validate_module_name
+        assert validate_module_name("half_adder") == "half_adder"
+
+    def test_valid_leading_underscore(self):
+        from kerf_silicon.bridges.yosys_bridge import validate_module_name
+        assert validate_module_name("_my_mod") == "_my_mod"
+
+    def test_valid_mixed_case_digits(self):
+        from kerf_silicon.bridges.yosys_bridge import validate_module_name
+        assert validate_module_name("Mod123") == "Mod123"
+
+    def test_rejects_newline_injection(self):
+        """Classic injection: mymod\\nshell id"""
+        from kerf_silicon.bridges.yosys_bridge import validate_module_name
+        with pytest.raises(ValueError, match="Invalid top-level module name"):
+            validate_module_name("mymod\nshell id")
+
+    def test_rejects_semicolon_injection(self):
+        """Semicolons separate Yosys commands in -p mode."""
+        from kerf_silicon.bridges.yosys_bridge import validate_module_name
+        with pytest.raises(ValueError, match="Invalid top-level module name"):
+            validate_module_name("mymod; shell id")
+
+    def test_rejects_shell_keyword(self):
+        """A bare 'shell' token is already invalid (space before it)."""
+        from kerf_silicon.bridges.yosys_bridge import validate_module_name
+        with pytest.raises(ValueError, match="Invalid top-level module name"):
+            validate_module_name("my mod")
+
+    def test_rejects_empty_string(self):
+        from kerf_silicon.bridges.yosys_bridge import validate_module_name
+        with pytest.raises(ValueError):
+            validate_module_name("")
+
+    def test_rejects_leading_digit(self):
+        from kerf_silicon.bridges.yosys_bridge import validate_module_name
+        with pytest.raises(ValueError):
+            validate_module_name("1bad")
+
+    def test_synthesize_raises_on_bad_top(self, monkeypatch):
+        """synthesize() must raise ValueError before reaching Yosys."""
+        from kerf_silicon.bridges import yosys_bridge as yb
+        monkeypatch.setattr(yb, "_YOSYS_AVAILABLE", True)
+        with pytest.raises(ValueError, match="Invalid top-level module name"):
+            yb.synthesize("module top(); endmodule", "mymod\nshell id")
+
+
+# ---------------------------------------------------------------------------
+# 7. Integration smoke test (skipped when yosys absent)
 # ---------------------------------------------------------------------------
 
 _needs_yosys = pytest.mark.skipif(

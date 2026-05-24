@@ -9,6 +9,7 @@ import {
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
+import { ALLOWED_ELEMENTS, urlTransformer } from '../lib/markdownSanitize.js'
 import PartChip from './PartChip.jsx'
 import { api } from '../lib/api.js'
 import { useWorkspace } from '../store/workspace.js'
@@ -357,6 +358,8 @@ export function Markdown({ text }) {
       remarkPlugins={[remarkGfm]}
       rehypePlugins={[[rehypeHighlight, { detect: true, ignoreMissing: true }]]}
       components={MD_COMPONENTS}
+      allowedElements={ALLOWED_ELEMENTS}
+      urlTransform={urlTransformer}
     >
       {text}
     </ReactMarkdown>

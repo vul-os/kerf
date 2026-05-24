@@ -5,6 +5,53 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5" />
 
+    <!--
+      Content-Security-Policy
+      ─────────────────────────────────────────────────────────────────────────
+      default-src 'self'          — safe baseline; unlisted fetch types fall here
+      script-src  'self'
+                  'unsafe-inline' — JSON-LD <script type="application/ld+json">
+                                    blocks in this file + Vite dev HMR injection
+                  'unsafe-eval'   — opencascade.js / planegcs emscripten glue
+                                    calls eval() internally; WASM JIT also
+                                    requires this in some browsers without the
+                                    more targeted 'wasm-unsafe-eval' (Chrome 95+
+                                    accepts the narrower form; we keep the broader
+                                    one for Safari/Firefox compat)
+      style-src   'self'
+                  'unsafe-inline' — Tailwind utility classes are injected as
+                                    inline <style> tags by the Vite Tailwind
+                                    plugin; component-level inline style={} props
+                                    also require this
+      img-src     'self' data: blob:
+                                  — data: for SVG/favicon inlining; blob: for
+                                    Three.js screenshot canvases and file-object
+                                    preview URLs
+      font-src    'self' data:    — self-hosted fonts; data: for inline font
+                                    faces if any are injected by hljs themes
+      connect-src 'self'          — all XHR/fetch goes to same origin (/api, /auth)
+      worker-src  blob: 'self'    — Web Workers are constructed from blob: URLs
+                                    by Vite's worker bundling and by the OCCT /
+                                    tscircuit / sketchSolver workers
+      child-src   blob:           — same blob: allowance for nested workers
+      object-src  'none'          — block <object>/<embed>; nothing uses these
+      base-uri    'self'          — prevent <base> tag injection attacks
+      form-action 'self'          — lock form submissions to same origin
+    -->
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self';
+      script-src  'self' 'unsafe-inline' 'unsafe-eval';
+      style-src   'self' 'unsafe-inline';
+      img-src     'self' data: blob:;
+      font-src    'self' data:;
+      connect-src 'self';
+      worker-src  blob: 'self';
+      child-src   blob:;
+      object-src  'none';
+      base-uri    'self';
+      form-action 'self';
+    " />
+
     <!-- Primary identity -->
     <title>Kerf — Chat-Driven CAD for Every Discipline</title>
     <meta name="description" content="Kerf is a chat-native CAD workspace: write JSCAD, draft B-rep features, sketch with constraints, lay out PCBs, and ship real engineering drawings — with an LLM editing the source for you. MIT-licensed, runs locally or hosted." />

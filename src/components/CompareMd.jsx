@@ -25,6 +25,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 import Button from './Button.jsx'
+import { ALLOWED_ELEMENTS, urlTransformer } from '../lib/markdownSanitize.js'
 
 /* -------------------------------------------------------------------------- */
 /* Verdict-glyph constants (mirrors Freecad.jsx)                               */
@@ -450,6 +451,8 @@ export default function CompareMd({ meta, loading, error }) {
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             components={components}
+            allowedElements={ALLOWED_ELEMENTS}
+            urlTransform={urlTransformer}
           >
             {meta.body || ''}
           </ReactMarkdown>

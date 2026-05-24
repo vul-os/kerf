@@ -29,6 +29,7 @@ Public API
         region_intersection,
         region_difference,
         region_area,
+        hatch_region,
         make_rect_loop,
         make_circle_loop,
     )
@@ -892,3 +893,275 @@ def make_circle_loop(cx: float, cy: float, radius: float,
     v = Vertex(point=p_start)
     edge = Edge(curve=arc, t0=0.0, t1=2.0 * math.pi, v_start=v, v_end=v)
     return Loop(coedges=[Coedge(edge=edge, orientation=True)], is_outer=True)
+
+
+# ---------------------------------------------------------------------------
+# Hatch patterns (GK-P32)
+# ---------------------------------------------------------------------------
+
+#: Built-in hatch pattern definitions.
+#:
+#: Each pattern is a list of ``(dx, dy, angle_offset_deg)`` tuples.  The
+#: *main* hatch lines are always drawn at ``angle`` degrees (user-supplied);
+#: extra entries add additional line families at ``angle + angle_offset_deg``
+#: with the given lateral (dy) spacing multiplier.
+#:
+#: ``dx`` — shift along the line direction between adjacent parallel lines
+#:          (for staggered patterns like brick); 0 for straight hatch.
+#: ``dy`` — lateral spacing multiplier relative to ``scale``.  The effective
+#:          spacing is ``dy * scale``.
+_PATTERNS: dict = {
+    # ANSI31 — general-purpose 45° cross-hatch (steel / solid section)
+    "ansi31":  [(0.0, 1.0, 0.0)],
+    # Concrete — diagonal lines at 45° + additional horizontal lines
+    "concrete": [(0.0, 1.0, 0.0), (0.0, 2.0, 90.0)],
+    # Brick — staggered horizontal course lines
+    "brick":    [(0.5, 1.0, 90.0), (0.0, 2.0, 0.0)],
+    # Earth / soil — diagonal at 45° + flat horizontal
+    "earth":    [(0.0, 1.0, 45.0), (0.0, 1.0, -45.0)],
+    # Wood grain — diagonal close lines
+    "wood":     [(0.0, 0.5, 0.0), (0.0, 0.5, 90.0)],
+    # Sand — very light diagonal
+    "sand":     [(0.0, 0.75, 0.0)],
+    # Insulation — wider diagonal spacing
+    "insulation": [(0.0, 2.0, 0.0)],
+    # Steel — ANSI31 alias (close diagonal lines)
+    "steel":    [(0.0, 1.0, 0.0)],
+    # Glass — two crossing diagonals at fine spacing
+    "glass":    [(0.0, 1.0, 0.0), (0.0, 1.0, 90.0)],
+}
+
+#: Alias map (material name → pattern key)
+_MATERIAL_PATTERN: dict = {
+    "concrete_reinforced":      "concrete",
+    "concrete_precast":         "concrete",
+    "masonry_cmu_concrete":     "brick",
+    "masonry_aac_block":        "brick",
+    "brick_clay":               "brick",
+    "insulation_rockwool":      "insulation",
+    "insulation_fiberglass_batt": "insulation",
+    "insulation_xps":           "insulation",
+    "insulation_eps":           "insulation",
+    "board_drywall_gypsum":     "concrete",
+    "plaster_lime":             "concrete",
+    "plaster_cement":           "concrete",
+    "plaster_gypsum_finish":    "concrete",
+    "board_cement_fibre":       "concrete",
+    "wood_structural":          "wood",
+    "wood_plywood":             "wood",
+    "steel_structural":         "steel",
+    "glass":                    "glass",
+    "soil":                     "earth",
+    "sand":                     "sand",
+}
+
+
+@dataclass
+class HatchLine:
+    """A single hatch line clipped to a loop boundary.
+
+    Attributes
+    ----------
+    start : (float, float)
+        2-D start point of the clipped segment (in the loop's coordinate frame,
+        i.e. plane-projected).
+    end : (float, float)
+        2-D end point.
+    """
+    start: Tuple[float, float]
+    end:   Tuple[float, float]
+
+
+@dataclass
+class HatchResult:
+    """Output of :func:`hatch_region`.
+
+    Attributes
+    ----------
+    lines : list of :class:`HatchLine`
+        Clipped hatch segments.  All segments are *inside* the input loop
+        (including on the boundary within tolerance).
+    pattern : str
+        Resolved pattern name used.
+    angle_deg : float
+        Hatch line angle in degrees (as actually applied).
+    scale : float
+        Scale (line spacing) applied.
+    """
+    lines: List["HatchLine"]
+    pattern: str
+    angle_deg: float
+    scale: float
+
+
+def _clip_line_to_poly(
+    origin: np.ndarray,
+    direction: np.ndarray,
+    poly: List[np.ndarray],
+) -> List[Tuple[float, float]]:
+    """Clip an infinite line (origin + t*direction) to the interior of a polygon.
+
+    Uses a robust edge-intersection + midpoint test approach that handles
+    both convex and non-convex polygons correctly.
+
+    Returns a list of (t_enter, t_exit) pairs sorted by t_enter.
+    """
+    return _clip_line_nonconvex(origin, direction, poly)
+
+
+def _clip_line_nonconvex(
+    origin: np.ndarray,
+    direction: np.ndarray,
+    poly: List[np.ndarray],
+) -> List[Tuple[float, float]]:
+    """Clip a line to a possibly non-convex polygon by collecting all edge intersections."""
+    n_poly = len(poly)
+    params: List[float] = []
+    for i in range(n_poly):
+        a = poly[i]
+        b = poly[(i + 1) % n_poly]
+        edge = b - a
+        d = direction
+        denom = d[0] * edge[1] - d[1] * edge[0]
+        if abs(denom) < 1e-14:
+            continue
+        dx = a[0] - origin[0]
+        dy = a[1] - origin[1]
+        t = (dx * edge[1] - dy * edge[0]) / denom
+        s = (dx * d[1] - dy * d[0]) / denom
+        if -1e-9 <= s <= 1.0 + 1e-9:
+            params.append(t)
+    params.sort()
+    # Pair up crossings; test midpoints
+    segments = []
+    for k in range(0, len(params) - 1, 2):
+        t0, t1 = params[k], params[k + 1]
+        mid = origin + 0.5 * (t0 + t1) * direction
+        if _point_in_poly(mid, poly):
+            segments.append((t0, t1))
+    return segments
+
+
+def hatch_region(
+    loop: "Loop",
+    pattern: str = "ansi31",
+    angle: float = 45.0,
+    scale: float = 1.0,
+    *,
+    plane: Optional["_Plane2D"] = None,
+) -> "HatchResult":
+    """Tile a hatch pattern inside a planar closed loop.
+
+    The function projects the loop into its 2-D plane, generates a grid of
+    infinite hatch lines, clips each line against the loop boundary, and
+    returns the clipped segments.
+
+    Parameters
+    ----------
+    loop :
+        Closed planar :class:`Loop` defining the fill boundary.  Must be the
+        outer (CCW) loop; inner holes are not automatically subtracted (use
+        a caller-side loop subtraction first).
+    pattern :
+        Hatch pattern name.  Supported built-in patterns: ``"ansi31"``
+        (default), ``"concrete"``, ``"brick"``, ``"earth"``, ``"wood"``,
+        ``"sand"``, ``"insulation"``, ``"steel"``, ``"glass"``.
+        Falls back to ``"ansi31"`` for unknown names.
+    angle :
+        Base hatch line angle in degrees (0 = horizontal, 90 = vertical,
+        45 = diagonal).
+    scale :
+        Hatch spacing in the units of the loop's coordinate system.  Larger
+        values give wider-spaced lines.  Must be > 0.
+    plane :
+        Optional pre-detected 2-D plane.  Derived automatically if ``None``.
+
+    Returns
+    -------
+    :class:`HatchResult`
+        ``result.lines`` is a list of :class:`HatchLine` objects (each is one
+        clipped segment inside the loop).  ``result.pattern`` holds the
+        resolved pattern key.
+    """
+    if scale <= 0:
+        raise ValueError(f"scale must be > 0, got {scale}")
+
+    # Resolve pattern
+    key = pattern.lower()
+    if key not in _PATTERNS:
+        key = "ansi31"
+    families = _PATTERNS[key]
+
+    # Detect plane
+    if plane is None:
+        plane = _detect_plane(loop)
+    if plane is None:
+        return HatchResult(lines=[], pattern=key, angle_deg=angle, scale=scale)
+
+    # Tessellate loop to 2-D polygon
+    poly_2d = _tessellate_loop(loop, plane)
+    if len(poly_2d) < 3:
+        return HatchResult(lines=[], pattern=key, angle_deg=angle, scale=scale)
+
+    # Bounding box in 2-D
+    poly_arr = np.array(poly_2d)
+    x_min, y_min = poly_arr[:, 0].min(), poly_arr[:, 1].min()
+    x_max, y_max = poly_arr[:, 0].max(), poly_arr[:, 1].max()
+    diag = float(np.hypot(x_max - x_min, y_max - y_min))
+
+    all_lines: List[HatchLine] = []
+
+    for (dx_stagger, dy_mult, angle_offset) in families:
+        line_angle = math.radians(angle + angle_offset)
+        cos_a = math.cos(line_angle)
+        sin_a = math.sin(line_angle)
+        direction = np.array([cos_a, sin_a])
+
+        # Perpendicular spacing vector
+        spacing = dy_mult * scale
+        perp = np.array([-sin_a, cos_a])  # 90° CCW from direction
+
+        # Centre of bounding box
+        cx = 0.5 * (x_min + x_max)
+        cy = 0.5 * (y_min + y_max)
+
+        # Project corners onto perp to find range
+        proj_vals = [float(np.dot(p, perp)) for p in poly_arr]
+        proj_min, proj_max = min(proj_vals), max(proj_vals)
+
+        # Number of hatch lines to cover the bounding region
+        n_lines = int(math.ceil((proj_max - proj_min) / spacing)) + 2
+
+        proj_start = proj_min - spacing
+
+        for k in range(n_lines + 1):
+            proj = proj_start + k * spacing
+            # Stagger: shift origin along direction for brick patterns
+            stagger = dx_stagger * scale * (k % 2)
+            # Line origin: point at (perp * proj) + direction * stagger
+            origin = np.array([cx, cy]) + (proj - np.dot(np.array([cx, cy]), perp)) * perp
+            origin_proj = float(np.dot(origin, perp))
+            # Correct origin to be exactly on the hatch line
+            origin = origin + (proj - origin_proj) * perp + stagger * direction
+
+            # Clip to polygon
+            segments = _clip_line_to_poly(origin, direction, poly_arr)
+            for (t0, t1) in segments:
+                if t1 - t0 < 1e-10:
+                    continue
+                p0_2d = origin + t0 * direction
+                p1_2d = origin + t1 * direction
+                all_lines.append(HatchLine(
+                    start=(float(p0_2d[0]), float(p0_2d[1])),
+                    end=(float(p1_2d[0]), float(p1_2d[1])),
+                ))
+
+    return HatchResult(lines=all_lines, pattern=key, angle_deg=angle, scale=scale)
+
+
+def material_hatch_pattern(material: str) -> str:
+    """Return the recommended hatch pattern key for a BIM material identifier.
+
+    Falls back to ``"ansi31"`` for unknown materials.
+    """
+    return _MATERIAL_PATTERN.get(material, "ansi31")

@@ -239,6 +239,11 @@ from kerf_cad_core.geom.region2d import (
     region_area,
     make_rect_loop,
     make_circle_loop,
+    # GK-P32: hatch fill
+    hatch_region,
+    HatchResult,
+    HatchLine,
+    material_hatch_pattern,
 )
 # GK-06/07: point inversion (closest-point on curve / surface)
 from kerf_cad_core.geom.inversion import (
@@ -545,6 +550,8 @@ __all__ = [
     # GK-56
     "region_union","region_intersection","region_difference",
     "region_area","make_rect_loop","make_circle_loop",
+    # GK-P32
+    "hatch_region","HatchResult","HatchLine","material_hatch_pattern",
     # GK-44
     "MatchResult","match_surface_edge","verify_seam_g1_analytic","verify_seam_g2_analytic",
     # GK-45

@@ -1787,3 +1787,148 @@ def to_subd_surface(
         return SubDSurface(mesh=result_mesh, cage=cage, levels=levels)
     except Exception:
         return SubDSurface(cage=cage, levels=levels)
+
+
+# ---------------------------------------------------------------------------
+# Public: retopo_snap — GK-P25
+# ---------------------------------------------------------------------------
+
+def retopo_snap(
+    source_mesh: Dict,
+    retopo_cage: SubDCage,
+) -> SubDCage:
+    """Project each vertex of *retopo_cage* onto the nearest point on
+    *source_mesh*, snapping the cage to the source surface.
+
+    This is the surface-snap retopo backend that allows a newly drawn cage
+    to conform tightly to a reference scan or high-res mesh.
+
+    Parameters
+    ----------
+    source_mesh : dict
+        Reference surface as ``{"vertices": list[list[float]],
+        "faces": list[list[int]]}`` (triangles or quads; quads are
+        triangulated internally).
+    retopo_cage : SubDCage
+        The cage whose vertices will be projected.
+
+    Returns
+    -------
+    SubDCage
+        New cage with every vertex moved to its closest point on
+        *source_mesh*.  Returns an unmodified copy if *source_mesh* has no
+        triangles.
+    """
+    try:
+        src_verts_raw = source_mesh.get("vertices", [])
+        src_faces_raw = source_mesh.get("faces", [])
+        if not src_verts_raw or not src_faces_raw:
+            return _copy_cage(retopo_cage)
+
+        src_verts = [list(map(float, v)) for v in src_verts_raw]
+        # Triangulate source faces
+        src_tris: List[List[int]] = []
+        for f in src_faces_raw:
+            if len(f) < 3:
+                continue
+            for k in range(1, len(f) - 1):
+                src_tris.append([int(f[0]), int(f[k]), int(f[k + 1])])
+
+        if not src_tris:
+            return _copy_cage(retopo_cage)
+
+        import numpy as np  # local import to avoid top-level overhead
+        sv = np.array(src_verts, dtype=float)  # (M, 3)
+        # Pre-build triangle arrays for vectorised closest-point search
+        A = sv[[t[0] for t in src_tris]]  # (T, 3)
+        B = sv[[t[1] for t in src_tris]]
+        C = sv[[t[2] for t in src_tris]]
+
+        new_verts: List[List[float]] = []
+        for v in retopo_cage.vertices:
+            p = np.array(v, dtype=float)
+            snapped = _closest_point_on_tri_set(p, A, B, C)
+            new_verts.append(snapped.tolist())
+
+        result = _copy_cage(retopo_cage)
+        result.vertices = new_verts
+        return result
+    except Exception:
+        return _copy_cage(retopo_cage)
+
+
+def _closest_point_on_tri_set(
+    p: "np.ndarray",
+    A: "np.ndarray",
+    B: "np.ndarray",
+    C: "np.ndarray",
+) -> "np.ndarray":
+    """Return the closest point on any triangle in the set (A[i], B[i], C[i]).
+
+    Uses the Ericson 2005 barycentric closest-point formula, vectorised over
+    all triangles, then picks the nearest.
+
+    Parameters
+    ----------
+    p : (3,) array
+    A, B, C : (T, 3) arrays of triangle corners
+
+    Returns
+    -------
+    (3,) array — closest surface point
+    """
+    import numpy as np
+
+    AB = B - A          # (T, 3)
+    AC = C - A
+    AP = p - A          # broadcast (T, 3)
+
+    d1 = (AB * AP).sum(axis=1)   # dot(AB, AP)
+    d2 = (AC * AP).sum(axis=1)
+    # Region 0 (vertex A)?
+    in_v0 = (d1 <= 0.0) & (d2 <= 0.0)
+
+    BP = p - B
+    d3 = (AB * BP).sum(axis=1)
+    d4 = (AC * BP).sum(axis=1)
+    in_v1 = (d3 >= 0.0) & (d4 <= d3)
+
+    CP = p - C
+    d5 = (AB * CP).sum(axis=1)
+    d6 = (AC * CP).sum(axis=1)
+    in_v2 = (d6 >= 0.0) & (d5 <= d6)
+
+    vc = d1 * d4 - d3 * d2
+    in_e01 = (vc <= 0.0) & (d1 >= 0.0) & (d3 <= 0.0)
+    t_e01 = d1 / (d1 - d3 + 1e-20)
+
+    vb = d5 * d2 - d1 * d6
+    in_e02 = (vb <= 0.0) & (d2 >= 0.0) & (d6 <= 0.0)
+    t_e02 = d2 / (d2 - d6 + 1e-20)
+
+    va = d3 * d6 - d5 * d4
+    in_e12 = (va <= 0.0) & ((d4 - d3) >= 0.0) & ((d5 - d6) >= 0.0)
+    t_e12 = (d4 - d3) / ((d4 - d3) + (d5 - d6) + 1e-20)
+
+    denom = 1.0 / (va + vb + vc + 1e-20)
+
+    T = len(A)
+    proj = np.empty((T, 3), dtype=float)
+
+    # Face interior (fallback)
+    s = vb * denom
+    t_ = vc * denom
+    proj[:] = A + s[:, None] * AB + t_[:, None] * AC
+
+    # Override with edge / vertex projections where appropriate
+    proj = np.where(in_v0[:, None], A, proj)
+    proj = np.where(in_v1[:, None], B, proj)
+    proj = np.where(in_v2[:, None], C, proj)
+    proj = np.where(in_e01[:, None], A + t_e01[:, None] * AB, proj)
+    proj = np.where(in_e02[:, None], A + t_e02[:, None] * AC, proj)
+    proj = np.where(in_e12[:, None], B + t_e12[:, None] * (C - B), proj)
+
+    # Pick triangle with smallest distance
+    dists = np.sum((proj - p) ** 2, axis=1)
+    best = int(np.argmin(dists))
+    return proj[best]

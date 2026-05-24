@@ -707,6 +707,175 @@ def _make_sphere_mesh(radius: float = 1.0, subdivisions: int = 2) -> Make2DInput
 
 
 # ---------------------------------------------------------------------------
+# B-rep → Make2DInput auto-tessellator (GK-P28)
+# ---------------------------------------------------------------------------
+
+
+def brep_to_make2d_input(body, *, linear_deflection: float = 1e-2) -> "Make2DInput":
+    """Auto-tessellate a B-rep ``Body`` into a :class:`Make2DInput`.
+
+    This bridges the B-rep kernel to the Make2D pipeline without requiring
+    the caller to supply a pre-computed mesh (the ``part["mesh"]`` pattern).
+    The function first attempts OCCT ``BRepMesh_IncrementalMesh`` via
+    ``kerf_cad_core.geom.brep_build``; if OCCT is not available it falls back
+    to a pure-Python linear tessellator of the B-rep faces.
+
+    Parameters
+    ----------
+    body :
+        A :class:`kerf_cad_core.geom.brep.Body` instance (or any object
+        with a ``solids`` attribute whose shells contain ``Face`` objects).
+    linear_deflection :
+        Chord-height tolerance for the tessellation (world units, default
+        ``0.01``).  Smaller values produce finer meshes.
+
+    Returns
+    -------
+    :class:`Make2DInput`
+        Ready for :func:`make2d`.
+
+    Raises
+    ------
+    ValueError
+        If *body* has no faces or the tessellation produces no triangles.
+    """
+    # Collect all faces from the body
+    all_faces = []
+    if hasattr(body, "solids"):
+        for solid in body.solids:
+            for shell in solid.shells:
+                all_faces.extend(shell.faces)
+    if hasattr(body, "shells"):
+        for shell in body.shells:
+            all_faces.extend(shell.faces)
+
+    if not all_faces:
+        raise ValueError("brep_to_make2d_input: body has no faces")
+
+    # Try OCCT path first
+    try:
+        from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh  # type: ignore
+        from OCC.Core.BRep import BRep_Builder  # type: ignore
+        from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeSolid  # type: ignore
+        from OCC.Core.TopAbs import TopAbs_FACE  # type: ignore
+        from OCC.Core.TopExp import TopExp_Explorer  # type: ignore
+        from OCC.Core.BRep import BRep_Tool  # type: ignore
+        from OCC.Core.TopLoc import TopLoc_Location  # type: ignore
+
+        if hasattr(body, "_occ_shape"):
+            shape = body._occ_shape
+            mesh = BRepMesh_IncrementalMesh(shape, linear_deflection, False, 0.5)
+            mesh.Perform()
+            verts_list = []
+            tris_list = []
+            v_offset = 0
+            exp = TopExp_Explorer(shape, TopAbs_FACE)
+            while exp.More():
+                face = exp.Current()
+                loc = TopLoc_Location()
+                trsf = BRep_Tool.Triangulation_s(face, loc)
+                if trsf is None:
+                    exp.Next()
+                    continue
+                n_nodes = trsf.NbNodes()
+                for i in range(1, n_nodes + 1):
+                    node = trsf.Node(i)
+                    verts_list.append([node.X(), node.Y(), node.Z()])
+                n_tris = trsf.NbTriangles()
+                for i in range(1, n_tris + 1):
+                    tri = trsf.Triangle(i)
+                    a, b, c = tri.Get()
+                    tris_list.append([v_offset + a - 1, v_offset + b - 1, v_offset + c - 1])
+                v_offset += n_nodes
+                exp.Next()
+            if verts_list and tris_list:
+                return Make2DInput(
+                    vertices=np.array(verts_list, dtype=float),
+                    triangles=np.array(tris_list, dtype=int),
+                )
+    except (ImportError, AttributeError):
+        pass
+
+    # Pure-Python fallback: tessellate each face using its loop edges.
+    # For planar triangular faces (the common case from box / toposolid):
+    # directly use the triangle vertices from each coedge loop.
+    vertices: List[np.ndarray] = []
+    triangles: List[List[int]] = []
+
+    def _face_verts(face) -> List[np.ndarray]:
+        """Return the 3D corner points of the first (outer) loop."""
+        pts = []
+        if not face.loops:
+            return pts
+        for ce in face.loops[0].coedges:
+            e = ce.edge
+            curve = e.curve
+            t0, t1 = (e.t0, e.t1) if ce.orientation else (e.t1, e.t0)
+            p = np.asarray(curve.evaluate(t0), dtype=float)
+            pts.append(p)
+        return pts
+
+    def _fan_triangulate(pts: List[np.ndarray], base_idx: int) -> List[List[int]]:
+        """Fan triangulation from first vertex."""
+        tris = []
+        n = len(pts)
+        for i in range(1, n - 1):
+            tris.append([base_idx, base_idx + i, base_idx + i + 1])
+        return tris
+
+    for face in all_faces:
+        pts = _face_verts(face)
+        if len(pts) < 3:
+            continue
+        base = len(vertices)
+        vertices.extend(pts)
+        triangles.extend(_fan_triangulate(pts, base))
+
+    if not vertices or not triangles:
+        raise ValueError("brep_to_make2d_input: tessellation produced no geometry")
+
+    return Make2DInput(
+        vertices=np.array([v.tolist() for v in vertices], dtype=float),
+        triangles=np.array(triangles, dtype=int),
+    )
+
+
+def make2d_from_brep(
+    body,
+    view: Optional["ViewParams"] = None,
+    *,
+    linear_deflection: float = 1e-2,
+    scale: float = 1.0,
+    subdivisions: int = _SUBDIVISIONS_DEFAULT,
+) -> "Make2DResult":
+    """Hidden-line drawing from a B-rep ``Body`` without a pre-supplied mesh.
+
+    Convenience wrapper: auto-tessellates the body via :func:`brep_to_make2d_input`
+    then calls :func:`make2d`.
+
+    Parameters
+    ----------
+    body :
+        B-rep :class:`kerf_cad_core.geom.brep.Body`.
+    view :
+        Camera parameters.  Defaults to isometric view if ``None``.
+    linear_deflection :
+        Tessellation chord-height tolerance.
+    scale :
+        Output scale factor.
+
+    Returns
+    -------
+    :class:`Make2DResult`
+    """
+    mesh_input = brep_to_make2d_input(body, linear_deflection=linear_deflection)
+    if view is None:
+        views = standard_views()
+        view = views["iso"]
+    return make2d(mesh_input, view, scale=scale, subdivisions=subdivisions)
+
+
+# ---------------------------------------------------------------------------
 # LLM tool registration
 # ---------------------------------------------------------------------------
 

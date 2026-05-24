@@ -298,3 +298,16 @@ create table if not exists rate_limit_buckets (
 );
 create index if not exists rate_limit_buckets_window_idx
     on rate_limit_buckets(window_start);
+
+-- ════════════ billing_scheduler_state (T-402 R3) ════════════
+-- Single-row idempotency guard for the StorageBillingWorker.  The worker
+-- checks last_storage_debit_month before calling monthly_storage_debit() and
+-- only proceeds when the current YYYY-MM differs from the stored value.
+-- After a successful sweep, last_storage_debit_month is updated to the
+-- current YYYY-MM, making every subsequent tick within that month a no-op.
+-- id=1 is the sentinel singleton row; INSERT ... ON CONFLICT DO NOTHING
+-- ensures the row exists before the first UPDATE check.
+create table if not exists billing_scheduler_state (
+    id                        integer primary key default 1 check (id = 1),
+    last_storage_debit_month  text not null default ''
+);

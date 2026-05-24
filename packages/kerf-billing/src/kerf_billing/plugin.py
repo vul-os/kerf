@@ -141,6 +141,22 @@ async def register(app: FastAPI, ctx) -> PluginManifest:
                 "kerf-billing: failed to register BillingResetWorker: %s", exc
             )
 
+        # ── StorageBillingWorker — monthly storage debit (T-402 R3).
+        # Calls monthly_storage_debit() once per calendar month; idempotent
+        # guard in billing_scheduler_state prevents double-billing.
+        try:
+            from kerf_billing.scheduler import StorageBillingWorker
+
+            async def _storage_factory():
+                return StorageBillingWorker(pool=ctx.pool)
+
+            workers_registry.register("storage_billing", _storage_factory)
+            ctx.logger.info("kerf-billing: StorageBillingWorker registered")
+        except Exception as exc:
+            ctx.logger.warning(
+                "kerf-billing: failed to register StorageBillingWorker: %s", exc
+            )
+
         # ── BlobGCWorker — storage GC sweep (T-136).
         # Dry-run by default; physical deletes require BLOB_GC_DRY_RUN=false
         # AND a GitReachabilityOracle wired in.

@@ -673,3 +673,166 @@ def test_regression_surface_eval_parity_random_bspline():
             assert np.allclose(surface_evaluate(s, u, v),
                                _nurbs_surface_eval(s, u, v),
                                atol=1e-12, rtol=0)
+
+
+# ===========================================================================
+# sketch_to_nurbs_curve — arc branch (was stub, now exact rational NURBS)
+# ===========================================================================
+
+from kerf_cad_core.surfacing import sketch_to_nurbs_curve
+
+
+class TestSketchToNurbsCurveArcBranch:
+    """Validate that the arc branch of sketch_to_nurbs_curve produces
+    an exact rational NURBS whose sampled points lie on the analytic
+    circle to machine precision."""
+
+    # --- helper ---
+    @staticmethod
+    def _check_on_circle(curve, center, radius, n_samples=200, tol=1e-12):
+        """Assert every sample is at distance `radius` from `center`."""
+        center = np.asarray(center, dtype=float)
+        u_start = float(curve.knots[curve.degree])
+        u_end = float(curve.knots[-curve.degree - 1])
+        for u in np.linspace(u_start, u_end, n_samples):
+            pt = curve.evaluate(u)
+            dist = np.linalg.norm(pt[:2] - center[:2])
+            assert abs(dist - radius) < tol, (
+                f"u={u:.4f}: distance {dist:.15g} != radius {radius:.15g}"
+            )
+
+    def test_arc_form_a_quarter_circle_on_circle_1e12(self):
+        """Form-A arc (center/start/end as lists): quarter circle radius 1,
+        all sampled points within 1e-12 of the analytic circle."""
+        import math
+        entity = {
+            "type": "arc",
+            "center": [0.0, 0.0, 0.0],
+            "start":  [1.0, 0.0, 0.0],
+            "end":    [0.0, 1.0, 0.0],
+            "radius": 1.0,
+            "sweep_ccw": True,
+        }
+        curve = sketch_to_nurbs_curve(entity)
+        assert curve is not None, "arc branch returned None"
+        assert curve.degree == 2, "arc should be degree-2 rational"
+        assert curve.is_rational, "arc NURBS must be rational"
+        self._check_on_circle(curve, [0.0, 0.0, 0.0], 1.0, tol=1e-12)
+
+    def test_arc_form_a_three_quarter_circle_on_circle_1e12(self):
+        """270-degree arc: split into 3 rational-quadratic segments."""
+        import math
+        # start at angle 0, end at 270 deg (3π/2) CCW
+        a_end = 3.0 * math.pi / 2.0
+        entity = {
+            "type": "arc",
+            "center": [0.0, 0.0, 0.0],
+            "start":  [1.0, 0.0, 0.0],
+            "end":    [math.cos(a_end), math.sin(a_end), 0.0],
+            "radius": 2.0,
+            "sweep_ccw": True,
+        }
+        curve = sketch_to_nurbs_curve(entity)
+        assert curve is not None
+        assert curve.num_control_points == 7  # 3 segments → 2*3+1 = 7 cps
+        self._check_on_circle(curve, [0.0, 0.0, 0.0], 2.0, tol=1e-11)
+
+    def test_arc_form_a_endpoint_match(self):
+        """Start and end points of the NURBS must match the requested geometry."""
+        import math
+        R = 3.0
+        a0, a1 = math.pi / 6, math.pi * 5 / 6  # 30 -> 150 degrees
+        sx, sy = R * math.cos(a0), R * math.sin(a0)
+        ex, ey = R * math.cos(a1), R * math.sin(a1)
+        entity = {
+            "type": "arc",
+            "center": [0.0, 0.0, 0.0],
+            "start":  [sx, sy, 0.0],
+            "end":    [ex, ey, 0.0],
+            "radius": R,
+            "sweep_ccw": True,
+        }
+        curve = sketch_to_nurbs_curve(entity)
+        assert curve is not None
+        u_s = float(curve.knots[curve.degree])
+        u_e = float(curve.knots[-curve.degree - 1])
+        p_start = curve.evaluate(u_s)
+        p_end = curve.evaluate(u_e)
+        assert abs(np.linalg.norm(p_start[:2] - np.array([sx, sy]))) < 1e-12
+        assert abs(np.linalg.norm(p_end[:2] - np.array([ex, ey]))) < 1e-12
+
+    def test_arc_form_b_explicit_angles_quarter_circle(self):
+        """Form-B arc (start_angle / end_angle fields): same result as Form A."""
+        import math
+        entity = {
+            "type": "arc",
+            "center": [0.0, 0.0, 0.0],
+            "radius": 1.0,
+            "start_angle": 0.0,
+            "end_angle": math.pi / 2,
+        }
+        curve = sketch_to_nurbs_curve(entity)
+        assert curve is not None
+        assert curve.is_rational
+        self._check_on_circle(curve, [0.0, 0.0, 0.0], 1.0, tol=1e-12)
+
+    def test_arc_form_b_cx_cy_gcode_style(self):
+        """GCode-style arc with cx/cy scalar fields and a_start_rad/a_end_rad."""
+        import math
+        entity = {
+            "type": "arc",
+            "cx": 1.0,
+            "cy": 2.0,
+            "radius": 0.5,
+            "a_start_rad": 0.0,
+            "a_end_rad": math.pi / 2,
+        }
+        curve = sketch_to_nurbs_curve(entity)
+        assert curve is not None
+        self._check_on_circle(curve, [1.0, 2.0], 0.5, tol=1e-12)
+
+    def test_arc_native_sketch_id_ref_returns_none(self):
+        """Sketch-native arc (center/start/end as string IDs) must return None —
+        cannot resolve without the sketch points map."""
+        entity = {
+            "type": "arc",
+            "center": "pt-1",
+            "start": "pt-2",
+            "end": "pt-3",
+            "radius": 5.0,
+        }
+        result = sketch_to_nurbs_curve(entity)
+        assert result is None
+
+    def test_arc_weight_rationality_quarter_circle(self):
+        """The middle control-point weight for a 90-degree arc must equal
+        cos(45°) = √2/2 ≈ 0.7071, the canonical rational NURBS value."""
+        import math
+        entity = {
+            "type": "arc",
+            "center": [0.0, 0.0, 0.0],
+            "start":  [1.0, 0.0, 0.0],
+            "end":    [0.0, 1.0, 0.0],
+            "radius": 1.0,
+            "sweep_ccw": True,
+        }
+        curve = sketch_to_nurbs_curve(entity)
+        assert curve is not None and curve.weights is not None
+        # For a single 90-deg segment: weights = [1, cos(45°), 1]
+        w_mid = float(curve.weights[1])
+        assert abs(w_mid - math.cos(math.pi / 4)) < 1e-14
+
+    def test_arc_cw_sweep_on_circle(self):
+        """Clockwise arc (sweep_ccw=False) also lies on the circle."""
+        import math
+        entity = {
+            "type": "arc",
+            "center": [0.0, 0.0, 0.0],
+            "start":  [0.0, 1.0, 0.0],   # 90 deg
+            "end":    [1.0, 0.0, 0.0],   # 0 deg → goes CW from 90 to 0
+            "radius": 1.0,
+            "sweep_ccw": False,
+        }
+        curve = sketch_to_nurbs_curve(entity)
+        assert curve is not None
+        self._check_on_circle(curve, [0.0, 0.0, 0.0], 1.0, tol=1e-12)

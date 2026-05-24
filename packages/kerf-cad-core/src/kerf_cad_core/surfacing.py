@@ -945,8 +945,9 @@ def parse_sketch_curves(sketch_content: str) -> list:
 
 
 def sketch_to_nurbs_curve(entity: dict) -> Optional["NurbsCurve"]:
-    from kerf_cad_core.geom.nurbs import NurbsCurve, make_line_nurbs, make_circle_nurbs
+    from kerf_cad_core.geom.nurbs import NurbsCurve, make_line_nurbs, make_circle_nurbs, make_arc_nurbs
     import numpy as np
+    import math
 
     etype = entity.get("type", "")
     if etype == "line":
@@ -958,7 +959,86 @@ def sketch_to_nurbs_curve(entity: dict) -> Optional["NurbsCurve"]:
         radius = entity.get("radius", 1.0)
         return make_circle_nurbs(center, radius)
     elif etype == "arc":
-        pass
+        # ----------------------------------------------------------------
+        # Exact rational quadratic arc via make_arc_nurbs (GK-04).
+        #
+        # Arc entities arrive in two forms depending on the call site:
+        #
+        #   Form A — "resolved" (from geom/curve_toolkit interpolate_arc_chain):
+        #       center: [cx, cy, cz]  (list/tuple)
+        #       start:  [sx, sy, sz]
+        #       end:    [ex, ey, ez]
+        #       radius: float
+        #       sweep_ccw: bool  (optional, default True)
+        #
+        #   Form B — "angle" (e.g. GCode post or explicit angle fields):
+        #       cx, cy, cz   (or center as list)
+        #       radius: float
+        #       start_angle / a_start_rad: float  (radians)
+        #       end_angle   / a_end_rad:   float  (radians)
+        #       sweep_ccw: bool  (optional, default True)
+        #
+        # Native sketch-file arcs reference points by ID string and cannot be
+        # resolved here without the full sketch; they fall through to None.
+        # ----------------------------------------------------------------
+        radius = float(entity.get("radius", 0.0))
+
+        # --- Decode center ---
+        raw_center = entity.get("center")
+        cx_scalar = entity.get("cx")
+        cy_scalar = entity.get("cy")
+        cz_scalar = entity.get("cz", 0.0)
+
+        if isinstance(raw_center, (list, tuple)) and len(raw_center) >= 2:
+            center = np.array([float(raw_center[0]), float(raw_center[1]),
+                               float(raw_center[2]) if len(raw_center) > 2 else 0.0])
+        elif cx_scalar is not None and cy_scalar is not None:
+            center = np.array([float(cx_scalar), float(cy_scalar), float(cz_scalar)])
+        else:
+            # center is a string point ID — cannot resolve without sketch context
+            return None
+
+        if radius <= 0.0:
+            return None
+
+        # --- Try Form B first (explicit angle fields) ---
+        a_start = entity.get("start_angle", entity.get("a_start_rad"))
+        a_end = entity.get("end_angle", entity.get("a_end_rad"))
+
+        if a_start is not None and a_end is not None:
+            a_start = float(a_start)
+            a_end = float(a_end)
+            sweep_ccw = entity.get("sweep_ccw", True)
+            if not sweep_ccw and a_end > a_start:
+                a_end -= 2.0 * math.pi
+            elif sweep_ccw and a_end < a_start:
+                a_end += 2.0 * math.pi
+            return make_arc_nurbs(center, radius, a_start, a_end)
+
+        # --- Form A: derive angles from start/end coordinate vectors ---
+        raw_start = entity.get("start")
+        raw_end = entity.get("end")
+        if (isinstance(raw_start, (list, tuple)) and len(raw_start) >= 2
+                and isinstance(raw_end, (list, tuple)) and len(raw_end) >= 2):
+            sx, sy = float(raw_start[0]) - center[0], float(raw_start[1]) - center[1]
+            ex, ey = float(raw_end[0]) - center[0], float(raw_end[1]) - center[1]
+            a_start = math.atan2(sy, sx)
+            a_end = math.atan2(ey, ex)
+            sweep_ccw = entity.get("sweep_ccw", True)
+            # Normalise so the arc sweeps in the right direction.
+            if sweep_ccw:
+                if a_end <= a_start:
+                    a_end += 2.0 * math.pi
+            else:
+                if a_end >= a_start:
+                    a_end -= 2.0 * math.pi
+            # Guard against degenerate (zero-sweep) arcs.
+            if abs(a_end - a_start) < 1e-12:
+                return None
+            return make_arc_nurbs(center, radius, a_start, a_end)
+
+        # start/end are string point IDs — cannot resolve without sketch context
+        return None
     return None
 
 

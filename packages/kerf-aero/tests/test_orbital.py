@@ -297,3 +297,88 @@ class TestAnomalyConversions:
         assert abs(nu_recovered - nu % (2 * math.pi)) < 1e-12, (
             f"ν={nu_deg}° e={e}: round-trip error"
         )
+
+
+# ---------------------------------------------------------------------------
+# 6. Multi-revolution Lambert (Izzo / Lancaster-Blanchard)
+# ---------------------------------------------------------------------------
+
+class TestMultiRevLambert:
+    """Multi-revolution Lambert: propagate-and-check round-trip.
+
+    Method: set up a slightly eccentric LEO (a=7000 km, e=0.05, i=28.5°),
+    pick r1 at periapsis.  Propagate to r2 using the true Kepler orbit for
+    a TOF that spans N + fraction revolutions.  Solve Lambert(r1, r2, TOF,
+    revs=N, branch=B) and verify that propagating r1 + v1_lambert for TOF
+    recovers r2 within tolerance.
+
+    propagate_kepler accumulates ~0.01–0.05 km Kepler solver error over
+    multi-thousand-second propagations, so tolerance is 0.5 km.
+    """
+
+    # Reference orbit
+    A_KM = 7000.0
+    E_ECC = 0.05
+    I_RAD = math.radians(28.5)
+
+    def _reference_orbit(self):
+        """Return (r1, v1_true, T) for the reference orbit."""
+        elems = KeplerianElements(
+            a=self.A_KM, e=self.E_ECC, i=self.I_RAD,
+            raan=0.0, argp=0.0, nu=0.0,
+        )
+        r1, v1 = elements_to_state(elems)
+        T = orbital_period(self.A_KM, MU_EARTH)
+        return r1, v1, T
+
+    @pytest.mark.parametrize("branch", ["left", "right"])
+    def test_n1_both_branches(self, branch):
+        """N=1: both left and right branches propagate back to r2 within 0.5 km."""
+        r1, v1_true, T = self._reference_orbit()
+        tof = 1.3 * T  # 1.3 orbits > minimum for N=1
+        r2, _ = propagate_kepler(r1, v1_true, tof)
+
+        v1_sol, _ = lambert_izzo(r1, r2, tof, MU_EARTH, prograde=True, revs=1, branch=branch)
+        r2_prop, _ = propagate_kepler(r1, v1_sol, tof)
+
+        err = np.linalg.norm(r2_prop - r2)
+        assert err < 0.5, (
+            f"N=1 {branch}: propagation error {err:.4f} km > 0.5 km"
+        )
+
+    @pytest.mark.parametrize("branch", ["left", "right"])
+    def test_n2_both_branches(self, branch):
+        """N=2: both branches recover r2 within 0.5 km."""
+        r1, v1_true, T = self._reference_orbit()
+        tof = 2.3 * T  # 2.3 orbits > minimum for N=2
+        r2, _ = propagate_kepler(r1, v1_true, tof)
+
+        v1_sol, _ = lambert_izzo(r1, r2, tof, MU_EARTH, prograde=True, revs=2, branch=branch)
+        r2_prop, _ = propagate_kepler(r1, v1_sol, tof)
+
+        err = np.linalg.norm(r2_prop - r2)
+        assert err < 0.5, (
+            f"N=2 {branch}: propagation error {err:.4f} km > 0.5 km"
+        )
+
+    def test_tof_below_minimum_raises(self):
+        """TOF shorter than the N=1 minimum must raise RuntimeError."""
+        r1, v1_true, T = self._reference_orbit()
+        # TOF = 0.3*T is well below any N=1 minimum (which needs > T)
+        r2, _ = propagate_kepler(r1, v1_true, 0.3 * T)
+        with pytest.raises(RuntimeError, match="below the minimum"):
+            lambert_izzo(r1, r2, 0.3 * T, MU_EARTH, prograde=True, revs=1)
+
+    def test_n1_left_right_differ(self):
+        """Left and right branches for N=1 must produce different velocities."""
+        r1, v1_true, T = self._reference_orbit()
+        tof = 1.3 * T
+        r2, _ = propagate_kepler(r1, v1_true, tof)
+
+        v1_left, _ = lambert_izzo(r1, r2, tof, MU_EARTH, prograde=True, revs=1, branch="left")
+        v1_right, _ = lambert_izzo(r1, r2, tof, MU_EARTH, prograde=True, revs=1, branch="right")
+
+        delta_v = np.linalg.norm(v1_left - v1_right)
+        assert delta_v > 0.01, (
+            f"N=1 left and right branches are suspiciously similar (Δv = {delta_v:.4f} km/s)"
+        )

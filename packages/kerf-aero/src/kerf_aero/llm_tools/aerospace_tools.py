@@ -921,10 +921,15 @@ def aero_lambert_solve(
     tof: float,
     mu: float | None = None,
     prograde: bool = True,
+    revs: int = 0,
+    branch: str = "left",
 ) -> dict:
     """
     Solve Lambert's problem: find the velocity vectors connecting two position
     vectors r1 and r2 in a given time-of-flight.
+
+    Supports both single-revolution (revs=0, default) and multi-revolution
+    (revs>=1) transfers.  Multi-revolution uses Izzo's 2010 algorithm.
 
     Input schema
     ------------
@@ -933,15 +938,20 @@ def aero_lambert_solve(
     tof      : float — time of flight [s] (> 0)
     mu       : float | None — gravitational parameter [km³/s²]; default Earth
     prograde : bool — if True, assume prograde transfer (default True)
+    revs     : int — number of complete revolutions (0 = single-rev, default 0)
+    branch   : str — multi-rev branch: "left" (lower-energy) or "right"
+                     (higher-energy); ignored for revs=0 (default "left")
 
     Returns
     -------
     dict:
-        v1_km_s : [vx, vy, vz] — departure velocity [km/s]
-        v2_km_s : [vx, vy, vz] — arrival velocity [km/s]
-        dv1_km_s: float — |v1| magnitude [km/s]
-        dv2_km_s: float — |v2| magnitude [km/s]
-        tof_s   : float — time of flight used [s]
+        v1_km_s  : [vx, vy, vz] — departure velocity [km/s]
+        v2_km_s  : [vx, vy, vz] — arrival velocity [km/s]
+        dv1_km_s : float — |v1| magnitude [km/s]
+        dv2_km_s : float — |v2| magnitude [km/s]
+        tof_s    : float — time of flight used [s]
+        revs     : int   — number of complete revolutions
+        branch   : str   — branch selected (multi-rev only)
 
     Example output
     --------------
@@ -951,12 +961,15 @@ def aero_lambert_solve(
       "v2_km_s": [-4.562, 1.234, 3.211],
       "dv1_km_s": 6.489,
       "dv2_km_s": 5.634,
-      "tof_s": 3600.0
+      "tof_s": 3600.0,
+      "revs": 0,
+      "branch": ""
     }
 
     Raises
     ------
-    ValueError: if r1/r2 are not length-3, tof <= 0, or positions are collinear.
+    ValueError: if r1/r2 are not length-3, tof <= 0, positions are collinear,
+                or TOF is below the minimum for multi-rev.
     """
     if not _LAMBERT_OK or not _NP_OK:
         raise ImportError("kerf_aero.orbital.lambert or numpy not available")
@@ -969,14 +982,23 @@ def aero_lambert_solve(
         raise ValueError(f"r2 must be a length-3 vector, got length {len(r2)}")
     if tof <= 0:
         raise ValueError(f"tof must be > 0 s, got {tof}")
+    if revs < 0:
+        raise ValueError(f"revs must be >= 0, got {revs}")
+    if branch not in ("left", "right", ""):
+        raise ValueError(f"branch must be 'left' or 'right', got {branch!r}")
 
     _mu = mu if mu is not None else MU_EARTH
 
     r1_arr = np.array([float(x) for x in r1])
     r2_arr = np.array([float(x) for x in r2])
 
+    _branch = branch if branch else "left"
+
     try:
-        v1, v2 = lambert_izzo(r1_arr, r2_arr, float(tof), mu=_mu, prograde=prograde)
+        v1, v2 = lambert_izzo(
+            r1_arr, r2_arr, float(tof), mu=_mu,
+            prograde=prograde, revs=int(revs), branch=_branch,
+        )
     except (ValueError, RuntimeError) as exc:
         raise ValueError(str(exc)) from exc
     except Exception as exc:
@@ -990,6 +1012,8 @@ def aero_lambert_solve(
         "dv2_km_s": round(float(np.linalg.norm(v2)), 6),
         "tof_s": float(tof),
         "prograde": prograde,
+        "revs": int(revs),
+        "branch": branch if revs > 0 else "",
     }
 
 

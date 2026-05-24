@@ -11,7 +11,7 @@
  * Palette: ink-* / kerf-* / cyan-edge from src/index.css. No raster assets.
  */
 import { Link } from 'react-router-dom'
-import { ArrowRight, Github, Scissors, Layers, Activity } from 'lucide-react'
+import { ArrowRight, Github, Scissors, Layers, Activity, ExternalLink } from 'lucide-react'
 import Header from '../../components/Header.jsx'
 import Footer from '../../components/Footer.jsx'
 import Button from '../../components/Button.jsx'
@@ -301,6 +301,31 @@ function InterchangeCallout() {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Compare strip                                                               */
+/* -------------------------------------------------------------------------- */
+
+function CompareStrip() {
+  return (
+    <section className="relative border-t border-ink-900">
+      <div className="mx-auto max-w-7xl px-6 py-6">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-500 mr-2">
+            Deep-dive comparison
+          </span>
+          <Link
+            to="/compare/clo3d"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-ink-800 bg-ink-900/40 px-3 py-1.5 text-xs font-mono text-ink-300 hover:border-ink-700 hover:text-ink-100 transition-colors"
+          >
+            Kerf vs CLO3D
+            <ExternalLink size={11} />
+          </Link>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
 /* CTA strip                                                                   */
 /* -------------------------------------------------------------------------- */
 
@@ -361,6 +386,7 @@ export default function Textiles() {
       <FileTypesStrip />
       <PromptExample />
       <InterchangeCallout />
+      <CompareStrip />
       <CTAStrip />
       <Footer />
     </div>

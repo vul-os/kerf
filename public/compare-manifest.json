@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-05-24T13:51:07.664Z",
+  "generatedAt": "2026-05-24T20:13:47.426Z",
   "items": [
     {
       "slug": "revit",
@@ -8282,6 +8282,473 @@
       ]
     },
     {
+      "slug": "3shape",
+      "competitor": "3Shape Dental System",
+      "category": "cad-mechanical",
+      "left": "kerf",
+      "right": "3shape",
+      "hero_tagline": "The dental lab CAD platform — versus an open-core CAD with DICOM ingest, surgical guide generation, and multi-domain engineering.",
+      "reviewed_at": "2026-05-24",
+      "features": [
+        {
+          "domain": "D13",
+          "feature": "Dental (crown/surgical guide/DICOM)",
+          "competitor": {
+            "status": "yes",
+            "note": "AI-powered crown, bridge, implant, denture, RPD, aligner, splint design; 3Shape Automate AI proposals in 90s",
+            "source": "https://www.3shape.com/en/software/dental-system"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "Crown design (placeholder cylinder), surgical guide, DICOM ingest (backend); crown is placeholder",
+            "evidence": "packages/kerf-dental/src/kerf_dental/crown.py"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Crown and bridge design",
+          "competitor": {
+            "status": "yes",
+            "note": "Parametric crown/bridge with AI design proposal; virtual articulator; screw-retained and standard crowns",
+            "source": "https://www.3shape.com/en/software/dental-system"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "Crown geometry tool (backend); crown is a placeholder cylinder not a full restoration design tool",
+            "evidence": "packages/kerf-dental/src/kerf_dental/crown.py"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Implant planning",
+          "competitor": {
+            "status": "yes",
+            "note": "Full implant planning with 100+ implant libraries; implant bar and bridge; abutment design",
+            "source": "https://www.3shape.com/en/software/dental-system"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "Implant guide geometry (backend); no implant library integration",
+            "evidence": "packages/kerf-dental/src/kerf_dental/guide.py"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Surgical guide design",
+          "competitor": {
+            "status": "yes",
+            "note": "Guided surgery workflow with TRIOS integration; ToothDesigner and surgical guide output",
+            "source": "https://www.3shape.com/en/software/dental-system"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "Surgical guide generation backend; wired but not UI-facing",
+            "evidence": "packages/kerf-dental/src/kerf_dental/guide.py"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "DICOM / CBCT ingest",
+          "competitor": {
+            "status": "yes",
+            "note": "3Shape integrates CBCT/DICOM data for implant and surgical planning workflows",
+            "source": "https://www.3shape.com/en/software/dental-system"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "DICOM ingest module for CBCT processing (backend)",
+            "evidence": "packages/kerf-dental/src/kerf_dental/dicom_ingest.py"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Removable partial denture (RPD) / full denture",
+          "competitor": {
+            "status": "yes",
+            "note": "Full and partial denture design; denture on implants; Splint Studio for occlusal devices",
+            "source": "https://www.3shape.com/en/software/dental-system"
+          },
+          "kerf": {
+            "status": "no",
+            "note": "No removable denture design",
+            "evidence": ""
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "AI-powered design automation",
+          "competitor": {
+            "status": "yes",
+            "note": "3Shape Automate: AI design proposals for crowns, onlays, inlays, nightguards in ~90 seconds",
+            "source": "https://www.3shape.com/en/software/dental-system"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "LLM-routed dental tool calls; no pre-trained dental restoration AI model",
+            "evidence": "src/components/ChatPanel.jsx"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Intraoral scanner integration",
+          "competitor": {
+            "status": "yes",
+            "note": "Native TRIOS intraoral scanner + third-party IOS format support; open STL/PLY export",
+            "source": "https://www.3shape.com/en/software/trios-design-studio"
+          },
+          "kerf": {
+            "status": "no",
+            "note": "No intraoral scanner integration",
+            "evidence": ""
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Lab management / manufacturing output",
+          "competitor": {
+            "status": "yes",
+            "note": "3Shape Produce: sends designs to pre-integrated mills, 3D printers, lab partners in clicks",
+            "source": "https://www.3shape.com/en/software/dental-system"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "STL export + FDM slicing for dental models; no dental mill post processor",
+            "evidence": "packages/kerf-dental/src/kerf_dental/tools.py"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "LLM / chat-native editing",
+          "competitor": {
+            "status": "no",
+            "note": "No LLM chat interface in 3Shape Dental System as of May 2026",
+            "source": "https://www.3shape.com/en/software/dental-system"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Chat-native: describe a restoration in plain language; Kerf routes to dental backend",
+            "evidence": "src/components/ChatPanel.jsx"
+          }
+        }
+      ]
+    },
+    {
+      "slug": "artioscad",
+      "competitor": "Esko ArtiosCAD",
+      "category": "cad-mechanical",
+      "left": "kerf",
+      "right": "artioscad",
+      "hero_tagline": "The packaging industry's gold standard structural CAD — versus an open-core alternative that adds structural performance and chat-native design.",
+      "reviewed_at": "2026-05-24",
+      "features": [
+        {
+          "domain": "D13",
+          "feature": "Packaging ECMA / FEFCO code library",
+          "competitor": {
+            "status": "yes",
+            "note": "Full FEFCO 12th Edition corrugated + ECMA folding-carton library; 31 new FEFCO designs in 2026",
+            "source": "https://www.esko.com/en/products/artioscad"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "ECMA and FEFCO parametric dieline generators; plugin wired",
+            "evidence": "packages/kerf-packaging/src/kerf_packaging/ecma_generators.py"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Parametric 2D dieline authoring",
+          "competitor": {
+            "status": "yes",
+            "note": "Intelligent parametric drafting tools; resize/rescale propagates to all lines",
+            "source": "https://www.esko.com/en/products/artioscad"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Parametric dieline engine with cut/crease/score/perforation layers",
+            "evidence": "packages/kerf-packaging/src/kerf_packaging/dieline.py"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "3D fold simulation",
+          "competitor": {
+            "status": "yes",
+            "note": "3D fold visualisation from 2D dieline; assembly animations and folding sequences",
+            "source": "https://www.esko.com/en/products/artioscad"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Fold simulation with spring-back compensation and panel clash detection (backend)",
+            "evidence": "packages/kerf-packaging/src/kerf_packaging/fold.py"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Blank nesting optimisation",
+          "competitor": {
+            "status": "yes",
+            "note": "Nesting engine for sheet/roll optimisation to minimise substrate waste",
+            "source": "https://www.esko.com/en/products/artioscad"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Skyline + true-shape NFP nesting (backend); 57.6% L-shape utilisation validated",
+            "evidence": "packages/kerf-manufacturing/src/kerf_manufacturing/nesting/nfp.py"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Structural performance (BCT / ECT)",
+          "competitor": {
+            "status": "partial",
+            "note": "ArtiosCAD Preflight detects structural quality issues; no in-tool BCT solver",
+            "source": "https://www.esko.com/en/lp/artioscad/structural-design-software-features-old"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "BCT estimation backend; no BCT UI panel yet",
+            "evidence": "packages/kerf-packaging/src/kerf_packaging/tools.py"
+          }
+        },
+        {
+          "domain": "D7",
+          "feature": "Die-making integration / CNC output",
+          "competitor": {
+            "status": "yes",
+            "note": "Die-making toolpath and cutting table output (Kongsberg, Zünd); layer-separated DXF for rule die",
+            "source": "https://www.esko.com/en/products/artioscad"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "DXF layer separation (cut/crease/score/perf) for Kongsberg/Zünd tables",
+            "evidence": "packages/kerf-packaging/src/kerf_packaging/dieline.py"
+          }
+        },
+        {
+          "domain": "D7",
+          "feature": "Print pre-press / graphics integration",
+          "competitor": {
+            "status": "yes",
+            "note": "Artios integrates with Esko Studio, ArtPro+, and PackEdge for graphic artwork placement on 3D model",
+            "source": "https://www.esko.com/en/products/artioscad"
+          },
+          "kerf": {
+            "status": "no",
+            "note": "No graphic artwork / pre-press integration",
+            "evidence": ""
+          }
+        },
+        {
+          "domain": "D14",
+          "feature": "Material cost / yield estimation",
+          "competitor": {
+            "status": "yes",
+            "note": "Pricing tied to design parameters; material waste and cost automatically computed from nesting",
+            "source": "https://www.esko.com/en/products/artioscad"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "Should-cost engine (backend) + nesting material calculation; no packaging-specific pricing UI",
+            "evidence": "packages/kerf-costing/src/"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "Open scripting / automation API",
+          "competitor": {
+            "status": "partial",
+            "note": "ArtiosCAD has a scripting interface; not Python-native; tightly coupled to Windows COM",
+            "source": "https://www.esko.com/en/products/artioscad"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "kerf-sdk on PyPI; HTTP/JSON-RPC automation from any Python environment",
+            "evidence": "packages/kerf-sdk/README.md"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "LLM / chat-native editing",
+          "competitor": {
+            "status": "no",
+            "note": "No LLM interface in ArtiosCAD as of May 2026",
+            "source": "https://www.esko.com/en/products/artioscad"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Chat-native: describe box dimensions in plain language, Kerf generates the dieline",
+            "evidence": "src/components/ChatPanel.jsx"
+          }
+        }
+      ]
+    },
+    {
+      "slug": "aveva-e3d",
+      "competitor": "AVEVA E3D Design",
+      "category": "cad-mechanical",
+      "left": "kerf",
+      "right": "aveva-e3d",
+      "hero_tagline": "The enterprise piping and plant design platform — versus an open-core CAD with P&ID, isometric generation, and piping stress in one workspace.",
+      "reviewed_at": "2026-05-24",
+      "features": [
+        {
+          "domain": "D13",
+          "feature": "Piping route design (3D intelligent)",
+          "competitor": {
+            "status": "yes",
+            "note": "Rule-driven 3D piping routing; pipe class/material/spec enforcement; automatic clash detection",
+            "source": "https://www.aveva.com/en/products/e3d-design/"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "Piping isometric/P&ID backend engine; no interactive 3D piping routing UI",
+            "evidence": "packages/kerf-piping/src/kerf_piping/isometric.py"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Piping component catalogue",
+          "competitor": {
+            "status": "yes",
+            "note": "Centralised catalogue of elbows, tees, valves, reducers, flanges with spec-driven selection",
+            "source": "https://www.multisoftsystems.com/article/aveva-e3d-piping-the-future-of-intelligent-3d-plant-design"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "Piping symbols and P&ID component library (backend); no 3D component catalogue",
+            "evidence": "packages/kerf-piping/src/kerf_piping/symbols.py"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Isometric drawing generation",
+          "competitor": {
+            "status": "yes",
+            "note": "Fabrication-ready isometric drawings with BOM, weld details, spool numbers, dimensions — auto-generated from 3D model",
+            "source": "https://www.multisoftsystems.com/article/aveva-e3d-piping-the-future-of-intelligent-3d-plant-design"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Isometric drawing generation from P&ID data (backend)",
+            "evidence": "packages/kerf-piping/src/kerf_piping/isometric.py"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "P&ID integration / data synchronisation",
+          "competitor": {
+            "status": "yes",
+            "note": "Seamless integration with AVEVA Engineering and AVEVA P&ID; upstream changes propagate to 3D model",
+            "source": "https://www.aveva.com/en/products/e3d-design/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "P&ID authoring with PID symbols; backend engine wired",
+            "evidence": "packages/kerf-piping/src/kerf_piping/pid.py"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Clash detection (hard/soft)",
+          "competitor": {
+            "status": "yes",
+            "note": "Hard, soft, and touch clash classifications; real-time highlighting; laser scan integration",
+            "source": "https://www.aveva.com/en/products/e3d-design/"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "Clash detection in assembly (OBB-SAT + BVH backend); no P&ID/plant-specific clash UI",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/clash/detect.py"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Multi-discipline plant design (structural/HVAC/civil)",
+          "competitor": {
+            "status": "yes",
+            "note": "Structural, civil, HVAC, cable tray, equipment — all disciplines in one AVEVA E3D model",
+            "source": "https://www.aveva.com/en/products/e3d-design/"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "Structural FEA, HVAC sizing, civil — separate packages but not a unified plant model",
+            "evidence": "packages/kerf-structural/"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Global multi-user concurrent design",
+          "competitor": {
+            "status": "yes",
+            "note": "AVEVA Global technology: multiple users across locations work simultaneously; real-time sync",
+            "source": "https://www.aveva.com/en/products/e3d-design/"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "Cloud git workspace with branch/merge; not real-time concurrent design at plant-model scale",
+            "evidence": "cloud/git/"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Laser scan / point cloud integration",
+          "competitor": {
+            "status": "yes",
+            "note": "Point cloud import from any laser scanner; brownfield retrofit design against as-built geometry",
+            "source": "https://www.aveva.com/en/products/e3d-design/"
+          },
+          "kerf": {
+            "status": "no",
+            "note": "No point cloud / laser scan integration",
+            "evidence": ""
+          }
+        },
+        {
+          "domain": "D4",
+          "feature": "HVAC duct sizing",
+          "competitor": {
+            "status": "yes",
+            "note": "HVAC/ductwork routing discipline within E3D Design plant model",
+            "source": "https://www.aveva.com/en/products/e3d-design/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "SMACNA duct sizing + flat-pattern (backend)",
+            "evidence": "packages/kerf-hvac/src/"
+          }
+        },
+        {
+          "domain": "D2",
+          "feature": "Piping stress / structural FEA",
+          "competitor": {
+            "status": "partial",
+            "note": "E3D integrates with AVEVA Mechanical Analyser and third-party tools (Caesar II) for piping stress; not native",
+            "source": "https://www.aveva.com/en/products/e3d-design/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Full structural FEA: 1D beam, ASME VIII pressure vessels, API 650 tanks (backend)",
+            "evidence": "packages/kerf-structural/src/"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "LLM / industrial AI assistant",
+          "competitor": {
+            "status": "partial",
+            "note": "AVEVA E3D includes in-built AI tools and an LLM industrial assistant (as of 2026)",
+            "source": "https://www.aveva.com/en/products/e3d-design/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Chat-native: plain-language design edits; full LLM tool routing for all backend engines",
+            "evidence": "src/components/ChatPanel.jsx"
+          }
+        }
+      ]
+    },
+    {
       "slug": "catia",
       "competitor": "Dassault CATIA",
       "category": "cad-mechanical",
@@ -8649,6 +9116,350 @@
           "feature": "Process simulation (moldflow/weld/AM/forming)",
           "competitor": "{ status: paid, note: \"SIMULIA Plastic for injection moulding; CATIA Composites for layup process; paid add-ins\", source: \"https://www.3ds.com/products/simulia\" }",
           "kerf": "{ status: yes, note: \"Moldflow Hele-Shaw + weld/AM/forming calculators; backend only\", evidence: \"packages/kerf-cad-core/src/kerf_cad_core/plugin.py\" }"
+        }
+      ]
+    },
+    {
+      "slug": "cimatron",
+      "competitor": "Cimatron",
+      "category": "cad-mechanical",
+      "left": "kerf",
+      "right": "cimatron",
+      "hero_tagline": "Integrated mold CAD/CAM from quote to shop floor — versus an open-core alternative that adds Moldflow fill simulation and multi-domain engineering.",
+      "reviewed_at": "2026-05-24",
+      "features": [
+        {
+          "domain": "D7",
+          "feature": "Moldflow / fill sim",
+          "competitor": {
+            "status": "yes",
+            "note": "Cimatron 2026 introduces integrated injection simulation; wall thickness, weld lines, air traps",
+            "source": "https://help.cimatron.com/en/2026/New_Injection_Simulation.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Hele-Shaw front tracking + weld-line + air-trap detection (backend)",
+            "evidence": "packages/kerf-manufacturing/src/kerf_manufacturing/moldflow/flow_front.py"
+          }
+        },
+        {
+          "domain": "D7",
+          "feature": "Parting line / cavity-core split",
+          "competitor": {
+            "status": "yes",
+            "note": "Industry's fastest parting and cavity design; undercut detection; split surface generation",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "no",
+            "note": "No parting line or cavity/core split tooling; mold package is a stub",
+            "evidence": ""
+          }
+        },
+        {
+          "domain": "D7",
+          "feature": "Mold base library",
+          "competitor": {
+            "status": "yes",
+            "note": "Load complete mold base plate sets from commercial catalogues (DME, HASCO, Futaba) in minutes",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "no",
+            "note": "No mold base library",
+            "evidence": ""
+          }
+        },
+        {
+          "domain": "D7",
+          "feature": "Cooling channel design",
+          "competitor": {
+            "status": "yes",
+            "note": "Standard and conformal cooling channel design; interference detection against cavities and ejectors",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "no",
+            "note": "No cooling channel tooling",
+            "evidence": ""
+          }
+        },
+        {
+          "domain": "D7",
+          "feature": "Electrode design (EDM)",
+          "competitor": {
+            "status": "yes",
+            "note": "Hybrid electrode design (surfaces + solids); spark gap definition; auto blank-cutting from holder shapes",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "no",
+            "note": "No electrode design",
+            "evidence": ""
+          }
+        },
+        {
+          "domain": "D7",
+          "feature": "5-axis CNC machining",
+          "competitor": {
+            "status": "yes",
+            "note": "2.5-axis to 5-axis milling and drilling; material removal simulator; gouge/collision detection",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "5-axis engine (backend); no UI; 3-axis CAMView wired in browser",
+            "evidence": "packages/kerf-cam/src/"
+          }
+        },
+        {
+          "domain": "D7",
+          "feature": "Wire EDM",
+          "competitor": {
+            "status": "yes",
+            "note": "Cimatron 2026 introduces integrated Wire EDM for 2-axis and 4-axis CNC programming",
+            "source": "https://www.cimatron.com/en/whats-new"
+          },
+          "kerf": {
+            "status": "no",
+            "note": "No wire EDM programming",
+            "evidence": ""
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "Draft angle analysis",
+          "competitor": {
+            "status": "yes",
+            "note": "Draft angle and direction analysis; body integrity and wall thickness checks",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "no",
+            "note": "No draft angle analysis tooling",
+            "evidence": ""
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "Assembly and collision detection",
+          "competitor": {
+            "status": "yes",
+            "note": "Motion analysis and collision detection for mold assembly verification (slides, lifters, ejectors)",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "Assembly clash detection backend (OBB-SAT + BVH); no mold-specific motion/collision sequence",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/clash/detect.py"
+          }
+        },
+        {
+          "domain": "D14",
+          "feature": "Quote-to-delivery workflow",
+          "competitor": {
+            "status": "yes",
+            "note": "Integrated from quote to design and manufacturing in a single CAD/CAM interface",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "Should-cost engine + BOM (backend); no mold-specific quoting workflow",
+            "evidence": "packages/kerf-costing/src/"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "LLM / chat-native editing",
+          "competitor": {
+            "status": "no",
+            "note": "No LLM interface in Cimatron as of May 2026",
+            "source": "https://www.cimatron.com/en"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Chat-native editing; Moldflow results describable in plain language",
+            "evidence": "src/components/ChatPanel.jsx"
+          }
+        }
+      ]
+    },
+    {
+      "slug": "clo3d",
+      "competitor": "CLO Virtual Fashion CLO3D",
+      "category": "cad-mechanical",
+      "left": "kerf",
+      "right": "clo3d",
+      "hero_tagline": "3D garment simulation for fashion studios — versus an open-core CAD that adds grading, cut-room automation, and engineering precision.",
+      "reviewed_at": "2026-05-24",
+      "features": [
+        {
+          "domain": "D13",
+          "feature": "Textiles (weave/knit/drape/cut-room)",
+          "competitor": {
+            "status": "yes",
+            "note": "Real-time 3D garment simulation; fabric drape, fit on avatar, pattern generation and DXF export",
+            "source": "https://www.clo3d.com/en/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Pattern drafting, grading, seam allowances, mass-spring drape, DXF/SVG export — backend; no 3D avatar drape",
+            "evidence": "packages/kerf-textiles/src/kerf_textiles/draft.py"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Pattern drafting (block construction)",
+          "competitor": {
+            "status": "yes",
+            "note": "2D pattern tools — AI curve tools, symmetric design, sewing blocks and modular templates",
+            "source": "https://www.clo3d.com/en/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Bodice/sleeve/trouser/skirt block drafting from measurements; notches and grain lines",
+            "evidence": "packages/kerf-textiles/src/kerf_textiles/draft.py"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Grading (size run)",
+          "competitor": {
+            "status": "yes",
+            "note": "Grading across size runs in CLO; grade rules applied to pattern pieces",
+            "source": "https://www.clo3d.com/en/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "ASTM + EN 13402 grade rules; multi-size export (backend)",
+            "evidence": "packages/kerf-apparel/src/kerf_apparel/"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Seam allowances and notches",
+          "competitor": {
+            "status": "yes",
+            "note": "Seam allowance tools with per-edge control; notch placement",
+            "source": "https://www.clo3d.com/en/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Per-edge seam allowances with corner mitring; notch placement",
+            "evidence": "packages/kerf-textiles/src/kerf_textiles/draft.py"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Fabric drape / cloth simulation",
+          "competitor": {
+            "status": "yes",
+            "note": "Real-time mass-spring / position-based dynamics with 23+ fabric presets; avatar movement simulation",
+            "source": "https://www.clo3d.com/en/"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "Mass-spring cloth simulation (backend); no 3D avatar drape in browser UI",
+            "evidence": "packages/kerf-textiles/src/kerf_textiles/mass_spring.py"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Avatar / dress form",
+          "competitor": {
+            "status": "yes",
+            "note": "Parametric avatar with adjustable body measurements, pose, and movement animation",
+            "source": "https://www.clo3d.com/en/"
+          },
+          "kerf": {
+            "status": "no",
+            "note": "No avatar/dress form; no garment-on-body visualisation",
+            "evidence": ""
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Fabric material library",
+          "competitor": {
+            "status": "yes",
+            "note": "23 fabric presets; physical properties (weight, stiffness, bend); non-linear simulation",
+            "source": "https://www.clo3d.com/en/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Fabric properties engine: weight, stiffness, coefficient of friction (backend)",
+            "evidence": "packages/kerf-textiles/src/kerf_textiles/materials.py"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Cut-room nesting / marker",
+          "competitor": {
+            "status": "partial",
+            "note": "Basic nesting/marker in CLO; professional cut-room marker automation is third-party (Lectra/Gerber)",
+            "source": "https://www.clo3d.com/en/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Nesting marker for fabric efficiency; single-ply and multi-ply cutting orders; lay plan export",
+            "evidence": "packages/kerf-textiles/src/kerf_textiles/cut_room.py"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "e-textiles / smart garment design",
+          "competitor": {
+            "status": "no",
+            "note": "CLO3D does not cover conductive yarn, e-textile circuit integration, or wearable electronics",
+            "source": "https://www.clo3d.com/en/"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "e-textiles module: conductive yarn routing, electrode placement, wearable circuit (backend)",
+            "evidence": "packages/kerf-textiles/src/kerf_textiles/etextiles.py"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Sustainability / material impact",
+          "competitor": {
+            "status": "partial",
+            "note": "Virtual sampling reduces physical waste; no LCA or material impact quantification",
+            "source": "https://www.clo3d.com/en/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Textile sustainability module + full ISO 14040/44 LCA with material impact categories",
+            "evidence": "packages/kerf-textiles/src/kerf_textiles/sustainability.py"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "DXF / SVG pattern export",
+          "competitor": {
+            "status": "yes",
+            "note": "DXF, OBJ, Alembic, OpenCollada export; industry-standard pattern exchange",
+            "source": "https://www.clo3d.com/en/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "DXF (pattern), SVG, PDF (lay plan), CSV (grade rules), OBJ (3D drape)",
+            "evidence": "packages/kerf-textiles/src/kerf_textiles/export.py"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "LLM / chat-native editing",
+          "competitor": {
+            "status": "no",
+            "note": "No LLM interface in CLO3D as of May 2026",
+            "source": "https://www.clo3d.com/en/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Chat-native: describe the garment in plain language; Kerf drafts blocks and grades",
+            "evidence": "src/components/ChatPanel.jsx"
+          }
         }
       ]
     },
@@ -9476,6 +10287,473 @@
       ]
     },
     {
+      "slug": "fibersim",
+      "competitor": "Siemens Fibersim",
+      "category": "cad-mechanical",
+      "left": "kerf",
+      "right": "fibersim",
+      "hero_tagline": "The composites ply design and manufacturing tool — versus an open-core CAD with CLT, failure analysis, AFP/ATL output, and multi-domain engineering.",
+      "reviewed_at": "2026-05-24",
+      "features": [
+        {
+          "domain": "D13",
+          "feature": "Ply-based laminate layup design",
+          "competitor": {
+            "status": "yes",
+            "note": "Ply-based and zone-based design; automated ply table generation; splice and dart management",
+            "source": "https://www.siemens.com/en-us/products/designcenter/nx-cad-software/offerings/fibersim-composites/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Layup definition with ply angles, materials, and stacking sequences (backend)",
+            "evidence": "packages/kerf-composites/src/kerf_composites/layup.py"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Drape simulation / producibility",
+          "competitor": {
+            "status": "yes",
+            "note": "Producibility simulation: accurate flat patterns and true fiber orientations; real-time darting feedback",
+            "source": "https://www.siemens.com/en-us/products/designcenter/nx-cad-software/offerings/fibersim-composites/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Drape simulation for composite prepreg on doubly-curved surfaces (backend)",
+            "evidence": "packages/kerf-composites/src/kerf_composites/drape.py"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "AFP / ATL manufacturing path output",
+          "competitor": {
+            "status": "yes",
+            "note": "Automated Fiber Placement (AFP) and Automated Tape Laying (ATL) path export for CNC path planners",
+            "source": "https://www.siemens.com/en-us/products/designcenter/nx-cad-software/offerings/fibersim-composites/"
+          },
+          "kerf": {
+            "status": "no",
+            "note": "No AFP/ATL CNC path generation",
+            "evidence": ""
+          }
+        },
+        {
+          "domain": "D2",
+          "feature": "Classical laminate theory (CLT)",
+          "competitor": {
+            "status": "yes",
+            "note": "Bi-directional CAE interface; CLT via Simcenter integration; stiffness/strength in FEA",
+            "source": "https://www.siemens.com/en-us/products/designcenter/nx-cad-software/offerings/fibersim-composites/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "CLT: [A][B][D] stiffness matrices, coupling analysis (backend)",
+            "evidence": "packages/kerf-composites/src/kerf_composites/clt.py"
+          }
+        },
+        {
+          "domain": "D2",
+          "feature": "Composite failure analysis",
+          "competitor": {
+            "status": "partial",
+            "note": "Failure via Simcenter FEA integration; Fibersim does not solve failure criteria natively",
+            "source": "https://www.siemens.com/en-us/products/designcenter/nx-cad-software/offerings/fibersim-composites/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Tsai-Wu, Tsai-Hill, max-stress, max-strain, Hashin, Puck failure criteria (backend)",
+            "evidence": "packages/kerf-composites/src/kerf_composites/failure.py"
+          }
+        },
+        {
+          "domain": "D2",
+          "feature": "Interlaminar shear and delamination",
+          "competitor": {
+            "status": "partial",
+            "note": "Core sampling shows ply thickness and fiber deviation; interlaminar stress via FEA tools",
+            "source": "https://www.siemens.com/en-us/products/designcenter/nx-cad-software/offerings/fibersim-composites/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Interlaminar shear stress with ILSS failure index; progressive delamination (backend)",
+            "evidence": "packages/kerf-composites/src/kerf_composites/interlaminar.py"
+          }
+        },
+        {
+          "domain": "D2",
+          "feature": "Thermal residual stress",
+          "competitor": {
+            "status": "partial",
+            "note": "Thermal effects via Simcenter FEA; not native in Fibersim design tool",
+            "source": "https://www.siemens.com/en-us/products/designcenter/nx-cad-software/offerings/fibersim-composites/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Thermal residual stress from cure temperature delta (backend)",
+            "evidence": "packages/kerf-composites/src/kerf_composites/thermal_residual.py"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Multi-CAD support (NX / CATIA / Creo)",
+          "competitor": {
+            "status": "yes",
+            "note": "Multi-CAD: Fibersim runs inside NX, CATIA V5/V6, and Creo as native plug-in",
+            "source": "https://www.siemens.com/en-us/products/designcenter/nx-cad-software/offerings/fibersim-composites/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Standalone open-core CAD; no plug-in for NX/CATIA/Creo (is its own CAD)",
+            "evidence": "packages/kerf-cad-core/src/"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Laser projection / flat pattern export",
+          "competitor": {
+            "status": "yes",
+            "note": "Flat pattern export for laser projector and ply cutting; accurate net shape patterns",
+            "source": "https://www.siemens.com/en-us/products/designcenter/nx-cad-software/offerings/fibersim-composites/"
+          },
+          "kerf": {
+            "status": "no",
+            "note": "No laser projection output or flat ply pattern for hand layup",
+            "evidence": ""
+          }
+        },
+        {
+          "domain": "D14",
+          "feature": "Laminate weight / cost",
+          "competitor": {
+            "status": "yes",
+            "note": "Instant laminate weight and cost including post-cure processes during review",
+            "source": "https://www.siemens.com/en-us/products/designcenter/nx-cad-software/offerings/fibersim-composites/"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "LCA material costing; no composites-specific laminate weight/cost UI",
+            "evidence": "packages/kerf-lca/phases.py"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "LLM / chat-native editing",
+          "competitor": {
+            "status": "no",
+            "note": "No LLM interface in Fibersim as of May 2026",
+            "source": "https://www.siemens.com/en-us/products/designcenter/nx-cad-software/offerings/fibersim-composites/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Chat-native: describe layup in plain language; Kerf routes to composites backend",
+            "evidence": "src/components/ChatPanel.jsx"
+          }
+        }
+      ]
+    },
+    {
+      "slug": "maxsurf",
+      "competitor": "Bentley Maxsurf",
+      "category": "cad-mechanical",
+      "left": "kerf",
+      "right": "maxsurf",
+      "hero_tagline": "Integrated naval architecture hull design and stability platform — versus an open-core CAD with hydrostatics, seakeeping, and resistance prediction.",
+      "reviewed_at": "2026-05-24",
+      "features": [
+        {
+          "domain": "D5",
+          "feature": "Hull form modelling (NURBS)",
+          "competitor": {
+            "status": "yes",
+            "note": "3D NURB surface hull modelling; parametric hull form generation with interactive sketch tools",
+            "source": "https://www.bentley.com/software/maxsurf/"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "NURBS surfacing math complete; OCCT bindings unconfirmed at build; no hull-specific parametric UI",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/surfacing.py"
+          }
+        },
+        {
+          "domain": "D5",
+          "feature": "Hydrostatics (intact)",
+          "competitor": {
+            "status": "yes",
+            "note": "Full hydrostatic calculations: displacement, VCB, BM, GM, curves of form from 3D hull",
+            "source": "https://www.bentley.com/software/maxsurf/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Hydrostatics: displacement, BM, GM, trim, freeboard (backend)",
+            "evidence": "packages/kerf-marine/src/kerf_marine/hydrostatics.py"
+          }
+        },
+        {
+          "domain": "D5",
+          "feature": "Intact and damage stability (IMO)",
+          "competitor": {
+            "status": "yes",
+            "note": "Intact + probabilistic damage stability; IMO IS-Code and SOLAS compliance checks",
+            "source": "https://www.bentley.com/software/maxsurf/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Intact stability (GZ curve, IMO criteria) and damage stability (backend)",
+            "evidence": "packages/kerf-marine/src/kerf_marine/stability.py"
+          }
+        },
+        {
+          "domain": "D5",
+          "feature": "Resistance prediction",
+          "competitor": {
+            "status": "yes",
+            "note": "Holtrop-Mennen, Savitsky (planing), and other resistance prediction methods",
+            "source": "https://www.bentley.com/software/maxsurf/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Holtrop-Mennen resistance prediction (backend)",
+            "evidence": "packages/kerf-marine/src/kerf_marine/holtrop_mennen.py"
+          }
+        },
+        {
+          "domain": "D5",
+          "feature": "Seakeeping / motions",
+          "competitor": {
+            "status": "yes",
+            "note": "Radiation diffraction panel method for motions prediction; ship response to waves",
+            "source": "https://www.bentley.com/software/maxsurf/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Seakeeping: heave/pitch/roll RAOs + added mass + damping (backend)",
+            "evidence": "packages/kerf-marine/src/kerf_marine/seakeeping.py"
+          }
+        },
+        {
+          "domain": "D5",
+          "feature": "Structural analysis (scantlings)",
+          "competitor": {
+            "status": "yes",
+            "note": "Structural modelling and analysis; class-rule scantling checks; longitudinal strength",
+            "source": "https://www.bentley.com/software/maxsurf/"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "Structural FEA backend (beam/plate); no class-rule marine scantling specific calculator",
+            "evidence": "packages/kerf-structural/src/"
+          }
+        },
+        {
+          "domain": "D5",
+          "feature": "Sailing VPP",
+          "competitor": {
+            "status": "yes",
+            "note": "Velocity prediction program for sailing vessels",
+            "source": "https://www.bentley.com/software/maxsurf/"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "Aerodynamic/hydrodynamic force models exist; no integrated sailing VPP",
+            "evidence": "packages/kerf-aero/src/"
+          }
+        },
+        {
+          "domain": "D5",
+          "feature": "Section / body-plan curves",
+          "competitor": {
+            "status": "yes",
+            "note": "Automatic section generation and body plan from 3D hull model",
+            "source": "https://www.bentley.com/software/maxsurf/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Hull section curve extraction (backend)",
+            "evidence": "packages/kerf-marine/src/kerf_marine/sections.py"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "DXF / IGES / 3DM file exchange",
+          "competitor": {
+            "status": "yes",
+            "note": "DGN, 3DM (Rhino), IGES, DXF interchange; integrates with MicroStation, Rhino, AutoCAD",
+            "source": "https://www.bentley.com/software/maxsurf/"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "STEP export; limited IGES; no DGN/3DM exchange",
+            "evidence": "packages/kerf-imports/src/"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "LLM / chat-native editing",
+          "competitor": {
+            "status": "no",
+            "note": "No LLM interface in Maxsurf as of May 2026",
+            "source": "https://www.bentley.com/software/maxsurf/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Chat-native: describe vessel parameters; Kerf runs hydrostatics and stability",
+            "evidence": "src/components/ChatPanel.jsx"
+          }
+        }
+      ]
+    },
+    {
+      "slug": "mozaik",
+      "competitor": "Mozaik Software",
+      "category": "cad-mechanical",
+      "left": "kerf",
+      "right": "mozaik",
+      "hero_tagline": "CNC-driven cabinet shop software — versus an open-core CAD with grain matching, joinery, and multi-domain engineering in one workspace.",
+      "reviewed_at": "2026-05-24",
+      "features": [
+        {
+          "domain": "D13",
+          "feature": "Woodworking (cut-list/joinery/grain)",
+          "competitor": {
+            "status": "yes",
+            "note": "Full cabinet design with cut list, CNC G-code, 3D visualisation, pricing, and hardware boring",
+            "source": "https://www.mozaiksoftware.com/mozaik-products"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "Cut list, joinery rules, grain direction engine (backend); no room-layout floor plan UI",
+            "evidence": "packages/kerf-woodworking/src/kerf_woodworking/cut_list.py"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Cabinet / room layout design",
+          "competitor": {
+            "status": "yes",
+            "note": "Drag-and-drop room floor plans and elevations; live-updating 3D visualisation of full rooms",
+            "source": "https://www.mozaiksoftware.com/mozaik-products"
+          },
+          "kerf": {
+            "status": "no",
+            "note": "No room/cabinet layout floor plan UI",
+            "evidence": ""
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Parametric cabinet libraries",
+          "competitor": {
+            "status": "yes",
+            "note": "Face Frame, Frameless, Wardrobe libraries; auto-update dimensions, parts, and machining on resize",
+            "source": "https://www.mozaiksoftware.com/mozaik-products"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "Joinery rules (backend); no parametric cabinet library UI",
+            "evidence": "packages/kerf-woodworking/src/kerf_woodworking/joinery.py"
+          }
+        },
+        {
+          "domain": "D7",
+          "feature": "CNC cut list and nesting",
+          "competitor": {
+            "status": "yes",
+            "note": "Mozaik Optimizer: sheet optimisation + G-code for 175+ CNC router brands",
+            "source": "https://www.mozaiksoftware.com/mozaik-products"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "True-shape NFP nesting + G-code post (Fanuc/GRBL/LinuxCNC); no cabinet-specific bore patterns",
+            "evidence": "packages/kerf-manufacturing/src/kerf_manufacturing/nesting/nfp.py"
+          }
+        },
+        {
+          "domain": "D7",
+          "feature": "Hardware boring / machining automation",
+          "competitor": {
+            "status": "yes",
+            "note": "Automatic hardware boring based on hardware brand and model; hardware requirements list",
+            "source": "https://www.mozaiksoftware.com/mozaik-products"
+          },
+          "kerf": {
+            "status": "no",
+            "note": "No cabinet hardware boring automation",
+            "evidence": ""
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Grain direction management",
+          "competitor": {
+            "status": "yes",
+            "note": "Grain direction tracked per piece; part orientation for visual consistency",
+            "source": "https://www.mozaiksoftware.com/mozaik-products"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Grain direction engine for cut list (backend)",
+            "evidence": "packages/kerf-woodworking/src/kerf_woodworking/grain.py"
+          }
+        },
+        {
+          "domain": "D14",
+          "feature": "Pricing / estimating",
+          "competitor": {
+            "status": "yes",
+            "note": "Automatic pricing estimation updates as design changes; supports material, hardware, and labour costs",
+            "source": "https://www.mozaiksoftware.com/mozaik-products"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "Should-cost engine (backend); no woodworking-specific pricing UI",
+            "evidence": "packages/kerf-costing/src/"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "Shop drawings / technical documentation",
+          "competitor": {
+            "status": "yes",
+            "note": "Detailed shop drawings, 3D renderings, and professional presentations generated from design",
+            "source": "https://www.mozaiksoftware.com/mozaik-products"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "Engineering multi-sheet drawings (template-based); no cabinet shop drawing format",
+            "evidence": "src/components/DrawingsView.jsx"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "LLM / chat-native editing",
+          "competitor": {
+            "status": "no",
+            "note": "No LLM interface in Mozaik as of May 2026",
+            "source": "https://www.mozaiksoftware.com/mozaik-products"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Chat-native: describe a cabinet in plain language; Kerf generates cut list and joinery",
+            "evidence": "src/components/ChatPanel.jsx"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "Cross-platform (macOS support)",
+          "competitor": {
+            "status": "no",
+            "note": "Mozaik is Windows-only; no macOS or Linux support",
+            "source": "https://www.mozaiksoftware.com/mozaik-products"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Runs in the browser; any OS with a modern browser",
+            "evidence": "src/"
+          }
+        }
+      ]
+    },
+    {
       "slug": "nx",
       "competitor": "Siemens NX",
       "category": "cad-mechanical",
@@ -10191,6 +11469,185 @@
             "status": "yes",
             "note": "Kerf hosted environment provides cloud compute for OpenROAD runs",
             "evidence": "cloud/"
+          }
+        }
+      ]
+    },
+    {
+      "slug": "adams",
+      "competitor": "MSC Adams (Hexagon)",
+      "category": "cad-sim",
+      "left": "kerf",
+      "right": "adams",
+      "hero_tagline": "The industry-standard multibody dynamics solver — versus an open-core CAD with rigid/flexible MBD, kinematics, and controls co-simulation.",
+      "reviewed_at": "2026-05-24",
+      "features": [
+        {
+          "domain": "D9",
+          "feature": "Planar MBD (Lagrange/DAE, Baumgarte)",
+          "competitor": {
+            "status": "yes",
+            "note": "Rigid and flexible multibody dynamics; planar mechanisms with full constraint handling",
+            "source": "https://www.mechutils.com/msc-adams"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Planar MBD with Lagrange/DAE + Baumgarte stabilisation (backend)",
+            "evidence": "packages/kerf-motion/src/kerf_motion/integrator.py"
+          }
+        },
+        {
+          "domain": "D9",
+          "feature": "3D MBD with constraint enforcement",
+          "competitor": {
+            "status": "yes",
+            "note": "Full 3D rigid and flexible multibody dynamics; joints, forces, contacts, constraint enforcement",
+            "source": "https://www.mechutils.com/msc-adams"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "3D joints defined; integrator is not fully constrained for 3D MBD",
+            "evidence": "packages/kerf-motion/src/kerf_motion/joints.py"
+          }
+        },
+        {
+          "domain": "D9",
+          "feature": "Contact / collision dynamics",
+          "competitor": {
+            "status": "yes",
+            "note": "Contact forces between parts; Hunt-Crossley, Coulomb friction, impact/restitution models",
+            "source": "https://www.mechutils.com/msc-adams"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Sphere/plane + sphere/mesh + Hunt-Crossley + Coulomb + impulse-restitution; 0.15% bounce error",
+            "evidence": "packages/kerf-motion/src/kerf_motion/contact.py"
+          }
+        },
+        {
+          "domain": "D9",
+          "feature": "Kinematics (four-bar/slider-crank/cam)",
+          "competitor": {
+            "status": "yes",
+            "note": "Full kinematic analysis: position, velocity, acceleration for any mechanism topology",
+            "source": "https://www.mechutils.com/msc-adams"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Four-bar, slider-crank, cam kinematics (backend)",
+            "evidence": "packages/kerf-motion/src/kerf_motion/forward_kinematics.py"
+          }
+        },
+        {
+          "domain": "D9",
+          "feature": "Flexible bodies (FEA mode shapes)",
+          "competitor": {
+            "status": "yes",
+            "note": "Adams/Flex: flexible body integration via FEA-derived mode shapes (Craig-Bampton)",
+            "source": "https://www.mechutils.com/msc-adams"
+          },
+          "kerf": {
+            "status": "no",
+            "note": "No flexible body / modal superposition in MBD",
+            "evidence": ""
+          }
+        },
+        {
+          "domain": "D9",
+          "feature": "Vehicle dynamics (Adams/Car)",
+          "competitor": {
+            "status": "yes",
+            "note": "Adams/Car: suspension, chassis, tire dynamics; full vehicle ride and handling simulation",
+            "source": "https://www.mechutils.com/msc-adams"
+          },
+          "kerf": {
+            "status": "no",
+            "note": "No vehicle dynamics / half-car / full-car model",
+            "evidence": ""
+          }
+        },
+        {
+          "domain": "D9",
+          "feature": "Controls co-simulation (MATLAB/Simulink)",
+          "competitor": {
+            "status": "yes",
+            "note": "Adams/Controls: real-time co-simulation with MATLAB Simulink; FMI/FMU interface",
+            "source": "https://www.mechutils.com/msc-adams"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Controls: state-space, LQR, Kalman, digital PID, Modelica DAE system simulation (backend)",
+            "evidence": "packages/kerf-motion/src/kerf_motion/"
+          }
+        },
+        {
+          "domain": "D9",
+          "feature": "Robotics FK / IK (6-DOF)",
+          "competitor": {
+            "status": "partial",
+            "note": "Adams can model 6-DOF robot arm kinematics; not a dedicated robotics IK solver",
+            "source": "https://www.mechutils.com/msc-adams"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "6-DOF spatial IK via DLS Jacobian; PUMA-class validated (backend)",
+            "evidence": "packages/kerf-motion/src/kerf_motion/inverse_kinematics.py"
+          }
+        },
+        {
+          "domain": "D9",
+          "feature": "Gear / belt / chain machinery (Adams/Machinery)",
+          "competitor": {
+            "status": "yes",
+            "note": "Adams/Machinery: gears, belts, chains, bearings, cables with physics-based contact",
+            "source": "https://www.mechutils.com/msc-adams"
+          },
+          "kerf": {
+            "status": "no",
+            "note": "No gear-train / belt-chain multibody module (horology has escapement, not general machinery)",
+            "evidence": ""
+          }
+        },
+        {
+          "domain": "D3",
+          "feature": "Gear geometry / tooth stress",
+          "competitor": {
+            "status": "partial",
+            "note": "Adams/Machinery gear contact is dynamic; not a standalone gear sizing/tooth stress tool",
+            "source": "https://www.mechutils.com/msc-adams"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Spur/helical/bevel/worm gear geometry + AGMA/ISO tooth bending + contact stress (backend)",
+            "evidence": "packages/kerf-manufacturing/src/kerf_manufacturing/"
+          }
+        },
+        {
+          "domain": "D2",
+          "feature": "FEA load export",
+          "competitor": {
+            "status": "yes",
+            "note": "Adams exports MBD loads directly to ANSYS, Abaqus, Nastran, MSC Nastran for structural FEA",
+            "source": "https://www.mechutils.com/msc-adams"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "Structural FEA native (CalculiX bridge); no load export to external FEA tools",
+            "evidence": "packages/kerf-fem/src/"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "LLM / chat-native editing",
+          "competitor": {
+            "status": "no",
+            "note": "No LLM interface in MSC Adams as of May 2026",
+            "source": "https://www.mechutils.com/msc-adams"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Chat-native: describe a mechanism in plain language; Kerf routes to MBD backend",
+            "evidence": "src/components/ChatPanel.jsx"
           }
         }
       ]
@@ -11397,6 +12854,171 @@
             "status": "yes",
             "note": "Should-cost engine (Boothroyd-Dewhurst, 6 processes) — backend tool",
             "evidence": "packages/kerf-manufacturing/src/kerf_manufacturing/should_cost.py"
+          }
+        }
+      ]
+    },
+    {
+      "slug": "zemax",
+      "competitor": "Ansys Zemax OpticStudio",
+      "category": "cad-sim",
+      "left": "kerf",
+      "right": "zemax",
+      "hero_tagline": "The gold standard for optical design and tolerancing — versus an open-core CAD with ray tracing, Gaussian beam propagation, and acoustics.",
+      "reviewed_at": "2026-05-24",
+      "features": [
+        {
+          "domain": "D12",
+          "feature": "Paraxial ABCD ray transfer",
+          "competitor": {
+            "status": "yes",
+            "note": "Sequential mode: full paraxial ray tracing; ABCD matrix; system cardinal points",
+            "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Paraxial ABCD ray transfer matrix (backend)",
+            "evidence": "packages/kerf-optics/src/kerf_optics/ray_transfer.py"
+          }
+        },
+        {
+          "domain": "D12",
+          "feature": "Sequential ray tracing (lens design)",
+          "competitor": {
+            "status": "yes",
+            "note": "Full sequential mode: multi-surface, multi-wavelength, apertures, aberrations, merit function optimisation",
+            "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "Sequential ray tracing via ray_transfer.py + lens_system.py (backend); no merit function optimiser",
+            "evidence": "packages/kerf-optics/src/kerf_optics/lens_system.py"
+          }
+        },
+        {
+          "domain": "D12",
+          "feature": "Seidel / Zernike aberration analysis",
+          "competitor": {
+            "status": "yes",
+            "note": "Full Seidel aberration coefficients; Zernike fringe; wavefront error maps; MTF",
+            "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Seidel aberrations S1-S5 (corrected 2026-05-24); no Zernike decomposition",
+            "evidence": "packages/kerf-optics/src/kerf_optics/lens_system.py"
+          }
+        },
+        {
+          "domain": "D12",
+          "feature": "Non-sequential ray tracing (stray light)",
+          "competitor": {
+            "status": "yes",
+            "note": "Non-sequential mode: scattered/reflected/refracted rays; ghost detection; LED/illumination systems; NSC imaging in 2026 R1",
+            "source": "https://www.padtinc.com/2026/04/06/whats-new-in-ansys-zemax-opticstudio-2026-r1-practical-advances-for-real-optical-systems/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Non-sequential ray tracing + Fresnel-split + ghost detection (backend); 0.01% ghost fraction",
+            "evidence": "packages/kerf-optics/src/kerf_optics/nonsequential.py"
+          }
+        },
+        {
+          "domain": "D12",
+          "feature": "Gaussian beam propagation",
+          "competitor": {
+            "status": "yes",
+            "note": "Gaussian beam propagation; physical optics propagation (POP); beam quality M² analysis",
+            "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Complex-q + ABCD + M² + fibre coupling; HeNe zR=4.96m validated (backend)",
+            "evidence": "packages/kerf-optics/src/kerf_optics/gaussian.py"
+          }
+        },
+        {
+          "domain": "D12",
+          "feature": "Tolerancing (NEST / Monte Carlo)",
+          "competitor": {
+            "status": "yes",
+            "note": "Advanced tolerancing: sensitivity, inverse sensitivity, Monte Carlo; NEST workflow in 2026 R1",
+            "source": "https://www.padtinc.com/2026/04/06/whats-new-in-ansys-zemax-opticstudio-2026-r1-practical-advances-for-real-optical-systems/"
+          },
+          "kerf": {
+            "status": "no",
+            "note": "No optical tolerance analysis",
+            "evidence": ""
+          }
+        },
+        {
+          "domain": "D12",
+          "feature": "Multiphysics STOP analysis (thermal + structural)",
+          "competitor": {
+            "status": "yes",
+            "note": "STAR Multiphysics: STOP + SOFT analysis with Ansys Mechanical/Fluent integration",
+            "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
+          },
+          "kerf": {
+            "status": "no",
+            "note": "No structural-thermal-optical performance (STOP) multiphysics coupling",
+            "evidence": ""
+          }
+        },
+        {
+          "domain": "D12",
+          "feature": "Wave optics / diffraction / polarisation",
+          "competitor": {
+            "status": "yes",
+            "note": "Physical optics propagation (POP); Mueller/Jones matrix polarisation; diffraction grating analysis",
+            "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
+          },
+          "kerf": {
+            "status": "no",
+            "note": "No wave optics / diffraction / polarisation in Kerf optics package",
+            "evidence": ""
+          }
+        },
+        {
+          "domain": "D12",
+          "feature": "Metalens design",
+          "competitor": {
+            "status": "yes",
+            "note": "Metalens fast mode (2026 R1): efficient simulation of flat, diffractive metalens elements",
+            "source": "https://www.padtinc.com/2026/04/06/whats-new-in-ansys-zemax-opticstudio-2026-r1-practical-advances-for-real-optical-systems/"
+          },
+          "kerf": {
+            "status": "no",
+            "note": "No metalens / diffractive optical element design",
+            "evidence": ""
+          }
+        },
+        {
+          "domain": "D12",
+          "feature": "Acoustics (ISO 9613, RT60, room acoustics)",
+          "competitor": {
+            "status": "no",
+            "note": "OpticStudio is an optics-only tool; no acoustics functionality",
+            "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "ISO 9613, RT60, weighting, mass-law TL, image-source IR, Schroeder RT60, SEA (backend)",
+            "evidence": "packages/kerf-optics/src/kerf_optics/"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "LLM / chat-native editing",
+          "competitor": {
+            "status": "no",
+            "note": "No LLM interface in Ansys Zemax OpticStudio as of May 2026",
+            "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Chat-native: describe optical system in plain language; Kerf routes to ray trace backend",
+            "evidence": "src/components/ChatPanel.jsx"
           }
         }
       ]

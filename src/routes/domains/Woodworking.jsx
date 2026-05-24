@@ -49,6 +49,7 @@ export default function Woodworking() {
       heroParagraph="Kerf will combine a parametric joinery library, cabinet and furniture designer, CNC router toolpaths, and sheet-goods nesting into one chat-driven workspace. The woodworking module is in development — sign up to be notified when it ships."
       heroTags={['MIT licensed', 'GRBL / LinuxCNC posts', 'Board-foot costing', 'DXF export']}
       bullets={BULLETS}
+      compareLinks={[{ slug: 'mozaik', label: 'Mozaik Software' }]}
     />
   )
 }

@@ -89,6 +89,7 @@ export default function Packaging() {
       heroTags={['MIT licensed', 'ECMA / FEFCO library', 'DXF layer separation', 'BCT estimation']}
       bullets={BULLETS}
       comparison={COMPARISON}
+      compareLinks={[{ slug: 'artioscad', label: 'Esko ArtiosCAD' }]}
     />
   )
 }

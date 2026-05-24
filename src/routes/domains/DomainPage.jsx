@@ -317,7 +317,7 @@ function CellIcon({ value }) {
   return <span className="text-xs text-ink-300 font-mono">{value}</span>
 }
 
-function ComparisonTable({ products, rows, accentColor }) {
+function ComparisonTable({ products, rows, accentColor, compareLinks }) {
   const accent = accentColor || 'kerf-300'
   return (
     <section className="relative border-t border-ink-900">
@@ -392,8 +392,25 @@ function ComparisonTable({ products, rows, accentColor }) {
           <span className="flex items-center gap-1.5"><Check size={11} aria-hidden className="text-emerald-400" />Yes</span>
           <span className="flex items-center gap-1.5"><Minus size={11} aria-hidden />Partial</span>
           <span className="flex items-center gap-1.5"><X size={11} aria-hidden className="text-ink-600" />No</span>
-          <span className="ml-auto text-ink-600">Comparisons updated 2026-05-18</span>
+          <span className="ml-auto text-ink-600">Comparisons updated 2026-05-24</span>
         </div>
+        {compareLinks && compareLinks.length > 0 && (
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <span className="text-[11px] font-mono uppercase tracking-[0.15em] text-ink-500 mr-1">
+              Deep-dive:
+            </span>
+            {compareLinks.map(({ slug, label }) => (
+              <Link
+                key={slug}
+                to={`/compare/${slug}`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-ink-800 bg-ink-900/40 px-3 py-1.5 text-xs font-mono text-ink-300 hover:border-ink-700 hover:text-ink-100 transition-colors"
+              >
+                Kerf vs {label}
+                <ArrowRight size={11} />
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   )
@@ -454,6 +471,7 @@ export default function DomainPage({
   capabilityIllustrations,
   bullets,
   comparison,
+  compareLinks,
   comingSoon,
   domainName,
 }) {
@@ -484,7 +502,29 @@ export default function DomainPage({
             products={comparison.products}
             rows={comparison.rows}
             accentColor={accentColor}
+            compareLinks={compareLinks}
           />
+        )}
+        {!comparison && compareLinks && compareLinks.length > 0 && (
+          <section className="relative border-t border-ink-900">
+            <div className="mx-auto max-w-7xl px-6 py-6">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-500 mr-2">
+                  Deep-dive comparison
+                </span>
+                {compareLinks.map(({ slug: cSlug, label }) => (
+                  <Link
+                    key={cSlug}
+                    to={`/compare/${cSlug}`}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-ink-800 bg-ink-900/40 px-3 py-1.5 text-xs font-mono text-ink-300 hover:border-ink-700 hover:text-ink-100 transition-colors"
+                  >
+                    Kerf vs {label}
+                    <ArrowRight size={11} />
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </section>
         )}
         <CTAStrip domainName={domainName || slug} />
       </main>

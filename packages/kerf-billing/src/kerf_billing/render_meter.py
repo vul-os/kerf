@@ -343,8 +343,20 @@ async def charge_render(
             }
 
     # ── Studio free-quota path ───────────────────────────────────────────────
+    # R11 fix: always resolve the tier from the DB so callers cannot grant
+    # themselves Studio entitlements by passing user_tier="studio".
+    # The passed-in `user_tier` is kept for backward-compat signatures but
+    # the DB value ALWAYS overrides it for the free-quota gate.
+    # If the DB lookup fails (e.g. column absent on older OSS DB), the
+    # exception is caught by _fetch_subscription_tier which returns "".
+    # An empty string is NOT "studio", so free quota is denied — fail-closed.
+    if preset == _FREE_QUOTA_PRESET:
+        effective_tier = await _fetch_subscription_tier(pool, user_id)
+    else:
+        effective_tier = ""
+
     if (
-        user_tier.lower() == _STUDIO_TIER_NAME
+        effective_tier == _STUDIO_TIER_NAME
         and preset == _FREE_QUOTA_PRESET
     ):
         used_quota = await _try_consume_free_quota(pool, user_id)
@@ -431,6 +443,31 @@ async def _fetch_balance(pool, user_id: str) -> float:
             user_id,
         )
     return float(row["credits_usd"]) if row else 0.0
+
+
+async def _fetch_subscription_tier(pool, user_id: str) -> str:
+    """Return the verified subscription tier for *user_id* from the DB.
+
+    Reads ``cloud_user_balances.subscription_tier``.  Returns an empty string
+    when no row exists (e.g. in tests that use a minimal pool stub).
+    """
+    try:
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT subscription_tier FROM cloud_user_balances WHERE user_id = $1",
+                user_id,
+            )
+        if row is None:
+            return ""
+        return str(row["subscription_tier"]).lower()
+    except Exception as exc:
+        # If the column doesn't exist (older DB) or any other DB error, fall back
+        # to empty so the caller degrades gracefully (no free quota granted).
+        logger.warning(
+            "_fetch_subscription_tier: DB error for user=%s — treating as non-studio: %s",
+            user_id, exc,
+        )
+        return ""
 
 
 async def _try_consume_free_quota(pool, user_id: str) -> bool:

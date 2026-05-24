@@ -176,15 +176,96 @@ def _write_output(
     output_format: str,
     data: bytes,
 ) -> str:
-    """Persist render output and return a signed URL (local path for now)."""
-    os.makedirs(config.cache_dir, exist_ok=True)
+    """Persist render output and return a URL.
+
+    S3/Tigris mode (``STORAGE_BACKEND=s3``)
+    -----------------------------------------
+    When the ``STORAGE_BACKEND`` environment variable is ``s3``, the output is
+    uploaded to the configured object-storage bucket under the key
+    ``renders/<cache_key>.<ext>`` and a presigned GET URL (TTL 7 days) is
+    returned.  This avoids storing render artefacts on the ephemeral local
+    filesystem of Koyeb instances and prevents serving them through the app
+    proxy.
+
+    Local / self-host mode (any other ``STORAGE_BACKEND``)
+    -------------------------------------------------------
+    The original behaviour is preserved: write to ``config.cache_dir`` and
+    return the local file path.
+    """
     ext = "png" if output_format == "png" else "exr"
     filename = f"{cache_key}.{ext}"
+
+    backend = os.environ.get("STORAGE_BACKEND", "").strip().lower()
+    if backend == "s3":
+        return _write_output_s3(config, filename, ext, data)
+
+    # ── Local / self-host fallback ───────────────────────────────────────────
+    os.makedirs(config.cache_dir, exist_ok=True)
     dest = os.path.join(config.cache_dir, filename)
     with open(dest, "wb") as fh:
         fh.write(data)
-    # For local storage the "signed URL" is just the file path.
     return dest
+
+
+def _write_output_s3(
+    config: CyclesWorkerConfig,
+    filename: str,
+    ext: str,
+    data: bytes,
+) -> str:
+    """Upload *data* to S3/Tigris and return a presigned GET URL.
+
+    Uses ``kerf_core.storage.create_storage`` with settings read from the
+    same environment variables the main app uses (``S3_BUCKET``,
+    ``S3_REGION``, ``S3_ACCESS_KEY_ID``, ``S3_SECRET_ACCESS_KEY``,
+    ``S3_ENDPOINT``, ``S3_PUBLIC_URL_BASE``).  The object key is
+    ``renders/<filename>``.  Presigned URL TTL is 7 days (604800 seconds).
+
+    Raises on upload failure so the caller surfaces the error rather than
+    silently returning a broken URL.
+    """
+    import asyncio
+    import io
+
+    try:
+        from kerf_core.storage import create_storage
+    except ImportError as exc:
+        raise RuntimeError(
+            "kerf_core.storage not available — cannot upload render output to S3"
+        ) from exc
+
+    storage = create_storage(
+        backend="s3",
+        s3_bucket=os.environ.get("S3_BUCKET", ""),
+        s3_region=os.environ.get("S3_REGION", ""),
+        s3_access_key_id=os.environ.get("S3_ACCESS_KEY_ID", ""),
+        s3_secret_access_key=os.environ.get("S3_SECRET_ACCESS_KEY", ""),
+        s3_endpoint=os.environ.get("S3_ENDPOINT", ""),
+        s3_public_url_base=os.environ.get("S3_PUBLIC_URL_BASE", ""),
+        cdn_base_url=os.environ.get("CDN_BASE_URL", ""),
+    )
+
+    object_key = f"renders/{filename}"
+    content_type = "image/png" if ext == "png" else "image/x-exr"
+    ttl_seconds = 604800  # 7 days
+
+    async def _upload_and_sign() -> str:
+        await storage.put(object_key, io.BytesIO(data), content_type, len(data))
+        return await storage.signed_url(object_key, ttl_seconds=ttl_seconds)
+
+    # Run in the current event loop if one is running, otherwise create one.
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop is not None and loop.is_running():
+        # We are inside an async context — schedule as a coroutine and wait.
+        import concurrent.futures
+        future = asyncio.run_coroutine_threadsafe(_upload_and_sign(), loop)
+        return future.result(timeout=120)
+    else:
+        return asyncio.run(_upload_and_sign())
 
 
 # ---------------------------------------------------------------------------

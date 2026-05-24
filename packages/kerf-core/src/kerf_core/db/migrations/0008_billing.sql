@@ -56,7 +56,12 @@ create table if not exists cloud_user_balances (
     -- folded from 051_billing_buckets.sql: free-tier monthly quota counters
     free_tokens_in_remaining  bigint not null default 100000,
     free_tokens_out_remaining bigint not null default 20000,
-    free_quota_resets_at      timestamptz not null default (date_trunc('month', now()) + interval '1 month')
+    free_quota_resets_at      timestamptz not null default (date_trunc('month', now()) + interval '1 month'),
+    -- subscription tier: 'free' | 'studio' | 'pro' | 'enterprise'
+    -- folded from T-402b R11: tier stored here so render_meter can verify
+    -- it without trusting caller-supplied strings.
+    subscription_tier         text not null default 'free'
+                                  check (subscription_tier in ('free','studio','pro','enterprise'))
 );
 
 -- ── cloud_invoices + cloud_debit_balance(): the Paystack top-up ledger and

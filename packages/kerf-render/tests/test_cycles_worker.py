@@ -87,6 +87,94 @@ def test_write_output_png_and_exr(tmp_path):
 
 
 # ===========================================================================
+# R19 — _write_output: local vs S3 mode
+# ===========================================================================
+
+
+def test_write_output_local_mode_returns_file_path(tmp_path, monkeypatch):
+    """R19: With STORAGE_BACKEND unset (local), _write_output returns a file path."""
+    monkeypatch.delenv("STORAGE_BACKEND", raising=False)
+    cfg = _cfg(tmp_path)
+    result = _write_output(cfg, "abc123", "png", b"BYTES")
+    # Must be a local filesystem path (not an http/s3 URL).
+    assert result.startswith("/"), f"Expected file path, got: {result}"
+    assert result.endswith("abc123.png")
+    assert os.path.isfile(result)
+
+
+def test_write_output_local_mode_non_s3_backend(tmp_path, monkeypatch):
+    """R19: With STORAGE_BACKEND=local, _write_output returns a file path."""
+    monkeypatch.setenv("STORAGE_BACKEND", "local")
+    cfg = _cfg(tmp_path)
+    result = _write_output(cfg, "def456", "exr", b"EXRBYTES")
+    assert result.startswith("/")
+    assert result.endswith("def456.exr")
+
+
+def test_write_output_s3_mode_returns_object_store_url(tmp_path, monkeypatch):
+    """R19: With STORAGE_BACKEND=s3, _write_output uploads and returns a presigned URL."""
+    monkeypatch.setenv("STORAGE_BACKEND", "s3")
+    monkeypatch.setenv("S3_BUCKET", "test-renders-bucket")
+
+    # Stub kerf_core.storage.create_storage so no real S3 call is made.
+    import types, sys
+
+    fake_presigned_url = "https://s3.example.com/renders/key789.png?X-Amz-Signature=abc"
+
+    class _FakeStorage:
+        async def put(self, key, body, content_type, size):
+            self.last_key = key
+            self.last_size = size
+            return None
+
+        async def signed_url(self, key, ttl_seconds=900):
+            return fake_presigned_url
+
+    fake_storage = _FakeStorage()
+
+    # Patch create_storage in the kerf_render.cycles_worker module namespace.
+    from kerf_render import cycles_worker as cw_module
+
+    original = getattr(cw_module, "_write_output_s3", None)
+
+    def _fake_write_output_s3(config, filename, ext, data):
+        import asyncio, io
+
+        async def _run():
+            await fake_storage.put(f"renders/{filename}", io.BytesIO(data), "image/png", len(data))
+            return await fake_storage.signed_url(f"renders/{filename}")
+
+        return asyncio.run(_run())
+
+    monkeypatch.setattr(cw_module, "_write_output_s3", _fake_write_output_s3)
+
+    cfg = _cfg(tmp_path)
+    result = _write_output(cfg, "key789", "png", b"IMGDATA")
+
+    # Result must be an object-store URL, not a local file path.
+    assert result.startswith("https://"), f"Expected object-store URL, got: {result}"
+    assert result == fake_presigned_url
+
+
+def test_write_output_s3_mode_not_a_local_path(tmp_path, monkeypatch):
+    """R19: S3 mode result must never be a local /tmp path."""
+    monkeypatch.setenv("STORAGE_BACKEND", "s3")
+
+    from kerf_render import cycles_worker as cw_module
+
+    def _fake_write_output_s3(config, filename, ext, data):
+        return "https://tigris.example.com/renders/render123.png"
+
+    monkeypatch.setattr(cw_module, "_write_output_s3", _fake_write_output_s3)
+    cfg = _cfg(tmp_path)
+    result = _write_output(cfg, "render123", "png", b"X")
+    assert not result.startswith("/tmp"), (
+        "S3 mode must not return a local /tmp path — "
+        f"ephemeral filesystem on Koyeb. Got: {result}"
+    )
+
+
+# ===========================================================================
 # cycles_worker — process_job cache hit (no Blender)
 # ===========================================================================
 

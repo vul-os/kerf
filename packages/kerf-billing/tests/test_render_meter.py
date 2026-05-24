@@ -57,6 +57,10 @@ class _Conn:
                 self.s["balances"][user] = bal
                 return {"credits_usd": bal}
             return None
+        if "SELECT subscription_tier FROM cloud_user_balances" in q:
+            user = args[0]
+            tier = self.s["tiers"].get(user, "free")
+            return {"subscription_tier": tier}
         if "SELECT credits_usd FROM cloud_user_balances" in q:
             user = args[0]
             if user in self.s["balances"]:
@@ -112,11 +116,12 @@ class _Acquire:
 
 
 class FakePool:
-    def __init__(self, *, balances=None, cache=None, quota=None):
+    def __init__(self, *, balances=None, cache=None, quota=None, tiers=None):
         self.state = {
             "balances": dict(balances or {}),
             "cache": set(cache or ()),
             "quota": dict(quota or {}),
+            "tiers": dict(tiers or {}),  # user_id → subscription_tier string
             "events": [],
             "gpu_events": [],
         }
@@ -215,7 +220,8 @@ async def test_charge_cache_hit_no_deduction():
 
 
 async def test_charge_studio_free_quota_consumed_before_credits():
-    pool = FakePool(balances={"u1": 100.0})
+    # DB tier = "studio" → free quota is granted.
+    pool = FakePool(balances={"u1": 100.0}, tiers={"u1": "studio"})
     res = await charge_render(
         pool, "u1", "j1", "hero", 30.0, user_tier="studio"
     )
@@ -226,8 +232,8 @@ async def test_charge_studio_free_quota_consumed_before_credits():
 
 
 async def test_studio_free_quota_exhausts_then_charges_credits():
-    pool = FakePool(balances={"u1": 100.0})
-    # 3 free Hero renders/month, then 4th draws credits
+    # DB tier = "studio" — 3 free Hero renders, then 4th charges credits.
+    pool = FakePool(balances={"u1": 100.0}, tiers={"u1": "studio"})
     for _ in range(3):
         r = await charge_render(pool, "u1", "j", "hero", 30.0, user_tier="studio")
         assert r["free_quota_used"] is True
@@ -238,15 +244,49 @@ async def test_studio_free_quota_exhausts_then_charges_credits():
 
 
 async def test_non_studio_tier_gets_no_free_quota():
-    pool = FakePool(balances={"u1": 100.0})
+    # DB tier = "pro" → no free quota even if caller passes user_tier="pro".
+    pool = FakePool(balances={"u1": 100.0}, tiers={"u1": "pro"})
     res = await charge_render(pool, "u1", "j", "hero", 30.0, user_tier="pro")
     assert res["free_quota_used"] is False
     assert res["credits_deducted"] == 10.0
     assert pool.balance("u1") == 90.0
 
 
+# ---------------------------------------------------------------------------
+# R11 security regression: caller-supplied tier cannot grant free quota
+# ---------------------------------------------------------------------------
+
+
+async def test_r11_free_tier_db_overrides_caller_studio_hint():
+    """R11: DB tier='free' → no Studio free quota even when caller passes user_tier='studio'.
+
+    This is the critical security assertion: a caller that passes
+    ``user_tier='studio'`` must not receive 3 free hero renders when
+    the authoritative DB value is 'free'.
+    """
+    pool = FakePool(balances={"u1": 100.0}, tiers={"u1": "free"})
+    res = await charge_render(pool, "u1", "j", "hero", 30.0, user_tier="studio")
+    # DB says "free" → no free quota, credits deducted normally.
+    assert res["free_quota_used"] is False, (
+        "User with DB tier='free' must not get Studio free quota "
+        "even when user_tier='studio' was passed by the caller."
+    )
+    assert res["credits_deducted"] == 10.0
+    assert pool.balance("u1") == 90.0
+
+
+async def test_r11_studio_db_tier_without_hint_grants_quota():
+    """R11: DB tier='studio' → free quota is granted regardless of user_tier arg."""
+    pool = FakePool(balances={"u1": 100.0}, tiers={"u1": "studio"})
+    # Pass user_tier="" (no hint) — DB value alone should be enough.
+    res = await charge_render(pool, "u1", "j", "hero", 30.0, user_tier="")
+    assert res["free_quota_used"] is True
+    assert res["credits_deducted"] == 0.0
+
+
 async def test_studio_free_quota_only_applies_to_hero():
-    pool = FakePool(balances={"u1": 100.0})
+    # Studio tier only gets free quota for the "hero" preset.
+    pool = FakePool(balances={"u1": 100.0}, tiers={"u1": "studio"})
     res = await charge_render(pool, "u1", "j", "draft", 5.0, user_tier="studio")
     assert res["free_quota_used"] is False
     assert res["credits_deducted"] == 0.5

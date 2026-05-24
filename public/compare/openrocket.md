@@ -84,8 +84,8 @@ features:
       note: "Dual-deploy, apogee detect, drogue + main chute simulation with drift"
       source: "https://openrocket.info/documentation.html"
     kerf:
-      status: partial
-      note: "Parachute drag descent calc in aero tools; no full event sequencer"
+      status: yes
+      note: "Full dual-deploy event sequencer: drogue at apogee → main at trigger alt; USSA-76 density; streamer Cd·A; horizontal wind drift"
       evidence: "packages/kerf-aero/src/kerf_aero/recovery.py"
   - domain: D5
     feature: "Propulsion (Tsiolkovsky / staging / specific impulse)"

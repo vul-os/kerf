@@ -60,8 +60,9 @@ features:
       source: "https://www.openfoam.com/documentation/guides/latest/doc/openfoam-guide.html"
     kerf:
       status: no
-      note: "Combustion solvers not yet exposed in Kerf bridge"
+      note: "Combustion CFD (reactingFoam / fireFoam) not yet exposed in Kerf bridge"
       evidence: "packages/kerf-cfd/"
+      kerf_note: "Reacting flow requires species transport, chemical mechanism files (Cantera/Chemkin), and reaction sub-models. Large scope; not currently planned for bridge exposure."
 
   - domain: D4
     feature: "CFD — turbulence models (RANS)"
@@ -106,6 +107,7 @@ features:
       status: no
       note: "Lagrangian particle models not exposed in Kerf bridge"
       evidence: "packages/kerf-cfd/"
+      kerf_note: "DPM/spray/coal particle tracking requires coupled Eulerian-Lagrangian case templates and post-processing infrastructure. Large scope; not currently planned."
 
   - domain: D4
     feature: "CFD — dynamic mesh / FSI"
@@ -117,6 +119,7 @@ features:
       status: no
       note: "Dynamic mesh and FSI not yet exposed in Kerf bridge"
       evidence: "packages/kerf-cfd/"
+      kerf_note: "Moving-boundary FSI requires coupled solver orchestration (OpenFOAM + CalculiX via preCICE or native). Large scope; not currently planned."
 
   - domain: D4
     feature: "CFD — parallel MPI execution"

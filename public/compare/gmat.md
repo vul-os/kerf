@@ -58,8 +58,8 @@ features:
       note: "Dual-cone shadow + spherical SRP; Cr configurable"
       source: "https://gmat.atlassian.net/wiki/spaces/GW/pages/380273281"
     kerf:
-      status: partial
-      note: "SRP modelled in orbital perturbations; no dual-cone shadow"
+      status: yes
+      note: "SRP with cylindrical Earth shadow; Cr / area / mass configurable; in_shadow flag"
       evidence: "packages/kerf-aero/src/kerf_aero/orbital/perturbations.py"
 
   - domain: D5
@@ -69,9 +69,9 @@ features:
       note: "BdotT/BdotR/C3 B-plane targeting sequences"
       source: "https://gmat.atlassian.net/wiki/spaces/GW/pages/380274219"
     kerf:
-      status: no
-      note: "Lambert + Hohmann only; no B-plane solver"
-      evidence: ""
+      status: yes
+      note: "B-plane frame (S/T/R triad), BdotT/BdotR from hyperbolic state, first-order ΔV differential correction"
+      evidence: "packages/kerf-aero/src/kerf_aero/orbital/b_plane.py"
 
   - domain: D5
     feature: "Finite-burn manoeuvre modelling"
@@ -114,8 +114,9 @@ features:
       source: "https://gmat.atlassian.net/wiki/spaces/GW/pages/380273617"
     kerf:
       status: no
-      note: "No orbit determination engine"
+      note: "No orbit determination engine; out of scope for current version"
       evidence: ""
+      kerf_note: "Batch OD + EKF require observations processing pipeline (range/Doppler); this is a large-scope addition. Not currently planned."
 
   - domain: D5
     feature: "Monte Carlo dispersion analysis"
@@ -124,9 +125,9 @@ features:
       note: "Built-in Monte Carlo mission sequence with variable perturbation"
       source: "https://gmat.atlassian.net/wiki/spaces/GW/pages/380274219"
     kerf:
-      status: no
-      note: "No MC orbit dispersion tool"
-      evidence: ""
+      status: yes
+      note: "Monte Carlo trajectory dispersion: wind/Cd/Cl/ignition-delay scatter; landing ellipse stats; p5/p50/p95 apogee/range"
+      evidence: "packages/kerf-aero/src/kerf_aero/monte_carlo.py"
 
   - domain: D5
     feature: "State transition matrix (STM) propagation"
@@ -135,9 +136,9 @@ features:
       note: "A-matrix + STM propagation for covariance and targeting"
       source: "https://gmat.atlassian.net/wiki/spaces/GW/pages/380273275"
     kerf:
-      status: no
-      note: "No STM propagation"
-      evidence: ""
+      status: yes
+      note: "Keplerian + J2 A-matrix; augmented RK4 STM (42-vector); P(t)=Φ P₀ Φᵀ covariance propagation; STM-based differential correction"
+      evidence: "packages/kerf-aero/src/kerf_aero/orbital/stm.py"
 
   - domain: D5
     feature: "Launch window / access / coverage analysis"
@@ -146,9 +147,9 @@ features:
       note: "ContactLocator, EclipseLocator, GroundStation access intervals"
       source: "https://gmat.atlassian.net/wiki/spaces/GW/pages/380274213"
     kerf:
-      status: no
-      note: "No coverage or contact-interval engine"
-      evidence: ""
+      status: yes
+      note: "Ground station contact intervals (rise/set bisection, ECI→ECEF→ENU, min elevation mask); multi-station coverage metrics"
+      evidence: "packages/kerf-aero/src/kerf_aero/orbital/coverage.py"
 
   - domain: D5
     feature: "Attitude dynamics (nadir / Sun-pointing / spin-stabilised)"
@@ -169,8 +170,9 @@ features:
       source: "https://gmat.atlassian.net/wiki/spaces/GW/pages/380273275"
     kerf:
       status: no
-      note: "No three-body / libration point propagator"
+      note: "No CR3BP / libration point propagator"
       evidence: ""
+      kerf_note: "Circular-restricted 3-body problem and halo orbit computation require dedicated differential corrector and continuation methods. This is large scope; not currently planned."
 
   - domain: D5
     feature: "Reentry / TPS analysis"

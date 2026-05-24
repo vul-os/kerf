@@ -35,14 +35,16 @@ features:
     nx_tier: paid
     competitor:source: https://plm.automation.siemens.com/global/en/products/nx/nx-design.html
     kerf:status: partial
-    kerf:evidence: cloud/occt/nurbs/
+    kerf:note: "blend/network/patch/match-srf + G3 + zebra/isophote + Class-A harness wired; not Shape-Studio depth"
+    kerf:evidence: packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py
   - domain: D1
     feature: Direct edit (push-pull)
     nx: "Synchronous Technology — history-free face move/resize/delete works on any B-rep regardless of origin"
     nx_tier: included
     competitor:source: https://plm.automation.siemens.com/global/en/products/nx/synchronous-technology.html
-    kerf:status: partial
-    kerf:evidence: cloud/occt/direct_edit.py
+    kerf:status: shipped
+    kerf:note: "push_pull (planar + curved), move_face, delete_face wired as ops"
+    kerf:evidence: packages/kerf-cad-core/src/kerf_cad_core/geom/direct_edit.py
   - domain: D1
     feature: Assemblies — mates
     nx: "Assembly constraints (coincident, concentric, parallel, distance, angle) with full kinematic DoF tracking"
@@ -55,8 +57,9 @@ features:
     nx: "NX Sheet Metal — flanges, hems, joggle, relief patterns, flat pattern, NC output"
     nx_tier: included
     competitor:source: https://docs.sw.siemens.com/en-US/doc/288068776/PL20231017083816340.xid1428210/en-US
-    kerf:status: partial
-    kerf:evidence: cloud/occt/sheetmetal/unfold.py
+    kerf:status: shipped
+    kerf:note: "flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief"
+    kerf:evidence: packages/kerf-cad-core/src/kerf_cad_core/construction_verbs_tools.py
   - domain: D1
     feature: 2D drawings (views/dims/sections)
     nx: "Full drafting environment — multi-sheet drawings, section views, detail views, GD&T annotations"
@@ -422,7 +425,7 @@ Both tools acknowledge that mechanical design does not stop at geometry: NX bund
 ## Where NX wins
 
 - **Synchronous technology.** NX's hybrid parametric/direct editing — where you can manipulate geometry without caring whether it was created with or without history — is a decade-long engineering investment with no peer. Kerf is feature-tree primary with limited direct editing.
-- **Advanced surfacing (Class A).** NX Shape Studio and its curvature-continuity surface modelling tools (G2/G3 blending, reflection line analysis, sectional curvature combs) are automotive-grade. Kerf's NURBS Phase 4 is early.
+- **Advanced surfacing (Class A).** NX Shape Studio and its curvature-continuity surface modelling tools (G2/G3 blending, reflection line analysis, sectional curvature combs) are automotive-grade. Kerf now ships G3 blends, match-surface, zebra/isophote/curvature-comb analysis and a Class-A continuity harness as wired ops, but its surfacing is far younger and does not approach Shape Studio depth.
 - **Production CAM.** NX CAM's multi-axis machining, adaptive clearing, and verified toolpath simulation have been validated in production aerospace and automotive shops for decades. Kerf's CAM is younger.
 - **Nastran-grade FEM.** NX's built-in Simcenter FEM, including pre/post-processing and solver integration, provides structural, thermal, fatigue, and vibration analysis at a depth Kerf does not approach.
 - **PLM integration.** NX integrates natively with Teamcenter for BOM, change management, and programme-level configuration — enterprise-scale product lifecycle management that Kerf's cloud git layer does not target.
@@ -435,9 +438,9 @@ Both tools acknowledge that mechanical design does not stop at geometry: NX bund
 | Cost | Free local; hosted credits | Thousands USD/seat/yr (May 2026) |
 | B-rep kernel | Open CASCADE (OCCT) | Parasolid |
 | Parametric history | Feature DAG | History tree + Synchronous Technology |
-| Direct editing | Limited | Synchronous Technology (mature) |
-| Class-A surfacing | NURBS Phase 4 (early) | NX Shape Studio (automotive-grade) |
-| Sheet metal | Flange + unfold + flat-pattern | Sheet Metal workbench (mature) |
+| Direct editing | push_pull (planar + curved) + move/delete-face | Synchronous Technology (mature) |
+| Class-A surfacing | G3 blends + match-srf + zebra/isophote + Class-A harness (younger) | NX Shape Studio (automotive-grade) |
+| Sheet metal | Flange + hem + jog + multi-flange + unfold + flat DXF | Sheet Metal workbench (mature) |
 | Assembly | Assembly mates | Full assembly + kinematic simulation |
 | FEM / simulation | Not yet | Simcenter FEM (Nastran-grade) |
 | CAM | 3-axis + 5-axis 3+2 | Multi-axis NX CAM (mature, production) |

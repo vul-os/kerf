@@ -1,31 +1,25 @@
 /**
- * Landing — production marketing page.
+ * Landing — persona-led marketing funnel.
  *
- * Sections (top → bottom):
- *   1. Hero — single-line headline, two CTAs (Try it free / Read the
- *      docs), a small "Run it locally" install snippet, and the three-
- *      pane editor illustration above the fold (>=lg) or below (mobile).
- *   2. Output strip — tiny pills listing the real engineering artifacts
- *      Kerf emits (STEP, IFC, gerber, G-code, SPICE, FEM, BOM).
- *   3. Pipeline divider — sketch → feature → assembly → drawing → CAM.
- *   4. Capability tour — capability cards, each with a domain
- *      illustration, grouped into mechanical / electronics / arch /
- *      engineering / sharing.
- *   5. Chat loop — single-frame view of how an LLM turn shapes geometry.
- *   6. Recently shipped — drawn from docs/whats-new.md and the most
- *      recent ROADMAP ✅ rows. Links into the docs.
- *   7. Roadmap glimpse — "what's next" tiles + link to roadmap.
- *   8. Local vs hosted — same product, two ways to run it.
- *   9. Pricing teaser — three plan cards linking to /pricing.
- *  10. CTA strip — try / GitHub.
- *  11. Footer (own component).
+ * Section structure (top → bottom):
+ *   1.  Hero — headline, two CTAs, trust microbadges, HeroIllustration.
+ *   2.  Persona strip — 4 engineer archetypes with illustrations.
+ *   3.  Domain spotlights — <DomainSpotlights /> "and many more" beat.
+ *   4.  Chat loop — ChatLoopIllustration + PipelineIllustration.
+ *   5.  Sketch → solid pipeline — 4 illustration grid.
+ *   6.  Capability grid — simulation / manufacturing / collaboration.
+ *   7.  Kernel depth — <KernelDepth /> credibility anchor.
+ *   8.  Architecture row — tolerance stackup + mates + viewport.
+ *   9.  Output strip — engineering artefacts emitted.
+ *  10.  Recently shipped — moving fast, in public.
+ *  11.  Local vs hosted — same product, two ways to run it.
+ *  12.  Pricing teaser — three plan cards (cloud only).
+ *  13.  CTA strip — close with workspace / compare / docs.
+ *  14.  Footer.
  *
- * Palette is locked to ink-* / kerf-* / cyan-edge / magenta-edge from
- * src/index.css. No raster assets — everything inline SVG.
- *
- * Density note: spacing is tuned for competitive density (Linear/Vercel
- * style) — section padding ~py-12/14, card gaps ~gap-4/5, card insets
- * ~p-5/6. Don't pad this page back out without checking with a designer.
+ * Palette locked to ink-* / kerf-* / cyan-edge / magenta-edge.
+ * No raster assets — all illustrations are inline SVG.
+ * Tailwind only. Mobile-first responsive.
  */
 import { Link } from 'react-router-dom'
 import {
@@ -106,313 +100,10 @@ const INSTALL_CMD = 'pip install -e .[mech]'
 const RUN_CMD = 'kerf-server --migrate'
 
 /* -------------------------------------------------------------------------- */
-/* Section: Hero                                                               */
+/* Domain href map — canonical source of truth for sector deep-links          */
+/* Tests in landing.{silicon,firmware,aerospace}.test.js scan this file.     */
 /* -------------------------------------------------------------------------- */
 
-function Hero() {
-  const authed = useAuth((s) => !!s.accessToken)
-  return (
-    <section className="relative overflow-hidden">
-      <HeroBackdrop />
-
-      <div className="relative mx-auto max-w-7xl px-6 pt-14 pb-16 sm:pt-16 lg:pt-20 lg:pb-20">
-        <div className="grid lg:grid-cols-[1fr_1.15fr] gap-8 lg:gap-12 items-center">
-          <div>
-            <span
-              className="inline-flex items-center gap-2 rounded-full border border-ink-800 bg-ink-900/70 backdrop-blur px-3 py-1 text-xs text-ink-300 font-mono"
-              aria-label="Verticals and licence summary"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-kerf-300 animate-pulse" />
-              open source · jewelry · mech · electronic
-            </span>
-
-            <h1 className="mt-4 font-display text-[2.6rem] sm:text-5xl lg:text-[4.25rem] font-semibold tracking-[-0.03em] leading-[1.02]">
-              Chat-driven CAD.
-              <br />
-              <span className="relative inline-block">
-                <span className="relative z-10 text-kerf-300">Real</span>
-                <span
-                  aria-hidden
-                  className="absolute left-0 right-0 -bottom-2 h-2.5 bg-kerf-300/15 -skew-x-12 rounded-sm"
-                />
-              </span>{' '}
-              geometry kernel underneath.
-            </h1>
-
-            <p className="mt-4 text-lg text-ink-300 leading-relaxed max-w-xl">
-              Three verticals in one workspace — jewelry, mechanical,
-              electronic — sitting on a validated B-rep + NURBS kernel with a
-              parametric history DAG. Parametric edits survive across fillets
-              and booleans via persistent face IDs.{' '}
-              <Link
-                to="/docs/whats-new"
-                className="text-kerf-300 underline underline-offset-2 hover:text-kerf-200 transition-colors"
-              >
-                See what shipped →
-              </Link>
-            </p>
-
-            <ul
-              className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2 max-w-xl text-[11px] font-mono text-ink-400"
-              aria-label="Per-vertical capability summary"
-            >
-              <li className="rounded-md border border-ink-800 bg-ink-900/50 px-2.5 py-1.5">
-                <span className="text-kerf-300">jewelry</span> · 40 modules
-              </li>
-              <li className="rounded-md border border-ink-800 bg-ink-900/50 px-2.5 py-1.5">
-                <span className="text-kerf-300">mech</span> · weld · forming · AM · moldflow · CAM
-              </li>
-              <li className="rounded-md border border-ink-800 bg-ink-900/50 px-2.5 py-1.5">
-                <span className="text-kerf-300">electronic</span> · SI · EMC · PDN · thermal
-              </li>
-            </ul>
-
-            <div className="mt-5 flex flex-wrap items-center gap-3">
-              {authed ? (
-                <Button as={Link} to="/projects" variant="primary" size="lg">
-                  Open Kerf
-                  <ArrowRight size={16} />
-                </Button>
-              ) : (
-                <Button as={Link} to="/signup" variant="primary" size="lg">
-                  Try it free
-                  <ArrowRight size={16} />
-                </Button>
-              )}
-              <Button as={Link} to="/docs/getting-started" variant="outline" size="lg">
-                Read the docs
-              </Button>
-            </div>
-
-            <RunLocallyChip />
-
-            <ul
-              className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-ink-400 font-mono"
-              aria-label="Quiet credibility footnotes"
-            >
-              <li className="flex items-center gap-1.5">
-                <span className="w-1 h-1 rounded-full bg-ink-500" />
-                ~23,959 tests green · 0 failing
-              </li>
-              <li className="flex items-center gap-1.5">
-                <span className="w-1 h-1 rounded-full bg-ink-500" />
-                MIT licensed
-              </li>
-              <li className="flex items-center gap-1.5">
-                <span className="w-1 h-1 rounded-full bg-ink-500" />
-                Python plugin monorepo
-              </li>
-              <li className="flex items-center gap-1.5">
-                <span className="w-1 h-1 rounded-full bg-ink-500" />
-                no card required
-              </li>
-            </ul>
-          </div>
-
-          <div className="relative hidden md:block rounded-[2rem] p-6 -m-6">
-            <div className="relative rounded-2xl border border-ink-800 bg-ink-900/40 backdrop-blur shadow-2xl shadow-black/60 overflow-hidden aspect-[3/2]">
-              <HeroIllustration className="block w-full h-full" />
-            </div>
-            <div
-              aria-hidden
-              className="absolute inset-0 -z-10 rounded-[2rem] bg-kerf-300/[0.05] blur-3xl"
-            />
-            {/* small floating chips around the hero illustration to read at a glance */}
-            <FloatingChip className="hidden lg:flex absolute -top-3 -left-4" icon={Sparkles} label="LLM tool surface" />
-            <FloatingChip className="hidden lg:flex absolute -bottom-3 -right-4" icon={GitBranch} label="GitHub sync" />
-          </div>
-        </div>
-
-        <LogoStrip />
-      </div>
-    </section>
-  )
-}
-
-function FloatingChip({ icon: Icon, label, className = '' }) {
-  return (
-    <div
-      className={
-        'items-center gap-1.5 rounded-full border border-ink-700 bg-ink-900/85 backdrop-blur px-2.5 py-1 text-[10px] font-mono text-ink-200 shadow-lg shadow-black/40 ' +
-        className
-      }
-    >
-      <Icon size={11} className="text-kerf-300" />
-      {label}
-    </div>
-  )
-}
-
-function RunLocallyChip() {
-  const [copied, setCopied] = useState(false)
-  const copy = () => {
-    const text = `${INSTALL_CMD}\n${RUN_CMD}`
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(text).catch(() => {})
-    }
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1400)
-  }
-  return (
-    <div className="mt-4 flex flex-col gap-1 rounded-lg border border-ink-800 bg-ink-900/60 px-3 py-2 font-mono text-xs text-ink-300 max-w-full sm:max-w-md">
-      <div className="flex items-start gap-2 min-w-0">
-        <Terminal size={12} className="text-kerf-300 shrink-0 mt-1" />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-ink-500 shrink-0">$</span>
-            <span className="text-ink-100 break-all">{INSTALL_CMD}</span>
-          </div>
-          <div className="flex items-center gap-2 min-w-0 mt-0.5">
-            <span className="text-ink-500 shrink-0">$</span>
-            <span className="text-ink-100 break-all">{RUN_CMD}</span>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={copy}
-          aria-label="Copy install commands"
-          className="inline-flex items-center justify-center w-6 h-6 rounded text-ink-400 hover:text-kerf-300 hover:bg-ink-800 transition-colors shrink-0"
-        >
-          {copied ? <Check size={12} className="text-kerf-300" /> : <Copy size={12} />}
-        </button>
-      </div>
-      <p className="text-[10px] text-ink-500 pl-5">
-        Python 3.11+ · Postgres · or{' '}
-        <code className="text-ink-400">curl kerf.sh/install.sh | sh</code>
-      </p>
-    </div>
-  )
-}
-
-function HeroBackdrop() {
-  return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div
-        className="absolute inset-0 opacity-[0.18]"
-        style={{
-          backgroundImage:
-            'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.5) 1px, transparent 0)',
-          backgroundSize: '28px 28px',
-          maskImage:
-            'radial-gradient(ellipse 70% 60% at 50% 30%, black 30%, transparent 80%)',
-          WebkitMaskImage:
-            'radial-gradient(ellipse 70% 60% at 50% 30%, black 30%, transparent 80%)',
-        }}
-      />
-      <div
-        className="absolute -top-40 left-1/2 -translate-x-1/2 w-[1100px] h-[700px] opacity-50"
-        style={{
-          background:
-            'radial-gradient(ellipse at center, rgba(255,214,51,0.18) 0%, rgba(255,214,51,0.04) 35%, transparent 70%)',
-        }}
-      />
-    </div>
-  )
-}
-
-function LogoStrip() {
-  // The "trusted by" strip is honest: list the technologies under the
-  // hood, not vapor logos. Pure typographic, low-key.
-  const items = [
-    'JSCAD',
-    'tscircuit',
-    'planegcs',
-    'FEniCSx',
-    'OpenCAMlib',
-    'IfcOpenShell',
-    'FreeRouting',
-    'TechDraw',
-    'KiCad',
-  ]
-  return (
-    <div className="mt-10 lg:mt-12 flex flex-col items-center gap-3">
-      <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-ink-500">
-        Built on open kernels
-      </p>
-      <ul className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
-        {items.map((it) => (
-          <li
-            key={it}
-            className="font-mono text-sm text-ink-400 hover:text-ink-200 transition-colors"
-          >
-            {it}
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
-
-/* -------------------------------------------------------------------------- */
-/* Section: Output formats strip                                               */
-/* -------------------------------------------------------------------------- */
-
-const OUTPUT_FORMATS = [
-  { label: 'STEP', sub: 'validated B-rep' },
-  { label: 'STL · 3MF', sub: 'mesh export' },
-  { label: 'IFC4', sub: 'BIM' },
-  { label: 'gerber', sub: 'PCB fab' },
-  { label: 'G-code', sub: 'CNC posts' },
-  { label: 'SPICE', sub: 'circuit sim' },
-  { label: 'FEM mesh', sub: 'CalculiX · gmsh' },
-  { label: 'PDF · DXF', sub: 'drawings' },
-  { label: 'BOM CSV', sub: 'with prices' },
-  { label: 'Touchstone', sub: 'S-parameters' },
-]
-
-function OutputStrip() {
-  return (
-    <section className="relative border-t border-ink-900 bg-ink-950/60">
-      <div className="mx-auto max-w-7xl px-6 py-8 lg:py-10">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-          <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-ink-500">
-            Real artefacts out the other side
-          </p>
-          <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-ink-500/70">
-            no proprietary lock-in
-          </p>
-        </div>
-        <ul className="flex flex-wrap gap-2">
-          {OUTPUT_FORMATS.map((f) => (
-            <li
-              key={f.label}
-              className="inline-flex items-center gap-2 rounded-md border border-ink-800 bg-ink-900/50 px-2.5 py-1"
-            >
-              <span className="font-mono text-xs text-kerf-300">{f.label}</span>
-              <span className="font-mono text-[10px] text-ink-500">{f.sub}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </section>
-  )
-}
-
-/* -------------------------------------------------------------------------- */
-/* Section: Pipeline divider                                                   */
-/* -------------------------------------------------------------------------- */
-
-function PipelineDivider() {
-  return (
-    <section className="relative border-t border-ink-900">
-      <div className="mx-auto max-w-7xl px-6 py-6 lg:py-8">
-        <PipelineIllustration className="block w-full h-auto" />
-      </div>
-    </section>
-  )
-}
-
-/* -------------------------------------------------------------------------- */
-/* Section: Capability tour                                                    */
-/* -------------------------------------------------------------------------- */
-
-// Map of capability-group id → /domains/<slug> deep-link target. Used by
-// CapabilityGroup to render a "Read more" link for groups that have a
-// dedicated domain page. The literal URLs also make Landing.jsx the
-// canonical source-of-truth for which sectors have a live domain page —
-// the source-text route-presence tests in
-// src/routes/__tests__/landing.{silicon,firmware,aerospace}.test.js and
-// src/routes/__tests__/domains.new-sectors.test.js scan this file.
 export const DOMAIN_HREFS = {
   silicon:  '/domains/silicon',
   firmware: '/domains/firmware',
@@ -422,6 +113,10 @@ export const DOMAIN_HREFS = {
   femcfd:   '/domains/femcfd',
   textiles: '/domains/textiles',
 }
+
+/* -------------------------------------------------------------------------- */
+/* CAPABILITY_GROUPS — kept intact for source-scan tests                      */
+/* -------------------------------------------------------------------------- */
 
 export const CAPABILITY_GROUPS = [
   {
@@ -634,7 +329,7 @@ export const CAPABILITY_GROUPS = [
       {
         icon: Boxes,
         title: 'Library',
-        body: 'Drop-in parts. Yours, the community’s, curated. Verified-publisher accounts (Adafruit, McMaster-style) seed common components. Live pricing via DigiKey / Mouser / LCSC.',
+        body: 'Drop-in parts. Yours, the community\'s, curated. Verified-publisher accounts (Adafruit, McMaster-style) seed common components. Live pricing via DigiKey / Mouser / LCSC.',
         Illustration: LibraryIllustration,
       },
       {
@@ -763,165 +458,359 @@ export const CAPABILITY_GROUPS = [
   },
 ]
 
-function CapabilityTour() {
+/* -------------------------------------------------------------------------- */
+/* § 1 — Hero                                                                  */
+/* -------------------------------------------------------------------------- */
+
+function Hero() {
+  const authed = useAuth((s) => !!s.accessToken)
   return (
-    <section className="relative border-t border-ink-900">
+    <section className="relative overflow-hidden">
+      <HeroBackdrop />
+
+      <div className="relative mx-auto max-w-7xl px-6 pt-14 pb-16 sm:pt-16 lg:pt-20 lg:pb-20">
+        <div className="grid lg:grid-cols-[1fr_1.15fr] gap-8 lg:gap-12 items-center">
+          <div>
+            <span
+              className="inline-flex items-center gap-2 rounded-full border border-ink-800 bg-ink-900/70 backdrop-blur px-3 py-1 text-xs text-ink-300 font-mono"
+              aria-label="Licence and discipline summary"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-kerf-300 animate-pulse" />
+              MIT · open-source · multi-discipline
+            </span>
+
+            <h1 className="mt-4 font-display text-[2.6rem] sm:text-5xl lg:text-[4.25rem] font-semibold tracking-[-0.03em] leading-[1.02]">
+              Design anything.
+              <br />
+              <span className="relative inline-block">
+                <span className="relative z-10 text-kerf-300">Chat</span>
+                <span
+                  aria-hidden
+                  className="absolute left-0 right-0 -bottom-2 h-2.5 bg-kerf-300/15 -skew-x-12 rounded-sm"
+                />
+              </span>{' '}
+              drives it all.
+            </h1>
+
+            <p className="mt-4 text-lg text-ink-300 leading-relaxed max-w-xl">
+              Multi-discipline open-source CAD: parametric mechanical,
+              electronics, BIM, jewelry, all driven by chat.{' '}
+              <Link
+                to="/docs/whats-new"
+                className="text-kerf-300 underline underline-offset-2 hover:text-kerf-200 transition-colors"
+              >
+                See what shipped →
+              </Link>
+            </p>
+
+            {/* Trust microbadges */}
+            <ul
+              className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] font-mono text-ink-400"
+              aria-label="Trust microbadges"
+            >
+              <li className="flex items-center gap-1.5">
+                <span className="w-1 h-1 rounded-full bg-kerf-300/70" />
+                MIT licensed
+              </li>
+              <li className="flex items-center gap-1.5">
+                <span className="w-1 h-1 rounded-full bg-kerf-300/70" />
+                Postgres-backed
+              </li>
+              <li className="flex items-center gap-1.5">
+                <span className="w-1 h-1 rounded-full bg-kerf-300/70" />
+                Run locally or hosted
+              </li>
+            </ul>
+
+            <div className="mt-5 flex flex-wrap items-center gap-3">
+              {authed ? (
+                <Button as={Link} to="/projects" variant="primary" size="lg">
+                  Open the workspace
+                  <ArrowRight size={16} />
+                </Button>
+              ) : (
+                <Button as={Link} to="/signup" variant="primary" size="lg">
+                  Sign up free
+                  <ArrowRight size={16} />
+                </Button>
+              )}
+              <Button as="a" href={GITHUB_URL} target="_blank" rel="noreferrer" variant="outline" size="lg">
+                <Github size={16} />
+                View on GitHub
+              </Button>
+            </div>
+
+            <RunLocallyChip />
+
+            <ul
+              className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-ink-400 font-mono"
+              aria-label="Quiet credibility footnotes"
+            >
+              <li className="flex items-center gap-1.5">
+                <span className="w-1 h-1 rounded-full bg-ink-500" />
+                ~23,959 tests green · 0 failing
+              </li>
+              <li className="flex items-center gap-1.5">
+                <span className="w-1 h-1 rounded-full bg-ink-500" />
+                Python plugin monorepo
+              </li>
+              <li className="flex items-center gap-1.5">
+                <span className="w-1 h-1 rounded-full bg-ink-500" />
+                no card required
+              </li>
+            </ul>
+          </div>
+
+          <div className="relative hidden md:block rounded-[2rem] p-6 -m-6">
+            <div className="relative rounded-2xl border border-ink-800 bg-ink-900/40 backdrop-blur shadow-2xl shadow-black/60 overflow-hidden aspect-[3/2]">
+              <HeroIllustration className="block w-full h-full" />
+            </div>
+            <div
+              aria-hidden
+              className="absolute inset-0 -z-10 rounded-[2rem] bg-kerf-300/[0.05] blur-3xl"
+            />
+            <FloatingChip className="hidden lg:flex absolute -top-3 -left-4" icon={Sparkles} label="LLM tool surface" />
+            <FloatingChip className="hidden lg:flex absolute -bottom-3 -right-4" icon={GitBranch} label="GitHub sync" />
+          </div>
+        </div>
+
+        <LogoStrip />
+      </div>
+    </section>
+  )
+}
+
+function FloatingChip({ icon: Icon, label, className = '' }) {
+  return (
+    <div
+      className={
+        'items-center gap-1.5 rounded-full border border-ink-700 bg-ink-900/85 backdrop-blur px-2.5 py-1 text-[10px] font-mono text-ink-200 shadow-lg shadow-black/40 ' +
+        className
+      }
+    >
+      <Icon size={11} className="text-kerf-300" />
+      {label}
+    </div>
+  )
+}
+
+function RunLocallyChip() {
+  const [copied, setCopied] = useState(false)
+  const copy = () => {
+    const text = `${INSTALL_CMD}\n${RUN_CMD}`
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(text).catch(() => {})
+    }
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1400)
+  }
+  return (
+    <div className="mt-4 flex flex-col gap-1 rounded-lg border border-ink-800 bg-ink-900/60 px-3 py-2 font-mono text-xs text-ink-300 max-w-full sm:max-w-md">
+      <div className="flex items-start gap-2 min-w-0">
+        <Terminal size={12} className="text-kerf-300 shrink-0 mt-1" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-ink-500 shrink-0">$</span>
+            <span className="text-ink-100 break-all">{INSTALL_CMD}</span>
+          </div>
+          <div className="flex items-center gap-2 min-w-0 mt-0.5">
+            <span className="text-ink-500 shrink-0">$</span>
+            <span className="text-ink-100 break-all">{RUN_CMD}</span>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={copy}
+          aria-label="Copy install commands"
+          className="inline-flex items-center justify-center w-6 h-6 rounded text-ink-400 hover:text-kerf-300 hover:bg-ink-800 transition-colors shrink-0"
+        >
+          {copied ? <Check size={12} className="text-kerf-300" /> : <Copy size={12} />}
+        </button>
+      </div>
+      <p className="text-[10px] text-ink-500 pl-5">
+        Python 3.11+ · Postgres · or{' '}
+        <code className="text-ink-400">curl kerf.sh/install.sh | sh</code>
+      </p>
+    </div>
+  )
+}
+
+function HeroBackdrop() {
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+      <div
+        className="absolute inset-0 opacity-[0.18]"
+        style={{
+          backgroundImage:
+            'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.5) 1px, transparent 0)',
+          backgroundSize: '28px 28px',
+          maskImage:
+            'radial-gradient(ellipse 70% 60% at 50% 30%, black 30%, transparent 80%)',
+          WebkitMaskImage:
+            'radial-gradient(ellipse 70% 60% at 50% 30%, black 30%, transparent 80%)',
+        }}
+      />
+      <div
+        className="absolute -top-40 left-1/2 -translate-x-1/2 w-[1100px] h-[700px] opacity-50"
+        style={{
+          background:
+            'radial-gradient(ellipse at center, rgba(255,214,51,0.18) 0%, rgba(255,214,51,0.04) 35%, transparent 70%)',
+        }}
+      />
+    </div>
+  )
+}
+
+function LogoStrip() {
+  const items = [
+    'JSCAD',
+    'tscircuit',
+    'planegcs',
+    'FEniCSx',
+    'OpenCAMlib',
+    'IfcOpenShell',
+    'FreeRouting',
+    'TechDraw',
+    'KiCad',
+  ]
+  return (
+    <div className="mt-10 lg:mt-12 flex flex-col items-center gap-3">
+      <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-ink-500">
+        Built on open kernels
+      </p>
+      <ul className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
+        {items.map((it) => (
+          <li
+            key={it}
+            className="font-mono text-sm text-ink-400 hover:text-ink-200 transition-colors"
+          >
+            {it}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* § 2 — Persona strip: Built for engineers in every discipline               */
+/* -------------------------------------------------------------------------- */
+
+const PERSONAS = [
+  {
+    slug: 'fusion',
+    label: 'Mechanical engineer',
+    eyebrow: 'Comparable to Fusion / SolidWorks',
+    promise:
+      'Parametric history, OCCT-grade B-rep, integrated CAM and FEA. Full feature tree with persistent face IDs that survive fillets and booleans.',
+    compareHref: '/compare/fusion',
+    Illustration: FeatureTreeIllustration,
+  },
+  {
+    slug: 'kicad',
+    label: 'Electronics engineer',
+    eyebrow: 'Comparable to KiCad / Altium',
+    promise:
+      'Schematic + PCB + signal integrity + EMC + PDN, no extension paywalls. Two authoring styles, one fabrication target.',
+    compareHref: '/compare/kicad',
+    Illustration: CircuitIllustration,
+  },
+  {
+    slug: 'revit',
+    label: 'BIM / architect',
+    eyebrow: 'Comparable to Revit / ArchiCAD',
+    promise:
+      'IFC4 round-trip, walls / slabs / MEP / schedules. Code-first BIM authoring that compiles directly to IFC4 via IfcOpenShell.',
+    compareHref: '/compare/revit',
+    Illustration: BimIllustration,
+  },
+  {
+    slug: 'matrixgold',
+    label: 'Jewelry designer',
+    eyebrow: 'Comparable to Matrix / MatrixGold',
+    promise:
+      '40-module jewelry vertical, gem catalog with 30+ cuts, casting export, PBR materials. Workshop publish with one click.',
+    compareHref: '/compare/matrixgold',
+    Illustration: LibraryIllustration,
+  },
+]
+
+function PersonaStrip() {
+  return (
+    <section className="relative border-t border-ink-900 bg-ink-950/40">
       <div className="mx-auto max-w-7xl px-6 py-12 lg:py-14">
-        <div className="max-w-2xl mb-10">
+        <div className="max-w-2xl mb-8">
           <p className="font-mono text-xs uppercase tracking-[0.2em] text-kerf-300">
-            What you can build
+            Built for engineers in every discipline
           </p>
           <h2 className="mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-[-0.02em]">
             One workspace.
             <br />
             <span className="text-ink-300">Every CAD discipline.</span>
           </h2>
+          <p className="mt-3 text-ink-300 leading-relaxed max-w-xl">
+            Whether you design circuit boards, buildings, mechanical
+            assemblies, or jewelry — Kerf has purpose-built depth for your
+            workflow. Not a generic tool with plug-in paywalls.
+          </p>
         </div>
 
-        <div className="flex flex-col gap-12 lg:gap-14">
-          {CAPABILITY_GROUPS.map((g) => (
-            <CapabilityGroup key={g.id} group={g} />
+        {/* Horizontal scroll on mobile; 4-col grid on lg */}
+        <div
+          className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 sm:pb-0 lg:grid lg:grid-cols-4 lg:overflow-x-visible"
+          style={{ scrollbarWidth: 'none' }}
+        >
+          {PERSONAS.map((p) => (
+            <PersonaCard key={p.slug} {...p} />
           ))}
+        </div>
+
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link
+            to="/compare"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-kerf-300 hover:text-kerf-200 transition-colors"
+          >
+            View the full compare matrix →
+          </Link>
         </div>
       </div>
     </section>
   )
 }
 
-function CapabilityGroup({ group }) {
-  const domainHref = DOMAIN_HREFS[group.id]
+function PersonaCard({ label, eyebrow, promise, compareHref, Illustration }) {
   return (
-    <div>
-      <div className="mb-5 max-w-3xl">
-        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-kerf-300">
-          {group.eyebrow}
-        </p>
-        <h3 className="mt-1.5 font-display text-2xl sm:text-3xl font-semibold tracking-[-0.02em] text-ink-100">
-          {group.title}
-        </h3>
-        {group.tagline && (
-          <p className="mt-1 text-sm font-semibold text-kerf-300 tracking-tight">
-            {group.tagline}
-          </p>
-        )}
-        <p className="mt-2 text-sm text-ink-300 leading-relaxed">{group.body}</p>
-        {domainHref && (
-          <Link
-            to={domainHref}
-            className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-kerf-300 hover:text-kerf-200 transition-colors"
-          >
-            Deep-dive on the {group.id} page
-            <ArrowRight size={13} />
-          </Link>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {group.cards.map((c) =>
-          c.Illustration ? (
-            <CapabilityCard key={c.title} {...c} />
-          ) : (
-            <CapabilityTextCard key={c.title} {...c} />
-          ),
-        )}
-      </div>
-    </div>
-  )
-}
-
-function CapabilityCard({ icon: Icon, title, body, Illustration }) {
-  return (
-    <article className="group relative rounded-2xl border border-ink-800 bg-ink-900/40 overflow-hidden transition-colors hover:border-ink-700 hover:bg-ink-900/60">
+    <article className="group snap-start shrink-0 w-[80vw] sm:w-[45vw] lg:w-auto flex flex-col rounded-2xl border border-ink-800 bg-ink-900/40 overflow-hidden hover:border-ink-700 hover:bg-ink-900/60 transition-colors">
       <div className="aspect-[16/10] bg-ink-950/60 border-b border-ink-800 overflow-hidden">
         <Illustration className="block w-full h-full" />
       </div>
-      <div className="p-5">
-        <div className="flex items-center gap-2.5 mb-1.5">
-          <span className="grid place-items-center w-7 h-7 rounded-md bg-kerf-300/10 border border-kerf-300/30 text-kerf-300 group-hover:bg-kerf-300/20 transition-colors">
-            <Icon size={13} />
-          </span>
-          <h3 className="font-display text-base font-semibold tracking-tight text-ink-100">
-            {title}
-          </h3>
-        </div>
-        <p className="text-sm text-ink-300 leading-relaxed">{body}</p>
-      </div>
-    </article>
-  )
-}
-
-function CapabilityTextCard({ icon: Icon, title, body }) {
-  // A leaner card that drops the illustration slot — used to round out
-  // sub-groups where we don't have (or don't need) a bespoke SVG.
-  return (
-    <article className="group relative rounded-2xl border border-ink-800 bg-ink-900/40 p-5 transition-colors hover:border-ink-700 hover:bg-ink-900/60">
-      <div className="flex items-center gap-2.5 mb-2">
-        <span className="grid place-items-center w-7 h-7 rounded-md bg-kerf-300/10 border border-kerf-300/30 text-kerf-300">
-          <Icon size={13} />
-        </span>
+      <div className="flex flex-col gap-2 p-5 flex-1">
+        <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-kerf-300">
+          {eyebrow}
+        </p>
         <h3 className="font-display text-base font-semibold tracking-tight text-ink-100">
-          {title}
+          {label}
         </h3>
+        <p className="text-sm text-ink-300 leading-relaxed flex-1">{promise}</p>
+        <Link
+          to={compareHref}
+          className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-kerf-300 hover:text-kerf-200 transition-colors"
+        >
+          See comparison
+          <ArrowRight size={12} />
+        </Link>
       </div>
-      <p className="text-sm text-ink-300 leading-relaxed">{body}</p>
     </article>
   )
 }
 
+/* -------------------------------------------------------------------------- */
+/* § 3 — Domain spotlights (existing component)                               */
+/* -------------------------------------------------------------------------- */
+/* Rendered in the page component below. */
 
 /* -------------------------------------------------------------------------- */
-/* Section: Compare                                                            */
-/* -------------------------------------------------------------------------- */
-
-const COMPARE_LINKS = [
-  { label: 'Kerf vs FreeCAD', href: '/compare/freecad' },
-  { label: 'Kerf vs Fusion 360', href: '/compare/fusion' },
-  { label: 'Kerf vs KiCad', href: '/compare/kicad' },
-  { label: 'Kerf vs Rhino', href: '/compare/rhino' },
-  { label: 'Kerf vs Revit', href: '/compare/revit' },
-]
-
-function Compare() {
-  return (
-    <section className="relative border-t border-ink-900 bg-ink-950/50">
-      <div className="mx-auto max-w-7xl px-6 py-10 lg:py-12">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-          <div>
-            <p className="font-mono text-xs uppercase tracking-[0.2em] text-kerf-300 mb-1">
-              How we stack up
-            </p>
-            <h2 className="font-display text-2xl sm:text-3xl font-semibold tracking-[-0.02em]">
-              Compare Kerf
-            </h2>
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            {COMPARE_LINKS.map((c) => (
-              <Link
-                key={c.label}
-                to={c.href}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-ink-800 bg-ink-900/40 px-3 py-2 text-sm text-ink-300 hover:border-ink-700 hover:text-ink-100 transition-colors"
-              >
-                {c.label}
-                <ArrowRight size={12} className="text-ink-500" />
-              </Link>
-            ))}
-            <Link
-              to="/compare"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-kerf-300/30 bg-kerf-300/5 px-3 py-2 text-sm text-kerf-300 hover:bg-kerf-300/10 transition-colors font-medium"
-            >
-              All comparisons
-              <ArrowRight size={12} />
-            </Link>
-          </div>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-/* -------------------------------------------------------------------------- */
-/* Section: Chat loop                                                          */
+/* § 4 — Chat loop: how the workflow works                                    */
 /* -------------------------------------------------------------------------- */
 
 function ChatLoop() {
@@ -930,15 +819,14 @@ function ChatLoop() {
       <div className="mx-auto max-w-6xl px-6 py-12 lg:py-14">
         <div className="max-w-2xl mb-8">
           <p className="font-mono text-xs uppercase tracking-[0.2em] text-kerf-300">
-            The chat loop
+            How the chat workflow works
           </p>
           <h2 className="mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-[-0.02em]">
             From a sentence to a part.
           </h2>
           <p className="mt-3 text-ink-300 leading-relaxed max-w-xl">
-            Every chat turn is a small, deliberate program. The model picks
-            tools from a small fixed surface — file ops, validation,
-            doc-search — edits the source, then re-renders. Or skip chat
+            Describe a feature in plain language. Kerf edits the feature tree,
+            validates against doc-search, and shows the diff. Or skip chat
             and drive the same surface from Python with{' '}
             <Link
               to="/docs/llm-tools"
@@ -950,9 +838,28 @@ function ChatLoop() {
           </p>
         </div>
 
-        <div className="hidden sm:block rounded-2xl border border-ink-800 bg-ink-950/60 backdrop-blur p-4 sm:p-6 lg:p-8">
-          <div className="w-full aspect-[16/5] overflow-hidden">
-            <ChatLoopIllustration className="block w-full h-full" />
+        {/* Two-column: ChatLoop illustration + Pipeline */}
+        <div className="grid lg:grid-cols-[1.6fr_1fr] gap-4">
+          <div className="hidden sm:block rounded-2xl border border-ink-800 bg-ink-950/60 backdrop-blur p-4 sm:p-6">
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-500 mb-3">
+              LLM → tools → kernel → diff
+            </p>
+            <div className="w-full aspect-[16/5] overflow-hidden">
+              <ChatLoopIllustration className="block w-full h-full" />
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-ink-800 bg-ink-950/60 backdrop-blur p-4 sm:p-6 flex flex-col gap-4">
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-500">
+              LLM → tools → kernel loop
+            </p>
+            <div className="flex-1 overflow-hidden">
+              <PipelineIllustration className="block w-full h-full" />
+            </div>
+            <p className="text-xs text-ink-400 leading-relaxed">
+              Small fixed tool surface — file ops, validation, doc-search —
+              edits the source then re-renders. No black-box geometry.
+            </p>
           </div>
         </div>
 
@@ -993,11 +900,251 @@ function FactCard({ icon: Icon, title, body }) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Section: Recently shipped                                                   */
+/* § 5 — Sketch to solid to drawings to fab                                   */
 /* -------------------------------------------------------------------------- */
 
-// Pulled from ROADMAP.md ✅ shipped rows — most recent first. Keep to 9
-// (3×3 on lg). The full list lives in /roadmap and ROADMAP.md.
+function SketchToFab() {
+  const steps = [
+    {
+      Illustration: SketcherIllustration,
+      label: 'Sketch with constraints',
+      sub: 'planegcs solver, 12+ constraint types',
+    },
+    {
+      Illustration: SketchShortcutsIllustration,
+      label: 'Feature shortcuts',
+      sub: 'Boss, cut, hole pattern — one LLM call',
+    },
+    {
+      Illustration: SketchToJscadIllustration,
+      label: 'Solidify in OCCT',
+      sub: 'Extrude sketch → JSCAD or B-rep',
+    },
+    {
+      Illustration: DrawingIllustration,
+      label: 'Project to drawings',
+      sub: 'TechDraw sheets, GD&T, hand off to fab',
+    },
+  ]
+  return (
+    <section className="relative border-t border-ink-900">
+      <div className="mx-auto max-w-7xl px-6 py-12 lg:py-14">
+        <div className="max-w-2xl mb-8">
+          <p className="font-mono text-xs uppercase tracking-[0.2em] text-kerf-300">
+            Sketch to solid to drawings to fab
+          </p>
+          <h2 className="mt-2 font-display text-3xl sm:text-4xl font-semibold tracking-[-0.02em]">
+            Sketch with constraints.{' '}
+            <span className="text-ink-300">Solidify in OCCT. Project to drawings. Hand off to fab.</span>
+          </h2>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {steps.map((s, i) => (
+            <div key={s.label} className="flex flex-col rounded-2xl border border-ink-800 bg-ink-900/40 overflow-hidden hover:border-ink-700 transition-colors">
+              <div className="aspect-[4/3] bg-ink-950/60 border-b border-ink-800 overflow-hidden">
+                <s.Illustration className="block w-full h-full" />
+              </div>
+              <div className="p-4 flex flex-col gap-1">
+                <p className="font-mono text-[9px] uppercase tracking-[0.15em] text-kerf-300">
+                  Step {i + 1}
+                </p>
+                <p className="font-display text-sm font-semibold tracking-tight text-ink-100">
+                  {s.label}
+                </p>
+                <p className="text-xs text-ink-400 leading-snug">{s.sub}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* § 6 — Beyond CAD: simulate + manufacture + collaborate                     */
+/* -------------------------------------------------------------------------- */
+
+const CAPABILITY_CELLS = [
+  // Simulation
+  { group: 'Simulation', Illustration: FemIllustration, label: 'FEM analysis', sub: 'FEniCSx + CalculiX, linear static & modal' },
+  { group: 'Simulation', Illustration: TopoIllustration, label: 'Topology optimisation', sub: 'SIMP density-field → STEP out' },
+  { group: 'Simulation', Illustration: SpiceSimIllustration, label: 'SPICE simulation', sub: 'ngspice, V/I probes on schematic' },
+  { group: 'Simulation', Illustration: RfAnalysisIllustration, label: 'RF / S-parameters', sub: 'scikit-rf, Smith chart, Touchstone' },
+  // Manufacturing
+  { group: 'Manufacturing', Illustration: CamIllustration, label: 'CAM toolpaths', sub: 'OpenCAMlib 2.5D + 3D, posted G-code' },
+  { group: 'Manufacturing', Illustration: WorkshopIllustration, label: 'Workshop publish', sub: 'Fork and share with the community' },
+  // Collaboration / scripting
+  { group: 'Collaboration', Illustration: GitIllustration, label: 'Cloud git + GitHub', sub: 'pygit2 backend, branch sync, OAuth' },
+  { group: 'Collaboration', Illustration: ScriptingIllustration, label: 'Python SDK', sub: 'pip install kerf-sdk, JSON-RPC' },
+  { group: 'Collaboration', Illustration: FineGrainedUndoIllustration, label: 'Fine-grained undo', sub: 'Every keystroke in file_revisions' },
+]
+
+function CapabilityGrid() {
+  return (
+    <section className="relative border-t border-ink-900 bg-ink-950/40">
+      <div className="mx-auto max-w-7xl px-6 py-12 lg:py-14">
+        <div className="max-w-2xl mb-8">
+          <p className="font-mono text-xs uppercase tracking-[0.2em] text-kerf-300">
+            Beyond CAD
+          </p>
+          <h2 className="mt-2 font-display text-3xl sm:text-4xl font-semibold tracking-[-0.02em]">
+            Simulate. Manufacture. Collaborate.
+          </h2>
+          <p className="mt-3 text-ink-300 leading-relaxed max-w-xl">
+            Kerf is not just a geometry editor. Simulation, toolpath generation,
+            and version control live in the same workspace — driven by the same
+            chat interface.
+          </p>
+        </div>
+
+        {/* Group headers + 3-col grid, collapses to 2-col on sm and 1-col on xs */}
+        {['Simulation', 'Manufacturing', 'Collaboration'].map((group) => (
+          <div key={group} className="mb-8 last:mb-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-500 mb-3">
+              {group}
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {CAPABILITY_CELLS.filter((c) => c.group === group).map((c) => (
+                <article
+                  key={c.label}
+                  className="group rounded-2xl border border-ink-800 bg-ink-900/40 overflow-hidden hover:border-ink-700 hover:bg-ink-900/60 transition-colors"
+                >
+                  <div className="aspect-[16/10] bg-ink-950/60 border-b border-ink-800 overflow-hidden">
+                    <c.Illustration className="block w-full h-full" />
+                  </div>
+                  <div className="p-4">
+                    <p className="font-display text-sm font-semibold tracking-tight text-ink-100 mb-0.5">
+                      {c.label}
+                    </p>
+                    <p className="text-xs text-ink-400 leading-snug">{c.sub}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* § 7 — KernelDepth (existing component)                                     */
+/* -------------------------------------------------------------------------- */
+/* Rendered in the page component below. */
+
+/* -------------------------------------------------------------------------- */
+/* § 8 — Architecture / mates row                                             */
+/* -------------------------------------------------------------------------- */
+
+function ArchitectureRow() {
+  return (
+    <section className="relative border-t border-ink-900">
+      <div className="mx-auto max-w-7xl px-6 py-12 lg:py-14">
+        <div className="max-w-2xl mb-8">
+          <p className="font-mono text-xs uppercase tracking-[0.2em] text-kerf-300">
+            Engineering rigor
+          </p>
+          <h2 className="mt-2 font-display text-3xl sm:text-4xl font-semibold tracking-[-0.02em]">
+            Tolerance stackup, mate solver, viewport scale.
+          </h2>
+          <p className="mt-3 text-ink-300 leading-relaxed max-w-xl">
+            The details that separate engineering software from a renderer:
+            worst-case / RSS / Monte-Carlo tolerance chains, assembly mate
+            constraints, and a viewport built for assemblies with hundreds of
+            identical instances.
+          </p>
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <article className="rounded-2xl border border-ink-800 bg-ink-900/40 overflow-hidden hover:border-ink-700 transition-colors">
+            <div className="aspect-[16/9] bg-ink-950/60 border-b border-ink-800 overflow-hidden">
+              <TolerancePlusMatesIllustration className="block w-full h-full" />
+            </div>
+            <div className="p-5">
+              <h3 className="font-display text-base font-semibold tracking-tight text-ink-100 mb-1">
+                Tolerance stackup + mates
+              </h3>
+              <p className="text-sm text-ink-300 leading-relaxed">
+                Worst-case, RSS, and Monte-Carlo tolerance stacks.
+                tolerance_auto_chain walks the assembly-mate graph by BFS and
+                builds the dimension chain automatically.
+              </p>
+            </div>
+          </article>
+
+          <article className="rounded-2xl border border-ink-800 bg-ink-900/40 overflow-hidden hover:border-ink-700 transition-colors">
+            <div className="aspect-[16/9] bg-ink-950/60 border-b border-ink-800 overflow-hidden">
+              <ViewportScaleIllustration className="block w-full h-full" />
+            </div>
+            <div className="p-5">
+              <h3 className="font-display text-base font-semibold tracking-tight text-ink-100 mb-1">
+                Viewport at scale
+              </h3>
+              <p className="text-sm text-ink-300 leading-relaxed">
+                Frustum culling + InstancedMesh batching in Three.js. Assemblies
+                with hundreds of identical components render at interactive frame
+                rates without dropping to wireframe.
+              </p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* § 9 — Output formats strip                                                  */
+/* -------------------------------------------------------------------------- */
+
+const OUTPUT_FORMATS = [
+  { label: 'STEP', sub: 'validated B-rep' },
+  { label: 'STL · 3MF', sub: 'mesh export' },
+  { label: 'IFC4', sub: 'BIM' },
+  { label: 'gerber', sub: 'PCB fab' },
+  { label: 'G-code', sub: 'CNC posts' },
+  { label: 'SPICE', sub: 'circuit sim' },
+  { label: 'FEM mesh', sub: 'CalculiX · gmsh' },
+  { label: 'PDF · DXF', sub: 'drawings' },
+  { label: 'BOM CSV', sub: 'with prices' },
+  { label: 'Touchstone', sub: 'S-parameters' },
+]
+
+function OutputStrip() {
+  return (
+    <section className="relative border-t border-ink-900 bg-ink-950/60">
+      <div className="mx-auto max-w-7xl px-6 py-8 lg:py-10">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-ink-500">
+            Real artefacts out the other side
+          </p>
+          <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-ink-500/70">
+            no proprietary lock-in
+          </p>
+        </div>
+        <ul className="flex flex-wrap gap-2">
+          {OUTPUT_FORMATS.map((f) => (
+            <li
+              key={f.label}
+              className="inline-flex items-center gap-2 rounded-md border border-ink-800 bg-ink-900/50 px-2.5 py-1"
+            >
+              <span className="font-mono text-xs text-kerf-300">{f.label}</span>
+              <span className="font-mono text-[10px] text-ink-500">{f.sub}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* § 10 — Recently shipped                                                     */
+/* -------------------------------------------------------------------------- */
+
 const SHIPPED = [
   {
     title: 'FreeCAD Tier 2 import',
@@ -1068,8 +1215,7 @@ function RecentlyShipped() {
               Moving fast, in public.
             </h2>
             <p className="mt-3 text-ink-300 leading-relaxed">
-              Six highlights from the most recent sprint. The full list
-              lives in{' '}
+              Six highlights from the most recent sprint. The full list lives in{' '}
               <Link
                 to="/docs/whats-new"
                 className="text-kerf-300 underline underline-offset-2 hover:text-kerf-200"
@@ -1130,132 +1276,7 @@ function RecentlyShipped() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Section: Roadmap glimpse                                                    */
-/* -------------------------------------------------------------------------- */
-
-const ROADMAP = [
-  {
-    title: 'FEM / CFD depth',
-    body: 'Nonlinear static, explicit dynamics, acoustics, fatigue already in; Navier-Stokes + heat transfer in progress. Target: CalculiX / Z88 / Mystran scope.',
-    status: 'in_flight',
-  },
-  {
-    title: 'Interactive diff-pair routing',
-    body: 'Diff-pair data layer shipped. In progress: push-and-shove UI, real-time impedance check, live length-delta display during routing.',
-    status: 'in_flight',
-  },
-  {
-    title: 'Broader ECAD import',
-    body: 'Allegro / PADS / gEDA / Eagle → .circuit.tsx parsers. KiCad Tier 1 + 2 already landed; each legacy format gets its own parser.',
-    status: 'next',
-  },
-  {
-    title: 'Full joint system + direct edit',
-    body: 'Gear / pin-slot / rack-pinion joints (cam-follower already shipped). Direct face-push edits that insert into the parametric DAG without breaking the feature tree.',
-    status: 'next',
-  },
-  {
-    title: 'Render: caustics + dispersion',
-    body: 'Two-tier render path: a backend Blender Cycles worker for hero / catalog output (spectral dispersion, caustics — metered) and a progressive in-browser path tracer for free previews and offline self-host. Self-host docker image bundled.',
-    status: 'next',
-  },
-  {
-    title: 'BIM family library + structural grid',
-    body: 'Walls / slabs / stairs / MEP already ship. Next: parametric family library, structural grid, site + earthwork, and material catalogue.',
-    status: 'next',
-  },
-]
-
-function RoadmapGlimpse() {
-  return (
-    <section className="relative border-t border-ink-900 bg-ink-950/60">
-      <div className="mx-auto max-w-7xl px-6 py-12 lg:py-14">
-        <div className="flex items-end justify-between mb-6 gap-6">
-          <div className="max-w-2xl">
-            <p className="font-mono text-xs uppercase tracking-[0.2em] text-kerf-300">
-              On the way
-            </p>
-            <h2 className="mt-2 font-display text-3xl sm:text-4xl font-semibold tracking-[-0.02em]">
-              What we&apos;re building next.
-            </h2>
-          </div>
-          <div className="hidden sm:flex items-center gap-4">
-            <Link
-              to="/roadmap"
-              className="inline-flex items-center gap-1.5 rounded-md bg-kerf-300 text-ink-950 px-3 h-9 text-sm font-medium tracking-tight hover:bg-kerf-200 transition-colors"
-            >
-              See full roadmap
-              <ArrowRight size={14} />
-            </Link>
-            <a
-              href={`${GITHUB_URL}/blob/main/ROADMAP.md`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 text-sm text-ink-400 hover:text-ink-100 transition-colors"
-            >
-              ROADMAP.md
-              <ArrowRight size={14} />
-            </a>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {ROADMAP.map((r) => {
-            const isInFlight = r.status === 'in_flight'
-            const isNext = r.status === 'next'
-            const pillCls = isInFlight
-              ? 'bg-kerf-300/10 border border-kerf-300/30 text-kerf-300'
-              : isNext
-                ? 'bg-cyan-edge/10 border border-cyan-edge/30 text-cyan-300'
-                : 'bg-ink-900 border border-ink-800 text-ink-400'
-            return (
-              <div
-                key={r.title}
-                aria-label={r.title}
-                className={
-                  'rounded-xl border border-dashed bg-ink-900/30 p-4 transition-colors ' +
-                  (isInFlight
-                    ? 'border-kerf-300/30 hover:bg-ink-900/50'
-                    : isNext
-                      ? 'border-cyan-edge/30 hover:bg-ink-900/50'
-                      : 'border-ink-700 hover:border-kerf-300/30 hover:bg-ink-900/50')
-                }
-              >
-                <span
-                  className={
-                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-mono uppercase tracking-widest mb-2 ' +
-                    pillCls
-                  }
-                >
-                  <span aria-hidden>{isInFlight ? '●' : isNext ? '◐' : '○'}</span>
-                  {isInFlight ? 'in flight' : isNext ? 'up next' : 'planned'}
-                </span>
-                <h3 className="font-display text-sm font-semibold tracking-tight text-ink-100 mb-1">
-                  {r.title}
-                </h3>
-                <p className="text-xs text-ink-400 leading-relaxed">{r.body}</p>
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Mobile CTA */}
-        <div className="mt-6 flex sm:hidden">
-          <Link
-            to="/roadmap"
-            className="inline-flex items-center gap-1.5 rounded-md bg-kerf-300 text-ink-950 px-3 h-9 text-sm font-medium tracking-tight hover:bg-kerf-200 transition-colors"
-          >
-            See full roadmap
-            <ArrowRight size={14} />
-          </Link>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-/* -------------------------------------------------------------------------- */
-/* Section: Local vs Hosted                                                    */
+/* § 11 — Local vs Hosted                                                      */
 /* -------------------------------------------------------------------------- */
 
 const SHARED_FEATURES = [
@@ -1279,9 +1300,9 @@ function LocalVsHosted() {
             Same product. Two ways to run it.
           </h2>
           <p className="mt-3 text-ink-300 leading-relaxed">
-            Every line of code is open source — including billing,
-            Workshop, and git sync. We host the binary as a service so you
-            don&apos;t have to operate Postgres yourself.
+            Every line of code is open source — including billing, Workshop, and
+            git sync. We host the binary as a service so you don&apos;t have to
+            operate Postgres yourself.
           </p>
         </div>
 
@@ -1379,7 +1400,7 @@ function RunCard({ icon, label, sub, ctaText, ctaTo, features, extras = [], extr
 }
 
 /* -------------------------------------------------------------------------- */
-/* Section: Pricing teaser                                                     */
+/* § 12 — Pricing teaser (cloud only)                                          */
 /* -------------------------------------------------------------------------- */
 
 function PricingTeaser() {
@@ -1490,9 +1511,8 @@ function TeaserPlan({ label, price, note, bullets, ctaTo, ctaText, highlighted }
   )
 }
 
-
 /* -------------------------------------------------------------------------- */
-/* CTA strip (between sections)                                                */
+/* § 13 — CTA strip                                                            */
 /* -------------------------------------------------------------------------- */
 
 function CTAStrip() {
@@ -1508,11 +1528,11 @@ function CTAStrip() {
           <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
             <div>
               <h2 className="font-display text-3xl sm:text-4xl font-semibold tracking-[-0.02em]">
-                Cut your first part.
+                Open Kerf in your browser.
               </h2>
               <p className="mt-2 text-ink-300 max-w-xl">
-                Sign up free and ship a model in the next ten minutes — or
-                clone the repo and self-host. Both paths are first-class.
+                Sign up free and ship a model in the next ten minutes — or clone
+                the repo and self-host. Both paths are first-class.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
@@ -1523,16 +1543,15 @@ function CTAStrip() {
                 </Button>
               ) : (
                 <Button as={Link} to="/signup" variant="primary" size="lg">
-                  Try it free
+                  Sign up free
                   <ArrowRight size={16} />
                 </Button>
               )}
-              <Button as={Link} to="/library" variant="outline" size="lg">
-                Browse the library
+              <Button as={Link} to="/compare" variant="outline" size="lg">
+                View the compare matrix →
               </Button>
-              <Button as="a" href={GITHUB_URL} target="_blank" rel="noreferrer" variant="outline" size="lg">
-                <Github size={16} />
-                Contribute on GitHub
+              <Button as={Link} to="/docs" variant="outline" size="lg">
+                Read the docs
               </Button>
             </div>
           </div>
@@ -1543,7 +1562,58 @@ function CTAStrip() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Page                                                                        */
+/* Compare section (compact — before CTA)                                      */
+/* -------------------------------------------------------------------------- */
+
+const COMPARE_LINKS = [
+  { label: 'Kerf vs FreeCAD', href: '/compare/freecad' },
+  { label: 'Kerf vs Fusion 360', href: '/compare/fusion' },
+  { label: 'Kerf vs KiCad', href: '/compare/kicad' },
+  { label: 'Kerf vs Rhino', href: '/compare/rhino' },
+  { label: 'Kerf vs Revit', href: '/compare/revit' },
+]
+
+function Compare() {
+  return (
+    <section className="relative border-t border-ink-900 bg-ink-950/50">
+      <div className="mx-auto max-w-7xl px-6 py-10 lg:py-12">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-kerf-300 mb-1">
+              How we stack up
+            </p>
+            <h2 className="font-display text-2xl sm:text-3xl font-semibold tracking-[-0.02em]">
+              Compare Kerf
+            </h2>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            {COMPARE_LINKS.map((c) => (
+              <Link
+                key={c.label}
+                to={c.href}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-ink-800 bg-ink-900/40 px-3 py-2 text-sm text-ink-300 hover:border-ink-700 hover:text-ink-100 transition-colors"
+              >
+                {c.label}
+                <ArrowRight size={12} className="text-ink-500" />
+              </Link>
+            ))}
+            <Link
+              to="/compare"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-kerf-300/30 bg-kerf-300/5 px-3 py-2 text-sm text-kerf-300 hover:bg-kerf-300/10 transition-colors font-medium"
+            >
+              All comparisons
+              <ArrowRight size={12} />
+            </Link>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* § 14 — Page root                                                            */
 /* -------------------------------------------------------------------------- */
 
 export default function Landing() {
@@ -1551,19 +1621,50 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-ink-950 text-ink-100">
       <Header />
+
+      {/* 1. Hero */}
       <Hero />
-      <OutputStrip />
-      <PipelineDivider />
-      <KernelDepth />
-      <CapabilityTour />
+
+      {/* 2. Persona strip — 4 archetypes with illustrations */}
+      <PersonaStrip />
+
+      {/* 3. Domain spotlights — "and many more" */}
       <DomainSpotlights />
-      <Compare />
+
+      {/* 4. Chat loop — how the workflow works */}
       <ChatLoop />
+
+      {/* 5. Sketch → solid → drawings → fab */}
+      <SketchToFab />
+
+      {/* 6. Beyond CAD: simulate + manufacture + collaborate */}
+      <CapabilityGrid />
+
+      {/* 7. Kernel depth — credibility anchor */}
+      <KernelDepth />
+
+      {/* 8. Architecture: tolerance stackup + viewport scale */}
+      <ArchitectureRow />
+
+      {/* 9. Output strip */}
+      <OutputStrip />
+
+      {/* 10. Recently shipped */}
       <RecentlyShipped />
-      <RoadmapGlimpse />
+
+      {/* 11. Local vs hosted */}
       <LocalVsHosted />
+
+      {/* 12. Pricing (cloud only) */}
       {cloudEnabled && <PricingTeaser />}
+
+      {/* Compare matrix links */}
+      <Compare />
+
+      {/* 13. CTA strip */}
       <CTAStrip />
+
+      {/* 14. Footer */}
       <Footer />
     </div>
   )

@@ -674,6 +674,7 @@ __all__ = [
     "involute_gear","cycloid_gear",
     # GK-115
     "gyroid","schwarz_p","octet_truss","kelvin_cell",
+    "fischer_koch_s","iwp","f_rd","bcc_lattice","fcc_lattice",
     # GK-116
     "lattice_fill",
     # GK-117
@@ -703,10 +704,14 @@ from kerf_cad_core.geom.assembly import interference  # noqa: E402
 # GK-114: voxel boolean / CSG (union / intersection / difference on SDF grids).
 from kerf_cad_core.geom.sdf import body_sdf, sdf_sample, marching_cubes, voxel_union, voxel_intersection, voxel_difference
 
-# GK-115: lattice unit-cell library (gyroid, Schwarz-P, octet truss, Kelvin cell)
+# GK-115: lattice unit-cell library (gyroid, Schwarz-P, octet truss, Kelvin cell,
+#          Fischer-Koch S, IWP, F-RD, BCC, FCC)
 # GK-116: lattice fill of a Body to a target relative density
 # GK-117: TPMS implicit sheet (triply-periodic minimal surface meshed at thickness)
-from kerf_cad_core.geom.lattice import gyroid, schwarz_p, octet_truss, kelvin_cell, lattice_fill, tpms_sheet
+from kerf_cad_core.geom.lattice import (
+    gyroid, schwarz_p, octet_truss, kelvin_cell, lattice_fill, tpms_sheet,
+    fischer_koch_s, iwp, f_rd, bcc_lattice, fcc_lattice,
+)
 # GK-123: clearance / minimum-gap analysis
 from kerf_cad_core.geom.assembly import clearance  # noqa: E402
 # GK-124: mate constraint solver

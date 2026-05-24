@@ -163,6 +163,54 @@ def sdf_diamond(period: float = 1.0, iso: float = 0.0) -> SDF:
     return _f
 
 
+def sdf_fischer_koch_s(period: float = 1.0, iso: float = 0.0) -> SDF:
+    """Fischer-Koch S TPMS:
+    cos(2X)·sin(Y)·cos(Z) + cos(2Y)·sin(Z)·cos(X) + cos(2Z)·sin(X)·cos(Y) = iso."""
+    k = 2.0 * math.pi / period
+
+    def _f(x, y, z):
+        kx, ky, kz = k * x, k * y, k * z
+        return (
+            math.cos(2.0 * kx) * math.sin(ky) * math.cos(kz)
+            + math.cos(2.0 * ky) * math.sin(kz) * math.cos(kx)
+            + math.cos(2.0 * kz) * math.sin(kx) * math.cos(ky)
+        ) - iso
+    return _f
+
+
+def sdf_iwp(period: float = 1.0, iso: float = 0.0) -> SDF:
+    """IWP (I-graph-Wrapped Package) TPMS:
+    2·(cos(X)cos(Y) + cos(Y)cos(Z) + cos(Z)cos(X)) − (cos(2X) + cos(2Y) + cos(2Z)) = iso."""
+    k = 2.0 * math.pi / period
+
+    def _f(x, y, z):
+        kx, ky, kz = k * x, k * y, k * z
+        cx, cy, cz = math.cos(kx), math.cos(ky), math.cos(kz)
+        return (
+            2.0 * (cx * cy + cy * cz + cz * cx)
+            - (math.cos(2.0 * kx) + math.cos(2.0 * ky) + math.cos(2.0 * kz))
+        ) - iso
+    return _f
+
+
+def sdf_f_rd(period: float = 1.0, iso: float = 0.0) -> SDF:
+    """F-RD TPMS:
+    4·cos(X)cos(Y)cos(Z) − (cos(2X)cos(2Y) + cos(2Y)cos(2Z) + cos(2X)cos(2Z)) = iso."""
+    k = 2.0 * math.pi / period
+
+    def _f(x, y, z):
+        kx, ky, kz = k * x, k * y, k * z
+        cx, cy, cz = math.cos(kx), math.cos(ky), math.cos(kz)
+        c2x = math.cos(2.0 * kx)
+        c2y = math.cos(2.0 * ky)
+        c2z = math.cos(2.0 * kz)
+        return (
+            4.0 * cx * cy * cz
+            - (c2x * c2y + c2y * c2z + c2x * c2z)
+        ) - iso
+    return _f
+
+
 # ---------------------------------------------------------------------------
 # CSG operations
 # ---------------------------------------------------------------------------

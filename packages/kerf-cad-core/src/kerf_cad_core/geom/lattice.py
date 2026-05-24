@@ -21,12 +21,54 @@ schwarz_p(cell_size, thickness) -> dict
         thickness   : float
         kind        : "tpms"
 
+fischer_koch_s(cell_size, thickness) -> dict
+    Fischer-Koch S TPMS implicit surface.
+    Returns:
+        f           : callable (x, y, z) -> float
+        cell_size   : float
+        thickness   : float
+        kind        : "tpms"
+
+iwp(cell_size, thickness) -> dict
+    IWP (I-graph-Wrapped Package) TPMS implicit surface.
+    Returns:
+        f           : callable (x, y, z) -> float
+        cell_size   : float
+        thickness   : float
+        kind        : "tpms"
+
+f_rd(cell_size, thickness) -> dict
+    F-RD TPMS implicit surface.
+    Returns:
+        f           : callable (x, y, z) -> float
+        cell_size   : float
+        thickness   : float
+        kind        : "tpms"
+
 octet_truss(cell_size, strut_radius) -> dict
     Octet truss (FCC + octahedron) strut lattice.
     Produces exactly 36 strut segments per unit cell.
     Returns:
         struts      : list[((x0,y0,z0),(x1,y1,z1))]  — 36 strut segments
         nodes       : list[(x, y, z)]                  — unique node positions
+        cell_size   : float
+        strut_radius: float
+        kind        : "strut"
+
+bcc_lattice(cell_size, strut_radius) -> dict
+    Body-centred cubic strut lattice — 8 corner→centre struts per cell.
+    Returns:
+        struts      : list[((x0,y0,z0),(x1,y1,z1))]
+        nodes       : list[(x, y, z)]
+        cell_size   : float
+        strut_radius: float
+        kind        : "strut"
+
+fcc_lattice(cell_size, strut_radius) -> dict
+    Face-centred cubic strut lattice.
+    Returns:
+        struts      : list[((x0,y0,z0),(x1,y1,z1))]
+        nodes       : list[(x, y, z)]
         cell_size   : float
         strut_radius: float
         kind        : "strut"
@@ -48,6 +90,10 @@ References
   of the octet-truss lattice material. J. Mech. Phys. Solids 49, 1747-1769.
 - Kelvin, Lord (1887) On the division of space with minimum partitional area.
   Phil. Mag. 24(151), 503-514.
+- Fischer, W. & Koch, E. (1987) On 3-periodic minimal surfaces.
+  Z. Kristallogr. 179, 31-52.
+- Schoen, A. H. (1970) Infinite periodic minimal surfaces without
+  self-intersections. NASA Technical Note TN D-5541.
 """
 
 from __future__ import annotations
@@ -80,6 +126,64 @@ def _make_schwarz_p_f(cell_size: float) -> Callable[[float, float, float], float
     """Return the Schwarz-P implicit function scaled to *cell_size*."""
     def f(x: float, y: float, z: float) -> float:
         return schwarz_p_field(x, y, z, cell_size)
+
+    return f
+
+
+def _make_fischer_koch_s_f(cell_size: float) -> Callable[[float, float, float], float]:
+    """Return the Fischer-Koch S implicit function scaled to *cell_size*.
+
+    Formula: cos(2kx)·sin(ky)·cos(kz) + cos(2ky)·sin(kz)·cos(kx)
+           + cos(2kz)·sin(kx)·cos(ky) = 0
+    """
+    k = 2.0 * math.pi / cell_size
+
+    def f(x: float, y: float, z: float) -> float:
+        kx, ky, kz = k * x, k * y, k * z
+        return (
+            math.cos(2.0 * kx) * math.sin(ky) * math.cos(kz)
+            + math.cos(2.0 * ky) * math.sin(kz) * math.cos(kx)
+            + math.cos(2.0 * kz) * math.sin(kx) * math.cos(ky)
+        )
+
+    return f
+
+
+def _make_iwp_f(cell_size: float) -> Callable[[float, float, float], float]:
+    """Return the IWP (I-graph-Wrapped Package) implicit function scaled to *cell_size*.
+
+    Formula: 2·(cos(kx)cos(ky) + cos(ky)cos(kz) + cos(kz)cos(kx))
+           − (cos(2kx) + cos(2ky) + cos(2kz)) = 0
+    """
+    k = 2.0 * math.pi / cell_size
+
+    def f(x: float, y: float, z: float) -> float:
+        kx, ky, kz = k * x, k * y, k * z
+        cx, cy, cz = math.cos(kx), math.cos(ky), math.cos(kz)
+        return (
+            2.0 * (cx * cy + cy * cz + cz * cx)
+            - (math.cos(2.0 * kx) + math.cos(2.0 * ky) + math.cos(2.0 * kz))
+        )
+
+    return f
+
+
+def _make_f_rd_f(cell_size: float) -> Callable[[float, float, float], float]:
+    """Return the F-RD implicit function scaled to *cell_size*.
+
+    Formula: 4·cos(kx)cos(ky)cos(kz)
+           − (cos(2kx)cos(2ky) + cos(2ky)cos(2kz) + cos(2kx)cos(2kz)) = 0
+    """
+    k = 2.0 * math.pi / cell_size
+
+    def f(x: float, y: float, z: float) -> float:
+        kx, ky, kz = k * x, k * y, k * z
+        cx, cy, cz = math.cos(kx), math.cos(ky), math.cos(kz)
+        c2x, c2y, c2z = math.cos(2.0 * kx), math.cos(2.0 * ky), math.cos(2.0 * kz)
+        return (
+            4.0 * cx * cy * cz
+            - (c2x * c2y + c2y * c2z + c2x * c2z)
+        )
 
     return f
 
@@ -148,6 +252,110 @@ def schwarz_p(cell_size: float, thickness: float) -> dict:
 
     return {
         "f": _make_schwarz_p_f(cell_size),
+        "cell_size": float(cell_size),
+        "thickness": float(thickness),
+        "kind": "tpms",
+    }
+
+
+def fischer_koch_s(cell_size: float, thickness: float) -> dict:
+    """Fischer-Koch S TPMS unit-cell descriptor.
+
+    Formula: cos(2x)·sin(y)·cos(z) + cos(2y)·sin(z)·cos(x)
+           + cos(2z)·sin(x)·cos(y) = 0  (arguments scaled by 2π/cell_size).
+
+    Parameters
+    ----------
+    cell_size:
+        Edge length of the cubic repeating unit cell.
+    thickness:
+        Shell half-thickness (same convention as gyroid).
+
+    Returns
+    -------
+    dict with keys:
+        ``f``          - callable (x, y, z) -> float
+        ``cell_size``  - float
+        ``thickness``  - float
+        ``kind``       - "tpms"
+    """
+    if cell_size <= 0:
+        raise ValueError(f"cell_size must be positive, got {cell_size}")
+    if thickness <= 0:
+        raise ValueError(f"thickness must be positive, got {thickness}")
+
+    return {
+        "f": _make_fischer_koch_s_f(cell_size),
+        "cell_size": float(cell_size),
+        "thickness": float(thickness),
+        "kind": "tpms",
+    }
+
+
+def iwp(cell_size: float, thickness: float) -> dict:
+    """IWP (I-graph-Wrapped Package) TPMS unit-cell descriptor.
+
+    Formula: 2·(cos(x)cos(y) + cos(y)cos(z) + cos(z)cos(x))
+           − (cos(2x) + cos(2y) + cos(2z)) = 0
+    (arguments scaled by 2π/cell_size).
+
+    Parameters
+    ----------
+    cell_size:
+        Edge length of the cubic repeating unit cell.
+    thickness:
+        Shell half-thickness.
+
+    Returns
+    -------
+    dict with keys:
+        ``f``          - callable (x, y, z) -> float
+        ``cell_size``  - float
+        ``thickness``  - float
+        ``kind``       - "tpms"
+    """
+    if cell_size <= 0:
+        raise ValueError(f"cell_size must be positive, got {cell_size}")
+    if thickness <= 0:
+        raise ValueError(f"thickness must be positive, got {thickness}")
+
+    return {
+        "f": _make_iwp_f(cell_size),
+        "cell_size": float(cell_size),
+        "thickness": float(thickness),
+        "kind": "tpms",
+    }
+
+
+def f_rd(cell_size: float, thickness: float) -> dict:
+    """F-RD TPMS unit-cell descriptor.
+
+    Formula: 4·cos(x)cos(y)cos(z)
+           − (cos(2x)cos(2y) + cos(2y)cos(2z) + cos(2x)cos(2z)) = 0
+    (arguments scaled by 2π/cell_size).
+
+    Parameters
+    ----------
+    cell_size:
+        Edge length of the cubic repeating unit cell.
+    thickness:
+        Shell half-thickness.
+
+    Returns
+    -------
+    dict with keys:
+        ``f``          - callable (x, y, z) -> float
+        ``cell_size``  - float
+        ``thickness``  - float
+        ``kind``       - "tpms"
+    """
+    if cell_size <= 0:
+        raise ValueError(f"cell_size must be positive, got {cell_size}")
+    if thickness <= 0:
+        raise ValueError(f"thickness must be positive, got {thickness}")
+
+    return {
+        "f": _make_f_rd_f(cell_size),
         "cell_size": float(cell_size),
         "thickness": float(thickness),
         "kind": "tpms",
@@ -248,6 +456,139 @@ def octet_truss(cell_size: float, strut_radius: float) -> dict:
     assert len(struts) == 36, (
         f"octet_truss: expected 36 struts, got {len(struts)}"
     )
+
+    return {
+        "struts": struts,
+        "nodes": nodes,
+        "cell_size": L,
+        "strut_radius": float(strut_radius),
+        "kind": "strut",
+    }
+
+
+# ---------------------------------------------------------------------------
+# BCC lattice — body-centred cubic, 8 corner→centre struts
+# ---------------------------------------------------------------------------
+
+def bcc_lattice(cell_size: float, strut_radius: float) -> dict:
+    """Body-centred cubic (BCC) strut lattice descriptor.
+
+    Nodes: 8 cube corners + 1 body centre = 9 nodes.
+    Each corner is connected to the body centre, giving **8 struts** per cell.
+
+    Parameters
+    ----------
+    cell_size:
+        Edge length of the cubic repeating unit cell.
+    strut_radius:
+        Radius of each cylindrical strut member.
+
+    Returns
+    -------
+    dict with keys:
+        ``struts``       - list of 8 ((x0,y0,z0),(x1,y1,z1)) tuples
+        ``nodes``        - list of 9 unique node positions
+        ``cell_size``    - float
+        ``strut_radius`` - float
+        ``kind``         - "strut"
+    """
+    if cell_size <= 0:
+        raise ValueError(f"cell_size must be positive, got {cell_size}")
+    if strut_radius <= 0:
+        raise ValueError(f"strut_radius must be positive, got {strut_radius}")
+
+    L = float(cell_size)
+    h = L / 2.0
+
+    corners: List[Point3] = [
+        (0.0, 0.0, 0.0), (L,   0.0, 0.0), (0.0, L,   0.0), (L,   L,   0.0),
+        (0.0, 0.0, L),   (L,   0.0, L),   (0.0, L,   L),   (L,   L,   L),
+    ]
+    centre: Point3 = (h, h, h)
+    nodes: List[Point3] = corners + [centre]
+
+    struts: List[Strut] = [_make_strut(c, centre) for c in corners]
+
+    return {
+        "struts": struts,
+        "nodes": nodes,
+        "cell_size": L,
+        "strut_radius": float(strut_radius),
+        "kind": "strut",
+    }
+
+
+# ---------------------------------------------------------------------------
+# FCC lattice — face-centred cubic strut layout
+# ---------------------------------------------------------------------------
+#
+# Node set: 8 cube corners + 6 face-centres = 14 FCC positions (same as octet
+# truss).  Connectivity differs: FCC struts connect each corner to its 3
+# nearest face-centres only (face-diagonal struts within each octant), giving
+# 24 struts per cell — the face-diagonal pattern without the body-diagonal
+# links of the octet.
+
+def fcc_lattice(cell_size: float, strut_radius: float) -> dict:
+    """Face-centred cubic (FCC) strut lattice descriptor.
+
+    Nodes: 8 cube corners + 6 face-centres = 14 nodes.
+    Struts connect each face-centre to the 4 corners of its own face (24 struts).
+
+    Parameters
+    ----------
+    cell_size:
+        Edge length of the cubic repeating unit cell.
+    strut_radius:
+        Radius of each cylindrical strut member.
+
+    Returns
+    -------
+    dict with keys:
+        ``struts``       - list of 24 ((x0,y0,z0),(x1,y1,z1)) tuples
+        ``nodes``        - list of 14 unique node positions
+        ``cell_size``    - float
+        ``strut_radius`` - float
+        ``kind``         - "strut"
+    """
+    if cell_size <= 0:
+        raise ValueError(f"cell_size must be positive, got {cell_size}")
+    if strut_radius <= 0:
+        raise ValueError(f"strut_radius must be positive, got {strut_radius}")
+
+    L = float(cell_size)
+    h = L / 2.0
+
+    # 8 corners
+    corners: List[Point3] = [
+        (0.0, 0.0, 0.0), (L,   0.0, 0.0), (0.0, L,   0.0), (L,   L,   0.0),
+        (0.0, 0.0, L),   (L,   0.0, L),   (0.0, L,   L),   (L,   L,   L),
+    ]
+    # 6 face centres: each face defined by which axis is fixed and its value
+    face_centres: List[Point3] = [
+        (h,   h,   0.0),  # -Z face: corners (0,1,2,3) = y,x in {0,L}
+        (h,   h,   L),    # +Z face: corners (4,5,6,7)
+        (h,   0.0, h),    # -Y face: corners (0,1,4,5)
+        (h,   L,   h),    # +Y face: corners (2,3,6,7)
+        (0.0, h,   h),    # -X face: corners (0,2,4,6)
+        (L,   h,   h),    # +X face: corners (1,3,5,7)
+    ]
+    # Corresponding corner indices for each face centre
+    face_corner_idx = [
+        [0, 1, 2, 3],   # -Z
+        [4, 5, 6, 7],   # +Z
+        [0, 1, 4, 5],   # -Y
+        [2, 3, 6, 7],   # +Y
+        [0, 2, 4, 6],   # -X
+        [1, 3, 5, 7],   # +X
+    ]
+
+    nodes: List[Point3] = corners + face_centres
+    strut_set: set = set()
+    for fc, cidx_list in zip(face_centres, face_corner_idx):
+        for ci in cidx_list:
+            strut_set.add(_make_strut(fc, corners[ci]))
+
+    struts = list(strut_set)
 
     return {
         "struts": struts,

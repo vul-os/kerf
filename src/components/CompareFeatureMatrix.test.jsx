@@ -150,4 +150,62 @@ describe('CompareFeatureMatrix', () => {
     expect(html).toContain('data-testid="compare-feature-matrix"')
     expect(html).toContain('Constraint sketcher')
   })
+
+  // ── Kerf-leftmost column invariant ──────────────────────────────────────────
+
+  it('Kerf column header (matrix-kerf-header) appears before the competitor header', () => {
+    const html = render(<CompareFeatureMatrix features={SAMPLE_FEATURES} competitor="Fusion 360" />)
+    const kerfHeaderIdx = html.indexOf('data-testid="matrix-kerf-header"')
+    // Competitor header contains "Fusion 360" text after the kerf header.
+    // The kerf header should come first in the DOM.
+    const featureHeaderIdx = html.indexOf('>Feature<')
+    expect(kerfHeaderIdx).toBeGreaterThan(-1)
+    expect(featureHeaderIdx).toBeGreaterThan(-1)
+    // Feature col (col 0) < Kerf col (col 1) in DOM order
+    expect(featureHeaderIdx).toBeLessThan(kerfHeaderIdx)
+    // Kerf header must appear before the competitor name in the same row
+    const compHeaderIdx = html.indexOf('>Fusion 360<')
+    expect(compHeaderIdx).toBeGreaterThan(-1)
+    expect(kerfHeaderIdx).toBeLessThan(compHeaderIdx)
+  })
+
+  it('Kerf status cell appears before competitor status cell in each feature row', () => {
+    // Use a feature where kerf=yes and competitor=no so we can distinguish the pills.
+    const distinctive = [
+      {
+        domain: 'D7',
+        feature: '3-axis CAM',
+        kerf: { status: 'yes', note: 'Kerf CAM note' },
+        competitor: { status: 'no', note: 'Competitor has no CAM' },
+      },
+    ]
+    const html = render(<CompareFeatureMatrix features={distinctive} competitor="RivalCAD" />)
+    // Find positions of kerf pill and competitor pill in the first feature row.
+    const kerfPillIdx = html.indexOf('data-testid="status-pill-yes"')
+    const compPillIdx = html.indexOf('data-testid="status-pill-no"')
+    expect(kerfPillIdx).toBeGreaterThan(-1)
+    expect(compPillIdx).toBeGreaterThan(-1)
+    // Kerf (yes) must render before competitor (no).
+    expect(kerfPillIdx).toBeLessThan(compPillIdx)
+  })
+
+  it('Kerf is leftmost even when multiple domains are rendered', () => {
+    // Render a multi-domain set and confirm kerf-header comes before competitor in each domain section.
+    const html = render(<CompareFeatureMatrix features={SAMPLE_FEATURES} competitor="SolidWorks" />)
+    // For each domain section, the kerf header should appear before the competitor name
+    // within that section's HTML. Extract each domain section independently.
+    const domainSections = [
+      html.match(/domain-section-D1"[\s\S]*?(?=data-testid="domain-section-D|$)/)?.[0],
+      html.match(/domain-section-D6"[\s\S]*?(?=data-testid="domain-section-D|$)/)?.[0],
+      html.match(/domain-section-D7"[\s\S]*/)?.[0],
+    ].filter(Boolean)
+    expect(domainSections.length).toBeGreaterThan(0)
+    domainSections.forEach((section) => {
+      const kerfIdx = section.indexOf('data-testid="matrix-kerf-header"')
+      const compIdx = section.indexOf('>SolidWorks<')
+      if (kerfIdx !== -1 && compIdx !== -1) {
+        expect(kerfIdx).toBeLessThan(compIdx)
+      }
+    })
+  })
 })

@@ -6,7 +6,10 @@
  * Props:
  *   features    — array of feature rows from the manifest item
  *   competitor  — display name of the competitor (e.g. "Autodesk Fusion 360")
- *   kerfFirst   — boolean, default true (Kerf column is first after Feature)
+ *
+ * Column order is ALWAYS: Feature | Kerf | Competitor.
+ * Kerf is unconditionally the first data column. The kerfFirst prop has been
+ * removed — the layout does not vary.
  */
 
 import { DOMAIN_META, STATUS_META, TONE_CLASSES, featuresByDomain } from '../lib/compareFeatures.js'
@@ -70,7 +73,7 @@ function StatusPill({ status, note, linkHref, evidencePath }) {
 /* Domain section                                                               */
 /* -------------------------------------------------------------------------- */
 
-function DomainSection({ domainMeta, rows, competitor, kerfFirst }) {
+function DomainSection({ domainMeta, rows, competitor }) {
   const matched = rows.filter(
     (r) => r?.kerf?.status === 'yes' && r?.competitor?.status === 'yes',
   ).length
@@ -110,25 +113,13 @@ function DomainSection({ domainMeta, rows, competitor, kerfFirst }) {
               <th className="text-left px-4 py-2.5 font-mono text-[10px] uppercase tracking-wider text-ink-400 w-[40%]">
                 Feature
               </th>
-              {kerfFirst ? (
-                <>
-                  <th className="text-left px-4 py-2.5 font-mono text-[10px] uppercase tracking-wider text-kerf-300 w-[30%]" data-testid="matrix-kerf-header">
-                    {kerfHeader}
-                  </th>
-                  <th className="text-left px-4 py-2.5 font-mono text-[10px] uppercase tracking-wider text-ink-400 w-[30%]">
-                    {compHeader}
-                  </th>
-                </>
-              ) : (
-                <>
-                  <th className="text-left px-4 py-2.5 font-mono text-[10px] uppercase tracking-wider text-ink-400 w-[30%]">
-                    {compHeader}
-                  </th>
-                  <th className="text-left px-4 py-2.5 font-mono text-[10px] uppercase tracking-wider text-kerf-300 w-[30%]" data-testid="matrix-kerf-header">
-                    {kerfHeader}
-                  </th>
-                </>
-              )}
+              {/* Kerf is ALWAYS the first data column */}
+              <th className="text-left px-4 py-2.5 font-mono text-[10px] uppercase tracking-wider text-kerf-300 w-[30%]" data-testid="matrix-kerf-header">
+                {kerfHeader}
+              </th>
+              <th className="text-left px-4 py-2.5 font-mono text-[10px] uppercase tracking-wider text-ink-400 w-[30%]">
+                {compHeader}
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -141,41 +132,21 @@ function DomainSection({ domainMeta, rows, competitor, kerfFirst }) {
                 <td className="px-4 py-3 text-ink-200 font-medium align-top text-sm">
                   {row.feature}
                 </td>
-                {kerfFirst ? (
-                  <>
-                    <td className="px-4 py-3 align-top">
-                      <StatusPill
-                        status={row?.kerf?.status ?? 'unknown'}
-                        note={row?.kerf?.note}
-                        evidencePath={row?.kerf?.evidence}
-                      />
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      <StatusPill
-                        status={row?.competitor?.status ?? 'unknown'}
-                        note={row?.competitor?.note}
-                        linkHref={row?.competitor?.source}
-                      />
-                    </td>
-                  </>
-                ) : (
-                  <>
-                    <td className="px-4 py-3 align-top">
-                      <StatusPill
-                        status={row?.competitor?.status ?? 'unknown'}
-                        note={row?.competitor?.note}
-                        linkHref={row?.competitor?.source}
-                      />
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      <StatusPill
-                        status={row?.kerf?.status ?? 'unknown'}
-                        note={row?.kerf?.note}
-                        evidencePath={row?.kerf?.evidence}
-                      />
-                    </td>
-                  </>
-                )}
+                {/* Kerf is ALWAYS the first data column */}
+                <td className="px-4 py-3 align-top">
+                  <StatusPill
+                    status={row?.kerf?.status ?? 'unknown'}
+                    note={row?.kerf?.note}
+                    evidencePath={row?.kerf?.evidence}
+                  />
+                </td>
+                <td className="px-4 py-3 align-top">
+                  <StatusPill
+                    status={row?.competitor?.status ?? 'unknown'}
+                    note={row?.competitor?.note}
+                    linkHref={row?.competitor?.source}
+                  />
+                </td>
               </tr>
             ))}
           </tbody>
@@ -220,10 +191,9 @@ function DomainSection({ domainMeta, rows, competitor, kerfFirst }) {
  * @param {{
  *   features: object[] | undefined,
  *   competitor: string,
- *   kerfFirst?: boolean,
  * }} props
  */
-export default function CompareFeatureMatrix({ features, competitor, kerfFirst = true }) {
+export default function CompareFeatureMatrix({ features, competitor }) {
   if (!features || features.length === 0) return null
 
   // Group features by domain code
@@ -256,7 +226,6 @@ export default function CompareFeatureMatrix({ features, competitor, kerfFirst =
             domainMeta={domainMeta}
             rows={rows}
             competitor={competitor}
-            kerfFirst={kerfFirst}
           />
         ))}
       </div>

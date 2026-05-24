@@ -367,8 +367,9 @@ def test_accept_share_no_membership_returns_403():
 
     conn = AsyncMock()
     conn.fetchrow = AsyncMock(side_effect=[
-        share_row,    # SELECT * FROM share_links WHERE token = $1
-        None,         # get_user_workspace_role → no membership
+        share_row,                          # SELECT * FROM share_links WHERE token = $1
+        {"workspace_id": uuid.UUID(ws_id)}, # SELECT workspace_id FROM projects WHERE id = $1
+        None,                               # get_user_workspace_role → no membership
     ])
     conn.execute = AsyncMock()
     fake_pool = _fake_pool(conn)

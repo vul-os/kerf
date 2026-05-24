@@ -3,6 +3,7 @@ import secrets
 import hashlib
 import hmac
 import base64
+import bcrypt
 import json
 import logging
 import os
@@ -75,13 +76,21 @@ def slug_from_name(name: str) -> str:
 
 
 def hash_password(password: str) -> str:
-    pepper = settings.password_pepper.encode()
-    salted = pepper + password.encode()
-    return hashlib.sha256(salted).hexdigest()
+    # Use bcrypt (same algorithm as kerf-auth) — pepper mixed in before hashing.
+    pepper = settings.password_pepper
+    peppered = (password + pepper).encode("utf-8")
+    return bcrypt.hashpw(peppered, bcrypt.gensalt()).decode("utf-8")
 
 
 def check_password(stored_hash: str, password: str) -> bool:
-    return hmac.compare_digest(stored_hash, hash_password(password))
+    if not stored_hash:
+        return False
+    pepper = settings.password_pepper
+    peppered = (password + pepper).encode("utf-8")
+    try:
+        return bcrypt.checkpw(peppered, stored_hash.encode("utf-8"))
+    except ValueError:
+        return False
 
 
 def generate_access_token(user_id: str) -> tuple[str, datetime]:
@@ -397,7 +406,14 @@ async def accept_share(token: str, payload: dict = Depends(require_auth)):
         if not row:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="share not found")
 
-        ws_id = str(row["project_id"])
+        # Resolve the project's workspace — share_links.project_id is not a workspace_id
+        ws_row = await conn.fetchrow(
+            "SELECT workspace_id FROM projects WHERE id = $1",
+            row["project_id"],
+        )
+        if not ws_row:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
+        ws_id = str(ws_row["workspace_id"])
 
         role = await get_user_workspace_role(conn, ws_id, user_id)
         if not role:
@@ -3139,9 +3155,18 @@ async def post_message(
                 )
         except HTTPException:
             raise
-        except Exception as bx:
-            _logger.warning(f"bucket-select: degrading to legacy path: {bx}")
+        except ImportError as bx:
+            # Billing module not installed (OSS/local mode) — safe to skip.
+            _logger.debug(f"bucket-select: billing module unavailable, skipping: {bx}")
             bucket = None
+        except Exception as bx:
+            # Unexpected error in billing gate — fail closed to avoid a free
+            # expensive-model call.
+            _logger.error(f"bucket-select: unexpected billing error: {bx}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="billing service error — please try again",
+            )
 
     # Resolve project tags addendum
     async with pool.acquire() as conn:
@@ -3489,9 +3514,15 @@ async def post_message_stream(
                     )
             except (GeneratorExit, asyncio.CancelledError):
                 return
-            except Exception as bx:
-                _logger.warning(f"bucket-select stream: degrading to legacy path: {bx}")
+            except ImportError as bx:
+                # Billing module not installed (OSS/local mode) — safe to skip.
+                _logger.debug(f"bucket-select stream: billing module unavailable, skipping: {bx}")
                 bucket = None
+            except Exception as bx:
+                # Unexpected billing error — fail closed.
+                _logger.error(f"bucket-select stream: unexpected billing error: {bx}")
+                yield _sse_frame("error", {"message": "billing service error — please try again", "is_error": True})
+                return
 
         last_assistant_content = ""
         last_assistant_tool_calls: list = []
@@ -3812,7 +3843,12 @@ async def delete_share_link(pid: str, lid: str, request: Request, payload: dict 
         if not role:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
 
-        await conn.execute("UPDATE share_links SET revoked_at = now() WHERE id = $1", lid)
+        # Confirm link belongs to this project (prevents IDOR across projects)
+        await conn.execute(
+            "UPDATE share_links SET revoked_at = now() WHERE id = $1 AND project_id = $2",
+            lid,
+            pid,
+        )
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -5665,7 +5701,7 @@ async def list_publishers(
                 select count(distinct f.id)
                 from files f
                 join projects p on p.id = f.project_id
-                where p.owner_id = u.id
+                where p.created_by = u.id
                   and f.kind = 'part'
                   and f.deleted_at is null
             ), 0) as library_count
@@ -5750,7 +5786,7 @@ async def set_publisher_verified(
             select count(distinct f.id)
               from files f
               join projects p on p.id = f.project_id
-             where p.owner_id = $1
+             where p.created_by = $1
                and f.kind = 'part'
                and f.deleted_at is null
             """,

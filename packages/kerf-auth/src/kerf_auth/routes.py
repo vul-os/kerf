@@ -972,5 +972,7 @@ async def revoke_api_token(request: Request, token_id: str, payload: dict = Depe
 
     pool = await get_pool_required()
     async with pool.acquire() as conn:
-        await api_tokens_queries.revoke_api_token(conn, token_id)
+        revoked = await api_tokens_queries.revoke_api_token(conn, uuid.UUID(token_id), uuid.UUID(workspace_id))
+    if not revoked:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="token not found")
     return Response(status_code=status.HTTP_204_NO_CONTENT)

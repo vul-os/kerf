@@ -568,6 +568,29 @@ async def run_import_step(ctx: ProjectCtx, args: bytes) -> str:
     if not url.startswith("https://"):
         return err_payload("url scheme must be https", "BAD_ARGS")
 
+    # SSRF guard: resolve the hostname and reject private/loopback/link-local addresses.
+    try:
+        import socket
+        import ipaddress
+        from urllib.parse import urlparse as _urlparse
+        _parsed = _urlparse(url)
+        _host = _parsed.hostname or ""
+        if not _host:
+            return err_payload("invalid url: no hostname", "BAD_ARGS")
+        _resolved = socket.getaddrinfo(_host, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        for _family, _type, _proto, _canonname, _sockaddr in _resolved:
+            _ip = ipaddress.ip_address(_sockaddr[0])
+            if (
+                _ip.is_loopback
+                or _ip.is_private
+                or _ip.is_link_local
+                or _ip.is_multicast
+                or (isinstance(_ip, ipaddress.IPv6Address) and _ip.is_site_local)
+            ):
+                return err_payload("url resolves to a private/internal address", "BAD_ARGS")
+    except OSError:
+        return err_payload("url hostname could not be resolved", "BAD_ARGS")
+
     parent_clean, err = normalize_path(parent_path)
     if err:
         return err_payload(err, "BAD_ARGS")

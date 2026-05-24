@@ -55,11 +55,19 @@ async def get_api_token_by_hash(
 async def revoke_api_token(
     conn: asyncpg.Connection,
     token_id: uuid.UUID,
+    workspace_id: Optional[uuid.UUID] = None,
 ) -> bool:
-    result = await conn.execute(
-        "UPDATE api_tokens SET revoked_at = now() WHERE id = $1",
-        token_id,
-    )
+    if workspace_id is not None:
+        result = await conn.execute(
+            "UPDATE api_tokens SET revoked_at = now() WHERE id = $1 AND workspace_id = $2",
+            token_id,
+            workspace_id,
+        )
+    else:
+        result = await conn.execute(
+            "UPDATE api_tokens SET revoked_at = now() WHERE id = $1",
+            token_id,
+        )
     return result == "UPDATE 1"
 
 

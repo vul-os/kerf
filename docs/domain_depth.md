@@ -127,7 +127,7 @@ Calculators solid; fluid-property fidelity is the weak point.
 | Feature | Kerf | Notes |
 |---|---|---|
 | Psychrometrics (moist air) | [x] (backend) | ASHRAE-grade |
-| Heat exchangers (LMTD + ε-NTU) | [x] (backend) | no Bell-Delaware/Kern bundle sizing |
+| Heat exchangers (LMTD + ε-NTU + Bell-Delaware) | [x] (backend) | + full TEMA layout + 5 correction factors + ΔP both sides (heatxfer/shell_tube_bell.py); Kern U≈504 validated |
 | HVAC duct sizing (SMACNA) | [x] (backend) | + flat-pattern |
 | Building loads | [x] (backend) | degree-day + CLTD/RTS transient (ASHRAE Ch.18) + Sol-air + fenestration (buildingenergy/transient.py) |
 | Pipe network (Hardy-Cross) | [x] (backend) | clean-water |
@@ -198,7 +198,7 @@ Real toolpaths via opencamlib; CAMView wired for common ops.
 | Feeds & speeds + tool-life | [x] (backend) | + Taylor extended (vcT^n·f^a·dp^b=C) + Gilbert economic speed (cuttingtool/tool_life.py) |
 | Moldflow / fill sim | [x] (backend) | + Hele-Shaw front tracking + weld-line + air-trap detection (moldflow/flow_front.py) |
 | DFM checks | [~] (backend) | mesh-based |
-| Nesting | [~] (backend) | skyline bbox; no true-shape NFP |
+| Nesting (skyline + true-shape NFP) | [x] (backend) | + Minkowski-sum NFP + IFP + bottom-left fill (nesting/nfp.py); 57.6% L-shape util |
 | Additive / DFAM | [x] (backend) | |
 | Injection / forming | [x] (backend) | |
 | FDM slicing (Cura) | [x] | wired (PrintSliceView) |

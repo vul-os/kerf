@@ -1502,6 +1502,61 @@ function opLoft(oc, _prev, node, sketches, tracker) {
       throw new Error(`loft: AddWire failed for '${paths[i]}': ${err?.message || err}`)
     }
   }
+
+  // GK-P16: guide curve rails.
+  // BRepOffsetAPI_ThruSections doesn't expose a guide-curve API in the
+  // opencascade.js WASM binding; guide wires are added via AddWire() just like
+  // profiles but are passed as intermediate open-wire sections.  If the binding
+  // ever exposes a SetGuideWire / AddGuide overload we can route through that.
+  //
+  // Graceful degradation: if guide_curve_paths is provided but the binding
+  // doesn't support a dedicated guide-curve API, we add the guide wires as
+  // intermediate section wires (approximation) and surface a warning so the
+  // caller knows the guides are advisory.
+  const guidePaths = Array.isArray(node.guide_curve_paths) ? node.guide_curve_paths : []
+  if (guidePaths.length > 0) {
+    // Check for a dedicated guide-curve overload (future-proof probe).
+    const hasGuideApi = (
+      typeof builder.SetGuideWire === 'function' ||
+      typeof builder.AddGuideWire === 'function' ||
+      typeof builder.SetSpine === 'function'
+    )
+    if (hasGuideApi) {
+      // Route through the dedicated guide API if available.
+      const addGuide = builder.SetGuideWire || builder.AddGuideWire || builder.SetSpine
+      for (const gp of guidePaths) {
+        const gWire = wireForSketchPath(oc, gp, sketches, tracker, { closed: false, preferGeom2: true })
+        if (!gWire) {
+          console.warn(`loft: guide curve '${gp}' produced no wire; skipping guide`)
+          continue
+        }
+        try {
+          addGuide.call(builder, gWire)
+        } catch (err) {
+          console.warn(`loft: guide-curve API call failed for '${gp}': ${err?.message || err}; continuing without this guide`)
+        }
+      }
+    } else {
+      // Fallback: guide wires are advisory only on this binding.
+      console.warn(
+        'loft: guide_curve_paths provided but BRepOffsetAPI_ThruSections binding ' +
+        'does not expose a guide-curve API in this build. ' +
+        'Guide curves are used as intermediate profile wires (advisory approximation). ' +
+        'Install a newer opencascade.js build for full guide-curve support.'
+      )
+      // Add guide wires as open-wire intermediate sections (best-effort).
+      for (const gp of guidePaths) {
+        const gWire = wireForSketchPath(oc, gp, sketches, tracker, { closed: false, preferGeom2: true })
+        if (gWire) {
+          try {
+            if (typeof builder.AddWire === 'function') builder.AddWire(gWire)
+            else if (typeof builder.AddWire_1 === 'function') builder.AddWire_1(gWire)
+          } catch { /* skip unacceptable guide wire */ }
+        }
+      }
+    }
+  }
+
   if (node.closed) {
     try { builder.SetSmoothing?.(true) } catch { /* */ }
   }

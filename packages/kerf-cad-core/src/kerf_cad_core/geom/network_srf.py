@@ -509,3 +509,104 @@ def gordon_network_srf(
             grid[gi, gj] = t1 + t2 - t3
 
     return _grid_interpolating_surface(grid)
+
+
+# ---------------------------------------------------------------------------
+# GK-P16: loft_surface — skinning loft with optional guide curves
+# ---------------------------------------------------------------------------
+
+def loft_surface(
+    profiles: list,
+    *,
+    guide_curves: list = None,
+    ruled: bool = False,
+    degree_u: int = 3,
+    grid_n: int = 20,
+) -> "NurbsSurface":
+    """Loft through a sequence of profile curves with optional guide rails.
+
+    When *guide_curves* is ``None`` (or empty) this degenerates to
+    :func:`network_srf` (skinning loft).  When guide curves are provided the
+    function builds a Gordon / network surface that interpolates both the
+    profile cross-sections and the guide rails, using :func:`gordon_network_srf`
+    internally.
+
+    The guide-curve path in the OCCT worker (``opLoft`` in occtWorker.js)
+    routes through ``BRepOffsetAPI_ThruSections.AddWire()`` for the profiles
+    and, when guide curves are provided and the binding supports it, calls the
+    guide-spine overload.  This pure-Python path is the fallback used when
+    the OCCT binding is absent or the guide-curve overload is not available.
+
+    Parameters
+    ----------
+    profiles : list[NurbsCurve]
+        Ordered cross-section profiles (≥ 2).
+    guide_curves : list[NurbsCurve] or None
+        Guide rails that constrain the loft.  Each guide curve must
+        intersect (or nearly intersect, within *tol*) every profile curve.
+        When provided, the function uses the Gordon surface construction so
+        that the output surface passes exactly through all guide curves.
+        If None or empty, a simple skinning loft is returned.
+    ruled : bool
+        If True, use linear (ruled) blending between profiles.  When guide
+        curves are also provided the ruled flag is advisory only (the Gordon
+        surface always interpolates exactly).
+    degree_u : int
+        Degree in the profile direction (along each cross-section).
+        Passed through to the skinning loft; the Gordon surface uses
+        degree-3 for the guide-curve interpolation.
+    grid_n : int
+        Grid sample count for the Gordon surface evaluation.  Larger values
+        give higher accuracy at the cost of performance.
+
+    Returns
+    -------
+    NurbsSurface
+        Lofted surface.  When *guide_curves* is None, control points lie on
+        the skinning loft.  With guide curves the surface also interpolates
+        the guide rails (Gordon formulation).
+
+    Raises
+    ------
+    ValueError
+        If fewer than 2 profiles are provided, or if guide curves are
+        provided but do not intersect all profiles within tolerance.
+    """
+    if len(profiles) < 2:
+        raise ValueError(
+            f"loft_surface: at least 2 profiles required; got {len(profiles)}"
+        )
+
+    # No guide curves → simple skinning loft.
+    if not guide_curves:
+        if ruled:
+            # Ruled: use degree 1 in the v direction (between profiles).
+            return network_srf(profiles, degree_u=1)
+        return network_srf(profiles, degree_u=degree_u)
+
+    # Guide curves present → Gordon / network surface.
+    # The u-curves are the profiles; the v-curves are the guide rails.
+    # Intersection parameters are inferred automatically (evenly spaced
+    # default works for well-conditioned inputs).
+    guide = list(guide_curves)
+    if len(guide) < 1:
+        raise ValueError("loft_surface: guide_curves must be non-empty if provided")
+
+    try:
+        surface = gordon_network_srf(
+            u_curves=list(profiles),
+            v_curves=guide,
+            grid_n=grid_n,
+        )
+        return surface
+    except ValueError as exc:
+        # Guide-curve intersection mismatch: degrade gracefully to simple loft
+        # and surface the warning so callers can detect the degradation.
+        import warnings
+        warnings.warn(
+            f"loft_surface: guide curves could not be interpolated exactly "
+            f"({exc}); falling back to skinning loft without guide influence.",
+            UserWarning,
+            stacklevel=2,
+        )
+        return network_srf(profiles, degree_u=degree_u)

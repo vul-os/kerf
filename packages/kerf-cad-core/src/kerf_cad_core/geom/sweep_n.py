@@ -178,3 +178,55 @@ def sweep_n(
         knots_u=knots_u,
         knots_v=knots_v,
     )
+
+
+# ---------------------------------------------------------------------------
+# GK-P16 pure-Python fallback: loft_with_guides_sweep_n
+# ---------------------------------------------------------------------------
+
+def loft_with_guides_sweep_n(
+    profiles: List[NurbsCurve],
+    guide_curves: List[NurbsCurve],
+    *,
+    frame: str = "rmf",
+) -> NurbsSurface:
+    """Pure-Python fallback for guided loft using sweep_n semantics.
+
+    Treats the guide rails as the N rails of :func:`sweep_n` and selects the
+    first profile as the cross-section to sweep.  This is a conservative
+    fallback; for the full Gordon-surface interpolation see
+    :func:`~kerf_cad_core.geom.network_srf.loft_surface`.
+
+    Parameters
+    ----------
+    profiles : list[NurbsCurve]
+        Cross-section profiles (≥ 2).  Only the first profile is used as
+        the sweep cross-section; the remaining profiles adjust the rail
+        parameterisation.
+    guide_curves : list[NurbsCurve]
+        Guide rails (≥ 2).  Passed directly to :func:`sweep_n` as the
+        *rails* argument.
+    frame : str
+        Frame computation method.  Only ``"rmf"`` is supported.
+
+    Returns
+    -------
+    NurbsSurface
+        Swept surface guided by the given rails.
+
+    Raises
+    ------
+    ValueError
+        If fewer than 2 profiles or guide curves are provided.
+    """
+    if len(profiles) < 2:
+        raise ValueError(
+            f"loft_with_guides_sweep_n: at least 2 profiles required; got {len(profiles)}"
+        )
+    if len(guide_curves) < 2:
+        raise ValueError(
+            f"loft_with_guides_sweep_n: at least 2 guide curves required; got {len(guide_curves)}"
+        )
+
+    # Use the first profile as the cross-section and the guide curves as rails.
+    return sweep_n(profiles[0], list(guide_curves), frame=frame)

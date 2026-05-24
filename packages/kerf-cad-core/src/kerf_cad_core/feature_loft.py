@@ -35,6 +35,7 @@ def validate_loft_args(
     closed: object,
     symmetric: object,
     continuity: object,
+    guide_curve_paths: object = None,
 ) -> tuple[str | None, str | None]:
     """Validate args; return (error_msg, error_code) or (None, None) on success."""
     if not isinstance(profile_sketch_paths, list):
@@ -72,6 +73,22 @@ def validate_loft_args(
             "BAD_ARGS",
         )
 
+    # Validate guide_curve_paths (GK-P16)
+    if guide_curve_paths is not None:
+        if not isinstance(guide_curve_paths, list):
+            return "guide_curve_paths must be a list or null", "BAD_ARGS"
+        for i, p in enumerate(guide_curve_paths):
+            if not isinstance(p, str) or not p.strip():
+                return (
+                    f"guide_curve_paths[{i}] must be a non-empty string", "BAD_ARGS"
+                )
+            if not p.endswith(".sketch"):
+                return (
+                    f"guide_curve_paths[{i}] must end in '.sketch'", "BAD_ARGS"
+                )
+        if len(guide_curve_paths) > 0 and symmetric:
+            return "guide_curve_paths cannot be combined with symmetric mode", "BAD_ARGS"
+
     return None, None
 
 
@@ -83,6 +100,7 @@ def build_loft_node(
     symmetric: bool,
     continuity: str,
     name: str = "",
+    guide_curve_paths: list | None = None,
 ) -> dict:
     """Return the feature-node dict for a loft operation."""
     node: dict = {
@@ -96,6 +114,9 @@ def build_loft_node(
     }
     if name:
         node["name"] = name
+    # GK-P16: include guide_curve_paths when provided
+    if guide_curve_paths:
+        node["guide_curve_paths"] = list(guide_curve_paths)
     return node
 
 
@@ -108,6 +129,13 @@ feature_loft_spec = ToolSpec(
         "Loft blends through ≥2 closed profile sketches using "
         "`BRepOffsetAPI_ThruSections`. "
         "\n\n"
+        "**`guide_curve_paths` (GK-P16)** — one or more `.sketch` paths that "
+        "act as guide rails constraining the loft shape.  The guide curves must "
+        "intersect (or nearly intersect) every profile sketch.  The OCCT worker "
+        "routes guide curves through `BRepOffsetAPI_ThruSections.AddWire()`; the "
+        "pure-Python kernel falls back to a Gordon / network-surface construction "
+        "or a sweep_n sweep.  Incompatible with `symmetric: true`. "
+        "\n\n"
         "**`symmetric: true` flag** — mid-plane symmetric loft for thin-walled "
         "bodies (handles, brackets, grips). Requires exactly 2 profiles. "
         "The worker mirrors both profiles across the mid-plane between them and "
@@ -116,8 +144,8 @@ feature_loft_spec = ToolSpec(
         "Both sketch planes must be parallel (non-parallel → BAD_ARGS). "
         "Incompatible with `closed: true`. "
         "\n\n"
-        "When `symmetric: false` (default) behaviour is identical to the "
-        "existing loft op — no change."
+        "When `symmetric: false` (default) and no `guide_curve_paths` the "
+        "behaviour is identical to the original loft op — no regression."
     ),
     input_schema={
         "type": "object",
@@ -132,6 +160,18 @@ feature_loft_spec = ToolSpec(
                 "description": (
                     "Ordered list of absolute .sketch file paths (≥2, ≥3 if closed). "
                     "When symmetric=true, exactly 2 paths are required."
+                ),
+            },
+            "guide_curve_paths": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "GK-P16: optional list of .sketch paths acting as guide rails. "
+                    "Each guide must intersect all profile sketches. "
+                    "Incompatible with symmetric=true. "
+                    "The OCCT worker routes these through AddWire(); the pure-Python "
+                    "kernel uses a Gordon / network-surface construction. "
+                    "Omit or pass [] for a standard (unguided) loft."
                 ),
             },
             "ruled": {
@@ -202,15 +242,21 @@ async def run_feature_loft(ctx: ProjectCtx, args: bytes) -> str:
     continuity = a.get("continuity", "C0")
     name = a.get("name", "").strip() or ""
     node_id = a.get("id", "").strip()
+    guide_curve_paths = a.get("guide_curve_paths", None)
 
     # Coerce to bool in case JSON sends 0/1
     ruled = bool(ruled)
     closed = bool(closed)
     symmetric = bool(symmetric)
 
+    # Normalise guide_curve_paths: None / [] → None
+    if isinstance(guide_curve_paths, list) and len(guide_curve_paths) == 0:
+        guide_curve_paths = None
+
     # ── validate ─────────────────────────────────────────────────────────────
     err_msg, err_code = validate_loft_args(
-        profile_sketch_paths, ruled, closed, symmetric, continuity
+        profile_sketch_paths, ruled, closed, symmetric, continuity,
+        guide_curve_paths,
     )
     if err_msg:
         return err_payload(err_msg, err_code)
@@ -232,6 +278,7 @@ async def run_feature_loft(ctx: ProjectCtx, args: bytes) -> str:
         symmetric,
         continuity,
         name,
+        guide_curve_paths=guide_curve_paths,
     )
 
     _, nid, err = append_feature_node(ctx, fid, node)
@@ -243,4 +290,5 @@ async def run_feature_loft(ctx: ProjectCtx, args: bytes) -> str:
         "id": nid,
         "op": "loft",
         "symmetric": symmetric,
+        "has_guides": guide_curve_paths is not None,
     })

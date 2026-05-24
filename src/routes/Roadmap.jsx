@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import rehypeHighlight from 'rehype-highlight'
 import { ArrowRight, Github, Loader2, AlertCircle } from 'lucide-react'
 import Header from '../components/Header.jsx'
 import Footer from '../components/Footer.jsx'
@@ -250,69 +251,81 @@ export default function Roadmap() {
       <RoadmapHead />
       <Header />
 
-      <main className="mx-auto max-w-7xl px-6 pt-10 pb-20" aria-label="Kerf engineering roadmap">
+      <main className="mx-auto max-w-7xl px-6 pt-10 pb-24" aria-label="Kerf engineering roadmap">
         {/* Hero strip */}
         <section
           aria-labelledby="roadmap-hero-heading"
-          className="mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4"
+          className="mb-10 pb-8 border-b border-ink-900"
         >
-          <div>
-            <p className="font-mono text-xs uppercase tracking-[0.2em] text-kerf-300">Roadmap</p>
-            <h1
-              id="roadmap-hero-heading"
-              className="mt-2 font-display text-3xl sm:text-4xl font-semibold tracking-[-0.02em]"
-            >
-              What ships, what&apos;s in flight, what&apos;s next.
-            </h1>
-            <p className="mt-3 text-sm sm:text-base text-ink-300 max-w-2xl leading-relaxed">
-              The single source of truth is{' '}
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6">
+            <div>
+              <p className="font-mono text-xs uppercase tracking-[0.2em] text-kerf-400 mb-2">Roadmap</p>
+              <h1
+                id="roadmap-hero-heading"
+                className="font-display text-3xl sm:text-4xl font-semibold tracking-[-0.02em] text-ink-100"
+              >
+                What ships, what&apos;s in flight, what&apos;s next.
+              </h1>
+              <p className="mt-3 text-sm sm:text-base text-ink-300 max-w-2xl leading-relaxed">
+                The single source of truth is{' '}
+                <a
+                  href={ROADMAP_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-kerf-300 underline underline-offset-2 hover:text-kerf-200"
+                >
+                  ROADMAP.md
+                </a>{' '}
+                in the repo. This page renders that file directly.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
               <a
                 href={ROADMAP_URL}
                 target="_blank"
                 rel="noreferrer"
-                className="text-kerf-300 underline underline-offset-2 hover:text-kerf-200"
+                aria-label="View ROADMAP.md on GitHub"
+                className="inline-flex items-center gap-1.5 rounded-md border border-ink-800 bg-ink-900/60 px-3 h-9 text-xs text-ink-300 hover:border-ink-700 hover:text-ink-100 transition-colors font-mono"
               >
+                <Github size={13} aria-hidden />
                 ROADMAP.md
-              </a>{' '}
-              in the repo. This page renders that file. Status glyphs are{' '}
-              <span className="font-mono text-emerald-300">✅ shipped</span>,{' '}
-              <span className="font-mono text-amber-300">🚧 in flight</span>, and{' '}
-              <span className="font-mono text-ink-400">🔴 not started</span>.
-            </p>
+              </a>
+              <Link
+                to="/docs"
+                className="inline-flex items-center gap-1.5 text-xs text-ink-400 hover:text-ink-100 transition-colors"
+              >
+                Docs <ArrowRight size={12} />
+              </Link>
+            </div>
           </div>
-          <div className="flex items-center gap-3 shrink-0">
-            <a
-              href={ROADMAP_URL}
-              target="_blank"
-              rel="noreferrer"
-              aria-label="View ROADMAP.md on GitHub"
-              className="inline-flex items-center gap-1.5 rounded-md border border-ink-800 bg-ink-900/60 px-3 h-9 text-xs text-ink-300 hover:border-ink-700 hover:text-ink-100 transition-colors font-mono"
-            >
-              <Github size={13} aria-hidden />
-              ROADMAP.md
-            </a>
-            <Link
-              to="/docs"
-              className="inline-flex items-center gap-1.5 text-xs text-ink-400 hover:text-ink-100 transition-colors"
-            >
-              Docs <ArrowRight size={12} />
-            </Link>
+          {/* Status glyph legend */}
+          <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2">
+            <span className="font-mono text-[11px] uppercase tracking-widest text-ink-500">Status</span>
+            <span className="inline-flex items-center gap-1.5 text-xs text-ink-300">
+              <span aria-hidden>✅</span> Shipped
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-xs text-ink-300">
+              <span aria-hidden>🚧</span> In flight
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-xs text-ink-300">
+              <span aria-hidden>🔴</span> Not started
+            </span>
           </div>
         </section>
 
         {/* TOC + body 2-col on lg, stacked on small */}
-        <div className="lg:grid lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-10">
+        <div className="lg:grid lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-12">
           <aside className="hidden lg:block">
             <nav aria-label="Table of contents" className="sticky top-20">
-              <p className="font-mono text-[11px] uppercase tracking-widest text-ink-500 mb-2">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-ink-500 mb-3">
                 Contents
               </p>
-              <ul className="space-y-1.5">
+              <ul className="space-y-2">
                 {toc.map((t) => (
                   <li key={t.id}>
                     <a
                       href={`#${t.id}`}
-                      className="block text-xs text-ink-400 hover:text-kerf-300 transition-colors leading-snug"
+                      className="block text-[11px] text-ink-400 hover:text-kerf-300 transition-colors leading-snug py-0.5"
                     >
                       {t.text.replace(/^§\s*[\d.]+\s*[—-]\s*/, '').replace(/^§\s*[\d.]+\s*/, '')}
                     </a>
@@ -351,6 +364,7 @@ export default function Roadmap() {
             {state.status === 'ready' && (
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
+                rehypePlugins={[[rehypeHighlight, { detect: true, ignoreMissing: true }]]}
                 allowedElements={ALLOWED_ELEMENTS}
                 urlTransform={urlTransformer}
                 components={MD_COMPONENTS}

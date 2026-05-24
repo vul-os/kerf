@@ -25,6 +25,7 @@ Author: imranparuk
 from __future__ import annotations
 
 import json
+import math
 
 from kerf_chat.tools.registry import ToolSpec, err_payload, ok_payload, register
 from kerf_core.utils.context import ProjectCtx  # noqa: F401
@@ -34,6 +35,7 @@ from kerf_cad_core.robotics.arm import (
     end_effector_pose,
     ik_2r_planar,
     ik_3r_planar,
+    ik_spatial_dls,
     geometric_jacobian,
     manipulability,
     workspace_radius,
@@ -623,3 +625,104 @@ async def run_robot_trajectory_trapezoidal(ctx: ProjectCtx, args: bytes) -> str:
         result["velocities_rad_s"] = result.pop("velocities")
 
     return ok_payload(result)
+
+
+# ---------------------------------------------------------------------------
+# Tool: robot_ik_spatial_dls
+# ---------------------------------------------------------------------------
+
+_ik_spatial_spec = ToolSpec(
+    name="robot_ik_spatial_dls",
+    description=(
+        "Numerical inverse kinematics for a general n-DOF DH chain via damped "
+        "least-squares (Levenberg-Marquardt) on the geometric Jacobian.\n\n"
+        "Iterates q ← q + α Jᵀ(JJᵀ + λ²I)⁻¹ e until the 6-D task error "
+        "e = [Δposition; Δorientation] falls below tolerance.\n\n"
+        "dh_params rows: [a_i, alpha_i_deg, d_i, theta_offset_deg].\n"
+        "q_init_deg: initial joint angles (degrees).\n"
+        "target_T: 4×4 target homogeneous transform.\n\n"
+        "Returns q_rad, q_deg, converged, iterations, pos_error_m, rot_error_rad.\n\n"
+        "Errors: {ok:false, reason}.  Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "dh_params": {
+                "type": "array",
+                "items": {"type": "array", "items": {"type": "number"},
+                          "minItems": 4, "maxItems": 4},
+                "description": "List of n DH rows [a_i, alpha_i_deg, d_i, theta_offset_deg].",
+            },
+            "q_init_deg": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "Initial joint angles (degrees), length n.",
+            },
+            "target_T": {
+                "type": "array",
+                "items": {"type": "array", "items": {"type": "number"}},
+                "description": "4×4 target end-effector homogeneous transform.",
+            },
+            "lam": {
+                "type": "number",
+                "description": "Damping factor λ (default 0.05). Larger = more regularisation.",
+            },
+            "pos_tol": {
+                "type": "number",
+                "description": "Position tolerance (m, default 1e-4).",
+            },
+            "rot_tol": {
+                "type": "number",
+                "description": "Rotation tolerance (rad, default 1e-3).",
+            },
+            "max_iter": {
+                "type": "integer",
+                "description": "Maximum iterations (default 200).",
+            },
+            "alpha_gain": {
+                "type": "number",
+                "description": "Step size gain (default 1.0).",
+            },
+        },
+        "required": ["dh_params", "q_init_deg", "target_T"],
+    },
+)
+
+
+@register(_ik_spatial_spec, write=False)
+async def run_robot_ik_spatial_dls(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    for field in ("dh_params", "q_init_deg", "target_T"):
+        if a.get(field) is None:
+            return json.dumps({"ok": False, "reason": f"{field} is required"})
+
+    dh_params = a["dh_params"]
+    # Convert alpha_i and theta_offset from degrees to radians in DH params
+    dh_rad = []
+    for row in dh_params:
+        dh_rad.append([
+            float(row[0]),
+            math.radians(float(row[1])),
+            float(row[2]),
+            math.radians(float(row[3])),
+        ])
+
+    q_init = [math.radians(float(q)) for q in a["q_init_deg"]]
+
+    kwargs = {}
+    if "lam" in a:
+        kwargs["lam"] = float(a["lam"])
+    if "pos_tol" in a:
+        kwargs["pos_tol"] = float(a["pos_tol"])
+    if "rot_tol" in a:
+        kwargs["rot_tol"] = float(a["rot_tol"])
+    if "max_iter" in a:
+        kwargs["max_iter"] = int(a["max_iter"])
+    if "alpha_gain" in a:
+        kwargs["alpha"] = float(a["alpha_gain"])
+
+    return ok_payload(ik_spatial_dls(dh_rad, q_init, a["target_T"], **kwargs))

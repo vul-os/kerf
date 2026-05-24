@@ -661,3 +661,187 @@ async def run_isolator_stiffness(ctx: ProjectCtx, args: bytes) -> str:
     return ok_payload(
         isolator_stiffness(a["m"], a["omega_exc"], a["TR_target"])
     )
+
+
+# ---------------------------------------------------------------------------
+# n-DOF modal analysis and FRF tools
+# ---------------------------------------------------------------------------
+
+from kerf_cad_core.vibration.mdof import (  # noqa: E402
+    mdof_eigen,
+    mdof_frf,
+    mdof_rayleigh_damping,
+)
+
+
+# ---------------------------------------------------------------------------
+# Tool: vibration_ndof_eigen
+# ---------------------------------------------------------------------------
+
+_ndof_eigen_spec = ToolSpec(
+    name="vibration_ndof_eigen",
+    description=(
+        "Solve the generalised eigenvalue problem (K − ω²M)u = 0 for an n-DOF "
+        "undamped system.\n\n"
+        "Returns natural frequencies ωᵣ (rad/s and Hz) and mass-normalised mode "
+        "shapes for all n modes, sorted ascending.\n\n"
+        "Matrices are passed as flat row-major lists of length n×n.\n\n"
+        "Errors: {ok:false, reason} for invalid inputs.  Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "M_flat": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "n×n mass matrix, row-major flat (length n²).",
+            },
+            "K_flat": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "n×n stiffness matrix, row-major flat (length n²).",
+            },
+            "n": {
+                "type": "integer",
+                "description": "Number of degrees of freedom.",
+            },
+        },
+        "required": ["M_flat", "K_flat", "n"],
+    },
+)
+
+
+@register(_ndof_eigen_spec, write=False)
+async def run_ndof_eigen(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    for field in ("M_flat", "K_flat", "n"):
+        if a.get(field) is None:
+            return json.dumps({"ok": False, "reason": f"{field} is required"})
+
+    return ok_payload(mdof_eigen(a["M_flat"], a["K_flat"], a["n"]))
+
+
+# ---------------------------------------------------------------------------
+# Tool: vibration_ndof_frf
+# ---------------------------------------------------------------------------
+
+_ndof_frf_spec = ToolSpec(
+    name="vibration_ndof_frf",
+    description=(
+        "Compute the n×n frequency response function matrix H(ω) for an n-DOF "
+        "system using modal superposition with proportional or uniform damping.\n\n"
+        "H[j][k](ω) is the displacement at DOF j per unit harmonic force at DOF k.\n\n"
+        "zeta_modal: single float (all modes share ζ) or list of n floats.\n\n"
+        "Returns H_real, H_imag, H_mag arrays of shape [n_omega][n][n].\n\n"
+        "Errors: {ok:false, reason} for invalid inputs.  Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "M_flat": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "n×n mass matrix, row-major flat (length n²).",
+            },
+            "K_flat": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "n×n stiffness matrix, row-major flat (length n²).",
+            },
+            "n": {
+                "type": "integer",
+                "description": "Number of degrees of freedom.",
+            },
+            "zeta_modal": {
+                "description": (
+                    "Modal damping ratio(s). Single float (uniform) or list of n floats."
+                ),
+            },
+            "omega_range": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "Excitation frequencies (rad/s) at which to evaluate H.",
+            },
+        },
+        "required": ["M_flat", "K_flat", "n", "zeta_modal", "omega_range"],
+    },
+)
+
+
+@register(_ndof_frf_spec, write=False)
+async def run_ndof_frf(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    for field in ("M_flat", "K_flat", "n", "zeta_modal", "omega_range"):
+        if a.get(field) is None:
+            return json.dumps({"ok": False, "reason": f"{field} is required"})
+
+    return ok_payload(
+        mdof_frf(a["M_flat"], a["K_flat"], a["n"], a["zeta_modal"], a["omega_range"])
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tool: vibration_ndof_rayleigh_damping
+# ---------------------------------------------------------------------------
+
+_rayleigh_spec = ToolSpec(
+    name="vibration_ndof_rayleigh_damping",
+    description=(
+        "Assemble Rayleigh (proportional) damping matrix C = α M + β K and "
+        "compute modal damping ratios ζᵣ = α/(2ωᵣ) + β ωᵣ/2 for each mode.\n\n"
+        "Matrices are passed as flat row-major lists of length n×n.\n\n"
+        "Errors: {ok:false, reason} for invalid inputs.  Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "alpha": {
+                "type": "number",
+                "description": "Mass-proportional coefficient α (1/s). Must be >= 0.",
+            },
+            "beta": {
+                "type": "number",
+                "description": "Stiffness-proportional coefficient β (s). Must be >= 0.",
+            },
+            "M_flat": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "n×n mass matrix, row-major flat (length n²).",
+            },
+            "K_flat": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "n×n stiffness matrix, row-major flat (length n²).",
+            },
+            "n": {
+                "type": "integer",
+                "description": "Number of degrees of freedom.",
+            },
+        },
+        "required": ["alpha", "beta", "M_flat", "K_flat", "n"],
+    },
+)
+
+
+@register(_rayleigh_spec, write=False)
+async def run_ndof_rayleigh_damping(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    for field in ("alpha", "beta", "M_flat", "K_flat", "n"):
+        if a.get(field) is None:
+            return json.dumps({"ok": False, "reason": f"{field} is required"})
+
+    return ok_payload(
+        mdof_rayleigh_damping(a["alpha"], a["beta"], a["M_flat"], a["K_flat"], a["n"])
+    )

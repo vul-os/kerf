@@ -670,6 +670,294 @@ def workspace_radius(dh_params: List[List[float]]) -> dict:
 # Joint-space trapezoidal velocity trajectory
 # ---------------------------------------------------------------------------
 
+def _mat_add_rect(
+    A: List[List[float]], B: List[List[float]]
+) -> List[List[float]]:
+    """Element-wise sum of two matrices with the same shape."""
+    return [[A[i][j] + B[i][j] for j in range(len(A[0]))] for i in range(len(A))]
+
+
+def _scalar_mul_mat(s: float, A: List[List[float]]) -> List[List[float]]:
+    return [[s * A[i][j] for j in range(len(A[0]))] for i in range(len(A))]
+
+
+def _vec_sub(a: List[float], b: List[float]) -> List[float]:
+    return [ai - bi for ai, bi in zip(a, b)]
+
+
+def _vec_add(a: List[float], b: List[float]) -> List[float]:
+    return [ai + bi for ai, bi in zip(a, b)]
+
+
+def _vec_norm6(v: List[float]) -> float:
+    return math.sqrt(sum(x * x for x in v))
+
+
+def _scalar_mul_vec(s: float, v: List[float]) -> List[float]:
+    return [s * x for x in v]
+
+
+def _rotation_error_so3(R_des: List[List[float]], R_cur: List[List[float]]) -> List[float]:
+    """
+    Orientation error as 3-vector from SO(3) log map.
+    err = 0.5 * [ R_cur[:,1]×R_des[:,1] + R_cur[:,2]×R_des[:,2] + R_cur[:,3]×R_des[:,3] ]
+    using the skew-symmetric formulation e = 0.5*(R_des - R_cur)^∨.
+
+    Actually uses: e = 0.5 * (r_cur × r_des + s_cur × s_des + t_cur × t_des)
+    where ×  denotes cross product of corresponding columns.
+    This is the standard geometric orientation error vector for rotation matrices.
+
+    Reference: Siciliano §3.7.3 — task-space error representation.
+    """
+    # Columns of R_des and R_cur
+    def _col(R: List[List[float]], j: int) -> List[float]:
+        return [R[0][j], R[1][j], R[2][j]]
+
+    err = [0.0, 0.0, 0.0]
+    for c in range(3):
+        cd = _col(R_des, c)
+        cc = _col(R_cur, c)
+        cr = _cross3(cc, cd)
+        err[0] += cr[0]
+        err[1] += cr[1]
+        err[2] += cr[2]
+    return [0.5 * e for e in err]
+
+
+def _damped_least_squares(
+    J: List[List[float]],
+    e: List[float],
+    lam: float,
+) -> List[float]:
+    """
+    Damped least-squares (Levenberg-Marquardt) pseudoinverse solve.
+
+    Solves: dq = Jᵀ (J Jᵀ + λ² I)⁻¹ e
+
+    For 6×n J, this is a 6×6 linear system.
+    Returns dq (length n).
+
+    Reference: Nakamura & Hanafusa 1986; Siciliano §3.8.
+    """
+    m = len(J)       # 6
+    n_joints = len(J[0])
+
+    # Compute A = J Jᵀ + λ² I  (m×m)
+    lam2 = lam * lam
+    A = [[0.0] * m for _ in range(m)]
+    for i in range(m):
+        for j in range(m):
+            s = 0.0
+            for k in range(n_joints):
+                s += J[i][k] * J[j][k]
+            A[i][j] = s
+        A[i][i] += lam2
+
+    # Solve A x = e via Gauss with partial pivoting
+    aug = [A[i][:] + [e[i]] for i in range(m)]
+    for col in range(m):
+        max_row = col
+        max_v = abs(aug[col][col])
+        for row in range(col + 1, m):
+            v = abs(aug[row][col])
+            if v > max_v:
+                max_v = v
+                max_row = row
+        aug[col], aug[max_row] = aug[max_row], aug[col]
+        piv = aug[col][col]
+        if abs(piv) < 1e-15:
+            continue
+        for k in range(col, m + 1):
+            aug[col][k] /= piv
+        for row in range(m):
+            if row == col:
+                continue
+            f = aug[row][col]
+            if f == 0.0:
+                continue
+            for k in range(col, m + 1):
+                aug[row][k] -= f * aug[col][k]
+    x = [aug[i][m] for i in range(m)]
+
+    # dq = Jᵀ x  (n×1)
+    dq = [0.0] * n_joints
+    for k in range(n_joints):
+        s = 0.0
+        for i in range(m):
+            s += J[i][k] * x[i]
+        dq[k] = s
+    return dq
+
+
+def ik_spatial_dls(
+    dh_params: List[List[float]],
+    q_init: List[float],
+    target_T: List[List[float]],
+    lam: float = 0.05,
+    pos_tol: float = 1e-4,
+    rot_tol: float = 1e-3,
+    max_iter: int = 200,
+    joint_limits: Optional[List[Optional[Tuple[float, float]]]] = None,
+    alpha: float = 1.0,
+) -> dict:
+    """
+    Numerical inverse kinematics for a general n-DOF DH chain via damped
+    least-squares (Levenberg-Marquardt) on the geometric Jacobian.
+
+    Iterates q ← q + α · Jᵀ (J Jᵀ + λ² I)⁻¹ e  until the 6-D task-space
+    error e = [Δp; Δφ] falls below tolerance.
+
+    Parameters
+    ----------
+    dh_params : list of n rows [a_i, alpha_i, d_i, theta_offset_i] (radians).
+    q_init    : list of n initial joint angles (radians).
+    target_T  : 4×4 target end-effector homogeneous transform (list-of-lists).
+    lam       : float
+        Damping factor λ for DLS (default 0.05).  Larger = more damping /
+        slower convergence; 0 = pseudo-inverse (can be ill-conditioned).
+    pos_tol   : float
+        Position convergence tolerance (m). Default 1e-4.
+    rot_tol   : float
+        Rotation convergence tolerance (rad). Default 1e-3.
+    max_iter  : int
+        Maximum iterations (default 200).
+    joint_limits : optional list of (lo, hi) per joint in radians.
+    alpha     : float
+        Step size / gain (default 1.0). Reduce to 0.5 if oscillating.
+
+    Returns
+    -------
+    dict
+        ok              : True / False
+        q_rad           : list[float] — solved joint angles (radians)
+        q_deg           : list[float] — solved joint angles (degrees)
+        converged       : bool
+        iterations      : int
+        pos_error_m     : float — final position error (m)
+        rot_error_rad   : float — final orientation error (rad)
+        n_joints        : int
+        warnings        : list[str]
+
+    References
+    ----------
+    Nakamura, Y. & Hanafusa, H. "Inverse kinematic solutions with singularity
+    robustness for robot manipulator control." J. Dyn. Sys., Meas., Ctrl.
+    108(3):163–171, 1986.
+    Siciliano et al. "Robotics: Modelling, Planning and Control" §3.8.
+    Craig, J.J. "Introduction to Robotics" Ch. 4.
+    """
+    warn: List[str] = []
+
+    # --- validate inputs ---
+    n = len(dh_params)
+    if n == 0:
+        return {"ok": False, "reason": "dh_params must not be empty."}
+    if len(q_init) != n:
+        return {
+            "ok": False,
+            "reason": (
+                f"q_init length {len(q_init)} != dh_params length {n}."
+            ),
+        }
+    if len(target_T) != 4 or any(len(row) != 4 for row in target_T):
+        return {"ok": False, "reason": "target_T must be a 4×4 matrix."}
+    if lam < 0.0:
+        return {"ok": False, "reason": f"lam must be >= 0, got {lam}"}
+    if max_iter < 1:
+        return {"ok": False, "reason": f"max_iter must be >= 1, got {max_iter}"}
+
+    # Extract target position + rotation
+    p_des = [target_T[0][3], target_T[1][3], target_T[2][3]]
+    R_des: List[List[float]] = [[target_T[i][j] for j in range(3)] for i in range(3)]
+
+    # Working joint angles
+    q = [float(qi) for qi in q_init]
+
+    pos_err = float("inf")
+    rot_err = float("inf")
+    it = 0
+
+    for it in range(max_iter):
+        # Forward kinematics
+        fk_res = fk_chain(dh_params, q)
+        if not fk_res["ok"]:
+            return {"ok": False, "reason": f"FK failed: {fk_res.get('reason', '?')}"}
+        T_cur = fk_res["T"]
+        p_cur = [T_cur[0][3], T_cur[1][3], T_cur[2][3]]
+        R_cur: List[List[float]] = [[T_cur[i][j] for j in range(3)] for i in range(3)]
+
+        # Task-space error
+        dp = _vec_sub(p_des, p_cur)
+        drot = _rotation_error_so3(R_des, R_cur)
+        e6 = dp + drot   # length 6
+
+        pos_err = _norm3(dp)
+        rot_err = _norm3(drot)
+
+        if pos_err < pos_tol and rot_err < rot_tol:
+            break
+
+        # Geometric Jacobian
+        jac_res = geometric_jacobian(dh_params, q)
+        if not jac_res["ok"]:
+            return {"ok": False, "reason": f"Jacobian failed: {jac_res.get('reason', '?')}"}
+        J = jac_res["J"]   # 6×n
+
+        # Damped least-squares step
+        dq = _damped_least_squares(J, e6, lam)
+        dq = _scalar_mul_vec(alpha, dq)
+
+        # Update q
+        q = _vec_add(q, dq)
+
+        # Clamp to joint limits if provided
+        if joint_limits is not None:
+            for i, lim in enumerate(joint_limits):
+                if lim is None:
+                    continue
+                lo, hi = lim
+                if q[i] < lo:
+                    q[i] = lo
+                elif q[i] > hi:
+                    q[i] = hi
+
+    converged = pos_err < pos_tol and rot_err < rot_tol
+
+    if not converged:
+        warn.append(
+            f"IK did not converge after {max_iter} iterations: "
+            f"pos_error={pos_err:.3e} m, rot_error={rot_err:.3e} rad. "
+            "Try different q_init, larger max_iter, or adjust lam."
+        )
+        _warnings_module.warn(warn[-1], stacklevel=2)
+
+    if joint_limits is not None:
+        for i, lim in enumerate(joint_limits):
+            if lim is None:
+                continue
+            lo, hi = lim
+            if not (lo <= q[i] <= hi):
+                warn.append(
+                    f"Joint {i} solution {math.degrees(q[i]):.2f}° outside limit "
+                    f"[{math.degrees(lo):.2f}°, {math.degrees(hi):.2f}°]"
+                )
+
+    # it is the 0-based loop index of the last executed iteration
+    n_iters = it + 1 if max_iter > 0 else 0
+
+    return {
+        "ok": True,
+        "q_rad": q,
+        "q_deg": [math.degrees(qi) for qi in q],
+        "converged": converged,
+        "iterations": n_iters,
+        "pos_error_m": pos_err,
+        "rot_error_rad": rot_err,
+        "n_joints": n,
+        "warnings": warn,
+    }
+
+
 def joint_trajectory_trapezoidal(
     q_start: List[float],
     q_end: List[float],

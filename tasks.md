@@ -5626,14 +5626,14 @@ These are the highest-ROI items: the kernel math is implemented and
 verified but not reachable. Each task = export from `geom/__init__.py`
 (if missing) + add a `surfacing.py` ToolSpec + a wiring test.
 
-- **GK-P01** 🔴 Wire `blend_srf_g3` + `g3_blend_trim_sew` as `feature_blend_srf_g3` ToolSpec in `surfacing.py`. Math at `geom/blend_srf.py:blend_srf_g3` (exported, unused by surfacing). DoD: feature invokable via `.feature` workflow; regression test vs `curvature_rate_continuity_residual` oracle.
-- **GK-P02** 🔴 Wire `feature_zebra_analysis` ToolSpec → `surface_analysis.zebra_stripe_continuity_analyser` + `reflection_lines` (both exported, unused). Read-only analysis node. DoD: returns stripe-break flags on a known-discontinuous fixture.
-- **GK-P03** 🔴 Export `class_a_acceptance_harness` (`surface_analysis.py:1726`, GK-64) + `run_leading_pass` (`leading.py:370`) from `geom/__init__.py`; add `feature_class_a_check` ToolSpec. DoD: harness runs on a reference A-surface fixture, flags hot-spots.
-- **GK-P04** 🔴 Export `global_continuity_audit` (`surface_analysis.py:3720`, GK-138) from `geom/__init__.py`; wire as read-only analysis in `surfacing.py`. DoD: walks all Body edges, returns per-edge G0/G1/G2/G3 report.
-- **GK-P05** 🔴 Add `feature_g3_chain_blend` ToolSpec consuming `blend_solid.g3_chain_blend` (GK-132, exported, unused by surfacing). DoD: multi-edge tangent-run G3 blend invokable.
-- **GK-P06** 🔴 Add `feature_fit_surface` ToolSpec wrapping `patch_srf.fit_surface` (GK-34) for point-cloud / mesh-vertex input (Rhino "Patch"). DoD: fits a surface to a seeded point set within tolerance.
-- **GK-P07** 🔴 Extend `feature_surface_curvature_combs` response to include G3 residuals from `curvature_rate_continuity_residual` when the input is a pure-Python `NurbsSurface` (bypass the OCCT path that can't enforce G3). DoD: G3 residual column present for pure-Py surfaces.
-- **GK-P08** 🔴 Audit + refresh `docs/plans/occt-phase4.md` and the geometry-kernel-roadmap §7 matrix: mark G3 / zebra / class-A / GK-138 as shipped (survey found them stale). Docs-only. DoD: no doc claims a shipped capability is "unbuilt".
+- **GK-P01** ✅ Wire `blend_srf_g3` + `g3_blend_trim_sew` as `feature_blend_srf_g3` ToolSpec in `surfacing.py`. Math at `geom/blend_srf.py:blend_srf_g3` (exported, unused by surfacing). DoD: feature invokable via `.feature` workflow; regression test vs `curvature_rate_continuity_residual` oracle.
+- **GK-P02** ✅ Wire `feature_zebra_analysis` ToolSpec → `surface_analysis.zebra_stripe_continuity_analyser` + `reflection_lines` (both exported, unused). Read-only analysis node. DoD: returns stripe-break flags on a known-discontinuous fixture.
+- **GK-P03** ✅ Export `class_a_acceptance_harness` (`surface_analysis.py:1726`, GK-64) + `run_leading_pass` (`leading.py:370`) from `geom/__init__.py`; add `feature_class_a_check` ToolSpec. DoD: harness runs on a reference A-surface fixture, flags hot-spots.
+- **GK-P04** ✅ Export `global_continuity_audit` (`surface_analysis.py:3720`, GK-138) from `geom/__init__.py`; wire as read-only analysis in `surfacing.py`. DoD: walks all Body edges, returns per-edge G0/G1/G2/G3 report.
+- **GK-P05** ✅ Add `feature_g3_chain_blend` ToolSpec consuming `blend_solid.g3_chain_blend` (GK-132, exported, unused by surfacing). DoD: multi-edge tangent-run G3 blend invokable.
+- **GK-P06** ✅ Add `feature_fit_surface` ToolSpec wrapping `patch_srf.fit_surface` (GK-34) for point-cloud / mesh-vertex input (Rhino "Patch"). DoD: fits a surface to a seeded point set within tolerance.
+- **GK-P07** ✅ Extend `feature_surface_curvature_combs` response to include G3 residuals from `curvature_rate_continuity_residual` when the input is a pure-Python `NurbsSurface` (bypass the OCCT path that can't enforce G3). DoD: G3 residual column present for pure-Py surfaces.
+- **GK-P08** ✅ Audit + refresh `docs/plans/occt-phase4.md` and the geometry-kernel-roadmap §7 matrix: mark G3 / zebra / class-A / GK-138 as shipped (survey found them stale). Docs-only. DoD: no doc claims a shipped capability is "unbuilt".
 
 ### Group F — Foundational kernel
 
@@ -5676,9 +5676,9 @@ verified but not reachable. Each task = export from `geom/__init__.py`
 
 ### Group K — Sketcher (PlaneGCS WASM; flagged by every MCAD survey)
 
-- **GK-P36** 🔴 Collinear constraint in the PlaneGCS WASM binding + sketcher UI. Size S.
-- **GK-P37** 🔴 Ellipse entity (center + semi-axes + angle, 5 DOF) in the GCS solver. Size S.
-- **GK-P38** 🔴 G2 (curvature) continuity constraint between adjacent bspline/arc endpoints in GCS. Size S.
+- **GK-P36** ✅ Collinear constraint in the PlaneGCS WASM binding + sketcher UI. Size S.
+- **GK-P37** ✅ Ellipse entity (center + semi-axes + angle, 5 DOF) in the GCS solver. Size S.
+- **GK-P38** ✅ G2 (curvature) continuity constraint between adjacent bspline/arc endpoints in GCS. Size S.
 
 ### Group I — Interop
 

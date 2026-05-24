@@ -107,6 +107,29 @@ describe('compare page modules import without error', () => {
     const mod = await import('../routes/compare/Freecad.jsx')
     expect(typeof mod.default).toBe('function')
   })
+
+  it('compare/CompareByDomain.jsx has a default export', async () => {
+    const mod = await import('../routes/compare/CompareByDomain.jsx')
+    expect(typeof mod.default).toBe('function')
+  })
+
+  it('CompareByDomain smoke render for slug=geometry renders without throwing', async () => {
+    const { renderToStaticMarkup } = await import('react-dom/server')
+    const { MemoryRouter, Route, Routes } = await import('react-router-dom')
+    const { default: CompareByDomain } = await import('../routes/compare/CompareByDomain.jsx')
+    const html = renderToStaticMarkup(
+      <MemoryRouter initialEntries={['/compare/by-domain/geometry']}>
+        <Routes>
+          <Route path="/compare/by-domain/:slug" element={<CompareByDomain />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    // Initial render (loading state) must not show "Domain not found"
+    expect(html).not.toContain('Domain not found')
+    // Should contain some page structure
+    expect(html.length).toBeGreaterThan(100)
+  })
+
   // Note: Kicad.jsx, Rhino.jsx, Revit.jsx, Fusion.jsx have been migrated
   // to public/compare/*.md files and their JSX files deleted.
 })

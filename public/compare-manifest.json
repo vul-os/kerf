@@ -1,5 +1,450 @@
 {
-  "version": 1,
-  "generatedAt": "2026-05-18T23:17:36.284Z",
-  "items": []
+  "version": 2,
+  "generatedAt": "2026-05-24T12:56:53.658Z",
+  "items": [
+    {
+      "slug": "revit",
+      "competitor": "Autodesk Revit",
+      "category": "bim",
+      "left": "kerf",
+      "right": "revit",
+      "hero_tagline": "Industry-standard BIM for AEC — compared honestly against MIT open-core.",
+      "reviewed_at": "2026-05-19"
+    },
+    {
+      "slug": "civil3d",
+      "competitor": "Civil 3D",
+      "category": "bim",
+      "left": "kerf",
+      "right": "civil3d",
+      "hero_tagline": "Civil infrastructure design — corridor/pipe depth vs MIT open-core analysis modules.",
+      "reviewed_at": "2026-05-19"
+    },
+    {
+      "slug": "archicad",
+      "competitor": "Graphisoft ArchiCAD",
+      "category": "cad-architecture",
+      "left": "kerf",
+      "right": "archicad",
+      "hero_tagline": "ArchiCAD pioneered BIM — Kerf brings engineering-grade precision to teams building beyond the building."
+    },
+    {
+      "slug": "sketchup",
+      "competitor": "Trimble SketchUp",
+      "category": "cad-architecture",
+      "left": "kerf",
+      "right": "sketchup",
+      "hero_tagline": "SketchUp made 3D intuitive for architects — Kerf brings engineering precision to the same audience."
+    },
+    {
+      "slug": "vectorworks",
+      "competitor": "Vectorworks",
+      "category": "cad-architecture",
+      "left": "kerf",
+      "right": "vectorworks",
+      "hero_tagline": "Vectorworks spans architecture, landscape, and entertainment — Kerf spans mechanical, electronics, and fabrication."
+    },
+    {
+      "slug": "zbrush",
+      "competitor": "Pixologic ZBrush",
+      "category": "cad-creative",
+      "left": "kerf",
+      "right": "zbrush",
+      "hero_tagline": "ZBrush sculpts the organic world in polygons — Kerf models the engineered world in exact B-rep."
+    },
+    {
+      "slug": "kicad",
+      "competitor": "KiCad",
+      "category": "cad-electronic",
+      "left": "kerf",
+      "right": "kicad",
+      "hero_tagline": "Open-source EDA suite — GPL vs MIT, deep vs integrated.",
+      "reviewed_at": "2026-05-19"
+    },
+    {
+      "slug": "altium",
+      "competitor": "Altium Designer",
+      "category": "cad-electronic",
+      "left": "kerf",
+      "right": "altium",
+      "hero_tagline": "Industrial-grade PCB design — Situs router vs MIT open-core EDA.",
+      "reviewed_at": "2026-05-19"
+    },
+    {
+      "slug": "eagle",
+      "competitor": "Autodesk Eagle",
+      "category": "cad-electronics",
+      "left": "kerf",
+      "right": "eagle",
+      "hero_tagline": "Eagle democratised PCB design for a generation of makers — its successor lives inside Fusion, but Kerf gives you the same workflow without the subscription."
+    },
+    {
+      "slug": "easyeda",
+      "competitor": "EasyEDA",
+      "category": "cad-electronics",
+      "left": "kerf",
+      "right": "easyeda",
+      "hero_tagline": "EasyEDA lowered the JLCPCB barrier to zero — Kerf raises the ceiling with in-box pre-compliance simulation."
+    },
+    {
+      "slug": "openplc",
+      "competitor": "OpenPLC",
+      "category": "cad-firmware",
+      "left": "kerf",
+      "right": "openplc",
+      "hero_tagline": "OpenPLC brings IEC 61131-3 logic to open hardware — Kerf connects the logic to the PCB that runs it."
+    },
+    {
+      "slug": "freecad",
+      "competitor": "FreeCAD",
+      "category": "cad-mechanical",
+      "left": "kerf",
+      "right": "freecad",
+      "hero_tagline": "Open-source parametric B-rep modeller — LGPL vs MIT, desktop vs cloud.",
+      "reviewed_at": "2026-05-19"
+    },
+    {
+      "slug": "fusion",
+      "competitor": "Autodesk Fusion 360",
+      "category": "cad-mechanical",
+      "left": "kerf",
+      "right": "fusion",
+      "hero_tagline": "Cloud-connected multi-discipline CAD — two tools, two philosophies.",
+      "reviewed_at": "2026-05-19",
+      "features": [
+        {
+          "domain": "D1",
+          "feature": "Constraint sketcher (geo + dim)",
+          "competitor": {
+            "status": "yes",
+            "note": "Full parametric sketcher with all major constraint types",
+            "source": "https://www.autodesk.com/products/fusion-360/features"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "PlaneGCS WASM; missing collinear, ellipse entity, G2",
+            "evidence": "packages/kerf-sketcher"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "Pad / pocket / revolve",
+          "competitor": {
+            "status": "yes",
+            "note": "Timeline-based feature modelling",
+            "source": "https://www.autodesk.com/products/fusion-360/features"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "OCCT, wired",
+            "evidence": "packages/kerf-occt"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "Fillet / chamfer (constant)",
+          "competitor": {
+            "status": "yes",
+            "note": "Standard solid body operations"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "wired",
+            "evidence": "packages/kerf-occt"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "Shell / hollow",
+          "competitor": {
+            "status": "yes",
+            "note": "Available in solid modelling workspace"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "wired",
+            "evidence": "packages/kerf-occt"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "Loft",
+          "competitor": {
+            "status": "yes",
+            "note": "Guide rails supported"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "no guide-rail overload in binding",
+            "evidence": "packages/kerf-occt"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "Hole wizard (standards/tapped/cbore)",
+          "competitor": {
+            "status": "yes",
+            "note": "Full hole wizard with thread library"
+          },
+          "kerf": {
+            "status": "no",
+            "note": "bare cylinder punch only"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "Assembly motion study / interference",
+          "competitor": {
+            "status": "yes",
+            "note": "Motion studies, contact sets, and interference detection"
+          },
+          "kerf": {
+            "status": "no",
+            "note": "Not yet shipped"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "Sheet metal",
+          "competitor": {
+            "status": "yes",
+            "note": "Full sheet-metal workspace with hem/relief/jog"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "single flange + unfold + flat DXF; no hem/relief/jog/multi-flange",
+            "evidence": "packages/kerf-sheetmetal"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "NURBS surfacing (blend/network/patch)",
+          "competitor": {
+            "status": "yes",
+            "note": "T-spline sculpt workspace"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "NURBS Phase 4 early; math complete, bindings unconfirmed",
+            "evidence": "packages/kerf-occt"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "Schematic capture",
+          "competitor": {
+            "status": "yes",
+            "note": "Fusion Electronics (EAGLE-derived)",
+            "source": "https://www.autodesk.com/products/fusion-360/electronics"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Hierarchical schematic; viewer wired (read-only)",
+            "evidence": "packages/kerf-ecad"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "PCB layout",
+          "competitor": {
+            "status": "yes",
+            "note": "Situs autorouter; native MCAD/ECAD link"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "PCB viewer wired; interactive editing not yet",
+            "evidence": "packages/kerf-ecad"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "Signal integrity pre-compliance",
+          "competitor": {
+            "status": "paid",
+            "note": "Extension-gated"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "In-box: transmission-line, via stub, diff pair",
+            "evidence": "packages/kerf-ecad/si"
+          }
+        },
+        {
+          "domain": "D7",
+          "feature": "3-axis CAM (profile/contour/pocket/face)",
+          "competitor": {
+            "status": "yes",
+            "note": "HSMWorks-lineage CAM with full simulation"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "CAMView wired; real opencamlib toolpaths",
+            "evidence": "packages/kerf-cam"
+          }
+        },
+        {
+          "domain": "D7",
+          "feature": "Multi-axis CAM (4/5-axis)",
+          "competitor": {
+            "status": "paid",
+            "note": "Available as paid extension"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "5-axis CAM 3+2",
+            "evidence": "packages/kerf-cam"
+          }
+        },
+        {
+          "domain": "D14",
+          "feature": "Should-cost / process simulation",
+          "competitor": {
+            "status": "no",
+            "note": "Not available in Fusion 360"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "6 processes, Boothroyd-Dewhurst method",
+            "evidence": "packages/kerf-cost"
+          }
+        }
+      ]
+    },
+    {
+      "slug": "solidworks",
+      "competitor": "SOLIDWORKS",
+      "category": "cad-mechanical",
+      "left": "kerf",
+      "right": "solidworks",
+      "hero_tagline": "30 years of Parasolid-kernel polish — compared honestly against MIT open-core.",
+      "reviewed_at": "2026-05-19"
+    },
+    {
+      "slug": "onshape",
+      "competitor": "Onshape",
+      "category": "cad-mechanical",
+      "left": "kerf",
+      "right": "onshape",
+      "hero_tagline": "Browser-native real-time-collab CAD — closest peer in cloud shape.",
+      "reviewed_at": "2026-05-19"
+    },
+    {
+      "slug": "inventor",
+      "competitor": "Autodesk Inventor",
+      "category": "cad-mechanical",
+      "left": "kerf",
+      "right": "inventor",
+      "hero_tagline": "30 years of industrial MFG depth — compared honestly against MIT open-core.",
+      "reviewed_at": "2026-05-19"
+    },
+    {
+      "slug": "catia",
+      "competitor": "Dassault CATIA",
+      "category": "cad-mechanical",
+      "left": "kerf",
+      "right": "catia",
+      "hero_tagline": "CATIA built the A380 — Kerf builds the next generation of engineers who work without seat fees."
+    },
+    {
+      "slug": "creo",
+      "competitor": "PTC Creo",
+      "category": "cad-mechanical",
+      "left": "kerf",
+      "right": "creo",
+      "hero_tagline": "Creo invented the parametric feature tree — Kerf brings that same discipline to teams who can't afford the subscription."
+    },
+    {
+      "slug": "nx",
+      "competitor": "Siemens NX",
+      "category": "cad-mechanical",
+      "left": "kerf",
+      "right": "nx",
+      "hero_tagline": "NX defined advanced surfacing for a generation — Kerf makes that power accessible without a six-figure licence."
+    },
+    {
+      "slug": "openroad",
+      "competitor": "OpenROAD",
+      "category": "cad-silicon",
+      "left": "kerf",
+      "right": "openroad",
+      "hero_tagline": "OpenROAD automates RTL-to-GDS-II — Kerf wraps it so you describe intent and the tool figures out the rest."
+    },
+    {
+      "slug": "calculix",
+      "competitor": "CalculiX",
+      "category": "cad-sim",
+      "left": "kerf",
+      "right": "calculix",
+      "hero_tagline": "CalculiX runs the FEM — Kerf wraps it so structural analysis is as easy as describing the load case."
+    },
+    {
+      "slug": "gmat",
+      "competitor": "NASA GMAT",
+      "category": "cad-sim",
+      "left": "kerf",
+      "right": "gmat",
+      "hero_tagline": "GMAT plans the mission — Kerf designs the spacecraft hardware that executes it."
+    },
+    {
+      "slug": "openfoam",
+      "competitor": "OpenFOAM",
+      "category": "cad-sim",
+      "left": "kerf",
+      "right": "openfoam",
+      "hero_tagline": "OpenFOAM solves the Navier-Stokes equations — Kerf wraps it so you describe the flow problem in plain language."
+    },
+    {
+      "slug": "openrocket",
+      "competitor": "OpenRocket",
+      "category": "cad-sim",
+      "left": "kerf",
+      "right": "openrocket",
+      "hero_tagline": "OpenRocket simulates the flight — Kerf designs the airframe and electronics that make it fly."
+    },
+    {
+      "slug": "blender",
+      "competitor": "Blender",
+      "category": "dcc",
+      "left": "kerf",
+      "right": "blender",
+      "hero_tagline": "World-class mesh / DCC tool — a different category from B-rep CAD.",
+      "reviewed_at": "2026-05-19"
+    },
+    {
+      "slug": "max3ds",
+      "competitor": "Autodesk 3ds Max",
+      "category": "dcc",
+      "left": "kerf",
+      "right": "max3ds",
+      "hero_tagline": "Archviz & game-art DCC — a different category from B-rep CAD.",
+      "reviewed_at": "2026-05-19"
+    },
+    {
+      "slug": "autocad",
+      "competitor": "AutoCAD",
+      "category": "drafting",
+      "left": "kerf",
+      "right": "autocad",
+      "hero_tagline": "Industry-standard 2D drafting + .dwg ecosystem — different primary jobs.",
+      "reviewed_at": "2026-05-19"
+    },
+    {
+      "slug": "rhino",
+      "competitor": "Rhino",
+      "category": "jewelry-nurbs",
+      "left": "kerf",
+      "right": "rhino",
+      "hero_tagline": "NURBS & jewelry CAD — class-leading kernel vs MIT open-core.",
+      "reviewed_at": "2026-05-19"
+    },
+    {
+      "slug": "matrixgold",
+      "competitor": "MatrixGold",
+      "category": "jewelry-nurbs",
+      "left": "kerf",
+      "right": "matrixgold",
+      "hero_tagline": "Industry-standard jewelry CAD — Grasshopper-based goldsmith depth vs MIT open-core.",
+      "reviewed_at": "2026-05-19"
+    }
+  ]
 }

@@ -26,6 +26,7 @@ import remarkGfm from 'remark-gfm'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 import Button from './Button.jsx'
 import { ALLOWED_ELEMENTS, urlTransformer } from '../lib/markdownSanitize.js'
+import CompareFeatureMatrix from './CompareFeatureMatrix.jsx'
 
 /* -------------------------------------------------------------------------- */
 /* Verdict-glyph constants (mirrors Freecad.jsx)                               */
@@ -457,6 +458,14 @@ export default function CompareMd({ meta, loading, error }) {
             {meta.body || ''}
           </ReactMarkdown>
         </div>
+
+        {/* ── Structured feature matrix (only when features are available) ── */}
+        {meta.features?.length > 0 && (
+          <CompareFeatureMatrix
+            features={meta.features}
+            competitor={rightVendor}
+          />
+        )}
 
         <FairnessNote />
         <CTAStrip />

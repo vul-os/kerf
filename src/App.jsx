@@ -52,6 +52,7 @@ const CompareHub = lazy(() => import('./routes/compare/index.jsx'))
 // exports shared sub-components (Section, CompareTable, etc.) consumed
 // by index.jsx.
 const CompareMdRoute = lazy(() => import('./routes/compare/CompareMdRoute.jsx'))
+const CompareByDomain = lazy(() => import('./routes/compare/CompareByDomain.jsx'))
 // New sector domain pages (T-182)
 const CompositesPage = lazy(() => import('./routes/domains/Composites.jsx'))
 const DentalPage = lazy(() => import('./routes/domains/Dental.jsx'))
@@ -197,6 +198,8 @@ export default function App() {
           via the `/compare/:slug` route registered below. */}
       {/* Markdown-driven compare pages — falls through to legacy JSX if a .md is missing */}
       <Route path="/compare/:slug" element={<CompareMdRoute />} />
+      {/* Cross-tool domain matrix pages */}
+      <Route path="/compare/by-domain/:slug" element={<CompareByDomain />} />
       {cloudEnabled && <Route path="/workshop" element={<Workshop />} />}
       {cloudEnabled && (
         <Route path="/workshop/:slug" element={<WorkshopListing />} />

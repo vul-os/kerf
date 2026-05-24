@@ -29,6 +29,7 @@ import Header from '../../components/Header.jsx'
 import Footer from '../../components/Footer.jsx'
 import CompareMd from '../../components/CompareMd.jsx'
 import { parseCompareMd } from '../../lib/compareMdParser.js'
+import { loadManifest } from '../../lib/compareFeatures.js'
 
 /* -------------------------------------------------------------------------- */
 /* Legacy JSX page registry                                                    */
@@ -68,8 +69,12 @@ export default function CompareMdRoute() {
     async function loadMd() {
       setState({ status: 'loading', meta: null, error: null })
       try {
-        const res = await fetch(`/compare/${slug}.md`)
-        if (!res.ok) {
+        // Fetch the .md prose and the manifest in parallel so features are available
+        const [mdRes, manifest] = await Promise.all([
+          fetch(`/compare/${slug}.md`),
+          loadManifest(),
+        ])
+        if (!mdRes.ok) {
           // 404 or other error — fall back to legacy JSX if registered
           if (!cancelled) {
             const hasLegacy = slug in LEGACY_PAGES
@@ -81,8 +86,13 @@ export default function CompareMdRoute() {
           }
           return
         }
-        const raw = await res.text()
+        const raw = await mdRes.text()
         const meta = parseCompareMd(raw, slug)
+        // Merge structured features from the manifest (if available for this slug)
+        const manifestItem = manifest.items.find((it) => it.slug === slug)
+        if (manifestItem?.features?.length > 0) {
+          meta.features = manifestItem.features
+        }
         if (!cancelled) {
           setState({ status: 'md', meta, error: null })
         }

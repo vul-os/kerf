@@ -89,6 +89,7 @@ export default function Dental() {
       heroTags={['MIT licensed', 'CBCT-aligned guides', 'STL / 3MF output', 'STEP export']}
       bullets={BULLETS}
       comparison={COMPARISON}
+      compareLinks={[{ slug: '3shape', label: '3Shape Dental System' }]}
     />
   )
 }

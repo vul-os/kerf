@@ -5704,3 +5704,23 @@ remainders flagged in `docs/plans/nurbs-phase-4-full.md`.
 - **GK-P42** 🔴 C2-T1 + C3-T1 — WASM binding-probe verification. The probe CODE exists (`NURBS_PHASE4_C2/C3_BINDINGS` in `occtWorker.js`, boot-time logging, graceful `UnsupportedError` degrade). **Deploy-gated:** confirm `BRepFeat_SplitShape` / `BRepProj_Projection` (C2) and `GeomFill_NSections` (C3) presence on a live OCCT WASM build by reading the boot probe log; record results in `nurbs-phase-4-full.md`. If absent, the graceful fallback already covers it. Needs the WASM build toolchain (like T-405 cutover — not a worktree code task). DoD: probe results recorded; fallback paths confirmed.
 
 **Explicitly NOT doing (documented non-goals, per `occt-phase4.md §6` + `nurbs-phase-4-full.md` "Out of scope"):** OCCT algorithmic G3 enforcement (structurally impossible — `GeomAbs_G3` absent from the enum); general NURBS×NURBS trim (stays OCCT-worker-delegated); G3 via custom OCCT extension (deferred past Phase 4).
+
+### Group BE — Best-effort attempts at the documented non-goals (Opus, sequenced after GK-P09..P15)
+
+The user asked to attempt the two items previously marked non-goals.
+"Structurally impossible" applies only to OCCT's *native enum*; the
+best-effort versions below deliver most of the value and are real. Both
+touch `intersection.py` / `surface_analysis.py` (owned by the Group-F
+Opus agent this wave) so they are **sequenced AFTER F integrates** and
+run on a dedicated Opus agent rebased on F's G3 work. Honest framing in
+the DoD so no run is burned chasing the truly-impossible enum part.
+
+- **GK-P43** 🔴 **(Opus, after F)** Best-effort OCCT-path G3. Two real deliverables, NOT OCCT-enum enforcement (that stays impossible):
+  (a) **G3 analyzer on OCCT surfaces** — sample 3rd derivatives via `Geom_BSplineSurface.DN(u,v,nu,nv)` in the worker (`occtWorker.js`/`occtBridge.js`) + compute the curvature-rate residual with the existing `curvature_rate_continuity_residual` oracle; surface it through `feature_global_continuity_audit` / `edge_continuity_report` for OCCT-origin bodies.
+  (b) **G3 enforcement via pole round-trip** — extract OCCT B-spline poles, run the existing pure-Python G3 pole-adjustment (`surface_blend_g3` / match_srf G3 from GK-P10), write poles back so the OCCT surface IS G3-quality. Size L. DoD: an OCCT-origin surface pair reports a G3 residual `< 1e-5` after the round-trip; documented that OCCT's enum is bypassed by design. Update `nurbs-phase-4-full.md` "Out of scope" → "best-effort shipped".
+- **GK-P44** 🔴 **(Opus, after F)** Best-effort general NURBS×NURBS pure-Python trim. Extend `geom/trim_curve.py` beyond the plane/cyl/sphere carrier matrix to use the existing SSI (`intersection.py`, grid-seed + tangent-march, hardened by GK-P15) to compute the trim curve for **arbitrary NURBS carriers**, then split + validate the face. Size L. DoD: trim a NURBS face by a curve lying on a second general NURBS surface, producing a `validate_body`-clean trimmed face for the common (non-degenerate) cases; OCCT worker (`feature_trim_by_curve`) stays the documented fallback for degenerate/elliptic-loop cases. Update `occt-phase4.md §6` + `nurbs-phase-4-full.md` to reflect best-effort coverage.
+
+**Still genuinely impossible (not attempted, even best-effort):** OCCT
+*natively* enforcing/reporting G3 through `GeomAbs_Shape` — the enum has
+no G3 token; we measure + pole-adjust around it (GK-P43) rather than ask
+OCCT to do it.

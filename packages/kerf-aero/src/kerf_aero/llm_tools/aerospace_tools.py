@@ -1642,6 +1642,123 @@ def aero_material_lookup(name: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Tool 13: aero_orbit_determination
+# ---------------------------------------------------------------------------
+
+def aero_orbit_determination(
+    observations: list[dict],
+    x0_apriori: list[float],
+    include_j2: bool = False,
+    max_iter: int = 20,
+    tol_pos_km: float = 1e-6,
+) -> dict:
+    """
+    Estimate a spacecraft orbit state from tracking observations via batch
+    least-squares (Differential Correction / WLS OD).
+
+    Algorithm: Vallado 2013 §10.6; Tapley, Schutz & Born 2004 §4.3.
+
+    Input schema
+    ------------
+    observations : list of dicts, each with keys:
+        t           float   — time since epoch t_0 [s], must be >= 0
+        obs_type    str     — 'range', 'range_rate', or 'both'
+        y           list    — observed values [km] or [km/s] or [km, km/s]
+        sigma       list    — 1-sigma noise (same shape as y)
+        station_eci list[3] — ground station position in ECI [km]
+    x0_apriori : list[6] — a priori state [r_x, r_y, r_z (km), v_x, v_y, v_z (km/s)]
+    include_j2 : bool   — include J2 oblateness in reference dynamics (default False)
+    max_iter   : int    — maximum differential-correction iterations (default 20)
+    tol_pos_km : float  — convergence tolerance on position component of δX [km]
+
+    Returns
+    -------
+    dict:
+        ok             : bool
+        converged      : bool
+        n_iter         : int
+        x_estimated    : list[6]  — estimated state [r(3) km, v(3) km/s]
+        position_error_km : float — ||δr|| at last iteration
+        rms_residual   : float   — RMS post-fit residual
+        covariance_trace : float — trace of 6×6 formal covariance matrix
+        n_observations  : int
+        warnings        : list[str]
+
+    Raises
+    ------
+    ValueError: if observations are not time-ordered, empty, or x0_apriori is wrong shape.
+    """
+    try:
+        import numpy as np
+        from kerf_aero.orbital.orbit_determination import (
+            Observation,
+            batch_least_squares_od,
+        )
+    except ImportError as exc:
+        raise ValueError(f"orbit determination module unavailable: {exc}") from exc
+
+    if not observations:
+        raise ValueError("observations must be a non-empty list")
+    if len(x0_apriori) != 6:
+        raise ValueError(f"x0_apriori must be length 6, got {len(x0_apriori)}")
+
+    # Parse observations
+    obs_list = []
+    for i, od in enumerate(observations):
+        try:
+            t = float(od["t"])
+            obs_type = str(od["obs_type"])
+            y = np.asarray(od["y"], dtype=float)
+            sigma = np.asarray(od["sigma"], dtype=float)
+            sta = np.asarray(od["station_eci"], dtype=float)
+            obs_list.append(Observation(t=t, obs_type=obs_type, y=y, sigma=sigma, station_eci=sta))
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(f"observations[{i}]: {exc}") from exc
+
+    x0 = np.asarray(x0_apriori, dtype=float)
+
+    try:
+        result = batch_least_squares_od(
+            obs_list,
+            x0,
+            include_j2=include_j2,
+            max_iter=max_iter,
+            tol_pos_km=tol_pos_km,
+        )
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": str(exc),
+            "n_observations": len(obs_list),
+        }
+
+    warnings: list[str] = []
+    if not result.converged:
+        warnings.append(
+            f"OD did not converge within {max_iter} iterations."
+        )
+
+    cov_trace = float(np.trace(result.covariance)) if result.covariance is not None else None
+
+    # Position component of the estimated state
+    x_est = result.state_epoch
+    pos_norm = float(np.linalg.norm(x_est[:3]))
+
+    return {
+        "ok": True,
+        "converged": result.converged,
+        "n_iter": result.iterations,
+        "x_estimated": [round(float(v), 6) for v in x_est],
+        "position_norm_km": round(pos_norm, 4),
+        "rms_residual": round(float(result.rms_residual), 8),
+        "sigma_0": round(float(result.sigma_0), 6),
+        "covariance_trace": round(cov_trace, 6) if cov_trace is not None else None,
+        "n_observations": len(obs_list),
+        "warnings": warnings,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Tool registry
 # ---------------------------------------------------------------------------
 
@@ -1705,5 +1822,14 @@ AEROSPACE_TOOLS: list[dict[str, Any]] = [
         "name": "aero_material_lookup",
         "fn": aero_material_lookup,
         "description": "Look up aerospace material properties (Al, Ti, steel, CFRP, superalloys, TPS).",
+    },
+    {
+        "name": "aero_orbit_determination",
+        "fn": aero_orbit_determination,
+        "description": (
+            "Batch least-squares orbit determination (Differential Correction) from "
+            "radar tracking observations (range and/or range-rate). "
+            "Estimates 6-DOF ECI state [r(3) km, v(3) km/s] at epoch."
+        ),
     },
 ]

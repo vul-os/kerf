@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "generatedAt": "2026-05-24T23:59:41.186Z",
+  "generatedAt": "2026-05-25T19:38:29.982Z",
   "source": "ROADMAP.md",
   "latestDelta": {
-    "date": "2026-05-24",
+    "date": "2026-05-25",
     "itemCount": 14,
     "items": [
       {
         "title": "Structural code design",
-        "body": "AISC 360-22 (Ch. E/F/H members + connections + base-plate, LRFD+ASD); ACI 318-19 (flexure/shear/PM + punching §22.6 + torsion §22.7); NDS 2018 timber; ASCE 7-22 load combos + ELF + RSA/Newmark seismic. Full Eurocode: EC2, EC3, EC5, EC8",
+        "body": "AISC 360-22 (Ch. E/F/H members + connections + base-plate, LRFD+ASD); ACI 318-19 (flexure/shear/PM + punching §22.6 + torsion §22.7); NDS 2018 timber; AISI S100-16 cold-formed steel (effective-width, flexure/compression/web-crippling); TMS 402-16 masonry ASD (flexure/shear/axial); ASCE 7-22 load combos + ELF + RSA/Newmark seismic. Full Eurocode: EC2, EC3, EC5, EC8",
         "domain": "Structural"
       },
       {

@@ -40,9 +40,9 @@ The sector work only matters if you **own your work, are not locked in, and can 
 
 ## What shipped
 
-### Latest delta — 2026-05-24
+### Latest delta — 2026-05-25
 
-**Structural code design** ✅ — AISC 360-22 (Ch. E/F/H members + connections + base-plate, LRFD+ASD); ACI 318-19 (flexure/shear/PM + punching §22.6 + torsion §22.7); NDS 2018 timber; ASCE 7-22 load combos + ELF + RSA/Newmark seismic. Full Eurocode: EC2, EC3, EC5, EC8.
+**Structural code design** ✅ — AISC 360-22 (Ch. E/F/H members + connections + base-plate, LRFD+ASD); ACI 318-19 (flexure/shear/PM + punching §22.6 + torsion §22.7); NDS 2018 timber; AISI S100-16 cold-formed steel (effective-width, flexure/compression/web-crippling); TMS 402-16 masonry ASD (flexure/shear/axial); ASCE 7-22 load combos + ELF + RSA/Newmark seismic. Full Eurocode: EC2, EC3, EC5, EC8.
 
 **Native FE** ✅ — MITC4 plate/shell (Bathe-Dvorkin) + modal via inverse iteration; 2D/3D frame stiffness + story drift; multi-axial critical-plane fatigue (Findley, SWT-3D, Brown-Miller); geotech liquefaction triggering (Seed-Idriss/Tokimatsu).
 
@@ -233,7 +233,7 @@ Everything committed, lowest priority. Ordered roughly by near-term readiness.
 
 **Vehicles:** composites ply/layup authoring (draping / fiber-steering / Fibersim class) · hull fairing (NURBS-reachable) · 3D harness routing.
 
-**Civil / infrastructure (distinct engines):** plan-and-profile sheet engine · LandXML + IFC-4.3-infra I/O · bridge/tunnel · water/wastewater · mining · marine/dredging · rail signaling. *(CRS engine, horizontal/vertical alignment, hydraulics, earthworks, geotechnical already shipped.)*
+**Civil / infrastructure (distinct engines):** plan-and-profile sheet engine · IFC-4.3-infra I/O · bridge/tunnel · mining · marine/dredging · rail signaling. *(CRS engine, horizontal/vertical alignment, corridor, earthworks, geotechnical, LandXML 1.2 I/O, pressurized water-distribution networks (Todini GGA + Hazen-Williams/Darcy-Weisbach), gravity sewer (Manning), storm rational method + HDS-5 culverts already shipped.)*
 
 **Body-worn / medical / craft:** watchmaking / horology · eyewear / frames · footwear / last design · dental CAD (crowns/aligners) · orthopedic / prosthetics · hearing aids.
 
@@ -256,7 +256,7 @@ These are roadmap-level moats that span every sector simultaneously and compound
 | Capability | Status |
 |---|---|
 | **Generative / topology / multi-objective optimization** — manufacturing-constrained, multi-load-case, lattice-infill. Basic single-objective SIMP shipped; production-grade unbuilt. | 🚧 in flight |
-| **Simulation pillar** — nonlinear FEA, explicit dynamics / crash, fatigue & durability, CFD (full turbulence), low/high-frequency EM, acoustics FEM, coupled multiphysics. Linear-static + modal + steady thermal + CFD 2-D laminar shipped. | 🚧 in flight |
+| **Simulation pillar** — nonlinear FEA, explicit dynamics / crash, fatigue & durability, CFD (full turbulence), low/high-frequency EM, acoustics FEM, coupled multiphysics. Linear-static + modal + steady thermal + linear eigenvalue buckling + harmonic (mode-superposition) frequency response + random-vibration PSD (modal + Miles) + CFD 2-D laminar shipped. | 🚧 in flight |
 | **Automatic Feature Recognition (AFR)** — turns any imported "dumb" STEP into an editable parametric feature tree; critical for the LLM to edit any model, not just ones authored in Kerf. | 🚧 in flight — AAG-based classifier (through-hole, blind-hole, counterbore, countersink, pocket, slot, boss, fillet, chamfer, rib, step) shipped with tests; full topology ordering into a replay-able parametric tree is the remaining step — `kerf-cad-core/afr/recognize.py`, `geom/feature_recognition.py` |
 | **Knowledge-based engineering / code-compliance** — AISC/ACI/Eurocode/ASME/ISO rules driven directly by the model. Shipped: AISC 360-22 + ACI 318-19 + EC2/3/5/8 + NDS 2018 + ASCE 7-22 + ISO 6336 + IAPWS-IF97 + IEEE 1584 + IEC 60255. General KBE configurator layer unbuilt. | 🚧 in flight |
 | **3D tolerance / variation analysis** — statistical stack-up + contributor analysis. Shipped: 1D worst-case/RSS/Monte-Carlo + 3D vector-loop 6-DOF Jacobian. Full FEA-coupled variation simulation ahead. | 🚧 in flight |

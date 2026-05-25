@@ -216,6 +216,30 @@ _TOOL_MODULES = [
     # GK-P47: feature_loft guide_curves is in feature_loft (already in _TOOL_MODULES above)
     # GK-P48: construction verbs (hem_sheet, jog_sheet, multi_flange, delete_face, push_pull, gusset_plate, cope_notch)
     "kerf_cad_core.construction_verbs_tools",
+    # Coverage sweep: modules with @register that were not yet in _TOOL_MODULES
+    "kerf_cad_core.heal",                               # heal_geometry — body heal + repair
+    "kerf_cad_core.sketch",                             # sketch_add_entity/constraint, sketch_set_constraint_value, sketch_delete_entity, sketch_carbon_copy, sketch_validate
+    "kerf_cad_core.concrete.eurocode2",                 # ec2_design_strengths, ec2_flexure, ec2_punching_shear, ec2_shear_design
+    "kerf_cad_core.concrete.punching_torsion_tools",    # rc_critical_perimeter, rc_two_way_shear_strength, rc_punching_shear_check, rc_cracking_torsion, rc_torsion_capacity
+    "kerf_cad_core.civil.transient_pipes",              # transient_pipe_network_moc, transient_pipe_network_quasi_steady, transient_surge_tank_validation
+    "kerf_cad_core.cuttingtool.tool_life",              # taylor_tool_life, gilbert_economic_speed
+    "kerf_cad_core.struct.eurocode5",                   # ec5_strength_class, ec5_kmod, ec5_design_strength, ec5_beam_bending, ec5_combined_nm, ec5_column_buckling, ec5_shear
+    "kerf_cad_core.struct.eurocode8",                   # ec8_spectrum, ec8_lateral_force, ec8_rsa
+    "kerf_cad_core.struct.frame",                       # struct_frame_solve_2d, struct_story_drift
+    "kerf_cad_core.fluids.iapws_if97",                  # fluids_steam_if97 — water/steam properties
+    "kerf_cad_core.fem_capabilities",                   # fem_list_capabilities
+    "kerf_cad_core.acoustics.wave",                     # wave_image_source_ir, wave_rt60_from_ir, wave_room_modes, wave_sea_two_rooms_tl
+    "kerf_cad_core.buildingenergy.transient_tools",     # be_sol_air_temp, be_cltd_wall, be_cltd_roof, be_correct_cltd, be_wall_cooling_load, + 3 more
+    "kerf_cad_core.casting.detail_tools",               # casting_shrinkage_factor, casting_pattern_dimensions, casting_chvorinov_time, casting_riser_diameter, casting_design_package
+    "kerf_cad_core.controls.statespace_tools",          # controls_ss_model, controls_controllability, controls_observability, controls_pole_placement, controls_lqr, + 4 more
+    "kerf_cad_core.elecpower.power_tools",              # elecpower_loadflow, elecpower_relay_trip, elecpower_coordinate, elecpower_arcflash
+    "kerf_cad_core.fatigue.multiaxial_tools",           # fatigue_findley, fatigue_swt3d, fatigue_brown_miller, fatigue_multiaxial_critical_plane
+    "kerf_cad_core.frep.csg",                           # csg_union, csg_intersect, csg_difference, csg_union_smooth, csg_intersect_smooth, + 11 more
+    "kerf_cad_core.gearbox.planetary_tools",            # planetary_stage_design, compound_planetary_design, planetary_module_select
+    "kerf_cad_core.geotech.liq_tools",                  # liq_csr, liq_crr_spt, liq_crr_cpt, liq_safety_factor, liq_settlement
+    "kerf_cad_core.matsel.multi_objective_tools",       # matsel_pareto, matsel_weighted, matsel_tradeoff
+    "kerf_cad_core.seismic.rsa_tools",                  # seismic_build_asce7_spectrum, seismic_rsa_sdof, seismic_rsa_mdof, seismic_newmark_sdof, seismic_newmark_mdof
+    "kerf_cad_core.solarpv.shading_tools",              # pv_cell_iv, pv_module_shaded_iv, pv_mppt_mismatch_loss
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

@@ -7,12 +7,10 @@ Provides:
       enum together with its capability requirements and a human description.
       Suitable for inclusion in ``GET /health/capabilities``.
 
-  fem_list_capabilities_tool — LLM tool stub (ToolSpec-compatible) that
-      wraps list_capabilities() for use in the Kerf agent tool registry.
-      It is a *stub*: the full async @register handler is wired in
-      kerf_cad_core.fea.tools when the registry is available.  Tests and
-      downstream callers can invoke the pure function directly without
-      needing the registry at import time.
+  fem_list_capabilities_spec — ToolSpec registered with @register so the
+      module self-wires when imported by plugin._register_tools().
+      Tests and downstream callers can invoke the pure function directly
+      without needing the registry at import time.
 
 Author: imranparuk
 """
@@ -23,6 +21,12 @@ import json
 from typing import Any
 
 from kerf_cad_core.analysis import AnalysisType
+
+try:
+    from kerf_chat.tools.registry import ToolSpec, err_payload, ok_payload, register
+    from kerf_core.utils.context import ProjectCtx
+except ImportError:
+    from kerf_cad_core._compat import ToolSpec, err_payload, ok_payload, register, ProjectCtx  # type: ignore[no-redef]
 
 
 # ---------------------------------------------------------------------------
@@ -77,12 +81,12 @@ def list_capabilities() -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# LLM tool stub — ToolSpec-compatible descriptor
+# LLM tool — ToolSpec + @register (self-wires on import)
 # ---------------------------------------------------------------------------
 
-_FEM_CAPABILITIES_SPEC: dict[str, Any] = {
-    "name": "fem_list_capabilities",
-    "description": (
+fem_list_capabilities_spec = ToolSpec(
+    name="fem_list_capabilities",
+    description=(
         "List all FEM / CAE analysis types supported by the Kerf FEM engine, "
         "together with the solver capability tags each type requires.\n"
         "\n"
@@ -98,30 +102,34 @@ _FEM_CAPABILITIES_SPEC: dict[str, Any] = {
         "Errors: {ok:false, reason} if the capability list cannot be built.  "
         "Never raises."
     ),
-    "input_schema": {
+    input_schema={
         "type": "object",
         "properties": {},
         "required": [],
     },
+)
+
+# Keep the old dict alias for backward-compat with existing tests.
+_FEM_CAPABILITIES_SPEC: dict[str, Any] = {
+    "name": fem_list_capabilities_spec.name,
+    "description": fem_list_capabilities_spec.description,
+    "input_schema": fem_list_capabilities_spec.input_schema,
 }
 
 
+@register(fem_list_capabilities_spec, write=False)
 async def _run_fem_list_capabilities(ctx: Any, args: bytes) -> str:  # noqa: ARG001
-    """Async handler — wraps list_capabilities() for the tool registry.
-
-    This is the handler function; it is registered in kerf_cad_core.fea.tools
-    once the registry is available.  It can also be called directly in tests
-    by passing a stub ctx and empty args.
-    """
+    """Async handler — wraps list_capabilities() for the tool registry."""
     try:
         result = list_capabilities()
-        return json.dumps({"ok": True, **result})
+        return ok_payload({"ok": True, **result})
     except Exception as exc:  # pragma: no cover — defensive
-        return json.dumps({"ok": False, "reason": str(exc)})
+        return err_payload(str(exc), "ERROR")
 
 
 __all__ = [
     "list_capabilities",
+    "fem_list_capabilities_spec",
     "_FEM_CAPABILITIES_SPEC",
     "_run_fem_list_capabilities",
 ]

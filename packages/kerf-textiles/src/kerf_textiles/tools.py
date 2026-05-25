@@ -243,3 +243,260 @@ async def run_textiles_cloth_drape(params: dict[str, Any]) -> dict[str, Any]:
 
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
+
+
+# ---------------------------------------------------------------------------
+# textiles_cut_room  — production-scale cut-room nesting
+# ---------------------------------------------------------------------------
+
+textiles_cut_room_spec = {
+    "name": "textiles_cut_room",
+    "description": (
+        "Production-scale cut-room nesting using the Skyline + No-Fit-Polygon "
+        "algorithm. Nests a list of fabric pieces (rectangular or arbitrary polygon) "
+        "onto one or more fabric rolls with optional grain-line constraints and "
+        "ply-direction (one-way/two-way). Returns utilisation, placement list, "
+        "and any unplaced pieces."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "pieces": {
+                "type": "array",
+                "description": (
+                    "Pieces to nest. Each: {name, w [mm], h [mm], qty?, "
+                    "grain_angles? [deg list], ply_direction? ('any'|'one_way'), "
+                    "polygon? [[x,y],...]}."
+                ),
+                "items": {"type": "object"},
+            },
+            "rolls": {
+                "type": "array",
+                "description": (
+                    "Fabric rolls. Each: {name, width [mm], max_length? [mm], "
+                    "kerf? [mm], margin? [mm]}."
+                ),
+                "items": {"type": "object"},
+            },
+        },
+        "required": ["pieces", "rolls"],
+    },
+}
+
+
+async def run_textiles_cut_room(params: dict) -> dict:
+    """Handler for the textiles_cut_room LLM tool."""
+    try:
+        from kerf_textiles.cut_room import (
+            FabricPiece, FabricRoll, make_marker, marker_result_to_dict,
+        )
+        import math
+
+        # Parse pieces
+        pieces = []
+        for i, p in enumerate(params.get("pieces", [])):
+            polygon = None
+            if p.get("polygon"):
+                polygon = [tuple(pt) for pt in p["polygon"]]
+            pieces.append(FabricPiece(
+                name=str(p["name"]),
+                w=float(p["w"]),
+                h=float(p["h"]),
+                qty=int(p.get("qty", 1)),
+                polygon=polygon,
+                grain_angles=list(p.get("grain_angles", [0.0])),
+                ply_direction=str(p.get("ply_direction", "any")),
+            ))
+
+        # Parse rolls
+        rolls = []
+        for r in params.get("rolls", []):
+            rolls.append(FabricRoll(
+                name=str(r["name"]),
+                width=float(r["width"]),
+                max_length=float(r.get("max_length", math.inf)),
+                kerf=float(r.get("kerf", 0.0)),
+                margin=float(r.get("margin", 0.0)),
+            ))
+
+        result = make_marker(pieces, rolls)
+        return marker_result_to_dict(result)
+
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+# ---------------------------------------------------------------------------
+# textiles_etextiles  — resistive-yarn heater + LED fabric layout
+# ---------------------------------------------------------------------------
+
+textiles_etextiles_spec = {
+    "name": "textiles_etextiles",
+    "description": (
+        "E-textile design tool for smart/wearable garments. "
+        "Two modes:\n"
+        "  'heater' — compute I²R power dissipation for a resistive-yarn trace: "
+        "resistance, power (W), voltage drop, length.\n"
+        "  'led_layout' — solve a uniform parallel-series LED-fabric network "
+        "(Kirchhoff KVL/KCL): branch currents, total current, total power.\n"
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "mode": {
+                "type": "string",
+                "enum": ["heater", "led_layout"],
+                "description": "Computation mode.",
+            },
+            # heater params
+            "yarn_resistance_per_metre": {
+                "type": "number",
+                "description": "(heater) Conductive yarn resistance in Ω/m.",
+            },
+            "length_m": {
+                "type": "number",
+                "description": "(heater) Trace length in metres.",
+            },
+            "current_a": {
+                "type": "number",
+                "description": "(heater) Operating current in amperes.",
+            },
+            # led_layout params
+            "vsupply": {
+                "type": "number",
+                "description": "(led_layout) Supply voltage in volts.",
+            },
+            "n_parallel": {
+                "type": "integer",
+                "description": "(led_layout) Number of parallel branches.",
+            },
+            "n_series": {
+                "type": "integer",
+                "description": "(led_layout) Number of LEDs in series per branch.",
+            },
+            "led_vf": {
+                "type": "number",
+                "description": "(led_layout) LED forward voltage Vf [V].",
+            },
+            "led_if_ma": {
+                "type": "number",
+                "description": "(led_layout) LED nominal operating current [mA].",
+            },
+            "r_series_ohm": {
+                "type": "number",
+                "description": "(led_layout) Current-limiting resistor per branch [Ω]. Default 0.",
+            },
+        },
+        "required": ["mode"],
+    },
+}
+
+
+async def run_textiles_etextiles(params: dict) -> dict:
+    """Handler for the textiles_etextiles LLM tool."""
+    mode = params.get("mode", "heater")
+    try:
+        if mode == "heater":
+            from kerf_textiles.etextiles import ResistiveYarn, heating_calc
+            r_per_m = float(params["yarn_resistance_per_metre"])
+            length_m = float(params["length_m"])
+            current_a = float(params["current_a"])
+            yarn = ResistiveYarn(name="user_yarn", resistance_per_metre=r_per_m)
+            result = heating_calc(yarn, length_m, current_a)
+            return {"ok": True, "mode": "heater", **result}
+
+        elif mode == "led_layout":
+            from kerf_textiles.etextiles import LEDNode, led_layout
+            vsupply = float(params["vsupply"])
+            n_parallel = int(params["n_parallel"])
+            n_series = int(params["n_series"])
+            vf = float(params["led_vf"])
+            if_ma = float(params["led_if_ma"])
+            r_series = float(params.get("r_series_ohm", 0.0))
+            led = LEDNode(name="LED", vf_v=vf, if_ma=if_ma)
+            layout = led_layout(vsupply, n_parallel, n_series, led, r_series)
+            solution = layout.solve()
+            return {"ok": True, "mode": "led_layout", **solution}
+
+        else:
+            return {"ok": False, "error": f"unknown mode {mode!r}; choose 'heater' or 'led_layout'"}
+
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+# ---------------------------------------------------------------------------
+# textiles_sustainability  — LCA sustainability scoring
+# ---------------------------------------------------------------------------
+
+textiles_sustainability_spec = {
+    "name": "textiles_sustainability",
+    "description": (
+        "Life-Cycle Assessment (LCA) sustainability scoring for garments (0–100, "
+        "higher = more sustainable). Supply a material mix as {material_id: fraction} "
+        "and optional garment mass. Returns GHG and water sub-scores, "
+        "biodegradability bonus, certification bonus, composite score, and "
+        "per-material breakdown. Supports 50+ material IDs (cotton_conventional, "
+        "cotton_organic, polyester_virgin, polyester_recycled, wool_mulesed, "
+        "wool_mulesing_free, nylon_virgin, linen_flax, hemp, silk, etc.)."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "material_mix": {
+                "type": "object",
+                "description": (
+                    "Mapping of material_id to mass fraction (0–1). "
+                    "Fractions must sum to 1.0 ± 1e-6. "
+                    "Example: {'cotton_organic': 0.6, 'polyester_recycled': 0.4}."
+                ),
+                "additionalProperties": {"type": "number"},
+            },
+            "garment_mass_kg": {
+                "type": "number",
+                "description": "Total dry garment mass in kg (default 0.3 = 300 g).",
+            },
+        },
+        "required": ["material_mix"],
+    },
+}
+
+
+async def run_textiles_sustainability(params: dict) -> dict:
+    """Handler for the textiles_sustainability LLM tool."""
+    try:
+        from kerf_textiles.sustainability import score_garment
+
+        mix = {str(k): float(v) for k, v in params["material_mix"].items()}
+        mass_kg = float(params.get("garment_mass_kg", 0.3))
+        impact = score_garment(mix, garment_mass_kg=mass_kg)
+
+        breakdown = [
+            {
+                "material_id": c.material_id,
+                "name": c.name,
+                "mass_fraction": round(c.mass_fraction, 4),
+                "mass_kg": round(c.mass_kg, 5),
+                "co2_kg": round(c.co2_contribution_kg, 5),
+                "water_l": round(c.water_contribution_l, 3),
+                "ghg_sub_score": round(c.ghg_sub_score, 2),
+                "water_sub_score": round(c.water_sub_score, 2),
+            }
+            for c in impact.breakdown
+        ]
+
+        return {
+            "ok": True,
+            "sustainability_score": round(impact.sustainability_score, 2),
+            "ghg_sub_score": round(impact.ghg_sub_score, 2),
+            "water_sub_score": round(impact.water_sub_score, 2),
+            "biodegradable_bonus": round(impact.biodegradable_bonus, 2),
+            "cert_bonus": round(impact.cert_bonus, 2),
+            "co2_total_kg": round(impact.co2_total_kg, 5),
+            "water_total_l": round(impact.water_total_l, 3),
+            "fully_biodegradable": impact.fully_biodegradable,
+            "garment_mass_kg": mass_kg,
+            "breakdown": breakdown,
+        }
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}

@@ -24,18 +24,34 @@ async def register(app: FastAPI, ctx):
     from kerf_textiles.tools import textiles_cloth_drape_spec, run_textiles_cloth_drape
     ctx.tools.register("textiles_cloth_drape", textiles_cloth_drape_spec, run_textiles_cloth_drape)
 
+    from kerf_textiles.tools import textiles_cut_room_spec, run_textiles_cut_room
+    ctx.tools.register("textiles_cut_room", textiles_cut_room_spec, run_textiles_cut_room)
+
+    from kerf_textiles.tools import textiles_etextiles_spec, run_textiles_etextiles
+    ctx.tools.register("textiles_etextiles", textiles_etextiles_spec, run_textiles_etextiles)
+
+    from kerf_textiles.tools import textiles_sustainability_spec, run_textiles_sustainability
+    ctx.tools.register("textiles_sustainability",
+                       textiles_sustainability_spec, run_textiles_sustainability)
+
     try:
         from kerf_core.plugin import PluginManifest
         return PluginManifest(
             name="textiles",
             version="0.1.0",
-            provides=["textiles.weave", "textiles.knit", "textiles.draft", "textiles.drape"],
+            provides=[
+                "textiles.weave", "textiles.knit", "textiles.draft", "textiles.drape",
+                "textiles.cut_room", "textiles.etextiles", "textiles.sustainability",
+            ],
             depends=[],
         )
     except ImportError:
         return {
             "name": "textiles",
             "version": "0.1.0",
-            "provides": ["textiles.weave", "textiles.knit", "textiles.draft", "textiles.drape"],
+            "provides": [
+                "textiles.weave", "textiles.knit", "textiles.draft", "textiles.drape",
+                "textiles.cut_room", "textiles.etextiles", "textiles.sustainability",
+            ],
             "depends": [],
         }

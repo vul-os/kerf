@@ -1154,19 +1154,16 @@ async def git_delete_repo(
     payload: dict = Depends(require_auth),
     pid: Optional[str] = None,
 ):
-    user_id = payload.get("sub")
-    uid, role = await require_role(request, pid, user_id)
-    if role != "owner":
-        raise HTTPException(status_code=403, detail="only the project owner can delete the git repo")
-
-    pool = await get_pool_required()
-    async with pool.acquire() as conn:
-        await conn.execute(
-            "DELETE FROM cloud_git_repos WHERE project_id = $1",
-            pid,
-        )
-
-    return Response(status_code=204)
+    # Deleting a project's git repo is disabled. The repo IS the project's
+    # version history (commits, branches, LFS pointers); dropping it is
+    # destructive and unrecoverable, so the endpoint refuses for everyone.
+    raise HTTPException(
+        status_code=405,
+        detail=(
+            "Deleting a project's git repo is not allowed — it holds the "
+            "project's full version history."
+        ),
+    )
 
 
 @github_oauth_router.get("/github/start")

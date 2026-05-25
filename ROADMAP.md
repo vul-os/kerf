@@ -40,11 +40,19 @@ The sector work only matters if you **own your work, are not locked in, and can 
 
 ## What shipped
 
-### Latest delta — 2026-05-25
+### Latest delta — 2026-05-26
+
+**Civil hydraulics** ✅ — LandXML 1.2 import/export (`civil_landxml_import/export`); steady-state pressurised pipe network (Todini GGA + HW/DW, `civil_water_network_solve`); Manning circular/trapezoidal sewer (`civil_sewer_manning_capacity`); rational-method peak runoff (`civil_storm_rational`); HDS-5 inlet-control culvert (`civil_culvert_capacity`) — `kerf-civil/src/kerf_civil/tools_hydraulics.py`.
+
+**FEM dynamics** ✅ — linear eigenvalue buckling (`fem_buckling_linear`); mode-superposition harmonic frequency response (`fem_harmonic_response`); random-vibration PSD / Miles equation (`fem_random_vibration_psd`); acoustics cavity FEM + BEM radiation; high-frequency EM (waveguide, S-params, FDTD); electrostatics + magnetostatics; 2-D projection Navier-Stokes — `kerf-fem/src/kerf_fem/{buckling,harmonic,random_vibration,acoustics_fem,em_highfreq,em_field,cfd_navier_stokes}.py`.
+
+**Structural codes (AISI + TMS)** ✅ — AISI S100-16 cold-formed steel: effective-width, flexure (`structural_cfs_flexure`), compression (`structural_cfs_compression`), web-crippling (`structural_cfs_web_crippling`); TMS 402-16 masonry ASD: flexure/shear/axial (`structural_masonry_*`) — `kerf-structural/src/kerf_structural/{cold_formed_steel,masonry}.py`.
+
+**G3 surfacing wired** ✅ — `feature_blend_srf_g3` (surfacing.py:1376) + `feature_g3_chain_blend` (surfacing.py:1894) registered as LLM tools via `surfacing` module in `_TOOL_MODULES`; `blend_srf_g3`, `curvature_rate_continuity_residual`, `zebra_stripe`, `reflection_lines`, `curvature_comb` all exported from `geom/__init__.py`; `feature_zebra_analysis` and `feature_isophote_analysis` also wired.
 
 **Structural code design** ✅ — AISC 360-22 (Ch. E/F/H members + connections + base-plate, LRFD+ASD); ACI 318-19 (flexure/shear/PM + punching §22.6 + torsion §22.7); NDS 2018 timber; AISI S100-16 cold-formed steel (effective-width, flexure/compression/web-crippling); TMS 402-16 masonry ASD (flexure/shear/axial); ASCE 7-22 load combos + ELF + RSA/Newmark seismic. Full Eurocode: EC2, EC3, EC5, EC8.
 
-**Native FE** ✅ — MITC4 plate/shell (Bathe-Dvorkin) + modal via inverse iteration; 2D/3D frame stiffness + story drift; multi-axial critical-plane fatigue (Findley, SWT-3D, Brown-Miller); geotech liquefaction triggering (Seed-Idriss/Tokimatsu).
+**Native FE** ✅ — MITC4 plate/shell (Bathe-Dvorkin) + modal via inverse iteration; linear eigenvalue buckling + harmonic response + random-vibration PSD; 2D/3D frame stiffness + story drift; multi-axial critical-plane fatigue (Findley, SWT-3D, Brown-Miller); acoustics FEM/BEM + high-frequency EM + electrostatics/magnetostatics; geotech liquefaction triggering (Seed-Idriss/Tokimatsu).
 
 **Machine elements depth** ✅ — ISO 6336 gear rating Method B; ISO/TS 16281 bearing modified life (aISO); planetary gearbox (3 Willis modes + compound); Taylor extended tool-life + Gilbert economics.
 
@@ -112,12 +120,11 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 | **`inversion.py`** | Closest-point / point-inversion (Piegl 6.1, analytic partials on rational surfaces) | ✅ shipped |
 | **`intersection.py`** | Hardened SSI: loop-detection, tangential-branch detection, small-loop guard, analytic specialisations | ✅ shipped |
 | **`geom/history/`** | Parametric history DAG + `feature_id::role::fingerprint` persistent naming — downstream fillet survives upstream parameter edits | ✅ shipped |
-| **G3 surfacing** | `surface_blend_g3` / `blend_srf_g3`, curvature-rate continuity oracle, zebra/reflection-line analyser, class-A acceptance harness — all verified, **wiring in progress** (GK-P series) | 🚧 in flight |
+| **G3 surfacing** | `feature_blend_srf_g3` (surfacing.py:1376) + `feature_g3_chain_blend` (surfacing.py:1894) registered LLM tools; `blend_srf_g3` / `curvature_rate_continuity_residual` / `zebra_stripe` / `reflection_lines` / `curvature_comb` exported from `geom/__init__.py`; `feature_zebra_analysis` + `feature_isophote_analysis` wired | ✅ shipped |
 | **General solid boolean** | NURBS-faced / non-axis-aligned solids (today: axis-aligned only; general CSG delegates to OCCT worker) | 🔴 not started |
 
 **GK-P (parity) series in flight.** A four-agent survey of Kerf vs ~18 kernel-relevant CADs found a concrete, finite gap list. GK-01..GK-139 are landed. The `GK-P` series (tracked in `tasks.md`) closes the remaining gaps:
 
-- **Wiring** — expose shipped class-A math (G3 blends, zebra analyser, curvature-rate oracle) from `geom/__init__.py` and `surfacing.py`; all small, first in queue.
 - **Foundational kernel** — general solid boolean for NURBS-faced bodies, MatchSrf G3, isophote/EMap, Stam limit-tangents + G1 at extraordinary SubD points, fractional creases, analytic surface derivatives.
 - **Construction verbs** — loft guide-rails, sheet-metal hem/jog/multi-flange, direct-edit non-planar + delete-face, weldment gussets/end-treatments, surface patch-from-points.
 - **SubD / mesh** — multires displacement, SDF CSG + marching-cubes, sculpt brush engine, isotropic remesh, surface-snap retopo, LSCM UV unwrap.
@@ -138,7 +145,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 
 ### Simulation / manufacturing
 
-- **FEM** ✅ — FEniCSx + CalculiX: linear-static + modal + steady thermal + bonded contact; reference-value suite with Roark/Blevins/Incropera oracles (42 of 43 green).
+- **FEM** ✅ — FEniCSx + CalculiX: linear-static + modal + steady thermal + bonded contact; linear eigenvalue buckling + harmonic frequency response + random-vibration PSD; MITC4 plate/shell; acoustics FEM/BEM; high-frequency EM; electrostatics + magnetostatics; multi-axial fatigue; 2-D projection NS solver. Reference-value suite with Roark/Blevins/Incropera oracles (42 of 43 green).
 - **CFD foundation** ✅ — 2-D laminar: potential flow (`Cp(θ)=1−4sin²θ` oracle) + lid-driven cavity (Ghia Re=100 reference); 61 hermetic tests.
 - **Topology optimization** ✅ — SIMP via FEniCSx; NURBS surface fit; multi-body.
 - **CAM** ✅ — 2.5D + 3D parallel/waterline + lathe + 5-axis constant-tilt + 3+2 indexed; tool DB; LinuxCNC/GRBL/Fanuc posts.
@@ -198,7 +205,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 | **P1-9** | **Unified `pip install kerf` client** — cloud-default, easy optional self-host; fail-fast on missing database URL. | Reach: one client for all install modes. | 🚧 in flight |
 | **P1-10** | **Local folder sync + export/import portability** — `kerf sync` two-way folder mirror; `kerf export` / `kerf import` plain file tree; symmetric cloud ↔ self-host. | Anti-lock-in, demonstrable not just promised. | 🚧 in flight — two-way sync daemon (one-shot + watch mode + OCC conflict detection) shipped; symmetric cloud↔self-host portability complete — `kerf-cli/sync.py`, `kerf-cli/portability.py` |
 | **GK-P** | **Geometry kernel parity series** — close the gap list from the multi-CAD survey (GK-01..GK-139 landed; wiring + foundational + SubD + architectural geometry remaining). | Every persona's work quality depends on kernel robustness. | 🚧 in flight |
-| **T-100** | **FEM matching CalculiX / Z88 / Mystran depth** — nonlinear, explicit, acoustics, EM, fatigue beyond the verified linear-static+modal+thermal slice. | Serious simulation work. | 🚧 in flight |
+| **T-100** | **FEM matching CalculiX / Z88 / Mystran depth** — buckling + harmonic + PSD + acoustics + EM + fatigue shipped; remaining: explicit dynamics, full nonlinear static, k-ε turbulence, coupled variation. | Serious simulation work. | 🚧 in flight |
 | **T-101** | **CFD (CfdOF-class)** — turbulence models, 3-D unstructured meshing, OpenFOAM bridge beyond the 2-D laminar foundation. | Fluid and aero simulation. | 🚧 in flight |
 | **Hosted infra** | **Cloud infrastructure** — engine on Fly.io (`jnb` Johannesburg, `shared-cpu-2x` / 2 GB), Neon Postgres (`eu-central-1`), Cloudflare R2 blobs (zero egress), Resend email. GPU renders via RunPod Serverless (L4→H100, scale-to-zero) — dispatch seam exists; `RunPodGPUBackend` planned. See `deployment/fly.md`. | Stable pay-as-you-go stack with SA-native region; GPU render prices 2-3× below previous estimates when RunPod backend ships. | 🚧 in flight — stack settled; RunPod GPU backend remaining |
 
@@ -269,12 +276,11 @@ These are roadmap-level moats that span every sector simultaneously and compound
 
 ## Genuinely outstanding
 
-*Last verified: 2026-05-25 (status verify-pass against live codebase).* Items that are actually `🔴 not started` or meaningfully incomplete after the pass above.
+*Last verified: 2026-05-26 (status verify-pass against live codebase).* Items that are actually `🔴 not started` or meaningfully incomplete after the pass above.
 
 ### Tractable soon (weeks, well-scoped)
 
 - **G-7 caustics + in-browser path-tracer** — Cycles spectral dispersion data (Sellmeier/Abbe) is stashed by the translator but no caustic solver is wired; in-browser WebGPU path-tracer not started.
-- **GK-P wiring** — expose shipped class-A math (G3 blends, zebra analyser, curvature-rate oracle) from `geom/__init__.py` / `surfacing.py`; mostly small plumbing tasks.
 - **P0-7 bulk import endpoint** — `POST /api/projects/import` (ZIP archive upload); workaround (file-by-file) exists; bulk path not yet implemented.
 - **P0-5 viewport integration** — LOD planner and lazy-load ordering are implemented in `assembly/perf.py` but not yet wired to the 3D viewport renderer.
 
@@ -286,7 +292,7 @@ These are roadmap-level moats that span every sector simultaneously and compound
 - **GK-P architectural geometry** — B-rep→2D tessellate; roof/curtain-wall/corridor generators; wall compound-layer offset; hatch/section-fill.
 - **GK-P sketcher** — collinear constraint; ellipse solver entity; G2 continuity.
 - **GK-P interop** — 3DM write with Hausdorff read→write→read oracle.
-- **T-100 FEM depth** — nonlinear static + explicit dynamics + acoustics FEM + EM + fatigue (multi-axial critical-plane shipped; coupled FEA-based variation not yet).
+- **T-100 FEM depth** — explicit dynamics (module exists, not yet imported/registered); full nonlinear static (only 1-D bar/truss shipped); k-ε turbulence CFD; coupled FEA-based variation analysis. (Acoustics FEM, EM, harmonic, buckling, PSD, multi-axial fatigue are now shipped.)
 - **T-101 CFD depth** — RANS turbulence models; 3-D unstructured meshing; OpenFOAM bridge.
 - **AFR topology ordering** — promote the AAG feature classifier output into a fully replay-able parametric DAG (depends on NURBS kernel completeness).
 - **Reverse-engineering freeform fit** — freeform NURBS surface fit from segmented point clouds; currently only analytic primitives (plane/sphere/cylinder/cone/torus).

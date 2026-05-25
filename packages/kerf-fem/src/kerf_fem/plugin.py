@@ -4,6 +4,9 @@ kerf-fem plugin entry-point.
 Registers:
   - FastAPI router  POST /run-fem
   - LLM tools       fem_run, fem_job_status  (via ctx.tools.register)
+  - LLM tools       fem_acoustics, fem_electrostatics, fem_magnetostatics,
+                    cfd_navier_stokes_steady, cfd_potential_cylinder
+                    (via import-triggered self-registration)
   - background worker for fem_jobs table     (via ctx.workers.register)
 
 Heavy deps (dolfinx, slepc4py) are optional — the plugin still loads
@@ -58,6 +61,10 @@ async def register(app: FastAPI, ctx):
     from kerf_fem.fatigue_fem import _fem_fatigue_spec, run_fem_fatigue; ctx.tools.register("fem_fatigue", _fem_fatigue_spec, run_fem_fatigue)  # kerf-fem: fatigue & durability
     from kerf_fem.plate import _fem_plate_static_spec, run_fem_plate_static_solve; ctx.tools.register("fem_plate_static_solve", _fem_plate_static_spec, run_fem_plate_static_solve)  # kerf-fem: MITC4 plate/shell
     import kerf_fem.em_highfreq  # kerf-fem: high-frequency EM (waveguide, S-params, FDTD) — self-registers fem_em_highfreq tool on import
+    import kerf_fem.acoustics_fem  # kerf-fem: acoustics FEM (cavity modes, BEM radiation) — self-registers fem_acoustics
+    import kerf_fem.em_field  # kerf-fem: electrostatics + magnetostatics — self-registers fem_electrostatics, fem_magnetostatics
+    import kerf_fem.cfd_navier_stokes  # kerf-fem: 2-D projection NS solver — self-registers cfd_navier_stokes_steady
+    import kerf_fem.cfd_potential  # kerf-fem: potential-flow cylinder — self-registers cfd_potential_cylinder
 
     # Register background worker
     from kerf_fem.worker import FEMWorker
@@ -74,7 +81,11 @@ async def register(app: FastAPI, ctx):
 
     # Build `provides` list based on available deps
     # fem.nonlinear is pure-Python — always available
-    provides = ["fem.nonlinear", "fem.electromagnetics"]
+    provides = [
+        "fem.nonlinear", "fem.electromagnetics",
+        "fem.acoustics", "fem.electrostatics", "fem.magnetostatics",
+        "fem.cfd-navier-stokes", "fem.cfd-potential",
+    ]
     if _DOLFINX_AVAILABLE:
         provides.append("fem.linear-static")
         provides.append("fem.thermal")

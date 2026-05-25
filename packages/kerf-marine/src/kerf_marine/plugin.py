@@ -20,6 +20,7 @@ async def register(app: FastAPI, ctx):
         marine_box_barge_spec, run_marine_box_barge,
         marine_stability_gz_spec, run_marine_stability_gz,
         marine_scantlings_spec, run_marine_scantlings,
+        marine_vpp_spec, run_marine_vpp,
     )
     from kerf_marine.holtrop_mennen import (
         holtrop_mennen_spec, run_holtrop_mennen,
@@ -49,6 +50,11 @@ async def register(app: FastAPI, ctx):
         marine_scantlings_spec,
         run_marine_scantlings,
     )
+    ctx.tools.register(
+        "marine_vpp",
+        marine_vpp_spec,
+        run_marine_vpp,
+    )
 
     try:
         from kerf_core.plugin import PluginManifest
@@ -56,7 +62,7 @@ async def register(app: FastAPI, ctx):
             name="marine",
             version="0.1.0",
             provides=["marine.hydrostatics", "marine.stability", "marine.sections",
-                      "marine.resistance", "marine.scantlings"],
+                      "marine.resistance", "marine.scantlings", "marine.vpp"],
             depends=[],
         )
     except ImportError:
@@ -64,6 +70,6 @@ async def register(app: FastAPI, ctx):
             "name": "marine",
             "version": "0.1.0",
             "provides": ["marine.hydrostatics", "marine.stability", "marine.sections",
-                         "marine.resistance", "marine.scantlings"],
+                         "marine.resistance", "marine.scantlings", "marine.vpp"],
             "depends": [],
         }

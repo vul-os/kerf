@@ -547,6 +547,99 @@ _MATERIAL_MAP = {
 }
 
 
+# ---------------------------------------------------------------------------
+# marine_vpp
+# ---------------------------------------------------------------------------
+
+marine_vpp_spec = ToolSpec(
+    name="marine_vpp",
+    description=(
+        "Velocity Prediction Programme (VPP) for sailing vessels — "
+        "Kerwin-Larsson aero/hydrodynamic force balance following the ORC/IMS framework.  "
+        "Sweeps true wind speed (TWS) and true wind angle (TWA) to produce a speed polar.  "
+        "Uses ITTC 1957 friction, Delft Series residuary resistance (Keuning & Sonnenberg 1998), "
+        "and an empirical sail-force model.  "
+        "Returns boat speed, heel angle, and drive force at each (TWS, TWA) combination."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "L_wl": {"type": "number", "description": "Waterline length (m)."},
+            "B_wl": {"type": "number", "description": "Waterline beam (m)."},
+            "T_c":  {"type": "number", "description": "Canoe body draught (m) — hull depth excluding fin keel."},
+            "T_keel": {"type": "number", "description": "Total draught including keel (m)."},
+            "displacement_t": {"type": "number", "description": "Displacement (metric tonnes). Default 5.0."},
+            "Cm": {"type": "number", "description": "Midship section coefficient. Default 0.65."},
+            "Cp": {"type": "number", "description": "Prismatic coefficient. Default 0.565."},
+            "sail_area_m2": {"type": "number", "description": "Total upwind sail area (m²). Default 60."},
+            "centre_of_effort_m": {"type": "number", "description": "Centre of effort height above waterline (m). Default 7."},
+            "tws_knots": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "True wind speeds to sweep (knots). Default [8, 12, 16].",
+            },
+            "twa_deg_list": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "True wind angles to sweep (degrees). Default standard 45-180.",
+            },
+            "hull_name": {"type": "string", "description": "Vessel label for output. Default 'vessel'."},
+        },
+        "required": ["L_wl", "B_wl", "T_c", "T_keel"],
+    },
+)
+
+
+async def run_marine_vpp(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_marine.vpp import HullData, generate_polar, VPPPoint
+
+        hull = HullData(
+            L_wl=float(args["L_wl"]),
+            B_wl=float(args["B_wl"]),
+            T_c=float(args["T_c"]),
+            T_keel=float(args["T_keel"]),
+            displacement_t=float(args.get("displacement_t", 5.0)),
+            Cm=float(args.get("Cm", 0.65)),
+            Cp=float(args.get("Cp", 0.565)),
+            sail_area_m2=float(args.get("sail_area_m2", 60.0)),
+            centre_of_effort_m=float(args.get("centre_of_effort_m", 7.0)),
+        )
+
+        tws_knots = [float(v) for v in args.get("tws_knots", [8.0, 12.0, 16.0])]
+        twa_list = [float(v) for v in args["twa_deg_list"]] if "twa_deg_list" in args else None
+        hull_name = str(args.get("hull_name", "vessel"))
+
+        polar = generate_polar(hull, tws_knots=tws_knots, twa_deg_list=twa_list, hull_name=hull_name)
+
+        # Summarise points
+        points_summary = [
+            {
+                "tws_kn": round(p.tws * 1.944, 2),
+                "twa_deg": round(p.twa_deg, 1),
+                "boat_speed_kn": round(p.boat_speed * 1.944, 3),
+                "heel_deg": round(p.heel_deg, 2),
+            }
+            for p in polar.points
+        ]
+
+        payload: dict[str, Any] = {
+            "ok": True,
+            "hull_name": polar.hull_name,
+            "n_tws": len(tws_knots),
+            "n_twa": len(polar.twa_deg_list),
+            "n_points": len(polar.points),
+            "tws_knots": tws_knots,
+            "twa_deg_list": polar.twa_deg_list,
+            "polar_points": points_summary,
+            "warnings": polar.warnings,
+        }
+        return ok_payload(payload)
+
+    except Exception as exc:
+        return err_payload(str(exc), "MARINE_VPP_ERROR")
+
+
 async def run_marine_scantlings(args: dict[str, Any], ctx: "ProjectCtx") -> str:
     try:
         import kerf_marine.scantlings as sc

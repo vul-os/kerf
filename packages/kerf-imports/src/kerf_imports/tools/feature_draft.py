@@ -134,3 +134,7 @@ async def run_feature_draft(ctx: ProjectCtx, args: bytes) -> str:
         "id": nid,
         "op": "draft",
     })
+
+
+# Expose TOOLS list for the plugin loader (_register_tools iterates mod.TOOLS).
+TOOLS = [(feature_draft_spec.name, feature_draft_spec, run_feature_draft)]

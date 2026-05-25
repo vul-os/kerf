@@ -96,6 +96,8 @@ def _register_tools(ctx, provides: list) -> None:
         "kerf_imports.tools.draft",
         "kerf_imports.tools.inspection",
         "kerf_imports.tools.graph",
+        "kerf_imports.tools.feature_draft",
+        "kerf_imports.tools.feature_mirror",
         "kerf_imports.tools.feature_helix",
         "kerf_imports.tools.feature_multi_transform",
         "kerf_imports.tools.feature_rib",

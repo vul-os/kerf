@@ -156,3 +156,7 @@ async def run_feature_mirror(ctx: ProjectCtx, args: bytes) -> str:
         "id": nid,
         "op": "mirror_feature",
     })
+
+
+# Expose TOOLS list for the plugin loader (_register_tools iterates mod.TOOLS).
+TOOLS = [(feature_mirror_spec.name, feature_mirror_spec, run_feature_mirror)]

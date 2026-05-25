@@ -157,6 +157,10 @@ def _register_tools(ctx, provides: list) -> None:
         "kerf_electronics.thermal_board",
         "kerf_electronics.pdn_wizard",
         "kerf_electronics.si_eye_wizard",
+        # PDN AC impedance sweep + decap optimiser (orphaned from pdn/analyzer.py coverage)
+        "kerf_electronics.pdn.ac_impedance",
+        # Fibre-link LLM tools (fibre coupling, full link budget, dispersion penalty)
+        "kerf_electronics.photonics.fibre_link",
     ]
 
     for module_path in tool_modules:

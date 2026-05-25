@@ -1,7 +1,7 @@
 """
 kerf-landscape plugin entry-point.
 
-Registers LLM tools for grading, drainage, planting, and hardscape.
+Registers LLM tools for grading, drainage, planting, hardscape, and irrigation.
 No background workers or FastAPI routes are needed — all landscape
 computations are synchronous pure-Python.
 """
@@ -21,6 +21,8 @@ async def register(app: FastAPI, ctx):
         landscape_plants_spec, run_landscape_plants,
         landscape_paver_spec, run_landscape_paver_pattern,
         landscape_wall_spec, run_landscape_retaining_wall,
+        # irrigation schedule (coverage sweep 2026-05-25 — was in tools.py but unregistered)
+        landscape_irrigation_spec, run_landscape_irrigation,
     )
 
     ctx.tools.register("landscape_contours", landscape_contours_spec, run_landscape_contours)
@@ -29,29 +31,32 @@ async def register(app: FastAPI, ctx):
     ctx.tools.register("landscape_plants", landscape_plants_spec, run_landscape_plants)
     ctx.tools.register("landscape_paver_pattern", landscape_paver_spec, run_landscape_paver_pattern)
     ctx.tools.register("landscape_retaining_wall", landscape_wall_spec, run_landscape_retaining_wall)
+    ctx.tools.register(
+        "landscape_irrigation_schedule",
+        landscape_irrigation_spec,
+        run_landscape_irrigation,
+    )
+
+    provides = [
+        "landscape.grading",
+        "landscape.drainage",
+        "landscape.planting",
+        "landscape.hardscape",
+        "landscape.irrigation",
+    ]
 
     try:
         from kerf_core.plugin import PluginManifest
         return PluginManifest(
             name="landscape",
             version="0.1.0",
-            provides=[
-                "landscape.grading",
-                "landscape.drainage",
-                "landscape.planting",
-                "landscape.hardscape",
-            ],
+            provides=provides,
             depends=[],
         )
     except ImportError:
         return {
             "name": "landscape",
             "version": "0.1.0",
-            "provides": [
-                "landscape.grading",
-                "landscape.drainage",
-                "landscape.planting",
-                "landscape.hardscape",
-            ],
+            "provides": provides,
             "depends": [],
         }

@@ -62,3 +62,25 @@ def _register_tools(ctx, provides: list) -> None:
         provides.append("plc.ld")
     except Exception as exc:
         logger.warning("kerf-plc: failed to load create_ladder_rung tool: %s", exc)
+
+    # make_ladder_program — synthesise a full LD program from a natural-language spec
+    try:
+        from kerf_plc.tools.make_ladder_program import make_ladder_program_spec, make_ladder_program_tool
+        ctx.tools.register("make_ladder_program", make_ladder_program_spec, make_ladder_program_tool)
+        provides.append("plc.make_ladder")
+    except Exception as exc:
+        logger.warning("kerf-plc: failed to load make_ladder_program tool: %s", exc)
+
+    # convert_st_to_ladder / convert_ladder_to_st — bidirectional ST ↔ LD transpiler
+    try:
+        from kerf_plc.tools.transpile_plc import (
+            convert_st_to_ladder_spec,
+            convert_st_to_ladder_tool,
+            convert_ladder_to_st_spec,
+            convert_ladder_to_st_tool,
+        )
+        ctx.tools.register("convert_st_to_ladder", convert_st_to_ladder_spec, convert_st_to_ladder_tool)
+        ctx.tools.register("convert_ladder_to_st", convert_ladder_to_st_spec, convert_ladder_to_st_tool)
+        provides.append("plc.transpile")
+    except Exception as exc:
+        logger.warning("kerf-plc: failed to load transpile_plc tools: %s", exc)

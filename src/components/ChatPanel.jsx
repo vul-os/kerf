@@ -416,6 +416,32 @@ export function Markdown({ text, projectId }) {
   )
 }
 
+// ---------- typing / streaming indicator ----------
+
+/**
+ * TypingIndicator — three animated bouncing dots shown while the assistant
+ * is generating but hasn't emitted any text yet, AND inside the "Kerf is
+ * thinking…" bar shown before a streaming message appears.
+ *
+ * Uses CSS keyframe animation via Tailwind's animate-bounce stagger trick.
+ * When reduced-motion is active the dots are shown statically (no bounce).
+ */
+export function TypingIndicator({ reduced = false }) {
+  const base = 'inline-block w-1.5 h-1.5 rounded-full bg-kerf-300'
+  return (
+    <span
+      data-testid="typing-indicator"
+      aria-label="Assistant is typing"
+      role="status"
+      className="inline-flex items-center gap-[3px] align-middle"
+    >
+      <span className={`${base}${reduced ? '' : ' animate-bounce [animation-delay:0ms]'}`} />
+      <span className={`${base}${reduced ? '' : ' animate-bounce [animation-delay:150ms]'}`} />
+      <span className={`${base}${reduced ? '' : ' animate-bounce [animation-delay:300ms]'}`} />
+    </span>
+  )
+}
+
 // ---------- tool-call chips ----------
 
 const TOOL_ICONS = {
@@ -711,6 +737,7 @@ function ToolChipList({ chips }) {
 
 function MessageBlock({ message, modelLookup, isLatestAssistant, onRetry }) {
   const projectId = useWorkspace((s) => s.projectId)
+  const reduced = usePrefersReducedMotion()
   const isUser = message.role === 'user'
   const showBadge = !isUser && message.model && message.model !== 'none'
   const badgeProvider = showBadge ? (modelLookup?.[message.model]?.provider || '') : ''
@@ -739,10 +766,13 @@ function MessageBlock({ message, modelLookup, isLatestAssistant, onRetry }) {
         </div>
       )}
       <div
+        data-streaming={(!isUser && message._streaming) ? 'true' : undefined}
         className={`max-w-[88%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
           isUser
             ? 'bg-kerf-300/15 border border-kerf-300/30 text-ink-100 rounded-br-sm'
-            : 'bg-ink-800 border border-ink-700 text-ink-100 rounded-bl-sm'
+            : message._streaming
+              ? 'bg-ink-800 border border-kerf-300/40 text-ink-100 rounded-bl-sm'
+              : 'bg-ink-800 border border-ink-700 text-ink-100 rounded-bl-sm'
         }`}
         {...(!isUser && isLatestAssistant
           ? { 'aria-live': 'polite', 'aria-atomic': 'false', 'data-live-region': 'assistant-reply' }
@@ -756,7 +786,12 @@ function MessageBlock({ message, modelLookup, isLatestAssistant, onRetry }) {
               <Markdown text={message.content || ''} projectId={projectId} />
             )}
             {message._streaming && !message.content && (
-              <span className="text-ink-500 animate-pulse text-xs">…</span>
+              <span
+                data-testid="streaming-placeholder"
+                className="inline-flex items-center gap-1.5 text-ink-300 text-xs py-0.5"
+              >
+                <TypingIndicator reduced={reduced} />
+              </span>
             )}
             {Array.isArray(message._toolChips) && message._toolChips.length > 0 && (
               <ToolChipList chips={message._toolChips} />
@@ -1072,11 +1107,19 @@ const ChatPanel = forwardRef(function ChatPanel({
           // taking up space in the list (the streaming message renders itself).
           const showThinking = !streamingMsg
           return (
-            <div className="flex items-center gap-2 text-[11px] text-ink-400">
+            <div
+              data-testid="streaming-status-bar"
+              className="flex items-center gap-2.5 px-3 py-2 rounded-xl border border-kerf-300/25 bg-kerf-300/5 text-[12px] text-ink-200"
+            >
               {showThinking && (
                 <>
-                  <Sparkles size={11} className={reduced ? 'text-kerf-300' : 'text-kerf-300 animate-pulse'} />
-                  <span className={reduced ? undefined : 'animate-pulse'}>Kerf is thinking…</span>
+                  <TypingIndicator reduced={reduced} />
+                  <span
+                    data-testid="thinking-label"
+                    className="font-medium tracking-wide"
+                  >
+                    Kerf is thinking
+                  </span>
                 </>
               )}
               {onCancelStream && (

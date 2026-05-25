@@ -68,6 +68,8 @@ def _register_tools(ctx, provides: list) -> None:
         ("kerf_bim.tools.drafting", "bim.drafting"),
         ("kerf_bim.tools.site_geometry", "bim.site-geometry"),
         ("kerf_bim.tools.space", "bim.space"),
+        # GK-P50: structural grid + framing layout
+        ("kerf_bim.tools.grid_framing", "bim.grid-framing"),
     ]
 
     for module_path, capability in tool_modules:

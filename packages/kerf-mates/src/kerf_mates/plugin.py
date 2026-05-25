@@ -52,6 +52,15 @@ async def register(app: FastAPI, ctx):
     ctx.tools.register("solve_joints", solve_joints_spec, run_solve_joints)
     from kerf_mates.tolerance3d import tolerance3d_analysis_spec, run_tolerance3d_analysis; ctx.tools.register("tolerance3d_analysis", tolerance3d_analysis_spec, run_tolerance3d_analysis)
 
+    from kerf_mates.synthesis_tools import (
+        synthesise_four_bar_spec, run_synthesise_four_bar,
+        synthesise_cam_spec, run_synthesise_cam,
+        synthesise_gear_train_spec, run_synthesise_gear_train,
+    )
+    ctx.tools.register("synthesise_four_bar", synthesise_four_bar_spec, run_synthesise_four_bar)
+    ctx.tools.register("synthesise_cam", synthesise_cam_spec, run_synthesise_cam)
+    ctx.tools.register("synthesise_gear_train", synthesise_gear_train_spec, run_synthesise_gear_train)
+
     # Pure-Python gradient-descent solver always available;
     # python-solvespace is the optional fast-path.
     provides = ["mates.gradient-descent"]

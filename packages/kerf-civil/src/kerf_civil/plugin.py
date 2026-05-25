@@ -69,6 +69,17 @@ async def register(app: FastAPI, ctx):
             "kerf-civil: failed to load tools_terrain: %s", _exc
         )
 
+    # LandXML I/O + hydraulics engines (2026-05-25)
+    try:
+        from kerf_civil.tools_hydraulics import TOOLS as _hydraulics_tools
+        for _tool_name, _tool_spec, _tool_handler in _hydraulics_tools:
+            ctx.tools.register(_tool_name, _tool_spec, _tool_handler)
+    except Exception as _exc:
+        import logging as _logging
+        _logging.getLogger(__name__).warning(
+            "kerf-civil: failed to load tools_hydraulics: %s", _exc
+        )
+
     provides = [
         "civil.horizontal_alignment",
         "civil.vertical_alignment",
@@ -79,6 +90,10 @@ async def register(app: FastAPI, ctx):
         "civil.corridor-ifc",
         "civil.tin-terrain",
         "civil.crs-transform",
+        "civil.landxml",
+        "civil.hydraulics-pressure",
+        "civil.hydraulics-gravity",
+        "civil.storm",
     ]
 
     try:

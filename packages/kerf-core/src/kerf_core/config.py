@@ -109,13 +109,26 @@ class Settings(BaseSettings):
             return ""
 
     # ---------------------------------------------------------------------------
-    # Transactional email — provider selection + credentials.
-    # email_provider: "smtp" (default, no regression) | "resend" | "ses"
+    # Transactional email — pluggable provider + credentials.
+    # email_provider: "smtp" (self-host default, zero-vendor) | "resend" | "ses".
+    #   New providers slot in via kerf_cloud.email.providers (add to
+    #   _VALID_PROVIDERS + a _send_<name>); no other code changes needed.
+    # Our hosted cloud runs Resend today (EMAIL_PROVIDER=resend in the deploy
+    #   env); the planned migration to SES is a pure env flip — set
+    #   EMAIL_PROVIDER=ses + the ses_* fields, no code change.
     # email_from: default From address, e.g. "Kerf <noreply@kerf.sh>"
     # ---------------------------------------------------------------------------
     email_provider: str = "smtp"
     email_from: str = ""
+    # SMTP (self-host / generic). STARTTLS is always negotiated; username and
+    # password are optional for open relays.
+    smtp_host: str = ""
+    smtp_port: int = 0
+    smtp_username: str = ""
+    smtp_password: str = ""
+    # Resend (current hosted provider).
     resend_api_key: str = ""
+    # Amazon SES (planned hosted migration).
     ses_region: str = ""
     ses_access_key_id: str = ""
     ses_secret_access_key: str = ""

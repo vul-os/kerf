@@ -1,0 +1,90 @@
+# fly.io app config — ONE app per env (kerf-dev / kerf-prod).
+#
+# Stack: Fly.io (app + in-process workers) · Neon (Postgres) · Cloudflare R2
+#        (blobs) · RunPod Serverless (GPU renders) · Resend (email).
+#
+# Each machine runs the engine (frontend + API) AND the worker harness
+# in-process (KERF_INPROCESS_WORKERS=true) — Fly VMs are persistent, so the
+# background job loop runs natively. Scaling the app scales workers too.
+# Primary: jnb (Johannesburg). App name "kerf" is taken on fly.io, so
+# production is "kerf-prod"; the public domain kerf.sh attaches via `flyctl
+# certs`. Deploy: ./scripts/deploy-fly.sh   (--dev for kerf-dev)
+
+app = "kerf-prod"
+primary_region = "jnb"
+
+[build]
+  dockerfile = "Dockerfile"
+  [build.args]
+    KERF_PERSONA = "full"
+
+# release_command runs ONCE in a one-off VM before the new version takes
+# traffic. Migrations MUST land here — otherwise the new machine boots its
+# in-process workers and they poll fem_jobs / sim_jobs / step_tessellation_jobs
+# / model_prices, crashing with UndefinedTableError until a later migration.
+[deploy]
+  release_command = "python -m kerf_core.db.migrations.runner"
+
+[env]
+  ENV = "production"
+  KERF_PORT = "8080"
+  KERF_FRONTEND_DIST = "/app/dist"
+  CLOUD_ENABLED = "true"
+  KERF_LOCAL_MODE = "false"
+  KERF_INPROCESS_WORKERS = "true"
+  # Object storage — Cloudflare R2 (S3-compatible). Bucket/keys/endpoint are
+  # secrets (the R2 endpoint embeds your account ID). region is always "auto".
+  STORAGE_BACKEND = "s3"
+  KERF_STORAGE_S3_REGION = "auto"
+  # Email — Resend now; flip to "ses" later (set SES_* secrets, no code change).
+  EMAIL_PROVIDER = "resend"
+  EMAIL_FROM = "Kerf <noreply@kerf.sh>"
+
+# Secrets to set (via `flyctl secrets set KEY=value --app <app>`, or pushed by
+# scripts/deploy-fly.sh from .env.main / .env.dev). Var names match
+# kerf_core.config exactly:
+#   DATABASE_URL                  Neon Postgres connection string
+#   JWT_SECRET                    session signing (openssl rand -base64 48)
+#   PASSWORD_PEPPER               password hash pepper (openssl rand -base64 32)
+#   KERF_STORAGE_S3_BUCKET        R2 bucket name
+#   KERF_STORAGE_S3_ACCESS_KEY    R2 access key id
+#   KERF_STORAGE_S3_SECRET_KEY    R2 secret access key
+#   KERF_STORAGE_S3_ENDPOINT      https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+#   RESEND_API_KEY                Resend API key (email)
+#   RUNPOD_API_KEY                RunPod Serverless API key (GPU renders)
+#   RUNPOD_ENDPOINT_ID            RunPod serverless endpoint id
+#   ANTHROPIC_API_KEY             LLM keys (≥1) — names match kerf_core.config
+#   OPENAI_API_KEY
+#   MOONSHOT_API_KEY
+#   GEMINI_API_KEY
+#   CLOUD_PAYSTACK_SECRET_KEY     billing (skip while KERF_CLOUD_BETA=true)
+#   CLOUD_PAYSTACK_PUBLIC_KEY
+#   GOOGLE_CLIENT_SECRET          OAuth (VITE_GOOGLE_CLIENT_ID is a build arg)
+#   CLOUD_GITHUB_APP_ID / _CLIENT_ID / _CLIENT_SECRET / _PRIVATE_KEY_B64
+
+# The engine loads numpy/scipy/OCCT + ~60 plugins and runs in-process workers,
+# so it needs real RAM — Fly's 256 MB default OOM-kills it (healthcheck flaps).
+# 2 GB is a sane dev floor; bump memory to "4gb" if heavy FEM/render jobs OOM.
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "2gb"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 200
+    hard_limit = 250
+
+[[http_service.checks]]
+  grace_period = "10s"
+  interval = "30s"
+  timeout = "5s"
+  method = "GET"
+  path = "/healthz"

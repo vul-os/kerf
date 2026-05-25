@@ -78,12 +78,12 @@ def _run(coro):
 
 _fake_resolve = _FakeResolve()
 
-with mock.patch("kerf_api.tools.file_ops.resolve_path", new=_fake_resolve):
+with mock.patch("kerf_cad_core.sketch.resolve_path", new=_fake_resolve):
     import kerf_cad_core.sketch as sketch_mod
 
 
 def _call(fn, ctx, args_dict: dict) -> dict:
-    with mock.patch("kerf_api.tools.file_ops.resolve_path", new=_fake_resolve):
+    with mock.patch("kerf_cad_core.sketch.resolve_path", new=_fake_resolve):
         raw = _run(fn(ctx, json.dumps(args_dict).encode()))
     return json.loads(raw)
 
@@ -95,7 +95,7 @@ def _read_sketch(ctx: _FakeCtx, path: str) -> dict:
 
 def _validate(sketch_data: dict) -> dict:
     ctx, path = _make_ctx_and_path(sketch_data)
-    with mock.patch("kerf_api.tools.file_ops.resolve_path", new=_fake_resolve):
+    with mock.patch("kerf_cad_core.sketch.resolve_path", new=_fake_resolve):
         raw = _run(sketch_mod.run_sketch_validate(ctx, json.dumps({"file_path": path}).encode()))
     return json.loads(raw)
 

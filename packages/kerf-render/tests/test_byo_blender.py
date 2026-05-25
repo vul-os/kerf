@@ -219,12 +219,30 @@ class TestWorkerConfig:
 # Docker availability guard — live build/run tests
 # ---------------------------------------------------------------------------
 
-_docker_available = shutil.which("docker") is not None
+def _docker_daemon_running() -> bool:
+    """True only when the docker CLI is on PATH AND its daemon answers.
+
+    `shutil.which` alone is insufficient: docker is frequently installed but
+    the daemon is stopped (CI runners, dev laptops), in which case `docker
+    info` exits non-zero. The smoke test is a live-daemon check, so gate on
+    the daemon actually responding — otherwise skip rather than fail.
+    """
+    if shutil.which("docker") is None:
+        return False
+    try:
+        return subprocess.run(
+            ["docker", "info"], capture_output=True, timeout=15
+        ).returncode == 0
+    except Exception:
+        return False
 
 
-@pytest.mark.skipif(not _docker_available, reason="docker not on PATH")
+_docker_available = _docker_daemon_running()
+
+
+@pytest.mark.skipif(not _docker_available, reason="docker daemon not running")
 class TestDockerSmoke:
-    """Smoke-level Docker tests.  Skipped when Docker is not installed."""
+    """Smoke-level Docker tests.  Skipped when the Docker daemon is unavailable."""
 
     def test_docker_is_callable(self):
         """Sanity: `docker info` exits 0 when the daemon is running."""

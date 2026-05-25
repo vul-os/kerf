@@ -19,8 +19,11 @@ export default defineConfig(({ mode }) => {
     // Vitest unit tests only. The Playwright e2e specs under tests/e2e/
     // use @playwright/test (their own runner via `npm run test:e2e`) and
     // must not be collected here, or vitest errors on `test.describe`.
+    // `.claude/**` is excluded so vitest never scans agent git worktrees
+    // (each is a full repo copy — collecting them doubles the suite and
+    // surfaces their e2e specs as spurious "@playwright/test not found" fails).
     test: {
-      exclude: [...configDefaults.exclude, 'tests/e2e/**'],
+      exclude: [...configDefaults.exclude, 'tests/e2e/**', '.claude/**'],
     },
     server: {
       port: 5173,

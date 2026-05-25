@@ -22,6 +22,20 @@ from kerf_core.app import _wire_storage
 from kerf_core.config import Config
 
 
+@pytest.fixture(autouse=True)
+def _restore_storage_singleton():
+    """These tests mutate the process-global storage singleton (set it to
+    None to simulate a fresh process). Save and restore it so the mutation
+    can't leak into later tests in the same pytest session — which would
+    make every storage-touching test raise 'Storage not initialized'.
+    """
+    saved = storage_mod.get_storage()
+    try:
+        yield
+    finally:
+        storage_mod.set_storage(saved)
+
+
 def test_get_storage_required_raises_until_set():
     storage_mod.set_storage(None)
     with pytest.raises(RuntimeError, match="Storage not initialized"):

@@ -287,7 +287,7 @@ def test_seat_cutter_normal_is_radially_inward():
 # 14. All setting styles: retention list is non-empty and correct length
 # ===========================================================================
 
-@pytest.mark.parametrize("style", list(_VALID_SETTING_STYLES))
+@pytest.mark.parametrize("style", sorted(_VALID_SETTING_STYLES))
 def test_retention_list_non_empty_all_styles(style):
     res = _distribute(setting_style=style)
     assert len(res["retention"]) == res["stone_count"]

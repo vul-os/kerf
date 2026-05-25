@@ -302,7 +302,7 @@ class TestSeatGeometry:
         )
         assert "girdle_profile" not in geom
 
-    @pytest.mark.parametrize("cut", list(GEMSTONE_CUTS))
+    @pytest.mark.parametrize("cut", sorted(GEMSTONE_CUTS))
     def test_all_cuts_produce_valid_geometry(self, cut):
         props = gemstone_proportions(cut, diameter_mm=5.0)
         geom = seat_geometry(
@@ -367,7 +367,7 @@ class TestFancyCutGirdleProfile:
         gp = fancy_cut_girdle_profile("oval", 8.0, aspect_ratio=0.8)
         assert gp["aspect_ratio"] == pytest.approx(0.8)
 
-    @pytest.mark.parametrize("cut", list(GEMSTONE_CUTS))
+    @pytest.mark.parametrize("cut", sorted(GEMSTONE_CUTS))
     def test_all_cuts_return_valid_profile(self, cut):
         gp = fancy_cut_girdle_profile(cut, 6.0)
         assert gp["long_axis_mm"] > 0
@@ -832,7 +832,7 @@ class TestRunJewelryCutGemSeat:
         assert "girdle_profile" in node
         assert node["girdle_profile"]["profile_shape"] == "ellipse"
 
-    @pytest.mark.parametrize("cut", list(GEMSTONE_CUTS))
+    @pytest.mark.parametrize("cut", sorted(GEMSTONE_CUTS))
     def test_all_cuts_succeed(self, cut):
         ctx, store, fid = make_ctx()
         result = run_gem_seat(ctx, fid, cut=cut, diameter_mm=5.0)
@@ -907,7 +907,7 @@ class TestRunChannelSeat:
         # n_stones defaults to 0 -> should fail
         assert result.get("code") == "BAD_ARGS"
 
-    @pytest.mark.parametrize("cut", list(GEMSTONE_CUTS))
+    @pytest.mark.parametrize("cut", sorted(GEMSTONE_CUTS))
     def test_all_cuts_channel_succeed(self, cut):
         ctx, store, fid = make_ctx()
         result = run_channel(ctx, fid, cut=cut, diameter_mm=2.0,
@@ -972,7 +972,7 @@ class TestRunBezealSeat:
                            bezel_wall_height_mm=-0.5)
         assert result.get("code") == "BAD_ARGS"
 
-    @pytest.mark.parametrize("cut", list(GEMSTONE_CUTS))
+    @pytest.mark.parametrize("cut", sorted(GEMSTONE_CUTS))
     def test_all_cuts_bezel_succeed(self, cut):
         ctx, store, fid = make_ctx()
         result = run_bezel(ctx, fid, cut=cut, diameter_mm=5.0)
@@ -1034,7 +1034,7 @@ class TestRunFishtailSeat:
                               n_bright_facets=0)
         assert result.get("code") == "BAD_ARGS"
 
-    @pytest.mark.parametrize("cut", list(GEMSTONE_CUTS))
+    @pytest.mark.parametrize("cut", sorted(GEMSTONE_CUTS))
     def test_all_cuts_fishtail_succeed(self, cut):
         ctx, store, fid = make_ctx()
         result = run_fishtail(ctx, fid, cut=cut, diameter_mm=2.5)
@@ -1138,7 +1138,7 @@ class TestRunMultiStoneSeat:
         assert result.get("error") is None, result
         assert len(result["side_positions"]) == 4
 
-    @pytest.mark.parametrize("cut", list(GEMSTONE_CUTS))
+    @pytest.mark.parametrize("cut", sorted(GEMSTONE_CUTS))
     def test_all_cuts_multi_stone_succeed(self, cut):
         ctx, store, fid = make_ctx()
         result = run_multi(ctx, fid, cut=cut,
@@ -1607,7 +1607,7 @@ class TestGypsySeatGeometry:
         g = self._geom(preset="tight")
         assert g["seat_type"] == "gypsy"
 
-    @pytest.mark.parametrize("cut", list(GEMSTONE_CUTS))
+    @pytest.mark.parametrize("cut", sorted(GEMSTONE_CUTS))
     def test_all_cuts_produce_valid_gypsy_geom(self, cut):
         props = gemstone_proportions(cut, diameter_mm=5.0)
         g = gypsy_seat_geometry(
@@ -1872,7 +1872,7 @@ class TestRunPaveFieldSeat:
                           field_width_mm=0.0, field_height_mm=8.0)
         assert result.get("code") == "BAD_ARGS"
 
-    @pytest.mark.parametrize("cut", list(GEMSTONE_CUTS))
+    @pytest.mark.parametrize("cut", sorted(GEMSTONE_CUTS))
     def test_all_cuts_pave_succeed(self, cut):
         ctx, store, fid = make_ctx()
         result = run_pave(ctx, fid, cut=cut, diameter_mm=1.5,
@@ -2083,7 +2083,7 @@ class TestRunGypsySeat:
         node = doc["features"][0]
         assert "girdle_profile" in node
 
-    @pytest.mark.parametrize("cut", list(GEMSTONE_CUTS))
+    @pytest.mark.parametrize("cut", sorted(GEMSTONE_CUTS))
     def test_all_cuts_gypsy_succeed(self, cut):
         ctx, store, fid = make_ctx()
         result = run_gypsy(ctx, fid, cut=cut, diameter_mm=5.0)
@@ -2223,7 +2223,7 @@ class TestRunBaguetteChannelSeat:
         assert result.get("error") is None, result
         assert result["n_stones"] == 1
 
-    @pytest.mark.parametrize("cut", list(GEMSTONE_CUTS))
+    @pytest.mark.parametrize("cut", sorted(GEMSTONE_CUTS))
     def test_all_cuts_baguette_succeed(self, cut):
         ctx, store, fid = make_ctx()
         result = run_baguette(ctx, fid, cut=cut,

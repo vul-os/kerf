@@ -495,6 +495,10 @@ class TestNoDivergenceGuarantee:
         cb = make_line_curve([0.0, 1e-8, 0.0], [1.0, 1e-8, 0.0])
         hits = curve_curve_intersect(ca, cb)
         for h in hits:
+            # Coincident-within-tolerance lines return the documented overlap
+            # sentinel [{"overlap": True}] with no ta/tb/point keys.
+            if h.get("overlap"):
+                continue
             assert np.isfinite(h["ta"])
             assert np.isfinite(h["tb"])
             for c in h["point"]:

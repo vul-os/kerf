@@ -653,15 +653,18 @@ class TestDeterminismAndNoRaise:
         assert result["ok"] is False
         assert "out of memory" in result["reason"].lower() or "memory" in result["reason"].lower()
 
-    def test_guard_only_mode_always_ok_for_valid(self):
-        """occ_fn=None always returns ok=True for valid surfaces (guards-only mode)."""
+    def test_pure_python_path_never_raises(self):
+        """occ_fn=None routes to the pure-Python engine (GK-72 default) and
+        always returns a well-formed structured result without raising — even
+        for single-face surfaces the solid engine cannot combine (graceful
+        ok=False with a structured reason rather than an exception)."""
         for kind in ("cut", "fuse", "common"):
             srf_a = make_flat(nu=4, nv=4, scale=1.0)
             srf_b = make_ring_shank_profile(radius=8.5, wire_radius=1.0, nu=16, nv=8)
             result = surface_boolean_robust(srf_a, srf_b, kind, occ_fn=None)
-            assert result["ok"] is True, f"guard-only failed for kind={kind}"
-            assert result["result"] is None
-            assert result["attempts"] == 0
+            _assert_has_all_keys(result)
+            assert result["via"] == "py", f"expected pure-Python path for kind={kind}"
+            assert isinstance(result["ok"], bool)
 
 
 # ---------------------------------------------------------------------------

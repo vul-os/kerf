@@ -101,7 +101,7 @@ def test_closed_bangle_profile_cs_matrix(size: str, cs: str):
 # A clash is defined as: hinge_volume_mm3 interfering with arm volume, i.e.
 # hinge_volume_mm3 > 0 and total_volume > arm_volume (no subtraction).
 
-@pytest.mark.parametrize("clasp_style", list(_VALID_CLASP_STYLES))
+@pytest.mark.parametrize("clasp_style", sorted(_VALID_CLASP_STYLES))
 def test_hinged_bangle_clasp_variants_no_clash(clasp_style: str):
     """All clasp styles: hinge volume is additive (total > arm volume) —
     i.e. the hinge body does not eat into the arm (no negative clash)."""
@@ -152,7 +152,7 @@ def test_open_cuff_spring_back_all_sizes(size: str):
 # Torque — finial variants
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("finial", list(_VALID_FINIALS))
+@pytest.mark.parametrize("finial", sorted(_VALID_FINIALS))
 def test_torque_finial_variants_volume(finial: str):
     """All finial styles: total volume > arm volume (finial adds material),
     and type == 'torque'."""

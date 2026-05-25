@@ -134,14 +134,14 @@ def _patch_and_import():
 
 
 # Patch before first import
-with mock.patch("kerf_api.tools.file_ops.resolve_path", new=_fake_resolve):
+with mock.patch("kerf_cad_core.sketch.resolve_path", new=_fake_resolve):
     import kerf_cad_core.sketch as sketch_mod  # noqa: E402
 
 
 def _call(fn, ctx, args_dict: dict) -> dict:
     """Call an async sketch tool handler with resolve_path patched, parse JSON result."""
     with mock.patch("kerf_cad_core.sketch._load_sketch", wraps=sketch_mod._load_sketch):
-        with mock.patch("kerf_api.tools.file_ops.resolve_path", new=_fake_resolve):
+        with mock.patch("kerf_cad_core.sketch.resolve_path", new=_fake_resolve):
             raw = _run(fn(ctx, json.dumps(args_dict).encode()))
     return json.loads(raw)
 
@@ -401,7 +401,7 @@ def test_carbon_copy_marks_reference():
     })
     ctx = _FakeCtx(pool)
 
-    with mock.patch("kerf_api.tools.file_ops.resolve_path", new=_fake_resolve):
+    with mock.patch("kerf_cad_core.sketch.resolve_path", new=_fake_resolve):
         result = _run(sketch_mod.run_sketch_carbon_copy(ctx, json.dumps({
             "source_file_path": src_path,
             "target_file_path": tgt_path,
@@ -436,7 +436,7 @@ def test_carbon_copy_idempotent():
     ctx = _FakeCtx(pool)
 
     def _cc():
-        with mock.patch("kerf_api.tools.file_ops.resolve_path", new=_fake_resolve):
+        with mock.patch("kerf_cad_core.sketch.resolve_path", new=_fake_resolve):
             return json.loads(_run(sketch_mod.run_sketch_carbon_copy(ctx, json.dumps({
                 "source_file_path": src_path,
                 "target_file_path": tgt_path,
@@ -461,7 +461,7 @@ def test_carbon_copy_idempotent():
 def _validate(sketch_data: dict) -> dict:
     """Run sketch_validate and return parsed result."""
     ctx, path = _make_ctx_and_path(sketch_data)
-    with mock.patch("kerf_api.tools.file_ops.resolve_path", new=_fake_resolve):
+    with mock.patch("kerf_cad_core.sketch.resolve_path", new=_fake_resolve):
         raw = _run(sketch_mod.run_sketch_validate(ctx, json.dumps({"file_path": path}).encode()))
     result = json.loads(raw)
     return result

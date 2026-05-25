@@ -167,8 +167,8 @@ def test_analytic_vs_richardson_fd_below_1e9():
 def test_analytic_rational_sphere_normal_exact():
     """Analytic first partials on an exact rational NURBS sphere give the exact
     radial unit normal (rational-correct path)."""
-    import sys
-    sys.path.insert(0, "tests")
+    import os, sys
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from test_ssi_robust import make_rational_sphere
     sph = make_rational_sphere([0.0, 0.0, 0.0], 2.0)
     for (u, v) in [(0.3, 0.4), (0.6, 0.55), (0.85, 0.2)]:
@@ -231,8 +231,8 @@ def test_ssi_stitch_helper_joins_split_polyline():
 def test_ssi_analytic_sphere_plane_circle_oracle():
     """Plane ∩ sphere is a circle whose radius matches the closed-form oracle
     (the analytic SSI path must survive the stitching pass unchanged)."""
-    import sys
-    sys.path.insert(0, "tests")
+    import os, sys
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from test_ssi_robust import make_rational_sphere
     R = 2.0
     sph = make_rational_sphere([0.0, 0.0, 0.0], R)

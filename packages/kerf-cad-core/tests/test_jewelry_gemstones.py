@@ -143,7 +143,7 @@ class TestCaratFormula:
         dim = mm_from_carat("round_brilliant", 0.5)
         assert dim == pytest.approx(6.5 * (0.5 ** (1 / 3)), rel=1e-6)
 
-    @pytest.mark.parametrize("cut", list(GEMSTONE_CUTS))
+    @pytest.mark.parametrize("cut", sorted(GEMSTONE_CUTS))
     def test_round_trip_all_cuts(self, cut):
         """mm_from_carat(carat_from_mm(d)) == d for all cuts."""
         for dim in [2.0, 5.0, 10.0]:
@@ -218,7 +218,7 @@ class TestGemstoneProportions:
         props = gemstone_proportions("marquise", diameter_mm=10.0)
         assert props.aspect_ratio == pytest.approx(0.5)
 
-    @pytest.mark.parametrize("cut", list(GEMSTONE_CUTS))
+    @pytest.mark.parametrize("cut", sorted(GEMSTONE_CUTS))
     def test_all_cuts_produce_valid_proportions(self, cut):
         props = gemstone_proportions(cut, diameter_mm=5.0)
         assert props.diameter_mm > 0
@@ -361,7 +361,7 @@ class TestRunJewelryCreateGemstone:
         doc = json.loads(store["content"])
         assert doc["features"][0]["table_pct"] == pytest.approx(53.0)
 
-    @pytest.mark.parametrize("cut", list(GEMSTONE_CUTS))
+    @pytest.mark.parametrize("cut", sorted(GEMSTONE_CUTS))
     def test_all_cuts_succeed(self, cut):
         ctx, store, fid = make_ctx()
         result = run_tool(ctx, fid, cut=cut, diameter_mm=5.0)
@@ -980,7 +980,7 @@ class TestGemReportRunner:
         assert result["depth_mm"] > 0
         assert result["table_pct"] == pytest.approx(0.0)
 
-    @pytest.mark.parametrize("cut", list(GEMSTONE_CUTS))
+    @pytest.mark.parametrize("cut", sorted(GEMSTONE_CUTS))
     def test_all_cuts_report_succeeds(self, cut):
         ctx = self._ctx()
         result = run_report(ctx, cut=cut, diameter_mm=5.0)
@@ -1484,7 +1484,7 @@ class TestGemReport4CsExtensions:
         setting = result["recommended_setting"].lower()
         assert "large" in setting or "secure" in setting or "prong" in setting
 
-    @pytest.mark.parametrize("cut", list(GEMSTONE_CUTS))
+    @pytest.mark.parametrize("cut", sorted(GEMSTONE_CUTS))
     def test_all_cuts_have_4cs_fields(self, cut):
         ctx = self._ctx()
         result = run_report(ctx, cut=cut, diameter_mm=5.0)

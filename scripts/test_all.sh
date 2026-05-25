@@ -47,14 +47,40 @@ for pkg_src in "$_REPO_ROOT"/packages/kerf-*/src; do
 done
 export PYTHONPATH="$PYPATH"
 
-if PYTHONPATH="$PYPATH" python3 -m pytest \
-      packages/kerf-api/tests/ \
-      packages/kerf-auth/tests/ \
+# 1a. Parallel bulk — every package EXCEPT the DB-integration ones, run across
+# all cores via pytest-xdist.
+#   - Must run from the repo root so the repo-root conftest.py loads (it
+#     installs the asyncio-loop + tools-namespace shims that per-package
+#     rootdirs would otherwise skip).
+#   - PYTHONHASHSEED is pinned so set/dict iteration order is identical across
+#     xdist workers; without it workers disagree on parametrized-test order
+#     ("Different tests were collected between gw0 and gw1") and the run aborts.
+#   - PYTEST_WORKERS overrides the worker count (default: auto = one per core).
+if PYTHONHASHSEED=0 PYTHONPATH="$PYPATH" python3 -m pytest \
+      packages/ \
+      -n "${PYTEST_WORKERS:-auto}" \
+      --ignore=packages/kerf-cloud \
+      --ignore=packages/kerf-billing \
+      --tb=short -q 2>&1; then
+  _pass "pytest (bulk, parallel)"
+else
+  _fail "pytest (bulk, parallel)"
+fi
+
+# 1b. DB-integration packages (cloud + billing) — run SERIALLY (no -n). These
+# assert on shared real-Postgres state (GC sweeps, billing debits) and cannot
+# run concurrently against one database without per-worker DB isolation; they
+# pass deterministically single-process. Set SKIP_DB_TESTS=1 to skip when no
+# Postgres is available (DATABASE_URL).
+if [[ "${SKIP_DB_TESTS:-0}" == "1" ]]; then
+  echo "  [skip] cloud + billing (SKIP_DB_TESTS=1)"
+elif PYTHONHASHSEED=0 PYTHONPATH="$PYPATH" python3 -m pytest \
+      packages/kerf-cloud/tests/ \
       packages/kerf-billing/tests/ \
       --tb=short -q 2>&1; then
-  _pass "pytest (kerf-api + kerf-auth + kerf-billing)"
+  _pass "pytest (cloud + billing, serial / DB)"
 else
-  _fail "pytest (kerf-api + kerf-auth + kerf-billing)"
+  _fail "pytest (cloud + billing, serial / DB)"
 fi
 
 # ── 2. Frontend vitest ────────────────────────────────────────────────────────

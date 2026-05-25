@@ -623,12 +623,21 @@ class TestRunExtrudeSketchToJscad:
             "parent_id": None,
         }
         ctx, pool = _make_ctx(files)
-        result = _run(run_extrude_sketch_to_jscad(ctx, json.dumps({
-            "path": TARGET_PATH,
-            "sketch_file_id": PROFILE_PATH,
-            "operation": "extrude_linear",
-            "params": {"height_mm": 5},
-        }).encode()))
+        import unittest.mock as mock
+
+        async def _exists(_ctx, _path):
+            return {"exists": True}
+
+        # The fake pool can't reproduce resolve_path's hierarchical name/parent
+        # walk, so patch resolve_path where the handler binds it to simulate the
+        # target already existing — exercising the collision (EXISTS) branch.
+        with mock.patch("kerf_cad_core.extrude_sketch_to_jscad.resolve_path", new=_exists):
+            result = _run(run_extrude_sketch_to_jscad(ctx, json.dumps({
+                "path": TARGET_PATH,
+                "sketch_file_id": PROFILE_PATH,
+                "operation": "extrude_linear",
+                "params": {"height_mm": 5},
+            }).encode()))
         data = json.loads(result)
         assert data.get("code") == "EXISTS"
 

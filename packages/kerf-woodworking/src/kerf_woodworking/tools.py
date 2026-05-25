@@ -626,3 +626,24 @@ async def woodworking_handle_pattern(ctx: Any, args: bytes) -> str:
     except (KeyError, TypeError, ValueError) as e:
         return err_payload(str(e), "BAD_ARGS")
     return ok_payload(bore_pattern_to_dict(pattern))
+
+
+# ---------------------------------------------------------------------------
+# TOOLS — (name, spec, handler) tuples consumed by plugin._register_tools
+# ---------------------------------------------------------------------------
+
+TOOLS: list[tuple[str, Any, Any]] = [
+    ("woodworking_mortise_tenon",        _mortise_tenon_spec,   woodworking_mortise_tenon),
+    ("woodworking_dovetail",             _dovetail_spec,        woodworking_dovetail),
+    ("woodworking_finger_joint",         _finger_joint_spec,    woodworking_finger_joint),
+    ("woodworking_dowel",                _dowel_spec,           woodworking_dowel),
+    ("woodworking_biscuit",              _biscuit_spec,         woodworking_biscuit),
+    ("woodworking_pocket_screw",         _pocket_screw_spec,    woodworking_pocket_screw),
+    ("woodworking_cut_list",             _cut_list_spec,        woodworking_cut_list),
+    ("woodworking_grain_check",          _grain_check_spec,     woodworking_grain_check),
+    ("woodworking_hinge_cup_pattern",    _hinge_cup_spec,       woodworking_hinge_cup_pattern),
+    ("woodworking_shelf_pin_pattern",    _shelf_pin_spec,       woodworking_shelf_pin_pattern),
+    ("woodworking_drawer_runner_pattern",_drawer_runner_spec,   woodworking_drawer_runner_pattern),
+    ("woodworking_euro_screw_pattern",   _euro_screw_spec,      woodworking_euro_screw_pattern),
+    ("woodworking_handle_pattern",       _handle_spec,          woodworking_handle_pattern),
+]

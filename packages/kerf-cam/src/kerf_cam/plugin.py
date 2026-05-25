@@ -73,8 +73,23 @@ async def register(app: FastAPI, ctx):
 
     ctx.workers.register("cam", _cam_factory)
 
+    # HSM adaptive strategies — pure-Python, always available (coverage sweep 2026-05-25)
+    from kerf_cam.adaptive import (
+        adaptive_pocket_spec, run_adaptive_pocket,
+        trochoidal_slot_spec, run_trochoidal_slot,
+        rest_machining_spec, run_rest_machining,
+    )
+    ctx.tools.register("adaptive_pocket",  adaptive_pocket_spec,  run_adaptive_pocket)
+    ctx.tools.register("trochoidal_slot",  trochoidal_slot_spec,  run_trochoidal_slot)
+    ctx.tools.register("rest_machining",   rest_machining_spec,   run_rest_machining)
+
     # Capabilities depend on available deps
-    provides = ["cam.2_5d"]   # pure-Python mock always available
+    provides = [
+        "cam.2_5d",
+        "cam.adaptive-pocket",
+        "cam.trochoidal-slot",
+        "cam.rest-machining",
+    ]   # pure-Python ops always available
     if _OCL_AVAILABLE:
         provides += ["cam.parallel-3d", "cam.waterline", "cam.lathe"]
 

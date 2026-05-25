@@ -40,12 +40,12 @@
     -->
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self';
-      script-src  'self' 'unsafe-inline' 'unsafe-eval';
-      style-src   'self' 'unsafe-inline';
-      img-src     'self' data: blob:;
-      font-src    'self' data:;
-      connect-src 'self';
-      worker-src  blob: 'self';
+      script-src  'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net;
+      style-src   'self' 'unsafe-inline' https://cdn.jsdelivr.net;
+      img-src     'self' data: blob: https://*.r2.dev https://*.kerf.sh https://lh3.googleusercontent.com https://*.googleusercontent.com https://avatars.githubusercontent.com;
+      font-src    'self' data: https://cdn.jsdelivr.net;
+      connect-src 'self' https://cdn.jsdelivr.net https://*.r2.dev https://*.kerf.sh;
+      worker-src  blob: 'self' https://cdn.jsdelivr.net;
       child-src   blob:;
       object-src  'none';
       base-uri    'self';

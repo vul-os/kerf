@@ -16,7 +16,7 @@ FastAPI backend plus the chosen plugin persona — built from the root
 
 | Provider | Best for | Cost @ 1k users | SA region | S3-compatible storage | Workers |
 |---|---|---|---|---|---|
-| **Fly.io** | Hosted tier (kerf.sh), `jnb` SA region, pay-as-you-go, large VMs | ~$60-90/mo | yes (`jnb` Johannesburg) | Cloudflare R2 (zero egress) | in-process (`KERF_INPROCESS_WORKERS=true`) |
+| **Fly.io** | Hosted tier (kerf.sh), `fra` (co-located with Neon `eu-central`), pay-as-you-go, large VMs | ~$60-90/mo | yes (`jnb` Johannesburg, available if needed) | Cloudflare R2 (zero egress) | in-process (`KERF_INPROCESS_WORKERS=true`) |
 | **GCP Cloud Run** | Serverless scale-to-zero, existing GCP shop | ~$50-80/mo | yes (`africa-south1`) | Cloud Storage (S3 interop) | Cloud Run Jobs / second service |
 | **AWS ECS Fargate** | Compliance-heavy, GovCloud, S3-native | ~$120-150/mo | yes (`af-south-1`) | S3 (native) | separate task |
 | **Azure Container Apps** | Microsoft shop, SSO via Entra ID | ~$100-130/mo | yes (`southafricanorth`) | Blob + MinIO facade (not native — see caveat) | separate revision |
@@ -24,11 +24,13 @@ FastAPI backend plus the chosen plugin persona — built from the root
 
 ## Which provider to choose
 
-**Fly.io** is the hosted-tier default — it powers `kerf.sh`. It has a
-native `jnb` (Johannesburg) region for low-latency SA access, supports
-VMs up to 16 vCPU / 128 GB (the engine needs at least 2 GB), offers
-pay-as-you-go pricing with no monthly floor, and already ran the engine
-cleanly before any migration. GPU rendering moves to RunPod Serverless
+**Fly.io** is the hosted-tier default — it powers `kerf.sh`. We run it in
+`fra` (Frankfurt), co-located with the Neon Postgres (`eu-central-1`) so the
+engine ↔ DB hop stays on-continent; Kerf is a worldwide product, so compute
+sits next to the database rather than any single user geography. Fly also has
+a native `jnb` (Johannesburg) region if SA-local latency is ever needed. It
+supports VMs up to 16 vCPU / 128 GB (the engine needs at least 2 GB), offers
+pay-as-you-go pricing with no monthly floor, and ran the engine cleanly. GPU rendering moves to RunPod Serverless
 (scale-to-zero, L4→H100 ladder). See [fly.md](./fly.md).
 
 **GCP Cloud Run** makes sense if you are already on GCP (Workspace,
@@ -73,7 +75,7 @@ See [digitalocean.md](./digitalocean.md) and [spaces.md](./spaces.md).
 
 | Guide | Content |
 |---|---|
-| [fly.md](./fly.md) | **Fly.io — hosted-tier canonical target, `jnb` SA region, R2 storage** |
+| [fly.md](./fly.md) | **Fly.io — hosted-tier canonical target, `fra` (co-located with Neon `eu-central`), R2 storage** |
 | [tigris.md](./tigris.md) | Tigris object storage — S3-compatible, valid self-host alternative |
 | [gcp.md](./gcp.md) | GCP Cloud Run — deploy, workers, custom domain, cost |
 | [gcs.md](./gcs.md) | Google Cloud Storage — HMAC keys, interop, lifecycle |

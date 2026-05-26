@@ -52,11 +52,13 @@ Set in `fly.toml`:
 
 ## Region
 
-Primary region: **`jnb` (Johannesburg)**. This is the only Fly region
-in Sub-Saharan Africa and gives the lowest latency to South African users.
+Primary region: **`fra` (Frankfurt)** — co-located with the Neon Postgres
+(`eu-central-1`) so DB round-trips stay on-continent and low-latency. Kerf is
+a worldwide product, so compute sits next to the database rather than in any
+single end-user geography.
 
 ```sh
-fly regions add jnb --app kerf-prod
+fly regions add fra --app kerf-prod
 ```
 
 ## Secrets
@@ -139,9 +141,9 @@ aws --endpoint-url "https://<ACCOUNT_ID>.r2.cloudflarestorage.com" \
 
 ## Database — Neon Postgres
 
-The hosted tier uses **Neon** (`eu-central-1`), which is the nearest
-Neon region to Johannesburg (Neon has no Africa region). The `DATABASE_URL`
-secret points at Neon unchanged.
+The hosted tier uses **Neon** (`eu-central-1`, Frankfurt), co-located with
+the Fly `fra` engine region so the engine ↔ DB hop stays within Frankfurt.
+The `DATABASE_URL` secret points at Neon unchanged.
 
 No migration is required when changing the engine host from Fly dev to
 Fly prod — the connection string is the only moving part.

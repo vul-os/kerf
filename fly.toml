@@ -6,12 +6,13 @@
 # Each machine runs the engine (frontend + API) AND the worker harness
 # in-process (KERF_INPROCESS_WORKERS=true) — Fly VMs are persistent, so the
 # background job loop runs natively. Scaling the app scales workers too.
-# Primary: jnb (Johannesburg). App name "kerf" is taken on fly.io, so
+# Primary: fra (Frankfurt) — co-located with the Neon Postgres (eu-central),
+# so DB round-trips stay on-continent. App name "kerf" is taken on fly.io, so
 # production is "kerf-prod"; the public domain kerf.sh attaches via `flyctl
 # certs`. Deploy: ./scripts/deploy-fly.sh   (--dev for kerf-dev)
 
 app = "kerf-prod"
-primary_region = "jnb"
+primary_region = "fra"
 
 [build]
   dockerfile = "Dockerfile"

@@ -14,7 +14,7 @@
 # No public HTTP service; fly manages lifecycle via internal probes.
 
 app = "kerf-workers"
-primary_region = "jnb"
+primary_region = "fra"
 
 [build]
   dockerfile = "Dockerfile"

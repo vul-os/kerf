@@ -108,13 +108,40 @@ Feature tree order: base → boss/rib (additive) → pocket/slot → holes → f
 
 ---
 
-## LLM tool name
+## LLM tool names
 
-`afr_recognize_features` — registered in kerf_chat tool registry.  Accepts a `topology` dict.
+`afr_recognize_features` — classify a topology/mesh dict into features.  Accepts a `topology` dict.
+
+`afr_to_parametric` — promote classifier output into a replay-able parametric DAG.  Accepts
+`topology` (same dict) + `features` (the list from `afr_recognize_features`) + optional `name`.
+Returns `{ok, feature_log, dag_summary, reason}` where `feature_log` is a `.feature` JSON dict
+that can be re-parsed and re-executed.
 
 ---
 
 ## Usage snippets
+
+```python
+# Two-step: classify → DAG → .feature log
+from kerf_cad_core.afr.recognize import recognize_features
+from kerf_cad_core.afr.dag import afr_to_dag, emit_feature_log
+
+topology = {
+    "faces": [
+        {"id": 0, "type": "planar", "normal": [0,0,1], "radius": 0, "area": 400,
+         "convexity": "flat", "adjacent": [1], "centroid": [10,10,5]},
+        {"id": 1, "type": "cylindrical", "normal": [0,0,1], "radius": 5, "area": 314,
+         "convexity": "concave", "adjacent": [0], "centroid": [10,10,2.5]},
+    ]
+}
+result = recognize_features(topology)
+dag = afr_to_dag(topology, result["features"])
+# dag.topological_order() → ["afr-base", "afr-through_hole-0"]
+# dag.parent_of("afr-through_hole-0") → "afr-base"
+log = emit_feature_log(topology, result["features"], name="my-step-import")
+# log["features"][0]["op"] == "box"          (base block)
+# log["features"][1]["op"] == "cylinder"     (through-hole)
+```
 
 ```python
 from kerf_cad_core.afr.recognize import recognize_features

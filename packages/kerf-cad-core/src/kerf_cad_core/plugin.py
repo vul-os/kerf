@@ -213,6 +213,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.subd_stam",
     # GK-P45: SubD/mesh authoring ops (subd_poke, subd_extrude_along, sculpt_brush, multires_evaluate)
     "kerf_cad_core.subd_tools",
+    # GK-P-C: multires displacement (subd_apply_displacement, subd_extract_displacement)
+    "kerf_cad_core.multires_displacement_tools",
     # GK-P46: mesh/implicit ops (sdf_csg, uv_unwrap, isotropic_remesh, retopo_snap)
     "kerf_cad_core.mesh_implicit_tools",
     # GK-P47: isophote analysis (feature_isophote_analysis added to surfacing module above)

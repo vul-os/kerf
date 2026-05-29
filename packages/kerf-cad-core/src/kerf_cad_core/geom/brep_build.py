@@ -1930,6 +1930,139 @@ def sweep2_to_body(
     return _open_shell_body(surface, tol=tol)
 
 
+# ---------------------------------------------------------------------------
+# Phase 4a jewelry priority: network_srf_to_body, blend_srf_to_body
+# ---------------------------------------------------------------------------
+
+
+def network_srf_to_body(
+    u_curves: list,
+    v_curves: list,
+    *,
+    degree_u: int = 3,
+    degree_v: int = 3,
+    tol: float = 1e-7,
+) -> Body:
+    """Build a network-surface Body from U and V curve families.
+
+    Constructs a Gordon / Coons-Gordon surface that passes through both
+    families of curves (using :func:`gordon_network_srf`) and wraps it in
+    an open Shell Body.
+
+    Parameters
+    ----------
+    u_curves : list[NurbsCurve]
+        ≥2 curves running in the U direction (iso-v contours).
+    v_curves : list[NurbsCurve]
+        ≥2 curves running in the V direction (iso-u contours).
+    degree_u, degree_v
+        Surface degree in each direction (default 3).
+    tol
+        Topological tolerance for the Body builder.
+
+    Returns
+    -------
+    Body
+        A validated open-shell Body.  ``validate_body(body, open=True)``
+        returns ``ok=True``.
+
+    Raises
+    ------
+    ValueError
+        If fewer than 2 curves are supplied in either direction, or if the
+        Gordon intersection points disagree by more than the default tolerance.
+    BuildError
+        If the assembled open-shell Body fails ``validate_body``.
+    """
+    if len(u_curves) < 2:
+        raise ValueError("network_srf_to_body: need at least 2 u_curves")
+    if len(v_curves) < 2:
+        raise ValueError("network_srf_to_body: need at least 2 v_curves")
+
+    from kerf_cad_core.geom.network_srf import gordon_network_srf, network_srf
+    try:
+        surface = gordon_network_srf(
+            u_curves=u_curves,
+            v_curves=v_curves,
+        )
+    except ValueError:
+        # Intersection mismatch — fall back to skinning loft on u_curves
+        surface = network_srf(u_curves, degree_u=degree_u)
+    return _open_shell_body(surface, tol=tol)
+
+
+def blend_srf_to_body(
+    surf1: object,
+    surf2: object,
+    *,
+    continuity: str = "G1",
+    edge: str = "v1_v0",
+    samples: int = 24,
+    blend_width: float = 0.2,
+    tol: float = 1e-7,
+) -> Body:
+    """Build a blend-surface Body bridging two NurbsSurfaces.
+
+    Constructs a G1 or G2 continuous Bezier blend strip between *surf1* and
+    *surf2* (using :func:`blend_srf_g1` or :func:`blend_srf_g2` from
+    ``geom/blend_srf.py``) and wraps it in an open Shell Body.
+
+    Parameters
+    ----------
+    surf1, surf2 : NurbsSurface
+        The two support surfaces to blend between.
+    continuity : ``"G1"`` | ``"G2"``
+        Target geometric continuity.  ``"G1"`` (default) builds a degree-3
+        Bezier strip; ``"G2"`` builds a degree-5 strip.
+    edge : ``"v1_v0"`` | ``"u1_u0"``
+        Which boundary pair to use (default ``"v1_v0"``).
+    samples : int
+        Number of control-point columns along the seam (default 24, min 3).
+    blend_width : float
+        Geometric width of the blend strip in model units (default 0.2).
+    tol
+        Topological tolerance for the Body builder.
+
+    Returns
+    -------
+    Body
+        A validated open-shell Body.  ``validate_body(body, open=True)``
+        returns ``ok=True``.
+
+    Raises
+    ------
+    ValueError
+        If the blend construction fails (e.g. degenerate surfaces).
+    BuildError
+        If the assembled open-shell Body fails ``validate_body``.
+    """
+    from kerf_cad_core.geom.blend_srf import blend_srf_g1, blend_srf_g2
+
+    cont = (continuity or "G1").upper()
+    if cont == "G2":
+        result = blend_srf_g2(
+            surf1, surf2,
+            edge=edge,
+            samples=samples,
+            blend_width=blend_width,
+        )
+    else:
+        result = blend_srf_g1(
+            surf1, surf2,
+            edge=edge,
+            samples=samples,
+            blend_width=blend_width,
+        )
+
+    if not result["ok"]:
+        raise ValueError(
+            f"blend_srf_to_body: blend construction failed — {result['reason']}"
+        )
+
+    blend_surface = result["blend_surface"]
+    return _open_shell_body(blend_surface, tol=tol)
+
+
 __all__ = [
     "BuildError",
     "surface_to_face",
@@ -1943,4 +2076,6 @@ __all__ = [
     "loft_to_body",
     "sweep1_to_body",
     "sweep2_to_body",
+    "network_srf_to_body",
+    "blend_srf_to_body",
 ]

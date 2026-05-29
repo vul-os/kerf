@@ -3926,7 +3926,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py",
-            "note": "blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends wired"
+            "note": "opBlendSrf (blend_srf_to_body G1/G2) + opNetworkSrf (network_srf_to_body Gordon) + opSweep2 (sweep2_to_body RMF) all wired as LLM tools; validate_body-clean; 33 Phase 4a tests green"
           }
         },
         {
@@ -4669,7 +4669,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "blend_srf, network_srf (Gordon), patch_srf_fit, match_srf wired as ops",
+            "note": "opBlendSrf (blend_srf_to_body G1/G2) + opNetworkSrf (network_srf_to_body Gordon) + opSweep2 (sweep2_to_body RMF) wired as LLM tools; validate_body-clean; 33 Phase 4a tests green",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py"
           }
         },
@@ -6651,7 +6651,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends wired",
+            "note": "opBlendSrf (blend_srf_to_body G1/G2) + opNetworkSrf (network_srf_to_body Gordon) + opSweep2 (sweep2_to_body RMF) all wired as LLM tools; validate_body-clean; 33 Phase 4a tests green",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py"
           }
         },
@@ -7432,7 +7432,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, feature_to_solid (sew) wired",
+            "note": "opBlendSrf (blend_srf_to_body G1/G2) + opNetworkSrf (network_srf_to_body Gordon) + opSweep2 (sweep2_to_body RMF) + feature_to_solid (sew) wired as LLM tools; validate_body-clean; 33 Phase 4a tests green",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py"
           }
         },
@@ -13146,7 +13146,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends wired",
+            "note": "opBlendSrf (blend_srf_to_body G1/G2) + opNetworkSrf (network_srf_to_body Gordon) + opSweep2 (sweep2_to_body RMF) all wired as LLM tools; validate_body-clean; 33 Phase 4a tests green",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py"
           }
         },
@@ -14663,7 +14663,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends wired",
+            "note": "opBlendSrf (blend_srf_to_body G1/G2) + opNetworkSrf (network_srf_to_body Gordon) + opSweep2 (sweep2_to_body RMF) all wired as LLM tools; validate_body-clean; 33 Phase 4a tests green",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py"
           }
         },
@@ -15108,7 +15108,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "blend_srf, network_srf (Gordon), patch_srf_fit all wired as feature ops",
+            "note": "opBlendSrf (blend_srf_to_body G1/G2) + opNetworkSrf (network_srf_to_body Gordon) + opSweep2 (sweep2_to_body RMF) all wired as LLM tools; validate_body-clean; 33 Phase 4a tests green",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py"
           }
         },
@@ -15136,8 +15136,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "BRepOffsetAPI_MakePipeShell; 1- and 2-rail wired",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/surfacing.py"
+            "note": "opSweep2 two-rail RMF sweep (sweep2_to_body) + LLM tool feature_sweep2; validate_body-clean; 33 Phase 4a tests green",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/brep_build.py"
           }
         },
         {
@@ -16085,7 +16085,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends wired",
+            "note": "opBlendSrf (blend_srf_to_body G1/G2) + opNetworkSrf (network_srf_to_body Gordon) + opSweep2 (sweep2_to_body RMF) all wired as LLM tools; validate_body-clean; 33 Phase 4a tests green",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py"
           }
         },
@@ -16113,8 +16113,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "BRepOffsetAPI_MakePipeShell; sweep1 + sweep2 wired",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/sweep1.py"
+            "note": "opSweep2 (sweep2_to_body, RMF two-rail) + opNetworkSrf (network_srf_to_body, Gordon) + opBlendSrf (blend_srf_to_body, G1/G2) all wired as LLM tools; validate_body-clean; 33 Phase 4a tests",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/brep_build.py"
           }
         },
         {

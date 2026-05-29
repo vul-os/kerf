@@ -69,6 +69,9 @@ import OrbitViewer from '../components/OrbitViewer.jsx'
 import BuildingEnergyPanel from '../components/energy/BuildingEnergyPanel.jsx'
 import PVShadingPanel from '../components/energy/PVShadingPanel.jsx'
 import MonthlyLoadChart from '../components/energy/MonthlyLoadChart.jsx'
+import HVACLoadPanel from '../components/hvac/HVACLoadPanel.jsx'
+import DuctDesignPanel from '../components/hvac/DuctDesignPanel.jsx'
+import EquipmentSelectPanel from '../components/hvac/EquipmentSelectPanel.jsx'
 import { fetchAirfoilPolar } from '../lib/airfoilPolarBridge.js'
 import FirmwareProjectPanel from '../components/firmware/FirmwareProjectPanel.jsx'
 import TINView from '../components/civil/TINView.jsx'
@@ -653,6 +656,27 @@ function isEnergyLoadFile(file) {
   return n.endsWith('.energy.load')
 }
 
+function isHvacLoadFile(file) {
+  if (!file) return false
+  if (file.kind === 'hvac_load') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.hvac.load')
+}
+
+function isHvacDuctFile(file) {
+  if (!file) return false
+  if (file.kind === 'hvac_duct') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.hvac.duct')
+}
+
+function isHvacEquipFile(file) {
+  if (!file) return false
+  if (file.kind === 'hvac_equip') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.hvac.equip')
+}
+
 function isFirmwareProjectFile(file) {
   if (!file) return false
   if (file.kind === 'firmware_project') return true
@@ -964,6 +988,9 @@ export default function Editor() {
     if (isEnergyBldgFile(w.currentFile)) return
     if (isEnergyPvFile(w.currentFile)) return
     if (isEnergyLoadFile(w.currentFile)) return
+    if (isHvacLoadFile(w.currentFile)) return
+    if (isHvacDuctFile(w.currentFile)) return
+    if (isHvacEquipFile(w.currentFile)) return
     if (isFirmwareProjectFile(w.currentFile)) return
     if (isLayupFile(w.currentFile)) return
     if (isAFPFile(w.currentFile)) return
@@ -1433,6 +1460,9 @@ export default function Editor() {
   const energyBldgFile = isEnergyBldgFile(w.currentFile)
   const energyPvFile = isEnergyPvFile(w.currentFile)
   const energyLoadFile = isEnergyLoadFile(w.currentFile)
+  const hvacLoadFile  = isHvacLoadFile(w.currentFile)
+  const hvacDuctFile  = isHvacDuctFile(w.currentFile)
+  const hvacEquipFile = isHvacEquipFile(w.currentFile)
   const firmwareProjectFile = isFirmwareProjectFile(w.currentFile)
   const civilTINFile      = isCivilTINFile(w.currentFile)
   const civilPipeFile     = isCivilPipeFile(w.currentFile)
@@ -2225,6 +2255,18 @@ export default function Editor() {
                 height={240}
                 title="Monthly Load Profile"
               />
+            </div>
+          ) : hvacLoadFile ? (
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <HVACLoadPanel />
+            </div>
+          ) : hvacDuctFile ? (
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <DuctDesignPanel />
+            </div>
+          ) : hvacEquipFile ? (
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <EquipmentSelectPanel />
             </div>
           ) : firmwareProjectFile ? (
             /* T-274: .fw.json / kerf.fw.json opens the FirmwareProjectPanel

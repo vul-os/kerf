@@ -48,6 +48,9 @@ The sector work only matters if you **own your work, are not locked in, and can 
 **`cad_component` real geometry substitution** ✅ — Library-mapped components in the CircuitEditor 3D tab now render real geometry instead of indicator chips: JSCAD `model_3d` source is evaluated in-browser; STEP `model_3d_paths` entries are fetched via `/api/projects/:pid/model3d` and parsed via `occt-import-js`. Cache: per-file-id in `fetchCacheRef` (STEP bytes cached by SHA-256 in `stepLoader.js`). `substitute_component` LLM tool registered via `kerf_parts.plugin`; `_try_include` pattern wired in `kerf_api.plugin` — `src/lib/circuitMappings.js`, `src/components/CircuitEditor.jsx`, `packages/kerf-parts/src/kerf_parts/tools.py`, `packages/kerf-api/src/kerf_api/routes_model3d.py`.
 
 ### Earlier delta — 2026-05-26
+**HVAC design UI** ✅ — Three interactive panels wired to the Editor for `.hvac.load` / `.hvac.duct` / `.hvac.equip` file kinds: `HVACLoadPanel` (ASHRAE CLTD/RTS zone cooling load + degree-day heating, zone breakdown, monthly profile sparklines); `DuctDesignPanel` (velocity-method sizing + Darcy-Weisbach/Colebrook-White pressure drop, material roughness catalogue, 7 ASHRAE fitting types, total system pressure); `EquipmentSelectPanel` (AHU/chiller/boiler/heat-pump with ASHRAE 90.1-2022 minimum-efficiency data, part-load curves). Dispatch via `POST /api/tools/call` with graceful client-side fallback. Compare pages added for Trace 3D Plus / Carrier HAP / IES VE / DesignBuilder — `src/components/hvac/`.
+
+### Previous delta — 2026-05-26
 
 **Civil hydraulics** ✅ — LandXML 1.2 import/export (`civil_landxml_import/export`); steady-state pressurised pipe network (Todini GGA + HW/DW, `civil_water_network_solve`); Manning circular/trapezoidal sewer (`civil_sewer_manning_capacity`); rational-method peak runoff (`civil_storm_rational`); HDS-5 inlet-control culvert (`civil_culvert_capacity`) — `kerf-civil/src/kerf_civil/tools_hydraulics.py`.
 
@@ -75,6 +78,8 @@ The sector work only matters if you **own your work, are not locked in, and can 
 **Verticals** ✅ — dental anatomic crown (multi-cusp fan, not placeholder); surgical guide emits milling-ready B-rep + STL export ✅; Swiss lever escapement + mainspring + balance-wheel; solar PV partial shading + bypass-diode + MPPT; analog PVT corner simulation (60 corners + Monte-Carlo mismatch).
 
 **Building/PV UI** ✅ — `BuildingEnergyPanel` (zone-by-zone occupancy/lighting/equipment/infiltration/HVAC editor, EnergyPlus IDF export); `PVShadingPanel` (array layout + obstruction polygons + bypass-diode + MPPT + monthly yield chart); `MonthlyLoadChart` (SVG stacked-bar); `.energy.bldg` / `.energy.pv` / `.energy.load` file kinds wired in Editor.jsx.
+**Verticals** ✅ — dental anatomic crown (multi-cusp fan, not placeholder); surgical guide watertight single-solid ✅ (`surgical_guide_to_body` — boolean subtract of drill bores from plate, genus-validated); Swiss lever escapement + mainspring + balance-wheel; solar PV partial shading + bypass-diode + MPPT; analog PVT corner simulation (60 corners + Monte-Carlo mismatch).
+**Verticals** ✅ — dental anatomic crown (multi-cusp fan, not placeholder); Swiss lever escapement + mainspring + balance-wheel; solar PV partial shading + bypass-diode + MPPT + full series IV convolution ✅; analog PVT corner simulation (60 corners + Monte-Carlo mismatch).
 
 **Tolerancing / QA** ✅ — 3D vector-loop tolerance stackup (6-DOF Jacobian); SPC control charts (Shewhart/CUSUM/EWMA + Nelson/WECO); ISO 286 limits & fits.
 

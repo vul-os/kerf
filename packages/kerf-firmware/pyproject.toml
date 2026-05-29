@@ -16,6 +16,9 @@ dev = [
     "pytest>=8.0.0",
 ]
 
+[project.entry-points."kerf.plugins"]
+firmware = "kerf_firmware.plugin:register"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/kerf_firmware"]
 

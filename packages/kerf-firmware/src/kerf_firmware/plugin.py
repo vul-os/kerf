@@ -31,7 +31,7 @@ async def register(app: "FastAPI", ctx):
     """Entry point called by the Kerf plugin loader."""
     # ── HTTP routes ──────────────────────────────────────────────────────────
     from kerf_firmware.routes import router as firmware_router
-    app.include_router(firmware_router, tags=["firmware"])
+    app.include_router(firmware_router, prefix="/api", tags=["firmware"])
 
     # ── LLM tools ────────────────────────────────────────────────────────────
     provides: list[str] = []

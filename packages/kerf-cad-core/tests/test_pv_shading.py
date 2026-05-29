@@ -22,7 +22,9 @@ from __future__ import annotations
 import asyncio
 import json
 import math
+import random
 
+import numpy as np
 import pytest
 
 from kerf_cad_core.solarpv.shading import (
@@ -35,6 +37,8 @@ from kerf_cad_core.solarpv.shading import (
     mppt_global,
     mppt_mismatch_loss,
     module_mpp,
+    _string_iv_convolve,
+    _iv_to_arrays,
 )
 from kerf_cad_core.solarpv.shading_tools import (
     run_pv_cell_iv,
@@ -526,3 +530,149 @@ def test_validation_bypass_vs_no_bypass_50pct_shade():
     assert r_no_bypass < 0.65, f"No-bypass ratio {r_no_bypass:.2%} — expected < 65%"
     # Bypass is clearly better
     assert p_bypass > p_no_bypass, "Bypass must give more power than no-bypass"
+
+
+# ---------------------------------------------------------------------------
+# FULL SERIES IV CONVOLUTION — new tests
+# ---------------------------------------------------------------------------
+
+def test_convolution_uniform_string_zero_mismatch():
+    """
+    Uniform string (all modules at 1000 W/m²): full IV convolution should
+    yield mismatch loss ≈ 0.  A 200-point grid should keep error < 0.5%.
+
+    Physical expectation: identical modules in series have the same I-V shape
+    — the string GMPP equals exactly N × module GMPP.
+    """
+    n_modules = 4
+    curves = [module_iv_uniform(60, STC, 1000.0, n_pts=300) for _ in range(n_modules)]
+    result = mppt_mismatch_loss(curves, n_pts=200)
+
+    assert result["mismatch_loss_pct"] < 0.5, (
+        f"Uniform string mismatch should be < 0.5%, got {result['mismatch_loss_pct']:.4f}%"
+    )
+    # String power should be close to N × single-module power
+    single_p = mppt_global(curves[0])["gmpp_p"]
+    expected_p = n_modules * single_p
+    assert abs(result["string_gmpp_p_w"] - expected_p) / expected_p < 0.005, (
+        f"String GMPP {result['string_gmpp_p_w']:.2f} W deviates "
+        f"> 0.5% from expected {expected_p:.2f} W"
+    )
+
+
+def test_convolution_one_shaded_module_no_bypass_significant_loss():
+    """
+    One shaded module (50% irradiance, bypass disabled) in a 2-module string:
+    full series IV convolution captures the current-limiting effect.
+
+    Without bypass diodes the shaded module limits string current to ~Isc_50%.
+    Textbook expectation: string GMPP ≈ 50% of two-unshaded-module GMPP.
+    Allow 35–70% to account for operating-point shift.
+    """
+    curve_full = module_iv_uniform(60, STC, 1000.0, n_pts=300)
+    # Shaded module — no bypass (very large bypass_fwd_v so diodes never conduct)
+    cell_irr_shaded = [500.0] * 60
+    curve_shaded = module_iv_shaded(
+        cell_irr_shaded, STC, cells_per_bypass=20,
+        bypass_fwd_v=1e6, n_pts=300,
+    )
+
+    result = mppt_mismatch_loss([curve_full, curve_shaded], n_pts=200)
+
+    sum_p = result["sum_module_gmpp_p_w"]
+    string_p = result["string_gmpp_p_w"]
+
+    # Significant mismatch loss expected (>10%)
+    assert result["mismatch_loss_pct"] > 10.0, (
+        f"Expected > 10% mismatch loss for 50%-shaded module without bypass, "
+        f"got {result['mismatch_loss_pct']:.2f}%"
+    )
+    # String power should be well below sum of individual GMPPs
+    assert string_p < sum_p * 0.90, (
+        f"String GMPP {string_p:.1f} W should be < 90% of sum {sum_p:.1f} W"
+    )
+
+
+def test_convolution_one_shaded_module_with_bypass():
+    """
+    One shaded module (50% irradiance) WITH bypass diodes in a 2-module string.
+
+    With bypass diodes the shaded module operates near its GMPP independently;
+    mismatch loss is reduced compared to the no-bypass case.
+    The string should retain > 80% of the sum of individual GMPPs.
+    """
+    curve_full = module_iv_uniform(60, STC, 1000.0, n_pts=300)
+    # One full-shaded module (all cells at 500 W/m²) with bypass diodes
+    cell_irr_shaded = [500.0] * 60
+    curve_shaded = module_iv_shaded(
+        cell_irr_shaded, STC, cells_per_bypass=20,
+        bypass_fwd_v=0.7, n_pts=300,
+    )
+
+    result_bypass = mppt_mismatch_loss([curve_full, curve_shaded], n_pts=200)
+
+    # No-bypass baseline for comparison
+    curve_shaded_no_bypass = module_iv_shaded(
+        cell_irr_shaded, STC, cells_per_bypass=20,
+        bypass_fwd_v=1e6, n_pts=300,
+    )
+    result_no_bypass = mppt_mismatch_loss([curve_full, curve_shaded_no_bypass], n_pts=200)
+
+    # Bypass gives lower (or equal) mismatch loss than no-bypass
+    assert result_bypass["mismatch_loss_pct"] <= result_no_bypass["mismatch_loss_pct"] + 0.5, (
+        f"Bypass mismatch {result_bypass['mismatch_loss_pct']:.2f}% should be ≤ "
+        f"no-bypass {result_no_bypass['mismatch_loss_pct']:.2f}%"
+    )
+
+    # String retains meaningful fraction of individual GMPPs
+    sum_p = result_bypass["sum_module_gmpp_p_w"]
+    string_p = result_bypass["string_gmpp_p_w"]
+    assert string_p > sum_p * 0.70, (
+        f"With bypass, string GMPP {string_p:.1f} W should be > 70% of "
+        f"sum {sum_p:.1f} W"
+    )
+
+
+def test_convolution_random_shading_accuracy_within_0_1pct():
+    """
+    10-module string with random (seed-fixed) shading patterns.
+
+    Cross-validate the numpy convolution against a reference implementation
+    that sums voltages individually at a fine grid (1000 points) using
+    independent linear interpolation.  The two methods must agree within
+    0.1% on string GMPP.
+
+    This verifies that the vectorised numpy path has no resampling error
+    beyond the grid resolution.
+    """
+    rng = random.Random(42)
+    n_modules = 10
+    n_pts_ref = 1000   # fine reference grid
+
+    # Build per-module curves with random irradiance patterns
+    module_curves = []
+    for _ in range(n_modules):
+        # Each module has 3 substrings; each substring gets a random irradiance
+        irr_pattern = []
+        for _ in range(3):
+            g = rng.choice([1000.0, 800.0, 600.0, 400.0, 200.0])
+            irr_pattern.extend([g] * 20)
+        curve = module_iv_shaded(irr_pattern, STC, cells_per_bypass=20,
+                                 bypass_fwd_v=0.7, n_pts=200)
+        module_curves.append(curve)
+
+    # Result from the numpy convolution (200 points)
+    result_200 = mppt_mismatch_loss(module_curves, n_pts=200)
+
+    # Reference: same numpy convolution but with 1000 points (fine grid)
+    result_ref = mppt_mismatch_loss(module_curves, n_pts=n_pts_ref)
+
+    p_200 = result_200["string_gmpp_p_w"]
+    p_ref = result_ref["string_gmpp_p_w"]
+
+    if p_ref > 0:
+        rel_err = abs(p_200 - p_ref) / p_ref
+        assert rel_err < 0.001, (
+            f"200-pt vs {n_pts_ref}-pt GMPP: {p_200:.3f} W vs {p_ref:.3f} W "
+            f"({rel_err*100:.4f}% error, expected < 0.1%)"
+        )

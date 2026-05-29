@@ -75,6 +75,35 @@ class LocalStorage(Storage):
     async def signed_url(self, key: str, ttl_seconds: int) -> str:
         return ""
 
+    async def signed_put_url(
+        self,
+        key: str,
+        ttl_seconds: int = 3600,
+        content_type: str | None = None,
+    ) -> str:
+        """Local mode cannot generate real presigned PUT URLs.
+
+        Returns a ``local://<key>`` scheme URL so callers can detect that
+        direct upload is unavailable and fall back to a server-side proxy.
+        The ``kerf-worker`` CLI treats any non-http(s) upload URL as the
+        ``file://`` fallback path, which is expected in local dev.
+        """
+        escaped = urllib.parse.quote(key.lstrip("/"), safe="/")
+        return f"local://{escaped}"
+
+    async def head(self, key: str):
+        """Return metadata for *key* via a stat() call (no body read)."""
+        from .base import HeadResult
+        try:
+            path = self._safe_path(key)
+            if not path.exists():
+                return HeadResult(key=key, size=0, content_type="", exists=False)
+            size = path.stat().st_size
+            ct = self._guess_content_type(key)
+            return HeadResult(key=key, size=size, content_type=ct, exists=True)
+        except Exception:
+            return HeadResult(key=key, size=0, content_type="", exists=False)
+
     def public_url(self, key: str, updated_at: datetime | None = None) -> str:
         base = "/api/blobs/" + self._escape_key(key)
         if self.cdn_url:

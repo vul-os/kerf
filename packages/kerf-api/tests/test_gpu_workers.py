@@ -11,6 +11,13 @@ Tests (all hermetic — no real DB):
   8. complete → BYO billing_bucket skips charge_render → charged=False
   9. complete → error body marks job failed, no charge
  10. complete → wrong worker token → 401
+ 11. claim-job → response includes signed_upload_url, result_key, result_ttl_seconds
+ 12. claim-job → signed_upload_url key matches "worker-results/{job_id}.bin"
+ 13. complete (result_key path) → persists result_key, no raw bytes, BYO billing unaffected
+ 14. complete (result_key path) → storage.head not-found → 422
+ 15. complete → no result_key and no signed_url → 422
+ 16. complete (signed_url legacy) → back-compat still works
+ 17. LocalStorage.signed_put_url → returns local:// URL string
 """
 from __future__ import annotations
 
@@ -380,3 +387,340 @@ class TestCompleteJob:
             )
 
         assert resp.status_code == 401, resp.text
+
+
+# ---------------------------------------------------------------------------
+# 5. Claim-job — signed upload URL
+# ---------------------------------------------------------------------------
+
+class TestClaimJobSignedUpload:
+    """claim-job now returns signed_upload_url, result_key, result_ttl_seconds."""
+
+    def _make_pool_with_job(self, token: str) -> _FakePool:
+        token_hash = _hash_token(token)
+        pool = _FakePool()
+        call_count = [0]
+
+        async def fetchrow(sql, *args):
+            sql_l = sql.lower()
+            if "from gpu_workers" in sql_l:
+                if len(args) >= 2 and str(args[0]) == _WORKER_ID and args[1] == token_hash:
+                    return _FakeRow({
+                        "id": _WORKER_ID, "user_id": _USER_ID,
+                        "name": "rig", "status": "online",
+                        "capabilities": {"supported_workloads": ["render"]},
+                        "last_seen_at": None,
+                    })
+                return None
+            if "from render_jobs" in sql_l:
+                # Return a job on the first poll attempt.
+                call_count[0] += 1
+                if call_count[0] == 1:
+                    return _FakeRow({
+                        "id": _JOB_ID,
+                        "user_id": _USER_ID,
+                        "scene_blob_hash": "abc123",
+                        "preset": "standard",
+                        "samples_total": 128,
+                        "billing_bucket": "byo",
+                    })
+                return None
+            return None
+
+        pool.conn._fetchrow_fn = fetchrow
+        return pool
+
+    def test_claim_job_returns_signed_upload_url_fields(self):
+        """claim-job response must contain result_key and result_ttl_seconds."""
+        token = _make_token()
+        pool = self._make_pool_with_job(token)
+
+        # Patch storage so signed_put_url returns a fake URL.
+        from unittest.mock import AsyncMock, MagicMock
+        fake_storage = MagicMock()
+        fake_storage.signed_put_url = AsyncMock(
+            return_value="https://r2.example.com/worker-results/JOBID.bin?X-Amz-Sig=xxx"
+        )
+
+        with _client(pool) as (c, _):
+            with patch("kerf_core.storage.get_storage_required", return_value=fake_storage):
+                resp = c.post(
+                    f"/api/workers/{_WORKER_ID}/claim-job",
+                    headers=_worker_auth(token),
+                )
+
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert "result_key" in data, f"result_key missing from: {data}"
+        assert "result_ttl_seconds" in data, f"result_ttl_seconds missing from: {data}"
+        assert "signed_upload_url" in data, f"signed_upload_url missing from: {data}"
+
+    def test_claim_job_result_key_contains_job_id(self):
+        """result_key must embed the job_id in a stable path."""
+        token = _make_token()
+        pool = self._make_pool_with_job(token)
+
+        from unittest.mock import AsyncMock, MagicMock
+        fake_storage = MagicMock()
+        fake_storage.signed_put_url = AsyncMock(return_value="https://r2.example.com/put-url")
+
+        with _client(pool) as (c, _):
+            with patch("kerf_core.storage.get_storage_required", return_value=fake_storage):
+                resp = c.post(
+                    f"/api/workers/{_WORKER_ID}/claim-job",
+                    headers=_worker_auth(token),
+                )
+
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        job_id = data["job_id"]
+        result_key = data["result_key"]
+        assert job_id in result_key, (
+            f"result_key {result_key!r} does not contain job_id {job_id!r}"
+        )
+        assert result_key.startswith("worker-results/"), (
+            f"result_key {result_key!r} does not start with 'worker-results/'"
+        )
+
+    def test_claim_job_signed_upload_url_matches_result_key(self):
+        """signed_put_url is called with the same key as result_key."""
+        token = _make_token()
+        pool = self._make_pool_with_job(token)
+
+        from unittest.mock import AsyncMock, MagicMock, call as mcall
+        fake_storage = MagicMock()
+        fake_storage.signed_put_url = AsyncMock(return_value="https://r2.example.com/put-url")
+
+        with _client(pool) as (c, _):
+            with patch("kerf_core.storage.get_storage_required", return_value=fake_storage):
+                resp = c.post(
+                    f"/api/workers/{_WORKER_ID}/claim-job",
+                    headers=_worker_auth(token),
+                )
+
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        result_key = data["result_key"]
+
+        # signed_put_url must have been called with the same key.
+        assert fake_storage.signed_put_url.called
+        call_kwargs = fake_storage.signed_put_url.call_args
+        called_key = call_kwargs[0][0] if call_kwargs[0] else call_kwargs[1].get("key")
+        assert called_key == result_key, (
+            f"signed_put_url called with key={called_key!r} but result_key={result_key!r}"
+        )
+
+    def test_claim_job_no_storage_still_returns_fields(self):
+        """When storage is unavailable, claim-job still returns result_key etc."""
+        token = _make_token()
+        pool = self._make_pool_with_job(token)
+
+        def _raise():
+            raise RuntimeError("Storage not initialized")
+
+        with _client(pool) as (c, _):
+            with patch(
+                "kerf_core.storage.get_storage_required",
+                side_effect=RuntimeError("Storage not initialized"),
+            ):
+                resp = c.post(
+                    f"/api/workers/{_WORKER_ID}/claim-job",
+                    headers=_worker_auth(token),
+                )
+
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert "result_key" in data
+        assert data["signed_upload_url"] is None  # graceful fallback
+
+
+# ---------------------------------------------------------------------------
+# 6. Complete (result_key path) — direct upload verification
+# ---------------------------------------------------------------------------
+
+class TestCompleteResultKeyPath:
+    """complete with result_key instead of signed_url."""
+
+    def _make_pool(self, token: str, billing_bucket: str = "byo") -> _FakePool:
+        token_hash = _hash_token(token)
+        pool = _FakePool()
+
+        async def fetchrow(sql, *args):
+            sql_l = sql.lower()
+            if "from gpu_workers" in sql_l:
+                if len(args) >= 2 and str(args[0]) == _WORKER_ID and args[1] == token_hash:
+                    return _FakeRow({
+                        "id": _WORKER_ID, "user_id": _USER_ID,
+                        "name": "rig", "status": "online",
+                        "capabilities": {}, "last_seen_at": None,
+                    })
+                return None
+            if "from render_jobs" in sql_l:
+                return _FakeRow({
+                    "id": _JOB_ID, "user_id": _USER_ID,
+                    "preset": "standard", "billing_bucket": billing_bucket,
+                    "status": "running",
+                })
+            return None
+
+        pool.conn._fetchrow_fn = fetchrow
+        return pool
+
+    def _fake_storage_head_exists(self, key: str):
+        """Return a mock storage where head() reports the key exists."""
+        from unittest.mock import AsyncMock, MagicMock
+        from kerf_core.storage.base import HeadResult
+        fake = MagicMock()
+        fake.head = AsyncMock(return_value=HeadResult(
+            key=key, size=1024, content_type="application/octet-stream", exists=True
+        ))
+        return fake
+
+    def _fake_storage_head_missing(self, key: str):
+        """Return a mock storage where head() reports the key does NOT exist."""
+        from unittest.mock import AsyncMock, MagicMock
+        from kerf_core.storage.base import HeadResult
+        fake = MagicMock()
+        fake.head = AsyncMock(return_value=HeadResult(
+            key=key, size=0, content_type="", exists=False
+        ))
+        return fake
+
+    def test_result_key_path_persists_key(self):
+        """complete via result_key records the key in UPDATE render_jobs."""
+        token = _make_token()
+        pool = self._make_pool(token, "byo")
+        rk = f"worker-results/{_JOB_ID}.bin"
+        fake_storage = self._fake_storage_head_exists(rk)
+
+        with _client(pool) as (c, conn):
+            with patch(
+                "kerf_core.storage.get_storage_required",
+                return_value=fake_storage,
+            ):
+                resp = c.post(
+                    f"/api/workers/{_WORKER_ID}/jobs/{_JOB_ID}/complete",
+                    json={"result_key": rk, "gpu_seconds": 45.0},
+                    headers=_worker_auth(token),
+                )
+
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["ok"] is True
+        assert data["completion_path"] == "result_key"
+
+        # result_key value must appear in an UPDATE render_jobs SQL.
+        sqls_and_args = conn.executions
+        update_args = [
+            args for sql, args in sqls_and_args
+            if "UPDATE render_jobs" in sql
+        ]
+        assert update_args, "No UPDATE render_jobs executed"
+        # The result_key (rk) must be in the args of the UPDATE.
+        found = any(rk in str(args) for args in update_args)
+        assert found, f"result_key {rk!r} not found in UPDATE args: {update_args}"
+
+    def test_result_key_path_byo_skips_charge(self):
+        """result_key path: BYO billing still skips credit charge."""
+        token = _make_token()
+        pool = self._make_pool(token, "byo")
+        rk = f"worker-results/{_JOB_ID}.bin"
+        fake_storage = self._fake_storage_head_exists(rk)
+
+        with _client(pool) as (c, conn):
+            with patch(
+                "kerf_core.storage.get_storage_required",
+                return_value=fake_storage,
+            ):
+                resp = c.post(
+                    f"/api/workers/{_WORKER_ID}/jobs/{_JOB_ID}/complete",
+                    json={"result_key": rk, "gpu_seconds": 45.0},
+                    headers=_worker_auth(token),
+                )
+
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["charged"] is False
+        assert data["billing_bucket"] == "byo"
+
+    def test_result_key_not_in_storage_returns_422(self):
+        """complete via result_key must 422 when storage.head says object absent."""
+        token = _make_token()
+        pool = self._make_pool(token, "byo")
+        rk = f"worker-results/{_JOB_ID}.bin"
+        fake_storage = self._fake_storage_head_missing(rk)
+
+        with _client(pool) as (c, _):
+            with patch(
+                "kerf_core.storage.get_storage_required",
+                return_value=fake_storage,
+            ):
+                resp = c.post(
+                    f"/api/workers/{_WORKER_ID}/jobs/{_JOB_ID}/complete",
+                    json={"result_key": rk, "gpu_seconds": 10.0},
+                    headers=_worker_auth(token),
+                )
+
+        assert resp.status_code == 422, resp.text
+
+    def test_complete_no_url_no_key_returns_422(self):
+        """complete with neither signed_url nor result_key must return 422."""
+        token = _make_token()
+        pool = self._make_pool(token, "byo")
+
+        with _client(pool) as (c, _):
+            resp = c.post(
+                f"/api/workers/{_WORKER_ID}/jobs/{_JOB_ID}/complete",
+                json={"gpu_seconds": 10.0},  # neither field
+                headers=_worker_auth(token),
+            )
+
+        assert resp.status_code == 422, resp.text
+
+    def test_signed_url_legacy_path_still_works(self):
+        """Legacy signed_url path must still succeed (back-compat)."""
+        token = _make_token()
+        pool = self._make_pool(token, "byo")
+
+        with _client(pool) as (c, conn):
+            resp = c.post(
+                f"/api/workers/{_WORKER_ID}/jobs/{_JOB_ID}/complete",
+                json={"signed_url": "https://cdn.example.com/result.bin", "gpu_seconds": 20.0},
+                headers=_worker_auth(token),
+            )
+
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["ok"] is True
+        assert data["completion_path"] == "signed_url"
+        assert data["charged"] is False  # BYO
+
+
+# ---------------------------------------------------------------------------
+# 7. LocalStorage.signed_put_url
+# ---------------------------------------------------------------------------
+
+class TestLocalStorageSignedPutUrl:
+    """LocalStorage.signed_put_url must return a discoverable URL string."""
+
+    def test_returns_local_scheme_string(self):
+        import tempfile
+        from kerf_core.storage.local import LocalStorage
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = LocalStorage(root=tmpdir)
+            import asyncio
+
+            url = asyncio.get_event_loop().run_until_complete(
+                store.signed_put_url("worker-results/abc-123.bin", ttl_seconds=3600)
+            )
+
+        assert isinstance(url, str), "signed_put_url must return a str"
+        assert len(url) > 0, "signed_put_url must return a non-empty string"
+        # Must be a local:// URL (non-http — workers treat this as file:// fallback).
+        assert url.startswith("local://"), (
+            f"LocalStorage.signed_put_url should start with 'local://', got: {url!r}"
+        )
+        assert "worker-results" in url or "abc-123" in url, (
+            f"URL should contain the key path: {url!r}"
+        )

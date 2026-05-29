@@ -18,6 +18,22 @@ Billing short-circuit
 When a BYO worker completes a job (``billing_bucket = 'byo'`` on the
 ``render_jobs`` row), the billing meter is NOT charged.  This is enforced
 inside the ``/complete`` handler before it calls any credit-deduction code.
+
+Signed-upload-URL flow (SIGNED-UPLOAD-URL)
+------------------------------------------
+On claim, the server mints a presigned PUT URL for a stable result key
+``worker-results/{job_id}.bin``.  The worker PUTs its rendered bytes
+directly to that URL (R2 / S3), then calls ``/complete`` with the
+``result_key`` field instead of raw bytes.
+
+``/complete`` accepts two paths:
+1. ``result_key`` (new) — worker uploaded directly; server calls
+   ``storage.head(result_key)`` to verify the object exists, then records
+   the key on the job row.  No bytes flow through the API server.
+2. ``signed_url`` (legacy) — worker provides a pre-formed URL; recorded
+   verbatim (back-compat).
+
+Both paths respect the BYO billing short-circuit.
 """
 from __future__ import annotations
 
@@ -110,7 +126,24 @@ class HeartbeatRequest(BaseModel):
 
 
 class CompleteJobRequest(BaseModel):
-    signed_url: str = Field(..., description="Blob URL of the render result")
+    # Legacy path: caller provides a pre-formed URL (back-compat).
+    signed_url: Optional[str] = Field(
+        default=None,
+        description="Pre-formed result URL (legacy; use result_key for direct upload).",
+    )
+    # New path: caller uploaded to the presigned PUT URL; server verifies.
+    result_key: Optional[str] = Field(
+        default=None,
+        description="Storage key of the result object uploaded via signed_upload_url.",
+    )
+    content_type: Optional[str] = Field(
+        default=None,
+        description="MIME type of the uploaded result (used with result_key).",
+    )
+    size_bytes: Optional[int] = Field(
+        default=None,
+        description="Byte size of the uploaded result (informational).",
+    )
     gpu_seconds: float = Field(default=0.0, ge=0)
     error: Optional[str] = None
 
@@ -264,6 +297,14 @@ async def claim_job(
 
     The job is atomically moved to ``status = 'running'`` and a row is
     inserted into ``gpu_worker_jobs`` so duplicate claims are impossible.
+
+    Signed-upload-URL fields
+    ------------------------
+    ``result_key``         — stable storage key for the result object.
+    ``signed_upload_url``  — presigned PUT URL; the worker PUTs its rendered
+                             bytes here directly, then calls /complete with
+                             ``result_key``.
+    ``result_ttl_seconds`` — seconds until the PUT URL expires.
     """
     pool = await get_pool_required()
     worker_row = await _verify_worker_token(request, worker_id, pool)
@@ -310,12 +351,38 @@ async def claim_job(
 
         if row is not None:
             logger.info("claim_job: worker=%s claimed job=%s", worker_id, job_id)
+
+            # Mint a presigned PUT URL so the worker can upload directly to R2.
+            # The TTL is job_ttl (30 min) + 1 h = 90 min total.
+            result_key = f"worker-results/{job_id}.bin"
+            result_ttl_seconds = 5400  # 90 minutes
+
+            signed_upload_url: Optional[str] = None
+            try:
+                from kerf_core.storage import get_storage_required
+                storage = get_storage_required()
+                signed_upload_url = await storage.signed_put_url(
+                    result_key,
+                    ttl_seconds=result_ttl_seconds,
+                    content_type="application/octet-stream",
+                )
+            except Exception as exc:
+                # Storage not configured (e.g. test env) — worker falls back to
+                # file:// path.  Log at DEBUG so tests stay quiet.
+                logger.debug(
+                    "claim_job: could not mint signed_upload_url for job=%s: %s",
+                    job_id, exc,
+                )
+
             return {
                 "job_id": job_id,
                 "scene_blob_hash": row["scene_blob_hash"],
                 "preset": row["preset"],
                 "samples_total": row["samples_total"],
                 "billing_bucket": row["billing_bucket"],
+                "result_key": result_key,
+                "signed_upload_url": signed_upload_url,
+                "result_ttl_seconds": result_ttl_seconds,
             }
 
         # No job yet — back off briefly and retry.
@@ -333,7 +400,21 @@ async def complete_job(
     body: CompleteJobRequest,
     request: Request,
 ):
-    """Upload the result URL and mark the job complete.
+    """Mark a render job as complete.
+
+    Accepts two upload paths — both respect the BYO billing short-circuit.
+
+    result_key path (preferred)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Worker uploaded the result directly to R2 via the ``signed_upload_url``
+    returned by claim-job.  Body must contain ``result_key``; the server
+    calls ``storage.head(result_key)`` to confirm the object exists, then
+    records the key on the job row.  No bytes flow through the API server.
+
+    signed_url path (legacy / back-compat)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Worker provides a pre-formed URL in ``signed_url``; recorded verbatim.
+    No storage verification is performed.
 
     Billing short-circuit
     ~~~~~~~~~~~~~~~~~~~~~
@@ -381,15 +462,60 @@ async def complete_job(
             )
         return {"ok": True, "charged": False, "reason": "job_error"}
 
-    # Successful completion.
+    # -----------------------------------------------------------------------
+    # Determine result storage — result_key path (new) vs signed_url (legacy)
+    # -----------------------------------------------------------------------
+    result_key: Optional[str] = body.result_key
+    result_signed_url: Optional[str] = body.signed_url
+    completion_path: str = "unknown"
+
+    if result_key:
+        # New path: worker uploaded directly; verify the object exists.
+        completion_path = "result_key"
+        try:
+            from kerf_core.storage import get_storage_required
+            storage = get_storage_required()
+            head = await storage.head(result_key)
+            if not head.exists:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"result_key '{result_key}' not found in storage — "
+                           "upload must complete before calling /complete",
+                )
+            logger.info(
+                "complete_job: job=%s result_key=%s size=%d verified",
+                job_id, result_key, head.size,
+            )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            # Storage not configured (local dev) — accept without verification.
+            logger.debug(
+                "complete_job: storage.head skipped for job=%s (storage unavailable): %s",
+                job_id, exc,
+            )
+
+    elif result_signed_url:
+        completion_path = "signed_url"
+        # Legacy path: just record the URL; no verification.
+    else:
+        raise HTTPException(
+            status_code=422,
+            detail="Either 'result_key' or 'signed_url' must be provided",
+        )
+
+    # Successful completion — record in DB.
     async with pool.acquire() as conn:
         await conn.execute(
             """
             UPDATE render_jobs
-               SET status = 'complete', signed_url = $2, updated_at = now()
+               SET status = 'complete',
+                   result_key = $2,
+                   signed_url = $3,
+                   updated_at = now()
              WHERE id = $1
             """,
-            job_id, body.signed_url,
+            job_id, result_key, result_signed_url,
         )
         await conn.execute(
             """
@@ -433,13 +559,14 @@ async def complete_job(
         )
 
     logger.info(
-        "complete_job: worker=%s job=%s billing_bucket=%s charged=%s",
-        worker_id, job_id, billing_bucket, charged,
+        "complete_job: worker=%s job=%s billing_bucket=%s charged=%s completion_path=%s",
+        worker_id, job_id, billing_bucket, charged, completion_path,
     )
     return {
         "ok": True,
         "charged": charged,
         "billing_bucket": billing_bucket,
+        "completion_path": completion_path,
         "charge_result": charge_result if charged else None,
     }
 

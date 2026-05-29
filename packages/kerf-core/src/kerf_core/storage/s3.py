@@ -149,6 +149,50 @@ class S3Storage(Storage):
             ExpiresIn=ttl_seconds,
         )
 
+    async def signed_put_url(
+        self,
+        key: str,
+        ttl_seconds: int = 3600,
+        content_type: str | None = None,
+    ) -> str:
+        """Generate a presigned PUT URL so external clients can upload directly."""
+        if ttl_seconds <= 0:
+            ttl_seconds = 3600
+
+        params: dict = {"Bucket": self.bucket, "Key": key}
+        if content_type:
+            params["ContentType"] = content_type
+
+        return await _run_sync(
+            self.client.generate_presigned_url,
+            "put_object",
+            Params=params,
+            ExpiresIn=ttl_seconds,
+        )
+
+    async def head(self, key: str):
+        """Return metadata for *key* via a HEAD request (no body download)."""
+        from .base import HeadResult
+        try:
+            resp = await _run_sync(
+                self.client.head_object, Bucket=self.bucket, Key=key
+            )
+            return HeadResult(
+                key=key,
+                size=resp.get("ContentLength", 0),
+                content_type=resp.get("ContentType", "application/octet-stream"),
+                exists=True,
+            )
+        except Exception as exc:
+            # botocore ClientError 404 or NoSuchKey both land here.
+            error_code = getattr(getattr(exc, "response", None), "get", lambda k, d=None: None)(
+                "Error", {}
+            ).get("Code", "")
+            if error_code in ("404", "NoSuchKey") or "404" in str(exc) or "NoSuchKey" in str(exc):
+                from .base import HeadResult
+                return HeadResult(key=key, size=0, content_type="", exists=False)
+            raise
+
     def public_url(self, key: str, updated_at: datetime | None = None) -> str:
         if self.cdn_url:
             base = f"{self.cdn_url}/{self._escape_key(key)}"

@@ -200,7 +200,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 | **GK-P** | **Geometry kernel parity series** — close the gap list from the multi-CAD survey (GK-01..GK-139 landed; wiring + foundational + SubD + architectural geometry remaining). | Every persona's work quality depends on kernel robustness. | 🚧 in flight |
 | **T-100** | **FEM matching CalculiX / Z88 / Mystran depth** — nonlinear, explicit, acoustics, EM, fatigue beyond the verified linear-static+modal+thermal slice. | Serious simulation work. | 🚧 in flight |
 | **T-101** | **CFD (CfdOF-class)** — turbulence models, 3-D unstructured meshing, OpenFOAM bridge beyond the 2-D laminar foundation. | Fluid and aero simulation. | 🚧 in flight |
-| **Hosted infra** | **Cloud infrastructure** — GPU renders via RunPod Serverless (L4→H100, scale-to-zero) — `RunPodGPUBackend` fully implemented: submit/poll/fetch_result/capabilities with retry + exponential back-off. BYO worker path (zero credit cost) unchanged. | GPU render prices 2-3× lower. | ✅ shipped |
+| **Hosted infra** | **Cloud infrastructure** — GPU renders via RunPod Serverless (L4→H100, scale-to-zero) — `RunPodGPUBackend` fully implemented: submit/poll/fetch_result/capabilities with retry + exponential back-off. BYO worker path (zero credit cost) — claim-job hands the worker a presigned R2 PUT URL so results upload directly without proxying through the API. | GPU render prices 2-3× lower. | ✅ shipped |
 
 ---
 

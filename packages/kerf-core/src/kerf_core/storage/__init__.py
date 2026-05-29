@@ -1,6 +1,6 @@
 from typing import Optional
 
-from .base import Storage, PutResult
+from .base import Storage, PutResult, HeadResult
 from .factory import create_storage
 from .git import S3Filesystem
 from .local import LocalStorage
@@ -24,4 +24,4 @@ def get_storage_required() -> Storage:
     return _storage
 
 
-__all__ = ["Storage", "PutResult", "LocalStorage", "S3Storage", "S3Filesystem", "create_storage", "get_storage", "get_storage_required", "set_storage"]
+__all__ = ["Storage", "PutResult", "HeadResult", "LocalStorage", "S3Storage", "S3Filesystem", "create_storage", "get_storage", "get_storage_required", "set_storage"]

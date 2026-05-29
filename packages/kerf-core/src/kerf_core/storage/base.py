@@ -11,6 +11,14 @@ class PutResult:
     content_type: str
 
 
+@dataclass
+class HeadResult:
+    key: str
+    size: int
+    content_type: str
+    exists: bool
+
+
 class Storage(ABC):
     @abstractmethod
     async def put(
@@ -25,6 +33,44 @@ class Storage(ABC):
 
     @abstractmethod
     async def signed_url(self, key: str, ttl_seconds: int) -> str: ...
+
+    async def signed_put_url(
+        self,
+        key: str,
+        ttl_seconds: int,
+        content_type: Optional[str] = None,
+    ) -> str:
+        """Generate a presigned PUT URL for direct upload by an external client.
+
+        Default raises :exc:`NotImplementedError`.  Override in backends that
+        support presigned PUTs (S3-compatible stores).
+
+        Local / test backends return a ``local://`` scheme URL that is
+        intentionally un-routable; callers should treat any non-http(s) URL as
+        a signal that direct upload is unavailable and fall back to a server-
+        side proxy upload instead.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support signed PUT URLs"
+        )
+
+    async def head(self, key: str) -> HeadResult:
+        """Return metadata for *key* without downloading the body.
+
+        Default implementation calls :meth:`get` and discards the body — not
+        efficient but correct.  Override in backends that support HEAD natively.
+
+        Returns a :class:`HeadResult` with ``exists=False`` when the object is
+        not found (never raises :exc:`KeyError` / 404 itself).
+        """
+        try:
+            body_io, content_type = await self.get(key)
+            # Drain and measure
+            body_io.seek(0, 2)
+            size = body_io.tell()
+            return HeadResult(key=key, size=size, content_type=content_type, exists=True)
+        except Exception:
+            return HeadResult(key=key, size=0, content_type="", exists=False)
 
     @abstractmethod
     def public_url(self, key: str, updated_at: datetime | None = None) -> str: ...

@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS render_jobs (
     samples_done    int         NOT NULL DEFAULT 0,
     samples_total   int         NOT NULL DEFAULT 0,
     signed_url      text,
+    result_key      text,
     error           text,
     -- GPU-worker dispatch (Wave 4A GPU-FOUNDATION). preferred_worker_id
     -- points at gpu_workers(id) defined in 0013_gpu_workers.sql; no FK

@@ -127,6 +127,7 @@ full = [
     "kerf-textiles",
     "kerf-wiring",
     "kerf-woodworking",
+    "kerf-plm",
 ]
 
 compute-only = [
@@ -148,6 +149,7 @@ compute-only = [
     "kerf-marine",
     "kerf-optics",
     "kerf-piping",
+    "kerf-plm",
 ]
 
 dev = [
@@ -221,6 +223,7 @@ members = [
     "packages/kerf-woodworking",
     "packages/kerf-worker",
     "packages/kerf-workers",
+    "packages/kerf-plm",
 ]
 
 [tool.uv.sources]
@@ -280,6 +283,7 @@ kerf-wiring = { workspace = true }
 kerf-woodworking = { workspace = true }
 kerf-worker = { workspace = true }
 kerf-workers = { workspace = true }
+kerf-plm = { workspace = true }
 
 [tool.pytest.ini_options]
 # Auto-discover tests from every plugin package and from the legacy backend/
@@ -309,6 +313,7 @@ testpaths = [
     "packages/kerf-parts/tests",
     "packages/kerf-partsgen/tests",
     "packages/kerf-worker/tests",
+    "packages/kerf-plm/tests",
     "tests/perf",
 ]
 asyncio_mode = "auto"

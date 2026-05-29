@@ -54,6 +54,7 @@ async def register(app: FastAPI, ctx) -> PluginManifest:
     _try_include(app, "kerf_api.routes_silicon_synth",   tags=["silicon"])
     _try_include(app, "kerf_api.routes_silicon",         tags=["silicon"])
     _try_include(app, "kerf_api.routes_composites",      tags=["composites"])
+    _try_include(app, "kerf_api.routes_composites_mfg",  tags=["composites"])
     _try_include(app, "kerf_api.routes_ota",             tags=["ota"])
     # T-408: break-even margin admin endpoint
     _try_include(app, "kerf_api.routes_admin_margin",    tags=["admin"])

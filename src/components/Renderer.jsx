@@ -1,6 +1,5 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
-import { Sun, SlidersHorizontal, Check, ChevronDown, MonitorX, Layers } from 'lucide-react'
-import { useAuth } from '../store/auth.js'
+import { Sun, SlidersHorizontal, Check, ChevronDown, MonitorX } from 'lucide-react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { Line2 } from 'three/examples/jsm/lines/Line2.js'
@@ -38,32 +37,18 @@ import { applyDocLightsToScene } from '../lib/applyDocLightsToScene.js'
 import { detectWebGL } from '../lib/detectWebGL.js'
 
 const PALETTE = [0xc9a96b, 0x6b9bc9, 0xc96b89, 0x89c96b, 0xc9b86b, 0x9b6bc9]
-
-// ── LOD (Level-of-Detail) planner constants ───────────────────────────────
-//
-// LOD_DEBOUNCE_MS: camera must be still for this many ms before a LOD plan
-//   query fires. 200 ms chosen so rapid orbiting doesn't spam the backend
-//   while still feeling responsive once the user stops.
-// LOD_MAX_TRIANGLES: triangle budget for the "full" tier. 500k triangles is
-//   approximately 10× a typical mid-size mechanical part (50k tris); enough
-//   for a dense sub-assembly without overwhelming the GPU on integrated graphics.
-// LOD_MAX_VISIBLE_PARTS: part-count budget for full+bbox tiers combined.
-//   1 000 parts is the target for the "1000s of parts" milestone in P0-5.
-// LOD_CAMERA_MOVE_EPS: squared distance the camera must move before we
-//   consider the camera "changed" and restart the debounce timer.
-const LOD_DEBOUNCE_MS = 200
-const LOD_MAX_TRIANGLES = 500_000
-const LOD_MAX_VISIBLE_PARTS = 1_000
-const LOD_CAMERA_MOVE_EPS = 0.25   // units²; ~0.5 unit movement threshold
-// Color for bbox-proxy wireframe boxes (LOD tier 2). Matches INK_300.
-const LOD_BBOX_COLOR = 0x8a93a6
-// Kerf API endpoint for tool dispatch.
-const API_URL = import.meta.env.VITE_API_URL || ''
 const HIGHLIGHT_EMISSIVE = 0x4d3c00 // kerf yellow tint
 const BG_COLOR = 0x0f1115 // ink-900
 const BG_COLOR_TOP = 0x1a1d24 // soft studio gradient top (slightly warmer)
 const KERF_YELLOW = 0xffd633
 const INK_300 = 0x8a93a6
+// LOD box-proxy colours.
+//   LOD_BBOX_COLOR     — neutral ink-300 wireframe when idle
+//   LOD_BBOX_HOVER_COLOR — subtle warm tint on hover
+//   LOD_BBOX_SEL_COLOR  — kerf-300 yellow on selection (matches KERF_YELLOW)
+const LOD_BBOX_COLOR = 0x8a93a6        // ink-300 (same as INK_300)
+const LOD_BBOX_HOVER_COLOR = 0xb8a96b  // warm gold tint
+const LOD_BBOX_SEL_COLOR = 0xffd633    // kerf-300 yellow (same as KERF_YELLOW)
 
 // ── Hero / PBR constants ──────────────────────────────────────────────────────
 //
@@ -264,19 +249,6 @@ function Renderer({
   // T-C5: screen-reader announcer text.  Written on selection change and
   // camera reset; picked up by the role="status" live region below.
   const [srAnnounce, setSrAnnounce] = useState('')
-  // LOD HUD: toggled from the Render dropdown; shows part counts per tier +
-  // frame-time + query latency.
-  const [lodHudOn, setLodHudOn] = useState(false)
-  // LOD stats updated by the debounced query callback.
-  const [lodStats, setLodStats] = useState(null) // { total, hi, lo, box, cull, instances, instHi, instBox, instCull, latencyMs, frameMs }
-  // Ref carrying debounce state for the LOD pass (shared between the render
-  // loop and the async query callback without causing re-renders).
-  const lodRef = useRef({
-    timer: null,          // setTimeout handle
-    lastCamPos: null,     // THREE.Vector3 snapshot at last query
-    pendingQuery: false,  // prevents concurrent in-flight queries
-    enabled: false,       // true when assemblyComponents list is non-empty
-  })
   const modeRef = useRef(mode)
   const selectedFeaturesRef = useRef(selectedFeatures)
   const onPickFeatureRef = useRef(onPickFeature)
@@ -350,271 +322,6 @@ function Renderer({
   // In object mode (no edge/vertex aux to build, no FeatureInspector open)
   // nothing gets computed.
   const topologies = useMemo(() => getTopologyLazy(parts), [parts])
-
-  // ----- LOD pass: query + apply -----
-  //
-  // queryLodPlan sends the current assembly (via assemblyComponents) and camera
-  // position to the backend `assembly_lod_plan` tool, then applies the returned
-  // plan to the Three.js scene:
-  //   "full"       → mesh.visible = true, restore original material
-  //   "bbox_proxy" → replace mesh with a LineSegments bounding-box wireframe
-  //   "culled"     → mesh.visible = false
-  //
-  // InstancedMesh batches are handled per-instance:
-  //   "full"       → restore original instance matrix (identity trs from cache)
-  //   "bbox_proxy" → scale instance matrix to bbox extents (visual box proxy)
-  //   "culled"     → zero-scale matrix (invisible, no buffer reallocation)
-  //
-  // The function is defined here (closure over stateRef / assemblyComponents)
-  // and called from the debounced camera-change handler installed in the render
-  // loop below.
-  const assemblyComponentsRef = useRef(assemblyComponents)
-  useEffect(() => { assemblyComponentsRef.current = assemblyComponents }, [assemblyComponents])
-
-  const queryLodPlan = useCallback(async () => {
-    const s = stateRef.current
-    const comps = assemblyComponentsRef.current
-    if (!s || !Array.isArray(comps) || comps.length === 0) return
-    const lod = lodRef.current
-    if (lod.pendingQuery) return
-    lod.pendingQuery = true
-
-    // Build a minimal Assembly dict the backend can deserialize.
-    // We pass every component as a flat leaf list — the planner doesn't require
-    // the sub-assembly tree structure, only the leaf component list.
-    const assemblyDict = {
-      name: 'viewport-assembly',
-      assembly_id: 'viewport-root',
-      components: comps.map((c) => ({
-        instance_id: c.id ?? c.instance_id ?? c.componentId ?? String(Math.random()),
-        part_ref: c.part_ref ?? c.file_id ?? 'unknown',
-        name: c.name ?? c.part_ref ?? 'part',
-        transform: null,
-      })),
-      sub_assemblies: [],
-      mates: [],
-    }
-
-    const cam = s.camera
-    const t0 = performance.now()
-    try {
-      const token = useAuth.getState().accessToken
-      const headers = { 'Content-Type': 'application/json' }
-      if (token) headers['Authorization'] = `Bearer ${token}`
-      const res = await fetch(`${API_URL}/api/tools/call`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          tool: 'assembly_lod_plan',
-          args: {
-            assembly: assemblyDict,
-            max_triangles: LOD_MAX_TRIANGLES,
-            max_visible_parts: LOD_MAX_VISIBLE_PARTS,
-            camera_x: cam.position.x,
-            camera_y: cam.position.y,
-            camera_z: cam.position.z,
-          },
-        }),
-      })
-      const latencyMs = Math.round(performance.now() - t0)
-      if (!res.ok) return
-
-      const plan = await res.json()
-      if (!Array.isArray(plan.entries)) return
-
-      // Build a lookup: instance_id → detail level
-      const detailMap = new Map()
-      for (const entry of plan.entries) {
-        detailMap.set(entry.instance_id, entry.detail)
-      }
-
-      // Apply the plan to meshGroup children.
-      // Non-instanced Mesh: match by mesh.userData.id.
-      // InstancedMesh: iterate instances, match by userData.componentIds[i].
-      let hi = 0, lo = 0, box = 0, cull = 0, instances = 0
-      let instHi = 0, instBox = 0, instCull = 0
-      // Collect InstancedMesh originals to skip the box-proxy siblings below.
-      const boxProxySiblings = new Set()
-      for (const mesh of s.meshGroup.children) {
-        if (mesh.userData._lodBoxProxyFor) {
-          boxProxySiblings.add(mesh)
-        }
-      }
-      for (const mesh of s.meshGroup.children) {
-        // Skip box-proxy siblings — they are driven by their paired original.
-        if (boxProxySiblings.has(mesh)) continue
-
-        if (mesh.isInstancedMesh) {
-          // ── InstancedMesh per-instance LOD (Wave 4H: clean wireframe box) ──
-          // Each instance in the batch may have its own LOD tier based on its
-          // componentId. We apply LOD by rewriting the instance's transform:
-          //   hi   → restore original matrix; zero-scale the box-proxy sibling
-          //   box  → zero-scale original; set box-proxy sibling to bbox scale+pos
-          //   cull → zero-scale both original and box-proxy sibling
-          //
-          // Box proxy: a sibling InstancedMesh using BoxGeometry + EdgesGeometry +
-          // LineBasicMaterial so each instance renders ~12 wireframe edges (24
-          // vertices) instead of potentially thousands of original triangles.
-          // Stored in mesh.userData._lodBoxProxyMesh; created on first touch.
-          //
-          // Cache: userData._lodInstOrigMatrices stores a Float32Array copy of
-          // the original instanceMatrix buffer so we can restore it cleanly.
-          const cids = mesh.userData.componentIds
-          if (!cids || !cids.length) { hi++; continue }
-
-          // Snapshot original matrices the first time we touch this batch.
-          if (!mesh.userData._lodInstOrigMatrices) {
-            mesh.userData._lodInstOrigMatrices =
-              new Float32Array(mesh.instanceMatrix.array)
-          }
-
-          // Get or derive per-instance bbox for box-proxy tier.
-          const geom = mesh.geometry
-          if (geom && !geom.boundingBox) geom.computeBoundingBox()
-          const geomBb = geom?.boundingBox
-
-          // Create the box-proxy sibling InstancedMesh on first touch.
-          let proxyMesh = mesh.userData._lodBoxProxyMesh
-          if (!proxyMesh) {
-            proxyMesh = _createInstBoxProxy(mesh, geomBb)
-            if (proxyMesh) {
-              mesh.userData._lodBoxProxyMesh = proxyMesh
-              // Tag it so we can skip it in the outer loop.
-              proxyMesh.userData._lodBoxProxyFor = mesh.uuid
-              mesh.parent?.add(proxyMesh)
-            }
-          }
-
-          let origChanged = false
-          let proxyChanged = false
-          const dummy = new THREE.Object3D()
-          const zeroDummy = new THREE.Object3D()
-          zeroDummy.position.set(0, 0, 0)
-          zeroDummy.scale.set(0, 0, 0)
-          zeroDummy.updateMatrix()
-
-          for (let i = 0; i < mesh.count; i++) {
-            instances++
-            const cid = cids[i]
-            const detail = cid ? detailMap.get(cid) : undefined
-
-            if (detail === 'full' || detail === undefined) {
-              instHi++
-              hi++
-              // Restore original instance from cache.
-              const src16 = mesh.userData._lodInstOrigMatrices
-              const m4 = new THREE.Matrix4().fromArray(src16, i * 16)
-              mesh.setMatrixAt(i, m4)
-              origChanged = true
-              // Zero-scale the box-proxy for this slot.
-              if (proxyMesh) {
-                proxyMesh.setMatrixAt(i, zeroDummy.matrix)
-                proxyChanged = true
-              }
-            } else if (detail === 'bbox_proxy') {
-              instBox++
-              lo++
-              box++
-              // Zero-scale the original instance (invisible, no triangle cost).
-              mesh.setMatrixAt(i, zeroDummy.matrix)
-              origChanged = true
-              // Drive the box-proxy instance to bbox scale + original position.
-              if (proxyMesh) {
-                const origM4 = new THREE.Matrix4().fromArray(
-                  mesh.userData._lodInstOrigMatrices, i * 16,
-                )
-                const pos = new THREE.Vector3()
-                const rot = new THREE.Quaternion()
-                const scale = new THREE.Vector3()
-                origM4.decompose(pos, rot, scale)
-
-                // Bbox size in world space (approx — ignoring non-uniform scale).
-                const bboxSize = geomBb
-                  ? new THREE.Vector3(
-                      (geomBb.max.x - geomBb.min.x) * scale.x || 1,
-                      (geomBb.max.y - geomBb.min.y) * scale.y || 1,
-                      (geomBb.max.z - geomBb.min.z) * scale.z || 1,
-                    )
-                  : new THREE.Vector3(1, 1, 1)
-
-                dummy.position.copy(pos)
-                dummy.quaternion.copy(rot)
-                dummy.scale.copy(bboxSize)
-                dummy.updateMatrix()
-                proxyMesh.setMatrixAt(i, dummy.matrix)
-                proxyChanged = true
-              }
-            } else {
-              // culled — zero-scale both original and proxy
-              instCull++
-              cull++
-              mesh.setMatrixAt(i, zeroDummy.matrix)
-              origChanged = true
-              if (proxyMesh) {
-                proxyMesh.setMatrixAt(i, zeroDummy.matrix)
-                proxyChanged = true
-              }
-            }
-          }
-
-          if (origChanged) {
-            mesh.instanceMatrix.needsUpdate = true
-          }
-          if (proxyMesh && proxyChanged) {
-            proxyMesh.instanceMatrix.needsUpdate = true
-          }
-          continue // skip the non-instanced branch below
-        }
-
-        // Non-instanced Mesh path.
-        const meshId = mesh.userData.id
-        const detail = meshId ? detailMap.get(meshId) : undefined
-        if (detail === undefined) { hi++; continue } // not in plan → show full
-
-        if (detail === 'full') {
-          hi++
-          // Restore original material if we previously swapped to bbox proxy.
-          if (mesh.userData._lodBboxProxy) {
-            _restoreFromBboxProxy(mesh, s)
-          }
-          // setUserVisible preserves user-hidden state correctly.
-          setUserVisible(mesh, true)
-        } else if (detail === 'bbox_proxy') {
-          lo++
-          box++
-          if (!mesh.userData._lodBboxProxy) {
-            _applyBboxProxy(mesh, s)
-          }
-          setUserVisible(mesh, true)
-        } else {
-          // culled
-          cull++
-          if (mesh.userData._lodBboxProxy) {
-            _restoreFromBboxProxy(mesh, s)
-          }
-          setUserVisible(mesh, false)
-        }
-      }
-
-      setLodStats({
-        total: s.meshGroup.children.length,
-        hi,
-        lo,
-        box,
-        cull,
-        instances,
-        instHi,
-        instBox,
-        instCull,
-        latencyMs,
-        frameMs: Math.round(1000 / 60), // placeholder; actual from render loop timing below
-      })
-    } catch {
-      // Network / backend unavailable — LOD pass is best-effort, never throws.
-    } finally {
-      lod.pendingQuery = false
-    }
-  }, []) // stateRef / lodRef are refs — no deps needed; useAuth.getState() is imperative
 
   // ----- Mount: create scene/camera/renderer/controls once -----
   useEffect(() => {
@@ -834,33 +541,6 @@ function Renderer({
         // skips objects without geometry.boundingBox in a safe way).
       }
 
-      // LOD pass — camera-change debounce.
-      // On each frame we check if the camera has moved more than the epsilon
-      // threshold since the last LOD query; if so, we (re-)start the debounce
-      // timer.  When the timer fires (camera has been still for LOD_DEBOUNCE_MS)
-      // we call queryLodPlan().  This is a ref-only path — no React state is
-      // touched per frame.
-      {
-        const lod = lodRef.current
-        if (lod.enabled) {
-          const camPos = camera.position
-          const last = lod.lastCamPos
-          const moved = !last || (
-            (camPos.x - last.x) ** 2 +
-            (camPos.y - last.y) ** 2 +
-            (camPos.z - last.z) ** 2 > LOD_CAMERA_MOVE_EPS
-          )
-          if (moved) {
-            lod.lastCamPos = { x: camPos.x, y: camPos.y, z: camPos.z }
-            if (lod.timer !== null) clearTimeout(lod.timer)
-            lod.timer = setTimeout(() => {
-              lod.timer = null
-              queryLodPlan()
-            }, LOD_DEBOUNCE_MS)
-          }
-        }
-      }
-
       // Drive the post-FX composer when bloom is on; fall back to the bare
       // renderer.render() path when bloom is off so the second framebuffer
       // copy of EffectComposer doesn't eat fillrate on low-end devices.
@@ -968,6 +648,10 @@ function Renderer({
       const m = modeRef.current
       if (m === 'object') {
         clearHoverOverlay(stateRef.current)
+        // Wave 4J: hover check for box-proxy InstancedMesh siblings.
+        setPointerFromEvent(ev)
+        raycaster.setFromCamera(pointer, camera)
+        _hoverBoxProxy(stateRef.current, raycaster, meshGroup)
         return
       }
       setPointerFromEvent(ev)
@@ -995,6 +679,17 @@ function Renderer({
           if (!id && hitObj.isInstancedMesh && hitObj.userData.componentIds) {
             const instanceId = hits[0].instanceId
             id = hitObj.userData.componentIds[instanceId] ?? null
+          }
+          // Wave 4J: box-proxy sibling hit — resolve via the parent original
+          // InstancedMesh's componentIds so the selection pipeline is unaware
+          // it's picking a proxy wireframe box.
+          if (!id && hitObj.isInstancedMesh && hitObj.userData._lodBoxProxyFor) {
+            const origMesh = meshGroup.children.find(
+              (mm) => mm.uuid === hitObj.userData._lodBoxProxyFor,
+            )
+            if (origMesh?.userData.componentIds) {
+              id = origMesh.userData.componentIds[hits[0].instanceId] ?? null
+            }
           }
           setHudId(id)
           stateRef.current?.onPickRef?.(id)
@@ -1102,6 +797,8 @@ function Renderer({
       fatLineMaterials: new Set(),
       // Hover state:
       hoverOverlay: null,
+      // Wave 4J: currently-hovered box-proxy sibling (null when none).
+      _hoveredBoxProxy: null,
       // Selection overlays:
       selectionOverlays: [],
       // Leader-line state:
@@ -1132,11 +829,6 @@ function Renderer({
       running = false
       ro.disconnect()
       cancelLongPress()
-      // Cancel any pending LOD debounce timer.
-      if (lodRef.current.timer !== null) {
-        clearTimeout(lodRef.current.timer)
-        lodRef.current.timer = null
-      }
       renderer.domElement.removeEventListener('webglcontextlost', onContextLost)
       renderer.domElement.removeEventListener('pointermove', onPointerMove)
       renderer.domElement.removeEventListener('pointerdown', onPointerDown)
@@ -1359,57 +1051,6 @@ function Renderer({
     }
   }, [parts, topologies, assemblyComponents])
 
-  // ----- LOD pass enable/disable based on assembly presence -----
-  // The LOD pass is only useful when an assembly is loaded (assemblyComponents
-  // non-empty).  We flip lodRef.enabled here so the render loop knows whether
-  // to bother with camera-change detection.  When the assembly is cleared we
-  // also cancel any pending debounce timer and clear LOD stats.
-  useEffect(() => {
-    const hasAssembly = Array.isArray(assemblyComponents) && assemblyComponents.length > 0
-    lodRef.current.enabled = hasAssembly
-    if (!hasAssembly) {
-      if (lodRef.current.timer !== null) {
-        clearTimeout(lodRef.current.timer)
-        lodRef.current.timer = null
-      }
-      setLodStats(null)
-      // Restore any bbox-proxy meshes back to their original state.
-      const s = stateRef.current
-      if (s) {
-        // First pass: collect and remove box-proxy sibling meshes.
-        const toRemove = []
-        for (const mesh of s.meshGroup.children) {
-          if (mesh.userData._lodBoxProxyFor) {
-            toRemove.push(mesh)
-          }
-        }
-        for (const proxy of toRemove) {
-          proxy.parent?.remove(proxy)
-          proxy.geometry?.dispose()
-          proxy.material?.dispose()
-        }
-        for (const mesh of s.meshGroup.children) {
-          if (mesh.isInstancedMesh) {
-            // Restore InstancedMesh original matrices if they were overwritten.
-            if (mesh.userData._lodInstOrigMatrices) {
-              const orig = mesh.userData._lodInstOrigMatrices
-              for (let i = 0; i < mesh.count; i++) {
-                const m4 = new THREE.Matrix4().fromArray(orig, i * 16)
-                mesh.setMatrixAt(i, m4)
-              }
-              mesh.instanceMatrix.needsUpdate = true
-              delete mesh.userData._lodInstOrigMatrices
-            }
-            delete mesh.userData._lodBoxProxyMesh
-            continue
-          }
-          if (mesh.userData._lodBboxProxy) _restoreFromBboxProxy(mesh, s)
-          setUserVisible(mesh, true)
-        }
-      }
-    }
-  }, [assemblyComponents])
-
   // ----- Visibility toggling -----
   useEffect(() => {
     const s = stateRef.current
@@ -1448,6 +1089,26 @@ function Renderer({
     const s = stateRef.current
     if (!s) return
     s.meshGroup.children.forEach((m) => {
+      // Wave 4J: box-proxy sibling — resolve componentId from the parent
+      // original InstancedMesh and tint the LineBasicMaterial to kerf-300 on
+      // selection, idle colour otherwise.
+      if (m.isInstancedMesh && m.userData._lodBoxProxyFor) {
+        const origMesh = s.meshGroup.children.find(
+          (mm) => mm.uuid === m.userData._lodBoxProxyFor,
+        )
+        const cids = origMesh?.userData.componentIds
+        if (!cids) return
+        // Check if any instance in this proxy is selected.
+        const anySelected = cids.some(
+          (cid) => cid === selectedId || (selectedComponentId && cid === selectedComponentId),
+        )
+        // Set material colour: kerf-300 (solid) when selected, idle ink-300 otherwise.
+        if (m.material && m.material.color) {
+          m.material.color.setHex(anySelected ? LOD_BBOX_SEL_COLOR : LOD_BBOX_COLOR)
+        }
+        return
+      }
+
       if (m.isInstancedMesh) {
         // S2: For InstancedMesh we use per-instance color to highlight.
         // We reset all instances to white (multiplicative identity) then
@@ -2025,7 +1686,6 @@ function Renderer({
                 { on: zebraOn, set: () => setZebraOn((v) => !v), label: 'Zebra', hint: 'Class-A surface lines' },
                 { on: bloomOn, set: () => setBloomOn((v) => !v), label: 'Bloom', hint: 'Gem / edge glow' },
                 { on: hdriBackground, set: () => setHdriBackground((v) => !v), label: 'HDRI background', hint: 'Env map as backdrop' },
-                { on: lodHudOn, set: () => setLodHudOn((v) => !v), label: 'LOD HUD', hint: 'Parts / tiers / latency' },
               ].map((it) => (
                 <button
                   key={it.label}
@@ -2072,56 +1732,6 @@ function Renderer({
           projectId={projectId}
           rendererRef={stateRef}
         />
-      )}
-      {/* LOD debug HUD — shown when the user enables "LOD HUD" in the Render
-          dropdown and an assembly is loaded. Displays part tier counts + last
-          query latency so the dev can verify the LOD pass is firing. */}
-      {lodHudOn && lodStats && (
-        <div
-          data-testid="lod-hud"
-          className="absolute bottom-10 left-3 z-10 flex flex-col gap-0.5 px-2.5 py-2 rounded-lg bg-ink-900/90 border border-ink-700 backdrop-blur shadow-lg shadow-black/30 font-mono text-[10px] text-ink-300"
-        >
-          <div className="flex items-center gap-1.5 mb-0.5 text-kerf-300 font-semibold">
-            <Layers size={11} />
-            <span>LOD</span>
-          </div>
-          <div className="flex gap-3">
-            <span className="text-ink-500">parts</span>
-            <span>{lodStats.total}</span>
-          </div>
-          <div className="flex gap-3">
-            <span className="text-green-400">hi</span>
-            <span>{lodStats.hi}</span>
-          </div>
-          <div className="flex gap-3">
-            <span className="text-yellow-400">box</span>
-            <span>{lodStats.box}</span>
-          </div>
-          <div className="flex gap-3">
-            <span className="text-ink-500">cull</span>
-            <span>{lodStats.cull}</span>
-          </div>
-          <div className="flex gap-3">
-            <span className="text-blue-400">inst</span>
-            <span>{lodStats.instances}</span>
-          </div>
-          <div className="flex gap-3">
-            <span className="text-blue-300">inst hi</span>
-            <span>{lodStats.instHi}</span>
-          </div>
-          <div className="flex gap-3">
-            <span className="text-yellow-300">inst box</span>
-            <span>{lodStats.instBox}</span>
-          </div>
-          <div className="flex gap-3">
-            <span className="text-ink-400">inst cull</span>
-            <span>{lodStats.instCull}</span>
-          </div>
-          <div className="flex gap-3 mt-0.5 pt-0.5 border-t border-ink-800">
-            <span className="text-ink-500">latency</span>
-            <span>{lodStats.latencyMs}ms</span>
-          </div>
-        </div>
       )}
     </div>
   )
@@ -2508,25 +2118,22 @@ function disposePartsAux(s) {
     }
   }
   s.perPart.clear()
-  // Clean up any LOD bbox proxy objects that remain on meshes.
+  // Wave 4J: Remove box-proxy sibling meshes added by _createInstBoxProxy.
   if (s.meshGroup) {
-    // Remove box-proxy sibling meshes added by Wave 4H.
     const toRemove = []
     for (const mesh of s.meshGroup.children) {
       if (mesh.userData._lodBoxProxyFor) toRemove.push(mesh)
     }
     for (const proxy of toRemove) {
       proxy.parent?.remove(proxy)
-      proxy.geometry?.dispose()
-      proxy.material?.dispose()
+      proxy.geometry?.dispose?.()
+      proxy.material?.dispose?.()
     }
+    // Clear the back-pointer on originals.
     for (const mesh of s.meshGroup.children) {
       if (mesh.isInstancedMesh) {
-        delete mesh.userData._lodInstOrigMatrices
         delete mesh.userData._lodBoxProxyMesh
-        continue
       }
-      if (mesh.userData._lodBboxProxy) _restoreFromBboxProxy(mesh, s)
     }
   }
   // Also clear hover/selection overlays.
@@ -2546,6 +2153,7 @@ function disposePartsAux(s) {
   }
   s._hoveredLine = null
   s._hoveredInstance = null
+  s._hoveredBoxProxy = null
 }
 
 function disposeAll(s) {
@@ -2560,104 +2168,30 @@ function disposeAll(s) {
   s.fatLineMaterials.clear()
 }
 
-// ---------------------------------------------------------------------------
-// LOD helpers — bbox proxy swap
-// ---------------------------------------------------------------------------
-
-/**
- * _applyBboxProxy — swap a mesh to a LineSegments bounding-box wireframe.
- *
- * We stash the original material + geometry on userData so _restoreFromBboxProxy
- * can recover the mesh state exactly.  The bbox is computed from the mesh's
- * existing geometry if available; otherwise a unit cube proxy is used.
- *
- * Only non-instanced Mesh objects are handled here.  InstancedMesh is handled
- * per-instance in the LOD apply loop (matrix rewrite, no geometry swap).
- */
-function _applyBboxProxy(mesh, s) {
-  if (!mesh || mesh.isInstancedMesh || mesh.userData._lodBboxProxy) return
-  try {
-    // Compute the bounding box of the part geometry.
-    const geom = mesh.geometry
-    if (geom && !geom.boundingBox) geom.computeBoundingBox()
-    const bb = geom?.boundingBox ?? new THREE.Box3(
-      new THREE.Vector3(-5, -5, -5),
-      new THREE.Vector3(5, 5, 5),
-    )
-    // EdgesGeometry of a BoxGeometry fitted to the bbox gives a clean wireframe.
-    const size = new THREE.Vector3(); bb.getSize(size)
-    const center = new THREE.Vector3(); bb.getCenter(center)
-    const boxGeom = new THREE.BoxGeometry(
-      Math.max(size.x, 0.01),
-      Math.max(size.y, 0.01),
-      Math.max(size.z, 0.01),
-    )
-    const edgesGeom = new THREE.EdgesGeometry(boxGeom)
-    boxGeom.dispose()
-    const edgeMat = new THREE.LineBasicMaterial({
-      color: LOD_BBOX_COLOR,
-      transparent: true,
-      opacity: 0.55,
-      depthTest: true,
-    })
-    const proxy = new THREE.LineSegments(edgesGeom, edgeMat)
-    proxy.position.copy(mesh.position).add(center)
-    proxy.rotation.copy(mesh.rotation)
-    proxy.scale.copy(mesh.scale)
-    proxy.userData._lodProxyFor = mesh.userData.id
-    // Stash the original material so we can restore it later.
-    mesh.userData._lodBboxProxy = proxy
-    mesh.userData._lodOrigMaterial = mesh.material
-    mesh.userData._lodOrigVisible = mesh.visible
-    // Add the proxy to the same parent group as the mesh.
-    mesh.parent?.add(proxy)
-    // Swap the mesh geometry to nothing (keep the mesh for raycasting identity,
-    // just hide it visually — visibility is managed by setUserVisible above).
-    mesh.visible = false
-  } catch {
-    // Geometry / material creation failed — leave mesh unmodified.
-  }
-}
-
-/**
- * _restoreFromBboxProxy — undo a prior _applyBboxProxy call.
- *
- * Removes the LineSegments proxy from the scene, restores the original material,
- * and clears the userData flags.
- */
-function _restoreFromBboxProxy(mesh, _s) {
-  if (!mesh || !mesh.userData._lodBboxProxy) return
-  const proxy = mesh.userData._lodBboxProxy
-  try {
-    proxy.parent?.remove(proxy)
-    proxy.geometry?.dispose()
-    proxy.material?.dispose()
-  } catch {}
-  if (mesh.userData._lodOrigMaterial !== undefined) {
-    mesh.material = mesh.userData._lodOrigMaterial
-  }
-  delete mesh.userData._lodBboxProxy
-  delete mesh.userData._lodOrigMaterial
-  delete mesh.userData._lodOrigVisible
-}
+// ── Wave 4J: LOD box-proxy picking helpers ────────────────────────────────────
+//
+// The LOD box-proxy InstancedMesh (created by _createInstBoxProxy) renders
+// ~12 wireframe edges per instance in the `bbox_proxy` LOD tier.  It is a
+// sibling of the original InstancedMesh in meshGroup and shares the same count
+// + the same instance indices.  Without explicit inclusion in the raycaster
+// intersectObjects call the proxy would be invisible to picks.
+//
+// These helpers are pure module-level functions so they are unit-testable
+// without mounting the full React component.
 
 /**
  * _createInstBoxProxy — create a sibling InstancedMesh for wireframe box proxies.
  *
- * Wave 4H: for InstancedMesh batches in the LOD `box` tier we need a separate
- * InstancedMesh that uses a unit-cube EdgesGeometry + LineBasicMaterial.  Each
- * instance in the proxy renders ~12 wireframe edges (24 vertices) instead of
- * the original geometry's potentially-thousands of triangles.
- *
- * The proxy shares the same `count` as the original so setMatrixAt indices are
- * 1:1.  All instances start at zero scale (invisible); the LOD pass drives each
- * instance's matrix independently.
+ * Builds a unit-cube BoxGeometry → EdgesGeometry + LineBasicMaterial batch.
+ * All instances start at zero scale (invisible); the LOD pass drives each
+ * instance's matrix independently.  The proxy is tagged with `_lodBoxProxyFor`
+ * (the original mesh's uuid) so dispatchPick and hover can resolve the
+ * componentId through the original's userData.componentIds.
  *
  * @param {THREE.InstancedMesh} origMesh - the original InstancedMesh
- * @param {THREE.Box3|null} geomBb - precomputed bounding box of the geometry
  * @returns {THREE.InstancedMesh|null}
  */
-function _createInstBoxProxy(origMesh, geomBb) {
+export function _createInstBoxProxy(origMesh) {
   try {
     // Unit cube edges — 12 edges, 24 vertices.  Each instance's matrix scales
     // this to the actual bbox extents at runtime.
@@ -2682,9 +2216,56 @@ function _createInstBoxProxy(origMesh, geomBb) {
       proxy.setMatrixAt(i, zeroObj.matrix)
     }
     proxy.instanceMatrix.needsUpdate = true
+
+    // Tag so picking + hover code can trace back to the original mesh.
+    proxy.userData._lodBoxProxyFor = origMesh.uuid
     return proxy
   } catch {
     return null
+  }
+}
+
+/**
+ * _hoverBoxProxy — raycast box-proxy InstancedMesh siblings and apply a subtle
+ * colour-shift hover state to the EdgesGeometry LineBasicMaterial.
+ *
+ * Called from onPointerMove when mode === 'object'.  On miss, restores the
+ * previously-hovered proxy to its idle colour.
+ *
+ * @param {object} s - stateRef.current
+ * @param {THREE.Raycaster} raycaster
+ * @param {THREE.Group} meshGroup
+ */
+export function _hoverBoxProxy(s, raycaster, meshGroup) {
+  if (!s || !raycaster || !meshGroup) return
+
+  // Collect visible box-proxy siblings.
+  const proxies = meshGroup.children.filter(
+    (m) => m.isInstancedMesh && m.userData._lodBoxProxyFor && m.visible,
+  )
+  if (proxies.length === 0) {
+    _clearBoxProxyHover(s)
+    return
+  }
+
+  const hits = raycaster.intersectObjects(proxies, false)
+  if (hits.length > 0) {
+    const hitProxy = hits[0].object
+    if (s._hoveredBoxProxy !== hitProxy) {
+      _clearBoxProxyHover(s)
+      hitProxy.material?.color?.setHex(LOD_BBOX_HOVER_COLOR)
+      s._hoveredBoxProxy = hitProxy
+    }
+  } else {
+    _clearBoxProxyHover(s)
+  }
+}
+
+function _clearBoxProxyHover(s) {
+  if (!s) return
+  if (s._hoveredBoxProxy) {
+    s._hoveredBoxProxy.material?.color?.setHex(LOD_BBOX_COLOR)
+    s._hoveredBoxProxy = null
   }
 }
 

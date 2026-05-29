@@ -31,18 +31,27 @@ async def register(app: FastAPI, ctx):
 
     ctx.tools.register("plm_change_management", plm_change_management_spec, _run_plm_change_management)
 
+    # KBE↔configurator bridge — kerf-rules KBE engine + kerf-plm configurator
+    # in one call. Per the KBE-PLM-BRIDGE work (commit 6de5658f).
+    try:
+        from kerf_plm.tools.plm_kbe_configure_tool import TOOLS as _KBE_BRIDGE_TOOLS
+        for name, spec, handler in _KBE_BRIDGE_TOOLS:
+            ctx.tools.register(name, spec, handler)
+    except Exception:
+        pass  # KBE bridge optional — fail silently if kerf-rules KBE unavailable.
+
     try:
         from kerf_core.plugin import PluginManifest
         return PluginManifest(
             name="plm",
             version="0.1.0",
-            provides=["plm.configurator", "plm.effectivity-bom", "plm.change-management"],
+            provides=["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge"],
             depends=[],
         )
     except ImportError:
         return {
             "name": "plm",
             "version": "0.1.0",
-            "provides": ["plm.configurator", "plm.effectivity-bom", "plm.change-management"],
+            "provides": ["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge"],
             "depends": [],
         }

@@ -28,6 +28,7 @@ import ScriptEditor from '../components/ScriptEditor.jsx'
 import ToleranceView from '../components/ToleranceView.jsx'
 import TopoView from '../components/TopoView.jsx'
 import FEMView from '../components/FEMView.jsx'
+import FEAView from '../components/fea/FEAView.jsx'
 import GraphEditor from '../components/GraphEditor.jsx'
 import RenderView from '../components/RenderView.jsx'
 import FamilyEditor from '../components/FamilyEditor.jsx'
@@ -2671,6 +2672,18 @@ export default function Editor() {
                 <GitBranch size={12} /> Git
               </button>
             )}
+            <button
+              type="button"
+              data-testid="right-drawer-tab-fea"
+              onClick={() => setRightDrawerTab('fea')}
+              className={`flex items-center gap-1.5 px-4 h-10 text-[11px] uppercase tracking-wider font-medium border-b-2 transition-colors ${
+                rightDrawer.tab === 'fea'
+                  ? 'border-cyan-400 text-cyan-400'
+                  : 'border-transparent text-ink-400 hover:text-ink-200'
+              }`}
+            >
+              FEA
+            </button>
             <div className="flex-1" />
             <button
               type="button"
@@ -2712,6 +2725,14 @@ export default function Editor() {
                 projectId={projectId}
                 onClose={() => closeRightDrawer()}
               />
+            )}
+            {rightDrawer.tab === 'fea' && projectId && (
+              <div className="flex-1 min-h-0 overflow-y-auto p-3">
+                <FEAView
+                  file={w.currentFile}
+                  projectId={projectId}
+                />
+              </div>
             )}
           </div>
         </div>

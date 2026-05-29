@@ -266,8 +266,8 @@
       "left": "kerf",
       "right": "civil3d",
       "hero_tagline": "Civil infrastructure design \u2014 corridor/pipe depth vs MIT open-core analysis modules.",
-      "reviewed_at": "2026-05-29",      "features": [
-        {
+      "reviewed_at": "2026-05-19",
+      "features": [        {
           "domain": "D8",
           "feature": "Horizontal+vertical alignment (clothoid, SSD)",
           "competitor": {
@@ -4780,7 +4780,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "CalculiX/Mystran/Z88 bridge (needs binary)",
+            "note": "CalculiX/FEniCSx solver + LinearStaticPanel UI (load/BC editor, von Mises contour)",
             "evidence": "packages/kerf-fem/src/kerf_fem/calculix_bridge.py"
           }
         },
@@ -4794,7 +4794,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Consistent-mass modal, Riks, J2 plasticity (backend)",
+            "note": "Consistent-mass modal + linear eigenvalue buckling + J2 plasticity + UI panels (ModalPanel, BucklingPanel)",
             "evidence": "packages/kerf-fem/src/kerf_fem/modal.py"
           }
         },
@@ -4836,8 +4836,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "S-N, \u03b5-N, rainflow counting (backend)",
-            "evidence": "packages/kerf-fem/src/kerf_fem/fatigue_fem.py"
+            "note": "S-N, \u03b5-N, rainflow (Goodman/Gerber/SWT, Miner) + FatiguePanel UI (S-N picker, load history, life contour)",            "evidence": "packages/kerf-fem/src/kerf_fem/fatigue_fem.py"
           }
         },
         {
@@ -5438,7 +5437,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Full n-DOF eigen + FRF matrix (backend)",
+            "note": "Harmonic (mode superposition) + PSD random vibration (Miles) + VibrationPanel UI (FRF plot)",
             "evidence": "packages/kerf-fem/src/kerf_fem/modal.py"
           }
         },
@@ -5966,8 +5965,8 @@
             "source": "https://help.solidworks.com/2021/english/SolidWorks/cworks/c_Fatigue_Analysis.htm"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Linear static solver; no UI panel beyond displacement render",
+            "status": "yes",
+            "note": "Linear static solver + UI panel (LinearStaticPanel: load/BC editor, von Mises contour)",
             "evidence": "packages/kerf-fem/src/kerf_fem/linear_static.py"
           }
         },
@@ -5980,9 +5979,8 @@
             "source": "https://help.solidworks.com/2024/english/SolidWorks/cworks/c_Fatigue_Analysis.htm"
           },
           "kerf": {
-            "status": "partial",
-            "note": "S-N + \u03b5-N + rainflow backend; no UI",
-            "evidence": "packages/kerf-fem/src/kerf_fem/fatigue_fem.py"
+            "status": "yes",
+            "note": "S-N + \u03b5-N + rainflow (Goodman/Gerber/SWT) + UI panel (FatiguePanel: S-N picker, load history, life contour)",            "evidence": "packages/kerf-fem/src/kerf_fem/fatigue_fem.py"
           }
         },
         {
@@ -5994,8 +5992,8 @@
             "source": "https://help.solidworks.com/2026/english/simtutorialonline/c_simconn_fatigue.htm"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Consistent-mass modal + linear eigenvalue buckling (Euler-Bernoulli Kg) + harmonic/FRF (mode superposition) + random-vibration PSD (Miles' equation + shaped PSD) + Riks + J2 plasticity backend; no UI",
+            "status": "yes",
+            "note": "Modal (ModalPanel: N-modes, freq table, modal participation) + Buckling (BucklingPanel: load-case, \u03bb factor, mode-shape sketch) + Harmonic/PSD (VibrationPanel)",
             "evidence": "packages/kerf-fem/src/kerf_fem/buckling.py"
           }
         },
@@ -6344,8 +6342,8 @@
             "source": "https://help.solidworks.com/2026/english/simtutorialonline/c_simconn_fatigue.htm"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Full n-DOF eigen + FRF matrix + harmonic response (mode superposition, DAF, phase) + random-vibration PSD (Miles' equation + shaped PSD via trapezoidal integration) backend; no UI",
+            "status": "yes",
+            "note": "Harmonic (mode superposition, DAF, phase) + random-vibration PSD (Miles' + shaped PSD) + UI panel (VibrationPanel: harmonic/PSD selector, FRF plot)",
             "evidence": "packages/kerf-fem/src/kerf_fem/harmonic.py"
           }
         },
@@ -7571,7 +7569,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "CalculiX/Mystran/Z88 bridge (needs binary; backend)",
+            "note": "CalculiX/FEniCSx solver + LinearStaticPanel UI (load/BC editor, von Mises contour)",
             "evidence": "packages/kerf-fem/src/kerf_fem/calculix_bridge.py"
           }
         },
@@ -7585,7 +7583,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Consistent-mass modal, Riks, J2 plasticity (backend)",
+            "note": "Consistent-mass modal + linear eigenvalue buckling + J2 plasticity + UI panels (ModalPanel, BucklingPanel)",
             "evidence": "packages/kerf-fem/src/kerf_fem/modal.py"
           }
         },
@@ -7627,8 +7625,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "S-N, \u03b5-N, rainflow counting (backend)",
-            "evidence": "packages/kerf-fem/src/kerf_fem/fatigue_fem.py"
+            "note": "S-N, \u03b5-N, rainflow (Goodman/Gerber/SWT, Miner) + FatiguePanel UI (S-N picker, load history, life contour)",            "evidence": "packages/kerf-fem/src/kerf_fem/fatigue_fem.py"
           }
         },
         {
@@ -8075,7 +8072,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "SDOF vibration analysis deep (backend)",
+            "note": "SDOF + n-DOF harmonic + PSD random vibration (Miles) + VibrationPanel UI (FRF plot)",
             "evidence": "packages/kerf-fem/src/kerf_fem/modal.py"
           }
         },
@@ -8886,9 +8883,9 @@
         {
           "domain": "D1",
           "feature": "2D drawings (views/dims/sections)",
-          "competitor": "{ status: yes, note: \"Drafting workbench — view generation, dimensions, sections, GD&T callouts\", source: \"https://www.3ds.com/products/catia/drafting\" }",
-          "kerf": "{ status: partial, note: \"Live HLR projection (make2d) + auto-dim; GD&T toolbar + FCF click-to-place (GdntToolbar.jsx)\", evidence: \"packages/kerf-cad-core/src/kerf_cad_core/geom/make2d.py\" }"        },
-        {
+          "competitor": "{ status: yes, note: \"Drafting workbench \u2014 view generation, dimensions, sections, GD&T callouts\", source: \"https://www.3ds.com/products/catia/drafting\" }",
+          "kerf": "{ status: partial, note: \"Live HLR projection (make2d) + auto-dim; no GD&T-placement UI\", evidence: \"packages/kerf-cad-core/src/kerf_cad_core/geom/make2d.py\" }"
+        },        {
           "domain": "D1",
           "feature": "GD&T on drawings / MBD / PMI",
           "competitor": "{ status: yes, note: \"Functional Tolerancing & Annotation (FTA) \u2014 full ISO / ASME PMI on 3D model; 3DEXPERIENCE MBD\", source: \"https://www.3ds.com/products/catia/functional-tolerancing-and-annotation\" }",
@@ -9124,9 +9121,9 @@
         {
           "domain": "D11",
           "feature": "GD&T data model (ASME Y14.5)",
-          "competitor": "{ status: yes, note: \"FTA (Functional Tolerancing & Annotation) — full PMI / 3D annotations on model; ASME Y14.5 + ISO 1101\", source: \"https://www.3ds.com/products/catia/functional-tolerancing-and-annotation\" }",
-          "kerf": "{ status: yes, note: \"Backend only; GD&T toolbar + FCF placement UI + 3D PMI overlay shipped\", evidence: \"packages/kerf-gdnt/src/kerf_gdnt/feature_control_frame.py\" }"        },
-        {
+          "competitor": "{ status: yes, note: \"FTA (Functional Tolerancing & Annotation) \u2014 full PMI / 3D annotations on model; ASME Y14.5 + ISO 1101\", source: \"https://www.3ds.com/products/catia/functional-tolerancing-and-annotation\" }",
+          "kerf": "{ status: yes, note: \"Backend only; no MBD/PMI on model\", evidence: \"packages/kerf-gdnt/src/kerf_gdnt/feature_control_frame.py\" }"
+        },        {
           "domain": "D11",
           "feature": "Tolerance stackup \u2014 1D (WC/RSS/MC)",
           "competitor": "{ status: paid, note: \"CATIA Tolerance Analysis \u2014 1D stackup; DELMIA/SIMULIA CETOL for full 3D; paid add-ins\", source: \"https://www.3ds.com/products/catia/tolerance-analysis\" }",

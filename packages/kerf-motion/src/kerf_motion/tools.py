@@ -64,7 +64,7 @@ simulate_motion_spec = ToolSpec(
                 "items": {
                     "type": "object",
                     "properties": {
-                        "type": {"type": "string", "enum": ["gravity", "applied", "spring_damper"]},
+                        "type": {"type": "string", "enum": ["gravity", "applied", "spring_damper", "table_driver"]},
                         "g": {"type": "number"},
                         "body_idx": {"type": "integer"},
                         "force": {"type": "array", "items": {"type": "number"}},
@@ -74,6 +74,16 @@ simulate_motion_spec = ToolSpec(
                         "k": {"type": "number"},
                         "c": {"type": "number"},
                         "natural_length": {"type": "number"},
+                        "table_times": {"type": "array", "items": {"type": "number"},
+                                        "description": "Time stamps for position-vs-time table driver (s)."},
+                        "table_thetas": {"type": "array", "items": {"type": "number"},
+                                         "description": "Target angular positions (rad) at each table time."},
+                        "inertia": {"type": "number",
+                                    "description": "Scalar moment of inertia for inverse-dynamics torque (kg·m²)."},
+                        "damping": {"type": "number",
+                                    "description": "Viscous damping coefficient (N·m·s/rad). Default 0."},
+                        "axis": {"type": "array", "items": {"type": "number"},
+                                 "description": "Drive axis [ax, ay, az]. Default [0,0,1]."},
                     },
                     "required": ["type"],
                 },
@@ -90,7 +100,7 @@ simulate_motion_spec = ToolSpec(
 async def run_simulate_motion(params: Dict, ctx: ProjectCtx) -> str:
     try:
         from kerf_motion.body import RigidBody
-        from kerf_motion.forces import gravity as gravity_ff, applied_force, spring_damper
+        from kerf_motion.forces import gravity as gravity_ff, applied_force, spring_damper, table_driver_torque
         from kerf_motion.integrator import simulate
 
         # Build bodies
@@ -129,6 +139,22 @@ async def run_simulate_motion(params: Dict, ctx: ProjectCtx) -> str:
                     k=fspec["k"],
                     c=fspec.get("c", 0.0),
                     natural_length=fspec.get("natural_length", 1.0),
+                ))
+            elif ftype == "table_driver":
+                bidx = int(fspec.get("body_idx", 0))
+                t_times = [float(v) for v in fspec.get("table_times", [])]
+                t_thetas = [float(v) for v in fspec.get("table_thetas", [])]
+                inertia_val = float(fspec.get("inertia", 1.0))
+                damping_val = float(fspec.get("damping", 0.0))
+                axis_raw = fspec.get("axis", [0.0, 0.0, 1.0])
+                axis_val = tuple(float(v) for v in axis_raw)
+                force_fields.append(table_driver_torque(
+                    bidx,
+                    t_times,
+                    t_thetas,
+                    inertia=inertia_val,
+                    damping=damping_val,
+                    axis=axis_val,  # type: ignore[arg-type]
                 ))
 
         dt = float(params["dt"])

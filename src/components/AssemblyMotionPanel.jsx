@@ -37,6 +37,30 @@ const DEFAULT_SIM = {
 // ---------------------------------------------------------------------------
 
 /**
+ * Parse a position-vs-time table string ("t theta" pairs, one per line) into
+ * { times: number[], thetas: number[] }.  Lines that don't parse as two numbers
+ * are silently skipped.
+ *
+ * @param {string} raw  — textarea content, e.g. "0.0 0\n0.5 1.57\n1.0 3.14"
+ * @returns {{ times: number[], thetas: number[] }}
+ */
+export function parseTableDriver(raw) {
+  const times = []
+  const thetas = []
+  for (const line of (raw || '').split('\n')) {
+    const parts = line.trim().split(/\s+/)
+    if (parts.length < 2) continue
+    const t = parseFloat(parts[0])
+    const theta = parseFloat(parts[1])
+    if (isFinite(t) && isFinite(theta)) {
+      times.push(t)
+      thetas.push(theta)
+    }
+  }
+  return { times, thetas }
+}
+
+/**
  * Build the `simulate_motion` tool payload from panel state.
  *
  * @param {object[]} joints  — [{type, componentA, componentB, axis, value, ...}]
@@ -68,8 +92,8 @@ export function buildSimPayload(joints, driver, sim) {
   // Driver → force/torque on body 0
   const forces = [{ type: 'gravity', g: 9.80665 }]
   if (bodies.length > 0) {
-    const dv = _driverForce(driver)
-    if (dv) forces.push({ type: 'applied', body_idx: 0, force: dv.force, torque: dv.torque })
+    const dv = _driverForce(driver, sim)
+    if (dv) forces.push(dv)
   }
 
   return {
@@ -90,14 +114,37 @@ export function buildSimPayload(joints, driver, sim) {
   }
 }
 
-function _driverForce(driver) {
+/**
+ * Build a force-spec entry from the driver state.
+ *
+ * For `table` driver this emits a `table_driver` force spec which the backend
+ * resolves via inverse dynamics (τ = I·α + c·ω).
+ *
+ * @param {object} driver
+ * @param {object} sim  — {dt, duration} used for inertia default
+ * @returns {object|null}  force spec, or null if driver applies no force
+ */
+function _driverForce(driver, sim) {
   if (!driver) return null
   switch (driver.type) {
     case 'constant_velocity':
-      return { force: [0, 0, 0], torque: [0, 0, (driver.velocity ?? 1.0)] }
+      return { type: 'applied', body_idx: 0, force: [0, 0, 0], torque: [0, 0, (driver.velocity ?? 1.0)] }
     case 'sinusoidal':
       // Amplitude × sin(2π f t) — approximated as constant amplitude for payload
-      return { force: [0, 0, 0], torque: [0, 0, (driver.amplitude ?? 1.0)] }
+      return { type: 'applied', body_idx: 0, force: [0, 0, 0], torque: [0, 0, (driver.amplitude ?? 1.0)] }
+    case 'table': {
+      const { times, thetas } = parseTableDriver(driver.table ?? '')
+      if (times.length < 2) return null   // not enough points — skip
+      return {
+        type: 'table_driver',
+        body_idx: 0,
+        table_times: times,
+        table_thetas: thetas,
+        inertia: driver.inertia ?? 1.0,   // kg·m² — user can override; default = unit
+        damping: driver.damping ?? 0.0,
+        axis: [0, 0, 1],
+      }
+    }
     default:
       return null
   }

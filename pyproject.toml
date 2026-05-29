@@ -219,6 +219,7 @@ members = [
     "packages/kerf-v1",
     "packages/kerf-wiring",
     "packages/kerf-woodworking",
+    "packages/kerf-worker",
     "packages/kerf-workers",
 ]
 
@@ -277,6 +278,7 @@ kerf-topo = { workspace = true }
 kerf-v1 = { workspace = true }
 kerf-wiring = { workspace = true }
 kerf-woodworking = { workspace = true }
+kerf-worker = { workspace = true }
 kerf-workers = { workspace = true }
 
 [tool.pytest.ini_options]
@@ -306,6 +308,7 @@ testpaths = [
     "packages/kerf-workers/tests",
     "packages/kerf-parts/tests",
     "packages/kerf-partsgen/tests",
+    "packages/kerf-worker/tests",
     "tests/perf",
 ]
 asyncio_mode = "auto"

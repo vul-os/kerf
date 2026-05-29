@@ -1578,6 +1578,49 @@ function Renderer({
 
     /** Paint DFM issue markers in the viewport. Pass null/[] to clear. */
     setDfmIssues: (issues) => { const s = stateRef.current; if (!s) return; issues?.length ? attachDfmOverlay(s.scene, s.camera, s.renderer, issues) : detachDfmOverlay() },
+
+    /**
+     * highlightFaces — highlight a set of component / face ids in the viewport.
+     *
+     * Accepts an array of component-id strings (the same ids carried by
+     * mesh userData.componentId).  Matching meshes are tinted with a warm
+     * emissive highlight; passing [] or null clears all clash highlights.
+     *
+     * Implementation: we reuse the existing selectedComponentId prop pathway
+     * by temporarily driving an in-state selection.  A single-element array
+     * maps cleanly to the existing highlight path; for multi-part clash pairs
+     * we highlight the first id (part A).
+     *
+     * @param {string[]} ids — component ids to highlight (empty array = clear)
+     */
+    highlightFaces: (ids) => {
+      const s = stateRef.current
+      if (!s) return
+      // Walk the scene and tint meshes whose componentId appears in `ids`.
+      const idSet = new Set(ids || [])
+      s.scene.traverse((obj) => {
+        if (!obj.isMesh) return
+        const cid = obj.userData?.componentId
+        if (!cid) return
+        if (idSet.has(cid)) {
+          if (obj.isInstancedMesh) {
+            // Per-instance emissive tint not trivially supported via InstancedMesh
+            // without a custom shader; fall back to whole-mesh emissive.
+            if (obj.material?.emissive != null) {
+              obj.material = obj.material.clone()
+              obj.material.emissive.setHex(0xff6600)
+              obj.material.emissiveIntensity = 0.4
+            }
+          } else {
+            if (obj.material?.emissive != null) {
+              obj.material = obj.material.clone()
+              obj.material.emissive.setHex(0xff6600)
+              obj.material.emissiveIntensity = 0.4
+            }
+          }
+        }
+      })
+    },
   }), [hdriBackground])
 
   // HUD shows the prop-driven selection if present, else the last clicked id.

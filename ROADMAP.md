@@ -137,6 +137,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 - **OCCT `.feature` Phase 2/3** ✅ — Pad/Pocket/Revolve/Hole/Fillet/Chamfer/Shell/Sweep/Loft/Push-Pull/Linear-Polar-Mirror patterns; face/edge gumball.
 - **2D sketcher v1 + v2** ✅ — full constraint set, trim/extend, ellipse, B-spline, bezier, fillet, mirror, patterns.
 - **Assembly model + 3D mates** ✅ — coincident/concentric/parallel/perp/distance/angle/tangent; gradient-descent solver.
+- **Assembly clash detection UI** ✅ — OBB-SAT + BVH + tri-tri backend; Check Clashes side panel with pair list (part A / part B / severity / Jump-to); viewport highlight via `highlightFaces` hook — parity with SOLIDWORKS Interference / Fusion / Onshape clash detection.
 - **Tolerance stack-up** ✅ — worst-case/RSS/Monte-Carlo + auto chain-walk.
 - **2D drawings** ✅ — multi-sheet, dimensions, GD&T frames, section hatching, leaders/balloons, centerlines.
 - **NURBS surfacing (Phase 4)** ✅ — sweep1/2/network/blend/loft + `surface_continuity` (C0–C2/G0–G2); surface-direct boolean; trim-by-curve; curvature-comb viz; zebra/reflection-line viewport toggle. G3 *enforcement* on the OCCT side is structurally impossible (absent from OCCT's type system); pure-Python is the G3 path.

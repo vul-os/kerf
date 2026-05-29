@@ -701,6 +701,17 @@ export const api = {
       method: 'POST',
       body: params,
     }),
+
+  // ---- Assembly clash detection ----
+  // Runs OBB-SAT + BVH clash detection on the components of a given assembly
+  // file.  The backend fetches bbox/transform data from the file store and
+  // runs kerf_cad_core.clash.detect.clash_detect inline.
+  // Returns { ok, clashes, clash_count, by_discipline_pair, errors }.
+  runClashDetect: (projectId, fileId, opts = {}) =>
+    request(`/api/projects/${projectId}/files/${fileId}/clash`, {
+      method: 'POST',
+      body: { min_clearance: opts.minClearance ?? 0 },
+    }),
 }
 
 // ---------------------------------------------------------------------------

@@ -7890,6 +7890,111 @@ async def jewelry_metal_cost(pid: str, request: Request, payload: dict = Depends
 
 
 # ---------------------------------------------------------------------------
+# Assembly clash detection — POST /api/projects/{pid}/files/{fid}/clash
+# ---------------------------------------------------------------------------
+
+@router.post("/projects/{pid}/files/{fid}/clash")
+async def run_clash_detect(pid: str, fid: str, request: Request, payload: dict = Depends(require_auth)):
+    """
+    Run OBB-SAT + BVH clash detection on the components of an assembly file.
+
+    The assembly JSON is read from the file store; each component's bounding
+    box and world transform are extracted and forwarded to
+    kerf_cad_core.clash.detect.clash_detect (pure-Python, no subprocess).
+
+    Body (all optional):
+      min_clearance  — minimum required gap in mm (default 0)
+
+    Response: { ok, clashes, clash_count, by_discipline_pair, errors }
+      clashes items: { a, b, discipline_a, discipline_b, discipline_pair,
+                       type ("hard"|"clearance"|"coincident"), depth }
+    """
+    user_id = payload.get("sub")
+
+    pool = await get_pool_required()
+    async with pool.acquire() as conn:
+        ws_id = await project_workspace_id(pid)
+        if not ws_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
+        role = await get_user_workspace_role(conn, ws_id, user_id)
+        if not role:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
+
+        row = await conn.fetchrow(
+            "SELECT kind, content FROM files WHERE id = $1 AND project_id = $2 AND deleted_at IS NULL",
+            fid, pid,
+        )
+        if not row:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="file not found")
+        if row["kind"] != "assembly":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="file is not an assembly file",
+            )
+        content_str = row["content"] or "{}"
+
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    min_clearance = float(body.get("min_clearance", 0.0)) if body else 0.0
+
+    # Parse the assembly JSON to extract component shapes.
+    try:
+        asm = json.loads(content_str)
+    except Exception:
+        asm = {}
+
+    components_raw = asm.get("components") or []
+
+    # Build the shape descriptors.  Each component in the assembly has a
+    # transform (16-float row-major 4x4) and optionally bbox data.  When
+    # bbox data is absent we use a unit box (1 mm³) centred at the origin
+    # so the clash detector still runs — the result will be approximate but
+    # won't crash.
+    shape_descriptors: list[dict] = []
+    for comp in components_raw:
+        instance_id = comp.get("id") or comp.get("instance_id")
+        if not instance_id:
+            continue
+        transform = comp.get("transform")
+        bbox_min = comp.get("bbox_min", [0.0, 0.0, 0.0])
+        bbox_max = comp.get("bbox_max", [1.0, 1.0, 1.0])
+        discipline = comp.get("discipline")
+        triangles = comp.get("triangles")
+        desc: dict = {
+            "instance_id": instance_id,
+            "bbox_min": bbox_min,
+            "bbox_max": bbox_max,
+        }
+        if transform:
+            desc["transform"] = transform
+        if discipline:
+            desc["discipline"] = discipline
+        if triangles:
+            desc["triangles"] = triangles
+        shape_descriptors.append(desc)
+
+    try:
+        from kerf_cad_core.clash.detect import clash_detect as _clash_detect
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"kerf-cad-core not installed: {exc}",
+        )
+
+    result = _clash_detect(shape_descriptors, min_clearance=min_clearance)
+    return {
+        "ok": result.get("ok", True),
+        "clashes": result.get("clashes", []),
+        "clash_count": len(result.get("clashes", [])),
+        "by_discipline_pair": result.get("by_discipline_pair", {}),
+        "errors": result.get("errors", []),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Part photo upload (T-310: rate-limited)
 # ---------------------------------------------------------------------------
 

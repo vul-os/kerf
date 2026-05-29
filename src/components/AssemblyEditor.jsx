@@ -38,6 +38,7 @@ import { api } from '../lib/api.js'
 import LibraryPicker from './LibraryPicker.jsx'
 import InlineBOMPanel from './InlineBOMPanel.jsx'
 import MatesPanel from './MatesPanel.jsx'
+import ClashPanel from './ClashPanel.jsx'
 
 // Module-scoped cache of file_id → Promise<string[]> of object ids. Re-used
 // across rows so opening the same source twice doesn't re-run JSCAD.
@@ -136,6 +137,7 @@ export default function AssemblyEditor({
   onRequestMatePick,        // (side: 'a'|'b') => void — tells parent to enter pick mode
   matePickResult,           // { side, ref } | null — delivered by parent after viewport pick
   onMatePickConsumed,       // () => void — called after we've applied the pick result
+  onHighlightComponent,     // (componentId) => void — zoom + highlight in the 3D viewport
 }) {
   const parsed = useMemo(() => parseAssembly(content), [content])
 
@@ -605,6 +607,14 @@ export default function AssemblyEditor({
         assemblyFileId={currentFileId}
         overrides={overrides}
         onChangeOverrides={onChangeOverrides}
+      />
+
+      {/* Clash detection panel */}
+      <ClashPanel
+        projectId={projectId}
+        assemblyFileId={currentFileId}
+        onHighlight={onHighlightComponent ?? onSelectComponent}
+        onToast={onToast}
       />
 
       {/* JSON view */}

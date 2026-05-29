@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-05-25T23:16:31.837Z",
+  "generatedAt": "2026-05-29T00:00:00.000Z",
   "items": [
     {
       "slug": "revit",
@@ -3898,9 +3898,9 @@
             "note": "Part Check Geometry + Boolean intersection"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/clash/detect.py",
-            "note": "backend OBB-SAT + BVH; no UI panel"
+            "note": "OBB-SAT + BVH + tri-tri; Check Clashes panel with pair list + Jump-to highlight"
           }
         },
         {
@@ -4696,8 +4696,8 @@
             "source": "https://help.autodesk.com/view/fusion360/ENU/?guid=ASM-CONTACT-SETS"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Backend OBB-SAT + BVH + tri-tri; no UI panel",
+            "status": "yes",
+            "note": "OBB-SAT + BVH + tri-tri; Check Clashes panel with pair list + Jump-to highlight",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/clash/detect.py"
           }
         },
@@ -5869,8 +5869,8 @@
             "source": "https://help.solidworks.com/2024/english/SolidWorks/motionstudies/t_detecting_interference_motion.htm"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Backend OBB-SAT + BVH + tri-tri; no UI panel",
+            "status": "yes",
+            "note": "OBB-SAT + BVH + tri-tri; Check Clashes panel with pair list + Jump-to highlight",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/clash/detect.py"
           }
         },

@@ -267,7 +267,7 @@ Everything committed, lowest priority. Ordered roughly by near-term readiness.
 
 **Silicon next:** verification depth + post-silicon (cocotb testbench harness, power analysis, STA, clock-tree synthesis, formal equivalence, Tiny Tapeout / Efabless harnesses). T-249..T-258.
 
-**Firmware next:** RTOS primitives, OTA, RTOS-aware debugger, power profiling, pin-map cross-check vs PCB, USB-class drivers. T-259..T-265.
+**Firmware next:** RTOS primitives, OTA, RTOS-aware debugger, power profiling, pin-map cross-check vs PCB, USB-class drivers. T-259..T-265. **T-274 ✅** — Build / Flash / Monitor UI wired: `FirmwareProjectPanel`, `BuildOutput`, `SerialMonitor` in `src/components/firmware/`; `firmware_project` kind renders in Editor; PlatformIO + Arduino IDE compare rows added.
 
 **Aerospace next:** XFOIL-class viscous solver, aircraft conceptual sizing (Raymer/Roskam), stability derivatives, aero-acoustics (FW-H), heat-shield/ablation, aerospace fasteners. T-266..T-272.
 

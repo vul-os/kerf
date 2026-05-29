@@ -67,6 +67,7 @@ import BIMView from '../components/BIMView.jsx'
 import AirfoilPolarPlot from '../components/AirfoilPolarPlot.jsx'
 import OrbitViewer from '../components/OrbitViewer.jsx'
 import { fetchAirfoilPolar } from '../lib/airfoilPolarBridge.js'
+import FirmwareProjectPanel from '../components/firmware/FirmwareProjectPanel.jsx'
 import TINView from '../components/civil/TINView.jsx'
 import PipeNetworkView from '../components/civil/PipeNetworkView.jsx'
 import GradingPlanView from '../components/civil/GradingPlanView.jsx'
@@ -627,6 +628,13 @@ function isOrbitFile(file) {
   return n.endsWith('.orbit')
 }
 
+function isFirmwareProjectFile(file) {
+  if (!file) return false
+  if (file.kind === 'firmware_project') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.fw.json') || n === 'kerf.fw.json'
+}
+
 function isCivilTINFile(file) {
   if (!file) return false
   if (file.kind === 'civil_tin') return true
@@ -928,6 +936,7 @@ export default function Editor() {
     if (isBIMFile(w.currentFile)) return
     if (isAirfoilFile(w.currentFile)) return
     if (isOrbitFile(w.currentFile)) return
+    if (isFirmwareProjectFile(w.currentFile)) return
     if (isLayupFile(w.currentFile)) return
     if (isAFPFile(w.currentFile)) return
     if (isFiberMapFile(w.currentFile)) return
@@ -1393,6 +1402,7 @@ export default function Editor() {
   const bimFile = isBIMFile(w.currentFile)
   const airfoilFile = isAirfoilFile(w.currentFile)
   const orbitFile = isOrbitFile(w.currentFile)
+  const firmwareProjectFile = isFirmwareProjectFile(w.currentFile)
   const civilTINFile      = isCivilTINFile(w.currentFile)
   const civilPipeFile     = isCivilPipeFile(w.currentFile)
   const civilGradingFile  = isCivilGradingFile(w.currentFile)
@@ -2166,6 +2176,20 @@ export default function Editor() {
           ) : dentalGuideFile ? (
             <div className="flex-1 min-h-0 overflow-y-auto">
               <SurgicalGuide projectId={projectId} />
+            </div>
+          ) : firmwareProjectFile ? (
+            /* T-274: .fw.json / kerf.fw.json opens the FirmwareProjectPanel
+               with Build / Flash / Monitor actions + inline build log. */
+            <div className="flex-1 min-h-0 relative overflow-hidden">
+              <FirmwareProjectPanel
+                file={w.currentFile}
+                content={w.currentFileContent}
+                projectId={projectId}
+                onFileAdded={(artifactPath) => {
+                  if (projectId) w.loadProject(projectId)
+                  void artifactPath
+                }}
+              />
             </div>
           ) : printFile ? (
             <div className="flex-1 min-h-0 relative">

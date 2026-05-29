@@ -11,6 +11,11 @@ description = "Shared pythonOCC base layer for Kerf CAD compute plugins"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.111",
+    # Numerical stack — used throughout geom/, surfacing, FEM bridges, etc.
+    # Declared here so every persona that includes kerf-cad-core (mech, full,
+    # compute-only) ships with a working numpy/scipy at runtime.
+    "numpy>=1.26",
+    "scipy>=1.11",
 ]
 
 [project.optional-dependencies]

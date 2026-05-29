@@ -16,6 +16,10 @@ dependencies = [
     "pyjwt>=2.8.0",
     "kerf-core>=0.1.0",
     "kerf-auth>=0.1.0",
+    # routes_aero_airfoil.py imports numpy directly; declared so the kerf-api
+    # plugin can register on every persona regardless of which compute
+    # plugins (kerf-cad-core etc.) are also installed.
+    "numpy>=1.26",
 ]
 
 [project.optional-dependencies]

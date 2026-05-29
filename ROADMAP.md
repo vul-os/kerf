@@ -74,6 +74,8 @@ The sector work only matters if you **own your work, are not locked in, and can 
 **Verticals** ✅ — dental anatomic crown (multi-cusp fan, not placeholder) + UI parity shipped (CrownSculptingPanel, ImplantLibrary, SurgicalGuide — preset picker, occlusion overlay, filterable Straumann/Nobel/Zimmer/MIS catalogue, CBCT import + pose editor + sleeve preview, all dispatching to kerf-dental backend); Swiss lever escapement + mainspring + balance-wheel; solar PV partial shading + bypass-diode + MPPT; analog PVT corner simulation (60 corners + Monte-Carlo mismatch).
 **Verticals** ✅ — dental anatomic crown (multi-cusp fan, not placeholder); surgical guide emits milling-ready B-rep + STL export ✅; Swiss lever escapement + mainspring + balance-wheel; solar PV partial shading + bypass-diode + MPPT; analog PVT corner simulation (60 corners + Monte-Carlo mismatch).
 
+**Building/PV UI** ✅ — `BuildingEnergyPanel` (zone-by-zone occupancy/lighting/equipment/infiltration/HVAC editor, EnergyPlus IDF export); `PVShadingPanel` (array layout + obstruction polygons + bypass-diode + MPPT + monthly yield chart); `MonthlyLoadChart` (SVG stacked-bar); `.energy.bldg` / `.energy.pv` / `.energy.load` file kinds wired in Editor.jsx.
+
 **Tolerancing / QA** ✅ — 3D vector-loop tolerance stackup (6-DOF Jacobian); SPC control charts (Shewhart/CUSUM/EWMA + Nelson/WECO); ISO 286 limits & fits.
 
 **Optics / acoustics** ✅ — Gaussian beam (complex-q + ABCD + M² + fibre coupling); non-sequential ray tracing + ghost detection; wave-domain room acoustics (image-source IR + Schroeder RT60 + SEA); Seidel S5 corrected.

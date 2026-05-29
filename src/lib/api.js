@@ -716,6 +716,29 @@ export const api = {
       method: 'POST',
       body: { min_clearance: opts.minClearance ?? 0 },
     }),
+
+  // ---- Building energy simulation ----
+  // POST /api/projects/:pid/energy/building
+  // Body: { zones: [...], location: {...}, export_idf: bool }
+  // Response: { totals, monthly, idf? }
+  buildingEnergy: (projectId, body) =>
+    request(`/api/projects/${projectId}/energy/building`, {
+      method: 'POST',
+      body,
+      timeoutMs: 30_000,
+    }),
+
+  // ---- PV partial-shading + bypass-diode + MPPT simulation ----
+  // POST /api/projects/:pid/energy/pv-shading
+  // Body: { modules_per_string, strings_in_parallel, module, shading_pattern, bypass_diodes, ... }
+  // Response: { string_gmpp_p_w, mismatch_loss_w, mismatch_loss_pct, annual_yield_yr1_kWh,
+  //             specific_yield_kWh_kWp, array_kWp, monthly_yield, per_module_gmpps }
+  pvShading: (projectId, body) =>
+    request(`/api/projects/${projectId}/energy/pv-shading`, {
+      method: 'POST',
+      body,
+      timeoutMs: 30_000,
+    }),
 }
 
 // ---------------------------------------------------------------------------

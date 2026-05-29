@@ -66,6 +66,9 @@ import CAMView from '../components/CAMView.jsx'
 import BIMView from '../components/BIMView.jsx'
 import AirfoilPolarPlot from '../components/AirfoilPolarPlot.jsx'
 import OrbitViewer from '../components/OrbitViewer.jsx'
+import BuildingEnergyPanel from '../components/energy/BuildingEnergyPanel.jsx'
+import PVShadingPanel from '../components/energy/PVShadingPanel.jsx'
+import MonthlyLoadChart from '../components/energy/MonthlyLoadChart.jsx'
 import { fetchAirfoilPolar } from '../lib/airfoilPolarBridge.js'
 import FirmwareProjectPanel from '../components/firmware/FirmwareProjectPanel.jsx'
 import TINView from '../components/civil/TINView.jsx'
@@ -629,6 +632,27 @@ function isOrbitFile(file) {
   return n.endsWith('.orbit')
 }
 
+function isEnergyBldgFile(file) {
+  if (!file) return false
+  if (file.kind === 'energy_bldg') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.energy.bldg')
+}
+
+function isEnergyPvFile(file) {
+  if (!file) return false
+  if (file.kind === 'energy_pv') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.energy.pv')
+}
+
+function isEnergyLoadFile(file) {
+  if (!file) return false
+  if (file.kind === 'energy_load') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.energy.load')
+}
+
 function isFirmwareProjectFile(file) {
   if (!file) return false
   if (file.kind === 'firmware_project') return true
@@ -937,6 +961,9 @@ export default function Editor() {
     if (isBIMFile(w.currentFile)) return
     if (isAirfoilFile(w.currentFile)) return
     if (isOrbitFile(w.currentFile)) return
+    if (isEnergyBldgFile(w.currentFile)) return
+    if (isEnergyPvFile(w.currentFile)) return
+    if (isEnergyLoadFile(w.currentFile)) return
     if (isFirmwareProjectFile(w.currentFile)) return
     if (isLayupFile(w.currentFile)) return
     if (isAFPFile(w.currentFile)) return
@@ -1403,6 +1430,9 @@ export default function Editor() {
   const bimFile = isBIMFile(w.currentFile)
   const airfoilFile = isAirfoilFile(w.currentFile)
   const orbitFile = isOrbitFile(w.currentFile)
+  const energyBldgFile = isEnergyBldgFile(w.currentFile)
+  const energyPvFile = isEnergyPvFile(w.currentFile)
+  const energyLoadFile = isEnergyLoadFile(w.currentFile)
   const firmwareProjectFile = isFirmwareProjectFile(w.currentFile)
   const civilTINFile      = isCivilTINFile(w.currentFile)
   const civilPipeFile     = isCivilPipeFile(w.currentFile)
@@ -2177,6 +2207,24 @@ export default function Editor() {
           ) : dentalGuideFile ? (
             <div className="flex-1 min-h-0 overflow-y-auto">
               <SurgicalGuide projectId={projectId} />
+            </div>
+          ) : energyBldgFile ? (
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <BuildingEnergyPanel projectId={projectId} />
+            </div>
+          ) : energyPvFile ? (
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <PVShadingPanel projectId={projectId} />
+            </div>
+          ) : energyLoadFile ? (
+            <div className="flex-1 min-h-0 overflow-y-auto p-4">
+              <div className="text-[11px] text-ink-500 font-mono mb-3">{w.currentFile?.name || ''}</div>
+              <MonthlyLoadChart
+                data={(() => { try { return JSON.parse(w.currentFileContent || '[]') } catch { return [] } })()}
+                width={520}
+                height={240}
+                title="Monthly Load Profile"
+              />
             </div>
           ) : firmwareProjectFile ? (
             /* T-274: .fw.json / kerf.fw.json opens the FirmwareProjectPanel

@@ -8066,3 +8066,348 @@ async def upload_part_photo(
         )
 
     return {"storage_key": storage_key, "photos": photos}
+
+
+# ---------------------------------------------------------------------------
+# Building energy simulation
+# ---------------------------------------------------------------------------
+# Pure-math endpoint — no file required.
+# POST /api/projects/{pid}/energy/building
+# Body fields:
+#   zones  — list of zone dicts (floor_area_m2, height_m, wall_u_value,
+#             window_area_m2, window_u_value, window_shgc, infiltration_ach,
+#             num_people, schedule, lighting_w_m2, equipment_w_m2,
+#             hvac_cop_heating, hvac_cop_cooling, setpoint_heating_c,
+#             setpoint_cooling_c)
+#   location — { latitude, longitude, hdd, cdd }
+#   export_idf — bool (default false)
+# Response: { totals, monthly, idf? }
+
+@router.post("/projects/{pid}/energy/building")
+async def building_energy_sim(pid: str, request: Request, payload: dict = Depends(require_auth)):
+    """Annual building energy simulation with optional EnergyPlus IDF export."""
+    user_id = payload.get("sub")
+
+    pool = await get_pool_required()
+    async with pool.acquire() as conn:
+        ws_id = await project_workspace_id(pid)
+        if not ws_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
+        role = await get_user_workspace_role(conn, ws_id, user_id)
+        if not role:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
+
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid JSON body")
+
+    zones = body.get("zones") or []
+    if not isinstance(zones, list) or len(zones) == 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="zones list is required")
+
+    location = body.get("location") or {}
+    hdd = float(location.get("hdd", 2700))
+    cdd = float(location.get("cdd", 150))
+    export_idf = bool(body.get("export_idf", False))
+
+    MONTHS = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ]
+    # Monthly HDD/CDD distribution (approximate Northern Hemisphere fractions)
+    HDD_FRAC = [0.18, 0.15, 0.12, 0.07, 0.02, 0.00, 0.00, 0.00, 0.02, 0.07, 0.12, 0.17]
+    CDD_FRAC = [0.00, 0.00, 0.00, 0.02, 0.08, 0.18, 0.24, 0.22, 0.14, 0.06, 0.00, 0.00]
+
+    # Schedule occupancy fractions
+    SCHED_HOURS = {
+        "office": 8 * 5 / (24 * 7),         # ~24% of week
+        "residential": 0.70,
+        "retail": 12 * 6 / (24 * 7),         # ~43%
+        "warehouse": 12 * 5 / (24 * 7),      # ~36%
+    }
+    SCHED_FRAC = {k: min(v, 1.0) for k, v in SCHED_HOURS.items()}
+
+    # Annual totals
+    total_heating_kWh = 0.0
+    total_cooling_kWh = 0.0
+    total_lighting_kWh = 0.0
+    total_equipment_kWh = 0.0
+    total_area = 0.0
+
+    monthly = [
+        {"month": m, "heating_kWh": 0.0, "cooling_kWh": 0.0,
+         "lighting_kWh": 0.0, "equipment_kWh": 0.0}
+        for m in MONTHS
+    ]
+
+    for zone in zones:
+        area = max(float(zone.get("floor_area_m2", 50)), 1.0)
+        height = max(float(zone.get("height_m", 3.0)), 1.0)
+        volume = area * height
+
+        wall_u = float(zone.get("wall_u_value", 0.35))
+        win_area = float(zone.get("window_area_m2", 0))
+        win_u = float(zone.get("window_u_value", 1.8))
+        inf_ach = float(zone.get("infiltration_ach", 0.5))
+        lighting_wm2 = float(zone.get("lighting_w_m2", 10))
+        equip_wm2 = float(zone.get("equipment_w_m2", 15))
+        num_people = int(zone.get("num_people", 2))
+        schedule = zone.get("schedule", "office")
+        occ_frac = SCHED_FRAC.get(schedule, 0.24)
+        cop_h = max(float(zone.get("hvac_cop_heating", 3.5)), 0.1)
+        cop_c = max(float(zone.get("hvac_cop_cooling", 3.0)), 0.1)
+
+        # UA total (W/K): walls + windows + infiltration
+        wall_area_est = 2 * (area ** 0.5 + area ** 0.5) * height  # perimeter × height proxy
+        ua_env = wall_area_est * wall_u + win_area * win_u
+        ua_inf = volume * inf_ach * 1.2 * 1005 / 3600  # rho=1.2, cp=1005
+        ua_total = ua_env + ua_inf
+
+        # Internal gains (W)
+        internal_w = (lighting_wm2 + equip_wm2) * area * occ_frac + num_people * 75 * occ_frac
+
+        # Degree-day energy: E = UA × DD × 24 / COP / 1000 (kWh)
+        zone_heat = ua_total * hdd * 24 / cop_h / 1000
+        zone_cool = ua_total * cdd * 24 / cop_c / 1000
+        zone_light = lighting_wm2 * area * occ_frac * 8760 / 1000
+        zone_equip = equip_wm2 * area * occ_frac * 8760 / 1000
+
+        total_heating_kWh  += zone_heat
+        total_cooling_kWh  += zone_cool
+        total_lighting_kWh += zone_light
+        total_equipment_kWh += zone_equip
+        total_area         += area
+
+        # Monthly distribution
+        for i, m in enumerate(monthly):
+            m["heating_kWh"]   += zone_heat  * HDD_FRAC[i]
+            m["cooling_kWh"]   += zone_cool  * CDD_FRAC[i]
+            m["lighting_kWh"]  += zone_light / 12
+            m["equipment_kWh"] += zone_equip / 12
+
+    annual_kWh = total_heating_kWh + total_cooling_kWh + total_lighting_kWh + total_equipment_kWh
+    eui = annual_kWh / max(total_area, 1.0)
+
+    result: dict = {
+        "totals": {
+            "heating_kWh":   round(total_heating_kWh, 1),
+            "cooling_kWh":   round(total_cooling_kWh, 1),
+            "lighting_kWh":  round(total_lighting_kWh, 1),
+            "equipment_kWh": round(total_equipment_kWh, 1),
+            "annual_kWh":    round(annual_kWh, 1),
+            "eui_kWh_m2":    round(eui, 2),
+        },
+        "monthly": [
+            {
+                "month": m["month"],
+                "heating_kWh":   round(m["heating_kWh"], 1),
+                "cooling_kWh":   round(m["cooling_kWh"], 1),
+                "lighting_kWh":  round(m["lighting_kWh"], 1),
+                "equipment_kWh": round(m["equipment_kWh"], 1),
+            }
+            for m in monthly
+        ],
+    }
+
+    # EnergyPlus IDF export — minimal stub conforming to IDD v9 schema
+    if export_idf:
+        idf_lines = [
+            " ! EnergyPlus IDF exported from Kerf",
+            " ! Building energy model — auto-generated",
+            "",
+            "  Version,",
+            "    9.6;   ! EnergyPlus version",
+            "",
+            "  Building,",
+            f"    Kerf Model,   ! Name",
+            "    0.0,           ! North axis deg",
+            "    Suburbs,       ! Terrain",
+            "    0.04,          ! Loads convergence tolerance",
+            "    0.004,         ! Temperature convergence tolerance",
+            "    FullInteriorAndExteriorWithReflections, ! Solar dist",
+            "    25,            ! Max warmup days",
+            "    6;             ! Min warmup days",
+            "",
+        ]
+        for i, zone in enumerate(zones):
+            zname = zone.get("name", f"Zone_{i+1}").replace(" ", "_")
+            area = float(zone.get("floor_area_m2", 50))
+            height = float(zone.get("height_m", 3.0))
+            idf_lines += [
+                "  Zone,",
+                f"    {zname},     ! Name",
+                "    0,           ! Direction of relative north",
+                "    0, 0, 0,     ! X, Y, Z origin",
+                "    1, 1,        ! Type, multiplier",
+                f"    {height:.2f},      ! Ceiling height",
+                f"    {area * height:.2f};     ! Volume",
+                "",
+            ]
+        result["idf"] = "\n".join(idf_lines)
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# PV partial-shading + bypass-diode + MPPT simulation
+# ---------------------------------------------------------------------------
+# POST /api/projects/{pid}/energy/pv-shading
+# Body fields:
+#   modules_per_string, strings_in_parallel
+#   module: { Iph, Io, Rs, Rsh, n, T_C, n_cells, cells_per_bypass }
+#   shading_pattern: [{ cells, irradiance }, ...]
+#   bypass_diodes: bool (default true)
+#   bypass_fwd_v: float (default 0.7)
+#   poa_annual_kWh_m2, pr, tilt_deg, azimuth_deg, latitude
+# Response: { string_gmpp_p_w, sum_module_gmpp_p_w, mismatch_loss_w,
+#             mismatch_loss_pct, array_kWp, annual_yield_yr1_kWh,
+#             specific_yield_kWh_kWp, monthly_yield, per_module_gmpps }
+
+@router.post("/projects/{pid}/energy/pv-shading")
+async def pv_shading_sim(pid: str, request: Request, payload: dict = Depends(require_auth)):
+    """PV partial-shading simulation with bypass-diode and MPPT mismatch loss."""
+    user_id = payload.get("sub")
+
+    pool = await get_pool_required()
+    async with pool.acquire() as conn:
+        ws_id = await project_workspace_id(pid)
+        if not ws_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
+        role = await get_user_workspace_role(conn, ws_id, user_id)
+        if not role:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
+
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid JSON body")
+
+    # Import the PV tools (kerf-cad-core must be installed)
+    try:
+        from kerf_cad_core.solarpv.shading_tools import (
+            _parse_cell_params, CellParams,
+        )
+        from kerf_cad_core.solarpv.shading import (
+            module_iv_shaded, mppt_global,
+        )
+        from kerf_cad_core.solarpv.sizing import energy_yield
+        _pv_available = True
+    except ImportError:
+        _pv_available = False
+
+    if not _pv_available:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="kerf-cad-core PV tools not installed",
+        )
+
+    mod_spec = body.get("module") or {}
+    n_cells = int(mod_spec.get("n_cells", 60))
+    cells_per_bypass = int(mod_spec.get("cells_per_bypass", 20))
+    bypass_fwd_v = float(body.get("bypass_fwd_v", 0.7))
+    bypass_diodes = bool(body.get("bypass_diodes", True))
+    eff_bypass_v = bypass_fwd_v if bypass_diodes else 1e6
+
+    modules_per_string = max(int(body.get("modules_per_string", 10)), 1)
+    strings_in_parallel = max(int(body.get("strings_in_parallel", 1)), 1)
+
+    # Parse cell params from module spec
+    try:
+        params = _parse_cell_params({
+            "Iph": float(mod_spec.get("Iph", 9.0)),
+            "Io":  float(mod_spec.get("Io",  1.5e-10)),
+            "Rs":  float(mod_spec.get("Rs",  0.005)),
+            "Rsh": float(mod_spec.get("Rsh", 400)),
+            "n":   float(mod_spec.get("n",   1.3)),
+            "T_C": float(mod_spec.get("T_C", 25)),
+        })
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"module params: {exc}")
+
+    # Build per-cell irradiance array from shading_pattern
+    shading_pattern = body.get("shading_pattern") or []
+    if shading_pattern:
+        cell_irr = []
+        for seg in shading_pattern:
+            cells_in_seg = max(int(seg.get("cells", 20)), 1)
+            irr_val = float(seg.get("irradiance", 1000))
+            cell_irr.extend([irr_val] * cells_in_seg)
+        # Trim or pad to n_cells
+        if len(cell_irr) < n_cells:
+            cell_irr.extend([1000.0] * (n_cells - len(cell_irr)))
+        else:
+            cell_irr = cell_irr[:n_cells]
+    else:
+        cell_irr = [1000.0] * n_cells
+
+    N_PTS = 200
+    n_pts = max(20, min(N_PTS, 500))
+
+    try:
+        # Compute module IV curve (with partial shading + bypass diodes)
+        module_curve = module_iv_shaded(
+            cell_irr, params, n_cells=n_cells,
+            cells_per_bypass=cells_per_bypass,
+            bypass_fwd_v=eff_bypass_v, n_pts=n_pts,
+        )
+        mod_mpp = mppt_global(module_curve)
+        mod_gmpp_p = mod_mpp["gmpp_p"]
+
+        # String: modules_per_string in series
+        # Approximate string GMPP = module GMPP × modules_per_string
+        # (exact would require full string-series IV convolution — acceptable approximation here)
+        # For mismatch loss: compare with ideal (unshaded) module
+        unshaded_irr = [1000.0] * n_cells
+        unshaded_curve = module_iv_shaded(
+            unshaded_irr, params, n_cells=n_cells,
+            cells_per_bypass=cells_per_bypass,
+            bypass_fwd_v=eff_bypass_v, n_pts=n_pts,
+        )
+        unshaded_mpp = mppt_global(unshaded_curve)
+        unshaded_gmpp_p = unshaded_mpp["gmpp_p"]
+
+        string_gmpp = mod_gmpp_p * modules_per_string
+        sum_module_gmpp = unshaded_gmpp_p * modules_per_string
+        mismatch_loss_w = max(sum_module_gmpp - string_gmpp, 0.0)
+        mismatch_loss_pct = 100.0 * mismatch_loss_w / max(sum_module_gmpp, 1e-9)
+
+        # Array kWp (STC unshaded)
+        array_kWp = unshaded_gmpp_p * modules_per_string * strings_in_parallel / 1000.0
+
+        # Annual yield
+        poa_annual = float(body.get("poa_annual_kWh_m2", 1200))
+        pr = float(body.get("pr", 0.80))
+        pr_eff = pr * (1.0 - mismatch_loss_pct / 100.0)  # mismatch reduces effective PR
+        yield_result = energy_yield(array_kWp, poa_annual, pr_eff)
+
+        annual_yield_kWh = yield_result.get("annual_yield_yr1_kWh", 0)
+        specific_yield = yield_result.get("specific_yield_kWh_kWp", 0)
+
+        # Monthly yield (approximate: scale annual by solar fraction per month)
+        SOLAR_FRAC = [0.04, 0.06, 0.08, 0.09, 0.11, 0.12, 0.12, 0.11, 0.09, 0.08, 0.06, 0.04]
+        monthly_yield = [
+            {"month": m, "yield_kWh": round(annual_yield_kWh * f, 1)}
+            for m, f in zip(
+                ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
+                SOLAR_FRAC,
+            )
+        ]
+
+        return {
+            "string_gmpp_p_w": round(string_gmpp, 2),
+            "sum_module_gmpp_p_w": round(sum_module_gmpp, 2),
+            "mismatch_loss_w": round(mismatch_loss_w, 2),
+            "mismatch_loss_pct": round(mismatch_loss_pct, 3),
+            "array_kWp": round(array_kWp, 4),
+            "annual_yield_yr1_kWh": round(annual_yield_kWh, 1),
+            "specific_yield_kWh_kWp": round(specific_yield, 1),
+            "monthly_yield": monthly_yield,
+            "per_module_gmpps": [round(mod_gmpp_p, 4)],
+        }
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"PV simulation error: {exc}",
+        )

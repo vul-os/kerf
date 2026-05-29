@@ -67,7 +67,7 @@ Author: imranparuk
 from __future__ import annotations
 
 import math
-from typing import Any
+from typing import Any, Optional
 
 # Re-use the 4x4 matrix helpers from the assembly layer — no duplication.
 from kerf_cad_core.assembly.model import (
@@ -76,6 +76,34 @@ from kerf_cad_core.assembly.model import (
     _transform_vector,
     _validate_transform,
 )
+
+# OBB-from-STEP: imported lazily via _resolve_obb_from_step so that
+# parse-time imports stay fast and STEP-reader is optional at module load.
+# The cache is shared across the process lifetime (module-level singleton).
+_obb_cache = None  # type: ignore[assignment]  # lazy-init in _resolve_obb_from_step
+
+
+def _resolve_obb_from_step(step_blob, blob_hash: Optional[str] = None):
+    """Compute (or retrieve cached) OBB for *step_blob*.
+
+    Returns a ``(OBB, is_fallback)`` pair where *is_fallback* is True when
+    the geometry could not be parsed and the 1 mm³ unit-box sentinel was
+    returned.  Returns ``(None, True)`` if the import itself fails.
+    """
+    global _obb_cache
+    try:
+        from kerf_cad_core.geom.obb import OBBCache, is_unit_box_fallback  # noqa: PLC0415
+        if _obb_cache is None:
+            _obb_cache = OBBCache(max_size=256)
+        obb = _obb_cache.get_or_compute(blob_hash, step_blob)
+        return obb, is_unit_box_fallback(obb)
+    except Exception:  # noqa: BLE001
+        return None, True
+
+
+#: Sentinel that means "caller did not supply bbox" — distinct from
+#: the default (0,0,0)-(1,1,1) unit box.
+_BBOX_ABSENT = object()
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -173,18 +201,28 @@ class ComponentShape:
 
     Parameters
     ----------
-    instance_id : str
-    discipline  : optional discipline tag, e.g. "structural", "mep",
-                  "architectural", "civil", "mechanical", "electrical".
-                  None means unclassified.
-    transform   : 16-float row-major 4x4 matrix; None → identity
-    bbox_min    : local-frame AABB min corner (x, y, z) in mm
-    bbox_max    : local-frame AABB max corner (x, y, z) in mm
-    triangles   : optional list of triangles [(v0,v1,v2), ...] in local frame
-                  for narrow-phase mesh intersection
+    instance_id   : str
+    discipline    : optional discipline tag, e.g. "structural", "mep",
+                    "architectural", "civil", "mechanical", "electrical".
+                    None means unclassified.
+    transform     : 16-float row-major 4x4 matrix; None → identity
+    bbox_min      : local-frame AABB min corner (x, y, z) in mm.
+                    If omitted **and** step_blob is supplied, the bbox is
+                    derived from the STEP geometry at clash-detect time.
+    bbox_max      : local-frame AABB max corner (x, y, z) in mm.
+    triangles     : optional list of triangles [(v0,v1,v2), ...] in local frame
+                    for narrow-phase mesh intersection
+    step_blob     : raw STEP Part 21 content (bytes or str).  Used to compute
+                    a real OBB when bbox_min/bbox_max are absent.
+    step_blob_hash: hex SHA-256 digest of step_blob for cache lookup; if None
+                    the cache computes the hash from step_blob on first use.
     """
 
-    __slots__ = ("instance_id", "discipline", "transform", "bbox_min", "bbox_max", "triangles")
+    __slots__ = (
+        "instance_id", "discipline", "transform",
+        "bbox_min", "bbox_max", "triangles",
+        "step_blob", "step_blob_hash", "_bbox_absent",
+    )
 
     def __init__(
         self,
@@ -194,6 +232,9 @@ class ComponentShape:
         bbox_min: tuple[float, float, float] = (0.0, 0.0, 0.0),
         bbox_max: tuple[float, float, float] = (1.0, 1.0, 1.0),
         triangles: list[tuple] | None = None,
+        step_blob=None,
+        step_blob_hash: str | None = None,
+        _bbox_absent: bool = False,
     ) -> None:
         if not instance_id or not str(instance_id).strip():
             raise ValueError("instance_id must be a non-empty string")
@@ -203,6 +244,10 @@ class ComponentShape:
         self.bbox_min: tuple[float, float, float] = tuple(float(v) for v in bbox_min)  # type: ignore[assignment]
         self.bbox_max: tuple[float, float, float] = tuple(float(v) for v in bbox_max)  # type: ignore[assignment]
         self.triangles: list[tuple] | None = triangles
+        self.step_blob = step_blob
+        self.step_blob_hash: str | None = step_blob_hash
+        # True when caller did NOT supply explicit bbox — triggers OBB fallback
+        self._bbox_absent: bool = bool(_bbox_absent)
 
 
 # ---------------------------------------------------------------------------
@@ -785,6 +830,37 @@ def clash_detect(
         errors.append(f"min_clearance must be a number; defaulting to 0")
         min_clearance = 0.0
 
+    # ── Resolve real OBBs for components that have step_blob but no bbox ─
+    # If _bbox_absent is True AND step_blob is set, compute the tight OBB
+    # from the STEP geometry and update bbox_min/bbox_max in-place.
+    # If _bbox_absent is True AND step_blob is None, keep unit-box defaults
+    # but emit a warning so callers know the result is approximate.
+    for s in shapes:
+        if not s._bbox_absent:
+            continue  # explicit bbox supplied; no action needed
+        if s.step_blob is not None:
+            obb, is_fallback = _resolve_obb_from_step(s.step_blob, s.step_blob_hash)
+            if obb is not None and not is_fallback:
+                # Patch the shape's bbox to the OBB's axis-aligned extents
+                # in the local frame (identity axes — OBB local frame IS
+                # the PCA frame; the transform already accounts for world
+                # placement).
+                s.bbox_min = obb.center[0] - obb.half_extents[0], obb.center[1] - obb.half_extents[1], obb.center[2] - obb.half_extents[2]  # type: ignore[assignment]
+                s.bbox_max = obb.center[0] + obb.half_extents[0], obb.center[1] + obb.half_extents[1], obb.center[2] + obb.half_extents[2]  # type: ignore[assignment]
+            else:
+                errors.append(
+                    f"component {s.instance_id!r}: STEP OBB computation failed; "
+                    "using 1 mm³ unit-box fallback — clash results for this component "
+                    "will be approximate"
+                )
+        else:
+            # No bbox AND no step_blob — unit-box fallback; warn
+            errors.append(
+                f"component {s.instance_id!r}: no bbox and no step_blob supplied; "
+                "using 1 mm³ unit-box fallback — clash results for this component "
+                "will be approximate"
+            )
+
     # ── Pre-compute world AABBs and OBBs ────────────────────────────────
     aabbs: list[tuple[tuple, tuple]] = []
     obbs: list[_OBB] = []
@@ -886,14 +962,32 @@ def clash_detect(
 # ---------------------------------------------------------------------------
 
 def _shape_from_dict(d: dict) -> ComponentShape:
-    """Parse a ComponentShape from a plain dict (e.g. from JSON)."""
+    """Parse a ComponentShape from a plain dict (e.g. from JSON).
+
+    Extended keys (for real-OBB fallback)
+    --------------------------------------
+    step_blob      : raw STEP text/bytes — used to compute the OBB when
+                     bbox_min/bbox_max are absent.
+    step_blob_ref  : alias for step_blob (legacy field name accepted too).
+    step_blob_hash : hex SHA-256 digest of step_blob for cache lookup.
+                     If absent the cache computes it automatically.
+
+    When bbox_min / bbox_max are absent **and** step_blob is present, the
+    bbox is derived from the STEP geometry at clash-detect time (real OBB).
+    When neither bbox nor step_blob is present, a 1 mm³ unit-box is used
+    and a warning is emitted in the ``errors`` list.
+    """
     iid = d.get("instance_id")
     if not iid:
         raise ValueError("instance_id is required")
     discipline = d.get("discipline")
     transform = d.get("transform")
+
+    # Detect whether the caller supplied explicit bbox coords.
+    has_bbox = "bbox_min" in d and "bbox_max" in d
     bbox_min = tuple(d.get("bbox_min", [0.0, 0.0, 0.0]))
     bbox_max = tuple(d.get("bbox_max", [1.0, 1.0, 1.0]))
+
     tris_raw = d.get("triangles")
     triangles = None
     if tris_raw is not None:
@@ -901,6 +995,11 @@ def _shape_from_dict(d: dict) -> ComponentShape:
             (tuple(t[0]), tuple(t[1]), tuple(t[2]))
             for t in tris_raw
         ]
+
+    # step_blob_ref is an alias for step_blob (legacy JSON key name).
+    step_blob = d.get("step_blob") or d.get("step_blob_ref")
+    step_blob_hash = d.get("step_blob_hash")
+
     return ComponentShape(
         instance_id=iid,
         discipline=discipline,
@@ -908,6 +1007,9 @@ def _shape_from_dict(d: dict) -> ComponentShape:
         bbox_min=bbox_min,  # type: ignore[arg-type]
         bbox_max=bbox_max,  # type: ignore[arg-type]
         triangles=triangles,
+        step_blob=step_blob,
+        step_blob_hash=step_blob_hash,
+        _bbox_absent=not has_bbox,
     )
 
 

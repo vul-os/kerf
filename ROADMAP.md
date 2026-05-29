@@ -322,7 +322,7 @@ These are roadmap-level moats that span every sector simultaneously and compound
 ### Needs UI / deploy-gated
 
 - **P0-8 deploy-hardening** — realistic seed data + one-command dev loop; test coverage breadth still expanding.
-- **P1-7 formboard flatten** ✅ — shipped in T-37: `formboard_flatten.py` + `wiring_formboard_flatten` LLM tool; topological unfold with branch alternation, connector pinouts, bbox.
+- **P1-7 formboard flatten** ✅ — shipped in T-37: `formboard_flatten.py` + `wiring_formboard_flatten` LLM tool; topological unfold with branch alternation, connector pinouts, bbox; waypoints complete ✅ — every branch traversal (including simple two-node stubs) now emits BranchPoint2D for tap AND tip.
 - **P1-8 large-file git** — pointer kind + Phase 1 shipped; deduplication-based free-fork accounting and content-addressed LFS store in progress.
 - ~~**G-5 class-A wiring**~~ ✅ frontend wiring shipped — see G-5 row above.
 - **Long-tail verticals** — see "Long-tail verticals" list above; all committed, none started.

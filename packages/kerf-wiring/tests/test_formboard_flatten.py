@@ -303,6 +303,105 @@ class TestBranchedHarness:
         y_extent = max_y - min_y
         assert y_extent > 10.0, "bbox Y extent should include stub heights"
 
+    def test_branch_points_count_with_stubs(self):
+        """
+        Topology: trunk A-B-C (3 nodes) + 2 stubs from B (B-D, B-E).
+
+        After the waypoints-complete fix each stub traversal emits a BP for the
+        tap node (B) in addition to the tip node.  Count derivation:
+
+          trunk traversal  : A(1), B(2), C(3)  = 3 BPs
+          stub B→D         : B(4, tap), D(5, tip) = 2 BPs
+          stub B→E         : B(6, tap), E(7, tip) = 2 BPs
+          ──────────────────────────────────────────────────
+          total            : 7 BPs
+
+        B appears three times (once per path it heads: trunk, D-stub, E-stub).
+        """
+        fb = formboard_flatten(_branched_harness())
+        assert len(fb.branches) == 7
+
+    def test_stub_tap_waypoints_present(self):
+        """
+        Every two-node stub must contribute BOTH tap and tip as BranchPoint2D
+        entries (the Wave-4B caveat: previously only the tip was emitted).
+
+        Topology: trunk A-B-C + stubs B-D and B-E.
+        Expected: B appears as a tap BP for each stub (B→D and B→E).
+        """
+        fb = formboard_flatten(_branched_harness())
+        # Collect (node_id, cumulative_length_mm) pairs for tap-node BPs
+        tap_entries = [
+            bp for bp in fb.branches if bp.node_id == "B"
+        ]
+        # B must appear at least once per stub (plus the trunk pass = 3 total)
+        assert len(tap_entries) == 3, (
+            f"Expected B to appear 3 times in branches "
+            f"(trunk + 2 stub taps), got {len(tap_entries)}"
+        )
+
+    def test_multi_node_stub_complete_waypoints(self):
+        """
+        A trunk + a multi-node side-branch must have BPs for EVERY node on
+        the branch — not just the tip.
+
+        Topology: trunk A-B-X (100+300mm), side-branch B-C-D (60+80mm).
+        After fix: branch traversal of [B, C, D] emits BPs for B (tap), C
+        (intermediate), and D (tip).  The trunk already provides B's first BP;
+        the branch traversal adds a second B plus C and D.
+        """
+        h = {
+            "nodes": [
+                {"id": "A"}, {"id": "B"}, {"id": "X"},
+                {"id": "C"}, {"id": "D"},
+            ],
+            "segments": [
+                {"from": "A", "to": "B", "length_mm": 100.0, "wires": []},
+                {"from": "B", "to": "X", "length_mm": 300.0, "wires": []},
+                {"from": "B", "to": "C", "length_mm": 60.0, "wires": []},
+                {"from": "C", "to": "D", "length_mm": 80.0, "wires": []},
+            ],
+            "root": "A",
+        }
+        fb = formboard_flatten(h)
+        node_ids_emitted = [bp.node_id for bp in fb.branches]
+
+        # Every node must appear at least once
+        assert "A" in node_ids_emitted
+        assert "B" in node_ids_emitted
+        assert "X" in node_ids_emitted
+        assert "C" in node_ids_emitted
+        assert "D" in node_ids_emitted
+
+        # Topology count: trunk A(1) B(2) X(3) + branch B(4 tap) C(5) D(6) = 6
+        assert len(fb.branches) == 6, (
+            f"Expected 6 branch points (trunk A,B,X + branch B,C,D), "
+            f"got {len(fb.branches)}: "
+            f"{[(bp.node_id, bp.position_mm) for bp in fb.branches]}"
+        )
+
+        # Branch intermediates C and D must be at perpendicular positions (non-zero Y)
+        pos_by_node: dict[str, list] = {}
+        for bp in fb.branches:
+            pos_by_node.setdefault(bp.node_id, []).append(bp.position_mm)
+
+        # C and D are on the side branch — their Y must be non-zero
+        c_ys = [p[1] for p in pos_by_node["C"]]
+        d_ys = [p[1] for p in pos_by_node["D"]]
+        assert any(abs(y) > 1e-9 for y in c_ys), "C intermediate must have non-zero Y"
+        assert any(abs(y) > 1e-9 for y in d_ys), "D tip must have non-zero Y"
+
+        # Distances along branch must equal segment lengths
+        import math
+        b_pos = pos_by_node["B"][0]  # trunk position of B
+        # branch B→C→D: B at tap, C is 60mm from B, D is 80mm from C
+        c_pos = pos_by_node["C"][0]
+        d_pos = pos_by_node["D"][0]
+        dist_bc = math.sqrt((c_pos[0] - b_pos[0]) ** 2 + (c_pos[1] - b_pos[1]) ** 2)
+        dist_cd = math.sqrt((d_pos[0] - c_pos[0]) ** 2 + (d_pos[1] - c_pos[1]) ** 2)
+        assert pytest.approx(dist_bc, rel=1e-6) == 60.0
+        assert pytest.approx(dist_cd, rel=1e-6) == 80.0
+
 
 # ---------------------------------------------------------------------------
 # Test: cycle detection

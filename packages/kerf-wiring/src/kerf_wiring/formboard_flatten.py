@@ -428,14 +428,25 @@ def _layout_branch(
     ...
     depth               : Recursion depth (for alternating Y directions).
     """
-    # sub_path[0] is the tap node (already placed); walk from index 1 onward.
+    # sub_path[0] is the tap node (already positioned by the caller).  We emit
+    # a BranchPoint2D for it here so that every branch traversal is self-contained
+    # — both the tap AND all subsequent waypoints appear in this branch's portion
+    # of the branches list.  This closes the "simple two-node stub" gap where
+    # previously only the tip was emitted.
     if not sub_path or len(sub_path) < 2:
         return
+
+    tap_node = sub_path[0]
+    _emit_node_bp(
+        tap_node, branch_root_pos, branch_start_cum,
+        all_nodes, connectors,
+        branch_points, annotations, _bp_counter,
+    )
 
     dx, dy = direction
     cum = branch_start_cum
     prev_pos = branch_root_pos
-    prev_node = sub_path[0]
+    prev_node = tap_node
 
     for i in range(1, len(sub_path)):
         curr_node = sub_path[i]

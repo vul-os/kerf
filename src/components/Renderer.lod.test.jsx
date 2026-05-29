@@ -267,7 +267,7 @@ describe('Renderer LOD — source: enable/disable useEffect', () => {
   it('enable effect depends on [assemblyComponents]', () => {
     const idx = src.indexOf('lodRef.current.enabled = hasAssembly')
     expect(idx).toBeGreaterThan(-1)
-    const after = src.slice(idx, idx + 1500)
+    const after = src.slice(idx, idx + 2500)
     expect(after).toContain('[assemblyComponents]')
   })
 
@@ -364,12 +364,12 @@ describe('Renderer LOD — source: InstancedMesh per-instance handling', () => {
 
   it('queryLodPlan counts instances in lodStats.instances', () => {
     const fnIdx = src.indexOf('const queryLodPlan = useCallback')
-    const block = src.slice(fnIdx, fnIdx + 8000)
+    const block = src.slice(fnIdx, fnIdx + 10000)
     expect(block).toContain('instances')
     // The setLodStats call should include instances
     const statsIdx = block.indexOf('setLodStats(')
     expect(statsIdx).toBeGreaterThan(-1)
-    const statsBlock = block.slice(statsIdx, statsIdx + 300)
+    const statsBlock = block.slice(statsIdx, statsIdx + 400)
     expect(statsBlock).toContain('instances')
   })
 
@@ -693,5 +693,357 @@ describe('Renderer LOD — fetch integration mock', () => {
     const block = src.slice(fnIdx, fnIdx + 10000)
     expect(block).toContain('catch')
     expect(block).toMatch(/catch\s*\{/)
+  })
+})
+
+// ===========================================================================
+// Wave 4H — source inspection: clean wireframe box proxy for InstancedMesh
+// ===========================================================================
+
+describe('Renderer LOD — Wave 4H: clean wireframe box proxy (source)', () => {
+  it('defines _createInstBoxProxy function', () => {
+    expect(src).toContain('function _createInstBoxProxy(')
+  })
+
+  it('_createInstBoxProxy uses BoxGeometry + EdgesGeometry', () => {
+    const fnIdx = src.indexOf('function _createInstBoxProxy(')
+    expect(fnIdx).toBeGreaterThan(-1)
+    const block = src.slice(fnIdx, fnIdx + 1500)
+    expect(block).toContain('BoxGeometry')
+    expect(block).toContain('EdgesGeometry')
+  })
+
+  it('_createInstBoxProxy creates an InstancedMesh with LineBasicMaterial', () => {
+    const fnIdx = src.indexOf('function _createInstBoxProxy(')
+    const block = src.slice(fnIdx, fnIdx + 1500)
+    expect(block).toContain('InstancedMesh')
+    expect(block).toContain('LineBasicMaterial')
+  })
+
+  it('_createInstBoxProxy starts all instances at zero scale', () => {
+    const fnIdx = src.indexOf('function _createInstBoxProxy(')
+    const block = src.slice(fnIdx, fnIdx + 1500)
+    expect(block).toContain('scale.set(0, 0, 0)')
+  })
+
+  it('queryLodPlan creates box-proxy sibling via _createInstBoxProxy for InstancedMesh', () => {
+    const fnIdx = src.indexOf('const queryLodPlan = useCallback')
+    const block = src.slice(fnIdx, fnIdx + 10000)
+    expect(block).toContain('_createInstBoxProxy')
+    expect(block).toContain('_lodBoxProxyMesh')
+  })
+
+  it('queryLodPlan sets original InstancedMesh to zero-scale for box tier', () => {
+    const fnIdx = src.indexOf('const queryLodPlan = useCallback')
+    const block = src.slice(fnIdx, fnIdx + 10000)
+    // In box tier the original mesh instance is zeroed: scale.set(0, 0, 0)
+    expect(block).toContain('zeroDummy.matrix')
+  })
+
+  it('queryLodPlan drives box-proxy instance to bbox scale + original position', () => {
+    const fnIdx = src.indexOf('const queryLodPlan = useCallback')
+    const block = src.slice(fnIdx, fnIdx + 10000)
+    // Box tier drives the proxy with the decomposed position + bboxSize scale.
+    expect(block).toContain('proxyMesh.setMatrixAt')
+    expect(block).toContain('bboxSize')
+  })
+
+  it('queryLodPlan calls proxyMesh.instanceMatrix.needsUpdate after applying tiers', () => {
+    const fnIdx = src.indexOf('const queryLodPlan = useCallback')
+    const block = src.slice(fnIdx, fnIdx + 10000)
+    expect(block).toContain('proxyMesh.instanceMatrix.needsUpdate = true')
+  })
+
+  it('queryLodPlan tags box-proxy sibling with _lodBoxProxyFor', () => {
+    const fnIdx = src.indexOf('const queryLodPlan = useCallback')
+    const block = src.slice(fnIdx, fnIdx + 10000)
+    expect(block).toContain('_lodBoxProxyFor')
+  })
+
+  it('LOD HUD exposes instHi, instBox, instCull breakdowns', () => {
+    const hudIdx = src.indexOf('data-testid="lod-hud"')
+    expect(hudIdx).toBeGreaterThan(-1)
+    const block = src.slice(hudIdx, hudIdx + 2000)
+    expect(block).toContain('lodStats.instHi')
+    expect(block).toContain('lodStats.instBox')
+    expect(block).toContain('lodStats.instCull')
+  })
+
+  it('setLodStats call includes instHi, instBox, instCull fields', () => {
+    const fnIdx = src.indexOf('const queryLodPlan = useCallback')
+    const statsIdx = src.indexOf('setLodStats({', fnIdx)
+    expect(statsIdx).toBeGreaterThan(-1)
+    const block = src.slice(statsIdx, statsIdx + 500)
+    expect(block).toContain('instHi')
+    expect(block).toContain('instBox')
+    expect(block).toContain('instCull')
+  })
+
+  it('LOD disable effect removes box-proxy sibling meshes', () => {
+    const idx = src.indexOf('lodRef.current.enabled = hasAssembly')
+    expect(idx).toBeGreaterThan(-1)
+    const block = src.slice(idx, idx + 2000)
+    expect(block).toContain('_lodBoxProxyFor')
+  })
+
+  it('disposePartsAux removes box-proxy sibling meshes', () => {
+    const fnIdx = src.indexOf('function disposePartsAux(')
+    const block = src.slice(fnIdx, fnIdx + 1500)
+    expect(block).toContain('_lodBoxProxyFor')
+    expect(block).toContain('_lodBoxProxyMesh')
+  })
+})
+
+// ===========================================================================
+// Wave 4H — functional tests: clean wireframe box proxy matrix logic
+//
+// Build a fake InstancedMesh + a fake box-proxy, apply mixed tiers, and
+// assert that the ORIGINAL mesh instances are zeroed for box-tier and the
+// BOX-PROXY instances get the bbox-scale + original-position matrix.
+// ===========================================================================
+
+describe('Renderer LOD — Wave 4H: box-proxy matrix correctness', () => {
+  // Re-use helpers from the Wave 4G functional tests above.
+  function makeMatrix4(values16) {
+    const arr = values16 ? [...values16] : Array(16).fill(0)
+    arr[0] = arr[0] ?? 1; arr[5] = arr[5] ?? 1; arr[10] = arr[10] ?? 1; arr[15] = arr[15] ?? 1
+    return {
+      elements: arr,
+      fromArray(src2, offset = 0) {
+        for (let i = 0; i < 16; i++) this.elements[i] = src2[offset + i]
+        return this
+      },
+      decompose(pos, quat, scale) {
+        pos.x = this.elements[12]; pos.y = this.elements[13]; pos.z = this.elements[14]
+        quat.x = 0; quat.y = 0; quat.z = 0; quat.w = 1
+        scale.x = Math.abs(this.elements[0]) || 1
+        scale.y = Math.abs(this.elements[5]) || 1
+        scale.z = Math.abs(this.elements[10]) || 1
+        return this
+      },
+    }
+  }
+
+  function makeVec3(x = 0, y = 0, z = 0) {
+    return { x, y, z, copy(v) { this.x = v.x; this.y = v.y; this.z = v.z; return this } }
+  }
+
+  function makeQuat() {
+    return { x: 0, y: 0, z: 0, w: 1, copy(q) { Object.assign(this, q); return this } }
+  }
+
+  function fakeObject3D() {
+    const obj = {
+      position: makeVec3(),
+      quaternion: makeQuat(),
+      scale: makeVec3(1, 1, 1),
+      matrix: makeMatrix4(),
+      updateMatrix() {
+        this.matrix.elements[0] = this.scale.x
+        this.matrix.elements[5] = this.scale.y
+        this.matrix.elements[10] = this.scale.z
+        this.matrix.elements[12] = this.position.x
+        this.matrix.elements[13] = this.position.y
+        this.matrix.elements[14] = this.position.z
+        this.matrix.elements[15] = 1
+      },
+    }
+    return obj
+  }
+
+  function makeInstancedMesh(count, componentIds) {
+    const buf = new Float32Array(count * 16)
+    for (let i = 0; i < count; i++) {
+      const off = i * 16
+      buf[off + 0] = 1; buf[off + 5] = 1; buf[off + 10] = 1; buf[off + 15] = 1
+      buf[off + 12] = i * 10 // distinct x translation per instance
+    }
+    return {
+      isInstancedMesh: true,
+      count,
+      instanceMatrix: { array: buf, needsUpdate: false },
+      geometry: {
+        boundingBox: {
+          min: { x: -2, y: -1, z: -1 },
+          max: { x: 2, y: 1, z: 1 },
+          getSize(v) { v.x = 4; v.y = 2; v.z = 2 },
+          getCenter(v) { v.x = 0; v.y = 0; v.z = 0 },
+        },
+        computeBoundingBox() {},
+      },
+      userData: { componentIds },
+      setMatrixAt(i, m) {
+        const off = i * 16
+        for (let k = 0; k < 16; k++) buf[off + k] = m.elements[k]
+      },
+    }
+  }
+
+  // Minimal implementation of Wave 4H box-proxy per-instance LOD logic.
+  function applyWave4HLodPlan(origMesh, proxyMesh, detailMap) {
+    const cids = origMesh.userData.componentIds
+    if (!cids || !cids.length) return
+
+    if (!origMesh.userData._lodInstOrigMatrices) {
+      origMesh.userData._lodInstOrigMatrices = new Float32Array(origMesh.instanceMatrix.array)
+    }
+
+    const geomBb = origMesh.geometry?.boundingBox
+
+    const dummy = fakeObject3D()
+    const zeroDummy = fakeObject3D()
+    zeroDummy.position.x = 0; zeroDummy.position.y = 0; zeroDummy.position.z = 0
+    zeroDummy.scale.x = 0; zeroDummy.scale.y = 0; zeroDummy.scale.z = 0
+    zeroDummy.updateMatrix()
+
+    for (let i = 0; i < origMesh.count; i++) {
+      const cid = cids[i]
+      const detail = cid ? detailMap.get(cid) : undefined
+
+      if (detail === 'full' || detail === undefined) {
+        const src16 = origMesh.userData._lodInstOrigMatrices
+        const m4 = makeMatrix4().fromArray(src16, i * 16)
+        origMesh.setMatrixAt(i, m4)
+        if (proxyMesh) proxyMesh.setMatrixAt(i, zeroDummy.matrix)
+      } else if (detail === 'bbox_proxy') {
+        // Original: zero-scale
+        origMesh.setMatrixAt(i, zeroDummy.matrix)
+        // Proxy: bbox scale + original position
+        if (proxyMesh) {
+          const origM4 = makeMatrix4().fromArray(origMesh.userData._lodInstOrigMatrices, i * 16)
+          const pos = makeVec3()
+          const rot = makeQuat()
+          const scale = makeVec3()
+          origM4.decompose(pos, rot, scale)
+          const bboxSize = geomBb
+            ? makeVec3(
+                (geomBb.max.x - geomBb.min.x) * scale.x || 1,
+                (geomBb.max.y - geomBb.min.y) * scale.y || 1,
+                (geomBb.max.z - geomBb.min.z) * scale.z || 1,
+              )
+            : makeVec3(1, 1, 1)
+          dummy.position.copy(pos)
+          dummy.quaternion.copy(rot)
+          dummy.scale.copy(bboxSize)
+          dummy.updateMatrix()
+          proxyMesh.setMatrixAt(i, dummy.matrix)
+        }
+      } else {
+        // cull — zero both
+        origMesh.setMatrixAt(i, zeroDummy.matrix)
+        if (proxyMesh) proxyMesh.setMatrixAt(i, zeroDummy.matrix)
+      }
+    }
+
+    origMesh.instanceMatrix.needsUpdate = true
+    if (proxyMesh) proxyMesh.instanceMatrix.needsUpdate = true
+  }
+
+  it('box tier: original instance is zero-scale', () => {
+    const orig = makeInstancedMesh(3, ['a', 'b', 'c'])
+    const proxy = makeInstancedMesh(3, ['a', 'b', 'c'])
+    const detailMap = new Map([['a', 'bbox_proxy'], ['b', 'bbox_proxy'], ['c', 'bbox_proxy']])
+
+    applyWave4HLodPlan(orig, proxy, detailMap)
+
+    // Original mesh instance 0: scale should be 0,0,0
+    const off0 = 0 * 16
+    expect(orig.instanceMatrix.array[off0 + 0]).toBeCloseTo(0, 5)
+    expect(orig.instanceMatrix.array[off0 + 5]).toBeCloseTo(0, 5)
+    expect(orig.instanceMatrix.array[off0 + 10]).toBeCloseTo(0, 5)
+  })
+
+  it('box tier: proxy instance gets bbox scale (4×2×2 for bbox min/max ±2/±1/±1)', () => {
+    const orig = makeInstancedMesh(3, ['a', 'b', 'c'])
+    const proxy = makeInstancedMesh(3, ['a', 'b', 'c'])
+    const detailMap = new Map([['a', 'bbox_proxy'], ['b', 'bbox_proxy'], ['c', 'bbox_proxy']])
+
+    applyWave4HLodPlan(orig, proxy, detailMap)
+
+    // Proxy instance 0 should have scale = bbox extents = (4, 2, 2)
+    const off0 = 0 * 16
+    expect(proxy.instanceMatrix.array[off0 + 0]).toBeCloseTo(4, 5) // scale.x = bbox_x = 4
+    expect(proxy.instanceMatrix.array[off0 + 5]).toBeCloseTo(2, 5) // scale.y = bbox_y = 2
+    expect(proxy.instanceMatrix.array[off0 + 10]).toBeCloseTo(2, 5) // scale.z = bbox_z = 2
+  })
+
+  it('box tier: proxy instance preserves original position', () => {
+    const orig = makeInstancedMesh(3, ['a', 'b', 'c'])
+    const proxy = makeInstancedMesh(3, ['a', 'b', 'c'])
+    const detailMap = new Map([['a', 'bbox_proxy'], ['b', 'bbox_proxy'], ['c', 'bbox_proxy']])
+
+    applyWave4HLodPlan(orig, proxy, detailMap)
+
+    // Instance 1 was at x=10, instance 2 at x=20
+    const off1 = 1 * 16
+    expect(proxy.instanceMatrix.array[off1 + 12]).toBeCloseTo(10, 5) // x position
+    const off2 = 2 * 16
+    expect(proxy.instanceMatrix.array[off2 + 12]).toBeCloseTo(20, 5)
+  })
+
+  it('hi tier: original restored, proxy zeroed', () => {
+    const orig = makeInstancedMesh(3, ['a', 'b', 'c'])
+    const proxy = makeInstancedMesh(3, ['a', 'b', 'c'])
+    const origBuf = new Float32Array(orig.instanceMatrix.array)
+    const detailMap = new Map([['a', 'full'], ['b', 'full'], ['c', 'full']])
+
+    applyWave4HLodPlan(orig, proxy, detailMap)
+
+    // Original matrix matches stored original.
+    const off0 = 0 * 16
+    for (let k = 0; k < 16; k++) {
+      expect(orig.instanceMatrix.array[off0 + k]).toBeCloseTo(origBuf[off0 + k], 5)
+    }
+    // Proxy instance 0 should be zero-scale.
+    expect(proxy.instanceMatrix.array[off0 + 0]).toBeCloseTo(0, 5)
+    expect(proxy.instanceMatrix.array[off0 + 5]).toBeCloseTo(0, 5)
+    expect(proxy.instanceMatrix.array[off0 + 10]).toBeCloseTo(0, 5)
+  })
+
+  it('cull tier: both original and proxy are zero-scale', () => {
+    const orig = makeInstancedMesh(3, ['a', 'b', 'c'])
+    const proxy = makeInstancedMesh(3, ['a', 'b', 'c'])
+    const detailMap = new Map([['a', 'culled'], ['b', 'culled'], ['c', 'culled']])
+
+    applyWave4HLodPlan(orig, proxy, detailMap)
+
+    for (let i = 0; i < 3; i++) {
+      const off = i * 16
+      expect(orig.instanceMatrix.array[off + 0]).toBeCloseTo(0, 5)
+      expect(orig.instanceMatrix.array[off + 5]).toBeCloseTo(0, 5)
+      expect(orig.instanceMatrix.array[off + 10]).toBeCloseTo(0, 5)
+      expect(proxy.instanceMatrix.array[off + 0]).toBeCloseTo(0, 5)
+      expect(proxy.instanceMatrix.array[off + 5]).toBeCloseTo(0, 5)
+      expect(proxy.instanceMatrix.array[off + 10]).toBeCloseTo(0, 5)
+    }
+  })
+
+  it('mixed plan: hi/box/cull applied correctly to both meshes', () => {
+    const orig = makeInstancedMesh(3, ['a', 'b', 'c'])
+    const proxy = makeInstancedMesh(3, ['a', 'b', 'c'])
+    const origBuf = new Float32Array(orig.instanceMatrix.array)
+    // Instance 0=hi, 1=box, 2=cull
+    const detailMap = new Map([['a', 'full'], ['b', 'bbox_proxy'], ['c', 'culled']])
+
+    applyWave4HLodPlan(orig, proxy, detailMap)
+
+    // Instance 0 (hi): orig matrix restored, proxy zero
+    const off0 = 0 * 16
+    for (let k = 0; k < 16; k++) {
+      expect(orig.instanceMatrix.array[off0 + k]).toBeCloseTo(origBuf[off0 + k], 5)
+    }
+    expect(proxy.instanceMatrix.array[off0 + 0]).toBeCloseTo(0, 5)
+
+    // Instance 1 (box): orig zero, proxy has bbox scale (4,2,2) and pos x=10
+    const off1 = 1 * 16
+    expect(orig.instanceMatrix.array[off1 + 0]).toBeCloseTo(0, 5)
+    expect(proxy.instanceMatrix.array[off1 + 0]).toBeCloseTo(4, 5)   // scale.x = bbox_x
+    expect(proxy.instanceMatrix.array[off1 + 5]).toBeCloseTo(2, 5)   // scale.y = bbox_y
+    expect(proxy.instanceMatrix.array[off1 + 12]).toBeCloseTo(10, 5) // position x
+
+    // Instance 2 (cull): both zero
+    const off2 = 2 * 16
+    expect(orig.instanceMatrix.array[off2 + 0]).toBeCloseTo(0, 5)
+    expect(proxy.instanceMatrix.array[off2 + 0]).toBeCloseTo(0, 5)
   })
 })

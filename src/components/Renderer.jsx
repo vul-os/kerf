@@ -268,7 +268,7 @@ function Renderer({
   // frame-time + query latency.
   const [lodHudOn, setLodHudOn] = useState(false)
   // LOD stats updated by the debounced query callback.
-  const [lodStats, setLodStats] = useState(null) // { total, hi, lo, box, cull, instances, latencyMs, frameMs }
+  const [lodStats, setLodStats] = useState(null) // { total, hi, lo, box, cull, instances, instHi, instBox, instCull, latencyMs, frameMs }
   // Ref carrying debounce state for the LOD pass (shared between the render
   // loop and the async query callback without causing re-renders).
   const lodRef = useRef({
@@ -432,14 +432,30 @@ function Renderer({
       // Non-instanced Mesh: match by mesh.userData.id.
       // InstancedMesh: iterate instances, match by userData.componentIds[i].
       let hi = 0, lo = 0, box = 0, cull = 0, instances = 0
+      let instHi = 0, instBox = 0, instCull = 0
+      // Collect InstancedMesh originals to skip the box-proxy siblings below.
+      const boxProxySiblings = new Set()
       for (const mesh of s.meshGroup.children) {
+        if (mesh.userData._lodBoxProxyFor) {
+          boxProxySiblings.add(mesh)
+        }
+      }
+      for (const mesh of s.meshGroup.children) {
+        // Skip box-proxy siblings — they are driven by their paired original.
+        if (boxProxySiblings.has(mesh)) continue
+
         if (mesh.isInstancedMesh) {
-          // ── InstancedMesh per-instance LOD ──────────────────────────────
+          // ── InstancedMesh per-instance LOD (Wave 4H: clean wireframe box) ──
           // Each instance in the batch may have its own LOD tier based on its
           // componentId. We apply LOD by rewriting the instance's transform:
-          //   hi   → restore original matrix from _lodInstOrigMatrices cache
-          //   box  → scale instance to bbox dimensions at its world center
-          //   cull → zero-scale (invisible, no GPU buffer reallocation)
+          //   hi   → restore original matrix; zero-scale the box-proxy sibling
+          //   box  → zero-scale original; set box-proxy sibling to bbox scale+pos
+          //   cull → zero-scale both original and box-proxy sibling
+          //
+          // Box proxy: a sibling InstancedMesh using BoxGeometry + EdgesGeometry +
+          // LineBasicMaterial so each instance renders ~12 wireframe edges (24
+          // vertices) instead of potentially thousands of original triangles.
+          // Stored in mesh.userData._lodBoxProxyMesh; created on first touch.
           //
           // Cache: userData._lodInstOrigMatrices stores a Float32Array copy of
           // the original instanceMatrix buffer so we can restore it cleanly.
@@ -453,13 +469,29 @@ function Renderer({
           }
 
           // Get or derive per-instance bbox for box-proxy tier.
-          // We use the shared geometry bbox expanded to the instance's scale.
           const geom = mesh.geometry
           if (geom && !geom.boundingBox) geom.computeBoundingBox()
           const geomBb = geom?.boundingBox
 
-          let matChanged = false
+          // Create the box-proxy sibling InstancedMesh on first touch.
+          let proxyMesh = mesh.userData._lodBoxProxyMesh
+          if (!proxyMesh) {
+            proxyMesh = _createInstBoxProxy(mesh, geomBb)
+            if (proxyMesh) {
+              mesh.userData._lodBoxProxyMesh = proxyMesh
+              // Tag it so we can skip it in the outer loop.
+              proxyMesh.userData._lodBoxProxyFor = mesh.uuid
+              mesh.parent?.add(proxyMesh)
+            }
+          }
+
+          let origChanged = false
+          let proxyChanged = false
           const dummy = new THREE.Object3D()
+          const zeroDummy = new THREE.Object3D()
+          zeroDummy.position.set(0, 0, 0)
+          zeroDummy.scale.set(0, 0, 0)
+          zeroDummy.updateMatrix()
 
           for (let i = 0; i < mesh.count; i++) {
             instances++
@@ -467,54 +499,69 @@ function Renderer({
             const detail = cid ? detailMap.get(cid) : undefined
 
             if (detail === 'full' || detail === undefined) {
+              instHi++
               hi++
-              // Restore from the original matrix cache.
+              // Restore original instance from cache.
               const src16 = mesh.userData._lodInstOrigMatrices
               const m4 = new THREE.Matrix4().fromArray(src16, i * 16)
               mesh.setMatrixAt(i, m4)
-              matChanged = true
+              origChanged = true
+              // Zero-scale the box-proxy for this slot.
+              if (proxyMesh) {
+                proxyMesh.setMatrixAt(i, zeroDummy.matrix)
+                proxyChanged = true
+              }
             } else if (detail === 'bbox_proxy') {
+              instBox++
               lo++
               box++
-              // Rewrite instance matrix to a box at the instance's world center
-              // scaled to the geometry bbox extents.
-              const origM4 = new THREE.Matrix4().fromArray(
-                mesh.userData._lodInstOrigMatrices, i * 16,
-              )
-              // Extract position from original matrix.
-              const pos = new THREE.Vector3()
-              const rot = new THREE.Quaternion()
-              const scale = new THREE.Vector3()
-              origM4.decompose(pos, rot, scale)
+              // Zero-scale the original instance (invisible, no triangle cost).
+              mesh.setMatrixAt(i, zeroDummy.matrix)
+              origChanged = true
+              // Drive the box-proxy instance to bbox scale + original position.
+              if (proxyMesh) {
+                const origM4 = new THREE.Matrix4().fromArray(
+                  mesh.userData._lodInstOrigMatrices, i * 16,
+                )
+                const pos = new THREE.Vector3()
+                const rot = new THREE.Quaternion()
+                const scale = new THREE.Vector3()
+                origM4.decompose(pos, rot, scale)
 
-              // Bbox size in world space (approx — ignoring non-uniform scale).
-              const bboxSize = geomBb
-                ? new THREE.Vector3(
-                    (geomBb.max.x - geomBb.min.x) * scale.x || 1,
-                    (geomBb.max.y - geomBb.min.y) * scale.y || 1,
-                    (geomBb.max.z - geomBb.min.z) * scale.z || 1,
-                  )
-                : new THREE.Vector3(1, 1, 1)
+                // Bbox size in world space (approx — ignoring non-uniform scale).
+                const bboxSize = geomBb
+                  ? new THREE.Vector3(
+                      (geomBb.max.x - geomBb.min.x) * scale.x || 1,
+                      (geomBb.max.y - geomBb.min.y) * scale.y || 1,
+                      (geomBb.max.z - geomBb.min.z) * scale.z || 1,
+                    )
+                  : new THREE.Vector3(1, 1, 1)
 
-              dummy.position.copy(pos)
-              dummy.quaternion.copy(rot)
-              dummy.scale.copy(bboxSize)
-              dummy.updateMatrix()
-              mesh.setMatrixAt(i, dummy.matrix)
-              matChanged = true
+                dummy.position.copy(pos)
+                dummy.quaternion.copy(rot)
+                dummy.scale.copy(bboxSize)
+                dummy.updateMatrix()
+                proxyMesh.setMatrixAt(i, dummy.matrix)
+                proxyChanged = true
+              }
             } else {
-              // culled — zero-scale matrix
+              // culled — zero-scale both original and proxy
+              instCull++
               cull++
-              dummy.position.set(0, 0, 0)
-              dummy.scale.set(0, 0, 0)
-              dummy.updateMatrix()
-              mesh.setMatrixAt(i, dummy.matrix)
-              matChanged = true
+              mesh.setMatrixAt(i, zeroDummy.matrix)
+              origChanged = true
+              if (proxyMesh) {
+                proxyMesh.setMatrixAt(i, zeroDummy.matrix)
+                proxyChanged = true
+              }
             }
           }
 
-          if (matChanged) {
+          if (origChanged) {
             mesh.instanceMatrix.needsUpdate = true
+          }
+          if (proxyMesh && proxyChanged) {
+            proxyMesh.instanceMatrix.needsUpdate = true
           }
           continue // skip the non-instanced branch below
         }
@@ -556,6 +603,9 @@ function Renderer({
         box,
         cull,
         instances,
+        instHi,
+        instBox,
+        instCull,
         latencyMs,
         frameMs: Math.round(1000 / 60), // placeholder; actual from render loop timing below
       })
@@ -1326,6 +1376,18 @@ function Renderer({
       // Restore any bbox-proxy meshes back to their original state.
       const s = stateRef.current
       if (s) {
+        // First pass: collect and remove box-proxy sibling meshes.
+        const toRemove = []
+        for (const mesh of s.meshGroup.children) {
+          if (mesh.userData._lodBoxProxyFor) {
+            toRemove.push(mesh)
+          }
+        }
+        for (const proxy of toRemove) {
+          proxy.parent?.remove(proxy)
+          proxy.geometry?.dispose()
+          proxy.material?.dispose()
+        }
         for (const mesh of s.meshGroup.children) {
           if (mesh.isInstancedMesh) {
             // Restore InstancedMesh original matrices if they were overwritten.
@@ -1338,6 +1400,7 @@ function Renderer({
               mesh.instanceMatrix.needsUpdate = true
               delete mesh.userData._lodInstOrigMatrices
             }
+            delete mesh.userData._lodBoxProxyMesh
             continue
           }
           if (mesh.userData._lodBboxProxy) _restoreFromBboxProxy(mesh, s)
@@ -2042,6 +2105,18 @@ function Renderer({
             <span className="text-blue-400">inst</span>
             <span>{lodStats.instances}</span>
           </div>
+          <div className="flex gap-3">
+            <span className="text-blue-300">inst hi</span>
+            <span>{lodStats.instHi}</span>
+          </div>
+          <div className="flex gap-3">
+            <span className="text-yellow-300">inst box</span>
+            <span>{lodStats.instBox}</span>
+          </div>
+          <div className="flex gap-3">
+            <span className="text-ink-400">inst cull</span>
+            <span>{lodStats.instCull}</span>
+          </div>
           <div className="flex gap-3 mt-0.5 pt-0.5 border-t border-ink-800">
             <span className="text-ink-500">latency</span>
             <span>{lodStats.latencyMs}ms</span>
@@ -2435,9 +2510,20 @@ function disposePartsAux(s) {
   s.perPart.clear()
   // Clean up any LOD bbox proxy objects that remain on meshes.
   if (s.meshGroup) {
+    // Remove box-proxy sibling meshes added by Wave 4H.
+    const toRemove = []
+    for (const mesh of s.meshGroup.children) {
+      if (mesh.userData._lodBoxProxyFor) toRemove.push(mesh)
+    }
+    for (const proxy of toRemove) {
+      proxy.parent?.remove(proxy)
+      proxy.geometry?.dispose()
+      proxy.material?.dispose()
+    }
     for (const mesh of s.meshGroup.children) {
       if (mesh.isInstancedMesh) {
         delete mesh.userData._lodInstOrigMatrices
+        delete mesh.userData._lodBoxProxyMesh
         continue
       }
       if (mesh.userData._lodBboxProxy) _restoreFromBboxProxy(mesh, s)
@@ -2553,5 +2639,52 @@ function _restoreFromBboxProxy(mesh, _s) {
   delete mesh.userData._lodBboxProxy
   delete mesh.userData._lodOrigMaterial
   delete mesh.userData._lodOrigVisible
+}
+
+/**
+ * _createInstBoxProxy — create a sibling InstancedMesh for wireframe box proxies.
+ *
+ * Wave 4H: for InstancedMesh batches in the LOD `box` tier we need a separate
+ * InstancedMesh that uses a unit-cube EdgesGeometry + LineBasicMaterial.  Each
+ * instance in the proxy renders ~12 wireframe edges (24 vertices) instead of
+ * the original geometry's potentially-thousands of triangles.
+ *
+ * The proxy shares the same `count` as the original so setMatrixAt indices are
+ * 1:1.  All instances start at zero scale (invisible); the LOD pass drives each
+ * instance's matrix independently.
+ *
+ * @param {THREE.InstancedMesh} origMesh - the original InstancedMesh
+ * @param {THREE.Box3|null} geomBb - precomputed bounding box of the geometry
+ * @returns {THREE.InstancedMesh|null}
+ */
+function _createInstBoxProxy(origMesh, geomBb) {
+  try {
+    // Unit cube edges — 12 edges, 24 vertices.  Each instance's matrix scales
+    // this to the actual bbox extents at runtime.
+    const boxGeom = new THREE.BoxGeometry(1, 1, 1)
+    const edgesGeom = new THREE.EdgesGeometry(boxGeom)
+    boxGeom.dispose()
+    const edgeMat = new THREE.LineBasicMaterial({
+      color: LOD_BBOX_COLOR,
+      transparent: true,
+      opacity: 0.55,
+      depthTest: true,
+    })
+    const proxy = new THREE.InstancedMesh(edgesGeom, edgeMat, origMesh.count)
+    proxy.frustumCulled = false // handled by parent mesh frustum path
+
+    // Start every instance at zero scale (invisible).
+    const zeroObj = new THREE.Object3D()
+    zeroObj.position.set(0, 0, 0)
+    zeroObj.scale.set(0, 0, 0)
+    zeroObj.updateMatrix()
+    for (let i = 0; i < origMesh.count; i++) {
+      proxy.setMatrixAt(i, zeroObj.matrix)
+    }
+    proxy.instanceMatrix.needsUpdate = true
+    return proxy
+  } catch {
+    return null
+  }
 }
 

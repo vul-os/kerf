@@ -143,11 +143,12 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 | **`intersection.py`** | Hardened SSI: loop-detection, tangential-branch detection, small-loop guard, analytic specialisations | ✅ shipped |
 | **`geom/history/`** | Parametric history DAG + `feature_id::role::fingerprint` persistent naming — downstream fillet survives upstream parameter edits | ✅ shipped |
 | **G3 surfacing** | `feature_blend_srf_g3` (surfacing.py:1376) + `feature_g3_chain_blend` (surfacing.py:1894) registered LLM tools; `blend_srf_g3` / `curvature_rate_continuity_residual` / `zebra_stripe` / `reflection_lines` / `curvature_comb` exported from `geom/__init__.py`; `feature_zebra_analysis` + `feature_isophote_analysis` wired | ✅ shipped |
-| **General solid boolean** | NURBS-faced / non-axis-aligned solids (today: axis-aligned only; general CSG delegates to OCCT worker) | 🔴 not started |
+| **General solid boolean** | NURBS-faced / non-axis-aligned solids; classification-first B-rep pipeline (SSI seeds → whole-face classify → sew); analytic fast-paths for box/sphere/cylinder; LLM tool registered (`nurbs_solid_boolean`); 18 hermetic tests — sphere∩box, Steinmetz, freeform NURBS, self-intersection guard | ✅ shipped |
 
 **GK-P (parity) series in flight.** A four-agent survey of Kerf vs ~18 kernel-relevant CADs found a concrete, finite gap list. GK-01..GK-139 are landed. The `GK-P` series (tracked in `tasks.md`) closes the remaining gaps:
 
 - **Foundational kernel** — general solid boolean for NURBS-faced bodies, MatchSrf G3, isophote/EMap, Stam limit-tangents ✅ + G1 at extraordinary SubD points, fractional creases, analytic surface derivatives.
+- **Foundational kernel** — MatchSrf G3, isophote/EMap, Stam limit-tangents + G1 at extraordinary SubD points, fractional creases, analytic surface derivatives. (General solid boolean shipped as GK-P-A.)
 - **Construction verbs** — loft guide-rails, sheet-metal hem/jog/multi-flange, direct-edit non-planar + delete-face, weldment gussets/end-treatments, surface patch-from-points.
 - **SubD / mesh** — multires displacement, SDF CSG + marching-cubes, sculpt brush engine, isotropic remesh, surface-snap retopo, LSCM UV unwrap.
 - **Architectural geometry** — B-rep→2D tessellate, roof/curtain-wall/corridor generators, wall compound-layer offset, hatch/section-fill.
@@ -329,6 +330,7 @@ These are roadmap-level moats that span every sector simultaneously and compound
 ### Multi-month epics
 
 - **GK-P foundational kernel** — general solid boolean for NURBS-faced bodies; Stam limit-tangents ✅ + G1 at extraordinary SubD points; fractional creases; MatchSrf G3; analytic surface derivatives.
+- **GK-P foundational kernel** — ✅ general solid boolean shipped (GK-P-A); remaining: Stam limit-tangents + G1 at extraordinary SubD points; fractional creases; MatchSrf G3; analytic surface derivatives.
 - **GK-P construction verbs** — loft guide-rails; sheet-metal hem/jog/multi-flange; direct-edit delete-face + non-planar push-pull; weldment gussets/end-treatments; surface patch-from-points.
 - **GK-P SubD / mesh** — multires displacement; SDF CSG + marching-cubes; sculpt brush engine; LSCM UV unwrap (module exists, wiring incomplete).
 - **GK-P architectural geometry** — B-rep→2D tessellate; roof/curtain-wall/corridor generators; wall compound-layer offset; hatch/section-fill.

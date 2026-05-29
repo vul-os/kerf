@@ -739,6 +739,17 @@ export const api = {
       body,
       timeoutMs: 30_000,
     }),
+
+  // ---------------------------------------------------------------------------
+  // Generic LLM tool dispatcher — POST /api/tools/call
+  // Used by SpiceRunPanel (and any other UI that needs to invoke a registered
+  // backend tool directly without going through the chat thread flow).
+  // ---------------------------------------------------------------------------
+  callTool: (toolName, params = {}) =>
+    request('/api/tools/call', {
+      method: 'POST',
+      body: { tool: toolName, params },
+    }),
 }
 
 // ---------------------------------------------------------------------------

@@ -72,6 +72,8 @@ import MonthlyLoadChart from '../components/energy/MonthlyLoadChart.jsx'
 import HVACLoadPanel from '../components/hvac/HVACLoadPanel.jsx'
 import DuctDesignPanel from '../components/hvac/DuctDesignPanel.jsx'
 import EquipmentSelectPanel from '../components/hvac/EquipmentSelectPanel.jsx'
+import WaveformViewer from '../components/silicon/WaveformViewer.jsx'
+import SpiceRunPanel from '../components/silicon/SpiceRunPanel.jsx'
 import { fetchAirfoilPolar } from '../lib/airfoilPolarBridge.js'
 import FirmwareProjectPanel from '../components/firmware/FirmwareProjectPanel.jsx'
 import TINView from '../components/civil/TINView.jsx'
@@ -656,6 +658,20 @@ function isEnergyLoadFile(file) {
   return n.endsWith('.energy.load')
 }
 
+function isSpiceWaveformFile(file) {
+  if (!file) return false
+  if (file.kind === 'spice_waveform') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.spice.waveform')
+}
+
+function isSpiceNetFile(file) {
+  if (!file) return false
+  if (file.kind === 'spice_net') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.spice.net') || n.endsWith('.cir')
+}
+
 function isHvacLoadFile(file) {
   if (!file) return false
   if (file.kind === 'hvac_load') return true
@@ -991,6 +1007,8 @@ export default function Editor() {
     if (isHvacLoadFile(w.currentFile)) return
     if (isHvacDuctFile(w.currentFile)) return
     if (isHvacEquipFile(w.currentFile)) return
+    if (isSpiceWaveformFile(w.currentFile)) return
+    if (isSpiceNetFile(w.currentFile)) return
     if (isFirmwareProjectFile(w.currentFile)) return
     if (isLayupFile(w.currentFile)) return
     if (isAFPFile(w.currentFile)) return
@@ -1463,6 +1481,8 @@ export default function Editor() {
   const hvacLoadFile  = isHvacLoadFile(w.currentFile)
   const hvacDuctFile  = isHvacDuctFile(w.currentFile)
   const hvacEquipFile = isHvacEquipFile(w.currentFile)
+  const spiceWaveformFile = isSpiceWaveformFile(w.currentFile)
+  const spiceNetFile = isSpiceNetFile(w.currentFile)
   const firmwareProjectFile = isFirmwareProjectFile(w.currentFile)
   const civilTINFile      = isCivilTINFile(w.currentFile)
   const civilPipeFile     = isCivilPipeFile(w.currentFile)
@@ -2267,6 +2287,20 @@ export default function Editor() {
           ) : hvacEquipFile ? (
             <div className="flex-1 min-h-0 overflow-y-auto">
               <EquipmentSelectPanel />
+            </div>
+          ) : spiceWaveformFile ? (
+            <div className="flex-1 min-h-0 relative flex flex-col">
+              <WaveformViewer content={w.currentFileContent} className="flex-1 min-h-0" />
+            </div>
+          ) : spiceNetFile ? (
+            <div className="flex-1 min-h-0 relative flex flex-col">
+              <SpiceRunPanel
+                content={w.currentFileContent}
+                fileName={w.currentFile?.name}
+                onChange={(v) => w.editContent(v)}
+                projectId={projectId}
+                fileId={w.currentFileId}
+              />
             </div>
           ) : firmwareProjectFile ? (
             /* T-274: .fw.json / kerf.fw.json opens the FirmwareProjectPanel

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-05-29T21:18:42.934Z",
+  "generatedAt": "2026-05-29T21:20:49.443Z",
   "items": [
     {
       "slug": "revit",
@@ -11275,6 +11275,536 @@
           "nx_tier": "paid",
           "competitor": "source: https://plm.automation.siemens.com/global/en/products/teamcenter/",
           "kerf": "evidence: cloud/cost/should_cost.py"
+        }
+      ]
+    },
+    {
+      "slug": "cadence-spectre",
+      "competitor": "Cadence Spectre",
+      "category": "cad-silicon",
+      "left": "kerf",
+      "right": "cadence-spectre",
+      "hero_tagline": "Spectre is the industry-standard commercial SPICE for tapeout — Kerf targets open PDK workflows and chat-driven exploration.",
+      "reviewed_at": "2026-05-29",
+      "features": [
+        {
+          "domain": "D6",
+          "feature": "SPICE — transient simulation",
+          "competitor": {
+            "status": "yes",
+            "note": "Spectre TRAN with proprietary solver; generally 2-10× faster than ngspice on large netlists",
+            "source": "https://www.cadence.com/en_US/home/tools/custom-ic-analog-rf-design/circuit-simulation/spectre-simulation-platform.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Transient via ngspice bridge; sufficient for sky130-scale netlists",
+            "evidence": "packages/kerf-silicon/bridges/ngspice_bridge.py"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — PVT corner sweep (automated)",
+          "competitor": {
+            "status": "yes",
+            "note": "Spectre APS (Accelerated Parallel Simulator) automates multi-corner runs in Virtuoso; Spectre AMS for mixed-signal corners",
+            "source": "https://www.cadence.com/en_US/home/tools/custom-ic-analog-rf-design/circuit-simulation/spectre-simulation-platform.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "60-corner PVT sweep automated via silicon_pvt_sweep (sky130 model); Monte-Carlo mismatch included",
+            "evidence": "packages/kerf-silicon/analog/pvt.py"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — Monte-Carlo mismatch",
+          "competitor": {
+            "status": "yes",
+            "note": "Spectre Monte-Carlo with foundry-supplied mismatch models (Pelgrom + local variation); used for 6σ production yield estimation",
+            "source": "https://www.cadence.com/en_US/home/tools/custom-ic-analog-rf-design/circuit-simulation/spectre-simulation-platform.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Pelgrom A_VT = 4 mV·µm model for sky130; production-sign-off accuracy requires foundry MC deck (not yet integrated)",
+            "evidence": "packages/kerf-silicon/analog/pvt.py"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — commercial foundry PDK sign-off accuracy",
+          "competitor": {
+            "status": "yes",
+            "note": "Spectre is the sign-off simulator for most commercial foundries (TSMC, Samsung, GlobalFoundries) — netlists are extracted in Spectre format",
+            "source": "https://www.cadence.com/en_US/home/tools/custom-ic-analog-rf-design/circuit-simulation/spectre-simulation-platform.html"
+          },
+          "kerf": {
+            "status": "no",
+            "note": "Kerf uses ngspice with open PDK models (sky130). Commercial foundry sign-off (TSMC, GF) requires Spectre + licensed PDK — out of scope for the MIT open-core."
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — waveform viewer",
+          "competitor": {
+            "status": "yes",
+            "note": "Virtuoso ADE includes a first-class waveform viewer (Virtuoso Visualization and Analysis XL)",
+            "source": "https://www.cadence.com/en_US/home/tools/custom-ic-analog-rf-design/circuit-simulation/spectre-simulation-platform.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "WaveformViewer.jsx: multi-trace SVG, zoom/pan/cursor measurement, .spice.waveform file kind",
+            "evidence": "src/components/silicon/WaveformViewer.jsx"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — schematic-driven simulation",
+          "competitor": {
+            "status": "yes",
+            "note": "Spectre + Virtuoso schematic editor; fully integrated testbench workflow",
+            "source": "https://www.cadence.com/en_US/home/tools/custom-ic-analog-rf-design/circuit-simulation/spectre-simulation-platform.html"
+          },
+          "kerf": {
+            "status": "no",
+            "note": "Kerf accepts netlists only; no analog schematic capture GUI yet"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — license cost",
+          "competitor": {
+            "status": "no",
+            "note": "Spectre requires a Cadence subscription; list price for a floating EDA suite licence is tens of thousands USD/year",
+            "source": "https://www.cadence.com/en_US/home/tools/custom-ic-analog-rf-design/circuit-simulation/spectre-simulation-platform.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Kerf is MIT open-core; ngspice backend is free/open-source; cloud execution priced on credits at cost",
+            "evidence": "LICENSE"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — chat-native / LLM-driven flow",
+          "competitor": {
+            "status": "no",
+            "note": "Spectre is GUI + Tcl/SKILL scripted; no LLM interface",
+            "source": "https://www.cadence.com/en_US/home/tools/custom-ic-analog-rf-design/circuit-simulation/spectre-simulation-platform.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "All silicon tools reachable via plain-language prompts",
+            "evidence": "packages/kerf-silicon/"
+          }
+        }
+      ]
+    },
+    {
+      "slug": "hspice",
+      "competitor": "Synopsys HSPICE",
+      "category": "cad-silicon",
+      "left": "kerf",
+      "right": "hspice",
+      "hero_tagline": "HSPICE is the gold-standard sign-off SPICE — Kerf targets open-PDK workflows without a six-figure EDA budget.",
+      "reviewed_at": "2026-05-29",
+      "features": [
+        {
+          "domain": "D6",
+          "feature": "SPICE — transient simulation",
+          "competitor": {
+            "status": "yes",
+            "note": "HSPICE .TRAN with multi-threading; considered the most accurate SPICE solver for production sign-off",
+            "source": "https://www.synopsys.com/implementation-and-signoff/ams-simulation/hspice.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Transient via ngspice bridge; suitable for sky130/open-PDK scale netlists",
+            "evidence": "packages/kerf-silicon/bridges/ngspice_bridge.py"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — PVT corner sweep",
+          "competitor": {
+            "status": "yes",
+            "note": "HSPICE supports .ALTER and .TEMP sweeps for multi-corner analysis; integrated with Synopsys CustomSim for parallel corners",
+            "source": "https://www.synopsys.com/implementation-and-signoff/ams-simulation/hspice.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "60-corner automated sweep (5P × 3V × 4T) with Monte-Carlo via silicon_pvt_sweep",
+            "evidence": "packages/kerf-silicon/analog/pvt.py"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — Monte-Carlo mismatch",
+          "competitor": {
+            "status": "yes",
+            "note": "HSPICE Monte-Carlo with .MC directive and foundry-supplied mismatch models; used for production yield sign-off",
+            "source": "https://www.synopsys.com/implementation-and-signoff/ams-simulation/hspice.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Pelgrom model (A_VT = 4 mV·µm, sky130) Monte-Carlo; not a foundry-certified MC deck",
+            "evidence": "packages/kerf-silicon/analog/pvt.py"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — commercial foundry sign-off accuracy",
+          "competitor": {
+            "status": "yes",
+            "note": "HSPICE is the sign-off simulator for Intel, IBM, and many foundries; PDKs ship in HSPICE format",
+            "source": "https://www.synopsys.com/implementation-and-signoff/ams-simulation/hspice.html"
+          },
+          "kerf": {
+            "status": "no",
+            "note": "Kerf uses ngspice + open PDK models. Commercial foundry sign-off (Intel, IBM) requires HSPICE + licensed PDK — outside the scope of the MIT open-core."
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — waveform viewer",
+          "competitor": {
+            "status": "yes",
+            "note": "HSPICE ships with CosmosScope waveform viewer; also integrates with Synopsys Custom WaveView",
+            "source": "https://www.synopsys.com/implementation-and-signoff/ams-simulation/hspice.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "WaveformViewer.jsx: multi-trace SVG, zoom/pan, dual cursors (A/B), ΔT measurement",
+            "evidence": "src/components/silicon/WaveformViewer.jsx"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — license cost",
+          "competitor": {
+            "status": "no",
+            "note": "HSPICE is a premium commercial license; list price is in the range of $10k–$50k/year depending on configuration",
+            "source": "https://www.synopsys.com/implementation-and-signoff/ams-simulation/hspice.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Kerf is MIT open-core; ngspice backend is free; cloud execution priced at cost",
+            "evidence": "LICENSE"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — chat-native / LLM-driven flow",
+          "competitor": {
+            "status": "no",
+            "note": "HSPICE is CLI + Tcl scripted; no LLM interface",
+            "source": "https://www.synopsys.com/implementation-and-signoff/ams-simulation/hspice.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "All silicon SPICE tools reachable via plain-language prompts",
+            "evidence": "packages/kerf-silicon/"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — open PDK / sky130 workflow",
+          "competitor": {
+            "status": "partial",
+            "note": "HSPICE can read sky130 SPICE models but sky130 PDK is designed and tested primarily against ngspice and Xyce",
+            "source": "https://github.com/google/skywater-pdk"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "PVT sweep models are sky130-calibrated; ngspice bridge accepts sky130 PDK decks natively",
+            "evidence": "packages/kerf-silicon/analog/pvt.py"
+          }
+        }
+      ]
+    },
+    {
+      "slug": "ltspice",
+      "competitor": "LTspice",
+      "category": "cad-silicon",
+      "left": "kerf",
+      "right": "ltspice",
+      "hero_tagline": "LTspice is the free SPICE standard for analog designers — Kerf wraps it in a cloud-native, chat-driven workflow.",
+      "reviewed_at": "2026-05-29",
+      "features": [
+        {
+          "domain": "D6",
+          "feature": "SPICE — transient simulation",
+          "competitor": {
+            "status": "yes",
+            "note": "LTspice .TRAN with native BSIM3/4/CMC models; fast SMPS-optimised solver",
+            "source": "https://www.analog.com/en/resources/design-tools-and-calculators/ltspice-simulator.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Transient via ngspice bridge; .TRAN directive injected automatically; waveforms returned as .spice.waveform JSON",
+            "evidence": "packages/kerf-silicon/bridges/ngspice_bridge.py"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — AC small-signal analysis",
+          "competitor": {
+            "status": "yes",
+            "note": "LTspice .AC with frequency sweep; Bode, Nyquist, Nichols plots",
+            "source": "https://www.analog.com/en/resources/design-tools-and-calculators/ltspice-simulator.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "AC analysis via ngspice bridge (.AC directive)",
+            "evidence": "packages/kerf-silicon/bridges/ngspice_bridge.py"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — DC operating-point / sweep",
+          "competitor": {
+            "status": "yes",
+            "note": "LTspice .DC sweep and .OP operating-point",
+            "source": "https://www.analog.com/en/resources/design-tools-and-calculators/ltspice-simulator.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "DC sweep via ngspice bridge",
+            "evidence": "packages/kerf-silicon/bridges/ngspice_bridge.py"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — PVT corner sweep (60 corners)",
+          "competitor": {
+            "status": "partial",
+            "note": "LTspice supports .STEP for parametric sweeps but has no built-in PVT corner automation; each corner requires a manual .STEP or separate run",
+            "source": "https://www.analog.com/en/resources/design-tools-and-calculators/ltspice-simulator.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "60-corner PVT sweep (5P × 3V × 4T) with Monte-Carlo mismatch via silicon_pvt_sweep tool; Pelgrom-matched sky130 model",
+            "evidence": "packages/kerf-silicon/analog/pvt.py"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — Monte-Carlo mismatch",
+          "competitor": {
+            "status": "partial",
+            "note": "LTspice .MC command available but undocumented/limited; Analog Devices component libraries include some mismatch models",
+            "source": "https://www.analog.com/en/resources/design-tools-and-calculators/ltspice-simulator.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Pelgrom model Monte-Carlo (A_VT = 4 mV·µm) per corner; 50 samples/corner default, configurable",
+            "evidence": "packages/kerf-silicon/analog/pvt.py"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — waveform viewer (interactive)",
+          "competitor": {
+            "status": "yes",
+            "note": "LTspice has a built-in waveform viewer with zoom/pan, cursors, FFT, probe expressions",
+            "source": "https://www.analog.com/en/resources/design-tools-and-calculators/ltspice-simulator.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "WaveformViewer.jsx: multi-trace SVG plot, zoom/scroll, dual cursors (A/B), ΔT/ΔY measurement, per-trace toggle; .spice.waveform file kind",
+            "evidence": "src/components/silicon/WaveformViewer.jsx"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — netlist editor with syntax highlighting",
+          "competitor": {
+            "status": "yes",
+            "note": "LTspice schematic-driven + direct netlist editing",
+            "source": "https://www.analog.com/en/resources/design-tools-and-calculators/ltspice-simulator.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "SpiceRunPanel.jsx netlist textarea + Monaco SPICE syntax mode (.cir / .spice.net files)",
+            "evidence": "src/components/silicon/SpiceRunPanel.jsx"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — schematic capture GUI",
+          "competitor": {
+            "status": "yes",
+            "note": "LTspice has a full schematic capture GUI (proprietary symbol format)",
+            "source": "https://www.analog.com/en/resources/design-tools-and-calculators/ltspice-simulator.html"
+          },
+          "kerf": {
+            "status": "no",
+            "note": "Kerf accepts netlists directly; no schematic GUI for SPICE (circuit.tsx is for PCB-level schematics)"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — chat-native / LLM-driven flow",
+          "competitor": {
+            "status": "no",
+            "note": "LTspice is a standalone GUI application with no LLM interface",
+            "source": "https://www.analog.com/en/resources/design-tools-and-calculators/ltspice-simulator.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "All silicon tools reachable via plain-language prompts; LLM translates to tool calls, backed by doc-search",
+            "evidence": "packages/kerf-silicon/"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — open-source / free",
+          "competitor": {
+            "status": "yes",
+            "note": "LTspice is freeware (gratis but proprietary, Windows/macOS)",
+            "source": "https://www.analog.com/en/resources/design-tools-and-calculators/ltspice-simulator.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Kerf is MIT open-core; the ngspice backend is GPL-licensed (user installs ngspice)",
+            "evidence": "LICENSE"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — sky130 / open PDK model support",
+          "competitor": {
+            "status": "partial",
+            "note": "LTspice supports generic SPICE level 3 / BSIM3 models but is not validated against sky130 SPICE decks",
+            "source": "https://www.analog.com/en/resources/design-tools-and-calculators/ltspice-simulator.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "PVT sweep models derived from sky130 BSIM4 corner data; ngspice bridge accepts sky130 PDK SPICE decks",
+            "evidence": "packages/kerf-silicon/analog/pvt.py"
+          }
+        }
+      ]
+    },
+    {
+      "slug": "ngspice",
+      "competitor": "NGSpice",
+      "category": "cad-silicon",
+      "left": "kerf",
+      "right": "ngspice",
+      "hero_tagline": "NGSpice is the open-source SPICE engine Kerf uses under the hood — Kerf adds the workflow layer on top.",
+      "reviewed_at": "2026-05-29",
+      "features": [
+        {
+          "domain": "D6",
+          "feature": "SPICE — transient simulation",
+          "competitor": {
+            "status": "yes",
+            "note": "ngspice batch .TRAN via -b flag; supports BSIM3/4/6, HiSIM, PSP models",
+            "source": "https://ngspice.sourceforge.io/docs/ngspice-html-manual/manual.xhtml"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Kerf wraps ngspice -b in a subprocess bridge; .TRAN injected automatically; result serialised to .spice.waveform JSON",
+            "evidence": "packages/kerf-silicon/bridges/ngspice_bridge.py"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — AC analysis",
+          "competitor": {
+            "status": "yes",
+            "note": "ngspice .AC with DEC/OCT/LIN sweep",
+            "source": "https://ngspice.sourceforge.io/docs/ngspice-html-manual/manual.xhtml"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "AC analysis via ngspice bridge",
+            "evidence": "packages/kerf-silicon/bridges/ngspice_bridge.py"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — PVT corner sweep",
+          "competitor": {
+            "status": "partial",
+            "note": "ngspice supports .STEP and shell scripting for corner sweeps; no built-in PVT automation",
+            "source": "https://ngspice.sourceforge.io/docs/ngspice-html-manual/manual.xhtml"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "60-corner automated PVT sweep (5P × 3V × 4T) with Monte-Carlo; silicon_pvt_sweep tool",
+            "evidence": "packages/kerf-silicon/analog/pvt.py"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — Monte-Carlo mismatch",
+          "competitor": {
+            "status": "partial",
+            "note": "ngspice supports MC via .PARAM + random() functions; requires manual model setup",
+            "source": "https://ngspice.sourceforge.io/docs/ngspice-html-manual/manual.xhtml"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Pelgrom model Monte-Carlo built into PVT sweep; 50 samples/corner default",
+            "evidence": "packages/kerf-silicon/analog/pvt.py"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — waveform viewer",
+          "competitor": {
+            "status": "partial",
+            "note": "ngspice has a basic built-in plot command; serious use relies on external tools (KiCad, GAW, Xschem)",
+            "source": "https://ngspice.sourceforge.io/docs/ngspice-html-manual/manual.xhtml"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "First-class in-app WaveformViewer: multi-trace SVG, zoom/pan, dual cursors (A/B), ΔT measurement",
+            "evidence": "src/components/silicon/WaveformViewer.jsx"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — interactive/GUI workflow",
+          "competitor": {
+            "status": "no",
+            "note": "ngspice is CLI-first; interactive mode exists but is not a GUI application",
+            "source": "https://ngspice.sourceforge.io/docs/ngspice-html-manual/manual.xhtml"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "SpiceRunPanel.jsx: netlist editor + analysis selector + Run button; results shown in WaveformViewer",
+            "evidence": "src/components/silicon/SpiceRunPanel.jsx"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — chat-native / LLM flow",
+          "competitor": {
+            "status": "no",
+            "note": "ngspice is a CLI tool with no LLM interface",
+            "source": "https://ngspice.sourceforge.io/docs/ngspice-html-manual/manual.xhtml"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "All SPICE analyses reachable via plain-language prompts",
+            "evidence": "packages/kerf-silicon/"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "SPICE — open-source",
+          "competitor": {
+            "status": "yes",
+            "note": "ngspice is LGPL/BSD — fully open-source",
+            "source": "https://ngspice.sourceforge.io/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Kerf is MIT open-core; ngspice backend installed separately by user (GPL/LGPL)",
+            "evidence": "LICENSE"
+          }
         }
       ]
     },

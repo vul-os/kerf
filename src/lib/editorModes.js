@@ -151,6 +151,8 @@ const DEDICATED_EXTENSIONS = new Set([
   '.layup',
   '.afp_plan',
   '.fiber_map',
+  '.spice.waveform',
+  '.spice.net',
 ])
 
 /**

@@ -186,6 +186,8 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 - **PLC** ✅ — MATIEC lint Tier 1.
 - **Silicon / IC layout** ✅ — VHDL + Verilog parsers; GHDL + Yosys + ngspice bridges; GDS II / OASIS I/O; SKY130 PDK; LEF/Liberty readers; OpenROAD place-and-route; DRC + LVS + parasitic extraction; mask fracturing. T-231..T-248.
 - **Firmware / embedded** ✅ — board catalogue (Arduino/ESP32/STM32/RP2040/AVR); library cache; direct-gcc orchestrator (`avr-gcc`/`arm-none-eabi-gcc`/`xtensa-esp32-elf`); upload wrappers; serial monitor panel; LLM tools; cloud Flash via BYO worker ✅ (esptool/avrdude/openocd dispatched to enrolled workshop machine). T-225..T-230.
+- **Silicon / IC layout** ✅ — VHDL + Verilog parsers; GHDL + Yosys + ngspice bridges; GDS II / OASIS I/O; SKY130 PDK; LEF/Liberty readers; OpenROAD place-and-route; DRC + LVS + parasitic extraction; mask fracturing; SPICE waveform viewer UI ✅. T-231..T-248.
+- **Firmware / embedded** ✅ — board catalogue (Arduino/ESP32/STM32/RP2040/AVR); library cache; direct-gcc orchestrator (`avr-gcc`/`arm-none-eabi-gcc`/`xtensa-esp32-elf`); upload wrappers; serial monitor panel; LLM tools. T-225..T-230.
 
 ### Architecture / BIM
 
@@ -197,7 +199,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 
 - **Applied aerodynamics** ✅ — ISA atmosphere, VLM/thin-airfoil, flight mechanics, propulsion, Breguet range/endurance; 6-DOF; orbital mechanics (Kepler/Lambert/Hohmann); rocket propulsion (CEA-lite); ADCS (quaternion + reaction wheels + magnetorquers); spacecraft thermal network.
 - **Composites (CLT)** ✅ — ABD matrix, per-ply stress/strain, Tsai-Wu/max-stress/Hashin failure indices, first-ply-failure, laminate moduli.
-- **Composites manufacturing UI** ✅ — `LaminateStackup` (drag-to-reorder ply table, balance/symmetry check, areal-weight + cost rollup, CLT stiffness matrix preview); `AFPToolpathView` (AFP 2D tape-path canvas, cure cycle plot, path-plan dispatch); `FiberOrientationContour` (HSL contour heatmap, angle tooltip, exploded ply stack, drape sim dispatch). File kinds: `.layup` / `.afp_plan` / `.fiber_map`. Compare parity: Fibersim AFP → partial, laminate cost → yes; VeriFiber + Composites Builder compare rows added. Backend routes live: `POST /api/composites/clt` (layup_analysis → A/B/D + moduli + weight), `POST /api/composites/afp` (AFP rectilinear pathplan + cure cycle), `POST /api/composites/fiber_map` (composites_drape → per-element fiber angle map); all auth-gated, 26 tests green.
+- **Composites manufacturing UI** ✅ — `LaminateStackup` (drag-to-reorder ply table, balance/symmetry check, areal-weight + cost rollup, CLT stiffness matrix preview); `AFPToolpathView` (AFP 2D tape-path canvas, cure cycle plot, path-plan dispatch, **Export CNC dropdown → G-code / APT**); `FiberOrientationContour` (HSL contour heatmap, angle tooltip, exploded ply stack, drape sim dispatch). File kinds: `.layup` / `.afp_plan` / `.fiber_map`. Backend routes: `POST /api/composites/clt`, `POST /api/composites/afp` (+ `?format=gcode|apt`), `POST /api/composites/fiber_map`; auth-gated. **AFP CNC export ✅** — `afp_export.py` (`afp_to_gcode` 5-axis G-code with M200/M201/M202/M203/M204/M205 fibre M-codes; `afp_to_apt` APT/CL ISO 3592 GOTO/FEDRAT/AUXFUN); `composites_afp_export` LLM tool; Fibersim + VeriFiber AFP rows → yes; 79 tests green.
 - **Aeroelasticity** ✅ — flutter boundary (Theodorsen + p-k method), doublet-lattice.
 
 ### Library / parts / BOM

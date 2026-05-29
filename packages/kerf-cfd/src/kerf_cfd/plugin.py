@@ -5,6 +5,8 @@ Registers:
   - LLM tools: cfd_run, cfd_select_turbulence_model, cfd_pick_solver (via cfd_llm_tools)
   - LLM tool:  cfd_rans_solve         (SIMPLE RANS — run cavity/channel case)
   - LLM tool:  cfd_rans_keps_solve    (k-ε RANS — channel + BFS validation)
+  - LLM tool:  cfd_rans_solve  (SIMPLE RANS — run cavity/channel case)
+  - LLM tools: cfd_openfoam_export, cfd_openfoam_import  (T-101-C OpenFOAM bridge)
 """
 
 from __future__ import annotations
@@ -25,6 +27,8 @@ async def register(app: FastAPI, ctx):
     # cfd_rans_keps_solve — standard k-ε turbulence model (Launder-Spalding 1974)
     from kerf_cfd.rans_keps import cfd_rans_keps_spec, run_cfd_rans_keps_solve
     ctx.tools.register("cfd_rans_keps_solve", cfd_rans_keps_spec, run_cfd_rans_keps_solve)
+    # T-101-C: OpenFOAM bridge — case generator + result parser
+    import kerf_cfd.openfoam_llm_tools  # noqa: F401 — triggers @register decorators
 
     provides = [
         "cfd.simple_rans",
@@ -33,6 +37,7 @@ async def register(app: FastAPI, ctx):
         "cfd.heat_transfer",
         "cfd.k_omega_sst",
         "cfd.k_epsilon_rans",
+        "cfd.openfoam_bridge",
     ]
 
     try:

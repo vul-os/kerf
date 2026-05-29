@@ -1838,6 +1838,31 @@ function Renderer({
         }
       })
     },
+
+    /**
+     * setComponentTransforms — apply per-component world-space transforms for
+     * motion-study playback (driven by AssemblyMotionPanel's timeline scrubber).
+     *
+     * @param {Map<string, {x,y,z,qw,qx,qy,qz}>} transformMap
+     *   Keys are componentId strings; values are position + quaternion.
+     *   Components absent from the map are left unchanged.
+     */
+    setComponentTransforms: (transformMap) => {
+      const s = stateRef.current
+      if (!s || !(transformMap instanceof Map)) return
+      s.scene.traverse((obj) => {
+        if (!obj.isMesh) return
+        const cid = obj.userData?.componentId
+        if (!cid) return
+        const t = transformMap.get(cid)
+        if (!t) return
+        obj.position.set(t.x ?? 0, t.y ?? 0, t.z ?? 0)
+        if (t.qw != null) {
+          obj.quaternion.set(t.qx ?? 0, t.qy ?? 0, t.qz ?? 0, t.qw ?? 1)
+        }
+        obj.updateMatrixWorld(true)
+      })
+    },
   }), [hdriBackground])
 
   // HUD shows the prop-driven selection if present, else the last clicked id.

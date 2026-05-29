@@ -39,6 +39,7 @@ import LibraryPicker from './LibraryPicker.jsx'
 import InlineBOMPanel from './InlineBOMPanel.jsx'
 import MatesPanel from './MatesPanel.jsx'
 import ClashPanel from './ClashPanel.jsx'
+import AssemblyMotionPanel from './AssemblyMotionPanel.jsx'
 
 // Module-scoped cache of file_id → Promise<string[]> of object ids. Re-used
 // across rows so opening the same source twice doesn't re-run JSCAD.
@@ -138,6 +139,7 @@ export default function AssemblyEditor({
   matePickResult,           // { side, ref } | null — delivered by parent after viewport pick
   onMatePickConsumed,       // () => void — called after we've applied the pick result
   onHighlightComponent,     // (componentId) => void — zoom + highlight in the 3D viewport
+  rendererRef = null,       // React ref to <Renderer>; exposes setComponentTransforms for motion playback
 }) {
   const parsed = useMemo(() => parseAssembly(content), [content])
 
@@ -614,6 +616,14 @@ export default function AssemblyEditor({
         projectId={projectId}
         assemblyFileId={currentFileId}
         onHighlight={onHighlightComponent ?? onSelectComponent}
+        onToast={onToast}
+      />
+
+      {/* Motion study panel — planar MBD via kerf-motion simulate_motion tool */}
+      <AssemblyMotionPanel
+        components={rows}
+        rendererRef={rendererRef}
+        projectId={projectId}
         onToast={onToast}
       />
 

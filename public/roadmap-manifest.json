@@ -1,98 +1,15 @@
 {
   "version": 1,
-  "generatedAt": "2026-05-29T18:27:52.174Z",  "source": "ROADMAP.md",
+  "generatedAt": "2026-05-29T19:01:51.880Z",
+  "source": "ROADMAP.md",
   "latestDelta": {
-    "date": "2026-05-26",
-    "itemCount": 18,
+    "date": "2026-05-29",
+    "itemCount": 1,
     "items": [
       {
-        "title": "Civil hydraulics",
-        "body": "LandXML 1.2 import/export (`civil_landxml_import/export`); steady-state pressurised pipe network (Todini GGA + HW/DW, `civil_water_network_solve`); Manning circular/trapezoidal sewer (`civil_sewer_manning_capacity`); rational-method peak runoff (`civil_storm_rational`); HDS-5 inlet-control culvert (`civil_culvert_capacity`) — `kerf-civil/src/kerf_civil/tools_hydraulics.py`",
+        "title": "Civil infrastructure UIs",
+        "body": "four viewport components wired to kerf-civil backends: `TINView.jsx` (3-D isometric TIN surface, wireframe + contour overlay, dispatches `civil_tin_terrain`); `PipeNetworkView.jsx` (2-D plan view with click-to-inspect pipes, flow/pressure overlay, dispatches `civil_water_network_solve`); `GradingPlanView.jsx` (existing + proposed contour overlay, cut/fill colour bands, dispatches `civil_tin_terrain` volume op); `LandscapeView.jsx` (planting symbols + irrigation zones, dispatches `landscape_plants` + `landscape_irrigation_schedule`) — `src/components/civil/`. Editor shell wired for `.tin`, `.pipe_net`, `.grading`, `.landscape` file kinds. 62 SSR tests pass",
         "domain": "Structural"
-      },
-      {
-        "title": "FEM dynamics",
-        "body": "linear eigenvalue buckling (`fem_buckling_linear`); mode-superposition harmonic frequency response (`fem_harmonic_response`); random-vibration PSD / Miles equation (`fem_random_vibration_psd`); acoustics cavity FEM + BEM radiation; high-frequency EM (waveguide, S-params, FDTD); electrostatics + magnetostatics; 2-D projection Navier-Stokes — `kerf-fem/src/kerf_fem/{buckling,harmonic,random_vibration,acoustics_fem,em_highfreq,em_field,cfd_navier_stokes}.py`",
-        "domain": "Optics"
-      },
-      {
-        "title": "Structural codes (AISI + TMS)",
-        "body": "AISI S100-16 cold-formed steel: effective-width, flexure (`structural_cfs_flexure`), compression (`structural_cfs_compression`), web-crippling (`structural_cfs_web_crippling`); TMS 402-16 masonry ASD: flexure/shear/axial (`structural_masonry_*`) — `kerf-structural/src/kerf_structural/{cold_formed_steel,masonry}.py`",
-        "domain": "Platform"
-      },
-      {
-        "title": "G3 surfacing wired",
-        "body": "`feature_blend_srf_g3` (surfacing.py:1376) + `feature_g3_chain_blend` (surfacing.py:1894) registered as LLM tools via `surfacing` module in `_TOOL_MODULES`; `blend_srf_g3`, `curvature_rate_continuity_residual`, `zebra_stripe`, `reflection_lines`, `curvature_comb` all exported from `geom/__init__.py`; `feature_zebra_analysis` and `feature_isophote_analysis` also wired",
-        "domain": "Structural"
-      },      {
-        "title": "Structural code design",
-        "body": "AISC 360-22 (Ch. E/F/H members + connections + base-plate, LRFD+ASD); ACI 318-19 (flexure/shear/PM + punching \u00a722.6 + torsion \u00a722.7); NDS 2018 timber; AISI S100-16 cold-formed steel (effective-width, flexure/compression/web-crippling); TMS 402-16 masonry ASD (flexure/shear/axial); ASCE 7-22 load combos + ELF + RSA/Newmark seismic. Full Eurocode: EC2, EC3, EC5, EC8",
-        "domain": "Structural"
-      },
-      {
-        "title": "Native FE",
-        "body": "MITC4 plate/shell (Bathe-Dvorkin) + modal via inverse iteration; linear eigenvalue buckling + harmonic response + random-vibration PSD; 2D/3D frame stiffness + story drift; multi-axial critical-plane fatigue (Findley, SWT-3D, Brown-Miller); acoustics FEM/BEM + high-frequency EM + electrostatics/magnetostatics; geotech liquefaction triggering (Seed-Idriss/Tokimatsu)",
-        "domain": "Structural"
-      },
-      {
-        "title": "Machine elements depth",
-        "body": "ISO 6336 gear rating Method B; ISO/TS 16281 bearing modified life (aISO); planetary gearbox (3 Willis modes + compound); Taylor extended tool-life + Gilbert economics",
-        "domain": "Machine"
-      },
-      {
-        "title": "Thermo-fluid depth",
-        "body": "IAPWS-IF97 steam Regions 1/2/4; Bell-Delaware shell-and-tube HX (TEMA + 5 correction factors); transient pipe-network (MOC waterhammer + surge-tank); ASHRAE CLTD/RTS transient cooling loads",
-        "domain": "Thermofluid"
-      },
-      {
-        "title": "Electronics / power depth",
-        "body": "IBIS-AMI signal integrity (Bergeron + PRBS eye); AC PDN impedance + decap optimiser; Newton-Raphson AC load-flow; IEC 60255 + IEEE C37.112 protection coordination + IEEE 1584-2018 arc-flash; fibre-optic link budget",
-        "domain": "Electronics"
-      },
-      {
-        "title": "Aero / marine / space depth",
-        "body": "3D VLM + viscous strip drag + Prandtl-Glauert/K\u00e1rm\u00e1n-Tsien + Korn-Lock wave-drag; strip-theory seakeeping RAOs (Lewis-form + JONSWAP); Holtrop-Mennen resistance + EHP; multi-revolution Lambert (Lancaster-Blanchard/Izzo 2015)",
-        "domain": "Aerospace"
-      },
-      {
-        "title": "Manufacturing depth",
-        "body": "adaptive/trochoidal CAM HSM + rest machining; moldflow Hele-Shaw front tracking + weld-line + air-trap; casting Chvorinov + riser sizing + gating; NFP true-shape polygon nesting (57.6 % L-shape utilisation)",
-        "domain": "Manufacturing"
-      },
-      {
-        "title": "Verticals",
-        "body": "dental anatomic crown (multi-cusp fan, not placeholder) + UI parity shipped (CrownSculptingPanel, ImplantLibrary, SurgicalGuide — preset picker, occlusion overlay, filterable Straumann/Nobel/Zimmer/MIS catalogue, CBCT import + pose editor + sleeve preview, all dispatching to kerf-dental backend); Swiss lever escapement + mainspring + balance-wheel; solar PV partial shading + bypass-diode + MPPT; analog PVT corner simulation (60 corners + Monte-Carlo mismatch)",
-        "domain": "Machine"
-      },
-      {
-        "title": "Tolerancing / QA",
-        "body": "3D vector-loop tolerance stackup (6-DOF Jacobian); SPC control charts (Shewhart/CUSUM/EWMA + Nelson/WECO); ISO 286 limits & fits",
-        "domain": "Aerospace"
-      },
-      {
-        "title": "Optics / acoustics",
-        "body": "Gaussian beam (complex-q + ABCD + M\u00b2 + fibre coupling); non-sequential ray tracing + ghost detection; wave-domain room acoustics (image-source IR + Schroeder RT60 + SEA); Seidel S5 corrected",
-        "domain": "Structural"
-      },
-      {
-        "title": "Implicit geometry",
-        "body": "F-rep CSG (union/intersect/subtract/blend/shell) + domain warps (twist/taper/wave) in `kerf_cad_core.frep.csg`",
-        "domain": "Platform"
-      },
-      {
-        "title": "Materials + LCA",
-        "body": "Ashby database to ~200 materials (14 families) with Pareto-frontier multi-objective selection; full ISO 14040/44 LCA (4 phases, 6 impact categories, Monte-Carlo uncertainty)",
-        "domain": "Cost"
-      },
-      {
-        "title": "Compare matrices",
-        "body": "feature-matrix YAML for 14 reference CADs: Fusion 360, SolidWorks, Onshape, FreeCAD, Rhino, KiCad, CATIA, Creo, NX, Inventor, AutoCAD, Altium, Revit, Blender \u2014 741 grounded rows total",
-        "domain": "Architecture"
-      },
-      {
-        "title": "Security hardening",
-        "body": "`/run-topo` auth gate; NFP `grid_step` clamped; PVT `n_mc` clamped; Yosys module-name injection blocked; shared `_guard_*` helpers extracted across 68 files (\u22122009/+129 lines net)",
-        "domain": "Silicon"
       }
     ]
   }

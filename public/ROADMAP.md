@@ -40,7 +40,14 @@ The sector work only matters if you **own your work, are not locked in, and can 
 
 ## What shipped
 
-### Latest delta — 2026-05-26
+### Latest delta — 2026-05-29
+
+**Civil infrastructure UIs** ✅ — four viewport components wired to kerf-civil backends: `TINView.jsx` (3-D isometric TIN surface, wireframe + contour overlay, dispatches `civil_tin_terrain`); `PipeNetworkView.jsx` (2-D plan view with click-to-inspect pipes, flow/pressure overlay, dispatches `civil_water_network_solve`); `GradingPlanView.jsx` (existing + proposed contour overlay, cut/fill colour bands, dispatches `civil_tin_terrain` volume op); `LandscapeView.jsx` (planting symbols + irrigation zones, dispatches `landscape_plants` + `landscape_irrigation_schedule`) — `src/components/civil/`. Editor shell wired for `.tin`, `.pipe_net`, `.grading`, `.landscape` file kinds. 62 SSR tests pass.
+
+### Previous delta — 2026-05-26
+**`cad_component` real geometry substitution** ✅ — Library-mapped components in the CircuitEditor 3D tab now render real geometry instead of indicator chips: JSCAD `model_3d` source is evaluated in-browser; STEP `model_3d_paths` entries are fetched via `/api/projects/:pid/model3d` and parsed via `occt-import-js`. Cache: per-file-id in `fetchCacheRef` (STEP bytes cached by SHA-256 in `stepLoader.js`). `substitute_component` LLM tool registered via `kerf_parts.plugin`; `_try_include` pattern wired in `kerf_api.plugin` — `src/lib/circuitMappings.js`, `src/components/CircuitEditor.jsx`, `packages/kerf-parts/src/kerf_parts/tools.py`, `packages/kerf-api/src/kerf_api/routes_model3d.py`.
+
+### Earlier delta — 2026-05-26
 
 **Civil hydraulics** ✅ — LandXML 1.2 import/export (`civil_landxml_import/export`); steady-state pressurised pipe network (Todini GGA + HW/DW, `civil_water_network_solve`); Manning circular/trapezoidal sewer (`civil_sewer_manning_capacity`); rational-method peak runoff (`civil_storm_rational`); HDS-5 inlet-control culvert (`civil_culvert_capacity`) — `kerf-civil/src/kerf_civil/tools_hydraulics.py`.
 
@@ -137,9 +144,12 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 - **OCCT `.feature` Phase 2/3** ✅ — Pad/Pocket/Revolve/Hole/Fillet/Chamfer/Shell/Sweep/Loft/Push-Pull/Linear-Polar-Mirror patterns; face/edge gumball.
 - **2D sketcher v1 + v2** ✅ — full constraint set, trim/extend, ellipse, B-spline, bezier, fillet, mirror, patterns.
 - **Assembly model + 3D mates** ✅ — coincident/concentric/parallel/perp/distance/angle/tangent; gradient-descent solver.
+- **Assembly clash detection UI** ✅ — OBB-SAT + BVH + tri-tri backend; Check Clashes side panel with pair list (part A / part B / severity / Jump-to); viewport highlight via `highlightFaces` hook — parity with SOLIDWORKS Interference / Fusion / Onshape clash detection.
 - **Tolerance stack-up** ✅ — worst-case/RSS/Monte-Carlo + auto chain-walk.
 - **2D drawings** ✅ — multi-sheet, dimensions, GD&T frames, section hatching, leaders/balloons, centerlines.
+- **3D PMI + GD&T annotation UI** ✅ — ISO 1101 GD&T toolbar (DrawingToolbar + GdntToolbar) with all 14 characteristics; datum A/B/C placement; FCF click-to-place modal with tolerance value, diameter zone, material-condition modifier, datum refs; SVG FCF glyphs (FcfGlyph/DatumGlyph) rendered inline per standard; 3D PMI overlay (Pmi3DOverlay) projects FCF labels into the three.js viewport; annotations persist via addFcf/addDatumLabel in the drawing data model.
 - **NURBS surfacing (Phase 4)** ✅ — sweep1/2/network/blend/loft + `surface_continuity` (C0–C2/G0–G2); surface-direct boolean; trim-by-curve; curvature-comb viz; zebra/reflection-line viewport toggle. G3 *enforcement* on the OCCT side is structurally impossible (absent from OCCT's type system); pure-Python is the G3 path.
+- **NURBS surfacing (Phase 4a — jewelry priority)** ✅ — `opSweep2` (two-rail sweep via `BRepFill_PipeShell`-style RMF midline, `sweep2_to_body` in `brep_build.py`), `opNetworkSrf` (Gordon/Coons-Gordon four-curve network, `network_srf_to_body`), `opBlendSrf` (G1/G2 Bezier blend strip, `blend_srf_to_body`); all three registered as LLM tools (`feature_sweep2`, `feature_network_srf`, `feature_blend_srf` in `surfacing.py`); 33 hermetic `validate_body`-clean tests in `test_phase4a_jewelry_surfacing.py`; scenario fixtures in `tests/fixtures/`.
 - **Rhino parity** ✅ — 3DM I/O, SubD (Catmull-Clark), quad remesh, mesh tools, layers/display, parametric `.graph`, render output.
 - **Persistent face naming** ✅ — sketch-anchored + topo-hash (frontend T1–T7) plus kernel-side `feature_id::role::fingerprint` selector in the pure-Python DAG.
 
@@ -149,14 +159,18 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 - **CFD foundation** ✅ — 2-D laminar: potential flow (`Cp(θ)=1−4sin²θ` oracle) + lid-driven cavity (Ghia Re=100 reference); 61 hermetic tests.
 - **Topology optimization** ✅ — SIMP via FEniCSx; NURBS surface fit; multi-body.
 - **CAM** ✅ — 2.5D + 3D parallel/waterline + lathe + 5-axis constant-tilt + 3+2 indexed; tool DB; LinuxCNC/GRBL/Fanuc posts.
+- **5-axis CAM UI** ✅ — `CAMView.jsx` mode switch (3-axis / 5-axis-indexed / 5-axis-continuous); tilt axis (A/B/C) + angle; strategy (swarf / contour-on-tilted-plane / indexed-rough); spindle vector preview; dispatches `cam_run` backend tool (`operation=5axis_finish` or `3plus2`).
 - **Slicing** ✅ — plane-section, CNC layered, 3D-print G-code (Cura, Tier 1).
 
 ### Electronics
 
 - **KiCad-class PCB design** ✅ — ERC, hier-schematic, buses/diff-pairs, net classes/rules, length tuning, via stitching/teardrops, shove router, copper pour, DRC.
+- **Library `cad_component` 3D substitution** ✅ — Library-mapped components resolve to real JSCAD/STEP geometry in the CircuitEditor 3D tab; indicator chips replaced; cache per component_id; `substitute_component` LLM tool.
 - **Fabrication package** ✅ — Gerber RS-274X, Excellon drill, IPC-2581, ODB++, pick-and-place, fab BOM, 3D board STEP export.
 - **SPICE + RF + autorouting** ✅ — ngspice, scikit-rf S-params/Smith chart, FreeRouting DSN/SES.
 - **Wiring/harness** ✅ — WireViz YAML→SVG (2D; 3D in flight at P1-7).
+- **PLC** ✅ — MATIEC lint Tier 1; PLCopen XML (IEC TR 61131-10) reader/writer (T-220); `import_plcopen_xml` + `export_plcopen_xml` LLM tools; LadderEditor Import/Export buttons wired.
+- **Wiring/harness** ✅ — WireViz YAML→SVG (2D) + 3D polyline harness routing + formboard-flatten 2D manufacturing output (T-37, P1-7 complete).
 - **PLC** ✅ — MATIEC lint Tier 1.
 - **Silicon / IC layout** ✅ — VHDL + Verilog parsers; GHDL + Yosys + ngspice bridges; GDS II / OASIS I/O; SKY130 PDK; LEF/Liberty readers; OpenROAD place-and-route; DRC + LVS + parasitic extraction; mask fracturing. T-231..T-248.
 - **Firmware / embedded** ✅ — board catalogue (Arduino/ESP32/STM32/RP2040/AVR); library cache; direct-gcc orchestrator (`avr-gcc`/`arm-none-eabi-gcc`/`xtensa-esp32-elf`); upload wrappers; serial monitor panel; LLM tools. T-225..T-230.
@@ -171,6 +185,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 
 - **Applied aerodynamics** ✅ — ISA atmosphere, VLM/thin-airfoil, flight mechanics, propulsion, Breguet range/endurance; 6-DOF; orbital mechanics (Kepler/Lambert/Hohmann); rocket propulsion (CEA-lite); ADCS (quaternion + reaction wheels + magnetorquers); spacecraft thermal network.
 - **Composites (CLT)** ✅ — ABD matrix, per-ply stress/strain, Tsai-Wu/max-stress/Hashin failure indices, first-ply-failure, laminate moduli.
+- **Composites manufacturing UI** ✅ — `LaminateStackup` (drag-to-reorder ply table, balance/symmetry check, areal-weight + cost rollup, CLT stiffness matrix preview); `AFPToolpathView` (AFP 2D tape-path canvas, cure cycle plot, path-plan dispatch); `FiberOrientationContour` (HSL contour heatmap, angle tooltip, exploded ply stack, drape sim dispatch). File kinds: `.layup` / `.afp_plan` / `.fiber_map`. Compare parity: Fibersim AFP → partial, laminate cost → yes; VeriFiber + Composites Builder compare rows added. Backend routes live: `POST /api/composites/clt` (layup_analysis → A/B/D + moduli + weight), `POST /api/composites/afp` (AFP rectilinear pathplan + cure cycle), `POST /api/composites/fiber_map` (composites_drape → per-element fiber angle map); all auth-gated, 26 tests green.
 - **Aeroelasticity** ✅ — flutter boundary (Theodorsen + p-k method), doublet-lattice.
 
 ### Library / parts / BOM
@@ -196,22 +211,19 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 
 | # | What | Why it matters | Status |
 |---|---|---|---|
-| **P0-5** | **Large-assembly performance ceiling** — measured budget + LOD / lazy-load for 1000s of parts. Automotive full-vehicle DMU is the extreme case. | First credibility block for automotive and large mechanical. | 🚧 in flight — `assembly/perf.py`: LOD planner + lazy-load ordering + performance harness shipped; viewport integration + real-part catalogue pending — `kerf_cad_core/assembly/perf.py` |
+| **P0-5** | **Large-assembly performance ceiling** — measured budget + LOD / lazy-load for 1000s of parts. Automotive full-vehicle DMU is the extreme case. | First credibility block for automotive and large mechanical. | ✅ shipped — `assembly/perf.py` LOD planner + lazy-load ordering wired to `Renderer.jsx` viewport: camera-move debounce (200 ms) queries `assembly_lod_plan` tool, applies full/bbox_proxy/culled tiers to scene meshes; debug HUD toggle added to Render menu — `kerf_cad_core/assembly/perf.py`, `src/components/Renderer.jsx` |
 | **P0-6** | **Broaden text / code file support** — common text and code files open as editable text with syntax highlighting. | Every project benefits; gates firmware depth. | ✅ shipped — `FileEditor.jsx` + `editorModes.js`: 30+ extensions (Python, C/C++, JS/TS, Markdown, YAML, …) mapped to Monaco language IDs — `src/components/FileEditor.jsx` |
-| **P0-7** | **Project export / materialize foundation** — plain file-tree for `kerf export` / `kerf import` / `kerf sync`. | The anti-lock-in guarantee's substrate. | 🚧 in flight — `GET /projects/{pid}/export` ZIP route + `materialize_project_tree` shipped; bulk `POST /projects/import` endpoint deferred (file-by-file workaround works) — `kerf-api/routes.py`, `kerf-cli/portability.py` |
+| **P0-7** | **Project export / materialize foundation** — plain file-tree for `kerf export` / `kerf import` / `kerf sync`. | The anti-lock-in guarantee's substrate. | ✅ shipped — `GET /projects/{pid}/export` ZIP route + `POST /api/projects/import` bulk ZIP import (path-traversal guard, size cap, file-count cap, ext→kind mapping, binary/text split) — `kerf-api/routes.py`, `kerf-cli/portability.py` |
 | **P0-8** | **Testing / seeding / deploy-hardening** — broad test suites + realistic seed data + one-command local/dev loops. | Quality gate before broader build-out. | 🚧 in flight |
-| **P1-7** | **3D in-vehicle wiring harness** — route through DMU, bundle/segment/connector libs, formboard flatten, length/gauge/voltage-drop. | Closes the ECAD-to-harness loop. | 🚧 in flight — 3D polyline bundle routing + wire-gauge + length/voltage-drop shipped; formboard-flatten noted as T-37 follow-on — `kerf-wiring/tools/route_harness_3d.py`, `kerf-wiring/harness3d.py` |
+| **P1-7** | **3D in-vehicle wiring harness** — route through DMU, bundle/segment/connector libs, formboard flatten, length/gauge/voltage-drop. | Closes the ECAD-to-harness loop. | ✅ shipped — 3D polyline bundle routing + wire-gauge + length/voltage-drop + formboard-flatten (T-37) all shipped — `kerf-wiring/harness3d.py`, `kerf-wiring/formboard_flatten.py`, `kerf-wiring/tools/route_harness_3d.py`, `kerf-wiring/tools/wiring_formboard_flatten.py` |
 | **P1-8** | **Git-as-substrate with automatic large-file handling + free forks** — every project a stock-`git clone`-able repo; large/binary files auto-detected + kept in storage with a small in-git pointer; near-instant forks via shared content-addressed storage. | Own-your-data guarantee. | 🚧 in flight |
 | **P1-9** | **Unified `pip install kerf` client** — cloud-default, easy optional self-host; fail-fast on missing database URL. | Reach: one client for all install modes. | 🚧 in flight |
 | **P1-10** | **Local folder sync + export/import portability** — `kerf sync` two-way folder mirror; `kerf export` / `kerf import` plain file tree; symmetric cloud ↔ self-host. | Anti-lock-in, demonstrable not just promised. | 🚧 in flight — two-way sync daemon (one-shot + watch mode + OCC conflict detection) shipped; symmetric cloud↔self-host portability complete — `kerf-cli/sync.py`, `kerf-cli/portability.py` |
 | **GK-P** | **Geometry kernel parity series** — close the gap list from the multi-CAD survey (GK-01..GK-139 landed; wiring + foundational + SubD + architectural geometry remaining). | Every persona's work quality depends on kernel robustness. | 🚧 in flight |
 | **T-100** | **FEM matching CalculiX / Z88 / Mystran depth** — buckling + harmonic + PSD + acoustics + EM + fatigue shipped; remaining: explicit dynamics, full nonlinear static, k-ε turbulence, coupled variation. | Serious simulation work. | 🚧 in flight |
 | **T-101** | **CFD (CfdOF-class)** — turbulence models, 3-D unstructured meshing, OpenFOAM bridge beyond the 2-D laminar foundation. | Fluid and aero simulation. | 🚧 in flight |
-<<<<<<< HEAD
-| **Hosted infra** | **Cloud infrastructure** — GPU renders via RunPod Serverless (L4→H100, scale-to-zero) — `RunPodGPUBackend` fully implemented: submit/poll/fetch_result/capabilities with retry + exponential back-off. BYO worker path (zero credit cost) — claim-job hands the worker a presigned R2 PUT URL so results upload directly without proxying through the API. | GPU render prices 2-3× lower. | ✅ shipped |
-=======
->>>>>>> 617e62b8 (feat(cache): wire compile-on-demand for derived-cache layer)
-| **Hosted infra** | **Cloud infrastructure** — engine on Fly.io (`fra` Frankfurt, co-located with the DB, `shared-cpu-2x` / 2 GB), Neon Postgres (`eu-central-1`), Cloudflare R2 blobs (zero egress), Resend email. GPU renders via RunPod Serverless (L4→H100, scale-to-zero) — dispatch seam exists; `RunPodGPUBackend` planned. See `deployment/fly.md`. | Stable pay-as-you-go stack with engine co-located with the database; GPU render prices 2-3× below previous estimates when RunPod backend ships. | 🚧 in flight — stack settled; RunPod GPU backend remaining |
+| **Hosted infra** | **Cloud infrastructure** — engine on Fly.io (`fra` Frankfurt, co-located with the DB, `shared-cpu-2x` / 2 GB), Neon Postgres (`eu-central-1`), Cloudflare R2 blobs (zero egress), Resend email. GPU renders via RunPod Serverless (L4→H100, scale-to-zero) — `GPUBackend` protocol + `RunPodGPUBackend` (submit/poll/fetch_result/capabilities, auth, retry/backoff) + `SelfHostedWorkerBackend` (BYO) all shipped; GPU worker dispatch foundation + BYO worker enrollment shipped (`POST /api/workers/enroll`, heartbeat, claim-job, complete + billing skip; Settings → Workers tab). See `deployment/fly.md`. | Stable pay-as-you-go stack; BYO workers run at zero credit cost; managed RunPod path now live. | ✅ shipped — see `packages/kerf-render/src/kerf_render/gpu_backend.py` |
+| **GPU worker dispatch + BYO worker CLI** | **`kerf-worker` companion CLI shipped** — `pip install kerf-worker`; `kerf-worker enroll/run/status/revoke`; NVIDIA GPU probing via `nvidia-smi`; heartbeat every 30 s; long-poll claim-job with `cycles_render` (Blender) + `fem_solve` (CalculiX) dispatch; BYO billing short-circuit (`billing_bucket='byo'` → no credits charged). **SIGNED-UPLOAD-URL shipped** — claim-job returns `signed_upload_url` (presigned S3/R2 PUT, 90-min TTL), `result_key` (`worker-results/{job_id}.bin`), `result_ttl_seconds`; `/complete` accepts `result_key` (storage.head verification, no bytes through API) alongside legacy `signed_url`; `Storage.signed_put_url` + `Storage.head` added to base ABC, S3Storage, LocalStorage (`local://` fallback). `packages/kerf-worker/` — 4 commands, 8 hermetic tests. | Users on paid plans can register their own GPU hardware to run render/FEM jobs at zero credit cost. Delivers on the BYO-key billing tier promise. | ✅ shipped — `packages/kerf-worker/src/kerf_worker/` |
 
 ---
 
@@ -223,7 +235,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 |---|---|---|---|
 | G-3 | **Interactive push-and-shove diff-pair tuning** — full diff-pair routing, length-skew tuning, and push-shove | KiCad / Altium | ✅ shipped — `route_diff_pair` + `tune_diff_pair_skew` + `validate_diff_pair` + `push_shove_segment` — `kerf-electronics/routing/push_shove.py` |
 | G-4 | **Broader ECAD import** — Allegro / PADS / gEDA / Eagle v10 | Altium / Cadence | ✅ shipped — four dedicated readers with tests — `kerf-imports/src/kerf_imports/{allegro_reader,pads_reader,geda_reader,eagle_reader}.py` |
-| G-5 | **Kernel G3 / class-A leading** — wired G3 blends + curvature-comb + imprint | Alias / ICEM Surf | 🚧 in flight |
+| G-5 | **Kernel G3 / class-A leading** — wired G3 blends + curvature-comb + imprint | Alias / ICEM Surf | ✅ frontend wiring shipped — Class-A viewport toggle (Render menu → "Class-A": zebra stripes + G2/G3 per-edge audit panel) + ImprintCurve inspector entry in FeatureView; backend `feature_global_continuity_audit` + `edge_continuity_report` + `imprint_curve_on_face` all pre-existing |
 | G-6 | **SubD authoring with creases + edit workflow** | Rhino 8 SubD | ✅ shipped — cage creation/extrude/bevel/loop-cut/slide/crease/bevel-weight + Catmull-Clark evaluation — `kerf-cad-core/geom/subd_authoring.py` |
 | G-7 | **Render: caustics + dispersion** — in-browser path-tracer + Blender Cycles spectral | Cycles / V-Ray / KeyShot | 🔴 not started — Cycles translator stashes Sellmeier/Abbe coefficients for downstream use but no caustic solver is wired; in-browser path-tracer not started |
 | G-8 | **Direct + parametric history coexistence** | Fusion / Inventor / Onshape | ✅ shipped — history mode (direct edit promoted to DAG feature node, replays on upstream changes) + in-place mode; 30+ tests — `kerf-cad-core/direct_edit.py`, `geom/history/direct_edit.py` |
@@ -244,7 +256,7 @@ Everything committed, lowest priority. Ordered roughly by near-term readiness.
 
 **Vehicles:** composites ply/layup authoring (draping / fiber-steering / Fibersim class) · hull fairing (NURBS-reachable) · 3D harness routing.
 
-**Civil / infrastructure (distinct engines):** plan-and-profile sheet engine · IFC-4.3-infra I/O · bridge/tunnel · mining · marine/dredging · rail signaling. *(CRS engine, horizontal/vertical alignment, corridor, earthworks, geotechnical, LandXML 1.2 I/O, pressurized water-distribution networks (Todini GGA + Hazen-Williams/Darcy-Weisbach), gravity sewer (Manning), storm rational method + HDS-5 culverts already shipped.)*
+**Civil / infrastructure (distinct engines):** plan-and-profile sheet engine · IFC-4.3-infra I/O · bridge/tunnel · mining · marine/dredging · rail signaling. *(CRS engine, horizontal/vertical alignment, corridor, earthworks, geotechnical, LandXML 1.2 I/O, pressurized water-distribution networks (Todini GGA + Hazen-Williams/Darcy-Weisbach), gravity sewer (Manning), storm rational method + HDS-5 culverts already shipped; TINView / PipeNetworkView / GradingPlanView / LandscapeView UIs ✅ 2026-05-29.)*
 
 **Body-worn / medical / craft:** watchmaking / horology · eyewear / frames · footwear / last design · dental CAD (crowns/aligners) · orthopedic / prosthetics · hearing aids.
 
@@ -267,14 +279,14 @@ These are roadmap-level moats that span every sector simultaneously and compound
 | Capability | Status |
 |---|---|
 | **Generative / topology / multi-objective optimization** — manufacturing-constrained, multi-load-case, lattice-infill. Basic single-objective SIMP shipped; production-grade unbuilt. | 🚧 in flight |
-| **Simulation pillar** — nonlinear FEA, explicit dynamics / crash, fatigue & durability, CFD (full turbulence), low/high-frequency EM, acoustics FEM, coupled multiphysics. Linear-static + modal + steady thermal + linear eigenvalue buckling + harmonic (mode-superposition) frequency response + random-vibration PSD (modal + Miles) + CFD 2-D laminar shipped. | 🚧 in flight |
-| **Automatic Feature Recognition (AFR)** — turns any imported "dumb" STEP into an editable parametric feature tree; critical for the LLM to edit any model, not just ones authored in Kerf. | 🚧 in flight — AAG-based classifier (through-hole, blind-hole, counterbore, countersink, pocket, slot, boss, fillet, chamfer, rib, step) shipped with tests; full topology ordering into a replay-able parametric tree is the remaining step — `kerf-cad-core/afr/recognize.py`, `geom/feature_recognition.py` |
+| **Simulation pillar** — nonlinear FEA, explicit dynamics / crash, fatigue & durability, CFD (full turbulence), low/high-frequency EM, acoustics FEM, coupled multiphysics. Linear-static + modal + steady thermal + linear eigenvalue buckling + harmonic (mode-superposition) frequency response + random-vibration PSD (modal + Miles) + CFD 2-D laminar shipped. **FEA UI panels** ✅ — 5 solve panels (LinearStaticPanel, ModalPanel, BucklingPanel, FatiguePanel, VibrationPanel) wired in right-drawer FEA tab — `src/components/fea/`. | 🚧 in flight |
+| **Automatic Feature Recognition (AFR)** — turns any imported "dumb" STEP into an editable parametric feature tree; critical for the LLM to edit any model, not just ones authored in Kerf. | ✅ complete — AAG-based classifier (through-hole, blind-hole, counterbore, countersink, pocket, slot, boss, fillet, chamfer, rib, step) + topology ordering into a replay-able parametric DAG (`afr_to_dag`) + `.feature` log emitter + `afr_to_parametric` LLM tool registered — `kerf-cad-core/afr/recognize.py`, `afr/dag.py`, `geom/feature_recognition.py` |
 | **Knowledge-based engineering / code-compliance** — AISC/ACI/Eurocode/ASME/ISO rules driven directly by the model. Shipped: AISC 360-22 + ACI 318-19 + EC2/3/5/8 + NDS 2018 + ASCE 7-22 + ISO 6336 + IAPWS-IF97 + IEEE 1584 + IEC 60255. General KBE configurator layer unbuilt. | 🚧 in flight |
 | **3D tolerance / variation analysis** — statistical stack-up + contributor analysis. Shipped: 1D worst-case/RSS/Monte-Carlo + 3D vector-loop 6-DOF Jacobian. Full FEA-coupled variation simulation ahead. | 🚧 in flight |
 | **PLM depth** — configurator, 150% / effectivity BOM, where-used, ECR/ECO, digital thread, MBSE/SysML traceability. File revisions + cloud git + configurations + BOM rollup shipped (partial PLM). | 🚧 in flight |
 | **Multi-CAD interop & geometry healing** — STEP AP242 / JT / Parasolid / QIF + automatic repair. STEP + JT + Parasolid + QIF + 3DM I/O shipped; body-level geometric heal (vertex weld, sliver-gap close, sub-tolerance edge removal) shipped — `kerf-cad-core/geom/body_heal.py`, `kerf-imports/heal.py`. FEA-grade topology repair for severely degenerate STEP not yet covered. | 🚧 in flight |
-| **Reverse-engineering pipeline** — point cloud → segmentation → feature fit → parametric solid. | ✅ shipped — full pipeline: PLY/PCD I/O, outlier removal, sequential-RANSAC segmentation (plane/sphere/cylinder/cone/torus), feature-map classification, ICP mesh registration (dental), **freeform NURBS surface fit from segmented clusters** (centripetal param + P&T §9.2 knots + damped LS; **ordered-grid + adaptive shipped** — ordered-grid uses P&T §9.4 row-by-row interpolation for near-exact fit on smooth grids; unordered cloud supports `target_rms` + Boehm knot insertion adaptive loop) — `kerf-cad-core/geom/nurbs_surface_fit.py`, `kerf-cad-core/scan/nurbs_fit_tools.py`. Topology ordering into replay-able parametric DAG remains outstanding. |
-| **Mechanism synthesis & motion** — linkage / cam / gear-train *synthesis*. | 🚧 in flight — four-bar (Burmester), cam-profile, and gear-train synthesis shipped with reference-oracle tests — `kerf-mates/synthesis/{fourbar,cam,gear_train}.py`. Multi-body dynamic simulation (kerf-motion integrator) also shipped. |
+| **Reverse-engineering pipeline** — point cloud → segmentation → feature fit → parametric solid. | ✅ shipped — full pipeline: PLY/PCD I/O, outlier removal, sequential-RANSAC segmentation (plane/sphere/cylinder/cone/torus), feature-map classification, ICP mesh registration (dental), **freeform NURBS surface fit from segmented clusters** (centripetal param + P&T §9.2 knots + damped LS; **ordered-grid + adaptive knot refinement shipped** — ordered-grid uses P&T §9.4 row-by-row interpolation for near-exact fit on smooth grids; unordered cloud supports `target_rms` + Boehm knot insertion adaptive loop) — `kerf-cad-core/geom/nurbs_surface_fit.py`, `kerf-cad-core/scan/nurbs_fit_tools.py`. Topology ordering into replay-able parametric DAG remains outstanding. |
+| **Mechanism synthesis & motion** — linkage / cam / gear-train *synthesis*. | ✅ shipped — four-bar (Burmester), cam-profile, and gear-train synthesis shipped with reference-oracle tests — `kerf-mates/synthesis/{fourbar,cam,gear_train}.py`. Multi-body dynamic simulation (kerf-motion integrator) also shipped. **Planar MBD UI shipped** — `AssemblyMotionPanel` wires the `simulate_motion` backend tool into the assembly side-panel: joint-list editor (revolute/prismatic/cylindrical), driver input (constant ω, sinusoidal, position-vs-time table), Run button, and timeline scrubber that drives `Renderer.setComponentTransforms` for playback (`src/components/AssemblyMotionPanel.jsx`). |
 
 ---
 
@@ -285,8 +297,10 @@ These are roadmap-level moats that span every sector simultaneously and compound
 ### Tractable soon (weeks, well-scoped)
 
 - **G-7 caustics + in-browser path-tracer** — Cycles spectral dispersion data (Sellmeier/Abbe) is stashed by the translator but no caustic solver is wired; in-browser WebGPU path-tracer not started.
-- **P0-7 bulk import endpoint** — `POST /api/projects/import` (ZIP archive upload); workaround (file-by-file) exists; bulk path not yet implemented.
+- ~~**P0-7 bulk import endpoint**~~ — ✅ shipped `POST /api/projects/import` (ZIP archive upload; path-traversal guard + size/count caps + ext→kind mapping).
 - **P0-5 viewport integration** — LOD planner and lazy-load ordering are implemented in `assembly/perf.py` but not yet wired to the 3D viewport renderer.
+- **P0-7 bulk import endpoint** — `POST /api/projects/import` (ZIP archive upload); workaround (file-by-file) exists; bulk path not yet implemented.
+- **P0-5 real-part catalogue** — LOD planner heuristics use synthetic triangle / bbox estimates; wiring to real tessellated part geometry (via `mesh_url` pre-baked buffers) would sharpen tier boundaries for production DMU use.
 
 ### Multi-month epics
 
@@ -298,6 +312,8 @@ These are roadmap-level moats that span every sector simultaneously and compound
 - **GK-P interop** — 3DM write with Hausdorff read→write→read oracle.
 - **T-100 FEM depth** — explicit dynamics (module exists, not yet imported/registered); full nonlinear static (only 1-D bar/truss shipped); k-ε turbulence CFD; coupled FEA-based variation analysis. (Acoustics FEM, EM, harmonic, buckling, PSD, multi-axial fatigue are now shipped.)
 - **T-101 CFD depth** — RANS turbulence models; 3-D unstructured meshing; OpenFOAM bridge.
+- ~~**AFR topology ordering**~~ — ✅ shipped: `afr_to_dag` + `.feature` emitter + `afr_to_parametric` LLM tool in `kerf-cad-core/afr/dag.py`.
+- **Reverse-engineering freeform fit** — freeform NURBS surface fit from segmented point clouds; currently only analytic primitives (plane/sphere/cylinder/cone/torus).
 - **AFR topology ordering** — promote the AAG feature classifier output into a fully replay-able parametric DAG (depends on NURBS kernel completeness).
 - **PLM configurator layer** — 150%/effectivity BOM, where-used, ECR/ECO workflow, MBSE/SysML traceability.
 - **KBE general configurator** — rule-driven design configurator layer on top of the existing standard-specific compliance engines.
@@ -305,10 +321,9 @@ These are roadmap-level moats that span every sector simultaneously and compound
 ### Needs UI / deploy-gated
 
 - **P0-8 deploy-hardening** — realistic seed data + one-command dev loop; test coverage breadth still expanding.
-- **P1-7 formboard flatten** — harness 3D path routing is shipped; 2D formboard-flattening output (T-37 follow-on) not yet wired.
+- **P1-7 formboard flatten** ✅ — shipped in T-37: `formboard_flatten.py` + `wiring_formboard_flatten` LLM tool; topological unfold with branch alternation, connector pinouts, bbox.
 - **P1-8 large-file git** — pointer kind + Phase 1 shipped; deduplication-based free-fork accounting and content-addressed LFS store in progress.
-- **RunPod GPU backend** — ✅ shipped; managed GPU renders via RunPod Serverless (L4→H100, scale-to-zero) live.
-- **G-5 class-A wiring** — math complete; frontend viewport toggle + imprint toolpath not yet exposed.
+- ~~**G-5 class-A wiring**~~ ✅ frontend wiring shipped — see G-5 row above.
 - **Long-tail verticals** — see "Long-tail verticals" list above; all committed, none started.
 
 ---

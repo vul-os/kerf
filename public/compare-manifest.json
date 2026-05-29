@@ -1,6 +1,7 @@
 {
   "version": 2,
-  "generatedAt": "2026-05-29T18:01:29.815Z",  "items": [
+  "generatedAt": "2026-05-29T18:42:35.025Z",
+  "items": [
     {
       "slug": "revit",
       "competitor": "Autodesk Revit",
@@ -266,7 +267,8 @@
       "right": "civil3d",
       "hero_tagline": "Civil infrastructure design \u2014 corridor/pipe depth vs MIT open-core analysis modules.",
       "reviewed_at": "2026-05-19",
-      "features": [        {
+      "features": [
+        {
           "domain": "D8",
           "feature": "Horizontal+vertical alignment (clothoid, SSD)",
           "competitor": {
@@ -317,9 +319,9 @@
             "source": "https://help.autodesk.com/view/CIV3D/2026/ENU/?guid=GUID-CF0B5B8A-8085-4768-92C6-E0BD5B8D37B5"
           },
           "kerf": {
-            "status": "yes",
-            "note": "TINView.jsx: 3-D isometric wireframe + contour overlay; civil_tin_terrain backend (stats/contours/volume ops)",
-            "evidence": "src/components/civil/TINView.jsx + packages/kerf-civil/src/kerf_civil/tin.py"
+            "status": "partial",
+            "note": "TIN surface from point cloud + cut/fill volumes; contour extraction; no corridor-driven composite TINs",
+            "evidence": "packages/kerf-civil/src/kerf_civil/tin.py"
           }
         },
         {
@@ -332,8 +334,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "PipeNetworkView.jsx plan-view (click-to-inspect); Manning solver wired; no automated sizing wizard or plan-production sheets",
-            "evidence": "src/components/civil/PipeNetworkView.jsx + packages/kerf-civil/src/kerf_civil/hydraulics_gravity.py"
+            "note": "Manning's equation for circular/trapezoidal gravity flow (normal-depth solver, full-flow capacity, part-full geometry); no network design, sizing wizard, or plan-production workflow",
+            "evidence": "packages/kerf-civil/src/kerf_civil/hydraulics_gravity.py"
           }
         },
         {
@@ -345,9 +347,9 @@
             "source": "https://help.autodesk.com/view/CIV3D/2026/ENU/?guid=GUID-A57BA96E-A2F5-4A4F-B0B3-2E3D8F6E1C9D"
           },
           "kerf": {
-            "status": "yes",
-            "note": "PipeNetworkView.jsx: 2-D plan view, click pipe for flow/pressure/diameter; Run network solve dispatches civil_water_network_solve (GGA + HW/DW)",
-            "evidence": "src/components/civil/PipeNetworkView.jsx + packages/kerf-civil/src/kerf_civil/hydraulics_pressure.py"
+            "status": "partial",
+            "note": "Hardy-Cross / Global Gradient Algorithm steady-state solver (Hazen-Williams + Darcy-Weisbach with Swamee-Jain friction); no plan-production or fittings layout",
+            "evidence": "packages/kerf-civil/src/kerf_civil/hydraulics_pressure.py"
           }
         },
         {
@@ -917,7 +919,7 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "GD&T data model (ASME Y14.5); GD&T toolbar + FCF placement UI shipped (GdntToolbar.jsx)",
+            "note": "GD&T data model (ASME Y14.5); no MBD/PMI on model view",
             "evidence": "packages/kerf-core/src/gdandt.py"
           }
         },
@@ -1110,7 +1112,7 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Live HLR projection (make2d) + auto-dim; GD&T toolbar + FCF click-to-place (GdntToolbar.jsx)",
+            "note": "Live HLR projection (make2d) + auto-dim; no GD&T-placement UI",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/make2d.py"
           }
         },
@@ -3896,9 +3898,9 @@
             "note": "Part Check Geometry + Boolean intersection"
           },
           "kerf": {
-            "status": "yes",
+            "status": "partial",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/clash/detect.py",
-            "note": "OBB-SAT + BVH + tri-tri; Check Clashes panel with pair list + Jump-to highlight"
+            "note": "backend OBB-SAT + BVH; no UI panel"
           }
         },
         {
@@ -3911,7 +3913,7 @@
           "kerf": {
             "status": "partial",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/history/feature_io.py",
-            "note": "live HLR projection + auto-dim; GD&T toolbar + FCF click-to-place (GdntToolbar.jsx)"
+            "note": "live HLR projection + auto-dim; no GD&T-placement UI"
           }
         },
         {
@@ -3923,8 +3925,8 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py, packages/kerf-cad-core/src/kerf_cad_core/geom/nurbs_surface_fit.py",
-            "note": "opBlendSrf (G1/G2) + opNetworkSrf (Gordon) + opSweep2 (RMF) wired as LLM tools; validate_body-clean. nurbs_surface_fit — freeform NURBS fit from segmented point clouds (ordered-grid P&T §9.4 row-by-row interpolation + unordered-cloud damped LS with Boehm adaptive knot refinement; target_rms API; sinusoidal patch RMS < 1e-2; torus grid RMS < 1e-3)"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py",
+            "note": "blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends wired"
           }
         },
         {
@@ -4667,7 +4669,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "opBlendSrf (blend_srf_to_body G1/G2) + opNetworkSrf (network_srf_to_body Gordon) + opSweep2 (sweep2_to_body RMF) wired as LLM tools; validate_body-clean; 33 Phase 4a tests green",
+            "note": "blend_srf, network_srf (Gordon), patch_srf_fit, match_srf wired as ops",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py"
           }
         },
@@ -4694,8 +4696,8 @@
             "source": "https://help.autodesk.com/view/fusion360/ENU/?guid=ASM-CONTACT-SETS"
           },
           "kerf": {
-            "status": "yes",
-            "note": "OBB-SAT + BVH + tri-tri; Check Clashes panel with pair list + Jump-to highlight",
+            "status": "partial",
+            "note": "Backend OBB-SAT + BVH + tri-tri; no UI panel",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/clash/detect.py"
           }
         },
@@ -4708,9 +4710,9 @@
             "source": "https://productdesignonline.com/overlooked-fusion-feature-motion-study-in-autodesk-fusion-360/"
           },
           "kerf": {
-            "status": "no",
-            "note": "Planar MBD not wired to assembly solver",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/assembly"
+            "status": "partial",
+            "note": "Planar MBD UI wired: AssemblyMotionPanel (joint-list, driver, timeline scrubber) dispatches to simulate_motion backend; full solver integration ongoing",
+            "evidence": "src/components/AssemblyMotionPanel.jsx"
           }
         },
         {
@@ -4723,7 +4725,7 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Live HLR projection + auto-dim; GD&T toolbar + FCF click-to-place (GdntToolbar.jsx)",
+            "note": "Live HLR projection + auto-dim; no GD&T-placement UI",
             "evidence": "src/components/DrawingView.jsx"
           }
         },
@@ -4756,20 +4758,6 @@
           }
         },
         {
-          "domain": "D1",
-          "feature": "Automatic Feature Recognition (STEP \u2192 parametric tree)",
-          "competitor": {
-            "status": "partial",
-            "note": "Feature recognition on imported STEP via FeatureWorks add-in (extra purchase); limited to simple prismatic features; no topology-ordering DAG export",
-            "source": "https://help.autodesk.com/view/fusion360/ENU/?guid=GUID-1DB13B23-4E0C-4B74-B35C-1A5CF49DAB50"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "AAG-based classifier (through-hole, blind-hole, counterbore, countersink, pocket, slot, boss, fillet, chamfer, rib, step) + topology ordering into replay-able parametric DAG; afr_to_parametric LLM tool wired",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/afr/"
-          }
-        },
-        {
           "domain": "D2",
           "feature": "FE \u2014 solid (tet/hex)",
           "competitor": {
@@ -4779,7 +4767,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "CalculiX/FEniCSx solver + LinearStaticPanel UI (load/BC editor, von Mises contour)",
+            "note": "CalculiX/Mystran/Z88 bridge (needs binary)",
             "evidence": "packages/kerf-fem/src/kerf_fem/calculix_bridge.py"
           }
         },
@@ -4793,7 +4781,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Consistent-mass modal + linear eigenvalue buckling + J2 plasticity + UI panels (ModalPanel, BucklingPanel)",
+            "note": "Consistent-mass modal, Riks, J2 plasticity (backend)",
             "evidence": "packages/kerf-fem/src/kerf_fem/modal.py"
           }
         },
@@ -4836,7 +4824,8 @@
           "kerf": {
             "status": "yes",
             "note": "S-N, \u03b5-N, rainflow counting (backend)",
-            "evidence": "packages/kerf-fem/src/kerf_fem/fatigue_fem.py"          }
+            "evidence": "packages/kerf-fem/src/kerf_fem/fatigue_fem.py"
+          }
         },
         {
           "domain": "D2",
@@ -5211,9 +5200,9 @@
             "source": "https://www.autodesk.com/products/fusion-360/manufacturing-extension"
           },
           "kerf": {
-            "status": "yes",
-            "evidence": "src/components/CAMView.jsx + packages/kerf-cam/src/kerf_cam/five_axis/",
-            "note": "5-axis UI (mode switch + tilt/strategy/post controls) + kinematics + posts (backend); 3+2 indexed + constant-tilt continuous"
+            "status": "partial",
+            "note": "Engine solid (5-axis 3+2); no UI",
+            "evidence": "packages/kerf-cam/src/kerf_cam/five_axis"
           }
         },
         {
@@ -5436,7 +5425,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Harmonic (mode superposition) + PSD random vibration (Miles) + VibrationPanel UI (FRF plot)",
+            "note": "Full n-DOF eigen + FRF matrix (backend)",
             "evidence": "packages/kerf-fem/src/kerf_fem/modal.py"
           }
         },
@@ -5733,6 +5722,20 @@
             "note": "Moldflow + weld + AM + forming (backend)",
             "evidence": "packages/kerf-manufacturing/src/kerf_manufacturing/moldflow"
           }
+        },
+        {
+          "domain": "D1",
+          "feature": "Standard parts library (ISO/DIN fasteners, bearings, profiles)",
+          "competitor": {
+            "status": "partial",
+            "note": "Fusion 360 has a McMaster-Carr / Toolbox integration; coverage narrower than SolidWorks Toolbox",
+            "source": "https://help.autodesk.com/view/fusion360/ENU/?guid=ASM-TOOLBOX-OVERVIEW"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "kerf-partsgen: 5 ISO/DIN generators; kerf-parts KiCad+BOLTS+FreeCAD pipeline; real STEP/JSCAD geometry in CircuitEditor 3D tab via substitute_component",
+            "evidence": "packages/kerf-parts/src/kerf_parts/tools.py"
+          }
         }
       ]
     },
@@ -5839,8 +5842,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "blend/network/patch/match-srf + G3 blends + Class-A continuity harness + viewport Class-A toggle (G2/G3 audit panel) + imprint toolpath wired",
-            "evidence": "src/components/Renderer.jsx, packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py"
+            "note": "blend/network/patch/match-srf + G3 blends + Class-A continuity harness wired",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py"
           }
         },
         {
@@ -5866,8 +5869,8 @@
             "source": "https://help.solidworks.com/2024/english/SolidWorks/motionstudies/t_detecting_interference_motion.htm"
           },
           "kerf": {
-            "status": "yes",
-            "note": "OBB-SAT + BVH + tri-tri; Check Clashes panel with pair list + Jump-to highlight",
+            "status": "partial",
+            "note": "Backend OBB-SAT + BVH + tri-tri; no UI panel",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/clash/detect.py"
           }
         },
@@ -5880,9 +5883,9 @@
             "source": "https://help.solidworks.com/2025/english/SolidWorks/motionstudies/t_detecting_interference_motion.htm"
           },
           "kerf": {
-            "status": "no",
-            "note": "Planar MBD not wired to assembly solver",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/assembly/model.py"
+            "status": "partial",
+            "note": "Planar MBD UI wired: AssemblyMotionPanel (joint-list, driver, timeline scrubber) dispatches to simulate_motion backend; full solver integration ongoing",
+            "evidence": "src/components/AssemblyMotionPanel.jsx"
           }
         },
         {
@@ -5895,7 +5898,7 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Live B-rep HLR projection + auto-dim; GD&T toolbar + FCF click-to-place (GdntToolbar.jsx)",
+            "note": "Live B-rep HLR projection + auto-dim; no GD&T-placement UI",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/drawings/auto_dimension.py"
           }
         },
@@ -5908,9 +5911,9 @@
             "source": "https://help.solidworks.com/2020/English/SolidWorks/sldworks/c_dimxpert_for_parts.htm"
           },
           "kerf": {
-            "status": "yes",
-            "note": "ISO 1101 GD&T toolbar (DrawingToolbar + GdntToolbar) + FCF placement modal + 3D PMI overlay (Pmi3DOverlay); datum A/B/C, position, perpendicularity, parallelism, flatness, circularity, straightness, profile-of-line, profile-of-surface, runout; click-to-place with leader; persisted via addFcf/addDatumLabel",
-            "evidence": "src/components/GdntToolbar.jsx"
+            "status": "partial",
+            "note": "Data model + auto-propose only; no UI for placement",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gdt/tools.py"
           }
         },
         {
@@ -5936,23 +5939,9 @@
             "source": "https://help.solidworks.com/2025/English/SolidWorks/sldworks/c_SpeedPak_OH.htm"
           },
           "kerf": {
-            "status": "yes",
-            "note": "Camera-debounced LOD pass in 3D viewport: full / bbox-proxy / culled tiers up to 1 000 visible parts; debug HUD; no SpeedPak equivalent",
-            "evidence": "src/components/Renderer.jsx + packages/kerf-cad-core/src/kerf_cad_core/assembly/perf.py"
-          }
-        },
-        {
-          "domain": "D1",
-          "feature": "Automatic Feature Recognition (STEP \u2192 parametric tree)",
-          "competitor": {
-            "status": "paid",
-            "note": "FeatureWorks add-in (separate license) \u2014 recognises basic prismatic features from imported STEP; does not export a replay-able parametric DAG",
-            "source": "https://www.solidworks.com/product/solidworks-featureworks"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "AAG-based classifier (through-hole, blind-hole, counterbore, countersink, pocket, slot, boss, fillet, chamfer, rib, step) + topology ordering into replay-able parametric DAG; afr_to_parametric LLM tool wired",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/afr/"
+            "status": "partial",
+            "note": "LOD mesh swapping (configurable); no SpeedPak equivalent",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/assembly/perf.py"
           }
         },
         {
@@ -5964,8 +5953,8 @@
             "source": "https://help.solidworks.com/2021/english/SolidWorks/cworks/c_Fatigue_Analysis.htm"
           },
           "kerf": {
-            "status": "yes",
-            "note": "Linear static solver + UI panel (LinearStaticPanel: load/BC editor, von Mises contour)",
+            "status": "partial",
+            "note": "Linear static solver; no UI panel beyond displacement render",
             "evidence": "packages/kerf-fem/src/kerf_fem/linear_static.py"
           }
         },
@@ -5980,7 +5969,8 @@
           "kerf": {
             "status": "partial",
             "note": "S-N + \u03b5-N + rainflow backend; no UI",
-            "evidence": "packages/kerf-fem/src/kerf_fem/fatigue_fem.py"          }
+            "evidence": "packages/kerf-fem/src/kerf_fem/fatigue_fem.py"
+          }
         },
         {
           "domain": "D2",
@@ -5991,8 +5981,8 @@
             "source": "https://help.solidworks.com/2026/english/simtutorialonline/c_simconn_fatigue.htm"
           },
           "kerf": {
-            "status": "yes",
-            "note": "Modal (ModalPanel: N-modes, freq table, modal participation) + Buckling (BucklingPanel: load-case, \u03bb factor, mode-shape sketch) + Harmonic/PSD (VibrationPanel)",
+            "status": "partial",
+            "note": "Consistent-mass modal + linear eigenvalue buckling (Euler-Bernoulli Kg) + harmonic/FRF (mode superposition) + random-vibration PSD (Miles' equation + shaped PSD) + Riks + J2 plasticity backend; no UI",
             "evidence": "packages/kerf-fem/src/kerf_fem/buckling.py"
           }
         },
@@ -6341,8 +6331,8 @@
             "source": "https://help.solidworks.com/2026/english/simtutorialonline/c_simconn_fatigue.htm"
           },
           "kerf": {
-            "status": "yes",
-            "note": "Harmonic (mode superposition, DAF, phase) + random-vibration PSD (Miles' + shaped PSD) + UI panel (VibrationPanel: harmonic/PSD selector, FRF plot)",
+            "status": "partial",
+            "note": "Full n-DOF eigen + FRF matrix + harmonic response (mode superposition, DAF, phase) + random-vibration PSD (Miles' equation + shaped PSD via trapezoidal integration) backend; no UI",
             "evidence": "packages/kerf-fem/src/kerf_fem/harmonic.py"
           }
         },
@@ -6398,7 +6388,7 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Data model + auto-propose; GD&T toolbar + FCF click-to-place + 3D PMI overlay shipped",
+            "note": "Data model + auto-propose; no MBD/PMI placement UI",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gdt/datums.py"
           }
         },
@@ -6569,6 +6559,20 @@
             "note": "kerf-sdk on PyPI \u2014 HTTP/JSON-RPC; same interface as LLM",
             "evidence": "packages/kerf-sdk"
           }
+        },
+        {
+          "domain": "D1",
+          "feature": "Standard parts library (ISO/DIN fasteners, bearings, profiles)",
+          "competitor": {
+            "status": "yes",
+            "note": "SOLIDWORKS Toolbox: ISO/DIN/ANSI/BSI/JIS fasteners + bearings; drag-and-drop into assemblies",
+            "source": "https://help.solidworks.com/2024/english/SolidWorks/toolbox/c_toolbox_overview.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "kerf-partsgen: 5 ISO/DIN generators; kerf-parts KiCad+BOLTS+FreeCAD pipeline; real STEP/JSCAD geometry in CircuitEditor 3D tab via substitute_component",
+            "evidence": "packages/kerf-parts/src/kerf_parts/tools.py"
+          }
         }
       ]
     },
@@ -6675,7 +6679,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "opBlendSrf (blend_srf_to_body G1/G2) + opNetworkSrf (network_srf_to_body Gordon) + opSweep2 (sweep2_to_body RMF) all wired as LLM tools; validate_body-clean; 33 Phase 4a tests green",
+            "note": "blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends wired",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py"
           }
         },
@@ -6688,9 +6692,9 @@
             "source": "https://cad.onshape.com/help/Content/drawings-gdt.htm"
           },
           "kerf": {
-            "status": "yes",
-            "note": "ISO 1101 GD&T toolbar + FCF click-to-place modal + 3D PMI overlay; all ISO 1101 characteristics; datum labels; persisted in drawing data model",
-            "evidence": "src/components/GdntToolbar.jsx"
+            "status": "partial",
+            "note": "Data model + auto-propose only; no UI placement",
+            "evidence": "packages/kerf-gdnt/src/kerf_gdnt/feature_control_frame.py"
           }
         },
         {
@@ -6982,9 +6986,9 @@
             "source": "https://www.onshape.com/en/blog/cam-studio-comprehensive-milling"
           },
           "kerf": {
-            "status": "yes",
-            "evidence": "src/components/CAMView.jsx + packages/kerf-cam/src/kerf_cam/five_axis/",
-            "note": "5-axis UI (mode switch + tilt/strategy/post controls) + kinematics + posts (backend); 3+2 indexed + constant-tilt continuous"
+            "status": "partial",
+            "note": "5-axis engine solid; no UI",
+            "evidence": "packages/kerf-cam/src/kerf_cam/adaptive.py"
           }
         },
         {
@@ -7364,6 +7368,20 @@
             "note": "ISO 14040/44 4-phase+multi-impact+uncertainty (backend)",
             "evidence": "packages/kerf-lca/src/kerf_lca/phases.py"
           }
+        },
+        {
+          "domain": "D1",
+          "feature": "Standard parts library (ISO/DIN fasteners, bearings, profiles)",
+          "competitor": {
+            "status": "partial",
+            "note": "Onshape Standard Content library: ISO/DIN/ANSI fasteners via Part Studio; narrower coverage than SolidWorks Toolbox",
+            "source": "https://cad.onshape.com/help/Content/standard_content.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "kerf-partsgen: 5 ISO/DIN generators; kerf-parts KiCad+BOLTS+FreeCAD pipeline; real STEP/JSCAD geometry in CircuitEditor 3D tab via substitute_component",
+            "evidence": "packages/kerf-parts/src/kerf_parts/tools.py"
+          }
         }
       ]
     },
@@ -7456,7 +7474,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "opBlendSrf (blend_srf_to_body G1/G2) + opNetworkSrf (network_srf_to_body Gordon) + opSweep2 (sweep2_to_body RMF) + feature_to_solid (sew) wired as LLM tools; validate_body-clean; 33 Phase 4a tests green",
+            "note": "blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, feature_to_solid (sew) wired",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py"
           }
         },
@@ -7483,9 +7501,9 @@
             "source": "https://help.autodesk.com/view/INVNTOR/2025/ENU/?guid=GUID-1B0C6E15-74C4-41C4-A06D-C5A7EB6D8E3E"
           },
           "kerf": {
-            "status": "no",
-            "note": "None \u2014 planar MBD not wired to assembly solver",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/assembly"
+            "status": "partial",
+            "note": "Planar MBD UI wired: AssemblyMotionPanel (joint-list, driver, timeline scrubber) dispatches to simulate_motion backend; full solver integration ongoing",
+            "evidence": "src/components/AssemblyMotionPanel.jsx"
           }
         },
         {
@@ -7498,7 +7516,7 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Live HLR projection + auto-dim; GD&T toolbar + FCF click-to-place (GdntToolbar.jsx)",
+            "note": "Live HLR projection + auto-dim; no GD&T-placement UI",
             "evidence": "src/components/DrawingView.jsx"
           }
         },
@@ -7511,9 +7529,9 @@
             "source": "https://help.autodesk.com/view/INVNTOR/2025/ENU/?guid=GUID-A44C5B4C-7BA6-4E56-B5E5-5B3D6F1A4A49"
           },
           "kerf": {
-            "status": "yes",
-            "note": "GD&T toolbar (ISO 1101 all characteristics) + FCF click-to-place + 3D PMI overlay; datum A/B/C; stored in drawing annotation model",
-            "evidence": "src/components/GdntToolbar.jsx"
+            "status": "partial",
+            "note": "GD&T data model only; no MBD/PMI UI",
+            "evidence": "packages/kerf-gdnt/src/kerf_gdnt/feature_control_frame.py"
           }
         },
         {
@@ -7545,20 +7563,6 @@
           }
         },
         {
-          "domain": "D1",
-          "feature": "Automatic Feature Recognition (STEP \u2192 parametric tree)",
-          "competitor": {
-            "status": "partial",
-            "note": "Limited 'Recognize Features' command on imported parts; fewer feature types than FeatureWorks; no parametric DAG export",
-            "source": "https://help.autodesk.com/view/INVNTOR/ENU/?guid=GUID-EEA15D3A-2AA5-4A7C-A748-0000E8B52614"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "AAG-based classifier (through-hole, blind-hole, counterbore, countersink, pocket, slot, boss, fillet, chamfer, rib, step) + topology ordering into replay-able parametric DAG; afr_to_parametric LLM tool wired",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/afr/"
-          }
-        },
-        {
           "domain": "D2",
           "feature": "FE \u2014 solid (tet/hex)",
           "competitor": {
@@ -7568,7 +7572,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "CalculiX/FEniCSx solver + LinearStaticPanel UI (load/BC editor, von Mises contour)",
+            "note": "CalculiX/Mystran/Z88 bridge (needs binary; backend)",
             "evidence": "packages/kerf-fem/src/kerf_fem/calculix_bridge.py"
           }
         },
@@ -7582,7 +7586,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Consistent-mass modal + linear eigenvalue buckling + J2 plasticity + UI panels (ModalPanel, BucklingPanel)",
+            "note": "Consistent-mass modal, Riks, J2 plasticity (backend)",
             "evidence": "packages/kerf-fem/src/kerf_fem/modal.py"
           }
         },
@@ -7625,7 +7629,8 @@
           "kerf": {
             "status": "yes",
             "note": "S-N, \u03b5-N, rainflow counting (backend)",
-            "evidence": "packages/kerf-fem/src/kerf_fem/fatigue_fem.py"          }
+            "evidence": "packages/kerf-fem/src/kerf_fem/fatigue_fem.py"
+          }
         },
         {
           "domain": "D2",
@@ -7903,8 +7908,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "WireViz 2D diagrams + 3D polyline harness routing + formboard-flatten 2D manufacturing output (topological unfold, branch alternation, connector pinouts); T-37 shipped",
-            "evidence": "packages/kerf-wiring/src/kerf_wiring/formboard_flatten.py"
+            "note": "WireViz runner + harness3d; WiringView wired",
+            "evidence": "packages/kerf-wiring/src/kerf_wiring/wireviz_runner.py"
           }
         },
         {
@@ -7930,9 +7935,9 @@
             "source": "https://help.autodesk.com/view/INVNTOR/2025/ENU/?guid=GUID-CAM"
           },
           "kerf": {
-            "status": "yes",
-            "evidence": "src/components/CAMView.jsx + packages/kerf-cam/src/kerf_cam/five_axis/",
-            "note": "5-axis UI (mode switch + tilt/strategy/post controls) + kinematics + posts (backend); 3+2 indexed + constant-tilt continuous"
+            "status": "partial",
+            "note": "Engine solid (5-axis 3+2); no UI",
+            "evidence": "packages/kerf-cam/src/kerf_cam/five_axis"
           }
         },
         {
@@ -8071,7 +8076,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "SDOF + n-DOF harmonic + PSD random vibration (Miles) + VibrationPanel UI (FRF plot)",
+            "note": "SDOF vibration analysis deep (backend)",
             "evidence": "packages/kerf-fem/src/kerf_fem/modal.py"
           }
         },
@@ -8390,7 +8395,7 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "ImplantLibrary: filterable catalogue (Straumann, Nobel Biocare, Zimmer, MIS; diameter 3.3-4.8 mm; length 8-13 mm), click-to-place sends fixture dims to dental_surgical_guide backend. Representative geometry — not a certified clinical implant library.",
+            "note": "ImplantLibrary: filterable catalogue (Straumann, Nobel Biocare, Zimmer, MIS; diameter 3.3-4.8 mm; length 8-13 mm), click-to-place sends fixture dims to dental_surgical_guide backend. Representative geometry \u2014 not a certified clinical implant library.",
             "evidence": "src/components/dental/ImplantLibrary.jsx, packages/kerf-dental/src/kerf_dental/guide.py"
           }
         },
@@ -8867,7 +8872,8 @@
           "feature": "NURBS surfacing (blend/network/patch)",
           "competitor": "{ status: yes, note: \"FreeStyle Shaper + GSD \u2014 Class-A surfaces, G2/G3 continuity, curvature combs, highlight analysis; industry gold standard\", source: \"https://www.3ds.com/products/catia/freestyle\" }",
           "kerf": "{ status: partial, note: \"blend/network/patch/match-srf + G3 + Class-A harness wired; not FreeStyle/GSD class-A depth\", evidence: \"packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py\" }"
-        },        {
+        },
+        {
           "domain": "D1",
           "feature": "Assemblies \u2014 mates",
           "competitor": "{ status: yes, note: \"Assembly Design \u2014 coincident, offset, angle, user-defined constraints\", source: \"https://www.3ds.com/products/catia/assembly-design\" }",
@@ -8877,14 +8883,19 @@
           "domain": "D1",
           "feature": "Assembly motion study / interference",
           "competitor": "{ status: yes, note: \"DMU Kinematics + DMU Space Analysis \u2014 envelope sweeps, clash/clearance/contact\", source: \"https://www.3ds.com/products/catia/dmu-kinematics\" }",
-          "kerf": "{ status: no, evidence: \"docs/domain_depth.md \u2014 D1 row: Assembly motion study / interference: [ ]\" }"
+          "kerf": {
+            "status": "partial",
+            "note": "Planar MBD UI wired: AssemblyMotionPanel (joint-list, driver, timeline scrubber) dispatches to simulate_motion backend; full solver integration ongoing",
+            "evidence": "src/components/AssemblyMotionPanel.jsx"
+          }
         },
         {
           "domain": "D1",
           "feature": "2D drawings (views/dims/sections)",
           "competitor": "{ status: yes, note: \"Drafting workbench \u2014 view generation, dimensions, sections, GD&T callouts\", source: \"https://www.3ds.com/products/catia/drafting\" }",
           "kerf": "{ status: partial, note: \"Live HLR projection (make2d) + auto-dim; no GD&T-placement UI\", evidence: \"packages/kerf-cad-core/src/kerf_cad_core/geom/make2d.py\" }"
-        },        {
+        },
+        {
           "domain": "D1",
           "feature": "GD&T on drawings / MBD / PMI",
           "competitor": "{ status: yes, note: \"Functional Tolerancing & Annotation (FTA) \u2014 full ISO / ASME PMI on 3D model; 3DEXPERIENCE MBD\", source: \"https://www.3ds.com/products/catia/functional-tolerancing-and-annotation\" }",
@@ -9033,7 +9044,8 @@
           "feature": "5-axis (kinematics + posts)",
           "competitor": "{ status: paid, note: \"CATIA Multi-Axis Surface Machining \u2014 full 5-axis; paid workbench\", source: \"https://www.3ds.com/products/catia/multi-axis-surface-machining\" }",
           "kerf": "{ status: partial, note: \"Engine solid; no UI\", evidence: \"packages/kerf-cam/src/kerf_cam/worker.py\" }"
-        },        {
+        },
+        {
           "domain": "D7",
           "feature": "Adaptive / trochoidal clearing",
           "competitor": "{ status: paid, note: \"DELMIA NC Machine Simulation \u2014 advanced clearing strategies; paid add-in\", source: \"https://www.3ds.com/products/delmia/nc-machine-tool-simulation\" }",
@@ -9122,7 +9134,8 @@
           "feature": "GD&T data model (ASME Y14.5)",
           "competitor": "{ status: yes, note: \"FTA (Functional Tolerancing & Annotation) \u2014 full PMI / 3D annotations on model; ASME Y14.5 + ISO 1101\", source: \"https://www.3ds.com/products/catia/functional-tolerancing-and-annotation\" }",
           "kerf": "{ status: yes, note: \"Backend only; no MBD/PMI on model\", evidence: \"packages/kerf-gdnt/src/kerf_gdnt/feature_control_frame.py\" }"
-        },        {
+        },
+        {
           "domain": "D11",
           "feature": "Tolerance stackup \u2014 1D (WC/RSS/MC)",
           "competitor": "{ status: paid, note: \"CATIA Tolerance Analysis \u2014 1D stackup; DELMIA/SIMULIA CETOL for full 3D; paid add-ins\", source: \"https://www.3ds.com/products/catia/tolerance-analysis\" }",
@@ -9694,9 +9707,9 @@
             "source": "https://support.ptc.com/help/creo/creo_pma/r9.0/usascii/index.html#page/assembly/simplified_reps/simplified_reps_intro.html"
           },
           "kerf": {
-            "status": "yes",
-            "note": "Camera-debounced LOD pass: full / bbox-proxy / culled tiers, 1 000-part budget; no formal simplified-rep / Shrinkwrap workflow yet",
-            "evidence": "src/components/Renderer.jsx + packages/kerf-cad-core/src/kerf_cad_core/assembly/perf.py"
+            "status": "partial",
+            "note": "LOD mesh swapping configurable; no formal simplified-rep workflow",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/assembly/mates.py"
           }
         },
         {
@@ -9709,7 +9722,7 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Live HLR projection (make2d) + auto-dim; GD&T toolbar + FCF click-to-place (GdntToolbar.jsx)",
+            "note": "Live HLR projection (make2d) + auto-dim; no GD&T-placement UI",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/make2d.py"
           }
         },
@@ -9932,9 +9945,9 @@
             "source": "https://www.ptc.com/en/products/creo/options/nc"
           },
           "kerf": {
-            "status": "yes",
-            "evidence": "src/components/CAMView.jsx + packages/kerf-cam/src/kerf_cam/five_axis/",
-            "note": "5-axis UI (mode switch + tilt/strategy/post controls) + kinematics + posts (backend); 3+2 indexed + constant-tilt continuous"
+            "status": "partial",
+            "note": "5-axis engine solid; no UI; kinematics + posts (backend)",
+            "evidence": "packages/kerf-cam/src/kerf_cam/worker.py"
           }
         },
         {
@@ -10128,9 +10141,9 @@
             "source": "https://www.ptc.com/en/products/creo/options/mbd"
           },
           "kerf": {
-            "status": "yes",
-            "note": "ISO 1101 GD&T toolbar + FCF click-to-place + 3D PMI overlay (Pmi3DOverlay); datum labels; all characteristics",
-            "evidence": "src/components/GdntToolbar.jsx"
+            "status": "partial",
+            "note": "Data model only; no 3D MBD/PMI annotation UI",
+            "evidence": "src/components/DrawingView.jsx"
           }
         },
         {
@@ -10352,7 +10365,8 @@
       "left": "kerf",
       "right": "fibersim",
       "hero_tagline": "The composites ply design and manufacturing tool \u2014 versus an open-core CAD with CLT, failure analysis, AFP/ATL output, and multi-domain engineering.",
-      "reviewed_at": "2026-05-29",      "features": [
+      "reviewed_at": "2026-05-24",
+      "features": [
         {
           "domain": "D13",
           "feature": "Ply-based laminate layup design",
@@ -10390,9 +10404,9 @@
             "source": "https://www.siemens.com/en-us/products/designcenter/nx-cad-software/offerings/fibersim-composites/"
           },
           "kerf": {
-            "status": "partial",
-            "note": "AFP toolpath UI + composites_afp_pathplan dispatch; full CNC export is next",
-            "evidence": "src/components/composites/AFPToolpathView.jsx"
+            "status": "no",
+            "note": "No AFP/ATL CNC path generation",
+            "evidence": ""
           }
         },
         {
@@ -10488,9 +10502,9 @@
             "source": "https://www.siemens.com/en-us/products/designcenter/nx-cad-software/offerings/fibersim-composites/"
           },
           "kerf": {
-            "status": "yes",
-            "note": "LaminateStackup UI: per-ply weight rollup (areal density g/m\u00b2) + cost rollup ($/m\u00b2)",
-            "evidence": "src/components/composites/LaminateStackup.jsx"
+            "status": "partial",
+            "note": "LCA material costing; no composites-specific laminate weight/cost UI",
+            "evidence": "packages/kerf-lca/phases.py"
           }
         },
         {
@@ -11160,7 +11174,7 @@
           "nx": "NX Routing Electrical / Capital Harness (Siemens EDA) \u2014 3D harness routing, formboard, bend radius checks",
           "nx_tier": "paid",
           "competitor": "source: https://eda.sw.siemens.com/en-US/pcb/capital/harness-engineering/",
-          "kerf": "{ status: yes, note: \"WireViz 2D diagrams + 3D polyline harness routing + formboard-flatten 2D manufacturing output (topological unfold, branch alternation, connector pinouts, bbox); T-37 shipped\", evidence: \"packages/kerf-wiring/src/kerf_wiring/formboard_flatten.py\" }"
+          "kerf": "evidence: src/components/WiringView.jsx"
         },
         {
           "domain": "D10",
@@ -13178,7 +13192,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "opBlendSrf (blend_srf_to_body G1/G2) + opNetworkSrf (network_srf_to_body Gordon) + opSweep2 (sweep2_to_body RMF) all wired as LLM tools; validate_body-clean; 33 Phase 4a tests green",
+            "note": "blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends wired",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py"
           }
         },
@@ -13206,7 +13220,7 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Live HLR projection (make2d) + auto-dim; GD&T toolbar + FCF click-to-place (GdntToolbar.jsx)",
+            "note": "Live HLR projection (make2d) + auto-dim; no GD&T-placement UI",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/make2d.py"
           }
         },
@@ -13219,9 +13233,9 @@
             "source": "https://docs.blender.org/manual/en/latest/modeling/index.html"
           },
           "kerf": {
-            "status": "yes",
-            "note": "ISO 1101 GD&T toolbar + FCF click-to-place + 3D PMI overlay; datum labels + all characteristics",
-            "evidence": "src/components/GdntToolbar.jsx"
+            "status": "partial",
+            "note": "Data model only; no UI",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core"
           }
         },
         {
@@ -14624,9 +14638,9 @@
             "source": "https://help.autodesk.com/view/ACD/2025/ENU/?guid=GUID-GDT-OVERVIEW"
           },
           "kerf": {
-            "status": "yes",
-            "note": "ISO 1101 GD&T toolbar (DrawingToolbar) + FCF click-to-place modal + 3D PMI overlay; all characteristics; datum A/B/C",
-            "evidence": "src/components/GdntToolbar.jsx"
+            "status": "partial",
+            "note": "Data model only (kerf-gdnt); no UI placement on drawings",
+            "evidence": "packages/kerf-gdnt/src/kerf_gdnt/feature_control_frame.py"
           }
         },
         {
@@ -14695,7 +14709,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "opBlendSrf (blend_srf_to_body G1/G2) + opNetworkSrf (network_srf_to_body Gordon) + opSweep2 (sweep2_to_body RMF) all wired as LLM tools; validate_body-clean; 33 Phase 4a tests green",
+            "note": "blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends wired",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py"
           }
         },
@@ -14947,8 +14961,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "WireViz 2D diagrams + 3D polyline harness routing + formboard-flatten 2D manufacturing output (T-37 shipped)",
-            "evidence": "packages/kerf-wiring/src/kerf_wiring/formboard_flatten.py"
+            "note": "WiringView wired; WireViz + 3D harness router",
+            "evidence": "packages/kerf-wiring/src/kerf_wiring/harness3d.py"
           }
         },
         {
@@ -15140,7 +15154,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "opBlendSrf (blend_srf_to_body G1/G2) + opNetworkSrf (network_srf_to_body Gordon) + opSweep2 (sweep2_to_body RMF) all wired as LLM tools; validate_body-clean; 33 Phase 4a tests green",
+            "note": "blend_srf, network_srf (Gordon), patch_srf_fit all wired as feature ops",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py"
           }
         },
@@ -15168,8 +15182,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "opSweep2 two-rail RMF sweep (sweep2_to_body) + LLM tool feature_sweep2; validate_body-clean; 33 Phase 4a tests green",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/brep_build.py"
+            "note": "BRepOffsetAPI_MakePipeShell; 1- and 2-rail wired",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/surfacing.py"
           }
         },
         {
@@ -15364,8 +15378,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "zebra_analysis, isophote, curvature combs, Gauss/mean, draft-angle ops + Class-A viewport toggle with G2/G3 per-edge audit panel",
-            "evidence": "src/components/Renderer.jsx, packages/kerf-cad-core/src/kerf_cad_core/geom/surface_analysis.py"
+            "note": "zebra_analysis, isophote, curvature combs, Gauss/mean, draft-angle ops",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/surface_analysis.py"
           }
         },
         {
@@ -16117,7 +16131,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "opBlendSrf (blend_srf_to_body G1/G2) + opNetworkSrf (network_srf_to_body Gordon) + opSweep2 (sweep2_to_body RMF) all wired as LLM tools; validate_body-clean; 33 Phase 4a tests green",
+            "note": "blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends wired",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py"
           }
         },
@@ -16145,8 +16159,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "opSweep2 (sweep2_to_body, RMF two-rail) + opNetworkSrf (network_srf_to_body, Gordon) + opBlendSrf (blend_srf_to_body, G1/G2) all wired as LLM tools; validate_body-clean; 33 Phase 4a tests",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/brep_build.py"
+            "note": "BRepOffsetAPI_MakePipeShell; sweep1 + sweep2 wired",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/sweep1.py"
           }
         },
         {
@@ -16175,196 +16189,6 @@
             "status": "yes",
             "note": "push_pull (planar + curved), move_face, delete_face wired as ops",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/direct_edit.py"
-          }
-        }
-      ]
-    },
-    {
-      "slug": "verifiber",
-      "competitor": "VeriFiber",
-      "category": "cad-mechanical",
-      "left": "kerf",
-      "right": "verifiber",
-      "hero_tagline": "VeriFiber composite laminate analysis \u2014 compared against open-core CLT + failure suite.",
-      "reviewed_at": "2026-05-29",
-      "features": [
-        {
-          "domain": "D13",
-          "feature": "Ply-based laminate stackup editor",
-          "competitor": {
-            "status": "yes",
-            "note": "Drag-and-drop ply table with angle, material, thickness",
-            "source": "https://verifiber.com"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "Interactive ply table: drag-to-reorder, auto symmetry/balance check",
-            "evidence": "src/components/composites/LaminateStackup.jsx"
-          }
-        },
-        {
-          "domain": "D2",
-          "feature": "Classical Laminate Theory (ABD matrices)",
-          "competitor": {
-            "status": "yes",
-            "note": "A/B/D stiffness matrices + effective moduli",
-            "source": "https://verifiber.com"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "CLT backend + inline matrix preview in stackup UI",
-            "evidence": "packages/kerf-composites/src/kerf_composites/clt.py"
-          }
-        },
-        {
-          "domain": "D2",
-          "feature": "Failure analysis (Tsai-Wu, Hashin)",
-          "competitor": {
-            "status": "yes",
-            "note": "Tsai-Wu, max-stress, max-strain criteria",
-            "source": "https://verifiber.com"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "Tsai-Wu, Tsai-Hill, max-stress, max-strain, Hashin (1980), Puck",
-            "evidence": "packages/kerf-composites/src/kerf_composites/failure.py"
-          }
-        },
-        {
-          "domain": "D13",
-          "feature": "Fiber orientation contour visualization",
-          "competitor": {
-            "status": "partial",
-            "note": "Ply angle display; no interactive heatmap contour",
-            "source": "https://verifiber.com"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "HSL heatmap contour with hover tooltip showing local fiber angle + drape sim",
-            "evidence": "src/components/composites/FiberOrientationContour.jsx"
-          }
-        },
-        {
-          "domain": "D14",
-          "feature": "Areal weight + material cost rollup",
-          "competitor": {
-            "status": "yes",
-            "note": "Laminate weight and material cost estimate",
-            "source": "https://verifiber.com"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "Per-ply areal density (g/m\u00b2) + cost ($/m\u00b2) auto-computed in stackup",
-            "evidence": "src/components/composites/LaminateStackup.jsx"
-          }
-        },
-        {
-          "domain": "D1",
-          "feature": "LLM / chat-native editing",
-          "competitor": {
-            "status": "no",
-            "note": "No LLM interface in VeriFiber as of May 2026",
-            "source": "https://verifiber.com"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "Chat-native composites: describe layup in plain language",
-            "evidence": "src/components/ChatPanel.jsx"
-          }
-        }
-      ]
-    },
-    {
-      "slug": "composites-builder",
-      "competitor": "Composites Builder (Siemens)",
-      "category": "cad-mechanical",
-      "left": "kerf",
-      "right": "composites-builder",
-      "hero_tagline": "Siemens Composites Builder \u2014 versus Kerf open-core CLT + AFP + fiber-orientation UI.",
-      "reviewed_at": "2026-05-29",
-      "features": [
-        {
-          "domain": "D13",
-          "feature": "Ply-based laminate design",
-          "competitor": {
-            "status": "yes",
-            "note": "Zone-based and ply-based stacking with automated drop-off",
-            "source": "https://www.siemens.com/composites-builder"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "Drag-to-reorder ply table with symmetry/balance check + CLT dispatch",
-            "evidence": "src/components/composites/LaminateStackup.jsx"
-          }
-        },
-        {
-          "domain": "D13",
-          "feature": "AFP/ATL path generation UI",
-          "competitor": {
-            "status": "yes",
-            "note": "AFP/ATL course planning with tow-path steering",
-            "source": "https://www.siemens.com/composites-builder"
-          },
-          "kerf": {
-            "status": "partial",
-            "note": "AFP toolpath UI with cure cycle chart; CNC export planned",
-            "evidence": "src/components/composites/AFPToolpathView.jsx"
-          }
-        },
-        {
-          "domain": "D13",
-          "feature": "Fiber orientation visualization",
-          "competitor": {
-            "status": "yes",
-            "note": "3D ply fiber orientation display with drape simulation",
-            "source": "https://www.siemens.com/composites-builder"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "HSL contour heatmap with angle tooltip + exploded ply stack + drape sim",
-            "evidence": "src/components/composites/FiberOrientationContour.jsx"
-          }
-        },
-        {
-          "domain": "D2",
-          "feature": "CLT structural analysis",
-          "competitor": {
-            "status": "yes",
-            "note": "Bi-directional CLT via Simcenter integration",
-            "source": "https://www.siemens.com/composites-builder"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "CLT A/B/D matrices + effective moduli; inline in stackup UI",
-            "evidence": "packages/kerf-composites/src/kerf_composites/clt.py"
-          }
-        },
-        {
-          "domain": "D2",
-          "feature": "Failure criteria (multi-mode)",
-          "competitor": {
-            "status": "yes",
-            "note": "Failure via Simcenter FEA; not native in CB design tool",
-            "source": "https://www.siemens.com/composites-builder"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "Tsai-Wu, Tsai-Hill, max-stress, Hashin native \u2014 no FEA dependency",
-            "evidence": "packages/kerf-composites/src/kerf_composites/failure.py"
-          }
-        },
-        {
-          "domain": "D1",
-          "feature": "LLM / AI design assistant",
-          "competitor": {
-            "status": "no",
-            "note": "No LLM interface as of May 2026",
-            "source": "https://www.siemens.com/composites-builder"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "Chat-native: describe layup, Kerf routes to composites backend",
-            "evidence": "src/components/ChatPanel.jsx"
           }
         }
       ]

@@ -593,3 +593,16 @@ async def run_fem_random_vibration_psd(ctx, args: bytes) -> str:
         n_sigma=int(a.get("n_sigma", 3)),
     )
     return ok_payload(result)
+
+
+# ---------------------------------------------------------------------------
+# fem_explicit_dynamics  — central-difference explicit transient FEM
+# ---------------------------------------------------------------------------
+
+from kerf_fem.explicit_dynamics import (
+    _fem_explicit_dynamics_spec,
+    run_fem_explicit_dynamics,
+)
+
+fem_explicit_dynamics_spec = _fem_explicit_dynamics_spec
+

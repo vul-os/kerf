@@ -2715,12 +2715,14 @@ async def lookup_derived_artifact(
         content = content_row[0]
         content_hash = compute_content_sha(content)
 
+        cache_key = f"{fid}:{content_hash}:{derived_kind}"
+
         row = await conn.fetchrow(
             """
             UPDATE derived_artifacts
             SET last_accessed_at = now()
             WHERE source_file_id = $1 AND content_sha256 = $2 AND derived_kind = $3
-            RETURNING payload
+            RETURNING payload, last_accessed_at
             """,
             fid, content_hash, derived_kind,
         )
@@ -2731,10 +2733,19 @@ async def lookup_derived_artifact(
                 detail="compile-on-demand-not-yet-wired",
             )
 
+        last_accessed = row["last_accessed_at"]
+        last_accessed_iso = (
+            last_accessed.isoformat()
+            if hasattr(last_accessed, "isoformat")
+            else str(last_accessed)
+        )
+
         return {
             "cached": True,
             "derived_kind": derived_kind,
             "payload_b64": base64.b64encode(row["payload"]).decode(),
+            "last_accessed_at": last_accessed_iso,
+            "cache_key": cache_key,
         }
 
 

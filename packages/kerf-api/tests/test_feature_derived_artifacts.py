@@ -399,27 +399,34 @@ class TestDerivedArtifactsStoreRoute:
 class TestDerivedArtifactsLookupRoute:
     """POST /projects/{pid}/files/{fid}/derived (cache lookup)."""
 
-    def _client_with_cache(self, uid: str, cached_payload: Optional[bytes]):
+    def _client_with_cache(
+        self,
+        uid: str,
+        cached_payload: Optional[bytes],
+        last_accessed: Optional[datetime] = None,
+    ):
         """Build a test client where the DB either has or lacks a cached row."""
         from fastapi.testclient import TestClient
         app = _build_app()
 
         # The route does two queries in the same conn:
         #   1. SELECT content from files (fetchrow → file content)
-        #   2. UPDATE derived_artifacts ... RETURNING payload (fetchrow → cached row)
+        #   2. UPDATE derived_artifacts ... RETURNING payload, last_accessed_at
+        #      (fetchrow → cached row)
         # We simulate this by having fetchrow return different things per call.
         call_count: list[int] = [0]
 
         file_content = "// hello world"
+        _last_accessed = last_accessed or datetime(2026, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
 
         async def _fetchrow(*args, **kwargs):
             call_count[0] += 1
             if call_count[0] == 1:
                 # First call: file content lookup
                 return {0: file_content}
-            # Second call: cache lookup (UPDATE RETURNING)
+            # Second call: cache lookup (UPDATE RETURNING payload, last_accessed_at)
             if cached_payload is not None:
-                return {"payload": cached_payload}
+                return {"payload": cached_payload, "last_accessed_at": _last_accessed}
             return None
 
         conn = MagicMock()
@@ -547,6 +554,90 @@ class TestDerivedArtifactsLookupRoute:
                     r = _lookup(c, _FILE_ID, _OWNER_ID, kind)
             if r.status_code == 200:
                 assert r.json()["derived_kind"] == kind
+
+    # -- Scenario 26: cache miss response shape unchanged ---------------------
+
+    def test_lookup_cache_miss_response_shape_unchanged(self):
+        """Cache miss (501) response does not include last_accessed_at or cache_key."""
+        app, ctx = self._client_with_cache(_OWNER_ID, cached_payload=None)
+        from fastapi.testclient import TestClient
+        with ctx[0], ctx[1], ctx[2]:
+            with TestClient(app, raise_server_exceptions=False) as c:
+                r = _lookup(c, _FILE_ID, _OWNER_ID, "jscad_mesh")
+        assert r.status_code == 501, f"expected 501, got {r.status_code}: {r.text}"
+        body = r.json()
+        # Miss response must NOT include hit-only fields
+        assert "last_accessed_at" not in body
+        assert "cache_key" not in body
+        assert "payload_b64" not in body
+
+    # -- Scenario 27: cache hit includes last_accessed_at matching row value --
+
+    def test_lookup_cache_hit_includes_last_accessed_at(self):
+        """Cache hit response includes last_accessed_at matching the row's value."""
+        fixed_ts = datetime(2026, 3, 10, 8, 30, 0, tzinfo=timezone.utc)
+        payload = b"mesh-data"
+        app, ctx = self._client_with_cache(_OWNER_ID, cached_payload=payload, last_accessed=fixed_ts)
+        from fastapi.testclient import TestClient
+        with ctx[0], ctx[1], ctx[2]:
+            with TestClient(app, raise_server_exceptions=False) as c:
+                r = _lookup(c, _FILE_ID, _OWNER_ID, "jscad_mesh")
+        assert r.status_code == 200, f"expected 200, got {r.status_code}: {r.text}"
+        body = r.json()
+        assert "last_accessed_at" in body, "hit response must include last_accessed_at"
+        assert body["last_accessed_at"] is not None, "last_accessed_at must not be null"
+        # Value must contain the timestamp info (ISO 8601 format)
+        assert "2026-03-10" in body["last_accessed_at"], (
+            f"last_accessed_at {body['last_accessed_at']!r} should contain the row's date"
+        )
+
+    # -- Scenario 28: cache hit includes cache_key echo -----------------------
+
+    def test_lookup_cache_hit_includes_cache_key(self):
+        """Cache hit response includes cache_key composed of file_id:sha:kind."""
+        payload = b"circuit-board-bytes"
+        app, ctx = self._client_with_cache(_OWNER_ID, cached_payload=payload)
+        from fastapi.testclient import TestClient
+        with ctx[0], ctx[1], ctx[2]:
+            with TestClient(app, raise_server_exceptions=False) as c:
+                r = _lookup(c, _FILE_ID, _OWNER_ID, "circuit_board_3d")
+        assert r.status_code == 200, f"expected 200, got {r.status_code}: {r.text}"
+        body = r.json()
+        assert "cache_key" in body, "hit response must include cache_key"
+        # cache_key must embed the file_id and derived_kind
+        assert _FILE_ID in body["cache_key"], "cache_key must contain the file_id"
+        assert "circuit_board_3d" in body["cache_key"], "cache_key must contain the derived_kind"
+
+    # -- Scenario 29: multiple hits — last_accessed_at advances ---------------
+
+    def test_lookup_last_accessed_at_advances_on_multiple_hits(self):
+        """last_accessed_at in successive hit responses reflects the latest DB value."""
+        from fastapi.testclient import TestClient
+
+        payload = b"sketch-data"
+        ts_first = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        ts_second = datetime(2026, 6, 1, 0, 0, 0, tzinfo=timezone.utc)
+
+        # First hit: last_accessed_at = ts_first
+        app1, ctx1 = self._client_with_cache(_OWNER_ID, cached_payload=payload, last_accessed=ts_first)
+        with ctx1[0], ctx1[1], ctx1[2]:
+            with TestClient(app1, raise_server_exceptions=False) as c:
+                r1 = _lookup(c, _FILE_ID, _OWNER_ID, "sketch_geom2")
+        assert r1.status_code == 200, r1.text
+        ts1_str = r1.json()["last_accessed_at"]
+
+        # Second hit (simulated later): last_accessed_at = ts_second (advanced)
+        app2, ctx2 = self._client_with_cache(_OWNER_ID, cached_payload=payload, last_accessed=ts_second)
+        with ctx2[0], ctx2[1], ctx2[2]:
+            with TestClient(app2, raise_server_exceptions=False) as c:
+                r2 = _lookup(c, _FILE_ID, _OWNER_ID, "sketch_geom2")
+        assert r2.status_code == 200, r2.text
+        ts2_str = r2.json()["last_accessed_at"]
+
+        # The second response must reflect a later timestamp
+        assert ts2_str > ts1_str, (
+            f"Second hit last_accessed_at ({ts2_str}) must be later than first ({ts1_str})"
+        )
 
 
 # ===========================================================================

@@ -60,9 +60,9 @@ async def register(app: FastAPI, ctx) -> PluginManifest:
     # POST /api/tools/call — frontend dispatch of any registered LLM tool
     # (used by LadderEditor Import/Export and any future UI-wired tool).
     _try_include(app, "kerf_api.routes_tools",           tags=["tools"])
-    # GPU worker enrollment + BYO dispatch. routes_workers.py declares short
-    # paths (/enroll, /heartbeat, ...) so the prefix MUST include /workers.
-    _try_include(app, "kerf_api.routes_workers", prefix="/api/workers", tags=["gpu-workers"])
+    # GPU worker enrollment + BYO dispatch. routes_workers.py's APIRouter
+    # already declares prefix="/api/workers", so this include uses prefix="".
+    _try_include(app, "kerf_api.routes_workers", prefix="", tags=["gpu-workers"])
 
     _register_tools(ctx)
 

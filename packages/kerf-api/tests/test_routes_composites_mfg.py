@@ -229,6 +229,151 @@ class TestAFPMfg:
 
 
 # ===========================================================================
+# POST /api/composites/afp?format=gcode
+# ===========================================================================
+
+class TestAFPExportGcode:
+
+    def test_gcode_format_returns_200(self, client):
+        """?format=gcode returns 200 with text/plain content."""
+        r = client.post("/api/composites/afp?format=gcode", json={
+            "tool": "composites_afp_pathplan",
+            "args": AFP_PARAMS,
+        })
+        assert r.status_code == 200
+        assert "text/plain" in r.headers.get("content-type", "")
+
+    def test_gcode_content_is_string(self, client):
+        """G-code response is a non-empty string."""
+        r = client.post("/api/composites/afp?format=gcode", json={
+            "tool": "composites_afp_pathplan",
+            "args": AFP_PARAMS,
+        })
+        assert len(r.text) > 0
+
+    def test_gcode_has_m200_fibre_start(self, client):
+        """G-code contains M200 (fibre start) commands."""
+        r = client.post("/api/composites/afp?format=gcode", json={
+            "tool": "composites_afp_pathplan",
+            "args": AFP_PARAMS,
+        })
+        assert "M200" in r.text
+
+    def test_gcode_has_m201_fibre_stop(self, client):
+        """G-code contains M201 (fibre stop) commands."""
+        r = client.post("/api/composites/afp?format=gcode", json={
+            "tool": "composites_afp_pathplan",
+            "args": AFP_PARAMS,
+        })
+        assert "M201" in r.text
+
+    def test_gcode_has_m202_tape_cut(self, client):
+        """G-code contains M202 (tape cut) commands."""
+        r = client.post("/api/composites/afp?format=gcode", json={
+            "tool": "composites_afp_pathplan",
+            "args": AFP_PARAMS,
+        })
+        assert "M202" in r.text
+
+    def test_gcode_content_disposition(self, client):
+        """Content-Disposition attachment header present."""
+        r = client.post("/api/composites/afp?format=gcode", json={
+            "tool": "composites_afp_pathplan",
+            "args": AFP_PARAMS,
+        })
+        cd = r.headers.get("content-disposition", "")
+        assert "attachment" in cd
+        assert ".gcode" in cd
+
+    def test_gcode_goto_lines_present(self, client):
+        """G-code contains GOTO-type G00/G01 lines."""
+        r = client.post("/api/composites/afp?format=gcode", json={
+            "tool": "composites_afp_pathplan",
+            "args": AFP_PARAMS,
+        })
+        lines = r.text.splitlines()
+        g_lines = [l for l in lines if l.strip().startswith(("G00", "G01"))]
+        assert len(g_lines) > 0
+
+    def test_gcode_m30_program_end(self, client):
+        """G-code ends with M30."""
+        r = client.post("/api/composites/afp?format=gcode", json={
+            "tool": "composites_afp_pathplan",
+            "args": AFP_PARAMS,
+        })
+        assert "M30" in r.text
+
+
+# ===========================================================================
+# POST /api/composites/afp?format=apt
+# ===========================================================================
+
+class TestAFPExportAPT:
+
+    def test_apt_format_returns_200(self, client):
+        r = client.post("/api/composites/afp?format=apt", json={
+            "tool": "composites_afp_pathplan",
+            "args": AFP_PARAMS,
+        })
+        assert r.status_code == 200
+        assert "text/plain" in r.headers.get("content-type", "")
+
+    def test_apt_content_disposition(self, client):
+        r = client.post("/api/composites/afp?format=apt", json={
+            "tool": "composites_afp_pathplan",
+            "args": AFP_PARAMS,
+        })
+        cd = r.headers.get("content-disposition", "")
+        assert "attachment" in cd
+        assert ".apt" in cd
+
+    def test_apt_partno_header(self, client):
+        r = client.post("/api/composites/afp?format=apt", json={
+            "tool": "composites_afp_pathplan",
+            "args": AFP_PARAMS,
+        })
+        assert "PARTNO" in r.text
+
+    def test_apt_goto_lines_present(self, client):
+        r = client.post("/api/composites/afp?format=apt", json={
+            "tool": "composites_afp_pathplan",
+            "args": AFP_PARAMS,
+        })
+        goto_lines = [l for l in r.text.splitlines() if l.strip().startswith("GOTO/")]
+        assert len(goto_lines) > 0
+
+    def test_apt_fedrat_present(self, client):
+        r = client.post("/api/composites/afp?format=apt", json={
+            "tool": "composites_afp_pathplan",
+            "args": AFP_PARAMS,
+        })
+        assert "FEDRAT" in r.text
+
+    def test_apt_end_statement(self, client):
+        r = client.post("/api/composites/afp?format=apt", json={
+            "tool": "composites_afp_pathplan",
+            "args": AFP_PARAMS,
+        })
+        assert r.text.strip().endswith("END")
+
+    def test_apt_auxfun_200_present(self, client):
+        """AUXFUN/200 (fibre start) in APT output."""
+        r = client.post("/api/composites/afp?format=apt", json={
+            "tool": "composites_afp_pathplan",
+            "args": AFP_PARAMS,
+        })
+        assert "AUXFUN/200" in r.text
+
+    def test_apt_auxfun_202_present(self, client):
+        """AUXFUN/202 (tape cut) in APT output."""
+        r = client.post("/api/composites/afp?format=apt", json={
+            "tool": "composites_afp_pathplan",
+            "args": AFP_PARAMS,
+        })
+        assert "AUXFUN/202" in r.text
+
+
+# ===========================================================================
 # POST /api/composites/fiber_map
 # ===========================================================================
 

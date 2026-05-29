@@ -19,7 +19,7 @@ import { useAuth } from '../../store/auth.js'
 const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
 
 // ---------------------------------------------------------------------------
-// API call
+// API calls
 // ---------------------------------------------------------------------------
 async function callAFPPathplan(params) {
   const token = useAuth.getState().accessToken
@@ -33,6 +33,20 @@ async function callAFPPathplan(params) {
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return res.json()
+}
+
+async function callAFPExport(params, format) {
+  const token = useAuth.getState().accessToken
+  const res = await fetch(`${API_URL}/api/composites/afp?format=${format}`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ tool: 'composites_afp_pathplan', args: params }),
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.text()
 }
 
 // ---------------------------------------------------------------------------
@@ -320,6 +334,8 @@ export default function AFPToolpathView({ file, projectId }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [result, setResult] = useState(null)
+  const [exporting, setExporting] = useState(false)
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
 
   const runPathplan = useCallback(async () => {
     setLoading(true)
@@ -333,6 +349,29 @@ export default function AFPToolpathView({ file, projectId }) {
       setError(e.message)
     } finally {
       setLoading(false)
+    }
+  }, [params])
+
+  const exportCNC = useCallback(async (format) => {
+    setExportMenuOpen(false)
+    setExporting(true)
+    setError(null)
+    try {
+      const text = await callAFPExport(params, format)
+      const ext = format === 'gcode' ? 'gcode' : 'apt'
+      const blob = new Blob([text], { type: 'text/plain' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `afp_toolpath.${ext}`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      setError(`Export failed: ${e.message}`)
+    } finally {
+      setExporting(false)
     }
   }, [params])
 
@@ -460,6 +499,50 @@ export default function AFPToolpathView({ file, projectId }) {
       textTransform: 'uppercase',
       cursor: 'pointer',
     },
+    exportWrap: {
+      position: 'relative',
+      display: 'inline-block',
+    },
+    exportBtn: {
+      padding: '5px 11px',
+      background: 'rgba(100,116,139,0.12)',
+      border: '1px solid rgba(100,116,139,0.3)',
+      borderRadius: 3,
+      color: '#94a3b8',
+      fontFamily: 'inherit',
+      fontSize: 9,
+      letterSpacing: '0.12em',
+      textTransform: 'uppercase',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 4,
+    },
+    exportMenu: {
+      position: 'absolute',
+      top: '100%',
+      right: 0,
+      marginTop: 2,
+      background: '#0d1321',
+      border: '1px solid #1e293b',
+      borderRadius: 3,
+      zIndex: 50,
+      minWidth: 130,
+      boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+    },
+    exportMenuItem: {
+      display: 'block',
+      width: '100%',
+      textAlign: 'left',
+      padding: '7px 12px',
+      background: 'none',
+      border: 'none',
+      color: '#cbd5e1',
+      fontFamily: 'inherit',
+      fontSize: 10,
+      cursor: 'pointer',
+      letterSpacing: '0.05em',
+    },
     errorMsg: {
       fontSize: 9,
       color: '#f87171',
@@ -480,6 +563,40 @@ export default function AFPToolpathView({ file, projectId }) {
         <span style={styles.title}>AFP Toolpath Planner</span>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {error && <span style={{ fontSize: 9, color: '#f87171' }}>{error}</span>}
+          {/* Export CNC dropdown */}
+          <div style={styles.exportWrap}>
+            <button
+              style={styles.exportBtn}
+              type="button"
+              disabled={exporting}
+              onClick={() => setExportMenuOpen((o) => !o)}
+              title="Export toolpath as CNC program"
+            >
+              {exporting ? '⟳' : '⬇'} Export CNC ▾
+            </button>
+            {exportMenuOpen && (
+              <div style={styles.exportMenu}>
+                <button
+                  style={styles.exportMenuItem}
+                  type="button"
+                  onClick={() => exportCNC('gcode')}
+                  onMouseEnter={(e) => { e.target.style.background = '#1e293b'; e.target.style.color = '#fbbf24' }}
+                  onMouseLeave={(e) => { e.target.style.background = 'none'; e.target.style.color = '#cbd5e1' }}
+                >
+                  G-code (.gcode)
+                </button>
+                <button
+                  style={styles.exportMenuItem}
+                  type="button"
+                  onClick={() => exportCNC('apt')}
+                  onMouseEnter={(e) => { e.target.style.background = '#1e293b'; e.target.style.color = '#fbbf24' }}
+                  onMouseLeave={(e) => { e.target.style.background = 'none'; e.target.style.color = '#cbd5e1' }}
+                >
+                  APT / CL (.apt)
+                </button>
+              </div>
+            )}
+          </div>
           <button style={styles.runBtn} onClick={runPathplan} type="button" disabled={loading}>
             {loading ? '⟳ Running…' : '▶ Plan Paths'}
           </button>

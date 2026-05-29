@@ -644,3 +644,109 @@ async def run_composites_failure_depth(args: dict[str, Any], ctx: "ProjectCtx") 
         return ok_payload(payload)
     except Exception as exc:
         return err_payload(str(exc), "COMPOSITES_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# Tool: composites_afp_export
+# ---------------------------------------------------------------------------
+
+composites_afp_export_spec = ToolSpec(
+    name="composites_afp_export",
+    description=(
+        "Export an AFP (Automated Fiber Placement) tape-path plan to CNC machine format. "
+        "Accepts a list of AFP courses (as returned by composites_afp_pathplan) and "
+        "produces either G-code (generic 5-axis, M200/M201/M202/M203/M204) or APT/CL "
+        "(ISO 3592, GOTO/FEDRAT/AUXFUN commands). "
+        "Returns the file content as a string plus a suggested filename."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "courses": {
+                "type": "array",
+                "description": (
+                    "AFP tape-path courses.  Each course is an object with: "
+                    "course_id [int], angle_deg [float], start_x [float mm], "
+                    "start_y [float mm], end_x [float mm], end_y [float mm], "
+                    "tow_width_mm [float], length_mm [float]."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "course_id":    {"type": "integer"},
+                        "angle_deg":    {"type": "number"},
+                        "start_x":      {"type": "number"},
+                        "start_y":      {"type": "number"},
+                        "end_x":        {"type": "number"},
+                        "end_y":        {"type": "number"},
+                        "tow_width_mm": {"type": "number"},
+                        "length_mm":    {"type": "number"},
+                    },
+                    "required": ["course_id", "angle_deg",
+                                 "start_x", "start_y", "end_x", "end_y",
+                                 "tow_width_mm", "length_mm"],
+                },
+                "minItems": 1,
+            },
+            "format": {
+                "type": "string",
+                "enum": ["gcode", "apt"],
+                "description": (
+                    "'gcode' — Generic 5-axis G-code with M200/M201/M202 fibre M-codes. "
+                    "'apt'   — APT/CL ISO 3592 Cutter Location file."
+                ),
+            },
+            "machine_config": {
+                "type": "object",
+                "description": (
+                    "Optional machine configuration overrides for G-code export. "
+                    "Keys: feedrate_mmpm [float, default 3000], "
+                    "rapid_feedrate_mmpm [float, default 9000], "
+                    "z_laydown [float mm, default 0.0], "
+                    "z_clearance [float mm, default 10.0], "
+                    "compaction_force_N [float, default 150.0], "
+                    "program_number [int, default 1], "
+                    "machine_name [str, default 'GENERIC_AFP']."
+                ),
+            },
+            "feedrate_mmpm": {
+                "type": "number",
+                "description": "Feed rate in mm/min for APT export (default 3000).",
+            },
+        },
+        "required": ["courses", "format"],
+    },
+)
+
+
+async def run_composites_afp_export(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_composites.afp_export import afp_to_gcode, afp_to_apt
+
+        courses = args["courses"]
+        fmt = str(args["format"]).lower().strip()
+        machine_config = args.get("machine_config") or None
+        feedrate = args.get("feedrate_mmpm")
+
+        if fmt == "gcode":
+            content = afp_to_gcode(courses, machine_config=machine_config)
+            filename = "afp_toolpath.gcode"
+        elif fmt == "apt":
+            content = afp_to_apt(courses, feedrate_mmpm=feedrate)
+            filename = "afp_toolpath.apt"
+        else:
+            return err_payload(f"Unknown format {fmt!r}; use 'gcode' or 'apt'", "BAD_ARGS")
+
+        payload = {
+            "format": fmt,
+            "filename": filename,
+            "num_courses": len(courses),
+            "content": content,
+            "byte_size": len(content.encode("utf-8")),
+        }
+        return ok_payload(payload)
+
+    except ValueError as exc:
+        return err_payload(str(exc), "BAD_ARGS")
+    except Exception as exc:
+        return err_payload(str(exc), "COMPOSITES_ERROR")

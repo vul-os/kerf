@@ -15,8 +15,8 @@ import logging
 import math
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, Query
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from kerf_core.dependencies import require_auth
@@ -170,14 +170,23 @@ class _AFPMfgRequest(BaseModel):
 
 
 @router.post("/composites/afp", tags=["composites"])
-def composites_afp(req: _AFPMfgRequest, _auth: dict = Depends(require_auth)):
+def composites_afp(
+    req: _AFPMfgRequest,
+    _auth: dict = Depends(require_auth),
+    format: str = Query(default="json", description="Response format: 'json' | 'gcode' | 'apt'"),
+):
     """AFP tape-path generation — Wave 4D AFPToolpathView panel.
 
     Generates tow courses for an Automated Fibre Placement layup and returns
     a cure-cycle summary.  No external package required; the pathplan is an
     analytical calculation.
 
-    Returns:
+    Query parameters:
+      format — 'json' (default)  → JSON response with courses + cure_cycle
+               'gcode'           → plain-text generic 5-axis G-code download
+               'apt'             → plain-text APT/CL Cutter Location download
+
+    Returns (JSON mode):
       ok            — True
       tool          — echoed tool name
       courses       — list of {course_id, angle_deg, start_x, start_y,
@@ -283,6 +292,49 @@ def composites_afp(req: _AFPMfgRequest, _auth: dict = Depends(require_auth)):
         "courses": courses,
         "cure_cycle": cure_cycle,
     }
+
+    # ---- CNC export formats -----------------------------------------------
+    fmt = (format or "json").lower().strip()
+    if fmt == "gcode":
+        try:
+            from kerf_composites.afp_export import afp_to_gcode
+        except ImportError as exc:
+            logger.warning("kerf_composites.afp_export not available: %s", exc)
+            return JSONResponse(
+                status_code=503,
+                content={"status": "pending",
+                         "reason": "kerf-composites package not installed."},
+            )
+        try:
+            gcode_text = afp_to_gcode(courses)
+        except ValueError as exc:
+            return JSONResponse(status_code=422, content={"ok": False, "reason": str(exc)})
+        return Response(
+            content=gcode_text,
+            media_type="text/plain",
+            headers={"Content-Disposition": 'attachment; filename="afp_toolpath.gcode"'},
+        )
+
+    if fmt == "apt":
+        try:
+            from kerf_composites.afp_export import afp_to_apt
+        except ImportError as exc:
+            logger.warning("kerf_composites.afp_export not available: %s", exc)
+            return JSONResponse(
+                status_code=503,
+                content={"status": "pending",
+                         "reason": "kerf-composites package not installed."},
+            )
+        try:
+            apt_text = afp_to_apt(courses)
+        except ValueError as exc:
+            return JSONResponse(status_code=422, content={"ok": False, "reason": str(exc)})
+        return Response(
+            content=apt_text,
+            media_type="text/plain",
+            headers={"Content-Disposition": 'attachment; filename="afp_toolpath.apt"'},
+        )
+
     return payload
 
 

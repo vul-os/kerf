@@ -20,6 +20,7 @@ async def register(app: FastAPI, ctx):
         composites_interlaminar_spec, run_composites_interlaminar,
         composites_thermal_spec, run_composites_thermal,
         composites_failure_depth_spec, run_composites_failure_depth,
+        composites_afp_export_spec, run_composites_afp_export,
     )
     ctx.tools.register("layup_analysis", layup_analysis_spec, run_layup_analysis)
     ctx.tools.register("composites_drape", composites_drape_spec, run_composites_drape)
@@ -29,6 +30,8 @@ async def register(app: FastAPI, ctx):
                        composites_thermal_spec, run_composites_thermal)
     ctx.tools.register("composites_failure_depth",
                        composites_failure_depth_spec, run_composites_failure_depth)
+    ctx.tools.register("composites_afp_export",
+                       composites_afp_export_spec, run_composites_afp_export)
 
     provides = [
         "composites.layup",
@@ -38,6 +41,7 @@ async def register(app: FastAPI, ctx):
         "composites.interlaminar",
         "composites.thermal",
         "composites.failure_depth",
+        "composites.afp_export",
     ]
 
     try:

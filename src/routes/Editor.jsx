@@ -71,6 +71,9 @@ import TINView from '../components/civil/TINView.jsx'
 import PipeNetworkView from '../components/civil/PipeNetworkView.jsx'
 import GradingPlanView from '../components/civil/GradingPlanView.jsx'
 import LandscapeView from '../components/civil/LandscapeView.jsx'
+import LaminateStackup from '../components/composites/LaminateStackup.jsx'
+import AFPToolpathView from '../components/composites/AFPToolpathView.jsx'
+import FiberOrientationContour from '../components/composites/FiberOrientationContour.jsx'
 
 // ---------------------------------------------------------------------------
 // Build3DDropdown — toolbar dropdown in the sketch header that scaffolds a
@@ -647,6 +650,25 @@ function isCivilLandscapeFile(file) {
   if (file.kind === 'civil_landscape') return true
   const n = (file.name || '').toLowerCase()
   return n.endsWith('.landscape') || n.endsWith('.civil_landscape')
+function isLayupFile(file) {
+  if (!file) return false
+  if (file.kind === 'layup') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.layup')
+}
+
+function isAFPFile(file) {
+  if (!file) return false
+  if (file.kind === 'afp_plan') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.afp_plan')
+}
+
+function isFiberMapFile(file) {
+  if (!file) return false
+  if (file.kind === 'fiber_map') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.fiber_map')
 }
 
 // ---------------------------------------------------------------------------
@@ -879,6 +901,9 @@ export default function Editor() {
     if (isBIMFile(w.currentFile)) return
     if (isAirfoilFile(w.currentFile)) return
     if (isOrbitFile(w.currentFile)) return
+    if (isLayupFile(w.currentFile)) return
+    if (isAFPFile(w.currentFile)) return
+    if (isFiberMapFile(w.currentFile)) return
     if (runTimerRef.current) clearTimeout(runTimerRef.current)
     const code = w.currentFileContent
     const delay = runDebounceFor(code)
@@ -1342,6 +1367,9 @@ export default function Editor() {
   const civilPipeFile     = isCivilPipeFile(w.currentFile)
   const civilGradingFile  = isCivilGradingFile(w.currentFile)
   const civilLandscapeFile = isCivilLandscapeFile(w.currentFile)
+  const layupFile = isLayupFile(w.currentFile)
+  const afpFile = isAFPFile(w.currentFile)
+  const fiberMapFile = isFiberMapFile(w.currentFile)
   // T-116: plain-text / code files — matched by extension via editorModes.js.
   // Must be checked AFTER all dedicated-extension checks above so that e.g.
   // a .json family file is not accidentally grabbed by the plain editor.
@@ -2081,6 +2109,18 @@ export default function Editor() {
               content={w.currentFileContent}
               fileName={w.currentFile?.name}
             />
+          ) : layupFile ? (
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <LaminateStackup />
+            </div>
+          ) : afpFile ? (
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <AFPToolpathView file={w.currentFile} projectId={projectId} />
+            </div>
+          ) : fiberMapFile ? (
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <FiberOrientationContour file={w.currentFile} projectId={projectId} />
+            </div>
           ) : printFile ? (
             <div className="flex-1 min-h-0 relative">
               <PrintSliceView

@@ -4836,8 +4836,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "S-N, \u03b5-N, rainflow (Goodman/Gerber/SWT, Miner) + FatiguePanel UI (S-N picker, load history, life contour)",            "evidence": "packages/kerf-fem/src/kerf_fem/fatigue_fem.py"
-          }
+            "note": "S-N, \u03b5-N, rainflow counting (backend)",
+            "evidence": "packages/kerf-fem/src/kerf_fem/fatigue_fem.py"          }
         },
         {
           "domain": "D2",
@@ -5979,9 +5979,9 @@
             "source": "https://help.solidworks.com/2024/english/SolidWorks/cworks/c_Fatigue_Analysis.htm"
           },
           "kerf": {
-            "status": "yes",
-            "note": "S-N + \u03b5-N + rainflow (Goodman/Gerber/SWT) + UI panel (FatiguePanel: S-N picker, load history, life contour)",            "evidence": "packages/kerf-fem/src/kerf_fem/fatigue_fem.py"
-          }
+            "status": "partial",
+            "note": "S-N + \u03b5-N + rainflow backend; no UI",
+            "evidence": "packages/kerf-fem/src/kerf_fem/fatigue_fem.py"          }
         },
         {
           "domain": "D2",
@@ -7625,8 +7625,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "S-N, \u03b5-N, rainflow (Goodman/Gerber/SWT, Miner) + FatiguePanel UI (S-N picker, load history, life contour)",            "evidence": "packages/kerf-fem/src/kerf_fem/fatigue_fem.py"
-          }
+            "note": "S-N, \u03b5-N, rainflow counting (backend)",
+            "evidence": "packages/kerf-fem/src/kerf_fem/fatigue_fem.py"          }
         },
         {
           "domain": "D2",
@@ -10353,8 +10353,7 @@
       "left": "kerf",
       "right": "fibersim",
       "hero_tagline": "The composites ply design and manufacturing tool \u2014 versus an open-core CAD with CLT, failure analysis, AFP/ATL output, and multi-domain engineering.",
-      "reviewed_at": "2026-05-24",
-      "features": [
+      "reviewed_at": "2026-05-29",      "features": [
         {
           "domain": "D13",
           "feature": "Ply-based laminate layup design",
@@ -10392,9 +10391,9 @@
             "source": "https://www.siemens.com/en-us/products/designcenter/nx-cad-software/offerings/fibersim-composites/"
           },
           "kerf": {
-            "status": "no",
-            "note": "No AFP/ATL CNC path generation",
-            "evidence": ""
+            "status": "partial",
+            "note": "AFP toolpath UI + composites_afp_pathplan dispatch; full CNC export is next",
+            "evidence": "src/components/composites/AFPToolpathView.jsx"
           }
         },
         {
@@ -10490,9 +10489,9 @@
             "source": "https://www.siemens.com/en-us/products/designcenter/nx-cad-software/offerings/fibersim-composites/"
           },
           "kerf": {
-            "status": "partial",
-            "note": "LCA material costing; no composites-specific laminate weight/cost UI",
-            "evidence": "packages/kerf-lca/phases.py"
+            "status": "yes",
+            "note": "LaminateStackup UI: per-ply weight rollup (areal density g/m\u00b2) + cost rollup ($/m\u00b2)",
+            "evidence": "src/components/composites/LaminateStackup.jsx"
           }
         },
         {
@@ -16177,6 +16176,196 @@
             "status": "yes",
             "note": "push_pull (planar + curved), move_face, delete_face wired as ops",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/direct_edit.py"
+          }
+        }
+      ]
+    },
+    {
+      "slug": "verifiber",
+      "competitor": "VeriFiber",
+      "category": "cad-mechanical",
+      "left": "kerf",
+      "right": "verifiber",
+      "hero_tagline": "VeriFiber composite laminate analysis \u2014 compared against open-core CLT + failure suite.",
+      "reviewed_at": "2026-05-29",
+      "features": [
+        {
+          "domain": "D13",
+          "feature": "Ply-based laminate stackup editor",
+          "competitor": {
+            "status": "yes",
+            "note": "Drag-and-drop ply table with angle, material, thickness",
+            "source": "https://verifiber.com"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Interactive ply table: drag-to-reorder, auto symmetry/balance check",
+            "evidence": "src/components/composites/LaminateStackup.jsx"
+          }
+        },
+        {
+          "domain": "D2",
+          "feature": "Classical Laminate Theory (ABD matrices)",
+          "competitor": {
+            "status": "yes",
+            "note": "A/B/D stiffness matrices + effective moduli",
+            "source": "https://verifiber.com"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "CLT backend + inline matrix preview in stackup UI",
+            "evidence": "packages/kerf-composites/src/kerf_composites/clt.py"
+          }
+        },
+        {
+          "domain": "D2",
+          "feature": "Failure analysis (Tsai-Wu, Hashin)",
+          "competitor": {
+            "status": "yes",
+            "note": "Tsai-Wu, max-stress, max-strain criteria",
+            "source": "https://verifiber.com"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Tsai-Wu, Tsai-Hill, max-stress, max-strain, Hashin (1980), Puck",
+            "evidence": "packages/kerf-composites/src/kerf_composites/failure.py"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Fiber orientation contour visualization",
+          "competitor": {
+            "status": "partial",
+            "note": "Ply angle display; no interactive heatmap contour",
+            "source": "https://verifiber.com"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "HSL heatmap contour with hover tooltip showing local fiber angle + drape sim",
+            "evidence": "src/components/composites/FiberOrientationContour.jsx"
+          }
+        },
+        {
+          "domain": "D14",
+          "feature": "Areal weight + material cost rollup",
+          "competitor": {
+            "status": "yes",
+            "note": "Laminate weight and material cost estimate",
+            "source": "https://verifiber.com"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Per-ply areal density (g/m\u00b2) + cost ($/m\u00b2) auto-computed in stackup",
+            "evidence": "src/components/composites/LaminateStackup.jsx"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "LLM / chat-native editing",
+          "competitor": {
+            "status": "no",
+            "note": "No LLM interface in VeriFiber as of May 2026",
+            "source": "https://verifiber.com"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Chat-native composites: describe layup in plain language",
+            "evidence": "src/components/ChatPanel.jsx"
+          }
+        }
+      ]
+    },
+    {
+      "slug": "composites-builder",
+      "competitor": "Composites Builder (Siemens)",
+      "category": "cad-mechanical",
+      "left": "kerf",
+      "right": "composites-builder",
+      "hero_tagline": "Siemens Composites Builder \u2014 versus Kerf open-core CLT + AFP + fiber-orientation UI.",
+      "reviewed_at": "2026-05-29",
+      "features": [
+        {
+          "domain": "D13",
+          "feature": "Ply-based laminate design",
+          "competitor": {
+            "status": "yes",
+            "note": "Zone-based and ply-based stacking with automated drop-off",
+            "source": "https://www.siemens.com/composites-builder"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Drag-to-reorder ply table with symmetry/balance check + CLT dispatch",
+            "evidence": "src/components/composites/LaminateStackup.jsx"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "AFP/ATL path generation UI",
+          "competitor": {
+            "status": "yes",
+            "note": "AFP/ATL course planning with tow-path steering",
+            "source": "https://www.siemens.com/composites-builder"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "AFP toolpath UI with cure cycle chart; CNC export planned",
+            "evidence": "src/components/composites/AFPToolpathView.jsx"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Fiber orientation visualization",
+          "competitor": {
+            "status": "yes",
+            "note": "3D ply fiber orientation display with drape simulation",
+            "source": "https://www.siemens.com/composites-builder"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "HSL contour heatmap with angle tooltip + exploded ply stack + drape sim",
+            "evidence": "src/components/composites/FiberOrientationContour.jsx"
+          }
+        },
+        {
+          "domain": "D2",
+          "feature": "CLT structural analysis",
+          "competitor": {
+            "status": "yes",
+            "note": "Bi-directional CLT via Simcenter integration",
+            "source": "https://www.siemens.com/composites-builder"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "CLT A/B/D matrices + effective moduli; inline in stackup UI",
+            "evidence": "packages/kerf-composites/src/kerf_composites/clt.py"
+          }
+        },
+        {
+          "domain": "D2",
+          "feature": "Failure criteria (multi-mode)",
+          "competitor": {
+            "status": "yes",
+            "note": "Failure via Simcenter FEA; not native in CB design tool",
+            "source": "https://www.siemens.com/composites-builder"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Tsai-Wu, Tsai-Hill, max-stress, Hashin native \u2014 no FEA dependency",
+            "evidence": "packages/kerf-composites/src/kerf_composites/failure.py"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "LLM / AI design assistant",
+          "competitor": {
+            "status": "no",
+            "note": "No LLM interface as of May 2026",
+            "source": "https://www.siemens.com/composites-builder"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Chat-native: describe layup, Kerf routes to composites backend",
+            "evidence": "src/components/ChatPanel.jsx"
           }
         }
       ]

@@ -3,12 +3,17 @@
   "generatedAt": "2026-05-29T00:00:00.000Z",
   "source": "ROADMAP.md",
   "latestDelta": {
-    "date": "2026-05-25",
-    "itemCount": 14,
+    "date": "2026-05-29",
+    "itemCount": 15,
     "items": [
       {
+        "title": "Composites manufacturing UI",
+        "body": "LaminateStackup (drag-to-reorder ply table, balance/symmetry check, areal-weight + cost rollup, CLT stiffness matrix preview); AFPToolpathView (AFP 2D tape-path canvas, cure cycle plot, path-plan dispatch); FiberOrientationContour (HSL contour heatmap, angle tooltip, exploded ply stack, drape sim dispatch). File kinds: .layup / .afp_plan / .fiber_map. Compare parity: Fibersim AFP \u2192 partial, laminate cost \u2192 yes; VeriFiber + Composites Builder compare rows added.",
+        "domain": "Composites"
+      },
+      {
         "title": "Structural code design",
-        "body": "AISC 360-22 (Ch. E/F/H members + connections + base-plate, LRFD+ASD); ACI 318-19 (flexure/shear/PM + punching §22.6 + torsion §22.7); NDS 2018 timber; AISI S100-16 cold-formed steel (effective-width, flexure/compression/web-crippling); TMS 402-16 masonry ASD (flexure/shear/axial); ASCE 7-22 load combos + ELF + RSA/Newmark seismic. Full Eurocode: EC2, EC3, EC5, EC8",
+        "body": "AISC 360-22 (Ch. E/F/H members + connections + base-plate, LRFD+ASD); ACI 318-19 (flexure/shear/PM + punching \u00a722.6 + torsion \u00a722.7); NDS 2018 timber; AISI S100-16 cold-formed steel (effective-width, flexure/compression/web-crippling); TMS 402-16 masonry ASD (flexure/shear/axial); ASCE 7-22 load combos + ELF + RSA/Newmark seismic. Full Eurocode: EC2, EC3, EC5, EC8",
         "domain": "Structural"
       },
       {
@@ -33,7 +38,7 @@
       },
       {
         "title": "Aero / marine / space depth",
-        "body": "3D VLM + viscous strip drag + Prandtl-Glauert/Kármán-Tsien + Korn-Lock wave-drag; strip-theory seakeeping RAOs (Lewis-form + JONSWAP); Holtrop-Mennen resistance + EHP; multi-revolution Lambert (Lancaster-Blanchard/Izzo 2015)",
+        "body": "3D VLM + viscous strip drag + Prandtl-Glauert/K\u00e1rm\u00e1n-Tsien + Korn-Lock wave-drag; strip-theory seakeeping RAOs (Lewis-form + JONSWAP); Holtrop-Mennen resistance + EHP; multi-revolution Lambert (Lancaster-Blanchard/Izzo 2015)",
         "domain": "Aerospace"
       },
       {
@@ -53,7 +58,7 @@
       },
       {
         "title": "Optics / acoustics",
-        "body": "Gaussian beam (complex-q + ABCD + M² + fibre coupling); non-sequential ray tracing + ghost detection; wave-domain room acoustics (image-source IR + Schroeder RT60 + SEA); Seidel S5 corrected",
+        "body": "Gaussian beam (complex-q + ABCD + M\u00b2 + fibre coupling); non-sequential ray tracing + ghost detection; wave-domain room acoustics (image-source IR + Schroeder RT60 + SEA); Seidel S5 corrected",
         "domain": "Structural"
       },
       {
@@ -68,12 +73,12 @@
       },
       {
         "title": "Compare matrices",
-        "body": "feature-matrix YAML for 14 reference CADs: Fusion 360, SolidWorks, Onshape, FreeCAD, Rhino, KiCad, CATIA, Creo, NX, Inventor, AutoCAD, Altium, Revit, Blender — 741 grounded rows total",
+        "body": "feature-matrix YAML for 14 reference CADs: Fusion 360, SolidWorks, Onshape, FreeCAD, Rhino, KiCad, CATIA, Creo, NX, Inventor, AutoCAD, Altium, Revit, Blender \u2014 741 grounded rows total",
         "domain": "Architecture"
       },
       {
         "title": "Security hardening",
-        "body": "`/run-topo` auth gate; NFP `grid_step` clamped; PVT `n_mc` clamped; Yosys module-name injection blocked; shared `_guard_*` helpers extracted across 68 files (−2009/+129 lines net)",
+        "body": "`/run-topo` auth gate; NFP `grid_step` clamped; PVT `n_mc` clamped; Yosys module-name injection blocked; shared `_guard_*` helpers extracted across 68 files (\u22122009/+129 lines net)",
         "domain": "Silicon"
       }
     ]

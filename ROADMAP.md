@@ -179,6 +179,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 
 - **Applied aerodynamics** ✅ — ISA atmosphere, VLM/thin-airfoil, flight mechanics, propulsion, Breguet range/endurance; 6-DOF; orbital mechanics (Kepler/Lambert/Hohmann); rocket propulsion (CEA-lite); ADCS (quaternion + reaction wheels + magnetorquers); spacecraft thermal network.
 - **Composites (CLT)** ✅ — ABD matrix, per-ply stress/strain, Tsai-Wu/max-stress/Hashin failure indices, first-ply-failure, laminate moduli.
+- **Composites manufacturing UI** ✅ — `LaminateStackup` (drag-to-reorder ply table, balance/symmetry check, areal-weight + cost rollup, CLT stiffness matrix preview); `AFPToolpathView` (AFP 2D tape-path canvas, cure cycle plot, path-plan dispatch); `FiberOrientationContour` (HSL contour heatmap, angle tooltip, exploded ply stack, drape sim dispatch). File kinds: `.layup` / `.afp_plan` / `.fiber_map`. Compare parity: Fibersim AFP → partial, laminate cost → yes; VeriFiber + Composites Builder compare rows added.
 - **Aeroelasticity** ✅ — flutter boundary (Theodorsen + p-k method), doublet-lattice.
 
 ### Library / parts / BOM

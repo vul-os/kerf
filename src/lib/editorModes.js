@@ -148,6 +148,9 @@ const DEDICATED_EXTENSIONS = new Set([
   '.print',
   '.step',
   '.stp',
+  '.layup',
+  '.afp_plan',
+  '.fiber_map',
 ])
 
 /**

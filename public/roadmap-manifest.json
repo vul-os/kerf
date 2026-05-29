@@ -1,7 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-05-29T18:01:29.768Z",
-  "source": "ROADMAP.md",
+  "generatedAt": "2026-05-29T18:27:52.174Z",  "source": "ROADMAP.md",
   "latestDelta": {
     "date": "2026-05-26",
     "itemCount": 18,
@@ -24,8 +23,8 @@
       {
         "title": "G3 surfacing wired",
         "body": "`feature_blend_srf_g3` (surfacing.py:1376) + `feature_g3_chain_blend` (surfacing.py:1894) registered as LLM tools via `surfacing` module in `_TOOL_MODULES`; `blend_srf_g3`, `curvature_rate_continuity_residual`, `zebra_stripe`, `reflection_lines`, `curvature_comb` all exported from `geom/__init__.py`; `feature_zebra_analysis` and `feature_isophote_analysis` also wired",
-        "domain": "Structural"      },
-      {
+        "domain": "Structural"
+      },      {
         "title": "Structural code design",
         "body": "AISC 360-22 (Ch. E/F/H members + connections + base-plate, LRFD+ASD); ACI 318-19 (flexure/shear/PM + punching \u00a722.6 + torsion \u00a722.7); NDS 2018 timber; AISI S100-16 cold-formed steel (effective-width, flexure/compression/web-crippling); TMS 402-16 masonry ASD (flexure/shear/axial); ASCE 7-22 load combos + ELF + RSA/Newmark seismic. Full Eurocode: EC2, EC3, EC5, EC8",
         "domain": "Structural"

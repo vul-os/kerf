@@ -176,7 +176,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 ### Library / parts / BOM
 
 - **Library system v1 + BOM** ✅ — `kind='part'`, distributor APIs (DigiKey/Mouser/LCSC), curated manufacturer libs.
-- **Cross-project parts** ✅ — external_ref, lockfile, derived-artifact cache.
+- **Cross-project parts** ✅ — external_ref, lockfile, derived-artifact cache; compile-on-demand (hit→skip recompile, miss→store) ✅; dev cache-stats overlay ✅.
 - **kerf-partsgen** ✅ — 5 ISO/DIN family generators shipped.
 
 ### Frontend / UX
@@ -207,7 +207,10 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 | **GK-P** | **Geometry kernel parity series** — close the gap list from the multi-CAD survey (GK-01..GK-139 landed; wiring + foundational + SubD + architectural geometry remaining). | Every persona's work quality depends on kernel robustness. | 🚧 in flight |
 | **T-100** | **FEM matching CalculiX / Z88 / Mystran depth** — buckling + harmonic + PSD + acoustics + EM + fatigue shipped; remaining: explicit dynamics, full nonlinear static, k-ε turbulence, coupled variation. | Serious simulation work. | 🚧 in flight |
 | **T-101** | **CFD (CfdOF-class)** — turbulence models, 3-D unstructured meshing, OpenFOAM bridge beyond the 2-D laminar foundation. | Fluid and aero simulation. | 🚧 in flight |
+<<<<<<< HEAD
 | **Hosted infra** | **Cloud infrastructure** — GPU renders via RunPod Serverless (L4→H100, scale-to-zero) — `RunPodGPUBackend` fully implemented: submit/poll/fetch_result/capabilities with retry + exponential back-off. BYO worker path (zero credit cost) — claim-job hands the worker a presigned R2 PUT URL so results upload directly without proxying through the API. | GPU render prices 2-3× lower. | ✅ shipped |
+=======
+>>>>>>> 617e62b8 (feat(cache): wire compile-on-demand for derived-cache layer)
 | **Hosted infra** | **Cloud infrastructure** — engine on Fly.io (`fra` Frankfurt, co-located with the DB, `shared-cpu-2x` / 2 GB), Neon Postgres (`eu-central-1`), Cloudflare R2 blobs (zero egress), Resend email. GPU renders via RunPod Serverless (L4→H100, scale-to-zero) — dispatch seam exists; `RunPodGPUBackend` planned. See `deployment/fly.md`. | Stable pay-as-you-go stack with engine co-located with the database; GPU render prices 2-3× below previous estimates when RunPod backend ships. | 🚧 in flight — stack settled; RunPod GPU backend remaining |
 
 ---

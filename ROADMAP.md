@@ -187,7 +187,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 ### Library / parts / BOM
 
 - **Library system v1 + BOM** ✅ — `kind='part'`, distributor APIs (DigiKey/Mouser/LCSC), curated manufacturer libs.
-- **Cross-project parts** ✅ — external_ref, lockfile, derived-artifact cache.
+- **Cross-project parts** ✅ — external_ref, lockfile, derived-artifact cache; compile-on-demand (hit→skip recompile, miss→store) ✅; dev cache-stats overlay ✅.
 - **kerf-partsgen** ✅ — 5 ISO/DIN family generators shipped.
 
 ### Frontend / UX

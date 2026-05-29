@@ -781,6 +781,33 @@ export function derivedKindForRefKind(kind) {
   return DERIVED_KIND_BY_REF_KIND[kind] || null
 }
 
+// ---------------------------------------------------------------------------
+// Derived-cache stats event bus (dev overlay support)
+// ---------------------------------------------------------------------------
+//
+// Module-level listeners for cache hit/miss events. Any code that wants to
+// observe cache activity (e.g. DerivedCacheOverlay.jsx) calls
+// `addDerivedCacheListener(fn)` and removes via the returned disposer.
+//
+// Event shape:
+//   { hit: boolean, derivedKind: string, payloadSize: number | null,
+//     age: number | null,   ← seconds since last_accessed_at, if server sent it
+//     projectId: string, fileId: string, timestamp: number }
+
+const _derivedCacheListeners = new Set()
+
+/** Subscribe to cache hit/miss events. Returns a disposer function. */
+export function addDerivedCacheListener(fn) {
+  _derivedCacheListeners.add(fn)
+  return () => _derivedCacheListeners.delete(fn)
+}
+
+function _emitDerivedCacheEvent(evt) {
+  for (const fn of _derivedCacheListeners) {
+    try { fn(evt) } catch { /* never let an observer crash the loader */ }
+  }
+}
+
 // loadExternalParts: cache-aware cross-project loader. Tries the derived
 // cache first (via `library.lookupDerivedArtifact`, #86) and on hit decodes
 // the payload via `decodePayload(kind, payload)` — a caller-supplied decoder
@@ -809,6 +836,12 @@ export function derivedKindForRefKind(kind) {
 // silently — the populate is a best-effort optimisation and MUST NOT block
 // or alter the resolver's return value.
 //
+// `onStats` (optional): called synchronously with
+//   { hit, derivedKind, payloadSize, age, projectId, fileId }
+// on every lookup. Intended for tests and the dev overlay; production callers
+// can omit it. The module-level event bus (addDerivedCacheListener) is also
+// notified after `onStats`.
+//
 // Contract:
 //   encodePayload(kind: string, parts: [{id, geom, color?}]) → Uint8Array | null
 //     - Synchronous or async; awaited inside a try/catch.
@@ -826,6 +859,7 @@ export async function loadExternalParts({
   decodePayload,
   encodePayload,
   store = library.storeDerivedArtifact.bind(library),
+  onStats,
 } = {}) {
   if (!ref || typeof recompile !== 'function') return []
   const derivedKind = derivedKindForRefKind(ref.kind)
@@ -845,12 +879,42 @@ export async function loadExternalParts({
     if (res && res.cached && res.payload && typeof decodePayload === 'function') {
       try {
         const parts = await decodePayload(res.derivedKind || derivedKind, res.payload)
-        if (Array.isArray(parts) && parts.length > 0) return parts
+        if (Array.isArray(parts) && parts.length > 0) {
+          // Cache hit — emit stats and return without recompile.
+          const payloadSize = res.payload instanceof Uint8Array ? res.payload.length : null
+          const age = res.last_accessed_at
+            ? Math.round((Date.now() - new Date(res.last_accessed_at).getTime()) / 1000)
+            : null
+          const evt = {
+            hit: true,
+            derivedKind: res.derivedKind || derivedKind,
+            payloadSize,
+            age,
+            projectId: ref.project_id,
+            fileId: ref.file_id,
+            timestamp: Date.now(),
+          }
+          if (typeof onStats === 'function') { try { onStats(evt) } catch { /* ignore */ } }
+          _emitDerivedCacheEvent(evt)
+          return parts
+        }
         console.debug(`derived-cache decode produced empty parts for ${ref.project_id}/${ref.file_id} (${derivedKind}); falling through`)
       } catch (err) {
         console.debug(`derived-cache decode failed for ${ref.project_id}/${ref.file_id} (${derivedKind}); falling through:`, err)
       }
     } else if (res && !res.cached) {
+      // Cache miss — emit miss stats before falling through to recompile.
+      const evt = {
+        hit: false,
+        derivedKind,
+        payloadSize: null,
+        age: null,
+        projectId: ref.project_id,
+        fileId: ref.file_id,
+        timestamp: Date.now(),
+      }
+      if (typeof onStats === 'function') { try { onStats(evt) } catch { /* ignore */ } }
+      _emitDerivedCacheEvent(evt)
       console.debug(`derived-cache miss for ${ref.project_id}/${ref.file_id} (${derivedKind})${res.error ? `: ${res.error}` : ''}`)
     }
   }

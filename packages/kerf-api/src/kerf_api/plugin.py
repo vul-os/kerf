@@ -17,42 +17,52 @@ logger = logging.getLogger(__name__)
 PLUGIN_DEPENDS = ["kerf-auth"]
 
 
-async def register(app: FastAPI, ctx) -> PluginManifest:
-    from kerf_api.routes import router
-    from kerf_api.routes_atopile import router as atopile_router
-    app.include_router(router, prefix="/api", tags=["api"])
-    from kerf_api.routes_git_diff import router as git_diff_router
-    app.include_router(git_diff_router, prefix="/api", tags=["git-diff"])
-    app.include_router(atopile_router, tags=["atopile"])
-    from kerf_api.routes_plc_sim import router as plc_sim_router
-    app.include_router(plc_sim_router, prefix="/api", tags=["plc-sim"])
+def _try_include(app: FastAPI, module_path: str, *, prefix: str = "/api", tags: list[str] | None = None) -> bool:
+    """Import a routes_* module and include its router; swallow ImportError.
 
-    from kerf_api.routes_aero_propulsion import router as aero_propulsion_router
-    app.include_router(aero_propulsion_router, prefix="/api", tags=["aero"])
-    from kerf_api.routes_aero_atmosphere import router as aero_atmosphere_router
-    app.include_router(aero_atmosphere_router, prefix="/api", tags=["aero"])
-    from kerf_api.routes_aero_airfoil import router as aero_airfoil_router
-    app.include_router(aero_airfoil_router, prefix="/api", tags=["aero"])
-    from kerf_api.routes_aero_orbit import router as aero_orbit_router
-    app.include_router(aero_orbit_router, prefix="/api", tags=["aero"])
-    from kerf_api.routes_silicon_synth import router as silicon_synth_router
-    app.include_router(silicon_synth_router, prefix="/api", tags=["silicon"])
-    from kerf_api.routes_silicon import router as silicon_router
-    app.include_router(silicon_router, prefix="/api", tags=["silicon"])
-    from kerf_api.routes_composites import router as composites_router
-    app.include_router(composites_router, prefix="/api", tags=["composites"])
-    from kerf_api.routes_ota import router as ota_router
-    app.include_router(ota_router, prefix="/api", tags=["ota"])
+    Several kerf-api sub-routers depend on optional plugin packages that may
+    not be present in every persona (e.g. routes_aero_orbit imports kerf_aero).
+    Without this wrapper, ONE missing optional dep would cause the entire
+    kerf-api plugin's register() to raise — the upstream loader catches that
+    as plugin_register_failed and silently 404s every kerf-api route (the
+    bug discovered on dev 2026-05-29). Per-router try/except keeps the rest
+    of the surface up and logs the gap.
+    """
+    import importlib
+    try:
+        mod = importlib.import_module(module_path)
+        app.include_router(mod.router, prefix=prefix, tags=tags or [])
+        return True
+    except Exception as exc:
+        logger.warning("kerf-api: skip %s (%s: %s)", module_path, type(exc).__name__, exc)
+        return False
+
+
+async def register(app: FastAPI, ctx) -> PluginManifest:
+    # Main API router (always required — if this raises we WANT to fail loud).
+    from kerf_api.routes import router
+    app.include_router(router, prefix="/api", tags=["api"])
+
+    # All other sub-routers are optional — wrapped so missing deps degrade.
+    _try_include(app, "kerf_api.routes_git_diff",        tags=["git-diff"])
+    _try_include(app, "kerf_api.routes_atopile",  prefix="",                  tags=["atopile"])
+    _try_include(app, "kerf_api.routes_plc_sim",         tags=["plc-sim"])
+    _try_include(app, "kerf_api.routes_aero_propulsion", tags=["aero"])
+    _try_include(app, "kerf_api.routes_aero_atmosphere", tags=["aero"])
+    _try_include(app, "kerf_api.routes_aero_airfoil",    tags=["aero"])
+    _try_include(app, "kerf_api.routes_aero_orbit",      tags=["aero"])
+    _try_include(app, "kerf_api.routes_silicon_synth",   tags=["silicon"])
+    _try_include(app, "kerf_api.routes_silicon",         tags=["silicon"])
+    _try_include(app, "kerf_api.routes_composites",      tags=["composites"])
+    _try_include(app, "kerf_api.routes_ota",             tags=["ota"])
     # T-408: break-even margin admin endpoint
-    from kerf_api.routes_admin_margin import router as admin_margin_router
-    app.include_router(admin_margin_router, prefix="/api", tags=["admin"])
+    _try_include(app, "kerf_api.routes_admin_margin",    tags=["admin"])
     # POST /api/tools/call — frontend dispatch of any registered LLM tool
     # (used by LadderEditor Import/Export and any future UI-wired tool).
-    from kerf_api.routes_tools import router as tools_router
-    app.include_router(tools_router, prefix="/api", tags=["tools"])
-    # GPU worker enrollment + BYO dispatch
-    from kerf_api.routes_workers import router as workers_router
-    app.include_router(workers_router, tags=["gpu-workers"])
+    _try_include(app, "kerf_api.routes_tools",           tags=["tools"])
+    # GPU worker enrollment + BYO dispatch. routes_workers.py declares short
+    # paths (/enroll, /heartbeat, ...) so the prefix MUST include /workers.
+    _try_include(app, "kerf_api.routes_workers", prefix="/api/workers", tags=["gpu-workers"])
 
     _register_tools(ctx)
 

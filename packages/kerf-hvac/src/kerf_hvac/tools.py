@@ -6,6 +6,7 @@ Registers the following tools:
   - hvac.fitting_loss         — Compute minor loss for a fitting.
   - hvac.reducer_flat_pattern — Generate reducer flat-pattern dimensions.
   - hvac.elbow_flat_pattern   — Generate elbow flat-pattern dimensions.
+  - hvac.equipment_select     — Select AHRI-listed equipment by category and capacity.
 """
 
 from __future__ import annotations
@@ -30,6 +31,7 @@ from kerf_hvac.pressure import (
     FLEX_PER_METRE_K,
 )
 from kerf_hvac.flat_pattern import rect_elbow_pattern, rect_reducer_pattern
+from kerf_hvac.ahri_catalogue import lookup_equipment, VALID_CATEGORIES
 
 
 # ---------------------------------------------------------------------------
@@ -387,6 +389,110 @@ def handle_elbow_flat_pattern(args: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
+# hvac.equipment_select  (AHRI-listed equipment catalogue)
+# ---------------------------------------------------------------------------
+
+_equipment_select_spec = ToolSpec(
+    name="hvac.equipment_select",
+    description=(
+        "Select AHRI-certified HVAC equipment that matches the given category "
+        "and design capacity.  Returns up to 5 matching models from the "
+        "built-in AHRI-listed catalogue, each with manufacturer, AHRI "
+        "certification number, full-load efficiency (EER / COP / AFUE), and "
+        "certified part-load curve values at 25 %, 50 %, 75 %, and 100 % "
+        "load.  Source: AHRI Certified Products Directory "
+        "(https://www.ahridirectory.org).  Catalogue covers 30 representative "
+        "models; not OEM-complete."
+    ),
+    input_schema={
+        "type": "object",
+        "required": ["category", "capacity_btu_hr"],
+        "properties": {
+            "category": {
+                "type": "string",
+                "enum": sorted(VALID_CATEGORIES),
+                "description": (
+                    "Equipment category. One of: rooftop_ac, split_ac, "
+                    "water_chiller, air_chiller, gas_boiler, heat_pump."
+                ),
+            },
+            "capacity_btu_hr": {
+                "type": "number",
+                "description": (
+                    "Required cooling or heating capacity in BTU/hr. "
+                    "Models within ±40 % of this value are returned. "
+                    "Pass 0 to return all models in the category."
+                ),
+            },
+            "min_efficiency": {
+                "type": "number",
+                "description": (
+                    "Optional minimum efficiency gate. "
+                    "For AC / chiller categories: minimum EER or cooling COP. "
+                    "For gas_boiler: minimum AFUE (0–1). "
+                    "For heat_pump: minimum cooling COP. "
+                    "Pass null to skip."
+                ),
+            },
+        },
+    },
+)
+
+
+@register(_equipment_select_spec)
+def handle_equipment_select(args: dict) -> str:
+    try:
+        category = str(args["category"])
+        capacity = float(args["capacity_btu_hr"])
+        min_eff = args.get("min_efficiency")
+        if min_eff is not None:
+            min_eff = float(min_eff)
+
+        models = lookup_equipment(category, capacity, min_eff)
+
+        if not models:
+            return ok_payload({
+                "models": [],
+                "note": (
+                    f"No AHRI-listed models found for category={category!r} "
+                    f"near {capacity:.0f} BTU/hr. "
+                    "Try widening the capacity range or removing the efficiency gate."
+                ),
+            })
+
+        def _serialise(m):
+            out: dict = {
+                "manufacturer": m.manufacturer,
+                "model_number": m.model_number,
+                "ahri_number": m.ahri_number,
+                "category": m.category,
+                "capacity_btu_hr": m.capacity_btu_hr,
+                "part_load_curve": {str(k): v for k, v in sorted(m.part_load_curve.items())},
+            }
+            if m.eer is not None:
+                out["eer"] = m.eer
+            if m.ieer is not None:
+                out["ieer"] = m.ieer
+            if m.cop_cooling is not None:
+                out["cop_cooling"] = m.cop_cooling
+            if m.cop_heating is not None:
+                out["cop_heating"] = m.cop_heating
+            if m.afue is not None:
+                out["afue"] = m.afue
+            if m.notes:
+                out["notes"] = m.notes
+            return out
+
+        return ok_payload({
+            "models": [_serialise(m) for m in models[:5]],
+            "total_matches": len(models),
+            "source": "AHRI Certified Products Directory — https://www.ahridirectory.org",
+        })
+    except (KeyError, ValueError, TypeError) as exc:
+        return err_payload(str(exc), "BAD_ARGS")
+
+
+# ---------------------------------------------------------------------------
 # TOOLS list (for plugin registration)
 # ---------------------------------------------------------------------------
 
@@ -396,4 +502,5 @@ TOOLS = [
     ("hvac.fitting_loss", _fitting_loss_spec, handle_fitting_loss),
     ("hvac.reducer_flat_pattern", _reducer_pattern_spec, handle_reducer_flat_pattern),
     ("hvac.elbow_flat_pattern", _elbow_pattern_spec, handle_elbow_flat_pattern),
+    ("hvac.equipment_select", _equipment_select_spec, handle_equipment_select),
 ]

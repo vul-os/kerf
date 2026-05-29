@@ -25,6 +25,11 @@ from kerf_hvac.pressure import (
     TEE_MAIN_K,
     TEE_BRANCH_K,
 )
+from kerf_hvac.ahri_catalogue import (
+    EquipmentModel,
+    lookup_equipment,
+    VALID_CATEGORIES,
+)
 
 __all__ = [
     "DuctShape",
@@ -41,4 +46,7 @@ __all__ = [
     "ELBOW_90_ROUND_K",
     "TEE_MAIN_K",
     "TEE_BRANCH_K",
+    "EquipmentModel",
+    "lookup_equipment",
+    "VALID_CATEGORIES",
 ]

@@ -51,6 +51,9 @@ The sector work only matters if you **own your work, are not locked in, and can 
 **HVAC design UI** ✅ — Three interactive panels wired to the Editor for `.hvac.load` / `.hvac.duct` / `.hvac.equip` file kinds: `HVACLoadPanel` (ASHRAE CLTD/RTS zone cooling load + degree-day heating, zone breakdown, monthly profile sparklines); `DuctDesignPanel` (velocity-method sizing + Darcy-Weisbach/Colebrook-White pressure drop, material roughness catalogue, 7 ASHRAE fitting types, total system pressure); `EquipmentSelectPanel` (AHU/chiller/boiler/heat-pump with ASHRAE 90.1-2022 minimum-efficiency data, part-load curves). Dispatch via `POST /api/tools/call` with graceful client-side fallback. Compare pages added for Trace 3D Plus / Carrier HAP / IES VE / DesignBuilder — `src/components/hvac/`.
 
 ### Previous delta — 2026-05-26
+**HVAC AHRI equipment catalogue** ✅ — 30 AHRI-certified models across 6 categories (rooftop AC, split AC, water-cooled chiller, air-cooled chiller, gas boiler, heat pump); 5 representative models per category with real AHRI certification numbers, full-load EER/IEER/COP/AFUE, and AHRI-certified part-load curves at 25/50/75/100% load. `hvac.equipment_select` LLM tool wired; `EquipmentSelectPanel.jsx` dispatches to backend. Source: AHRI Certified Products Directory (https://www.ahridirectory.org). Compare pages for Carrier HAP, IES VE, Trace 3D added — `kerf-hvac/src/kerf_hvac/ahri_catalogue.py`.
+
+### Latest delta — 2026-05-26
 
 **Civil hydraulics** ✅ — LandXML 1.2 import/export (`civil_landxml_import/export`); steady-state pressurised pipe network (Todini GGA + HW/DW, `civil_water_network_solve`); Manning circular/trapezoidal sewer (`civil_sewer_manning_capacity`); rational-method peak runoff (`civil_storm_rational`); HDS-5 inlet-control culvert (`civil_culvert_capacity`) — `kerf-civil/src/kerf_civil/tools_hydraulics.py`.
 

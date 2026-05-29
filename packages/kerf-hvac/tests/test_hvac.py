@@ -665,5 +665,294 @@ class TestToolsSurface(unittest.TestCase):
         self._err(self.elbow_pattern({"width_mm": 0, "height_mm": 300}))
 
 
+# ===========================================================================
+# 9. AHRI catalogue — DoD: each category returns ≥1 model; part-load values
+#    match catalogue entries; equipment_select LLM tool returns valid JSON.
+# ===========================================================================
+
+class TestAhriCatalogue(unittest.TestCase):
+    """Verify the AHRI-listed equipment catalogue and LLM tool surface."""
+
+    def setUp(self):
+        from kerf_hvac.ahri_catalogue import lookup_equipment, VALID_CATEGORIES, _CATALOGUE
+        from kerf_hvac.tools import handle_equipment_select
+        self.lookup = lookup_equipment
+        self.VALID_CATEGORIES = VALID_CATEGORIES
+        self._CATALOGUE = _CATALOGUE
+        self.handle_equipment_select = handle_equipment_select
+
+    # -----------------------------------------------------------------------
+    # 9a. Thirty models across 6 categories
+    # -----------------------------------------------------------------------
+
+    def test_catalogue_has_thirty_models(self):
+        """DoD: exactly 30 models are present in the catalogue."""
+        self.assertEqual(len(self._CATALOGUE), 30)
+
+    def test_six_categories_present(self):
+        """DoD: all 6 required categories are in VALID_CATEGORIES."""
+        required = {
+            "rooftop_ac", "split_ac", "water_chiller",
+            "air_chiller", "gas_boiler", "heat_pump",
+        }
+        self.assertEqual(required, set(self.VALID_CATEGORIES))
+
+    def test_five_models_per_category(self):
+        """DoD: each category has exactly 5 representative models."""
+        from collections import Counter
+        counts = Counter(m.category for m in self._CATALOGUE)
+        for cat in self.VALID_CATEGORIES:
+            self.assertEqual(counts[cat], 5, f"Expected 5 models for {cat}, got {counts[cat]}")
+
+    # -----------------------------------------------------------------------
+    # 9b. Each category returns ≥1 model on an open capacity query
+    # -----------------------------------------------------------------------
+
+    def test_each_category_returns_at_least_one_model(self):
+        """DoD: lookup_equipment(cat, 0) returns ≥1 result for every category."""
+        for cat in self.VALID_CATEGORIES:
+            with self.subTest(category=cat):
+                results = self.lookup(cat, 0)
+                self.assertGreaterEqual(len(results), 1,
+                    f"lookup_equipment({cat!r}, 0) returned no models")
+
+    def test_rooftop_ac_returns_models(self):
+        results = self.lookup("rooftop_ac", 0)
+        self.assertGreaterEqual(len(results), 1)
+
+    def test_split_ac_returns_models(self):
+        results = self.lookup("split_ac", 0)
+        self.assertGreaterEqual(len(results), 1)
+
+    def test_water_chiller_returns_models(self):
+        results = self.lookup("water_chiller", 0)
+        self.assertGreaterEqual(len(results), 1)
+
+    def test_air_chiller_returns_models(self):
+        results = self.lookup("air_chiller", 0)
+        self.assertGreaterEqual(len(results), 1)
+
+    def test_gas_boiler_returns_models(self):
+        results = self.lookup("gas_boiler", 0)
+        self.assertGreaterEqual(len(results), 1)
+
+    def test_heat_pump_returns_models(self):
+        results = self.lookup("heat_pump", 0)
+        self.assertGreaterEqual(len(results), 1)
+
+    # -----------------------------------------------------------------------
+    # 9c. Part-load curve values match the catalogue entries
+    # -----------------------------------------------------------------------
+
+    def test_part_load_curve_has_four_load_points(self):
+        """Every model must have part-load values at 0.25, 0.5, 0.75, 1.0."""
+        required_points = {0.25, 0.5, 0.75, 1.0}
+        for m in self._CATALOGUE:
+            with self.subTest(model=m.model_number):
+                self.assertEqual(
+                    set(m.part_load_curve.keys()),
+                    required_points,
+                    f"{m.model_number}: part_load_curve keys must be exactly {required_points}",
+                )
+
+    def test_part_load_values_are_positive(self):
+        """All part-load efficiency values must be positive finite numbers."""
+        for m in self._CATALOGUE:
+            for load, val in m.part_load_curve.items():
+                with self.subTest(model=m.model_number, load=load):
+                    self.assertGreater(val, 0)
+                    self.assertTrue(
+                        val == val and val != float("inf"),
+                        f"{m.model_number} load={load}: value {val} is not finite",
+                    )
+
+    def test_part_load_25_gte_full_load_for_ac_and_hp(self):
+        """AC / heat-pump part-load efficiency at 25 % must exceed full-load EER/COP.
+
+        All variable-speed HVAC equipment achieves higher COP at reduced load
+        (this is the physical basis for IEER > EER).
+        """
+        for m in self._CATALOGUE:
+            if m.category not in ("rooftop_ac", "split_ac", "heat_pump"):
+                continue
+            with self.subTest(model=m.model_number):
+                v_25 = m.part_load_curve[0.25]
+                v_100 = m.part_load_curve[1.0]
+                self.assertGreater(
+                    v_25, v_100,
+                    f"{m.model_number}: 25% load efficiency {v_25} should exceed "
+                    f"full-load {v_100}",
+                )
+
+    def test_part_load_matches_catalogue_carrier_rooftop(self):
+        """Spot-check: Carrier rooftop 48k BTU part-load curve is exactly as catalogued."""
+        models = self.lookup("rooftop_ac", 48_000)
+        carrier = next(
+            (m for m in models if m.manufacturer == "Carrier" and "48HC" in m.model_number),
+            None,
+        )
+        self.assertIsNotNone(carrier, "Carrier 48HC model not found near 48k BTU/hr")
+        self.assertAlmostEqual(carrier.part_load_curve[0.25], 14.8)
+        self.assertAlmostEqual(carrier.part_load_curve[0.5],  13.6)
+        self.assertAlmostEqual(carrier.part_load_curve[0.75], 12.8)
+        self.assertAlmostEqual(carrier.part_load_curve[1.0],  11.2)
+        self.assertAlmostEqual(carrier.eer, 11.2)
+
+    def test_part_load_matches_catalogue_carrier_water_chiller(self):
+        """Spot-check: Carrier water-cooled chiller COP values from catalogue."""
+        models = self.lookup("water_chiller", 600_000)
+        carrier = next(
+            (m for m in models if m.manufacturer == "Carrier" and "19DV" in m.model_number),
+            None,
+        )
+        self.assertIsNotNone(carrier, "Carrier 19DV chiller not found near 600k BTU/hr")
+        self.assertAlmostEqual(carrier.cop_cooling, 6.10)
+        self.assertAlmostEqual(carrier.part_load_curve[0.25], 8.40)
+        self.assertAlmostEqual(carrier.part_load_curve[1.0],  6.10)
+
+    def test_part_load_matches_catalogue_viessmann_boiler(self):
+        """Spot-check: Viessmann boiler AFUE values from catalogue."""
+        models = self.lookup("gas_boiler", 0)
+        vies = next(
+            (m for m in models if m.manufacturer == "Viessmann"),
+            None,
+        )
+        self.assertIsNotNone(vies, "Viessmann boiler not found")
+        self.assertAlmostEqual(vies.afue, 0.97)
+        # Condensing boiler: part-load efficiency should be >= full-load
+        self.assertGreaterEqual(vies.part_load_curve[0.25], vies.part_load_curve[1.0])
+
+    # -----------------------------------------------------------------------
+    # 9d. Capacity-band filter
+    # -----------------------------------------------------------------------
+
+    def test_capacity_band_filter_excludes_far_models(self):
+        """Lookup near 36,000 BTU/hr should not return 360-ton models."""
+        results = self.lookup("rooftop_ac", 36_000)
+        for m in results:
+            ratio = m.capacity_btu_hr / 36_000
+            self.assertGreaterEqual(ratio, 0.60)
+            self.assertLessEqual(ratio, 1.40)
+
+    def test_zero_capacity_returns_all_in_category(self):
+        """Capacity=0 should bypass the band filter and return all 5 models."""
+        results = self.lookup("split_ac", 0)
+        self.assertEqual(len(results), 5)
+
+    def test_invalid_category_raises(self):
+        with self.assertRaises(ValueError):
+            self.lookup("bogus_category", 0)
+
+    # -----------------------------------------------------------------------
+    # 9e. Efficiency filter
+    # -----------------------------------------------------------------------
+
+    def test_efficiency_filter_removes_low_models(self):
+        """min_efficiency=15 for split_ac should narrow results to high-IEER models."""
+        results = self.lookup("split_ac", 0, min_efficiency=15.0)
+        for m in results:
+            eff = m.eer if m.eer else m.ieer
+            self.assertGreaterEqual(
+                eff, 15.0,
+                f"{m.model_number} EER/IEER {eff} is below min_efficiency=15",
+            )
+
+    def test_boiler_afue_filter(self):
+        """Boiler AFUE filter: min_efficiency=0.95 should exclude Raypak (AFUE=0.83)."""
+        results = self.lookup("gas_boiler", 0, min_efficiency=0.95)
+        for m in results:
+            self.assertGreaterEqual(m.afue, 0.95)
+
+    # -----------------------------------------------------------------------
+    # 9f. LLM tool surface — handle_equipment_select
+    # -----------------------------------------------------------------------
+
+    def _ok(self, raw: str) -> dict:
+        d = json.loads(raw)
+        self.assertNotIn("error", d, f"Tool returned error: {d}")
+        return d
+
+    def _err(self, raw: str) -> dict:
+        d = json.loads(raw)
+        self.assertIn("error", d)
+        return d
+
+    def test_equipment_select_rooftop_ac(self):
+        r = self._ok(self.handle_equipment_select({
+            "category": "rooftop_ac",
+            "capacity_btu_hr": 60_000,
+        }))
+        self.assertIn("models", r)
+        self.assertGreaterEqual(len(r["models"]), 1)
+        m = r["models"][0]
+        self.assertIn("manufacturer", m)
+        self.assertIn("ahri_number", m)
+        self.assertIn("part_load_curve", m)
+        # Part-load curve should have 4 load points
+        self.assertEqual(len(m["part_load_curve"]), 4)
+
+    def test_equipment_select_water_chiller(self):
+        r = self._ok(self.handle_equipment_select({
+            "category": "water_chiller",
+            "capacity_btu_hr": 1_200_000,
+        }))
+        self.assertGreaterEqual(len(r["models"]), 1)
+
+    def test_equipment_select_all_categories(self):
+        """Every category returns ≥1 model via the LLM tool with capacity=0."""
+        for cat in self.VALID_CATEGORIES:
+            with self.subTest(category=cat):
+                r = self._ok(self.handle_equipment_select({
+                    "category": cat,
+                    "capacity_btu_hr": 0,
+                }))
+                self.assertGreaterEqual(len(r.get("models", [])), 1,
+                    f"Tool returned no models for category={cat!r}")
+
+    def test_equipment_select_returns_ahri_source(self):
+        """Result should include an AHRI source citation."""
+        r = self._ok(self.handle_equipment_select({
+            "category": "heat_pump",
+            "capacity_btu_hr": 0,
+        }))
+        self.assertIn("source", r)
+        self.assertIn("ahri", r["source"].lower())
+
+    def test_equipment_select_bad_category(self):
+        self._err(self.handle_equipment_select({
+            "category": "bogus",
+            "capacity_btu_hr": 60_000,
+        }))
+
+    def test_equipment_select_missing_capacity(self):
+        self._err(self.handle_equipment_select({
+            "category": "split_ac",
+        }))
+
+    def test_equipment_select_model_has_ahri_number(self):
+        """Each returned model must have a non-empty AHRI number."""
+        r = self._ok(self.handle_equipment_select({
+            "category": "gas_boiler",
+            "capacity_btu_hr": 0,
+        }))
+        for m in r["models"]:
+            self.assertTrue(m["ahri_number"], f"AHRI number missing: {m}")
+
+    def test_equipment_select_part_load_matches_catalogue(self):
+        """Carrier 19DV water chiller part-load values come through correctly."""
+        r = self._ok(self.handle_equipment_select({
+            "category": "water_chiller",
+            "capacity_btu_hr": 600_000,
+        }))
+        carrier = next(
+            (m for m in r["models"] if "19DV" in m.get("model_number", "")),
+            None,
+        )
+        self.assertIsNotNone(carrier, "Carrier 19DV not in results near 600k BTU/hr")
+        plc = carrier["part_load_curve"]
+        self.assertAlmostEqual(float(plc["0.25"]), 8.40)
+        self.assertAlmostEqual(float(plc["1.0"]),  6.10)
+
+
 if __name__ == "__main__":
     unittest.main()

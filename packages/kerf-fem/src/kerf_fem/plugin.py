@@ -67,6 +67,7 @@ async def register(app: FastAPI, ctx):
     ctx.tools.register("fem_random_vibration_psd", fem_random_vibration_psd_spec, run_fem_random_vibration_psd)
     ctx.tools.register("fem_explicit_dynamics", fem_explicit_dynamics_spec, run_fem_explicit_dynamics)  # kerf-fem: explicit transient dynamics
     from kerf_fem.nonlinear import _fem_nonlinear_spec, run_fem_nonlinear; ctx.tools.register("fem_nonlinear", _fem_nonlinear_spec, run_fem_nonlinear)
+    from kerf_fem.nonlinear_static import _fem_nonlinear_static_spec, run_fem_nonlinear_static; ctx.tools.register("fem_nonlinear_static", _fem_nonlinear_static_spec, run_fem_nonlinear_static)  # kerf-fem: 3-D NL static, TL, J2 plasticity, arc-length
     from kerf_fem.fatigue_fem import _fem_fatigue_spec, run_fem_fatigue; ctx.tools.register("fem_fatigue", _fem_fatigue_spec, run_fem_fatigue)  # kerf-fem: fatigue & durability
     from kerf_fem.plate import _fem_plate_static_spec, run_fem_plate_static_solve; ctx.tools.register("fem_plate_static_solve", _fem_plate_static_spec, run_fem_plate_static_solve)  # kerf-fem: MITC4 plate/shell
     import kerf_fem.em_highfreq  # kerf-fem: high-frequency EM (waveguide, S-params, FDTD) — self-registers fem_em_highfreq tool on import

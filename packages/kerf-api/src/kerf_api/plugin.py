@@ -50,6 +50,9 @@ async def register(app: FastAPI, ctx) -> PluginManifest:
     # (used by LadderEditor Import/Export and any future UI-wired tool).
     from kerf_api.routes_tools import router as tools_router
     app.include_router(tools_router, prefix="/api", tags=["tools"])
+    # GPU worker enrollment + BYO dispatch
+    from kerf_api.routes_workers import router as workers_router
+    app.include_router(workers_router, tags=["gpu-workers"])
 
     _register_tools(ctx)
 

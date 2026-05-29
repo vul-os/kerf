@@ -5214,9 +5214,9 @@
             "source": "https://www.autodesk.com/products/fusion-360/manufacturing-extension"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Engine solid (5-axis 3+2); no UI",
-            "evidence": "packages/kerf-cam/src/kerf_cam/five_axis"
+            "status": "yes",
+            "evidence": "src/components/CAMView.jsx + packages/kerf-cam/src/kerf_cam/five_axis/",
+            "note": "5-axis UI (mode switch + tilt/strategy/post controls) + kinematics + posts (backend); 3+2 indexed + constant-tilt continuous"
           }
         },
         {
@@ -6986,9 +6986,9 @@
             "source": "https://www.onshape.com/en/blog/cam-studio-comprehensive-milling"
           },
           "kerf": {
-            "status": "partial",
-            "note": "5-axis engine solid; no UI",
-            "evidence": "packages/kerf-cam/src/kerf_cam/adaptive.py"
+            "status": "yes",
+            "evidence": "src/components/CAMView.jsx + packages/kerf-cam/src/kerf_cam/five_axis/",
+            "note": "5-axis UI (mode switch + tilt/strategy/post controls) + kinematics + posts (backend); 3+2 indexed + constant-tilt continuous"
           }
         },
         {
@@ -7935,9 +7935,9 @@
             "source": "https://help.autodesk.com/view/INVNTOR/2025/ENU/?guid=GUID-CAM"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Engine solid (5-axis 3+2); no UI",
-            "evidence": "packages/kerf-cam/src/kerf_cam/five_axis"
+            "status": "yes",
+            "evidence": "src/components/CAMView.jsx + packages/kerf-cam/src/kerf_cam/five_axis/",
+            "note": "5-axis UI (mode switch + tilt/strategy/post controls) + kinematics + posts (backend); 3+2 indexed + constant-tilt continuous"
           }
         },
         {
@@ -8870,13 +8870,8 @@
         {
           "domain": "D1",
           "feature": "NURBS surfacing (blend/network/patch)",
-          "competitor": "{ status: yes, note: \"FreeStyle Shaper + GSD — Class-A surfaces, G2/G3 continuity, curvature combs, highlight analysis; industry gold standard\", source: \"https://www.3ds.com/products/catia/freestyle\" }",
-          "kerf": {
-            "status": "partial",
-            "note": "blend/network/patch/match-srf + G3 + Class-A harness + viewport Class-A diagnostic toggle (zebra + G2/G3 per-edge readouts) + imprint toolpath wired; not FreeStyle/GSD depth",
-            "evidence": "src/components/Renderer.jsx, packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py"
-          }
-        },
+          "competitor": "{ status: yes, note: \"FreeStyle Shaper + GSD \u2014 Class-A surfaces, G2/G3 continuity, curvature combs, highlight analysis; industry gold standard\", source: \"https://www.3ds.com/products/catia/freestyle\" }",
+          "kerf": "{ status: partial, note: \"blend/network/patch/match-srf + G3 + Class-A harness wired; not FreeStyle/GSD class-A depth\", evidence: \"packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py\" }"        },
         {
           "domain": "D1",
           "feature": "Assemblies \u2014 mates",
@@ -9043,8 +9038,11 @@
           "domain": "D7",
           "feature": "5-axis (kinematics + posts)",
           "competitor": "{ status: paid, note: \"CATIA Multi-Axis Surface Machining \u2014 full 5-axis; paid workbench\", source: \"https://www.3ds.com/products/catia/multi-axis-surface-machining\" }",
-          "kerf": "{ status: partial, note: \"Engine solid; no UI\", evidence: \"packages/kerf-cam/src/kerf_cam/worker.py\" }"
-        },
+          "kerf": {
+            "status": "yes",
+            "evidence": "src/components/CAMView.jsx + packages/kerf-cam/src/kerf_cam/five_axis/",
+            "note": "5-axis UI (mode switch + tilt/strategy/post controls) + kinematics + posts (backend); 3+2 indexed + constant-tilt continuous"
+          }        },
         {
           "domain": "D7",
           "feature": "Adaptive / trochoidal clearing",
@@ -9945,9 +9943,9 @@
             "source": "https://www.ptc.com/en/products/creo/options/nc"
           },
           "kerf": {
-            "status": "partial",
-            "note": "5-axis engine solid; no UI; kinematics + posts (backend)",
-            "evidence": "packages/kerf-cam/src/kerf_cam/worker.py"
+            "status": "yes",
+            "evidence": "src/components/CAMView.jsx + packages/kerf-cam/src/kerf_cam/five_axis/",
+            "note": "5-axis UI (mode switch + tilt/strategy/post controls) + kinematics + posts (backend); 3+2 indexed + constant-tilt continuous"
           }
         },
         {

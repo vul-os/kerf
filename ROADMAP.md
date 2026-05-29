@@ -150,6 +150,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 - **CFD foundation** ✅ — 2-D laminar: potential flow (`Cp(θ)=1−4sin²θ` oracle) + lid-driven cavity (Ghia Re=100 reference); 61 hermetic tests.
 - **Topology optimization** ✅ — SIMP via FEniCSx; NURBS surface fit; multi-body.
 - **CAM** ✅ — 2.5D + 3D parallel/waterline + lathe + 5-axis constant-tilt + 3+2 indexed; tool DB; LinuxCNC/GRBL/Fanuc posts.
+- **5-axis CAM UI** ✅ — `CAMView.jsx` mode switch (3-axis / 5-axis-indexed / 5-axis-continuous); tilt axis (A/B/C) + angle; strategy (swarf / contour-on-tilted-plane / indexed-rough); spindle vector preview; dispatches `cam_run` backend tool (`operation=5axis_finish` or `3plus2`).
 - **Slicing** ✅ — plane-section, CNC layered, 3D-print G-code (Cura, Tier 1).
 
 ### Electronics

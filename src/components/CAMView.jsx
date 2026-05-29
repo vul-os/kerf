@@ -5,8 +5,13 @@
 //   file.id   UUID
 //
 // Polls GET /api/projects/{pid}/files/{fid}/cam/status every 3 s while a job
-// is queued or running. Lets the user configure a 2.5D CAM operation and
-// submit via POST /api/projects/{pid}/files/{fid}/cam.
+// is queued or running. Lets the user configure a 2.5D/3-axis or 5-axis CAM
+// operation and submit via POST /api/projects/{pid}/files/{fid}/cam.
+//
+// Axis modes:
+//   '3axis'          — standard 2.5D / 3D toolpath (original behaviour)
+//   '5axis_indexed'  — 3+2 indexed (drive face aligned, no simultaneous)
+//   '5axis_cont'     — 5-axis continuous constant-tilt surface finishing
 //
 // Also exports LayeredCAMView for `.cam.layered` file kind:
 //   file.kind === 'cam_layered'
@@ -21,7 +26,26 @@ import ToolDBPanel, { ToolPicker } from './ToolDBPanel.jsx'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
+// ── Axis mode constants ───────────────────────────────────────────────────────
+export const AXIS_MODES = {
+  '3axis':         '3-axis',
+  '5axis_indexed': '5-axis indexed (3+2)',
+  '5axis_cont':    '5-axis continuous',
+}
+
 const OPERATIONS = ['face', 'contour', 'pocket', 'drill', 'profile']
+
+// Strategies available for 5-axis operations.  The backend cam_run tool maps:
+//   swarf            → operation '5axis_finish' + tilt_deg=0 (side-cutting engagement)
+//   contour_tilted   → operation '5axis_finish' + normal tilt_deg>0
+//   indexed_rough    → operation '3plus2'  + indexed_op='face'
+const FIVE_AXIS_STRATEGIES = [
+  { value: 'swarf',          label: 'Swarf (side-cutting)' },
+  { value: 'contour_tilted', label: 'Contour on tilted plane' },
+  { value: 'indexed_rough',  label: 'Indexed rough (3+2)' },
+]
+
+const TILT_AXES = ['A', 'B', 'C']
 
 const OPERATION_DEFAULTS = {
   face: { step_over: 3.0, step_down: 0.5, feed_rate: 1200, spindle_speed: 10000 },
@@ -29,6 +53,26 @@ const OPERATION_DEFAULTS = {
   pocket: { step_over: 2.0, step_down: 0.8, feed_rate: 1000, spindle_speed: 10000 },
   drill: { step_over: 0.0, step_down: 5.0, feed_rate: 200, spindle_speed: 3000 },
   profile: { step_over: 0.5, step_down: 1.0, feed_rate: 600, spindle_speed: 15000 },
+}
+
+// Map UI 5-axis strategy + axisMode → backend operation string + extra fields.
+// The backend cam_run tool (registered in kerf_cam/plugin.py) dispatches on
+// operation: '5axis_finish' for continuous and '3plus2' for indexed.
+export function fiveAxisBackendArgs(axisMode, strategy, tiltAxis, tiltAngle) {
+  if (axisMode === '5axis_indexed' || strategy === 'indexed_rough') {
+    return {
+      operation: '3plus2',
+      indexed_op: 'face',
+    }
+  }
+  // Continuous: swarf uses tilt_deg=0 (tool axis = surface normal, side engage)
+  // contour_tilted uses tilt_deg from user input
+  const tilt = strategy === 'swarf' ? 0 : (parseFloat(tiltAngle) || 15)
+  return {
+    operation: '5axis_finish',
+    tilt_deg: tilt,
+    kinematic_family: 'head_table',
+  }
 }
 
 function fmtMm(v) {
@@ -52,6 +96,12 @@ export default function CAMView({ file, projectId, viewRef }) {
     snapshot: async () => null,
   }), [])
   const [activeTab, setActiveTab] = useState('job')  // 'job' | 'tools'
+
+  // ── Axis mode ───────────────────────────────────────────────────────────────
+  // '3axis' | '5axis_indexed' | '5axis_cont'
+  const [axisMode, setAxisMode] = useState('3axis')
+
+  // ── 3-axis fields ───────────────────────────────────────────────────────────
   const [operation, setOperation] = useState('profile')
   const [toolDiameter, setToolDiameter] = useState('3.0')
   const [stepOver, setStepOver] = useState('0.5')
@@ -59,6 +109,13 @@ export default function CAMView({ file, projectId, viewRef }) {
   const [feedRate, setFeedRate] = useState('1000')
   const [spindleSpeed, setSpindleSpeed] = useState('10000')
   const [coolant, setCoolant] = useState(true)
+
+  // ── 5-axis fields ───────────────────────────────────────────────────────────
+  const [tiltAxis, setTiltAxis] = useState('B')          // A / B / C
+  const [tiltAngle, setTiltAngle] = useState('15')       // degrees
+  const [fiveAxisStrategy, setFiveAxisStrategy] = useState('contour_tilted')
+  const [post5x, setPost5x] = useState('linuxcnc')       // linuxcnc | fanuc
+
   const [running, setRunning] = useState(false)
   const [jobStatus, setJobStatus] = useState(null)
   const [error, setError] = useState(null)
@@ -161,14 +218,27 @@ export default function CAMView({ file, projectId, viewRef }) {
     setRunning(true)
     stopPolling()
 
-    const body = {
-      operation,
+    // Base fields shared by all modes
+    const baseBody = {
       tool_diameter: parseFloat(toolDiameter) || 3.0,
       step_over: parseFloat(stepOver) || 0.5,
       step_down: parseFloat(stepDown) || 1.0,
       feed_rate: parseFloat(feedRate) || 1000.0,
       spindle_speed: parseFloat(spindleSpeed) || 10000.0,
       coolant,
+    }
+
+    let body
+    if (axisMode === '3axis') {
+      body = { ...baseBody, operation }
+    } else {
+      // 5-axis: derive backend operation + extra fields from UI state
+      const extraFields = fiveAxisBackendArgs(axisMode, fiveAxisStrategy, tiltAxis, tiltAngle)
+      body = {
+        ...baseBody,
+        ...extraFields,
+        post_processor_5x: post5x,
+      }
     }
 
     try {
@@ -210,6 +280,8 @@ export default function CAMView({ file, projectId, viewRef }) {
   const result = jobStatus?.result && typeof jobStatus.result === 'object' ? jobStatus.result : null
   const st = jobStatus?.status
   const canDownload = st === 'done' && (result?.gcode_b64 || jobStatus?.output_key)
+
+  const is5Axis = axisMode !== '3axis'
 
   return (
     <div style={styles.root}>
@@ -267,6 +339,30 @@ export default function CAMView({ file, projectId, viewRef }) {
 
       {activeTab === 'job' && (
         <>
+        {/* ── Axis mode switch ───────────────────────────────────────────────── */}
+        <div style={{ ...styles.section, paddingBottom: 8, borderBottom: '1px solid #1f2937' }}>
+          <div style={{ ...styles.sectionTitle, marginBottom: 6 }}>Axis Mode</div>
+          <div data-testid="axis-mode-switch" style={{ display: 'flex', gap: 4 }}>
+            {Object.entries(AXIS_MODES).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                data-mode={key}
+                onClick={() => setAxisMode(key)}
+                disabled={running}
+                aria-pressed={axisMode === key}
+                style={{
+                  ...styles.tabBtn,
+                  flex: 1, justifyContent: 'center', fontSize: 10, padding: '3px 4px',
+                  ...(axisMode === key ? styles.tabBtnActive : {}),
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Tool picker row (T7) */}
         {projectTools.length > 0 && (
           <div style={{ ...styles.section, paddingBottom: 6, borderBottom: '1px solid #1f2937' }}>
@@ -281,14 +377,18 @@ export default function CAMView({ file, projectId, viewRef }) {
             </div>
           </div>
         )}
-      {/* Form */}
+
+      {/* ── Shared cutting params ─────────────────────────────────────────────── */}
       <div style={styles.section}>
-        <div style={styles.row}>
-          <label style={styles.label}>Operation</label>
-          <select value={operation} onChange={e => handleOperationChange(e.target.value)} style={styles.select} disabled={running}>
-            {OPERATIONS.map(op => <option key={op} value={op}>{op.charAt(0).toUpperCase() + op.slice(1)}</option>)}
-          </select>
-        </div>
+        {/* 3-axis: operation selector only when in 3-axis mode */}
+        {!is5Axis && (
+          <div style={styles.row}>
+            <label style={styles.label}>Operation</label>
+            <select value={operation} onChange={e => handleOperationChange(e.target.value)} style={styles.select} disabled={running}>
+              {OPERATIONS.map(op => <option key={op} value={op}>{op.charAt(0).toUpperCase() + op.slice(1)}</option>)}
+            </select>
+          </div>
+        )}
         <div style={styles.row}>
           <label style={styles.label}>Tool ⌀ (mm)</label>
           <input type="number" value={toolDiameter} onChange={e => setToolDiameter(e.target.value)} style={styles.input} step="0.5" min="0.1" disabled={running} />
@@ -314,6 +414,79 @@ export default function CAMView({ file, projectId, viewRef }) {
           <input type="checkbox" checked={coolant} onChange={e => setCoolant(e.target.checked)} disabled={running} style={{ accentColor: '#a78bfa' }} />
           <span style={{ color: '#9ca3af', fontSize: 12, marginLeft: 4 }}>{coolant ? 'Flood' : 'Off'}</span>
         </div>
+
+        {/* ── 5-axis controls (only when in a 5-axis mode) ───────────────────── */}
+        {is5Axis && (
+          <div data-testid="five-axis-controls" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4, padding: '8px 0 4px', borderTop: '1px solid #1f2937' }}>
+            <div style={{ ...styles.sectionTitle, marginBottom: 2 }}>5-Axis Settings</div>
+
+            {/* Toolpath strategy */}
+            <div style={styles.row}>
+              <label style={styles.label}>Strategy</label>
+              <select
+                value={fiveAxisStrategy}
+                onChange={e => setFiveAxisStrategy(e.target.value)}
+                style={styles.select}
+                disabled={running}
+                data-testid="five-axis-strategy"
+              >
+                {FIVE_AXIS_STRATEGIES.map(s => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Tilt axis — only relevant for continuous (not indexed) */}
+            {axisMode === '5axis_cont' && (
+              <>
+                <div style={styles.row}>
+                  <label style={styles.label}>Tilt axis</label>
+                  <select
+                    value={tiltAxis}
+                    onChange={e => setTiltAxis(e.target.value)}
+                    style={{ ...styles.select, flex: '0 0 60px' }}
+                    disabled={running}
+                    data-testid="tilt-axis-select"
+                  >
+                    {TILT_AXES.map(ax => <option key={ax} value={ax}>{ax}</option>)}
+                  </select>
+                </div>
+                <div style={styles.row}>
+                  <label style={styles.label}>Tilt angle (°)</label>
+                  <input
+                    type="number"
+                    value={tiltAngle}
+                    onChange={e => setTiltAngle(e.target.value)}
+                    style={styles.input}
+                    step="1"
+                    min="0"
+                    max="90"
+                    disabled={running}
+                    data-testid="tilt-angle-input"
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Post-processor */}
+            <div style={styles.row}>
+              <label style={styles.label}>Post (5x)</label>
+              <select
+                value={post5x}
+                onChange={e => setPost5x(e.target.value)}
+                style={styles.select}
+                disabled={running}
+                data-testid="post5x-select"
+              >
+                <option value="linuxcnc">LinuxCNC</option>
+                <option value="fanuc">Fanuc</option>
+              </select>
+            </div>
+
+            {/* Spindle vector preview — shows the unit vector implied by tilt axis + angle */}
+            <SpindleVectorPreview tiltAxis={tiltAxis} tiltAngle={parseFloat(tiltAngle) || 0} axisMode={axisMode} strategy={fiveAxisStrategy} />
+          </div>
+        )}
 
         <button type="button" onClick={handleGenerate} disabled={running || !fid || !pid} style={{ ...styles.button, ...(running ? styles.buttonDisabled : {}) }}>
           {running
@@ -398,6 +571,61 @@ export default function CAMView({ file, projectId, viewRef }) {
       )}
         </>
       )}
+    </div>
+  )
+}
+
+// ── SpindleVectorPreview ───────────────────────────────────────────────────────
+// Renders a compact SVG showing the tool-axis unit vector implied by the
+// chosen tilt axis and angle.  The part surface is shown as a horizontal grey
+// bar; the tool axis arrow rotates by tiltAngle around the named rotary axis.
+//
+// For indexed (3+2) mode the arrow is shown locked at the programmed angle.
+// For swarf strategy tiltAngle is effectively 0 (side-of-cutter engagement).
+function SpindleVectorPreview({ tiltAxis, tiltAngle, axisMode, strategy }) {
+  // Compute a 2-D projection of the tool vector.
+  // A-axis = rotation around X (tilt appears in Y-Z view → draw in YZ = looks like Y here)
+  // B-axis = rotation around Y (tilt appears in X-Z view → draws in XZ = natural side view)
+  // C-axis = rotation around Z (tilt appears in X-Y view → draws in XY = end view)
+  // We simplify to a single 2-D canvas; all three show the same geometry.
+  const effectiveTilt = (strategy === 'swarf') ? 0 : (tiltAngle || 0)
+  const rad = (effectiveTilt * Math.PI) / 180
+  // Tool axis vector projected onto the 2-D preview plane
+  const dx = Math.sin(rad)   // horizontal component
+  const dy = -Math.cos(rad)  // vertical component (negative = up)
+
+  const cx = 50, cy = 60  // tip of tool on surface
+  const len = 40
+
+  const tx = cx + dx * len
+  const ty = cy + dy * len
+
+  const isLocked = axisMode === '5axis_indexed'
+
+  return (
+    <div data-testid="spindle-vector-preview" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ fontSize: 10, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        Spindle vector preview
+        {isLocked && <span style={{ color: '#f59e0b', marginLeft: 6 }}>locked (indexed)</span>}
+      </div>
+      <svg
+        width={100}
+        height={90}
+        viewBox="0 0 100 90"
+        style={{ background: '#0d1117', borderRadius: 4, border: '1px solid #1f2937' }}
+        aria-label={`Spindle axis: ${tiltAxis} ${effectiveTilt.toFixed(1)}°`}
+      >
+        {/* Surface line */}
+        <line x1={5} y1={65} x2={95} y2={65} stroke="#374151" strokeWidth={1.5} />
+        <text x={50} y={78} textAnchor="middle" fontSize={8} fill="#4b5563">surface</text>
+        {/* Tool axis arrow */}
+        <line x1={cx} y1={cy} x2={tx} y2={ty} stroke={isLocked ? '#f59e0b' : '#a78bfa'} strokeWidth={2} strokeLinecap="round" />
+        <circle cx={tx} cy={ty} r={2.5} fill={isLocked ? '#f59e0b' : '#a78bfa'} />
+        {/* Label */}
+        <text x={tx + 4} y={ty + 4} fontSize={7} fill="#9ca3af">{tiltAxis} {effectiveTilt.toFixed(0)}°</text>
+        {/* Origin dot on surface */}
+        <circle cx={cx} cy={cy} r={2} fill="#4b5563" />
+      </svg>
     </div>
   )
 }

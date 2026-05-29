@@ -14,6 +14,12 @@
 #
 # Combine: `./scripts/deploy-fly.sh --dev --secrets-only`
 #
+# Logging:
+#   The script tees its own output to /tmp/kerf-deploy-<env>-<timestamp>.log.
+#   Do NOT pipe through external tee — that swallows the script exit code.
+#   The final log line always prints "[deploy-fly] exit code: N" so CI/humans
+#   can grep for outcome without parsing shell exit status from a pipe.
+#
 # Prereqs:
 #   - flyctl installed and logged in (flyctl auth login)
 #   - .env.main exists (cp .env.z.example .env.main) — or .env.dev for --dev
@@ -54,6 +60,14 @@ while [[ $# -gt 0 ]]; do
       echo "Unknown arg: $1"; exit 1 ;;
   esac
 done
+
+# ── Self-logging: tee to a timestamped file so callers see real exit codes ────
+# This must come AFTER arg parsing (we need ENV_NAME for the filename).
+# Doing this here means the caller never needs `| tee` — piping through tee
+# caused Wave 4D/4E silent failures because the outer pipe took tee's exit 0.
+_LOG_FILE="/tmp/kerf-deploy-${ENV_NAME}-$(date +%Y%m%d-%H%M%S).log"
+exec > >(tee -a "$_LOG_FILE") 2>&1
+echo "[deploy-fly] logging to $_LOG_FILE"
 
 ENV_FILE=".env.${ENV_NAME}"
 if [[ "$ENV_NAME" == "main" ]]; then
@@ -189,12 +203,28 @@ if [[ "$SECRETS_ONLY" == "true" ]]; then
 fi
 
 # ── Deploy ───────────────────────────────────────────────────────────────────
+# Capture flyctl exit codes explicitly so set -e won't be the only guard.
+# If flyctl fails we still want the final "[deploy-fly] exit code: N" line
+# printed before we exit, so we use `|| true` here and check $rc ourselves.
+_rc=0
+
 echo "▸ deploying app: $APP_NAME"
-flyctl deploy --config fly.toml --app "$APP_NAME" --remote-only
+flyctl deploy --config fly.toml --app "$APP_NAME" --remote-only || _rc=$?
+
+if [[ $_rc -ne 0 ]]; then
+  echo "[deploy-fly] ERROR: flyctl deploy for $APP_NAME exited with code $_rc"
+  echo "[deploy-fly] exit code: $_rc"
+  exit $_rc
+fi
 
 if [[ "$DEPLOY_WORKERS" == "true" ]]; then
   echo "▸ deploying workers: $WORKER_APP_NAME"
-  flyctl deploy --config fly.worker.toml --app "$WORKER_APP_NAME" --remote-only
+  flyctl deploy --config fly.worker.toml --app "$WORKER_APP_NAME" --remote-only || _rc=$?
+  if [[ $_rc -ne 0 ]]; then
+    echo "[deploy-fly] ERROR: flyctl deploy for $WORKER_APP_NAME exited with code $_rc"
+    echo "[deploy-fly] exit code: $_rc"
+    exit $_rc
+  fi
 fi
 
 # Migrations now run in Fly's `[deploy] release_command` (fly.toml),
@@ -211,3 +241,4 @@ echo "✓ ${ENV_NAME} deploy complete."
 echo "  app:    https://${APP_NAME}.fly.dev  (or the custom domain mapped via flyctl certs)"
 echo "  status: flyctl status --app $APP_NAME"
 echo "  logs:   flyctl logs --app $APP_NAME"
+echo "[deploy-fly] exit code: 0"

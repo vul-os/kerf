@@ -140,6 +140,12 @@ export function symbolGlyph(kind, params) {
     case 'surface_finish': return surfaceFinishGlyph(params)
     case 'weld':           return weldGlyph(params)
     case 'gdt':            return gdtGlyph(params)
+    // GD&T FCF and datum are handled by FcfGlyph/DatumGlyph sub-components in
+    // DrawingView and are not rendered via this symbolGlyph path. Return an empty
+    // placeholder so the SymbolGlyph renderer gracefully no-ops for these kinds
+    // if encountered (belt-and-suspenders guard).
+    case 'fcf':
+    case 'gdt_datum':      return { elements: [], bbox: { w: 0, h: 0 } }
     default: return { elements: [], bbox: { w: 0, h: 0 } }
   }
 }

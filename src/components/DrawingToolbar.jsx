@@ -116,6 +116,34 @@ const TOOL_GROUPS = [
       { id: 'dim-chain', icon: Link2,         label: 'Dimension chain · click picks, dbl-click to finish' },
     ],
   },
+  // ---------------------------------------------------------------------------
+  // NEW: GD&T / ISO 1101 tools — datum labels + FCF placement.
+  // Tool ids: 'gdt:datum:A', 'gdt:fcf:position', etc.
+  {
+    label: 'GD&T',
+    items: [
+      // Datum labels
+      { id: 'gdt:datum:A', icon: null, labelChar: 'A', label: 'Datum A · click to place datum triangle' },
+      { id: 'gdt:datum:B', icon: null, labelChar: 'B', label: 'Datum B · click to place datum triangle' },
+      { id: 'gdt:datum:C', icon: null, labelChar: 'C', label: 'Datum C · click to place datum triangle' },
+      // Form
+      { id: 'gdt:fcf:flatness',         icon: null, labelChar: '▱', label: 'Flatness' },
+      { id: 'gdt:fcf:circularity',      icon: null, labelChar: '○', label: 'Circularity' },
+      { id: 'gdt:fcf:straightness',     icon: null, labelChar: '⎯', label: 'Straightness' },
+      // Profile
+      { id: 'gdt:fcf:profile_line',     icon: null, labelChar: '⌒', label: 'Profile of a Line' },
+      { id: 'gdt:fcf:profile_surface',  icon: null, labelChar: '⌓', label: 'Profile of a Surface' },
+      // Orientation
+      { id: 'gdt:fcf:perpendicularity', icon: null, labelChar: '⟂', label: 'Perpendicularity' },
+      { id: 'gdt:fcf:parallelism',      icon: null, labelChar: '∥', label: 'Parallelism' },
+      { id: 'gdt:fcf:angularity',       icon: null, labelChar: '∠', label: 'Angularity' },
+      // Location
+      { id: 'gdt:fcf:position',         icon: null, labelChar: '⌖', label: 'Position' },
+      // Runout
+      { id: 'gdt:fcf:circular_runout',  icon: null, labelChar: '↗', label: 'Circular Runout' },
+      { id: 'gdt:fcf:total_runout',     icon: null, labelChar: '⇈', label: 'Total Runout' },
+    ],
+  },
 ]
 
 // Optional sheet-level actions wired in from the parent. Surfaced as a
@@ -152,21 +180,28 @@ export default function DrawingToolbar({
       {TOOL_GROUPS.map((group, gi) => (
         <div key={gi} className="flex flex-col gap-1">
           {gi > 0 && <div className="h-px bg-ink-700/70 mx-0.5 my-0.5" />}
-          {group.items.map(({ id, icon: Icon, label }) => {
+          {group.items.map(({ id, icon: Icon, label, labelChar }) => {
             const active = id === tool
             return (
               <button
                 key={id}
                 type="button"
                 title={label}
+                aria-label={label}
+                aria-pressed={active}
+                data-testid={`drawing-tool-${id}`}
                 onClick={() => onTool?.(id)}
-                className={`p-1.5 rounded transition-colors ${
+                className={`rounded transition-colors flex items-center justify-center ${
+                  labelChar
+                    ? 'w-7 h-6 text-[13px] leading-none'
+                    : 'p-1.5'
+                } ${
                   active
                     ? 'bg-kerf-300 text-ink-950'
                     : 'bg-ink-900/60 text-ink-300 hover:text-kerf-300 hover:bg-ink-800 border border-ink-700/50'
                 }`}
               >
-                <Icon size={14} />
+                {labelChar ? labelChar : <Icon size={14} />}
               </button>
             )
           })}

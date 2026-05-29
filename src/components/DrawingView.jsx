@@ -23,6 +23,10 @@ import {
   addRichText,
   addDimensionChain,
 } from '../lib/draftingComplete.js'
+// ---------------------------------------------------------------------------
+// GD&T FCF placement helpers.
+import { GDT_SYMBOL_MAP, renderFcf } from '../lib/gdntAnnotations.js'
+import { FcfPlacementModal } from './GdntToolbar.jsx'
 
 // Drawing renderer — a single SVG element. Renders the sheet, each view's
 // projected polylines, the title block, dimensions, and now annotations and
@@ -72,10 +76,18 @@ const ANN_PLACE_TOOLS = new Set(['leader', 'note', 'text', 'centerline', 'break'
 // ---------------------------------------------------------------------------
 // NEW: Drafting completeness tool ids.
 const DRAFTING_COMPLETENESS_TOOLS = new Set(['hatch', 'dc-leader', 'rich-text', 'dim-chain'])
+// ---------------------------------------------------------------------------
+// NEW: GD&T tool helpers. Tool ids follow the pattern:
+//   'gdt:datum:A' — place a datum label
+//   'gdt:fcf:<symbol_code>' — open the FCF placement modal
+function isGdtTool(t) {
+  return typeof t === 'string' && t.startsWith('gdt:')
+}
 function isSnappingTool(t) {
   return DIM_TOOLS.has(t) || MEASURE_TOOLS.has(t)
     || t === 'leader' || t === 'dc-leader' || t === 'centerline' || t === 'break'
     || SYMBOL_TOOLS.has(t)
+    || isGdtTool(t)
 }
 
 // localStorage key for the snap toggle. Mirrored from DrawingToolbar — both
@@ -212,6 +224,13 @@ const DrawingView = forwardRef(function DrawingView({
   const [hatchPopover, setHatchPopover] = useState(null)
   const [dcLeaderDraft, setDcLeaderDraft] = useState(null)
   const [dimChainDraft, setDimChainDraft] = useState(null)
+
+  // ---------------------------------------------------------------------------
+  // NEW: GD&T FCF placement state.
+  //
+  // fcfModal: opened when user clicks in the viewport with a 'gdt:fcf:*' tool.
+  //   { symbolCode, position:{x,y}, viewId }
+  const [fcfModal, setFcfModal] = useState(null)
 
   // Cursor readout state. Updated on every mousemove inside the SVG.
   // Hidden when the user leaves the SVG entirely.
@@ -725,6 +744,31 @@ const DrawingView = forwardRef(function DrawingView({
       return
     }
 
+    // ---------------------------------------------------------------------------
+    // NEW: GD&T tools.
+
+    // gdt:datum:X — place a datum label annotation immediately.
+    if (tool && tool.startsWith('gdt:datum:')) {
+      const label = tool.replace('gdt:datum:', '').toUpperCase()
+      onAddSymbol?.({
+        kind: 'gdt_datum',
+        view_id: sn.viewId || undefined,
+        position: { x: sn.x, y: sn.y },
+        params: { label },
+      })
+      onResetTool?.()
+      return
+    }
+
+    // gdt:fcf:<symbolCode> — open the FCF placement modal at the click point.
+    if (tool && tool.startsWith('gdt:fcf:')) {
+      const symbolCode = tool.replace('gdt:fcf:', '')
+      if (GDT_SYMBOL_MAP[symbolCode]) {
+        setFcfModal({ symbolCode, position: { x: sn.x, y: sn.y }, viewId: sn.viewId || null })
+      }
+      return
+    }
+
     // ---- Dimension authoring ----
     // Fall through to dimension flow for remaining tools.
     if (!sn.viewId) return
@@ -798,6 +842,8 @@ const DrawingView = forwardRef(function DrawingView({
     setMeasure, setAnnDraft,
     // NEW: drafting completeness
     dcLeaderDraft, setDcLeaderDraft, dimChainDraft, setDimChainDraft, setHatchPopover,
+    // NEW: GD&T
+    setFcfModal,
   ])
 
   // Double-click commits a polyline-draft (≥2 points needed) OR a multi-pick
@@ -1254,6 +1300,43 @@ const DrawingView = forwardRef(function DrawingView({
           />
         ))}
 
+        {/* GD&T FCF annotations — rendered inline as SVG frames per ISO 1101. */}
+        {sheetAnns.filter((a) => a.kind === 'fcf').map((a) => (
+          <FcfGlyph
+            key={a.id}
+            ann={a}
+            selected={a.id === selectedAnnotationId}
+            onSelect={(e) => {
+              e.stopPropagation()
+              onSelectAnnotation?.(a.id)
+              onSelectDimension?.(null)
+            }}
+          />
+        ))}
+
+        {/* GD&T datum triangle labels. */}
+        {sheetAnns.filter((a) => a.kind === 'gdt_datum').map((a) => (
+          <DatumGlyph
+            key={a.id}
+            ann={a}
+            selected={a.id === selectedAnnotationId}
+            onSelect={(e) => {
+              e.stopPropagation()
+              onSelectAnnotation?.(a.id)
+              onSelectDimension?.(null)
+            }}
+          />
+        ))}
+
+        {/* GD&T placement cursor stencil — FCF box follows the cursor. */}
+        {isGdtTool(tool) && tool.startsWith('gdt:fcf:') && !fcfModal && hover && (
+          <FcfCursorStencil
+            x={hover.x}
+            y={hover.y}
+            symbolCode={tool.replace('gdt:fcf:', '')}
+          />
+        )}
+
         {/* In-progress dimension preview. */}
         {draft && (
           <DraftDimension
@@ -1408,6 +1491,37 @@ const DrawingView = forwardRef(function DrawingView({
             onResetTool?.()
           }}
           onCancel={() => { setHatchPopover(null); onResetTool?.() }}
+        />
+      )}
+
+      {/* ---------------------------------------------------------------------------
+          NEW: FCF placement modal. Opens when the user clicks with a gdt:fcf:* tool.
+          Lets them fill in tolerance value, modifier, and datum references before
+          the FCF annotation is committed to the drawing. */}
+      {fcfModal && (
+        <FcfPlacementModal
+          symbolCode={fcfModal.symbolCode}
+          position={fcfModal.position}
+          onCommit={(opts) => {
+            onAddSymbol?.({
+              kind: 'fcf',
+              view_id: fcfModal.viewId || undefined,
+              position: { x: opts.x, y: opts.y },
+              params: {
+                symbol_code: opts.symbol_code,
+                tolerance_value: opts.tolerance_value,
+                diameter_zone: opts.diameter_zone,
+                tolerance_modifier: opts.tolerance_modifier,
+                datum_refs: opts.datum_refs,
+              },
+            })
+            setFcfModal(null)
+            onResetTool?.()
+          }}
+          onCancel={() => {
+            setFcfModal(null)
+            onResetTool?.()
+          }}
         />
       )}
 
@@ -2334,6 +2448,203 @@ function ScaleBar({ frame, sheetW, sheetH, views }) {
   )
 }
 
+// ---------------------------------------------------------------------------
+// NEW: FCF glyph — renders an ISO 1101 feature-control-frame inline in SVG.
+// Layout: | symbol | ⌀?tol modifier? | datumA | datumB | datumC |
+// All cells are 6mm tall; widths are proportional to content.
+// If `ann` carries a leader_from, a thin line + arrowhead is drawn from
+// leader_from → {x,y}.
+function FcfGlyph({ ann, selected, onSelect }) {
+  const FCF_STROKE = selected ? ANN_SELECTED_STROKE : '#0c1118'
+  const FCF_FILL = '#ffffff'
+  const CELL_H = 6    // mm
+  const SYM_W = 7     // symbol cell
+  const TOL_W = 18    // tolerance cell
+  const DAT_W = 6     // per-datum cell
+
+  const sym = GDT_SYMBOL_MAP[ann.symbol_code || '']
+  const symChar = sym?.unicode || '?'
+  const diaPrefix = ann.diameter_zone ? '⌀' : ''
+  const modMap = { M: 'Ⓜ', L: 'Ⓛ', S: 'Ⓢ', F: 'Ⓕ', P: 'Ⓟ', T: 'Ⓣ' }
+  const modStr = ann.tolerance_modifier ? ` ${modMap[ann.tolerance_modifier] || ann.tolerance_modifier}` : ''
+  const tolText = `${diaPrefix}${ann.tolerance_value ?? '?'}${modStr}`
+
+  const datumRefs = ann.datum_refs || []
+  const totalW = SYM_W + TOL_W + datumRefs.length * DAT_W
+
+  const x = ann.x ?? 0
+  const y = ann.y ?? 0
+
+  return (
+    <g
+      style={{ cursor: 'pointer' }}
+      onClick={onSelect}
+      data-testid={`fcf-glyph-${ann.id}`}
+    >
+      {/* Optional leader line from feature to FCF */}
+      {ann.leader_from && (
+        <line
+          x1={ann.leader_from.x} y1={ann.leader_from.y}
+          x2={x} y2={y + CELL_H / 2}
+          stroke={FCF_STROKE} strokeWidth={0.25}
+          markerStart="url(#ann-arrow)"
+          vectorEffect="non-scaling-stroke"
+        />
+      )}
+
+      {/* Frame background */}
+      <rect
+        x={x} y={y} width={totalW} height={CELL_H}
+        fill={FCF_FILL} stroke={FCF_STROKE}
+        strokeWidth={0.3} vectorEffect="non-scaling-stroke"
+      />
+
+      {/* Symbol compartment */}
+      <line x1={x + SYM_W} y1={y} x2={x + SYM_W} y2={y + CELL_H}
+        stroke={FCF_STROKE} strokeWidth={0.25}
+        vectorEffect="non-scaling-stroke" />
+      <text
+        x={x + SYM_W / 2} y={y + CELL_H / 2 + 1.6}
+        textAnchor="middle"
+        fontSize={4.2} fill={FCF_STROKE}
+        fontFamily="ui-sans-serif, system-ui"
+      >{symChar}</text>
+
+      {/* Tolerance compartment */}
+      <line x1={x + SYM_W + TOL_W} y1={y} x2={x + SYM_W + TOL_W} y2={y + CELL_H}
+        stroke={FCF_STROKE} strokeWidth={0.25}
+        vectorEffect="non-scaling-stroke" />
+      <text
+        x={x + SYM_W + TOL_W / 2} y={y + CELL_H / 2 + 1.1}
+        textAnchor="middle"
+        fontSize={2.8} fill={FCF_STROKE}
+        fontFamily="ui-monospace, Menlo, monospace"
+      >{tolText}</text>
+
+      {/* Datum compartments */}
+      {datumRefs.map((dr, i) => {
+        const cx = x + SYM_W + TOL_W + i * DAT_W
+        return (
+          <g key={i}>
+            {i < datumRefs.length - 1 && (
+              <line x1={cx + DAT_W} y1={y} x2={cx + DAT_W} y2={y + CELL_H}
+                stroke={FCF_STROKE} strokeWidth={0.25}
+                vectorEffect="non-scaling-stroke" />
+            )}
+            <text
+              x={cx + DAT_W / 2} y={y + CELL_H / 2 + 1.1}
+              textAnchor="middle"
+              fontSize={2.8} fill={FCF_STROKE}
+              fontFamily="ui-monospace, Menlo, monospace"
+              fontWeight={700}
+            >{dr.label}</text>
+          </g>
+        )
+      })}
+
+      {/* Selection indicator */}
+      {selected && (
+        <rect
+          x={x - 0.5} y={y - 0.5}
+          width={totalW + 1} height={CELL_H + 1}
+          fill="none" stroke={ANN_SELECTED_STROKE}
+          strokeWidth={0.3} strokeDasharray="1,1"
+          vectorEffect="non-scaling-stroke"
+        />
+      )}
+    </g>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// NEW: DatumGlyph — renders a datum identification symbol per ISO 1101.
+// A filled triangle + rectangle + letter, per the ISO datum target symbol.
+function DatumGlyph({ ann, selected, onSelect }) {
+  const STROKE = selected ? ANN_SELECTED_STROKE : '#0c1118'
+  const x = ann.x ?? 0
+  const y = ann.y ?? 0
+  const label = ann.label || ann.params?.label || 'A'
+  const boxW = 6
+  const boxH = 6
+  const triH = 3.5
+
+  return (
+    <g
+      style={{ cursor: 'pointer' }}
+      onClick={onSelect}
+      data-testid={`datum-glyph-${ann.id}`}
+    >
+      {/* Triangle pointing downward (toward the feature) */}
+      <path
+        d={`M ${x} ${y + boxH} L ${x + boxW / 2} ${y + boxH + triH} L ${x + boxW} ${y + boxH} Z`}
+        fill={STROKE}
+        stroke={STROKE} strokeWidth={0.2}
+        vectorEffect="non-scaling-stroke"
+      />
+      {/* Identification box */}
+      <rect
+        x={x} y={y} width={boxW} height={boxH}
+        fill="#ffffff" stroke={STROKE}
+        strokeWidth={0.3} vectorEffect="non-scaling-stroke"
+      />
+      <text
+        x={x + boxW / 2} y={y + boxH / 2 + 1.2}
+        textAnchor="middle"
+        fontSize={3.2} fill={STROKE}
+        fontFamily="ui-monospace, Menlo, monospace"
+        fontWeight={700}
+      >{label}</text>
+
+      {selected && (
+        <rect
+          x={x - 0.5} y={y - 0.5}
+          width={boxW + 1} height={boxH + triH + 1}
+          fill="none" stroke={ANN_SELECTED_STROKE}
+          strokeWidth={0.3} strokeDasharray="1,1"
+          vectorEffect="non-scaling-stroke"
+        />
+      )}
+    </g>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// NEW: FcfCursorStencil — ghost FCF box that follows the cursor while placing.
+function FcfCursorStencil({ x, y, symbolCode }) {
+  const sym = GDT_SYMBOL_MAP[symbolCode]
+  const symChar = sym?.unicode || '?'
+  const CELL_H = 6
+  const SYM_W = 7
+  const TOL_W = 18
+  const totalW = SYM_W + TOL_W
+  return (
+    <g pointerEvents="none" opacity={0.7}>
+      <rect
+        x={x} y={y} width={totalW} height={CELL_H}
+        fill="rgba(255,255,255,0.8)" stroke={ANN_SELECTED_STROKE}
+        strokeWidth={0.3} strokeDasharray="1.5,1.5"
+        vectorEffect="non-scaling-stroke"
+      />
+      <line x1={x + SYM_W} y1={y} x2={x + SYM_W} y2={y + CELL_H}
+        stroke={ANN_SELECTED_STROKE} strokeWidth={0.25}
+        strokeDasharray="1.5,1.5"
+        vectorEffect="non-scaling-stroke" />
+      <text
+        x={x + SYM_W / 2} y={y + CELL_H / 2 + 1.6}
+        textAnchor="middle"
+        fontSize={4.2} fill={ANN_SELECTED_STROKE}
+        fontFamily="ui-sans-serif, system-ui"
+      >{symChar}</text>
+      <text
+        x={x + SYM_W + TOL_W / 2} y={y + CELL_H / 2 + 1.1}
+        textAnchor="middle"
+        fontSize={2.2} fill={ANN_SELECTED_STROKE}
+        fontFamily="ui-monospace, Menlo, monospace"
+      >0.0</text>
+    </g>
+  )
+}
+
 function Handle({ cx, cy, onMouseDown }) {
   // Use onPointerDown so touch and stylus also work for handle drags.
   return (
@@ -2891,6 +3202,18 @@ function toolHint(tool, draft, measure, annDraft, dcLeaderDraft, dimChainDraft) 
   if (tool === 'surface_finish') return 'Surface finish · click to place'
   if (tool === 'weld') return 'Weld symbol · click to place'
   if (tool === 'gdt') return 'GD&T frame · click to place'
+  // NEW: GD&T toolbar tools
+  if (tool && tool.startsWith('gdt:datum:')) {
+    const label = tool.replace('gdt:datum:', '')
+    return `Datum ${label} · click on a face/edge to place the datum triangle`
+  }
+  if (tool && tool.startsWith('gdt:fcf:')) {
+    const code = tool.replace('gdt:fcf:', '')
+    const sym = GDT_SYMBOL_MAP[code]
+    return sym
+      ? `${sym.name} (${sym.unicode}) · click in the drawing to place a feature-control-frame`
+      : 'GD&T FCF · click to place'
+  }
   if (tool === 'angular') {
     if (!draft) return 'Angular · click the angle vertex (snaps to vertex/edge)'
     if (draft.stage === 1) return 'Angular · click first arm endpoint'

@@ -918,7 +918,7 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "GD&T data model (ASME Y14.5); no MBD/PMI on model view",
+            "note": "GD&T data model (ASME Y14.5); GD&T toolbar + FCF placement UI shipped (GdntToolbar.jsx)",
             "evidence": "packages/kerf-core/src/gdandt.py"
           }
         },
@@ -1111,7 +1111,7 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Live HLR projection (make2d) + auto-dim; no GD&T-placement UI",
+            "note": "Live HLR projection (make2d) + auto-dim; GD&T toolbar + FCF click-to-place (GdntToolbar.jsx)",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/make2d.py"
           }
         },
@@ -3912,7 +3912,7 @@
           "kerf": {
             "status": "partial",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/history/feature_io.py",
-            "note": "live HLR projection + auto-dim; no GD&T-placement UI"
+            "note": "live HLR projection + auto-dim; GD&T toolbar + FCF click-to-place (GdntToolbar.jsx)"
           }
         },
         {
@@ -4724,7 +4724,7 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Live HLR projection + auto-dim; no GD&T-placement UI",
+            "note": "Live HLR projection + auto-dim; GD&T toolbar + FCF click-to-place (GdntToolbar.jsx)",
             "evidence": "src/components/DrawingView.jsx"
           }
         },
@@ -5897,7 +5897,7 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Live B-rep HLR projection + auto-dim; no GD&T-placement UI",
+            "note": "Live B-rep HLR projection + auto-dim; GD&T toolbar + FCF click-to-place (GdntToolbar.jsx)",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/drawings/auto_dimension.py"
           }
         },
@@ -5910,9 +5910,9 @@
             "source": "https://help.solidworks.com/2020/English/SolidWorks/sldworks/c_dimxpert_for_parts.htm"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Data model + auto-propose only; no UI for placement",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gdt/tools.py"
+            "status": "yes",
+            "note": "ISO 1101 GD&T toolbar (DrawingToolbar + GdntToolbar) + FCF placement modal + 3D PMI overlay (Pmi3DOverlay); datum A/B/C, position, perpendicularity, parallelism, flatness, circularity, straightness, profile-of-line, profile-of-surface, runout; click-to-place with leader; persisted via addFcf/addDatumLabel",
+            "evidence": "src/components/GdntToolbar.jsx"
           }
         },
         {
@@ -6401,7 +6401,7 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Data model + auto-propose; no MBD/PMI placement UI",
+            "note": "Data model + auto-propose; GD&T toolbar + FCF click-to-place + 3D PMI overlay shipped",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gdt/datums.py"
           }
         },
@@ -6691,9 +6691,9 @@
             "source": "https://cad.onshape.com/help/Content/drawings-gdt.htm"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Data model + auto-propose only; no UI placement",
-            "evidence": "packages/kerf-gdnt/src/kerf_gdnt/feature_control_frame.py"
+            "status": "yes",
+            "note": "ISO 1101 GD&T toolbar + FCF click-to-place modal + 3D PMI overlay; all ISO 1101 characteristics; datum labels; persisted in drawing data model",
+            "evidence": "src/components/GdntToolbar.jsx"
           }
         },
         {
@@ -7501,7 +7501,7 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Live HLR projection + auto-dim; no GD&T-placement UI",
+            "note": "Live HLR projection + auto-dim; GD&T toolbar + FCF click-to-place (GdntToolbar.jsx)",
             "evidence": "src/components/DrawingView.jsx"
           }
         },
@@ -7514,9 +7514,9 @@
             "source": "https://help.autodesk.com/view/INVNTOR/2025/ENU/?guid=GUID-A44C5B4C-7BA6-4E56-B5E5-5B3D6F1A4A49"
           },
           "kerf": {
-            "status": "partial",
-            "note": "GD&T data model only; no MBD/PMI UI",
-            "evidence": "packages/kerf-gdnt/src/kerf_gdnt/feature_control_frame.py"
+            "status": "yes",
+            "note": "GD&T toolbar (ISO 1101 all characteristics) + FCF click-to-place + 3D PMI overlay; datum A/B/C; stored in drawing annotation model",
+            "evidence": "src/components/GdntToolbar.jsx"
           }
         },
         {
@@ -8886,9 +8886,8 @@
         {
           "domain": "D1",
           "feature": "2D drawings (views/dims/sections)",
-          "competitor": "{ status: yes, note: \"Drafting workbench \u2014 view generation, dimensions, sections, GD&T callouts\", source: \"https://www.3ds.com/products/catia/drafting\" }",
-          "kerf": "{ status: partial, note: \"Live HLR projection (make2d) + auto-dim; no GD&T-placement UI\", evidence: \"packages/kerf-cad-core/src/kerf_cad_core/geom/make2d.py\" }"
-        },
+          "competitor": "{ status: yes, note: \"Drafting workbench — view generation, dimensions, sections, GD&T callouts\", source: \"https://www.3ds.com/products/catia/drafting\" }",
+          "kerf": "{ status: partial, note: \"Live HLR projection (make2d) + auto-dim; GD&T toolbar + FCF click-to-place (GdntToolbar.jsx)\", evidence: \"packages/kerf-cad-core/src/kerf_cad_core/geom/make2d.py\" }"        },
         {
           "domain": "D1",
           "feature": "GD&T on drawings / MBD / PMI",
@@ -9125,9 +9124,8 @@
         {
           "domain": "D11",
           "feature": "GD&T data model (ASME Y14.5)",
-          "competitor": "{ status: yes, note: \"FTA (Functional Tolerancing & Annotation) \u2014 full PMI / 3D annotations on model; ASME Y14.5 + ISO 1101\", source: \"https://www.3ds.com/products/catia/functional-tolerancing-and-annotation\" }",
-          "kerf": "{ status: yes, note: \"Backend only; no MBD/PMI on model\", evidence: \"packages/kerf-gdnt/src/kerf_gdnt/feature_control_frame.py\" }"
-        },
+          "competitor": "{ status: yes, note: \"FTA (Functional Tolerancing & Annotation) — full PMI / 3D annotations on model; ASME Y14.5 + ISO 1101\", source: \"https://www.3ds.com/products/catia/functional-tolerancing-and-annotation\" }",
+          "kerf": "{ status: yes, note: \"Backend only; GD&T toolbar + FCF placement UI + 3D PMI overlay shipped\", evidence: \"packages/kerf-gdnt/src/kerf_gdnt/feature_control_frame.py\" }"        },
         {
           "domain": "D11",
           "feature": "Tolerance stackup \u2014 1D (WC/RSS/MC)",
@@ -9715,7 +9713,7 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Live HLR projection (make2d) + auto-dim; no GD&T-placement UI",
+            "note": "Live HLR projection (make2d) + auto-dim; GD&T toolbar + FCF click-to-place (GdntToolbar.jsx)",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/make2d.py"
           }
         },
@@ -10134,9 +10132,9 @@
             "source": "https://www.ptc.com/en/products/creo/options/mbd"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Data model only; no 3D MBD/PMI annotation UI",
-            "evidence": "src/components/DrawingView.jsx"
+            "status": "yes",
+            "note": "ISO 1101 GD&T toolbar + FCF click-to-place + 3D PMI overlay (Pmi3DOverlay); datum labels; all characteristics",
+            "evidence": "src/components/GdntToolbar.jsx"
           }
         },
         {
@@ -13213,7 +13211,7 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Live HLR projection (make2d) + auto-dim; no GD&T-placement UI",
+            "note": "Live HLR projection (make2d) + auto-dim; GD&T toolbar + FCF click-to-place (GdntToolbar.jsx)",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/make2d.py"
           }
         },
@@ -13226,9 +13224,9 @@
             "source": "https://docs.blender.org/manual/en/latest/modeling/index.html"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Data model only; no UI",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core"
+            "status": "yes",
+            "note": "ISO 1101 GD&T toolbar + FCF click-to-place + 3D PMI overlay; datum labels + all characteristics",
+            "evidence": "src/components/GdntToolbar.jsx"
           }
         },
         {
@@ -14631,9 +14629,9 @@
             "source": "https://help.autodesk.com/view/ACD/2025/ENU/?guid=GUID-GDT-OVERVIEW"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Data model only (kerf-gdnt); no UI placement on drawings",
-            "evidence": "packages/kerf-gdnt/src/kerf_gdnt/feature_control_frame.py"
+            "status": "yes",
+            "note": "ISO 1101 GD&T toolbar (DrawingToolbar) + FCF click-to-place modal + 3D PMI overlay; all characteristics; datum A/B/C",
+            "evidence": "src/components/GdntToolbar.jsx"
           }
         },
         {

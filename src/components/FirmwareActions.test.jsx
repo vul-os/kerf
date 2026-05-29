@@ -6,7 +6,7 @@
  * of the rendered HTML, not interactive state changes.
  *
  * Key assertions:
- *   - 3 buttons are rendered (Build, Upload, Monitor)
+ *   - 4 buttons are rendered (Build, Local CLI, Via Worker, Monitor)
  *   - data-testid="firmware-actions" wrapper is present
  *   - "Firmware" header label is present
  *   - Button labels match expected text
@@ -36,10 +36,10 @@ describe('FirmwareActions — structure', () => {
     expect(html).toContain('data-testid="firmware-actions"')
   })
 
-  it('renders exactly 3 buttons', () => {
+  it('renders exactly 4 buttons', () => {
     const html = render()
     const matches = html.match(/<button\b/g) || []
-    expect(matches.length).toBe(3)
+    expect(matches.length).toBe(4)
   })
 
   it('renders a Build button', () => {
@@ -47,9 +47,14 @@ describe('FirmwareActions — structure', () => {
     expect(html).toContain('Build')
   })
 
-  it('renders an Upload button', () => {
+  it('renders a Local CLI button', () => {
     const html = render()
-    expect(html).toContain('Upload')
+    expect(html).toContain('Local CLI')
+  })
+
+  it('renders a Via Worker button', () => {
+    const html = render()
+    expect(html).toContain('Via Worker')
   })
 
   it('renders a Monitor button', () => {
@@ -71,16 +76,20 @@ describe('FirmwareActions — button attributes', () => {
   it('all buttons have type="button"', () => {
     const html = render()
     const typeButton = (html.match(/type="button"/g) || []).length
-    expect(typeButton).toBe(3)
+    expect(typeButton).toBe(4)
   })
 
-  it('buttons are not disabled by default (idle state)', () => {
+  it('Via Worker button is disabled by default when no worker enrolled', () => {
     const html = render()
-    // In idle state no button should carry the disabled attribute
-    // (disabled appears only when anyLoading is true; can't trigger in SSR)
-    // We just confirm buttons render without all being disabled.
+    // "Via Worker" is disabled when hasWorker=false (default).
+    // Exactly 1 button should be disabled in the default idle state.
     const disabledCount = (html.match(/\bdisabled\b/g) || []).length
-    // Idle state: 0 disabled buttons
+    expect(disabledCount).toBe(1)
+  })
+
+  it('all action buttons are enabled when hasWorker=true and artifactKey provided', () => {
+    const html = render({ hasWorker: true, artifactKey: 'projects/abc/fw.bin', boardTarget: 'esp32' })
+    const disabledCount = (html.match(/\bdisabled\b/g) || []).length
     expect(disabledCount).toBe(0)
   })
 })
@@ -121,7 +130,8 @@ describe('FirmwareActions — result panels in idle', () => {
     expect(html).not.toContain('Build succeeded')
     expect(html).not.toContain('Build failed')
     expect(html).not.toContain('Upload failed')
-    expect(html).not.toContain('Uploaded →')
+    expect(html).not.toContain('Uploaded')
+    expect(html).not.toContain('Flash job dispatched')
     expect(html).not.toContain('Serial')
     expect(html).not.toContain('Tool not ready')
     expect(html).not.toContain('No output')

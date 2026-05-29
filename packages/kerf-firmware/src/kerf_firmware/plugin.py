@@ -213,6 +213,21 @@ def _register_tools(ctx, provides: list) -> None:
     except Exception as exc:
         logger.warning("kerf-firmware: failed to load make_usb_midi_controller tool: %s", exc)
 
+    # firmware_flash_via_worker — cloud-relay flash job dispatcher (BYO worker)
+    try:
+        from kerf_firmware.tools.firmware_flash_via_worker import (
+            firmware_flash_via_worker_spec,
+            run_firmware_flash_via_worker,
+        )
+        ctx.tools.register(
+            "firmware_flash_via_worker",
+            firmware_flash_via_worker_spec,
+            run_firmware_flash_via_worker,
+        )
+        provides.append("firmware.flash_via_worker")
+    except Exception as exc:
+        logger.warning("kerf-firmware: failed to load firmware_flash_via_worker tool: %s", exc)
+
     # make_usb_macro_keyboard — generate USB-HID macro keyboard Arduino sketch
     try:
         from kerf_firmware.tools.make_usb_macro_keyboard import make_usb_macro_keyboard as _make_macro

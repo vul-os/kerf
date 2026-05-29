@@ -20,8 +20,8 @@
  */
 
 import { useState } from 'react'
-import { Hammer, Upload, Monitor, Loader2, CheckCircle2, AlertCircle, Clock } from 'lucide-react'
-import { buildFirmware, uploadFirmware, monitorFirmware } from '../lib/firmwareBridge.js'
+import { Hammer, Upload, Monitor, Wifi, Loader2, CheckCircle2, AlertCircle, Clock } from 'lucide-react'
+import { buildFirmware, uploadFirmware, monitorFirmware, flashViaWorker } from '../lib/firmwareBridge.js'
 
 // ── constants ─────────────────────────────────────────────────────────────────
 
@@ -113,6 +113,12 @@ function ResultPanel({ action, result }) {
             Uploaded{port ? ` → ${port}` : ''}
           </p>
         )}
+        {action === 'worker_flash' && (
+          <p className="font-medium">
+            Flash job dispatched to worker
+            {result?.job_id ? ` — job ${result.job_id.slice(0, 8)}…` : ''}
+          </p>
+        )}
         {action === 'monitor' && (
           <>
             <p className="font-medium">
@@ -145,24 +151,49 @@ function ResultPanel({ action, result }) {
 /**
  * FirmwareActions
  *
- * @param {{ sourcePath: string, fwConfig?: object|null, onResult?: function }} props
+ * @param {{
+ *   sourcePath: string,
+ *   fwConfig?: object|null,
+ *   onResult?: function,
+ *   projectId?: string|null,
+ *   artifactKey?: string|null,
+ *   boardTarget?: string|null,
+ *   hasWorker?: boolean,
+ * }} props
+ *
+ * hasWorker: true when the user has at least one enrolled BYO worker with
+ *   capabilities.firmware_flash=true.  When true the "Via Worker" button is
+ *   enabled alongside the local "Upload" button.
  */
-export default function FirmwareActions({ sourcePath, fwConfig = null, onResult = null }) {
-  const [buildState,   setBuildState]   = useState(ACTION_IDLE)
-  const [uploadState,  setUploadState]  = useState(ACTION_IDLE)
-  const [monitorState, setMonitorState] = useState(ACTION_IDLE)
+export default function FirmwareActions({
+  sourcePath,
+  fwConfig = null,
+  onResult = null,
+  projectId = null,
+  artifactKey = null,
+  boardTarget = null,
+  hasWorker = false,
+}) {
+  const [buildState,        setBuildState]        = useState(ACTION_IDLE)
+  const [uploadState,       setUploadState]       = useState(ACTION_IDLE)
+  const [monitorState,      setMonitorState]      = useState(ACTION_IDLE)
+  const [workerFlashState,  setWorkerFlashState]  = useState(ACTION_IDLE)
 
-  const [buildResult,   setBuildResult]   = useState(null)
-  const [uploadResult,  setUploadResult]  = useState(null)
-  const [monitorResult, setMonitorResult] = useState(null)
+  const [buildResult,       setBuildResult]       = useState(null)
+  const [uploadResult,      setUploadResult]      = useState(null)
+  const [monitorResult,     setMonitorResult]     = useState(null)
+  const [workerFlashResult, setWorkerFlashResult] = useState(null)
 
   // The hex artifact from the most recent successful build — passed to upload.
-  const [lastHexPath, setLastHexPath] = useState(null)
+  const [lastHexPath,     setLastHexPath]     = useState(null)
+  // Effective artifact key: explicit prop or derived from build result.
+  const [lastArtifactKey, setLastArtifactKey] = useState(artifactKey || null)
 
   const anyLoading = (
-    buildState === ACTION_LOADING ||
-    uploadState === ACTION_LOADING ||
-    monitorState === ACTION_LOADING
+    buildState        === ACTION_LOADING ||
+    uploadState       === ACTION_LOADING ||
+    monitorState      === ACTION_LOADING ||
+    workerFlashState  === ACTION_LOADING
   )
 
   // ── handlers ────────────────────────────────────────────────────────────────
@@ -175,6 +206,8 @@ export default function FirmwareActions({ sourcePath, fwConfig = null, onResult 
     setBuildResult(result)
     if (result.ok && result.hex_path) {
       setLastHexPath(result.hex_path)
+      // Derive a storage key from the hex path for the Via Worker path.
+      setLastArtifactKey(result.artifact_key || result.hex_path || null)
     }
     onResult?.('build', result)
   }
@@ -197,6 +230,30 @@ export default function FirmwareActions({ sourcePath, fwConfig = null, onResult 
     setMonitorResult(result)
     onResult?.('monitor', result)
   }
+
+  async function handleWorkerFlash() {
+    setWorkerFlashState(ACTION_LOADING)
+    setWorkerFlashResult(null)
+
+    const effectiveProjectId  = projectId  || fwConfig?.project_id  || ''
+    const effectiveArtifactKey = lastArtifactKey || artifactKey || ''
+    const effectiveBoardTarget = boardTarget || fwConfig?.board?.target || fwConfig?.board?.fqbn || ''
+
+    const result = await flashViaWorker(
+      effectiveProjectId,
+      effectiveArtifactKey,
+      effectiveBoardTarget,
+    )
+    setWorkerFlashState(result.ok ? ACTION_SUCCESS : ACTION_ERROR)
+    setWorkerFlashResult(result)
+    onResult?.('worker_flash', result)
+  }
+
+  // Via Worker button is enabled when the user has an enrolled worker and we
+  // have either an explicit artifactKey prop or one from a completed build.
+  const workerFlashEnabled = hasWorker && (
+    !!(artifactKey || lastArtifactKey)
+  )
 
   // ── render ──────────────────────────────────────────────────────────────────
 
@@ -227,12 +284,23 @@ export default function FirmwareActions({ sourcePath, fwConfig = null, onResult 
         <div className="flex items-center gap-1">
           <ActionButton
             icon={Upload}
-            label="Upload"
+            label="Local CLI"
             onClick={handleUpload}
             disabled={anyLoading}
             status={uploadState}
           />
           <StatusBadge status={uploadState} />
+        </div>
+
+        <div className="flex items-center gap-1">
+          <ActionButton
+            icon={Wifi}
+            label="Via Worker"
+            onClick={handleWorkerFlash}
+            disabled={anyLoading || !workerFlashEnabled}
+            status={workerFlashState}
+          />
+          <StatusBadge status={workerFlashState} />
         </div>
 
         <div className="flex items-center gap-1">
@@ -247,10 +315,18 @@ export default function FirmwareActions({ sourcePath, fwConfig = null, onResult 
         </div>
       </div>
 
+      {/* Via Worker availability hint */}
+      {!hasWorker && (
+        <p className="text-[11px] text-ink-500 italic">
+          Enroll a kerf-worker on your workshop machine to enable cloud flash.
+        </p>
+      )}
+
       {/* Result panels — only the most recent action's result is shown */}
-      <ResultPanel action="build"   result={buildResult} />
-      <ResultPanel action="upload"  result={uploadResult} />
-      <ResultPanel action="monitor" result={monitorResult} />
+      <ResultPanel action="build"        result={buildResult} />
+      <ResultPanel action="upload"       result={uploadResult} />
+      <ResultPanel action="worker_flash" result={workerFlashResult} />
+      <ResultPanel action="monitor"      result={monitorResult} />
     </div>
   )
 }

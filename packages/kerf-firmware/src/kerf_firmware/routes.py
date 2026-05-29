@@ -32,7 +32,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from kerf_core.dependencies import require_auth
 
@@ -338,6 +338,126 @@ async def firmware_ota_check_route(
         "manifest": None,
         "download_path": None,
         "message": "OTA release store empty — publish a release via POST /firmware/ota/release first.",
+    }
+
+
+# ── cloud-relay flash via BYO worker ─────────────────────────────────────────
+
+@router.post("/firmware/flash-via-worker")
+async def firmware_flash_via_worker_route(
+    req: dict,
+    request: Request,
+    _auth: dict = Depends(require_auth),
+) -> dict:
+    """
+    Dispatch a firmware flash job to a BYO worker.
+
+    The worker machine (with USB-attached board) claims the job, downloads the
+    artifact, runs the appropriate flash tool, and uploads the log.  No credits
+    are consumed (billing_bucket='byo').
+
+    Body
+    ----
+    ``project_id``           : str — UUID of the firmware project
+    ``firmware_artifact_key``: str — storage key of the compiled binary
+    ``board_target``         : str — board family ('esp32', 'avr_uno', 'stm32f4', …)
+
+    Returns
+    -------
+    ``ok``             : bool
+    ``job_id``         : str | None
+    ``status``         : "queued" | "error"
+    ``billing_bucket`` : "byo"
+    ``flash_tool``     : str — selected flash tool name
+    """
+    from kerf_firmware.tools.firmware_flash_via_worker import (
+        run_firmware_flash_via_worker,
+        firmware_flash_via_worker_spec,  # noqa: F401 — imported for side-effects
+    )
+    import json as _json
+
+    project_id = req.get("project_id", "")
+    artifact_key = req.get("firmware_artifact_key", "")
+    board_target = req.get("board_target", "")
+
+    if not project_id or not artifact_key or not board_target:
+        return {
+            "ok": False,
+            "error": "BAD_ARGS",
+            "message": "'project_id', 'firmware_artifact_key', and 'board_target' are required",
+        }
+
+    # Build a minimal ctx that carries pool + user_id
+    pool = getattr(request.app.state, "pool", None)
+    user_id = (_auth or {}).get("sub")
+
+    class _Ctx:
+        pass
+
+    ctx = _Ctx()
+    ctx.pool = pool
+    ctx.user_id = user_id
+
+    args = _json.dumps({
+        "project_id": project_id,
+        "firmware_artifact_key": artifact_key,
+        "board_target": board_target,
+    }).encode()
+
+    raw = await run_firmware_flash_via_worker(ctx, args)
+    return _json.loads(raw)
+
+
+@router.get("/firmware/flash-job/{job_id}")
+async def firmware_flash_job_status_route(
+    job_id: str,
+    request: Request,
+    _auth: dict = Depends(require_auth),
+) -> dict:
+    """
+    Poll the status of a firmware flash job.
+
+    Returns the ``firmware_flash_jobs`` row normalised to::
+
+        {
+            "job_id":       str,
+            "status":       "queued" | "running" | "done" | "error" | "cancelled",
+            "board_target": str,
+            "flash_tool":   str | null,
+            "log_key":      str | null,
+            "error":        str | null,
+            "created_at":   str,
+            "updated_at":   str,
+        }
+    """
+    pool = getattr(request.app.state, "pool", None)
+    if pool is None:
+        return {"ok": False, "error": "no_pool",
+                "detail": "DB pool not configured on this instance."}
+
+    row = await pool.fetchrow(
+        """
+        SELECT id, project_id, user_id, artifact_key, board_target, status,
+               log_key, error, created_at, updated_at
+        FROM firmware_flash_jobs
+        WHERE id = $1
+        """,
+        job_id,
+    )
+    if row is None:
+        return {"ok": False, "error": "not_found", "job_id": job_id}
+
+    from kerf_firmware.tools.firmware_flash_via_worker import _flash_tool_for
+    return {
+        "ok": True,
+        "job_id": str(row["id"]),
+        "status": row["status"],
+        "board_target": row["board_target"],
+        "flash_tool": _flash_tool_for(row["board_target"]),
+        "log_key": row["log_key"],
+        "error": row["error"],
+        "created_at": str(row["created_at"]),
+        "updated_at": str(row["updated_at"]),
     }
 
 

@@ -139,3 +139,56 @@ export async function monitorFirmware(fwConfig = null, port = null, baud = 9600)
     baud,
   })
 }
+
+/**
+ * Dispatch a firmware flash job to a registered BYO worker.
+ *
+ * The worker machine (with USB-attached board) claims the job, downloads
+ * the artifact, runs esptool/avrdude/openocd, and uploads the log.
+ * No credits are consumed — billing_bucket='byo'.
+ *
+ * @param {string} projectId          - UUID of the firmware project
+ * @param {string} firmwareArtifactKey - storage key of the compiled binary
+ * @param {string} boardTarget        - board family ('esp32', 'avr_uno', …)
+ * @returns {Promise<{
+ *   ok: boolean,
+ *   job_id: string|null,
+ *   status: "queued"|"error",
+ *   billing_bucket: "byo",
+ *   flash_tool: string,
+ *   errors: string[],
+ * }>}
+ */
+export async function flashViaWorker(projectId, firmwareArtifactKey, boardTarget) {
+  const url = `${API_URL}/api/firmware/flash-via-worker`
+  let res = null
+  let body = null
+
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        project_id: projectId,
+        firmware_artifact_key: firmwareArtifactKey,
+        board_target: boardTarget,
+      }),
+    })
+  } catch (err) {
+    return normalise(null, null, `Network error: ${err.message || err}`)
+  }
+
+  try {
+    body = await res.json()
+  } catch {
+    return normalise(res, null, 'Failed to parse response from /api/firmware/flash-via-worker')
+  }
+
+  // Normalise: treat ok=true + status='queued' as success shape.
+  return {
+    ...normalise(res, body),
+    job_id:         body?.job_id  || null,
+    billing_bucket: body?.billing_bucket || 'byo',
+    flash_tool:     body?.flash_tool || '',
+  }
+}

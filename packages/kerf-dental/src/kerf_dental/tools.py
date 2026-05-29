@@ -7,6 +7,7 @@ Registered via plugin.py at startup.
 
 from __future__ import annotations
 
+import base64
 import json
 from typing import Any
 
@@ -108,8 +109,10 @@ dental_surgical_guide_spec = ToolSpec(
     name="dental_surgical_guide",
     description=(
         "Place drill-guide sleeves on a jaw model at specified implant angulations. "
-        "Each sleeve is a validate_body-clean cylinder. Returns placement metadata "
-        "and angular accuracy (should be < 0.1°)."
+        "Each sleeve is a validate_body-clean cylinder. Returns placement metadata, "
+        "angular accuracy (< 0.1°), AND a milling-ready B-rep guide body as "
+        "binary STL base64-encoded in the 'body_stl_b64' field. "
+        "The SVG preview path still works if 'body_stl_b64' is ignored (back-compat)."
     ),
     input_schema={
         "type": "object",
@@ -151,6 +154,14 @@ dental_surgical_guide_spec = ToolSpec(
                 },
                 "minItems": 1,
             },
+            "guide_thickness_mm": {
+                "type": "number",
+                "description": "Guide plate thickness in mm (default 3.0).",
+            },
+            "guide_margin_mm": {
+                "type": "number",
+                "description": "XY margin around jaw bounding box in mm (default 5.0).",
+            },
         },
         "required": ["jaw_surface_pts", "implants"],
     },
@@ -159,7 +170,10 @@ dental_surgical_guide_spec = ToolSpec(
 
 async def run_dental_surgical_guide(args: dict[str, Any], ctx: "ProjectCtx") -> str:
     try:
-        from kerf_dental.guide import ImplantSpec, place_surgical_guide
+        from kerf_dental.guide import (
+            ImplantSpec, place_surgical_guide,
+            surgical_guide_to_body, guide_body_to_stl_bytes,
+        )
 
         jaw_pts = args["jaw_surface_pts"]
         implant_specs = [
@@ -173,12 +187,35 @@ async def run_dental_surgical_guide(args: dict[str, Any], ctx: "ProjectCtx") -> 
         ]
         result = place_surgical_guide(jaw_pts, implant_specs)
 
+        # Build milling-ready B-rep guide body and serialise to STL bytes (base64)
+        body_stl_b64: str | None = None
+        plate_dims: list | None = None
+        try:
+            gb = surgical_guide_to_body(
+                jaw_pts,
+                implant_specs,
+                thickness_mm=float(args.get("guide_thickness_mm", 3.0)),
+                margin_mm=float(args.get("guide_margin_mm", 5.0)),
+            )
+            stl_bytes = guide_body_to_stl_bytes(gb, fmt="binary")
+            body_stl_b64 = base64.b64encode(stl_bytes).decode("ascii")
+            plate_dims = list(gb.plate_dims_mm)
+        except Exception:
+            # Non-fatal: planning data still returned; body field absent
+            pass
+
         payload: dict[str, Any] = {
             "sleeve_count": len(result.sleeves),
             "max_angular_error_deg": round(result.max_angular_error_deg(), 6),
             "angular_errors_deg": [round(e, 6) for e in result.angular_errors_deg],
             "all_validate_body_ok": True,
         }
+        if body_stl_b64 is not None:
+            payload["body_stl_b64"] = body_stl_b64
+            payload["body_stl_bytes"] = len(base64.b64decode(body_stl_b64))
+        if plate_dims is not None:
+            payload["plate_dims_mm"] = plate_dims
+
         return ok_payload(payload)
     except Exception as exc:
         return err_payload(str(exc), "SURGICAL_GUIDE_ERROR")

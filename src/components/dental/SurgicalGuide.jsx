@@ -1,19 +1,161 @@
 /**
  * SurgicalGuide — CBCT scan import + implant pose editor + drill sleeve setup
- * + final guide preview.
+ * + final guide preview with milling-ready B-rep body rendering + STL export.
  *
  * Uses the existing point-cloud importer pattern (file input → parse as JSON
  * or CSV xyz, builds jaw_surface_pts array). Dispatches `dental_surgical_guide`
  * via POST /api/tools/call.
  *
  * Backend tool: packages/kerf-dental/src/kerf_dental/tools.py → dental_surgical_guide
+ *
+ * Wave 4D caveat closed: backend now emits `body_stl_b64` (binary STL base64)
+ * alongside the planning data.  This component renders the B-rep in a Three.js
+ * viewport and provides an "Export STL" button.
  */
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../../store/auth.js'
 import { buildSurgicalGuidePayload } from './dentalDispatch.js'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
+
+// ---------------------------------------------------------------------------
+// STL export helper — decodes base64 binary STL and triggers a download
+// ---------------------------------------------------------------------------
+function exportStlFromB64(b64, filename = 'surgical_guide.stl') {
+  const binary = atob(b64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  const blob = new Blob([bytes], { type: 'model/stl' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+// ---------------------------------------------------------------------------
+// Three.js B-rep viewport — renders the guide body STL in a canvas
+// ---------------------------------------------------------------------------
+function GuideBrepViewport({ stlB64 }) {
+  const canvasRef = useRef(null)
+  const rendererRef = useRef(null)
+  const animRef = useRef(null)
+
+  useEffect(() => {
+    if (!stlB64 || !canvasRef.current) return
+
+    let three, scene, camera, renderer, mesh, animId
+
+    async function init() {
+      try {
+        three = await import('three')
+        const { STLLoader } = await import('three/examples/jsm/loaders/STLLoader.js')
+
+        const canvas = canvasRef.current
+        renderer = new three.WebGLRenderer({ canvas, antialias: true, alpha: true })
+        renderer.setSize(320, 180)
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+        rendererRef.current = renderer
+
+        scene = new three.Scene()
+        camera = new three.PerspectiveCamera(45, 320 / 180, 0.1, 1000)
+
+        // Decode base64 STL
+        const binary = atob(stlB64)
+        const buf = new ArrayBuffer(binary.length)
+        const view = new Uint8Array(buf)
+        for (let i = 0; i < binary.length; i++) view[i] = binary.charCodeAt(i)
+
+        const loader = new STLLoader()
+        const geometry = loader.parse(buf)
+        geometry.computeBoundingBox()
+        geometry.computeVertexNormals()
+
+        const box = geometry.boundingBox
+        const center = new three.Vector3()
+        box.getCenter(center)
+        geometry.translate(-center.x, -center.y, -center.z)
+
+        const size = new three.Vector3()
+        box.getSize(size)
+        const maxDim = Math.max(size.x, size.y, size.z)
+
+        const material = new three.MeshPhongMaterial({
+          color: 0x38bdf8,
+          specular: 0x1e3a5f,
+          shininess: 40,
+          transparent: true,
+          opacity: 0.85,
+          side: three.DoubleSide,
+        })
+        mesh = new three.Mesh(geometry, material)
+        scene.add(mesh)
+
+        // Lights
+        scene.add(new three.AmbientLight(0xffffff, 0.5))
+        const dirLight = new three.DirectionalLight(0xffffff, 1.0)
+        dirLight.position.set(1, 2, 3)
+        scene.add(dirLight)
+
+        camera.position.set(0, -maxDim * 1.5, maxDim * 1.2)
+        camera.lookAt(0, 0, 0)
+
+        // Simple orbit on mouse drag
+        let isDragging = false, lastX = 0, lastY = 0, rotX = 0, rotY = 0
+        canvas.addEventListener('mousedown', (e) => { isDragging = true; lastX = e.clientX; lastY = e.clientY })
+        canvas.addEventListener('mousemove', (e) => {
+          if (!isDragging) return
+          rotY += (e.clientX - lastX) * 0.01
+          rotX += (e.clientY - lastY) * 0.01
+          lastX = e.clientX; lastY = e.clientY
+        })
+        canvas.addEventListener('mouseup', () => { isDragging = false })
+        canvas.addEventListener('mouseleave', () => { isDragging = false })
+
+        function animate() {
+          animId = requestAnimationFrame(animate)
+          if (!isDragging) rotY += 0.005
+          mesh.rotation.x = rotX
+          mesh.rotation.y = rotY
+          renderer.render(scene, camera)
+        }
+        animate()
+        animRef.current = () => cancelAnimationFrame(animId)
+      } catch {
+        // Three.js not available — silently degrade to SVG preview
+      }
+    }
+
+    init()
+
+    return () => {
+      animRef.current?.()
+      rendererRef.current?.dispose()
+    }
+  }, [stlB64])
+
+  if (!stlB64) return null
+
+  return (
+    <div className="relative rounded overflow-hidden border border-sky-700/40 bg-ink-950">
+      <canvas
+        ref={canvasRef}
+        width={320}
+        height={180}
+        aria-label="3D viewport — milling-ready surgical guide B-rep"
+        className="block w-full"
+        style={{ cursor: 'grab' }}
+      />
+      <div className="absolute top-1.5 left-2 text-[8px] font-mono text-sky-500/70 tracking-widest">
+        B-REP · MILLING-READY
+      </div>
+    </div>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // SVG guide preview — draws jaw surface points + implant cylinders + sleeves
@@ -46,7 +188,7 @@ function GuidePreview({ jawPts, implants, result }) {
       width={W}
       height={H}
       viewBox={`0 0 ${W} ${H}`}
-      aria-label="Surgical guide preview"
+      aria-label="Surgical guide occlusal SVG preview"
       className="rounded border border-ink-700 bg-ink-950"
     >
       {/* Jaw surface polygon */}
@@ -61,7 +203,6 @@ function GuidePreview({ jawPts, implants, result }) {
         const placed = result && i < result.sleeve_count
         return (
           <g key={i}>
-            {/* Implant body */}
             <line
               x1={cx} y1={cy}
               x2={cx + imp.axis_direction[0] * len}
@@ -71,7 +212,6 @@ function GuidePreview({ jawPts, implants, result }) {
               strokeLinecap="round"
               opacity="0.7"
             />
-            {/* Sleeve ring */}
             <circle
               cx={cx}
               cy={cy}
@@ -81,7 +221,6 @@ function GuidePreview({ jawPts, implants, result }) {
               strokeWidth="1.5"
               opacity="0.8"
             />
-            {/* Label */}
             <text x={cx + r + 4} y={cy + 4} fontSize="9" fill="#94a3b8" fontFamily="monospace">
               I{i + 1}
             </text>
@@ -95,6 +234,11 @@ function GuidePreview({ jawPts, implants, result }) {
         <text x="6" y={H - 6} fontSize="8" fill="#22c55e" fontFamily="monospace">
           {result.sleeve_count} sleeve{result.sleeve_count !== 1 ? 's' : ''} placed
           {' · '}max err {result.max_angular_error_deg?.toFixed(4)}°
+        </text>
+      )}
+      {result?.body_stl_b64 && (
+        <text x="6" y={H - 16} fontSize="8" fill="#38bdf8" fontFamily="monospace">
+          B-rep: {result.body_stl_bytes} bytes STL
         </text>
       )}
     </svg>
@@ -153,7 +297,7 @@ function ImplantPoseRow({ index, implant, onChange, onRemove }) {
       </div>
       <div className="flex items-center gap-3">
         <label className="flex items-center gap-1 text-ink-400">
-          ⌀
+          &#8960;
           <input
             type="number"
             min="2"
@@ -185,7 +329,6 @@ function ImplantPoseRow({ index, implant, onChange, onRemove }) {
 
 // ---------------------------------------------------------------------------
 // Parse point cloud from .csv or .json string
-// Accepts: CSV (x,y,z per line) or JSON array [[x,y,z],...] / [{x,y,z},...]
 // ---------------------------------------------------------------------------
 function parsePointCloud(text) {
   text = text.trim()
@@ -197,7 +340,6 @@ function parsePointCloud(text) {
       return [Number(row.x || row[0] || 0), Number(row.y || row[1] || 0), Number(row.z || row[2] || 0)]
     })
   }
-  // CSV
   return text
     .split('\n')
     .filter(Boolean)
@@ -304,6 +446,12 @@ export default function SurgicalGuide({ projectId }) {
     }
   }
 
+  // ---- export STL ----
+  function handleExportStl() {
+    if (!result?.body_stl_b64) return
+    exportStlFromB64(result.body_stl_b64, `surgical_guide_${implants.length}imp.stl`)
+  }
+
   return (
     <div className="flex flex-col gap-4 p-4 text-ink-100" data-testid="surgical-guide-panel">
       <div className="flex items-center gap-2">
@@ -338,13 +486,23 @@ export default function SurgicalGuide({ projectId }) {
           <p className="mt-1 text-[10px] text-red-400 font-mono">{jawError}</p>
         )}
         <p className="mt-1 text-[10px] text-ink-600">
-          Accepts .csv (x,y,z per line) or .json ([[x,y,z],…]). Demo jaw loaded by default.
+          Accepts .csv (x,y,z per line) or .json ([[x,y,z],...]). Demo jaw loaded by default.
         </p>
       </div>
 
-      {/* Guide preview */}
+      {/* B-rep 3D viewport (shown after generation) */}
+      {result?.body_stl_b64 && (
+        <div>
+          <label className="block text-[11px] text-ink-400 mb-1.5">B-rep guide body (Three.js)</label>
+          <GuideBrepViewport stlB64={result.body_stl_b64} />
+        </div>
+      )}
+
+      {/* SVG guide preview (always shown) */}
       <div>
-        <label className="block text-[11px] text-ink-400 mb-1.5">Guide preview</label>
+        <label className="block text-[11px] text-ink-400 mb-1.5">
+          {result?.body_stl_b64 ? 'Occlusal SVG preview' : 'Guide preview'}
+        </label>
         <GuidePreview jawPts={jawPts} implants={implants} result={result} />
       </div>
 
@@ -376,22 +534,36 @@ export default function SurgicalGuide({ projectId }) {
         </div>
       </div>
 
-      {/* Run button */}
-      <button
-        type="button"
-        onClick={handleRun}
-        disabled={running || implants.length === 0}
-        className="flex items-center justify-center gap-2 px-4 py-2 rounded bg-sky-500/20 border border-sky-400/50 text-sky-200 text-xs font-medium hover:bg-sky-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-      >
-        {running ? (
-          <>
-            <span className="w-3 h-3 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
-            Generating guide…
-          </>
-        ) : (
-          'Generate surgical guide'
+      {/* Action buttons */}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={handleRun}
+          disabled={running || implants.length === 0}
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded bg-sky-500/20 border border-sky-400/50 text-sky-200 text-xs font-medium hover:bg-sky-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {running ? (
+            <>
+              <span className="w-3 h-3 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
+              Generating guide…
+            </>
+          ) : (
+            'Generate surgical guide'
+          )}
+        </button>
+
+        {result?.body_stl_b64 && (
+          <button
+            type="button"
+            onClick={handleExportStl}
+            data-testid="export-stl-button"
+            className="px-3 py-2 rounded bg-emerald-500/20 border border-emerald-400/50 text-emerald-200 text-xs font-medium hover:bg-emerald-500/30 transition-colors whitespace-nowrap"
+            aria-label="Export surgical guide as STL"
+          >
+            Export STL
+          </button>
         )}
-      </button>
+      </div>
 
       {/* Result */}
       {result && (
@@ -404,7 +576,7 @@ export default function SurgicalGuide({ projectId }) {
             <div>sleeves: <span className="text-sky-200">{result.sleeve_count}</span></div>
           )}
           {result.max_angular_error_deg != null && (
-            <div>max angular error: <span className="text-sky-200">{result.max_angular_error_deg}°</span></div>
+            <div>max angular error: <span className="text-sky-200">{result.max_angular_error_deg}&#176;</span></div>
           )}
           {Array.isArray(result.angular_errors_deg) && (
             <div>
@@ -416,6 +588,16 @@ export default function SurgicalGuide({ projectId }) {
           )}
           {result.all_validate_body_ok && (
             <div className="text-sky-400">validate_body: OK</div>
+          )}
+          {result.body_stl_b64 && (
+            <div className="text-emerald-400">
+              B-rep body: {result.body_stl_bytes} bytes STL
+              {result.plate_dims_mm && (
+                <span className="text-emerald-300 ml-1">
+                  · plate {result.plate_dims_mm.map((v) => v.toFixed(1)).join('×')} mm
+                </span>
+              )}
+            </div>
           )}
         </div>
       )}

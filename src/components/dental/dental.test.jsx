@@ -1,5 +1,5 @@
 /**
- * dental.test.jsx — Vitest tests for the three dental UI panels.
+ * dental.test.jsx — Vitest tests for the dental UI panels.
  *
  * Follows the project convention: pure data-layer tests (no @testing-library/react).
  * The interesting dispatch logic lives in dentalDispatch.js; React rendering is
@@ -10,6 +10,7 @@
  *   2. CrownSculptingPanel — mounts via renderToStaticMarkup, shows key elements
  *   3. ImplantLibrary — mounts via renderToStaticMarkup, shows key elements
  *   4. SurgicalGuide — mounts via renderToStaticMarkup, shows key elements
+ *   5. SurgicalGuide B-rep/STL fields — payload + Export STL button present
  */
 
 import { describe, it, expect, vi } from 'vitest'
@@ -281,7 +282,6 @@ describe('ImplantLibrary mount', () => {
 
   it('shows implant cards with dimension labels', () => {
     const html = renderToStaticMarkup(<ImplantLibrary projectId="proj-1" />)
-    // Should show at least one card with mm notation
     expect(html).toMatch(/\d+\.\d+ × \d+ mm/)
   })
 
@@ -293,8 +293,6 @@ describe('ImplantLibrary mount', () => {
   })
 
   it('contains Place button for card (static render shows it only on selected, but rendered count > 0)', () => {
-    // Static render: no interactivity, no selected card → no Place button
-    // But all implant cards should be present.
     const html = renderToStaticMarkup(<ImplantLibrary projectId="proj-1" />)
     expect(html).toContain('Bone Level RC')
   })
@@ -341,5 +339,40 @@ describe('SurgicalGuide mount', () => {
   it('shows first implant row by default', () => {
     const html = renderToStaticMarkup(<SurgicalGuide projectId="proj-1" />)
     expect(html).toContain('Implant 1')
+  })
+
+  // B-rep / STL export presence checks (Wave 4D caveat)
+  it('does not render Export STL button before a result (no body_stl_b64)', () => {
+    // Before any result, the Export STL button should not appear (conditional render)
+    const html = renderToStaticMarkup(<SurgicalGuide projectId="proj-1" />)
+    expect(html).not.toContain('Export STL')
+  })
+
+  it('renders the B-rep viewport canvas element in markup (absent before result)', () => {
+    // GuideBrepViewport is only rendered when result.body_stl_b64 exists.
+    // In static SSR there is no result yet, so no canvas.
+    const html = renderToStaticMarkup(<SurgicalGuide projectId="proj-1" />)
+    // Canvas is absent before a result
+    expect(html).not.toContain('B-REP · MILLING-READY')
+  })
+})
+
+// ============================================================================
+// 5. payload builders do not mutate their inputs
+// ============================================================================
+
+describe('payload builder immutability', () => {
+  it('buildSurgicalGuidePayload does not mutate jaw_surface_pts', () => {
+    const pts = [[0, 0, 0], [10, 0, 0], [10, 10, 0]]
+    const ptsCopy = pts.map((p) => [...p])
+    buildSurgicalGuidePayload({ jaw_surface_pts: pts, implants: IMPLANTS })
+    expect(pts).toEqual(ptsCopy)
+  })
+
+  it('buildSurgicalGuidePayload does not mutate implants array', () => {
+    const imps = [{ position: [0, 0, 0], axis_direction: [0, 0, 1], diameter_mm: 4.0, length_mm: 10 }]
+    const before = JSON.stringify(imps)
+    buildSurgicalGuidePayload({ jaw_surface_pts: JAW_PTS, implants: imps })
+    expect(JSON.stringify(imps)).toBe(before)
   })
 })

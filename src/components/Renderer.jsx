@@ -2178,6 +2178,9 @@ function ClassAPanel({ loading, report, onClose }) {
           {edges.filter((e) => e.G3_ok).length} G3-pass
           {' · '}
           {edges.filter((e) => !e.G0_ok).length} below-G0
+        </div>
+      )}
+
       {/* LOD debug HUD — shown when the user enables "LOD HUD" in the Render
           dropdown and an assembly is loaded. Displays part tier counts + last
           query latency so the dev can verify the LOD pass is firing. */}

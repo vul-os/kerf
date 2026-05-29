@@ -653,6 +653,8 @@ function isCivilLandscapeFile(file) {
   if (file.kind === 'civil_landscape') return true
   const n = (file.name || '').toLowerCase()
   return n.endsWith('.landscape') || n.endsWith('.civil_landscape')
+}
+
 function isLayupFile(file) {
   if (!file) return false
   if (file.kind === 'layup') return true
@@ -672,6 +674,8 @@ function isFiberMapFile(file) {
   if (file.kind === 'fiber_map') return true
   const n = (file.name || '').toLowerCase()
   return n.endsWith('.fiber_map')
+}
+
 // Dental file kinds: .dental.crown, .dental.implant, .dental.guide
 function isDentalCrownFile(file) {
   if (!file) return false
@@ -2150,6 +2154,7 @@ export default function Editor() {
           ) : fiberMapFile ? (
             <div className="flex-1 min-h-0 overflow-hidden">
               <FiberOrientationContour file={w.currentFile} projectId={projectId} />
+            </div>
           ) : dentalCrownFile ? (
             <div className="flex-1 min-h-0 overflow-y-auto">
               <CrownSculptingPanel projectId={projectId} />

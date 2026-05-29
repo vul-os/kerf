@@ -208,6 +208,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.jewelry.enamel",
     "kerf_cad_core.simple_parametric.tools",
     "kerf_cad_core.spc.tools",
+    # GK-P-B: Stam exact limit-position + limit-tangent evaluation (subd_eval_limit tool)
+    "kerf_cad_core.geom.subd_stam",
     # GK-P45: SubD/mesh authoring ops (subd_poke, subd_extrude_along, sculpt_brush, multires_evaluate)
     "kerf_cad_core.subd_tools",
     # GK-P46: mesh/implicit ops (sdf_csg, uv_unwrap, isotropic_remesh, retopo_snap)

@@ -147,7 +147,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 
 **GK-P (parity) series in flight.** A four-agent survey of Kerf vs ~18 kernel-relevant CADs found a concrete, finite gap list. GK-01..GK-139 are landed. The `GK-P` series (tracked in `tasks.md`) closes the remaining gaps:
 
-- **Foundational kernel** — general solid boolean for NURBS-faced bodies, MatchSrf G3, isophote/EMap, Stam limit-tangents + G1 at extraordinary SubD points, fractional creases, analytic surface derivatives.
+- **Foundational kernel** — general solid boolean for NURBS-faced bodies, MatchSrf G3, isophote/EMap, Stam limit-tangents ✅ + G1 at extraordinary SubD points, fractional creases, analytic surface derivatives.
 - **Construction verbs** — loft guide-rails, sheet-metal hem/jog/multi-flange, direct-edit non-planar + delete-face, weldment gussets/end-treatments, surface patch-from-points.
 - **SubD / mesh** — multires displacement, SDF CSG + marching-cubes, sculpt brush engine, isotropic remesh, surface-snap retopo, LSCM UV unwrap.
 - **Architectural geometry** — B-rep→2D tessellate, roof/curtain-wall/corridor generators, wall compound-layer offset, hatch/section-fill.
@@ -326,7 +326,7 @@ These are roadmap-level moats that span every sector simultaneously and compound
 
 ### Multi-month epics
 
-- **GK-P foundational kernel** — general solid boolean for NURBS-faced bodies; Stam limit-tangents + G1 at extraordinary SubD points; fractional creases; MatchSrf G3; analytic surface derivatives.
+- **GK-P foundational kernel** — general solid boolean for NURBS-faced bodies; Stam limit-tangents ✅ + G1 at extraordinary SubD points; fractional creases; MatchSrf G3; analytic surface derivatives.
 - **GK-P construction verbs** — loft guide-rails; sheet-metal hem/jog/multi-flange; direct-edit delete-face + non-planar push-pull; weldment gussets/end-treatments; surface patch-from-points.
 - **GK-P SubD / mesh** — multires displacement; SDF CSG + marching-cubes; sculpt brush engine; LSCM UV unwrap (module exists, wiring incomplete).
 - **GK-P architectural geometry** — B-rep→2D tessellate; roof/curtain-wall/corridor generators; wall compound-layer offset; hatch/section-fill.

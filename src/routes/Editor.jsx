@@ -66,6 +66,10 @@ import BIMView from '../components/BIMView.jsx'
 import AirfoilPolarPlot from '../components/AirfoilPolarPlot.jsx'
 import OrbitViewer from '../components/OrbitViewer.jsx'
 import { fetchAirfoilPolar } from '../lib/airfoilPolarBridge.js'
+import TINView from '../components/civil/TINView.jsx'
+import PipeNetworkView from '../components/civil/PipeNetworkView.jsx'
+import GradingPlanView from '../components/civil/GradingPlanView.jsx'
+import LandscapeView from '../components/civil/LandscapeView.jsx'
 
 // ---------------------------------------------------------------------------
 // Build3DDropdown — toolbar dropdown in the sketch header that scaffolds a
@@ -614,6 +618,34 @@ function isOrbitFile(file) {
   if (file.kind === 'orbit') return true
   const n = (file.name || '').toLowerCase()
   return n.endsWith('.orbit')
+}
+
+function isCivilTINFile(file) {
+  if (!file) return false
+  if (file.kind === 'civil_tin') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.tin') || n.endsWith('.civil_tin')
+}
+
+function isCivilPipeFile(file) {
+  if (!file) return false
+  if (file.kind === 'civil_pipe') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.pipe_net') || n.endsWith('.civil_pipe')
+}
+
+function isCivilGradingFile(file) {
+  if (!file) return false
+  if (file.kind === 'civil_grading') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.grading') || n.endsWith('.civil_grading')
+}
+
+function isCivilLandscapeFile(file) {
+  if (!file) return false
+  if (file.kind === 'civil_landscape') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.landscape') || n.endsWith('.civil_landscape')
 }
 
 // ---------------------------------------------------------------------------
@@ -1305,6 +1337,10 @@ export default function Editor() {
   const bimFile = isBIMFile(w.currentFile)
   const airfoilFile = isAirfoilFile(w.currentFile)
   const orbitFile = isOrbitFile(w.currentFile)
+  const civilTINFile      = isCivilTINFile(w.currentFile)
+  const civilPipeFile     = isCivilPipeFile(w.currentFile)
+  const civilGradingFile  = isCivilGradingFile(w.currentFile)
+  const civilLandscapeFile = isCivilLandscapeFile(w.currentFile)
   // T-116: plain-text / code files — matched by extension via editorModes.js.
   // Must be checked AFTER all dedicated-extension checks above so that e.g.
   // a .json family file is not accidentally grabbed by the plain editor.
@@ -2251,6 +2287,42 @@ export default function Editor() {
                   {w.toast}
                 </div>
               )}
+            </div>
+          ) : civilTINFile ? (
+            <div className="flex-1 min-h-0 overflow-auto p-3">
+              <TINView
+                {...(w.currentFileContent
+                  ? (() => { try { return JSON.parse(w.currentFileContent) } catch { return {} } })()
+                  : {})}
+                className="w-full"
+              />
+            </div>
+          ) : civilPipeFile ? (
+            <div className="flex-1 min-h-0 overflow-auto p-3">
+              <PipeNetworkView
+                {...(w.currentFileContent
+                  ? (() => { try { return JSON.parse(w.currentFileContent) } catch { return {} } })()
+                  : {})}
+                className="w-full"
+              />
+            </div>
+          ) : civilGradingFile ? (
+            <div className="flex-1 min-h-0 overflow-auto p-3">
+              <GradingPlanView
+                {...(w.currentFileContent
+                  ? (() => { try { return JSON.parse(w.currentFileContent) } catch { return {} } })()
+                  : {})}
+                className="w-full"
+              />
+            </div>
+          ) : civilLandscapeFile ? (
+            <div className="flex-1 min-h-0 overflow-auto p-3">
+              <LandscapeView
+                {...(w.currentFileContent
+                  ? (() => { try { return JSON.parse(w.currentFileContent) } catch { return {} } })()
+                  : {})}
+                className="w-full"
+              />
             </div>
           ) : textCodeFile ? (
             /* T-116: plain-text / code files open full-bleed in the FileEditor

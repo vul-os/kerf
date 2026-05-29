@@ -266,8 +266,7 @@
       "left": "kerf",
       "right": "civil3d",
       "hero_tagline": "Civil infrastructure design \u2014 corridor/pipe depth vs MIT open-core analysis modules.",
-      "reviewed_at": "2026-05-19",
-      "features": [
+      "reviewed_at": "2026-05-29",      "features": [
         {
           "domain": "D8",
           "feature": "Horizontal+vertical alignment (clothoid, SSD)",
@@ -319,9 +318,9 @@
             "source": "https://help.autodesk.com/view/CIV3D/2026/ENU/?guid=GUID-CF0B5B8A-8085-4768-92C6-E0BD5B8D37B5"
           },
           "kerf": {
-            "status": "partial",
-            "note": "TIN surface from point cloud + cut/fill volumes; contour extraction; no corridor-driven composite TINs",
-            "evidence": "packages/kerf-civil/src/kerf_civil/tin.py"
+            "status": "yes",
+            "note": "TINView.jsx: 3-D isometric wireframe + contour overlay; civil_tin_terrain backend (stats/contours/volume ops)",
+            "evidence": "src/components/civil/TINView.jsx + packages/kerf-civil/src/kerf_civil/tin.py"
           }
         },
         {
@@ -334,8 +333,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Manning's equation for circular/trapezoidal gravity flow (normal-depth solver, full-flow capacity, part-full geometry); no network design, sizing wizard, or plan-production workflow",
-            "evidence": "packages/kerf-civil/src/kerf_civil/hydraulics_gravity.py"
+            "note": "PipeNetworkView.jsx plan-view (click-to-inspect); Manning solver wired; no automated sizing wizard or plan-production sheets",
+            "evidence": "src/components/civil/PipeNetworkView.jsx + packages/kerf-civil/src/kerf_civil/hydraulics_gravity.py"
           }
         },
         {
@@ -347,9 +346,9 @@
             "source": "https://help.autodesk.com/view/CIV3D/2026/ENU/?guid=GUID-A57BA96E-A2F5-4A4F-B0B3-2E3D8F6E1C9D"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Hardy-Cross / Global Gradient Algorithm steady-state solver (Hazen-Williams + Darcy-Weisbach with Swamee-Jain friction); no plan-production or fittings layout",
-            "evidence": "packages/kerf-civil/src/kerf_civil/hydraulics_pressure.py"
+            "status": "yes",
+            "note": "PipeNetworkView.jsx: 2-D plan view, click pipe for flow/pressure/diameter; Run network solve dispatches civil_water_network_solve (GGA + HW/DW)",
+            "evidence": "src/components/civil/PipeNetworkView.jsx + packages/kerf-civil/src/kerf_civil/hydraulics_pressure.py"
           }
         },
         {
@@ -8871,8 +8870,8 @@
           "domain": "D1",
           "feature": "NURBS surfacing (blend/network/patch)",
           "competitor": "{ status: yes, note: \"FreeStyle Shaper + GSD \u2014 Class-A surfaces, G2/G3 continuity, curvature combs, highlight analysis; industry gold standard\", source: \"https://www.3ds.com/products/catia/freestyle\" }",
-          "kerf": "{ status: partial, note: \"blend/network/patch/match-srf + G3 + Class-A harness wired; not FreeStyle/GSD class-A depth\", evidence: \"packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py\" }"        },
-        {
+          "kerf": "{ status: partial, note: \"blend/network/patch/match-srf + G3 + Class-A harness wired; not FreeStyle/GSD class-A depth\", evidence: \"packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py\" }"
+        },        {
           "domain": "D1",
           "feature": "Assemblies \u2014 mates",
           "competitor": "{ status: yes, note: \"Assembly Design \u2014 coincident, offset, angle, user-defined constraints\", source: \"https://www.3ds.com/products/catia/assembly-design\" }",
@@ -9038,12 +9037,8 @@
           "domain": "D7",
           "feature": "5-axis (kinematics + posts)",
           "competitor": "{ status: paid, note: \"CATIA Multi-Axis Surface Machining \u2014 full 5-axis; paid workbench\", source: \"https://www.3ds.com/products/catia/multi-axis-surface-machining\" }",
-          "kerf": {
-            "status": "yes",
-            "evidence": "src/components/CAMView.jsx + packages/kerf-cam/src/kerf_cam/five_axis/",
-            "note": "5-axis UI (mode switch + tilt/strategy/post controls) + kinematics + posts (backend); 3+2 indexed + constant-tilt continuous"
-          }        },
-        {
+          "kerf": "{ status: partial, note: \"Engine solid; no UI\", evidence: \"packages/kerf-cam/src/kerf_cam/worker.py\" }"
+        },        {
           "domain": "D7",
           "feature": "Adaptive / trochoidal clearing",
           "competitor": "{ status: paid, note: \"DELMIA NC Machine Simulation \u2014 advanced clearing strategies; paid add-in\", source: \"https://www.3ds.com/products/delmia/nc-machine-tool-simulation\" }",

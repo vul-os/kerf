@@ -40,7 +40,11 @@ The sector work only matters if you **own your work, are not locked in, and can 
 
 ## What shipped
 
-### Latest delta — 2026-05-26
+### Latest delta — 2026-05-29
+
+**Civil infrastructure UIs** ✅ — four viewport components wired to kerf-civil backends: `TINView.jsx` (3-D isometric TIN surface, wireframe + contour overlay, dispatches `civil_tin_terrain`); `PipeNetworkView.jsx` (2-D plan view with click-to-inspect pipes, flow/pressure overlay, dispatches `civil_water_network_solve`); `GradingPlanView.jsx` (existing + proposed contour overlay, cut/fill colour bands, dispatches `civil_tin_terrain` volume op); `LandscapeView.jsx` (planting symbols + irrigation zones, dispatches `landscape_plants` + `landscape_irrigation_schedule`) — `src/components/civil/`. Editor shell wired for `.tin`, `.pipe_net`, `.grading`, `.landscape` file kinds. 62 SSR tests pass.
+
+### Previous delta — 2026-05-26
 
 **Civil hydraulics** ✅ — LandXML 1.2 import/export (`civil_landxml_import/export`); steady-state pressurised pipe network (Todini GGA + HW/DW, `civil_water_network_solve`); Manning circular/trapezoidal sewer (`civil_sewer_manning_capacity`); rational-method peak runoff (`civil_storm_rational`); HDS-5 inlet-control culvert (`civil_culvert_capacity`) — `kerf-civil/src/kerf_civil/tools_hydraulics.py`.
 
@@ -244,7 +248,7 @@ Everything committed, lowest priority. Ordered roughly by near-term readiness.
 
 **Vehicles:** composites ply/layup authoring (draping / fiber-steering / Fibersim class) · hull fairing (NURBS-reachable) · 3D harness routing.
 
-**Civil / infrastructure (distinct engines):** plan-and-profile sheet engine · IFC-4.3-infra I/O · bridge/tunnel · mining · marine/dredging · rail signaling. *(CRS engine, horizontal/vertical alignment, corridor, earthworks, geotechnical, LandXML 1.2 I/O, pressurized water-distribution networks (Todini GGA + Hazen-Williams/Darcy-Weisbach), gravity sewer (Manning), storm rational method + HDS-5 culverts already shipped.)*
+**Civil / infrastructure (distinct engines):** plan-and-profile sheet engine · IFC-4.3-infra I/O · bridge/tunnel · mining · marine/dredging · rail signaling. *(CRS engine, horizontal/vertical alignment, corridor, earthworks, geotechnical, LandXML 1.2 I/O, pressurized water-distribution networks (Todini GGA + Hazen-Williams/Darcy-Weisbach), gravity sewer (Manning), storm rational method + HDS-5 culverts already shipped; TINView / PipeNetworkView / GradingPlanView / LandscapeView UIs ✅ 2026-05-29.)*
 
 **Body-worn / medical / craft:** watchmaking / horology · eyewear / frames · footwear / last design · dental CAD (crowns/aligners) · orthopedic / prosthetics · hearing aids.
 

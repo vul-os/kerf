@@ -43,14 +43,9 @@ CREATE INDEX IF NOT EXISTS gpu_worker_jobs_worker_id_idx
 CREATE INDEX IF NOT EXISTS gpu_worker_jobs_render_job_id_idx
     ON gpu_worker_jobs (render_job_id);
 
--- Extend render_jobs with BYO dispatch columns.
--- preferred_worker_id: when set, only that worker may claim the job.
--- billing_bucket: 'kerf_paid' (default) | 'byo' — controls credit charging.
-ALTER TABLE render_jobs
-    ADD COLUMN IF NOT EXISTS preferred_worker_id uuid REFERENCES gpu_workers(id) ON DELETE SET NULL;
-ALTER TABLE render_jobs
-    ADD COLUMN IF NOT EXISTS billing_bucket text NOT NULL DEFAULT 'kerf_paid';
-
+-- render_jobs.preferred_worker_id + billing_bucket are defined in
+-- 0010_github_app_render.sql (folded into the render_jobs baseline per the
+-- clean-baseline directive — no ALTER shims).
 CREATE INDEX IF NOT EXISTS render_jobs_preferred_worker_idx
     ON render_jobs (preferred_worker_id)
     WHERE preferred_worker_id IS NOT NULL;

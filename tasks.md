@@ -5775,3 +5775,69 @@ packages, integrate by SHA.
 - DENTAL-EPIC: IOS scan-registration pipeline (kerf-dental)
 - AERO-EPIC: orbit determination (kerf-aero)
 - MARINE-EPIC: class-rule scantlings (kerf-marine)
+
+## Wave 4 — audit-driven fanout + GPU-worker rethink (2026-05-29)
+
+User directive: 30-min autonomous loop, multiple waves of sonnet agents,
+broadened GPU scope. GPU is no longer "RunPod only" — it's a pluggable
+backend layer that ALSO supports users linking their own GPU machine via
+a token (BYO worker, runs on their hardware, no credit consumption).
+
+### Wave 4A — launched 2026-05-29
+
+- **PLC-WIRE** (T-220) — PLCopen XML reader/writer + LadderEditor wiring.
+  `packages/kerf-plc/`, `src/components/LadderEditor.jsx`,
+  `src/lib/ladderCanvas.js`, LLM tool registry. Source TODOs at
+  LadderEditor.jsx:1 + ladderCanvas.js:1.
+- **JEWELRY-4A-REBUILD** — Phase 4a `opSweep2` + `opNetworkSrf` +
+  `opBlendSrf` rebuild (silent-reverted per decisions.md). Ops + 3 LLM
+  tools + 3 scenarios.
+- **GPU-FOUNDATION** — Pluggable `GPUBackend` protocol + **BYO worker
+  enrollment** (token-link, `/api/workers/*`, `gpu_workers` schema in
+  baseline, Settings → Workers tab). Stubs `RunPodGPUBackend` +
+  `SelfHostedWorkerBackend`. BYO jobs skip credit consumption.
+- **CLASS-A-WIRE** (G-5) — Class-A overlay toggle in Renderer + imprint
+  toolpath inspector. Backend math already shipped.
+- **AFR-DAG** — Promote AAG classifier output → parametric `.feature`
+  DAG (topological ordering). LLM tool `afr_to_parametric`.
+
+### Wave 4B — queued (after 4A SHAs integrate)
+
+- **RUNPOD-BACKEND** — actual RunPod Serverless API behind the protocol
+  GPU-FOUNDATION ships. Blocked by GPU-FOUNDATION.
+- **KERF-WORKER-CLI** — `kerf-worker` package: `kerf-worker enroll <token>`
+  + long-poll claim loop + Cycles/FEM execution. Pip-installable.
+- **P0-7 BULK-IMPORT** — `POST /api/projects/import` (ZIP).
+- **P0-5 LOD-VIEWPORT** — wire LOD planner into Renderer.
+- **FORMBOARD-FLATTEN** — T-37 follow-on, 2D harness output.
+- **REV-ENG-NURBS-FIT** — NURBS freeform fit from segmented point clouds.
+- **COMPILE-ON-DEMAND** — `storeDerivedArtifact` wiring.
+- **CAD-COMPONENT-STEP** — real STEP/JSCAD substitution for library
+  components (replace indicator chip).
+
+### Wave 4C — UI-only compare gaps (backend complete)
+
+Per compare-matrix audit (140 gaps total; 25 UI-only). Each closes 1-5
+compare-matrix rows.
+
+- **ASSEMBLY-CLASH-UI** — clash viewer; OBB-SAT + BVH ready.
+- **CAM-5AXIS-UI** — 5-axis panel in CAMView; kinematics + post ready.
+- **FEA-PANELS** — linear static / modal / fatigue / vibration / buckling.
+- **GDT-3D-PMI** — 3D PMI placement on drawings + 2D annotation.
+- **CIVIL-INFRA-UIS** — TIN / pipe networks / grading / landscaping.
+- **MBD-PLANAR-UI** — Lagrange integrator → assembly motion UI.
+- **DENTAL-3SHAPE** — crown anatomic sculpting + implant + surgical guide.
+- **COMPOSITES-MFG-UI** — laminate weight/cost + AFP toolpath viz.
+
+### Wave 4D — multi-month epics (decompose later, NOT for waves yet)
+
+- T-100 FEM depth (explicit dynamics, nonlinear static, k-ε, coupled).
+- T-101 CFD depth (RANS, 3D unstructured, OpenFOAM bridge).
+- GK-P long-tail (NURBS×NURBS boolean, Stam, multires, loft rails).
+- PLM configurator + KBE general rule engine.
+
+### Loop cadence (autonomous)
+
+Every 30 min: collect completed SHAs → cherry-pick → re-audit (1-2 Explore
+agents) for new items → append to tasks.md → launch next 5 sonnet agents
+from queue → re-schedule.

@@ -29,6 +29,13 @@ CREATE TABLE IF NOT EXISTS render_jobs (
     samples_total   int         NOT NULL DEFAULT 0,
     signed_url      text,
     error           text,
+    -- GPU-worker dispatch (Wave 4A GPU-FOUNDATION). preferred_worker_id
+    -- points at gpu_workers(id) defined in 0013_gpu_workers.sql; no FK
+    -- because the baseline order is render_jobs (0010) before gpu_workers
+    -- (0013) — relationship enforced at app level.
+    -- billing_bucket: 'kerf_paid' (hosted vendor) | 'byo' (self-hosted worker).
+    preferred_worker_id uuid,
+    billing_bucket      text        NOT NULL DEFAULT 'kerf_paid',
     created_at      timestamptz NOT NULL DEFAULT now(),
     updated_at      timestamptz NOT NULL DEFAULT now()
 );

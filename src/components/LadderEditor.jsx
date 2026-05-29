@@ -1,12 +1,14 @@
-// TODO(parent): wire to T-220's plcopen.reader/writer once that ships.
-
 /**
  * LadderEditor — SVG canvas for IEC 61131-3 Ladder Diagram editing.
  *
  * Props:
- *   value     {Rung[]}  Array of rungs (controlled).
- *   onChange  {fn}      Called with a new array when rungs mutate.
- *   className {string}  Extra CSS classes for the outer container.
+ *   value        {Rung[]}  Array of rungs (controlled).
+ *   onChange     {fn}      Called with a new array when rungs mutate.
+ *   programName  {string}  Optional program name for PLCopen XML export.
+ *   className    {string}  Extra CSS classes for the outer container.
+ *
+ * Import/Export buttons in the toolbar call the backend's import_plcopen_xml
+ * and export_plcopen_xml LLM tools (T-220 — PLCopen IEC TR 61131-10).
  *
  * The editor renders:
  *   - A vertical left power rail.
@@ -29,7 +31,10 @@
  */
 
 import { useCallback, useRef, useState } from 'react'
-import { createRung, addContact, addCoil, deleteElement, moveElement } from '../lib/ladderCanvas.js'
+import {
+  createRung, addContact, addCoil, deleteElement, moveElement,
+  rungsToPlcopenModel, plcopenModelToRungs,
+} from '../lib/ladderCanvas.js'
 
 // ── Layout constants ──────────────────────────────────────────────────────────
 
@@ -215,7 +220,7 @@ function DropZones({ rungIndex, onDrop, dragActive }) {
 
 // ── Main LadderEditor ─────────────────────────────────────────────────────────
 
-export default function LadderEditor({ value = [], onChange, className = '' }) {
+export default function LadderEditor({ value = [], onChange, programName = 'Main', className = '' }) {
   // Currently selected palette item for click-to-place
   const [selectedPalette, setSelectedPalette] = useState(null)
   // Element being dragged (from placed elements, not palette)
@@ -223,6 +228,9 @@ export default function LadderEditor({ value = [], onChange, className = '' }) {
   // Palette drag-to-canvas state
   const [paletteDrag, setPaletteDrag] = useState(null) // { kind, type } — palette item being dragged onto canvas
   const [paletteDragOver, setPaletteDragOver] = useState(false)
+  // PLCopen import/export state
+  const [ioStatus, setIoStatus] = useState(null) // null | 'importing' | 'exporting' | {error: string}
+  const importInputRef = useRef(null)
   const svgRef = useRef(null)
 
   const rungs = value
@@ -293,6 +301,70 @@ export default function LadderEditor({ value = [], onChange, className = '' }) {
     setPaletteDrag(null)
     setPaletteDragOver(false)
   }, [])
+
+  // ── PLCopen XML Import ───────────────────────────────────────────────────
+
+  const handleImportClick = useCallback(() => {
+    importInputRef.current?.click()
+  }, [])
+
+  const handleImportFile = useCallback(async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setIoStatus('importing')
+    try {
+      const xml = await file.text()
+      const resp = await fetch('/api/tools/call', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tool: 'import_plcopen_xml', args: { xml } }),
+      })
+      const data = await resp.json()
+      if (data.error) {
+        setIoStatus({ error: `Import failed: ${data.error}` })
+        return
+      }
+      const model = data.model ?? data
+      const importedRungs = plcopenModelToRungs(model)
+      onChange?.(importedRungs)
+      setIoStatus(null)
+    } catch (err) {
+      setIoStatus({ error: `Import error: ${err.message}` })
+    } finally {
+      // Reset input so the same file can be re-selected
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }, [onChange])
+
+  // ── PLCopen XML Export ───────────────────────────────────────────────────
+
+  const handleExport = useCallback(async () => {
+    setIoStatus('exporting')
+    try {
+      const model = rungsToPlcopenModel(rungs, programName)
+      const resp = await fetch('/api/tools/call', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tool: 'export_plcopen_xml', args: { model, project_name: programName } }),
+      })
+      const data = await resp.json()
+      if (data.error) {
+        setIoStatus({ error: `Export failed: ${data.error}` })
+        return
+      }
+      const xml = data.xml ?? data
+      const blob = new Blob([xml], { type: 'application/xml' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${programName}.plc`
+      a.click()
+      URL.revokeObjectURL(url)
+      setIoStatus(null)
+    } catch (err) {
+      setIoStatus({ error: `Export error: ${err.message}` })
+    }
+  }, [rungs, programName])
 
   // ── SVG canvas height ─────────────────────────────────────────────────────
 
@@ -535,6 +607,16 @@ export default function LadderEditor({ value = [], onChange, className = '' }) {
 
       {/* Footer toolbar */}
       <div className="flex items-center gap-2 px-4 py-2 border-t border-[#21262d] bg-[#161b22] flex-shrink-0">
+        {/* Hidden file input for PLCopen import */}
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".plc,.xml"
+          className="hidden"
+          data-testid="plcopen-import-input"
+          onChange={handleImportFile}
+        />
+
         <button
           className="flex items-center gap-1.5 text-[11px] px-3 py-1 rounded border border-[#30363d] bg-[#21262d] text-[#c9d1d9] hover:border-lime-500/50 hover:text-lime-300 transition-colors"
           onClick={addRung}
@@ -544,15 +626,41 @@ export default function LadderEditor({ value = [], onChange, className = '' }) {
           Add Rung
         </button>
 
+        {/* PLCopen Import */}
+        <button
+          className="flex items-center gap-1.5 text-[11px] px-3 py-1 rounded border border-[#30363d] bg-[#21262d] text-[#c9d1d9] hover:border-blue-500/50 hover:text-blue-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          onClick={handleImportClick}
+          disabled={ioStatus === 'importing' || ioStatus === 'exporting'}
+          data-testid="plcopen-import-btn"
+          title="Import PLCopen XML (.plc)"
+        >
+          {ioStatus === 'importing' ? '...' : 'Import .plc'}
+        </button>
+
+        {/* PLCopen Export */}
+        <button
+          className="flex items-center gap-1.5 text-[11px] px-3 py-1 rounded border border-[#30363d] bg-[#21262d] text-[#c9d1d9] hover:border-emerald-500/50 hover:text-emerald-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          onClick={handleExport}
+          disabled={ioStatus === 'importing' || ioStatus === 'exporting' || rungs.length === 0}
+          data-testid="plcopen-export-btn"
+          title="Export as PLCopen XML (.plc)"
+        >
+          {ioStatus === 'exporting' ? '...' : 'Export .plc'}
+        </button>
+
         {selectedPalette && (
           <span className="text-[10px] text-cyan-400 ml-2">
             Placing: {selectedPalette.title} — click a canvas cell to place, or press Esc to cancel
           </span>
         )}
 
+        {ioStatus && typeof ioStatus === 'object' && ioStatus.error && (
+          <span className="text-[10px] text-red-400 ml-2" data-testid="io-error">
+            {ioStatus.error}
+          </span>
+        )}
+
         <div className="ml-auto flex items-center gap-3">
-          {/* Palette active indicator */}
-          {ALL_PALETTE_ITEMS.map((item) => null /* spacer — remove if not needed */)}
           <span className="text-[10px] text-[#6b7280]">
             Right-click element to delete
           </span>

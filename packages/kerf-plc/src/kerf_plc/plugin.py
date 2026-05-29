@@ -84,3 +84,17 @@ def _register_tools(ctx, provides: list) -> None:
         provides.append("plc.transpile")
     except Exception as exc:
         logger.warning("kerf-plc: failed to load transpile_plc tools: %s", exc)
+
+    # import_plcopen_xml / export_plcopen_xml — PLCopen XML IEC TR 61131-10 I/O (T-220)
+    try:
+        from kerf_plc.tools.plcopen_io import (
+            import_plcopen_xml_spec,
+            import_plcopen_xml,
+            export_plcopen_xml_spec,
+            export_plcopen_xml,
+        )
+        ctx.tools.register("import_plcopen_xml", import_plcopen_xml_spec, import_plcopen_xml)
+        ctx.tools.register("export_plcopen_xml", export_plcopen_xml_spec, export_plcopen_xml)
+        provides.append("plc.plcopen_io")
+    except Exception as exc:
+        logger.warning("kerf-plc: failed to load plcopen_io tools: %s", exc)

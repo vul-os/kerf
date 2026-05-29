@@ -1,6 +1,6 @@
-// TODO(parent): wire to T-220's plcopen.reader/writer once that ships.
-
 // ladderCanvas.js — Pure logic for ladder diagram (LD) rung data.
+// PLCopen XML I/O is wired via rungsToPlcopenModel / plcopenModelToRungs
+// which map between the canvas rung model and the T-220 PLCopen JSON model.
 //
 // A Rung is an immutable record:
 //   {
@@ -197,7 +197,6 @@ export function validateRung(rung) {
 
 /**
  * Serialise a rung to a stable JSON-friendly document.
- * The parent can pass this through T-220's PLCopen writer.
  *
  * @param {object} rung
  * @returns {object} serialised rung document
@@ -225,4 +224,130 @@ export function serialiseRung(rung) {
       to: w.to,
     })),
   }
+}
+
+// ── PLCopen XML bridge (T-220) ────────────────────────────────────────────────
+
+/**
+ * Convert canvas rungs to the PLCopen model dict expected by the backend's
+ * `export_plcopen_xml` LLM tool (T-220).
+ *
+ * Each canvas rung becomes one LD rung in a single Program POU.
+ * Contact type mapping:
+ *   no      → negated: false
+ *   nc      → negated: true
+ *   rising  → negated: false (best-effort; edge detection is FB-based in PLCopen)
+ *   falling → negated: false
+ *
+ * @param {object[]} rungs   - Canvas rung array
+ * @param {string}   name    - POU / project name
+ * @returns {object}         - model dict for export_plcopen_xml
+ */
+export function rungsToPlcopenModel(rungs, name = 'Main') {
+  const CELL_W = 80
+  const RAIL_X_LEFT = 60
+  const RUNG_SPACING = 90
+  const RUNG_Y_START = 80
+
+  let localId = 1
+  const plcRungs = rungs.map((rung, rungIndex) => {
+    const rungY = RUNG_Y_START + rungIndex * RUNG_SPACING
+    const leftId = localId++
+    const rightId = localId++
+
+    const contacts = rung.contacts.map((c) => ({
+      local_id: localId++,
+      variable: c.name || `var_${c.id}`,
+      negated: c.type === 'nc' || c.negated === true,
+      position: {
+        x: RAIL_X_LEFT + (c.position + 1) * CELL_W,
+        y: rungY,
+      },
+    }))
+
+    const coils = rung.coils.map((c) => ({
+      local_id: localId++,
+      variable: c.name || `coil_${c.id}`,
+      negated: false,
+      position: {
+        x: RAIL_X_LEFT + (c.position + 1) * CELL_W,
+        y: rungY,
+      },
+    }))
+
+    return {
+      left_power_rail: { local_id: leftId },
+      right_power_rail: { local_id: rightId },
+      contacts,
+      coils,
+      fb_instances: [],
+    }
+  })
+
+  return {
+    project_name: name,
+    version: '1.0',
+    author: '',
+    description: '',
+    pous: [
+      {
+        name,
+        pou_type: 'program',
+        body_language: 'LD',
+        var_blocks: [],
+        body: { language: 'LD', rungs: plcRungs },
+      },
+    ],
+    configurations: [],
+  }
+}
+
+/**
+ * Convert a PLCopen model dict (as returned by `import_plcopen_xml`) back to
+ * canvas rungs. Only LD bodies are converted; ST/FBD/IL bodies are skipped.
+ *
+ * @param {object} model - PLCopen model dict from import_plcopen_xml
+ * @returns {object[]}   - Canvas rung array
+ */
+export function plcopenModelToRungs(model) {
+  const result = []
+
+  for (const pou of model.pous ?? []) {
+    const body = pou.body ?? {}
+    if (body.language !== 'LD') continue
+
+    for (const rung of body.rungs ?? []) {
+      const canvasRung = createRung()
+
+      // Map PLCopen contacts → canvas contacts
+      for (const c of rung.contacts ?? []) {
+        const pos = c.position ? Math.round((c.position.x - 60) / 80) - 1 : result.length
+        const type = c.negated ? 'nc' : 'no'
+        const contact = {
+          id: uid('c'),
+          name: c.variable ?? '',
+          type,
+          position: Math.max(0, pos),
+          negated: c.negated ?? false,
+        }
+        canvasRung.contacts.push(contact)
+      }
+
+      // Map PLCopen coils → canvas coils
+      for (const c of rung.coils ?? []) {
+        const pos = c.position ? Math.round((c.position.x - 60) / 80) - 1 : 8
+        const coil = {
+          id: uid('coil'),
+          name: c.variable ?? '',
+          type: 'output',
+          position: Math.max(0, pos),
+        }
+        canvasRung.coils.push(coil)
+      }
+
+      result.push(canvasRung)
+    }
+  }
+
+  return result
 }

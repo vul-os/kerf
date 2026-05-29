@@ -15,8 +15,18 @@ features:
       source: "https://www.openplcproject.com/reference"
     kerf:
       status: yes
-      note: "ST editor + live Ladder power-flow sim wired in-browser; chat-native ST generation"
+      note: "ST editor + live Ladder power-flow sim wired in-browser; chat-native ST generation; PLCopen XML (IEC TR 61131-10) import/export"
       evidence: "packages/kerf-plc/"
+  - domain: D10
+    feature: "PLCopen XML import/export (IEC TR 61131-10)"
+    competitor:
+      status: yes
+      note: "OpenPLC Editor (Beremiz) reads and writes PLCopen XML natively"
+      source: "https://github.com/thiagoralves/OpenPLC_Editor"
+    kerf:
+      status: yes
+      note: "Pure-Python PLCopen XML reader/writer (kerf_plc.plcopen); import_plcopen_xml + export_plcopen_xml LLM tools; LadderEditor Import/Export .plc buttons; round-trip test against blinker + conveyor fixtures"
+      evidence: "packages/kerf-plc/src/kerf_plc/plcopen/"
   - domain: D10
     feature: "Firmware build/upload/monitor/debug"
     competitor:
@@ -220,7 +230,8 @@ Kerf integrates OpenPLC as a companion for hardware projects that include a prog
 | Feature | Kerf | OpenPLC (standalone) |
 |---|---|---|
 | License | MIT (Kerf) + Apache 2.0 (OpenPLC) | Apache 2.0 |
-| IEC 61131-3 languages | ST (chat-native generation) | LD, ST, FBD, SFC, IL |
+| IEC 61131-3 languages | LD + ST (chat-native generation + LadderEditor) | LD, ST, FBD, SFC, IL |
+| PLCopen XML import/export (IEC TR 61131-10) | ✅ `import_plcopen_xml` + `export_plcopen_xml` LLM tools; LadderEditor Import/Export buttons | ✅ Beremiz-based editor reads/writes PLCopen XML natively |
 | Runtime targets | Via OpenPLC: RPi, Arduino, Linux | RPi, BeagleBone, Arduino, Linux, Windows |
 | Chat-native logic generation | Yes | No |
 | PCB design for target hardware | In-box (full Kerf PCB workflow) | Not included |

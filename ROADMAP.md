@@ -157,7 +157,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 - **Fabrication package** ✅ — Gerber RS-274X, Excellon drill, IPC-2581, ODB++, pick-and-place, fab BOM, 3D board STEP export.
 - **SPICE + RF + autorouting** ✅ — ngspice, scikit-rf S-params/Smith chart, FreeRouting DSN/SES.
 - **Wiring/harness** ✅ — WireViz YAML→SVG (2D; 3D in flight at P1-7).
-- **PLC** ✅ — MATIEC lint Tier 1.
+- **PLC** ✅ — MATIEC lint Tier 1; PLCopen XML (IEC TR 61131-10) reader/writer (T-220); `import_plcopen_xml` + `export_plcopen_xml` LLM tools; LadderEditor Import/Export buttons wired.
 - **Silicon / IC layout** ✅ — VHDL + Verilog parsers; GHDL + Yosys + ngspice bridges; GDS II / OASIS I/O; SKY130 PDK; LEF/Liberty readers; OpenROAD place-and-route; DRC + LVS + parasitic extraction; mask fracturing. T-231..T-248.
 - **Firmware / embedded** ✅ — board catalogue (Arduino/ESP32/STM32/RP2040/AVR); library cache; direct-gcc orchestrator (`avr-gcc`/`arm-none-eabi-gcc`/`xtensa-esp32-elf`); upload wrappers; serial monitor panel; LLM tools. T-225..T-230.
 

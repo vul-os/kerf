@@ -78,6 +78,7 @@ import FiberOrientationContour from '../components/composites/FiberOrientationCo
 import CrownSculptingPanel from '../components/dental/CrownSculptingPanel.jsx'
 import ImplantLibrary from '../components/dental/ImplantLibrary.jsx'
 import SurgicalGuide from '../components/dental/SurgicalGuide.jsx'
+import DerivedCacheOverlay from '../components/DerivedCacheOverlay.jsx'
 
 // ---------------------------------------------------------------------------
 // Build3DDropdown — toolbar dropdown in the sketch header that scaffolds a
@@ -2851,6 +2852,9 @@ export default function Editor() {
       {showShare && projectId && (
         <ShareModal projectId={projectId} onClose={() => setShowShare(false)} />
       )}
+
+      {/* Dev-only floating overlay — derived-artifact cache hit/miss stats. */}
+      {import.meta.env.DEV && <DerivedCacheOverlay />}
     </div>
   )
 }

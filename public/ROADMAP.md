@@ -146,7 +146,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 - **2D sketcher v1 + v2** ✅ — full constraint set, trim/extend, ellipse, B-spline, bezier, fillet, mirror, patterns.
 - **Assembly model + 3D mates** ✅ — coincident/concentric/parallel/perp/distance/angle/tangent; gradient-descent solver.
 - **Assembly clash detection UI** ✅ — OBB-SAT + BVH + tri-tri backend; Check Clashes side panel with pair list (part A / part B / severity / Jump-to); viewport highlight via `highlightFaces` hook — parity with SOLIDWORKS Interference / Fusion / Onshape clash detection.
-- **Assembly clash detection** ✅ — hard/clearance/coincident OBB-SAT + triangle-mesh narrow phase; cross-discipline summary; real OBB fallback ✅: `step_blob` components use a PCA-OBB computed from STEP geometry (SHA-256 cached) — no more 1 mm³ approximation.
+- **Assembly clash detection** ✅ — hard/clearance/coincident OBB-SAT + triangle-mesh narrow phase; cross-discipline `by_discipline_pair` summary; real OBB fallback ✅: when a component has no `bbox` but carries a `step_blob` / `step_blob_ref`, a tight PCA-OBB is computed from the STEP geometry and SHA-256 cached — no more 1 mm³ approximation; unit-box fallback retained only when neither bbox nor STEP is available, with an explicit warning in `errors`.
 - **Tolerance stack-up** ✅ — worst-case/RSS/Monte-Carlo + auto chain-walk.
 - **2D drawings** ✅ — multi-sheet, dimensions, GD&T frames, section hatching, leaders/balloons, centerlines.
 - **3D PMI + GD&T annotation UI** ✅ — ISO 1101 GD&T toolbar (DrawingToolbar + GdntToolbar) with all 14 characteristics; datum A/B/C placement; FCF click-to-place modal with tolerance value, diameter zone, material-condition modifier, datum refs; SVG FCF glyphs (FcfGlyph/DatumGlyph) rendered inline per standard; 3D PMI overlay (Pmi3DOverlay) projects FCF labels into the three.js viewport; annotations persist via addFcf/addDatumLabel in the drawing data model.
@@ -194,6 +194,8 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 
 - **Library system v1 + BOM** ✅ — `kind='part'`, distributor APIs (DigiKey/Mouser/LCSC), curated manufacturer libs.
 - **Cross-project parts** ✅ — external_ref, lockfile, derived-artifact cache; compile-on-demand (hit→skip recompile, miss→store) ✅; dev cache-stats overlay ✅.
+- **Cross-project parts** ✅ — external_ref, lockfile, derived-artifact cache; derived-cache hit response includes `last_accessed_at` + `cache_key` ✅.
+- **Cross-project parts** ✅ — external_ref, lockfile, derived-artifact cache; DerivedCacheOverlay mounted (dev-only).
 - **kerf-partsgen** ✅ — 5 ISO/DIN family generators shipped.
 
 ### Frontend / UX
@@ -268,7 +270,7 @@ Everything committed, lowest priority. Ordered roughly by near-term readiness.
 
 **Silicon next:** verification depth + post-silicon (cocotb testbench harness, power analysis, STA, clock-tree synthesis, formal equivalence, Tiny Tapeout / Efabless harnesses). T-249..T-258.
 
-**Firmware next:** RTOS primitives, OTA, RTOS-aware debugger, power profiling, pin-map cross-check vs PCB, USB-class drivers. T-259..T-265.
+**Firmware next:** RTOS primitives, OTA, RTOS-aware debugger, power profiling, pin-map cross-check vs PCB, USB-class drivers. T-259..T-265. **T-274 ✅** — Build / Flash / Monitor UI wired: `FirmwareProjectPanel`, `BuildOutput`, `SerialMonitor` in `src/components/firmware/`; `firmware_project` kind renders in Editor; PlatformIO + Arduino IDE compare rows added.
 
 **Aerospace next:** XFOIL-class viscous solver, aircraft conceptual sizing (Raymer/Roskam), stability derivatives, aero-acoustics (FW-H), heat-shield/ablation, aerospace fasteners. T-266..T-272.
 
@@ -323,7 +325,7 @@ These are roadmap-level moats that span every sector simultaneously and compound
 ### Needs UI / deploy-gated
 
 - **P0-8 deploy-hardening** — realistic seed data + one-command dev loop; test coverage breadth still expanding.
-- **P1-7 formboard flatten** ✅ — shipped in T-37: `formboard_flatten.py` + `wiring_formboard_flatten` LLM tool; topological unfold with branch alternation, connector pinouts, bbox.
+- **P1-7 formboard flatten** ✅ — shipped in T-37: `formboard_flatten.py` + `wiring_formboard_flatten` LLM tool; topological unfold with branch alternation, connector pinouts, bbox; waypoints complete ✅ — every branch traversal (including simple two-node stubs) now emits BranchPoint2D for tap AND tip.
 - **P1-8 large-file git** — pointer kind + Phase 1 shipped; deduplication-based free-fork accounting and content-addressed LFS store in progress.
 - ~~**G-5 class-A wiring**~~ ✅ frontend wiring shipped — see G-5 row above.
 - **Long-tail verticals** — see "Long-tail verticals" list above; all committed, none started.

@@ -19,7 +19,7 @@ from typing import Sequence
 import numpy as np
 
 
-@dataclass
+@dataclass(frozen=True)
 class PlyMaterial:
     """
     Orthotropic ply material — in-plane engineering constants.
@@ -197,7 +197,7 @@ class LaminateLayup:
         for i in range(n // 2):
             a = self.plies[i]
             b = self.plies[n - 1 - i]
-            if a.angle != b.angle or a.material is not b.material or a.thickness != b.thickness:
+            if a.angle != b.angle or a.material != b.material or a.thickness != b.thickness:
                 return False
         return True
 

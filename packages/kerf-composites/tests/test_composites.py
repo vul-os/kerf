@@ -92,6 +92,36 @@ class TestPlyMaterial:
         with pytest.raises(ValueError):
             Ply(angle=0.0, material=T300_5208, thickness=0.0)
 
+    def test_equal_valued_instances_are_equal(self):
+        """Two PlyMaterial instances with identical fields must compare equal."""
+        m1 = PlyMaterial(
+            name="T300/5208 CFRP", E1=181.0, E2=10.3, G12=7.17, nu12=0.28,
+            Xt=1500.0, Xc=1500.0, Yt=40.0, Yc=246.0, S12=68.0,
+        )
+        m2 = PlyMaterial(
+            name="T300/5208 CFRP", E1=181.0, E2=10.3, G12=7.17, nu12=0.28,
+            Xt=1500.0, Xc=1500.0, Yt=40.0, Yc=246.0, S12=68.0,
+        )
+        assert m1 is not m2          # distinct objects
+        assert m1 == m2              # value equality
+        assert not (m1 != m2)
+
+    def test_different_valued_instances_are_not_equal(self):
+        """PlyMaterial instances with different fields must not compare equal."""
+        assert T300_5208 != EGLASS_EPOXY
+
+    def test_equal_instances_have_equal_hash(self):
+        """Equal PlyMaterial instances must produce the same hash (usable in sets/dicts)."""
+        m1 = PlyMaterial(
+            name="T300/5208 CFRP", E1=181.0, E2=10.3, G12=7.17, nu12=0.28,
+            Xt=1500.0, Xc=1500.0, Yt=40.0, Yc=246.0, S12=68.0,
+        )
+        m2 = PlyMaterial(
+            name="T300/5208 CFRP", E1=181.0, E2=10.3, G12=7.17, nu12=0.28,
+            Xt=1500.0, Xc=1500.0, Yt=40.0, Yc=246.0, S12=68.0,
+        )
+        assert hash(m1) == hash(m2)
+
 
 class TestLaminateLayup:
     def test_from_sequence_creates_plies(self):
@@ -107,8 +137,38 @@ class TestLaminateLayup:
         layup = LaminateLayup.from_sequence([0, 90, 0], T300_5208)
         assert layup.is_symmetric is True
 
+    def test_is_symmetric_true_value_equal_materials(self):
+        """is_symmetric must return True when mirror plies use value-equal but
+        distinct PlyMaterial instances (guards against identity-check regression)."""
+        m_a = PlyMaterial(
+            name="T300/5208 CFRP", E1=181.0, E2=10.3, G12=7.17, nu12=0.28,
+            Xt=1500.0, Xc=1500.0, Yt=40.0, Yc=246.0, S12=68.0,
+        )
+        m_b = PlyMaterial(
+            name="T300/5208 CFRP", E1=181.0, E2=10.3, G12=7.17, nu12=0.28,
+            Xt=1500.0, Xc=1500.0, Yt=40.0, Yc=246.0, S12=68.0,
+        )
+        assert m_a is not m_b, "precondition: distinct objects"
+        plies = [
+            Ply(angle=0.0,  material=m_a, thickness=0.125),
+            Ply(angle=90.0, material=m_a, thickness=0.125),
+            Ply(angle=0.0,  material=m_b, thickness=0.125),
+        ]
+        layup = LaminateLayup(plies=plies)
+        assert layup.is_symmetric is True
+
     def test_is_symmetric_false(self):
         layup = LaminateLayup.from_sequence([0, 90, 45], T300_5208)
+        assert layup.is_symmetric is False
+
+    def test_is_symmetric_false_different_material(self):
+        """is_symmetric must return False when mirror plies differ by material."""
+        plies = [
+            Ply(angle=0.0,  material=T300_5208,   thickness=0.125),
+            Ply(angle=90.0, material=T300_5208,   thickness=0.125),
+            Ply(angle=0.0,  material=EGLASS_EPOXY, thickness=0.125),
+        ]
+        layup = LaminateLayup(plies=plies)
         assert layup.is_symmetric is False
 
     def test_z_coords_length(self):

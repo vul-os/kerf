@@ -1,7 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-05-29T00:00:00.000Z",
-  "items": [
+  "generatedAt": "2026-05-29T18:01:29.815Z",  "items": [
     {
       "slug": "revit",
       "competitor": "Autodesk Revit",
@@ -8377,8 +8376,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Anatomic crown (design_crown_anatomic): sweeps actual margin-line polygon with raised-cosine cusp ridges (n_cusps=2 premolar, n_cusps=4 molar); validate_body-clean B-rep; STL export via stl_export.py. No virtual articulator, no AI design proposal, no bridge pontic.",
-            "evidence": "packages/kerf-dental/src/kerf_dental/crown.py (design_crown_anatomic), packages/kerf-dental/src/kerf_dental/stl_export.py"
+            "note": "CrownSculptingPanel: anatomic preset picker (incisor/canine/premolar/molar), cusp height/angle sliders, occlusion-contact SVG overlay, Run dispatches dental_crown_design. Backend: design_crown_anatomic (swept margin polygon + raised-cosine cusp ridges, n_cusps=2-4). No virtual articulator, no bridge pontic.",
+            "evidence": "src/components/dental/CrownSculptingPanel.jsx, packages/kerf-dental/src/kerf_dental/crown.py (design_crown_anatomic), packages/kerf-dental/src/kerf_dental/stl_export.py"
           }
         },
         {
@@ -8391,8 +8390,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Implant guide geometry (backend); no implant library integration",
-            "evidence": "packages/kerf-dental/src/kerf_dental/guide.py"
+            "note": "ImplantLibrary: filterable catalogue (Straumann, Nobel Biocare, Zimmer, MIS; diameter 3.3-4.8 mm; length 8-13 mm), click-to-place sends fixture dims to dental_surgical_guide backend. Representative geometry — not a certified clinical implant library.",
+            "evidence": "src/components/dental/ImplantLibrary.jsx, packages/kerf-dental/src/kerf_dental/guide.py"
           }
         },
         {
@@ -8405,8 +8404,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Surgical guide generation backend; wired but not UI-facing",
-            "evidence": "packages/kerf-dental/src/kerf_dental/guide.py"
+            "note": "SurgicalGuide: CBCT/point-cloud import (CSV/JSON xyz), implant pose editor (position + axis per implant), drill sleeve setup, SVG guide preview; dispatches dental_surgical_guide. Backend: place_surgical_guide returns validate_body-clean cylinder sleeves + angular accuracy.",
+            "evidence": "src/components/dental/SurgicalGuide.jsx, packages/kerf-dental/src/kerf_dental/guide.py (place_surgical_guide)"
           }
         },
         {

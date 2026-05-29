@@ -74,6 +74,9 @@ import LandscapeView from '../components/civil/LandscapeView.jsx'
 import LaminateStackup from '../components/composites/LaminateStackup.jsx'
 import AFPToolpathView from '../components/composites/AFPToolpathView.jsx'
 import FiberOrientationContour from '../components/composites/FiberOrientationContour.jsx'
+import CrownSculptingPanel from '../components/dental/CrownSculptingPanel.jsx'
+import ImplantLibrary from '../components/dental/ImplantLibrary.jsx'
+import SurgicalGuide from '../components/dental/SurgicalGuide.jsx'
 
 // ---------------------------------------------------------------------------
 // Build3DDropdown — toolbar dropdown in the sketch header that scaffolds a
@@ -669,6 +672,26 @@ function isFiberMapFile(file) {
   if (file.kind === 'fiber_map') return true
   const n = (file.name || '').toLowerCase()
   return n.endsWith('.fiber_map')
+// Dental file kinds: .dental.crown, .dental.implant, .dental.guide
+function isDentalCrownFile(file) {
+  if (!file) return false
+  if (file.kind === 'dental.crown') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.dental.crown')
+}
+
+function isDentalImplantFile(file) {
+  if (!file) return false
+  if (file.kind === 'dental.implant') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.dental.implant')
+}
+
+function isDentalGuideFile(file) {
+  if (!file) return false
+  if (file.kind === 'dental.guide') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.dental.guide')
 }
 
 // ---------------------------------------------------------------------------
@@ -904,6 +927,9 @@ export default function Editor() {
     if (isLayupFile(w.currentFile)) return
     if (isAFPFile(w.currentFile)) return
     if (isFiberMapFile(w.currentFile)) return
+    if (isDentalCrownFile(w.currentFile)) return
+    if (isDentalImplantFile(w.currentFile)) return
+    if (isDentalGuideFile(w.currentFile)) return
     if (runTimerRef.current) clearTimeout(runTimerRef.current)
     const code = w.currentFileContent
     const delay = runDebounceFor(code)
@@ -1370,6 +1396,10 @@ export default function Editor() {
   const layupFile = isLayupFile(w.currentFile)
   const afpFile = isAFPFile(w.currentFile)
   const fiberMapFile = isFiberMapFile(w.currentFile)
+  // Dental specialty panels
+  const dentalCrownFile   = isDentalCrownFile(w.currentFile)
+  const dentalImplantFile = isDentalImplantFile(w.currentFile)
+  const dentalGuideFile   = isDentalGuideFile(w.currentFile)
   // T-116: plain-text / code files — matched by extension via editorModes.js.
   // Must be checked AFTER all dedicated-extension checks above so that e.g.
   // a .json family file is not accidentally grabbed by the plain editor.
@@ -2120,6 +2150,17 @@ export default function Editor() {
           ) : fiberMapFile ? (
             <div className="flex-1 min-h-0 overflow-hidden">
               <FiberOrientationContour file={w.currentFile} projectId={projectId} />
+          ) : dentalCrownFile ? (
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <CrownSculptingPanel projectId={projectId} />
+            </div>
+          ) : dentalImplantFile ? (
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <ImplantLibrary projectId={projectId} />
+            </div>
+          ) : dentalGuideFile ? (
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <SurgicalGuide projectId={projectId} />
             </div>
           ) : printFile ? (
             <div className="flex-1 min-h-0 relative">

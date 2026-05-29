@@ -25,8 +25,8 @@ features:
       source: "https://www.3shape.com/en/software/dental-system"
     kerf:
       status: partial
-      note: "Anatomic crown (design_crown_anatomic): sweeps actual margin-line polygon with raised-cosine cusp ridges (n_cusps=2 premolar, n_cusps=4 molar); validate_body-clean B-rep; STL export via stl_export.py. No virtual articulator, no AI design proposal, no bridge pontic."
-      evidence: "packages/kerf-dental/src/kerf_dental/crown.py (design_crown_anatomic), packages/kerf-dental/src/kerf_dental/stl_export.py"
+      note: "CrownSculptingPanel: anatomic preset picker (incisor/canine/premolar/molar), cusp height/angle sliders, occlusion-contact SVG overlay, Run dispatches dental_crown_design. Backend: design_crown_anatomic (swept margin polygon + raised-cosine cusp ridges, n_cusps=2-4). No virtual articulator, no bridge pontic."
+      evidence: "src/components/dental/CrownSculptingPanel.jsx, packages/kerf-dental/src/kerf_dental/crown.py (design_crown_anatomic), packages/kerf-dental/src/kerf_dental/stl_export.py"
   - domain: D13
     feature: "Implant planning"
     competitor:
@@ -35,8 +35,8 @@ features:
       source: "https://www.3shape.com/en/software/dental-system"
     kerf:
       status: partial
-      note: "Implant guide geometry (backend); no implant library integration"
-      evidence: "packages/kerf-dental/src/kerf_dental/guide.py"
+      note: "ImplantLibrary: filterable catalogue (Straumann, Nobel Biocare, Zimmer, MIS; diameter 3.3-4.8 mm; length 8-13 mm), click-to-place sends fixture dims to dental_surgical_guide backend. Representative geometry — not a certified clinical implant library."
+      evidence: "src/components/dental/ImplantLibrary.jsx, packages/kerf-dental/src/kerf_dental/guide.py"
   - domain: D13
     feature: "Surgical guide design"
     competitor:
@@ -45,8 +45,8 @@ features:
       source: "https://www.3shape.com/en/software/dental-system"
     kerf:
       status: partial
-      note: "Surgical guide generation backend; wired but not UI-facing"
-      evidence: "packages/kerf-dental/src/kerf_dental/guide.py"
+      note: "SurgicalGuide: CBCT/point-cloud import (CSV/JSON xyz), implant pose editor (position + axis per implant), drill sleeve setup, SVG guide preview; dispatches dental_surgical_guide. Backend: place_surgical_guide returns validate_body-clean cylinder sleeves + angular accuracy."
+      evidence: "src/components/dental/SurgicalGuide.jsx, packages/kerf-dental/src/kerf_dental/guide.py (place_surgical_guide)"
   - domain: D13
     feature: "DICOM / CBCT ingest"
     competitor:
@@ -116,8 +116,8 @@ features:
 
 ## Where 3Shape is strong
 
-- **Restoration design depth.** 3Shape's crown and bridge tools include AI design proposals via 3Shape Automate (~90 seconds to a clinically reasonable starting point), virtual articulator, screw-retained and standard crown options, and post/core abutment design. Kerf's crown is a placeholder cylinder.
-- **100+ implant library.** Every major implant system's geometry, connection, and scan body. Kerf has no implant library.
+- **Restoration design depth.** 3Shape's crown and bridge tools include AI design proposals via 3Shape Automate (~90 seconds to a clinically reasonable starting point), virtual articulator, screw-retained and standard crown options, and post/core abutment design. Kerf's CrownSculptingPanel provides parametric sculpting with preset + sliders but no AI proposals or virtual articulator.
+- **100+ implant library.** Every major implant system's geometry, connection, and scan body. Kerf's ImplantLibrary ships representative entries for 4 manufacturers — not a certified clinical library.
 - **Denture and RPD.** Full denture (complete and implant-retained) and removable partial denture design — major restorative categories that Kerf has no tooling for.
 - **3Shape Produce / manufacturing.** Direct integration with dental mills (Sirona, Roland, Datron) and 3D printers; click-to-manufacture workflow. Kerf exports STL; no dental mill post processor.
 - **TRIOS scanner ecosystem.** Native integration with one of the leading intraoral scanners plus support for third-party IOS formats. Kerf has no scanner integration.
@@ -133,9 +133,10 @@ features:
 
 ## Honest gaps — where Kerf is behind today
 
-- **Crown anatomy is parametric, not AI-guided.** Kerf's anatomic crown sweeps the actual margin polygon with raised-cosine cusp ridges (2 cusps for premolars, 4 for molars) — a parameterically reasonable restoration form. It is not clinically tuned to patient occlusion, does not include a virtual articulator, and does not produce a bridge pontic.
+- **Crown anatomy is parametric, not AI-guided.** CrownSculptingPanel provides preset picker + sliders + occlusion overlay + backend dispatch. The backend sweeps the margin polygon with raised-cosine cusp ridges (2 cusps for premolars, 4 for molars). It is not clinically tuned to patient occlusion, does not include a virtual articulator, and does not produce a bridge pontic.
+- **Implant library is representative, not certified.** ImplantLibrary ships Straumann, Nobel Biocare, Zimmer, and MIS entries with real diameter/length ranges and connection types. It is not a certified clinical library — it does not include every SKU or proprietary scan-body geometry.
+- **Surgical guide is preview-only in the UI.** SurgicalGuide dispatches to the backend and renders an SVG sleeve preview. It does not produce a milling-ready guide body (no B-rep or 3MF output from the UI layer).
 - **Denture is geometry, not fit-optimised.** The full denture and RPD connector are parametric arch meshes. There is no residual-ridge scan registration, no mucosal relief, and no occlusal balance.
-- **No implant library.** Without implant system geometry and connection data, implant planning is not clinically useful.
 - **No scanner integration.** No way to import an intraoral scan directly from a TRIOS or third-party IOS. Full IOS pipeline (multi-scan alignment, deviation map) is an epic.
 - **No dental-specific AI.** Kerf's general LLM is not trained on dental anatomy.
 - **No dental mill post processor.** Can export STL; cannot generate G-code for Sirona, Roland, or Datron dental mills.
@@ -146,10 +147,10 @@ features:
 |---|---|---|
 | License | MIT open-core | Proprietary (per seat/module) |
 | Primary focus | Multi-domain engineering CAD | Dental laboratory CAD |
-| Crown design | Anatomic (swept margin + n_cusps=2-4) | Full AI-assisted |
+| Crown design | CrownSculptingPanel: presets + sliders + occlusion overlay + backend | Full AI-assisted |
 | Bridge design | No pontic | Full AI-assisted |
-| Implant planning | Backend (no library) | 100+ implant libraries |
-| Surgical guide | Backend | Yes |
+| Implant planning | ImplantLibrary: Straumann/Nobel/Zimmer/MIS catalogue + click-to-place | 100+ implant libraries |
+| Surgical guide | SurgicalGuide: CBCT import + pose editor + sleeve preview + backend | Yes |
 | DICOM / CBCT ingest | Yes (backend) | Yes |
 | Full denture | Parametric arch mesh | Full fit-optimised design |
 | RPD / partial denture | Major connector mesh | Full RPD design |

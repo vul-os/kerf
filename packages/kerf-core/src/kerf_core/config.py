@@ -55,6 +55,13 @@ class Settings(BaseSettings):
     max_threads_per_project: int = 50
     file_revisions_max: int = 200
 
+    # RunPod Serverless GPU backend.
+    # Set RUNPOD_API_KEY + RUNPOD_ENDPOINT_ID in the environment or .env to enable
+    # managed GPU renders.  When empty, RunPodGPUBackend raises RunPodAuthError /
+    # RunPodError on first use rather than crashing at startup.
+    runpod_api_key: str = ""
+    runpod_endpoint_id: str = ""
+
     # Compute-worker dispatch endpoint (pythonOCC + FEM + CAM + topo subprocess).
     pyworker_url: str = "http://localhost:8090"
     step_max_bytes: int = 200_000_000

@@ -200,7 +200,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 | **GK-P** | **Geometry kernel parity series** — close the gap list from the multi-CAD survey (GK-01..GK-139 landed; wiring + foundational + SubD + architectural geometry remaining). | Every persona's work quality depends on kernel robustness. | 🚧 in flight |
 | **T-100** | **FEM matching CalculiX / Z88 / Mystran depth** — nonlinear, explicit, acoustics, EM, fatigue beyond the verified linear-static+modal+thermal slice. | Serious simulation work. | 🚧 in flight |
 | **T-101** | **CFD (CfdOF-class)** — turbulence models, 3-D unstructured meshing, OpenFOAM bridge beyond the 2-D laminar foundation. | Fluid and aero simulation. | 🚧 in flight |
-| **Hosted infra migration** | **Cloud infrastructure migration** — GPU compute instances needed for Cycles renders and future GPU workloads. GPU worker dispatch foundation + BYO worker enrollment shipped — enroll your own GPU machine, jobs run on your hardware at zero credit cost. RunPod vendor API calls are the last remaining item. | GPU render price drops 2-3× when RunPod backend ships; BYO path available now. | 🚧 in flight — RunPod HTTP calls remaining |
+| **Hosted infra** | **Cloud infrastructure** — GPU renders via RunPod Serverless (L4→H100, scale-to-zero) — `RunPodGPUBackend` fully implemented: submit/poll/fetch_result/capabilities with retry + exponential back-off. BYO worker path (zero credit cost) unchanged. | GPU render prices 2-3× lower. | ✅ shipped |
 
 ---
 
@@ -297,7 +297,7 @@ These are roadmap-level moats that span every sector simultaneously and compound
 - **P0-8 deploy-hardening** — realistic seed data + one-command dev loop; test coverage breadth still expanding.
 - **P1-7 formboard flatten** — harness 3D path routing is shipped; 2D formboard-flattening output (T-37 follow-on) not yet wired.
 - **P1-8 large-file git** — pointer kind + Phase 1 shipped; deduplication-based free-fork accounting and content-addressed LFS store in progress.
-- **Hosted infra GPU migration** — Cycles render cost; no self-host impact.
+- **RunPod GPU backend** — ✅ shipped; managed GPU renders via RunPod Serverless (L4→H100, scale-to-zero) live.
 - **G-5 class-A wiring** — math complete; frontend viewport toggle + imprint toolpath not yet exposed.
 - **Long-tail verticals** — see "Long-tail verticals" list above; all committed, none started.
 

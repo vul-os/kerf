@@ -1,5 +1,6 @@
 """
-Tests for kerf_dental.guide — Phase 2 watertight single-solid boolean subtract.
+Tests for kerf_dental.guide — Phase 2 watertight single-solid boolean subtract
++ tessellator watertightness fix (DENTAL-GUIDE-BOOLEAN caveat closure).
 
 DoD checks
 ----------
@@ -10,8 +11,8 @@ DoD checks
    1 inner cylinder).
 3. validate_body passes for all cases.
 4. guide_body_to_stl_bytes: produces valid binary STL (correct header + size).
-5. Euler characteristic of tessellated mesh: V - E + F = 2 per connected
-   component (closed manifold).
+5. STL watertightness (is_watertight oracle): all edge counts == 2, N = 1, 2, 4, 6.
+6. Euler characteristic == 2 - 2*N for N-hole guide.
 """
 
 from __future__ import annotations
@@ -33,6 +34,8 @@ from kerf_dental.guide import (
     ImplantSpec,
     surgical_guide_to_body,
     guide_body_to_stl_bytes,
+    is_watertight,
+    mesh_euler_characteristic,
 )
 from kerf_cad_core.geom.brep import validate_body
 
@@ -52,11 +55,23 @@ def _make_spec(x: float, y: float, d: float = 4.0) -> ImplantSpec:
 
 
 SINGLE_IMPLANT = [_make_spec(10.0, 10.0)]
+TWO_IMPLANTS = [
+    _make_spec(5.0, 10.0),
+    _make_spec(15.0, 10.0),
+]
 FOUR_IMPLANTS = [
     _make_spec(5.0, 5.0),
     _make_spec(5.0, 15.0),
     _make_spec(15.0, 5.0),
     _make_spec(15.0, 15.0),
+]
+SIX_IMPLANTS = [
+    _make_spec(5.0, 5.0),
+    _make_spec(5.0, 15.0),
+    _make_spec(5.0, 25.0),
+    _make_spec(15.0, 5.0),
+    _make_spec(15.0, 15.0),
+    _make_spec(15.0, 25.0),
 ]
 
 
@@ -460,3 +475,91 @@ class TestSurgicalGuideToBodyAPI:
             assert len(body.solids) == 1, (
                 f"n={n} implants: expected 1 solid, got {len(body.solids)}"
             )
+
+
+# ===========================================================================
+# 6. is_watertight oracle — DENTAL-GUIDE-BOOLEAN caveat closure
+#    Every STL for N = 1, 2, 4, 6 holes must pass the oracle.
+# ===========================================================================
+
+class TestIsWatertightOracle:
+    """
+    Verify the ``is_watertight`` STL oracle and the tessellator fix.
+
+    Wave 4H caveat: multi-hole STL was not a closed 2-manifold at sector
+    boundary vertices.  The bridge-cut tessellator + shared-vertex quantisation
+    fix must close this for all N.
+    """
+
+    def test_oracle_single_hole_watertight(self):
+        """1-hole STL: is_watertight → True (backwards compat)."""
+        body = surgical_guide_to_body(SINGLE_IMPLANT)
+        data = guide_body_to_stl_bytes(body, arc_samples=24)
+        assert is_watertight(data), "1-hole STL failed is_watertight"
+
+    def test_oracle_two_holes_watertight(self):
+        """2-hole STL: is_watertight → True (previously failing case)."""
+        body = surgical_guide_to_body(TWO_IMPLANTS)
+        data = guide_body_to_stl_bytes(body, arc_samples=24)
+        assert is_watertight(data), "2-hole STL failed is_watertight"
+
+    def test_oracle_four_holes_watertight(self):
+        """4-hole STL: is_watertight → True."""
+        body = surgical_guide_to_body(FOUR_IMPLANTS)
+        data = guide_body_to_stl_bytes(body, arc_samples=24)
+        assert is_watertight(data), "4-hole STL failed is_watertight"
+
+    def test_oracle_six_holes_watertight(self):
+        """6-hole STL: is_watertight → True."""
+        body = surgical_guide_to_body(SIX_IMPLANTS)
+        data = guide_body_to_stl_bytes(body, arc_samples=24)
+        assert is_watertight(data), "6-hole STL failed is_watertight"
+
+    def test_oracle_arc_samples_12_watertight(self):
+        """Fewer arc samples still produces watertight mesh for 4 holes."""
+        body = surgical_guide_to_body(FOUR_IMPLANTS)
+        data = guide_body_to_stl_bytes(body, arc_samples=12)
+        assert is_watertight(data), "4-hole arc_samples=12 STL failed is_watertight"
+
+    def test_oracle_arc_samples_48_watertight(self):
+        """More arc samples still produces watertight mesh for 4 holes."""
+        body = surgical_guide_to_body(FOUR_IMPLANTS)
+        data = guide_body_to_stl_bytes(body, arc_samples=48)
+        assert is_watertight(data), "4-hole arc_samples=48 STL failed is_watertight"
+
+    def test_oracle_rejects_short_bytes(self):
+        """is_watertight raises ValueError on undersized input."""
+        with pytest.raises(ValueError, match="too short"):
+            is_watertight(b"\x00" * 10)
+
+    # -----------------------------------------------------------------------
+    # Euler characteristic checks via mesh_euler_characteristic
+    # -----------------------------------------------------------------------
+
+    def test_euler_single_hole(self):
+        """1-hole guide: genus 1 → V - E + F = 0."""
+        body = surgical_guide_to_body(SINGLE_IMPLANT)
+        data = guide_body_to_stl_bytes(body, arc_samples=24)
+        chi = mesh_euler_characteristic(data)
+        assert chi == 0, f"1-hole: expected chi=0 (genus 1), got {chi}"
+
+    def test_euler_two_holes(self):
+        """2-hole guide: genus 2 → V - E + F = -2."""
+        body = surgical_guide_to_body(TWO_IMPLANTS)
+        data = guide_body_to_stl_bytes(body, arc_samples=24)
+        chi = mesh_euler_characteristic(data)
+        assert chi == -2, f"2-hole: expected chi=-2 (genus 2), got {chi}"
+
+    def test_euler_four_holes(self):
+        """4-hole guide: genus 4 → V - E + F = -6."""
+        body = surgical_guide_to_body(FOUR_IMPLANTS)
+        data = guide_body_to_stl_bytes(body, arc_samples=24)
+        chi = mesh_euler_characteristic(data)
+        assert chi == -6, f"4-hole: expected chi=-6 (genus 4), got {chi}"
+
+    def test_euler_six_holes(self):
+        """6-hole guide: genus 6 → V - E + F = -10."""
+        body = surgical_guide_to_body(SIX_IMPLANTS)
+        data = guide_body_to_stl_bytes(body, arc_samples=24)
+        chi = mesh_euler_characteristic(data)
+        assert chi == -10, f"6-hole: expected chi=-10 (genus 6), got {chi}"

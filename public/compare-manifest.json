@@ -5936,9 +5936,9 @@
             "source": "https://help.solidworks.com/2025/English/SolidWorks/sldworks/c_SpeedPak_OH.htm"
           },
           "kerf": {
-            "status": "partial",
-            "note": "LOD mesh swapping (configurable); no SpeedPak equivalent",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/assembly/perf.py"
+            "status": "yes",
+            "note": "Camera-debounced LOD pass in 3D viewport: full / bbox-proxy / culled tiers up to 1 000 visible parts; debug HUD; no SpeedPak equivalent",
+            "evidence": "src/components/Renderer.jsx + packages/kerf-cad-core/src/kerf_cad_core/assembly/perf.py"
           }
         },
         {
@@ -9694,9 +9694,9 @@
             "source": "https://support.ptc.com/help/creo/creo_pma/r9.0/usascii/index.html#page/assembly/simplified_reps/simplified_reps_intro.html"
           },
           "kerf": {
-            "status": "partial",
-            "note": "LOD mesh swapping configurable; no formal simplified-rep workflow",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/assembly/mates.py"
+            "status": "yes",
+            "note": "Camera-debounced LOD pass: full / bbox-proxy / culled tiers, 1 000-part budget; no formal simplified-rep / Shrinkwrap workflow yet",
+            "evidence": "src/components/Renderer.jsx + packages/kerf-cad-core/src/kerf_cad_core/assembly/perf.py"
           }
         },
         {

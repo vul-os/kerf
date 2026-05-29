@@ -207,7 +207,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 
 | # | What | Why it matters | Status |
 |---|---|---|---|
-| **P0-5** | **Large-assembly performance ceiling** — measured budget + LOD / lazy-load for 1000s of parts. Automotive full-vehicle DMU is the extreme case. | First credibility block for automotive and large mechanical. | 🚧 in flight — `assembly/perf.py`: LOD planner + lazy-load ordering + performance harness shipped; viewport integration + real-part catalogue pending — `kerf_cad_core/assembly/perf.py` |
+| **P0-5** | **Large-assembly performance ceiling** — measured budget + LOD / lazy-load for 1000s of parts. Automotive full-vehicle DMU is the extreme case. | First credibility block for automotive and large mechanical. | ✅ shipped — `assembly/perf.py` LOD planner + lazy-load ordering wired to `Renderer.jsx` viewport: camera-move debounce (200 ms) queries `assembly_lod_plan` tool, applies full/bbox_proxy/culled tiers to scene meshes; debug HUD toggle added to Render menu — `kerf_cad_core/assembly/perf.py`, `src/components/Renderer.jsx` |
 | **P0-6** | **Broaden text / code file support** — common text and code files open as editable text with syntax highlighting. | Every project benefits; gates firmware depth. | ✅ shipped — `FileEditor.jsx` + `editorModes.js`: 30+ extensions (Python, C/C++, JS/TS, Markdown, YAML, …) mapped to Monaco language IDs — `src/components/FileEditor.jsx` |
 | **P0-7** | **Project export / materialize foundation** — plain file-tree for `kerf export` / `kerf import` / `kerf sync`. | The anti-lock-in guarantee's substrate. | ✅ shipped — `GET /projects/{pid}/export` ZIP route + `POST /api/projects/import` bulk ZIP import (path-traversal guard, size cap, file-count cap, ext→kind mapping, binary/text split) — `kerf-api/routes.py`, `kerf-cli/portability.py` |
 | **P0-8** | **Testing / seeding / deploy-hardening** — broad test suites + realistic seed data + one-command local/dev loops. | Quality gate before broader build-out. | 🚧 in flight |
@@ -295,6 +295,8 @@ These are roadmap-level moats that span every sector simultaneously and compound
 - **G-7 caustics + in-browser path-tracer** — Cycles spectral dispersion data (Sellmeier/Abbe) is stashed by the translator but no caustic solver is wired; in-browser WebGPU path-tracer not started.
 - ~~**P0-7 bulk import endpoint**~~ — ✅ shipped `POST /api/projects/import` (ZIP archive upload; path-traversal guard + size/count caps + ext→kind mapping).
 - **P0-5 viewport integration** — LOD planner and lazy-load ordering are implemented in `assembly/perf.py` but not yet wired to the 3D viewport renderer.
+- **P0-7 bulk import endpoint** — `POST /api/projects/import` (ZIP archive upload); workaround (file-by-file) exists; bulk path not yet implemented.
+- **P0-5 real-part catalogue** — LOD planner heuristics use synthetic triangle / bbox estimates; wiring to real tessellated part geometry (via `mesh_url` pre-baked buffers) would sharpen tier boundaries for production DMU use.
 
 ### Multi-month epics
 

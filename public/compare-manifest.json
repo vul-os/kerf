@@ -3925,8 +3925,8 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py",
-            "note": "opBlendSrf (blend_srf_to_body G1/G2) + opNetworkSrf (network_srf_to_body Gordon) + opSweep2 (sweep2_to_body RMF) all wired as LLM tools; validate_body-clean; 33 Phase 4a tests green"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py, packages/kerf-cad-core/src/kerf_cad_core/geom/nurbs_surface_fit.py",
+            "note": "opBlendSrf (G1/G2) + opNetworkSrf (Gordon) + opSweep2 (RMF) wired as LLM tools; validate_body-clean. nurbs_surface_fit — freeform NURBS fit from segmented point clouds (centripetal param, P&T §9.2.2 knots, damped LS; reverse-engineering pipeline)"
           }
         },
         {

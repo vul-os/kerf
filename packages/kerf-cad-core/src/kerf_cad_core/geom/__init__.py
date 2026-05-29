@@ -747,6 +747,10 @@ __all__ = [
     # GK-64: Class-A leading pass
     "LeadingReport",
     "run_leading_pass",
+    # GK-140: NURBS freeform-surface fit (reverse-engineering)
+    "nurbs_surface_fit",
+    "FitError",
+    "FitReport",
 ]
 
 # GK-122: interference / collision detection
@@ -787,5 +791,11 @@ from kerf_cad_core.geom.io.rhino3dm import (
 from kerf_cad_core.geom.direct_edit import push_pull_face, move_face, delete_face
 # GK-137: point-cloud → mesh reconstruction (ball-pivoting / Poisson-lite)
 from kerf_cad_core.geom.recon import reconstruct_mesh  # noqa: E402
+# GK-140: NURBS freeform-surface fit from segmented point clouds (reverse-engineering)
+from kerf_cad_core.geom.nurbs_surface_fit import (  # noqa: E402
+    nurbs_surface_fit,
+    FitError,
+    FitReport,
+)
 # GK-64: Class-A leading quality pass (comb-peak + zebra-break + G3-dropout)
 from kerf_cad_core.geom.leading import LeadingReport, run_leading_pass

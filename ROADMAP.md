@@ -271,7 +271,7 @@ These are roadmap-level moats that span every sector simultaneously and compound
 | **3D tolerance / variation analysis** — statistical stack-up + contributor analysis. Shipped: 1D worst-case/RSS/Monte-Carlo + 3D vector-loop 6-DOF Jacobian. Full FEA-coupled variation simulation ahead. | 🚧 in flight |
 | **PLM depth** — configurator, 150% / effectivity BOM, where-used, ECR/ECO, digital thread, MBSE/SysML traceability. File revisions + cloud git + configurations + BOM rollup shipped (partial PLM). | 🚧 in flight |
 | **Multi-CAD interop & geometry healing** — STEP AP242 / JT / Parasolid / QIF + automatic repair. STEP + JT + Parasolid + QIF + 3DM I/O shipped; body-level geometric heal (vertex weld, sliver-gap close, sub-tolerance edge removal) shipped — `kerf-cad-core/geom/body_heal.py`, `kerf-imports/heal.py`. FEA-grade topology repair for severely degenerate STEP not yet covered. | 🚧 in flight |
-| **Reverse-engineering pipeline** — point cloud → segmentation → feature fit → parametric solid. | 🚧 in flight — full pipeline shipped: PLY/PCD I/O, outlier removal, sequential-RANSAC segmentation for plane/sphere/cylinder/cone/torus, feature-map classification, ICP mesh registration (dental) — `kerf-cad-core/reverse_engineering/pipeline.py`, `kerf-dental/registration.py`. Topology ordering + freeform NURBS fit deferred (depends on NURBS kernel). |
+| **Reverse-engineering pipeline** — point cloud → segmentation → feature fit → parametric solid. | ✅ shipped — full pipeline: PLY/PCD I/O, outlier removal, sequential-RANSAC segmentation (plane/sphere/cylinder/cone/torus), feature-map classification, ICP mesh registration (dental), **freeform NURBS surface fit from segmented clusters** (centripetal param + P&T §9.2 knots + damped LS) — `kerf-cad-core/geom/nurbs_surface_fit.py`, `kerf-cad-core/scan/nurbs_fit_tools.py`. Topology ordering into replay-able parametric DAG remains outstanding. |
 | **Mechanism synthesis & motion** — linkage / cam / gear-train *synthesis*. | 🚧 in flight — four-bar (Burmester), cam-profile, and gear-train synthesis shipped with reference-oracle tests — `kerf-mates/synthesis/{fourbar,cam,gear_train}.py`. Multi-body dynamic simulation (kerf-motion integrator) also shipped. |
 
 ---
@@ -298,6 +298,7 @@ These are roadmap-level moats that span every sector simultaneously and compound
 - **T-101 CFD depth** — RANS turbulence models; 3-D unstructured meshing; OpenFOAM bridge.
 - ~~**AFR topology ordering**~~ — ✅ shipped: `afr_to_dag` + `.feature` emitter + `afr_to_parametric` LLM tool in `kerf-cad-core/afr/dag.py`.
 - **Reverse-engineering freeform fit** — freeform NURBS surface fit from segmented point clouds; currently only analytic primitives (plane/sphere/cylinder/cone/torus).
+- **AFR topology ordering** — promote the AAG feature classifier output into a fully replay-able parametric DAG (depends on NURBS kernel completeness).
 - **PLM configurator layer** — 150%/effectivity BOM, where-used, ECR/ECO workflow, MBSE/SysML traceability.
 - **KBE general configurator** — rule-driven design configurator layer on top of the existing standard-specific compliance engines.
 

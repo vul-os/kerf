@@ -58,6 +58,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.clash.tools",
     "kerf_cad_core.marine.tools",
     "kerf_cad_core.scan.tools",
+    "kerf_cad_core.scan.nurbs_fit_tools",    # scan_fit_nurbs_surface — NURBS freeform fit
     "kerf_cad_core.gdt_callouts.tools",
     "kerf_cad_core.family.tools",
     "kerf_cad_core.shaft.tools",

@@ -79,6 +79,12 @@ from kerf_cad_core.geom.network_srf import (
     loft_surface,  # GK-P16: guided loft
 )
 
+# GK-P-D: loft with multiple guide rails (Gordon surface)
+from kerf_cad_core.geom.loft_rails import (
+    loft_with_rails,
+    _gordon_loft_surface,
+)
+
 from kerf_cad_core.geom.blend_srf import (
     blend_srf,
     blend_srf_g1,

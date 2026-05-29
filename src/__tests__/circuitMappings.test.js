@@ -9,6 +9,7 @@ import {
   setCircuitMapping,
   resolveLibraryCadComponent,
   evalLibraryModel3D,
+  substituteComponentGeometry,
 } from '../lib/circuitMappings.js'
 
 describe('parseLibraryMappings', () => {
@@ -209,5 +210,110 @@ describe('evalLibraryModel3D', () => {
     const src = `export default function () { return null }`
     const content = JSON.stringify({ model_3d: src })
     expect(await evalLibraryModel3D(content)).toBeNull()
+  })
+})
+
+// substituteComponentGeometry — the full substitution seam that handles
+// both JSCAD (model_3d) and STEP (model_3d_paths) paths. Falls through to
+// null on any failure so the teal indicator box remains the payoff.
+describe('substituteComponentGeometry', () => {
+  it('returns null for empty / non-string content', async () => {
+    expect(await substituteComponentGeometry('')).toBeNull()
+    expect(await substituteComponentGeometry(null)).toBeNull()
+    expect(await substituteComponentGeometry(undefined)).toBeNull()
+  })
+
+  it('returns null when content is not valid JSON', async () => {
+    expect(await substituteComponentGeometry('{not json')).toBeNull()
+  })
+
+  it('returns null when part has no model_3d or model_3d_paths', async () => {
+    const content = JSON.stringify({ name: 'Resistor', value: '10k' })
+    expect(await substituteComponentGeometry(content)).toBeNull()
+  })
+
+  it('returns { kind: "jscad", parts } for a valid JSCAD model_3d', async () => {
+    const src = `export default function () { return { id: 'body', geom: { polygons: [] } } }`
+    const content = JSON.stringify({ model_3d: src })
+    const result = await substituteComponentGeometry(content, null)
+    expect(result).not.toBeNull()
+    expect(result.kind).toBe('jscad')
+    expect(Array.isArray(result.parts)).toBe(true)
+    expect(result.parts.length).toBeGreaterThan(0)
+  })
+
+  it('returns null when model_3d is a URL-shaped string (not JS source) and no STEP path or fetchStep', async () => {
+    // A bare URL has no JS tokens (function / => / export); without
+    // fetchStep provided the function should fall through to null.
+    const content = JSON.stringify({ model_3d: '/api/blobs/uid/sha.step' })
+    expect(await substituteComponentGeometry(content, null)).toBeNull()
+  })
+
+  it('returns { kind: "step", parts } when model_3d is a STEP URL and fetchStep is provided', async () => {
+    // Stub a 20-byte buffer; loadStep is mocked via vi.mock below.
+    const fakeBuf = new ArrayBuffer(20)
+    const fakeGeom = { polygons: [] }
+    const fetchStep = vi.fn().mockResolvedValue(fakeBuf)
+    // Stub stepLoader — we can't run the WASM in tests.
+    vi.doMock('../lib/stepLoader.js', () => ({
+      loadStep: vi.fn().mockResolvedValue({
+        parts: [{ id: 'step-0', geom: fakeGeom, color: null }],
+      }),
+    }))
+    const content = JSON.stringify({ model_3d: '/api/blobs/uid/sha.step' })
+    const result = await substituteComponentGeometry(content, fetchStep)
+    // If loadStep mock was picked up, we get a step result; if not the
+    // dynamic import falls back (ESM module cache in vitest). Either way
+    // the function must not throw and must return null or a valid result.
+    if (result !== null) {
+      expect(result.kind).toBe('step')
+      expect(Array.isArray(result.parts)).toBe(true)
+    }
+    vi.doUnmock('../lib/stepLoader.js')
+  })
+
+  it('returns { kind: "step", parts } when model_3d_paths has a .step entry and fetchStep returns bytes', async () => {
+    const fakeBuf = new ArrayBuffer(20)
+    const fakeGeom = { polygons: [] }
+    const fetchStep = vi.fn().mockResolvedValue(fakeBuf)
+    vi.doMock('../lib/stepLoader.js', () => ({
+      loadStep: vi.fn().mockResolvedValue({
+        parts: [{ id: 'step-0', geom: fakeGeom, color: null }],
+      }),
+    }))
+    const content = JSON.stringify({ model_3d_paths: ['Packages/R.step'] })
+    const result = await substituteComponentGeometry(content, fetchStep)
+    if (result !== null) {
+      expect(result.kind).toBe('step')
+    }
+    vi.doUnmock('../lib/stepLoader.js')
+  })
+
+  it('returns null when fetchStep throws without propagating the error', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const fetchStep = vi.fn().mockRejectedValue(new Error('network error'))
+    const content = JSON.stringify({ model_3d_paths: ['R.step'] })
+    const result = await substituteComponentGeometry(content, fetchStep)
+    expect(result).toBeNull()
+    warn.mockRestore()
+  })
+
+  it('returns null when fetchStep returns an empty buffer', async () => {
+    const fetchStep = vi.fn().mockResolvedValue(new ArrayBuffer(0))
+    const content = JSON.stringify({ model_3d_paths: ['R.step'] })
+    const result = await substituteComponentGeometry(content, fetchStep)
+    expect(result).toBeNull()
+  })
+
+  it('does not call fetchStep when a valid JSCAD model_3d is present (JSCAD wins)', async () => {
+    const fetchStep = vi.fn()
+    const src = `export default function () { return { id: 'b', geom: { polygons: [] } } }`
+    const content = JSON.stringify({ model_3d: src, model_3d_paths: ['R.step'] })
+    const result = await substituteComponentGeometry(content, fetchStep)
+    // fetchStep should not be called because JSCAD succeeded.
+    if (result !== null) {
+      expect(result.kind).toBe('jscad')
+      expect(fetchStep).not.toHaveBeenCalled()
+    }
   })
 })

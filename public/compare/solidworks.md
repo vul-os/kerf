@@ -659,6 +659,18 @@ features:
       status: yes
       note: "kerf-sdk on PyPI — HTTP/JSON-RPC; same interface as LLM"
       evidence: "packages/kerf-sdk"
+
+  # ── D1 Standard parts library ─────────────────────────────────────────────
+  - domain: D1
+    feature: "Standard parts library (ISO/DIN fasteners, bearings, profiles)"
+    competitor:
+      status: yes
+      note: "SOLIDWORKS Toolbox: ISO/DIN/ANSI/BSI/JIS fasteners + bearings; drag-and-drop into assemblies"
+      source: "https://help.solidworks.com/2024/english/SolidWorks/toolbox/c_toolbox_overview.htm"
+    kerf:
+      status: yes
+      note: "kerf-partsgen: 5 ISO/DIN generators; kerf-parts KiCad+BOLTS+FreeCAD pipeline; real STEP/JSCAD geometry in CircuitEditor 3D tab via substitute_component"
+      evidence: "packages/kerf-parts/src/kerf_parts/tools.py"
 ---
 
 # Kerf vs SOLIDWORKS

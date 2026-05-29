@@ -637,6 +637,18 @@ features:
       status: yes
       note: "ISO 14040/44 4-phase+multi-impact+uncertainty (backend)"
       evidence: "packages/kerf-lca/src/kerf_lca/phases.py"
+
+  # ── D1 Standard parts library ─────────────────────────────────────────────
+  - domain: D1
+    feature: "Standard parts library (ISO/DIN fasteners, bearings, profiles)"
+    competitor:
+      status: partial
+      note: "Onshape Standard Content library: ISO/DIN/ANSI fasteners via Part Studio; narrower coverage than SolidWorks Toolbox"
+      source: "https://cad.onshape.com/help/Content/standard_content.htm"
+    kerf:
+      status: yes
+      note: "kerf-partsgen: 5 ISO/DIN generators; kerf-parts KiCad+BOLTS+FreeCAD pipeline; real STEP/JSCAD geometry in CircuitEditor 3D tab via substitute_component"
+      evidence: "packages/kerf-parts/src/kerf_parts/tools.py"
 ---
 
 # Kerf vs Onshape

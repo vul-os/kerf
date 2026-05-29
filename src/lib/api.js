@@ -263,6 +263,10 @@ export const api = {
   deleteFile: (projectId, fileId) =>
     request(`/api/projects/${projectId}/files/${fileId}`, { method: 'DELETE' }),
 
+  // fetchRaw — returns the raw Response (not parsed JSON). Used by the
+  // component-substitution path to fetch STEP blob bytes.
+  fetchRaw: (path, init = {}) => request(path, { ...init, raw: true }),
+
   // Upload a binary asset (e.g. STEP file). The backend should return a File row.
   // We use multipart/form-data; do NOT set content-type — the browser will set
   // the correct boundary header automatically.

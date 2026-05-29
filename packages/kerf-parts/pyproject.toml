@@ -21,6 +21,9 @@ seed = ["kerf-core", "kerf-imports"]
 kerf-parts-fetch = "kerf_parts.fetch:main"
 kerf-seed-parts = "kerf_parts.seed:main"
 
+[project.entry-points."kerf.plugins"]
+kerf-parts = "kerf_parts.plugin"
+
 # Contributor tooling — deliberately NOT a kerf.plugins runtime entry point.
 
 [tool.hatch.build.targets.wheel]

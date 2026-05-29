@@ -98,6 +98,73 @@ export function resolveLibraryCadComponent(refdes, mappings) {
   return typeof v === 'string' && v.length > 0 ? v : null
 }
 
+// substituteComponentGeometry — full substitution seam for a Library Part.
+//
+// Given a Library Part file's content string and an optional async fetchStep
+// function `(relativePath) => ArrayBuffer`, tries to resolve real geometry:
+//
+//   1. If the Part JSON has a `model_3d` JSCAD source → delegates to
+//      evalLibraryModel3D and returns `{ kind: 'jscad', parts: [...] }`.
+//   2. If the Part JSON has a `model_3d_paths` with a .step/.stp entry and
+//      `fetchStep` is provided → fetches the bytes, parses via loadStep, and
+//      returns `{ kind: 'step', parts: [...] }`.
+//   3. Otherwise returns null (caller should show indicator chip).
+//
+// Cache: the STEP bytes cache lives in stepLoader.js (keyed by SHA-256 of
+// the buffer). JSCAD caching is handled by the fetchCacheRef in
+// CircuitEditor.jsx. This function is pure-async with no internal state.
+//
+// Exported for testing. Callers that don't need STEP substitution can omit
+// fetchStep (pass null / undefined) — the function will still try JSCAD.
+export async function substituteComponentGeometry(content, fetchStep) {
+  if (typeof content !== 'string' || content.length === 0) return null
+  let raw = null
+  try { raw = JSON.parse(content) } catch { return null }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+
+  // 1. JSCAD path — prefer over STEP (client-side, no extra round-trip).
+  const src = raw.model_3d
+  if (typeof src === 'string' && src.length > 0) {
+    const looksLikeJs = /\bfunction\b|=>|\bexport\b/.test(src)
+    if (looksLikeJs) {
+      const res = await evalLibraryModel3D(content)
+      if (res) return { kind: 'jscad', parts: res.parts }
+    }
+    // If model_3d is present but is a URL/path (not JS), fall through to STEP
+    // detection below rather than silently doing nothing.
+  }
+
+  // 2. STEP path — requires a fetchStep injector (so tests can stub it).
+  if (typeof fetchStep === 'function') {
+    const paths = Array.isArray(raw.model_3d_paths) ? raw.model_3d_paths : []
+    // Also accept a model_3d that looks like a /api/blobs/... URL.
+    const maybeUrl = typeof raw.model_3d === 'string' ? raw.model_3d : null
+    const stepUrl = maybeUrl && /\.(step|stp)($|\?)/i.test(maybeUrl) ? maybeUrl : null
+    const stepPath = stepUrl || paths.find(
+      (p) => typeof p === 'string' && /\.(step|stp)$/i.test(p),
+    )
+    if (stepPath) {
+      try {
+        const buf = await fetchStep(stepPath)
+        if (buf && buf.byteLength > 0) {
+          // Lazy-import stepLoader so the module stays tree-shakable.
+          const { loadStep } = await import('./stepLoader.js')
+          const res = await loadStep(buf)
+          if (res && Array.isArray(res.parts) && res.parts.length > 0) {
+            return { kind: 'step', parts: res.parts }
+          }
+        }
+      } catch (err) {
+        if (typeof console !== 'undefined') {
+          console.warn('substituteComponentGeometry: STEP load failed:', err)
+        }
+      }
+    }
+  }
+
+  return null
+}
+
 // evalLibraryModel3D — parse a Library Part file's content and, if it carries
 // a JSCAD-source `model_3d` field, evaluate it via the standard jscadRunner
 // and return `{ parts: [{id, geom}, ...] }`. Returns null in every failure

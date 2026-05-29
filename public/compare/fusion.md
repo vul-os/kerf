@@ -901,6 +901,18 @@ features:
       status: yes
       note: "Moldflow + weld + AM + forming (backend)"
       evidence: "packages/kerf-manufacturing/src/kerf_manufacturing/moldflow"
+
+  # ── D1 Standard parts library ─────────────────────────────────────────────
+  - domain: D1
+    feature: "Standard parts library (ISO/DIN fasteners, bearings, profiles)"
+    competitor:
+      status: partial
+      note: "Fusion 360 has a McMaster-Carr / Toolbox integration; coverage narrower than SolidWorks Toolbox"
+      source: "https://help.autodesk.com/view/fusion360/ENU/?guid=ASM-TOOLBOX-OVERVIEW"
+    kerf:
+      status: yes
+      note: "kerf-partsgen: 5 ISO/DIN generators; kerf-parts KiCad+BOLTS+FreeCAD pipeline; real STEP/JSCAD geometry in CircuitEditor 3D tab via substitute_component"
+      evidence: "packages/kerf-parts/src/kerf_parts/tools.py"
 ---
 
 # Kerf vs Autodesk Fusion 360

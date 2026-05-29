@@ -65,6 +65,9 @@ async def register(app: FastAPI, ctx) -> PluginManifest:
     # already declares prefix="/api/workers", so this include uses prefix="".
     _try_include(app, "kerf_api.routes_workers", prefix="", tags=["gpu-workers"])
 
+    # Component 3D model blob serving (STEP/WRL for Library Part model_3d_paths).
+    _try_include(app, "kerf_api.routes_model3d", prefix="/api", tags=["model3d"])
+
     _register_tools(ctx)
 
     ctx.logger.info("kerf-api: registered /api routes and LLM tools")

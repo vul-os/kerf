@@ -45,6 +45,9 @@ The sector work only matters if you **own your work, are not locked in, and can 
 **Civil infrastructure UIs** ✅ — four viewport components wired to kerf-civil backends: `TINView.jsx` (3-D isometric TIN surface, wireframe + contour overlay, dispatches `civil_tin_terrain`); `PipeNetworkView.jsx` (2-D plan view with click-to-inspect pipes, flow/pressure overlay, dispatches `civil_water_network_solve`); `GradingPlanView.jsx` (existing + proposed contour overlay, cut/fill colour bands, dispatches `civil_tin_terrain` volume op); `LandscapeView.jsx` (planting symbols + irrigation zones, dispatches `landscape_plants` + `landscape_irrigation_schedule`) — `src/components/civil/`. Editor shell wired for `.tin`, `.pipe_net`, `.grading`, `.landscape` file kinds. 62 SSR tests pass.
 
 ### Previous delta — 2026-05-26
+**`cad_component` real geometry substitution** ✅ — Library-mapped components in the CircuitEditor 3D tab now render real geometry instead of indicator chips: JSCAD `model_3d` source is evaluated in-browser; STEP `model_3d_paths` entries are fetched via `/api/projects/:pid/model3d` and parsed via `occt-import-js`. Cache: per-file-id in `fetchCacheRef` (STEP bytes cached by SHA-256 in `stepLoader.js`). `substitute_component` LLM tool registered via `kerf_parts.plugin`; `_try_include` pattern wired in `kerf_api.plugin` — `src/lib/circuitMappings.js`, `src/components/CircuitEditor.jsx`, `packages/kerf-parts/src/kerf_parts/tools.py`, `packages/kerf-api/src/kerf_api/routes_model3d.py`.
+
+### Earlier delta — 2026-05-26
 
 **Civil hydraulics** ✅ — LandXML 1.2 import/export (`civil_landxml_import/export`); steady-state pressurised pipe network (Todini GGA + HW/DW, `civil_water_network_solve`); Manning circular/trapezoidal sewer (`civil_sewer_manning_capacity`); rational-method peak runoff (`civil_storm_rational`); HDS-5 inlet-control culvert (`civil_culvert_capacity`) — `kerf-civil/src/kerf_civil/tools_hydraulics.py`.
 
@@ -162,6 +165,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 ### Electronics
 
 - **KiCad-class PCB design** ✅ — ERC, hier-schematic, buses/diff-pairs, net classes/rules, length tuning, via stitching/teardrops, shove router, copper pour, DRC.
+- **Library `cad_component` 3D substitution** ✅ — Library-mapped components resolve to real JSCAD/STEP geometry in the CircuitEditor 3D tab; indicator chips replaced; cache per component_id; `substitute_component` LLM tool.
 - **Fabrication package** ✅ — Gerber RS-274X, Excellon drill, IPC-2581, ODB++, pick-and-place, fab BOM, 3D board STEP export.
 - **SPICE + RF + autorouting** ✅ — ngspice, scikit-rf S-params/Smith chart, FreeRouting DSN/SES.
 - **Wiring/harness** ✅ — WireViz YAML→SVG (2D; 3D in flight at P1-7).

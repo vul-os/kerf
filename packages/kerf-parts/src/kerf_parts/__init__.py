@@ -7,4 +7,4 @@ code, the source manifest, and license/attribution docs — it never bundles
 or redistributes third-party parts data. See packages/kerf-parts/LICENSES.md.
 """
 
-__all__ = ["manifest", "fetch", "seed", "model", "adapters"]
+__all__ = ["manifest", "fetch", "seed", "model", "adapters", "tools", "plugin"]

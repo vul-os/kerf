@@ -41,7 +41,7 @@ import Renderer from './Renderer.jsx'
 import SchematicView from './SchematicView.jsx'
 import PCBView from './PCBView.jsx'
 import { useWorkspace } from '../store/workspace.js'
-import { parseLibraryMappings, resolveLibraryCadComponent, evalLibraryModel3D } from '../lib/circuitMappings.js'
+import { parseLibraryMappings, resolveLibraryCadComponent, substituteComponentGeometry } from '../lib/circuitMappings.js'
 import { api } from '../lib/api.js'
 
 const COMPILE_DEBOUNCE_MS = 500
@@ -276,7 +276,16 @@ export default function CircuitEditor({ viewRef } = {}) {
             const file = await api.getFile(projectId, fileId)
             if (cancelled) return
             const sig = String((file?.content || '').length) + ':' + (file?.updated_at || '')
-            const result = await evalLibraryModel3D(file?.content || '')
+            // substituteComponentGeometry handles both JSCAD (model_3d) and
+            // STEP (model_3d_paths) in priority order. The fetchStep injector
+            // fetches a relative model path via the project blobs API.
+            const fetchStep = async (relPath) => {
+              const resp = await api.fetchRaw(
+                `/api/projects/${projectId}/model3d?path=${encodeURIComponent(relPath)}&file_id=${encodeURIComponent(fileId)}`,
+              )
+              return resp.arrayBuffer()
+            }
+            const result = await substituteComponentGeometry(file?.content || '', fetchStep)
             if (cancelled) return
             entry = { sig, parts: result?.parts || null }
             fetchCacheRef.current.set(fileId, entry)
@@ -386,10 +395,12 @@ export default function CircuitEditor({ viewRef } = {}) {
           />
         )}
         {tab === '3d' && (
-          // Library-mapped refdes cad_components are tinted teal and id'd
-          // `lib:<refdes>` (see buildBoardParts). Real STEP/JSCAD splicing
-          // is a follow-up; resolveLibraryCadComponent in circuitMappings.js
-          // is the pure seam that follow-up will hang off.
+          // Library-mapped components render real geometry when available:
+          //   - JSCAD model_3d source → evaluated in-browser via runJscad
+          //   - STEP model_3d_paths   → fetched + parsed via occt-import-js
+          // Falls through to a teal indicator cuboid when neither is present.
+          // Geometry is cached per file-id in fetchCacheRef (STEP bytes cached
+          // in stepLoader.js by SHA-256 of the buffer).
           <Renderer
             parts={threeDParts}
             selectedId={

@@ -7904,8 +7904,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "WireViz runner + harness3d; WiringView wired",
-            "evidence": "packages/kerf-wiring/src/kerf_wiring/wireviz_runner.py"
+            "note": "WireViz 2D diagrams + 3D polyline harness routing + formboard-flatten 2D manufacturing output (topological unfold, branch alternation, connector pinouts); T-37 shipped",
+            "evidence": "packages/kerf-wiring/src/kerf_wiring/formboard_flatten.py"
           }
         },
         {
@@ -11161,7 +11161,7 @@
           "nx": "NX Routing Electrical / Capital Harness (Siemens EDA) \u2014 3D harness routing, formboard, bend radius checks",
           "nx_tier": "paid",
           "competitor": "source: https://eda.sw.siemens.com/en-US/pcb/capital/harness-engineering/",
-          "kerf": "evidence: src/components/WiringView.jsx"
+          "kerf": "{ status: yes, note: \"WireViz 2D diagrams + 3D polyline harness routing + formboard-flatten 2D manufacturing output (topological unfold, branch alternation, connector pinouts, bbox); T-37 shipped\", evidence: \"packages/kerf-wiring/src/kerf_wiring/formboard_flatten.py\" }"
         },
         {
           "domain": "D10",
@@ -14948,8 +14948,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "WiringView wired; WireViz + 3D harness router",
-            "evidence": "packages/kerf-wiring/src/kerf_wiring/harness3d.py"
+            "note": "WireViz 2D diagrams + 3D polyline harness routing + formboard-flatten 2D manufacturing output (T-37 shipped)",
+            "evidence": "packages/kerf-wiring/src/kerf_wiring/formboard_flatten.py"
           }
         },
         {

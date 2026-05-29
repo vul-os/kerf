@@ -166,6 +166,8 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 - **SPICE + RF + autorouting** ✅ — ngspice, scikit-rf S-params/Smith chart, FreeRouting DSN/SES.
 - **Wiring/harness** ✅ — WireViz YAML→SVG (2D; 3D in flight at P1-7).
 - **PLC** ✅ — MATIEC lint Tier 1; PLCopen XML (IEC TR 61131-10) reader/writer (T-220); `import_plcopen_xml` + `export_plcopen_xml` LLM tools; LadderEditor Import/Export buttons wired.
+- **Wiring/harness** ✅ — WireViz YAML→SVG (2D) + 3D polyline harness routing + formboard-flatten 2D manufacturing output (T-37, P1-7 complete).
+- **PLC** ✅ — MATIEC lint Tier 1.
 - **Silicon / IC layout** ✅ — VHDL + Verilog parsers; GHDL + Yosys + ngspice bridges; GDS II / OASIS I/O; SKY130 PDK; LEF/Liberty readers; OpenROAD place-and-route; DRC + LVS + parasitic extraction; mask fracturing. T-231..T-248.
 - **Firmware / embedded** ✅ — board catalogue (Arduino/ESP32/STM32/RP2040/AVR); library cache; direct-gcc orchestrator (`avr-gcc`/`arm-none-eabi-gcc`/`xtensa-esp32-elf`); upload wrappers; serial monitor panel; LLM tools. T-225..T-230.
 
@@ -209,7 +211,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 | **P0-6** | **Broaden text / code file support** — common text and code files open as editable text with syntax highlighting. | Every project benefits; gates firmware depth. | ✅ shipped — `FileEditor.jsx` + `editorModes.js`: 30+ extensions (Python, C/C++, JS/TS, Markdown, YAML, …) mapped to Monaco language IDs — `src/components/FileEditor.jsx` |
 | **P0-7** | **Project export / materialize foundation** — plain file-tree for `kerf export` / `kerf import` / `kerf sync`. | The anti-lock-in guarantee's substrate. | ✅ shipped — `GET /projects/{pid}/export` ZIP route + `POST /api/projects/import` bulk ZIP import (path-traversal guard, size cap, file-count cap, ext→kind mapping, binary/text split) — `kerf-api/routes.py`, `kerf-cli/portability.py` |
 | **P0-8** | **Testing / seeding / deploy-hardening** — broad test suites + realistic seed data + one-command local/dev loops. | Quality gate before broader build-out. | 🚧 in flight |
-| **P1-7** | **3D in-vehicle wiring harness** — route through DMU, bundle/segment/connector libs, formboard flatten, length/gauge/voltage-drop. | Closes the ECAD-to-harness loop. | 🚧 in flight — 3D polyline bundle routing + wire-gauge + length/voltage-drop shipped; formboard-flatten noted as T-37 follow-on — `kerf-wiring/tools/route_harness_3d.py`, `kerf-wiring/harness3d.py` |
+| **P1-7** | **3D in-vehicle wiring harness** — route through DMU, bundle/segment/connector libs, formboard flatten, length/gauge/voltage-drop. | Closes the ECAD-to-harness loop. | ✅ shipped — 3D polyline bundle routing + wire-gauge + length/voltage-drop + formboard-flatten (T-37) all shipped — `kerf-wiring/harness3d.py`, `kerf-wiring/formboard_flatten.py`, `kerf-wiring/tools/route_harness_3d.py`, `kerf-wiring/tools/wiring_formboard_flatten.py` |
 | **P1-8** | **Git-as-substrate with automatic large-file handling + free forks** — every project a stock-`git clone`-able repo; large/binary files auto-detected + kept in storage with a small in-git pointer; near-instant forks via shared content-addressed storage. | Own-your-data guarantee. | 🚧 in flight |
 | **P1-9** | **Unified `pip install kerf` client** — cloud-default, easy optional self-host; fail-fast on missing database URL. | Reach: one client for all install modes. | 🚧 in flight |
 | **P1-10** | **Local folder sync + export/import portability** — `kerf sync` two-way folder mirror; `kerf export` / `kerf import` plain file tree; symmetric cloud ↔ self-host. | Anti-lock-in, demonstrable not just promised. | 🚧 in flight — two-way sync daemon (one-shot + watch mode + OCC conflict detection) shipped; symmetric cloud↔self-host portability complete — `kerf-cli/sync.py`, `kerf-cli/portability.py` |
@@ -313,7 +315,7 @@ These are roadmap-level moats that span every sector simultaneously and compound
 ### Needs UI / deploy-gated
 
 - **P0-8 deploy-hardening** — realistic seed data + one-command dev loop; test coverage breadth still expanding.
-- **P1-7 formboard flatten** — harness 3D path routing is shipped; 2D formboard-flattening output (T-37 follow-on) not yet wired.
+- **P1-7 formboard flatten** ✅ — shipped in T-37: `formboard_flatten.py` + `wiring_formboard_flatten` LLM tool; topological unfold with branch alternation, connector pinouts, bbox.
 - **P1-8 large-file git** — pointer kind + Phase 1 shipped; deduplication-based free-fork accounting and content-addressed LFS store in progress.
 - ~~**G-5 class-A wiring**~~ ✅ frontend wiring shipped — see G-5 row above.
 - **Long-tail verticals** — see "Long-tail verticals" list above; all committed, none started.

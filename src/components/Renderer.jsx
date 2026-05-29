@@ -232,12 +232,6 @@ function Renderer({
   const [hudId, setHudId] = useState(null)
   const [leaderHtml, setLeaderHtml] = useState(null) // {x, y, text} screen coords
   const [zebraOn, setZebraOn] = useState(false)
-  // Class-A overlay: when on, fetches continuity audit data from the backend
-  // (via a synthetic occtRunner message) and renders a side-panel showing
-  // per-edge G2/G3 residual readouts alongside the zebra-stripe overlay.
-  const [classAOn, setClassAOn] = useState(false)
-  const [classAReport, setClassAReport] = useState(null)   // { edges: [...] } | null
-  const [classALoading, setClassALoading] = useState(false)
   // Exposure slider state — wired into the tone-mapping exposure of the
   // WebGLRenderer.  Lives in a state hook (not a ref) so the slider thumb
   // updates as the user drags; the live render loop reads renderer state
@@ -274,7 +268,7 @@ function Renderer({
   // frame-time + query latency.
   const [lodHudOn, setLodHudOn] = useState(false)
   // LOD stats updated by the debounced query callback.
-  const [lodStats, setLodStats] = useState(null) // { total, hi, lo, box, cull, latencyMs, frameMs }
+  const [lodStats, setLodStats] = useState(null) // { total, hi, lo, box, cull, instances, latencyMs, frameMs }
   // Ref carrying debounce state for the LOD pass (shared between the render
   // loop and the async query callback without causing re-renders).
   const lodRef = useRef({
@@ -366,6 +360,11 @@ function Renderer({
   //   "bbox_proxy" → replace mesh with a LineSegments bounding-box wireframe
   //   "culled"     → mesh.visible = false
   //
+  // InstancedMesh batches are handled per-instance:
+  //   "full"       → restore original instance matrix (identity trs from cache)
+  //   "bbox_proxy" → scale instance matrix to bbox extents (visual box proxy)
+  //   "culled"     → zero-scale matrix (invisible, no buffer reallocation)
+  //
   // The function is defined here (closure over stateRef / assemblyComponents)
   // and called from the debounced camera-change handler installed in the render
   // loop below.
@@ -430,13 +429,97 @@ function Renderer({
       }
 
       // Apply the plan to meshGroup children.
-      // We match by mesh.userData.id (part id used throughout Renderer) against
-      // the instance_id returned by the planner. This works for non-instanced
-      // parts; InstancedMesh is skipped (each instance id would need individual
-      // handling — left for a future iteration).
-      let hi = 0, lo = 0, box = 0, cull = 0
+      // Non-instanced Mesh: match by mesh.userData.id.
+      // InstancedMesh: iterate instances, match by userData.componentIds[i].
+      let hi = 0, lo = 0, box = 0, cull = 0, instances = 0
       for (const mesh of s.meshGroup.children) {
-        if (mesh.isInstancedMesh) { hi++; continue } // skip instanced batches
+        if (mesh.isInstancedMesh) {
+          // ── InstancedMesh per-instance LOD ──────────────────────────────
+          // Each instance in the batch may have its own LOD tier based on its
+          // componentId. We apply LOD by rewriting the instance's transform:
+          //   hi   → restore original matrix from _lodInstOrigMatrices cache
+          //   box  → scale instance to bbox dimensions at its world center
+          //   cull → zero-scale (invisible, no GPU buffer reallocation)
+          //
+          // Cache: userData._lodInstOrigMatrices stores a Float32Array copy of
+          // the original instanceMatrix buffer so we can restore it cleanly.
+          const cids = mesh.userData.componentIds
+          if (!cids || !cids.length) { hi++; continue }
+
+          // Snapshot original matrices the first time we touch this batch.
+          if (!mesh.userData._lodInstOrigMatrices) {
+            mesh.userData._lodInstOrigMatrices =
+              new Float32Array(mesh.instanceMatrix.array)
+          }
+
+          // Get or derive per-instance bbox for box-proxy tier.
+          // We use the shared geometry bbox expanded to the instance's scale.
+          const geom = mesh.geometry
+          if (geom && !geom.boundingBox) geom.computeBoundingBox()
+          const geomBb = geom?.boundingBox
+
+          let matChanged = false
+          const dummy = new THREE.Object3D()
+
+          for (let i = 0; i < mesh.count; i++) {
+            instances++
+            const cid = cids[i]
+            const detail = cid ? detailMap.get(cid) : undefined
+
+            if (detail === 'full' || detail === undefined) {
+              hi++
+              // Restore from the original matrix cache.
+              const src16 = mesh.userData._lodInstOrigMatrices
+              const m4 = new THREE.Matrix4().fromArray(src16, i * 16)
+              mesh.setMatrixAt(i, m4)
+              matChanged = true
+            } else if (detail === 'bbox_proxy') {
+              lo++
+              box++
+              // Rewrite instance matrix to a box at the instance's world center
+              // scaled to the geometry bbox extents.
+              const origM4 = new THREE.Matrix4().fromArray(
+                mesh.userData._lodInstOrigMatrices, i * 16,
+              )
+              // Extract position from original matrix.
+              const pos = new THREE.Vector3()
+              const rot = new THREE.Quaternion()
+              const scale = new THREE.Vector3()
+              origM4.decompose(pos, rot, scale)
+
+              // Bbox size in world space (approx — ignoring non-uniform scale).
+              const bboxSize = geomBb
+                ? new THREE.Vector3(
+                    (geomBb.max.x - geomBb.min.x) * scale.x || 1,
+                    (geomBb.max.y - geomBb.min.y) * scale.y || 1,
+                    (geomBb.max.z - geomBb.min.z) * scale.z || 1,
+                  )
+                : new THREE.Vector3(1, 1, 1)
+
+              dummy.position.copy(pos)
+              dummy.quaternion.copy(rot)
+              dummy.scale.copy(bboxSize)
+              dummy.updateMatrix()
+              mesh.setMatrixAt(i, dummy.matrix)
+              matChanged = true
+            } else {
+              // culled — zero-scale matrix
+              cull++
+              dummy.position.set(0, 0, 0)
+              dummy.scale.set(0, 0, 0)
+              dummy.updateMatrix()
+              mesh.setMatrixAt(i, dummy.matrix)
+              matChanged = true
+            }
+          }
+
+          if (matChanged) {
+            mesh.instanceMatrix.needsUpdate = true
+          }
+          continue // skip the non-instanced branch below
+        }
+
+        // Non-instanced Mesh path.
         const meshId = mesh.userData.id
         const detail = meshId ? detailMap.get(meshId) : undefined
         if (detail === undefined) { hi++; continue } // not in plan → show full
@@ -472,6 +555,7 @@ function Renderer({
         lo,
         box,
         cull,
+        instances,
         latencyMs,
         frameMs: Math.round(1000 / 60), // placeholder; actual from render loop timing below
       })
@@ -1243,6 +1327,19 @@ function Renderer({
       const s = stateRef.current
       if (s) {
         for (const mesh of s.meshGroup.children) {
+          if (mesh.isInstancedMesh) {
+            // Restore InstancedMesh original matrices if they were overwritten.
+            if (mesh.userData._lodInstOrigMatrices) {
+              const orig = mesh.userData._lodInstOrigMatrices
+              for (let i = 0; i < mesh.count; i++) {
+                const m4 = new THREE.Matrix4().fromArray(orig, i * 16)
+                mesh.setMatrixAt(i, m4)
+              }
+              mesh.instanceMatrix.needsUpdate = true
+              delete mesh.userData._lodInstOrigMatrices
+            }
+            continue
+          }
           if (mesh.userData._lodBboxProxy) _restoreFromBboxProxy(mesh, s)
           setUserVisible(mesh, true)
         }
@@ -1526,68 +1623,6 @@ function Renderer({
     }
   }, [zebraOn, parts])
 
-  // ----- Class-A overlay -----
-  // When classAOn flips on: also enables the zebra material swap (reuses the
-  // existing zebraOn path) and dispatches a synthetic `feature_global_continuity_audit`
-  // + `edge_continuity_report` request via the occtRunner worker.  The response
-  // is stored in classAReport so the side-panel can render per-edge G2/G3 residuals.
-  //
-  // When classAOn flips off: clear the report and turn zebra off if it was only
-  // on because Class-A activated it.
-  useEffect(() => {
-    if (classAOn) {
-      // Turn on zebra stripes so the overlay is visible immediately.
-      setZebraOn(true)
-      // Dispatch a lightweight synthetic audit.  The occtRunner.js `runFeatures`
-      // API is designed for tree evaluation, not direct analysis calls — we send
-      // a minimal feature tree containing only a `global_continuity_audit` node
-      // targeting the first available body in the current parts list, and parse
-      // the result back into the classAReport shape.
-      //
-      // If parts is empty or there is no body id we show a placeholder report.
-      const firstBodyId = (parts || []).find((p) => p.id)?.id || null
-      if (!firstBodyId) {
-        setClassAReport({ edges: [], summary: 'No body selected — add parts to run Class-A audit.' })
-        return
-      }
-      setClassALoading(true)
-      // Build a minimal single-node tree that mirrors the `global_continuity_audit`
-      // feature kind defined in FeatureView.jsx FEATURE_KINDS.
-      const auditTree = [{ id: 'classA-audit', op: 'global_continuity_audit', target_id: firstBodyId, tolerance: 1e-4 }]
-      import('../lib/occtRunner.js').then(({ runFeatures }) => {
-        return runFeatures(auditTree, {})
-      }).then((result) => {
-        if (result?.stale) return
-        const raw = result?.meshes?.[0]?.continuity_report
-        if (raw && Array.isArray(raw.edges)) {
-          setClassAReport(raw)
-        } else {
-          // Fallback: show a placeholder report with the summary from the mesh metadata.
-          setClassAReport({
-            edges: [],
-            summary: result?.error
-              ? `Audit error: ${result.error}`
-              : 'Class-A audit complete — no shared edges found (single-body or open shell).',
-          })
-        }
-      }).catch((err) => {
-        setClassAReport({ edges: [], summary: `Audit failed: ${String(err)}` })
-      }).finally(() => {
-        setClassALoading(false)
-      })
-    } else {
-      setClassAReport(null)
-      setClassALoading(false)
-      // Only turn zebra off if we turned it on; don't stomp a user-set zebra.
-      // We use a heuristic: if classAReport was non-null it means Class-A set
-      // the zebra, so restore it.  Since classAReport is already cleared above
-      // the state machine is: classAOn=false → clear report → zebra stays as
-      // user left it (they can toggle separately).  We do NOT force zebraOn=false
-      // here to preserve any user-set zebra preference.
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [classAOn])
-
   // ----- Hero-shot capture (shared between UI button + imperative API) -----
   // Defined here as a closure so the UI button and the ref both invoke the
   // same path.  Hides UI chrome by walking the live state graph rather than
@@ -1795,74 +1830,6 @@ function Renderer({
 
     /** Paint DFM issue markers in the viewport. Pass null/[] to clear. */
     setDfmIssues: (issues) => { const s = stateRef.current; if (!s) return; issues?.length ? attachDfmOverlay(s.scene, s.camera, s.renderer, issues) : detachDfmOverlay() },
-
-    /**
-     * highlightFaces — highlight a set of component / face ids in the viewport.
-     *
-     * Accepts an array of component-id strings (the same ids carried by
-     * mesh userData.componentId).  Matching meshes are tinted with a warm
-     * emissive highlight; passing [] or null clears all clash highlights.
-     *
-     * Implementation: we reuse the existing selectedComponentId prop pathway
-     * by temporarily driving an in-state selection.  A single-element array
-     * maps cleanly to the existing highlight path; for multi-part clash pairs
-     * we highlight the first id (part A).
-     *
-     * @param {string[]} ids — component ids to highlight (empty array = clear)
-     */
-    highlightFaces: (ids) => {
-      const s = stateRef.current
-      if (!s) return
-      // Walk the scene and tint meshes whose componentId appears in `ids`.
-      const idSet = new Set(ids || [])
-      s.scene.traverse((obj) => {
-        if (!obj.isMesh) return
-        const cid = obj.userData?.componentId
-        if (!cid) return
-        if (idSet.has(cid)) {
-          if (obj.isInstancedMesh) {
-            // Per-instance emissive tint not trivially supported via InstancedMesh
-            // without a custom shader; fall back to whole-mesh emissive.
-            if (obj.material?.emissive != null) {
-              obj.material = obj.material.clone()
-              obj.material.emissive.setHex(0xff6600)
-              obj.material.emissiveIntensity = 0.4
-            }
-          } else {
-            if (obj.material?.emissive != null) {
-              obj.material = obj.material.clone()
-              obj.material.emissive.setHex(0xff6600)
-              obj.material.emissiveIntensity = 0.4
-            }
-          }
-        }
-      })
-    },
-
-    /**
-     * setComponentTransforms — apply per-component world-space transforms for
-     * motion-study playback (driven by AssemblyMotionPanel's timeline scrubber).
-     *
-     * @param {Map<string, {x,y,z,qw,qx,qy,qz}>} transformMap
-     *   Keys are componentId strings; values are position + quaternion.
-     *   Components absent from the map are left unchanged.
-     */
-    setComponentTransforms: (transformMap) => {
-      const s = stateRef.current
-      if (!s || !(transformMap instanceof Map)) return
-      s.scene.traverse((obj) => {
-        if (!obj.isMesh) return
-        const cid = obj.userData?.componentId
-        if (!cid) return
-        const t = transformMap.get(cid)
-        if (!t) return
-        obj.position.set(t.x ?? 0, t.y ?? 0, t.z ?? 0)
-        if (t.qw != null) {
-          obj.quaternion.set(t.qx ?? 0, t.qy ?? 0, t.qz ?? 0, t.qw ?? 1)
-        }
-        obj.updateMatrixWorld(true)
-      })
-    },
   }), [hdriBackground])
 
   // HUD shows the prop-driven selection if present, else the last clicked id.
@@ -1993,7 +1960,6 @@ function Renderer({
               {[
                 { on: daylight, set: () => setDaylight((v) => !v), label: 'Daylight', hint: 'Single strong sun' },
                 { on: zebraOn, set: () => setZebraOn((v) => !v), label: 'Zebra', hint: 'Class-A surface lines' },
-                { on: classAOn, set: () => setClassAOn((v) => !v), label: 'Class-A', hint: 'G2/G3 continuity audit + combs' },
                 { on: bloomOn, set: () => setBloomOn((v) => !v), label: 'Bloom', hint: 'Gem / edge glow' },
                 { on: hdriBackground, set: () => setHdriBackground((v) => !v), label: 'HDRI background', hint: 'Env map as backdrop' },
                 { on: lodHudOn, set: () => setLodHudOn((v) => !v), label: 'LOD HUD', hint: 'Parts / tiers / latency' },
@@ -2044,168 +2010,6 @@ function Renderer({
           rendererRef={stateRef}
         />
       )}
-      {/* Class-A side panel — per-edge G2/G3 residual readouts.
-          Mounted when classAOn=true; positioned bottom-left to avoid the
-          existing top-right controls.  Scrollable so many-edge reports
-          don't overflow the viewport. */}
-      {classAOn && (
-        <ClassAPanel
-          loading={classALoading}
-          report={classAReport}
-          onClose={() => setClassAOn(false)}
-        />
-      )}
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// ClassAPanel — per-edge G2/G3 continuity readouts side panel.
-//
-// Props:
-//   loading  — boolean: show spinner while audit is in flight
-//   report   — { edges: Array<EdgeReport>, summary?: string } | null
-//   onClose  — () => void
-//
-// EdgeReport shape (from edge_continuity_report backend):
-//   { edge_id, G0_ok, G1_ok, G2_ok, G3_ok, G0_max, G1_max, G2_max, G3_max,
-//     G0_rms, G1_rms, G2_rms, G3_rms, continuity_grade }
-function ClassAPanel({ loading, report, onClose }) {
-  const edges = report?.edges || []
-  const summary = report?.summary || null
-
-  return (
-    <div
-      role="region"
-      aria-label="Class-A continuity audit"
-      data-testid="class-a-panel"
-      style={{
-        position: 'absolute',
-        bottom: 48,
-        left: 12,
-        zIndex: 20,
-        background: 'rgba(15,17,21,0.93)',
-        border: '1px solid rgba(255,255,255,0.12)',
-        borderRadius: 8,
-        padding: '10px 14px',
-        minWidth: 260,
-        maxWidth: 320,
-        maxHeight: 380,
-        display: 'flex',
-        flexDirection: 'column',
-        color: '#e5e7eb',
-        fontSize: 12,
-        userSelect: 'none',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-      }}
-    >
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexShrink: 0 }}>
-        <h2 style={{ margin: 0, fontWeight: 600, fontSize: 12, flex: 1, color: '#e5e7eb' }}>
-          Class-A Audit
-        </h2>
-        {loading && (
-          <span style={{ fontSize: 10, color: '#ffd633', marginRight: 4 }}>
-            Analysing…
-          </span>
-        )}
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close Class-A panel"
-          style={{
-            background: 'none',
-            border: 'none',
-            color: '#6b7280',
-            cursor: 'pointer',
-            padding: '0 2px',
-            fontSize: 14,
-            lineHeight: 1,
-          }}
-        >
-          ×
-        </button>
-      </div>
-
-      {/* Legend */}
-      <div style={{
-        display: 'flex', gap: 8, marginBottom: 8, fontSize: 10, flexShrink: 0,
-        color: '#9ca3af', flexWrap: 'wrap',
-      }}>
-        <span style={{ color: '#4ade80' }}>G3 pass</span>
-        <span style={{ color: '#86efac' }}>G2 pass</span>
-        <span style={{ color: '#fbbf24' }}>G1 pass</span>
-        <span style={{ color: '#f87171' }}>G0 pass</span>
-        <span style={{ color: '#dc2626' }}>fail</span>
-      </div>
-
-      {/* Summary message (no edges or error) */}
-      {summary && edges.length === 0 && (
-        <p style={{ fontSize: 11, color: '#9ca3af', margin: 0 }}>{summary}</p>
-      )}
-
-      {/* Per-edge table */}
-      {edges.length > 0 && (
-        <div style={{ overflowY: 'auto', flex: 1 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', color: '#6b7280' }}>
-                <th style={{ textAlign: 'left', paddingBottom: 4, fontWeight: 500 }}>Edge</th>
-                <th style={{ textAlign: 'center', paddingBottom: 4, fontWeight: 500 }}>Grade</th>
-                <th style={{ textAlign: 'right', paddingBottom: 4, fontWeight: 500 }}>G2 rms</th>
-                <th style={{ textAlign: 'right', paddingBottom: 4, fontWeight: 500 }}>G3 rms</th>
-              </tr>
-            </thead>
-            <tbody>
-              {edges.map((e, i) => {
-                const grade = e.continuity_grade || '—'
-                const gradeColor =
-                  grade === 'G3' ? '#4ade80' :
-                  grade === 'G2' ? '#86efac' :
-                  grade === 'G1' ? '#fbbf24' :
-                  grade === 'G0' ? '#f87171' : '#dc2626'
-                const g2rms = typeof e.G2_rms === 'number' ? e.G2_rms.toExponential(2) : '—'
-                const g3rms = typeof e.G3_rms === 'number' ? e.G3_rms.toExponential(2) : '—'
-                return (
-                  <tr
-                    key={e.edge_id ?? i}
-                    style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
-                  >
-                    <td style={{ padding: '3px 0', color: '#d1d5db', fontFamily: 'monospace' }}>
-                      {e.edge_id ?? i}
-                    </td>
-                    <td style={{ textAlign: 'center', color: gradeColor, fontWeight: 600 }}>
-                      {grade}
-                    </td>
-                    <td style={{ textAlign: 'right', color: '#9ca3af', fontFamily: 'monospace' }}>
-                      {g2rms}
-                    </td>
-                    <td style={{ textAlign: 'right', color: '#9ca3af', fontFamily: 'monospace' }}>
-                      {g3rms}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Footer summary stats */}
-      {edges.length > 0 && (
-        <div style={{
-          marginTop: 8, paddingTop: 6,
-          borderTop: '1px solid rgba(255,255,255,0.08)',
-          fontSize: 10, color: '#6b7280', flexShrink: 0,
-        }}>
-          {edges.length} edge{edges.length !== 1 ? 's' : ''}
-          {' · '}
-          {edges.filter((e) => e.G3_ok).length} G3-pass
-          {' · '}
-          {edges.filter((e) => !e.G0_ok).length} below-G0
-        </div>
-      )}
-
       {/* LOD debug HUD — shown when the user enables "LOD HUD" in the Render
           dropdown and an assembly is loaded. Displays part tier counts + last
           query latency so the dev can verify the LOD pass is firing. */}
@@ -2233,6 +2037,10 @@ function ClassAPanel({ loading, report, onClose }) {
           <div className="flex gap-3">
             <span className="text-ink-500">cull</span>
             <span>{lodStats.cull}</span>
+          </div>
+          <div className="flex gap-3">
+            <span className="text-blue-400">inst</span>
+            <span>{lodStats.instances}</span>
           </div>
           <div className="flex gap-3 mt-0.5 pt-0.5 border-t border-ink-800">
             <span className="text-ink-500">latency</span>
@@ -2628,6 +2436,10 @@ function disposePartsAux(s) {
   // Clean up any LOD bbox proxy objects that remain on meshes.
   if (s.meshGroup) {
     for (const mesh of s.meshGroup.children) {
+      if (mesh.isInstancedMesh) {
+        delete mesh.userData._lodInstOrigMatrices
+        continue
+      }
       if (mesh.userData._lodBboxProxy) _restoreFromBboxProxy(mesh, s)
     }
   }
@@ -2673,8 +2485,8 @@ function disposeAll(s) {
  * can recover the mesh state exactly.  The bbox is computed from the mesh's
  * existing geometry if available; otherwise a unit cube proxy is used.
  *
- * Only non-instanced Mesh objects are handled here.  InstancedMesh is skipped
- * in the LOD apply loop above.
+ * Only non-instanced Mesh objects are handled here.  InstancedMesh is handled
+ * per-instance in the LOD apply loop (matrix rewrite, no geometry swap).
  */
 function _applyBboxProxy(mesh, s) {
   if (!mesh || mesh.isInstancedMesh || mesh.userData._lodBboxProxy) return

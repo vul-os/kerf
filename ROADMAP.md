@@ -220,7 +220,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 |---|---|---|---|
 | G-3 | **Interactive push-and-shove diff-pair tuning** — full diff-pair routing, length-skew tuning, and push-shove | KiCad / Altium | ✅ shipped — `route_diff_pair` + `tune_diff_pair_skew` + `validate_diff_pair` + `push_shove_segment` — `kerf-electronics/routing/push_shove.py` |
 | G-4 | **Broader ECAD import** — Allegro / PADS / gEDA / Eagle v10 | Altium / Cadence | ✅ shipped — four dedicated readers with tests — `kerf-imports/src/kerf_imports/{allegro_reader,pads_reader,geda_reader,eagle_reader}.py` |
-| G-5 | **Kernel G3 / class-A leading** — wired G3 blends + curvature-comb + imprint | Alias / ICEM Surf | 🚧 in flight |
+| G-5 | **Kernel G3 / class-A leading** — wired G3 blends + curvature-comb + imprint | Alias / ICEM Surf | ✅ frontend wiring shipped — Class-A viewport toggle (Render menu → "Class-A": zebra stripes + G2/G3 per-edge audit panel) + ImprintCurve inspector entry in FeatureView; backend `feature_global_continuity_audit` + `edge_continuity_report` + `imprint_curve_on_face` all pre-existing |
 | G-6 | **SubD authoring with creases + edit workflow** | Rhino 8 SubD | ✅ shipped — cage creation/extrude/bevel/loop-cut/slide/crease/bevel-weight + Catmull-Clark evaluation — `kerf-cad-core/geom/subd_authoring.py` |
 | G-7 | **Render: caustics + dispersion** — in-browser path-tracer + Blender Cycles spectral | Cycles / V-Ray / KeyShot | 🔴 not started — Cycles translator stashes Sellmeier/Abbe coefficients for downstream use but no caustic solver is wired; in-browser path-tracer not started |
 | G-8 | **Direct + parametric history coexistence** | Fusion / Inventor / Onshape | ✅ shipped — history mode (direct edit promoted to DAG feature node, replays on upstream changes) + in-place mode; 30+ tests — `kerf-cad-core/direct_edit.py`, `geom/history/direct_edit.py` |
@@ -306,7 +306,7 @@ These are roadmap-level moats that span every sector simultaneously and compound
 - **P1-7 formboard flatten** — harness 3D path routing is shipped; 2D formboard-flattening output (T-37 follow-on) not yet wired.
 - **P1-8 large-file git** — pointer kind + Phase 1 shipped; deduplication-based free-fork accounting and content-addressed LFS store in progress.
 - **Hosted infra GPU migration** — Cycles render cost; no self-host impact.
-- **G-5 class-A wiring** — math complete; frontend viewport toggle + imprint toolpath not yet exposed.
+- ~~**G-5 class-A wiring**~~ ✅ frontend wiring shipped — see G-5 row above.
 - **Long-tail verticals** — see "Long-tail verticals" list above; all committed, none started.
 
 ---

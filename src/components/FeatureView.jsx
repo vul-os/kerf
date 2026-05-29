@@ -2307,6 +2307,40 @@ const FEATURE_KINDS = [
     ],
   },
 
+  // imprint_curve — project a 3D curve onto a face and record the resulting
+  // boundary on the surface (surfacing.py / imprint.py imprint_curve_on_face).
+  // UI: pick a source curve (.sketch path or feature id) + a target surface
+  // (feature body ref + face name), click Run → calls imprint_curve_on_face,
+  // displays the resulting boundary edge on the surface.
+  // This is a Class-A G-5 toolpath imprint operation: the projected boundary
+  // can be used as a trim curve for Class-A surface divisions.
+  {
+    op: 'imprint_curve',
+    label: 'ImprintCurve',
+    icon: Activity,
+    caption: (
+      'Project a 3D source curve onto a target NURBS face and imprint its ' +
+      'boundary as a new edge on the surface. Used in Class-A toolpath wiring ' +
+      'to create clean division edges for downstream trim and blend operations. ' +
+      'Source curve: a .sketch path or a feature id whose output is a wire edge. ' +
+      'After evaluation the imprinted boundary edge is returned as a new body.'
+    ),
+    defaults: {
+      source_curve_ref: '',
+      target_feature_ref: '',
+      target_face_name: 'face-1',
+      tolerance: 1e-3,
+      extend_curve: false,
+    },
+    fields: [
+      { key: 'source_curve_ref',  kind: 'sketch_picker',  label: 'Source curve (.sketch or feature id)' },
+      { key: 'target_feature_ref',kind: 'feature_picker', label: 'Target surface / body' },
+      { key: 'target_face_name',  kind: 'text',           label: 'Target face name (e.g. face-1)' },
+      { key: 'tolerance',         kind: 'number',         label: 'Projection tolerance (mm)', min: 1e-9, step: 1e-4 },
+      { key: 'extend_curve',      kind: 'boolean',        label: 'Extend curve to face boundary' },
+    ],
+  },
+
   // blend_srf_g3 — G3 degree-7 Bézier blend strip (surfacing.py GK-62)
   {
     op: 'blend_srf_g3',
@@ -2929,7 +2963,7 @@ const FEATURE_CATEGORIES = [
   ] },
   { id: 'pattern',  label: 'Pattern',       ops: ['linear_pattern', 'polar_pattern', 'mirror_pattern', 'multi_transform'] },
   { id: 'surface',  label: 'Surfacing',     ops: ['sweep1', 'sweep2', 'loft', 'network_srf', 'blend_srf', 'blend_srf_g3', 'g3_chain_blend', 'fit_surface', 'surface_boolean', 'trim_by_curve', 'surface_curvature_combs', 'isophote_analysis', 'uv_unwrap'] },
-  { id: 'analysis', label: 'Analysis',      ops: ['zebra_analysis', 'class_a_check', 'global_continuity_audit'] },
+  { id: 'analysis', label: 'Analysis',      ops: ['zebra_analysis', 'class_a_check', 'global_continuity_audit', 'imprint_curve'] },
   { id: 'gears',    label: 'Gears',         ops: ['gear_spur', 'gear_helical', 'gear_internal', 'gear_rack'] },
   { id: 'jewelry',  label: 'Jewelry',       ops: [
     // Gemstones

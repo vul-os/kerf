@@ -5828,8 +5828,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "blend/network/patch/match-srf + G3 blends + Class-A continuity harness wired",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py"
+            "note": "blend/network/patch/match-srf + G3 blends + Class-A continuity harness + viewport Class-A toggle (G2/G3 audit panel) + imprint toolpath wired",
+            "evidence": "src/components/Renderer.jsx, packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py"
           }
         },
         {
@@ -8829,7 +8829,11 @@
           "domain": "D1",
           "feature": "NURBS surfacing (blend/network/patch)",
           "competitor": "{ status: yes, note: \"FreeStyle Shaper + GSD — Class-A surfaces, G2/G3 continuity, curvature combs, highlight analysis; industry gold standard\", source: \"https://www.3ds.com/products/catia/freestyle\" }",
-          "kerf": "{ status: partial, note: \"blend/network/patch/match-srf + G3 + Class-A harness wired; not FreeStyle/GSD class-A depth\", evidence: \"packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py\" }"
+          "kerf": {
+            "status": "partial",
+            "note": "blend/network/patch/match-srf + G3 + Class-A harness + viewport Class-A diagnostic toggle (zebra + G2/G3 per-edge readouts) + imprint toolpath wired; not FreeStyle/GSD depth",
+            "evidence": "src/components/Renderer.jsx, packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py"
+          }
         },
         {
           "domain": "D1",
@@ -15332,8 +15336,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "zebra_analysis, isophote, curvature combs, Gauss/mean, draft-angle ops",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/surface_analysis.py"
+            "note": "zebra_analysis, isophote, curvature combs, Gauss/mean, draft-angle ops + Class-A viewport toggle with G2/G3 per-edge audit panel",
+            "evidence": "src/components/Renderer.jsx, packages/kerf-cad-core/src/kerf_cad_core/geom/surface_analysis.py"
           }
         },
         {

@@ -46,6 +46,10 @@ async def register(app: FastAPI, ctx) -> PluginManifest:
     # T-408: break-even margin admin endpoint
     from kerf_api.routes_admin_margin import router as admin_margin_router
     app.include_router(admin_margin_router, prefix="/api", tags=["admin"])
+    # POST /api/tools/call — frontend dispatch of any registered LLM tool
+    # (used by LadderEditor Import/Export and any future UI-wired tool).
+    from kerf_api.routes_tools import router as tools_router
+    app.include_router(tools_router, prefix="/api", tags=["tools"])
 
     _register_tools(ctx)
 

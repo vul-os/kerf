@@ -13,6 +13,8 @@ dependencies = [
     "fastapi",
     "asyncpg",
     "aiohttp",
+    "numpy>=1.26",
+    "scipy>=1.11",
 ]
 
 [project.entry-points."kerf.plugins"]

@@ -12,6 +12,8 @@ requires-python = ">=3.11"
 dependencies = [
     "fastapi",
     "pydantic",
+    "numpy>=1.26",
+    "scipy>=1.11",
 ]
 
 [project.entry-points."kerf.plugins"]

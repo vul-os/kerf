@@ -95,6 +95,38 @@ full = [
     "kerf-imports",
     "kerf-render",
     "kerf-workers",
+    "kerf-1dsim",
+    "kerf-aero",
+    "kerf-apparel",
+    "kerf-cfd",
+    "kerf-civil",
+    "kerf-composites",
+    "kerf-dental",
+    "kerf-energy",
+    "kerf-firmware",
+    "kerf-gdnt",
+    "kerf-horology",
+    "kerf-hvac",
+    "kerf-interior",
+    "kerf-landscape",
+    "kerf-lca",
+    "kerf-manufacturing",
+    "kerf-marine",
+    "kerf-microfluidics",
+    "kerf-mold",
+    "kerf-motion",
+    "kerf-optics",
+    "kerf-packaging",
+    "kerf-piping",
+    "kerf-plc",
+    "kerf-rules",
+    "kerf-silicon",
+    "kerf-slicing",
+    "kerf-structural",
+    "kerf-systems",
+    "kerf-textiles",
+    "kerf-wiring",
+    "kerf-woodworking",
 ]
 
 compute-only = [
@@ -110,6 +142,12 @@ compute-only = [
     "kerf-imports",
     "kerf-render",
     "kerf-workers",
+    "kerf-composites",
+    "kerf-dental",
+    "kerf-manufacturing",
+    "kerf-marine",
+    "kerf-optics",
+    "kerf-piping",
 ]
 
 dev = [
@@ -127,55 +165,119 @@ bypass-selection = true
 
 [tool.uv.workspace]
 members = [
-    "packages/kerf-cli",
-    "packages/kerf-core",
-    "packages/kerf-sdk",
-    "packages/kerf-auth",
+    "packages/kerf-1dsim",
+    "packages/kerf-aero",
     "packages/kerf-api",
-    "packages/kerf-chat",
-    "packages/kerf-v1",
+    "packages/kerf-apparel",
+    "packages/kerf-auth",
     "packages/kerf-billing",
-    "packages/kerf-cloud",
-    "packages/kerf-pricing",
-    "packages/kerf-cad-core",
-    "packages/kerf-tess",
-    "packages/kerf-fem",
-    "packages/kerf-cam",
-    "packages/kerf-topo",
-    "packages/kerf-mates",
     "packages/kerf-bim",
+    "packages/kerf-cad-core",
+    "packages/kerf-cam",
+    "packages/kerf-cfd",
+    "packages/kerf-chat",
+    "packages/kerf-civil",
+    "packages/kerf-cli",
+    "packages/kerf-cloud",
+    "packages/kerf-composites",
+    "packages/kerf-core",
+    "packages/kerf-dental",
     "packages/kerf-electronics",
+    "packages/kerf-energy",
+    "packages/kerf-fem",
+    "packages/kerf-firmware",
+    "packages/kerf-gdnt",
+    "packages/kerf-horology",
+    "packages/kerf-hvac",
     "packages/kerf-imports",
-    "packages/kerf-render",
-    "packages/kerf-workers",
+    "packages/kerf-interior",
+    "packages/kerf-landscape",
+    "packages/kerf-lca",
+    "packages/kerf-manufacturing",
+    "packages/kerf-marine",
+    "packages/kerf-mates",
+    "packages/kerf-microfluidics",
+    "packages/kerf-mold",
+    "packages/kerf-motion",
+    "packages/kerf-optics",
+    "packages/kerf-packaging",
     "packages/kerf-parts",
     "packages/kerf-partsgen",
+    "packages/kerf-piping",
+    "packages/kerf-plc",
+    "packages/kerf-pricing",
+    "packages/kerf-render",
+    "packages/kerf-rules",
+    "packages/kerf-sdk",
+    "packages/kerf-silicon",
+    "packages/kerf-slicing",
+    "packages/kerf-structural",
+    "packages/kerf-systems",
+    "packages/kerf-tess",
+    "packages/kerf-textiles",
+    "packages/kerf-topo",
+    "packages/kerf-v1",
+    "packages/kerf-wiring",
+    "packages/kerf-woodworking",
+    "packages/kerf-workers",
 ]
 
 [tool.uv.sources]
-kerf-cli = { workspace = true }
-kerf-core = { workspace = true }
-kerf-sdk = { workspace = true }
-kerf-auth = { workspace = true }
+kerf-1dsim = { workspace = true }
+kerf-aero = { workspace = true }
 kerf-api = { workspace = true }
-kerf-chat = { workspace = true }
-kerf-v1 = { workspace = true }
+kerf-apparel = { workspace = true }
+kerf-auth = { workspace = true }
 kerf-billing = { workspace = true }
-kerf-cloud = { workspace = true }
-kerf-pricing = { workspace = true }
-kerf-cad-core = { workspace = true }
-kerf-tess = { workspace = true }
-kerf-fem = { workspace = true }
-kerf-cam = { workspace = true }
-kerf-topo = { workspace = true }
-kerf-mates = { workspace = true }
 kerf-bim = { workspace = true }
+kerf-cad-core = { workspace = true }
+kerf-cam = { workspace = true }
+kerf-cfd = { workspace = true }
+kerf-chat = { workspace = true }
+kerf-civil = { workspace = true }
+kerf-cli = { workspace = true }
+kerf-cloud = { workspace = true }
+kerf-composites = { workspace = true }
+kerf-core = { workspace = true }
+kerf-dental = { workspace = true }
 kerf-electronics = { workspace = true }
+kerf-energy = { workspace = true }
+kerf-fem = { workspace = true }
+kerf-firmware = { workspace = true }
+kerf-gdnt = { workspace = true }
+kerf-horology = { workspace = true }
+kerf-hvac = { workspace = true }
 kerf-imports = { workspace = true }
-kerf-render = { workspace = true }
-kerf-workers = { workspace = true }
+kerf-interior = { workspace = true }
+kerf-landscape = { workspace = true }
+kerf-lca = { workspace = true }
+kerf-manufacturing = { workspace = true }
+kerf-marine = { workspace = true }
+kerf-mates = { workspace = true }
+kerf-microfluidics = { workspace = true }
+kerf-mold = { workspace = true }
+kerf-motion = { workspace = true }
+kerf-optics = { workspace = true }
+kerf-packaging = { workspace = true }
 kerf-parts = { workspace = true }
 kerf-partsgen = { workspace = true }
+kerf-piping = { workspace = true }
+kerf-plc = { workspace = true }
+kerf-pricing = { workspace = true }
+kerf-render = { workspace = true }
+kerf-rules = { workspace = true }
+kerf-sdk = { workspace = true }
+kerf-silicon = { workspace = true }
+kerf-slicing = { workspace = true }
+kerf-structural = { workspace = true }
+kerf-systems = { workspace = true }
+kerf-tess = { workspace = true }
+kerf-textiles = { workspace = true }
+kerf-topo = { workspace = true }
+kerf-v1 = { workspace = true }
+kerf-wiring = { workspace = true }
+kerf-woodworking = { workspace = true }
+kerf-workers = { workspace = true }
 
 [tool.pytest.ini_options]
 # Auto-discover tests from every plugin package and from the legacy backend/

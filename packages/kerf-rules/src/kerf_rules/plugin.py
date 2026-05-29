@@ -18,13 +18,20 @@ logger = logging.getLogger(__name__)
 
 async def register(app: FastAPI, ctx):
     # ── LLM tools ────────────────────────────────────────────────────────────
-    try:
-        from kerf_rules.tools.validate_against_rules import TOOLS
-        for name, spec, handler in TOOLS:
-            ctx.tools.register(name, spec, handler)
-        logger.info("kerf-rules: registered %d tool(s)", len(TOOLS))
-    except Exception as exc:
-        logger.warning("kerf-rules: failed to register tools: %s", exc)
+    _all_tools = []
+    for _module in (
+        "kerf_rules.tools.validate_against_rules",
+        "kerf_rules.tools.kbe_apply_rules",
+    ):
+        try:
+            import importlib
+            mod = importlib.import_module(_module)
+            for name, spec, handler in getattr(mod, "TOOLS", []):
+                ctx.tools.register(name, spec, handler)
+                _all_tools.append(name)
+        except Exception as exc:
+            logger.warning("kerf-rules: failed to register tools from %s: %s", _module, exc)
+    logger.info("kerf-rules: registered %d tool(s): %s", len(_all_tools), _all_tools)
 
     try:
         from kerf_core.plugin import PluginManifest

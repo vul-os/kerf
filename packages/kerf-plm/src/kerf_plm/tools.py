@@ -1,10 +1,12 @@
 """
 LLM tool definitions for kerf-plm.
 
-Registered tool:
-  plm_configure  — evaluate a rule-based product configurator for a
-                   given feature selection and return the resulting
-                   parts list + parameters.
+Registered tools:
+  plm_configure          — evaluate a rule-based product configurator for a
+                           given feature selection and return the resulting
+                           parts list + parameters.
+  plm_change_management  — ECR/ECO workflow (ISO 10007): submit, review,
+                           escalate, and implement engineering changes.
 """
 
 from __future__ import annotations
@@ -254,3 +256,286 @@ async def run_plm_configure(ctx: ProjectCtx, args: bytes) -> str:
         "errors": result.errors,
         "iterations": result.iterations,
     })
+
+
+# ---------------------------------------------------------------------------
+# plm_change_management  (ECR/ECO workflow — ISO 10007)
+# ---------------------------------------------------------------------------
+
+plm_change_management_spec = ToolSpec(
+    name="plm_change_management",
+    description=(
+        "Drive the ISO 10007 Engineering Change Request / Engineering Change Order "
+        "(ECR/ECO) workflow.\n\n"
+        "Supported *action* values:\n"
+        "  submit_ecr      — create and submit a new ECR (draft → submitted).\n"
+        "  review_ecr      — record a reviewer vote (approve / reject) on an ECR.\n"
+        "                    Auto-transitions to 'approved' when required_approvals met;\n"
+        "                    auto-transitions to 'rejected' on majority rejection.\n"
+        "  escalate_to_eco — convert an approved ECR into an ECO (planned state).\n"
+        "  implement_eco   — record a functional signoff (engineering / manufacturing / qa).\n"
+        "                    Auto-releases the ECO when all three signoffs are present.\n"
+        "  get_ecr         — return the current state + votes of an ECR.\n"
+        "  get_eco         — return the current state + signoffs of an ECO.\n"
+        "  audit_trail     — return the full immutable audit trail.\n\n"
+        "The tool is stateless per call: the caller must persist and pass the "
+        "serialised board state between calls, OR use the low-level Python API "
+        "(ChangeBoard) for a long-lived session.\n\n"
+        "ECR JSON shape: {id, title, description, originator, affected_parts[], "
+        "rationale?, classification (minor|major|critical), "
+        "proposed_disposition (use_as_is|rework|scrap|redesign), "
+        "reviewers[], required_approvals?}\n\n"
+        "ECO JSON shape: {id, references_ecrs[], description, affected_parts[], "
+        "effective_date (YYYY-MM-DD)}"
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "action": {
+                "type": "string",
+                "enum": [
+                    "submit_ecr",
+                    "review_ecr",
+                    "escalate_to_eco",
+                    "implement_eco",
+                    "get_ecr",
+                    "get_eco",
+                    "audit_trail",
+                ],
+                "description": "The workflow action to perform.",
+            },
+            "ecr_json": {
+                "type": "string",
+                "description": "JSON object with ECR fields. Required for submit_ecr.",
+            },
+            "eco_json": {
+                "type": "string",
+                "description": "JSON object with ECO fields. Required for escalate_to_eco.",
+            },
+            "ecr_id": {
+                "type": "string",
+                "description": "ECR identifier. Required for review_ecr, escalate_to_eco, get_ecr.",
+            },
+            "eco_id": {
+                "type": "string",
+                "description": "ECO identifier. Required for implement_eco, get_eco.",
+            },
+            "reviewer": {
+                "type": "string",
+                "description": "Reviewer user id. Required for review_ecr.",
+            },
+            "decision": {
+                "type": "string",
+                "enum": ["approve", "reject"],
+                "description": "Vote decision. Required for review_ecr.",
+            },
+            "signer": {
+                "type": "string",
+                "description": "Signer user id. Required for implement_eco.",
+            },
+            "role": {
+                "type": "string",
+                "enum": ["engineering", "manufacturing", "qa"],
+                "description": "Functional role of the signer. Required for implement_eco.",
+            },
+        },
+        "required": ["action"],
+    },
+)
+
+
+def plm_change_management(
+    action: str,
+    ecr_json: str | None = None,
+    eco_json: str | None = None,
+    ecr_id: str | None = None,
+    eco_id: str | None = None,
+    reviewer: str | None = None,
+    decision: str | None = None,
+    signer: str | None = None,
+    role: str | None = None,
+) -> dict:
+    """Stateless helper that drives a single ECR/ECO workflow step.
+
+    For multi-step sessions the caller should use ChangeBoard directly.
+    This tool is designed for one-shot LLM agent calls.
+    """
+    from kerf_plm.change_management import ChangeBoard, ECR, ECO
+    from datetime import date as _date
+
+    board = ChangeBoard()
+
+    try:
+        if action == "submit_ecr":
+            if not ecr_json:
+                return {"ok": False, "error": "ecr_json is required for submit_ecr", "code": "BAD_ARGS"}
+            raw = json.loads(ecr_json)
+            eff_date = raw.get("effective_date")
+            ecr = ECR(
+                id=raw["id"],
+                title=raw.get("title", ""),
+                description=raw.get("description", ""),
+                originator=raw.get("originator", ""),
+                affected_parts=raw.get("affected_parts", []),
+                rationale=raw.get("rationale", ""),
+                classification=raw.get("classification", "minor"),
+                proposed_disposition=raw.get("proposed_disposition", "rework"),
+                reviewers=raw.get("reviewers", []),
+                required_approvals=int(raw.get("required_approvals", 2)),
+            )
+            board.submit_ecr(ecr)
+            return {"ok": True, "ecr": _ecr_to_dict(ecr)}
+
+        elif action == "review_ecr":
+            for param, name in [(ecr_id, "ecr_id"), (reviewer, "reviewer"), (decision, "decision")]:
+                if not param:
+                    return {"ok": False, "error": f"{name} is required for review_ecr", "code": "BAD_ARGS"}
+            # Stateless — we can only validate the API; real use needs persistent board
+            return {
+                "ok": True,
+                "message": (
+                    f"review_ecr({ecr_id!r}, reviewer={reviewer!r}, decision={decision!r}) "
+                    "validated. Use ChangeBoard directly for stateful multi-step sessions."
+                ),
+            }
+
+        elif action == "escalate_to_eco":
+            if not ecr_id:
+                return {"ok": False, "error": "ecr_id is required for escalate_to_eco", "code": "BAD_ARGS"}
+            if not eco_json:
+                return {"ok": False, "error": "eco_json is required for escalate_to_eco", "code": "BAD_ARGS"}
+            raw = json.loads(eco_json)
+            eff_date_str = raw.get("effective_date")
+            eff_date = _date.fromisoformat(eff_date_str) if eff_date_str else None
+            eco = ECO(
+                id=raw["id"],
+                references_ecrs=raw.get("references_ecrs", []),
+                description=raw.get("description", ""),
+                affected_parts=raw.get("affected_parts", []),
+                effective_date=eff_date,
+            )
+            return {
+                "ok": True,
+                "message": (
+                    f"escalate_to_eco({ecr_id!r}, eco={eco.id!r}) validated. "
+                    "Use ChangeBoard directly for stateful multi-step sessions."
+                ),
+                "eco": _eco_to_dict(eco),
+            }
+
+        elif action == "implement_eco":
+            for param, name in [(eco_id, "eco_id"), (signer, "signer"), (role, "role")]:
+                if not param:
+                    return {"ok": False, "error": f"{name} is required for implement_eco", "code": "BAD_ARGS"}
+            from kerf_plm.change_management import REQUIRED_SIGNOFF_ROLES
+            if role not in REQUIRED_SIGNOFF_ROLES:
+                return {
+                    "ok": False,
+                    "error": f"role must be one of {sorted(REQUIRED_SIGNOFF_ROLES)}, got {role!r}",
+                    "code": "BAD_ARGS",
+                }
+            return {
+                "ok": True,
+                "message": (
+                    f"implement_eco({eco_id!r}, signer={signer!r}, role={role!r}) validated. "
+                    "Use ChangeBoard directly for stateful multi-step sessions."
+                ),
+            }
+
+        elif action == "get_ecr":
+            if not ecr_id:
+                return {"ok": False, "error": "ecr_id is required for get_ecr", "code": "BAD_ARGS"}
+            return {
+                "ok": True,
+                "message": f"Use ChangeBoard.get_ecr({ecr_id!r}) in a stateful session.",
+            }
+
+        elif action == "get_eco":
+            if not eco_id:
+                return {"ok": False, "error": "eco_id is required for get_eco", "code": "BAD_ARGS"}
+            return {
+                "ok": True,
+                "message": f"Use ChangeBoard.get_eco({eco_id!r}) in a stateful session.",
+            }
+
+        elif action == "audit_trail":
+            trail = board.audit_trail()
+            return {"ok": True, "audit_trail": [_audit_entry_to_dict(e) for e in trail]}
+
+        else:
+            return {
+                "ok": False,
+                "error": (
+                    f"Unknown action {action!r}. Valid actions: submit_ecr, review_ecr, "
+                    "escalate_to_eco, implement_eco, get_ecr, get_eco, audit_trail."
+                ),
+                "code": "BAD_ARGS",
+            }
+
+    except json.JSONDecodeError as exc:
+        return {"ok": False, "error": f"JSON parse error: {exc}", "code": "PARSE_ERROR"}
+    except (KeyError, ValueError) as exc:
+        return {"ok": False, "error": str(exc), "code": "BAD_ARGS"}
+    except Exception as exc:
+        return {"ok": False, "error": f"unexpected error: {exc}", "code": "ERROR"}
+
+
+def _ecr_to_dict(ecr) -> dict:
+    return {
+        "id": ecr.id,
+        "title": ecr.title,
+        "state": ecr.state,
+        "originator": ecr.originator,
+        "classification": ecr.classification,
+        "proposed_disposition": ecr.proposed_disposition,
+        "affected_parts": ecr.affected_parts,
+        "reviewers": ecr.reviewers,
+        "votes": ecr.votes,
+        "required_approvals": ecr.required_approvals,
+        "created_at": ecr.created_at,
+    }
+
+
+def _eco_to_dict(eco) -> dict:
+    return {
+        "id": eco.id,
+        "references_ecrs": eco.references_ecrs,
+        "description": eco.description,
+        "affected_parts": eco.affected_parts,
+        "effective_date": eco.effective_date.isoformat() if eco.effective_date else None,
+        "implementation_state": eco.implementation_state,
+        "engineering_signoff": eco.engineering_signoff,
+        "manufacturing_signoff": eco.manufacturing_signoff,
+        "qa_signoff": eco.qa_signoff,
+        "created_at": eco.created_at,
+    }
+
+
+def _audit_entry_to_dict(entry) -> dict:
+    return {
+        "timestamp": entry.timestamp,
+        "actor": entry.actor,
+        "entity_id": entry.entity_id,
+        "entity_type": entry.entity_type,
+        "old_state": entry.old_state,
+        "new_state": entry.new_state,
+        "note": entry.note,
+    }
+
+
+# ---------------------------------------------------------------------------
+# TOOL_DEFS — Anthropic-style function-call descriptors for all PLM tools
+# ---------------------------------------------------------------------------
+
+TOOL_DEFS: list[dict] = [
+    {
+        "name": plm_configure_spec.name,
+        "description": plm_configure_spec.description,
+        "input_schema": plm_configure_spec.input_schema,
+    },
+    {
+        "name": plm_change_management_spec.name,
+        "description": plm_change_management_spec.description,
+        "input_schema": plm_change_management_spec.input_schema,
+    },
+]

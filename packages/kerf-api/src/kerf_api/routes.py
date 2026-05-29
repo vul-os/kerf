@@ -1280,6 +1280,336 @@ async def create_project(req: CreateProjectRequest, payload: dict = Depends(requ
     }
 
 
+# ── P0-7: Bulk project import via ZIP ──────────────────────────────────────
+# Extension → file kind mapping used by the ZIP importer.  Mirrors the kinds
+# visible in the FileTree "+ New" menu and the FILE_KINDS allow-list above.
+_IMPORT_EXT_KIND: dict[str, str] = {
+    # CAD / geometry
+    ".step": "step", ".stp": "step",
+    ".jscad": "script",
+    ".assembly": "assembly",
+    ".feature": "feature",
+    ".sketch": "sketch",
+    ".part": "part",
+    ".drawing": "drawing",
+    ".canvas": "canvas",
+    ".subd": "subd",
+    ".mesh": "mesh",
+    ".quadmesh": "quadmesh",
+    ".section": "section",
+    ".view": "view",
+    # Circuit / electronics
+    ".circuit": "circuit", ".tsx": "circuit",
+    ".spice": "spice_netlist", ".sp": "spice_netlist", ".cir": "spice_netlist",
+    ".v": "hdl_verilog", ".sv": "hdl_verilog",
+    ".vhd": "hdl_vhdl", ".vhdl": "hdl_vhdl",
+    ".gds": "gds_layout",
+    ".oas": "oasis_layout",
+    ".lef": "lef_lib",
+    ".def": "def_design",
+    ".lib": "liberty_lib",
+    # Manufacturing / workshop
+    ".layup": "layup",
+    ".cam": "cam_layered",
+    ".print": "print",
+    ".gem": "gem",
+    ".mold": "mold",
+    ".pid": "pid",
+    ".optics": "optics",
+    ".dental": "dental",
+    ".wiring": "wiring",
+    ".harness": "harness",
+    # Simulation / analysis
+    ".simulation": "simulation",
+    ".material": "material",
+    ".equations": "equations",
+    ".system": "system",
+    # Programmable logic
+    ".plc_st": "plc_st",
+    ".plc_ld": "plc_ld",
+    # Firmware
+    ".firmware_project": "firmware_project",
+    ".elf": "firmware",
+    ".hex": "firmware",
+    ".bin": "firmware",
+    # Documents / schedules
+    ".schedule": "schedule",
+    ".eco": "eco",
+    ".sysml": "sysml",
+    # Text / code (kind="text" so they open in the editor)
+    ".py": "text", ".js": "text", ".ts": "text", ".jsx": "text",
+    ".md": "text", ".txt": "text", ".csv": "text", ".json": "text",
+    ".yaml": "text", ".yml": "text", ".toml": "text", ".ini": "text",
+    ".c": "text", ".cpp": "text", ".h": "text", ".hpp": "text",
+    ".rs": "text", ".go": "text", ".java": "text", ".kt": "text",
+    ".sh": "text", ".bash": "text", ".zsh": "text",
+    ".html": "text", ".css": "text", ".xml": "text", ".svg": "text",
+    ".f90": "text", ".f": "text",
+    # Render outputs
+    ".png": "render", ".jpg": "render", ".jpeg": "render",
+    ".gif": "render", ".bmp": "render", ".tiff": "render", ".tif": "render",
+    ".exr": "render", ".hdr": "render",
+    ".pdf": "file",
+    # Sheet / spreadsheet
+    ".sheet": "sheet",
+}
+
+_IMPORT_MAX_FILE_COUNT = 10_000
+_IMPORT_HARD_CAP_BYTES = 2 * 1024 * 1024 * 1024  # 2 GB absolute hard cap
+
+
+def _kind_from_ext(filename: str) -> str:
+    """Return a FILE_KINDS member for *filename* based on its extension.
+
+    Falls back to ``"file"`` for unknown extensions — safe to store, shown as
+    a generic attachment in the UI.
+    """
+    ext = os.path.splitext(filename.lower())[1]
+    return _IMPORT_EXT_KIND.get(ext, "file")
+
+
+@router.post("/projects/import")
+async def import_project_zip(
+    file: UploadFile = Form(...),
+    name: str = Form(...),
+    workspace_id: Optional[str] = Form(None),
+    workspace_slug: Optional[str] = Form(None),
+    kind: Optional[str] = Form(None),
+    payload: dict = Depends(require_auth),
+):
+    """POST /api/projects/import — create a project from a ZIP archive.
+
+    Multipart fields
+    ----------------
+    file         : the ZIP binary (required)
+    name         : new project name (required)
+    workspace_id : target workspace UUID (optional — defaults to caller's personal ws)
+    workspace_slug : alternative to workspace_id (optional)
+    kind         : project kind tag hint (optional, stored as a tag)
+
+    Returns
+    -------
+    { project_id, file_count, total_bytes, skipped: [{path, reason}, …] }
+    """
+    user_id = payload.get("sub")
+    name = (name or "").strip()
+    if not name:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="name is required")
+
+    # ── Resolve workspace ────────────────────────────────────────────────────
+    ws_id = workspace_id
+    if not ws_id and workspace_slug:
+        ws = await get_workspace_by_slug(workspace_slug)
+        if ws:
+            ws_id = str(ws["id"])
+
+    pool = await get_pool_required()
+    async with pool.acquire() as conn:
+        if not ws_id:
+            default_ws, exists = await get_default_workspace(conn, user_id)
+            if not exists:
+                urow = await conn.fetchrow(
+                    "SELECT name, email FROM users WHERE id = $1", user_id
+                )
+                display = (urow["name"].strip() if urow and urow["name"] else "")
+                if not display:
+                    email = urow["email"] if urow and urow["email"] else ""
+                    at = email.find("@")
+                    display = email[:at] if at > 0 else "My"
+                default_ws = await create_personal_workspace(conn, user_id, display)
+            if default_ws:
+                ws_id = str(default_ws["id"])
+
+        if not ws_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="no workspace available for user",
+            )
+
+        role = await get_user_workspace_role(conn, ws_id, user_id)
+        if not role:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="workspace not found")
+        if role == "viewer":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="viewer cannot import projects",
+            )
+
+        # ── Stream upload to a temp file ─────────────────────────────────────
+        import tempfile
+        max_zip_bytes = max(settings.step_max_bytes * 10, _IMPORT_HARD_CAP_BYTES)
+        zip_size = 0
+        with tempfile.SpooledTemporaryFile(max_size=64 * 1024 * 1024) as tmp:
+            while True:
+                chunk = await file.read(256 * 1024)  # 256 KB chunks
+                if not chunk:
+                    break
+                zip_size += len(chunk)
+                if zip_size > max_zip_bytes:
+                    raise HTTPException(
+                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        detail=f"ZIP exceeds maximum allowed size ({max_zip_bytes} bytes)",
+                    )
+                tmp.write(chunk)
+            tmp.seek(0)
+
+            # ── Validate + enumerate ZIP ──────────────────────────────────────
+            try:
+                zf = zipfile.ZipFile(tmp, "r")
+            except zipfile.BadZipFile:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="uploaded file is not a valid ZIP archive",
+                )
+
+            with zf:
+                entries = zf.infolist()
+
+                if len(entries) > _IMPORT_MAX_FILE_COUNT:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=(
+                            f"ZIP contains {len(entries)} entries; "
+                            f"maximum allowed is {_IMPORT_MAX_FILE_COUNT}"
+                        ),
+                    )
+
+                # Pre-flight: check uncompressed size + path traversal
+                total_uncompressed = sum(e.file_size for e in entries)
+                if total_uncompressed > max_zip_bytes:
+                    raise HTTPException(
+                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        detail=(
+                            f"ZIP uncompressed size ({total_uncompressed} bytes) "
+                            f"exceeds maximum ({max_zip_bytes} bytes)"
+                        ),
+                    )
+
+                # ── Create the project ────────────────────────────────────────
+                tags: list[str] = []
+                if kind and kind.strip():
+                    tags = [kind.strip()]
+
+                # default visibility: mirrors create_project logic
+                default_visibility = "private"
+                if settings.cloud_enabled:
+                    try:
+                        from kerf_billing.buckets import is_paid_user as _is_paid_user
+                        if not await _is_paid_user(conn, user_id):
+                            default_visibility = "public"
+                    except Exception:
+                        pass
+
+                async with conn.transaction():
+                    project = await projects_queries.create_project(
+                        conn, ws_id, name, "", default_visibility, tags,
+                        created_by=payload.get("sub"),
+                    )
+                    project_id = str(project["id"])
+
+                    # ── Ingest ZIP entries ────────────────────────────────────
+                    file_count = 0
+                    total_bytes = 0
+                    skipped: list[dict] = []
+
+                    for entry in entries:
+                        entry_path = entry.filename
+
+                        # Skip directory entries
+                        if entry.is_dir():
+                            continue
+
+                        # Path traversal check
+                        norm = os.path.normpath(entry_path)
+                        if (
+                            os.path.isabs(norm)
+                            or ".." in norm.split(os.sep)
+                            or entry_path.startswith("/")
+                            or entry_path.startswith("\\")
+                        ):
+                            skipped.append({"path": entry_path, "reason": "path traversal rejected"})
+                            continue
+
+                        # Use just the basename as the file name (flatten hierarchy
+                        # to match file-by-file workaround behaviour).
+                        file_name = os.path.basename(entry_path)
+                        if not file_name:
+                            skipped.append({"path": entry_path, "reason": "empty filename"})
+                            continue
+
+                        file_kind = _kind_from_ext(file_name)
+                        uncompressed_size = entry.file_size
+
+                        try:
+                            raw_bytes = zf.read(entry.filename)
+                        except Exception as exc:
+                            skipped.append({"path": entry_path, "reason": f"read error: {exc}"})
+                            continue
+
+                        # Binary kinds: store via storage backend; text kinds: store inline
+                        binary_kinds = {
+                            "step", "step-ref", "mesh", "quadmesh", "subd",
+                            "render", "firmware", "gds_layout", "oasis_layout",
+                        }
+                        if file_kind in binary_kinds:
+                            # Store blob via storage backend
+                            storage = get_storage_required()
+                            storage_key = f"projects/{project_id}/assets/{uuid.uuid4()}-{file_name}"
+                            mime_guess = (
+                                "model/step" if file_kind == "step"
+                                else "application/octet-stream"
+                            )
+                            try:
+                                await storage.put(
+                                    storage_key,
+                                    io.BytesIO(raw_bytes),
+                                    mime_guess,
+                                    uncompressed_size,
+                                )
+                            except Exception as exc:
+                                skipped.append({"path": entry_path, "reason": f"storage error: {exc}"})
+                                continue
+                            await files_queries.create_file(
+                                conn, project_id, file_name, file_kind,
+                                None, "",
+                                storage_key=storage_key,
+                                mime_type=mime_guess,
+                                size=uncompressed_size,
+                                created_by=user_id,
+                            )
+                        else:
+                            # Text / structured content: store inline
+                            try:
+                                content = raw_bytes.decode("utf-8", errors="replace")
+                            except Exception:
+                                content = ""
+                            ext = os.path.splitext(file_name.lower())[1]
+                            await files_queries.create_file(
+                                conn, project_id, file_name, file_kind,
+                                None, content,
+                                extension=ext.lstrip(".") if ext else None,
+                                created_by=user_id,
+                            )
+
+                        file_count += 1
+                        total_bytes += uncompressed_size
+
+    # Auto-init cloud git repo (non-fatal)
+    if settings.cloud_enabled:
+        try:
+            from kerf_cloud.routes import ensure_git_repo
+            await ensure_git_repo(pool, project_id)
+        except Exception as _git_exc:
+            _logger.warning(f"auto git init for imported project {project_id}: {_git_exc}")
+
+    return {
+        "project_id": project_id,
+        "file_count": file_count,
+        "total_bytes": total_bytes,
+        "skipped": skipped,
+    }
+
+
 @router.get("/projects/{pid}")
 async def get_project(pid: str, request: Request, payload: dict = Depends(require_auth)):
     user_id = payload.get("sub")

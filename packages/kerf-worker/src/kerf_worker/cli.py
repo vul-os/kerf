@@ -20,6 +20,7 @@ import httpx
 import typer
 
 from kerf_worker import config
+from kerf_worker import flash as flash_probe
 from kerf_worker import gpu as gpu_probe
 from kerf_worker import runner
 
@@ -73,6 +74,18 @@ def enroll(
         typer.echo(f"  Found GPUs: {', '.join(gpu_names)}")
     else:
         typer.echo("  No GPUs detected (NVIDIA/AMD ROCm/Apple Metal) — enrolling anyway (CPU-only).")
+
+    # Probe firmware flash tool capabilities.
+    typer.echo("Probing firmware flash capabilities...")
+    flash_caps = flash_probe.firmware_flash_capabilities()
+    if flash_caps["flash_tools"]:
+        typer.echo(f"  Flash tools: {', '.join(flash_caps['flash_tools'])}")
+        typer.echo(f"  Board families: {', '.join(flash_caps['flash_board_families'])}")
+    else:
+        typer.echo("  No flash tools detected (esptool/avrdude/openocd/picotool) — firmware_flash jobs will not be claimed.")
+
+    # Merge flash capabilities into the main capabilities dict.
+    caps.update(flash_caps)
 
     # Call POST /api/workers/enroll.
     url = f"{base}/api/workers/enroll"
@@ -178,6 +191,15 @@ def status() -> None:
 
     workloads = cfg.capabilities.get("supported_workloads", [])
     typer.echo(f"Workloads      : {', '.join(workloads) or '(none)'}")
+
+    flash_tools = cfg.capabilities.get("flash_tools", [])
+    if flash_tools:
+        families = cfg.capabilities.get("flash_board_families", [])
+        typer.echo(f"Flash tools    : {', '.join(flash_tools)}")
+        typer.echo(f"Flash families : {', '.join(families)}")
+    else:
+        typer.echo("Flash tools    : (none — firmware_flash jobs not claimed)")
+
     typer.echo(f"Config path    : {config._config_path()}")
 
 

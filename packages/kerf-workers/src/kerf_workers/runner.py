@@ -70,6 +70,25 @@ def _maybe_rate_limit_gc_worker(pool):
         return []
 
 
+def _maybe_firmware_flash_workers(pool, storage_getter):
+    """One FirmwareFlashWorker — drains firmware_flash_jobs table.
+
+    Lazy import so a missing kerf-workers sub-module does not hard-fail the
+    worker set on installs that do not have firmware tooling.
+    BYO billing short-circuit: billing_bucket='byo' is set at job-creation
+    time; this worker never writes a billing record.
+    """
+    try:
+        from kerf_workers.firmware_flash_worker import FirmwareFlashWorker  # type: ignore
+        return [FirmwareFlashWorker(pool=pool, storage_getter=storage_getter)]
+    except ImportError:
+        logger.warning("kerf-workers: FirmwareFlashWorker not available; skipping")
+        return []
+    except Exception:
+        logger.exception("kerf-workers: failed to create FirmwareFlashWorker")
+        return []
+
+
 def _maybe_cycles_workers(pool, count: int):
     """Instantiate CyclesWorker instances that drain the render_jobs table.
 
@@ -90,23 +109,6 @@ def _maybe_cycles_workers(pool, count: int):
         return []
     except Exception:
         logger.exception("kerf-workers: failed to create CyclesQueueWorker")
-        return []
-
-
-def _maybe_firmware_flash_workers(pool, storage_getter):
-    """One FirmwareFlashWorker — drains firmware_flash_jobs table.
-
-    Lazy import so a missing kerf-workers sub-module does not hard-fail the
-    worker set on installs that do not have firmware tooling.
-    """
-    try:
-        from kerf_workers.firmware_flash_worker import FirmwareFlashWorker  # type: ignore
-        return [FirmwareFlashWorker(pool=pool, storage_getter=storage_getter)]
-    except ImportError:
-        logger.warning("kerf-workers: FirmwareFlashWorker not available; skipping")
-        return []
-    except Exception:
-        logger.exception("kerf-workers: failed to create FirmwareFlashWorker")
         return []
 
 
@@ -231,6 +233,7 @@ def _build_workers(
     # CyclesQueueWorker: drains render_jobs table (kerf-render); lazy import.
     workers.extend(_maybe_cycles_workers(pool, cycles_count))
     # FirmwareFlashWorker: drains firmware_flash_jobs; lazy import.
+    # billing_bucket='byo' is enforced at job-creation; no credits consumed here.
     workers.extend(_maybe_firmware_flash_workers(pool, storage_getter))
     return workers
 

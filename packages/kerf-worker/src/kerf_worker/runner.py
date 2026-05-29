@@ -16,6 +16,16 @@ fem_solve
     ``ccx <input-stem>``
     Requires: CalculiX ``ccx`` in PATH (or CCX_PATH env).
 
+firmware_flash
+    Flash a firmware artifact to a locally-attached board.  Requires one of:
+      - esptool / esptool.py  (ESP32 / ESP8266)
+      - avrdude               (Arduino AVR / ATmega)
+      - openocd               (STM32 / ARM Cortex-M)
+      - picotool              (RP2040)
+    Tool selection is automatic based on ``board_target`` from the job payload.
+    The flash log is uploaded via ``signed_upload_url`` (Wave 4D path).
+    ``billing_bucket='byo'`` → zero credit consumption.
+
 Other kinds are logged as unsupported and the job is completed with an error
 so the server can re-queue it on a different worker.
 """
@@ -255,6 +265,169 @@ async def _run_fem(job: Dict[str, Any], workdir: Path) -> tuple[str, float, Opti
     return (str(frd_files[0]), gpu_secs, None)
 
 
+async def _run_firmware_flash(
+    job: Dict[str, Any], workdir: Path
+) -> tuple[str, float, Optional[str]]:
+    """Download a firmware artifact and flash it to a locally-attached board.
+
+    Returns (log_path, elapsed_seconds, error_or_None).
+
+    The flash log is written to ``workdir/flash.log`` and then uploaded via
+    ``signed_upload_url`` by the caller.  ``billing_bucket='byo'`` is implicit
+    — no credits are ever consumed for firmware_flash jobs.
+
+    Parameters
+    ----------
+    job:
+        Claim-job response dict.  Expected keys:
+          ``signed_input_url``  — presigned GET URL for the firmware artifact.
+          ``board_target``      — board identifier, e.g. ``"esp32"``, ``"stm32f4"``.
+          ``signed_upload_url`` — presigned PUT URL for the flash log.
+    workdir:
+        Temporary working directory managed by the caller.
+    """
+    import time
+    from kerf_worker.flash import tool_for_board
+
+    board_target: str = job.get("board_target", "").strip()
+    if not board_target:
+        return ("", 0.0, "firmware_flash job missing 'board_target' in payload")
+
+    # Select the appropriate flash tool (checks PATH).
+    tool_name = tool_for_board(board_target)
+    if tool_name is None:
+        return (
+            "", 0.0,
+            f"No flash tool available for board_target={board_target!r}. "
+            "Install esptool, avrdude, openocd, or picotool and re-enroll."
+        )
+
+    # Download the firmware artifact.
+    signed_input_url: Optional[str] = job.get("signed_input_url")
+    fw_ext = ".bin"
+    if board_target.lower().startswith("avr"):
+        fw_ext = ".hex"
+
+    fw_path = workdir / f"firmware{fw_ext}"
+
+    if signed_input_url and signed_input_url.startswith("http"):
+        try:
+            await _download_scene(signed_input_url, fw_path)
+        except Exception as exc:
+            return ("", 0.0, f"firmware artifact download failed: {exc}")
+    else:
+        if not fw_path.exists():
+            return ("", 0.0, "firmware artifact not found and no download URL provided")
+
+    # Build the flash command.
+    cmd = _build_flash_cmd(tool_name, str(fw_path), board_target)
+    log_path = workdir / "flash.log"
+
+    t0 = time.monotonic()
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=str(workdir),
+        )
+        stdout_bytes, stderr_bytes = await asyncio.wait_for(proc.communicate(), timeout=120)
+    except asyncio.TimeoutError:
+        elapsed = time.monotonic() - t0
+        return ("", elapsed, f"flash tool timed out after 120 s (board={board_target})")
+    except FileNotFoundError:
+        return (
+            "", 0.0,
+            f"Flash tool binary '{cmd[0]}' not found. "
+            "Ensure it is installed and on PATH."
+        )
+    except Exception as exc:
+        elapsed = time.monotonic() - t0
+        return ("", elapsed, f"flash subprocess error: {exc}")
+
+    elapsed = time.monotonic() - t0
+
+    stdout_text = (stdout_bytes or b"").decode(errors="replace")
+    stderr_text = (stderr_bytes or b"").decode(errors="replace")
+    log_content = (
+        f"board_target: {board_target}\n"
+        f"tool: {tool_name}\n"
+        f"command: {' '.join(cmd)}\n"
+        f"elapsed: {elapsed:.1f}s\n"
+        f"exit_code: {proc.returncode}\n"
+        f"\n--- STDOUT ---\n{stdout_text}"
+        f"\n--- STDERR ---\n{stderr_text}"
+    )
+    log_path.write_text(log_content)
+
+    if proc.returncode != 0:
+        return (
+            str(log_path),
+            elapsed,
+            f"flash tool exited {proc.returncode}: {stderr_text[-500:]}",
+        )
+
+    return (str(log_path), elapsed, None)
+
+
+def _build_flash_cmd(tool: str, firmware_path: str, board_target: str) -> list[str]:
+    """Return the subprocess argv for the given flash tool + board."""
+    bt = board_target.lower()
+
+    if tool == "esptool":
+        # Prefer 'esptool' over 'esptool.py' if both exist.
+        binary = shutil.which("esptool") or shutil.which("esptool.py") or "esptool"
+        chip = "auto"
+        if "esp8266" in bt:
+            chip = "esp8266"
+        elif "esp32s2" in bt:
+            chip = "esp32s2"
+        elif "esp32s3" in bt:
+            chip = "esp32s3"
+        elif "esp32c3" in bt:
+            chip = "esp32c3"
+        elif "esp32" in bt:
+            chip = "esp32"
+        return [
+            binary,
+            "--chip", chip,
+            "write_flash", "--flash_mode", "dio",
+            "0x0", firmware_path,
+        ]
+
+    if tool == "openocd":
+        cfg_file = "target/stm32f4x.cfg"
+        if "f1" in bt:
+            cfg_file = "target/stm32f1x.cfg"
+        elif "f7" in bt:
+            cfg_file = "target/stm32f7x.cfg"
+        elif "h7" in bt:
+            cfg_file = "target/stm32h7x.cfg"
+        return [
+            "openocd",
+            "-f", cfg_file,
+            "-c", f"program {firmware_path} verify reset exit",
+        ]
+
+    if tool == "picotool":
+        return ["picotool", "load", "-f", firmware_path]
+
+    # Default: avrdude
+    part = "atmega328p"
+    if "mega" in bt or "2560" in bt:
+        part = "atmega2560"
+    elif "32u4" in bt:
+        part = "atmega32u4"
+    elif "tiny85" in bt or "attiny85" in bt:
+        part = "attiny85"
+    return [
+        "avrdude",
+        "-c", "arduino",
+        "-p", part,
+        "-U", f"flash:w:{firmware_path}:{'i' if firmware_path.endswith('.hex') else 'r'}",
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Upload helper (stub — in real use would PUT to a signed upload URL)
 # ---------------------------------------------------------------------------
@@ -332,7 +505,8 @@ async def run_loop(stop_event: Optional[asyncio.Event] = None) -> None:
                 continue
 
             job_id = job["job_id"]
-            job_kind = job.get("preset") or "cycles_render"
+            # firmware_flash jobs use "kind"; render jobs use "preset".
+            job_kind = job.get("kind") or job.get("preset") or "cycles_render"
 
             # Mark worker busy.
             cfg2 = config.load()
@@ -349,6 +523,8 @@ async def run_loop(stop_event: Optional[asyncio.Event] = None) -> None:
                     result_path, gpu_secs, err = await _run_cycles(job, workdir)
                 elif job_kind in ("fem_solve", "fem"):
                     result_path, gpu_secs, err = await _run_fem(job, workdir)
+                elif job_kind in ("firmware_flash", "flash"):
+                    result_path, gpu_secs, err = await _run_firmware_flash(job, workdir)
                 else:
                     logger.warning("unsupported job kind: %r — skipping", job_kind)
                     await _complete_job(

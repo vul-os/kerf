@@ -7,8 +7,8 @@ happens on the enrolled BYO worker machine (the user's workshop PC with USB-
 attached hardware) via the kerf-worker CLI claim-poll loop.
 
 In LOCAL_CLI mode (``KERF_LOCAL_CLI=1``) the worker performs the flash itself
-by shelling out to the appropriate tool (esptool / avrdude / openocd) after
-downloading the artifact from storage.
+by shelling out to the appropriate tool (esptool / avrdude / openocd / picotool)
+after downloading the artifact from storage.
 
 Job lifecycle
 -------------
@@ -20,23 +20,22 @@ Billing
 -------
 ``billing_bucket = 'byo'`` on every row — no credits are consumed.
 
-Board-target → tool mapping (mirrors firmware_flash_via_worker.py)
+Board-target → tool mapping
 --------------------------------------------------------------------
   esp32 / esp8266       → esptool
   avr_*                 → avrdude
-  stm32* / openocd      → openocd
+  stm32* / arm*         → openocd
   rp2040                → picotool
   * (default)           → avrdude
 """
 from __future__ import annotations
 
 import asyncio
-import io
 import logging
 import os
+import shutil
 import subprocess
 import tempfile
-import time
 from typing import Optional
 
 import asyncpg
@@ -54,6 +53,7 @@ _BOARD_TO_TOOL: dict[str, str] = {
     "stm32f4":  "openocd",
     "stm32f1":  "openocd",
     "stm32":    "openocd",
+    "arm":      "openocd",
     "rp2040":   "picotool",
 }
 
@@ -72,15 +72,25 @@ def _flash_tool_for(board_target: str) -> str:
 
 def _build_flash_cmd(tool: str, firmware_path: str, board_target: str) -> list[str]:
     """Return the subprocess argv for the given flash tool."""
+    bt = board_target.lower()
+
     if tool == "esptool":
+        binary = shutil.which("esptool") or shutil.which("esptool.py") or "esptool.py"
+        chip = "auto"
+        if "esp8266" in bt:
+            chip = "esp8266"
+        elif "esp32" in bt:
+            chip = "esp32"
         return [
-            "esptool.py",
-            "--chip", "auto",
+            binary,
+            "--chip", chip,
             "write_flash", "--flash_mode", "dio",
             "0x0", firmware_path,
         ]
     if tool == "openocd":
-        cfg = _openocd_cfg_for(board_target)
+        cfg = "target/stm32f4x.cfg"
+        if "f1" in bt:
+            cfg = "target/stm32f1x.cfg"
         return [
             "openocd",
             "-f", cfg,
@@ -89,29 +99,18 @@ def _build_flash_cmd(tool: str, firmware_path: str, board_target: str) -> list[s
     if tool == "picotool":
         return ["picotool", "load", "-f", firmware_path]
     # Default: avrdude
-    part = _avr_part_for(board_target)
+    part = "atmega328p"
+    if "mega" in bt or "2560" in bt:
+        part = "atmega2560"
+    elif "32u4" in bt:
+        part = "atmega32u4"
+    fmt = "i" if firmware_path.endswith(".hex") else "r"
     return [
         "avrdude",
         "-c", "arduino",
         "-p", part,
-        "-U", f"flash:w:{firmware_path}:i",
+        "-U", f"flash:w:{firmware_path}:{fmt}",
     ]
-
-
-def _openocd_cfg_for(board_target: str) -> str:
-    bt = board_target.lower()
-    if "f4" in bt:
-        return "target/stm32f4x.cfg"
-    if "f1" in bt:
-        return "target/stm32f1x.cfg"
-    return "target/stm32f4x.cfg"
-
-
-def _avr_part_for(board_target: str) -> str:
-    bt = board_target.lower()
-    if "mega" in bt:
-        return "atmega2560"
-    return "atmega328p"
 
 
 # ── async worker ─────────────────────────────────────────────────────────────
@@ -121,8 +120,12 @@ class FirmwareFlashWorker:
 
     In cloud mode (``KERF_LOCAL_CLI`` not set) only BYO workers (enrolled
     kerf-worker agents) should run actual flashes; the server-side instance
-    merely keeps the status current.  In local-CLI mode the worker shells
-    out to the flash tool directly.
+    merely keeps the status current by marking jobs running so the BYO
+    worker CLI can claim them via ``GET /api/firmware/flash-jobs/claim``.
+
+    In local-CLI mode the worker shells out to the flash tool directly.
+    ``billing_bucket='byo'`` is enforced at job-creation time (server side);
+    this worker never writes a billing record.
     """
 
     POLL_INTERVAL = float(os.getenv("FIRMWARE_FLASH_POLL_INTERVAL", "5"))
@@ -242,15 +245,16 @@ def _run_flash_sync(
 ) -> tuple[str, Optional[str]]:
     """Download artifact, run flash tool.  Returns (log, error_or_None)."""
     tool = _flash_tool_for(board_target)
-    import shutil
-    if shutil.which(tool) is None and tool != "esptool":
-        # esptool may be installed as esptool.py — tolerate both
-        if tool == "esptool" and shutil.which("esptool.py") is not None:
-            tool_bin = "esptool.py"
-        else:
-            return "", f"Flash tool '{tool}' not found on PATH. Install it to enable local flash."
+
+    # Verify tool binary exists.
+    if tool == "esptool":
+        tool_bin = shutil.which("esptool") or shutil.which("esptool.py")
+        if tool_bin is None:
+            return "", "Flash tool 'esptool' not found on PATH. Install it: pip install esptool"
     else:
-        tool_bin = tool
+        tool_bin = shutil.which(tool)
+        if tool_bin is None:
+            return "", f"Flash tool '{tool}' not found on PATH. Install it to enable local flash."
 
     # Download artifact from storage.
     storage = storage_getter() if storage_getter else None
@@ -263,7 +267,9 @@ def _run_flash_sync(
         return "", f"Failed to download artifact '{artifact_key}': {exc}"
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        fw_path = os.path.join(tmpdir, "firmware.bin")
+        import os as _os
+        fw_ext = ".hex" if board_target.lower().startswith("avr") else ".bin"
+        fw_path = _os.path.join(tmpdir, f"firmware{fw_ext}")
         with open(fw_path, "wb") as fh:
             fh.write(firmware_bytes)
 
@@ -282,7 +288,13 @@ def _run_flash_sync(
         except Exception as exc:
             return "", f"Flash subprocess error: {exc}"
 
-        log = f"STDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+        log = (
+            f"board_target: {board_target}\n"
+            f"tool: {tool}\n"
+            f"command: {' '.join(cmd)}\n"
+            f"exit_code: {result.returncode}\n"
+            f"\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+        )
         if result.returncode != 0:
             return log, f"Flash tool exited {result.returncode}: {result.stderr[-500:]}"
         return log, None
@@ -293,7 +305,6 @@ def _download_artifact_sync(storage, key: str) -> bytes:
     import asyncio
 
     async def _dl():
-        # storage.get() may return bytes or a file-like.
         data = await storage.get(key)
         if isinstance(data, (bytes, bytearray)):
             return bytes(data)

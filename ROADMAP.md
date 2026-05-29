@@ -54,6 +54,9 @@ The sector work only matters if you **own your work, are not locked in, and can 
 **HVAC AHRI equipment catalogue** ✅ — 30 AHRI-certified models across 6 categories (rooftop AC, split AC, water-cooled chiller, air-cooled chiller, gas boiler, heat pump); 5 representative models per category with real AHRI certification numbers, full-load EER/IEER/COP/AFUE, and AHRI-certified part-load curves at 25/50/75/100% load. `hvac.equipment_select` LLM tool wired; `EquipmentSelectPanel.jsx` dispatches to backend. Source: AHRI Certified Products Directory (https://www.ahridirectory.org). Compare pages for Carrier HAP, IES VE, Trace 3D added — `kerf-hvac/src/kerf_hvac/ahri_catalogue.py`.
 
 ### Latest delta — 2026-05-26
+**PV latitude-aware TMY** ✅ — `monthly_yield_factors(latitude_deg)` in `solarpv/tmy.py` returns TMY3-derived (NREL/TP-581-43156) monthly irradiance fractions keyed to latitude band (0°–70°, 10° steps, linearly interpolated); Southern-hemisphere sites automatically receive the seasonally-flipped profile; `POST /energy/pv-shading` endpoint wired to use latitude-aware fractions instead of fixed Northern-Hemisphere constants; `PVShadingPanel` latitude input exposed in UI with hemisphere hint; 29 hermetic tests green.
+
+### Previous delta — 2026-05-26
 
 **Civil hydraulics** ✅ — LandXML 1.2 import/export (`civil_landxml_import/export`); steady-state pressurised pipe network (Todini GGA + HW/DW, `civil_water_network_solve`); Manning circular/trapezoidal sewer (`civil_sewer_manning_capacity`); rational-method peak runoff (`civil_storm_rational`); HDS-5 inlet-control culvert (`civil_culvert_capacity`) — `kerf-civil/src/kerf_civil/tools_hydraulics.py`.
 
@@ -83,6 +86,7 @@ The sector work only matters if you **own your work, are not locked in, and can 
 **Building/PV UI** ✅ — `BuildingEnergyPanel` (zone-by-zone occupancy/lighting/equipment/infiltration/HVAC editor, EnergyPlus IDF export); `PVShadingPanel` (array layout + obstruction polygons + bypass-diode + MPPT + monthly yield chart); `MonthlyLoadChart` (SVG stacked-bar); `.energy.bldg` / `.energy.pv` / `.energy.load` file kinds wired in Editor.jsx.
 **Verticals** ✅ — dental anatomic crown (multi-cusp fan, not placeholder); surgical guide watertight single-solid ✅ (`surgical_guide_to_body` — boolean subtract of drill bores from plate, genus-validated); Swiss lever escapement + mainspring + balance-wheel; solar PV partial shading + bypass-diode + MPPT; analog PVT corner simulation (60 corners + Monte-Carlo mismatch).
 **Verticals** ✅ — dental anatomic crown (multi-cusp fan, not placeholder); Swiss lever escapement + mainspring + balance-wheel; solar PV partial shading + bypass-diode + MPPT + full series IV convolution ✅; analog PVT corner simulation (60 corners + Monte-Carlo mismatch).
+**Verticals** ✅ — dental anatomic crown (multi-cusp fan, not placeholder); Swiss lever escapement + mainspring + balance-wheel; solar PV partial shading + bypass-diode + MPPT + latitude-aware TMY monthly yield; analog PVT corner simulation (60 corners + Monte-Carlo mismatch).
 
 **Tolerancing / QA** ✅ — 3D vector-loop tolerance stackup (6-DOF Jacobian); SPC control charts (Shewhart/CUSUM/EWMA + Nelson/WECO); ISO 286 limits & fits.
 

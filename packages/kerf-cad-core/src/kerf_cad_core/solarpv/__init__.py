@@ -61,6 +61,7 @@ from kerf_cad_core.solarpv.sizing import (
     energy_yield,
     row_spacing,
 )
+from kerf_cad_core.solarpv.tmy import monthly_yield_factors
 
 __all__ = [
     "solar_declination",
@@ -78,4 +79,5 @@ __all__ = [
     "cable_sizing",
     "energy_yield",
     "row_spacing",
+    "monthly_yield_factors",
 ]

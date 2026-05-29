@@ -2,12 +2,16 @@
 //
 // Lets the user configure:
 //   • Array layout: modules per string, strings per array, tilt/azimuth, location
+//   • Latitude — used by the backend to look up TMY3-derived monthly irradiance
+//     fractions (NREL TMY3 medians, Wilcox & Marion 2008).  Changing latitude
+//     flips the seasonal profile for Southern-hemisphere sites.
 //   • Module parameters (defaults = 60-cell 255Wp)
 //   • Obstruction polygons (simple list of obstruction descriptions)
 //   • Bypass-diode configuration
 //
 // Run → dispatches to POST /api/projects/:pid/energy/pv-shading which
 //   calls pv_mppt_mismatch_loss + pv_energy_yield for each month.
+//   Monthly yield chart reflects latitude-aware TMY seasonal distribution.
 //
 // Output: monthly energy yield bar chart (via MonthlyLoadChart) +
 //   mismatch loss, GMPP, annual yield.
@@ -15,7 +19,7 @@
 // Props: { projectId: string }
 
 import { useState, useCallback } from 'react'
-import { Sun, Play, AlertTriangle, Plus, Trash2, Zap } from 'lucide-react'
+import { Sun, Play, AlertTriangle, Plus, Trash2, Zap, MapPin } from 'lucide-react'
 import { api } from '../../lib/api.js'
 import MonthlyLoadChart from './MonthlyLoadChart.jsx'
 
@@ -146,7 +150,8 @@ export default function PVShadingPanel({ projectId }) {
   const [stringsInParallel, setStringsInParallel] = useState(2)
   const [tiltDeg, setTiltDeg] = useState(30)
   const [azimuthDeg, setAzimuthDeg] = useState(180)  // South
-  const [latitude, setLatitude] = useState(51.5)
+  // Latitude — drives TMY-aware monthly yield fractions; default 30°N for compat
+  const [latitude, setLatitude] = useState(30)
   const [poa_annual, setPoa_annual] = useState(1200)  // kWh/m²/yr
   const [pr, setPr] = useState(0.80)  // Performance ratio
 
@@ -186,13 +191,15 @@ export default function PVShadingPanel({ projectId }) {
     setError(null)
     setResult(null)
     try {
+      const latVal = parseFloat(latitude)
       const body = {
         // Array geometry
         modules_per_string: parseInt(modulesPerString, 10) || 10,
         strings_in_parallel: parseInt(stringsInParallel, 10) || 1,
         tilt_deg: parseFloat(tiltDeg) || 30,
         azimuth_deg: parseFloat(azimuthDeg) || 180,
-        latitude: parseFloat(latitude) || 51.5,
+        // Latitude drives TMY monthly fractions on the backend
+        latitude: Number.isFinite(latVal) ? latVal : 30,
         poa_annual_kWh_m2: parseFloat(poa_annual) || 1200,
         pr: parseFloat(pr) || 0.80,
         // Module
@@ -227,6 +234,7 @@ export default function PVShadingPanel({ projectId }) {
   ])
 
   // Build chart data from monthly yield if available
+  // monthly_yield comes from the backend with latitude-aware TMY fractions
   const monthlyChartData = result?.monthly_yield
     ? result.monthly_yield.map((m) => ({
         heating_kWh:   0,
@@ -235,6 +243,14 @@ export default function PVShadingPanel({ projectId }) {
         equipment_kWh: m.yield_kWh ?? 0,
       }))
     : null
+
+  // Hemisphere label for UI hint
+  const latVal = parseFloat(latitude)
+  const hemisphereHint = Number.isFinite(latVal)
+    ? latVal >= 0
+      ? `${latVal.toFixed(1)}°N — NH profile`
+      : `${Math.abs(latVal).toFixed(1)}°S — SH flipped`
+    : ''
 
   return (
     <div className="h-full flex flex-col min-h-0 bg-ink-950 text-ink-100" data-testid="pv-shading-panel">
@@ -277,8 +293,23 @@ export default function PVShadingPanel({ projectId }) {
             <FieldRow label="Azimuth (°)" hint="180 = south">
               <NumInput value={azimuthDeg} onChange={setAzimuthDeg} min={0} max={360} />
             </FieldRow>
-            <FieldRow label="Latitude (°)">
-              <NumInput value={latitude} onChange={setLatitude} min={-90} max={90} />
+            <FieldRow
+              label={
+                <span className="flex items-center gap-1">
+                  <MapPin size={9} className="text-amber-400 inline" />
+                  Latitude (°)
+                </span>
+              }
+              hint={hemisphereHint || '+N / −S; drives TMY monthly fractions'}
+            >
+              <NumInput
+                value={latitude}
+                onChange={(v) => { setLatitude(v); setResult(null) }}
+                min={-90}
+                max={90}
+                step={0.1}
+                aria-label="Site latitude in decimal degrees, positive north, negative south"
+              />
             </FieldRow>
             <FieldRow label="POA annual (kWh/m²)">
               <NumInput value={poa_annual} onChange={setPoa_annual} min={0} />
@@ -287,6 +318,10 @@ export default function PVShadingPanel({ projectId }) {
               <NumInput value={pr} onChange={setPr} min={0.1} max={1} step={0.01} />
             </FieldRow>
           </div>
+          <p className="text-[10px] text-ink-600 mt-1">
+            Monthly yield uses TMY3-derived irradiance fractions keyed to latitude
+            (NREL/TP-581-43156).  Southern-hemisphere sites get the seasonally-flipped profile.
+          </p>
         </section>
 
         {/* Module params */}
@@ -435,7 +470,16 @@ export default function PVShadingPanel({ projectId }) {
             {/* Monthly energy yield chart */}
             {monthlyChartData && (
               <section>
-                <div className="text-[10px] uppercase tracking-wider text-ink-500 mb-2">Monthly Energy Yield</div>
+                <div className="text-[10px] uppercase tracking-wider text-ink-500 mb-2">
+                  Monthly Energy Yield
+                  {result.latitude_deg != null && (
+                    <span className="ml-2 normal-case text-ink-600">
+                      ({result.latitude_deg >= 0
+                        ? `${result.latitude_deg}°N`
+                        : `${Math.abs(result.latitude_deg)}°S`} TMY profile)
+                    </span>
+                  )}
+                </div>
                 <div className="bg-ink-900 rounded-md p-3 overflow-x-auto">
                   <MonthlyLoadChart
                     data={monthlyChartData}
@@ -443,7 +487,9 @@ export default function PVShadingPanel({ projectId }) {
                     height={200}
                     title=""
                   />
-                  <div className="text-[10px] text-ink-600 mt-1 text-right">Equipment series = PV yield (kWh)</div>
+                  <div className="text-[10px] text-ink-600 mt-1 text-right">
+                    Equipment series = PV yield (kWh) · TMY3 latitude-adjusted fractions
+                  </div>
                 </div>
               </section>
             )}

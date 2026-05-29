@@ -8129,6 +8129,13 @@ async def building_energy_sim(pid: str, request: Request, payload: dict = Depend
     SCHED_FRAC = {k: min(v, 1.0) for k, v in SCHED_HOURS.items()}
 
     # Annual totals
+        "office": 8 * 5 / (24 * 7),
+        "residential": 0.70,
+        "retail": 12 * 6 / (24 * 7),
+        "warehouse": 12 * 5 / (24 * 7),
+    }
+    SCHED_FRAC = {k: min(v, 1.0) for k, v in SCHED_HOURS.items()}
+
     total_heating_kWh = 0.0
     total_cooling_kWh = 0.0
     total_lighting_kWh = 0.0
@@ -8168,6 +8175,11 @@ async def building_energy_sim(pid: str, request: Request, payload: dict = Depend
         internal_w = (lighting_wm2 + equip_wm2) * area * occ_frac + num_people * 75 * occ_frac
 
         # Degree-day energy: E = UA × DD × 24 / COP / 1000 (kWh)
+        wall_area_est = 2 * (area ** 0.5 + area ** 0.5) * height
+        ua_env = wall_area_est * wall_u + win_area * win_u
+        ua_inf = volume * inf_ach * 1.2 * 1005 / 3600
+        ua_total = ua_env + ua_inf
+
         zone_heat = ua_total * hdd * 24 / cop_h / 1000
         zone_cool = ua_total * cdd * 24 / cop_c / 1000
         zone_light = lighting_wm2 * area * occ_frac * 8760 / 1000
@@ -8221,6 +8233,7 @@ async def building_energy_sim(pid: str, request: Request, payload: dict = Depend
             "",
             "  Building,",
             f"    Kerf Model,   ! Name",
+            "    Kerf Model,   ! Name",
             "    0.0,           ! North axis deg",
             "    Suburbs,       ! Terrain",
             "    0.04,          ! Loads convergence tolerance",
@@ -8267,6 +8280,7 @@ async def building_energy_sim(pid: str, request: Request, payload: dict = Depend
 @router.post("/projects/{pid}/energy/pv-shading")
 async def pv_shading_sim(pid: str, request: Request, payload: dict = Depends(require_auth)):
     """PV partial-shading simulation with bypass-diode and MPPT mismatch loss."""
+    """PV partial-shading simulation with latitude-aware TMY monthly yield."""
     user_id = payload.get("sub")
 
     pool = await get_pool_required()
@@ -8292,6 +8306,11 @@ async def pv_shading_sim(pid: str, request: Request, payload: dict = Depends(req
             module_iv_shaded, mppt_global,
         )
         from kerf_cad_core.solarpv.sizing import energy_yield
+    try:
+        from kerf_cad_core.solarpv.shading_tools import _parse_cell_params
+        from kerf_cad_core.solarpv.shading import module_iv_shaded, mppt_global
+        from kerf_cad_core.solarpv.sizing import energy_yield
+        from kerf_cad_core.solarpv.tmy import monthly_yield_factors
         _pv_available = True
     except ImportError:
         _pv_available = False
@@ -8313,6 +8332,9 @@ async def pv_shading_sim(pid: str, request: Request, payload: dict = Depends(req
     strings_in_parallel = max(int(body.get("strings_in_parallel", 1)), 1)
 
     # Parse cell params from module spec
+    # Latitude for TMY-aware monthly fractions (default 30° for backward-compat)
+    latitude = float(body.get("latitude", 30.0))
+
     try:
         params = _parse_cell_params({
             "Iph": float(mod_spec.get("Iph", 9.0)),
@@ -8329,6 +8351,9 @@ async def pv_shading_sim(pid: str, request: Request, payload: dict = Depends(req
     shading_pattern = body.get("shading_pattern") or []
     if shading_pattern:
         cell_irr = []
+    shading_pattern = body.get("shading_pattern") or []
+    if shading_pattern:
+        cell_irr: list[float] = []
         for seg in shading_pattern:
             cells_in_seg = max(int(seg.get("cells", 20)), 1)
             irr_val = float(seg.get("irradiance", 1000))
@@ -8348,6 +8373,11 @@ async def pv_shading_sim(pid: str, request: Request, payload: dict = Depends(req
         # Compute module IV curve (with partial shading + bypass diodes)
         module_curve = module_iv_shaded(
             cell_irr, params, n_cells=n_cells,
+    n_pts = 200
+
+    try:
+        module_curve = module_iv_shaded(
+            cell_irr, params,
             cells_per_bypass=cells_per_bypass,
             bypass_fwd_v=eff_bypass_v, n_pts=n_pts,
         )
@@ -8361,6 +8391,9 @@ async def pv_shading_sim(pid: str, request: Request, payload: dict = Depends(req
         unshaded_irr = [1000.0] * n_cells
         unshaded_curve = module_iv_shaded(
             unshaded_irr, params, n_cells=n_cells,
+        unshaded_irr = [1000.0] * n_cells
+        unshaded_curve = module_iv_shaded(
+            unshaded_irr, params,
             cells_per_bypass=cells_per_bypass,
             bypass_fwd_v=eff_bypass_v, n_pts=n_pts,
         )
@@ -8379,6 +8412,11 @@ async def pv_shading_sim(pid: str, request: Request, payload: dict = Depends(req
         poa_annual = float(body.get("poa_annual_kWh_m2", 1200))
         pr = float(body.get("pr", 0.80))
         pr_eff = pr * (1.0 - mismatch_loss_pct / 100.0)  # mismatch reduces effective PR
+        array_kWp = unshaded_gmpp_p * modules_per_string * strings_in_parallel / 1000.0
+
+        poa_annual = float(body.get("poa_annual_kWh_m2", 1200))
+        pr = float(body.get("pr", 0.80))
+        pr_eff = pr * (1.0 - mismatch_loss_pct / 100.0)
         yield_result = energy_yield(array_kWp, poa_annual, pr_eff)
 
         annual_yield_kWh = yield_result.get("annual_yield_yr1_kWh", 0)
@@ -8391,6 +8429,14 @@ async def pv_shading_sim(pid: str, request: Request, payload: dict = Depends(req
             for m, f in zip(
                 ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
                 SOLAR_FRAC,
+        # Monthly yield: latitude-aware TMY fractions
+        solar_frac = monthly_yield_factors(latitude)
+        monthly_yield = [
+            {"month": m, "yield_kWh": round(annual_yield_kWh * f, 1)}
+            for m, f in zip(
+                ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                 "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+                solar_frac,
             )
         ]
 
@@ -8404,6 +8450,16 @@ async def pv_shading_sim(pid: str, request: Request, payload: dict = Depends(req
             "specific_yield_kWh_kWp": round(specific_yield, 1),
             "monthly_yield": monthly_yield,
             "per_module_gmpps": [round(mod_gmpp_p, 4)],
+            "string_gmpp_p_w":         round(string_gmpp, 2),
+            "sum_module_gmpp_p_w":      round(sum_module_gmpp, 2),
+            "mismatch_loss_w":          round(mismatch_loss_w, 2),
+            "mismatch_loss_pct":        round(mismatch_loss_pct, 3),
+            "array_kWp":               round(array_kWp, 4),
+            "annual_yield_yr1_kWh":    round(annual_yield_kWh, 1),
+            "specific_yield_kWh_kWp":  round(specific_yield, 1),
+            "monthly_yield":           monthly_yield,
+            "per_module_gmpps":        [round(mod_gmpp_p, 4)],
+            "latitude_deg":            latitude,
         }
 
     except Exception as exc:

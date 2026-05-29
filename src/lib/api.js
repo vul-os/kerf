@@ -721,6 +721,10 @@ export const api = {
   // POST /api/projects/:pid/energy/building
   // Body: { zones: [...], location: {...}, export_idf: bool }
   // Response: { totals, monthly, idf? }
+  // ---- Energy simulation ----
+  // POST /api/projects/:pid/energy/building
+  // Body: { zones: [...], location: {...}, export_idf: bool }
+  // Returns { totals, monthly, idf? }
   buildingEnergy: (projectId, body) =>
     request(`/api/projects/${projectId}/energy/building`, {
       method: 'POST',
@@ -730,9 +734,10 @@ export const api = {
 
   // ---- PV partial-shading + bypass-diode + MPPT simulation ----
   // POST /api/projects/:pid/energy/pv-shading
-  // Body: { modules_per_string, strings_in_parallel, module, shading_pattern, bypass_diodes, ... }
-  // Response: { string_gmpp_p_w, mismatch_loss_w, mismatch_loss_pct, annual_yield_yr1_kWh,
-  //             specific_yield_kWh_kWp, array_kWp, monthly_yield, per_module_gmpps }
+  // Body: { modules_per_string, strings_in_parallel, module, shading_pattern,
+  //         bypass_diodes, bypass_fwd_v, poa_annual_kWh_m2, pr, latitude }
+  // Returns { string_gmpp_p_w, mismatch_loss_pct, annual_yield_yr1_kWh,
+  //           monthly_yield (latitude-aware TMY), ... }
   pvShading: (projectId, body) =>
     request(`/api/projects/${projectId}/energy/pv-shading`, {
       method: 'POST',

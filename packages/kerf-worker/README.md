@@ -14,7 +14,8 @@ billed at your hardware cost only.
   (or set `BLENDER_PATH=/path/to/blender`).
 - **For `fem_solve` jobs:** [CalculiX](https://www.calculix.de/) `ccx` in `PATH`
   (or set `CCX_PATH=/path/to/ccx`).
-- NVIDIA GPU with drivers + `nvidia-smi` in `PATH` (Linux only; other GPU types are a follow-on).
+- GPU hardware (NVIDIA, AMD, or Apple Silicon) — see [GPU support](#gpu-support) below.
+  CPU-only machines can also enroll; they just run fewer workloads.
 
 ---
 
@@ -109,13 +110,23 @@ Calls `DELETE /api/workers/{id}` to invalidate the token on the server, then rem
 
 ---
 
-## GPU support notes
+## GPU support
 
-- **NVIDIA (Linux):** Full support via `nvidia-smi`. GPU name and VRAM are probed
-  at enroll time.
-- **Apple Silicon / AMD ROCm / Windows:** Not yet probed — worker enrolls with empty
-  GPU capabilities. Jobs will still run if the required software (Blender / CalculiX)
-  is present. Hardware-specific probing is a planned follow-on.
+`kerf-worker enroll` probes all available GPU types automatically and reports
+them to the server.  Probe order: NVIDIA → AMD ROCm → Apple Metal.  Multi-GPU
+machines are fully supported — all detected GPUs are reported.
+
+| Platform | Detection method | What is reported |
+|---|---|---|
+| **NVIDIA (Linux)** | `nvidia-smi --query-gpu=name,memory.total` | GPU name + VRAM (MiB) |
+| **AMD ROCm (Linux)** | `rocm-smi --showproductname --showmeminfo vram --csv` | GPU name + VRAM (bytes) |
+| **AMD (Linux, no ROCm tools)** | `/sys/class/drm/card*/device/vendor` + `mem_info_vram_total` | GPU name + VRAM from sysfs |
+| **Apple Silicon (macOS)** | `sysctl machdep.cpu.brand_string` + `sysctl hw.memsize` | Chip name + unified memory size, `metal: true` |
+| **Intel Mac / Windows / other** | — | Enrolls with empty GPU list; CPU jobs still run |
+
+No extra Python packages are required — all probing uses subprocesses (`nvidia-smi`,
+`rocm-smi`, `sysctl`, `system_profiler`) that are present when the GPU drivers
+are installed.
 
 ---
 

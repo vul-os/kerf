@@ -72,7 +72,7 @@ def enroll(
     if gpu_names:
         typer.echo(f"  Found GPUs: {', '.join(gpu_names)}")
     else:
-        typer.echo("  No NVIDIA GPUs detected — enrolling anyway (CPU-only or unsupported GPU).")
+        typer.echo("  No GPUs detected (NVIDIA/AMD ROCm/Apple Metal) — enrolling anyway (CPU-only).")
 
     # Call POST /api/workers/enroll.
     url = f"{base}/api/workers/enroll"

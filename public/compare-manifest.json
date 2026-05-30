@@ -15699,6 +15699,20 @@
         },
         {
           "domain": "D1",
+          "feature": "SubD cage edge ring selection",
+          "competitor": {
+            "status": "yes",
+            "note": "Maya Select Edge Ring, Blender Select Edge Ring (Alt+click) — follows opposite edges across each quad face for loop-cut / bevel / bridge operations",
+            "source": "https://docs.blender.org/manual/en/latest/modeling/meshes/selecting/edge_loops.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "compute_edge_ring(cage, start_edge): traverses opposite edges across quad faces (Maya/Blender Bridge ring pattern); closed on cube (4-ring) and torus; open at mesh boundary; is_degenerate flag at non-quad faces; LLM tool subd_compute_edge_ring; 25 tests.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/subd_edge_ring.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "Mesh repair / ShrinkWrap",
           "competitor": {
             "status": "yes",

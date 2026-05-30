@@ -363,6 +363,9 @@ _TOOL_MODULES = [
     # tool constraint, and sharp-edge preservation
     # (Peterson 1974 §2.3; Boothroyd-Dewhurst 2002 §4) — brep_recommend_fillet_radius
     "kerf_cad_core.geom.fillet_recommend_radius",
+    # SUBD-CAGE-RING-FROM-EDGE: edge ring traversal (opposite edges across quad faces)
+    # Pure-Python; honest degenerate flag for non-quad faces.
+    "kerf_cad_core.geom.subd_edge_ring",          # subd_compute_edge_ring
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

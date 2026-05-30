@@ -1444,3 +1444,10 @@ from kerf_cad_core.geom.composite_fair import (
     CompositeFairResult,
     fair_composite,
 )
+# SUBD-CAGE-RING-FROM-EDGE: edge ring traversal on CC quad cages
+# (Maya/Blender Bridge ring pattern — opposite edges across each quad face)
+# Honest caveat: pure-quad cages only; non-quad face → is_degenerate=True.
+from kerf_cad_core.geom.subd_edge_ring import (  # noqa: E402
+    EdgeRingResult,
+    compute_edge_ring,
+)

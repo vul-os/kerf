@@ -13311,6 +13311,20 @@
         },
         {
           "domain": "D12",
+          "feature": "Vignetting / relative illumination",
+          "competitor": {
+            "status": "yes",
+            "note": "Full vignetting analysis: pupil shifting, real-ray vignetting curves, relative illumination plot per field point",
+            "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Chief-ray vignetting (OPTICS-CHIEF-RAY-VIGNETTING): marginal-ray bundle sampled around entrance pupil at each field angle; per-surface clear-aperture clipping check; relative illumination = surviving fraction; cos4(theta) photometric baseline; excess-vignetting ratio RI/cos4; LLM tool optics_compute_vignetting. Welford 1986 §4.5 / Hecht §6.6. Circular symmetric apertures; anamorphic/off-axis stops not modelled.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/chief_ray_vignetting.py"
+          }
+        },
+        {
+          "domain": "D12",
           "feature": "Non-sequential ray tracing (stray light)",
           "competitor": {
             "status": "yes",

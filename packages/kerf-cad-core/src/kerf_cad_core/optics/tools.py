@@ -1048,6 +1048,7 @@ async def run_mtf_across_field(ctx: ProjectCtx, args: bytes) -> str:
     return ok_payload(result)
 
 from kerf_cad_core.optics.seidel_aberrations import seidel_coefficients  # noqa: E402
+from kerf_cad_core.optics.chief_ray_vignetting import compute_vignetting  # noqa: E402
 
 # Tool: optics_seidel_aberrations
 # ---------------------------------------------------------------------------
@@ -1159,5 +1160,140 @@ async def run_seidel_aberrations(ctx: ProjectCtx, args: bytes) -> str:
 
     result = seidel_coefficients(a["surfaces"], **kwargs)
     if isinstance(result, dict):  # error dict
+        return json.dumps(result)
+    return ok_payload(result.to_dict())
+
+
+# ---------------------------------------------------------------------------
+# Tool: optics_compute_vignetting
+# ---------------------------------------------------------------------------
+
+_compute_vignetting_spec = ToolSpec(
+    name="optics_compute_vignetting",
+    description=(
+        "Compute vignetting (relative illumination) across field angles for a\n"
+        "sequential lens stack.\n"
+        "\n"
+        "Algorithm (Welford 1986 §4.5 / Hecht §6.6):\n"
+        "  1. For each field angle θ, trace N marginal rays uniformly around the\n"
+        "     entrance-pupil perimeter using the exact paraxial height formula.\n"
+        "  2. At each surface, check if the ray height exceeds the surface clear\n"
+        "     aperture (physical lens rim radius).  Rays that exceed any CA are\n"
+        "     blocked.\n"
+        "  3. Relative illumination (RI) = n_surviving / N_M.\n"
+        "  4. Compare RI against the natural cos⁴(θ) photometric baseline.\n"
+        "\n"
+        "cos⁴ baseline: for a lens with no physical clipping, illumination falls\n"
+        "off as cos⁴(θ) due to projected-area + obliquity (Hecht §6.6).\n"
+        "Physical clipping causes RI to drop below this baseline.\n"
+        "\n"
+        "HONEST FLAG: circular, rotationally-symmetric apertures only.\n"
+        "Anamorphic / off-axis stops, polychromatic pupil walk: NOT modelled.\n"
+        "Sagittal-ray component is projected onto the meridional plane.\n"
+        "\n"
+        "Surface definition (each element of 'surfaces' array):\n"
+        "  c  : curvature 1/R (mm^-1). 0 = flat.\n"
+        "  t  : thickness to NEXT surface vertex (mm). Last surface: 0.\n"
+        "  n  : refractive index of medium AFTER this surface.\n"
+        "  k  : conic constant (default 0 = sphere).\n"
+        "\n"
+        "Returns per-field:\n"
+        "  relative_illumination   : fraction of marginal rays that survive [0,1]\n"
+        "  cos4_baseline           : natural cos⁴(θ) baseline\n"
+        "  excess_vignetting       : RI / cos⁴ (< 1 means clipping beyond natural)\n"
+        "  per_field_blocked_surfaces : surface indices where clipping occurred\n"
+        "\n"
+        "Errors: {ok:false, reason} for invalid inputs. Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "surfaces": {
+                "type": "array",
+                "description": (
+                    "Ordered list of optical surface dicts. Each must have: "
+                    "c (mm^-1), t (mm), n (>= 1.0). Optional: k (conic, default 0)."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "c": {"type": "number", "description": "Curvature 1/R (mm^-1). 0 = flat."},
+                        "t": {"type": "number", "description": "Thickness to next surface (mm)."},
+                        "n": {"type": "number", "description": "Refractive index after surface (>= 1.0)."},
+                        "k": {"type": "number", "description": "Conic constant (default 0 = sphere)."},
+                    },
+                    "required": ["c", "t", "n"],
+                },
+            },
+            "field_angles_deg": {
+                "type": "array",
+                "description": (
+                    "List of field angles in degrees (e.g. [0, 5, 10, 14]). "
+                    "0 = on-axis."
+                ),
+                "items": {"type": "number"},
+            },
+            "aperture_radius_mm": {
+                "type": "number",
+                "description": (
+                    "Entrance-pupil half-diameter (mm). Default 10 mm. "
+                    "Should be <= the physical clear aperture of the first surface."
+                ),
+            },
+            "clear_apertures_mm": {
+                "type": "array",
+                "description": (
+                    "Per-surface clear aperture radius (mm). "
+                    "Length must equal number of surfaces. "
+                    "Use 1e18 for surfaces with no physical rim (infinite aperture). "
+                    "If omitted, all surfaces are treated as infinite — produces pure cos⁴."
+                ),
+                "items": {"type": "number"},
+            },
+            "n_marginal_rays": {
+                "type": "integer",
+                "description": (
+                    "Number of marginal rays sampled around the pupil perimeter. "
+                    "Default 8. Minimum 4."
+                ),
+            },
+            "n_object": {
+                "type": "number",
+                "description": "Refractive index of object space (default 1.0 = air).",
+            },
+        },
+        "required": ["surfaces", "field_angles_deg"],
+    },
+)
+
+
+@register(_compute_vignetting_spec, write=False)
+async def run_compute_vignetting(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    if a.get("surfaces") is None:
+        return json.dumps({"ok": False, "reason": "surfaces is required"})
+    if a.get("field_angles_deg") is None:
+        return json.dumps({"ok": False, "reason": "field_angles_deg is required"})
+
+    kwargs: dict = {}
+    if "aperture_radius_mm" in a:
+        kwargs["aperture_radius_mm"] = float(a["aperture_radius_mm"])
+    if "clear_apertures_mm" in a:
+        kwargs["clear_apertures_mm"] = a["clear_apertures_mm"]
+    if "n_marginal_rays" in a:
+        kwargs["n_marginal_rays"] = int(a["n_marginal_rays"])
+    if "n_object" in a:
+        kwargs["n_object"] = float(a["n_object"])
+
+    result = compute_vignetting(
+        a["surfaces"],
+        a["field_angles_deg"],
+        **kwargs,
+    )
+    if isinstance(result, dict):
         return json.dumps(result)
     return ok_payload(result.to_dict())

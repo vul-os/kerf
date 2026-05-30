@@ -150,6 +150,12 @@
           "kerf": "evidence: \"cloud/bim/ifc_import.go\""
         },
         {
+          "name": "IFC 4 façade parser + thermal summary ✅",
+          "domain": "D13",
+          "competitor": "paid: false",
+          "kerf": "evidence: \"packages/kerf-bim/src/kerf_bim/ifc_facade_parser.py\" — walls/curtain-walls/windows/doors; U-value, R-value, fire-rating, structural-class; weighted building-envelope U-value; WWR; continuity validation. IFC 4 subset parser — NOT buildingSMART certified."
+        },
+        {
           "name": "IFC export (IFC4 round-trip)",
           "domain": "D13",
           "competitor": "paid: false",

@@ -72,6 +72,8 @@ def _register_tools(ctx, provides: list) -> None:
         ("kerf_bim.tools.grid_framing", "bim.grid-framing"),
         # Compound walls and floor/roof slabs
         ("kerf_bim.tools.walls_slabs", "bim.walls-slabs"),
+        # IFC 4 façade parser + thermal summary
+        ("kerf_bim.tools.facade_ifc", "bim.facade-ifc"),
     ]
 
     for module_path, capability in tool_modules:

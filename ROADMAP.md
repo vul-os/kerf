@@ -286,6 +286,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 
 - **`.bim` text-DSL → IFC4** ✅ — walls/slabs/spaces/openings/levels/site.
 - **IFC import Tier 1 + 2** ✅ — walls/slabs/spaces/levels/sites + openings/MEP/families/schedules.
+- **IFC 4 façade parser + thermal summary** ✅ — extract walls/curtain walls/windows/doors with U-value, R-value, fire rating, structural class; weighted building-envelope U-value; WWR; continuity validation. `kerf-bim/ifc_facade_parser.py`. IFC 4 subset parser — NOT buildingSMART certified.
 - **Revit parity** ✅ — `.family`/`.schedule`/`.view`/`.sheet`, categories, type-vs-instance, phasing/filters, stairs/railings, MEP, curtain wall.
 
 ### Aerospace / composites

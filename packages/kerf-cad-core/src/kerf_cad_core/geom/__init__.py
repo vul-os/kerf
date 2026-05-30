@@ -958,6 +958,12 @@ __all__ = [
     "voxel_difference",
     # GK-128
     "involute_gear","cycloid_gear",
+    # GK-SUBD-LIMIT-INTEGRAL-METRIC
+    "SubDIntegralReport",
+    "integrate_area",
+    "integrate_mean_curvature",
+    "integrate_gaussian_curvature",
+    "compute_subd_integrals",
     # GK-115
     "gyroid","schwarz_p","octet_truss","kelvin_cell",
     "fischer_koch_s","iwp","f_rd","bcc_lattice","fcc_lattice",
@@ -1306,4 +1312,19 @@ from kerf_cad_core.geom.brep_edge_metrics import (  # noqa: E402
     edge_length_by_kind,
     edges_by_curve_type,
     compute_edge_metrics,
+)
+# GK-SUBD-LIMIT-INTEGRAL-METRIC: exact-as-feasible integrals over CC limit surface
+from kerf_cad_core.geom.subd_limit_integrals import (
+    SubDIntegralReport,
+    integrate_area,
+    integrate_mean_curvature,
+    integrate_gaussian_curvature,
+    compute_subd_integrals,
+)
+# BREP-FACE-AREA-WEIGHTED-CENTROID: surface centroid of a B-rep shell/solid
+# (Gauss-Legendre 16×16 per face; distinct from volumetric body_mass_props centroid)
+from kerf_cad_core.geom.face_centroid import (  # noqa: E402
+    face_area,
+    face_centroid,
+    surface_centroid,
 )

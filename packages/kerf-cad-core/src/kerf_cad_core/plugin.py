@@ -317,6 +317,8 @@ _TOOL_MODULES = [
     # BREP-SUM-EDGE-LENGTHS: total edge length + kind/curve-type breakdowns for cutting-cost
     # (Weiler 1985 §3 radial-edge + Gauss-Legendre arc integration) — brep_total_edge_length, brep_edge_length_by_kind
     "kerf_cad_core.geom.brep_edge_metrics",
+    # GK-SUBD-LIMIT-INTEGRAL-METRIC: exact-as-feasible ∫∫dA, ∫HdA, ∫KdA over CC limit surface
+    "kerf_cad_core.geom.subd_limit_integrals",          # subd_integrate_area, subd_integrate_mean_curvature, subd_integrate_gaussian_curvature
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

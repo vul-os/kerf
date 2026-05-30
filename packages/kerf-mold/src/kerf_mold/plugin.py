@@ -15,6 +15,8 @@ Registers:
                (Beaumont 2007 §6.5 + Menges 2001 §6 cold-runner tree design)
   - LLM tool:  mold_optimize_gate_placement
                (Beaumont 2007 §7 + Menges 2001 §6.6 gate location optimisation)
+  - LLM tool:  mold_optimize_vent_placement
+               (Beaumont 2007 §8.4 + Table 8.4 air-vent location optimisation)
 """
 from __future__ import annotations
 
@@ -99,6 +101,15 @@ async def register(app: FastAPI, ctx):
         mold_gate_placement_spec,
         run_mold_optimize_gate_placement,
     )
+    # Register vent placement optimisation tool (Beaumont 2007 §8.4 + Table 8.4)
+    from kerf_mold.vent_placement_tool import (
+        mold_vent_placement_spec, run_mold_optimize_vent_placement,
+    )
+    ctx.tools.register(
+        "mold_optimize_vent_placement",
+        mold_vent_placement_spec,
+        run_mold_optimize_vent_placement,
+    )
 
     provides = [
         "mold.moldability",
@@ -111,6 +122,7 @@ async def register(app: FastAPI, ctx):
         "mold.draft_validation",
         "mold.runner_layout",
         "mold.gate_placement",
+        "mold.vent_placement",
     ]
 
     try:

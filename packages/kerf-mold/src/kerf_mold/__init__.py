@@ -51,6 +51,12 @@ from kerf_mold.gate_placement import (
     GatePlacementResult,
     optimize_gate_placement,
 )
+from kerf_mold.vent_placement import (
+    CavityBbox as VentCavityBbox,
+    VentLocation,
+    VentPlacementResult,
+    optimize_vent_placement,
+)
 
 __all__ = [
     # mold.py
@@ -98,4 +104,9 @@ __all__ = [
     "GateConstraint",
     "GatePlacementResult",
     "optimize_gate_placement",
+    # vent_placement.py
+    "VentCavityBbox",
+    "VentLocation",
+    "VentPlacementResult",
+    "optimize_vent_placement",
 ]

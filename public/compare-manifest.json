@@ -9711,6 +9711,20 @@
         },
         {
           "domain": "D7",
+          "feature": "Mold vent placement optimisation",
+          "competitor": {
+            "status": "partial",
+            "note": "Vent location guidance in mold wizard; no automated geometric optimiser",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Air-vent placement optimiser (Beaumont 2007 §8.4 + Table 8.4): last-fill zones (4 farthest-from-gate corners, priority 1), parting-line rib positions (priority 2), sharp-corner pockets (priority 3); material-specific vent depths — ABS 0.025–0.040 mm, PP/PE 0.020–0.030 mm, POM/PA/PBT/PET 0.013–0.020 mm (crystalline), LCP/PPS 0.010–0.015 mm; land length 0.8 mm; avoid-zone constraint; LLM tool `mold_optimize_vent_placement`; 72 oracle tests; honest-flag: geometric heuristic only — not Moldflow/Moldex3D/SigmaSoft",
+            "evidence": "packages/kerf-mold/src/kerf_mold/vent_placement.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "Electrode design (EDM)",
           "competitor": {
             "status": "yes",

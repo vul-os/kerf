@@ -10210,6 +10210,20 @@
           }
         },
         {
+          "domain": "D9",
+          "feature": "Inverse dynamics (Newton-Euler torque computation)",
+          "competitor": {
+            "status": "yes",
+            "note": "Creo Mechanism — inverse dynamics via Adams/MBD solver; requires Mechanism Design option",
+            "source": "https://www.ptc.com/en/products/creo/options/mechanism"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Recursive Newton-Euler inverse dynamics (Featherstone §5.3) ✅ — trajectory θ(t)/θ̇(t)/θ̈(t) → τ(t); gravity compensation; LLM tools motion_inverse_dynamics + motion_gravity_compensation",
+            "evidence": "packages/kerf-motion/src/kerf_motion/inverse_dynamics.py"
+          }
+        },
+        {
           "domain": "D11",
           "feature": "GD&T data model (ASME Y14.5)",
           "competitor": {

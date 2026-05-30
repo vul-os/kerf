@@ -381,3 +381,297 @@ async def run_compute_workspace(params: Dict, ctx: ProjectCtx) -> str:
 
     except Exception as exc:
         return err_payload(str(exc), "WORKSPACE_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# motion_inverse_dynamics
+# ---------------------------------------------------------------------------
+
+motion_inverse_dynamics_spec = ToolSpec(
+    name="motion_inverse_dynamics",
+    description=(
+        "Compute joint torques required to produce a given motion trajectory "
+        "using the Recursive Newton-Euler algorithm (Featherstone 2008 §5.3). "
+        "Given joint positions q, velocities q̇, and accelerations q̈, returns "
+        "the joint torques τ that produce the specified motion. "
+        "Supports revolute and prismatic joints in serial kinematic chains. "
+        "The two-pass RNE forward pass propagates kinematics base→tip; "
+        "the backward pass propagates forces tip→base to extract torques."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "links": {
+                "type": "array",
+                "description": (
+                    "List of link descriptors, one per joint (base→tip). "
+                    "Each has: mass (kg), length (m), inertia (optional 3×3 matrix, "
+                    "defaults to uniform rod), com_offset (optional [x,y,z] in link "
+                    "frame, defaults to [length/2, 0, 0])."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "mass": {"type": "number"},
+                        "length": {"type": "number"},
+                        "inertia": {
+                            "type": "array",
+                            "description": "3×3 inertia tensor as list of 3 rows.",
+                            "items": {"type": "array", "items": {"type": "number"}},
+                        },
+                        "com_offset": {
+                            "type": "array",
+                            "items": {"type": "number"},
+                            "minItems": 3,
+                            "maxItems": 3,
+                        },
+                    },
+                    "required": ["mass", "length"],
+                },
+            },
+            "joint_axes": {
+                "type": "array",
+                "description": "Rotation axis for each revolute joint, e.g. [[0,0,1], [0,0,1]]. Defaults to [0,0,1] for each joint.",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 3,
+                    "maxItems": 3,
+                },
+            },
+            "trajectory": {
+                "type": "array",
+                "description": (
+                    "Trajectory as a list of time-steps. Each element: "
+                    "[t, q, q_dot, q_ddot] where q/q_dot/q_ddot are arrays "
+                    "of length n_joints."
+                ),
+                "items": {
+                    "type": "array",
+                    "description": "[t, [q...], [q_dot...], [q_ddot...]]",
+                },
+            },
+            "gravity": {
+                "type": "array",
+                "description": "Gravity vector [gx,gy,gz] in m/s². Default [0,0,-9.81].",
+                "items": {"type": "number"},
+                "minItems": 3,
+                "maxItems": 3,
+            },
+        },
+        "required": ["links", "trajectory"],
+    },
+)
+
+
+async def run_motion_inverse_dynamics(params: Dict, ctx: ProjectCtx) -> str:
+    try:
+        from kerf_motion.joints import RevoluteJoint
+        from kerf_motion.inverse_dynamics import (
+            Robot, compute_joint_torques_from_trajectory,
+        )
+
+        links_raw = params["links"]
+        n = len(links_raw)
+        axes_raw = params.get("joint_axes", [[0.0, 0.0, 1.0]] * n)
+
+        # Build joints
+        joints = []
+        offset = 0.0
+        for i, link_def in enumerate(links_raw):
+            length = float(link_def["length"])
+            ax = tuple(float(v) for v in axes_raw[i]) if i < len(axes_raw) else (0.0, 0.0, 1.0)
+            j = RevoluteJoint(
+                parent_idx=i,
+                child_idx=i + 1,
+                axis=ax,  # type: ignore[arg-type]
+                parent_offset=(offset, 0.0, 0.0),
+                name=f"j{i}",
+            )
+            joints.append(j)
+            offset = length
+
+        # Build masses, inertias, CoM offsets
+        masses = []
+        inertias = []
+        com_offsets = []
+        for link_def in links_raw:
+            m = float(link_def["mass"])
+            L = float(link_def["length"])
+            masses.append(m)
+            if "inertia" in link_def:
+                I_raw = link_def["inertia"]
+                I = tuple(tuple(float(v) for v in row) for row in I_raw)
+            else:
+                # Uniform rod default: I_zz = mL²/12 about CoM
+                Izz = m * L ** 2 / 12.0
+                I = ((Izz, 0.0, 0.0), (0.0, Izz, 0.0), (0.0, 0.0, Izz))
+            inertias.append(I)  # type: ignore[arg-type]
+            if "com_offset" in link_def:
+                com_offsets.append(tuple(float(v) for v in link_def["com_offset"]))
+            else:
+                com_offsets.append((L / 2.0, 0.0, 0.0))
+
+        robot = Robot(
+            joints=joints,
+            link_masses=masses,
+            link_inertias=inertias,  # type: ignore[arg-type]
+            com_offsets=com_offsets,  # type: ignore[arg-type]
+        )
+
+        grav_raw = params.get("gravity", [0.0, 0.0, -9.81])
+        gravity = tuple(float(v) for v in grav_raw)  # type: ignore[arg-type]
+
+        # Build trajectory
+        traj = []
+        for step in params["trajectory"]:
+            t, q, qd, qdd = step[0], step[1], step[2], step[3]
+            traj.append((float(t), [float(v) for v in q],
+                         [float(v) for v in qd], [float(v) for v in qdd]))
+
+        torques = compute_joint_torques_from_trajectory(robot, traj, gravity=gravity)
+
+        return ok_payload({
+            "ok": True,
+            "n_steps": len(torques),
+            "n_joints": n,
+            "torques": torques,
+        })
+
+    except Exception as exc:
+        return err_payload(str(exc), "INVERSE_DYNAMICS_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# motion_gravity_compensation
+# ---------------------------------------------------------------------------
+
+motion_gravity_compensation_spec = ToolSpec(
+    name="motion_gravity_compensation",
+    description=(
+        "Compute joint torques required to hold a robot stationary at a given "
+        "configuration against gravity (gravity compensation / static equilibrium). "
+        "Uses the Recursive Newton-Euler algorithm with zero velocity and "
+        "acceleration: τ = RNE(robot, q, 0, 0, gravity). "
+        "Returns the torque each joint must apply to balance the weight of all "
+        "links distal to it."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "links": {
+                "type": "array",
+                "description": "List of link descriptors (mass, length, optional inertia/com_offset).",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "mass": {"type": "number"},
+                        "length": {"type": "number"},
+                        "inertia": {
+                            "type": "array",
+                            "items": {"type": "array", "items": {"type": "number"}},
+                        },
+                        "com_offset": {
+                            "type": "array",
+                            "items": {"type": "number"},
+                            "minItems": 3,
+                            "maxItems": 3,
+                        },
+                    },
+                    "required": ["mass", "length"],
+                },
+            },
+            "joint_axes": {
+                "type": "array",
+                "description": "Rotation axis per joint [[x,y,z], ...]. Default [0,0,1].",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 3,
+                    "maxItems": 3,
+                },
+            },
+            "q": {
+                "type": "array",
+                "description": "Joint angles (rad) for static configuration.",
+                "items": {"type": "number"},
+            },
+            "gravity": {
+                "type": "array",
+                "description": "Gravity vector [gx,gy,gz] in m/s². Default [0,0,-9.81].",
+                "items": {"type": "number"},
+                "minItems": 3,
+                "maxItems": 3,
+            },
+        },
+        "required": ["links", "q"],
+    },
+)
+
+
+async def run_motion_gravity_compensation(params: Dict, ctx: ProjectCtx) -> str:
+    try:
+        from kerf_motion.joints import RevoluteJoint
+        from kerf_motion.inverse_dynamics import Robot, gravity_compensation
+
+        links_raw = params["links"]
+        n = len(links_raw)
+        axes_raw = params.get("joint_axes", [[0.0, 0.0, 1.0]] * n)
+
+        joints = []
+        offset = 0.0
+        for i, link_def in enumerate(links_raw):
+            length = float(link_def["length"])
+            ax = tuple(float(v) for v in axes_raw[i]) if i < len(axes_raw) else (0.0, 0.0, 1.0)
+            j = RevoluteJoint(
+                parent_idx=i,
+                child_idx=i + 1,
+                axis=ax,  # type: ignore[arg-type]
+                parent_offset=(offset, 0.0, 0.0),
+                name=f"j{i}",
+            )
+            joints.append(j)
+            offset = length
+
+        masses = []
+        inertias = []
+        com_offsets = []
+        for link_def in links_raw:
+            m = float(link_def["mass"])
+            L = float(link_def["length"])
+            masses.append(m)
+            if "inertia" in link_def:
+                I_raw = link_def["inertia"]
+                I = tuple(tuple(float(v) for v in row) for row in I_raw)
+            else:
+                Izz = m * L ** 2 / 12.0
+                I = ((Izz, 0.0, 0.0), (0.0, Izz, 0.0), (0.0, 0.0, Izz))
+            inertias.append(I)  # type: ignore[arg-type]
+            if "com_offset" in link_def:
+                com_offsets.append(tuple(float(v) for v in link_def["com_offset"]))
+            else:
+                com_offsets.append((L / 2.0, 0.0, 0.0))
+
+        robot = Robot(
+            joints=joints,
+            link_masses=masses,
+            link_inertias=inertias,  # type: ignore[arg-type]
+            com_offsets=com_offsets,  # type: ignore[arg-type]
+        )
+
+        q_vals = [float(v) for v in params["q"]]
+        grav_raw = params.get("gravity", [0.0, 0.0, -9.81])
+        gravity_vec = tuple(float(v) for v in grav_raw)  # type: ignore[arg-type]
+
+        tau = gravity_compensation(robot, q_vals, gravity=gravity_vec)
+
+        return ok_payload({
+            "ok": True,
+            "n_joints": n,
+            "q": q_vals,
+            "tau": tau,
+            "gravity": list(gravity_vec),
+        })
+
+    except Exception as exc:
+        return err_payload(str(exc), "GRAVITY_COMP_ERROR")

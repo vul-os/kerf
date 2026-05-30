@@ -22,10 +22,22 @@ async def register(app: FastAPI, ctx):
         simulate_motion_spec, run_simulate_motion,
         solve_ik_spec, run_solve_ik,
         compute_workspace_spec, run_compute_workspace,
+        motion_inverse_dynamics_spec, run_motion_inverse_dynamics,
+        motion_gravity_compensation_spec, run_motion_gravity_compensation,
     )
     ctx.tools.register("simulate_motion", simulate_motion_spec, run_simulate_motion)
     ctx.tools.register("solve_ik", solve_ik_spec, run_solve_ik)
     ctx.tools.register("compute_workspace", compute_workspace_spec, run_compute_workspace)
+    ctx.tools.register(
+        "motion_inverse_dynamics",
+        motion_inverse_dynamics_spec,
+        run_motion_inverse_dynamics,
+    )
+    ctx.tools.register(
+        "motion_gravity_compensation",
+        motion_gravity_compensation_spec,
+        run_motion_gravity_compensation,
+    )
 
     from kerf_motion.contact import (
         motion_contact_sphere_plane_spec, run_motion_contact_sphere_plane,
@@ -53,6 +65,7 @@ async def register(app: FastAPI, ctx):
         "motion.rk4-integrator",
         "motion.forward-kinematics",
         "motion.inverse-kinematics",
+        "motion.inverse-dynamics",
         "motion.workspace-analysis",
         "motion.contact-detection",
     ]

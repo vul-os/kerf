@@ -63,6 +63,11 @@ The sector work only matters if you **own your work, are not locked in, and can 
 ### Latest delta — 2026-05-30
 
 **ASME B31 pressure-loss + Crane TP-410 K-factors** ✅ — Darcy-Weisbach with Colebrook-White friction factor; 15-entry Crane TP-410 §3 K-factor table (elbows, tees, gate/globe/check/ball/butterfly valves, reducers, expanders); Hooper Two-K method for small-pipe/low-Re accuracy; `compute_pipeline_pressure_drop` for full B31.1/B31.3 pipeline ΔP; LLM tools `piping_pressure_loss` + `piping_pipeline_drop` registered — `packages/kerf-piping/src/kerf_piping/asme_pressure.py`.
+### Latest delta — 2026-05-30
+
+**Motion inverse dynamics** ✅ — Recursive Newton-Euler inverse dynamics (Featherstone 2008 §5.3): given joint trajectory θ(t), θ̇(t), θ̈(t) → torques τ(t); `gravity_compensation(robot, q)` static equilibrium; `compute_joint_torques_from_trajectory` vectorised over full trajectories; LLM tools `motion_inverse_dynamics` + `motion_gravity_compensation` registered — `kerf-motion/src/kerf_motion/inverse_dynamics.py`.
+
+### Previous delta — 2026-05-26
 
 **Civil hydraulics** ✅ — LandXML 1.2 import/export (`civil_landxml_import/export`); steady-state pressurised pipe network (Todini GGA + HW/DW, `civil_water_network_solve`); Manning circular/trapezoidal sewer (`civil_sewer_manning_capacity`); rational-method peak runoff (`civil_storm_rational`); HDS-5 inlet-control culvert (`civil_culvert_capacity`) — `kerf-civil/src/kerf_civil/tools_hydraulics.py`.
 

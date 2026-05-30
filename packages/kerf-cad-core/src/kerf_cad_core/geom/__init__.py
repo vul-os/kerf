@@ -270,6 +270,14 @@ from kerf_cad_core.geom.continuity_recovery import (
     recover_continuity_at_seam,
     recover_continuity_body,
 )
+# GK-P (curvature-comb): peak detection + variance metrics (Farin 1990)
+from kerf_cad_core.geom.curvature_metrics import (
+    CurvaturePeak,
+    CurvaturePeakReport,
+    curvature_comb_peaks,
+    curvature_variance_metric,
+    isophote_density_metric,
+)
 # GK-47: STEP reader
 from kerf_cad_core.geom.io.step_read import read_step, StepReadError
 # GK-48: STEP writer
@@ -692,6 +700,9 @@ __all__ = [
     "ContinuityRecoveryResult",
     "recover_continuity_at_seam",
     "recover_continuity_body",
+    # GK-P curvature-comb
+    "CurvaturePeak","CurvaturePeakReport",
+    "curvature_comb_peaks","curvature_variance_metric","isophote_density_metric",
     "read_step","StepReadError",
     "write_step","StepWriteError",
     # GK-23

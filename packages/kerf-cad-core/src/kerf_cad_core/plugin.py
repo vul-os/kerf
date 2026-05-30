@@ -392,6 +392,8 @@ _TOOL_MODULES = [
     # BREP-SOLID-CONTAINS-POINT: ray-casting Jordan-curve inside/outside test on B-rep solids
     # (Mortenson §11.5; Ericson 2005 §5.1; O'Rourke §7.4) — brep_solid_contains_point
     "kerf_cad_core.geom.solid_contains_point",
+    # SUBD-EXPORT-PLY: CC limit-surface → Stanford PLY (ASCII + binary_little_endian)
+    "kerf_cad_core.geom.subd_export_ply",               # subd_export_limit_to_ply
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

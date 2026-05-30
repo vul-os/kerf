@@ -1203,6 +1203,13 @@ from kerf_cad_core.geom.nurbs_surface_fit import (  # noqa: E402
     FitError,
     FitReport,
 )
+# SUBD-EXPORT-PLY: CC limit-surface → Stanford PLY (ASCII + binary little-endian)
+# Ref: https://en.wikipedia.org/wiki/PLY_(file_format); Turk (1994) Stanford.
+# Honest (v1): geometry only — no colour, normals, texture coords; no big-endian.
+from kerf_cad_core.geom.subd_export_ply import (  # noqa: E402
+    export_limit_to_ply,
+    parse_ply as parse_subd_ply,
+)
 # GK-64: Class-A leading quality pass (comb-peak + zebra-break + G3-dropout)
 from kerf_cad_core.geom.leading import LeadingReport, run_leading_pass
 

@@ -24,6 +24,8 @@ async def register(app: FastAPI, ctx):
         gdnt_build_report_spec, run_gdnt_build_report,
         gdt_validate_frame_spec, run_gdt_validate_frame,
         gdt_parse_frame_spec, run_gdt_parse_frame,
+        gdt_validate_datum_reference_frame_spec,
+        run_gdt_validate_datum_reference_frame,
     )
 
     ctx.tools.register("gdnt_list_symbols", gdnt_list_symbols_spec, run_gdnt_list_symbols)
@@ -33,6 +35,11 @@ async def register(app: FastAPI, ctx):
     ctx.tools.register("gdnt_build_report", gdnt_build_report_spec, run_gdnt_build_report)
     ctx.tools.register("gdt_validate_frame", gdt_validate_frame_spec, run_gdt_validate_frame)
     ctx.tools.register("gdt_parse_frame", gdt_parse_frame_spec, run_gdt_parse_frame)
+    ctx.tools.register(
+        "gdt_validate_datum_reference_frame",
+        gdt_validate_datum_reference_frame_spec,
+        run_gdt_validate_datum_reference_frame,
+    )
 
     try:
         from kerf_core.plugin import PluginManifest
@@ -40,6 +47,7 @@ async def register(app: FastAPI, ctx):
             name="gdnt",
             version="0.1.0",
             provides=["gdnt.fcf", "gdnt.inspection", "gdnt.homologation", "gdnt.validation"],
+            provides=["gdnt.fcf", "gdnt.inspection", "gdnt.homologation", "gdnt.drf_validation"],
             depends=[],
         )
     except ImportError:
@@ -47,5 +55,6 @@ async def register(app: FastAPI, ctx):
             "name": "gdnt",
             "version": "0.1.0",
             "provides": ["gdnt.fcf", "gdnt.inspection", "gdnt.homologation", "gdnt.validation"],
+            "provides": ["gdnt.fcf", "gdnt.inspection", "gdnt.homologation", "gdnt.drf_validation"],
             "depends": [],
         }

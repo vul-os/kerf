@@ -530,3 +530,125 @@ def run_gdt_monte_carlo_stack(params: dict, ctx: Any) -> str:
         return ok_payload(result)
     except Exception as exc:
         return err_payload(str(exc), "STACK_ERROR")
+# gdt_validate_datum_reference_frame   (DRF precedence -- ASME Y14.5-2018 §4.11)
+# ---------------------------------------------------------------------------
+
+gdt_validate_datum_reference_frame_spec = ToolSpec(
+    name="gdt_validate_datum_reference_frame",
+    description=(
+        "Validate the datum reference frame (DRF) declared in a feature control "
+        "frame against ASME Y14.5-2018 §4.11 datum precedence rules. Checks: "
+        "3-2-1 contact (primary plane 3-pt, secondary 2-pt, tertiary 1-pt); "
+        "duplicate datum letters; missing primary datum; material-boundary "
+        "modifiers on features of size (RMB/MMB/LMB); conflicting modifier with "
+        "feature type (e.g. MMB/LMB/RMB on a planar datum). Each violation "
+        "includes an ASME Y14.5-2018 §4 rule citation. "
+        "NOTE: composite tolerance frames (§10.5) are flagged but out of scope."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "datum_refs": {
+                "type": "array",
+                "description": (
+                    "Ordered datum references from the FCF "
+                    "[primary, secondary?, tertiary?]. At most 3 entries."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "label": {
+                            "type": "string",
+                            "description": "Datum letter, e.g. 'A'.",
+                        },
+                        "modifier": {
+                            "type": "string",
+                            "enum": ["M", "L", "S"],
+                            "description": "Material-boundary modifier: M=MMB, L=LMB, S=RMB/RFS.",
+                        },
+                    },
+                    "required": ["label"],
+                },
+                "maxItems": 3,
+            },
+            "datums": {
+                "type": "object",
+                "description": (
+                    "Registry of datum features on the drawing. Keys are datum "
+                    "letters; values describe the nominated feature."
+                ),
+                "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                        "feature_type": {
+                            "type": "string",
+                            "enum": [
+                                "flat_face", "plane", "cylinder", "cone",
+                                "sphere", "slot", "width",
+                            ],
+                            "description": "Geometric type of the nominated datum feature.",
+                        },
+                        "is_datum_target": {
+                            "type": "boolean",
+                            "description": "True when datum targets (§4.24) are used.",
+                            "default": False,
+                        },
+                        "target_type": {
+                            "type": "string",
+                            "enum": ["point", "line", "area", "movable"],
+                            "description": "Type of datum target (§4.24 Fig. 4-11).",
+                        },
+                    },
+                    "required": ["feature_type"],
+                },
+            },
+            "is_composite_lower_segment": {
+                "type": "boolean",
+                "description": (
+                    "Set True if this is the lower segment of a composite "
+                    "tolerance frame (§10.5). DRF precedence checks are skipped "
+                    "-- out of scope."
+                ),
+                "default": False,
+            },
+        },
+        "required": ["datum_refs", "datums"],
+    },
+)
+
+
+def run_gdt_validate_datum_reference_frame(params: dict, ctx: Any) -> str:
+    try:
+        from kerf_gdnt.datum_reference_validator import (
+            validate_datum_reference_frame,
+            DatumReferenceEntry,
+            DatumInfo,
+        )
+
+        frame_datums = [
+            DatumReferenceEntry(
+                label=d["label"],
+                modifier=d.get("modifier"),
+            )
+            for d in params.get("datum_refs", [])
+        ]
+
+        datum_registry: dict[str, DatumInfo] = {}
+        for label, info in params.get("datums", {}).items():
+            datum_registry[label] = DatumInfo(
+                label=label,
+                feature_type=info["feature_type"],
+                is_datum_target=bool(info.get("is_datum_target", False)),
+                target_type=info.get("target_type"),
+            )
+
+        report = validate_datum_reference_frame(
+            frame_datums=frame_datums,
+            datum_registry=datum_registry,
+            is_composite_lower_segment=bool(
+                params.get("is_composite_lower_segment", False)
+            ),
+        )
+        return ok_payload(report.to_dict())
+    except Exception as exc:
+        return err_payload(str(exc), "DRF_VALIDATE_ERROR")

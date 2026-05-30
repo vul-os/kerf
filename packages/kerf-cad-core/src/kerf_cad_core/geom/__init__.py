@@ -1090,6 +1090,15 @@ from kerf_cad_core.geom.feature_recognition import (  # noqa: E402
     FeatureRecognitionResult,
 )
 
+# NURBS dependency graph + smart-edit propagation (Hoffmann-Joan-Arinyo 2002)
+from kerf_cad_core.geom.dependency_graph import (
+    NodeKind,
+    GraphNode,
+    DependencyGraph,
+    build_graph_for_body,
+    smart_edit,
+)
+
 # GK-127 / GK-P39: 3DM (Rhino OpenNURBS) read + write
 from kerf_cad_core.geom.io.rhino3dm import (
     read_3dm,

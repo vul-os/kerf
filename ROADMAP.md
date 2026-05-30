@@ -78,6 +78,9 @@ The sector work only matters if you **own your work, are not locked in, and can 
 ### Latest delta — 2026-05-30
 
 **Motion inverse dynamics** ✅ — Recursive Newton-Euler inverse dynamics (Featherstone 2008 §5.3): given joint trajectory θ(t), θ̇(t), θ̈(t) → torques τ(t); `gravity_compensation(robot, q)` static equilibrium; `compute_joint_torques_from_trajectory` vectorised over full trajectories; LLM tools `motion_inverse_dynamics` + `motion_gravity_compensation` registered — `kerf-motion/src/kerf_motion/inverse_dynamics.py`.
+### Latest delta — 2026-05-30
+
+**Dental implant trajectory planning** ✅ — Misch 2014 §22 / EAO guidelines: bone density classification (HU → D1-D4), mandibular nerve clearance (≥ 2 mm), maxillary sinus floor clearance (≥ 1 mm), axial alignment deviation (≤ 10° EAO limit), cortical thickness at entry; `recommend_implant_dimensions` per site (anterior/premolar/posterior × maxillary/mandibular); `generate_surgical_guide_geometry` cylinder output; LLM tools `dental_implant_metrics` + `dental_recommend_implant` — `kerf-dental/src/kerf_dental/implant_planning.py`. NOT FDA-cleared; planning-support only.
 
 ### Previous delta — 2026-05-26
 
@@ -110,6 +113,7 @@ The sector work only matters if you **own your work, are not locked in, and can 
 **Verticals** ✅ — dental anatomic crown (multi-cusp fan, not placeholder) + UI parity shipped (CrownSculptingPanel, ImplantLibrary, SurgicalGuide — preset picker, occlusion overlay, filterable Straumann/Nobel/Zimmer/MIS catalogue, CBCT import + pose editor + sleeve preview, all dispatching to kerf-dental backend); Swiss lever escapement + mainspring + balance-wheel; solar PV partial shading + bypass-diode + MPPT; analog PVT corner simulation (60 corners + Monte-Carlo mismatch).
 **Verticals** ✅ — dental anatomic crown (multi-cusp fan, not placeholder); surgical guide emits milling-ready B-rep + STL export ✅; Swiss lever escapement + mainspring + balance-wheel; solar PV partial shading + bypass-diode + MPPT; analog PVT corner simulation (60 corners + Monte-Carlo mismatch).
 **Verticals** ✅ — dental anatomic crown (multi-cusp fan, not placeholder); Swiss lever escapement + mainspring + balance-wheel; train ratio calculator + inverse design (Daniels §6.1) ✅; solar PV partial shading + bypass-diode + MPPT; analog PVT corner simulation (60 corners + Monte-Carlo mismatch).
+**Verticals** ✅ — dental anatomic crown (multi-cusp fan, not placeholder); dental implant trajectory metrics (Misch 2014 / EAO — bone density D1-D4, nerve/sinus clearance, axial alignment); Swiss lever escapement + mainspring + balance-wheel; solar PV partial shading + bypass-diode + MPPT; analog PVT corner simulation (60 corners + Monte-Carlo mismatch).
 
 **Building/PV UI** ✅ — `BuildingEnergyPanel` (zone-by-zone occupancy/lighting/equipment/infiltration/HVAC editor, EnergyPlus IDF export); `PVShadingPanel` (array layout + obstruction polygons + bypass-diode + MPPT + monthly yield chart); `MonthlyLoadChart` (SVG stacked-bar); `.energy.bldg` / `.energy.pv` / `.energy.load` file kinds wired in Editor.jsx.
 **Verticals** ✅ — dental anatomic crown (multi-cusp fan, not placeholder); surgical guide watertight single-solid ✅ (`surgical_guide_to_body` — boolean subtract of drill bores from plate, genus-validated); Swiss lever escapement + mainspring + balance-wheel; solar PV partial shading + bypass-diode + MPPT; analog PVT corner simulation (60 corners + Monte-Carlo mismatch).

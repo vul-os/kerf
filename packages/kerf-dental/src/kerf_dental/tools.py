@@ -7,7 +7,6 @@ Registered via plugin.py at startup.
 
 from __future__ import annotations
 
-import base64
 import json
 from typing import Any
 
@@ -109,10 +108,8 @@ dental_surgical_guide_spec = ToolSpec(
     name="dental_surgical_guide",
     description=(
         "Place drill-guide sleeves on a jaw model at specified implant angulations. "
-        "Each sleeve is a validate_body-clean cylinder. Returns placement metadata, "
-        "angular accuracy (< 0.1°), AND a milling-ready B-rep guide body as "
-        "binary STL base64-encoded in the 'body_stl_b64' field. "
-        "The SVG preview path still works if 'body_stl_b64' is ignored (back-compat)."
+        "Each sleeve is a validate_body-clean cylinder. Returns placement metadata "
+        "and angular accuracy (should be < 0.1°)."
     ),
     input_schema={
         "type": "object",
@@ -154,14 +151,6 @@ dental_surgical_guide_spec = ToolSpec(
                 },
                 "minItems": 1,
             },
-            "guide_thickness_mm": {
-                "type": "number",
-                "description": "Guide plate thickness in mm (default 3.0).",
-            },
-            "guide_margin_mm": {
-                "type": "number",
-                "description": "XY margin around jaw bounding box in mm (default 5.0).",
-            },
         },
         "required": ["jaw_surface_pts", "implants"],
     },
@@ -170,10 +159,7 @@ dental_surgical_guide_spec = ToolSpec(
 
 async def run_dental_surgical_guide(args: dict[str, Any], ctx: "ProjectCtx") -> str:
     try:
-        from kerf_dental.guide import (
-            ImplantSpec, place_surgical_guide,
-            surgical_guide_to_body, guide_body_to_stl_bytes,
-        )
+        from kerf_dental.guide import ImplantSpec, place_surgical_guide
 
         jaw_pts = args["jaw_surface_pts"]
         implant_specs = [
@@ -187,35 +173,12 @@ async def run_dental_surgical_guide(args: dict[str, Any], ctx: "ProjectCtx") -> 
         ]
         result = place_surgical_guide(jaw_pts, implant_specs)
 
-        # Build milling-ready B-rep guide body and serialise to STL bytes (base64)
-        body_stl_b64: str | None = None
-        plate_dims: list | None = None
-        try:
-            gb = surgical_guide_to_body(
-                jaw_pts,
-                implant_specs,
-                thickness_mm=float(args.get("guide_thickness_mm", 3.0)),
-                margin_mm=float(args.get("guide_margin_mm", 5.0)),
-            )
-            stl_bytes = guide_body_to_stl_bytes(gb, fmt="binary")
-            body_stl_b64 = base64.b64encode(stl_bytes).decode("ascii")
-            plate_dims = list(gb.plate_dims_mm)
-        except Exception:
-            # Non-fatal: planning data still returned; body field absent
-            pass
-
         payload: dict[str, Any] = {
             "sleeve_count": len(result.sleeves),
             "max_angular_error_deg": round(result.max_angular_error_deg(), 6),
             "angular_errors_deg": [round(e, 6) for e in result.angular_errors_deg],
             "all_validate_body_ok": True,
         }
-        if body_stl_b64 is not None:
-            payload["body_stl_b64"] = body_stl_b64
-            payload["body_stl_bytes"] = len(base64.b64decode(body_stl_b64))
-        if plate_dims is not None:
-            payload["plate_dims_mm"] = plate_dims
-
         return ok_payload(payload)
     except Exception as exc:
         return err_payload(str(exc), "SURGICAL_GUIDE_ERROR")
@@ -629,209 +592,230 @@ async def run_dental_deviation_map(args: dict[str, Any], ctx: "ProjectCtx") -> s
 
 
 # ---------------------------------------------------------------------------
-# dental_occlusal_analysis
+# dental_implant_metrics
 # ---------------------------------------------------------------------------
 
-dental_occlusal_analysis_spec = ToolSpec(
-    name="dental_occlusal_analysis",
+dental_implant_metrics_spec = ToolSpec(
+    name="dental_implant_metrics",
     description=(
-        "Detect occlusal contact patches between upper and lower dental arch meshes. "
-        "For each vertex in the lower arch, finds the nearest point on the upper arch; "
-        "vertices with gap < threshold_um are grouped into contact regions. "
-        "Returns contact region count, total area, max pressure proxy, and gap "
-        "distribution. Method: Okeson (2019) 'Management of Temporomandibular "
-        "Disorders and Occlusion' §8. Not ADA-certified."
+        "Compute implant trajectory planning metrics from a CBCT volume. "
+        "Performs Hounsfield-Unit bone density classification (Misch 2014 §22 D1-D4), "
+        "mandibular nerve clearance check (EAO: ≥ 2 mm), maxillary sinus floor "
+        "clearance check (EAO: ≥ 1 mm), axial alignment deviation from prosthetic "
+        "axis (EAO: ≤ 10°), and cortical bone thickness at the entry point. "
+        "Returns ImplantMetrics including violations list. "
+        "NOTE: Misch + EAO guidelines — NOT FDA-cleared medical device. "
+        "All plans require review by a qualified dental clinician."
     ),
     input_schema={
         "type": "object",
         "properties": {
-            "upper_arch": {
+            "entry_point": {
                 "type": "array",
-                "items": {
-                    "type": "array",
-                    "items": {"type": "number"},
-                    "minItems": 3,
-                    "maxItems": 3,
-                },
-                "description": "Maxillary (upper) arch vertices [[x,y,z], ...] in mm. Minimum 3.",
+                "items": {"type": "number"},
                 "minItems": 3,
+                "maxItems": 3,
+                "description": "Implant entry (crestal surface) in jaw coordinates (mm).",
             },
-            "lower_arch": {
+            "exit_point": {
                 "type": "array",
-                "items": {
-                    "type": "array",
-                    "items": {"type": "number"},
-                    "minItems": 3,
-                    "maxItems": 3,
-                },
-                "description": "Mandibular (lower) arch vertices [[x,y,z], ...] in mm. Minimum 3.",
+                "items": {"type": "number"},
                 "minItems": 3,
+                "maxItems": 3,
+                "description": "Implant apical tip in jaw coordinates (mm).",
             },
-            "threshold_um": {
+            "diameter_mm": {
                 "type": "number",
-                "description": "Gap threshold in micrometres for contact classification. Default 50 μm.",
+                "description": "Implant body diameter (mm). Default 4.0.",
             },
-            "adjacency_radius_mm": {
+            "length_mm": {
                 "type": "number",
-                "description": "Spatial radius (mm) to group contact vertices into regions. Default 2.0.",
+                "description": "Implant body length (mm). Default 10.0.",
             },
-            "pressure_flag_threshold": {
-                "type": "number",
-                "description": "Normalised pressure threshold (0–1) for flagging high-pressure regions. Default 0.5.",
-            },
-        },
-        "required": ["upper_arch", "lower_arch"],
-    },
-)
-
-
-async def run_dental_occlusal_analysis(args: dict[str, Any], ctx: "ProjectCtx") -> str:
-    try:
-        from kerf_dental.occlusal_contacts import (
-            compute_occlusal_contacts,
-            mark_high_pressure_zones,
-        )
-
-        threshold_um = float(args.get("threshold_um", 50.0))
-        adjacency_radius_mm = float(args.get("adjacency_radius_mm", 2.0))
-        pressure_flag_threshold = float(args.get("pressure_flag_threshold", 0.5))
-
-        report = compute_occlusal_contacts(
-            upper_arch=args["upper_arch"],
-            lower_arch=args["lower_arch"],
-            threshold_um=threshold_um,
-            adjacency_radius_mm=adjacency_radius_mm,
-        )
-        flagged = mark_high_pressure_zones(report, max_pressure_threshold=pressure_flag_threshold)
-
-        regions_out = []
-        for r in report.contact_regions:
-            regions_out.append({
-                "vertex_count": len(r.vertex_indices),
-                "center_mm": [round(float(v), 4) for v in r.center_mm],
-                "area_mm2": round(r.area_mm2, 6),
-                "mean_gap_um": round(r.mean_gap_um, 2),
-                "max_pressure": round(r.max_pressure, 4),
-                "is_flagged": r.is_flagged,
-            })
-
-        import numpy as np
-        gap_d = report.gap_distribution_um
-        payload: dict[str, Any] = {
-            "contact_region_count": len(report.contact_regions),
-            "total_contact_area_mm2": round(report.total_contact_area_mm2, 6),
-            "max_pressure": round(report.max_pressure, 4),
-            "high_pressure_region_count": len(flagged),
-            "threshold_um": threshold_um,
-            "n_lower_vertices_evaluated": report.n_lower_vertices_evaluated,
-            "gap_distribution_um": {
-                "count": len(gap_d),
-                "mean": round(float(gap_d.mean()), 2) if len(gap_d) > 0 else None,
-                "p50": round(float(np.percentile(gap_d, 50)), 2) if len(gap_d) > 0 else None,
-                "p95": round(float(np.percentile(gap_d, 95)), 2) if len(gap_d) > 0 else None,
-            },
-            "contact_regions": regions_out,
-        }
-        return ok_payload(payload)
-    except Exception as exc:
-        return err_payload(str(exc), "OCCLUSAL_ANALYSIS_ERROR")
-
-
-# ---------------------------------------------------------------------------
-# dental_motion_analysis
-# ---------------------------------------------------------------------------
-
-dental_motion_analysis_spec = ToolSpec(
-    name="dental_motion_analysis",
-    description=(
-        "Simulate articulator jaw movement (centric / protrusive / lateral) and "
-        "report which occlusal contacts persist, disappear, or shift during motion. "
-        "Uses a rigid-body translation model (no condylar path); sufficient for "
-        "identifying contact interference during functional movements. "
-        "Method: Okeson (2019) §8 functional occlusion and mandibular movements."
-    ),
-    input_schema={
-        "type": "object",
-        "properties": {
-            "upper_arch": {
-                "type": "array",
-                "items": {
-                    "type": "array",
-                    "items": {"type": "number"},
-                    "minItems": 3,
-                    "maxItems": 3,
-                },
-                "description": "Upper arch vertices [[x,y,z], ...] in mm.",
-                "minItems": 3,
-            },
-            "lower_arch": {
-                "type": "array",
-                "items": {
-                    "type": "array",
-                    "items": {"type": "number"},
-                    "minItems": 3,
-                    "maxItems": 3,
-                },
-                "description": "Lower arch vertices [[x,y,z], ...] in mm (starting at max intercuspation).",
-                "minItems": 3,
-            },
-            "motion": {
+            "tooth_position": {
                 "type": "string",
-                "enum": ["lateral", "protrusive", "centric"],
-                "description": "Jaw motion type. Default 'centric'.",
+                "description": "FDI two-digit tooth number (e.g. '16' = upper right first molar).",
             },
-            "n_steps": {
-                "type": "integer",
-                "description": "Number of incremental positions to evaluate. Default 5.",
+            "prosthetic_axis": {
+                "type": "array",
+                "items": {"type": "number"},
+                "minItems": 3,
+                "maxItems": 3,
+                "description": "Desired prosthetic long axis unit vector. Default (0,0,1).",
             },
-            "step_mm": {
-                "type": "number",
-                "description": "Magnitude of each incremental step in mm. Default 0.5.",
+            "cbct_volume": {
+                "type": "array",
+                "description": (
+                    "3-D CBCT volume as nested lists [z][y][x] of Hounsfield Unit values. "
+                    "Shape must be (nz, ny, nx). For testing/demo, a small uniform array is acceptable."
+                ),
             },
-            "threshold_um": {
-                "type": "number",
-                "description": "Contact gap threshold in μm. Default 50.",
+            "voxel_spacing_mm": {
+                "type": "array",
+                "items": {"type": "number"},
+                "minItems": 3,
+                "maxItems": 3,
+                "description": "Voxel spacing [sx, sy, sz] in mm. Default [0.4, 0.4, 0.4].",
+            },
+            "mandibular_nerve_curve": {
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 3,
+                    "maxItems": 3,
+                },
+                "description": "3-D polyline of mandibular nerve canal (mm). Optional.",
+            },
+            "maxillary_sinus_surface": {
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 3,
+                    "maxItems": 3,
+                },
+                "description": "Point cloud of maxillary sinus floor (mm). Optional.",
             },
         },
-        "required": ["upper_arch", "lower_arch"],
+        "required": ["entry_point", "exit_point", "cbct_volume"],
     },
 )
 
 
-async def run_dental_motion_analysis(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+async def run_dental_implant_metrics(args: dict[str, Any], ctx: "ProjectCtx") -> str:
     try:
-        from kerf_dental.occlusal_contacts import compute_articulator_motion
+        import numpy as np
+        from kerf_dental.implant_planning import ImplantPlan, compute_implant_metrics
 
-        result = compute_articulator_motion(
-            upper=args["upper_arch"],
-            lower=args["lower_arch"],
-            motion=args.get("motion", "centric"),
-            n_steps=int(args.get("n_steps", 5)),
-            step_mm=float(args.get("step_mm", 0.5)),
-            threshold_um=float(args.get("threshold_um", 50.0)),
+        plan = ImplantPlan(
+            entry_point=tuple(args["entry_point"]),
+            exit_point=tuple(args["exit_point"]),
+            diameter_mm=float(args.get("diameter_mm", 4.0)),
+            length_mm=float(args.get("length_mm", 10.0)),
+            tooth_position=str(args.get("tooth_position", "")),
+            prosthetic_axis=tuple(args["prosthetic_axis"]) if args.get("prosthetic_axis") else None,
         )
 
-        steps_summary = []
-        for i, (step, count) in enumerate(zip(result.steps, result.contact_count_by_step)):
-            steps_summary.append({
-                "step": i,
-                "contact_region_count": count,
-                "total_area_mm2": round(step.total_contact_area_mm2, 4),
-                "max_pressure": round(step.max_pressure, 4),
-                "shift_mm": [round(float(v), 4) for v in result.shift_vectors_mm[i]],
-            })
+        volume = np.array(args["cbct_volume"], dtype=float)
+        spacing = tuple(args["voxel_spacing_mm"]) if args.get("voxel_spacing_mm") else (0.4, 0.4, 0.4)
+
+        nerve = None
+        if args.get("mandibular_nerve_curve"):
+            nerve = np.array(args["mandibular_nerve_curve"], dtype=float)
+
+        sinus = None
+        if args.get("maxillary_sinus_surface"):
+            sinus = np.array(args["maxillary_sinus_surface"], dtype=float)
+
+        metrics = compute_implant_metrics(
+            plan=plan,
+            cbct_volume=volume,
+            voxel_spacing_mm=spacing,
+            mandibular_nerve_curve=nerve,
+            maxillary_sinus_surface=sinus,
+        )
 
         payload: dict[str, Any] = {
-            "motion": result.motion,
-            "n_steps": len(result.steps),
-            "initial_contact_count": result.contact_count_by_step[0] if result.contact_count_by_step else 0,
-            "final_contact_count": result.contact_count_by_step[-1] if result.contact_count_by_step else 0,
-            "persistent_region_count": len(result.persistent_region_indices),
-            "disappeared_region_count": len(result.disappeared_region_indices),
-            "persistent_region_indices": result.persistent_region_indices,
-            "disappeared_region_indices": result.disappeared_region_indices,
-            "steps": steps_summary,
+            "bone_density_classification": metrics.bone_density_classification,
+            "mean_hu": round(metrics.mean_hu, 1),
+            "cortical_thickness_entry_mm": round(metrics.cortical_thickness_entry_mm, 2),
+            "nerve_clearance_mm": round(metrics.nerve_clearance_mm, 2) if metrics.nerve_clearance_mm is not None else None,
+            "sinus_clearance_mm": round(metrics.sinus_clearance_mm, 2) if metrics.sinus_clearance_mm is not None else None,
+            "axial_deviation_deg": round(metrics.axial_deviation_deg, 2),
+            "recommended_violations": metrics.recommended_violations,
+            "violation_count": len(metrics.recommended_violations),
+            "n_samples": metrics.n_samples,
+            "disclaimer": "Misch 2014 + EAO guidelines — NOT FDA-cleared medical device.",
         }
         return ok_payload(payload)
     except Exception as exc:
-        return err_payload(str(exc), "MOTION_ANALYSIS_ERROR")
+        return err_payload(str(exc), "IMPLANT_METRICS_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# dental_recommend_implant
+# ---------------------------------------------------------------------------
+
+dental_recommend_implant_spec = ToolSpec(
+    name="dental_recommend_implant",
+    description=(
+        "Recommend implant dimensions (diameter × length) for a given tooth site "
+        "per Misch 2014 §22 site-specific tables. Takes FDI tooth position, bone "
+        "quality (D1-D4), and sinus-present flag. Returns ImplantPlan with recommended "
+        "diameter_mm and length_mm. Anterior maxillary: 3.5×11mm; posterior maxillary "
+        "(D2): 4.0×10mm; posterior mandibular: 4.5×10mm. D3/D4 bone → wider + longer. "
+        "Sinus-present in posterior maxilla → shorter implant (≥ 8 mm minimum). "
+        "NOTE: Misch + EAO guidelines — NOT FDA-cleared medical device."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "tooth_position": {
+                "type": "string",
+                "description": (
+                    "FDI two-digit tooth number (e.g. '16' = upper right first molar, "
+                    "'11' = upper right central incisor, '36' = lower left first molar)."
+                ),
+            },
+            "bone_quality": {
+                "type": "string",
+                "enum": ["D1", "D2", "D3", "D4", "D4-"],
+                "description": "Misch bone density classification. Default 'D2'.",
+            },
+            "sinus_present": {
+                "type": "boolean",
+                "description": "True if maxillary sinus is present at this site. Default false.",
+            },
+            "entry_point": {
+                "type": "array",
+                "items": {"type": "number"},
+                "minItems": 3,
+                "maxItems": 3,
+                "description": "Entry point in jaw coordinates (mm). Default [0,0,0].",
+            },
+            "prosthetic_axis": {
+                "type": "array",
+                "items": {"type": "number"},
+                "minItems": 3,
+                "maxItems": 3,
+                "description": "Prosthetic long axis direction. Default [0,0,1] (occlusal).",
+            },
+        },
+        "required": ["tooth_position"],
+    },
+)
+
+
+async def run_dental_recommend_implant(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_dental.implant_planning import recommend_implant_dimensions
+
+        tooth_pos = str(args["tooth_position"])
+        bone_quality = str(args.get("bone_quality", "D2"))
+        sinus_present = bool(args.get("sinus_present", False))
+        entry = tuple(args["entry_point"]) if args.get("entry_point") else None
+        pa = tuple(args["prosthetic_axis"]) if args.get("prosthetic_axis") else None
+
+        plan = recommend_implant_dimensions(
+            tooth_position=tooth_pos,
+            bone_quality=bone_quality,
+            sinus_present=sinus_present,
+            entry_point=entry,
+            prosthetic_axis=pa,
+        )
+
+        payload: dict[str, Any] = {
+            "tooth_position": plan.tooth_position,
+            "diameter_mm": round(plan.diameter_mm, 2),
+            "length_mm": round(plan.length_mm, 2),
+            "entry_point": [round(v, 4) for v in plan.entry_point],
+            "exit_point": [round(v, 4) for v in plan.exit_point],
+            "trajectory_length_mm": round(plan.trajectory_length_mm, 2),
+            "bone_quality": bone_quality,
+            "sinus_present": sinus_present,
+            "disclaimer": "Misch 2014 + EAO guidelines — NOT FDA-cleared medical device.",
+        }
+        return ok_payload(payload)
+    except Exception as exc:
+        return err_payload(str(exc), "RECOMMEND_IMPLANT_ERROR")

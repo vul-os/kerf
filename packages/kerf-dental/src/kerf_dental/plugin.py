@@ -2,7 +2,9 @@
 kerf-dental plugin entry-point.
 
 Registers:
-  - LLM tools: dental_crown_design, dental_surgical_guide, dental_dicom_ingest
+  - LLM tools: dental_crown_design, dental_surgical_guide, dental_dicom_ingest,
+    dental_denture_design, dental_stl_export, dental_register_scans,
+    dental_deviation_map, dental_implant_metrics, dental_recommend_implant
 """
 
 from __future__ import annotations
@@ -29,8 +31,8 @@ async def register(app: FastAPI, ctx):
         dental_stl_export_spec, run_dental_stl_export,
         dental_register_scans_spec, run_dental_register_scans,
         dental_deviation_map_spec, run_dental_deviation_map,
-        dental_occlusal_analysis_spec, run_dental_occlusal_analysis,
-        dental_motion_analysis_spec, run_dental_motion_analysis,
+        dental_implant_metrics_spec, run_dental_implant_metrics,
+        dental_recommend_implant_spec, run_dental_recommend_implant,
     )
     ctx.tools.register("dental_crown_design", dental_crown_design_spec, run_dental_crown_design)
     ctx.tools.register("dental_surgical_guide", dental_surgical_guide_spec, run_dental_surgical_guide)
@@ -39,11 +41,11 @@ async def register(app: FastAPI, ctx):
     ctx.tools.register("dental_stl_export", dental_stl_export_spec, run_dental_stl_export)
     ctx.tools.register("dental_register_scans", dental_register_scans_spec, run_dental_register_scans)
     ctx.tools.register("dental_deviation_map", dental_deviation_map_spec, run_dental_deviation_map)
-    ctx.tools.register("dental_occlusal_analysis", dental_occlusal_analysis_spec, run_dental_occlusal_analysis)
-    ctx.tools.register("dental_motion_analysis", dental_motion_analysis_spec, run_dental_motion_analysis)
+    ctx.tools.register("dental_implant_metrics", dental_implant_metrics_spec, run_dental_implant_metrics)
+    ctx.tools.register("dental_recommend_implant", dental_recommend_implant_spec, run_dental_recommend_implant)
 
     provides = ["dental.crown", "dental.guide", "dental.denture", "dental.stl",
-                "dental.registration", "dental.deviation", "dental.occlusal"]
+                "dental.registration", "dental.deviation", "dental.implant_planning"]
     if _PYDICOM_AVAILABLE:
         provides.append("dental.dicom")
 

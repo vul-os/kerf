@@ -8,8 +8,6 @@ Wires the following already-implemented functions from
 - ``sculpt_brush``       (GK-P27) — sculpt-brush stroke (grab/smooth/inflate)
 - ``MultiresStack``      (GK-P26) — multi-resolution displacement stack
   (evaluate + serialise as feature nodes)
-- ``subd_to_nurbs_schaefer`` (GK-P-LS) — Loop-Schaefer 2008 bicubic-NURBS
-  approximation of a Catmull-Clark SubD cage (stateless, returns patches + error)
 
 These ops append a node to a ``.feature`` file. The OCCT worker has no
 special dispatch for SubD nodes — evaluation is pure-Python.
@@ -473,133 +471,139 @@ async def run_feature_multires_evaluate(ctx: ProjectCtx, args: bytes) -> str:
     })
 
 
-# ── subd_to_nurbs_schaefer ────────────────────────────────────────────────────
+# ── subd_insert_edge_loop ─────────────────────────────────────────────────────
 #
-# GK-P-LS: Loop-Schaefer 2008 bicubic-NURBS approximation (stateless tool).
-# Converts an inline SubD cage description to a bicubic NURBS patch quilt
-# and returns fit-error statistics + serialised control grids.
+# GK-P (Wave 4Q): limit-surface-preserving edge-loop insertion.
 
-subd_to_nurbs_schaefer_spec = ToolSpec(
-    name="subd_to_nurbs_schaefer",
+feature_subd_insert_edge_loop_spec = ToolSpec(
+    name="subd_insert_edge_loop",
     description=(
-        "Convert a Catmull-Clark SubD control cage to a bicubic NURBS patch "
-        "quilt using the Loop-Schaefer 2008 algorithm "
-        "(ACM Trans. Graphics 27(1), Feb 2008). "
-        "Regular interior faces (all valence-4 vertices) produce exact "
-        "Stam-basis bicubic patches with C2 continuity. "
-        "Irregular faces (extraordinary vertex, valence ≠ 4) are fitted by "
-        "least-squares to Catmull-Clark limit-surface samples. "
-        "Returns one 4×4 control grid per face plus fit-error statistics. "
-        "Stateless: does not read or write any file."
+        "Insert a new edge loop into a SubD cage using the Catmull-Clark "
+        "limit-surface-preserving formula (Loop-Schaefer 2008 bicubic weights).  "
+        "For each edge in `edge_path`, a new vertex is inserted at `parameter` "
+        "(default 0.5 = midpoint) using the CC edge-point formula:\n"
+        "\n"
+        "    new_pos(t) = lerp(P_a, P_b, t) + 4·t·(1-t)·(M_edge - mid(P_a, P_b))\n"
+        "\n"
+        "where M_edge = (va + vb + fp1 + fp2)/4 is the CC edge midpoint.  At "
+        "t=0.5 new_pos = M_edge exactly (the CC-subdivision edge-point).  Each "
+        "quad face containing a path edge is split into two quads using the new "
+        "vertex plus a corresponding vertex on the opposite edge.  On flat "
+        "surfaces this is exact (max deviation = 0); on curved surfaces the "
+        "deviation is O(h²) in the cage edge length.\n"
+        "\n"
+        "Appends a `subd_insert_edge_loop` node to the target `.feature` file.\n"
+        "\n"
+        "Returns:\n"
+        "  ok           : bool\n"
+        "  file_id      : str\n"
+        "  id           : str — new node id\n"
+        "  op           : 'subd_insert_edge_loop'\n"
+        "  new_vertices : int — number of new vertices inserted on path edges\n"
+        "\n"
+        "Errors: {ok:false, reason}.  Never raises."
     ),
     input_schema={
         "type": "object",
         "properties": {
-            "vertices": {
-                "type": "array",
-                "items": {
-                    "type": "array",
-                    "items": {"type": "number"},
-                    "minItems": 3,
-                    "maxItems": 3,
-                },
-                "description": "Vertex positions as [[x,y,z], ...] (≥4 vertices).",
-                "minItems": 4,
+            "file_id": {
+                "type": "string",
+                "description": "UUID of the target .feature file.",
             },
-            "faces": {
+            "target_id": {
+                "type": "string",
+                "description": "Id of the SubD cage node to insert the edge loop into.",
+            },
+            "edge_path": {
                 "type": "array",
+                "description": (
+                    "Sequence of [va, vb] vertex-index pairs identifying the "
+                    "cage edges that form the edge loop path.  Each pair must "
+                    "be an edge that exists in the cage.  Adjacent edges sharing "
+                    "a quad face are split into two quads."
+                ),
                 "items": {
                     "type": "array",
                     "items": {"type": "integer"},
-                    "minItems": 4,
-                    "maxItems": 4,
+                    "minItems": 2,
+                    "maxItems": 2,
                 },
-                "description": "Quad faces as [[i0,i1,i2,i3], ...] (all quads, CCW winding).",
                 "minItems": 1,
             },
-            "target_error": {
+            "parameter": {
                 "type": "number",
                 "description": (
-                    "Target fit error for irregular (extraordinary-vertex) faces "
-                    "(default 1e-3, in the same units as vertices). "
-                    "The actual max_fit_error may exceed this for very irregular cages."
+                    "Position along each edge for the new vertex, in (0, 1).  "
+                    "Default 0.5 = midpoint (places new vertex exactly at the "
+                    "CC edge-point position, maximally close to the limit surface)."
                 ),
-                "default": 0.001,
+                "default": 0.5,
                 "exclusiveMinimum": 0,
+                "exclusiveMaximum": 1,
+            },
+            "id": {
+                "type": "string",
+                "description": "Optional explicit node id.",
             },
         },
-        "required": ["vertices", "faces"],
+        "required": ["file_id", "target_id", "edge_path"],
     },
 )
 
 
-@register(subd_to_nurbs_schaefer_spec, write=False)
-async def run_subd_to_nurbs_schaefer(ctx: ProjectCtx, args: bytes) -> str:
+@register(feature_subd_insert_edge_loop_spec, write=True)
+async def run_subd_insert_edge_loop(ctx: ProjectCtx, args: bytes) -> str:
     try:
         a = json.loads(args)
     except Exception as exc:
         return err_payload(f"invalid args: {exc}", "BAD_ARGS")
 
-    raw_verts = a.get("vertices")
-    raw_faces = a.get("faces")
-    target_error = a.get("target_error", 1e-3)
+    file_id = a.get("file_id", "").strip()
+    target_id = a.get("target_id", "").strip()
+    edge_path_raw = a.get("edge_path", [])
+    parameter = float(a.get("parameter", 0.5))
+    node_id = a.get("id", "").strip()
 
-    if not isinstance(raw_verts, list) or len(raw_verts) < 4:
-        return err_payload("vertices must be a list of ≥4 [x,y,z] points", "BAD_ARGS")
-    if not isinstance(raw_faces, list) or len(raw_faces) < 1:
-        return err_payload("faces must be a non-empty list of quad index lists", "BAD_ARGS")
-    if not isinstance(target_error, (int, float)) or target_error <= 0:
-        return err_payload("target_error must be a positive number", "BAD_ARGS")
-
-    try:
-        verts = [[float(c) for c in v] for v in raw_verts]
-        faces = [[int(i) for i in f] for f in raw_faces]
-    except (TypeError, ValueError) as exc:
-        return err_payload(f"invalid vertex/face data: {exc}", "BAD_ARGS")
-
-    for fi, f in enumerate(faces):
-        if len(f) != 4:
-            return err_payload(
-                f"face {fi} has {len(f)} vertices; only quads supported", "BAD_ARGS"
-            )
-        for vi in f:
-            if vi < 0 or vi >= len(verts):
-                return err_payload(
-                    f"face {fi} has out-of-range vertex index {vi}", "BAD_ARGS"
-                )
+    if not file_id or not target_id:
+        return err_payload("file_id and target_id are required", "BAD_ARGS")
+    if not isinstance(edge_path_raw, list) or len(edge_path_raw) == 0:
+        return err_payload("edge_path must be a non-empty list of [va, vb] pairs", "BAD_ARGS")
+    if not (0.0 < parameter < 1.0):
+        return err_payload("parameter must be in (0, 1)", "BAD_ARGS")
 
     try:
-        from kerf_cad_core.geom.subd import SubDMesh
-        from kerf_cad_core.geom.subd_to_nurbs import (
-            subd_to_nurbs_loop_schaefer,
-            compute_conversion_loss,
-        )
-    except ImportError as exc:
-        return err_payload(f"import error: {exc}", "ERROR")
-
-    mesh = SubDMesh(vertices=verts, faces=faces)
-    try:
-        result = subd_to_nurbs_loop_schaefer(mesh, target_error=float(target_error))
-    except Exception as exc:
-        return err_payload(f"conversion failed: {exc}", "ERROR")
-
-    try:
-        loss = compute_conversion_loss(mesh, result.patches, n_samples=200)
+        fid = uuid.UUID(file_id)
     except Exception:
-        loss = {"rms_error": 0.0, "max_error": 0.0, "near_extraordinary_max": 0.0}
+        return err_payload("file_id must be a valid UUID", "BAD_ARGS")
 
-    # Serialise control grids (list of 4×4 grids, each [[x,y,z]])
-    ctrl_grids = []
-    for patch in result.patches:
-        grid = patch.control_points.tolist()
-        ctrl_grids.append(grid)
+    content, err = read_feature_content(ctx, fid)
+    if err:
+        return err_payload(f"file not found: {err}", "NOT_FOUND")
+
+    if not node_id:
+        node_id = next_node_id(content, "subd_insert_edge_loop")
+
+    try:
+        edge_path = [[int(e[0]), int(e[1])] for e in edge_path_raw]
+    except Exception as exc:
+        return err_payload(f"invalid edge_path entries: {exc}", "BAD_ARGS")
+
+    node = {
+        "id": node_id,
+        "op": "subd_insert_edge_loop",
+        "target_id": target_id,
+        "edge_path": edge_path,
+        "parameter": parameter,
+    }
+
+    _, nid, err2 = append_feature_node(ctx, fid, node)
+    if err2:
+        return err_payload(err2, "ERROR")
 
     return ok_payload({
-        "patch_count": len(result.patches),
-        "max_fit_error": result.max_fit_error,
-        "valence_table": {str(k): v for k, v in result.valence_table.items()},
-        "rms_error": loss["rms_error"],
-        "max_error": loss["max_error"],
-        "near_extraordinary_max": loss["near_extraordinary_max"],
-        "control_grids": ctrl_grids,
+        "ok": True,
+        "file_id": file_id,
+        "id": nid or node_id,
+        "op": "subd_insert_edge_loop",
+        "new_vertices": len(edge_path),
     })

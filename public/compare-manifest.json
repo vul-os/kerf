@@ -9379,9 +9379,12 @@
             "source": "https://www.cimatron.com/en/cimatron-mold"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Cooling circuit thermal analysis: Re/Nu/HTC (Dittus-Boelter), pressure drop (Darcy-Weisbach), coolant temp rise, Janeschitz-Kriegl cooling time; series and parallel layouts; no 3D channel routing or conformal path tooling",
-            "evidence": "packages/kerf-mold/src/kerf_mold/cooling.py"
+            "status": "yes",
+            "note": "Cooling circuit thermal analysis: Re/Nu/HTC (Dittus-Boelter), pressure drop (Darcy-Weisbach), coolant temp rise, Janeschitz-Kriegl cooling time; series and parallel layouts. Geometric conflict detection (Menges 2001 §6.5): CHANNEL_SPACING (2x-diam rule), CHANNEL_EJECTOR, WALL_CLEARANCE, MOLD_BOUNDS via segment-segment min-dist (Ericson 2005 §5.1.9); severity 1-5 scale; LLM tool `mold_verify_cooling_channels`; no 3D routing or conformal toolpaths.",
+            "evidence": [
+              "packages/kerf-mold/src/kerf_mold/cooling.py",
+              "packages/kerf-mold/src/kerf_mold/cooling_channel_conflict.py"
+            ]
           }
         },
         {

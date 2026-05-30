@@ -23,6 +23,15 @@ from kerf_mold.ejector_pin_planner import (
     compute_warpage_risk,
     SPI_STANDARD_DIAMETERS_MM,
 )
+from kerf_mold.cooling_channel_conflict import (
+    CavityWall,
+    CoolingChannel3D,
+    CoolingConflictReport,
+    Conflict as CoolingConflict,
+    EjectorPin3D,
+    MoldBbox,
+    verify_cooling_channels,
+)
 
 __all__ = [
     # mold.py
@@ -46,4 +55,12 @@ __all__ = [
     "detect_pin_conflicts",
     "compute_warpage_risk",
     "SPI_STANDARD_DIAMETERS_MM",
+    # cooling_channel_conflict.py
+    "CavityWall",
+    "CoolingChannel3D",
+    "CoolingConflictReport",
+    "CoolingConflict",
+    "EjectorPin3D",
+    "MoldBbox",
+    "verify_cooling_channels",
 ]

@@ -7,6 +7,8 @@ Registers:
   - LLM tool:  brep_construct_parting_surface  (Yu-Fan 2003 §6 parting surface)
   - LLM tools: mold_plan_ejector_pins, mold_pin_conflicts
                (Yu-Fan 2003 §10 + SPI/ANSI B151.1 ejector pin layout)
+  - LLM tool:  mold_verify_cooling_channels
+               (Menges 2001 §6.5 cooling-channel conflict detection)
 """
 from __future__ import annotations
 
@@ -54,6 +56,15 @@ async def register(app: FastAPI, ctx):
         _CONFLICT_SPEC,
         run_mold_pin_conflicts,
     )
+    # Register cooling-channel conflict verification tool
+    from kerf_mold.cooling_channel_conflict_tool import (
+        _VERIFY_SPEC, run_mold_verify_cooling_channels,
+    )
+    ctx.tools.register(
+        "mold_verify_cooling_channels",
+        _VERIFY_SPEC,
+        run_mold_verify_cooling_channels,
+    )
 
     provides = [
         "mold.moldability",
@@ -62,6 +73,7 @@ async def register(app: FastAPI, ctx):
         "mold.draft_angle",
         "mold.cooling_analysis",
         "mold.ejector_pin_layout",
+        "mold.cooling_channel_conflict",
     ]
 
     try:

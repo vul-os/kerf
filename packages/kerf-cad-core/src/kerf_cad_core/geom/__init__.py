@@ -1284,3 +1284,8 @@ from kerf_cad_core.geom.brep_connect_inspector import (  # noqa: E402
     inspect_connectivity,
     is_manifold_closed,
 )
+# GK-P NURBS-DERIVATIVE-FIELD-VISUAL: 1st partial-derivative vector-field arrow-plot PNG/SVG
+from kerf_cad_core.geom.derivative_field_viz import (
+    render_derivative_field_png,
+    render_derivative_field_svg,
+)

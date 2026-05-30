@@ -52,6 +52,11 @@ from kerf_cad_core.geom.brep import (
 
 __all__ = ["simplify_body", "heal_body"]
 
+# lazy import to avoid circular; non_manifold.py imports brep only
+def _repair_nm(body: "Body", mode: str) -> "Body":
+    from kerf_cad_core.geom.non_manifold import repair_non_manifold  # noqa: PLC0415
+    return repair_non_manifold(body, mode=mode).body
+
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -298,7 +303,12 @@ def simplify_body(body: Body, tol: float = 1e-6) -> Body:
     return _rebuild_body(body, tol=tol, remove_short_edges=True, snap_gaps=False)
 
 
-def heal_body(body: Body, tol: float = 1e-6) -> Body:
+def heal_body(
+    body: Body,
+    tol: float = 1e-6,
+    repair_non_manifold: bool = False,
+    non_manifold_mode: str = "split",
+) -> Body:
     """Simplify and close sliver gaps in *body*.
 
     Runs :func:`simplify_body` and then snaps coedge-endpoint gaps within
@@ -312,6 +322,14 @@ def heal_body(body: Body, tol: float = 1e-6) -> Body:
     tol:
         Tolerance threshold passed to both the simplify pass and the gap-snap
         pass.
+    repair_non_manifold:
+        When ``True``, run a non-manifold detection + repair pass after the
+        standard simplify/snap pass.  Uses
+        :func:`~kerf_cad_core.geom.non_manifold.repair_non_manifold` with
+        *non_manifold_mode*.  Default ``False`` to preserve existing behaviour.
+    non_manifold_mode:
+        ``'split'`` (default) or ``'delete_smaller'`` — forwarded to the
+        non-manifold repair function when *repair_non_manifold* is ``True``.
 
     Returns
     -------
@@ -320,4 +338,7 @@ def heal_body(body: Body, tol: float = 1e-6) -> Body:
     """
     if tol <= 0:
         raise ValueError(f"tol must be positive, got {tol!r}")
-    return _rebuild_body(body, tol=tol, remove_short_edges=True, snap_gaps=True)
+    result = _rebuild_body(body, tol=tol, remove_short_edges=True, snap_gaps=True)
+    if repair_non_manifold:
+        result = _repair_nm(result, non_manifold_mode)
+    return result

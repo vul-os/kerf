@@ -162,6 +162,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.mesh_repair",
     # GK-82 ext: body-body imprint with edge tagging
     "kerf_cad_core.geom.imprint_body_tool",
+    # GK-NM: non-manifold detection + repair (brep_non_manifold_check, brep_non_manifold_repair)
+    "kerf_cad_core.geom.non_manifold_tools",
     "kerf_cad_core.geom.unroll_srf",
     "kerf_cad_core.geom.solid_features",
     "kerf_cad_core.geom.patch_srf",

@@ -1288,6 +1288,7 @@ layer (history/UI/CAM/FEM packages), not the geometry kernel.
 | Bevel weight (graded crease) | 🟡 GK-107 |
 | Loop subdivision (triangle scheme) | 🟡 GK-108 |
 | SubD limit-surface area + volume (Stam-quadrature) | ✅ GK-P-area-vol |
+| Stam-exact arbitrary-order limit derivative | ✅ GK-P (`subd_limit_derivative.py`) |
 
 ### F. Mesh & implicit
 | Capability | Status |

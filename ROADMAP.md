@@ -459,6 +459,7 @@ These are roadmap-level moats that span every sector simultaneously and compound
 - **GK-P SubD / mesh** — multires displacement; SDF CSG + marching-cubes; sculpt brush engine; LSCM UV unwrap (module exists, wiring incomplete); **SubD deformation cage with mean-value coords (Ju 2005) ✅** — `kerf-cad-core/geom/subd_deform.py`, LLM tool `subd_deform_with_cage`.
 - **GK-P SubD / mesh** — multires displacement; SDF CSG + marching-cubes; sculpt brush engine; UV unwrap with LSCM + ARAP + mesh atlas (Sheffer 2006) ✅ (`geom/uv_unwrap.py`, `brep_uv_unwrap` + `brep_uv_distortion_report` LLM tools, GK-P58).
 - **GK-P SubD / mesh** — multires displacement; SDF CSG + marching-cubes; sculpt brush engine; LSCM UV unwrap (module exists, wiring incomplete); **Harmonic coordinates for cage deformation (Joshi 2007) ✅** — `kerf-cad-core/geom/subd_harmonic.py`; `subd_harmonic_coords` LLM tool registered; non-negativity + partition-of-unity oracles verified.
+- **GK-P SubD / mesh** — multires displacement; SDF CSG + marching-cubes; sculpt brush engine; LSCM UV unwrap (module exists, wiring incomplete). Stam-exact arbitrary-order limit derivative ✅ (`subd_limit_derivative.py`, GK-P).
 - **GK-P architectural geometry** — B-rep→2D tessellate; roof/curtain-wall/corridor generators; wall compound-layer offset; hatch/section-fill.
 - **GK-P sketcher** — collinear constraint; ellipse solver entity; G2 continuity.
 - **GK-P interop** — 3DM write with Hausdorff read→write→read oracle.

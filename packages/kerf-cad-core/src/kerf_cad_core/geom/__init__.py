@@ -1359,3 +1359,9 @@ from kerf_cad_core.geom.face_neighbor_walk import (  # noqa: E402
     bfs_from_face,
     shortest_face_path,
 )
+# SUBD-LIMIT-WALK-ALONG-EDGES: sample CC limit-surface curve along cage-edge chain
+# (boundary=cage, creased=crease curve, smooth=limit surface arc; arc_length via segment sum)
+from kerf_cad_core.geom.subd_edge_walk import (  # noqa: E402
+    SubDEdgeWalk,
+    walk_along_cage_edges,
+)

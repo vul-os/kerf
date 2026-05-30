@@ -332,6 +332,8 @@ _TOOL_MODULES = [
     # BREP-FACE-NEIGHBOR-WALK: face-adjacency graph + BFS traversal for CNC routing /
     # geodesic shortest-path / paint-area planning (Weiler 1985 §3 edge-sharing adjacency)
     "kerf_cad_core.geom.face_neighbor_walk",            # brep_face_neighbors, brep_shortest_face_path
+    # SUBD-LIMIT-WALK-ALONG-EDGES: CC limit-surface curve along a cage edge chain
+    "kerf_cad_core.geom.subd_edge_walk",               # subd_walk_edge_chain
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

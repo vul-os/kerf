@@ -148,6 +148,8 @@ The sector work only matters if you **own your work, are not locked in, and can 
 
 **Security hardening** ✅ — `/run-topo` auth gate; NFP `grid_step` clamped; PVT `n_mc` clamped; Yosys module-name injection blocked; shared `_guard_*` helpers extracted across 68 files (−2009/+129 lines net).
 
+**SUBD-LIMIT-WALK-ALONG-EDGES** ✅ — sample the Catmull-Clark limit-surface curve corresponding to a chain of cage edges: `walk_along_cage_edges(cage, vertex_sequence, samples_per_edge=8)` returns `SubDEdgeWalk(points, arc_length)`; boundary edges → limit = cage (crease rule); creased interior edges → limit on sharp crease curve; smooth interior edges → smooth arc through CC limit positions; intermediate points via index-tracked CC subdivision (k = ceil(log2(spe)) levels, max 6) + per-vertex limit stencil; honest ValueError for non-adjacent vertices or out-of-range indices; LLM tool `subd_walk_edge_chain`; 14 oracle-asserted tests — `kerf-cad-core/geom/subd_edge_walk.py`.
+
 ### Core platform
 
 - **Auth + projects + files + chat (CRUD)** ✅ — Postgres, JWT, Google OAuth.

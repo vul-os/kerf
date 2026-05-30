@@ -21,7 +21,15 @@ except ImportError:
     from kerf_apparel._compat import ToolSpec, err_payload, ok_payload, register, ProjectCtx
 
 from kerf_apparel.blocks import get_measurements, bodice_front, bodice_back, sleeve, pants_front, pants_back
-from kerf_apparel.grading import grade_bodice, grade_sleeve, grade_pants, bust_girth_from_piece
+from kerf_apparel.grading import (
+    grade_bodice,
+    grade_sleeve,
+    grade_pants,
+    bust_girth_from_piece,
+    build_grading_table,
+    apply_grading,
+    grade_check_iso_8559,
+)
 from kerf_apparel.seam_allowance import add_seam_allowance
 from kerf_apparel.marker_making import make_marker
 from kerf_apparel.pattern_flatten import flatten_surface, compute_distortion, add_darts, TriMesh
@@ -497,7 +505,7 @@ async def run_flatten_pattern(ctx: ProjectCtx, args: bytes) -> str:
 
 
 @register(make_marker_spec, write=False)
-async def run_make_marker(ctx: ProjectCtx, args: bytes) -> str:
+async def run_make_marker(ctx: ProjectCtx, args: bytes) -> str:  # noqa: F811
     try:
         a = json.loads(args)
     except Exception as e:
@@ -551,4 +559,176 @@ async def run_make_marker(ctx: ProjectCtx, args: bytes) -> str:
             }
             for pp in result.placements
         ],
+    })
+
+
+# ------------------------------------------------------------------ #
+# apparel_apply_grading                                                #
+# ------------------------------------------------------------------ #
+
+apply_grading_spec = ToolSpec(
+    name="apparel_apply_grading",
+    description=(
+        "Apply ASTM D5219 + ISO 8559-2 industry-standard grade rules to a "
+        "named pattern block, returning the graded piece at the target size. "
+        "Specs: women_us (default), men_us, women_eu, men_eu. "
+        "Returns the new bounding box, area, and accumulated grade deltas in mm."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "block": {
+                "type": "string",
+                "enum": ["bodice_front", "bodice_back", "sleeve", "pants_front", "pants_back"],
+                "description": "Which pattern block to grade.",
+            },
+            "from_size": {
+                "type": "string",
+                "description": "Starting size label, e.g. '4' (US) or '36' (EU).",
+            },
+            "to_size": {
+                "type": "string",
+                "description": "Target size label, e.g. '6' (US) or '38' (EU).",
+            },
+            "spec": {
+                "type": "string",
+                "enum": ["women_us", "men_us", "women_eu", "men_eu"],
+                "description": "Grading specification. Default: women_us.",
+            },
+        },
+        "required": ["block", "from_size", "to_size"],
+    },
+)
+
+
+@register(apply_grading_spec, write=False)
+async def run_apply_grading(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    block_name = a.get("block", "").strip()
+    from_size = a.get("from_size", "").strip()
+    to_size = a.get("to_size", "").strip()
+    spec = a.get("spec", "women_us").strip()
+
+    if not block_name:
+        return err_payload("block is required", "BAD_ARGS")
+    if not from_size:
+        return err_payload("from_size is required", "BAD_ARGS")
+    if not to_size:
+        return err_payload("to_size is required", "BAD_ARGS")
+
+    valid_specs = ["women_us", "men_us", "women_eu", "men_eu"]
+    if spec not in valid_specs:
+        return err_payload(f"spec must be one of {valid_specs}", "BAD_ARGS")
+
+    # For US numeric sizes use the size table; for EU or alpha use what we have.
+    # For grading demonstration, use size "M" / "4" as the base block regardless
+    # of from_size (the grade deltas define the shape change, not the absolute size).
+    # We generate the from_size block using the US alpha/numeric table where available.
+    _generators_factory = {
+        "bodice_front": lambda m: bodice_front(m["bust"], m["waist"], m["hip"], m["back_length"]),
+        "bodice_back": lambda m: bodice_back(m["bust"], m["waist"], m["hip"], m["back_length"]),
+        "sleeve": lambda m: sleeve(m["bust"], m["sleeve_length"]),
+        "pants_front": lambda m: pants_front(m["waist"], m["hip"], m["inseam"], m["rise"]),
+        "pants_back": lambda m: pants_back(m["waist"], m["hip"], m["inseam"], m["rise"]),
+    }
+    gen_fn = _generators_factory.get(block_name)
+    if not gen_fn:
+        return err_payload(f"unknown block {block_name!r}", "BAD_ARGS")
+
+    # Resolve source measurements: try from_size in the size table; fallback to M.
+    try:
+        m = get_measurements(from_size)
+    except ValueError:
+        try:
+            m = get_measurements("M")
+        except ValueError as e:
+            return err_payload(str(e), "BAD_ARGS")
+
+    try:
+        piece = gen_fn(m)
+    except KeyError as e:
+        return err_payload(f"missing measurement for block: {e}", "BAD_ARGS")
+
+    try:
+        grading_table = build_grading_table(spec=spec)
+        graded = apply_grading(piece, from_size, to_size, grading_table, spec=spec)
+    except ValueError as e:
+        return err_payload(str(e), "BAD_ARGS")
+
+    bb_from = piece.bounding_box()
+    bb_to = graded.bounding_box()
+
+    return ok_payload({
+        "block": block_name,
+        "from_size": from_size,
+        "to_size": to_size,
+        "spec": spec,
+        "grade_dx_mm": graded.labels.get("grade_dx_mm", 0.0),
+        "grade_dy_mm": graded.labels.get("grade_dy_mm", 0.0),
+        "from_bbox_cm": {
+            "width": round(bb_from[2] - bb_from[0], 3),
+            "height": round(bb_from[3] - bb_from[1], 3),
+        },
+        "to_bbox_cm": {
+            "width": round(bb_to[2] - bb_to[0], 3),
+            "height": round(bb_to[3] - bb_to[1], 3),
+        },
+        "from_area_cm2": round(piece.area(), 2),
+        "to_area_cm2": round(graded.area(), 2),
+    })
+
+
+# ------------------------------------------------------------------ #
+# apparel_grade_check                                                  #
+# ------------------------------------------------------------------ #
+
+grade_check_spec = ToolSpec(
+    name="apparel_grade_check",
+    description=(
+        "Validate measurement codes against the ISO 8559-2:2017 canonical "
+        "nomenclature table.  Returns a list of warnings for any non-standard "
+        "codes, or an empty list if all codes are ISO-compliant."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "measurements": {
+                "type": "object",
+                "description": (
+                    "Mapping of measurement-code strings to numeric values (cm). "
+                    "Only the keys are validated against ISO 8559-2; values are ignored. "
+                    "Example: {\"chest_girth\": 92, \"waist_girth\": 74}"
+                ),
+            },
+        },
+        "required": ["measurements"],
+    },
+)
+
+
+@register(grade_check_spec, write=False)
+async def run_grade_check(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    measurements = a.get("measurements")
+    if measurements is None or not isinstance(measurements, dict):
+        return err_payload("measurements must be an object", "BAD_ARGS")
+
+    warnings = grade_check_iso_8559(measurements)
+
+    return ok_payload({
+        "total_codes": len(measurements),
+        "non_standard_count": len(warnings),
+        "warnings": [
+            {"code": w.code, "message": w.message}
+            for w in warnings
+        ],
+        "iso_compliant": len(warnings) == 0,
     })

@@ -9494,8 +9494,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "ASTM + EN 13402 grade rules; multi-size export (backend)",
-            "evidence": "packages/kerf-apparel/src/kerf_apparel/"
+            "note": "ASTM D5219 + ISO 8559 grading rules ✅ — GradingRule dataclass, build_grading_table (women_us/men_us/women_eu/men_eu), apply_grading, grade_check_iso_8559; apparel_apply_grading + apparel_grade_check LLM tools registered; EN 13402 + multi-size export (backend)",
+            "evidence": "packages/kerf-apparel/src/kerf_apparel/grading.py"
           }
         },
         {

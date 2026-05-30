@@ -240,6 +240,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.subd_deform_tools",
     # GK-P46: mesh/implicit ops (sdf_csg, uv_unwrap, isotropic_remesh, retopo_snap)
     "kerf_cad_core.mesh_implicit_tools",
+    # GK-P58: B-rep UV unwrap atlas (brep_uv_unwrap, brep_uv_distortion_report)
+    "kerf_cad_core.geom.brep_uv_tools",
     # GK-P47: isophote analysis (feature_isophote_analysis added to surfacing module above)
     # GK-P47: match_srf G3 is in geom.match_srf (already in _TOOL_MODULES above)
     # GK-P47: feature_loft guide_curves is in feature_loft (already in _TOOL_MODULES above)

@@ -299,8 +299,15 @@ from kerf_cad_core.geom.boolean import (
 )
 # GK-73: inset face (SubD + B-rep)
 from kerf_cad_core.geom.inset_face import inset_face, InsetResult
-# GK-76: wall-thickness map (printability gate)
-from kerf_cad_core.geom.wall_thickness import wall_thickness_map
+# GK-76 / GK-P: wall-thickness map + high-level analysis API
+from kerf_cad_core.geom.wall_thickness import (
+    wall_thickness_map,
+    ThicknessReport,
+    ThinWallWarning,
+    analyze_wall_thickness,
+    material_thickness_guideline,
+    flag_thin_walls,
+)
 # GK-29: solid edge/corner blend (concave/convex; degree-3 cylinder/sphere faces)
 from kerf_cad_core.geom.blend_solid import (
     BlendResult,
@@ -683,8 +690,13 @@ __all__ = [
     "nurbs_to_subd_cage",
     # GK-73
     "inset_face","InsetResult",
-    # GK-76
+    # GK-76 / GK-P
     "wall_thickness_map",
+    "ThicknessReport",
+    "ThinWallWarning",
+    "analyze_wall_thickness",
+    "material_thickness_guideline",
+    "flag_thin_walls",
     # GK-29
     "BlendResult",
     "blend_edge",

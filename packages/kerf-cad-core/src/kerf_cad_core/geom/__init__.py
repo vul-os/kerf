@@ -1612,3 +1612,11 @@ from kerf_cad_core.geom.face_developable_check import (  # noqa: E402
     DevelopabilityReport,
     check_face_developable,
 )
+# NURBS-CURVE-FRESNEL-PARAMETERIZE: re-parameterize a NurbsCurve so κ(s) ≈ α·s
+# (Euler spiral / clothoid law). Road/rail transition curves, CNC toolpaths.
+# Refs: Walton & Meek (2009); Bertolazzi & Frego (2015).
+# LLM tool: nurbs_fresnel_parameterize_curve.
+from kerf_cad_core.geom.fresnel_parameterize import (  # noqa: E402
+    FresnelParameterizationResult,
+    fresnel_parameterize_curve,
+)

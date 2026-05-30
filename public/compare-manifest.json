@@ -4037,6 +4037,20 @@
           }
         },
         {
+          "name": "Clothoid / Fresnel curve re-parameterization (road/rail transition)",
+          "domain": "D01",
+          "competitor": {
+            "status": "no",
+            "source": "https://wiki.freecad.org/Part_Module",
+            "note": "No built-in clothoid / Euler-spiral transition curve or arc-length curvature-rate re-parameterization"
+          },
+          "kerf": {
+            "status": "partial",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/fresnel_parameterize.py",
+            "note": "fresnel_parameterize_curve(): sampling-based (not closed-form) re-parameterization imposing κ(s)≈α·s Euler-spiral law; Fresnel integral C(σ)/S(σ) via scipy.special or Simpson fallback; monotone Fresnel-C parameter sequence drives degree-3 NURBS re-interpolation; max_curvature_residual metric; LLM tool nurbs_fresnel_parameterize_curve; 25 hermetic tests. HONEST: approximate (not closed-form Walton-Meek G1 clothoid spline); residual grows for long curves with large curvature rates. Refs: Walton & Meek (2009); Bertolazzi & Frego (2015)."
+          }
+        },
+        {
           "name": "Configurations / family variants",
           "competitor": {
             "status": "partial",

@@ -62,6 +62,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.osculating_circle",
     # BREP-FACE-DEVELOPABLE-CHECK: K=0 sampling test (do Carmo §3.6; Pottmann-Wallner §4)
     "kerf_cad_core.geom.face_developable_check",
+    # NURBS-CURVE-FRESNEL-PARAMETERIZE: κ(s)≈αs clothoid re-parameterization (Walton-Meek 2009; Bertolazzi-Frego 2015)
+    "kerf_cad_core.geom.fresnel_parameterize",
     # GK-P Wave 4P: far-offset robustness (Maekawa 1999) — nurbs_surface_offset_robust
     "kerf_cad_core.geom.offset_far_tools",
     "kerf_cad_core.geom.trim_curve",

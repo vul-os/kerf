@@ -67,17 +67,14 @@ def _register_tools(ctx, provides: list) -> None:
         logger.warning("kerf-wiring: failed to load route_harness_3d tool: %s", exc)
 
     try:
-        from kerf_wiring.tools.wiring_formboard_flatten import (
-            wiring_formboard_flatten_spec,
-            wiring_formboard_flatten,
+        from kerf_wiring.tools.auto_route import (
+            wiring_auto_route_spec,
+            wiring_auto_route,
+            wiring_check_clearance_spec,
+            wiring_check_clearance,
         )
-        ctx.tools.register(
-            "wiring_formboard_flatten",
-            wiring_formboard_flatten_spec,
-            wiring_formboard_flatten,
-        )
-        provides.append("wiring.formboard")
+        ctx.tools.register("wiring_auto_route", wiring_auto_route_spec, wiring_auto_route)
+        ctx.tools.register("wiring_check_clearance", wiring_check_clearance_spec, wiring_check_clearance)
+        provides.append("wiring.auto_route_3d")
     except Exception as exc:
-        logger.warning(
-            "kerf-wiring: failed to load wiring_formboard_flatten tool: %s", exc
-        )
+        logger.warning("kerf-wiring: failed to load auto_route tools: %s", exc)

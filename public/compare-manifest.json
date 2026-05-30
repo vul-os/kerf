@@ -2219,8 +2219,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "WiringView wired; harness3d 3D router + formboard + report",
-            "evidence": "packages/kerf-electronics/src/kerf_electronics/harness3d/router.py"
+            "note": "WiringView wired; harness3d 3D router + formboard + report; 3D harness auto-routing with collision avoidance (Cheng-Quan 2001) ✅",
+            "evidence": "packages/kerf-wiring/src/kerf_wiring/auto_routing_3d.py"
           }
         },
         {
@@ -2842,8 +2842,8 @@
           },
           "kerf": {
             "status": "[x]",
-            "notes": "WireViz runner + 3D harness router wired (WiringView)",
-            "evidence": "packages/kerf-wiring/src/kerf_wiring/wireviz_runner.py"
+            "notes": "WireViz runner + 3D harness auto-router with collision avoidance (Cheng-Quan 2001) wired (WiringView); wiring_auto_route + wiring_check_clearance LLM tools ✅",
+            "evidence": "packages/kerf-wiring/src/kerf_wiring/auto_routing_3d.py"
           }
         },
         {
@@ -3594,8 +3594,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "WiringView with WireViz + 3D harness router wired",
-            "evidence": "src/components/WiringView"
+            "note": "WiringView with WireViz + 3D harness auto-router with collision avoidance (Cheng-Quan 2001) wired ✅",
+            "evidence": "packages/kerf-wiring/src/kerf_wiring/auto_routing_3d.py"
           }
         },
         {
@@ -5528,8 +5528,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "WireViz runner + harness3d; WiringView wired",
-            "evidence": "packages/kerf-wiring/src/kerf_wiring/wireviz_runner.py"
+            "note": "WireViz runner + harness3d; WiringView wired; 3D harness auto-routing with collision avoidance (Cheng-Quan 2001) ✅",
+            "evidence": "packages/kerf-wiring/src/kerf_wiring/auto_routing_3d.py"
           }
         },
         {
@@ -6266,8 +6266,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "WiringView wired; WireViz + 3D router",
-            "evidence": "packages/kerf-wiring"
+            "note": "WiringView wired; WireViz + 3D harness auto-router with collision avoidance (Cheng-Quan 2001) ✅",
+            "evidence": "packages/kerf-wiring/src/kerf_wiring/auto_routing_3d.py"
           }
         },
         {
@@ -7257,8 +7257,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "WiringView wired",
-            "evidence": "src/components/WiringView.jsx"
+            "note": "WiringView wired; 3D harness auto-routing with collision avoidance (Cheng-Quan 2001) ✅",
+            "evidence": "packages/kerf-wiring/src/kerf_wiring/auto_routing_3d.py"
           }
         },
         {
@@ -7996,8 +7996,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "WireViz runner + harness3d; WiringView wired",
-            "evidence": "packages/kerf-wiring/src/kerf_wiring/wireviz_runner.py"
+            "note": "WireViz runner + harness3d; WiringView wired; 3D harness auto-routing with collision avoidance (Cheng-Quan 2001) ✅",
+            "evidence": "packages/kerf-wiring/src/kerf_wiring/auto_routing_3d.py"
           }
         },
         {
@@ -10462,8 +10462,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "WiringView wired; harness3d 3D router + formboard + report",
-            "evidence": "packages/kerf-wiring/src/kerf_wiring"
+            "note": "WiringView wired; harness3d 3D router + formboard + report; 3D harness auto-routing with collision avoidance (Cheng-Quan 2001) ✅",
+            "evidence": "packages/kerf-wiring/src/kerf_wiring/auto_routing_3d.py"
           }
         },
         {

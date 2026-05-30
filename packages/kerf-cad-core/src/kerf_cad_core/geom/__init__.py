@@ -1586,3 +1586,8 @@ from kerf_cad_core.geom.subd_subdivide_edge import (  # noqa: E402
     SubdivideEdgeResult,
     subdivide_edge,
 )
+# BREP-CURVE-ON-SURFACE-PROJECTION: Newton-Raphson UV projection (P&T §6.1 / PM §3.3)
+from kerf_cad_core.geom.curve_on_surface_robust import (
+    CurveOnSurfaceResult,
+    project_curve_to_surface,
+)

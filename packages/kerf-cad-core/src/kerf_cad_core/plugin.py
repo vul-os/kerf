@@ -217,6 +217,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.intersection",
     "kerf_cad_core.geom.curve_projection",  # GK-P: nurbs_project_point (Newton + arc-length)
     "kerf_cad_core.geom.edge_curve_from_face_pair",
+    # BREP-CURVE-ON-SURFACE-PROJECTION: Newton-Raphson UV-trace (P&T §6.1 / PM §3.3)
+    "kerf_cad_core.geom.curve_on_surface_robust",  # nurbs_project_curve_to_surface
     "kerf_cad_core.jewelry.bezel_auto",
     "kerf_cad_core.jewelry.plating",
     "kerf_cad_core.jewelry.gem_cert",

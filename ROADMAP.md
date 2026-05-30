@@ -96,6 +96,9 @@ The sector work only matters if you **own your work, are not locked in, and can 
 ### Latest delta — 2026-05-30
 
 **Injection-mold runner layout** ✅ — `mold_generate_runner_layout` LLM tool: balanced cold-runner tree for multi-cavity molds; Beaumont 2007 §6.5 diameter sizing (D=W^0.25+0.5 mm, cap 10 mm) cross-checked against Table 6.5; natural balance (1.0) for symmetric 2×2 grids; spine-and-branch topology for row layouts (artificial balance flagged with graduated-diameter advisory per Menges 2001 §6); Hagen-Poiseuille pressure-drop coefficient; cold runners only (hot-runner scope honest-flagged) — `packages/kerf-mold/src/kerf_mold/runner_layout.py`.
+### Latest delta — 2026-05-30
+
+**Injection-mold gate placement optimiser** ✅ — `mold_optimize_gate_placement` LLM tool: geometric heuristic gate location for a cavity bounding box; samples candidates on all bbox faces (top-centre, edge, side, bottom, multi-gate equidistant seeds); scores by Euclidean max-flow-length + fill-balance std-dev (0.6/0.4 weighted composite); functional-face + avoid-zone constraints; soft penalty for underside gates; multi-gate suggestion when flow/min-dim > 5×; balance score (0–1); 41 oracle tests; honest-flag: geometric heuristic only (not Moldflow / Moldex3D / SigmaSoft); refs Beaumont 2007 §7 + Menges 2001 §6.6 — `packages/kerf-mold/src/kerf_mold/gate_placement.py`.
 
 ### Previous delta — 2026-05-26
 

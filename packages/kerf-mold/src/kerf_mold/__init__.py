@@ -44,6 +44,13 @@ from kerf_mold.runner_layout import (
     generate_runner_layout,
     beaumont_runner_diameter,
 )
+from kerf_mold.gate_placement import (
+    CavityBbox,
+    GateCandidate,
+    GateConstraint,
+    GatePlacementResult,
+    optimize_gate_placement,
+)
 
 __all__ = [
     # mold.py
@@ -85,4 +92,10 @@ __all__ = [
     "RunnerLayout",
     "generate_runner_layout",
     "beaumont_runner_diameter",
+    # gate_placement.py
+    "CavityBbox",
+    "GateCandidate",
+    "GateConstraint",
+    "GatePlacementResult",
+    "optimize_gate_placement",
 ]

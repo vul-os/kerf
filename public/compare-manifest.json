@@ -9590,6 +9590,20 @@
         },
         {
           "domain": "D7",
+          "feature": "Gate location optimisation",
+          "competitor": {
+            "status": "yes",
+            "note": "Automated gate-location analysis: fill-balance, pressure, weld-line prediction integrated in mold workspace",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Gate placement optimiser (Beaumont 2007 §7 + Menges 2001 §6.6): samples candidates on all bbox faces (top-centre, edge, side, bottom, multi-gate seeds); scores by Euclidean max-flow-length + fill-balance std-dev (0.6/0.4 weighted composite); functional-face + avoid-zone constraints; soft penalty for underside gates; multi-gate suggestion when flow/min-dim > 5×; balance score 0–1; LLM tool `mold_optimize_gate_placement`; 41 oracle tests; honest-flag: geometric heuristic only — not Moldflow/Moldex3D/SigmaSoft",
+            "evidence": "packages/kerf-mold/src/kerf_mold/gate_placement.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "Electrode design (EDM)",
           "competitor": {
             "status": "yes",

@@ -2134,3 +2134,130 @@ async def run_optics_relative_illum_map(ctx, args: bytes) -> str:
     if isinstance(result, dict):
         return json.dumps(result)
     return ok_payload(result.to_dict())
+# Tool: optics_compute_entrance_pupil
+# ---------------------------------------------------------------------------
+
+from kerf_cad_core.optics.entrance_pupil import (  # noqa: E402
+    EntrancePupilReport,
+    compute_entrance_pupil,
+)
+
+_entrance_pupil_spec = ToolSpec(
+    name="optics_compute_entrance_pupil",
+    description=(
+        "Compute the paraxial entrance pupil position and size for a lens stack.\n"
+        "\n"
+        "The entrance pupil is the image of the aperture stop formed by all lens\n"
+        "elements in front of the stop, as seen from object space.\n"
+        "Its position and semi-diameter define the light-gathering cone accepted\n"
+        "by the system (Welford 1986 §4.4; Hecht §6.6).\n"
+        "\n"
+        "Algorithm (Welford 1986 §4.4):\n"
+        "  For each surface j = stop_surface_index−1 … 0 (right to left):\n"
+        "    1. Transfer backward by t[j] (gap from surface j to next surface).\n"
+        "    2. Refract at surface j with negated curvature (reverse-trace convention).\n"
+        "  Then:\n"
+        "    position_z_mm = -h_exit / u_exit  (axis crossing from first surface).\n"
+        "    radius_mm = D * stop_radius  where D is the (2,2) paraxial matrix element.\n"
+        "    magnification = radius_mm / (stop_diameter_mm / 2).\n"
+        "\n"
+        "Depth bar:\n"
+        "  * Stop at first surface (stop_surface_index=0): pupil at z=0, m=1.\n"
+        "    (Thin-lens identity; Hecht §6.6.)\n"
+        "  * Converging front lens, rear stop (d << f): pupil at positive z,\n"
+        "    slightly demagnified (m < 1). (BK7 biconvex, stop at rear surface.)\n"
+        "  * Diverging front lens, rear stop: pupil at negative z (virtual),\n"
+        "    magnified (m > 1). (Hecht §6.6 virtual-pupil example.)\n"
+        "\n"
+        "HONEST FLAGS:\n"
+        "  * PARAXIAL ONLY.  Real chief-ray entrance pupil requires finite-ray\n"
+        "    chief-ray back-tracing from the stop (not implemented).\n"
+        "  * EXIT PUPIL is a separate computation (not in this tool).\n"
+        "  * Stop modelled as a thin plane; thick stops not handled.\n"
+        "  * Paraxial approximation degrades for fast (f/# < 2) or wide-field systems.\n"
+        "\n"
+        "Surface definition (same as optics_ray_trace_lens_stack):\n"
+        "  c  : curvature 1/R (mm^-1). 0 = flat.\n"
+        "  t  : thickness to NEXT surface vertex (mm). Last surface: 0.\n"
+        "  n  : refractive index of medium AFTER this surface.\n"
+        "  k  : conic constant (default 0; unused for paraxial trace).\n"
+        "\n"
+        "Returns:\n"
+        "  position_z_mm  : entrance pupil z-position from first surface (mm).\n"
+        "                   Negative = virtual pupil in front of the first surface.\n"
+        "  radius_mm      : entrance pupil semi-diameter (mm).\n"
+        "  diameter_mm    : full entrance pupil diameter (mm).\n"
+        "  magnification  : D matrix element of front group (radius / stop_radius).\n"
+        "  honest_flag    : scope caveats.\n"
+        "\n"
+        "Errors: {ok:false, reason} for invalid inputs. Never raises.\n"
+        "\n"
+        "References: Welford (1986) §4.4; Hecht §6.6."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "surfaces": {
+                "type": "array",
+                "description": (
+                    "Ordered list of optical surface dicts. Each must have: "
+                    "c (mm^-1), t (mm), n (>= 1.0). Optional: k (conic, default 0)."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "c": {"type": "number", "description": "Curvature 1/R (mm^-1). 0 = flat."},
+                        "t": {"type": "number", "description": "Thickness to next surface (mm)."},
+                        "n": {"type": "number", "description": "Refractive index after surface (>= 1.0)."},
+                        "k": {"type": "number", "description": "Conic constant (default 0 = sphere)."},
+                    },
+                    "required": ["c", "t", "n"],
+                },
+            },
+            "stop_diameter_mm": {
+                "type": "number",
+                "description": "Full diameter of the aperture stop (mm). Must be > 0.",
+            },
+            "stop_surface_index": {
+                "type": "integer",
+                "description": (
+                    "0-based index of the aperture-stop surface (default 0 = first surface). "
+                    "The stop is at the vertex plane of this surface."
+                ),
+            },
+            "n_object": {
+                "type": "number",
+                "description": "Refractive index of object space (default 1.0 = air).",
+            },
+        },
+        "required": ["surfaces", "stop_diameter_mm"],
+    },
+)
+
+
+@register(_entrance_pupil_spec, write=False)
+async def run_compute_entrance_pupil(ctx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    if a.get("surfaces") is None:
+        return json.dumps({"ok": False, "reason": "surfaces is required"})
+    if a.get("stop_diameter_mm") is None:
+        return json.dumps({"ok": False, "reason": "stop_diameter_mm is required"})
+
+    kwargs: dict = {}
+    if "stop_surface_index" in a:
+        kwargs["stop_surface_index"] = int(a["stop_surface_index"])
+    if "n_object" in a:
+        kwargs["n_object"] = float(a["n_object"])
+
+    result = compute_entrance_pupil(
+        a["surfaces"],
+        float(a["stop_diameter_mm"]),
+        **kwargs,
+    )
+    if isinstance(result, dict):
+        return json.dumps(result)
+    return ok_payload(result.to_dict())

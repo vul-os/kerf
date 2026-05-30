@@ -13686,6 +13686,20 @@
         },
         {
           "domain": "D12",
+          "feature": "Entrance pupil position and size",
+          "competitor": {
+            "status": "yes",
+            "note": "Entrance/exit pupil position, size, and chief-ray angle at pupil; pupil aberration analysis",
+            "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Entrance pupil position and size (OPTICS-ENTRANCE-PUPIL-POS): paraxial reverse-trace of marginal ray from aperture stop through front sub-stack (Welford 1986 §4.4 / Hecht §6.6); position_z_mm from first surface vertex; D-element transverse magnification; converging front lens → real pupil (positive z); diverging front → virtual pupil (negative z); LLM tool optics_compute_entrance_pupil; 38 hermetic tests. Honest: paraxial only; exit pupil is a separate computation; stop modelled as thin plane.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/entrance_pupil.py"
+          }
+        },
+        {
+          "domain": "D12",
           "feature": "Non-sequential ray tracing (stray light)",
           "competitor": {
             "status": "yes",

@@ -1397,3 +1397,11 @@ from kerf_cad_core.geom.composite_tangent_match import (
     CompositeMatchResult,
     match_composite_tangents,
 )
+# BREP-EDGE-CONVEX-CONCAVE-CLASSIFY: dihedral-angle classification of interior edges
+# (Hoffmann 1989 §5.3; Mantyla 1988 §7.4) — classify_edges / EdgeConvexityReport
+from kerf_cad_core.geom.edge_convexity import (  # noqa: E402
+    EdgeClass,
+    EdgeConvexityReport,
+    classify_edges,
+    classify_body_edges,
+)

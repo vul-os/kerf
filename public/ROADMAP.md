@@ -150,6 +150,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 | **General solid boolean** | NURBS-faced / non-axis-aligned solids (today: axis-aligned only; general CSG delegates to OCCT worker) | 🔴 not started |
 | **GK-P: Hollow operator** | Compound feature: shell offset + inner-face blend + inner-edge fillet + port drilling + optional ribs — `hollow_body` / `hollow_with_ribs`; LLM tool `brep_make_hollow` | ✅ shipped |
 | **Volume-weighted centroid + inertia for non-uniform density** | Monte Carlo volume integration (Mortenson §11.5); `functionally_graded_centroid` for linear-z / shell-dense / radial FGM patterns; LLM tool `brep_centroid_density_field`; 22 tests green. | ✅ shipped |
+| **BREP-EDGE-CONVEX-CONCAVE-CLASSIFY** | Dihedral-angle classification of every interior edge as convex / concave / tangential; `classify_edges` + `brep_classify_edges` LLM tool (Hoffmann 1989 §5.3; Mantyla 1988 §7.4) | ✅ shipped |
 
 **GK-P (parity) series in flight.** A four-agent survey of Kerf vs ~18 kernel-relevant CADs found a concrete, finite gap list. GK-01..GK-139 are landed. The `GK-P` series (tracked in `tasks.md`) closes the remaining gaps:
 

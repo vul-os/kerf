@@ -343,6 +343,9 @@ _TOOL_MODULES = [
     # NURBS-COMPOSITE-TANGENT-MATCH: G1/G2 seam CP adjustment for composite curve chains
     # (Klass 1980 §3; Farin §8.4; Piegl-Tiller §7.3) — nurbs_match_composite_tangents
     "kerf_cad_core.geom.composite_tangent_match",
+    # BREP-EDGE-CONVEX-CONCAVE-CLASSIFY: dihedral-angle edge classification
+    # (Hoffmann 1989 §5.3; Mantyla 1988 §7.4) — brep_classify_edges
+    "kerf_cad_core.geom.edge_convexity",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

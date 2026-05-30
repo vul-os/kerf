@@ -1038,6 +1038,11 @@ __all__ = [
     "hausdorff_surface_to_mesh",
     "bidirectional_hausdorff",
     "max_deviation_visualization",
+    # GK-P: SubD cage derivation from dense mesh
+    "CageResult",
+    "derive_cage_from_mesh",
+    "fit_subd_to_mesh",
+    "recommend_subd_topology",
 ]
 
 # Variable-section edge blend (Vida-Martin-Varady 1994 §4)
@@ -1178,4 +1183,11 @@ from kerf_cad_core.geom.surface_mesh_deviation import (
     hausdorff_surface_to_mesh,
     bidirectional_hausdorff,
     max_deviation_visualization,
+)
+# GK-P: SubD cage derivation from dense mesh (Lee-Moreton-Hoppe 2000)
+from kerf_cad_core.geom.subd_from_mesh import (
+    CageResult,
+    derive_cage_from_mesh,
+    fit_subd_to_mesh,
+    recommend_subd_topology,
 )

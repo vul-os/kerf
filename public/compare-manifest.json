@@ -4983,6 +4983,20 @@
         },
         {
           "domain": "D4",
+          "feature": "ASHRAE §35 fittings pressure loss ✅",
+          "competitor": {
+            "status": "no",
+            "note": "No ASHRAE §35 fitting loss calculation in Fusion",
+            "source": "https://www.autodesk.com/support/technical/article/caas/sfdcarticles/sfdcarticles/Does-Fusion-360-have-flow-simulation-as-a-simulation-study.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "ASHRAE HOF 2021 §35 Table 21-1: 10 fitting kinds (smooth/segmented elbows, tee branch/through, gradual/abrupt transitions, butterfly damper, reducer/expander); fitting_pressure_loss() + compute_duct_run_pressure_drop() + build_loss_table(); 2 LLM tools",
+            "evidence": "packages/kerf-hvac/src/kerf_hvac/pressure.py"
+          }
+        },
+        {
+          "domain": "D4",
           "feature": "Building loads",
           "competitor": {
             "status": "no",

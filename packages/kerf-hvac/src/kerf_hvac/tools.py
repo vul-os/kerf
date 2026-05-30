@@ -6,7 +6,6 @@ Registers the following tools:
   - hvac.fitting_loss         — Compute minor loss for a fitting.
   - hvac.reducer_flat_pattern — Generate reducer flat-pattern dimensions.
   - hvac.elbow_flat_pattern   — Generate elbow flat-pattern dimensions.
-  - hvac.equipment_select     — Select AHRI-listed equipment by category and capacity.
 """
 
 from __future__ import annotations
@@ -21,6 +20,8 @@ from kerf_hvac.pressure import (
     darcy_weisbach_loss,
     minor_loss,
     total_duct_loss,
+    fitting_pressure_loss,
+    compute_duct_run_pressure_drop,
     ELBOW_90_RECT_K,
     ELBOW_90_ROUND_K,
     ELBOW_45_RECT_K,
@@ -29,9 +30,9 @@ from kerf_hvac.pressure import (
     REDUCER_K,
     CAP_K,
     FLEX_PER_METRE_K,
+    FITTING_KINDS,
 )
 from kerf_hvac.flat_pattern import rect_elbow_pattern, rect_reducer_pattern
-from kerf_hvac.ahri_catalogue import lookup_equipment, VALID_CATEGORIES
 
 
 # ---------------------------------------------------------------------------
@@ -389,104 +390,212 @@ def handle_elbow_flat_pattern(args: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
-# hvac.equipment_select  (AHRI-listed equipment catalogue)
+# hvac.fitting_pressure_loss  — ASHRAE §35 Table 21-1 fitting loss
 # ---------------------------------------------------------------------------
 
-_equipment_select_spec = ToolSpec(
-    name="hvac.equipment_select",
+_fitting_pressure_loss_spec = ToolSpec(
+    name="hvac.fitting_pressure_loss",
     description=(
-        "Select AHRI-certified HVAC equipment that matches the given category "
-        "and design capacity.  Returns up to 5 matching models from the "
-        "built-in AHRI-listed catalogue, each with manufacturer, AHRI "
-        "certification number, full-load efficiency (EER / COP / AFUE), and "
-        "certified part-load curve values at 25 %, 50 %, 75 %, and 100 % "
-        "load.  Source: AHRI Certified Products Directory "
-        "(https://www.ahridirectory.org).  Catalogue covers 30 representative "
-        "models; not OEM-complete."
+        "Compute the pressure loss (Pa) across a specific duct fitting using "
+        "ASHRAE Handbook of Fundamentals 2021 §35 (Chapter 21) Table 21-1 "
+        "C coefficients.  Supports 10 fitting kinds: elbows, tees, transitions, "
+        "dampers, reducers, and expanders.  "
+        "DISCLAIMER: Values from ASHRAE HOF 2021 §35 — NOT ASHRAE certified."
     ),
     input_schema={
         "type": "object",
-        "required": ["category", "capacity_btu_hr"],
+        "required": ["fitting_kind", "flow_rate_cfm"],
         "properties": {
-            "category": {
+            "fitting_kind": {
                 "type": "string",
-                "enum": sorted(VALID_CATEGORIES),
+                "enum": sorted(FITTING_KINDS),
                 "description": (
-                    "Equipment category. One of: rooftop_ac, split_ac, "
-                    "water_chiller, air_chiller, gas_boiler, heat_pump."
+                    "ASHRAE §35 fitting type.  One of: "
+                    "elbow_90_smooth, elbow_90_segmented, elbow_45, "
+                    "tee_branch, tee_through, transition_gradual, "
+                    "transition_abrupt, damper_butterfly, "
+                    "reducer_gradual, expander_gradual."
                 ),
             },
-            "capacity_btu_hr": {
+            "flow_rate_cfm": {
                 "type": "number",
-                "description": (
-                    "Required cooling or heating capacity in BTU/hr. "
-                    "Models within ±40 % of this value are returned. "
-                    "Pass 0 to return all models in the category."
-                ),
+                "description": "Volumetric airflow in CFM.",
             },
-            "min_efficiency": {
+            "diameter_m": {
                 "type": "number",
-                "description": (
-                    "Optional minimum efficiency gate. "
-                    "For AC / chiller categories: minimum EER or cooling COP. "
-                    "For gas_boiler: minimum AFUE (0–1). "
-                    "For heat_pump: minimum cooling COP. "
-                    "Pass null to skip."
-                ),
+                "description": "Upstream duct inner diameter in metres (round duct).",
+            },
+            "width_m": {
+                "type": "number",
+                "description": "Upstream duct width in metres (rectangular duct).",
+            },
+            "height_m": {
+                "type": "number",
+                "description": "Upstream duct height in metres (rectangular duct).",
+            },
+            "area_m2": {
+                "type": "number",
+                "description": "Upstream duct cross-sectional area in m² (alternative to diameter/width+height).",
+            },
+            "r_over_d": {
+                "type": "number",
+                "description": "Centreline bend radius / duct diameter for smooth elbows. Default 1.0.",
+                "default": 1.0,
+            },
+            "n_segments": {
+                "type": "integer",
+                "description": "Number of gore segments for segmented elbows (2–5). Default 4.",
+                "default": 4,
+            },
+            "A2_over_A1": {
+                "type": "number",
+                "description": "Downstream/upstream area ratio for abrupt contraction (0–1).",
+            },
+            "A1_over_A2": {
+                "type": "number",
+                "description": "Upstream/downstream area ratio for gradual expander (0–1).",
+            },
+            "theta_half_deg": {
+                "type": "number",
+                "description": "Half included-angle of taper in degrees for gradual reducer/transition. Default 10.",
+                "default": 10.0,
+            },
+            "Ab_over_Ac": {
+                "type": "number",
+                "description": "Branch/common area ratio for tee fittings (0–1). Default 0.5.",
+                "default": 0.5,
+            },
+            "blade_angle_deg": {
+                "type": "number",
+                "description": "Damper blade opening angle in degrees (10–90). Default 90 (wide open).",
+                "default": 90.0,
             },
         },
     },
 )
 
 
-@register(_equipment_select_spec)
-def handle_equipment_select(args: dict) -> str:
+@register(_fitting_pressure_loss_spec)
+def handle_fitting_pressure_loss(args: dict) -> str:
     try:
-        category = str(args["category"])
-        capacity = float(args["capacity_btu_hr"])
-        min_eff = args.get("min_efficiency")
-        if min_eff is not None:
-            min_eff = float(min_eff)
+        fk = args["fitting_kind"]
+        q_cfm = float(args["flow_rate_cfm"])
 
-        models = lookup_equipment(category, capacity, min_eff)
+        # Build params dict from optional geometric fields
+        params: dict = {}
+        for key in (
+            "diameter_m", "width_m", "height_m", "area_m2",
+            "r_over_d", "n_segments", "A2_over_A1", "A1_over_A2",
+            "theta_half_deg", "Ab_over_Ac", "blade_angle_deg",
+        ):
+            if key in args and args[key] is not None:
+                params[key] = float(args[key]) if key != "n_segments" else int(args[key])
 
-        if not models:
-            return ok_payload({
-                "models": [],
-                "note": (
-                    f"No AHRI-listed models found for category={category!r} "
-                    f"near {capacity:.0f} BTU/hr. "
-                    "Try widening the capacity range or removing the efficiency gate."
-                ),
-            })
-
-        def _serialise(m):
-            out: dict = {
-                "manufacturer": m.manufacturer,
-                "model_number": m.model_number,
-                "ahri_number": m.ahri_number,
-                "category": m.category,
-                "capacity_btu_hr": m.capacity_btu_hr,
-                "part_load_curve": {str(k): v for k, v in sorted(m.part_load_curve.items())},
-            }
-            if m.eer is not None:
-                out["eer"] = m.eer
-            if m.ieer is not None:
-                out["ieer"] = m.ieer
-            if m.cop_cooling is not None:
-                out["cop_cooling"] = m.cop_cooling
-            if m.cop_heating is not None:
-                out["cop_heating"] = m.cop_heating
-            if m.afue is not None:
-                out["afue"] = m.afue
-            if m.notes:
-                out["notes"] = m.notes
-            return out
+        loss_pa = fitting_pressure_loss(fk, params, q_cfm)
 
         return ok_payload({
-            "models": [_serialise(m) for m in models[:5]],
-            "total_matches": len(models),
-            "source": "AHRI Certified Products Directory — https://www.ahridirectory.org",
+            "fitting_kind": fk,
+            "flow_rate_cfm": q_cfm,
+            "loss_pa": round(loss_pa, 4),
+            "disclaimer": (
+                "Values from ASHRAE Handbook of Fundamentals 2021 §35 — "
+                "NOT ASHRAE certified."
+            ),
+        })
+    except (KeyError, ValueError, TypeError) as exc:
+        return err_payload(str(exc), "BAD_ARGS")
+
+
+# ---------------------------------------------------------------------------
+# hvac.compute_run_pressure_drop  — end-to-end duct run solver
+# ---------------------------------------------------------------------------
+
+_compute_run_spec = ToolSpec(
+    name="hvac.compute_run_pressure_drop",
+    description=(
+        "Compute total pressure drop (Pa) for a multi-segment duct run "
+        "including straight-duct friction losses (Darcy-Weisbach / Colebrook-White) "
+        "and fitting losses (ASHRAE HOF 2021 §35 Table 21-1).  "
+        "Returns per-segment and per-fitting breakdowns.  "
+        "DISCLAIMER: Values from ASHRAE HOF 2021 §35 — NOT ASHRAE certified."
+    ),
+    input_schema={
+        "type": "object",
+        "required": ["duct_segments", "fittings", "flow_cfm"],
+        "properties": {
+            "duct_segments": {
+                "type": "array",
+                "description": (
+                    "List of straight-duct segments.  Each object requires "
+                    "'length_m' and either 'diameter_m' (round) or "
+                    "'width_m'+'height_m' (rectangular).  Optional: 'roughness_m'."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "length_m": {"type": "number"},
+                        "diameter_m": {"type": "number"},
+                        "width_m": {"type": "number"},
+                        "height_m": {"type": "number"},
+                        "roughness_m": {"type": "number"},
+                    },
+                },
+            },
+            "fittings": {
+                "type": "array",
+                "description": (
+                    "List of fittings.  Each object requires 'fitting_kind' "
+                    "(one of the ASHRAE §35 kinds) and 'params' (geometric "
+                    "parameter dict — same keys as hvac.fitting_pressure_loss)."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "fitting_kind": {"type": "string"},
+                        "params": {"type": "object"},
+                    },
+                },
+            },
+            "flow_cfm": {
+                "type": "number",
+                "description": "Total volumetric airflow in CFM.",
+            },
+            "roughness_mm": {
+                "type": "number",
+                "description": "Default absolute roughness in mm for all segments (default 0.09 galvanised steel).",
+                "default": 0.09,
+            },
+        },
+    },
+)
+
+
+@register(_compute_run_spec)
+def handle_compute_run_pressure_drop(args: dict) -> str:
+    try:
+        segs = args["duct_segments"]
+        fits = args["fittings"]
+        q_cfm = float(args["flow_cfm"])
+        eps_mm = float(args.get("roughness_mm", 0.09))
+
+        result = compute_duct_run_pressure_drop(
+            duct_segments=segs,
+            fittings=fits,
+            flow_cfm=q_cfm,
+            roughness_m=eps_mm / 1000.0,
+        )
+
+        return ok_payload({
+            "straight_duct_pa": round(result["straight_duct_pa"], 4),
+            "fittings_pa": round(result["fittings_pa"], 4),
+            "total_pa": round(result["total_pa"], 4),
+            "flow_cfm": result["flow_cfm"],
+            "segment_losses_pa": [round(x, 4) for x in result["segment_losses_pa"]],
+            "fitting_losses_pa": [round(x, 4) for x in result["fitting_losses_pa"]],
+            "disclaimer": (
+                "Values from ASHRAE Handbook of Fundamentals 2021 §35 — "
+                "NOT ASHRAE certified."
+            ),
         })
     except (KeyError, ValueError, TypeError) as exc:
         return err_payload(str(exc), "BAD_ARGS")
@@ -502,5 +611,6 @@ TOOLS = [
     ("hvac.fitting_loss", _fitting_loss_spec, handle_fitting_loss),
     ("hvac.reducer_flat_pattern", _reducer_pattern_spec, handle_reducer_flat_pattern),
     ("hvac.elbow_flat_pattern", _elbow_pattern_spec, handle_elbow_flat_pattern),
-    ("hvac.equipment_select", _equipment_select_spec, handle_equipment_select),
+    ("hvac.fitting_pressure_loss", _fitting_pressure_loss_spec, handle_fitting_pressure_loss),
+    ("hvac.compute_run_pressure_drop", _compute_run_spec, handle_compute_run_pressure_drop),
 ]

@@ -1,4 +1,4 @@
-"""GK-82  Imprint (3D curve → new face edges).
+"""GK-82  Imprint (3D curve → new face edges) + Body-body imprint.
 
 Pure-Python, no OCCT dependency.
 
@@ -43,13 +43,48 @@ imprint_curve_on_face(body, face_id, curve_3d) -> Body
         or the curve path does not validly bisect the face boundary.
     TypeError
         When ``body`` is not a ``Body`` instance.
+
+imprint_body(target, tool, mode='intersect') -> ImprintResult
+    Project all edges of ``tool`` onto the faces of ``target``, splitting
+    target faces along each projected curve and tagging new edges with
+    imprint provenance.
+
+    Parameters
+    ----------
+    target : Body
+        The body whose faces receive imprinted edges.  Not mutated.
+    tool : Body
+        The body whose edges are projected onto ``target``.  Not mutated.
+    mode : str
+        ``'intersect'`` (default) — only imprint where the tool edge's
+        midpoint lies within ``_INTERSECT_TOL`` of a target face (i.e.
+        the edge plausibly lies on or near the face).
+        ``'all'`` — project every tool edge onto every target face
+        regardless of proximity.
+
+    Returns
+    -------
+    ImprintResult
+        A named-tuple with:
+          body       — new Body (target with imprinted edges)
+          edge_tags  — dict mapping new Edge.id -> ImprintTag
+          n_imprinted — int, number of face-edge pairs where imprint
+                        succeeded
+
+    Edge metadata
+    -------------
+    Each new edge produced by body-body imprint carries an ``ImprintTag``
+    (accessible via ``result.edge_tags[edge.id]``) with:
+      source_body_id  — tool.id (int)
+      source_edge_id  — the originating tool Edge.id (int)
 """
 
 from __future__ import annotations
 
 import copy
 import math
-from typing import List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Dict, List, NamedTuple, Optional, Tuple
 
 import numpy as np
 
@@ -538,3 +573,231 @@ def imprint_curve_on_face(body: "Body", face_id: int, curve_3d) -> "Body":
             f"imprint_curve_on_face: expected Body, got {type(body).__name__!r}"
         )
     return _imprint_brep(body, face_id, curve_3d)
+
+
+# ---------------------------------------------------------------------------
+# Body-body imprint (GK-82 extension)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class ImprintTag:
+    """Provenance record for an edge created by body-body imprint.
+
+    Attributes
+    ----------
+    source_body_id : int
+        ``Body.id`` of the tool body whose edge was projected.
+    source_edge_id : int
+        ``Edge.id`` of the tool edge that produced this imprinted edge.
+    """
+
+    source_body_id: int
+    source_edge_id: int
+
+
+class ImprintResult(NamedTuple):
+    """Return value of :func:`imprint_body`.
+
+    Attributes
+    ----------
+    body : Body
+        New target body with faces split along imprinted curves.
+    edge_tags : dict[int, ImprintTag]
+        Maps the ``Edge.id`` of every new imprinted edge to its
+        :class:`ImprintTag` provenance record.
+    n_imprinted : int
+        Number of (face, edge) pairs where imprint succeeded.
+    """
+
+    body: "Body"
+    edge_tags: Dict[int, "ImprintTag"]
+    n_imprinted: int
+
+
+class _EdgeAsCurve:
+    """Wrap an :class:`Edge` as a curve-like object consumable by ``_sample_curve``.
+
+    ``_sample_curve`` requires ``evaluate(t) -> array`` and ``t0``/``t1``
+    attributes.  The :class:`Edge` class has ``point(t)`` but no
+    ``evaluate``.  This thin adapter bridges the gap.
+    """
+
+    def __init__(self, edge: "Edge"):
+        self._edge = edge
+        self.t0 = edge.t0
+        self.t1 = edge.t1
+
+    def evaluate(self, t: float) -> np.ndarray:
+        return self._edge.point(t)
+
+
+def _aabb_overlap(pts_a: np.ndarray, pts_b: np.ndarray, tol: float = 0.0) -> bool:
+    """Return True if the axis-aligned bounding boxes of two point sets overlap."""
+    for axis in range(3):
+        min_a = float(pts_a[:, axis].min()) - tol
+        max_a = float(pts_a[:, axis].max()) + tol
+        min_b = float(pts_b[:, axis].min()) - tol
+        max_b = float(pts_b[:, axis].max()) + tol
+        if max_a < min_b or max_b < min_a:
+            return False
+    return True
+
+
+def _point_near_face_poly(
+    point: np.ndarray, poly: np.ndarray, tol: float
+) -> bool:
+    """Return True if *point* is within *tol* of the plane spanned by *poly*.
+
+    Uses the face polygon's centroid and its computed normal for the
+    signed-distance test.  Falls back to True (permissive) when the
+    polygon has fewer than 3 distinct points.
+    """
+    if len(poly) < 3:
+        return True
+    p0 = poly[0]
+    e1 = poly[1] - poly[0]
+    normal = np.zeros(3)
+    for i in range(2, len(poly)):
+        crs = np.cross(e1, poly[i] - poly[0])
+        if np.linalg.norm(crs) > _TOL:
+            normal = _unit(crs)
+            break
+    if np.linalg.norm(normal) < _TOL:
+        return True  # degenerate face — allow
+    dist = abs(float(np.dot(point - p0, normal)))
+    return dist <= tol
+
+
+def _collect_new_edges(body_before: "Body", body_after: "Body") -> List["Edge"]:
+    """Return edges in *body_after* that do not appear (by id) in *body_before*."""
+    ids_before = {e.id for e in body_before.all_edges()}
+    return [e for e in body_after.all_edges() if e.id not in ids_before]
+
+
+# Tolerance used to decide if a tool-edge midpoint is "near" a target face.
+_INTERSECT_TOL: float = 0.5  # model-unit distance; generous for polygon tests
+
+
+def imprint_body(
+    target: "Body",
+    tool: "Body",
+    mode: str = "intersect",
+) -> "ImprintResult":
+    """Body-body imprint — project tool edges onto target faces.
+
+    For each edge of *tool*, the function samples the edge and projects the
+    sample points onto each face of *target*.  When the projection indicates
+    the edge intersects or lies on the face (controlled by *mode*), the
+    existing :func:`imprint_curve_on_face` path is used to split the face and
+    introduce new edges.  Each new edge is tagged with the source body/edge ids
+    via an :class:`ImprintTag` stored in ``ImprintResult.edge_tags``.
+
+    Parameters
+    ----------
+    target : Body
+        The body to be modified.  Not mutated.
+    tool : Body
+        The body whose edges are projected.  Not mutated.
+    mode : str
+        ``'intersect'`` (default) — only imprint where the tool edge's
+        midpoint projects near a target face (within ``_INTERSECT_TOL``).
+        ``'all'`` — project every tool edge onto every face.
+
+    Returns
+    -------
+    ImprintResult
+        Named-tuple ``(body, edge_tags, n_imprinted)``.
+
+    Raises
+    ------
+    TypeError
+        If *target* or *tool* is not a ``Body`` instance.
+    ValueError
+        If *mode* is not ``'intersect'`` or ``'all'``.
+    """
+    if not _HAS_BREP:  # pragma: no cover
+        raise RuntimeError("kerf_cad_core.geom.brep is not available")
+    if not isinstance(target, Body):
+        raise TypeError(
+            f"imprint_body: target must be Body, got {type(target).__name__!r}"
+        )
+    if not isinstance(tool, Body):
+        raise TypeError(
+            f"imprint_body: tool must be Body, got {type(tool).__name__!r}"
+        )
+    if mode not in ("intersect", "all"):
+        raise ValueError(
+            f"imprint_body: mode must be 'intersect' or 'all', got {mode!r}"
+        )
+
+    tool_id = tool.id
+    edge_tags: Dict[int, ImprintTag] = {}
+    n_imprinted = 0
+
+    current_body = target
+
+    for tool_edge in tool.all_edges():
+        # Wrap the edge as a curve-like object for _imprint_brep / _sample_curve.
+        edge_curve = _EdgeAsCurve(tool_edge)
+
+        # Sample the tool edge to get a representative polyline.
+        edge_pts = _sample_curve(edge_curve)  # (N, 3)
+        mid_pt = tool_edge.point(
+            0.5 * (tool_edge.t0 + tool_edge.t1)
+        )
+
+        # Try to imprint this tool edge on every face of the current target body.
+        face_idx = 0
+        all_faces = current_body.all_faces()
+        n_faces = len(all_faces)
+
+        while face_idx < n_faces:
+            face = current_body.all_faces()[face_idx]
+            poly = _poly_vertices_3d(face)
+
+            # ── Proximity check (mode='intersect') ───────────────────────────
+            if mode == "intersect":
+                # Fast AABB pre-filter.
+                if len(poly) >= 1 and not _aabb_overlap(
+                    edge_pts, poly, tol=_INTERSECT_TOL
+                ):
+                    face_idx += 1
+                    continue
+                # Signed-distance check: midpoint near face plane?
+                if not _point_near_face_poly(mid_pt, poly, tol=_INTERSECT_TOL):
+                    face_idx += 1
+                    continue
+
+            # ── Attempt imprint ───────────────────────────────────────────────
+            body_before = current_body
+            try:
+                new_body = _imprint_brep(current_body, face_idx, edge_curve)
+            except (ValueError, Exception):
+                # Degenerate projection / non-bisecting curve — skip silently.
+                face_idx += 1
+                continue
+
+            # ── Tag new edges ─────────────────────────────────────────────────
+            new_edges = _collect_new_edges(body_before, new_body)
+            tag = ImprintTag(
+                source_body_id=tool_id,
+                source_edge_id=tool_edge.id,
+            )
+            for ne in new_edges:
+                edge_tags[ne.id] = tag
+
+            n_imprinted += 1
+            current_body = new_body
+
+            # The face was split into 2; we've consumed face_idx — advance past
+            # the two new faces by incrementing face count and moving forward.
+            # (face_idx stays the same; the next iteration will see new face.)
+            n_faces = len(current_body.all_faces())
+            face_idx += 2  # skip the two replacement faces; both are new
+
+    return ImprintResult(
+        body=current_body,
+        edge_tags=edge_tags,
+        n_imprinted=n_imprinted,
+    )

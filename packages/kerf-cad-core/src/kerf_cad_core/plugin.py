@@ -156,6 +156,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.curve_toolkit",
     "kerf_cad_core.geom.surface_analysis",
     "kerf_cad_core.geom.mesh_repair",
+    # GK-82 ext: body-body imprint with edge tagging
+    "kerf_cad_core.geom.imprint_body_tool",
     "kerf_cad_core.geom.unroll_srf",
     "kerf_cad_core.geom.solid_features",
     "kerf_cad_core.geom.patch_srf",

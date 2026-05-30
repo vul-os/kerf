@@ -15275,8 +15275,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "SubD authoring with creases; quad remesh",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/quad_remesh.py"
+            "note": "SubD authoring with creases; quad remesh; dense-mesh→cage via QEM (Garland-Heckbert 1997) + quad recovery (Bommes 2013)",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/subd_decimate_to_cage.py"
           }
         },
         {

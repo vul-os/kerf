@@ -572,6 +572,12 @@ from kerf_cad_core.geom.io.dxf import read_dxf, write_dxf, DxfReadError, DxfWrit
 # GK-128: gear tooth profile generator
 from kerf_cad_core.geom.gears import involute_gear, cycloid_gear
 
+# SUBD-DENSE-TO-LOW-POLY-CONVERT: QEM decimation + quad recovery → SubD cage
+from kerf_cad_core.geom.subd_decimate_to_cage import (
+    dense_mesh_to_subd_cage,
+    DecimationReport,
+)
+
 __all__ = [
     "read_3dm","write_3dm","Rhino3dmReadError",
     "read_dxf","write_dxf","DxfReadError","DxfWriteError",
@@ -580,6 +586,8 @@ __all__ = [
     "PartingLineResult","extract_parting_line","detect_undercuts","optimal_pull_direction",
     # GK-P Wave 4T
     "construct_parting_surface","construct_with_shutoff_inserts","validate_parting_surface",
+    "dense_mesh_to_subd_cage",
+    "DecimationReport",
     "NurbsCurve",
     "NurbsSurface",
     "de_boor",
@@ -1269,12 +1277,6 @@ from kerf_cad_core.geom.curvature_heatmap import (
 # Restore the curvature_heatmap *function* from surface_analysis (the submodule
 # import above sets the attribute to the module object; we need the function).
 from kerf_cad_core.geom.surface_analysis import curvature_heatmap  # noqa: E402 (re-bind)
-# GK-P NURBS-DERIVATIVE-FIELD-VISUAL: 1st partial-derivative vector-field arrow-plot PNG/SVG
-from kerf_cad_core.geom.derivative_field_viz import (
-    render_derivative_field_png,
-    render_derivative_field_svg,
-)
-
 # BREP-CONNECT-INSPECTOR: radial-edge connectivity classification
 # (Weiler 1985 §3 + Mantyla 1988 §6 Euler operators) — pure-Python, no OCCT.
 from kerf_cad_core.geom.brep_connect_inspector import (  # noqa: E402

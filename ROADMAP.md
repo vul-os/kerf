@@ -206,6 +206,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 - **SubD / mesh** — multires displacement, SDF CSG + marching-cubes, sculpt brush engine, isotropic remesh, surface-snap retopo, LSCM UV unwrap. **Geodesic distance via heat method (Crane et al. 2013) ✅** — cotangent Laplacian + Poisson solve; `subd_geodesic_distance` LLM tool wired (GK-P49).
 - **SubD / mesh** — multires displacement, SDF CSG + marching-cubes, sculpt brush engine, isotropic remesh, surface-snap retopo, UV unwrap LSCM + ARAP + mesh atlas ✅.
 - **SubD / mesh** — multires displacement, SDF CSG + marching-cubes, sculpt brush engine, isotropic remesh, surface-snap retopo, LSCM UV unwrap; **harmonic cage coords ✅** (Joshi 2007).
+- **NURBS surface optimal reparametrization (LSCM + ARAP)** ✅ — GK-P50: `reparametrize_lscm` / `reparametrize_arap` / `distortion_metric` / `reparam_compare`; LLM tool `nurbs_reparametrize_optimal`; 21 hermetic tests green.
 - **Architectural geometry** — B-rep→2D tessellate, roof/curtain-wall/corridor generators, wall compound-layer offset, hatch/section-fill.
 - **Sketcher** — collinear constraint, ellipse solver entity, G2 continuity.
 - **Interop** — 3DM write with read→write→read Hausdorff oracle.
@@ -471,6 +472,7 @@ These are roadmap-level moats that span every sector simultaneously and compound
 - **GK-P SubD / mesh** — multires displacement; SDF CSG + marching-cubes; sculpt brush engine; UV unwrap with LSCM + ARAP + mesh atlas (Sheffer 2006) ✅ (`geom/uv_unwrap.py`, `brep_uv_unwrap` + `brep_uv_distortion_report` LLM tools, GK-P58).
 - **GK-P SubD / mesh** — multires displacement; SDF CSG + marching-cubes; sculpt brush engine; LSCM UV unwrap (module exists, wiring incomplete); **Harmonic coordinates for cage deformation (Joshi 2007) ✅** — `kerf-cad-core/geom/subd_harmonic.py`; `subd_harmonic_coords` LLM tool registered; non-negativity + partition-of-unity oracles verified.
 - **GK-P SubD / mesh** — multires displacement; SDF CSG + marching-cubes; sculpt brush engine; LSCM UV unwrap (module exists, wiring incomplete). Stam-exact arbitrary-order limit derivative ✅ (`subd_limit_derivative.py`, GK-P).
+- **GK-P50** ✅ — NURBS surface optimal reparametrization: LSCM (angle-preserving, Lévy 2002) + ARAP (shape-preserving, Liu 2008); distortion metrics; `nurbs_reparametrize_optimal` LLM tool; 21 tests.
 - **GK-P architectural geometry** — B-rep→2D tessellate; roof/curtain-wall/corridor generators; wall compound-layer offset; hatch/section-fill.
 - **GK-P sketcher** — collinear constraint; ellipse solver entity; G2 continuity.
 - **GK-P interop** — 3DM write with Hausdorff read→write→read oracle.

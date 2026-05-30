@@ -988,6 +988,11 @@ __all__ = [
     "detect_conic",
     "extract_canonical_circle",
     "simplify_conic_curve",
+    # GK-P50: optimal NURBS surface reparametrization (LSCM + ARAP)
+    "reparametrize_lscm",
+    "reparametrize_arap",
+    "distortion_metric",
+    "reparam_compare",
 ]
 
 # Variable-section edge blend (Vida-Martin-Varady 1994 §4)
@@ -1091,4 +1096,11 @@ from kerf_cad_core.geom.conic_detect import (
     detect_conic,
     extract_canonical_circle,
     simplify_curve as simplify_conic_curve,
+)
+# GK-P50: optimal NURBS surface reparametrization (LSCM + ARAP)
+from kerf_cad_core.geom.nurbs_param_optimal import (
+    reparametrize_lscm,
+    reparametrize_arap,
+    distortion_metric,
+    reparam_compare,
 )

@@ -4356,8 +4356,8 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/turning/__init__.py",
-            "note": "G71/G70/threading turning cycles (backend)"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/turning/__init__.py, packages/kerf-cad-core/src/kerf_cad_core/cam_lathe_profile.py",
+            "note": "G71/G70/threading turning cycles (backend); cam_lathe_profile: full G71+G70 lathe program from 2-D profile, G96 CSS, G97 constant-RPM, M03/M05/M06; cam_emit_lathe_gcode LLM tool"
           }
         },
         {

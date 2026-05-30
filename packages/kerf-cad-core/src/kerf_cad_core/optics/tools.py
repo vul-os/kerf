@@ -1993,3 +1993,144 @@ async def run_compute_chromatic_focus(ctx: ProjectCtx, args: bytes) -> str:
     if isinstance(result, dict):
         return json.dumps(result)
     return ok_payload(result.to_dict())
+from kerf_cad_core.optics.relative_illum_map import (  # noqa: E402
+    RelIllumMapReport,
+    compute_relative_illum_map,
+)
+
+# ---------------------------------------------------------------------------
+# Tool: optics_compute_relative_illum_map
+# ---------------------------------------------------------------------------
+
+_relative_illum_map_spec = ToolSpec(
+    name="optics_compute_relative_illum_map",
+    description=(
+        "Compute a 2-D relative illumination (RI) map across the image plane\n"
+        "for a sequential lens stack.\n"
+        "\n"
+        "For each grid point (x, y) on the sensor the field angle\n"
+        "  theta(x, y) = arctan(sqrt(x^2+y^2) / EFL)\n"
+        "is computed and RI(theta) is evaluated by tracing a bundle of marginal\n"
+        "rays through all lens surfaces and counting the surviving fraction.\n"
+        "\n"
+        "Theory (Welford 1986 §4.5 / Hecht §6.6 / Slyusarev §3.4):\n"
+        "  cos4_map: natural cos4(theta) photometric baseline — 1.0 at centre,\n"
+        "    falling to cos4(theta_corner) at corners (Hecht §6.6 eq. 6.68).\n"
+        "  ri_map: physical aperture clipping model — 1.0 everywhere without\n"
+        "    clear_apertures_mm; drops below 1.0 when finite CAs block marginal rays.\n"
+        "  Real system with clipping: ri_map shows sharper drop than cos4 baseline.\n"
+        "  Wide-angle lens (theta_max > 50 deg): cos4_corner < 16%.\n"
+        "\n"
+        "Returns:\n"
+        "  ri_map      : 2-D list (grid x grid), physical clipping model RI.\n"
+        "  cos4_map    : 2-D list (grid x grid), cos4(theta) natural baseline.\n"
+        "  corner_ri   : RI at sensor corner (physical clipping).\n"
+        "  corner_cos4 : cos4 baseline at corner.\n"
+        "  max_field_angle : degrees at sensor corner.\n"
+        "  efl_mm      : effective focal length used (mm).\n"
+        "\n"
+        "HONEST FLAGS:\n"
+        "  * Monochromatic only (polychromatic pupil walk out of scope).\n"
+        "  * Rotationally symmetric stack assumed; map is azimuthally symmetric.\n"
+        "  * Sensor acceptance tilt / field-lens telecentricity not modelled.\n"
+        "\n"
+        "Surface definition (same as optics_ray_trace_lens_stack):\n"
+        "  c : curvature 1/R (mm^-1). 0 = flat.\n"
+        "  t : thickness to NEXT surface (mm). Last surface: 0.\n"
+        "  n : refractive index after surface (>= 1.0).\n"
+        "  k : conic constant (default 0 = sphere).\n"
+        "\n"
+        "Errors: {ok:false, reason} for invalid inputs. Never raises.\n"
+        "\n"
+        "References: Welford 1986 §4.5; Hecht §6.6; Slyusarev §3.4."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "surfaces": {
+                "type": "array",
+                "description": (
+                    "Ordered list of optical surface dicts. Each must have: "
+                    "c (mm^-1), t (mm), n (>= 1.0). Optional: k (conic, default 0)."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "c": {"type": "number", "description": "Curvature 1/R (mm^-1). 0 = flat."},
+                        "t": {"type": "number", "description": "Thickness to next surface (mm)."},
+                        "n": {"type": "number", "description": "Refractive index after surface (>= 1.0)."},
+                        "k": {"type": "number", "description": "Conic constant (default 0 = sphere)."},
+                    },
+                    "required": ["c", "t", "n"],
+                },
+            },
+            "image_grid_size": {
+                "type": "integer",
+                "description": (
+                    "Number of grid points per side (default 33, minimum 3). "
+                    "Odd values place a sample at the exact image centre."
+                ),
+            },
+            "sensor_half_height_mm": {
+                "type": "number",
+                "description": (
+                    "Half-side of the square sensor (mm). "
+                    "Default 15 mm (30 mm sensor — full-frame 35 mm equivalent)."
+                ),
+            },
+            "aperture_radius_mm": {
+                "type": "number",
+                "description": "Entrance-pupil half-diameter (mm). Default 10 mm.",
+            },
+            "clear_apertures_mm": {
+                "type": "array",
+                "description": (
+                    "Per-surface clear aperture radius (mm). "
+                    "Length must equal number of surfaces. "
+                    "Use 1e18 for surfaces with no physical rim. "
+                    "If omitted, all surfaces are infinite — ri_map = all 1.0."
+                ),
+                "items": {"type": "number"},
+            },
+            "n_marginal_rays": {
+                "type": "integer",
+                "description": "Marginal rays per field angle (default 8, minimum 4).",
+            },
+            "n_object": {
+                "type": "number",
+                "description": "Refractive index of object space (default 1.0 = air).",
+            },
+        },
+        "required": ["surfaces"],
+    },
+)
+
+
+@register(_relative_illum_map_spec, write=False)
+async def run_optics_relative_illum_map(ctx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    if a.get("surfaces") is None:
+        return json.dumps({"ok": False, "reason": "surfaces is required"})
+
+    kwargs: dict = {}
+    if "image_grid_size" in a:
+        kwargs["image_grid_size"] = int(a["image_grid_size"])
+    if "sensor_half_height_mm" in a:
+        kwargs["sensor_half_height_mm"] = float(a["sensor_half_height_mm"])
+    if "aperture_radius_mm" in a:
+        kwargs["aperture_radius_mm"] = float(a["aperture_radius_mm"])
+    if "clear_apertures_mm" in a:
+        kwargs["clear_apertures_mm"] = a["clear_apertures_mm"]
+    if "n_marginal_rays" in a:
+        kwargs["n_marginal_rays"] = int(a["n_marginal_rays"])
+    if "n_object" in a:
+        kwargs["n_object"] = float(a["n_object"])
+
+    result = compute_relative_illum_map(a["surfaces"], **kwargs)
+    if isinstance(result, dict):
+        return json.dumps(result)
+    return ok_payload(result.to_dict())

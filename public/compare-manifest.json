@@ -13672,6 +13672,20 @@
         },
         {
           "domain": "D12",
+          "feature": "2-D illumination map (relative illumination heatmap)",
+          "competitor": {
+            "status": "yes",
+            "note": "Full relative illumination map per field; shows cos4 fall-off and physical vignetting contours",
+            "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "2-D relative illumination map (OPTICS-RELATIVE-ILLUM-MAP): for each (x,y) sensor position computes field angle theta=arctan(r/EFL) and evaluates RI(theta) = surviving-ray fraction; ri_map (aperture-clipping model) + cos4_map (natural cos4(theta) baseline, Hecht §6.6 / Slyusarev §3.4); 1-D radial pre-computation exploits rotational symmetry; corner_ri + corner_cos4 diagnostics; BK7 biconvex @60mm half-sensor: theta_corner~60deg, cos4_corner~0.063; LLM tool optics_compute_relative_illum_map; 38 hermetic tests. Honest: monochromatic; rotationally-symmetric stack assumed; sensor tilt/telecentricity not modelled. Ref: Welford 1986 §4.5; Hecht §6.6; Slyusarev §3.4.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/relative_illum_map.py"
+          }
+        },
+        {
+          "domain": "D12",
           "feature": "Non-sequential ray tracing (stray light)",
           "competitor": {
             "status": "yes",

@@ -397,6 +397,9 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.solid_contains_point",
     # SUBD-EXPORT-PLY: CC limit-surface → Stanford PLY (ASCII + binary_little_endian)
     "kerf_cad_core.geom.subd_export_ply",               # subd_export_limit_to_ply
+    # MANUFACTURING-TOOLING-CATALOG-MATCH: tool lookup from embedded Sandvik/Iscar/KMT/OSG/Tungaloy catalog
+    # (Sandvik Cutting Data Rec. 2024; Drozda-Wick §3) — manufacturing_match_tooling
+    "kerf_cad_core.manufacturing_tooling_catalog",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

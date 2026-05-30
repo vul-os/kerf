@@ -121,26 +121,43 @@ class ToolingMatchResult:
 # Operation → tool_type mapping
 # ---------------------------------------------------------------------------
 
+import re as _re
+
+# Word-boundary patterns keyed by tool type.
 # Order matters: first match wins.
-_OP_TYPE_MAP = [
-    # Tapping
-    (["tap", "thread", "m4", "m5", "m6", "m8", "m10", "m12", "m16"], "tap"),
-    # Reaming
-    (["ream", "reamer"], "reamer"),
-    # Drilling
-    (["drill", "hole", "bore"], "drill"),
-    # Milling / slotting
-    (["mill", "slot", "pocket", "face", "contour", "profile", "cut"], "end_mill"),
-    # Turning
-    (["turn", "lathe", "face turn", "bore turn"], "insert"),
+# Uses whole-word matching (\b) to avoid "surface"→"face" false positives.
+# Priority: reamer > drill > tap (because "drill M8 tap hole" = drill op).
+_OP_PATTERNS: list[tuple[list[str], str]] = [
+    # Reaming — unambiguous
+    (["\\bream(?:ing|ed)?\\b", "\\breamer\\b"], "reamer"),
+    # Drilling — "drill" verb takes priority over "tap" noun in same phrase
+    (["\\bdrill(?:ing|ed)?\\b", "\\bthrough.hole\\b", "\\bblind.hole\\b"], "drill"),
+    # Tapping — tap/thread verb, OR standalone M-thread designation without drill verb
+    (["\\btap(?:ping)?\\b", "\\bthread(?:ing|ed)?\\b", "\\btapping\\b"], "tap"),
+    # Milling / slotting (word-boundary; avoid "surface" → "face" match)
+    (["\\bmill(?:ing|ed)?\\b", "\\bslot(?:ting)?\\b", "\\bpocket(?:ing)?\\b",
+      "\\bface\\s+mill\\b", "\\bcontour\\b", "\\bprofile\\b", "\\bprofil(?:ing|ed)\\b"], "end_mill"),
+    # Turning — requires whole-word "turn" or "lathe"
+    (["\\bturn(?:ing|ed)?\\b", "\\blathe\\b"], "insert"),
+    # Drilling fallback for bare "hole" or "bore" keyword (without drill verb)
+    (["\\bhole\\b", "\\bbore\\b"], "drill"),
 ]
 
 
 def _classify_operation(operation: str) -> Optional[str]:
-    """Map free-text operation description to a tool_type key."""
+    """Map free-text operation description to a tool_type key.
+
+    Uses word-boundary regex matching to avoid false positives like
+    "surface"→end_mill (via substring "face").  Drill verb takes priority
+    over tap noun so "drill M8 tap hole" resolves to drill, not tap.
+
+    References
+    ----------
+    Drozda-Wick §3-1: machining operation taxonomy.
+    """
     low = operation.lower()
-    for keywords, tool_type in _OP_TYPE_MAP:
-        if any(kw in low for kw in keywords):
+    for patterns, tool_type in _OP_PATTERNS:
+        if any(_re.search(pat, low) for pat in patterns):
             return tool_type
     return None
 
@@ -309,12 +326,16 @@ def _parse_dimension(text: str) -> float:
     """
     import re
     # M-thread: extract major diameter from standard thread designation
-    m = re.search(r'\bM(\d+(?:\.\d+)?)\b', text, re.IGNORECASE)
+    # Handles: M6, M8, M6x1.0, M8x1.25 — \b after digits, allowing 'x' pitch separator
+    m = re.search(r'\bM(\d+(?:\.\d+)?)(?:[xX]\d+(?:\.\d+)?)?\b', text, re.IGNORECASE)
     if m:
         md = float(m.group(1))
-        # Return tap drill for standard metric pitches (ISO 965-1 §5)
+        # If this is a drill/hole operation, return the ISO 965-1 §5 tap-drill diameter.
+        # For tapping operations, return the nominal thread diameter (tool selection key).
+        low = text.lower()
+        is_drill_op = bool(re.search(r'\bdrill(?:ing)?\b|\bhole\b|\bbore\b', low))
         _tap_drill = {4: 3.3, 5: 4.2, 6: 5.0, 8: 6.8, 10: 8.5, 12: 10.2, 16: 14.0}
-        if md in _tap_drill:
+        if is_drill_op and md in _tap_drill:
             return _tap_drill[md]
         return md
     # ø-notation or plain number + optional "mm"
@@ -422,6 +443,7 @@ async def run_manufacturing_match_tooling(ctx: ProjectCtx, args: bytes) -> str:
         return err_payload(result.reason, "NO_MATCH")
 
     payload = {
+        "ok": True,
         "tool_id": result.tool_id,
         "manufacturer": result.manufacturer,
         "tool_type": result.tool_type,

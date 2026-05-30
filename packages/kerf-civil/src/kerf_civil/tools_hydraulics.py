@@ -497,14 +497,259 @@ async def run_civil_culvert_capacity(params: dict, ctx: "ProjectCtx") -> str:
 
 
 # ---------------------------------------------------------------------------
+# Tool: civil_drainage_rational_method  (FHWA HEC-22 §3, US customary)
+# ---------------------------------------------------------------------------
+
+civil_drainage_rational_method_spec = ToolSpec(
+    name="civil_drainage_rational_method",
+    description=(
+        "Rational method peak stormwater runoff per FHWA HEC-22 §3.1 "
+        "(Urban Drainage Design Manual, 3rd Edition, 2009).\n"
+        "\n"
+        "Formula:  Q = C · i · A\n"
+        "  Q — peak discharge [cfs]\n"
+        "  C — runoff coefficient (0–1, dimensionless)\n"
+        "  i — rainfall intensity [in/hr] at the time of concentration\n"
+        "  A — drainage area [acres]\n"
+        "\n"
+        "US-customary (acres / in/hr / cfs) as per HEC-22 §3.1.\n"
+        "Valid for watersheds ≤ ~200 acres with uniform land cover.\n"
+        "\n"
+        "Optional composite watershed: supply 'watershed' list of\n"
+        "  {surface_kind, area_acres} or {C, area_acres} sub-areas;\n"
+        "  the weighted-C method (HEC-22 §3.3) is applied automatically.\n"
+        "\n"
+        "Surface kinds (HEC-22 Table 3-1):\n"
+        "  asphalt, concrete, roofs, gravel_drives,\n"
+        "  lawn_sandy, lawn_clay, forest_flat\n"
+        "\n"
+        "Returns:\n"
+        "  ok              : bool\n"
+        "  Q_cfs           : peak discharge [ft³/s]\n"
+        "  Q_m3s           : peak discharge [m³/s]\n"
+        "  weighted_C      : composite runoff coefficient used\n"
+        "  total_area_acres: total drainage area\n"
+        "  warnings        : list of advisory strings\n"
+        "\n"
+        "Note: implements HEC-22 rational method; not FHWA certified.\n"
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "C": {
+                "type": "number",
+                "description": (
+                    "Runoff coefficient (0–1).  Required for single-surface mode. "
+                    "Ignored if 'watershed' is supplied."
+                ),
+            },
+            "i_in_per_hr": {
+                "type": "number",
+                "description": "Rainfall intensity [in/hr].",
+            },
+            "area_acres": {
+                "type": "number",
+                "description": (
+                    "Drainage area [acres].  Required for single-surface mode. "
+                    "Ignored if 'watershed' is supplied."
+                ),
+            },
+            "surface_kind": {
+                "type": "string",
+                "description": (
+                    "HEC-22 Table 3-1 surface type for automatic C lookup "
+                    "(single-surface mode).  One of: asphalt, concrete, roofs, "
+                    "gravel_drives, lawn_sandy, lawn_clay, forest_flat."
+                ),
+            },
+            "watershed": {
+                "type": "array",
+                "description": (
+                    "Composite watershed sub-areas (HEC-22 §3.3 weighted-C). "
+                    "Each item: {area_acres, C} or {area_acres, surface_kind}."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "area_acres": {"type": "number"},
+                        "C": {"type": "number"},
+                        "surface_kind": {"type": "string"},
+                    },
+                    "required": ["area_acres"],
+                },
+            },
+            "return_period_years": {
+                "type": "integer",
+                "description": "Design storm return period [years]. Default 10.",
+                "default": 10,
+            },
+        },
+        "required": ["i_in_per_hr"],
+    },
+)
+
+
+async def run_civil_drainage_rational_method(params: dict, ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_civil.drainage import (
+            rational_method,
+            runoff_coefficient_lookup,
+            compute_design_flow,
+        )
+
+        i = float(params["i_in_per_hr"])
+        return_period = int(params.get("return_period_years", 10))
+        watershed = params.get("watershed")
+
+        if watershed:
+            result = compute_design_flow(
+                watershed=watershed,
+                return_period_years=return_period,
+                rainfall_intensity_i=i,
+            )
+            if not result["ok"]:
+                return err_payload(result["reason"], "DRAINAGE_ERROR")
+            return ok_payload(result)
+
+        # Single-surface mode
+        if "C" in params and params["C"] is not None:
+            C = float(params["C"])
+        elif "surface_kind" in params and params["surface_kind"]:
+            C = runoff_coefficient_lookup(params["surface_kind"])
+        else:
+            return err_payload(
+                "Supply either 'C' or 'surface_kind' (or 'watershed' for composite)",
+                "BAD_ARGS",
+            )
+
+        if "area_acres" not in params or params["area_acres"] is None:
+            return err_payload("Supply 'area_acres' for single-surface mode", "BAD_ARGS")
+
+        area = float(params["area_acres"])
+        Q_cfs = rational_method(C, i, area)
+        Q_m3s = Q_cfs * 0.028316846
+
+        return ok_payload({
+            "ok": True,
+            "Q_cfs": round(Q_cfs, 6),
+            "Q_m3s": round(Q_m3s, 8),
+            "weighted_C": round(C, 6),
+            "total_area_acres": round(area, 6),
+            "return_period_years": return_period,
+            "warnings": [],
+        })
+
+    except Exception as exc:
+        return err_payload(str(exc), "CIVIL_DRAINAGE_RATIONAL_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# Tool: civil_time_of_concentration  (Kirpich — HEC-22 §3.5)
+# ---------------------------------------------------------------------------
+
+civil_time_of_concentration_spec = ToolSpec(
+    name="civil_time_of_concentration",
+    description=(
+        "Time of concentration Tc using the Kirpich (1940) formula "
+        "per FHWA HEC-22 §3.5.\n"
+        "\n"
+        "Formula:  Tc = 0.0078 · L^0.77 / S^0.385   [minutes]\n"
+        "  L — hydraulic flow-path length [ft]\n"
+        "  S — average watershed slope [ft/ft]\n"
+        "\n"
+        "HEC-22 §3.5 notes the Kirpich formula is applicable to small "
+        "urban catchments with well-defined channel flow paths.  Apply a "
+        "factor of 2 for overland/sheet-flow-dominated catchments.\n"
+        "\n"
+        "Returns:\n"
+        "  ok       : bool\n"
+        "  Tc_min   : time of concentration [minutes]\n"
+        "  Tc_hr    : time of concentration [hours]\n"
+        "  length_ft: flow-path length supplied\n"
+        "  slope    : slope supplied\n"
+        "  formula  : 'kirpich_hec22'\n"
+        "  warnings : list of advisory strings\n"
+        "\n"
+        "Note: implements HEC-22 Kirpich method; not FHWA certified.\n"
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "length_ft": {
+                "type": "number",
+                "description": "Hydraulic flow-path length from most remote point to design point [ft].",
+            },
+            "slope": {
+                "type": "number",
+                "description": (
+                    "Average slope along flow path [ft/ft] (e.g. 0.02 for 2%). "
+                    "Must be > 0."
+                ),
+            },
+            "surface_kind": {
+                "type": "string",
+                "description": (
+                    "Cover type (informational; does not alter Kirpich Tc). "
+                    "One of: asphalt, concrete, roofs, gravel_drives, "
+                    "lawn_sandy, lawn_clay, forest_flat."
+                ),
+            },
+        },
+        "required": ["length_ft", "slope"],
+    },
+)
+
+
+async def run_civil_time_of_concentration(params: dict, ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_civil.drainage import time_of_concentration
+
+        length_ft = float(params["length_ft"])
+        slope = float(params["slope"])
+        surface_kind = params.get("surface_kind", "asphalt")
+
+        Tc_min = time_of_concentration(length_ft, slope, surface_kind)
+        Tc_hr = Tc_min / 60.0
+
+        warnings_out: list[str] = []
+        if Tc_min < 5.0:
+            warnings_out.append(
+                f"Tc = {Tc_min:.2f} min < 5 min; HEC-22 §3.5 recommends a minimum "
+                "Tc of 5 minutes for design."
+            )
+        if length_ft > 3000.0:
+            warnings_out.append(
+                f"length_ft = {length_ft:.0f} ft; Kirpich formula is calibrated for "
+                "small catchments.  Consider TR-55 sheet/shallow/channel method for "
+                "longer flow paths."
+            )
+
+        return ok_payload({
+            "ok": True,
+            "Tc_min": round(Tc_min, 4),
+            "Tc_hr": round(Tc_hr, 6),
+            "length_ft": round(length_ft, 4),
+            "slope": round(slope, 6),
+            "surface_kind": surface_kind,
+            "formula": "kirpich_hec22",
+            "warnings": warnings_out,
+        })
+
+    except Exception as exc:
+        return err_payload(str(exc), "CIVIL_TC_ERROR")
+
+
+# ---------------------------------------------------------------------------
 # TOOLS list consumed by plugin.py
 # ---------------------------------------------------------------------------
 
 TOOLS = [
-    ("civil_landxml_import",          civil_landxml_import_spec,          run_civil_landxml_import),
-    ("civil_landxml_export",          civil_landxml_export_spec,          run_civil_landxml_export),
-    ("civil_water_network_solve",     civil_water_network_solve_spec,     run_civil_water_network_solve),
-    ("civil_sewer_manning_capacity",  civil_sewer_manning_capacity_spec,  run_civil_sewer_manning_capacity),
-    ("civil_storm_rational",          civil_storm_rational_spec,          run_civil_storm_rational),
-    ("civil_culvert_capacity",        civil_culvert_capacity_spec,        run_civil_culvert_capacity),
+    ("civil_landxml_import",                civil_landxml_import_spec,                run_civil_landxml_import),
+    ("civil_landxml_export",                civil_landxml_export_spec,                run_civil_landxml_export),
+    ("civil_water_network_solve",           civil_water_network_solve_spec,           run_civil_water_network_solve),
+    ("civil_sewer_manning_capacity",        civil_sewer_manning_capacity_spec,        run_civil_sewer_manning_capacity),
+    ("civil_storm_rational",                civil_storm_rational_spec,                run_civil_storm_rational),
+    ("civil_culvert_capacity",              civil_culvert_capacity_spec,              run_civil_culvert_capacity),
+    ("civil_drainage_rational_method",      civil_drainage_rational_method_spec,      run_civil_drainage_rational_method),
+    ("civil_time_of_concentration",         civil_time_of_concentration_spec,         run_civil_time_of_concentration),
 ]

@@ -283,6 +283,7 @@ Everything committed, lowest priority. Ordered roughly by near-term readiness.
 **Vehicles:** composites ply/layup authoring (draping / fiber-steering / Fibersim class) · hull fairing (NURBS-reachable) · 3D harness routing.
 
 **Civil / infrastructure (distinct engines):** plan-and-profile sheet engine · IFC-4.3-infra I/O · bridge/tunnel · mining · marine/dredging · rail signaling. *(CRS engine, horizontal/vertical alignment, corridor, earthworks, geotechnical, LandXML 1.2 I/O, pressurized water-distribution networks (Todini GGA + Hazen-Williams/Darcy-Weisbach), gravity sewer (Manning), storm rational method + HDS-5 culverts already shipped; TINView / PipeNetworkView / GradingPlanView / LandscapeView UIs ✅ 2026-05-29.)*
+**Civil / infrastructure (distinct engines):** plan-and-profile sheet engine · IFC-4.3-infra I/O · bridge/tunnel · mining · marine/dredging · rail signaling. *(CRS engine, horizontal/vertical alignment, corridor, earthworks, geotechnical, LandXML 1.2 I/O, pressurized water-distribution networks (Todini GGA + Hazen-Williams/Darcy-Weisbach), gravity sewer (Manning), storm rational method + HDS-5 culverts, rational drainage method + composite watershed (FHWA HEC-22) already shipped.)*
 
 **Body-worn / medical / craft:** watchmaking / horology · eyewear / frames · footwear / last design · dental CAD (crowns/aligners) · orthopedic / prosthetics · hearing aids.
 

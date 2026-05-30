@@ -424,8 +424,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Rational method (ASCE/EWRI 77-17) + TR-55 runoff + HDS-5 culvert inlet-control (unsubmerged/submerged, concrete box + circular)",
-            "evidence": "packages/kerf-civil/src/kerf_civil/storm.py"
+            "note": "Rational method (ASCE/EWRI 77-17) + TR-55 runoff + HDS-5 culvert inlet-control (unsubmerged/submerged, concrete box + circular); rational drainage method + composite watershed (FHWA HEC-22) ✅",
+            "evidence": "packages/kerf-civil/src/kerf_civil/drainage.py"
           }
         },
         {

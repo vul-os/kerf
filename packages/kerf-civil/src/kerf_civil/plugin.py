@@ -94,6 +94,7 @@ async def register(app: FastAPI, ctx):
         "civil.hydraulics-pressure",
         "civil.hydraulics-gravity",
         "civil.storm",
+        "civil.drainage-rational-hec22",
     ]
 
     try:

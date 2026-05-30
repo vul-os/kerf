@@ -66,6 +66,8 @@ The sector work only matters if you **own your work, are not locked in, and can 
 
 **Civil hydraulics** ✅ — LandXML 1.2 import/export (`civil_landxml_import/export`); steady-state pressurised pipe network (Todini GGA + HW/DW, `civil_water_network_solve`); Manning circular/trapezoidal sewer (`civil_sewer_manning_capacity`); rational-method peak runoff (`civil_storm_rational`); HDS-5 inlet-control culvert (`civil_culvert_capacity`) — `kerf-civil/src/kerf_civil/tools_hydraulics.py`.
 
+**Rational drainage method + composite watershed (FHWA HEC-22)** ✅ — Q = C·i·A in US customary (acres/in-hr/cfs); HEC-22 Table 3-1 runoff-coefficient lookup (7 surface types); Kirpich Tc (HEC-22 §3.5); composite weighted-C watershed (HEC-22 §3.3); LLM tools `civil_drainage_rational_method`, `civil_time_of_concentration` — `kerf-civil/src/kerf_civil/drainage.py` + `tools_hydraulics.py`.
+
 **FEM dynamics** ✅ — linear eigenvalue buckling (`fem_buckling_linear`); mode-superposition harmonic frequency response (`fem_harmonic_response`); random-vibration PSD / Miles equation (`fem_random_vibration_psd`); acoustics cavity FEM + BEM radiation; high-frequency EM (waveguide, S-params, FDTD); electrostatics + magnetostatics; 2-D projection Navier-Stokes — `kerf-fem/src/kerf_fem/{buckling,harmonic,random_vibration,acoustics_fem,em_highfreq,em_field,cfd_navier_stokes}.py`.
 
 **Structural codes (AISI + TMS)** ✅ — AISI S100-16 cold-formed steel: effective-width, flexure (`structural_cfs_flexure`), compression (`structural_cfs_compression`), web-crippling (`structural_cfs_web_crippling`); TMS 402-16 masonry ASD: flexure/shear/axial (`structural_masonry_*`) — `kerf-structural/src/kerf_structural/{cold_formed_steel,masonry}.py`.

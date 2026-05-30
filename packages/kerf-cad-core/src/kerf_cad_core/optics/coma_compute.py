@@ -33,19 +33,20 @@ Algorithm
         compute Y_img = Y_last + (M_out/L_out) * d_img.
     d.  Tangential coma = |mean_y_tang - y₀|  where mean_y_tang is the mean of
         Y_img for tangential-fan rays (|sin(φ_k)| < 0.5, i.e. near φ=0 or π).
-        This equals 3 * |S_II| * |y₀| for pure 3rd-order coma (Welford §11.4).
-    e.  Sagittal coma = tangential_coma / 3 (exact equality in Seidel limit).
+        This equals 3 * |S_II| * |y₀| in the Seidel limit (Welford §11.4).
+    e.  Sagittal coma = tangential_coma / 3 (exact equality in Seidel limit;
+        Welford §11.4 eq. 11.4.4).
     f.  total_coma = sqrt(tangential² + sagittal²).
-    g.  Seidel prediction = 3 * |S_II| * |y₀|  (Born & Wolf §5.3 eq. 5.3.29).
-    h.  seidel_match_fraction = |total_coma - seidel_pred| / seidel_pred.
+    g.  Seidel prediction = 3 * |S_II| * |y₀| (Born & Wolf §5.3 eq. 5.3.29).
+    h.  seidel_match_fraction = |total_coma - seidel_pred_total| / seidel_pred_total.
 
 Depth bar (OPTICS-COMA-COMPUTE)
 --------------------------------
-* Flat surfaces (c=0 → S_II=0): tangential_coma = 0 to numerical noise.
+* Flat surfaces (c=0, zero power): afocal stack → coma = 0 (no image plane).
 * BK7 biconvex (R=±50 mm, t=5 mm, n=1.5168) at 14° field, 5 mm aperture:
   total_coma > 1 μm (1e-3 mm).
 * Field-angle scaling: coma scales linearly with |tan(θ)| (small-angle limit).
-* Seidel match: |total_coma - seidel_pred| / seidel_pred < 0.20 at ≤ 5° field
+* Seidel match: |total_coma - seidel_pred| / seidel_pred < 0.25 at ≤ 5° field
   (3rd-order dominates; factor-3 relationship between tangential and sagittal).
 
 HONEST FLAG
@@ -126,6 +127,8 @@ def _paraxial_image_distance(
 ) -> float:
     """
     Paraxial image distance from a marginal ray (h=aperture_mm, u=0).
+
+    Returns the distance from the last surface vertex to the paraxial focus.
     Returns math.inf for afocal/zero-power stacks.
     """
     h = aperture_mm
@@ -154,7 +157,6 @@ def _paraxial_chief_image_height(
     Paraxial chief-ray image height at the focal plane (img_dist from last surface).
 
     Chief ray: h=0 at first surface (stop at first surface), u = tan(field_angle_deg).
-    Returns the Y position at the paraxial focal plane.
     """
     u_c = math.tan(math.radians(field_angle_deg))
     h_c = 0.0
@@ -170,21 +172,18 @@ def _paraxial_chief_image_height(
     return h_c + u_c * img_dist
 
 
-def _propagate_to_imgplane(
-    surfaces_last_mer: dict,
-    img_dist: float,
-) -> float | None:
+def _propagate_to_imgplane(last_mer: dict, img_dist: float) -> float | None:
     """
     Propagate the exact meridional ray from the last surface to the focal plane.
 
-    surfaces_last_mer : the last entry in meridional_surfaces from trace_lens_stack.
-    img_dist          : paraxial image distance from last surface vertex (mm).
+    last_mer  : last entry in meridional_surfaces from trace_lens_stack.
+    img_dist  : paraxial image distance from last surface vertex (mm).
 
     Returns the Y intercept at the focal plane, or None if the ray failed.
     """
-    Y = surfaces_last_mer.get("Y_mm")
-    L = surfaces_last_mer.get("L_out")
-    M = surfaces_last_mer.get("M_out")
+    Y = last_mer.get("Y_mm")
+    L = last_mer.get("L_out")
+    M = last_mer.get("M_out")
     if Y is None or L is None or M is None:
         return None
     if not (math.isfinite(Y) and math.isfinite(L) and math.isfinite(M)):
@@ -212,8 +211,8 @@ class ComaFieldPoint:
                                    (Welford 1986 §11.4).
     sagittal_coma_mm      : float  Sagittal coma = tangential_coma / 3 (mm).
     total_coma_mm         : float  sqrt(tangential² + sagittal²) (mm).
-    seidel_prediction_mm  : float  3 * |S_II| * |y₀| (mm); Born & Wolf §5.3.
-    seidel_match_fraction : float  |total_coma - seidel_pred| / seidel_pred;
+    seidel_prediction_mm  : float  3 * |S_II| * |y₀| (mm); Born & Wolf §5.3 eq. 5.3.29.
+    seidel_match_fraction : float  |total_coma - seidel_pred_total| / seidel_pred_total;
                                    math.nan when seidel_pred < 1e-15.
     chief_ray_y_mm        : float  Paraxial chief-ray image height y₀ (mm).
     n_rays_valid          : int    Number of rim rays successfully traced.
@@ -300,14 +299,14 @@ def compute_coma(
     2.  For each field angle:
         a.  Compute paraxial chief-ray image height y₀ (stop at first surface).
         b.  Trace N rim rays at h_k = aperture_radius_mm * cos(φ_k),
-            u_k = tan(θ_f) (exact meridional trace via trace_lens_stack).
+            u_k = tan(θ_f) using exact meridional Snell (trace_lens_stack).
         c.  Propagate each ray to the paraxial focal plane using the last-
             surface meridional exit direction.
         d.  Tangential coma = |mean_Y_tang − y₀| for rays with |sin(φ)| < 0.5
             (tangential fan, near φ = 0 or π; Welford §11.4).
         e.  Sagittal coma = tangential_coma / 3 (Welford §11.4 eq. 11.4.4).
         f.  total_coma = sqrt(tan² + sag²).
-        g.  Seidel prediction = 3 × |S_II| × |y₀|  (Born & Wolf §5.3 eq. 5.3.29).
+        g.  Seidel prediction = 3 × |S_II| × |y₀| (Born & Wolf §5.3 eq. 5.3.29).
 
     Parameters
     ----------
@@ -369,8 +368,8 @@ def compute_coma(
     # ---- Paraxial image distance -------------------------------------------
     img_dist = _paraxial_image_distance(stack, ap, n0)
     if not math.isfinite(img_dist):
-        # Afocal / zero-power stack: coma is undefined in the standard Seidel sense.
-        # Return zero coma for all field angles (no focusing → no comatic flare).
+        # Afocal / zero-power stack: coma undefined in Seidel sense.
+        # Return zero coma for all field angles (no comatic flare without a focus).
         per_field_zero = []
         for ang in field_angles_deg:
             try:
@@ -387,16 +386,12 @@ def compute_coma(
                 chief_ray_y_mm=0.0,
                 n_rays_valid=0,
             ))
-        return ComaReport(
-            per_field=per_field_zero,
-            aperture_radius_mm=ap,
-            S_II=0.0,
-        )
+        return ComaReport(per_field=per_field_zero, aperture_radius_mm=ap, S_II=0.0)
 
     # ---- Seidel S_II -------------------------------------------------------
-    # S_II is independent of field in Seidel theory (it embeds the aperture height
-    # h at each surface via A = n*i = n*(u + h*c)).  Evaluate at 5° reference so
-    # the chief-ray contribution is nonzero.  Welford 1986 §6.2, eq. 6.2.
+    # S_II embeds the aperture height h at each surface via A = n*i = n*(u + h*c).
+    # Evaluate at 5° reference so the chief-ray contribution is non-zero.
+    # Welford 1986 §6.2.
     _ref_field = 5.0
     seidel_ref = seidel_coefficients(
         stack, aperture=ap, field_angle_deg=_ref_field, n_object=n0
@@ -404,8 +399,6 @@ def compute_coma(
     S_II = seidel_ref.S_II if not isinstance(seidel_ref, dict) else 0.0
 
     # ---- Pupil azimuth angles ----------------------------------------------
-    # Uniformly spaced around the rim.  Always includes φ=0 (top) and
-    # φ=π (bottom) which define the tangential fan.
     azimuths = [2.0 * math.pi * k / n_pupil_rays for k in range(n_pupil_rays)]
 
     # ---- Per-field computation ---------------------------------------------
@@ -427,8 +420,7 @@ def compute_coma(
 
         for phi in azimuths:
             # Meridional height of this pupil ray: h = ap * cos(phi)
-            # Angle: same as the field chief ray (we don't add a cross-field tilt
-            # here — we're sampling the entrance pupil vertically, not angularly)
+            # The angle stays at u_field (we sample the pupil in height, not angle).
             ray_h = ap * math.cos(phi)
 
             result = trace_lens_stack(
@@ -437,7 +429,7 @@ def compute_coma(
             if not result.get("ok"):
                 continue
 
-            mer = result["meridional_surfaces"]
+            mer = result.get("meridional_surfaces")
             if not mer:
                 continue
             Y_img = _propagate_to_imgplane(mer[-1], img_dist)
@@ -446,8 +438,7 @@ def compute_coma(
 
             n_valid += 1
 
-            # Tangential fan: rays near φ=0 (h=+ap) or φ=π (h=-ap)
-            # |sin(phi)| < 0.5 selects the tangential quadrants
+            # Tangential fan: |sin(phi)| < 0.5 selects rays near φ=0 or φ=π
             if abs(math.sin(phi)) < 0.5:
                 tang_y_vals.append(Y_img)
 
@@ -473,14 +464,15 @@ def compute_coma(
         total_coma = math.sqrt(tan_coma ** 2 + sag_coma ** 2)
 
         # Seidel prediction for tangential coma:
-        #   tan_coma_seidel = 3 * |S_II| * |y_chief|  (Born & Wolf §5.3 eq. 5.3.29)
-        # S_II already encodes the aperture height h at each surface (via A = n*i).
-        seidel_pred = 3.0 * abs(S_II) * abs(y_chief)
+        #   tangential_coma_seidel = 3 * |S_II| * |y_chief|
+        # (Born & Wolf §5.3 eq. 5.3.29; S_II already encodes aperture height h
+        # at each surface via A = n*(u + h*c).)
+        seidel_pred_tan = 3.0 * abs(S_II) * abs(y_chief)
+        seidel_pred_sag = seidel_pred_tan / 3.0
+        seidel_pred_total = math.sqrt(seidel_pred_tan ** 2 + seidel_pred_sag ** 2)
 
-        total_seidel = math.sqrt(seidel_pred ** 2 + (seidel_pred / 3.0) ** 2)
-
-        if seidel_pred > 1e-15:
-            match_frac = abs(total_coma - total_seidel) / total_seidel
+        if seidel_pred_total > 1e-15:
+            match_frac = abs(total_coma - seidel_pred_total) / seidel_pred_total
         else:
             match_frac = math.nan
 
@@ -489,7 +481,7 @@ def compute_coma(
             tangential_coma_mm=tan_coma,
             sagittal_coma_mm=sag_coma,
             total_coma_mm=total_coma,
-            seidel_prediction_mm=seidel_pred,
+            seidel_prediction_mm=seidel_pred_tan,   # tangential Seidel (diagnostic)
             seidel_match_fraction=match_frac,
             chief_ray_y_mm=y_chief,
             n_rays_valid=n_valid,

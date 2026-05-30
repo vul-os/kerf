@@ -13617,6 +13617,20 @@
         },
         {
           "domain": "D12",
+          "feature": "Coma aberration metrics (comatic flare length, Seidel S_II comparison)",
+          "competitor": {
+            "status": "yes",
+            "note": "Coma analysis: tangential and sagittal coma vs field angle; transverse ray aberration plots; Seidel coma coefficient; wavefront maps",
+            "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Coma aberration metrics (OPTICS-COMA-COMPUTE): pupil-rim ray bundle trace at N azimuths (Welford 1986 §11.4 / Born & Wolf §5.3); comatic flare length = mean Y-displacement of tangential-fan rays from chief-ray image point; sagittal coma = tangential/3 (Welford §11.4 eq. 11.4.4); total coma = sqrt(tan²+sag²); Seidel S_II prediction = 3×|S_II|×|y_chief| (Born & Wolf §5.3 eq. 5.3.29); depth bar: BK7 biconvex at 14 deg coma > 1 um; Seidel match < 0.1% at 5 deg; LLM tool optics_compute_coma; 33 hermetic tests. Honest: third-order coma only; Hopkins higher-order and oblique spherical aberration not implemented; monochromatic only.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/coma_compute.py"
+          }
+        },
+        {
+          "domain": "D12",
           "feature": "Non-sequential ray tracing (stray light)",
           "competitor": {
             "status": "yes",

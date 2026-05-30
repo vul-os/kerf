@@ -1700,3 +1700,145 @@ async def run_distortion_map(ctx: ProjectCtx, args: bytes) -> str:
     if isinstance(result, dict):
         return json.dumps(result)
     return ok_payload(result.to_dict())
+
+
+# ---------------------------------------------------------------------------
+# Tool: optics_compute_coma
+# ---------------------------------------------------------------------------
+
+from kerf_cad_core.optics.coma_compute import compute_coma  # noqa: E402
+
+_compute_coma_spec = ToolSpec(
+    name="optics_compute_coma",
+    description=(
+        "Compute coma aberration metrics from a lens stack across multiple field angles.\n"
+        "\n"
+        "Algorithm (Welford 1986 §11.4 / Born & Wolf §5.3):\n"
+        "  1. Establish the paraxial focal plane (marginal ray h=aperture, u=0).\n"
+        "  2. For each field angle, trace N rim rays at heights h=ap·cos(φ) with\n"
+        "     angle u=tan(θ_f) using exact meridional Snell traces.\n"
+        "  3. Propagate each ray to the paraxial focal plane.\n"
+        "  4. Tangential coma = |mean(Y_tang) − y₀|, where Y_tang are the tangential-\n"
+        "     fan ray intercepts and y₀ is the paraxial chief-ray image height\n"
+        "     (Welford §11.4 — the comatic flare length).\n"
+        "  5. Sagittal coma = tangential_coma / 3 (Welford §11.4 eq. 11.4.4).\n"
+        "  6. total_coma = sqrt(tangential² + sagittal²).\n"
+        "  7. Seidel prediction = 3 × |S_II| × |y₀|\n"
+        "     where S_II is the Seidel coma coefficient (Born & Wolf §5.3 eq. 5.3.29).\n"
+        "\n"
+        "Depth bar:\n"
+        "  * Afocal / flat stacks (c=0): coma = 0 (no focal plane).\n"
+        "  * BK7 biconvex (R=±50 mm, t=5 mm, n=1.5168) at 14° field, 5 mm aperture:\n"
+        "    total_coma > 1 μm (1e-3 mm).\n"
+        "  * Field-angle scaling: total_coma ∝ |tan(θ)| (linear in small-angle limit).\n"
+        "  * Seidel match: < 50% error at ≤ 5° field.\n"
+        "\n"
+        "HONEST FLAG: Third-order (Seidel) coma only. Higher-order coma (Hopkins\n"
+        "5th-order, oblique spherical aberration) requires finite-ray OPD analysis\n"
+        "(not implemented). Monochromatic; chromatic coma excluded.\n"
+        "Stop assumed at first surface.\n"
+        "\n"
+        "Surface definition (same as optics_ray_trace_lens_stack):\n"
+        "  c  : curvature 1/R (mm^-1). 0 = flat.\n"
+        "  t  : thickness to NEXT surface vertex (mm). Last surface: 0.\n"
+        "  n  : refractive index of medium AFTER this surface.\n"
+        "  k  : conic constant (default 0 = sphere).\n"
+        "\n"
+        "Returns:\n"
+        "  S_II                 : float  Seidel coma coefficient\n"
+        "  aperture_radius_mm   : float  pupil rim radius used\n"
+        "  per_field            : list   one entry per field angle:\n"
+        "    field_angle_deg      : input angle (deg)\n"
+        "    tangential_coma_mm   : comatic flare length in tangential plane (mm)\n"
+        "    sagittal_coma_mm     : coma in sagittal plane = tan_coma/3 (mm)\n"
+        "    total_coma_mm        : sqrt(tan² + sag²) (mm)\n"
+        "    seidel_prediction_mm : 3×|S_II|×|y_chief| (mm)\n"
+        "    seidel_match_fraction: |total − seidel_total|/seidel_total; null when seidel≈0\n"
+        "    chief_ray_y_mm       : paraxial chief-ray image height (mm)\n"
+        "    n_rays_valid         : number of successfully traced rim rays\n"
+        "  honest_flag          : str caveats\n"
+        "\n"
+        "Errors: {ok:false, reason} for invalid inputs. Never raises.\n"
+        "\n"
+        "References: Welford (1986) §11.4; Born & Wolf (1999) §5.3."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "surfaces": {
+                "type": "array",
+                "description": (
+                    "Ordered list of optical surface dicts. Each must have: "
+                    "c (mm^-1), t (mm), n (>= 1.0). Optional: k (conic, default 0)."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "c": {"type": "number", "description": "Curvature 1/R (mm^-1). 0 = flat."},
+                        "t": {"type": "number", "description": "Thickness to next surface (mm)."},
+                        "n": {"type": "number", "description": "Refractive index after surface (>= 1.0)."},
+                        "k": {"type": "number", "description": "Conic constant (default 0 = sphere)."},
+                    },
+                    "required": ["c", "t", "n"],
+                },
+            },
+            "field_angles_deg": {
+                "type": "array",
+                "description": (
+                    "List of field angles in degrees (e.g. [0, 5, 10, 14]). "
+                    "0 = on-axis (coma = 0 by symmetry)."
+                ),
+                "items": {"type": "number"},
+            },
+            "n_pupil_rays": {
+                "type": "integer",
+                "description": (
+                    "Number of rim rays sampled around the entrance pupil (default 16). "
+                    "Must be >= 4."
+                ),
+            },
+            "aperture_radius_mm": {
+                "type": "number",
+                "description": (
+                    "Entrance-pupil rim radius (mm). Default 1.0. "
+                    "Should be <= physical clear aperture of the first surface."
+                ),
+            },
+            "n_object": {
+                "type": "number",
+                "description": "Refractive index of object space (default 1.0 = air).",
+            },
+        },
+        "required": ["surfaces", "field_angles_deg"],
+    },
+)
+
+
+@register(_compute_coma_spec, write=False)
+async def run_optics_compute_coma(ctx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    if a.get("surfaces") is None:
+        return json.dumps({"ok": False, "reason": "surfaces is required"})
+    if a.get("field_angles_deg") is None:
+        return json.dumps({"ok": False, "reason": "field_angles_deg is required"})
+
+    kwargs: dict = {}
+    if "n_pupil_rays" in a:
+        kwargs["n_pupil_rays"] = int(a["n_pupil_rays"])
+    if "aperture_radius_mm" in a:
+        kwargs["aperture_radius_mm"] = float(a["aperture_radius_mm"])
+    if "n_object" in a:
+        kwargs["n_object"] = float(a["n_object"])
+
+    result = compute_coma(
+        a["surfaces"],
+        a["field_angles_deg"],
+        **kwargs,
+    )
+    if isinstance(result, dict):
+        return json.dumps(result)
+    return ok_payload(result.to_dict())

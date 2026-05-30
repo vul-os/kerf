@@ -376,6 +376,9 @@ _TOOL_MODULES = [
     # BREP-CHAMFER-RECOMMEND-SIZE: per-edge chamfer offset+angle recommendation
     # (Drozda-Wick §3-7; DIN 74:1974 Form A/B; ISO 13715:2017) — brep_recommend_chamfer_size
     "kerf_cad_core.geom.chamfer_recommend_size",
+    # NURBS-NORMAL-CURVATURE-AT-POINT: Meusnier's theorem; κ_n, κ_1, κ_2, K, H,
+    # principal directions (do Carmo §3.2 / Mortenson §10.4)
+    "kerf_cad_core.geom.normal_curvature",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

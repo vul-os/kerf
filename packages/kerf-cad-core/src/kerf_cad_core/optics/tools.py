@@ -1050,6 +1050,7 @@ async def run_mtf_across_field(ctx: ProjectCtx, args: bytes) -> str:
 from kerf_cad_core.optics.seidel_aberrations import seidel_coefficients  # noqa: E402
 from kerf_cad_core.optics.chief_ray_vignetting import compute_vignetting  # noqa: E402
 from kerf_cad_core.optics.pupil_diagram import compute_pupil_diagram  # noqa: E402
+from kerf_cad_core.optics.defocus_curve import compute_defocus_curve  # noqa: E402
 
 # Tool: optics_seidel_aberrations
 # ---------------------------------------------------------------------------
@@ -1434,6 +1435,137 @@ async def run_pupil_diagram(ctx, args: bytes) -> str:
         a["field_angles_deg"],
         **kwargs,
     )
+    if isinstance(result, dict):
+        return json.dumps(result)
+    return ok_payload(result.to_dict())
+
+
+# ---------------------------------------------------------------------------
+# Tool: optics_defocus_curve
+# ---------------------------------------------------------------------------
+
+_defocus_curve_spec = ToolSpec(
+    name="optics_defocus_curve",
+    description=(
+        "Compute the through-focus RMS spot-size curve (defocus curve) for a lens stack.\n"
+        "\n"
+        "Algorithm (Welford 1986 §11.5 / Hecht §6.5):\n"
+        "  1. Determine paraxial image distance (BFL) via marginal paraxial trace.\n"
+        "  2. For each of `samples` defocus steps Dz in [-defocus_range_mm, +defocus_range_mm],\n"
+        "     trace a uniform aperture bundle at field_angle_deg through the stack.\n"
+        "  3. Propagate each ray to the shifted evaluation plane (BFL + Dz).\n"
+        "  4. Compute meridional RMS = sqrt(mean((y - mean_y)^2)) over surviving rays.\n"
+        "  5. best_focus_shift_mm = Dz at minimum RMS.\n"
+        "\n"
+        "Depth bar:\n"
+        "  * Ideal paraxial singlet at 0 deg: parabolic RMS curve; minimum at Dz=0.\n"
+        "  * Full-aperture singlet: spherical aberration shifts RMS minimum to Dz < 0\n"
+        "    (marginal best focus is closer to the lens than paraxial best focus).\n"
+        "  * Off-axis field: field curvature / astigmatism shifts the minimum further.\n"
+        "\n"
+        "HONEST FLAGS:\n"
+        "  * MONOCHROMATIC ONLY. Polychromatic defocus curves require per-wavelength\n"
+        "    traces weighted by spectral power density (not implemented).\n"
+        "  * MERIDIONAL (tangential) RMS only. Astigmatic sagittal/tangential focus\n"
+        "    splitting requires full 3-D skew-ray trace (not implemented).\n"
+        "  * Dz=0 is the paraxial BFL. For aberrated systems the RMS minimum may lie\n"
+        "    at Dz != 0; best_focus_shift_mm quantifies this offset.\n"
+        "\n"
+        "Surface definition (same as optics_ray_trace_lens_stack):\n"
+        "  c  : curvature 1/R (mm^-1). 0 = flat.\n"
+        "  t  : thickness to NEXT surface vertex (mm). Last surface: 0.\n"
+        "  n  : refractive index of medium AFTER this surface.\n"
+        "  k  : conic constant (default 0 = sphere).\n"
+        "\n"
+        "Returns:\n"
+        "  defocus_axis_mm      : list[float] -- Dz values (mm), length = samples\n"
+        "  rms_per_defocus_mm   : list[float] -- RMS spot radius at each Dz (mm)\n"
+        "  best_focus_shift_mm  : float -- Dz at RMS minimum\n"
+        "  min_rms_mm           : float -- RMS value at best focus\n"
+        "  bfl_mm               : float -- nominal paraxial BFL (mm)\n"
+        "  n_rays_valid         : list[int] -- surviving ray counts per step\n"
+        "  honest_flag          : str -- caveats\n"
+        "\n"
+        "Errors: {ok:false, reason} for invalid inputs. Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "surfaces": {
+                "type": "array",
+                "description": (
+                    "Ordered list of optical surface dicts. Each must have: "
+                    "c (mm^-1), t (mm), n (>= 1.0). Optional: k (conic, default 0)."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "c": {"type": "number", "description": "Curvature 1/R (mm^-1). 0 = flat."},
+                        "t": {"type": "number", "description": "Thickness to next surface (mm)."},
+                        "n": {"type": "number", "description": "Refractive index after surface (>= 1.0)."},
+                        "k": {"type": "number", "description": "Conic constant (default 0 = sphere)."},
+                    },
+                    "required": ["c", "t", "n"],
+                },
+            },
+            "field_angle_deg": {
+                "type": "number",
+                "description": "Field angle from optical axis (degrees, default 0.0 = on-axis).",
+            },
+            "defocus_range_mm": {
+                "type": "number",
+                "description": (
+                    "Half-width of the defocus scan (mm, default 0.5). "
+                    "Scans Dz in [-defocus_range_mm, +defocus_range_mm]."
+                ),
+            },
+            "samples": {
+                "type": "integer",
+                "description": "Number of defocus steps (default 21, minimum 3).",
+            },
+            "aperture_radius_mm": {
+                "type": "number",
+                "description": "Entrance-pupil half-diameter (mm, default 10 mm).",
+            },
+            "n_rays": {
+                "type": "integer",
+                "description": "Number of rays across the entrance-pupil diameter (default 51).",
+            },
+            "n_object": {
+                "type": "number",
+                "description": "Refractive index of object space (default 1.0 = air).",
+            },
+        },
+        "required": ["surfaces"],
+    },
+)
+
+
+@register(_defocus_curve_spec, write=False)
+async def run_defocus_curve(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    if a.get("surfaces") is None:
+        return json.dumps({"ok": False, "reason": "surfaces is required"})
+
+    kwargs: dict = {}
+    if "field_angle_deg" in a:
+        kwargs["field_angle_deg"] = float(a["field_angle_deg"])
+    if "defocus_range_mm" in a:
+        kwargs["defocus_range_mm"] = float(a["defocus_range_mm"])
+    if "samples" in a:
+        kwargs["samples"] = int(a["samples"])
+    if "aperture_radius_mm" in a:
+        kwargs["aperture_radius_mm"] = float(a["aperture_radius_mm"])
+    if "n_rays" in a:
+        kwargs["n_rays"] = int(a["n_rays"])
+    if "n_object" in a:
+        kwargs["n_object"] = float(a["n_object"])
+
+    result = compute_defocus_curve(a["surfaces"], **kwargs)
     if isinstance(result, dict):
         return json.dumps(result)
     return ok_payload(result.to_dict())

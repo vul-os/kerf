@@ -13456,6 +13456,20 @@
         },
         {
           "domain": "D12",
+          "feature": "Through-focus / defocus curve (RMS spot vs. focus shift)",
+          "competitor": {
+            "status": "yes",
+            "note": "Through-focus analysis: RMS spot size, MTF, and Strehl ratio vs. defocus; polychromatic and per-wavelength; astigmatic focus splitting",
+            "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Through-focus defocus curve (OPTICS-DEFOCUS-CURVE): per-Dz meridional RMS spot-size via exact Snell + Newton-Raphson conic intersect (Welford 1986 §11.5 / Hecht §6.5); best-focus shift quantified; parabolic growth verified for paraxial singlet (min at Dz=0); spherical-aberration-shifted minimum verified for full-aperture BK7 singlet (Dz approx -0.5 mm); field-angle dependency; LLM tool optics_defocus_curve; 33 hermetic tests. Honest: monochromatic only; meridional (tangential) RMS only; astigmatic sagittal/tangential splitting not implemented.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/defocus_curve.py"
+          }
+        },
+        {
+          "domain": "D12",
           "feature": "Non-sequential ray tracing (stray light)",
           "competitor": {
             "status": "yes",
@@ -15999,6 +16013,20 @@
             "status": "yes",
             "note": "zebra_analysis, isophote, curvature combs, Gauss/mean, draft-angle ops",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/surface_analysis.py"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "NURBS surface normal curvature + principal curvatures",
+          "competitor": {
+            "status": "partial",
+            "note": "CurvatureAnalysis command shows Gaussian/mean; no per-direction normal curvature or principal-direction export",
+            "source": "http://docs.mcneel.com/rhino/8/help/en-us/commands/curvatureanalysis.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "normal_curvature_at(srf, u, v, dir_uv) \u2192 NormalCurvatureReport(\u03ba_n, \u03ba_1, \u03ba_2, K, H, principal_dirs, is_umbilic); Meusnier\u2019s theorem II/I; principal curvatures from shape-operator eigenvalues (Mortenson \u00a710.4); Euler\u2019s formula verified; umbilic honest-flag; LLM tool nurbs_normal_curvature_at_point; 32 hermetic tests",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/normal_curvature.py"
           }
         },
         {

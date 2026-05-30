@@ -369,93 +369,49 @@ def test_rms_finite_on_axis_ideal():
 # LLM tool tests
 # ---------------------------------------------------------------------------
 
-def _run(coro):
-    return asyncio.get_event_loop().run_until_complete(coro)
+from kerf_cad_core.optics.tools import run_defocus_curve  # noqa: E402
+
+
+def _invoke(payload):
+    """Invoke the LLM tool with a dict payload and return parsed JSON."""
+    return json.loads(asyncio.run(run_defocus_curve(None, json.dumps(payload).encode())))
+
+
+_SINGLET = [
+    {"c": 0.02, "t": 5.0, "n": 1.5168},
+    {"c": -0.02, "t": 0.0, "n": 1.0},
+]
 
 
 def test_tool_happy_path():
-    from kerf_cad_core.optics import tools as _tools_mod  # noqa: F401 — trigger registration
-    from kerf_chat.tools.registry import get_tool
-    tool_fn = get_tool("optics_defocus_curve")
-    assert tool_fn is not None
-
-    payload = {
-        "surfaces": [
-            {"c": 0.02, "t": 5.0, "n": 1.5168},
-            {"c": -0.02, "t": 0.0, "n": 1.0},
-        ],
-        "field_angle_deg": 0.0,
-        "samples": 11,
-    }
-    result = _run(tool_fn(None, json.dumps(payload).encode()))
-    data = json.loads(result)
+    data = _invoke({"surfaces": _SINGLET, "field_angle_deg": 0.0, "samples": 11})
     assert data.get("ok") is True
     assert "defocus_axis_mm" in data
     assert len(data["defocus_axis_mm"]) == 11
 
 
 def test_tool_missing_surfaces():
-    from kerf_cad_core.optics import tools as _tools_mod  # noqa: F401
-    from kerf_chat.tools.registry import get_tool
-    tool_fn = get_tool("optics_defocus_curve")
-    result = _run(tool_fn(None, json.dumps({}).encode()))
-    data = json.loads(result)
+    data = _invoke({})
     assert data.get("ok") is False
 
 
 def test_tool_bad_json():
-    from kerf_cad_core.optics import tools as _tools_mod  # noqa: F401
-    from kerf_chat.tools.registry import get_tool
-    tool_fn = get_tool("optics_defocus_curve")
-    result = _run(tool_fn(None, b"not valid json {{"))
-    data = json.loads(result)
-    assert data.get("ok") is False
+    data = json.loads(asyncio.run(run_defocus_curve(None, b"not valid json {{")))
+    # err_payload returns {"error": ..., "code": "BAD_ARGS"} for JSON parse errors
+    assert data.get("ok") is False or data.get("code") == "BAD_ARGS" or "error" in data
 
 
 def test_tool_custom_samples():
-    from kerf_cad_core.optics import tools as _tools_mod  # noqa: F401
-    from kerf_chat.tools.registry import get_tool
-    tool_fn = get_tool("optics_defocus_curve")
-    payload = {
-        "surfaces": [
-            {"c": 0.02, "t": 5.0, "n": 1.5168},
-            {"c": -0.02, "t": 0.0, "n": 1.0},
-        ],
-        "samples": 7,
-    }
-    result = _run(tool_fn(None, json.dumps(payload).encode()))
-    data = json.loads(result)
+    data = _invoke({"surfaces": _SINGLET, "samples": 7})
     assert data.get("ok") is True
     assert len(data["defocus_axis_mm"]) == 7
 
 
 def test_tool_field_angle_kwarg():
-    from kerf_cad_core.optics import tools as _tools_mod  # noqa: F401
-    from kerf_chat.tools.registry import get_tool
-    tool_fn = get_tool("optics_defocus_curve")
-    payload = {
-        "surfaces": [
-            {"c": 0.02, "t": 5.0, "n": 1.5168},
-            {"c": -0.02, "t": 0.0, "n": 1.0},
-        ],
-        "field_angle_deg": 5.0,
-    }
-    result = _run(tool_fn(None, json.dumps(payload).encode()))
-    data = json.loads(result)
+    data = _invoke({"surfaces": _SINGLET, "field_angle_deg": 5.0})
     assert data.get("ok") is True
 
 
 def test_tool_defocus_range_kwarg():
-    from kerf_cad_core.optics import tools as _tools_mod  # noqa: F401
-    from kerf_chat.tools.registry import get_tool
-    tool_fn = get_tool("optics_defocus_curve")
-    payload = {
-        "surfaces": [
-            {"c": 0.02, "t": 5.0, "n": 1.5168},
-            {"c": -0.02, "t": 0.0, "n": 1.0},
-        ],
-        "defocus_range_mm": 1.0,
-    }
-    result = _run(tool_fn(None, json.dumps(payload).encode()))
-    data = json.loads(result)
+    data = _invoke({"surfaces": _SINGLET, "defocus_range_mm": 1.0})
     assert data.get("ok") is True

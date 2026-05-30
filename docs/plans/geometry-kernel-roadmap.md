@@ -1267,6 +1267,7 @@ layer (history/UI/CAM/FEM packages), not the geometry kernel.
 | Tangent-chain edge select | 🟡 GK-131 |
 | G3 chain blend | ✅ GK-132 (wired GK-P05) |
 | Mass properties | ✅ GK-23 |
+| Multi-density assembly + void mass props (Mortenson §11) | ✅ GK-P mass_props_multi |
 | Wall thickness | ✅ GK-76 |
 | Draft analysis | ✅ GK-92 |
 | Undercut detection | 🟡 GK-121 |

@@ -121,6 +121,7 @@ The sector work only matters if you **own your work, are not locked in, and can 
 **Implicit geometry** ✅ — F-rep CSG (union/intersect/subtract/blend/shell) + domain warps (twist/taper/wave) in `kerf_cad_core.frep.csg`.
 
 **Materials + LCA** ✅ — Ashby database to ~200 materials (14 families) with Pareto-frontier multi-objective selection; full ISO 14040/44 LCA (4 phases, 6 impact categories, Monte-Carlo uncertainty). **Embodied-carbon DB (ICE v3 lookups)** ✅ — `kerf_lca.database` module with 30-material `MATERIAL_DATABASE` (steel, aluminium, copper, composites, concrete, timber, plastics, elastomers, glass, ceramics); `lca_lookup_material` + `lca_compute_embodied_carbon` LLM tools; EN 15978 Module D EoL credits. Data: ICE v3.0, Hammond & Jones, University of Bath, 2019 — NOT Ecoinvent (license-restricted).
+**Materials + LCA** ✅ — Ashby database to ~200 materials (14 families) with Pareto-frontier multi-objective selection; full ISO 14040/44 LCA (4 phases, 6 impact categories, Monte-Carlo uncertainty); EoL circularity (EN 15978 Module D + Ellen MacArthur MCI) ✅.
 
 **Compare matrices** ✅ — feature-matrix YAML for 14 reference CADs: Fusion 360, SolidWorks, Onshape, FreeCAD, Rhino, KiCad, CATIA, Creo, NX, Inventor, AutoCAD, Altium, Revit, Blender — 741 grounded rows total.
 

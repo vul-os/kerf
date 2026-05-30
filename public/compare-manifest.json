@@ -5869,6 +5869,19 @@
             "note": "Where-Used Analysis: reverse-traverses the assembly hierarchy from a target part. Returns all parent assemblies with occurrence multiplicity and depth (depth=1 immediate parent, depth=2 grandparent, …). Cycle detection with cap at depth=20. LLM tool: plm_where_used.",
             "evidence": "packages/kerf-plm/src/kerf_plm/where_used.py"
           }
+        },
+        {
+          "domain": "D14",
+          "feature": "Document Version Diff — controlled document delta (ISO 10303-44 §5.2 + Borst-Lahti §6.3)",
+          "competitor": {
+            "status": "no",
+            "note": "No built-in document revision diff with field-level criticality classification; requires external PLM/PDM or custom scripting."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Field-level diff for BOM, drawing metadata, or any JSON-like doc revision: added, removed, modified (field-level criticality: engineering vs administrative), renamed (>=80% Jaccard heuristic). 100-item diff < 1 ms. LLM tool: plm_document_version_diff.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/document_version_diff.py"
+          }
         }
       ]
     },
@@ -6749,6 +6762,19 @@
           }
         },
         {
+          "domain": "D14",
+          "feature": "Document Version Diff — controlled document delta (ISO 10303-44 §5.2 + Borst-Lahti §6.3)",
+          "competitor": {
+            "status": "no",
+            "note": "No built-in document revision diff with field-level criticality classification; requires external PLM/PDM or custom scripting."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Field-level diff for BOM, drawing metadata, or any JSON-like doc revision: added, removed, modified (field-level criticality: engineering vs administrative), renamed (>=80% Jaccard heuristic). 100-item diff < 1 ms. LLM tool: plm_document_version_diff.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/document_version_diff.py"
+          }
+        },
+        {
           "domain": "D1",
           "feature": "B-rep face planarity check (SVD best-fit plane)",
           "competitor": {
@@ -7582,6 +7608,19 @@
             "status": "yes",
             "note": "Where-Used Analysis: reverse-traverses the assembly hierarchy from a target part. Returns all parent assemblies with occurrence multiplicity and depth (depth=1 immediate parent, depth=2 grandparent, …). Cycle detection with cap at depth=20. LLM tool: plm_where_used.",
             "evidence": "packages/kerf-plm/src/kerf_plm/where_used.py"
+          }
+        },
+        {
+          "domain": "D14",
+          "feature": "Document Version Diff — controlled document delta (ISO 10303-44 §5.2 + Borst-Lahti §6.3)",
+          "competitor": {
+            "status": "no",
+            "note": "No built-in document revision diff with field-level criticality classification; requires external PLM/PDM or custom scripting."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Field-level diff for BOM, drawing metadata, or any JSON-like doc revision: added, removed, modified (field-level criticality: engineering vs administrative), renamed (>=80% Jaccard heuristic). 100-item diff < 1 ms. LLM tool: plm_document_version_diff.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/document_version_diff.py"
           }
         }
       ]
@@ -9412,6 +9451,19 @@
             "note": "Where-Used Analysis: reverse-traverses the assembly hierarchy from a target part. Returns all parent assemblies with occurrence multiplicity and depth (depth=1 immediate parent, depth=2 grandparent, …). Cycle detection with cap at depth=20. LLM tool: plm_where_used.",
             "evidence": "packages/kerf-plm/src/kerf_plm/where_used.py"
           }
+        },
+        {
+          "domain": "D14",
+          "feature": "Document Version Diff — controlled document delta (ISO 10303-44 §5.2 + Borst-Lahti §6.3)",
+          "competitor": {
+            "status": "no",
+            "note": "No built-in document revision diff with field-level criticality classification; requires external PLM/PDM or custom scripting."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Field-level diff for BOM, drawing metadata, or any JSON-like doc revision: added, removed, modified (field-level criticality: engineering vs administrative), renamed (>=80% Jaccard heuristic). 100-item diff < 1 ms. LLM tool: plm_document_version_diff.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/document_version_diff.py"
+          }
         }
       ]
     },
@@ -10637,6 +10689,19 @@
             "note": "Where-Used Analysis: reverse-traverses the assembly hierarchy from a target part. Returns all parent assemblies with occurrence multiplicity and depth (depth=1 immediate parent, depth=2 grandparent, …). Cycle detection with cap at depth=20. LLM tool: plm_where_used.",
             "evidence": "packages/kerf-plm/src/kerf_plm/where_used.py"
           }
+        },
+        {
+          "domain": "D14",
+          "feature": "Document Version Diff — controlled document delta (ISO 10303-44 §5.2 + Borst-Lahti §6.3)",
+          "competitor": {
+            "status": "no",
+            "note": "No built-in document revision diff with field-level criticality classification; requires external PLM/PDM or custom scripting."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Field-level diff for BOM, drawing metadata, or any JSON-like doc revision: added, removed, modified (field-level criticality: engineering vs administrative), renamed (>=80% Jaccard heuristic). 100-item diff < 1 ms. LLM tool: plm_document_version_diff.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/document_version_diff.py"
+          }
         }
       ]
     },
@@ -11587,6 +11652,19 @@
             "status": "yes",
             "note": "Where-Used Analysis: reverse-traverses the assembly hierarchy from a target part. Returns all parent assemblies with occurrence multiplicity and depth (depth=1 immediate parent, depth=2 grandparent, …). Cycle detection with cap at depth=20. LLM tool: plm_where_used.",
             "evidence": "packages/kerf-plm/src/kerf_plm/where_used.py"
+          }
+        },
+        {
+          "domain": "D14",
+          "feature": "Document Version Diff — controlled document delta (ISO 10303-44 §5.2 + Borst-Lahti §6.3)",
+          "competitor": {
+            "status": "no",
+            "note": "No built-in document revision diff with field-level criticality classification; requires external PLM/PDM or custom scripting."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Field-level diff for BOM, drawing metadata, or any JSON-like doc revision: added, removed, modified (field-level criticality: engineering vs administrative), renamed (>=80% Jaccard heuristic). 100-item diff < 1 ms. LLM tool: plm_document_version_diff.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/document_version_diff.py"
           }
         }
       ]

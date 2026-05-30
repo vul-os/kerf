@@ -930,3 +930,114 @@ async def run_plm_expand_effectivity_bom(ctx, args: bytes) -> str:
         ],
         "honest_flag": HONEST_FLAG,
     })
+
+
+# ===========================================================================
+# PLM Document Version Diff (ISO 10303-44 §5.2 + Borst-Lahti §6.3)
+# ===========================================================================
+
+plm_document_version_diff_spec = ToolSpec(
+    name="plm_document_version_diff",
+    description=(
+        "Diff two revisions of a controlled PLM document (BOM, drawing metadata, "
+        "spec, or any JSON-like list of dicts with stable keys).\n\n"
+        "Per ISO 10303-44 §5.2 (document version control) and Borst-Lahti §6.3 "
+        "(change record and document delta), returns a structured diff report "
+        "identifying:\n"
+        "  1. Added items\n"
+        "  2. Removed items\n"
+        "  3. Modified items with field-level change records\n"
+        "  4. Renamed items (heuristic: >=80% Jaccard field-value similarity;\n"
+        "     see honest_flag in response for limitations)\n"
+        "  5. Per-change criticality (engineering vs administrative) per\n"
+        "     Borst-Lahti §6.3 Table 3 field classification\n\n"
+        "UNCHANGED items are not included in the entries list; the *unchanged* "
+        "count is reported in the summary only.\n\n"
+        "Criticality rules:\n"
+        "  ENGINEERING  — qty, material, tolerance, drawing_rev, revision, spec, "
+        "type, part_number, mass, and related design-intent fields.\n"
+        "  ADMINISTRATIVE — description-only edits, notes, supplier, cost, "
+        "dates, approved_by, and metadata fields.\n"
+        "  Additions and removals are always ENGINEERING.\n\n"
+        "Honest flag: rename detection uses a heuristic fingerprint (>=80% field "
+        "similarity). May misclassify coincidentally similar add/remove pairs as "
+        "renames."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "doc_a": {
+                "type": "array",
+                "description": (
+                    "Revision A — list of item objects with stable key fields. "
+                    "Example: [{\"id\": \"P-001\", \"qty\": 2, \"material\": \"Al\"}]"
+                ),
+                "items": {"type": "object"},
+            },
+            "doc_b": {
+                "type": "array",
+                "description": "Revision B — same schema as doc_a.",
+                "items": {"type": "object"},
+            },
+            "key_field": {
+                "type": "string",
+                "description": (
+                    "Field name used as the stable item identifier. Default: 'id'. "
+                    "Common alternatives: 'part_number', 'pn', 'drawing_number'."
+                ),
+                "default": "id",
+            },
+            "rename_threshold": {
+                "type": "number",
+                "description": (
+                    "Jaccard similarity threshold for rename detection (0.0-1.0). "
+                    "Default: 0.80. Lower = more renames detected (higher false-positive "
+                    "risk); 1.0 disables rename detection."
+                ),
+                "default": 0.80,
+                "minimum": 0.0,
+                "maximum": 1.0,
+            },
+        },
+        "required": ["doc_a", "doc_b"],
+    },
+)
+
+
+@register(plm_document_version_diff_spec)
+async def run_plm_document_version_diff(ctx, args: bytes) -> str:
+    """Tool handler for plm_document_version_diff (ISO 10303-44 §5.2 + Borst-Lahti §6.3)."""
+    import json as _json
+    try:
+        a = _json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+    doc_a = a.get("doc_a")
+    doc_b = a.get("doc_b")
+    key_field = a.get("key_field", "id") or "id"
+    rename_threshold = float(a.get("rename_threshold", 0.80))
+
+    if not isinstance(doc_a, list):
+        return err_payload("'doc_a' must be an array", "BAD_ARGS")
+    if not isinstance(doc_b, list):
+        return err_payload("'doc_b' must be an array", "BAD_ARGS")
+    if not isinstance(key_field, str) or not key_field:
+        return err_payload("'key_field' must be a non-empty string", "BAD_ARGS")
+    if not (0.0 <= rename_threshold <= 1.0):
+        return err_payload("'rename_threshold' must be between 0.0 and 1.0", "BAD_ARGS")
+
+    try:
+        from kerf_plm.document_version_diff import diff_documents
+        report = diff_documents(
+            doc_a,
+            doc_b,
+            key_field=key_field,
+            rename_threshold=rename_threshold,
+        )
+    except (TypeError, ValueError) as exc:
+        return err_payload(f"diff error: {exc}", "BAD_ARGS")
+    except Exception as exc:
+        return err_payload(f"diff error: {exc}", "DIFF_ERROR")
+
+    return ok_payload(report.to_dict())

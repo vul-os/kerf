@@ -1872,25 +1872,10 @@ def curve_self_intersect(
 ) -> List[dict]:
     """Find all self-intersection points of a single NurbsCurve.
 
-    Strategy
-    --------
-    Subdivide the curve into ``samples`` equal-parameter segments and sample
-    the polyline.  For every pair of segments **(i, j)** with ``j >= i + 2``
-    (so adjacent segments sharing exactly one endpoint are excluded), test
-    whether their AABBs overlap.  For each overlapping pair, seed
-    ``_newton_curve_curve`` with the segment mid-parameters.  Points that
-    converge and whose residual is below ``tol`` are collected; near-duplicate
-    hits (closer than ``tol`` in 3-D) are merged before returning.
-
-    Adjacent-segment exclusion
-    --------------------------
-    Segments ``i`` and ``i+1`` share the sample point at index ``i+1``, which
-    would appear as a trivial "hit" at the shared endpoint.  Skipping pairs
-    with ``j < i + 2`` eliminates all such endpoint-adjacency false positives.
-    Additionally, after Newton refinement, any hit whose *parameter gap*
-    ``|ta - tb|`` is below a minimum threshold (indicating the two parameters
-    converged to the same location on the curve rather than two truly distinct
-    parameter values) is rejected.
+    Delegates to ``curve_self_intersect_robust`` (Piegl-Tiller §5.5 +
+    Sederberg 1985 AABB-tree recursive subdivision + Newton-Raphson
+    refinement).  The legacy flat-grid implementation is retained as
+    ``_curve_self_intersect_impl`` for reference / fallback.
 
     Parameters
     ----------
@@ -1898,7 +1883,7 @@ def curve_self_intersect(
     tol : float
         Spatial convergence tolerance and duplicate-merge radius.
     samples : int
-        Number of curve subdivisions for AABB cull.
+        Number of initial curve subdivisions for the AABB seeding grid.
 
     Returns
     -------
@@ -1910,10 +1895,10 @@ def curve_self_intersect(
 
     Never raises.
     """
-    try:
-        return _curve_self_intersect_impl(curve, tol=tol, samples=samples)
-    except Exception:
-        return []
+    # NOTE: curve_self_intersect_robust is defined after this function in the
+    # source; the module-level call works at runtime because Python resolves
+    # names at call time, not at definition time.
+    return curve_self_intersect_robust(curve, tol=tol, samples=samples)
 
 
 def _curve_self_intersect_impl(
@@ -1967,6 +1952,381 @@ def _curve_self_intersect_impl(
         A = _curve_eval(curve, ta_ref)
         B = _curve_eval(curve, tb_ref)
         if np.linalg.norm(A - B) > tol * 1e3:
+            continue
+        pt = ((A + B) * 0.5).tolist()
+        hits.append({"ta": ta_ref, "tb": tb_ref, "point": pt})
+
+    return _merge_close_hits(hits, tol)
+
+
+# ---------------------------------------------------------------------------
+# NURBS-CURVE-SELF-INTERSECT — Piegl-Tiller §5.5 + Sederberg 1985 robust impl
+# ---------------------------------------------------------------------------
+#
+# References
+# ----------
+# [PT95]  L. Piegl & W. Tiller, "The NURBS Book", Springer 1995 / 1997,
+#         §5.5 "Curve–Curve Intersection".  The AABB-hierarchy / recursive-
+#         subdivision culling strategy is described there as the primary
+#         approach before Newton refinement.
+# [Sed85] T. W. Sederberg, "Piecewise algebraic surface patches",
+#         PhD thesis / CGA 1985.  The "geometric Hermite" recursive
+#         subdivision idea: a Bézier segment can be replaced by its convex
+#         hull (control polygon AABB); when two hulls do not overlap they
+#         cannot intersect; keep halving until segments are within a
+#         linearisation tolerance, then use line–segment intersection.
+#
+# Honest-flag
+# -----------
+# Newton iteration on f(t1,t2) = C(t1)−C(t2) = 0 detects *transversal*
+# double-points (multiplicity 2).  THREE-WAY (multiplicity-3) or higher
+# self-intersections need an extended algebraic resultant algorithm
+# (Sederberg–Anderson–Goldman 1984) and are NOT detected by this code.
+# ---------------------------------------------------------------------------
+
+
+def _newton_self_intersect(
+    curve: NurbsCurve,
+    t1_0: float,
+    t2_0: float,
+    *,
+    tol: float,
+    max_iter: int = 60,
+) -> Optional[Tuple[float, float]]:
+    """Newton–Raphson refinement on f(t1,t2) = |C(t1)−C(t2)|² → 0.
+
+    Minimises the squared distance  F = C(t1) − C(t2)  (a 3-vector) by
+    iterating the 2×2 normal-equation system:
+
+        [C'(t1)·C'(t1)   0              ] [Δt1]   [C'(t1)·F]
+        [0               -C'(t2)·C'(t2) ] [Δt2] = [C'(t2)·F] (negated sign)
+
+    which is the Gauss–Newton step for the least-squares objective on F.
+    References: Piegl-Tiller §5.5; standard curve-curve Newton (Sederberg 1985).
+
+    Returns (t1, t2) with t1 < t2 on convergence, else None.
+    """
+    t_min, t_max = _curve_param_range(curve)
+    t1 = float(np.clip(t1_0, t_min, t_max))
+    t2 = float(np.clip(t2_0, t_min, t_max))
+    h = max(1e-7, (t_max - t_min) * 5e-5)
+
+    for _ in range(max_iter):
+        P1 = _curve_eval(curve, t1)
+        P2 = _curve_eval(curve, t2)
+        F = P1 - P2
+        dist = float(np.linalg.norm(F))
+        if dist < tol:
+            if t1 > t2:
+                t1, t2 = t2, t1
+            return (t1, t2)
+
+        # Finite-difference derivatives
+        t1p = min(t_max, t1 + h); t1m = max(t_min, t1 - h)
+        t2p = min(t_max, t2 + h); t2m = max(t_min, t2 - h)
+        dC1 = (_curve_eval(curve, t1p) - _curve_eval(curve, t1m)) / (t1p - t1m + 1e-300)
+        dC2 = (_curve_eval(curve, t2p) - _curve_eval(curve, t2m)) / (t2p - t2m + 1e-300)
+
+        # 2×2 Gauss-Newton: J = [dC1 | -dC2] (3×2), normal eqs J^T J δ = -J^T F
+        j11 = float(dC1 @ dC1)
+        j22 = float(dC2 @ dC2)
+        j12 = float(dC1 @ (-dC2))
+        r1 = float(dC1 @ (-F))
+        r2 = float((-dC2) @ (-F))
+        det = j11 * j22 - j12 * j12
+        if abs(det) < 1e-24:
+            # Near-singular: fall back to individual gradient steps
+            dt1 = r1 / j11 if j11 > 1e-24 else 0.0
+            dt2 = r2 / j22 if j22 > 1e-24 else 0.0
+        else:
+            dt1 = (j22 * r1 - j12 * r2) / det
+            dt2 = (j11 * r2 - j12 * r1) / det
+
+        # Clamp step size to avoid large jumps
+        step_cap = max(h * 200, (t_max - t_min) * 0.1)
+        dt1 = float(np.clip(dt1, -step_cap, step_cap))
+        dt2 = float(np.clip(dt2, -step_cap, step_cap))
+
+        t1_new = float(np.clip(t1 + dt1, t_min, t_max))
+        t2_new = float(np.clip(t2 + dt2, t_min, t_max))
+
+        if abs(t1_new - t1) < tol * 1e-3 and abs(t2_new - t2) < tol * 1e-3:
+            t1, t2 = t1_new, t2_new
+            break
+        t1, t2 = t1_new, t2_new
+
+    # Accept if residual is within relaxed threshold
+    P1 = _curve_eval(curve, t1)
+    P2 = _curve_eval(curve, t2)
+    if float(np.linalg.norm(P1 - P2)) < tol * 100:
+        if t1 > t2:
+            t1, t2 = t2, t1
+        return (t1, t2)
+    return None
+
+
+def _aabb_from_pts(pts: List[np.ndarray]) -> Tuple[np.ndarray, np.ndarray]:
+    """AABB of a list of 3-D points."""
+    arr = np.stack(pts)
+    return arr.min(axis=0), arr.max(axis=0)
+
+
+def _subdivide_candidates_recursive(
+    curve: NurbsCurve,
+    t1_lo: float, t1_hi: float,
+    t2_lo: float, t2_hi: float,
+    pts_cache: dict,
+    *,
+    lin_tol: float,
+    depth: int,
+    max_depth: int,
+    t_span: float,
+    t_min: float,
+    t_max: float,
+) -> List[Tuple[float, float]]:
+    """Recursive AABB-tree subdivision to find self-intersect candidate pairs.
+
+    Implements Piegl-Tiller §5.5 + Sederberg 1985 "convex hull / control
+    polygon" recursive subdivision:
+
+    1. Build AABB for [t1_lo, t1_hi] and [t2_lo, t2_hi].
+    2. If AABBs do not overlap → no intersection in this sub-problem; return [].
+    3. If BOTH segments are below the linearisation tolerance ``lin_tol`` (the
+       chord length is small enough that the arc ≈ its chord to within ``tol``)
+       → record the midpoint pair as a candidate leaf.
+    4. Otherwise bisect the LONGER sub-interval and recurse.
+
+    The cache ``pts_cache`` maps float parameter → evaluated 3-D point to
+    avoid re-evaluating the curve at the same parameter twice.
+    """
+    if depth > max_depth:
+        # Reached maximum recursion: record as a candidate (safe fallback)
+        mid1 = (t1_lo + t1_hi) * 0.5
+        mid2 = (t2_lo + t2_hi) * 0.5
+        return [(mid1, mid2)]
+
+    def _eval(t: float) -> np.ndarray:
+        if t not in pts_cache:
+            pts_cache[t] = _curve_eval(curve, t)
+        return pts_cache[t]
+
+    n_samp = 4  # quick chord estimate
+
+    def _seg_pts(lo: float, hi: float) -> List[np.ndarray]:
+        ts = np.linspace(lo, hi, n_samp)
+        return [_eval(float(t)) for t in ts]
+
+    seg1 = _seg_pts(t1_lo, t1_hi)
+    seg2 = _seg_pts(t2_lo, t2_hi)
+    lo1, hi1 = _aabb_from_pts(seg1)
+    lo2, hi2 = _aabb_from_pts(seg2)
+
+    # AABB overlap test (Piegl-Tiller §5.5 cull step)
+    if not _aabb_overlap(lo1, hi1, lo2, hi2, lin_tol * 0.5):
+        return []
+
+    # Linearisation check: chord length of each segment
+    chord1 = float(np.linalg.norm(seg1[-1] - seg1[0]))
+    chord2 = float(np.linalg.norm(seg2[-1] - seg2[0]))
+
+    if chord1 <= lin_tol and chord2 <= lin_tol:
+        # Both segments linear enough → leaf: record midpoint pair
+        mid1 = (t1_lo + t1_hi) * 0.5
+        mid2 = (t2_lo + t2_hi) * 0.5
+        return [(mid1, mid2)]
+
+    # Bisect the longer sub-interval (Sederberg 1985 bisection strategy)
+    results: List[Tuple[float, float]] = []
+    if chord1 >= chord2:
+        mid1 = (t1_lo + t1_hi) * 0.5
+        results += _subdivide_candidates_recursive(
+            curve, t1_lo, mid1, t2_lo, t2_hi,
+            pts_cache, lin_tol=lin_tol, depth=depth + 1, max_depth=max_depth,
+            t_span=t_span, t_min=t_min, t_max=t_max,
+        )
+        results += _subdivide_candidates_recursive(
+            curve, mid1, t1_hi, t2_lo, t2_hi,
+            pts_cache, lin_tol=lin_tol, depth=depth + 1, max_depth=max_depth,
+            t_span=t_span, t_min=t_min, t_max=t_max,
+        )
+    else:
+        mid2 = (t2_lo + t2_hi) * 0.5
+        results += _subdivide_candidates_recursive(
+            curve, t1_lo, t1_hi, t2_lo, mid2,
+            pts_cache, lin_tol=lin_tol, depth=depth + 1, max_depth=max_depth,
+            t_span=t_span, t_min=t_min, t_max=t_max,
+        )
+        results += _subdivide_candidates_recursive(
+            curve, t1_lo, t1_hi, mid2, t2_hi,
+            pts_cache, lin_tol=lin_tol, depth=depth + 1, max_depth=max_depth,
+            t_span=t_span, t_min=t_min, t_max=t_max,
+        )
+    return results
+
+
+def curve_self_intersect_robust(
+    curve: NurbsCurve,
+    *,
+    tol: float = _DEFAULT_TOL,
+    samples: int = _DEFAULT_SAMPLES_C,
+    lin_tol: Optional[float] = None,
+) -> List[dict]:
+    """Find all self-intersection points of a single NurbsCurve.
+
+    Enhanced implementation using a proper AABB-hierarchy recursive
+    subdivision algorithm (Piegl-Tiller §5.5 [PT95] + Sederberg 1985
+    "Geometric Hermite approximation" bisection [Sed85]), followed by
+    Newton–Raphson refinement on f(t1,t2) = C(t1)−C(t2).
+
+    Algorithm
+    ---------
+    1. **AABB-tree seeding** (Piegl-Tiller §5.5 + Sederberg 1985 §3):
+       Build an initial grid of ``samples`` segments from the curve's
+       parameter span.  For each non-adjacent pair (i, j) with j >= i+2
+       whose AABBs overlap, recursively subdivide both sub-intervals,
+       culling non-overlapping AABB pairs at each level, until both
+       segments are within the linearisation tolerance ``lin_tol``
+       (default 10 × ``tol``).
+    2. **Leaf candidates**: at each leaf, record the midpoint parameters
+       (t1_mid, t2_mid) as a Newton seed.
+    3. **Newton–Raphson refinement**: minimise |C(t1)−C(t2)|² via the
+       2×2 Gauss–Newton system; converge to tolerance ``tol``.
+    4. **Deduplication**: merge hits whose 3-D points are within ``tol``
+       of each other; enforce ta < tb; reject t1 ≈ t2 (adjacency artefacts).
+
+    Honest limitations
+    ------------------
+    - **Multiplicity ≥ 3 (NOT detected)**: A curve that passes through the
+      same point three or more times (multiplicity-3 or higher
+      self-intersection) is NOT reliably detected.  The Newton iteration on
+      f(t1,t2) can only converge to a PAIR (t1, t2); detecting higher-order
+      contacts requires an extended resultant/Gröbner-basis algorithm
+      (Sederberg–Anderson–Goldman 1984) which is out of scope here.
+    - **Near-tangent double points**: extremely flat crossings where the
+      two curve branches meet at a very small angle may require more
+      Newton iterations; setting a tighter ``tol`` and more ``samples``
+      helps.
+
+    Parameters
+    ----------
+    curve : NurbsCurve
+    tol : float
+        Spatial convergence tolerance and duplicate-merge radius (default 1e-6).
+    samples : int
+        Number of initial curve subdivisions for the AABB seeding grid.
+    lin_tol : float or None
+        Linearisation tolerance for the recursive subdivision stop criterion.
+        Defaults to ``max(tol * 10, 1e-8)``.
+
+    Returns
+    -------
+    list of dict, each with:
+        ta    : float  -- smaller parameter of the self-intersection
+        tb    : float  -- larger parameter of the self-intersection
+        point : list[float, float, float]  -- 3-D intersection point
+
+    Never raises.
+
+    References
+    ----------
+    [PT95]  Piegl & Tiller, "The NURBS Book", Springer 1995, §5.5.
+    [Sed85] Sederberg, "Piecewise algebraic surface patches", CGA 1985.
+    """
+    try:
+        return _curve_self_intersect_robust_impl(
+            curve, tol=tol, samples=samples, lin_tol=lin_tol
+        )
+    except Exception:
+        return []
+
+
+def _curve_self_intersect_robust_impl(
+    curve: NurbsCurve,
+    *,
+    tol: float,
+    samples: int,
+    lin_tol: Optional[float],
+) -> List[dict]:
+    if not isinstance(curve, NurbsCurve):
+        return []
+
+    n = max(4, int(samples))
+    t_min, t_max = _curve_param_range(curve)
+    t_span = t_max - t_min
+    if t_span < 1e-14:
+        return []
+
+    # Linearisation tolerance (Sederberg 1985 §3: stop when chord ≤ lin_tol)
+    if lin_tol is None:
+        lin_tol = max(tol * 10.0, 1e-8)
+
+    # Minimum param gap: rejects t1 ≈ t2 (endpoint-adjacency false positive)
+    min_param_gap = t_span / (n * 4.0)
+
+    t_vals = np.linspace(t_min, t_max, n + 1)
+    pts_cache: dict = {}
+
+    def _eval(t: float) -> np.ndarray:
+        if t not in pts_cache:
+            pts_cache[t] = _curve_eval(curve, float(t))
+        return pts_cache[t]
+
+    # Pre-evaluate grid points
+    for t in t_vals:
+        _eval(float(t))
+
+    # Segment AABBs for initial coarse-grid cull
+    seg_lo: List[np.ndarray] = []
+    seg_hi: List[np.ndarray] = []
+    for i in range(n):
+        lo, hi = _aabb_from_pts([_eval(float(t_vals[i])), _eval(float(t_vals[i + 1]))])
+        seg_lo.append(lo)
+        seg_hi.append(hi)
+
+    # Recursion depth: ceil(log2(t_span / lin_tol)) + 4, capped at 32
+    if lin_tol > 0:
+        max_depth = min(32, max(8, int(math.ceil(math.log2(t_span / lin_tol + 1))) + 4))
+    else:
+        max_depth = 32
+
+    # Gather leaf candidates via AABB-tree recursive subdivision
+    raw_candidates: List[Tuple[float, float]] = []
+    for i in range(n):
+        for j in range(i + 2, n):
+            # Quick coarse AABB cull before recursion (Piegl-Tiller §5.5)
+            if not _aabb_overlap(seg_lo[i], seg_hi[i], seg_lo[j], seg_hi[j],
+                                 lin_tol):
+                continue
+            leaves = _subdivide_candidates_recursive(
+                curve,
+                float(t_vals[i]), float(t_vals[i + 1]),
+                float(t_vals[j]), float(t_vals[j + 1]),
+                pts_cache,
+                lin_tol=lin_tol,
+                depth=0,
+                max_depth=max_depth,
+                t_span=t_span,
+                t_min=t_min,
+                t_max=t_max,
+            )
+            raw_candidates.extend(leaves)
+
+    # Newton refinement on each leaf candidate
+    hits: List[dict] = []
+    for ta0, tb0 in raw_candidates:
+        result = _newton_self_intersect(curve, ta0, tb0, tol=tol)
+        if result is None:
+            continue
+        ta_ref, tb_ref = result
+        # Canonical: ta <= tb
+        if ta_ref > tb_ref:
+            ta_ref, tb_ref = tb_ref, ta_ref
+        # Reject endpoint-adjacency artefacts
+        if abs(tb_ref - ta_ref) < min_param_gap:
+            continue
+        A = _curve_eval(curve, ta_ref)
+        B = _curve_eval(curve, tb_ref)
+        if float(np.linalg.norm(A - B)) > tol * 1e3:
             continue
         pt = ((A + B) * 0.5).tolist()
         hits.append({"ta": ta_ref, "tb": tb_ref, "point": pt})

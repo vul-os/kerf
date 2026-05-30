@@ -80,12 +80,26 @@ async def register(app: FastAPI, ctx):
     except Exception:
         pass  # effectivity-bom tool optional — fail silently if symbol missing.
 
+    # Document version diff (ISO 10303-44 §5.2 + Borst-Lahti §6.3).
+    try:
+        from kerf_plm.tools import (
+            plm_document_version_diff_spec,
+            run_plm_document_version_diff,
+        )
+        ctx.tools.register(
+            "plm_document_version_diff",
+            plm_document_version_diff_spec,
+            run_plm_document_version_diff,
+        )
+    except Exception:
+        pass  # document-version-diff tool optional — fail silently if symbol missing.
+
     try:
         from kerf_core.plugin import PluginManifest
         return PluginManifest(
             name="plm",
             version="0.1.0",
-            provides=["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.sysml-traceability", "plm.xmi-export", "plm.where-used"],
+            provides=["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.sysml-traceability", "plm.xmi-export", "plm.where-used", "plm.document-version-diff"],
             depends=[],
         )
     except ImportError:

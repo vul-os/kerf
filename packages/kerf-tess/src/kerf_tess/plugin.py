@@ -96,8 +96,12 @@ async def register(app, ctx: "PluginContext") -> "PluginManifest":
             local_mode,
         )
 
+    # ── LLM tools ────────────────────────────────────────────────────────────
+    _register_lod_tools(ctx)
+
     # ── manifest ──────────────────────────────────────────────────────────────
     provides = ["tess.step-to-glb"] if _OCC_AVAILABLE else []
+    provides.append("tess.lod-chain")
     if not _OCC_AVAILABLE:
         logger.warning(
             "kerf-tess: pythonOCC not available — tess.step-to-glb capability absent. "
@@ -110,3 +114,23 @@ async def register(app, ctx: "PluginContext") -> "PluginManifest":
         provides=provides,
         depends=["cad-core"],
     )
+
+
+def _register_lod_tools(ctx: "PluginContext") -> None:
+    """Register adaptive LOD LLM tools into ctx.tools."""
+    try:
+        import importlib
+        mod = importlib.import_module("kerf_tess.adaptive_lod")
+        tools_list = getattr(mod, "TOOLS", [])
+        tools_registry = getattr(ctx, "tools", None)
+        if tools_registry is None:
+            logger.warning("kerf-tess: ctx.tools is None — LOD tools not registered")
+            return
+        for name, spec, handler in tools_list:
+            try:
+                tools_registry.register(name, spec, handler)
+                logger.info("kerf-tess: registered LLM tool '%s'", name)
+            except Exception as exc:
+                logger.warning("kerf-tess: failed to register tool '%s': %s", name, exc)
+    except Exception as exc:
+        logger.warning("kerf-tess: adaptive_lod tools registration failed: %s", exc)

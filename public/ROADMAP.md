@@ -149,6 +149,8 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 
 **GK-P (parity) series in flight.** A four-agent survey of Kerf vs ~18 kernel-relevant CADs found a concrete, finite gap list. GK-01..GK-139 are landed. The `GK-P` series (tracked in `tasks.md`) closes the remaining gaps:
 
+- **Adaptive tessellation LOD chain** ✅ — `kerf_tess.adaptive_lod`: `generate_lod_chain` / `screen_error_to_chord_deviation` / `pick_lod_for_distance`; pinhole-camera screen-error math; 4-level independent mesh chain for three.js `MeshLOD`; `tess_generate_lod_chain` LLM tool registered.
+- **Wiring** — expose shipped class-A math (G3 blends, zebra analyser, curvature-rate oracle) from `geom/__init__.py` and `surfacing.py`; all small, first in queue.
 - **Foundational kernel** — general solid boolean for NURBS-faced bodies, MatchSrf G3, isophote/EMap, Stam limit-tangents + G1 at extraordinary SubD points, fractional creases, analytic surface derivatives.
 - **Construction verbs** — loft guide-rails, sheet-metal hem/jog/multi-flange, direct-edit non-planar + delete-face, weldment gussets/end-treatments, surface patch-from-points.
 - **SubD / mesh** — multires displacement, SDF CSG + marching-cubes, sculpt brush engine, isotropic remesh, surface-snap retopo, LSCM UV unwrap.

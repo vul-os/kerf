@@ -87,6 +87,48 @@ Keywords: auto dimension, technical drawing, engineering drawing, multi-view, 4-
 | `auto_dimension_generate` | Read-only: generate a Drawing dict from a part description; required: `part` dict; optional `view` (default `front_top_right_iso`), `sheet` (`A3` or `A4`) |
 | `auto_dimension_export_dxf` | Read-only: serialise a Drawing dict to DXF R12 text string; required: `drawing` |
 | `auto_dimension_export_svg` | Read-only: serialise a Drawing dict to SVG 1.1 text string; required: `drawing` |
+| `drawing_auto_dimension_iso` | Read-only: ISO 129-1:2018-convention dimensioning (chain/baseline/mixed) for a view; required: `view` dict with `bbox`; optional `mode` (default `chain`) |
+| `drawing_validate_iso` | Read-only: validate a view dict for ISO 129-1:2018 compliance (extension lines, spacing, leader angles, text height); required: `view` |
+
+## ISO 129-1:2018 dimensioning (drawing_auto_dimension_iso)
+
+Follows ISO 129-1:2018 conventions (NOT ISO certified):
+
+- **Chain** (§5.1): dims chain end-to-end — n-1 dims for n feature positions.
+- **Baseline** (§5.1): all dims from common leftmost / bottommost edge; stacked with 10 mm spacing.
+- **Mixed**: chain for close features (gap < 2×spacing); baseline for wide gaps.
+- **Extension lines** (§5.4): 1.5 mm gap from feature edge; 2 mm overshoot past dim line.
+- **Dimension-line spacing** (§5.4): ≥ 10 mm between parallel lines.
+- **Arrowheads** (§5.4): 3.5 mm (within the 3–4 mm range).
+- **Circular features / leader lines** (§10): `iso_leader_dim` at preferred 15° angle; centrepoint cross mark.
+
+### dim dict shapes
+
+```
+iso_linear_dim: {
+  type, axis, value_mm, label, feature_ref,
+  ext1_start, ext1_end, ext2_start, ext2_end,  // extension lines
+  dim_p1, dim_p2,                               // dim line endpoints
+  text_pos, arrowhead_length_mm
+}
+
+iso_leader_dim: {
+  type, label, diameter_mm, centre,
+  leader_start, leader_elbow, shoulder_end, text_pos,
+  leader_angle_deg, arrowhead_length_mm, centre_mark_size_mm
+}
+```
+
+## ISO 129-1:2018 compliance validation (drawing_validate_iso)
+
+Checks performed:
+1. Extension-line length ≥ gap + 1 mm (§5.4).
+2. Parallel dim-line spacing ≥ 10 mm (§5.4).
+3. Leader-line angle matches preferred 15/30/45/60/75° (§10) ± 5°.
+4. Dim-line orientation matches feature axis (§5).
+5. Text height ≥ 2.5 mm (ISO 3098-2 via ISO 129-1).
+
+Returns `compliant` (bool), `violations` (list), `warnings` (list), counts.
 
 ## Example
 

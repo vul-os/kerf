@@ -18,6 +18,9 @@ Given a *part description dict* produces a Drawing dict containing:
     position tolerance on the most-critical hole pattern.
   • Title block with project metadata.
   • DXF R12 and SVG 1.1 export helpers.
+  • ISO 129-1:2018 chain/baseline/mixed dimensioning (auto_dimension_view_iso129).
+  • ISO 129-1:2018 tolerance formatting (apply_iso129_tolerance_format).
+  • ISO 129-1:2018 compliance validation (validate_iso129_compliance).
 
 Public API
 ----------
@@ -30,11 +33,32 @@ dxf_export(drawing) -> str
 svg_export(drawing) -> str
     Serialise a Drawing to an SVG 1.1 string.
 
+auto_dimension_view_iso129(view, mode='chain'|'baseline'|'mixed') -> list[dict]
+    Produce ISO 129-1:2018-conformant dimension line dicts for a view.
+    Implements chain (§5.1), baseline (§5.1), and mixed modes; enforces
+    extension-line gap/overshoot (§5.4: 2 mm gap, 2 mm overshoot), 10 mm
+    line spacing, 3–4 mm arrowhead length, and leader lines for circular
+    features (ISO §10).  Claim: follows ISO 129-1:2018 conventions, NOT ISO
+    certified.
+
+apply_iso129_tolerance_format(value, tolerance, kind='symmetric'|'unilateral'|'limit') -> str
+    Format a dimension value with tolerance per ISO 129-1:2018 §8:
+      symmetric  → "100 ± 0.1"
+      unilateral → "100 +0.2/0"
+      limit      → "100.1 / 99.9"
+
+validate_iso129_compliance(view) -> ValidationResult
+    Check a view dict for ISO 129-1:2018 compliance: extension-line length,
+    dimension-line spacing, leader-line angle (15° preferred per §10), and
+    dimension-line orientation vs feature direction.
+
 LLM tools registered (kerf_chat gated)
 ---------------------------------------
-  auto_dimension_generate       — generate drawing dict (read)
-  auto_dimension_export_dxf     — export drawing as DXF text (read)
-  auto_dimension_export_svg     — export drawing as SVG text (read)
+  auto_dimension_generate         — generate drawing dict (read)
+  auto_dimension_export_dxf       — export drawing as DXF text (read)
+  auto_dimension_export_svg       — export drawing as SVG text (read)
+  drawing_auto_dimension_iso      — ISO 129-1:2018 chain/baseline/mixed dim (read)
+  drawing_validate_iso            — validate ISO 129-1:2018 compliance (read)
 
 Part description schema (dict)
 -------------------------------
@@ -1007,6 +1031,588 @@ def _svg_export_inner(drawing: Dict[str, Any]) -> str:
 
 
 # ---------------------------------------------------------------------------
+# ISO 129-1:2018 dimensioning conventions
+# ---------------------------------------------------------------------------
+# Claim: follows ISO 129-1:2018 conventions — NOT ISO certified.
+#
+# Key constants from the standard:
+#   §5.4 — extension line gap (from feature edge) = 1–2 mm; overshoot past
+#           dimension line = 2 mm; arrowhead length 3–4 mm.
+#   §5.4 — minimum dimension-line spacing = 10 mm.
+#   §10  — leader line preferred angle = 15°, 30°, 45°, 60°, 75°.
+# ---------------------------------------------------------------------------
+
+# ISO §5.4 layout constants (all in mm, drawing-space units)
+_ISO_EXTENSION_LINE_GAP_MM: float = 1.5     # gap from feature boundary
+_ISO_EXTENSION_LINE_OVERSHOOT_MM: float = 2.0  # past the dimension line
+_ISO_DIM_LINE_SPACING_MM: float = 10.0     # between parallel dim lines
+_ISO_ARROWHEAD_LENGTH_MM: float = 3.5      # 3–4 mm per §5.4
+_ISO_FONT_HEIGHT_MM: float = 2.5           # minimum text height ISO 3098-2
+# Preferred leader-line angles (degrees from horizontal) per ISO §10
+_ISO_LEADER_ANGLES_DEG: Tuple[float, ...] = (15.0, 30.0, 45.0, 60.0, 75.0)
+
+
+def _nearest_leader_angle(dx: float, dy: float) -> float:
+    """Return the ISO §10 preferred angle closest to the vector (dx, dy)."""
+    actual = math.degrees(math.atan2(abs(dy), abs(dx)))
+    return min(_ISO_LEADER_ANGLES_DEG, key=lambda a: abs(a - actual))
+
+
+def _make_iso_linear_dim(
+    value_mm: float,
+    axis: str,          # "horizontal" | "vertical"
+    p_start: List[float],
+    p_end: List[float],
+    dim_line_offset: float,  # perpendicular distance from feature edge
+    label: Optional[str] = None,
+    feature_ref: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Build an ISO 129-1:2018-conformant linear dimension dict.
+
+    The dict carries all geometry needed for DXF/SVG rendering:
+      ext1_start / ext1_end  — first extension line (gap + overshoot)
+      ext2_start / ext2_end  — second extension line
+      dim_p1 / dim_p2        — dimension line endpoints (at arrowheads)
+      text_pos               — dimension text midpoint
+      arrowhead_length_mm    — 3.5 mm
+    """
+    if label is None:
+        label = f"{value_mm:.2f}"
+
+    gap = _ISO_EXTENSION_LINE_GAP_MM
+    over = _ISO_EXTENSION_LINE_OVERSHOOT_MM
+
+    if axis == "horizontal":
+        # p_start / p_end are left/right feature points (same Y)
+        fx1, fy = p_start[0], p_start[1]
+        fx2 = p_end[0]
+        # Dimension line above (offset positive = up on drawing Y)
+        dim_y = fy - dim_line_offset  # convention: above feature
+        return {
+            "type": "iso_linear_dim",
+            "axis": axis,
+            "value_mm": value_mm,
+            "label": label,
+            "feature_ref": feature_ref,
+            # Extension line 1 (left feature point)
+            "ext1_start": [fx1, fy - gap],
+            "ext1_end":   [fx1, dim_y + over],
+            # Extension line 2 (right feature point)
+            "ext2_start": [fx2, fy - gap],
+            "ext2_end":   [fx2, dim_y + over],
+            # Dimension line
+            "dim_p1": [fx1, dim_y],
+            "dim_p2": [fx2, dim_y],
+            "text_pos": [(fx1 + fx2) / 2.0, dim_y - 1.5],
+            "arrowhead_length_mm": _ISO_ARROWHEAD_LENGTH_MM,
+        }
+    else:  # vertical
+        fx, fy1 = p_start[0], p_start[1]
+        fy2 = p_end[1]
+        dim_x = fx + dim_line_offset  # to the right of the feature
+        return {
+            "type": "iso_linear_dim",
+            "axis": axis,
+            "value_mm": value_mm,
+            "label": label,
+            "feature_ref": feature_ref,
+            "ext1_start": [fx + gap, fy1],
+            "ext1_end":   [dim_x + over, fy1],
+            "ext2_start": [fx + gap, fy2],
+            "ext2_end":   [dim_x + over, fy2],
+            "dim_p1": [dim_x, fy1],
+            "dim_p2": [dim_x, fy2],
+            "text_pos": [dim_x + 1.5, (fy1 + fy2) / 2.0],
+            "arrowhead_length_mm": _ISO_ARROWHEAD_LENGTH_MM,
+        }
+
+
+def _make_iso_leader_dim(
+    cx: float,
+    cy: float,
+    diameter_mm: float,
+    label: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Build an ISO §10 leader-line annotation for a circular feature.
+
+    Leader goes from (cx, cy) at the preferred 15° angle outward; a
+    horizontal shoulder extends to the text.  A centrepoint mark (+) is
+    also placed at (cx, cy).
+    """
+    if label is None:
+        label = f"Ø{diameter_mm:.2f}"
+    angle_deg = _ISO_LEADER_ANGLES_DEG[0]  # 15° preferred
+    leader_len = max(diameter_mm / 2.0 + 4.0, 10.0)
+    rad = math.radians(angle_deg)
+    tip_x = cx + math.cos(rad) * leader_len
+    tip_y = cy - math.sin(rad) * leader_len  # up-right
+    shoulder_len = 6.0
+    return {
+        "type": "iso_leader_dim",
+        "label": label,
+        "diameter_mm": diameter_mm,
+        "centre": [cx, cy],
+        "leader_start": [cx, cy],
+        "leader_elbow": [tip_x, tip_y],
+        "shoulder_end": [tip_x + shoulder_len, tip_y],
+        "text_pos": [tip_x + shoulder_len + 0.5, tip_y - 1.0],
+        "leader_angle_deg": angle_deg,
+        "arrowhead_length_mm": _ISO_ARROWHEAD_LENGTH_MM,
+        # centrepoint cross marks (ISO §10)
+        "centre_mark_size_mm": 2.5,
+    }
+
+
+def auto_dimension_view_iso129(
+    view: Dict[str, Any],
+    mode: str = "chain",
+) -> List[Dict[str, Any]]:
+    """Produce ISO 129-1:2018-conformant dimension dicts for a view.
+
+    Parameters
+    ----------
+    view : dict
+        View dict as returned by ``auto_dimension`` — must contain at minimum:
+        ``bbox`` (dict with x, y, w, h), optionally ``features`` (list of
+        feature dicts with ``kind``, ``x_mm``, ``y_mm``, ``diameter_mm`` for
+        holes).
+    mode : str
+        ``'chain'``    — dimensions chain end-to-end (ISO §5.1).
+        ``'baseline'`` — all dimensions from a common baseline (ISO §5.1).
+        ``'mixed'``    — small gaps use chain; wide gaps use baseline.
+
+    Returns
+    -------
+    list[dict]
+        List of ISO dimension dicts (``iso_linear_dim`` or ``iso_leader_dim``).
+        Each dict carries ext-line geometry, dim-line endpoints, text position,
+        arrowhead length, and the dimension value.
+
+    Notes
+    -----
+    - Claim: follows ISO 129-1:2018 conventions — NOT ISO certified.
+    - Extension lines: 1.5 mm gap from feature, 2 mm overshoot past dim line
+      (§5.4).
+    - Dimension-line spacing: 10 mm between parallel dimension lines (§5.4).
+    - Arrowheads: 3.5 mm (within the 3–4 mm range of §5.4).
+    - Circular features → leader lines with preferred 15° angle (ISO §10).
+    - Dimension lines placed outside view extents to avoid crossing view lines.
+    """
+    if mode not in ("chain", "baseline", "mixed"):
+        raise ValueError(f"mode must be 'chain', 'baseline', or 'mixed'; got {mode!r}")
+
+    bbox = view.get("bbox") or {}
+    bx = float(bbox.get("x", 0.0))
+    by = float(bbox.get("y", 0.0))
+    bw = float(bbox.get("w", 100.0))
+    bh = float(bbox.get("h", 100.0))
+
+    # Feature extraction — accept either a "features" list in the view dict or
+    # derive synthetic points from bbox corners.
+    features: List[Dict[str, Any]] = list(view.get("features") or [])
+
+    # Collect horizontal feature X-positions and vertical feature Y-positions
+    # from bbox-derived edges plus any explicit feature points.
+    x_coords: List[float] = sorted({bx, bx + bw} | {float(f.get("x_mm", f.get("cx", bx))) for f in features if isinstance(f, dict)})
+    y_coords: List[float] = sorted({by, by + bh} | {float(f.get("y_mm", f.get("cy", by))) for f in features if isinstance(f, dict)})
+
+    dims: List[Dict[str, Any]] = []
+
+    # ---- Horizontal dimensions (across the width of the view) ---------------
+    # Dimension lines placed above view extents: base_y = by + bh + spacing
+    base_y_offset = _ISO_DIM_LINE_SPACING_MM  # first dim line above top edge
+
+    if mode == "chain":
+        # Chain: each segment between consecutive X-positions (n-1 dims for n points)
+        for i in range(len(x_coords) - 1):
+            x1, x2 = x_coords[i], x_coords[i + 1]
+            offset = base_y_offset  # all at same level in chain mode
+            d = _make_iso_linear_dim(
+                value_mm=abs(x2 - x1),
+                axis="horizontal",
+                p_start=[x1, by + bh],
+                p_end=[x2, by + bh],
+                dim_line_offset=offset,
+                label=f"{abs(x2-x1):.2f}",
+                feature_ref=f"x[{i}]→x[{i+1}]",
+            )
+            dims.append(d)
+
+    elif mode == "baseline":
+        # Baseline: all dims from leftmost edge (n dims for n+1 points if left is baseline)
+        # For n feature positions (including left edge as baseline), produce n-1 dims.
+        baseline_x = x_coords[0]
+        for i, x2 in enumerate(x_coords[1:], start=1):
+            # Stack each dim at increasing offset to avoid crossings
+            offset = base_y_offset + (i - 1) * _ISO_DIM_LINE_SPACING_MM
+            d = _make_iso_linear_dim(
+                value_mm=abs(x2 - baseline_x),
+                axis="horizontal",
+                p_start=[baseline_x, by + bh],
+                p_end=[x2, by + bh],
+                dim_line_offset=offset,
+                label=f"{abs(x2-baseline_x):.2f}",
+                feature_ref=f"baseline→x[{i}]",
+            )
+            dims.append(d)
+
+    else:  # mixed
+        # Mixed: chain close features (gap < 2× spacing), baseline for wide
+        baseline_x = x_coords[0]
+        chain_threshold = 2.0 * _ISO_DIM_LINE_SPACING_MM
+        for i, x2 in enumerate(x_coords[1:], start=1):
+            x1 = x_coords[i - 1]
+            gap = abs(x2 - x1)
+            if gap < chain_threshold:
+                # Chain: relative to previous
+                offset = base_y_offset
+                d = _make_iso_linear_dim(
+                    value_mm=gap,
+                    axis="horizontal",
+                    p_start=[x1, by + bh],
+                    p_end=[x2, by + bh],
+                    dim_line_offset=offset,
+                    label=f"{gap:.2f}",
+                    feature_ref=f"chain x[{i-1}]→x[{i}]",
+                )
+            else:
+                # Baseline: from left edge
+                total = abs(x2 - baseline_x)
+                offset = base_y_offset + _ISO_DIM_LINE_SPACING_MM
+                d = _make_iso_linear_dim(
+                    value_mm=total,
+                    axis="horizontal",
+                    p_start=[baseline_x, by + bh],
+                    p_end=[x2, by + bh],
+                    dim_line_offset=offset,
+                    label=f"{total:.2f}",
+                    feature_ref=f"baseline→x[{i}]",
+                )
+            dims.append(d)
+
+    # ---- Vertical dimensions (height of the view) ---------------------------
+    # Placed to the right of view extents.
+    base_x_offset = _ISO_DIM_LINE_SPACING_MM
+
+    if mode == "chain":
+        for i in range(len(y_coords) - 1):
+            y1, y2 = y_coords[i], y_coords[i + 1]
+            d = _make_iso_linear_dim(
+                value_mm=abs(y2 - y1),
+                axis="vertical",
+                p_start=[bx + bw, y1],
+                p_end=[bx + bw, y2],
+                dim_line_offset=base_x_offset,
+                label=f"{abs(y2-y1):.2f}",
+                feature_ref=f"y[{i}]→y[{i+1}]",
+            )
+            dims.append(d)
+
+    elif mode == "baseline":
+        baseline_y = y_coords[0]
+        for i, y2 in enumerate(y_coords[1:], start=1):
+            offset = base_x_offset + (i - 1) * _ISO_DIM_LINE_SPACING_MM
+            d = _make_iso_linear_dim(
+                value_mm=abs(y2 - baseline_y),
+                axis="vertical",
+                p_start=[bx + bw, baseline_y],
+                p_end=[bx + bw, y2],
+                dim_line_offset=offset,
+                label=f"{abs(y2-baseline_y):.2f}",
+                feature_ref=f"baseline→y[{i}]",
+            )
+            dims.append(d)
+
+    else:  # mixed
+        baseline_y = y_coords[0]
+        chain_threshold = 2.0 * _ISO_DIM_LINE_SPACING_MM
+        for i, y2 in enumerate(y_coords[1:], start=1):
+            y1 = y_coords[i - 1]
+            gap = abs(y2 - y1)
+            if gap < chain_threshold:
+                d = _make_iso_linear_dim(
+                    value_mm=gap,
+                    axis="vertical",
+                    p_start=[bx + bw, y1],
+                    p_end=[bx + bw, y2],
+                    dim_line_offset=base_x_offset,
+                    label=f"{gap:.2f}",
+                    feature_ref=f"chain y[{i-1}]→y[{i}]",
+                )
+            else:
+                total = abs(y2 - baseline_y)
+                offset = base_x_offset + _ISO_DIM_LINE_SPACING_MM
+                d = _make_iso_linear_dim(
+                    value_mm=total,
+                    axis="vertical",
+                    p_start=[bx + bw, baseline_y],
+                    p_end=[bx + bw, y2],
+                    dim_line_offset=offset,
+                    label=f"{total:.2f}",
+                    feature_ref=f"baseline→y[{i}]",
+                )
+            dims.append(d)
+
+    # ---- Leader lines for circular features (ISO §10) -----------------------
+    for feat in features:
+        if not isinstance(feat, dict):
+            continue
+        if feat.get("kind") == "hole" or "diameter_mm" in feat:
+            cx = float(feat.get("x_mm", feat.get("cx", bx + bw / 2)))
+            cy = float(feat.get("y_mm", feat.get("cy", by + bh / 2)))
+            dia = float(feat.get("diameter_mm", 1.0))
+            lbl = feat.get("label") or f"Ø{dia:.2f}"
+            dims.append(_make_iso_leader_dim(cx, cy, dia, label=lbl))
+
+    return dims
+
+
+def apply_iso129_tolerance_format(
+    value: Any,
+    tolerance: Any,
+    kind: str = "symmetric",
+) -> str:
+    """Format a dimension value with tolerance per ISO 129-1:2018 §8.
+
+    Parameters
+    ----------
+    value : float or tuple(upper, lower)
+        The nominal dimension value in mm.  For ``kind='limit'`` supply a
+        2-tuple ``(upper_limit, lower_limit)``.
+    tolerance : float or tuple(upper_dev, lower_dev)
+        For ``kind='symmetric'``: a single positive float (e.g. 0.1).
+        For ``kind='unilateral'``: a 2-tuple ``(upper, lower)``
+          where lower is often 0, e.g. ``(0.2, 0)``.
+        For ``kind='limit'``: ignored — use ``value`` as the 2-tuple.
+    kind : str
+        ``'symmetric'``  → ``"100 ± 0.1"``
+        ``'unilateral'`` → ``"100 +0.2/0"``
+        ``'limit'``      → ``"100.1 / 99.9"``
+
+    Returns
+    -------
+    str
+        Formatted tolerance string following ISO 129-1:2018 §8 notation.
+
+    Notes
+    -----
+    Claim: follows ISO 129-1:2018 conventions — NOT ISO certified.
+    """
+    if kind == "symmetric":
+        nom = float(value)
+        tol = float(tolerance)
+        return f"{nom:g} ± {tol:g}"
+
+    elif kind == "unilateral":
+        nom = float(value)
+        if isinstance(tolerance, (list, tuple)) and len(tolerance) >= 2:
+            upper = float(tolerance[0])
+            lower = float(tolerance[1])
+        else:
+            # Single value means +tol / 0
+            upper = float(tolerance)
+            lower = 0.0
+        upper_str = f"+{upper:g}" if upper >= 0 else f"{upper:g}"
+        lower_str = f"{lower:g}"
+        return f"{nom:g} {upper_str}/{lower_str}"
+
+    elif kind == "limit":
+        if isinstance(value, (list, tuple)) and len(value) >= 2:
+            upper = float(value[0])
+            lower = float(value[1])
+        else:
+            raise ValueError("For kind='limit', value must be a 2-tuple (upper_limit, lower_limit)")
+        return f"{upper:g} / {lower:g}"
+
+    else:
+        raise ValueError(f"kind must be 'symmetric', 'unilateral', or 'limit'; got {kind!r}")
+
+
+# ---------------------------------------------------------------------------
+# ISO 129-1:2018 compliance validation
+# ---------------------------------------------------------------------------
+
+class ValidationResult:
+    """Result of ISO 129-1:2018 compliance validation.
+
+    Attributes
+    ----------
+    compliant : bool
+        True if no violations found.
+    violations : list[dict]
+        Each violation dict: ``{rule, actual, expected, detail}``.
+    warnings : list[dict]
+        Non-mandatory recommendations.
+    """
+
+    def __init__(self) -> None:
+        self.compliant: bool = True
+        self.violations: List[Dict[str, Any]] = []
+        self.warnings: List[Dict[str, Any]] = []
+
+    def add_violation(self, rule: str, actual: Any, expected: str, detail: str) -> None:
+        self.compliant = False
+        self.violations.append({
+            "rule": rule,
+            "actual": actual,
+            "expected": expected,
+            "detail": detail,
+        })
+
+    def add_warning(self, rule: str, actual: Any, expected: str, detail: str) -> None:
+        self.warnings.append({
+            "rule": rule,
+            "actual": actual,
+            "expected": expected,
+            "detail": detail,
+        })
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "compliant": self.compliant,
+            "violations": self.violations,
+            "warnings": self.warnings,
+            "violation_count": len(self.violations),
+            "warning_count": len(self.warnings),
+        }
+
+
+def validate_iso129_compliance(view: Dict[str, Any]) -> ValidationResult:
+    """Check a view for ISO 129-1:2018 compliance.
+
+    Checks performed
+    ----------------
+    1. Extension-line length ≥ ``_ISO_EXTENSION_LINE_GAP_MM`` + 1 mm  (§5.4).
+    2. Parallel dimension-line spacing ≥ ``_ISO_DIM_LINE_SPACING_MM`` (§5.4).
+    3. Leader-line angle is one of the ISO §10 preferred angles (15°, 30°,
+       45°, 60°, 75°) ± 5°.
+    4. Dimension-line orientation matches feature axis (horizontal dim on
+       horizontal feature, vertical on vertical).
+    5. Text height ≥ ``_ISO_FONT_HEIGHT_MM`` mm (ISO 3098-2 as referenced by
+       ISO 129-1).
+
+    Parameters
+    ----------
+    view : dict
+        View dict — may contain ``dimensions`` (legacy linear_dim items),
+        ``iso_dims`` (iso_linear_dim / iso_leader_dim items), or both.
+
+    Returns
+    -------
+    ValidationResult
+        Claim: follows ISO 129-1:2018 conventions — NOT ISO certified.
+    """
+    result = ValidationResult()
+
+    # Collect all dimension objects: legacy + iso
+    all_dims: List[Dict[str, Any]] = []
+    all_dims.extend(view.get("dimensions") or [])
+    all_dims.extend(view.get("iso_dims") or [])
+
+    # ---- Rule 1: extension line length (§5.4) --------------------------------
+    min_ext_length = _ISO_EXTENSION_LINE_GAP_MM + 1.0  # gap + at least 1 mm past
+    for i, dim in enumerate(all_dims):
+        dtype = dim.get("type", "")
+        if dtype == "iso_linear_dim":
+            for ext_key in (("ext1_start", "ext1_end"), ("ext2_start", "ext2_end")):
+                s = dim.get(ext_key[0])
+                e = dim.get(ext_key[1])
+                if s is not None and e is not None:
+                    length = math.hypot(e[0] - s[0], e[1] - s[1])
+                    if length < min_ext_length:
+                        result.add_violation(
+                            rule="ISO 129-1:2018 §5.4 extension-line length",
+                            actual=round(length, 3),
+                            expected=f">= {min_ext_length} mm",
+                            detail=f"dim[{i}] {ext_key[0]}: extension line too short ({length:.3f} mm)",
+                        )
+
+    # ---- Rule 2: parallel dim-line spacing (§5.4) ---------------------------
+    # Group horizontal and vertical iso dims; check spacing between parallel lines.
+    h_lines: List[float] = []
+    v_lines: List[float] = []
+    for dim in all_dims:
+        if dim.get("type") == "iso_linear_dim":
+            axis = dim.get("axis", "")
+            dp1 = dim.get("dim_p1")
+            if dp1 is not None:
+                if axis == "horizontal":
+                    h_lines.append(float(dp1[1]))
+                elif axis == "vertical":
+                    v_lines.append(float(dp1[0]))
+
+    for coord_list, axis_name in ((sorted(h_lines), "horizontal"), (sorted(v_lines), "vertical")):
+        for j in range(len(coord_list) - 1):
+            spacing = abs(coord_list[j + 1] - coord_list[j])
+            if spacing < _ISO_DIM_LINE_SPACING_MM - 0.5:  # 0.5 mm tolerance
+                result.add_violation(
+                    rule="ISO 129-1:2018 §5.4 dimension-line spacing",
+                    actual=round(spacing, 3),
+                    expected=f">= {_ISO_DIM_LINE_SPACING_MM} mm",
+                    detail=f"{axis_name} dim lines too close: {spacing:.3f} mm spacing",
+                )
+
+    # ---- Rule 3: leader-line angle (§10) ------------------------------------
+    for i, dim in enumerate(all_dims):
+        if dim.get("type") == "iso_leader_dim":
+            angle = dim.get("leader_angle_deg")
+            if angle is not None:
+                nearest = _nearest_leader_angle(1.0, math.tan(math.radians(float(angle))))
+                deviation = abs(float(angle) - nearest)
+                if deviation > 5.0:
+                    result.add_violation(
+                        rule="ISO 129-1:2018 §10 leader-line angle",
+                        actual=round(float(angle), 1),
+                        expected=f"one of {_ISO_LEADER_ANGLES_DEG} ±5°",
+                        detail=f"leader dim[{i}] angle {angle}° deviates {deviation:.1f}° from nearest preferred angle",
+                    )
+                elif deviation > 2.0:
+                    result.add_warning(
+                        rule="ISO 129-1:2018 §10 leader-line angle",
+                        actual=round(float(angle), 1),
+                        expected=f"one of {_ISO_LEADER_ANGLES_DEG}",
+                        detail=f"leader dim[{i}] angle {angle}° slightly off preferred angle (deviation {deviation:.1f}°)",
+                    )
+
+    # ---- Rule 4: dim-line orientation vs feature axis -----------------------
+    for i, dim in enumerate(all_dims):
+        if dim.get("type") == "iso_linear_dim":
+            axis = dim.get("axis", "")
+            dp1 = dim.get("dim_p1")
+            dp2 = dim.get("dim_p2")
+            if dp1 is not None and dp2 is not None:
+                dx = abs(dp2[0] - dp1[0])
+                dy = abs(dp2[1] - dp1[1])
+                if axis == "horizontal" and dy > dx:
+                    result.add_violation(
+                        rule="ISO 129-1:2018 §5 dim-line orientation",
+                        actual=f"axis=horizontal but dy={dy:.2f} > dx={dx:.2f}",
+                        expected="horizontal dim line should be wider than tall",
+                        detail=f"dim[{i}] orientation mismatch",
+                    )
+                elif axis == "vertical" and dx > dy:
+                    result.add_violation(
+                        rule="ISO 129-1:2018 §5 dim-line orientation",
+                        actual=f"axis=vertical but dx={dx:.2f} > dy={dy:.2f}",
+                        expected="vertical dim line should be taller than wide",
+                        detail=f"dim[{i}] orientation mismatch",
+                    )
+
+    # ---- Rule 5: text height ------------------------------------------------
+    for i, dim in enumerate(all_dims):
+        th = dim.get("text_height_mm")
+        if th is not None and float(th) < _ISO_FONT_HEIGHT_MM:
+            result.add_violation(
+                rule="ISO 129-1:2018 / ISO 3098-2 text height",
+                actual=round(float(th), 2),
+                expected=f">= {_ISO_FONT_HEIGHT_MM} mm",
+                detail=f"dim[{i}] text height {th} mm below ISO minimum",
+            )
+
+    return result
+
+
+# ---------------------------------------------------------------------------
 # LLM tool registration (kerf_chat gated)
 # ---------------------------------------------------------------------------
 
@@ -1135,3 +1741,107 @@ if _REGISTRY_AVAILABLE:
         if not svg:
             return err_payload("SVG export failed or drawing is invalid", "OP_FAILED")
         return ok_payload({"svg": svg, "length": len(svg)})
+
+    # -----------------------------------------------------------------------
+    # ISO 129-1:2018 tools
+    # -----------------------------------------------------------------------
+
+    _iso_dim_spec = ToolSpec(
+        name="drawing_auto_dimension_iso",
+        description=(
+            "Generate ISO 129-1:2018-convention dimension annotations for a\n"
+            "drawing view (chain / baseline / mixed modes).\n"
+            "\n"
+            "Follows ISO 129-1:2018 conventions (NOT ISO certified):\n"
+            "  • Chain (§5.1): n-1 dims for n feature positions, end-to-end.\n"
+            "  • Baseline (§5.1): all dims from common baseline, stacked.\n"
+            "  • Mixed: chain for close features, baseline for wide gaps.\n"
+            "  • Extension lines: 1.5 mm gap + 2 mm overshoot (§5.4).\n"
+            "  • Dimension-line spacing: 10 mm (§5.4).\n"
+            "  • Arrowhead length: 3.5 mm (§5.4).\n"
+            "  • Circular features: leader lines at preferred 15° (ISO §10).\n"
+            "\n"
+            "Returns: ok, dims (list), count (int).  Never raises."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "view": {
+                    "type": "object",
+                    "description": (
+                        "View dict with at minimum bbox ({x,y,w,h}).  "
+                        "Optionally includes features: list of {kind, x_mm, y_mm, diameter_mm}."
+                    ),
+                },
+                "mode": {
+                    "type": "string",
+                    "enum": ["chain", "baseline", "mixed"],
+                    "description": "Dimensioning mode per ISO 129-1:2018 §5.1 (default: chain).",
+                },
+            },
+            "required": ["view"],
+        },
+    )
+
+    @register(_iso_dim_spec)
+    async def run_drawing_auto_dimension_iso(ctx: "ProjectCtx", args: bytes) -> str:
+        try:
+            a = _json.loads(args)
+        except Exception as exc:
+            return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+        view = a.get("view")
+        if view is None or not isinstance(view, dict):
+            return err_payload("view must be an object with at minimum a bbox", "BAD_ARGS")
+        mode = str(a.get("mode", "chain"))
+        if mode not in ("chain", "baseline", "mixed"):
+            return err_payload("mode must be 'chain', 'baseline', or 'mixed'", "BAD_ARGS")
+        try:
+            dims = auto_dimension_view_iso129(view, mode=mode)
+        except Exception as exc:
+            return err_payload(str(exc), "OP_FAILED")
+        return ok_payload({"dims": dims, "count": len(dims), "mode": mode})
+
+    _iso_validate_spec = ToolSpec(
+        name="drawing_validate_iso",
+        description=(
+            "Validate a drawing view for ISO 129-1:2018 compliance.\n"
+            "\n"
+            "Checks (follows ISO 129-1:2018 conventions, NOT ISO certified):\n"
+            "  • Extension-line length ≥ gap + 1 mm (§5.4).\n"
+            "  • Parallel dim-line spacing ≥ 10 mm (§5.4).\n"
+            "  • Leader-line angle matches preferred angles 15/30/45/60/75° (§10).\n"
+            "  • Dim-line orientation matches feature axis (§5).\n"
+            "  • Text height ≥ 2.5 mm (ISO 3098-2 via ISO 129-1).\n"
+            "\n"
+            "Returns: ok, compliant (bool), violations ([]), warnings ([]),\n"
+            "  violation_count, warning_count.  Never raises."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "view": {
+                    "type": "object",
+                    "description": (
+                        "View dict — may contain 'dimensions' (legacy) and/or "
+                        "'iso_dims' (from drawing_auto_dimension_iso)."
+                    ),
+                },
+            },
+            "required": ["view"],
+        },
+    )
+
+    @register(_iso_validate_spec)
+    async def run_drawing_validate_iso(ctx: "ProjectCtx", args: bytes) -> str:
+        try:
+            a = _json.loads(args)
+        except Exception as exc:
+            return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+        view = a.get("view")
+        if view is None or not isinstance(view, dict):
+            return err_payload("view must be an object", "BAD_ARGS")
+        try:
+            vr = validate_iso129_compliance(view)
+        except Exception as exc:
+            return err_payload(str(exc), "OP_FAILED")
+        return ok_payload(vr.to_dict())

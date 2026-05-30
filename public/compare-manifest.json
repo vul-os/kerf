@@ -5904,6 +5904,19 @@
         },
         {
           "domain": "D1",
+          "feature": "Auto-dim ISO 129-1:2018",
+          "competitor": {
+            "status": "partial",
+            "note": "Standards-based dimensioning available but not automatically enforced end-to-end"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Auto-dim ISO 129-1:2018 ✅ — chain/baseline/mixed (§5.1); ext-line gap+overshoot (§5.4); 10 mm spacing; 15° leader (§10); tolerance formats §8; compliance validator; LLM tools drawing_auto_dimension_iso + drawing_validate_iso",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/drawings/auto_dimension.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "GD&T on drawings / MBD / PMI",
           "competitor": {
             "status": "yes",

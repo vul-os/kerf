@@ -293,6 +293,14 @@ from kerf_cad_core.geom.io.step_read import read_step, StepReadError
 from kerf_cad_core.geom.io.step_write import write_step, StepWriteError
 # GK-23: body mass properties
 from kerf_cad_core.geom.mass_props import body_mass_props
+# GK-P-VWC: volume-weighted centroid + inertia for non-uniform density (Mortenson §11.5)
+from kerf_cad_core.geom.volume_weighted_centroid import (
+    compute_centroid_density_field,
+    compute_inertia_density_field,
+    functionally_graded_centroid,
+    CentroidResult,
+    InertiaResult,
+)
 # GK-54: mesh -> NURBS autosurface
 from kerf_cad_core.geom.mesh_to_nurbs import mesh_autosurface
 # GK-55: mesh boolean sealed-manifold
@@ -720,6 +728,12 @@ __all__ = [
     "write_step","StepWriteError",
     # GK-23
     "body_mass_props",
+    # GK-P-VWC: volume-weighted centroid + inertia for non-uniform density
+    "compute_centroid_density_field",
+    "compute_inertia_density_field",
+    "functionally_graded_centroid",
+    "CentroidResult",
+    "InertiaResult",
     # GK-54
     "mesh_autosurface",
     # GK-55

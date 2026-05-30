@@ -147,6 +147,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 | **G3 surfacing** | `feature_blend_srf_g3` (surfacing.py:1376) + `feature_g3_chain_blend` (surfacing.py:1894) registered LLM tools; `blend_srf_g3` / `curvature_rate_continuity_residual` / `zebra_stripe` / `reflection_lines` / `curvature_comb` exported from `geom/__init__.py`; `feature_zebra_analysis` + `feature_isophote_analysis` wired | ✅ shipped |
 | **General solid boolean** | NURBS-faced / non-axis-aligned solids (today: axis-aligned only; general CSG delegates to OCCT worker) | 🔴 not started |
 | **GK-P: Hollow operator** | Compound feature: shell offset + inner-face blend + inner-edge fillet + port drilling + optional ribs — `hollow_body` / `hollow_with_ribs`; LLM tool `brep_make_hollow` | ✅ shipped |
+| **Volume-weighted centroid + inertia for non-uniform density** | Monte Carlo volume integration (Mortenson §11.5); `functionally_graded_centroid` for linear-z / shell-dense / radial FGM patterns; LLM tool `brep_centroid_density_field`; 22 tests green. | ✅ shipped |
 
 **GK-P (parity) series in flight.** A four-agent survey of Kerf vs ~18 kernel-relevant CADs found a concrete, finite gap list. GK-01..GK-139 are landed. The `GK-P` series (tracked in `tasks.md`) closes the remaining gaps:
 

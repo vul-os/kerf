@@ -1241,6 +1241,7 @@ layer (history/UI/CAM/FEM packages), not the geometry kernel.
 | Hausdorff deviation | ✅ GK-37 |
 | Class-A hotspot report | ✅ (`leading.py`, wired GK-P03) |
 | Global continuity audit (whole body) | ✅ GK-138 (wired GK-P04) |
+| Characteristic curve extraction (Pottmann-Wallner §11) | ✅ GK-P49 — ridge/valley/parabolic/umbilic wired |
 
 ### D. Solid B-rep
 | Capability | Status |

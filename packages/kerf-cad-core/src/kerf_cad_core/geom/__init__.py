@@ -993,6 +993,11 @@ __all__ = [
     "reparametrize_arap",
     "distortion_metric",
     "reparam_compare",
+    # GK-P49: characteristic curve extraction (Pottmann-Wallner §11)
+    "CharacteristicCurves",
+    "Curve2D",
+    "extract_characteristic_curves",
+    "trace_curve_from_seed",
 ]
 
 # Variable-section edge blend (Vida-Martin-Varady 1994 §4)
@@ -1103,4 +1108,11 @@ from kerf_cad_core.geom.nurbs_param_optimal import (
     reparametrize_arap,
     distortion_metric,
     reparam_compare,
+)
+# GK-P49: characteristic curve extraction (Pottmann-Wallner §11)
+from kerf_cad_core.geom.characteristic_curves import (
+    CharacteristicCurves,
+    Curve2D,
+    extract_characteristic_curves,
+    trace_curve_from_seed,
 )

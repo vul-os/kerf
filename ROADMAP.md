@@ -210,6 +210,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 - **5-axis CAM UI** ✅ — `CAMView.jsx` mode switch (3-axis / 5-axis-indexed / 5-axis-continuous); tilt axis (A/B/C) + angle; strategy (swarf / contour-on-tilted-plane / indexed-rough); spindle vector preview; dispatches `cam_run` backend tool (`operation=5axis_finish` or `3plus2`).
 - **Slicing** ✅ — plane-section, CNC layered, 3D-print G-code (Cura, Tier 1).
 - **HVAC duct pressure loss — ASHRAE §35 fittings** ✅ — ASHRAE Handbook of Fundamentals 2021 §35 (Ch. 21) Table 21-1 fitting loss coefficients: 10 fitting kinds (smooth/segmented elbows, 45° elbow, tee branch/through, gradual/abrupt transitions, butterfly damper, gradual reducer/expander); `fitting_pressure_loss()` + `compute_duct_run_pressure_drop()` (straight-duct + fittings combined); `build_loss_table()` with full ASHRAE citations; 2 new LLM tools (`hvac.fitting_pressure_loss`, `hvac.compute_run_pressure_drop`).
+- **Slicing** ✅ — plane-section, CNC layered, 3D-print G-code (Cura, Tier 1); infill pattern library (gyroid TPMS, honeycomb, triangular grid, concentric) ✅.
 
 ### Electronics
 

@@ -76,3 +76,17 @@ def _register_tools(ctx, provides: list) -> None:
         provides.append("slicing.fdm")
     except Exception as exc:
         logger.warning("kerf-slicing: failed to load run_print_slice tool: %s", exc)
+
+    try:
+        from kerf_slicing.tools.generate_infill import (
+            slicing_generate_infill,
+            slicing_generate_infill_spec,
+        )
+        ctx.tools.register(
+            "slicing_generate_infill",
+            slicing_generate_infill_spec,
+            slicing_generate_infill,
+        )
+        provides.append("slicing.infill")
+    except Exception as exc:
+        logger.warning("kerf-slicing: failed to load slicing_generate_infill tool: %s", exc)

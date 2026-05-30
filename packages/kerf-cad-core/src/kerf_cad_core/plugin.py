@@ -305,6 +305,11 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.auto_lightweight",              # brep_auto_lightweight
     # GK-P: Quadratic → cubic NURBS elevation (Piegl-Tiller §5.5 specialisation)
     "kerf_cad_core.geom.degree_2_to_3",                 # nurbs_elevate_to_cubic — degree-2 B-spline → degree-3, shape-preserving
+    # BREP-CONNECT-INSPECTOR: radial-edge valence + shell connectivity
+    # (Weiler 1985 §3 + Mantyla 1988 §6) — brep_inspect_connectivity, brep_is_manifold
+    "kerf_cad_core.geom.brep_connect_inspector_tools",
+    # GK-P NURBS-DERIVATIVE-FIELD-VISUAL: 1st partial-derivative arrow-plot PNG/SVG
+    "kerf_cad_core.geom.derivative_field_viz",           # nurbs_derivative_field_png, nurbs_derivative_field_svg
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

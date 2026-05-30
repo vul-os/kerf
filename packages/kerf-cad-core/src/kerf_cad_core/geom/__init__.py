@@ -1069,6 +1069,10 @@ __all__ = [
     "export_heatmap_png",
     "export_heatmap_svg",
     "generate_curvature_legend",
+    # BREP-CONNECT-INSPECTOR: radial-edge connectivity (Weiler 1985 + Mantyla 1988)
+    "ConnectivityReport",
+    "inspect_connectivity",
+    "is_manifold_closed",
 ]
 
 # Variable-section edge blend (Vida-Martin-Varady 1994 §4)
@@ -1265,3 +1269,16 @@ from kerf_cad_core.geom.curvature_heatmap import (
 # Restore the curvature_heatmap *function* from surface_analysis (the submodule
 # import above sets the attribute to the module object; we need the function).
 from kerf_cad_core.geom.surface_analysis import curvature_heatmap  # noqa: E402 (re-bind)
+# GK-P NURBS-DERIVATIVE-FIELD-VISUAL: 1st partial-derivative vector-field arrow-plot PNG/SVG
+from kerf_cad_core.geom.derivative_field_viz import (
+    render_derivative_field_png,
+    render_derivative_field_svg,
+)
+
+# BREP-CONNECT-INSPECTOR: radial-edge connectivity classification
+# (Weiler 1985 §3 + Mantyla 1988 §6 Euler operators) — pure-Python, no OCCT.
+from kerf_cad_core.geom.brep_connect_inspector import (  # noqa: E402
+    ConnectivityReport,
+    inspect_connectivity,
+    is_manifold_closed,
+)

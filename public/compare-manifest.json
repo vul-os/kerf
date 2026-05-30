@@ -9262,7 +9262,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Ejector pin layout planner (Yu-Fan 2003 §10 + SPI/ANSI B151.1): regular-grid placement with 20 mm default spacing; SPI standard diameters (3/16\"–1/2\" series); dedicated feature pins for bosses and ribs; force distribution (Menges §7.2 side-wall friction model); conflict detection against cooling channels and rib bodies; warpage risk from force non-uniformity (4×4 region grid); LLM tools: mold_plan_ejector_pins + mold_pin_conflicts",
+            "note": "Ejector pin layout planner (Yu-Fan 2003 \u00a710 + SPI/ANSI B151.1): regular-grid placement with 20 mm default spacing; SPI standard diameters (3/16\"\u20131/2\" series); dedicated feature pins for bosses and ribs; force distribution (Menges \u00a77.2 side-wall friction model); conflict detection against cooling channels and rib bodies; warpage risk from force non-uniformity (4\u00d74 region grid); LLM tools: mold_plan_ejector_pins + mold_pin_conflicts",
             "evidence": "packages/kerf-mold/src/kerf_mold/ejector_pin_planner.py"
           }
         },
@@ -15278,6 +15278,20 @@
             "status": "partial",
             "note": "mesh_repair (fill_holes/manifold), retopo_snap, mesh_to_nurbs; no SDF-envelope ShrinkWrap",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/mesh_repair.py"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "B-rep shell connectivity inspector (Weiler radial-edge)",
+          "competitor": {
+            "status": "yes",
+            "note": "CheckObjectsCommand + EdgeContinuity \u2014 reports naked/non-manifold edges; no programmatic union-find component count",
+            "source": "https://docs.mcneel.com/rhino/8/help/en-us/commands/check.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "inspect_connectivity(): dangling/boundary/manifold/non-manifold edge counts + isolated vertices + degenerate edges + union-find components + Euler-Poincare V-E+F; is_manifold_closed(); LLM tools brep_inspect_connectivity + brep_is_manifold; 11 hermetic tests (cube manifold=12/boundary=0/components=1; open box boundary=4; T-shape nonmanifold; two disconnected cubes components=2)",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/brep_connect_inspector.py"
           }
         },
         {

@@ -1046,3 +1046,118 @@ async def run_mtf_across_field(ctx: ProjectCtx, args: bytes) -> str:
         **kwargs,
     )
     return ok_payload(result)
+
+from kerf_cad_core.optics.seidel_aberrations import seidel_coefficients  # noqa: E402
+
+# Tool: optics_seidel_aberrations
+# ---------------------------------------------------------------------------
+
+_seidel_aberrations_spec = ToolSpec(
+    name="optics_seidel_aberrations",
+    description=(
+        "Compute the five Seidel third-order aberration coefficients (S_I-S_V)\n"
+        "for a sequential lens stack via dual paraxial-ray trace.\n"
+        "\n"
+        "Theory (Welford 1986 §6.2 / Born & Wolf §5.3):\n"
+        "  Traces a *marginal ray* (full aperture, on-axis) and a *chief ray*\n"
+        "  (zero height at stop, full field angle) through all surfaces.\n"
+        "  Per-surface contributions are summed:\n"
+        "\n"
+        "    S_I   = -A^2    * h * delta(u/n)   [spherical aberration]\n"
+        "    S_II  = -A*Abar * h * delta(u/n)   [coma]\n"
+        "    S_III = -Abar^2 * h * delta(u/n)   [astigmatism]\n"
+        "    S_IV  = -H^2    * delta(c/n)        [Petzval field curvature]\n"
+        "    S_V   = (S_III + S_IV) * Abar/A    [distortion]\n"
+        "\n"
+        "  where A = n*i (marginal refraction invariant), Abar = n*ibar (chief),\n"
+        "  H = Lagrange invariant (n*u*ybar - n*ubar*y), constant across surfaces.\n"
+        "\n"
+        "  Positive S_I = under-corrected spherical aberration (converging singlet).\n"
+        "\n"
+        "HONEST FLAG: Third-order only. Higher-order aberrations require Hopkins\n"
+        "exact finite-ray OPD. Monochromatic; chromatic aberrations excluded.\n"
+        "Stop assumed at first surface (entrance pupil = front surface).\n"
+        "\n"
+        "Surface definition (each element of 'surfaces' array):\n"
+        "  c  : curvature 1/R (mm^-1). 0 = flat.\n"
+        "  t  : thickness to NEXT surface vertex (mm). Last surface: 0.\n"
+        "  n  : refractive index of medium AFTER this surface.\n"
+        "  k  : conic constant (default 0 = sphere, unused for paraxial Seidel).\n"
+        "\n"
+        "Returns S_I, S_II, S_III, S_IV, S_V, H_lagrange, per_surface contributions,\n"
+        "and total_wavefront_aberration_waves (RSS / 8*lambda at 550 nm).\n"
+        "\n"
+        "Errors: {ok:false, reason} for invalid inputs. Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "surfaces": {
+                "type": "array",
+                "description": (
+                    "Ordered list of optical surface dicts. Each must have: "
+                    "c (mm^-1), t (mm), n (>= 1.0). Optional: k (conic, unused)."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "c": {
+                            "type": "number",
+                            "description": "Curvature 1/R (mm^-1). 0 = flat.",
+                        },
+                        "t": {
+                            "type": "number",
+                            "description": "Thickness to next surface (mm).",
+                        },
+                        "n": {
+                            "type": "number",
+                            "description": "Refractive index after surface (>= 1.0).",
+                        },
+                        "k": {
+                            "type": "number",
+                            "description": "Conic constant (default 0 = sphere).",
+                        },
+                    },
+                    "required": ["c", "t", "n"],
+                },
+            },
+            "aperture": {
+                "type": "number",
+                "description": "Marginal ray height at first surface (mm). Default 1.0.",
+            },
+            "field_angle_deg": {
+                "type": "number",
+                "description": "Chief-ray field angle (degrees). Default 5.0.",
+            },
+            "n_object": {
+                "type": "number",
+                "description": "Refractive index of object space (default 1.0 = air).",
+            },
+        },
+        "required": ["surfaces"],
+    },
+)
+
+
+@register(_seidel_aberrations_spec, write=False)
+async def run_seidel_aberrations(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    if a.get("surfaces") is None:
+        return json.dumps({"ok": False, "reason": "surfaces is required"})
+
+    kwargs: dict = {}
+    if "aperture" in a:
+        kwargs["aperture"] = float(a["aperture"])
+    if "field_angle_deg" in a:
+        kwargs["field_angle_deg"] = float(a["field_angle_deg"])
+    if "n_object" in a:
+        kwargs["n_object"] = float(a["n_object"])
+
+    result = seidel_coefficients(a["surfaces"], **kwargs)
+    if isinstance(result, dict):  # error dict
+        return json.dumps(result)
+    return ok_payload(result.to_dict())

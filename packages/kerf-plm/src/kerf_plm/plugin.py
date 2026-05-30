@@ -66,6 +66,20 @@ async def register(app: FastAPI, ctx):
     except Exception:
         pass  # where-used tool optional — fail silently if symbol missing.
 
+    # Effectivity BOM expansion (ISO 10303-44 + Borst-Lahti §7.4) — 150% → 100% BOM.
+    try:
+        from kerf_plm.tools import (
+            plm_expand_effectivity_bom_spec,
+            run_plm_expand_effectivity_bom,
+        )
+        ctx.tools.register(
+            "plm_expand_effectivity_bom",
+            plm_expand_effectivity_bom_spec,
+            run_plm_expand_effectivity_bom,
+        )
+    except Exception:
+        pass  # effectivity-bom tool optional — fail silently if symbol missing.
+
     try:
         from kerf_core.plugin import PluginManifest
         return PluginManifest(

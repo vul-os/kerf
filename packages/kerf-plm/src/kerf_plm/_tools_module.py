@@ -767,3 +767,166 @@ async def run_plm_propose_co_changes(ctx, args: bytes) -> str:
             for s in suggestions
         ],
     })
+
+
+# ===========================================================================
+# PLM Effectivity BOM Expansion (ISO 10303-44 + Borst-Lahti ss7.4)
+# ===========================================================================
+
+plm_expand_effectivity_bom_spec = ToolSpec(
+    name="plm_expand_effectivity_bom",
+    description=(
+        "Expand a 150% BOM (max-effectivity structure) to a 100% BOM for a "
+        "specific effectivity context: date, configuration options, and/or "
+        "serial number.\n\n"
+        "A 150% BOM contains every possible line item across all variants and "
+        "time periods.  This tool filters the superset down to the concrete "
+        "parts list valid for the given build context.\n\n"
+        "Filtering rules (ISO 10303-44 ss5.3 + Borst-Lahti ss7.4):\n"
+        "  date:          line included when effective_from <= date <= effective_to "
+        "(open bounds = no constraint).\n"
+        "  options:       each option_requirement key=value must match the selector "
+        "(implicit AND, exact-match -- complex AND/OR not supported in v1).\n"
+        "  serial_number: inclusive integer or lexicographic range.\n\n"
+        "Returns resolved entries with qty and total_qty summed across all "
+        "included lines."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "bom_lines": {
+                "type": "array",
+                "description": (
+                    "The 150% BOM. Each line: "
+                    "{part_id (required), description?, qty? (default 1), "
+                    "effective_from? (YYYY-MM-DD), effective_to? (YYYY-MM-DD), "
+                    "serial_from? (string), serial_to? (string), "
+                    "option_requirements? ({key: value, ...}), attributes? ({})}"
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "part_id": {"type": "string"},
+                        "description": {"type": "string"},
+                        "qty": {"type": "number"},
+                        "effective_from": {"type": "string"},
+                        "effective_to": {"type": "string"},
+                        "serial_from": {"type": "string"},
+                        "serial_to": {"type": "string"},
+                        "option_requirements": {
+                            "type": "object",
+                            "additionalProperties": {"type": "string"},
+                        },
+                        "attributes": {"type": "object"},
+                    },
+                    "required": ["part_id"],
+                },
+            },
+            "effective_date": {
+                "type": "string",
+                "description": "ISO-8601 date (YYYY-MM-DD). Activates date-effectivity filtering.",
+            },
+            "options": {
+                "type": "object",
+                "description": (
+                    "Configuration option selections, e.g. {\"engine\": \"v6\"}. "
+                    "Lines with option_requirements not fully matched are excluded."
+                ),
+                "additionalProperties": {"type": "string"},
+            },
+            "serial_number": {
+                "type": "string",
+                "description": "Unit serial number for serial-range effectivity filtering.",
+            },
+        },
+        "required": ["bom_lines"],
+    },
+)
+
+
+@register(plm_expand_effectivity_bom_spec)
+async def run_plm_expand_effectivity_bom(ctx, args: bytes) -> str:
+    import json as _json
+    try:
+        a = _json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+    raw_lines = a.get("bom_lines")
+    if not isinstance(raw_lines, list):
+        return err_payload("'bom_lines' must be an array", "BAD_ARGS")
+
+    from datetime import date as _date
+    from kerf_plm.effectivity_bom import BomLine, expand_effectivity_bom, HONEST_FLAG
+
+    effective_date = None
+    eff_date_str = a.get("effective_date")
+    if eff_date_str:
+        try:
+            effective_date = _date.fromisoformat(eff_date_str)
+        except ValueError as exc:
+            return err_payload(f"invalid effective_date: {exc}", "BAD_ARGS")
+
+    options = a.get("options") or {}
+    if not isinstance(options, dict):
+        return err_payload("'options' must be an object", "BAD_ARGS")
+
+    serial_number = a.get("serial_number") or None
+
+    bom_lines: list[BomLine] = []
+    for i, raw in enumerate(raw_lines):
+        if not isinstance(raw, dict):
+            return err_payload(f"bom_lines[{i}] must be an object", "BAD_ARGS")
+        part_id = raw.get("part_id")
+        if not part_id:
+            return err_payload(f"bom_lines[{i}].part_id is required", "BAD_ARGS")
+
+        eff_from = None
+        eff_to = None
+        if raw.get("effective_from"):
+            try:
+                eff_from = _date.fromisoformat(raw["effective_from"])
+            except ValueError as exc:
+                return err_payload(f"bom_lines[{i}].effective_from invalid: {exc}", "BAD_ARGS")
+        if raw.get("effective_to"):
+            try:
+                eff_to = _date.fromisoformat(raw["effective_to"])
+            except ValueError as exc:
+                return err_payload(f"bom_lines[{i}].effective_to invalid: {exc}", "BAD_ARGS")
+
+        bom_lines.append(BomLine(
+            part_id=part_id,
+            description=raw.get("description", ""),
+            qty=float(raw.get("qty", 1.0)),
+            effective_from=eff_from,
+            effective_to=eff_to,
+            serial_from=raw.get("serial_from") or None,
+            serial_to=raw.get("serial_to") or None,
+            option_requirements=raw.get("option_requirements") or {},
+            attributes=raw.get("attributes") or {},
+        ))
+
+    try:
+        result = expand_effectivity_bom(
+            bom_lines,
+            effective_date=effective_date,
+            options=options,
+            serial_number=serial_number,
+        )
+    except Exception as exc:
+        return err_payload(f"expansion error: {exc}", "EXPANSION_ERROR")
+
+    return ok_payload({
+        "entry_count": len(result.entries),
+        "total_qty": result.total_qty,
+        "entries": [
+            {
+                "part_id": e.part_id,
+                "description": e.description,
+                "qty": e.qty,
+                "attributes": e.attributes,
+            }
+            for e in result.entries
+        ],
+        "honest_flag": HONEST_FLAG,
+    })

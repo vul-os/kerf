@@ -6693,6 +6693,20 @@
             "note": "Where-Used Analysis: reverse-traverses the assembly hierarchy from a target part. Returns all parent assemblies with occurrence multiplicity and depth (depth=1 immediate parent, depth=2 grandparent, …). Cycle detection with cap at depth=20. LLM tool: plm_where_used.",
             "evidence": "packages/kerf-plm/src/kerf_plm/where_used.py"
           }
+        },
+        {
+          "domain": "D1",
+          "feature": "B-rep face planarity check (SVD best-fit plane)",
+          "competitor": {
+            "status": "yes",
+            "note": "SOLIDWORKS IFaceFeature.GetPlanarFaceData() returns plane normal + origin for planar faces; non-planar faces not classified",
+            "source": "https://help.solidworks.com/2024/english/api/sldworksapiprogguide/Welcome.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "check_face_planarity: uniform UV-grid sampling + SVD orthogonal regression (Pratt 1987 §3; Eberly §6.6); returns is_planar, plane_origin, plane_normal, max_deviation, planarity_score (0→flat, higher→curved); default tolerance=1e-4×bbox_diag; LLM tool brep_check_face_planarity. Useful for sheet-metal flat-pattern feasibility, simple-face fast-rendering, planar-face cooling-channel routing. CAVEAT: v1 uses full UV domain — inner trim loops not excluded.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/face_planarity.py"
+          }
         }
       ]
     },

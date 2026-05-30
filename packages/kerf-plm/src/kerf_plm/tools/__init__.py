@@ -17,4 +17,6 @@ from kerf_plm._tools_module import (  # noqa: F401
     run_plm_where_used,
     plm_propose_co_changes_spec,
     run_plm_propose_co_changes,
+    plm_expand_effectivity_bom_spec,
+    run_plm_expand_effectivity_bom,
 )

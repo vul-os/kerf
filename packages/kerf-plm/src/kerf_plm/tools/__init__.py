@@ -27,4 +27,6 @@ from kerf_plm._tools_module import (  # noqa: F401
     run_plm_validate_part_number,
     plm_allocate_part_number_spec,
     run_plm_allocate_part_number,
+    plm_compute_change_notification_spec,
+    run_plm_compute_change_notification,
 )

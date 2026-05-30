@@ -129,18 +129,32 @@ async def register(app: FastAPI, ctx):
     except Exception:
         pass  # part-numbering tools optional — fail silently if symbol missing.
 
+    # Change notification distribution (ISO 10007 §6.2 + APQP PPAP §3).
+    try:
+        from kerf_plm.tools import (
+            plm_compute_change_notification_spec,
+            run_plm_compute_change_notification,
+        )
+        ctx.tools.register(
+            "plm_compute_change_notification",
+            plm_compute_change_notification_spec,
+            run_plm_compute_change_notification,
+        )
+    except Exception:
+        pass  # change-notification tool optional — fail silently if symbol missing.
+
     try:
         from kerf_core.plugin import PluginManifest
         return PluginManifest(
             name="plm",
             version="0.1.0",
-            provides=["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.sysml-traceability", "plm.xmi-export", "plm.where-used", "plm.document-version-diff", "plm.multi-cavity-effectivity", "plm.part-numbering-schema"],
+            provides=["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.sysml-traceability", "plm.xmi-export", "plm.where-used", "plm.document-version-diff", "plm.multi-cavity-effectivity", "plm.part-numbering-schema", "plm.change-notification-distribution"],
             depends=[],
         )
     except ImportError:
         return {
             "name": "plm",
             "version": "0.1.0",
-            "provides": ["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.multi-cavity-effectivity", "plm.part-numbering-schema"],
+            "provides": ["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.multi-cavity-effectivity", "plm.part-numbering-schema", "plm.change-notification-distribution"],
             "depends": [],
         }

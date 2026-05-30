@@ -1515,3 +1515,192 @@ async def run_plm_allocate_part_number(ctx, args: bytes) -> str:
         "state": schema.to_state_dict(),
         "honest_flag": PartNumberSchema.HONEST_FLAG,
     })
+
+
+# ===========================================================================
+# PLM Change Notification Distribution (ISO 10007 §6.2 + APQP PPAP §3)
+# ===========================================================================
+
+plm_compute_change_notification_spec = ToolSpec(
+    name="plm_compute_change_notification",
+    description=(
+        "Compute the notification distribution for an Engineering Change Order (ECO).\n\n"
+        "For each ECO line item (part revision change) the tool identifies every "
+        "stakeholder that must be notified, the reason (citing ISO 10007 §6.2 or "
+        "APQP PPAP §3 where applicable), and the urgency level.\n\n"
+        "Stakeholder categories:\n"
+        "  engineering       — owner of the affected part/assembly; notified for "
+        "every ECO line (ISO 10007 §6.2).\n"
+        "  supplier          — external supplier; notified when PPAP renewal is "
+        "triggered (Class A or Class B dimension/material/process/finish change, "
+        "per APQP PPAP §3).\n"
+        "  manufacturing_lead — process documentation lead; notified when process "
+        "spec, dimension, material, or finish changes (ISO 10007 §6.2).\n"
+        "  quality           — QA team; notified for Class A changes, PPAP renewals, "
+        "and dimension/material/process changes (ISO 10007 §5.1 + APQP §3).\n"
+        "  document_control  — notified for every ECO line for revision packaging "
+        "(ISO 10007 §6.2).\n\n"
+        "Change classification (ISO 10007 §5.1):\n"
+        "  class_a — Critical/Major (safety, regulatory, key characteristic). "
+        "Always triggers Quality + Supplier PPAP + Manufacturing.\n"
+        "  class_b — Significant functional change. Triggers suppliers/quality/mfg "
+        "only for specific change types.\n"
+        "  class_c — Minor/Administrative. Engineering + Document Control only.\n\n"
+        "Urgency levels (APQP §3 timing guidance):\n"
+        "  high   — action required before effectivity date "
+        "(PPAP renewal, safety review).\n"
+        "  normal — action within normal process lead time.\n"
+        "  low    — informational only.\n\n"
+        "HONEST FLAG: this tool produces a *recipient list* only. "
+        "It does NOT send notifications. The caller must route the returned "
+        "notification list to their delivery layer."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "eco_id": {
+                "type": "string",
+                "description": "Engineering Change Order identifier, e.g. 'ECO-0042'.",
+            },
+            "eco_lines": {
+                "type": "array",
+                "description": (
+                    "List of ECO line items. Each item:\n"
+                    "  part_id (str, required) — part number being changed.\n"
+                    "  rev_from (str) — current revision, e.g. 'A'.\n"
+                    "  rev_to (str) — target revision, e.g. 'B'.\n"
+                    "  change_class (str) — 'class_a' | 'class_b' | 'class_c'. "
+                    "Default 'class_b'.\n"
+                    "  change_types (list[str]) — one or more of: 'dimension', "
+                    "'material', 'process_spec', 'drawing', 'document', 'finish', "
+                    "'other'.\n"
+                    "  description (str) — free-text change description."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "part_id": {"type": "string"},
+                        "rev_from": {"type": "string"},
+                        "rev_to": {"type": "string"},
+                        "change_class": {
+                            "type": "string",
+                            "enum": ["class_a", "class_b", "class_c"],
+                        },
+                        "change_types": {
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "dimension", "material", "process_spec",
+                                    "drawing", "document", "finish", "other",
+                                ],
+                            },
+                        },
+                        "description": {"type": "string"},
+                    },
+                    "required": ["part_id"],
+                },
+            },
+            "plm_data": {
+                "type": "object",
+                "description": (
+                    "PLM product-structure and stakeholder data. Shape:\n"
+                    "  parts: { <part_id>: { owner_team, suppliers, "
+                    "manufacturing_routes } }\n"
+                    "  quality_team: str (default '@quality-team')\n"
+                    "  document_control_team: str (default '@doc-control')"
+                ),
+                "properties": {
+                    "parts": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                                "owner_team": {"type": "string"},
+                                "suppliers": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                },
+                                "manufacturing_routes": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                },
+                            },
+                        },
+                    },
+                    "quality_team": {"type": "string"},
+                    "document_control_team": {"type": "string"},
+                },
+            },
+        },
+        "required": ["eco_id", "eco_lines", "plm_data"],
+    },
+)
+
+
+@register(plm_compute_change_notification_spec)
+async def run_plm_compute_change_notification(ctx, args: bytes) -> str:
+    """Tool handler for plm_compute_change_notification (ISO 10007 §6.2 + APQP §3)."""
+    import json as _json
+    try:
+        a = _json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+    eco_id = a.get("eco_id", "")
+    raw_lines = a.get("eco_lines")
+    raw_plm = a.get("plm_data")
+
+    if not eco_id:
+        return err_payload("'eco_id' is required", "BAD_ARGS")
+    if not isinstance(raw_lines, list):
+        return err_payload("'eco_lines' must be an array", "BAD_ARGS")
+    if not isinstance(raw_plm, dict):
+        return err_payload("'plm_data' must be an object", "BAD_ARGS")
+
+    from kerf_plm.change_notification import (
+        compute_notification_distribution,
+        eco_line_from_dict,
+        plm_data_from_dict,
+    )
+
+    try:
+        eco_lines = [eco_line_from_dict(l) for l in raw_lines]
+    except (KeyError, TypeError) as exc:
+        return err_payload(f"invalid eco_lines entry: {exc}", "BAD_ARGS")
+
+    plm_data = plm_data_from_dict(raw_plm)
+
+    try:
+        report = compute_notification_distribution(eco_id, eco_lines, plm_data)
+    except Exception as exc:
+        return err_payload(f"notification computation error: {exc}", "COMPUTATION_ERROR")
+
+    return ok_payload({
+        "eco_id": report.eco_id,
+        "notification_count": len(report.notifications),
+        "honest_flag": report.honest_flag,
+        "notifications": [
+            {
+                "part_id": n.part_id,
+                "stakeholder": n.stakeholder,
+                "role": n.role,
+                "reason": n.reason,
+                "urgency": n.urgency.value,
+                "ppap_renewal_required": n.ppap_renewal_required,
+            }
+            for n in report.notifications
+        ],
+        "by_part": {
+            pid: [
+                {
+                    "stakeholder": n.stakeholder,
+                    "role": n.role,
+                    "urgency": n.urgency.value,
+                    "ppap_renewal_required": n.ppap_renewal_required,
+                }
+                for n in notifs
+            ]
+            for pid, notifs in report.by_part().items()
+        },
+    })

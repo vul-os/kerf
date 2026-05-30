@@ -94,7 +94,7 @@ The sector work only matters if you **own your work, are not locked in, and can 
 
 **Machine elements depth** ✅ — ISO 6336 gear rating Method B; ISO/TS 16281 bearing modified life (aISO); planetary gearbox (3 Willis modes + compound); Taylor extended tool-life + Gilbert economics.
 
-**Thermo-fluid depth** ✅ — IAPWS-IF97 steam Regions 1/2/4; Bell-Delaware shell-and-tube HX (TEMA + 5 correction factors); transient pipe-network (MOC waterhammer + surge-tank); ASHRAE CLTD/RTS transient cooling loads.
+**Thermo-fluid depth** ✅ — IAPWS-IF97 steam Regions 1/2/4; Bell-Delaware shell-and-tube HX (TEMA + 5 correction factors); transient pipe-network (MOC waterhammer + surge-tank); ASHRAE CLTD/RTS transient cooling loads; equal-friction duct sizing optimizer (ASHRAE §35) ✅.
 
 **Electronics / power depth** ✅ — IBIS-AMI signal integrity (Bergeron + PRBS eye); AC PDN impedance + decap optimiser; Newton-Raphson AC load-flow; IEC 60255 + IEEE C37.112 protection coordination + IEEE 1584-2018 arc-flash; fibre-optic link budget.
 

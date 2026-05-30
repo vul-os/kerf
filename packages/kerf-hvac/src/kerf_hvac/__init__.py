@@ -3,6 +3,7 @@
 Provides:
 - DuctSystem data model (rectangular, round, oval ducts; elbow/reducer/tee/cap/flex fittings)
 - ASHRAE velocity method duct sizing
+- ASHRAE §35 equal-friction duct sizing optimizer
 - Sheet-metal flat-pattern generation for rectangular elbow and reducer
 - Darcy-Weisbach pressure drop + ASHRAE minor-loss coefficients
 - LLM tool surface
@@ -25,10 +26,11 @@ from kerf_hvac.pressure import (
     TEE_MAIN_K,
     TEE_BRANCH_K,
 )
-from kerf_hvac.ahri_catalogue import (
-    EquipmentModel,
-    lookup_equipment,
-    VALID_CATEGORIES,
+from kerf_hvac.duct_sizing_optimizer import (
+    equal_friction_size,
+    size_duct_run,
+    compute_duct_cost,
+    SizedSegment,
 )
 
 __all__ = [
@@ -46,7 +48,8 @@ __all__ = [
     "ELBOW_90_ROUND_K",
     "TEE_MAIN_K",
     "TEE_BRANCH_K",
-    "EquipmentModel",
-    "lookup_equipment",
-    "VALID_CATEGORIES",
+    "equal_friction_size",
+    "size_duct_run",
+    "compute_duct_cost",
+    "SizedSegment",
 ]

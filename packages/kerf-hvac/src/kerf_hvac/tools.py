@@ -1,11 +1,13 @@
 """tools.py — LLM tool surface for kerf-hvac.
 
 Registers the following tools:
-  - hvac.size_duct            — Select duct size for given airflow and velocity.
-  - hvac.pressure_drop        — Compute pressure drop for a straight duct run.
-  - hvac.fitting_loss         — Compute minor loss for a fitting.
-  - hvac.reducer_flat_pattern — Generate reducer flat-pattern dimensions.
-  - hvac.elbow_flat_pattern   — Generate elbow flat-pattern dimensions.
+  - hvac.size_duct                  — Select duct size for given airflow and velocity.
+  - hvac.pressure_drop              — Compute pressure drop for a straight duct run.
+  - hvac.fitting_loss               — Compute minor loss for a fitting.
+  - hvac.reducer_flat_pattern       — Generate reducer flat-pattern dimensions.
+  - hvac.elbow_flat_pattern         — Generate elbow flat-pattern dimensions.
+  - hvac.equal_friction_sizing      — ASHRAE §35 equal-friction single-segment sizing.
+  - hvac.size_duct_run              — ASHRAE §35 equal-friction multi-segment run sizing.
 """
 
 from __future__ import annotations
@@ -20,8 +22,6 @@ from kerf_hvac.pressure import (
     darcy_weisbach_loss,
     minor_loss,
     total_duct_loss,
-    fitting_pressure_loss,
-    compute_duct_run_pressure_drop,
     ELBOW_90_RECT_K,
     ELBOW_90_ROUND_K,
     ELBOW_45_RECT_K,
@@ -30,9 +30,9 @@ from kerf_hvac.pressure import (
     REDUCER_K,
     CAP_K,
     FLEX_PER_METRE_K,
-    FITTING_KINDS,
 )
 from kerf_hvac.flat_pattern import rect_elbow_pattern, rect_reducer_pattern
+from kerf_hvac.duct_sizing_optimizer import equal_friction_size, size_duct_run
 
 
 # ---------------------------------------------------------------------------
@@ -390,213 +390,180 @@ def handle_elbow_flat_pattern(args: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
-# hvac.fitting_pressure_loss  — ASHRAE §35 Table 21-1 fitting loss
+# hvac.equal_friction_sizing
 # ---------------------------------------------------------------------------
 
-_fitting_pressure_loss_spec = ToolSpec(
-    name="hvac.fitting_pressure_loss",
+_equal_friction_sizing_spec = ToolSpec(
+    name="hvac.equal_friction_sizing",
     description=(
-        "Compute the pressure loss (Pa) across a specific duct fitting using "
-        "ASHRAE Handbook of Fundamentals 2021 §35 (Chapter 21) Table 21-1 "
-        "C coefficients.  Supports 10 fitting kinds: elbows, tees, transitions, "
-        "dampers, reducers, and expanders.  "
-        "DISCLAIMER: Values from ASHRAE HOF 2021 §35 — NOT ASHRAE certified."
+        "Size a single round duct segment by the ASHRAE §35 equal-friction method. "
+        "Given airflow and a target friction rate (in w.c. / 100 ft), returns the "
+        "exact and standard-size diameters, mean velocity, and actual friction rate. "
+        "Default friction rate 0.08 in w.c./100 ft (ASHRAE low-pressure default). "
+        "Optionally enforces a maximum velocity (FPM) for residential noise budgets. "
+        "DISCLAIMER: ASHRAE methods — NOT ASHRAE certified."
     ),
     input_schema={
         "type": "object",
-        "required": ["fitting_kind", "flow_rate_cfm"],
+        "required": ["flow_cfm"],
         "properties": {
-            "fitting_kind": {
-                "type": "string",
-                "enum": sorted(FITTING_KINDS),
+            "flow_cfm": {
+                "type": "number",
+                "description": "Design airflow through this segment (CFM).",
+            },
+            "friction_rate_in_wc_per_100ft": {
+                "type": "number",
                 "description": (
-                    "ASHRAE §35 fitting type.  One of: "
-                    "elbow_90_smooth, elbow_90_segmented, elbow_45, "
-                    "tee_branch, tee_through, transition_gradual, "
-                    "transition_abrupt, damper_butterfly, "
-                    "reducer_gradual, expander_gradual."
+                    "Target friction loss rate (in w.c. / 100 ft). "
+                    "Default 0.08 (ASHRAE low-pressure supply). "
+                    "Typical range: 0.06–0.12 in w.c./100 ft."
                 ),
+                "default": 0.08,
             },
-            "flow_rate_cfm": {
+            "roughness_mm": {
                 "type": "number",
-                "description": "Volumetric airflow in CFM.",
+                "description": (
+                    "Duct absolute roughness (mm). Default 0.09 mm (galvanised steel)."
+                ),
+                "default": 0.09,
             },
-            "diameter_m": {
+            "max_velocity_fpm": {
                 "type": "number",
-                "description": "Upstream duct inner diameter in metres (round duct).",
-            },
-            "width_m": {
-                "type": "number",
-                "description": "Upstream duct width in metres (rectangular duct).",
-            },
-            "height_m": {
-                "type": "number",
-                "description": "Upstream duct height in metres (rectangular duct).",
-            },
-            "area_m2": {
-                "type": "number",
-                "description": "Upstream duct cross-sectional area in m² (alternative to diameter/width+height).",
-            },
-            "r_over_d": {
-                "type": "number",
-                "description": "Centreline bend radius / duct diameter for smooth elbows. Default 1.0.",
-                "default": 1.0,
-            },
-            "n_segments": {
-                "type": "integer",
-                "description": "Number of gore segments for segmented elbows (2–5). Default 4.",
-                "default": 4,
-            },
-            "A2_over_A1": {
-                "type": "number",
-                "description": "Downstream/upstream area ratio for abrupt contraction (0–1).",
-            },
-            "A1_over_A2": {
-                "type": "number",
-                "description": "Upstream/downstream area ratio for gradual expander (0–1).",
-            },
-            "theta_half_deg": {
-                "type": "number",
-                "description": "Half included-angle of taper in degrees for gradual reducer/transition. Default 10.",
-                "default": 10.0,
-            },
-            "Ab_over_Ac": {
-                "type": "number",
-                "description": "Branch/common area ratio for tee fittings (0–1). Default 0.5.",
-                "default": 0.5,
-            },
-            "blade_angle_deg": {
-                "type": "number",
-                "description": "Damper blade opening angle in degrees (10–90). Default 90 (wide open).",
-                "default": 90.0,
+                "description": (
+                    "Optional velocity ceiling (FPM). Duct will be sized up if "
+                    "equal-friction diameter exceeds this. "
+                    "Recommended: 700 FPM residential, 1200 FPM light commercial."
+                ),
             },
         },
     },
 )
 
 
-@register(_fitting_pressure_loss_spec)
-def handle_fitting_pressure_loss(args: dict) -> str:
+@register(_equal_friction_sizing_spec)
+def handle_equal_friction_sizing(args: dict) -> str:
     try:
-        fk = args["fitting_kind"]
-        q_cfm = float(args["flow_rate_cfm"])
+        flow_cfm = float(args["flow_cfm"])
+        fr = float(args.get("friction_rate_in_wc_per_100ft", 0.08))
+        eps_mm = float(args.get("roughness_mm", 0.09))
+        max_v = args.get("max_velocity_fpm")
+        if max_v is not None:
+            max_v = float(max_v)
 
-        # Build params dict from optional geometric fields
-        params: dict = {}
-        for key in (
-            "diameter_m", "width_m", "height_m", "area_m2",
-            "r_over_d", "n_segments", "A2_over_A1", "A1_over_A2",
-            "theta_half_deg", "Ab_over_Ac", "blade_angle_deg",
-        ):
-            if key in args and args[key] is not None:
-                params[key] = float(args[key]) if key != "n_segments" else int(args[key])
-
-        loss_pa = fitting_pressure_loss(fk, params, q_cfm)
-
-        return ok_payload({
-            "fitting_kind": fk,
-            "flow_rate_cfm": q_cfm,
-            "loss_pa": round(loss_pa, 4),
-            "disclaimer": (
-                "Values from ASHRAE Handbook of Fundamentals 2021 §35 — "
-                "NOT ASHRAE certified."
-            ),
-        })
+        result = equal_friction_size(
+            flow_cfm=flow_cfm,
+            friction_rate_in_wc_per_100ft=fr,
+            roughness_mm=eps_mm,
+            max_velocity_fpm=max_v,
+        )
+        return ok_payload(result)
     except (KeyError, ValueError, TypeError) as exc:
         return err_payload(str(exc), "BAD_ARGS")
 
 
 # ---------------------------------------------------------------------------
-# hvac.compute_run_pressure_drop  — end-to-end duct run solver
+# hvac.size_duct_run
 # ---------------------------------------------------------------------------
 
-_compute_run_spec = ToolSpec(
-    name="hvac.compute_run_pressure_drop",
+_size_duct_run_spec = ToolSpec(
+    name="hvac.size_duct_run",
     description=(
-        "Compute total pressure drop (Pa) for a multi-segment duct run "
-        "including straight-duct friction losses (Darcy-Weisbach / Colebrook-White) "
-        "and fitting losses (ASHRAE HOF 2021 §35 Table 21-1).  "
-        "Returns per-segment and per-fitting breakdowns.  "
-        "DISCLAIMER: Values from ASHRAE HOF 2021 §35 — NOT ASHRAE certified."
+        "Size all segments in a duct run by the ASHRAE §35 equal-friction method "
+        "(or static_regain / T_method stubs). "
+        "Pass a list of segment descriptors (label, optional flow_cfm override, "
+        "optional length_ft, optional downstream_cfm branch takeoff). "
+        "Upstream segments automatically carry more flow than downstream segments. "
+        "Returns sized diameters, velocities, and friction losses for each segment. "
+        "DISCLAIMER: ASHRAE methods — NOT ASHRAE certified."
     ),
     input_schema={
         "type": "object",
-        "required": ["duct_segments", "fittings", "flow_cfm"],
+        "required": ["segments", "total_flow_cfm"],
         "properties": {
-            "duct_segments": {
+            "segments": {
                 "type": "array",
                 "description": (
-                    "List of straight-duct segments.  Each object requires "
-                    "'length_m' and either 'diameter_m' (round) or "
-                    "'width_m'+'height_m' (rectangular).  Optional: 'roughness_m'."
+                    "Ordered list of duct segment descriptors, trunk-first. "
+                    "Each item may include: label (str), flow_cfm (number, optional override), "
+                    "length_ft (number, optional), downstream_cfm (number, optional branch takeoff)."
                 ),
                 "items": {
                     "type": "object",
                     "properties": {
-                        "length_m": {"type": "number"},
-                        "diameter_m": {"type": "number"},
-                        "width_m": {"type": "number"},
-                        "height_m": {"type": "number"},
-                        "roughness_m": {"type": "number"},
+                        "label": {"type": "string"},
+                        "flow_cfm": {"type": "number"},
+                        "length_ft": {"type": "number"},
+                        "downstream_cfm": {"type": "number"},
                     },
                 },
             },
-            "fittings": {
-                "type": "array",
-                "description": (
-                    "List of fittings.  Each object requires 'fitting_kind' "
-                    "(one of the ASHRAE §35 kinds) and 'params' (geometric "
-                    "parameter dict — same keys as hvac.fitting_pressure_loss)."
-                ),
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "fitting_kind": {"type": "string"},
-                        "params": {"type": "object"},
-                    },
-                },
-            },
-            "flow_cfm": {
+            "total_flow_cfm": {
                 "type": "number",
-                "description": "Total volumetric airflow in CFM.",
+                "description": "Total system airflow entering the first segment (CFM).",
+            },
+            "method": {
+                "type": "string",
+                "enum": ["equal_friction", "static_regain", "T_method"],
+                "description": "Sizing method. Only equal_friction is fully implemented.",
+                "default": "equal_friction",
+            },
+            "friction_rate_in_wc_per_100ft": {
+                "type": "number",
+                "description": "Target friction rate (in w.c. / 100 ft). Default 0.08.",
+                "default": 0.08,
             },
             "roughness_mm": {
                 "type": "number",
-                "description": "Default absolute roughness in mm for all segments (default 0.09 galvanised steel).",
+                "description": "Duct roughness (mm). Default 0.09.",
                 "default": 0.09,
+            },
+            "max_velocity_fpm": {
+                "type": "number",
+                "description": "Optional velocity ceiling (FPM) for all segments.",
             },
         },
     },
 )
 
 
-@register(_compute_run_spec)
-def handle_compute_run_pressure_drop(args: dict) -> str:
+@register(_size_duct_run_spec)
+def handle_size_duct_run(args: dict) -> str:
     try:
-        segs = args["duct_segments"]
-        fits = args["fittings"]
-        q_cfm = float(args["flow_cfm"])
-        eps_mm = float(args.get("roughness_mm", 0.09))
+        segments = args["segments"]
+        if not isinstance(segments, list):
+            return err_payload("segments must be a list", "BAD_ARGS")
 
-        result = compute_duct_run_pressure_drop(
-            duct_segments=segs,
-            fittings=fits,
-            flow_cfm=q_cfm,
-            roughness_m=eps_mm / 1000.0,
+        total_flow = float(args["total_flow_cfm"])
+        method = args.get("method", "equal_friction")
+        fr = float(args.get("friction_rate_in_wc_per_100ft", 0.08))
+        eps_mm = float(args.get("roughness_mm", 0.09))
+        max_v = args.get("max_velocity_fpm")
+        if max_v is not None:
+            max_v = float(max_v)
+
+        sized = size_duct_run(
+            segments=segments,
+            total_flow_cfm=total_flow,
+            method=method,  # type: ignore[arg-type]
+            friction_rate_in_wc_per_100ft=fr,
+            roughness_mm=eps_mm,
+            max_velocity_fpm=max_v,
         )
 
-        return ok_payload({
-            "straight_duct_pa": round(result["straight_duct_pa"], 4),
-            "fittings_pa": round(result["fittings_pa"], 4),
-            "total_pa": round(result["total_pa"], 4),
-            "flow_cfm": result["flow_cfm"],
-            "segment_losses_pa": [round(x, 4) for x in result["segment_losses_pa"]],
-            "fitting_losses_pa": [round(x, 4) for x in result["fitting_losses_pa"]],
-            "disclaimer": (
-                "Values from ASHRAE Handbook of Fundamentals 2021 §35 — "
-                "NOT ASHRAE certified."
-            ),
-        })
+        return ok_payload([
+            {
+                "label": s.label,
+                "flow_cfm": round(s.flow_cfm, 2),
+                "length_ft": s.length_ft,
+                "diameter_in": s.diameter_in,
+                "diameter_mm": round(s.diameter_mm, 1),
+                "velocity_fpm": s.velocity_fpm,
+                "friction_loss_in_wc_per_100ft": s.friction_loss_in_wc_per_100ft,
+                "total_friction_loss_in_wc": s.total_friction_loss_in_wc,
+                "method": s.method,
+            }
+            for s in sized
+        ])
     except (KeyError, ValueError, TypeError) as exc:
         return err_payload(str(exc), "BAD_ARGS")
 
@@ -611,6 +578,6 @@ TOOLS = [
     ("hvac.fitting_loss", _fitting_loss_spec, handle_fitting_loss),
     ("hvac.reducer_flat_pattern", _reducer_pattern_spec, handle_reducer_flat_pattern),
     ("hvac.elbow_flat_pattern", _elbow_pattern_spec, handle_elbow_flat_pattern),
-    ("hvac.fitting_pressure_loss", _fitting_pressure_loss_spec, handle_fitting_pressure_loss),
-    ("hvac.compute_run_pressure_drop", _compute_run_spec, handle_compute_run_pressure_drop),
+    ("hvac.equal_friction_sizing", _equal_friction_sizing_spec, handle_equal_friction_sizing),
+    ("hvac.size_duct_run", _size_duct_run_spec, handle_size_duct_run),
 ]

@@ -956,6 +956,11 @@ __all__ = [
     "solve_mate",
     # GK-131
     "tangent_edge_chain",
+    # GK-P fillet chain propagation
+    "EdgeChain",
+    "identify_fillet_chains",
+    "apply_fillet_chain",
+    "auto_fillet_all_edges",
     # GK-136
     "tetrahedralize",
     # GK-133 / ISO 10303-224
@@ -1082,6 +1087,13 @@ from kerf_cad_core.geom.assembly import solve_mate  # noqa: E402
 
 # GK-131: tangent-chain edge auto-select
 from kerf_cad_core.geom.fillet_solid import tangent_edge_chain
+# GK-P (fillet chain propagation — Vida-Martin-Varady 1994)
+from kerf_cad_core.geom.fillet_chain import (
+    EdgeChain,
+    identify_fillet_chains,
+    apply_fillet_chain,
+    auto_fillet_all_edges,
+)
 # GK-136: Delaunay volume mesh (tetrahedralization) for FEM hand-off
 from kerf_cad_core.geom.tetmesh import tetrahedralize
 # GK-133 / ISO 10303-224: feature recognition (hole / pocket / boss / fillet / chamfer)

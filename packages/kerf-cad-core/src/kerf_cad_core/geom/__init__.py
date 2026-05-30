@@ -1507,3 +1507,19 @@ from kerf_cad_core.geom.subd_gauss_bonnet_check import (  # noqa: E402
     GaussBonnetCheckReport,
     verify_gauss_bonnet,
 )
+# SUBD-EXPORT-PLY: CC limit-surface → Stanford PLY (ASCII + binary little-endian)
+# Ref: https://en.wikipedia.org/wiki/PLY_(file_format); Turk (1994) Stanford.
+# Honest (v1): geometry only — no colour, normals, texture coords; no big-endian.
+from kerf_cad_core.geom.subd_export_ply import (  # noqa: E402
+    export_limit_to_ply,
+    parse_ply as parse_subd_ply,
+)
+# BREP-SOLID-CONTAINS-POINT: ray-casting Jordan-curve inside/outside test on B-rep solids.
+# (Mortenson §11.5; Ericson 2005 §5.1; O'Rourke §7.4)
+# Honest: degenerate ray hits handled by fallback direction; parametric faces use
+# UV-grid triangulation approximation (uv_samples²); non-manifold shells may give
+# unreliable parity.
+from kerf_cad_core.geom.solid_contains_point import (  # noqa: E402
+    ContainmentResult,
+    solid_contains_point,
+)

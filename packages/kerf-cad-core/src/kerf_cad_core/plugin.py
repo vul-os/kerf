@@ -335,6 +335,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.subd_export_usd",               # subd_export_to_usd
     # SUBD-LIMIT-MESH-EXPORT-OBJ: CC limit-surface → Wavefront OBJ (v/vn/f; geometry only)
     "kerf_cad_core.geom.subd_export_obj",               # subd_export_limit_to_obj
+    # SUBD-EXPORT-PLY: CC limit-surface → Stanford PLY (ASCII + binary_little_endian)
+    "kerf_cad_core.geom.subd_export_ply",               # subd_export_limit_to_ply
     # MANUFACTURING-AUTO-FIXTURE-LAYOUT: 3-2-1 fixture placement (Asada-By 1985)
     "kerf_cad_core.manufacturing_fixture_layout",       # manufacturing_auto_fixture_layout
     # BREP-FACE-NEIGHBOR-WALK: face-adjacency graph + BFS traversal for CNC routing /
@@ -387,6 +389,9 @@ _TOOL_MODULES = [
     # SUBD-LIMIT-INTEGRAL-GAUSS-BONNET-CHECK: verify ∫∫K dA = 2π·χ on closed CC limit surface
     # (do Carmo §4.5; Edelsbrunner-Harer 2010 §1) — subd_verify_gauss_bonnet
     "kerf_cad_core.geom.subd_gauss_bonnet_check",
+    # BREP-SOLID-CONTAINS-POINT: ray-casting Jordan-curve inside/outside test on B-rep solids
+    # (Mortenson §11.5; Ericson 2005 §5.1; O'Rourke §7.4) — brep_solid_contains_point
+    "kerf_cad_core.geom.solid_contains_point",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

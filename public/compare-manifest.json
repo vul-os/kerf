@@ -15954,6 +15954,19 @@
         },
         {
           "domain": "D1",
+          "feature": "B-rep solid point-containment (inside/outside/boundary)",
+          "competitor": {
+            "status": "partial",
+            "note": "Ray-casting available via RhinoCommon BrepFace.IsPointOnFace / ClosestPoint; no dedicated solid inside/outside LLM-callable API"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "solid_contains_point(body, point) -> ContainmentResult; ray-casting Jordan-curve parity test (Mortenson §11.5; Ericson 2005 §5.1); degenerate-ray fallback; boundary detection; LLM tool brep_solid_contains_point; 25 tests",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/solid_contains_point.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "Mesh repair / ShrinkWrap",
           "competitor": {
             "status": "yes",

@@ -1020,6 +1020,10 @@ __all__ = [
     "generate_subd_lod_chain",
     "generate_progressive_mesh",
     "pick_lod_for_view",
+    # GK-P: arc-length-preserving offset (Klass 1980 / Maekawa 1999)
+    "offset_curve_arclength_preserving",
+    "exact_arclength_match_error",
+    "compare_offsets",
 ]
 
 # Variable-section edge blend (Vida-Martin-Varady 1994 §4)
@@ -1147,4 +1151,10 @@ from kerf_cad_core.geom.subd_automatic_lod import (
     generate_subd_lod_chain,
     generate_progressive_mesh,
     pick_lod_for_view,
+)
+# GK-P (arc-length-preserving offset): Klass 1980 / Maekawa 1999
+from kerf_cad_core.geom.exact_length_offset import (
+    offset_curve_arclength_preserving,
+    exact_arclength_match_error,
+    compare_offsets,
 )

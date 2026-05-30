@@ -286,6 +286,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.assembly_interference_tools",   # brep_assembly_interference, brep_check_clearance
     # GK-P06: NURBS curve/surface split at parameter (nurbs_split_curve, nurbs_split_surface)
     "kerf_cad_core.geom.curve_split",
+    # GK-P: NURBS rational conic detection + simplification (Lee 1987 / Piegl-Tiller §7.2)
+    "kerf_cad_core.geom.conic_detect",                 # nurbs_detect_conic, nurbs_simplify_conic
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

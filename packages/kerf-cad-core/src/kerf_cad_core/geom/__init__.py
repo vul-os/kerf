@@ -952,6 +952,12 @@ __all__ = [
     "compute_geodesic_heat_method",
     "compute_geodesic_to_point",
     "compute_geodesic_path",
+    # GK-P: NURBS rational conic detection + simplification
+    "ConicInfo",
+    "CircleParams",
+    "detect_conic",
+    "extract_canonical_circle",
+    "simplify_conic_curve",
 ]
 
 # Variable-section edge blend (Vida-Martin-Varady 1994 §4)
@@ -1039,4 +1045,12 @@ from kerf_cad_core.geom.subd_geodesic import (
     compute_geodesic_heat_method,
     compute_geodesic_to_point,
     compute_geodesic_path,
+)
+# GK-P: NURBS rational conic detection + simplification (Lee 1987 / Piegl-Tiller §7.2)
+from kerf_cad_core.geom.conic_detect import (
+    ConicInfo,
+    CircleParams,
+    detect_conic,
+    extract_canonical_circle,
+    simplify_curve as simplify_conic_curve,
 )

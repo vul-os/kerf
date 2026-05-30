@@ -25,6 +25,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.feature_section",
     "kerf_cad_core.cam_layered",
     "kerf_cad_core.cam_toolpath_collision",  # cam_verify_toolpath_collision
+    "kerf_cad_core.cam_feedrate_lookahead",  # cam_optimize_feedrate_lookahead (Altintas 2012 §5.7)
     "kerf_cad_core.extrude_sketch_to_jscad",
     "kerf_cad_core.surfacing",
     "kerf_cad_core.quad_remesh",
@@ -339,6 +340,9 @@ _TOOL_MODULES = [
     # SUBD-LIMIT-WALK-ALONG-EDGES: CC limit-surface curve along a cage edge chain
     "kerf_cad_core.geom.subd_edge_walk",               # subd_walk_edge_chain
     "kerf_cad_core.geom.half_space_volume",             # brep_volume_above_plane
+    # NURBS-COMPOSITE-TANGENT-MATCH: G1/G2 seam CP adjustment for composite curve chains
+    # (Klass 1980 §3; Farin §8.4; Piegl-Tiller §7.3) — nurbs_match_composite_tangents
+    "kerf_cad_core.geom.composite_tangent_match",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

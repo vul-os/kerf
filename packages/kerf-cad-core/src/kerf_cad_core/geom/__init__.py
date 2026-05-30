@@ -1391,3 +1391,9 @@ from kerf_cad_core.geom.half_space_volume import (
     volume_above_plane,
     volume_below_plane,
 )
+# NURBS-COMPOSITE-TANGENT-MATCH: G1/G2 seam matching for composite curve chains
+# (Klass 1980 §3; Farin §8.4; Piegl-Tiller §7.3)
+from kerf_cad_core.geom.composite_tangent_match import (
+    CompositeMatchResult,
+    match_composite_tangents,
+)

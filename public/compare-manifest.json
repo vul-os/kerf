@@ -4348,6 +4348,19 @@
           }
         },
         {
+          "name": "CAM feedrate lookahead optimizer",
+          "competitor": {
+            "status": "no",
+            "source": "https://wiki.freecad.org/CAM_Workbench",
+            "note": "CAM WB does not include a per-waypoint corner-lookahead feedrate scheduler"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/cam_feedrate_lookahead.py",
+            "note": "Two-pass corner lookahead (Erkorkmaz-Altintas 2001 / Altintas 2012 §5.7): V_corner = sqrt(a_max × r_blend / sin(θ/2)); forward + backward trapezoidal passes; per-waypoint feedrate + corner angles + cycle time; cam_optimize_feedrate_lookahead LLM tool. Jerk not modelled (trapezoidal profile only)."
+          }
+        },
+        {
           "name": "Moldflow / fill simulation",
           "competitor": {
             "status": "no",
@@ -6049,6 +6062,20 @@
             "status": "yes",
             "note": "brep_volume_above_plane LLM tool; divergence theorem (Mortenson §11.6); Plane faces: Green's theorem + Sutherland-Hodgman clip; curved faces: GL sub-quad grid; depth-bar oracles: unit cube z=0.5 → 0.5/0.5; sphere equator → each half 4π/6 ≈ 2.094; cylinder r=1 h=2 x=0 → each half π",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/half_space_volume.py"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "NURBS composite curve G1/G2 tangent matching",
+          "competitor": {
+            "status": "yes",
+            "note": "Rhino MatchCrv and CATIA curve-match operations adjust seam CPs for G1/G2 continuity at composite curve joints",
+            "source": "https://docs.mcneel.com/rhino/8/help/en-us/commands/matchcrv.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "match_composite_tangents(curves, target='G1'|'G2') — Klass 1980 §3 / Farin §8.4 bisector construction for G1; Piegl-Tiller §7.3 second-derivative constraint for G2; CompositeMatchResult (adjusted_curves, max_cp_displacement, residual_tangent_error_per_seam, g2_converged); G2 non-convergence honest-flag when curvature magnitudes differ >10x; nurbs_match_composite_tangents LLM tool; 19 tests",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/composite_tangent_match.py"
           }
         },
         {

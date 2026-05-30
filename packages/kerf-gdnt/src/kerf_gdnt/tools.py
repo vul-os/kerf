@@ -8,6 +8,8 @@ Exposes the following tools to the Claude / kerf-chat tool registry:
   gdnt_validate_fcf       — validate an FCF dict and return issues
   gdnt_inspect_feature    — check a single measured value against an FCF
   gdnt_build_report       — build a full inspection report from measurements
+  gdt_validate_frame      — ASME Y14.5-2018 structural validation of an FCF
+  gdt_parse_frame         — parse canonical frame string → FCF dict
 """
 
 from __future__ import annotations
@@ -30,6 +32,12 @@ from kerf_gdnt.inspection_report import (
     build_report,
     render_report,
     report_to_dicts,
+)
+from kerf_gdnt.validator import (
+    validate_frame,
+    canonical_frame_string,
+    parse_canonical_frame,
+    zone_for_position_tol,
 )
 
 
@@ -346,3 +354,98 @@ def run_gdnt_build_report(params: dict, ctx: Any) -> str:
         })
     except Exception as exc:
         return err_payload(str(exc), "REPORT_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# gdt_validate_frame — ASME Y14.5-2018 structural validation
+# ---------------------------------------------------------------------------
+
+gdt_validate_frame_spec = ToolSpec(
+    name="gdt_validate_frame",
+    description=(
+        "Validate a Feature Control Frame for structural well-formedness per "
+        "ASME Y14.5-2018 §3.4.  Returns valid=true/false plus a list of "
+        "structured errors (with Y14.5 clause references) and advisory "
+        "warnings.  Checks: symbol–modifier compatibility (only size-"
+        "controlling tolerances may use M/L), datum requirements for "
+        "orientation/location/runout symbols, datum prohibition on form "
+        "tolerances, duplicate datum labels, positive tolerance value, "
+        "projected-zone applicability, and tangent-plane applicability.\n\n"
+        "NOTE: implements ASME Y14.5-2018 *structural* validation; "
+        "kerf is not ASME-certified."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "fcf": {
+                "type": "object",
+                "description": "FCF dict as returned by gdnt_create_fcf.",
+            },
+            "standard": {
+                "type": "string",
+                "description": "Validation standard (default: 'ASME Y14.5-2018').",
+                "default": "ASME Y14.5-2018",
+            },
+        },
+        "required": ["fcf"],
+    },
+)
+
+
+def run_gdt_validate_frame(params: dict, ctx: Any) -> str:
+    try:
+        fcf = FeatureControlFrame.from_dict(params["fcf"])
+        standard = params.get("standard", "ASME Y14.5-2018")
+        result = validate_frame(fcf, standard=standard)
+        return ok_payload(result.to_dict())
+    except ValueError as exc:
+        return err_payload(str(exc), "VALIDATE_ERROR")
+    except Exception as exc:
+        return err_payload(str(exc), "VALIDATE_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# gdt_parse_frame — parse canonical frame string
+# ---------------------------------------------------------------------------
+
+gdt_parse_frame_spec = ToolSpec(
+    name="gdt_parse_frame",
+    description=(
+        "Parse a canonical feature control frame string (as produced by the "
+        "canonical_frame_string format) back into a structured FCF dict.  "
+        "Canonical format: [symbol_code][dia?tolerance][modifier?][datumA?]...  "
+        "Example: '[position][dia:0.05][M][A][B][C]'.\n\n"
+        "The returned dict can be passed directly to gdnt_validate_fcf or "
+        "gdt_validate_frame."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "canonical": {
+                "type": "string",
+                "description": "Canonical frame string, e.g. '[position][dia:0.05][M][A][B][C]'.",
+            },
+            "validate": {
+                "type": "boolean",
+                "description": "If true, also run ASME Y14.5-2018 validation and include result.",
+                "default": False,
+            },
+        },
+        "required": ["canonical"],
+    },
+)
+
+
+def run_gdt_parse_frame(params: dict, ctx: Any) -> str:
+    try:
+        fcf = parse_canonical_frame(params["canonical"])
+        result: dict = fcf.to_dict()
+        result["canonical"] = canonical_frame_string(fcf)
+        if params.get("validate", False):
+            vr = validate_frame(fcf)
+            result["validation"] = vr.to_dict()
+        return ok_payload(result)
+    except ValueError as exc:
+        return err_payload(str(exc), "PARSE_ERROR")
+    except Exception as exc:
+        return err_payload(str(exc), "PARSE_ERROR")

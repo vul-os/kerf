@@ -9,6 +9,14 @@ Capabilities
   silicon.drc             — silicon_drc_check: design rule check against PDK rules
   silicon.formal_equiv    — silicon_formal_equiv: BDD-based combinational equivalence check
   silicon.openlane        — silicon_run_openlane: RTL→GDS-II via OpenLane (external binary)
+  silicon.ibis            — silicon_import_ibis: IBIS 7.1 model import + eye-diagram estimation
+                            silicon_eye_diagram:  compute eye-diagram metrics at a pin
+
+IBIS 7.1 compliance note
+-------------------------
+  The IBIS tools implement the core I/O buffer model sections (Component, Pin,
+  Model, Pulldown/Pullup IV tables, GND/POWER clamp, Ramp, Voltage Range).
+  They are NOT IBIS-certified.  Full spec: https://ibis.org/ver7.1/ibis_specs_7_1.pdf
 """
 from __future__ import annotations
 
@@ -391,3 +399,206 @@ def _register_tools(ctx, provides: list) -> None:
         provides.append("silicon.openlane")
     except Exception as exc:
         logger.warning("kerf-silicon: failed to load silicon_run_openlane tool: %s", exc)
+
+    # ── 5. silicon_import_ibis ──────────────────────────────────────────────
+    try:
+        import json as _json
+
+        try:
+            from kerf_chat.tools.registry import ToolSpec as _TS5
+        except ImportError:
+            from kerf_silicon._compat import ToolSpec as _TS5  # type: ignore
+
+        _ibis_import_spec = _TS5(
+            name="silicon_import_ibis",
+            description=(
+                "Parse an IBIS 7.1 .ibs file and return the component, pin map, "
+                "and buffer model summary including IV table sizes and voltage range. "
+                "IBIS (Input/Output Buffer Information Specification) is the industry-standard "
+                "format for signal-integrity buffer models used in high-speed digital interfaces "
+                "(DDR, PCIe, USB, SerDes). "
+                "Returns {ok, component, ibis_version, models: [{name, model_type, vcc_typ, "
+                "pulldown_points, pullup_points, has_ramp}], pins: [{name, signal, model_name}]}. "
+                "NOTE: NOT IBIS-certified. Covers core 7.1 keywords only. "
+                "Spec: https://ibis.org/ver7.1/ibis_specs_7_1.pdf"
+            ),
+            input_schema={
+                "type": "object",
+                "required": ["path"],
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Absolute path to the .ibs file to parse.",
+                    },
+                },
+            },
+        )
+
+        async def _silicon_import_ibis_tool(ctx, args: bytes) -> str:
+            try:
+                a = _json.loads(args)
+            except Exception as e:
+                return _json.dumps({"ok": False, "error": f"invalid args: {e}", "code": "BAD_ARGS"})
+            path = a.get("path", "").strip()
+            if not path:
+                return _json.dumps({"ok": False, "error": "'path' is required", "code": "BAD_ARGS"})
+            try:
+                from kerf_silicon.ibis_import import parse_ibis_file
+                model = parse_ibis_file(path)
+                models_summary = []
+                for m_name, buf in model.models.items():
+                    models_summary.append({
+                        "name": m_name,
+                        "model_type": buf.model_type,
+                        "vcc_min": buf.vcc_min,
+                        "vcc_typ": buf.vcc_typ,
+                        "vcc_max": buf.vcc_max,
+                        "c_comp_pf": round(buf.c_comp * 1e12, 3),
+                        "pulldown_points": len(buf.pulldown.points) if buf.pulldown else 0,
+                        "pullup_points": len(buf.pullup.points) if buf.pullup else 0,
+                        "gnd_clamp_points": len(buf.gnd_clamp.points) if buf.gnd_clamp else 0,
+                        "power_clamp_points": len(buf.power_clamp.points) if buf.power_clamp else 0,
+                        "has_ramp": buf.ramp is not None,
+                        "ramp_dvdt_rise_v_per_ns": (
+                            round(buf.ramp.dv_dt_rise * 1e-9, 4) if buf.ramp else None
+                        ),
+                    })
+                pins_list = [
+                    {
+                        "name": p.name,
+                        "signal": p.signal,
+                        "model_name": p.model_name,
+                        "R_pin_ohm": p.R_pin,
+                        "L_pin_pH": round(p.L_pin * 1e12, 3),
+                        "C_pin_pF": round(p.C_pin * 1e12, 3),
+                    }
+                    for p in model.pins.values()
+                ]
+                return _json.dumps({
+                    "ok": True,
+                    "ibis_version": model.ibis_version,
+                    "component": {
+                        "name": model.component.name,
+                        "manufacturer": model.component.manufacturer,
+                        "package_type": model.component.package_type,
+                    },
+                    "models": models_summary,
+                    "pins": pins_list,
+                    "source_file": model.source_file,
+                    "compliance_note": (
+                        "IBIS 7.1 spec compliance — NOT IBIS-certified. "
+                        "Core keywords parsed; algorithmic models and sub-model matrices not supported."
+                    ),
+                })
+            except FileNotFoundError as exc:
+                return _json.dumps({"ok": False, "error": str(exc), "code": "FILE_NOT_FOUND"})
+            except Exception as exc:
+                return _json.dumps({"ok": False, "error": str(exc), "code": "IBIS_ERROR"})
+
+        ctx.tools.register("silicon_import_ibis", _ibis_import_spec, _silicon_import_ibis_tool)
+
+    except Exception as exc:
+        logger.warning("kerf-silicon: failed to load silicon_import_ibis tool: %s", exc)
+
+    # ── 6. silicon_eye_diagram ──────────────────────────────────────────────
+    try:
+        import json as _json
+
+        try:
+            from kerf_chat.tools.registry import ToolSpec as _TS6
+        except ImportError:
+            from kerf_silicon._compat import ToolSpec as _TS6  # type: ignore
+
+        _eye_spec = _TS6(
+            name="silicon_eye_diagram",
+            description=(
+                "Compute analytical eye-diagram metrics for a driver pin at a given "
+                "bit-rate and termination load. Requires a previously parsed IBIS model "
+                "(call silicon_import_ibis first to get the file path validated, then "
+                "provide the same path here). "
+                "Returns {ok, pin, model_name, frequency_ghz, load_ohm, "
+                "opening_height_mV, opening_width_ps, jitter_estimate_ps, "
+                "symbol_period_ps, rise_time_ps, r_driver_eff_ohm, vcc_typ}. "
+                "Eye opening > 50% Vcc indicates a functional interface margin. "
+                "IMPORTANT: This is an analytical approximation based on IBIS IV curves "
+                "and ramp data — not a full waveform simulation. "
+                "NOT IBIS-certified."
+            ),
+            input_schema={
+                "type": "object",
+                "required": ["path", "pin_name"],
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Absolute path to the .ibs file.",
+                    },
+                    "pin_name": {
+                        "type": "string",
+                        "description": "Pin name from the [Pin] section of the .ibs file.",
+                    },
+                    "frequency_ghz": {
+                        "type": "number",
+                        "description": "Bit-rate frequency in GHz (e.g. 1.0 for 1 Gbps NRZ). Default 1.0.",
+                        "default": 1.0,
+                    },
+                    "load_impedance_ohm": {
+                        "type": "number",
+                        "description": "Termination resistance in ohms (e.g. 50 for matched load). Default 50.",
+                        "default": 50.0,
+                    },
+                },
+            },
+        )
+
+        async def _silicon_eye_diagram_tool(ctx, args: bytes) -> str:
+            try:
+                a = _json.loads(args)
+            except Exception as e:
+                return _json.dumps({"ok": False, "error": f"invalid args: {e}", "code": "BAD_ARGS"})
+            path = a.get("path", "").strip()
+            pin_name = a.get("pin_name", "").strip()
+            if not path:
+                return _json.dumps({"ok": False, "error": "'path' is required", "code": "BAD_ARGS"})
+            if not pin_name:
+                return _json.dumps({"ok": False, "error": "'pin_name' is required", "code": "BAD_ARGS"})
+            frequency_ghz = float(a.get("frequency_ghz", 1.0))
+            load_ohm = float(a.get("load_impedance_ohm", 50.0))
+            try:
+                from kerf_silicon.ibis_import import (
+                    parse_ibis_file,
+                    compute_eye_diagram_at_pin,
+                )
+                model = parse_ibis_file(path)
+                eye = compute_eye_diagram_at_pin(pin_name, model, frequency_ghz, load_ohm)
+                vcc = model.models[model.pins[pin_name].model_name].vcc_typ
+                eye_pct = (eye.opening_height_mV / (vcc * 1000.0)) * 100.0 if vcc > 0 else 0.0
+                return _json.dumps({
+                    "ok": True,
+                    "pin": pin_name,
+                    "model_name": eye.model_name,
+                    "frequency_ghz": frequency_ghz,
+                    "load_ohm": load_ohm,
+                    "opening_height_mV": round(eye.opening_height_mV, 2),
+                    "opening_height_pct_vcc": round(eye_pct, 1),
+                    "opening_width_ps": round(eye.opening_width_ps, 2),
+                    "jitter_estimate_ps": round(eye.jitter_estimate_ps, 2),
+                    "symbol_period_ps": round(eye.symbol_period_ps, 2),
+                    "rise_time_ps": round(eye.rise_time_ps, 2),
+                    "r_driver_eff_ohm": round(eye.r_driver_eff_ohm, 2),
+                    "vcc_typ": eye.vcc_typ,
+                    "compliance_note": (
+                        "IBIS 7.1 spec compliance — NOT IBIS-certified. "
+                        "Analytical approximation only."
+                    ),
+                })
+            except FileNotFoundError as exc:
+                return _json.dumps({"ok": False, "error": str(exc), "code": "FILE_NOT_FOUND"})
+            except (KeyError, ValueError) as exc:
+                return _json.dumps({"ok": False, "error": str(exc), "code": "BAD_ARGS"})
+            except Exception as exc:
+                return _json.dumps({"ok": False, "error": str(exc), "code": "EYE_ERROR"})
+
+        ctx.tools.register("silicon_eye_diagram", _eye_spec, _silicon_eye_diagram_tool)
+        provides.append("silicon.ibis")
+    except Exception as exc:
+        logger.warning("kerf-silicon: failed to load silicon_eye_diagram tool: %s", exc)

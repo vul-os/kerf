@@ -254,6 +254,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 - **Silicon / IC layout** ✅ — VHDL + Verilog parsers; GHDL + Yosys + ngspice bridges; GDS II / OASIS I/O; SKY130 PDK; LEF/Liberty readers; OpenROAD place-and-route; DRC + LVS + parasitic extraction; mask fracturing. T-231..T-248.
 - **Firmware / embedded** ✅ — board catalogue (Arduino/ESP32/STM32/RP2040/AVR); library cache; direct-gcc orchestrator (`avr-gcc`/`arm-none-eabi-gcc`/`xtensa-esp32-elf`); upload wrappers; serial monitor panel; LLM tools; cloud Flash via BYO worker ✅ (esptool/avrdude/openocd dispatched to enrolled workshop machine). T-225..T-230.
 - **Silicon / IC layout** ✅ — VHDL + Verilog parsers; GHDL + Yosys + ngspice bridges; GDS II / OASIS I/O; SKY130 PDK; LEF/Liberty readers; OpenROAD place-and-route; DRC + LVS + parasitic extraction; mask fracturing; SPICE waveform viewer UI ✅. T-231..T-248.
+- **Silicon / IBIS 7.1 signal integrity** ✅ — IBIS 7.1 model import + eye-diagram estimation (`silicon_import_ibis`, `silicon_eye_diagram`); [Component]/[Pin]/[Model]/[Pulldown]/[Pullup]/[GND_clamp]/[POWER_clamp]/[Ramp]/[Voltage Range]; IV-curve interpolation; analytical eye opening height/width/jitter at arbitrary bit-rate + load. NOT IBIS-certified.
 - **Firmware / embedded** ✅ — board catalogue (Arduino/ESP32/STM32/RP2040/AVR); library cache; direct-gcc orchestrator (`avr-gcc`/`arm-none-eabi-gcc`/`xtensa-esp32-elf`); upload wrappers; serial monitor panel; LLM tools. T-225..T-230.
 
 ### Architecture / BIM

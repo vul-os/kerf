@@ -12213,6 +12213,20 @@
             "note": "Kerf hosted environment provides cloud compute for OpenROAD runs",
             "evidence": "cloud/"
           }
+        },
+        {
+          "domain": "D6",
+          "feature": "Silicon — IBIS 7.1 model import + eye-diagram",
+          "competitor": {
+            "status": "partial",
+            "note": "OpenROAD does not include an IBIS model parser; signal-integrity simulation requires separate tools (HyperLynx, Sigrity, etc.)",
+            "source": "https://openroad.readthedocs.io/en/latest/main/README.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "IBIS 7.1 model import + eye-diagram ✅ — [Component]/[Pin]/[Model]/[Pulldown]/[Pullup]/[GND_clamp]/[POWER_clamp]/[Ramp] parser; IV interpolation; analytical eye opening/width/jitter at arbitrary bit-rate + load (silicon_import_ibis, silicon_eye_diagram LLM tools). NOT IBIS-certified.",
+            "evidence": "packages/kerf-silicon/src/kerf_silicon/ibis_import.py"
+          }
         }
       ]
     },

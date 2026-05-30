@@ -1,0 +1,74 @@
+| Simple buffer fixture for kerf-silicon IBIS tests
+| 1 component, 1 pin, 1 Output model with 3.3 V supply
+| Pulldown table: linear 0..3.3 V, 0..66 mA (R_pd ≈ 50 Ω)
+| Ramp: dV/dt_r ≈ 1.98V/0.2ns = 9.9e9 V/s (fast DDR-class output)
+
+[IBIS Ver]   7.1
+[File Name]  simple_buffer.ibs
+[File Rev]   1.0
+[Date]       2026-05-30
+[Source]     kerf-silicon test fixture
+[Disclaimer] Engineering approximation. NOT silicon-measured. NOT IBIS-certified.
+
+[Component]  TestBuffer
+[Manufacturer]  Kerf Test
+
+[Pin]  signal_name   model_name
+A1     DQ            OutBuf
+
+[Model]   OutBuf
+Model_type   Output
+
+[Voltage Range]   3.3   3.0   3.6
+
+[C_comp]    2p    1p    3p
+
+[Pulldown]
+| Voltage   Typ        Min        Max
+-0.5       -10.0m    -8.0m     -12.0m
+0.0         0.0       0.0        0.0
+0.5        10.0m     8.0m      12.0m
+1.0        20.0m    16.0m      24.0m
+1.65       33.0m    26.4m      39.6m
+2.0        40.0m    32.0m      48.0m
+2.5        50.0m    40.0m      60.0m
+3.0        60.0m    48.0m      72.0m
+3.3        66.0m    52.8m      79.2m
+3.8        76.0m    60.8m      91.2m
+
+[Pullup]
+| Voltage referenced to Vcc (V_pullup = Vcc - V_out)
+| At V_out=0 → V_pu_ref=3.3: full on; at V_out=3.3 → V_pu_ref=0: off
+-0.5        76.0m    60.8m      91.2m
+0.0        66.0m    52.8m      79.2m
+0.5        60.0m    48.0m      72.0m
+1.0        50.0m    40.0m      60.0m
+1.65       33.0m    26.4m      39.6m
+2.0        20.0m    16.0m      24.0m
+2.5        10.0m     8.0m      12.0m
+3.0         3.0m     2.4m       3.6m
+3.3         0.0       0.0        0.0
+3.8        -5.0m    -4.0m      -6.0m
+
+[GND_clamp]
+| Clamping diode to GND
+-0.5       -50.0m   -40.0m    -60.0m
+-0.3       -10.0m    -8.0m    -12.0m
+-0.1        -1.0m    -0.8m     -1.2m
+ 0.0         0.0      0.0       0.0
+ 0.5         0.0      0.0       0.0
+
+[POWER_clamp]
+| Clamping diode to Vcc
+-0.5         0.0      0.0       0.0
+ 0.0         0.0      0.0       0.0
+ 0.3        -1.0m    -0.8m     -1.2m
+ 0.5       -10.0m    -8.0m    -12.0m
+ 0.8       -50.0m   -40.0m    -60.0m
+
+[Ramp]
+R_load        50
+dV/dt_r      1.980/200p     1.584/200p     2.376/200p
+dV/dt_f      1.980/200p     1.584/200p     2.376/200p
+
+[End]

@@ -68,6 +68,13 @@ from kerf_cad_core.geom.sweep2 import (
     normalize_rails,
 )
 
+# Variable-section extrude / morphing sweep (Piegl §10.5 skinning).
+from kerf_cad_core.geom.variable_extrude import (
+    extrude_variable_section,
+    extrude_with_scaling_curve,
+    extrude_morph_via_rail_pair,
+)
+
 from kerf_cad_core.geom.network_srf import (
     network_srf,
     network_srf_with_compatibility,

@@ -2272,3 +2272,164 @@ async def run_feature_isophote_analysis(ctx: ProjectCtx, args: bytes) -> str:
             "evaluation result."
         ),
     })
+
+
+# ---------------------------------------------------------------------------
+# nurbs_extrude_variable — variable-section / morphing sweep LLM tool
+# ---------------------------------------------------------------------------
+
+nurbs_extrude_variable_spec = ToolSpec(
+    name="nurbs_extrude_variable",
+    description=(
+        "Append a `nurbs_extrude_variable` node to a `.feature` file. "
+        "Sweeps a profile that morphs along the path — e.g. circle at the "
+        "start transitioning to an ellipse and ending as a rectangle. "
+        "\n\n"
+        "Supports three interpolation modes:\n"
+        "- `linear`        — piecewise-linear profile blending (C0 at section knots).\n"
+        "- `cubic_hermite` — Catmull-Rom Hermite (C1); smooth profile evolution.\n"
+        "- `C2`            — alias for `cubic_hermite`.\n"
+        "\n\n"
+        "Each `section` entry pairs a path parameter `t ∈ [0, 1]` with a "
+        "profile sketch.  At least one section is required; two or more "
+        "produce the morphing effect.  The profile is placed in a "
+        "rotation-minimising frame (Wang 2008) at each path sample so the "
+        "sweep is torsion-free.\n\n"
+        "Related tools: `feature_sweep1` (constant profile, one path), "
+        "`feature_sweep2` (constant profile, two rails)."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_id": {
+                "type": "string",
+                "description": "UUID of the target .feature file.",
+            },
+            "path_sketch_path": {
+                "type": "string",
+                "description": "Absolute path of the spine / path .sketch file (3-D open curve).",
+            },
+            "sections": {
+                "type": "array",
+                "minItems": 1,
+                "description": (
+                    "List of {t, sketch_path} objects defining the profile at each "
+                    "path parameter. t=0 is the start, t=1 the end."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "t": {
+                            "type": "number",
+                            "minimum": 0.0,
+                            "maximum": 1.0,
+                            "description": "Path parameter at which this profile is placed.",
+                        },
+                        "sketch_path": {
+                            "type": "string",
+                            "description": "Absolute path of the profile .sketch file.",
+                        },
+                    },
+                    "required": ["t", "sketch_path"],
+                },
+            },
+            "interp": {
+                "type": "string",
+                "enum": ["linear", "cubic_hermite", "C2"],
+                "description": "Profile interpolation scheme (default 'linear').",
+                "default": "linear",
+            },
+            "n_path_samples": {
+                "type": "integer",
+                "minimum": 2,
+                "description": "Number of cross-sections along the path (default 20).",
+                "default": 20,
+            },
+            "id": {"type": "string", "description": "Optional explicit node id."},
+        },
+        "required": ["file_id", "path_sketch_path", "sections"],
+    },
+)
+
+
+@register(nurbs_extrude_variable_spec, write=True)
+async def run_nurbs_extrude_variable(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    file_id = a.get("file_id", "").strip()
+    path_sketch_path = a.get("path_sketch_path", "").strip()
+    sections_raw = a.get("sections", [])
+    interp = a.get("interp", "linear").strip()
+    n_path_samples = int(a.get("n_path_samples", 20))
+    node_id = a.get("id", "").strip()
+
+    if not file_id:
+        return err_payload("file_id is required", "BAD_ARGS")
+    if not path_sketch_path:
+        return err_payload("path_sketch_path is required", "BAD_ARGS")
+    if not sections_raw or not isinstance(sections_raw, list) or len(sections_raw) == 0:
+        return err_payload("sections must be a non-empty list", "BAD_ARGS")
+    if interp not in ("linear", "cubic_hermite", "C2"):
+        return err_payload(
+            f"interp must be 'linear', 'cubic_hermite', or 'C2'; got '{interp}'",
+            "BAD_ARGS",
+        )
+    if n_path_samples < 2:
+        return err_payload("n_path_samples must be >= 2", "BAD_ARGS")
+
+    try:
+        fid = uuid.UUID(file_id)
+    except Exception:
+        return err_payload("file_id must be a uuid", "BAD_ARGS")
+
+    # Validate each section entry.
+    sections_clean = []
+    for idx, sec in enumerate(sections_raw):
+        if not isinstance(sec, dict):
+            return err_payload(f"sections[{idx}] must be an object", "BAD_ARGS")
+        t_val = sec.get("t")
+        sketch_path = sec.get("sketch_path", "").strip()
+        if t_val is None:
+            return err_payload(f"sections[{idx}] missing 't'", "BAD_ARGS")
+        if not sketch_path:
+            return err_payload(f"sections[{idx}] missing 'sketch_path'", "BAD_ARGS")
+        try:
+            t_float = float(t_val)
+        except (TypeError, ValueError):
+            return err_payload(f"sections[{idx}].t must be a number", "BAD_ARGS")
+        if not (0.0 <= t_float <= 1.0):
+            return err_payload(f"sections[{idx}].t must be in [0, 1]", "BAD_ARGS")
+        sections_clean.append({"t": t_float, "sketch_path": sketch_path})
+
+    content, err = read_feature_content(ctx, fid)
+    if err:
+        return err_payload(f"file not found: {err}", "NOT_FOUND")
+
+    if not node_id:
+        node_id = next_node_id(content, "nurbs_extrude_variable")
+
+    node = {
+        "id": node_id,
+        "op": "nurbs_extrude_variable",
+        "path_sketch_path": path_sketch_path,
+        "sections": sections_clean,
+        "interp": interp,
+        "n_path_samples": n_path_samples,
+    }
+
+    name, nid, err = append_feature_node(ctx, fid, node)
+    if err:
+        return err_payload(err, "ERROR")
+
+    return ok_payload({
+        "file_id": file_id,
+        "name": name,
+        "id": nid,
+        "op": "nurbs_extrude_variable",
+        "sections_count": len(sections_clean),
+        "interp": interp,
+        "n_path_samples": n_path_samples,
+    })

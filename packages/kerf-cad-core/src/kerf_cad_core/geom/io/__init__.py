@@ -15,8 +15,11 @@ from kerf_cad_core.geom.io.iges import (
     IgesReadError,
     IgesWriteError,
     TrimmedSurface,
+    TrimmedSurfaceRecord,
     write_iges,
     read_iges,
+    write_iges_trimmed_surface,
+    read_iges_trimmed_surface,
 )
 from kerf_cad_core.geom.io.step_read import (
     read_step,
@@ -73,8 +76,11 @@ __all__ = [
     "IgesReadError",
     "IgesWriteError",
     "TrimmedSurface",
+    "TrimmedSurfaceRecord",
     "write_iges",
     "read_iges",
+    "write_iges_trimmed_surface",
+    "read_iges_trimmed_surface",
     "read_step",
     "StepReadError",
     "write_step",

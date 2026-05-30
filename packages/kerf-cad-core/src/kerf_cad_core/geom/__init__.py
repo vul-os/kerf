@@ -223,11 +223,15 @@ from kerf_cad_core.geom.patch_srf import fit_surface, mid_surface, extend_surfac
 # GK-12: curve self-intersection
 from kerf_cad_core.geom.intersection import curve_self_intersect
 # GK-49: IGES 144 trimmed-surface reader/writer
+# NURBS-CONVERT-TO-IGES-144: bytes-returning API + TrimmedSurfaceRecord
 from kerf_cad_core.geom.io.iges import (
     write_iges,
     read_iges,
     IgesReadError,
     IgesWriteError,
+    write_iges_trimmed_surface,
+    read_iges_trimmed_surface,
+    TrimmedSurfaceRecord,
 )
 # GK-37: certified Hausdorff surface deviation
 from kerf_cad_core.geom.surface_fillet import (
@@ -704,11 +708,14 @@ __all__ = [
     "mid_surface",
     # GK-12
     "curve_self_intersect",
-    # GK-49
+    # GK-49 / NURBS-CONVERT-TO-IGES-144
     "write_iges",
     "read_iges",
     "IgesReadError",
     "IgesWriteError",
+    "write_iges_trimmed_surface",
+    "read_iges_trimmed_surface",
+    "TrimmedSurfaceRecord",
     # GK-37
     "variable_radius_fillet_g1",
     # GK-62 oracle

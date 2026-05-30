@@ -311,6 +311,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.brep_connect_inspector_tools",
     # GK-P NURBS-DERIVATIVE-FIELD-VISUAL: 1st partial-derivative arrow-plot PNG/SVG
     "kerf_cad_core.geom.derivative_field_viz",           # nurbs_derivative_field_png, nurbs_derivative_field_svg
+    # NURBS-CONVERT-TO-IGES-144: IGES 5.3 entity-144 export (§4.27 + §4.26 + §4.23 + §4.22)
+    "kerf_cad_core.geom.io.iges_144_tool",               # nurbs_export_iges_144
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

@@ -4294,6 +4294,19 @@
           }
         },
         {
+          "name": "Toolpath holder/spindle collision verification",
+          "competitor": {
+            "status": "no",
+            "source": "https://wiki.freecad.org/CAM_Workbench",
+            "note": "No built-in holder collision check; requires external CAM simulation software"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/cam_toolpath_collision.py",
+            "note": "Segment-by-segment capsule-vs-AABB + capsule-vs-mesh (Ericson 2005/Möller 1997) at 1 mm resolution; configurable safety margin; fixture support; cam_verify_toolpath_collision LLM tool"
+          }
+        },
+        {
           "name": "Moldflow / fill simulation",
           "competitor": {
             "status": "no",

@@ -855,3 +855,288 @@ def read_iges(filepath: str) -> List[TrimmedSurface]:
         )
 
     return results
+
+
+# ---------------------------------------------------------------------------
+# NURBS-CONVERT-TO-IGES-144 — bytes-returning writer + TrimmedSurfaceRecord
+# ---------------------------------------------------------------------------
+
+@dataclass
+class TrimmedSurfaceRecord:
+    """Parsed result of a single IGES entity-144 (Trimmed Parametric Surface).
+
+    Extends :class:`TrimmedSurface` with explicit loop metadata so callers can
+    distinguish outer from inner loops without re-parsing entity pointers.
+
+    IGES 5.3 §4.27 Table 1 layout
+    --------------------------------
+    Entity-144 PD fields (Form 0 = outer boundary is a trimming curve;
+    Form 1 = outer boundary coincides with the surface boundary)::
+
+        PTS   — DE pointer to entity-128 (NURBS surface)
+        N1    — 0 means outer boundary is a trimming curve (Form 0)
+                 1 means outer boundary is the surface boundary (Form 1)
+        N2    — number of inner (hole) loop entity-142 DE pointers
+        PT0   — DE pointer to outer-boundary entity-142
+        PTi   — DE pointers to inner-boundary entity-142 (i = 1..N2)
+
+    Entity-142 PD fields (Curve on Parametric Surface, §4.23)::
+
+        CRTN  — creation method (1 = projection)
+        SPTR  — DE pointer to the surface (entity-128)
+        BPTR  — DE pointer to parameter-space curve (entity-126)
+        CPTR  — DE pointer to model-space 3D curve (entity-126); 0 if not provided
+        PREF  — preferred representation (1 = parameter-space curve preferred)
+
+    Attributes
+    ----------
+    surface : NurbsSurface
+        The underlying NURBS surface (entity-128, IGES 5.3 §4.26).
+    outer_loop : list[NurbsCurve]
+        Parameter-space curves (entity-126, 2-D UV) forming the outer boundary.
+        Each curve resolved from entity-142 BPTR; CPTR degenerate means entity-142
+        written with model-space curve pointer == 0 (see ``has_3d_outer``).
+    inner_loops : list[list[NurbsCurve]]
+        Zero or more inner (hole) boundary loops, same representation.
+    has_3d_outer : bool
+        True when the outer-boundary entity-142 carried a non-zero CPTR
+        (model-space 3D curve).  False when the 3D curve was degenerate /
+        omitted (CPTR == 0 or same pointer as BPTR).
+    has_3d_inner : list[bool]
+        Per-inner-loop flag, same semantics as ``has_3d_outer``.
+    form : int
+        Entity-144 form number: 0 = outer boundary is a trimming curve,
+        1 = outer boundary coincides with the surface boundary.
+    """
+    surface: NurbsSurface
+    outer_loop: List[NurbsCurve]
+    inner_loops: List[List[NurbsCurve]] = field(default_factory=list)
+    has_3d_outer: bool = False
+    has_3d_inner: List[bool] = field(default_factory=list)
+    form: int = 0
+
+
+def write_iges_trimmed_surface(
+    srf: NurbsSurface,
+    outer_loop: List[NurbsCurve],
+    inner_loops: Optional[List[List[NurbsCurve]]] = None,
+) -> bytes:
+    """Serialise a NURBS surface with trim boundaries to an IGES 5.3 byte string.
+
+    Implements IGES 5.3 §4.27 (entity 144, Trimmed Parametric Surface) wrapping
+    entity 128 (§4.26, NURBS surface) via entity 142 (§4.23, Curve on a
+    Parametric Surface) boundaries.  Each boundary curve is stored as entity 126
+    (§4.22, Rational B-Spline Curve) in the (u, v) parameter domain.
+
+    Entity-144 Form 0 is always written (outer boundary is an explicit trimming
+    curve, not the surface boundary).  If ``inner_loops`` is empty, N2 == 0 and
+    no inner-loop entity-142 pointers are emitted.
+
+    Model-space 3D curve caveats
+    ----------------------------
+    This implementation writes entity-142 with ``CPTR = BPTR`` (the same DE
+    pointer as the UV-space curve) when no explicit 3-D model-space curve is
+    provided.  Strictly the 3-D curve should be the image of the UV curve under
+    the surface map; computing that requires surface evaluation at every knot
+    span.  Callers that require a true model-space curve should evaluate the
+    surface themselves and pass a pre-built 3-D NurbsCurve via a higher-level
+    helper.  The round-trip reader (``read_iges_trimmed_surface``) marks
+    ``has_3d_outer / has_3d_inner = False`` for pointers equal to BPTR.
+
+    IGES 5.3 field layout (entity-144, §4.27 Table 1)
+    --------------------------------------------------
+    ``144, PTS, N1, N2, PT0 [, PT1, ..., PTN2] ;``
+
+    where:
+
+    * ``PTS``  — DE sequence of entity-128
+    * ``N1``   — 0 (Form 0: outer boundary is an explicit trimming curve)
+    * ``N2``   — count of inner loop entity-142 DE pointers
+    * ``PT0``  — DE sequence of outer-boundary entity-142
+    * ``PTi``  — DE sequences of inner-boundary entity-142 (i = 1 .. N2)
+
+    Parameters
+    ----------
+    srf        : NurbsSurface to export.
+    outer_loop : Ordered list of UV-space NurbsCurve objects (2-D control
+                 points) forming the outer (CCW) boundary.
+    inner_loops: Optional list of inner (hole) loops, each a list of 2-D
+                 NurbsCurve objects forming a CW hole boundary.
+
+    Returns
+    -------
+    bytes
+        ASCII IGES 5.3 content as bytes (encoding: ASCII).
+
+    Raises
+    ------
+    IgesWriteError
+        If ``srf`` is not a :class:`~kerf_cad_core.geom.nurbs.NurbsSurface`,
+        if ``outer_loop`` is empty, or if any float value is non-finite.
+    """
+    import os
+    import tempfile
+
+    if not isinstance(srf, NurbsSurface):
+        raise IgesWriteError(f"Expected NurbsSurface, got {type(srf).__name__}")
+    if not outer_loop:
+        raise IgesWriteError("outer_loop must contain at least one curve")
+
+    ts = TrimmedSurface(
+        surface=srf,
+        outer_boundary=list(outer_loop),
+        inner_boundaries=list(inner_loops) if inner_loops else [],
+    )
+
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".igs", delete=False, encoding="ascii"
+    ) as tmp:
+        tmp_path = tmp.name
+
+    try:
+        write_iges(ts, tmp_path)
+        with open(tmp_path, "rb") as f:
+            return f.read()
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+
+
+def read_iges_trimmed_surface(filepath: str) -> "List[TrimmedSurfaceRecord]":
+    """Read an IGES file and return all entity-144 trimmed surfaces as
+    :class:`TrimmedSurfaceRecord` objects with explicit loop metadata.
+
+    Unlike :func:`read_iges` which returns plain :class:`TrimmedSurface`
+    dataclasses, this function returns :class:`TrimmedSurfaceRecord` instances
+    with:
+
+    * ``outer_loop`` — list of UV-space NurbsCurve objects
+    * ``inner_loops`` — list of inner-loop lists
+    * ``has_3d_outer`` / ``has_3d_inner`` — flags indicating whether model-space
+      3-D curve pointers (entity-142 CPTR) were present and distinct from BPTR
+    * ``form`` — entity-144 form number (0 or 1)
+
+    IGES 5.3 §4.27 Table 1 field-count oracle:
+
+    * Mandatory fields: PTS, N1, N2, PT0 (4 fields after entity-type sentinel)
+    * Inner-loop count: N2 additional DE fields after PT0
+    * Total parameter count: 1 + 4 + N2 tokens (sentinel + mandatory + inner DEs)
+
+    Parameters
+    ----------
+    filepath : Path to the IGES file to read.
+
+    Returns
+    -------
+    list[TrimmedSurfaceRecord]
+        One entry per entity-144 found.  Empty list if none found.
+
+    Raises
+    ------
+    IgesReadError
+        On any fatal parsing error.
+    """
+    try:
+        with open(filepath, "r", encoding="ascii", errors="replace") as f:
+            text = f.read()
+    except OSError as exc:
+        raise IgesReadError(f"Cannot open file {filepath!r}: {exc}") from exc
+
+    _s_lines, _g_lines, d_lines, p_lines = _parse_iges_sections(text)
+    de_map = _parse_de_section(d_lines)
+
+    if not de_map:
+        return []
+
+    def _get_pd(entry: _DEEntry) -> List[str]:
+        raw = _extract_pd_string(p_lines, entry.pd_first, entry.pd_count)
+        return _split_params(raw)
+
+    _entity_cache: Dict[int, object] = {}
+
+    def _resolve(de_seq: int) -> object:
+        if de_seq in _entity_cache:
+            return _entity_cache[de_seq]
+        entry = de_map.get(de_seq)
+        if entry is None:
+            raise IgesReadError(f"DE sequence {de_seq} not found in directory")
+        params = _get_pd(entry)
+        etype = entry.entity_type
+        result: object
+        if etype == 126:
+            result = _parse_entity_126(params)
+        elif etype == 128:
+            result = _parse_entity_128(params)
+        elif etype == 142:
+            result = _parse_entity_142(params)
+        elif etype == 144:
+            result = _parse_entity_144(params)
+        else:
+            result = {"entity_type": etype, "params": params}
+        _entity_cache[de_seq] = result
+        return result
+
+    records: List[TrimmedSurfaceRecord] = []
+
+    for de_seq, entry in sorted(de_map.items()):
+        if entry.entity_type != 144:
+            continue
+
+        surf_de, outer_de, inner_des = _resolve(de_seq)  # type: ignore[misc]
+        form = entry.form
+
+        surf = _resolve(surf_de)
+        if not isinstance(surf, NurbsSurface):
+            raise IgesReadError(
+                f"Entity-144 surface pointer (DE={surf_de}) resolves to "
+                f"{type(surf).__name__}, expected NurbsSurface"
+            )
+
+        def _loop_from_142(de142: int) -> Tuple[List[NurbsCurve], bool]:
+            """Resolve entity-142 to (UV curves list, has_3d_flag)."""
+            resolved = _resolve(de142)
+            if not isinstance(resolved, tuple):
+                raise IgesReadError(
+                    f"DE={de142} expected entity-142 tuple, got {type(resolved).__name__}"
+                )
+            _s_de, crv2d_de, crv3d_de = resolved
+            has_3d = (crv3d_de != 0 and crv3d_de != crv2d_de)
+            crv2d = _resolve(crv2d_de)
+            if not isinstance(crv2d, NurbsCurve):
+                raise IgesReadError(
+                    f"Entity-142 BPTR (DE={crv2d_de}) resolves to "
+                    f"{type(crv2d).__name__}, expected NurbsCurve"
+                )
+            cp = crv2d.control_points
+            if cp.shape[1] == 3:
+                cp = cp[:, :2]
+                crv2d = NurbsCurve(
+                    degree=crv2d.degree,
+                    control_points=cp,
+                    knots=crv2d.knots,
+                    weights=crv2d.weights,
+                )
+            return [crv2d], has_3d
+
+        outer_curves, has_3d_outer = _loop_from_142(outer_de)
+        inner_loops_out: List[List[NurbsCurve]] = []
+        has_3d_inner: List[bool] = []
+        for de in inner_des:
+            curves, h3d = _loop_from_142(de)
+            inner_loops_out.append(curves)
+            has_3d_inner.append(h3d)
+
+        records.append(
+            TrimmedSurfaceRecord(
+                surface=surf,
+                outer_loop=outer_curves,
+                inner_loops=inner_loops_out,
+                has_3d_outer=has_3d_outer,
+                has_3d_inner=has_3d_inner,
+                form=form,
+            )
+        )
+
+    return records

@@ -276,6 +276,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 | G-6 | **SubD authoring with creases + edit workflow** | Rhino 8 SubD | ✅ shipped — cage creation/extrude/bevel/loop-cut/slide/crease/bevel-weight + Catmull-Clark evaluation — `kerf-cad-core/geom/subd_authoring.py` |
 | G-5 | **Kernel G3 / class-A leading** — wired G3 blends + curvature-comb + imprint | Alias / ICEM Surf | 🚧 in flight |
 | G-6 | **SubD authoring with creases + edit workflow** | Rhino 8 SubD | ✅ shipped — cage creation/extrude/bevel/loop-cut/slide/crease/bevel-weight + Catmull-Clark evaluation — `kerf-cad-core/geom/subd_authoring.py`; **GK-P SubD parity**: Loop (1987) triangle subdivision, Modified Butterfly (Zorin-Schroder-Sweldens 1996) interpolating, Doo-Sabin (1978) face-based, CC sharp creases/corners/darts/variable-sharpness ✅ — `geom/{loop_subdivide,modified_butterfly,doo_sabin}.py` + `geom/subd.py` |
+| GK-P | **SubD feature curves with continuous sharpness** — designer polylines that propagate through subdivision levels independently from hard creases; sharpness ∈ [0,∞) spectrum (Biermann-Levin-Zorin 2000 / DeRose-Kass-Truong 1998 §4); auto-detect by dihedral; `subd_make_feature_curve` LLM tool | Rhino 8 SubD / Maya SubD | ✅ shipped — `kerf-cad-core/geom/subd_feature_curves.py` |
 | G-7 | **Render: caustics + dispersion** — in-browser path-tracer + Blender Cycles spectral | Cycles / V-Ray / KeyShot | 🔴 not started — Cycles translator stashes Sellmeier/Abbe coefficients for downstream use but no caustic solver is wired; in-browser path-tracer not started |
 | G-8 | **Direct + parametric history coexistence** | Fusion / Inventor / Onshape | ✅ shipped — history mode (direct edit promoted to DAG feature node, replays on upstream changes) + in-place mode; 30+ tests — `kerf-cad-core/direct_edit.py`, `geom/history/direct_edit.py` |
 | G-9 | **Full joint system** — rigid/revolute/slider/cam/gear/pin-slot | Inventor / SolidWorks | ✅ shipped — all six joint types with analytic kinematics and drive support — `kerf-mates/joints.py` |
@@ -370,6 +371,7 @@ These are roadmap-level moats that span every sector simultaneously and compound
 - **GK-P SubD / mesh** — multires displacement; SDF CSG + marching-cubes; sculpt brush engine; LSCM UV unwrap (module exists, wiring incomplete).
 - **GK-P SubD / mesh** — multires displacement ✅; SDF CSG + marching-cubes; sculpt brush engine; LSCM UV unwrap (module exists, wiring incomplete).
 - **GK-P SubD / mesh** — Loop + Mod-Butterfly + Doo-Sabin + CC creases/corners/darts ✅; multires displacement ✅; SDF CSG + marching-cubes; sculpt brush engine; LSCM UV unwrap (module exists, wiring incomplete).
+- **GK-P SubD / mesh** — ~~SubD feature curves with continuous sharpness~~ ✅ shipped; multires displacement; SDF CSG + marching-cubes; sculpt brush engine; LSCM UV unwrap (module exists, wiring incomplete).
 - **GK-P architectural geometry** — B-rep→2D tessellate; roof/curtain-wall/corridor generators; wall compound-layer offset; hatch/section-fill.
 - **GK-P sketcher** — collinear constraint; ellipse solver entity; G2 continuity.
 - **GK-P interop** — 3DM write with Hausdorff read→write→read oracle.

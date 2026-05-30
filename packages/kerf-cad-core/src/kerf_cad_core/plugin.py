@@ -54,6 +54,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.surface_boolean_robust",
     "kerf_cad_core.geom.nurbs_boolean",
     "kerf_cad_core.geom.trim_curve",
+    "kerf_cad_core.geom.trim_loop_heal",   # GK-P: nurbs_trim_loop_heal tool
     "kerf_cad_core.nesting.tools",
     "kerf_cad_core.harness.tools",
     "kerf_cad_core.clash.tools",

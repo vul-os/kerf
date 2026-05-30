@@ -361,3 +361,20 @@ def _register_tools(ctx, provides: list) -> None:
         logger.warning(
             "kerf-firmware: failed to load firmware_verify_memory_map tool: %s", exc
         )
+
+    # firmware_compute_can_bus_load — CAN 2.0B / J1939-21 bus utilisation analyser
+    try:
+        from kerf_firmware.tools.firmware_compute_can_bus_load import (
+            _spec as _can_spec,
+            run_firmware_compute_can_bus_load_async as _can_fn,
+        )
+        ctx.tools.register(
+            "firmware_compute_can_bus_load",
+            _can_spec,
+            _can_fn,
+        )
+        provides.append("firmware.can_bus_load")
+    except Exception as exc:
+        logger.warning(
+            "kerf-firmware: failed to load firmware_compute_can_bus_load tool: %s", exc
+        )

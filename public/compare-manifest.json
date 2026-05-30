@@ -3704,6 +3704,20 @@
           }
         },
         {
+          "domain": "D10",
+          "feature": "CAN bus load analyser (CAN 2.0B / J1939-21 utilisation check)",
+          "competitor": {
+            "status": "no",
+            "note": "OpenPLC has no CAN bus load or utilisation analysis; bus sizing must be done manually",
+            "source": "https://www.openplcproject.com/reference"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "firmware_compute_can_bus_load: CAN 2.0B frame model (standard 11-bit: 47+8·DLC+24 avg stuffing bits; extended 29-bit: 67+8·DLC+24); per-message load breakdown; flags >30% conservative + >40% J1939-21 §5.2 threshold; 55 tests. AVERAGE stuffing estimate — add ≥10% headroom for worst-case.",
+            "evidence": "packages/kerf-firmware/src/kerf_firmware/can_bus_load.py"
+          }
+        },
+        {
           "domain": "D6",
           "feature": "Schematic capture (KiCad round-trip, ERC)",
           "competitor": {

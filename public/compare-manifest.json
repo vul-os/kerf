@@ -2841,6 +2841,19 @@
           }
         },
         {
+          "name": "NEC 2023 wire ampacity calculator (NEC 310.15)",
+          "domain": "D10",
+          "competitor": {
+            "status": "no",
+            "notes": "Altium has no NEC ampacity derating calculator; requires external reference or spreadsheet"
+          },
+          "kerf": {
+            "status": "[x]",
+            "notes": "NEC 2023 Table 310.16 (Cu+Al separate tables, AWG 14–4/0 + kcmil), ambient temp correction §310.15(B)(2)(a), bundling derating §310.15(B)(3)(a); `wiring_compute_ampacity` LLM tool",
+            "evidence": "packages/kerf-wiring/src/kerf_wiring/ampacity.py"
+          }
+        },
+        {
           "name": "ActiveBOM / Octopart supply-chain integration",
           "domain": "D7",
           "competitor": {

@@ -78,3 +78,17 @@ def _register_tools(ctx, provides: list) -> None:
         provides.append("wiring.auto_route_3d")
     except Exception as exc:
         logger.warning("kerf-wiring: failed to load auto_route tools: %s", exc)
+
+    try:
+        from kerf_wiring.tools.wiring_compute_ampacity import (
+            wiring_compute_ampacity_spec,
+            wiring_compute_ampacity,
+        )
+        ctx.tools.register(
+            "wiring_compute_ampacity",
+            wiring_compute_ampacity_spec,
+            wiring_compute_ampacity,
+        )
+        provides.append("wiring.ampacity")
+    except Exception as exc:
+        logger.warning("kerf-wiring: failed to load wiring_compute_ampacity tool: %s", exc)

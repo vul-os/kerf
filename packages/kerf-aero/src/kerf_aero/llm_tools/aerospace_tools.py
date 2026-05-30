@@ -128,6 +128,15 @@ try:
 except ImportError:
     _NP_OK = False
 
+try:
+    from kerf_aero.drag_estimate import (
+        Body3D,
+        estimate_drag_coefficient as _estimate_drag_coefficient,
+    )
+    _DRAG_OK = True
+except ImportError:
+    _DRAG_OK = False
+
 # ---------------------------------------------------------------------------
 # Aerospace materials database (self-contained, no external deps)
 # ---------------------------------------------------------------------------
@@ -1759,6 +1768,137 @@ def aero_orbit_determination(
 
 
 # ---------------------------------------------------------------------------
+# Tool 14: aero_estimate_drag
+# ---------------------------------------------------------------------------
+
+def aero_estimate_drag(
+    body_type: str,
+    dimensions: list,
+    flow_direction: list | None = None,
+    velocity_m_s: float = 10.0,
+    fluid: str = "air_sea_level",
+) -> dict:
+    """
+    Estimate the drag coefficient Cd of a 3D body using Hoerner 1965 empirical
+    formulas (skin friction + form factor).
+
+    DISCLAIMER: NOT certified.  Low-fidelity preliminary estimate only.
+    Based on Hoerner 1965 "Fluid-Dynamic Drag" — errors of 20-50% are typical.
+    Use wind tunnel or CFD for design validation.
+
+    Input schema
+    ------------
+    body_type  : str  — one of: "sphere", "flat_plate", "ellipsoid"
+    dimensions : list — shape-dependent parameters:
+        "sphere":     [radius_m]
+        "flat_plate": [length_m, width_m, thickness_m]
+        "ellipsoid":  [semi_axis_a_m, semi_axis_b_m, semi_axis_c_m]
+                      (a = streamwise, b = lateral, c = vertical)
+    flow_direction : [dx, dy, dz] — flow direction vector (default [1, 0, 0])
+    velocity_m_s   : float — free-stream speed [m/s] (default 10.0)
+    fluid          : str   — one of:
+                      'air_sea_level' (default), 'air_10km', 'air_20km',
+                      'water_fresh_15c', 'water_salt_15c', 'water_fresh_25c'
+
+    Returns
+    -------
+    dict:
+        ok              : bool
+        Cd_total        : float — total drag coefficient (frontal-area referenced)
+        Cd_friction     : float — skin-friction component
+        Cd_form         : float — pressure/form drag component
+        Cf              : float — flat-plate skin friction coefficient
+        form_factor     : float — Hoerner form factor FF
+        Re              : float — Reynolds number (L = √frontal_area)
+        frontal_area_m2 : float — projected frontal area [m²]
+        wetted_area_m2  : float — total wetted area [m²]
+        fineness_ratio  : float — body length / effective diameter
+        method          : str
+        disclaimer      : str
+
+    Example output
+    --------------
+    aero_estimate_drag("sphere", [0.5], velocity_m_s=50.0) ->
+    {
+      "ok": true,
+      "Cd_total": 0.139,
+      "Cd_friction": 0.017,
+      "Cd_form": 0.122,
+      "Cf": 0.00432,
+      "form_factor": 9.452,
+      "Re": 1711175.0,
+      "frontal_area_m2": 0.7854,
+      "wetted_area_m2": 3.1416,
+      "fineness_ratio": 1.0,
+      "method": "Hoerner 1965 empirical (Schultz-Grunow skin friction + form factor)",
+      "disclaimer": "Hoerner 1965 empirical formulas — NOT certified, ..."
+    }
+
+    Raises
+    ------
+    ValueError: if body_type is unrecognised, dimensions are wrong length/value,
+                or fluid is unknown.
+    """
+    if not _DRAG_OK or not _NP_OK:
+        raise ImportError("kerf_aero.drag_estimate or numpy not available")
+
+    SUPPORTED = ("sphere", "flat_plate", "ellipsoid")
+    if body_type not in SUPPORTED:
+        raise ValueError(
+            f"body_type must be one of {SUPPORTED}, got {body_type!r}"
+        )
+
+    fd = flow_direction if flow_direction is not None else [1, 0, 0]
+    if len(fd) != 3:
+        raise ValueError(f"flow_direction must be [dx, dy, dz] (length 3), got {fd}")
+
+    # Build Body3D from simple parameters
+    try:
+        if body_type == "sphere":
+            if len(dimensions) < 1:
+                raise ValueError("sphere needs dimensions=[radius_m]")
+            body = Body3D.sphere(radius=float(dimensions[0]))
+
+        elif body_type == "flat_plate":
+            if len(dimensions) < 3:
+                raise ValueError("flat_plate needs dimensions=[length_m, width_m, thickness_m]")
+            body = Body3D.flat_plate(
+                length=float(dimensions[0]),
+                width=float(dimensions[1]),
+                thickness=float(dimensions[2]),
+            )
+
+        elif body_type == "ellipsoid":
+            if len(dimensions) < 3:
+                raise ValueError("ellipsoid needs dimensions=[a_m, b_m, c_m] (semi-axes)")
+            body = Body3D.ellipsoid(
+                a=float(dimensions[0]),
+                b=float(dimensions[1]),
+                c=float(dimensions[2]),
+            )
+    except (ValueError, TypeError) as exc:
+        raise ValueError(str(exc)) from exc
+
+    try:
+        result = _estimate_drag_coefficient(
+            body=body,
+            flow_direction=fd,
+            velocity_m_s=float(velocity_m_s),
+            fluid=str(fluid),
+        )
+    except (ValueError, TypeError) as exc:
+        raise ValueError(str(exc)) from exc
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+    d = result.to_dict()
+    d["body_type"] = body_type
+    d["dimensions"] = dimensions
+    d["flow_direction"] = [float(x) for x in fd]
+    return d
+
+
+# ---------------------------------------------------------------------------
 # Tool registry
 # ---------------------------------------------------------------------------
 
@@ -1830,6 +1970,18 @@ AEROSPACE_TOOLS: list[dict[str, Any]] = [
             "Batch least-squares orbit determination (Differential Correction) from "
             "radar tracking observations (range and/or range-rate). "
             "Estimates 6-DOF ECI state [r(3) km, v(3) km/s] at epoch."
+        ),
+    },
+    {
+        "name": "aero_estimate_drag",
+        "fn": aero_estimate_drag,
+        "description": (
+            "Estimate 3D body drag coefficient Cd using Hoerner 1965 empirical formulas "
+            "(Schultz-Grunow skin friction + form factor from fineness ratio). "
+            "Supports sphere, flat_plate, and ellipsoid bodies. "
+            "Returns Cd, breakdown (friction/form), Re, frontal area, wetted area. "
+            "NOT certified — low-fidelity preliminary estimate (±20-50%). "
+            "Ref: Hoerner 1965 'Fluid-Dynamic Drag' §4+§6; Anderson 2017 §3.18."
         ),
     },
 ]

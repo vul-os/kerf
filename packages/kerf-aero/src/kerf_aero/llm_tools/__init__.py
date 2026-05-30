@@ -1,7 +1,7 @@
 """
 kerf_aero.llm_tools — LLM-callable aerospace tool registry.
 
-Exposes 12 aerospace simulation tools for LLM use:
+Exposes 14 aerospace simulation tools for LLM use:
 
   aero_airfoil_coords         — NACA/Selig airfoil coordinates
   aero_airfoil_polar          — CL/CD sweep (panel method)
@@ -15,6 +15,8 @@ Exposes 12 aerospace simulation tools for LLM use:
   aero_attitude_propagate     — ADCS attitude dynamics simulation
   aero_thermal_steady_state   — Lumped thermal network steady-state solver
   aero_material_lookup        — Aerospace materials database lookup
+  aero_orbit_determination    — Batch least-squares orbit determination
+  aero_estimate_drag          — 3D body drag coefficient (Hoerner 1965 empirical)
 
 All tools return plain JSON-serializable dicts.
 """
@@ -32,6 +34,7 @@ from kerf_aero.llm_tools.aerospace_tools import (
     aero_attitude_propagate,
     aero_thermal_steady_state,
     aero_material_lookup,
+    aero_estimate_drag,
     AEROSPACE_TOOLS,
 )
 
@@ -48,5 +51,6 @@ __all__ = [
     "aero_attitude_propagate",
     "aero_thermal_steady_state",
     "aero_material_lookup",
+    "aero_estimate_drag",
     "AEROSPACE_TOOLS",
 ]

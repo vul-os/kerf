@@ -5086,6 +5086,20 @@
           }
         },
         {
+          "domain": "D5",
+          "feature": "Drag-coefficient estimation (Hoerner 1965)",
+          "competitor": {
+            "status": "no",
+            "note": "No Cd estimation in Fusion; requires separate Autodesk CFD",
+            "source": "https://www.autodesk.com/support/technical/article/caas/sfdcarticles/sfdcarticles/Does-Fusion-360-have-flow-simulation-as-a-simulation-study.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "3D body Cd: frontal area + Schultz-Grunow Cf + Hoerner form factor; wired LLM tool aero_estimate_drag (NOT certified, low-fidelity)",
+            "evidence": "packages/kerf-aero/src/kerf_aero/drag_estimate.py"
+          }
+        },
+        {
           "domain": "D6",
           "feature": "Schematic capture (KiCad round-trip, ERC)",
           "competitor": {

@@ -138,6 +138,12 @@
           "kerf": "evidence: \"cloud/drawings/\""
         },
         {
+          "name": "Measurement chain auto-extraction (ASME Y14.5 + ISO 129) ✅",
+          "domain": "D13",
+          "competitor": "paid: false",
+          "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/drawings/measurement_chain.py\""
+        },
+        {
           "name": "IFC import (IFC2x3 / IFC4)",
           "domain": "D13",
           "competitor": "paid: false",

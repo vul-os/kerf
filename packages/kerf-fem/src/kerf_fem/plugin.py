@@ -5,7 +5,8 @@ Registers:
   - FastAPI router  POST /run-fem
   - LLM tools       fem_run, fem_job_status  (via ctx.tools.register)
   - LLM tools       fem_acoustics, fem_electrostatics, fem_magnetostatics,
-                    cfd_navier_stokes_steady, cfd_potential_cylinder
+                    cfd_navier_stokes_steady, cfd_potential_cylinder,
+                    fem_propagate_uncertainty
                     (via import-triggered self-registration)
   - background worker for fem_jobs table     (via ctx.workers.register)
 
@@ -75,6 +76,7 @@ async def register(app: FastAPI, ctx):
     import kerf_fem.em_field  # kerf-fem: electrostatics + magnetostatics — self-registers fem_electrostatics, fem_magnetostatics
     import kerf_fem.cfd_navier_stokes  # kerf-fem: 2-D projection NS solver — self-registers cfd_navier_stokes_steady
     import kerf_fem.cfd_potential  # kerf-fem: potential-flow cylinder — self-registers cfd_potential_cylinder
+    from kerf_fem.coupled_variation import fem_propagate_uncertainty_spec, run_fem_propagate_uncertainty; ctx.tools.register("fem_propagate_uncertainty", fem_propagate_uncertainty_spec, run_fem_propagate_uncertainty)  # kerf-fem: probabilistic FEA (LHS + Karhunen-Loève)
 
     # Register background worker
     from kerf_fem.worker import FEMWorker
@@ -96,6 +98,7 @@ async def register(app: FastAPI, ctx):
         "fem.acoustics", "fem.electrostatics", "fem.magnetostatics",
         "fem.cfd-navier-stokes", "fem.cfd-potential",
         "fem.buckling", "fem.harmonic-response", "fem.random-vibration",
+        "fem.probabilistic",  # LHS + Karhunen-Loève uncertainty propagation
     ]
     if _DOLFINX_AVAILABLE:
         provides.append("fem.linear-static")

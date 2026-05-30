@@ -1064,6 +1064,11 @@ __all__ = [
     "validate_mate",
     "auto_detect_potential_mates",
     "validate_assembly_mates",
+    # GK-P: Curvature heatmap PNG/SVG export
+    "render_curvature_heatmap",
+    "export_heatmap_png",
+    "export_heatmap_svg",
+    "generate_curvature_legend",
 ]
 
 # Variable-section edge blend (Vida-Martin-Varady 1994 §4)
@@ -1250,3 +1255,13 @@ from kerf_cad_core.geom.mate_inspector import (
     auto_detect_potential_mates,
     validate_assembly_mates,
 )
+# GK-P: Curvature heatmap PNG/SVG export (Wave 4DD extension)
+from kerf_cad_core.geom.curvature_heatmap import (
+    render_curvature_heatmap,
+    export_heatmap_png,
+    export_heatmap_svg,
+    generate_curvature_legend,
+)
+# Restore the curvature_heatmap *function* from surface_analysis (the submodule
+# import above sets the attribute to the module object; we need the function).
+from kerf_cad_core.geom.surface_analysis import curvature_heatmap  # noqa: E402 (re-bind)

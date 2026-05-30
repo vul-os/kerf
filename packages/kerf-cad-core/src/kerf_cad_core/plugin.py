@@ -164,6 +164,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.curve_toolkit",
     "kerf_cad_core.geom.surface_analysis",
     "kerf_cad_core.geom.wall_thickness",   # GK-P: brep_analyze_wall_thickness + brep_check_moldability
+    "kerf_cad_core.geom.curvature_heatmap",
     "kerf_cad_core.geom.mesh_repair",
     # GK-82 ext: body-body imprint with edge tagging
     "kerf_cad_core.geom.imprint_body_tool",

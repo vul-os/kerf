@@ -1107,6 +1107,9 @@ __all__ = [
     "ConnectivityReport",
     "inspect_connectivity",
     "is_manifold_closed",
+    # SUBD-CAGE-RING-FROM-EDGE
+    "EdgeRingResult",
+    "compute_edge_ring",
 ]
 
 # Variable-section edge blend (Vida-Martin-Varady 1994 §4)
@@ -1424,4 +1427,25 @@ from kerf_cad_core.geom.subd_symmetry import (
     detect_mirror_symmetry,
     enforce_mirror_symmetry,
     mirror_edit,
+)
+# BREP-FILLET-RECOMMEND-RADIUS: per-edge fillet radius recommendation engine
+# (Peterson 1974 §2.3; Boothroyd-Dewhurst 2002 §4) — recommend_fillet_radius / RadiusRecommendation
+from kerf_cad_core.geom.fillet_recommend_radius import (  # noqa: E402
+    FilletRadiusContext,
+    RadiusRecommendation,
+    recommend_fillet_radius,
+    recommend_fillet_radii_for_body,
+)
+# NURBS-FAIR-COMPOSITE-CURVE: global curvature-variance fairing for poly-NURBS chains
+# (Greiner-Hormann 1996; Sapidis-Farin 1990 §3; Klass 1980 §3 seam G1)
+from kerf_cad_core.geom.composite_fair import (
+    CompositeFairResult,
+    fair_composite,
+)
+# SUBD-CAGE-RING-FROM-EDGE: edge ring traversal on CC quad cages
+# (Maya/Blender Bridge ring pattern — opposite edges across each quad face)
+# Honest caveat: pure-quad cages only; non-quad face → is_degenerate=True.
+from kerf_cad_core.geom.subd_edge_ring import (  # noqa: E402
+    EdgeRingResult,
+    compute_edge_ring,
 )

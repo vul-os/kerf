@@ -26,6 +26,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.cam_layered",
     "kerf_cad_core.cam_toolpath_collision",  # cam_verify_toolpath_collision
     "kerf_cad_core.cam_feedrate_lookahead",  # cam_optimize_feedrate_lookahead (Altintas 2012 §5.7)
+    "kerf_cad_core.cam_gcode_emit",          # cam_emit_gcode (RS-274/NGC → Fanuc G-code from toolpath)
     "kerf_cad_core.extrude_sketch_to_jscad",
     "kerf_cad_core.surfacing",
     "kerf_cad_core.quad_remesh",
@@ -354,6 +355,17 @@ _TOOL_MODULES = [
     # SUBD-SYMMETRY-DETECT: PCA mirror + rotational + spherical symmetry
     # (Mitra-Guibas-Pauly 2006; Podolak et al. 2006) -- subd_detect_symmetry, subd_enforce_symmetry
     "kerf_cad_core.geom.subd_symmetry_tools",
+    # NURBS-FAIR-COMPOSITE-CURVE: global curvature-variance fairing for poly-NURBS chains
+    # (Greiner-Hormann 1996; Sapidis-Farin 1990 §3; Klass 1980 §3) — nurbs_fair_composite
+    "kerf_cad_core.geom.composite_fair",
+    # BREP-FILLET-RECOMMEND-RADIUS: per-edge radius recommendation combining
+    # face-size rule, Peterson Kt notch formula, material stress-relief floor,
+    # tool constraint, and sharp-edge preservation
+    # (Peterson 1974 §2.3; Boothroyd-Dewhurst 2002 §4) — brep_recommend_fillet_radius
+    "kerf_cad_core.geom.fillet_recommend_radius",
+    # SUBD-CAGE-RING-FROM-EDGE: edge ring traversal (opposite edges across quad faces)
+    # Pure-Python; honest degenerate flag for non-quad faces.
+    "kerf_cad_core.geom.subd_edge_ring",          # subd_compute_edge_ring
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

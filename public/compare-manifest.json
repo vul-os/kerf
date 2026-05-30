@@ -5952,6 +5952,19 @@
         },
         {
           "domain": "D1",
+          "feature": "Fillet radius recommendation (per-edge, multi-criteria)",
+          "competitor": {
+            "status": "no",
+            "note": "SolidWorks has no per-edge radius recommendation engine; user specifies radius manually"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "brep_recommend_fillet_radius: face-size cap (Boothroyd-Dewhurst §4), Peterson 1974 §2.3 Kt notch formula, material stress-relief floor (steel/aluminium/titanium/cast_iron/plastic), tool-radius constraint, intentional-sharpness preservation; RadiusRecommendation dataclass with criteria_radii transparency; 21 hermetic oracle tests",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/fillet_recommend_radius.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "Sweep (1 & 2 rail)",
           "competitor": {
             "status": "yes",

@@ -40,12 +40,20 @@ async def register(app: FastAPI, ctx):
     except Exception:
         pass  # KBE bridge optional — fail silently if kerf-rules KBE unavailable.
 
+    # MBSE / SysML 1.x XMI digital-thread tools (Wave 4P).
+    try:
+        from kerf_plm.sysml_tools import TOOLS as _SYSML_TOOLS
+        for name, spec, handler in _SYSML_TOOLS:
+            ctx.tools.register(name, spec, handler)
+    except Exception:
+        pass  # sysml tools optional — fail silently if XMI deps unavailable.
+
     try:
         from kerf_core.plugin import PluginManifest
         return PluginManifest(
             name="plm",
             version="0.1.0",
-            provides=["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge"],
+            provides=["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.sysml-traceability", "plm.xmi-export"],
             depends=[],
         )
     except ImportError:

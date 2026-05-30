@@ -9184,6 +9184,12 @@
           "feature": "Process simulation (moldflow/weld/AM/forming)",
           "competitor": "{ status: paid, note: \"SIMULIA Plastic for injection moulding; CATIA Composites for layup process; paid add-ins\", source: \"https://www.3ds.com/products/simulia\" }",
           "kerf": "{ status: yes, note: \"Moldflow Hele-Shaw + weld/AM/forming calculators; backend only\", evidence: \"packages/kerf-cad-core/src/kerf_cad_core/plugin.py\" }"
+        },
+        {
+          "domain": "D15",
+          "feature": "MBSE digital thread (SysML 1.x XMI + traceability)",
+          "competitor": "{ status: paid, note: \"CATIA Systems Engineering — SysML 1.x/2.0 + Modelica; 3DEXPERIENCE paid role; full MBSE toolchain\", source: \"https://www.3ds.com/products/catia/systems-engineering\" }",
+          "kerf": "{ status: yes, note: \"MBSE digital thread (SysML 1.x XMI + traceability) ✅ — requirements-to-design-to-test traceability matrix; SysML 1.6/1.7 XMI export+import (OMG namespace URIs); orphan + coverage report; LLM tools sysml_trace_coverage / sysml_export_xmi / sysml_import_xmi; backend only. Caveat: SysML 1.x subset, not OMG-certified.\", evidence: \"packages/kerf-plm/src/kerf_plm/sysml.py\" }"
         }
       ]
     },
@@ -11275,6 +11281,14 @@
           "nx_tier": "paid",
           "competitor": "source: https://plm.automation.siemens.com/global/en/products/teamcenter/",
           "kerf": "evidence: cloud/cost/should_cost.py"
+        },
+        {
+          "domain": "D15",
+          "feature": "MBSE digital thread (SysML 1.x XMI + traceability)",
+          "nx": "Teamcenter Requirements + SysML via Capital/Polarion bridge; paid PLM add-on; not in NX base",
+          "nx_tier": "paid",
+          "competitor": "source: https://plm.automation.siemens.com/global/en/products/teamcenter/requirements-management.html",
+          "kerf": "{ status: yes, note: \"MBSE digital thread (SysML 1.x XMI + traceability) ✅ — SysML 1.6/1.7 XMI export+import; requirements-to-design-to-test matrix; LLM tools; backend only.\", evidence: \"packages/kerf-plm/src/kerf_plm/sysml.py\" }"
         }
       ]
     },

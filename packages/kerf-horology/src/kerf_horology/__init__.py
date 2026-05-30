@@ -9,11 +9,12 @@ that exposes LLM-callable tools for:
   * ``train_calculator`` — given target frequency + power reserve, computes
     the required gear-train ratio and a factored wheel/pinion solution
 
-Extended physics modules (new):
+Extended physics modules:
 
-  * ``escapement`` — Swiss-lever geometry: draw angle, lift, drop, impulse
-  * ``mainspring`` — Mainspring torque model + power-reserve calculation
-  * ``balance``    — Balance-wheel period, beat rate, isochronism check
+  * ``escapement``   — Swiss-lever geometry: draw angle, lift, drop, impulse
+  * ``mainspring``   — Mainspring torque model + power-reserve calculation
+  * ``balance``      — Balance-wheel period, beat rate, isochronism check
+  * ``train_ratio``  — Gear-train ratio calculator + inverse design (Daniels §6.1)
 
 Public re-exports
 -----------------
@@ -44,6 +45,15 @@ From ``kerf_horology.balance``:
   beats_per_hour(period_seconds) → float
   isochronism_check(...) → IsochronismResult
   hairspring_stiffness(bph, I_balance_gmm2) → float
+
+From ``kerf_horology.train_ratio`` (Daniels §6.1):
+
+  Wheel                          — dataclass for a watch arbor
+  TrainResult                    — complete train analysis result
+  compute_train_ratios(wheels)   → TrainResult
+  compute_beat_rate(...)         → float (BPH)
+  design_train_for_beat_rate(target_bph) → list[Wheel]
+  power_reserve_estimate(...)    → float (hours)
 
 See ``llm_docs/horology.md`` for LLM tool documentation.
 """
@@ -78,6 +88,15 @@ from kerf_horology.balance import (  # noqa: F401
     hairspring_stiffness,
     IsochronismResult,
 )
+from kerf_horology.train_ratio import (  # noqa: F401
+    Wheel,
+    StageRatio,
+    TrainResult,
+    compute_train_ratios,
+    compute_beat_rate,
+    design_train_for_beat_rate,
+    power_reserve_estimate,
+)
 
 __all__ = [
     "__version__",
@@ -103,4 +122,12 @@ __all__ = [
     "isochronism_check",
     "hairspring_stiffness",
     "IsochronismResult",
+    # train ratio (Daniels §6.1)
+    "Wheel",
+    "StageRatio",
+    "TrainResult",
+    "compute_train_ratios",
+    "compute_beat_rate",
+    "design_train_for_beat_rate",
+    "power_reserve_estimate",
 ]

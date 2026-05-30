@@ -1,7 +1,7 @@
 """
 kerf_horology.tools_spec
 ========================
-ToolSpec definitions and async handlers for the 8 horology LLM tools.
+ToolSpec definitions and async handlers for the 9 horology LLM tools.
 
 Wraps the pure-Python computation functions in kerf_horology.tools
 and presents them via the standard Kerf ToolSpec / ctx.tools.register pattern.
@@ -15,7 +15,8 @@ horology_mainspring_torque
 horology_power_reserve
 horology_balance_period
 horology_isochronism
-horology_validate_swiss_lever
+horology_train_ratios        (new — Daniels §6.1 train analysis)
+horology_design_train        (new — inverse design for target BPH)
 """
 
 from __future__ import annotations
@@ -37,7 +38,13 @@ from kerf_horology.tools import (
     _power_reserve_tool,
     _balance_period_tool,
     _isochronism_tool,
-    _validate_swiss_lever_tool,
+)
+from kerf_horology.train_ratio import (
+    Wheel,
+    compute_train_ratios,
+    compute_beat_rate,
+    design_train_for_beat_rate,
+    power_reserve_estimate,
 )
 
 
@@ -405,143 +412,181 @@ async def run_horology_isochronism(args: dict[str, Any], ctx: "ProjectCtx") -> s
 
 
 # ---------------------------------------------------------------------------
-# 8. validate_swiss_lever
+# 8. horology_train_ratios  (Daniels §6.1 gear-train ratio analysis)
 # ---------------------------------------------------------------------------
 
-horology_validate_swiss_lever_spec = ToolSpec(
-    name="horology_validate_swiss_lever",
+horology_train_ratios_spec = ToolSpec(
+    name="horology_train_ratios",
     description=(
-        "Full 16-check Swiss-lever escapement geometry validation per George Daniels "
-        "'Watchmaking' (1981) §6.2 and Schmid-Hammond-Roberts 'The Theory of Horology' "
-        "(2002) §10.  Checks: escape-wheel tooth count (15/18/21 standard), pitch-circle "
-        "radius, addendum/dedendum proportions, locking-face draw angle (nominal 10°), "
-        "impulse-face angle (4–6° per stone), pallet jewel separation (5½-tooth rule), "
-        "impulse pin/slot ratio (≥60%), safety-roller sizing (50–70% of main roller), "
-        "horn–jewel clearance (≥1.5× pin diameter), lock depth ratio (1/3 rule), "
-        "entry/exit angular drop (0.5°–2.5° each), drop uniformity (<0.2°), and "
-        "slide asymmetry (entry = exit + 1°).  Returns valid (bool), per-rule violations "
-        "with Daniels section references, derived lift angle, drop uniformity, and "
-        "correction recommendations.  Default parameters model the ETA 2824-2 at 28 800 bph."
+        "Analyse a mechanical watch gear train: compute per-stage ratios, "
+        "total train ratio (barrel → escape wheel), arbor speeds (rev/hr), "
+        "and beat rate (BPH).  Follows Daniels §6.1 (Watchmaking, 1981). "
+        "Input is an ordered list of wheel descriptions from barrel to escape wheel. "
+        "Each entry has a name, teeth count, and optionally pinion_leaves (the pinion "
+        "on that arbor driven by the previous wheel).  The barrel has no pinion; the "
+        "escape wheel pinion is driven by the fourth wheel."
     ),
     input_schema={
         "type": "object",
         "properties": {
-            "escape_wheel_teeth": {
-                "type": "integer",
-                "description": "Escape wheel tooth count (standard: 15, 18, or 21; default 15).",
+            "wheels": {
+                "type": "array",
+                "description": (
+                    "Ordered list of arbors from barrel to escape wheel.  "
+                    "Each item: {name, teeth, pinion_leaves?}.  "
+                    "Example: [{name:'barrel',teeth:80}, {name:'center_wheel',teeth:80,pinion_leaves:12}, "
+                    "{name:'escape_wheel',teeth:15,pinion_leaves:7}]"
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string"},
+                        "teeth": {"type": "integer"},
+                        "pinion_leaves": {"type": "integer"},
+                    },
+                    "required": ["name", "teeth"],
+                },
             },
-            "escape_wheel_pitch_radius_mm": {
+            "barrel_rev_per_hr": {
                 "type": "number",
-                "description": "Pitch-circle radius in mm (default 1.925 ≈ ETA 2824-2).",
-            },
-            "escape_wheel_addendum_mm": {
-                "type": "number",
-                "description": "Tooth addendum above pitch circle (mm, default 0.175).",
-            },
-            "escape_wheel_dedendum_mm": {
-                "type": "number",
-                "description": "Tooth dedendum below pitch circle (mm, default 0.200). "
-                               "Must exceed addendum.",
-            },
-            "locking_face_angle_deg": {
-                "type": "number",
-                "description": "Pallet draw angle on locking faces (degrees, nominal 10°; "
-                               "range 8°–14°).",
-            },
-            "impulse_face_angle_deg": {
-                "type": "number",
-                "description": "Pallet impulse face angle per stone (degrees, standard 4–6°).",
-            },
-            "pallet_jewel_separation_teeth": {
-                "type": "number",
-                "description": "Entry-to-exit pallet jewel span in tooth pitches (standard 5.5).",
-            },
-            "impulse_pin_diameter_mm": {
-                "type": "number",
-                "description": "Roller impulse pin diameter (mm, default 0.18).",
-            },
-            "slot_width_mm": {
-                "type": "number",
-                "description": "Lever notch width (mm, default 0.25). Pin must be ≥60%.",
-            },
-            "safety_roller_diameter_mm": {
-                "type": "number",
-                "description": "Guard roller diameter (mm, default 0.90).",
-            },
-            "roller_diameter_mm": {
-                "type": "number",
-                "description": "Main (impulse) roller diameter (mm, default 1.60).",
-            },
-            "horn_gap_mm": {
-                "type": "number",
-                "description": "Horn–jewel clearance (mm, default 0.30; must be ≥1.5× pin diam).",
-            },
-            "entry_drop_deg": {
-                "type": "number",
-                "description": "Angular drop on entry pallet side (degrees, nominal 1.5°).",
-            },
-            "exit_drop_deg": {
-                "type": "number",
-                "description": "Angular drop on exit pallet side (degrees, nominal 1.5°).",
-            },
-            "lock_depth_ratio": {
-                "type": "number",
-                "description": "Lock depth as fraction of impulse face (standard 1/3 ≈ 0.333).",
-            },
-            "slide_entry_deg": {
-                "type": "number",
-                "description": "Entry pallet draw angle (degrees, standard ≈ 11°).",
-            },
-            "slide_exit_deg": {
-                "type": "number",
-                "description": "Exit pallet draw angle (degrees, standard ≈ 10°; "
-                               "entry should be 1° more than exit).",
-            },
-            "beat_rate_bph": {
-                "type": "integer",
-                "description": "Beat rate in beats per hour (default 28 800; "
-                               "also 18 000, 21 600, 36 000).",
+                "description": (
+                    "Mainspring barrel rotation speed in revolutions per hour.  "
+                    "Default 0.125 (1/8 RPH — barrel completes 1 revolution every 8 hours)."
+                ),
             },
         },
-        "required": [],
+        "required": ["wheels"],
     },
 )
 
 
-async def run_horology_validate_swiss_lever(
-    args: dict[str, Any], ctx: "ProjectCtx"
-) -> str:
+async def run_horology_train_ratios(args: dict[str, Any], ctx: "ProjectCtx") -> str:
     try:
-        result = _validate_swiss_lever_tool(
-            escape_wheel_teeth=int(args.get("escape_wheel_teeth", 15)),
-            escape_wheel_pitch_radius_mm=float(
-                args.get("escape_wheel_pitch_radius_mm", 1.925)
-            ),
-            escape_wheel_addendum_mm=float(
-                args.get("escape_wheel_addendum_mm", 0.175)
-            ),
-            escape_wheel_dedendum_mm=float(
-                args.get("escape_wheel_dedendum_mm", 0.200)
-            ),
-            locking_face_angle_deg=float(args.get("locking_face_angle_deg", 10.0)),
-            impulse_face_angle_deg=float(args.get("impulse_face_angle_deg", 5.0)),
-            pallet_jewel_separation_teeth=float(
-                args.get("pallet_jewel_separation_teeth", 5.5)
-            ),
-            impulse_pin_diameter_mm=float(args.get("impulse_pin_diameter_mm", 0.18)),
-            slot_width_mm=float(args.get("slot_width_mm", 0.25)),
-            safety_roller_diameter_mm=float(
-                args.get("safety_roller_diameter_mm", 0.90)
-            ),
-            roller_diameter_mm=float(args.get("roller_diameter_mm", 1.60)),
-            horn_gap_mm=float(args.get("horn_gap_mm", 0.30)),
-            entry_drop_deg=float(args.get("entry_drop_deg", 1.5)),
-            exit_drop_deg=float(args.get("exit_drop_deg", 1.5)),
-            lock_depth_ratio=float(args.get("lock_depth_ratio", 1.0 / 3.0)),
-            slide_entry_deg=float(args.get("slide_entry_deg", 11.0)),
-            slide_exit_deg=float(args.get("slide_exit_deg", 10.0)),
-            beat_rate_bph=int(args.get("beat_rate_bph", 28800)),
+        raw_wheels = args["wheels"]
+        wheels = [
+            Wheel(
+                name=str(w["name"]),
+                teeth=int(w["teeth"]),
+                pinion_leaves=int(w["pinion_leaves"]) if "pinion_leaves" in w else None,
+            )
+            for w in raw_wheels
+        ]
+        barrel_rph = float(args.get("barrel_rev_per_hr", 1.0 / 8.0))
+        result = compute_train_ratios(wheels, barrel_rev_per_hr=barrel_rph)
+        payload = {
+            "total_ratio": round(result.total_ratio, 6),
+            "beat_rate_bph": round(result.beat_rate_bph, 3),
+            "is_valid": result.is_valid,
+            "validation_errors": result.validation_errors,
+            "stages": [
+                {
+                    "driving_wheel": s.driving_wheel,
+                    "driven_pinion": s.driven_pinion,
+                    "wheel_teeth": s.wheel_teeth,
+                    "pinion_leaves": s.pinion_leaves,
+                    "ratio": round(s.ratio, 6),
+                }
+                for s in result.stages
+            ],
+            "arbor_speeds_rev_per_hr": {
+                k: round(v, 6) for k, v in result.arbor_speeds_rev_per_hr.items()
+            },
+        }
+        return ok_payload(payload)
+    except Exception as exc:
+        return err_payload(str(exc), "HOROLOGY_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# 9. horology_design_train  (inverse design — target BPH → wheel configuration)
+# ---------------------------------------------------------------------------
+
+horology_design_train_spec = ToolSpec(
+    name="horology_design_train",
+    description=(
+        "Design a mechanical watch gear train for a target beat rate (BPH).  "
+        "Inverts the Daniels §6.1 formula to find integer wheel/pinion counts "
+        "in practical ranges (pinion 6–12 leaves, wheel 60–130 teeth) whose "
+        "product matches the required train ratio within 5%.  "
+        "Standard beat rates: 18000 (vintage), 21600 (mid), 28800 (modern, ETA 2824-2), "
+        "36000 (high-beat, Seiko 9SA5).  "
+        "Returns the wheel list and the achieved beat rate."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "target_bph": {
+                "type": "number",
+                "description": (
+                    "Target beat rate in beats per hour.  "
+                    "Standard values: 18000, 21600, 28800, 36000."
+                ),
+            },
+            "mainspring_rev_per_hr": {
+                "type": "number",
+                "description": (
+                    "Mainspring barrel rotation speed in rev/hr.  "
+                    "Default 0.125 (= 1/8 RPH, barrel makes 1 revolution every 8 hours).  "
+                    "Use 0.3125 for 7.5 turns/day (kerf-partsgen convention)."
+                ),
+            },
+            "escape_wheel_teeth": {
+                "type": "integer",
+                "description": "Number of teeth on the escape wheel.  Default 15 (Swiss lever standard).",
+            },
+            "n_stages": {
+                "type": "integer",
+                "description": "Number of wheel/pinion stages.  Default 3.",
+            },
+        },
+        "required": ["target_bph"],
+    },
+)
+
+
+async def run_horology_design_train(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        target_bph = float(args["target_bph"])
+        barrel_rph = float(args.get("mainspring_rev_per_hr", 1.0 / 8.0))
+        escape_teeth = int(args.get("escape_wheel_teeth", 15))
+        n_stages = int(args.get("n_stages", 3))
+
+        wheels = design_train_for_beat_rate(
+            target_bph=target_bph,
+            mainspring_rev_per_hr=barrel_rph,
+            escape_wheel_teeth=escape_teeth,
+            n_stages=n_stages,
         )
-        return ok_payload(result)
+        result = compute_train_ratios(wheels, barrel_rev_per_hr=barrel_rph)
+
+        payload = {
+            "target_bph": target_bph,
+            "achieved_bph": round(result.beat_rate_bph, 3),
+            "deviation_pct": round(
+                abs(result.beat_rate_bph - target_bph) / target_bph * 100, 3
+            ),
+            "total_ratio": round(result.total_ratio, 6),
+            "is_valid": result.is_valid,
+            "validation_errors": result.validation_errors,
+            "wheels": [
+                {
+                    "name": w.name,
+                    "teeth": w.teeth,
+                    "pinion_leaves": w.pinion_leaves,
+                }
+                for w in wheels
+            ],
+            "stages": [
+                {
+                    "driving_wheel": s.driving_wheel,
+                    "driven_pinion": s.driven_pinion,
+                    "wheel_teeth": s.wheel_teeth,
+                    "pinion_leaves": s.pinion_leaves,
+                    "ratio": round(s.ratio, 6),
+                }
+                for s in result.stages
+            ],
+        }
+        return ok_payload(payload)
     except Exception as exc:
         return err_payload(str(exc), "HOROLOGY_ERROR")

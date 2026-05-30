@@ -1,5 +1,5 @@
 """
-Dispatch tests for the 7 horology LLM tools registered via plugin.py.
+Dispatch tests for the 9 horology LLM tools registered via plugin.py.
 
 Verifies:
   - Each tool handler can be called with valid args and returns ok_payload JSON.
@@ -20,6 +20,8 @@ from kerf_horology.tools_spec import (
     horology_power_reserve_spec, run_horology_power_reserve,
     horology_balance_period_spec, run_horology_balance_period,
     horology_isochronism_spec, run_horology_isochronism,
+    horology_train_ratios_spec, run_horology_train_ratios,
+    horology_design_train_spec, run_horology_design_train,
 )
 
 
@@ -50,6 +52,8 @@ class TestSpecs:
             horology_power_reserve_spec,
             horology_balance_period_spec,
             horology_isochronism_spec,
+            horology_train_ratios_spec,
+            horology_design_train_spec,
         ]
         for spec in specs:
             assert spec.name.startswith("horology_"), spec.name
@@ -223,3 +227,118 @@ class TestIsochronism:
         )))
         assert isinstance(result["notes"], list)
         assert len(result["notes"]) > 0
+
+
+# ---------------------------------------------------------------------------
+# 8. horology_train_ratios
+# ---------------------------------------------------------------------------
+
+class TestTrainRatiosTool:
+    _WHEELS_4STAGE = [
+        {"name": "barrel",       "teeth": 80},
+        {"name": "center_wheel", "teeth": 80, "pinion_leaves": 12},
+        {"name": "third_wheel",  "teeth": 75, "pinion_leaves": 10},
+        {"name": "fourth_wheel", "teeth": 70, "pinion_leaves": 8},
+        {"name": "escape_wheel", "teeth": 15, "pinion_leaves": 7},
+    ]
+
+    def test_returns_total_ratio(self):
+        result = json.loads(_run(run_horology_train_ratios(
+            {"wheels": self._WHEELS_4STAGE, "barrel_rev_per_hr": 0.125},
+            CTX,
+        )))
+        assert "total_ratio" in result
+        assert abs(result["total_ratio"] - 5000.0) < 1e-4
+
+    def test_returns_beat_rate(self):
+        result = json.loads(_run(run_horology_train_ratios(
+            {"wheels": self._WHEELS_4STAGE, "barrel_rev_per_hr": 0.125},
+            CTX,
+        )))
+        assert "beat_rate_bph" in result
+        assert abs(result["beat_rate_bph"] - 18750.0) < 1.0
+
+    def test_stages_list_returned(self):
+        result = json.loads(_run(run_horology_train_ratios(
+            {"wheels": self._WHEELS_4STAGE},
+            CTX,
+        )))
+        assert isinstance(result["stages"], list)
+        assert len(result["stages"]) == 4
+
+    def test_arbor_speeds_returned(self):
+        result = json.loads(_run(run_horology_train_ratios(
+            {"wheels": self._WHEELS_4STAGE, "barrel_rev_per_hr": 0.125},
+            CTX,
+        )))
+        assert "arbor_speeds_rev_per_hr" in result
+        assert "barrel" in result["arbor_speeds_rev_per_hr"]
+        assert "escape_wheel" in result["arbor_speeds_rev_per_hr"]
+
+    def test_is_valid_flag(self):
+        result = json.loads(_run(run_horology_train_ratios(
+            {"wheels": self._WHEELS_4STAGE},
+            CTX,
+        )))
+        assert result["is_valid"] is True
+
+    def test_missing_wheels_returns_error(self):
+        result = json.loads(_run(run_horology_train_ratios(
+            {},  # missing 'wheels' key
+            CTX,
+        )))
+        assert "error" in result
+
+
+# ---------------------------------------------------------------------------
+# 9. horology_design_train
+# ---------------------------------------------------------------------------
+
+class TestDesignTrainTool:
+    def test_design_28800_returns_wheels(self):
+        result = json.loads(_run(run_horology_design_train(
+            {"target_bph": 28800, "mainspring_rev_per_hr": 0.125},
+            CTX,
+        )))
+        assert "wheels" in result
+        assert len(result["wheels"]) >= 2
+        assert result["wheels"][0]["name"] == "barrel"
+        assert result["wheels"][-1]["name"] == "escape_wheel"
+
+    def test_design_28800_within_5pct(self):
+        result = json.loads(_run(run_horology_design_train(
+            {"target_bph": 28800, "mainspring_rev_per_hr": 0.125},
+            CTX,
+        )))
+        assert result["deviation_pct"] <= 5.0, (
+            f"28800 BPH design deviation {result['deviation_pct']:.2f}% > 5%"
+        )
+
+    def test_design_36000_higher_ratio_than_28800(self):
+        r28 = json.loads(_run(run_horology_design_train(
+            {"target_bph": 28800, "mainspring_rev_per_hr": 0.125},
+            CTX,
+        )))
+        r36 = json.loads(_run(run_horology_design_train(
+            {"target_bph": 36000, "mainspring_rev_per_hr": 0.125},
+            CTX,
+        )))
+        assert r36["total_ratio"] > r28["total_ratio"], (
+            f"36000 BPH ratio {r36['total_ratio']:.0f} should be > "
+            f"28800 BPH ratio {r28['total_ratio']:.0f}"
+        )
+
+    def test_design_18000_valid(self):
+        result = json.loads(_run(run_horology_design_train(
+            {"target_bph": 18000, "mainspring_rev_per_hr": 0.125},
+            CTX,
+        )))
+        assert result["is_valid"] is True
+        assert result["deviation_pct"] <= 5.0
+
+    def test_design_invalid_target_returns_error(self):
+        result = json.loads(_run(run_horology_design_train(
+            {"target_bph": -100},
+            CTX,
+        )))
+        assert "error" in result

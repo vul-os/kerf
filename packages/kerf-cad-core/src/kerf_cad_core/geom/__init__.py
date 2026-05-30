@@ -1451,3 +1451,17 @@ from kerf_cad_core.geom.subd_edge_ring import (  # noqa: E402
     EdgeRingResult,
     compute_edge_ring,
 )
+# BREP-SHELL-WALL-CHECK: post-shell wall-thickness verification vs process spec
+# (Menges 2001 §3.3; Boothroyd-Dewhurst §5; FDM/SLA nozzle-diameter rules)
+# Honest caveat: static rule-based only — no CFD or mould-fill simulation.
+from kerf_cad_core.geom.shell_wall_check import (  # noqa: E402
+    FaceWallResult,
+    ShellWallReport,
+    check_shell_walls,
+)
+# SUBD-LIMIT-CRITICAL-POINTS: discrete Morse critical points on CC limit surface
+# (Edelsbrunner-Harer 2010 §1 — maxima, minima, saddles; Morse-Euler χ verification)
+from kerf_cad_core.geom.subd_critical_points import (  # noqa: E402
+    CriticalPointsReport,
+    find_critical_points,
+)

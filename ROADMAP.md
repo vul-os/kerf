@@ -161,6 +161,8 @@ The sector work only matters if you **own your work, are not locked in, and can 
 
 **SUBD-CAGE-RING-FROM-EDGE** ✅ — edge ring traversal on Catmull-Clark quad cages: `compute_edge_ring(cage, start_edge)` returns `EdgeRingResult(edge_indices, is_closed, is_degenerate, transition_face_indices)`; follows opposite edges across each quad face (Maya/Blender Bridge pattern); closed on cube (4-ring) and torus (ring length = opposite-axis count); open at mesh boundary; honest degenerate flag at non-quad faces; start_edge accepts `(v0, v1)` pair or integer edge index; LLM tool `subd_compute_edge_ring`; 25 oracle-asserted tests — `kerf-cad-core/geom/subd_edge_ring.py`.
 
+**BREP-SHELL-WALL-CHECK** ✅ — post-shell wall-thickness verification against manufacturing process requirements: `check_shell_walls(body, process, material) -> ShellWallReport`; injection moulding spec from Menges 2001 §3.3 Table 3.3 (t_min/t_max per material, flow-length correction +0.5 mm/100 mm); sheet metal from Boothroyd-Dewhurst §5 (constant-wall + §5.4 bend-radius multiplier); FDM/SLA/SLS/DLP/MJF nozzle-diameter minimum wall; per-face `FaceWallResult` with violation text; `violations_thin`/`violations_thick` lists; honest caveat: static rule-based only, no CFD or mould-fill simulation; LLM tool `brep_check_shell_walls`; 20 oracle-asserted tests (2mm ABS → pass; 0.5mm ABS → thin; 0.5mm FDM → pass; 0.2mm FDM → thin; 6mm ABS → thick; Menges Table 3.3 oracle for PP/PC/LCP/PVC/POM/PEEK; flow-length correction; sheet-metal Al; SLA; nozzle override) — `kerf-cad-core/geom/shell_wall_check.py`.
+
 ### Core platform
 
 - **Auth + projects + files + chat (CRUD)** ✅ — Postgres, JWT, Google OAuth.

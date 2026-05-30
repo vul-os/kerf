@@ -172,6 +172,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.curve_toolkit",
     "kerf_cad_core.geom.surface_analysis",
     "kerf_cad_core.geom.wall_thickness",   # GK-P: brep_analyze_wall_thickness + brep_check_moldability
+    "kerf_cad_core.geom.shell_wall_check", # BREP-SHELL-WALL-CHECK: brep_check_shell_walls (Menges 2001 §3.3; BD §5)
     "kerf_cad_core.geom.curvature_heatmap",
     "kerf_cad_core.geom.mesh_repair",
     # GK-82 ext: body-body imprint with edge tagging
@@ -366,6 +367,9 @@ _TOOL_MODULES = [
     # SUBD-CAGE-RING-FROM-EDGE: edge ring traversal (opposite edges across quad faces)
     # Pure-Python; honest degenerate flag for non-quad faces.
     "kerf_cad_core.geom.subd_edge_ring",          # subd_compute_edge_ring
+    # SUBD-LIMIT-CRITICAL-POINTS: discrete Morse critical points on CC limit surface
+    # (Edelsbrunner-Harer 2010 §1) — subd_find_critical_points
+    "kerf_cad_core.geom.subd_critical_points",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

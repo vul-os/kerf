@@ -15713,6 +15713,20 @@
         },
         {
           "domain": "D1",
+          "feature": "Shell wall-thickness DFM check",
+          "competitor": {
+            "status": "partial",
+            "note": "Fusion 360 Design Advisor flags thin walls for injection moulding; Solidworks DFMXpress checks wall thickness; neither exposes programmatic per-face API.",
+            "source": "https://help.autodesk.com/view/fusion360/ENU/?guid=GUID-design-advisor"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "check_shell_walls(body, process, material) verifies post-shell wall thickness against injection_molding (Menges 2001 §3.3 Table 3.3: t_min/t_max per material, flow-length correction), sheet_metal (Boothroyd-Dewhurst §5), and FDM/SLA/SLS/DLP/MJF nozzle-diameter rules; ShellWallReport with per-face FaceWallResult, violations_thin/thick; LLM tool brep_check_shell_walls; 20 oracle-asserted tests; honest caveat: static rule-based only, no CFD or mould-fill simulation.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/shell_wall_check.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "Mesh repair / ShrinkWrap",
           "competitor": {
             "status": "yes",

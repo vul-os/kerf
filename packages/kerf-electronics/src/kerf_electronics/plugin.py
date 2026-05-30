@@ -161,6 +161,8 @@ def _register_tools(ctx, provides: list) -> None:
         "kerf_electronics.pdn.ac_impedance",
         # Fibre-link LLM tools (fibre coupling, full link budget, dispersion penalty)
         "kerf_electronics.photonics.fibre_link",
+        # Netlist-vs-layout consistency DRC (IPC-7351B §4.1-4.2)
+        "kerf_electronics.tools.netlist_drc",
     ]
 
     for module_path in tool_modules:

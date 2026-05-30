@@ -270,6 +270,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 
 - **KiCad-class PCB design** ✅ — ERC, hier-schematic, buses/diff-pairs, net classes/rules, length tuning, via stitching/teardrops, shove router, copper pour, DRC.
 - **Library `cad_component` 3D substitution** ✅ — Library-mapped components resolve to real JSCAD/STEP geometry in the CircuitEditor 3D tab; indicator chips replaced; cache per component_id; `substitute_component` LLM tool.
+- **KiCad-class PCB design** ✅ — ERC, hier-schematic, buses/diff-pairs, net classes/rules, length tuning, via stitching/teardrops, shove router, copper pour, DRC, netlist-vs-layout consistency DRC (IPC-7351B) ✅.
 - **Fabrication package** ✅ — Gerber RS-274X, Excellon drill, IPC-2581, ODB++, pick-and-place, fab BOM, 3D board STEP export.
 - **SPICE + RF + autorouting** ✅ — ngspice, scikit-rf S-params/Smith chart, FreeRouting DSN/SES.
 - **Wiring/harness** ✅ — WireViz YAML→SVG (2D; 3D in flight at P1-7).

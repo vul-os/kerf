@@ -1959,8 +1959,22 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "DRC overlay wired; ERC + IPC-2221B presets",
+            "note": "DRC overlay wired; ERC + IPC-2221B presets; netlist-vs-layout consistency DRC (IPC-7351B) ✅",
             "evidence": "packages/kerf-electronics/src/kerf_electronics/drc.py"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "Netlist-vs-layout consistency DRC (IPC-7351B)",
+          "competitor": {
+            "status": "yes",
+            "note": "KiCad BOM-vs-Schematic + netlist DRC catches missing/extra/swapped connections",
+            "source": "https://docs.kicad.org/10.0/en/pcbnew/pcbnew.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Netlist-vs-layout consistency DRC (IPC-7351B) ✅ — detects missing_connections, extra_connections (shorts), swapped_nets; IPC-7351B §4.1-4.2 violation tags; LLM tool electronics_netlist_consistency",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/netlist_drc.py"
           }
         },
         {

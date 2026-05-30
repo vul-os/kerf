@@ -412,6 +412,13 @@ from kerf_cad_core.geom.degree_op import (
 )
 # GK-102: knot removal / minimal-CP refit
 from kerf_cad_core.geom.nurbs import remove_knot, minimal_cp_refit
+# GK-P: NURBS seam control for periodic (closed) surfaces
+from kerf_cad_core.geom.seam_control import (
+    SeamInfo,
+    detect_seam,
+    shift_seam,
+    align_seam_to_curve,
+)
 # GK-84: split body by plane / surface (no-fill cut)
 from kerf_cad_core.geom.split_body import (
     split_body_by_plane,
@@ -710,6 +717,9 @@ __all__ = [
     # GK-102
     "remove_knot","minimal_cp_refit",
     # GK-83 / GK-P-NURBS-OFFSET
+    # GK-P: NURBS seam control
+    "SeamInfo","detect_seam","shift_seam","align_seam_to_curve",
+    # GK-83
     "surface_offset",
     "offset_surface",
     "detect_self_intersection",

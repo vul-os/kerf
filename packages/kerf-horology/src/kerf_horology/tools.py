@@ -31,6 +31,11 @@ balance_period_tool
 
 isochronism
     Check isochronism of the balance-hairspring oscillator.
+
+validate_swiss_lever
+    Full 16-check geometry validation per Daniels (1981) §6.2:
+    escape-wheel proportions, pallet angles, roller/pin dimensions,
+    lock depth, drop uniformity, slide asymmetry.
 """
 
 from __future__ import annotations
@@ -41,6 +46,12 @@ from typing import Any, Tuple
 from kerf_partsgen.generators.horology.involute import check_involute_profile
 from kerf_partsgen.generators.horology.train_calculator import compute_train_ratio
 from kerf_horology.escapement import swiss_lever_geometry
+from kerf_horology.escapement_validator import (
+    validate_swiss_lever,
+    compute_lift_angle,
+    compute_drop_uniformity,
+    recommend_corrections,
+)
 from kerf_horology.mainspring import mainspring_torque, power_reserve_hours
 from kerf_horology.balance import (
     balance_period,
@@ -348,6 +359,123 @@ def _isochronism_tool(
     }
 
 
+def _validate_swiss_lever_tool(
+    escape_wheel_teeth: int = 15,
+    escape_wheel_pitch_radius_mm: float = 1.925,
+    escape_wheel_addendum_mm: float = 0.175,
+    escape_wheel_dedendum_mm: float = 0.200,
+    locking_face_angle_deg: float = 10.0,
+    impulse_face_angle_deg: float = 5.0,
+    pallet_jewel_separation_teeth: float = 5.5,
+    impulse_pin_diameter_mm: float = 0.18,
+    slot_width_mm: float = 0.25,
+    safety_roller_diameter_mm: float = 0.90,
+    roller_diameter_mm: float = 1.60,
+    horn_gap_mm: float = 0.30,
+    entry_drop_deg: float = 1.5,
+    exit_drop_deg: float = 1.5,
+    lock_depth_ratio: float = 0.333,
+    slide_entry_deg: float = 11.0,
+    slide_exit_deg: float = 10.0,
+    beat_rate_bph: int = 28800,
+) -> dict[str, Any]:
+    """Validate Swiss lever escapement geometry against Daniels (1981) §6.2.
+
+    Parameters
+    ----------
+    escape_wheel_teeth : int
+        Number of teeth on the escape wheel (standard: 15, 18, or 21).
+    escape_wheel_pitch_radius_mm : float
+        Pitch-circle radius in mm (default 1.925 ≈ ETA 2824-2).
+    escape_wheel_addendum_mm : float
+        Tooth tip overhang above pitch circle (mm).
+    escape_wheel_dedendum_mm : float
+        Tooth root below pitch circle (mm). Must exceed addendum.
+    locking_face_angle_deg : float
+        Draw angle on pallet locking faces (degrees, nominal 10°).
+    impulse_face_angle_deg : float
+        Pallet impulse face angle per stone (degrees, standard 4–6°).
+    pallet_jewel_separation_teeth : float
+        Entry-to-exit pallet jewel span in tooth pitches (standard 5.5).
+    impulse_pin_diameter_mm : float
+        Roller impulse pin diameter (mm).
+    slot_width_mm : float
+        Lever notch (slot) width (mm). Pin must be ≥ 60% of slot.
+    safety_roller_diameter_mm : float
+        Guard (safety) roller diameter (mm).
+    roller_diameter_mm : float
+        Main (impulse) roller diameter (mm).
+    horn_gap_mm : float
+        Clearance between lever horn and guard roller (mm).
+    entry_drop_deg : float
+        Angular drop on entry pallet side (degrees, nominal 1.5°).
+    exit_drop_deg : float
+        Angular drop on exit pallet side (degrees, nominal 1.5°).
+    lock_depth_ratio : float
+        Lock depth as a fraction of impulse face depth (standard 1/3).
+    slide_entry_deg : float
+        Draw angle on entry pallet locking face (degrees).
+    slide_exit_deg : float
+        Draw angle on exit pallet locking face (degrees).
+        Standard: slide_entry ≈ slide_exit + 1°.
+    beat_rate_bph : int
+        Beat rate in beats per hour (default 28 800).
+
+    Returns
+    -------
+    dict with keys:
+        valid (bool): True when no error-severity violations exist.
+        violations (list): Each has rule_id, description, measured, limit,
+            daniels_ref, severity.
+        warnings (list[str]): Warning messages.
+        daniels_section_refs (list[str]): §-references cited.
+        lift_angle_deg (float): Derived total pallet swing angle.
+        drop_uniformity_deg (float): |entry_drop − exit_drop|.
+        corrections (list[str]): Recommended corrections per violation.
+    """
+    geom = {
+        "escape_wheel_teeth": escape_wheel_teeth,
+        "escape_wheel_pitch_radius_mm": escape_wheel_pitch_radius_mm,
+        "escape_wheel_addendum_mm": escape_wheel_addendum_mm,
+        "escape_wheel_dedendum_mm": escape_wheel_dedendum_mm,
+        "locking_face_angle_deg": locking_face_angle_deg,
+        "impulse_face_angle_deg": impulse_face_angle_deg,
+        "pallet_jewel_separation_teeth": pallet_jewel_separation_teeth,
+        "impulse_pin_diameter_mm": impulse_pin_diameter_mm,
+        "slot_width_mm": slot_width_mm,
+        "safety_roller_diameter_mm": safety_roller_diameter_mm,
+        "roller_diameter_mm": roller_diameter_mm,
+        "horn_gap_mm": horn_gap_mm,
+        "entry_drop_deg": entry_drop_deg,
+        "exit_drop_deg": exit_drop_deg,
+        "lock_depth_ratio": lock_depth_ratio,
+        "slide_entry_deg": slide_entry_deg,
+        "slide_exit_deg": slide_exit_deg,
+        "beat_rate_bph": beat_rate_bph,
+    }
+    result = validate_swiss_lever(geom)
+    corrections = recommend_corrections(geom, result.violations)
+    return {
+        "valid": result.valid,
+        "violations": [
+            {
+                "rule_id": v.rule_id,
+                "description": v.description,
+                "measured": v.measured,
+                "limit": v.limit,
+                "daniels_ref": v.daniels_ref,
+                "severity": v.severity,
+            }
+            for v in result.violations
+        ],
+        "warnings": result.warnings,
+        "daniels_section_refs": result.daniels_section_refs,
+        "lift_angle_deg": result.lift_angle_deg,
+        "drop_uniformity_deg": result.drop_uniformity_deg,
+        "corrections": corrections,
+    }
+
+
 # Registry-style tool definitions
 TOOLS = [
     {
@@ -406,5 +534,18 @@ TOOLS = [
             "amplitude range, reporting period stability."
         ),
         "fn": _isochronism_tool,
+    },
+    {
+        "name": "horology_validate_swiss_lever",
+        "description": (
+            "Full 16-check Swiss-lever escapement geometry validation per George "
+            "Daniels 'Watchmaking' (1981) §6.2.  Checks escape-wheel tooth count, "
+            "pitch/addendum/dedendum proportions, locking-face draw angle, impulse-face "
+            "angle, pallet jewel separation (5½-tooth rule), impulse pin/slot ratio "
+            "(60% rule), safety-roller sizing, horn clearance, lock depth, entry/exit "
+            "drop, drop uniformity, and slide asymmetry.  Returns valid flag, "
+            "per-rule violations with Daniels references, lift angle, and corrections."
+        ),
+        "fn": _validate_swiss_lever_tool,
     },
 ]

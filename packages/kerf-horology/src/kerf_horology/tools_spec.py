@@ -1,7 +1,7 @@
 """
 kerf_horology.tools_spec
 ========================
-ToolSpec definitions and async handlers for the 7 horology LLM tools.
+ToolSpec definitions and async handlers for the 8 horology LLM tools.
 
 Wraps the pure-Python computation functions in kerf_horology.tools
 and presents them via the standard Kerf ToolSpec / ctx.tools.register pattern.
@@ -15,6 +15,7 @@ horology_mainspring_torque
 horology_power_reserve
 horology_balance_period
 horology_isochronism
+horology_validate_swiss_lever
 """
 
 from __future__ import annotations
@@ -36,6 +37,7 @@ from kerf_horology.tools import (
     _power_reserve_tool,
     _balance_period_tool,
     _isochronism_tool,
+    _validate_swiss_lever_tool,
 )
 
 
@@ -396,6 +398,149 @@ async def run_horology_isochronism(args: dict[str, Any], ctx: "ProjectCtx") -> s
             k_hairspring_Nmmrad=float(args["k_hairspring_Nmmrad"]),
             amp_min_deg=float(args.get("amp_min_deg", 180.0)),
             amp_max_deg=float(args.get("amp_max_deg", 300.0)),
+        )
+        return ok_payload(result)
+    except Exception as exc:
+        return err_payload(str(exc), "HOROLOGY_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# 8. validate_swiss_lever
+# ---------------------------------------------------------------------------
+
+horology_validate_swiss_lever_spec = ToolSpec(
+    name="horology_validate_swiss_lever",
+    description=(
+        "Full 16-check Swiss-lever escapement geometry validation per George Daniels "
+        "'Watchmaking' (1981) §6.2 and Schmid-Hammond-Roberts 'The Theory of Horology' "
+        "(2002) §10.  Checks: escape-wheel tooth count (15/18/21 standard), pitch-circle "
+        "radius, addendum/dedendum proportions, locking-face draw angle (nominal 10°), "
+        "impulse-face angle (4–6° per stone), pallet jewel separation (5½-tooth rule), "
+        "impulse pin/slot ratio (≥60%), safety-roller sizing (50–70% of main roller), "
+        "horn–jewel clearance (≥1.5× pin diameter), lock depth ratio (1/3 rule), "
+        "entry/exit angular drop (0.5°–2.5° each), drop uniformity (<0.2°), and "
+        "slide asymmetry (entry = exit + 1°).  Returns valid (bool), per-rule violations "
+        "with Daniels section references, derived lift angle, drop uniformity, and "
+        "correction recommendations.  Default parameters model the ETA 2824-2 at 28 800 bph."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "escape_wheel_teeth": {
+                "type": "integer",
+                "description": "Escape wheel tooth count (standard: 15, 18, or 21; default 15).",
+            },
+            "escape_wheel_pitch_radius_mm": {
+                "type": "number",
+                "description": "Pitch-circle radius in mm (default 1.925 ≈ ETA 2824-2).",
+            },
+            "escape_wheel_addendum_mm": {
+                "type": "number",
+                "description": "Tooth addendum above pitch circle (mm, default 0.175).",
+            },
+            "escape_wheel_dedendum_mm": {
+                "type": "number",
+                "description": "Tooth dedendum below pitch circle (mm, default 0.200). "
+                               "Must exceed addendum.",
+            },
+            "locking_face_angle_deg": {
+                "type": "number",
+                "description": "Pallet draw angle on locking faces (degrees, nominal 10°; "
+                               "range 8°–14°).",
+            },
+            "impulse_face_angle_deg": {
+                "type": "number",
+                "description": "Pallet impulse face angle per stone (degrees, standard 4–6°).",
+            },
+            "pallet_jewel_separation_teeth": {
+                "type": "number",
+                "description": "Entry-to-exit pallet jewel span in tooth pitches (standard 5.5).",
+            },
+            "impulse_pin_diameter_mm": {
+                "type": "number",
+                "description": "Roller impulse pin diameter (mm, default 0.18).",
+            },
+            "slot_width_mm": {
+                "type": "number",
+                "description": "Lever notch width (mm, default 0.25). Pin must be ≥60%.",
+            },
+            "safety_roller_diameter_mm": {
+                "type": "number",
+                "description": "Guard roller diameter (mm, default 0.90).",
+            },
+            "roller_diameter_mm": {
+                "type": "number",
+                "description": "Main (impulse) roller diameter (mm, default 1.60).",
+            },
+            "horn_gap_mm": {
+                "type": "number",
+                "description": "Horn–jewel clearance (mm, default 0.30; must be ≥1.5× pin diam).",
+            },
+            "entry_drop_deg": {
+                "type": "number",
+                "description": "Angular drop on entry pallet side (degrees, nominal 1.5°).",
+            },
+            "exit_drop_deg": {
+                "type": "number",
+                "description": "Angular drop on exit pallet side (degrees, nominal 1.5°).",
+            },
+            "lock_depth_ratio": {
+                "type": "number",
+                "description": "Lock depth as fraction of impulse face (standard 1/3 ≈ 0.333).",
+            },
+            "slide_entry_deg": {
+                "type": "number",
+                "description": "Entry pallet draw angle (degrees, standard ≈ 11°).",
+            },
+            "slide_exit_deg": {
+                "type": "number",
+                "description": "Exit pallet draw angle (degrees, standard ≈ 10°; "
+                               "entry should be 1° more than exit).",
+            },
+            "beat_rate_bph": {
+                "type": "integer",
+                "description": "Beat rate in beats per hour (default 28 800; "
+                               "also 18 000, 21 600, 36 000).",
+            },
+        },
+        "required": [],
+    },
+)
+
+
+async def run_horology_validate_swiss_lever(
+    args: dict[str, Any], ctx: "ProjectCtx"
+) -> str:
+    try:
+        result = _validate_swiss_lever_tool(
+            escape_wheel_teeth=int(args.get("escape_wheel_teeth", 15)),
+            escape_wheel_pitch_radius_mm=float(
+                args.get("escape_wheel_pitch_radius_mm", 1.925)
+            ),
+            escape_wheel_addendum_mm=float(
+                args.get("escape_wheel_addendum_mm", 0.175)
+            ),
+            escape_wheel_dedendum_mm=float(
+                args.get("escape_wheel_dedendum_mm", 0.200)
+            ),
+            locking_face_angle_deg=float(args.get("locking_face_angle_deg", 10.0)),
+            impulse_face_angle_deg=float(args.get("impulse_face_angle_deg", 5.0)),
+            pallet_jewel_separation_teeth=float(
+                args.get("pallet_jewel_separation_teeth", 5.5)
+            ),
+            impulse_pin_diameter_mm=float(args.get("impulse_pin_diameter_mm", 0.18)),
+            slot_width_mm=float(args.get("slot_width_mm", 0.25)),
+            safety_roller_diameter_mm=float(
+                args.get("safety_roller_diameter_mm", 0.90)
+            ),
+            roller_diameter_mm=float(args.get("roller_diameter_mm", 1.60)),
+            horn_gap_mm=float(args.get("horn_gap_mm", 0.30)),
+            entry_drop_deg=float(args.get("entry_drop_deg", 1.5)),
+            exit_drop_deg=float(args.get("exit_drop_deg", 1.5)),
+            lock_depth_ratio=float(args.get("lock_depth_ratio", 1.0 / 3.0)),
+            slide_entry_deg=float(args.get("slide_entry_deg", 11.0)),
+            slide_exit_deg=float(args.get("slide_exit_deg", 10.0)),
+            beat_rate_bph=int(args.get("beat_rate_bph", 28800)),
         )
         return ok_payload(result)
     except Exception as exc:

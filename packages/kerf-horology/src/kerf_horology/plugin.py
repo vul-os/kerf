@@ -1,6 +1,6 @@
 """Kerf plugin registration for kerf-horology.
 
-Registers 7 LLM tools via ctx.tools.register:
+Registers 8 LLM tools via ctx.tools.register:
   - horology_train_calculator
   - horology_check_tooth_profile
   - horology_escapement_geometry
@@ -8,6 +8,7 @@ Registers 7 LLM tools via ctx.tools.register:
   - horology_power_reserve
   - horology_balance_period
   - horology_isochronism
+  - horology_validate_swiss_lever
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ async def register(app: FastAPI, ctx) -> None:
         horology_power_reserve_spec, run_horology_power_reserve,
         horology_balance_period_spec, run_horology_balance_period,
         horology_isochronism_spec, run_horology_isochronism,
+        horology_validate_swiss_lever_spec, run_horology_validate_swiss_lever,
     )
 
     ctx.tools.register("horology_train_calculator",
@@ -41,11 +43,15 @@ async def register(app: FastAPI, ctx) -> None:
                        horology_balance_period_spec, run_horology_balance_period)
     ctx.tools.register("horology_isochronism",
                        horology_isochronism_spec, run_horology_isochronism)
+    ctx.tools.register("horology_validate_swiss_lever",
+                       horology_validate_swiss_lever_spec,
+                       run_horology_validate_swiss_lever)
 
     provides = [
         "horology.train_calculator",
         "horology.tooth_profile",
         "horology.escapement",
+        "horology.escapement_validator",
         "horology.mainspring",
         "horology.power_reserve",
         "horology.balance",

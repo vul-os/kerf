@@ -589,6 +589,17 @@ from kerf_cad_core.geom.subd_project_primitive import (
     project_cage_to_cylinder,
     project_cage_to_plane,
 )
+# BREP-EDGE-CURVE-FROM-FACE-PAIR: SSI edge curve extraction (Sederberg-Parry 1986 / PM §7)
+from kerf_cad_core.geom.edge_curve_from_face_pair import (
+    EdgeCurveResult,
+    extract_edge_curve,
+)
+
+# NURBS-NORMAL-CURVATURE-AT-POINT: normal curvature + principal curvatures (do Carmo §3 / Mortenson §10.4)
+from kerf_cad_core.geom.normal_curvature import (
+    NormalCurvatureReport,
+    normal_curvature_at,
+)
 
 __all__ = [
     "read_3dm","write_3dm","Rhino3dmReadError",

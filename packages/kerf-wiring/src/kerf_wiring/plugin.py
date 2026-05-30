@@ -92,3 +92,15 @@ def _register_tools(ctx, provides: list) -> None:
         provides.append("wiring.ampacity")
     except Exception as exc:
         logger.warning("kerf-wiring: failed to load wiring_compute_ampacity tool: %s", exc)
+        from kerf_wiring.tools.wiring_voltage_drop import (
+            wiring_voltage_drop_spec,
+            wiring_voltage_drop,
+        )
+        ctx.tools.register(
+            "wiring_voltage_drop",
+            wiring_voltage_drop_spec,
+            wiring_voltage_drop,
+        )
+        provides.append("wiring.voltage_drop")
+    except Exception as exc:
+        logger.warning("kerf-wiring: failed to load wiring_voltage_drop tool: %s", exc)

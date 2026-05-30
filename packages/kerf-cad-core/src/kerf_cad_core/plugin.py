@@ -27,6 +27,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.cam_toolpath_collision",  # cam_verify_toolpath_collision
     "kerf_cad_core.cam_feedrate_lookahead",  # cam_optimize_feedrate_lookahead (Altintas 2012 §5.7)
     "kerf_cad_core.cam_gcode_emit",          # cam_emit_gcode (RS-274/NGC → Fanuc G-code from toolpath)
+    "kerf_cad_core.cam_lathe_profile",      # cam_emit_lathe_gcode (G71/G70 lathe profile → Fanuc G-code)
     "kerf_cad_core.extrude_sketch_to_jscad",
     "kerf_cad_core.surfacing",
     "kerf_cad_core.quad_remesh",
@@ -65,6 +66,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.subd_decimate_to_cage_tool",
     "kerf_cad_core.geom.subd_project_primitive_tools",  # SUBD-CAGE-PROJECT-TO-PRIMITIVE
     "kerf_cad_core.geom.subd_export_gltf",  # SUBD-EXPORT-GLTF: CC limit-surface → glTF 2.0 (json + struct; no third-party)
+    "kerf_cad_core.geom.subd_export_step",  # SUBD-EXPORT-STEP: CC limit-surface → STEP AP242 faceted B-rep (ISO 10303-242:2020)
     "kerf_cad_core.nesting.tools",
     "kerf_cad_core.nesting.optimize_nest_tool",  # manufacturing_optimize_nest — NFP+GA (Burke 2006, Kovacs 2002)
     "kerf_cad_core.harness.tools",
@@ -277,6 +279,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.subd_geodesic",
     # GK-P: fillet chain propagation (Vida-Martin-Varady 1994) — brep_fillet_chain + brep_auto_fillet_all
     "kerf_cad_core.geom.fillet_chain",
+    # BREP-FACE-COMPATIBLE-RESPLIT: knot-union insertion on shared edge (P-T §6.5; Hoffmann 1989 §6)
+    "kerf_cad_core.geom.face_compatible_resplit",
     # Coverage sweep: modules with @register that were not yet in _TOOL_MODULES
     "kerf_cad_core.heal",                               # heal_geometry — body heal + repair
     "kerf_cad_core.sketch",                             # sketch_add_entity/constraint, sketch_set_constraint_value, sketch_delete_entity, sketch_carbon_copy, sketch_validate
@@ -400,6 +404,9 @@ _TOOL_MODULES = [
     # MANUFACTURING-TOOLING-CATALOG-MATCH: tool lookup from embedded Sandvik/Iscar/KMT/OSG/Tungaloy catalog
     # (Sandvik Cutting Data Rec. 2024; Drozda-Wick §3) — manufacturing_match_tooling
     "kerf_cad_core.manufacturing_tooling_catalog",
+    # NURBS-CURVE-RESAMPLE-UNIFORM: resample a NurbsCurve at uniform arc-length intervals
+    # (Piegl-Tiller §9.4 + Patrikalakis-Maekawa §3.5) — nurbs_curve_resample_uniform
+    "kerf_cad_core.geom.curve_resample_uniform",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

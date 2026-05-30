@@ -4010,6 +4010,19 @@
           }
         },
         {
+          "name": "NURBS face knot compatibility (B-rep sewing)",
+          "competitor": {
+            "status": "partial",
+            "source": "https://wiki.freecad.org/Part_Module",
+            "note": "OpenCASCADE BRep_Builder::Sewing handles geometric tolerance but not explicit knot-vector harmonisation exposed to user"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/face_compatible_resplit.py",
+            "note": "make_faces_compatible(): union of internal breakpoints + tensor-product Boehm insertion (Piegl-Tiller §6.5 + Hoffmann 1989 §6); CompatibilityResult dataclass; LLM tool brep_make_faces_compatible; 14 hermetic tests; degree_mismatch flag for elevation cases"
+          }
+        },
+        {
           "name": "Configurations / family variants",
           "competitor": {
             "status": "partial",
@@ -15951,6 +15964,20 @@
             "status": "yes",
             "note": "export_limit_to_gltf: CC limit-surface exported as glTF 2.0 \u2014 both .gltf (JSON + base64 buffer) and .glb (binary GLB container). Valid asset.version='2.0'; POSITION VEC3 FLOAT + SCALAR UNSIGNED_INT indices; quads fan-triangulated; cube cage 2 levels \u2192 192 triangles; GLB magic b'glTF' + version 2; vertex/face counts round-trip via parse_gltf; sphere cage convergence. Honest (v1): geometry only \u2014 no materials, normals attribute, textures, animations, skinning; no Draco compression; pure-Python (json+struct). 39 tests. LLM tool subd_export_limit_to_gltf. Ref: Khronos glTF 2.0.",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/subd_export_gltf.py"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "SubD limit-surface STEP AP242 export",
+          "competitor": {
+            "status": "yes",
+            "note": "Rhino 8 can export SubD meshes as STEP via polyhedral B-rep; Catia/SolidWorks export subdivision surfaces to STEP as faceted solid",
+            "source": "https://docs.mcneel.com/rhino/8/help/en-us/commands/exportwithoriginoff.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "export_limit_to_step: CC limit-surface exported as STEP AP242 faceted B-rep (ISO 10303-242:2020 / ISO 10303-21). Valid STEP file with FILE_DESCRIPTION + FILE_NAME + FILE_SCHEMA + DATA section; CARTESIAN_POINT / VERTEX_POINT / EDGE_CURVE / EDGE_LOOP / FACE_OUTER_BOUND / ADVANCED_FACE on PLANE surfaces / OPEN_SHELL / SHELL_BASED_SURFACE_MODEL / SHAPE_REPRESENTATION; cube cage 2 levels → 96 ADVANCED_FACEs; face count scales 4× per level; sphere cage bounding-box convergence; structural validity verified (header + DATA + ENDSEC). Honest: flat PLANE per polygon (STEP has no native SubD primitive; not smooth NURBS). 38 tests. LLM tool subd_export_limit_to_step. Ref: ISO 10303-242:2020.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/subd_export_step.py"
           }
         },
         {

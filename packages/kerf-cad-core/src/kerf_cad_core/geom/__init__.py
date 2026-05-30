@@ -1547,3 +1547,29 @@ from kerf_cad_core.geom.mass_props_mesh import (  # noqa: E402
     MassPropsReport,
     compute_mesh_mass_props,
 )
+# SUBD-EXPORT-STEP: CC limit-surface → STEP AP242 faceted B-rep (.stp ASCII)
+# Ref: ISO 10303-242:2020 (AP242 ed. 2), ISO 10303-42:2022, ISO 10303-21:2016.
+# Honest: each subdivided polygon is a flat PLANE face (not smooth NURBS).
+# STEP has no native SubD primitive; this emits a polyhedral B-rep.
+# LLM tool: subd_export_limit_to_step.
+from kerf_cad_core.geom.subd_export_step import (  # noqa: E402
+    export_limit_to_step,
+    parse_step_subd,
+)
+# NURBS-CURVE-RESAMPLE-UNIFORM: resample a NurbsCurve at uniform arc-length
+# intervals via arc-length parameterisation inversion (Piegl-Tiller §9.4 +
+# Patrikalakis-Maekawa §3.5; Gauss-Legendre quadrature for length).
+# LLM tool: nurbs_curve_resample_uniform.
+from kerf_cad_core.geom.curve_resample_uniform import (  # noqa: E402
+    ResampleResult,
+    resample_uniform_arc_length,
+)
+# BREP-FACE-COMPATIBLE-RESPLIT: insert knots into two adjacent NURBS faces so
+# their shared-edge knot vectors become identical — prerequisite for surface
+# sewing, BREP repair, and Boolean operations.
+# (Piegl-Tiller §6.5 "Compatibility of Surfaces"; Hoffmann 1989 §6)
+# LLM tool: brep_make_faces_compatible.
+from kerf_cad_core.geom.face_compatible_resplit import (  # noqa: E402
+    CompatibilityResult,
+    make_faces_compatible,
+)

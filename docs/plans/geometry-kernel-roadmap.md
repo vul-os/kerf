@@ -1197,6 +1197,7 @@ layer (history/UI/CAM/FEM packages), not the geometry kernel.
 | Knot insertion / refinement | ✅ |
 | Degree elevation | ✅ · reduction 🟡 GK-135 |
 | Knot removal / minimal-CP refit | 🟡 GK-102 |
+| Bezier extraction (B-spline → multi-Bezier, FEA/GPU/IGES) | ✅ GK-P (bezier_extract.py) |
 
 ### B. Curves
 | Capability | Status |

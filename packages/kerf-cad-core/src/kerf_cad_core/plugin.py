@@ -249,6 +249,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.seismic.rsa_tools",                  # seismic_build_asce7_spectrum, seismic_rsa_sdof, seismic_rsa_mdof, seismic_newmark_sdof, seismic_newmark_mdof
     "kerf_cad_core.solarpv.shading_tools",              # pv_cell_iv, pv_module_shaded_iv, pv_mppt_mismatch_loss
     "kerf_cad_core.jewelry.profile_lib",                # jewelry_list_profiles, jewelry_get_profile, jewelry_compare_comfort
+    # GK-P: Bezier extraction (B-spline → multi-Bezier, Piegl & Tiller §5.6)
+    "kerf_cad_core.geom.bezier_extract",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

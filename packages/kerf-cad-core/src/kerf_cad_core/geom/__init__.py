@@ -757,6 +757,12 @@ __all__ = [
     "nurbs_surface_fit",
     "FitError",
     "FitReport",
+    # GK-P: Bezier extraction
+    "BezierCurve",
+    "BezierSurface",
+    "extract_bezier_curve",
+    "extract_bezier_surface",
+    "reconstruct_from_beziers",
 ]
 
 # GK-122: interference / collision detection
@@ -805,3 +811,13 @@ from kerf_cad_core.geom.nurbs_surface_fit import (  # noqa: E402
 )
 # GK-64: Class-A leading quality pass (comb-peak + zebra-break + G3-dropout)
 from kerf_cad_core.geom.leading import LeadingReport, run_leading_pass
+
+# GK-P: Bezier extraction — B-spline → multi-Bezier patch decomposition
+# (Piegl & Tiller §5.6; foundational for FEA mesh handoff, GPU rendering, IGES)
+from kerf_cad_core.geom.bezier_extract import (
+    BezierCurve,
+    BezierSurface,
+    extract_bezier_curve,
+    extract_bezier_surface,
+    reconstruct_from_beziers,
+)

@@ -351,6 +351,8 @@ These are roadmap-level moats that span every sector simultaneously and compound
 
 - **GK-P foundational kernel** — general solid boolean for NURBS-faced bodies; Stam limit-tangents ✅ + G1 at extraordinary SubD points; fractional creases; MatchSrf G3; analytic surface derivatives.
 - **GK-P foundational kernel** — ✅ general solid boolean shipped (GK-P-A); remaining: Stam limit-tangents + G1 at extraordinary SubD points; fractional creases; MatchSrf G3; analytic surface derivatives.
+- **GK-P Bezier extraction** ✅ — B-spline → multi-Bezier patch decomposition (Piegl & Tiller §5.6); foundational for FEA tet-mesh handoff, GPU-friendly rendering, IGES export. (`bezier_extract.py`, LLM tool `bezier_extract` registered.)
+- **GK-P foundational kernel** — general solid boolean for NURBS-faced bodies; Stam limit-tangents + G1 at extraordinary SubD points; fractional creases; MatchSrf G3; analytic surface derivatives.
 - **GK-P construction verbs** — loft guide-rails; sheet-metal hem/jog/multi-flange; direct-edit delete-face + non-planar push-pull; weldment gussets/end-treatments; surface patch-from-points.
 - **GK-P foundational kernel** — general solid boolean for NURBS-faced bodies; Stam limit-tangents + G1 at extraordinary SubD points; fractional creases; MatchSrf G3; analytic surface derivatives.
 - **GK-P construction verbs** — ~~loft guide-rails~~ ✅ (`loft_with_rails`, Gordon surface, N rails, GK-P-D); sheet-metal hem/jog/multi-flange; direct-edit delete-face + non-planar push-pull; weldment gussets/end-treatments; surface patch-from-points.

@@ -9279,6 +9279,20 @@
         },
         {
           "domain": "D7",
+          "feature": "Boss + rib auto-detection + moldability score (Boothroyd-Dewhurst 2002)",
+          "competitor": {
+            "status": "partial",
+            "note": "Draft angle and basic moldability checks; no automatic boss/rib detection with Boothroyd-Dewhurst ratio rules",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Auto-detect bosses + ribs + moldability score (Boothroyd-Dewhurst 2002) ✅ — boss D/W >= 2.5 rule; rib T/W <= 0.6 rule; composite [0-100] score with undercut + draft + wall-uniformity terms; LLM tools brep_detect_features + brep_moldability_score registered",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/feature_detect.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "Mold base library",
           "competitor": {
             "status": "yes",

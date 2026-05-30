@@ -79,7 +79,7 @@ The sector work only matters if you **own your work, are not locked in, and can 
 
 **Aero / marine / space depth** ✅ — 3D VLM + viscous strip drag + Prandtl-Glauert/Kármán-Tsien + Korn-Lock wave-drag; strip-theory seakeeping RAOs (Lewis-form + JONSWAP); Holtrop-Mennen resistance + EHP; multi-revolution Lambert (Lancaster-Blanchard/Izzo 2015).
 
-**Manufacturing depth** ✅ — adaptive/trochoidal CAM HSM + rest machining; moldflow Hele-Shaw front tracking + weld-line + air-trap; casting Chvorinov + riser sizing + gating; NFP true-shape polygon nesting (57.6 % L-shape utilisation).
+**Manufacturing depth** ✅ — adaptive/trochoidal CAM HSM + rest machining; moldflow Hele-Shaw front tracking + weld-line + air-trap; casting Chvorinov + riser sizing + gating; NFP true-shape polygon nesting (57.6 % L-shape utilisation). Auto-detect bosses + ribs + moldability score (Boothroyd-Dewhurst 2002) ✅
 
 **Verticals** ✅ — dental anatomic crown (multi-cusp fan, not placeholder) + UI parity shipped (CrownSculptingPanel, ImplantLibrary, SurgicalGuide — preset picker, occlusion overlay, filterable Straumann/Nobel/Zimmer/MIS catalogue, CBCT import + pose editor + sleeve preview, all dispatching to kerf-dental backend); Swiss lever escapement + mainspring + balance-wheel; solar PV partial shading + bypass-diode + MPPT; analog PVT corner simulation (60 corners + Monte-Carlo mismatch).
 **Verticals** ✅ — dental anatomic crown (multi-cusp fan, not placeholder); surgical guide emits milling-ready B-rep + STL export ✅; Swiss lever escapement + mainspring + balance-wheel; solar PV partial shading + bypass-diode + MPPT; analog PVT corner simulation (60 corners + Monte-Carlo mismatch).

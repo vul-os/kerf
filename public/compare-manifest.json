@@ -13717,6 +13717,20 @@
         },
         {
           "domain": "D12",
+          "feature": "Abbe number (V-number) and partial dispersion from Sellmeier coefficients",
+          "competitor": {
+            "status": "yes",
+            "note": "Glass map browser: V_d vs n_d for all catalog glasses; partial dispersion plots; apochromat glass selection",
+            "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Abbe number + partial dispersion (OPTICS-ABBE-NUMBER-COMPUTE): V_d = (n_d − 1)/(n_F − n_C) from Sellmeier Fraunhofer lines d/F/C (Hecht §6.3 / ISO 10110); secondary spectrum partial dispersion P_{F,g} = (n_g − n_F)/(n_F − n_C) for g-line (435.84 nm); BK7 V_d=64.17, F2=36.37, SF6=25.43, K5=59.45, BK10=66.95 (all within 0.1% of Schott catalog); SF11=25.37 (catalog 25.76; 1.5% gap due to Sellmeier fit vs spectrophotometric measurement, documented in honest_flag per Schott TIE-29 §3.3); LLM tool optics_compute_abbe_number; 30 hermetic tests. Honest: catalog nominal/melt-mean Sellmeier coefficients; melt-to-melt V_d variation ±0.3–0.5% (Schott TIE-31).",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/abbe_number.py"
+          }
+        },
+        {
+          "domain": "D12",
           "feature": "2-D illumination map (relative illumination heatmap)",
           "competitor": {
             "status": "yes",

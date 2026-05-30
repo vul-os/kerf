@@ -1993,6 +1993,91 @@ async def run_compute_chromatic_focus(ctx: ProjectCtx, args: bytes) -> str:
     if isinstance(result, dict):
         return json.dumps(result)
     return ok_payload(result.to_dict())
+
+
+# ---------------------------------------------------------------------------
+# Tool: optics_compute_abbe_number
+# ---------------------------------------------------------------------------
+
+from kerf_cad_core.optics.abbe_number import (  # noqa: E402
+    AbbeReport,
+    compute_abbe_number,
+)
+
+_compute_abbe_number_spec = ToolSpec(
+    name="optics_compute_abbe_number",
+    description=(
+        "Compute the Abbe number (V-number) and secondary-spectrum partial\n"
+        "dispersion for a named Schott glass using its Sellmeier coefficients.\n"
+        "\n"
+        "Abbe number (ISO 10110 / Hecht §6.3):\n"
+        "  V_d = (n_d − 1) / (n_F − n_C)\n"
+        "\n"
+        "where n_d, n_F, n_C are refractive indices at Fraunhofer lines:\n"
+        "  d  — helium  d-line  587.56 nm  (photopic peak)\n"
+        "  F  — hydrogen F-line 486.13 nm  (blue)\n"
+        "  C  — hydrogen C-line 656.27 nm  (red)\n"
+        "\n"
+        "High V (> 55) = crown glass (low dispersion); e.g. BK7 V ≈ 64.17.\n"
+        "Low  V (< 40) = flint glass (high dispersion); e.g. SF11 V ≈ 25.76.\n"
+        "\n"
+        "Secondary spectrum partial dispersion P_{F,g}:\n"
+        "  P_FC_g = (n_g − n_F) / (n_F − n_C)\n"
+        "where n_g is the refractive index at the mercury g-line (435.84 nm).\n"
+        "Matching P_{F,g} between two glasses suppresses residual secondary\n"
+        "spectrum (apochromat condition, Hecht §6.3 / Conrady criterion).\n"
+        "\n"
+        "Supported glasses: BK7, F2, SF6, K5, SF11, BK10 (Schott catalog 2023).\n"
+        "\n"
+        "Depth bar (Schott catalog values):\n"
+        "  BK7:  V_d = 64.17  (n_d = 1.5168)\n"
+        "  F2:   V_d = 36.37  (n_d = 1.6200)\n"
+        "  SF11: V_d = 25.76  (n_d = 1.7847)\n"
+        "  SF6:  V_d = 25.43  (n_d = 1.8052)\n"
+        "  K5:   V_d = 59.48  (n_d = 1.5225)\n"
+        "  BK10: V_d = 67.02  (n_d = 1.4978)\n"
+        "\n"
+        "Returns glass_name, n_d, n_F, n_C, n_g, V_d, P_FC_g, honest_flag.\n"
+        "\n"
+        "HONEST FLAG: Sellmeier coefficients are catalog nominal/melt-mean values;\n"
+        "melt-to-melt V_d variation ±0.3–0.5% (Schott TIE-31). Only six glasses\n"
+        "are available; other glasses require adding their Sellmeier coefficients.\n"
+        "\n"
+        "Errors: {ok:false, reason} for unknown glass or invalid input. Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "glass_name": {
+                "type": "string",
+                "description": (
+                    "Schott glass name (case-sensitive). "
+                    "One of: BK7, F2, SF6, K5, SF11, BK10."
+                ),
+            },
+        },
+        "required": ["glass_name"],
+    },
+)
+
+
+@register(_compute_abbe_number_spec, write=False)
+async def run_compute_abbe_number(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    glass_name = a.get("glass_name")
+    if not glass_name:
+        return json.dumps({"ok": False, "reason": "glass_name is required"})
+
+    result = compute_abbe_number(glass_name)
+    if isinstance(result, dict):
+        return json.dumps(result)
+    return ok_payload(result.to_dict())
+
+
 from kerf_cad_core.optics.relative_illum_map import (  # noqa: E402
     RelIllumMapReport,
     compute_relative_illum_map,

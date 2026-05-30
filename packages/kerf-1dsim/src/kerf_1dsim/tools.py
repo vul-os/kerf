@@ -312,3 +312,140 @@ async def run_sim1d_parse(ctx: ProjectCtx, args: bytes) -> str:
         "n_state_vars": sum(1 for v in model.vars if not v.is_parameter),
         "n_equations": len(model.equations),
     })
+
+
+# ---------------------------------------------------------------------------
+# sim_import_modelica
+# ---------------------------------------------------------------------------
+
+sim_import_modelica_spec = ToolSpec(
+    name="sim_import_modelica",
+    description=(
+        "Import a Modelica .mo file (subset parser — NOT certified Modelica compliance) "
+        "and return structured information about the model: parameters, variables, "
+        "component instances, equations, and connect statements. "
+        "Optionally map the model to native kerf-1dsim components. "
+        "Supported subset: model/end blocks, parameter Real, Real variables, "
+        "equation sections, der(), connect(), algebraic equations, package wrapping."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "source": {
+                "type": "string",
+                "description": (
+                    "Modelica model source text (inline). "
+                    "Mutually exclusive with 'file_path'."
+                ),
+            },
+            "file_path": {
+                "type": "string",
+                "description": (
+                    "Absolute path to a .mo file on the server. "
+                    "Mutually exclusive with 'source'."
+                ),
+            },
+            "to_kerf_components": {
+                "type": "boolean",
+                "description": (
+                    "If true, map parsed Modelica components to native kerf-1dsim "
+                    "component instances and include a summary in the response."
+                ),
+            },
+        },
+        "oneOf": [
+            {"required": ["source"]},
+            {"required": ["file_path"]},
+        ],
+    },
+)
+
+
+@register(sim_import_modelica_spec)
+async def run_sim_import_modelica(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    source = a.get("source")
+    file_path = a.get("file_path")
+
+    if not source and not file_path:
+        return err_payload("Provide 'source' or 'file_path'.", "BAD_ARGS")
+
+    from kerf_1dsim.modelica_import import (
+        parse_modelica_source,
+        parse_modelica_file,
+        modelica_to_kerf_components,
+    )
+
+    try:
+        if source:
+            model = parse_modelica_source(source)
+        else:
+            model = parse_modelica_file(file_path)  # type: ignore[arg-type]
+    except FileNotFoundError as e:
+        return err_payload(str(e), "FILE_NOT_FOUND")
+    except ValueError as e:
+        return err_payload(f"parse error: {e}", "PARSE_ERROR")
+    except Exception as e:
+        return err_payload(f"import error: {e}", "IMPORT_ERROR")
+
+    params_out = [
+        {"name": p.name, "value": p.value, "unit": p.unit}
+        for p in model.parameters
+    ]
+    vars_out = [
+        {"name": v.name, "start": v.start, "unit": v.unit}
+        for v in model.variables
+    ]
+    comps_out = [
+        {
+            "type": c.type_name,
+            "instance": c.instance_name,
+            "modifications": c.modifications,
+        }
+        for c in model.components
+    ]
+    eqs_out = []
+    for eq in model.equations:
+        if eq.is_connect:
+            eqs_out.append({"kind": "connect", "a": eq.connect_a, "b": eq.connect_b})
+        elif eq.is_der:
+            eqs_out.append({"kind": "der", "var": eq.der_var, "rhs": eq.rhs})
+        else:
+            eqs_out.append({"kind": "algebraic", "lhs": eq.lhs, "rhs": eq.rhs})
+
+    payload: dict = {
+        "model_name": model.name,
+        "package": model.package,
+        "parameters": params_out,
+        "variables": vars_out,
+        "components": comps_out,
+        "equations": eqs_out,
+        "connections": [{"a": a, "b": b} for a, b in model.connections],
+        "n_parameters": len(model.parameters),
+        "n_variables": len(model.variables),
+        "n_components": len(model.components),
+        "n_equations": len(model.equations),
+        "n_connections": len(model.connections),
+        "caveat": (
+            "Modelica subset support — NOT certified Modelica compliance. "
+            "Covers: model/end, parameter Real, Real, equation, der(), connect(). "
+            "Does NOT support: extends, redeclare, arrays, records, connectors, algorithms."
+        ),
+    }
+
+    if a.get("to_kerf_components"):
+        try:
+            kerf_comps = modelica_to_kerf_components(model)
+            payload["kerf_components"] = [
+                {"type": type(c).__name__, "params": vars(c)}
+                for c in kerf_comps
+            ]
+            payload["n_kerf_components"] = len(kerf_comps)
+        except Exception as e:
+            payload["kerf_components_error"] = str(e)
+
+    return ok_payload(payload)

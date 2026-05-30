@@ -158,6 +158,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 - **Architectural geometry** — B-rep→2D tessellate, roof/curtain-wall/corridor generators, wall compound-layer offset, hatch/section-fill.
 - **Sketcher** — collinear constraint, ellipse solver entity, G2 continuity.
 - **Interop** — 3DM write with read→write→read Hausdorff oracle.
+- **Multi-plane section + serial sections (ISO 128-30)** ✅ — `section_multi_plane.py`: `cut_body_with_planes` (parallel/perpendicular/arbitrary), `generate_serial_sections` (N evenly-spaced planes along axis), `generate_corner_detail_sections` (3 perpendicular planes at a corner), `combine_section_views_for_drawing` (grid/linear Bertoline layout); LLM tools `brep_multi_plane_section` + `brep_serial_sections` registered; 40 hermetic tests with analytic-oracle assertions.
 
 ### Mechanical / CAD
 

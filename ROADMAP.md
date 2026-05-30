@@ -212,6 +212,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 - **Interop** — 3DM write with read→write→read Hausdorff oracle.
 - **Composite curve G2 audit + upgrade** ✅ — `composite_g2.py`: audit + auto-blend (cubic Hermite / quintic Bezier); LLM tools registered; 27 tests green.
 - **Precise NURBS arc-length (Gauss-Legendre + adaptive subdivision)** ✅ — `arc_length_precise` (5-pt GL + bounded-error recursive bisection, rel_tol/abs_tol contract); `arc_length_parametrize_gauss` (s↔t lookup via bisection on cumulative integral); `reparametrize_arclength_gauss`; LLM tool `nurbs_curve_arc_length`; 13 analytic-oracle tests (straight-line ≤1e-12, circle 2π ≤1e-9, bounded-error, round-trip ±1e-6).
+- **Multi-plane section + serial sections (ISO 128-30)** ✅ — `section_multi_plane.py`: `cut_body_with_planes` (parallel/perpendicular/arbitrary), `generate_serial_sections` (N evenly-spaced planes along axis), `generate_corner_detail_sections` (3 perpendicular planes at a corner), `combine_section_views_for_drawing` (grid/linear Bertoline layout); LLM tools `brep_multi_plane_section` + `brep_serial_sections` registered; 40 hermetic tests with analytic-oracle assertions (cube 10×10 square sections, cylinder unit-circle radius within 5e-3).
 
 ### Mechanical / CAD
 

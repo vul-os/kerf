@@ -397,6 +397,14 @@ from kerf_cad_core.geom.reparam import (
 )
 # GK-135: degree reduction (curve + surface)
 from kerf_cad_core.geom.nurbs import reduce_degree_curve, reduce_degree_surface
+# GK-P: degree raise + lower (Cohen-Lyche-Schumaker 1985)
+from kerf_cad_core.geom.degree_op import (
+    degree_raise_curve,
+    degree_raise_surface,
+    degree_lower_curve,
+    degree_lower_surface,
+    elevate_to_match,
+)
 # GK-102: knot removal / minimal-CP refit
 from kerf_cad_core.geom.nurbs import remove_knot, minimal_cp_refit
 # GK-84: split body by plane / surface (no-fill cut)
@@ -680,6 +688,10 @@ __all__ = [
     "parametrize_chord_length","parametrize_centripetal","parametrize_foley_nielsen",
     # GK-135
     "reduce_degree_curve","reduce_degree_surface",
+    # GK-P: degree raise + lower (Cohen-Lyche-Schumaker 1985)
+    "degree_raise_curve","degree_raise_surface",
+    "degree_lower_curve","degree_lower_surface",
+    "elevate_to_match",
     # GK-102
     "remove_knot","minimal_cp_refit",
     # GK-83 / GK-P-NURBS-OFFSET

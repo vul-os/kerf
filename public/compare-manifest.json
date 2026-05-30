@@ -3880,6 +3880,18 @@
           }
         },
         {
+          "name": "Chamfer size recommendation (DIN 74 / deburring / cosmetic)",
+          "competitor": {
+            "status": "no",
+            "note": "No standard CAD tool recommends chamfer dimensions per-edge from DIN 74 / Drozda-Wick criteria"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/chamfer_recommend_size.py",
+            "note": "brep_recommend_chamfer_size LLM tool; DIN 74:1974 Form A/B countersink table; deburring 0.5mm×45°; cosmetic 1.5mm×45°; Drozda-Wick §3-7; ISO 13715:2017"
+          }
+        },
+        {
           "name": "Sweep (1 & 2 rail)",
           "competitor": {
             "status": "yes",

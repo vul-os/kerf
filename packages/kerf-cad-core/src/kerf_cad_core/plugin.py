@@ -370,6 +370,9 @@ _TOOL_MODULES = [
     # SUBD-LIMIT-CRITICAL-POINTS: discrete Morse critical points on CC limit surface
     # (Edelsbrunner-Harer 2010 §1) — subd_find_critical_points
     "kerf_cad_core.geom.subd_critical_points",
+    # BREP-CHAMFER-RECOMMEND-SIZE: per-edge chamfer offset+angle recommendation
+    # (Drozda-Wick §3-7; DIN 74:1974 Form A/B; ISO 13715:2017) — brep_recommend_chamfer_size
+    "kerf_cad_core.geom.chamfer_recommend_size",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

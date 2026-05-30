@@ -1459,9 +1459,14 @@ from kerf_cad_core.geom.shell_wall_check import (  # noqa: E402
     ShellWallReport,
     check_shell_walls,
 )
-# SUBD-LIMIT-CRITICAL-POINTS: discrete Morse critical points on CC limit surface
-# (Edelsbrunner-Harer 2010 §1 — maxima, minima, saddles; Morse-Euler χ verification)
-from kerf_cad_core.geom.subd_critical_points import (  # noqa: E402
-    CriticalPointsReport,
-    find_critical_points,
+# BREP-CHAMFER-RECOMMEND-SIZE: per-edge chamfer dimension recommendation engine
+# (Drozda-Wick §3-7/§3-7.3; DIN 74:1974 Form A/B; ISO 13715:2017 §5)
+# Criteria: deburring 0.5mm×45°; chamfer mill; DIN 74 countersink; cosmetic 1.5mm×45°.
+# Honest: no production cost modelling; DIN 74 nominal only; 45° equal-leg only.
+from kerf_cad_core.geom.chamfer_recommend_size import (  # noqa: E402
+    ChamferContext,
+    ChamferRecommendation,
+    DIN74_COUNTERSINK_TABLE,
+    recommend_chamfer_size,
+    recommend_chamfer_sizes_for_body,
 )

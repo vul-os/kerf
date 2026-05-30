@@ -1313,6 +1313,7 @@ layer (history/UI/CAM/FEM packages), not the geometry kernel.
 | Region boolean (planar loops) | ✅ GK-56 |
 | Hidden-line 2D projection | ✅ (`make2d.py`) |
 | Section / cross-section contour | ✅ (`section_contour.py`) |
+| NURBS silhouette projection to plane (Hertzmann 2000) | ✅ (`geom/nurbs_projection.py`) — sign-change grid locus trace, NURBS curve fit, visible/hidden layer output, LLM tool `drawing_silhouette_projection` |
 
 ### I. Manufacturing prep
 | Capability | Status |

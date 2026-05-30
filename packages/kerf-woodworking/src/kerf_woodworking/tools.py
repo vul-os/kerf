@@ -31,6 +31,13 @@ from kerf_woodworking.joinery import (
     mortise_tenon,
     pocket_screw,
 )
+from kerf_woodworking.joinery_validate import (
+    joinery_strength_estimate,
+    validate_box_joint,
+    validate_dovetail,
+    validate_finger_joint,
+    validate_mortise_and_tenon,
+)
 from kerf_woodworking.cut_list import (
     BoardPiece,
     StockBoard,
@@ -629,6 +636,134 @@ async def woodworking_handle_pattern(ctx: Any, args: bytes) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Tool: woodworking_validate_joinery
+# ---------------------------------------------------------------------------
+
+_validate_joinery_spec = ToolSpec(
+    name="woodworking_validate_joinery",
+    description=(
+        "Validate woodworking joint geometry against master-craftsman proportions "
+        "(Hammer-Krenov reference — NOT FWW-certified). "
+        "Supported joint_type values: 'dovetail', 'mortise_and_tenon', "
+        "'box_joint', 'finger_joint'. "
+        "Returns ValidationResult with valid flag and a list of issues (severity, code, message)."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "joint_type": {
+                "type": "string",
+                "enum": ["dovetail", "mortise_and_tenon", "box_joint", "finger_joint"],
+                "description": "Type of joint to validate",
+            },
+            "geometry": {
+                "type": "object",
+                "description": (
+                    "Joint geometry descriptor. For 'dovetail': pin_angle_deg (or "
+                    "tail_angle_deg), board_thickness_mm, pin_width_mm (or "
+                    "tail_half_width_mm), pin_count (or tail_count). "
+                    "For 'mortise_and_tenon': board_thickness_mm, tenon_thickness_mm "
+                    "(or tenon_width_mm), mortise_width_mm, tenon_length_mm (or "
+                    "tenon_depth_mm). "
+                    "For 'box_joint'/'finger_joint': finger_count, finger_width_mm, "
+                    "board_thickness_mm, finger_depth_mm."
+                ),
+            },
+        },
+        "required": ["joint_type", "geometry"],
+    },
+)
+
+_VALIDATE_DISPATCH = {
+    "dovetail":          validate_dovetail,
+    "mortise_and_tenon": validate_mortise_and_tenon,
+    "box_joint":         validate_box_joint,
+    "finger_joint":      validate_finger_joint,
+}
+
+
+@register(_validate_joinery_spec, write=False)
+async def woodworking_validate_joinery(ctx: Any, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    joint_type = str(a.get("joint_type", ""))
+    if joint_type not in _VALIDATE_DISPATCH:
+        return err_payload(
+            f"Unknown joint_type '{joint_type}'. "
+            f"Supported: {list(_VALIDATE_DISPATCH)}",
+            "BAD_ARGS",
+        )
+
+    geometry = a.get("geometry")
+    if not isinstance(geometry, dict):
+        return err_payload("geometry must be an object", "BAD_ARGS")
+
+    try:
+        result = _VALIDATE_DISPATCH[joint_type](geometry)
+    except (TypeError, ValueError) as e:
+        return err_payload(str(e), "BAD_ARGS")
+
+    return ok_payload(result.to_dict())
+
+
+# ---------------------------------------------------------------------------
+# Tool: woodworking_joinery_strength
+# ---------------------------------------------------------------------------
+
+_joinery_strength_spec = ToolSpec(
+    name="woodworking_joinery_strength",
+    description=(
+        "Estimate joint shear strength in kN using USDA Forest Products Lab "
+        "Wood Handbook shear values scaled by joint efficiency. "
+        "Supported species: oak, pine, cherry, maple, walnut. "
+        "IMPORTANT: Apply ≥ 3× safety factor before structural use. "
+        "Hammer-Krenov reference proportions — NOT FWW-certified."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "geometry": {
+                "type": "object",
+                "description": (
+                    "Joint descriptor as returned by any woodworking joint tool "
+                    "(must include 'joint_type' and relevant dimension fields)."
+                ),
+            },
+            "wood_species": {
+                "type": "string",
+                "enum": ["oak", "pine", "cherry", "maple", "walnut"],
+                "description": "Wood species for shear strength lookup (default 'oak')",
+            },
+        },
+        "required": ["geometry"],
+    },
+)
+
+
+@register(_joinery_strength_spec, write=False)
+async def woodworking_joinery_strength(ctx: Any, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    geometry = a.get("geometry")
+    if not isinstance(geometry, dict):
+        return err_payload("geometry must be an object", "BAD_ARGS")
+
+    species = str(a.get("wood_species", "oak"))
+    try:
+        result = joinery_strength_estimate(geometry, wood_species=species)
+    except (TypeError, ValueError) as e:
+        return err_payload(str(e), "BAD_ARGS")
+
+    return ok_payload(result)
+
+
+# ---------------------------------------------------------------------------
 # TOOLS — (name, spec, handler) tuples consumed by plugin._register_tools
 # ---------------------------------------------------------------------------
 
@@ -645,5 +780,7 @@ TOOLS: list[tuple[str, Any, Any]] = [
     ("woodworking_shelf_pin_pattern",    _shelf_pin_spec,       woodworking_shelf_pin_pattern),
     ("woodworking_drawer_runner_pattern",_drawer_runner_spec,   woodworking_drawer_runner_pattern),
     ("woodworking_euro_screw_pattern",   _euro_screw_spec,      woodworking_euro_screw_pattern),
-    ("woodworking_handle_pattern",       _handle_spec,          woodworking_handle_pattern),
+    ("woodworking_handle_pattern",        _handle_spec,              woodworking_handle_pattern),
+    ("woodworking_validate_joinery",      _validate_joinery_spec,    woodworking_validate_joinery),
+    ("woodworking_joinery_strength",      _joinery_strength_spec,    woodworking_joinery_strength),
 ]

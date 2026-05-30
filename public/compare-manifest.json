@@ -10853,8 +10853,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Cut list, joinery rules, grain direction engine (backend); no room-layout floor plan UI",
-            "evidence": "packages/kerf-woodworking/src/kerf_woodworking/cut_list.py"
+            "note": "Cut list, joinery rules + geometry validator (Hammer-Krenov), grain direction engine (backend); no room-layout floor plan UI. Joinery geometry validator (Hammer-Krenov) ✅",
+            "evidence": "packages/kerf-woodworking/src/kerf_woodworking/joinery_validate.py"
           }
         },
         {
@@ -10881,8 +10881,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Joinery rules (backend); no parametric cabinet library UI",
-            "evidence": "packages/kerf-woodworking/src/kerf_woodworking/joinery.py"
+            "note": "Joinery rules + geometry validator with master-craftsman ratios (backend); no parametric cabinet library UI",
+            "evidence": "packages/kerf-woodworking/src/kerf_woodworking/joinery_validate.py"
           }
         },
         {

@@ -356,6 +356,10 @@ Everything committed, lowest priority. Ordered roughly by near-term readiness.
 
 **Mechanical / product:** cams generators · woodworking / furniture / joinery + cutlist · power one-line / switchgear · lighting / photometric · interior / space-planning / FF&E · kitchen / bath / cabinetry / millwork · landscape · scaffolding / formwork.
 
+| Woodworking | Capability | Status |
+|---|---|---|
+| Joinery geometry validator (Hammer-Krenov) | Validate dovetail (7°–14° pin angle, ≥1/3 board pin width, ≥2 pins), mortise-and-tenon (1/3-rule, cheek check, tenon length), box joint (≥3 fingers, equal widths, depth==thickness), finger joint (angle 15±3°); strength estimate via FPL Wood Handbook shear values × joint efficiency for oak/pine/cherry/maple/walnut in kN; `woodworking_validate_joinery` + `woodworking_joinery_strength` LLM tools | ✅ shipped — `kerf-woodworking/joinery_validate.py` |
+
 **Vehicles:** composites ply/layup authoring (draping / fiber-steering / Fibersim class) · hull fairing (NURBS-reachable) · 3D harness routing.
 
 **Civil / infrastructure (distinct engines):** plan-and-profile sheet engine · IFC-4.3-infra I/O · bridge/tunnel · mining · marine/dredging · rail signaling. *(CRS engine, horizontal/vertical alignment, corridor, earthworks, geotechnical, LandXML 1.2 I/O, pressurized water-distribution networks (Todini GGA + Hazen-Williams/Darcy-Weisbach), gravity sewer (Manning), storm rational method + HDS-5 culverts already shipped; TINView / PipeNetworkView / GradingPlanView / LandscapeView UIs ✅ 2026-05-29.)*

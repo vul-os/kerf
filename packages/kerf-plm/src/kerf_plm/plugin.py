@@ -94,18 +94,32 @@ async def register(app: FastAPI, ctx):
     except Exception:
         pass  # document-version-diff tool optional — fail silently if symbol missing.
 
+    # Multi-cavity tool effectivity (PROSTEP-iViP SIG §6).
+    try:
+        from kerf_plm.tools import (
+            plm_query_multi_cavity_spec,
+            run_plm_query_multi_cavity,
+        )
+        ctx.tools.register(
+            "plm_query_multi_cavity",
+            plm_query_multi_cavity_spec,
+            run_plm_query_multi_cavity,
+        )
+    except Exception:
+        pass  # multi-cavity tool optional — fail silently if symbol missing.
+
     try:
         from kerf_core.plugin import PluginManifest
         return PluginManifest(
             name="plm",
             version="0.1.0",
-            provides=["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.sysml-traceability", "plm.xmi-export", "plm.where-used", "plm.document-version-diff"],
+            provides=["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.sysml-traceability", "plm.xmi-export", "plm.where-used", "plm.document-version-diff", "plm.multi-cavity-effectivity"],
             depends=[],
         )
     except ImportError:
         return {
             "name": "plm",
             "version": "0.1.0",
-            "provides": ["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge"],
+            "provides": ["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.multi-cavity-effectivity"],
             "depends": [],
         }

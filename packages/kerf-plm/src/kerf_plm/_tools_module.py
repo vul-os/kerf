@@ -1041,3 +1041,206 @@ async def run_plm_document_version_diff(ctx, args: bytes) -> str:
         return err_payload(f"diff error: {exc}", "DIFF_ERROR")
 
     return ok_payload(report.to_dict())
+
+
+# ===========================================================================
+# PLM Multi-Cavity Tool Effectivity (PROSTEP-iViP SIG §6)
+# ===========================================================================
+
+plm_query_multi_cavity_spec = ToolSpec(
+    name="plm_query_multi_cavity",
+    description=(
+        "Query per-cavity insert revision state for a multi-cavity injection mold "
+        "or similar tooling family on a specific date.\n\n"
+        "Per PROSTEP-iViP SIG §6 'Multi-cavity tool effectivity', each cavity slot "
+        "carries a history of insert revision records with date-effectivity windows. "
+        "For a given query date the tool returns which revision each cavity is "
+        "currently producing.\n\n"
+        "Resolution rule: the LAST declared insert record whose effectivity window "
+        "contains the query date wins (latest-specification-wins; ISO 10303-44 §5.3 "
+        "date-effectivity bounds are inclusive, open ends = no constraint).\n\n"
+        "Honest flag — does NOT model:\n"
+        "  - Insert wear curves or physical degradation.\n"
+        "  - Change-out queuing or maintenance schedules.\n"
+        "  - Partial revision ordering (e.g. R5 >= R4); compatible_revisions is "
+        "    an exact-match set only.\n\n"
+        "Example: 4-cavity tool at R5; cavity 3 swapped to R6 from 2026-04-01.\n"
+        "  query 2026-05-01 → [(1,R5),(2,R5),(3,R6),(4,R5)]\n"
+        "  query 2026-03-15 → [(1,R5),(2,R5),(3,R5),(4,R5)]"
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "tool_id": {
+                "type": "string",
+                "description": "Unique identifier for the multi-cavity tool, e.g. 'MOLD-001'.",
+            },
+            "cavities": {
+                "type": "array",
+                "description": (
+                    "List of cavity objects. Each cavity has:\n"
+                    "  cavity_id (integer, required) — slot number 1-N.\n"
+                    "  inserts (array, required) — ordered list of insert revision records.\n"
+                    "Each insert record: {revision (str), effective_from? (YYYY-MM-DD), "
+                    "effective_to? (YYYY-MM-DD), compatible_revisions? ([str, ...])}."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "cavity_id": {"type": "integer"},
+                        "inserts": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "revision": {"type": "string"},
+                                    "effective_from": {"type": "string"},
+                                    "effective_to": {"type": "string"},
+                                    "compatible_revisions": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                    },
+                                },
+                                "required": ["revision"],
+                            },
+                        },
+                    },
+                    "required": ["cavity_id", "inserts"],
+                },
+            },
+            "query_date": {
+                "type": "string",
+                "description": "ISO-8601 date (YYYY-MM-DD) for which to resolve cavity states.",
+            },
+            "options": {
+                "type": "object",
+                "description": (
+                    "Optional query modifiers:\n"
+                    "  require_revision (str | [str]): only count cavities whose active "
+                    "revision is in this set toward effective_count."
+                ),
+                "properties": {
+                    "require_revision": {
+                        "oneOf": [
+                            {"type": "string"},
+                            {"type": "array", "items": {"type": "string"}},
+                        ],
+                        "description": "Only these revision labels count as effective.",
+                    },
+                },
+            },
+        },
+        "required": ["tool_id", "cavities", "query_date"],
+    },
+)
+
+
+@register(plm_query_multi_cavity_spec)
+async def run_plm_query_multi_cavity(ctx, args: bytes) -> str:
+    """Tool handler for plm_query_multi_cavity (PROSTEP-iViP SIG §6)."""
+    import json as _json
+    try:
+        a = _json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+    tool_id = a.get("tool_id", "")
+    raw_cavities = a.get("cavities")
+    query_date_str = a.get("query_date", "")
+    options = a.get("options") or {}
+
+    if not tool_id:
+        return err_payload("'tool_id' is required", "BAD_ARGS")
+    if not isinstance(raw_cavities, list):
+        return err_payload("'cavities' must be an array", "BAD_ARGS")
+    if not query_date_str:
+        return err_payload("'query_date' is required", "BAD_ARGS")
+
+    from datetime import date as _date
+    try:
+        query_date = _date.fromisoformat(query_date_str)
+    except ValueError as exc:
+        return err_payload(f"invalid query_date: {exc}", "BAD_ARGS")
+
+    from kerf_plm.multi_cavity_effectivity import (
+        MultiCavityTool,
+        ToolCavity,
+        CavityInsert,
+        query_multi_cavity_effectivity,
+        HONEST_FLAG,
+    )
+
+    cavities = []
+    for i, raw_c in enumerate(raw_cavities):
+        if not isinstance(raw_c, dict):
+            return err_payload(f"cavities[{i}] must be an object", "BAD_ARGS")
+        cid = raw_c.get("cavity_id")
+        if cid is None:
+            return err_payload(f"cavities[{i}].cavity_id is required", "BAD_ARGS")
+        try:
+            cid = int(cid)
+        except (TypeError, ValueError):
+            return err_payload(f"cavities[{i}].cavity_id must be an integer", "BAD_ARGS")
+
+        raw_inserts = raw_c.get("inserts")
+        if not isinstance(raw_inserts, list):
+            return err_payload(f"cavities[{i}].inserts must be an array", "BAD_ARGS")
+
+        inserts = []
+        for j, raw_ins in enumerate(raw_inserts):
+            if not isinstance(raw_ins, dict):
+                return err_payload(f"cavities[{i}].inserts[{j}] must be an object", "BAD_ARGS")
+            rev = raw_ins.get("revision")
+            if not rev:
+                return err_payload(
+                    f"cavities[{i}].inserts[{j}].revision is required", "BAD_ARGS"
+                )
+            eff_from = None
+            eff_to = None
+            if raw_ins.get("effective_from"):
+                try:
+                    eff_from = _date.fromisoformat(raw_ins["effective_from"])
+                except ValueError as exc:
+                    return err_payload(
+                        f"cavities[{i}].inserts[{j}].effective_from invalid: {exc}", "BAD_ARGS"
+                    )
+            if raw_ins.get("effective_to"):
+                try:
+                    eff_to = _date.fromisoformat(raw_ins["effective_to"])
+                except ValueError as exc:
+                    return err_payload(
+                        f"cavities[{i}].inserts[{j}].effective_to invalid: {exc}", "BAD_ARGS"
+                    )
+            compat = set(raw_ins.get("compatible_revisions") or [])
+            inserts.append(CavityInsert(
+                revision=rev,
+                effective_from=eff_from,
+                effective_to=eff_to,
+                compatible_revisions=compat,
+            ))
+
+        cavities.append(ToolCavity(cavity_id=cid, inserts=inserts))
+
+    tool = MultiCavityTool(tool_id=tool_id, cavities=cavities)
+
+    try:
+        result = query_multi_cavity_effectivity(tool, query_date, options=options)
+    except Exception as exc:
+        return err_payload(f"query error: {exc}", "QUERY_ERROR")
+
+    return ok_payload({
+        "tool_id": result.tool_id,
+        "query_date": result.query_date.isoformat(),
+        "effective_count": result.effective_count,
+        "cavity_count": len(result.per_cavity_revisions),
+        "per_cavity_revisions": [
+            {
+                "cavity_id": r.cavity_id,
+                "revision": r.revision,
+                "effective": r.effective,
+                "compatible_revisions": sorted(r.compatible_revisions),
+            }
+            for r in result.per_cavity_revisions
+        ],
+        "honest_flag": HONEST_FLAG,
+    })

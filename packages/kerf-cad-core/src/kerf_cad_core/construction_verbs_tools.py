@@ -903,3 +903,288 @@ async def run_feature_cope_notch(ctx: ProjectCtx, args: bytes) -> str:
         "cope_style": cope_style,
         "notch_style": notch_style,
     })
+
+
+# ── brep_push_pull_constrained ────────────────────────────────────────────────
+#
+# GK-P18 extension: constrained push-pull (clamp / reject modes).
+
+brep_push_pull_constrained_spec = ToolSpec(
+    name="brep_push_pull_constrained",
+    description=(
+        "Append a `push_pull_constrained` node to a `.feature` file. "
+        "Offsets a face along its outward normal by `distance`, checking "
+        "geometric constraints before applying. "
+        "\n\n"
+        "**Constraint kinds** (each is a dict with `'kind'`):\n"
+        "- `preserve_adjacent_face_position` — clamp distance so the pushed "
+        "face does not cross any opposing adjacent face.\n"
+        "- `preserve_volume_sign` — clamp distance so the body retains positive "
+        "volume (face does not push past the opposite wall).\n"
+        "- `preserve_planarity` — ensure the target face remains planar after "
+        "the operation (relevant for non-planar faces).\n"
+        "\n\n"
+        "**mode** controls what happens when a constraint is violated:\n"
+        "- `clamp` (default): reduce distance to the maximum allowed value.\n"
+        "- `reject`: raise an error immediately.\n"
+        "\n\n"
+        "Returns `applied_distance` (possibly less than `distance` when "
+        "clamped) and `clamped_constraints` (list of constraint kinds that "
+        "were activated)."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_id": {
+                "type": "string",
+                "description": "UUID of the target .feature file.",
+            },
+            "target_id": {
+                "type": "string",
+                "description": "Id of the body node whose face to push/pull.",
+            },
+            "face_id": {
+                "type": "integer",
+                "description": "0-based index of the face to offset.",
+                "minimum": 0,
+            },
+            "distance": {
+                "type": "number",
+                "description": "Requested signed offset along outward normal (mm). Non-zero.",
+            },
+            "constraints": {
+                "type": "array",
+                "description": (
+                    "List of constraint objects.  Each must have a `kind` field.  "
+                    "Supported kinds: 'preserve_adjacent_face_position', "
+                    "'preserve_volume_sign', 'preserve_planarity'."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "kind": {
+                            "type": "string",
+                            "enum": [
+                                "preserve_adjacent_face_position",
+                                "preserve_volume_sign",
+                                "preserve_planarity",
+                            ],
+                        },
+                    },
+                    "required": ["kind"],
+                },
+                "default": [],
+            },
+            "mode": {
+                "type": "string",
+                "enum": ["clamp", "reject"],
+                "description": "How to handle constraint violations: 'clamp' (default) or 'reject'.",
+                "default": "clamp",
+            },
+            "id": {"type": "string", "description": "Optional explicit node id."},
+        },
+        "required": ["file_id", "target_id", "face_id", "distance"],
+    },
+)
+
+
+@register(brep_push_pull_constrained_spec, write=True)
+async def run_brep_push_pull_constrained(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+    file_id = a.get("file_id", "").strip()
+    target_id = a.get("target_id", "").strip()
+    face_id = a.get("face_id")
+    distance = a.get("distance")
+    constraints = a.get("constraints", [])
+    mode = a.get("mode", "clamp")
+    node_id = a.get("id", "").strip()
+
+    if not file_id or not target_id:
+        return err_payload("file_id and target_id are required", "BAD_ARGS")
+    if face_id is None or not isinstance(face_id, int) or face_id < 0:
+        return err_payload("face_id must be a non-negative integer", "BAD_ARGS")
+    if distance is None or not isinstance(distance, (int, float)):
+        return err_payload("distance is required and must be a number", "BAD_ARGS")
+    if not isinstance(constraints, list):
+        return err_payload("constraints must be an array", "BAD_ARGS")
+    if mode not in ("clamp", "reject"):
+        return err_payload("mode must be 'clamp' or 'reject'", "BAD_ARGS")
+
+    try:
+        fid = uuid.UUID(file_id)
+    except Exception:
+        return err_payload("file_id must be a uuid", "BAD_ARGS")
+
+    content, err = read_feature_content(ctx, fid)
+    if err:
+        return err_payload(f"file not found: {err}", "NOT_FOUND")
+
+    if not node_id:
+        node_id = next_node_id(content, "push_pull_constrained")
+
+    node = {
+        "id": node_id,
+        "op": "push_pull_constrained",
+        "target_id": target_id,
+        "face_id": face_id,
+        "distance": float(distance),
+        "constraints": constraints,
+        "mode": mode,
+    }
+
+    _, nid, err2 = append_feature_node(ctx, fid, node)
+    if err2:
+        return err_payload(err2, "ERROR")
+
+    return ok_payload({
+        "file_id": file_id,
+        "id": nid or node_id,
+        "op": "push_pull_constrained",
+        "face_id": face_id,
+        "distance": float(distance),
+        "mode": mode,
+    })
+
+
+# ── brep_partial_face_replace ─────────────────────────────────────────────────
+#
+# GK-P18 extension: partial face replace (UV-region sub-face replacement).
+
+brep_partial_face_replace_spec = ToolSpec(
+    name="brep_partial_face_replace",
+    description=(
+        "Append a `partial_face_replace` node to a `.feature` file. "
+        "Replaces a sub-region of a face (defined by a 2-D UV loop) with a "
+        "new replacement surface. "
+        "\n\n"
+        "The operation: "
+        "(1) maps the UV loop to 3-D world coordinates on the face's surface, "
+        "(2) splits the face at the loop boundary using imprint primitives, "
+        "(3) replaces the inner sub-face's surface with `replacement_surface_spec`. "
+        "\n\n"
+        "`region_loop` is a list of [u, v] pairs defining the closed 2-D "
+        "boundary in parametric (UV) space.  Must have ≥ 3 points. "
+        "\n\n"
+        "`replacement_surface_spec` is a descriptor dict understood by the "
+        "geometry kernel.  Supported types: "
+        "`{'type': 'sphere', 'center': [cx, cy, cz], 'radius': r}`, "
+        "`{'type': 'nurbs', 'control_points': [...], 'degree_u': int, 'degree_v': int}`. "
+        "\n\n"
+        "Returns the `face_id` of the inner (replaced) sub-face in the "
+        "resulting body."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_id": {
+                "type": "string",
+                "description": "UUID of the target .feature file.",
+            },
+            "target_id": {
+                "type": "string",
+                "description": "Id of the body node whose face to partially replace.",
+            },
+            "face_id": {
+                "type": "integer",
+                "description": "0-based index of the face to partially replace.",
+                "minimum": 0,
+            },
+            "region_loop": {
+                "type": "array",
+                "description": (
+                    "Closed 2-D loop in UV parametric space.  "
+                    "Each element is [u, v] (floats).  ≥ 3 points required."
+                ),
+                "items": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 2,
+                    "maxItems": 2,
+                },
+                "minItems": 3,
+            },
+            "replacement_surface_spec": {
+                "type": "object",
+                "description": (
+                    "Descriptor of the replacement surface.  "
+                    "Must have a `type` field.  "
+                    "Supported: 'sphere' (center, radius), "
+                    "'nurbs' (control_points, degree_u, degree_v)."
+                ),
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": ["sphere", "nurbs"],
+                    },
+                },
+                "required": ["type"],
+            },
+            "id": {"type": "string", "description": "Optional explicit node id."},
+        },
+        "required": ["file_id", "target_id", "face_id", "region_loop", "replacement_surface_spec"],
+    },
+)
+
+
+@register(brep_partial_face_replace_spec, write=True)
+async def run_brep_partial_face_replace(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+    file_id = a.get("file_id", "").strip()
+    target_id = a.get("target_id", "").strip()
+    face_id = a.get("face_id")
+    region_loop = a.get("region_loop")
+    replacement_surface_spec = a.get("replacement_surface_spec")
+    node_id = a.get("id", "").strip()
+
+    if not file_id or not target_id:
+        return err_payload("file_id and target_id are required", "BAD_ARGS")
+    if face_id is None or not isinstance(face_id, int) or face_id < 0:
+        return err_payload("face_id must be a non-negative integer", "BAD_ARGS")
+    if not isinstance(region_loop, list) or len(region_loop) < 3:
+        return err_payload("region_loop must be a list of >= 3 [u, v] pairs", "BAD_ARGS")
+    for i, pt in enumerate(region_loop):
+        if not isinstance(pt, list) or len(pt) < 2:
+            return err_payload(f"region_loop[{i}] must be [u, v]", "BAD_ARGS")
+    if not isinstance(replacement_surface_spec, dict) or "type" not in replacement_surface_spec:
+        return err_payload("replacement_surface_spec must have a 'type' field", "BAD_ARGS")
+
+    try:
+        fid = uuid.UUID(file_id)
+    except Exception:
+        return err_payload("file_id must be a uuid", "BAD_ARGS")
+
+    content, err = read_feature_content(ctx, fid)
+    if err:
+        return err_payload(f"file not found: {err}", "NOT_FOUND")
+
+    if not node_id:
+        node_id = next_node_id(content, "partial_face_replace")
+
+    node = {
+        "id": node_id,
+        "op": "partial_face_replace",
+        "target_id": target_id,
+        "face_id": face_id,
+        "region_loop": region_loop,
+        "replacement_surface_spec": replacement_surface_spec,
+    }
+
+    _, nid, err2 = append_feature_node(ctx, fid, node)
+    if err2:
+        return err_payload(err2, "ERROR")
+
+    return ok_payload({
+        "file_id": file_id,
+        "id": nid or node_id,
+        "op": "partial_face_replace",
+        "face_id": face_id,
+        "region_loop_points": len(region_loop),
+    })

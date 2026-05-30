@@ -9424,6 +9424,20 @@
         },
         {
           "domain": "D13",
+          "feature": "3D-to-2D pattern flattening (non-developable surfaces)",
+          "competitor": {
+            "status": "yes",
+            "note": "CLO3D flattens 3D simulation meshes to 2D patterns; proprietary solver",
+            "source": "https://www.clo3d.com/en/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "ARAP (As-Rigid-As-Possible, Bo-Wang 2007) + LSCM (Lévy 2002) + cone-singularity flattening for non-developable garment surfaces (sleeves, bodices); per-face distortion metrics; dart placement for excess material",
+            "evidence": "packages/kerf-apparel/src/kerf_apparel/pattern_flatten.py"
+          }
+        },
+        {
+          "domain": "D13",
           "feature": "Grading (size run)",
           "competitor": {
             "status": "yes",

@@ -3,9 +3,11 @@ LLM tool definitions for kerf-apparel.
 
 Registered tools
 ----------------
-apparel_grade_bodice   — grade a bodice across a size run
-apparel_add_seam       — add seam allowance to a named size block
-apparel_make_marker    — nest pieces and report utilisation
+apparel_grade_bodice     — grade a bodice across a size run
+apparel_add_seam         — add seam allowance to a named size block
+apparel_make_marker      — nest pieces and report utilisation
+apparel_generate_block   — generate a parametric pattern block
+apparel_flatten_pattern  — flatten a 3-D garment surface to 2-D pattern (ARAP/LSCM)
 """
 
 from __future__ import annotations
@@ -22,6 +24,7 @@ from kerf_apparel.blocks import get_measurements, bodice_front, bodice_back, sle
 from kerf_apparel.grading import grade_bodice, grade_sleeve, grade_pants, bust_girth_from_piece
 from kerf_apparel.seam_allowance import add_seam_allowance
 from kerf_apparel.marker_making import make_marker
+from kerf_apparel.pattern_flatten import flatten_surface, compute_distortion, add_darts, TriMesh
 
 
 # ------------------------------------------------------------------ #
@@ -334,6 +337,162 @@ async def run_generate_block(ctx: ProjectCtx, args: bytes) -> str:
         "perimeter_cm": round(piece.perimeter(), 2),
         "grain_line": grain,
         "labels": {k: round(float(v), 3) for k, v in piece.labels.items()},
+    })
+
+
+# ------------------------------------------------------------------ #
+# apparel_flatten_pattern                                              #
+# ------------------------------------------------------------------ #
+
+flatten_pattern_spec = ToolSpec(
+    name="apparel_flatten_pattern",
+    description=(
+        "Flatten a 3-D garment surface mesh to a 2-D pattern using ARAP "
+        "(As-Rigid-As-Possible), LSCM (Least-Squares Conformal Mapping), "
+        "or cone-singularity methods (Bo-Wang 2007 / Lévy 2002). "
+        "Accepts a triangulated mesh as vertices + faces, returns 2-D UV "
+        "coordinates, per-face distortion metrics, and optional dart placements "
+        "for non-developable regions. "
+        "Typical use: flatten a bodice or sleeve 3-D surface to a sewable 2-D pattern."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "vertices": {
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 3,
+                    "maxItems": 3,
+                },
+                "description": "List of [x, y, z] vertex coordinates (cm).",
+            },
+            "faces": {
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "minItems": 3,
+                    "maxItems": 3,
+                },
+                "description": "List of [i, j, k] triangle indices (0-based).",
+            },
+            "method": {
+                "type": "string",
+                "enum": ["arap", "lscm", "cone_singularity"],
+                "description": (
+                    "Flattening algorithm: "
+                    "'arap' (default) — As-Rigid-As-Possible, best for low-stretch garment sections; "
+                    "'lscm' — angle-preserving conformal map, good for curved seam lines; "
+                    "'cone_singularity' — Gaussian-curvature-based, best for closed/highly-curved surfaces."
+                ),
+            },
+            "n_iters": {
+                "type": "integer",
+                "description": "ARAP local/global iteration count (default 50). Ignored for lscm.",
+                "minimum": 1,
+                "maximum": 500,
+            },
+            "add_darts_threshold": {
+                "type": "number",
+                "description": (
+                    "If provided, compute dart placements where area-ratio deviation "
+                    "exceeds this fraction (e.g. 0.10 = 10 %). "
+                    "Omit to skip dart computation."
+                ),
+                "minimum": 0.0,
+                "maximum": 1.0,
+            },
+        },
+        "required": ["vertices", "faces"],
+    },
+)
+
+
+@register(flatten_pattern_spec, write=False)
+async def run_flatten_pattern(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    vertices_raw = a.get("vertices")
+    faces_raw = a.get("faces")
+    if not vertices_raw or not faces_raw:
+        return err_payload("vertices and faces are required", "BAD_ARGS")
+
+    try:
+        import numpy as np
+        verts = np.array(vertices_raw, dtype=float)
+        faces = np.array(faces_raw, dtype=int)
+    except Exception as e:
+        return err_payload(f"cannot parse vertices/faces: {e}", "BAD_ARGS")
+
+    if verts.ndim != 2 or verts.shape[1] != 3:
+        return err_payload("vertices must be Nx3", "BAD_ARGS")
+    if faces.ndim != 2 or faces.shape[1] != 3:
+        return err_payload("faces must be Mx3", "BAD_ARGS")
+    if faces.max() >= len(verts):
+        return err_payload("face index out of range", "BAD_ARGS")
+
+    method = a.get("method", "arap")
+    if method not in ("arap", "lscm", "cone_singularity"):
+        return err_payload(f"unknown method {method!r}", "BAD_ARGS")
+
+    n_iters = int(a.get("n_iters", 50))
+    if n_iters < 1:
+        return err_payload("n_iters must be >= 1", "BAD_ARGS")
+
+    dart_threshold = a.get("add_darts_threshold")
+    if dart_threshold is not None:
+        try:
+            dart_threshold = float(dart_threshold)
+        except (TypeError, ValueError):
+            return err_payload("add_darts_threshold must be a number", "BAD_ARGS")
+
+    try:
+        mesh = TriMesh(verts, faces)
+        result = flatten_surface(mesh, method=method, n_iters=n_iters)
+    except Exception as e:
+        return err_payload(f"flatten_surface failed: {e}", "FLATTEN_ERROR")
+
+    try:
+        distortion = compute_distortion(mesh, result.uv)
+    except Exception as e:
+        distortion = {"error": str(e)}
+
+    darts_out = None
+    if dart_threshold is not None:
+        try:
+            pattern = add_darts(result, mesh, distortion_threshold=dart_threshold)
+            darts_out = [
+                {
+                    "face_index": d.face_index,
+                    "position": [round(float(d.position[0]), 4), round(float(d.position[1]), 4)],
+                    "angle_rad": round(float(d.angle_rad), 6),
+                    "depth_cm": round(float(d.depth_cm), 4),
+                }
+                for d in pattern.darts
+            ]
+        except Exception as e:
+            darts_out = {"error": str(e)}
+
+    return ok_payload({
+        "method": method,
+        "n_vertices": int(verts.shape[0]),
+        "n_faces": int(faces.shape[0]),
+        "uv": [[round(float(u), 6), round(float(v), 6)] for u, v in result.uv],
+        "distortion": {
+            k: round(float(v), 6) if isinstance(v, (int, float)) else v
+            for k, v in distortion.items()
+        },
+        "darts": darts_out,
+        "cone_verts": (
+            [int(i) for i in result.cone_verts]
+            if hasattr(result, "cone_verts") and result.cone_verts is not None
+            else []
+        ),
     })
 
 

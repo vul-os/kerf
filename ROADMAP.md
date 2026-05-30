@@ -325,7 +325,7 @@ Everything committed, lowest priority. Ordered roughly by near-term readiness.
 
 **Body-worn / medical / craft:** watchmaking / horology · eyewear / frames · footwear / last design · dental CAD (crowns/aligners) · orthopedic / prosthetics · hearing aids.
 
-**Soft goods (distinct 2D/developable engine):** apparel / pattern-making + drape · technical textiles / sails / membrane / tensile · upholstery / leather.
+**Soft goods (distinct 2D/developable engine):** apparel / pattern-making + drape · technical textiles / sails / membrane / tensile · upholstery / leather. *(ARAP/LSCM pattern flattening for non-developable surfaces (Bo-Wang 2007 / Lévy 2002) ✅ — `kerf-apparel/pattern_flatten.py`, `apparel_flatten_pattern` LLM tool wired.)*
 
 **Scientific / niche:** microfluidics / MEMS · signage / large-format.
 

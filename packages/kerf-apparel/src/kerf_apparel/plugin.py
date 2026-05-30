@@ -21,11 +21,13 @@ async def register(app: FastAPI, ctx):
         add_seam_spec, run_add_seam,
         make_marker_spec, run_make_marker,
         generate_block_spec, run_generate_block,
+        flatten_pattern_spec, run_flatten_pattern,
     )
     ctx.tools.register("apparel_grade_bodice", grade_bodice_spec, run_grade_bodice)
     ctx.tools.register("apparel_add_seam", add_seam_spec, run_add_seam)
     ctx.tools.register("apparel_make_marker", make_marker_spec, run_make_marker)
     ctx.tools.register("apparel_generate_block", generate_block_spec, run_generate_block)
+    ctx.tools.register("apparel_flatten_pattern", flatten_pattern_spec, run_flatten_pattern)
 
     try:
         from kerf_core.plugin import PluginManifest
@@ -35,6 +37,7 @@ async def register(app: FastAPI, ctx):
             provides=[
                 "apparel.blocks", "apparel.seam", "apparel.grading",
                 "apparel.marker", "apparel.generate_block",
+                "apparel.pattern_flatten",
             ],
             depends=[],
         )
@@ -45,6 +48,7 @@ async def register(app: FastAPI, ctx):
             "provides": [
                 "apparel.blocks", "apparel.seam", "apparel.grading",
                 "apparel.marker", "apparel.generate_block",
+                "apparel.pattern_flatten",
             ],
             "depends": [],
         }

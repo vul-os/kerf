@@ -7,6 +7,7 @@ Registers:
   - LLM tool:  cfd_rans_keps_solve    (k-ε RANS — channel + BFS validation)
   - LLM tool:  cfd_rans_solve  (SIMPLE RANS — run cavity/channel case)
   - LLM tools: cfd_openfoam_export, cfd_openfoam_import  (T-101-C OpenFOAM bridge)
+  - LLM tool:  cfd_mesh_unstructured  (3-D unstructured mesh generation)
 """
 
 from __future__ import annotations
@@ -29,6 +30,16 @@ async def register(app: FastAPI, ctx):
     ctx.tools.register("cfd_rans_keps_solve", cfd_rans_keps_spec, run_cfd_rans_keps_solve)
     # T-101-C: OpenFOAM bridge — case generator + result parser
     import kerf_cfd.openfoam_llm_tools  # noqa: F401 — triggers @register decorators
+    # New: cfd_mesh_unstructured (3-D Delaunay tet mesh + Voronoi dual)
+    from kerf_cfd.mesh_unstructured_tool import (
+        cfd_mesh_unstructured_spec,
+        run_cfd_mesh_unstructured,
+    )
+    ctx.tools.register(
+        "cfd_mesh_unstructured",
+        cfd_mesh_unstructured_spec,
+        run_cfd_mesh_unstructured,
+    )
 
     provides = [
         "cfd.simple_rans",
@@ -38,6 +49,7 @@ async def register(app: FastAPI, ctx):
         "cfd.k_omega_sst",
         "cfd.k_epsilon_rans",
         "cfd.openfoam_bridge",
+        "cfd.mesh_unstructured_3d",
     ]
 
     try:

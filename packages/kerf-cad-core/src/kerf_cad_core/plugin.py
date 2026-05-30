@@ -284,6 +284,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.io.step_import_tool",               # step_import_brep — STEP import with auto-heal
     # GK-P49: assembly-level interference detection (Möller 1997 + AABB broad-phase)
     "kerf_cad_core.geom.assembly_interference_tools",   # brep_assembly_interference, brep_check_clearance
+    # GK-P06: NURBS curve/surface split at parameter (nurbs_split_curve, nurbs_split_surface)
+    "kerf_cad_core.geom.curve_split",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

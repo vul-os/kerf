@@ -182,7 +182,7 @@ Legend: ✅ solid · ⚠️ partial / sampling-grade / unwired · ❌ missing.
 | Rational derivatives | ✅ `nurbs.py:rational_curve_derivative` | correct quotient rule |
 | `curve_derivative` (public) | ⚠️ `nurbs.py:126` | wrongly normalises; callers must use rational variant |
 | Knot insert/refine/remove/elevate/reduce | ✅ `nurbs.py` | Tiller removal w/ exact test; reduction gated |
-| Split / reparam | ✅ `nurbs.py:split_curve, reparameterize` | |
+| Split / reparam | ✅ `geom/curve_split.py:split_curve_at, split_curve_at_multiple, split_surface_at_u/v` (GK-P06) | Piegl–Tiller §5.3 full-mult knot insertion; rational-correct; 25 tests |
 | Exact circle / conic (rational) | ⚠️ `nurbs.py:make_circle_nurbs` non-rational; `curve_toolkit.conic` | circle is an approximation — breaks "exact radius" oracles |
 | Interpolate / fit to tolerance | ⚠️ `curve_toolkit.interp_curve, fit_curve` | uniform knots, brute CP count; no Piegl–Tiller knot placement |
 | Fair / rebuild / simplify | ⚠️ `curve_toolkit.fair_curve, rebuild_curve, simplify_curve` | smoothing only, no curvature target |
@@ -1266,6 +1266,7 @@ layer (history/UI/CAM/FEM packages), not the geometry kernel.
 | Direct edit (move-face / push-pull) | 🟡 GK-134 |
 | Tangent-chain edge select | 🟡 GK-131 |
 | G3 chain blend | ✅ GK-132 (wired GK-P05) |
+| NURBS curve/surface split at parameter | ✅ `geom/curve_split.py` (GK-P06) |
 | Mass properties | ✅ GK-23 |
 | Multi-density assembly + void mass props (Mortenson §11) | ✅ GK-P mass_props_multi |
 | Wall thickness | ✅ GK-76 |

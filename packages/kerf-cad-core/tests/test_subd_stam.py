@@ -500,6 +500,112 @@ class TestTangentOrthogonality:
 
 
 # ---------------------------------------------------------------------------
+# GK-P-B Appendix A precision tests
+# ---------------------------------------------------------------------------
+
+class TestAppendixAPrecision:
+    """Precision tests for the full Stam Appendix A eigenpatch implementation."""
+
+    def test_appendix_a_self_consistency_valence5(self):
+        """Full Appendix A evaluation at valence-5 is deterministic: two calls
+        with identical inputs return bit-for-bit identical results.  This guards
+        against accidental mutation of the cached patch matrices.
+        """
+        from kerf_cad_core.geom.subd_stam import (
+            _STAM_APPENDIX_A,
+            _eigenpatch_eval,
+        )
+        assert 5 in _STAM_APPENDIX_A, "Appendix A table missing for valence 5"
+        table = _STAM_APPENDIX_A[5]
+        pts = make_extraordinary_2ring(5)
+        pos1 = stam_limit_position(pts, 0.3, 0.4, n_irregular_vertex=5)
+        pos2 = stam_limit_position(pts, 0.3, 0.4, n_irregular_vertex=5)
+        diff = float(np.max(np.abs(pos1 - pos2)))
+        assert diff == 0.0, f"self-consistency failed: diff={diff}"
+        # Also verify all 12 eigenpatch entries are finite
+        for k, C in enumerate(table.patches):
+            val = _eigenpatch_eval(C, 0.5, 0.5)
+            assert math.isfinite(val), f"eigenpatch {k} gives non-finite value"
+
+    def test_appendix_a_tangent_precision_vs_fd(self):
+        """Analytic tangents from the full Appendix A table match central
+        finite-difference tangents (h=1e-6) within 1e-8 for a valence-5
+        extraordinary vertex at several interior parameter values.
+        """
+        pts = make_extraordinary_2ring(5)
+        h = 1e-6
+        tol = 1e-8
+        test_params = [(0.25, 0.25), (0.5, 0.5), (0.3, 0.7)]
+        for u, v in test_params:
+            du_analytic, dv_analytic = stam_limit_tangents(
+                pts, u, v, n_irregular_vertex=5
+            )
+            # Central FD for du
+            pos_up = stam_limit_position(pts, min(u + h, 1.0), v, n_irregular_vertex=5)
+            pos_dn = stam_limit_position(pts, max(u - h, 0.0), v, n_irregular_vertex=5)
+            du_fd = (pos_up - pos_dn) / (2 * h)
+            # Central FD for dv
+            pos_rp = stam_limit_position(pts, u, min(v + h, 1.0), n_irregular_vertex=5)
+            pos_rm = stam_limit_position(pts, u, max(v - h, 0.0), n_irregular_vertex=5)
+            dv_fd = (pos_rp - pos_rm) / (2 * h)
+            err_du = float(np.linalg.norm(du_analytic - du_fd))
+            err_dv = float(np.linalg.norm(dv_analytic - dv_fd))
+            assert err_du < tol, (
+                f"du analytic vs FD error {err_du:.2e} > {tol} at ({u},{v})"
+            )
+            assert err_dv < tol, (
+                f"dv analytic vs FD error {err_dv:.2e} > {tol} at ({u},{v})"
+            )
+
+    def test_appendix_a_cross_valence_consistency_regular(self):
+        """At valence-4 (regular), stam_limit_position uses the regular closed-form
+        B-spline path; the Appendix A table is NOT used.  Verify that the regular
+        path and direct _eval_regular_patch agree within 1e-12.
+        """
+        pts = make_regular_2ring_flat()
+        for u, v in [(0.25, 0.25), (0.5, 0.5), (0.75, 0.75)]:
+            pos_stam = stam_limit_position(pts, u, v, n_irregular_vertex=4)
+            ctrl = regular_2ring_to_ctrl_grid(pts)
+            pos_direct = _eval_regular_patch(ctrl, u, v)
+            diff = float(np.max(np.abs(pos_stam - pos_direct)))
+            assert diff < 1e-12, (
+                f"regular-path vs direct B-spline diff {diff:.2e} at ({u},{v})"
+            )
+
+    def test_appendix_a_eigenpatch_linear_independence(self):
+        """For each valence in {3, 5, 6, 7, 8} the 12 Appendix A eigenpatch
+        polynomials, evaluated on a 5x5 parameter grid, form a matrix whose
+        Gram matrix has positive determinant (log|det| > -200), confirming
+        linear independence.
+        """
+        from kerf_cad_core.geom.subd_stam import (
+            _STAM_APPENDIX_A,
+            _eigenpatch_eval,
+        )
+        test_u = [0.1, 0.3, 0.5, 0.7, 0.9]
+        test_v = [0.1, 0.3, 0.5, 0.7, 0.9]
+        n_pts = len(test_u) * len(test_v)
+        for n in (3, 5, 6, 7, 8):
+            assert n in _STAM_APPENDIX_A, f"Appendix A table missing for valence {n}"
+            table = _STAM_APPENDIX_A[n]
+            phi_grid = np.zeros((12, n_pts), dtype=float)
+            for k, C in enumerate(table.patches):
+                idx = 0
+                for u in test_u:
+                    for v in test_v:
+                        phi_grid[k, idx] = _eigenpatch_eval(C, u, v)
+                        idx += 1
+            gram = phi_grid @ phi_grid.T
+            sign, logdet = np.linalg.slogdet(gram)
+            assert sign > 0, (
+                f"Gram matrix non-positive for valence {n}: sign={sign}"
+            )
+            assert logdet > -200, (
+                f"Gram log-det too small for valence {n}: logdet={logdet:.2f}"
+            )
+
+
+# ---------------------------------------------------------------------------
 # Type import fix for older Pythons
 # ---------------------------------------------------------------------------
 

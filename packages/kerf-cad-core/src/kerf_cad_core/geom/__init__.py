@@ -1556,14 +1556,6 @@ from kerf_cad_core.geom.subd_export_step import (  # noqa: E402
     export_limit_to_step,
     parse_step_subd,
 )
-# NURBS-CURVE-RESAMPLE-UNIFORM: resample a NurbsCurve at uniform arc-length
-# intervals via arc-length parameterisation inversion (Piegl-Tiller §9.4 +
-# Patrikalakis-Maekawa §3.5; Gauss-Legendre quadrature for length).
-# LLM tool: nurbs_curve_resample_uniform.
-from kerf_cad_core.geom.curve_resample_uniform import (  # noqa: E402
-    ResampleResult,
-    resample_uniform_arc_length,
-)
 # BREP-FACE-COMPATIBLE-RESPLIT: insert knots into two adjacent NURBS faces so
 # their shared-edge knot vectors become identical — prerequisite for surface
 # sewing, BREP repair, and Boolean operations.

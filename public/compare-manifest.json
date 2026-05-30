@@ -9696,6 +9696,20 @@
         },
         {
           "domain": "D7",
+          "feature": "Ejector stroke verification",
+          "competitor": {
+            "status": "yes",
+            "note": "Ejector stroke adequacy and pin deflection check integrated in mold tooling workspace",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Ejector stroke verifier (Beaumont 2007 §9 + Menges 2001 §7.4): (1) stroke adequacy — required_stroke (part_depth + safety_margin) ≤ machine_stroke; (2) force capacity — pin_count × max_force ≥ ejection_force; (3) pin deflection — δ=F·L³/(3·E·I) ≤ 0.05mm allowable (Euler-Bernoulli cantilever, Beaumont §9.3); (4) knockout bar contact — plate thickness ≥ bar diameter (Beaumont §9.5); LLM tool `mold_verify_ejector_stroke`; static load only, honest-flagged for dynamic/fatigue scope; 33 oracle tests",
+            "evidence": "packages/kerf-mold/src/kerf_mold/ejector_stroke_verify.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "Draft angle validation",
           "competitor": {
             "status": "yes",

@@ -17,6 +17,8 @@ Registers:
                (Beaumont 2007 §7 + Menges 2001 §6.6 gate location optimisation)
   - LLM tool:  mold_optimize_vent_placement
                (Beaumont 2007 §8.4 + Table 8.4 air-vent location optimisation)
+  - LLM tool:  mold_verify_ejector_stroke
+               (Beaumont 2007 §9 + Menges 2001 §7.4 ejector stroke verification)
 """
 from __future__ import annotations
 
@@ -110,6 +112,15 @@ async def register(app: FastAPI, ctx):
         mold_vent_placement_spec,
         run_mold_optimize_vent_placement,
     )
+    # Register ejector stroke verification tool (Beaumont 2007 §9 + Menges 2001 §7.4)
+    from kerf_mold.ejector_stroke_verify_tool import (
+        mold_verify_ejector_stroke_spec, run_mold_verify_ejector_stroke,
+    )
+    ctx.tools.register(
+        "mold_verify_ejector_stroke",
+        mold_verify_ejector_stroke_spec,
+        run_mold_verify_ejector_stroke,
+    )
 
     provides = [
         "mold.moldability",
@@ -123,6 +134,7 @@ async def register(app: FastAPI, ctx):
         "mold.runner_layout",
         "mold.gate_placement",
         "mold.vent_placement",
+        "mold.ejector_stroke_verify",
     ]
 
     try:

@@ -57,6 +57,14 @@ from kerf_mold.vent_placement import (
     VentPlacementResult,
     optimize_vent_placement,
 )
+from kerf_mold.ejector_stroke_verify import (
+    EjectorPinSpec,
+    EjectorStrokeReport,
+    PinDeflectionResult,
+    verify_ejector_stroke,
+    DEFAULT_ALLOWABLE_DEFLECTION_MM,
+    STEEL_E_N_MM2,
+)
 
 __all__ = [
     # mold.py
@@ -109,4 +117,11 @@ __all__ = [
     "VentLocation",
     "VentPlacementResult",
     "optimize_vent_placement",
+    # ejector_stroke_verify.py
+    "EjectorPinSpec",
+    "EjectorStrokeReport",
+    "PinDeflectionResult",
+    "verify_ejector_stroke",
+    "DEFAULT_ALLOWABLE_DEFLECTION_MM",
+    "STEEL_E_N_MM2",
 ]

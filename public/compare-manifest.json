@@ -13562,6 +13562,20 @@
         },
         {
           "domain": "D12",
+          "feature": "Geometric distortion map (barrel / pincushion)",
+          "competitor": {
+            "status": "yes",
+            "note": "Distortion analysis: grid distortion map, percent distortion vs field, barrel/pincushion/TV distortion display; polychromatic",
+            "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Geometric distortion map (OPTICS-DISTORTION-MAP): chief-ray tangential distortion D=(y_actual-y_paraxial)/|y_paraxial|x100 vs field angle (Hecht SS5.6 / Welford 1986 SS6.3); barrel (D<0) / pincushion (D>0) / mixed classification; Seidel S_V third-order cross-check (Welford SS6.3); BK7 biconvex singlet >0.5% barrel distortion at 20 deg field verified; LLM tool optics_distortion_map; 30 hermetic tests. Honest: monochromatic only; tangential (meridional) distortion only; stop assumed at first surface.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/distortion_map.py"
+          }
+        },
+        {
+          "domain": "D12",
           "feature": "Non-sequential ray tracing (stray light)",
           "competitor": {
             "status": "yes",

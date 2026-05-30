@@ -1051,6 +1051,7 @@ from kerf_cad_core.optics.seidel_aberrations import seidel_coefficients  # noqa:
 from kerf_cad_core.optics.chief_ray_vignetting import compute_vignetting  # noqa: E402
 from kerf_cad_core.optics.pupil_diagram import compute_pupil_diagram  # noqa: E402
 from kerf_cad_core.optics.defocus_curve import compute_defocus_curve  # noqa: E402
+from kerf_cad_core.optics.distortion_map import compute_distortion_map  # noqa: E402
 
 # Tool: optics_seidel_aberrations
 # ---------------------------------------------------------------------------
@@ -1566,6 +1567,136 @@ async def run_defocus_curve(ctx: ProjectCtx, args: bytes) -> str:
         kwargs["n_object"] = float(a["n_object"])
 
     result = compute_defocus_curve(a["surfaces"], **kwargs)
+    if isinstance(result, dict):
+        return json.dumps(result)
+    return ok_payload(result.to_dict())
+
+
+# ---------------------------------------------------------------------------
+# Tool: optics_distortion_map
+# ---------------------------------------------------------------------------
+
+_distortion_map_spec = ToolSpec(
+    name="optics_distortion_map",
+    description=(
+        "Compute the geometric (tangential) distortion map for a sequential lens stack.\n"
+        "\n"
+        "For each field angle θ, traces the chief ray (height=0 at first surface,\n"
+        "aperture stop = first surface) and computes:\n"
+        "  y_actual    = exact meridional image-plane intercept (chief ray).\n"
+        "  y_paraxial  = f_eff * tan(θ)  (ideal first-order image height).\n"
+        "  distortion  = (y_actual - y_paraxial) / |y_paraxial| × 100  [%]\n"
+        "\n"
+        "Sign convention (Hecht §5.6 / ISO 9039):\n"
+        "  barrel distortion     → D < 0  (image compressed at edges)\n"
+        "  pincushion distortion → D > 0  (image stretched at edges)\n"
+        "\n"
+        "Also returns the Seidel third-order S_V additive prediction\n"
+        "(Welford §6.3) for comparison: accurate for small θ, diverges at\n"
+        "large field where higher-order terms dominate.\n"
+        "\n"
+        "Depth bar:\n"
+        "  Symmetric equiconvex singlet at small field: |D| < 2%\n"
+        "    (S_V ≈ 0 by bending symmetry; Welford §6.4).\n"
+        "  BK7 biconvex singlet at 20 deg field: |D| > 5% typical\n"
+        "    for an uncorrected singlet with high S_V coefficient.\n"
+        "\n"
+        "HONEST FLAGS:\n"
+        "  * Monochromatic only. Lateral chromatic distortion requires per-wavelength\n"
+        "    chief-ray traces weighted by spectral power (not implemented).\n"
+        "  * Tangential (meridional) distortion only. For rotationally symmetric\n"
+        "    systems sagittal distortion is identical; astigmatic differences ignored.\n"
+        "  * Aperture stop assumed at first surface (chief ray height = 0 there).\n"
+        "\n"
+        "Surface definition (same as optics_ray_trace_lens_stack):\n"
+        "  c  : curvature 1/R (mm^-1). 0 = flat.\n"
+        "  t  : thickness to NEXT surface vertex (mm). Last surface: 0.\n"
+        "  n  : refractive index of medium AFTER this surface.\n"
+        "  k  : conic constant (default 0 = sphere).\n"
+        "\n"
+        "Returns:\n"
+        "  field_angles_deg         : input field angles (degrees)\n"
+        "  y_actual_mm              : actual chief-ray image heights (mm)\n"
+        "  y_paraxial_mm            : ideal paraxial image heights (mm)\n"
+        "  distortion_percent       : (y_actual - y_paraxial)/|y_paraxial| × 100\n"
+        "  max_distortion_pct       : max |distortion| across all field angles\n"
+        "  kind                     : 'barrel' | 'pincushion' | 'mixed' | 'none'\n"
+        "  EFL_mm                   : effective focal length used for y_paraxial\n"
+        "  seidel_distortion_percent: Seidel S_V third-order additive prediction (%)\n"
+        "  honest_flag              : caveats\n"
+        "\n"
+        "Errors: {ok:false, reason} for invalid inputs. Never raises.\n"
+        "\n"
+        "References: Hecht §5.6; Welford 1986 §6.3."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "surfaces": {
+                "type": "array",
+                "description": (
+                    "Ordered list of optical surface dicts. Each must have: "
+                    "c (mm^-1), t (mm), n (>= 1.0). Optional: k (conic, default 0)."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "c": {"type": "number", "description": "Curvature 1/R (mm^-1). 0 = flat."},
+                        "t": {"type": "number", "description": "Thickness to next surface (mm)."},
+                        "n": {"type": "number", "description": "Refractive index after surface (>= 1.0)."},
+                        "k": {"type": "number", "description": "Conic constant (default 0 = sphere)."},
+                    },
+                    "required": ["c", "t", "n"],
+                },
+            },
+            "field_angles_deg": {
+                "type": "array",
+                "description": (
+                    "List of field angles in degrees (e.g. [0, 5, 10, 15, 20]). "
+                    "0 = on-axis (distortion = 0 by definition)."
+                ),
+                "items": {"type": "number"},
+            },
+            "aperture_mm": {
+                "type": "number",
+                "description": (
+                    "Marginal ray height for Seidel cross-check and paraxial EFL "
+                    "computation (mm). Default 1.0 mm."
+                ),
+            },
+            "n_object": {
+                "type": "number",
+                "description": "Refractive index of object space (default 1.0 = air).",
+            },
+        },
+        "required": ["surfaces", "field_angles_deg"],
+    },
+)
+
+
+@register(_distortion_map_spec, write=False)
+async def run_distortion_map(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    if a.get("surfaces") is None:
+        return json.dumps({"ok": False, "reason": "surfaces is required"})
+    if a.get("field_angles_deg") is None:
+        return json.dumps({"ok": False, "reason": "field_angles_deg is required"})
+
+    kwargs: dict = {}
+    if "aperture_mm" in a:
+        kwargs["aperture_mm"] = float(a["aperture_mm"])
+    if "n_object" in a:
+        kwargs["n_object"] = float(a["n_object"])
+
+    result = compute_distortion_map(
+        a["surfaces"],
+        a["field_angles_deg"],
+        **kwargs,
+    )
     if isinstance(result, dict):
         return json.dumps(result)
     return ok_payload(result.to_dict())

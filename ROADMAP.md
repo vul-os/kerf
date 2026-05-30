@@ -155,6 +155,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 | **Surface fairing + Sapidis curve fairing** | `surface_fairing.py`: `fair_surface()` (iterative discrete-Laplacian control-net smoothing, 3 boundary modes) + `fair_surface_bend()` (sparse bending-energy linear solve via scipy.sparse); `curve_toolkit.py`: `fair_curve(sapidis=True)` (Sapidis & Farin 1994 iterative knot removal + insertion); LLM tools `surface_fair` + `curve_fair` registered; 19 hermetic tests (σ(z) oracle, boundary preservation, energy-monotone, Sapidis curvature-variance reduction) | ✅ shipped |
 | **Variable-radius G2 fillet (Stadler 2006)** | `variable_radius_fillet_g2` + `fillet_radius_field_planner` in `geom/surface_fillet.py`; `nurbs_fillet_variable_g2` LLM tool registered; G2 continuity along radius gradient via cubic Hermite curvature blending; 48 hermetic analytic-oracle-asserted tests | ✅ shipped |
 | **General solid boolean** | NURBS-faced / non-axis-aligned solids (today: axis-aligned only; general CSG delegates to OCCT worker) | 🔴 not started |
+| **GK-P: Hollow operator** | Compound feature: shell offset + inner-face blend + inner-edge fillet + port drilling + optional ribs — `hollow_body` / `hollow_with_ribs` in `geom/body_hollow.py`; LLM tool `brep_make_hollow`; 37 analytic-oracle tests green | ✅ shipped |
 
 **GK-P (parity) series in flight.** A four-agent survey of Kerf vs ~18 kernel-relevant CADs found a concrete, finite gap list. GK-01..GK-139 are landed. The `GK-P` series (tracked in `tasks.md`) closes the remaining gaps:
 

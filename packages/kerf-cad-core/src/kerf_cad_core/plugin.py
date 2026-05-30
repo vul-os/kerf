@@ -166,6 +166,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.non_manifold_tools",
     "kerf_cad_core.geom.unroll_srf",
     "kerf_cad_core.geom.solid_features",
+    # GK-P: Hollow compound operator (shell + blend + fillet + port + ribs)
+    "kerf_cad_core.geom.body_hollow",
     "kerf_cad_core.geom.patch_srf",
     "kerf_cad_core.geom.revolve_srf",
     "kerf_cad_core.jewelry.production",

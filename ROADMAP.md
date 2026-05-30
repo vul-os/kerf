@@ -144,6 +144,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 | **`surface_offset.py`** | NURBS surface offset (Tiller-Hanson 1984 + Hoschek 1988): CP face-normal displacement, iterative isotropic-error refinement, Möller 1997 self-intersection detection, local-loop trim; `nurbs_surface_offset` LLM tool; 4 analytical oracle tests (plane/cylinder/sphere/C-shape) | ✅ shipped |
 | **`coons.py`** | Boundary-interpolation Coons patches, exact to 1e-12 | ✅ shipped |
 | **`inversion.py`** | Closest-point / point-inversion (Piegl 6.1, analytic partials on rational surfaces) | ✅ shipped |
+| **`curve_projection.py`** | Point→curve / point→surface projection (Newton-Raphson + arc-length fallback, Hu-Wallner 2006); `ProjectionResult` dataclass; `distance_curve_to_curve`; LLM tool `nurbs_project_point` | ✅ shipped |
 | **`intersection.py`** | Hardened SSI: loop-detection, tangential-branch detection, small-loop guard, analytic specialisations | ✅ shipped |
 | **`intersection_degen.py` — Degenerate SSI (Legendre canonical forms)** | `detect_degenerate_ssi` + `compute_degenerate_ssi_curve` + `ssi_extended`; handles coaxial cylinders, coplanar planes, sphere-tangent-plane, Legendre/Weierstrass conic section for tangent quadric pairs; LLM tool `nurbs_ssi_with_degenerate_check` registered; 27 hermetic tests with analytical oracles | ✅ shipped |
 | **`geom/history/`** | Parametric history DAG + `feature_id::role::fingerprint` persistent naming — downstream fillet survives upstream parameter edits | ✅ shipped |

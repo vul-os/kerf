@@ -183,6 +183,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.jewelry.engraving",
     "kerf_cad_core.geom.match_srf",
     "kerf_cad_core.geom.intersection",
+    "kerf_cad_core.geom.curve_projection",  # GK-P: nurbs_project_point (Newton + arc-length)
     "kerf_cad_core.jewelry.bezel_auto",
     "kerf_cad_core.jewelry.plating",
     "kerf_cad_core.jewelry.gem_cert",

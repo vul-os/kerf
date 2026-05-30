@@ -28,6 +28,8 @@ async def register(app: FastAPI, ctx):
         run_gdt_validate_datum_reference_frame,
         gdt_validate_composite_tolerance_frame_spec,
         run_gdt_validate_composite_tolerance_frame,
+        gdt_warn_datum_precedence_spec,
+        run_gdt_warn_datum_precedence,
     )
 
     ctx.tools.register("gdnt_list_symbols", gdnt_list_symbols_spec, run_gdnt_list_symbols)
@@ -52,6 +54,15 @@ async def register(app: FastAPI, ctx):
         pass
 
     try:
+        ctx.tools.register(
+            "gdt_warn_datum_precedence",
+            gdt_warn_datum_precedence_spec,
+            run_gdt_warn_datum_precedence,
+        )
+    except Exception:
+        pass
+
+    try:
         from kerf_core.plugin import PluginManifest
         return PluginManifest(
             name="gdnt",
@@ -59,6 +70,7 @@ async def register(app: FastAPI, ctx):
             provides=[
                 "gdnt.fcf", "gdnt.inspection", "gdnt.homologation",
                 "gdnt.drf_validation", "gdnt.composite_tolerance",
+                "gdnt.datum_precedence_warn",
             ],
             depends=[],
         )
@@ -69,6 +81,7 @@ async def register(app: FastAPI, ctx):
             "provides": [
                 "gdnt.fcf", "gdnt.inspection", "gdnt.homologation",
                 "gdnt.drf_validation", "gdnt.composite_tolerance",
+                "gdnt.datum_precedence_warn",
             ],
             "depends": [],
         }

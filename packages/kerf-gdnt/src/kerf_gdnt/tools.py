@@ -714,3 +714,117 @@ def run_gdt_validate_composite_tolerance_frame(params: dict, ctx: Any) -> str:
         return err_payload(str(exc), "COMPOSITE_PARSE_ERROR")
     except Exception as exc:
         return err_payload(str(exc), "COMPOSITE_VALIDATE_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# gdt_warn_datum_precedence  (§4.7 + §4.11 cross-frame consistency)
+# ---------------------------------------------------------------------------
+
+gdt_warn_datum_precedence_spec = ToolSpec(
+    name="gdt_warn_datum_precedence",
+    description=(
+        "Analyse a set of feature control frames for datum precedence "
+        "inconsistencies per ASME Y14.5-2018 §4.7 + §4.11. "
+        "Four warning classes: "
+        "(P1) same datum letter with conflicting feature types across frames — ERROR; "
+        "(P2) datum precedence reversal (e.g. A|B|C vs B|A|C) — WARNING; "
+        "(P3) datum sequence removes >6 DOF — ERROR; "
+        "(P4) same datum referenced with different material-boundary modifiers — WARNING. "
+        "Returns PrecedenceReport with per-warning severity, rule citations, "
+        "affected frame IDs, and recommendations. "
+        "HONEST FLAG: analyses declared datum properties only; geometric "
+        "consistency (actual 3D feature shapes and DOF elimination) requires "
+        "the solid model and is NOT performed here."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "frames": {
+                "type": "array",
+                "description": "Feature control frame datum reference compartments to analyse.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "frame_id": {
+                            "type": "string",
+                            "description": "Frame identifier, e.g. 'F1'.",
+                        },
+                        "datum_refs": {
+                            "type": "array",
+                            "description": "Ordered datum references [primary, secondary?, tertiary?].",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "label": {"type": "string"},
+                                    "modifier": {
+                                        "type": "string",
+                                        "enum": ["M", "L", "S"],
+                                    },
+                                },
+                                "required": ["label"],
+                            },
+                            "maxItems": 3,
+                        },
+                    },
+                    "required": ["frame_id", "datum_refs"],
+                },
+                "minItems": 1,
+            },
+            "datums": {
+                "type": "object",
+                "description": "Registry of datum features. Keys = datum letters.",
+                "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                        "feature_type": {
+                            "type": "string",
+                            "enum": [
+                                "flat_face", "plane", "cylinder", "cone",
+                                "sphere", "slot", "width",
+                            ],
+                        },
+                    },
+                    "required": ["feature_type"],
+                },
+            },
+        },
+        "required": ["frames", "datums"],
+    },
+)
+
+
+def run_gdt_warn_datum_precedence(params: dict, ctx: Any) -> str:
+    try:
+        from kerf_gdnt.datum_precedence_warn import (
+            analyze_datum_precedence_consistency,
+            DatumFeatureInfo,
+            FrameDatumRef,
+            FrameSpec,
+        )
+
+        frames = [
+            FrameSpec(
+                frame_id=f["frame_id"],
+                datum_refs=[
+                    FrameDatumRef(
+                        label=d["label"],
+                        modifier=d.get("modifier"),
+                    )
+                    for d in f.get("datum_refs", [])
+                ],
+            )
+            for f in params.get("frames", [])
+        ]
+
+        datums = {
+            label.upper(): DatumFeatureInfo(
+                label=label.upper(),
+                feature_type=info["feature_type"],
+            )
+            for label, info in params.get("datums", {}).items()
+        }
+
+        report = analyze_datum_precedence_consistency(frames, datums)
+        return ok_payload(report.to_dict())
+    except Exception as exc:
+        return err_payload(str(exc), "DATUM_PRECEDENCE_ERROR")

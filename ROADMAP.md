@@ -106,6 +106,9 @@ The sector work only matters if you **own your work, are not locked in, and can 
 ### Latest delta — 2026-05-30
 
 **Injection-mold gate placement optimiser** ✅ — `mold_optimize_gate_placement` LLM tool: geometric heuristic gate location for a cavity bounding box; samples candidates on all bbox faces (top-centre, edge, side, bottom, multi-gate equidistant seeds); scores by Euclidean max-flow-length + fill-balance std-dev (0.6/0.4 weighted composite); functional-face + avoid-zone constraints; soft penalty for underside gates; multi-gate suggestion when flow/min-dim > 5×; balance score (0–1); 41 oracle tests; honest-flag: geometric heuristic only (not Moldflow / Moldex3D / SigmaSoft); refs Beaumont 2007 §7 + Menges 2001 §6.6 — `packages/kerf-mold/src/kerf_mold/gate_placement.py`.
+### Latest delta — 2026-05-30
+
+**BREP-MESH-MASS-PROPS** ✅ — `compute_mesh_mass_props(vertices, triangles, density=1.0) → MassPropsReport`: volume, mass, centroid, and full 3×3 inertia tensor from a triangle mesh via divergence theorem (Mirtich 1996 §3 / Mortenson §11.4 / Eberly 2002).  All six second moments in a single O(M) NumPy pass using the Eberly recurrence.  `MassPropsReport` dataclass: volume, mass, centroid, inertia_tensor, principal_moments, principal_axes.  LLM tool `brep_mesh_mass_props` registered.  Re-exported from `geom/__init__.py`.  28 tests green: unit cube (V=1.0±1e-9, Ixx=1/6±1e-9), UV sphere (V≈4π/3 ± 0.25%, Idiag=(2/5)mr² ± 0.14%), L-shape (cx=5/6 exact), regular tetrahedron (V=|det|/6 exact), open mesh → ValueError, inverted normals → ValueError.  Honest: requires closed orientable mesh with outward-facing normals; non-manifold / open mesh gives wrong sign or incorrect magnitudes — `kerf-cad-core/geom/mass_props_mesh.py`.
 
 ### Previous delta — 2026-05-26
 

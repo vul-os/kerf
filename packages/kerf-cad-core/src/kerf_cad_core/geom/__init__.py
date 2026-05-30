@@ -1540,6 +1540,8 @@ from kerf_cad_core.geom.subd_export_gltf import (  # noqa: E402
 )
 # BREP-MESH-MASS-PROPS: volume, centroid, inertia tensor from triangle mesh.
 # (Mirtich 1996 §3; Mortenson §11.4)
+# BREP-MESH-MASS-PROPS: volume, centroid, inertia tensor from triangle mesh.
+# (Mirtich 1996 §3; Mortenson §11.4; Eberly 2002)
 # Honest: closed orientable mesh with outward normals required; open/inverted → ValueError.
 from kerf_cad_core.geom.mass_props_mesh import (  # noqa: E402
     MassPropsReport,

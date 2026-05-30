@@ -1529,8 +1529,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "3-axis CAM wired in CAMView; profile/contour/pocket/face ops",
-            "evidence": "src/components/CAMView.jsx"
+            "note": "3-axis CAM wired in CAMView; profile/contour/pocket/face ops; Fanuc RS-274 G-code emitter (G00/G01/G02/G03/M06) via cam_emit_gcode LLM tool",
+            "evidence": "src/components/CAMView.jsx, packages/kerf-cad-core/src/kerf_cad_core/cam_gcode_emit.py"
           }
         },
         {

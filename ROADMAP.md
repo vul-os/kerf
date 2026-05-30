@@ -379,6 +379,7 @@ Everything committed, lowest priority. Ordered roughly by near-term readiness.
 | Woodworking | Capability | Status |
 |---|---|---|
 | Joinery geometry validator (Hammer-Krenov) | Validate dovetail (7°–14° pin angle, ≥1/3 board pin width, ≥2 pins), mortise-and-tenon (1/3-rule, cheek check, tenon length), box joint (≥3 fingers, equal widths, depth==thickness), finger joint (angle 15±3°); strength estimate via FPL Wood Handbook shear values × joint efficiency for oak/pine/cherry/maple/walnut in kN; `woodworking_validate_joinery` + `woodworking_joinery_strength` LLM tools | ✅ shipped — `kerf-woodworking/joinery_validate.py` |
+**Mechanical / product:** cams generators · woodworking / furniture / joinery + cutlist · power one-line / switchgear · lighting / photometric · interior / space-planning / FF&E · kitchen / bath / cabinetry / millwork · landscape (plant catalog with USDA + Dirr references, 101 species ✅) · scaffolding / formwork.
 
 **Vehicles:** composites ply/layup authoring (draping / fiber-steering / Fibersim class) · hull fairing (NURBS-reachable) · 3D harness routing.
 

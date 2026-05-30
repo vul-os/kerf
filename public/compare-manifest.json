@@ -15724,6 +15724,20 @@
         },
         {
           "domain": "D1",
+          "feature": "SubD limit-surface mesh export to OBJ",
+          "competitor": {
+            "status": "yes",
+            "note": "Rhino 8 Mesh + Export: extract limit-surface mesh and write Wavefront OBJ",
+            "source": "https://docs.mcneel.com/rhino/8/help/en-us/commands/mesh.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "export_limit_to_obj: CC limit-surface mesh exported as Wavefront OBJ ASCII (v/vn/f; geometry only, no MTL). N levels of CC subdivision; cube cage at 2 levels \u2192 96 quads; face count scales 4\u00d7 per level; vertex normals via area-weighted cross-product; parse_obj round-trip oracle; LLM tool subd_export_limit_to_obj. Honest: no vt texture coords, no MTL material library.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/subd_export_obj.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "SubD limit-surface curve along cage edges",
           "competitor": {
             "status": "yes",

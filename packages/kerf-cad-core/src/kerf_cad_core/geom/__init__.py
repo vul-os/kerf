@@ -1110,6 +1110,9 @@ __all__ = [
     # SUBD-CAGE-RING-FROM-EDGE
     "EdgeRingResult",
     "compute_edge_ring",
+    # SUBD-LIMIT-MESH-EXPORT-OBJ
+    "export_limit_to_obj",
+    "parse_subd_obj",
 ]
 
 # Variable-section edge blend (Vida-Martin-Varady 1994 §4)
@@ -1469,4 +1472,12 @@ from kerf_cad_core.geom.chamfer_recommend_size import (  # noqa: E402
     DIN74_COUNTERSINK_TABLE,
     recommend_chamfer_size,
     recommend_chamfer_sizes_for_body,
+)
+# SUBD-LIMIT-MESH-EXPORT-OBJ: CC limit-surface → Wavefront OBJ (v/vn/f; geometry only)
+# Ref: https://en.wikipedia.org/wiki/Wavefront_.obj_file
+# Honest: geometry only — no MTL, no vt; vertex normals via area-weighted cross-product,
+# not Stam exact eigenbasis.
+from kerf_cad_core.geom.subd_export_obj import (  # noqa: E402
+    export_limit_to_obj,
+    parse_obj as parse_subd_obj,
 )

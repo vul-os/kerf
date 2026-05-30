@@ -332,6 +332,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.iso_curve_extract",             # nurbs_extract_iso_u, nurbs_extract_iso_v
     # SUBD-EXPORT-OPENSUBDIV-USD: USD Mesh prim (.usda ASCII) — catmullClark + creases
     "kerf_cad_core.geom.subd_export_usd",               # subd_export_to_usd
+    # SUBD-LIMIT-MESH-EXPORT-OBJ: CC limit-surface → Wavefront OBJ (v/vn/f; geometry only)
+    "kerf_cad_core.geom.subd_export_obj",               # subd_export_limit_to_obj
     # MANUFACTURING-AUTO-FIXTURE-LAYOUT: 3-2-1 fixture placement (Asada-By 1985)
     "kerf_cad_core.manufacturing_fixture_layout",       # manufacturing_auto_fixture_layout
     # BREP-FACE-NEIGHBOR-WALK: face-adjacency graph + BFS traversal for CNC routing /

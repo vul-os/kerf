@@ -91,6 +91,7 @@ class TestPluginRegistration:
             "mold_generate_parting_surface",
             "mold_draft_angle_per_face",
             "mold_cooling_analysis",
+            "brep_construct_parting_surface",
         ):
             assert name in ctx.tools.registered, f"Missing: {name}"
 

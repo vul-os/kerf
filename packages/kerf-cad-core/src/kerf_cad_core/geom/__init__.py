@@ -519,6 +519,12 @@ from kerf_cad_core.geom.parting_line import (
     detect_undercuts,
     optimal_pull_direction,
 )
+# GK-P Wave 4T: mold parting-surface construction (Yu-Fan 2003 §6)
+from kerf_cad_core.geom.mold_parting_surface import (
+    construct_parting_surface,
+    construct_with_shutoff_inserts,
+    validate_parting_surface,
+)
 
 # GK-125: DXF read+write
 from kerf_cad_core.geom.io.dxf import read_dxf, write_dxf, DxfReadError, DxfWriteError
@@ -532,6 +538,8 @@ __all__ = [
     "parting_line","undercut_faces","mold_split",
     # GK-P parting-line module
     "PartingLineResult","extract_parting_line","detect_undercuts","optimal_pull_direction",
+    # GK-P Wave 4T
+    "construct_parting_surface","construct_with_shutoff_inserts","validate_parting_surface",
     "NurbsCurve",
     "NurbsSurface",
     "de_boor",

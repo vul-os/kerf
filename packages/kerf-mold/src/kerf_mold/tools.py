@@ -1,13 +1,16 @@
 """
 kerf_mold.tools — LLM tool wrappers for injection-mold tooling.
 
-Registers three tools with the Kerf tool registry:
+Registers four tools with the Kerf tool registry:
 
-  mold_check_moldability       — check draft angles, wall uniformity,
-                                  parting-surface continuity for a mold design.
-  mold_generate_parting_surface — extend a parting-line loop into a flat or
-                                  ruled surface patch.
-  mold_draft_angle_per_face    — compute signed draft angle for each face.
+  mold_check_moldability         — check draft angles, wall uniformity,
+                                    parting-surface continuity for a mold design.
+  mold_generate_parting_surface  — extend a parting-line loop into a flat or
+                                    ruled surface patch.
+  mold_draft_angle_per_face      — compute signed draft angle for each face.
+  brep_construct_parting_surface — construct the full mold parting surface
+                                    (cavity/core separator) from a parting line
+                                    and mold block bbox (Yu-Fan 2003 §6).
 
 All tools are pure-Python; no OCC dependency.
 Errors returned as {"ok": false, "reason": "..."} — tools never raise.
@@ -18,6 +21,7 @@ Menges G., Michaeli W., Mohren P. "How to Make Injection Molds", 3rd ed.,
   Hanser 2001.
 Rosato D.V., Rosato M.G. "Injection Molding Handbook", 3rd ed.,
   Kluwer Academic 2000.
+Yu-Fan Chen, "Computer-aided design of plastic injection molds", 2003, §6.
 """
 from __future__ import annotations
 
@@ -339,3 +343,155 @@ async def run_mold_draft_angle_per_face(ctx: "ProjectCtx", args: bytes) -> str:
 
     results = draft_angle_per_face(faces, pull)
     return ok_payload({"ok": True, "results": results, "num_faces": len(results)})
+
+
+# ------------------------------------------------------------------
+# Tool: brep_construct_parting_surface  (GK-P Wave 4T — Yu-Fan 2003 §6)
+# ------------------------------------------------------------------
+
+_CONSTRUCT_PARTING_SPEC = ToolSpec(
+    name="brep_construct_parting_surface",
+    description=(
+        "Construct the mold parting surface that separates the cavity (top) "
+        "and core (bottom) mold halves.\n\n"
+        "Given the parting line (a list of 3-D points on the silhouette of the "
+        "part w.r.t. the pull direction) and the mold block bounding box, builds "
+        "a ruled surface mesh that:\n"
+        "  • starts at the parting-line loop (inner boundary),\n"
+        "  • extends radially in the parting plane to the mold block boundary,\n"
+        "  • forms a flat or near-flat parting sheet separating cavity from core.\n\n"
+        "Reference: Yu-Fan Chen, 'Computer-aided design of plastic injection molds', "
+        "2003 §6; Kalpakjian & Schmid 'Manufacturing Engineering & Technology' §19.10.\n\n"
+        "Returns: {ok, top: SurfaceMesh, bottom: SurfaceMesh, validation: report}.\n"
+        "Each SurfaceMesh: {vertices, faces, area, is_planar, centroid, "
+        "pull_direction, parting_height, side}. Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "parting_line_points": {
+                "type": "array",
+                "description": (
+                    "Ordered list of 3-D points [x,y,z] on the parting line "
+                    "(silhouette of the part w.r.t. pull direction). "
+                    "At least 3 points required."
+                ),
+                "items": {"type": "array", "items": {"type": "number"}},
+            },
+            "pull_direction": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "Mold demould direction [dx, dy, dz] (need not be unit length).",
+            },
+            "mold_block_bbox_lo": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "Lower corner [x, y, z] of the mold block bounding box.",
+            },
+            "mold_block_bbox_hi": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "Upper corner [x, y, z] of the mold block bounding box.",
+            },
+            "undercut_regions": {
+                "type": "array",
+                "description": (
+                    "Optional list of undercut zone boundary loops. Each element is a "
+                    "list of [x,y,z] points forming a closed loop bounding an undercut "
+                    "feature. When provided, shutoff insert patches are added."
+                ),
+                "items": {
+                    "type": "array",
+                    "items": {"type": "array", "items": {"type": "number"}},
+                },
+            },
+        },
+        "required": ["parting_line_points", "pull_direction",
+                     "mold_block_bbox_lo", "mold_block_bbox_hi"],
+    },
+)
+
+
+@register(_CONSTRUCT_PARTING_SPEC, write=False)
+async def run_brep_construct_parting_surface(ctx: "ProjectCtx", args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    pl_raw = a.get("parting_line_points")
+    pull_raw = a.get("pull_direction")
+    bbox_lo_raw = a.get("mold_block_bbox_lo")
+    bbox_hi_raw = a.get("mold_block_bbox_hi")
+
+    if not pl_raw or len(pl_raw) < 3:
+        return err_payload("parting_line_points must have >= 3 points", "BAD_ARGS")
+    if not pull_raw or len(pull_raw) != 3:
+        return err_payload("pull_direction ([dx,dy,dz]) is required", "BAD_ARGS")
+    if not bbox_lo_raw or len(bbox_lo_raw) != 3:
+        return err_payload("mold_block_bbox_lo ([x,y,z]) is required", "BAD_ARGS")
+    if not bbox_hi_raw or len(bbox_hi_raw) != 3:
+        return err_payload("mold_block_bbox_hi ([x,y,z]) is required", "BAD_ARGS")
+
+    try:
+        pl_pts = [[float(x) for x in p[:3]] for p in pl_raw]
+        pull = [float(x) for x in pull_raw[:3]]
+        bbox_lo = [float(x) for x in bbox_lo_raw[:3]]
+        bbox_hi = [float(x) for x in bbox_hi_raw[:3]]
+    except Exception as exc:
+        return err_payload(f"numeric conversion failed: {exc}", "BAD_ARGS")
+
+    try:
+        from kerf_cad_core.geom.mold_parting_surface import (
+            construct_parting_surface,
+            construct_with_shutoff_inserts,
+            validate_parting_surface,
+        )
+    except ImportError as exc:
+        return err_payload(
+            f"kerf_cad_core not available: {exc}", "DEP_MISSING"
+        )
+
+    undercut_raw = a.get("undercut_regions")
+
+    try:
+        # Minimal duck-typed body stub (no vertex iteration needed for the
+        # construct_parting_surface geometric path — body is API-only there)
+        class _StubBody:
+            def all_faces(self):
+                return []
+            def all_vertices(self):
+                return []
+
+        stub = _StubBody()
+
+        if undercut_raw:
+            undercut_regions = [
+                [[float(x) for x in p[:3]] for p in region]
+                for region in undercut_raw
+            ]
+            top, bottom = construct_with_shutoff_inserts(
+                stub, pl_pts, pull, undercut_regions=undercut_regions
+            )
+        else:
+            top, bottom = construct_parting_surface(
+                stub, pl_pts, (bbox_lo, bbox_hi), pull
+            )
+
+        validation = validate_parting_surface(stub, top, bottom, pull)
+
+    except ValueError as exc:
+        return err_payload(str(exc), "BAD_ARGS")
+    except Exception as exc:
+        return err_payload(f"construct_parting_surface failed: {exc}", "OP_FAILED")
+
+    return ok_payload({
+        "ok": True,
+        "top": top,
+        "bottom": bottom,
+        "validation": validation,
+        "num_quads": len(top.get("faces", [])),
+        "area": top.get("area", 0.0),
+        "is_planar": top.get("is_planar", False),
+        "parting_height": top.get("parting_height", 0.0),
+    })

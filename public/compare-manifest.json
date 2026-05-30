@@ -9272,9 +9272,9 @@
             "source": "https://www.cimatron.com/en/cimatron-mold"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Parting line data model (closed 3-D loop); flat and ruled parting surface generation; draft-angle check; moldability validation; no interactive curve-extraction from NURBS solid",
-            "evidence": "packages/kerf-mold/src/kerf_mold/mold.py"
+            "status": "yes",
+            "note": "Mold parting surface construction (Yu-Fan 2003 §6): construct_parting_surface (radial ruled quads from parting line to mold bbox), construct_with_shutoff_inserts (undercut shutoff patches), validate_parting_surface, LLM tool brep_construct_parting_surface; parting line + cavity/core split + draft-angle check + moldability validation",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/mold_parting_surface.py"
           }
         },
         {

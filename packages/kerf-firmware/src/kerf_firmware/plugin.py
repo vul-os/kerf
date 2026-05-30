@@ -228,6 +228,23 @@ def _register_tools(ctx, provides: list) -> None:
     except Exception as exc:
         logger.warning("kerf-firmware: failed to load firmware_flash_via_worker tool: %s", exc)
 
+    # firmware_verify_peripheral_map — MCU peripheral pin-map verifier
+    try:
+        from kerf_firmware.tools.firmware_verify_peripheral_map import (
+            _spec as _pvmap_spec,
+            run_firmware_verify_peripheral_map_async as _pvmap_fn,
+        )
+        ctx.tools.register(
+            "firmware_verify_peripheral_map",
+            _pvmap_spec,
+            _pvmap_fn,
+        )
+        provides.append("firmware.peripheral_map_verify")
+    except Exception as exc:
+        logger.warning(
+            "kerf-firmware: failed to load firmware_verify_peripheral_map tool: %s", exc
+        )
+
     # make_usb_macro_keyboard — generate USB-HID macro keyboard Arduino sketch
     try:
         from kerf_firmware.tools.make_usb_macro_keyboard import make_usb_macro_keyboard as _make_macro

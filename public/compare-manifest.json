@@ -3786,6 +3786,20 @@
             "note": "BOM management + real-time distributor pricing (Octopart/Mouser/Digi-Key) in-browser",
             "evidence": "src/components/BOMView"
           }
+        },
+        {
+          "domain": "D10",
+          "feature": "MCU peripheral pin-map verifier (alt-function + conflict check)",
+          "competitor": {
+            "status": "no",
+            "note": "OpenPLC has no MCU peripheral pin-mapping verifier; pin assignments must be checked manually in the IDE",
+            "source": "https://www.openplcproject.com/reference"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "firmware_verify_peripheral_map: checks pin alt-function, pin conflicts, missing required peripherals, peripheral mux conflicts, voltage compatibility (5V tolerant); embedded STM32F411 LQFP64 (RM0383 §7.3) + ATmega328P PDIP-28 (§13) tables; 59 tests. NOT a substitute for ST CubeMX / Atmel Start.",
+            "evidence": "packages/kerf-firmware/src/kerf_firmware/peripheral_map_verify.py"
+          }
         }
       ]
     },

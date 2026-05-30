@@ -161,6 +161,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 | **`boolean.py`** | Tolerant pure-Python solid booleans (regularised cut/fuse/common) over the primitive matrix, 2-manifold result | ✅ shipped |
 | **`fillet_solid.py` / `chamfer.py`** | G1/G2 surface blend + edge fillet + variable chamfer | ✅ shipped |
 | **`geom/auto_chamfer.py`** | Auto-chamfer recommendation (ISO 13715): dihedral-angle classification → safety / manufacturing / cosmetic / no-chamfer; `brep_recommend_chamfers` + `brep_apply_chamfer_recommendations` LLM tools | ✅ shipped |
+| **`geom/auto_fillet.py`** | Auto-fillet recommendation engine (Peterson 1974 + Boothroyd-Dewhurst 2002) — classifies interior/exterior corners, sizes radii per design intent, estimates Kt reduction; LLM tools `brep_recommend_fillets` + `brep_apply_fillet_recommendations` | ✅ shipped |
 | **`offset.py`** | Exact-distance surface/curve/loop offsets with self-intersection trim | ✅ shipped |
 | **`surface_offset.py`** | NURBS surface offset (Tiller-Hanson 1984 + Hoschek 1988): CP face-normal displacement, iterative isotropic-error refinement, Möller 1997 self-intersection detection, local-loop trim; `nurbs_surface_offset` LLM tool; 4 analytical oracle tests (plane/cylinder/sphere/C-shape) | ✅ shipped |
 | **`curve_offset_2d.py`** | NURBS 2D curve offset + self-intersection trim (Tiller-Hanson 1984) — foundation for flat patterns, CAM toolpath offset, hatch fill | ✅ shipped |

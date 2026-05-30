@@ -137,6 +137,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 | **`brep_build.py`** | Analytic verbs (box/cylinder/sphere/Coons patch) → `validate_body`-clean `Body` | ✅ shipped |
 | **`boolean.py`** | Tolerant pure-Python solid booleans (regularised cut/fuse/common) over the primitive matrix, 2-manifold result | ✅ shipped |
 | **`fillet_solid.py` / `chamfer.py`** | G1/G2 surface blend + edge fillet + variable chamfer | ✅ shipped |
+| **`geom/auto_fillet.py`** | Auto-fillet recommendation (Peterson 1974 + Boothroyd-Dewhurst 2002) ✅ | ✅ shipped |
 | **`offset.py`** | Exact-distance surface/curve/loop offsets with self-intersection trim | ✅ shipped |
 | **`coons.py`** | Boundary-interpolation Coons patches, exact to 1e-12 | ✅ shipped |
 | **`inversion.py`** | Closest-point / point-inversion (Piegl 6.1, analytic partials on rational surfaces) | ✅ shipped |

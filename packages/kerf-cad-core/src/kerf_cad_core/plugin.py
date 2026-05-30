@@ -293,6 +293,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.curve_split",
     # GK-P: NURBS rational conic detection + simplification (Lee 1987 / Piegl-Tiller §7.2)
     "kerf_cad_core.geom.conic_detect",                 # nurbs_detect_conic, nurbs_simplify_conic
+    # GK-P auto-fillet: smart fillet recommendation (Peterson 1974 + Boothroyd-Dewhurst 2002)
+    "kerf_cad_core.geom.auto_fillet",                  # brep_recommend_fillets, brep_apply_fillet_recommendations
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

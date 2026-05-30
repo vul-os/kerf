@@ -338,6 +338,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.face_planarity_tools",
     # SUBD-LIMIT-WALK-ALONG-EDGES: CC limit-surface curve along a cage edge chain
     "kerf_cad_core.geom.subd_edge_walk",               # subd_walk_edge_chain
+    "kerf_cad_core.geom.half_space_volume",             # brep_volume_above_plane
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

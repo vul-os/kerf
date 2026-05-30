@@ -1384,3 +1384,10 @@ from kerf_cad_core.geom.face_planarity import (
     PlanarityReport,
     check_face_planarity,
 )
+# BREP-VOLUME-OF-HALF-SPACE-INTERSECTION: divergence theorem (Mortenson §11.6)
+from kerf_cad_core.geom.half_space_volume import (
+    HalfSpaceVolumeReport,
+    compute_half_space_volume,
+    volume_above_plane,
+    volume_below_plane,
+)

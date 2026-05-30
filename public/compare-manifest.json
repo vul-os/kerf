@@ -6039,6 +6039,20 @@
         },
         {
           "domain": "D1",
+          "feature": "B-rep half-space volume (cutting-plane analysis)",
+          "competitor": {
+            "status": "yes",
+            "note": "SOLIDWORKS Section Properties + Mass Properties tools show volume above/below a section plane",
+            "source": "https://help.solidworks.com/2024/English/SolidWorks/sldworks/c_Mass_Properties_Overview.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "brep_volume_above_plane LLM tool; divergence theorem (Mortenson §11.6); Plane faces: Green's theorem + Sutherland-Hodgman clip; curved faces: GL sub-quad grid; depth-bar oracles: unit cube z=0.5 → 0.5/0.5; sphere equator → each half 4π/6 ≈ 2.094; cylinder r=1 h=2 x=0 → each half π",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/half_space_volume.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "Large assembly performance mode",
           "competitor": {
             "status": "yes",

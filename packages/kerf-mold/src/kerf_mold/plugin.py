@@ -5,6 +5,8 @@ Registers:
                mold_draft_angle_per_face  (via @register decorator in tools.py)
   - LLM tool:  mold_cooling_analysis  (Dittus-Boelter cooling circuit)
   - LLM tool:  brep_construct_parting_surface  (Yu-Fan 2003 §6 parting surface)
+  - LLM tools: mold_plan_ejector_pins, mold_pin_conflicts
+               (Yu-Fan 2003 §10 + SPI/ANSI B151.1 ejector pin layout)
 """
 from __future__ import annotations
 
@@ -37,12 +39,29 @@ async def register(app: FastAPI, ctx):
         run_mold_cooling_analysis,
     )
 
+    # Register ejector pin layout tools
+    from kerf_mold.ejector_pin_tool import (
+        _PLAN_SPEC, run_mold_plan_ejector_pins,
+        _CONFLICT_SPEC, run_mold_pin_conflicts,
+    )
+    ctx.tools.register(
+        "mold_plan_ejector_pins",
+        _PLAN_SPEC,
+        run_mold_plan_ejector_pins,
+    )
+    ctx.tools.register(
+        "mold_pin_conflicts",
+        _CONFLICT_SPEC,
+        run_mold_pin_conflicts,
+    )
+
     provides = [
         "mold.moldability",
         "mold.parting_surface",
         "mold.parting_surface_construction",
         "mold.draft_angle",
         "mold.cooling_analysis",
+        "mold.ejector_pin_layout",
     ]
 
     try:

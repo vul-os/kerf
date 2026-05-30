@@ -9254,6 +9254,20 @@
         },
         {
           "domain": "D7",
+          "feature": "Ejector pin layout",
+          "competitor": {
+            "status": "yes",
+            "note": "Automated ejector pin placement with interference detection against cooling channels and mold features",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Ejector pin layout planner (Yu-Fan 2003 §10 + SPI/ANSI B151.1): regular-grid placement with 20 mm default spacing; SPI standard diameters (3/16\"–1/2\" series); dedicated feature pins for bosses and ribs; force distribution (Menges §7.2 side-wall friction model); conflict detection against cooling channels and rib bodies; warpage risk from force non-uniformity (4×4 region grid); LLM tools: mold_plan_ejector_pins + mold_pin_conflicts",
+            "evidence": "packages/kerf-mold/src/kerf_mold/ejector_pin_planner.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "Electrode design (EDM)",
           "competitor": {
             "status": "yes",

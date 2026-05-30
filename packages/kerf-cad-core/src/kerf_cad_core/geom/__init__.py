@@ -233,6 +233,11 @@ from kerf_cad_core.geom.surface_analysis import (
 )
 # GK-138: global continuity audit
 from kerf_cad_core.geom.surface_analysis import continuity_audit
+# GK-P: Gauss-Bonnet integrity + per-face chord-deviation reporting
+from kerf_cad_core.geom.surface_analysis import (
+    gauss_bonnet_residual,
+    chord_deviation_per_face,
+)
 # GK-P43: best-effort OCCT-path G3 (analyzer + pole round-trip)
 from kerf_cad_core.geom.surface_analysis import (
     occt_g3_residual_from_poles,

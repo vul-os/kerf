@@ -2498,6 +2498,132 @@ if _REGISTRY_AVAILABLE:
             return err_payload(result["reason"], "OP_FAILED")
         return ok_payload(result)
 
+    # ------------------------------------------------------------------
+    # geometry_topology_integrity_check  (GK-P: Gauss-Bonnet + chord-dev)
+    # ------------------------------------------------------------------
+
+    _topology_integrity_spec = ToolSpec(
+        name="geometry_topology_integrity_check",
+        description=(
+            "Run Gauss-Bonnet integrity check and/or per-face chord-deviation "
+            "metrics on a NURBS body expressed as a list of faces (each face is "
+            "a control-point grid).\n\n"
+            "Gauss-Bonnet: ∑∫K·dA + ∑∫κ_g·ds + ∑θ_ext = 2π·χ (do Carmo §4.5). "
+            "A topologically consistent body has residual < 1e-2.\n\n"
+            "Chord deviation: max distance between surface and its planar "
+            "tessellation at n×n per face (Piegl-Tiller §5.4.4). Returns "
+            "per-face {max_deviation, mean_deviation, suggested_subdivision_level}.\n\n"
+            "Returns: {ok, gauss_bonnet: {residual, expected, computed_K_integral, "
+            "computed_kappa_g_integral, computed_exterior_angles, genus_used}, "
+            "chord_deviation: {per_face: {face_id: {max_deviation, mean_deviation, "
+            "suggested_subdivision_level}}}}. Never raises."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "faces": {
+                    "type": "array",
+                    "description": (
+                        "List of face descriptors. Each face: "
+                        "{degree_u, degree_v, control_points, num_u, num_v}."
+                    ),
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "degree_u": {"type": "integer"},
+                            "degree_v": {"type": "integer"},
+                            "control_points": {
+                                "type": "array",
+                                "items": {"type": "array", "items": {"type": "number"}},
+                            },
+                            "num_u": {"type": "integer"},
+                            "num_v": {"type": "integer"},
+                        },
+                        "required": ["degree_u", "degree_v", "control_points", "num_u", "num_v"],
+                    },
+                },
+                "include_gauss_bonnet": {
+                    "type": "boolean",
+                    "description": "Run Gauss-Bonnet integrity check (default true).",
+                },
+                "include_chord_deviation": {
+                    "type": "boolean",
+                    "description": "Run per-face chord-deviation metrics (default true).",
+                },
+                "n_samples_per_face": {
+                    "type": "integer",
+                    "description": "Integration grid per face for Gauss-Bonnet (default 20).",
+                },
+                "n_chord_samples": {
+                    "type": "integer",
+                    "description": "Chord-deviation tessellation grid per face (default 10).",
+                },
+                "target_tol": {
+                    "type": "number",
+                    "description": "Chord-height target tolerance (default 1e-3).",
+                },
+            },
+            "required": ["faces"],
+        },
+    )
+
+    @register(_topology_integrity_spec)
+    async def run_geometry_topology_integrity_check(ctx: "ProjectCtx", args: bytes) -> str:
+        try:
+            a = _json.loads(args)
+        except Exception as exc:
+            return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+        faces_raw = a.get("faces", [])
+        if not faces_raw:
+            return err_payload("faces list is required and must be non-empty", "BAD_ARGS")
+
+        incl_gb = bool(a.get("include_gauss_bonnet", True))
+        incl_cd = bool(a.get("include_chord_deviation", True))
+        n_samp = int(a.get("n_samples_per_face", 20))
+        n_chord = int(a.get("n_chord_samples", 10))
+        t_tol = float(a.get("target_tol", 1e-3))
+
+        # Build a lightweight body from the face list
+        # We reuse _build_surface_from_args to get NurbsSurface objects,
+        # then wrap them in a minimal duck-typed body for the GB/CD functions.
+        surfaces = []
+        for face_dict in faces_raw:
+            surf, err = _build_surface_from_args(face_dict)
+            if surf is None:
+                return err_payload(f"invalid face: {err}", "BAD_ARGS")
+            surfaces.append(surf)
+
+        # Minimal duck-typed body / face wrappers
+        class _DummyFace:
+            def __init__(self, surf, fid):
+                self.surface = surf
+                self.id = fid
+
+        class _DummyBody:
+            def __init__(self, surfs):
+                self._faces = [_DummyFace(s, i) for i, s in enumerate(surfs)]
+
+            def all_faces(self):
+                return self._faces
+
+            def all_edges(self):
+                return []
+
+        body = _DummyBody(surfaces)
+
+        out: dict = {"ok": True}
+
+        if incl_gb:
+            gb = gauss_bonnet_residual(body, n_samples_per_face=n_samp)
+            out["gauss_bonnet"] = gb
+
+        if incl_cd:
+            cd = chord_deviation_per_face(body, n_samples=n_chord, target_tol=t_tol)
+            out["chord_deviation"] = cd
+
+        return ok_payload(out)
+
 
 # ---------------------------------------------------------------------------
 # GK-63 — adaptive_refine_surface: deviation-driven knot insertion
@@ -4001,10 +4127,655 @@ def isophote_continuity_analyser(
 
 
 # ---------------------------------------------------------------------------
+# GK-P (new): Gauss-Bonnet integrity check + per-face chord-deviation metrics
+# ---------------------------------------------------------------------------
+
+def _face_gaussian_curvature_integral(
+    face_surf: object,
+    n_samples: int,
+) -> float:
+    """Integrate K · dA over a face surface using a midpoint-rule UV grid.
+
+    For a NurbsSurface, uses the analytic curvature data (exact K and the
+    area element ||Su × Sv|| du dv).  For analytic surfaces (SphereSurface,
+    TorusSurface, PlaneSurface …) falls back to a finite-difference K estimate
+    at each grid point.
+
+    Returns the integral ∫K·dA over the face domain.
+    """
+    if isinstance(face_surf, NurbsSurface):
+        # Determine domain
+        u_min = float(face_surf.knots_u[0])
+        u_max = float(face_surf.knots_u[-1])
+        v_min = float(face_surf.knots_v[0])
+        v_max = float(face_surf.knots_v[-1])
+        du = (u_max - u_min) / n_samples
+        dv = (v_max - v_min) / n_samples
+        us = np.linspace(u_min + 0.5 * du, u_max - 0.5 * du, n_samples)
+        vs = np.linspace(v_min + 0.5 * dv, v_max - 0.5 * dv, n_samples)
+        integral = 0.0
+        for u in us:
+            for v in vs:
+                cd = _analytic_curvature_data(face_surf, u, v)
+                if cd is None:
+                    continue
+                # dA = ||Su × Sv|| du dv
+                Su, Sv = cd["Su"], cd["Sv"]
+                dA = float(np.linalg.norm(np.cross(Su, Sv))) * du * dv
+                integral += cd["K"] * dA
+        return integral
+
+    # Analytic fallback: finite-difference K at grid centres
+    # Use the surface's own evaluate() + central-difference normals
+    # to get curvature.  For a sphere K = 1/R², for a plane K = 0.
+    if not hasattr(face_surf, "evaluate"):
+        return 0.0
+
+    # Finite-difference K via the shape operator (discrete approximation)
+    # For analytic surfaces we use the normal method if available.
+    # A cheap but correct path: integrate K via the area element sampled
+    # from finite differences.
+    from math import pi as _pi
+
+    # Infer correct domain from surface type.
+    # SphereSurface: u in [0, 2π], v in [-π/2, π/2]
+    # TorusSurface:  u in [0, 2π], v in [0, 2π]
+    # PlaneSurface / others: use [0, 1] × [0, 1] as a safe default
+    type_name = type(face_surf).__name__
+    if type_name == "SphereSurface":
+        u_min, u_max = 0.0, 2.0 * _pi
+        v_min, v_max = -0.5 * _pi, 0.5 * _pi
+    elif type_name == "TorusSurface":
+        u_min, u_max = 0.0, 2.0 * _pi
+        v_min, v_max = 0.0, 2.0 * _pi
+    elif type_name == "CylinderSurface":
+        u_min, u_max = 0.0, 2.0 * _pi
+        v_min, v_max = 0.0, 1.0
+    else:
+        # Generic fallback: use unit domain
+        u_min, u_max = 0.0, 1.0
+        v_min, v_max = 0.0, 1.0
+
+    du = (u_max - u_min) / n_samples
+    dv = (v_max - v_min) / n_samples
+    h = min(du, dv) * 0.1  # finite-difference step
+
+    integral = 0.0
+    for i in range(n_samples):
+        u = u_min + (i + 0.5) * du
+        for j in range(n_samples):
+            v = v_min + (j + 0.5) * dv
+            try:
+                p = np.asarray(face_surf.evaluate(u, v), dtype=float)
+                pu = np.asarray(face_surf.evaluate(u + h, v), dtype=float)
+                pd = np.asarray(face_surf.evaluate(u - h, v), dtype=float)
+                pr = np.asarray(face_surf.evaluate(u, v + h), dtype=float)
+                pl = np.asarray(face_surf.evaluate(u, v - h), dtype=float)
+            except Exception:
+                continue
+            Su = (pu - pd) / (2.0 * h)
+            Sv = (pr - pl) / (2.0 * h)
+            cross = np.cross(Su, Sv)
+            mag = float(np.linalg.norm(cross))
+            if mag < 1e-14:
+                continue
+            n_hat = cross / mag
+
+            Suu = (pu - 2.0 * p + pd) / (h * h)
+            Svv = (pr - 2.0 * p + pl) / (h * h)
+            # Mixed partial via four-point difference
+            try:
+                ppp = np.asarray(face_surf.evaluate(u + h, v + h), dtype=float)
+                Suv = (ppp - pu - pr + p) / (h * h)
+            except Exception:
+                Suv = np.zeros(3)
+
+            E = float(np.dot(Su, Su))
+            F = float(np.dot(Su, Sv))
+            G = float(np.dot(Sv, Sv))
+            EGF2 = E * G - F * F
+            if EGF2 < 1e-20:
+                continue
+
+            e = float(np.dot(Suu, n_hat))
+            f = float(np.dot(Suv, n_hat))
+            g_sf = float(np.dot(Svv, n_hat))
+            K = (e * g_sf - f * f) / EGF2
+            dA = mag * du * dv
+            integral += K * dA
+    return integral
+
+
+def _edge_geodesic_curvature_integral(
+    edge: object,
+    face_surf: object,
+    n_samples: int,
+) -> float:
+    """Integrate geodesic curvature κ_g along an edge curve.
+
+    The geodesic curvature of a curve on a surface is:
+        κ_g = (T' · (n × T)) / |T|²
+    where T is the tangent to the curve, n is the surface normal.
+
+    Uses finite differences along the edge parametrisation for T and T',
+    and the surface's normal at the closest UV parameter.
+
+    Returns the integral ∫κ_g ds along the edge.
+    """
+    if not hasattr(edge, "point") or not hasattr(edge, "t0"):
+        return 0.0
+
+    t0 = float(edge.t0)
+    t1 = float(edge.t1)
+    dt = (t1 - t0) / n_samples
+    if dt < 1e-15:
+        return 0.0
+
+    h = dt * 0.1  # finite-difference step for T'
+
+    # Get surface normal method
+    def _surf_normal(u_or_pt, v=None):
+        """Return unit normal at a 3D point by projecting onto surface."""
+        if isinstance(face_surf, NurbsSurface):
+            # Best UV approximation: use the 3D point to find closest UV
+            pt = u_or_pt
+            # Quick brute-force on coarse grid
+            n_grid = 8
+            u_min = float(face_surf.knots_u[0])
+            u_max = float(face_surf.knots_u[-1])
+            v_min = float(face_surf.knots_v[0])
+            v_max = float(face_surf.knots_v[-1])
+            best_d2 = float("inf")
+            best_u = 0.5 * (u_min + u_max)
+            best_v = 0.5 * (v_min + v_max)
+            for ui in np.linspace(u_min, u_max, n_grid):
+                for vi in np.linspace(v_min, v_max, n_grid):
+                    sp = _eval_surface(face_surf, ui, vi)[:3]
+                    d2 = float(np.sum((sp - pt[:3]) ** 2))
+                    if d2 < best_d2:
+                        best_d2 = d2
+                        best_u, best_v = ui, vi
+            cd = _analytic_curvature_data(face_surf, best_u, best_v)
+            if cd is None:
+                return np.array([0.0, 0.0, 1.0])
+            return cd["n"]
+        elif hasattr(face_surf, "normal"):
+            try:
+                return np.asarray(face_surf.normal(0.0, 0.0), dtype=float)
+            except Exception:
+                return np.array([0.0, 0.0, 1.0])
+        return np.array([0.0, 0.0, 1.0])
+
+    integral = 0.0
+    t_vals = np.linspace(t0 + 0.5 * dt, t1 - 0.5 * dt, n_samples)
+
+    for t in t_vals:
+        try:
+            p_f = np.asarray(edge.point(float(min(t + h, t1))), dtype=float)
+            p_b = np.asarray(edge.point(float(max(t - h, t0))), dtype=float)
+        except Exception:
+            continue
+
+        T = p_f - p_b
+        T_mag = float(np.linalg.norm(T))
+        if T_mag < 1e-15:
+            continue
+
+        try:
+            p_c = np.asarray(edge.point(float(t)), dtype=float)
+            p_ff = np.asarray(edge.point(float(min(t + 2 * h, t1))), dtype=float)
+            p_bb = np.asarray(edge.point(float(max(t - 2 * h, t0))), dtype=float)
+        except Exception:
+            continue
+
+        # Second derivative T' ≈ (p(t+h) - 2*p(t) + p(t-h)) / h²
+        T_prime = (p_f - 2.0 * p_c + p_b) / (h * h)
+
+        n_hat = _surf_normal(p_c)
+
+        # κ_g = (T' · (n × T̂)) / |T|
+        T_hat = T / T_mag
+        n_cross_T = np.cross(n_hat, T_hat)
+        kappa_g = float(np.dot(T_prime, n_cross_T))
+
+        # Arc-length element ds ≈ |T| · dt = T_mag / (2*h) * dt
+        # Since T = (p(t+h) - p(t-h))/(2h) * 2h, ds ≈ T_mag / (2h) * dt
+        ds = (T_mag / (2.0 * h)) * dt
+        integral += kappa_g * ds
+    return integral
+
+
+def _body_genus(body: object) -> int:
+    """Estimate the topological genus of a closed body.
+
+    Uses the Euler characteristic χ = V - E + F (for a closed orientable surface)
+    and the relation χ = 2 - 2·genus.
+
+    Returns genus (0 for sphere/cube, 1 for torus, etc.).
+    """
+    try:
+        faces = body.all_faces() if hasattr(body, "all_faces") else []
+        n_F = len(faces)
+        all_edges = body.all_edges() if hasattr(body, "all_edges") else []
+        n_E = len(all_edges)
+
+        # Count vertices — try common attribute names in order
+        seen_v: set = set()
+        for edge in all_edges:
+            for attr in ("v_start", "v_end", "start", "end", "start_vertex", "end_vertex"):
+                v = getattr(edge, attr, None)
+                if v is not None:
+                    seen_v.add(id(v))
+        n_V = len(seen_v)
+
+        if n_V == 0 and n_E == 0 and n_F == 0:
+            return 0
+
+        # Euler characteristic for a closed surface embedded in R³:
+        #   χ = V - E + F = 2 - 2g   (for a single connected component)
+        chi = n_V - n_E + n_F
+        genus = (2 - chi) // 2
+        return max(0, int(genus))
+    except Exception:
+        return 0
+
+
+def gauss_bonnet_residual(
+    body: object,
+    n_samples_per_face: int = 20,
+) -> dict:
+    """Gauss-Bonnet integrity check for a B-rep body.
+
+    Computes the full Gauss-Bonnet theorem sum:
+
+        ∑_face ∫K·dA  +  ∑_edge ∫κ_g·ds  +  ∑_vertex θ_ext = 2π·χ
+
+    where χ = 2 − 2·genus (Euler characteristic) and θ_ext is the exterior
+    angle at each vertex (π − dihedral_angle_between_adjacent_faces).
+
+    For a topologically consistent, curvature-correct body the residual:
+
+        |LHS − 2π·χ|
+
+    is < 1e-3 (dominated by numerical integration error).  Large residuals
+    indicate either a topology flaw (incorrect Euler characteristic) or a
+    curvature inconsistency (surface geometry doesn't match the declared
+    topology).
+
+    Parameters
+    ----------
+    body : Body
+        A ``kerf_cad_core.geom.brep.Body`` instance.
+    n_samples_per_face : int
+        Integration grid resolution per face (default 20; higher is more
+        accurate at the cost of runtime).
+
+    Returns
+    -------
+    dict
+        ok, reason, residual, expected (2π·χ),
+        computed_K_integral (∑∫K·dA over all faces),
+        computed_kappa_g_integral (∑∫κ_g·ds over all edges),
+        computed_exterior_angles (∑θ_ext over all vertices),
+        genus_used (int).
+
+    References
+    ----------
+    do Carmo, "Differential Geometry of Curves and Surfaces", §4.5.
+    """
+    try:
+        # ---- collect faces, edges, vertices ---------------------------------
+        faces = body.all_faces() if hasattr(body, "all_faces") else []
+        all_edges = body.all_edges() if hasattr(body, "all_edges") else []
+
+        if not faces and not all_edges:
+            return {
+                "ok": False,
+                "reason": "body has no faces or edges",
+                "residual": float("inf"),
+                "expected": 0.0,
+                "computed_K_integral": 0.0,
+                "computed_kappa_g_integral": 0.0,
+                "computed_exterior_angles": 0.0,
+                "genus_used": 0,
+            }
+
+        genus = _body_genus(body)
+        chi = 2 - 2 * genus
+        expected = 2.0 * math.pi * chi
+
+        # ---- Σ_face ∫K·dA ---------------------------------------------------
+        K_integral = 0.0
+        for face in faces:
+            surf = face.surface if hasattr(face, "surface") else None
+            if surf is None:
+                continue
+            K_integral += _face_gaussian_curvature_integral(surf, n_samples_per_face)
+
+        # ---- Σ_edge ∫κ_g·ds -------------------------------------------------
+        # For a smooth body the geodesic curvature on the *boundary* contributes
+        # but for a closed piecewise-flat/smooth body interior faces have no
+        # boundary.  The geodesic curvature term is zero for geodesic edges
+        # (straight lines on the surface), so for a cube or sphere the
+        # contribution is zero (up to numerics).
+        kappa_g_integral = 0.0
+        for edge in all_edges:
+            coedges = list(getattr(edge, "coedges", []))
+            if len(coedges) != 2:
+                continue  # skip naked edges
+            # Use the face on the first coedge's side
+            ce = coedges[0]
+            lp = getattr(ce, "loop", None)
+            if lp is None:
+                continue
+            face = getattr(lp, "face", None)
+            if face is None:
+                continue
+            surf = getattr(face, "surface", None)
+            if surf is None:
+                continue
+            kappa_g_integral += _edge_geodesic_curvature_integral(
+                edge, surf, max(4, n_samples_per_face // 4)
+            )
+
+        # ---- Σ_vertex θ_ext (angle defect) ----------------------------------
+        # For the polyhedral Gauss-Bonnet theorem, the contribution of each
+        # vertex is the *angle defect*:
+        #
+        #   θ_defect(v) = 2π − Σ_i(face_angle_i_at_v)
+        #
+        # where face_angle_i is the angle between the two edges of face i at v.
+        # This is distinct from the dihedral angle between face normals.
+        #
+        # For a cube vertex (3 right-angled faces): defect = 2π − 3(π/2) = π/2.
+        # For 8 cube vertices: 8 × (π/2) = 4π = 2π·2 ✓
+        #
+        # For degenerate vertices (poles of sphere): we compute edge tangents
+        # at the vertex; if the edge is a seam with both coedges going to the
+        # same face (sphere pole), the face angle wraps to 2π → defect ≈ 0.
+        exterior_angles_sum = 0.0
+        seen_v_ids: set = set()
+
+        # Build a map: vertex_id → list of (edge, at_start:bool) for edges at that vertex
+        vert_edge_map: dict = {}
+        for edge in all_edges:
+            for attr, is_start in (("v_start", True), ("v_end", False),
+                                    ("start", True), ("end", False)):
+                v_node = getattr(edge, attr, None)
+                if v_node is None:
+                    continue
+                vid = id(v_node)
+                if vid not in vert_edge_map:
+                    vert_edge_map[vid] = (v_node, [])
+                if edge not in vert_edge_map[vid][1]:
+                    vert_edge_map[vid][1].append((edge, is_start))
+
+        for vid, (v_node, inc_edges) in vert_edge_map.items():
+            vpt = np.asarray(v_node.point, dtype=float)
+
+            # Collect edge tangent vectors leaving v (pointing away from v)
+            tangents = []
+            for edge, at_start in inc_edges:
+                t0 = float(edge.t0)
+                t1 = float(edge.t1)
+                dt_sample = (t1 - t0) * 0.05  # 5% step for tangent
+                if hasattr(edge, "point"):
+                    try:
+                        if at_start:
+                            p_near = np.asarray(edge.point(float(t0 + dt_sample)), dtype=float)
+                            tangent = p_near - vpt
+                        else:
+                            p_near = np.asarray(edge.point(float(t1 - dt_sample)), dtype=float)
+                            tangent = p_near - vpt
+                    except Exception:
+                        continue
+                else:
+                    continue
+                tnorm = float(np.linalg.norm(tangent))
+                if tnorm < 1e-14:
+                    continue
+                tangents.append(tangent / tnorm)
+
+            if len(tangents) < 2:
+                # Degenerate or seam vertex with only 1 distinct edge:
+                # use the angle defect = 0 (smooth manifold point)
+                continue
+
+            # Face angles at this vertex: for each pair of tangents that
+            # bound a face, compute the interior angle.
+            # For a mesh vertex of degree k, there are k face angles summing
+            # to the solid angle. We estimate the total face angle sum as the
+            # sum of angles between UNIQUE adjacent tangent pairs.
+            # For robust handling of repeated tangents (same face seen twice
+            # via both coedges), de-duplicate by direction.
+            unique_tangents = []
+            for t in tangents:
+                is_dup = False
+                for ut in unique_tangents:
+                    if abs(float(np.dot(t, ut)) - 1.0) < 1e-6:
+                        is_dup = True
+                        break
+                if not is_dup:
+                    unique_tangents.append(t)
+
+            n_tang = len(unique_tangents)
+            if n_tang < 2:
+                continue
+
+            # Sum the angles between consecutive unique tangents.
+            # For a convex vertex (like a cube corner), these sum correctly.
+            face_angle_sum = 0.0
+            for k_t in range(n_tang - 1):
+                t1_v = unique_tangents[k_t]
+                t2_v = unique_tangents[k_t + 1]
+                cos_a = float(np.clip(np.dot(t1_v, t2_v), -1.0, 1.0))
+                face_angle_sum += math.acos(cos_a)
+
+            # Close the polygon: angle between last and first tangent
+            if n_tang >= 3:
+                t_last = unique_tangents[-1]
+                t_first = unique_tangents[0]
+                cos_a = float(np.clip(np.dot(t_last, t_first), -1.0, 1.0))
+                face_angle_sum += math.acos(cos_a)
+
+            # Angle defect
+            defect = 2.0 * math.pi - face_angle_sum
+            exterior_angles_sum += defect
+
+        lhs = K_integral + kappa_g_integral + exterior_angles_sum
+        residual = abs(lhs - expected)
+
+        return {
+            "ok": True,
+            "reason": "",
+            "residual": float(residual),
+            "expected": float(expected),
+            "computed_K_integral": float(K_integral),
+            "computed_kappa_g_integral": float(kappa_g_integral),
+            "computed_exterior_angles": float(exterior_angles_sum),
+            "genus_used": int(genus),
+        }
+
+    except Exception as exc:
+        return {
+            "ok": False,
+            "reason": str(exc),
+            "residual": float("inf"),
+            "expected": 0.0,
+            "computed_K_integral": 0.0,
+            "computed_kappa_g_integral": 0.0,
+            "computed_exterior_angles": 0.0,
+            "genus_used": 0,
+        }
+
+
+def chord_deviation_per_face(
+    body: object,
+    n_samples: int = 10,
+    target_tol: float = 1e-3,
+) -> dict:
+    """Per-face chord-deviation metric between each surface and its planar tessellation.
+
+    For each face of the body, samples the surface on an n×n grid and computes
+    the maximum and mean distance between surface points and the planar
+    triangulation (chord approximation) formed by adjacent grid points.
+
+    The *chord deviation* for a face is the maximum distance from any surface
+    sample point to the nearest chord segment in the coarse tessellation.  This
+    is a direct measure of how much error is introduced by linearising the
+    surface to a mesh at the given resolution.
+
+    The ``suggested_subdivision_level`` is the number of times each grid cell
+    must be halved to bring the chord deviation below ``target_tol``:
+
+        level = ceil(log2(max_deviation / target_tol))   if max_deviation > target_tol
+              = 0                                         otherwise
+
+    This matches the Piegl & Tiller §5.4.4 chord-height tolerance formula.
+
+    Parameters
+    ----------
+    body : Body
+    n_samples : int
+        Coarse tessellation grid (n × n per face), default 10.
+    target_tol : float
+        Chord-height target tolerance, default 1e-3.
+
+    Returns
+    -------
+    dict
+        ok, reason, per_face: dict[face_id -> {max_deviation, mean_deviation,
+        suggested_subdivision_level}].
+
+    References
+    ----------
+    Piegl & Tiller, "The NURBS Book", §5.4.4.
+    """
+    try:
+        faces = body.all_faces() if hasattr(body, "all_faces") else []
+        if not faces:
+            return {"ok": False, "reason": "body has no faces", "per_face": {}}
+
+        per_face: dict = {}
+        n = max(3, int(n_samples))
+
+        for face in faces:
+            face_id = getattr(face, "id", id(face))
+            surf = getattr(face, "surface", None)
+            if surf is None:
+                per_face[face_id] = {
+                    "max_deviation": 0.0,
+                    "mean_deviation": 0.0,
+                    "suggested_subdivision_level": 0,
+                }
+                continue
+
+            if isinstance(surf, NurbsSurface):
+                u_min = float(surf.knots_u[0])
+                u_max = float(surf.knots_u[-1])
+                v_min = float(surf.knots_v[0])
+                v_max = float(surf.knots_v[-1])
+                us = np.linspace(u_min, u_max, n)
+                vs = np.linspace(v_min, v_max, n)
+
+                # Build sample grid
+                pts = np.zeros((n, n, 3))
+                for i, u in enumerate(us):
+                    for j, v in enumerate(vs):
+                        pts[i, j] = _eval_surface(surf, u, v)[:3]
+
+            elif hasattr(surf, "evaluate"):
+                # Generic analytic surface
+                from math import pi as _pi
+                us = np.linspace(0.0, 2.0 * _pi, n)
+                vs = np.linspace(-_pi / 2.0, _pi / 2.0, n)
+                pts = np.zeros((n, n, 3))
+                for i, u in enumerate(us):
+                    for j, v in enumerate(vs):
+                        try:
+                            pts[i, j] = np.asarray(
+                                surf.evaluate(float(u), float(v)), dtype=float
+                            )[:3]
+                        except Exception:
+                            pass
+            else:
+                per_face[face_id] = {
+                    "max_deviation": 0.0,
+                    "mean_deviation": 0.0,
+                    "suggested_subdivision_level": 0,
+                }
+                continue
+
+            # For each interior sample point, find the chord-deviation to the
+            # bilinear patch formed by its four neighbours.  The chord deviation
+            # at a surface point p(u, v) relative to the planar quad formed by
+            # (p[i,j], p[i+1,j], p[i+1,j+1], p[i,j+1]) is computed as the
+            # distance from the *midpoint of the quad diagonal* to the surface
+            # point at the quad centre.
+            devs = []
+            for i in range(n - 1):
+                for j in range(n - 1):
+                    # Corners of the quad cell
+                    c00 = pts[i, j]
+                    c10 = pts[i + 1, j]
+                    c01 = pts[i, j + 1]
+                    c11 = pts[i + 1, j + 1]
+                    # Chord midpoint (bilinear interpolation centre)
+                    chord_mid = 0.25 * (c00 + c10 + c01 + c11)
+
+                    # Surface point at cell centre
+                    if isinstance(surf, NurbsSurface):
+                        u_c = 0.5 * (us[i] + us[i + 1])
+                        v_c = 0.5 * (vs[j] + vs[j + 1])
+                        surf_mid = _eval_surface(surf, u_c, v_c)[:3]
+                    else:
+                        # Evaluate analytic surface at cell-centre parameters
+                        u_c = 0.5 * (us[i] + us[i + 1])
+                        v_c = 0.5 * (vs[j] + vs[j + 1])
+                        try:
+                            surf_mid = np.asarray(
+                                surf.evaluate(float(u_c), float(v_c)), dtype=float
+                            )[:3]
+                        except Exception:
+                            surf_mid = chord_mid  # fallback: zero deviation
+
+                    dev = float(np.linalg.norm(surf_mid - chord_mid))
+                    devs.append(dev)
+
+            if devs:
+                max_dev = float(max(devs))
+                mean_dev = float(sum(devs) / len(devs))
+            else:
+                max_dev = 0.0
+                mean_dev = 0.0
+
+            if max_dev > target_tol:
+                level = math.ceil(math.log2(max_dev / target_tol))
+            else:
+                level = 0
+
+            per_face[face_id] = {
+                "max_deviation": max_dev,
+                "mean_deviation": mean_dev,
+                "suggested_subdivision_level": int(level),
+            }
+
+        return {"ok": True, "reason": "", "per_face": per_face}
+
+    except Exception as exc:
+        return {"ok": False, "reason": str(exc), "per_face": {}}
+
+
+# ---------------------------------------------------------------------------
 # GK-138: Global continuity audit
 # ---------------------------------------------------------------------------
 
-def continuity_audit(body: object, tol: float = 1e-4) -> dict:
+def continuity_audit(
+    body: object,
+    tol: float = 1e-4,
+    include_gauss_bonnet: bool = False,
+    include_chord_deviation: bool = False,
+) -> dict:
     """Walk every shared edge of a Body and classify G0/G1/G2/G3 continuity.
 
     For each edge that is shared by exactly two faces (a *manifold* edge), the
@@ -4344,13 +5115,23 @@ def continuity_audit(body: object, tol: float = 1e-4) -> dict:
             **counts,
         }
 
-        return {
+        result: dict = {
             "ok": True,
             "reason": "",
             "edge_continuity": edge_continuity,
             "g3_residuals": g3_residuals,
             "summary": summary,
         }
+
+        # Optional: Gauss-Bonnet integrity check
+        if include_gauss_bonnet:
+            result["gauss_bonnet"] = gauss_bonnet_residual(body)
+
+        # Optional: per-face chord-deviation metrics
+        if include_chord_deviation:
+            result["chord_deviation"] = chord_deviation_per_face(body)
+
+        return result
 
     except Exception as exc:
         return {

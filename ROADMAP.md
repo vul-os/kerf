@@ -483,6 +483,7 @@ These are roadmap-level moats that span every sector simultaneously and compound
 - **GK-P SubD / mesh** — multires displacement; SDF CSG + marching-cubes; sculpt brush engine; LSCM UV unwrap (module exists, wiring incomplete). Stam-exact arbitrary-order limit derivative ✅ (`subd_limit_derivative.py`, GK-P).
 - **GK-P50** ✅ — NURBS surface optimal reparametrization: LSCM (angle-preserving, Lévy 2002) + ARAP (shape-preserving, Liu 2008); distortion metrics; `nurbs_reparametrize_optimal` LLM tool; 21 tests.
 - **GK-P SubD / mesh** — multires displacement; SDF CSG + marching-cubes; sculpt brush engine; LSCM UV unwrap (module exists, wiring incomplete). **SubD automatic LOD chain + progressive mesh (Hoppe 1996) ✅** — `geom/subd_automatic_lod.py`; `subd_generate_lod_chain` LLM tool; cage = LOD 0, each CC step = next level, QEM progressive mesh, screen-space LOD picker.
+- **GK-P SubD / mesh** — multires displacement; SDF CSG + marching-cubes; sculpt brush engine; LSCM UV unwrap (module exists, wiring incomplete); **SubD wire intersection + feature curve embedding ✅** (`geom/subd_wire_intersect.py` — `intersect_subd_with_wires`, `extract_wire_from_subd_intersection`, `embed_wire_as_feature_curve`; LLM tool `subd_intersect_wires` registered).
 - **GK-P architectural geometry** — B-rep→2D tessellate; roof/curtain-wall/corridor generators; wall compound-layer offset; hatch/section-fill.
 - **GK-P sketcher** — collinear constraint; ellipse solver entity; G2 continuity.
 - **GK-P interop** — 3DM write with Hausdorff read→write→read oracle.

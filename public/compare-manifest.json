@@ -15425,6 +15425,20 @@
         },
         {
           "domain": "D1",
+          "feature": "SubD USD export (Pixar HdStorm / Houdini / Maya)",
+          "competitor": {
+            "status": "yes",
+            "note": "Rhino 8 USD export via RhinoUSD plug-in (catmullClark Mesh prim)",
+            "source": "https://www.rhino3d.com/features/usd/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "export_subd_to_usda: USDA 1.0 ASCII Mesh prim with subdivisionScheme=catmullClark, interpolateBoundary=edgeAndCorner, creaseIndices/creaseLengths/creaseSharpnesses per USD Mesh schema; parse_usda_subd round-trip oracle; LLM tool subd_export_to_usd. USDA ASCII only — USDC binary out of scope.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/subd_export_usd.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "Mesh repair / ShrinkWrap",
           "competitor": {
             "status": "yes",

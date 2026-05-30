@@ -323,6 +323,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.face_centroid",                  # brep_surface_centroid
     # NURBS-EXTRACT-ISO-CURVES: Piegl-Tiller §5.3 knot-insertion iso extraction
     "kerf_cad_core.geom.iso_curve_extract",             # nurbs_extract_iso_u, nurbs_extract_iso_v
+    # SUBD-EXPORT-OPENSUBDIV-USD: USD Mesh prim (.usda ASCII) — catmullClark + creases
+    "kerf_cad_core.geom.subd_export_usd",               # subd_export_to_usd
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

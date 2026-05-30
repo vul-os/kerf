@@ -1336,3 +1336,10 @@ from kerf_cad_core.geom.iso_curve_extract import (
     extract_iso_curve_v,
     extract_iso_grid,
 )
+# SUBD-EXPORT-OPENSUBDIV-USD: USD Mesh prim (.usda ASCII) — catmullClark + creases
+# (Pixar HdStorm / Houdini / Maya; USDA ASCII only, no USDC binary)
+from kerf_cad_core.geom.subd_export_usd import (
+    export_subd_to_usda,
+    write_subd_usda,
+    parse_usda_subd,
+)

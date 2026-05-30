@@ -294,6 +294,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 - **Cross-project parts** ✅ — external_ref, lockfile, derived-artifact cache; derived-cache hit response includes `last_accessed_at` + `cache_key` ✅.
 - **Cross-project parts** ✅ — external_ref, lockfile, derived-artifact cache; DerivedCacheOverlay mounted (dev-only).
 - **kerf-partsgen** ✅ — 5 ISO/DIN family generators shipped.
+- **DIN/ISO metric fastener catalog** ✅ — `kerf_parts.din_fasteners`: DIN 931/933 hex bolts, DIN 912 cap screws, DIN 7991 countersunk cap screws, DIN 125 washers, DIN 934 hex nuts, ISO 7380 button heads, ISO 4762 (≡ DIN 912); M3–M36 × standard lengths; VDI 2230 torque calculator (Shigley thread+collar); 2 LLM tools (`parts_lookup_fastener`, `parts_torque_recommendation`). Standard dimensions from public DIN tables — NOT DIN-certified.
 
 ### Frontend / UX
 

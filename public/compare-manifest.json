@@ -4088,8 +4088,8 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/assembly/__init__.py",
-            "note": "VDI 2230 preload + fatigue analysis (backend)"
+            "evidence": "packages/kerf-parts/src/kerf_parts/din_fasteners.py",
+            "note": "DIN/ISO metric fastener catalog (DIN 931/912/7991, ISO 4762) + VDI 2230 torque calculator; LLM tools parts_lookup_fastener + parts_torque_recommendation. Standard dimensions from public DIN tables — NOT DIN-certified."
           }
         },
         {
@@ -7813,8 +7813,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "VDI 2230 bolted joint analysis (backend)",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core"
+            "evidence": "packages/kerf-parts/src/kerf_parts/din_fasteners.py",
+            "note": "DIN/ISO metric fastener catalog (DIN 931/912/7991, ISO 4762) + VDI 2230 torque; parts_lookup_fastener + parts_torque_recommendation LLM tools"
           }
         },
         {

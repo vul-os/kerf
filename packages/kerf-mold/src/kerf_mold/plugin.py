@@ -9,6 +9,8 @@ Registers:
                (Yu-Fan 2003 §10 + SPI/ANSI B151.1 ejector pin layout)
   - LLM tool:  mold_verify_cooling_channels
                (Menges 2001 §6.5 cooling-channel conflict detection)
+  - LLM tool:  mold_validate_draft
+               (Menges 2001 §3.4 + Beaumont 2007 §4 draft-angle validation)
 """
 from __future__ import annotations
 
@@ -66,6 +68,16 @@ async def register(app: FastAPI, ctx):
         run_mold_verify_cooling_channels,
     )
 
+    # Register draft-angle validation tool
+    from kerf_mold.draft_validation_tool import (
+        _VALIDATE_DRAFT_SPEC, run_mold_validate_draft,
+    )
+    ctx.tools.register(
+        "mold_validate_draft",
+        _VALIDATE_DRAFT_SPEC,
+        run_mold_validate_draft,
+    )
+
     provides = [
         "mold.moldability",
         "mold.parting_surface",
@@ -74,6 +86,7 @@ async def register(app: FastAPI, ctx):
         "mold.cooling_analysis",
         "mold.ejector_pin_layout",
         "mold.cooling_channel_conflict",
+        "mold.draft_validation",
     ]
 
     try:

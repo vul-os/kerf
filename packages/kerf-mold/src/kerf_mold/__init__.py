@@ -32,6 +32,12 @@ from kerf_mold.cooling_channel_conflict import (
     MoldBbox,
     verify_cooling_channels,
 )
+from kerf_mold.draft_validation import (
+    DraftValidationReport,
+    FaceInput,
+    FaceResult,
+    validate_draft,
+)
 
 __all__ = [
     # mold.py
@@ -63,4 +69,9 @@ __all__ = [
     "EjectorPin3D",
     "MoldBbox",
     "verify_cooling_channels",
+    # draft_validation.py
+    "DraftValidationReport",
+    "FaceInput",
+    "FaceResult",
+    "validate_draft",
 ]

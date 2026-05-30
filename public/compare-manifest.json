@@ -9499,6 +9499,20 @@
         },
         {
           "domain": "D7",
+          "feature": "Draft angle validation",
+          "competitor": {
+            "status": "yes",
+            "note": "Draft angle analysis per face with colour-mapped pass/fail display; integrated in Cimatron mold tooling workspace",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Per-face draft-angle validation: arcsin(|n̂·pull̂|) angle; SPI finish grades A1–D3 minimum lookup (Menges 2001 §3.4 + Beaumont 2007 §4); region-aware minimums (outer 0.5°, inner 1.0°, rib 1.0°, boss 0.5°); degenerate-normal flagging; LLM tool `mold_validate_draft`; 38 oracle tests; v1 honest-flag: undercut detection out of scope",
+            "evidence": "packages/kerf-mold/src/kerf_mold/draft_validation.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "Electrode design (EDM)",
           "competitor": {
             "status": "yes",

@@ -28,6 +28,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.cam_feedrate_lookahead",  # cam_optimize_feedrate_lookahead (Altintas 2012 §5.7)
     "kerf_cad_core.cam_gcode_emit",          # cam_emit_gcode (RS-274/NGC → Fanuc G-code from toolpath)
     "kerf_cad_core.cam_lathe_profile",      # cam_emit_lathe_gcode (G71/G70 lathe profile → Fanuc G-code)
+    "kerf_cad_core.cam_wire_edm_path",      # cam_emit_wire_edm_gcode (Fanuc wire-EDM G41/G42 + G01/G02/G03)
     "kerf_cad_core.extrude_sketch_to_jscad",
     "kerf_cad_core.surfacing",
     "kerf_cad_core.quad_remesh",

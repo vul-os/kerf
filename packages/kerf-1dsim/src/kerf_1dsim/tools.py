@@ -315,137 +315,171 @@ async def run_sim1d_parse(ctx: ProjectCtx, args: bytes) -> str:
 
 
 # ---------------------------------------------------------------------------
-# sim_import_modelica
+# sim_export_fmu
 # ---------------------------------------------------------------------------
 
-sim_import_modelica_spec = ToolSpec(
-    name="sim_import_modelica",
+sim_export_fmu_spec = ToolSpec(
+    name="sim_export_fmu",
     description=(
-        "Import a Modelica .mo file (subset parser — NOT certified Modelica compliance) "
-        "and return structured information about the model: parameters, variables, "
-        "component instances, equations, and connect statements. "
-        "Optionally map the model to native kerf-1dsim components. "
-        "Supported subset: model/end blocks, parameter Real, Real variables, "
-        "equation sections, der(), connect(), algebraic equations, package wrapping."
+        "Export a 1D simulation model as an FMI 2.0 Functional Mock-up Unit (.fmu). "
+        "The .fmu is a ZIP archive containing a modelDescription.xml (FMI 2.0 compliant) "
+        "and a C source-code wrapper. Supports CoSimulation ('cs') and ModelExchange ('me') "
+        "kinds. Accepts either a Modelica source string or an explicit variable list. "
+        "NOTE: FMI 2.0 export subset — NOT FMI Cross-Check certified."
     ),
     input_schema={
         "type": "object",
         "properties": {
-            "source": {
+            "modelica_source": {
                 "type": "string",
                 "description": (
-                    "Modelica model source text (inline). "
-                    "Mutually exclusive with 'file_path'."
+                    "Modelica-flavoured model source text. "
+                    "The parser extracts variables and parameters automatically. "
+                    "Mutually exclusive with 'variables'."
                 ),
             },
-            "file_path": {
+            "model_name": {
                 "type": "string",
-                "description": (
-                    "Absolute path to a .mo file on the server. "
-                    "Mutually exclusive with 'source'."
-                ),
+                "description": "Model name (used as modelIdentifier). Required when using 'variables'.",
             },
-            "to_kerf_components": {
+            "variables": {
+                "type": "array",
+                "description": (
+                    "Explicit list of scalar variables. "
+                    "Each item: {name, causality, variability, start, unit, description}. "
+                    "causality: 'input'|'output'|'local'|'parameter'. "
+                    "variability: 'continuous'|'discrete'|'fixed'|'tunable'|'constant'."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string"},
+                        "causality": {"type": "string"},
+                        "variability": {"type": "string"},
+                        "start": {"type": "number"},
+                        "unit": {"type": "string"},
+                        "description": {"type": "string"},
+                    },
+                    "required": ["name", "causality"],
+                },
+            },
+            "state_variables": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Names of continuous state variables.",
+            },
+            "fmu_kind": {
+                "type": "string",
+                "enum": ["cs", "me"],
+                "description": "'cs' = CoSimulation (default); 'me' = ModelExchange.",
+            },
+            "output_path": {
+                "type": "string",
+                "description": "Destination file path for the .fmu archive. Default: /tmp/<model_name>.fmu.",
+            },
+            "validate": {
                 "type": "boolean",
-                "description": (
-                    "If true, map parsed Modelica components to native kerf-1dsim "
-                    "component instances and include a summary in the response."
-                ),
+                "description": "If true (default), validate the generated FMU before returning.",
             },
         },
-        "oneOf": [
-            {"required": ["source"]},
-            {"required": ["file_path"]},
-        ],
     },
 )
 
 
-@register(sim_import_modelica_spec)
-async def run_sim_import_modelica(ctx: ProjectCtx, args: bytes) -> str:
+@register(sim_export_fmu_spec)
+async def run_sim_export_fmu(ctx: ProjectCtx, args: bytes) -> str:
+    import os
+    import tempfile
+
     try:
         a = json.loads(args)
     except Exception as e:
         return err_payload(f"invalid args: {e}", "BAD_ARGS")
 
-    source = a.get("source")
-    file_path = a.get("file_path")
+    fmu_kind = a.get("fmu_kind", "cs")
+    if fmu_kind not in ("cs", "me"):
+        return err_payload("fmu_kind must be 'cs' or 'me'", "BAD_ARGS")
 
-    if not source and not file_path:
-        return err_payload("Provide 'source' or 'file_path'.", "BAD_ARGS")
+    do_validate = bool(a.get("validate", True))
 
-    from kerf_1dsim.modelica_import import (
-        parse_modelica_source,
-        parse_modelica_file,
-        modelica_to_kerf_components,
-    )
-
+    # --- Build SimModel ---
     try:
-        if source:
-            model = parse_modelica_source(source)
+        if "modelica_source" in a:
+            from kerf_1dsim.parser import parse_model
+            from kerf_1dsim.fmi_export import model_from_parsed
+
+            parsed = parse_model(a["modelica_source"])
+            model = model_from_parsed(parsed, name=a.get("model_name"))
+
+        elif "variables" in a:
+            from kerf_1dsim.fmi_export import SimModel, FMIVariable
+
+            model_name = a.get("model_name")
+            if not model_name:
+                return err_payload("'model_name' is required when using 'variables'", "BAD_ARGS")
+
+            fmi_vars = []
+            for idx, v in enumerate(a["variables"]):
+                fmi_vars.append(FMIVariable(
+                    name=v["name"],
+                    causality=v.get("causality", "local"),
+                    variability=v.get("variability", "continuous"),
+                    start=float(v["start"]) if "start" in v else None,
+                    unit=v.get("unit"),
+                    description=v.get("description", ""),
+                    value_ref=idx,
+                ))
+
+            state_vars = a.get("state_variables", [])
+            model = SimModel(
+                name=model_name,
+                variables=fmi_vars,
+                state_variables=state_vars,
+            )
+
         else:
-            model = parse_modelica_file(file_path)  # type: ignore[arg-type]
-    except FileNotFoundError as e:
-        return err_payload(str(e), "FILE_NOT_FOUND")
-    except ValueError as e:
-        return err_payload(f"parse error: {e}", "PARSE_ERROR")
+            return err_payload(
+                "Provide 'modelica_source' or 'variables' to define the model.",
+                "BAD_ARGS",
+            )
     except Exception as e:
-        return err_payload(f"import error: {e}", "IMPORT_ERROR")
+        return err_payload(f"model build error: {e}", "BUILD_ERROR")
 
-    params_out = [
-        {"name": p.name, "value": p.value, "unit": p.unit}
-        for p in model.parameters
-    ]
-    vars_out = [
-        {"name": v.name, "start": v.start, "unit": v.unit}
-        for v in model.variables
-    ]
-    comps_out = [
-        {
-            "type": c.type_name,
-            "instance": c.instance_name,
-            "modifications": c.modifications,
-        }
-        for c in model.components
-    ]
-    eqs_out = []
-    for eq in model.equations:
-        if eq.is_connect:
-            eqs_out.append({"kind": "connect", "a": eq.connect_a, "b": eq.connect_b})
-        elif eq.is_der:
-            eqs_out.append({"kind": "der", "var": eq.der_var, "rhs": eq.rhs})
-        else:
-            eqs_out.append({"kind": "algebraic", "lhs": eq.lhs, "rhs": eq.rhs})
+    # --- Determine output path ---
+    out_path = a.get("output_path")
+    if not out_path:
+        tmp_dir = tempfile.gettempdir()
+        safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in model.name)
+        out_path = os.path.join(tmp_dir, f"{safe_name}.fmu")
 
-    payload: dict = {
+    # --- Export ---
+    try:
+        from kerf_1dsim.fmi_export import export_fmu
+        export_fmu(model, path=out_path, fmi_version="2.0", fmu_kind=fmu_kind)
+    except Exception as e:
+        return err_payload(f"export error: {e}", "EXPORT_ERROR")
+
+    result: dict = {
+        "fmu_path": out_path,
         "model_name": model.name,
-        "package": model.package,
-        "parameters": params_out,
-        "variables": vars_out,
-        "components": comps_out,
-        "equations": eqs_out,
-        "connections": [{"a": a, "b": b} for a, b in model.connections],
-        "n_parameters": len(model.parameters),
+        "guid": model.guid,
+        "fmu_kind": fmu_kind,
         "n_variables": len(model.variables),
-        "n_components": len(model.components),
-        "n_equations": len(model.equations),
-        "n_connections": len(model.connections),
-        "caveat": (
-            "Modelica subset support — NOT certified Modelica compliance. "
-            "Covers: model/end, parameter Real, Real, equation, der(), connect(). "
-            "Does NOT support: extends, redeclare, arrays, records, connectors, algorithms."
-        ),
+        "n_state_variables": len(model.state_variables),
+        "disclaimer": "FMI 2.0 export subset — NOT FMI Cross-Check certified",
     }
 
-    if a.get("to_kerf_components"):
+    # --- Validate ---
+    if do_validate:
         try:
-            kerf_comps = modelica_to_kerf_components(model)
-            payload["kerf_components"] = [
-                {"type": type(c).__name__, "params": vars(c)}
-                for c in kerf_comps
-            ]
-            payload["n_kerf_components"] = len(kerf_comps)
+            from kerf_1dsim.fmi_export import validate_fmu
+            vr = validate_fmu(out_path)
+            result["validation"] = {
+                "valid": vr.valid,
+                "errors": vr.errors,
+                "warnings": vr.warnings,
+            }
         except Exception as e:
-            payload["kerf_components_error"] = str(e)
+            result["validation"] = {"valid": None, "error": str(e)}
 
-    return ok_payload(payload)
+    return ok_payload(result)

@@ -9210,6 +9210,12 @@
           "kerf": "{ status: yes, note: \"16 extended components (mech/hyd/pneu/thermal/control); backend only\", evidence: \"packages/kerf-motion/src\" }"
         },
         {
+          "domain": "D9",
+          "feature": "FMI 2.0 model export (.fmu)",
+          "competitor": "{ status: paid, note: \"CATIA Systems Engineering exports FMUs via Dymola/Modelica integration\", source: \"https://www.3ds.com/products/catia/systems-engineering\" }",
+          "kerf": "{ status: yes, note: \"FMI 2.0 export subset — NOT FMI Cross-Check certified. export_fmu() builds ZIP with modelDescription.xml (ScalarVariables, causality, CoSimulation/ModelExchange) + C source wrapper; sim_export_fmu LLM tool\", evidence: \"packages/kerf-1dsim/src/kerf_1dsim/fmi_export.py\" }"
+        },
+        {
           "domain": "D10",
           "feature": "Wiring/harness (WireViz + 3D router)",
           "competitor": "{ status: paid, note: \"CATIA Electrical Wire Routing + Electrical Harness Assembly \u2014 3D harness; paid workbenches\", source: \"https://www.3ds.com/products/catia/electrical-wire-routing\" }",

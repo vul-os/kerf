@@ -18,24 +18,24 @@ async def register(app: FastAPI, ctx):
     from kerf_1dsim.tools import (
         sim1d_run_spec, run_sim1d_run,
         sim1d_parse_spec, run_sim1d_parse,
-        sim_import_modelica_spec, run_sim_import_modelica,
+        sim_export_fmu_spec, run_sim_export_fmu,
     )
     ctx.tools.register("sim1d_run", sim1d_run_spec, run_sim1d_run)
     ctx.tools.register("sim1d_parse", sim1d_parse_spec, run_sim1d_parse)
-    ctx.tools.register("sim_import_modelica", sim_import_modelica_spec, run_sim_import_modelica)
+    ctx.tools.register("sim_export_fmu", sim_export_fmu_spec, run_sim_export_fmu)
 
     try:
         from kerf_core.plugin import PluginManifest
         return PluginManifest(
             name="sim1d",
             version="0.1.0",
-            provides=["sim1d.dae", "sim1d.modelica-parser", "sim1d.modelica-import"],
+            provides=["sim1d.dae", "sim1d.modelica-parser", "sim1d.fmi-export"],
             depends=[],
         )
     except ImportError:
         return {
             "name": "sim1d",
             "version": "0.1.0",
-            "provides": ["sim1d.dae", "sim1d.modelica-parser", "sim1d.modelica-import"],
+            "provides": ["sim1d.dae", "sim1d.modelica-parser", "sim1d.fmi-export"],
             "depends": [],
         }

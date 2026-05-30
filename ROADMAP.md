@@ -55,6 +55,9 @@ The sector work only matters if you **own your work, are not locked in, and can 
 ### Latest delta — 2026-05-30
 
 **Gauss-Bonnet integrity + chord-deviation reporting** ✅ — `gauss_bonnet_residual(body)` integrates K·dA per face + κ_g·ds per edge + exterior angle defect per vertex and checks against 2π·χ (do Carmo §4.5); `chord_deviation_per_face(body)` computes per-face max/mean chord deviation between surface and its bilinear tessellation + `suggested_subdivision_level` = ⌈log₂(dev/tol)⌉ (Piegl-Tiller §5.4.4); `continuity_audit()` extended with `include_gauss_bonnet` and `include_chord_deviation` flags; `geometry_topology_integrity_check` LLM tool registered; `gauss_bonnet_residual` + `chord_deviation_per_face` exported from `geom/__init__.py` — `kerf-cad-core/src/kerf_cad_core/geom/surface_analysis.py`.
+### Latest delta — 2026-05-30
+
+**FMI 2.0 model export (.fmu)** ✅ — `export_fmu(model, path, fmu_kind='cs'|'me')` builds a ZIP archive with FMI 2.0 compliant `modelDescription.xml` (ScalarVariables, causality/variability/initial, CoSimulation or ModelExchange capability element, ModelStructure/Outputs/Derivatives) + C source wrapper; `generate_model_description_xml` + `validate_fmu` (structural compliance check); `sim_export_fmu` LLM tool wired; `model_from_parsed` bridge from Modelica ParsedModel. NOTE: export subset — NOT FMI Cross-Check certified — `kerf-1dsim/src/kerf_1dsim/fmi_export.py`.
 
 ### Latest delta — 2026-05-26
 **PV latitude-aware TMY** ✅ — `monthly_yield_factors(latitude_deg)` in `solarpv/tmy.py` returns TMY3-derived (NREL/TP-581-43156) monthly irradiance fractions keyed to latitude band (0°–70°, 10° steps, linearly interpolated); Southern-hemisphere sites automatically receive the seasonally-flipped profile; `POST /energy/pv-shading` endpoint wired to use latitude-aware fractions instead of fixed Northern-Hemisphere constants; `PVShadingPanel` latitude input exposed in UI with hemisphere hint; 29 hermetic tests green.

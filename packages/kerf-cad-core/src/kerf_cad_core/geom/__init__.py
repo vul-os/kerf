@@ -1413,3 +1413,15 @@ from kerf_cad_core.geom.hole_recognition import (  # noqa: E402
     recognize_holes,
     recognize_holes_in_body,
 )
+# SUBD-SYMMETRY-DETECT: PCA mirror + rotational + spherical symmetry
+# (Mitra-Guibas-Pauly 2006; Podolak et al. 2006)
+from kerf_cad_core.geom.subd_symmetry import (
+    SymmetryPlane,
+    RotationAxis,
+    SymmetryReport,
+    SymmetryResult,
+    detect_symmetry as subd_detect_symmetry_full,
+    detect_mirror_symmetry,
+    enforce_mirror_symmetry,
+    mirror_edit,
+)

@@ -350,6 +350,9 @@ _TOOL_MODULES = [
     # counterbore, countersink, possibly-threaded holes from B-rep inner loops
     # (Joshi-Chang 1988; Han-Pratt-Regli 2000) — brep_recognize_holes
     "kerf_cad_core.geom.hole_recognition",
+    # SUBD-SYMMETRY-DETECT: PCA mirror + rotational + spherical symmetry
+    # (Mitra-Guibas-Pauly 2006; Podolak et al. 2006) -- subd_detect_symmetry, subd_enforce_symmetry
+    "kerf_cad_core.geom.subd_symmetry_tools",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

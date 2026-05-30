@@ -254,6 +254,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.jewelry.profile_lib",                # jewelry_list_profiles, jewelry_get_profile, jewelry_compare_comfort
     # GK-P: Bezier extraction (B-spline → multi-Bezier, Piegl & Tiller §5.6)
     "kerf_cad_core.geom.bezier_extract",
+    # STEP import auto-heal pipeline (GK-P: STEP import + heal wiring)
+    "kerf_cad_core.io.step_import_tool",               # step_import_brep — STEP import with auto-heal
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

@@ -41,8 +41,10 @@ Raises :class:`StepReadError` on unrecoverable parse failures.
 
 from __future__ import annotations
 
+import logging
 import math
 import re
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -66,7 +68,67 @@ from kerf_cad_core.geom.brep import (
     validate_body,
 )
 
-__all__ = ["read_step", "StepReadError"]
+__all__ = ["read_step", "StepReadError", "StepReadResult", "HealStats"]
+
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Result types
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class HealStats:
+    """Per-body heal statistics produced by the auto-heal pass."""
+    vertices_merged: int = 0
+    edges_stitched: int = 0
+    faces_orientation_fixed: int = 0
+
+    def is_clean(self, vert_tol: int = 2, edge_tol: int = 1) -> bool:
+        """Return True if the body was already nearly clean (near-zero repairs)."""
+        return (
+            self.vertices_merged <= vert_tol
+            and self.edges_stitched <= edge_tol
+        )
+
+
+@dataclass
+class StepReadResult:
+    """Result of :func:`read_step` when ``auto_heal=True`` or when a caller
+    requests the rich result object.
+
+    The object is also **iterable** as the plain bodies list so that existing
+    callers that do ``body, = read_step(...)`` or ``for b in read_step(...)``
+    continue to work after upgrading to return ``StepReadResult``.
+
+    Attributes
+    ----------
+    bodies:
+        List of :class:`~kerf_cad_core.geom.brep.Body` objects — one per
+        ``MANIFOLD_SOLID_BREP`` found in the file (typically one).
+    heal_stats:
+        Per-body :class:`HealStats` dict keyed by body index.
+        Empty when ``auto_heal=False``.
+    heal_warnings:
+        List of body indices where heal raised an exception (graceful
+        degradation — the un-healed body is still returned).
+    """
+    bodies: List[Body] = field(default_factory=list)
+    heal_stats: Dict[int, HealStats] = field(default_factory=dict)
+    heal_warnings: List[int] = field(default_factory=list)
+
+    # ---- iterable protocol so legacy callers still work --------------------
+
+    def __iter__(self):
+        """Iterate over bodies so ``body, = read_step(...)`` still works."""
+        return iter(self.bodies)
+
+    def __len__(self):
+        return len(self.bodies)
+
+    def __getitem__(self, index):
+        return self.bodies[index]
 
 
 # ---------------------------------------------------------------------------
@@ -928,12 +990,35 @@ def _body_volume(body: Body) -> float:
 # ---------------------------------------------------------------------------
 
 
+def _compute_heal_stats(body_before: Body, body_after: Body) -> HealStats:
+    """Compute HealStats by comparing vertex / edge counts before and after heal.
+
+    ``vertices_merged`` = vertices_before − vertices_after (net reduction).
+    ``edges_stitched``  = edges_before − edges_after.
+    ``faces_orientation_fixed`` is not directly observable from topology counts
+    alone; we leave it as 0 (conservative — a deeper diff would need face
+    orientation comparison, out of scope for the lightweight pass).
+    """
+    v_before = len(body_before.all_vertices())
+    v_after = len(body_after.all_vertices())
+    e_before = len(body_before.all_edges())
+    e_after = len(body_after.all_edges())
+    return HealStats(
+        vertices_merged=max(0, v_before - v_after),
+        edges_stitched=max(0, e_before - e_after),
+        faces_orientation_fixed=0,
+    )
+
+
 def read_step(
     source: Union[str, Path],
     *,
     validate: bool = True,
-) -> Body:
-    """Parse a STEP Part 21 file and return a Kerf :class:`Body`.
+    auto_heal: bool = False,
+    heal_options: Optional[Dict[str, Any]] = None,
+) -> Union[Body, StepReadResult]:
+    """Parse a STEP Part 21 file and return a Kerf :class:`Body` or
+    :class:`StepReadResult`.
 
     Parameters
     ----------
@@ -945,13 +1030,33 @@ def read_step(
     validate:
         If ``True`` (default) call :func:`validate_body` and raise
         :class:`StepReadError` if the result is invalid.
+    auto_heal:
+        If ``True``, run :func:`~kerf_cad_core.geom.body_heal.heal_body`
+        on each imported body after parsing.  Returns a
+        :class:`StepReadResult` (which is also iterable as the bodies list
+        for backward compatibility).  If a heal pass raises an exception
+        for a particular body, the un-healed body is returned and the body
+        index is appended to :attr:`StepReadResult.heal_warnings`.
+        Default: ``False``.
+    heal_options:
+        Optional dict of keyword arguments forwarded to
+        :func:`~kerf_cad_core.geom.body_heal.heal_body`.  Currently
+        supports ``tol`` (float, default ``1e-6``).  Ignored when
+        ``auto_heal=False``.
 
     Returns
     -------
     Body
-        The first ``MANIFOLD_SOLID_BREP`` in the file assembled into a
-        Kerf ``Body``.  If the file contains multiple solids they are
-        all assembled into the same ``Body`` as separate ``Solid`` items.
+        When ``auto_heal=False`` (default): the first
+        ``MANIFOLD_SOLID_BREP`` in the file assembled into a Kerf
+        ``Body``.  If the file contains multiple solids they are all
+        assembled into the same ``Body`` as separate ``Solid`` items.
+    StepReadResult
+        When ``auto_heal=True``: a dataclass with ``bodies``,
+        ``heal_stats`` (per-body :class:`HealStats`), and
+        ``heal_warnings``.  The object supports ``__iter__`` / ``__len__``
+        / ``__getitem__`` so existing callers that unpack or iterate the
+        return value continue to work.
 
     Raises
     ------
@@ -990,8 +1095,10 @@ def read_step(
             shell = _build_shell(sd, parser)
             solids.append(Solid([shell]))
         body = Body(solids=solids)
+        raw_bodies: List[Body] = [body]
     else:
-        solids: List[Solid] = []
+        # Build one Body per MANIFOLD_SOLID_BREP (multi-body aware)
+        raw_bodies = []
         for bref in body_refs:
             msb = parser.get(bref)
             if msb is None or not isinstance(msb, dict):
@@ -1000,8 +1107,14 @@ def read_step(
             if outer_shell_dict is None or not isinstance(outer_shell_dict, dict):
                 continue
             shell = _build_shell(outer_shell_dict, parser)
-            solids.append(Solid([shell]))
-        body = Body(solids=solids)
+            raw_bodies.append(Body(solids=[Solid([shell])]))
+
+        if not raw_bodies:
+            raise StepReadError("STEP file parsed but produced no bodies")
+
+        # Legacy path: collapse into a single Body (all solids merged)
+        # Kept for full backward compatibility when auto_heal=False.
+        body = Body(solids=[s for b in raw_bodies for s in b.solids])
 
     if not body.all_faces():
         raise StepReadError("STEP file parsed but produced zero faces")
@@ -1014,7 +1127,48 @@ def read_step(
                 f"B-rep validation failed after STEP read:\n  {errs}"
             )
 
-    return body
+    # ------------------------------------------------------------------
+    # auto_heal=False → legacy single-Body return (unchanged behaviour)
+    # ------------------------------------------------------------------
+    if not auto_heal:
+        return body
+
+    # ------------------------------------------------------------------
+    # auto_heal=True → heal each body, collect stats, return StepReadResult
+    # ------------------------------------------------------------------
+    from kerf_cad_core.geom.body_heal import heal_body  # deferred import
+
+    opts = heal_options or {}
+    tol = float(opts.get("tol", 1e-6))
+
+    healed_bodies: List[Body] = []
+    heal_stats: Dict[int, HealStats] = {}
+    heal_warnings: List[int] = []
+
+    for idx, raw_body in enumerate(raw_bodies):
+        try:
+            healed = heal_body(raw_body, tol=tol)
+            stats = _compute_heal_stats(raw_body, healed)
+            healed_bodies.append(healed)
+            heal_stats[idx] = stats
+            logger.debug(
+                "step_read auto_heal body[%d]: merged=%d stitched=%d",
+                idx, stats.vertices_merged, stats.edges_stitched,
+            )
+        except Exception as exc:
+            logger.warning(
+                "step_read auto_heal body[%d] failed (returning un-healed): %s",
+                idx, exc,
+            )
+            healed_bodies.append(raw_body)
+            heal_stats[idx] = HealStats()
+            heal_warnings.append(idx)
+
+    return StepReadResult(
+        bodies=healed_bodies,
+        heal_stats=heal_stats,
+        heal_warnings=heal_warnings,
+    )
 
 
 def body_volume(body: Body) -> float:

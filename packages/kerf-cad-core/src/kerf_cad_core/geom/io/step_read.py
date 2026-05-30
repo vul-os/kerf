@@ -65,6 +65,8 @@ from __future__ import annotations
 
 from kerf_cad_core.io.step_reader import (  # noqa: F401  (re-export)
     StepReadError,
+    StepReadResult,
+    HealStats,
     body_volume,
     read_step,
     _StepParser,  # exposed for advanced use / testing
@@ -76,6 +78,8 @@ from kerf_cad_core.io.step_reader import (  # noqa: F401  (re-export)
 
 __all__ = [
     "StepReadError",
+    "StepReadResult",
+    "HealStats",
     "read_step",
     "body_volume",
 ]

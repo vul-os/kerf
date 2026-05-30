@@ -1597,8 +1597,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Irrigation zone scheduling (head spacing, zone flow demand, weekly run-time schedule, DU audit); ASABE/ICC 802-2014; landscape_irrigation_schedule tool",
-            "evidence": "packages/kerf-landscape/src/kerf_landscape/irrigation.py"
+            "note": "Irrigation sprinkler layout (Hunter / Rain Bird) ✅ — SprinklerHead catalog (Hunter PGP/I-20/MP1000, Rain Bird 5000/1800, Toro 570Z, K-Rain Pro Plus); recommend_spacing (square 50%/triangular 87%/oblong per Rain Bird DM + Hunter IDM); layout_for_rectangle (grid + staggered rows, arc assignment); compute_flow_demand (zone round-robin, arc-scaled GPM); landscape_layout_sprinkler + landscape_flow_demand tools. Plus: zone scheduling (head spacing, zone flow demand, weekly run-time schedule, DU audit); ASABE/ICC 802-2014; landscape_irrigation_schedule tool.",
+            "evidence": "packages/kerf-landscape/src/kerf_landscape/irrigation_design.py"
           }
         },
         {

@@ -210,6 +210,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.drawings.auto_dimension",
     "kerf_cad_core.mbd.tools",
     "kerf_cad_core.afr.recognize",
+    # GK-133 / ISO 10303-224: brep_feature_recognition + brep_feature_to_machining
+    "kerf_cad_core.geom.feature_recognition",
     "kerf_cad_core.sysml1d.network",
     "kerf_cad_core.frep.sdf",
     "kerf_cad_core.sheet_metal_bend_table",

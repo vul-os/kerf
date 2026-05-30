@@ -911,8 +911,14 @@ __all__ = [
     "tangent_edge_chain",
     # GK-136
     "tetrahedralize",
-    # GK-133
+    # GK-133 / ISO 10303-224
     "recognize_features",
+    "recognize_features_iso",
+    "classify_hole",
+    "feature_to_machining_op",
+    "Feature",
+    "HoleInfo",
+    "FeatureRecognitionResult",
     # GK-134
     "push_pull_face",
     "move_face",
@@ -994,8 +1000,16 @@ from kerf_cad_core.geom.assembly import solve_mate  # noqa: E402
 from kerf_cad_core.geom.fillet_solid import tangent_edge_chain
 # GK-136: Delaunay volume mesh (tetrahedralization) for FEM hand-off
 from kerf_cad_core.geom.tetmesh import tetrahedralize
-# GK-133: feature recognition (hole / pocket / boss / fillet / chamfer)
-from kerf_cad_core.geom.feature_recognition import recognize_features  # noqa: E402
+# GK-133 / ISO 10303-224: feature recognition (hole / pocket / boss / fillet / chamfer)
+from kerf_cad_core.geom.feature_recognition import (  # noqa: E402
+    recognize_features,
+    recognize_features_iso,
+    classify_hole,
+    feature_to_machining_op,
+    Feature,
+    HoleInfo,
+    FeatureRecognitionResult,
+)
 
 # GK-127 / GK-P39: 3DM (Rhino OpenNURBS) read + write
 from kerf_cad_core.geom.io.rhino3dm import (

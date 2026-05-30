@@ -6006,6 +6006,20 @@
           }
         },
         {
+          "domain": "D1",
+          "feature": "Feature recognition (ISO 10303-224 / Han 2000)",
+          "competitor": {
+            "status": "yes",
+            "note": "FeatureWorks: automatic recognition of holes, slots, pockets, fillets, chamfers, bosses from imported dumb solids; integrated into SolidWorks as an add-in",
+            "source": "https://help.solidworks.com/2024/english/SolidWorks/featureworks/c_featureworks_overview.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Feature recognition (ISO 10303-224 / Han 2000) ✅ — recognize_features_iso(), classify_hole(), feature_to_machining_op() + brep_feature_recognition + brep_feature_to_machining LLM tools; detects through-hole, blind-hole, counterbore, countersink, pocket, slot, boss, fillet (interior/exterior), chamfer, rib, step from B-rep face adjacency graph",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/feature_recognition.py"
+          }
+        },
+        {
           "domain": "D2",
           "feature": "FE \u2014 linear static (native)",
           "competitor": {

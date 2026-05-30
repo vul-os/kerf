@@ -190,6 +190,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.section_cutaway",  # brep_section_view — ISO 128-30 section cutaway + hatch
     "kerf_cad_core.jewelry.eternity_auto",
     "kerf_cad_core.geom.surface_fillet",
+    "kerf_cad_core.geom.auto_chamfer",      # brep_recommend_chamfers, brep_apply_chamfer_recommendations (ISO 13715)
     "kerf_cad_core.jewelry.bangle",
     "kerf_cad_core.jewelry.hollowing",
     "kerf_cad_core.jewelry.engraving",

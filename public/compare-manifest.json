@@ -3845,6 +3845,19 @@
           }
         },
         {
+          "name": "Auto-chamfer recommendation (ISO 13715)",
+          "competitor": {
+            "status": "no",
+            "source": "https://wiki.freecad.org/PartDesign_Workbench",
+            "note": "No automated DFM chamfer recommendation"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/auto_chamfer.py",
+            "note": "Auto-chamfer recommendation (ISO 13715) ✅ — dihedral-angle classification (safety/manufacturing/cosmetic), convex-hull handling-region heuristic, brep_recommend_chamfers + brep_apply_chamfer_recommendations LLM tools"
+          }
+        },
+        {
           "name": "Sweep (1 & 2 rail)",
           "competitor": {
             "status": "yes",

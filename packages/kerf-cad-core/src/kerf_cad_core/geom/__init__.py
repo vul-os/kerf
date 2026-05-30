@@ -487,6 +487,12 @@ from kerf_cad_core.geom.body_heal import simplify_body, heal_body
 from kerf_cad_core.geom.imprint import imprint_curve_on_face, imprint_body, ImprintTag, ImprintResult
 # GK-90: N-rail sweep (3+ rails)
 from kerf_cad_core.geom.sweep_n import sweep_n, loft_with_guides_sweep_n  # GK-P16
+# GK-P (variable rail-tangent): variable-tangent Gordon loft (Piegl-Tiller §10.4.3)
+from kerf_cad_core.geom.loft_rails_variable import (
+    loft_with_rails_variable,
+    extract_rail_tangents,
+    validate_rail_tangent_compatibility,
+)
 # GK-91: sheet metal bend / unfold (K-factor + bend tables)
 from kerf_cad_core.geom.sheet_metal import (
     K_FACTOR_TABLE,
@@ -840,6 +846,10 @@ __all__ = [
     # GK-90
     "sweep_n",
     "loft_with_guides_sweep_n",  # GK-P16
+    # GK-P variable rail-tangent Gordon loft (Piegl-Tiller §10.4.3)
+    "loft_with_rails_variable",
+    "extract_rail_tangents",
+    "validate_rail_tangent_compatibility",
     # GK-91
     "K_FACTOR_TABLE",
     "bend_allowance",

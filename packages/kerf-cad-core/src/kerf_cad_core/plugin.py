@@ -379,6 +379,9 @@ _TOOL_MODULES = [
     # NURBS-NORMAL-CURVATURE-AT-POINT: Meusnier's theorem; κ_n, κ_1, κ_2, K, H,
     # principal directions (do Carmo §3.2 / Mortenson §10.4)
     "kerf_cad_core.geom.normal_curvature",
+    # BREP-TOPOLOGY-EULER-CHECK: generalised Euler-Poincaré formula verifier
+    # (Mantyla 1988 §6 + Hoffmann 1989 §5) — brep_verify_euler_topology
+    "kerf_cad_core.geom.topology_euler_check_tools",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

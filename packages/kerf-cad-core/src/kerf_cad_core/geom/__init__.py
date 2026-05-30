@@ -1492,3 +1492,11 @@ from kerf_cad_core.geom.subd_export_obj import (  # noqa: E402
     export_limit_to_obj,
     parse_obj as parse_subd_obj,
 )
+# BREP-TOPOLOGY-EULER-CHECK: generalised Euler-Poincaré formula verifier
+# (Mantyla 1988 §6 + Hoffmann 1989 §5) — verify_euler_topology,
+# verify_euler_topology_from_dict, EulerCheckReport
+from kerf_cad_core.geom.topology_euler_check import (
+    EulerCheckReport,
+    verify_euler_topology,
+    verify_euler_topology_from_dict,
+)

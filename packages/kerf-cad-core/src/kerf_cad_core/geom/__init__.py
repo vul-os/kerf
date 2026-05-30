@@ -1344,7 +1344,7 @@ from kerf_cad_core.geom.brep_edge_metrics import (  # noqa: E402
     compute_edge_metrics,
 )
 # GK-SUBD-LIMIT-INTEGRAL-METRIC: exact-as-feasible integrals over CC limit surface
-from kerf_cad_core.geom.subd_limit_integrals import (
+from kerf_cad_core.geom.subd_limit_integrals import (  # noqa: E402
     SubDIntegralReport,
     integrate_area,
     integrate_mean_curvature,
@@ -1499,4 +1499,11 @@ from kerf_cad_core.geom.topology_euler_check import (
     EulerCheckReport,
     verify_euler_topology,
     verify_euler_topology_from_dict,
+)
+# SUBD-LIMIT-INTEGRAL-GAUSS-BONNET-CHECK: verify ∫∫K dA = 2π·χ on a closed
+# Catmull-Clark limit surface (do Carmo §4.5; Edelsbrunner-Harer 2010 §1).
+# Honest: valid=False for surfaces with boundary (geodesic-curvature term excluded).
+from kerf_cad_core.geom.subd_gauss_bonnet_check import (  # noqa: E402
+    GaussBonnetCheckReport,
+    verify_gauss_bonnet,
 )

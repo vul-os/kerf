@@ -15928,6 +15928,32 @@
         },
         {
           "domain": "D1",
+          "feature": "SubD limit-surface global integrals (area, \u222bH dA, \u222bK dA)",
+          "competitor": {
+            "status": "no",
+            "note": "No dedicated API for \u222bH dA or discrete Gauss-Bonnet \u222bK dA over CC limit surfaces"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "integrate_area / integrate_mean_curvature / integrate_gaussian_curvature via B-spline 4\u00d74 + 16\u00d716 GL + discrete Gauss-Bonnet (exact: 4\u03c0 sphere, 0 torus); LLM tools subd_integrate_area/mean/gaussian",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/subd_limit_integrals.py"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "SubD Gauss-Bonnet theorem check (\u222b\u222bK dA = 2\u03c0\u00b7\u03c7)",
+          "competitor": {
+            "status": "no",
+            "note": "No Gauss-Bonnet integrity verification API for CC limit surfaces"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "verify_gauss_bonnet(cage) checks \u222b\u222bK dA = 2\u03c0\u00b7\u03c7; GaussBonnetCheckReport with chi_from_cage, relative_error, valid, boundary honest-flag; LLM tool subd_verify_gauss_bonnet (do Carmo §4.5; Edelsbrunner-Harer 2010 §1)",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/subd_gauss_bonnet_check.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "Mesh repair / ShrinkWrap",
           "competitor": {
             "status": "yes",

@@ -382,6 +382,11 @@ _TOOL_MODULES = [
     # BREP-TOPOLOGY-EULER-CHECK: generalised Euler-Poincaré formula verifier
     # (Mantyla 1988 §6 + Hoffmann 1989 §5) — brep_verify_euler_topology
     "kerf_cad_core.geom.topology_euler_check_tools",
+    # GK-SUBD-LIMIT-INTEGRAL-METRIC: exact-as-feasible integrals over CC limit surface
+    "kerf_cad_core.geom.subd_limit_integrals",          # subd_integrate_area, subd_integrate_mean_curvature, subd_integrate_gaussian_curvature
+    # SUBD-LIMIT-INTEGRAL-GAUSS-BONNET-CHECK: verify ∫∫K dA = 2π·χ on closed CC limit surface
+    # (do Carmo §4.5; Edelsbrunner-Harer 2010 §1) — subd_verify_gauss_bonnet
+    "kerf_cad_core.geom.subd_gauss_bonnet_check",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

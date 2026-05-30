@@ -312,3 +312,20 @@ def _register_tools(ctx, provides: list) -> None:
         logger.warning(
             "kerf-firmware: failed to load firmware_verify_clock_tree tool: %s", exc
         )
+
+    # firmware_verify_dma_assignments — STM32 DMA channel-conflict verifier
+    try:
+        from kerf_firmware.tools.firmware_verify_dma_assignments import (
+            _spec as _dma_spec,
+            run_firmware_verify_dma_assignments_async as _dma_fn,
+        )
+        ctx.tools.register(
+            "firmware_verify_dma_assignments",
+            _dma_spec,
+            _dma_fn,
+        )
+        provides.append("firmware.dma_channel_verify")
+    except Exception as exc:
+        logger.warning(
+            "kerf-firmware: failed to load firmware_verify_dma_assignments tool: %s", exc
+        )

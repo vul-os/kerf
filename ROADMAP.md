@@ -435,6 +435,7 @@ These are roadmap-level moats that span every sector simultaneously and compound
 - **GK-P SubD / mesh** — multires displacement; SDF CSG + marching-cubes; sculpt brush engine; LSCM UV unwrap (module exists, wiring incomplete); SubD boundary→curve snap ✅ shipped.
 - **GK-P SubD / mesh** — multires displacement; SDF CSG + marching-cubes; sculpt brush engine; LSCM UV unwrap (module exists, wiring incomplete). Mirror-symmetry detect + enforce ✅ shipped (`subd_symmetry.py`).
 - **GK-P SubD / mesh** — multires displacement; SDF CSG + marching-cubes; sculpt brush engine; LSCM UV unwrap (module exists, wiring incomplete); **geodesic distance heat method ✅** (GK-P49).
+- **GK-P SubD / mesh** — multires displacement; SDF CSG + marching-cubes; sculpt brush engine; LSCM UV unwrap (module exists, wiring incomplete); **SubD deformation cage with mean-value coords (Ju 2005) ✅** — `kerf-cad-core/geom/subd_deform.py`, LLM tool `subd_deform_with_cage`.
 - **GK-P architectural geometry** — B-rep→2D tessellate; roof/curtain-wall/corridor generators; wall compound-layer offset; hatch/section-fill.
 - **GK-P sketcher** — collinear constraint; ellipse solver entity; G2 continuity.
 - **GK-P interop** — 3DM write with Hausdorff read→write→read oracle.

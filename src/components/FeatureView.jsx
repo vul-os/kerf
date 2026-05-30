@@ -1907,6 +1907,28 @@ const FEATURE_KINDS = [
     ],
   },
 
+  // subd_deform_with_cage — deformation cage via mean-value coordinates (GK-P49)
+  {
+    op: 'subd_deform_with_cage',
+    label: 'SubD Deform Cage',
+    icon: GitBranch,
+    caption: 'Control a high-resolution mesh by manipulating a low-resolution cage. Uses mean-value coordinates (Ju-Schaefer-Warren 2005) for smooth, partition-of-unity weighting.',
+    defaults: {
+      target_id: '',
+      cage_deformed: [],
+      n_cage_verts: 20,
+      method: 'convex_hull',
+    },
+    fields: [
+      { key: 'target_id',    kind: 'feature_picker', label: 'Detail SubD cage' },
+      { key: 'n_cage_verts', kind: 'number', label: 'Cage vertices', min: 4, max: 200, step: 1 },
+      { key: 'method', kind: 'select', label: 'Cage method', options: [
+        { value: 'convex_hull',    label: 'Convex hull' },
+        { value: 'simplification', label: 'Simplified hull' },
+      ] },
+    ],
+  },
+
   // ── GK-P46: mesh/implicit ops ───────────────────────────────────────────────
 
   // sdf_csg — SDF CSG + marching cubes (GK-P22)
@@ -3001,7 +3023,7 @@ const FEATURE_CATEGORIES = [
     // Coverage sweep additions
     'sheet_metal_flat_pattern', 'sheet_metal_unfold',
   ] },
-  { id: 'subd',      label: 'SubD / Mesh',  ops: ['subd_poke', 'subd_extrude_along', 'sculpt_brush', 'multires_evaluate', 'sdf_csg', 'retopo_snap'] },
+  { id: 'subd',      label: 'SubD / Mesh',  ops: ['subd_poke', 'subd_extrude_along', 'sculpt_brush', 'multires_evaluate', 'subd_deform_with_cage', 'sdf_csg', 'retopo_snap'] },
   { id: 'weldment',  label: 'Weldment',     ops: ['gusset_plate', 'cope_notch'] },
   { id: 'bim',       label: 'BIM',          ops: ['bim_make_grid', 'bim_make_framing', 'bim_make_wall', 'bim_make_slab'] },
 ]

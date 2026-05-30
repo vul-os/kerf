@@ -26,6 +26,8 @@ async def register(app: FastAPI, ctx):
         gdt_parse_frame_spec, run_gdt_parse_frame,
         gdt_validate_datum_reference_frame_spec,
         run_gdt_validate_datum_reference_frame,
+        gdt_validate_composite_tolerance_frame_spec,
+        run_gdt_validate_composite_tolerance_frame,
     )
 
     ctx.tools.register("gdnt_list_symbols", gdnt_list_symbols_spec, run_gdnt_list_symbols)
@@ -40,21 +42,33 @@ async def register(app: FastAPI, ctx):
         gdt_validate_datum_reference_frame_spec,
         run_gdt_validate_datum_reference_frame,
     )
+    try:
+        ctx.tools.register(
+            "gdt_validate_composite_tolerance_frame",
+            gdt_validate_composite_tolerance_frame_spec,
+            run_gdt_validate_composite_tolerance_frame,
+        )
+    except Exception:
+        pass
 
     try:
         from kerf_core.plugin import PluginManifest
         return PluginManifest(
             name="gdnt",
             version="0.1.0",
-            provides=["gdnt.fcf", "gdnt.inspection", "gdnt.homologation", "gdnt.validation"],
-            provides=["gdnt.fcf", "gdnt.inspection", "gdnt.homologation", "gdnt.drf_validation"],
+            provides=[
+                "gdnt.fcf", "gdnt.inspection", "gdnt.homologation",
+                "gdnt.drf_validation", "gdnt.composite_tolerance",
+            ],
             depends=[],
         )
     except ImportError:
         return {
             "name": "gdnt",
             "version": "0.1.0",
-            "provides": ["gdnt.fcf", "gdnt.inspection", "gdnt.homologation", "gdnt.validation"],
-            "provides": ["gdnt.fcf", "gdnt.inspection", "gdnt.homologation", "gdnt.drf_validation"],
+            "provides": [
+                "gdnt.fcf", "gdnt.inspection", "gdnt.homologation",
+                "gdnt.drf_validation", "gdnt.composite_tolerance",
+            ],
             "depends": [],
         }

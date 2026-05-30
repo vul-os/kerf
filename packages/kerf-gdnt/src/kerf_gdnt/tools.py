@@ -652,3 +652,65 @@ def run_gdt_validate_datum_reference_frame(params: dict, ctx: Any) -> str:
         return ok_payload(report.to_dict())
     except Exception as exc:
         return err_payload(str(exc), "DRF_VALIDATE_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# gdt_validate_composite_tolerance_frame  (§10.5 PLTZF/FRTZF)
+# ---------------------------------------------------------------------------
+
+gdt_validate_composite_tolerance_frame_spec = ToolSpec(
+    name="gdt_validate_composite_tolerance_frame",
+    description=(
+        "Parse and validate an ASME Y14.5-2018 §10.5 composite position tolerance "
+        "frame (PLTZF / FRTZF). "
+        "A composite frame has two lines: the upper line (PLTZF, Pattern-Locating "
+        "Tolerance Zone Framework) controls location of the entire pattern; the "
+        "lower line (FRTZF, Feature-Relating Tolerance Zone Framework) controls "
+        "feature-to-feature relationships. "
+        "Rules checked: FRTZF tolerance ≤ PLTZF tolerance (§10.5.1 Note 2); "
+        "FRTZF primary datum must match PLTZF primary datum (§10.5.1(a)); "
+        "FRTZF datums must be a precedence-ordered subset of PLTZF datums "
+        "(§10.5.1(b)); symbol must match between lines. "
+        "Each violation includes a §10.5 rule citation. "
+        "HONEST FLAG: parser accepts one canonical text format only — "
+        "full Unicode GD&T requires a dedicated lexer. "
+        "Input text format: 'symbol|[D]tol[M|L|S]|datum1|... / symbol|[D]tol[M|L|S]|datum1|...'"
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "frame_text": {
+                "type": "string",
+                "description": (
+                    "Composite tolerance frame in canonical text form. "
+                    "Two lines separated by '/'. "
+                    "Example: 'position|D0.5|A|B|C / position|D0.2|A' "
+                    "(PLTZF: ⌀0.5 A|B|C; FRTZF: ⌀0.2 A). "
+                    "Symbol codes: position, flatness, perpendicularity, etc. "
+                    "D prefix = diameter zone. Modifier suffix: M=MMC, L=LMC, S=RFS."
+                ),
+            },
+        },
+        "required": ["frame_text"],
+    },
+)
+
+
+def run_gdt_validate_composite_tolerance_frame(params: dict, ctx: Any) -> str:
+    try:
+        from kerf_gdnt.composite_tolerance import (
+            parse_composite_frame,
+            validate_composite_frame,
+        )
+        frame = parse_composite_frame(params["frame_text"])
+        report = validate_composite_frame(frame)
+        return ok_payload({
+            "valid": report.valid,
+            "pltzf": frame.pltzf.__dict__,
+            "frtzf": frame.frtzf.__dict__,
+            **report.to_dict(),
+        })
+    except ValueError as exc:
+        return err_payload(str(exc), "COMPOSITE_PARSE_ERROR")
+    except Exception as exc:
+        return err_payload(str(exc), "COMPOSITE_VALIDATE_ERROR")

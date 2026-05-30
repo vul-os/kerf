@@ -3943,6 +3943,19 @@
           }
         },
         {
+          "name": "NURBS iso-curve extraction",
+          "competitor": {
+            "status": "no",
+            "source": "https://wiki.freecad.org/Workbenches",
+            "note": "No direct iso-curve extraction as parametric NurbsCurve"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/iso_curve_extract.py",
+            "note": "Piegl-Tiller §5.3 knot-insertion; extract_iso_curve_u/v/grid; rational surfaces; LLM tools nurbs_extract_iso_u + nurbs_extract_iso_v"
+          }
+        },
+        {
           "name": "Configurations / family variants",
           "competitor": {
             "status": "partial",

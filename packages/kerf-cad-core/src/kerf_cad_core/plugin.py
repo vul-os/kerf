@@ -321,6 +321,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.subd_limit_integrals",          # subd_integrate_area, subd_integrate_mean_curvature, subd_integrate_gaussian_curvature
     # BREP-FACE-AREA-WEIGHTED-CENTROID: surface centroid of shell/solid (GL 16x16 per face)
     "kerf_cad_core.geom.face_centroid",                  # brep_surface_centroid
+    # NURBS-EXTRACT-ISO-CURVES: Piegl-Tiller §5.3 knot-insertion iso extraction
+    "kerf_cad_core.geom.iso_curve_extract",             # nurbs_extract_iso_u, nurbs_extract_iso_v
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

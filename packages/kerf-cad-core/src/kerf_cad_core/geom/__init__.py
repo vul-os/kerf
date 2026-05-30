@@ -1330,3 +1330,9 @@ from kerf_cad_core.geom.face_centroid import (  # noqa: E402
     face_centroid,
     surface_centroid,
 )
+# NURBS-EXTRACT-ISO-CURVES: Piegl-Tiller §5.3 knot-insertion iso-curve extraction
+from kerf_cad_core.geom.iso_curve_extract import (
+    extract_iso_curve_u,
+    extract_iso_curve_v,
+    extract_iso_grid,
+)

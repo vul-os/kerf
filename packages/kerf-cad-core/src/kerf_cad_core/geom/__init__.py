@@ -1530,3 +1530,18 @@ from kerf_cad_core.geom.solid_contains_point import (  # noqa: E402
     ContainmentResult,
     solid_contains_point,
 )
+# SUBD-EXPORT-GLTF: CC limit-surface → glTF 2.0 (.gltf JSON + base64 buffer or .glb binary container)
+# Ref: Khronos glTF 2.0 — https://www.khronos.org/gltf/ (§5.1 asset, §5.9 buffers/accessors, §5.12 meshes)
+# Honest (v1): geometry only — no materials, normals, textures, animations, skinning; quads fan-triangulated;
+# pure-Python (json + struct); no Draco compression.
+from kerf_cad_core.geom.subd_export_gltf import (  # noqa: E402
+    export_limit_to_gltf,
+    parse_gltf as parse_subd_gltf,
+)
+# BREP-MESH-MASS-PROPS: volume, centroid, inertia tensor from triangle mesh.
+# (Mirtich 1996 §3; Mortenson §11.4)
+# Honest: closed orientable mesh with outward normals required; open/inverted → ValueError.
+from kerf_cad_core.geom.mass_props_mesh import (  # noqa: E402
+    MassPropsReport,
+    compute_mesh_mass_props,
+)

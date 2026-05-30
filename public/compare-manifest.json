@@ -15913,6 +15913,20 @@
         },
         {
           "domain": "D1",
+          "feature": "SubD limit-surface mesh export to glTF 2.0",
+          "competitor": {
+            "status": "yes",
+            "note": "Rhino 8 can export mesh to glTF via third-party plug-ins; Blender exports SubD limit-surface to glTF natively",
+            "source": "https://docs.blender.org/manual/en/latest/addons/import_export/scene_gltf2.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "export_limit_to_gltf: CC limit-surface exported as glTF 2.0 \u2014 both .gltf (JSON + base64 buffer) and .glb (binary GLB container). Valid asset.version='2.0'; POSITION VEC3 FLOAT + SCALAR UNSIGNED_INT indices; quads fan-triangulated; cube cage 2 levels \u2192 192 triangles; GLB magic b'glTF' + version 2; vertex/face counts round-trip via parse_gltf; sphere cage convergence. Honest (v1): geometry only \u2014 no materials, normals attribute, textures, animations, skinning; no Draco compression; pure-Python (json+struct). 39 tests. LLM tool subd_export_limit_to_gltf. Ref: Khronos glTF 2.0.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/subd_export_gltf.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "SubD limit-surface curve along cage edges",
           "competitor": {
             "status": "yes",

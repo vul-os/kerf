@@ -64,6 +64,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.trim_loop_heal",   # GK-P: nurbs_trim_loop_heal tool
     "kerf_cad_core.geom.subd_decimate_to_cage_tool",
     "kerf_cad_core.geom.subd_project_primitive_tools",  # SUBD-CAGE-PROJECT-TO-PRIMITIVE
+    "kerf_cad_core.geom.subd_export_gltf",  # SUBD-EXPORT-GLTF: CC limit-surface → glTF 2.0 (json + struct; no third-party)
     "kerf_cad_core.nesting.tools",
     "kerf_cad_core.nesting.optimize_nest_tool",  # manufacturing_optimize_nest — NFP+GA (Burke 2006, Kovacs 2002)
     "kerf_cad_core.harness.tools",
@@ -166,6 +167,7 @@ _TOOL_MODULES = [
     # GK-P-NURBS-OFFSET: nurbs_surface_offset LLM tool
     "kerf_cad_core.geom.surface_offset",
     "kerf_cad_core.geom.mass_props_multi",
+    "kerf_cad_core.geom.mass_props_mesh",   # BREP-MESH-MASS-PROPS: triangle-mesh volume/CG/inertia
     "kerf_cad_core.geom.make2d",
     "kerf_cad_core.geom.reparam_tools",  # GK-P: chord-length + centripetal + Foley-Nielsen reparametrisation
     "kerf_cad_core.geom.curve_offset_2d",

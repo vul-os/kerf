@@ -185,6 +185,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 | **GK-P Curvature-comb peaks + variance metrics (Farin 1990)** | `curvature_comb_peaks` (peak detection, sharpness), `curvature_variance_metric` (variance/std/skewness/kurtosis/total variation), `isophote_density_metric` (Pottmann-Wallner 2001 Ch 10); `continuity_audit(include_curvature_metrics=True)`; LLM tool `nurbs_curvature_metrics` registered; 16 tests green | ✅ shipped |
 | **General solid boolean** | NURBS-faced / non-axis-aligned solids (today: axis-aligned only; general CSG delegates to OCCT worker) | 🔴 not started |
 | **GK-P: Hollow operator** | Compound feature: shell offset + inner-face blend + inner-edge fillet + port drilling + optional ribs — `hollow_body` / `hollow_with_ribs` in `geom/body_hollow.py`; LLM tool `brep_make_hollow`; 37 analytic-oracle tests green | ✅ shipped |
+| **Face color assignment** | Per-face semantic color by feature/curvature/orientation/material; STEP AP242 COLOUR_RGB + OBJ/MTL export; `brep_assign_face_colors` + `brep_export_step_with_colors` LLM tools | ✅ shipped |
 
 **GK-P (parity) series in flight.** A four-agent survey of Kerf vs ~18 kernel-relevant CADs found a concrete, finite gap list. GK-01..GK-139 are landed. The `GK-P` series (tracked in `tasks.md`) closes the remaining gaps:
 

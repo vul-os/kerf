@@ -15638,6 +15638,19 @@
         },
         {
           "domain": "D1",
+          "feature": "B-rep face-adjacency traversal (CNC routing / geodesic path / paint-area)",
+          "competitor": {
+            "status": "no",
+            "note": "Rhino has no public face-adjacency graph API; tool-path routing relies on external CAM plugins"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "face_adjacency_graph() (inverted edge-index O(F·E)); face_neighbors(); bfs_from_face(depth_cap); shortest_face_path() BFS; FaceAdjacencyGraph dataclass + connected_components(); LLM tools brep_face_neighbors + brep_shortest_face_path; oracles: cube each-face=4-neighbours / BFS-depth-2=opposite / path-len=3; cylinder side=2/cap=1; 2-cube disconnected=2-components; edge-sharing adjacency only (Weiler 1985 §3 — point-touching not adjacent); 41 hermetic tests",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/face_neighbor_walk.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "Surface analysis (zebra / curvature combs)",
           "competitor": {
             "status": "yes",

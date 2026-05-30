@@ -54,6 +54,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.gears",
     "kerf_cad_core.geom.surface_boolean_robust",
     "kerf_cad_core.geom.nurbs_boolean",
+    # NURBS-CURVE-CURVATURE-OSCULATING-CIRCLE: osculating circle at param t
+    "kerf_cad_core.geom.osculating_circle",
     # GK-P Wave 4P: far-offset robustness (Maekawa 1999) — nurbs_surface_offset_robust
     "kerf_cad_core.geom.offset_far_tools",
     "kerf_cad_core.geom.trim_curve",
@@ -327,6 +329,9 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.subd_export_usd",               # subd_export_to_usd
     # MANUFACTURING-AUTO-FIXTURE-LAYOUT: 3-2-1 fixture placement (Asada-By 1985)
     "kerf_cad_core.manufacturing_fixture_layout",       # manufacturing_auto_fixture_layout
+    # BREP-FACE-NEIGHBOR-WALK: face-adjacency graph + BFS traversal for CNC routing /
+    # geodesic shortest-path / paint-area planning (Weiler 1985 §3 edge-sharing adjacency)
+    "kerf_cad_core.geom.face_neighbor_walk",            # brep_face_neighbors, brep_shortest_face_path
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

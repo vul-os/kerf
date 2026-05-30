@@ -1343,3 +1343,19 @@ from kerf_cad_core.geom.subd_export_usd import (
     write_subd_usda,
     parse_usda_subd,
 )
+# NURBS-CURVE-CURVATURE-OSCULATING-CIRCLE: osculating circle at parameter t
+# (do Carmo §1.5; κ = |C′×C″|/|C′|³; center = C(t) + (1/κ)·N(t))
+from kerf_cad_core.geom.osculating_circle import (
+    OsculatingCircle,
+    osculating_circle,
+    osculating_circles_along,
+)
+# BREP-FACE-NEIGHBOR-WALK: face-adjacency traversal for CNC routing, geodesic
+# shortest-path, paint-area planning; edge-sharing adjacency only (Weiler 1985 §3)
+from kerf_cad_core.geom.face_neighbor_walk import (  # noqa: E402
+    FaceAdjacencyGraph,
+    face_adjacency_graph,
+    face_neighbors,
+    bfs_from_face,
+    shortest_face_path,
+)

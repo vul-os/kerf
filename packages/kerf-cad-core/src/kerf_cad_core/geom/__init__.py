@@ -395,6 +395,13 @@ from kerf_cad_core.geom.subd_authoring import subd_edge_split
 from kerf_cad_core.geom.subd_authoring import subd_set_bevel_weight
 # GK-108: Loop subdivision scheme (triangle mesh)
 from kerf_cad_core.geom.subd_authoring import loop_subdivide
+# GK-P SubD boundary→curve snap
+from kerf_cad_core.geom.subd_boundary_replace import (
+    BoundaryLoop,
+    BoundarySnapResult,
+    extract_boundary_loops,
+    snap_boundary_to_curve,
+)
 # GK-87: pattern (linear / circular / path)
 from kerf_cad_core.geom.pattern import (
     linear_pattern,
@@ -789,6 +796,11 @@ __all__ = [
     "subd_set_bevel_weight",
     # GK-108
     "loop_subdivide",
+    # GK-P SubD boundary→curve snap
+    "BoundaryLoop",
+    "BoundarySnapResult",
+    "extract_boundary_loops",
+    "snap_boundary_to_curve",
     # GK-93
     "detect_symmetry",
     # GK-85

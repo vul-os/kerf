@@ -824,6 +824,238 @@ def _try_sew(faces: List[Face], tol: float) -> Optional[Shell]:
 # Main boolean engine
 # ---------------------------------------------------------------------------
 
+
+
+# ---------------------------------------------------------------------------
+# GK-P-B: Exact UV-trim at SSI curves
+# ---------------------------------------------------------------------------
+
+
+def _classify_ssi_branch(
+    curve: "IntersectionCurve",
+    srf_a: "NurbsSurface",
+    srf_b: "NurbsSurface",
+    tangent_cos_threshold: float = 0.98,
+) -> str:
+    """Classify an SSI branch as 'transversal' or 'tangential'.
+
+    When |nA.nB| > threshold the normals are nearly parallel (grazing
+    contact) -> 'tangential'.  Otherwise 'transversal'.
+    """
+    n = len(curve.params_a)
+    if n == 0:
+        return "transversal"
+    mid = n // 2
+    try:
+        ua, va = float(curve.params_a[mid, 0]), float(curve.params_a[mid, 1])
+        ub, vb = float(curve.params_b[mid, 0]), float(curve.params_b[mid, 1])
+        na = _unit(_surf_normal(srf_a, ua, va))
+        nb = _unit(_surf_normal(srf_b, ub, vb))
+        cos_theta = abs(float(np.dot(na, nb)))
+        return "tangential" if cos_theta > tangent_cos_threshold else "transversal"
+    except Exception:
+        return "transversal"
+
+
+@dataclass
+class _TrimResult:
+    """Outcome of _trim_face_by_ssi_branch."""
+
+    ok: bool
+    face_keep: Optional[Face]
+    reason: str = ""
+
+
+def _build_polyline_face(
+    surface: "NurbsSurface",
+    pts_3d: np.ndarray,
+    tol: float,
+    keep_side: str,
+) -> Optional[Face]:
+    """Build a B-rep Face on *surface* trimmed by a closed 3-D polyline.
+
+    keep_side: 'inside' keeps the enclosed region; 'outside' puts the loop
+    as an inner hole on the natural surface boundary.
+    Returns None on failure.
+    """
+    try:
+        from kerf_cad_core.geom.trim_curve import _PolylineCurve3  # noqa: PLC0415
+        from kerf_cad_core.geom.brep_build import _outer_loop_ccw, _natural_boundary  # noqa: PLC0415
+    except Exception:
+        return None
+
+    try:
+        loop_pts = np.asarray(pts_3d, dtype=float)
+        if float(np.linalg.norm(loop_pts[0] - loop_pts[-1])) > max(10.0 * tol, 1e-9):
+            loop_pts = np.vstack([loop_pts, loop_pts[0]])
+
+        poly_crv = _PolylineCurve3(loop_pts)
+        v_seam = Vertex(loop_pts[0].copy(), tol)
+        e_loop = Edge(poly_crv, 0.0, 1.0, v_seam, v_seam, tol)
+
+        if keep_side == "inside":
+            coedges, _ = _outer_loop_ccw(surface, [(e_loop, True)])
+            outer = Loop(coedges, is_outer=True)
+            face = Face(surface, [outer], orientation=True, tol=tol)
+        else:
+            _verts, edge_orients = _natural_boundary(surface, tol)
+            outer_coedges, _ = _outer_loop_ccw(surface, edge_orients)
+            outer = Loop(outer_coedges, is_outer=True)
+            ccw_inner, _ = _outer_loop_ccw(surface, [(e_loop, True)])
+            inner_coedges = [
+                Coedge(c.edge, not c.orientation) for c in reversed(ccw_inner)
+            ]
+            inner = Loop(inner_coedges, is_outer=False)
+            face = Face(surface, [outer, inner], orientation=True, tol=tol)
+
+        return face
+    except Exception:
+        return None
+
+
+def _trim_face_by_ssi_branch(
+    face: Face,
+    curve: "IntersectionCurve",
+    is_face_a: bool,
+    op: "BoolOp",
+    tol: float,
+) -> "_TrimResult":
+    """Trim *face* along one transversal closed SSI branch.
+
+    Only closed loops are trimmed exactly; open branches return ok=False
+    so the caller falls back to whole-face classification.
+    """
+    srf = _ensure_nurbs(face.surface)
+    if srf is None:
+        return _TrimResult(ok=False, face_keep=None, reason="non-NURBS surface")
+
+    if not curve.closed:
+        return _TrimResult(ok=False, face_keep=None, reason="open SSI branch")
+
+    params_uv = curve.params_a if is_face_a else curve.params_b
+    n_pts = len(curve.points)
+    if n_pts < 4 or len(params_uv) < 4:
+        return _TrimResult(ok=False, face_keep=None, reason="too few SSI samples")
+
+    uv_curve: List[Tuple[float, float]] = [
+        (float(params_uv[k, 0]), float(params_uv[k, 1])) for k in range(len(params_uv))
+    ]
+
+    # Determine keep side:
+    # Face A: union/subtract -> keep outside; intersect -> keep inside.
+    # Face B: union -> keep outside; intersect/subtract -> keep inside.
+    try:
+        from kerf_cad_core.geom.trim_curve import split_face_uv  # noqa: PLC0415
+        uv_arr = np.array(uv_curve, dtype=float)
+        uv_centroid = (float(uv_arr[:, 0].mean()), float(uv_arr[:, 1].mean()))
+        side = split_face_uv(uv_curve, uv_centroid, closed_loop=True)
+        centroid_is_inside_loop = side == "positive"
+    except Exception:
+        centroid_is_inside_loop = True
+
+    if is_face_a:
+        want_inside = op == "intersect"
+    else:
+        want_inside = op in ("intersect", "subtract")
+
+    keep_side = "inside" if (centroid_is_inside_loop == want_inside) else "outside"
+
+    pts_3d = curve.points
+    face_out = _build_polyline_face(srf, pts_3d, tol, keep_side)
+    if face_out is None:
+        return _TrimResult(ok=False, face_keep=None, reason="face build failed")
+
+    if op == "subtract" and not is_face_a:
+        face_out = _flip_face(face_out)
+
+    return _TrimResult(ok=True, face_keep=face_out)
+
+
+def _split_face_at_t_junction(
+    face: Face,
+    t_vertex_pt: np.ndarray,
+    tol: float,
+) -> bool:
+    """Insert an explicit vertex at a T-junction point via MEV.
+
+    Splits the boundary edge of *face* that passes within tol of
+    *t_vertex_pt* (but does not already end there) via the MEV Euler
+    operator.  Returns True when a split was made, False otherwise.
+    """
+    from kerf_cad_core.geom.brep import mev as _mev  # noqa: PLC0415
+
+    outer = face.outer_loop()
+    if outer is None:
+        return False
+
+    for ce in list(outer.coedges):
+        e = ce.edge
+        try:
+            t0, t1 = e.t0, e.t1
+            pts_along = [
+                np.asarray(e.curve.evaluate(float(t0 + (t1 - t0) * k / 20)), dtype=float).ravel()[:3]
+                for k in range(21)
+            ]
+            dists = [float(np.linalg.norm(p - t_vertex_pt)) for p in pts_along]
+            if min(dists) > tol * 10:
+                continue
+            d_start = float(np.linalg.norm(pts_along[0] - t_vertex_pt))
+            d_end = float(np.linalg.norm(pts_along[-1] - t_vertex_pt))
+            if d_start < tol * 10 or d_end < tol * 10:
+                continue  # already at endpoint
+            v_from = ce.start_vertex()
+            _mev(outer, v_from, t_vertex_pt, tol=tol)
+            return True
+        except Exception:
+            continue
+    return False
+
+
+def _collect_ssi_trim_results(
+    body_a: Body,
+    body_b: Body,
+    pair_curves: "Dict[Tuple[int, int], List[IntersectionCurve]]",
+    op: "BoolOp",
+    tol: float,
+) -> "Tuple[Dict[int, Optional[Face]], Dict[int, Optional[Face]]]":
+    """Attempt exact UV-trim for faces with transversal SSI branches.
+
+    Returns (trim_a, trim_b): face-index -> trimmed Face (or None when
+    trim was attempted but failed).
+    Tangential branches are skipped; whole-face fallback handles them.
+    """
+    faces_a = body_a.all_faces()
+    faces_b = body_b.all_faces()
+    trim_a: Dict[int, Optional[Face]] = {}
+    trim_b: Dict[int, Optional[Face]] = {}
+
+    for (i, j), curves in pair_curves.items():
+        fa = faces_a[i] if i < len(faces_a) else None
+        fb = faces_b[j] if j < len(faces_b) else None
+        if fa is None or fb is None:
+            continue
+
+        srf_a = _ensure_nurbs(fa.surface)
+        srf_b = _ensure_nurbs(fb.surface)
+        if srf_a is None or srf_b is None:
+            continue
+
+        for curve in curves:
+            kind = _classify_ssi_branch(curve, srf_a, srf_b)
+            if kind == "tangential":
+                # Tangential: no trim, whole-face fallback
+                continue
+
+            if i not in trim_a:
+                res_a = _trim_face_by_ssi_branch(fa, curve, True, op, tol)
+                trim_a[i] = res_a.face_keep
+
+            if j not in trim_b:
+                res_b = _trim_face_by_ssi_branch(fb, curve, False, op, tol)
+                trim_b[j] = res_b.face_keep
+
+    return trim_a, trim_b
+
 def nurbs_solid_boolean(
     body_a: Body,
     body_b: Body,
@@ -882,15 +1114,28 @@ def nurbs_solid_boolean(
     intersecting_a: Set[int] = set(k[0] for k in pair_curves)
     intersecting_b: Set[int] = set(k[1] for k in pair_curves)
 
-    # Step 2: Classify each face
+    # Step 2: Exact UV-trim for intersecting faces (GK-P-B)
+    trim_a, trim_b = _collect_ssi_trim_results(body_a, body_b, pair_curves, op, tol)
+
+    # Step 3: Assemble result faces (trimmed or whole-face fallback)
     result_faces: List[Face] = []
 
     for i, fa in enumerate(faces_a):
+        if i in intersecting_a:
+            trimmed = trim_a.get(i)
+            if trimmed is not None:
+                result_faces.append(trimmed)
+                continue
         cls = _classify_face_vs_body(fa, body_b)
         if _keep_face_a(cls, op):
             result_faces.append(fa)
 
     for j, fb in enumerate(faces_b):
+        if j in intersecting_b:
+            trimmed = trim_b.get(j)
+            if trimmed is not None:
+                result_faces.append(trimmed)
+                continue
         cls = _classify_face_vs_body(fb, body_a)
         if _keep_face_b(cls, op):
             face_to_add = _flip_face(fb) if op == "subtract" else fb
@@ -911,7 +1156,7 @@ def nurbs_solid_boolean(
     if not result_faces:
         return Body(solids=[])
 
-    # Step 3: Sew surviving faces
+    # Step 4: Sew surviving faces (whole + trimmed)
     shell = _try_sew(result_faces, tol)
     if shell is None:
         # Return the faces as an unvalidated open body rather than raising
@@ -1032,7 +1277,7 @@ if _REGISTRY_AVAILABLE:
                 "body_b_faces": len(body_b.all_faces()),
                 "result_faces": n_faces,
                 "valid": res.get("ok", True),
-                "method": "nurbs_solid_boolean",
+                "method": "nurbs_solid_boolean_uv_trim",
             })
         except Exception as exc:
             return err_payload(f"nurbs_solid_boolean failed: {exc}", "OP_FAILED")

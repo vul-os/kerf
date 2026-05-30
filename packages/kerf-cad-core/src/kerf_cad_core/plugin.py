@@ -53,6 +53,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.gears",
     "kerf_cad_core.geom.surface_boolean_robust",
     "kerf_cad_core.geom.nurbs_boolean",
+    # GK-P Wave 4P: far-offset robustness (Maekawa 1999) — nurbs_surface_offset_robust
+    "kerf_cad_core.geom.offset_far_tools",
     "kerf_cad_core.geom.trim_curve",
     "kerf_cad_core.geom.trim_loop_heal",   # GK-P: nurbs_trim_loop_heal tool
     "kerf_cad_core.nesting.tools",

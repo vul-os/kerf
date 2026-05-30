@@ -396,6 +396,14 @@ from kerf_cad_core.geom.surface_offset import (
     detect_self_intersection,
     trim_self_intersection_loops,
 )
+# GK-P Wave 4P: far-offset robustness (Maekawa 1999 §6; Hoschek-Lasser 1993 §17)
+from kerf_cad_core.geom.offset_far_correction import (
+    UnsafeRegion,
+    GracefulOffsetResult,
+    safe_offset_distance,
+    offset_with_local_refinement,
+    graceful_offset,
+)
 # GK-96: reverse curve/surface direction
 from kerf_cad_core.geom.nurbs import reverse_curve, reverse_surface
 # GK-97: reparametrize curve/surface (normalize knots, domain rescale, arc-length)
@@ -734,6 +742,12 @@ __all__ = [
     "offset_surface",
     "detect_self_intersection",
     "trim_self_intersection_loops",
+    # GK-P Wave 4P
+    "UnsafeRegion",
+    "GracefulOffsetResult",
+    "safe_offset_distance",
+    "offset_with_local_refinement",
+    "graceful_offset",
     # GK-87
     "linear_pattern",
     "circular_pattern",

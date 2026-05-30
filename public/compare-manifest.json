@@ -3635,6 +3635,20 @@
         },
         {
           "domain": "D10",
+          "feature": "Cortex-M memory-layout verifier (linker map check)",
+          "competitor": {
+            "status": "no",
+            "note": "OpenPLC has no linker memory-map analysis; Flash/SRAM overflow is discovered only at link time",
+            "source": "https://www.openplcproject.com/reference"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "firmware_verify_memory_map: FLASH_OVERFLOW, SRAM_OVERFLOW, STACK_OVERFLOW_INTO_BSS, VECTOR_TABLE_MISPLACED (ARM Cortex-M UG §B3.2.4), ISR_COUNT_MISMATCH; STM32F411 512 KB Flash/128 KB SRAM (RM0383 §3) + STM32F407 1 MB/128 KB (RM0090 §3); 63 tests. STATIC SECTION-SIZE CHECK ONLY — does not run the linker.",
+            "evidence": "packages/kerf-firmware/src/kerf_firmware/memory_map_verify.py"
+          }
+        },
+        {
+          "domain": "D10",
           "feature": "Solar PV (system + partial shading)",
           "competitor": {
             "status": "no",

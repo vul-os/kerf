@@ -345,3 +345,19 @@ def _register_tools(ctx, provides: list) -> None:
         logger.warning(
             "kerf-firmware: failed to load firmware_verify_interrupt_priorities tool: %s", exc
         )
+    # firmware_verify_memory_map — Cortex-M linker memory-layout verifier
+    try:
+        from kerf_firmware.tools.firmware_verify_memory_map import (
+            _spec as _mm_spec,
+            run_firmware_verify_memory_map_async as _mm_fn,
+        )
+        ctx.tools.register(
+            "firmware_verify_memory_map",
+            _mm_spec,
+            _mm_fn,
+        )
+        provides.append("firmware.memory_map_verify")
+    except Exception as exc:
+        logger.warning(
+            "kerf-firmware: failed to load firmware_verify_memory_map tool: %s", exc
+        )

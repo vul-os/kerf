@@ -278,6 +278,15 @@ from kerf_cad_core.geom.curvature_metrics import (
     curvature_variance_metric,
     isophote_density_metric,
 )
+# GK-P (curvature gradient field + ridge/valley lines — Pottmann-Wallner §11)
+from kerf_cad_core.geom.curvature_gradient import (
+    CurvatureGradientResult,
+    RidgeLine,
+    compute_curvature_gradient,
+    compute_ridge_lines,
+    compute_valley_lines,
+    curvature_gradient_field_visualization,
+)
 # GK-47: STEP reader
 from kerf_cad_core.geom.io.step_read import read_step, StepReadError
 # GK-48: STEP writer
@@ -703,6 +712,10 @@ __all__ = [
     # GK-P curvature-comb
     "CurvaturePeak","CurvaturePeakReport",
     "curvature_comb_peaks","curvature_variance_metric","isophote_density_metric",
+    # GK-P: curvature gradient field + ridge/valley tracing (Pottmann-Wallner §11)
+    "CurvatureGradientResult","RidgeLine",
+    "compute_curvature_gradient","compute_ridge_lines","compute_valley_lines",
+    "curvature_gradient_field_visualization",
     "read_step","StepReadError",
     "write_step","StepWriteError",
     # GK-23

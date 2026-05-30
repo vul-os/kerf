@@ -173,6 +173,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.jewelry.gallery",
     "kerf_cad_core.jewelry.head_wizard",
     "kerf_cad_core.geom.subd",
+    # GK-P SubD/mesh: SubD-cage boolean (transversal case, Cohen-Or-Sheffer 2003)
+    "kerf_cad_core.geom.subd_csg_tools",
     "kerf_cad_core.geom.blocks",
     "kerf_cad_core.geom.mesh_to_nurbs",
     "kerf_cad_core.geom.section_contour",

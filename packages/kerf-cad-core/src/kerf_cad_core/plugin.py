@@ -173,6 +173,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.body_hollow",
     "kerf_cad_core.geom.patch_srf",
     "kerf_cad_core.geom.revolve_srf",
+    # GK-P: N-sided Coons + Gregory + Hosaka-Kimura patch fit
+    "kerf_cad_core.geom.network_surface_tools",
     "kerf_cad_core.jewelry.production",
     "kerf_cad_core.jewelry.gem_studio",
     "kerf_cad_core.jewelry.gallery",

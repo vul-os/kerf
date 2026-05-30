@@ -864,6 +864,10 @@ __all__ = [
     "morph_cross_sections",
     "blend_cross_section_at",
     "blend_volume_estimate",
+    # GK-P: N-sided patch
+    "fit_network_patch",
+    "fit_n_sided_g1_blend",
+    "fairness_metric",
 ]
 
 # Variable-section edge blend (Vida-Martin-Varady 1994 §4)
@@ -930,4 +934,10 @@ from kerf_cad_core.geom.bezier_extract import (
     extract_bezier_curve,
     extract_bezier_surface,
     reconstruct_from_beziers,
+)
+# GK-P (N-sided patch): Coons + Gregory + Hosaka-Kimura N-sided patch fit
+from kerf_cad_core.geom.network_surface import (
+    fit_network_patch,
+    fit_n_sided_g1_blend,
+    fairness_metric,
 )

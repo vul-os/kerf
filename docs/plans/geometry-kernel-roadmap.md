@@ -1224,6 +1224,7 @@ layer (history/UI/CAM/FEM packages), not the geometry kernel.
 | Sweep1 / Sweep2 / SweepN | ✅ GK-14/15/16/90 |
 | Loft / skin / revolve | ✅ |
 | Coons / patch / network / Gordon | ✅ GK-42 |
+| N-sided patch (Coons + Gregory + Hosaka-Kimura) | ✅ GK-P (`network_surface.py`) |
 | Blend G1 / G2 / G3 | ✅ GK-43/62 (G3 wired GK-P01) |
 | Variable-radius fillet (G1) | ✅ GK-28 |
 | Match-surface (G1/G2 verify) | ✅ GK-44 |

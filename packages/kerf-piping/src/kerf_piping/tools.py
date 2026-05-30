@@ -1,13 +1,11 @@
 """
-kerf_piping LLM tools — P&ID routing + import + ASME B31 pressure-loss.
+kerf_piping LLM tools — P&ID routing + import.
 
 Tools
 -----
 piping_route_isometric  Route a pipe between equipment nozzles and return fitting counts.
 piping_import_pid       Parse a text-format P&ID specification into the data model.
 piping_export_svg       Export a P&ID diagram as an SVG string.
-piping_pressure_loss    Darcy-Weisbach + Crane TP-410 K-factor pressure loss for a single run.
-piping_pipeline_drop    Total ASME B31 pipeline pressure drop (segments + fittings).
 """
 
 from __future__ import annotations
@@ -509,213 +507,203 @@ async def run_piping_pipe_spec_check(args: dict[str, Any], ctx: "ProjectCtx") ->
 
 
 # ---------------------------------------------------------------------------
-# piping_pressure_loss  (ASME B31 / Crane TP-410)
+# piping_min_wall_thickness  (ASME B31.1 §104.1.2 Eq. 7)
 # ---------------------------------------------------------------------------
 
-piping_pressure_loss_spec = ToolSpec(
-    name="piping_pressure_loss",
+piping_min_wall_thickness_spec = ToolSpec(
+    name="piping_min_wall_thickness",
     description=(
-        "Compute frictional pressure loss for a straight pipe run using "
-        "Darcy-Weisbach with Colebrook-White friction factor (Crane Technical "
-        "Paper 410 §1).  Optionally add fitting K-factor losses for one fitting "
-        "type per call.  Returns ΔP in psi.\n\n"
-        "DISCLAIMER: values from ASME B31 / Crane TP-410 — NOT certified "
-        "compliance.  Have results reviewed by a licensed engineer.\n\n"
-        "Supported fluids: 'water' (default), 'oil', 'air', 'steam'.\n"
-        "Default roughness 0.00015 ft = commercial steel per Crane TP-410 App. B.\n\n"
-        "Known fitting_kind values (Crane TP-410 §3 K-factors):\n"
-        "  90_elbow_threaded (K=0.50), 90_elbow_welded (K=0.30),\n"
-        "  45_elbow_threaded (K=0.38), 45_elbow_welded (K=0.20),\n"
-        "  tee_through (K=0.40), tee_branch (K=1.00),\n"
-        "  gate_valve_open (K=0.15), globe_valve (K=10.0),\n"
-        "  check_valve (K=2.00), ball_valve_open (K=0.07),\n"
-        "  butterfly_valve_open (K=0.30), angle_valve_open (K=2.00),\n"
-        "  reducer_sudden (K=0.5·(1−β²)²), expander_sudden (K=(1−β²)²)."
+        "Calculate the minimum pipe wall thickness per ASME B31.1-2022 §104.1.2 "
+        "Equation 7 (Power Piping).  Applies to straight pipe under internal "
+        "pressure.  Returns minimum required thickness, ordered minimum thickness "
+        "(including mill tolerance), maximum allowable working pressure, and "
+        "recommended ASME schedule.  "
+        "\n\nFormula (Eq. 7): t = P·D / (2·(S·E + P·y)) + A"
+        "\nWhere P = design pressure, D = outside diameter, S = allowable stress, "
+        "E = joint efficiency, y = Table 104.1.2-1 coefficient, A = corrosion allowance.  "
+        "\n\nDISCLAIMER: ASME B31.1 methods — NOT ASME stamp certified.  "
+        "Review by a licensed Professional Engineer required for physical installation."
     ),
     input_schema={
         "type": "object",
         "properties": {
+            "pressure_psi": {
+                "type": "number",
+                "description": "Internal design gauge pressure (psi).",
+            },
             "diameter_in": {
                 "type": "number",
-                "description": "Internal pipe diameter (inches).",
-            },
-            "length_ft": {
-                "type": "number",
-                "description": "Pipe run length (feet).",
-            },
-            "flow_gpm": {
-                "type": "number",
-                "description": "Volumetric flow rate (US gallons per minute).",
-            },
-            "fluid": {
-                "type": "string",
-                "enum": ["water", "oil", "air", "steam"],
-                "description": "Fluid type. Default 'water'.",
-            },
-            "roughness": {
-                "type": "number",
                 "description": (
-                    "Absolute pipe wall roughness (feet). "
-                    "Default 0.00015 ft (commercial steel)."
+                    "Pipe outside diameter (inches).  "
+                    "Standard NPS values: 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, "
+                    "3.0, 4.0, 6.0 (OD 6.625\"), 8.0 (OD 8.625\"), 10.0, 12.0.  "
+                    "Pass the NPS size or the actual OD — both are accepted."
                 ),
             },
-            "fitting_kind": {
+            "material": {
                 "type": "string",
+                "enum": ["A106-B", "A53-B", "A312-304", "A312-316"],
                 "description": (
-                    "Optional: include one fitting type to add its K-factor ΔP. "
-                    "See tool description for valid values."
+                    "Material key for ASME B31.1 Table A-1 allowable stress lookup.  "
+                    "A106-B = carbon steel seamless (most common power piping); "
+                    "A53-B = ERW/seamless lower grade; "
+                    "A312-304 = SS 304; A312-316 = SS 316.  Default 'A106-B'."
                 ),
             },
-            "fitting_qty": {
-                "type": "integer",
-                "description": "Number of fittings of fitting_kind. Default 1.",
-            },
-            "fitting_beta": {
+            "temp_F": {
                 "type": "number",
                 "description": (
-                    "Diameter ratio (d_small/d_large) for reducer/expander. "
-                    "Required only for 'reducer_sudden' and 'expander_sudden'."
+                    "Design temperature (°F).  Used to look up allowable stress "
+                    "from Table A-1 and y coefficient from Table 104.1.2-1.  "
+                    "Default 70 (ambient)."
+                ),
+            },
+            "joint_efficiency": {
+                "type": "number",
+                "description": (
+                    "Longitudinal weld joint efficiency E.  "
+                    "1.0 = seamless (default); 0.85 = ERW; 0.80 = furnace-butt-weld."
+                ),
+            },
+            "mill_tolerance_pct": {
+                "type": "number",
+                "description": (
+                    "Under-thickness mill tolerance (%).  "
+                    "ASME B36.10M standard = 12.5% (default)."
+                ),
+            },
+            "corrosion_allowance_in": {
+                "type": "number",
+                "description": (
+                    "Corrosion/erosion allowance (inches).  "
+                    "Include thread or groove depth if applicable.  "
+                    "Default 0.0625\" (1/16\")."
                 ),
             },
         },
-        "required": ["diameter_in", "length_ft", "flow_gpm"],
+        "required": ["pressure_psi", "diameter_in"],
     },
 )
 
 
-async def run_piping_pressure_loss(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+async def run_piping_min_wall_thickness(args: dict[str, Any], ctx: "ProjectCtx") -> str:
     try:
-        from kerf_piping.asme_pressure import (
-            darcy_weisbach_loss,
-            fitting_k_factor,
-            _k_to_psi,
+        from kerf_piping.wall_thickness import (
+            min_wall_thickness_b31_1,
+            material_allowable_stress,
         )
 
-        d_in    = float(args["diameter_in"])
-        l_ft    = float(args["length_ft"])
-        q_gpm   = float(args["flow_gpm"])
-        fluid   = str(args.get("fluid", "water")).lower()
-        rough   = float(args.get("roughness", 0.00015))
+        pressure_psi = float(args["pressure_psi"])
+        diameter_in = float(args["diameter_in"])
+        material = str(args.get("material", "A106-B"))
+        temp_F = float(args.get("temp_F", 70.0))
+        joint_efficiency = float(args.get("joint_efficiency", 1.0))
+        mill_tolerance_pct = float(args.get("mill_tolerance_pct", 12.5))
+        corrosion_allowance_in = float(args.get("corrosion_allowance_in", 0.0625))
 
-        pipe_dp = darcy_weisbach_loss(d_in, l_ft, q_gpm, fluid, rough)
+        # Look up allowable stress from Table A-1
+        try:
+            S = material_allowable_stress(material, temp_F)
+        except (KeyError, ValueError) as exc:
+            return err_payload(str(exc), "BAD_MATERIAL_OR_TEMP")
 
-        fitting_dp = 0.0
-        fitting_detail: dict[str, Any] = {}
-        if "fitting_kind" in args and args["fitting_kind"]:
-            fk   = str(args["fitting_kind"])
-            qty  = int(args.get("fitting_qty", 1))
-            beta = float(args.get("fitting_beta", 1.0))
-            k    = fitting_k_factor(fk, d_in, beta)
-            fitting_dp = _k_to_psi(k, d_in, q_gpm, fluid) * qty
-            fitting_detail = {
-                "fitting_kind": fk,
-                "quantity": qty,
-                "K": round(k, 5),
-                "fitting_dp_psi": round(fitting_dp, 6),
-            }
-
-        total_dp = pipe_dp + fitting_dp
+        result = min_wall_thickness_b31_1(
+            pressure_psi=pressure_psi,
+            diameter_in=diameter_in,
+            allowable_stress_psi=S,
+            joint_efficiency=joint_efficiency,
+            mill_tolerance_pct=mill_tolerance_pct,
+            corrosion_allowance_in=corrosion_allowance_in,
+            temp_F=temp_F,
+            material=material,
+        )
 
         payload: dict[str, Any] = {
-            "pipe_dp_psi": round(pipe_dp, 6),
-            "fitting_dp_psi": round(fitting_dp, 6),
-            "total_dp_psi": round(total_dp, 4),
-            "diameter_in": d_in,
-            "length_ft": l_ft,
-            "flow_gpm": q_gpm,
-            "fluid": fluid,
-            "disclaimer": (
-                "Values from ASME B31 / Crane TP-410 — NOT certified compliance."
-            ),
+            "ok": True,
+            "material": material,
+            "temp_F": temp_F,
+            "allowable_stress_psi": round(S, 1),
+            **result,
         }
-        if fitting_detail:
-            payload["fitting"] = fitting_detail
-
         return ok_payload(payload)
 
     except Exception as exc:
-        return err_payload(str(exc), "PIPING_PRESSURE_LOSS_ERROR")
+        return err_payload(str(exc), "PIPING_WALL_THICKNESS_ERROR")
 
 
 # ---------------------------------------------------------------------------
-# piping_pipeline_drop  (ASME B31 total pipeline ΔP)
+# piping_recommend_schedule  (ASME B36.10M schedule selector)
 # ---------------------------------------------------------------------------
 
-piping_pipeline_drop_spec = ToolSpec(
-    name="piping_pipeline_drop",
+piping_recommend_schedule_spec = ToolSpec(
+    name="piping_recommend_schedule",
     description=(
-        "Compute the total ASME B31 pressure drop for a complete pipeline: "
-        "sum of Darcy-Weisbach straight-pipe losses over all segments plus "
-        "Crane TP-410 §3 K-factor losses for all fittings.  Assumes "
-        "incompressible, single-phase, steady-state flow at constant GPM.\n\n"
-        "DISCLAIMER: values from ASME B31 / Crane TP-410 — NOT certified "
-        "compliance.  Have results reviewed by a licensed engineer.\n\n"
-        "Segment dict keys: diameter_in (float), length_ft (float), "
-        "roughness (float, optional, ft), fluid (str, optional).\n"
-        "Fitting dict keys: fitting_kind (str), diameter_in (float), "
-        "beta (float, optional), quantity (int, optional), fluid (str, optional).\n\n"
-        "Known fitting_kind values: 90_elbow_threaded (0.50), 90_elbow_welded (0.30), "
-        "tee_through (0.40), tee_branch (1.00), gate_valve_open (0.15), "
-        "globe_valve (10.0), check_valve (2.00), reducer_sudden, expander_sudden."
+        "Recommend the thinnest ASME B36.10M pipe schedule whose nominal wall "
+        "thickness is ≥ the specified minimum required wall thickness.  "
+        "Inputs are the NPS size (in inches) and the minimum wall thickness (inches).  "
+        "Returns a schedule code (e.g. '40', '80', '160', 'XXS') or "
+        "'EXCEEDS-XXS' if no standard schedule is sufficient.  "
+        "\n\nTypical NPS sizes: 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 6.0, 8.0, 10.0, 12.0.  "
+        "Use piping_min_wall_thickness to get the minimum wall thickness first, "
+        "then call this tool to select the schedule — or use the schedule_recommended "
+        "field that piping_min_wall_thickness already returns.  "
+        "\n\nDISCLAIMER: ASME B31.1 methods — NOT ASME stamp certified."
     ),
     input_schema={
         "type": "object",
         "properties": {
-            "segments": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "diameter_in": {"type": "number"},
-                        "length_ft":   {"type": "number"},
-                        "roughness":   {"type": "number"},
-                        "fluid":       {"type": "string"},
-                    },
-                    "required": ["diameter_in", "length_ft"],
-                },
-                "description": "List of straight-pipe segments.",
-            },
-            "fittings": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "fitting_kind": {"type": "string"},
-                        "diameter_in":  {"type": "number"},
-                        "beta":         {"type": "number"},
-                        "quantity":     {"type": "integer"},
-                        "fluid":        {"type": "string"},
-                    },
-                    "required": ["fitting_kind", "diameter_in"],
-                },
-                "description": "List of fittings (valves, elbows, tees, etc.).",
-            },
-            "flow_gpm": {
+            "nps_in": {
                 "type": "number",
-                "description": "Total flow rate (US gallons per minute).",
+                "description": (
+                    "Nominal pipe size (NPS) in inches.  "
+                    "E.g. 6.0 for NPS 6, 4.0 for NPS 4.  "
+                    "Supported: 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0, "
+                    "4.0, 6.0, 8.0, 10.0, 12.0."
+                ),
             },
-            "fluid": {
-                "type": "string",
-                "enum": ["water", "oil", "air", "steam"],
-                "description": "Default fluid for all segments/fittings. Default 'water'.",
+            "min_thickness_in": {
+                "type": "number",
+                "description": (
+                    "Minimum required wall thickness (inches).  "
+                    "Use the ordered_min_thickness_in from piping_min_wall_thickness."
+                ),
             },
         },
-        "required": ["segments", "fittings", "flow_gpm"],
+        "required": ["nps_in", "min_thickness_in"],
     },
 )
 
 
-async def run_piping_pipeline_drop(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+async def run_piping_recommend_schedule(args: dict[str, Any], ctx: "ProjectCtx") -> str:
     try:
-        from kerf_piping.asme_pressure import compute_pipeline_pressure_drop
+        from kerf_piping.wall_thickness import recommend_schedule, _WALL_THICKNESS_IN
+        import math
 
-        segments = args.get("segments", [])
-        fittings = args.get("fittings", [])
-        q_gpm    = float(args["flow_gpm"])
-        fluid    = str(args.get("fluid", "water")).lower()
+        nps_in = float(args["nps_in"])
+        min_thickness_in = float(args["min_thickness_in"])
 
-        result = compute_pipeline_pressure_drop(segments, fittings, q_gpm, fluid)
-        return ok_payload(result)
+        schedule = recommend_schedule(nps_in, min_thickness_in)
+
+        # Look up the actual wall for this NPS + schedule (if found)
+        actual_wall = None
+        if schedule not in ("NPS-NOT-FOUND", "EXCEEDS-XXS"):
+            for (nps, sched), t in _WALL_THICKNESS_IN.items():
+                if math.isclose(nps, nps_in, rel_tol=1e-4) and sched == schedule:
+                    actual_wall = round(t, 4)
+                    break
+
+        payload: dict[str, Any] = {
+            "ok": True,
+            "nps_in": nps_in,
+            "min_thickness_in": round(min_thickness_in, 5),
+            "schedule_recommended": schedule,
+            "actual_wall_in": actual_wall,
+            "caveat": (
+                "ASME B36.10M schedule lookup — NOT ASME stamp certified.  "
+                "Review by a licensed Professional Engineer required before use."
+            ),
+        }
+        return ok_payload(payload)
 
     except Exception as exc:
-        return err_payload(str(exc), "PIPING_PIPELINE_DROP_ERROR")
+        return err_payload(str(exc), "PIPING_SCHEDULE_ERROR")

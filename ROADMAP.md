@@ -64,6 +64,9 @@ The sector work only matters if you **own your work, are not locked in, and can 
 ### Latest delta — 2026-05-30
 
 **SubD ridge/valley/parabolic-line detection** ✅ — discrete differential-geometry on Catmull-Clark limit surfaces: angle-deficit Gaussian curvature + cotangent Laplacian mean curvature + Taubin curvature tensor; ridge lines (∂κ₁/∂e₁=0), valley lines (∂κ₂/∂e₂=0), parabolic lines (K=0 contour) extracted as polylines; LLM tool `subd_detect_features`; 23 oracle tests (flat plane, CC sphere, creased cube, saddle mesh) — `kerf-cad-core/geom/subd_ridge_valley.py`.
+### Latest delta — 2026-05-30
+
+**Piping wall thickness (ASME B31.1)** ✅ — ASME B31.1-2022 §104.1.2 Eq. 7 minimum wall thickness sizing (`piping_min_wall_thickness` LLM tool); ASME B36.10M schedule recommendation (`piping_recommend_schedule` LLM tool); Table A-1 allowable stress lookup with temperature interpolation for A106-B / A53-B / A312-304 / A312-316 (four materials, eight temperature breakpoints); Table 104.1.2-1 y-coefficient (ferritic/austenitic); fully-restrained thermal stress σ_th = E·α·ΔT; mill-tolerance ordering; MAWP back-calculation; 37 hermetic oracle-asserted tests — `kerf-piping/src/kerf_piping/wall_thickness.py`. *Disclaimer: ASME B31.1 methods — NOT ASME stamp certified.*
 
 ### Latest delta — 2026-05-26
 **PV latitude-aware TMY** ✅ — `monthly_yield_factors(latitude_deg)` in `solarpv/tmy.py` returns TMY3-derived (NREL/TP-581-43156) monthly irradiance fractions keyed to latitude band (0°–70°, 10° steps, linearly interpolated); Southern-hemisphere sites automatically receive the seasonally-flipped profile; `POST /energy/pv-shading` endpoint wired to use latitude-aware fractions instead of fixed Northern-Hemisphere constants; `PVShadingPanel` latitude input exposed in UI with hemisphere hint; 29 hermetic tests green.

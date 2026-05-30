@@ -205,6 +205,12 @@ from kerf_cad_core.geom.composite_g2 import (
     CompositeAuditResult,
     JointAudit,
 )
+# GK-P: Precise NURBS arc-length (Gauss-Legendre + adaptive subdivision)
+from kerf_cad_core.geom.arc_length_gauss import (
+    arc_length_precise,
+    arc_length_parametrize as arc_length_parametrize_gauss,
+    reparametrize_arclength as reparametrize_arclength_gauss,
+)
 # GK-11: curve-curve intersection hardening
 from kerf_cad_core.geom.intersection import (
     curve_curve_intersect,
@@ -626,6 +632,10 @@ __all__ = [
     # GK-98
     "curve_length",
     "arc_length_param",
+    # GK-P: Precise NURBS arc-length (Gauss-Legendre + adaptive subdivision)
+    "arc_length_precise",
+    "arc_length_parametrize_gauss",
+    "reparametrize_arclength_gauss",
     # GK-99
     "mid_curve",
     # GK-100

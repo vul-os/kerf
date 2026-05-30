@@ -192,6 +192,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 - **Sketcher** — collinear constraint, ellipse solver entity, G2 continuity.
 - **Interop** — 3DM write with read→write→read Hausdorff oracle.
 - **Composite curve G2 audit + upgrade** ✅ — `composite_g2.py`: audit + auto-blend (cubic Hermite / quintic Bezier); LLM tools registered; 27 tests green.
+- **Precise NURBS arc-length (Gauss-Legendre + adaptive subdivision)** ✅ — `arc_length_precise` (5-pt GL + bounded-error recursive bisection, rel_tol/abs_tol contract); `arc_length_parametrize_gauss` (s↔t lookup via bisection on cumulative integral); `reparametrize_arclength_gauss`; LLM tool `nurbs_curve_arc_length`; 13 analytic-oracle tests (straight-line ≤1e-12, circle 2π ≤1e-9, bounded-error, round-trip ±1e-6).
 
 ### Mechanical / CAD
 

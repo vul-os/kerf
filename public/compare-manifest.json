@@ -5310,6 +5310,19 @@
         },
         {
           "domain": "D7",
+          "feature": "Feed-rate optimizer (Altintas 2012 + tool material DB)",
+          "competitor": {
+            "status": "partial",
+            "note": "Fusion 360 CAM applies feeds & speeds from material library but does not expose Altintas chip-load / deflection optimizer"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Altintas 2012 chip-load model (Table 3.1) + machine acceleration cap (§3.6) + tool deflection (Euler-Bernoulli); 9 materials × 5 tool classes; MRR + cycle-time estimator. Altintas reference data — NOT cutting-tool-manufacturer-certified.",
+            "evidence": "packages/kerf-manufacturing/src/kerf_manufacturing/feed_rate.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "Moldflow / fill sim",
           "competitor": {
             "status": "paid",

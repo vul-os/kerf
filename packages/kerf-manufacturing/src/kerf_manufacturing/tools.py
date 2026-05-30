@@ -3,9 +3,13 @@ LLM tool definitions for kerf-manufacturing.
 
 Tools
 -----
-manufacturing_moldflow  — Hele-Shaw isothermal injection-moulding fill
-                          simulation (v1: fill-time map, weld-line detection,
-                          short-shot flag).
+manufacturing_moldflow       — Hele-Shaw isothermal injection-moulding fill
+                               simulation (v1: fill-time map, weld-line detection,
+                               short-shot flag).
+manufacturing_optimize_feed  — CAM feed-rate optimizer: compute recommended feed
+                               per segment from chip-load model + machine dynamics
+                               + tool deflection (Altintas 2012).
+manufacturing_cycle_time     — Estimate CNC cycle time from an optimized toolpath.
 """
 
 from __future__ import annotations
@@ -210,9 +214,243 @@ async def run_manufacturing_moldflow(params: dict, ctx: "ProjectCtx") -> str:
 
 
 # ---------------------------------------------------------------------------
+# manufacturing_optimize_feed
+# ---------------------------------------------------------------------------
+
+manufacturing_optimize_feed_spec = ToolSpec(
+    name="manufacturing_optimize_feed",
+    description=(
+        "Optimize the CNC feed rate for each segment of a toolpath using chip-load "
+        "theory (Altintas 2012 Table 3.1), machine acceleration limits (Altintas §3.6), "
+        "and tool deflection (Euler-Bernoulli cantilever model).\n"
+        "\n"
+        "DISCLAIMER: Reference values are from Altintas 2012 — NOT cutting-tool-"
+        "manufacturer-certified.  Always verify with your tool supplier.\n"
+        "\n"
+        "toolpath_segments : list of segment dicts, each with:\n"
+        "  length_mm       : float — segment length (mm)\n"
+        "  doc_mm          : float — axial depth of cut (mm)\n"
+        "  woc_mm          : float — radial width of cut (mm)\n"
+        "  feed_override   : float (optional) — manual feed override (mm/min)\n"
+        "\n"
+        "material : str — work material: 'aluminum', 'steel', 'stainless',\n"
+        "                 'cast_iron', 'plastic', 'titanium', 'brass', 'copper'\n"
+        "\n"
+        "tool : dict —\n"
+        "  kind          : str   — 'hss'|'carbide'|'carbide_uncoated'|'ceramic'|'cermet'\n"
+        "  diameter_mm   : float\n"
+        "  n_flutes      : int   (optional)\n"
+        "  overhang_mm   : float (optional — cantilever length for deflection cap)\n"
+        "  e_gpa         : float (optional — tool Young's modulus; default 620 GPa carbide)\n"
+        "\n"
+        "dynamic_limits : dict —\n"
+        "  max_feed_mm_min   : float — absolute feed cap (mm/min)\n"
+        "  max_accel_mm_s2   : float — max table acceleration (mm/s²)\n"
+        "  jerk_limit_mm_s3  : float (optional)\n"
+        "\n"
+        "Returns list of objects, one per segment:\n"
+        "  segment_id         : int\n"
+        "  length_mm          : float\n"
+        "  base_feed_mm_min   : float — chip-load feed before dynamic caps\n"
+        "  feed_mm_min        : float — final optimized feed\n"
+        "  cap_reason         : str   — 'nominal'|'acceleration'|'deflection'|'override'\n"
+        "  mrr_mm3_per_min    : float — material removal rate\n"
+        "  doc_mm             : float\n"
+        "  woc_mm             : float\n"
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "toolpath_segments": {
+                "type": "array",
+                "description": "List of toolpath segment descriptors.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "length_mm": {"type": "number"},
+                        "doc_mm": {"type": "number"},
+                        "woc_mm": {"type": "number"},
+                        "feed_override": {"type": "number"},
+                    },
+                    "required": ["length_mm", "doc_mm", "woc_mm"],
+                },
+                "minItems": 1,
+            },
+            "material": {
+                "type": "string",
+                "description": (
+                    "Work material: 'aluminum', 'steel', 'stainless', 'cast_iron', "
+                    "'plastic', 'titanium', 'brass', 'copper'."
+                ),
+            },
+            "tool": {
+                "type": "object",
+                "description": "Tool descriptor (kind, diameter_mm, n_flutes, overhang_mm, e_gpa).",
+                "properties": {
+                    "kind": {"type": "string"},
+                    "diameter_mm": {"type": "number"},
+                    "n_flutes": {"type": "integer"},
+                    "overhang_mm": {"type": "number"},
+                    "e_gpa": {"type": "number"},
+                },
+                "required": ["kind", "diameter_mm"],
+            },
+            "dynamic_limits": {
+                "type": "object",
+                "description": "Machine dynamic limits.",
+                "properties": {
+                    "max_feed_mm_min": {"type": "number", "default": 10000.0},
+                    "max_accel_mm_s2": {"type": "number", "default": 500.0},
+                    "jerk_limit_mm_s3": {"type": "number"},
+                },
+            },
+        },
+        "required": ["toolpath_segments", "material", "tool"],
+    },
+)
+
+
+async def run_manufacturing_optimize_feed(params: dict, ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_manufacturing.feed_rate import optimize_toolpath_feed
+
+        segments = params.get("toolpath_segments")
+        if not segments:
+            return err_payload("toolpath_segments is required and must be non-empty", "BAD_ARGS")
+
+        material = params.get("material")
+        if not material:
+            return err_payload("material is required", "BAD_ARGS")
+
+        tool = params.get("tool")
+        if not tool:
+            return err_payload("tool is required", "BAD_ARGS")
+
+        dynamic_limits = params.get("dynamic_limits") or {}
+
+        result = optimize_toolpath_feed(
+            toolpath_segments=segments,
+            material=material,
+            tool=tool,
+            dynamic_limits=dynamic_limits,
+        )
+
+        return ok_payload({
+            "ok": True,
+            "n_segments": len(result),
+            "segments": [
+                {
+                    "segment_id": s.segment_id,
+                    "length_mm": s.length_mm,
+                    "base_feed_mm_min": s.base_feed_mm_min,
+                    "feed_mm_min": s.feed_mm_min,
+                    "cap_reason": s.cap_reason,
+                    "mrr_mm3_per_min": s.mrr_mm3_per_min,
+                    "doc_mm": s.doc_mm,
+                    "woc_mm": s.woc_mm,
+                }
+                for s in result
+            ],
+            "disclaimer": (
+                "Altintas 2012 Table 3.1 reference data — "
+                "NOT cutting-tool-manufacturer-certified."
+            ),
+        })
+
+    except ValueError as exc:
+        return err_payload(str(exc), "BAD_ARGS")
+    except Exception as exc:
+        return err_payload(str(exc), "MANUFACTURING_OPTIMIZE_FEED_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# manufacturing_cycle_time
+# ---------------------------------------------------------------------------
+
+manufacturing_cycle_time_spec = ToolSpec(
+    name="manufacturing_cycle_time",
+    description=(
+        "Estimate the total CNC cycle time (seconds) from an optimized toolpath "
+        "produced by manufacturing_optimize_feed, or from any list of segments "
+        "with length_mm and feed_mm_min fields.\n"
+        "\n"
+        "Formula: t = Σ (length_i / feed_i) × 60  (length in mm, feed in mm/min)\n"
+        "\n"
+        "segments : list of dicts with:\n"
+        "  length_mm    : float — segment length (mm)\n"
+        "  feed_mm_min  : float — feed rate (mm/min)\n"
+        "\n"
+        "Returns:\n"
+        "  ok            : bool\n"
+        "  cycle_time_s  : float — total cycle time (seconds)\n"
+        "  cycle_time_min: float — total cycle time (minutes)\n"
+        "  n_segments    : int\n"
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "segments": {
+                "type": "array",
+                "description": "Toolpath segments, each with length_mm and feed_mm_min.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "length_mm": {"type": "number"},
+                        "feed_mm_min": {"type": "number"},
+                    },
+                    "required": ["length_mm", "feed_mm_min"],
+                },
+                "minItems": 1,
+            },
+        },
+        "required": ["segments"],
+    },
+)
+
+
+async def run_manufacturing_cycle_time(params: dict, ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_manufacturing.feed_rate import OptimizedSegment, estimate_cycle_time
+
+        raw_segs = params.get("segments")
+        if not raw_segs:
+            return err_payload("segments is required and must be non-empty", "BAD_ARGS")
+
+        # Accept either OptimizedSegment-shaped dicts or plain {length_mm, feed_mm_min}
+        pseudo_segs: list[OptimizedSegment] = []
+        for i, s in enumerate(raw_segs):
+            pseudo_segs.append(
+                OptimizedSegment(
+                    segment_id=i,
+                    length_mm=float(s.get("length_mm", 0.0)),
+                    base_feed_mm_min=float(s.get("feed_mm_min", 0.0)),
+                    feed_mm_min=float(s.get("feed_mm_min", 0.0)),
+                    cap_reason="nominal",
+                    mrr_mm3_per_min=0.0,
+                    doc_mm=0.0,
+                    woc_mm=0.0,
+                )
+            )
+
+        t = estimate_cycle_time(pseudo_segs)
+
+        return ok_payload({
+            "ok": True,
+            "cycle_time_s": round(t, 3),
+            "cycle_time_min": round(t / 60.0, 4),
+            "n_segments": len(pseudo_segs),
+        })
+
+    except Exception as exc:
+        return err_payload(str(exc), "MANUFACTURING_CYCLE_TIME_ERROR")
+
+
+# ---------------------------------------------------------------------------
 # TOOLS list consumed by plugin
 # ---------------------------------------------------------------------------
 
 TOOLS = [
     ("manufacturing_moldflow", manufacturing_moldflow_spec, run_manufacturing_moldflow),
+    ("manufacturing_optimize_feed", manufacturing_optimize_feed_spec, run_manufacturing_optimize_feed),
+    ("manufacturing_cycle_time", manufacturing_cycle_time_spec, run_manufacturing_cycle_time),
 ]

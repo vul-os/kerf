@@ -1,16 +1,15 @@
-"""subd_tools.py — GK-P45 + GK-P: Wire SubD/mesh authoring ops as LLM ToolSpecs.
+"""subd_tools.py — GK-P45: Wire SubD/mesh authoring ops as LLM ToolSpecs.
 
 Wires the following already-implemented functions from
 ``kerf_cad_core.geom.subd_authoring`` into the tool/feature/LLM surface:
 
-- ``subd_poke``                   (GK-P20) — poke a face by centroid fan
-- ``subd_extrude_along``          (GK-P21) — extrude a face along a curve path
-- ``sculpt_brush``                (GK-P27) — sculpt-brush stroke (grab/smooth/inflate)
-- ``MultiresStack``               (GK-P26) — multi-resolution displacement stack
+- ``subd_poke``          (GK-P20) — poke a face by centroid fan
+- ``subd_extrude_along`` (GK-P21) — extrude a face along a curve path
+- ``sculpt_brush``       (GK-P27) — sculpt-brush stroke (grab/smooth/inflate)
+- ``MultiresStack``      (GK-P26) — multi-resolution displacement stack
   (evaluate + serialise as feature nodes)
-- ``subd_evaluate_limit_curvature`` (GK-P)  — Stam-exact limit-surface curvature
-  (Gaussian K, mean H, principal κ₁/κ₂) at arbitrary (u,v), including
-  extraordinary vertices.
+- ``subd_normal_color_map`` (GK-P-normap) — per-vertex normal-to-color map
+- ``subd_export_glb``       (GK-P-normap) — export limit surface as GLB with vertex colors
 
 These ops append a node to a ``.feature`` file. The OCCT worker has no
 special dispatch for SubD nodes — evaluation is pure-Python.
@@ -474,28 +473,25 @@ async def run_feature_multires_evaluate(ctx: ProjectCtx, args: bytes) -> str:
     })
 
 
-# ── subd_evaluate_limit_curvature ─────────────────────────────────────────────
+# ── subd_normal_color_map ─────────────────────────────────────────────────────
 #
-# GK-P: Stam-exact limit-surface curvature at arbitrary (u,v), including
-# extraordinary vertices.  Returns Gaussian K, mean H, principal κ₁/κ₂.
+# GK-P-normap: Compute per-vertex normal-to-color map for the SubD limit surface.
+# Returns the color map inline (no feature node — pure query op).
 
-subd_evaluate_limit_curvature_spec = ToolSpec(
-    name="subd_evaluate_limit_curvature",
+subd_normal_color_map_spec = ToolSpec(
+    name="subd_normal_color_map",
     description=(
-        "Evaluate the Stam-exact Catmull-Clark limit-surface curvature at "
-        "an arbitrary parametric point (u, v) on a SubD cage face. "
-        "Returns Gaussian curvature K, mean curvature H, and principal "
-        "curvatures κ₁ and κ₂. "
-        "Works at extraordinary vertices (valence ≠ 4) — the curvature "
-        "converges to a well-defined finite limit as (u,v) approaches the "
-        "extraordinary corner. "
-        "Based on the second fundamental form of the bicubic CC limit patch: "
-        "L, M, N from the Stam eigenvector-corrected NURBS second derivatives. "
-        "Use face_id=0..N-1 to select the cage face. "
-        "u, v ∈ [0, 1]; (0,0) = first vertex corner. "
-        "Optionally request a grid (n_samples × n_samples) of curvature values "
-        "over the face by setting n_samples > 1 (returns summary statistics). "
-        "No OCCT required — pure-Python SubD + NURBS evaluator."
+        "Compute a per-vertex normal-color map for the Catmull-Clark limit "
+        "surface of a SubD mesh.  The mesh is subdivided `n_levels` times; "
+        "at each vertex the Stam limit-surface tangent frame is computed and "
+        "its normal is encoded as an RGB colour.  Three encoding schemes are "
+        "supported:\n"
+        "  • `rgb_xyz`       — standard normal-map: X→R, Y→G, Z→B via (n+1)/2.\n"
+        "  • `hemispherical` — up (+Z) = blue; down (−Z) = near-black.  Good "
+        "for concavity/convexity diagnostic.\n"
+        "  • `matcap`        — synthetic clay MatCap; mimics sculpt-mode "
+        "rendering with a key light and rim highlight.\n"
+        "Returns a dict of {vertex_index: [R, G, B]} with values in [0, 255]."
     ),
     input_schema={
         "type": "object",
@@ -508,63 +504,37 @@ subd_evaluate_limit_curvature_spec = ToolSpec(
                     "minItems": 3,
                     "maxItems": 3,
                 },
-                "minItems": 1,
-                "description": (
-                    "SubD cage vertices as [[x,y,z], ...]. "
-                    "All faces must be quads (4 vertex indices each)."
-                ),
+                "description": "List of [x,y,z] cage vertex positions.",
             },
             "faces": {
                 "type": "array",
                 "items": {
                     "type": "array",
-                    "items": {"type": "integer", "minimum": 0},
-                    "minItems": 4,
-                    "maxItems": 4,
+                    "items": {"type": "integer"},
                 },
-                "minItems": 1,
-                "description": (
-                    "Quad faces as [[i,j,k,l], ...] (0-based vertex indices)."
-                ),
+                "description": "List of face index lists (quads or n-gons).",
             },
-            "face_id": {
+            "n_levels": {
                 "type": "integer",
+                "description": "Number of Catmull-Clark subdivision levels (default 2).",
                 "minimum": 0,
-                "description": "0-based index of the face to evaluate.",
+                "maximum": 4,
+                "default": 2,
             },
-            "u": {
-                "type": "number",
-                "minimum": 0.0,
-                "maximum": 1.0,
-                "default": 0.5,
-                "description": "Parametric u coordinate in [0, 1] (default 0.5 = face centre).",
-            },
-            "v": {
-                "type": "number",
-                "minimum": 0.0,
-                "maximum": 1.0,
-                "default": 0.5,
-                "description": "Parametric v coordinate in [0, 1] (default 0.5 = face centre).",
-            },
-            "n_samples": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 50,
-                "default": 1,
-                "description": (
-                    "If > 1, evaluate curvature on an n×n grid over the face "
-                    "and return summary statistics (min/max/mean K and H). "
-                    "If 1 (default), return the single-point evaluation at (u,v)."
-                ),
+            "encoding": {
+                "type": "string",
+                "enum": ["rgb_xyz", "hemispherical", "matcap"],
+                "description": "Normal encoding scheme (default 'rgb_xyz').",
+                "default": "rgb_xyz",
             },
         },
-        "required": ["vertices", "faces", "face_id"],
+        "required": ["vertices", "faces"],
     },
 )
 
 
-@register(subd_evaluate_limit_curvature_spec, write=False)
-async def run_subd_evaluate_limit_curvature(ctx: ProjectCtx, args: bytes) -> str:
+@register(subd_normal_color_map_spec, write=False)
+async def run_subd_normal_color_map(ctx: ProjectCtx, args: bytes) -> str:
     try:
         a = json.loads(args)
     except Exception as exc:
@@ -572,79 +542,149 @@ async def run_subd_evaluate_limit_curvature(ctx: ProjectCtx, args: bytes) -> str
 
     vertices = a.get("vertices")
     faces    = a.get("faces")
-    face_id  = a.get("face_id")
-    u        = float(a.get("u", 0.5))
-    v        = float(a.get("v", 0.5))
-    n_samples = int(a.get("n_samples", 1))
+    n_levels = a.get("n_levels", 2)
+    encoding = a.get("encoding", "rgb_xyz")
 
-    if not isinstance(vertices, list) or len(vertices) < 1:
-        return err_payload("vertices must be a list of [x,y,z] triples", "BAD_ARGS")
-    if not isinstance(faces, list) or len(faces) < 1:
-        return err_payload("faces must be a list of quad [i,j,k,l] index lists", "BAD_ARGS")
-    if face_id is None or not isinstance(face_id, int) or face_id < 0:
-        return err_payload("face_id must be a non-negative integer", "BAD_ARGS")
-    if face_id >= len(faces):
+    if not vertices or not isinstance(vertices, list):
+        return err_payload("vertices must be a non-empty list", "BAD_ARGS")
+    if not faces or not isinstance(faces, list):
+        return err_payload("faces must be a non-empty list", "BAD_ARGS")
+    if not isinstance(n_levels, int) or not (0 <= n_levels <= 4):
+        return err_payload("n_levels must be an integer 0–4", "BAD_ARGS")
+    if encoding not in ("rgb_xyz", "hemispherical", "matcap"):
         return err_payload(
-            f"face_id={face_id} out of range; mesh has {len(faces)} faces", "BAD_ARGS"
+            "encoding must be 'rgb_xyz', 'hemispherical', or 'matcap'", "BAD_ARGS"
         )
-    if not (0.0 <= u <= 1.0) or not (0.0 <= v <= 1.0):
-        return err_payload("u and v must be in [0, 1]", "BAD_ARGS")
-    if not (1 <= n_samples <= 50):
-        return err_payload("n_samples must be in [1, 50]", "BAD_ARGS")
-
-    # Validate face vertex counts
-    for fi, f in enumerate(faces):
-        if not isinstance(f, list) or len(f) != 4:
-            return err_payload(
-                f"face {fi} must be a quad (4 vertex indices), got len={len(f) if isinstance(f, list) else '?'}",
-                "BAD_ARGS",
-            )
 
     try:
         from kerf_cad_core.geom.subd import SubDMesh
-        from kerf_cad_core.geom.subd_limit_curvature import (
-            evaluate_limit_curvature,
-            evaluate_curvature_grid,
-        )
+        from kerf_cad_core.geom.subd_normal_color import compute_normal_color_map
 
-        mesh = SubDMesh(
-            vertices=[[float(c) for c in vert] for vert in vertices],
-            faces=[[int(idx) for idx in face] for face in faces],
-        )
-
-        if n_samples <= 1:
-            cv = evaluate_limit_curvature(mesh, face_id, u, v)
-            return ok_payload({
-                "face_id": face_id,
-                "u": u,
-                "v": v,
-                "gaussian_K": cv.gaussian_K,
-                "mean_H": cv.mean_H,
-                "principal_kappa_1": cv.principal_kappa_1,
-                "principal_kappa_2": cv.principal_kappa_2,
-                "curvature_type": (
-                    "elliptic" if cv.gaussian_K > 1e-10
-                    else "hyperbolic" if cv.gaussian_K < -1e-10
-                    else "parabolic_or_flat"
-                ),
-            })
-        else:
-            import numpy as np
-            grid = evaluate_curvature_grid(mesh, face_id, n_samples=n_samples)
-            K_grid = grid[:, :, 0]
-            H_grid = grid[:, :, 1]
-            return ok_payload({
-                "face_id": face_id,
-                "n_samples": n_samples,
-                "gaussian_K_min": float(np.min(K_grid)),
-                "gaussian_K_max": float(np.max(K_grid)),
-                "gaussian_K_mean": float(np.mean(K_grid)),
-                "mean_H_min": float(np.min(H_grid)),
-                "mean_H_max": float(np.max(H_grid)),
-                "mean_H_mean": float(np.mean(H_grid)),
-                "principal_kappa_1_max": float(np.max(grid[:, :, 2])),
-                "principal_kappa_2_min": float(np.min(grid[:, :, 3])),
-            })
-
+        mesh = SubDMesh(vertices=vertices, faces=faces)
+        color_map = compute_normal_color_map(mesh, n_levels=n_levels, encoding=encoding)
+        # Serialise: keys must be strings for JSON
+        result = {str(k): list(v) for k, v in color_map.items()}
     except Exception as exc:
-        return err_payload(f"curvature evaluation failed: {exc}", "ERROR")
+        return err_payload(f"compute failed: {exc}", "ERROR")
+
+    return ok_payload({
+        "encoding": encoding,
+        "n_levels": n_levels,
+        "vertex_count": len(result),
+        "color_map": result,
+    })
+
+
+# ── subd_export_glb ───────────────────────────────────────────────────────────
+#
+# GK-P-normap: Export the SubD limit surface as a GLB file with per-vertex
+# COLOR_0 attribute encoded from limit-surface normals.
+
+subd_export_glb_spec = ToolSpec(
+    name="subd_export_glb",
+    description=(
+        "Export a SubD cage's Catmull-Clark limit surface as a GLB file with "
+        "per-vertex COLOR_0 (normal-color) attribute.  The cage is subdivided "
+        "`n_levels` times; vertex normals are computed via the Stam "
+        "limit-tangent formula and encoded as colours.  The output is a valid "
+        "glTF 2.0 binary file (.glb) with POSITION, NORMAL, and COLOR_0 "
+        "attributes, suitable for import into Blender, Three.js, Babylon.js, "
+        "or any glTF viewer that respects vertex colours.\n\n"
+        "Encoding schemes:\n"
+        "  • `rgb_xyz`       — standard (X→R, Y→G, Z→B); best for normal-map "
+        "debugging.\n"
+        "  • `hemispherical` — up/down diagnostic (blue=up, black=down).\n"
+        "  • `matcap`        — synthetic clay sculpt shading."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "vertices": {
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 3,
+                    "maxItems": 3,
+                },
+                "description": "List of [x,y,z] cage vertex positions.",
+            },
+            "faces": {
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                },
+                "description": "List of face index lists (quads or n-gons).",
+            },
+            "output_path": {
+                "type": "string",
+                "description": "Absolute path for the output .glb file.",
+            },
+            "color_encoding": {
+                "type": "string",
+                "enum": ["rgb_xyz", "hemispherical", "matcap"],
+                "description": "Normal encoding scheme (default 'rgb_xyz').",
+                "default": "rgb_xyz",
+            },
+            "n_levels": {
+                "type": "integer",
+                "description": "Number of Catmull-Clark subdivision levels (default 2).",
+                "minimum": 0,
+                "maximum": 4,
+                "default": 2,
+            },
+        },
+        "required": ["vertices", "faces", "output_path"],
+    },
+)
+
+
+@register(subd_export_glb_spec, write=True)
+async def run_subd_export_glb(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+    vertices       = a.get("vertices")
+    faces          = a.get("faces")
+    output_path    = a.get("output_path", "").strip()
+    color_encoding = a.get("color_encoding", "rgb_xyz")
+    n_levels       = a.get("n_levels", 2)
+
+    if not vertices or not isinstance(vertices, list):
+        return err_payload("vertices must be a non-empty list", "BAD_ARGS")
+    if not faces or not isinstance(faces, list):
+        return err_payload("faces must be a non-empty list", "BAD_ARGS")
+    if not output_path:
+        return err_payload("output_path is required", "BAD_ARGS")
+    if color_encoding not in ("rgb_xyz", "hemispherical", "matcap"):
+        return err_payload(
+            "color_encoding must be 'rgb_xyz', 'hemispherical', or 'matcap'", "BAD_ARGS"
+        )
+    if not isinstance(n_levels, int) or not (0 <= n_levels <= 4):
+        return err_payload("n_levels must be an integer 0–4", "BAD_ARGS")
+
+    try:
+        from kerf_cad_core.geom.subd import SubDMesh
+        from kerf_cad_core.geom.subd_normal_color import export_subd_with_normals_glb
+        import os
+
+        mesh = SubDMesh(vertices=vertices, faces=faces)
+        export_subd_with_normals_glb(
+            mesh,
+            path=output_path,
+            color_encoding=color_encoding,
+            n_levels=n_levels,
+        )
+        file_size = os.path.getsize(output_path)
+    except Exception as exc:
+        return err_payload(f"export failed: {exc}", "ERROR")
+
+    return ok_payload({
+        "output_path":    output_path,
+        "color_encoding": color_encoding,
+        "n_levels":       n_levels,
+        "file_size_bytes": file_size,
+    })

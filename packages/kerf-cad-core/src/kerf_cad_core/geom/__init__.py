@@ -1053,6 +1053,10 @@ __all__ = [
     "compute_interference_volume",
     "interference_severity_score",
     "pairwise_interference_assembly",
+    # GK-P-normap: SubD normal-color map + GLB vertex-color export
+    "compute_normal_color_map",
+    "compute_face_color_from_normals",
+    "export_subd_with_normals_glb",
 ]
 
 # Variable-section edge blend (Vida-Martin-Varady 1994 §4)
@@ -1223,4 +1227,10 @@ from kerf_cad_core.geom.interference_volume import (  # noqa: E402
     compute_interference_volume,
     interference_severity_score,
     pairwise_interference_assembly,
+)
+# GK-P-normap: SubD limit-surface normal-to-color map + GLB vertex-color export
+from kerf_cad_core.geom.subd_normal_color import (
+    compute_normal_color_map,
+    compute_face_color_from_normals,
+    export_subd_with_normals_glb,
 )

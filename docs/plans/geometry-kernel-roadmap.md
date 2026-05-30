@@ -1281,6 +1281,7 @@ layer (history/UI/CAM/FEM packages), not the geometry kernel.
 | Cage authoring + primitives | ✅ |
 | Extrude / bevel / loop-cut / crease | ✅ |
 | SubD ↔ NURBS (Catmull-Clark limit, Stam) | ✅ GK-52/53 |
+| SubD limit principal directions (κ_1, κ_2, d_1, d_2) | ✅ GK-P (subd_limit_principal_dirs) |
 | Loop slide | ✅ GK-88 |
 | Stam-exact limit curvature evaluation (K, H, κ₁/κ₂, extraordinary verts) | ✅ GK-P |
 | Edge slide / vertex slide | 🟡 GK-104/105 |

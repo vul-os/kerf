@@ -238,6 +238,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.multires_displacement_tools",
     # GK-P49: SubD deformation cage with mean-value coordinates (subd_deform_with_cage)
     "kerf_cad_core.subd_deform_tools",
+    # Wave 4AA: harmonic coordinates for cage deformation (Joshi et al. 2007)
+    "kerf_cad_core.geom.subd_harmonic",
     # GK-P46: mesh/implicit ops (sdf_csg, uv_unwrap, isotropic_remesh, retopo_snap)
     "kerf_cad_core.mesh_implicit_tools",
     # GK-P58: B-rep UV unwrap atlas (brep_uv_unwrap, brep_uv_distortion_report)

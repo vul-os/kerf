@@ -822,7 +822,22 @@ __all__ = [
     "extract_bezier_curve",
     "extract_bezier_surface",
     "reconstruct_from_beziers",
+    # Variable-section edge blend (Vida-Martin-Varady 1994)
+    "CrossSection",
+    "variable_section_blend",
+    "morph_cross_sections",
+    "blend_cross_section_at",
+    "blend_volume_estimate",
 ]
+
+# Variable-section edge blend (Vida-Martin-Varady 1994 §4)
+from kerf_cad_core.geom.edge_blend import (  # noqa: E402
+    CrossSection,
+    variable_section_blend,
+    morph_cross_sections,
+    blend_cross_section_at,
+    blend_volume_estimate,
+)
 
 # GK-122: interference / collision detection
 from kerf_cad_core.geom.assembly import interference  # noqa: E402

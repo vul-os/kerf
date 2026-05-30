@@ -15475,6 +15475,34 @@
         },
         {
           "domain": "D1",
+          "feature": "B-rep shell connectivity inspector (Weiler radial-edge)",
+          "competitor": {
+            "status": "yes",
+            "note": "CheckObjectsCommand + EdgeContinuity — reports naked/non-manifold edges; no programmatic union-find component count",
+            "source": "https://docs.mcneel.com/rhino/8/help/en-us/commands/check.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "inspect_connectivity(): dangling/boundary/manifold/non-manifold edge counts + isolated vertices + degenerate edges + union-find components + Euler-Poincare V-E+F; is_manifold_closed(); LLM tools brep_inspect_connectivity + brep_is_manifold",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/brep_connect_inspector.py"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "B-rep total edge length + kind/curve-type breakdown (cutting-cost)",
+          "competitor": {
+            "status": "partial",
+            "note": "Rhino Length command reports individual curve length; no batch edge classification or cutting-cost breakdown API",
+            "source": "https://docs.mcneel.com/rhino/8/help/en-us/commands/length.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "total_edge_length() + edge_length_by_kind() (boundary/manifold/nonmanifold) + edges_by_curve_type() (linear/circular/freeform); linear=Euclidean, circular=radius*angle, freeform=adaptive Gauss-Legendre (Stoer-Bulirsch §3 + Piegl-Tiller §5.4); oracles: 100x50 rect=300, unit cube=12, sphere 12 great-circles r=50=3769.91; LLM tools brep_total_edge_length + brep_edge_length_by_kind; 20 hermetic tests",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/brep_edge_metrics.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "Surface analysis (zebra / curvature combs)",
           "competitor": {
             "status": "yes",

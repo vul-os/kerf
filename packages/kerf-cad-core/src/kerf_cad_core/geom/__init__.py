@@ -1296,3 +1296,14 @@ from kerf_cad_core.geom.derivative_field_viz import (
     render_derivative_field_png,
     render_derivative_field_svg,
 )
+# BREP-SUM-EDGE-LENGTHS: total edge length + kind/curve-type breakdowns for cutting-cost
+# (Weiler 1985 §3 radial-edge classification + Gauss-Legendre arc integration)
+from kerf_cad_core.geom.brep_edge_metrics import (  # noqa: E402
+    EdgeKindMetrics,
+    EdgeCurveTypeMetrics,
+    EdgeMetricsReport,
+    total_edge_length,
+    edge_length_by_kind,
+    edges_by_curve_type,
+    compute_edge_metrics,
+)

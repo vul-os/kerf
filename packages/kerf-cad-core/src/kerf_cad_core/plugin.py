@@ -314,6 +314,9 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.derivative_field_viz",           # nurbs_derivative_field_png, nurbs_derivative_field_svg
     # NURBS-CONVERT-TO-IGES-144: IGES 5.3 entity-144 export (§4.27 + §4.26 + §4.23 + §4.22)
     "kerf_cad_core.geom.io.iges_144_tool",               # nurbs_export_iges_144
+    # BREP-SUM-EDGE-LENGTHS: total edge length + kind/curve-type breakdowns for cutting-cost
+    # (Weiler 1985 §3 radial-edge + Gauss-Legendre arc integration) — brep_total_edge_length, brep_edge_length_by_kind
+    "kerf_cad_core.geom.brep_edge_metrics",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

@@ -303,6 +303,15 @@ from kerf_cad_core.geom.volume_weighted_centroid import (
 )
 # GK-54: mesh -> NURBS autosurface
 from kerf_cad_core.geom.mesh_to_nurbs import mesh_autosurface
+# GK-P51: NURBS↔Mesh reconciliation with fidelity tracking (Lévy 2009)
+from kerf_cad_core.geom.mesh_reconciliation import (
+    ReconciliationResult,
+    RoundTripResult,
+    fidelity_report,
+    reconcile_nurbs_mesh,
+    round_trip_nurbs_mesh,
+    reconcile_mesh_to_nurbs_with_features,
+)
 # GK-55: mesh boolean sealed-manifold
 from kerf_cad_core.geom.mesh_repair import mesh_boolean_sealed, boolean_volume_oracle
 # GK-109: mesh decimate (QEM edge collapse)

@@ -16293,8 +16293,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "mesh_repair (fill_holes/manifold), retopo_snap, mesh_to_nurbs; no SDF-envelope ShrinkWrap",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/mesh_repair.py"
+            "note": "mesh_repair (fill_holes/manifold), retopo_snap, mesh_to_nurbs; NURBS↔Mesh reconciliation with fidelity tracking (Lévy 2009) ✅; no SDF-envelope ShrinkWrap",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/mesh_reconciliation.py"
           }
         },
         {

@@ -215,6 +215,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 - **SubD / mesh** — multires displacement, SDF CSG + marching-cubes, sculpt brush engine, isotropic remesh, surface-snap retopo, LSCM UV unwrap; **harmonic cage coords ✅** (Joshi 2007).
 - **NURBS surface optimal reparametrization (LSCM + ARAP)** ✅ — GK-P50: `reparametrize_lscm` / `reparametrize_arap` / `distortion_metric` / `reparam_compare`; LLM tool `nurbs_reparametrize_optimal`; 21 hermetic tests green.
 - **Architectural geometry** — B-rep→2D tessellate, roof/curtain-wall/corridor generators, wall compound-layer offset, hatch/section-fill.
+- **Oblique projection (cabinet + cavalier + general) per Bertoline §11 + ISO 5456-2** ✅ — 30°/45°/user-angle shear; 1:1:0.5 cabinet; 1:1:1 cavalier; isometric 120°-axis; hidden-line classification; LLM tool `drawing_oblique_projection` — `kerf-cad-core/src/kerf_cad_core/geom/oblique_projection.py`
 - **Sketcher** — collinear constraint, ellipse solver entity, G2 continuity.
 - **Interop** — 3DM write with read→write→read Hausdorff oracle.
 - **Composite curve G2 audit + upgrade** ✅ — `composite_g2.py`: audit + auto-blend (cubic Hermite / quintic Bezier); LLM tools registered; 27 tests green.

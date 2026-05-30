@@ -1323,6 +1323,8 @@ from kerf_cad_core.geom.subd_limit_integrals import (
 )
 # BREP-FACE-AREA-WEIGHTED-CENTROID: surface centroid of a B-rep shell/solid
 # (Gauss-Legendre 16×16 per face; distinct from volumetric body_mass_props centroid)
+# BREP-FACE-AREA-WEIGHTED-CENTROID: surface centroid of a B-rep shell/solid
+# (Gauss-Legendre 16x16 per face; distinct from volumetric body_mass_props centroid)
 from kerf_cad_core.geom.face_centroid import (  # noqa: E402
     face_area,
     face_centroid,

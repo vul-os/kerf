@@ -40,6 +40,10 @@ from kerf_cad_core.optics.lens_stack_trace import (
     paraxial_properties,
     trace_lens_stack,
 )
+from kerf_cad_core.optics.mtf_across_field import (
+    mtf_at_field,
+    mtf_curves_across_field,
+)
 from kerf_cad_core.optics.lens import (
     lensmaker,
     thin_lens_imaging,
@@ -923,3 +927,122 @@ async def run_ray_trace_lens_stack(ctx: ProjectCtx, args: bytes) -> str:
         combined["paraxial_properties_error"] = props_result.get("reason")
 
     return ok_payload(combined)
+
+
+# ---------------------------------------------------------------------------
+# Tool: optics_mtf_across_field
+# ---------------------------------------------------------------------------
+
+_mtf_across_field_spec = ToolSpec(
+    name="optics_mtf_across_field",
+    description=(
+        "Compute the tangential Modulation Transfer Function (MTF) as a function of\n"
+        "field angle (off-axis position) for a multi-element lens stack.\n"
+        "\n"
+        "Algorithm (Hecht 'Optics' 5e SS11.2; Welford 1986 SS11.4):\n"
+        "  1. Trace a uniform aperture bundle from a point source at infinity at each\n"
+        "     field angle through the lens stack using exact meridional Snell traces.\n"
+        "  2. Histogram ray-intercept Y positions at the paraxial image plane -> line-PSF.\n"
+        "  3. FFT(PSF) -> MTF;  MTF[0] is normalised to 1.0.\n"
+        "\n"
+        "Honest limits:\n"
+        "  * Monochromatic only. Polychromatic MTF requires integrating MTF(lambda)\n"
+        "    weighted by the spectral power density -- out of scope.\n"
+        "  * Tangential plane only; sagittal MTF is not computed.\n"
+        "  * Wavefront-based MTF (Strehl / OTF phase) is out of scope.\n"
+        "\n"
+        "Surface definition (same as optics_ray_trace_lens_stack):\n"
+        "  c  : curvature 1/R (mm^-1). 0 = flat.\n"
+        "  t  : thickness to NEXT surface vertex (mm). Last surface: 0.\n"
+        "  n  : refractive index of medium AFTER this surface.\n"
+        "  k  : conic constant (default 0 = sphere).\n"
+        "\n"
+        "Pass field_angles_deg as a list (e.g. [0, 5, 10, 14]) to get MTF curves for\n"
+        "all angles in a single call.\n"
+        "\n"
+        "Returns for each field angle:\n"
+        "  frequencies_lp_per_mm : spatial frequency axis (lp/mm)\n"
+        "  mtf                   : MTF values in [0, 1]\n"
+        "  psf_bins_mm / psf     : line-PSF histogram\n"
+        "  n_rays_traced / n_rays_vignetted\n"
+        "\n"
+        "Errors: {ok:false, reason} for invalid inputs. Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "surfaces": {
+                "type": "array",
+                "description": (
+                    "Ordered list of optical surface dicts. Each must have: "
+                    "c (mm^-1), t (mm), n (>= 1.0). Optional: k (conic, default 0)."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "c": {"type": "number", "description": "Curvature 1/R (mm^-1). 0 = flat."},
+                        "t": {"type": "number", "description": "Thickness to next surface (mm)."},
+                        "n": {"type": "number", "description": "Refractive index after surface (>= 1.0)."},
+                        "k": {"type": "number", "description": "Conic constant (default 0 = sphere)."},
+                    },
+                    "required": ["c", "t", "n"],
+                },
+            },
+            "field_angles_deg": {
+                "type": "array",
+                "description": (
+                    "List of field angles in degrees (e.g. [0, 5, 10, 14]). "
+                    "0 = on-axis. Ordering is preserved in the output."
+                ),
+                "items": {"type": "number"},
+            },
+            "samples_per_aperture": {
+                "type": "integer",
+                "description": (
+                    "Number of rays sampled across the entrance-pupil diameter (default 50). "
+                    "More rays give a smoother PSF and finer MTF sampling."
+                ),
+            },
+            "aperture_radius_mm": {
+                "type": "number",
+                "description": (
+                    "Half-diameter of the entrance pupil in mm (default 10 mm). "
+                    "Should be <= the physical clear aperture of the first surface."
+                ),
+            },
+            "n_object": {
+                "type": "number",
+                "description": "Refractive index of object space (default 1.0 = air).",
+            },
+        },
+        "required": ["surfaces", "field_angles_deg"],
+    },
+)
+
+
+@register(_mtf_across_field_spec, write=False)
+async def run_mtf_across_field(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    if a.get("surfaces") is None:
+        return json.dumps({"ok": False, "reason": "surfaces is required"})
+    if a.get("field_angles_deg") is None:
+        return json.dumps({"ok": False, "reason": "field_angles_deg is required"})
+
+    kwargs: dict = {}
+    if "samples_per_aperture" in a:
+        kwargs["samples_per_aperture"] = int(a["samples_per_aperture"])
+    if "aperture_radius_mm" in a:
+        kwargs["aperture_radius_mm"] = float(a["aperture_radius_mm"])
+    if "n_object" in a:
+        kwargs["n_object"] = float(a["n_object"])
+
+    result = mtf_curves_across_field(
+        a["surfaces"],
+        a["field_angles_deg"],
+        **kwargs,
+    )
+    return ok_payload(result)

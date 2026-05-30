@@ -13195,8 +13195,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Seidel aberrations S1-S5 (corrected 2026-05-24); no Zernike decomposition",
-            "evidence": "packages/kerf-optics/src/kerf_optics/lens_system.py"
+            "note": "Seidel aberrations S1-S5 (corrected 2026-05-24); no Zernike decomposition. MTF across field: ray-bundle PSF histogram + numpy.fft.rfft; tangential MTF at arbitrary field angles; BK7 biconvex off-axis MTF drop verified (coma+astigmatism); LLM tool optics_mtf_across_field. Monochromatic only; polychromatic MTF = integral W(lambda) MTF(lambda) dlambda -- not implemented.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/mtf_across_field.py"
           }
         },
         {

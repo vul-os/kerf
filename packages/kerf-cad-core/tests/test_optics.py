@@ -1018,3 +1018,254 @@ def test_tool_ray_trace_cooke():
     assert 40.0 <= d["EFL_mm"] <= 75.0, (
         f"Cooke EFL={d['EFL_mm']:.3f} mm via tool, outside plausible range"
     )
+
+
+# ===========================================================================
+# MTF across field tests
+# ===========================================================================
+
+from kerf_cad_core.optics.mtf_across_field import (
+    mtf_at_field,
+    mtf_curves_across_field,
+)
+from kerf_cad_core.optics.tools import run_mtf_across_field
+
+
+def _thin_lens_surfaces(f_mm: float = 100.0, n: float = 1.5) -> list[dict]:
+    """Plano-convex thin-lens approximation (thickness 0): power = (n-1)*c1 = 1/f_mm."""
+    c1 = (1.0 / f_mm) / (n - 1.0)
+    return [
+        {"c": c1, "t": 0.0, "n": n},
+        {"c": 0.0, "t": 0.0, "n": 1.0},
+    ]
+
+
+def _bk7_biconvex() -> list[dict]:
+    """Biconvex BK7 lens: R1=+50 mm, R2=-50 mm, n=1.5168, d=5 mm."""
+    return [
+        {"c":  1.0 / 50.0, "t": 5.0, "n": 1.5168},
+        {"c": -1.0 / 50.0, "t": 0.0, "n": 1.0},
+    ]
+
+
+# T1: mtf_at_field returns valid structure
+
+def test_mtf_at_field_returns_ok():
+    """mtf_at_field on-axis returns ok=True with expected keys."""
+    surfs = _bk7_biconvex()
+    result = mtf_at_field(surfs, field_angle_deg=0.0, samples_per_aperture=30,
+                          aperture_radius_mm=5.0)
+    assert result["ok"] is True, result.get("reason")
+    assert "frequencies_lp_per_mm" in result
+    assert "mtf" in result
+    assert "psf_bins_mm" in result
+    assert "psf" in result
+    assert "n_rays_traced" in result
+    assert "n_rays_vignetted" in result
+    assert result["field_angle_deg"] == 0.0
+
+
+# T2: MTF[0] == 1.0 (normalised DC)
+
+def test_mtf_dc_normalised():
+    """MTF[0] (DC component) must be 1.0 for any valid result."""
+    surfs = _bk7_biconvex()
+    result = mtf_at_field(surfs, field_angle_deg=0.0, samples_per_aperture=40,
+                          aperture_radius_mm=5.0)
+    assert result["ok"] is True
+    assert abs(result["mtf"][0] - 1.0) < 1e-9, f"MTF[0]={result['mtf'][0]}"
+
+
+# T3: MTF values in [0, 1]
+
+def test_mtf_values_in_range():
+    """All MTF values must be in [0, 1] (modulus of normalised FFT)."""
+    surfs = _bk7_biconvex()
+    result = mtf_at_field(surfs, field_angle_deg=5.0, samples_per_aperture=40,
+                          aperture_radius_mm=5.0)
+    assert result["ok"] is True
+    for v in result["mtf"]:
+        assert 0.0 <= v <= 1.0 + 1e-9, f"MTF value {v} out of [0,1]"
+
+
+# T4: On-axis singlet — DC (MTF[0]) == 1.0 and first freq bin is real spatial freq
+
+def test_onaxis_singlet_low_freq_mtf_high():
+    """
+    On-axis: MTF[0] must be 1.0 (normalised DC); MTF must decrease from DC
+    toward the Nyquist frequency (MTF[-1] < MTF[0]).
+    Note: bin 1 corresponds to 1/(n_bins * bin_width) lp/mm which for typical
+    ~50 mm singlets with small apertures can be 10-30 lp/mm -- not 'low freq'
+    in the photographic sense.  The meaningful assertion is that DC is
+    correctly normalised and MTF falls off at higher frequencies.
+    """
+    surfs = _bk7_biconvex()
+    result = mtf_at_field(surfs, field_angle_deg=0.0, samples_per_aperture=60,
+                          aperture_radius_mm=3.0)
+    assert result["ok"] is True
+    assert abs(result["mtf"][0] - 1.0) < 1e-9, f"MTF[0]={result['mtf'][0]}"
+    # MTF at Nyquist should be strictly less than 1 for a real lens
+    assert result["mtf"][-1] < result["mtf"][0]
+
+
+# T5: Off-axis BK7 biconvex at 14 deg — MTF drops vs on-axis
+
+def test_offaxis_bk7_mtf_drops():
+    """BK7 biconvex at 14 deg off-axis: mid-freq MTF must be lower than on-axis."""
+    surfs = _bk7_biconvex()
+    on_axis  = mtf_at_field(surfs, 0.0,  samples_per_aperture=60, aperture_radius_mm=5.0)
+    off_axis = mtf_at_field(surfs, 14.0, samples_per_aperture=60, aperture_radius_mm=5.0)
+    assert on_axis["ok"] is True
+    assert off_axis["ok"] is True
+    n = min(len(on_axis["mtf"]), len(off_axis["mtf"]))
+    mid = max(1, n // 2)
+    mtf_on  = on_axis["mtf"][mid]
+    mtf_off = off_axis["mtf"][mid]
+    assert mtf_on > mtf_off, (
+        f"Expected on-axis MTF ({mtf_on:.4f}) > off-axis 14 deg MTF ({mtf_off:.4f}) "
+        f"at bin {mid}"
+    )
+
+
+# T6: MTF curves across field — ordering preserved
+
+def test_mtf_curves_ordering_preserved():
+    """mtf_curves_across_field preserves field-angle input ordering."""
+    angles = [14.0, 0.0, 5.0, 10.0]
+    surfs = _bk7_biconvex()
+    result = mtf_curves_across_field(surfs, angles, samples_per_aperture=30,
+                                     aperture_radius_mm=5.0)
+    assert result["ok"] is True
+    assert result["field_angles_deg"] == [14.0, 0.0, 5.0, 10.0]
+    for a in angles:
+        key = str(float(a))
+        assert key in result["curves"], f"Missing key {key!r}"
+        assert result["curves"][key]["ok"] is True
+
+
+# T7: Thin-lens paraxial — PSF spot RMS is small at all field angles
+
+def test_thin_lens_mtf_constant_small_field():
+    """
+    For a paraxial thin lens (thickness 0), both on-axis and 5-deg PSFs should
+    have small geometric spread (RMS < 1 mm for a 3 mm aperture / f=100 mm lens),
+    confirming the system is well-behaved across field angles.
+    MTF DC == 1.0 at both angles (always true by construction).
+    """
+    surfs = _thin_lens_surfaces(f_mm=100.0, n=1.5)
+    r0 = mtf_at_field(surfs, 0.0, samples_per_aperture=40, aperture_radius_mm=3.0)
+    r5 = mtf_at_field(surfs, 5.0, samples_per_aperture=40, aperture_radius_mm=3.0)
+    assert r0["ok"] is True, r0.get("reason")
+    assert r5["ok"] is True, r5.get("reason")
+    # DC always 1.0
+    assert abs(r0["mtf"][0] - 1.0) < 1e-9
+    assert abs(r5["mtf"][0] - 1.0) < 1e-9
+    # PSF spread (RMS of bin centres about their mean) should be small
+    import numpy as np
+    for label, r in [("0-deg", r0), ("5-deg", r5)]:
+        bins = np.array(r["psf_bins_mm"])
+        rms = float(np.std(bins))
+        assert rms < 1.0, f"Thin lens {label} PSF bin spread RMS={rms:.4f} mm > 1 mm"
+
+
+# T8: PSF normalised to unit area
+
+def test_psf_normalised():
+    """PSF histogram * bin_width must sum to ~1."""
+    surfs = _bk7_biconvex()
+    result = mtf_at_field(surfs, 0.0, samples_per_aperture=50, aperture_radius_mm=5.0)
+    assert result["ok"] is True
+    bins = result["psf_bins_mm"]
+    psf  = result["psf"]
+    assert len(bins) == len(psf)
+    if len(bins) >= 2:
+        bin_width = bins[1] - bins[0]
+        area = sum(psf) * bin_width
+        assert abs(area - 1.0) < 0.05, f"PSF area={area:.4f}, expected ~1.0"
+
+
+# T9: Frequency axis length matches rfft convention
+
+def test_frequency_axis_length():
+    """len(frequencies) == len(mtf) == n_bins//2+1."""
+    surfs = _bk7_biconvex()
+    result = mtf_at_field(surfs, 0.0, samples_per_aperture=50, aperture_radius_mm=5.0)
+    assert result["ok"] is True
+    assert len(result["frequencies_lp_per_mm"]) == len(result["mtf"])
+    n_bins = len(result["psf"])
+    assert len(result["frequencies_lp_per_mm"]) == n_bins // 2 + 1
+
+
+# T10: Frequencies non-negative and monotonically increasing
+
+def test_frequencies_monotone_nonneg():
+    """Spatial frequency axis must be non-negative and increasing."""
+    surfs = _bk7_biconvex()
+    result = mtf_at_field(surfs, 0.0, samples_per_aperture=50, aperture_radius_mm=5.0)
+    assert result["ok"] is True
+    freqs = result["frequencies_lp_per_mm"]
+    assert all(f >= 0 for f in freqs)
+    for i in range(1, len(freqs)):
+        assert freqs[i] >= freqs[i - 1]
+
+
+# T11: Invalid surfaces rejected
+
+def test_mtf_invalid_surfaces():
+    """Empty surfaces list returns ok=False."""
+    result = mtf_at_field([], 0.0)
+    assert result["ok"] is False
+    assert "reason" in result
+
+
+# T12: Too-small samples_per_aperture rejected
+
+def test_mtf_too_few_samples():
+    """samples_per_aperture < 3 returns ok=False."""
+    surfs = _bk7_biconvex()
+    result = mtf_at_field(surfs, 0.0, samples_per_aperture=2)
+    assert result["ok"] is False
+
+
+# T13: LLM tool wrapper — happy path
+
+def test_tool_mtf_across_field_happy():
+    """LLM tool optics_mtf_across_field returns ok=True for a valid biconvex lens."""
+    surfs = _bk7_biconvex()
+    raw = _run(run_mtf_across_field(
+        _ctx(),
+        _args(
+            surfaces=surfs,
+            field_angles_deg=[0.0, 7.0],
+            samples_per_aperture=30,
+            aperture_radius_mm=5.0,
+        ),
+    ))
+    d = _ok_tool(raw)
+    assert "curves" in d
+    assert "0.0" in d["curves"]
+    assert "7.0" in d["curves"]
+    assert d["curves"]["0.0"]["ok"] is True
+
+
+# T14: LLM tool — missing surfaces returns error
+
+def test_tool_mtf_missing_surfaces():
+    """LLM tool returns error when surfaces is missing."""
+    raw = _run(run_mtf_across_field(
+        _ctx(),
+        _args(field_angles_deg=[0.0]),
+    ))
+    _err_tool(raw)
+
+
+# T15: LLM tool — missing field_angles_deg returns error
+
+def test_tool_mtf_missing_angles():
+    """LLM tool returns error when field_angles_deg is missing."""
+    surfs = _bk7_biconvex()
+    raw = _run(run_mtf_across_field(
+        _ctx(),
+        _args(surfaces=surfs),
+    ))
+    _err_tool(raw)

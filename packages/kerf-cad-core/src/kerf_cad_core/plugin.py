@@ -24,6 +24,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.feature_loft",
     "kerf_cad_core.feature_section",
     "kerf_cad_core.cam_layered",
+    "kerf_cad_core.cam_toolpath_collision",  # cam_verify_toolpath_collision
     "kerf_cad_core.extrude_sketch_to_jscad",
     "kerf_cad_core.surfacing",
     "kerf_cad_core.quad_remesh",

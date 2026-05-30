@@ -1470,6 +1470,202 @@ def match_surface_edge(
 
 
 # ---------------------------------------------------------------------------
+# Public API: elevate_to_g3_capability
+# ---------------------------------------------------------------------------
+
+def elevate_to_g3_capability(
+    surface: NurbsSurface,
+    target_degree: int = 4,
+) -> NurbsSurface:
+    """Return *surface* with both parametric directions elevated to *target_degree*.
+
+    G3 boundary conditions require degree >= 4 in the cross-boundary direction
+    (four independent CP rows: G0, G1, G2, G3).  This helper degree-elevates
+    each parametric direction that is currently below *target_degree*.
+
+    The operation is exact: it uses Bezier decomposition + degree elevation
+    (the same ``_elevate_curve_bspline`` used internally by the GK-135
+    degree-reduction tests).  Evaluation of the elevated surface at any
+    (u, v) parameter matches the original within floating-point tolerance.
+
+    Parameters
+    ----------
+    surface : NurbsSurface
+        Input surface.  May have any degree >= 1.
+    target_degree : int
+        Minimum degree after elevation (default 4).  If the surface's degree
+        in a direction is already >= *target_degree*, that direction is left
+        unchanged.
+
+    Returns
+    -------
+    NurbsSurface
+        A new surface (deep copy) with degree >= *target_degree* in both
+        parametric directions.  The number of control points increases
+        accordingly.  Never raises; returns a copy of the input on error.
+    """
+    from kerf_cad_core.geom.nurbs import NurbsCurve, _elevate_curve_bspline
+
+    if not isinstance(surface, NurbsSurface):
+        raise TypeError(f"surface must be NurbsSurface, got {type(surface).__name__}")
+    if not isinstance(target_degree, int) or target_degree < 1:
+        raise ValueError(f"target_degree must be a positive integer, got {target_degree!r}")
+
+    result = NurbsSurface(
+        degree_u=surface.degree_u,
+        degree_v=surface.degree_v,
+        control_points=surface.control_points.copy(),
+        knots_u=surface.knots_u.copy(),
+        knots_v=surface.knots_v.copy(),
+    )
+
+    # --- Elevate in u direction (iso-v curves are u-parametric) ---
+    times_u = max(0, target_degree - result.degree_u)
+    if times_u > 0:
+        nu, nv, dim = result.control_points.shape
+        # Elevate each iso-v column (a u-parametric curve)
+        elevated_u_curves = []
+        new_knots_u = None
+        for j in range(nv):
+            col = result.control_points[:, j, :].copy()
+            curve = NurbsCurve(
+                degree=result.degree_u,
+                control_points=col,
+                knots=result.knots_u.copy(),
+            )
+            elevated = _elevate_curve_bspline(curve, times=times_u)
+            elevated_u_curves.append(elevated)
+            if new_knots_u is None:
+                new_knots_u = elevated.knots.copy()
+
+        new_nu = elevated_u_curves[0].num_control_points
+        new_cp = np.zeros((new_nu, nv, dim))
+        for j, ec in enumerate(elevated_u_curves):
+            new_cp[:, j, :dim] = ec.control_points[:, :dim]
+
+        result = NurbsSurface(
+            degree_u=result.degree_u + times_u,
+            degree_v=result.degree_v,
+            control_points=new_cp,
+            knots_u=new_knots_u,
+            knots_v=result.knots_v.copy(),
+        )
+
+    # --- Elevate in v direction (iso-u curves are v-parametric) ---
+    times_v = max(0, target_degree - result.degree_v)
+    if times_v > 0:
+        nu, nv, dim = result.control_points.shape
+        elevated_v_curves = []
+        new_knots_v = None
+        for i in range(nu):
+            row = result.control_points[i, :, :].copy()
+            curve = NurbsCurve(
+                degree=result.degree_v,
+                control_points=row,
+                knots=result.knots_v.copy(),
+            )
+            elevated = _elevate_curve_bspline(curve, times=times_v)
+            elevated_v_curves.append(elevated)
+            if new_knots_v is None:
+                new_knots_v = elevated.knots.copy()
+
+        new_nv = elevated_v_curves[0].num_control_points
+        new_cp = np.zeros((nu, new_nv, dim))
+        for i, ec in enumerate(elevated_v_curves):
+            new_cp[i, :, :dim] = ec.control_points[:, :dim]
+
+        result = NurbsSurface(
+            degree_u=result.degree_u,
+            degree_v=result.degree_v + times_v,
+            control_points=new_cp,
+            knots_u=result.knots_u.copy(),
+            knots_v=new_knots_v,
+        )
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Public API: match_surface_edge_g3
+# ---------------------------------------------------------------------------
+
+def match_surface_edge_g3(
+    target_surface: NurbsSurface,
+    source_surface: NurbsSurface,
+    target_edge: str,
+    source_edge: str,
+    n_constraints: int = 12,
+    tol: float = 1e-6,
+) -> Tuple[NurbsSurface, float]:
+    """Match *source_surface*'s *source_edge* to *target_surface*'s *target_edge* at G3.
+
+    Full G3 (curvature-rate) match-at-edge per Hoschek-Lasser §14.2.  Enforces
+    G0 + G1 + G2 + G3 by adjusting the four boundary CP rows of the source
+    surface's matched edge.
+
+    This is a convenience wrapper around :func:`match_surface_edge` with
+    ``continuity="G3"``.  The *n_constraints* parameter sets the diagnostic
+    sample count used for the residual computation; the underlying solver
+    always uses the full Greville abscissa system (one equation per CP column).
+
+    Parameters
+    ----------
+    target_surface : NurbsSurface
+        The reference surface to match against (unmodified).
+    source_surface : NurbsSurface
+        The surface whose boundary will be modified (not mutated; a copy is
+        returned).
+    target_edge : str
+        Which edge of the target surface: ``'u0'``, ``'u1'``, ``'v0'``, or ``'v1'``.
+    source_edge : str
+        Which edge of the source surface.
+    n_constraints : int
+        Number of diagnostic sample points along the seam (default 12).
+        Must be >= 2.
+    tol : float
+        Continuity-achieved classification tolerance (default 1e-6).
+
+    Returns
+    -------
+    (modified_target_surface, residuals) : tuple
+        *modified_target_surface* is a deep copy of *source_surface* with the
+        four boundary CP rows adjusted for G3 continuity.
+        *residuals* is the maximum ``|dκ_src/ds − dκ_tgt/ds|`` across the seam
+        after matching (analytic G3 residual via :func:`verify_seam_g3_analytic`).
+
+        On error, returns the unmodified *source_surface* and ``math.nan``.
+
+    Notes
+    -----
+    The G3 condition requires:
+      * Source degree >= 3 in the matched cross-boundary direction.
+      * At least 4 CP rows in the inward direction (G0 = row 0, G1 = row 1,
+        G2 = row 2, G3 = row 3).
+
+    If either condition is not met, use :func:`elevate_to_g3_capability` to
+    pre-elevate the surface to degree 4 before calling this function.
+    """
+    result = match_surface_edge(
+        target_surface, target_edge,
+        source_surface, source_edge,
+        "G3",
+        samples=max(2, int(n_constraints)),
+        tolerance=float(tol),
+    )
+    if not result.ok:
+        return source_surface, math.nan
+
+    residuals = (result.max_curvature_rate_deviation
+                 if not math.isnan(result.max_curvature_rate_deviation)
+                 else verify_seam_g3_analytic(
+                     result.modified_surface, source_edge,
+                     target_surface, target_edge,
+                     samples=max(2, int(n_constraints)),
+                 ))
+    return result.modified_surface, float(residuals)
+
+
+# ---------------------------------------------------------------------------
 # LLM tool registration
 # ---------------------------------------------------------------------------
 
@@ -1794,4 +1990,171 @@ if _REGISTRY_AVAILABLE:
             "max_tangent_deviation": (None if math.isnan(max_tan) else max_tan),
             "max_curvature_deviation": (None if math.isnan(max_cur) else max_cur),
             "continuity_achieved": continuity_achieved,
+        })
+
+    # ------------------------------------------------------------------
+    # nurbs_match_surface_g3 — dedicated G3 match-at-edge tool
+    # ------------------------------------------------------------------
+
+    _g3_match_spec = ToolSpec(
+        name="nurbs_match_surface_g3",
+        description=(
+            "Match a source NURBS surface's boundary edge to a target NURBS "
+            "surface's boundary edge at G3 (curvature-rate) continuity.\n"
+            "\n"
+            "Implements Hoschek-Lasser §14.2 'Higher-order continuity': adjusts "
+            "the four boundary CP rows of the source surface (row 0 = G0, "
+            "row 1 = G1, row 2 = G2, row 3 = G3) to enforce G0 + G1 + G2 + G3 "
+            "simultaneously.  The G3 condition matches dκ/ds (arc-length "
+            "curvature rate) across the seam.\n"
+            "\n"
+            "Requirements:\n"
+            "  * source degree >= 3 in the cross-boundary direction\n"
+            "  * at least 4 CP rows in the inward direction\n"
+            "  If the source is too low degree, use elevate_to_g3_capability "
+            "  first (target_degree=4).\n"
+            "\n"
+            "Returns:\n"
+            "  ok                              : bool\n"
+            "  modified_control_points         : list of [x,y,z] row-major\n"
+            "  modified_num_u, modified_num_v  : int (CP grid dims)\n"
+            "  g3_residual                     : float (max |dκ_src/ds − dκ_tgt/ds|)\n"
+            "  max_position_deviation          : float (G0 seam error)\n"
+            "  max_tangent_deviation           : float (G1 angle, radians)\n"
+            "  max_curvature_deviation         : float (G2 normal-curvature diff)\n"
+            "  continuity_achieved             : str (G0/G1/G2/G3/none)\n"
+            "\n"
+            "On error: {ok: false, reason: str}.  Never raises."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "target_degree_u": {"type": "integer"},
+                "target_degree_v": {"type": "integer"},
+                "target_control_points": {
+                    "type": "array",
+                    "items": {"type": "array", "items": {"type": "number"}},
+                },
+                "target_num_u": {"type": "integer"},
+                "target_num_v": {"type": "integer"},
+                "target_edge": {
+                    "type": "string",
+                    "enum": ["u0", "u1", "v0", "v1"],
+                    "description": "Which edge of the target surface to match against.",
+                },
+                "source_degree_u": {"type": "integer"},
+                "source_degree_v": {"type": "integer"},
+                "source_control_points": {
+                    "type": "array",
+                    "items": {"type": "array", "items": {"type": "number"}},
+                },
+                "source_num_u": {"type": "integer"},
+                "source_num_v": {"type": "integer"},
+                "source_edge": {
+                    "type": "string",
+                    "enum": ["u0", "u1", "v0", "v1"],
+                    "description": "Which edge of the source surface to modify.",
+                },
+                "n_constraints": {
+                    "type": "integer",
+                    "description": "Diagnostic sample count along seam (default 12, min 2).",
+                },
+                "tol": {
+                    "type": "number",
+                    "description": "Continuity-achieved classification tolerance (default 1e-6).",
+                },
+            },
+            "required": [
+                "target_degree_u", "target_degree_v",
+                "target_control_points", "target_num_u", "target_num_v",
+                "target_edge",
+                "source_degree_u", "source_degree_v",
+                "source_control_points", "source_num_u", "source_num_v",
+                "source_edge",
+            ],
+        },
+    )
+
+    @register(_g3_match_spec)
+    async def run_nurbs_match_surface_g3(ctx: "ProjectCtx", args: bytes) -> str:
+        try:
+            a = _json.loads(args)
+        except Exception as exc:
+            return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+        target_surf, err = _parse_surface_args(a, "target_")
+        if err is not None:
+            return err
+        source_surf, err = _parse_surface_args(a, "source_")
+        if err is not None:
+            return err
+
+        target_edge = a.get("target_edge", "")
+        source_edge = a.get("source_edge", "")
+        n_constraints = a.get("n_constraints", 12)
+        tol = a.get("tol", 1e-6)
+
+        if target_edge not in _VALID_EDGES:
+            return err_payload(
+                f"target_edge must be one of {sorted(_VALID_EDGES)}", "BAD_ARGS"
+            )
+        if source_edge not in _VALID_EDGES:
+            return err_payload(
+                f"source_edge must be one of {sorted(_VALID_EDGES)}", "BAD_ARGS"
+            )
+        if not isinstance(n_constraints, int) or n_constraints < 2:
+            return err_payload("n_constraints must be integer >= 2", "BAD_ARGS")
+        if not isinstance(tol, (int, float)) or tol <= 0:
+            return err_payload("tol must be a positive number", "BAD_ARGS")
+
+        modified, residual = match_surface_edge_g3(
+            target_surf, source_surf,
+            target_edge, source_edge,
+            n_constraints=n_constraints,
+            tol=float(tol),
+        )
+
+        if modified is source_surf:
+            return err_payload(
+                "G3 match failed (check source degree >= 3 and >= 4 CP rows "
+                "in matched direction)",
+                "OP_FAILED",
+            )
+
+        cp = modified.control_points
+        flat_cp = cp.reshape(-1, cp.shape[2]).tolist()
+
+        g3_res = verify_seam_g3_analytic(
+            modified, source_edge,
+            target_surf, target_edge,
+            samples=n_constraints,
+        )
+
+        result = match_surface_edge(
+            target_surf, target_edge,
+            source_surf, source_edge,
+            "G3",
+            samples=n_constraints,
+            tolerance=float(tol),
+        )
+
+        return ok_payload({
+            "modified_control_points": flat_cp,
+            "modified_num_u": modified.control_points.shape[0],
+            "modified_num_v": modified.control_points.shape[1],
+            "g3_residual": (None if math.isnan(residual) else residual),
+            "max_position_deviation": (
+                result.max_position_deviation
+                if result.ok and not math.isnan(result.max_position_deviation)
+                else None
+            ),
+            "max_tangent_deviation": (
+                None if (not result.ok or math.isnan(result.max_tangent_deviation))
+                else result.max_tangent_deviation
+            ),
+            "max_curvature_deviation": (
+                None if (not result.ok or math.isnan(result.max_curvature_deviation))
+                else result.max_curvature_deviation
+            ),
+            "continuity_achieved": result.continuity_achieved if result.ok else "unknown",
         })

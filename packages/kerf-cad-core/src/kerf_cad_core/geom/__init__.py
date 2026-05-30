@@ -1591,3 +1591,11 @@ from kerf_cad_core.geom.curve_on_surface_robust import (
     CurveOnSurfaceResult,
     project_curve_to_surface,
 )
+# NURBS-SURFACE-AREA-EXACT: exact surface area via first-fundamental-form integrand
+# A = ∫∫ sqrt(EG-F²) du dv (do Carmo §2.5 / Mortenson §10.4).
+# 5×5 Gauss-Legendre per knot-span cell + adaptive subdivision.
+# LLM tool: nurbs_surface_area_exact.
+from kerf_cad_core.geom.surface_area_exact import (  # noqa: E402
+    SurfaceAreaReport,
+    compute_exact_surface_area,
+)

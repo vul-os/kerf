@@ -414,6 +414,9 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.curve_resample_uniform",
     # GK-140: NURBS-surface offset distance field (Maekawa 1999; Piegl & Tiller §11.3)
     "kerf_cad_core.geom.offset_distance_field",         # nurbs_offset_distance_field
+    # NURBS-SURFACE-AREA-EXACT: exact area via first-fundamental-form integrand
+    # A = ∫∫ sqrt(EG-F²) du dv (do Carmo §2.5 / Mortenson §10.4)
+    "kerf_cad_core.geom.surface_area_exact",            # nurbs_surface_area_exact
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

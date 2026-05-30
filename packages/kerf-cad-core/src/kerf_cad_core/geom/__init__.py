@@ -1599,3 +1599,16 @@ from kerf_cad_core.geom.surface_area_exact import (  # noqa: E402
     SurfaceAreaReport,
     compute_exact_surface_area,
 )
+# NURBS-CURVE-CURVATURE-PROFILE-EXPORT: κ(t) → CSV/SVG/PNG (Farin §11.6; Sapidis §3)
+from kerf_cad_core.geom.curvature_profile_export import (  # noqa: E402
+    CurvatureProfileResult,
+    export_curvature_profile,
+    export_curvature_profile_result,
+)
+# BREP-FACE-DEVELOPABLE-CHECK: Gaussian curvature sampling test for developability
+# (do Carmo §3.6 "Ruled and Developable Surfaces"; Pottmann-Wallner §4)
+# K = κ_1·κ_2 = 0 everywhere ↔ developable. LLM tool: brep_check_face_developable.
+from kerf_cad_core.geom.face_developable_check import (  # noqa: E402
+    DevelopabilityReport,
+    check_face_developable,
+)

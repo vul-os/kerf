@@ -60,6 +60,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.nurbs_boolean",
     # NURBS-CURVE-CURVATURE-OSCULATING-CIRCLE: osculating circle at param t
     "kerf_cad_core.geom.osculating_circle",
+    # BREP-FACE-DEVELOPABLE-CHECK: K=0 sampling test (do Carmo §3.6; Pottmann-Wallner §4)
+    "kerf_cad_core.geom.face_developable_check",
     # GK-P Wave 4P: far-offset robustness (Maekawa 1999) — nurbs_surface_offset_robust
     "kerf_cad_core.geom.offset_far_tools",
     "kerf_cad_core.geom.trim_curve",
@@ -180,6 +182,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.wall_thickness",   # GK-P: brep_analyze_wall_thickness + brep_check_moldability
     "kerf_cad_core.geom.shell_wall_check", # BREP-SHELL-WALL-CHECK: brep_check_shell_walls (Menges 2001 §3.3; BD §5)
     "kerf_cad_core.geom.curvature_heatmap",
+    # NURBS-CURVE-CURVATURE-PROFILE-EXPORT: κ(t) CSV/SVG/PNG export (Farin §11.6; Sapidis §3)
+    "kerf_cad_core.geom.curvature_profile_export",
     "kerf_cad_core.geom.mesh_repair",
     # GK-82 ext: body-body imprint with edge tagging
     "kerf_cad_core.geom.imprint_body_tool",

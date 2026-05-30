@@ -6923,6 +6923,20 @@
             "note": "check_face_planarity: uniform UV-grid sampling + SVD orthogonal regression (Pratt 1987 §3; Eberly §6.6); returns is_planar, plane_origin, plane_normal, max_deviation, planarity_score (0→flat, higher→curved); default tolerance=1e-4×bbox_diag; LLM tool brep_check_face_planarity. Useful for sheet-metal flat-pattern feasibility, simple-face fast-rendering, planar-face cooling-channel routing. CAVEAT: v1 uses full UV domain — inner trim loops not excluded.",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/face_planarity.py"
           }
+        },
+        {
+          "domain": "D1",
+          "feature": "B-rep face developability check (Gaussian curvature K=0 test)",
+          "competitor": {
+            "status": "partial",
+            "note": "SOLIDWORKS has no direct developability API; sheet-metal module classifies bends as cylindrical/conical but does not expose K=0 sampling or ruled-surface detection for arbitrary NURBS faces",
+            "source": "https://help.solidworks.com/2024/english/solidworks/sldworks/c_Sheet_Metal_Forming_Tools.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "check_face_developable: N×N UV-grid sampling + Gaussian curvature K=κ_1·κ_2 via shape operator (do Carmo §3.6; Pottmann-Wallner §4); returns is_developable (max|K|<tol), max_abs_K, mean_abs_K, ruled_direction_if_any (kappa_1/kappa_2 identically zero); LLM tool brep_check_face_developable. Oracles: cylinder K=0→True; sphere K=1/R²→False; cone K=0→True; torus K varies→False; plane K=0→True. CAVEAT: sampling-based lower bound on max|K|.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/face_developable_check.py"
+          }
         }
       ]
     },

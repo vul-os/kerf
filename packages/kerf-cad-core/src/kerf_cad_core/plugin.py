@@ -346,6 +346,10 @@ _TOOL_MODULES = [
     # BREP-EDGE-CONVEX-CONCAVE-CLASSIFY: dihedral-angle edge classification
     # (Hoffmann 1989 §5.3; Mantyla 1988 §7.4) — brep_classify_edges
     "kerf_cad_core.geom.edge_convexity",
+    # BREP-HOLE-RECOGNITION-FROM-LOOPS: AAG-based recognition of through-hole, blind hole,
+    # counterbore, countersink, possibly-threaded holes from B-rep inner loops
+    # (Joshi-Chang 1988; Han-Pratt-Regli 2000) — brep_recognize_holes
+    "kerf_cad_core.geom.hole_recognition",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

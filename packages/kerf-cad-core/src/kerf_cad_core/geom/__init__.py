@@ -1405,3 +1405,11 @@ from kerf_cad_core.geom.edge_convexity import (  # noqa: E402
     classify_edges,
     classify_body_edges,
 )
+# BREP-HOLE-RECOGNITION-FROM-LOOPS: AAG-based recognition of through-hole, blind hole,
+# counterbore, countersink, possibly-threaded holes from B-rep inner loops
+# (Joshi-Chang 1988; Han-Pratt-Regli 2000) — recognize_holes / HoleFeature
+from kerf_cad_core.geom.hole_recognition import (  # noqa: E402
+    HoleFeature,
+    recognize_holes,
+    recognize_holes_in_body,
+)

@@ -1244,3 +1244,274 @@ async def run_plm_query_multi_cavity(ctx, args: bytes) -> str:
         ],
         "honest_flag": HONEST_FLAG,
     })
+
+
+# ===========================================================================
+# PLM Part-Numbering Schema (GS1 GTIN + ISO 8000-110 + Cooper DFM §6)
+# ===========================================================================
+
+plm_validate_part_number_spec = ToolSpec(
+    name="plm_validate_part_number",
+    description=(
+        "Validate a part number against a declared corporate part-numbering schema.\n\n"
+        "Supported schema types:\n"
+        "  sequential   — PN-00001 … PN-99999 (simple sequential, Cooper DFM §6.2).\n"
+        "  hierarchical — TTT-FFF-VVV-SSS (type-family-variant-serial, Cooper §6.3).\n"
+        "  semantic     — SKU-BLK-12X10-AL-V2 (color/size/material/revision, Cooper §6.4).\n"
+        "  hash_based   — HASH-<10-hex> (SHA-256 truncation of attributes, deterministic).\n"
+        "  custom       — caller-supplied regex pattern.\n\n"
+        "Validation checks (GS1 GTIN §2.1 + ISO 8000-110 §6.5):\n"
+        "  1. Part number matches the schema regex pattern.\n"
+        "  2. Part number does not start with any reserved prefix.\n\n"
+        "Returns {valid: bool, reason: str, matched_schema: str}.\n\n"
+        "Depth-bar example:\n"
+        "  schema PN-{type:3}-{family:3}-{serial:5}, pattern PN-[A-Z]{3}-[A-Z]{3}-\\d{5}:\n"
+        "  'PN-ABC-DEF-00123' → valid=true\n"
+        "  'PN-AB-DEF-00123'  → valid=false, reason='does not match … pattern'\n\n"
+        "Honest flag: validation is syntactic only; duplicate / issued-set checks require "
+        "the stateful plm_allocate_part_number tool."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "part_number": {
+                "type": "string",
+                "description": "The part number string to validate.",
+            },
+            "schema_type": {
+                "type": "string",
+                "enum": ["sequential", "hierarchical", "semantic", "hash_based", "custom"],
+                "description": "Schema type.  Use 'custom' and supply *pattern* for non-standard schemas.",
+                "default": "sequential",
+            },
+            "pattern": {
+                "type": "string",
+                "description": (
+                    "Regex pattern (Python re, anchored at both ends automatically). "
+                    "Required for schema_type='custom'; ignored otherwise."
+                ),
+            },
+            "prefix": {
+                "type": "string",
+                "description": (
+                    "Constant prefix for sequential schemas.  Default: 'PN-'."
+                ),
+                "default": "PN-",
+            },
+            "serial_width": {
+                "type": "integer",
+                "description": "Zero-padded serial digit width for sequential schemas.  Default: 5.",
+                "default": 5,
+            },
+            "reserved_prefixes": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Prefixes that must not appear at the start of any valid PN.",
+            },
+        },
+        "required": ["part_number"],
+    },
+)
+
+
+@register(plm_validate_part_number_spec)
+async def run_plm_validate_part_number(ctx, args: bytes) -> str:
+    """Tool handler for plm_validate_part_number (GS1 GTIN §2.1 + ISO 8000-110 §6.5)."""
+    import json as _json
+    try:
+        a = _json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+    pn = a.get("part_number", "")
+    if not pn:
+        return err_payload("'part_number' is required", "BAD_ARGS")
+
+    schema_type_str = a.get("schema_type", "sequential")
+    pattern = a.get("pattern")
+    prefix = a.get("prefix", "PN-")
+    serial_width = int(a.get("serial_width", 5))
+    reserved = set(a.get("reserved_prefixes") or [])
+
+    try:
+        from kerf_plm.part_numbering_schema import (
+            PartNumberSchema, SchemaType,
+            make_sequential_schema, make_hierarchical_schema,
+            make_semantic_schema, make_hash_schema,
+        )
+        schema_type = SchemaType(schema_type_str)
+        if schema_type == SchemaType.SEQUENTIAL:
+            schema = make_sequential_schema(
+                prefix=prefix, serial_width=serial_width, reserved_prefixes=reserved
+            )
+        elif schema_type == SchemaType.HIERARCHICAL:
+            schema = make_hierarchical_schema(reserved_prefixes=reserved)
+        elif schema_type == SchemaType.SEMANTIC:
+            schema = make_semantic_schema(reserved_prefixes=reserved)
+        elif schema_type == SchemaType.HASH_BASED:
+            schema = make_hash_schema(reserved_prefixes=reserved)
+        else:  # CUSTOM
+            if not pattern:
+                return err_payload(
+                    "'pattern' is required for schema_type='custom'", "BAD_ARGS"
+                )
+            schema = PartNumberSchema(
+                name="custom",
+                schema_type=SchemaType.CUSTOM,
+                pattern=pattern,
+                prefix=prefix,
+                serial_width=serial_width,
+                reserved_prefixes=reserved,
+            )
+        result = schema.validate(pn)
+    except ValueError as exc:
+        return err_payload(f"invalid schema_type '{schema_type_str}': {exc}", "BAD_ARGS")
+    except Exception as exc:
+        return err_payload(f"validation error: {exc}", "ERROR")
+
+    return ok_payload({
+        "valid": result.valid,
+        "reason": result.reason,
+        "matched_schema": result.matched_schema,
+        "honest_flag": PartNumberSchema.HONEST_FLAG,
+    })
+
+
+plm_allocate_part_number_spec = ToolSpec(
+    name="plm_allocate_part_number",
+    description=(
+        "Allocate (mint) the next available part number under a declared schema.\n\n"
+        "The tool maintains a per-call issued-number set passed as *state_json* — "
+        "a serialised dict previously returned in the response.  Callers must persist "
+        "and re-supply state_json to maintain uniqueness across calls.\n\n"
+        "Supported schema types: sequential, hierarchical, hash_based.  Semantic "
+        "schemas do not support auto-allocation.\n\n"
+        "Sequential family_key: optional string key to namespace serials "
+        "(e.g. 'component' vs 'assembly').  Omit for a single global sequence.\n\n"
+        "Hierarchical family_key: [type_code, family_code, variant_code], each a "
+        "3-digit string.  Separate counter per (type, family, variant).\n\n"
+        "Hash-based family_key: a JSON object of part attributes — SHA-256 truncated "
+        "to 10 hex chars; deterministic (same attrs → same PN).  Returns duplicate=true "
+        "if already issued.\n\n"
+        "Depth-bar: allocate next in family ABC-DEF after 'PN-ABC-DEF-00123' issued "
+        "→ returns 'PN-ABC-DEF-00124'.\n\n"
+        "Honest flag: uniqueness is per-instance / per-state_json only.  "
+        "No cross-session federation.  Persist state_json between calls."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "schema_type": {
+                "type": "string",
+                "enum": ["sequential", "hierarchical", "hash_based"],
+                "description": "Schema type for allocation.",
+                "default": "sequential",
+            },
+            "prefix": {
+                "type": "string",
+                "description": "Constant prefix for sequential schemas.  Default: 'PN-'.",
+                "default": "PN-",
+            },
+            "serial_width": {
+                "type": "integer",
+                "description": "Zero-padded digit width for sequential schemas.  Default: 5.",
+                "default": 5,
+            },
+            "family_key": {
+                "description": (
+                    "Namespace key for allocation.  "
+                    "Sequential: omit or supply a string key.  "
+                    "Hierarchical: [type_code, family_code, variant_code].  "
+                    "Hash-based: a JSON object of part attributes."
+                ),
+            },
+            "state_json": {
+                "type": "string",
+                "description": (
+                    "Serialised schema state from a previous call "
+                    "(value of 'state' in the previous response).  "
+                    "Omit on the first call.  Must be supplied on subsequent "
+                    "calls to maintain duplicate detection."
+                ),
+            },
+            "reserved_prefixes": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Prefixes that must not be allocated.",
+            },
+        },
+        "required": [],
+    },
+)
+
+
+@register(plm_allocate_part_number_spec)
+async def run_plm_allocate_part_number(ctx, args: bytes) -> str:
+    """Tool handler for plm_allocate_part_number (GS1 GTIN §2.1 + ISO 8000-110 §6.5)."""
+    import json as _json
+    try:
+        a = _json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+    schema_type_str = a.get("schema_type", "sequential")
+    prefix = a.get("prefix", "PN-")
+    serial_width = int(a.get("serial_width", 5))
+    family_key_raw = a.get("family_key")
+    state_json_str = a.get("state_json")
+    reserved = set(a.get("reserved_prefixes") or [])
+
+    try:
+        from kerf_plm.part_numbering_schema import (
+            PartNumberSchema, SchemaType,
+            make_sequential_schema, make_hierarchical_schema, make_hash_schema,
+        )
+        schema_type = SchemaType(schema_type_str)
+        if schema_type == SchemaType.SEQUENTIAL:
+            schema = make_sequential_schema(
+                prefix=prefix, serial_width=serial_width, reserved_prefixes=reserved
+            )
+        elif schema_type == SchemaType.HIERARCHICAL:
+            schema = make_hierarchical_schema(reserved_prefixes=reserved)
+        elif schema_type == SchemaType.HASH_BASED:
+            schema = make_hash_schema(reserved_prefixes=reserved)
+        else:
+            return err_payload(
+                f"schema_type '{schema_type_str}' does not support auto-allocation; "
+                "use sequential, hierarchical, or hash_based.",
+                "BAD_ARGS",
+            )
+
+        # Restore state if provided
+        if state_json_str:
+            try:
+                state = _json.loads(state_json_str)
+                PartNumberSchema.from_state_dict(state, schema)
+            except Exception as exc:
+                return err_payload(f"invalid state_json: {exc}", "BAD_ARGS")
+
+        # Build family_key
+        if family_key_raw is None:
+            family_key: tuple = ()
+        elif isinstance(family_key_raw, list):
+            family_key = tuple(family_key_raw)
+        elif isinstance(family_key_raw, dict):
+            family_key = (family_key_raw,)
+        else:
+            family_key = (str(family_key_raw),)
+
+        result = schema.allocate_next(family_key=family_key)
+    except ValueError as exc:
+        return err_payload(f"invalid schema_type '{schema_type_str}': {exc}", "BAD_ARGS")
+    except Exception as exc:
+        return err_payload(f"allocation error: {exc}", "ERROR")
+
+    if not result.ok:
+        return err_payload(result.reason, "DUPLICATE" if result.duplicate else "ALLOC_FAILED")
+
+    return ok_payload({
+        "part_number": result.part_number,
+        "duplicate": result.duplicate,
+        "state": schema.to_state_dict(),
+        "honest_flag": PartNumberSchema.HONEST_FLAG,
+    })

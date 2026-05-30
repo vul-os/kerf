@@ -5186,6 +5186,19 @@
           }
         },
         {
+          "domain": "D5",
+          "feature": "Corporate part-numbering schema (sequential / hierarchical / semantic / hash)",
+          "competitor": {
+            "status": "no",
+            "note": "Fusion 360 has no built-in part-numbering schema engine; PN format is free-text or managed externally via Fusion Manage / Vault PDM."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Four schema types (sequential PN-00001, hierarchical TTT-FFF-VVV-SSS, semantic SKU-BLK-12X10-AL-V2, hash-based HASH-<sha256[:10]>). Regex validation with per-segment error messages; reserved-prefix guard; duplicate detection; schema migration; state serialisation. GS1 GTIN §2.1 + ISO 8000-110 §6.5. Honest-flagged: per-instance uniqueness only. LLM tools: plm_validate_part_number, plm_allocate_part_number.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/part_numbering_schema.py"
+          }
+        },
+        {
           "domain": "D6",
           "feature": "Schematic capture (KiCad round-trip, ERC)",
           "competitor": {

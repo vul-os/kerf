@@ -108,18 +108,39 @@ async def register(app: FastAPI, ctx):
     except Exception:
         pass  # multi-cavity tool optional — fail silently if symbol missing.
 
+    # Part-numbering schema (GS1 GTIN + ISO 8000-110 + Cooper DFM §6).
+    try:
+        from kerf_plm.tools import (
+            plm_validate_part_number_spec,
+            run_plm_validate_part_number,
+            plm_allocate_part_number_spec,
+            run_plm_allocate_part_number,
+        )
+        ctx.tools.register(
+            "plm_validate_part_number",
+            plm_validate_part_number_spec,
+            run_plm_validate_part_number,
+        )
+        ctx.tools.register(
+            "plm_allocate_part_number",
+            plm_allocate_part_number_spec,
+            run_plm_allocate_part_number,
+        )
+    except Exception:
+        pass  # part-numbering tools optional — fail silently if symbol missing.
+
     try:
         from kerf_core.plugin import PluginManifest
         return PluginManifest(
             name="plm",
             version="0.1.0",
-            provides=["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.sysml-traceability", "plm.xmi-export", "plm.where-used", "plm.document-version-diff", "plm.multi-cavity-effectivity"],
+            provides=["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.sysml-traceability", "plm.xmi-export", "plm.where-used", "plm.document-version-diff", "plm.multi-cavity-effectivity", "plm.part-numbering-schema"],
             depends=[],
         )
     except ImportError:
         return {
             "name": "plm",
             "version": "0.1.0",
-            "provides": ["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.multi-cavity-effectivity"],
+            "provides": ["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.multi-cavity-effectivity", "plm.part-numbering-schema"],
             "depends": [],
         }

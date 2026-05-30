@@ -11,6 +11,8 @@ Registers:
                (Menges 2001 §6.5 cooling-channel conflict detection)
   - LLM tool:  mold_validate_draft
                (Menges 2001 §3.4 + Beaumont 2007 §4 draft-angle validation)
+  - LLM tool:  mold_generate_runner_layout
+               (Beaumont 2007 §6.5 + Menges 2001 §6 cold-runner tree design)
 """
 from __future__ import annotations
 
@@ -77,6 +79,15 @@ async def register(app: FastAPI, ctx):
         _VALIDATE_DRAFT_SPEC,
         run_mold_validate_draft,
     )
+    # Register runner-layout tool (Beaumont 2007 §6.5 + Menges 2001 §6)
+    from kerf_mold.runner_layout_tool import (
+        mold_runner_layout_spec, run_mold_generate_runner_layout,
+    )
+    ctx.tools.register(
+        "mold_generate_runner_layout",
+        mold_runner_layout_spec,
+        run_mold_generate_runner_layout,
+    )
 
     provides = [
         "mold.moldability",
@@ -87,6 +98,7 @@ async def register(app: FastAPI, ctx):
         "mold.ejector_pin_layout",
         "mold.cooling_channel_conflict",
         "mold.draft_validation",
+        "mold.runner_layout",
     ]
 
     try:

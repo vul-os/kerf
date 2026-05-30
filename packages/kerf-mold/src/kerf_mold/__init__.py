@@ -38,6 +38,12 @@ from kerf_mold.draft_validation import (
     FaceResult,
     validate_draft,
 )
+from kerf_mold.runner_layout import (
+    RunnerSegment,
+    RunnerLayout,
+    generate_runner_layout,
+    beaumont_runner_diameter,
+)
 
 __all__ = [
     # mold.py
@@ -74,4 +80,9 @@ __all__ = [
     "FaceInput",
     "FaceResult",
     "validate_draft",
+    # runner_layout.py
+    "RunnerSegment",
+    "RunnerLayout",
+    "generate_runner_layout",
+    "beaumont_runner_diameter",
 ]

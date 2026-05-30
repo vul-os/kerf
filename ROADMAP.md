@@ -93,6 +93,9 @@ The sector work only matters if you **own your work, are not locked in, and can 
 ### Latest delta — 2026-05-30
 
 **Dental implant trajectory planning** ✅ — Misch 2014 §22 / EAO guidelines: bone density classification (HU → D1-D4), mandibular nerve clearance (≥ 2 mm), maxillary sinus floor clearance (≥ 1 mm), axial alignment deviation (≤ 10° EAO limit), cortical thickness at entry; `recommend_implant_dimensions` per site (anterior/premolar/posterior × maxillary/mandibular); `generate_surgical_guide_geometry` cylinder output; LLM tools `dental_implant_metrics` + `dental_recommend_implant` — `kerf-dental/src/kerf_dental/implant_planning.py`. NOT FDA-cleared; planning-support only.
+### Latest delta — 2026-05-30
+
+**Injection-mold runner layout** ✅ — `mold_generate_runner_layout` LLM tool: balanced cold-runner tree for multi-cavity molds; Beaumont 2007 §6.5 diameter sizing (D=W^0.25+0.5 mm, cap 10 mm) cross-checked against Table 6.5; natural balance (1.0) for symmetric 2×2 grids; spine-and-branch topology for row layouts (artificial balance flagged with graduated-diameter advisory per Menges 2001 §6); Hagen-Poiseuille pressure-drop coefficient; cold runners only (hot-runner scope honest-flagged) — `packages/kerf-mold/src/kerf_mold/runner_layout.py`.
 
 ### Previous delta — 2026-05-26
 

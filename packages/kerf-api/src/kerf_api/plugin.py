@@ -93,6 +93,8 @@ def _register_tools(ctx) -> None:
         "kerf_api.tools.validation",
         "kerf_api.tools.project_layers",
         "kerf_api.tools.material",
+        # GK-P-IV: interference volume metric
+        "kerf_api.tools.brep_interference",
     ]
 
     import importlib

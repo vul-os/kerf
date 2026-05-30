@@ -12,6 +12,8 @@ Coverage:
   estimate.batch_curve       — breakpoints, monotone decrease
   estimate.learning_curve    — Wright 80%, doubling law
   estimate.make_vs_buy       — break-even, prefer-make, prefer-buy
+  material_prices_2025       — 2025 spot-price DB, aliases, validation
+  material_cost_rollup       — BOM cost roll-up, per-material aggregation
   tools.*                    — LLM tool wrappers (happy path + error paths)
 
 All tests are pure-Python and hermetic: no OCC, no DB, no network, no fixtures.
@@ -21,6 +23,7 @@ References
 ----------
 Boothroyd, Dewhurst & Knight, "Product Design for Manufacture and Assembly", 3rd ed.
 Wright, T.P. (1936), "Factors Affecting the Cost of Airplanes", JAS 3(4)
+ASME Y14.5-2018 §1.3 (BOM structure definitions)
 
 Author: imranparuk
 """
@@ -34,28 +37,31 @@ import uuid
 import pytest
 
 from kerf_cad_core.costing.estimate import (
-    cnc_cost,
-    casting_cost,
-    injection_cost,
-    sheet_metal_cost,
-    printing_cost,
     assembly_cost,
-    rollup,
     batch_curve,
+    casting_cost,
+    cnc_cost,
+    injection_cost,
     learning_curve,
     make_vs_buy,
+    printing_cost,
+    rollup,
+    sheet_metal_cost,
 )
+from kerf_cad_core.costing.material_cost_rollup import BomLine, compute_material_cost_rollup
+from kerf_cad_core.costing.material_prices_2025 import MATERIAL_DB, lookup_material
 from kerf_cad_core.costing.tools import (
-    run_costing_cnc,
-    run_costing_casting,
-    run_costing_injection,
-    run_costing_sheet_metal,
-    run_costing_printing,
     run_costing_assembly,
-    run_costing_rollup,
     run_costing_batch_curve,
+    run_costing_casting,
+    run_costing_cnc,
+    run_costing_injection,
     run_costing_learning_curve,
     run_costing_make_vs_buy,
+    run_costing_printing,
+    run_costing_rollup,
+    run_costing_sheet_metal,
+    run_manufacturing_compute_material_cost_rollup,
 )
 
 
@@ -323,12 +329,6 @@ class TestInjectionCost:
 
     def test_zero_scrap_no_inflation(self):
         """scrap=0 → material = shot_mass * cost_per_kg"""
-        res = injection_cost(
-            material_cost_per_kg=40.0, shot_mass_kg=0.025,
-            scrap_rate=0.0, overhead_rate=0.0,
-            cycle_time_hr=0.005, machine_rate_per_hr=0.0,
-        )
-        # machine_rate=0 not valid, use small value
         res = injection_cost(
             material_cost_per_kg=40.0, shot_mass_kg=0.025,
             scrap_rate=0.0, overhead_rate=0.0,
@@ -1064,3 +1064,279 @@ class TestCostingExternalReferenceCases:
         assert math.isclose(r["unit_price"],
                             r["full_cost"] / (1.0 - 0.2), rel_tol=1e-6)
         assert math.isclose(r["margin_rate_actual"], 0.2, rel_tol=1e-6)
+
+
+# ===========================================================================
+# §8 Material Cost Roll-up — hermetic oracle tests
+#
+# References:
+#   Boothroyd, Dewhurst & Knight, "Product Design for Manufacture and
+#     Assembly", 3rd ed. (2010), §8.3 — material cost models.
+#   ASME Y14.5-2018 §1.3 — BOM structure definitions.
+#
+# Notation:
+#   mass_per_part = volume_mm3 × density_g_cm3 × 1e-6  [kg]
+#   gross_mass    = mass_per_part × qty × (1 + waste_factor)
+#   cost          = gross_mass × price_per_kg
+# ===========================================================================
+
+
+class TestMaterialPrices2025:
+    """Unit tests for the 2025 spot-price baseline database."""
+
+    def test_abs_entry_present(self):
+        spec = lookup_material("ABS")
+        assert spec is not None
+        assert math.isclose(spec.density_g_cm3, 1.04, rel_tol=1e-6)
+        assert math.isclose(spec.price_per_kg_usd, 2.50, rel_tol=1e-6)
+
+    def test_al6061_entry(self):
+        spec = lookup_material("Al6061")
+        assert spec is not None
+        assert math.isclose(spec.density_g_cm3, 2.70, rel_tol=1e-6)
+
+    def test_ti6al4v_entry(self):
+        spec = lookup_material("Ti6Al4V")
+        assert spec is not None
+        assert spec.density_g_cm3 > 4.0
+
+    def test_alias_aluminium(self):
+        spec = lookup_material("aluminium")
+        assert spec is not None
+        assert spec.name == "Al6061"
+
+    def test_alias_copper(self):
+        spec = lookup_material("copper")
+        assert spec is not None
+        assert spec.name == "Cu"
+
+    def test_unknown_returns_none(self):
+        assert lookup_material("Unobtainium") is None
+
+    def test_all_entries_positive(self):
+        for key, spec in MATERIAL_DB.items():
+            assert spec.density_g_cm3 > 0, f"{key}: density must be > 0"
+            assert spec.price_per_kg_usd > 0, f"{key}: price must be > 0"
+
+
+class TestMaterialCostRollupCore:
+    """Core computation tests for compute_material_cost_rollup.
+
+    References: Boothroyd-Dewhurst §8.3; ASME Y14.5-2018 §1.3.
+    """
+
+    def test_1000_abs_oracle(self):
+        """Boothroyd-Dewhurst §8.3 depth-bar oracle: 1000 × ABS @ 100 000 mm³.
+
+        mass_per_part = 100 000 × 1.04 × 1e-6 = 0.104 kg
+        total_net     = 0.104 × 1000           = 104 kg
+        gross         = 104 × 1.10             = 114.4 kg
+        cost          = 114.4 × $2.50          = $286.00
+        """
+        parts = [BomLine("ABS-001", "ABS", 100_000.0, 1000)]
+        r = compute_material_cost_rollup(parts, waste_factor=0.10)
+        assert r.ok is True
+        assert not r.per_part_costs[0].flagged
+        pc = r.per_part_costs[0]
+        assert math.isclose(pc.mass_per_part_kg, 0.104, rel_tol=1e-5)
+        assert math.isclose(pc.total_net_mass_kg, 104.0, rel_tol=1e-5)
+        assert math.isclose(pc.gross_mass_kg, 114.4, rel_tol=1e-5)
+        assert math.isclose(r.total_cost_usd, 286.0, rel_tol=1e-4)
+
+    def test_al6061_oracle(self):
+        """Al6061: 500 parts @ 50 000 mm³, density 2.70, $4.80/kg, 10% waste.
+
+        mass_per_part = 50 000 × 2.70 × 1e-6 = 0.135 kg
+        gross         = 0.135 × 500 × 1.10   = 74.25 kg
+        cost          = 74.25 × $4.80         = $356.40
+        """
+        parts = [BomLine("AL-001", "Al6061", 50_000.0, 500)]
+        r = compute_material_cost_rollup(parts, waste_factor=0.10)
+        assert r.ok is True
+        pc = r.per_part_costs[0]
+        assert math.isclose(pc.mass_per_part_kg, 0.135, rel_tol=1e-5)
+        assert math.isclose(pc.gross_mass_kg, 74.25, rel_tol=1e-4)
+        assert math.isclose(r.total_cost_usd, 356.40, rel_tol=1e-4)
+
+    def test_mixed_materials(self):
+        """Mixed ABS + Steel304: totals sum independently."""
+        parts = [
+            BomLine("P1", "ABS", 10_000.0, 2),
+            BomLine("P2", "Steel304", 5_000.0, 10),
+        ]
+        r = compute_material_cost_rollup(parts, waste_factor=0.10)
+        assert r.ok is True
+        assert len(r.per_part_costs) == 2
+        assert len(r.per_material_breakdown) == 2
+
+        abs_b = next(b for b in r.per_material_breakdown if b.material == "ABS")
+        steel_b = next(b for b in r.per_material_breakdown if b.material == "Steel304")
+        # ABS: 0.0104 kg × 2 × 1.10 × 2.50
+        abs_expected = 0.01040 * 2 * 1.10 * 2.50
+        # Steel304: 0.03965 kg × 10 × 1.10 × 3.20
+        steel_expected = 0.03965 * 10 * 1.10 * 3.20
+        assert math.isclose(abs_b.total_cost_usd, abs_expected, rel_tol=1e-3)
+        assert math.isclose(steel_b.total_cost_usd, steel_expected, rel_tol=1e-3)
+        assert math.isclose(
+            r.total_cost_usd, abs_expected + steel_expected, rel_tol=1e-4
+        )
+
+    def test_waste_factor_zero(self):
+        """waste_factor=0 → gross_mass == net_mass."""
+        parts = [BomLine("X", "PP", 20_000.0, 100)]
+        r = compute_material_cost_rollup(parts, waste_factor=0.0)
+        assert r.ok is True
+        pc = r.per_part_costs[0]
+        assert math.isclose(pc.gross_mass_kg, pc.total_net_mass_kg, rel_tol=1e-9)
+
+    def test_waste_factor_15_pct(self):
+        """waste_factor=0.15 scales cost by ×1.15 vs waste_factor=0.0."""
+        parts = [BomLine("Y", "ABS", 100_000.0, 100)]
+        r0 = compute_material_cost_rollup(parts, waste_factor=0.0)
+        r15 = compute_material_cost_rollup(parts, waste_factor=0.15)
+        assert math.isclose(r15.total_cost_usd, r0.total_cost_usd * 1.15, rel_tol=1e-6)
+
+    def test_waste_factor_invalid_negative(self):
+        parts = [BomLine("Z", "ABS", 1000.0, 1)]
+        r = compute_material_cost_rollup(parts, waste_factor=-0.01)
+        assert r.ok is False
+        assert "waste_factor" in r.reason
+
+    def test_waste_factor_invalid_above_one(self):
+        parts = [BomLine("Z", "ABS", 1000.0, 1)]
+        r = compute_material_cost_rollup(parts, waste_factor=1.5)
+        assert r.ok is False
+
+    def test_unknown_material_flagged(self):
+        """Unknown material is zero-costed + flagged; known part unaffected."""
+        parts = [
+            BomLine("known", "ABS", 10_000.0, 1),
+            BomLine("mystery", "Unobtainium9000", 5_000.0, 5),
+        ]
+        r = compute_material_cost_rollup(parts, waste_factor=0.10)
+        assert r.ok is True
+        mystery = next(p for p in r.per_part_costs if p.part_id == "mystery")
+        known = next(p for p in r.per_part_costs if p.part_id == "known")
+        assert mystery.flagged is True
+        assert math.isclose(mystery.total_material_cost_usd, 0.0, abs_tol=1e-10)
+        assert known.flagged is False
+        assert math.isclose(r.total_cost_usd, known.total_material_cost_usd, rel_tol=1e-9)
+        assert any("Unobtainium9000" in w for w in r.warnings)
+
+    def test_large_production_run(self):
+        """1 000 000 Steel304 parts — no precision issues."""
+        parts = [BomLine("bulk", "Steel304", 2_000.0, 1_000_000)]
+        r = compute_material_cost_rollup(parts, waste_factor=0.10)
+        assert r.ok is True
+        pc = r.per_part_costs[0]
+        expected = pc.mass_per_part_kg * 1_000_000 * 1.10 * 3.20
+        assert math.isclose(r.total_cost_usd, expected, rel_tol=1e-5)
+
+    def test_aggregation_by_finishing(self):
+        parts = [
+            BomLine("P1", "ABS", 10_000.0, 10, finishing="paint"),
+            BomLine("P2", "ABS", 10_000.0, 10, finishing="anodise"),
+        ]
+        r = compute_material_cost_rollup(parts, waste_factor=0.0)
+        assert len(r.per_finishing_breakdown) == 2
+        names = {b.material for b in r.per_finishing_breakdown}
+        assert names == {"paint", "anodise"}
+
+    def test_aggregation_by_supplier(self):
+        parts = [
+            BomLine("P1", "Al6061", 50_000.0, 5, supplier="Supplier-A"),
+            BomLine("P2", "Al6061", 50_000.0, 5, supplier="Supplier-B"),
+        ]
+        r = compute_material_cost_rollup(parts, waste_factor=0.10)
+        assert len(r.per_supplier_breakdown) == 2
+        names = {b.material for b in r.per_supplier_breakdown}
+        assert names == {"Supplier-A", "Supplier-B"}
+
+    def test_custom_material_db_price_override(self):
+        """Custom price overrides the 2025 baseline."""
+        parts = [BomLine("C1", "ABS", 100_000.0, 1000)]
+        r_baseline = compute_material_cost_rollup(parts, waste_factor=0.10)
+        r_custom = compute_material_cost_rollup(
+            parts, material_db={"ABS": 5.00}, waste_factor=0.10
+        )
+        assert math.isclose(r_custom.total_cost_usd, r_baseline.total_cost_usd * 2.0,
+                            rel_tol=1e-6)
+
+    def test_dict_input_equivalent_to_bomline(self):
+        """Plain dict BOM line gives same result as BomLine dataclass."""
+        bl = BomLine("P1", "PC", 30_000.0, 50)
+        plain = {"part_id": "P1", "material": "PC", "volume_mm3": 30_000.0, "quantity": 50}
+        r_bl = compute_material_cost_rollup([bl])
+        r_d = compute_material_cost_rollup([plain])
+        assert math.isclose(r_bl.total_cost_usd, r_d.total_cost_usd, rel_tol=1e-9)
+
+    def test_empty_parts_list(self):
+        r = compute_material_cost_rollup([])
+        assert r.ok is True
+        assert math.isclose(r.total_cost_usd, 0.0, abs_tol=1e-10)
+        assert any("No BOM lines" in w for w in r.warnings)
+
+
+class TestMaterialCostRollupLLMTool:
+    """LLM tool wrapper tests for manufacturing_compute_material_cost_rollup."""
+
+    def test_tool_1000_abs_oracle(self):
+        raw = _run(run_manufacturing_compute_material_cost_rollup(
+            _ctx(),
+            _args(
+                parts=[{
+                    "part_id": "ABS-001",
+                    "material": "ABS",
+                    "volume_mm3": 100_000.0,
+                    "quantity": 1000,
+                }],
+                waste_factor=0.10,
+            ),
+        ))
+        d = json.loads(raw)
+        assert d["ok"] is True
+        assert math.isclose(d["total_cost_usd"], 286.0, rel_tol=1e-4)
+
+    def test_tool_missing_parts_returns_error(self):
+        raw = _run(run_manufacturing_compute_material_cost_rollup(
+            _ctx(), _args(waste_factor=0.10)
+        ))
+        d = json.loads(raw)
+        assert d["ok"] is False
+        assert "parts" in d["reason"]
+
+    def test_tool_invalid_json_returns_error(self):
+        raw = _run(run_manufacturing_compute_material_cost_rollup(
+            _ctx(), b"not-json"
+        ))
+        d = json.loads(raw)
+        # err_payload returns {"error": ..., "code": ...} shape
+        assert "error" in d or d.get("ok") is False
+
+    def test_tool_unknown_material_flagged_in_warnings(self):
+        raw = _run(run_manufacturing_compute_material_cost_rollup(
+            _ctx(),
+            _args(parts=[{
+                "part_id": "X",
+                "material": "FakeMat",
+                "volume_mm3": 1000.0,
+                "quantity": 1,
+            }]),
+        ))
+        d = json.loads(raw)
+        assert d["ok"] is True
+        assert d["total_cost_usd"] == 0.0
+        assert any("FakeMat" in w for w in d["warnings"])
+
+    def test_tool_mixed_bom_breakdown_count(self):
+        raw = _run(run_manufacturing_compute_material_cost_rollup(
+            _ctx(),
+            _args(parts=[
+                {"part_id": "P1", "material": "ABS", "volume_mm3": 5000.0, "quantity": 10},
+                {"part_id": "P2", "material": "Cu", "volume_mm3": 1000.0, "quantity": 5},
+            ]),
+        ))
+        d = json.loads(raw)
+        assert d["ok"] is True
+        assert len(d["per_material_breakdown"]) == 2
+        assert d["total_cost_usd"] > 0

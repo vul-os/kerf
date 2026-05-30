@@ -5397,6 +5397,20 @@
         },
         {
           "domain": "D7",
+          "feature": "Manufacturing material cost roll-up (BOM, multi-cavity)",
+          "competitor": {
+            "status": "paid",
+            "note": "DELMIA Manufacturing Cost Estimation / Fusion 360 parametric cost — process-based BOM costing; paid add-on",
+            "source": "https://www.3ds.com/products/delmia/manufacturing-cost-estimation"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "MANUFACTURING-MATERIAL-COST-ROLLUP: compute_material_cost_rollup(parts, material_db, waste_factor) — mass=vol×density×1e-6 kg; gross=net×(1+wf); cost=gross×price_per_kg; 17-material 2025 H1 spot-price DB (ABS/PP/PC/PA66/PEEK/PLA/Al6061/Al7075/Steel304/316/1018/4140/Cu/Ti6Al4V/GrayIron/CFRP/GFRP); aggregation by material, finishing, supplier; unknown-material flag; manufacturing_compute_material_cost_rollup LLM tool; 26 tests; B-D §8.3 oracle $286. Advisory: prices are 2025 H1 baselines.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/costing/material_cost_rollup.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "3-2-1 auto-fixture layout (Asada-By form-closure)",
           "competitor": {
             "status": "paid",

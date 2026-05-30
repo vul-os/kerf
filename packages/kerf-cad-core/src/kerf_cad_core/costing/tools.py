@@ -822,3 +822,110 @@ async def run_costing_make_vs_buy(ctx: ProjectCtx, args: bytes) -> str:
 
     result = make_vs_buy(a["make_unit_cost"], a["buy_unit_price"], **kwargs)
     return ok_payload(result)
+
+
+# ---------------------------------------------------------------------------
+# Tool: manufacturing_compute_material_cost_rollup
+# ---------------------------------------------------------------------------
+
+_material_cost_rollup_spec = ToolSpec(
+    name="manufacturing_compute_material_cost_rollup",
+    description=(
+        "Compute total material cost for a multi-cavity production run from a BOM.\n"
+        "\n"
+        "Algorithm (Boothroyd-Dewhurst §8.3):\n"
+        "  mass_per_part = volume_mm3 × density_g_cm3 × 1e-6  [kg]\n"
+        "  gross_mass    = mass_per_part × quantity × (1 + waste_factor)\n"
+        "  cost          = gross_mass × price_per_kg\n"
+        "\n"
+        "Results aggregated by material type, finishing operation, and\n"
+        "cavity supplier.  Unknown materials zero-costed + flagged.\n"
+        "\n"
+        "Default prices: 2025 H1 LME / Plastics News spot baselines.\n"
+        "ADVISORY: actual prices depend on form, quantity, supplier.\n"
+        "\n"
+        "Oracle: 1000 ABS parts at 100 000 mm3 each -> cost $286.00 USD.\n"
+        "\n"
+        "Errors: {ok:false, reason}. Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "parts": {
+                "type": "array",
+                "description": (
+                    "BOM lines. Each: {part_id, material, volume_mm3 (>0), "
+                    "quantity (>=1), finishing (opt), supplier (opt)}. "
+                    "Supported materials: ABS, PP, PC, PA66, PEEK, PLA, "
+                    "Al6061, Al7075, Steel304, Steel316, Steel1018, Steel4140, "
+                    "Cu, Ti6Al4V, GrayIron, CFRP, GFRP."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "part_id": {"type": "string"},
+                        "material": {"type": "string"},
+                        "volume_mm3": {"type": "number"},
+                        "quantity": {"type": "integer"},
+                        "finishing": {"type": "string"},
+                        "supplier": {"type": "string"},
+                    },
+                    "required": ["part_id", "material", "volume_mm3", "quantity"],
+                },
+            },
+            "material_db": {
+                "type": "object",
+                "description": (
+                    "Optional price overrides: {material_name: price_per_kg_usd}. "
+                    "Case-insensitive. Overrides 2025 baseline."
+                ),
+                "additionalProperties": {"type": "number"},
+            },
+            "waste_factor": {
+                "type": "number",
+                "description": (
+                    "Scrap/sprue/machining-stock fraction (default 0.10). "
+                    "Range [0, 1]. B-D s8.3 typical: 0.05-0.15."
+                ),
+            },
+            "density_overrides": {
+                "type": "object",
+                "description": (
+                    "Optional density overrides: {material_name: density_g_cm3}. "
+                    "Required for custom materials not in 2025 baseline."
+                ),
+                "additionalProperties": {"type": "number"},
+            },
+        },
+        "required": ["parts"],
+    },
+)
+
+
+@register(_material_cost_rollup_spec, write=False)
+async def run_manufacturing_compute_material_cost_rollup(
+    ctx: ProjectCtx, args: bytes
+) -> str:
+    from kerf_cad_core.costing.material_cost_rollup import (  # noqa: PLC0415
+        _report_to_dict,
+        compute_material_cost_rollup,
+    )
+
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    if a.get("parts") is None:
+        return json.dumps({"ok": False, "reason": "parts is required"})
+
+    kwargs: dict = {}
+    if "material_db" in a:
+        kwargs["material_db"] = a["material_db"]
+    if "waste_factor" in a:
+        kwargs["waste_factor"] = a["waste_factor"]
+    if "density_overrides" in a:
+        kwargs["density_overrides"] = a["density_overrides"]
+
+    report = compute_material_cost_rollup(a["parts"], **kwargs)
+    return json.dumps(_report_to_dict(report))

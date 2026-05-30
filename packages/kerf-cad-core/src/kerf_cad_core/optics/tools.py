@@ -1049,6 +1049,7 @@ async def run_mtf_across_field(ctx: ProjectCtx, args: bytes) -> str:
 
 from kerf_cad_core.optics.seidel_aberrations import seidel_coefficients  # noqa: E402
 from kerf_cad_core.optics.chief_ray_vignetting import compute_vignetting  # noqa: E402
+from kerf_cad_core.optics.pupil_diagram import compute_pupil_diagram  # noqa: E402
 
 # Tool: optics_seidel_aberrations
 # ---------------------------------------------------------------------------
@@ -1290,6 +1291,145 @@ async def run_compute_vignetting(ctx: ProjectCtx, args: bytes) -> str:
         kwargs["n_object"] = float(a["n_object"])
 
     result = compute_vignetting(
+        a["surfaces"],
+        a["field_angles_deg"],
+        **kwargs,
+    )
+    if isinstance(result, dict):
+        return json.dumps(result)
+    return ok_payload(result.to_dict())
+
+
+# ---------------------------------------------------------------------------
+# Tool: optics_pupil_diagram
+# ---------------------------------------------------------------------------
+
+_pupil_diagram_spec = ToolSpec(
+    name="optics_pupil_diagram",
+    description=(
+        "Generate spot diagrams and pupil illumination maps for a sequential lens stack.\n"
+        "\n"
+        "Algorithm (Welford 1986 §8.2 / Hecht §5.7):\n"
+        "  1. For each field angle, fill the entrance pupil with a uniform grid of N\n"
+        "     ray positions (px, py) over the unit disk.\n"
+        "  2. Trace each ray through the lens stack using exact meridional Snell traces\n"
+        "     + Newton-Raphson conic intersect (trace_lens_stack).\n"
+        "  3. Collect (x, y) intercepts at the paraxial image plane:\n"
+        "       y_img : exact meridional trace result\n"
+        "       x_img : first-order sagittal estimate = -px * R_ap * BFL/EFL\n"
+        "  4. Compute RMS spot radius (2-D), meridional y-only RMS, and max ray\n"
+        "     distance from chief ray.\n"
+        "  5. Return surviving pupil coordinates (exit-pupil illumination map).\n"
+        "\n"
+        "Depth bar (Welford 1986 §8.2):\n"
+        "  * Stigmatic stack (flat surface, c=0): y-RMS < 1e-6 mm (single-point focus).\n"
+        "  * BK7 biconvex on-axis: y-RMS > 0 (spherical aberration).\n"
+        "  * BK7 biconvex at 14 deg: y-RMS >> y-RMS at 0 deg (coma dominates off-axis).\n"
+        "  * Use rms_spot_y_mm (meridional-only) as the aberration diagnostic;\n"
+        "    rms_spot_radius_mm (2-D) includes the first-order sagittal x contribution\n"
+        "    which is nearly constant across field angles.\n"
+        "\n"
+        "HONEST FLAGS:\n"
+        "  * Monochromatic only. Polychromatic spot diagrams require per-wavelength\n"
+        "    tracing weighted by spectral power density (out of scope).\n"
+        "  * Sagittal (x) intercepts are first-order estimates; rigorous x requires\n"
+        "    full 3-D skew-ray tracing (not implemented).\n"
+        "  * Exit-pupil position is a paraxial estimate (BFL); rigorous location\n"
+        "    requires chief-ray back-trace from image space (Welford 1986 §3.5).\n"
+        "  * Physical aperture clipping not applied; use optics_compute_vignetting.\n"
+        "\n"
+        "Surface definition (same as optics_ray_trace_lens_stack):\n"
+        "  c  : curvature 1/R (mm^-1). 0 = flat.\n"
+        "  t  : thickness to NEXT surface vertex (mm). Last surface: 0.\n"
+        "  n  : refractive index of medium AFTER this surface.\n"
+        "  k  : conic constant (default 0 = sphere).\n"
+        "\n"
+        "Returns for each field angle:\n"
+        "  intercepts_mm          : list of [x_mm, y_mm] intercepts at image plane\n"
+        "  chief_ray_y_mm         : chief-ray y intercept\n"
+        "  rms_spot_radius_mm     : 2-D RMS spot radius (mm, includes sagittal x)\n"
+        "  rms_spot_y_mm          : meridional y-only RMS (aberration signal)\n"
+        "  max_ray_distance_mm    : max ray distance from chief ray (mm)\n"
+        "  n_rays_traced          : number of rays successfully traced\n"
+        "  pupil_coords_surviving : surviving [px, py] pupil positions\n"
+        "Plus top-level: rms_spot_size_per_field, rms_spot_y_per_field,\n"
+        "exit_pupil_pos_mm, EFL_mm.\n"
+        "\n"
+        "Errors: {ok:false, reason} for invalid inputs. Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "surfaces": {
+                "type": "array",
+                "description": (
+                    "Ordered list of optical surface dicts. Each must have: "
+                    "c (mm^-1), t (mm), n (>= 1.0). Optional: k (conic, default 0)."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "c": {"type": "number", "description": "Curvature 1/R (mm^-1). 0 = flat."},
+                        "t": {"type": "number", "description": "Thickness to next surface (mm)."},
+                        "n": {"type": "number", "description": "Refractive index after surface (>= 1.0)."},
+                        "k": {"type": "number", "description": "Conic constant (default 0 = sphere)."},
+                    },
+                    "required": ["c", "t", "n"],
+                },
+            },
+            "field_angles_deg": {
+                "type": "array",
+                "description": (
+                    "List of field angles in degrees (e.g. [0, 5, 10, 14]). "
+                    "0 = on-axis."
+                ),
+                "items": {"type": "number"},
+            },
+            "n_rays_per_field": {
+                "type": "integer",
+                "description": (
+                    "Target number of rays per field angle (default 200). "
+                    "Actual count may be slightly less due to unit-disk clipping."
+                ),
+            },
+            "aperture_radius_mm": {
+                "type": "number",
+                "description": (
+                    "Entrance-pupil half-diameter (mm). Default 10 mm. "
+                    "Should be <= physical clear aperture of first surface."
+                ),
+            },
+            "n_object": {
+                "type": "number",
+                "description": "Refractive index of object space (default 1.0 = air).",
+            },
+        },
+        "required": ["surfaces", "field_angles_deg"],
+    },
+)
+
+
+@register(_pupil_diagram_spec, write=False)
+async def run_pupil_diagram(ctx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    if a.get("surfaces") is None:
+        return json.dumps({"ok": False, "reason": "surfaces is required"})
+    if a.get("field_angles_deg") is None:
+        return json.dumps({"ok": False, "reason": "field_angles_deg is required"})
+
+    kwargs: dict = {}
+    if "n_rays_per_field" in a:
+        kwargs["n_rays_per_field"] = int(a["n_rays_per_field"])
+    if "aperture_radius_mm" in a:
+        kwargs["aperture_radius_mm"] = float(a["aperture_radius_mm"])
+    if "n_object" in a:
+        kwargs["n_object"] = float(a["n_object"])
+
+    result = compute_pupil_diagram(
         a["surfaces"],
         a["field_angles_deg"],
         **kwargs,

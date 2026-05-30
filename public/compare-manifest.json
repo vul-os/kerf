@@ -13428,6 +13428,20 @@
         },
         {
           "domain": "D12",
+          "feature": "Spot diagrams and pupil illumination maps",
+          "competitor": {
+            "status": "yes",
+            "note": "Full spot diagram with wavelength weighting, wavefront map, OPD fan; exit-pupil illumination map",
+            "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Spot diagrams + pupil illumination maps (OPTICS-PUPIL-DIAGRAM): uniform pupil-grid ray trace (Welford 1986 §8.2); per-field (x,y) intercepts at image plane; 2-D RMS and meridional y-only RMS spot radius; max ray distance from chief ray; exit-pupil illumination map (surviving pupil coords); paraxial exit-pupil position estimate (Welford 1986 §3.5 / Hecht §5.7); stigmatic stack RMS < 1e-6 mm; BK7 biconvex at 14deg y-RMS > 3x on-axis (coma verified); Seidel S_II cross-check; LLM tool optics_pupil_diagram. Monochromatic only; sagittal x intercepts are first-order estimates (full 3-D skew-ray trace not implemented); 33 hermetic tests.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/pupil_diagram.py"
+          }
+        },
+        {
+          "domain": "D12",
           "feature": "Non-sequential ray tracing (stray light)",
           "competitor": {
             "status": "yes",

@@ -5343,6 +5343,20 @@
           }
         },
         {
+          "domain": "D7",
+          "feature": "3-2-1 auto-fixture layout (Asada-By form-closure)",
+          "competitor": {
+            "status": "paid",
+            "note": "Fusion 360 Manufacturing Extension — fixture advisor; paid add-on",
+            "source": "https://www.autodesk.com/products/fusion-360/manufacturing-extension"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Asada-By (1985) §5 wrench-matrix rank-6 validation; P1-P6 placement; clamp-force scaling by material + operation; ASME B5.18-2018 compliant (bbox-aligned parts; freeform flagged)",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/manufacturing_fixture_layout.py"
+          }
+        },
+        {
           "domain": "D8",
           "feature": "Horizontal+vertical alignment (clothoid, SSD)",
           "competitor": {

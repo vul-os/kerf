@@ -382,6 +382,12 @@ from kerf_cad_core.geom.surface_offset import surface_offset
 from kerf_cad_core.geom.nurbs import reverse_curve, reverse_surface
 # GK-97: reparametrize curve/surface (normalize knots, domain rescale, arc-length)
 from kerf_cad_core.geom.nurbs import normalize_knots, reparametrize_curve, reparametrize_arclength
+# GK-P: chord-length + centripetal + Foley-Nielsen point-cloud parametrisation (Piegl-Tiller §9.2.2)
+from kerf_cad_core.geom.reparam import (
+    parametrize_chord_length,
+    parametrize_centripetal,
+    parametrize_foley_nielsen,
+)
 # GK-135: degree reduction (curve + surface)
 from kerf_cad_core.geom.nurbs import reduce_degree_curve, reduce_degree_surface
 # GK-102: knot removal / minimal-CP refit
@@ -663,6 +669,8 @@ __all__ = [
     "reverse_curve","reverse_surface",
     # GK-97
     "normalize_knots","reparametrize_curve","reparametrize_arclength",
+    # GK-P: point-cloud parametrisation
+    "parametrize_chord_length","parametrize_centripetal","parametrize_foley_nielsen",
     # GK-135
     "reduce_degree_curve","reduce_degree_surface",
     # GK-102

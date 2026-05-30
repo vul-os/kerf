@@ -147,6 +147,31 @@ def _chord_params(points: np.ndarray, centripetal: bool = False) -> np.ndarray:
     return ts / ts[-1]
 
 
+def _params_for_method(points: np.ndarray, method: str) -> np.ndarray:
+    """Dispatch to the right parametrisation function.
+
+    Accepted method names (case-insensitive):
+      ``'chord_length'`` / ``'chord'``
+      ``'centripetal'`` (default)
+      ``'foley_nielsen'`` / ``'foley'``
+      ``'uniform'``
+
+    Falls back to centripetal for unrecognised names.
+    """
+    key = method.lower().replace("-", "_").replace(" ", "_")
+    if key in ("chord_length", "chord"):
+        return _chord_params(points, centripetal=False)
+    elif key in ("uniform",):
+        n = len(points)
+        return np.linspace(0.0, 1.0, n)
+    elif key in ("foley_nielsen", "foley"):
+        from kerf_cad_core.geom.reparam import parametrize_foley_nielsen
+        return parametrize_foley_nielsen(points)
+    else:
+        # Default: centripetal (α=0.5)
+        return _chord_params(points, centripetal=True)
+
+
 def _sample_curve(curve: NurbsCurve, num: int = 200) -> np.ndarray:
     """Evaluate curve at ``num`` uniformly spaced parameter values."""
     u0 = curve.knots[curve.degree]
@@ -177,6 +202,7 @@ def interp_curve(
     points: Sequence,
     degree: int = 3,
     param: str = "chord",
+    parameterisation: str | None = None,
 ) -> NurbsCurve:
     """Interpolate a NURBS curve through ``points``.
 
@@ -184,7 +210,11 @@ def interp_curve(
     ----------
     points : sequence of array-like, shape (n, dim)
     degree : int, default 3
-    param  : ``'chord'`` or ``'centripetal'`` parametrisation
+    param  : legacy alias — ``'chord'`` or ``'centripetal'``.  Ignored when
+             ``parameterisation`` is given.
+    parameterisation : str, optional
+        One of ``'chord_length'``, ``'centripetal'``, ``'foley_nielsen'``, or
+        ``'uniform'``.  Overrides ``param`` when provided.
 
     Returns
     -------
@@ -199,8 +229,12 @@ def interp_curve(
         raise ValueError("interp_curve requires at least 2 points")
     degree = min(degree, n - 1)
 
-    centripetal = (param == "centripetal")
-    ts = _chord_params(pts, centripetal=centripetal)
+    # Resolve method: new kwarg takes priority over legacy param
+    if parameterisation is not None:
+        ts = _params_for_method(pts, parameterisation)
+    else:
+        centripetal = (param == "centripetal")
+        ts = _chord_params(pts, centripetal=centripetal)
 
     # Build averaging knot vector (Piegl & Tiller 9.3.6)
     num_ctrl = n
@@ -228,16 +262,28 @@ def fit_curve(
     degree: int = 3,
     tolerance: float = 1e-3,
     max_ctrl: int = 64,
+    parameterisation: str = "centripetal",
 ) -> dict:
     """Least-squares B-spline fit to ``points`` within ``tolerance``.
 
     Uses Piegl–Tiller averaging knot placement (Algorithm 9.69): interior
-    knots are set as averages of ``degree`` consecutive chord-length
-    parameters.  Control-point count is increased from ``degree+1`` until
+    knots are set as averages of ``degree`` consecutive parameters.
+    Control-point count is increased from ``degree+1`` until
     max_deviation ≤ ``tolerance`` or ``max_ctrl`` is reached.
 
     Degenerate (collinear / single-cluster) inputs are handled gracefully —
     the function never raises; it returns the best-effort fit.
+
+    Parameters
+    ----------
+    points : sequence of array-like, shape (n, dim)
+    degree : int
+    tolerance : float
+    max_ctrl : int
+    parameterisation : str
+        One of ``'chord_length'``, ``'centripetal'`` (default), or
+        ``'foley_nielsen'``.  'centripetal' is the industry standard for
+        noisy point-cloud fits (Piegl-Tiller §9.2.2).
 
     Returns
     -------
@@ -267,7 +313,7 @@ def fit_curve(
                     "num_ctrl": 2, "reason": "degenerate: all points identical"}
 
         degree = min(degree, n - 1)
-        ts = _chord_params(pts)
+        ts = _params_for_method(pts, parameterisation)
 
         curve = None
         dev = float("inf")

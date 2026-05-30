@@ -153,6 +153,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.plumbing.tools",
     "kerf_cad_core.earthworks.tools",
     "kerf_cad_core.geom.make2d",
+    "kerf_cad_core.geom.reparam_tools",  # GK-P: chord-length + centripetal + Foley-Nielsen reparametrisation
     "kerf_cad_core.geom.curve_toolkit",
     "kerf_cad_core.geom.surface_analysis",
     "kerf_cad_core.geom.mesh_repair",

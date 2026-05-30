@@ -820,6 +820,64 @@ def _chord_params_2d(pts_grid: np.ndarray) -> tuple:
     return u_params, v_params
 
 
+def _chord_params_2d_method(pts_grid: np.ndarray, method: str) -> tuple:
+    """Averaged parametrisation for a (m, n, 3) grid using the given scheme.
+
+    Delegates to ``_chord_params_2d`` for chord-length / centripetal (existing
+    behaviour), or uses the new ``reparam`` module for foley_nielsen / uniform.
+    """
+    key = method.lower().replace("-", "_").replace(" ", "_")
+    if key in ("centripetal",):
+        # Existing centripetal implementation (sqrt chord-length) — default
+        return _chord_params_2d(pts_grid)
+    if key in ("chord_length", "chord"):
+        # Plain chord-length: identical to centripetal with power=1
+        return _chord_params_2d_power(pts_grid, alpha=1.0)
+    if key in ("uniform",):
+        m, n, _ = pts_grid.shape
+        return np.linspace(0.0, 1.0, m), np.linspace(0.0, 1.0, n)
+
+    # foley_nielsen: use reparam module per-row / per-column then average
+    from kerf_cad_core.geom.reparam import parametrize_foley_nielsen
+    m, n, _ = pts_grid.shape
+    u_all = [parametrize_foley_nielsen(pts_grid[:, j, :3]) for j in range(n)]
+    u_params = np.mean(u_all, axis=0)
+    u_params[0] = 0.0; u_params[-1] = 1.0
+
+    v_all = [parametrize_foley_nielsen(pts_grid[i, :, :3]) for i in range(m)]
+    v_params = np.mean(v_all, axis=0)
+    v_params[0] = 0.0; v_params[-1] = 1.0
+    return u_params, v_params
+
+
+def _chord_params_2d_power(pts_grid: np.ndarray, alpha: float) -> tuple:
+    """Chord-length parametrisation raised to power alpha, averaged over grid."""
+    m, n, _ = pts_grid.shape
+
+    u_all = []
+    for j in range(n):
+        col = pts_grid[:, j, :3]
+        dists = np.linalg.norm(np.diff(col, axis=0), axis=1) ** alpha
+        dists = np.maximum(dists, 1e-15)
+        u_col = np.concatenate([[0.0], np.cumsum(dists)])
+        u_col /= max(u_col[-1], 1e-15)
+        u_all.append(u_col)
+    u_params = np.mean(u_all, axis=0)
+    u_params[0] = 0.0; u_params[-1] = 1.0
+
+    v_all = []
+    for i in range(m):
+        row = pts_grid[i, :, :3]
+        dists = np.linalg.norm(np.diff(row, axis=0), axis=1) ** alpha
+        dists = np.maximum(dists, 1e-15)
+        v_row = np.concatenate([[0.0], np.cumsum(dists)])
+        v_row /= max(v_row[-1], 1e-15)
+        v_all.append(v_row)
+    v_params = np.mean(v_all, axis=0)
+    v_params[0] = 0.0; v_params[-1] = 1.0
+    return u_params, v_params
+
+
 def _build_basis_matrix(params: np.ndarray, knots: np.ndarray,
                         num_ctrl: int, degree: int) -> np.ndarray:
     """Build least-squares collocation matrix B of shape (len(params), num_ctrl).
@@ -853,17 +911,25 @@ def fit_surface(
     tol: float = 1e-3,
     max_ctrl_u: int = 32,
     max_ctrl_v: int = 32,
+    parameterisation: str = "centripetal",
 ) -> dict:
     """Least-squares NURBS surface fit to an ordered (m×n) point grid.
 
     Mirrors the ``fit_curve`` strategy from ``geom/curve_toolkit.py`` (GK-22)
-    extended to surfaces.  Computes centripetal chord-length parameters in
-    both U and V, then uses Piegl–Tiller knot placement (P&T §9.4.1, eq. 9.68)
-    to build the B-spline least-squares system.
+    extended to surfaces.  Computes parameters in both U and V according to
+    ``parameterisation``, then uses Piegl–Tiller knot placement (P&T §9.4.1,
+    eq. 9.68) to build the B-spline least-squares system.
 
     Control-point count is increased from ``degree+1`` in each direction,
     independently, until ``max_deviation ≤ tol`` or ``max_ctrl`` is reached.
     The U refinement loop runs first; then V is refined holding U fixed.
+
+    Parameters
+    ----------
+    parameterisation : str
+        ``'centripetal'`` (default, α=0.5 — Piegl-Tiller §9.2.2 standard for
+        noisy data), ``'chord_length'``, ``'foley_nielsen'``, or ``'uniform'``.
+        Applies to both U and V directions.
 
     Parameters
     ----------
@@ -918,8 +984,8 @@ def fit_surface(
     if not (isinstance(tol, (int, float)) and tol > 0):
         return _err(f"tol must be a positive number; got {tol!r}")
 
-    # ── Chord-length parameters ───────────────────────────────────────────────
-    u_params, v_params = _chord_params_2d(pg[:, :, :3])
+    # ── Parametrisation ───────────────────────────────────────────────────────
+    u_params, v_params = _chord_params_2d_method(pg[:, :, :3], parameterisation)
 
     # ── Helper: fit one axis (U or V) by least squares, return ctrl net ───────
     def _fit_axis_u(nu_c: int) -> np.ndarray:

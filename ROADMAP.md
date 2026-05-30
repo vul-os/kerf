@@ -358,6 +358,7 @@ These are roadmap-level moats that span every sector simultaneously and compound
 - **GK-P foundational kernel** — general solid boolean for NURBS-faced bodies; Stam limit-tangents ✅ + G1 at extraordinary SubD points; fractional creases; MatchSrf G3; analytic surface derivatives.
 - **GK-P foundational kernel** — ✅ general solid boolean shipped (GK-P-A); remaining: Stam limit-tangents + G1 at extraordinary SubD points; fractional creases; MatchSrf G3; analytic surface derivatives.
 - **GK-P Bezier extraction** ✅ — B-spline → multi-Bezier patch decomposition (Piegl & Tiller §5.6); foundational for FEA tet-mesh handoff, GPU-friendly rendering, IGES export. (`bezier_extract.py`, LLM tool `bezier_extract` registered.)
+- **GK-P reparametrisation** — Reparametrization (chord-length + centripetal + Foley-Nielsen) ✅ — `geom/reparam.py`; `fit_curve`/`fit_surface` accept `parameterisation` kwarg; LLM tool `nurbs_reparametrize` registered (Piegl-Tiller §9.2.2).
 - **GK-P foundational kernel** — general solid boolean for NURBS-faced bodies; Stam limit-tangents + G1 at extraordinary SubD points; fractional creases; MatchSrf G3; analytic surface derivatives.
 - **GK-P construction verbs** — loft guide-rails; sheet-metal hem/jog/multi-flange; direct-edit delete-face + non-planar push-pull; weldment gussets/end-treatments; surface patch-from-points.
 - **GK-P foundational kernel** — general solid boolean for NURBS-faced bodies; Stam limit-tangents + G1 at extraordinary SubD points; fractional creases; MatchSrf G3; analytic surface derivatives.

@@ -81,7 +81,7 @@ The sector work only matters if you **own your work, are not locked in, and can 
 
 **Aero / marine / space depth** ✅ — 3D VLM + viscous strip drag + Prandtl-Glauert/Kármán-Tsien + Korn-Lock wave-drag; strip-theory seakeeping RAOs (Lewis-form + JONSWAP); Holtrop-Mennen resistance + EHP; multi-revolution Lambert (Lancaster-Blanchard/Izzo 2015).
 
-**Manufacturing depth** ✅ — adaptive/trochoidal CAM HSM + rest machining; moldflow Hele-Shaw front tracking + weld-line + air-trap; casting Chvorinov + riser sizing + gating; NFP true-shape polygon nesting (57.6 % L-shape utilisation).
+**Manufacturing depth** ✅ — adaptive/trochoidal CAM HSM + rest machining; moldflow Hele-Shaw front tracking + weld-line + air-trap; casting Chvorinov + riser sizing + gating; NFP true-shape polygon nesting (57.6 % L-shape utilisation); parting-line extraction + undercut detection (Ahn-Cho-Kim 2002) ✅.
 
 **Verticals** ✅ — dental anatomic crown (multi-cusp fan, not placeholder) + UI parity shipped (CrownSculptingPanel, ImplantLibrary, SurgicalGuide — preset picker, occlusion overlay, filterable Straumann/Nobel/Zimmer/MIS catalogue, CBCT import + pose editor + sleeve preview, all dispatching to kerf-dental backend); Swiss lever escapement + mainspring + balance-wheel; solar PV partial shading + bypass-diode + MPPT; analog PVT corner simulation (60 corners + Monte-Carlo mismatch).
 **Verticals** ✅ — dental anatomic crown (multi-cusp fan, not placeholder); surgical guide emits milling-ready B-rep + STL export ✅; Swiss lever escapement + mainspring + balance-wheel; solar PV partial shading + bypass-diode + MPPT; analog PVT corner simulation (60 corners + Monte-Carlo mismatch).
@@ -387,6 +387,7 @@ These are roadmap-level moats that span every sector simultaneously and compound
 - **GK-P foundational kernel** — general solid boolean for NURBS-faced bodies; Stam limit-tangents + G1 at extraordinary SubD points; fractional creases; MatchSrf G3; analytic surface derivatives.
 - **GK-P construction verbs** — ~~loft guide-rails~~ ✅ (`loft_with_rails`, Gordon surface, N rails, GK-P-D); sheet-metal hem/jog/multi-flange; direct-edit delete-face + non-planar push-pull; weldment gussets/end-treatments; surface patch-from-points.
 - **GK-P construction verbs** — loft guide-rails; sheet-metal hem/jog/multi-flange; direct-edit delete-face + non-planar push-pull; weldment gussets/end-treatments; surface patch-from-points. Direct-edit constrained push-pull + partial face replace ✅ (GK-P18 extension, 2026-05-30).
+- **GK-P parting-line extraction** ✅ — B-rep parting-line (Ahn-Cho-Kim 2002): face classification top/bottom/side; edge-adjacency parting-edge detection; loop tracing; undercut detection; optimal-pull-direction Fibonacci search. LLM tools: `brep_parting_line`, `brep_detect_undercuts`, `brep_optimal_pull_direction`.
 - **GK-P SubD / mesh** — multires displacement; SDF CSG + marching-cubes; sculpt brush engine; LSCM UV unwrap (module exists, wiring incomplete).
 - **GK-P SubD / mesh** — multires displacement ✅; SDF CSG + marching-cubes; sculpt brush engine; LSCM UV unwrap (module exists, wiring incomplete).
 - **GK-P SubD / mesh** — Loop + Mod-Butterfly + Doo-Sabin + CC creases/corners/darts ✅; multires displacement ✅; SDF CSG + marching-cubes; sculpt brush engine; LSCM UV unwrap (module exists, wiring incomplete).

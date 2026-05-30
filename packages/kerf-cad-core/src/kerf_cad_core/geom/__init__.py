@@ -449,6 +449,14 @@ from kerf_cad_core.geom.threads import (
 # GK-119: cavity / core mould split
 from kerf_cad_core.geom.mold import parting_line, undercut_faces, mold_split
 
+# GK-P: parting-line extraction + undercut detection (Ahn-Cho-Kim 2002)
+from kerf_cad_core.geom.parting_line import (
+    PartingLineResult,
+    extract_parting_line,
+    detect_undercuts,
+    optimal_pull_direction,
+)
+
 # GK-125: DXF read+write
 from kerf_cad_core.geom.io.dxf import read_dxf, write_dxf, DxfReadError, DxfWriteError
 
@@ -459,6 +467,8 @@ __all__ = [
     "read_3dm","write_3dm","Rhino3dmReadError",
     "read_dxf","write_dxf","DxfReadError","DxfWriteError",
     "parting_line","undercut_faces","mold_split",
+    # GK-P parting-line module
+    "PartingLineResult","extract_parting_line","detect_undercuts","optimal_pull_direction",
     "NurbsCurve",
     "NurbsSurface",
     "de_boor",

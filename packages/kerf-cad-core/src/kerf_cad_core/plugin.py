@@ -244,6 +244,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.subd_deform_tools",
     # Wave 4AA: harmonic coordinates for cage deformation (Joshi et al. 2007)
     "kerf_cad_core.geom.subd_harmonic",
+    # GK-P: SubD edge flow optimization (Bommes 2009 Mixed-Integer Quadrangulation)
+    "kerf_cad_core.geom.subd_edge_flow",
     # GK-P46: mesh/implicit ops (sdf_csg, uv_unwrap, isotropic_remesh, retopo_snap)
     "kerf_cad_core.mesh_implicit_tools",
     # GK-P58: B-rep UV unwrap atlas (brep_uv_unwrap, brep_uv_distortion_report)

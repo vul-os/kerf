@@ -5351,8 +5351,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Minkowski-sum NFP + IFP + bottom-left fill (backend)",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/nesting/pack.py"
+            "note": "Minkowski-sum NFP + IFP + bottom-left fill + GA rotation optimizer (Burke 2006 + Kovacs 2002); manufacturing_optimize_nest LLM tool; 82.4% L-shape utilisation validated; 23 tests",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/nesting/optimize_nest.py"
           }
         },
         {
@@ -8232,8 +8232,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Minkowski-sum NFP + IFP + bottom-left fill (backend)",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/nesting/pack.py"
+            "note": "Minkowski-sum NFP + IFP + bottom-left fill + GA rotation optimizer; manufacturing_optimize_nest LLM tool; 23 tests",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/nesting/optimize_nest.py"
           }
         },
         {

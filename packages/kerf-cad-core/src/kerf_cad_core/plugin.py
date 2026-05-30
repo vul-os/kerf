@@ -64,6 +64,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.subd_decimate_to_cage_tool",
     "kerf_cad_core.geom.subd_project_primitive_tools",  # SUBD-CAGE-PROJECT-TO-PRIMITIVE
     "kerf_cad_core.nesting.tools",
+    "kerf_cad_core.nesting.optimize_nest_tool",  # manufacturing_optimize_nest — NFP+GA (Burke 2006, Kovacs 2002)
     "kerf_cad_core.harness.tools",
     "kerf_cad_core.clash.tools",
     "kerf_cad_core.marine.tools",

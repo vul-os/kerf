@@ -368,7 +368,49 @@ delete_object_spec = ToolSpec(
 )
 
 # ---------------------------------------------------------------------------
-# The authoritative 14-entry tool catalog sent to every LLM turn.
+# 15. subd_auto_classify
+# ---------------------------------------------------------------------------
+subd_auto_classify_spec = ToolSpec(
+    name="subd_auto_classify",
+    description=(
+        "Auto-detect and classify mesh edges for SubD modelling. "
+        "Computes the dihedral angle between every pair of adjacent faces and "
+        "tags each edge as 'hard_crease' (angle > hard_threshold_deg, default 80°), "
+        "'feature_curve' (angle between feature_threshold_deg and hard_threshold_deg, "
+        "default 30°–80°), or 'smooth' (angle < feature_threshold_deg). "
+        "Returns classified edge lists, connected feature-curve chains, and a "
+        "crease-tagged SubD cage ready for Catmull-Clark evaluation. "
+        "Optionally calls recommend_thresholds (Otsu's method) to suggest "
+        "optimal thresholds from the mesh's dihedral-angle distribution. "
+        "Input mesh must be supplied as an absolute file path (.obj/.stl) or as "
+        "inline vertex/face data via the 'mesh' field."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "mesh_path": {
+                "type": "string",
+                "description": "Absolute path to a mesh file (.obj or .stl).",
+            },
+            "hard_threshold_deg": {
+                "type": "number",
+                "description": "Dihedral angle (degrees) above which an edge is a hard crease. Default 80.",
+            },
+            "feature_threshold_deg": {
+                "type": "number",
+                "description": "Dihedral angle (degrees) above which an edge is a feature curve. Default 30.",
+            },
+            "auto_threshold": {
+                "type": "boolean",
+                "description": "If true, run recommend_thresholds (Otsu) before classifying and use the suggested values.",
+            },
+        },
+        "required": ["mesh_path"],
+    },
+)
+
+# ---------------------------------------------------------------------------
+# The authoritative 15-entry tool catalog sent to every LLM turn.
 # Order matters: Anthropic caches everything up to (and including) the LAST
 # entry — keep compute/rarely-changing tools later for better cache hits.
 # ---------------------------------------------------------------------------
@@ -385,6 +427,7 @@ TOOL_CATALOG: list[ToolSpec] = [
     delete_object_spec,
     import_step_spec,
     export_artifact_spec,
+    subd_auto_classify_spec,
     run_compute_spec,
     poll_compute_spec,
 ]

@@ -564,6 +564,118 @@ async def dispatch_poll_compute(ctx: ProjectCtx, args: bytes) -> str:
 
 
 # ---------------------------------------------------------------------------
+# subd_auto_classify — edge classification for SubD preprocessing
+# ---------------------------------------------------------------------------
+
+async def dispatch_subd_auto_classify(ctx: ProjectCtx, args: bytes) -> str:
+    """subd_auto_classify — classify mesh edges for SubD modelling.
+
+    Loads a mesh from ``mesh_path`` (OBJ or STL), runs auto_classify_edges
+    (and optionally recommend_thresholds), and returns the classification
+    summary as JSON.
+    """
+    try:
+        a = json.loads(args) if args else {}
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    mesh_path = a.get("mesh_path", "")
+    if not mesh_path:
+        return err_payload("mesh_path is required", "BAD_ARGS")
+
+    hard_threshold_deg = float(a.get("hard_threshold_deg", 80.0))
+    feature_threshold_deg = float(a.get("feature_threshold_deg", 30.0))
+    auto_threshold = bool(a.get("auto_threshold", False))
+
+    try:
+        from kerf_cad_core.geom.subd_auto_detect import (
+            auto_classify_edges,
+            auto_subd_preprocess,
+            recommend_thresholds,
+        )
+        from kerf_cad_core.geom.subd import SubDMesh
+
+        # Load the mesh — support OBJ and STL via minimal parsers
+        import os
+        if not os.path.isabs(mesh_path):
+            return err_payload("mesh_path must be an absolute path", "BAD_ARGS")
+        if not os.path.exists(mesh_path):
+            return err_payload(f"file not found: {mesh_path}", "NOT_FOUND")
+
+        ext = os.path.splitext(mesh_path)[1].lower()
+        mesh: SubDMesh | None = None
+
+        if ext == ".obj":
+            verts, faces = [], []
+            with open(mesh_path) as fh:
+                for line in fh:
+                    tok = line.split()
+                    if not tok:
+                        continue
+                    if tok[0] == "v":
+                        verts.append([float(tok[1]), float(tok[2]), float(tok[3])])
+                    elif tok[0] == "f":
+                        # OBJ face: indices are 1-based; strip v/vt/vn
+                        idxs = [int(t.split("/")[0]) - 1 for t in tok[1:]]
+                        faces.append(idxs)
+            mesh = SubDMesh(vertices=verts, faces=faces)
+
+        elif ext == ".stl":
+            # ASCII STL only — binary is not needed for the tool surface
+            verts, faces = [], []
+            v_buf: list = []
+            with open(mesh_path, errors="replace") as fh:
+                for line in fh:
+                    tok = line.strip().split()
+                    if not tok:
+                        continue
+                    if tok[0] == "vertex" and len(tok) == 4:
+                        v_buf.append([float(tok[1]), float(tok[2]), float(tok[3])])
+                    elif tok[0] == "endfacet":
+                        if len(v_buf) == 3:
+                            base = len(verts)
+                            verts.extend(v_buf)
+                            faces.append([base, base + 1, base + 2])
+                        v_buf = []
+            mesh = SubDMesh(vertices=verts, faces=faces)
+
+        else:
+            return err_payload(
+                f"unsupported mesh format '{ext}'; use .obj or .stl",
+                "BAD_ARGS",
+            )
+
+        rec: dict = {}
+        if auto_threshold:
+            rec = recommend_thresholds(mesh)
+            hard_threshold_deg = rec.get("hard_threshold", hard_threshold_deg)
+            feature_threshold_deg = rec.get("feature_threshold", feature_threshold_deg)
+
+        result = auto_subd_preprocess(mesh, hard_threshold_deg, feature_threshold_deg)
+        cls = result.classification
+
+        return ok_payload({
+            "hard_edge_count": len(cls.hard_edges),
+            "feature_edge_count": len(cls.feature_edges),
+            "smooth_edge_count": len(cls.smooth_edges),
+            "boundary_edge_count": len(cls.boundary_edges),
+            "hard_curve_count": len(result.hard_curves),
+            "feature_curve_count": len(result.feature_curves),
+            "dihedral_stats": cls.dihedral_stats,
+            "thresholds_used": {
+                "hard_threshold_deg": hard_threshold_deg,
+                "feature_threshold_deg": feature_threshold_deg,
+            },
+            "recommended_thresholds": rec if auto_threshold else {},
+        })
+
+    except ImportError as e:
+        return err_payload(f"kerf-cad-core not available: {e}", "NOT_AVAILABLE")
+    except Exception as e:
+        return err_payload(str(e), "ERROR")
+
+
+# ---------------------------------------------------------------------------
 # Master dispatch table
 # ---------------------------------------------------------------------------
 
@@ -580,6 +692,7 @@ _DISPATCH: dict[str, object] = {
     "export_artifact": dispatch_export_artifact,
     "duplicate_object": dispatch_duplicate_object,
     "delete_object": dispatch_delete_object,
+    "subd_auto_classify": dispatch_subd_auto_classify,
     "run_compute": dispatch_run_compute,
     "poll_compute": dispatch_poll_compute,
 }

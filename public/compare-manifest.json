@@ -8717,8 +8717,22 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Spec-driven pipe class enforcement (ASME B36.10M/B31.3 Barlow wall check, material grade, pressure/temp limits); orthogonal isometric routing; no interactive 3D plant routing UI",
+            "note": "Spec-driven pipe class enforcement (ASME B36.10M/B31.3 Barlow wall check, material grade, pressure/temp limits); orthogonal isometric routing; ASME B31 pressure-loss (Darcy-Weisbach + Crane TP-410 K-factors); no interactive 3D plant routing UI",
             "evidence": "packages/kerf-piping/src/kerf_piping/pipe_spec.py"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Pipeline pressure-loss (ASME B31 / Crane TP-410)",
+          "competitor": {
+            "status": "yes",
+            "note": "AVEVA E3D includes hydraulic sizing integrated with pipe routing and specification enforcement",
+            "source": "https://www.aveva.com/en/products/e3d-design/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "ASME B31 pressure-loss + Crane TP-410 K-factors ✅ — Darcy-Weisbach (Colebrook-White), 15-entry K-factor table (elbows/tees/valves/reducers), Hooper Two-K method, full pipeline ΔP; `piping_pressure_loss` + `piping_pipeline_drop` LLM tools. Values from ASME B31 / Crane TP-410 — NOT certified compliance.",
+            "evidence": "packages/kerf-piping/src/kerf_piping/asme_pressure.py"
           }
         },
         {

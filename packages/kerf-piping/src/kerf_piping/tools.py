@@ -1,11 +1,13 @@
 """
-kerf_piping LLM tools — P&ID routing + import.
+kerf_piping LLM tools — P&ID routing + import + ASME B31 pressure-loss.
 
 Tools
 -----
 piping_route_isometric  Route a pipe between equipment nozzles and return fitting counts.
 piping_import_pid       Parse a text-format P&ID specification into the data model.
 piping_export_svg       Export a P&ID diagram as an SVG string.
+piping_pressure_loss    Darcy-Weisbach + Crane TP-410 K-factor pressure loss for a single run.
+piping_pipeline_drop    Total ASME B31 pipeline pressure drop (segments + fittings).
 """
 
 from __future__ import annotations
@@ -504,3 +506,216 @@ async def run_piping_pipe_spec_check(args: dict[str, Any], ctx: "ProjectCtx") ->
 
     except Exception as exc:
         return err_payload(str(exc), "PIPING_SPEC_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# piping_pressure_loss  (ASME B31 / Crane TP-410)
+# ---------------------------------------------------------------------------
+
+piping_pressure_loss_spec = ToolSpec(
+    name="piping_pressure_loss",
+    description=(
+        "Compute frictional pressure loss for a straight pipe run using "
+        "Darcy-Weisbach with Colebrook-White friction factor (Crane Technical "
+        "Paper 410 §1).  Optionally add fitting K-factor losses for one fitting "
+        "type per call.  Returns ΔP in psi.\n\n"
+        "DISCLAIMER: values from ASME B31 / Crane TP-410 — NOT certified "
+        "compliance.  Have results reviewed by a licensed engineer.\n\n"
+        "Supported fluids: 'water' (default), 'oil', 'air', 'steam'.\n"
+        "Default roughness 0.00015 ft = commercial steel per Crane TP-410 App. B.\n\n"
+        "Known fitting_kind values (Crane TP-410 §3 K-factors):\n"
+        "  90_elbow_threaded (K=0.50), 90_elbow_welded (K=0.30),\n"
+        "  45_elbow_threaded (K=0.38), 45_elbow_welded (K=0.20),\n"
+        "  tee_through (K=0.40), tee_branch (K=1.00),\n"
+        "  gate_valve_open (K=0.15), globe_valve (K=10.0),\n"
+        "  check_valve (K=2.00), ball_valve_open (K=0.07),\n"
+        "  butterfly_valve_open (K=0.30), angle_valve_open (K=2.00),\n"
+        "  reducer_sudden (K=0.5·(1−β²)²), expander_sudden (K=(1−β²)²)."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "diameter_in": {
+                "type": "number",
+                "description": "Internal pipe diameter (inches).",
+            },
+            "length_ft": {
+                "type": "number",
+                "description": "Pipe run length (feet).",
+            },
+            "flow_gpm": {
+                "type": "number",
+                "description": "Volumetric flow rate (US gallons per minute).",
+            },
+            "fluid": {
+                "type": "string",
+                "enum": ["water", "oil", "air", "steam"],
+                "description": "Fluid type. Default 'water'.",
+            },
+            "roughness": {
+                "type": "number",
+                "description": (
+                    "Absolute pipe wall roughness (feet). "
+                    "Default 0.00015 ft (commercial steel)."
+                ),
+            },
+            "fitting_kind": {
+                "type": "string",
+                "description": (
+                    "Optional: include one fitting type to add its K-factor ΔP. "
+                    "See tool description for valid values."
+                ),
+            },
+            "fitting_qty": {
+                "type": "integer",
+                "description": "Number of fittings of fitting_kind. Default 1.",
+            },
+            "fitting_beta": {
+                "type": "number",
+                "description": (
+                    "Diameter ratio (d_small/d_large) for reducer/expander. "
+                    "Required only for 'reducer_sudden' and 'expander_sudden'."
+                ),
+            },
+        },
+        "required": ["diameter_in", "length_ft", "flow_gpm"],
+    },
+)
+
+
+async def run_piping_pressure_loss(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_piping.asme_pressure import (
+            darcy_weisbach_loss,
+            fitting_k_factor,
+            _k_to_psi,
+        )
+
+        d_in    = float(args["diameter_in"])
+        l_ft    = float(args["length_ft"])
+        q_gpm   = float(args["flow_gpm"])
+        fluid   = str(args.get("fluid", "water")).lower()
+        rough   = float(args.get("roughness", 0.00015))
+
+        pipe_dp = darcy_weisbach_loss(d_in, l_ft, q_gpm, fluid, rough)
+
+        fitting_dp = 0.0
+        fitting_detail: dict[str, Any] = {}
+        if "fitting_kind" in args and args["fitting_kind"]:
+            fk   = str(args["fitting_kind"])
+            qty  = int(args.get("fitting_qty", 1))
+            beta = float(args.get("fitting_beta", 1.0))
+            k    = fitting_k_factor(fk, d_in, beta)
+            fitting_dp = _k_to_psi(k, d_in, q_gpm, fluid) * qty
+            fitting_detail = {
+                "fitting_kind": fk,
+                "quantity": qty,
+                "K": round(k, 5),
+                "fitting_dp_psi": round(fitting_dp, 6),
+            }
+
+        total_dp = pipe_dp + fitting_dp
+
+        payload: dict[str, Any] = {
+            "pipe_dp_psi": round(pipe_dp, 6),
+            "fitting_dp_psi": round(fitting_dp, 6),
+            "total_dp_psi": round(total_dp, 4),
+            "diameter_in": d_in,
+            "length_ft": l_ft,
+            "flow_gpm": q_gpm,
+            "fluid": fluid,
+            "disclaimer": (
+                "Values from ASME B31 / Crane TP-410 — NOT certified compliance."
+            ),
+        }
+        if fitting_detail:
+            payload["fitting"] = fitting_detail
+
+        return ok_payload(payload)
+
+    except Exception as exc:
+        return err_payload(str(exc), "PIPING_PRESSURE_LOSS_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# piping_pipeline_drop  (ASME B31 total pipeline ΔP)
+# ---------------------------------------------------------------------------
+
+piping_pipeline_drop_spec = ToolSpec(
+    name="piping_pipeline_drop",
+    description=(
+        "Compute the total ASME B31 pressure drop for a complete pipeline: "
+        "sum of Darcy-Weisbach straight-pipe losses over all segments plus "
+        "Crane TP-410 §3 K-factor losses for all fittings.  Assumes "
+        "incompressible, single-phase, steady-state flow at constant GPM.\n\n"
+        "DISCLAIMER: values from ASME B31 / Crane TP-410 — NOT certified "
+        "compliance.  Have results reviewed by a licensed engineer.\n\n"
+        "Segment dict keys: diameter_in (float), length_ft (float), "
+        "roughness (float, optional, ft), fluid (str, optional).\n"
+        "Fitting dict keys: fitting_kind (str), diameter_in (float), "
+        "beta (float, optional), quantity (int, optional), fluid (str, optional).\n\n"
+        "Known fitting_kind values: 90_elbow_threaded (0.50), 90_elbow_welded (0.30), "
+        "tee_through (0.40), tee_branch (1.00), gate_valve_open (0.15), "
+        "globe_valve (10.0), check_valve (2.00), reducer_sudden, expander_sudden."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "segments": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "diameter_in": {"type": "number"},
+                        "length_ft":   {"type": "number"},
+                        "roughness":   {"type": "number"},
+                        "fluid":       {"type": "string"},
+                    },
+                    "required": ["diameter_in", "length_ft"],
+                },
+                "description": "List of straight-pipe segments.",
+            },
+            "fittings": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "fitting_kind": {"type": "string"},
+                        "diameter_in":  {"type": "number"},
+                        "beta":         {"type": "number"},
+                        "quantity":     {"type": "integer"},
+                        "fluid":        {"type": "string"},
+                    },
+                    "required": ["fitting_kind", "diameter_in"],
+                },
+                "description": "List of fittings (valves, elbows, tees, etc.).",
+            },
+            "flow_gpm": {
+                "type": "number",
+                "description": "Total flow rate (US gallons per minute).",
+            },
+            "fluid": {
+                "type": "string",
+                "enum": ["water", "oil", "air", "steam"],
+                "description": "Default fluid for all segments/fittings. Default 'water'.",
+            },
+        },
+        "required": ["segments", "fittings", "flow_gpm"],
+    },
+)
+
+
+async def run_piping_pipeline_drop(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_piping.asme_pressure import compute_pipeline_pressure_drop
+
+        segments = args.get("segments", [])
+        fittings = args.get("fittings", [])
+        q_gpm    = float(args["flow_gpm"])
+        fluid    = str(args.get("fluid", "water")).lower()
+
+        result = compute_pipeline_pressure_drop(segments, fittings, q_gpm, fluid)
+        return ok_payload(result)
+
+    except Exception as exc:
+        return err_payload(str(exc), "PIPING_PIPELINE_DROP_ERROR")

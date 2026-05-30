@@ -297,6 +297,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.concrete.punching_torsion_tools",    # rc_critical_perimeter, rc_two_way_shear_strength, rc_punching_shear_check, rc_cracking_torsion, rc_torsion_capacity
     "kerf_cad_core.civil.transient_pipes",              # transient_pipe_network_moc, transient_pipe_network_quasi_steady, transient_surge_tank_validation
     "kerf_cad_core.cuttingtool.tool_life",              # taylor_tool_life, gilbert_economic_speed
+    "kerf_cad_core.cuttingtool.cutting_speed_tools",   # manufacturing_query_cutting_speed
     "kerf_cad_core.struct.eurocode5",                   # ec5_strength_class, ec5_kmod, ec5_design_strength, ec5_beam_bending, ec5_combined_nm, ec5_column_buckling, ec5_shear
     "kerf_cad_core.struct.eurocode8",                   # ec8_spectrum, ec8_lateral_force, ec8_rsa
     "kerf_cad_core.struct.frame",                       # struct_frame_solve_2d, struct_story_drift

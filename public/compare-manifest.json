@@ -5703,7 +5703,6 @@
         },
         {
           "domain": "D11",
-<<<<<<< HEAD
           "feature": "GD&T composite tolerance frame (ASME Y14.5-2018 §10.5 PLTZF/FRTZF)",
           "competitor": {
             "status": "no",
@@ -5744,9 +5743,8 @@
         {
           "domain": "D11",
           "feature": "Tolerance stackup — 1D (WC/RSS/MC)",
-=======
           "feature": "Tolerance stackup \u2014 1D (WC/RSS/MC)",
->>>>>>> 9ed27ec4 (feat(geom): NURBS-SURFACE-AREA-EXACT — first-fundamental-form GL integrator)
+          "feature": "Tolerance stackup \u2014 1D (WC/RSS/MC)",
           "competitor": {
             "status": "no",
             "note": "Stackup in Inventor Tolerance Analysis; not in Fusion itself",
@@ -6531,7 +6529,7 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Taylor extended + Gilbert economic speed backend",
+            "note": "Taylor extended + Gilbert economic speed backend; cutting-speed database (MH31 \u00a71100 + Sandvik, 320 entries, manufacturing_query_cutting_speed LLM tool)",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/cuttingtool"
           }
         },
@@ -7379,7 +7377,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Taylor extended + Gilbert economic speed (backend)",
+            "note": "Taylor extended + Gilbert economic speed (backend); cutting-speed database (MH31 \u00a71100 + Sandvik, 320 entries, manufacturing_query_cutting_speed LLM tool)",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/cuttingtool/tool_life.py"
           }
         },
@@ -9468,7 +9466,7 @@
           "domain": "D7",
           "feature": "Feeds & speeds + tool-life",
           "competitor": "{ status: no, note: \"No built-in Taylor tool-life or Gilbert economic speed in CATIA CAM\", source: \"https://www.3ds.com/products/catia/prismatic-machining\" }",
-          "kerf": "{ status: yes, note: \"Taylor extended + Gilbert economic speed; backend only\", evidence: \"packages/kerf-cad-core/src/kerf_cad_core/cuttingtool/tool_life.py\" }"
+          "kerf": "{ status: yes, note: \"Taylor extended + Gilbert economic speed; backend only\", evidence: \"packages/kerf-cad-core/src/kerf_cad_core/cuttingtool/tool_life.py\" }; cutting_speed_database.py: 320-entry MH31 \u00a71100 + Sandvik matrix; manufacturing_query_cutting_speed LLM tool"
         },
         {
           "domain": "D7",
@@ -11702,7 +11700,7 @@
           "nx": "NX CAM includes feeds/speeds database and tool life tracking; Taylor model not exposed as standalone calc",
           "nx_tier": "paid",
           "competitor": "source: https://plm.automation.siemens.com/global/en/products/nx/nx-cam.html",
-          "kerf": "evidence: cloud/manufacturing/cuttingtool/tool_life.py"
+          "kerf": "evidence: cloud/manufacturing/cuttingtool/tool_life.py; cutting_speed_database.py: 320-entry MH31 \u00a71100 + Sandvik matrix; manufacturing_query_cutting_speed LLM tool"
         },
         {
           "domain": "D7",

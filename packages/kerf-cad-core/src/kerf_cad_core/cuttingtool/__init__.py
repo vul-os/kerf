@@ -16,6 +16,8 @@ Public API (re-exported for convenience):
         break_even_speed,
         machinability_rating,
         nose_radius_roughness,
+        query_cutting_speed,
+        CuttingSpeedResult,
     )
 
 Distinct from:
@@ -31,6 +33,8 @@ Shaw, M.C. "Metal Cutting Principles", 2nd ed. (2005)
 Merchant, M.E. (1945) J. Appl. Phys. 16, 267–275
 Taylor, F.W. (1907) Trans. ASME 28, 31–350
 Cook, N.H. (1973) CIRP Ann. 22, 45–48
+Machinery's Handbook, 31st ed. §1100 (Industrial Press, 2020)
+Sandvik Coromant CoroKey 2023/2024
 
 Author: imranparuk
 """
@@ -49,6 +53,13 @@ from kerf_cad_core.cuttingtool.tool import (
     machinability_rating,
     nose_radius_roughness,
 )
+from kerf_cad_core.cuttingtool.cutting_speed_database import (
+    query_cutting_speed,
+    CuttingSpeedResult,
+    list_materials,
+    list_tool_materials,
+    list_operations,
+)
 
 __all__ = [
     "orthogonal_to_normal",
@@ -63,4 +74,9 @@ __all__ = [
     "break_even_speed",
     "machinability_rating",
     "nose_radius_roughness",
+    "query_cutting_speed",
+    "CuttingSpeedResult",
+    "list_materials",
+    "list_tool_materials",
+    "list_operations",
 ]

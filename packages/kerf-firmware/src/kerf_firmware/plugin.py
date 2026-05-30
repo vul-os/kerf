@@ -295,3 +295,20 @@ def _register_tools(ctx, provides: list) -> None:
         provides.append("firmware.usb_hid")
     except Exception as exc:
         logger.warning("kerf-firmware: failed to load make_usb_macro_keyboard tool: %s", exc)
+
+    # firmware_verify_clock_tree — STM32 clock-tree verifier
+    try:
+        from kerf_firmware.tools.firmware_verify_clock_tree import (
+            _spec as _clk_spec,
+            run_firmware_verify_clock_tree_async as _clk_fn,
+        )
+        ctx.tools.register(
+            "firmware_verify_clock_tree",
+            _clk_spec,
+            _clk_fn,
+        )
+        provides.append("firmware.clock_tree_verify")
+    except Exception as exc:
+        logger.warning(
+            "kerf-firmware: failed to load firmware_verify_clock_tree tool: %s", exc
+        )

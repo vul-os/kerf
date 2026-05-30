@@ -3662,6 +3662,34 @@
           }
         },
         {
+          "domain": "D10",
+          "feature": "MCU peripheral pin-map verifier (alt-function + conflict check)",
+          "competitor": {
+            "status": "no",
+            "note": "OpenPLC has no MCU peripheral pin-mapping verifier; pin assignments must be checked manually in the IDE",
+            "source": "https://www.openplcproject.com/reference"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "firmware_verify_peripheral_map: checks pin alt-function, pin conflicts, missing required peripherals, peripheral mux conflicts, voltage compatibility (5V tolerant); embedded STM32F411 LQFP64 (RM0383 §7.3) + ATmega328P PDIP-28 (§13) tables; 59 tests. NOT a substitute for ST CubeMX / Atmel Start.",
+            "evidence": "packages/kerf-firmware/src/kerf_firmware/peripheral_map_verify.py"
+          }
+        },
+        {
+          "domain": "D10",
+          "feature": "MCU clock-tree verifier (PLL + AHB/APB + USB 48 MHz + ADC 36 MHz)",
+          "competitor": {
+            "status": "no",
+            "note": "OpenPLC has no clock-tree configuration verifier",
+            "source": "https://www.openplcproject.com/reference"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "firmware_verify_clock_tree: real PLL arithmetic (VCO=HSE/PLLM×PLLN, SYSCLK=VCO/PLLP, USB=VCO/PLLQ); detects SYSCLK exceeded (100 MHz F411 / 168 MHz F407), APB1 >42 MHz, APB2 >84 MHz, VCO out of range, USB≠48 MHz (±500 ppm), ADC >36 MHz; embedded RM0383 §6 (STM32F411) + RM0090 §6 (STM32F407) tables; 71 tests. LOOKUP-TABLE ONLY — no jitter model.",
+            "evidence": "packages/kerf-firmware/src/kerf_firmware/clock_tree_verify.py"
+          }
+        },
+        {
           "domain": "D6",
           "feature": "Schematic capture (KiCad round-trip, ERC)",
           "competitor": {

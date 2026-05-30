@@ -314,6 +314,8 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 - **Silicon / IC layout** ✅ — VHDL + Verilog parsers; GHDL + Yosys + ngspice bridges; GDS II / OASIS I/O; SKY130 PDK; LEF/Liberty readers; OpenROAD place-and-route; DRC + LVS + parasitic extraction; mask fracturing; SPICE waveform viewer UI ✅. T-231..T-248.
 - **Silicon / IBIS 7.1 signal integrity** ✅ — IBIS 7.1 model import + eye-diagram estimation (`silicon_import_ibis`, `silicon_eye_diagram`); [Component]/[Pin]/[Model]/[Pulldown]/[Pullup]/[GND_clamp]/[POWER_clamp]/[Ramp]/[Voltage Range]; IV-curve interpolation; analytical eye opening height/width/jitter at arbitrary bit-rate + load. NOT IBIS-certified.
 - **Firmware / embedded** ✅ — board catalogue (Arduino/ESP32/STM32/RP2040/AVR); library cache; direct-gcc orchestrator (`avr-gcc`/`arm-none-eabi-gcc`/`xtensa-esp32-elf`); upload wrappers; serial monitor panel; LLM tools. T-225..T-230.
+- **FIRMWARE-PERIPHERAL-MAP-VERIFY** ✅ — peripheral pin-mapping verifier; detects bad alt-function, pin conflict, missing required, peripheral mux conflict, voltage incompatibility; embedded STM32F411 LQFP64 (RM0383 §7.3) + ATmega328P PDIP-28 tables; `firmware_verify_peripheral_map` LLM tool; 59 tests.
+- **FIRMWARE-CLOCK-TREE-VERIFY** ✅ — STM32 clock-tree verifier; real PLL arithmetic (VCO = HSE/PLLM × PLLN; SYSCLK = VCO/PLLP; USB = VCO/PLLQ); detects VCO out of range, SYSCLK exceeded (100 MHz F411 / 168 MHz F407), APB1 > 42 MHz, APB2 > 84 MHz, USB ≠ 48 MHz (±500 ppm), ADC > 36 MHz; embedded RM0383 §6 (STM32F411) + RM0090 §6 (STM32F407) tables; `firmware_verify_clock_tree` LLM tool; `clock_tree_specs.py` + `clock_tree_verify.py`; 71 tests. LOOKUP-TABLE ONLY — no jitter/phase-noise model.
 
 ### Architecture / BIM
 

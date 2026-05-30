@@ -329,3 +329,19 @@ def _register_tools(ctx, provides: list) -> None:
         logger.warning(
             "kerf-firmware: failed to load firmware_verify_dma_assignments tool: %s", exc
         )
+    # firmware_verify_interrupt_priorities — Cortex-M NVIC priority verifier
+    try:
+        from kerf_firmware.tools.firmware_verify_interrupt_priorities import (
+            _spec as _irq_spec,
+            run_firmware_verify_interrupt_priorities_async as _irq_fn,
+        )
+        ctx.tools.register(
+            "firmware_verify_interrupt_priorities",
+            _irq_spec,
+            _irq_fn,
+        )
+        provides.append("firmware.interrupt_priority_verify")
+    except Exception as exc:
+        logger.warning(
+            "kerf-firmware: failed to load firmware_verify_interrupt_priorities tool: %s", exc
+        )

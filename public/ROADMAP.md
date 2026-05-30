@@ -289,7 +289,7 @@ Everything committed, lowest priority. Ordered roughly by near-term readiness.
 
 **Soft goods (distinct 2D/developable engine):** apparel / pattern-making + drape · technical textiles / sails / membrane / tensile · upholstery / leather.
 
-**Scientific / niche:** microfluidics / MEMS · signage / large-format.
+**Scientific / niche:** microfluidics / MEMS ✅ — channel hydraulics, mixer geometry, MEMS cantilever, network solver, **channel cross-section optimizer** (Bruus 2008 eq. 3.27 Fourier-series friction factor; rectangular / trapezoidal / semicircular; min-footprint grid search; LLM tools `microfluidics_optimize_channel` + `microfluidics_pressure_drop`) · signage / large-format.
 
 **Silicon next:** verification depth + post-silicon (cocotb testbench harness, power analysis, STA, clock-tree synthesis, formal equivalence, Tiny Tapeout / Efabless harnesses). T-249..T-258.
 

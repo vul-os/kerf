@@ -17145,6 +17145,143 @@
           }
         }
       ]
+    },
+    {
+      "slug": "openfoam-microfluidics",
+      "competitor": "OpenFOAM (microfluidics use-case)",
+      "category": "microfluidics",
+      "left": "kerf",
+      "right": "openfoam-microfluidics",
+      "hero_tagline": "General-purpose CFD solver used for microfluidics vs purpose-built microfluidic design tool.",
+      "reviewed_at": "2026-05-30",
+      "features": [
+        {
+          "domain": "D11",
+          "feature": "Rectangular microchannel pressure drop (Bruus 2008 eq. 3.27 Fourier-series)",
+          "competitor": {
+            "status": "yes",
+            "note": "Solvable via laminar Navier-Stokes but requires mesh setup and solver run",
+            "source": "https://www.openfoam.com/documentation/guides/latest/doc/guide-applications-solvers-incompressible-icoFoam.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Channel cross-section optimizer (Bruus 2008 eq. 3.27) — analytical, instant",
+            "evidence": "packages/kerf-microfluidics/src/kerf_microfluidics/channel_optimizer.py"
+          }
+        },
+        {
+          "domain": "D11",
+          "feature": "Trapezoidal (DRIE) channel pressure drop",
+          "competitor": {
+            "status": "yes",
+            "note": "Solvable via CFD with trapezoidal mesh cross-section; no dedicated DRIE utility",
+            "source": "https://www.openfoam.com"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "pressure_drop_trapezoidal — hydraulic diameter method (Nguyen-Wereley 2002 §2.3)",
+            "evidence": "packages/kerf-microfluidics/src/kerf_microfluidics/channel_optimizer.py"
+          }
+        },
+        {
+          "domain": "D11",
+          "feature": "Semicircular channel pressure drop",
+          "competitor": {
+            "status": "yes",
+            "note": "Solvable via CFD; no dedicated semicircular utility",
+            "source": "https://www.openfoam.com"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "pressure_drop_semicircular — hydraulic diameter method",
+            "evidence": "packages/kerf-microfluidics/src/kerf_microfluidics/channel_optimizer.py"
+          }
+        },
+        {
+          "domain": "D11",
+          "feature": "Cross-section optimizer (min footprint for pressure budget)",
+          "competitor": {
+            "status": "no",
+            "note": "OpenFOAM has no built-in optimizer; requires external adjoint or parametric sweep",
+            "source": "https://www.openfoam.com"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "optimize_cross_section — grid search over shape + aspect ratio + size; returns min footprint satisfying ΔP budget",
+            "evidence": "packages/kerf-microfluidics/src/kerf_microfluidics/channel_optimizer.py"
+          }
+        },
+        {
+          "domain": "D11",
+          "feature": "Reynolds number / flow regime classification",
+          "competitor": {
+            "status": "yes",
+            "note": "Computed post-hoc from simulation velocity field",
+            "source": "https://www.openfoam.com"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "reynolds_number() + laminar/turbulent regime label; LLM tool microfluidics_pressure_drop returns it inline",
+            "evidence": "packages/kerf-microfluidics/src/kerf_microfluidics/channel_optimizer.py"
+          }
+        },
+        {
+          "domain": "D11",
+          "feature": "Microfluidic network solver",
+          "competitor": {
+            "status": "partial",
+            "note": "Solvable as multi-inlet/outlet CFD; no dedicated resistor-network abstraction",
+            "source": "https://www.openfoam.com"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "MicrofluidicNetwork — sparse linear system, parallel/series, arbitrary topology",
+            "evidence": "packages/kerf-microfluidics/src/kerf_microfluidics/networks.py"
+          }
+        },
+        {
+          "domain": "D11",
+          "feature": "MEMS cantilever stiffness + resonance",
+          "competitor": {
+            "status": "no",
+            "note": "Out of scope for OpenFOAM (structural, not fluid)",
+            "source": "https://www.openfoam.com"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "cantilever_stiffness + cantilever_resonance (Euler-Bernoulli); lumped-mass model; LLM tool microfluidics_mems",
+            "evidence": "packages/kerf-microfluidics/src/kerf_microfluidics/mems_cantilever.py"
+          }
+        },
+        {
+          "domain": "D11",
+          "feature": "Passive mixer geometry (serpentine + herringbone)",
+          "competitor": {
+            "status": "no",
+            "note": "No geometry generator; users must supply mesh manually",
+            "source": "https://www.openfoam.com"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "serpentine_geometry + herringbone_geometry; LLM tool microfluidics_mixer",
+            "evidence": "packages/kerf-microfluidics/src/kerf_microfluidics/mixers.py"
+          }
+        },
+        {
+          "domain": "D11",
+          "feature": "LLM-callable tools for microfluidic design",
+          "competitor": {
+            "status": "no",
+            "note": "No LLM integration; CLI/Python API only",
+            "source": "https://www.openfoam.com"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "6 LLM tools: microfluidics_channel, microfluidics_network, microfluidics_mems, microfluidics_mixer, microfluidics_pressure_drop, microfluidics_optimize_channel",
+            "evidence": "packages/kerf-microfluidics/src/kerf_microfluidics/tools.py"
+          }
+        }
+      ]
     }
   ]
 }

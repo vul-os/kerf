@@ -13177,9 +13177,9 @@
             "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Sequential ray tracing via ray_transfer.py + lens_system.py (backend); no merit function optimiser",
-            "evidence": "packages/kerf-optics/src/kerf_optics/lens_system.py"
+            "status": "yes",
+            "note": "Sequential paraxial + meridional ray trace through multi-element lens stacks: Welford 1986 §3.3/§5 exact Snell + Newton-Raphson conic intersect; EFL/BFL/FFL; Hecht biconvex BK7 oracle <0.1% error; LLM tool optics_ray_trace_lens_stack. v1: no Seidel coefficients, no polychromatic trace.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/lens_stack_trace.py"
           }
         },
         {

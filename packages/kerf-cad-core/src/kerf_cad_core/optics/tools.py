@@ -36,6 +36,10 @@ import json
 from kerf_chat.tools.registry import ToolSpec, err_payload, ok_payload, register
 from kerf_core.utils.context import ProjectCtx  # noqa: F401
 
+from kerf_cad_core.optics.lens_stack_trace import (
+    paraxial_properties,
+    trace_lens_stack,
+)
 from kerf_cad_core.optics.lens import (
     lensmaker,
     thin_lens_imaging,
@@ -798,3 +802,124 @@ async def run_achromat_powers(ctx: ProjectCtx, args: bytes) -> str:
 
     result = achromat_powers(a["f_total"], a["V1"], a["V2"])
     return ok_payload(result)
+
+
+# ---------------------------------------------------------------------------
+# Tool: optics_ray_trace_lens_stack
+# ---------------------------------------------------------------------------
+
+_ray_trace_lens_stack_spec = ToolSpec(
+    name="optics_ray_trace_lens_stack",
+    description=(
+        "Sequential paraxial + meridional ray trace through a multi-element lens stack.\n"
+        "\n"
+        "Traces a single ray (specified by height and angle at the first surface) through\n"
+        "an ordered list of optical surfaces using:\n"
+        "  * Paraxial refraction (Welford 1986 §3.3, nu-form).\n"
+        "  * Exact meridional Snell's law + Newton-Raphson conic intersect\n"
+        "    (Welford 1986 §5.2-5.3).\n"
+        "\n"
+        "Also computes system paraxial properties (EFL, BFL, FFL).\n"
+        "\n"
+        "NOTE v1 scope: ray heights + angles at each surface; EFL / BFL / FFL.\n"
+        "OUT OF SCOPE: Seidel aberration coefficients, polychromatic traces,\n"
+        "vignetting, skew rays.\n"
+        "\n"
+        "Surface definition (each element of 'surfaces' array):\n"
+        "  c  : curvature 1/R (mm^-1). 0 = flat.\n"
+        "  t  : thickness to NEXT surface vertex (mm). Last surface: 0.\n"
+        "  n  : refractive index of medium AFTER this surface.\n"
+        "  k  : conic constant (default 0 = sphere).\n"
+        "\n"
+        "Oracle: biconvex BK7 (n=1.5168, R1=+50 mm, R2=-50 mm, t=5 mm) => EFL ~48.4 mm\n"
+        "(Hecht 'Optics' 5e §6.4 thick-lens formula).\n"
+        "\n"
+        "Returns paraxial_surfaces, meridional_surfaces (per-surface Y/L/M),\n"
+        "paraxial_image_distance_mm, meridional_image_Y_mm, EFL_mm, BFL_mm, FFL_mm.\n"
+        "\n"
+        "Errors: {ok:false, reason} for invalid inputs. Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "surfaces": {
+                "type": "array",
+                "description": (
+                    "Ordered list of optical surface dicts. Each must have: "
+                    "c (mm^-1), t (mm), n (>= 1.0). Optional: k (conic, default 0)."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "c": {
+                            "type": "number",
+                            "description": "Curvature 1/R (mm^-1). 0 = flat.",
+                        },
+                        "t": {
+                            "type": "number",
+                            "description": "Thickness to next surface (mm).",
+                        },
+                        "n": {
+                            "type": "number",
+                            "description": "Refractive index after surface (>= 1.0).",
+                        },
+                        "k": {
+                            "type": "number",
+                            "description": "Conic constant (default 0 = sphere).",
+                        },
+                    },
+                    "required": ["c", "t", "n"],
+                },
+            },
+            "ray_h": {
+                "type": "number",
+                "description": "Ray height at first surface (mm).",
+            },
+            "ray_u": {
+                "type": "number",
+                "description": "Ray angle in object space (rad). Small for paraxial.",
+            },
+            "n_object": {
+                "type": "number",
+                "description": "Refractive index of object space (default 1.0 = air).",
+            },
+        },
+        "required": ["surfaces", "ray_h", "ray_u"],
+    },
+)
+
+
+@register(_ray_trace_lens_stack_spec, write=False)
+async def run_ray_trace_lens_stack(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    if a.get("surfaces") is None:
+        return json.dumps({"ok": False, "reason": "surfaces is required"})
+    if a.get("ray_h") is None:
+        return json.dumps({"ok": False, "reason": "ray_h is required"})
+    if a.get("ray_u") is None:
+        return json.dumps({"ok": False, "reason": "ray_u is required"})
+
+    n_object = a.get("n_object", 1.0)
+
+    trace_result = trace_lens_stack(
+        a["surfaces"], a["ray_h"], a["ray_u"], n_object=n_object
+    )
+    if not trace_result.get("ok"):
+        return json.dumps(trace_result)
+
+    props_result = paraxial_properties(a["surfaces"], n_object=n_object)
+
+    combined = dict(trace_result)
+    if props_result.get("ok"):
+        combined["EFL_mm"] = props_result["EFL_mm"]
+        combined["BFL_mm"] = props_result["BFL_mm"]
+        combined["FFL_mm"] = props_result["FFL_mm"]
+        combined["power_mm_inv"] = props_result["power_mm_inv"]
+    else:
+        combined["paraxial_properties_error"] = props_result.get("reason")
+
+    return ok_payload(combined)

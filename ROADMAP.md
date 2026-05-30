@@ -113,7 +113,7 @@ The sector work only matters if you **own your work, are not locked in, and can 
 
 **Tolerancing / QA** ✅ — 1D tolerance stack-up (worst-case + RSS + Monte Carlo) ✅; 3D vector-loop tolerance stackup (6-DOF Jacobian); SPC control charts (Shewhart/CUSUM/EWMA + Nelson/WECO); ISO 286 limits & fits.
 
-**Optics / acoustics** ✅ — Gaussian beam (complex-q + ABCD + M² + fibre coupling); non-sequential ray tracing + ghost detection; wave-domain room acoustics (image-source IR + Schroeder RT60 + SEA); Seidel S5 corrected.
+**Optics / acoustics** ✅ — Gaussian beam (complex-q + ABCD + M² + fibre coupling); non-sequential ray tracing + ghost detection; wave-domain room acoustics (image-source IR + Schroeder RT60 + SEA); Seidel S5 corrected; Zernike polynomial aberration decomposition (Noll 1976) ✅.
 
 **Implicit geometry** ✅ — F-rep CSG (union/intersect/subtract/blend/shell) + domain warps (twist/taper/wave) in `kerf_cad_core.frep.csg`.
 

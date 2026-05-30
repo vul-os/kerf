@@ -49,9 +49,25 @@ async def register(app: FastAPI, ctx):
         run_optics_nonsequential_trace,
     )
 
+    from kerf_optics.zernike_tools import (
+        optics_fit_zernike_spec, run_optics_fit_zernike,
+        optics_aberration_breakdown_spec, run_optics_aberration_breakdown,
+    )
+    ctx.tools.register(
+        "optics_fit_zernike",
+        optics_fit_zernike_spec,
+        run_optics_fit_zernike,
+    )
+    ctx.tools.register(
+        "optics_aberration_breakdown",
+        optics_aberration_breakdown_spec,
+        run_optics_aberration_breakdown,
+    )
+
     provides = [
         "optics.paraxial", "optics.abcd", "optics.gaussian", "optics.pop",
         "optics.tolerancing", "optics.mtf", "optics.nonsequential",
+        "optics.zernike",
     ]
 
     try:

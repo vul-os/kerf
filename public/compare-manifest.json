@@ -13714,8 +13714,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Seidel aberrations S1-S5 (corrected 2026-05-24); no Zernike decomposition",
-            "evidence": "packages/kerf-optics/src/kerf_optics/lens_system.py"
+            "note": "Seidel aberrations S1-S5 (corrected 2026-05-24); Zernike polynomial aberration decomposition (Noll 1976) ✅ — fit_zernike, reconstruct_wavefront, classical_aberration_breakdown; optics_fit_zernike + optics_aberration_breakdown LLM tools",
+            "evidence": "packages/kerf-optics/src/kerf_optics/zernike.py"
           }
         },
         {

@@ -49,6 +49,8 @@ def _register_tools(ctx, provides: list) -> None:
             "interior.clearance-check",
             "interior.make-furniture",
             "interior.room-layout",
+            "interior.export-ifc",
+            "interior.validate-ifc",
         ])
     except Exception as exc:
         logger.warning("kerf-interior: failed to load tools: %s", exc)
@@ -56,3 +58,4 @@ def _register_tools(ctx, provides: list) -> None:
     provides.append("interior.ada-audit")
     provides.append("interior.space-planning")
     provides.append("interior.ffe")
+    provides.append("interior.ifc4-export")

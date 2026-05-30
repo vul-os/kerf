@@ -1689,8 +1689,22 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Interior space-planning engine exists (backend only); no UI route",
-            "evidence": "packages/kerf-verticals/interior.py"
+            "note": "Interior space-planning engine + ADA clearance audit + FF&E placement (backend only); no UI route",
+            "evidence": "packages/kerf-interior/src/kerf_interior/space_planning.py"
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "IFC 4 export for interior (Revit / ArchiCAD coordination)",
+          "competitor": {
+            "status": "paid",
+            "note": "Vectorworks Architect: certified IFC4 export of interior elements; Architect tier",
+            "source": "https://app-help.vectorworks.net/2024/eng/index.htm#t=VW2024_Guide%2FImport_Export%2FExporting_IFC_Files.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "IFC 4 export (ISO 16739-1:2018) ✅ — IfcWall/IfcWallStandardCase, IfcSlab (floor+ceiling), IfcDoor, IfcWindow, IfcFurniture, IfcLightFixture; full IfcProject→IfcSite→IfcBuilding→IfcBuildingStorey hierarchy; pure-Python SPF generator. Subset export — NOT buildingSMART certified.",
+            "evidence": "packages/kerf-interior/src/kerf_interior/ifc_export.py"
           }
         },
         {

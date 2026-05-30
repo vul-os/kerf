@@ -363,7 +363,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 
 Everything committed, lowest priority. Ordered roughly by near-term readiness.
 
-**Mechanical / product:** cams generators · woodworking / furniture / joinery + cutlist · power one-line / switchgear · lighting / photometric · interior / space-planning / FF&E · kitchen / bath / cabinetry / millwork · landscape · scaffolding / formwork.
+**Mechanical / product:** cams generators · woodworking / furniture / joinery + cutlist · power one-line / switchgear · lighting / photometric · interior / space-planning / FF&E *(IFC 4 export (ISO 16739-1:2018) ✅ — subset export, NOT buildingSMART certified; `kerf-interior/ifc_export.py`)* · kitchen / bath / cabinetry / millwork · landscape · scaffolding / formwork.
 
 | Woodworking | Capability | Status |
 |---|---|---|

@@ -31,6 +31,16 @@ from kerf_interior.clearance import (
 )
 from kerf_interior.furniture import make_chair, make_desk, make_sofa, make_table
 from kerf_interior.space_planning import make_room
+from kerf_interior.ifc_export import (
+    InteriorModel,
+    InteriorWall,
+    InteriorDoor,
+    InteriorWindow,
+    InteriorLight,
+    export_ifc4,
+    validate_ifc4_subset,
+    list_supported_entity_types,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -289,6 +299,202 @@ async def run_interior_room_layout(ctx: ProjectCtx, params: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
+# interior_export_ifc
+# ---------------------------------------------------------------------------
+
+interior_export_ifc_spec = ToolSpec(
+    name="interior_export_ifc",
+    description=(
+        "Export a room layout to an IFC 4 STEP-physical-file (ISO 16739-1:2018) for "
+        "Revit / ArchiCAD BIM coordination. "
+        "Produces IfcWall/IfcWallStandardCase, IfcSlab (floor+ceiling), IfcDoor, "
+        "IfcWindow, IfcFurniture, and IfcLightFixture entities inside the full "
+        "IfcProject→IfcSite→IfcBuilding→IfcBuildingStorey spatial hierarchy. "
+        "NOTE: IFC 4 subset export — NOT buildingSMART certified. "
+        "Use for coordination/import only. "
+        "Supported entity types: " + ", ".join(list_supported_entity_types()) + "."
+    ),
+    input_schema={
+        "type": "object",
+        "required": ["name", "width_mm", "depth_mm", "output_path"],
+        "properties": {
+            "name": {"type": "string", "description": "Project / room name."},
+            "width_mm": {"type": "number", "description": "Room interior width in mm."},
+            "depth_mm": {"type": "number", "description": "Room interior depth in mm."},
+            "ceiling_height_mm": {
+                "type": "number",
+                "description": "Ceiling height in mm (default 2700).",
+            },
+            "output_path": {
+                "type": "string",
+                "description": "Absolute file path to write the .ifc file.",
+            },
+            "wall_thickness_mm": {
+                "type": "number",
+                "description": "Perimeter wall thickness in mm (default 150).",
+            },
+            "doors": {
+                "type": "array",
+                "description": "Door objects to include.",
+                "items": {
+                    "type": "object",
+                    "required": ["name", "x_mm", "y_mm"],
+                    "properties": {
+                        "name":          {"type": "string"},
+                        "x_mm":          {"type": "number"},
+                        "y_mm":          {"type": "number"},
+                        "width_mm":      {"type": "number"},
+                        "height_mm":     {"type": "number"},
+                        "thickness_mm":  {"type": "number"},
+                    },
+                },
+            },
+            "windows": {
+                "type": "array",
+                "description": "Window objects to include.",
+                "items": {
+                    "type": "object",
+                    "required": ["name", "x_mm", "y_mm"],
+                    "properties": {
+                        "name":           {"type": "string"},
+                        "x_mm":           {"type": "number"},
+                        "y_mm":           {"type": "number"},
+                        "width_mm":       {"type": "number"},
+                        "height_mm":      {"type": "number"},
+                        "sill_height_mm": {"type": "number"},
+                    },
+                },
+            },
+            "lights": {
+                "type": "array",
+                "description": "Light fixture objects to include.",
+                "items": {
+                    "type": "object",
+                    "required": ["name", "x_mm", "y_mm"],
+                    "properties": {
+                        "name": {"type": "string"},
+                        "x_mm": {"type": "number"},
+                        "y_mm": {"type": "number"},
+                        "z_mm": {"type": "number"},
+                    },
+                },
+            },
+        },
+    },
+)
+
+
+async def run_interior_export_ifc(ctx: ProjectCtx, params: dict) -> str:
+    try:
+        room = make_room(
+            params["name"],
+            float(params["width_mm"]),
+            float(params["depth_mm"]),
+            ceiling_height_mm=float(params.get("ceiling_height_mm", 2700.0)),
+        )
+    except (ValueError, TypeError, KeyError) as exc:
+        return err_payload(str(exc), "BAD_ARGS")
+
+    wall_t = float(params.get("wall_thickness_mm", 150.0))
+
+    doors = [
+        InteriorDoor(
+            name=str(d.get("name", "Door")),
+            x_mm=float(d["x_mm"]),
+            y_mm=float(d["y_mm"]),
+            width_mm=float(d.get("width_mm", 900.0)),
+            height_mm=float(d.get("height_mm", 2100.0)),
+            thickness_mm=float(d.get("thickness_mm", 50.0)),
+        )
+        for d in params.get("doors", [])
+    ]
+    windows = [
+        InteriorWindow(
+            name=str(w.get("name", "Window")),
+            x_mm=float(w["x_mm"]),
+            y_mm=float(w["y_mm"]),
+            width_mm=float(w.get("width_mm", 1200.0)),
+            height_mm=float(w.get("height_mm", 1200.0)),
+            sill_height_mm=float(w.get("sill_height_mm", 900.0)),
+        )
+        for w in params.get("windows", [])
+    ]
+    lights = [
+        InteriorLight(
+            name=str(lt.get("name", "Light")),
+            x_mm=float(lt["x_mm"]),
+            y_mm=float(lt["y_mm"]),
+            z_mm=float(lt.get("z_mm", 2600.0)),
+        )
+        for lt in params.get("lights", [])
+    ]
+
+    model = InteriorModel.from_room_layout(
+        room,
+        wall_thickness_mm=wall_t,
+        doors=doors,
+        windows=windows,
+        lights=lights,
+    )
+
+    output_path = str(params["output_path"])
+    try:
+        export_ifc4(model, output_path)
+    except OSError as exc:
+        return err_payload(f"Write failed: {exc}", "IO_ERROR")
+
+    result = {
+        "output_path": output_path,
+        "entity_types_exported": list_supported_entity_types(),
+        "note": (
+            "IFC 4 subset export — NOT buildingSMART certified. "
+            "For coordination/import only (ISO 16739-1:2018)."
+        ),
+    }
+    return ok_payload(result)
+
+
+# ---------------------------------------------------------------------------
+# interior_validate_ifc
+# ---------------------------------------------------------------------------
+
+interior_validate_ifc_spec = ToolSpec(
+    name="interior_validate_ifc",
+    description=(
+        "Validate an IFC 4 file produced by interior_export_ifc (or any IFC 4 SPF). "
+        "Checks: FILE_SCHEMA is IFC4; IfcProject/IfcSite/IfcBuilding/IfcBuildingStorey "
+        "hierarchy present; all #N forward-references resolved; file ends with "
+        "END-ISO-10303-21;. Returns valid=true/false, entity counts, and any errors."
+    ),
+    input_schema={
+        "type": "object",
+        "required": ["path"],
+        "properties": {
+            "path": {
+                "type": "string",
+                "description": "Absolute path to the .ifc file to validate.",
+            },
+        },
+    },
+)
+
+
+async def run_interior_validate_ifc(ctx: ProjectCtx, params: dict) -> str:
+    path = str(params.get("path", ""))
+    if not path:
+        return err_payload("path is required", "BAD_ARGS")
+    result = validate_ifc4_subset(path)
+    return ok_payload({
+        "valid": result.valid,
+        "schema": result.schema,
+        "entity_count": result.entity_count,
+        "entity_type_counts": result.entity_type_counts,
+        "errors": result.errors,
+        "warnings": result.warnings,
+    })
+
+
+# ---------------------------------------------------------------------------
 # TOOLS registry list (for plugin loader)
 # ---------------------------------------------------------------------------
 
@@ -296,4 +502,6 @@ TOOLS = [
     ("interior_clearance_check", interior_clearance_check_spec, run_interior_clearance_check),
     ("interior_make_furniture", interior_make_furniture_spec, run_interior_make_furniture),
     ("interior_room_layout", interior_room_layout_spec, run_interior_room_layout),
+    ("interior_export_ifc", interior_export_ifc_spec, run_interior_export_ifc),
+    ("interior_validate_ifc", interior_validate_ifc_spec, run_interior_validate_ifc),
 ]

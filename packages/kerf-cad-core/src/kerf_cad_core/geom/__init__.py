@@ -1204,6 +1204,7 @@ from kerf_cad_core.geom.subd_from_mesh import (
     derive_cage_from_mesh,
     fit_subd_to_mesh,
     recommend_subd_topology,
+)
 # GK-P-IV: interference volume metric (Stroud-Nagy §10)
 from kerf_cad_core.geom.interference_volume import (  # noqa: E402
     InterferenceVolume,

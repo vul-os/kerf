@@ -300,6 +300,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.auto_fillet",                  # brep_recommend_fillets, brep_apply_fillet_recommendations
     # GK-P: Auto-lightweight (Lyche-Mørken knot removal + rational simplification)
     "kerf_cad_core.geom.auto_lightweight",              # brep_auto_lightweight
+    # GK-P: Quadratic → cubic NURBS elevation (Piegl-Tiller §5.5 specialisation)
+    "kerf_cad_core.geom.degree_2_to_3",                 # nurbs_elevate_to_cubic — degree-2 B-spline → degree-3, shape-preserving
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

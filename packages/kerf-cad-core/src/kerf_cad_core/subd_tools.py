@@ -8,6 +8,8 @@ Wires the following already-implemented functions from
 - ``sculpt_brush``       (GK-P27) — sculpt-brush stroke (grab/smooth/inflate)
 - ``MultiresStack``      (GK-P26) — multi-resolution displacement stack
   (evaluate + serialise as feature nodes)
+- ``subd_to_nurbs_schaefer`` (GK-P-LS) — Loop-Schaefer 2008 bicubic-NURBS
+  approximation of a Catmull-Clark SubD cage (stateless, returns patches + error)
 
 These ops append a node to a ``.feature`` file. The OCCT worker has no
 special dispatch for SubD nodes — evaluation is pure-Python.
@@ -468,4 +470,136 @@ async def run_feature_multires_evaluate(ctx: ProjectCtx, args: bytes) -> str:
         "op": "multires_evaluate",
         "level": level,
         "max_levels": max_levels,
+    })
+
+
+# ── subd_to_nurbs_schaefer ────────────────────────────────────────────────────
+#
+# GK-P-LS: Loop-Schaefer 2008 bicubic-NURBS approximation (stateless tool).
+# Converts an inline SubD cage description to a bicubic NURBS patch quilt
+# and returns fit-error statistics + serialised control grids.
+
+subd_to_nurbs_schaefer_spec = ToolSpec(
+    name="subd_to_nurbs_schaefer",
+    description=(
+        "Convert a Catmull-Clark SubD control cage to a bicubic NURBS patch "
+        "quilt using the Loop-Schaefer 2008 algorithm "
+        "(ACM Trans. Graphics 27(1), Feb 2008). "
+        "Regular interior faces (all valence-4 vertices) produce exact "
+        "Stam-basis bicubic patches with C2 continuity. "
+        "Irregular faces (extraordinary vertex, valence ≠ 4) are fitted by "
+        "least-squares to Catmull-Clark limit-surface samples. "
+        "Returns one 4×4 control grid per face plus fit-error statistics. "
+        "Stateless: does not read or write any file."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "vertices": {
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 3,
+                    "maxItems": 3,
+                },
+                "description": "Vertex positions as [[x,y,z], ...] (≥4 vertices).",
+                "minItems": 4,
+            },
+            "faces": {
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "minItems": 4,
+                    "maxItems": 4,
+                },
+                "description": "Quad faces as [[i0,i1,i2,i3], ...] (all quads, CCW winding).",
+                "minItems": 1,
+            },
+            "target_error": {
+                "type": "number",
+                "description": (
+                    "Target fit error for irregular (extraordinary-vertex) faces "
+                    "(default 1e-3, in the same units as vertices). "
+                    "The actual max_fit_error may exceed this for very irregular cages."
+                ),
+                "default": 0.001,
+                "exclusiveMinimum": 0,
+            },
+        },
+        "required": ["vertices", "faces"],
+    },
+)
+
+
+@register(subd_to_nurbs_schaefer_spec, write=False)
+async def run_subd_to_nurbs_schaefer(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+    raw_verts = a.get("vertices")
+    raw_faces = a.get("faces")
+    target_error = a.get("target_error", 1e-3)
+
+    if not isinstance(raw_verts, list) or len(raw_verts) < 4:
+        return err_payload("vertices must be a list of ≥4 [x,y,z] points", "BAD_ARGS")
+    if not isinstance(raw_faces, list) or len(raw_faces) < 1:
+        return err_payload("faces must be a non-empty list of quad index lists", "BAD_ARGS")
+    if not isinstance(target_error, (int, float)) or target_error <= 0:
+        return err_payload("target_error must be a positive number", "BAD_ARGS")
+
+    try:
+        verts = [[float(c) for c in v] for v in raw_verts]
+        faces = [[int(i) for i in f] for f in raw_faces]
+    except (TypeError, ValueError) as exc:
+        return err_payload(f"invalid vertex/face data: {exc}", "BAD_ARGS")
+
+    for fi, f in enumerate(faces):
+        if len(f) != 4:
+            return err_payload(
+                f"face {fi} has {len(f)} vertices; only quads supported", "BAD_ARGS"
+            )
+        for vi in f:
+            if vi < 0 or vi >= len(verts):
+                return err_payload(
+                    f"face {fi} has out-of-range vertex index {vi}", "BAD_ARGS"
+                )
+
+    try:
+        from kerf_cad_core.geom.subd import SubDMesh
+        from kerf_cad_core.geom.subd_to_nurbs import (
+            subd_to_nurbs_loop_schaefer,
+            compute_conversion_loss,
+        )
+    except ImportError as exc:
+        return err_payload(f"import error: {exc}", "ERROR")
+
+    mesh = SubDMesh(vertices=verts, faces=faces)
+    try:
+        result = subd_to_nurbs_loop_schaefer(mesh, target_error=float(target_error))
+    except Exception as exc:
+        return err_payload(f"conversion failed: {exc}", "ERROR")
+
+    try:
+        loss = compute_conversion_loss(mesh, result.patches, n_samples=200)
+    except Exception:
+        loss = {"rms_error": 0.0, "max_error": 0.0, "near_extraordinary_max": 0.0}
+
+    # Serialise control grids (list of 4×4 grids, each [[x,y,z]])
+    ctrl_grids = []
+    for patch in result.patches:
+        grid = patch.control_points.tolist()
+        ctrl_grids.append(grid)
+
+    return ok_payload({
+        "patch_count": len(result.patches),
+        "max_fit_error": result.max_fit_error,
+        "valence_table": {str(k): v for k, v in result.valence_table.items()},
+        "rms_error": loss["rms_error"],
+        "max_error": loss["max_error"],
+        "near_extraordinary_max": loss["near_extraordinary_max"],
+        "control_grids": ctrl_grids,
     })

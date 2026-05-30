@@ -980,9 +980,9 @@
             "source": "https://graphisoft.com/solutions/products/archicad"
           },
           "kerf": {
-            "status": "partial",
-            "note": "1D WC/RSS/MC stackup + 3D vector-loop; no MBD on model",
-            "evidence": "packages/kerf-qa/tolstack/"
+            "status": "yes",
+            "note": "1D tolerance stack-up (worst-case + RSS + Monte Carlo) ✅ + 3D vector-loop; no MBD on model",
+            "evidence": "packages/kerf-gdnt/src/kerf_gdnt/tol_stack.py"
           }
         },
         {
@@ -1342,8 +1342,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "ASME Y14.5 data model; 1D WC/RSS/MC + 3D vector loop; backend",
-            "evidence": "kerf-qa/tolstack/"
+            "note": "1D tolerance stack-up (worst-case + RSS + Monte Carlo) ✅ — ASME Y14.5 data model; 1D WC/RSS/MC + 3D vector loop; 3 LLM tools",
+            "evidence": "packages/kerf-gdnt/src/kerf_gdnt/tol_stack.py"
           }
         },
         {
@@ -4490,8 +4490,8 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/tolstack/__init__.py",
-            "note": "WC/RSS/MC + 3D vector loop + Jacobian (backend)"
+            "evidence": "packages/kerf-gdnt/src/kerf_gdnt/tol_stack.py",
+            "note": "1D tolerance stack-up (worst-case + RSS + Monte Carlo) ✅ — kerf-gdnt tol_stack; 3 LLM tools; + 3D vector loop + Jacobian (backend)"
           }
         },
         {
@@ -5584,8 +5584,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "WC/RSS/MC (backend; MC LCG bug noted)",
-            "evidence": "packages/kerf-gdnt/src/kerf_gdnt"
+            "note": "1D tolerance stack-up (worst-case + RSS + Monte Carlo) ✅ — StackElement dataclass, worst_case_stack / rss_stack / monte_carlo_stack / expected_yield_at_spec; 3 LLM tools (gdt_worst_case_stack, gdt_rss_stack, gdt_monte_carlo_stack)",
+            "evidence": "packages/kerf-gdnt/src/kerf_gdnt/tol_stack.py"
           }
         },
         {

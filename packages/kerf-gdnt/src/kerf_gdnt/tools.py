@@ -3,13 +3,14 @@ LLM tool surface for kerf-gdnt.
 
 Exposes the following tools to the Claude / kerf-chat tool registry:
 
-  gdnt_list_symbols       — list all GD&T symbol codes with names and Unicode
-  gdnt_create_fcf         — create a feature control frame from parameters
-  gdnt_validate_fcf       — validate an FCF dict and return issues
-  gdnt_inspect_feature    — check a single measured value against an FCF
-  gdnt_build_report       — build a full inspection report from measurements
-  gdt_validate_frame      — ASME Y14.5-2018 structural validation of an FCF
-  gdt_parse_frame         — parse canonical frame string → FCF dict
+  gdnt_list_symbols         — list all GD&T symbol codes with names and Unicode
+  gdnt_create_fcf           — create a feature control frame from parameters
+  gdnt_validate_fcf         — validate an FCF dict and return issues
+  gdnt_inspect_feature      — check a single measured value against an FCF
+  gdnt_build_report         — build a full inspection report from measurements
+  gdt_worst_case_stack      — 1D worst-case (arithmetic) tolerance stack-up
+  gdt_rss_stack             — 1D RSS (root-sum-square) statistical stack-up
+  gdt_monte_carlo_stack     — 1D Monte-Carlo tolerance stack-up + yield
 """
 
 from __future__ import annotations
@@ -33,11 +34,12 @@ from kerf_gdnt.inspection_report import (
     render_report,
     report_to_dicts,
 )
-from kerf_gdnt.validator import (
-    validate_frame,
-    canonical_frame_string,
-    parse_canonical_frame,
-    zone_for_position_tol,
+from kerf_gdnt.tol_stack import (
+    StackElement,
+    worst_case_stack,
+    rss_stack,
+    monte_carlo_stack,
+    expected_yield_at_spec,
 )
 
 
@@ -357,95 +359,174 @@ def run_gdnt_build_report(params: dict, ctx: Any) -> str:
 
 
 # ---------------------------------------------------------------------------
-# gdt_validate_frame — ASME Y14.5-2018 structural validation
+# Tolerance stack-up tools — shared element-list deserialiser
 # ---------------------------------------------------------------------------
 
-gdt_validate_frame_spec = ToolSpec(
-    name="gdt_validate_frame",
+_ELEMENT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "nominal":       {"type": "number", "description": "Nominal dimension value."},
+        "plus_tol":      {"type": "number", "description": "Upper tolerance (≥ 0)."},
+        "minus_tol":     {"type": "number", "description": "Lower tolerance magnitude (≥ 0)."},
+        "distribution":  {
+            "type": "string",
+            "enum": ["uniform", "normal", "triangular"],
+            "description": "Assumed statistical distribution for Monte-Carlo sampling.",
+            "default": "normal",
+        },
+        "direction": {
+            "type": "integer",
+            "enum": [1, -1],
+            "description": "1 = additive; -1 = subtractive.",
+            "default": 1,
+        },
+    },
+    "required": ["nominal", "plus_tol", "minus_tol"],
+}
+
+
+def _parse_elements(raw: list[dict]) -> list[StackElement]:
+    return [
+        StackElement(
+            nominal=float(e["nominal"]),
+            plus_tol=float(e["plus_tol"]),
+            minus_tol=float(e["minus_tol"]),
+            distribution=e.get("distribution", "normal"),
+            direction=int(e.get("direction", 1)),
+        )
+        for e in raw
+    ]
+
+
+# ---------------------------------------------------------------------------
+# gdt_worst_case_stack
+# ---------------------------------------------------------------------------
+
+gdt_worst_case_stack_spec = ToolSpec(
+    name="gdt_worst_case_stack",
     description=(
-        "Validate a Feature Control Frame for structural well-formedness per "
-        "ASME Y14.5-2018 §3.4.  Returns valid=true/false plus a list of "
-        "structured errors (with Y14.5 clause references) and advisory "
-        "warnings.  Checks: symbol–modifier compatibility (only size-"
-        "controlling tolerances may use M/L), datum requirements for "
-        "orientation/location/runout symbols, datum prohibition on form "
-        "tolerances, duplicate datum labels, positive tolerance value, "
-        "projected-zone applicability, and tangent-plane applicability.\n\n"
-        "NOTE: implements ASME Y14.5-2018 *structural* validation; "
-        "kerf is not ASME-certified."
+        "1D worst-case (arithmetic) tolerance stack-up per ASME Y14.5-2018 §11. "
+        "Accumulates all element tolerances simultaneously at their worst values — "
+        "gives a 100 % yield guarantee but may be overly conservative for long chains. "
+        "Returns nominal sum, worst-case max/min bounds, and the total range."
     ),
     input_schema={
         "type": "object",
         "properties": {
-            "fcf": {
-                "type": "object",
-                "description": "FCF dict as returned by gdnt_create_fcf.",
-            },
-            "standard": {
-                "type": "string",
-                "description": "Validation standard (default: 'ASME Y14.5-2018').",
-                "default": "ASME Y14.5-2018",
+            "elements": {
+                "type": "array",
+                "description": "Ordered list of tolerance chain elements.",
+                "items": _ELEMENT_SCHEMA,
+                "minItems": 1,
             },
         },
-        "required": ["fcf"],
+        "required": ["elements"],
     },
 )
 
 
-def run_gdt_validate_frame(params: dict, ctx: Any) -> str:
+def run_gdt_worst_case_stack(params: dict, ctx: Any) -> str:
     try:
-        fcf = FeatureControlFrame.from_dict(params["fcf"])
-        standard = params.get("standard", "ASME Y14.5-2018")
-        result = validate_frame(fcf, standard=standard)
-        return ok_payload(result.to_dict())
-    except ValueError as exc:
-        return err_payload(str(exc), "VALIDATE_ERROR")
-    except Exception as exc:
-        return err_payload(str(exc), "VALIDATE_ERROR")
-
-
-# ---------------------------------------------------------------------------
-# gdt_parse_frame — parse canonical frame string
-# ---------------------------------------------------------------------------
-
-gdt_parse_frame_spec = ToolSpec(
-    name="gdt_parse_frame",
-    description=(
-        "Parse a canonical feature control frame string (as produced by the "
-        "canonical_frame_string format) back into a structured FCF dict.  "
-        "Canonical format: [symbol_code][dia?tolerance][modifier?][datumA?]...  "
-        "Example: '[position][dia:0.05][M][A][B][C]'.\n\n"
-        "The returned dict can be passed directly to gdnt_validate_fcf or "
-        "gdt_validate_frame."
-    ),
-    input_schema={
-        "type": "object",
-        "properties": {
-            "canonical": {
-                "type": "string",
-                "description": "Canonical frame string, e.g. '[position][dia:0.05][M][A][B][C]'.",
-            },
-            "validate": {
-                "type": "boolean",
-                "description": "If true, also run ASME Y14.5-2018 validation and include result.",
-                "default": False,
-            },
-        },
-        "required": ["canonical"],
-    },
-)
-
-
-def run_gdt_parse_frame(params: dict, ctx: Any) -> str:
-    try:
-        fcf = parse_canonical_frame(params["canonical"])
-        result: dict = fcf.to_dict()
-        result["canonical"] = canonical_frame_string(fcf)
-        if params.get("validate", False):
-            vr = validate_frame(fcf)
-            result["validation"] = vr.to_dict()
+        elements = _parse_elements(params["elements"])
+        result = worst_case_stack(elements)
         return ok_payload(result)
-    except ValueError as exc:
-        return err_payload(str(exc), "PARSE_ERROR")
     except Exception as exc:
-        return err_payload(str(exc), "PARSE_ERROR")
+        return err_payload(str(exc), "STACK_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# gdt_rss_stack
+# ---------------------------------------------------------------------------
+
+gdt_rss_stack_spec = ToolSpec(
+    name="gdt_rss_stack",
+    description=(
+        "1D Root-Sum-Square (RSS) statistical tolerance stack-up (Bhote 1991 §15). "
+        "Assumes independent normal distributions where 3σ = declared tolerance. "
+        "Returns nominal sum, ±3σ assembly bounds (≈99.73 % yield), total σ, and 6σ range."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "elements": {
+                "type": "array",
+                "description": "Ordered list of tolerance chain elements.",
+                "items": _ELEMENT_SCHEMA,
+                "minItems": 1,
+            },
+        },
+        "required": ["elements"],
+    },
+)
+
+
+def run_gdt_rss_stack(params: dict, ctx: Any) -> str:
+    try:
+        elements = _parse_elements(params["elements"])
+        result = rss_stack(elements)
+        return ok_payload(result)
+    except Exception as exc:
+        return err_payload(str(exc), "STACK_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# gdt_monte_carlo_stack
+# ---------------------------------------------------------------------------
+
+gdt_monte_carlo_stack_spec = ToolSpec(
+    name="gdt_monte_carlo_stack",
+    description=(
+        "1D Monte-Carlo tolerance stack-up. Samples each element according to its "
+        "declared distribution (normal / uniform / triangular) and accumulates totals "
+        "over n_trials iterations.  Returns mean, std, percentiles (5/95/99), "
+        "observed extremes, and — if spec_min/spec_max are provided — the estimated "
+        "yield (fraction of trials within spec)."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "elements": {
+                "type": "array",
+                "description": "Ordered list of tolerance chain elements.",
+                "items": _ELEMENT_SCHEMA,
+                "minItems": 1,
+            },
+            "n_trials": {
+                "type": "integer",
+                "description": "Number of Monte-Carlo trials (default 10 000).",
+                "default": 10000,
+                "minimum": 100,
+                "maximum": 1000000,
+            },
+            "spec_min": {
+                "type": "number",
+                "description": "Lower specification limit for yield calculation (optional).",
+            },
+            "spec_max": {
+                "type": "number",
+                "description": "Upper specification limit for yield calculation (optional).",
+            },
+        },
+        "required": ["elements"],
+    },
+)
+
+
+def run_gdt_monte_carlo_stack(params: dict, ctx: Any) -> str:
+    try:
+        elements = _parse_elements(params["elements"])
+        n_trials = int(params.get("n_trials", 10_000))
+        result = monte_carlo_stack(elements, n_trials=n_trials)
+
+        if "spec_min" in params and "spec_max" in params:
+            yield_val = expected_yield_at_spec(
+                elements,
+                spec_min=float(params["spec_min"]),
+                spec_max=float(params["spec_max"]),
+                n_trials=n_trials,
+            )
+            result["expected_yield"] = yield_val
+
+        return ok_payload(result)
+    except Exception as exc:
+        return err_payload(str(exc), "STACK_ERROR")

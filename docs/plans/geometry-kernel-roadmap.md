@@ -1287,6 +1287,7 @@ layer (history/UI/CAM/FEM packages), not the geometry kernel.
 | Edge split | 🟡 GK-106 |
 | Bevel weight (graded crease) | 🟡 GK-107 |
 | Loop subdivision (triangle scheme) | 🟡 GK-108 |
+| SubD limit-surface area + volume (Stam-quadrature) | ✅ GK-P-area-vol |
 
 ### F. Mesh & implicit
 | Capability | Status |

@@ -153,6 +153,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.elecpower.tools",
     "kerf_cad_core.plumbing.tools",
     "kerf_cad_core.earthworks.tools",
+    # GK-P-NURBS-OFFSET: nurbs_surface_offset LLM tool
+    "kerf_cad_core.geom.surface_offset",
     "kerf_cad_core.geom.make2d",
     "kerf_cad_core.geom.reparam_tools",  # GK-P: chord-length + centripetal + Foley-Nielsen reparametrisation
     "kerf_cad_core.geom.curve_toolkit",

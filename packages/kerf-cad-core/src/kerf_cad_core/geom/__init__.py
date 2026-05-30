@@ -377,7 +377,14 @@ from kerf_cad_core.geom.pattern import (
     path_pattern,
 )
 
-from kerf_cad_core.geom.surface_offset import surface_offset
+# GK-83 / GK-P-NURBS-OFFSET: surface_offset (legacy alias) + Tiller-Hanson offset_surface
+# with detect_self_intersection + trim_self_intersection_loops.
+from kerf_cad_core.geom.surface_offset import (
+    surface_offset,
+    offset_surface,
+    detect_self_intersection,
+    trim_self_intersection_loops,
+)
 # GK-96: reverse curve/surface direction
 from kerf_cad_core.geom.nurbs import reverse_curve, reverse_surface
 # GK-97: reparametrize curve/surface (normalize knots, domain rescale, arc-length)
@@ -675,8 +682,11 @@ __all__ = [
     "reduce_degree_curve","reduce_degree_surface",
     # GK-102
     "remove_knot","minimal_cp_refit",
-    # GK-83
+    # GK-83 / GK-P-NURBS-OFFSET
     "surface_offset",
+    "offset_surface",
+    "detect_self_intersection",
+    "trim_self_intersection_loops",
     # GK-87
     "linear_pattern",
     "circular_pattern",

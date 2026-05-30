@@ -138,6 +138,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 | **`boolean.py`** | Tolerant pure-Python solid booleans (regularised cut/fuse/common) over the primitive matrix, 2-manifold result | ✅ shipped |
 | **`fillet_solid.py` / `chamfer.py`** | G1/G2 surface blend + edge fillet + variable chamfer | ✅ shipped |
 | **`offset.py`** | Exact-distance surface/curve/loop offsets with self-intersection trim | ✅ shipped |
+| **`surface_offset.py`** | NURBS surface offset (Tiller-Hanson 1984 + Hoschek 1988): CP face-normal displacement, iterative isotropic-error refinement, Möller 1997 self-intersection detection, local-loop trim; `nurbs_surface_offset` LLM tool; 4 analytical oracle tests (plane/cylinder/sphere/C-shape) | ✅ shipped |
 | **`coons.py`** | Boundary-interpolation Coons patches, exact to 1e-12 | ✅ shipped |
 | **`inversion.py`** | Closest-point / point-inversion (Piegl 6.1, analytic partials on rational surfaces) | ✅ shipped |
 | **`intersection.py`** | Hardened SSI: loop-detection, tangential-branch detection, small-loop guard, analytic specialisations | ✅ shipped |

@@ -998,6 +998,14 @@ __all__ = [
     "Curve2D",
     "extract_characteristic_curves",
     "trace_curve_from_seed",
+    # GK-P SubD LOD chain + progressive mesh
+    "SubdLodChain",
+    "ProgressiveMesh",
+    "EdgeCollapseRecord",
+    "VertexSplitRecord",
+    "generate_subd_lod_chain",
+    "generate_progressive_mesh",
+    "pick_lod_for_view",
 ]
 
 # Variable-section edge blend (Vida-Martin-Varady 1994 §4)
@@ -1115,4 +1123,14 @@ from kerf_cad_core.geom.characteristic_curves import (
     Curve2D,
     extract_characteristic_curves,
     trace_curve_from_seed,
+)
+# GK-P (SubD LOD): automatic LOD chain + progressive mesh (Hoppe 1996)
+from kerf_cad_core.geom.subd_automatic_lod import (
+    SubdLodChain,
+    ProgressiveMesh,
+    EdgeCollapseRecord,
+    VertexSplitRecord,
+    generate_subd_lod_chain,
+    generate_progressive_mesh,
+    pick_lod_for_view,
 )

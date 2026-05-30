@@ -16038,6 +16038,20 @@
         },
         {
           "domain": "D1",
+          "feature": "SubD cage single-edge subdivide (localized refinement)",
+          "competitor": {
+            "status": "partial",
+            "note": "Maya polySplit / Blender subdivide_edges on one edge; not exposed as a programmatic API with topology-count guarantees.",
+            "source": "https://help.autodesk.com/view/MAYAUL/ENU/?guid=__CommandsPython_polySplit_html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "subdivide_edge(cage, edge_index, position_t=0.5): inserts midpoint vertex on a single cage edge (not a full CC pass); each adjacent face split into triangle + quad; cube oracle V=8→9, F=6→8, E=12→15, Euler=2 ✓; boundary edge (1 adjacent face) and interior edge (2) both handled; invalid edge_index → ValueError; has_non_quad_input honest flag for non-quad input; LLM tool subd_subdivide_edge; 24 oracle-asserted tests. Ref: Catmull & Clark 1978; Stam 1998 §4; Maya polySplit.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/subd_subdivide_edge.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "Shell wall-thickness DFM check",
           "competitor": {
             "status": "partial",

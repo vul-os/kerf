@@ -199,6 +199,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.subd",
     # GK-P SubD/mesh: SubD-cage boolean (transversal case, Cohen-Or-Sheffer 2003)
     "kerf_cad_core.geom.subd_csg_tools",
+    # SUBD-CAGE-SUBDIVIDE-EDGE: localized single-edge refinement (Catmull-Clark 1978; Stam 1998 §4; Maya polySplit)
+    "kerf_cad_core.geom.subd_subdivide_edge_tool",
     "kerf_cad_core.geom.blocks",
     "kerf_cad_core.geom.mesh_to_nurbs",
     "kerf_cad_core.geom.nurbs_param_optimal",   # GK-P50: nurbs_reparametrize_optimal

@@ -1573,3 +1573,11 @@ from kerf_cad_core.geom.curve_resample_uniform import (  # noqa: E402
     ResampleResult,
     resample_uniform_arc_length,
 )
+# SUBD-CAGE-SUBDIVIDE-EDGE: localized single-edge refinement (not a full CC pass).
+# Ref: Catmull & Clark 1978; Stam 1998 §4 local refinement; Maya polySplit API.
+# Honest: quad-cage only for clean topology; non-quad sets has_non_quad_input flag.
+# LLM tool: subd_subdivide_edge.
+from kerf_cad_core.geom.subd_subdivide_edge import (  # noqa: E402
+    SubdivideEdgeResult,
+    subdivide_edge,
+)

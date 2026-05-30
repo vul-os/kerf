@@ -197,6 +197,14 @@ from kerf_cad_core.geom.curve_toolkit import (
     extend_curve,
     geodesic,
 )
+# GK-P: composite curve G2 audit + auto-blending
+from kerf_cad_core.geom.composite_g2 import (
+    audit_composite_g2,
+    upgrade_to_g2,
+    composite_curvature_profile,
+    CompositeAuditResult,
+    JointAudit,
+)
 # GK-11: curve-curve intersection hardening
 from kerf_cad_core.geom.intersection import (
     curve_curve_intersect,
@@ -602,6 +610,12 @@ __all__ = [
     # GK-100
     "composite_curve",
     "split_composite",
+    # GK-P: composite curve G2 audit + auto-blending
+    "audit_composite_g2",
+    "upgrade_to_g2",
+    "composite_curvature_profile",
+    "CompositeAuditResult",
+    "JointAudit",
     # GK-101
     "geodesic",
     # GK-103

@@ -177,6 +177,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 - **Architectural geometry** — B-rep→2D tessellate, roof/curtain-wall/corridor generators, wall compound-layer offset, hatch/section-fill.
 - **Sketcher** — collinear constraint, ellipse solver entity, G2 continuity.
 - **Interop** — 3DM write with read→write→read Hausdorff oracle.
+- **Composite curve G2 audit + upgrade** ✅ — `composite_g2.py`: audit + auto-blend (cubic Hermite / quintic Bezier); LLM tools registered; 27 tests green.
 
 ### Mechanical / CAD
 
@@ -416,6 +417,8 @@ These are roadmap-level moats that span every sector simultaneously and compound
 - **GK-P interop** — 3DM write with Hausdorff read→write→read oracle.
 - **T-100 FEM depth** — explicit dynamics ✅ shipped (`kerf_fem/explicit_dynamics.py`); full nonlinear static (only 1-D bar/truss shipped); k-ε turbulence CFD; coupled FEA-based variation analysis. (Acoustics FEM, EM, harmonic, buckling, PSD, multi-axial fatigue, explicit dynamics are now all shipped.)
 - **T-100 FEM depth** ✅ EPIC CLOSED — all sub-tasks shipped: explicit dynamics, full nonlinear static (geometric + material + contact + arc-length), k-ε turbulence CFD, coupled-field probabilistic FEA (LHS + Karhunen-Loève), plus acoustics FEM, EM, harmonic, buckling, PSD, multi-axial fatigue.
+- **Composite curve G2 audit + upgrade** ✅ — `composite_g2.py`: `audit_composite_g2` (per-joint G0/G1/G2 residuals), `upgrade_to_g2` (cubic Hermite / quintic Bezier blend insertion), `composite_curvature_profile` (κ(s) statistics + jump detection); LLM tools `nurbs_composite_g2_audit` + `nurbs_composite_g2_upgrade` registered; 4 validation test classes (27 tests green).
+- **T-100 FEM depth** — explicit dynamics (module exists, not yet imported/registered); full nonlinear static (only 1-D bar/truss shipped); k-ε turbulence CFD; coupled FEA-based variation analysis. (Acoustics FEM, EM, harmonic, buckling, PSD, multi-axial fatigue are now shipped.)
 - **T-101 CFD depth** — RANS turbulence models; 3-D unstructured meshing; OpenFOAM bridge.
 - ~~**AFR topology ordering**~~ — ✅ shipped: `afr_to_dag` + `.feature` emitter + `afr_to_parametric` LLM tool in `kerf-cad-core/afr/dag.py`.
 - **T-101 CFD depth** — k-ε RANS shipped (T-101-A ✅); 3-D unstructured meshing (T-101-B, 4L); OpenFOAM bridge depth (T-101-C, 4M).

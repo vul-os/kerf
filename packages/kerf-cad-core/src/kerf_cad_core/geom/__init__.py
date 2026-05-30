@@ -243,6 +243,12 @@ from kerf_cad_core.geom.surface_analysis import (
     occt_g3_residual_from_poles,
     occt_g3_pole_roundtrip,
 )
+# GK-P: post-Boolean continuity recovery (G1/G2 seam blending)
+from kerf_cad_core.geom.continuity_recovery import (
+    ContinuityRecoveryResult,
+    recover_continuity_at_seam,
+    recover_continuity_body,
+)
 # GK-47: STEP reader
 from kerf_cad_core.geom.io.step_read import read_step, StepReadError
 # GK-48: STEP writer
@@ -608,6 +614,10 @@ __all__ = [
     "continuity_audit",
     "occt_g3_residual_from_poles",
     "occt_g3_pole_roundtrip",
+    # GK-P: post-Boolean continuity recovery
+    "ContinuityRecoveryResult",
+    "recover_continuity_at_seam",
+    "recover_continuity_body",
     "read_step","StepReadError",
     "write_step","StepWriteError",
     # GK-23

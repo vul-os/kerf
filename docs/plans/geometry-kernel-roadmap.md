@@ -1284,6 +1284,7 @@ layer (history/UI/CAM/FEM packages), not the geometry kernel.
 | SubD limit principal directions (κ_1, κ_2, d_1, d_2) | ✅ GK-P (subd_limit_principal_dirs) |
 | Loop slide | ✅ GK-88 |
 | Stam-exact limit curvature evaluation (K, H, κ₁/κ₂, extraordinary verts) | ✅ GK-P |
+| Ridge / valley / parabolic-line detection (limit surface) | ✅ GK-P (`subd_ridge_valley.py`) |
 | Edge slide / vertex slide | 🟡 GK-104/105 |
 | Edge split | 🟡 GK-106 |
 | Bevel weight (graded crease) | 🟡 GK-107 |

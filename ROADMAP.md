@@ -61,6 +61,9 @@ The sector work only matters if you **own your work, are not locked in, and can 
 ### Latest delta — 2026-05-30
 
 **Tilted-surface PV irradiance** ✅ — Plane-of-array (POA) irradiance for tilted PV modules: Liu-Jordan (1960) isotropic sky, Hay-Davies (1980) anisotropic, Perez (1990) 5-coefficient industry-standard model; `poa_irradiance`, `compute_sun_position`, `optimal_tilt_for_annual_pv`; LLM tools `energy_poa_irradiance` + `energy_sun_position` registered — `kerf-energy/src/kerf_energy/pv_irradiance.py`.
+### Latest delta — 2026-05-30
+
+**SubD ridge/valley/parabolic-line detection** ✅ — discrete differential-geometry on Catmull-Clark limit surfaces: angle-deficit Gaussian curvature + cotangent Laplacian mean curvature + Taubin curvature tensor; ridge lines (∂κ₁/∂e₁=0), valley lines (∂κ₂/∂e₂=0), parabolic lines (K=0 contour) extracted as polylines; LLM tool `subd_detect_features`; 23 oracle tests (flat plane, CC sphere, creased cube, saddle mesh) — `kerf-cad-core/geom/subd_ridge_valley.py`.
 
 ### Latest delta — 2026-05-26
 **PV latitude-aware TMY** ✅ — `monthly_yield_factors(latitude_deg)` in `solarpv/tmy.py` returns TMY3-derived (NREL/TP-581-43156) monthly irradiance fractions keyed to latitude band (0°–70°, 10° steps, linearly interpolated); Southern-hemisphere sites automatically receive the seasonally-flipped profile; `POST /energy/pv-shading` endpoint wired to use latitude-aware fractions instead of fixed Northern-Hemisphere constants; `PVShadingPanel` latitude input exposed in UI with hemisphere hint; 29 hermetic tests green.

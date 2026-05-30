@@ -2261,3 +2261,134 @@ async def run_compute_entrance_pupil(ctx, args: bytes) -> str:
     if isinstance(result, dict):
         return json.dumps(result)
     return ok_payload(result.to_dict())
+
+
+# ---------------------------------------------------------------------------
+# Tool: optics_compute_exit_pupil
+# ---------------------------------------------------------------------------
+
+from kerf_cad_core.optics.exit_pupil import (  # noqa: E402
+    ExitPupilReport,
+    compute_exit_pupil,
+)
+
+_exit_pupil_spec = ToolSpec(
+    name="optics_compute_exit_pupil",
+    description=(
+        "Compute the paraxial exit pupil position and size for a lens stack.\n"
+        "\n"
+        "The exit pupil is the image of the aperture stop formed by all lens\n"
+        "elements behind the stop, as seen from image space.\n"
+        "Its position and semi-diameter define the cone of rays converging\n"
+        "toward each image point (Welford 1986 §4.4; Hecht §6.6).\n"
+        "\n"
+        "Algorithm (Welford 1986 §4.4, two-ray forward trace):\n"
+        "  Ray 1 (h=stop_r, nu=0) and Ray 2 (h=0, nu=1) are traced forward\n"
+        "  from the stop through the rear sub-stack.\n"
+        "  position_z_mm = -h2_last / u2_last  (image of stop via B-element; Welford eq. 4.4.5)\n"
+        "  radius_mm = |h1_last + z_ep * u1_last|  (stop edge image height at exit pupil plane)\n"
+        "  magnification = radius_mm / (stop_diameter_mm / 2)\n"
+        "\n"
+        "Depth bar:\n"
+        "  * Stop at last surface (stop_surface_index=N-1): pupil at z=0, m=1.\n"
+        "    (Thin-lens identity; Hecht §6.6.)\n"
+        "  * Thin lens (t=0), stop at front surface: pupil at z=0, m=1.\n"
+        "  * BK7 biconvex, stop at first surface: virtual pupil (z<0) just\n"
+        "    inside the rear surface; m approx 1.035.\n"
+        "  * Afocal telescope (f_obj=100mm, f_eye=25mm): stop at objective ->\n"
+        "    Ramsden disk at z=31.25mm, radius=1.25mm, m=0.25 = 1/M_telescope.\n"
+        "    (Hecht §6.6 Ramsden disk.)\n"
+        "\n"
+        "HONEST FLAGS:\n"
+        "  * PARAXIAL ONLY.  Real chief-ray exit pupil requires finite-ray\n"
+        "    chief-ray back-tracing from image space to the stop (not implemented).\n"
+        "  * ENTRANCE PUPIL is a separate computation (optics_compute_entrance_pupil).\n"
+        "  * Stop modelled as a thin plane; thick stops not handled.\n"
+        "  * Paraxial approximation degrades for fast (f/# < 2) or wide-field systems.\n"
+        "\n"
+        "Surface definition (same as optics_ray_trace_lens_stack):\n"
+        "  c  : curvature 1/R (mm^-1). 0 = flat.\n"
+        "  t  : thickness to NEXT surface vertex (mm). Last surface: 0.\n"
+        "  n  : refractive index of medium AFTER this surface.\n"
+        "  k  : conic constant (default 0; unused for paraxial trace).\n"
+        "\n"
+        "Returns:\n"
+        "  position_z_mm  : exit pupil z-position from last surface (mm).\n"
+        "                   Positive = real pupil behind the last surface.\n"
+        "                   Negative = virtual pupil inside the barrel.\n"
+        "  radius_mm      : exit pupil semi-diameter (mm).\n"
+        "  diameter_mm    : full exit pupil diameter (mm).\n"
+        "  magnification  : radius / stop_radius (rear group transverse mag).\n"
+        "  honest_flag    : scope caveats.\n"
+        "\n"
+        "Errors: {ok:false, reason} for invalid inputs. Never raises.\n"
+        "\n"
+        "References: Welford (1986) §4.4; Hecht §6.6."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "surfaces": {
+                "type": "array",
+                "description": (
+                    "Ordered list of optical surface dicts. Each must have: "
+                    "c (mm^-1), t (mm), n (>= 1.0). Optional: k (conic, default 0)."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "c": {"type": "number", "description": "Curvature 1/R (mm^-1). 0 = flat."},
+                        "t": {"type": "number", "description": "Thickness to next surface (mm)."},
+                        "n": {"type": "number", "description": "Refractive index after surface (>= 1.0)."},
+                        "k": {"type": "number", "description": "Conic constant (default 0 = sphere)."},
+                    },
+                    "required": ["c", "t", "n"],
+                },
+            },
+            "stop_diameter_mm": {
+                "type": "number",
+                "description": "Full diameter of the aperture stop (mm). Must be > 0.",
+            },
+            "stop_surface_index": {
+                "type": "integer",
+                "description": (
+                    "0-based index of the aperture-stop surface (default 0 = first surface). "
+                    "The stop is at the vertex plane of this surface."
+                ),
+            },
+            "n_object": {
+                "type": "number",
+                "description": "Refractive index of object space (default 1.0 = air).",
+            },
+        },
+        "required": ["surfaces", "stop_diameter_mm"],
+    },
+)
+
+
+@register(_exit_pupil_spec, write=False)
+async def run_compute_exit_pupil(ctx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    if a.get("surfaces") is None:
+        return json.dumps({"ok": False, "reason": "surfaces is required"})
+    if a.get("stop_diameter_mm") is None:
+        return json.dumps({"ok": False, "reason": "stop_diameter_mm is required"})
+
+    kwargs: dict = {}
+    if "stop_surface_index" in a:
+        kwargs["stop_surface_index"] = int(a["stop_surface_index"])
+    if "n_object" in a:
+        kwargs["n_object"] = float(a["n_object"])
+
+    result = compute_exit_pupil(
+        a["surfaces"],
+        float(a["stop_diameter_mm"]),
+        **kwargs,
+    )
+    if isinstance(result, dict):
+        return json.dumps(result)
+    return ok_payload(result.to_dict())

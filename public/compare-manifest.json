@@ -13721,8 +13721,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Entrance pupil position and size (OPTICS-ENTRANCE-PUPIL-POS): paraxial reverse-trace of marginal ray from aperture stop through front sub-stack (Welford 1986 §4.4 / Hecht §6.6); position_z_mm from first surface vertex; D-element transverse magnification; converging front lens → real pupil (positive z); diverging front → virtual pupil (negative z); LLM tool optics_compute_entrance_pupil; 38 hermetic tests. Honest: paraxial only; exit pupil is a separate computation; stop modelled as thin plane.",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/entrance_pupil.py"
+            "note": "Entrance pupil position and size (OPTICS-ENTRANCE-PUPIL-POS): paraxial reverse-trace of marginal ray from aperture stop through front sub-stack (Welford 1986 §4.4 / Hecht §6.6); position_z_mm from first surface vertex; D-element transverse magnification; converging front → real pupil; diverging front → virtual pupil; LLM tool optics_compute_entrance_pupil; 38 hermetic tests. Exit pupil position and size (OPTICS-EXIT-PUPIL-POS): two-ray forward trace (Welford §4.4 eq. 4.4.5); position_z_mm from last surface vertex; Ramsden disk oracle: z=31.25 mm, radius=1.25 mm, m=0.25 for 4× telescope (Hecht §6.6); Welford §4.4 virtual exit pupil oracle (BK7 biconvex, z≈−3.41 mm); LLM tool optics_compute_exit_pupil; 43 hermetic tests. Honest: paraxial only; stop modelled as thin plane.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/exit_pupil.py"
           }
         },
         {

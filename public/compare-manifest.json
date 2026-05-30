@@ -15464,8 +15464,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "SubD authoring with creases; quad remesh; dense-mesh→cage via QEM (Garland-Heckbert 1997) + quad recovery (Bommes 2013)",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/subd_decimate_to_cage.py"
+            "note": "SubD authoring with creases; quad remesh; dense-mesh→cage via QEM (Garland-Heckbert 1997) + quad recovery (Bommes 2013); cage→primitive snap: project_cage_to_sphere / _cylinder / _plane (analytic closest-point projection, 3 LLM tools)",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/subd_project_primitive.py"
           }
         },
         {

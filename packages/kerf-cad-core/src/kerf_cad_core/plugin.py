@@ -61,6 +61,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.trim_curve",
     "kerf_cad_core.geom.trim_loop_heal",   # GK-P: nurbs_trim_loop_heal tool
     "kerf_cad_core.geom.subd_decimate_to_cage_tool",
+    "kerf_cad_core.geom.subd_project_primitive_tools",  # SUBD-CAGE-PROJECT-TO-PRIMITIVE
     "kerf_cad_core.nesting.tools",
     "kerf_cad_core.harness.tools",
     "kerf_cad_core.clash.tools",
@@ -332,6 +333,9 @@ _TOOL_MODULES = [
     # BREP-FACE-NEIGHBOR-WALK: face-adjacency graph + BFS traversal for CNC routing /
     # geodesic shortest-path / paint-area planning (Weiler 1985 §3 edge-sharing adjacency)
     "kerf_cad_core.geom.face_neighbor_walk",            # brep_face_neighbors, brep_shortest_face_path
+    # BREP-FACE-PLANARITY-CHECK: SVD best-fit plane + max deviation + planarity score
+    # (Pratt 1987 §3; Eberly §6.6) — brep_check_face_planarity
+    "kerf_cad_core.geom.face_planarity_tools",
     # SUBD-LIMIT-WALK-ALONG-EDGES: CC limit-surface curve along a cage edge chain
     "kerf_cad_core.geom.subd_edge_walk",               # subd_walk_edge_chain
 ]

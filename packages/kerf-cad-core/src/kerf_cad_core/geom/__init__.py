@@ -582,6 +582,14 @@ from kerf_cad_core.geom.subd_decimate_to_cage import (
     DecimationReport,
 )
 
+# SUBD-CAGE-PROJECT-TO-PRIMITIVE: snap cage vertices to sphere / cylinder / plane
+from kerf_cad_core.geom.subd_project_primitive import (
+    ProjectionReport,
+    project_cage_to_sphere,
+    project_cage_to_cylinder,
+    project_cage_to_plane,
+)
+
 __all__ = [
     "read_3dm","write_3dm","Rhino3dmReadError",
     "read_dxf","write_dxf","DxfReadError","DxfWriteError",
@@ -592,6 +600,11 @@ __all__ = [
     "construct_parting_surface","construct_with_shutoff_inserts","validate_parting_surface",
     "dense_mesh_to_subd_cage",
     "DecimationReport",
+    # SUBD-CAGE-PROJECT-TO-PRIMITIVE
+    "ProjectionReport",
+    "project_cage_to_sphere",
+    "project_cage_to_cylinder",
+    "project_cage_to_plane",
     "NurbsCurve",
     "NurbsSurface",
     "de_boor",
@@ -1364,4 +1377,10 @@ from kerf_cad_core.geom.face_neighbor_walk import (  # noqa: E402
 from kerf_cad_core.geom.subd_edge_walk import (  # noqa: E402
     SubDEdgeWalk,
     walk_along_cage_edges,
+)
+# BREP-FACE-PLANARITY-CHECK: SVD best-fit plane + max deviation + score
+# (Pratt 1987 §3; Eberly §6.6 orthogonal regression) — check_face_planarity / PlanarityReport
+from kerf_cad_core.geom.face_planarity import (
+    PlanarityReport,
+    check_face_planarity,
 )

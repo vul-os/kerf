@@ -222,6 +222,8 @@ _TOOL_MODULES = [
     # GK-P47: feature_loft guide_curves is in feature_loft (already in _TOOL_MODULES above)
     # GK-P48: construction verbs (hem_sheet, jog_sheet, multi_flange, delete_face, push_pull, gusset_plate, cope_notch)
     "kerf_cad_core.construction_verbs_tools",
+    # GK-P (B-rep heal + inertia): industrial STEP-import clean-up pass
+    "kerf_cad_core.geom.brep_heal",                     # brep_heal, brep_compute_inertia — industrial heal pipeline + inertia tensor
     # Coverage sweep: modules with @register that were not yet in _TOOL_MODULES
     "kerf_cad_core.heal",                               # heal_geometry — body heal + repair
     "kerf_cad_core.sketch",                             # sketch_add_entity/constraint, sketch_set_constraint_value, sketch_delete_entity, sketch_carbon_copy, sketch_validate

@@ -258,6 +258,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 - **HVAC duct pressure loss — ASHRAE §35 fittings** ✅ — ASHRAE Handbook of Fundamentals 2021 §35 (Ch. 21) Table 21-1 fitting loss coefficients: 10 fitting kinds (smooth/segmented elbows, 45° elbow, tee branch/through, gradual/abrupt transitions, butterfly damper, gradual reducer/expander); `fitting_pressure_loss()` + `compute_duct_run_pressure_drop()` (straight-duct + fittings combined); `build_loss_table()` with full ASHRAE citations; 2 new LLM tools (`hvac.fitting_pressure_loss`, `hvac.compute_run_pressure_drop`).
 - **Slicing** ✅ — plane-section, CNC layered, 3D-print G-code (Cura, Tier 1); infill pattern library (gyroid TPMS, honeycomb, triangular grid, concentric) ✅.
 - **1D system simulation (kerf-1dsim)** ✅ — Modelica-compatible equation-based DAE solver (BDF-1); R/L/C/MassSpring/Damper/ThermalConductor/FluidResistor components; **Modelica .mo import** ✅ — recursive-descent subset parser: `model/end`, `parameter Real`, `Real`, `equation`, `der()`, `connect()`, `package` wrapping; `modelica_to_kerf_components` mapper; `load_modelica_library` directory scan; `sim_import_modelica` LLM tool registered. *Modelica subset support — NOT certified Modelica compliance.*
+- **1DSim** ✅ — Modelica-compatible equation-based DAE solver (BDF-1); Modelica import; FMI export; **SPICE 3F5 netlist import + MNA DC analysis** (R/C/L/V/I/Q/M parsing, `sim_import_spice` + `sim_dc_analysis` LLM tools; SPICE subset — NOT SPICE-certified, BSIM models out of scope).
 
 ### Electronics
 

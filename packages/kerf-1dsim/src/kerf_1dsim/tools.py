@@ -315,171 +315,162 @@ async def run_sim1d_parse(ctx: ProjectCtx, args: bytes) -> str:
 
 
 # ---------------------------------------------------------------------------
-# sim_export_fmu
+# sim_import_spice
 # ---------------------------------------------------------------------------
 
-sim_export_fmu_spec = ToolSpec(
-    name="sim_export_fmu",
+sim_import_spice_spec = ToolSpec(
+    name="sim_import_spice",
     description=(
-        "Export a 1D simulation model as an FMI 2.0 Functional Mock-up Unit (.fmu). "
-        "The .fmu is a ZIP archive containing a modelDescription.xml (FMI 2.0 compliant) "
-        "and a C source-code wrapper. Supports CoSimulation ('cs') and ModelExchange ('me') "
-        "kinds. Accepts either a Modelica source string or an explicit variable list. "
-        "NOTE: FMI 2.0 export subset — NOT FMI Cross-Check certified."
+        "Parse a SPICE 3F5 netlist (text or file path) and return its structural "
+        "representation: components, nodes, analyses, models, and sub-circuits. "
+        "Supported: R, C, L, V (DC/AC/SIN), I, Q (BJT), M (MOSFET), "
+        ".SUBCKT/.ENDS, .MODEL, .TRAN, .AC, .DC. "
+        "SPICE subset only — NOT SPICE-certified; BSIM models out of scope."
     ),
     input_schema={
         "type": "object",
         "properties": {
-            "modelica_source": {
+            "spice_text": {
                 "type": "string",
                 "description": (
-                    "Modelica-flavoured model source text. "
-                    "The parser extracts variables and parameters automatically. "
-                    "Mutually exclusive with 'variables'."
+                    "Inline SPICE netlist text. "
+                    "Mutually exclusive with 'file_path'."
                 ),
             },
-            "model_name": {
+            "file_path": {
                 "type": "string",
-                "description": "Model name (used as modelIdentifier). Required when using 'variables'.",
-            },
-            "variables": {
-                "type": "array",
                 "description": (
-                    "Explicit list of scalar variables. "
-                    "Each item: {name, causality, variability, start, unit, description}. "
-                    "causality: 'input'|'output'|'local'|'parameter'. "
-                    "variability: 'continuous'|'discrete'|'fixed'|'tunable'|'constant'."
+                    "Absolute path to a .sp / .cir / .net SPICE file. "
+                    "Mutually exclusive with 'spice_text'."
                 ),
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "name": {"type": "string"},
-                        "causality": {"type": "string"},
-                        "variability": {"type": "string"},
-                        "start": {"type": "number"},
-                        "unit": {"type": "string"},
-                        "description": {"type": "string"},
-                    },
-                    "required": ["name", "causality"],
-                },
-            },
-            "state_variables": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "Names of continuous state variables.",
-            },
-            "fmu_kind": {
-                "type": "string",
-                "enum": ["cs", "me"],
-                "description": "'cs' = CoSimulation (default); 'me' = ModelExchange.",
-            },
-            "output_path": {
-                "type": "string",
-                "description": "Destination file path for the .fmu archive. Default: /tmp/<model_name>.fmu.",
-            },
-            "validate": {
-                "type": "boolean",
-                "description": "If true (default), validate the generated FMU before returning.",
             },
         },
     },
 )
 
 
-@register(sim_export_fmu_spec)
-async def run_sim_export_fmu(ctx: ProjectCtx, args: bytes) -> str:
-    import os
-    import tempfile
-
+@register(sim_import_spice_spec)
+async def run_sim_import_spice(ctx: ProjectCtx, args: bytes) -> str:
     try:
         a = json.loads(args)
     except Exception as e:
         return err_payload(f"invalid args: {e}", "BAD_ARGS")
 
-    fmu_kind = a.get("fmu_kind", "cs")
-    if fmu_kind not in ("cs", "me"):
-        return err_payload("fmu_kind must be 'cs' or 'me'", "BAD_ARGS")
+    from kerf_1dsim.spice_import import parse_spice_file, parse_spice_text
 
-    do_validate = bool(a.get("validate", True))
+    spice_text = a.get("spice_text")
+    file_path = a.get("file_path")
 
-    # --- Build SimModel ---
+    if not spice_text and not file_path:
+        return err_payload("Provide 'spice_text' or 'file_path'.", "BAD_ARGS")
+
     try:
-        if "modelica_source" in a:
-            from kerf_1dsim.parser import parse_model
-            from kerf_1dsim.fmi_export import model_from_parsed
-
-            parsed = parse_model(a["modelica_source"])
-            model = model_from_parsed(parsed, name=a.get("model_name"))
-
-        elif "variables" in a:
-            from kerf_1dsim.fmi_export import SimModel, FMIVariable
-
-            model_name = a.get("model_name")
-            if not model_name:
-                return err_payload("'model_name' is required when using 'variables'", "BAD_ARGS")
-
-            fmi_vars = []
-            for idx, v in enumerate(a["variables"]):
-                fmi_vars.append(FMIVariable(
-                    name=v["name"],
-                    causality=v.get("causality", "local"),
-                    variability=v.get("variability", "continuous"),
-                    start=float(v["start"]) if "start" in v else None,
-                    unit=v.get("unit"),
-                    description=v.get("description", ""),
-                    value_ref=idx,
-                ))
-
-            state_vars = a.get("state_variables", [])
-            model = SimModel(
-                name=model_name,
-                variables=fmi_vars,
-                state_variables=state_vars,
-            )
-
+        if spice_text:
+            netlist = parse_spice_text(spice_text)
         else:
-            return err_payload(
-                "Provide 'modelica_source' or 'variables' to define the model.",
-                "BAD_ARGS",
-            )
+            netlist = parse_spice_file(file_path)
+    except FileNotFoundError as e:
+        return err_payload(str(e), "FILE_NOT_FOUND")
     except Exception as e:
-        return err_payload(f"model build error: {e}", "BUILD_ERROR")
+        return err_payload(f"parse error: {e}", "PARSE_ERROR")
 
-    # --- Determine output path ---
-    out_path = a.get("output_path")
-    if not out_path:
-        tmp_dir = tempfile.gettempdir()
-        safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in model.name)
-        out_path = os.path.join(tmp_dir, f"{safe_name}.fmu")
+    components_out = [
+        {
+            "name": c.name,
+            "type": c.type,
+            "nodes": c.nodes,
+            "value": c.value,
+            **({"model": c.model} if c.model else {}),
+            **({"source_type": c.source_type} if c.type == "V" else {}),
+        }
+        for c in netlist.components
+    ]
+    analyses_out = [
+        {"kind": a.kind, "params": a.params}
+        for a in netlist.analyses
+    ]
 
-    # --- Export ---
+    return ok_payload({
+        "title": netlist.title,
+        "components": components_out,
+        "nodes": netlist.nodes,
+        "n_components": len(netlist.components),
+        "n_nodes": len(netlist.nodes),
+        "analyses": analyses_out,
+        "models": list(netlist.models.keys()),
+        "subckts": list(netlist.subckts.keys()),
+        "note": "SPICE subset — NOT SPICE-certified; BSIM models out of scope.",
+    })
+
+
+# ---------------------------------------------------------------------------
+# sim_dc_analysis
+# ---------------------------------------------------------------------------
+
+sim_dc_analysis_spec = ToolSpec(
+    name="sim_dc_analysis",
+    description=(
+        "Compute the DC operating point of a linear SPICE netlist using "
+        "Modified Nodal Analysis (MNA). Returns node voltages and "
+        "voltage-source currents. "
+        "Accepts the same 'spice_text' or 'file_path' inputs as sim_import_spice. "
+        "SPICE subset — NOT SPICE-certified. "
+        "Nonlinear devices (BJT Q, MOSFET M) are excluded from MNA. "
+        "AC sources contribute 0 V to the DC operating point."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "spice_text": {
+                "type": "string",
+                "description": "Inline SPICE netlist text.",
+            },
+            "file_path": {
+                "type": "string",
+                "description": "Absolute path to a .sp / .cir / .net SPICE file.",
+            },
+        },
+    },
+)
+
+
+@register(sim_dc_analysis_spec)
+async def run_sim_dc_analysis(ctx: ProjectCtx, args: bytes) -> str:
     try:
-        from kerf_1dsim.fmi_export import export_fmu
-        export_fmu(model, path=out_path, fmi_version="2.0", fmu_kind=fmu_kind)
+        a = json.loads(args)
     except Exception as e:
-        return err_payload(f"export error: {e}", "EXPORT_ERROR")
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
 
-    result: dict = {
-        "fmu_path": out_path,
-        "model_name": model.name,
-        "guid": model.guid,
-        "fmu_kind": fmu_kind,
-        "n_variables": len(model.variables),
-        "n_state_variables": len(model.state_variables),
-        "disclaimer": "FMI 2.0 export subset — NOT FMI Cross-Check certified",
-    }
+    from kerf_1dsim.spice_import import (
+        parse_spice_file, parse_spice_text, run_dc_analysis,
+    )
 
-    # --- Validate ---
-    if do_validate:
-        try:
-            from kerf_1dsim.fmi_export import validate_fmu
-            vr = validate_fmu(out_path)
-            result["validation"] = {
-                "valid": vr.valid,
-                "errors": vr.errors,
-                "warnings": vr.warnings,
-            }
-        except Exception as e:
-            result["validation"] = {"valid": None, "error": str(e)}
+    spice_text = a.get("spice_text")
+    file_path = a.get("file_path")
 
-    return ok_payload(result)
+    if not spice_text and not file_path:
+        return err_payload("Provide 'spice_text' or 'file_path'.", "BAD_ARGS")
+
+    try:
+        if spice_text:
+            netlist = parse_spice_text(spice_text)
+        else:
+            netlist = parse_spice_file(file_path)
+    except FileNotFoundError as e:
+        return err_payload(str(e), "FILE_NOT_FOUND")
+    except Exception as e:
+        return err_payload(f"parse error: {e}", "PARSE_ERROR")
+
+    try:
+        dc_result = run_dc_analysis(netlist)
+    except Exception as e:
+        return err_payload(f"DC analysis error: {e}", "SOLVER_ERROR")
+
+    return ok_payload({
+        **dc_result,
+        "note": (
+            "SPICE subset — NOT SPICE-certified. "
+            "Nonlinear devices (Q, M) excluded from MNA. "
+            "AC sources contribute 0 V to DC OP."
+        ),
+    })

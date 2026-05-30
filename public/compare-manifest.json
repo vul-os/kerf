@@ -1244,8 +1244,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Real ngspice wired; binary .raw not yet parsed",
-            "evidence": "packages/kerf-ecad/spice/"
+            "note": "SPICE 3F5 netlist import + MNA DC analysis (kerf-1dsim); real ngspice wired for transient/AC. SPICE subset — NOT SPICE-certified; BSIM models out of scope.",
+            "evidence": "packages/kerf-1dsim/src/kerf_1dsim/spice_import.py"
           }
         },
         {
@@ -1967,8 +1967,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Real ngspice wired; binary .raw parse gap noted",
-            "evidence": "packages/kerf-electronics/src/kerf_electronics/routes_spice.py"
+            "note": "SPICE 3F5 netlist import + MNA DC analysis (kerf-1dsim); real ngspice wired for transient/AC. SPICE subset — NOT SPICE-certified; BSIM models out of scope.",
+            "evidence": "packages/kerf-1dsim/src/kerf_1dsim/spice_import.py"
           }
         },
         {
@@ -2997,8 +2997,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Real ngspice wired; binary .raw parsing not yet surfaced",
-            "evidence": "packages/kerf-electronics/"
+            "note": "SPICE 3F5 netlist import + MNA DC analysis (kerf-1dsim); real ngspice wired for transient/AC. SPICE subset — NOT SPICE-certified; BSIM models out of scope.",
+            "evidence": "packages/kerf-1dsim/src/kerf_1dsim/spice_import.py"
           }
         },
         {
@@ -4218,8 +4218,8 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/src/kerf_electronics/routes_spice.py",
-            "note": "real ngspice wired"
+            "evidence": "packages/kerf-1dsim/src/kerf_1dsim/spice_import.py",
+            "note": "SPICE 3F5 netlist import + MNA DC analysis (kerf-1dsim); real ngspice wired for transient/AC. SPICE subset — NOT SPICE-certified; BSIM models out of scope."
           }
         },
         {
@@ -10461,8 +10461,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Real ngspice wired; binary .raw parse gap noted",
-            "evidence": "packages/kerf-electronics/src/kerf_electronics/routes_spice.py"
+            "note": "SPICE 3F5 netlist import + MNA DC analysis (kerf-1dsim); real ngspice wired for transient/AC. SPICE subset — NOT SPICE-certified; BSIM models out of scope.",
+            "evidence": "packages/kerf-1dsim/src/kerf_1dsim/spice_import.py"
           }
         },
         {

@@ -2,10 +2,12 @@
 LLM tool definitions for kerf-energy.
 
 Tools exposed to the Kerf agent:
-  energy_heat_load   — compute peak zone cooling/heating load
-  energy_daylight    — estimate mean daylight factor (split-flux)
-  energy_rt60        — calculate Sabine RT60 reverberation time
-  energy_solar       — solar altitude/azimuth + ASHRAE clear-sky irradiance
+  energy_heat_load        — compute peak zone cooling/heating load
+  energy_daylight         — estimate mean daylight factor (split-flux)
+  energy_rt60             — calculate Sabine RT60 reverberation time
+  energy_solar            — solar altitude/azimuth + ASHRAE clear-sky irradiance
+  energy_poa_irradiance   — plane-of-array (POA) irradiance for tilted PV modules
+  energy_sun_position     — solar zenith/azimuth from site + UTC datetime
 """
 from __future__ import annotations
 
@@ -33,6 +35,11 @@ from kerf_energy.solar import (
     solar_position,
     clear_sky_irradiance,
     day_of_year,
+)
+from kerf_energy.pv_irradiance import (
+    poa_irradiance,
+    compute_sun_position,
+    optimal_tilt_for_annual_pv,
 )
 
 
@@ -346,4 +353,201 @@ async def run_energy_heat_load(ctx: ProjectCtx, args: bytes) -> str:
         "total_cooling_w": round(peak_sensible + latent, 1),
         "peak_hour": peak_h,
         "method": "ASHRAE CLTD/CLF",
+    })
+
+
+# ---------------------------------------------------------------------------
+# energy_poa_irradiance
+# ---------------------------------------------------------------------------
+
+energy_poa_irradiance_spec = ToolSpec(
+    name="energy_poa_irradiance",
+    description=(
+        "Compute plane-of-array (POA) irradiance on a tilted PV surface. "
+        "Returns poa_total, poa_beam, poa_diffuse_sky, poa_diffuse_ground (W/m²). "
+        "Three transposition models available: "
+        "'liu_jordan' (isotropic, conservative), "
+        "'hay_davies' (anisotropic, better for clear sky), "
+        "'perez' (Perez 1990, industry standard, most accurate — default). "
+        "DISCLAIMER: published methods (Liu-Jordan 1960, Hay-Davies 1980, "
+        "Perez 1990) — NOT NREL-certified reference code."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "direct_normal_irradiance": {
+                "type": "number",
+                "description": "Direct normal irradiance (DNI) in W/m².",
+            },
+            "diffuse_horizontal_irradiance": {
+                "type": "number",
+                "description": "Diffuse horizontal irradiance (DHI) in W/m².",
+            },
+            "ghi": {
+                "type": "number",
+                "description": "Global horizontal irradiance (GHI) in W/m².",
+            },
+            "sun_zenith_deg": {
+                "type": "number",
+                "description": "Solar zenith angle in degrees (0 = overhead, 90 = horizon).",
+            },
+            "sun_azimuth_deg": {
+                "type": "number",
+                "description": "Solar azimuth clockwise from north (degrees, 0–360).",
+            },
+            "tilt_deg": {
+                "type": "number",
+                "description": "Surface tilt from horizontal (degrees, 0 = flat, 90 = vertical).",
+            },
+            "surface_azimuth_deg": {
+                "type": "number",
+                "description": (
+                    "Surface azimuth clockwise from north (degrees). "
+                    "180 = south-facing (optimal in Northern Hemisphere)."
+                ),
+            },
+            "ground_albedo": {
+                "type": "number",
+                "description": "Ground reflectance (dimensionless, default 0.2 = grass/soil).",
+            },
+            "model": {
+                "type": "string",
+                "enum": ["liu_jordan", "hay_davies", "perez"],
+                "description": "Sky diffuse transposition model (default 'perez').",
+            },
+        },
+        "required": [
+            "direct_normal_irradiance",
+            "diffuse_horizontal_irradiance",
+            "ghi",
+            "sun_zenith_deg",
+            "sun_azimuth_deg",
+            "tilt_deg",
+            "surface_azimuth_deg",
+        ],
+    },
+)
+
+
+@register(energy_poa_irradiance_spec, write=False)
+async def run_energy_poa_irradiance(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    required = [
+        "direct_normal_irradiance", "diffuse_horizontal_irradiance", "ghi",
+        "sun_zenith_deg", "sun_azimuth_deg", "tilt_deg", "surface_azimuth_deg",
+    ]
+    for key in required:
+        if key not in a:
+            return err_payload(f"{key} is required", "BAD_ARGS")
+
+    try:
+        result = poa_irradiance(
+            direct_normal_irradiance=float(a["direct_normal_irradiance"]),
+            diffuse_horizontal_irradiance=float(a["diffuse_horizontal_irradiance"]),
+            ghi=float(a["ghi"]),
+            sun_zenith_deg=float(a["sun_zenith_deg"]),
+            sun_azimuth_deg=float(a["sun_azimuth_deg"]),
+            tilt_deg=float(a["tilt_deg"]),
+            surface_azimuth_deg=float(a["surface_azimuth_deg"]),
+            ground_albedo=float(a.get("ground_albedo", 0.2)),
+            model=a.get("model", "perez"),
+        )
+    except (ValueError, KeyError) as e:
+        return err_payload(str(e), "BAD_ARGS")
+
+    tilt = float(a["tilt_deg"])
+    lat_hint = 90.0 - float(a["sun_zenith_deg"])
+    opt_tilt = optimal_tilt_for_annual_pv(lat_hint) if lat_hint > 0 else None
+
+    payload = {
+        "poa_total_w_m2": round(result["poa_total"], 2),
+        "poa_beam_w_m2": round(result["poa_beam"], 2),
+        "poa_diffuse_sky_w_m2": round(result["poa_diffuse_sky"], 2),
+        "poa_diffuse_ground_w_m2": round(result["poa_diffuse_ground"], 2),
+        "tilt_deg": tilt,
+        "surface_azimuth_deg": float(a["surface_azimuth_deg"]),
+        "model": a.get("model", "perez"),
+        "disclaimer": (
+            "Liu-Jordan/Hay-Davies/Perez 1990 published methods — NOT NREL-certified"
+        ),
+    }
+    if opt_tilt is not None:
+        payload["optimal_tilt_hint_deg"] = round(opt_tilt, 1)
+
+    return ok_payload(payload)
+
+
+# ---------------------------------------------------------------------------
+# energy_sun_position
+# ---------------------------------------------------------------------------
+
+energy_sun_position_spec = ToolSpec(
+    name="energy_sun_position",
+    description=(
+        "Compute solar zenith, azimuth, and altitude for a site and UTC datetime "
+        "using Spencer (1971) solar geometry. Returns sun_zenith_deg, "
+        "sun_azimuth_deg, sun_altitude_deg, solar_time_hours, day_of_year. "
+        "Typical accuracy ±0.01–0.1° — adequate for hourly PV energy modelling. "
+        "NOT the NREL SPA algorithm (Reda & Andreas 2004)."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "latitude_deg": {
+                "type": "number",
+                "description": "Site latitude in decimal degrees (north positive).",
+            },
+            "longitude_deg": {
+                "type": "number",
+                "description": "Site longitude in decimal degrees (east positive).",
+            },
+            "datetime_utc": {
+                "type": "string",
+                "description": (
+                    "UTC datetime in ISO 8601 format, e.g. '2024-06-21T12:00:00'. "
+                    "Timezone suffix 'Z' or '+00:00' is accepted but not required."
+                ),
+            },
+        },
+        "required": ["latitude_deg", "longitude_deg", "datetime_utc"],
+    },
+)
+
+
+@register(energy_sun_position_spec, write=False)
+async def run_energy_sun_position(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    for key in ("latitude_deg", "longitude_deg", "datetime_utc"):
+        if key not in a:
+            return err_payload(f"{key} is required", "BAD_ARGS")
+
+    try:
+        from datetime import datetime, timezone
+
+        dt_str = a["datetime_utc"].rstrip("Z").replace("+00:00", "")
+        # Accept both date-only and full datetime strings
+        if "T" in dt_str:
+            dt = datetime.fromisoformat(dt_str).replace(tzinfo=timezone.utc)
+        else:
+            dt = datetime.fromisoformat(dt_str + "T12:00:00").replace(tzinfo=timezone.utc)
+
+        result = compute_sun_position(
+            latitude_deg=float(a["latitude_deg"]),
+            longitude_deg=float(a["longitude_deg"]),
+            datetime_utc=dt,
+        )
+    except (ValueError, TypeError) as e:
+        return err_payload(str(e), "BAD_ARGS")
+
+    return ok_payload({
+        **result,
+        "method": "Spencer (1971) — NOT NREL SPA",
     })

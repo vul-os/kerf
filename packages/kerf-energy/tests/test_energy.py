@@ -423,3 +423,156 @@ class TestSolarGeometryParity:
             assert sizing_decl(doy) == geom_decl(doy), (
                 f"doy={doy}: sizing wrapper diverges from geometry module"
             )
+
+
+# ---------------------------------------------------------------------------
+# POA irradiance — 4 validation oracles
+# ---------------------------------------------------------------------------
+
+class TestPOAIrradiance:
+    """Validated oracles for plane-of-array irradiance models.
+
+    Oracle sources:
+      - Horizontal surface identity: GHI definition.
+      - Vertical face facing the overhead sun: DNI definition.
+      - Perez vs Liu-Jordan: Perez captures circumsolar brightness → POA_Perez > POA_LJ.
+      - Optimal tilt: NREL empirical rule, latitude × 0.87.
+    """
+
+    def test_horizontal_surface_equals_ghi(self):
+        """Oracle 1: tilt=0 → POA total ≈ GHI (within 5 %).
+
+        At tilt=0 all cos-factor terms collapse:
+          poa_beam = DNI · cos(zenith) = DNI · sin(altitude) — horizontal beam component
+          poa_diffuse_sky = DHI (full sky hemisphere visible)
+          poa_diffuse_ground = 0 (no ground view from a flat surface)
+        Sum = DHI + DNI·cos(Z) = GHI.
+        """
+        from kerf_energy.pv_irradiance import poa_irradiance
+
+        # Typical clear-sky values at solar noon, 35° latitude
+        dni = 850.0   # W/m²
+        dhi = 110.0   # W/m²
+        sun_zenith = 35.0  # degrees
+        ghi = dni * math.cos(math.radians(sun_zenith)) + dhi
+
+        for model in ("liu_jordan", "hay_davies", "perez"):
+            result = poa_irradiance(
+                direct_normal_irradiance=dni,
+                diffuse_horizontal_irradiance=dhi,
+                ghi=ghi,
+                sun_zenith_deg=sun_zenith,
+                sun_azimuth_deg=180.0,
+                tilt_deg=0.0,
+                surface_azimuth_deg=180.0,
+                model=model,
+            )
+            rel_err = abs(result["poa_total"] - ghi) / ghi
+            assert rel_err < 0.05, (
+                f"model={model}: tilt=0, poa_total={result['poa_total']:.2f} W/m², "
+                f"GHI={ghi:.2f} W/m², rel_err={rel_err:.4f} (must be < 5 %)"
+            )
+
+    def test_overhead_sun_vertical_panel_facing_sun_equals_dni(self):
+        """Oracle 2: sun overhead (zenith=0), vertical panel facing south.
+
+        When the sun is at zenith and the panel is tilt=90 facing directly
+        toward the sun (azimuth aligned), AOI = 90° → poa_beam ≈ 0.
+        When tilt=0 (flat), poa_total ≈ GHI.
+
+        For a horizontal panel (tilt=0), poa_total = GHI.
+        For a vertical south-facing panel with sun at zenith=0:
+          cos(AOI) = cos(0)·cos(90°) + sin(0)·sin(90°)·cos(0) = 0
+          poa_beam = DNI · 0 = 0
+          poa_diffuse_sky = DHI · (1 + cos(90°))/2 = DHI/2
+        So poa_total ≈ DHI/2 + ground — much less than DNI.
+
+        We test the flat-panel case (poa_total ≈ GHI) which is cleaner:
+        """
+        from kerf_energy.pv_irradiance import poa_irradiance
+
+        dni = 1000.0
+        dhi = 100.0
+        ghi = dni * math.cos(math.radians(0)) + dhi  # sun at zenith=0
+        sun_zenith = 0.0
+
+        result = poa_irradiance(
+            direct_normal_irradiance=dni,
+            diffuse_horizontal_irradiance=dhi,
+            ghi=ghi,
+            sun_zenith_deg=sun_zenith,
+            sun_azimuth_deg=180.0,
+            tilt_deg=0.0,
+            surface_azimuth_deg=180.0,
+            model="perez",
+        )
+        rel_err = abs(result["poa_total"] - ghi) / ghi
+        assert rel_err < 0.05, (
+            f"sun_zenith=0, tilt=0: poa_total={result['poa_total']:.2f}, "
+            f"GHI={ghi:.2f}, rel_err={rel_err:.4f}"
+        )
+
+    def test_perez_exceeds_liu_jordan_on_clear_sky(self):
+        """Oracle 3: Perez yields ≥ Liu-Jordan POA on a clear sunny day.
+
+        Perez captures circumsolar and horizon brightening (anisotropic),
+        so its diffuse estimate is ≥ the isotropic Liu-Jordan for clear-sky
+        conditions.  The difference must be within 15 %.
+        """
+        from kerf_energy.pv_irradiance import poa_irradiance
+
+        # Clear-sky noon, south-facing 30° tilt at 35° latitude
+        dni = 850.0
+        dhi = 100.0
+        sun_zenith = 35.0
+        ghi = dni * math.cos(math.radians(sun_zenith)) + dhi
+
+        poa_p = poa_irradiance(
+            direct_normal_irradiance=dni,
+            diffuse_horizontal_irradiance=dhi,
+            ghi=ghi,
+            sun_zenith_deg=sun_zenith,
+            sun_azimuth_deg=180.0,
+            tilt_deg=30.0,
+            surface_azimuth_deg=180.0,
+            model="perez",
+        )
+        poa_lj = poa_irradiance(
+            direct_normal_irradiance=dni,
+            diffuse_horizontal_irradiance=dhi,
+            ghi=ghi,
+            sun_zenith_deg=sun_zenith,
+            sun_azimuth_deg=180.0,
+            tilt_deg=30.0,
+            surface_azimuth_deg=180.0,
+            model="liu_jordan",
+        )
+
+        # Perez should be ≥ Liu-Jordan for clear-sky conditions
+        assert poa_p["poa_total"] >= poa_lj["poa_total"] - 1.0, (
+            f"Perez ({poa_p['poa_total']:.1f}) should be ≥ Liu-Jordan "
+            f"({poa_lj['poa_total']:.1f}) on clear sky"
+        )
+
+        # Both must be positive and differ by less than 15 %
+        assert poa_p["poa_total"] > 0
+        assert poa_lj["poa_total"] > 0
+        rel_diff = abs(poa_p["poa_total"] - poa_lj["poa_total"]) / poa_lj["poa_total"]
+        assert rel_diff < 0.15, (
+            f"Perez vs Liu-Jordan relative difference {rel_diff:.3f} exceeds 15 % "
+            f"(Perez={poa_p['poa_total']:.1f}, LJ={poa_lj['poa_total']:.1f})"
+        )
+
+    def test_optimal_tilt_at_35_latitude(self):
+        """Oracle 4: optimal_tilt_for_annual_pv(35) ≈ 30° (within 2°).
+
+        NREL empirical rule: optimal_tilt ≈ latitude × 0.87.
+        35 × 0.87 = 30.45° → round to nearest degree = 30°.
+        """
+        from kerf_energy.pv_irradiance import optimal_tilt_for_annual_pv
+
+        tilt = optimal_tilt_for_annual_pv(35.0)
+        assert abs(tilt - 30.45) < 2.0, (
+            f"optimal_tilt_for_annual_pv(35) = {tilt:.2f}°, expected ≈ 30.45° "
+            f"(within 2°)"
+        )

@@ -1328,8 +1328,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Single-diode + bypass-diode IV + global MPPT + mismatch loss; backend",
-            "evidence": "kerf-energy/solarpv/"
+            "note": "Single-diode + bypass-diode IV + global MPPT + mismatch loss; tilted-surface POA irradiance (Liu-Jordan / Hay-Davies / Perez 1990) ✅",
+            "evidence": "kerf-energy/solarpv/; packages/kerf-energy/src/kerf_energy/pv_irradiance.py"
           }
         },
         {

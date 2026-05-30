@@ -58,6 +58,9 @@ The sector work only matters if you **own your work, are not locked in, and can 
 ### Latest delta — 2026-05-30
 
 **FMI 2.0 model export (.fmu)** ✅ — `export_fmu(model, path, fmu_kind='cs'|'me')` builds a ZIP archive with FMI 2.0 compliant `modelDescription.xml` (ScalarVariables, causality/variability/initial, CoSimulation or ModelExchange capability element, ModelStructure/Outputs/Derivatives) + C source wrapper; `generate_model_description_xml` + `validate_fmu` (structural compliance check); `sim_export_fmu` LLM tool wired; `model_from_parsed` bridge from Modelica ParsedModel. NOTE: export subset — NOT FMI Cross-Check certified — `kerf-1dsim/src/kerf_1dsim/fmi_export.py`.
+### Latest delta — 2026-05-30
+
+**Tilted-surface PV irradiance** ✅ — Plane-of-array (POA) irradiance for tilted PV modules: Liu-Jordan (1960) isotropic sky, Hay-Davies (1980) anisotropic, Perez (1990) 5-coefficient industry-standard model; `poa_irradiance`, `compute_sun_position`, `optimal_tilt_for_annual_pv`; LLM tools `energy_poa_irradiance` + `energy_sun_position` registered — `kerf-energy/src/kerf_energy/pv_irradiance.py`.
 
 ### Latest delta — 2026-05-26
 **PV latitude-aware TMY** ✅ — `monthly_yield_factors(latitude_deg)` in `solarpv/tmy.py` returns TMY3-derived (NREL/TP-581-43156) monthly irradiance fractions keyed to latitude band (0°–70°, 10° steps, linearly interpolated); Southern-hemisphere sites automatically receive the seasonally-flipped profile; `POST /energy/pv-shading` endpoint wired to use latitude-aware fractions instead of fixed Northern-Hemisphere constants; `PVShadingPanel` latitude input exposed in UI with hemisphere hint; 29 hermetic tests green.

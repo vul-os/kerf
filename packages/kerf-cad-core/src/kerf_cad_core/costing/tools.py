@@ -929,3 +929,110 @@ async def run_manufacturing_compute_material_cost_rollup(
 
     report = compute_material_cost_rollup(a["parts"], **kwargs)
     return json.dumps(_report_to_dict(report))
+
+
+# ---------------------------------------------------------------------------
+# Tool: manufacturing_tolerance_cost
+# ---------------------------------------------------------------------------
+
+_tolerance_cost_spec = ToolSpec(
+    name="manufacturing_tolerance_cost",
+    description=(
+        "Estimate the cost premium of tightening a manufacturing tolerance.\n"
+        "\n"
+        "As tolerance decreases (tightens), machining cost increases roughly\n"
+        "exponentially because higher-accuracy processes (grinding, lapping)\n"
+        "must replace lower-cost roughing operations (turning, milling).\n"
+        "\n"
+        "Model: Boothroyd-Dewhurst §11.2 / Figure 11.4 exponential curve fit.\n"
+        "\n"
+        "  multiplier = exp(k × log10(t_max / tolerance_mm))\n"
+        "\n"
+        "Cost = base_cost_usd × multiplier.  If the tolerance is tighter than\n"
+        "the requested process's native capability, the process is automatically\n"
+        "upgraded (turning → grinding → lapping) with an advisory note.\n"
+        "\n"
+        "Oracle (Boothroyd Figure 11.4, Al turning Ø50 shaft):\n"
+        "  ±0.1 mm  → ~base (multiplier ≈ 3.5× relative to t_max=0.5)\n"
+        "  ±0.025 mm → ≈ 2× cost of ±0.1 mm\n"
+        "  ±0.005 mm → ≈ 6× cost of ±0.1 mm (process upgraded to grinding)\n"
+        "\n"
+        "Returns: cost_usd, cost_multiplier, process_used, IT_grade, advisory.\n"
+        "\n"
+        "ADVISORY: simplified exponential curve; real cost depends on shop,\n"
+        "batch size, and equipment.  Treat as ±30 % estimate.\n"
+        "\n"
+        "Errors: {ok:false, reason}. Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "tolerance_mm": {
+                "type": "number",
+                "description": (
+                    "Bilateral tolerance (half-range) in mm. E.g. 0.025 for ±0.025 mm. "
+                    "Must be > 0."
+                ),
+            },
+            "process": {
+                "type": "string",
+                "enum": ["turning", "milling", "grinding", "lapping"],
+                "description": (
+                    "Intended machining process. Auto-upgraded if tolerance is tighter "
+                    "than process capability. "
+                    "turning: ±0.012–0.5 mm; milling: ±0.025–0.5 mm; "
+                    "grinding: ±0.002–0.02 mm; lapping: ±0.0005–0.005 mm."
+                ),
+            },
+            "base_cost_usd": {
+                "type": "number",
+                "description": (
+                    "Base machining cost in USD at the coarsest practical tolerance "
+                    "(t_max) for this process. Must be > 0."
+                ),
+            },
+            "dimension_mm": {
+                "type": "number",
+                "description": (
+                    "Nominal feature dimension (mm) for ISO IT-grade mapping per "
+                    "ISO 286-1:2010. Default 50.0 mm (representative shaft)."
+                ),
+            },
+        },
+        "required": ["tolerance_mm", "process", "base_cost_usd"],
+    },
+)
+
+
+@register(_tolerance_cost_spec, write=False)
+async def run_manufacturing_tolerance_cost(ctx: ProjectCtx, args: bytes) -> str:
+    from dataclasses import asdict  # noqa: PLC0415
+
+    from kerf_cad_core.costing.tolerance_cost import (  # noqa: PLC0415
+        compute_tolerance_cost,
+    )
+
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    for required_field in ("tolerance_mm", "process", "base_cost_usd"):
+        if a.get(required_field) is None:
+            return json.dumps({"ok": False, "reason": f"{required_field} is required"})
+
+    kwargs: dict = {}
+    if "dimension_mm" in a:
+        kwargs["dimension_mm"] = a["dimension_mm"]
+
+    try:
+        result = compute_tolerance_cost(
+            tolerance_mm=a["tolerance_mm"],
+            process=a["process"],
+            base_cost_usd=a["base_cost_usd"],
+            **kwargs,
+        )
+    except ValueError as exc:
+        return err_payload(str(exc), "BAD_ARGS")
+
+    return ok_payload(asdict(result))

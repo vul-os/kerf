@@ -33,6 +33,11 @@ from kerf_cad_core.costing.estimate import (
     learning_curve,
     make_vs_buy,
 )
+from kerf_cad_core.costing.tolerance_cost import (
+    ToleranceCostResult,
+    compute_tolerance_cost,
+    tolerance_to_IT_grade,
+)
 
 __all__ = [
     "cnc_cost",
@@ -45,4 +50,7 @@ __all__ = [
     "batch_curve",
     "learning_curve",
     "make_vs_buy",
+    "ToleranceCostResult",
+    "compute_tolerance_cost",
+    "tolerance_to_IT_grade",
 ]

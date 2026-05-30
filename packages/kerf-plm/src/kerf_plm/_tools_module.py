@@ -539,3 +539,144 @@ TOOL_DEFS: list[dict] = [
         "input_schema": plm_change_management_spec.input_schema,
     },
 ]
+
+
+# ===========================================================================
+# Change-impact analyzer (PROSTEP-iViP SIG) — Wave 4NN
+# ===========================================================================
+
+from kerf_plm.change_impact import (
+    analyze_change_impact as _analyze_change_impact,
+    build_impact_graph as _build_impact_graph,
+    estimate_change_cost as _estimate_change_cost,
+    propose_co_changes as _propose_co_changes,
+)
+
+
+plm_change_impact_spec = ToolSpec(
+    name="plm_change_impact",
+    description=(
+        "Analyze the downstream change impact when a part or assembly changes. "
+        "Builds a directed impact graph from BOM, assembly hierarchy, requirements, "
+        "tests, and documents, then BFS-propagates from the changed node. "
+        "Returns each impacted entity with its impact level "
+        "(high = direct, medium = 2-3 hops, low = >=4 hops) "
+        "and estimated rework hours per PROSTEP-iViP SIG methodology."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "changed_part_id": {"type": "string"},
+            "plm_data": {"type": "object"},
+            "hourly_rate": {"type": "number"},
+            "max_hops": {"type": "integer"},
+        },
+        "required": ["changed_part_id", "plm_data"],
+    },
+)
+
+
+@register(plm_change_impact_spec)
+async def run_plm_change_impact(ctx, args: bytes) -> str:
+    import json as _json
+    try:
+        a = _json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+    changed_part_id = a.get("changed_part_id", "")
+    plm_data = a.get("plm_data", {})
+    hourly_rate = float(a.get("hourly_rate", 100.0))
+    max_hops = int(a.get("max_hops", 10))
+
+    if not changed_part_id:
+        return err_payload("'changed_part_id' is required", "BAD_ARGS")
+    if not isinstance(plm_data, dict):
+        return err_payload("'plm_data' must be an object", "BAD_ARGS")
+
+    try:
+        graph = _build_impact_graph(plm_data)
+        report = _analyze_change_impact(changed_part_id, graph, max_hops=max_hops)
+        cost = _estimate_change_cost(report, hourly_rate=hourly_rate)
+    except Exception as exc:
+        return err_payload(f"analysis error: {exc}", "ANALYSIS_ERROR")
+
+    impacted_out = [
+        {
+            "node_id": n.node_id,
+            "kind": n.kind,
+            "label": n.label,
+            "hop_distance": n.hop_distance,
+            "impact_level": n.impact_level,
+            "rework_hours": n.rework_hours,
+        }
+        for n in report.impacted_nodes
+    ]
+
+    return ok_payload({
+        "changed_part_id": changed_part_id,
+        "impacted_count": len(impacted_out),
+        "impacted_nodes": impacted_out,
+        "cost_estimate": cost,
+        "summary": {
+            "high": len(report.nodes_at_level("high")),
+            "medium": len(report.nodes_at_level("medium")),
+            "low": len(report.nodes_at_level("low")),
+            "total_rework_hours": report.total_rework_hours(),
+        },
+    })
+
+
+plm_propose_co_changes_spec = ToolSpec(
+    name="plm_propose_co_changes",
+    description=(
+        "Given a changed part and PLM product structure, propose co-changes "
+        "via PROSTEP-iViP §6.2 interface-coupling heuristics."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "changed_part_id": {"type": "string"},
+            "plm_data": {"type": "object"},
+        },
+        "required": ["changed_part_id", "plm_data"],
+    },
+)
+
+
+@register(plm_propose_co_changes_spec)
+async def run_plm_propose_co_changes(ctx, args: bytes) -> str:
+    import json as _json
+    try:
+        a = _json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+    changed_part_id = a.get("changed_part_id", "")
+    plm_data = a.get("plm_data", {})
+
+    if not changed_part_id:
+        return err_payload("'changed_part_id' is required", "BAD_ARGS")
+    if not isinstance(plm_data, dict):
+        return err_payload("'plm_data' must be an object", "BAD_ARGS")
+
+    try:
+        graph = _build_impact_graph(plm_data)
+        report = _analyze_change_impact(changed_part_id, graph)
+        suggestions = _propose_co_changes(report, impact_graph=graph)
+    except Exception as exc:
+        return err_payload(f"analysis error: {exc}", "ANALYSIS_ERROR")
+
+    return ok_payload({
+        "changed_part_id": changed_part_id,
+        "suggestion_count": len(suggestions),
+        "suggestions": [
+            {
+                "node_id": s.node_id,
+                "label": s.label,
+                "reason": s.reason,
+                "confidence": s.confidence,
+            }
+            for s in suggestions
+        ],
+    })

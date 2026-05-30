@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-05-30T08:00:00.000Z",
+  "generatedAt": "2026-05-25T23:16:31.837Z",
   "items": [
     {
       "slug": "revit",
@@ -138,22 +138,10 @@
           "kerf": "evidence: \"cloud/drawings/\""
         },
         {
-          "name": "Measurement chain auto-extraction (ASME Y14.5 + ISO 129) ✅",
-          "domain": "D13",
-          "competitor": "paid: false",
-          "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/drawings/measurement_chain.py\""
-        },
-        {
           "name": "IFC import (IFC2x3 / IFC4)",
           "domain": "D13",
           "competitor": "paid: false",
           "kerf": "evidence: \"cloud/bim/ifc_import.go\""
-        },
-        {
-          "name": "IFC 4 façade parser + thermal summary ✅",
-          "domain": "D13",
-          "competitor": "paid: false",
-          "kerf": "evidence: \"packages/kerf-bim/src/kerf_bim/ifc_facade_parser.py\" — walls/curtain-walls/windows/doors; U-value, R-value, fire-rating, structural-class; weighted building-envelope U-value; WWR; continuity validation. IFC 4 subset parser — NOT buildingSMART certified."
         },
         {
           "name": "IFC export (IFC4 round-trip)",
@@ -430,8 +418,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Rational method (ASCE/EWRI 77-17) + TR-55 runoff + HDS-5 culvert inlet-control (unsubmerged/submerged, concrete box + circular); rational drainage method + composite watershed (FHWA HEC-22) ✅",
-            "evidence": "packages/kerf-civil/src/kerf_civil/drainage.py"
+            "note": "Rational method (ASCE/EWRI 77-17) + TR-55 runoff + HDS-5 culvert inlet-control (unsubmerged/submerged, concrete box + circular)",
+            "evidence": "packages/kerf-civil/src/kerf_civil/storm.py"
           }
         },
         {
@@ -986,9 +974,9 @@
             "source": "https://graphisoft.com/solutions/products/archicad"
           },
           "kerf": {
-            "status": "yes",
-            "note": "1D tolerance stack-up (worst-case + RSS + Monte Carlo) ✅ + 3D vector-loop; no MBD on model",
-            "evidence": "packages/kerf-gdnt/src/kerf_gdnt/tol_stack.py"
+            "status": "partial",
+            "note": "1D WC/RSS/MC stackup + 3D vector-loop; no MBD on model",
+            "evidence": "packages/kerf-qa/tolstack/"
           }
         },
         {
@@ -1250,8 +1238,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "SPICE 3F5 netlist import + MNA DC analysis (kerf-1dsim); real ngspice wired for transient/AC. SPICE subset — NOT SPICE-certified; BSIM models out of scope.",
-            "evidence": "packages/kerf-1dsim/src/kerf_1dsim/spice_import.py"
+            "note": "Real ngspice wired; binary .raw not yet parsed",
+            "evidence": "packages/kerf-ecad/spice/"
           }
         },
         {
@@ -1334,8 +1322,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Single-diode + bypass-diode IV + global MPPT + mismatch loss; tilted-surface POA irradiance (Liu-Jordan / Hay-Davies / Perez 1990) ✅",
-            "evidence": "kerf-energy/solarpv/; packages/kerf-energy/src/kerf_energy/pv_irradiance.py"
+            "note": "Single-diode + bypass-diode IV + global MPPT + mismatch loss; backend",
+            "evidence": "kerf-energy/solarpv/"
           }
         },
         {
@@ -1348,8 +1336,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "1D tolerance stack-up (worst-case + RSS + Monte Carlo) ✅ — ASME Y14.5 data model; 1D WC/RSS/MC + 3D vector loop; 3 LLM tools",
-            "evidence": "packages/kerf-gdnt/src/kerf_gdnt/tol_stack.py"
+            "note": "ASME Y14.5 data model; 1D WC/RSS/MC + 3D vector loop; backend",
+            "evidence": "kerf-qa/tolstack/"
           }
         },
         {
@@ -1456,9 +1444,9 @@
             "source": "https://www.vectorworks.net/architect/features"
           },
           "kerf": {
-            "status": "yes",
-            "note": "OCCT NURBS surfaces + general NURBS\u00d7NURBS solid boolean (SHA 419043fe); confirmed kerf-cad-core build",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/"
+            "status": "partial",
+            "note": "OCCT NURBS math complete; browser WASM bindings unconfirmed at build",
+            "evidence": "packages/kerf-occt/nurbs/"
           }
         },
         {
@@ -1597,8 +1585,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Irrigation sprinkler layout (Hunter / Rain Bird) ✅ — SprinklerHead catalog (Hunter PGP/I-20/MP1000, Rain Bird 5000/1800, Toro 570Z, K-Rain Pro Plus); recommend_spacing (square 50%/triangular 87%/oblong per Rain Bird DM + Hunter IDM); layout_for_rectangle (grid + staggered rows, arc assignment); compute_flow_demand (zone round-robin, arc-scaled GPM); landscape_layout_sprinkler + landscape_flow_demand tools. Plus: zone scheduling (head spacing, zone flow demand, weekly run-time schedule, DU audit); ASABE/ICC 802-2014; landscape_irrigation_schedule tool.",
-            "evidence": "packages/kerf-landscape/src/kerf_landscape/irrigation_design.py"
+            "note": "Irrigation zone scheduling (head spacing, zone flow demand, weekly run-time schedule, DU audit); ASABE/ICC 802-2014; landscape_irrigation_schedule tool",
+            "evidence": "packages/kerf-landscape/src/kerf_landscape/irrigation.py"
           }
         },
         {
@@ -1695,22 +1683,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Interior space-planning engine + ADA clearance audit + FF&E placement (backend only); no UI route",
-            "evidence": "packages/kerf-interior/src/kerf_interior/space_planning.py"
-          }
-        },
-        {
-          "domain": "D13",
-          "feature": "IFC 4 export for interior (Revit / ArchiCAD coordination)",
-          "competitor": {
-            "status": "paid",
-            "note": "Vectorworks Architect: certified IFC4 export of interior elements; Architect tier",
-            "source": "https://app-help.vectorworks.net/2024/eng/index.htm#t=VW2024_Guide%2FImport_Export%2FExporting_IFC_Files.htm"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "IFC 4 export (ISO 16739-1:2018) ✅ — IfcWall/IfcWallStandardCase, IfcSlab (floor+ceiling), IfcDoor, IfcWindow, IfcFurniture, IfcLightFixture; full IfcProject→IfcSite→IfcBuilding→IfcBuildingStorey hierarchy; pure-Python SPF generator. Subset export — NOT buildingSMART certified.",
-            "evidence": "packages/kerf-interior/src/kerf_interior/ifc_export.py"
+            "note": "Interior space-planning engine exists (backend only); no UI route",
+            "evidence": "packages/kerf-verticals/interior.py"
           }
         },
         {
@@ -1959,22 +1933,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "DRC overlay wired; ERC + IPC-2221B presets; netlist-vs-layout consistency DRC (IPC-7351B) ✅",
+            "note": "DRC overlay wired; ERC + IPC-2221B presets",
             "evidence": "packages/kerf-electronics/src/kerf_electronics/drc.py"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "Netlist-vs-layout consistency DRC (IPC-7351B)",
-          "competitor": {
-            "status": "yes",
-            "note": "KiCad BOM-vs-Schematic + netlist DRC catches missing/extra/swapped connections",
-            "source": "https://docs.kicad.org/10.0/en/pcbnew/pcbnew.html"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "Netlist-vs-layout consistency DRC (IPC-7351B) ✅ — detects missing_connections, extra_connections (shorts), swapped_nets; IPC-7351B §4.1-4.2 violation tags; LLM tool electronics_netlist_consistency",
-            "evidence": "packages/kerf-electronics/src/kerf_electronics/netlist_drc.py"
           }
         },
         {
@@ -1987,8 +1947,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "SPICE 3F5 netlist import + MNA DC analysis (kerf-1dsim); real ngspice wired for transient/AC. SPICE subset — NOT SPICE-certified; BSIM models out of scope.",
-            "evidence": "packages/kerf-1dsim/src/kerf_1dsim/spice_import.py"
+            "note": "Real ngspice wired; binary .raw parse gap noted",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/routes_spice.py"
           }
         },
         {
@@ -2253,8 +2213,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "WiringView wired; harness3d 3D router + formboard + report; 3D harness auto-routing with collision avoidance (Cheng-Quan 2001) ✅",
-            "evidence": "packages/kerf-wiring/src/kerf_wiring/auto_routing_3d.py"
+            "note": "WiringView wired; harness3d 3D router + formboard + report",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/harness3d/router.py"
           }
         },
         {
@@ -2876,8 +2836,8 @@
           },
           "kerf": {
             "status": "[x]",
-            "notes": "WireViz runner + 3D harness auto-router with collision avoidance (Cheng-Quan 2001) wired (WiringView); wiring_auto_route + wiring_check_clearance LLM tools ✅",
-            "evidence": "packages/kerf-wiring/src/kerf_wiring/auto_routing_3d.py"
+            "notes": "WireViz runner + 3D harness router wired (WiringView)",
+            "evidence": "packages/kerf-wiring/src/kerf_wiring/wireviz_runner.py"
           }
         },
         {
@@ -3017,8 +2977,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "SPICE 3F5 netlist import + MNA DC analysis (kerf-1dsim); real ngspice wired for transient/AC. SPICE subset — NOT SPICE-certified; BSIM models out of scope.",
-            "evidence": "packages/kerf-1dsim/src/kerf_1dsim/spice_import.py"
+            "note": "Real ngspice wired; binary .raw parsing not yet surfaced",
+            "evidence": "packages/kerf-electronics/"
           }
         },
         {
@@ -3586,22 +3546,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "ST editor + live Ladder power-flow sim wired in-browser; chat-native ST generation; PLCopen XML (IEC TR 61131-10) import/export",
+            "note": "ST editor + live Ladder power-flow sim wired in-browser; chat-native ST generation",
             "evidence": "packages/kerf-plc/"
-          }
-        },
-        {
-          "domain": "D10",
-          "feature": "PLCopen XML import/export (IEC TR 61131-10)",
-          "competitor": {
-            "status": "yes",
-            "note": "OpenPLC Editor (Beremiz) reads and writes PLCopen XML natively",
-            "source": "https://github.com/thiagoralves/OpenPLC_Editor"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "Pure-Python PLCopen XML reader/writer (kerf_plc.plcopen); import_plcopen_xml + export_plcopen_xml LLM tools; LadderEditor Import/Export .plc buttons; round-trip test against blinker + conveyor fixtures",
-            "evidence": "packages/kerf-plc/src/kerf_plc/plcopen/"
           }
         },
         {
@@ -3628,8 +3574,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "WiringView with WireViz + 3D harness auto-router with collision avoidance (Cheng-Quan 2001) wired ✅",
-            "evidence": "packages/kerf-wiring/src/kerf_wiring/auto_routing_3d.py"
+            "note": "WiringView with WireViz + 3D harness router wired",
+            "evidence": "src/components/WiringView"
           }
         },
         {
@@ -3879,19 +3825,6 @@
           }
         },
         {
-          "name": "Auto-chamfer recommendation (ISO 13715)",
-          "competitor": {
-            "status": "no",
-            "source": "https://wiki.freecad.org/PartDesign_Workbench",
-            "note": "No automated DFM chamfer recommendation"
-          },
-          "kerf": {
-            "status": "yes",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/auto_chamfer.py",
-            "note": "Auto-chamfer recommendation (ISO 13715) ✅ — dihedral-angle classification (safety/manufacturing/cosmetic), convex-hull handling-region heuristic, brep_recommend_chamfers + brep_apply_chamfer_recommendations LLM tools"
-          }
-        },
-        {
           "name": "Sweep (1 & 2 rail)",
           "competitor": {
             "status": "yes",
@@ -3951,9 +3884,9 @@
             "note": "Part Check Geometry + Boolean intersection"
           },
           "kerf": {
-            "status": "yes",
-            "evidence": "src/components/ClashPanel.jsx",
-            "note": "OBB-SAT + BVH backend + ClashPanel.jsx UI wired into AssemblyEditor (SHA 0c78f08d)"
+            "status": "partial",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/clash/detect.py",
+            "note": "backend OBB-SAT + BVH; no UI panel"
           }
         },
         {
@@ -3964,9 +3897,9 @@
             "note": "TechDraw WB \u2014 HLR projections, sections, dimensions"
           },
           "kerf": {
-            "status": "yes",
-            "evidence": "src/components/DrawingView.jsx",
-            "note": "Live HLR projection + auto-dim + GD&T toolbar + FCF click-to-place (GdntToolbar.jsx, SHA 0d74e89c)"
+            "status": "partial",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/history/feature_io.py",
+            "note": "live HLR projection + auto-dim; no GD&T-placement UI"
           }
         },
         {
@@ -4108,8 +4041,8 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-parts/src/kerf_parts/din_fasteners.py",
-            "note": "DIN/ISO metric fastener catalog (DIN 931/912/7991, ISO 4762) + VDI 2230 torque calculator; LLM tools parts_lookup_fastener + parts_torque_recommendation. Standard dimensions from public DIN tables — NOT DIN-certified."
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/assembly/__init__.py",
+            "note": "VDI 2230 preload + fatigue analysis (backend)"
           }
         },
         {
@@ -4238,8 +4171,8 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-1dsim/src/kerf_1dsim/spice_import.py",
-            "note": "SPICE 3F5 netlist import + MNA DC analysis (kerf-1dsim); real ngspice wired for transient/AC. SPICE subset — NOT SPICE-certified; BSIM models out of scope."
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/routes_spice.py",
+            "note": "real ngspice wired"
           }
         },
         {
@@ -4302,9 +4235,9 @@
             "note": "CAM WB supports up to 3-axis; no official 5-axis"
           },
           "kerf": {
-            "status": "yes",
-            "evidence": "src/components/CAMView.jsx",
-            "note": "5-axis CAM UI in CAMView.jsx: 3+2 indexed + continuous tilt strategies; fiveAxisBackendArgs() dispatch (SHA f18c927c)"
+            "status": "partial",
+            "evidence": "packages/kerf-cam/src/kerf_cam/five_axis/__init__.py",
+            "note": "5-axis engine solid; no UI"
           }
         },
         {
@@ -4510,9 +4443,9 @@
             "note": "TechDraw \u2014 GD&T symbols, surface finish, ISO/ASME style"
           },
           "kerf": {
-            "status": "yes",
-            "evidence": "src/components/GdntToolbar.jsx",
-            "note": "GdntToolbar.jsx ISO 1101 + FCF placement modal + Pmi3DOverlay.jsx 3D PMI; full characteristic set (SHA 0d74e89c)"
+            "status": "partial",
+            "evidence": "packages/kerf-gdnt/src/kerf_gdnt/__init__.py",
+            "note": "ASME Y14.5 data model + auto-propose; no UI placement"
           }
         },
         {
@@ -4524,8 +4457,8 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-gdnt/src/kerf_gdnt/tol_stack.py",
-            "note": "1D tolerance stack-up (worst-case + RSS + Monte Carlo) ✅ — kerf-gdnt tol_stack; 3 LLM tools; + 3D vector loop + Jacobian (backend)"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/tolstack/__init__.py",
+            "note": "WC/RSS/MC + 3D vector loop + Jacobian (backend)"
           }
         },
         {
@@ -4749,9 +4682,9 @@
             "source": "https://help.autodesk.com/view/fusion360/ENU/?guid=ASM-CONTACT-SETS"
           },
           "kerf": {
-            "status": "yes",
-            "note": "OBB-SAT + BVH + tri-tri engine; ClashPanel.jsx UI wired into AssemblyEditor (SHA 0c78f08d)",
-            "evidence": "src/components/ClashPanel.jsx"
+            "status": "partial",
+            "note": "Backend OBB-SAT + BVH + tri-tri; no UI panel",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/clash/detect.py"
           }
         },
         {
@@ -4763,9 +4696,9 @@
             "source": "https://productdesignonline.com/overlooked-fusion-feature-motion-study-in-autodesk-fusion-360/"
           },
           "kerf": {
-            "status": "yes",
-            "note": "AssemblyMotionPanel.jsx wired in AssemblyEditor: planar MBD Lagrange/DAE + Baumgarte via simulate_motion tool (SHA 567cc619)",
-            "evidence": "src/components/AssemblyMotionPanel.jsx"
+            "status": "no",
+            "note": "Planar MBD not wired to assembly solver",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/assembly"
           }
         },
         {
@@ -5036,20 +4969,6 @@
         },
         {
           "domain": "D4",
-          "feature": "ASHRAE §35 fittings pressure loss ✅",
-          "competitor": {
-            "status": "no",
-            "note": "No ASHRAE §35 fitting loss calculation in Fusion",
-            "source": "https://www.autodesk.com/support/technical/article/caas/sfdcarticles/sfdcarticles/Does-Fusion-360-have-flow-simulation-as-a-simulation-study.html"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "ASHRAE HOF 2021 §35 Table 21-1: 10 fitting kinds (smooth/segmented elbows, tee branch/through, gradual/abrupt transitions, butterfly damper, reducer/expander); fitting_pressure_loss() + compute_duct_run_pressure_drop() + build_loss_table(); 2 LLM tools",
-            "evidence": "packages/kerf-hvac/src/kerf_hvac/pressure.py"
-          }
-        },
-        {
-          "domain": "D4",
           "feature": "Building loads",
           "competitor": {
             "status": "no",
@@ -5130,20 +5049,6 @@
             "status": "yes",
             "note": "Doublet-lattice flutter (backend)",
             "evidence": "packages/kerf-aero/src/kerf_aero/flutter_pk.py"
-          }
-        },
-        {
-          "domain": "D5",
-          "feature": "Drag-coefficient estimation (Hoerner 1965)",
-          "competitor": {
-            "status": "no",
-            "note": "No Cd estimation in Fusion; requires separate Autodesk CFD",
-            "source": "https://www.autodesk.com/support/technical/article/caas/sfdcarticles/sfdcarticles/Does-Fusion-360-have-flow-simulation-as-a-simulation-study.html"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "3D body Cd: frontal area + Schultz-Grunow Cf + Hoerner form factor; wired LLM tool aero_estimate_drag (NOT certified, low-fidelity)",
-            "evidence": "packages/kerf-aero/src/kerf_aero/drag_estimate.py"
           }
         },
         {
@@ -5330,19 +5235,6 @@
         },
         {
           "domain": "D7",
-          "feature": "Feed-rate optimizer (Altintas 2012 + tool material DB)",
-          "competitor": {
-            "status": "partial",
-            "note": "Fusion 360 CAM applies feeds & speeds from material library but does not expose Altintas chip-load / deflection optimizer"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "Altintas 2012 chip-load model (Table 3.1) + machine acceleration cap (§3.6) + tool deflection (Euler-Bernoulli); 9 materials × 5 tool classes; MRR + cycle-time estimator. Altintas reference data — NOT cutting-tool-manufacturer-certified.",
-            "evidence": "packages/kerf-manufacturing/src/kerf_manufacturing/feed_rate.py"
-          }
-        },
-        {
-          "domain": "D7",
           "feature": "Moldflow / fill sim",
           "competitor": {
             "status": "paid",
@@ -5395,20 +5287,6 @@
             "status": "yes",
             "note": "Cura runner wired (PrintSliceView)",
             "evidence": "packages/kerf-slicing/src/kerf_slicing/cura_runner.py"
-          }
-        },
-        {
-          "domain": "D7",
-          "feature": "Infill pattern library (gyroid, honeycomb, tri-grid, concentric)",
-          "competitor": {
-            "status": "partial",
-            "note": "Basic infill patterns via external Cura; no programmatic API",
-            "source": "https://ultimaker.com/software/ultimaker-cura/"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "Infill pattern library (gyroid TPMS, honeycomb, triangular grid, concentric) — pure-Python, no CuraEngine required; LLM tool slicing_generate_infill",
-            "evidence": "packages/kerf-slicing/src/kerf_slicing/infill_patterns.py"
           }
         },
         {
@@ -5575,8 +5453,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "WireViz runner + harness3d; WiringView wired; 3D harness auto-routing with collision avoidance (Cheng-Quan 2001) ✅",
-            "evidence": "packages/kerf-wiring/src/kerf_wiring/auto_routing_3d.py"
+            "note": "WireViz runner + harness3d; WiringView wired",
+            "evidence": "packages/kerf-wiring/src/kerf_wiring/wireviz_runner.py"
           }
         },
         {
@@ -5631,8 +5509,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "1D tolerance stack-up (worst-case + RSS + Monte Carlo) ✅ — StackElement dataclass, worst_case_stack / rss_stack / monte_carlo_stack / expected_yield_at_spec; 3 LLM tools (gdt_worst_case_stack, gdt_rss_stack, gdt_monte_carlo_stack)",
-            "evidence": "packages/kerf-gdnt/src/kerf_gdnt/tol_stack.py"
+            "note": "WC/RSS/MC (backend; MC LCG bug noted)",
+            "evidence": "packages/kerf-gdnt/src/kerf_gdnt"
           }
         },
         {
@@ -5770,9 +5648,9 @@
             "source": "https://www.autodesk.com/products/fusion-360/simulation-extension"
           },
           "kerf": {
-            "status": "yes",
-            "note": "Full dental UI: CrownSculptingPanel + ImplantLibrary + SurgicalGuide panels (SHA 480afca5); watertight multi-hole B-rep + STL (SHAs 159bdf48, 163fcf75)",
-            "evidence": "packages/kerf-dental/src/kerf_dental/"
+            "status": "partial",
+            "note": "Crown is placeholder cylinder; surgical guide in spotlight",
+            "evidence": "packages/kerf-dental/src/kerf_dental"
           }
         },
         {
@@ -5832,17 +5710,17 @@
           }
         },
         {
-          "domain": "D1",
-          "feature": "Standard parts library (ISO/DIN fasteners, bearings, profiles)",
+          "domain": "D14",
+          "feature": "Change-impact analyzer + co-change suggestions (PROSTEP-iViP)",
           "competitor": {
             "status": "partial",
-            "note": "Fusion 360 has a McMaster-Carr / Toolbox integration; coverage narrower than SolidWorks Toolbox",
-            "source": "https://help.autodesk.com/view/fusion360/ENU/?guid=ASM-TOOLBOX-OVERVIEW"
+            "note": "Change management available through PDM/PLM integration (Fusion Manage / Autodesk Vault); no standalone change-impact graph propagation in base Fusion",
+            "source": "https://help.autodesk.com/view/fusion360/ENU/?guid=MFG-MANAGE-OVERVIEW"
           },
           "kerf": {
             "status": "yes",
-            "note": "kerf-partsgen: 5 ISO/DIN generators; kerf-parts KiCad+BOLTS+FreeCAD pipeline; real STEP/JSCAD geometry in CircuitEditor 3D tab via substitute_component",
-            "evidence": "packages/kerf-parts/src/kerf_parts/tools.py"
+            "note": "Change-impact analyzer + co-change suggestions (PROSTEP-iViP). BFS propagation through BOM + assembly + requirements graph; impact levels high/medium/low; rework cost estimate; mates-interface co-change heuristics. LLM tools: plm_change_impact, plm_propose_co_changes.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/change_impact.py"
           }
         }
       ]
@@ -5977,23 +5855,9 @@
             "source": "https://help.solidworks.com/2024/english/SolidWorks/motionstudies/t_detecting_interference_motion.htm"
           },
           "kerf": {
-            "status": "yes",
-            "note": "OBB-SAT + BVH + tri-tri engine; ClashPanel.jsx UI wired into AssemblyEditor (SHA 0c78f08d)",
-            "evidence": "src/components/ClashPanel.jsx"
-          }
-        },
-        {
-          "domain": "D1",
-          "feature": "Assembly mate inspector + validation",
-          "competitor": {
-            "status": "yes",
-            "note": "Mate validation with constraint analysis, DOF checking, and over/under-constraint detection",
-            "source": "https://help.solidworks.com/2024/english/SolidWorks/sldworks/c_mate_types.htm"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "Assembly mate inspector + validation ✅ — validate_mate / auto_detect_potential_mates / validate_assembly_mates; concentric/coincident/distance/angle/tangent/parallel/perpendicular; residual + correction hints; brep_validate_mate + brep_detect_mates LLM tools; ASME Y14.5 §11",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/mate_inspector.py"
+            "status": "partial",
+            "note": "Backend OBB-SAT + BVH + tri-tri; no UI panel",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/clash/detect.py"
           }
         },
         {
@@ -6005,9 +5869,9 @@
             "source": "https://help.solidworks.com/2025/english/SolidWorks/motionstudies/t_detecting_interference_motion.htm"
           },
           "kerf": {
-            "status": "yes",
-            "note": "AssemblyMotionPanel.jsx wired in AssemblyEditor: planar MBD Lagrange/DAE + Baumgarte via simulate_motion tool (SHA 567cc619)",
-            "evidence": "src/components/AssemblyMotionPanel.jsx"
+            "status": "no",
+            "note": "Planar MBD not wired to assembly solver",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/assembly/model.py"
           }
         },
         {
@@ -6019,21 +5883,8 @@
             "source": "https://help.solidworks.com/2024/english/SolidWorks/acadhelp/c_drawing_views_acadhelp.htm"
           },
           "kerf": {
-            "status": "yes",
-            "note": "Live B-rep HLR projection (make2d) + auto-dim + GD&T toolbar (GdntToolbar.jsx) + FCF click-to-place (SHA 0d74e89c)",
-            "evidence": "src/components/DrawingView.jsx"
-          }
-        },
-        {
-          "domain": "D1",
-          "feature": "Auto-dim ISO 129-1:2018",
-          "competitor": {
             "status": "partial",
-            "note": "Standards-based dimensioning available but not automatically enforced end-to-end"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "Auto-dim ISO 129-1:2018 ✅ — chain/baseline/mixed (§5.1); ext-line gap+overshoot (§5.4); 10 mm spacing; 15° leader (§10); tolerance formats §8; compliance validator; LLM tools drawing_auto_dimension_iso + drawing_validate_iso",
+            "note": "Live B-rep HLR projection + auto-dim; no GD&T-placement UI",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/drawings/auto_dimension.py"
           }
         },
@@ -6046,9 +5897,9 @@
             "source": "https://help.solidworks.com/2020/English/SolidWorks/sldworks/c_dimxpert_for_parts.htm"
           },
           "kerf": {
-            "status": "yes",
-            "note": "GdntToolbar.jsx ISO 1101 toolbar + FCF click-to-place modal + Pmi3DOverlay.jsx 3D PMI; datum A/B/C; all 14 characteristics (SHA 0d74e89c)",
-            "evidence": "src/components/GdntToolbar.jsx"
+            "status": "partial",
+            "note": "Data model + auto-propose only; no UI for placement",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gdt/tools.py"
           }
         },
         {
@@ -6080,20 +5931,6 @@
           }
         },
         {
-          "domain": "D1",
-          "feature": "Feature recognition (ISO 10303-224 / Han 2000)",
-          "competitor": {
-            "status": "yes",
-            "note": "FeatureWorks: automatic recognition of holes, slots, pockets, fillets, chamfers, bosses from imported dumb solids; integrated into SolidWorks as an add-in",
-            "source": "https://help.solidworks.com/2024/english/SolidWorks/featureworks/c_featureworks_overview.htm"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "Feature recognition (ISO 10303-224 / Han 2000) ✅ — recognize_features_iso(), classify_hole(), feature_to_machining_op() + brep_feature_recognition + brep_feature_to_machining LLM tools; detects through-hole, blind-hole, counterbore, countersink, pocket, slot, boss, fillet (interior/exterior), chamfer, rib, step from B-rep face adjacency graph",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/feature_recognition.py"
-          }
-        },
-        {
           "domain": "D2",
           "feature": "FE \u2014 linear static (native)",
           "competitor": {
@@ -6102,9 +5939,9 @@
             "source": "https://help.solidworks.com/2021/english/SolidWorks/cworks/c_Fatigue_Analysis.htm"
           },
           "kerf": {
-            "status": "yes",
-            "note": "LinearStaticPanel.jsx: load/BC editor (force/pressure/distributed, fixed/roller/symmetry) + von Mises contour; FEAView in Editor right-drawer (SHA 7e2530e8)",
-            "evidence": "src/components/fea/LinearStaticPanel.jsx"
+            "status": "partial",
+            "note": "Linear static solver; no UI panel beyond displacement render",
+            "evidence": "packages/kerf-fem/src/kerf_fem/linear_static.py"
           }
         },
         {
@@ -6116,9 +5953,9 @@
             "source": "https://help.solidworks.com/2024/english/SolidWorks/cworks/c_Fatigue_Analysis.htm"
           },
           "kerf": {
-            "status": "yes",
-            "note": "FatiguePanel.jsx: S-N curve (5 presets) + Goodman/Gerber/SWT + rainflow + life contour; FEAView wired in Editor (SHA 7e2530e8)",
-            "evidence": "src/components/fea/FatiguePanel.jsx"
+            "status": "partial",
+            "note": "S-N + \u03b5-N + rainflow backend; no UI",
+            "evidence": "packages/kerf-fem/src/kerf_fem/fatigue_fem.py"
           }
         },
         {
@@ -6130,9 +5967,9 @@
             "source": "https://help.solidworks.com/2026/english/simtutorialonline/c_simconn_fatigue.htm"
           },
           "kerf": {
-            "status": "yes",
-            "note": "ModalPanel + BucklingPanel in FEAView (SHA 7e2530e8); nonlinear static Total-Lagrangian + arc-length (SHA 709fa568); explicit dynamics central-diff + J2 plasticity (SHA 8b7ad261)",
-            "evidence": "src/components/fea/FEAView.jsx"
+            "status": "partial",
+            "note": "Consistent-mass modal + linear eigenvalue buckling (Euler-Bernoulli Kg) + harmonic/FRF (mode superposition) + random-vibration PSD (Miles' equation + shaped PSD) + Riks + J2 plasticity backend; no UI",
+            "evidence": "packages/kerf-fem/src/kerf_fem/buckling.py"
           }
         },
         {
@@ -6214,9 +6051,9 @@
             "source": "https://help.solidworks.com/2023/english/SolidWorks/floxpress/c_flow_simulation_overview.htm"
           },
           "kerf": {
-            "status": "yes",
-            "note": "OpenFOAM bridge: incompressible/compressible/CHT solvers + k-\u03b5 RANS (SHA f9c33663) + k-\u03c9 SST (SHA c9008860); chat-native case generation",
-            "evidence": "packages/kerf-cfd/src/kerf_cfd/openfoam_bridge.py"
+            "status": "partial",
+            "note": "Real OpenFOAM bridge backend (needs install); no UI",
+            "evidence": "packages/kerf-fem/src/kerf_fem/cfd_navier_stokes.py"
           }
         },
         {
@@ -6228,9 +6065,9 @@
             "source": "https://help.solidworks.com/2024/english/SolidWorks/sldworks/c_features_top.htm"
           },
           "kerf": {
-            "status": "yes",
-            "note": "SMACNA duct sizing backend + DuctDesignPanel.jsx (sizing, pressure drop, flat-pattern); EquipmentSelectPanel with AHRI-listed catalogue (SHAs 9cbaec76, 9a31ba10)",
-            "evidence": "src/components/hvac/DuctDesignPanel.jsx"
+            "status": "partial",
+            "note": "SMACNA duct sizing + flat-pattern backend; no UI",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/hvac/ducts.py"
           }
         },
         {
@@ -6327,8 +6164,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "WiringView wired; WireViz + 3D harness auto-router with collision avoidance (Cheng-Quan 2001) ✅",
-            "evidence": "packages/kerf-wiring/src/kerf_wiring/auto_routing_3d.py"
+            "note": "WiringView wired; WireViz + 3D router",
+            "evidence": "packages/kerf-wiring"
           }
         },
         {
@@ -6354,9 +6191,9 @@
             "source": "https://help.solidworks.com/2025/English/WhatsNew/c_wn_cam.htm"
           },
           "kerf": {
-            "status": "yes",
-            "note": "5-axis CAM UI in CAMView.jsx: axis-mode switch (3-axis/5-axis-indexed/5-axis-continuous), tilt axis, toolpath strategy, post selector (SHA f18c927c)",
-            "evidence": "src/components/CAMView.jsx"
+            "status": "partial",
+            "note": "5-axis 3+2 engine solid; no UI",
+            "evidence": "packages/kerf-cam/src/kerf_cam/five_axis/constant_tilt.py"
           }
         },
         {
@@ -6452,9 +6289,9 @@
             "source": "https://help.solidworks.com/2025/english/SolidWorks/motionstudies/t_detecting_interference_motion.htm"
           },
           "kerf": {
-            "status": "yes",
-            "note": "Planar MBD Lagrange/DAE backend + AssemblyMotionPanel.jsx UI wired into AssemblyEditor (SHA 567cc619)",
-            "evidence": "src/components/AssemblyMotionPanel.jsx"
+            "status": "partial",
+            "note": "Planar MBD Lagrange/DAE backend; not wired to assembly UI",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/dynamics/rigidbody.py"
           }
         },
         {
@@ -6480,9 +6317,9 @@
             "source": "https://help.solidworks.com/2026/english/simtutorialonline/c_simconn_fatigue.htm"
           },
           "kerf": {
-            "status": "yes",
-            "note": "VibrationPanel.jsx: harmonic FRF sweep + PSD random vibration (MIL-STD-810G / NASA GSFC-7000); FEAView wired in Editor right-drawer (SHA 7e2530e8)",
-            "evidence": "src/components/fea/VibrationPanel.jsx"
+            "status": "partial",
+            "note": "Full n-DOF eigen + FRF matrix + harmonic response (mode superposition, DAF, phase) + random-vibration PSD (Miles' equation + shaped PSD via trapezoidal integration) backend; no UI",
+            "evidence": "packages/kerf-fem/src/kerf_fem/harmonic.py"
           }
         },
         {
@@ -6536,9 +6373,9 @@
             "source": "https://help.solidworks.com/2022/English/WhatsNew/c_wn2022_mbd_dimxpert_geometric_tolerancing.htm"
           },
           "kerf": {
-            "status": "yes",
-            "note": "GD&T toolbar (ISO 1101 all characteristics) + FCF placement + Pmi3DOverlay.jsx 3D PMI overlay; GdntToolbar.jsx wired (SHA 0d74e89c)",
-            "evidence": "src/components/GdntToolbar.jsx"
+            "status": "partial",
+            "note": "Data model + auto-propose; no MBD/PMI placement UI",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gdt/datums.py"
           }
         },
         {
@@ -6710,17 +6547,17 @@
           }
         },
         {
-          "domain": "D1",
-          "feature": "Standard parts library (ISO/DIN fasteners, bearings, profiles)",
+          "domain": "D14",
+          "feature": "Change-impact analyzer + co-change suggestions (PROSTEP-iViP)",
           "competitor": {
-            "status": "yes",
-            "note": "SOLIDWORKS Toolbox: ISO/DIN/ANSI/BSI/JIS fasteners + bearings; drag-and-drop into assemblies",
-            "source": "https://help.solidworks.com/2024/english/SolidWorks/toolbox/c_toolbox_overview.htm"
+            "status": "no",
+            "note": "No native change-impact propagation in SOLIDWORKS; PDM/PLM requires separate SOLIDWORKS PDM or 3DExperience lifecycle add-on",
+            "source": "https://www.solidworks.com/product/solidworks-pdm"
           },
           "kerf": {
             "status": "yes",
-            "note": "kerf-partsgen: 5 ISO/DIN generators; kerf-parts KiCad+BOLTS+FreeCAD pipeline; real STEP/JSCAD geometry in CircuitEditor 3D tab via substitute_component",
-            "evidence": "packages/kerf-parts/src/kerf_parts/tools.py"
+            "note": "Change-impact analyzer + co-change suggestions (PROSTEP-iViP SIG methodology; ISO 10303-242). BFS propagation through BOM + assembly + requirements; impact levels high/medium/low; rework cost estimation; mating-interface co-change suggestions. LLM tools: plm_change_impact, plm_propose_co_changes.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/change_impact.py"
           }
         }
       ]
@@ -6799,8 +6636,8 @@
             "source": "https://cad.onshape.com/help/Content/drawings.htm"
           },
           "kerf": {
-            "status": "yes",
-            "note": "Multi-sheet HLR drawings + GD&T toolbar + FCF click-to-place (GdntToolbar.jsx, SHA 0d74e89c)",
+            "status": "partial",
+            "note": "Multi-sheet HLR drawings; no GD&T placement UI",
             "evidence": "src/components/DrawingView.jsx"
           }
         },
@@ -6841,9 +6678,9 @@
             "source": "https://cad.onshape.com/help/Content/drawings-gdt.htm"
           },
           "kerf": {
-            "status": "yes",
-            "note": "GdntToolbar.jsx ISO 1101 + FCF click-to-place modal + Pmi3DOverlay.jsx 3D PMI (SHA 0d74e89c)",
-            "evidence": "src/components/GdntToolbar.jsx"
+            "status": "partial",
+            "note": "Data model + auto-propose only; no UI placement",
+            "evidence": "packages/kerf-gdnt/src/kerf_gdnt/feature_control_frame.py"
           }
         },
         {
@@ -6855,9 +6692,9 @@
             "source": "https://www.onshape.com/en/features/simulation"
           },
           "kerf": {
-            "status": "yes",
-            "note": "LinearStaticPanel + ModalPanel + BucklingPanel + FatiguePanel + VibrationPanel in FEAView; Editor right-drawer wired (SHA 7e2530e8)",
-            "evidence": "src/components/fea/FEAView.jsx"
+            "status": "partial",
+            "note": "Linear static + thermal + modal; no UI panel",
+            "evidence": "packages/kerf-structural/src/kerf_structural/aisc_member.py"
           }
         },
         {
@@ -6995,9 +6832,9 @@
             "source": "https://www.onshape.com/en/blog/rapid-design-simulation-directly-browser"
           },
           "kerf": {
-            "status": "yes",
-            "note": "OpenFOAM bridge (SHA c9008860): incompressible + compressible + CHT + k-\u03b5 RANS + k-\u03c9 SST via LLM tools",
-            "evidence": "packages/kerf-cfd/src/kerf_cfd/openfoam_bridge.py"
+            "status": "partial",
+            "note": "Real OpenFOAM bridge (backend, needs install)",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/heatxfer/transfer.py"
           }
         },
         {
@@ -7318,8 +7155,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "WiringView wired; 3D harness auto-routing with collision avoidance (Cheng-Quan 2001) ✅",
-            "evidence": "packages/kerf-wiring/src/kerf_wiring/auto_routing_3d.py"
+            "note": "WiringView wired",
+            "evidence": "src/components/WiringView.jsx"
           }
         },
         {
@@ -7519,17 +7356,17 @@
           }
         },
         {
-          "domain": "D1",
-          "feature": "Standard parts library (ISO/DIN fasteners, bearings, profiles)",
+          "domain": "D14",
+          "feature": "Change-impact analyzer + co-change suggestions (PROSTEP-iViP)",
           "competitor": {
             "status": "partial",
-            "note": "Onshape Standard Content library: ISO/DIN/ANSI fasteners via Part Studio; narrower coverage than SolidWorks Toolbox",
-            "source": "https://cad.onshape.com/help/Content/standard_content.htm"
+            "note": "Change management available through PDM/PLM integration (Fusion Manage / Autodesk Vault); no standalone change-impact graph propagation in base Fusion",
+            "source": "https://help.autodesk.com/view/fusion360/ENU/?guid=MFG-MANAGE-OVERVIEW"
           },
           "kerf": {
             "status": "yes",
-            "note": "kerf-partsgen: 5 ISO/DIN generators; kerf-parts KiCad+BOLTS+FreeCAD pipeline; real STEP/JSCAD geometry in CircuitEditor 3D tab via substitute_component",
-            "evidence": "packages/kerf-parts/src/kerf_parts/tools.py"
+            "note": "Change-impact analyzer + co-change suggestions (PROSTEP-iViP). BFS propagation through BOM + assembly + requirements graph; impact levels high/medium/low; rework cost estimate; mates-interface co-change heuristics. LLM tools: plm_change_impact, plm_propose_co_changes.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/change_impact.py"
           }
         }
       ]
@@ -7650,9 +7487,9 @@
             "source": "https://help.autodesk.com/view/INVNTOR/2025/ENU/?guid=GUID-1B0C6E15-74C4-41C4-A06D-C5A7EB6D8E3E"
           },
           "kerf": {
-            "status": "yes",
-            "note": "AssemblyMotionPanel.jsx (planar MBD) + ClashPanel.jsx (interference) wired in AssemblyEditor (SHAs 567cc619, 0c78f08d)",
-            "evidence": "src/components/AssemblyMotionPanel.jsx"
+            "status": "no",
+            "note": "None \u2014 planar MBD not wired to assembly solver",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/assembly"
           }
         },
         {
@@ -7664,8 +7501,8 @@
             "source": "https://help.autodesk.com/view/INVNTOR/2025/ENU/?guid=GUID-A09FC2B5-D3B4-4D17-8C9C-CC2D4C6D0D8E"
           },
           "kerf": {
-            "status": "yes",
-            "note": "Live HLR projection + auto-dim + GD&T toolbar + FCF click-to-place (GdntToolbar.jsx, SHA 0d74e89c)",
+            "status": "partial",
+            "note": "Live HLR projection + auto-dim; no GD&T-placement UI",
             "evidence": "src/components/DrawingView.jsx"
           }
         },
@@ -7678,9 +7515,9 @@
             "source": "https://help.autodesk.com/view/INVNTOR/2025/ENU/?guid=GUID-A44C5B4C-7BA6-4E56-B5E5-5B3D6F1A4A49"
           },
           "kerf": {
-            "status": "yes",
-            "note": "GdntToolbar.jsx ISO 1101 + FCF click-to-place modal + Pmi3DOverlay.jsx 3D PMI (SHA 0d74e89c)",
-            "evidence": "src/components/GdntToolbar.jsx"
+            "status": "partial",
+            "note": "GD&T data model only; no MBD/PMI UI",
+            "evidence": "packages/kerf-gdnt/src/kerf_gdnt/feature_control_frame.py"
           }
         },
         {
@@ -7847,8 +7684,8 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-parts/src/kerf_parts/din_fasteners.py",
-            "note": "DIN/ISO metric fastener catalog (DIN 931/912/7991, ISO 4762) + VDI 2230 torque; parts_lookup_fastener + parts_torque_recommendation LLM tools"
+            "note": "VDI 2230 bolted joint analysis (backend)",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core"
           }
         },
         {
@@ -8057,8 +7894,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "WireViz runner + harness3d; WiringView wired; 3D harness auto-routing with collision avoidance (Cheng-Quan 2001) ✅",
-            "evidence": "packages/kerf-wiring/src/kerf_wiring/auto_routing_3d.py"
+            "note": "WireViz runner + harness3d; WiringView wired",
+            "evidence": "packages/kerf-wiring/src/kerf_wiring/wireviz_runner.py"
           }
         },
         {
@@ -8515,9 +8352,9 @@
             "source": "https://www.3shape.com/en/software/dental-system"
           },
           "kerf": {
-            "status": "yes",
-            "note": "Anatomic crown B-rep + DICOM/CSV ingest + implant planning + surgical guide (watertight multi-hole boolean, SHA 163fcf75); milling-ready STL (SHA 159bdf48)",
-            "evidence": "packages/kerf-dental/src/kerf_dental/"
+            "status": "partial",
+            "note": "Anatomic crown (swept margin polygon + cusp ridges, n_cusps=2-4), surgical guide, DICOM ingest, parametric full denture + RPD, binary/ASCII STL export (backend tools). No AI design proposals, no implant library, no virtual articulator.",
+            "evidence": "packages/kerf-dental/src/kerf_dental/crown.py, packages/kerf-dental/src/kerf_dental/denture.py, packages/kerf-dental/src/kerf_dental/stl_export.py"
           }
         },
         {
@@ -8529,9 +8366,9 @@
             "source": "https://www.3shape.com/en/software/dental-system"
           },
           "kerf": {
-            "status": "yes",
-            "note": "CrownSculptingPanel: anatomic preset picker (incisor/canine/premolar/molar), cusp geometry, margin line B-rep, full STL export (SHA 480afca5)",
-            "evidence": "packages/kerf-dental/src/kerf_dental/crown.py"
+            "status": "partial",
+            "note": "Anatomic crown (design_crown_anatomic): sweeps actual margin-line polygon with raised-cosine cusp ridges (n_cusps=2 premolar, n_cusps=4 molar); validate_body-clean B-rep; STL export via stl_export.py. No virtual articulator, no AI design proposal, no bridge pontic.",
+            "evidence": "packages/kerf-dental/src/kerf_dental/crown.py (design_crown_anatomic), packages/kerf-dental/src/kerf_dental/stl_export.py"
           }
         },
         {
@@ -8543,8 +8380,8 @@
             "source": "https://www.3shape.com/en/software/dental-system"
           },
           "kerf": {
-            "status": "yes",
-            "note": "ImplantLibrary: filterable catalogue (Straumann, Nobel Biocare, Zimmer, MIS); diameter + length selection; placement into surgical guide (SHA 480afca5)",
+            "status": "partial",
+            "note": "Implant guide geometry (backend); no implant library integration",
             "evidence": "packages/kerf-dental/src/kerf_dental/guide.py"
           }
         },
@@ -8557,8 +8394,8 @@
             "source": "https://www.3shape.com/en/software/dental-system"
           },
           "kerf": {
-            "status": "yes",
-            "note": "Surgical guide: watertight single-solid via boolean subtract (multi-hole, all edges 2-manifold); milling-ready B-rep + binary STL (SHAs 159bdf48, 163fcf75)",
+            "status": "partial",
+            "note": "Surgical guide generation backend; wired but not UI-facing",
             "evidence": "packages/kerf-dental/src/kerf_dental/guide.py"
           }
         },
@@ -8628,9 +8465,9 @@
             "source": "https://www.3shape.com/en/software/dental-system"
           },
           "kerf": {
-            "status": "yes",
-            "note": "Binary + ASCII STL export for crown, full denture, RPD; milling-ready B-rep; guide_body_to_stl_bytes (SHA 159bdf48)",
-            "evidence": "packages/kerf-dental/src/kerf_dental/stl_export.py"
+            "status": "partial",
+            "note": "Binary and ASCII STL export for dental meshes (crown, full denture, RPD) via stl_export.py; normal computation from vertex cross-product; dental_stl_export LLM tool. No dental mill post processor (G-code, Sirona/Roland CAM paths).",
+            "evidence": "packages/kerf-dental/src/kerf_dental/stl_export.py, packages/kerf-dental/src/kerf_dental/tools.py"
           }
         },
         {
@@ -8819,22 +8656,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Spec-driven pipe class enforcement (ASME B36.10M/B31.3 Barlow wall check, material grade, pressure/temp limits); orthogonal isometric routing; ASME B31 pressure-loss (Darcy-Weisbach + Crane TP-410 K-factors); no interactive 3D plant routing UI",
+            "note": "Spec-driven pipe class enforcement (ASME B36.10M/B31.3 Barlow wall check, material grade, pressure/temp limits); orthogonal isometric routing; no interactive 3D plant routing UI",
             "evidence": "packages/kerf-piping/src/kerf_piping/pipe_spec.py"
-          }
-        },
-        {
-          "domain": "D13",
-          "feature": "Pipeline pressure-loss (ASME B31 / Crane TP-410)",
-          "competitor": {
-            "status": "yes",
-            "note": "AVEVA E3D includes hydraulic sizing integrated with pipe routing and specification enforcement",
-            "source": "https://www.aveva.com/en/products/e3d-design/"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "ASME B31 pressure-loss + Crane TP-410 K-factors ✅ — Darcy-Weisbach (Colebrook-White), 15-entry K-factor table (elbows/tees/valves/reducers), Hooper Two-K method, full pipeline ΔP; `piping_pressure_loss` + `piping_pipeline_drop` LLM tools. Values from ASME B31 / Crane TP-410 — NOT certified compliance.",
-            "evidence": "packages/kerf-piping/src/kerf_piping/asme_pressure.py"
           }
         },
         {
@@ -9140,12 +8963,6 @@
         },
         {
           "domain": "D5",
-          "feature": "Layup angle optimizer (Tsai-Hahn 1980 + Daniel-Ishai 2006)",
-          "competitor": "{ status: paid, note: \"CATIA Composites / HyperWorks OptiStruct — ply angle optimisation as add-in; no open-source baseline\", source: \"https://www.3ds.com/products/catia/composites-design\" }",
-          "kerf": "{ status: yes, note: \"Simulated-annealing search over discrete angles; minimise weight subject to Tsai-Wu FPF margin ≥ 1.5; symmetric + balanced constraint; LLM tools composites_optimize_layup + composites_failure_check\", evidence: \"packages/kerf-composites/src/kerf_composites/layup_optimizer.py\" }"
-        },
-        {
-          "domain": "D5",
           "feature": "6-DOF flight dynamics + stability derivs",
           "competitor": "{ status: no, note: \"No built-in 6-DOF flight dynamics in CATIA\", source: \"https://www.3ds.com/products/catia\" }",
           "kerf": "{ status: yes, note: \"Backend only\", evidence: \"packages/kerf-aero/src/kerf_aero/aeroelasticity.py\" }"
@@ -9277,12 +9094,6 @@
           "kerf": "{ status: yes, note: \"16 extended components (mech/hyd/pneu/thermal/control); backend only\", evidence: \"packages/kerf-motion/src\" }"
         },
         {
-          "domain": "D9",
-          "feature": "FMI 2.0 model export (.fmu)",
-          "competitor": "{ status: paid, note: \"CATIA Systems Engineering exports FMUs via Dymola/Modelica integration\", source: \"https://www.3ds.com/products/catia/systems-engineering\" }",
-          "kerf": "{ status: yes, note: \"FMI 2.0 export subset — NOT FMI Cross-Check certified. export_fmu() builds ZIP with modelDescription.xml (ScalarVariables, causality, CoSimulation/ModelExchange) + C source wrapper; sim_export_fmu LLM tool\", evidence: \"packages/kerf-1dsim/src/kerf_1dsim/fmi_export.py\" }"
-        },
-        {
           "domain": "D10",
           "feature": "Wiring/harness (WireViz + 3D router)",
           "competitor": "{ status: paid, note: \"CATIA Electrical Wire Routing + Electrical Harness Assembly \u2014 3D harness; paid workbenches\", source: \"https://www.3ds.com/products/catia/electrical-wire-routing\" }",
@@ -9361,10 +9172,18 @@
           "kerf": "{ status: yes, note: \"Moldflow Hele-Shaw + weld/AM/forming calculators; backend only\", evidence: \"packages/kerf-cad-core/src/kerf_cad_core/plugin.py\" }"
         },
         {
-          "domain": "D15",
-          "feature": "MBSE digital thread (SysML 1.x XMI + traceability)",
-          "competitor": "{ status: paid, note: \"CATIA Systems Engineering — SysML 1.x/2.0 + Modelica; 3DEXPERIENCE paid role; full MBSE toolchain\", source: \"https://www.3ds.com/products/catia/systems-engineering\" }",
-          "kerf": "{ status: yes, note: \"MBSE digital thread (SysML 1.x XMI + traceability) ✅ — requirements-to-design-to-test traceability matrix; SysML 1.6/1.7 XMI export+import (OMG namespace URIs); orphan + coverage report; LLM tools sysml_trace_coverage / sysml_export_xmi / sysml_import_xmi; backend only. Caveat: SysML 1.x subset, not OMG-certified.\", evidence: \"packages/kerf-plm/src/kerf_plm/sysml.py\" }"
+          "domain": "D14",
+          "feature": "Change-impact analyzer + co-change suggestions (PROSTEP-iViP)",
+          "competitor": {
+            "status": "partial",
+            "note": "Change management available through PDM/PLM integration (Fusion Manage / Autodesk Vault); no standalone change-impact graph propagation in base Fusion",
+            "source": "https://help.autodesk.com/view/fusion360/ENU/?guid=MFG-MANAGE-OVERVIEW"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Change-impact analyzer + co-change suggestions (PROSTEP-iViP). BFS propagation through BOM + assembly + requirements graph; impact levels high/medium/low; rework cost estimate; mates-interface co-change heuristics. LLM tools: plm_change_impact, plm_propose_co_changes.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/change_impact.py"
+          }
         }
       ]
     },
@@ -9400,23 +9219,9 @@
             "source": "https://www.cimatron.com/en/cimatron-mold"
           },
           "kerf": {
-            "status": "yes",
-            "note": "Mold parting surface construction (Yu-Fan 2003 §6): construct_parting_surface (radial ruled quads from parting line to mold bbox), construct_with_shutoff_inserts (undercut shutoff patches), validate_parting_surface, LLM tool brep_construct_parting_surface; parting line + cavity/core split + draft-angle check + moldability validation",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/mold_parting_surface.py"
-          }
-        },
-        {
-          "domain": "D7",
-          "feature": "Boss + rib auto-detection + moldability score (Boothroyd-Dewhurst 2002)",
-          "competitor": {
             "status": "partial",
-            "note": "Draft angle and basic moldability checks; no automatic boss/rib detection with Boothroyd-Dewhurst ratio rules",
-            "source": "https://www.cimatron.com/en/cimatron-mold"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "Auto-detect bosses + ribs + moldability score (Boothroyd-Dewhurst 2002) ✅ — boss D/W >= 2.5 rule; rib T/W <= 0.6 rule; composite [0-100] score with undercut + draft + wall-uniformity terms; LLM tools brep_detect_features + brep_moldability_score registered",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/feature_detect.py"
+            "note": "Parting line data model (closed 3-D loop); flat and ruled parting surface generation; draft-angle check; moldability validation; no interactive curve-extraction from NURBS solid",
+            "evidence": "packages/kerf-mold/src/kerf_mold/mold.py"
           }
         },
         {
@@ -9586,20 +9391,6 @@
         },
         {
           "domain": "D13",
-          "feature": "3D-to-2D pattern flattening (non-developable surfaces)",
-          "competitor": {
-            "status": "yes",
-            "note": "CLO3D flattens 3D simulation meshes to 2D patterns; proprietary solver",
-            "source": "https://www.clo3d.com/en/"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "ARAP (As-Rigid-As-Possible, Bo-Wang 2007) + LSCM (Lévy 2002) + cone-singularity flattening for non-developable garment surfaces (sleeves, bodices); per-face distortion metrics; dart placement for excess material",
-            "evidence": "packages/kerf-apparel/src/kerf_apparel/pattern_flatten.py"
-          }
-        },
-        {
-          "domain": "D13",
           "feature": "Grading (size run)",
           "competitor": {
             "status": "yes",
@@ -9608,8 +9399,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "ASTM D5219 + ISO 8559 grading rules ✅ — GradingRule dataclass, build_grading_table (women_us/men_us/women_eu/men_eu), apply_grading, grade_check_iso_8559; apparel_apply_grading + apparel_grade_check LLM tools registered; EN 13402 + multi-size export (backend)",
-            "evidence": "packages/kerf-apparel/src/kerf_apparel/grading.py"
+            "note": "ASTM + EN 13402 grade rules; multi-size export (backend)",
+            "evidence": "packages/kerf-apparel/src/kerf_apparel/"
           }
         },
         {
@@ -9884,8 +9675,8 @@
             "source": "https://www.ptc.com/en/products/creo/options/style"
           },
           "kerf": {
-            "status": "yes",
-            "note": "blend/network/patch/match-srf + G3 + Class-A harness wired; guide-rail loft (Gordon surface multi-rail, SHA a468c5e1); NURBS\u00d7NURBS boolean (SHA 419043fe)",
+            "status": "partial",
+            "note": "blend/network/patch/match-srf + G3 + Class-A harness wired; not Creo Style ISDX depth",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py"
           }
         },
@@ -9926,9 +9717,9 @@
             "source": "https://support.ptc.com/help/creo/creo_pma/r9.0/usascii/index.html#page/drawing/drawing_intro.html"
           },
           "kerf": {
-            "status": "yes",
-            "note": "Live HLR projection (make2d) + auto-dim + GD&T toolbar + FCF click-to-place (GdntToolbar.jsx, SHA 0d74e89c)",
-            "evidence": "src/components/DrawingView.jsx"
+            "status": "partial",
+            "note": "Live HLR projection (make2d) + auto-dim; no GD&T-placement UI",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/make2d.py"
           }
         },
         {
@@ -10324,20 +10115,6 @@
           }
         },
         {
-          "domain": "D9",
-          "feature": "Inverse dynamics (Newton-Euler torque computation)",
-          "competitor": {
-            "status": "yes",
-            "note": "Creo Mechanism — inverse dynamics via Adams/MBD solver; requires Mechanism Design option",
-            "source": "https://www.ptc.com/en/products/creo/options/mechanism"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "Recursive Newton-Euler inverse dynamics (Featherstone §5.3) ✅ — trajectory θ(t)/θ̇(t)/θ̈(t) → τ(t); gravity compensation; LLM tools motion_inverse_dynamics + motion_gravity_compensation",
-            "evidence": "packages/kerf-motion/src/kerf_motion/inverse_dynamics.py"
-          }
-        },
-        {
           "domain": "D11",
           "feature": "GD&T data model (ASME Y14.5)",
           "competitor": {
@@ -10360,9 +10137,9 @@
             "source": "https://www.ptc.com/en/products/creo/options/mbd"
           },
           "kerf": {
-            "status": "yes",
-            "note": "GdntToolbar.jsx ISO 1101 + FCF click-to-place modal + Pmi3DOverlay.jsx 3D PMI; datum labels; all characteristics (SHA 0d74e89c)",
-            "evidence": "src/components/GdntToolbar.jsx"
+            "status": "partial",
+            "note": "Data model only; no 3D MBD/PMI annotation UI",
+            "evidence": "src/components/DrawingView.jsx"
           }
         },
         {
@@ -10501,8 +10278,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "SPICE 3F5 netlist import + MNA DC analysis (kerf-1dsim); real ngspice wired for transient/AC. SPICE subset — NOT SPICE-certified; BSIM models out of scope.",
-            "evidence": "packages/kerf-1dsim/src/kerf_1dsim/spice_import.py"
+            "note": "Real ngspice wired; binary .raw parse gap noted",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/routes_spice.py"
           }
         },
         {
@@ -10529,8 +10306,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "WiringView wired; harness3d 3D router + formboard + report; 3D harness auto-routing with collision avoidance (Cheng-Quan 2001) ✅",
-            "evidence": "packages/kerf-wiring/src/kerf_wiring/auto_routing_3d.py"
+            "note": "WiringView wired; harness3d 3D router + formboard + report",
+            "evidence": "packages/kerf-wiring/src/kerf_wiring"
           }
         },
         {
@@ -10573,6 +10350,20 @@
             "status": "yes",
             "note": "Use+transport+EoL + multi-impact categories (ISO 14040/44; backend)",
             "evidence": "packages/kerf-lca/src/kerf_lca"
+          }
+        },
+        {
+          "domain": "D14",
+          "feature": "Change-impact analyzer + co-change suggestions (PROSTEP-iViP)",
+          "competitor": {
+            "status": "partial",
+            "note": "Change management available through PDM/PLM integration (Fusion Manage / Autodesk Vault); no standalone change-impact graph propagation in base Fusion",
+            "source": "https://help.autodesk.com/view/fusion360/ENU/?guid=MFG-MANAGE-OVERVIEW"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Change-impact analyzer + co-change suggestions (PROSTEP-iViP). BFS propagation through BOM + assembly + requirements graph; impact levels high/medium/low; rework cost estimate; mates-interface co-change heuristics. LLM tools: plm_change_impact, plm_propose_co_changes.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/change_impact.py"
           }
         }
       ]
@@ -10623,9 +10414,9 @@
             "source": "https://www.siemens.com/en-us/products/designcenter/nx-cad-software/offerings/fibersim-composites/"
           },
           "kerf": {
-            "status": "yes",
-            "note": "AFP CNC export: afp_to_gcode() G-code (rapid + feed + M-codes) + afp_to_apt() APT/CL output (SHA 730f05c6)",
-            "evidence": "packages/kerf-composites/src/kerf_composites/afp_export.py"
+            "status": "no",
+            "note": "No AFP/ATL CNC path generation",
+            "evidence": ""
           }
         },
         {
@@ -10721,9 +10512,9 @@
             "source": "https://www.siemens.com/en-us/products/designcenter/nx-cad-software/offerings/fibersim-composites/"
           },
           "kerf": {
-            "status": "yes",
-            "note": "LaminateStackup.jsx shows ply area \u00d7 density \u00d7 resin weight + per-ply cost; full LCA costing (SHA 9a222c43)",
-            "evidence": "src/components/composites/LaminateStackup.jsx"
+            "status": "partial",
+            "note": "LCA material costing; no composites-specific laminate weight/cost UI",
+            "evidence": "packages/kerf-lca/phases.py"
           }
         },
         {
@@ -10926,8 +10717,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Cut list, joinery rules + geometry validator (Hammer-Krenov), grain direction engine (backend); no room-layout floor plan UI. Joinery geometry validator (Hammer-Krenov) ✅",
-            "evidence": "packages/kerf-woodworking/src/kerf_woodworking/joinery_validate.py"
+            "note": "Cut list, joinery rules, grain direction engine (backend); no room-layout floor plan UI",
+            "evidence": "packages/kerf-woodworking/src/kerf_woodworking/cut_list.py"
           }
         },
         {
@@ -10954,8 +10745,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Joinery rules + geometry validator with master-craftsman ratios (backend); no parametric cabinet library UI",
-            "evidence": "packages/kerf-woodworking/src/kerf_woodworking/joinery_validate.py"
+            "note": "Joinery rules (backend); no parametric cabinet library UI",
+            "evidence": "packages/kerf-woodworking/src/kerf_woodworking/joinery.py"
           }
         },
         {
@@ -11500,541 +11291,17 @@
           "kerf": "evidence: cloud/cost/should_cost.py"
         },
         {
-          "domain": "D15",
-          "feature": "MBSE digital thread (SysML 1.x XMI + traceability)",
-          "nx": "Teamcenter Requirements + SysML via Capital/Polarion bridge; paid PLM add-on; not in NX base",
-          "nx_tier": "paid",
-          "competitor": "source: https://plm.automation.siemens.com/global/en/products/teamcenter/requirements-management.html",
-          "kerf": "{ status: yes, note: \"MBSE digital thread (SysML 1.x XMI + traceability) ✅ — SysML 1.6/1.7 XMI export+import; requirements-to-design-to-test matrix; LLM tools; backend only.\", evidence: \"packages/kerf-plm/src/kerf_plm/sysml.py\" }"
-        }
-      ]
-    },
-    {
-      "slug": "cadence-spectre",
-      "competitor": "Cadence Spectre",
-      "category": "cad-silicon",
-      "left": "kerf",
-      "right": "cadence-spectre",
-      "hero_tagline": "Spectre is the industry-standard commercial SPICE for tapeout \u2014 Kerf targets open PDK workflows and chat-driven exploration.",
-      "reviewed_at": "2026-05-29",
-      "features": [
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 transient simulation",
-          "competitor": {
-            "status": "yes",
-            "note": "Spectre TRAN with proprietary solver; generally 2-10\u00d7 faster than ngspice on large netlists",
-            "source": "https://www.cadence.com/en_US/home/tools/custom-ic-analog-rf-design/circuit-simulation/spectre-simulation-platform.html"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "Transient via ngspice bridge; sufficient for sky130-scale netlists",
-            "evidence": "packages/kerf-silicon/bridges/ngspice_bridge.py"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 PVT corner sweep (automated)",
-          "competitor": {
-            "status": "yes",
-            "note": "Spectre APS (Accelerated Parallel Simulator) automates multi-corner runs in Virtuoso; Spectre AMS for mixed-signal corners",
-            "source": "https://www.cadence.com/en_US/home/tools/custom-ic-analog-rf-design/circuit-simulation/spectre-simulation-platform.html"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "60-corner PVT sweep automated via silicon_pvt_sweep (sky130 model); Monte-Carlo mismatch included",
-            "evidence": "packages/kerf-silicon/analog/pvt.py"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 Monte-Carlo mismatch",
-          "competitor": {
-            "status": "yes",
-            "note": "Spectre Monte-Carlo with foundry-supplied mismatch models (Pelgrom + local variation); used for 6\u03c3 production yield estimation",
-            "source": "https://www.cadence.com/en_US/home/tools/custom-ic-analog-rf-design/circuit-simulation/spectre-simulation-platform.html"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "Pelgrom A_VT = 4 mV\u00b7\u00b5m model for sky130; production-sign-off accuracy requires foundry MC deck (not yet integrated)",
-            "evidence": "packages/kerf-silicon/analog/pvt.py"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 commercial foundry PDK sign-off accuracy",
-          "competitor": {
-            "status": "yes",
-            "note": "Spectre is the sign-off simulator for most commercial foundries (TSMC, Samsung, GlobalFoundries) \u2014 netlists are extracted in Spectre format",
-            "source": "https://www.cadence.com/en_US/home/tools/custom-ic-analog-rf-design/circuit-simulation/spectre-simulation-platform.html"
-          },
-          "kerf": {
-            "status": "no",
-            "note": "Kerf uses ngspice with open PDK models (sky130). Commercial foundry sign-off (TSMC, GF) requires Spectre + licensed PDK \u2014 out of scope for the MIT open-core."
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 waveform viewer",
-          "competitor": {
-            "status": "yes",
-            "note": "Virtuoso ADE includes a first-class waveform viewer (Virtuoso Visualization and Analysis XL)",
-            "source": "https://www.cadence.com/en_US/home/tools/custom-ic-analog-rf-design/circuit-simulation/spectre-simulation-platform.html"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "WaveformViewer.jsx: multi-trace SVG, zoom/pan/cursor measurement, .spice.waveform file kind",
-            "evidence": "src/components/silicon/WaveformViewer.jsx"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 schematic-driven simulation",
-          "competitor": {
-            "status": "yes",
-            "note": "Spectre + Virtuoso schematic editor; fully integrated testbench workflow",
-            "source": "https://www.cadence.com/en_US/home/tools/custom-ic-analog-rf-design/circuit-simulation/spectre-simulation-platform.html"
-          },
-          "kerf": {
-            "status": "no",
-            "note": "Kerf accepts netlists only; no analog schematic capture GUI yet"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 license cost",
-          "competitor": {
-            "status": "no",
-            "note": "Spectre requires a Cadence subscription; list price for a floating EDA suite licence is tens of thousands USD/year",
-            "source": "https://www.cadence.com/en_US/home/tools/custom-ic-analog-rf-design/circuit-simulation/spectre-simulation-platform.html"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "Kerf is MIT open-core; ngspice backend is free/open-source; cloud execution priced on credits at cost",
-            "evidence": "LICENSE"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 chat-native / LLM-driven flow",
-          "competitor": {
-            "status": "no",
-            "note": "Spectre is GUI + Tcl/SKILL scripted; no LLM interface",
-            "source": "https://www.cadence.com/en_US/home/tools/custom-ic-analog-rf-design/circuit-simulation/spectre-simulation-platform.html"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "All silicon tools reachable via plain-language prompts",
-            "evidence": "packages/kerf-silicon/"
-          }
-        }
-      ]
-    },
-    {
-      "slug": "hspice",
-      "competitor": "Synopsys HSPICE",
-      "category": "cad-silicon",
-      "left": "kerf",
-      "right": "hspice",
-      "hero_tagline": "HSPICE is the gold-standard sign-off SPICE \u2014 Kerf targets open-PDK workflows without a six-figure EDA budget.",
-      "reviewed_at": "2026-05-29",
-      "features": [
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 transient simulation",
-          "competitor": {
-            "status": "yes",
-            "note": "HSPICE .TRAN with multi-threading; considered the most accurate SPICE solver for production sign-off",
-            "source": "https://www.synopsys.com/implementation-and-signoff/ams-simulation/hspice.html"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "Transient via ngspice bridge; suitable for sky130/open-PDK scale netlists",
-            "evidence": "packages/kerf-silicon/bridges/ngspice_bridge.py"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 PVT corner sweep",
-          "competitor": {
-            "status": "yes",
-            "note": "HSPICE supports .ALTER and .TEMP sweeps for multi-corner analysis; integrated with Synopsys CustomSim for parallel corners",
-            "source": "https://www.synopsys.com/implementation-and-signoff/ams-simulation/hspice.html"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "60-corner automated sweep (5P \u00d7 3V \u00d7 4T) with Monte-Carlo via silicon_pvt_sweep",
-            "evidence": "packages/kerf-silicon/analog/pvt.py"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 Monte-Carlo mismatch",
-          "competitor": {
-            "status": "yes",
-            "note": "HSPICE Monte-Carlo with .MC directive and foundry-supplied mismatch models; used for production yield sign-off",
-            "source": "https://www.synopsys.com/implementation-and-signoff/ams-simulation/hspice.html"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "Pelgrom model (A_VT = 4 mV\u00b7\u00b5m, sky130) Monte-Carlo; not a foundry-certified MC deck",
-            "evidence": "packages/kerf-silicon/analog/pvt.py"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 commercial foundry sign-off accuracy",
-          "competitor": {
-            "status": "yes",
-            "note": "HSPICE is the sign-off simulator for Intel, IBM, and many foundries; PDKs ship in HSPICE format",
-            "source": "https://www.synopsys.com/implementation-and-signoff/ams-simulation/hspice.html"
-          },
-          "kerf": {
-            "status": "no",
-            "note": "Kerf uses ngspice + open PDK models. Commercial foundry sign-off (Intel, IBM) requires HSPICE + licensed PDK \u2014 outside the scope of the MIT open-core."
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 waveform viewer",
-          "competitor": {
-            "status": "yes",
-            "note": "HSPICE ships with CosmosScope waveform viewer; also integrates with Synopsys Custom WaveView",
-            "source": "https://www.synopsys.com/implementation-and-signoff/ams-simulation/hspice.html"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "WaveformViewer.jsx: multi-trace SVG, zoom/pan, dual cursors (A/B), \u0394T measurement",
-            "evidence": "src/components/silicon/WaveformViewer.jsx"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 license cost",
-          "competitor": {
-            "status": "no",
-            "note": "HSPICE is a premium commercial license; list price is in the range of $10k\u2013$50k/year depending on configuration",
-            "source": "https://www.synopsys.com/implementation-and-signoff/ams-simulation/hspice.html"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "Kerf is MIT open-core; ngspice backend is free; cloud execution priced at cost",
-            "evidence": "LICENSE"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 chat-native / LLM-driven flow",
-          "competitor": {
-            "status": "no",
-            "note": "HSPICE is CLI + Tcl scripted; no LLM interface",
-            "source": "https://www.synopsys.com/implementation-and-signoff/ams-simulation/hspice.html"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "All silicon SPICE tools reachable via plain-language prompts",
-            "evidence": "packages/kerf-silicon/"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 open PDK / sky130 workflow",
+          "domain": "D14",
+          "feature": "Change-impact analyzer + co-change suggestions (PROSTEP-iViP)",
           "competitor": {
             "status": "partial",
-            "note": "HSPICE can read sky130 SPICE models but sky130 PDK is designed and tested primarily against ngspice and Xyce",
-            "source": "https://github.com/google/skywater-pdk"
+            "note": "Change management available through PDM/PLM integration (Fusion Manage / Autodesk Vault); no standalone change-impact graph propagation in base Fusion",
+            "source": "https://help.autodesk.com/view/fusion360/ENU/?guid=MFG-MANAGE-OVERVIEW"
           },
           "kerf": {
             "status": "yes",
-            "note": "PVT sweep models are sky130-calibrated; ngspice bridge accepts sky130 PDK decks natively",
-            "evidence": "packages/kerf-silicon/analog/pvt.py"
-          }
-        }
-      ]
-    },
-    {
-      "slug": "ltspice",
-      "competitor": "LTspice",
-      "category": "cad-silicon",
-      "left": "kerf",
-      "right": "ltspice",
-      "hero_tagline": "LTspice is the free SPICE standard for analog designers \u2014 Kerf wraps it in a cloud-native, chat-driven workflow.",
-      "reviewed_at": "2026-05-29",
-      "features": [
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 transient simulation",
-          "competitor": {
-            "status": "yes",
-            "note": "LTspice .TRAN with native BSIM3/4/CMC models; fast SMPS-optimised solver",
-            "source": "https://www.analog.com/en/resources/design-tools-and-calculators/ltspice-simulator.html"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "Transient via ngspice bridge; .TRAN directive injected automatically; waveforms returned as .spice.waveform JSON",
-            "evidence": "packages/kerf-silicon/bridges/ngspice_bridge.py"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 AC small-signal analysis",
-          "competitor": {
-            "status": "yes",
-            "note": "LTspice .AC with frequency sweep; Bode, Nyquist, Nichols plots",
-            "source": "https://www.analog.com/en/resources/design-tools-and-calculators/ltspice-simulator.html"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "AC analysis via ngspice bridge (.AC directive)",
-            "evidence": "packages/kerf-silicon/bridges/ngspice_bridge.py"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 DC operating-point / sweep",
-          "competitor": {
-            "status": "yes",
-            "note": "LTspice .DC sweep and .OP operating-point",
-            "source": "https://www.analog.com/en/resources/design-tools-and-calculators/ltspice-simulator.html"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "DC sweep via ngspice bridge",
-            "evidence": "packages/kerf-silicon/bridges/ngspice_bridge.py"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 PVT corner sweep (60 corners)",
-          "competitor": {
-            "status": "partial",
-            "note": "LTspice supports .STEP for parametric sweeps but has no built-in PVT corner automation; each corner requires a manual .STEP or separate run",
-            "source": "https://www.analog.com/en/resources/design-tools-and-calculators/ltspice-simulator.html"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "60-corner PVT sweep (5P \u00d7 3V \u00d7 4T) with Monte-Carlo mismatch via silicon_pvt_sweep tool; Pelgrom-matched sky130 model",
-            "evidence": "packages/kerf-silicon/analog/pvt.py"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 Monte-Carlo mismatch",
-          "competitor": {
-            "status": "partial",
-            "note": "LTspice .MC command available but undocumented/limited; Analog Devices component libraries include some mismatch models",
-            "source": "https://www.analog.com/en/resources/design-tools-and-calculators/ltspice-simulator.html"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "Pelgrom model Monte-Carlo (A_VT = 4 mV\u00b7\u00b5m) per corner; 50 samples/corner default, configurable",
-            "evidence": "packages/kerf-silicon/analog/pvt.py"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 waveform viewer (interactive)",
-          "competitor": {
-            "status": "yes",
-            "note": "LTspice has a built-in waveform viewer with zoom/pan, cursors, FFT, probe expressions",
-            "source": "https://www.analog.com/en/resources/design-tools-and-calculators/ltspice-simulator.html"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "WaveformViewer.jsx: multi-trace SVG plot, zoom/scroll, dual cursors (A/B), \u0394T/\u0394Y measurement, per-trace toggle; .spice.waveform file kind",
-            "evidence": "src/components/silicon/WaveformViewer.jsx"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 netlist editor with syntax highlighting",
-          "competitor": {
-            "status": "yes",
-            "note": "LTspice schematic-driven + direct netlist editing",
-            "source": "https://www.analog.com/en/resources/design-tools-and-calculators/ltspice-simulator.html"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "SpiceRunPanel.jsx netlist textarea + Monaco SPICE syntax mode (.cir / .spice.net files)",
-            "evidence": "src/components/silicon/SpiceRunPanel.jsx"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 schematic capture GUI",
-          "competitor": {
-            "status": "yes",
-            "note": "LTspice has a full schematic capture GUI (proprietary symbol format)",
-            "source": "https://www.analog.com/en/resources/design-tools-and-calculators/ltspice-simulator.html"
-          },
-          "kerf": {
-            "status": "no",
-            "note": "Kerf accepts netlists directly; no schematic GUI for SPICE (circuit.tsx is for PCB-level schematics)"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 chat-native / LLM-driven flow",
-          "competitor": {
-            "status": "no",
-            "note": "LTspice is a standalone GUI application with no LLM interface",
-            "source": "https://www.analog.com/en/resources/design-tools-and-calculators/ltspice-simulator.html"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "All silicon tools reachable via plain-language prompts; LLM translates to tool calls, backed by doc-search",
-            "evidence": "packages/kerf-silicon/"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 open-source / free",
-          "competitor": {
-            "status": "yes",
-            "note": "LTspice is freeware (gratis but proprietary, Windows/macOS)",
-            "source": "https://www.analog.com/en/resources/design-tools-and-calculators/ltspice-simulator.html"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "Kerf is MIT open-core; the ngspice backend is GPL-licensed (user installs ngspice)",
-            "evidence": "LICENSE"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 sky130 / open PDK model support",
-          "competitor": {
-            "status": "partial",
-            "note": "LTspice supports generic SPICE level 3 / BSIM3 models but is not validated against sky130 SPICE decks",
-            "source": "https://www.analog.com/en/resources/design-tools-and-calculators/ltspice-simulator.html"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "PVT sweep models derived from sky130 BSIM4 corner data; ngspice bridge accepts sky130 PDK SPICE decks",
-            "evidence": "packages/kerf-silicon/analog/pvt.py"
-          }
-        }
-      ]
-    },
-    {
-      "slug": "ngspice",
-      "competitor": "NGSpice",
-      "category": "cad-silicon",
-      "left": "kerf",
-      "right": "ngspice",
-      "hero_tagline": "NGSpice is the open-source SPICE engine Kerf uses under the hood \u2014 Kerf adds the workflow layer on top.",
-      "reviewed_at": "2026-05-29",
-      "features": [
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 transient simulation",
-          "competitor": {
-            "status": "yes",
-            "note": "ngspice batch .TRAN via -b flag; supports BSIM3/4/6, HiSIM, PSP models",
-            "source": "https://ngspice.sourceforge.io/docs/ngspice-html-manual/manual.xhtml"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "Kerf wraps ngspice -b in a subprocess bridge; .TRAN injected automatically; result serialised to .spice.waveform JSON",
-            "evidence": "packages/kerf-silicon/bridges/ngspice_bridge.py"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 AC analysis",
-          "competitor": {
-            "status": "yes",
-            "note": "ngspice .AC with DEC/OCT/LIN sweep",
-            "source": "https://ngspice.sourceforge.io/docs/ngspice-html-manual/manual.xhtml"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "AC analysis via ngspice bridge",
-            "evidence": "packages/kerf-silicon/bridges/ngspice_bridge.py"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 PVT corner sweep",
-          "competitor": {
-            "status": "partial",
-            "note": "ngspice supports .STEP and shell scripting for corner sweeps; no built-in PVT automation",
-            "source": "https://ngspice.sourceforge.io/docs/ngspice-html-manual/manual.xhtml"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "60-corner automated PVT sweep (5P \u00d7 3V \u00d7 4T) with Monte-Carlo; silicon_pvt_sweep tool",
-            "evidence": "packages/kerf-silicon/analog/pvt.py"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 Monte-Carlo mismatch",
-          "competitor": {
-            "status": "partial",
-            "note": "ngspice supports MC via .PARAM + random() functions; requires manual model setup",
-            "source": "https://ngspice.sourceforge.io/docs/ngspice-html-manual/manual.xhtml"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "Pelgrom model Monte-Carlo built into PVT sweep; 50 samples/corner default",
-            "evidence": "packages/kerf-silicon/analog/pvt.py"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 waveform viewer",
-          "competitor": {
-            "status": "partial",
-            "note": "ngspice has a basic built-in plot command; serious use relies on external tools (KiCad, GAW, Xschem)",
-            "source": "https://ngspice.sourceforge.io/docs/ngspice-html-manual/manual.xhtml"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "First-class in-app WaveformViewer: multi-trace SVG, zoom/pan, dual cursors (A/B), \u0394T measurement",
-            "evidence": "src/components/silicon/WaveformViewer.jsx"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 interactive/GUI workflow",
-          "competitor": {
-            "status": "no",
-            "note": "ngspice is CLI-first; interactive mode exists but is not a GUI application",
-            "source": "https://ngspice.sourceforge.io/docs/ngspice-html-manual/manual.xhtml"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "SpiceRunPanel.jsx: netlist editor + analysis selector + Run button; results shown in WaveformViewer",
-            "evidence": "src/components/silicon/SpiceRunPanel.jsx"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 chat-native / LLM flow",
-          "competitor": {
-            "status": "no",
-            "note": "ngspice is a CLI tool with no LLM interface",
-            "source": "https://ngspice.sourceforge.io/docs/ngspice-html-manual/manual.xhtml"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "All SPICE analyses reachable via plain-language prompts",
-            "evidence": "packages/kerf-silicon/"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "SPICE \u2014 open-source",
-          "competitor": {
-            "status": "yes",
-            "note": "ngspice is LGPL/BSD \u2014 fully open-source",
-            "source": "https://ngspice.sourceforge.io/"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "Kerf is MIT open-core; ngspice backend installed separately by user (GPL/LGPL)",
-            "evidence": "LICENSE"
+            "note": "Change-impact analyzer + co-change suggestions (PROSTEP-iViP). BFS propagation through BOM + assembly + requirements graph; impact levels high/medium/low; rework cost estimate; mates-interface co-change heuristics. LLM tools: plm_change_impact, plm_propose_co_changes.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/change_impact.py"
           }
         }
       ]
@@ -12312,20 +11579,6 @@
             "status": "yes",
             "note": "Kerf hosted environment provides cloud compute for OpenROAD runs",
             "evidence": "cloud/"
-          }
-        },
-        {
-          "domain": "D6",
-          "feature": "Silicon — IBIS 7.1 model import + eye-diagram",
-          "competitor": {
-            "status": "partial",
-            "note": "OpenROAD does not include an IBIS model parser; signal-integrity simulation requires separate tools (HyperLynx, Sigrity, etc.)",
-            "source": "https://openroad.readthedocs.io/en/latest/main/README.html"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "IBIS 7.1 model import + eye-diagram ✅ — [Component]/[Pin]/[Model]/[Pulldown]/[Pullup]/[GND_clamp]/[POWER_clamp]/[Ramp] parser; IV interpolation; analytical eye opening/width/jitter at arbitrary bit-rate + load (silicon_import_ibis, silicon_eye_diagram LLM tools). NOT IBIS-certified.",
-            "evidence": "packages/kerf-silicon/src/kerf_silicon/ibis_import.py"
           }
         }
       ]
@@ -13125,9 +12378,9 @@
             "source": "https://www.openfoam.com/documentation/guides/latest/doc/openfoam-guide.html"
           },
           "kerf": {
-            "status": "yes",
-            "note": "OpenFOAM bridge (SHA c9008860): incompressibleFoam + simpleFoam case generator + polyMesh writer + result parser; LLM tools wired",
-            "evidence": "packages/kerf-cfd/src/kerf_cfd/openfoam_bridge.py"
+            "status": "partial",
+            "note": "OpenFOAM backend bridge; chat-native case generation; needs OpenFOAM install",
+            "evidence": "packages/kerf-cfd/"
           }
         },
         {
@@ -13139,9 +12392,9 @@
             "source": "https://www.openfoam.com/documentation/guides/latest/doc/openfoam-guide.html"
           },
           "kerf": {
-            "status": "yes",
-            "note": "OpenFOAM bridge (SHA c9008860): rhoCentralFoam + sonicFoam compressible solvers; chat-native case generation",
-            "evidence": "packages/kerf-cfd/src/kerf_cfd/openfoam_bridge.py"
+            "status": "partial",
+            "note": "OpenFOAM backend bridge; core compressible solvers exposed via chat",
+            "evidence": "packages/kerf-cfd/"
           }
         },
         {
@@ -13153,9 +12406,9 @@
             "source": "https://www.openfoam.com/documentation/guides/latest/doc/openfoam-guide.html"
           },
           "kerf": {
-            "status": "yes",
-            "note": "OpenFOAM bridge (SHA c9008860): chtMultiRegionFoam CHT case generation; heat_transfer.py validates convective coupling",
-            "evidence": "packages/kerf-cfd/src/kerf_cfd/openfoam_bridge.py"
+            "status": "partial",
+            "note": "OpenFOAM backend bridge; CHT solver accessible via LLM tool",
+            "evidence": "packages/kerf-cfd/"
           }
         },
         {
@@ -13196,9 +12449,9 @@
             "source": "https://www.openfoam.com/documentation/guides/latest/doc/openfoam-guide.html"
           },
           "kerf": {
-            "status": "yes",
-            "note": "k-\u03b5 RANS (Launder-Spalding 1974, SHA f9c33663) + k-\u03c9 SST; chat-native case generation via OpenFOAM bridge (SHA c9008860)",
-            "evidence": "packages/kerf-cfd/src/kerf_cfd/rans_tool.py"
+            "status": "partial",
+            "note": "k-eps and k-omega SST exposed via chat case generation; full model library via direct OpenFOAM",
+            "evidence": "packages/kerf-cfd/"
           }
         },
         {
@@ -13767,8 +13020,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Seidel aberrations S1-S5 (corrected 2026-05-24); Zernike polynomial aberration decomposition (Noll 1976) ✅ — fit_zernike, reconstruct_wavefront, classical_aberration_breakdown; optics_fit_zernike + optics_aberration_breakdown LLM tools",
-            "evidence": "packages/kerf-optics/src/kerf_optics/zernike.py"
+            "note": "Seidel aberrations S1-S5 (corrected 2026-05-24); no Zernike decomposition",
+            "evidence": "packages/kerf-optics/src/kerf_optics/lens_system.py"
           }
         },
         {
@@ -13990,9 +13243,9 @@
             "source": "https://docs.blender.org/manual/en/latest/render/index.html"
           },
           "kerf": {
-            "status": "yes",
-            "note": "Live HLR projection (make2d) + auto-dim + GD&T toolbar + FCF click-to-place (GdntToolbar.jsx, SHA 0d74e89c)",
-            "evidence": "src/components/DrawingView.jsx"
+            "status": "partial",
+            "note": "Live HLR projection (make2d) + auto-dim; no GD&T-placement UI",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/make2d.py"
           }
         },
         {
@@ -14004,9 +13257,9 @@
             "source": "https://docs.blender.org/manual/en/latest/modeling/index.html"
           },
           "kerf": {
-            "status": "yes",
-            "note": "GdntToolbar.jsx ISO 1101 + FCF click-to-place + Pmi3DOverlay.jsx 3D PMI (SHA 0d74e89c)",
-            "evidence": "src/components/GdntToolbar.jsx"
+            "status": "partial",
+            "note": "Data model only; no UI",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core"
           }
         },
         {
@@ -15907,330 +15160,6 @@
       ]
     },
     {
-      "slug": "carrier-hap",
-      "competitor": "Carrier HAP (Hourly Analysis Program)",
-      "category": "hvac-energy",
-      "left": "kerf",
-      "right": "carrier-hap",
-      "hero_tagline": "Building energy analysis and HVAC system design \u2014 Carrier HAP vs MIT open-core.",
-      "reviewed_at": "2026-05-29",
-      "features": [
-        {
-          "name": "Cooling / heating load calculation (ASHRAE CLTD/RTS)",
-          "competitor": {
-            "status": "yes",
-            "source": "https://www.carrier.com/commercial/en/us/software/hvac-system-design/hourly-analysis-program/",
-            "note": "Full RTS room-by-room load with ASHRAE HOF 2017 method"
-          },
-          "kerf": {
-            "status": "yes",
-            "evidence": "packages/kerf-hvac/src/kerf_hvac/sizing.py",
-            "note": "ASHRAE CLTD/RTS transient cooling loads shipped"
-          }
-        },
-        {
-          "name": "AHRI-listed equipment catalogue",
-          "competitor": {
-            "status": "yes",
-            "source": "https://www.carrier.com/commercial/en/us/software/hvac-system-design/hourly-analysis-program/",
-            "note": "Integrated AHRI certified product directory with live lookup"
-          },
-          "kerf": {
-            "status": "yes",
-            "evidence": "packages/kerf-hvac/src/kerf_hvac/ahri_catalogue.py",
-            "note": "30 representative AHRI-listed models (6 categories, 5 per); real AHRI numbers + certified part-load curves. OEM-complete follow-on TBD."
-          }
-        },
-        {
-          "name": "SMACNA duct sizing (velocity / equal-friction methods)",
-          "competitor": {
-            "status": "yes",
-            "source": "https://www.carrier.com/commercial/en/us/software/hvac-system-design/hourly-analysis-program/",
-            "note": "Full duct system design in HAP"
-          },
-          "kerf": {
-            "status": "yes",
-            "evidence": "packages/kerf-hvac/src/kerf_hvac/sizing.py",
-            "note": "ASHRAE velocity method + Darcy-Weisbach + SMACNA minor-loss coefficients"
-          }
-        },
-        {
-          "name": "Part-load efficiency curves (AHRI-certified)",
-          "competitor": {
-            "status": "yes",
-            "source": "https://www.carrier.com/commercial/en/us/software/hvac-system-design/hourly-analysis-program/",
-            "note": "AHRI certified performance data for HAP equipment library"
-          },
-          "kerf": {
-            "status": "yes",
-            "evidence": "packages/kerf-hvac/src/kerf_hvac/ahri_catalogue.py",
-            "note": "AHRI-certified part-load curves at 25/50/75/100% load \u2014 not normalised illustrative values"
-          }
-        },
-        {
-          "name": "Annual hourly energy simulation (8760-hour)",
-          "competitor": {
-            "status": "yes",
-            "source": "https://www.carrier.com/commercial/en/us/software/hvac-system-design/hourly-analysis-program/",
-            "note": "Full 8760-hour weather-file simulation; DOE-2 based engine"
-          },
-          "kerf": {
-            "status": "no",
-            "note": "Hourly energy simulation not yet implemented; steady-state load calc only"
-          }
-        },
-        {
-          "name": "ASHRAE 90.1 / LEED energy compliance reporting",
-          "competitor": {
-            "status": "yes",
-            "source": "https://www.carrier.com/commercial/en/us/software/hvac-system-design/hourly-analysis-program/",
-            "note": "LEED EAp2 / EAc1 reports built-in"
-          },
-          "kerf": {
-            "status": "no",
-            "note": "No ASHRAE 90.1 compliance reporting yet"
-          }
-        },
-        {
-          "name": "IFC / BIM geometry import",
-          "competitor": {
-            "status": "no",
-            "note": "HAP is standalone; no native IFC import"
-          },
-          "kerf": {
-            "status": "yes",
-            "evidence": "packages/kerf-bim/src/kerf_bim/ifc_import.py",
-            "note": "Full IFC Tier 1+2 import including MEP elements"
-          }
-        },
-        {
-          "name": "Open-source core / scripting API",
-          "competitor": {
-            "status": "no",
-            "note": "Proprietary Windows desktop app; no public API"
-          },
-          "kerf": {
-            "status": "yes",
-            "evidence": "packages/kerf-hvac/src/kerf_hvac/tools.py",
-            "note": "MIT-licensed Python plugin; full JSON-RPC LLM tool surface including hvac.equipment_select"
-          }
-        }
-      ]
-    },
-    {
-      "slug": "ies-ve",
-      "competitor": "IES VE (Virtual Environment)",
-      "category": "hvac-energy",
-      "left": "kerf",
-      "right": "ies-ve",
-      "hero_tagline": "Integrated building performance simulation \u2014 IES VE vs MIT open-core.",
-      "reviewed_at": "2026-05-29",
-      "features": [
-        {
-          "name": "Dynamic thermal simulation (ASHRAE fundamentals)",
-          "competitor": {
-            "status": "yes",
-            "source": "https://www.iesve.com/software/virtual-environment",
-            "note": "APACHE / APACHESIM dynamic simulation; ASHRAE HB methods; CIBSE TM54"
-          },
-          "kerf": {
-            "status": "yes",
-            "evidence": "packages/kerf-hvac/src/kerf_hvac/sizing.py",
-            "note": "ASHRAE CLTD/RTS steady-state loads; dynamic 8760-hour not yet implemented"
-          }
-        },
-        {
-          "name": "AHRI-listed equipment catalogue",
-          "competitor": {
-            "status": "yes",
-            "source": "https://www.iesve.com/software/virtual-environment",
-            "note": "MacroFlo / HVAC systems library with manufacturer-supplied performance data"
-          },
-          "kerf": {
-            "status": "yes",
-            "evidence": "packages/kerf-hvac/src/kerf_hvac/ahri_catalogue.py",
-            "note": "30 representative AHRI-listed models (6 categories, 5 per); real AHRI cert numbers + certified part-load curves. OEM-complete follow-on TBD."
-          }
-        },
-        {
-          "name": "Part-load efficiency curves (AHRI-certified)",
-          "competitor": {
-            "status": "yes",
-            "source": "https://www.iesve.com/software/virtual-environment",
-            "note": "Manufacturer-supplied COP/EER curves with hourly interpolation"
-          },
-          "kerf": {
-            "status": "yes",
-            "evidence": "packages/kerf-hvac/src/kerf_hvac/ahri_catalogue.py",
-            "note": "AHRI-certified part-load curves at 25/50/75/100% load from directory listings"
-          }
-        },
-        {
-          "name": "Daylighting + solar radiation simulation",
-          "competitor": {
-            "status": "yes",
-            "source": "https://www.iesve.com/software/virtual-environment",
-            "note": "Radiance integration; climate-based daylight; LEED v4 IEQ; BREEAM"
-          },
-          "kerf": {
-            "status": "partial",
-            "note": "energy_daylight LLM tool: split-flux daylight factor (BS 8206-2 + IES LM-83-12 sDA/ASE); no 3D ray-traced daylighting simulation",
-            "evidence": "packages/kerf-energy/src/kerf_energy/daylight.py"
-          }
-        },
-        {
-          "name": "CFD internal airflow (IESVE MicroFlo)",
-          "competitor": {
-            "status": "yes",
-            "source": "https://www.iesve.com/software/modules/microflo-cfd",
-            "note": "Integrated CFD for room airflow and stratification"
-          },
-          "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-fem/src/kerf_fem/cfd_navier_stokes.py",
-            "note": "2-D projection Navier-Stokes shipped; full 3-D room CFD not yet wired"
-          }
-        },
-        {
-          "name": "Full HVAC plant + air-side system modelling",
-          "competitor": {
-            "status": "yes",
-            "source": "https://www.iesve.com/software/modules/apache-hvac",
-            "note": "APACHE HVAC: full plant loop + air handling unit control sequences"
-          },
-          "kerf": {
-            "status": "no",
-            "note": "Equipment selection + duct sizing only; no full plant loop simulation"
-          }
-        },
-        {
-          "name": "IFC import for geometry",
-          "competitor": {
-            "status": "yes",
-            "source": "https://www.iesve.com/software/virtual-environment",
-            "note": "IFC 2x3 and IFC4 import for building geometry"
-          },
-          "kerf": {
-            "status": "yes",
-            "evidence": "packages/kerf-bim/src/kerf_bim/ifc_import.py",
-            "note": "Full IFC Tier 1+2 including MEP elements; IFC 2x3 + IFC4"
-          }
-        },
-        {
-          "name": "Open-source / scripting API",
-          "competitor": {
-            "status": "partial",
-            "note": "VE-API (proprietary COM/Python bindings for automation; not open-source)"
-          },
-          "kerf": {
-            "status": "yes",
-            "evidence": "packages/kerf-hvac/src/kerf_hvac/tools.py",
-            "note": "MIT-licensed; full JSON-RPC LLM tool surface; hvac.equipment_select wired"
-          }
-        }
-      ]
-    },
-    {
-      "slug": "trace-3d",
-      "competitor": "Trane TRACE 3D Plus",
-      "category": "hvac-energy",
-      "left": "kerf",
-      "right": "trace-3d",
-      "hero_tagline": "Commercial building energy analysis and HVAC design \u2014 TRACE 3D Plus vs MIT open-core.",
-      "reviewed_at": "2026-05-29",
-      "features": [
-        {
-          "name": "Cooling / heating load calculation (RTS / HAP-comparable)",
-          "competitor": {
-            "status": "yes",
-            "source": "https://www.trane.com/commercial/north-america/us/en/products-systems/design-and-analysis-tools/analysis-tools/trace-3d-plus.html",
-            "note": "ASHRAE RTS + whole-building energy model; 8760-hour DOE-2.2 engine"
-          },
-          "kerf": {
-            "status": "yes",
-            "evidence": "packages/kerf-hvac/src/kerf_hvac/sizing.py",
-            "note": "ASHRAE CLTD/RTS steady-state; 8760-hour engine not yet implemented"
-          }
-        },
-        {
-          "name": "AHRI-listed equipment catalogue",
-          "competitor": {
-            "status": "yes",
-            "source": "https://www.trane.com/commercial/north-america/us/en/products-systems/design-and-analysis-tools/analysis-tools/trace-3d-plus.html",
-            "note": "TRACE includes Trane and third-party AHRI certified equipment with part-load curves"
-          },
-          "kerf": {
-            "status": "yes",
-            "evidence": "packages/kerf-hvac/src/kerf_hvac/ahri_catalogue.py",
-            "note": "30 representative AHRI-listed models (6 categories, 5 per); real AHRI cert numbers + certified part-load curves from AHRI directory. OEM-complete follow-on TBD."
-          }
-        },
-        {
-          "name": "Part-load efficiency curves (AHRI-certified)",
-          "competitor": {
-            "status": "yes",
-            "source": "https://www.trane.com/commercial/north-america/us/en/products-systems/design-and-analysis-tools/analysis-tools/trace-3d-plus.html",
-            "note": "AHRI certified equipment curves used in hourly simulation"
-          },
-          "kerf": {
-            "status": "yes",
-            "evidence": "packages/kerf-hvac/src/kerf_hvac/ahri_catalogue.py",
-            "note": "AHRI-certified part-load values at 25/50/75/100% load \u2014 same source (ahridirectory.org)"
-          }
-        },
-        {
-          "name": "Duct and hydronic pipe sizing",
-          "competitor": {
-            "status": "yes",
-            "source": "https://www.trane.com/commercial/north-america/us/en/products-systems/design-and-analysis-tools/analysis-tools/trace-3d-plus.html",
-            "note": "Full duct sizing, equal-friction and velocity methods; hydronic balancing"
-          },
-          "kerf": {
-            "status": "yes",
-            "evidence": "packages/kerf-hvac/src/kerf_hvac/sizing.py",
-            "note": "Velocity + equal-friction duct sizing; Darcy-Weisbach + SMACNA minor losses"
-          }
-        },
-        {
-          "name": "ASHRAE 90.1 / Title 24 compliance baseline modelling",
-          "competitor": {
-            "status": "yes",
-            "source": "https://www.trane.com/commercial/north-america/us/en/products-systems/design-and-analysis-tools/analysis-tools/trace-3d-plus.html",
-            "note": "ASHRAE 90.1 Appendix G baseline automation; LEED EAp2"
-          },
-          "kerf": {
-            "status": "no",
-            "note": "No ASHRAE 90.1 compliance reporting yet"
-          }
-        },
-        {
-          "name": "Revit / IFC geometry import",
-          "competitor": {
-            "status": "yes",
-            "source": "https://www.trane.com/commercial/north-america/us/en/products-systems/design-and-analysis-tools/analysis-tools/trace-3d-plus.html",
-            "note": "Revit gbXML export \u2192 TRACE 3D import workflow"
-          },
-          "kerf": {
-            "status": "yes",
-            "evidence": "packages/kerf-bim/src/kerf_bim/ifc_import.py",
-            "note": "Native IFC Tier 1+2 import; no gbXML reader yet"
-          }
-        },
-        {
-          "name": "Open-source / scripting API",
-          "competitor": {
-            "status": "no",
-            "note": "Proprietary Windows app; no public API"
-          },
-          "kerf": {
-            "status": "yes",
-            "evidence": "packages/kerf-hvac/src/kerf_hvac/tools.py",
-            "note": "MIT-licensed Python plugin; JSON-RPC LLM tool surface; hvac.equipment_select"
-          }
-        }
-      ]
-    },
-    {
       "slug": "rhino",
       "competitor": "Rhino",
       "category": "jewelry-nurbs",
@@ -16333,8 +15262,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "mesh_repair (fill_holes/manifold), retopo_snap, mesh_to_nurbs; NURBS↔Mesh reconciliation with fidelity tracking (Lévy 2009) ✅; no SDF-envelope ShrinkWrap",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/mesh_reconciliation.py"
+            "note": "mesh_repair (fill_holes/manifold), retopo_snap, mesh_to_nurbs; no SDF-envelope ShrinkWrap",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/mesh_repair.py"
           }
         },
         {
@@ -17284,143 +16213,6 @@
             "status": "yes",
             "note": "push_pull (planar + curved), move_face, delete_face wired as ops",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/direct_edit.py"
-          }
-        }
-      ]
-    },
-    {
-      "slug": "openfoam-microfluidics",
-      "competitor": "OpenFOAM (microfluidics use-case)",
-      "category": "microfluidics",
-      "left": "kerf",
-      "right": "openfoam-microfluidics",
-      "hero_tagline": "General-purpose CFD solver used for microfluidics vs purpose-built microfluidic design tool.",
-      "reviewed_at": "2026-05-30",
-      "features": [
-        {
-          "domain": "D11",
-          "feature": "Rectangular microchannel pressure drop (Bruus 2008 eq. 3.27 Fourier-series)",
-          "competitor": {
-            "status": "yes",
-            "note": "Solvable via laminar Navier-Stokes but requires mesh setup and solver run",
-            "source": "https://www.openfoam.com/documentation/guides/latest/doc/guide-applications-solvers-incompressible-icoFoam.html"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "Channel cross-section optimizer (Bruus 2008 eq. 3.27) — analytical, instant",
-            "evidence": "packages/kerf-microfluidics/src/kerf_microfluidics/channel_optimizer.py"
-          }
-        },
-        {
-          "domain": "D11",
-          "feature": "Trapezoidal (DRIE) channel pressure drop",
-          "competitor": {
-            "status": "yes",
-            "note": "Solvable via CFD with trapezoidal mesh cross-section; no dedicated DRIE utility",
-            "source": "https://www.openfoam.com"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "pressure_drop_trapezoidal — hydraulic diameter method (Nguyen-Wereley 2002 §2.3)",
-            "evidence": "packages/kerf-microfluidics/src/kerf_microfluidics/channel_optimizer.py"
-          }
-        },
-        {
-          "domain": "D11",
-          "feature": "Semicircular channel pressure drop",
-          "competitor": {
-            "status": "yes",
-            "note": "Solvable via CFD; no dedicated semicircular utility",
-            "source": "https://www.openfoam.com"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "pressure_drop_semicircular — hydraulic diameter method",
-            "evidence": "packages/kerf-microfluidics/src/kerf_microfluidics/channel_optimizer.py"
-          }
-        },
-        {
-          "domain": "D11",
-          "feature": "Cross-section optimizer (min footprint for pressure budget)",
-          "competitor": {
-            "status": "no",
-            "note": "OpenFOAM has no built-in optimizer; requires external adjoint or parametric sweep",
-            "source": "https://www.openfoam.com"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "optimize_cross_section — grid search over shape + aspect ratio + size; returns min footprint satisfying ΔP budget",
-            "evidence": "packages/kerf-microfluidics/src/kerf_microfluidics/channel_optimizer.py"
-          }
-        },
-        {
-          "domain": "D11",
-          "feature": "Reynolds number / flow regime classification",
-          "competitor": {
-            "status": "yes",
-            "note": "Computed post-hoc from simulation velocity field",
-            "source": "https://www.openfoam.com"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "reynolds_number() + laminar/turbulent regime label; LLM tool microfluidics_pressure_drop returns it inline",
-            "evidence": "packages/kerf-microfluidics/src/kerf_microfluidics/channel_optimizer.py"
-          }
-        },
-        {
-          "domain": "D11",
-          "feature": "Microfluidic network solver",
-          "competitor": {
-            "status": "partial",
-            "note": "Solvable as multi-inlet/outlet CFD; no dedicated resistor-network abstraction",
-            "source": "https://www.openfoam.com"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "MicrofluidicNetwork — sparse linear system, parallel/series, arbitrary topology",
-            "evidence": "packages/kerf-microfluidics/src/kerf_microfluidics/networks.py"
-          }
-        },
-        {
-          "domain": "D11",
-          "feature": "MEMS cantilever stiffness + resonance",
-          "competitor": {
-            "status": "no",
-            "note": "Out of scope for OpenFOAM (structural, not fluid)",
-            "source": "https://www.openfoam.com"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "cantilever_stiffness + cantilever_resonance (Euler-Bernoulli); lumped-mass model; LLM tool microfluidics_mems",
-            "evidence": "packages/kerf-microfluidics/src/kerf_microfluidics/mems_cantilever.py"
-          }
-        },
-        {
-          "domain": "D11",
-          "feature": "Passive mixer geometry (serpentine + herringbone)",
-          "competitor": {
-            "status": "no",
-            "note": "No geometry generator; users must supply mesh manually",
-            "source": "https://www.openfoam.com"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "serpentine_geometry + herringbone_geometry; LLM tool microfluidics_mixer",
-            "evidence": "packages/kerf-microfluidics/src/kerf_microfluidics/mixers.py"
-          }
-        },
-        {
-          "domain": "D11",
-          "feature": "LLM-callable tools for microfluidic design",
-          "competitor": {
-            "status": "no",
-            "note": "No LLM integration; CLI/Python API only",
-            "source": "https://www.openfoam.com"
-          },
-          "kerf": {
-            "status": "yes",
-            "note": "6 LLM tools: microfluidics_channel, microfluidics_network, microfluidics_mems, microfluidics_mixer, microfluidics_pressure_drop, microfluidics_optimize_channel",
-            "evidence": "packages/kerf-microfluidics/src/kerf_microfluidics/tools.py"
           }
         }
       ]

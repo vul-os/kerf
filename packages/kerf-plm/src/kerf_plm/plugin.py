@@ -48,6 +48,17 @@ async def register(app: FastAPI, ctx):
     except Exception:
         pass  # sysml tools optional — fail silently if XMI deps unavailable.
 
+    # Change-impact analyzer (PROSTEP-iViP SIG) — Wave 4NN.
+    try:
+        from kerf_plm.tools import (
+            plm_change_impact_spec, run_plm_change_impact,
+            plm_propose_co_changes_spec, run_plm_propose_co_changes,
+        )
+        ctx.tools.register("plm_change_impact", plm_change_impact_spec, run_plm_change_impact)
+        ctx.tools.register("plm_propose_co_changes", plm_propose_co_changes_spec, run_plm_propose_co_changes)
+    except Exception:
+        pass  # change-impact tools optional — fail silently if symbols missing.
+
     try:
         from kerf_core.plugin import PluginManifest
         return PluginManifest(

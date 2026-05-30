@@ -1842,3 +1842,154 @@ async def run_optics_compute_coma(ctx, args: bytes) -> str:
     if isinstance(result, dict):
         return json.dumps(result)
     return ok_payload(result.to_dict())
+
+# Tool: optics_compute_chromatic_focus
+# ---------------------------------------------------------------------------
+
+from kerf_cad_core.optics.chromatic_focus import (  # noqa: E402
+    GLASS_SELLMEIER,
+    ChromaticReport,
+    LensElement,
+    compute_chromatic_focus,
+)
+
+_compute_chromatic_focus_spec = ToolSpec(
+    name="optics_compute_chromatic_focus",
+    description=(
+        "Compute longitudinal chromatic aberration (LCA) through a thin-lens stack\n"
+        "using Sellmeier dispersion for each glass element.\n"
+        "\n"
+        "For each wavelength λ, refractive indices n(λ) are evaluated from the\n"
+        "Sellmeier equation:\n"
+        "  n²(λ) = 1 + Σ B_i·λ²/(λ² − C_i)   [λ in μm; Schott catalog coefficients]\n"
+        "\n"
+        "The paraxial back focal length (BFL) is derived via thin-lens ABCD matrix\n"
+        "reduction at each wavelength. Primary LCA is:\n"
+        "  LCA = BFL(F, 486 nm) − BFL(C, 656 nm)\n"
+        "\n"
+        "Depth bar (Hecht §6.3 / Welford §6.5):\n"
+        "  BK7 singlet f=100 mm: V = (n_d−1)/(n_F−n_C) ≈ 64.2; LCA ≈ f/V ≈ 1.56 mm.\n"
+        "  BK7+F2 achromatic doublet: LCA < 0.1 mm (F-line focus ≈ C-line focus).\n"
+        "  SF6 singlet f=100 mm: V ≈ 25.4; LCA ≈ 3.9 mm (high LCA dense flint).\n"
+        "\n"
+        "HONEST FLAGS:\n"
+        "  * PARAXIAL THIN-LENS LCA ONLY. Chromatic lateral aberration (transverse\n"
+        "    colour) is NOT computed (requires real chief-ray traces per wavelength).\n"
+        "  * Thick-lens principal-plane shifts with wavelength are not modelled.\n"
+        "  * V_number is reported only for single-element stacks; multi-element\n"
+        "    stacks require system-level Abbe analysis (not implemented).\n"
+        "\n"
+        "Supported glasses: BK7, F2, SF6, K5, SF11, BK10 (Schott catalog 2023).\n"
+        "\n"
+        "Each element of 'stack' requires:\n"
+        "  glass          — glass name string (e.g. 'BK7')\n"
+        "  R1             — front radius of curvature (mm). Non-zero; use 1e18 for flat.\n"
+        "  R2             — rear radius of curvature (mm). Non-zero; use -1e18 for flat.\n"
+        "  separation_mm  — axial gap to next element (mm). 0 for last element.\n"
+        "\n"
+        "Returns:\n"
+        "  per_wavelength_focal_mm — dict mapping e.g. '486nm' -> BFL (mm)\n"
+        "  lca_FC_mm               — BFL(486nm) − BFL(656nm)  (mm; negative = blue shorter)\n"
+        "  lca_percent             — |LCA| / mean_BFL × 100\n"
+        "  V_number                — Abbe V-number (singlet only; null for multi-element)\n"
+        "  mean_BFL_mm             — mean BFL across requested wavelengths\n"
+        "  honest_flag             — scope caveats\n"
+        "\n"
+        "Errors: {ok:false, reason} for invalid inputs. Never raises.\n"
+        "\n"
+        "References: Hecht §6.3; Welford (1986) §6.5; Schott Optical Glass catalog 2023."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "stack": {
+                "type": "array",
+                "description": (
+                    "Ordered list of thin-lens elements, front to back. "
+                    "Each element: glass (str), R1 (mm), R2 (mm), separation_mm (mm, default 0)."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "glass": {
+                            "type": "string",
+                            "description": (
+                                "Schott glass name. Supported: "
+                                "BK7, F2, SF6, K5, SF11, BK10."
+                            ),
+                        },
+                        "R1": {
+                            "type": "number",
+                            "description": (
+                                "Front surface radius of curvature (mm). "
+                                "Non-zero; use 1e18 for flat surface."
+                            ),
+                        },
+                        "R2": {
+                            "type": "number",
+                            "description": (
+                                "Rear surface radius of curvature (mm). "
+                                "Non-zero; use -1e18 for flat surface."
+                            ),
+                        },
+                        "separation_mm": {
+                            "type": "number",
+                            "description": (
+                                "Axial gap to next element (mm). "
+                                "Use 0 for last element or cemented pair."
+                            ),
+                        },
+                    },
+                    "required": ["glass", "R1", "R2"],
+                },
+            },
+            "wavelengths_nm": {
+                "type": "array",
+                "description": (
+                    "Wavelengths to evaluate (nm). "
+                    "Defaults to [486, 587, 656] (F, d, C Fraunhofer lines)."
+                ),
+                "items": {"type": "number"},
+            },
+        },
+        "required": ["stack"],
+    },
+)
+
+
+@register(_compute_chromatic_focus_spec, write=False)
+async def run_compute_chromatic_focus(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    raw_stack = a.get("stack")
+    if raw_stack is None:
+        return json.dumps({"ok": False, "reason": "stack is required"})
+    if not isinstance(raw_stack, list) or len(raw_stack) == 0:
+        return json.dumps({"ok": False, "reason": "stack must be a non-empty list"})
+
+    elements = []
+    for i, elem in enumerate(raw_stack):
+        if not isinstance(elem, dict):
+            return json.dumps({"ok": False, "reason": f"stack[{i}] must be an object"})
+        glass = elem.get("glass")
+        if not isinstance(glass, str):
+            return json.dumps({"ok": False, "reason": f"stack[{i}].glass must be a string"})
+        R1 = elem.get("R1")
+        R2 = elem.get("R2")
+        if R1 is None or R2 is None:
+            return json.dumps({"ok": False, "reason": f"stack[{i}] requires R1 and R2"})
+        sep = float(elem.get("separation_mm", 0.0))
+        elements.append(LensElement(glass=glass, R1=float(R1), R2=float(R2), separation_mm=sep))
+
+    wavelengths = a.get("wavelengths_nm")
+    if wavelengths is not None:
+        if not isinstance(wavelengths, list) or len(wavelengths) == 0:
+            return json.dumps({"ok": False, "reason": "wavelengths_nm must be a non-empty list"})
+
+    result = compute_chromatic_focus(elements, wavelengths_nm=wavelengths)
+    if isinstance(result, dict):
+        return json.dumps(result)
+    return ok_payload(result.to_dict())

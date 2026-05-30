@@ -13645,6 +13645,20 @@
         },
         {
           "domain": "D12",
+          "feature": "Longitudinal chromatic aberration (Sellmeier LCA)",
+          "competitor": {
+            "status": "yes",
+            "note": "Full polychromatic analysis: longitudinal and transverse chromatic aberration; Sellmeier dispersion for all catalog glasses; achromatic doublet design",
+            "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Longitudinal chromatic aberration (OPTICS-CHROMATIC-FOCUS): Sellmeier equation n²(λ)=1+Σ B_i λ²/(λ²−C_i) for BK7/F2/SF6/K5/SF11/BK10 (Schott catalog 2023); per-wavelength BFL via ABCD thin-lens stack; LCA_FC=BFL(486nm)−BFL(656nm); Abbe V-number (singlet); BK7 V≈64.2 verified; achromat BK7+F2 LCA<0.1mm verified; SF6 high LCA verified; LLM tool optics_compute_chromatic_focus; 34 hermetic tests. Honest: paraxial thin-lens LCA only; chromatic lateral aberration (transverse colour) not computed.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/chromatic_focus.py"
+          }
+        },
+        {
+          "domain": "D12",
           "feature": "Non-sequential ray tracing (stray light)",
           "competitor": {
             "status": "yes",

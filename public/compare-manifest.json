@@ -9126,6 +9126,12 @@
         },
         {
           "domain": "D5",
+          "feature": "Layup angle optimizer (Tsai-Hahn 1980 + Daniel-Ishai 2006)",
+          "competitor": "{ status: paid, note: \"CATIA Composites / HyperWorks OptiStruct — ply angle optimisation as add-in; no open-source baseline\", source: \"https://www.3ds.com/products/catia/composites-design\" }",
+          "kerf": "{ status: yes, note: \"Simulated-annealing search over discrete angles; minimise weight subject to Tsai-Wu FPF margin ≥ 1.5; symmetric + balanced constraint; LLM tools composites_optimize_layup + composites_failure_check\", evidence: \"packages/kerf-composites/src/kerf_composites/layup_optimizer.py\" }"
+        },
+        {
+          "domain": "D5",
           "feature": "6-DOF flight dynamics + stability derivs",
           "competitor": "{ status: no, note: \"No built-in 6-DOF flight dynamics in CATIA\", source: \"https://www.3ds.com/products/catia\" }",
           "kerf": "{ status: yes, note: \"Backend only\", evidence: \"packages/kerf-aero/src/kerf_aero/aeroelasticity.py\" }"

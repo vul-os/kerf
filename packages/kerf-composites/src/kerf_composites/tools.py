@@ -5,11 +5,13 @@ Registered via plugin.py at startup.
 
 Tools
 -----
-layup_analysis          — Classical Laminate Theory A/B/D + failure indices
-composites_drape        — geodesic drape of flat ply sheet onto 3D surface
-composites_interlaminar — interlaminar shear stress (ILSS) at ply interfaces
-composites_thermal      — thermal residual stress from cure cool-down
-composites_failure_depth — extended failure criteria (Hashin, max-stress, max-strain)
+layup_analysis            — Classical Laminate Theory A/B/D + failure indices
+composites_drape          — geodesic drape of flat ply sheet onto 3D surface
+composites_interlaminar   — interlaminar shear stress (ILSS) at ply interfaces
+composites_thermal        — thermal residual stress from cure cool-down
+composites_failure_depth  — extended failure criteria (Hashin, max-stress, max-strain)
+composites_optimize_layup — layup angle optimizer (Tsai-Wu FPF + SA search)
+composites_failure_check  — per-ply Tsai-Wu FPF check for a given load state
 """
 
 from __future__ import annotations
@@ -647,106 +649,293 @@ async def run_composites_failure_depth(args: dict[str, Any], ctx: "ProjectCtx") 
 
 
 # ---------------------------------------------------------------------------
-# Tool: composites_afp_export
+# Shared ply-list parser for optimizer tools
 # ---------------------------------------------------------------------------
 
-composites_afp_export_spec = ToolSpec(
-    name="composites_afp_export",
+def _parse_optimizer_plies(raw_plies: list[dict], name: str = "laminate"):
+    """
+    Parse a list of raw ply dicts into a layup_optimizer.Laminate.
+    Returns (laminate, None) or (None, error_str).
+    """
+    from kerf_composites.layup_optimizer import TsaiWuMaterial, Ply, Laminate
+    plies = []
+    for i, rp in enumerate(raw_plies):
+        try:
+            mat = TsaiWuMaterial(
+                name=f"ply_{i}",
+                E1=float(rp["E1"]),
+                E2=float(rp["E2"]),
+                G12=float(rp["G12"]),
+                nu12=float(rp["nu12"]),
+                Xt=float(rp.get("Xt", 1500.0)),
+                Xc=float(rp.get("Xc", 1500.0)),
+                Yt=float(rp.get("Yt", 40.0)),
+                Yc=float(rp.get("Yc", 246.0)),
+                S12=float(rp.get("S12", 68.0)),
+                rho=float(rp.get("rho", 1.6)),
+            )
+            plies.append(Ply(
+                angle_deg=float(rp["angle"]),
+                thickness_mm=float(rp["thickness"]),
+                material=mat,
+            ))
+        except Exception as exc:
+            return None, f"ply[{i}]: {exc}"
+    lam = Laminate(plies=plies, symmetric=True)
+    return lam, None
+
+
+# ---------------------------------------------------------------------------
+# Tool: composites_failure_check
+# ---------------------------------------------------------------------------
+
+composites_failure_check_spec = ToolSpec(
+    name="composites_failure_check",
     description=(
-        "Export an AFP (Automated Fiber Placement) tape-path plan to CNC machine format. "
-        "Accepts a list of AFP courses (as returned by composites_afp_pathplan) and "
-        "produces either G-code (generic 5-axis, M200/M201/M202/M203/M204) or APT/CL "
-        "(ISO 3592, GOTO/FEDRAT/AUXFUN commands). "
-        "Returns the file content as a string plus a suggested filename."
+        "Evaluate Tsai-Wu first-ply-failure (FPF) for a composite laminate "
+        "under a given load state.  Returns per-ply failure indices, margins "
+        "of safety, and the first-ply-failure index and load ply. "
+        "Uses Classical Laminate Theory (CLT) per Tsai-Hahn 1980 §6 + §7; "
+        "Daniel-Ishai 2006 §8."
     ),
     input_schema={
         "type": "object",
         "properties": {
-            "courses": {
+            "plies": {
                 "type": "array",
                 "description": (
-                    "AFP tape-path courses.  Each course is an object with: "
-                    "course_id [int], angle_deg [float], start_x [float mm], "
-                    "start_y [float mm], end_x [float mm], end_y [float mm], "
-                    "tow_width_mm [float], length_mm [float]."
+                    "Ordered ply stack (bottom to top). Each ply: "
+                    "{angle [deg], E1 [GPa], E2 [GPa], G12 [GPa], nu12 [-], "
+                    "thickness [mm], Xt [MPa], Xc [MPa], Yt [MPa], Yc [MPa], S12 [MPa]}."
                 ),
                 "items": {
                     "type": "object",
                     "properties": {
-                        "course_id":    {"type": "integer"},
-                        "angle_deg":    {"type": "number"},
-                        "start_x":      {"type": "number"},
-                        "start_y":      {"type": "number"},
-                        "end_x":        {"type": "number"},
-                        "end_y":        {"type": "number"},
-                        "tow_width_mm": {"type": "number"},
-                        "length_mm":    {"type": "number"},
+                        "angle":     {"type": "number", "description": "Fibre angle [deg]"},
+                        "E1":        {"type": "number", "description": "Longitudinal modulus [GPa]"},
+                        "E2":        {"type": "number", "description": "Transverse modulus [GPa]"},
+                        "G12":       {"type": "number", "description": "Shear modulus [GPa]"},
+                        "nu12":      {"type": "number", "description": "Major Poisson ratio"},
+                        "thickness": {"type": "number", "description": "Ply thickness [mm]"},
+                        "Xt":  {"type": "number", "description": "Long. tensile strength [MPa]"},
+                        "Xc":  {"type": "number", "description": "Long. compressive strength [MPa]"},
+                        "Yt":  {"type": "number", "description": "Trans. tensile strength [MPa]"},
+                        "Yc":  {"type": "number", "description": "Trans. compressive strength [MPa]"},
+                        "S12": {"type": "number", "description": "In-plane shear strength [MPa]"},
                     },
-                    "required": ["course_id", "angle_deg",
-                                 "start_x", "start_y", "end_x", "end_y",
-                                 "tow_width_mm", "length_mm"],
+                    "required": ["angle", "E1", "E2", "G12", "nu12", "thickness"],
                 },
                 "minItems": 1,
             },
-            "format": {
-                "type": "string",
-                "enum": ["gcode", "apt"],
-                "description": (
-                    "'gcode' — Generic 5-axis G-code with M200/M201/M202 fibre M-codes. "
-                    "'apt'   — APT/CL ISO 3592 Cutter Location file."
-                ),
-            },
-            "machine_config": {
+            "loads": {
                 "type": "object",
                 "description": (
-                    "Optional machine configuration overrides for G-code export. "
-                    "Keys: feedrate_mmpm [float, default 3000], "
-                    "rapid_feedrate_mmpm [float, default 9000], "
-                    "z_laydown [float mm, default 0.0], "
-                    "z_clearance [float mm, default 10.0], "
-                    "compaction_force_N [float, default 150.0], "
-                    "program_number [int, default 1], "
-                    "machine_name [str, default 'GENERIC_AFP']."
+                    "Applied load resultants. "
+                    "Nx, Ny, Nxy [N/mm] — in-plane; "
+                    "Mx, My, Mxy [N·mm/mm] — bending. Unspecified → 0."
                 ),
+                "properties": {
+                    "Nx":  {"type": "number"},
+                    "Ny":  {"type": "number"},
+                    "Nxy": {"type": "number"},
+                    "Mx":  {"type": "number"},
+                    "My":  {"type": "number"},
+                    "Mxy": {"type": "number"},
+                },
             },
-            "feedrate_mmpm": {
+            "F12_star": {
                 "type": "number",
-                "description": "Feed rate in mm/min for APT export (default 3000).",
+                "description": "Tsai-Wu interaction coefficient (default −0.5).",
             },
+            "name": {"type": "string", "description": "Optional laminate label."},
         },
-        "required": ["courses", "format"],
+        "required": ["plies", "loads"],
     },
 )
 
 
-async def run_composites_afp_export(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+async def run_composites_failure_check(args: dict[str, Any], ctx: "ProjectCtx") -> str:
     try:
-        from kerf_composites.afp_export import afp_to_gcode, afp_to_apt
+        layup, err = _parse_optimizer_plies(args["plies"], name=args.get("name", "laminate"))
+        if layup is None:
+            return err_payload(err, "BAD_ARGS")
 
-        courses = args["courses"]
-        fmt = str(args["format"]).lower().strip()
-        machine_config = args.get("machine_config") or None
-        feedrate = args.get("feedrate_mmpm")
+        from kerf_composites.layup_optimizer import tsai_wu_failure_index
 
-        if fmt == "gcode":
-            content = afp_to_gcode(courses, machine_config=machine_config)
-            filename = "afp_toolpath.gcode"
-        elif fmt == "apt":
-            content = afp_to_apt(courses, feedrate_mmpm=feedrate)
-            filename = "afp_toolpath.apt"
-        else:
-            return err_payload(f"Unknown format {fmt!r}; use 'gcode' or 'apt'", "BAD_ARGS")
+        loads = args.get("loads", {})
+        F12_star = float(args.get("F12_star", -0.5))
+
+        result = tsai_wu_failure_index(layup, loads, F12_star=F12_star)
+
+        # Round floats in ply_results
+        ply_out = []
+        for pr in result["ply_results"]:
+            ply_out.append({
+                "ply_index": pr["ply_index"],
+                "angle_deg": pr["angle_deg"],
+                "sigma1_MPa": round(pr["sigma1_MPa"], 4),
+                "sigma2_MPa": round(pr["sigma2_MPa"], 4),
+                "tau12_MPa":  round(pr["tau12_MPa"], 4),
+                "tsai_wu_fi": round(pr["tsai_wu_fi"], 6),
+                "margin":     round(pr["margin"], 6) if pr["margin"] != float("inf") else "inf",
+                "failed":     pr["failed"],
+            })
 
         payload = {
-            "format": fmt,
-            "filename": filename,
-            "num_courses": len(courses),
-            "content": content,
-            "byte_size": len(content.encode("utf-8")),
+            "name": args.get("name", "laminate"),
+            "num_plies": layup.num_plies,
+            "total_thickness_mm": round(layup.total_thickness, 4),
+            "loads": {k: round(float(v), 4) for k, v in loads.items()},
+            "ply_results": ply_out,
+            "fpf_ply_index": result["fpf_ply_index"],
+            "fpf_fi": round(result["fpf_fi"], 6),
+            "fpf_margin": round(result["fpf_margin"], 6)
+            if result["fpf_margin"] != float("inf") else "inf",
         }
         return ok_payload(payload)
+    except Exception as exc:
+        return err_payload(str(exc), "COMPOSITES_ERROR")
 
-    except ValueError as exc:
-        return err_payload(str(exc), "BAD_ARGS")
+
+# ---------------------------------------------------------------------------
+# Tool: composites_optimize_layup
+# ---------------------------------------------------------------------------
+
+composites_optimize_layup_spec = ToolSpec(
+    name="composites_optimize_layup",
+    description=(
+        "Optimize composite ply angles to minimize weight (total thickness) "
+        "subject to a Tsai-Wu first-ply-failure (FPF) margin constraint.  "
+        "Uses simulated annealing over discrete angle sets, enforcing symmetric "
+        "and balanced layups.  "
+        "Reference: Tsai-Hahn 1980 §6–7; Daniel-Ishai 2006 §8."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "plies": {
+                "type": "array",
+                "description": (
+                    "Initial ply stack (bottom to top). Each ply: "
+                    "{angle [deg], E1 [GPa], E2 [GPa], G12 [GPa], nu12 [-], "
+                    "thickness [mm], optional Xt/Xc/Yt/Yc/S12 [MPa]}."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "angle":     {"type": "number"},
+                        "E1":        {"type": "number"},
+                        "E2":        {"type": "number"},
+                        "G12":       {"type": "number"},
+                        "nu12":      {"type": "number"},
+                        "thickness": {"type": "number"},
+                        "Xt":  {"type": "number"},
+                        "Xc":  {"type": "number"},
+                        "Yt":  {"type": "number"},
+                        "Yc":  {"type": "number"},
+                        "S12": {"type": "number"},
+                    },
+                    "required": ["angle", "E1", "E2", "G12", "nu12", "thickness"],
+                },
+                "minItems": 2,
+            },
+            "loads": {
+                "type": "object",
+                "description": (
+                    "Applied load resultants. "
+                    "Nx, Ny, Nxy [N/mm]; Mx, My, Mxy [N·mm/mm]. Unspecified → 0."
+                ),
+                "properties": {
+                    "Nx":  {"type": "number"},
+                    "Ny":  {"type": "number"},
+                    "Nxy": {"type": "number"},
+                    "Mx":  {"type": "number"},
+                    "My":  {"type": "number"},
+                    "Mxy": {"type": "number"},
+                },
+            },
+            "allowed_angles": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": (
+                    "Discrete ply angle candidates [degrees]. "
+                    "Default: [0, 15, 30, 45, 60, 75, 90]."
+                ),
+            },
+            "required_fpf_margin": {
+                "type": "number",
+                "description": (
+                    "Minimum required FPF margin of safety (1/FI − 1). "
+                    "Default 1.5 → reserve factor 2.5."
+                ),
+            },
+            "n_iters": {
+                "type": "integer",
+                "description": "SA iterations (default 200; increase for better results).",
+            },
+            "seed": {
+                "type": "integer",
+                "description": "Random seed for reproducibility (optional).",
+            },
+            "name": {"type": "string"},
+        },
+        "required": ["plies", "loads"],
+    },
+)
+
+
+async def run_composites_optimize_layup(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        initial, err = _parse_optimizer_plies(args["plies"], name=args.get("name", "laminate"))
+        if initial is None:
+            return err_payload(err, "BAD_ARGS")
+
+        from kerf_composites.layup_optimizer import (
+            optimize_layup_angles,
+            tsai_wu_failure_index,
+            compute_lamination_constants,
+        )
+
+        loads = args.get("loads", {})
+        allowed_angles = [float(a) for a in args.get("allowed_angles", [0, 15, 30, 45, 60, 75, 90])]
+        required_margin = float(args.get("required_fpf_margin", 1.5))
+        n_iters = int(args.get("n_iters", 200))
+        seed = args.get("seed")
+        seed = int(seed) if seed is not None else None
+
+        optimized = optimize_layup_angles(
+            initial_layup=initial,
+            loads=loads,
+            n_iters=n_iters,
+            allowed_angles=[int(a) for a in allowed_angles],
+            required_fpf_margin=required_margin,
+            seed=seed,
+        )
+
+        # Evaluate optimized result
+        failure = tsai_wu_failure_index(optimized, loads)
+        moduli = compute_lamination_constants(optimized)
+
+        optimized_angles = [p.angle_deg for p in optimized.plies]
+        weight_reduction_pct = (
+            1.0 - optimized.total_thickness / initial.total_thickness
+        ) * 100.0
+
+        payload = {
+            "name": args.get("name", "laminate"),
+            "initial_total_thickness_mm": round(initial.total_thickness, 4),
+            "optimized_total_thickness_mm": round(optimized.total_thickness, 4),
+            "weight_reduction_pct": round(weight_reduction_pct, 2),
+            "optimized_angles_deg": optimized_angles,
+            "num_plies": optimized.num_plies,
+            "symmetric": optimized.symmetric,
+            "fpf_fi": round(failure["fpf_fi"], 6),
+            "fpf_margin": round(failure["fpf_margin"], 6)
+            if failure["fpf_margin"] != float("inf") else "inf",
+            "fpf_ply_index": failure["fpf_ply_index"],
+            "effective_moduli": {k: round(v, 6) for k, v in moduli.items()
+                                  if isinstance(v, float)},
+        }
+        return ok_payload(payload)
     except Exception as exc:
         return err_payload(str(exc), "COMPOSITES_ERROR")

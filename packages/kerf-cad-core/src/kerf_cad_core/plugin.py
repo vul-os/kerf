@@ -246,6 +246,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.brep_heal",                     # brep_heal, brep_compute_inertia — industrial heal pipeline + inertia tensor
     # GK-P: degree raise + lower (Cohen-Lyche-Schumaker 1985)
     "kerf_cad_core.geom.degree_op",
+    # GK-P49: geodesic distance via heat method (Crane, Weischedel & Wardetzky 2013)
+    "kerf_cad_core.geom.subd_geodesic",
     # Coverage sweep: modules with @register that were not yet in _TOOL_MODULES
     "kerf_cad_core.heal",                               # heal_geometry — body heal + repair
     "kerf_cad_core.sketch",                             # sketch_add_entity/constraint, sketch_set_constraint_value, sketch_delete_entity, sketch_carbon_copy, sketch_validate

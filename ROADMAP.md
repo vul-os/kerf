@@ -187,6 +187,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 - **SubD / mesh** — multires displacement, SDF CSG + marching-cubes, sculpt brush engine, isotropic remesh, surface-snap retopo, LSCM UV unwrap.
 - **SubD / mesh** — multires displacement ✅, SDF CSG + marching-cubes, sculpt brush engine, isotropic remesh, surface-snap retopo, LSCM UV unwrap.
 - **SubD / mesh** — multires displacement, SDF CSG + marching-cubes, sculpt brush engine, isotropic remesh, surface-snap retopo, LSCM UV unwrap. Stam-exact limit curvature evaluation ✅.
+- **SubD / mesh** — multires displacement, SDF CSG + marching-cubes, sculpt brush engine, isotropic remesh, surface-snap retopo, LSCM UV unwrap. **Geodesic distance via heat method (Crane et al. 2013) ✅** — cotangent Laplacian + Poisson solve; `subd_geodesic_distance` LLM tool wired (GK-P49).
 - **Architectural geometry** — B-rep→2D tessellate, roof/curtain-wall/corridor generators, wall compound-layer offset, hatch/section-fill.
 - **Sketcher** — collinear constraint, ellipse solver entity, G2 continuity.
 - **Interop** — 3DM write with read→write→read Hausdorff oracle.
@@ -433,6 +434,7 @@ These are roadmap-level moats that span every sector simultaneously and compound
 - **GK-P SubD / mesh** — multires displacement; SDF CSG + marching-cubes; sculpt brush engine; LSCM UV unwrap (module exists, wiring incomplete). **Auto-detect SubD creases + feature curves ✅** — dihedral-angle classification (Hubeli-Gross 2000 / Botsch-Kobbelt 2003), Otsu threshold recommendation, polyline chaining, end-to-end preprocess pipeline — `kerf-cad-core/geom/subd_auto_detect.py`; LLM tool `subd_auto_classify`.
 - **GK-P SubD / mesh** — multires displacement; SDF CSG + marching-cubes; sculpt brush engine; LSCM UV unwrap (module exists, wiring incomplete); SubD boundary→curve snap ✅ shipped.
 - **GK-P SubD / mesh** — multires displacement; SDF CSG + marching-cubes; sculpt brush engine; LSCM UV unwrap (module exists, wiring incomplete). Mirror-symmetry detect + enforce ✅ shipped (`subd_symmetry.py`).
+- **GK-P SubD / mesh** — multires displacement; SDF CSG + marching-cubes; sculpt brush engine; LSCM UV unwrap (module exists, wiring incomplete); **geodesic distance heat method ✅** (GK-P49).
 - **GK-P architectural geometry** — B-rep→2D tessellate; roof/curtain-wall/corridor generators; wall compound-layer offset; hatch/section-fill.
 - **GK-P sketcher** — collinear constraint; ellipse solver entity; G2 continuity.
 - **GK-P interop** — 3DM write with Hausdorff read→write→read oracle.

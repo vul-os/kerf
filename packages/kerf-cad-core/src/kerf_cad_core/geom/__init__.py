@@ -938,6 +938,10 @@ __all__ = [
     "detect_interference_pair",
     "detect_interference_assembly",
     "compute_assembly_aabb",
+    # GK-P49: geodesic distance via heat method
+    "compute_geodesic_heat_method",
+    "compute_geodesic_to_point",
+    "compute_geodesic_path",
 ]
 
 # Variable-section edge blend (Vida-Martin-Varady 1994 §4)
@@ -1019,4 +1023,10 @@ from kerf_cad_core.geom.assembly_interference import (  # noqa: E402
     detect_interference_pair,
     detect_interference_assembly,
     compute_assembly_aabb,
+)
+# GK-P49: geodesic distance via heat method (Crane, Weischedel & Wardetzky 2013)
+from kerf_cad_core.geom.subd_geodesic import (
+    compute_geodesic_heat_method,
+    compute_geodesic_to_point,
+    compute_geodesic_path,
 )

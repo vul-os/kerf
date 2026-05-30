@@ -626,3 +626,212 @@ async def run_dental_deviation_map(args: dict[str, Any], ctx: "ProjectCtx") -> s
         return ok_payload(payload)
     except Exception as exc:
         return err_payload(str(exc), "DEVIATION_MAP_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# dental_occlusal_analysis
+# ---------------------------------------------------------------------------
+
+dental_occlusal_analysis_spec = ToolSpec(
+    name="dental_occlusal_analysis",
+    description=(
+        "Detect occlusal contact patches between upper and lower dental arch meshes. "
+        "For each vertex in the lower arch, finds the nearest point on the upper arch; "
+        "vertices with gap < threshold_um are grouped into contact regions. "
+        "Returns contact region count, total area, max pressure proxy, and gap "
+        "distribution. Method: Okeson (2019) 'Management of Temporomandibular "
+        "Disorders and Occlusion' §8. Not ADA-certified."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "upper_arch": {
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 3,
+                    "maxItems": 3,
+                },
+                "description": "Maxillary (upper) arch vertices [[x,y,z], ...] in mm. Minimum 3.",
+                "minItems": 3,
+            },
+            "lower_arch": {
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 3,
+                    "maxItems": 3,
+                },
+                "description": "Mandibular (lower) arch vertices [[x,y,z], ...] in mm. Minimum 3.",
+                "minItems": 3,
+            },
+            "threshold_um": {
+                "type": "number",
+                "description": "Gap threshold in micrometres for contact classification. Default 50 μm.",
+            },
+            "adjacency_radius_mm": {
+                "type": "number",
+                "description": "Spatial radius (mm) to group contact vertices into regions. Default 2.0.",
+            },
+            "pressure_flag_threshold": {
+                "type": "number",
+                "description": "Normalised pressure threshold (0–1) for flagging high-pressure regions. Default 0.5.",
+            },
+        },
+        "required": ["upper_arch", "lower_arch"],
+    },
+)
+
+
+async def run_dental_occlusal_analysis(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_dental.occlusal_contacts import (
+            compute_occlusal_contacts,
+            mark_high_pressure_zones,
+        )
+
+        threshold_um = float(args.get("threshold_um", 50.0))
+        adjacency_radius_mm = float(args.get("adjacency_radius_mm", 2.0))
+        pressure_flag_threshold = float(args.get("pressure_flag_threshold", 0.5))
+
+        report = compute_occlusal_contacts(
+            upper_arch=args["upper_arch"],
+            lower_arch=args["lower_arch"],
+            threshold_um=threshold_um,
+            adjacency_radius_mm=adjacency_radius_mm,
+        )
+        flagged = mark_high_pressure_zones(report, max_pressure_threshold=pressure_flag_threshold)
+
+        regions_out = []
+        for r in report.contact_regions:
+            regions_out.append({
+                "vertex_count": len(r.vertex_indices),
+                "center_mm": [round(float(v), 4) for v in r.center_mm],
+                "area_mm2": round(r.area_mm2, 6),
+                "mean_gap_um": round(r.mean_gap_um, 2),
+                "max_pressure": round(r.max_pressure, 4),
+                "is_flagged": r.is_flagged,
+            })
+
+        import numpy as np
+        gap_d = report.gap_distribution_um
+        payload: dict[str, Any] = {
+            "contact_region_count": len(report.contact_regions),
+            "total_contact_area_mm2": round(report.total_contact_area_mm2, 6),
+            "max_pressure": round(report.max_pressure, 4),
+            "high_pressure_region_count": len(flagged),
+            "threshold_um": threshold_um,
+            "n_lower_vertices_evaluated": report.n_lower_vertices_evaluated,
+            "gap_distribution_um": {
+                "count": len(gap_d),
+                "mean": round(float(gap_d.mean()), 2) if len(gap_d) > 0 else None,
+                "p50": round(float(np.percentile(gap_d, 50)), 2) if len(gap_d) > 0 else None,
+                "p95": round(float(np.percentile(gap_d, 95)), 2) if len(gap_d) > 0 else None,
+            },
+            "contact_regions": regions_out,
+        }
+        return ok_payload(payload)
+    except Exception as exc:
+        return err_payload(str(exc), "OCCLUSAL_ANALYSIS_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# dental_motion_analysis
+# ---------------------------------------------------------------------------
+
+dental_motion_analysis_spec = ToolSpec(
+    name="dental_motion_analysis",
+    description=(
+        "Simulate articulator jaw movement (centric / protrusive / lateral) and "
+        "report which occlusal contacts persist, disappear, or shift during motion. "
+        "Uses a rigid-body translation model (no condylar path); sufficient for "
+        "identifying contact interference during functional movements. "
+        "Method: Okeson (2019) §8 functional occlusion and mandibular movements."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "upper_arch": {
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 3,
+                    "maxItems": 3,
+                },
+                "description": "Upper arch vertices [[x,y,z], ...] in mm.",
+                "minItems": 3,
+            },
+            "lower_arch": {
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 3,
+                    "maxItems": 3,
+                },
+                "description": "Lower arch vertices [[x,y,z], ...] in mm (starting at max intercuspation).",
+                "minItems": 3,
+            },
+            "motion": {
+                "type": "string",
+                "enum": ["lateral", "protrusive", "centric"],
+                "description": "Jaw motion type. Default 'centric'.",
+            },
+            "n_steps": {
+                "type": "integer",
+                "description": "Number of incremental positions to evaluate. Default 5.",
+            },
+            "step_mm": {
+                "type": "number",
+                "description": "Magnitude of each incremental step in mm. Default 0.5.",
+            },
+            "threshold_um": {
+                "type": "number",
+                "description": "Contact gap threshold in μm. Default 50.",
+            },
+        },
+        "required": ["upper_arch", "lower_arch"],
+    },
+)
+
+
+async def run_dental_motion_analysis(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_dental.occlusal_contacts import compute_articulator_motion
+
+        result = compute_articulator_motion(
+            upper=args["upper_arch"],
+            lower=args["lower_arch"],
+            motion=args.get("motion", "centric"),
+            n_steps=int(args.get("n_steps", 5)),
+            step_mm=float(args.get("step_mm", 0.5)),
+            threshold_um=float(args.get("threshold_um", 50.0)),
+        )
+
+        steps_summary = []
+        for i, (step, count) in enumerate(zip(result.steps, result.contact_count_by_step)):
+            steps_summary.append({
+                "step": i,
+                "contact_region_count": count,
+                "total_area_mm2": round(step.total_contact_area_mm2, 4),
+                "max_pressure": round(step.max_pressure, 4),
+                "shift_mm": [round(float(v), 4) for v in result.shift_vectors_mm[i]],
+            })
+
+        payload: dict[str, Any] = {
+            "motion": result.motion,
+            "n_steps": len(result.steps),
+            "initial_contact_count": result.contact_count_by_step[0] if result.contact_count_by_step else 0,
+            "final_contact_count": result.contact_count_by_step[-1] if result.contact_count_by_step else 0,
+            "persistent_region_count": len(result.persistent_region_indices),
+            "disappeared_region_count": len(result.disappeared_region_indices),
+            "persistent_region_indices": result.persistent_region_indices,
+            "disappeared_region_indices": result.disappeared_region_indices,
+            "steps": steps_summary,
+        }
+        return ok_payload(payload)
+    except Exception as exc:
+        return err_payload(str(exc), "MOTION_ANALYSIS_ERROR")

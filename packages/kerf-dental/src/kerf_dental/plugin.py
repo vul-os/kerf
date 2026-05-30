@@ -29,6 +29,8 @@ async def register(app: FastAPI, ctx):
         dental_stl_export_spec, run_dental_stl_export,
         dental_register_scans_spec, run_dental_register_scans,
         dental_deviation_map_spec, run_dental_deviation_map,
+        dental_occlusal_analysis_spec, run_dental_occlusal_analysis,
+        dental_motion_analysis_spec, run_dental_motion_analysis,
     )
     ctx.tools.register("dental_crown_design", dental_crown_design_spec, run_dental_crown_design)
     ctx.tools.register("dental_surgical_guide", dental_surgical_guide_spec, run_dental_surgical_guide)
@@ -37,9 +39,11 @@ async def register(app: FastAPI, ctx):
     ctx.tools.register("dental_stl_export", dental_stl_export_spec, run_dental_stl_export)
     ctx.tools.register("dental_register_scans", dental_register_scans_spec, run_dental_register_scans)
     ctx.tools.register("dental_deviation_map", dental_deviation_map_spec, run_dental_deviation_map)
+    ctx.tools.register("dental_occlusal_analysis", dental_occlusal_analysis_spec, run_dental_occlusal_analysis)
+    ctx.tools.register("dental_motion_analysis", dental_motion_analysis_spec, run_dental_motion_analysis)
 
     provides = ["dental.crown", "dental.guide", "dental.denture", "dental.stl",
-                "dental.registration", "dental.deviation"]
+                "dental.registration", "dental.deviation", "dental.occlusal"]
     if _PYDICOM_AVAILABLE:
         provides.append("dental.dicom")
 

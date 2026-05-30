@@ -600,6 +600,11 @@ from kerf_cad_core.geom.normal_curvature import (
     NormalCurvatureReport,
     normal_curvature_at,
 )
+# GK-140: NURBS-surface offset distance field (Maekawa 1999; Piegl & Tiller §11.3)
+from kerf_cad_core.geom.offset_distance_field import (
+    DistanceFieldResult,
+    compute_offset_distance_field,
+)
 
 __all__ = [
     "read_3dm","write_3dm","Rhino3dmReadError",

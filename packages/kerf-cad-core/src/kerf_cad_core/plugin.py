@@ -410,6 +410,8 @@ _TOOL_MODULES = [
     # NURBS-CURVE-RESAMPLE-UNIFORM: resample a NurbsCurve at uniform arc-length intervals
     # (Piegl-Tiller §9.4 + Patrikalakis-Maekawa §3.5) — nurbs_curve_resample_uniform
     "kerf_cad_core.geom.curve_resample_uniform",
+    # GK-140: NURBS-surface offset distance field (Maekawa 1999; Piegl & Tiller §11.3)
+    "kerf_cad_core.geom.offset_distance_field",         # nurbs_offset_distance_field
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

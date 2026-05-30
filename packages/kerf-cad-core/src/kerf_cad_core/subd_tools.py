@@ -1,13 +1,16 @@
-"""subd_tools.py — GK-P45: Wire SubD/mesh authoring ops as LLM ToolSpecs.
+"""subd_tools.py — GK-P45 + GK-P: Wire SubD/mesh authoring ops as LLM ToolSpecs.
 
 Wires the following already-implemented functions from
 ``kerf_cad_core.geom.subd_authoring`` into the tool/feature/LLM surface:
 
-- ``subd_poke``          (GK-P20) — poke a face by centroid fan
-- ``subd_extrude_along`` (GK-P21) — extrude a face along a curve path
-- ``sculpt_brush``       (GK-P27) — sculpt-brush stroke (grab/smooth/inflate)
-- ``MultiresStack``      (GK-P26) — multi-resolution displacement stack
+- ``subd_poke``                   (GK-P20) — poke a face by centroid fan
+- ``subd_extrude_along``          (GK-P21) — extrude a face along a curve path
+- ``sculpt_brush``                (GK-P27) — sculpt-brush stroke (grab/smooth/inflate)
+- ``MultiresStack``               (GK-P26) — multi-resolution displacement stack
   (evaluate + serialise as feature nodes)
+- ``subd_evaluate_limit_curvature`` (GK-P)  — Stam-exact limit-surface curvature
+  (Gaussian K, mean H, principal κ₁/κ₂) at arbitrary (u,v), including
+  extraordinary vertices.
 
 These ops append a node to a ``.feature`` file. The OCCT worker has no
 special dispatch for SubD nodes — evaluation is pure-Python.
@@ -471,252 +474,177 @@ async def run_feature_multires_evaluate(ctx: ProjectCtx, args: bytes) -> str:
     })
 
 
-# ── subd_detect_symmetry ──────────────────────────────────────────────────────
+# ── subd_evaluate_limit_curvature ─────────────────────────────────────────────
 #
-# GK-P: Detect mirror-symmetry planes in a SubD cage.
+# GK-P: Stam-exact limit-surface curvature at arbitrary (u,v), including
+# extraordinary vertices.  Returns Gaussian K, mean H, principal κ₁/κ₂.
 
-subd_detect_symmetry_spec = ToolSpec(
-    name="subd_detect_symmetry",
+subd_evaluate_limit_curvature_spec = ToolSpec(
+    name="subd_evaluate_limit_curvature",
     description=(
-        "Detect mirror-symmetry planes in a SubD control cage. "
-        "Tests axis-aligned candidate planes (XY, XZ, YZ plus bbox-centred "
-        "variants) and returns each plane's symmetry score — the fraction of "
-        "cage vertices that have a mirrored counterpart within `tol`. "
-        "A score of 1.0 = perfect symmetry; 0.0 = no mirror relationship. "
-        "Returns the dominant (highest-scoring) plane, all scored planes, and "
-        "the dominant score. "
-        "Use before enforce_symmetry or mirror_edit to discover which planes "
-        "are already symmetric. "
-        "Reference: Podolak et al. 2006 'Planar-Reflective Symmetry Transform'."
+        "Evaluate the Stam-exact Catmull-Clark limit-surface curvature at "
+        "an arbitrary parametric point (u, v) on a SubD cage face. "
+        "Returns Gaussian curvature K, mean curvature H, and principal "
+        "curvatures κ₁ and κ₂. "
+        "Works at extraordinary vertices (valence ≠ 4) — the curvature "
+        "converges to a well-defined finite limit as (u,v) approaches the "
+        "extraordinary corner. "
+        "Based on the second fundamental form of the bicubic CC limit patch: "
+        "L, M, N from the Stam eigenvector-corrected NURBS second derivatives. "
+        "Use face_id=0..N-1 to select the cage face. "
+        "u, v ∈ [0, 1]; (0,0) = first vertex corner. "
+        "Optionally request a grid (n_samples × n_samples) of curvature values "
+        "over the face by setting n_samples > 1 (returns summary statistics). "
+        "No OCCT required — pure-Python SubD + NURBS evaluator."
     ),
     input_schema={
         "type": "object",
         "properties": {
-            "file_id": {
-                "type": "string",
-                "description": "UUID of the .feature file containing the SubD cage.",
-            },
-            "target_id": {
-                "type": "string",
-                "description": "Id of the SubD cage node to analyse.",
-            },
-            "tol": {
-                "type": "number",
-                "description": (
-                    "Vertex-matching tolerance for mirror detection. "
-                    "Default 1e-4. Increase for noisy/scanned geometry."
-                ),
-                "default": 1e-4,
-                "exclusiveMinimum": 0,
-            },
-        },
-        "required": ["file_id", "target_id"],
-    },
-)
-
-
-@register(subd_detect_symmetry_spec, write=False)
-async def run_subd_detect_symmetry(ctx: ProjectCtx, args: bytes) -> str:
-    try:
-        a = json.loads(args)
-    except Exception as exc:
-        return err_payload(f"invalid args: {exc}", "BAD_ARGS")
-
-    file_id = a.get("file_id", "").strip()
-    target_id = a.get("target_id", "").strip()
-    tol = float(a.get("tol", 1e-4))
-
-    if not file_id or not target_id:
-        return err_payload("file_id and target_id are required", "BAD_ARGS")
-    if tol <= 0:
-        return err_payload("tol must be > 0", "BAD_ARGS")
-
-    try:
-        fid = uuid.UUID(file_id)
-    except Exception:
-        return err_payload("file_id must be a uuid", "BAD_ARGS")
-
-    content, err = read_feature_content(ctx, fid)
-    if err:
-        return err_payload(f"file not found: {err}", "NOT_FOUND")
-
-    # Locate the cage node in the feature tree and reconstruct the SubDCage.
-    try:
-        from kerf_cad_core.geom.subd_symmetry import detect_mirror_symmetry
-        from kerf_cad_core.geom.subd_authoring import SubDCage
-        from kerf_cad_core.surfacing import evaluate_feature_node  # type: ignore
-    except ImportError as exc:
-        return err_payload(f"import error: {exc}", "ERROR")
-
-    try:
-        cage = evaluate_feature_node(content, target_id)
-        if not isinstance(cage, SubDCage):
-            return err_payload(
-                f"node '{target_id}' does not evaluate to a SubDCage", "BAD_ARGS"
-            )
-    except Exception as exc:
-        return err_payload(f"failed to evaluate cage node: {exc}", "ERROR")
-
-    result = detect_mirror_symmetry(cage, tol=tol)
-
-    planes_out = []
-    for plane in result.planes:
-        planes_out.append({
-            "label": plane.label,
-            "normal": plane.normal,
-            "offset": plane.offset,
-            "score": result.scores.get(plane.label, 0.0),
-        })
-
-    dominant = None
-    if result.dominant_plane:
-        dominant = {
-            "label": result.dominant_plane.label,
-            "normal": result.dominant_plane.normal,
-            "offset": result.dominant_plane.offset,
-        }
-
-    return ok_payload({
-        "file_id": file_id,
-        "target_id": target_id,
-        "dominant_plane": dominant,
-        "dominant_score": result.score,
-        "planes": planes_out,
-    })
-
-
-# ── subd_enforce_symmetry ─────────────────────────────────────────────────────
-#
-# GK-P: Enforce mirror symmetry on a SubD cage by copying vertex positions
-#       from the authoritative side to the opposite side.
-
-subd_enforce_symmetry_spec = ToolSpec(
-    name="subd_enforce_symmetry",
-    description=(
-        "Enforce mirror symmetry on a SubD cage across a specified plane. "
-        "Copies vertex positions from the *keep* side to their mirror counterparts "
-        "on the opposite side. Vertices on the plane are snapped to it. "
-        "The plane is specified by `plane_normal` ([nx,ny,nz], will be "
-        "normalised) and `plane_offset` (d in dot(n,p)=d). "
-        "`side` is 'left' (keep positive half-space, dot(n,p)>=offset) or "
-        "'right' (keep negative half-space). "
-        "Appends a `subd_enforce_symmetry` node to the feature file. "
-        "Topology is unchanged; only vertex positions are updated. "
-        "Use after subd_detect_symmetry to get the plane parameters."
-    ),
-    input_schema={
-        "type": "object",
-        "properties": {
-            "file_id": {
-                "type": "string",
-                "description": "UUID of the .feature file.",
-            },
-            "target_id": {
-                "type": "string",
-                "description": "Id of the SubD cage node to enforce symmetry on.",
-            },
-            "plane_normal": {
+            "vertices": {
                 "type": "array",
-                "items": {"type": "number"},
-                "minItems": 3,
-                "maxItems": 3,
-                "description": "Plane normal vector [nx, ny, nz] (will be normalised).",
-            },
-            "plane_offset": {
-                "type": "number",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 3,
+                    "maxItems": 3,
+                },
+                "minItems": 1,
                 "description": (
-                    "Plane offset d so that dot(normal, p) = d for points on the plane. "
-                    "0.0 for a plane through the world origin."
+                    "SubD cage vertices as [[x,y,z], ...]. "
+                    "All faces must be quads (4 vertex indices each)."
                 ),
-                "default": 0.0,
             },
-            "plane_label": {
-                "type": "string",
-                "description": "Human-readable label for the plane, e.g. 'XY'. Optional.",
-                "default": "",
-            },
-            "side": {
-                "type": "string",
-                "enum": ["left", "right"],
+            "faces": {
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "integer", "minimum": 0},
+                    "minItems": 4,
+                    "maxItems": 4,
+                },
+                "minItems": 1,
                 "description": (
-                    "'left' = keep positive half-space (dot(n,p) >= offset); "
-                    "'right' = keep negative half-space. Default 'left'."
+                    "Quad faces as [[i,j,k,l], ...] (0-based vertex indices)."
                 ),
-                "default": "left",
             },
-            "tol": {
+            "face_id": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "0-based index of the face to evaluate.",
+            },
+            "u": {
                 "type": "number",
-                "description": "Plane-snapping tolerance. Default 1e-4.",
-                "default": 1e-4,
-                "exclusiveMinimum": 0,
+                "minimum": 0.0,
+                "maximum": 1.0,
+                "default": 0.5,
+                "description": "Parametric u coordinate in [0, 1] (default 0.5 = face centre).",
             },
-            "id": {
-                "type": "string",
-                "description": "Optional explicit node id.",
+            "v": {
+                "type": "number",
+                "minimum": 0.0,
+                "maximum": 1.0,
+                "default": 0.5,
+                "description": "Parametric v coordinate in [0, 1] (default 0.5 = face centre).",
+            },
+            "n_samples": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 50,
+                "default": 1,
+                "description": (
+                    "If > 1, evaluate curvature on an n×n grid over the face "
+                    "and return summary statistics (min/max/mean K and H). "
+                    "If 1 (default), return the single-point evaluation at (u,v)."
+                ),
             },
         },
-        "required": ["file_id", "target_id", "plane_normal"],
+        "required": ["vertices", "faces", "face_id"],
     },
 )
 
 
-@register(subd_enforce_symmetry_spec, write=True)
-async def run_subd_enforce_symmetry(ctx: ProjectCtx, args: bytes) -> str:
+@register(subd_evaluate_limit_curvature_spec, write=False)
+async def run_subd_evaluate_limit_curvature(ctx: ProjectCtx, args: bytes) -> str:
     try:
         a = json.loads(args)
     except Exception as exc:
         return err_payload(f"invalid args: {exc}", "BAD_ARGS")
 
-    file_id = a.get("file_id", "").strip()
-    target_id = a.get("target_id", "").strip()
-    plane_normal = a.get("plane_normal")
-    plane_offset = float(a.get("plane_offset", 0.0))
-    plane_label = a.get("plane_label", "")
-    side = a.get("side", "left")
-    tol = float(a.get("tol", 1e-4))
-    node_id = a.get("id", "").strip()
+    vertices = a.get("vertices")
+    faces    = a.get("faces")
+    face_id  = a.get("face_id")
+    u        = float(a.get("u", 0.5))
+    v        = float(a.get("v", 0.5))
+    n_samples = int(a.get("n_samples", 1))
 
-    if not file_id or not target_id:
-        return err_payload("file_id and target_id are required", "BAD_ARGS")
-    if not isinstance(plane_normal, list) or len(plane_normal) < 3:
-        return err_payload("plane_normal must be [nx, ny, nz]", "BAD_ARGS")
-    if side not in ("left", "right"):
-        return err_payload("side must be 'left' or 'right'", "BAD_ARGS")
-    if tol <= 0:
-        return err_payload("tol must be > 0", "BAD_ARGS")
+    if not isinstance(vertices, list) or len(vertices) < 1:
+        return err_payload("vertices must be a list of [x,y,z] triples", "BAD_ARGS")
+    if not isinstance(faces, list) or len(faces) < 1:
+        return err_payload("faces must be a list of quad [i,j,k,l] index lists", "BAD_ARGS")
+    if face_id is None or not isinstance(face_id, int) or face_id < 0:
+        return err_payload("face_id must be a non-negative integer", "BAD_ARGS")
+    if face_id >= len(faces):
+        return err_payload(
+            f"face_id={face_id} out of range; mesh has {len(faces)} faces", "BAD_ARGS"
+        )
+    if not (0.0 <= u <= 1.0) or not (0.0 <= v <= 1.0):
+        return err_payload("u and v must be in [0, 1]", "BAD_ARGS")
+    if not (1 <= n_samples <= 50):
+        return err_payload("n_samples must be in [1, 50]", "BAD_ARGS")
+
+    # Validate face vertex counts
+    for fi, f in enumerate(faces):
+        if not isinstance(f, list) or len(f) != 4:
+            return err_payload(
+                f"face {fi} must be a quad (4 vertex indices), got len={len(f) if isinstance(f, list) else '?'}",
+                "BAD_ARGS",
+            )
 
     try:
-        fid = uuid.UUID(file_id)
-    except Exception:
-        return err_payload("file_id must be a uuid", "BAD_ARGS")
+        from kerf_cad_core.geom.subd import SubDMesh
+        from kerf_cad_core.geom.subd_limit_curvature import (
+            evaluate_limit_curvature,
+            evaluate_curvature_grid,
+        )
 
-    content, err = read_feature_content(ctx, fid)
-    if err:
-        return err_payload(f"file not found: {err}", "NOT_FOUND")
+        mesh = SubDMesh(
+            vertices=[[float(c) for c in vert] for vert in vertices],
+            faces=[[int(idx) for idx in face] for face in faces],
+        )
 
-    if not node_id:
-        node_id = next_node_id(content, "subd_enforce_symmetry")
+        if n_samples <= 1:
+            cv = evaluate_limit_curvature(mesh, face_id, u, v)
+            return ok_payload({
+                "face_id": face_id,
+                "u": u,
+                "v": v,
+                "gaussian_K": cv.gaussian_K,
+                "mean_H": cv.mean_H,
+                "principal_kappa_1": cv.principal_kappa_1,
+                "principal_kappa_2": cv.principal_kappa_2,
+                "curvature_type": (
+                    "elliptic" if cv.gaussian_K > 1e-10
+                    else "hyperbolic" if cv.gaussian_K < -1e-10
+                    else "parabolic_or_flat"
+                ),
+            })
+        else:
+            import numpy as np
+            grid = evaluate_curvature_grid(mesh, face_id, n_samples=n_samples)
+            K_grid = grid[:, :, 0]
+            H_grid = grid[:, :, 1]
+            return ok_payload({
+                "face_id": face_id,
+                "n_samples": n_samples,
+                "gaussian_K_min": float(np.min(K_grid)),
+                "gaussian_K_max": float(np.max(K_grid)),
+                "gaussian_K_mean": float(np.mean(K_grid)),
+                "mean_H_min": float(np.min(H_grid)),
+                "mean_H_max": float(np.max(H_grid)),
+                "mean_H_mean": float(np.mean(H_grid)),
+                "principal_kappa_1_max": float(np.max(grid[:, :, 2])),
+                "principal_kappa_2_min": float(np.min(grid[:, :, 3])),
+            })
 
-    node = {
-        "id": node_id,
-        "op": "subd_enforce_symmetry",
-        "target_id": target_id,
-        "plane_normal": [float(x) for x in plane_normal[:3]],
-        "plane_offset": plane_offset,
-        "plane_label": plane_label,
-        "side": side,
-        "tol": tol,
-    }
-
-    _, nid, err2 = append_feature_node(ctx, fid, node)
-    if err2:
-        return err_payload(err2, "ERROR")
-
-    return ok_payload({
-        "file_id": file_id,
-        "id": nid or node_id,
-        "op": "subd_enforce_symmetry",
-        "side": side,
-        "plane_normal": node["plane_normal"],
-        "plane_offset": plane_offset,
-    })
+    except Exception as exc:
+        return err_payload(f"curvature evaluation failed: {exc}", "ERROR")

@@ -1280,6 +1280,7 @@ layer (history/UI/CAM/FEM packages), not the geometry kernel.
 | Extrude / bevel / loop-cut / crease | ✅ |
 | SubD ↔ NURBS (Catmull-Clark limit, Stam) | ✅ GK-52/53 |
 | Loop slide | ✅ GK-88 |
+| Stam-exact limit curvature evaluation (K, H, κ₁/κ₂, extraordinary verts) | ✅ GK-P |
 | Edge slide / vertex slide | 🟡 GK-104/105 |
 | Edge split | 🟡 GK-106 |
 | Bevel weight (graded crease) | 🟡 GK-107 |

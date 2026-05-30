@@ -180,6 +180,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 - **Construction verbs** — ~~loft guide-rails~~ ✅, sheet-metal hem/jog/multi-flange, direct-edit non-planar + delete-face, weldment gussets/end-treatments, surface patch-from-points.
 - **SubD / mesh** — multires displacement, SDF CSG + marching-cubes, sculpt brush engine, isotropic remesh, surface-snap retopo, LSCM UV unwrap.
 - **SubD / mesh** — multires displacement ✅, SDF CSG + marching-cubes, sculpt brush engine, isotropic remesh, surface-snap retopo, LSCM UV unwrap.
+- **SubD / mesh** — multires displacement, SDF CSG + marching-cubes, sculpt brush engine, isotropic remesh, surface-snap retopo, LSCM UV unwrap. Stam-exact limit curvature evaluation ✅.
 - **Architectural geometry** — B-rep→2D tessellate, roof/curtain-wall/corridor generators, wall compound-layer offset, hatch/section-fill.
 - **Sketcher** — collinear constraint, ellipse solver entity, G2 continuity.
 - **Interop** — 3DM write with read→write→read Hausdorff oracle.

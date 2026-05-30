@@ -215,6 +215,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 - **Variable-section extrude / morphing sweep** ✅ — `extrude_variable_section` (profile morphs per path parameter; linear / cubic-Hermite / C2 interpolation; Wang 2008 RMF frames) + `extrude_with_scaling_curve` (1-D scale taper along path) + `extrude_morph_via_rail_pair` (rail-guided profile morph); `nurbs_extrude_variable` LLM tool registered; 17 analytic-oracle tests green (constant-section degenerate, circle→square morph, conical-surface oracle, C2 smoothness).
 - **Rhino parity** ✅ — 3DM I/O, SubD (Catmull-Clark), quad remesh, mesh tools, layers/display, parametric `.graph`, render output.
 - **Persistent face naming** ✅ — sketch-anchored + topo-hash (frontend T1–T7) plus kernel-side `feature_id::role::fingerprint` selector in the pure-Python DAG.
+- **Assembly interference detection (Möller 1997)** ✅ — `detect_interference_pair` / `detect_interference_assembly` / `compute_assembly_aabb`; AABB broad-phase + Möller 1997 triangle-triangle narrow phase + GK-18 boolean intersection volume; severity classification (none/touch/overlap/major_overlap); LLM tools `brep_assembly_interference` + `brep_check_clearance` — `kerf_cad_core/geom/assembly_interference.py`.
 
 ### Simulation / manufacturing
 

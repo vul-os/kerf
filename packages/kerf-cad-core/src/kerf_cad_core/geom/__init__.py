@@ -931,6 +931,13 @@ __all__ = [
     "fit_network_patch",
     "fit_n_sided_g1_blend",
     "fairness_metric",
+    # GK-P49: assembly interference detection (Möller 1997)
+    "AABB",
+    "InterferenceResult",
+    "AssemblyInterferenceReport",
+    "detect_interference_pair",
+    "detect_interference_assembly",
+    "compute_assembly_aabb",
 ]
 
 # Variable-section edge blend (Vida-Martin-Varady 1994 §4)
@@ -1003,4 +1010,13 @@ from kerf_cad_core.geom.network_surface import (
     fit_network_patch,
     fit_n_sided_g1_blend,
     fairness_metric,
+)
+# GK-P49: assembly-level interference detection (Möller 1997 + AABB broad-phase)
+from kerf_cad_core.geom.assembly_interference import (  # noqa: E402
+    AABB,
+    InterferenceResult,
+    AssemblyInterferenceReport,
+    detect_interference_pair,
+    detect_interference_assembly,
+    compute_assembly_aabb,
 )

@@ -627,6 +627,93 @@ async def run_plm_change_impact(ctx, args: bytes) -> str:
     })
 
 
+plm_where_used_spec = ToolSpec(
+    name="plm_where_used",
+    description=(
+        "Perform a Where-Used Analysis for a given part: list every assembly and "
+        "sub-assembly that consumes it, with occurrence multiplicity and hierarchy "
+        "depth.\n\n"
+        "This is the *inverse* of BOM expansion.  Where BOM expansion walks "
+        "downward from an assembly to its children, Where-Used walks *upward* "
+        "from a part to every parent assembly that references it.\n\n"
+        "Methodology: PROSTEP-iViP SIG §5.2 'Where-Used Analysis'.\n\n"
+        "Depth semantics:\n"
+        "  depth == 1 → the assembly is an immediate parent of the target part.\n"
+        "  depth == 2 → grandparent assembly (contains a sub-assembly that\n"
+        "               contains the target part), etc.\n\n"
+        "Multiplicity: *occurrence_count* is the number of times the target part "
+        "(or the sub-assembly that carries it) appears as a direct child in the "
+        "named assembly.  A bolt used four times in one bracket gives "
+        "occurrence_count == 4 for that assembly entry.\n\n"
+        "Cycle handling: assumes an acyclic assembly DAG.  If a cycle is detected "
+        "the traversal is cut at that branch and *cycle_detected* is set True in "
+        "the response.  Traversal is capped at depth 20 as a defensive measure."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "target_part_id": {
+                "type": "string",
+                "description": "ID of the part (or sub-assembly) to query.",
+            },
+            "plm_data": {
+                "type": "object",
+                "description": (
+                    "PLM product-structure data.  Same schema as plm_change_impact: "
+                    "keys 'parts' (list of {id, label?, kind?, attributes?}) and "
+                    "'assemblies' (list of {id, label?, children: [part_id, ...]}) "
+                    "are used.  'children' may repeat a part_id to express "
+                    "multiplicity (e.g. ['P-001', 'P-001'] → occurrence_count=2). "
+                    "Additional keys (requirements, tests, edges) are accepted but "
+                    "ignored for where-used."
+                ),
+            },
+        },
+        "required": ["target_part_id", "plm_data"],
+    },
+)
+
+
+@register(plm_where_used_spec)
+async def run_plm_where_used(ctx, args: bytes) -> str:
+    import json as _json
+    try:
+        a = _json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+    target_part_id = a.get("target_part_id", "")
+    plm_data = a.get("plm_data", {})
+
+    if not target_part_id:
+        return err_payload("'target_part_id' is required", "BAD_ARGS")
+    if not isinstance(plm_data, dict):
+        return err_payload("'plm_data' must be an object", "BAD_ARGS")
+
+    try:
+        from kerf_plm.where_used import where_used as _where_used
+        report = _where_used(target_part_id, plm_data)
+    except Exception as exc:
+        return err_payload(f"where-used error: {exc}", "ANALYSIS_ERROR")
+
+    return ok_payload({
+        "target_part_id": target_part_id,
+        "assembly_count": len(report.entries),
+        "total_occurrences": report.total_occurrences(),
+        "cycle_detected": report.cycle_detected,
+        "cycle_path": report.cycle_path,
+        "entries": [
+            {
+                "assembly_id": e.assembly_id,
+                "label": e.label,
+                "occurrence_count": e.occurrence_count,
+                "depth": e.depth,
+            }
+            for e in report.entries
+        ],
+    })
+
+
 plm_propose_co_changes_spec = ToolSpec(
     name="plm_propose_co_changes",
     description=(

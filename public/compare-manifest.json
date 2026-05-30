@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-05-25T23:16:31.837Z",
+  "generatedAt": "2026-05-30T00:00:00.000Z",
   "items": [
     {
       "slug": "revit",
@@ -5775,6 +5775,19 @@
             "note": "Change-impact analyzer + co-change suggestions (PROSTEP-iViP). BFS propagation through BOM + assembly + requirements graph; impact levels high/medium/low; rework cost estimate; mates-interface co-change heuristics. LLM tools: plm_change_impact, plm_propose_co_changes.",
             "evidence": "packages/kerf-plm/src/kerf_plm/change_impact.py"
           }
+        },
+        {
+          "domain": "D14",
+          "feature": "Where-Used Analysis — inverse BOM traversal (PROSTEP-iViP SIG §5.2)",
+          "competitor": {
+            "status": "partial",
+            "note": "Where-used available only through full PDM/PLM add-ons (e.g. SOLIDWORKS PDM, Fusion Manage, 3DExperience); not available in base modeller."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Where-Used Analysis: reverse-traverses the assembly hierarchy from a target part. Returns all parent assemblies with occurrence multiplicity and depth (depth=1 immediate parent, depth=2 grandparent, …). Cycle detection with cap at depth=20. LLM tool: plm_where_used.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/where_used.py"
+          }
         }
       ]
     },
@@ -6612,6 +6625,19 @@
             "note": "Change-impact analyzer + co-change suggestions (PROSTEP-iViP SIG methodology; ISO 10303-242). BFS propagation through BOM + assembly + requirements; impact levels high/medium/low; rework cost estimation; mating-interface co-change suggestions. LLM tools: plm_change_impact, plm_propose_co_changes.",
             "evidence": "packages/kerf-plm/src/kerf_plm/change_impact.py"
           }
+        },
+        {
+          "domain": "D14",
+          "feature": "Where-Used Analysis — inverse BOM traversal (PROSTEP-iViP SIG §5.2)",
+          "competitor": {
+            "status": "partial",
+            "note": "Where-used available only through full PDM/PLM add-ons (e.g. SOLIDWORKS PDM, Fusion Manage, 3DExperience); not available in base modeller."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Where-Used Analysis: reverse-traverses the assembly hierarchy from a target part. Returns all parent assemblies with occurrence multiplicity and depth (depth=1 immediate parent, depth=2 grandparent, …). Cycle detection with cap at depth=20. LLM tool: plm_where_used.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/where_used.py"
+          }
         }
       ]
     },
@@ -7420,6 +7446,19 @@
             "status": "yes",
             "note": "Change-impact analyzer + co-change suggestions (PROSTEP-iViP). BFS propagation through BOM + assembly + requirements graph; impact levels high/medium/low; rework cost estimate; mates-interface co-change heuristics. LLM tools: plm_change_impact, plm_propose_co_changes.",
             "evidence": "packages/kerf-plm/src/kerf_plm/change_impact.py"
+          }
+        },
+        {
+          "domain": "D14",
+          "feature": "Where-Used Analysis — inverse BOM traversal (PROSTEP-iViP SIG §5.2)",
+          "competitor": {
+            "status": "partial",
+            "note": "Where-used available only through full PDM/PLM add-ons (e.g. SOLIDWORKS PDM, Fusion Manage, 3DExperience); not available in base modeller."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Where-Used Analysis: reverse-traverses the assembly hierarchy from a target part. Returns all parent assemblies with occurrence multiplicity and depth (depth=1 immediate parent, depth=2 grandparent, …). Cycle detection with cap at depth=20. LLM tool: plm_where_used.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/where_used.py"
           }
         }
       ]
@@ -9237,6 +9276,19 @@
             "note": "Change-impact analyzer + co-change suggestions (PROSTEP-iViP). BFS propagation through BOM + assembly + requirements graph; impact levels high/medium/low; rework cost estimate; mates-interface co-change heuristics. LLM tools: plm_change_impact, plm_propose_co_changes.",
             "evidence": "packages/kerf-plm/src/kerf_plm/change_impact.py"
           }
+        },
+        {
+          "domain": "D14",
+          "feature": "Where-Used Analysis — inverse BOM traversal (PROSTEP-iViP SIG §5.2)",
+          "competitor": {
+            "status": "partial",
+            "note": "Where-used available only through full PDM/PLM add-ons (e.g. SOLIDWORKS PDM, Fusion Manage, 3DExperience); not available in base modeller."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Where-Used Analysis: reverse-traverses the assembly hierarchy from a target part. Returns all parent assemblies with occurrence multiplicity and depth (depth=1 immediate parent, depth=2 grandparent, …). Cycle detection with cap at depth=20. LLM tool: plm_where_used.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/where_used.py"
+          }
         }
       ]
     },
@@ -10432,6 +10484,19 @@
             "note": "Change-impact analyzer + co-change suggestions (PROSTEP-iViP). BFS propagation through BOM + assembly + requirements graph; impact levels high/medium/low; rework cost estimate; mates-interface co-change heuristics. LLM tools: plm_change_impact, plm_propose_co_changes.",
             "evidence": "packages/kerf-plm/src/kerf_plm/change_impact.py"
           }
+        },
+        {
+          "domain": "D14",
+          "feature": "Where-Used Analysis — inverse BOM traversal (PROSTEP-iViP SIG §5.2)",
+          "competitor": {
+            "status": "partial",
+            "note": "Where-used available only through full PDM/PLM add-ons (e.g. SOLIDWORKS PDM, Fusion Manage, 3DExperience); not available in base modeller."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Where-Used Analysis: reverse-traverses the assembly hierarchy from a target part. Returns all parent assemblies with occurrence multiplicity and depth (depth=1 immediate parent, depth=2 grandparent, …). Cycle detection with cap at depth=20. LLM tool: plm_where_used.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/where_used.py"
+          }
         }
       ]
     },
@@ -11369,6 +11434,19 @@
             "status": "yes",
             "note": "Change-impact analyzer + co-change suggestions (PROSTEP-iViP). BFS propagation through BOM + assembly + requirements graph; impact levels high/medium/low; rework cost estimate; mates-interface co-change heuristics. LLM tools: plm_change_impact, plm_propose_co_changes.",
             "evidence": "packages/kerf-plm/src/kerf_plm/change_impact.py"
+          }
+        },
+        {
+          "domain": "D14",
+          "feature": "Where-Used Analysis — inverse BOM traversal (PROSTEP-iViP SIG §5.2)",
+          "competitor": {
+            "status": "partial",
+            "note": "Where-used available only through full PDM/PLM add-ons (e.g. SOLIDWORKS PDM, Fusion Manage, 3DExperience); not available in base modeller."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Where-Used Analysis: reverse-traverses the assembly hierarchy from a target part. Returns all parent assemblies with occurrence multiplicity and depth (depth=1 immediate parent, depth=2 grandparent, …). Cycle detection with cap at depth=20. LLM tool: plm_where_used.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/where_used.py"
           }
         }
       ]
@@ -15303,6 +15381,19 @@
             "status": "yes",
             "note": "patch_srf_fit — least-squares fit through curves/points; wired op",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/patch_srf.py"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "SubD limit-surface global integrals (area, ∫H dA, ∫K dA)",
+          "competitor": {
+            "status": "no",
+            "note": "No dedicated API for ∫H dA or discrete Gauss-Bonnet ∫K dA over CC limit surfaces"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "integrate_area / integrate_mean_curvature / integrate_gaussian_curvature via B-spline 4×4 + 16×16 GL + discrete Gauss-Bonnet (exact: 4π sphere, 0 torus); LLM tools subd_integrate_area/mean/gaussian",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/subd_limit_integrals.py"
           }
         },
         {

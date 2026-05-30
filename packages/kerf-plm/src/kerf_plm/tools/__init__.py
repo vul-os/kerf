@@ -13,6 +13,8 @@ from kerf_plm._tools_module import (  # noqa: F401
     plm_change_management,
     plm_change_impact_spec,
     run_plm_change_impact,
+    plm_where_used_spec,
+    run_plm_where_used,
     plm_propose_co_changes_spec,
     run_plm_propose_co_changes,
 )

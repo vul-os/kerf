@@ -59,12 +59,19 @@ async def register(app: FastAPI, ctx):
     except Exception:
         pass  # change-impact tools optional — fail silently if symbols missing.
 
+    # Where-Used analysis (PROSTEP-iViP SIG §5.2) — inverse BOM traversal.
+    try:
+        from kerf_plm.tools import plm_where_used_spec, run_plm_where_used
+        ctx.tools.register("plm_where_used", plm_where_used_spec, run_plm_where_used)
+    except Exception:
+        pass  # where-used tool optional — fail silently if symbol missing.
+
     try:
         from kerf_core.plugin import PluginManifest
         return PluginManifest(
             name="plm",
             version="0.1.0",
-            provides=["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.sysml-traceability", "plm.xmi-export"],
+            provides=["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.sysml-traceability", "plm.xmi-export", "plm.where-used"],
             depends=[],
         )
     except ImportError:

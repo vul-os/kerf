@@ -16400,6 +16400,20 @@
           }
         },
         {
+          "domain": "D1",
+          "feature": "NURBS curve curvature-profile export (CSV / SVG / PNG)",
+          "competitor": {
+            "status": "partial",
+            "note": "CurvatureGraph command shows an on-screen comb; no CSV/SVG/PNG export of the numeric κ(t) profile",
+            "source": "http://docs.mcneel.com/rhino/8/help/en-us/commands/curvaturegraph.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "export_curvature_profile(curve, samples, fmt) → CSV (t,κ,arc_length,x,y,z,high_kappa_risk) / SVG line-plot / PNG (pure-Python encoder); CurvatureProfileResult dataclass; inflection detection; high_kappa_risk flag; LLM tool nurbs_export_curvature_profile; 35 tests; Farin §11.6, Sapidis §3",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curvature_profile_export.py"
+          }
+        },
+        {
           "domain": "D2",
           "feature": "FE \u2014 1D beam / 2D truss (native)",
           "competitor": {

@@ -1438,14 +1438,9 @@ from kerf_cad_core.geom.fillet_recommend_radius import (  # noqa: E402
 )
 # NURBS-FAIR-COMPOSITE-CURVE: global curvature-variance fairing for poly-NURBS chains
 # (Greiner-Hormann 1996; Sapidis-Farin 1990 §3; Klass 1980 §3 seam G1)
+# NURBS-FAIR-COMPOSITE-CURVE: global curvature-variance fairing for poly-NURBS chains
+# (Greiner-Hormann 1996 §3.2; Sapidis-Farin 1990 §3; Klass 1980 §3 G1 seam)
 from kerf_cad_core.geom.composite_fair import (
     CompositeFairResult,
     fair_composite,
-)
-# SUBD-CAGE-RING-FROM-EDGE: edge ring traversal on CC quad cages
-# (Maya/Blender Bridge ring pattern — opposite edges across each quad face)
-# Honest caveat: pure-quad cages only; non-quad face → is_degenerate=True.
-from kerf_cad_core.geom.subd_edge_ring import (  # noqa: E402
-    EdgeRingResult,
-    compute_edge_ring,
 )

@@ -185,6 +185,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.blocks",
     "kerf_cad_core.geom.mesh_to_nurbs",
     "kerf_cad_core.geom.section_contour",
+    "kerf_cad_core.geom.section_cutaway",  # brep_section_view — ISO 128-30 section cutaway + hatch
     "kerf_cad_core.jewelry.eternity_auto",
     "kerf_cad_core.geom.surface_fillet",
     "kerf_cad_core.jewelry.bangle",

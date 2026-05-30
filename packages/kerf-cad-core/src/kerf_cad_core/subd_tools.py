@@ -471,88 +471,52 @@ async def run_feature_multires_evaluate(ctx: ProjectCtx, args: bytes) -> str:
     })
 
 
-# ── subd_insert_edge_loop ─────────────────────────────────────────────────────
+# ── subd_detect_symmetry ──────────────────────────────────────────────────────
 #
-# GK-P (Wave 4Q): limit-surface-preserving edge-loop insertion.
+# GK-P: Detect mirror-symmetry planes in a SubD cage.
 
-feature_subd_insert_edge_loop_spec = ToolSpec(
-    name="subd_insert_edge_loop",
+subd_detect_symmetry_spec = ToolSpec(
+    name="subd_detect_symmetry",
     description=(
-        "Insert a new edge loop into a SubD cage using the Catmull-Clark "
-        "limit-surface-preserving formula (Loop-Schaefer 2008 bicubic weights).  "
-        "For each edge in `edge_path`, a new vertex is inserted at `parameter` "
-        "(default 0.5 = midpoint) using the CC edge-point formula:\n"
-        "\n"
-        "    new_pos(t) = lerp(P_a, P_b, t) + 4·t·(1-t)·(M_edge - mid(P_a, P_b))\n"
-        "\n"
-        "where M_edge = (va + vb + fp1 + fp2)/4 is the CC edge midpoint.  At "
-        "t=0.5 new_pos = M_edge exactly (the CC-subdivision edge-point).  Each "
-        "quad face containing a path edge is split into two quads using the new "
-        "vertex plus a corresponding vertex on the opposite edge.  On flat "
-        "surfaces this is exact (max deviation = 0); on curved surfaces the "
-        "deviation is O(h²) in the cage edge length.\n"
-        "\n"
-        "Appends a `subd_insert_edge_loop` node to the target `.feature` file.\n"
-        "\n"
-        "Returns:\n"
-        "  ok           : bool\n"
-        "  file_id      : str\n"
-        "  id           : str — new node id\n"
-        "  op           : 'subd_insert_edge_loop'\n"
-        "  new_vertices : int — number of new vertices inserted on path edges\n"
-        "\n"
-        "Errors: {ok:false, reason}.  Never raises."
+        "Detect mirror-symmetry planes in a SubD control cage. "
+        "Tests axis-aligned candidate planes (XY, XZ, YZ plus bbox-centred "
+        "variants) and returns each plane's symmetry score — the fraction of "
+        "cage vertices that have a mirrored counterpart within `tol`. "
+        "A score of 1.0 = perfect symmetry; 0.0 = no mirror relationship. "
+        "Returns the dominant (highest-scoring) plane, all scored planes, and "
+        "the dominant score. "
+        "Use before enforce_symmetry or mirror_edit to discover which planes "
+        "are already symmetric. "
+        "Reference: Podolak et al. 2006 'Planar-Reflective Symmetry Transform'."
     ),
     input_schema={
         "type": "object",
         "properties": {
             "file_id": {
                 "type": "string",
-                "description": "UUID of the target .feature file.",
+                "description": "UUID of the .feature file containing the SubD cage.",
             },
             "target_id": {
                 "type": "string",
-                "description": "Id of the SubD cage node to insert the edge loop into.",
+                "description": "Id of the SubD cage node to analyse.",
             },
-            "edge_path": {
-                "type": "array",
-                "description": (
-                    "Sequence of [va, vb] vertex-index pairs identifying the "
-                    "cage edges that form the edge loop path.  Each pair must "
-                    "be an edge that exists in the cage.  Adjacent edges sharing "
-                    "a quad face are split into two quads."
-                ),
-                "items": {
-                    "type": "array",
-                    "items": {"type": "integer"},
-                    "minItems": 2,
-                    "maxItems": 2,
-                },
-                "minItems": 1,
-            },
-            "parameter": {
+            "tol": {
                 "type": "number",
                 "description": (
-                    "Position along each edge for the new vertex, in (0, 1).  "
-                    "Default 0.5 = midpoint (places new vertex exactly at the "
-                    "CC edge-point position, maximally close to the limit surface)."
+                    "Vertex-matching tolerance for mirror detection. "
+                    "Default 1e-4. Increase for noisy/scanned geometry."
                 ),
-                "default": 0.5,
+                "default": 1e-4,
                 "exclusiveMinimum": 0,
-                "exclusiveMaximum": 1,
-            },
-            "id": {
-                "type": "string",
-                "description": "Optional explicit node id.",
             },
         },
-        "required": ["file_id", "target_id", "edge_path"],
+        "required": ["file_id", "target_id"],
     },
 )
 
 
-@register(feature_subd_insert_edge_loop_spec, write=True)
-async def run_subd_insert_edge_loop(ctx: ProjectCtx, args: bytes) -> str:
+@register(subd_detect_symmetry_spec, write=False)
+async def run_subd_detect_symmetry(ctx: ProjectCtx, args: bytes) -> str:
     try:
         a = json.loads(args)
     except Exception as exc:
@@ -560,40 +524,188 @@ async def run_subd_insert_edge_loop(ctx: ProjectCtx, args: bytes) -> str:
 
     file_id = a.get("file_id", "").strip()
     target_id = a.get("target_id", "").strip()
-    edge_path_raw = a.get("edge_path", [])
-    parameter = float(a.get("parameter", 0.5))
-    node_id = a.get("id", "").strip()
+    tol = float(a.get("tol", 1e-4))
 
     if not file_id or not target_id:
         return err_payload("file_id and target_id are required", "BAD_ARGS")
-    if not isinstance(edge_path_raw, list) or len(edge_path_raw) == 0:
-        return err_payload("edge_path must be a non-empty list of [va, vb] pairs", "BAD_ARGS")
-    if not (0.0 < parameter < 1.0):
-        return err_payload("parameter must be in (0, 1)", "BAD_ARGS")
+    if tol <= 0:
+        return err_payload("tol must be > 0", "BAD_ARGS")
 
     try:
         fid = uuid.UUID(file_id)
     except Exception:
-        return err_payload("file_id must be a valid UUID", "BAD_ARGS")
+        return err_payload("file_id must be a uuid", "BAD_ARGS")
+
+    content, err = read_feature_content(ctx, fid)
+    if err:
+        return err_payload(f"file not found: {err}", "NOT_FOUND")
+
+    # Locate the cage node in the feature tree and reconstruct the SubDCage.
+    try:
+        from kerf_cad_core.geom.subd_symmetry import detect_mirror_symmetry
+        from kerf_cad_core.geom.subd_authoring import SubDCage
+        from kerf_cad_core.surfacing import evaluate_feature_node  # type: ignore
+    except ImportError as exc:
+        return err_payload(f"import error: {exc}", "ERROR")
+
+    try:
+        cage = evaluate_feature_node(content, target_id)
+        if not isinstance(cage, SubDCage):
+            return err_payload(
+                f"node '{target_id}' does not evaluate to a SubDCage", "BAD_ARGS"
+            )
+    except Exception as exc:
+        return err_payload(f"failed to evaluate cage node: {exc}", "ERROR")
+
+    result = detect_mirror_symmetry(cage, tol=tol)
+
+    planes_out = []
+    for plane in result.planes:
+        planes_out.append({
+            "label": plane.label,
+            "normal": plane.normal,
+            "offset": plane.offset,
+            "score": result.scores.get(plane.label, 0.0),
+        })
+
+    dominant = None
+    if result.dominant_plane:
+        dominant = {
+            "label": result.dominant_plane.label,
+            "normal": result.dominant_plane.normal,
+            "offset": result.dominant_plane.offset,
+        }
+
+    return ok_payload({
+        "file_id": file_id,
+        "target_id": target_id,
+        "dominant_plane": dominant,
+        "dominant_score": result.score,
+        "planes": planes_out,
+    })
+
+
+# ── subd_enforce_symmetry ─────────────────────────────────────────────────────
+#
+# GK-P: Enforce mirror symmetry on a SubD cage by copying vertex positions
+#       from the authoritative side to the opposite side.
+
+subd_enforce_symmetry_spec = ToolSpec(
+    name="subd_enforce_symmetry",
+    description=(
+        "Enforce mirror symmetry on a SubD cage across a specified plane. "
+        "Copies vertex positions from the *keep* side to their mirror counterparts "
+        "on the opposite side. Vertices on the plane are snapped to it. "
+        "The plane is specified by `plane_normal` ([nx,ny,nz], will be "
+        "normalised) and `plane_offset` (d in dot(n,p)=d). "
+        "`side` is 'left' (keep positive half-space, dot(n,p)>=offset) or "
+        "'right' (keep negative half-space). "
+        "Appends a `subd_enforce_symmetry` node to the feature file. "
+        "Topology is unchanged; only vertex positions are updated. "
+        "Use after subd_detect_symmetry to get the plane parameters."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_id": {
+                "type": "string",
+                "description": "UUID of the .feature file.",
+            },
+            "target_id": {
+                "type": "string",
+                "description": "Id of the SubD cage node to enforce symmetry on.",
+            },
+            "plane_normal": {
+                "type": "array",
+                "items": {"type": "number"},
+                "minItems": 3,
+                "maxItems": 3,
+                "description": "Plane normal vector [nx, ny, nz] (will be normalised).",
+            },
+            "plane_offset": {
+                "type": "number",
+                "description": (
+                    "Plane offset d so that dot(normal, p) = d for points on the plane. "
+                    "0.0 for a plane through the world origin."
+                ),
+                "default": 0.0,
+            },
+            "plane_label": {
+                "type": "string",
+                "description": "Human-readable label for the plane, e.g. 'XY'. Optional.",
+                "default": "",
+            },
+            "side": {
+                "type": "string",
+                "enum": ["left", "right"],
+                "description": (
+                    "'left' = keep positive half-space (dot(n,p) >= offset); "
+                    "'right' = keep negative half-space. Default 'left'."
+                ),
+                "default": "left",
+            },
+            "tol": {
+                "type": "number",
+                "description": "Plane-snapping tolerance. Default 1e-4.",
+                "default": 1e-4,
+                "exclusiveMinimum": 0,
+            },
+            "id": {
+                "type": "string",
+                "description": "Optional explicit node id.",
+            },
+        },
+        "required": ["file_id", "target_id", "plane_normal"],
+    },
+)
+
+
+@register(subd_enforce_symmetry_spec, write=True)
+async def run_subd_enforce_symmetry(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+    file_id = a.get("file_id", "").strip()
+    target_id = a.get("target_id", "").strip()
+    plane_normal = a.get("plane_normal")
+    plane_offset = float(a.get("plane_offset", 0.0))
+    plane_label = a.get("plane_label", "")
+    side = a.get("side", "left")
+    tol = float(a.get("tol", 1e-4))
+    node_id = a.get("id", "").strip()
+
+    if not file_id or not target_id:
+        return err_payload("file_id and target_id are required", "BAD_ARGS")
+    if not isinstance(plane_normal, list) or len(plane_normal) < 3:
+        return err_payload("plane_normal must be [nx, ny, nz]", "BAD_ARGS")
+    if side not in ("left", "right"):
+        return err_payload("side must be 'left' or 'right'", "BAD_ARGS")
+    if tol <= 0:
+        return err_payload("tol must be > 0", "BAD_ARGS")
+
+    try:
+        fid = uuid.UUID(file_id)
+    except Exception:
+        return err_payload("file_id must be a uuid", "BAD_ARGS")
 
     content, err = read_feature_content(ctx, fid)
     if err:
         return err_payload(f"file not found: {err}", "NOT_FOUND")
 
     if not node_id:
-        node_id = next_node_id(content, "subd_insert_edge_loop")
-
-    try:
-        edge_path = [[int(e[0]), int(e[1])] for e in edge_path_raw]
-    except Exception as exc:
-        return err_payload(f"invalid edge_path entries: {exc}", "BAD_ARGS")
+        node_id = next_node_id(content, "subd_enforce_symmetry")
 
     node = {
         "id": node_id,
-        "op": "subd_insert_edge_loop",
+        "op": "subd_enforce_symmetry",
         "target_id": target_id,
-        "edge_path": edge_path,
-        "parameter": parameter,
+        "plane_normal": [float(x) for x in plane_normal[:3]],
+        "plane_offset": plane_offset,
+        "plane_label": plane_label,
+        "side": side,
+        "tol": tol,
     }
 
     _, nid, err2 = append_feature_node(ctx, fid, node)
@@ -601,9 +713,10 @@ async def run_subd_insert_edge_loop(ctx: ProjectCtx, args: bytes) -> str:
         return err_payload(err2, "ERROR")
 
     return ok_payload({
-        "ok": True,
         "file_id": file_id,
         "id": nid or node_id,
-        "op": "subd_insert_edge_loop",
-        "new_vertices": len(edge_path),
+        "op": "subd_enforce_symmetry",
+        "side": side,
+        "plane_normal": node["plane_normal"],
+        "plane_offset": plane_offset,
     })

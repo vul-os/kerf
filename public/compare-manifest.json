@@ -5984,6 +5984,20 @@
         },
         {
           "domain": "D1",
+          "feature": "Assembly mate inspector + validation",
+          "competitor": {
+            "status": "yes",
+            "note": "Mate validation with constraint analysis, DOF checking, and over/under-constraint detection",
+            "source": "https://help.solidworks.com/2024/english/SolidWorks/sldworks/c_mate_types.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Assembly mate inspector + validation ✅ — validate_mate / auto_detect_potential_mates / validate_assembly_mates; concentric/coincident/distance/angle/tangent/parallel/perpendicular; residual + correction hints; brep_validate_mate + brep_detect_mates LLM tools; ASME Y14.5 §11",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/mate_inspector.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "Assembly motion study",
           "competitor": {
             "status": "yes",

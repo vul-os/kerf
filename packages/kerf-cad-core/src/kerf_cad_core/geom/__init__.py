@@ -1057,6 +1057,13 @@ __all__ = [
     "compute_normal_color_map",
     "compute_face_color_from_normals",
     "export_subd_with_normals_glb",
+    # GK-P-MI: Assembly mate inspector
+    "MateConstraint",
+    "MateValidation",
+    "AssemblyValidation",
+    "validate_mate",
+    "auto_detect_potential_mates",
+    "validate_assembly_mates",
 ]
 
 # Variable-section edge blend (Vida-Martin-Varady 1994 §4)
@@ -1233,4 +1240,13 @@ from kerf_cad_core.geom.subd_normal_color import (
     compute_normal_color_map,
     compute_face_color_from_normals,
     export_subd_with_normals_glb,
+)
+# GK-P-MI: Assembly mate inspector + joint geometry validation
+from kerf_cad_core.geom.mate_inspector import (
+    MateConstraint,
+    MateValidation,
+    AssemblyValidation,
+    validate_mate,
+    auto_detect_potential_mates,
+    validate_assembly_mates,
 )

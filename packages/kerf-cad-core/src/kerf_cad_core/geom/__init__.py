@@ -1024,6 +1024,11 @@ __all__ = [
     "offset_curve_arclength_preserving",
     "exact_arclength_match_error",
     "compare_offsets",
+    # GK-P: NURBS↔mesh max deviation
+    "SurfaceMeshDeviation",
+    "hausdorff_surface_to_mesh",
+    "bidirectional_hausdorff",
+    "max_deviation_visualization",
 ]
 
 # Variable-section edge blend (Vida-Martin-Varady 1994 §4)
@@ -1157,4 +1162,11 @@ from kerf_cad_core.geom.exact_length_offset import (
     offset_curve_arclength_preserving,
     exact_arclength_match_error,
     compare_offsets,
+)
+# GK-P: NURBS↔mesh max deviation (Aspert 2002 / Cignoni 1998) — class-A RE acceptance
+from kerf_cad_core.geom.surface_mesh_deviation import (
+    SurfaceMeshDeviation,
+    hausdorff_surface_to_mesh,
+    bidirectional_hausdorff,
+    max_deviation_visualization,
 )

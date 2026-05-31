@@ -3824,6 +3824,19 @@
         },
         {
           "domain": "D6",
+          "feature": "UART baud-rate drift check (divisor/UBRR vs RS-232 ±2% tolerance)",
+          "competitor": {
+            "status": "no",
+            "note": "No UART baud-rate drift analysis built into OpenPLC or any standard EDA suite"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "firmware_check_uart_baud_drift: ATmega-style integer-divisor model (ATmega328P §19 + STM32F411 RM0383 §19); baud=clock/(N×(UBRR+1)) where N=16 (normal) or 8 (double_speed); drift_pct=(actual−nominal)/nominal×100; reliable=|drift|<2% (RS-232/IEEE Std 488); recommendation engine scans standard bauds [9600..921600]×{normal,double_speed} for |drift|<0.5%; 24 tests. HONEST: integer-divisor model is exact for AVR (ATmega328P); for STM32 (fractional BRR) this model OVER-ESTIMATES drift — STM32 fractional generator achieves <0.1% on standard bauds whereas integer model reports ~0.94% at 80 MHz/115200; clock-source tolerance not modelled.",
+            "evidence": "packages/kerf-firmware/src/kerf_firmware/uart_baud_drift_check.py"
+          }
+        },
+        {
+          "domain": "D6",
           "feature": "Schematic capture (KiCad round-trip, ERC)",
           "competitor": {
             "status": "no",

@@ -412,3 +412,20 @@ def _register_tools(ctx, provides: list) -> None:
         logger.warning(
             "kerf-firmware: failed to load firmware_check_i2c_clock_stretch tool: %s", exc
         )
+
+    # firmware_check_uart_baud_drift — UART baud-rate drift analyser
+    try:
+        from kerf_firmware.tools.firmware_check_uart_baud_drift import (
+            _spec as _uart_baud_spec,
+            run_firmware_check_uart_baud_drift_async as _uart_baud_fn,
+        )
+        ctx.tools.register(
+            "firmware_check_uart_baud_drift",
+            _uart_baud_spec,
+            _uart_baud_fn,
+        )
+        provides.append("firmware.uart_baud_drift_check")
+    except Exception as exc:
+        logger.warning(
+            "kerf-firmware: failed to load firmware_check_uart_baud_drift tool: %s", exc
+        )

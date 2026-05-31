@@ -4978,6 +4978,20 @@
           }
         },
         {
+          "name": "NURBS surface analytic derivatives + Gaussian/mean curvature (GK-P15)",
+          "domain": "D01",
+          "competitor": {
+            "status": "no",
+            "source": "https://wiki.freecad.org/Part_Module",
+            "note": "No native closed-form higher-order surface derivative API with Gaussian/mean curvature; FreeCAD uses OpenCASCADE BRepLProp which provides curvature but not raw ∂²S/∂u² etc. as a direct Python API"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/surface_analytic_derivatives.py",
+            "note": "compute_analytic_derivatives(surface, u, v) -> SurfaceDerivativeResult; closed-form ∂S/∂u, ∂S/∂v, ∂²S/∂u², ∂²S/∂u∂v, ∂²S/∂v² via P&T Algorithm A3.6 (tensor-product derivative table) + rational quotient rule A4.4; gauss_K=(LN-M²)/(EG-F²); mean_H=(EN-2FM+GL)/(2(EG-F²)) (do Carmo §3.2); SSIHardenedMarcher with bisection fallback for near-tangent regions (Patrikalakis-Maekawa §5); LLM tool nurbs_surface_derivatives_analytic registered; 19 hermetic tests (plane K=H=0, cylinder K=0/H=1/(2R), sphere K=1/R²/H=1/R, analytic vs Richardson FD < 1e-8 non-rational, FD < 1e-6 rational, Steinmetz SSI curve, cylinder×plane circle radius). HONEST: closed-form for ALL NURBS (polynomial and rational); rational case uses exact quotient rule (P&T A4.4) — numerically stable for well-conditioned weights but condition number grows for near-zero weights; curvature NaN at degenerate points (poles/seams). Refs: Piegl & Tiller §3.3; Patrikalakis & Maekawa §5; do Carmo §3.2; Mortenson §6.5."
+          }
+        },
+        {
           "name": "NURBS curve footprint on plane (orthographic projection to 2-D)",
           "domain": "D01",
           "competitor": {

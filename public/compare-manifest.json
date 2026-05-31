@@ -6052,6 +6052,20 @@
         },
         {
           "domain": "D7",
+          "feature": "G83 peck-drill live-time analytics (chip-evacuation + tool-life budgeting)",
+          "competitor": {
+            "status": "no",
+            "note": "Fusion 360 CAM / HSMWorks do not expose per-cycle cutting live-time fraction or chip-evacuation adequacy flag; retract overhead is implicit in time estimates only",
+            "source": "https://cam.autodesk.com/hsmposts"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "compute_peck_live_time: PeckCycleParams + PeckLiveTimeReport; num_pecks = ceil(depth/peck); per-peck rapid-down + feed + rapid-up + dwell; live_time_fraction = cutting_s/total_s; adequate flag (threshold 0.50 per Sandvik CoroPlus 2024); cam_compute_peck_live_time LLM tool; 52 tests. HONEST: ideal rigid-rapid — no acceleration ramps at peck reversal (real machines +5–20 % retract overhead); full-retract G83 model only (G73 partial-retract not modelled). Refs: MH 31e §1132; Sandvik CoroPlus Drill Cycle Analytics 2024; NIST RS-274/NGC §3.8.4",
+            "evidence": "packages/kerf-cam/src/kerf_cam/peck_live_time.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "G84/G74 rigid tapping canned cycle",
           "competitor": {
             "status": "yes",

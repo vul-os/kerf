@@ -94,6 +94,17 @@ async def register(app: FastAPI, ctx):
         run_cam_generate_peck_drill_cycle,
     )
 
+    # G83 peck-drill live-time analytics — MH 31e §1132 + Sandvik CoroPlus (2026-05-31)
+    from kerf_cam.peck_live_time import (
+        cam_compute_peck_live_time_spec,
+        run_cam_compute_peck_live_time,
+    )
+    ctx.tools.register(
+        "cam_compute_peck_live_time",
+        cam_compute_peck_live_time_spec,
+        run_cam_compute_peck_live_time,
+    )
+
     # G84/G74 rigid tapping canned cycle — NIST RS-274/NGC §3.8.4 + MH 31e §1934
     from kerf_cam.tap_cycle import (
         cam_generate_tap_cycle_spec,
@@ -211,6 +222,7 @@ async def register(app: FastAPI, ctx):
         "cam.trochoidal-slot",
         "cam.rest-machining",
         "cam.g83-peck-drill",
+        "cam.peck-live-time",
         "cam.g84-g74-tap-cycle",
         "cam.g85-g86-g89-boring-cycles",
         "cam.face-mill-path",

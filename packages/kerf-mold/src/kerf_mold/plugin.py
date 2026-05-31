@@ -106,6 +106,15 @@ Registers:
                 freeze time from 1-D Fourier Chen-Chiang/Menges §7.3.3;
                 angle recommendation 30°–45° per Menges §6.6.5; HONEST:
                 Beaumont heuristic — multi-cavity timing needs Moldflow)
+  - LLM tool:  mold_check_surface_finish
+               (SPI Mold Finish Standards 2017 + Menges §11: validate that
+                a resin + mold-steel + hardness combination can achieve the
+                requested SPI finish grade A1–D3; recommend steel grade,
+                minimum HRC, and polishing method; glass-fiber pull-out
+                warning for GF resins at A-grade; HONEST: catalog-based
+                only — ignores texture chemistry, etcher capability,
+                polishing wear-life, part geometry effects, and process
+                variables)
   - LLM tool:  mold_compute_color_concentrate_ratio
                (SPI Color Concentrates Handbook 3rd ed. §3+§6+§8+§11 +
                 Menges Plastics Manufacturing §10: gravimetric let-down
@@ -428,6 +437,18 @@ async def register(app: FastAPI, ctx):
         run_mold_compute_color_concentrate_ratio,
     )
 
+    # Register SPI mold surface finish check tool
+    # (SPI Mold Finish Standards 2017 + Menges §11)
+    from kerf_mold.surface_finish_check_tool import (
+        mold_check_surface_finish_spec,
+        run_mold_check_surface_finish,
+    )
+    ctx.tools.register(
+        "mold_check_surface_finish",
+        mold_check_surface_finish_spec,
+        run_mold_check_surface_finish,
+    )
+
     provides = [
         "mold.moldability",
         "mold.parting_surface",
@@ -459,6 +480,7 @@ async def register(app: FastAPI, ctx):
         "mold.core_pin_cooling",
         "mold.tunnel_gate_design",
         "mold.color_concentrate_ratio",
+        "mold.surface_finish_check",
     ]
 
     try:

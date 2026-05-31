@@ -178,6 +178,12 @@ from kerf_mold.color_concentrate_ratio import (
     MIXING_INDEX_POOR,
     compute_color_ratio,
 )
+from kerf_mold.surface_finish_check import (
+    SurfaceFinishSpec,
+    MoldSpec,
+    SurfaceFinishReport,
+    check_surface_finish,
+)
 
 __all__ = [
     # mold.py
@@ -332,4 +338,9 @@ __all__ = [
     "MIXING_INDEX_ADEQUATE",
     "MIXING_INDEX_POOR",
     "compute_color_ratio",
+    # surface_finish_check.py
+    "SurfaceFinishSpec",
+    "MoldSpec",
+    "SurfaceFinishReport",
+    "check_surface_finish",
 ]

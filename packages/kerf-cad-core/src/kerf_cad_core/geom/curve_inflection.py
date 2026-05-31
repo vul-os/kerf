@@ -11,10 +11,17 @@ For a plane curve C(t) = (x(t), y(t)) the *signed* curvature is:
     κ_signed(t) = (x'·y'' − y'·x'') / |C'|³
 
 A point where κ_signed(t) = 0 AND dκ/dt ≠ 0 is called an *inflection point*
-(do Carmo §1.5; Sapidis "Designing Fair Curves and Surfaces" §3).
+(do Carmo §1.5; Sapidis "Designing Fair Curves and Surfaces" §3;
+Farin §10.6 curvature of polynomial/rational curves).
 
 At an inflection point the curve transitions from bending left (κ > 0) to
 bending right (κ < 0) or vice-versa — the osculating circle switches side.
+
+Fairness / Class-A criteria (Farin §10.6; Sapidis §3)
+------------------------------------------------------
+A curve is considered *fair* (Class-A) if it has at most one inflection point
+and no abrupt curvature jumps.  Naval-architecture and automotive styling
+require fair curves to avoid reflective highlight discontinuities.
 
 Algorithm
 ---------
@@ -22,29 +29,32 @@ Algorithm
 2. Compute κ_signed(t_i) at each sample via analytical NURBS 1st/2nd
    derivatives (Piegl & Tiller §9.1 / §9.2).
 3. Detect adjacent-sample sign changes of κ_signed (ignoring near-zero
-   samples with |κ| < threshold to suppress false positives in near-zero
+   samples with |κ| < tol to suppress false positives in near-zero
    curvature regions).
 4. For each detected sign-change interval [t_lo, t_hi], refine with 5
    iterations of bisection to locate the zero crossing to high precision.
+5. At each refined crossing, evaluate curvature just left and right of t*
+   to populate InflectionPoint.curvature_left / curvature_right.
 
 Honest caveats
 --------------
 * 2D curves only.  Input must be a NurbsCurve with 2D control points, or a 3D
   curve whose z-components are negligible.  3D space-curve inflections (where
-  the osculating plane changes) are not computed.
-* Near-zero-curvature regions (|κ| < threshold) are treated as zero during
-  sign-change detection.  Curves with very low curvature throughout (e.g.
-  near-lines) may yield 0 inflections even when the curvature technically
-  crosses zero — raise the threshold to suppress false positives, or lower it
-  to detect gentle transitions.
+  the osculating plane changes, requiring torsion analysis) are NOT computed.
+* Near-zero-curvature regions (|κ| < tol) are treated as zero during sign-
+  change detection.  Curves with very low curvature throughout (e.g. near-
+  lines) may yield 0 inflections — raise tol to suppress false positives, or
+  lower it to detect gentle transitions.
 * A straight line (κ ≡ 0) has no well-defined inflection points.
   `num_inflections = 0` and `honest_caveat` states the reason.
 * Sample density controls detection reliability: undersampled curves may miss
   inflections that occur within a single sample interval.
+* Sampling-based — does NOT solve κ=0 analytically.  Algebraic root-finding
+  (Sturm sequences on B-spline coefficients) is not implemented.
 
 Applications
 ------------
-* Fairness analysis — even-κ-sign curves are "fair" (no unwanted inflections)
+* Fairness analysis — Class-A surface validation (naval/automotive styling)
 * Sketch QC — flag unintended S-curves in sketch segments
 * Toolpath transitions — avoid κ-sign changes during constant-feed machining
 * Clothoid design — inflection = boundary between left/right clothoid arcs
@@ -54,13 +64,20 @@ References
 do Carmo, M.P. (1976) "Differential Geometry of Curves and Surfaces" §1.5.
 Sapidis, N.S. ed. (1994) "Designing Fair Curves and Surfaces" §3
     (AMS SIAM Geometric Design Publications).
-Piegl, L. & Tiller, W. (1997) "The NURBS Book" §9.1/§9.2 (curve derivatives).
-Farin, G. (1997) "Curves and Surfaces for CAGD" §5.5 (curvature of a curve).
+Piegl, L. & Tiller, W. (1997) "The NURBS Book" §5.3 (derivatives) §9.1/§9.2.
+Farin, G. (2002) "Curves and Surfaces for CAGD" §10.6 (curvature; fairness).
 
-Public API
-----------
-InflectionResult   — dataclass with result fields.
-find_curve_inflections(curve_or_points, num_samples=200, threshold=1e-9)
+Public API (v2 — typed, Class-A aware)
+---------------------------------------
+InflectionPoint       — per-inflection dataclass with xy_mm, κ_left/right.
+CurveInflectionReport — full report with fairness flag and warnings.
+find_curve_inflections(curve, num_samples=200, tol=1e-6)
+    -> CurveInflectionReport
+
+Legacy API (v1 — kept for backward compatibility)
+-------------------------------------------------
+InflectionResult      — legacy dataclass (v1).
+find_curve_inflections_v1(curve_or_points, num_samples=200, threshold=1e-9)
     -> InflectionResult
 """
 
@@ -81,14 +98,90 @@ from kerf_cad_core.geom.nurbs import NurbsCurve, curve_derivative
 _SPEED_TOL: float = 1e-12   # |C'| below this → singular
 _BISECT_ITERS: int = 5       # bisection refinement iterations per crossing
 
+# Fraction of parameter range used to sample left/right curvature at each
+# inflection point for sign_change and curvature_left/curvature_right fields.
+_KAPPA_FLANK_FRAC: float = 1e-4
+
+# Curvature jump threshold: if |κ_left| or |κ_right| is more than this factor
+# above the mean |κ|, flag it as an abrupt jump in the fairness check.
+_ABRUPT_JUMP_FACTOR: float = 5.0
+
 
 # ---------------------------------------------------------------------------
-# Dataclass
+# Dataclasses (v2 — typed, Class-A aware)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class InflectionPoint:
+    """A single inflection point of a 2D NURBS curve.
+
+    Attributes
+    ----------
+    parameter_u : float
+        NURBS parameter value t* at which κ_signed = 0 (sign change).
+        Refined by 5-iteration bisection from the coarse sample bracket.
+    xy_mm : tuple[float, float]
+        Cartesian coordinates (x, y) in model units (mm) at t*.
+        Computed by evaluating the NURBS curve at ``parameter_u``.
+    curvature_left : float
+        Signed curvature κ_signed just before t* (at t* − ε).
+    curvature_right : float
+        Signed curvature κ_signed just after t* (at t* + ε).
+    sign_change : bool
+        True if curvature_left and curvature_right have opposite signs.
+        Should always be True for a genuine inflection; False only if the
+        crossing is extremely close to an endpoint or a numerical artefact.
+    """
+
+    parameter_u: float
+    xy_mm: Tuple[float, float]
+    curvature_left: float
+    curvature_right: float
+    sign_change: bool
+
+
+@dataclass
+class CurveInflectionReport:
+    """Full inflection-point report for a 2D NURBS curve.
+
+    Attributes
+    ----------
+    inflection_points : list[InflectionPoint]
+        Detected inflection points, ordered by parameter_u.
+    num_inflections : int
+        Number of inflection points.  Equals len(inflection_points).
+    max_curvature : float
+        Maximum |κ_signed| across all samples (0.0 for a straight line).
+    min_curvature : float
+        Minimum |κ_signed| across all samples.
+    is_fair_class_a : bool
+        True if the curve meets the Class-A fairness criterion:
+        at most 1 inflection AND no abrupt κ-jumps (Farin §10.6; Sapidis §3).
+        Straight lines (κ ≡ 0) and circles (κ = const) are considered fair.
+        Curves with ≥ 2 inflections are NOT fair.
+    warnings : list[str]
+        Human-readable warnings for edge cases (near-line curvature,
+        abrupt curvature jumps, high sample density needed, etc.).
+    honest_caveat : str
+        Fixed plain-language statement of scope, accuracy, and limitations.
+    """
+
+    inflection_points: List[InflectionPoint] = field(default_factory=list)
+    num_inflections: int = 0
+    max_curvature: float = 0.0
+    min_curvature: float = 0.0
+    is_fair_class_a: bool = True
+    warnings: List[str] = field(default_factory=list)
+    honest_caveat: str = ""
+
+
+# ---------------------------------------------------------------------------
+# Legacy dataclass (v1 — kept for backward compatibility)
 # ---------------------------------------------------------------------------
 
 @dataclass
 class InflectionResult:
-    """Result of find_curve_inflections().
+    """Legacy result of find_curve_inflections_v1().
 
     Attributes
     ----------
@@ -175,10 +268,10 @@ def _bisect_zero(
 
 
 # ---------------------------------------------------------------------------
-# Public API
+# Legacy public API (v1)
 # ---------------------------------------------------------------------------
 
-def find_curve_inflections(
+def find_curve_inflections_v1(
     curve_or_points: Union[NurbsCurve, Sequence],
     num_samples: int = 200,
     threshold: float = 1e-9,
@@ -389,6 +482,222 @@ def _detect_sign_changes_from_samples(
 
 
 # ---------------------------------------------------------------------------
+# v2 Public API — InflectionPoint + CurveInflectionReport
+# ---------------------------------------------------------------------------
+
+_HONEST_CAVEAT_V2: str = (
+    "HONEST: 2D curves only — 3D space-curve inflections (osculating-plane "
+    "flips, requiring torsion) are NOT supported.  Curvature is evaluated via "
+    "NURBS analytical 1st/2nd derivatives (Piegl-Tiller §5.3/§9.2); samples "
+    "with |κ| < tol are treated as zero during sign-change detection.  "
+    "Sampling-based — does NOT solve κ=0 analytically.  Near-zero-curvature "
+    "regions may produce false positives (tol too low) or missed crossings "
+    "(tol too high).  Bisection uses 5 iterations per bracket; increase "
+    "num_samples for densely oscillating curves.  "
+    "is_fair_class_a = True iff ≤ 1 inflection AND no abrupt κ-jump "
+    "(Farin §10.6; Sapidis §3).  "
+    "Refs: Piegl-Tiller §5.3/§9.2; Farin §10.6; do Carmo §1.5; Sapidis §3."
+)
+
+
+def find_curve_inflections(
+    curve: NurbsCurve,
+    num_samples: int = 200,
+    tol: float = 1e-6,
+) -> "CurveInflectionReport":
+    """Find inflection points (κ sign-change) of a 2D NURBS curve.
+
+    Implements Piegl & Tiller §5.3 (derivatives) + Farin §10.6 (curvature)
+    for signed curvature κ(u) = (x'·y'' − y'·x'') / (x'² + y'²)^1.5.
+
+    Inflection detection: uniform sampling → adjacent sign-change scan →
+    5-iteration bisection refinement per bracket.
+
+    Class-A fairness check (naval-architecture / automotive styling):
+    ``is_fair_class_a = True`` iff ``num_inflections ≤ 1`` AND no abrupt
+    curvature jump (|κ| > 5× mean) at any inflection.
+
+    Parameters
+    ----------
+    curve : NurbsCurve
+        2D NURBS curve (control points in ℝ² or ℝ³ with z ≈ 0).
+    num_samples : int
+        Number of uniform parameter samples (default 200).
+    tol : float
+        Near-zero curvature tolerance.  Samples with |κ| < tol are treated
+        as zero for sign-change detection.  Default 1e-6.
+
+    Returns
+    -------
+    CurveInflectionReport
+        inflection_points, num_inflections, max_curvature, min_curvature,
+        is_fair_class_a, warnings, honest_caveat.
+        Never raises.
+
+    References
+    ----------
+    Piegl & Tiller (1997) §5.3, §9.2; Farin (2002) §10.6;
+    do Carmo (1976) §1.5; Sapidis (1994) §3.
+    """
+    warnings_out: List[str] = []
+
+    # ------------------------------------------------------------------
+    # Guard: must be a NurbsCurve
+    # ------------------------------------------------------------------
+    if not isinstance(curve, NurbsCurve):
+        warnings_out.append(
+            f"Input is not a NurbsCurve (got {type(curve).__name__!r}); "
+            "returning empty report."
+        )
+        return CurveInflectionReport(
+            inflection_points=[],
+            num_inflections=0,
+            max_curvature=0.0,
+            min_curvature=0.0,
+            is_fair_class_a=True,
+            warnings=warnings_out,
+            honest_caveat=_HONEST_CAVEAT_V2,
+        )
+
+    num_samples = max(3, int(num_samples))
+    tol = float(tol)
+
+    t_min, t_max = _param_range(curve)
+    param_range_size = t_max - t_min
+    ts = np.linspace(t_min, t_max, num_samples)
+
+    # ------------------------------------------------------------------
+    # Step 1 — sample κ_signed across the parameter domain
+    # ------------------------------------------------------------------
+    kappa_vals: List[float] = [_signed_kappa(curve, float(t)) for t in ts]
+    kappa_arr = np.array(kappa_vals, dtype=float)
+
+    kappa_abs = np.abs(kappa_arr)
+    max_kappa = float(np.max(kappa_abs))
+    min_kappa = float(np.min(kappa_abs))
+    mean_kappa = float(np.mean(kappa_abs))
+
+    # ------------------------------------------------------------------
+    # Straight-line / near-zero guard
+    # ------------------------------------------------------------------
+    if max_kappa < tol:
+        warnings_out.append(
+            f"Near-zero curvature at all sampled points (max |κ| = {max_kappa:.2e} "
+            f"< tol {tol:.2e}).  Likely a straight line or near-straight curve; "
+            "κ ≡ 0 everywhere — no inflections defined."
+        )
+        return CurveInflectionReport(
+            inflection_points=[],
+            num_inflections=0,
+            max_curvature=max_kappa,
+            min_curvature=min_kappa,
+            is_fair_class_a=True,  # straight lines are fair
+            warnings=warnings_out,
+            honest_caveat=_HONEST_CAVEAT_V2,
+        )
+
+    # ------------------------------------------------------------------
+    # Step 2 — detect sign-change brackets; bisect each one
+    # ------------------------------------------------------------------
+    inflection_params: List[float] = []
+
+    for i in range(num_samples - 1):
+        k0 = kappa_arr[i]
+        k1 = kappa_arr[i + 1]
+        t0 = float(ts[i])
+        t1 = float(ts[i + 1])
+
+        k0_eff = k0 if abs(k0) >= tol else 0.0
+        k1_eff = k1 if abs(k1) >= tol else 0.0
+
+        if k0_eff == 0.0 and k1_eff == 0.0:
+            continue
+
+        if k0_eff * k1_eff < 0.0:
+            t_star = _bisect_zero(curve, t0, t1, k0, k1, iters=_BISECT_ITERS)
+            inflection_params.append(t_star)
+        elif k0_eff == 0.0 and k1_eff != 0.0:
+            if i > 0:
+                k_prev = kappa_arr[i - 1]
+                if abs(k_prev) >= tol and k_prev * k1_eff < 0.0:
+                    inflection_params.append(t0)
+
+    # ------------------------------------------------------------------
+    # Step 3 — build InflectionPoint objects; compute curvature flanks
+    # ------------------------------------------------------------------
+    flank_eps = _KAPPA_FLANK_FRAC * param_range_size
+
+    inflection_points: List[InflectionPoint] = []
+    for t_star in inflection_params:
+        # Evaluate curve position
+        try:
+            pos = np.asarray(curve.evaluate(t_star), dtype=float).ravel()
+            xy = (float(pos[0]), float(pos[1] if pos.size > 1 else 0.0))
+        except Exception:  # noqa: BLE001
+            xy = (float("nan"), float("nan"))
+
+        # Left/right curvature (clamped to domain)
+        t_left = max(t_min, t_star - flank_eps)
+        t_right = min(t_max, t_star + flank_eps)
+        k_left = _signed_kappa(curve, t_left)
+        k_right = _signed_kappa(curve, t_right)
+
+        # sign_change: true if left and right have opposite signs
+        sign_chg = (k_left * k_right < 0.0)
+
+        inflection_points.append(InflectionPoint(
+            parameter_u=t_star,
+            xy_mm=xy,
+            curvature_left=k_left,
+            curvature_right=k_right,
+            sign_change=sign_chg,
+        ))
+
+    # ------------------------------------------------------------------
+    # Step 4 — fairness / Class-A check (Farin §10.6; Sapidis §3)
+    # ------------------------------------------------------------------
+    is_fair = True
+    if len(inflection_points) > 1:
+        is_fair = False
+        warnings_out.append(
+            f"Curve has {len(inflection_points)} inflection points — NOT Class-A fair "
+            "(Farin §10.6 requires ≤ 1 inflection for a fair curve)."
+        )
+
+    # Check for abrupt curvature jumps at each inflection
+    if mean_kappa > 0.0:
+        for ip in inflection_points:
+            left_ratio = abs(ip.curvature_left) / mean_kappa
+            right_ratio = abs(ip.curvature_right) / mean_kappa
+            if left_ratio > _ABRUPT_JUMP_FACTOR or right_ratio > _ABRUPT_JUMP_FACTOR:
+                is_fair = False
+                warnings_out.append(
+                    f"Abrupt curvature jump at t={ip.parameter_u:.4f}: "
+                    f"|κ_left|={abs(ip.curvature_left):.3e}, "
+                    f"|κ_right|={abs(ip.curvature_right):.3e}, "
+                    f"mean |κ|={mean_kappa:.3e} — violates Class-A fairness."
+                )
+
+    # Warn if no sign_change (numerical artefact at endpoint)
+    for ip in inflection_points:
+        if not ip.sign_change:
+            warnings_out.append(
+                f"Inflection at t={ip.parameter_u:.4f} has no confirmed sign change "
+                "(may be a numerical artefact near a curve endpoint)."
+            )
+
+    return CurveInflectionReport(
+        inflection_points=inflection_points,
+        num_inflections=len(inflection_points),
+        max_curvature=max_kappa,
+        min_curvature=min_kappa,
+        is_fair_class_a=is_fair,
+        warnings=warnings_out,
+        honest_caveat=_HONEST_CAVEAT_V2,
+    )
+
+
+# ---------------------------------------------------------------------------
 # LLM tool registration (gated import pattern)
 # ---------------------------------------------------------------------------
 
@@ -411,26 +720,34 @@ if _REGISTRY_AVAILABLE:
         name="nurbs_find_curve_inflections",
         description=(
             "Find inflection points of a 2D NURBS curve — parameter values t* where "
-            "the signed curvature κ(t) changes sign (do Carmo §1.5; Sapidis §3).\n"
+            "the signed curvature κ(t) changes sign.  Used for fairness analysis and "
+            "naval-architecture/automotive Class-A surface validation.\n"
             "\n"
             "An inflection point is where the curve transitions from bending left "
-            "(κ > 0) to bending right (κ < 0) or vice-versa.  The osculating circle "
-            "switches side at each inflection.\n"
+            "(κ > 0) to bending right (κ < 0) or vice-versa — the osculating circle "
+            "switches side (Piegl-Tiller §5.3; Farin §10.6; do Carmo §1.5).\n"
             "\n"
-            "Algorithm: uniform sampling of κ_signed(t) → sign-change detection → "
-            "5-iteration bisection refinement per bracket.\n"
+            "κ(u) = (x'·y'' − y'·x'') / (x'² + y'²)^1.5  [signed 2D curvature]\n"
             "\n"
-            "Returns:\n"
-            "  inflection_t_params        : [t*, ...] refined parameter values at inflections\n"
-            "  num_inflections            : count of inflection points\n"
-            "  signed_curvature_samples   : [[t, κ_signed], ...] uniform sample grid\n"
-            "  honest_caveat              : scope and accuracy caveats\n"
+            "Algorithm: sample κ(u) at num_samples uniform u-values → adjacent "
+            "sign-change detection (|κ| < tol treated as zero) → 5-iteration "
+            "bisection refinement per bracket.\n"
             "\n"
-            "Applications: fairness analysis, sketch QC, toolpath transition planning, "
-            "clothoid design.\n"
+            "Returns CurveInflectionReport:\n"
+            "  inflection_points  : [{parameter_u, xy_mm, curvature_left, "
+            "curvature_right, sign_change}, ...]\n"
+            "  num_inflections    : count\n"
+            "  max_curvature      : max |κ| over samples\n"
+            "  min_curvature      : min |κ| over samples\n"
+            "  is_fair_class_a    : True iff ≤ 1 inflection AND no abrupt κ-jump\n"
+            "  warnings           : list of diagnostic strings\n"
+            "  honest_caveat      : scope / accuracy caveats\n"
             "\n"
-            "HONEST: 2D only.  Near-zero-curvature regions (|κ| < threshold) may "
-            "produce false positives or suppress genuine gentle crossings.\n"
+            "Applications: Class-A fairness QC, sketch QC, toolpath transitions, "
+            "clothoid / fresnel-transition design.\n"
+            "\n"
+            "HONEST: 2D only — 3D space-curve torsion not supported.  "
+            "Sampling-based, not analytical root-finding.  "
             "Never raises — returns {ok:false, reason} for invalid inputs."
         ),
         input_schema={
@@ -462,11 +779,11 @@ if _REGISTRY_AVAILABLE:
                     "type": "integer",
                     "description": "Number of uniform parameter samples for detection (default 200).",
                 },
-                "threshold": {
+                "tol": {
                     "type": "number",
                     "description": (
-                        "Near-zero curvature threshold; samples with |κ| < threshold "
-                        "are treated as zero.  Default 1e-9.  Raise to suppress false "
+                        "Near-zero curvature tolerance; samples with |κ| < tol "
+                        "are treated as zero.  Default 1e-6.  Raise to suppress false "
                         "positives in near-flat regions."
                     ),
                 },
@@ -497,18 +814,27 @@ if _REGISTRY_AVAILABLE:
             )
 
             n_samples = int(params.get("num_samples") or 200)
-            thresh = float(params.get("threshold") or 1e-9)
+            tol = float(params.get("tol") or 1e-6)
 
-            result = find_curve_inflections(curve, num_samples=n_samples, threshold=thresh)
+            report = find_curve_inflections(curve, num_samples=n_samples, tol=tol)
 
             return ok_payload({
-                "inflection_t_params": result.inflection_t_params,
-                "num_inflections": result.num_inflections,
-                "signed_curvature_samples": [
-                    {"t": t, "kappa_signed": k}
-                    for t, k in result.signed_curvature_samples
+                "inflection_points": [
+                    {
+                        "parameter_u": ip.parameter_u,
+                        "xy_mm": list(ip.xy_mm),
+                        "curvature_left": ip.curvature_left,
+                        "curvature_right": ip.curvature_right,
+                        "sign_change": ip.sign_change,
+                    }
+                    for ip in report.inflection_points
                 ],
-                "honest_caveat": result.honest_caveat,
+                "num_inflections": report.num_inflections,
+                "max_curvature": report.max_curvature,
+                "min_curvature": report.min_curvature,
+                "is_fair_class_a": report.is_fair_class_a,
+                "warnings": report.warnings,
+                "honest_caveat": report.honest_caveat,
             })
         except Exception as exc:  # noqa: BLE001
             return err_payload(str(exc))

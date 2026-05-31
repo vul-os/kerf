@@ -5042,9 +5042,9 @@
             "note": "No built-in inflection-point detection for NURBS curves"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_inflection.py",
-            "note": "find_curve_inflections(curve, num_samples=200, threshold=1e-9) -> InflectionResult; κ_signed(t)=(x'y''-y'x'')/|C'|³ sampled at num_samples uniform t-values; sign-change detection with threshold guard; 5-iteration bisection per bracket; signed_curvature_samples profile; LLM tool nurbs_find_curve_inflections registered (gated import); 20 hermetic tests. HONEST: 2D only — near-zero-curvature regions may produce false positives; gentle crossings may be missed at low threshold. Applications: fairness analysis, sketch QC, toolpath transitions. Refs: do Carmo §1.5; Sapidis §3."
+            "note": "find_curve_inflections(curve, num_samples=200, tol=1e-6) -> CurveInflectionReport; InflectionPoint(parameter_u, xy_mm, curvature_left, curvature_right, sign_change); κ(u)=(x'y''-y'x'')/(x'²+y'²)^1.5 (Piegl-Tiller §5.3; Farin §10.6); sign-change detection with tol guard; 5-iteration bisection per bracket; is_fair_class_a=True iff ≤1 inflection AND no abrupt κ-jump (Farin §10.6 Class-A criterion); LLM tool nurbs_find_curve_inflections registered (gated import); 38 hermetic tests (20 legacy v1 + 18 v2; oracles: S-curve→1 inflection+fair, double-S→≥2+not-fair, circle→0+fair+κ≈1/R, straight-line→0+warns). HONEST: 2D only — 3D torsion not supported; sampling-based, not analytical κ=0 root-finding; gentle crossings may be missed at high tol. Applications: Class-A fairness QC (naval/automotive), sketch QC, toolpath transitions. Refs: Piegl-Tiller §5.3/§9.2; Farin §10.6; do Carmo §1.5; Sapidis §3."
           }
         },
         {
@@ -11596,6 +11596,20 @@
             "status": "yes",
             "note": "Tunnel gate design (Beaumont 2007 §7.4 + Menges 2001 §6.6.5): D = 0.5×wall_thickness; +10% viscosity correction for PC/PA66/PMMA/POM/PEI/PPO; lower bound 0.8 mm; upper cap 2/3×wall. Break-off force: F = τ_shear × π/4·D² (Menges Table 6.3: ABS=30, PC=45, PP=22, PA66=40 MPa). Shear rate: γ̇ = 4Q/(π·r³) Hagen-Poiseuille; limit 50000 s⁻¹. Freeze time: Chen-Chiang/Menges §7.3.3 1-D Fourier. Angle: 30° flexible / 45° stiff (Menges §6.6.5). Oracle: ABS 30 g, wall 2 mm → D=1.0 mm, F_break=23.6 N, freeze≈1.42 s. LLM tool `mold_design_tunnel_gate`; 35 tests. HONEST: Beaumont heuristic — multi-cavity timing and fill-pressure balance require Moldflow/Moldex3D 3-D fill simulation; shear rate is Newtonian (actual shear-thinning 1.25–1.5× higher); freeze time is 1-D constant-diffusivity (PP/PA66/POM 15–25% longer due to crystallisation latent heat); confirm by mold trial",
             "evidence": "packages/kerf-mold/src/kerf_mold/tunnel_gate_design.py"
+          }
+        },
+        {
+          "domain": "D7",
+          "feature": "SPI mold surface finish compliance check — resin + steel + hardness vs. A1–D3 grade",
+          "competitor": {
+            "status": "no",
+            "note": "Cimatron Mold Wizard does not provide a dedicated SPI mold finish compliance checker; users must manually consult SPI standards documents and steel supplier polishability specifications",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "SPI Mold Finish Standards 2017 compliance check (Menges §11): given required finish (A1–D3), resin, mold steel, and HRC, returns achievable flag, recommended steel, recommended HRC_min, polishing method, Ra_target_um, Ra_achievable_um, and glass_filled_warning. Steel limits: S136→A1 (Ra 0.012 µm); 420SS→A2; H13→A3; P20→B3. HRC minimums: A1 50 HRC, A2 48 HRC, A3 44 HRC, B1 38 HRC, B2 32 HRC, B3/C/D 20–28 HRC. Glass-fiber rule (Menges §11.4.2): GF resins cannot achieve A-grade on molded part regardless of mold polish. Resin limits: PA66→max A3; PP→max B1; POM→max B2; LDPE→max C1. LLM tool `mold_check_surface_finish`; 27 tests. HONEST: catalog-based only — does NOT model texture chemistry, etcher capability, polishing wear-life, part-geometry effects (weld lines, deep ribs), or process variables (mold temperature, hold pressure, cooling time affect surface replication fidelity)",
+            "evidence": "packages/kerf-mold/src/kerf_mold/surface_finish_check.py"
           }
         },
         {

@@ -11,6 +11,8 @@ Submodules:
   report                    — gdt_callout_report() formatted-text builder
   tools                     — LLM tool wrappers registered with the tool registry
   composite_tolerance_check — Composite frame validator (ASME Y14.5-2018 §10.5.2 / §11.6)
+  composite_position        — Composite positional tolerance evaluation: PLTZF + FRTZF
+                              against measured feature points (ASME Y14.5-2018 §10.5)
   datum_shift_check         — Datum shift (bonus tolerance) for MMC/LMC datum features
                               (ASME Y14.5-2018 §4.5 + §7.3.5)
   feature_of_size_dof       — Feature of Size DOF enumerator (ASME Y14.5-2018 §4.7 + §7.3)
@@ -51,6 +53,12 @@ from kerf_cad_core.gdt.dimension_chain import (
     DimensionChainReport,
     compute_dimension_chain,
 )
+from kerf_cad_core.gdt.composite_position import (
+    FeaturePoint,
+    CompositePositionSpec,
+    CompositePositionReport,
+    check_composite_position,
+)
 
 __all__ = [
     "Datum",
@@ -75,4 +83,8 @@ __all__ = [
     "DimensionLink",
     "DimensionChainReport",
     "compute_dimension_chain",
+    "FeaturePoint",
+    "CompositePositionSpec",
+    "CompositePositionReport",
+    "check_composite_position",
 ]

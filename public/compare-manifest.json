@@ -7051,6 +7051,19 @@
         },
         {
           "domain": "D11",
+          "feature": "GD&T composite positional tolerance evaluation — PLTZF + FRTZF vs measured points (ASME Y14.5-2018 §10.5)",
+          "competitor": {
+            "status": "no",
+            "note": "Fusion 360 does not provide a programmatic composite positional tolerance evaluator that takes measured feature point coordinates and checks both PLTZF (pattern location vs datum frame) and FRTZF (inter-feature spacing) tolerance zones"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "check_composite_position(CompositePositionSpec) -> CompositePositionReport: PLTZF (upper frame) — diametral dev = 2‖measured−nominal‖ ≤ upper_pltzf_tolerance_mm per feature; FRTZF (lower frame) — centroid-shift measured pattern onto nominal, residual dev ≤ lower_frtzf_tolerance_mm; MMC bonus = max(0, feature_size_mm−mmc_size_mm) per §4.5. Returns pltzf_violations, frtzf_violations, max deviations, centroid_shift_mm. gdt_check_composite_position LLM tool registered; 34 tests green. HONEST FLAG: positional tolerance only (not orientation of feature axes); FRTZF uses centroid translation only — no 6-DOF rigid-body registration; datum simulator computation not performed.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gdt/composite_position.py"
+          }
+        },
+        {
+          "domain": "D11",
           "feature": "GD&T datum reference frame validator (ASME Y14.5-2018 §4.11)",
           "competitor": {
             "status": "no",

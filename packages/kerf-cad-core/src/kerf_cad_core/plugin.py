@@ -52,6 +52,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.gdt.feature_of_size_dof",        # gdt_compute_fos_dof (§4.7 + §7.3 FOS DOF enumerator)
     "kerf_cad_core.gdt.runout_check",               # gdt_check_runout (§13 circular + total runout / ISO 1101 §18)
     "kerf_cad_core.gdt.dimension_chain",            # gdt_compute_dimension_chain (§5.3 WC + RSS tolerance stack-up)
+    "kerf_cad_core.gdt.composite_position",         # gdt_check_composite_position (§10.5 PLTZF+FRTZF vs measured points)
     "kerf_cad_core.arch.tools",
     "kerf_cad_core.struct.tools",
     "kerf_cad_core.feature_thread",

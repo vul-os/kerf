@@ -181,6 +181,9 @@ def _register_tools(ctx, provides: list) -> None:
         # Passive LC / RC power-line EMI filter design — Ott §15.3 + CISPR 22
         # electronics_design_emi_filter: corner freq, L, C, attenuation
         "kerf_electronics.emi_filter_design",
+        # Buck DC-DC converter CCM output voltage ripple — Erickson 3e §2.4 + Sandler §3
+        # electronics_compute_buck_ripple: D, ΔiL, ΔV_cap, ΔV_ESR, total ΔV_out
+        "kerf_electronics.dc_dc_ripple",
     ]
 
     for module_path in tool_modules:

@@ -32,3 +32,8 @@ from kerf_electronics.emi_filter_design import (  # noqa: F401
     EmiFilterReport,
     design_emi_filter,
 )
+from kerf_electronics.dc_dc_ripple import (  # noqa: F401
+    BuckConverterSpec,
+    ConverterRippleReport,
+    compute_buck_ripple,
+)

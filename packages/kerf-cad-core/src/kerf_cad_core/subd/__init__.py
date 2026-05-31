@@ -38,6 +38,11 @@ dual_mesh
     each primal vertex becomes a dual face whose corners are the neighboring
     face centroids ordered CCW. Used for ringing analysis, mesh smoothing,
     and visualization (Bossen-Heckbert 1996; Bommes-Lévy-Pietroni 2013 §3.2).
+edge_flip
+    SUBD-CAGE-EDGE-FLIP: flip the shared edge of two adjacent triangles,
+    replacing (v_a, v_b) with (v_c, v_d) where v_c and v_d are the opposite
+    vertices. Purely topological — no Delaunay in-circle test. Triangles only.
+    (Bommes-Lévy-Pietroni 2013 §3; Edelsbrunner 2001 §2).
 """
 
 from kerf_cad_core.subd.limit_walk_cross_curve import (
@@ -68,6 +73,10 @@ from kerf_cad_core.subd.dual_mesh import (
     DualMeshResult,
     compute_dual_mesh,
 )
+from kerf_cad_core.subd.edge_flip import (
+    EdgeFlipResult,
+    flip_edge,
+)
 
 __all__ = [
     "CrossCurveResult",
@@ -84,4 +93,6 @@ __all__ = [
     "merge_vertices",
     "DualMeshResult",
     "compute_dual_mesh",
+    "EdgeFlipResult",
+    "flip_edge",
 ]

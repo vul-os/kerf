@@ -548,3 +548,20 @@ def _register_tools(ctx, provides: list) -> None:
         logger.warning(
             "kerf-firmware: failed to load firmware_check_pwm_resolution tool: %s", exc
         )
+
+    # firmware_compute_adc_enob — ADC effective-number-of-bits calculator
+    try:
+        from kerf_firmware.tools.firmware_compute_adc_enob import (
+            _spec as _adc_enob_spec,
+            run_firmware_compute_adc_enob_async as _adc_enob_fn,
+        )
+        ctx.tools.register(
+            "firmware_compute_adc_enob",
+            _adc_enob_spec,
+            _adc_enob_fn,
+        )
+        provides.append("firmware.adc_enob")
+    except Exception as exc:
+        logger.warning(
+            "kerf-firmware: failed to load firmware_compute_adc_enob tool: %s", exc
+        )

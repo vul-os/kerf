@@ -101,6 +101,12 @@ from kerf_cad_core.subd.stam_limit_tangents import (
     LimitTangentReport,
     compute_stam_limit_tangents,
 )
+from kerf_cad_core.subd.crease_fractional_decay import (
+    CreasedEdge,
+    FractionalCreaseSpec,
+    CreaseDecayResult,
+    apply_fractional_crease_decay,
+)
 
 __all__ = [
     "CrossCurveResult",
@@ -125,4 +131,8 @@ __all__ = [
     "ExtraordinaryVertex",
     "LimitTangentReport",
     "compute_stam_limit_tangents",
+    "CreasedEdge",
+    "FractionalCreaseSpec",
+    "CreaseDecayResult",
+    "apply_fractional_crease_decay",
 ]

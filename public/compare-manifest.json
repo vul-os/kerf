@@ -19123,6 +19123,19 @@
         },
         {
           "domain": "D1",
+          "feature": "SubD fractional crease sharpness decay (semi-sharp creases)",
+          "competitor": {
+            "status": "partial",
+            "note": "OpenSubdiv supports fractional crease sharpness s in [0,inf) with the s_new=s-1 decay rule (DeRose-Kass-Truong 1998 §4) but exposes it only via C++ API or USD prims — no standalone Python sharpness-schedule query tool."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "GK-P14: apply_fractional_crease_decay(spec) applies the DeRose-Kass-Truong (1998) §4 rule s_new=max(0,s-1) per subdivision level. After L levels: s_L=max(0,s_0-L). CreasedEdge (v0_idx, v1_idx, sharpness); FractionalCreaseSpec (cage, edges, subdivision_level); CreaseDecayResult (decayed_edges, effective_dihedral_smoothing_per_edge 0=sharp/1=smooth, max_sharpness_remaining, num_fully_decayed, honest_caveat). Smooth-weight = 1-clamp(s_L,0,1) matching OpenSubdiv fractional blend definition. s>=10 = permanently sharp per OpenSubdiv convention. LLM tool subd_apply_crease_decay; re-exported from kerf_cad_core.subd; 42 tests green. HONEST: SHARPNESS SCHEDULE ONLY — applies the s-1 rule per level; does NOT simulate the resulting subdivided cage geometry, only the sharpness schedule. Refs: DeRose-Kass-Truong (1998) §4 SIGGRAPH; OpenSubdiv Subdivision Surfaces docs; Catmull-Clark (1978) CAD 10(6).",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/subd/crease_fractional_decay.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "SubD control-cage surface area + CC limit-surface area estimate",
           "competitor": {
             "status": "no",

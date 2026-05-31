@@ -71,6 +71,9 @@ _TOOL_MODULES = [
     # NURBS-CURVE-EVOLUTE: locus of osculating-circle centres E(t)=C(t)+n̂/κ
     # (do Carmo §1.6; Mortenson §4.2) — 2D only; 3D Frenet-Serret not yet supported
     "kerf_cad_core.geom.curve_evolute",
+    # NURBS-CURVE-INFLECTION: inflection points where κ_signed changes sign
+    # (do Carmo §1.5; Sapidis §3) — fairness QC, sketch QC, toolpath transitions
+    "kerf_cad_core.geom.curve_inflection",
     # GK-P Wave 4P: far-offset robustness (Maekawa 1999) — nurbs_surface_offset_robust
     "kerf_cad_core.geom.offset_far_tools",
     "kerf_cad_core.geom.trim_curve",
@@ -102,6 +105,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.arch.base_plate_aisc_tools",  # arch_design_base_plate: AISC DG-1 §3.1 + AISC 360-22 §J8 column base plate (concentric axial load only)
     "kerf_cad_core.arch.shear_wall_oop_tools",   # arch_check_shear_wall_oop: ACI 318-19 §11.7 RC shear wall OOP flexural + slenderness (h/t≤30 §11.5.3)
     "kerf_cad_core.arch.diaphragm_shear_tools",  # arch_check_diaphragm_shear: AWC SDPWS-2021 §4.2 wood + SDI DDM04 metal-deck in-plane shear (chord forces + deflection separate)
+    "kerf_cad_core.arch.retaining_wall_stability_tools",  # arch_check_retaining_wall_stability: Rankine active Ka=tan²(45-φ/2); FoS_overt/slide/bearing (Bowles 5e §12.3; Das §13)
     "kerf_cad_core.civil.hydraulics_tools",
     "kerf_cad_core.tolstack.tools",
     "kerf_cad_core.kinematics.tools",

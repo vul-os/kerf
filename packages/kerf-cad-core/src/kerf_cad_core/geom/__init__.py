@@ -1170,6 +1170,9 @@ __all__ = [
     # NURBS-CURVE-CIRCLE-FIT: Kasa (1976) + Taubin (1991) algebraic circle fit
     "CircleFitResult",
     "fit_circle_to_curve",
+    # NURBS-CURVE-INFLECTION: κ-sign change inflection point detection
+    "InflectionResult",
+    "find_curve_inflections",
 ]
 
 # Variable-section edge blend (Vida-Martin-Varady 1994 §4)
@@ -1720,4 +1723,11 @@ from kerf_cad_core.geom.face_normal_flip import (  # noqa: E402
 from kerf_cad_core.geom.curve_conic_detect import (  # noqa: E402
     ConicDetectResult,
     detect_conic_type,
+)
+# NURBS-CURVE-INFLECTION: inflection points of a 2D NurbsCurve where κ_signed
+# changes sign (do Carmo §1.5; Sapidis §3). Used for fairness analysis, sketch QC,
+# and toolpath transitions. LLM tool: nurbs_find_curve_inflections.
+from kerf_cad_core.geom.curve_inflection import (  # noqa: E402
+    InflectionResult,
+    find_curve_inflections,
 )

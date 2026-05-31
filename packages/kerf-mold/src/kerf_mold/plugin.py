@@ -22,6 +22,9 @@ Registers:
   - LLM tool:  mold_check_flow_length
                (Beaumont 2007 §4 Table 4.2 + Menges 2001 §6.2.1 L/T ratio
                 short-shot risk check)
+  - LLM tool:  mold_compute_cooling_time_chen_chiang
+               (Chen-Chiang 1985 + Menges 2001 §7.3.3 + Beaumont 2007 §10.4
+                1-D Fourier cooling-time formula)
 """
 from __future__ import annotations
 
@@ -135,6 +138,18 @@ async def register(app: FastAPI, ctx):
         run_mold_check_flow_length,
     )
 
+    # Register Chen-Chiang cooling-time tool
+    # (Chen-Chiang 1985 + Menges 2001 §7.3.3 + Beaumont 2007 §10.4)
+    from kerf_mold.cooling_time_chen_chiang_tool import (
+        mold_cooling_time_chen_chiang_spec,
+        run_mold_compute_cooling_time_chen_chiang,
+    )
+    ctx.tools.register(
+        "mold_compute_cooling_time_chen_chiang",
+        mold_cooling_time_chen_chiang_spec,
+        run_mold_compute_cooling_time_chen_chiang,
+    )
+
     provides = [
         "mold.moldability",
         "mold.parting_surface",
@@ -149,6 +164,7 @@ async def register(app: FastAPI, ctx):
         "mold.vent_placement",
         "mold.ejector_stroke_verify",
         "mold.flow_length_check",
+        "mold.cooling_time_chen_chiang",
     ]
 
     try:

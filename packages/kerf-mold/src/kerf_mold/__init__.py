@@ -71,6 +71,12 @@ from kerf_mold.flow_length_check import (
     MATERIAL_LT_LIMITS,
     compute_flow_length_check,
 )
+from kerf_mold.cooling_time_chen_chiang import (
+    MaterialThermalProps,
+    CoolingTimeReport,
+    MATERIAL_THERMAL_DB,
+    compute_cooling_time_chen_chiang,
+)
 
 __all__ = [
     # mold.py
@@ -135,4 +141,9 @@ __all__ = [
     "FlowLengthReport",
     "MATERIAL_LT_LIMITS",
     "compute_flow_length_check",
+    # cooling_time_chen_chiang.py
+    "MaterialThermalProps",
+    "CoolingTimeReport",
+    "MATERIAL_THERMAL_DB",
+    "compute_cooling_time_chen_chiang",
 ]

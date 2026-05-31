@@ -9871,6 +9871,20 @@
         },
         {
           "domain": "D7",
+          "feature": "Cooling time estimation (Chen-Chiang 1-D Fourier)",
+          "competitor": {
+            "status": "yes",
+            "note": "Cimatron cooling-circuit analysis includes cycle-time estimates; full 3-D thermal solver in separate Moldflow product",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Chen-Chiang (1985) 1-D Fourier first-term cooling-time formula (Menges 2001 §7.3.3 + Beaumont 2007 §10.4): t_c = (h²/π²α)·ln[(8/π²)·(T_m−T_w)/(T_e−T_w)]; MATERIAL_THERMAL_DB (Menges 2001 Table 7.3) — ABS α=1.00e-7, PC α=1.50e-7, PP α=0.95e-7, PA66 α=1.40e-7, POM α=0.95e-7, PMMA α=1.13e-7 m²/s; dominant-factor diagnosis (thickness_squared|diffusivity|temp_window); LLM tool `mold_compute_cooling_time_chen_chiang`; 24 oracle tests; honest-flag: 1-D Fourier first-term approximation only — ignores cooling-channel layout and conformal-cooling effects; does NOT model crystallisation latent heat (semi-crystalline PP/PA66/POM times 15–30% longer), thermal contact resistance, or wall-thickness-variation hot spots; use Moldflow/Moldex3D/SigmaSoft for a full cooling-circuit simulation",
+            "evidence": "packages/kerf-mold/src/kerf_mold/cooling_time_chen_chiang.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "Electrode design (EDM)",
           "competitor": {
             "status": "yes",

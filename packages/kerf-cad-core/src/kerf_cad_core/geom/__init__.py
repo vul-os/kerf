@@ -638,6 +638,13 @@ from kerf_cad_core.geom.principal_curvature_viz import (
     sample_principal_curvatures,
 )
 
+# BREP-WIRE-CLOSED-CHECK: ordered edge-list closure + planarity (Mantyla §3; Hoffmann §4)
+from kerf_cad_core.geom.wire_closed_check import (
+    EdgeSegment,
+    WireCheckReport,
+    check_wire_closed,
+)
+
 __all__ = [
     "read_3dm","write_3dm","Rhino3dmReadError",
     "read_dxf","write_dxf","DxfReadError","DxfWriteError",
@@ -1180,6 +1187,10 @@ __all__ = [
     # NURBS-CURVE-INFLECTION: κ-sign change inflection point detection
     "InflectionResult",
     "find_curve_inflections",
+    # BREP-WIRE-CLOSED-CHECK: ordered edge-list closure + planarity (Mantyla §3; Hoffmann §4)
+    "EdgeSegment",
+    "WireCheckReport",
+    "check_wire_closed",
 ]
 
 # Variable-section edge blend (Vida-Martin-Varady 1994 §4)

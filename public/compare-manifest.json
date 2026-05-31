@@ -20071,6 +20071,20 @@
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
             "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T \u00a79.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only \u2014 centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat \u2014 use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller \u00a79.4; Farin CAGD Ch 10."
           }
+        },
+        {
+          "name": "B-rep wire closed-loop + planarity pre-check (Mantyla \u00a73; Hoffmann \u00a74)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://dev.opencascade.org/doc/overview/html/",
+            "note": "OCCT BRepCheck_Analyzer and BRep_Builder perform wire validity checks internally but do not expose a standalone ordered-edge-list closed-loop + planarity API with explicit max_endpoint_gap and SVD out-of-plane deviation fields for LLM/script interrogation"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/wire_closed_check.py",
+            "note": "check_wire_closed(edges: list[EdgeSegment], tolerance_mm=1e-6) -> WireCheckReport; EdgeSegment dataclass: start_xyz, end_xyz, edge_id; WireCheckReport: closed (bool), planar (bool), max_endpoint_gap_mm, num_edges, plane_normal_xyz (SVD least-singular-vector), max_out_of_plane_deviation_mm, honest_caveat; closed = every consecutive pair connected AND last.end \u2248 first.start within tolerance; planar = SVD best-fit plane over all endpoints (Pratt 1987; Eberly \u00a76.6) has max_oop < tolerance; LLM tool brep_check_wire_closed registered (gated import); re-exported from geom/__init__.py; 26 hermetic tests (closed square closed=True/planar=True/normal=(0,0,1), open wire closed=False/gap>0, 3-D zig-zag planar=False, triangle closed+planar, hexagon, XZ-plane triangle normal=(0,1,0), large square, lifted vertex non-planar, tetrahedron-outline non-planar, tolerance sensitivity, empty ValueError). HONEST: edge order-dependent \u2014 scrambled/unordered edge lists are NOT automatically sorted; pass pre-ordered edges only; planarity is endpoint-only, curve interiors NOT sampled. Refs: Mantyla 'Solid Modeling' \u00a73; Hoffmann \u00a74."
+          }
         }
       ]
     }

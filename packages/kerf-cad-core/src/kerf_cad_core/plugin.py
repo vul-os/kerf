@@ -113,6 +113,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.arch.bearing_wall_axial_tools",     # arch_check_bearing_wall_axial: ACI 318-19 §11.5.3.1 + TMS 402-22 §8.3 plain/masonry bearing wall axial capacity + DCR
     "kerf_cad_core.arch.lintel_design_tools",          # arch_design_lintel: AISC Table 3-23 + ACI 318-19 §9 + TMS 402-22 §5 lintel design (steel/RC/RM; 45° arching; L/240 or L/360)
     "kerf_cad_core.arch.anchor_bolt_pullout_tools",   # arch_check_anchor_pullout: ACI 318-19 §17.6 cast-in-place headed bolt tension — steel §17.6.1 + concrete breakout §17.6.2 + pullout §17.6.3
+    "kerf_cad_core.arch.opening_in_wall_tools",       # arch_check_opening_in_wall: IBC §2308.4 + ACI 318-19 §11.5.3.1 + TMS 402-22 §8.3 wall opening tributary jamb load + capacity + lintel DCR
     "kerf_cad_core.civil.hydraulics_tools",
     "kerf_cad_core.tolstack.tools",
     "kerf_cad_core.kinematics.tools",
@@ -307,6 +308,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.subd.vertex_merge",
     # SUBD-CAGE-DUAL-MESH: dual mesh of quad cage — face centroids become dual verts; vertex star becomes dual face (CCW angular sort); ringing analysis + mesh smoothing (Bossen-Heckbert 1996 §3.1; Bommes-Lévy-Pietroni 2013 §3.2)
     "kerf_cad_core.subd.dual_mesh",
+    # SUBD-CAGE-EDGE-FLIP: topological edge flip for two adjacent triangles sharing an edge; replace (v_a,v_b) with (v_c,v_d) opposite vertices; triangles only; no Delaunay in-circle test (Bommes-Lévy-Pietroni 2013 §3; Edelsbrunner 2001 §2)
+    "kerf_cad_core.subd.edge_flip",
     # GK-P-B: Stam exact limit-position + limit-tangent evaluation (subd_eval_limit tool)
     "kerf_cad_core.geom.subd_stam",
     # GK-P45: SubD/mesh authoring ops (subd_poke, subd_extrude_along, sculpt_brush, multires_evaluate)
@@ -517,6 +520,9 @@ _TOOL_MODULES = [
     # HONEST: chord-length parameterisation; centripetal may give better results
     # for high-aspect-ratio data. LLM tool: nurbs_fit_curve_g2
     "kerf_cad_core.geom.curve_fit_g2",
+    # BREP-WIRE-CLOSED-CHECK: ordered edge-list closure + SVD planarity (Mantyla §3; Hoffmann §4)
+    # LLM tool: brep_check_wire_closed
+    "kerf_cad_core.geom.wire_closed_check",
 ]
 # NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
 # (already in _TOOL_MODULES above at line 128); sagitta_arrow_chart module is imported

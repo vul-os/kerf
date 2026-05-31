@@ -248,6 +248,17 @@ async def register(app: FastAPI, ctx):
         run_cam_linearize_arcs,
     )
 
+    # Dry-machining feasibility checker — Sandvik Coromant dry-machining guide + ISO 8688-1
+    from kerf_cam.dry_machining_check import (
+        cam_check_dry_machining_spec,
+        run_cam_check_dry_machining,
+    )
+    ctx.tools.register(
+        "cam_check_dry_machining",
+        cam_check_dry_machining_spec,
+        run_cam_check_dry_machining,
+    )
+
     # Capabilities depend on available deps
     provides = [
         "cam.2_5d",
@@ -269,6 +280,7 @@ async def register(app: FastAPI, ctx):
         "cam.dwell-audit",
         "cam.coolant-flow-check",
         "cam.arc-linearize",
+        "cam.dry-machining-check",
     ]   # pure-Python ops always available
     if _OCL_AVAILABLE:
         provides += ["cam.parallel-3d", "cam.waterline", "cam.lathe"]

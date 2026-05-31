@@ -6566,6 +6566,20 @@
         },
         {
           "domain": "D7",
+          "feature": "Dry-machining feasibility check (coating, vc, tool life)",
+          "competitor": {
+            "status": "partial",
+            "note": "Fusion 360 CAM / CoroPlus ToolGuide can suggest dry vs wet machining strategy for specific Sandvik inserts, but there is no general-purpose in-app dry-machining feasibility check that returns a coating requirement, tool-life reduction factor, and per-material vc limit for arbitrary workpiece materials",
+            "source": "https://www.sandvik.coromant.com/en-us/knowledge/machining-formulas-definitions/pages/coating-and-dry-machining.aspx"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "check_dry_machining(DryMachiningSpec) → DryMachiningReport: dry-machining feasibility per Sandvik Coromant Dry/Near-Dry Machining Application Guide (2024) + ISO 8688-1. 8 material classes × 5 coatings × 4 operations. Returns feasible (bool), recommendation, tool_life_reduction_factor (1.0=flood-equivalent; Sandvik mid-range Taylor values), min_coating_required, max_vc_dry_m_per_min (Sandvik catalogue absolute limit), warnings list, honest_caveat. Rules: cast-iron-grey → FEASIBLE (factor 0.90–1.00; graphite lubrication; uncoated ok; TiAlN preferred); steel-low-carbon + TiAlN/AlCrN → CONDITIONAL (factor 0.70–0.85; max vc 180 m/min); steel-stainless-austenitic + AlCrN/TiAlN → CONDITIONAL (factor 0.50–0.65; max vc 120 m/min; uncoated NOT ok); aluminum-wrought/cast → NOT FEASIBLE (BUE / chip welding); titanium-Ti6Al4V → CHALLENGING (factor 0.30–0.50; MQL minimum; combustion above 60 m/min per Biermann 2020 §4); Inconel-718 → NOT FEASIBLE (flood mandatory). cam_check_dry_machining LLM tool registered; 59 tests green. HONEST: heuristic rules from Sandvik catalogue + CIRP literature — NOT a substitute for chip-form testing; tool_life_reduction_factor uncertainty ±40 %; no thermal FEA or chip-evacuation modelling. Refs: Sandvik Coromant Dry/Near-Dry Machining Guide (2024); ISO 8688-1:1989; Klocke & Eisenblätter CIRP Ann. 46(2) 1997; Biermann et al. Springer 2020 §4",
+            "evidence": "packages/kerf-cam/src/kerf_cam/dry_machining_check.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "Face-mill zig-zag toolpath (rectangular pocket)",
           "competitor": {
             "status": "yes",

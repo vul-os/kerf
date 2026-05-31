@@ -3257,3 +3257,125 @@ async def run_compute_sagitta_arrow_chart(ctx: ProjectCtx, args: bytes) -> str:
     if isinstance(result, dict):
         return json.dumps(result)
     return ok_payload(result.to_dict())
+
+
+# ---------------------------------------------------------------------------
+# Tool: optics_compute_seidel_coma
+# ---------------------------------------------------------------------------
+
+from kerf_cad_core.optics.seidel_coma import (  # noqa: E402
+    SeidelComaReport,
+    compute_seidel_coma,
+)
+
+_seidel_coma_spec = ToolSpec(
+    name="optics_compute_seidel_coma",
+    description=(
+        "Compute the third-order Seidel coma aberration coefficient S_II for a\n"
+        "sequential thin-lens system from the surface paraxial parameters.\n"
+        "\n"
+        "Theory (Welford 'Aberrations of Optical Systems' §7 / Born & Wolf §5.3):\n"
+        "  Traces a marginal ray (h=aperture, u=0) and a chief ray (ybar=0 at stop,\n"
+        "  u=tan(field_angle_deg)) through all surfaces.  Per-surface contributions:\n"
+        "\n"
+        "    A_j    = n_j * (u_j + h_j * c_j)          [marginal refraction invariant]\n"
+        "    Ā_j    = n_j * (ubar_j + ybar_j * c_j)    [chief refraction invariant]\n"
+        "    S_II_j = -A_j * Ā_j * h_j * Δ(u/n)_j     [Welford §7 eq. 7.42]\n"
+        "\n"
+        "  S_II = Σ S_II_j  (total Seidel coma sum).\n"
+        "\n"
+        "  Coma in physical units (Born & Wolf §5.3 eq. 5.3.29):\n"
+        "    tangential_coma = 3 * S_II * y_chief   [y_chief = chief-ray image height]\n"
+        "    coma_waves = |tangential_coma| / (8 * lambda)\n"
+        "\n"
+        "HONEST FLAGS:\n"
+        "  * Third-order (Seidel) only.  Higher-order coma requires Hopkins finite-ray OPD.\n"
+        "  * Monochromatic.  Chromatic coma / lateral colour NOT computed.\n"
+        "  * Paraxial Seidel; no defocus residual.\n"
+        "  * Stop assumed at first surface.\n"
+        "\n"
+        "Surface definition (same as optics_seidel_aberrations):\n"
+        "  c  : curvature 1/R (mm^-1). 0 = flat.\n"
+        "  t  : thickness to NEXT surface vertex (mm). Last surface: 0.\n"
+        "  n  : refractive index of medium AFTER this surface (>= 1.0).\n"
+        "\n"
+        "Returns:\n"
+        "  S_II                      : float  Seidel coma coefficient sum (Welford §7)\n"
+        "  coma_waves_at_lambda      : float  |3*S_II*y_chief| / (8*lambda) in waves\n"
+        "  dominant_surface_idx      : int    surface with max |S_II_j| (0-based; -1 if all zero)\n"
+        "  per_surface_contributions : list   per-surface S_II_j + A, Ā, h, ybar\n"
+        "  honest_caveat             : str    scope limitations\n"
+        "\n"
+        "Errors: {ok:false, reason} for invalid inputs.  Never raises.\n"
+        "\n"
+        "References: Welford (1986) §7, eq. 7.42; Born & Wolf (1999) §5.3, eq. 5.3.29."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "lens_system_dict": {
+                "type": "object",
+                "description": (
+                    "Lens system description with key 'surfaces' (list of surface dicts, "
+                    "each with c, t, n). "
+                    "Optional top-level keys: aperture_radius_mm (default 1.0), "
+                    "n_object (default 1.0)."
+                ),
+                "properties": {
+                    "surfaces": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "c": {"type": "number", "description": "Curvature 1/R (mm^-1). 0 = flat."},
+                                "t": {"type": "number", "description": "Thickness to next surface (mm)."},
+                                "n": {"type": "number", "description": "Refractive index after surface (>= 1.0)."},
+                            },
+                            "required": ["c", "t", "n"],
+                        },
+                    },
+                    "aperture_radius_mm": {
+                        "type": "number",
+                        "description": "Marginal ray height at first surface (mm). Default 1.0.",
+                    },
+                    "n_object": {
+                        "type": "number",
+                        "description": "Refractive index of object space. Default 1.0.",
+                    },
+                },
+                "required": ["surfaces"],
+            },
+            "wavelength_nm": {
+                "type": "number",
+                "description": "Reference wavelength (nm). Used for coma_waves_at_lambda. Default 550.",
+            },
+            "field_angle_deg": {
+                "type": "number",
+                "description": "Chief-ray field angle (degrees). Default 5.0. 0 = on-axis.",
+            },
+        },
+        "required": ["lens_system_dict"],
+    },
+)
+
+
+@register(_seidel_coma_spec, write=False)
+async def run_compute_seidel_coma(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    if a.get("lens_system_dict") is None:
+        return json.dumps({"ok": False, "reason": "lens_system_dict is required"})
+
+    kwargs: dict = {}
+    if "wavelength_nm" in a:
+        kwargs["wavelength_nm"] = float(a["wavelength_nm"])
+    if "field_angle_deg" in a:
+        kwargs["field_angle_deg"] = float(a["field_angle_deg"])
+
+    result = compute_seidel_coma(a["lens_system_dict"], **kwargs)
+    if isinstance(result, dict):
+        return json.dumps(result)
+    return ok_payload(result.to_dict())

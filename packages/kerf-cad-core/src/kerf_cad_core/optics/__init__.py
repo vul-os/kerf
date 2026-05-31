@@ -79,6 +79,10 @@ from kerf_cad_core.optics.piston_tip_tilt import (
     PistonTipTiltReport,
     analyze_wavefront_alignment,
 )
+from kerf_cad_core.optics.seidel_coma import (
+    SeidelComaReport,
+    compute_seidel_coma,
+)
 
 __all__ = [
     "lensmaker",
@@ -115,4 +119,6 @@ __all__ = [
     "compute_sagitta_arrow_chart",
     "PistonTipTiltReport",
     "analyze_wavefront_alignment",
+    "SeidelComaReport",
+    "compute_seidel_coma",
 ]

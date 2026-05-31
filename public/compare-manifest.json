@@ -9809,6 +9809,20 @@
         },
         {
           "domain": "D7",
+          "feature": "Flow-length / wall-thickness (L/T) short-shot check",
+          "competitor": {
+            "status": "yes",
+            "note": "Cimatron 2026 injection simulation includes wall-thickness and fill analysis; L/T ratio not explicitly surfaced as a standalone metric",
+            "source": "https://help.cimatron.com/en/2026/New_Injection_Simulation.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "L/T ratio checker (Beaumont 2007 §4 Table 4.2 + Menges 2001 §6.2.1): lt_ratio = flow_length_mm / wall_thickness_mm per feature; MATERIAL_LT_LIMITS — ABS=150, PC=220, PP=300, PA66=250, POM=200, PMMA=180; risk: ≤80% limit → safe, 80–100% → caution, >100% → short_shot; recommended_min_thickness = flow_length/(limit×0.85) (15% margin); LLM tool `mold_check_flow_length`; 23 oracle tests; honest-flag: L/T ratio check only — NOT Hagen-Poiseuille pressure-drop simulation or melt-front thermal analysis; use Moldflow/Moldex3D/SigmaSoft for full fill simulation",
+            "evidence": "packages/kerf-mold/src/kerf_mold/flow_length_check.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "Electrode design (EDM)",
           "competitor": {
             "status": "yes",

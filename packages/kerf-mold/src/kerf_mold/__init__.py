@@ -65,6 +65,12 @@ from kerf_mold.ejector_stroke_verify import (
     DEFAULT_ALLOWABLE_DEFLECTION_MM,
     STEEL_E_N_MM2,
 )
+from kerf_mold.flow_length_check import (
+    FlowFeature,
+    FlowLengthReport,
+    MATERIAL_LT_LIMITS,
+    compute_flow_length_check,
+)
 
 __all__ = [
     # mold.py
@@ -124,4 +130,9 @@ __all__ = [
     "verify_ejector_stroke",
     "DEFAULT_ALLOWABLE_DEFLECTION_MM",
     "STEEL_E_N_MM2",
+    # flow_length_check.py
+    "FlowFeature",
+    "FlowLengthReport",
+    "MATERIAL_LT_LIMITS",
+    "compute_flow_length_check",
 ]

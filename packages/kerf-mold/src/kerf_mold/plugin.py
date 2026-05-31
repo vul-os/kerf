@@ -19,6 +19,9 @@ Registers:
                (Beaumont 2007 §8.4 + Table 8.4 air-vent location optimisation)
   - LLM tool:  mold_verify_ejector_stroke
                (Beaumont 2007 §9 + Menges 2001 §7.4 ejector stroke verification)
+  - LLM tool:  mold_check_flow_length
+               (Beaumont 2007 §4 Table 4.2 + Menges 2001 §6.2.1 L/T ratio
+                short-shot risk check)
 """
 from __future__ import annotations
 
@@ -121,6 +124,16 @@ async def register(app: FastAPI, ctx):
         mold_verify_ejector_stroke_spec,
         run_mold_verify_ejector_stroke,
     )
+    # Register flow-length / wall-thickness (L/T) short-shot risk tool
+    # (Beaumont 2007 §4 Table 4.2 + Menges 2001 §6.2.1)
+    from kerf_mold.flow_length_check_tool import (
+        mold_check_flow_length_spec, run_mold_check_flow_length,
+    )
+    ctx.tools.register(
+        "mold_check_flow_length",
+        mold_check_flow_length_spec,
+        run_mold_check_flow_length,
+    )
 
     provides = [
         "mold.moldability",
@@ -135,6 +148,7 @@ async def register(app: FastAPI, ctx):
         "mold.gate_placement",
         "mold.vent_placement",
         "mold.ejector_stroke_verify",
+        "mold.flow_length_check",
     ]
 
     try:

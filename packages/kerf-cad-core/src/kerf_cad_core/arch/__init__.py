@@ -48,6 +48,8 @@ To avoid collision this package re-exports the structural one as ``SlabDeflSpec`
   opening_in_wall_tools — LLM tool arch_check_opening_in_wall
   slab_on_grade     — ACI 360R-10 + Westergaard (1948) slab-on-grade under concentrated load
   slab_on_grade_tools — LLM tool arch_check_slab_on_grade
+  stair_stringer    — IBC §1011 + AWC NDS-2018 §3.3 + AISC 360-22 §F2 stair stringer bending check
+  stair_stringer_tools — LLM tool arch_design_stair_stringer
 """
 from __future__ import annotations
 
@@ -160,6 +162,12 @@ from kerf_cad_core.arch.bolt_shear_aisc import (
     BoltShearReport,
     check_bolt_shear,
 )
+from kerf_cad_core.arch.stair_stringer import (
+    StairGeometry,
+    StringerSpec,
+    StringerReport,
+    design_stair_stringer,
+)
 
 __all__ = [
     "WallLayer",
@@ -252,4 +260,9 @@ __all__ = [
     "ConnectionSpec",
     "BoltShearReport",
     "check_bolt_shear",
+    # IBC §1011 + AWC NDS-2018 §3.3 + AISC 360-22 §F2 stair stringer bending check
+    "StairGeometry",
+    "StringerSpec",
+    "StringerReport",
+    "design_stair_stringer",
 ]

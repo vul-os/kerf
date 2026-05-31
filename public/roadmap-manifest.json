@@ -3,13 +3,13 @@
   "generatedAt": "2026-05-29T21:20:49.471Z",
   "source": "ROADMAP.md",
   "latestDelta": {
-    "date": "2026-05-29",
+    "date": "2026-05-31",
     "itemCount": 1,
     "items": [
       {
-        "title": "Civil infrastructure UIs",
-        "body": "four viewport components wired to kerf-civil backends: `TINView.jsx` (3-D isometric TIN surface, wireframe + contour overlay, dispatches `civil_tin_terrain`); `PipeNetworkView.jsx` (2-D plan view with click-to-inspect pipes, flow/pressure overlay, dispatches `civil_water_network_solve`); `GradingPlanView.jsx` (existing + proposed contour overlay, cut/fill colour bands, dispatches `civil_tin_terrain` volume op); `LandscapeView.jsx` (planting symbols + irrigation zones, dispatches `landscape_plants` + `landscape_irrigation_schedule`) — `src/components/civil/`. Editor shell wired for `.tin`, `.pipe_net`, `.grading`, `.landscape` file kinds. 62 SSR tests pass",
-        "domain": "Structural"
+        "title": "MOLD-EJECTOR-PIN-PUSH — Euler buckling-force check for SPI ejector pins",
+        "body": "compute_ejector_pin_push(EjectorPinPushSpec) -> EjectorPinPushReport in kerf_mold.ejector_pin_push. F_cr = pi²·E·I/(K·L)² (Roark's 9e §15.2 + SPI/ANSI B151.1); E=200 GPa for all tool-steel grades (M2/H13/S7/D2); I=pi·d⁴/64; K=1.0 pinned-pinned (default), 0.5 fixed-fixed, 2.0 cantilever; DCR=required/F_cr; recommends smallest SPI-standard diameter with F_cr >= 1.1× required; short-column warning when K·L/d < 30. LLM tool mold_compute_ejector_pin_push registered; 45 oracle tests green. HONEST: Euler non-conservative for K·L/d < 30 — use Johnson formula in short-column regime; bushing friction and pin eccentricity NOT modelled.",
+        "domain": "Mechanical/Mold"
       }
     ]
   }

@@ -10987,6 +10987,20 @@
         },
         {
           "domain": "D7",
+          "feature": "Ejector pin buckling-force check (Euler critical load)",
+          "competitor": {
+            "status": "partial",
+            "note": "Cimatron's ejector design module sizes pins geometrically from cavity depth/part area but does not expose an explicit Euler buckling-force calculation or demand/capacity ratio check",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "F_cr = π²·E·I/(K·L)² (Roark's 9e §15.2 + SPI/ANSI B151.1); E=200 GPa all tool-steel grades (M2/H13/S7/D2); I=π·d⁴/64; K=1.0 pinned-pinned (SPI default) / 0.5 fixed-fixed / 2.0 cantilever; DCR=required/F_cr; recommends smallest SPI-standard diameter with F_cr ≥ 1.1×required; short-column warning when K·L/d < 30 (Johnson formula flag); LLM tool `mold_compute_ejector_pin_push`; 45 oracle tests. HONEST: Euler non-conservative for short stout pins; bushing friction and pin eccentricity NOT modelled",
+            "evidence": "packages/kerf-mold/src/kerf_mold/ejector_pin_push.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "Demolding (ejection) force estimation",
           "competitor": {
             "status": "partial",

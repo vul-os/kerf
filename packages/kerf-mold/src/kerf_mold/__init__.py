@@ -150,6 +150,12 @@ from kerf_mold.cooling_turbulent_re_check import (
     TurbulentReCheckReport,
     check_turbulent_re,
 )
+from kerf_mold.ejector_pin_push import (
+    EjectorPinPushSpec,
+    EjectorPinPushReport,
+    SPI_EJECTOR_PIN_DIAMETERS_MM as SPI_EJECTOR_PIN_DIAMETERS_MM_PUSH,
+    compute_ejector_pin_push,
+)
 
 __all__ = [
     # mold.py
@@ -280,4 +286,9 @@ __all__ = [
     "CoolingFlowSpec",
     "TurbulentReCheckReport",
     "check_turbulent_re",
+    # ejector_pin_push.py
+    "EjectorPinPushSpec",
+    "EjectorPinPushReport",
+    "SPI_EJECTOR_PIN_DIAMETERS_MM_PUSH",
+    "compute_ejector_pin_push",
 ]

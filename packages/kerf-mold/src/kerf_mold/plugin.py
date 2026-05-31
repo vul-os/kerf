@@ -82,6 +82,16 @@ Registers:
                 dittus_boelter_applicable; HONEST: Re classification only —
                 does NOT compute Nu/HTC, polymer-side boundary layer, or
                 mold-steel thermal resistance)
+  - LLM tool:  mold_compute_ejector_pin_push
+               (SPI/ANSI B151.1 + Roark's 9e §15.2: Euler critical buckling
+                load F_cr = π²·E·I/(K·L)² for ejector pins; E=200 GPa for all
+                tool-steel grades (M2/H13/S7/D2); I=π·d⁴/64 solid round;
+                K end-condition coefficient 1.0 pinned-pinned / 0.5 fixed-fixed
+                / 2.0 cantilever; DCR = required_force / F_cr; recommends
+                smallest SPI-standard diameter with F_cr ≥ 1.1×required force;
+                HONEST: Euler non-conservative for K·L/d < 30 — use Johnson
+                formula in short-column regime; bushing friction and pin
+                eccentricity NOT modelled)
 """
 from __future__ import annotations
 
@@ -348,6 +358,18 @@ async def register(app: FastAPI, ctx):
         run_mold_check_turbulent_re,
     )
 
+    # Register ejector pin push-force / buckling check tool
+    # (SPI/ANSI B151.1 + Roark's 9e §15.2 Euler critical load)
+    from kerf_mold.ejector_pin_push_tool import (
+        mold_compute_ejector_pin_push_spec,
+        run_mold_compute_ejector_pin_push,
+    )
+    ctx.tools.register(
+        "mold_compute_ejector_pin_push",
+        mold_compute_ejector_pin_push_spec,
+        run_mold_compute_ejector_pin_push,
+    )
+
     provides = [
         "mold.moldability",
         "mold.parting_surface",
@@ -375,6 +397,7 @@ async def register(app: FastAPI, ctx):
         "mold.melt_flow_ratio_check",
         "mold.sprue_bushing_match",
         "mold.cooling_turbulent_re_check",
+        "mold.ejector_pin_push",
     ]
 
     try:

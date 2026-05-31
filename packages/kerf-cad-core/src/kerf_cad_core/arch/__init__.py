@@ -13,6 +13,8 @@ Submodules:
   footing_bearing_tools — LLM tool arch_compute_bearing_capacity
   slab_deflection   — Two-way slab deflection (Timoshenko §44 Tables 41–42; Roark 9e Table 11.4)
   slab_deflection_tools — LLM tool arch_compute_slab_deflection
+  wind_load_asce7   — ASCE 7-22 §26–27 Directional Procedure wall wind pressures
+  wind_load_asce7_tools — LLM tool arch_compute_wind_load
 
 Note on naming: ``SlabSpec`` in ``primitives`` is the BIM slab (polygon outline).
 ``SlabSpec`` in ``slab_deflection`` is the structural deflection slab (a×b×h).
@@ -50,6 +52,12 @@ from kerf_cad_core.arch.slab_deflection import (
     SlabDeflectionReport,
     compute_slab_deflection,
 )
+from kerf_cad_core.arch.wind_load_asce7 import (
+    WindSiteSpec,
+    BuildingSpec as WindBuildingSpec,
+    WindPressureReport,
+    compute_wind_load,
+)
 
 __all__ = [
     "WallLayer",
@@ -77,4 +85,9 @@ __all__ = [
     "LoadSpec",
     "SlabDeflectionReport",
     "compute_slab_deflection",
+    # ASCE 7-22 §26–27 wind load (WindBuildingSpec avoids name clash with BIM BuildingSpec)
+    "WindSiteSpec",
+    "WindBuildingSpec",
+    "WindPressureReport",
+    "compute_wind_load",
 ]

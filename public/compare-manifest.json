@@ -240,7 +240,13 @@
           "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/slab_deflection.py\"; note: \"Kirchhoff thin-plate δ=α·q·a⁴/D; D=E·h³/(12·(1-ν²)); α from Timoshenko Table 41 (SS, interpolated at any b/a) and Table 42 (fixed, a/b=1 exact); SS: a/b=1→α=0.00406, a/b=1.5→α=0.00772, a/b=2→α=0.01013, ∞→0.01302 strip limit; FF: a/b=1→α=0.00126; moments M_xx=β_x·q·a², M_yy=β_y·q·a²; arch_compute_slab_deflection LLM tool; SCOPE: linear-elastic Kirchhoff only — no Mindlin shear deformation, no cracking, no plastic hinges, no creep/shrinkage\""
         },
         {
-          "name": "ASCE 7 wind and seismic loads",
+          "name": "ASCE 7-22 wind loads — MWFRS Directional Procedure (§26–27)",
+          "domain": "D2",
+          "competitor": "paid: true",
+          "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/wind_load_asce7.py\"; note: \"ASCE 7-22 §26–27 Directional Procedure: qz=0.00256·Kz·Kzt·Kd·V² (psf); Kz per Table 26.10-1 (Exp B/C/D, floor at 15 ft); Cp_windward=+0.8, Cp_leeward per Fig 27.4-1 (−0.5/−0.3/−0.2 interpolated by L/B); G=0.85 rigid; design pressure p=qz·G·Cp; arch_compute_wind_load LLM tool; SCOPE: Directional Procedure §27 only — Envelope Procedure §28 not implemented, tornado loads §32 not implemented, internal pressure GCpi §26.13 excluded, parapet+roof pressures excluded, flexible-building dynamic G §26.11.2 not supported\""
+        },
+        {
+          "name": "ASCE 7 seismic loads",
           "domain": "D2",
           "competitor": "paid: true",
           "kerf": "evidence: \"kerf-structural/seismic/rsa.py\""

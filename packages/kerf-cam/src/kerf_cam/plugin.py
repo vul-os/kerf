@@ -226,6 +226,17 @@ async def register(app: FastAPI, ctx):
         run_cam_audit_milling_dwells,
     )
 
+    # Coolant flow-rate + pressure adequacy checker — Sandvik CoroPlus §3 + MH 31e §1140
+    from kerf_cam.coolant_flow_check import (
+        cam_check_coolant_flow_spec,
+        run_cam_check_coolant_flow,
+    )
+    ctx.tools.register(
+        "cam_check_coolant_flow",
+        cam_check_coolant_flow_spec,
+        run_cam_check_coolant_flow,
+    )
+
     # Capabilities depend on available deps
     provides = [
         "cam.2_5d",
@@ -245,6 +256,7 @@ async def register(app: FastAPI, ctx):
         "cam.profile-roughing",
         "cam.grinding-dress-cycle",
         "cam.dwell-audit",
+        "cam.coolant-flow-check",
     ]   # pure-Python ops always available
     if _OCL_AVAILABLE:
         provides += ["cam.parallel-3d", "cam.waterline", "cam.lathe"]

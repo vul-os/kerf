@@ -6202,6 +6202,20 @@
         },
         {
           "domain": "D7",
+          "feature": "Coolant flow rate and pressure adequacy check",
+          "competitor": {
+            "status": "partial",
+            "note": "Fusion 360 CAM links to CoroPlus ToolGuide for coolant recommendations but does not provide an in-app flow-rate vs MRR adequacy check or minimum pressure verification for through-tool systems",
+            "source": "https://www.autodesk.com/products/fusion-360/cam"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "check_coolant_flow(MachiningOpForCoolant) → CoolantFlowReport: required_flow = flow_factor × MRR; factors (Sandvik CoroPlus §3): steel=0.50, stainless=0.60, aluminum=0.30, titanium=0.50, composite=0.20 L/min per cm³/min; pressure thresholds: titanium ≥70 bar (mandate), through-tool d>8mm ≥20 bar, d≤8mm ≥10 bar, flood ≥2 bar, mist ≥4 bar, MQL ≥5 bar; material-specific recommended_coolant_type (titanium→through_tool, stainless→through_tool, steel→flood, aluminum→flood, composite→MQL); flow_adequate + pressure_adequate flags; cam_check_coolant_flow LLM tool; 41 tests green. HONEST: heuristic flow factors only — coolant chemistry, concentration, and chip-evacuation effectiveness out of scope; seal integrity of through-tool spindle channels not verified; MQL/mist flow is lubricant volumetric flow, not flood; composite may require dry/MQL regardless of flow rate. Refs: Sandvik CoroPlus Coolant Guide §3 (2024); MH 31e §1140",
+            "evidence": "packages/kerf-cam/src/kerf_cam/coolant_flow_check.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "Face-mill zig-zag toolpath (rectangular pocket)",
           "competitor": {
             "status": "yes",

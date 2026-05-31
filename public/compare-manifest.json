@@ -5966,15 +5966,15 @@
         },
         {
           "domain": "D11",
-          "feature": "GD&T composite tolerance frame (ASME Y14.5-2018 §10.5 PLTZF/FRTZF)",
+          "feature": "GD&T composite tolerance frame (ASME Y14.5-2018 §10.5.2 PLTZF/FRTZF + §11.6)",
           "competitor": {
             "status": "no",
             "note": "Fusion 360 does not validate §10.5 composite frame PLTZF/FRTZF rules programmatically"
           },
           "kerf": {
             "status": "yes",
-            "note": "parse_composite_frame + validate_composite_frame: FRTZF tol ≤ PLTZF (§10.5.1 Note 2); FRTZF primary datum matches PLTZF (§10.5.1(a)); FRTZF datum subset in precedence order (§10.5.1(b)); symbol match; gdt_validate_composite_tolerance_frame LLM tool; 26 tests. HONEST FLAG: parser accepts one canonical text form.",
-            "evidence": "packages/kerf-gdnt/src/kerf_gdnt/composite_tolerance.py"
+            "note": "validate_composite_frame(CompositeFrameSpec): R1 all segments same symbol (§10.5.2(a)); R2 FRTZF tol ≤ PLTZF tol (§10.5.1 Note 2); R3 FRTZF datum_refs ⊆ PLTZF datum_refs — no location datums below PLTZF (§10.5.1(b)); multi-tier 3+ segments; gdt_validate_composite_frame LLM tool; 44 tests. HONEST FLAG: validates frame structure only — does not verify inspection data against tolerance zones.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gdt/composite_tolerance_check.py"
           }
         },
         {

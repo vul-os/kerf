@@ -1704,3 +1704,177 @@ async def run_plm_compute_change_notification(ctx, args: bytes) -> str:
             for pid, notifs in report.by_part().items()
         },
     })
+
+
+# ===========================================================================
+# PLM BOM Cost Roll-up (ISO 10303-44 + APICS "rolled-up cost")
+# ===========================================================================
+
+plm_rollup_bom_cost_spec = ToolSpec(
+    name="plm_rollup_bom_cost",
+    description=(
+        "Compute the rolled-up cost at every assembly node in a multi-level BOM tree.\n\n"
+        "Per ISO 10303-44 (STEP AP44 product structure) and the APICS dictionary "
+        "'rolled-up cost' definition:\n\n"
+        "    rolled_cost(node) = node.internal_cost\n"
+        "                      + sum(qty_i * rolled_cost(child_i))\n\n"
+        "All costs are converted to the target *currency* via *fx_rates* before "
+        "summation.  For leaf (purchased) nodes where internal_cost is omitted, "
+        "unit_cost is used as the leaf cost.\n\n"
+        "Cycle detection: raises an error if any part_number appears on its own "
+        "ancestor path (A → B → A).\n\n"
+        "HONEST FLAG — static unit costs only:\n"
+        "  - No scrap allowance, overhead absorption, or yield-based costing.\n"
+        "  - No activity-based or machine-rate overhead.\n"
+        "  - FX rates are caller-supplied constants (no live feed).\n"
+        "  - Shared sub-assemblies are costed per occurrence path, not deduplicated.\n\n"
+        "References: ISO 10303-44:2021 §5.3; APICS Dictionary 16th ed. 'rolled-up cost';\n"
+        "Horngren et al. *Cost Accounting* 16th ed. §7."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "bom_tree": {
+                "type": "object",
+                "description": (
+                    "Root BOM node (recursive tree). Each node:\n"
+                    "  part_number (str, required) — unique part identifier.\n"
+                    "  name (str, required) — human-readable part name.\n"
+                    "  unit_cost (number, required) — own cost (purchase price for "
+                    "    leaf parts; own-process cost for assemblies).\n"
+                    "  currency (str, required) — ISO 4217 code for unit_cost and "
+                    "    internal_cost, e.g. 'USD', 'EUR', 'ZAR'.\n"
+                    "  internal_cost (number, default 0.0) — cost intrinsic to this "
+                    "    assembly beyond its children (e.g. assembly labour).  "
+                    "    For leaf parts leave at 0.0 and set unit_cost.\n"
+                    "  children (array, default []) — list of {node, qty} objects:\n"
+                    "    node: nested BOM node (same schema, recursive).\n"
+                    "    qty: positive real quantity of the child."
+                ),
+                "properties": {
+                    "part_number": {"type": "string"},
+                    "name": {"type": "string"},
+                    "unit_cost": {"type": "number"},
+                    "currency": {"type": "string"},
+                    "internal_cost": {"type": "number", "default": 0.0},
+                    "children": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "node": {"type": "object"},
+                                "qty": {"type": "number"},
+                            },
+                            "required": ["node", "qty"],
+                        },
+                    },
+                },
+                "required": ["part_number", "name", "unit_cost", "currency"],
+            },
+            "currency": {
+                "type": "string",
+                "description": (
+                    "ISO 4217 target currency for the roll-up report. "
+                    "Default: 'USD'."
+                ),
+                "default": "USD",
+            },
+            "fx_rates": {
+                "type": "object",
+                "description": (
+                    "Optional FX rate table mapping ISO 4217 code → rate-to-USD. "
+                    "Example: {'USD': 1.0, 'EUR': 1.10, 'ZAR': 0.054}. "
+                    "If omitted, a built-in 2025 baseline table is used. "
+                    "Provide your own for accurate conversion."
+                ),
+                "additionalProperties": {"type": "number"},
+            },
+        },
+        "required": ["bom_tree"],
+    },
+)
+
+
+def _parse_bom_node(raw: dict) -> "BomNode":
+    """Recursively parse a raw dict into a BomNode."""
+    from kerf_plm.bom_cost_rollup import BomNode
+
+    part_number = raw.get("part_number")
+    if not part_number:
+        raise ValueError("bom_tree node missing 'part_number'")
+    name = raw.get("name", "")
+    unit_cost = float(raw.get("unit_cost", 0.0))
+    currency = raw.get("currency", "USD")
+    internal_cost = float(raw.get("internal_cost", 0.0))
+
+    children = []
+    for item in raw.get("children", []):
+        if not isinstance(item, dict):
+            raise ValueError(
+                f"children entries must be objects, got {type(item).__name__}"
+            )
+        child_raw = item.get("node")
+        if child_raw is None:
+            raise ValueError(
+                f"children entry missing 'node' field for part '{part_number}'"
+            )
+        qty = float(item.get("qty", 1.0))
+        child_node = _parse_bom_node(child_raw)
+        children.append((child_node, qty))
+
+    return BomNode(
+        part_number=part_number,
+        name=name,
+        unit_cost=unit_cost,
+        currency=currency,
+        children=children,
+        internal_cost=internal_cost,
+    )
+
+
+@register(plm_rollup_bom_cost_spec)
+async def run_plm_rollup_bom_cost(ctx, args: bytes) -> str:
+    """Tool handler for plm_rollup_bom_cost (ISO 10303-44 + APICS rolled-up cost)."""
+    import json as _json
+    try:
+        a = _json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+    raw_tree = a.get("bom_tree")
+    if not isinstance(raw_tree, dict):
+        return err_payload("'bom_tree' must be an object", "BAD_ARGS")
+
+    currency = a.get("currency", "USD") or "USD"
+    fx_rates_raw = a.get("fx_rates")
+    fx_rates = None
+    if fx_rates_raw is not None:
+        if not isinstance(fx_rates_raw, dict):
+            return err_payload("'fx_rates' must be an object", "BAD_ARGS")
+        try:
+            fx_rates = {k: float(v) for k, v in fx_rates_raw.items()}
+        except (TypeError, ValueError) as exc:
+            return err_payload(f"invalid fx_rates: {exc}", "BAD_ARGS")
+
+    try:
+        root = _parse_bom_node(raw_tree)
+    except (TypeError, ValueError) as exc:
+        return err_payload(f"invalid bom_tree: {exc}", "BAD_ARGS")
+
+    try:
+        from kerf_plm.bom_cost_rollup import rollup_bom_cost
+        report = rollup_bom_cost(root, currency=currency, fx_rates=fx_rates)
+    except ValueError as exc:
+        return err_payload(str(exc), "CYCLE_DETECTED" if "Cycle" in str(exc) else "BAD_ARGS")
+    except Exception as exc:
+        return err_payload(f"rollup error: {exc}", "ROLLUP_ERROR")
+
+    return ok_payload({
+        "part_number": report.part_number,
+        "total_cost": report.total_cost,
+        "currency": report.currency,
+        "num_unique_parts": report.num_unique_parts,
+        "depth": report.depth,
+        "cost_breakdown_by_node": report.cost_breakdown_by_node,
+        "honest_caveat": report.honest_caveat,
+    })

@@ -9,6 +9,9 @@ Public API:
     from kerf_plm.change_management import (
         ECR, ECO, ChangeBoard, AuditEntry,
     )
+    from kerf_plm.bom_cost_rollup import (
+        BomNode, RollupReport, rollup_bom_cost,
+    )
 """
 
 from kerf_plm.configurator import (
@@ -28,6 +31,11 @@ from kerf_plm.change_management import (
     ChangeBoard,
     AuditEntry,
 )
+from kerf_plm.bom_cost_rollup import (
+    BomNode,
+    RollupReport,
+    rollup_bom_cost,
+)
 
 __all__ = [
     "Rule",
@@ -43,4 +51,7 @@ __all__ = [
     "ECO",
     "ChangeBoard",
     "AuditEntry",
+    "BomNode",
+    "RollupReport",
+    "rollup_bom_cost",
 ]

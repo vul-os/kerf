@@ -216,10 +216,10 @@
           "kerf": "evidence: \"kerf-structural/aci318.py\""
         },
         {
-          "name": "Column axial-load check (AISC 360-22 §E3 + ACI 318-19 §22.4)",
+          "name": "Column axial-load check (AISC 360-22 \u00a7E3 + ACI 318-19 \u00a722.4)",
           "domain": "D2",
           "competitor": "paid: true",
-          "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/column_load_check.py\"; note: \"AISC 360-22 §E3 inelastic/elastic Euler buckling (E3-2/E3-3) + ACI 318-19 §22.4.2.2 short tied/spiral column; phi_Pn, DCR, governing mode, KL/r>200 slender flag; arch_check_column_load LLM tool\""
+          "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/column_load_check.py\"; note: \"AISC 360-22 \u00a7E3 inelastic/elastic Euler buckling (E3-2/E3-3) + ACI 318-19 \u00a722.4.2.2 short tied/spiral column; phi_Pn, DCR, governing mode, KL/r>200 slender flag; arch_check_column_load LLM tool\""
         },
         {
           "name": "ASCE 7 wind and seismic loads",
@@ -2409,6 +2409,20 @@
           }
         },
         {
+          "name": "Multi-level BOM cost roll-up (APICS rolled-up cost)",
+          "domain": "D6",
+          "competitor": {
+            "status": "yes",
+            "notes": "ActiveBOM with cost summation; no multi-level recursive roll-up exposed via API",
+            "tier": "paid"
+          },
+          "kerf": {
+            "status": "[x]",
+            "notes": "Recursive depth-first rollup (ISO 10303-44 + APICS); FX conversion; cycle detection; honest caveat: static unit costs \u2014 no scrap, overhead, or yield-based costing",
+            "evidence": "packages/kerf-plm/src/kerf_plm/bom_cost_rollup.py"
+          }
+        },
+        {
           "name": "Interactive PCB editing (route/place)",
           "domain": "D6",
           "competitor": {
@@ -2855,7 +2869,7 @@
           },
           "kerf": {
             "status": "[x]",
-            "notes": "NEC 2023 Table 310.16 (Cu+Al separate tables, AWG 14–4/0 + kcmil), ambient temp correction §310.15(B)(2)(a), bundling derating §310.15(B)(3)(a); `wiring_compute_ampacity` LLM tool",
+            "notes": "NEC 2023 Table 310.16 (Cu+Al separate tables, AWG 14\u20134/0 + kcmil), ambient temp correction \u00a7310.15(B)(2)(a), bundling derating \u00a7310.15(B)(3)(a); `wiring_compute_ampacity` LLM tool",
             "evidence": "packages/kerf-wiring/src/kerf_wiring/ampacity.py"
           }
         },
@@ -3649,7 +3663,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "firmware_verify_memory_map: FLASH_OVERFLOW, SRAM_OVERFLOW, STACK_OVERFLOW_INTO_BSS, VECTOR_TABLE_MISPLACED (ARM Cortex-M UG §B3.2.4), ISR_COUNT_MISMATCH; STM32F411 512 KB Flash/128 KB SRAM (RM0383 §3) + STM32F407 1 MB/128 KB (RM0090 §3); 63 tests. STATIC SECTION-SIZE CHECK ONLY — does not run the linker.",
+            "note": "firmware_verify_memory_map: FLASH_OVERFLOW, SRAM_OVERFLOW, STACK_OVERFLOW_INTO_BSS, VECTOR_TABLE_MISPLACED (ARM Cortex-M UG \u00a7B3.2.4), ISR_COUNT_MISMATCH; STM32F411 512 KB Flash/128 KB SRAM (RM0383 \u00a73) + STM32F407 1 MB/128 KB (RM0090 \u00a73); 63 tests. STATIC SECTION-SIZE CHECK ONLY \u2014 does not run the linker.",
             "evidence": "packages/kerf-firmware/src/kerf_firmware/memory_map_verify.py"
           }
         },
@@ -3691,7 +3705,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "firmware_verify_peripheral_map: checks pin alt-function, pin conflicts, missing required peripherals, peripheral mux conflicts, voltage compatibility (5V tolerant); embedded STM32F411 LQFP64 (RM0383 §7.3) + ATmega328P PDIP-28 (§13) tables; 59 tests. NOT a substitute for ST CubeMX / Atmel Start.",
+            "note": "firmware_verify_peripheral_map: checks pin alt-function, pin conflicts, missing required peripherals, peripheral mux conflicts, voltage compatibility (5V tolerant); embedded STM32F411 LQFP64 (RM0383 \u00a77.3) + ATmega328P PDIP-28 (\u00a713) tables; 59 tests. NOT a substitute for ST CubeMX / Atmel Start.",
             "evidence": "packages/kerf-firmware/src/kerf_firmware/peripheral_map_verify.py"
           }
         },
@@ -3705,7 +3719,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "firmware_verify_clock_tree: real PLL arithmetic (VCO=HSE/PLLM×PLLN, SYSCLK=VCO/PLLP, USB=VCO/PLLQ); detects SYSCLK exceeded (100 MHz F411 / 168 MHz F407), APB1 >42 MHz, APB2 >84 MHz, VCO out of range, USB≠48 MHz (±500 ppm), ADC >36 MHz; embedded RM0383 §6 (STM32F411) + RM0090 §6 (STM32F407) tables; 71 tests. LOOKUP-TABLE ONLY — no jitter model.",
+            "note": "firmware_verify_clock_tree: real PLL arithmetic (VCO=HSE/PLLM\u00d7PLLN, SYSCLK=VCO/PLLP, USB=VCO/PLLQ); detects SYSCLK exceeded (100 MHz F411 / 168 MHz F407), APB1 >42 MHz, APB2 >84 MHz, VCO out of range, USB\u226048 MHz (\u00b1500 ppm), ADC >36 MHz; embedded RM0383 \u00a76 (STM32F411) + RM0090 \u00a76 (STM32F407) tables; 71 tests. LOOKUP-TABLE ONLY \u2014 no jitter model.",
             "evidence": "packages/kerf-firmware/src/kerf_firmware/clock_tree_verify.py"
           }
         },
@@ -3719,7 +3733,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "firmware_compute_can_bus_load: CAN 2.0B frame model (standard 11-bit: 47+8·DLC+24 avg stuffing bits; extended 29-bit: 67+8·DLC+24); per-message load breakdown; flags >30% conservative + >40% J1939-21 §5.2 threshold; 55 tests. AVERAGE stuffing estimate — add ≥10% headroom for worst-case.",
+            "note": "firmware_compute_can_bus_load: CAN 2.0B frame model (standard 11-bit: 47+8\u00b7DLC+24 avg stuffing bits; extended 29-bit: 67+8\u00b7DLC+24); per-message load breakdown; flags >30% conservative + >40% J1939-21 \u00a75.2 threshold; 55 tests. AVERAGE stuffing estimate \u2014 add \u226510% headroom for worst-case.",
             "evidence": "packages/kerf-firmware/src/kerf_firmware/can_bus_load.py"
           }
         },
@@ -3859,7 +3873,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "firmware_verify_peripheral_map: checks pin alt-function, pin conflicts, missing required peripherals, peripheral mux conflicts, voltage compatibility (5V tolerant); embedded STM32F411 LQFP64 (RM0383 §7.3) + ATmega328P PDIP-28 (§13) tables; 59 tests. NOT a substitute for ST CubeMX / Atmel Start.",
+            "note": "firmware_verify_peripheral_map: checks pin alt-function, pin conflicts, missing required peripherals, peripheral mux conflicts, voltage compatibility (5V tolerant); embedded STM32F411 LQFP64 (RM0383 \u00a77.3) + ATmega328P PDIP-28 (\u00a713) tables; 59 tests. NOT a substitute for ST CubeMX / Atmel Start.",
             "evidence": "packages/kerf-firmware/src/kerf_firmware/peripheral_map_verify.py"
           }
         }
@@ -3922,7 +3936,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/chamfer_recommend_size.py",
-            "note": "brep_recommend_chamfer_size LLM tool; DIN 74:1974 Form A/B countersink table; deburring 0.5mm×45°; cosmetic 1.5mm×45°; Drozda-Wick §3-7; ISO 13715:2017"
+            "note": "brep_recommend_chamfer_size LLM tool; DIN 74:1974 Form A/B countersink table; deburring 0.5mm\u00d745\u00b0; cosmetic 1.5mm\u00d745\u00b0; Drozda-Wick \u00a73-7; ISO 13715:2017"
           }
         },
         {
@@ -4026,7 +4040,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/iso_curve_extract.py",
-            "note": "Piegl-Tiller §5.3 knot-insertion; extract_iso_curve_u/v/grid; rational surfaces; LLM tools nurbs_extract_iso_u + nurbs_extract_iso_v"
+            "note": "Piegl-Tiller \u00a75.3 knot-insertion; extract_iso_curve_u/v/grid; rational surfaces; LLM tools nurbs_extract_iso_u + nurbs_extract_iso_v"
           }
         },
         {
@@ -4039,7 +4053,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/face_compatible_resplit.py",
-            "note": "make_faces_compatible(): union of internal breakpoints + tensor-product Boehm insertion (Piegl-Tiller §6.5 + Hoffmann 1989 §6); CompatibilityResult dataclass; LLM tool brep_make_faces_compatible; 14 hermetic tests; degree_mismatch flag for elevation cases"
+            "note": "make_faces_compatible(): union of internal breakpoints + tensor-product Boehm insertion (Piegl-Tiller \u00a76.5 + Hoffmann 1989 \u00a76); CompatibilityResult dataclass; LLM tool brep_make_faces_compatible; 14 hermetic tests; degree_mismatch flag for elevation cases"
           }
         },
         {
@@ -4067,7 +4081,7 @@
           "kerf": {
             "status": "partial",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/fresnel_parameterize.py",
-            "note": "fresnel_parameterize_curve(): sampling-based (not closed-form) re-parameterization imposing κ(s)≈α·s Euler-spiral law; Fresnel integral C(σ)/S(σ) via scipy.special or Simpson fallback; monotone Fresnel-C parameter sequence drives degree-3 NURBS re-interpolation; max_curvature_residual metric; LLM tool nurbs_fresnel_parameterize_curve; 25 hermetic tests. HONEST: approximate (not closed-form Walton-Meek G1 clothoid spline); residual grows for long curves with large curvature rates. Refs: Walton & Meek (2009); Bertolazzi & Frego (2015)."
+            "note": "fresnel_parameterize_curve(): sampling-based (not closed-form) re-parameterization imposing \u03ba(s)\u2248\u03b1\u00b7s Euler-spiral law; Fresnel integral C(\u03c3)/S(\u03c3) via scipy.special or Simpson fallback; monotone Fresnel-C parameter sequence drives degree-3 NURBS re-interpolation; max_curvature_residual metric; LLM tool nurbs_fresnel_parameterize_curve; 25 hermetic tests. HONEST: approximate (not closed-form Walton-Meek G1 clothoid spline); residual grows for long curves with large curvature rates. Refs: Walton & Meek (2009); Bertolazzi & Frego (2015)."
           }
         },
         {
@@ -4431,7 +4445,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/cam_toolpath_collision.py",
-            "note": "Segment-by-segment capsule-vs-AABB + capsule-vs-mesh (Ericson 2005/Möller 1997) at 1 mm resolution; configurable safety margin; fixture support; cam_verify_toolpath_collision LLM tool"
+            "note": "Segment-by-segment capsule-vs-AABB + capsule-vs-mesh (Ericson 2005/M\u00f6ller 1997) at 1 mm resolution; configurable safety margin; fixture support; cam_verify_toolpath_collision LLM tool"
           }
         },
         {
@@ -4444,7 +4458,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/cam_feedrate_lookahead.py",
-            "note": "Two-pass corner lookahead (Erkorkmaz-Altintas 2001 / Altintas 2012 §5.7): V_corner = sqrt(a_max × r_blend / sin(θ/2)); forward + backward trapezoidal passes; per-waypoint feedrate + corner angles + cycle time; cam_optimize_feedrate_lookahead LLM tool. Jerk not modelled (trapezoidal profile only)."
+            "note": "Two-pass corner lookahead (Erkorkmaz-Altintas 2001 / Altintas 2012 \u00a75.7): V_corner = sqrt(a_max \u00d7 r_blend / sin(\u03b8/2)); forward + backward trapezoidal passes; per-waypoint feedrate + corner angles + cycle time; cam_optimize_feedrate_lookahead LLM tool. Jerk not modelled (trapezoidal profile only)."
           }
         },
         {
@@ -4747,7 +4761,7 @@
           }
         },
         {
-          "name": "Manufacturing tolerance-cost (Boothroyd-Dewhurst §11.2)",
+          "name": "Manufacturing tolerance-cost (Boothroyd-Dewhurst \u00a711.2)",
           "domain": "D13",
           "competitor": {
             "status": "no",
@@ -4757,7 +4771,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/costing/tolerance_cost.py",
-            "note": "B-D §11.2 exponential curve; 4 processes; ISO IT-grade mapping; process auto-upgrade; manufacturing_tolerance_cost LLM tool"
+            "note": "B-D \u00a711.2 exponential curve; 4 processes; ISO IT-grade mapping; process auto-upgrade; manufacturing_tolerance_cost LLM tool"
           }
         },
         {
@@ -5255,7 +5269,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Four schema types (sequential PN-00001, hierarchical TTT-FFF-VVV-SSS, semantic SKU-BLK-12X10-AL-V2, hash-based HASH-<sha256[:10]>). Regex validation with per-segment error messages; reserved-prefix guard; duplicate detection; schema migration; state serialisation. GS1 GTIN §2.1 + ISO 8000-110 §6.5. Honest-flagged: per-instance uniqueness only. LLM tools: plm_validate_part_number, plm_allocate_part_number.",
+            "note": "Four schema types (sequential PN-00001, hierarchical TTT-FFF-VVV-SSS, semantic SKU-BLK-12X10-AL-V2, hash-based HASH-<sha256[:10]>). Regex validation with per-segment error messages; reserved-prefix guard; duplicate detection; schema migration; state serialisation. GS1 GTIN \u00a72.1 + ISO 8000-110 \u00a76.5. Honest-flagged: per-instance uniqueness only. LLM tools: plm_validate_part_number, plm_allocate_part_number.",
             "evidence": "packages/kerf-plm/src/kerf_plm/part_numbering_schema.py"
           }
         },
@@ -5423,7 +5437,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "NIST RS-274/NGC §3.8.4 G83 (full-retract peck); MH 31e §1132 peck count; time estimate excludes acceleration ramps",
+            "note": "NIST RS-274/NGC \u00a73.8.4 G83 (full-retract peck); MH 31e \u00a71132 peck count; time estimate excludes acceleration ramps",
             "evidence": "packages/kerf-cam/src/kerf_cam/peck_drill_cycle.py"
           }
         },
@@ -5530,12 +5544,12 @@
           "feature": "Manufacturing material cost roll-up (BOM, multi-cavity)",
           "competitor": {
             "status": "paid",
-            "note": "DELMIA Manufacturing Cost Estimation / Fusion 360 parametric cost — process-based BOM costing; paid add-on",
+            "note": "DELMIA Manufacturing Cost Estimation / Fusion 360 parametric cost \u2014 process-based BOM costing; paid add-on",
             "source": "https://www.3ds.com/products/delmia/manufacturing-cost-estimation"
           },
           "kerf": {
             "status": "yes",
-            "note": "MANUFACTURING-MATERIAL-COST-ROLLUP: compute_material_cost_rollup(parts, material_db, waste_factor) — mass=vol×density×1e-6 kg; gross=net×(1+wf); cost=gross×price_per_kg; 17-material 2025 H1 spot-price DB (ABS/PP/PC/PA66/PEEK/PLA/Al6061/Al7075/Steel304/316/1018/4140/Cu/Ti6Al4V/GrayIron/CFRP/GFRP); aggregation by material, finishing, supplier; unknown-material flag; manufacturing_compute_material_cost_rollup LLM tool; 26 tests; B-D §8.3 oracle $286. Advisory: prices are 2025 H1 baselines.",
+            "note": "MANUFACTURING-MATERIAL-COST-ROLLUP: compute_material_cost_rollup(parts, material_db, waste_factor) \u2014 mass=vol\u00d7density\u00d71e-6 kg; gross=net\u00d7(1+wf); cost=gross\u00d7price_per_kg; 17-material 2025 H1 spot-price DB (ABS/PP/PC/PA66/PEEK/PLA/Al6061/Al7075/Steel304/316/1018/4140/Cu/Ti6Al4V/GrayIron/CFRP/GFRP); aggregation by material, finishing, supplier; unknown-material flag; manufacturing_compute_material_cost_rollup LLM tool; 26 tests; B-D \u00a78.3 oracle $286. Advisory: prices are 2025 H1 baselines.",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/costing/material_cost_rollup.py"
           }
         },
@@ -5544,12 +5558,12 @@
           "feature": "3-2-1 auto-fixture layout (Asada-By form-closure)",
           "competitor": {
             "status": "paid",
-            "note": "Fusion 360 Manufacturing Extension — fixture advisor; paid add-on",
+            "note": "Fusion 360 Manufacturing Extension \u2014 fixture advisor; paid add-on",
             "source": "https://www.autodesk.com/products/fusion-360/manufacturing-extension"
           },
           "kerf": {
             "status": "yes",
-            "note": "Asada-By (1985) §5 wrench-matrix rank-6 validation; P1-P6 placement; clamp-force scaling by material + operation; ASME B5.18-2018 compliant (bbox-aligned parts; freeform flagged)",
+            "note": "Asada-By (1985) \u00a75 wrench-matrix rank-6 validation; P1-P6 placement; clamp-force scaling by material + operation; ASME B5.18-2018 compliant (bbox-aligned parts; freeform flagged)",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/manufacturing_fixture_layout.py"
           }
         },
@@ -5765,47 +5779,45 @@
         },
         {
           "domain": "D11",
-          "feature": "GD&T composite tolerance frame (ASME Y14.5-2018 §10.5 PLTZF/FRTZF)",
+          "feature": "GD&T composite tolerance frame (ASME Y14.5-2018 \u00a710.5 PLTZF/FRTZF)",
           "competitor": {
             "status": "no",
-            "note": "Fusion 360 does not validate §10.5 composite frame PLTZF/FRTZF rules programmatically"
+            "note": "Fusion 360 does not validate \u00a710.5 composite frame PLTZF/FRTZF rules programmatically"
           },
           "kerf": {
             "status": "yes",
-            "note": "parse_composite_frame + validate_composite_frame: FRTZF tol ≤ PLTZF (§10.5.1 Note 2); FRTZF primary datum matches PLTZF (§10.5.1(a)); FRTZF datum subset in precedence order (§10.5.1(b)); symbol match; gdt_validate_composite_tolerance_frame LLM tool; 26 tests. HONEST FLAG: parser accepts one canonical text form.",
+            "note": "parse_composite_frame + validate_composite_frame: FRTZF tol \u2264 PLTZF (\u00a710.5.1 Note 2); FRTZF primary datum matches PLTZF (\u00a710.5.1(a)); FRTZF datum subset in precedence order (\u00a710.5.1(b)); symbol match; gdt_validate_composite_tolerance_frame LLM tool; 26 tests. HONEST FLAG: parser accepts one canonical text form.",
             "evidence": "packages/kerf-gdnt/src/kerf_gdnt/composite_tolerance.py"
           }
         },
         {
           "domain": "D11",
-          "feature": "GD&T datum reference frame validator (ASME Y14.5-2018 §4.11)",
+          "feature": "GD&T datum reference frame validator (ASME Y14.5-2018 \u00a74.11)",
           "competitor": {
             "status": "no",
             "note": "Fusion GD&T tooling does not validate DRF precedence rules programmatically"
           },
           "kerf": {
             "status": "yes",
-            "note": "ASME Y14.5-2018 §4.11 DRF precedence: 3-2-1 contact, MMB/LMB/RMB on FOS, duplicate-datum, datum-target (Fig. 4-1/4-2/4-11 oracles); gdt_validate_datum_reference_frame LLM tool",
+            "note": "ASME Y14.5-2018 \u00a74.11 DRF precedence: 3-2-1 contact, MMB/LMB/RMB on FOS, duplicate-datum, datum-target (Fig. 4-1/4-2/4-11 oracles); gdt_validate_datum_reference_frame LLM tool",
             "evidence": "packages/kerf-gdnt/src/kerf_gdnt/datum_reference_validator.py"
           }
         },
         {
           "domain": "D11",
-          "feature": "GD&T datum precedence consistency analyser (ASME Y14.5-2018 §4.7 + §4.11)",
+          "feature": "GD&T datum precedence consistency analyser (ASME Y14.5-2018 \u00a74.7 + \u00a74.11)",
           "competitor": {
             "status": "no",
             "note": "Fusion 360 does not analyse cross-frame datum precedence consistency programmatically"
           },
           "kerf": {
             "status": "yes",
-            "note": "analyze_datum_precedence_consistency: P1 feature-type conflict (ERROR); P2 precedence reversal A|B|C vs B|A|C (WARNING, §4.11); P3 DOF over-constraint >6 (ERROR, §4.7); P4 modifier conflict RMB/MMB/LMB (WARNING, §4.11.5). PrecedenceWarning carries code, severity, rule, affected_frames, recommendation. gdt_warn_datum_precedence LLM tool. HONEST FLAG: declared datum properties only. 41 tests.",
+            "note": "analyze_datum_precedence_consistency: P1 feature-type conflict (ERROR); P2 precedence reversal A|B|C vs B|A|C (WARNING, \u00a74.11); P3 DOF over-constraint >6 (ERROR, \u00a74.7); P4 modifier conflict RMB/MMB/LMB (WARNING, \u00a74.11.5). PrecedenceWarning carries code, severity, rule, affected_frames, recommendation. gdt_warn_datum_precedence LLM tool. HONEST FLAG: declared datum properties only. 41 tests.",
             "evidence": "packages/kerf-gdnt/src/kerf_gdnt/datum_precedence_warn.py"
           }
         },
         {
           "domain": "D11",
-          "feature": "Tolerance stackup — 1D (WC/RSS/MC)",
-          "feature": "Tolerance stackup \u2014 1D (WC/RSS/MC)",
           "feature": "Tolerance stackup \u2014 1D (WC/RSS/MC)",
           "competitor": {
             "status": "no",
@@ -6030,20 +6042,20 @@
         },
         {
           "domain": "D14",
-          "feature": "Where-Used Analysis — inverse BOM traversal (PROSTEP-iViP SIG §5.2)",
+          "feature": "Where-Used Analysis \u2014 inverse BOM traversal (PROSTEP-iViP SIG \u00a75.2)",
           "competitor": {
             "status": "partial",
             "note": "Where-used available only through full PDM/PLM add-ons (e.g. SOLIDWORKS PDM, Fusion Manage, 3DExperience); not available in base modeller."
           },
           "kerf": {
             "status": "yes",
-            "note": "Where-Used Analysis: reverse-traverses the assembly hierarchy from a target part. Returns all parent assemblies with occurrence multiplicity and depth (depth=1 immediate parent, depth=2 grandparent, …). Cycle detection with cap at depth=20. LLM tool: plm_where_used.",
+            "note": "Where-Used Analysis: reverse-traverses the assembly hierarchy from a target part. Returns all parent assemblies with occurrence multiplicity and depth (depth=1 immediate parent, depth=2 grandparent, \u2026). Cycle detection with cap at depth=20. LLM tool: plm_where_used.",
             "evidence": "packages/kerf-plm/src/kerf_plm/where_used.py"
           }
         },
         {
           "domain": "D14",
-          "feature": "Document Version Diff — controlled document delta (ISO 10303-44 §5.2 + Borst-Lahti §6.3)",
+          "feature": "Document Version Diff \u2014 controlled document delta (ISO 10303-44 \u00a75.2 + Borst-Lahti \u00a76.3)",
           "competitor": {
             "status": "no",
             "note": "No built-in document revision diff with field-level criticality classification; requires external PLM/PDM or custom scripting."
@@ -6056,14 +6068,14 @@
         },
         {
           "domain": "D14",
-          "feature": "Multi-Cavity Tool Effectivity — per-cavity insert revision tracking (PROSTEP-iViP SIG §6)",
+          "feature": "Multi-Cavity Tool Effectivity \u2014 per-cavity insert revision tracking (PROSTEP-iViP SIG \u00a76)",
           "competitor": {
             "status": "no",
             "note": "No built-in per-cavity insert effectivity tracking; multi-cavity tooling managed through external tool databases (DataM, ToolMonitor) or custom ERP; not natively modelled in base CAD/PLM."
           },
           "kerf": {
             "status": "yes",
-            "note": "Per-cavity insert revision state for multi-cavity injection molds: each cavity slot carries an insert history with date-effectivity windows. Query (tool, date) → [(cavity_id, revision), …]. Cavity-3 mid-run swap: query 2026-05-01 → [(1,R5),(2,R5),(3,R6),(4,R5)]; query 2026-03-15 → all R5. Honest flag: no insert wear / change-out queuing modelled. LLM tool: plm_query_multi_cavity.",
+            "note": "Per-cavity insert revision state for multi-cavity injection molds: each cavity slot carries an insert history with date-effectivity windows. Query (tool, date) \u2192 [(cavity_id, revision), \u2026]. Cavity-3 mid-run swap: query 2026-05-01 \u2192 [(1,R5),(2,R5),(3,R6),(4,R5)]; query 2026-03-15 \u2192 all R5. Honest flag: no insert wear / change-out queuing modelled. LLM tool: plm_query_multi_cavity.",
             "evidence": "packages/kerf-plm/src/kerf_plm/multi_cavity_effectivity.py"
           }
         }
@@ -6143,7 +6155,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "brep_recommend_fillet_radius: face-size cap (Boothroyd-Dewhurst §4), Peterson 1974 §2.3 Kt notch formula, material stress-relief floor (steel/aluminium/titanium/cast_iron/plastic), tool-radius constraint, intentional-sharpness preservation; RadiusRecommendation dataclass with criteria_radii transparency; 21 hermetic oracle tests",
+            "note": "brep_recommend_fillet_radius: face-size cap (Boothroyd-Dewhurst \u00a74), Peterson 1974 \u00a72.3 Kt notch formula, material stress-relief floor (steel/aluminium/titanium/cast_iron/plastic), tool-radius constraint, intentional-sharpness preservation; RadiusRecommendation dataclass with criteria_radii transparency; 21 hermetic oracle tests",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/fillet_recommend_radius.py"
           }
         },
@@ -6283,7 +6295,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "brep_volume_above_plane LLM tool; divergence theorem (Mortenson §11.6); Plane faces: Green's theorem + Sutherland-Hodgman clip; curved faces: GL sub-quad grid; depth-bar oracles: unit cube z=0.5 → 0.5/0.5; sphere equator → each half 4π/6 ≈ 2.094; cylinder r=1 h=2 x=0 → each half π",
+            "note": "brep_volume_above_plane LLM tool; divergence theorem (Mortenson \u00a711.6); Plane faces: Green's theorem + Sutherland-Hodgman clip; curved faces: GL sub-quad grid; depth-bar oracles: unit cube z=0.5 \u2192 0.5/0.5; sphere equator \u2192 each half 4\u03c0/6 \u2248 2.094; cylinder r=1 h=2 x=0 \u2192 each half \u03c0",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/half_space_volume.py"
           }
         },
@@ -6297,7 +6309,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "match_composite_tangents(curves, target='G1'|'G2') — Klass 1980 §3 / Farin §8.4 bisector construction for G1; Piegl-Tiller §7.3 second-derivative constraint for G2; CompositeMatchResult (adjusted_curves, max_cp_displacement, residual_tangent_error_per_seam, g2_converged); G2 non-convergence honest-flag when curvature magnitudes differ >10x; nurbs_match_composite_tangents LLM tool; 19 tests",
+            "note": "match_composite_tangents(curves, target='G1'|'G2') \u2014 Klass 1980 \u00a73 / Farin \u00a78.4 bisector construction for G1; Piegl-Tiller \u00a77.3 second-derivative constraint for G2; CompositeMatchResult (adjusted_curves, max_cp_displacement, residual_tangent_error_per_seam, g2_converged); G2 non-convergence honest-flag when curvature magnitudes differ >10x; nurbs_match_composite_tangents LLM tool; 19 tests",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/composite_tangent_match.py"
           }
         },
@@ -6947,20 +6959,20 @@
         },
         {
           "domain": "D14",
-          "feature": "Where-Used Analysis — inverse BOM traversal (PROSTEP-iViP SIG §5.2)",
+          "feature": "Where-Used Analysis \u2014 inverse BOM traversal (PROSTEP-iViP SIG \u00a75.2)",
           "competitor": {
             "status": "partial",
             "note": "Where-used available only through full PDM/PLM add-ons (e.g. SOLIDWORKS PDM, Fusion Manage, 3DExperience); not available in base modeller."
           },
           "kerf": {
             "status": "yes",
-            "note": "Where-Used Analysis: reverse-traverses the assembly hierarchy from a target part. Returns all parent assemblies with occurrence multiplicity and depth (depth=1 immediate parent, depth=2 grandparent, …). Cycle detection with cap at depth=20. LLM tool: plm_where_used.",
+            "note": "Where-Used Analysis: reverse-traverses the assembly hierarchy from a target part. Returns all parent assemblies with occurrence multiplicity and depth (depth=1 immediate parent, depth=2 grandparent, \u2026). Cycle detection with cap at depth=20. LLM tool: plm_where_used.",
             "evidence": "packages/kerf-plm/src/kerf_plm/where_used.py"
           }
         },
         {
           "domain": "D14",
-          "feature": "Document Version Diff — controlled document delta (ISO 10303-44 §5.2 + Borst-Lahti §6.3)",
+          "feature": "Document Version Diff \u2014 controlled document delta (ISO 10303-44 \u00a75.2 + Borst-Lahti \u00a76.3)",
           "competitor": {
             "status": "no",
             "note": "No built-in document revision diff with field-level criticality classification; requires external PLM/PDM or custom scripting."
@@ -6973,14 +6985,14 @@
         },
         {
           "domain": "D14",
-          "feature": "Multi-Cavity Tool Effectivity — per-cavity insert revision tracking (PROSTEP-iViP SIG §6)",
+          "feature": "Multi-Cavity Tool Effectivity \u2014 per-cavity insert revision tracking (PROSTEP-iViP SIG \u00a76)",
           "competitor": {
             "status": "no",
             "note": "No built-in per-cavity insert effectivity tracking; multi-cavity tooling managed through external tool databases (DataM, ToolMonitor) or custom ERP; not natively modelled in base CAD/PLM."
           },
           "kerf": {
             "status": "yes",
-            "note": "Per-cavity insert revision state for multi-cavity injection molds: each cavity slot carries an insert history with date-effectivity windows. Query (tool, date) → [(cavity_id, revision), …]. Cavity-3 mid-run swap: query 2026-05-01 → [(1,R5),(2,R5),(3,R6),(4,R5)]; query 2026-03-15 → all R5. Honest flag: no insert wear / change-out queuing modelled. LLM tool: plm_query_multi_cavity.",
+            "note": "Per-cavity insert revision state for multi-cavity injection molds: each cavity slot carries an insert history with date-effectivity windows. Query (tool, date) \u2192 [(cavity_id, revision), \u2026]. Cavity-3 mid-run swap: query 2026-05-01 \u2192 [(1,R5),(2,R5),(3,R6),(4,R5)]; query 2026-03-15 \u2192 all R5. Honest flag: no insert wear / change-out queuing modelled. LLM tool: plm_query_multi_cavity.",
             "evidence": "packages/kerf-plm/src/kerf_plm/multi_cavity_effectivity.py"
           }
         },
@@ -6994,7 +7006,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "check_face_planarity: uniform UV-grid sampling + SVD orthogonal regression (Pratt 1987 §3; Eberly §6.6); returns is_planar, plane_origin, plane_normal, max_deviation, planarity_score (0→flat, higher→curved); default tolerance=1e-4×bbox_diag; LLM tool brep_check_face_planarity. Useful for sheet-metal flat-pattern feasibility, simple-face fast-rendering, planar-face cooling-channel routing. CAVEAT: v1 uses full UV domain — inner trim loops not excluded.",
+            "note": "check_face_planarity: uniform UV-grid sampling + SVD orthogonal regression (Pratt 1987 \u00a73; Eberly \u00a76.6); returns is_planar, plane_origin, plane_normal, max_deviation, planarity_score (0\u2192flat, higher\u2192curved); default tolerance=1e-4\u00d7bbox_diag; LLM tool brep_check_face_planarity. Useful for sheet-metal flat-pattern feasibility, simple-face fast-rendering, planar-face cooling-channel routing. CAVEAT: v1 uses full UV domain \u2014 inner trim loops not excluded.",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/face_planarity.py"
           }
         },
@@ -7008,7 +7020,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "check_face_developable: N×N UV-grid sampling + Gaussian curvature K=κ_1·κ_2 via shape operator (do Carmo §3.6; Pottmann-Wallner §4); returns is_developable (max|K|<tol), max_abs_K, mean_abs_K, ruled_direction_if_any (kappa_1/kappa_2 identically zero); LLM tool brep_check_face_developable. Oracles: cylinder K=0→True; sphere K=1/R²→False; cone K=0→True; torus K varies→False; plane K=0→True. CAVEAT: sampling-based lower bound on max|K|.",
+            "note": "check_face_developable: N\u00d7N UV-grid sampling + Gaussian curvature K=\u03ba_1\u00b7\u03ba_2 via shape operator (do Carmo \u00a73.6; Pottmann-Wallner \u00a74); returns is_developable (max|K|<tol), max_abs_K, mean_abs_K, ruled_direction_if_any (kappa_1/kappa_2 identically zero); LLM tool brep_check_face_developable. Oracles: cylinder K=0\u2192True; sphere K=1/R\u00b2\u2192False; cone K=0\u2192True; torus K varies\u2192False; plane K=0\u2192True. CAVEAT: sampling-based lower bound on max|K|.",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/face_developable_check.py"
           }
         }
@@ -7823,20 +7835,20 @@
         },
         {
           "domain": "D14",
-          "feature": "Where-Used Analysis — inverse BOM traversal (PROSTEP-iViP SIG §5.2)",
+          "feature": "Where-Used Analysis \u2014 inverse BOM traversal (PROSTEP-iViP SIG \u00a75.2)",
           "competitor": {
             "status": "partial",
             "note": "Where-used available only through full PDM/PLM add-ons (e.g. SOLIDWORKS PDM, Fusion Manage, 3DExperience); not available in base modeller."
           },
           "kerf": {
             "status": "yes",
-            "note": "Where-Used Analysis: reverse-traverses the assembly hierarchy from a target part. Returns all parent assemblies with occurrence multiplicity and depth (depth=1 immediate parent, depth=2 grandparent, …). Cycle detection with cap at depth=20. LLM tool: plm_where_used.",
+            "note": "Where-Used Analysis: reverse-traverses the assembly hierarchy from a target part. Returns all parent assemblies with occurrence multiplicity and depth (depth=1 immediate parent, depth=2 grandparent, \u2026). Cycle detection with cap at depth=20. LLM tool: plm_where_used.",
             "evidence": "packages/kerf-plm/src/kerf_plm/where_used.py"
           }
         },
         {
           "domain": "D14",
-          "feature": "Document Version Diff — controlled document delta (ISO 10303-44 §5.2 + Borst-Lahti §6.3)",
+          "feature": "Document Version Diff \u2014 controlled document delta (ISO 10303-44 \u00a75.2 + Borst-Lahti \u00a76.3)",
           "competitor": {
             "status": "no",
             "note": "No built-in document revision diff with field-level criticality classification; requires external PLM/PDM or custom scripting."
@@ -7849,14 +7861,14 @@
         },
         {
           "domain": "D14",
-          "feature": "Multi-Cavity Tool Effectivity — per-cavity insert revision tracking (PROSTEP-iViP SIG §6)",
+          "feature": "Multi-Cavity Tool Effectivity \u2014 per-cavity insert revision tracking (PROSTEP-iViP SIG \u00a76)",
           "competitor": {
             "status": "no",
             "note": "No built-in per-cavity insert effectivity tracking; multi-cavity tooling managed through external tool databases (DataM, ToolMonitor) or custom ERP; not natively modelled in base CAD/PLM."
           },
           "kerf": {
             "status": "yes",
-            "note": "Per-cavity insert revision state for multi-cavity injection molds: each cavity slot carries an insert history with date-effectivity windows. Query (tool, date) → [(cavity_id, revision), …]. Cavity-3 mid-run swap: query 2026-05-01 → [(1,R5),(2,R5),(3,R6),(4,R5)]; query 2026-03-15 → all R5. Honest flag: no insert wear / change-out queuing modelled. LLM tool: plm_query_multi_cavity.",
+            "note": "Per-cavity insert revision state for multi-cavity injection molds: each cavity slot carries an insert history with date-effectivity windows. Query (tool, date) \u2192 [(cavity_id, revision), \u2026]. Cavity-3 mid-run swap: query 2026-05-01 \u2192 [(1,R5),(2,R5),(3,R6),(4,R5)]; query 2026-03-15 \u2192 all R5. Honest flag: no insert wear / change-out queuing modelled. LLM tool: plm_query_multi_cavity.",
             "evidence": "packages/kerf-plm/src/kerf_plm/multi_cavity_effectivity.py"
           }
         }
@@ -9678,20 +9690,20 @@
         },
         {
           "domain": "D14",
-          "feature": "Where-Used Analysis — inverse BOM traversal (PROSTEP-iViP SIG §5.2)",
+          "feature": "Where-Used Analysis \u2014 inverse BOM traversal (PROSTEP-iViP SIG \u00a75.2)",
           "competitor": {
             "status": "partial",
             "note": "Where-used available only through full PDM/PLM add-ons (e.g. SOLIDWORKS PDM, Fusion Manage, 3DExperience); not available in base modeller."
           },
           "kerf": {
             "status": "yes",
-            "note": "Where-Used Analysis: reverse-traverses the assembly hierarchy from a target part. Returns all parent assemblies with occurrence multiplicity and depth (depth=1 immediate parent, depth=2 grandparent, …). Cycle detection with cap at depth=20. LLM tool: plm_where_used.",
+            "note": "Where-Used Analysis: reverse-traverses the assembly hierarchy from a target part. Returns all parent assemblies with occurrence multiplicity and depth (depth=1 immediate parent, depth=2 grandparent, \u2026). Cycle detection with cap at depth=20. LLM tool: plm_where_used.",
             "evidence": "packages/kerf-plm/src/kerf_plm/where_used.py"
           }
         },
         {
           "domain": "D14",
-          "feature": "Document Version Diff — controlled document delta (ISO 10303-44 §5.2 + Borst-Lahti §6.3)",
+          "feature": "Document Version Diff \u2014 controlled document delta (ISO 10303-44 \u00a75.2 + Borst-Lahti \u00a76.3)",
           "competitor": {
             "status": "no",
             "note": "No built-in document revision diff with field-level criticality classification; requires external PLM/PDM or custom scripting."
@@ -9704,14 +9716,14 @@
         },
         {
           "domain": "D14",
-          "feature": "Multi-Cavity Tool Effectivity — per-cavity insert revision tracking (PROSTEP-iViP SIG §6)",
+          "feature": "Multi-Cavity Tool Effectivity \u2014 per-cavity insert revision tracking (PROSTEP-iViP SIG \u00a76)",
           "competitor": {
             "status": "no",
             "note": "No built-in per-cavity insert effectivity tracking; multi-cavity tooling managed through external tool databases (DataM, ToolMonitor) or custom ERP; not natively modelled in base CAD/PLM."
           },
           "kerf": {
             "status": "yes",
-            "note": "Per-cavity insert revision state for multi-cavity injection molds: each cavity slot carries an insert history with date-effectivity windows. Query (tool, date) → [(cavity_id, revision), …]. Cavity-3 mid-run swap: query 2026-05-01 → [(1,R5),(2,R5),(3,R6),(4,R5)]; query 2026-03-15 → all R5. Honest flag: no insert wear / change-out queuing modelled. LLM tool: plm_query_multi_cavity.",
+            "note": "Per-cavity insert revision state for multi-cavity injection molds: each cavity slot carries an insert history with date-effectivity windows. Query (tool, date) \u2192 [(cavity_id, revision), \u2026]. Cavity-3 mid-run swap: query 2026-05-01 \u2192 [(1,R5),(2,R5),(3,R6),(4,R5)]; query 2026-03-15 \u2192 all R5. Honest flag: no insert wear / change-out queuing modelled. LLM tool: plm_query_multi_cavity.",
             "evidence": "packages/kerf-plm/src/kerf_plm/multi_cavity_effectivity.py"
           }
         }
@@ -9778,7 +9790,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Cooling circuit thermal analysis: Re/Nu/HTC (Dittus-Boelter), pressure drop (Darcy-Weisbach), coolant temp rise, Janeschitz-Kriegl cooling time; series and parallel layouts. Geometric conflict detection (Menges 2001 §6.5): CHANNEL_SPACING (2x-diam rule), CHANNEL_EJECTOR, WALL_CLEARANCE, MOLD_BOUNDS via segment-segment min-dist (Ericson 2005 §5.1.9); severity 1-5 scale; LLM tool `mold_verify_cooling_channels`; no 3D routing or conformal toolpaths.",
+            "note": "Cooling circuit thermal analysis: Re/Nu/HTC (Dittus-Boelter), pressure drop (Darcy-Weisbach), coolant temp rise, Janeschitz-Kriegl cooling time; series and parallel layouts. Geometric conflict detection (Menges 2001 \u00a76.5): CHANNEL_SPACING (2x-diam rule), CHANNEL_EJECTOR, WALL_CLEARANCE, MOLD_BOUNDS via segment-segment min-dist (Ericson 2005 \u00a75.1.9); severity 1-5 scale; LLM tool `mold_verify_cooling_channels`; no 3D routing or conformal toolpaths.",
             "evidence": [
               "packages/kerf-mold/src/kerf_mold/cooling.py",
               "packages/kerf-mold/src/kerf_mold/cooling_channel_conflict.py"
@@ -9795,7 +9807,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Ejector pin layout planner (Yu-Fan 2003 §10 + SPI/ANSI B151.1): regular-grid placement with 20 mm default spacing; SPI standard diameters (3/16\"–1/2\" series); dedicated feature pins for bosses and ribs; force distribution (Menges §7.2 side-wall friction model); conflict detection against cooling channels and rib bodies; warpage risk from force non-uniformity (4×4 region grid); LLM tools: mold_plan_ejector_pins + mold_pin_conflicts",
+            "note": "Ejector pin layout planner (Yu-Fan 2003 \u00a710 + SPI/ANSI B151.1): regular-grid placement with 20 mm default spacing; SPI standard diameters (3/16\"\u20131/2\" series); dedicated feature pins for bosses and ribs; force distribution (Menges \u00a77.2 side-wall friction model); conflict detection against cooling channels and rib bodies; warpage risk from force non-uniformity (4\u00d74 region grid); LLM tools: mold_plan_ejector_pins + mold_pin_conflicts",
             "evidence": "packages/kerf-mold/src/kerf_mold/ejector_pin_planner.py"
           }
         },
@@ -9809,7 +9821,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Ejector stroke verifier (Beaumont 2007 §9 + Menges 2001 §7.4): (1) stroke adequacy — required_stroke (part_depth + safety_margin) ≤ machine_stroke; (2) force capacity — pin_count × max_force ≥ ejection_force; (3) pin deflection — δ=F·L³/(3·E·I) ≤ 0.05mm allowable (Euler-Bernoulli cantilever, Beaumont §9.3); (4) knockout bar contact — plate thickness ≥ bar diameter (Beaumont §9.5); LLM tool `mold_verify_ejector_stroke`; static load only, honest-flagged for dynamic/fatigue scope; 33 oracle tests",
+            "note": "Ejector stroke verifier (Beaumont 2007 \u00a79 + Menges 2001 \u00a77.4): (1) stroke adequacy \u2014 required_stroke (part_depth + safety_margin) \u2264 machine_stroke; (2) force capacity \u2014 pin_count \u00d7 max_force \u2265 ejection_force; (3) pin deflection \u2014 \u03b4=F\u00b7L\u00b3/(3\u00b7E\u00b7I) \u2264 0.05mm allowable (Euler-Bernoulli cantilever, Beaumont \u00a79.3); (4) knockout bar contact \u2014 plate thickness \u2265 bar diameter (Beaumont \u00a79.5); LLM tool `mold_verify_ejector_stroke`; static load only, honest-flagged for dynamic/fatigue scope; 33 oracle tests",
             "evidence": "packages/kerf-mold/src/kerf_mold/ejector_stroke_verify.py"
           }
         },
@@ -9823,7 +9835,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Per-face draft-angle validation: arcsin(|n̂·pull̂|) angle; SPI finish grades A1–D3 minimum lookup (Menges 2001 §3.4 + Beaumont 2007 §4); region-aware minimums (outer 0.5°, inner 1.0°, rib 1.0°, boss 0.5°); degenerate-normal flagging; LLM tool `mold_validate_draft`; 38 oracle tests; v1 honest-flag: undercut detection out of scope",
+            "note": "Per-face draft-angle validation: arcsin(|n\u0302\u00b7pull\u0302|) angle; SPI finish grades A1\u2013D3 minimum lookup (Menges 2001 \u00a73.4 + Beaumont 2007 \u00a74); region-aware minimums (outer 0.5\u00b0, inner 1.0\u00b0, rib 1.0\u00b0, boss 0.5\u00b0); degenerate-normal flagging; LLM tool `mold_validate_draft`; 38 oracle tests; v1 honest-flag: undercut detection out of scope",
             "evidence": "packages/kerf-mold/src/kerf_mold/draft_validation.py"
           }
         },
@@ -9837,7 +9849,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Gate placement optimiser (Beaumont 2007 §7 + Menges 2001 §6.6): samples candidates on all bbox faces (top-centre, edge, side, bottom, multi-gate seeds); scores by Euclidean max-flow-length + fill-balance std-dev (0.6/0.4 weighted composite); functional-face + avoid-zone constraints; soft penalty for underside gates; multi-gate suggestion when flow/min-dim > 5×; balance score 0–1; LLM tool `mold_optimize_gate_placement`; 41 oracle tests; honest-flag: geometric heuristic only — not Moldflow/Moldex3D/SigmaSoft",
+            "note": "Gate placement optimiser (Beaumont 2007 \u00a77 + Menges 2001 \u00a76.6): samples candidates on all bbox faces (top-centre, edge, side, bottom, multi-gate seeds); scores by Euclidean max-flow-length + fill-balance std-dev (0.6/0.4 weighted composite); functional-face + avoid-zone constraints; soft penalty for underside gates; multi-gate suggestion when flow/min-dim > 5\u00d7; balance score 0\u20131; LLM tool `mold_optimize_gate_placement`; 41 oracle tests; honest-flag: geometric heuristic only \u2014 not Moldflow/Moldex3D/SigmaSoft",
             "evidence": "packages/kerf-mold/src/kerf_mold/gate_placement.py"
           }
         },
@@ -9851,7 +9863,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Air-vent placement optimiser (Beaumont 2007 §8.4 + Table 8.4): last-fill zones (4 farthest-from-gate corners, priority 1), parting-line rib positions (priority 2), sharp-corner pockets (priority 3); material-specific vent depths — ABS 0.025–0.040 mm, PP/PE 0.020–0.030 mm, POM/PA/PBT/PET 0.013–0.020 mm (crystalline), LCP/PPS 0.010–0.015 mm; land length 0.8 mm; avoid-zone constraint; LLM tool `mold_optimize_vent_placement`; 72 oracle tests; honest-flag: geometric heuristic only — not Moldflow/Moldex3D/SigmaSoft",
+            "note": "Air-vent placement optimiser (Beaumont 2007 \u00a78.4 + Table 8.4): last-fill zones (4 farthest-from-gate corners, priority 1), parting-line rib positions (priority 2), sharp-corner pockets (priority 3); material-specific vent depths \u2014 ABS 0.025\u20130.040 mm, PP/PE 0.020\u20130.030 mm, POM/PA/PBT/PET 0.013\u20130.020 mm (crystalline), LCP/PPS 0.010\u20130.015 mm; land length 0.8 mm; avoid-zone constraint; LLM tool `mold_optimize_vent_placement`; 72 oracle tests; honest-flag: geometric heuristic only \u2014 not Moldflow/Moldex3D/SigmaSoft",
             "evidence": "packages/kerf-mold/src/kerf_mold/vent_placement.py"
           }
         },
@@ -9865,7 +9877,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "L/T ratio checker (Beaumont 2007 §4 Table 4.2 + Menges 2001 §6.2.1): lt_ratio = flow_length_mm / wall_thickness_mm per feature; MATERIAL_LT_LIMITS — ABS=150, PC=220, PP=300, PA66=250, POM=200, PMMA=180; risk: ≤80% limit → safe, 80–100% → caution, >100% → short_shot; recommended_min_thickness = flow_length/(limit×0.85) (15% margin); LLM tool `mold_check_flow_length`; 23 oracle tests; honest-flag: L/T ratio check only — NOT Hagen-Poiseuille pressure-drop simulation or melt-front thermal analysis; use Moldflow/Moldex3D/SigmaSoft for full fill simulation",
+            "note": "L/T ratio checker (Beaumont 2007 \u00a74 Table 4.2 + Menges 2001 \u00a76.2.1): lt_ratio = flow_length_mm / wall_thickness_mm per feature; MATERIAL_LT_LIMITS \u2014 ABS=150, PC=220, PP=300, PA66=250, POM=200, PMMA=180; risk: \u226480% limit \u2192 safe, 80\u2013100% \u2192 caution, >100% \u2192 short_shot; recommended_min_thickness = flow_length/(limit\u00d70.85) (15% margin); LLM tool `mold_check_flow_length`; 23 oracle tests; honest-flag: L/T ratio check only \u2014 NOT Hagen-Poiseuille pressure-drop simulation or melt-front thermal analysis; use Moldflow/Moldex3D/SigmaSoft for full fill simulation",
             "evidence": "packages/kerf-mold/src/kerf_mold/flow_length_check.py"
           }
         },
@@ -10999,20 +11011,20 @@
         },
         {
           "domain": "D14",
-          "feature": "Where-Used Analysis — inverse BOM traversal (PROSTEP-iViP SIG §5.2)",
+          "feature": "Where-Used Analysis \u2014 inverse BOM traversal (PROSTEP-iViP SIG \u00a75.2)",
           "competitor": {
             "status": "partial",
             "note": "Where-used available only through full PDM/PLM add-ons (e.g. SOLIDWORKS PDM, Fusion Manage, 3DExperience); not available in base modeller."
           },
           "kerf": {
             "status": "yes",
-            "note": "Where-Used Analysis: reverse-traverses the assembly hierarchy from a target part. Returns all parent assemblies with occurrence multiplicity and depth (depth=1 immediate parent, depth=2 grandparent, …). Cycle detection with cap at depth=20. LLM tool: plm_where_used.",
+            "note": "Where-Used Analysis: reverse-traverses the assembly hierarchy from a target part. Returns all parent assemblies with occurrence multiplicity and depth (depth=1 immediate parent, depth=2 grandparent, \u2026). Cycle detection with cap at depth=20. LLM tool: plm_where_used.",
             "evidence": "packages/kerf-plm/src/kerf_plm/where_used.py"
           }
         },
         {
           "domain": "D14",
-          "feature": "Document Version Diff — controlled document delta (ISO 10303-44 §5.2 + Borst-Lahti §6.3)",
+          "feature": "Document Version Diff \u2014 controlled document delta (ISO 10303-44 \u00a75.2 + Borst-Lahti \u00a76.3)",
           "competitor": {
             "status": "no",
             "note": "No built-in document revision diff with field-level criticality classification; requires external PLM/PDM or custom scripting."
@@ -11025,14 +11037,14 @@
         },
         {
           "domain": "D14",
-          "feature": "Multi-Cavity Tool Effectivity — per-cavity insert revision tracking (PROSTEP-iViP SIG §6)",
+          "feature": "Multi-Cavity Tool Effectivity \u2014 per-cavity insert revision tracking (PROSTEP-iViP SIG \u00a76)",
           "competitor": {
             "status": "no",
             "note": "No built-in per-cavity insert effectivity tracking; multi-cavity tooling managed through external tool databases (DataM, ToolMonitor) or custom ERP; not natively modelled in base CAD/PLM."
           },
           "kerf": {
             "status": "yes",
-            "note": "Per-cavity insert revision state for multi-cavity injection molds: each cavity slot carries an insert history with date-effectivity windows. Query (tool, date) → [(cavity_id, revision), …]. Cavity-3 mid-run swap: query 2026-05-01 → [(1,R5),(2,R5),(3,R6),(4,R5)]; query 2026-03-15 → all R5. Honest flag: no insert wear / change-out queuing modelled. LLM tool: plm_query_multi_cavity.",
+            "note": "Per-cavity insert revision state for multi-cavity injection molds: each cavity slot carries an insert history with date-effectivity windows. Query (tool, date) \u2192 [(cavity_id, revision), \u2026]. Cavity-3 mid-run swap: query 2026-05-01 \u2192 [(1,R5),(2,R5),(3,R6),(4,R5)]; query 2026-03-15 \u2192 all R5. Honest flag: no insert wear / change-out queuing modelled. LLM tool: plm_query_multi_cavity.",
             "evidence": "packages/kerf-plm/src/kerf_plm/multi_cavity_effectivity.py"
           }
         }
@@ -11976,20 +11988,20 @@
         },
         {
           "domain": "D14",
-          "feature": "Where-Used Analysis — inverse BOM traversal (PROSTEP-iViP SIG §5.2)",
+          "feature": "Where-Used Analysis \u2014 inverse BOM traversal (PROSTEP-iViP SIG \u00a75.2)",
           "competitor": {
             "status": "partial",
             "note": "Where-used available only through full PDM/PLM add-ons (e.g. SOLIDWORKS PDM, Fusion Manage, 3DExperience); not available in base modeller."
           },
           "kerf": {
             "status": "yes",
-            "note": "Where-Used Analysis: reverse-traverses the assembly hierarchy from a target part. Returns all parent assemblies with occurrence multiplicity and depth (depth=1 immediate parent, depth=2 grandparent, …). Cycle detection with cap at depth=20. LLM tool: plm_where_used.",
+            "note": "Where-Used Analysis: reverse-traverses the assembly hierarchy from a target part. Returns all parent assemblies with occurrence multiplicity and depth (depth=1 immediate parent, depth=2 grandparent, \u2026). Cycle detection with cap at depth=20. LLM tool: plm_where_used.",
             "evidence": "packages/kerf-plm/src/kerf_plm/where_used.py"
           }
         },
         {
           "domain": "D14",
-          "feature": "Document Version Diff — controlled document delta (ISO 10303-44 §5.2 + Borst-Lahti §6.3)",
+          "feature": "Document Version Diff \u2014 controlled document delta (ISO 10303-44 \u00a75.2 + Borst-Lahti \u00a76.3)",
           "competitor": {
             "status": "no",
             "note": "No built-in document revision diff with field-level criticality classification; requires external PLM/PDM or custom scripting."
@@ -12002,14 +12014,14 @@
         },
         {
           "domain": "D14",
-          "feature": "Multi-Cavity Tool Effectivity — per-cavity insert revision tracking (PROSTEP-iViP SIG §6)",
+          "feature": "Multi-Cavity Tool Effectivity \u2014 per-cavity insert revision tracking (PROSTEP-iViP SIG \u00a76)",
           "competitor": {
             "status": "no",
             "note": "No built-in per-cavity insert effectivity tracking; multi-cavity tooling managed through external tool databases (DataM, ToolMonitor) or custom ERP; not natively modelled in base CAD/PLM."
           },
           "kerf": {
             "status": "yes",
-            "note": "Per-cavity insert revision state for multi-cavity injection molds: each cavity slot carries an insert history with date-effectivity windows. Query (tool, date) → [(cavity_id, revision), …]. Cavity-3 mid-run swap: query 2026-05-01 → [(1,R5),(2,R5),(3,R6),(4,R5)]; query 2026-03-15 → all R5. Honest flag: no insert wear / change-out queuing modelled. LLM tool: plm_query_multi_cavity.",
+            "note": "Per-cavity insert revision state for multi-cavity injection molds: each cavity slot carries an insert history with date-effectivity windows. Query (tool, date) \u2192 [(cavity_id, revision), \u2026]. Cavity-3 mid-run swap: query 2026-05-01 \u2192 [(1,R5),(2,R5),(3,R6),(4,R5)]; query 2026-03-15 \u2192 all R5. Honest flag: no insert wear / change-out queuing modelled. LLM tool: plm_query_multi_cavity.",
             "evidence": "packages/kerf-plm/src/kerf_plm/multi_cavity_effectivity.py"
           }
         }
@@ -13715,7 +13727,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Sequential paraxial + meridional ray trace through multi-element lens stacks: Welford 1986 §3.3/§5 exact Snell + Newton-Raphson conic intersect; EFL/BFL/FFL; Hecht biconvex BK7 oracle <0.1% error; LLM tool optics_ray_trace_lens_stack. v1: no Seidel coefficients, no polychromatic trace.",
+            "note": "Sequential paraxial + meridional ray trace through multi-element lens stacks: Welford 1986 \u00a73.3/\u00a75 exact Snell + Newton-Raphson conic intersect; EFL/BFL/FFL; Hecht biconvex BK7 oracle <0.1% error; LLM tool optics_ray_trace_lens_stack. v1: no Seidel coefficients, no polychromatic trace.",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/lens_stack_trace.py"
           }
         },
@@ -13743,7 +13755,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Chief-ray vignetting (OPTICS-CHIEF-RAY-VIGNETTING): marginal-ray bundle sampled around entrance pupil at each field angle; per-surface clear-aperture clipping check; relative illumination = surviving fraction; cos4(theta) photometric baseline; excess-vignetting ratio RI/cos4; LLM tool optics_compute_vignetting. Welford 1986 §4.5 / Hecht §6.6. Circular symmetric apertures; anamorphic/off-axis stops not modelled.",
+            "note": "Chief-ray vignetting (OPTICS-CHIEF-RAY-VIGNETTING): marginal-ray bundle sampled around entrance pupil at each field angle; per-surface clear-aperture clipping check; relative illumination = surviving fraction; cos4(theta) photometric baseline; excess-vignetting ratio RI/cos4; LLM tool optics_compute_vignetting. Welford 1986 \u00a74.5 / Hecht \u00a76.6. Circular symmetric apertures; anamorphic/off-axis stops not modelled.",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/chief_ray_vignetting.py"
           }
         },
@@ -13757,7 +13769,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Spot diagrams + pupil illumination maps (OPTICS-PUPIL-DIAGRAM): uniform pupil-grid ray trace (Welford 1986 §8.2); per-field (x,y) intercepts at image plane; 2-D RMS and meridional y-only RMS spot radius; max ray distance from chief ray; exit-pupil illumination map (surviving pupil coords); paraxial exit-pupil position estimate (Welford 1986 §3.5 / Hecht §5.7); stigmatic stack RMS < 1e-6 mm; BK7 biconvex at 14deg y-RMS > 3x on-axis (coma verified); Seidel S_II cross-check; LLM tool optics_pupil_diagram. Monochromatic only; sagittal x intercepts are first-order estimates (full 3-D skew-ray trace not implemented); 33 hermetic tests.",
+            "note": "Spot diagrams + pupil illumination maps (OPTICS-PUPIL-DIAGRAM): uniform pupil-grid ray trace (Welford 1986 \u00a78.2); per-field (x,y) intercepts at image plane; 2-D RMS and meridional y-only RMS spot radius; max ray distance from chief ray; exit-pupil illumination map (surviving pupil coords); paraxial exit-pupil position estimate (Welford 1986 \u00a73.5 / Hecht \u00a75.7); stigmatic stack RMS < 1e-6 mm; BK7 biconvex at 14deg y-RMS > 3x on-axis (coma verified); Seidel S_II cross-check; LLM tool optics_pupil_diagram. Monochromatic only; sagittal x intercepts are first-order estimates (full 3-D skew-ray trace not implemented); 33 hermetic tests.",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/pupil_diagram.py"
           }
         },
@@ -13771,7 +13783,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Through-focus defocus curve (OPTICS-DEFOCUS-CURVE): per-Dz meridional RMS spot-size via exact Snell + Newton-Raphson conic intersect (Welford 1986 §11.5 / Hecht §6.5); best-focus shift quantified; parabolic growth verified for paraxial singlet (min at Dz=0); spherical-aberration-shifted minimum verified for full-aperture BK7 singlet (Dz approx -0.5 mm); field-angle dependency; LLM tool optics_defocus_curve; 33 hermetic tests. Honest: monochromatic only; meridional (tangential) RMS only; astigmatic sagittal/tangential splitting not implemented.",
+            "note": "Through-focus defocus curve (OPTICS-DEFOCUS-CURVE): per-Dz meridional RMS spot-size via exact Snell + Newton-Raphson conic intersect (Welford 1986 \u00a711.5 / Hecht \u00a76.5); best-focus shift quantified; parabolic growth verified for paraxial singlet (min at Dz=0); spherical-aberration-shifted minimum verified for full-aperture BK7 singlet (Dz approx -0.5 mm); field-angle dependency; LLM tool optics_defocus_curve; 33 hermetic tests. Honest: monochromatic only; meridional (tangential) RMS only; astigmatic sagittal/tangential splitting not implemented.",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/defocus_curve.py"
           }
         },
@@ -13799,7 +13811,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Coma aberration metrics (OPTICS-COMA-COMPUTE): pupil-rim ray bundle trace at N azimuths (Welford 1986 §11.4 / Born & Wolf §5.3); comatic flare length = mean Y-displacement of tangential-fan rays from chief-ray image point; sagittal coma = tangential/3 (Welford §11.4 eq. 11.4.4); total coma = sqrt(tan²+sag²); Seidel S_II prediction = 3×|S_II|×|y_chief| (Born & Wolf §5.3 eq. 5.3.29); depth bar: BK7 biconvex at 14 deg coma > 1 um; Seidel match < 0.1% at 5 deg; LLM tool optics_compute_coma; 33 hermetic tests. Honest: third-order coma only; Hopkins higher-order and oblique spherical aberration not implemented; monochromatic only.",
+            "note": "Coma aberration metrics (OPTICS-COMA-COMPUTE): pupil-rim ray bundle trace at N azimuths (Welford 1986 \u00a711.4 / Born & Wolf \u00a75.3); comatic flare length = mean Y-displacement of tangential-fan rays from chief-ray image point; sagittal coma = tangential/3 (Welford \u00a711.4 eq. 11.4.4); total coma = sqrt(tan\u00b2+sag\u00b2); Seidel S_II prediction = 3\u00d7|S_II|\u00d7|y_chief| (Born & Wolf \u00a75.3 eq. 5.3.29); depth bar: BK7 biconvex at 14 deg coma > 1 um; Seidel match < 0.1% at 5 deg; LLM tool optics_compute_coma; 33 hermetic tests. Honest: third-order coma only; Hopkins higher-order and oblique spherical aberration not implemented; monochromatic only.",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/coma_compute.py"
           }
         },
@@ -13813,7 +13825,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Petzval field curvature (OPTICS-PETZVAL-CURVATURE-COMPUTE): P = Σ (n_after−n_before)/(n_before·n_after·R_i) (Hecht §6.3.2 / Born & Wolf §4.5); R_P = 1/P; flat-field score 1/(1+|P|·100); BK7 biconvex oracle (R1=+50, R2=−50, n=1.5168): P ≈ 0.01363 mm⁻¹, R_P ≈ 73.4 mm (within 1%); flat-field condition Σφ/n=0 → P=0 verified; plano surfaces (|R|=1e18) contribute 0; stop-shift invariance; per-surface breakdown with is_plano flag; LLM tool optics_compute_petzval_curvature; 26 hermetic tests. Honest: paraxial (third-order) only; astigmatism (S_III) not included; P=0 flat Petzval sphere does NOT guarantee zero field curvature in presence of astigmatism (Hecht §6.3.2); thick-lens pupil-shift corrections not modelled.",
+            "note": "Petzval field curvature (OPTICS-PETZVAL-CURVATURE-COMPUTE): P = \u03a3 (n_after\u2212n_before)/(n_before\u00b7n_after\u00b7R_i) (Hecht \u00a76.3.2 / Born & Wolf \u00a74.5); R_P = 1/P; flat-field score 1/(1+|P|\u00b7100); BK7 biconvex oracle (R1=+50, R2=\u221250, n=1.5168): P \u2248 0.01363 mm\u207b\u00b9, R_P \u2248 73.4 mm (within 1%); flat-field condition \u03a3\u03c6/n=0 \u2192 P=0 verified; plano surfaces (|R|=1e18) contribute 0; stop-shift invariance; per-surface breakdown with is_plano flag; LLM tool optics_compute_petzval_curvature; 26 hermetic tests. Honest: paraxial (third-order) only; astigmatism (S_III) not included; P=0 flat Petzval sphere does NOT guarantee zero field curvature in presence of astigmatism (Hecht \u00a76.3.2); thick-lens pupil-shift corrections not modelled.",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/petzval_curvature.py"
           }
         },
@@ -13827,7 +13839,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Longitudinal chromatic aberration (OPTICS-CHROMATIC-FOCUS): Sellmeier equation n²(λ)=1+Σ B_i λ²/(λ²−C_i) for BK7/F2/SF6/K5/SF11/BK10 (Schott catalog 2023); per-wavelength BFL via ABCD thin-lens stack; LCA_FC=BFL(486nm)−BFL(656nm); Abbe V-number (singlet); BK7 V≈64.2 verified; achromat BK7+F2 LCA<0.1mm verified; SF6 high LCA verified; LLM tool optics_compute_chromatic_focus; 34 hermetic tests. Honest: paraxial thin-lens LCA only; chromatic lateral aberration (transverse colour) not computed.",
+            "note": "Longitudinal chromatic aberration (OPTICS-CHROMATIC-FOCUS): Sellmeier equation n\u00b2(\u03bb)=1+\u03a3 B_i \u03bb\u00b2/(\u03bb\u00b2\u2212C_i) for BK7/F2/SF6/K5/SF11/BK10 (Schott catalog 2023); per-wavelength BFL via ABCD thin-lens stack; LCA_FC=BFL(486nm)\u2212BFL(656nm); Abbe V-number (singlet); BK7 V\u224864.2 verified; achromat BK7+F2 LCA<0.1mm verified; SF6 high LCA verified; LLM tool optics_compute_chromatic_focus; 34 hermetic tests. Honest: paraxial thin-lens LCA only; chromatic lateral aberration (transverse colour) not computed.",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/chromatic_focus.py"
           }
         },
@@ -13841,7 +13853,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Abbe number + partial dispersion (OPTICS-ABBE-NUMBER-COMPUTE): V_d = (n_d − 1)/(n_F − n_C) from Sellmeier Fraunhofer lines d/F/C (Hecht §6.3 / ISO 10110); secondary spectrum partial dispersion P_{F,g} = (n_g − n_F)/(n_F − n_C) for g-line (435.84 nm); BK7 V_d=64.17, F2=36.37, SF6=25.43, K5=59.45, BK10=66.95 (all within 0.1% of Schott catalog); SF11=25.37 (catalog 25.76; 1.5% gap due to Sellmeier fit vs spectrophotometric measurement, documented in honest_flag per Schott TIE-29 §3.3); LLM tool optics_compute_abbe_number; 30 hermetic tests. Honest: catalog nominal/melt-mean Sellmeier coefficients; melt-to-melt V_d variation ±0.3–0.5% (Schott TIE-31).",
+            "note": "Abbe number + partial dispersion (OPTICS-ABBE-NUMBER-COMPUTE): V_d = (n_d \u2212 1)/(n_F \u2212 n_C) from Sellmeier Fraunhofer lines d/F/C (Hecht \u00a76.3 / ISO 10110); secondary spectrum partial dispersion P_{F,g} = (n_g \u2212 n_F)/(n_F \u2212 n_C) for g-line (435.84 nm); BK7 V_d=64.17, F2=36.37, SF6=25.43, K5=59.45, BK10=66.95 (all within 0.1% of Schott catalog); SF11=25.37 (catalog 25.76; 1.5% gap due to Sellmeier fit vs spectrophotometric measurement, documented in honest_flag per Schott TIE-29 \u00a73.3); LLM tool optics_compute_abbe_number; 30 hermetic tests. Honest: catalog nominal/melt-mean Sellmeier coefficients; melt-to-melt V_d variation \u00b10.3\u20130.5% (Schott TIE-31).",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/abbe_number.py"
           }
         },
@@ -13855,7 +13867,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "2-D relative illumination map (OPTICS-RELATIVE-ILLUM-MAP): for each (x,y) sensor position computes field angle theta=arctan(r/EFL) and evaluates RI(theta) = surviving-ray fraction; ri_map (aperture-clipping model) + cos4_map (natural cos4(theta) baseline, Hecht §6.6 / Slyusarev §3.4); 1-D radial pre-computation exploits rotational symmetry; corner_ri + corner_cos4 diagnostics; BK7 biconvex @60mm half-sensor: theta_corner~60deg, cos4_corner~0.063; LLM tool optics_compute_relative_illum_map; 38 hermetic tests. Honest: monochromatic; rotationally-symmetric stack assumed; sensor tilt/telecentricity not modelled. Ref: Welford 1986 §4.5; Hecht §6.6; Slyusarev §3.4.",
+            "note": "2-D relative illumination map (OPTICS-RELATIVE-ILLUM-MAP): for each (x,y) sensor position computes field angle theta=arctan(r/EFL) and evaluates RI(theta) = surviving-ray fraction; ri_map (aperture-clipping model) + cos4_map (natural cos4(theta) baseline, Hecht \u00a76.6 / Slyusarev \u00a73.4); 1-D radial pre-computation exploits rotational symmetry; corner_ri + corner_cos4 diagnostics; BK7 biconvex @60mm half-sensor: theta_corner~60deg, cos4_corner~0.063; LLM tool optics_compute_relative_illum_map; 38 hermetic tests. Honest: monochromatic; rotationally-symmetric stack assumed; sensor tilt/telecentricity not modelled. Ref: Welford 1986 \u00a74.5; Hecht \u00a76.6; Slyusarev \u00a73.4.",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/relative_illum_map.py"
           }
         },
@@ -13869,7 +13881,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Entrance pupil position and size (OPTICS-ENTRANCE-PUPIL-POS): paraxial reverse-trace of marginal ray from aperture stop through front sub-stack (Welford 1986 §4.4 / Hecht §6.6); position_z_mm from first surface vertex; D-element transverse magnification; converging front → real pupil; diverging front → virtual pupil; LLM tool optics_compute_entrance_pupil; 38 hermetic tests. Exit pupil position and size (OPTICS-EXIT-PUPIL-POS): two-ray forward trace (Welford §4.4 eq. 4.4.5); position_z_mm from last surface vertex; Ramsden disk oracle: z=31.25 mm, radius=1.25 mm, m=0.25 for 4× telescope (Hecht §6.6); Welford §4.4 virtual exit pupil oracle (BK7 biconvex, z≈−3.41 mm); LLM tool optics_compute_exit_pupil; 43 hermetic tests. Honest: paraxial only; stop modelled as thin plane.",
+            "note": "Entrance pupil position and size (OPTICS-ENTRANCE-PUPIL-POS): paraxial reverse-trace of marginal ray from aperture stop through front sub-stack (Welford 1986 \u00a74.4 / Hecht \u00a76.6); position_z_mm from first surface vertex; D-element transverse magnification; converging front \u2192 real pupil; diverging front \u2192 virtual pupil; LLM tool optics_compute_entrance_pupil; 38 hermetic tests. Exit pupil position and size (OPTICS-EXIT-PUPIL-POS): two-ray forward trace (Welford \u00a74.4 eq. 4.4.5); position_z_mm from last surface vertex; Ramsden disk oracle: z=31.25 mm, radius=1.25 mm, m=0.25 for 4\u00d7 telescope (Hecht \u00a76.6); Welford \u00a74.4 virtual exit pupil oracle (BK7 biconvex, z\u2248\u22123.41 mm); LLM tool optics_compute_exit_pupil; 43 hermetic tests. Honest: paraxial only; stop modelled as thin plane.",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/exit_pupil.py"
           }
         },
@@ -16103,14 +16115,14 @@
         },
         {
           "domain": "D1",
-          "feature": "SubD limit-surface global integrals (area, ∫H dA, ∫K dA)",
+          "feature": "SubD limit-surface global integrals (area, \u222bH dA, \u222bK dA)",
           "competitor": {
             "status": "no",
-            "note": "No dedicated API for ∫H dA or discrete Gauss-Bonnet ∫K dA over CC limit surfaces"
+            "note": "No dedicated API for \u222bH dA or discrete Gauss-Bonnet \u222bK dA over CC limit surfaces"
           },
           "kerf": {
             "status": "yes",
-            "note": "integrate_area / integrate_mean_curvature / integrate_gaussian_curvature via B-spline 4×4 + 16×16 GL + discrete Gauss-Bonnet (exact: 4π sphere, 0 torus); LLM tools subd_integrate_area/mean/gaussian",
+            "note": "integrate_area / integrate_mean_curvature / integrate_gaussian_curvature via B-spline 4\u00d74 + 16\u00d716 GL + discrete Gauss-Bonnet (exact: 4\u03c0 sphere, 0 torus); LLM tools subd_integrate_area/mean/gaussian",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/subd_limit_integrals.py"
           }
         },
@@ -16123,7 +16135,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "find_critical_points: discrete Morse theory (Edelsbrunner-Harer 2010 §1) — maxima, minima, saddles via lower/upper link + SoS tie-breaking; Morse-Euler χ verification; oracle: sphere 1+1+0 χ=2, torus 1+1+2 χ=0; LLM tool subd_find_critical_points",
+            "note": "find_critical_points: discrete Morse theory (Edelsbrunner-Harer 2010 \u00a71) \u2014 maxima, minima, saddles via lower/upper link + SoS tie-breaking; Morse-Euler \u03c7 verification; oracle: sphere 1+1+0 \u03c7=2, torus 1+1+2 \u03c7=0; LLM tool subd_find_critical_points",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/subd_critical_points.py"
           }
         },
@@ -16137,7 +16149,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "SubD authoring with creases; quad remesh; dense-mesh→cage via QEM (Garland-Heckbert 1997) + quad recovery (Bommes 2013); cage→primitive snap: project_cage_to_sphere / _cylinder / _plane (analytic closest-point projection, 3 LLM tools)",
+            "note": "SubD authoring with creases; quad remesh; dense-mesh\u2192cage via QEM (Garland-Heckbert 1997) + quad recovery (Bommes 2013); cage\u2192primitive snap: project_cage_to_sphere / _cylinder / _plane (analytic closest-point projection, 3 LLM tools)",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/subd_project_primitive.py"
           }
         },
@@ -16151,7 +16163,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "export_subd_to_usda: USDA 1.0 ASCII Mesh prim with subdivisionScheme=catmullClark, interpolateBoundary=edgeAndCorner, creaseIndices/creaseLengths/creaseSharpnesses per USD Mesh schema; parse_usda_subd round-trip oracle; LLM tool subd_export_to_usd. USDA ASCII only — USDC binary out of scope.",
+            "note": "export_subd_to_usda: USDA 1.0 ASCII Mesh prim with subdivisionScheme=catmullClark, interpolateBoundary=edgeAndCorner, creaseIndices/creaseLengths/creaseSharpnesses per USD Mesh schema; parse_usda_subd round-trip oracle; LLM tool subd_export_to_usd. USDA ASCII only \u2014 USDC binary out of scope.",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/subd_export_usd.py"
           }
         },
@@ -16165,7 +16177,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "export_limit_to_obj: CC limit-surface mesh exported as Wavefront OBJ ASCII (v/vn/f; geometry only, no MTL). N levels of CC subdivision; cube cage at 2 levels → 96 quads; face count scales 4× per level; vertex normals via area-weighted cross-product; parse_obj round-trip oracle; LLM tool subd_export_limit_to_obj. Honest: no vt texture coords, no MTL material library.",
+            "note": "export_limit_to_obj: CC limit-surface mesh exported as Wavefront OBJ ASCII (v/vn/f; geometry only, no MTL). N levels of CC subdivision; cube cage at 2 levels \u2192 96 quads; face count scales 4\u00d7 per level; vertex normals via area-weighted cross-product; parse_obj round-trip oracle; LLM tool subd_export_limit_to_obj. Honest: no vt texture coords, no MTL material library.",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/subd_export_obj.py"
           }
         },
@@ -16179,7 +16191,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "export_limit_to_gltf: CC limit-surface exported as glTF 2.0 — both .gltf (JSON + base64 buffer) and .glb (binary GLB container). Valid asset.version='2.0'; POSITION VEC3 FLOAT + SCALAR UNSIGNED_INT indices; quads fan-triangulated; cube cage 2 levels → 192 triangles; GLB magic b'glTF' + version 2; vertex/face counts round-trip via parse_gltf; sphere cage convergence. Honest (v1): geometry only — no materials, normals attribute, textures, animations, skinning; no Draco compression; pure-Python (json+struct). 39 tests. LLM tool subd_export_limit_to_gltf. Ref: Khronos glTF 2.0.",
+            "note": "export_limit_to_gltf: CC limit-surface exported as glTF 2.0 \u2014 both .gltf (JSON + base64 buffer) and .glb (binary GLB container). Valid asset.version='2.0'; POSITION VEC3 FLOAT + SCALAR UNSIGNED_INT indices; quads fan-triangulated; cube cage 2 levels \u2192 192 triangles; GLB magic b'glTF' + version 2; vertex/face counts round-trip via parse_gltf; sphere cage convergence. Honest (v1): geometry only \u2014 no materials, normals attribute, textures, animations, skinning; no Draco compression; pure-Python (json+struct). 39 tests. LLM tool subd_export_limit_to_gltf. Ref: Khronos glTF 2.0.",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/subd_export_gltf.py"
           }
         },
@@ -16193,7 +16205,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "export_limit_to_step: CC limit-surface exported as STEP AP242 faceted B-rep (ISO 10303-242:2020 / ISO 10303-21). Valid STEP file with FILE_DESCRIPTION + FILE_NAME + FILE_SCHEMA + DATA section; CARTESIAN_POINT / VERTEX_POINT / EDGE_CURVE / EDGE_LOOP / FACE_OUTER_BOUND / ADVANCED_FACE on PLANE surfaces / OPEN_SHELL / SHELL_BASED_SURFACE_MODEL / SHAPE_REPRESENTATION; cube cage 2 levels → 96 ADVANCED_FACEs; face count scales 4× per level; sphere cage bounding-box convergence; structural validity verified (header + DATA + ENDSEC). Honest: flat PLANE per polygon (STEP has no native SubD primitive; not smooth NURBS). 38 tests. LLM tool subd_export_limit_to_step. Ref: ISO 10303-242:2020.",
+            "note": "export_limit_to_step: CC limit-surface exported as STEP AP242 faceted B-rep (ISO 10303-242:2020 / ISO 10303-21). Valid STEP file with FILE_DESCRIPTION + FILE_NAME + FILE_SCHEMA + DATA section; CARTESIAN_POINT / VERTEX_POINT / EDGE_CURVE / EDGE_LOOP / FACE_OUTER_BOUND / ADVANCED_FACE on PLANE surfaces / OPEN_SHELL / SHELL_BASED_SURFACE_MODEL / SHAPE_REPRESENTATION; cube cage 2 levels \u2192 96 ADVANCED_FACEs; face count scales 4\u00d7 per level; sphere cage bounding-box convergence; structural validity verified (header + DATA + ENDSEC). Honest: flat PLANE per polygon (STEP has no native SubD primitive; not smooth NURBS). 38 tests. LLM tool subd_export_limit_to_step. Ref: ISO 10303-242:2020.",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/subd_export_step.py"
           }
         },
@@ -16207,7 +16219,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "walk_along_cage_edges: CC limit-surface polyline along cage edge chain — boundary=cage, creased=crease curve, smooth=limit arc; intermediate points via index-tracked CC subdivision + vertex limit stencils; LLM tool subd_walk_edge_chain; 14 tests.",
+            "note": "walk_along_cage_edges: CC limit-surface polyline along cage edge chain \u2014 boundary=cage, creased=crease curve, smooth=limit arc; intermediate points via index-tracked CC subdivision + vertex limit stencils; LLM tool subd_walk_edge_chain; 14 tests.",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/subd_edge_walk.py"
           }
         },
@@ -16216,12 +16228,12 @@
           "feature": "SubD symmetry detection (mirror / rotational / spherical)",
           "competitor": {
             "status": "yes",
-            "note": "Symmetry command — mirror-plane symmetry on SubD; no scored multi-axis detection",
+            "note": "Symmetry command \u2014 mirror-plane symmetry on SubD; no scored multi-axis detection",
             "source": "https://docs.mcneel.com/rhino/8/help/en-us/seealso/sak_subd.htm"
           },
           "kerf": {
             "status": "yes",
-            "note": "PCA mirror planes (Podolak 2006) + n-fold rotational axes (Mitra-Guibas-Pauly 2006) + spherical flag; quality score 0–1; subd_detect_symmetry + subd_enforce_symmetry LLM tools",
+            "note": "PCA mirror planes (Podolak 2006) + n-fold rotational axes (Mitra-Guibas-Pauly 2006) + spherical flag; quality score 0\u20131; subd_detect_symmetry + subd_enforce_symmetry LLM tools",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/subd_symmetry.py"
           }
         },
@@ -16230,7 +16242,7 @@
           "feature": "SubD cage edge ring selection",
           "competitor": {
             "status": "yes",
-            "note": "Maya Select Edge Ring, Blender Select Edge Ring (Alt+click) — follows opposite edges across each quad face for loop-cut / bevel / bridge operations",
+            "note": "Maya Select Edge Ring, Blender Select Edge Ring (Alt+click) \u2014 follows opposite edges across each quad face for loop-cut / bevel / bridge operations",
             "source": "https://docs.blender.org/manual/en/latest/modeling/meshes/selecting/edge_loops.html"
           },
           "kerf": {
@@ -16249,7 +16261,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "subdivide_edge(cage, edge_index, position_t=0.5): inserts midpoint vertex on a single cage edge (not a full CC pass); each adjacent face split into triangle + quad; cube oracle V=8→9, F=6→8, E=12→15, Euler=2 ✓; boundary edge (1 adjacent face) and interior edge (2) both handled; invalid edge_index → ValueError; has_non_quad_input honest flag for non-quad input; LLM tool subd_subdivide_edge; 24 oracle-asserted tests. Ref: Catmull & Clark 1978; Stam 1998 §4; Maya polySplit.",
+            "note": "subdivide_edge(cage, edge_index, position_t=0.5): inserts midpoint vertex on a single cage edge (not a full CC pass); each adjacent face split into triangle + quad; cube oracle V=8\u21929, F=6\u21928, E=12\u219215, Euler=2 \u2713; boundary edge (1 adjacent face) and interior edge (2) both handled; invalid edge_index \u2192 ValueError; has_non_quad_input honest flag for non-quad input; LLM tool subd_subdivide_edge; 24 oracle-asserted tests. Ref: Catmull & Clark 1978; Stam 1998 \u00a74; Maya polySplit.",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/subd_subdivide_edge.py"
           }
         },
@@ -16263,33 +16275,33 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "check_shell_walls(body, process, material) verifies post-shell wall thickness against injection_molding (Menges 2001 §3.3 Table 3.3: t_min/t_max per material, flow-length correction), sheet_metal (Boothroyd-Dewhurst §5), and FDM/SLA/SLS/DLP/MJF nozzle-diameter rules; ShellWallReport with per-face FaceWallResult, violations_thin/thick; LLM tool brep_check_shell_walls; 20 oracle-asserted tests; honest caveat: static rule-based only, no CFD or mould-fill simulation.",
+            "note": "check_shell_walls(body, process, material) verifies post-shell wall thickness against injection_molding (Menges 2001 \u00a73.3 Table 3.3: t_min/t_max per material, flow-length correction), sheet_metal (Boothroyd-Dewhurst \u00a75), and FDM/SLA/SLS/DLP/MJF nozzle-diameter rules; ShellWallReport with per-face FaceWallResult, violations_thin/thick; LLM tool brep_check_shell_walls; 20 oracle-asserted tests; honest caveat: static rule-based only, no CFD or mould-fill simulation.",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/shell_wall_check.py"
           }
         },
         {
           "domain": "D1",
-          "feature": "SubD limit-surface global integrals (area, ∫H dA, ∫K dA)",
+          "feature": "SubD limit-surface global integrals (area, \u222bH dA, \u222bK dA)",
           "competitor": {
             "status": "no",
-            "note": "No dedicated API for ∫H dA or discrete Gauss-Bonnet ∫K dA over CC limit surfaces"
+            "note": "No dedicated API for \u222bH dA or discrete Gauss-Bonnet \u222bK dA over CC limit surfaces"
           },
           "kerf": {
             "status": "yes",
-            "note": "integrate_area / integrate_mean_curvature / integrate_gaussian_curvature via B-spline 4×4 + 16×16 GL + discrete Gauss-Bonnet (exact: 4π sphere, 0 torus); LLM tools subd_integrate_area/mean/gaussian",
+            "note": "integrate_area / integrate_mean_curvature / integrate_gaussian_curvature via B-spline 4\u00d74 + 16\u00d716 GL + discrete Gauss-Bonnet (exact: 4\u03c0 sphere, 0 torus); LLM tools subd_integrate_area/mean/gaussian",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/subd_limit_integrals.py"
           }
         },
         {
           "domain": "D1",
-          "feature": "SubD Gauss-Bonnet theorem check (∫∫K dA = 2π·χ)",
+          "feature": "SubD Gauss-Bonnet theorem check (\u222b\u222bK dA = 2\u03c0\u00b7\u03c7)",
           "competitor": {
             "status": "no",
             "note": "No Gauss-Bonnet integrity verification API for CC limit surfaces"
           },
           "kerf": {
             "status": "yes",
-            "note": "verify_gauss_bonnet(cage) checks ∫∫K dA = 2π·χ; GaussBonnetCheckReport with chi_from_cage, relative_error, valid, boundary honest-flag; LLM tool subd_verify_gauss_bonnet (do Carmo §4.5; Edelsbrunner-Harer 2010 §1)",
+            "note": "verify_gauss_bonnet(cage) checks \u222b\u222bK dA = 2\u03c0\u00b7\u03c7; GaussBonnetCheckReport with chi_from_cage, relative_error, valid, boundary honest-flag; LLM tool subd_verify_gauss_bonnet (do Carmo \u00a74.5; Edelsbrunner-Harer 2010 \u00a71)",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/subd_gauss_bonnet_check.py"
           }
         },
@@ -16302,7 +16314,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "solid_contains_point(body, point) -> ContainmentResult; ray-casting Jordan-curve parity test (Mortenson §11.5; Ericson 2005 §5.1); degenerate-ray fallback; boundary detection; LLM tool brep_solid_contains_point; 25 tests",
+            "note": "solid_contains_point(body, point) -> ContainmentResult; ray-casting Jordan-curve parity test (Mortenson \u00a711.5; Ericson 2005 \u00a75.1); degenerate-ray fallback; boundary detection; LLM tool brep_solid_contains_point; 25 tests",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/solid_contains_point.py"
           }
         },
@@ -16325,7 +16337,7 @@
           "feature": "B-rep shell connectivity inspector (Weiler radial-edge)",
           "competitor": {
             "status": "yes",
-            "note": "CheckObjectsCommand + EdgeContinuity — reports naked/non-manifold edges; no programmatic union-find component count",
+            "note": "CheckObjectsCommand + EdgeContinuity \u2014 reports naked/non-manifold edges; no programmatic union-find component count",
             "source": "https://docs.mcneel.com/rhino/8/help/en-us/commands/check.htm"
           },
           "kerf": {
@@ -16465,7 +16477,7 @@
           "feature": "B-rep shell connectivity inspector (Weiler radial-edge)",
           "competitor": {
             "status": "yes",
-            "note": "CheckObjectsCommand + EdgeContinuity — reports naked/non-manifold edges; no programmatic union-find component count",
+            "note": "CheckObjectsCommand + EdgeContinuity \u2014 reports naked/non-manifold edges; no programmatic union-find component count",
             "source": "https://docs.mcneel.com/rhino/8/help/en-us/commands/check.htm"
           },
           "kerf": {
@@ -16484,7 +16496,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "total_edge_length() + edge_length_by_kind() (boundary/manifold/nonmanifold) + edges_by_curve_type() (linear/circular/freeform); linear=Euclidean, circular=radius*angle, freeform=adaptive Gauss-Legendre (Stoer-Bulirsch §3 + Piegl-Tiller §5.4); oracles: 100x50 rect=300, unit cube=12, sphere 12 great-circles r=50=3769.91; LLM tools brep_total_edge_length + brep_edge_length_by_kind; 20 hermetic tests",
+            "note": "total_edge_length() + edge_length_by_kind() (boundary/manifold/nonmanifold) + edges_by_curve_type() (linear/circular/freeform); linear=Euclidean, circular=radius*angle, freeform=adaptive Gauss-Legendre (Stoer-Bulirsch \u00a73 + Piegl-Tiller \u00a75.4); oracles: 100x50 rect=300, unit cube=12, sphere 12 great-circles r=50=3769.91; LLM tools brep_total_edge_length + brep_edge_length_by_kind; 20 hermetic tests",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/brep_edge_metrics.py"
           }
         },
@@ -16497,7 +16509,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "face_adjacency_graph() (inverted edge-index O(F·E)); face_neighbors(); bfs_from_face(depth_cap); shortest_face_path() BFS; FaceAdjacencyGraph dataclass + connected_components(); LLM tools brep_face_neighbors + brep_shortest_face_path; oracles: cube each-face=4-neighbours / BFS-depth-2=opposite / path-len=3; cylinder side=2/cap=1; 2-cube disconnected=2-components; edge-sharing adjacency only (Weiler 1985 §3 — point-touching not adjacent); 41 hermetic tests",
+            "note": "face_adjacency_graph() (inverted edge-index O(F\u00b7E)); face_neighbors(); bfs_from_face(depth_cap); shortest_face_path() BFS; FaceAdjacencyGraph dataclass + connected_components(); LLM tools brep_face_neighbors + brep_shortest_face_path; oracles: cube each-face=4-neighbours / BFS-depth-2=opposite / path-len=3; cylinder side=2/cap=1; 2-cube disconnected=2-components; edge-sharing adjacency only (Weiler 1985 \u00a73 \u2014 point-touching not adjacent); 41 hermetic tests",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/face_neighbor_walk.py"
           }
         },
@@ -16525,13 +16537,13 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "normal_curvature_at(srf, u, v, dir_uv) → NormalCurvatureReport(κ_n, κ_1, κ_2, K, H, principal_dirs, is_umbilic); Meusnier’s theorem II/I; principal curvatures from shape-operator eigenvalues (Mortenson §10.4); Euler’s formula verified; umbilic honest-flag; LLM tool nurbs_normal_curvature_at_point; 32 hermetic tests",
+            "note": "normal_curvature_at(srf, u, v, dir_uv) \u2192 NormalCurvatureReport(\u03ba_n, \u03ba_1, \u03ba_2, K, H, principal_dirs, is_umbilic); Meusnier\u2019s theorem II/I; principal curvatures from shape-operator eigenvalues (Mortenson \u00a710.4); Euler\u2019s formula verified; umbilic honest-flag; LLM tool nurbs_normal_curvature_at_point; 32 hermetic tests",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/normal_curvature.py"
           }
         },
         {
           "domain": "D1",
-          "feature": "NURBS partial-derivative vector field (∂S/∂u, ∂S/∂v) visualisation",
+          "feature": "NURBS partial-derivative vector field (\u2202S/\u2202u, \u2202S/\u2202v) visualisation",
           "competitor": {
             "status": "partial",
             "note": "EvaluateSurface command shows point + tangent vectors; no arrow-plot image export",
@@ -16539,7 +16551,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "render_derivative_field_png / render_derivative_field_svg; analytic derivatives at 12×12 grid; two-colour arrows (red=∂u, blue=∂v); pure-Python PNG; LLM tools nurbs_derivative_field_png + nurbs_derivative_field_svg",
+            "note": "render_derivative_field_png / render_derivative_field_svg; analytic derivatives at 12\u00d712 grid; two-colour arrows (red=\u2202u, blue=\u2202v); pure-Python PNG; LLM tools nurbs_derivative_field_png + nurbs_derivative_field_svg",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/derivative_field_viz.py"
           }
         },
@@ -16548,12 +16560,12 @@
           "feature": "NURBS curve curvature-profile export (CSV / SVG / PNG)",
           "competitor": {
             "status": "partial",
-            "note": "CurvatureGraph command shows an on-screen comb; no CSV/SVG/PNG export of the numeric κ(t) profile",
+            "note": "CurvatureGraph command shows an on-screen comb; no CSV/SVG/PNG export of the numeric \u03ba(t) profile",
             "source": "http://docs.mcneel.com/rhino/8/help/en-us/commands/curvaturegraph.htm"
           },
           "kerf": {
             "status": "yes",
-            "note": "export_curvature_profile(curve, samples, fmt) → CSV (t,κ,arc_length,x,y,z,high_kappa_risk) / SVG line-plot / PNG (pure-Python encoder); CurvatureProfileResult dataclass; inflection detection; high_kappa_risk flag; LLM tool nurbs_export_curvature_profile; 35 tests; Farin §11.6, Sapidis §3",
+            "note": "export_curvature_profile(curve, samples, fmt) \u2192 CSV (t,\u03ba,arc_length,x,y,z,high_kappa_risk) / SVG line-plot / PNG (pure-Python encoder); CurvatureProfileResult dataclass; inflection detection; high_kappa_risk flag; LLM tool nurbs_export_curvature_profile; 35 tests; Farin \u00a711.6, Sapidis \u00a73",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curvature_profile_export.py"
           }
         },
@@ -17388,7 +17400,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "classify_edges / brep_classify_edges: convex/concave/tangential per interior edge via dihedral angle (Hoffmann 1989 §5.3; Mantyla 1988 §7.4)",
+            "note": "classify_edges / brep_classify_edges: convex/concave/tangential per interior edge via dihedral angle (Hoffmann 1989 \u00a75.3; Mantyla 1988 \u00a77.4)",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/edge_convexity.py"
           }
         }

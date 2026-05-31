@@ -165,6 +165,8 @@ def _register_tools(ctx, provides: list) -> None:
         "kerf_electronics.tools.netlist_drc",
         # NEC 2023 Article 210.19(A) voltage-drop check for AC/DC conductor runs
         "kerf_electronics.tools.voltage_drop",
+        # NEC 2023 Article 240.4 + Table 310.16 + 215 circuit-protection check
+        "kerf_electronics.tools.circuit_protection",
     ]
 
     for module_path in tool_modules:

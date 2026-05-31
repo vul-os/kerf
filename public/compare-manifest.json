@@ -2944,6 +2944,21 @@
             "notes": "NEC 2023 Article 210.19(A) voltage-drop check: DC/single-phase/three-phase; NEC Ch9 Table 8 resistance at 75°C (AWG 14–4/0 + 250 kcmil, Cu/Al); IEEE 141 §3 formulas; advisory ≤3% feeder / ≤2% branch check; electronics_check_voltage_drop LLM tool. Honest: 75°C baseline only; AC reactance ignored for short runs.",
             "evidence": "packages/kerf-electronics/src/kerf_electronics/voltage_drop.py"
           }
+        },
+        {
+          "name": "OCPD sizing check / NEC 240.4 + 215 circuit-protection compliance",
+          "domain": "D7",
+          "competitor": {
+            "status": "no",
+            "notes": "Altium has no NEC 240.4 OCPD sizing or conductor-ampacity compliance check; requires external NEC reference or spreadsheet",
+            "source": "https://www.altium.com/documentation/altium-designer/pcb-design-rules-violations-reference",
+            "tier": "paid"
+          },
+          "kerf": {
+            "status": "[x]",
+            "notes": "NEC 2023 Article 240.4 + Table 310.16 + Article 215 circuit-protection check: NEC Table 310.16 75°C column (Cu + Al, AWG 14–500 kcmil, THWN/THHN/XHHW/RHW); required OCPD = 1.25 × I_continuous + I_non_continuous (NEC 215.3/210.20(A)); 240.4(B) OCPD ≤ ampacity; 240.4(D) small-conductor cap (14 AWG→15 A, 12→20 A, 10→30 A); electronics_check_circuit_protection LLM tool. Honest: 75°C THWN baseline; no ambient-temperature derating (NEC 310.15(B)(2)(a)); no bundling derating (NEC Table 310.15(B)(3)(a)); arc-flash and grounding out of scope.",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/circuit_protection_check.py"
+          }
         }
       ]
     },

@@ -2,36 +2,51 @@
 ============================
 Tests for subd/edge_collapse.py — SUBD-CAGE-EDGE-COLLAPSE.
 
-Coverage (14 tests across 7 classes):
+API under test:
+  collapse_edge(cage: SubdCage, v_keep: int, v_remove: int, midpoint: bool=True)
+  -> EdgeCollapseResult
 
-  TestCubeCollapse (3 tests):
-    1.  Cube cage (8 verts, 6 quads), collapse top edge → 7 verts.
-    2.  Cube: degenerate faces containing both endpoints removed (2 faces).
-    3.  Cube: result faces all contain valid vertex indices.
+  EdgeCollapseResult fields:
+    new_cage: SubdCage
+    num_vertices_removed: int
+    num_faces_removed: int
+    collapsed_position_xyz_mm: tuple[float, float, float]
+    degenerate_faces_removed: int
+    became_invalid: bool
+    honest_caveat: str
 
-  TestCylinderCollapse (2 tests):
-    4.  Cylinder cage: collapse one axial edge → vertex count decreases by 1.
-    5.  Cylinder: num_faces_removed equals number of faces that contained
-        both endpoint vertices.
+Coverage (14 tests across 8 classes):
 
-  TestPlaneCollapse (3 tests):
-    6.  Mid-edge of 2×2 plane grid: both vertex count and face count shrink.
-    7.  Plane: mid-edge collapse → correct midpoint vertex position.
-    8.  Plane: no face index exceeds new vertex count.
+  TestUnitCubeTopEdge (3 tests):
+    1.  Unit cube (8 verts, 6 quads): collapse top-front edge → 7 verts.
+    2.  Unit cube top-front edge: 2 degenerate faces removed (top + front).
+    3.  Unit cube top-front edge: result faces are all triangles or quads
+        (collapsed quads become triangles).
 
-  TestEdgeNotFound (2 tests):
-    9.  Edge index == num_edges raises ValueError.
-    10. Negative edge index raises ValueError.
+  TestPyramidBaseEdge (2 tests):
+    4.  Pyramid: collapse base edge → vertex count decreases by 1.
+    5.  Pyramid: degenerate_faces_removed >= 1 (face(s) adjacent to base edge).
 
-  TestResultStructure (2 tests):
-    11. Return type is EdgeCollapseResult.
-    12. EdgeCollapseResult has all required fields.
+  TestNonEdgePair (2 tests):
+    6.  Non-adjacent vertex pair returns became_invalid=True.
+    7.  Non-adjacent: returned cage is unchanged (same verts and faces).
 
-  TestCollapseConsistency (1 test):
-    13. After collapse, num_verts_removed is always 1.
+  TestMidpointVsEndpoint (2 tests):
+    8.  midpoint=True: collapsed_position_xyz_mm equals midpoint of v_keep, v_remove.
+    9.  midpoint=False: collapsed_position_xyz_mm equals V[v_keep].
+
+  TestIndexValidation (2 tests):
+    10. Out-of-range v_keep raises ValueError.
+    11. Out-of-range v_remove raises ValueError.
+
+  TestResultStructure (1 test):
+    12. Return type is EdgeCollapseResult with all required fields.
+
+  TestConsistency (1 test):
+    13. num_vertices_removed == 1 on any valid cube edge collapse.
 
   TestHonestCaveat (1 test):
-    14. honest_caveat is a non-empty string mentioning 'midpoint'.
+    14. honest_caveat mentions 'midpoint' and 'QEM' / 'Garland'.
 """
 
 from __future__ import annotations
@@ -41,29 +56,28 @@ from typing import List, Tuple
 
 import pytest
 
-from kerf_cad_core.geom.subd import SubDMesh
+from kerf_cad_core.subd.cage_area import SubdCage
 from kerf_cad_core.subd.edge_collapse import (
     EdgeCollapseResult,
     collapse_edge,
-    _build_ordered_edges,
 )
 
 
 # ---------------------------------------------------------------------------
-# Helpers to build test cages
+# Helpers — build standard test cages using SubdCage
 # ---------------------------------------------------------------------------
 
-def _unit_cube() -> SubDMesh:
+def _unit_cube() -> SubdCage:
     """Unit cube: 8 vertices, 6 quad faces."""
-    verts = [
-        [0.0, 0.0, 0.0],  # 0 bottom-front-left
-        [1.0, 0.0, 0.0],  # 1 bottom-front-right
-        [1.0, 1.0, 0.0],  # 2 bottom-back-right
-        [0.0, 1.0, 0.0],  # 3 bottom-back-left
-        [0.0, 0.0, 1.0],  # 4 top-front-left
-        [1.0, 0.0, 1.0],  # 5 top-front-right
-        [1.0, 1.0, 1.0],  # 6 top-back-right
-        [0.0, 1.0, 1.0],  # 7 top-back-left
+    verts: List[Tuple[float, float, float]] = [
+        (0.0, 0.0, 0.0),  # 0 bottom-front-left
+        (1.0, 0.0, 0.0),  # 1 bottom-front-right
+        (1.0, 1.0, 0.0),  # 2 bottom-back-right
+        (0.0, 1.0, 0.0),  # 3 bottom-back-left
+        (0.0, 0.0, 1.0),  # 4 top-front-left
+        (1.0, 0.0, 1.0),  # 5 top-front-right
+        (1.0, 1.0, 1.0),  # 6 top-back-right
+        (0.0, 1.0, 1.0),  # 7 top-back-left
     ]
     faces = [
         [0, 1, 2, 3],  # bottom
@@ -73,40 +87,50 @@ def _unit_cube() -> SubDMesh:
         [2, 3, 7, 6],  # back
         [3, 0, 4, 7],  # left
     ]
-    return SubDMesh(vertices=verts, faces=faces)
+    return SubdCage(vertices_xyz_mm=verts, faces=faces)
 
 
-def _simple_plane_grid() -> SubDMesh:
-    """2×2 plane grid: 6 vertices, 4 quad faces.
+def _pyramid() -> SubdCage:
+    """Square pyramid: 5 vertices, 1 quad base + 4 triangle sides.
+
+    Vertex layout:
+      0 = base front-left   (0,0,0)
+      1 = base front-right  (1,0,0)
+      2 = base back-right   (1,1,0)
+      3 = base back-left    (0,1,0)
+      4 = apex              (0.5, 0.5, 1.0)
+    """
+    verts: List[Tuple[float, float, float]] = [
+        (0.0, 0.0, 0.0),
+        (1.0, 0.0, 0.0),
+        (1.0, 1.0, 0.0),
+        (0.0, 1.0, 0.0),
+        (0.5, 0.5, 1.0),  # apex
+    ]
+    faces = [
+        [0, 1, 2, 3],  # base quad
+        [0, 1, 4],     # front tri
+        [1, 2, 4],     # right tri
+        [2, 3, 4],     # back tri
+        [3, 0, 4],     # left tri
+    ]
+    return SubdCage(vertices_xyz_mm=verts, faces=faces)
+
+
+def _simple_plane_grid() -> SubdCage:
+    """2×2 plane grid: 9 vertices, 4 quad faces.
 
     Vertex layout (z=0 plane):
       0--1--2
       |  |  |
       3--4--5
-    Faces:
-      [0,1,4,3], [1,2,5,4]  (top row)
-      No lower row — it's a 2×1 grid in u, not 2×2.
-
-    Actually let's make a proper 2×2 grid (2 rows, 2 cols of quads):
-    Vertices: 3 × 3 = 9
-      0--1--2
-      |  |  |
-      3--4--5
       |  |  |
       6--7--8
-    Faces (4 quads):
-      [0,1,4,3], [1,2,5,4], [3,4,7,6], [4,5,8,7]
     """
-    verts = [
-        [0.0, 0.0, 0.0],  # 0
-        [1.0, 0.0, 0.0],  # 1
-        [2.0, 0.0, 0.0],  # 2
-        [0.0, 1.0, 0.0],  # 3
-        [1.0, 1.0, 0.0],  # 4 centre
-        [2.0, 1.0, 0.0],  # 5
-        [0.0, 2.0, 0.0],  # 6
-        [1.0, 2.0, 0.0],  # 7
-        [2.0, 2.0, 0.0],  # 8
+    verts: List[Tuple[float, float, float]] = [
+        (0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (2.0, 0.0, 0.0),
+        (0.0, 1.0, 0.0), (1.0, 1.0, 0.0), (2.0, 1.0, 0.0),
+        (0.0, 2.0, 0.0), (1.0, 2.0, 0.0), (2.0, 2.0, 0.0),
     ]
     faces = [
         [0, 1, 4, 3],
@@ -114,178 +138,166 @@ def _simple_plane_grid() -> SubDMesh:
         [3, 4, 7, 6],
         [4, 5, 8, 7],
     ]
-    return SubDMesh(vertices=verts, faces=faces)
+    return SubdCage(vertices_xyz_mm=verts, faces=faces)
 
 
-def _cylinder_cage(nu: int = 6, layers: int = 2) -> SubDMesh:
-    """Simple open cylinder cage (nu segments circumferential, `layers` stacks).
+def _non_adjacent_cage() -> SubdCage:
+    """Two quads sharing an edge; vertices 0 and 8 are NOT adjacent.
 
-    Side quads only (no caps), nu×layers quad faces.
-    Vertices: nu × (layers+1).
+    Vertex layout:
+      0--1--2
+      |  |  |
+      3--4--5
+    Vertex 0 and vertex 5 are not connected (diagonal corners of 2-quad strip).
     """
-    verts = []
-    for stack in range(layers + 1):
-        z = float(stack)
-        for i in range(nu):
-            angle = 2.0 * math.pi * i / nu
-            verts.append([math.cos(angle), math.sin(angle), z])
-
-    faces = []
-    for stack in range(layers):
-        for i in range(nu):
-            i_next = (i + 1) % nu
-            a = stack * nu + i
-            b = stack * nu + i_next
-            c = (stack + 1) * nu + i_next
-            d = (stack + 1) * nu + i
-            faces.append([a, b, c, d])
-
-    return SubDMesh(vertices=verts, faces=faces)
-
-
-def _edge_idx_for_vertices(cage: SubDMesh, va: int, vb: int) -> int:
-    """Return the edge index for the edge between va and vb."""
-    all_edges, _ = _build_ordered_edges(cage.faces)
-    key = (min(va, vb), max(va, vb))
-    for i, e in enumerate(all_edges):
-        if e == key:
-            return i
-    raise ValueError(f"Edge ({va}, {vb}) not found in cage")
+    verts: List[Tuple[float, float, float]] = [
+        (0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (2.0, 0.0, 0.0),
+        (0.0, 1.0, 0.0), (1.0, 1.0, 0.0), (2.0, 1.0, 0.0),
+    ]
+    faces = [
+        [0, 1, 4, 3],
+        [1, 2, 5, 4],
+    ]
+    return SubdCage(vertices_xyz_mm=verts, faces=faces)
 
 
 # ---------------------------------------------------------------------------
-# TestCubeCollapse
+# TestUnitCubeTopEdge
 # ---------------------------------------------------------------------------
 
-class TestCubeCollapse:
-    """Collapse a top face edge of the unit cube."""
+class TestUnitCubeTopEdge:
+    """Collapse the top-front edge (vertices 4 and 5) of the unit cube."""
 
-    def test_vertex_count_decreases_by_one(self):
-        """After collapsing one edge, vertex count drops from 8 to 7."""
+    def test_vertex_count_7(self):
+        """After collapsing top-front edge (4,5): 8 → 7 vertices."""
         cube = _unit_cube()
-        # Top face edge: e.g., edge between vertices 4 and 5 (top-front)
-        eidx = _edge_idx_for_vertices(cube, 4, 5)
-        res = collapse_edge(cube, eidx)
-        assert len(res.new_cage_vertices) == 7
+        res = collapse_edge(cube, v_keep=4, v_remove=5)
+        assert len(res.new_cage.vertices_xyz_mm) == 7, (
+            f"Expected 7 verts, got {len(res.new_cage.vertices_xyz_mm)}"
+        )
 
-    def test_degenerate_faces_removed(self):
-        """Faces sharing both endpoints are removed (top face and front face both contain 4 and 5)."""
+    def test_two_degenerate_faces_removed(self):
+        """Faces containing both 4 and 5 are removed: top [4,5,6,7] + front [0,1,5,4] → 2 removed."""
         cube = _unit_cube()
-        # Edge (4, 5) is shared by top face [4,5,6,7] and front face [0,1,5,4]
-        eidx = _edge_idx_for_vertices(cube, 4, 5)
-        res = collapse_edge(cube, eidx)
-        # Both top and front faces contain vertices 4 and 5 → both become degenerate
-        assert res.num_faces_removed == 2
+        res = collapse_edge(cube, v_keep=4, v_remove=5)
+        assert res.num_faces_removed == 2, (
+            f"Expected 2 faces removed, got {res.num_faces_removed}"
+        )
+        assert res.degenerate_faces_removed == res.num_faces_removed
 
-    def test_all_face_indices_valid(self):
-        """All vertex indices in result faces reference valid new vertices."""
+    def test_collapsed_faces_have_valid_winding(self):
+        """After collapse the remaining 4 faces should be triangles or quads (size 3 or 4)."""
         cube = _unit_cube()
-        eidx = _edge_idx_for_vertices(cube, 4, 5)
-        res = collapse_edge(cube, eidx)
-        nv = len(res.new_cage_vertices)
-        for face in res.new_cage_faces:
+        res = collapse_edge(cube, v_keep=4, v_remove=5)
+        nv = len(res.new_cage.vertices_xyz_mm)
+        for face in res.new_cage.faces:
+            # Each face must have at least 3 unique vertices
+            assert len(set(face)) >= 3, f"Degenerate face survived: {face}"
+            # Each index must be in range
             for vi in face:
                 assert 0 <= vi < nv, f"Face index {vi} out of range [0, {nv})"
 
 
 # ---------------------------------------------------------------------------
-# TestCylinderCollapse
+# TestPyramidBaseEdge
 # ---------------------------------------------------------------------------
 
-class TestCylinderCollapse:
-    """Collapse an axial (vertical) edge of the cylinder cage."""
+class TestPyramidBaseEdge:
+    """Collapse a base edge of the pyramid."""
 
     def test_vertex_count_decreases_by_one(self):
-        """Collapsing any edge reduces vertex count by exactly 1."""
-        cyl = _cylinder_cage(nu=6, layers=2)
-        # Axial edge: vertices 0 (bottom) and 6 (one stack up, same angle)
-        eidx = _edge_idx_for_vertices(cyl, 0, 6)
-        res = collapse_edge(cyl, eidx)
-        assert len(res.new_cage_vertices) == len(cyl.vertices) - 1
+        """Collapsing base edge (0, 1) → 4 vertices (was 5)."""
+        pyr = _pyramid()
+        res = collapse_edge(pyr, v_keep=0, v_remove=1)
+        assert res.num_vertices_removed == 1
+        assert len(res.new_cage.vertices_xyz_mm) == 4
 
-    def test_faces_containing_both_endpoints_removed(self):
-        """Faces that contained both collapsed endpoints are gone."""
-        cyl = _cylinder_cage(nu=6, layers=2)
-        # Edge (0, 6): which faces contain BOTH 0 and 6?
-        v_a, v_b = 0, 6
-        degenerate_expected = 0
-        for face in cyl.faces:
-            if v_a in face and v_b in face:
-                degenerate_expected += 1
-        eidx = _edge_idx_for_vertices(cyl, v_a, v_b)
-        res = collapse_edge(cyl, eidx)
-        assert res.num_faces_removed == degenerate_expected
+    def test_at_least_one_degenerate_face_removed(self):
+        """The front triangle [0,1,4] contains both base endpoints → degenerate."""
+        pyr = _pyramid()
+        res = collapse_edge(pyr, v_keep=0, v_remove=1)
+        # Face [0,1,4] must be removed (both 0 and 1 present → becomes [0,0,4] after map)
+        # Base quad [0,1,2,3] also contains both → becomes [0,0,2,3] → degenerate
+        assert res.degenerate_faces_removed >= 1, (
+            f"Expected ≥1 degenerate faces removed, got {res.degenerate_faces_removed}"
+        )
 
 
 # ---------------------------------------------------------------------------
-# TestPlaneCollapse
+# TestNonEdgePair
 # ---------------------------------------------------------------------------
 
-class TestPlaneCollapse:
-    """Collapse the interior shared edge between two quads in a 2×2 plane grid."""
+class TestNonEdgePair:
+    """Vertices that don't share a face are not an edge — must return became_invalid=True."""
 
-    def test_vertex_and_face_count_both_shrink(self):
-        """After collapsing an interior edge, both vertex and face count shrink."""
-        plane = _simple_plane_grid()
-        # Interior edge: (1, 4) — shared by faces [0,1,4,3] and [1,2,5,4]
-        eidx = _edge_idx_for_vertices(plane, 1, 4)
-        res = collapse_edge(plane, eidx)
-        assert len(res.new_cage_vertices) < len(plane.vertices)
-        assert len(res.new_cage_faces) < len(plane.faces)
+    def test_non_adjacent_became_invalid(self):
+        """Vertices 0 and 5 are not adjacent → became_invalid=True."""
+        cage = _non_adjacent_cage()
+        res = collapse_edge(cage, v_keep=0, v_remove=5)
+        assert res.became_invalid is True, "Expected became_invalid=True for non-edge pair"
 
-    def test_midpoint_vertex_position_correct(self):
-        """The midpoint vertex v_m must equal (v_a + v_b) / 2."""
+    def test_non_adjacent_cage_unchanged(self):
+        """When became_invalid, the returned cage must equal the input."""
+        cage = _non_adjacent_cage()
+        res = collapse_edge(cage, v_keep=0, v_remove=5)
+        assert res.num_vertices_removed == 0
+        assert res.num_faces_removed == 0
+        # Vertex count unchanged
+        assert len(res.new_cage.vertices_xyz_mm) == len(cage.vertices_xyz_mm)
+        # Face count unchanged
+        assert len(res.new_cage.faces) == len(cage.faces)
+
+
+# ---------------------------------------------------------------------------
+# TestMidpointVsEndpoint
+# ---------------------------------------------------------------------------
+
+class TestMidpointVsEndpoint:
+    """Test midpoint=True vs midpoint=False position for the kept vertex."""
+
+    def test_midpoint_true_position(self):
+        """midpoint=True: collapsed_position should equal (V[v_keep] + V[v_remove]) / 2."""
         plane = _simple_plane_grid()
-        v_a, v_b = 1, 4
-        eidx = _edge_idx_for_vertices(plane, v_a, v_b)
-        res = collapse_edge(plane, eidx)
-        # Midpoint of vertex 1 = [1,0,0] and vertex 4 = [1,1,0] is [1,0.5,0].
+        # Vertex 1 = (1,0,0), vertex 4 = (1,1,0) → midpoint = (1, 0.5, 0)
+        res = collapse_edge(plane, v_keep=1, v_remove=4, midpoint=True)
         expected = (1.0, 0.5, 0.0)
-        # The midpoint replaces v_a (index 1) in the new vertex list.
-        # After removing v_b (index 4), the vertex at position 1 is the midpoint.
-        # Find which index now has coordinates closest to expected.
-        found = False
-        for v in res.new_cage_vertices:
-            if (abs(v[0] - expected[0]) < 1e-9
-                    and abs(v[1] - expected[1]) < 1e-9
-                    and abs(v[2] - expected[2]) < 1e-9):
-                found = True
-                break
-        assert found, f"Midpoint {expected} not found in {res.new_cage_vertices}"
+        pos = res.collapsed_position_xyz_mm
+        assert abs(pos[0] - expected[0]) < 1e-9, f"x: {pos[0]} != {expected[0]}"
+        assert abs(pos[1] - expected[1]) < 1e-9, f"y: {pos[1]} != {expected[1]}"
+        assert abs(pos[2] - expected[2]) < 1e-9, f"z: {pos[2]} != {expected[2]}"
 
-    def test_no_face_index_out_of_range(self):
-        """No face index should exceed the new vertex count."""
+    def test_midpoint_false_keeps_v_keep_position(self):
+        """midpoint=False: collapsed_position should equal V[v_keep] exactly."""
         plane = _simple_plane_grid()
-        eidx = _edge_idx_for_vertices(plane, 1, 4)
-        res = collapse_edge(plane, eidx)
-        nv = len(res.new_cage_vertices)
-        for face in res.new_cage_faces:
-            for vi in face:
-                assert 0 <= vi < nv, (
-                    f"Face index {vi} out of range [0, {nv}) in face {face}"
-                )
+        # Vertex 1 = (1,0,0)
+        v_keep_pos = plane.vertices_xyz_mm[1]
+        res = collapse_edge(plane, v_keep=1, v_remove=4, midpoint=False)
+        pos = res.collapsed_position_xyz_mm
+        assert abs(pos[0] - float(v_keep_pos[0])) < 1e-9
+        assert abs(pos[1] - float(v_keep_pos[1])) < 1e-9
+        assert abs(pos[2] - float(v_keep_pos[2])) < 1e-9
 
 
 # ---------------------------------------------------------------------------
-# TestEdgeNotFound
+# TestIndexValidation
 # ---------------------------------------------------------------------------
 
-class TestEdgeNotFound:
-    """Out-of-range edge indices raise ValueError."""
+class TestIndexValidation:
+    """Out-of-range vertex indices raise ValueError."""
 
-    def test_edge_idx_equals_num_edges_raises(self):
-        """edge_idx == num_edges is out of range."""
+    def test_v_keep_out_of_range_raises(self):
+        """v_keep >= nv raises ValueError."""
         cube = _unit_cube()
-        all_edges, _ = _build_ordered_edges(cube.faces)
-        ne = len(all_edges)
-        with pytest.raises(ValueError, match="out of range"):
-            collapse_edge(cube, ne)
+        nv = len(cube.vertices_xyz_mm)
+        with pytest.raises(ValueError, match="v_keep"):
+            collapse_edge(cube, v_keep=nv, v_remove=0)
 
-    def test_negative_edge_idx_raises(self):
-        """Negative edge index raises ValueError."""
+    def test_v_remove_out_of_range_raises(self):
+        """v_remove >= nv raises ValueError."""
         cube = _unit_cube()
-        with pytest.raises(ValueError, match="out of range"):
-            collapse_edge(cube, -1)
+        nv = len(cube.vertices_xyz_mm)
+        with pytest.raises(ValueError, match="v_remove"):
+            collapse_edge(cube, v_keep=0, v_remove=nv)
 
 
 # ---------------------------------------------------------------------------
@@ -293,43 +305,52 @@ class TestEdgeNotFound:
 # ---------------------------------------------------------------------------
 
 class TestResultStructure:
-    """EdgeCollapseResult has the correct type and fields."""
+    """EdgeCollapseResult has the correct type and all required fields."""
 
-    def test_return_type_is_edge_collapse_result(self):
-        """collapse_edge returns an EdgeCollapseResult instance."""
+    def test_all_required_fields_present(self):
+        """EdgeCollapseResult has all fields mandated by the task spec."""
         cube = _unit_cube()
-        eidx = _edge_idx_for_vertices(cube, 0, 1)
-        res = collapse_edge(cube, eidx)
+        res = collapse_edge(cube, v_keep=0, v_remove=1)
         assert isinstance(res, EdgeCollapseResult)
-
-    def test_all_fields_present(self):
-        """EdgeCollapseResult has all required fields."""
-        cube = _unit_cube()
-        eidx = _edge_idx_for_vertices(cube, 0, 1)
-        res = collapse_edge(cube, eidx)
-        assert hasattr(res, "new_cage_vertices")
-        assert hasattr(res, "new_cage_faces")
+        assert hasattr(res, "new_cage")
+        assert hasattr(res, "num_vertices_removed")
         assert hasattr(res, "num_faces_removed")
-        assert hasattr(res, "num_verts_removed")
+        assert hasattr(res, "collapsed_position_xyz_mm")
+        assert hasattr(res, "degenerate_faces_removed")
+        assert hasattr(res, "became_invalid")
         assert hasattr(res, "honest_caveat")
+        # new_cage must be a SubdCage
+        assert isinstance(res.new_cage, SubdCage)
+        # collapsed_position must be a 3-tuple
+        assert len(res.collapsed_position_xyz_mm) == 3
 
 
 # ---------------------------------------------------------------------------
-# TestCollapseConsistency
+# TestConsistency
 # ---------------------------------------------------------------------------
 
-class TestCollapseConsistency:
-    """After any single edge collapse, num_verts_removed == 1."""
+class TestConsistency:
+    """After any valid single edge collapse on a cube, num_vertices_removed == 1."""
 
-    def test_num_verts_removed_always_one(self):
-        """num_verts_removed is always 1 regardless of which edge is collapsed."""
+    def test_num_vertices_removed_always_one(self):
+        """Collapse every edge of the unit cube — each removes exactly 1 vertex."""
+        # The 12 edges of a cube: we try all vertex pairs that share a face
         cube = _unit_cube()
-        all_edges, _ = _build_ordered_edges(cube.faces)
-        for i in range(len(all_edges)):
-            res = collapse_edge(cube, i)
-            assert res.num_verts_removed == 1, (
-                f"Edge {i}: expected num_verts_removed=1, got {res.num_verts_removed}"
+        edges = set()
+        for face in cube.faces:
+            n = len(face)
+            for i in range(n):
+                a = face[i]
+                b = face[(i + 1) % n]
+                edges.add((min(a, b), max(a, b)))
+
+        for v_a, v_b in edges:
+            res = collapse_edge(cube, v_keep=v_a, v_remove=v_b)
+            assert res.num_vertices_removed == 1, (
+                f"Edge ({v_a},{v_b}): expected num_vertices_removed=1, "
+                f"got {res.num_vertices_removed}"
             )
+            assert res.became_invalid is False
 
 
 # ---------------------------------------------------------------------------
@@ -337,13 +358,15 @@ class TestCollapseConsistency:
 # ---------------------------------------------------------------------------
 
 class TestHonestCaveat:
-    """honest_caveat is a non-empty string mentioning midpoint."""
+    """honest_caveat is a non-empty string mentioning key limitations."""
 
-    def test_honest_caveat_mentions_midpoint(self):
-        """honest_caveat should mention 'midpoint' (no QEM)."""
+    def test_caveat_mentions_midpoint_and_qem(self):
+        """honest_caveat should mention 'midpoint' and either 'QEM' or 'Garland'."""
         cube = _unit_cube()
-        eidx = _edge_idx_for_vertices(cube, 4, 7)
-        res = collapse_edge(cube, eidx)
-        assert isinstance(res.honest_caveat, str)
-        assert len(res.honest_caveat) > 0
-        assert "midpoint" in res.honest_caveat.lower()
+        res = collapse_edge(cube, v_keep=4, v_remove=7)
+        caveat = res.honest_caveat
+        assert isinstance(caveat, str), "honest_caveat must be a str"
+        assert len(caveat) > 20, "honest_caveat should be a meaningful description"
+        assert "midpoint" in caveat.lower(), "honest_caveat should mention 'midpoint'"
+        has_qem = ("qem" in caveat.lower() or "garland" in caveat.lower())
+        assert has_qem, "honest_caveat should mention QEM or Garland-Heckbert"

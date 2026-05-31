@@ -18988,7 +18988,7 @@
         },
         {
           "domain": "D1",
-          "feature": "SubD cage edge collapse (midpoint decimation)",
+          "feature": "SubD cage edge collapse (topology-only; caller chooses edge)",
           "competitor": {
             "status": "yes",
             "note": "Maya polyChamfer/merge vertex / Blender Merge by Distance / collapse edge — midpoint or target-point collapse; Rhino SubD CollapseEdge command; none expose QEM cost as programmatic API.",
@@ -18996,7 +18996,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "collapse_edge(cage, edge_idx): v_m = (v_a + v_b) / 2; degenerate faces (contained both endpoints) removed; vertex list compacted (net -1 vertex); midpoint position oracle; all face indices valid post-collapse; LLM tool subd_collapse_edge. HONEST: midpoint-only — no quadric error metric (Garland-Heckbert 1997); shape not preserved optimally; crease annotations on incident edges not preserved.",
+            "note": "collapse_edge(cage: SubdCage, v_keep, v_remove, midpoint=True) → EdgeCollapseResult(new_cage, num_vertices_removed, num_faces_removed, collapsed_position_xyz_mm, degenerate_faces_removed, became_invalid, honest_caveat); midpoint=True: v_new = (v_keep + v_remove) / 2; midpoint=False: v_new = V[v_keep]; degenerate faces (containing both endpoints) removed; adjacency check — non-edge pairs rejected with became_invalid=True; LLM tool subd_collapse_edge; 14 oracle-asserted tests. HONEST: topology-only — NO quadric error metric (Garland-Heckbert 1997); caller chooses which edge to collapse; no QEM-based quality cost; crease annotations on incident edges not preserved; CC limit surface shape changes after collapse. Refs: Hoppe (1993); Hoppe (1996) §3.2; Garland-Heckbert (1997) §3.",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/subd/edge_collapse.py"
           }
         },

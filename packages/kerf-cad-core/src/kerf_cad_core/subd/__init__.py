@@ -24,9 +24,10 @@ limit_normal_fit
     a uniform (u,v) grid on each cage face using Stam (1998) exact tangents;
     compute residuals vs bilinear face-corner approximation for shading use.
 edge_collapse
-    SUBD-CAGE-EDGE-COLLAPSE: collapse a quad cage edge to its midpoint
-    vertex, updating adjacent face indices and removing degenerate faces
-    (Hoppe 1996 §3.2; Bommes-Lévy-Pietroni 2013 §4).
+    SUBD-CAGE-EDGE-COLLAPSE: collapse a cage edge (merge v_keep and v_remove
+    into one vertex) while maintaining mesh validity; midpoint or endpoint
+    placement; degenerate faces removed; non-edge pairs rejected with
+    became_invalid=True (Hoppe 1993/1996 §3.2; Garland-Heckbert 1997 QEM §3).
 vertex_merge
     SUBD-CAGE-VERTEX-MERGE: merge a list of cage vertices (by index) into
     their centroid, updating all adjacent face indices and removing

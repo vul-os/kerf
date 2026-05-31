@@ -96,6 +96,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.arch.footing_bearing_tools",   # arch_compute_bearing_capacity: Meyerhof 1963 general equation (Bowles 5e §4; Das 8e §3)
     "kerf_cad_core.arch.slab_deflection_tools",  # arch_compute_slab_deflection: Timoshenko §44 Tables 41–42 + Roark 9e Table 11.4
     "kerf_cad_core.arch.wind_load_asce7_tools",  # arch_compute_wind_load: ASCE 7-22 §26–27 Directional Procedure MWFRS wall pressures
+    "kerf_cad_core.arch.lateral_bracing_check_tools",  # arch_check_lateral_bracing: AISC 360-22 §F2 LTB (compact doubly symmetric I-shapes)
     "kerf_cad_core.civil.hydraulics_tools",
     "kerf_cad_core.tolstack.tools",
     "kerf_cad_core.kinematics.tools",
@@ -225,6 +226,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.nurbs_param_optimal",   # GK-P50: nurbs_reparametrize_optimal
     "kerf_cad_core.geom.section_contour",
     "kerf_cad_core.geom.section_cutaway",  # brep_section_view — ISO 128-30 section cutaway + hatch
+    "kerf_cad_core.geom.surface_cross_section",  # nurbs_compute_surface_cross_section (Sederberg §7.3)
     "kerf_cad_core.jewelry.eternity_auto",
     "kerf_cad_core.geom.surface_fillet",
     "kerf_cad_core.geom.auto_chamfer",      # brep_recommend_chamfers, brep_apply_chamfer_recommendations (ISO 13715)

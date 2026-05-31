@@ -16798,6 +16798,20 @@
         },
         {
           "domain": "D1",
+          "feature": "NURBS surface planar cross-section curve",
+          "competitor": {
+            "status": "yes",
+            "note": "Rhino 8 Section command intersects NURBS surfaces with a plane; returns polyline or NURBS curve",
+            "source": "https://docs.mcneel.com/rhino/8/help/en-us/commands/section.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "compute_surface_cross_section: samples S(u,v) on (nu×nv) grid, computes signed distance d(u,v)=(S−P)·n̂, detects sign-change grid edges, refines each crossing via 5 bisection iterations (error ≈ cell_size/32), chains points into polyline components via greedy nearest-neighbour. SurfaceCrossSectionResult: intersection_points_3d, num_intersections, num_components, is_closed_loop, honest_caveat. LLM tool nurbs_compute_surface_cross_section. Re-exported from geom/__init__.py. 22 hermetic tests. Honest: sample-based — sub-cell features may be missed at low nu/nv; 5-iter bisection (not sub-pixel); component ordering greedy (may mis-order interleaved loops). Refs: Sederberg CAGD §7.3; Patrikalakis-Maekawa §5.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/surface_cross_section.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "SubD symmetry detection (mirror / rotational / spherical)",
           "competitor": {
             "status": "yes",

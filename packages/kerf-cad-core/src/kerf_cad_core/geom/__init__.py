@@ -1676,3 +1676,7 @@ from kerf_cad_core.geom.curve_evolute import (  # noqa: E402
     EvoluteResult,
     compute_curve_evolute,
 )
+from kerf_cad_core.geom.surface_cross_section import (  # noqa: E402
+    SurfaceCrossSectionResult,
+    compute_surface_cross_section,
+)

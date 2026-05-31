@@ -173,6 +173,8 @@ def _register_tools(ctx, provides: list) -> None:
         "kerf_electronics.tools.pcb_trace_current",
         # Decoupling cap sizing: Z_target + bulk/bypass recommendation (Ott §13.3 + HJ §8.3)
         "kerf_electronics.decoupling_cap_size",
+        # Differential pair intra-pair skew check (Johnson §12.4 + IPC-2141A §6)
+        "kerf_electronics.diffpair_skew_check",
     ]
 
     for module_path in tool_modules:

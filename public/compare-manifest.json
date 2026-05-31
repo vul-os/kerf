@@ -2733,6 +2733,21 @@
           }
         },
         {
+          "name": "Differential pair intra-pair skew check",
+          "domain": "D6",
+          "competitor": {
+            "status": "yes",
+            "notes": "Altium Interactive Length Tuning + DRC skew rules; KiCad PCB DRC diff-pair skew",
+            "source": "https://www.altium.com/documentation/altium-designer/interactive-length-tuning",
+            "tier": "paid"
+          },
+          "kerf": {
+            "status": "[x]",
+            "notes": "v = c/√εr (c=0.3 mm/ps); Δt = |ΔL|/v; budgets: HDMI 2.1=15 ps, USB 3.0=20 ps, PCIe 4.0=2 ps, DDR5=5 ps, SATA III=15 ps (Johnson §12.4 + IPC-2141A §6); electronics_check_diffpair_skew LLM tool; custom budget override. Honest: assumes uniform effective εr (±5–15% actual variation); meander-delay skew NOT modelled; via/connector transitions and inter-pair skew out of scope.",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/diffpair_skew_check.py"
+          }
+        },
+        {
           "name": "EMC (radiated/shielding/limits)",
           "domain": "D6",
           "competitor": {

@@ -16,3 +16,8 @@ from kerf_electronics.pcb_trace_current import (  # noqa: F401
     PcbTraceCurrentReport,
     compute_pcb_trace_max_current,
 )
+from kerf_electronics.diffpair_skew_check import (  # noqa: F401
+    DiffPairSpec,
+    DiffPairSkewReport,
+    check_diffpair_skew,
+)

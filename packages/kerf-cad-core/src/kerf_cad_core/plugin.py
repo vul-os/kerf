@@ -50,6 +50,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.gdt.composite_tolerance_check",  # gdt_validate_composite_frame (§10.5.2 + §11.6)
     "kerf_cad_core.gdt.datum_shift_check",          # gdt_compute_datum_shift (§4.5 + §7.3.5 MMC/LMC datum shift)
     "kerf_cad_core.gdt.feature_of_size_dof",        # gdt_compute_fos_dof (§4.7 + §7.3 FOS DOF enumerator)
+    "kerf_cad_core.gdt.runout_check",               # gdt_check_runout (§13 circular + total runout / ISO 1101 §18)
     "kerf_cad_core.arch.tools",
     "kerf_cad_core.struct.tools",
     "kerf_cad_core.feature_thread",
@@ -507,6 +508,12 @@ _TOOL_MODULES = [
     # control points for warp compensation during finish-machining post-processing.
     # (Mortenson §4.8; Piegl & Tiller §6.1). LLM tool: nurbs_apply_surface_shear_offset
     "kerf_cad_core.geom.surface_shear_offset",
+    # NURBS-CURVE-FIT-G2: degree-5 B-spline fit with G2 (curvature-continuous)
+    # end conditions (Piegl & Tiller §9.4; Farin "CAGD" Ch 10).
+    # Prescribe tangent + curvature vectors at both endpoints for surface blending.
+    # HONEST: chord-length parameterisation; centripetal may give better results
+    # for high-aspect-ratio data. LLM tool: nurbs_fit_curve_g2
+    "kerf_cad_core.geom.curve_fit_g2",
 ]
 # NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
 # (already in _TOOL_MODULES above at line 128); sagitta_arrow_chart module is imported

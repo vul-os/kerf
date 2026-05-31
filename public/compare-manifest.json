@@ -6680,6 +6680,19 @@
         },
         {
           "domain": "D11",
+          "feature": "GD&T circular and total runout compliance check (ASME Y14.5-2018 §13 / ISO 1101:2017 §18)",
+          "competitor": {
+            "status": "no",
+            "note": "Fusion 360 does not provide a programmatic runout compliance checker that takes inspection point measurements and returns max_runout, FoM, and per-section breakdown"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "check_runout(RunoutCheckSpec, list[InspectionPoint]) -> RunoutCheckReport: circular runout (§13.2/ISO §18.3) = max FIM per z-section (max(R)−min(R)); total runout (§13.3/ISO §18.4) = FIM over all points simultaneously; fom = max_runout/tolerance; compliant when fom ≤ 1.0. Eccentric-cylinder oracle: 2d offset=0.10 mm confirmed. Tapered-cylinder oracle: circular_runout=0, total_runout=0.20 mm. gdt_check_runout LLM tool registered. 26 tests. HONEST FLAG: ideal datum axis assumed — Chebyshev-optimal (minimum zone) axis fit (ASME B89.3.1 / ISO 12181-1 §4.3) not computed; axial deviation for face runout surfaces not checked.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gdt/runout_check.py"
+          }
+        },
+        {
+          "domain": "D11",
           "feature": "GD&T datum reference frame validator (ASME Y14.5-2018 §4.11)",
           "competitor": {
             "status": "no",

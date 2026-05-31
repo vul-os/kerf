@@ -14,6 +14,8 @@ Submodules:
   datum_shift_check         — Datum shift (bonus tolerance) for MMC/LMC datum features
                               (ASME Y14.5-2018 §4.5 + §7.3.5)
   feature_of_size_dof       — Feature of Size DOF enumerator (ASME Y14.5-2018 §4.7 + §7.3)
+  runout_check              — Circular / total runout compliance check
+                              (ASME Y14.5-2018 §13 / ISO 1101 §18)
 """
 from __future__ import annotations
 
@@ -36,6 +38,12 @@ from kerf_cad_core.gdt.feature_of_size_dof import (
     FOSDoFReport,
     compute_fos_dof,
 )
+from kerf_cad_core.gdt.runout_check import (
+    InspectionPoint,
+    RunoutCheckSpec,
+    RunoutCheckReport,
+    check_runout,
+)
 
 __all__ = [
     "Datum",
@@ -53,4 +61,8 @@ __all__ = [
     "FOSSpec",
     "FOSDoFReport",
     "compute_fos_dof",
+    "InspectionPoint",
+    "RunoutCheckSpec",
+    "RunoutCheckReport",
+    "check_runout",
 ]

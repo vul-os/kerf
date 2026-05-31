@@ -101,6 +101,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.arch.wind_component_cladding_tools",  # arch_compute_wind_cc_pressure: ASCE 7-22 §30.3 C&C windows/doors/roof panels (enclosed buildings, h≤60 ft)
     "kerf_cad_core.arch.base_plate_aisc_tools",  # arch_design_base_plate: AISC DG-1 §3.1 + AISC 360-22 §J8 column base plate (concentric axial load only)
     "kerf_cad_core.arch.shear_wall_oop_tools",   # arch_check_shear_wall_oop: ACI 318-19 §11.7 RC shear wall OOP flexural + slenderness (h/t≤30 §11.5.3)
+    "kerf_cad_core.arch.diaphragm_shear_tools",  # arch_check_diaphragm_shear: AWC SDPWS-2021 §4.2 wood + SDI DDM04 metal-deck in-plane shear (chord forces + deflection separate)
     "kerf_cad_core.civil.hydraulics_tools",
     "kerf_cad_core.tolstack.tools",
     "kerf_cad_core.kinematics.tools",
@@ -478,6 +479,11 @@ _TOOL_MODULES = [
     # via iterative neighbour-consensus voting (Mantyla §6.4; Hoffmann §3).
     # LLM tool: brep_detect_and_flip_face_normals
     "kerf_cad_core.geom.face_normal_flip",
+    # NURBS-CURVE-CONIC-DETECT: classify 2-D NurbsCurve/point-set as conic via algebraic LS
+    # (Pratt 1987 SIGGRAPH + Fitzgibbon-Pilu-Fisher 1999 IEEE TPAMI).
+    # Classifies: circle|ellipse|parabola|hyperbola|line|free_form.
+    # LLM tool: nurbs_detect_conic_type
+    "kerf_cad_core.geom.curve_conic_detect",
 ]
 # NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
 # (already in _TOOL_MODULES above at line 128); sagitta_arrow_chart module is imported

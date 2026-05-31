@@ -1710,3 +1710,14 @@ from kerf_cad_core.geom.face_normal_flip import (  # noqa: E402
     FaceNormalFlipResult,
     detect_and_flip_face_normals,
 )
+# NURBS-CURVE-CONIC-DETECT: classify a 2-D NurbsCurve (or raw point set) as
+# circle|ellipse|parabola|hyperbola|line|free_form via algebraic conic fitting
+# (general conic Ax²+Bxy+Cy²+Dx+Ey+F=0, SVD null-space) and discriminant B²−4AC.
+# HONEST: algebraic fit is susceptible to noise bias; for production-quality circle
+# detection use Pratt/Taubin in curve_circle_fit.py.
+# Refs: Pratt (1987) SIGGRAPH §3; Fitzgibbon-Pilu-Fisher (1999) IEEE TPAMI 21(5):476–480.
+# LLM tool: nurbs_detect_conic_type.
+from kerf_cad_core.geom.curve_conic_detect import (  # noqa: E402
+    ConicDetectResult,
+    detect_conic_type,
+)

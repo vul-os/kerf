@@ -31,6 +31,8 @@ To avoid collision this package re-exports the structural one as ``SlabDeflSpec`
   shear_wall_oop_tools — LLM tool arch_check_shear_wall_oop
   diaphragm_shear   — AWC SDPWS-2021 §4.2 wood + SDI DDM04 metal-deck in-plane shear check
   diaphragm_shear_tools — LLM tool arch_check_diaphragm_shear
+  retaining_wall_stability — Rankine active pressure; overturning/sliding/bearing FoS (Bowles 5e §12.3)
+  retaining_wall_stability_tools — LLM tool arch_check_retaining_wall_stability
 """
 from __future__ import annotations
 
@@ -101,6 +103,12 @@ from kerf_cad_core.arch.diaphragm_shear import (
     DiaphragmShearReport,
     check_diaphragm_shear,
 )
+from kerf_cad_core.arch.retaining_wall_stability import (
+    RetainingWallSpec,
+    SoilSpec as RetainingSoilSpec,
+    RetainingWallReport,
+    check_retaining_wall,
+)
 
 __all__ = [
     "WallLayer",
@@ -159,4 +167,9 @@ __all__ = [
     "DiaphragmSpec",
     "DiaphragmShearReport",
     "check_diaphragm_shear",
+    # Bowles 5e §12.3 cantilever retaining wall: Rankine active; overturning/sliding/bearing FoS
+    "RetainingWallSpec",
+    "RetainingSoilSpec",
+    "RetainingWallReport",
+    "check_retaining_wall",
 ]

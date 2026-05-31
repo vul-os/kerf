@@ -282,6 +282,12 @@
           "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/diaphragm_shear.py\"; note: \"AWC SDPWS-2021 §4.2 wood structural panel + SDI DDM04 metal deck in-plane shear (ASD basis); v=V/L (plf); v_allow from SDPWS Table 4.2A (plywood 15/32\": 6\"oc→510 plf, 4\"oc→665 plf, 2.5\"oc→870 plf, 2\"oc→1000 plf; plywood 19/32\": 6\"oc→640 plf; OSB 15/32\"=plywood); species factor C_s (DF_L/SP=1.00, HF=0.90, SPF=0.80); unblocked×0.50 (§4.2.7 Case 1); linear nail-spacing interpolation; metal deck 22ga→480 plf, 18ga→760 plf (SDI DDM04 36/6 ASD); AR≤4:1 wood (SDPWS Table 4.2.4), ≤2:1 steel deck (IBC §2209.2); oracle 30×40ft plywood 15/32\" blocked 6\"oc DF_L V=20000lbs→v=667 plf>510→DCR=1.307 (FAIL); arch_check_diaphragm_shear LLM tool; SCOPE: in-plane unit shear ONLY — chord forces NOT computed; deflection NOT computed (use SDPWS Eq.4.2-1 separately); ASD only; SDC A–C only without §4.2.4 review; metal deck 36/6 weld pattern only; 41 tests pass\""
         },
         {
+          "name": "Cantilever retaining wall stability (Rankine active / Bowles 5e §12.3)",
+          "domain": "D2",
+          "competitor": "paid: true",
+          "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/retaining_wall_stability.py\"; note: \"Rankine active Ka=tan²(45-φ/2); Pa=0.5·γ_s·H²·Ka at H/3; FoS_overturning=ΣM_resist/ΣM_overt (min 2.0); FoS_sliding=ΣW·tan(δ)/Pa (min 1.5); bearing q_max=(ΣW/B)·(1+6e/B) FoS_bearing=q_a/q_max (min 3.0); oracle H=3m B=2m φ=30°→Ka=1/3 Pa=27kN/m FoS_overt=4.16; arch_check_retaining_wall_stability LLM tool; SCOPE: Rankine active only (level cohesionless backfill) — NO surcharge; NO seismic (Mononobe-Okabe); NO passive resistance at toe; NO hydrostatic pressure; 27 tests pass\""
+        },
+        {
           "name": "ASCE 7 seismic loads",
           "domain": "D2",
           "competitor": "paid: true",

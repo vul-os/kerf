@@ -246,6 +246,12 @@
           "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/wind_load_asce7.py\"; note: \"ASCE 7-22 §26–27 Directional Procedure: qz=0.00256·Kz·Kzt·Kd·V² (psf); Kz per Table 26.10-1 (Exp B/C/D, floor at 15 ft); Cp_windward=+0.8, Cp_leeward per Fig 27.4-1 (−0.5/−0.3/−0.2 interpolated by L/B); G=0.85 rigid; design pressure p=qz·G·Cp; arch_compute_wind_load LLM tool; SCOPE: Directional Procedure §27 only — Envelope Procedure §28 not implemented, tornado loads §32 not implemented, internal pressure GCpi §26.13 excluded, parapet+roof pressures excluded, flexible-building dynamic G §26.11.2 not supported\""
         },
         {
+          "name": "ASCE 7-22 wind loads — Components and Cladding §30.3 (windows, doors, roof panels)",
+          "domain": "D2",
+          "competitor": "paid: true",
+          "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/wind_component_cladding.py\"; note: \"ASCE 7-22 §30.3 C&C: qh=0.00256·Kh·Kzt·Kd·V² (psf); six zones: Zone_1_interior_wall(+0.9/−1.1 @ 10 ft²), Zone_4_wall_edge(+1.0/−1.1), Zone_5_corner_wall(+1.0/−1.4), Zone_1_roof_interior(+0.3/−1.0 @ 10 ft²), Zone_2_roof_edge(+0.3/−1.8), Zone_3_roof_corner(+0.3/−2.8); log-linear effective-area reduction [10→500 ft² walls; 10→100 ft² roofs]; GCpi=±0.18 enclosed (Table 26.13-1): p_pos=qh·(GCp+0.18), p_neg=qh·(GCp−0.18); arch_compute_wind_cc_pressure LLM tool; SCOPE: enclosed buildings only — partially-enclosed GCpi=±0.55 NOT modelled; h ≤ 60 ft (§30.3 Low-Rise only); roof slopes ≤7° only; parapets §30.9 not implemented; min pressure ±16 psf (§30.2.2) not auto-enforced\""
+        },
+        {
           "name": "Lateral-torsional buckling check (AISC 360-22 §F2, compact I-shapes)",
           "domain": "D2",
           "competitor": "paid: true",

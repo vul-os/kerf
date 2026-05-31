@@ -19,6 +19,8 @@ Submodules:
   lateral_bracing_check_tools — LLM tool arch_check_lateral_bracing
   punching_shear    — ACI 318-19 §22.6 two-way (punching) shear capacity check
   punching_shear_tools — LLM tool arch_check_punching_shear
+  wind_component_cladding — ASCE 7-22 §30.3 C&C design pressures (windows, doors, roof cladding)
+  wind_component_cladding_tools — LLM tool arch_compute_wind_cc_pressure
 
 Note on naming: ``SlabSpec`` in ``primitives`` is the BIM slab (polygon outline).
 ``SlabSpec`` in ``slab_deflection`` is the structural deflection slab (a×b×h).
@@ -72,6 +74,11 @@ from kerf_cad_core.arch.punching_shear import (
     PunchingShearReport,
     check_punching_shear,
 )
+from kerf_cad_core.arch.wind_component_cladding import (
+    ComponentSpec as CCComponentSpec,
+    WindCCPressureReport,
+    compute_wind_cc_pressure,
+)
 
 __all__ = [
     "WallLayer",
@@ -112,4 +119,9 @@ __all__ = [
     "ColumnSlabSpec",
     "PunchingShearReport",
     "check_punching_shear",
+    # ASCE 7-22 §30.3 Components and Cladding wind pressures
+    # (CCComponentSpec avoids name clash with BIM ComponentSpec)
+    "CCComponentSpec",
+    "WindCCPressureReport",
+    "compute_wind_cc_pressure",
 ]

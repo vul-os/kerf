@@ -98,6 +98,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.arch.wind_load_asce7_tools",  # arch_compute_wind_load: ASCE 7-22 §26–27 Directional Procedure MWFRS wall pressures
     "kerf_cad_core.arch.lateral_bracing_check_tools",  # arch_check_lateral_bracing: AISC 360-22 §F2 LTB (compact doubly symmetric I-shapes)
     "kerf_cad_core.arch.punching_shear_tools",  # arch_check_punching_shear: ACI 318-19 §22.6 two-way (punching) shear (no shear reinforcement)
+    "kerf_cad_core.arch.wind_component_cladding_tools",  # arch_compute_wind_cc_pressure: ASCE 7-22 §30.3 C&C windows/doors/roof panels (enclosed buildings, h≤60 ft)
     "kerf_cad_core.civil.hydraulics_tools",
     "kerf_cad_core.tolstack.tools",
     "kerf_cad_core.kinematics.tools",

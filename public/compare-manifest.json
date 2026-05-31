@@ -18746,8 +18746,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "match_surface_edge_tool G0–G3 + blend_srf_g3 + continuity audit",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/match_srf.py"
+            "note": "GK-P10: match_srf_g3 (MatchSrfG3Spec/Report/match_srf_g3) + match_surface_edge_tool G0-G3 + blend_srf_g3 + continuity audit; nurbs_match_srf_g3 LLM tool; adjusts 4 boundary CP rows per Piegl & Tiller §11.4 + Patrikalakis & Maekawa §6.5. HONEST: requires >= 4 control point rows per surface; if surfaces lack degrees of freedom (degree < 3), G3 may be impossible — use elevate_to_g3_capability first.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/match_srf_g3.py"
           }
         },
         {

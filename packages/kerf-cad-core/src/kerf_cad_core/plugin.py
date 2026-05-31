@@ -326,6 +326,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.subd.edge_flip",
     # SUBD-CAGE-AREA: total surface area of control polygon; limit-surface estimate ×0.94 (empirical Catmull-Clark shrinkage; Catmull-Clark 1978; Stam 1998 §2; Zorin-Schröder 2000 §3); per-face distribution; degenerate face flagging (area < 1e-6 mm²)
     "kerf_cad_core.subd.cage_area",
+    # GK-P12: Stam exact limit tangents at extraordinary CC vertices (valence n!=4) via eigenstructure (Stam 1998 §3.2-3.3; Reif 1995; Meyer et al. 2003)
+    "kerf_cad_core.subd.stam_limit_tangents",
     # GK-P-B: Stam exact limit-position + limit-tangent evaluation (subd_eval_limit tool)
     "kerf_cad_core.geom.subd_stam",
     # GK-P45: SubD/mesh authoring ops (subd_poke, subd_extrude_along, sculpt_brush, multires_evaluate)
@@ -342,8 +344,14 @@ _TOOL_MODULES = [
     "kerf_cad_core.mesh_implicit_tools",
     # GK-P58: B-rep UV unwrap atlas (brep_uv_unwrap, brep_uv_distortion_report)
     "kerf_cad_core.geom.brep_uv_tools",
+    # GK-P11: isophote / EMap continuity analyser (IsophoteSpec / IsophoteReport / analyze_isophotes)
+    # nurbs_analyze_isophotes LLM tool — marching-squares isolines + fairness score
+    "kerf_cad_core.geom.isophote_analyzer",
+    # GK-P10: MatchSrf G3 — curvature-rate (dκ/ds) continuity; MatchSrfG3Spec/Report/match_srf_g3
+    # nurbs_match_srf_g3 LLM tool; requires degree >= 3 and >= 4 CP rows
+    "kerf_cad_core.geom.match_srf_g3",
     # GK-P47: isophote analysis (feature_isophote_analysis added to surfacing module above)
-    # GK-P47: match_srf G3 is in geom.match_srf (already in _TOOL_MODULES above)
+    # GK-P47: match_srf G3 is in geom.match_srf (also in match_srf_g3 above for dedicated API)
     # GK-P47: feature_loft guide_curves is in feature_loft (already in _TOOL_MODULES above)
     # GK-P48: construction verbs (hem_sheet, jog_sheet, multi_flange, delete_face, push_pull, gusset_plate, cope_notch)
     "kerf_cad_core.construction_verbs_tools",
@@ -548,6 +556,11 @@ _TOOL_MODULES = [
     # STEP/IGES import validation + surface flatness QC.
     # LLM tool: geom_check_face_planarity
     "kerf_cad_core.geom.face_plane_deviation",
+    # NURBS-SURFACE-ANALYTIC-DERIVATIVES (GK-P15): closed-form ∂S/∂u, ∂S/∂v,
+    # ∂²S/∂u², ∂²S/∂u∂v, ∂²S/∂v² (P&T A3.6 + rational A4.4). Gaussian K, mean H.
+    # SSIHardenedMarcher: near-tangent bisection fallback (Patrikalakis & Maekawa §5).
+    # LLM tool: nurbs_surface_derivatives_analytic
+    "kerf_cad_core.geom.surface_analytic_derivatives",
 ]
 # NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
 # (already in _TOOL_MODULES above at line 128); sagitta_arrow_chart module is imported

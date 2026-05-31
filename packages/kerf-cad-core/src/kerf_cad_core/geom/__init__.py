@@ -163,6 +163,14 @@ from kerf_cad_core.geom.match_srf import (
     verify_seam_g2_analytic,
     verify_seam_g3_analytic,
 )
+# GK-P10: MatchSrf G3 (curvature-rate / dκ/ds continuity).
+# Piegl & Tiller §11.4; Patrikalakis & Maekawa §6.5; Hoschek & Lasser §14.2.
+# Requires degree >= 3 and >= 4 CP rows; G3 is best-effort for arbitrary pairs.
+from kerf_cad_core.geom.match_srf_g3 import (
+    MatchSrfG3Spec,
+    MatchSrfG3Report,
+    match_srf_g3,
+)
 
 # GK-39: untrim / shrink trimmed surface.
 # GK-P44: general NURBS × NURBS pure-Python trim via robust SSI.
@@ -260,6 +268,12 @@ from kerf_cad_core.geom.surface_analysis import reflection_lines
 from kerf_cad_core.geom.surface_analysis import (
     isophote_analysis,
     isophote_continuity_analyser,
+)
+# GK-P11: dedicated isophote analyser dataclass API (IsophoteSpec / IsophoteReport)
+from kerf_cad_core.geom.isophote_analyzer import (
+    IsophoteSpec,
+    IsophoteReport,
+    analyze_isophotes,
 )
 # GK-138: global continuity audit
 from kerf_cad_core.geom.surface_analysis import continuity_audit
@@ -1820,4 +1834,16 @@ from kerf_cad_core.geom.face_plane_deviation import (  # noqa: E402
     PlaneFit,
     FacePlaneDeviationReport,
     compute_face_plane_deviation,
+)
+# NURBS-SURFACE-ANALYTIC-DERIVATIVES (GK-P15): closed-form ∂S/∂u, ∂S/∂v,
+# ∂²S/∂u², ∂²S/∂u∂v, ∂²S/∂v² via Piegl & Tiller A3.6 + rational A4.4.
+# Gaussian K = (LN-M²)/(EG-F²); mean H = (EN-2FM+GL)/(2(EG-F²)).
+# SSIHardenedMarcher: near-tangent bisection fallback (Patrikalakis & Maekawa §5).
+# HONEST: curvature NaN at degenerate points; rational quotient rule may have
+# large condition number for near-zero weights.
+# LLM tool: nurbs_surface_derivatives_analytic.
+from kerf_cad_core.geom.surface_analytic_derivatives import (  # noqa: E402
+    SurfaceDerivativeResult,
+    compute_analytic_derivatives,
+    SSIHardenedMarcher,
 )

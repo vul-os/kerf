@@ -116,6 +116,17 @@ async def register(app: FastAPI, ctx):
         run_cam_generate_boring_cycle,
     )
 
+    # Grinding wheel dressing cycle — MH 31e §1145 + Sandvik CoroGrind §5
+    from kerf_cam.dress_cycle import (
+        cam_generate_dress_cycle_spec,
+        run_cam_generate_dress_cycle,
+    )
+    ctx.tools.register(
+        "cam_generate_dress_cycle",
+        cam_generate_dress_cycle_spec,
+        run_cam_generate_dress_cycle,
+    )
+
     # Rigid-tap operation validator — Sandvik CoroPlus 2024 + MH 31e §1934
     from kerf_cam.rigid_tapping_check import (
         cam_check_rigid_tap_spec,
@@ -209,6 +220,7 @@ async def register(app: FastAPI, ctx):
         "cam.3d-offset-path",
         "cam.turning-depth-calc",
         "cam.profile-roughing",
+        "cam.grinding-dress-cycle",
     ]   # pure-Python ops always available
     if _OCL_AVAILABLE:
         provides += ["cam.parallel-3d", "cam.waterline", "cam.lathe"]

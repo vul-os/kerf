@@ -5853,6 +5853,20 @@
         },
         {
           "domain": "D7",
+          "feature": "Grinding wheel dressing cycle (traverse, open-loop)",
+          "competitor": {
+            "status": "yes",
+            "note": "Grinding wheel dress cycles available in Fusion 360 Manufacture for grinding operations; dresser traverse rate, depth, and pass count configurable; closed-loop dress compensation via sensor integration in premium setups",
+            "source": "https://www.autodesk.com/products/fusion-360/cam"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "generate_dress_cycle(DressSpec) → DressCycleResult: num_passes = ceil(total_dress_amount / depth_per_pass); per pass: G01 infeed X + G01 traverse Z at traverse_rate + G00 rapid-retract Z; G28 reference return after last pass; dresser_type = 'single_point_diamond' (50–300 mm/min traverse, 0.002–0.025 mm/pass per MH 31e §1145) or 'rotary_diamond' (100–800 mm/min, 0.005–0.050 mm/pass per Sandvik CoroGrind §5); out-of-band advisory if spec outside safe bands; cam_generate_dress_cycle LLM tool; 58 tests green. HONEST: open-loop only — no AE sensor / power monitoring / roundness-gauging closed-loop correction; uni-directional traverse (+Z) only; no rotary-roll spindle sync G-code; acceleration ramps excluded from time estimate (add 10–20%); Fanuc 0i-PD / RS-274/NGC G-code — Siemens CYCLE12x / ANCA DressPro NOT emitted",
+            "evidence": "packages/kerf-cam/src/kerf_cam/dress_cycle.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "Face-mill zig-zag toolpath (rectangular pocket)",
           "competitor": {
             "status": "yes",

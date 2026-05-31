@@ -112,6 +112,12 @@ from kerf_mold.vent_slot_layout import (
     POLYMER_VENT_DEPTH_RANGE,
     generate_vent_slot_layout,
 )
+from kerf_mold.cooling_pressure_drop import (
+    CoolingChannelSegment,
+    CoolantSpec,
+    CoolingPressureDropReport,
+    compute_cooling_pressure_drop,
+)
 
 __all__ = [
     # mold.py
@@ -210,4 +216,9 @@ __all__ = [
     "VentSlotLayoutReport",
     "POLYMER_VENT_DEPTH_RANGE",
     "generate_vent_slot_layout",
+    # cooling_pressure_drop.py
+    "CoolingChannelSegment",
+    "CoolantSpec",
+    "CoolingPressureDropReport",
+    "compute_cooling_pressure_drop",
 ]

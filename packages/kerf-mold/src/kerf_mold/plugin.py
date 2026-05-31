@@ -48,6 +48,10 @@ Registers:
                 width layout; 0.5 % projected-area rule; speed-scaling for
                 fast injection; minimum 4 slots + 10 mm steel bridge; heuristic
                 rule — actual fill simulation needs Moldflow)
+  - LLM tool:  mold_compute_cooling_pressure_drop
+               (Beaumont 2007 §11.2 + White "Fluid Mechanics" §6.7
+                Darcy-Weisbach multi-segment cooling-channel pressure drop +
+                minor-loss K-factors; chiller pump head verification)
 """
 from __future__ import annotations
 
@@ -243,6 +247,18 @@ async def register(app: FastAPI, ctx):
         run_mold_generate_vent_slot_layout,
     )
 
+    # Register cooling pressure-drop tool
+    # (Beaumont 2007 §11.2 + White "Fluid Mechanics" §6.7)
+    from kerf_mold.cooling_pressure_drop_tool import (
+        mold_cooling_pressure_drop_spec,
+        run_mold_compute_cooling_pressure_drop,
+    )
+    ctx.tools.register(
+        "mold_compute_cooling_pressure_drop",
+        mold_cooling_pressure_drop_spec,
+        run_mold_compute_cooling_pressure_drop,
+    )
+
     provides = [
         "mold.moldability",
         "mold.parting_surface",
@@ -264,6 +280,7 @@ async def register(app: FastAPI, ctx):
         "mold.vent_depth_check",
         "mold.cold_slug_check",
         "mold.vent_slot_layout",
+        "mold.cooling_pressure_drop",
     ]
 
     try:

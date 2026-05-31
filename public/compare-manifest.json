@@ -10341,10 +10341,11 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Cooling circuit thermal analysis: Re/Nu/HTC (Dittus-Boelter), pressure drop (Darcy-Weisbach), coolant temp rise, Janeschitz-Kriegl cooling time; series and parallel layouts. Geometric conflict detection (Menges 2001 §6.5): CHANNEL_SPACING (2x-diam rule), CHANNEL_EJECTOR, WALL_CLEARANCE, MOLD_BOUNDS via segment-segment min-dist (Ericson 2005 §5.1.9); severity 1-5 scale; LLM tool `mold_verify_cooling_channels`; no 3D routing or conformal toolpaths.",
+            "note": "Cooling circuit thermal analysis: Re/Nu/HTC (Dittus-Boelter), coolant temp rise, Janeschitz-Kriegl cooling time; series and parallel layouts. Geometric conflict detection (Menges 2001 §6.5): CHANNEL_SPACING (2x-diam rule), CHANNEL_EJECTOR, WALL_CLEARANCE, MOLD_BOUNDS via segment-segment min-dist (Ericson 2005 §5.1.9); severity 1-5 scale; LLM tool `mold_verify_cooling_channels`. Hydraulic pressure-drop (Beaumont 2007 §11.2; White §6.7): Darcy-Weisbach major losses + K-factor minor losses (elbow_90=0.9, elbow_45=0.4, tee_thru=0.6, tee_branch=1.8); Blasius turbulent f; chiller pump head check with 25% margin; LLM tool `mold_compute_cooling_pressure_drop`. HONEST: single-phase incompressible only — no two-phase/boiling, no conformal toolpaths.",
             "evidence": [
               "packages/kerf-mold/src/kerf_mold/cooling.py",
-              "packages/kerf-mold/src/kerf_mold/cooling_channel_conflict.py"
+              "packages/kerf-mold/src/kerf_mold/cooling_channel_conflict.py",
+              "packages/kerf-mold/src/kerf_mold/cooling_pressure_drop.py"
             ]
           }
         },

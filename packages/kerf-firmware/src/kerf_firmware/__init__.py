@@ -6,3 +6,9 @@ from kerf_firmware.const_allocation import (  # noqa: F401
     ConstAllocationReport,
     analyze_const_allocation,
 )
+from kerf_firmware.watchdog_check import (  # noqa: F401
+    FirmwareTask,
+    WatchdogSpec,
+    WatchdogCheckReport,
+    check_watchdog,
+)

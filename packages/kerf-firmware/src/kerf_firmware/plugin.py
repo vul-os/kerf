@@ -582,3 +582,20 @@ def _register_tools(ctx, provides: list) -> None:
         logger.warning(
             "kerf-firmware: failed to load firmware_analyze_const_allocation tool: %s", exc
         )
+
+    # firmware_check_watchdog — firmware watchdog-kick gap verifier (IWDG/WWDG)
+    try:
+        from kerf_firmware.tools.firmware_check_watchdog import (
+            _spec as _wdg_check_spec,
+            run_firmware_check_watchdog_async as _wdg_check_fn,
+        )
+        ctx.tools.register(
+            "firmware_check_watchdog",
+            _wdg_check_spec,
+            _wdg_check_fn,
+        )
+        provides.append("firmware.watchdog_check")
+    except Exception as exc:
+        logger.warning(
+            "kerf-firmware: failed to load firmware_check_watchdog tool: %s", exc
+        )

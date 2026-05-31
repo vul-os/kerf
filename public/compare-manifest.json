@@ -4469,6 +4469,19 @@
         },
         {
           "domain": "D6",
+          "feature": "Firmware watchdog-kick gap analyser — verifies IWDG/WWDG kicked on all paths under worst-case task latency (task schedule: period, WCET, priority, kicks_watchdog)",
+          "competitor": {
+            "status": "no",
+            "note": "No tool in OpenPLC or standard EDA suites statically verifies watchdog-kick coverage across a multi-task firmware schedule; engineers manually trace worst-case paths"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "firmware_check_watchdog: max_gap = slowest_kicker.period_ms + sum(WCET of higher-priority non-kicker tasks); is_safe = max_gap < timeout_ms; WWDG: also flags kicks earlier than window_min_ms (early-kick reset risk, RM0383 §20); depth-bar: kicker=100ms+no-blocker vs IWDG 250ms → gap=100ms, margin=150ms, safe; kicker=1000ms vs IWDG 500ms → violated; WWDG kick=50ms in window 60-100ms → window violation; FirmwareTask + WatchdogSpec + WatchdogCheckReport dataclasses; check_watchdog function; firmware_check_watchdog LLM tool; watchdog_check.py; 29 tests. HONEST: STATIC SCHEDULE ONLY — no IRQ latency, DMA burst, or scheduling-jitter model; assumes ideal fixed-priority preemptive scheduler; shared-resource blocking (PCP/PIP) NOT modelled; WWDG window-minimum uses kicker period as proxy — verify on hardware with logic analyser; IEC 61508 SIL-2+ requires challenge-response watchdog in addition. Refs: STM32F4 RM0383 §19 (IWDG), §20 (WWDG); IEC 61508:2010 Part 2 §7.4.3.7; ARM Keil AN259.",
+            "evidence": "packages/kerf-firmware/src/kerf_firmware/watchdog_check.py"
+          }
+        },
+        {
+          "domain": "D6",
           "feature": "Flash wear-level endurance estimator (sector erase cycles, time-to-failure, recommended N-sector pool)",
           "competitor": {
             "status": "no",

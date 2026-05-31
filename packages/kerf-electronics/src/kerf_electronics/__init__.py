@@ -65,3 +65,9 @@ from kerf_electronics.zener_clamp_design import (  # noqa: F401
     ZenerClampReport,
     design_zener_clamp,
 )
+from kerf_electronics.fuse_i2t_check import (  # noqa: F401
+    FuseSpec,
+    FaultSpec,
+    FuseI2tReport,
+    check_fuse_i2t,
+)

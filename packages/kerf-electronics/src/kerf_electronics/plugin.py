@@ -202,6 +202,10 @@ def _register_tools(ctx, provides: list) -> None:
         # electronics_design_zener_clamp: R_series, R_series_power, I_zener_max, P_zener_max,
         #   recommended_zener_package (0.4W|0.5W|1W|3W|5W), recommended_R_E12_ohm, regulation_pct
         "kerf_electronics.zener_clamp_design",
+        # Fuse I²t (melting energy) verification — IEC 60269 + Cooper Bussmann SPD §2–§4
+        # electronics_check_fuse_i2t: applied_I2t, ratio_pct, clears_safely,
+        #   breaking_capacity_adequate, recommended_fuse_class
+        "kerf_electronics.tools.fuse_i2t",
     ]
 
     for module_path in tool_modules:

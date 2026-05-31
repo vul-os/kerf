@@ -93,6 +93,10 @@ __all__ = [
     "EdgeConvexityReport",
     "classify_edges",
     "classify_body_edges",
+    # Sampled-normals API (BREP-EDGE-CONVEXITY task, Mantyla §5)
+    "EdgeSample",
+    "SampledEdgeConvexityReport",
+    "classify_edge_convexity",
 ]
 
 # ---------------------------------------------------------------------------
@@ -371,6 +375,219 @@ def classify_body_edges(
     return classify_edges(faces, n_samples=n_samples, eps=eps)
 
 
+# ===========================================================================
+# SAMPLED-NORMALS API
+# Mantyla "An Introduction to Solid Modeling" §5: classify B-rep edges
+# from pre-sampled face normals along the edge, without requiring direct
+# access to B-rep topology objects.  Suitable for LLM agents and external
+# callers who can evaluate normals at sample points but do not hold the
+# full B-rep graph.
+# ===========================================================================
+
+@dataclass
+class EdgeSample:
+    """One sample along a B-rep edge for convexity classification.
+
+    Attributes
+    ----------
+    point_xyz_mm : (x, y, z) in mm — the 3-D location of the sample on the edge
+    face_a_normal : outward unit normal of the first adjacent face at (or near)
+        the sample point.  Must be consistent (outward).
+    face_b_normal : outward unit normal of the second adjacent face at (or near)
+        the sample point.
+    edge_tangent : unit tangent of the edge at the sample point (arbitrary but
+        consistent direction along the edge).  Used as the tiebreaker axis for
+        the signed dihedral: cross(n_a, n_b) · edge_tangent > 0 → convex,
+        < 0 → concave, ≈ 0 → smooth/tangent.
+    """
+
+    point_xyz_mm: Tuple[float, float, float]
+    face_a_normal: Tuple[float, float, float]
+    face_b_normal: Tuple[float, float, float]
+    edge_tangent: Tuple[float, float, float]
+
+
+# Classification label constants for the sampled API
+_CONV = "convex"
+_CONC = "concave"
+_TANG = "tangent"
+_SMTH = "smooth"
+_SCV  = "sharp-convex"
+_SCC  = "sharp-concave"
+
+_HONEST_CAVEAT = (
+    "Requires pre-sampled face normals at (or near) the edge point; "
+    "does not parse B-rep topology directly. "
+    "Normal consistency (outward) is the caller's responsibility — "
+    "inverted normals flip the convex/concave label. "
+    "Convexity sign is determined by cross(n_a, n_b) · edge_tangent: "
+    "positive → convex, negative → concave, near-zero → smooth/tangent. "
+    "Dihedral angle is the interior solid angle (arccos(n_a · n_b)); "
+    "'sharp-convex' / 'sharp-concave' labels apply when |dihedral| > sharp_threshold_deg. "
+    "Algorithm: Mantyla 1988 §5; Hoffmann 1989 §5.3."
+)
+
+
+@dataclass
+class SampledEdgeConvexityReport:
+    """Result of :func:`classify_edge_convexity`.
+
+    Attributes
+    ----------
+    classification : one of "convex", "concave", "tangent", "smooth",
+        "sharp-convex", "sharp-concave".
+        * "convex"       — interior dihedral < 180° and |dihedral| ≤ sharp_threshold_deg
+        * "concave"      — interior dihedral < 180° from the other side (re-entrant),
+                           sign from cross(n_a, n_b) · edge_tangent negative,
+                           |dihedral| ≤ sharp_threshold_deg
+        * "tangent"      — |dihedral| ≤ tangent_tol_deg (near 0°, normals nearly parallel)
+        * "smooth"       — same as tangent (alias kept for backwards compat)
+        * "sharp-convex" — convex AND dihedral > sharp_threshold_deg
+        * "sharp-concave"— concave AND dihedral > sharp_threshold_deg
+    mean_dihedral_deg : mean of per-sample dihedral angles in degrees
+    max_dihedral_deg : maximum per-sample dihedral in degrees
+    min_dihedral_deg : minimum per-sample dihedral in degrees
+    num_samples : number of EdgeSample objects that were processed
+    honest_caveat : human-readable limitation string
+    """
+
+    classification: str
+    mean_dihedral_deg: float
+    max_dihedral_deg: float
+    min_dihedral_deg: float
+    num_samples: int
+    honest_caveat: str = _HONEST_CAVEAT
+
+
+def _vec3(t: Tuple[float, float, float]) -> np.ndarray:
+    return np.asarray(t, dtype=float)
+
+
+def _unit3(t: Tuple[float, float, float]) -> np.ndarray:
+    v = _vec3(t)
+    n = float(np.linalg.norm(v))
+    return v / n if n > 1e-14 else v.copy()
+
+
+def _sample_dihedral_and_sign(
+    sample: "EdgeSample",
+) -> Tuple[float, float]:
+    """Return (dihedral_deg, sign_float) for one EdgeSample.
+
+    dihedral_deg is the unsigned dihedral angle between the two face normals
+    expressed in degrees (arccos of their dot product, so in [0, 180]).
+
+    sign_float is the dot product of (n_a × n_b) with the edge tangent:
+      > 0 → convex (material is on the concave side of the V-notch)
+      < 0 → concave (re-entrant pocket)
+      ≈ 0 → smooth / tangent
+    """
+    na = _unit3(sample.face_a_normal)
+    nb = _unit3(sample.face_b_normal)
+    et = _unit3(sample.edge_tangent)
+
+    dot = float(np.dot(na, nb))
+    dot = max(-1.0, min(1.0, dot))
+    dihedral_deg = float(math.degrees(math.acos(dot)))
+
+    cross = np.cross(na, nb)
+    sign = float(np.dot(cross, et))
+    return dihedral_deg, sign
+
+
+def classify_edge_convexity(
+    samples: "List[EdgeSample]",
+    tangent_tol_deg: float = 2.0,
+    sharp_threshold_deg: float = 135.0,
+) -> "SampledEdgeConvexityReport":
+    """Classify a B-rep edge as convex / concave / tangent / smooth.
+
+    Parameters
+    ----------
+    samples : list of :class:`EdgeSample`
+        Pre-sampled points along the edge with adjacent face outward normals
+        and the edge tangent.  Typically 3–5 samples are sufficient.
+    tangent_tol_deg : float
+        Edges whose mean dihedral angle (arccos of normal dot product) is
+        ≤ this threshold are classified as "tangent" (near-zero dihedral,
+        i.e. nearly co-planar faces).  Default 2.0°.
+    sharp_threshold_deg : float
+        If the dihedral angle (unsigned, ∈ [0°, 180°]) is greater than this
+        threshold (default 135°) the edge is further qualified as
+        "sharp-convex" or "sharp-concave".  For example a 170° interior
+        angle is a very oblique / nearly-planar convex edge; 170° maps to
+        "sharp-convex".
+
+    Returns
+    -------
+    SampledEdgeConvexityReport
+
+    Notes
+    -----
+    Convexity sign convention (Mantyla 1988 §5):
+
+        cross_vec = n_a × n_b
+        sign      = cross_vec · edge_tangent
+
+    When the edge tangent points "along" the edge (e.g. from vertex A to B)
+    and the two outward normals flare outward from the solid's surface:
+
+    * sign > 0 → the dihedral opens *away* from the solid interior → **convex**
+    * sign < 0 → the dihedral opens *into* the solid (re-entrant) → **concave**
+    * sign ≈ 0 → normals nearly parallel → **tangent** (smooth / G1 junction)
+
+    The dihedral angle θ = arccos(n_a · n_b) ∈ [0°, 180°].  A 90° cube
+    corner has θ = 90° (the two face normals are perpendicular).  A sharp
+    blade edge at 170° is near-planar and will be flagged "sharp-convex".
+
+    Honest caveat
+    -------------
+    The method requires consistent outward face normals supplied by the
+    caller.  It does **not** parse B-rep topology or perform UV-inversion.
+    If normals are inconsistent (one inward), the convex/concave label will
+    be wrong for that sample.  The ``honest_caveat`` field of the report
+    documents all limitations.
+    """
+    if not samples:
+        return SampledEdgeConvexityReport(
+            classification=_SMTH,
+            mean_dihedral_deg=0.0,
+            max_dihedral_deg=0.0,
+            min_dihedral_deg=0.0,
+            num_samples=0,
+        )
+
+    dihedrals: List[float] = []
+    signs: List[float] = []
+    for s in samples:
+        d, sg = _sample_dihedral_and_sign(s)
+        dihedrals.append(d)
+        signs.append(sg)
+
+    mean_d = float(np.mean(dihedrals))
+    max_d = float(np.max(dihedrals))
+    min_d = float(np.min(dihedrals))
+    mean_sign = float(np.mean(signs))
+
+    # Near-tangent / smooth (normals nearly parallel → small dihedral angle)
+    if mean_d <= tangent_tol_deg:
+        cls = _TANG
+    elif mean_sign > 0.0:
+        # Convex: outward normals flare apart from the solid's surface
+        cls = _SCV if mean_d > sharp_threshold_deg else _CONV
+    else:
+        # Concave: re-entrant pocket edge
+        cls = _SCC if mean_d > sharp_threshold_deg else _CONC
+
+    return SampledEdgeConvexityReport(
+        classification=cls,
+        mean_dihedral_deg=round(mean_d, 6),
+        max_dihedral_deg=round(max_d, 6),
+        min_dihedral_deg=round(min_d, 6),
+        num_samples=len(samples),
+    )
+
+
 # ---------------------------------------------------------------------------
 # LLM tool registration (kerf_chat registry, try/except guard)
 # ---------------------------------------------------------------------------
@@ -496,6 +713,108 @@ try:
             },
             "warnings": report.warnings,
             "caveat": report.caveat,
+        })
+
+    # -----------------------------------------------------------------------
+    # geom_classify_edge_convexity — sampled-normals API
+    # -----------------------------------------------------------------------
+
+    _spec_sampled = ToolSpec(
+        name="geom_classify_edge_convexity",
+        description=(
+            "Classify a B-rep edge as convex, concave, tangent, smooth, "
+            "sharp-convex, or sharp-concave using pre-sampled face normals along "
+            "the edge. Suitable when B-rep topology objects are unavailable — "
+            "pass 1–N sample points with adjacent face outward normals and the "
+            "edge tangent direction. "
+            "Sign convention: cross(n_a, n_b) · edge_tangent > 0 → convex; "
+            "< 0 → concave; ≈ 0 → smooth/tangent. "
+            "Dihedral = arccos(n_a · n_b) ∈ [0°, 180°]. "
+            "Algorithm: Mantyla 1988 §5; Hoffmann 1989 §5.3."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "samples": {
+                    "type": "array",
+                    "description": (
+                        "List of sample objects, each with: "
+                        "point_xyz_mm:[x,y,z], "
+                        "face_a_normal:[nx,ny,nz] (outward), "
+                        "face_b_normal:[nx,ny,nz] (outward), "
+                        "edge_tangent:[tx,ty,tz] (unit tangent along edge)."
+                    ),
+                    "items": {
+                        "type": "object",
+                        "required": ["point_xyz_mm", "face_a_normal", "face_b_normal", "edge_tangent"],
+                    },
+                },
+                "tangent_tol_deg": {
+                    "type": "number",
+                    "description": (
+                        "Edges with dihedral ≤ this angle (degrees) are 'tangent'. "
+                        "Default 2.0."
+                    ),
+                    "default": 2.0,
+                },
+                "sharp_threshold_deg": {
+                    "type": "number",
+                    "description": (
+                        "Dihedral above this angle is labelled 'sharp-convex' or "
+                        "'sharp-concave'. Default 135.0."
+                    ),
+                    "default": 135.0,
+                },
+            },
+            "required": ["samples"],
+        },
+    )
+
+    @register(_spec_sampled)
+    async def run_geom_classify_edge_convexity(ctx: "object", args: bytes) -> str:
+        """LLM tool: geom_classify_edge_convexity."""
+        try:
+            a = _json.loads(args)
+        except Exception as exc:
+            return err_payload(f"invalid JSON: {exc}", "BAD_ARGS")
+
+        raw_samples = a.get("samples")
+        if not isinstance(raw_samples, list) or len(raw_samples) == 0:
+            return err_payload("'samples' must be a non-empty list", "BAD_ARGS")
+
+        parsed: "List[EdgeSample]" = []
+        for i, s in enumerate(raw_samples):
+            if not isinstance(s, dict):
+                return err_payload(f"sample[{i}] must be an object", "BAD_ARGS")
+            try:
+                parsed.append(EdgeSample(
+                    point_xyz_mm=tuple(float(v) for v in s["point_xyz_mm"]),  # type: ignore[arg-type]
+                    face_a_normal=tuple(float(v) for v in s["face_a_normal"]),  # type: ignore[arg-type]
+                    face_b_normal=tuple(float(v) for v in s["face_b_normal"]),  # type: ignore[arg-type]
+                    edge_tangent=tuple(float(v) for v in s["edge_tangent"]),  # type: ignore[arg-type]
+                ))
+            except (KeyError, TypeError, ValueError) as exc:
+                return err_payload(
+                    f"sample[{i}] parse error: {exc}; "
+                    "required keys: point_xyz_mm, face_a_normal, face_b_normal, edge_tangent",
+                    "BAD_ARGS",
+                )
+
+        tol = float(a.get("tangent_tol_deg", 2.0))
+        sharp = float(a.get("sharp_threshold_deg", 135.0))
+
+        try:
+            report = classify_edge_convexity(parsed, tangent_tol_deg=tol, sharp_threshold_deg=sharp)
+        except Exception as exc:
+            return err_payload(str(exc), "OP_FAILED")
+
+        return ok_payload({
+            "classification": report.classification,
+            "mean_dihedral_deg": report.mean_dihedral_deg,
+            "max_dihedral_deg": report.max_dihedral_deg,
+            "min_dihedral_deg": report.min_dihedral_deg,
+            "num_samples": report.num_samples,
+            "honest_caveat": report.honest_caveat,
         })
 
 except ImportError:

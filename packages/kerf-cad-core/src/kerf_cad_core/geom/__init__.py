@@ -1197,9 +1197,12 @@ __all__ = [
     # NURBS-CURVE-CIRCLE-FIT: Kasa (1976) + Taubin (1991) algebraic circle fit
     "CircleFitResult",
     "fit_circle_to_curve",
-    # NURBS-CURVE-INFLECTION: κ-sign change inflection point detection
-    "InflectionResult",
+    # NURBS-CURVE-INFLECTION: κ-sign change inflection point detection (v2 + legacy)
+    "InflectionPoint",
+    "CurveInflectionReport",
     "find_curve_inflections",
+    "InflectionResult",
+    "find_curve_inflections_v1",
     # NURBS-SURFACE-CURVATURE-MAP: scalar K/H/|κ₁|/|κ₂| heatmap (do Carmo §3.3 / Mortenson §6.5)
     "CurvatureMapSpec",
     "CurvatureMapResult",
@@ -1507,11 +1510,16 @@ from kerf_cad_core.geom.composite_tangent_match import (
 )
 # BREP-EDGE-CONVEX-CONCAVE-CLASSIFY: dihedral-angle classification of interior edges
 # (Hoffmann 1989 §5.3; Mantyla 1988 §7.4) — classify_edges / EdgeConvexityReport
+# BREP-EDGE-CONVEXITY: sampled-normals classify_edge_convexity / EdgeSample
+# (Mantyla 1988 §5) — classify_edge_convexity / SampledEdgeConvexityReport
 from kerf_cad_core.geom.edge_convexity import (  # noqa: E402
     EdgeClass,
     EdgeConvexityReport,
     classify_edges,
     classify_body_edges,
+    EdgeSample,
+    SampledEdgeConvexityReport,
+    classify_edge_convexity,
 )
 # BREP-HOLE-RECOGNITION-FROM-LOOPS: AAG-based recognition of through-hole, blind hole,
 # counterbore, countersink, possibly-threaded holes from B-rep inner loops
@@ -1760,11 +1768,16 @@ from kerf_cad_core.geom.curve_conic_detect import (  # noqa: E402
     detect_conic_type,
 )
 # NURBS-CURVE-INFLECTION: inflection points of a 2D NurbsCurve where κ_signed
-# changes sign (do Carmo §1.5; Sapidis §3). Used for fairness analysis, sketch QC,
-# and toolpath transitions. LLM tool: nurbs_find_curve_inflections.
+# changes sign (Piegl-Tiller §5.3; Farin §10.6; do Carmo §1.5; Sapidis §3).
+# Used for Class-A fairness analysis (naval/automotive), sketch QC, toolpath
+# transitions. v2 API: InflectionPoint + CurveInflectionReport with fairness flag.
+# LLM tool: nurbs_find_curve_inflections.
 from kerf_cad_core.geom.curve_inflection import (  # noqa: E402
-    InflectionResult,
+    InflectionPoint,
+    CurveInflectionReport,
     find_curve_inflections,
+    InflectionResult,
+    find_curve_inflections_v1,
 )
 # BREP-VERTEX-DEGREE-CHECK: count incident edges per vertex; flag boundary
 # (degree < expected) and non-manifold (degree > expected + 2) vertices.

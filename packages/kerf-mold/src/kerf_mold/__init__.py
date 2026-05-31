@@ -77,6 +77,11 @@ from kerf_mold.cooling_time_chen_chiang import (
     MATERIAL_THERMAL_DB,
     compute_cooling_time_chen_chiang,
 )
+from kerf_mold.runner_balance_check import (
+    RunnerSegment as BalanceRunnerSegment,
+    RunnerBalanceReport,
+    check_runner_balance,
+)
 
 __all__ = [
     # mold.py
@@ -146,4 +151,8 @@ __all__ = [
     "CoolingTimeReport",
     "MATERIAL_THERMAL_DB",
     "compute_cooling_time_chen_chiang",
+    # runner_balance_check.py
+    "BalanceRunnerSegment",
+    "RunnerBalanceReport",
+    "check_runner_balance",
 ]

@@ -9917,6 +9917,20 @@
         },
         {
           "domain": "D7",
+          "feature": "Runner network balance check (Hagen-Poiseuille path resistance)",
+          "competitor": {
+            "status": "partial",
+            "note": "Cimatron mold runner design includes symmetric runner layout tools; explicit Hagen-Poiseuille path-resistance imbalance percentage not surfaced as a standalone metric",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Hagen-Poiseuille path-resistance balance checker (Beaumont 2007 §6.6 + Menges 2001 §6.6.4): R_norm = L/r⁴ per segment (μ cancels in ratios); path resistance summed sprue→gate via parent-pointer walk; max_imbalance_pct = 100×(R_max−R_min)/R_mean; balanced=True iff max_imbalance_pct < 5%; fill_ratio per cavity; LLM tool `mold_check_runner_balance`; 42 oracle tests; honest-flag: geometric resistance only — does NOT model temperature-dependent or shear-thinning viscosity, shear-heating asymmetry in graduated-diameter runners (Beaumont RPI runner), or transient filling inertia; use Moldflow/Moldex3D/SigmaSoft for full rheological fill simulation",
+            "evidence": "packages/kerf-mold/src/kerf_mold/runner_balance_check.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "Electrode design (EDM)",
           "competitor": {
             "status": "yes",

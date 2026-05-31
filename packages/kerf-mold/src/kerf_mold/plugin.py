@@ -25,6 +25,9 @@ Registers:
   - LLM tool:  mold_compute_cooling_time_chen_chiang
                (Chen-Chiang 1985 + Menges 2001 §7.3.3 + Beaumont 2007 §10.4
                 1-D Fourier cooling-time formula)
+  - LLM tool:  mold_check_runner_balance
+               (Beaumont 2007 §6.6 + Menges 2001 §6.6.4 naturally balanced
+                runner network check via Hagen-Poiseuille path resistance)
 """
 from __future__ import annotations
 
@@ -150,6 +153,18 @@ async def register(app: FastAPI, ctx):
         run_mold_compute_cooling_time_chen_chiang,
     )
 
+    # Register runner balance check tool
+    # (Beaumont 2007 §6.6 + Menges 2001 §6.6.4)
+    from kerf_mold.runner_balance_check_tool import (
+        mold_runner_balance_check_spec,
+        run_mold_check_runner_balance,
+    )
+    ctx.tools.register(
+        "mold_check_runner_balance",
+        mold_runner_balance_check_spec,
+        run_mold_check_runner_balance,
+    )
+
     provides = [
         "mold.moldability",
         "mold.parting_surface",
@@ -165,6 +180,7 @@ async def register(app: FastAPI, ctx):
         "mold.ejector_stroke_verify",
         "mold.flow_length_check",
         "mold.cooling_time_chen_chiang",
+        "mold.runner_balance_check",
     ]
 
     try:

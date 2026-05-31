@@ -99,6 +99,10 @@ from kerf_cad_core.optics.focal_depth_field import (
     DepthOfFieldReport,
     compute_depth_of_field,
 )
+from kerf_cad_core.optics.telecentricity_check import (
+    TelecentricityReport,
+    compute_telecentricity,
+)
 
 __all__ = [
     "lensmaker",
@@ -147,4 +151,6 @@ __all__ = [
     "LensFocusSpec",
     "DepthOfFieldReport",
     "compute_depth_of_field",
+    "TelecentricityReport",
+    "compute_telecentricity",
 ]

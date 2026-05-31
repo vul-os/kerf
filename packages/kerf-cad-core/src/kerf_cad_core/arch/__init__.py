@@ -25,6 +25,8 @@ Submodules:
 Note on naming: ``SlabSpec`` in ``primitives`` is the BIM slab (polygon outline).
 ``SlabSpec`` in ``slab_deflection`` is the structural deflection slab (a×b×h).
 To avoid collision this package re-exports the structural one as ``SlabDeflSpec``.
+  base_plate_aisc   — AISC DG-1 §3.1 + AISC 360-22 §J8 column base plate (concentric axial load)
+  base_plate_aisc_tools — LLM tool arch_design_base_plate
 """
 from __future__ import annotations
 
@@ -79,6 +81,12 @@ from kerf_cad_core.arch.wind_component_cladding import (
     WindCCPressureReport,
     compute_wind_cc_pressure,
 )
+from kerf_cad_core.arch.base_plate_aisc import (
+    ColumnSpec,
+    ConcreteSpec,
+    BasePlateReport,
+    design_base_plate,
+)
 
 __all__ = [
     "WallLayer",
@@ -124,4 +132,9 @@ __all__ = [
     "CCComponentSpec",
     "WindCCPressureReport",
     "compute_wind_cc_pressure",
+    # AISC DG-1 §3.1 + AISC 360-22 §J8 column base plate (concentric axial only)
+    "ColumnSpec",
+    "ConcreteSpec",
+    "BasePlateReport",
+    "design_base_plate",
 ]

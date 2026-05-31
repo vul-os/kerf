@@ -210,6 +210,12 @@
           "kerf": "evidence: \"kerf-structural/aisc_member.py\""
         },
         {
+          "name": "Steel column base plate design (AISC DG-1 §3.1 + AISC 360-22 §J8, concentric axial only)",
+          "domain": "D2",
+          "competitor": "paid: true",
+          "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/base_plate_aisc.py\"; note: \"AISC DG-1 2nd ed. §3.1 + AISC 360-22 §J8: bearing Pp=0.85·f'c·A1·√(A2/A1) A2/A1≤4 φ_c=0.65; plate sized to φ_c·Pp≥P_u and cover 0.95·d×0.80·bf; m=(N−0.95·d)/2 (Eq 3.1-1); n=(B−0.80·bf)/2 (Eq 3.1-2); n'=√(d·bf)/4; X=[4·d·bf/(d+bf)²]·[P_u/(φ_c·Pp)] (Eq 3.1-8); λ=min(1,2·√X/(1+√(1−X))); t=l·√(2·P_u/(0.9·Fy·B·N)) Murray-Stockwell (Eq 3.1-5); W14x90 P=1000kN f'c=30MPa ped600×600→plate 295×340×15mm DCR=0.318; arch_design_base_plate LLM tool; SCOPE: concentric axial ONLY — moment (DG-1 §3.2), anchor rods (§3.3–3.4), shear lug (§3.5) NOT modelled\""
+        },
+        {
           "name": "ACI 318 concrete design",
           "domain": "D2",
           "competitor": "paid: true",

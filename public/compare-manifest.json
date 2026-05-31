@@ -7084,6 +7084,19 @@
         },
         {
           "domain": "D11",
+          "feature": "GD&T single-plane circular runout FIM evaluation (ASME Y14.5-2018 §12.4)",
+          "competitor": {
+            "status": "no",
+            "note": "Fusion 360 does not expose a programmatic §12.4 single-plane circular runout API with section-oriented input and FIM computation"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "check_circular_runout(CircularRunoutSpec) -> CircularRunoutReport: FIM_s = max(r)−min(r) per cross-section; max_FIM = worst section; pass ⟺ max_FIM ≤ tolerance_mm. margin_mm = tolerance−max_FIM (positive=headroom; negative=overrun). Section-oriented input (list[list[RunoutMeasurement]]) mirrors physical inspection. governing_axial_position_mm reported. Oracle: eccentricity=1mm→FIM=2mm; tol=1mm→FAIL; tol=2mm→PASS. gdt_check_circular_runout LLM tool registered; 27 tests green. HONEST FLAG: measurements must be pre-computed radial distances from TRUE datum axis; datum simulator (ASME B89.3.1 / ISO 12181-1 §4.3) NOT performed; probe offset/cosine error must be corrected by caller.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gdt/runout_circular.py"
+          }
+        },
+        {
+          "domain": "D11",
           "feature": "GD&T dimension chain tolerance stack-up — WC + RSS (ASME Y14.5-2018 §5.3)",
           "competitor": {
             "status": "no",
@@ -20284,7 +20297,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "classify_edges / brep_classify_edges: convex/concave/tangential per interior edge via dihedral angle (Hoffmann 1989 §5.3; Mantyla 1988 §7.4)",
+            "note": "Two APIs: (1) B-rep topology: classify_edges / brep_classify_edges — convex/concave/tangential per interior edge via dihedral angle (Hoffmann 1989 §5.3; Mantyla 1988 §7.4). (2) Sampled-normals: classify_edge_convexity / geom_classify_edge_convexity — classify from pre-sampled face normals + edge tangent without B-rep graph access; labels convex/concave/tangent/smooth/sharp-convex/sharp-concave; sign via cross(n_a,n_b)·tangent (Mantyla 1988 §5). HONEST: sampled API requires caller-evaluated outward normals; does not parse B-rep topology directly.",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/edge_convexity.py"
           }
         },

@@ -18,6 +18,8 @@ Submodules:
   feature_of_size_dof       — Feature of Size DOF enumerator (ASME Y14.5-2018 §4.7 + §7.3)
   runout_check              — Circular / total runout compliance check
                               (ASME Y14.5-2018 §13 / ISO 1101 §18)
+  runout_circular           — Single-plane circular runout (§12.4): section-oriented FIM
+                              evaluation; distinct from runout_check total/circular sweep
   dimension_chain           — WC + RSS tolerance stack-up for linear dimension chains
                               (ASME Y14.5-2018 §5.3 + Bralla §1)
 """
@@ -59,6 +61,12 @@ from kerf_cad_core.gdt.composite_position import (
     CompositePositionReport,
     check_composite_position,
 )
+from kerf_cad_core.gdt.runout_circular import (
+    RunoutMeasurement,
+    CircularRunoutSpec,
+    CircularRunoutReport,
+    check_circular_runout,
+)
 
 __all__ = [
     "Datum",
@@ -87,4 +95,8 @@ __all__ = [
     "CompositePositionSpec",
     "CompositePositionReport",
     "check_composite_position",
+    "RunoutMeasurement",
+    "CircularRunoutSpec",
+    "CircularRunoutReport",
+    "check_circular_runout",
 ]

@@ -51,6 +51,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.gdt.datum_shift_check",          # gdt_compute_datum_shift (§4.5 + §7.3.5 MMC/LMC datum shift)
     "kerf_cad_core.gdt.feature_of_size_dof",        # gdt_compute_fos_dof (§4.7 + §7.3 FOS DOF enumerator)
     "kerf_cad_core.gdt.runout_check",               # gdt_check_runout (§13 circular + total runout / ISO 1101 §18)
+    "kerf_cad_core.gdt.runout_circular",            # gdt_check_circular_runout (§12.4 single-plane circular runout FIM)
     "kerf_cad_core.gdt.dimension_chain",            # gdt_compute_dimension_chain (§5.3 WC + RSS tolerance stack-up)
     "kerf_cad_core.gdt.composite_position",         # gdt_check_composite_position (§10.5 PLTZF+FRTZF vs measured points)
     "kerf_cad_core.arch.tools",

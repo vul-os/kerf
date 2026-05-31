@@ -2481,6 +2481,20 @@
           }
         },
         {
+          "name": "Part obsolescence check (IEC 62402 DMSMS BOM risk)",
+          "domain": "D6",
+          "competitor": {
+            "status": "no",
+            "notes": "No built-in IEC 62402 obsolescence risk scoring; requires external DMSMS tool (SiliconExpert, IHS Markit, or custom spreadsheet)",
+            "tier": "paid"
+          },
+          "kerf": {
+            "status": "[x]",
+            "notes": "PartLifecycleStatus (active/preferred/NRND/LTB/EOL/obsolete); PartLifecycleEntry (part_number, manufacturer, status, last_buy_date, alternative_pn); check_part_obsolescence() — risk_score = (NRND×1 + LTB×3 + EOL×5 + obsolete×10) / total_parts × 10 (IEC 62402 §5.3 heuristic); critical_part_alerts for EOL and obsolete parts with alternative_pn suggestions; affected_assemblies from flat BOM relationships (deduplicated). LLM tool: plm_check_part_obsolescence. Honest caveat: lifecycle data is caller-supplied — no live IHS Markit / Octopart / Silicon Expert API; callers must refresh from distributor feeds / ERP / quarterly DMSMS scans; risk weights are kerf heuristics calibrated to DMSMS handbook §2.3; affected_assemblies is flat depth-1 only. References: IEC 62402:2019; US DoD DMSMS Handbook (2018) §2.3+§4.1; JEDEC JEP106. 26 tests.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/part_obsolescence_check.py"
+          }
+        },
+        {
           "name": "Interactive PCB editing (route/place)",
           "domain": "D6",
           "competitor": {

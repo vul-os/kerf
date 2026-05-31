@@ -64,6 +64,12 @@ from kerf_plm.change_log_export import (
     ChangeLogExportResult,
     export_change_log,
 )
+from kerf_plm.part_obsolescence_check import (
+    PartLifecycleStatus,
+    PartLifecycleEntry,
+    ObsolescenceReport,
+    check_part_obsolescence,
+)
 
 __all__ = [
     "Rule",
@@ -95,4 +101,8 @@ __all__ = [
     "EcnLogEntry",
     "ChangeLogExportResult",
     "export_change_log",
+    "PartLifecycleStatus",
+    "PartLifecycleEntry",
+    "ObsolescenceReport",
+    "check_part_obsolescence",
 ]

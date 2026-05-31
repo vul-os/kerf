@@ -2580,3 +2580,207 @@ async def run_plm_export_change_log(ctx, args: bytes) -> str:
         "summary_stats": result.summary_stats,
         "honest_caveat": result.honest_caveat,
     })
+
+
+# ===========================================================================
+# PLM Part Obsolescence Check (IEC 62402 + DMSMS handbook)
+# ===========================================================================
+
+plm_check_part_obsolescence_spec = ToolSpec(
+    name="plm_check_part_obsolescence",
+    description=(
+        "Check the obsolescence status of components in a BOM against "
+        "caller-supplied part-lifecycle data (active / preferred / NRND / LTB / "
+        "EOL / obsolete) and identify which assemblies have exposure.\n\n"
+        "References: IEC 62402:2019 (Obsolescence management — Application guide) "
+        "and the US DoD DMSMS Handbook (2018) §2.3 + §4.1.\n\n"
+        "Lifecycle status vocabulary:\n"
+        "  active    — in full production; no supply-chain constraint.\n"
+        "  preferred — manufacturer's preferred alternative for new designs.\n"
+        "  NRND      — Not Recommended for New Designs (risk weight: 1).\n"
+        "  LTB       — Last-Time Buy; final order window published (weight: 3).\n"
+        "  EOL       — End-of-Life; production stopped, stock-on-hand only "
+        "(weight: 5).\n"
+        "  obsolete  — no manufacturer stock; aftermarket or re-design needed "
+        "(weight: 10).\n\n"
+        "Risk score formula (IEC 62402 §5.3 heuristic):\n"
+        "  risk_score = (NRND×1 + LTB×3 + EOL×5 + obsolete×10) / "
+        "total_parts × 10\n\n"
+        "Returns: total_parts, num_active, num_at_risk (NRND+LTB+EOL), "
+        "num_obsolete, risk_score (0–100), critical_part_alerts (EOL + obsolete "
+        "with alternative_pn suggestions), affected_assemblies (parent assembly "
+        "PNs from bom_relationships that contain at-risk/obsolete parts), and "
+        "honest_caveat.\n\n"
+        "HONEST FLAG: lifecycle data is caller-supplied — no live IHS Markit / "
+        "Octopart / Silicon Expert API integration is included. Callers must "
+        "refresh lifecycle entries from their preferred data source."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "parts": {
+                "type": "array",
+                "description": (
+                    "List of part lifecycle entries. Each entry has:\n"
+                    "  part_number:   Manufacturer part number (MPN) or internal PN.\n"
+                    "  manufacturer:  Manufacturer name.\n"
+                    "  status:        One of: active, preferred, NRND, LTB, EOL, "
+                    "obsolete.\n"
+                    "  last_buy_date: Optional ISO 8601 date (e.g. '2025-12-31') for "
+                    "LTB window close; null if not applicable.\n"
+                    "  alternative_pn: Optional recommended replacement MPN; null if "
+                    "none identified."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "part_number": {
+                            "type": "string",
+                            "description": "Manufacturer part number or internal PN.",
+                        },
+                        "manufacturer": {
+                            "type": "string",
+                            "description": "Manufacturer name (e.g. 'Texas Instruments').",
+                        },
+                        "status": {
+                            "type": "string",
+                            "enum": [
+                                "active",
+                                "preferred",
+                                "NRND",
+                                "LTB",
+                                "EOL",
+                                "obsolete",
+                            ],
+                            "description": "IEC 62402 lifecycle status.",
+                        },
+                        "last_buy_date": {
+                            "type": ["string", "null"],
+                            "description": (
+                                "ISO 8601 date string for the LTB window close date "
+                                "(e.g. '2025-12-31'), or null."
+                            ),
+                        },
+                        "alternative_pn": {
+                            "type": ["string", "null"],
+                            "description": "Recommended replacement MPN, or null.",
+                        },
+                    },
+                    "required": [
+                        "part_number",
+                        "manufacturer",
+                        "status",
+                        "last_buy_date",
+                        "alternative_pn",
+                    ],
+                },
+            },
+            "bom_relationships": {
+                "type": ["array", "null"],
+                "description": (
+                    "Optional flat list of BOM relationship objects, each with:\n"
+                    "  parent_pn: str — parent assembly part number.\n"
+                    "  child_pn:  str — child component part number.\n"
+                    "Used to populate affected_assemblies. If null or omitted, "
+                    "affected_assemblies will be empty."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "parent_pn": {
+                            "type": "string",
+                            "description": "Parent assembly part number.",
+                        },
+                        "child_pn": {
+                            "type": "string",
+                            "description": "Child component part number.",
+                        },
+                    },
+                    "required": ["parent_pn", "child_pn"],
+                },
+            },
+        },
+        "required": ["parts"],
+    },
+)
+
+
+@register(plm_check_part_obsolescence_spec)
+async def run_plm_check_part_obsolescence(ctx, args: bytes) -> str:
+    """Tool handler for plm_check_part_obsolescence (IEC 62402 + DMSMS)."""
+    import json as _json
+
+    try:
+        a = _json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+    parts_raw = a.get("parts")
+    bom_raw = a.get("bom_relationships")  # may be None or omitted
+
+    if not isinstance(parts_raw, list):
+        return err_payload("'parts' must be an array", "BAD_ARGS")
+    if bom_raw is not None and not isinstance(bom_raw, list):
+        return err_payload("'bom_relationships' must be an array or null", "BAD_ARGS")
+
+    from kerf_plm.part_obsolescence_check import (
+        PartLifecycleEntry,
+        check_part_obsolescence,
+    )
+
+    # Parse parts
+    parts = []
+    for i, raw in enumerate(parts_raw):
+        if not isinstance(raw, dict):
+            return err_payload(f"parts[{i}] must be an object", "BAD_ARGS")
+        pn = raw.get("part_number")
+        mfr = raw.get("manufacturer")
+        status = raw.get("status")
+        lbd = raw.get("last_buy_date")
+        alt = raw.get("alternative_pn")
+
+        if not pn:
+            return err_payload(f"parts[{i}].part_number is required", "BAD_ARGS")
+        if not mfr:
+            return err_payload(f"parts[{i}].manufacturer is required", "BAD_ARGS")
+        if not status:
+            return err_payload(f"parts[{i}].status is required", "BAD_ARGS")
+
+        try:
+            entry = PartLifecycleEntry(
+                part_number=pn,
+                manufacturer=mfr,
+                status=status,
+                last_buy_date=lbd if lbd else None,
+                alternative_pn=alt if alt else None,
+            )
+        except (TypeError, ValueError) as exc:
+            return err_payload(f"parts[{i}] invalid: {exc}", "BAD_ARGS")
+
+        parts.append(entry)
+
+    # Validate BOM relationships structure (loose — extra keys ignored)
+    if bom_raw is not None:
+        for j, rel in enumerate(bom_raw):
+            if not isinstance(rel, dict):
+                return err_payload(
+                    f"bom_relationships[{j}] must be an object", "BAD_ARGS"
+                )
+
+    try:
+        report = check_part_obsolescence(parts=parts, bom_relationships=bom_raw)
+    except (TypeError, ValueError) as exc:
+        return err_payload(str(exc), "BAD_ARGS")
+    except Exception as exc:
+        return err_payload(f"obsolescence check error: {exc}", "CHECK_ERROR")
+
+    return ok_payload({
+        "total_parts": report.total_parts,
+        "num_active": report.num_active,
+        "num_at_risk": report.num_at_risk,
+        "num_obsolete": report.num_obsolete,
+        "risk_score": report.risk_score,
+        "critical_part_alerts": report.critical_part_alerts,
+        "affected_assemblies": report.affected_assemblies,
+        "honest_caveat": report.honest_caveat,
+    })

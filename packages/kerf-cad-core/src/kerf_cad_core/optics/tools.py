@@ -4093,3 +4093,120 @@ async def run_compute_iris_diameter_map(ctx: "ProjectCtx", args: bytes) -> str:
     if isinstance(result, dict):
         return json.dumps(result)
     return ok_payload(result.to_dict())
+
+
+# ---------------------------------------------------------------------------
+# Tool: optics_compute_diffraction_psf
+# ---------------------------------------------------------------------------
+
+from kerf_cad_core.optics.diffraction_psf import (  # noqa: E402
+    DiffractionPSFSpec,
+    compute_diffraction_psf,
+)
+
+_diffraction_psf_spec = ToolSpec(
+    name="optics_compute_diffraction_psf",
+    description=(
+        "Compute the diffraction-limited Airy-disk Point Spread Function (PSF)\n"
+        "for a circular aperture.\n"
+        "\n"
+        "Theory (Hecht 'Optics' 5e §10.2; Born & Wolf 'Principles of Optics' 7e §8.5):\n"
+        "\n"
+        "  I(r) = [2·J1(x)/x]²          x = π·D·r / (λ·f) = π·r / (λ·F#)\n"
+        "\n"
+        "  Airy disk radius  r_Airy = 1.22·λ·F#   [first dark ring, first zero of J1]\n"
+        "  Rayleigh limit    Δr     = 1.22·λ·F#   [Rayleigh resolution criterion]\n"
+        "  FWHM              ≈ 1.03·λ·F#           [Hecht eq. 10.59]\n"
+        "\n"
+        "Oracle: λ=550nm, D=10mm, f=50mm → F#=5:\n"
+        "  r_Airy ≈ 3.355 μm, FWHM ≈ 2.833 μm, I(0) = 1.0 exactly.\n"
+        "\n"
+        "Returns:\n"
+        "  airy_disk_radius_um    : 1.22·λ·F# (μm)\n"
+        "  rayleigh_resolution_um : equals airy_disk_radius_um\n"
+        "  fwhm_um                : 1.03·λ·F# (μm)\n"
+        "  psf_profile            : list of [r_um, I] pairs, I ∈ [0,1], I(0)=1.0\n"
+        "  honest_caveat          : model limitations\n"
+        "\n"
+        "HONEST LIMITATIONS:\n"
+        "  SCALAR DIFFRACTION ONLY — no polarisation / vector diffraction effects\n"
+        "    (Richards-Wolf high-NA integral, Born & Wolf §8.7).\n"
+        "  CIRCULAR APERTURE — non-circular/annular pupils not modelled.\n"
+        "  ABERRATION-FREE — no Seidel/Zernike wavefront error (Strehl < 1).\n"
+        "  MONOCHROMATIC — polychromatic PSF = ∫W(λ)·I(r,λ)dλ not implemented.\n"
+        "  ON-AXIS / PARAXIAL — valid for NA = D/(2f) ≪ 1 only.\n"
+        "\n"
+        "Errors: {ok:false, reason} for invalid inputs.  Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "wavelength_nm": {
+                "type": "number",
+                "description": (
+                    "Wavelength of light in nanometres (nm). "
+                    "E.g. 550 for green, 632.8 for HeNe laser. Must be > 0."
+                ),
+            },
+            "aperture_diameter_mm": {
+                "type": "number",
+                "description": (
+                    "Entrance-pupil (aperture) diameter D in millimetres. Must be > 0."
+                ),
+            },
+            "focal_length_mm": {
+                "type": "number",
+                "description": (
+                    "Lens focal length f in millimetres. Must be > 0."
+                ),
+            },
+            "num_samples": {
+                "type": "integer",
+                "description": (
+                    "Number of radial samples in [0, max_radius_um]. "
+                    "Default 200. Must be >= 2."
+                ),
+            },
+            "max_radius_um": {
+                "type": "number",
+                "description": (
+                    "Maximum radial extent of the PSF profile in micrometres. "
+                    "Default 20.0 μm.  Increase to see multiple Airy rings. Must be > 0."
+                ),
+            },
+        },
+        "required": ["wavelength_nm", "aperture_diameter_mm", "focal_length_mm"],
+    },
+)
+
+
+@register(_diffraction_psf_spec, write=False)
+async def run_compute_diffraction_psf(ctx: "ProjectCtx", args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    for field_name in ("wavelength_nm", "aperture_diameter_mm", "focal_length_mm"):
+        if a.get(field_name) is None:
+            return json.dumps({"ok": False, "reason": f"{field_name} is required"})
+
+    kwargs: dict = {}
+    if "num_samples" in a:
+        kwargs["num_samples"] = int(a["num_samples"])
+    if "max_radius_um" in a:
+        kwargs["max_radius_um"] = float(a["max_radius_um"])
+
+    try:
+        spec = DiffractionPSFSpec(
+            wavelength_nm=float(a["wavelength_nm"]),
+            aperture_diameter_mm=float(a["aperture_diameter_mm"]),
+            focal_length_mm=float(a["focal_length_mm"]),
+        )
+        result = compute_diffraction_psf(spec, **kwargs)
+    except Exception as exc:
+        return json.dumps({"ok": False, "reason": str(exc)})
+
+    if isinstance(result, dict):
+        return json.dumps(result)
+    return ok_payload(result.to_dict())

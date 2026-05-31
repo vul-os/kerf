@@ -15348,6 +15348,20 @@
         },
         {
           "domain": "D12",
+          "feature": "Airy-disk diffraction-limited PSF (point spread function)",
+          "competitor": {
+            "status": "yes",
+            "note": "Zemax OpticStudio: Huygens PSF, FFT PSF, geometric PSF; polychromatic and coherent variants; pupil-weighted PSF integration",
+            "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Airy-disk diffraction-limited PSF (OPTICS-DIFFRACTION-PSF): DiffractionPSFSpec(wavelength_nm, aperture_diameter_mm, focal_length_mm) -> DiffractionPSFReport; radial intensity I(r)=[2·J₁(x)/x]² where x=π·D·r/(λ·f) (Hecht §10.2 eq. 10.22; Born & Wolf §8.5.2 eq. 8.41); Airy disk radius r_Airy=1.22·λ·F# (first zero of J₁); Rayleigh resolution criterion Δr=r_Airy (Hecht §10.2.7); FWHM≈1.03·λ·F# (Hecht eq. 10.59); scipy.special.j1 with pure-Python series fallback; oracle λ=550nm, D=10mm, f=50mm (F#=5): r_Airy=3.355 μm, FWHM=2.833 μm, I(0)=1.0, I(r_Airy)≈0 validated to <1e-6; LLM tool optics_compute_diffraction_psf; 32 hermetic tests. HONEST: SCALAR DIFFRACTION ONLY (Kirchhoff/Fraunhofer) -- no vector/polarisation effects (Richards-Wolf high-NA integral, Born & Wolf §8.7); circular aperture only; aberration-free (Seidel/Zernike wavefront error not modelled); monochromatic only; on-axis paraxial (NA=D/(2f) << 1). Ref: Hecht (2017) §10.2; Born & Wolf (1999) §8.5; Goodman (2005) §4.4.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/diffraction_psf.py"
+          }
+        },
+        {
+          "domain": "D12",
           "feature": "Wave optics / diffraction / polarisation",
           "competitor": {
             "status": "yes",

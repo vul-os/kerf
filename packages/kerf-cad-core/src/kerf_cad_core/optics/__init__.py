@@ -113,6 +113,11 @@ from kerf_cad_core.optics.iris_diameter_map import (
     IrisDiameterReport,
     compute_iris_diameter,
 )
+from kerf_cad_core.optics.diffraction_psf import (
+    DiffractionPSFSpec,
+    DiffractionPSFReport,
+    compute_diffraction_psf,
+)
 
 __all__ = [
     "lensmaker",
@@ -169,4 +174,7 @@ __all__ = [
     "IrisMapSpec",
     "IrisDiameterReport",
     "compute_iris_diameter",
+    "DiffractionPSFSpec",
+    "DiffractionPSFReport",
+    "compute_diffraction_psf",
 ]

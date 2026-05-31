@@ -19366,8 +19366,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "zebra_analysis, isophote, curvature combs, Gauss/mean, draft-angle ops",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/surface_analysis.py"
+            "note": "zebra_analysis, isophote/EMap (IsophoteSpec/IsophoteReport/analyze_isophotes + nurbs_analyze_isophotes LLM tool; GK-P11), curvature combs, Gauss/mean, draft-angle ops. HONEST: isophote fairness_score is a UV-parameter-space heuristic; not a substitute for curvature-comb or zebra analysis.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/isophote_analyzer.py"
           }
         },
         {

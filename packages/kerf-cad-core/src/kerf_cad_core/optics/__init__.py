@@ -62,6 +62,10 @@ from kerf_cad_core.optics.mtf_diffraction import (
     MTFReport,
     compute_diffraction_mtf,
 )
+from kerf_cad_core.optics.zernike_fit import (
+    ZernikeFitReport,
+    fit_zernike_wavefront,
+)
 
 __all__ = [
     "lensmaker",
@@ -89,4 +93,6 @@ __all__ = [
     "compute_petzval_curvature",
     "MTFReport",
     "compute_diffraction_mtf",
+    "ZernikeFitReport",
+    "fit_zernike_wavefront",
 ]

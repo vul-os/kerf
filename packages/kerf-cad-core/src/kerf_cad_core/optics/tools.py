@@ -2706,3 +2706,137 @@ async def run_diffraction_mtf(ctx: ProjectCtx, args: bytes) -> str:
     if isinstance(result, dict):
         return json.dumps(result)
     return ok_payload(result.to_dict())
+
+
+# ---------------------------------------------------------------------------
+# Tool: optics_fit_zernike_wavefront
+# ---------------------------------------------------------------------------
+
+try:
+    from kerf_cad_core.optics.zernike_fit import (
+        ZernikeFitReport,
+        fit_zernike_wavefront,
+    )
+    _ZERNIKE_FIT_AVAILABLE = True
+except ImportError:  # numpy not installed
+    _ZERNIKE_FIT_AVAILABLE = False
+
+_fit_zernike_spec = ToolSpec(
+    name="optics_fit_zernike_wavefront",
+    description=(
+        "Fit the first N Zernike polynomial coefficients (Noll 1976 ordering,\n"
+        "j=1..15) to sampled wavefront data W(ρ,θ) over a unit-disk pupil using\n"
+        "least-squares regression (numpy.linalg.lstsq).\n"
+        "\n"
+        "Noll j-index and aberration name mapping (first 15 terms):\n"
+        "  j=1  piston         j=2  tip             j=3  tilt\n"
+        "  j=4  defocus        j=5  astigmatism_45  j=6  astigmatism_0\n"
+        "  j=7  coma_y         j=8  coma_x          j=9  trefoil_y\n"
+        "  j=10 trefoil_x      j=11 spherical       j=12 secondary_astig_0\n"
+        "  j=13 secondary_astig_45  j=14 tetrafoil_x  j=15 tetrafoil_y\n"
+        "\n"
+        "Explicit polynomial formulas (Noll 1976 orthonormal on unit disk):\n"
+        "  Z_1  = 1\n"
+        "  Z_2  = 2ρ cos θ\n"
+        "  Z_3  = 2ρ sin θ\n"
+        "  Z_4  = √3 (2ρ²−1)\n"
+        "  Z_5  = √6 ρ² sin 2θ\n"
+        "  Z_6  = √6 ρ² cos 2θ\n"
+        "  Z_7  = √8 (3ρ³−2ρ) sin θ\n"
+        "  Z_8  = √8 (3ρ³−2ρ) cos θ\n"
+        "  Z_9  = √8 ρ³ sin 3θ\n"
+        "  Z_10 = √8 ρ³ cos 3θ\n"
+        "  Z_11 = √5 (6ρ⁴−6ρ²+1)\n"
+        "  Z_12 = √10 (4ρ⁴−3ρ²) cos 2θ\n"
+        "  Z_13 = √10 (4ρ⁴−3ρ²) sin 2θ\n"
+        "  Z_14 = √10 ρ⁴ cos 4θ\n"
+        "  Z_15 = √10 ρ⁴ sin 4θ\n"
+        "\n"
+        "Returns:\n"
+        "  coefficients       : list of N floats [c_1..c_N] in Noll order\n"
+        "  rms_residual_waves : RMS of (W_measured − W_fitted) [same units as W]\n"
+        "  dominant_aberration: name of argmax(|c_j|) for j ≥ 2 (piston excluded)\n"
+        "  coefficient_names  : list of N strings\n"
+        "  honest_caveat      : scope limitations\n"
+        "\n"
+        "Honest limits:\n"
+        "  * First 15 Noll terms only; higher-order wavefront content aliases into\n"
+        "    residual — report rms_residual to expose unmodelled power.\n"
+        "  * Unit-disk pupil (ρ ∈ [0,1]); no elliptical aperture, no obscuration.\n"
+        "  * Requires ≥ num_terms samples; returns error for under-determined system.\n"
+        "\n"
+        "References: Noll (1976) J. Opt. Soc. Am. 66 207; Born & Wolf §9.2;\n"
+        "Wyant & Creath (1992) Applied Optics and Optical Engineering XI ch.1.\n"
+        "\n"
+        "Errors: {ok: false, reason} for invalid inputs.  Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "samples": {
+                "type": "array",
+                "description": (
+                    "List of wavefront sample points.  Each element must be a\n"
+                    "3-element array [rho, theta, W] where:\n"
+                    "  rho   : normalised pupil radius in [0, 1]\n"
+                    "  theta : pupil angle (radians)\n"
+                    "  W     : wavefront value at this point (waves)"
+                ),
+                "items": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 3,
+                    "maxItems": 3,
+                },
+                "minItems": 1,
+            },
+            "num_terms": {
+                "type": "integer",
+                "description": (
+                    "Number of Noll-ordered Zernike terms to fit (1..15). "
+                    "Default 15.  Must be ≤ number of samples."
+                ),
+            },
+        },
+        "required": ["samples"],
+    },
+)
+
+
+@register(_fit_zernike_spec, write=False)
+async def run_fit_zernike_wavefront(ctx: ProjectCtx, args: bytes) -> str:
+    if not _ZERNIKE_FIT_AVAILABLE:
+        return err_payload("numpy is required for Zernike fitting", "MISSING_DEP")
+
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    if a.get("samples") is None:
+        return json.dumps({"ok": False, "reason": "samples is required"})
+
+    raw_samples = a["samples"]
+    if not isinstance(raw_samples, list) or len(raw_samples) == 0:
+        return json.dumps({"ok": False, "reason": "samples must be a non-empty list"})
+
+    num_terms = int(a.get("num_terms", 15))
+
+    try:
+        sample_tuples = [(float(s[0]), float(s[1]), float(s[2])) for s in raw_samples]
+    except (TypeError, IndexError, ValueError) as exc:
+        return json.dumps({
+            "ok": False,
+            "reason": f"each sample must be [rho, theta, W]: {exc}",
+        })
+
+    try:
+        report = fit_zernike_wavefront(sample_tuples, num_terms=num_terms)
+    except ValueError as exc:
+        return json.dumps({"ok": False, "reason": str(exc)})
+    except TypeError as exc:
+        return json.dumps({"ok": False, "reason": str(exc)})
+    except Exception as exc:
+        return json.dumps({"ok": False, "reason": f"unexpected error: {exc}"})
+
+    return ok_payload(report.to_dict())

@@ -514,3 +514,20 @@ def _register_tools(ctx, provides: list) -> None:
         logger.warning(
             "kerf-firmware: failed to load firmware_check_rtos_priorities tool: %s", exc
         )
+
+    # firmware_compute_crc — table-driven CRC checksums for embedded protocol verification
+    try:
+        from kerf_firmware.tools.firmware_compute_crc import (
+            _spec as _crc_spec,
+            run_firmware_compute_crc_async as _crc_fn,
+        )
+        ctx.tools.register(
+            "firmware_compute_crc",
+            _crc_spec,
+            _crc_fn,
+        )
+        provides.append("firmware.crc_compute")
+    except Exception as exc:
+        logger.warning(
+            "kerf-firmware: failed to load firmware_compute_crc tool: %s", exc
+        )

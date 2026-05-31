@@ -4312,6 +4312,19 @@
         },
         {
           "domain": "D6",
+          "feature": "CRC checksum computation (CRC-8, CRC-16/CCITT, CRC-16/MODBUS, CRC-32, CRC-32C)",
+          "competitor": {
+            "status": "no",
+            "note": "OpenPLC has no CRC computation tooling; engineers must implement manually or use external tools"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "firmware_compute_crc: table-driven CRC-8 (poly 0x07), CRC-16/CCITT-FALSE (poly 0x1021, init 0xFFFF, ITU-T V.41), CRC-16/MODBUS (reflected 0xA001, init 0xFFFF, Modbus RTU §2.5.1), CRC-32/ISO-HDLC (reflected 0xEDB88320, IEEE 802.3), CRC-32C/Castagnoli (reflected 0x82F63B78, iSCSI RFC 3720 / SCTP RFC 4960); check-vector '123456789': CRC-16/CCITT=0x29B1, CRC-32=0xCBF43926, CRC-32C=0xE3069283; returns hex + int + zero-padded binary; 66 tests. HONEST: 5 standard algorithms only — CRC-64, CRC-16/CCITT-TRUE (init=0), CRC-32/BZIP2 (big-endian), and bitwise-reflection variants require a separate tool. Refs: Koopman (2002); ITU-T V.41; IEEE 802.3-2018 §3.2.8; RFC 3720 §B.4; Williams (1993).",
+            "evidence": "packages/kerf-firmware/src/kerf_firmware/crc_compute.py"
+          }
+        },
+        {
+          "domain": "D6",
           "feature": "Schematic capture (KiCad round-trip, ERC)",
           "competitor": {
             "status": "no",

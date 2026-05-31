@@ -378,3 +378,20 @@ def _register_tools(ctx, provides: list) -> None:
         logger.warning(
             "kerf-firmware: failed to load firmware_compute_can_bus_load tool: %s", exc
         )
+
+    # firmware_verify_spi_timing — SPI master/slave timing compatibility verifier
+    try:
+        from kerf_firmware.tools.firmware_verify_spi_timing import (
+            _spec as _spi_spec,
+            run_firmware_verify_spi_timing_async as _spi_fn,
+        )
+        ctx.tools.register(
+            "firmware_verify_spi_timing",
+            _spi_spec,
+            _spi_fn,
+        )
+        provides.append("firmware.spi_timing_verify")
+    except Exception as exc:
+        logger.warning(
+            "kerf-firmware: failed to load firmware_verify_spi_timing tool: %s", exc
+        )

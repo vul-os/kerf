@@ -3744,6 +3744,20 @@
           }
         },
         {
+          "domain": "D10",
+          "feature": "SPI master/slave timing compatibility verifier (CPOL/CPHA, clock rate, setup/hold margins)",
+          "competitor": {
+            "status": "no",
+            "note": "OpenPLC has no SPI timing compatibility analysis; engineers must check datasheet timing manually",
+            "source": "https://www.openplcproject.com/reference"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "firmware_verify_spi_timing: Motorola SPI spec (canonical CPOL/CPHA) + ARM Cortex-M Generic UG §SPI Timing; checks clock_hz ≤ max_clk_hz, setup_ns ≥ min_setup_ns, hold_ns ≥ min_hold_ns, CPOL exact match, CPHA exact match; violation codes: CLOCK_TOO_FAST, SETUP_VIOLATION, HOLD_VIOLATION, CPOL_MISMATCH, CPHA_MISMATCH; MCP3008 ADC edge case (DS21295D §1.0 Table 1-1, 1.35 MHz max at 2.7V) tested against STM32F411 SPI1; 41 tests. HONEST: assumes ideal square-wave signals — ignores PCB trace propagation delay and crosstalk.",
+            "evidence": "packages/kerf-firmware/src/kerf_firmware/spi_timing_verify.py"
+          }
+        },
+        {
           "domain": "D6",
           "feature": "Schematic capture (KiCad round-trip, ERC)",
           "competitor": {

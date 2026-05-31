@@ -463,3 +463,20 @@ def _register_tools(ctx, provides: list) -> None:
         logger.warning(
             "kerf-firmware: failed to load firmware_compute_flash_wear tool: %s", exc
         )
+
+    # firmware_audit_ram_usage — MCU RAM utilisation auditor
+    try:
+        from kerf_firmware.tools.firmware_audit_ram_usage import (
+            _spec as _ram_audit_spec,
+            run_firmware_audit_ram_usage_async as _ram_audit_fn,
+        )
+        ctx.tools.register(
+            "firmware_audit_ram_usage",
+            _ram_audit_spec,
+            _ram_audit_fn,
+        )
+        provides.append("firmware.ram_usage_audit")
+    except Exception as exc:
+        logger.warning(
+            "kerf-firmware: failed to load firmware_audit_ram_usage tool: %s", exc
+        )

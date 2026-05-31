@@ -3994,6 +3994,19 @@
         },
         {
           "domain": "D6",
+          "feature": "RAM utilisation audit (.data + .bss + heap + stack vs total SRAM, 80% budget, largest-contributor recommendation)",
+          "competitor": {
+            "status": "no",
+            "note": "OpenPLC has no RAM utilisation analysis; engineers manually sum section sizes from arm-none-eabi-size output and compare against datasheet"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "firmware_audit_ram_usage: static_alloc=data+bss; dynamic_alloc=heap+stack; total_used=static+dynamic; within_budget=total_used≤80% of total_ram (10% safety guard); recommendation names largest contributor when over budget; depth-bar: STM32F411 128KB (RM0383 §2) data=8KB/bss=16KB/heap=24KB/stack=8KB → 56KB used, 43.75% → adequate; ATmega328P 2KB (§8) data=500B/bss=1200B/heap=200B/stack=100B → 2000B, 97.66% → over budget; 46 tests. HONEST: static estimate only — does not account for malloc fragmentation or interrupt-driven stack growth beyond declared stack_max_bytes.",
+            "evidence": "packages/kerf-firmware/src/kerf_firmware/ram_usage_audit.py"
+          }
+        },
+        {
+          "domain": "D6",
           "feature": "Schematic capture (KiCad round-trip, ERC)",
           "competitor": {
             "status": "no",

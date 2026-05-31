@@ -83,6 +83,12 @@ from kerf_plm.bom_compare_diff import (
     BomDiffReport,
     compare_boms,
 )
+from kerf_plm.cost_rollup_currency import (
+    MultiCurrencyBomEntry,
+    FxRateSnapshot,
+    CurrencyRolledUpCost,
+    rollup_cost_multi_currency,
+)
 
 __all__ = [
     "Rule",
@@ -127,4 +133,8 @@ __all__ = [
     "BomDiffEntry",
     "BomDiffReport",
     "compare_boms",
+    "MultiCurrencyBomEntry",
+    "FxRateSnapshot",
+    "CurrencyRolledUpCost",
+    "rollup_cost_multi_currency",
 ]

@@ -2681,6 +2681,20 @@
           }
         },
         {
+          "name": "Multi-currency BOM cost rollup (ISO 4217 FX normalisation)",
+          "domain": "D6",
+          "competitor": {
+            "status": "partial",
+            "notes": "ActiveBOM supports single-currency cost sheets; multi-currency normalisation requires manual export to spreadsheet",
+            "tier": "paid"
+          },
+          "kerf": {
+            "status": "[x]",
+            "notes": "Flat-BOM input with per-entry ISO 4217 currency; FxRateSnapshot (target_currency, snapshot_date, rates dict); by_currency_breakdown for cost-origin analysis; missing-FX entries flagged in unresolved_currencies (not raised); LLM tool: plm_rollup_cost_multi_currency. Honest caveat: snapshot-in-time FX only — no historical rate tracking, no live market feed, no forward-curve discounting; rates may be stale. References: ISO 4217:2015; ISO 10303-44:2021 §5.3; APICS rolled-up cost. 20 tests.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/cost_rollup_currency.py"
+          }
+        },
+        {
           "name": "BOM maturity assessment (NASA TRL roll-up)",
           "domain": "D6",
           "competitor": {
@@ -8231,6 +8245,20 @@
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
             "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "NURBS curve degree reduction (for STEP export compatibility)",
+          "competitor": {
+            "status": "partial",
+            "note": "SolidWorks: no direct user-facing ChangeDegree command; degree reduction only available indirectly through SaveAs STEP with kernel simplification",
+            "source": "https://help.solidworks.com/2024/english/solidworks/sldworks/t_saving_step_files.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "lower_curve_degree (Piegl-Tiller §6.5): reduces B-spline degree with reported max/mean deviation; exact when previously degree-elevated; LLM tool nurbs_lower_curve_degree. HONEST: local Forrest-Piegl approximation — not global L2 minimiser.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_degree_lower.py"
           }
         }
       ]
@@ -19486,6 +19514,20 @@
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
             "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "NURBS curve degree reduction (for STEP export compatibility)",
+          "competitor": {
+            "status": "yes",
+            "note": "Rhino: ChangeDegree command reduces degree; internal Forrest-Piegl algorithm; no explicit deviation report exposed to user",
+            "source": "https://docs.mcneel.com/rhino/8/help/en-us/commands/changedegree.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "lower_curve_degree (Piegl-Tiller §6.5 Forrest-Piegl + Schumaker §6): reduces degree by 1 or to target; returns DegreeLowerResult with max_deviation_mm, mean_deviation_mm, exact flag and honest_caveat; exact (max_dev < 1e-9) when input was previously degree-elevated; Forrest-Piegl minimises local per-segment error (NOT global L2); deviation sampled at 33 pts/segment. LLM tool nurbs_lower_curve_degree. Primary use-case: STEP export to CATIA V4/V5 / legacy ACIS kernels that reject degree ≥ 5 curves.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_degree_lower.py"
           }
         }
       ]

@@ -3160,3 +3160,163 @@ async def run_plm_compare_boms(ctx, args: bytes) -> str:
         ],
         "honest_caveat": report.honest_caveat,
     })
+
+
+# ===========================================================================
+# PLM Multi-Currency BOM Cost Rollup (ISO 4217 + ISO 10303-44 + APICS)
+# ===========================================================================
+
+plm_rollup_cost_multi_currency_spec = ToolSpec(
+    name="plm_rollup_cost_multi_currency",
+    description=(
+        "Roll up a flat BOM's line costs to a single reporting currency using a "
+        "caller-supplied FX rate snapshot.\n\n"
+        "Each BOM entry has its own ISO 4217 currency; costs are normalised to the "
+        "target currency via the FX rates dict before summation. Entries whose "
+        "currency is absent from the snapshot are excluded from the total and "
+        "listed in unresolved_currencies so callers can surface them.\n\n"
+        "Distinct from plm_rollup_bom_cost (which accepts a recursive multi-level "
+        "BOM tree and raises on missing FX). This tool accepts a flat entry list "
+        "and never raises on missing FX — it flags them instead.\n\n"
+        "Output includes:\n"
+        "  total_cost — sum of resolved line costs in target_currency.\n"
+        "  by_currency_breakdown — per-source-currency sub-totals (target units).\n"
+        "  unresolved_currencies — ISO 4217 codes with no FX rate supplied.\n"
+        "  honest_caveat — scope limitations.\n\n"
+        "HONEST FLAG:\n"
+        "  - Snapshot-in-time FX only: no historical rate tracking, no live feed.\n"
+        "  - Static unit costs: no scrap, overhead, yield, or learning-curve.\n"
+        "  - Quantities must be positive real numbers.\n\n"
+        "References: ISO 4217:2015; ISO 10303-44:2021 §5.3; "
+        "APICS Dictionary 16th ed. 'rolled-up cost'; Horngren et al. §7."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "entries": {
+                "type": "array",
+                "description": (
+                    "Flat list of BOM line items. Each entry:\n"
+                    "  part_number (str, required) — unique part identifier.\n"
+                    "  name (str, required) — human-readable part name.\n"
+                    "  unit_cost (number, required) — cost per unit (>= 0).\n"
+                    "  currency (str, required) — ISO 4217 source currency, e.g. 'USD', 'EUR', 'ZAR'.\n"
+                    "  qty (number, required) — quantity required (> 0)."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "part_number": {"type": "string"},
+                        "name": {"type": "string"},
+                        "unit_cost": {"type": "number"},
+                        "currency": {"type": "string"},
+                        "qty": {"type": "number"},
+                    },
+                    "required": ["part_number", "name", "unit_cost", "currency", "qty"],
+                },
+            },
+            "target_currency": {
+                "type": "string",
+                "description": (
+                    "ISO 4217 code for the rollup reporting currency. "
+                    "Must be present in fx_rates. Default: 'USD'."
+                ),
+                "default": "USD",
+            },
+            "snapshot_date": {
+                "type": "string",
+                "description": (
+                    "ISO 8601 date string identifying when the FX rates were captured "
+                    "(informational; stored in output but not validated). "
+                    "Example: '2025-06-01'."
+                ),
+                "default": "unknown",
+            },
+            "fx_rates": {
+                "type": "object",
+                "description": (
+                    "FX rate table mapping ISO 4217 code → rate-to-USD. "
+                    "Example: {'USD': 1.0, 'EUR': 1.10, 'ZAR': 0.054, 'GBP': 1.27, "
+                    "'JPY': 0.0068, 'CNY': 0.14}. "
+                    "The target_currency must appear in this dict. "
+                    "Missing currencies are flagged in unresolved_currencies, not raised."
+                ),
+                "additionalProperties": {"type": "number"},
+            },
+        },
+        "required": ["entries", "fx_rates"],
+    },
+)
+
+
+@register(plm_rollup_cost_multi_currency_spec)
+async def run_plm_rollup_cost_multi_currency(ctx, args: bytes) -> str:
+    """Tool handler for plm_rollup_cost_multi_currency."""
+    import json as _json
+    try:
+        a = _json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+    raw_entries = a.get("entries")
+    if not isinstance(raw_entries, list):
+        return err_payload("'entries' must be an array", "BAD_ARGS")
+
+    fx_rates_raw = a.get("fx_rates")
+    if not isinstance(fx_rates_raw, dict):
+        return err_payload("'fx_rates' must be an object", "BAD_ARGS")
+
+    target_currency = a.get("target_currency", "USD") or "USD"
+    snapshot_date = a.get("snapshot_date", "unknown") or "unknown"
+
+    try:
+        fx_rates = {k: float(v) for k, v in fx_rates_raw.items()}
+    except (TypeError, ValueError) as exc:
+        return err_payload(f"invalid fx_rates: {exc}", "BAD_ARGS")
+
+    from kerf_plm.cost_rollup_currency import (
+        FxRateSnapshot,
+        MultiCurrencyBomEntry,
+        rollup_cost_multi_currency,
+    )
+
+    try:
+        fx = FxRateSnapshot(
+            target_currency=target_currency,
+            snapshot_date=snapshot_date,
+            rates=fx_rates,
+        )
+    except ValueError as exc:
+        return err_payload(str(exc), "BAD_ARGS")
+
+    entries = []
+    for i, raw in enumerate(raw_entries):
+        if not isinstance(raw, dict):
+            return err_payload(
+                f"entries[{i}] must be an object, got {type(raw).__name__}", "BAD_ARGS"
+            )
+        try:
+            entry = MultiCurrencyBomEntry(
+                part_number=str(raw.get("part_number", "")),
+                name=str(raw.get("name", "")),
+                unit_cost=float(raw.get("unit_cost", 0.0)),
+                currency=str(raw.get("currency", "")),
+                qty=float(raw.get("qty", 1.0)),
+            )
+        except (TypeError, ValueError) as exc:
+            return err_payload(f"entries[{i}] invalid: {exc}", "BAD_ARGS")
+        entries.append(entry)
+
+    try:
+        report = rollup_cost_multi_currency(entries, fx)
+    except Exception as exc:
+        return err_payload(f"rollup error: {exc}", "ROLLUP_ERROR")
+
+    return ok_payload({
+        "total_cost": report.total_cost,
+        "target_currency": report.target_currency,
+        "fx_snapshot_date": report.fx_snapshot_date,
+        "by_currency_breakdown": report.by_currency_breakdown,
+        "unresolved_currencies": report.unresolved_currencies,
+        "honest_caveat": report.honest_caveat,
+    })

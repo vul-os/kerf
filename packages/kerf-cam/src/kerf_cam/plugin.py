@@ -149,6 +149,17 @@ async def register(app: FastAPI, ctx):
         run_cam_generate_lead_in_out,
     )
 
+    # Chip-load + chip-thinning calculator — MH 31e §1136 + Sandvik CoroPlus 2024
+    from kerf_cam.chip_load_calc import (
+        cam_compute_chip_load_spec,
+        run_cam_compute_chip_load,
+    )
+    ctx.tools.register(
+        "cam_compute_chip_load",
+        cam_compute_chip_load_spec,
+        run_cam_compute_chip_load,
+    )
+
     # Capabilities depend on available deps
     provides = [
         "cam.2_5d",
@@ -161,6 +172,7 @@ async def register(app: FastAPI, ctx):
         "cam.face-mill-path",
         "cam.rigid-tap-check",
         "cam.lead-in-lead-out",
+        "cam.chip-load-calc",
     ]   # pure-Python ops always available
     if _OCL_AVAILABLE:
         provides += ["cam.parallel-3d", "cam.waterline", "cam.lathe"]

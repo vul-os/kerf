@@ -5691,6 +5691,20 @@
         },
         {
           "domain": "D7",
+          "feature": "Chip-load + chip-thinning calculator",
+          "competitor": {
+            "status": "yes",
+            "note": "Feed-per-tooth and chip-thinning shown in CAM workspace",
+            "source": "https://www.autodesk.com/products/fusion-360/blog/machining-fundamentals-introduction-to-post-processors/"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "compute_chip_load(MillingOpSpec) → ChipLoadReport: fz = Vf/(n×z) (MH 31e §1136); Krad = D/(2·sqrt(D·ae−ae²)) when ae<D/2 else 1.0 (Sandvik CoroPlus 2024; Stephenson-Agapiou §6); actual_chip_load = fz×Krad; MRR = ae×ap×Vf/1000 cm³/min; Sandvik recommended ranges (carbide/aluminium 0.05–0.15, carbide/steel 0.05–0.20, HSS/aluminium 0.03–0.10, HSS/steel 0.03–0.12, ceramic 0.10–0.30 mm/tooth); compliant flag; cam_compute_chip_load LLM tool; 32 tests green. Honest caveats: thinning formula assumes circular arc-of-engagement (flat workpiece, peripheral end-mill only) — ball-nose and curved workpieces change engagement geometry; no climb/conventional distinction; tool deflection NOT modelled",
+            "evidence": "packages/kerf-cam/src/kerf_cam/chip_load_calc.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "G-code post (Fanuc/GRBL/LinuxCNC/Mach3)",
           "competitor": {
             "status": "yes",

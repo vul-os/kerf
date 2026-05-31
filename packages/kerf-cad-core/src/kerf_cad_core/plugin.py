@@ -116,6 +116,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.arch.anchor_bolt_pullout_tools",   # arch_check_anchor_pullout: ACI 318-19 §17.6 cast-in-place headed bolt tension — steel §17.6.1 + concrete breakout §17.6.2 + pullout §17.6.3
     "kerf_cad_core.arch.opening_in_wall_tools",       # arch_check_opening_in_wall: IBC §2308.4 + ACI 318-19 §11.5.3.1 + TMS 402-22 §8.3 wall opening tributary jamb load + capacity + lintel DCR
     "kerf_cad_core.arch.slab_on_grade_tools",        # arch_check_slab_on_grade: ACI 360R-10 + Westergaard (1948) slab-on-grade concentrated interior load; l, σ_max, MR, DCR, joint spacing (30·h PCA rule)
+    "kerf_cad_core.arch.bolt_shear_aisc_tools",     # arch_check_bolt_shear: AISC 360-22 §J3.6 bolt-group shear (bearing-type/slip-critical; single/double shear; bearing §J3.10a + tearout §J3.10b + slip §J3.8)
     "kerf_cad_core.civil.hydraulics_tools",
     "kerf_cad_core.tolstack.tools",
     "kerf_cad_core.kinematics.tools",
@@ -152,6 +153,10 @@ _TOOL_MODULES = [
     "kerf_cad_core.robotics.tools",
     "kerf_cad_core.aero.tools",
     "kerf_cad_core.optics.tools",
+    # OPTICS-SCHMIDT-CORRECTOR-PLATE: Schmidt corrector plate aspheric sag profile
+    # z(r) = r²·(r² − 2·κ·ρ_n²) / [8·(n−1)·R³] (Schmidt 1932 / Born & Wolf §6.3)
+    # LLM tool: optics_design_schmidt_corrector
+    "kerf_cad_core.optics.schmidt_corrector",
     "kerf_cad_core.composites.tools",
     "kerf_cad_core.navalarch.tools",
     "kerf_cad_core.lubrication.tools",

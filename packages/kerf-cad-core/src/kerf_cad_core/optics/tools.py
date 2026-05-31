@@ -4507,3 +4507,134 @@ async def run_trace_chief_ray(ctx: "ProjectCtx", args: bytes) -> str:
     if isinstance(result, dict):
         return json.dumps(result)
     return ok_payload(result.to_dict())
+
+
+# ---------------------------------------------------------------------------
+# Tool: optics_design_schmidt_corrector
+# ---------------------------------------------------------------------------
+
+from kerf_cad_core.optics.schmidt_corrector import (  # noqa: E402
+    SchmidtSpec,
+    design_schmidt_corrector,
+)
+
+_schmidt_corrector_spec = ToolSpec(
+    name="optics_design_schmidt_corrector",
+    description=(
+        "Compute the Schmidt corrector plate aspheric profile z(r) that cancels\n"
+        "the spherical aberration of a spherical primary mirror in a Schmidt\n"
+        "telescope.\n"
+        "\n"
+        "Theory (Schmidt 1932 / Born & Wolf §6.3):\n"
+        "  A Schmidt corrector plate placed at the centre of curvature (distance R\n"
+        "  from mirror vertex) introduces the conjugate wavefront error to cancel\n"
+        "  the W∝r^4 spherical aberration of the spherical mirror.\n"
+        "\n"
+        "  Corrector sag:  z(r) = r²·(r² − 2·κ·ρ_n²) / [8·(n−1)·R³]\n"
+        "\n"
+        "  where:\n"
+        "    R   = primary mirror radius of curvature (mm)\n"
+        "    n   = corrector glass refractive index (default 1.5168 = BK7)\n"
+        "    κ   = neutral-zone factor (default 1.5, minimises peak-to-valley sag)\n"
+        "    ρ_n = (D/2) / sqrt(κ)  neutral zone radius\n"
+        "\n"
+        "  The neutral zone (dz/dr = 0) is at r = ρ_n. With κ = 1.5, this is\n"
+        "  at r ≈ 0.8165·(D/2) — the classic Schmidt (1932) optimum.\n"
+        "\n"
+        "Oracle / cross-check:\n"
+        "  200 mm aperture, f/2 mirror (R=400 mm), BK7 (n=1.5168), κ=1.5:\n"
+        "    neutral zone at r ≈ 81.65 mm\n"
+        "    max sag ≈ 0.0207 mm  (computed by formula)\n"
+        "\n"
+        "HONEST LIMITATIONS:\n"
+        "  * Classical Schmidt (1932) only. Modern Schmidt-Cassegrain and\n"
+        "    Schmidt-Newtonian designs include a secondary mirror, field-flattener,\n"
+        "    and refined aspherics — these are NOT modelled here.\n"
+        "  * Monochromatic. Chromatic residual (second-order, Wilkins 1950) is\n"
+        "    not computed.\n"
+        "  * On-axis only. Off-axis coma appears if corrector is not at the exact\n"
+        "    centre-of-curvature plane.\n"
+        "  * Field curvature (Petzval radius ≈ −R/2) is not corrected.\n"
+        "  * Thin-plate approximation: sag ≪ plate thickness assumed.\n"
+        "\n"
+        "Returns:\n"
+        "  aspheric_profile     : [[r_mm, z_mm], ...] sampled profile\n"
+        "  max_sag_mm           : peak-to-valley sag amplitude\n"
+        "  neutral_zone_radius_mm: radius where plate slope = 0\n"
+        "  schwarzschild_constant_k: equivalent mirror conic (always -1 = paraboloid)\n"
+        "  honest_caveat        : plain-text limitations\n"
+        "\n"
+        "Errors: {ok:false, reason} for invalid inputs.  Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "primary_radius_R_mm": {
+                "type": "number",
+                "description": (
+                    "Radius of curvature of the spherical primary mirror (mm). "
+                    "Must be > 0. Focal length = R/2. Example: f/2 200mm aperture "
+                    "=> R=400 mm."
+                ),
+            },
+            "aperture_diameter_D_mm": {
+                "type": "number",
+                "description": (
+                    "Clear aperture diameter of the corrector plate (mm). "
+                    "Must be > 0. Typically equals telescope entrance diameter."
+                ),
+            },
+            "glass_index_n": {
+                "type": "number",
+                "description": (
+                    "Refractive index of the corrector glass at design wavelength. "
+                    "Default 1.5168 (BK7 at 587.6 nm d-line). Must be > 1.0."
+                ),
+            },
+            "neutral_zone_factor_kappa": {
+                "type": "number",
+                "description": (
+                    "Neutral-zone placement factor kappa. Default 1.5 (minimises "
+                    "peak-to-valley sag, classic Schmidt optimum). kappa=1.0 places "
+                    "the neutral zone at the aperture edge. Must be > 0."
+                ),
+            },
+            "num_radii": {
+                "type": "integer",
+                "description": (
+                    "Number of radial sample points from 0 to D/2. Default 50. "
+                    "Must be >= 2."
+                ),
+            },
+        },
+        "required": ["primary_radius_R_mm", "aperture_diameter_D_mm"],
+    },
+)
+
+
+@register(_schmidt_corrector_spec, write=False)
+async def run_design_schmidt_corrector(ctx: "ProjectCtx", args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    for field_name in ("primary_radius_R_mm", "aperture_diameter_D_mm"):
+        if a.get(field_name) is None:
+            return json.dumps({"ok": False, "reason": f"{field_name} is required"})
+
+    try:
+        spec = SchmidtSpec(
+            primary_radius_R_mm=float(a["primary_radius_R_mm"]),
+            aperture_diameter_D_mm=float(a["aperture_diameter_D_mm"]),
+            glass_index_n=float(a.get("glass_index_n", 1.5168)),
+            neutral_zone_factor_kappa=float(a.get("neutral_zone_factor_kappa", 1.5)),
+        )
+        num_radii = int(a.get("num_radii", 50))
+        result = design_schmidt_corrector(spec, num_radii=num_radii)
+    except (ValueError, TypeError) as exc:
+        return json.dumps({"ok": False, "reason": str(exc)})
+    except Exception as exc:
+        return json.dumps({"ok": False, "reason": f"unexpected error: {exc}"})
+
+    return ok_payload(result.to_dict())

@@ -127,6 +127,11 @@ from kerf_cad_core.optics.chief_ray_height import (
     ChiefRayHeightReport,
     trace_chief_ray,
 )
+from kerf_cad_core.optics.schmidt_corrector import (
+    SchmidtSpec,
+    SchmidtReport,
+    design_schmidt_corrector,
+)
 
 __all__ = [
     "lensmaker",
@@ -191,4 +196,7 @@ __all__ = [
     "compute_lens_volume",
     "ChiefRayHeightReport",
     "trace_chief_ray",
+    "SchmidtSpec",
+    "SchmidtReport",
+    "design_schmidt_corrector",
 ]

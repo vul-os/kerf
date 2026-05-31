@@ -2923,6 +2923,21 @@
             "notes": "IPC-2221 trace ampacity calculator",
             "evidence": "packages/kerf-electronics/src/kerf_electronics/tracecurrent/ampacity.py"
           }
+        },
+        {
+          "name": "Voltage-drop check / NEC 210.19(A) compliance",
+          "domain": "D7",
+          "competitor": {
+            "status": "partial",
+            "notes": "Altium has no native NEC 210.19(A) voltage-drop check for conductor runs; third-party scripts required",
+            "source": "https://www.altium.com/documentation/altium-designer/pcb-design-rules-violations-reference",
+            "tier": "paid"
+          },
+          "kerf": {
+            "status": "[x]",
+            "notes": "NEC 2023 Article 210.19(A) voltage-drop check: DC/single-phase/three-phase; NEC Ch9 Table 8 resistance at 75°C (AWG 14–4/0 + 250 kcmil, Cu/Al); IEEE 141 §3 formulas; advisory ≤3% feeder / ≤2% branch check; electronics_check_voltage_drop LLM tool. Honest: 75°C baseline only; AC reactance ignored for short runs.",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/voltage_drop.py"
+          }
         }
       ]
     },
@@ -16347,6 +16362,20 @@
             "status": "yes",
             "note": "walk_along_cage_edges: CC limit-surface polyline along cage edge chain — boundary=cage, creased=crease curve, smooth=limit arc; intermediate points via index-tracked CC subdivision + vertex limit stencils; LLM tool subd_walk_edge_chain; 14 tests.",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/subd_edge_walk.py"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "SubD limit-surface planar cross-section curve",
+          "competitor": {
+            "status": "yes",
+            "note": "Rhino 8 Section / Contour commands intersect SubD (converted to mesh) with a plane; limit-surface exact plane intersection not available as a SubD-native API",
+            "source": "https://docs.mcneel.com/rhino/8/help/en-us/commands/section.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "walk_subd_limit_cross_plane: samples (u,v) grid on each cage face via Stam (1998) exact limit-position evaluator (bi-cubic B-spline for regular patches, eigenstructure for extraordinary vertices); sign-change detection + 5-iteration bisection refinement (error ≈ cell_size/32); CrossCurveResult with points, face_indices_crossed, num_intersections, honest_caveat; LLM tool subd_walk_limit_cross_plane. Honest: discrete sample walk — coarse grids miss sub-cell features; 5-iter bisection (not sub-pixel); boundary duplicates possible; unsorted output.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/subd/limit_walk_cross_curve.py"
           }
         },
         {

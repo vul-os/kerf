@@ -89,6 +89,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.arch.spaces_tools",
     "kerf_cad_core.arch.column_load_check_tools",  # arch_check_column_load: AISC 360-22 §E3 + ACI 318-19 §22.4
     "kerf_cad_core.arch.beam_deflection_tools",    # arch_compute_beam_deflection: Roark 9e §8 + AISC Table 3-23
+    "kerf_cad_core.arch.footing_bearing_tools",   # arch_compute_bearing_capacity: Meyerhof 1963 general equation (Bowles 5e §4; Das 8e §3)
     "kerf_cad_core.civil.hydraulics_tools",
     "kerf_cad_core.tolstack.tools",
     "kerf_cad_core.kinematics.tools",
@@ -266,6 +267,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.jewelry.enamel",
     "kerf_cad_core.simple_parametric.tools",
     "kerf_cad_core.spc.tools",
+    # SUBD-LIMIT-WALK-CROSS-CURVE: walk CC limit surface + planar cross-section (Stam 1998 + 5-iter bisection)
+    "kerf_cad_core.subd.limit_walk_cross_curve",
     # GK-P-B: Stam exact limit-position + limit-tangent evaluation (subd_eval_limit tool)
     "kerf_cad_core.geom.subd_stam",
     # GK-P45: SubD/mesh authoring ops (subd_poke, subd_extrude_along, sculpt_brush, multires_evaluate)

@@ -163,6 +163,8 @@ def _register_tools(ctx, provides: list) -> None:
         "kerf_electronics.photonics.fibre_link",
         # Netlist-vs-layout consistency DRC (IPC-7351B §4.1-4.2)
         "kerf_electronics.tools.netlist_drc",
+        # NEC 2023 Article 210.19(A) voltage-drop check for AC/DC conductor runs
+        "kerf_electronics.tools.voltage_drop",
     ]
 
     for module_path in tool_modules:

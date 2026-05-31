@@ -1797,3 +1797,14 @@ from kerf_cad_core.geom.curve_fit_g2 import (  # noqa: E402
     G2FitResult,
     fit_curve_g2,
 )
+# BREP-FACE-PLANE-DEVIATION: SVD least-squares best-fit plane from pre-sampled points;
+# max/RMS deviation + 4-tier planarity classification (Pratt 1987 §3; Eberly §6.6).
+# Used for STEP/IGES import validation and surface flatness QC.
+# HONEST: least-squares only — no robust outlier rejection.
+# LLM tool: geom_check_face_planarity.
+from kerf_cad_core.geom.face_plane_deviation import (  # noqa: E402
+    FaceSamplePoint,
+    PlaneFit,
+    FacePlaneDeviationReport,
+    compute_face_plane_deviation,
+)

@@ -8338,6 +8338,20 @@
         },
         {
           "domain": "D1",
+          "feature": "B-rep face plane deviation from pre-sampled points (STEP/IGES import QC)",
+          "competitor": {
+            "status": "partial",
+            "note": "SOLIDWORKS IFaceFeature.GetPlanarFaceData() classifies pre-existing plane faces but does not expose a standalone SVD best-fit plane API over a caller-supplied point cloud with max/RMS deviation and 4-tier classification for STEP/IGES import validation or CMM data QC",
+            "source": "https://help.solidworks.com/2024/english/api/sldworksapiprogguide/Welcome.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "compute_face_plane_deviation: SVD least-squares best-fit plane from caller-supplied list[FaceSamplePoint] (Pratt 1987 §3; Eberly §6.6); returns FacePlaneDeviationReport with PlaneFit (origin_xyz_mm, normal_xyz, d where n·p=d), max_deviation_mm, rms_deviation_mm, num_samples, is_planar (max_dev<tol), classification (planar/near-planar/curved/highly-curved at 1×/10×/100× tolerance); LLM tool geom_check_face_planarity; re-exported from geom/__init__.py; 23 hermetic tests. DISTINCT FROM face_planarity.py (which samples NURBS UV internally) — this module accepts raw points (STEP import mesh, CMM data, simulation output). HONEST: least-squares only — no robust outlier rejection (RANSAC/LMedS); single far outlier inflates max_deviation and tilts normal; sampling density is caller-controlled.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/face_plane_deviation.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "B-rep face developability check (Gaussian curvature K=0 test)",
           "competitor": {
             "status": "partial",

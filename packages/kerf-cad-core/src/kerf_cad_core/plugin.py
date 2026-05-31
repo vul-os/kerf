@@ -317,6 +317,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.subd.dual_mesh",
     # SUBD-CAGE-EDGE-FLIP: topological edge flip for two adjacent triangles sharing an edge; replace (v_a,v_b) with (v_c,v_d) opposite vertices; triangles only; no Delaunay in-circle test (Bommes-Lévy-Pietroni 2013 §3; Edelsbrunner 2001 §2)
     "kerf_cad_core.subd.edge_flip",
+    # SUBD-CAGE-AREA: total surface area of control polygon; limit-surface estimate ×0.94 (empirical Catmull-Clark shrinkage; Catmull-Clark 1978; Stam 1998 §2; Zorin-Schröder 2000 §3); per-face distribution; degenerate face flagging (area < 1e-6 mm²)
+    "kerf_cad_core.subd.cage_area",
     # GK-P-B: Stam exact limit-position + limit-tangent evaluation (subd_eval_limit tool)
     "kerf_cad_core.geom.subd_stam",
     # GK-P45: SubD/mesh authoring ops (subd_poke, subd_extrude_along, sculpt_brush, multires_evaluate)
@@ -534,6 +536,11 @@ _TOOL_MODULES = [
     # BREP-WIRE-CLOSED-CHECK: ordered edge-list closure + SVD planarity (Mantyla §3; Hoffmann §4)
     # LLM tool: brep_check_wire_closed
     "kerf_cad_core.geom.wire_closed_check",
+    # BREP-FACE-PLANE-DEVIATION: SVD least-squares best-fit plane from pre-sampled points;
+    # max/RMS deviation + planarity classification (Pratt 1987 §3; Eberly §6.6).
+    # STEP/IGES import validation + surface flatness QC.
+    # LLM tool: geom_check_face_planarity
+    "kerf_cad_core.geom.face_plane_deviation",
 ]
 # NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
 # (already in _TOOL_MODULES above at line 128); sagitta_arrow_chart module is imported

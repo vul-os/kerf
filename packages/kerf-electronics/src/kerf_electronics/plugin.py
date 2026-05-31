@@ -175,6 +175,9 @@ def _register_tools(ctx, provides: list) -> None:
         "kerf_electronics.decoupling_cap_size",
         # Differential pair intra-pair skew check (Johnson §12.4 + IPC-2141A §6)
         "kerf_electronics.diffpair_skew_check",
+        # Pierce crystal oscillator external load capacitor calculator
+        # (NXP AN-2867 §3 + AVR ATmega §28.5: CL=(C1·C2)/(C1+C2)+C_stray)
+        "kerf_electronics.crystal_load_cap",
     ]
 
     for module_path in tool_modules:

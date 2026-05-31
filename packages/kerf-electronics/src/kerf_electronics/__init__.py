@@ -21,3 +21,9 @@ from kerf_electronics.diffpair_skew_check import (  # noqa: F401
     DiffPairSkewReport,
     check_diffpair_skew,
 )
+from kerf_electronics.crystal_load_cap import (  # noqa: F401
+    CrystalSpec,
+    PCBLayoutSpec,
+    CrystalLoadCapReport,
+    compute_crystal_load_caps,
+)

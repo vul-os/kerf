@@ -2774,6 +2774,21 @@
           }
         },
         {
+          "name": "Pierce crystal oscillator load capacitor calculator (C1, C2)",
+          "domain": "D6",
+          "competitor": {
+            "status": "yes",
+            "notes": "Altium oscillator wizard provides basic load-cap guidance; full simulation via SPICE",
+            "source": "https://www.altium.com/documentation/altium-designer/crystal-oscillator-design",
+            "tier": "paid"
+          },
+          "kerf": {
+            "status": "[x]",
+            "notes": "CL=(C1·C2)/(C1+C2)+C_stray (NXP AN-2867 §3 + AVR ATmega §28.5); symmetric C1=C2=2·(CL−C_stray); asymmetric verification; qualitative gain-margin check (gm≥5×ESR per NXP AN-2867 §4.2); electronics_compute_crystal_load_caps LLM tool. Honest: drive-level limiting NOT modelled; PI-network for >20 MHz NOT applied; C_stray is a first-order estimate.",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/crystal_load_cap.py"
+          }
+        },
+        {
           "name": "EMC (radiated/shielding/limits)",
           "domain": "D6",
           "competitor": {
@@ -10313,6 +10328,20 @@
             "status": "yes",
             "note": "Cold-slug well checker (Beaumont 2007 §6.7 + Menges 2001 §6.5): verify slug-well diameter = 1.5× and depth = 2.0× runner diameter at each junction; ±20% tolerance band (1.2×–1.8× dia, 1.6×–2.4× depth); RunnerJunctionSpec dataclass (junction_id, runner_diameter_mm, slug_well_diameter_mm, slug_well_depth_mm, polymer_grade); ColdSlugReport with per-junction slug_well_compliant, recommended dims, reason string; LLM tool `mold_check_cold_slug_design`; 32 oracle tests; honest-flagged: geometric rule-of-thumb only — actual cold-slug capture depends on melt temperature, injection speed, and resin freeze-off time; fast-crystallising/filled grades may need larger wells; confirm by mold trial + gate-area visual inspection",
             "evidence": "packages/kerf-mold/src/kerf_mold/cold_slug_check.py"
+          }
+        },
+        {
+          "domain": "D7",
+          "feature": "Vent slot layout (count, width, spacing for air displacement)",
+          "competitor": {
+            "status": "no",
+            "note": "Cimatron mold wizard provides manual vent placement tools but no automated vent-slot count and spacing calculation from cavity volume and injection speed",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Vent slot layout (Beaumont 2007 §8.5 + Menges 2001 §6.4): propose slot count, width, and spacing from cavity volume, parting-line perimeter, polymer grade, and injection speed; Beaumont 0.5%-projected-area rule (total_vent_area ≥ 0.005 × volume_mm³/3mm wall); speed scaling: vent_area_factor = max(1.0, speed/50 cm³/s); slot width = 6 mm standard; polymer-specific vent depth midpoint for per-slot area sizing; minimum 4 slots; 10 mm minimum steel bridge between slots; MoldVolumeSpec dataclass (cavity_volume_cm3, parting_line_perimeter_mm, polymer_grade, injection_speed_cm3_s); VentSlotLayoutReport dataclass (num_vent_slots, vent_slot_width_mm, vent_slot_spacing_mm, total_vent_width_mm, air_displacement_rate_cm3_s, adequate, honest_caveat); LLM tool `mold_generate_vent_slot_layout`; 47 oracle tests; honest-flagged: heuristic rule from production experience — NOT first-principles fluid dynamics; wall thickness assumed 3 mm for area estimation; uniform spacing only — use mold_optimize_vent_placement for last-to-fill location; actual fill simulation needs Moldflow/Moldex3D/SigmaSoft",
+            "evidence": "packages/kerf-mold/src/kerf_mold/vent_slot_layout.py"
           }
         },
         {

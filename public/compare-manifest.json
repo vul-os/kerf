@@ -4953,6 +4953,20 @@
           }
         },
         {
+          "name": "NURBS 2D curve offset with accuracy stats (Piegl-Tiller §10.7 approx)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://wiki.freecad.org/Part_Offset2D",
+            "note": "FreeCAD Part Offset2D offsets 2D shapes but does not return per-sample offset accuracy statistics, self-intersection count, or honest approximation caveats"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_offset_2d.py",
+            "note": "offset_nurbs_curve_2d(curve, offset_distance_mm, side='left') -> Offset2DResult; Offset2DResult.offset_curve (NurbsCurve), max_actual_offset_mm, mean_actual_offset_mm (200-sample nearest-point stats), num_self_intersections (segment-sampling), honest_caveat; linear CP-offset approx (Tiller-Hanson 1984 / Piegl & Tiller §10.7): each CP displaced by offset_distance_mm along in-plane normal at Greville abscissa; analytic circle shortcut (exact); Newton refinement for residual < tol; LLM tool nurbs_offset_curve_2d; 26 hermetic tests. HONEST: NOT the exact NURBS offset — max_actual_offset_mm may differ from target by O(κ·d²) for high-curvature regions; applications: tool-radius compensation (CAM), gap-closing. Refs: Piegl & Tiller §10.7; Mortenson §4.6; Tiller & Hanson (1984) IEEE CG&A 4(9)."
+          }
+        },
+        {
           "name": "NURBS curve inflection points (κ sign-change detection)",
           "domain": "D01",
           "competitor": {

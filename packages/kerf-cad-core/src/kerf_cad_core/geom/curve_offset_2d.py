@@ -41,6 +41,7 @@ References
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -52,6 +53,44 @@ from kerf_cad_core.geom.nurbs import (
     find_span,
     _basis_funcs,
 )
+
+
+# ---------------------------------------------------------------------------
+# Public result dataclass
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class Offset2DResult:
+    """Result of a 2D NURBS curve offset operation (Piegl-Tiller §10.7 approx).
+
+    Attributes
+    ----------
+    offset_curve : NurbsCurve
+        The offset curve.  Same degree, knot vector, and number of control
+        points as the input.  Each CP is displaced by ``offset_distance_mm``
+        along the in-plane normal at its Greville abscissa (linear CP-offset
+        approximation — NOT the exact NURBS offset).
+    max_actual_offset_mm : float
+        Maximum sampled distance between ``offset_curve`` and the original
+        curve over 200 uniform parameter samples.  For straight lines and
+        circles this equals ``offset_distance_mm``; for high-curvature regions
+        it may differ significantly.
+    mean_actual_offset_mm : float
+        Mean sampled distance over the same 200 samples.
+    num_self_intersections : int
+        Number of self-intersection loops detected in ``offset_curve`` via
+        segment-sampling.  Non-zero for large offsets on sharp-corner or
+        high-curvature curves.
+    honest_caveat : str
+        Human-readable description of algorithm limitations.  Always non-empty.
+    """
+
+    offset_curve: NurbsCurve
+    max_actual_offset_mm: float
+    mean_actual_offset_mm: float
+    num_self_intersections: int
+    honest_caveat: str
 
 
 # ---------------------------------------------------------------------------
@@ -595,6 +634,100 @@ def offset_loop_2d(
 
 
 # ---------------------------------------------------------------------------
+# offset_nurbs_curve_2d — Offset2DResult wrapper (Piegl-Tiller §10.7 approx)
+# ---------------------------------------------------------------------------
+
+_HONEST_CAVEAT = (
+    "Linear CP-offset approximation (Piegl & Tiller §10.7 / Tiller-Hanson 1984): "
+    "each control point is displaced by offset_distance_mm along the in-plane "
+    "normal at its Greville abscissa.  This is NOT the exact NURBS offset.  For "
+    "straight lines and circles the approximation is exact; for high-curvature "
+    "regions max_actual_offset_mm may differ from the target by O(κ·d²) where κ "
+    "is the local curvature.  Applications: tool-radius compensation (CAM), "
+    "gap-closing, hatch fill.  Refs: Piegl & Tiller §10.7; Mortenson §4.6."
+)
+
+
+def _measure_offset_stats(
+    original: NurbsCurve,
+    offset: NurbsCurve,
+    n_samples: int = 200,
+) -> tuple[float, float]:
+    """Return (max_dist, mean_dist) between offset_curve and original, sampled
+    at n_samples uniform parameter values on the offset curve.
+
+    The nearest-point on the original is approximated by a dense sample grid
+    (4×n_samples points) — sufficient for the honest_caveat statistics.
+    """
+    t0_off = float(offset.knots[offset.degree])
+    t1_off = float(offset.knots[-(offset.degree + 1)])
+    t0_orig = float(original.knots[original.degree])
+    t1_orig = float(original.knots[-(original.degree + 1)])
+
+    off_ts = np.linspace(t0_off, t1_off, n_samples)
+    orig_ts = np.linspace(t0_orig, t1_orig, 4 * n_samples)
+
+    off_pts = np.array([_eval_2d(offset, float(t)) for t in off_ts])  # (n, 2)
+    orig_pts = np.array([_eval_2d(original, float(t)) for t in orig_ts])  # (4n, 2)
+
+    dists: list[float] = []
+    for p in off_pts:
+        d_vec = orig_pts - p  # (4n, 2)
+        d_min = float(np.min(np.linalg.norm(d_vec, axis=1)))
+        dists.append(d_min)
+    arr = np.array(dists)
+    return float(arr.max()), float(arr.mean())
+
+
+def offset_nurbs_curve_2d(
+    curve: NurbsCurve,
+    offset_distance_mm: float,
+    side: str = "left",
+) -> Offset2DResult:
+    """Offset a 2D NurbsCurve by ``offset_distance_mm`` (Piegl-Tiller §10.7 approx).
+
+    Linear CP-offset approximation: each control point is displaced by
+    ``offset_distance_mm`` along the in-plane normal at its Greville abscissa
+    (Tiller-Hanson 1984).  This is NOT the exact NURBS offset — for the exact
+    arc-length-preserving variant see ``exact_length_offset.py``.
+
+    Parameters
+    ----------
+    curve             : NurbsCurve  — source 2-D curve (z≈0 expected).
+    offset_distance_mm: signed offset magnitude (> 0 = away; < 0 = inward for
+                        the chosen side).
+    side              : ``'left'`` or ``'right'`` — which side of the curve
+                        direction to offset toward.
+
+    Returns
+    -------
+    Offset2DResult
+        ``offset_curve``, accuracy statistics, self-intersection count, and
+        ``honest_caveat`` describing algorithm limitations.
+
+    References
+    ----------
+    * Piegl & Tiller (1997) §10.7 (Approximate offsetting).
+    * Tiller & Hanson (1984) IEEE CG&A 4(9).
+    * Mortenson, M. E. (1997) *Geometric Modeling*, §4.6.
+    """
+    off_curve = offset_curve_2d(curve, offset_distance_mm, side=side)
+
+    max_dist, mean_dist = _measure_offset_stats(curve, off_curve)
+
+    sis = detect_self_intersection_2d(off_curve, n_samples=80)
+    n_si = len(sis)
+
+    return Offset2DResult(
+        offset_curve=off_curve,
+        max_actual_offset_mm=max_dist,
+        mean_actual_offset_mm=mean_dist,
+        num_self_intersections=n_si,
+        honest_caveat=_HONEST_CAVEAT,
+    )
+
+
+# ---------------------------------------------------------------------------
 # LLM tool registration
 # ---------------------------------------------------------------------------
 
@@ -725,4 +858,118 @@ if _REGISTRY_AVAILABLE:
             "knots": offset.knots.tolist(),
             "weights": offset.weights.tolist() if offset.weights is not None else None,
             "self_intersections": sis,
+        })
+
+    # -----------------------------------------------------------------------
+    # nurbs_offset_curve_2d — Offset2DResult tool (Piegl-Tiller §10.7 approx)
+    # -----------------------------------------------------------------------
+
+    _NURBS_OFFSET_2D_SPEC = ToolSpec(
+        name="nurbs_offset_curve_2d",
+        description=(
+            "Offset a 2D NURBS curve by offset_distance_mm using the linear CP-offset "
+            "approximation (Piegl & Tiller §10.7 / Tiller-Hanson 1984).  Each control "
+            "point is displaced by offset_distance_mm along the in-plane normal at its "
+            "Greville abscissa.  Returns Offset2DResult with accuracy stats and self-"
+            "intersection count.  HONEST: NOT the exact NURBS offset — max_actual_offset_mm "
+            "may differ from the target for high-curvature regions.  For tool-radius "
+            "compensation and gap-closing.\n"
+            "\n"
+            "Parameters\n"
+            "----------\n"
+            "control_points   : [[x,y] or [x,y,z]] — source NURBS control points.\n"
+            "degree           : int — polynomial degree.\n"
+            "knots            : [float] — clamped knot vector.\n"
+            "weights          : [float] or null — rational weights (null = non-rational).\n"
+            "offset_distance_mm : float — signed offset magnitude.\n"
+            "side             : 'left' or 'right' (default 'left').\n"
+            "\n"
+            "Returns\n"
+            "-------\n"
+            "  ok                      : bool\n"
+            "  control_points          : [[x,y,z]]\n"
+            "  degree                  : int\n"
+            "  knots                   : [float]\n"
+            "  weights                 : [float] or null\n"
+            "  max_actual_offset_mm    : float\n"
+            "  mean_actual_offset_mm   : float\n"
+            "  num_self_intersections  : int\n"
+            "  honest_caveat           : str\n"
+            "\n"
+            "Errors: {ok:false, reason}.  Never raises."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "control_points": {
+                    "type": "array",
+                    "items": {"type": "array", "items": {"type": "number"}},
+                    "description": "[[x,y] or [x,y,z]] control points.",
+                },
+                "degree": {"type": "integer", "description": "NURBS degree."},
+                "knots": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "description": "Clamped knot vector.",
+                },
+                "weights": {
+                    "type": ["array", "null"],
+                    "items": {"type": "number"},
+                    "description": "Per-CP rational weights, or null.",
+                },
+                "offset_distance_mm": {
+                    "type": "number",
+                    "description": "Signed offset magnitude in mm.",
+                },
+                "side": {
+                    "type": "string",
+                    "enum": ["left", "right"],
+                    "description": "Which side to offset toward (default 'left').",
+                },
+            },
+            "required": ["control_points", "degree", "knots", "offset_distance_mm"],
+        },
+    )
+
+    @register(_NURBS_OFFSET_2D_SPEC)
+    async def run_nurbs_offset_curve_2d(ctx: "ProjectCtx", args: bytes) -> str:
+        try:
+            a = _json.loads(args)
+        except Exception as exc:
+            return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+        try:
+            cp = np.array(a["control_points"], dtype=float)
+            degree = int(a["degree"])
+            knots = np.array(a["knots"], dtype=float)
+            weights_raw = a.get("weights")
+            weights = np.array(weights_raw, dtype=float) if weights_raw is not None else None
+            curve = NurbsCurve(
+                degree=degree,
+                control_points=cp,
+                knots=knots,
+                weights=weights,
+            )
+        except Exception as exc:
+            return err_payload(f"invalid curve: {exc}", "BAD_ARGS")
+
+        offset_distance_mm = float(a.get("offset_distance_mm", 0.0))
+        side = str(a.get("side", "left"))
+
+        try:
+            result = offset_nurbs_curve_2d(curve, offset_distance_mm, side=side)
+        except Exception as exc:
+            return err_payload(f"offset_nurbs_curve_2d failed: {exc}", "OP_FAILED")
+
+        off = result.offset_curve
+        return ok_payload({
+            "ok": True,
+            "control_points": off.control_points.tolist(),
+            "degree": off.degree,
+            "knots": off.knots.tolist(),
+            "weights": off.weights.tolist() if off.weights is not None else None,
+            "max_actual_offset_mm": result.max_actual_offset_mm,
+            "mean_actual_offset_mm": result.mean_actual_offset_mm,
+            "num_self_intersections": result.num_self_intersections,
+            "honest_caveat": result.honest_caveat,
         })

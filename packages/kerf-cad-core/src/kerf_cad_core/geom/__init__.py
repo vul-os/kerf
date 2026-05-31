@@ -484,7 +484,9 @@ from kerf_cad_core.geom.offset_far_correction import (
 )
 # GK-P: 2D in-plane NURBS curve offset (Tiller-Hanson 1984) + self-intersection trim
 from kerf_cad_core.geom.curve_offset_2d import (
+    Offset2DResult,
     offset_curve_2d,
+    offset_nurbs_curve_2d,
     detect_self_intersection_2d,
     trim_self_intersections_2d,
     offset_loop_2d,
@@ -963,8 +965,10 @@ __all__ = [
     "safe_offset_distance",
     "offset_with_local_refinement",
     "graceful_offset",
-    # GK-P: 2D curve offset
+    # GK-P: 2D curve offset (Tiller-Hanson 1984 + Piegl-Tiller §10.7 approx)
+    "Offset2DResult",
     "offset_curve_2d",
+    "offset_nurbs_curve_2d",
     "detect_self_intersection_2d",
     "trim_self_intersections_2d",
     "offset_loop_2d",

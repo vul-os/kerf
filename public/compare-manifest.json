@@ -246,6 +246,12 @@
           "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/wind_load_asce7.py\"; note: \"ASCE 7-22 §26–27 Directional Procedure: qz=0.00256·Kz·Kzt·Kd·V² (psf); Kz per Table 26.10-1 (Exp B/C/D, floor at 15 ft); Cp_windward=+0.8, Cp_leeward per Fig 27.4-1 (−0.5/−0.3/−0.2 interpolated by L/B); G=0.85 rigid; design pressure p=qz·G·Cp; arch_compute_wind_load LLM tool; SCOPE: Directional Procedure §27 only — Envelope Procedure §28 not implemented, tornado loads §32 not implemented, internal pressure GCpi §26.13 excluded, parapet+roof pressures excluded, flexible-building dynamic G §26.11.2 not supported\""
         },
         {
+          "name": "Lateral-torsional buckling check (AISC 360-22 §F2, compact I-shapes)",
+          "domain": "D2",
+          "competitor": "paid: true",
+          "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/lateral_bracing_check.py\"; note: \"AISC 360-22 §F2 LRFD: Lp=1.76·ry·√(E/Fy) (F2-5); Lr via F2-6; Zone 1 Lb≤Lp→yielding Mn=Mp; Zone 2 inelastic LTB Mn=Cb·[Mp−(Mp−0.7·Fy·Sx)·ramp]≤Mp (F2-2); Zone 3 elastic LTB Mn=Fcr·Sx≤Mp (F2-3/4); φ_b=0.90; c=1.0 (F2-8a); arch_check_lateral_bracing LLM tool; W14x90 oracle: Lp≈3983mm, Lr≈12962mm, Mp≈887.6kN·m; SCOPE: doubly symmetric compact I-shapes only — channels, tees, built-up sections out of scope; Cb must be supplied by caller\""
+        },
+        {
           "name": "ASCE 7 seismic loads",
           "domain": "D2",
           "competitor": "paid: true",

@@ -15,6 +15,8 @@ Submodules:
   slab_deflection_tools — LLM tool arch_compute_slab_deflection
   wind_load_asce7   — ASCE 7-22 §26–27 Directional Procedure wall wind pressures
   wind_load_asce7_tools — LLM tool arch_compute_wind_load
+  lateral_bracing_check — AISC 360-22 §F2 lateral-torsional buckling (LTB) check
+  lateral_bracing_check_tools — LLM tool arch_check_lateral_bracing
 
 Note on naming: ``SlabSpec`` in ``primitives`` is the BIM slab (polygon outline).
 ``SlabSpec`` in ``slab_deflection`` is the structural deflection slab (a×b×h).
@@ -58,6 +60,11 @@ from kerf_cad_core.arch.wind_load_asce7 import (
     WindPressureReport,
     compute_wind_load,
 )
+from kerf_cad_core.arch.lateral_bracing_check import (
+    WSectionSpec,
+    LateralBracingReport,
+    check_lateral_bracing,
+)
 
 __all__ = [
     "WallLayer",
@@ -90,4 +97,8 @@ __all__ = [
     "WindBuildingSpec",
     "WindPressureReport",
     "compute_wind_load",
+    # AISC 360-22 §F2 lateral-torsional buckling check
+    "WSectionSpec",
+    "LateralBracingReport",
+    "check_lateral_bracing",
 ]

@@ -1699,3 +1699,14 @@ from kerf_cad_core.geom.curve_circle_fit import CircleFitResult, fit_circle_to_c
 # — linear-segment detection, snap-to-line, near-straight edge classification.
 # Refs: Press §15.7 (TLS); Lawson-Hanson §6 (SVD geometric fitting).
 from kerf_cad_core.geom.curve_line_fit import LineFitResult, fit_line_to_curve
+# BREP-EDGE-FACE-NORMAL-FLIP: detect and fix B-rep faces with inconsistent outward normals.
+# Iterative neighbour-consensus voting: for each edge with two adjacent faces, check normal
+# compatibility; BFS-propagate flip signal from seed face (Mantyla §6.4 / Hoffmann §3).
+# Returns corrected normals + list of flipped face indices.
+# HONEST: isolated faces (no neighbours) cannot be voted; absolute orientation seeded
+# from seed face; not a geometric B-rep heal.
+# LLM tool: brep_detect_and_flip_face_normals.
+from kerf_cad_core.geom.face_normal_flip import (  # noqa: E402
+    FaceNormalFlipResult,
+    detect_and_flip_face_normals,
+)

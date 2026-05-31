@@ -18461,6 +18461,19 @@
             "note": "classify_edges / brep_classify_edges: convex/concave/tangential per interior edge via dihedral angle (Hoffmann 1989 §5.3; Mantyla 1988 §7.4)",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/edge_convexity.py"
           }
+        },
+        {
+          "domain": "D1",
+          "feature": "B-rep face normal flip detection and correction",
+          "competitor": {
+            "status": "no",
+            "note": "No public API for automatic detection and correction of inverted face normals in MatrixGold / Rhino (manual via FlipNormal command only)"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "brep_detect_and_flip_face_normals: iterative neighbour-consensus BFS voting (Mantyla §6.4; Hoffmann §3). Detects inverted faces on CONVEX curved surfaces (adjacent outward normals co-oriented, dot>threshold). CAVEATS: (1) perpendicular-adjacent faces (e.g. unit cube) produce no detectable signal — cannot correct a cube from normals alone; (2) concave surfaces and open flat meshes are not supported; (3) isolated faces (no neighbours) unchanged; (4) absolute orientation seeded from first face per component. For production use OCCT BRepLib::OrientClosedSolid.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/face_normal_flip.py"
+          }
         }
       ]
     }

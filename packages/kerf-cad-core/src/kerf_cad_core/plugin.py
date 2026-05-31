@@ -285,6 +285,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.subd.limit_normal_fit",
     # SUBD-CAGE-EDGE-COLLAPSE: collapse a quad cage edge to midpoint; merge v_a+v_b→v_m; remove degenerate faces (Hoppe 1996 §3.2; Bommes-Lévy-Pietroni 2013 §4)
     "kerf_cad_core.subd.edge_collapse",
+    # SUBD-CAGE-VERTEX-MERGE: merge N cage vertices by index into centroid; N-vertex generalisation of edge collapse; remove degenerate faces (Hoppe 1996 §3.2; Garland-Heckbert 1997 QEM §3)
+    "kerf_cad_core.subd.vertex_merge",
     # GK-P-B: Stam exact limit-position + limit-tangent evaluation (subd_eval_limit tool)
     "kerf_cad_core.geom.subd_stam",
     # GK-P45: SubD/mesh authoring ops (subd_poke, subd_extrude_along, sculpt_brush, multires_evaluate)

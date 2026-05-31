@@ -22,6 +22,11 @@ edge_collapse
     SUBD-CAGE-EDGE-COLLAPSE: collapse a quad cage edge to its midpoint
     vertex, updating adjacent face indices and removing degenerate faces
     (Hoppe 1996 §3.2; Bommes-Lévy-Pietroni 2013 §4).
+vertex_merge
+    SUBD-CAGE-VERTEX-MERGE: merge a list of cage vertices (by index) into
+    their centroid, updating all adjacent face indices and removing
+    degenerate faces. Generalisation of edge collapse to N vertices
+    (Hoppe 1996 §3.2; Garland-Heckbert 1997 QEM §3).
 """
 
 from kerf_cad_core.subd.limit_walk_cross_curve import (
@@ -40,6 +45,10 @@ from kerf_cad_core.subd.edge_collapse import (
     EdgeCollapseResult,
     collapse_edge,
 )
+from kerf_cad_core.subd.vertex_merge import (
+    VertexMergeResult,
+    merge_vertices,
+)
 
 __all__ = [
     "CrossCurveResult",
@@ -50,4 +59,6 @@ __all__ = [
     "sample_subd_limit_normals",
     "EdgeCollapseResult",
     "collapse_edge",
+    "VertexMergeResult",
+    "merge_vertices",
 ]

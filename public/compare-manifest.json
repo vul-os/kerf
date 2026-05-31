@@ -17122,6 +17122,20 @@
         },
         {
           "domain": "D1",
+          "feature": "SubD cage vertex merge (N-vertex centroid decimation)",
+          "competitor": {
+            "status": "partial",
+            "note": "Blender 'Merge by Distance' / Maya mergeVertex — merge multiple selected vertices to average (centroid) or target position; no programmatic API with topology-count guarantees; no QEM-optimal placement.",
+            "source": "https://docs.blender.org/manual/en/latest/modeling/meshes/editing/mesh/merge.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "merge_vertices(cage, vertex_indices): v_c = centroid of named vertices; all face refs to any named vertex rewritten to v_c; faces containing ≥ 2 named vertices become degenerate and are removed; vertex list compacted (net -(|S|-1) vertices); empty/single-index list → no-op; duplicates deduplicated; non-adjacent merge → no faces removed, vertex count drops by |S|-1; out-of-range index → ValueError; VertexMergeResult.merged_index valid; LLM tool subd_merge_vertices; 20 oracle-asserted tests. HONEST: centroid placement only — no quadric error metric (Garland-Heckbert 1997 §3); simple centroid; CC limit surface shape changes after merge; crease annotations on incident edges not preserved.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/subd/vertex_merge.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "Shell wall-thickness DFM check",
           "competitor": {
             "status": "partial",

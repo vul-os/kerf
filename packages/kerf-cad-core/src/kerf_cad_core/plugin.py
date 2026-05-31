@@ -84,6 +84,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.shaft.tools",
     "kerf_cad_core.gearbox.tools",
     "kerf_cad_core.arch.spaces_tools",
+    "kerf_cad_core.arch.column_load_check_tools",  # arch_check_column_load: AISC 360-22 §E3 + ACI 318-19 §22.4
     "kerf_cad_core.civil.hydraulics_tools",
     "kerf_cad_core.tolstack.tools",
     "kerf_cad_core.kinematics.tools",

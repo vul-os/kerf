@@ -216,6 +216,12 @@
           "kerf": "evidence: \"kerf-structural/aci318.py\""
         },
         {
+          "name": "Column axial-load check (AISC 360-22 §E3 + ACI 318-19 §22.4)",
+          "domain": "D2",
+          "competitor": "paid: true",
+          "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/column_load_check.py\"; note: \"AISC 360-22 §E3 inelastic/elastic Euler buckling (E3-2/E3-3) + ACI 318-19 §22.4.2.2 short tied/spiral column; phi_Pn, DCR, governing mode, KL/r>200 slender flag; arch_check_column_load LLM tool\""
+        },
+        {
           "name": "ASCE 7 wind and seismic loads",
           "domain": "D2",
           "competitor": "paid: true",

@@ -16874,6 +16874,20 @@
         },
         {
           "domain": "D1",
+          "feature": "SubD cage edge collapse (midpoint decimation)",
+          "competitor": {
+            "status": "yes",
+            "note": "Maya polyChamfer/merge vertex / Blender Merge by Distance / collapse edge — midpoint or target-point collapse; Rhino SubD CollapseEdge command; none expose QEM cost as programmatic API.",
+            "source": "https://docs.blender.org/manual/en/latest/modeling/meshes/editing/edge/collapse.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "collapse_edge(cage, edge_idx): v_m = (v_a + v_b) / 2; degenerate faces (contained both endpoints) removed; vertex list compacted (net -1 vertex); midpoint position oracle; all face indices valid post-collapse; LLM tool subd_collapse_edge. HONEST: midpoint-only — no quadric error metric (Garland-Heckbert 1997); shape not preserved optimally; crease annotations on incident edges not preserved.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/subd/edge_collapse.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "Shell wall-thickness DFM check",
           "competitor": {
             "status": "partial",

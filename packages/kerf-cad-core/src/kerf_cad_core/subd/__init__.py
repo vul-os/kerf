@@ -18,6 +18,10 @@ limit_normal_fit
     SUBD-LIMIT-NORMAL-FIT: sample the CC limit-surface normal n̂(u,v) at
     a uniform (u,v) grid on each cage face using Stam (1998) exact tangents;
     compute residuals vs bilinear face-corner approximation for shading use.
+edge_collapse
+    SUBD-CAGE-EDGE-COLLAPSE: collapse a quad cage edge to its midpoint
+    vertex, updating adjacent face indices and removing degenerate faces
+    (Hoppe 1996 §3.2; Bommes-Lévy-Pietroni 2013 §4).
 """
 
 from kerf_cad_core.subd.limit_walk_cross_curve import (
@@ -32,6 +36,10 @@ from kerf_cad_core.subd.limit_normal_fit import (
     LimitNormalFitResult,
     sample_subd_limit_normals,
 )
+from kerf_cad_core.subd.edge_collapse import (
+    EdgeCollapseResult,
+    collapse_edge,
+)
 
 __all__ = [
     "CrossCurveResult",
@@ -40,4 +48,6 @@ __all__ = [
     "select_edge_loop",
     "LimitNormalFitResult",
     "sample_subd_limit_normals",
+    "EdgeCollapseResult",
+    "collapse_edge",
 ]

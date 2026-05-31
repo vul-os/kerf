@@ -97,6 +97,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.arch.slab_deflection_tools",  # arch_compute_slab_deflection: Timoshenko §44 Tables 41–42 + Roark 9e Table 11.4
     "kerf_cad_core.arch.wind_load_asce7_tools",  # arch_compute_wind_load: ASCE 7-22 §26–27 Directional Procedure MWFRS wall pressures
     "kerf_cad_core.arch.lateral_bracing_check_tools",  # arch_check_lateral_bracing: AISC 360-22 §F2 LTB (compact doubly symmetric I-shapes)
+    "kerf_cad_core.arch.punching_shear_tools",  # arch_check_punching_shear: ACI 318-19 §22.6 two-way (punching) shear (no shear reinforcement)
     "kerf_cad_core.civil.hydraulics_tools",
     "kerf_cad_core.tolstack.tools",
     "kerf_cad_core.kinematics.tools",
@@ -281,6 +282,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.subd.edge_loop_select",
     # SUBD-LIMIT-NORMAL-FIT: sample CC limit-surface normal n̂(u,v) at uniform grid; residuals vs bilinear approx (Stam 1998 §3.2; Halstead-Kass-DeRose 1993)
     "kerf_cad_core.subd.limit_normal_fit",
+    # SUBD-CAGE-EDGE-COLLAPSE: collapse a quad cage edge to midpoint; merge v_a+v_b→v_m; remove degenerate faces (Hoppe 1996 §3.2; Bommes-Lévy-Pietroni 2013 §4)
+    "kerf_cad_core.subd.edge_collapse",
     # GK-P-B: Stam exact limit-position + limit-tangent evaluation (subd_eval_limit tool)
     "kerf_cad_core.geom.subd_stam",
     # GK-P45: SubD/mesh authoring ops (subd_poke, subd_extrude_along, sculpt_brush, multires_evaluate)

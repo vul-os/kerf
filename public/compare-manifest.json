@@ -300,6 +300,12 @@
           "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/opening_in_wall.py\"; note: \"IBC §2308.4 tributary redistribution: trib_w=opening_width/2+jamb_width/2+header_above_height; Pu=1.2·axial·trib_w+0.5·lateral·opening_area (ASCE 7-16 §2.3.1 combo 2); jamb capacity: concrete→ACI §11.5.3.1 φ·Pn=0.55·φ·f'c·Ag·[1−(h/(32t))²] (φ=0.65, k=1.0 pin-pin); masonry→TMS §8.3 Eq 8-22 r=t/√12 C_s=1−(h/(140r))² φ·Pn=φ·0.80·f'm·Ag·C_s (φ=0.60); wood_frame→simplified bearing φ·Pn=φ·Fc·Ag (NDS Cp NOT computed); lintel bending/deflection delegated to arch_design_lintel; oracle concrete 3m wall 200mm 1.2m×1.5m window fc=30MPa jamb=0.4m axial=30kN/m lateral=1.0kN/m²: trib_w=1.8m Pu=65.7kN φ·Pn≈812kN jamb DCR≈0.081 all_adequate=True; arch_check_opening_in_wall LLM tool; SCOPE: simplified tributary method — full 2-D FE stress-concentration NOT modelled (St. Venant diffusion ≈ 1–2× opening dimension; unconservative for wide openings > wall_height/2 or clustered openings); jamb: ACI §11.5.3.1 empirical only (e≈0 assumed); wood-frame: NDS Cp NOT computed; in-plane shear (IBC §2308.9/SDPWS §4.3) NOT checked; 25 tests pass\""
         },
         {
+          "name": "Slab-on-grade thickness check (ACI 360R-10 / Westergaard interior load)",
+          "domain": "D2",
+          "competitor": "paid: true",
+          "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/slab_on_grade.py\"; note: \"ACI 360R-10 + PCA EB119 + Westergaard (1948) interior concentrated load; l=[E·h³/(12·(1−ν²)·k)]^0.25 (E=4700√f'c ACI §19.2.2.1, ν=0.15, k [N/mm³]); σ_max=3P(1+ν)/(2πh²)·(log₁₀(l/b)+0.5) (PCA EB119 simplified); MR=0.62√f'c (ACI §19.2.3.1); DCR=σ_max/MR; joint_spacing≤30·h (PCA 30×h rule); oracle h=150mm f'c=25MPa k=27.2MPa/m P=50kN b=80mm: l≈706mm MR=3.10MPa σ_max≈1.76MPa DCR≈0.57 adequate; P=200kN→DCR≈2.28 inadequate; arch_check_slab_on_grade LLM tool; SCOPE: interior load ONLY (edge ≈25–30% higher stress, corner higher still; Westergaard 1948 §3); thermal/shrinkage curling NOT modelled (adds 0.3–1.0 MPa; ACI 360R-10 Appendix A2.2); single load only; unreinforced/crack-control rebar only; k at slab soffit (no plate-bearing correction); working-stress design (no FS); ACI 360R-10 Appendix A recommends FS 1.7–2.0 for unreinforced slabs; 28 tests pass\""
+        },
+        {
           "name": "Steel/RC/RM lintel design over wall opening (AISC Table 3-23 + ACI 318-19 §9 + TMS 402-22 §5)",
           "domain": "D2",
           "competitor": "paid: true",

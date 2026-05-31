@@ -44,6 +44,8 @@ To avoid collision this package re-exports the structural one as ``SlabDeflSpec`
   opening_in_wall   — IBC §2308.4 + ACI 318-19 §11.5.3.1 + TMS 402-22 §8.3 wall opening check
                       (tributary jamb load redistribution + jamb axial DCR + lintel bending DCR)
   opening_in_wall_tools — LLM tool arch_check_opening_in_wall
+  slab_on_grade     — ACI 360R-10 + Westergaard (1948) slab-on-grade under concentrated load
+  slab_on_grade_tools — LLM tool arch_check_slab_on_grade
 """
 from __future__ import annotations
 
@@ -145,6 +147,11 @@ from kerf_cad_core.arch.opening_in_wall import (
     OpeningCheckReport,
     check_opening,
 )
+from kerf_cad_core.arch.slab_on_grade import (
+    SlabOnGradeSpec,
+    SlabOnGradeReport,
+    check_slab_on_grade,
+)
 
 __all__ = [
     "WallLayer",
@@ -228,4 +235,8 @@ __all__ = [
     "WallOpeningSpec",
     "OpeningCheckReport",
     "check_opening",
+    # ACI 360R-10 + Westergaard (1948) slab-on-grade under concentrated interior load
+    "SlabOnGradeSpec",
+    "SlabOnGradeReport",
+    "check_slab_on_grade",
 ]

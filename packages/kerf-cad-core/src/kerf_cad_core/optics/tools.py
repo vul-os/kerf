@@ -3718,3 +3718,129 @@ async def run_compute_depth_of_field_focal(ctx: ProjectCtx, args: bytes) -> str:
         return json.dumps({"ok": False, "reason": str(exc)})
 
     return ok_payload(result.to_dict())
+
+
+# ---------------------------------------------------------------------------
+# Tool: optics_compute_telecentricity  (OPTICS-TELECENTRICITY)
+# ---------------------------------------------------------------------------
+
+from kerf_cad_core.optics.telecentricity_check import (  # noqa: E402
+    TelecentricityReport,
+    compute_telecentricity,
+)
+
+_telecentricity_spec = ToolSpec(
+    name="optics_compute_telecentricity",
+    description=(
+        "Compute the telecentricity (chief-ray angle in object/image space) for a\n"
+        "sequential optical system.\n"
+        "\n"
+        "A telecentric system has the aperture stop placed at a focal plane so that\n"
+        "chief rays are parallel to the optical axis in one or both conjugate spaces.\n"
+        "\n"
+        "Object-space telecentric:\n"
+        "  Stop at rear focal plane of the system. Chief rays in object space\n"
+        "  are parallel to the optical axis. Magnification invariant with object\n"
+        "  defocus. Used in machine vision / metrology (Smith MOE §5.4).\n"
+        "\n"
+        "Image-space telecentric:\n"
+        "  Stop at front focal plane. Chief rays in image space are parallel.\n"
+        "  Magnification invariant with image-plane defocus.\n"
+        "\n"
+        "Algorithm (paraxial, Welford 1986 §3):\n"
+        "  1. Solve for u_obj (object-space chief-ray angle) via superposition:\n"
+        "     Ray A (H, 0) + alpha * Ray B (0, 1) → h_stop = 0; alpha = u_obj.\n"
+        "  2. Trace chief ray through all surfaces → image-space angle.\n"
+        "  3. |angle| < 0.5 deg → telecentric (conventional threshold).\n"
+        "  4. Magnification variation over ±focus_shift_mm/2 image-plane defocus.\n"
+        "\n"
+        "lens_system_dict keys:\n"
+        "  surfaces : list of {c (mm^-1), t (mm), n (>=1.0), k (conic, opt.)}\n"
+        "  stop_surface_index : int (optional, default 0)\n"
+        "  object_distance_mm : float (optional; omit for infinite-conjugate)\n"
+        "  n_object : float (optional, default 1.0)\n"
+        "\n"
+        "Returns:\n"
+        "  chief_ray_angle_object_deg    - angle in object space (deg)\n"
+        "  chief_ray_angle_image_deg     - angle in image space (deg)\n"
+        "  object_telecentric            - |obj angle| < 0.5 deg\n"
+        "  image_telecentric             - |img angle| < 0.5 deg\n"
+        "  both_telecentric              - doubly telecentric flag\n"
+        "  max_magnification_variation_pct - % mag change over ±focus_shift_mm/2\n"
+        "  honest_caveat                 - scope disclaimer\n"
+        "\n"
+        "HONEST FLAG: Paraxial first-order only. Stop thin plane. Aspheric\n"
+        "higher-order terms do not affect first-order chief-ray angle.\n"
+        "Infinite-conjugate approximated by 10,000 x EFL object distance.\n"
+        "\n"
+        "Ref: Welford (1986) §3, §4.4; Smith 'Modern Optical Engineering' §5.4;\n"
+        "Hecht §6.6; Kingslake (1978) §5.1.\n"
+        "\n"
+        "Errors: {ok:false, reason} for invalid inputs. Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "lens_system_dict": {
+                "type": "object",
+                "description": (
+                    "Optical system descriptor. Required: 'surfaces' list. "
+                    "Optional: 'stop_surface_index' (int), 'object_distance_mm' (float), "
+                    "'n_object' (float)."
+                ),
+                "properties": {
+                    "surfaces": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "c": {"type": "number"},
+                                "t": {"type": "number"},
+                                "n": {"type": "number"},
+                                "k": {"type": "number"},
+                            },
+                            "required": ["c", "t", "n"],
+                        },
+                    },
+                    "stop_surface_index": {"type": "integer"},
+                    "object_distance_mm": {"type": "number"},
+                    "n_object": {"type": "number"},
+                },
+                "required": ["surfaces"],
+            },
+            "field_height_mm": {
+                "type": "number",
+                "description": "Off-axis field height (mm). Default 10.0. Must be > 0.",
+            },
+            "focus_shift_mm": {
+                "type": "number",
+                "description": "Focus shift range (mm). Default 0.5. Must be > 0.",
+            },
+        },
+        "required": ["lens_system_dict"],
+    },
+)
+
+
+@register(_telecentricity_spec, write=False)
+async def run_compute_telecentricity(ctx: "ProjectCtx", args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    if a.get("lens_system_dict") is None:
+        return json.dumps({"ok": False, "reason": "lens_system_dict is required"})
+
+    kwargs: dict = {}
+    if "field_height_mm" in a:
+        kwargs["field_height_mm"] = float(a["field_height_mm"])
+    if "focus_shift_mm" in a:
+        kwargs["focus_shift_mm"] = float(a["focus_shift_mm"])
+
+    result = compute_telecentricity(a["lens_system_dict"], **kwargs)
+    if isinstance(result, dict) and not result.get("ok", True):
+        return json.dumps(result)
+    if isinstance(result, TelecentricityReport):
+        return ok_payload(result.to_dict())
+    return ok_payload(result)

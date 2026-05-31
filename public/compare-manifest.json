@@ -14665,6 +14665,20 @@
         },
         {
           "domain": "D12",
+          "feature": "Telecentricity check (chief-ray angle)",
+          "competitor": {
+            "status": "yes",
+            "note": "Full pupil chief-ray angle and telecentricity check via exact ray tracing through sequential surfaces; object-space, image-space, and doubly-telecentric configurations; field dependence; export to report",
+            "source": "https://www.zemax.com/pages/opticstudio"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Telecentricity check (OPTICS-TELECENTRICITY): compute_telecentricity(lens_system_dict, field_height_mm=10.0, focus_shift_mm=0.5) -> TelecentricityReport(chief_ray_angle_object_deg, chief_ray_angle_image_deg, object_telecentric, image_telecentric, both_telecentric, max_magnification_variation_pct, honest_caveat); paraxial chief-ray trace via Welford nu-form (n'u' = nu - hc(n'-n)); chief-ray angle solved by superposition: Ray A (H, 0) + alpha*Ray B (obj_dist, 1), alpha = -h_A_stop/h_B_stop forces h=0 at stop; object-space telecentric <-> |angle_obj| < 0.5 deg (machine-vision convention); image-space telecentric <-> |angle_img| < 0.5 deg; magnification variation across +/-focus_shift_mm relative to Lagrange-invariant reference magnification; oracle: single-lens (f=100mm, stop at front focal plane, 5m object) -> object_telecentric=True, image_telecentric=False; doubly-telecentric relay (two equal lenses, stop at shared focal plane) -> both_telecentric=True; LLM tool optics_compute_telecentricity; 25 hermetic tests. Honest: PARAXIAL (first-order) ONLY — aspheric terms do not affect first-order chief-ray angle; stop modelled as thin plane; infinite-conjugate approximated by large finite distance; magnification variation uses nu-form thin-lens paraxial formula. Ref: Welford (1986) S3, S4.4; Smith MOE S5.4; Hecht S6.6.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/telecentricity_check.py"
+          }
+        },
+        {
+          "domain": "D12",
           "feature": "Non-sequential ray tracing (stray light)",
           "competitor": {
             "status": "yes",

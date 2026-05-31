@@ -486,41 +486,68 @@ def compute_telecentricity(
     both_telecentric = object_telecentric and image_telecentric
 
     # ── Magnification variation with image-plane focus shift ───────────────
-    # Trace a marginal ray from the axial object point at z = -object_distance_mm:
-    # h_obj = 0, u_obj = 1/object_distance_mm (maps to unit off-axis height at obj).
-    # At first surface: h0 = 0 + obj_dist * (1/obj_dist) = 1.
-    # Actually use a canonical marginal ray: h0 = 1/obj_dist * obj_dist = 1,
-    # u0 = 1/obj_dist.
-    # The image height at the nominal focus is h_image = h_last + bfl * u_last.
-    # Magnification = h_image / (object_height = 1).
+    # Algorithm (Welford §3.5 / Kingslake §5.1):
+    #
+    # Trace ray A: (h=field_height_mm, u=0) from the first surface.
+    # This is an off-axis ray from the field point with zero initial slope.
+    # At focus shift Δ from the nominal image plane, the image height is:
+    #
+    #   h_img(Δ) = h_last_A + (bfl_A + Δ) * u_last_A
+    #
+    # At the NOMINAL image plane (Δ=0): h_img(0) = 0 by definition.
+    # For a focus shift Δ: h_img(Δ) = Δ * u_last_A  (since bfl_A cancels).
+    #
+    # The reference magnification m_nom is derived from the marginal ray
+    # slope ratio (Lagrange invariant form, Welford §3.5):
+    #
+    #   m_nom = (n_obj * u_marg_in) / (n_img * u_marg_out)
+    #
+    # where (u_marg_in, u_marg_out) are the slopes of a paraxial marginal
+    # ray traced from the axial object point (h=0, u=1/obj_dist).
+    #
+    # Magnification variation percentage:
+    #
+    #   Δm = h_img(+δ) - h_img(-δ) = 2δ * u_last_A  (changes in image height)
+    #   Reference image height at shift δ: m_nom * field_height_mm
+    #
+    #   mag_variation_pct = 100 * |2δ * u_last_A| / |m_nom * field_height_mm|
+    #
+    # For a telecentric system: u_last_A ≈ 0 → variation ≈ 0%.
+    # For a non-telecentric system: u_last_A ≠ 0 → variation > 0%.
 
-    u_marg_obj = 1.0 / object_distance_mm
-    h0_marg = object_distance_mm * u_marg_obj  # = 1.0
-    heights_marg, u_after_marg, bfl_marg = _paraxial_trace_surfaces(
-        surfaces, h0=h0_marg, u0=u_marg_obj, n_object=n_object,
+    # Trace ray A: (H, 0)
+    heights_A, u_after_A, bfl_A = _paraxial_trace_surfaces(
+        surfaces, h0=field_height_mm, u0=0.0, n_object=n_object,
     )
+    u_last_A = u_after_A[-1]
 
-    h_last_marg = heights_marg[-1]
-    u_img_marg = u_after_marg[-1]
+    # Reference magnification via marginal ray (Lagrange)
+    u_marg_in = 1.0 / object_distance_mm
+    heights_marg, u_after_marg, _ = _paraxial_trace_surfaces(
+        surfaces, h0=0.0, u0=u_marg_in, n_object=n_object,
+    )
+    u_marg_out = u_after_marg[-1]
+    n_img = float(surfaces[-1]["n"])
 
-    def _mag_at_shift(shift_mm: float) -> float:
-        if not math.isfinite(bfl_marg):
-            return math.inf
-        h_image = h_last_marg + (bfl_marg + shift_mm) * u_img_marg
-        # object height = 1 mm (unit object)
-        return h_image
+    if abs(u_marg_out) < 1e-18:
+        m_nom = math.inf
+    else:
+        m_nom = (n_object * u_marg_in) / (n_img * u_marg_out)
 
     delta = focus_shift_mm / 2.0
-    m_nom = _mag_at_shift(0.0)
     if not math.isfinite(m_nom) or abs(m_nom) < 1e-18:
-        mag_variation_pct = float("nan")
+        # Use u_last_A as absolute variation (in mm) normalised by field height
+        if abs(field_height_mm) > 0:
+            mag_variation_pct = 100.0 * abs(2.0 * delta * u_last_A) / abs(field_height_mm)
+        else:
+            mag_variation_pct = float("nan")
     else:
-        m_plus = _mag_at_shift(delta)
-        m_minus = _mag_at_shift(-delta)
-        if not math.isfinite(m_plus) or not math.isfinite(m_minus):
+        # Normalise by the reference image size = m_nom * field_height_mm
+        ref_image_height = abs(m_nom * field_height_mm)
+        if ref_image_height < 1e-18:
             mag_variation_pct = float("nan")
         else:
-            mag_variation_pct = 100.0 * abs(m_plus - m_minus) / abs(m_nom)
+            mag_variation_pct = 100.0 * abs(2.0 * delta * u_last_A) / ref_image_height
 
     return TelecentricityReport(
         chief_ray_angle_object_deg=chief_ray_angle_object_deg,

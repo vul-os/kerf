@@ -5318,6 +5318,19 @@
           }
         },
         {
+          "name": "G02/G03 arc linearisation (legacy controller support)",
+          "competitor": {
+            "status": "partial",
+            "source": "https://wiki.freecad.org/CAM_Post",
+            "note": "FreeCAD CAM post-processors can be customised to emit linear-only output, but no built-in configurable chord-error arc lineariser tool"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cam/src/kerf_cam/arc_linearize.py",
+            "note": "linearize_arcs(ArcLinearizeSpec): converts G02/G03 to G01 segments; I/J + R formats; Δθ=2·acos(1−ε/R) per MH 31e §1130; 42 tests green. HONEST: modal G-codes not preserved; XY-plane only; full-circle R-format passed through with warning"
+          }
+        },
+        {
           "name": "Moldflow / fill simulation",
           "competitor": {
             "status": "no",

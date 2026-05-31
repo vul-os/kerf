@@ -294,6 +294,12 @@
           "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/pier_axial_capacity.py\"; note: \"TMS 402-22 §8.3 masonry: φ·Pn=φ·0.80·f'm·Ag·C_s; ACI 318-19 §22.4.2.2 RC: φ·Pn=φ·0.80·[0.85·f'c·(Ag-As)+fy·As]·C_s; slenderness factor C_s=1−(h_eff/(140·r))² (TMS Eq 8-22) valid h_eff/r≤99; r=min(width,thickness)/√12; k: fixed_fixed=0.5, pin_pin=1.0, fixed_pin=0.7, cantilever=2.0 (Drysdale-Hamid §10); oracle 200×200mm pin-pin h=3000mm clay_masonry f'm=10MPa→r=57.7mm h/r=52.0 C_s≈0.862 φ·Pn≈179.5kN; h/r>99→slenderness_limit_exceeded φ·Pn=0; arch_check_pier_axial LLM tool; SCOPE: concentric axial ONLY — no eccentricity, no moment interaction, no PM curve; TMS Eq 8-22 h_eff/r≤99 limit; grout/inspection Φ not applied; 49 tests pass\""
         },
         {
+          "name": "Steel/RC/RM lintel design over wall opening (AISC Table 3-23 + ACI 318-19 §9 + TMS 402-22 §5)",
+          "domain": "D2",
+          "competitor": "paid: true",
+          "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/lintel_design.py\"; note: \"AISC Table 3-23 + ACI 318-19 §9 + TMS 402-22 §5; materials: steel/reinforced_concrete/reinforced_masonry; load model: w_u=1.2·DL+1.6·LL (ASCE 7-16 §2.3.1 combo 2) + masonry arching action (45° triangle when h_masonry≥L/2, TMS 402-22 Commentary §5.3.1; BIA TN-31B); steel: φ·Mn=0.90·Fy·S_x (rectangle approx), φ·Vn=1.00·0.6·Fy·0.5·b·h; RC ACI §9: ρ_max=0.018, φ·Mn=0.90·As·fy·(d−a/2), φ·Vn=0.75·0.17·√f'c·b·d (V_c only); RM TMS §9.3: ρ_max=0.010, φ·Mn=0.90·As·fy·(d−a/2), φ·Vn=0.80·A_n·√f'm/3; deflection L/240 (wall/roof) or L/360 (floor); oracle steel L=1200mm 101.6×101.6mm Fy=250MPa DL=5 LL=3: M_factored=1.944kN·m, service M=1.44kN·m, φ·Mn=39.33kN·m, adequate=True; arch_design_lintel LLM tool; SCOPE: simple span ONLY — continuous-beam moment redistribution NOT modelled; steel: rectangle approx (actual W/L-shapes have higher S_x/I_x); LTB not checked; RC: ρ_max estimate, V_c only (no stirrups); RM: ρ_max estimate, no shear rebar; combo 1.2D+1.6L only; 53 tests pass\""
+        },
+        {
           "name": "Plain/masonry bearing wall axial capacity + DCR (ACI 318-19 §11.5.3.1 + TMS 402-22 §8.3)",
           "domain": "D2",
           "competitor": "paid: true",

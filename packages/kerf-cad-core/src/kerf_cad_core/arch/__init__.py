@@ -37,6 +37,8 @@ To avoid collision this package re-exports the structural one as ``SlabDeflSpec`
   pier_axial_capacity_tools — LLM tool arch_check_pier_axial
   bearing_wall_axial — ACI 318-19 §11.5.3.1 + TMS 402-22 §8.3 plain/masonry bearing wall axial check
   bearing_wall_axial_tools — LLM tool arch_check_bearing_wall_axial
+  lintel_design     — AISC Table 3-23 + ACI 318-19 §9 + TMS 402-22 §5 lintel design (steel/RC/RM)
+  lintel_design_tools — LLM tool arch_design_lintel
 """
 from __future__ import annotations
 
@@ -123,6 +125,11 @@ from kerf_cad_core.arch.bearing_wall_axial import (
     BearingWallReport,
     check_bearing_wall,
 )
+from kerf_cad_core.arch.lintel_design import (
+    LintelSpec,
+    LintelDesignReport,
+    design_lintel,
+)
 
 __all__ = [
     "WallLayer",
@@ -194,4 +201,8 @@ __all__ = [
     "BearingWallSpec",
     "BearingWallReport",
     "check_bearing_wall",
+    # AISC Table 3-23 + ACI 318-19 §9 + TMS 402-22 §5 steel/RC/RM lintel design
+    "LintelSpec",
+    "LintelDesignReport",
+    "design_lintel",
 ]

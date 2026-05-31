@@ -145,6 +145,11 @@ from kerf_mold.sprue_bushing_match import (
     TAPER_MIN_DEG,
     TAPER_MAX_DEG,
 )
+from kerf_mold.cooling_turbulent_re_check import (
+    CoolingFlowSpec,
+    TurbulentReCheckReport,
+    check_turbulent_re,
+)
 
 __all__ = [
     # mold.py
@@ -271,4 +276,8 @@ __all__ = [
     "O_EXCESS_MAX_MM",
     "TAPER_MIN_DEG",
     "TAPER_MAX_DEG",
+    # cooling_turbulent_re_check.py
+    "CoolingFlowSpec",
+    "TurbulentReCheckReport",
+    "check_turbulent_re",
 ]

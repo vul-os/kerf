@@ -72,6 +72,16 @@ Registers:
                 nozzle_r + 0.5–1.0 mm; sprue orifice = nozzle_O + 0.5–1.0 mm;
                 taper 1.5–3.0°/side; HONEST: cold-runner standard bushings only
                 — hot-runner nozzle seats follow different design rules)
+  - LLM tool:  mold_check_turbulent_re
+               (Beaumont 2007 §11 + White "Fluid Mechanics" §8.1 + Incropera
+                & DeWitt eq. 8.60: verify cooling-channel Reynolds number
+                Re > 10 000 for fully-turbulent flow and Dittus-Boelter
+                applicability; flag laminar Re<2300 and transitional zones;
+                returns Re, flow_regime, velocity_m_per_s,
+                recommended_min_flow_rate_L_per_min,
+                dittus_boelter_applicable; HONEST: Re classification only —
+                does NOT compute Nu/HTC, polymer-side boundary layer, or
+                mold-steel thermal resistance)
 """
 from __future__ import annotations
 
@@ -326,6 +336,18 @@ async def register(app: FastAPI, ctx):
         run_mold_check_sprue_bushing_match,
     )
 
+    # Register cooling-channel Reynolds-number turbulence check tool
+    # (Beaumont 2007 §11 + White "Fluid Mechanics" §8.1 + Incropera eq. 8.60)
+    from kerf_mold.cooling_turbulent_re_check_tool import (
+        mold_check_turbulent_re_spec,
+        run_mold_check_turbulent_re,
+    )
+    ctx.tools.register(
+        "mold_check_turbulent_re",
+        mold_check_turbulent_re_spec,
+        run_mold_check_turbulent_re,
+    )
+
     provides = [
         "mold.moldability",
         "mold.parting_surface",
@@ -352,6 +374,7 @@ async def register(app: FastAPI, ctx):
         "mold.warpage_index",
         "mold.melt_flow_ratio_check",
         "mold.sprue_bushing_match",
+        "mold.cooling_turbulent_re_check",
     ]
 
     try:

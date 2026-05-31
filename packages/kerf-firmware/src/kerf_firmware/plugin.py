@@ -480,3 +480,20 @@ def _register_tools(ctx, provides: list) -> None:
         logger.warning(
             "kerf-firmware: failed to load firmware_audit_ram_usage tool: %s", exc
         )
+
+    # firmware_estimate_stack_depth — static worst-case stack depth estimator
+    try:
+        from kerf_firmware.tools.firmware_estimate_stack_depth import (
+            _spec as _stack_depth_spec,
+            run_firmware_estimate_stack_depth_async as _stack_depth_fn,
+        )
+        ctx.tools.register(
+            "firmware_estimate_stack_depth",
+            _stack_depth_spec,
+            _stack_depth_fn,
+        )
+        provides.append("firmware.stack_depth_estimate")
+    except Exception as exc:
+        logger.warning(
+            "kerf-firmware: failed to load firmware_estimate_stack_depth tool: %s", exc
+        )

@@ -2858,6 +2858,20 @@
           }
         },
         {
+          "name": "LDO linear regulator dropout and thermal compliance check",
+          "domain": "D6",
+          "competitor": {
+            "status": "partial",
+            "notes": "Altium Designer has no built-in LDO dropout checker; requires manual datasheet lookup or SPICE/LTspice simulation",
+            "source": "https://www.altium.com/documentation/altium-designer/power-integrity"
+          },
+          "kerf": {
+            "status": "[x]",
+            "notes": "electronics_check_ldo_dropout: headroom_mV=(V_in_min−V_out)×1000; dropout_compliant=headroom>dropout_spec (strict); P_diss=(V_in_max−V_out)×I_load; T_j=T_ambient+P_diss×R_θja (Jedec JESD51 single-node); thermal_compliant=T_j<T_max_j; efficiency=100×V_out/V_in_max (pessimistic). Honest: quiescent current I_Q NOT included (dominates at light load); transient headroom NOT checked (add ≥100–200 mV guard-band for PSRR/load steps, Sandler §4.4); output capacitor stability NOT verified (ESR window); θja is worst-case single-node thermal model. Refs: TI Power Ref §3; Sandler §4; Jedec JESD51-1.",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/ldo_dropout_check.py"
+          }
+        },
+        {
           "name": "PCB thermal (board-level)",
           "domain": "D6",
           "competitor": {
@@ -4037,6 +4051,19 @@
             "status": "yes",
             "note": "firmware_audit_ram_usage: static_alloc=data+bss; dynamic_alloc=heap+stack; total_used=static+dynamic; within_budget=total_used≤80% of total_ram (10% safety guard); recommendation names largest contributor when over budget; depth-bar: STM32F411 128KB (RM0383 §2) data=8KB/bss=16KB/heap=24KB/stack=8KB → 56KB used, 43.75% → adequate; ATmega328P 2KB (§8) data=500B/bss=1200B/heap=200B/stack=100B → 2000B, 97.66% → over budget; 46 tests. HONEST: static estimate only — does not account for malloc fragmentation or interrupt-driven stack growth beyond declared stack_max_bytes.",
             "evidence": "packages/kerf-firmware/src/kerf_firmware/ram_usage_audit.py"
+          }
+        },
+        {
+          "domain": "D6",
+          "feature": "Static worst-case stack depth estimator (Cortex-M / ATmega, DFS call-tree, ISR overhead, cycle detection)",
+          "competitor": {
+            "status": "no",
+            "note": "OpenPLC has no static stack depth analysis; engineers must manually trace call graphs from arm-none-eabi-gcc -fstack-usage output"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "firmware_estimate_stack_depth: DFS through call graph accumulating per-function frame sizes; detects recursive cycles (back-edges); ISR preemption overhead added once (default 32 B = Cortex-M3/M4/M7 exception frame: 8 regs × 4 B, ARM Generic UG §B1.5.6); depth-bar: main(100 B)→A(200 B)→B(50 B) + ISR 32 B = 382 B; cycle A→B→A flagged has_cycles=True; multiple-callee branching takes deepest path; ATmega variant isr_overhead_bytes=3 (PC save only); 38 tests. HONEST: static estimate only — does not account for VLA (variable-length arrays; exact depth is undecidable with VLAs), alloca(), longjmp/setjmp, or indirect calls; frame sizes must come from -fstack-usage *.su files, not guesses; recursive cycles report per-iteration lower bound only. Refs: ARM IHI 0042F AAPCS §5.2/§6.1; Greenwood (2011) ‘Static Stack Analysis for Embedded Systems’ §3.",
+            "evidence": "packages/kerf-firmware/src/kerf_firmware/stack_depth_estimate.py"
           }
         },
         {

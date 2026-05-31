@@ -123,6 +123,11 @@ from kerf_mold.runner_diameter_optimize import (
     RunnerOptimizeReport,
     optimize_runner_diameter,
 )
+from kerf_mold.warpage_index import (
+    WarpageSpec,
+    WarpageIndexReport,
+    compute_warpage_index,
+)
 
 __all__ = [
     # mold.py
@@ -230,4 +235,8 @@ __all__ = [
     "RunnerOptimizeSpec",
     "RunnerOptimizeReport",
     "optimize_runner_diameter",
+    # warpage_index.py
+    "WarpageSpec",
+    "WarpageIndexReport",
+    "compute_warpage_index",
 ]

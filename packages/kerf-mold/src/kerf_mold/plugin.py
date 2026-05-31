@@ -56,6 +56,12 @@ Registers:
                (Beaumont 2007 §6.5 + Menges 2001 §6.5 optimal cold-runner
                 diameter: D=(W^0.25×√L)/3.7 with material-viscosity
                 adjustment; cold-runner waste + fill-pressure proxy)
+  - LLM tool:  mold_compute_warpage_index
+               (Beaumont 2007 §10 Warpage Analysis + Menges 2001 §8 Post-mold
+                shrinkage; heuristic 0–100 warpage-risk index from wall
+                uniformity, gate location, polymer grade, post-ejection cooling
+                time, and mold temperature; HONEST: screening tool only —
+                real warpage prediction requires Moldflow/Moldex3D FEM)
 """
 from __future__ import annotations
 
@@ -275,6 +281,18 @@ async def register(app: FastAPI, ctx):
         run_mold_optimize_runner_diameter,
     )
 
+    # Register warpage index tool
+    # (Beaumont 2007 §10 + Menges 2001 §8)
+    from kerf_mold.warpage_index_tool import (
+        mold_compute_warpage_index_spec,
+        run_mold_compute_warpage_index,
+    )
+    ctx.tools.register(
+        "mold_compute_warpage_index",
+        mold_compute_warpage_index_spec,
+        run_mold_compute_warpage_index,
+    )
+
     provides = [
         "mold.moldability",
         "mold.parting_surface",
@@ -298,6 +316,7 @@ async def register(app: FastAPI, ctx):
         "mold.vent_slot_layout",
         "mold.cooling_pressure_drop",
         "mold.runner_diameter_optimize",
+        "mold.warpage_index",
     ]
 
     try:

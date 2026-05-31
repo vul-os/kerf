@@ -1,15 +1,16 @@
 {
   "version": 1,
-  "generatedAt": "2026-05-29T21:20:49.471Z",
+  "generatedAt": "2026-06-01T00:00:00.000Z",
   "source": "ROADMAP.md",
   "latestDelta": {
-    "date": "2026-05-31",
+    "date": "2026-06-01",
     "itemCount": 1,
     "items": [
       {
-        "title": "MOLD-EJECTOR-PIN-PUSH — Euler buckling-force check for SPI ejector pins",
-        "body": "compute_ejector_pin_push(EjectorPinPushSpec) -> EjectorPinPushReport in kerf_mold.ejector_pin_push. F_cr = pi²·E·I/(K·L)² (Roark's 9e §15.2 + SPI/ANSI B151.1); E=200 GPa for all tool-steel grades (M2/H13/S7/D2); I=pi·d⁴/64; K=1.0 pinned-pinned (default), 0.5 fixed-fixed, 2.0 cantilever; DCR=required/F_cr; recommends smallest SPI-standard diameter with F_cr >= 1.1× required; short-column warning when K·L/d < 30. LLM tool mold_compute_ejector_pin_push registered; 45 oracle tests green. HONEST: Euler non-conservative for K·L/d < 30 — use Johnson formula in short-column regime; bushing friction and pin eccentricity NOT modelled.",
-        "domain": "Mechanical/Mold"
+        "title": "GK-P22 -- Sculpt brushes for SubD cages and triangle meshes",
+        "body": "apply_sculpt_brush(vertices, faces, SculptStroke) -> MeshSculptResult in kerf_cad_core.mesh_sculpt_brushes. 4 brushes: Inflate (along one-ring normal), Crease (inverted inflate), Smooth (first-order centroid relaxation), Pinch (attract to stroke centre). Wendland C2 falloff w(t)=(1-t^2)^2 (Wendland 1995). Auto-normals via area-weighted one-ring averaging. LLM tool mesh_sculpt_brush wired. 35 tests. Honest (v1): single-stroke stateless -- no undo stack, no stroke history, no dyntopo; smooth = unweighted first-order centroid only; crease = mesh-level inward inflate (not CC subdivision sharpness). Refs: Botsch-Sorkine 2008 S3; Sculptris/ZBrush brush math (Pixologic 2024).",
+        "status": "shipped",
+        "date": "2026-06-01"
       }
     ]
   }

@@ -88,6 +88,12 @@ from kerf_cad_core.optics.vignetting_check import (
     VignettingReport as VignettingCheckReport,
     compute_vignetting as compute_vignetting_check,
 )
+from kerf_cad_core.optics.pixel_mtf import (
+    PixelSensorSpec,
+    PixelMtfReport,
+    compute_pixel_mtf,
+    combine_mtf_curves,
+)
 
 __all__ = [
     "lensmaker",
@@ -129,4 +135,8 @@ __all__ = [
     "LensClearApertureSpec",
     "VignettingCheckReport",
     "compute_vignetting_check",
+    "PixelSensorSpec",
+    "PixelMtfReport",
+    "compute_pixel_mtf",
+    "combine_mtf_curves",
 ]

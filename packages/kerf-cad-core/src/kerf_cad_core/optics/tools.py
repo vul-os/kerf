@@ -3503,3 +3503,115 @@ async def run_compute_vignetting_check(ctx: ProjectCtx, args: bytes) -> str:
     if isinstance(result, dict):
         return json.dumps(result)
     return ok_payload(result.to_dict())
+
+
+# ---------------------------------------------------------------------------
+# Tool: optics_compute_pixel_mtf
+# ---------------------------------------------------------------------------
+
+from kerf_cad_core.optics.pixel_mtf import (  # noqa: E402
+    PixelSensorSpec,
+    compute_pixel_mtf,
+)
+
+_pixel_mtf_spec = ToolSpec(
+    name="optics_compute_pixel_mtf",
+    description=(
+        "Compute the pixel aperture Modulation Transfer Function (MTF) for an imaging\n"
+        "sensor given pixel pitch and fill factor.\n"
+        "\n"
+        "Theory (Boreman §3.4 / Hecht §11.3):\n"
+        "  A finite-sized pixel integrates incident irradiance over its aperture a = pitch × ff.\n"
+        "  This spatial averaging acts as a sinc low-pass filter:\n"
+        "\n"
+        "    MTF_pixel(ν) = |sinc(π · a · ν)| = |sin(π·a·ν) / (π·a·ν)|\n"
+        "\n"
+        "  where a = pixel_pitch_um × fill_factor × 1e-3 (mm), ν in cyc/mm.\n"
+        "\n"
+        "  Nyquist limit: ν_N = 1 / (2 × pixel_pitch_mm).\n"
+        "  Spatial frequencies above ν_N ALIAS and cannot be recovered.\n"
+        "\n"
+        "  For fill_factor=1.0 (full fill):\n"
+        "    MTF(0)    = 1.0 exactly\n"
+        "    MTF(ν_N)  = |sinc(π/2)| = 2/π ≈ 0.6366\n"
+        "\n"
+        "  For fill_factor < 1.0 (partial fill), the effective aperture is narrower\n"
+        "  → sinc rolls off more slowly → MTF at Nyquist is HIGHER than 2/π.\n"
+        "\n"
+        "System MTF (Boreman §2.1 cascade):\n"
+        "  MTF_system(ν) = MTF_optical(ν) × MTF_pixel(ν)\n"
+        "  Combine this result with optics_compute_diffraction_mtf for end-to-end quality.\n"
+        "\n"
+        "Oracle (p=1.5μm, ff=1.0):\n"
+        "  ν_N = 1/(2×0.0015) = 333.33 cyc/mm\n"
+        "  MTF(ν_N) = 2/π ≈ 0.6366\n"
+        "  MTF(0)   = 1.0\n"
+        "\n"
+        "HONEST: pixel aperture (sinc) ONLY — NOT modelled: silicon carrier-diffusion\n"
+        "MTF (Boreman §3.4); inter-pixel electrical/optical crosstalk; anti-aliasing\n"
+        "filter MTF; Bayer CFA demosaicing; charge-transfer inefficiency; non-square pixels.\n"
+        "\n"
+        "Returns:\n"
+        "  nyquist_freq_cyc_per_mm : ν_N = 1/(2p) in cyc/mm\n"
+        "  mtf_curve               : list of [ν, MTF(ν)] sampled from 0 to 2·ν_N\n"
+        "  mtf_at_nyquist          : MTF at ν_N (≈0.6366 for ff=1; higher for ff<1)\n"
+        "  mtf_at_50_percent_nyquist : MTF at 0.5·ν_N\n"
+        "  honest_caveat           : plain-English limitations string\n"
+        "\n"
+        "Errors: {ok:false, reason} for invalid inputs. Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "pixel_pitch_um": {
+                "type": "number",
+                "description": (
+                    "Centre-to-centre pixel pitch in micrometres (μm). Must be > 0. "
+                    "E.g. 1.5 for a modern smartphone, 5.5 for a scientific sensor."
+                ),
+            },
+            "fill_factor": {
+                "type": "number",
+                "description": (
+                    "Fraction of pixel area that collects light (0 < ff ≤ 1). "
+                    "Modelled as rect aperture of width = pitch × ff. "
+                    "Default 1.0 (100%% fill). "
+                    "BSI CMOS: 0.95–1.0; FSI CMOS: 0.3–0.7."
+                ),
+            },
+            "num_samples": {
+                "type": "integer",
+                "description": (
+                    "Number of frequency samples from 0 to 2·ν_N (default 200). "
+                    "Must be >= 2."
+                ),
+            },
+        },
+        "required": ["pixel_pitch_um"],
+    },
+)
+
+
+@register(_pixel_mtf_spec, write=False)
+async def run_pixel_mtf(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    if a.get("pixel_pitch_um") is None:
+        return json.dumps({"ok": False, "reason": "pixel_pitch_um is required"})
+
+    spec = PixelSensorSpec(
+        pixel_pitch_um=float(a["pixel_pitch_um"]),
+        fill_factor=float(a.get("fill_factor", 1.0)),
+    )
+
+    kwargs: dict = {}
+    if "num_samples" in a:
+        kwargs["num_samples"] = int(a["num_samples"])
+
+    result = compute_pixel_mtf(spec, **kwargs)
+    if isinstance(result, dict):
+        return json.dumps(result)
+    return ok_payload(result.to_dict())

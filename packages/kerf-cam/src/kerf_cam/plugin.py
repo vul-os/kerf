@@ -215,6 +215,17 @@ async def register(app: FastAPI, ctx):
         run_cam_generate_profile_roughing,
     )
 
+    # G04 dwell audit — MH 31e §1140 + NIST RS-274/NGC §3.5 (2026-05-31)
+    from kerf_cam.dwell_audit import (
+        cam_audit_milling_dwells_spec,
+        run_cam_audit_milling_dwells,
+    )
+    ctx.tools.register(
+        "cam_audit_milling_dwells",
+        cam_audit_milling_dwells_spec,
+        run_cam_audit_milling_dwells,
+    )
+
     # Capabilities depend on available deps
     provides = [
         "cam.2_5d",
@@ -233,6 +244,7 @@ async def register(app: FastAPI, ctx):
         "cam.turning-depth-calc",
         "cam.profile-roughing",
         "cam.grinding-dress-cycle",
+        "cam.dwell-audit",
     ]   # pure-Python ops always available
     if _OCL_AVAILABLE:
         provides += ["cam.parallel-3d", "cam.waterline", "cam.lathe"]

@@ -1741,3 +1741,13 @@ from kerf_cad_core.geom.vertex_degree_check import (  # noqa: E402
     VertexDegreeReport,
     check_vertex_degrees,
 )
+# NURBS-SURFACE-SHEAR-OFFSET: global linear shear transform on NurbsSurface
+# control points (Mortenson §4.8; Piegl & Tiller §6.1).  Useful for
+# compensating workpiece warp during finish-machining post-processing.
+# HONEST: linear shear only — non-uniform warp needs per-point deformation.
+# LLM tool: nurbs_apply_surface_shear_offset.
+from kerf_cad_core.geom.surface_shear_offset import (  # noqa: E402
+    ShearMatrix,
+    SurfaceShearOffsetResult,
+    apply_shear_offset,
+)

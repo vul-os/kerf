@@ -4637,6 +4637,20 @@
           }
         },
         {
+          "name": "NURBS surface shear-transform offset (linear warp compensation)",
+          "domain": "D01",
+          "competitor": {
+            "status": "no",
+            "source": "https://wiki.freecad.org/Part_Module",
+            "note": "No native global linear shear-transform on NURBS surface control points for machining warp compensation"
+          },
+          "kerf": {
+            "status": "partial",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/surface_shear_offset.py",
+            "note": "apply_shear_offset(surface, ShearMatrix) -> SurfaceShearOffsetResult; six off-diagonal shear coefficients (s_xy, s_xz, s_yx, s_yz, s_zx, s_zy); P'=(x+s_xy*y+s_xz*z, y+s_yx*x+s_yz*z, z+s_zx*x+s_zy*y); knots and weights preserved exactly (P&T §6.1 Theorem 6.1); max/mean displacement metrics; LLM tool nurbs_apply_surface_shear_offset; 20 hermetic tests. HONEST: global linear shear only — non-uniform warp (thermal distortion, springback, gravity sag) requires per-point deformation, not a ShearMatrix. Refs: Mortenson §4.8; Piegl & Tiller §6.1."
+          }
+        },
+        {
           "name": "NURBS curve footprint on plane (orthographic projection to 2-D)",
           "domain": "D01",
           "competitor": {

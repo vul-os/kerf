@@ -302,6 +302,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.subd.edge_collapse",
     # SUBD-CAGE-VERTEX-MERGE: merge N cage vertices by index into centroid; N-vertex generalisation of edge collapse; remove degenerate faces (Hoppe 1996 §3.2; Garland-Heckbert 1997 QEM §3)
     "kerf_cad_core.subd.vertex_merge",
+    # SUBD-CAGE-DUAL-MESH: dual mesh of quad cage — face centroids become dual verts; vertex star becomes dual face (CCW angular sort); ringing analysis + mesh smoothing (Bossen-Heckbert 1996 §3.1; Bommes-Lévy-Pietroni 2013 §3.2)
+    "kerf_cad_core.subd.dual_mesh",
     # GK-P-B: Stam exact limit-position + limit-tangent evaluation (subd_eval_limit tool)
     "kerf_cad_core.geom.subd_stam",
     # GK-P45: SubD/mesh authoring ops (subd_poke, subd_extrude_along, sculpt_brush, multires_evaluate)
@@ -500,6 +502,10 @@ _TOOL_MODULES = [
     # HONEST: edge-based degree only; does NOT analyse face-fan angular order.
     # Refs: Mantyla 1988 §3.4; Hoffmann 1989 §4. LLM tool: brep_check_vertex_degrees
     "kerf_cad_core.geom.vertex_degree_check_tools",
+    # NURBS-SURFACE-SHEAR-OFFSET: global linear shear transform on NurbsSurface
+    # control points for warp compensation during finish-machining post-processing.
+    # (Mortenson §4.8; Piegl & Tiller §6.1). LLM tool: nurbs_apply_surface_shear_offset
+    "kerf_cad_core.geom.surface_shear_offset",
 ]
 # NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
 # (already in _TOOL_MODULES above at line 128); sagitta_arrow_chart module is imported

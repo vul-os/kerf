@@ -166,6 +166,18 @@ from kerf_mold.tunnel_gate_design import (
     TunnelGateReport,
     design_tunnel_gate,
 )
+from kerf_mold.color_concentrate_ratio import (
+    ColorConcentrateSpec,
+    ShotSpec,
+    ColorRatioReport,
+    LDR_MIN_SPI_PCT,
+    LDR_MAX_SPI_PCT,
+    LDR_LOW_RISK_PCT,
+    LDR_COST_WASTE_PCT,
+    MIXING_INDEX_ADEQUATE,
+    MIXING_INDEX_POOR,
+    compute_color_ratio,
+)
 
 __all__ = [
     # mold.py
@@ -309,4 +321,15 @@ __all__ = [
     "TunnelGateSpec",
     "TunnelGateReport",
     "design_tunnel_gate",
+    # color_concentrate_ratio.py
+    "ColorConcentrateSpec",
+    "ShotSpec",
+    "ColorRatioReport",
+    "LDR_MIN_SPI_PCT",
+    "LDR_MAX_SPI_PCT",
+    "LDR_LOW_RISK_PCT",
+    "LDR_COST_WASTE_PCT",
+    "MIXING_INDEX_ADEQUATE",
+    "MIXING_INDEX_POOR",
+    "compute_color_ratio",
 ]

@@ -106,6 +106,14 @@ Registers:
                 freeze time from 1-D Fourier Chen-Chiang/Menges §7.3.3;
                 angle recommendation 30°–45° per Menges §6.6.5; HONEST:
                 Beaumont heuristic — multi-cavity timing needs Moldflow)
+  - LLM tool:  mold_compute_color_concentrate_ratio
+               (SPI Color Concentrates Handbook 3rd ed. §3+§6+§8+§11 +
+                Menges Plastics Manufacturing §10: gravimetric let-down
+                ratio LDR = target_pct / masterbatch_pct × 100; MB mass
+                per shot and per kg natural resin; heuristic mixing index
+                1−exp(−residence_s·L/D/200); streaking risk low/moderate/
+                high; SPI LDR range 1–5 %; HONEST: mixing index is a
+                proxy — trial colour plaques + L*a*b* measurement required)
 """
 from __future__ import annotations
 
@@ -408,6 +416,18 @@ async def register(app: FastAPI, ctx):
         run_mold_design_tunnel_gate,
     )
 
+    # Register color concentrate (masterbatch) dosing tool
+    # (SPI Color Concentrates Handbook 3rd ed. + Menges Plastics Manufacturing §10)
+    from kerf_mold.color_concentrate_ratio_tool import (
+        mold_compute_color_concentrate_ratio_spec,
+        run_mold_compute_color_concentrate_ratio,
+    )
+    ctx.tools.register(
+        "mold_compute_color_concentrate_ratio",
+        mold_compute_color_concentrate_ratio_spec,
+        run_mold_compute_color_concentrate_ratio,
+    )
+
     provides = [
         "mold.moldability",
         "mold.parting_surface",
@@ -438,6 +458,7 @@ async def register(app: FastAPI, ctx):
         "mold.ejector_pin_push",
         "mold.core_pin_cooling",
         "mold.tunnel_gate_design",
+        "mold.color_concentrate_ratio",
     ]
 
     try:

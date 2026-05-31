@@ -11541,6 +11541,20 @@
         },
         {
           "domain": "D7",
+          "feature": "Color concentrate (masterbatch) let-down ratio and mixing quality",
+          "competitor": {
+            "status": "no",
+            "note": "Cimatron Mold Wizard is a tooling CAD product and does not provide color concentrate dosing calculations, masterbatch let-down ratio computation, or mixing-quality estimates; users must consult masterbatch supplier data sheets or use dedicated compounding software",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Color concentrate dosing (SPI Color Concentrates Handbook 3rd ed. §3+§6+§8+§11 + Menges Plastics Manufacturing §10): LDR (%) = target_pigment_pct / masterbatch_pigment_pct × 100; SPI recommended range 1–5 %; masterbatch_per_shot_g = shot_weight_g × LDR/100; masterbatch_per_kg_natural = 1000 × (LDR/100) / (1−LDR/100). Mixing index heuristic (Tadmor & Gogos §12.5): mixing_index = 1−exp(−residence_s × L/D / 200); adequate > 0.80. Streaking risk: low (LDR 1–5 % AND mixing_index > 0.80), moderate (LDR 0.5–1 % or 5–8 %, or marginal mixing), high (LDR < 0.5 % — too dilute — or LDR > 8 % — cost waste / property dilution). Oracle: 100 g shot, 1 % target, 40 % MB → LDR 2.5 %, 2.5 g/shot, 25.64 g/kg natural. LLM tool `mold_compute_color_concentrate_ratio`; 40 tests. HONEST: empirical mixing estimate only — does NOT model screw-flight geometry, back-pressure, viscosity mismatch, or colorant particle size; not a substitute for colour-master trial shots and L*a*b* measurement per ISO 11664-4",
+            "evidence": "packages/kerf-mold/src/kerf_mold/color_concentrate_ratio.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "Demolding (ejection) force estimation",
           "competitor": {
             "status": "partial",

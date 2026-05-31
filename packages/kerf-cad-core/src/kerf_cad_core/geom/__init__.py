@@ -613,6 +613,14 @@ from kerf_cad_core.geom.curve_footprint_on_plane import (
     lift_footprint_to_3d,
 )
 
+# BREP-FACE-PRINCIPAL-CURVATURE-VIZ: sample κ₁, κ₂ over a B-rep Face UV grid +
+# SVG/PNG heatmap overlay (do Carmo §3.4 / Mortenson §6.5 / Pottmann-Wallner §4)
+from kerf_cad_core.geom.principal_curvature_viz import (
+    PrincipalCurvatureSample,
+    PrincipalCurvatureVizResult,
+    sample_principal_curvatures,
+)
+
 __all__ = [
     "read_3dm","write_3dm","Rhino3dmReadError",
     "read_dxf","write_dxf","DxfReadError","DxfWriteError",
@@ -1140,6 +1148,10 @@ __all__ = [
     "FootprintResult",
     "project_curve_to_plane",
     "lift_footprint_to_3d",
+    # BREP-FACE-PRINCIPAL-CURVATURE-VIZ: κ₁/κ₂ grid + SVG/PNG heatmap
+    "PrincipalCurvatureSample",
+    "PrincipalCurvatureVizResult",
+    "sample_principal_curvatures",
 ]
 
 # Variable-section edge blend (Vida-Martin-Varady 1994 §4)

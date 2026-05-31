@@ -16563,6 +16563,20 @@
         },
         {
           "domain": "D1",
+          "feature": "B-rep face principal curvature grid sample + SVG/PNG heatmap",
+          "competitor": {
+            "status": "partial",
+            "note": "Rhino CurvatureAnalysis command shows Gauss/mean on screen; no per-vertex κ₁/κ₂ export or programmatic SVG/PNG heatmap output",
+            "source": "http://docs.mcneel.com/rhino/8/help/en-us/commands/curvatureanalysis.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "sample_principal_curvatures(face, nu, nv) → PrincipalCurvatureVizResult(samples, svg_heatmap, png_bytes, honest_caveat); per-vertex PrincipalCurvatureSample(u,v,kappa_1,kappa_2,gauss_K,mean_H,is_degenerate); shape-operator eigenvalues: κ₁=H+√(H²−K), κ₂=H−√(H²−K) (do Carmo §3.4); SVG/PNG viridis heatmap of |κ₁|; pure-Python PNG encoder; LLM tool brep_face_principal_curvature_viz; 33 hermetic tests. CAVEAT: uniform UV grid only — high-curvature pockets between grid points may be missed; not adaptive.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/principal_curvature_viz.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "Surface analysis (zebra / curvature combs)",
           "competitor": {
             "status": "yes",

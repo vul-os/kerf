@@ -54,3 +54,9 @@ from kerf_electronics.inductor_core_saturation import (  # noqa: F401
     CoreSaturationReport,
     check_inductor_saturation,
 )
+from kerf_electronics.op_amp_offset_drift import (  # noqa: F401
+    OpAmpSpec,
+    CircuitSpec as OpAmpCircuitSpec,
+    OpAmpOffsetReport,
+    compute_op_amp_drift,
+)

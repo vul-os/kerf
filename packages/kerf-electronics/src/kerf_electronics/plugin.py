@@ -194,6 +194,10 @@ def _register_tools(ctx, provides: list) -> None:
         # electronics_check_inductor_saturation: B_peak_mT, B_sat_mT, saturation_margin_pct,
         #   saturated, recommended_max_I_dc_A; ferrite B_sat temp derating (−15%@100°C, −25%@125°C)
         "kerf_electronics.inductor_core_saturation",
+        # Op-amp offset voltage + temperature drift — TI SLOA069 §3 + Analog Devices AN-580 §1
+        # electronics_compute_op_amp_drift: Vos(T)=Vos_typ+TC_Vos×(T-Tref); input-/output-referred
+        #   worst-case offset; error_pct_of_FS; recommended class (standard|precision|zero-drift|chopper)
+        "kerf_electronics.op_amp_offset_drift",
     ]
 
     for module_path in tool_modules:

@@ -3022,6 +3022,20 @@
           }
         },
         {
+          "name": "Op-amp offset voltage and temperature drift (precision instrumentation)",
+          "domain": "D6",
+          "competitor": {
+            "status": "no",
+            "notes": "Altium Designer has no built-in op-amp offset drift calculator; requires manual datasheet lookup or SPICE/LTspice Monte Carlo / temperature sweep simulation",
+            "source": "https://www.altium.com/documentation/altium-designer/signal-integrity"
+          },
+          "kerf": {
+            "status": "[x]",
+            "notes": "electronics_compute_op_amp_drift: Vos(T)=Vos_typ+TC_Vos×(T−Tref) (TI SLOA069 §3 Eq. 3-1); worst-case over all 4 ±drift×±endpoint combinations; Vos_max_IR=max(|Vos(T_min)|,|Vos(T_max)|); Vos_OR_mV=gain×Vos_max_IR/1000; error_pct=100×(Vos_OR/1000)/FS. Class thresholds: chopper≤0.05µV/°C (AD8551, MAX420), zero-drift≤0.1µV/°C (OPA188, LTC2050), precision≤1µV/°C (OPA227, LT1012), standard>1µV/°C. Honest: linear drift model only — real drift is non-linear and asymmetric (TI SLOA069 Fig 3-2); 1/f noise NOT modelled; PSRR/CMRR cross-talk OUT OF SCOPE; resistor TC mismatch NOT included; use Vos_max (not Vos_typ) for guaranteed worst-case. Refs: TI SLOA069 §3; Analog Devices AN-580 §1.",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/op_amp_offset_drift.py"
+          }
+        },
+        {
           "name": "PCB thermal (board-level)",
           "domain": "D6",
           "competitor": {
@@ -6164,6 +6178,20 @@
             "status": "yes",
             "note": "generate_dress_cycle(DressSpec) → DressCycleResult: num_passes = ceil(total_dress_amount / depth_per_pass); per pass: G01 infeed X + G01 traverse Z at traverse_rate + G00 rapid-retract Z; G28 reference return after last pass; dresser_type = 'single_point_diamond' (50–300 mm/min traverse, 0.002–0.025 mm/pass per MH 31e §1145) or 'rotary_diamond' (100–800 mm/min, 0.005–0.050 mm/pass per Sandvik CoroGrind §5); out-of-band advisory if spec outside safe bands; cam_generate_dress_cycle LLM tool; 58 tests green. HONEST: open-loop only — no AE sensor / power monitoring / roundness-gauging closed-loop correction; uni-directional traverse (+Z) only; no rotary-roll spindle sync G-code; acceleration ramps excluded from time estimate (add 10–20%); Fanuc 0i-PD / RS-274/NGC G-code — Siemens CYCLE12x / ANCA DressPro NOT emitted",
             "evidence": "packages/kerf-cam/src/kerf_cam/dress_cycle.py"
+          }
+        },
+        {
+          "domain": "D7",
+          "feature": "G04 dwell audit for milling programs",
+          "competitor": {
+            "status": "partial",
+            "note": "Fusion 360 CAM does not provide a dedicated G04 dwell audit or dwell-to-cutting-time ratio analysis; dwell commands can be inserted manually but no automatic flag for excessive or suspicious dwells",
+            "source": "https://www.autodesk.com/products/fusion-360/cam"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "audit_milling_dwells(DwellAuditSpec) → DwellAuditReport: parses G04 X<seconds> (NIST RS-274/NGC §3.5) + G04 P<ms> (Fanuc/Haas); estimates G01 cutting time from distance/feed modal state; total_dwell_time_ms, num_dwells, dwell_per_op_ms, total_program_time_estimate_s, dwell_ratio_pct, excessive flag (ratio > max_total_dwell_ratio_pct, default 5 %), suspicious_long_dwells (> max_recommended_dwell_per_op_ms, default 500 ms); modal G20/G21, G90/G91, G94/G95 tracked; cam_audit_milling_dwells LLM tool; 45 tests. HONEST: heuristic only — some dwells are deliberate (G89 boring settle, machine warm-up, coolant pressure build); excessive=True is not proof of error; G02/G03 arc moves excluded from cutting-time estimate; rapid time assumed 10 000 mm/min generic constant; G95 feed-per-rev blocks contribute 0. Refs: MH 31e §1140; NIST RS-274/NGC §3.5",
+            "evidence": "packages/kerf-cam/src/kerf_cam/dwell_audit.py"
           }
         },
         {

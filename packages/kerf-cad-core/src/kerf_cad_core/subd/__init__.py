@@ -14,6 +14,11 @@ edge_loop_select
     SUBD-CAGE-EDGE-LOOP-SELECT: directional edge-loop walk on a quad cage;
     stops at irregular vertex (valence≠4) or loop closure
     (Bommes-Lévy-Pietroni 2013 §3.2).
+face_loop_select
+    SUBD-CAGE-FACE-LOOP: walk a face loop on a quad cage by hopping through
+    opposite-edge adjacent quads; stops at non-quad face, boundary edge, or
+    loop closure. walk_direction 0/1 gives orthogonal rings.
+    (Bommes-Lévy-Pietroni 2013 §3.2; Hoppe 1996).
 limit_normal_fit
     SUBD-LIMIT-NORMAL-FIT: sample the CC limit-surface normal n̂(u,v) at
     a uniform (u,v) grid on each cage face using Stam (1998) exact tangents;
@@ -37,6 +42,10 @@ from kerf_cad_core.subd.edge_loop_select import (
     EdgeLoopResult,
     select_edge_loop,
 )
+from kerf_cad_core.subd.face_loop_select import (
+    FaceLoopResult,
+    select_face_loop,
+)
 from kerf_cad_core.subd.limit_normal_fit import (
     LimitNormalFitResult,
     sample_subd_limit_normals,
@@ -55,6 +64,8 @@ __all__ = [
     "walk_subd_limit_cross_plane",
     "EdgeLoopResult",
     "select_edge_loop",
+    "FaceLoopResult",
+    "select_face_loop",
     "LimitNormalFitResult",
     "sample_subd_limit_normals",
     "EdgeCollapseResult",

@@ -17940,6 +17940,20 @@
         },
         {
           "domain": "D1",
+          "feature": "SubD cage face-loop selection for ring-cut planning (Bommes-Lévy-Pietroni §3.2)",
+          "competitor": {
+            "status": "yes",
+            "note": "Maya Select Face Loop / Blender face loop selection — walks faces by hopping through opposite-edge adjacent quads; used for ring-cut, loop-cut target, subdivision sweep selection; terminates at non-quad face or mesh boundary",
+            "source": "https://docs.blender.org/manual/en/latest/modeling/meshes/selecting/face_loops.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "select_face_loop(cage_mesh, start_face_idx, walk_direction=0): hops through opposite-edge adjacent quads; walk_direction 0/1 selects which opposite-edge pair to cross, giving orthogonal rings; FaceLoopResult with face_indices, closed, terminated_at_irregular, irregular_face_indices, honest_caveat; oracles: 4×4 torus dir=0 closed ring 4; 4×6 torus dir=0→length 4 dir=1→length 6; cylinder (nu=12) dir=1 → closed ring 12; cube → closed 4-ring; mixed tri/quad → terminated; non-quad start → immediate termination; LLM tool subd_select_face_loop; HONEST: quads only — non-quad face terminates walk immediately; boundary edges terminate; walk_direction relative to start face winding; manifold assumed; 20 tests.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/subd/face_loop_select.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "SubD cage single-edge subdivide (localized refinement)",
           "competitor": {
             "status": "partial",

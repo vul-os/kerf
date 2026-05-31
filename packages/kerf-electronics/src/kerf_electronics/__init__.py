@@ -60,3 +60,8 @@ from kerf_electronics.op_amp_offset_drift import (  # noqa: F401
     OpAmpOffsetReport,
     compute_op_amp_drift,
 )
+from kerf_electronics.zener_clamp_design import (  # noqa: F401
+    ZenerClampSpec,
+    ZenerClampReport,
+    design_zener_clamp,
+)

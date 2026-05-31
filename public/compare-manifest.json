@@ -3042,6 +3042,19 @@
           }
         },
         {
+          "name": "Zener clamp / shunt voltage regulator design",
+          "domain": "D6",
+          "competitor": {
+            "status": "no",
+            "notes": "Altium Designer has no built-in Zener shunt regulator calculator; requires manual SPICE simulation or external spreadsheet"
+          },
+          "kerf": {
+            "status": "[x]",
+            "notes": "electronics_design_zener_clamp: R=(V_in_max−V_Z)/(I_load_min+I_knee); I_Z_max=(V_in_max−V_Z_max)/R−I_load_min; P_Z_design=V_Z×I_Z_max×1.25 (25% derating, Vishay AN-2014-3 §3); packages 0.4W/0.5W/1W/3W/5W; E12 series resistor (IEC 60063). Honest: SIMPLE LINEAR SHUNT ONLY — wasted power is constant regardless of load; Zener rZ NOT modelled (ΔV_out=rZ×ΔI_Z, typical 7–20 Ω for 5V/400mW); temperature coefficient of V_Z NOT modelled; for I_load>100 mA prefer LDO or buck converter; static regulation=2×tol% (dynamic excluded). Refs: H&H §2.2.4; Vishay AN-2014-3.",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/zener_clamp_design.py"
+          }
+        },
+        {
           "name": "PCB thermal (board-level)",
           "domain": "D6",
           "competitor": {

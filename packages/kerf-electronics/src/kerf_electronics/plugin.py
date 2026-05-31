@@ -198,6 +198,10 @@ def _register_tools(ctx, provides: list) -> None:
         # electronics_compute_op_amp_drift: Vos(T)=Vos_typ+TC_Vos×(T-Tref); input-/output-referred
         #   worst-case offset; error_pct_of_FS; recommended class (standard|precision|zero-drift|chopper)
         "kerf_electronics.op_amp_offset_drift",
+        # Zener diode voltage clamp + series resistor design — H&H §2.2.4 + Vishay AN-2014-3
+        # electronics_design_zener_clamp: R_series, R_series_power, I_zener_max, P_zener_max,
+        #   recommended_zener_package (0.4W|0.5W|1W|3W|5W), recommended_R_E12_ohm, regulation_pct
+        "kerf_electronics.zener_clamp_design",
     ]
 
     for module_path in tool_modules:

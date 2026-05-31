@@ -5664,6 +5664,20 @@
         },
         {
           "domain": "D7",
+          "feature": "Lead-in / lead-out arc segments (witness mark prevention)",
+          "competitor": {
+            "status": "yes",
+            "note": "Tangent-arc, perpendicular, and smooth lead-in/out strategies for all 2D contour ops; configurable radius and angle; 3D ramp and helical entry also supported",
+            "source": "https://cam.autodesk.com/hsmposts"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "MH 31e §1131 tangent-arc lead-in/lead-out; 3 types: arc (G02/G03 with I/J, sweep α=1–90°), line (G01 along tangent), perpendicular (G01 normal offset); G41/G42 cutter compensation activated in lead-in block (G40 cancel on exit); lead length = R·α_rad; cam_generate_lead_in_out LLM tool; 54 tests. Honest limits: 2D contours only (XY plane, constant Z) — 3D ramp entry and helical entry NOT implemented; no gouge/collision check; I/J incremental (Fanuc convention)",
+            "evidence": "packages/kerf-cam/src/kerf_cam/lead_in_out.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "G-code post (Fanuc/GRBL/LinuxCNC/Mach3)",
           "competitor": {
             "status": "yes",

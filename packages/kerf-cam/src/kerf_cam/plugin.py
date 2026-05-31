@@ -138,6 +138,17 @@ async def register(app: FastAPI, ctx):
         run_cam_generate_face_mill_path,
     )
 
+    # Lead-in / lead-out arc/line segments — MH 31e §1131 + Fanuc §G41/G42
+    from kerf_cam.lead_in_out import (
+        cam_generate_lead_in_out_spec,
+        run_cam_generate_lead_in_out,
+    )
+    ctx.tools.register(
+        "cam_generate_lead_in_out",
+        cam_generate_lead_in_out_spec,
+        run_cam_generate_lead_in_out,
+    )
+
     # Capabilities depend on available deps
     provides = [
         "cam.2_5d",
@@ -149,6 +160,7 @@ async def register(app: FastAPI, ctx):
         "cam.g85-g86-g89-boring-cycles",
         "cam.face-mill-path",
         "cam.rigid-tap-check",
+        "cam.lead-in-lead-out",
     ]   # pure-Python ops always available
     if _OCL_AVAILABLE:
         provides += ["cam.parallel-3d", "cam.waterline", "cam.lathe"]

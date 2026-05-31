@@ -252,6 +252,12 @@
           "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/lateral_bracing_check.py\"; note: \"AISC 360-22 §F2 LRFD: Lp=1.76·ry·√(E/Fy) (F2-5); Lr via F2-6; Zone 1 Lb≤Lp→yielding Mn=Mp; Zone 2 inelastic LTB Mn=Cb·[Mp−(Mp−0.7·Fy·Sx)·ramp]≤Mp (F2-2); Zone 3 elastic LTB Mn=Fcr·Sx≤Mp (F2-3/4); φ_b=0.90; c=1.0 (F2-8a); arch_check_lateral_bracing LLM tool; W14x90 oracle: Lp≈3983mm, Lr≈12962mm, Mp≈887.6kN·m; SCOPE: doubly symmetric compact I-shapes only — channels, tees, built-up sections out of scope; Cb must be supplied by caller\""
         },
         {
+          "name": "Two-way punching shear check (ACI 318-19 §22.6, no shear reinforcement)",
+          "domain": "D2",
+          "competitor": "paid: true",
+          "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/punching_shear.py\"; note: \"ACI 318-19 §22.6 + Wight §13.10: b_0 at d/2 from column face; vc=min(0.33·λ·√f'c, 0.17·(1+2/β_c)·λ·√f'c, 0.083·(α_s·d/b_0+2)·λ·√f'c); φ·Vn=φ·vc·b_0·d (φ=0.75); square/rectangular/circular columns; oracle 300mm sq col d=160mm f'c=30MPa→b_0=1840mm→φ·Vn≈399kN; DCR for V=300/500/900kN; β_c>2 rectangular→aspect-ratio governs; arch_check_punching_shear LLM tool; SCOPE: Vs=0 (no shear reinforcement); no unbalanced moment; no openings/drop panels; no axial load effect; √f'c cap not auto-enforced\""
+        },
+        {
           "name": "ASCE 7 seismic loads",
           "domain": "D2",
           "competitor": "paid: true",

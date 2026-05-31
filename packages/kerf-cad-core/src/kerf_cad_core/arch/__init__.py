@@ -17,6 +17,8 @@ Submodules:
   wind_load_asce7_tools — LLM tool arch_compute_wind_load
   lateral_bracing_check — AISC 360-22 §F2 lateral-torsional buckling (LTB) check
   lateral_bracing_check_tools — LLM tool arch_check_lateral_bracing
+  punching_shear    — ACI 318-19 §22.6 two-way (punching) shear capacity check
+  punching_shear_tools — LLM tool arch_check_punching_shear
 
 Note on naming: ``SlabSpec`` in ``primitives`` is the BIM slab (polygon outline).
 ``SlabSpec`` in ``slab_deflection`` is the structural deflection slab (a×b×h).
@@ -65,6 +67,11 @@ from kerf_cad_core.arch.lateral_bracing_check import (
     LateralBracingReport,
     check_lateral_bracing,
 )
+from kerf_cad_core.arch.punching_shear import (
+    ColumnSlabSpec,
+    PunchingShearReport,
+    check_punching_shear,
+)
 
 __all__ = [
     "WallLayer",
@@ -101,4 +108,8 @@ __all__ = [
     "WSectionSpec",
     "LateralBracingReport",
     "check_lateral_bracing",
+    # ACI 318-19 §22.6 two-way (punching) shear
+    "ColumnSlabSpec",
+    "PunchingShearReport",
+    "check_punching_shear",
 ]

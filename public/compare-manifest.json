@@ -4725,6 +4725,20 @@
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
             "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
           }
+        },
+        {
+          "domain": "D10",
+          "feature": "Flash vs RAM const-allocation analyser (linker map symbol-table heuristic)",
+          "competitor": {
+            "status": "no",
+            "note": "No firmware symbol-map const-placement analyser in OpenPLC or standard EDA toolchains; engineers must manually inspect arm-none-eabi-nm / avr-nm output to detect constants stranded in .data (RAM)",
+            "source": "https://www.openplcproject.com/reference"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "firmware_analyze_const_allocation: Flash (.text+.rodata+.init_array+.ARM.exidx) vs RAM (.data+.bss) split from GCC linker-map symbol list; rodata_bytes (correct Flash placement), data_init_bytes (RAM-stored constants — wasteful); suspect_data_consts: top-10 ALL_CAPS .data symbols >= 4 bytes (heuristic: likely constants misplaced in RAM); top_rodata_consumers: top-10 .rodata symbols by size; recommendations: data_init_bytes > 1 KB → const-qualifier / section attribute migration; flash > 80% → -Os; flash_utilization_pct + ram_utilization_pct; 41 tests. HONEST: heuristic based on section placement and ALL_CAPS naming convention — NOT AST or DWARF source-level analysis; mutable global named MAX_SPEED will be flagged; const array named 'lookup' will not. Refs: GCC Internals §18; ARM IHI 0044F AAPCS §5.4; RM0383 Rev 3 §3 (STM32F411); ATmega328P §8.",
+            "evidence": "packages/kerf-firmware/src/kerf_firmware/const_allocation.py"
+          }
         }
       ]
     },

@@ -565,3 +565,20 @@ def _register_tools(ctx, provides: list) -> None:
         logger.warning(
             "kerf-firmware: failed to load firmware_compute_adc_enob tool: %s", exc
         )
+
+    # firmware_analyze_const_allocation — Flash vs RAM const-allocation analyser
+    try:
+        from kerf_firmware.tools.firmware_analyze_const_allocation import (
+            _spec as _const_alloc_spec,
+            run_firmware_analyze_const_allocation_async as _const_alloc_fn,
+        )
+        ctx.tools.register(
+            "firmware_analyze_const_allocation",
+            _const_alloc_spec,
+            _const_alloc_fn,
+        )
+        provides.append("firmware.const_allocation")
+    except Exception as exc:
+        logger.warning(
+            "kerf-firmware: failed to load firmware_analyze_const_allocation tool: %s", exc
+        )

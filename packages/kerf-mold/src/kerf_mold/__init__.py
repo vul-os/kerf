@@ -156,6 +156,11 @@ from kerf_mold.ejector_pin_push import (
     SPI_EJECTOR_PIN_DIAMETERS_MM as SPI_EJECTOR_PIN_DIAMETERS_MM_PUSH,
     compute_ejector_pin_push,
 )
+from kerf_mold.core_pin_cooling import (
+    CorePinSpec,
+    CorePinCoolingReport,
+    design_core_pin_cooling,
+)
 
 __all__ = [
     # mold.py
@@ -291,4 +296,8 @@ __all__ = [
     "EjectorPinPushReport",
     "SPI_EJECTOR_PIN_DIAMETERS_MM_PUSH",
     "compute_ejector_pin_push",
+    # core_pin_cooling.py
+    "CorePinSpec",
+    "CorePinCoolingReport",
+    "design_core_pin_cooling",
 ]

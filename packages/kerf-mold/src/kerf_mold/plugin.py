@@ -82,6 +82,11 @@ Registers:
                 dittus_boelter_applicable; HONEST: Re classification only —
                 does NOT compute Nu/HTC, polymer-side boundary layer, or
                 mold-steel thermal resistance)
+  - LLM tool:  mold_design_core_pin_cooling
+               (Menges 2001 §7.5 + Beaumont 2007 §11.4: baffle/bubbler
+                cooling design for tall slender core pins; Reynolds number,
+                Dittus-Boelter HTC, lumped-capacitance tip temperature,
+                cycle-time estimate; bubbler ≈ 2× baffle HTC multiplier)
   - LLM tool:  mold_compute_ejector_pin_push
                (SPI/ANSI B151.1 + Roark's 9e §15.2: Euler critical buckling
                 load F_cr = π²·E·I/(K·L)² for ejector pins; E=200 GPa for all
@@ -370,6 +375,18 @@ async def register(app: FastAPI, ctx):
         run_mold_compute_ejector_pin_push,
     )
 
+    # Register core-pin baffle/bubbler cooling design tool
+    # (Menges 2001 §7.5 + Beaumont 2007 §11.4)
+    from kerf_mold.core_pin_cooling_tool import (
+        mold_design_core_pin_cooling_spec,
+        run_mold_design_core_pin_cooling,
+    )
+    ctx.tools.register(
+        "mold_design_core_pin_cooling",
+        mold_design_core_pin_cooling_spec,
+        run_mold_design_core_pin_cooling,
+    )
+
     provides = [
         "mold.moldability",
         "mold.parting_surface",
@@ -398,6 +415,7 @@ async def register(app: FastAPI, ctx):
         "mold.sprue_bushing_match",
         "mold.cooling_turbulent_re_check",
         "mold.ejector_pin_push",
+        "mold.core_pin_cooling",
     ]
 
     try:

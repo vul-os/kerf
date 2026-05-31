@@ -11389,6 +11389,20 @@
         },
         {
           "domain": "D7",
+          "feature": "Core-pin baffle/bubbler interior cooling design",
+          "competitor": {
+            "status": "partial",
+            "note": "Cimatron/Moldflow provide cooling-circuit layout for standard drilled channels; baffle/bubbler sizing for slender cores requires manual calculation or Moldflow Cool FEA module (not exposed as a standalone analytical tool)",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Baffle/bubbler cooling design for slender core pins (Menges 2001 §7.5 + Beaumont 2007 §11.4): Re = 4·Q·ρ/(π·D_h·μ); Nu = 0.023·Re^0.8·Pr^0.4 (Dittus-Boelter, Incropera eq. 8.60); HTC h = Nu·k_f/D_h; bubbler ≈ 2× baffle HTC (Menges §7.5 fountain-effect multiplier); core-tip temperature from 1-D lumped resistance model (R_polymer + R_steel + R_coolant); cooling_adequate = Re ≥ 10 000 AND T_tip ≤ target; cycle-time estimate via Menges §7.3.3 first-term Fourier. Oracle: 30 mm core, 4 mm ID, 2 L/min water → Re = 10610, HTC = 12445 W/m²K; bubbler = 24890 W/m²K (2×). LLM tool `mold_design_core_pin_cooling`; 33 oracle tests. HONEST: lumped-capacitance steady-state only — no transient FEA; uniform melt temperature assumed; bubbler 2× multiplier is empirical; Dittus-Boelter valid Re ≥ 10 000 only; polymer-side HTC fixed at 2000 W/m²K handbook midpoint; confirm with Moldflow Insight/Moldex3D/SigmaSoft for production tooling",
+            "evidence": "packages/kerf-mold/src/kerf_mold/core_pin_cooling.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "Demolding (ejection) force estimation",
           "competitor": {
             "status": "partial",

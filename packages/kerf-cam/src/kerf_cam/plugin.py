@@ -160,6 +160,17 @@ async def register(app: FastAPI, ctx):
         run_cam_compute_chip_load,
     )
 
+    # Turning depth-of-cut + roughing pass count — MH 31e §1148 + Sandvik CoroPlus 2024
+    from kerf_cam.turning_depth_calc import (
+        cam_compute_turning_depth_spec,
+        run_cam_compute_turning_depth,
+    )
+    ctx.tools.register(
+        "cam_compute_turning_depth",
+        cam_compute_turning_depth_spec,
+        run_cam_compute_turning_depth,
+    )
+
     # 3D parallel-offset surface milling — MH 31e §1139 + Held & Klingenstein (1991)
     from kerf_cam.offset_3d_path import (
         cam_generate_offset_3d_path_spec,
@@ -185,6 +196,7 @@ async def register(app: FastAPI, ctx):
         "cam.lead-in-lead-out",
         "cam.chip-load-calc",
         "cam.3d-offset-path",
+        "cam.turning-depth-calc",
     ]   # pure-Python ops always available
     if _OCL_AVAILABLE:
         provides += ["cam.parallel-3d", "cam.waterline", "cam.lathe"]

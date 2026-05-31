@@ -5773,6 +5773,20 @@
         },
         {
           "domain": "D7",
+          "feature": "Turning depth-of-cut + roughing pass calculator",
+          "competitor": {
+            "status": "yes",
+            "note": "Fusion 360 CAM turning workspace computes recommended DOC and pass strategy per material and insert grade via CoroPlus ToolGuide integration",
+            "source": "https://www.autodesk.com/products/fusion-360/cam"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "compute_turning_depth(TurningSpec) → TurningDepthReport: radial_stock = (D_stock−D_final)/2; num_roughing = ceil((radial_stock−finish_doc)/effective_max_doc); roughing_doc = stock_for_roughing/num_roughing (equal passes); max_doc clamped to Sandvik CoroPlus / MH 31e §1148 material max (steel_1018 2–4 mm rec 3.0, aluminum_6061 4–8 mm rec 6.0, stainless_303 1.5–2.5 mm rec 2.0); nose-radius check finish_doc ≥ 0.5×r_ε; time_per_pass = L/(f×n/60); cam_compute_turning_depth LLM tool; 38 tests green. HONEST: straight (cylindrical) turning only — no profile turning, no taper, no threading, no facing; CSS/G96 NOT implemented; time estimate excludes rapids, tool changes, acceleration ramps",
+            "evidence": "packages/kerf-cam/src/kerf_cam/turning_depth_calc.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "3D parallel-offset surface milling (constant offset raster)",
           "competitor": {
             "status": "yes",
@@ -14467,6 +14481,20 @@
             "status": "yes",
             "note": "Diffraction-limited MTF for circular aperture (OPTICS-MTF-DIFFRACTION-LIMITED): closed-form on-axis MTF(ν) = (2/π)[arccos(ν/ν₀) − (ν/ν₀)·√(1−(ν/ν₀)²)] for ν ≤ ν₀, 0 otherwise; cutoff ν₀ = 1/(λ·F#) (Goodman §6.4 eq. 6-49; Hecht 5e §11.3.3); oracle: λ=550nm, F/4 → ν₀=454.5 cyc/mm, MTF(0)=1.0, MTF(ν₀/2)≈0.391 — all validated to <0.1%; mtf_at_50_percent Nyquist metric; LLM tool optics_compute_diffraction_mtf; 36 hermetic tests. Honest: diffraction-limited upper bound only — no aberrations (Seidel S_I–S_V), no defocus, no sensor MTF, no polychromatic weighting (polychromatic MTF = ∫W(λ)·MTF(λ)dλ, not implemented), on-axis only, circular aperture only.",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/mtf_diffraction.py"
+          }
+        },
+        {
+          "domain": "D12",
+          "feature": "Pixel aperture MTF + Nyquist limit (sensor MTF)",
+          "competitor": {
+            "status": "partial",
+            "note": "Zemax OpticStudio detector MTF: requires Detector Rectangle object + FFT; pixel sinc not exposed as a first-class analytic tool",
+            "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Pixel aperture MTF (OPTICS-PIXEL-MTF): MTF_pixel(ν) = |sinc(π·a·ν)| where a = pitch·fill_factor (Boreman §3.4; Hecht §11.3); PixelSensorSpec(pixel_pitch_um, fill_factor=1.0) → PixelMtfReport(nyquist_freq_cyc_per_mm, mtf_curve, mtf_at_nyquist, mtf_at_50_percent_nyquist, honest_caveat); Nyquist limit ν_N = 1/(2·p); oracle p=1.5μm ff=1: ν_N=333.33 cyc/mm, MTF(ν_N)=2/π≈0.6366, MTF(0)=1.0 — all validated to <1e-6; combine_mtf_curves() for incoherent system cascade MTF_system = MTF_optical × MTF_pixel (Boreman §2.1); LLM tool optics_compute_pixel_mtf; 36 hermetic tests. Honest: pixel aperture sinc ONLY — NOT modelled: silicon carrier-diffusion MTF (Boreman §3.4); inter-pixel crosstalk; anti-aliasing filter MTF; Bayer CFA demosaicing; charge-transfer inefficiency; non-square pixels.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/pixel_mtf.py"
           }
         },
         {

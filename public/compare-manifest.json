@@ -4160,6 +4160,18 @@
           }
         },
         {
+          "name": "Variable-width chamfer strip (linear ramp, 2D edge curve)",
+          "competitor": {
+            "status": "no",
+            "note": "No standard CAD tool exposes a linearly-ramped chamfer-width strip as a standalone 2D operation; variable chamfers in commercial tools (SolidWorks, CATIA) operate only on full B-rep solid topology"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/edge_chamfer_variable.py",
+            "note": "brep_generate_variable_chamfer LLM tool; w(t)=w_start+t*(w_end-w_start) linear ramp; inner+outer offset strip; min/max/avg statistics; Piegl-Tiller §10.5 + Mortenson §9.3. HONEST: 2D polyline input only — 3D B-rep solid topology chamfer is P2/P3 scope."
+          }
+        },
+        {
           "name": "Sweep (1 & 2 rail)",
           "competitor": {
             "status": "yes",

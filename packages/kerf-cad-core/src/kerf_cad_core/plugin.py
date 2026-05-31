@@ -460,6 +460,11 @@ _TOOL_MODULES = [
     # BREP-EDGE-CURVE-EXTEND: extend B-rep edge NurbsCurve beyond domain by ΔL mm,
     # G1 tangent-continuous join (Piegl & Tiller §10.4; Mortenson §3.7)
     "kerf_cad_core.geom.edge_curve_extend",
+    # BREP-EDGE-CHAMFER-VARIABLE: variable-width chamfer strip along a 2D edge curve;
+    # width ramps linearly from width_start_mm to width_end_mm (Piegl-Tiller §10.5;
+    # Mortenson §9.3). LLM tool: brep_generate_variable_chamfer.
+    # Honest: 2D polyline only; 3D B-rep solid edge chamfer is P2/P3 scope.
+    "kerf_cad_core.geom.edge_chamfer_variable",
 ]
 # NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
 # (already in _TOOL_MODULES above at line 128); sagitta_arrow_chart module is imported

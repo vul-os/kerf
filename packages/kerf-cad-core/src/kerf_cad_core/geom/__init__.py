@@ -1680,3 +1680,12 @@ from kerf_cad_core.geom.surface_cross_section import (  # noqa: E402
     SurfaceCrossSectionResult,
     compute_surface_cross_section,
 )
+# BREP-EDGE-CHAMFER-VARIABLE: linear-ramp chamfer strip along a 2D edge curve.
+# (Piegl & Tiller §10.5 — Variable offsets; Mortenson §9.3 — Edge blends)
+# HONEST: 2D polyline input only; 3D B-rep solid edge chamfer is P2/P3 scope.
+# LLM tool: brep_generate_variable_chamfer.
+from kerf_cad_core.geom.edge_chamfer_variable import (  # noqa: E402
+    ChamferVariableSpec,
+    ChamferVariableResult,
+    generate_variable_chamfer,
+)

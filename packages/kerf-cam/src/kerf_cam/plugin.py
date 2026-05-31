@@ -182,6 +182,17 @@ async def register(app: FastAPI, ctx):
         run_cam_generate_offset_3d_path,
     )
 
+    # Multi-pass 2D profile roughing — MH 31e §1131 + Sandvik CoroPlus Contour Roughing (2024)
+    from kerf_cam.profile_roughing import (
+        cam_generate_profile_roughing_spec,
+        run_cam_generate_profile_roughing,
+    )
+    ctx.tools.register(
+        "cam_generate_profile_roughing",
+        cam_generate_profile_roughing_spec,
+        run_cam_generate_profile_roughing,
+    )
+
     # Capabilities depend on available deps
     provides = [
         "cam.2_5d",
@@ -197,6 +208,7 @@ async def register(app: FastAPI, ctx):
         "cam.chip-load-calc",
         "cam.3d-offset-path",
         "cam.turning-depth-calc",
+        "cam.profile-roughing",
     ]   # pure-Python ops always available
     if _OCL_AVAILABLE:
         provides += ["cam.parallel-3d", "cam.waterline", "cam.lathe"]

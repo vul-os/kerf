@@ -4668,7 +4668,20 @@
           "kerf": {
             "status": "yes",
             "evidence": "packages/kerf-cam/src/kerf_cam/plugin.py",
-            "note": "CAMView wired; profile/contour/pocket/face"
+            "note": "CAMView wired; profile/contour/pocket/face; multi-pass profile roughing (cam_generate_profile_roughing, MH 31e §1131)"
+          }
+        },
+        {
+          "name": "Multi-pass 2D profile roughing (contour roughing)",
+          "competitor": {
+            "status": "yes",
+            "source": "https://wiki.freecad.org/CAM_Profile",
+            "note": "CAM WB Profile op supports depth-of-cut steps and finish allowance"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cam/src/kerf_cam/profile_roughing.py",
+            "note": "generate_profile_roughing: closed CCW polygon, stock_offset, finish_allowance, cutter_diameter, depth_per_pass, total_depth; axial levels × radial inward passes; vertex-bisector polygon offset; cam_generate_profile_roughing LLM tool. HONEST: 2D polygon only — no pocket-with-islands; no climb/conventional differentiation; bisector offset may self-intersect on non-convex profiles. Refs: MH 31e §1131; Sandvik CoroPlus Contour Roughing (2024)."
           }
         },
         {

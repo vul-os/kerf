@@ -43,6 +43,11 @@ Registers:
                 dimension check at runner junctions; diameter = 1.5× runner,
                 depth = 2× runner, ±20 % tolerance; prevents flow lines and
                 weak welds from cold leading-edge polymer slug)
+  - LLM tool:  mold_generate_vent_slot_layout
+               (Beaumont 2007 §8.5 + Menges 2001 §6.4 vent slot count and
+                width layout; 0.5 % projected-area rule; speed-scaling for
+                fast injection; minimum 4 slots + 10 mm steel bridge; heuristic
+                rule — actual fill simulation needs Moldflow)
 """
 from __future__ import annotations
 
@@ -226,6 +231,18 @@ async def register(app: FastAPI, ctx):
         run_mold_check_cold_slug_design,
     )
 
+    # Register vent slot layout tool
+    # (Beaumont 2007 §8.5 + Menges 2001 §6.4)
+    from kerf_mold.vent_slot_layout_tool import (
+        mold_generate_vent_slot_layout_spec,
+        run_mold_generate_vent_slot_layout,
+    )
+    ctx.tools.register(
+        "mold_generate_vent_slot_layout",
+        mold_generate_vent_slot_layout_spec,
+        run_mold_generate_vent_slot_layout,
+    )
+
     provides = [
         "mold.moldability",
         "mold.parting_surface",
@@ -246,6 +263,7 @@ async def register(app: FastAPI, ctx):
         "mold.demold_force_check",
         "mold.vent_depth_check",
         "mold.cold_slug_check",
+        "mold.vent_slot_layout",
     ]
 
     try:

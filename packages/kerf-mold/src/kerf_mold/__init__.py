@@ -106,6 +106,12 @@ from kerf_mold.cold_slug_check import (
     ColdSlugReport,
     check_cold_slug_design,
 )
+from kerf_mold.vent_slot_layout import (
+    MoldVolumeSpec,
+    VentSlotLayoutReport,
+    POLYMER_VENT_DEPTH_RANGE,
+    generate_vent_slot_layout,
+)
 
 __all__ = [
     # mold.py
@@ -199,4 +205,9 @@ __all__ = [
     "RunnerJunctionSpec",
     "ColdSlugReport",
     "check_cold_slug_design",
+    # vent_slot_layout.py
+    "MoldVolumeSpec",
+    "VentSlotLayoutReport",
+    "POLYMER_VENT_DEPTH_RANGE",
+    "generate_vent_slot_layout",
 ]

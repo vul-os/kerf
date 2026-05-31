@@ -600,6 +600,13 @@ from kerf_cad_core.geom.edge_curve_from_face_pair import (
     extract_edge_curve,
 )
 
+# BREP-EDGE-CURVE-EXTEND: extend a B-rep edge's NurbsCurve beyond its domain by ΔL mm,
+# preserving G1 continuity at the join (Piegl & Tiller §10.4; Mortenson §3.7).
+from kerf_cad_core.geom.edge_curve_extend import (
+    EdgeExtendResult,
+    extend_edge_curve,
+)
+
 # NURBS-NORMAL-CURVATURE-AT-POINT: normal curvature + principal curvatures (do Carmo §3 / Mortenson §10.4)
 from kerf_cad_core.geom.normal_curvature import (
     NormalCurvatureReport,

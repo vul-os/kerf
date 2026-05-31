@@ -439,7 +439,13 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.principal_curvature_viz",       # brep_face_principal_curvature_viz
     # GK-P50: arc-length inversion (Newton–Raphson, chord-length param, even-spaced CAM)
     "kerf_cad_core.geom.arc_length_invert",
+    # BREP-EDGE-CURVE-EXTEND: extend B-rep edge NurbsCurve beyond domain by ΔL mm,
+    # G1 tangent-continuous join (Piegl & Tiller §10.4; Mortenson §3.7)
+    "kerf_cad_core.geom.edge_curve_extend",
 ]
+# NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
+# (already in _TOOL_MODULES above at line 128); sagitta_arrow_chart module is imported
+# from within tools.py via gated import at module bottom.
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────
 # Import lazily so this plugin boots even before kerf_core is installed.

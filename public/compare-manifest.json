@@ -294,6 +294,12 @@
           "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/pier_axial_capacity.py\"; note: \"TMS 402-22 §8.3 masonry: φ·Pn=φ·0.80·f'm·Ag·C_s; ACI 318-19 §22.4.2.2 RC: φ·Pn=φ·0.80·[0.85·f'c·(Ag-As)+fy·As]·C_s; slenderness factor C_s=1−(h_eff/(140·r))² (TMS Eq 8-22) valid h_eff/r≤99; r=min(width,thickness)/√12; k: fixed_fixed=0.5, pin_pin=1.0, fixed_pin=0.7, cantilever=2.0 (Drysdale-Hamid §10); oracle 200×200mm pin-pin h=3000mm clay_masonry f'm=10MPa→r=57.7mm h/r=52.0 C_s≈0.862 φ·Pn≈179.5kN; h/r>99→slenderness_limit_exceeded φ·Pn=0; arch_check_pier_axial LLM tool; SCOPE: concentric axial ONLY — no eccentricity, no moment interaction, no PM curve; TMS Eq 8-22 h_eff/r≤99 limit; grout/inspection Φ not applied; 49 tests pass\""
         },
         {
+          "name": "Plain/masonry bearing wall axial capacity + DCR (ACI 318-19 §11.5.3.1 + TMS 402-22 §8.3)",
+          "domain": "D2",
+          "competitor": "paid: true",
+          "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/bearing_wall_axial.py\"; note: \"ACI 318-19 §11.5.3.1 concrete/RC: φ·Pn=0.55·φ·f'c·Ag·[1−(k·lc/(32·t))²]; k: fixed_fixed=0.8, pin_pin=1.0, cantilever=2.0; valid for e≤t/6 (small-eccentricity bound); TMS 402-22 §8.3 Eq 8-22 masonry: r=t/√12; C_s=1−(h_eff/(140·r))² valid h_eff/r≤99; φ·Pn=φ·0.80·f'm·Ag·C_s; oracle t=200mm h=3000mm fc=25MPa pin-pin→slend=0.7803 φ·Pn=1394.7kN/m P=1000kN/m→DCR=0.717 (adequate); cantilever→φ·Pn=216.5kN/m; masonry f'm=10MPa pin-pin→r=57.7mm C_s=0.862 φ·Pn=896.7kN/m; e>t/6→large_eccentricity_method_required (PM interaction required); h/r>99→slenderness_limit_exceeded; arch_check_bearing_wall_axial LLM tool; SCOPE: ACI §11.5.3.1 EMPIRICAL only — large eccentricity requires full PM interaction (ACI §11.4); rebar NOT credited in empirical formula; TMS h/r≤99 limit; no in-plane shear (§11.6); Wight §13.13; 47 tests pass\""
+        },
+        {
           "name": "ASCE 7 seismic loads",
           "domain": "D2",
           "competitor": "paid: true",

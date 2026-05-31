@@ -35,6 +35,8 @@ To avoid collision this package re-exports the structural one as ``SlabDeflSpec`
   retaining_wall_stability_tools — LLM tool arch_check_retaining_wall_stability
   pier_axial_capacity — TMS 402-22 §8.3 + ACI 318-19 §22.4.2.2 slender pier axial capacity
   pier_axial_capacity_tools — LLM tool arch_check_pier_axial
+  bearing_wall_axial — ACI 318-19 §11.5.3.1 + TMS 402-22 §8.3 plain/masonry bearing wall axial check
+  bearing_wall_axial_tools — LLM tool arch_check_bearing_wall_axial
 """
 from __future__ import annotations
 
@@ -116,6 +118,11 @@ from kerf_cad_core.arch.pier_axial_capacity import (
     PierAxialReport,
     check_pier_axial,
 )
+from kerf_cad_core.arch.bearing_wall_axial import (
+    BearingWallSpec,
+    BearingWallReport,
+    check_bearing_wall,
+)
 
 __all__ = [
     "WallLayer",
@@ -183,4 +190,8 @@ __all__ = [
     "PierSpec",
     "PierAxialReport",
     "check_pier_axial",
+    # ACI 318-19 §11.5.3.1 + TMS 402-22 §8.3 plain/masonry bearing wall axial capacity
+    "BearingWallSpec",
+    "BearingWallReport",
+    "check_bearing_wall",
 ]

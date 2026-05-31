@@ -21,6 +21,8 @@ Submodules:
   punching_shear_tools — LLM tool arch_check_punching_shear
   wind_component_cladding — ASCE 7-22 §30.3 C&C design pressures (windows, doors, roof cladding)
   wind_component_cladding_tools — LLM tool arch_compute_wind_cc_pressure
+  bolt_shear_aisc   — AISC 360-22 §J3.6 bolt-group shear strength (bearing-type + slip-critical)
+  bolt_shear_aisc_tools — LLM tool arch_check_bolt_shear
 
 Note on naming: ``SlabSpec`` in ``primitives`` is the BIM slab (polygon outline).
 ``SlabSpec`` in ``slab_deflection`` is the structural deflection slab (a×b×h).
@@ -152,6 +154,12 @@ from kerf_cad_core.arch.slab_on_grade import (
     SlabOnGradeReport,
     check_slab_on_grade,
 )
+from kerf_cad_core.arch.bolt_shear_aisc import (
+    BoltSpec,
+    ConnectionSpec,
+    BoltShearReport,
+    check_bolt_shear,
+)
 
 __all__ = [
     "WallLayer",
@@ -239,4 +247,9 @@ __all__ = [
     "SlabOnGradeSpec",
     "SlabOnGradeReport",
     "check_slab_on_grade",
+    # AISC 360-22 §J3.6 bolt-group shear strength (bearing-type + slip-critical)
+    "BoltSpec",
+    "ConnectionSpec",
+    "BoltShearReport",
+    "check_bolt_shear",
 ]

@@ -318,6 +318,12 @@
           "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/anchor_bolt_pullout.py\"; note: \"ACI 318-19 §17.6 + ACI 355.2: three limit states — steel §17.6.1: A_se=0.85·π·d²/4, φ·N_sa=φ_s·A_se·fy (φ_s=0.75); concrete breakout §17.6.2: N_b=k_c_SI·λ·√f'c·hef^1.5 (k_c_SI=2.40 cracked/3.40 uncracked, SI equiv. of ACI imperial k_c=24/34; N,MPa,mm), A_Nco=9·hef², A_Nc from projected-cone geometry clipped at edges, ψ_ed=1.0 if c_a,min≥1.5·hef else 0.7+0.3·c_a,min/(1.5·hef) (§17.6.2.4.1), ψ_c=1.0 cracked/1.25 uncracked, φ·N_cb=φ_c·(A_Nc/A_Nco)·ψ_ed·ψ_c·N_b; pullout §17.6.3: N_p=8·A_brg·f'c, φ·N_pn=φ_c·N_p; governing=min(φ·N_sa,φ·N_cb,φ·N_pn); oracle 16mm bolt hef=200mm edge=300mm fc=25MPa fy=420MPa A_brg=400mm² cracked: N_b=33941N, φ·N_cb=22.06kN governs, N=15kN→adequate, N=50kN→FAILS; arch_check_anchor_pullout LLM tool; SCOPE: tension-only (no shear §17.7); cracked concrete default (k_c=2.40, ψ_c=1.0); λ=1.0 NW concrete; ψ_ec=1.0 concentric; splitting/side-face-blowout/adhesive NOT checked; one close edge assumed; 52 tests pass\""
         },
         {
+          "name": "Bolt-group shear strength (AISC 360-22 §J3.6 bearing-type + §J3.8 slip-critical)",
+          "domain": "D2",
+          "competitor": "paid: true",
+          "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/bolt_shear_aisc.py\"; note: \"AISC 360-22 §J3.6/§J3.8/§J3.10 LRFD: bolt shear Rn=Fnv·Ab·n_planes φ_v=0.75; Fnv Table J3.2: A325-N=54ksi A325-X=68ksi A490-N=68ksi A490-X=84ksi A307=27ksi; bearing §J3.10a φ·Rn=φ·2.4·d·t·Fu; tearout §J3.10b Lc=Le−dh/2 φ·Rn=φ·1.2·Lc·t·Fu; slip-critical §J3.8 Eq J3-4: Rn=μ·Du·hf·Tb·ns (μ=0.35 ClassA/0.50 ClassB, Du=1.13, hf=1.0, Tb Table J3.1); oracle 3/4 A325-N single shear φ·Rn_per_bolt=17.89kip (AISC Manual Table 7-1 ≈17.9kip); A325-X double shear=45.06kip (2× single-plane exact); bearing 3/8 plate Fu=58→29.36kip; tearout Le=0.875→Lc=0.469 governs; SC ClassB 3/4 A325 nb=1 ns=1→15.82kip; arch_check_bolt_shear LLM tool; SCOPE: LRFD only; shear-lag/combined-tension/block-shear/eccentric-bolt-groups/weld-bolt-combined NOT checked; tearout uses end-bolt Lc only; A307 no SC; standard holes assumed; 32 tests pass\""
+        },
+        {
           "name": "Plain/masonry bearing wall axial capacity + DCR (ACI 318-19 §11.5.3.1 + TMS 402-22 §8.3)",
           "domain": "D2",
           "competitor": "paid: true",

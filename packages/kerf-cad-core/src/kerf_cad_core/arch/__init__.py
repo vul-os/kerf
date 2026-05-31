@@ -41,6 +41,9 @@ To avoid collision this package re-exports the structural one as ``SlabDeflSpec`
   lintel_design_tools — LLM tool arch_design_lintel
   anchor_bolt_pullout — ACI 318-19 §17.6 cast-in-place headed bolt tension (steel §17.6.1 + breakout §17.6.2 + pullout §17.6.3)
   anchor_bolt_pullout_tools — LLM tool arch_check_anchor_pullout
+  opening_in_wall   — IBC §2308.4 + ACI 318-19 §11.5.3.1 + TMS 402-22 §8.3 wall opening check
+                      (tributary jamb load redistribution + jamb axial DCR + lintel bending DCR)
+  opening_in_wall_tools — LLM tool arch_check_opening_in_wall
 """
 from __future__ import annotations
 
@@ -137,6 +140,11 @@ from kerf_cad_core.arch.anchor_bolt_pullout import (
     AnchorPulloutReport,
     check_anchor_pullout,
 )
+from kerf_cad_core.arch.opening_in_wall import (
+    WallOpeningSpec,
+    OpeningCheckReport,
+    check_opening,
+)
 
 __all__ = [
     "WallLayer",
@@ -216,4 +224,8 @@ __all__ = [
     "AnchorBoltSpec",
     "AnchorPulloutReport",
     "check_anchor_pullout",
+    # IBC §2308.4 + ACI 318-19 §11.5.3.1 + TMS 402-22 §8.3 wall opening check
+    "WallOpeningSpec",
+    "OpeningCheckReport",
+    "check_opening",
 ]

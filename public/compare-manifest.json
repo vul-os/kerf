@@ -270,6 +270,12 @@
           "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/punching_shear.py\"; note: \"ACI 318-19 §22.6 + Wight §13.10: b_0 at d/2 from column face; vc=min(0.33·λ·√f'c, 0.17·(1+2/β_c)·λ·√f'c, 0.083·(α_s·d/b_0+2)·λ·√f'c); φ·Vn=φ·vc·b_0·d (φ=0.75); square/rectangular/circular columns; oracle 300mm sq col d=160mm f'c=30MPa→b_0=1840mm→φ·Vn≈399kN; DCR for V=300/500/900kN; β_c>2 rectangular→aspect-ratio governs; arch_check_punching_shear LLM tool; SCOPE: Vs=0 (no shear reinforcement); no unbalanced moment; no openings/drop panels; no axial load effect; √f'c cap not auto-enforced\""
         },
         {
+          "name": "RC shear wall out-of-plane flexural + slenderness check (ACI 318-19 §11.7)",
+          "domain": "D2",
+          "competitor": "paid: true",
+          "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/shear_wall_oop.py\"; note: \"ACI 318-19 §11.5.3 h/t≤30 slenderness; §11.7.5.1 empirical axial φPn=0.55·φ·f'c·Ag·[1−(k·h/(32·t))²] (k=0.8 fixed-fixed); §22.3 OOP unit-strip flexure a=(As_total·fy)/(0.85·f'c·1000); φMn=φ·As_total·fy·(d−a/2); Bresler linear DCR=Pu/φPn+Mu/φMn; oracle t=200mm h=3000mm f'c=30MPa fy=420MPa As_each_face=300mm²/m→φPn=1843kN/m φMn=27.1kNm/m DCR=0.791 (adequate); h/t>30→slenderness fail; Mu=40kNm/m→DCR=1.53 (FAIL); arch_check_shear_wall_oop LLM tool; SCOPE: empirical §11.7.5 only — slender-wall moment-magnifier (§11.8/§6.7.3) NOT implemented; no P-delta; no biaxial bending; no in-plane shear (§11.6/§18.10); Bresler linear interaction only (not full PM curve); Wight §13.13; 34 tests pass\""
+        },
+        {
           "name": "ASCE 7 seismic loads",
           "domain": "D2",
           "competitor": "paid: true",

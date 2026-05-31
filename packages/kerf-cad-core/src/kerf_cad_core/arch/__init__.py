@@ -27,6 +27,8 @@ Note on naming: ``SlabSpec`` in ``primitives`` is the BIM slab (polygon outline)
 To avoid collision this package re-exports the structural one as ``SlabDeflSpec``.
   base_plate_aisc   — AISC DG-1 §3.1 + AISC 360-22 §J8 column base plate (concentric axial load)
   base_plate_aisc_tools — LLM tool arch_design_base_plate
+  shear_wall_oop    — ACI 318-19 §11.7 RC shear wall out-of-plane flexural + slenderness check
+  shear_wall_oop_tools — LLM tool arch_check_shear_wall_oop
 """
 from __future__ import annotations
 
@@ -87,6 +89,11 @@ from kerf_cad_core.arch.base_plate_aisc import (
     BasePlateReport,
     design_base_plate,
 )
+from kerf_cad_core.arch.shear_wall_oop import (
+    ShearWallSpec,
+    ShearWallOOPReport,
+    check_shear_wall_oop,
+)
 
 __all__ = [
     "WallLayer",
@@ -137,4 +144,8 @@ __all__ = [
     "ConcreteSpec",
     "BasePlateReport",
     "design_base_plate",
+    # ACI 318-19 §11.7 RC shear wall OOP flexural + slenderness check
+    "ShearWallSpec",
+    "ShearWallOOPReport",
+    "check_shear_wall_oop",
 ]

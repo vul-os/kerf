@@ -1751,3 +1751,14 @@ from kerf_cad_core.geom.surface_shear_offset import (  # noqa: E402
     SurfaceShearOffsetResult,
     apply_shear_offset,
 )
+# NURBS-CURVE-FIT-G2: degree-5 B-spline fit with G2 (curvature-continuous)
+# end conditions (Piegl & Tiller §9.4; Farin "CAGD" Ch 10).
+# Prescribe tangent + curvature vectors at both endpoints for surface blending.
+# HONEST: chord-length parameterisation only; centripetal may be better for
+# high-aspect-ratio data.  Curvature vectors are parametric C''(t), not κ·n̂.
+# LLM tool: nurbs_fit_curve_g2.
+from kerf_cad_core.geom.curve_fit_g2 import (  # noqa: E402
+    G2FitSpec,
+    G2FitResult,
+    fit_curve_g2,
+)

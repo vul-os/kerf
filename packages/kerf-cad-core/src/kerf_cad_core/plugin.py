@@ -112,6 +112,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.arch.pier_axial_capacity_tools",     # arch_check_pier_axial: TMS 402-22 §8.3 + ACI 318-19 §22.4.2.2 masonry/RC pier axial capacity with h/r slenderness factor
     "kerf_cad_core.arch.bearing_wall_axial_tools",     # arch_check_bearing_wall_axial: ACI 318-19 §11.5.3.1 + TMS 402-22 §8.3 plain/masonry bearing wall axial capacity + DCR
     "kerf_cad_core.arch.lintel_design_tools",          # arch_design_lintel: AISC Table 3-23 + ACI 318-19 §9 + TMS 402-22 §5 lintel design (steel/RC/RM; 45° arching; L/240 or L/360)
+    "kerf_cad_core.arch.anchor_bolt_pullout_tools",   # arch_check_anchor_pullout: ACI 318-19 §17.6 cast-in-place headed bolt tension — steel §17.6.1 + concrete breakout §17.6.2 + pullout §17.6.3
     "kerf_cad_core.civil.hydraulics_tools",
     "kerf_cad_core.tolstack.tools",
     "kerf_cad_core.kinematics.tools",

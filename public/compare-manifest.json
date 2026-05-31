@@ -360,6 +360,20 @@
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
           }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
+          }
         }
       ]
     },
@@ -777,6 +791,20 @@
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
           }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
+          }
         }
       ]
     },
@@ -1166,6 +1194,20 @@
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
           }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
+          }
         }
       ]
     },
@@ -1540,6 +1582,20 @@
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
+          }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
           }
         }
       ]
@@ -1985,6 +2041,20 @@
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
+          }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
           }
         }
       ]
@@ -2473,6 +2543,20 @@
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
+          }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
           }
         }
       ]
@@ -3356,6 +3440,20 @@
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
           }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
+          }
         }
       ]
     },
@@ -3690,6 +3788,20 @@
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
           }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
+          }
         }
       ]
     },
@@ -4023,6 +4135,20 @@
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
+          }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
           }
         }
       ]
@@ -4475,6 +4601,20 @@
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
+          }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
           }
         }
       ]
@@ -5466,6 +5606,20 @@
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
+          }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
           }
         },
         {
@@ -7032,6 +7186,20 @@
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
           }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
+          }
         }
       ]
     },
@@ -8031,6 +8199,20 @@
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
           }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
+          }
         }
       ]
     },
@@ -8918,6 +9100,20 @@
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
+          }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
           }
         }
       ]
@@ -9896,6 +10092,20 @@
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
           }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
+          }
         }
       ]
     },
@@ -10062,6 +10272,20 @@
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
           }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
+          }
         }
       ]
     },
@@ -10226,6 +10450,20 @@
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
+          }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
           }
         }
       ]
@@ -10405,6 +10643,20 @@
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
+          }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
           }
         }
       ]
@@ -10884,6 +11136,20 @@
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
           }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
+          }
         }
       ]
     },
@@ -11320,6 +11586,20 @@
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
           }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
+          }
         }
       ]
     },
@@ -11512,6 +11792,20 @@
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
+          }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
           }
         }
       ]
@@ -12443,6 +12737,20 @@
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
           }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
+          }
         }
       ]
     },
@@ -12621,6 +12929,20 @@
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
+          }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
           }
         }
       ]
@@ -12801,6 +13123,20 @@
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
           }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
+          }
         }
       ]
     },
@@ -12965,6 +13301,20 @@
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
+          }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
           }
         }
       ]
@@ -13516,6 +13866,20 @@
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
           }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
+          }
         }
       ]
     },
@@ -13807,6 +14171,20 @@
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
           }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
+          }
         }
       ]
     },
@@ -13999,6 +14377,20 @@
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
+          }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
           }
         }
       ]
@@ -14347,6 +14739,20 @@
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
           }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
+          }
         }
       ]
     },
@@ -14625,6 +15031,20 @@
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
+          }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
           }
         }
       ]
@@ -15004,6 +15424,20 @@
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
           }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
+          }
         }
       ]
     },
@@ -15266,6 +15700,20 @@
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
+          }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
           }
         }
       ]
@@ -15728,6 +16176,20 @@
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
+          }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
           }
         }
       ]
@@ -16482,6 +16944,20 @@
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
           }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
+          }
         }
       ]
     },
@@ -16899,6 +17375,20 @@
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
           }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
+          }
         }
       ]
     },
@@ -17203,6 +17693,20 @@
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
+          }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
           }
         }
       ]
@@ -17802,6 +18306,20 @@
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
+          }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
           }
         }
       ]
@@ -18936,6 +19454,20 @@
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
           }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
+          }
         }
       ]
     },
@@ -19392,6 +19924,20 @@
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_conic_detect.py",
             "note": "detect_conic_type(curve_or_points, num_samples=100, residual_threshold_mm=0.01) -> ConicDetectResult(conic_type, conic_coefficients, eccentricity, rms_residual_mm, honest_caveat); fits general conic Ax²+Bxy+Cy²+Dx+Ey+F=0 via SVD null-space (Pratt 1987 + Fitzgibbon-Pilu-Fisher 1999); classifies by discriminant B²−4AC: circle|ellipse|parabola|hyperbola|line|free_form; eccentricity from 3×3 homogeneous matrix eigendecomposition; LLM tool nurbs_detect_conic_type. HONEST: algebraic fit is susceptible to noise bias — for production-quality circle detection use Pratt/Taubin (curve_circle_fit.py); parabola discrimination at discriminant boundary is fragile under noise."
+          }
+        },
+        {
+          "name": "Degree-5 NURBS curve fit with G2 curvature-continuous end conditions (P&T §9.4)",
+          "domain": "D01",
+          "competitor": {
+            "status": "partial",
+            "source": "https://developer.rhino3d.com/api/",
+            "note": "Most CAD kernels provide G1 (tangent) end-condition interpolation; G2 (curvature) endpoint matching for freeform curve fitting is less common and typically requires accessing lower-level knot/CP construction APIs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
+            "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
           }
         }
       ]

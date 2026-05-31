@@ -17966,8 +17966,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "quad/isotropic remesh + retopo_snap + decimate ops (ZRemesher-class); no interactive brush UI",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/mesh_implicit_tools.py"
+            "note": "quad/isotropic remesh + retopo_snap + decimate ops (ZRemesher-class); no interactive brush UI. GK-P23: in-process isotropic remesh (Botsch-Kobbelt 2004) via mesh_isotropic_remesh.py — pure-Python, no external binary; slower than instant_meshes for > 50k triangles; triangle output only (quad remesh in quad_remesh.py)",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/mesh_isotropic_remesh.py"
           }
         },
         {

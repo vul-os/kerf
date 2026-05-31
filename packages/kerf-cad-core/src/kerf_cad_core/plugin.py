@@ -331,6 +331,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.subd.cage_area",
     # GK-P12: Stam exact limit tangents at extraordinary CC vertices (valence n!=4) via eigenstructure (Stam 1998 §3.2-3.3; Reif 1995; Meyer et al. 2003)
     "kerf_cad_core.subd.stam_limit_tangents",
+    # GK-P13: G1 continuity at extraordinary-vertex SubD→NURBS conversion (Loop 1987 §4; Stam 1998 §3.1-3.3; Peters-Reif 2008 §7.4)
+    "kerf_cad_core.subd.g1_extraordinary_patches",
     # GK-P14: fractional crease sharpness decay s_new=max(0,s-1) per level (DeRose-Kass-Truong 1998 §4; OpenSubdiv hierarchical edits)
     "kerf_cad_core.subd.crease_fractional_decay",
     # GK-P-B: Stam exact limit-position + limit-tangent evaluation (subd_eval_limit tool)
@@ -568,6 +570,10 @@ _TOOL_MODULES = [
     # SSIHardenedMarcher: near-tangent bisection fallback (Patrikalakis & Maekawa §5).
     # LLM tool: nurbs_surface_derivatives_analytic
     "kerf_cad_core.geom.surface_analytic_derivatives",
+    # GK-P22: sculpt brushes for SubD cages + triangle meshes (inflate/crease/smooth/pinch)
+    # Wendland C2 falloff w(t)=(1-t^2)^2; Botsch-Sorkine 2008 S3; Sculptris/ZBrush brush math.
+    # LLM tool: mesh_sculpt_brush
+    "kerf_cad_core.mesh_sculpt_brushes",
 ]
 # NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
 # (already in _TOOL_MODULES above at line 128); sagitta_arrow_chart module is imported

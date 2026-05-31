@@ -437,6 +437,8 @@ _TOOL_MODULES = [
     # BREP-FACE-PRINCIPAL-CURVATURE-VIZ: sample κ₁, κ₂ over a B-rep Face UV grid;
     # SVG/PNG heatmap overlay (do Carmo §3.4 / Mortenson §6.5 / Pottmann-Wallner §4)
     "kerf_cad_core.geom.principal_curvature_viz",       # brep_face_principal_curvature_viz
+    # GK-P50: arc-length inversion (Newton–Raphson, chord-length param, even-spaced CAM)
+    "kerf_cad_core.geom.arc_length_invert",
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

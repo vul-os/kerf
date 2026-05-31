@@ -211,6 +211,11 @@ from kerf_cad_core.geom.arc_length_gauss import (
     arc_length_parametrize as arc_length_parametrize_gauss,
     reparametrize_arclength as reparametrize_arclength_gauss,
 )
+# GK-P50: arc-length inversion — Newton–Raphson parameter solve for target arc length
+from kerf_cad_core.geom.arc_length_invert import (
+    ArcLengthInvertResult,
+    invert_arc_length,
+)
 # GK-11: curve-curve intersection hardening
 from kerf_cad_core.geom.intersection import (
     curve_curve_intersect,
@@ -742,6 +747,9 @@ __all__ = [
     # GK-103
     "text_on_curve",
     "text_on_surface",
+    # GK-P50: arc-length inversion
+    "ArcLengthInvertResult",
+    "invert_arc_length",
     # GK-11
     "curve_curve_intersect",
     "curve_surface_intersect",

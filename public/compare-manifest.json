@@ -16249,6 +16249,20 @@
       "features": [
         {
           "domain": "D1",
+          "feature": "Arc-length inversion / chord-length re-parameterisation",
+          "competitor": {
+            "status": "yes",
+            "note": "Rhino: CurveArcLengthPoint, RebuildCrvNonUniform — built-in arc-length inversion",
+            "source": "https://docs.mcneel.com/rhino/8/help/en-us/commands/curvelength.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "invert_arc_length — Newton–Raphson (Piegl & Tiller §11.2) + bisection fall-back; returns t_param, residual_mm, iterations. Wired as nurbs_invert_arc_length LLM tool. Caveat: may be slower on highly non-uniform knot vectors (bisection triggered).",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/arc_length_invert.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "NURBS surfacing (blend/network/patch)",
           "competitor": {
             "status": "yes",

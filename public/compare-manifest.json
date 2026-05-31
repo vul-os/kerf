@@ -234,6 +234,12 @@
           "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/footing_bearing.py\"; note: \"Meyerhof (1963) general bearing capacity: q_ult = c·Nc·sc·dc + γ·Df·Nq·sq·dq + 0.5·γ·B·Nγ·sγ·dγ; N-factors (Bowles 5e §4 / Das 8e §3); shape+depth factors for strip/square/circular/rectangular; φ=0 Prandtl limit Nc=5.14; arch_compute_bearing_capacity LLM tool; SCOPE: Meyerhof shape+depth only — no Brinch Hansen Ir correction, no inclined/eccentric loads, no seismic, no liquefaction\""
         },
         {
+          "name": "Two-way slab deflection (Kirchhoff plate, Timoshenko §44 Tables 41–42)",
+          "domain": "D2",
+          "competitor": "paid: true",
+          "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/slab_deflection.py\"; note: \"Kirchhoff thin-plate δ=α·q·a⁴/D; D=E·h³/(12·(1-ν²)); α from Timoshenko Table 41 (SS, interpolated at any b/a) and Table 42 (fixed, a/b=1 exact); SS: a/b=1→α=0.00406, a/b=1.5→α=0.00772, a/b=2→α=0.01013, ∞→0.01302 strip limit; FF: a/b=1→α=0.00126; moments M_xx=β_x·q·a², M_yy=β_y·q·a²; arch_compute_slab_deflection LLM tool; SCOPE: linear-elastic Kirchhoff only — no Mindlin shear deformation, no cracking, no plastic hinges, no creep/shrinkage\""
+        },
+        {
           "name": "ASCE 7 wind and seismic loads",
           "domain": "D2",
           "competitor": "paid: true",

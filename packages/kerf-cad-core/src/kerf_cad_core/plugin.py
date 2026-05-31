@@ -93,6 +93,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.arch.column_load_check_tools",  # arch_check_column_load: AISC 360-22 §E3 + ACI 318-19 §22.4
     "kerf_cad_core.arch.beam_deflection_tools",    # arch_compute_beam_deflection: Roark 9e §8 + AISC Table 3-23
     "kerf_cad_core.arch.footing_bearing_tools",   # arch_compute_bearing_capacity: Meyerhof 1963 general equation (Bowles 5e §4; Das 8e §3)
+    "kerf_cad_core.arch.slab_deflection_tools",  # arch_compute_slab_deflection: Timoshenko §44 Tables 41–42 + Roark 9e Table 11.4
     "kerf_cad_core.civil.hydraulics_tools",
     "kerf_cad_core.tolstack.tools",
     "kerf_cad_core.kinematics.tools",

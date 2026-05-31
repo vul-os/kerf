@@ -10193,6 +10193,20 @@
         },
         {
           "domain": "D7",
+          "feature": "Mold vent depth check (parting-line air-escape gap)",
+          "competitor": {
+            "status": "partial",
+            "note": "Cimatron mold wizard provides vent depth guidelines per material class; no automated per-polymer compliance check or depth classifier",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Vent depth checker (Beaumont 2007 §8.3 Table 8.2 + Menges 2001 §6.4 Table 6.7): polymer-specific recommended ranges — ABS 0.025–0.038 mm, PC 0.013–0.025 mm, PP 0.025–0.050 mm, PA66 0.013–0.025 mm, POM 0.013–0.025 mm, PMMA 0.025–0.038 mm, PE 0.038–0.075 mm; depth_class: too_shallow|correct|too_deep|flash_risk (>25% above max); unknown polymers get fallback [0.013–0.038 mm] with caveat; VentSpec dataclass (polymer_grade, proposed_depth_mm, land_length_mm=1.5, vent_width_mm=6.0); LLM tool ; 35 oracle tests; honest-flagged: empirical handbook ranges only — actual safe depth depends on resin batch viscosity, melt temp, injection speed, mold surface finish; filled/FR grades may flash within the correct band; confirm by mold trial + visual flash inspection",
+            "evidence": "packages/kerf-mold/src/kerf_mold/vent_depth_check.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "Draft angle validation",
           "competitor": {
             "status": "yes",

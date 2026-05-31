@@ -95,6 +95,12 @@ from kerf_mold.demold_force_check import (
     FRICTION_COEFF,
     compute_demold_force,
 )
+from kerf_mold.vent_depth_check import (
+    VentSpec,
+    VentDepthReport,
+    VENT_DEPTH_DB,
+    check_vent_depth,
+)
 
 __all__ = [
     # mold.py
@@ -179,4 +185,9 @@ __all__ = [
     "SHRINKAGE_STRESS_MPA",
     "FRICTION_COEFF",
     "compute_demold_force",
+    # vent_depth_check.py
+    "VentSpec",
+    "VentDepthReport",
+    "VENT_DEPTH_DB",
+    "check_vent_depth",
 ]

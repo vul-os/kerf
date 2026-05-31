@@ -34,6 +34,10 @@ Registers:
   - LLM tool:  mold_compute_demold_force
                (Beaumont 2007 §9.3 + Menges 2001 §7.4 + Table 7.6 demolding /
                 ejection force per cavity; ejector pin count verification)
+  - LLM tool:  mold_check_vent_depth
+               (Beaumont 2007 §8.3 Table 8.2 + Menges 2001 §6.4 Table 6.7
+                polymer-specific parting-line vent depth verification;
+                too_shallow → short shot / burn marks; too_deep → flash)
 """
 from __future__ import annotations
 
@@ -193,6 +197,18 @@ async def register(app: FastAPI, ctx):
         run_mold_compute_demold_force,
     )
 
+    # Register vent depth check tool
+    # (Beaumont 2007 §8.3 Table 8.2 + Menges 2001 §6.4 Table 6.7)
+    from kerf_mold.vent_depth_check_tool import (
+        mold_check_vent_depth_spec,
+        run_mold_check_vent_depth,
+    )
+    ctx.tools.register(
+        "mold_check_vent_depth",
+        mold_check_vent_depth_spec,
+        run_mold_check_vent_depth,
+    )
+
     provides = [
         "mold.moldability",
         "mold.parting_surface",
@@ -211,6 +227,7 @@ async def register(app: FastAPI, ctx):
         "mold.runner_balance_check",
         "mold.gate_vestige_check",
         "mold.demold_force_check",
+        "mold.vent_depth_check",
     ]
 
     try:

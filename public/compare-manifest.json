@@ -11057,6 +11057,20 @@
           }
         },
         {
+          "domain": "D7",
+          "feature": "Sprue bushing nozzle radius match (cold-runner)",
+          "competitor": {
+            "status": "no",
+            "note": "No automated sprue bushing / machine nozzle seat-radius and orifice compliance check in Cimatron; requires manual catalogue lookup",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "mold_check_sprue_bushing_match: verify sprue bushing seat radius R = nozzle_r + 0.5–1.0 mm; sprue orifice O = nozzle_O + 0.5–1.0 mm; taper 1.5–3.0°/side (DME standard §3.2). Dataclasses SprueBushingSpec + MachineNozzleSpec; SprueMatchReport (R_mismatch_mm, R_compliant, O_mismatch_mm, O_compliant, taper_compliant, recommendation, honest_caveat). 35 oracle tests. HONEST: standard cold-runner bushings only — hot-runner nozzle seats (DME hot-tip, valve-gate, edge-gate) follow different design rules and are NOT covered. References: Beaumont 2007 §6.4 + DME Catalogue §3.2.",
+            "evidence": "packages/kerf-mold/src/kerf_mold/sprue_bushing_match.py"
+          }
+        },
+        {
           "domain": "D1",
           "feature": "Assembly and collision detection",
           "competitor": {

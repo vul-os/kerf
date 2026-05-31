@@ -133,6 +133,18 @@ from kerf_mold.melt_flow_ratio_check import (
     MeltFlowRatioReport,
     check_melt_flow_ratio,
 )
+from kerf_mold.sprue_bushing_match import (
+    SprueBushingSpec,
+    MachineNozzleSpec,
+    SprueMatchReport,
+    check_sprue_bushing_match,
+    R_EXCESS_MIN_MM,
+    R_EXCESS_MAX_MM,
+    O_EXCESS_MIN_MM,
+    O_EXCESS_MAX_MM,
+    TAPER_MIN_DEG,
+    TAPER_MAX_DEG,
+)
 
 __all__ = [
     # mold.py
@@ -248,4 +260,15 @@ __all__ = [
     "MeltFlowSpec",
     "MeltFlowRatioReport",
     "check_melt_flow_ratio",
+    # sprue_bushing_match.py
+    "SprueBushingSpec",
+    "MachineNozzleSpec",
+    "SprueMatchReport",
+    "check_sprue_bushing_match",
+    "R_EXCESS_MIN_MM",
+    "R_EXCESS_MAX_MM",
+    "O_EXCESS_MIN_MM",
+    "O_EXCESS_MAX_MM",
+    "TAPER_MIN_DEG",
+    "TAPER_MAX_DEG",
 ]

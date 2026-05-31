@@ -66,6 +66,12 @@ Registers:
                (Beaumont 2007 §4 + Menges 2001 §6.2 + ASTM D1238 MFR/MVR
                 injection-speed envelope to avoid jetting, sink marks, and gate
                 freeze-off; heuristic — real speed tuning needs mold trial DOE)
+  - LLM tool:  mold_check_sprue_bushing_match
+               (Beaumont 2007 §6.4 Sprue Bushing Design + DME standard sprue
+                bushing catalogue §3.2: verify sprue bushing seat radius =
+                nozzle_r + 0.5–1.0 mm; sprue orifice = nozzle_O + 0.5–1.0 mm;
+                taper 1.5–3.0°/side; HONEST: cold-runner standard bushings only
+                — hot-runner nozzle seats follow different design rules)
 """
 from __future__ import annotations
 
@@ -308,6 +314,18 @@ async def register(app: FastAPI, ctx):
         run_mold_check_melt_flow_ratio,
     )
 
+    # Register sprue bushing match tool
+    # (Beaumont 2007 §6.4 + DME standard sprue bushing catalogue §3.2)
+    from kerf_mold.sprue_bushing_match_tool import (
+        mold_check_sprue_bushing_match_spec,
+        run_mold_check_sprue_bushing_match,
+    )
+    ctx.tools.register(
+        "mold_check_sprue_bushing_match",
+        mold_check_sprue_bushing_match_spec,
+        run_mold_check_sprue_bushing_match,
+    )
+
     provides = [
         "mold.moldability",
         "mold.parting_surface",
@@ -333,6 +351,7 @@ async def register(app: FastAPI, ctx):
         "mold.runner_diameter_optimize",
         "mold.warpage_index",
         "mold.melt_flow_ratio_check",
+        "mold.sprue_bushing_match",
     ]
 
     try:

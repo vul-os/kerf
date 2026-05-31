@@ -1,0 +1,437 @@
+"""
+Tests for kerf_cad_core.arch.beam_deflection.
+
+Covers:
+  - All five supported load cases (formula verification against Roark 9e §8
+    Table 8.1 + AISC Manual Table 3-23), tolerance ≤ 0.1 %.
+  - W14x90, L=6 m, P=100 kN centre load (hand-computed reference).
+  - Zero load → zero deflection and zero moment.
+  - Unsupported case (fixed_fixed + point_center) → ValueError.
+  - Invalid inputs (bad support/load type, non-positive L/E/I, negative load).
+  - Report field types and signs.
+  - deflection_location_mm correctness for each case.
+  - Re-export from arch/__init__.py.
+  - BeamDeflectionReport fields are all finite and non-negative for valid loads.
+  16 tests total.
+
+All dimensions mm, forces N, stresses MPa.
+"""
+from __future__ import annotations
+
+import math
+import pytest
+
+from kerf_cad_core.arch.beam_deflection import (
+    BeamSpec,
+    BeamDeflectionReport,
+    compute_beam_deflection,
+)
+
+# Re-export check
+from kerf_cad_core.arch import (
+    BeamSpec as _BeamSpecFromInit,
+    BeamDeflectionReport as _ReportFromInit,
+    compute_beam_deflection as _ComputeFromInit,
+)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _rel_err(actual: float, expected: float) -> float:
+    """Relative error |actual - expected| / |expected|."""
+    if expected == 0.0:
+        return 0.0 if actual == 0.0 else float("inf")
+    return abs(actual - expected) / abs(expected)
+
+
+TOL = 1e-3  # 0.1 % tolerance for formula checks
+
+
+# ---------------------------------------------------------------------------
+# Section properties helpers
+# ---------------------------------------------------------------------------
+
+# W14x90: Ix = 999 in⁴ (AISC Manual 15e Table 1-1)
+# 1 in⁴ = 416 231.426 mm⁴  →  Ix ≈ 415 815 195 mm⁴ (using 1 in = 25.4 mm exactly)
+_W14x90_I_mm4 = 999.0 * (25.4 ** 4)  # exact conversion
+_STEEL_E = 200_000.0   # MPa
+
+
+# ---------------------------------------------------------------------------
+# Test 1: Simply-supported + centre point load (Roark 9e case 7)
+# ---------------------------------------------------------------------------
+
+class TestSimplySupportedPointCenter:
+
+    def _spec(self, L, E, I, P):
+        return BeamSpec(
+            length_mm=L, E_MPa=E, I_mm4=I,
+            support_type="simply_supported",
+            load_type="point_center",
+            load_value=P,
+        )
+
+    def test_delta_formula(self):
+        """δ = PL³/(48EI)."""
+        L, E, I, P = 5_000.0, 200_000.0, 1e8, 50_000.0
+        report = compute_beam_deflection(self._spec(L, E, I, P))
+        expected = P * L**3 / (48.0 * E * I)
+        assert _rel_err(report.delta_max_mm, expected) < TOL
+
+    def test_moment_formula(self):
+        """M_max = PL/4."""
+        L, E, I, P = 5_000.0, 200_000.0, 1e8, 50_000.0
+        report = compute_beam_deflection(self._spec(L, E, I, P))
+        expected_M = P * L / 4.0
+        assert _rel_err(report.M_max_Nmm, expected_M) < TOL
+
+    def test_shear_formula(self):
+        """V_max = P/2."""
+        L, E, I, P = 5_000.0, 200_000.0, 1e8, 50_000.0
+        report = compute_beam_deflection(self._spec(L, E, I, P))
+        assert _rel_err(report.V_max_N, P / 2.0) < TOL
+
+    def test_deflection_location_midspan(self):
+        """Deflection occurs at L/2."""
+        L = 4_000.0
+        report = compute_beam_deflection(self._spec(L, 200_000.0, 5e7, 30_000.0))
+        assert abs(report.deflection_location_mm - L / 2.0) < 1e-9
+
+
+# ---------------------------------------------------------------------------
+# Test 2: Simply-supported + UDL (Roark 9e case 2)
+# ---------------------------------------------------------------------------
+
+class TestSimplySupportedUDL:
+
+    def _spec(self, L, E, I, w):
+        return BeamSpec(
+            length_mm=L, E_MPa=E, I_mm4=I,
+            support_type="simply_supported",
+            load_type="udl",
+            load_value=w,
+        )
+
+    def test_delta_formula(self):
+        """δ = 5wL⁴/(384EI)."""
+        L, E, I, w = 8_000.0, 200_000.0, 2e8, 10.0
+        report = compute_beam_deflection(self._spec(L, E, I, w))
+        expected = 5.0 * w * L**4 / (384.0 * E * I)
+        assert _rel_err(report.delta_max_mm, expected) < TOL
+
+    def test_moment_formula(self):
+        """M_max = wL²/8."""
+        L, E, I, w = 8_000.0, 200_000.0, 2e8, 10.0
+        report = compute_beam_deflection(self._spec(L, E, I, w))
+        expected_M = w * L**2 / 8.0
+        assert _rel_err(report.M_max_Nmm, expected_M) < TOL
+
+    def test_shear_formula(self):
+        """V_max = wL/2."""
+        L, E, I, w = 8_000.0, 200_000.0, 2e8, 10.0
+        report = compute_beam_deflection(self._spec(L, E, I, w))
+        assert _rel_err(report.V_max_N, w * L / 2.0) < TOL
+
+
+# ---------------------------------------------------------------------------
+# Test 3: Cantilever + tip point load (Roark 9e case 1)
+# ---------------------------------------------------------------------------
+
+class TestCantileverPointLoad:
+
+    def _spec(self, L, E, I, P):
+        return BeamSpec(
+            length_mm=L, E_MPa=E, I_mm4=I,
+            support_type="cantilever",
+            load_type="point_center",
+            load_value=P,
+        )
+
+    def test_delta_formula(self):
+        """δ = PL³/(3EI)."""
+        L, E, I, P = 3_000.0, 200_000.0, 5e7, 20_000.0
+        report = compute_beam_deflection(self._spec(L, E, I, P))
+        expected = P * L**3 / (3.0 * E * I)
+        assert _rel_err(report.delta_max_mm, expected) < TOL
+
+    def test_moment_formula(self):
+        """M_max = PL at fixed support."""
+        L, E, I, P = 3_000.0, 200_000.0, 5e7, 20_000.0
+        report = compute_beam_deflection(self._spec(L, E, I, P))
+        expected_M = P * L
+        assert _rel_err(report.M_max_Nmm, expected_M) < TOL
+
+    def test_deflection_at_free_tip(self):
+        """Deflection location = L (free end)."""
+        L = 2_500.0
+        report = compute_beam_deflection(self._spec(L, 200_000.0, 5e7, 10_000.0))
+        assert abs(report.deflection_location_mm - L) < 1e-9
+
+
+# ---------------------------------------------------------------------------
+# Test 4: Cantilever + UDL (Roark 9e case 3)
+# ---------------------------------------------------------------------------
+
+class TestCantileverUDL:
+
+    def _spec(self, L, E, I, w):
+        return BeamSpec(
+            length_mm=L, E_MPa=E, I_mm4=I,
+            support_type="cantilever",
+            load_type="udl",
+            load_value=w,
+        )
+
+    def test_delta_formula(self):
+        """δ = wL⁴/(8EI)."""
+        L, E, I, w = 4_000.0, 200_000.0, 1e8, 5.0
+        report = compute_beam_deflection(self._spec(L, E, I, w))
+        expected = w * L**4 / (8.0 * E * I)
+        assert _rel_err(report.delta_max_mm, expected) < TOL
+
+    def test_moment_formula(self):
+        """M_max = wL²/2."""
+        L, E, I, w = 4_000.0, 200_000.0, 1e8, 5.0
+        report = compute_beam_deflection(self._spec(L, E, I, w))
+        expected_M = w * L**2 / 2.0
+        assert _rel_err(report.M_max_Nmm, expected_M) < TOL
+
+    def test_shear_formula(self):
+        """V_max = wL."""
+        L, E, I, w = 4_000.0, 200_000.0, 1e8, 5.0
+        report = compute_beam_deflection(self._spec(L, E, I, w))
+        assert _rel_err(report.V_max_N, w * L) < TOL
+
+
+# ---------------------------------------------------------------------------
+# Test 5: Fixed-fixed + UDL (Roark 9e case 15)
+# ---------------------------------------------------------------------------
+
+class TestFixedFixedUDL:
+
+    def _spec(self, L, E, I, w):
+        return BeamSpec(
+            length_mm=L, E_MPa=E, I_mm4=I,
+            support_type="fixed_fixed",
+            load_type="udl",
+            load_value=w,
+        )
+
+    def test_delta_formula(self):
+        """δ = wL⁴/(384EI)."""
+        L, E, I, w = 6_000.0, 200_000.0, 3e8, 8.0
+        report = compute_beam_deflection(self._spec(L, E, I, w))
+        expected = w * L**4 / (384.0 * E * I)
+        assert _rel_err(report.delta_max_mm, expected) < TOL
+
+    def test_moment_formula(self):
+        """M_max = wL²/12 (at supports, hogging)."""
+        L, E, I, w = 6_000.0, 200_000.0, 3e8, 8.0
+        report = compute_beam_deflection(self._spec(L, E, I, w))
+        expected_M = w * L**2 / 12.0
+        assert _rel_err(report.M_max_Nmm, expected_M) < TOL
+
+    def test_midspan_moment_is_half_support(self):
+        """
+        Mid-span sagging moment for fixed-fixed UDL = wL²/24.
+        The report returns M_support = wL²/12 (governing).
+        Check that support M is exactly 2× midspan value.
+        """
+        L, E, I, w = 6_000.0, 200_000.0, 3e8, 8.0
+        report = compute_beam_deflection(self._spec(L, E, I, w))
+        midspan_M = w * L**2 / 24.0
+        # report M_max (support) = 2 × midspan
+        assert _rel_err(report.M_max_Nmm, 2.0 * midspan_M) < TOL
+
+    def test_delta_equals_ss_udl_deflection(self):
+        """
+        Fixed-fixed UDL δ = wL⁴/(384EI) is numerically identical to SS UDL
+        δ = 5wL⁴/(384EI) / 5; i.e., exactly 1/5 of the SS value.
+        """
+        L, E, I, w = 6_000.0, 200_000.0, 3e8, 8.0
+        spec_ff = self._spec(L, E, I, w)
+        spec_ss = BeamSpec(length_mm=L, E_MPa=E, I_mm4=I,
+                           support_type="simply_supported",
+                           load_type="udl", load_value=w)
+        r_ff = compute_beam_deflection(spec_ff)
+        r_ss = compute_beam_deflection(spec_ss)
+        ratio = r_ss.delta_max_mm / r_ff.delta_max_mm
+        assert abs(ratio - 5.0) < 1e-9
+
+
+# ---------------------------------------------------------------------------
+# Test 6: W14x90, L=6 m, P=100 kN centre (hand-computed reference)
+# ---------------------------------------------------------------------------
+
+class TestW14x90Reference:
+
+    def test_ss_point_delta(self):
+        """
+        W14x90, L=6000 mm, P=100 kN, SS + centre point load.
+        Hand calc: δ = PL³/(48EI)
+          I = 999 in⁴ × (25.4 mm/in)⁴ ≈ 4.158×10⁸ mm⁴
+          δ ≈ 5.411 mm
+        """
+        I = _W14x90_I_mm4
+        L = 6_000.0
+        P = 100_000.0  # 100 kN
+        expected_delta = P * L**3 / (48.0 * _STEEL_E * I)
+        report = compute_beam_deflection(BeamSpec(
+            length_mm=L, E_MPa=_STEEL_E, I_mm4=I,
+            support_type="simply_supported",
+            load_type="point_center",
+            load_value=P,
+        ))
+        # Absolute check against pre-computed value ≈ 5.411 mm
+        assert abs(report.delta_max_mm - expected_delta) < 1e-6
+        # Sanity bounds: should be between 4 mm and 7 mm
+        assert 4.0 < report.delta_max_mm < 7.0
+
+    def test_ss_point_moment(self):
+        """M_max = PL/4 = 100 000 × 6 000 / 4 = 150 000 000 N·mm = 150 kN·m."""
+        I = _W14x90_I_mm4
+        report = compute_beam_deflection(BeamSpec(
+            length_mm=6_000.0, E_MPa=_STEEL_E, I_mm4=I,
+            support_type="simply_supported",
+            load_type="point_center",
+            load_value=100_000.0,
+        ))
+        expected_M = 100_000.0 * 6_000.0 / 4.0  # = 1.5e8 N·mm
+        assert abs(report.M_max_Nmm - expected_M) < 1.0  # N·mm tolerance
+
+
+# ---------------------------------------------------------------------------
+# Test 7: Zero load → zero results
+# ---------------------------------------------------------------------------
+
+class TestZeroLoad:
+
+    @pytest.mark.parametrize("support,load", [
+        ("simply_supported", "point_center"),
+        ("simply_supported", "udl"),
+        ("cantilever", "point_center"),
+        ("cantilever", "udl"),
+        ("fixed_fixed", "udl"),
+    ])
+    def test_zero_load_gives_zero_deflection(self, support, load):
+        """Zero load must produce zero deflection, moment, and shear."""
+        spec = BeamSpec(
+            length_mm=5_000.0, E_MPa=200_000.0, I_mm4=1e8,
+            support_type=support, load_type=load, load_value=0.0,
+        )
+        report = compute_beam_deflection(spec)
+        assert report.delta_max_mm == 0.0
+        assert report.M_max_Nmm == 0.0
+        assert report.V_max_N == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Test 8: Unsupported case → ValueError
+# ---------------------------------------------------------------------------
+
+class TestUnsupportedCase:
+
+    def test_fixed_fixed_point_center_raises(self):
+        """fixed_fixed + point_center is not implemented — must raise ValueError."""
+        spec = BeamSpec(
+            length_mm=6_000.0, E_MPa=200_000.0, I_mm4=1e8,
+            support_type="fixed_fixed",
+            load_type="point_center",
+            load_value=50_000.0,
+        )
+        with pytest.raises(ValueError, match="fixed_fixed.*point_center"):
+            compute_beam_deflection(spec)
+
+
+# ---------------------------------------------------------------------------
+# Test 9: Invalid inputs raise ValueError
+# ---------------------------------------------------------------------------
+
+class TestInvalidInputs:
+
+    def _base(self, **overrides):
+        kwargs = dict(
+            length_mm=5_000.0, E_MPa=200_000.0, I_mm4=1e8,
+            support_type="simply_supported",
+            load_type="udl",
+            load_value=5.0,
+        )
+        kwargs.update(overrides)
+        return BeamSpec(**kwargs)
+
+    def test_zero_length_raises(self):
+        with pytest.raises(ValueError, match="length_mm"):
+            compute_beam_deflection(self._base(length_mm=0.0))
+
+    def test_negative_length_raises(self):
+        with pytest.raises(ValueError, match="length_mm"):
+            compute_beam_deflection(self._base(length_mm=-100.0))
+
+    def test_zero_E_raises(self):
+        with pytest.raises(ValueError, match="E_MPa"):
+            compute_beam_deflection(self._base(E_MPa=0.0))
+
+    def test_zero_I_raises(self):
+        with pytest.raises(ValueError, match="I_mm4"):
+            compute_beam_deflection(self._base(I_mm4=0.0))
+
+    def test_negative_load_raises(self):
+        with pytest.raises(ValueError, match="load_value"):
+            compute_beam_deflection(self._base(load_value=-1.0))
+
+    def test_bad_support_type_raises(self):
+        with pytest.raises(ValueError, match="support_type"):
+            compute_beam_deflection(self._base(support_type="pinned_roller"))
+
+    def test_bad_load_type_raises(self):
+        with pytest.raises(ValueError, match="load_type"):
+            compute_beam_deflection(self._base(load_type="triangular"))
+
+
+# ---------------------------------------------------------------------------
+# Test 10: Report fields are finite and non-negative
+# ---------------------------------------------------------------------------
+
+class TestReportFieldSanity:
+
+    @pytest.mark.parametrize("support,load,val", [
+        ("simply_supported", "point_center", 40_000.0),
+        ("simply_supported", "udl", 6.0),
+        ("cantilever", "point_center", 15_000.0),
+        ("cantilever", "udl", 4.0),
+        ("fixed_fixed", "udl", 7.0),
+    ])
+    def test_fields_finite_nonneg(self, support, load, val):
+        spec = BeamSpec(
+            length_mm=6_000.0, E_MPa=200_000.0, I_mm4=2e8,
+            support_type=support, load_type=load, load_value=val,
+        )
+        r = compute_beam_deflection(spec)
+        assert math.isfinite(r.delta_max_mm) and r.delta_max_mm >= 0.0
+        assert math.isfinite(r.M_max_Nmm) and r.M_max_Nmm >= 0.0
+        assert math.isfinite(r.V_max_N) and r.V_max_N >= 0.0
+        assert math.isfinite(r.deflection_location_mm) and r.deflection_location_mm >= 0.0
+        assert isinstance(r.honest_caveat, str) and len(r.honest_caveat) > 20
+
+
+# ---------------------------------------------------------------------------
+# Test 11: Re-export from arch/__init__.py works
+# ---------------------------------------------------------------------------
+
+class TestReExport:
+
+    def test_re_export_types_identical(self):
+        assert _BeamSpecFromInit is BeamSpec
+        assert _ReportFromInit is BeamDeflectionReport
+        assert _ComputeFromInit is compute_beam_deflection
+
+    def test_re_export_computes_correctly(self):
+        spec = _BeamSpecFromInit(
+            length_mm=3_000.0, E_MPa=200_000.0, I_mm4=5e7,
+            support_type="cantilever", load_type="udl", load_value=2.0,
+        )
+        r = _ComputeFromInit(spec)
+        expected_delta = 2.0 * 3_000.0**4 / (8.0 * 200_000.0 * 5e7)
+        assert _rel_err(r.delta_max_mm, expected_delta) < TOL

@@ -105,6 +105,17 @@ async def register(app: FastAPI, ctx):
         run_cam_generate_tap_cycle,
     )
 
+    # G85/G86/G89 boring canned cycles — NIST RS-274/NGC §3.8.4 + MH 31e §1162
+    from kerf_cam.boring_cycle import (
+        cam_generate_boring_cycle_spec,
+        run_cam_generate_boring_cycle,
+    )
+    ctx.tools.register(
+        "cam_generate_boring_cycle",
+        cam_generate_boring_cycle_spec,
+        run_cam_generate_boring_cycle,
+    )
+
     # Capabilities depend on available deps
     provides = [
         "cam.2_5d",
@@ -113,6 +124,7 @@ async def register(app: FastAPI, ctx):
         "cam.rest-machining",
         "cam.g83-peck-drill",
         "cam.g84-g74-tap-cycle",
+        "cam.g85-g86-g89-boring-cycles",
     ]   # pure-Python ops always available
     if _OCL_AVAILABLE:
         provides += ["cam.parallel-3d", "cam.waterline", "cam.lathe"]

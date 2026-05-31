@@ -88,6 +88,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.gearbox.tools",
     "kerf_cad_core.arch.spaces_tools",
     "kerf_cad_core.arch.column_load_check_tools",  # arch_check_column_load: AISC 360-22 §E3 + ACI 318-19 §22.4
+    "kerf_cad_core.arch.beam_deflection_tools",    # arch_compute_beam_deflection: Roark 9e §8 + AISC Table 3-23
     "kerf_cad_core.civil.hydraulics_tools",
     "kerf_cad_core.tolstack.tools",
     "kerf_cad_core.kinematics.tools",
@@ -428,6 +429,9 @@ _TOOL_MODULES = [
     # NURBS-SURFACE-AREA-EXACT: exact area via first-fundamental-form integrand
     # A = ∫∫ sqrt(EG-F²) du dv (do Carmo §2.5 / Mortenson §10.4)
     "kerf_cad_core.geom.surface_area_exact",            # nurbs_surface_area_exact
+    # BREP-FACE-PRINCIPAL-CURVATURE-VIZ: sample κ₁, κ₂ over a B-rep Face UV grid;
+    # SVG/PNG heatmap overlay (do Carmo §3.4 / Mortenson §6.5 / Pottmann-Wallner §4)
+    "kerf_cad_core.geom.principal_curvature_viz",       # brep_face_principal_curvature_viz
 ]
 
 # ── kerf_core contract (built by kerf-core agent in parallel) ─────────────────

@@ -17556,6 +17556,18 @@
           }
         },
         {
+          "feature": "Line fit to curve (TLS/SVD)",
+          "competitor": {
+            "status": "no",
+            "note": "No dedicated least-squares line fit with residual analysis for linear segment detection in Rhino"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "fit_line_to_curve (TLS via SVD; Press §15.7; Lawson-Hanson §6); LineFitResult with origin, direction, rms/max residual, is_planar_line; LLM tool nurbs_fit_line_to_curve; 2D only — for 3D space curves project onto plane first",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_line_fit.py"
+          }
+        },
+        {
           "domain": "D2",
           "feature": "FE — 1D beam / 2D truss (native)",
           "competitor": {

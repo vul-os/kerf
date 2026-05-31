@@ -196,6 +196,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.curve_offset_2d",
     "kerf_cad_core.geom.mass_props_mesh",   # BREP-MESH-MASS-PROPS: triangle-mesh volume/CG/inertia
     "kerf_cad_core.geom.curve_toolkit",
+    # NURBS-CURVE-LINE-FIT: fit straight line to 2D NurbsCurve via TLS/SVD (Press §15.7; Lawson-Hanson §6)
+    "kerf_cad_core.geom.curve_line_fit",
     "kerf_cad_core.geom.surface_analysis",
     "kerf_cad_core.geom.wall_thickness",   # GK-P: brep_analyze_wall_thickness + brep_check_moldability
     "kerf_cad_core.geom.shell_wall_check", # BREP-SHELL-WALL-CHECK: brep_check_shell_walls (Menges 2001 §3.3; BD §5)

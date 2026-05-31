@@ -1695,3 +1695,7 @@ from kerf_cad_core.geom.edge_chamfer_variable import (  # noqa: E402
 # NURBS-CURVE-CIRCLE-FIT: Kasa (1976) + Taubin (1991) circle fit for 2D NurbsCurves
 # — snap-to-circle in sketcher, circular region detection, near-arc classification.
 from kerf_cad_core.geom.curve_circle_fit import CircleFitResult, fit_circle_to_curve
+# NURBS-CURVE-LINE-FIT: total-least-squares (TLS/SVD) straight-line fit for 2D NurbsCurves
+# — linear-segment detection, snap-to-line, near-straight edge classification.
+# Refs: Press §15.7 (TLS); Lawson-Hanson §6 (SVD geometric fitting).
+from kerf_cad_core.geom.curve_line_fit import LineFitResult, fit_line_to_curve

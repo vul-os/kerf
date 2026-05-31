@@ -40,7 +40,11 @@ The sector work only matters if you **own your work, are not locked in, and can 
 
 ## What shipped
 
-### Latest delta — 2026-05-29
+### Latest delta — 2026-05-31
+
+**SUBD-LIMIT-NORMAL-FIT** ✅ — sample the Catmull-Clark limit-surface normal n̂(u,v) at a uniform (u,v) grid across all cage faces using Stam (1998) exact eigenstructure tangent vectors; `sample_subd_limit_normals(cage_mesh, samples_per_face=9, normalize=True)` returns `LimitNormalFitResult(sampled_normals, max_normal_residual_deg, mean_normal_residual_deg, num_irregular_samples, honest_caveat)`; per-face n×n grid (n = round(sqrt(samples_per_face))); normal via N = ∂S/∂u × ∂S/∂v from Stam tangents (C¹-continuous at extraordinary vertices, exact bi-cubic B-spline for valence-4 regular faces); residuals computed against bilinear interpolation of four face-corner Stam normals — quantifies accuracy gain of a proper normal field vs the simple shader approximation; irregular-vertex flag per sample (valence ≠ 4 faces); LLM tool `subd_sample_limit_normals` registered in plugin via gated import; re-exported from `kerf_cad_core.subd`; 17 oracle-asserted tests (flat plane nz > 0.9999, unit-length all faces, nx/ny ≈ 0, dot > 0.9999, normalize=True/False, result structure, total sample count, honest_caveat non-empty, irregular cube valence-3 > 0, flat plane residual < 0.5°, max residual ≤ 90°, cylinder normals perpendicular to Y, cube 24-sample count + unit-length, empty cage no exception). HONEST: "fit" = residual analysis vs bilinear, NOT a closed-form NURBS surface (would require overdetermined least-squares + knot/CP storage) — `kerf-cad-core/src/kerf_cad_core/subd/limit_normal_fit.py`. Refs: Stam (1998) §3.2; Halstead-Kass-DeRose (1993); Piegl-Tiller §9.
+
+### Previous delta — 2026-05-29
 
 **Civil infrastructure UIs** ✅ — four viewport components wired to kerf-civil backends: `TINView.jsx` (3-D isometric TIN surface, wireframe + contour overlay, dispatches `civil_tin_terrain`); `PipeNetworkView.jsx` (2-D plan view with click-to-inspect pipes, flow/pressure overlay, dispatches `civil_water_network_solve`); `GradingPlanView.jsx` (existing + proposed contour overlay, cut/fill colour bands, dispatches `civil_tin_terrain` volume op); `LandscapeView.jsx` (planting symbols + irrigation zones, dispatches `landscape_plants` + `landscape_irrigation_schedule`) — `src/components/civil/`. Editor shell wired for `.tin`, `.pipe_net`, `.grading`, `.landscape` file kinds. 62 SSR tests pass.
 

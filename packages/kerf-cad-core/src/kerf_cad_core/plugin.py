@@ -67,6 +67,9 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.face_developable_check",
     # NURBS-CURVE-FRESNEL-PARAMETERIZE: κ(s)≈αs clothoid re-parameterization (Walton-Meek 2009; Bertolazzi-Frego 2015)
     "kerf_cad_core.geom.fresnel_parameterize",
+    # NURBS-CURVE-EVOLUTE: locus of osculating-circle centres E(t)=C(t)+n̂/κ
+    # (do Carmo §1.6; Mortenson §4.2) — 2D only; 3D Frenet-Serret not yet supported
+    "kerf_cad_core.geom.curve_evolute",
     # GK-P Wave 4P: far-offset robustness (Maekawa 1999) — nurbs_surface_offset_robust
     "kerf_cad_core.geom.offset_far_tools",
     "kerf_cad_core.geom.trim_curve",
@@ -271,6 +274,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.subd.limit_walk_cross_curve",
     # SUBD-CAGE-EDGE-LOOP-SELECT: directional edge-loop walk on quad cage; stops at irregular vertex (Bommes-Lévy-Pietroni 2013 §3.2)
     "kerf_cad_core.subd.edge_loop_select",
+    # SUBD-LIMIT-NORMAL-FIT: sample CC limit-surface normal n̂(u,v) at uniform grid; residuals vs bilinear approx (Stam 1998 §3.2; Halstead-Kass-DeRose 1993)
+    "kerf_cad_core.subd.limit_normal_fit",
     # GK-P-B: Stam exact limit-position + limit-tangent evaluation (subd_eval_limit tool)
     "kerf_cad_core.geom.subd_stam",
     # GK-P45: SubD/mesh authoring ops (subd_poke, subd_extrude_along, sculpt_brush, multires_evaluate)
@@ -446,8 +451,6 @@ _TOOL_MODULES = [
 # NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
 # (already in _TOOL_MODULES above at line 128); sagitta_arrow_chart module is imported
 # from within tools.py via gated import at module bottom.
-    # OPTICS-SAGITTA-ARROW-CHART: optics_compute_sagitta_arrow_chart registered via optics.tools
-]
 # NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
 # (already in _TOOL_MODULES above); sagitta_arrow_chart module imported from tools.py bottom.
 

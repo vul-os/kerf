@@ -94,6 +94,17 @@ async def register(app: FastAPI, ctx):
         run_cam_generate_peck_drill_cycle,
     )
 
+    # G84/G74 rigid tapping canned cycle — NIST RS-274/NGC §3.8.4 + MH 31e §1934
+    from kerf_cam.tap_cycle import (
+        cam_generate_tap_cycle_spec,
+        run_cam_generate_tap_cycle,
+    )
+    ctx.tools.register(
+        "cam_generate_tap_cycle",
+        cam_generate_tap_cycle_spec,
+        run_cam_generate_tap_cycle,
+    )
+
     # Capabilities depend on available deps
     provides = [
         "cam.2_5d",
@@ -101,6 +112,7 @@ async def register(app: FastAPI, ctx):
         "cam.trochoidal-slot",
         "cam.rest-machining",
         "cam.g83-peck-drill",
+        "cam.g84-g74-tap-cycle",
     ]   # pure-Python ops always available
     if _OCL_AVAILABLE:
         provides += ["cam.parallel-3d", "cam.waterline", "cam.lathe"]

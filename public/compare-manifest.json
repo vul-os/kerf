@@ -5415,6 +5415,20 @@
         },
         {
           "domain": "D7",
+          "feature": "G84/G74 rigid tapping canned cycle",
+          "competitor": {
+            "status": "yes",
+            "note": "G84 right-hand and G74 left-hand tapping cycles; rigid and floating-holder modes; post-processor configurable",
+            "source": "https://cam.autodesk.com/hsmposts"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "NIST RS-274/NGC §3.8.4 G84 (right-hand) + G74 (left-hand); feed = pitch × rpm per MH 31e §1934; M29 Fanuc rigid-tap engage; cam_generate_tap_cycle LLM tool. Honest caveat: rigid tap timing only — floating tap holders not modelled; acceleration ramps excluded from time estimate",
+            "evidence": "packages/kerf-cam/src/kerf_cam/tap_cycle.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "G-code post (Fanuc/GRBL/LinuxCNC/Mach3)",
           "competitor": {
             "status": "yes",

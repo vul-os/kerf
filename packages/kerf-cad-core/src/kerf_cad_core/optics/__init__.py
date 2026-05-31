@@ -132,6 +132,12 @@ from kerf_cad_core.optics.schmidt_corrector import (
     SchmidtReport,
     design_schmidt_corrector,
 )
+from kerf_cad_core.optics.coma_coefficient import (
+    ThinLensSpec,
+    ImageSpec,
+    ComaCoefficientReport,
+    compute_coma_coefficient,
+)
 
 __all__ = [
     "lensmaker",
@@ -199,4 +205,8 @@ __all__ = [
     "SchmidtSpec",
     "SchmidtReport",
     "design_schmidt_corrector",
+    "ThinLensSpec",
+    "ImageSpec",
+    "ComaCoefficientReport",
+    "compute_coma_coefficient",
 ]

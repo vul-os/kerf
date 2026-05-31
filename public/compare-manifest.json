@@ -5512,6 +5512,20 @@
         },
         {
           "domain": "D7",
+          "feature": "Face-mill zig-zag toolpath (rectangular pocket)",
+          "competitor": {
+            "status": "yes",
+            "note": "Parallel / zig-zag facing strategies with stepover control; climb/conventional toggle; helical ramp entry available",
+            "source": "https://cam.autodesk.com/hsmposts"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "MH 31e §1136 zig-zag face mill; 70 % stepover default; climb vs conventional; NIST RS-274/NGC §3.5 G-code output; cam_generate_face_mill_path LLM tool; 71 tests. Honest limits: 2.5D only (single flat depth); no helical entry; no G41/G42 cutter comp; no high-feed (HFC) strategies; no corner arcs at reversal; time estimate excludes acceleration ramps",
+            "evidence": "packages/kerf-cam/src/kerf_cam/face_mill_path.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "G-code post (Fanuc/GRBL/LinuxCNC/Mach3)",
           "competitor": {
             "status": "yes",

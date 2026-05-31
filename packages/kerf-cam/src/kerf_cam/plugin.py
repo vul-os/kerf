@@ -116,6 +116,17 @@ async def register(app: FastAPI, ctx):
         run_cam_generate_boring_cycle,
     )
 
+    # Zig-zag face-mill toolpath — MH 31e §1136 + NIST RS-274/NGC §3.5
+    from kerf_cam.face_mill_path import (
+        cam_generate_face_mill_path_spec,
+        run_cam_generate_face_mill_path,
+    )
+    ctx.tools.register(
+        "cam_generate_face_mill_path",
+        cam_generate_face_mill_path_spec,
+        run_cam_generate_face_mill_path,
+    )
+
     # Capabilities depend on available deps
     provides = [
         "cam.2_5d",
@@ -125,6 +136,7 @@ async def register(app: FastAPI, ctx):
         "cam.g83-peck-drill",
         "cam.g84-g74-tap-cycle",
         "cam.g85-g86-g89-boring-cycles",
+        "cam.face-mill-path",
     ]   # pure-Python ops always available
     if _OCL_AVAILABLE:
         provides += ["cam.parallel-3d", "cam.waterline", "cam.lathe"]

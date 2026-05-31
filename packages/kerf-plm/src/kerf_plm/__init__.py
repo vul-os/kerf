@@ -46,6 +46,11 @@ from kerf_plm.component_whereused import (
     WhereUsedReport,
     find_component_whereused,
 )
+from kerf_plm.ecn_impact_analysis import (
+    EcnInput,
+    EcnImpactReport,
+    analyze_ecn_impact,
+)
 
 __all__ = [
     "Rule",
@@ -68,4 +73,7 @@ __all__ = [
     "WhereUsedEntry",
     "WhereUsedReport",
     "find_component_whereused",
+    "EcnInput",
+    "EcnImpactReport",
+    "analyze_ecn_impact",
 ]

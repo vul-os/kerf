@@ -171,18 +171,32 @@ async def register(app: FastAPI, ctx):
     except Exception:
         pass  # component-whereused tool optional — fail silently if symbol missing.
 
+    # ECN Impact Analysis (ISO 10007 §6 + APICS "ECN").
+    try:
+        from kerf_plm.tools import (
+            plm_analyze_ecn_impact_spec,
+            run_plm_analyze_ecn_impact,
+        )
+        ctx.tools.register(
+            "plm_analyze_ecn_impact",
+            plm_analyze_ecn_impact_spec,
+            run_plm_analyze_ecn_impact,
+        )
+    except Exception:
+        pass  # ecn-impact tool optional — fail silently if symbol missing.
+
     try:
         from kerf_core.plugin import PluginManifest
         return PluginManifest(
             name="plm",
             version="0.1.0",
-            provides=["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.sysml-traceability", "plm.xmi-export", "plm.where-used", "plm.document-version-diff", "plm.multi-cavity-effectivity", "plm.part-numbering-schema", "plm.change-notification-distribution", "plm.bom-cost-rollup", "plm.component-whereused"],
+            provides=["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.sysml-traceability", "plm.xmi-export", "plm.where-used", "plm.document-version-diff", "plm.multi-cavity-effectivity", "plm.part-numbering-schema", "plm.change-notification-distribution", "plm.bom-cost-rollup", "plm.component-whereused", "plm.ecn-impact-analysis"],
             depends=[],
         )
     except ImportError:
         return {
             "name": "plm",
             "version": "0.1.0",
-            "provides": ["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.multi-cavity-effectivity", "plm.part-numbering-schema", "plm.change-notification-distribution", "plm.bom-cost-rollup", "plm.component-whereused"],
+            "provides": ["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.multi-cavity-effectivity", "plm.part-numbering-schema", "plm.change-notification-distribution", "plm.bom-cost-rollup", "plm.component-whereused", "plm.ecn-impact-analysis"],
             "depends": [],
         }

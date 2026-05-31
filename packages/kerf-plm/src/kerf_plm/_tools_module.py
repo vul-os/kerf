@@ -2018,3 +2018,219 @@ async def run_plm_component_whereused(ctx, args: bytes) -> str:
             for e in report.entries
         ],
     })
+
+
+# ===========================================================================
+# PLM ECN Impact Analysis (ISO 10007 §6 + APICS "ECN")
+# ===========================================================================
+
+plm_analyze_ecn_impact_spec = ToolSpec(
+    name="plm_analyze_ecn_impact",
+    description=(
+        "Compute the cascading impact of an Engineering Change Notice (ECN) "
+        "affecting one or more part numbers.\n\n"
+        "Per ISO 10007:2003 §6 (Change control) and the APICS Dictionary "
+        "'engineering change notice (ECN)' definition, an ECN initiates a "
+        "structured change-control process.  This tool performs:\n\n"
+        "  1. BFS upward traversal from every ECN-affected component through "
+        "the BOM hierarchy to identify ALL transitively affected parent "
+        "assemblies (deduplicated across all input components).\n"
+        "  2. Drawing impact: counts distinct drawing IDs linked to any "
+        "affected parent (from optional *drawings_db*).\n"
+        "  3. Work-order impact: counts distinct open work order IDs linked "
+        "to any affected parent (from optional *work_orders_db*).\n"
+        "  4. Heuristic cost estimate (USD):\n"
+        "       cost = (parents × $50) + (drawings × cost_per_drawing_revision) "
+        "+ (work_orders × $200)\n"
+        "  5. Implementation class assignment (ISO 10007 §6.3.2):\n"
+        "       Class_I_immediate    — emergency urgency OR ≥ 20 affected parents.\n"
+        "       Class_II_rev         — normal urgency, 1–19 affected parents.\n"
+        "       Class_III_drawing_only — deferred urgency OR zero affected parents.\n\n"
+        "HONEST FLAG: cost formula is a heuristic estimate only.  "
+        "Real-world ECN costs vary widely by industry — aerospace/defence "
+        "drawing revisions can exceed $10 000; consumer electronics may be "
+        "< $50.  Use for initial prioritisation, not budget approval.  "
+        "Class assignment is heuristic; real ECN classification requires "
+        "engineering judgment and change-board review per ISO 10007 §6.5."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "ecn_id": {
+                "type": "string",
+                "description": "Unique ECN identifier, e.g. 'ECN-2026-0042'.",
+            },
+            "affected_components": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "Part numbers directly listed on the ECN. "
+                    "Each is used as a starting point for BFS upward traversal."
+                ),
+            },
+            "change_description": {
+                "type": "string",
+                "description": "Free-text description of the engineering change.",
+            },
+            "urgency": {
+                "type": "string",
+                "enum": ["emergency", "normal", "deferred"],
+                "description": (
+                    "Change urgency.  Controls implementation class:\n"
+                    "  emergency → Class_I_immediate (regardless of impact size).\n"
+                    "  normal    → Class_I if >= 20 parents, else Class_II_rev.\n"
+                    "  deferred  → Class_III_drawing_only if zero parents found, "
+                    "else Class_II_rev."
+                ),
+            },
+            "relationships": {
+                "type": "array",
+                "description": (
+                    "Flat list of BOM relationships. Each entry:\n"
+                    "  parent_pn (str, required) — parent assembly part number.\n"
+                    "  child_pn  (str, required) — child component part number.\n"
+                    "  qty       (number, required) — quantity of child in one parent."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "parent_pn": {"type": "string"},
+                        "child_pn": {"type": "string"},
+                        "qty": {"type": "number"},
+                    },
+                    "required": ["parent_pn", "child_pn", "qty"],
+                },
+            },
+            "drawings_db": {
+                "type": "object",
+                "description": (
+                    "Optional mapping of part_number → [drawing_id, ...]. "
+                    "Used to count distinct drawings affected by the ECN. "
+                    "Omit if drawing impact is not relevant."
+                ),
+                "additionalProperties": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                },
+            },
+            "work_orders_db": {
+                "type": "object",
+                "description": (
+                    "Optional mapping of part_number → [work_order_id, ...] "
+                    "for currently open work orders. "
+                    "Omit if work-order impact is not relevant."
+                ),
+                "additionalProperties": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                },
+            },
+            "cost_per_drawing_revision": {
+                "type": "number",
+                "description": (
+                    "Heuristic cost (USD) to revise one drawing. "
+                    "Default: 150.0.  "
+                    "Adjust for your industry — aerospace typically higher, "
+                    "consumer electronics typically lower."
+                ),
+                "default": 150.0,
+            },
+        },
+        "required": ["ecn_id", "affected_components", "change_description", "urgency", "relationships"],
+    },
+)
+
+
+@register(plm_analyze_ecn_impact_spec)
+async def run_plm_analyze_ecn_impact(ctx, args: bytes) -> str:
+    """Tool handler for plm_analyze_ecn_impact (ISO 10007 §6 + APICS ECN)."""
+    import json as _json
+    try:
+        a = _json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+    ecn_id = a.get("ecn_id", "")
+    affected_components = a.get("affected_components")
+    change_description = a.get("change_description", "")
+    urgency = a.get("urgency", "")
+    raw_relationships = a.get("relationships")
+    drawings_db_raw = a.get("drawings_db") or {}
+    work_orders_db_raw = a.get("work_orders_db") or {}
+    cost_per_rev = float(a.get("cost_per_drawing_revision", 150.0))
+
+    if not ecn_id:
+        return err_payload("'ecn_id' is required", "BAD_ARGS")
+    if not isinstance(affected_components, list):
+        return err_payload("'affected_components' must be an array", "BAD_ARGS")
+    if not urgency:
+        return err_payload("'urgency' is required", "BAD_ARGS")
+    if urgency not in {"emergency", "normal", "deferred"}:
+        return err_payload(
+            f"'urgency' must be 'emergency', 'normal', or 'deferred', got {urgency!r}",
+            "BAD_ARGS",
+        )
+    if not isinstance(raw_relationships, list):
+        return err_payload("'relationships' must be an array", "BAD_ARGS")
+    if not isinstance(drawings_db_raw, dict):
+        return err_payload("'drawings_db' must be an object", "BAD_ARGS")
+    if not isinstance(work_orders_db_raw, dict):
+        return err_payload("'work_orders_db' must be an object", "BAD_ARGS")
+
+    from kerf_plm.component_whereused import BomRelationship
+    from kerf_plm.ecn_impact_analysis import EcnInput, analyze_ecn_impact
+
+    # Parse relationships
+    try:
+        relationships = []
+        for i, raw in enumerate(raw_relationships):
+            if not isinstance(raw, dict):
+                return err_payload(f"relationships[{i}] must be an object", "BAD_ARGS")
+            parent_pn = raw.get("parent_pn")
+            child_pn = raw.get("child_pn")
+            qty_raw = raw.get("qty")
+            if not parent_pn:
+                return err_payload(f"relationships[{i}].parent_pn is required", "BAD_ARGS")
+            if not child_pn:
+                return err_payload(f"relationships[{i}].child_pn is required", "BAD_ARGS")
+            if qty_raw is None:
+                return err_payload(f"relationships[{i}].qty is required", "BAD_ARGS")
+            try:
+                qty = float(qty_raw)
+            except (TypeError, ValueError) as exc:
+                return err_payload(f"relationships[{i}].qty must be a number: {exc}", "BAD_ARGS")
+            relationships.append(BomRelationship(parent_pn=parent_pn, child_pn=child_pn, qty=qty))
+    except Exception as exc:
+        return err_payload(f"invalid relationships: {exc}", "BAD_ARGS")
+
+    ecn_input = EcnInput(
+        ecn_id=ecn_id,
+        affected_components=affected_components,
+        change_description=change_description,
+        urgency=urgency,
+    )
+
+    try:
+        report = analyze_ecn_impact(
+            ecn_input=ecn_input,
+            bom_relationships=relationships,
+            drawings_db=drawings_db_raw if drawings_db_raw else None,
+            work_orders_db=work_orders_db_raw if work_orders_db_raw else None,
+            cost_per_drawing_revision=cost_per_rev,
+        )
+    except ValueError as exc:
+        code = "CYCLE_DETECTED" if "Cycle" in str(exc) else "BAD_ARGS"
+        return err_payload(str(exc), code)
+    except Exception as exc:
+        return err_payload(f"analysis error: {exc}", "ANALYSIS_ERROR")
+
+    return ok_payload({
+        "ecn_id": report.ecn_id,
+        "total_affected_parents": report.total_affected_parents,
+        "total_affected_drawings": report.total_affected_drawings,
+        "total_open_work_orders": report.total_open_work_orders,
+        "estimated_cost_usd": report.estimated_cost_usd,
+        "implementation_class": report.implementation_class,
+        "affected_parent_tree": report.affected_parent_tree,
+        "honest_caveat": report.honest_caveat,
+    })

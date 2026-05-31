@@ -6189,6 +6189,19 @@
             "note": "Per-cavity insert revision state for multi-cavity injection molds: each cavity slot carries an insert history with date-effectivity windows. Query (tool, date) → [(cavity_id, revision), …]. Cavity-3 mid-run swap: query 2026-05-01 → [(1,R5),(2,R5),(3,R6),(4,R5)]; query 2026-03-15 → all R5. Honest flag: no insert wear / change-out queuing modelled. LLM tool: plm_query_multi_cavity.",
             "evidence": "packages/kerf-plm/src/kerf_plm/multi_cavity_effectivity.py"
           }
+        },
+        {
+          "domain": "D14",
+          "feature": "ECN Cascading Impact Analysis — BFS upward BOM traversal, drawings, work orders, heuristic cost (ISO 10007 §6 + APICS 'ECN')",
+          "competitor": {
+            "status": "partial",
+            "note": "Most CAD/PLM tools do not offer automated ECN cascading impact analysis from a flat BOM input; typically requires full PLM suite (Windchill, Teamcenter, Enovia)."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "analyze_ecn_impact: BFS upward from all ECN-affected components; deduped parent set; drawings + work-order counts; heuristic cost estimate (parents×$50 + drawings×$150 + WOs×$200); ISO 10007 §6.3.2 class assignment (Class_I_immediate / Class_II_rev / Class_III_drawing_only). Honest-flagged: cost is heuristic — real ECN costs vary widely; use for prioritisation only. LLM tool: plm_analyze_ecn_impact. 23 tests.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/ecn_impact_analysis.py"
+          }
         }
       ]
     },
@@ -7147,6 +7160,19 @@
             "note": "check_face_developable: N×N UV-grid sampling + Gaussian curvature K=κ_1·κ_2 via shape operator (do Carmo §3.6; Pottmann-Wallner §4); returns is_developable (max|K|<tol), max_abs_K, mean_abs_K, ruled_direction_if_any (kappa_1/kappa_2 identically zero); LLM tool brep_check_face_developable. Oracles: cylinder K=0→True; sphere K=1/R²→False; cone K=0→True; torus K varies→False; plane K=0→True. CAVEAT: sampling-based lower bound on max|K|.",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/face_developable_check.py"
           }
+        },
+        {
+          "domain": "D14",
+          "feature": "ECN Cascading Impact Analysis — BFS upward BOM traversal, drawings, work orders, heuristic cost (ISO 10007 §6 + APICS 'ECN')",
+          "competitor": {
+            "status": "partial",
+            "note": "Most CAD/PLM tools do not offer automated ECN cascading impact analysis from a flat BOM input; typically requires full PLM suite (Windchill, Teamcenter, Enovia)."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "analyze_ecn_impact: BFS upward from all ECN-affected components; deduped parent set; drawings + work-order counts; heuristic cost estimate (parents×$50 + drawings×$150 + WOs×$200); ISO 10007 §6.3.2 class assignment (Class_I_immediate / Class_II_rev / Class_III_drawing_only). Honest-flagged: cost is heuristic — real ECN costs vary widely; use for prioritisation only. LLM tool: plm_analyze_ecn_impact. 23 tests.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/ecn_impact_analysis.py"
+          }
         }
       ]
     },
@@ -8007,6 +8033,19 @@
             "status": "yes",
             "note": "Per-cavity insert revision state for multi-cavity injection molds: each cavity slot carries an insert history with date-effectivity windows. Query (tool, date) → [(cavity_id, revision), …]. Cavity-3 mid-run swap: query 2026-05-01 → [(1,R5),(2,R5),(3,R6),(4,R5)]; query 2026-03-15 → all R5. Honest flag: no insert wear / change-out queuing modelled. LLM tool: plm_query_multi_cavity.",
             "evidence": "packages/kerf-plm/src/kerf_plm/multi_cavity_effectivity.py"
+          }
+        },
+        {
+          "domain": "D14",
+          "feature": "ECN Cascading Impact Analysis — BFS upward BOM traversal, drawings, work orders, heuristic cost (ISO 10007 §6 + APICS 'ECN')",
+          "competitor": {
+            "status": "partial",
+            "note": "Most CAD/PLM tools do not offer automated ECN cascading impact analysis from a flat BOM input; typically requires full PLM suite (Windchill, Teamcenter, Enovia)."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "analyze_ecn_impact: BFS upward from all ECN-affected components; deduped parent set; drawings + work-order counts; heuristic cost estimate (parents×$50 + drawings×$150 + WOs×$200); ISO 10007 §6.3.2 class assignment (Class_I_immediate / Class_II_rev / Class_III_drawing_only). Honest-flagged: cost is heuristic — real ECN costs vary widely; use for prioritisation only. LLM tool: plm_analyze_ecn_impact. 23 tests.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/ecn_impact_analysis.py"
           }
         }
       ]
@@ -9876,6 +9915,19 @@
             "note": "Per-cavity insert revision state for multi-cavity injection molds: each cavity slot carries an insert history with date-effectivity windows. Query (tool, date) → [(cavity_id, revision), …]. Cavity-3 mid-run swap: query 2026-05-01 → [(1,R5),(2,R5),(3,R6),(4,R5)]; query 2026-03-15 → all R5. Honest flag: no insert wear / change-out queuing modelled. LLM tool: plm_query_multi_cavity.",
             "evidence": "packages/kerf-plm/src/kerf_plm/multi_cavity_effectivity.py"
           }
+        },
+        {
+          "domain": "D14",
+          "feature": "ECN Cascading Impact Analysis — BFS upward BOM traversal, drawings, work orders, heuristic cost (ISO 10007 §6 + APICS 'ECN')",
+          "competitor": {
+            "status": "partial",
+            "note": "Most CAD/PLM tools do not offer automated ECN cascading impact analysis from a flat BOM input; typically requires full PLM suite (Windchill, Teamcenter, Enovia)."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "analyze_ecn_impact: BFS upward from all ECN-affected components; deduped parent set; drawings + work-order counts; heuristic cost estimate (parents×$50 + drawings×$150 + WOs×$200); ISO 10007 §6.3.2 class assignment (Class_I_immediate / Class_II_rev / Class_III_drawing_only). Honest-flagged: cost is heuristic — real ECN costs vary widely; use for prioritisation only. LLM tool: plm_analyze_ecn_impact. 23 tests.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/ecn_impact_analysis.py"
+          }
         }
       ]
     },
@@ -11238,6 +11290,19 @@
             "note": "Per-cavity insert revision state for multi-cavity injection molds: each cavity slot carries an insert history with date-effectivity windows. Query (tool, date) → [(cavity_id, revision), …]. Cavity-3 mid-run swap: query 2026-05-01 → [(1,R5),(2,R5),(3,R6),(4,R5)]; query 2026-03-15 → all R5. Honest flag: no insert wear / change-out queuing modelled. LLM tool: plm_query_multi_cavity.",
             "evidence": "packages/kerf-plm/src/kerf_plm/multi_cavity_effectivity.py"
           }
+        },
+        {
+          "domain": "D14",
+          "feature": "ECN Cascading Impact Analysis — BFS upward BOM traversal, drawings, work orders, heuristic cost (ISO 10007 §6 + APICS 'ECN')",
+          "competitor": {
+            "status": "partial",
+            "note": "Most CAD/PLM tools do not offer automated ECN cascading impact analysis from a flat BOM input; typically requires full PLM suite (Windchill, Teamcenter, Enovia)."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "analyze_ecn_impact: BFS upward from all ECN-affected components; deduped parent set; drawings + work-order counts; heuristic cost estimate (parents×$50 + drawings×$150 + WOs×$200); ISO 10007 §6.3.2 class assignment (Class_I_immediate / Class_II_rev / Class_III_drawing_only). Honest-flagged: cost is heuristic — real ECN costs vary widely; use for prioritisation only. LLM tool: plm_analyze_ecn_impact. 23 tests.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/ecn_impact_analysis.py"
+          }
         }
       ]
     },
@@ -12227,6 +12292,19 @@
             "status": "yes",
             "note": "Per-cavity insert revision state for multi-cavity injection molds: each cavity slot carries an insert history with date-effectivity windows. Query (tool, date) → [(cavity_id, revision), …]. Cavity-3 mid-run swap: query 2026-05-01 → [(1,R5),(2,R5),(3,R6),(4,R5)]; query 2026-03-15 → all R5. Honest flag: no insert wear / change-out queuing modelled. LLM tool: plm_query_multi_cavity.",
             "evidence": "packages/kerf-plm/src/kerf_plm/multi_cavity_effectivity.py"
+          }
+        },
+        {
+          "domain": "D14",
+          "feature": "ECN Cascading Impact Analysis — BFS upward BOM traversal, drawings, work orders, heuristic cost (ISO 10007 §6 + APICS 'ECN')",
+          "competitor": {
+            "status": "partial",
+            "note": "Most CAD/PLM tools do not offer automated ECN cascading impact analysis from a flat BOM input; typically requires full PLM suite (Windchill, Teamcenter, Enovia)."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "analyze_ecn_impact: BFS upward from all ECN-affected components; deduped parent set; drawings + work-order counts; heuristic cost estimate (parents×$50 + drawings×$150 + WOs×$200); ISO 10007 §6.3.2 class assignment (Class_I_immediate / Class_II_rev / Class_III_drawing_only). Honest-flagged: cost is heuristic — real ECN costs vary widely; use for prioritisation only. LLM tool: plm_analyze_ecn_impact. 23 tests.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/ecn_impact_analysis.py"
           }
         }
       ]

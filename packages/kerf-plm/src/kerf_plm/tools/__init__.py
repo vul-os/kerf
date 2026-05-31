@@ -33,4 +33,6 @@ from kerf_plm._tools_module import (  # noqa: F401
     run_plm_rollup_bom_cost,
     plm_component_whereused_spec,
     run_plm_component_whereused,
+    plm_analyze_ecn_impact_spec,
+    run_plm_analyze_ecn_impact,
 )

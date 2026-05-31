@@ -184,6 +184,9 @@ def _register_tools(ctx, provides: list) -> None:
         # Buck DC-DC converter CCM output voltage ripple — Erickson 3e §2.4 + Sandler §3
         # electronics_compute_buck_ripple: D, ΔiL, ΔV_cap, ΔV_ESR, total ΔV_out
         "kerf_electronics.dc_dc_ripple",
+        # LDO dropout + thermal compliance check — TI Power Ref §3 + Sandler §4
+        # electronics_check_ldo_dropout: headroom, dropout_compliant, P_diss, T_j, thermal_compliant
+        "kerf_electronics.ldo_dropout_check",
     ]
 
     for module_path in tool_modules:

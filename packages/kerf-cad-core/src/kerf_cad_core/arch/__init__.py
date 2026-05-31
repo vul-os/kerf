@@ -33,6 +33,8 @@ To avoid collision this package re-exports the structural one as ``SlabDeflSpec`
   diaphragm_shear_tools — LLM tool arch_check_diaphragm_shear
   retaining_wall_stability — Rankine active pressure; overturning/sliding/bearing FoS (Bowles 5e §12.3)
   retaining_wall_stability_tools — LLM tool arch_check_retaining_wall_stability
+  pier_axial_capacity — TMS 402-22 §8.3 + ACI 318-19 §22.4.2.2 slender pier axial capacity
+  pier_axial_capacity_tools — LLM tool arch_check_pier_axial
 """
 from __future__ import annotations
 
@@ -109,6 +111,11 @@ from kerf_cad_core.arch.retaining_wall_stability import (
     RetainingWallReport,
     check_retaining_wall,
 )
+from kerf_cad_core.arch.pier_axial_capacity import (
+    PierSpec,
+    PierAxialReport,
+    check_pier_axial,
+)
 
 __all__ = [
     "WallLayer",
@@ -172,4 +179,8 @@ __all__ = [
     "RetainingSoilSpec",
     "RetainingWallReport",
     "check_retaining_wall",
+    # TMS 402-22 §8.3 + ACI 318-19 §22.4.2.2 slender masonry/RC pier axial capacity
+    "PierSpec",
+    "PierAxialReport",
+    "check_pier_axial",
 ]

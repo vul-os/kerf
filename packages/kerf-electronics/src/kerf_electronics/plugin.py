@@ -190,6 +190,10 @@ def _register_tools(ctx, provides: list) -> None:
         # MOSFET Safe Operating Area (SOA) check — IRF Hexfet Designer's Manual §5 + IPC-9701
         # electronics_check_fet_soa: within_soa, P_diss, T_J, soa_violation_modes, headroom_pct
         "kerf_electronics.fet_soa_check",
+        # Inductor core saturation check — Erickson §15 + McLyman §10
+        # electronics_check_inductor_saturation: B_peak_mT, B_sat_mT, saturation_margin_pct,
+        #   saturated, recommended_max_I_dc_A; ferrite B_sat temp derating (−15%@100°C, −25%@125°C)
+        "kerf_electronics.inductor_core_saturation",
     ]
 
     for module_path in tool_modules:

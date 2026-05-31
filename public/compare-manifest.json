@@ -288,6 +288,12 @@
           "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/retaining_wall_stability.py\"; note: \"Rankine active Ka=tan²(45-φ/2); Pa=0.5·γ_s·H²·Ka at H/3; FoS_overturning=ΣM_resist/ΣM_overt (min 2.0); FoS_sliding=ΣW·tan(δ)/Pa (min 1.5); bearing q_max=(ΣW/B)·(1+6e/B) FoS_bearing=q_a/q_max (min 3.0); oracle H=3m B=2m φ=30°→Ka=1/3 Pa=27kN/m FoS_overt=4.16; arch_check_retaining_wall_stability LLM tool; SCOPE: Rankine active only (level cohesionless backfill) — NO surcharge; NO seismic (Mononobe-Okabe); NO passive resistance at toe; NO hydrostatic pressure; 27 tests pass\""
         },
         {
+          "name": "Masonry/RC pier axial capacity with h/r slenderness (TMS 402-22 §8.3 + ACI 318-19 §22.4.2.2)",
+          "domain": "D2",
+          "competitor": "paid: true",
+          "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/pier_axial_capacity.py\"; note: \"TMS 402-22 §8.3 masonry: φ·Pn=φ·0.80·f'm·Ag·C_s; ACI 318-19 §22.4.2.2 RC: φ·Pn=φ·0.80·[0.85·f'c·(Ag-As)+fy·As]·C_s; slenderness factor C_s=1−(h_eff/(140·r))² (TMS Eq 8-22) valid h_eff/r≤99; r=min(width,thickness)/√12; k: fixed_fixed=0.5, pin_pin=1.0, fixed_pin=0.7, cantilever=2.0 (Drysdale-Hamid §10); oracle 200×200mm pin-pin h=3000mm clay_masonry f'm=10MPa→r=57.7mm h/r=52.0 C_s≈0.862 φ·Pn≈179.5kN; h/r>99→slenderness_limit_exceeded φ·Pn=0; arch_check_pier_axial LLM tool; SCOPE: concentric axial ONLY — no eccentricity, no moment interaction, no PM curve; TMS Eq 8-22 h_eff/r≤99 limit; grout/inspection Φ not applied; 49 tests pass\""
+        },
+        {
           "name": "ASCE 7 seismic loads",
           "domain": "D2",
           "competitor": "paid: true",
@@ -2999,6 +3005,20 @@
             "status": "[x]",
             "notes": "electronics_check_ldo_dropout: headroom_mV=(V_in_min−V_out)×1000; dropout_compliant=headroom>dropout_spec (strict); P_diss=(V_in_max−V_out)×I_load; T_j=T_ambient+P_diss×R_θja (Jedec JESD51 single-node); thermal_compliant=T_j<T_max_j; efficiency=100×V_out/V_in_max (pessimistic). Honest: quiescent current I_Q NOT included (dominates at light load); transient headroom NOT checked (add ≥100–200 mV guard-band for PSRR/load steps, Sandler §4.4); output capacitor stability NOT verified (ESR window); θja is worst-case single-node thermal model. Refs: TI Power Ref §3; Sandler §4; Jedec JESD51-1.",
             "evidence": "packages/kerf-electronics/src/kerf_electronics/ldo_dropout_check.py"
+          }
+        },
+        {
+          "name": "Inductor core saturation check",
+          "domain": "D6",
+          "competitor": {
+            "status": "no",
+            "notes": "Altium Designer has no built-in inductor core saturation checker; requires manual datasheet lookup or external magnetics simulation (e.g. Ansys Maxwell, FEMM)",
+            "source": "https://www.altium.com/documentation/altium-designer/power-integrity"
+          },
+          "kerf": {
+            "status": "[x]",
+            "notes": "electronics_check_inductor_saturation: I_pk=I_dc+I_ripple_pp/2; B_pk=μ₀·μ_r·N·I_pk/l_e (Ampere's law, Erickson §15 + McLyman §10); saturation_margin=(B_sat−B_pk)/B_sat×100; saturated=B_pk>=B_sat; recommended_max_I_dc (1% guard-band). Ferrite B_sat derating: 100°C→−15%, 125°C→−25%, 150°C→−40%, 200°C→−50% (Ferroxcube 3C95/3F36). Materials: ferrite_3C95 (B_sat≈500mT, μ_r≈2000), ferrite_3F36 (≈380mT, ≈1500), powdered_iron_-26 (≈1400mT, ≈75), sendust (≈1000mT, ≈125), NiFe50 (≈1600mT, ≈3000). Honest: fringing flux ignored (gapped cores need Dowell/Erickson §15.3 correction); μ_r assumed constant (real ferrite μ_r rolls off in knee region BEFORE B_sat — model conservatively over-estimates B_pk; use nonlinear B-H curve for precision); non-ferrite B_sat derating NOT modelled; winding I²R NOT accounted; AC core losses (Steinmetz) NOT computed. Refs: Erickson 3e §15; McLyman 4e §10; Ferroxcube 3C95/3F36 datasheets; Magnetics Inc. Powder Core Catalog §3.",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/inductor_core_saturation.py"
           }
         },
         {

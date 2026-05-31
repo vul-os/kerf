@@ -48,3 +48,9 @@ from kerf_electronics.fet_soa_check import (  # noqa: F401
     FETSOAReport,
     check_fet_soa,
 )
+from kerf_electronics.inductor_core_saturation import (  # noqa: F401
+    InductorCoreSpec,
+    InductorCurrentSpec,
+    CoreSaturationReport,
+    check_inductor_saturation,
+)

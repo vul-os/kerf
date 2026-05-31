@@ -1637,6 +1637,15 @@ from kerf_cad_core.geom.surface_area_exact import (  # noqa: E402
     SurfaceAreaReport,
     compute_exact_surface_area,
 )
+# BREP-FACE-AREA-EXACT: exact area of a B-rep Face (NurbsSurface) via first-fundamental-form
+# A = ∫∫ sqrt(EG-F²) du dv (do Carmo §2.5; Piegl & Tiller §10.3; Farin §11.2).
+# gauss_order×gauss_order GL per knot-span cell + adaptive subdivision.
+# LLM tool: brep_compute_face_area_exact.
+# CAVEAT: trimmed faces use bounding-rectangle approximation (v1 — trim curves not respected).
+from kerf_cad_core.geom.face_area_exact import (  # noqa: E402
+    FaceAreaResult,
+    compute_face_area_exact,
+)
 # NURBS-CURVE-CURVATURE-PROFILE-EXPORT: κ(t) → CSV/SVG/PNG (Farin §11.6; Sapidis §3)
 from kerf_cad_core.geom.curvature_profile_export import (  # noqa: E402
     CurvatureProfileResult,

@@ -17542,8 +17542,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "compute_exact_surface_area: A = ∫∫ sqrt(EG-F²) du dv; 5×5 GL per knot-span cell + adaptive subdivision; SurfaceAreaReport; LLM tool nurbs_surface_area_exact (do Carmo §2.5 / Mortenson §10.4). v1: full UV domain only.",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/surface_area_exact.py"
+            "note": "compute_exact_surface_area: A = ∫∫ sqrt(EG-F²) du dv; 5×5 GL per knot-span cell + adaptive subdivision; SurfaceAreaReport; LLM tool nurbs_surface_area_exact (do Carmo §2.5 / Mortenson §10.4). v1: full UV domain only. ALSO: compute_face_area_exact (BREP-FACE-AREA-EXACT): exact area of a B-rep Face via first-fundamental-form; FaceAreaResult{area_mm2, num_quadrature_points, relative_error_estimate, honest_caveat}; handles NurbsSurface (analytic partials) + Plane/Cylinder/Sphere/Torus (FD partials); LLM tool brep_compute_face_area_exact; 34 hermetic tests. HONEST: trimmed faces use bounding-rectangle approximation if no trim curves provided (v1).",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/surface_area_exact.py packages/kerf-cad-core/src/kerf_cad_core/geom/face_area_exact.py"
           }
         },
         {

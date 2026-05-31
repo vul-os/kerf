@@ -442,6 +442,11 @@ _TOOL_MODULES = [
     # NURBS-SURFACE-AREA-EXACT: exact area via first-fundamental-form integrand
     # A = ∫∫ sqrt(EG-F²) du dv (do Carmo §2.5 / Mortenson §10.4)
     "kerf_cad_core.geom.surface_area_exact",            # nurbs_surface_area_exact
+    # BREP-FACE-AREA-EXACT: exact area of a B-rep Face (NurbsSurface + analytic surfaces)
+    # via first-fundamental-form A = ∫∫ sqrt(EG-F²) du dv
+    # (do Carmo §2.5; Piegl & Tiller §10.3; Farin §11.2)
+    # CAVEAT: trimmed faces (inner loops) use bounding-rectangle approximation (v1)
+    "kerf_cad_core.geom.face_area_exact",               # brep_compute_face_area_exact
     # BREP-FACE-PRINCIPAL-CURVATURE-VIZ: sample κ₁, κ₂ over a B-rep Face UV grid;
     # SVG/PNG heatmap overlay (do Carmo §3.4 / Mortenson §6.5 / Pottmann-Wallner §4)
     "kerf_cad_core.geom.principal_curvature_viz",       # brep_face_principal_curvature_viz

@@ -3794,6 +3794,20 @@
           }
         },
         {
+          "domain": "D10",
+          "feature": "I²C clock-stretch worst-case effective speed + SCL low-timeout compliance (NXP UM10204 §3.1.9)",
+          "competitor": {
+            "status": "no",
+            "note": "OpenPLC has no I²C clock-stretch analysis; engineers must manually account for slave stretching and MCU timeout configuration",
+            "source": "https://www.openplcproject.com/reference"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "firmware_check_i2c_clock_stretch: NXP UM10204 Rev 7 §3.1.9 + ARM Cortex-M I²C timing; f_effective = 9/((9/f_nom)+stretch_us/1e6); timeout_compliant = (worst_stretch×bytes) < scl_low_timeout_ms×1000; reports effective_clock_hz, worst_case_stretch_per_byte_us, throughput_degradation_pct, slowest_slave; 36 tests. HONEST: single-master only — multi-master arbitration NOT modelled; stretch conservatively accumulated on every byte; rise/fall derating and t_BUF not included.",
+            "evidence": "packages/kerf-firmware/src/kerf_firmware/i2c_clock_stretch_check.py"
+          }
+        },
+        {
           "domain": "D6",
           "feature": "Schematic capture (KiCad round-trip, ERC)",
           "competitor": {

@@ -3615,3 +3615,106 @@ async def run_pixel_mtf(ctx: ProjectCtx, args: bytes) -> str:
     if isinstance(result, dict):
         return json.dumps(result)
     return ok_payload(result.to_dict())
+
+
+# ---------------------------------------------------------------------------
+# Tool: optics_compute_depth_of_field  (OPTICS-FOCAL-DISTANCE-DEPTH)
+# ---------------------------------------------------------------------------
+
+from kerf_cad_core.optics.focal_depth_field import (  # noqa: E402
+    LensFocusSpec,
+    compute_depth_of_field,
+)
+
+_focal_depth_field_spec = ToolSpec(
+    name="optics_compute_depth_of_field",
+    description=(
+        "Compute depth-of-field (DoF) and hyperfocal distance for a thin-lens\n"
+        "imaging system.\n"
+        "\n"
+        "Formulae (Greenleaf §3 / Hecht §6.4):\n"
+        "  H      = f² / (N · c) + f          (hyperfocal distance)\n"
+        "  D_near = D · (H−f) / (H + D − 2f)  (near limit of sharp focus)\n"
+        "  D_far  = D · (H−f) / (H − D)       (far limit; ∞ when D ≥ H)\n"
+        "  DoF    = D_far − D_near             (∞ when D ≥ H)\n"
+        "\n"
+        "All distances in millimetres.\n"
+        "\n"
+        "Returns:\n"
+        "  hyperfocal_distance_mm     — H in mm\n"
+        "  near_limit_mm              — nearest acceptable-focus distance\n"
+        "  far_limit_mm               — furthest acceptable-focus distance; null = ∞\n"
+        "  depth_of_field_mm          — total DoF; null = ∞\n"
+        "  behind_focus_fraction      — fraction of DoF behind focus plane; null = ∞\n"
+        "  infinity_focus_at_hyperfocal — true when focus ≥ H\n"
+        "  honest_caveat              — geometric model only; Airy-disk blur NOT added\n"
+        "\n"
+        "HONEST: Geometric thin-lens model only.  Does NOT add diffraction-limited\n"
+        "Airy-disk blur to the geometric CoC.  At small apertures (f/# ≳ f/16 for\n"
+        "visible light) the Airy disk 1.22·λ·N approaches the 35mm-FF CoC of 0.03 mm.\n"
+        "For a combined blur circle: c_eff = sqrt(c_geom² + c_airy²).\n"
+        "\n"
+        "Errors: {ok:false, reason} for invalid inputs.  Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "focal_length_mm": {
+                "type": "number",
+                "description": (
+                    "Focal length of the lens (mm). Must be > 0. "
+                    "E.g. 50 for a standard 35mm-FF lens."
+                ),
+            },
+            "f_number": {
+                "type": "number",
+                "description": (
+                    "Aperture f-number (f/#). Must be > 0. "
+                    "E.g. 2.8 for a fast prime; 8 for landscape shooting."
+                ),
+            },
+            "focus_distance_mm": {
+                "type": "number",
+                "description": (
+                    "Distance from lens to focus plane (mm). "
+                    "Must be > focal_length_mm. "
+                    "E.g. 5000 for a subject 5 m away."
+                ),
+            },
+            "circle_of_confusion_mm": {
+                "type": "number",
+                "description": (
+                    "Maximum acceptable blur-spot diameter on the image plane (mm). "
+                    "Default 0.03 — the 35mm full-frame standard. "
+                    "APS-C ≈ 0.019; MFT ≈ 0.015; medium-format 645 ≈ 0.045."
+                ),
+            },
+        },
+        "required": ["focal_length_mm", "f_number", "focus_distance_mm"],
+    },
+)
+
+
+@register(_focal_depth_field_spec, write=False)
+async def run_compute_depth_of_field_focal(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    for field_name in ("focal_length_mm", "f_number", "focus_distance_mm"):
+        if a.get(field_name) is None:
+            return json.dumps({"ok": False, "reason": f"{field_name} is required"})
+
+    try:
+        spec = LensFocusSpec(
+            focal_length_mm=float(a["focal_length_mm"]),
+            f_number=float(a["f_number"]),
+            focus_distance_mm=float(a["focus_distance_mm"]),
+            circle_of_confusion_mm=float(a.get("circle_of_confusion_mm", 0.03)),
+        )
+        result = compute_depth_of_field(spec)
+    except ValueError as exc:
+        return json.dumps({"ok": False, "reason": str(exc)})
+
+    return ok_payload(result.to_dict())

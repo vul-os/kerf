@@ -14528,6 +14528,20 @@
         },
         {
           "domain": "D12",
+          "feature": "Depth-of-field + hyperfocal distance (photographic DoF)",
+          "competitor": {
+            "status": "yes",
+            "note": "Depth of field analysis: DoF display on lens data + Image Simulation module; hyperfocal table; defocus pupil wavefront",
+            "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Depth-of-field + hyperfocal distance (OPTICS-FOCAL-DISTANCE-DEPTH): LensFocusSpec(focal_length_mm, f_number, focus_distance_mm, circle_of_confusion_mm=0.03) -> DepthOfFieldReport; H = f^2/(N*c) + f; D_near = D*(H-f)/(H+D-2f); D_far = D*(H-f)/(H-D) [inf when D>=H]; DoF = D_far - D_near [inf when D>=H]; oracle 50mm f/2.8 @ 5m c=0.03mm: H~29812mm (~29.81m), near~4286mm, far~5993mm, DoF~1707mm — all validated <0.01%; at focus=H: D_near=H/2 exactly, D_far=inf; D>=H -> DoF infinite; larger f/# -> wider DoF; LLM tool optics_compute_depth_of_field; 25 hermetic tests. Default CoC 0.03mm = 35mm full-frame standard (Greenleaf S3). Honest: geometric thin-lens model ONLY — does NOT add diffraction-limited Airy-disk blur to geometric CoC; at small apertures (f/# ~> f/16 for visible light) Airy disk 1.22*lambda*N approaches 0.03mm CoC, so geometric DoF is slightly optimistic; for combined blur circle: c_eff = sqrt(c_geom^2 + c_airy^2). Ref: Hecht (2017) S6.4; Greenleaf (1950) S3; Kingslake (1978) S4.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/focal_depth_field.py"
+          }
+        },
+        {
+          "domain": "D12",
           "feature": "Non-sequential ray tracing (stray light)",
           "competitor": {
             "status": "yes",

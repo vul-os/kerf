@@ -94,6 +94,11 @@ from kerf_cad_core.optics.pixel_mtf import (
     compute_pixel_mtf,
     combine_mtf_curves,
 )
+from kerf_cad_core.optics.focal_depth_field import (
+    LensFocusSpec,
+    DepthOfFieldReport,
+    compute_depth_of_field,
+)
 
 __all__ = [
     "lensmaker",
@@ -139,4 +144,7 @@ __all__ = [
     "PixelMtfReport",
     "compute_pixel_mtf",
     "combine_mtf_curves",
+    "LensFocusSpec",
+    "DepthOfFieldReport",
+    "compute_depth_of_field",
 ]

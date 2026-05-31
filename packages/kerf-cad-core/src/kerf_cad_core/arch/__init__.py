@@ -9,6 +9,8 @@ Submodules:
   tools             — LLM tool wrappers registered with the tool registry
   beam_deflection   — Euler-Bernoulli beam deflection + moment (Roark 9e §8)
   beam_deflection_tools — LLM tool arch_compute_beam_deflection
+  footing_bearing   — Meyerhof (1963) general bearing capacity (Bowles 5e §4; Das 8e §3)
+  footing_bearing_tools — LLM tool arch_compute_bearing_capacity
 """
 from __future__ import annotations
 
@@ -30,6 +32,12 @@ from kerf_cad_core.arch.beam_deflection import (
     BeamDeflectionReport,
     compute_beam_deflection,
 )
+from kerf_cad_core.arch.footing_bearing import (
+    SoilProperties,
+    FootingSpec,
+    BearingCapacityReport,
+    compute_bearing_capacity,
+)
 
 __all__ = [
     "WallLayer",
@@ -47,4 +55,9 @@ __all__ = [
     "BeamSpec",
     "BeamDeflectionReport",
     "compute_beam_deflection",
+    # footing bearing capacity
+    "SoilProperties",
+    "FootingSpec",
+    "BearingCapacityReport",
+    "compute_bearing_capacity",
 ]

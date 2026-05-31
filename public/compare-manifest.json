@@ -228,6 +228,12 @@
           "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/beam_deflection.py\"; note: \"Euler-Bernoulli closed-form for 5 cases: SS+point (Roark 8.1 case 7), SS+UDL (case 2), cantilever+point (case 1), cantilever+UDL (case 3), fixed-fixed+UDL (case 15); delta_max, M_max, V_max, deflection location; arch_compute_beam_deflection LLM tool; SCOPE: linear-elastic only — no buckling, no yield, no shear deformation\""
         },
         {
+          "name": "Shallow footing bearing capacity (Meyerhof 1963 general eq.)",
+          "domain": "D2",
+          "competitor": "paid: true",
+          "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/footing_bearing.py\"; note: \"Meyerhof (1963) general bearing capacity: q_ult = c·Nc·sc·dc + γ·Df·Nq·sq·dq + 0.5·γ·B·Nγ·sγ·dγ; N-factors (Bowles 5e §4 / Das 8e §3); shape+depth factors for strip/square/circular/rectangular; φ=0 Prandtl limit Nc=5.14; arch_compute_bearing_capacity LLM tool; SCOPE: Meyerhof shape+depth only — no Brinch Hansen Ir correction, no inclined/eccentric loads, no seismic, no liquefaction\""
+        },
+        {
           "name": "ASCE 7 wind and seismic loads",
           "domain": "D2",
           "competitor": "paid: true",

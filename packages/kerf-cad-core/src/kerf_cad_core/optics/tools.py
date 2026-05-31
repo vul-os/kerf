@@ -2477,3 +2477,117 @@ async def run_compute_exit_pupil(ctx, args: bytes) -> str:
     if isinstance(result, dict):
         return json.dumps(result)
     return ok_payload(result.to_dict())
+
+
+# ---------------------------------------------------------------------------
+# Tool: optics_compute_petzval_curvature
+# ---------------------------------------------------------------------------
+
+from kerf_cad_core.optics.petzval_curvature import (  # noqa: E402
+    PetzvalReport,
+    compute_petzval_curvature,
+)
+
+_petzval_curvature_spec = ToolSpec(
+    name="optics_compute_petzval_curvature",
+    description=(
+        "Compute Petzval field curvature (1/R_P) for a sequential optical system.\n"
+        "\n"
+        "Theory (Hecht 'Optics' 5e §6.3.2 / Born & Wolf §4.5):\n"
+        "  The Petzval sum is the curvature of the Petzval sphere — the ideal image\n"
+        "  surface for a system free of astigmatism:\n"
+        "\n"
+        "    P = Σ_i (n_after_i − n_before_i) / (n_before_i · n_after_i · R_i)\n"
+        "\n"
+        "  Petzval radius R_P = 1/P.\n"
+        "  P = 0 (flat-field condition) requires compensating positive and negative\n"
+        "  contributions from lens elements with appropriate glass choice and bending.\n"
+        "\n"
+        "Oracle: single thin BK7 lens (n=1.5168, R1=+50 mm, R2=−50 mm):\n"
+        "  Surface 1: P_1 = (1.5168−1)/(1·1.5168·50) = 0.006813 mm⁻¹\n"
+        "  Surface 2: P_2 = (1−1.5168)/(1.5168·1·(−50)) = 0.006813 mm⁻¹ → wait\n"
+        "  Correct:   P_2 = (1.0 − 1.5168) / (1.5168 · 1.0 · (−50)) = +0.006813\n"
+        "  Total P ≈ 0.013657 mm⁻¹  →  R_P ≈ 73.2 mm.\n"
+        "\n"
+        "Input format:\n"
+        "  'surfaces' is a list of dicts, each with:\n"
+        "    radius_mm      : float  Radius of curvature (mm). Use 1e18 for plano.\n"
+        "    n_index_before : float  Refractive index before this surface (>= 1.0).\n"
+        "    n_index_after  : float  Refractive index after this surface (>= 1.0).\n"
+        "\n"
+        "  Note: unlike optics_ray_trace_lens_stack (which uses curvature c=1/R),\n"
+        "  THIS tool uses radius_mm directly for clarity.\n"
+        "\n"
+        "Returns:\n"
+        "  petzval_sum_mm_inv       : P = 1/R_P (mm⁻¹). 0 = flat field.\n"
+        "  petzval_radius_mm        : R_P = 1/P (mm). null when P=0 (flat).\n"
+        "  field_flatness_score     : 0..1 quality score; 1.0 = flat field.\n"
+        "  per_surface_contributions: per-surface breakdown with radius, n values,\n"
+        "                             contribution, and is_plano flag.\n"
+        "  honest_caveat            : scope caveats (astigmatism, thick-lens effects).\n"
+        "\n"
+        "HONEST FLAG:\n"
+        "  Petzval sum is a PARAXIAL quantity. It equals the Seidel S_IV\n"
+        "  field-curvature coefficient but does NOT include astigmatism (S_III).\n"
+        "  Real curved-field appearance includes both S_III and S_IV.\n"
+        "  P=0 guarantees a flat Petzval sphere but NOT zero field curvature in\n"
+        "  the presence of astigmatism (Hecht §6.3.2).\n"
+        "  Thick-lens and pupil-shift corrections to P are ignored.\n"
+        "\n"
+        "Errors: {ok:false, reason} for invalid inputs. Never raises.\n"
+        "\n"
+        "References: Hecht §6.3.2; Born & Wolf §4.5; Smith 'Modern Optical Engineering' §4.4."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "surfaces": {
+                "type": "array",
+                "description": (
+                    "Ordered list of refracting surface dicts. Each must have: "
+                    "radius_mm (float; use 1e18 for plano), "
+                    "n_index_before (float >= 1.0), "
+                    "n_index_after (float >= 1.0)."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "radius_mm": {
+                            "type": "number",
+                            "description": (
+                                "Radius of curvature (mm). Sign: R > 0 if centre of "
+                                "curvature is to the right. Use 1e18 for a flat (plano) surface."
+                            ),
+                        },
+                        "n_index_before": {
+                            "type": "number",
+                            "description": "Refractive index of medium before this surface (>= 1.0).",
+                        },
+                        "n_index_after": {
+                            "type": "number",
+                            "description": "Refractive index of medium after this surface (>= 1.0).",
+                        },
+                    },
+                    "required": ["radius_mm", "n_index_before", "n_index_after"],
+                },
+            },
+        },
+        "required": ["surfaces"],
+    },
+)
+
+
+@register(_petzval_curvature_spec, write=False)
+async def run_compute_petzval_curvature(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    if a.get("surfaces") is None:
+        return json.dumps({"ok": False, "reason": "surfaces is required"})
+
+    result = compute_petzval_curvature({"surfaces": a["surfaces"]})
+    if isinstance(result, dict):
+        return json.dumps(result)
+    return ok_payload(result.to_dict())

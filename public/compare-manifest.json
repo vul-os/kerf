@@ -13743,6 +13743,20 @@
         },
         {
           "domain": "D12",
+          "feature": "Petzval field curvature (1/R_P, flat-field condition, per-surface breakdown)",
+          "competitor": {
+            "status": "yes",
+            "note": "Petzval field curvature and field-flatness analysis; Petzval radius vs field angle; flat-field lens design tools; astigmatic field curve plots",
+            "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Petzval field curvature (OPTICS-PETZVAL-CURVATURE-COMPUTE): P = Σ (n_after−n_before)/(n_before·n_after·R_i) (Hecht §6.3.2 / Born & Wolf §4.5); R_P = 1/P; flat-field score 1/(1+|P|·100); BK7 biconvex oracle (R1=+50, R2=−50, n=1.5168): P ≈ 0.01363 mm⁻¹, R_P ≈ 73.4 mm (within 1%); flat-field condition Σφ/n=0 → P=0 verified; plano surfaces (|R|=1e18) contribute 0; stop-shift invariance; per-surface breakdown with is_plano flag; LLM tool optics_compute_petzval_curvature; 26 hermetic tests. Honest: paraxial (third-order) only; astigmatism (S_III) not included; P=0 flat Petzval sphere does NOT guarantee zero field curvature in presence of astigmatism (Hecht §6.3.2); thick-lens pupil-shift corrections not modelled.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/petzval_curvature.py"
+          }
+        },
+        {
+          "domain": "D12",
           "feature": "Longitudinal chromatic aberration (Sellmeier LCA)",
           "competitor": {
             "status": "yes",

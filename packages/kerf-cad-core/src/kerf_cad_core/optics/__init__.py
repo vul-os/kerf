@@ -54,6 +54,10 @@ from kerf_cad_core.optics.lens import (
     chromatic_aberration,
     achromat_powers,
 )
+from kerf_cad_core.optics.petzval_curvature import (
+    PetzvalReport,
+    compute_petzval_curvature,
+)
 
 __all__ = [
     "lensmaker",
@@ -77,4 +81,6 @@ __all__ = [
     "prism_deviation",
     "chromatic_aberration",
     "achromat_powers",
+    "PetzvalReport",
+    "compute_petzval_curvature",
 ]

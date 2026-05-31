@@ -1658,3 +1658,12 @@ from kerf_cad_core.geom.fresnel_parameterize import (  # noqa: E402
     FresnelParameterizationResult,
     fresnel_parameterize_curve,
 )
+# NURBS-CURVE-EVOLUTE: locus of centres of osculating circles E(t)=C(t)+n̂(t)/κ(t).
+# 2D curves only (3D Frenet-Serret evolutes not yet supported).
+# Applications: cycloidal-gear design, cam-profile cusps, CNC offset analysis.
+# Refs: do Carmo §1.6; Mortenson §4.2.
+# LLM tool: nurbs_compute_curve_evolute.
+from kerf_cad_core.geom.curve_evolute import (  # noqa: E402
+    EvoluteResult,
+    compute_curve_evolute,
+)

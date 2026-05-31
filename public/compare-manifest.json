@@ -4216,6 +4216,20 @@
           }
         },
         {
+          "name": "NURBS curve evolute (locus of osculating-circle centres)",
+          "domain": "D01",
+          "competitor": {
+            "status": "no",
+            "source": "https://wiki.freecad.org/Part_Module",
+            "note": "No built-in evolute computation for NURBS curves"
+          },
+          "kerf": {
+            "status": "partial",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_evolute.py",
+            "note": "compute_curve_evolute(curve, num_samples=200, min_curvature=1e-6) -> EvoluteResult; E(t)=C(t)+n̂(t)/κ(t) via analytical NURBS 1st/2nd derivatives; windowed local-extremum cusp detection with amplitude guard; circle oracle ≤ 1.6e-15 of center; parabola apex (0,1) exact; ellipse a=2,b=1 gives 4 cusps (stretched astroid); straight line gives empty evolute; LLM tool nurbs_compute_curve_evolute registered (gated import); 20 hermetic tests. HONEST: 2D curves only — 3D Frenet-Serret evolutes (torsion component) not yet supported; cusp detection windowed/amplitude-gated, depends on sample density. Applications: cycloidal-gear design, cam-profile cusps, CNC offset analysis. Refs: do Carmo §1.6; Mortenson §4.2."
+          }
+        },
+        {
           "name": "Configurations / family variants",
           "competitor": {
             "status": "partial",

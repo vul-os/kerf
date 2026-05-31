@@ -76,3 +76,9 @@ from kerf_electronics.pcb_via_current import (  # noqa: F401
     PcbViaCurrentReport,
     compute_pcb_via_max_current,
 )
+from kerf_electronics.optocoupler_ctr import (  # noqa: F401
+    OptocouplerSpec,
+    CircuitSpec as OptocouplerCircuitSpec,
+    OptocouplerReport,
+    analyze_optocoupler,
+)

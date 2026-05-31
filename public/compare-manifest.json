@@ -3516,6 +3516,21 @@
             "notes": "electronics_check_fuse_i2t: applied I²t = I_peak² × t (square-wave); clears_safely = applied ≥ fuse pre-arcing I²t; breaking_capacity_adequate = available_SCC ≤ breaking_capacity_kA; fuse classes F/M/T/FF/gG/aR (IEC 60269-1). HONEST: square-wave fault current only — sinusoidal AC or exponentially decaying DC NOT modelled; arcing I²t NOT included; fuse co-ordination NOT checked. Refs: IEC 60269-1:2020; Cooper Bussmann SPD §2–§4.",
             "evidence": "packages/kerf-electronics/src/kerf_electronics/fuse_i2t_check.py"
           }
+        },
+        {
+          "name": "Optocoupler isolation circuit analysis / Vishay AN-38 + Avago AN-5078 + IEC 60747-5-5",
+          "domain": "D7",
+          "competitor": {
+            "status": "no",
+            "notes": "Altium Designer has no built-in optocoupler CTR analysis, saturation verification, or rise/fall time estimation; requires manual spreadsheet calculation from device datasheets",
+            "source": "https://www.altium.com/documentation/altium-designer/component-placement-processes",
+            "tier": "paid"
+          },
+          "kerf": {
+            "status": "[x]",
+            "notes": "elec_analyze_optocoupler: IC_min/typ/max = CTR/100 × IF (IEC 60747-5-5 §6.3); IC_sat = Vcc/R_L; saturated_min_case = IC_min >= IC_sat; Vout_low = Vce_sat; t_rise = max(2.2×R_L×C_L, datasheet_spec×R_L_actual/R_L_spec); headroom_factor = IC_min/IC_sat; warns on over-drive, missing saturation, low headroom. HONEST: linear CTR model only — real CTR vs IF is non-linear; temperature and LED aging derating (30-50% CTR loss over lifetime) NOT modelled; minority-carrier storage time NOT modelled in t_rise; isolation voltage (V_IORM, IEC 60747-5-5 creepage) not checked. 68 tests.",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/optocoupler_ctr.py"
+          }
         }
       ]
     },

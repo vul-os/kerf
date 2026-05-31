@@ -211,6 +211,10 @@ def _register_tools(ctx, provides: list) -> None:
         #   via_length_mm, temp_rise_C, target_current_A → max_current_A,
         #   via_cross_section_um2, equivalent_trace_width_mm, N_vias_recommended
         "kerf_electronics.tools.pcb_via_current",
+        # Optocoupler isolation circuit analysis (Vishay AN-38 + Avago AN-5078 + IEC 60747-5-5)
+        # elec_analyze_optocoupler: IF_mA, CTR_min/typ/max, R_pullup, Vcc → IC min/typ/max,
+        #   IC_sat, saturated_min_case, Vout_low, Vout_high, t_rise/fall, headroom_factor
+        "kerf_electronics.optocoupler_ctr",
     ]
 
     for module_path in tool_modules:

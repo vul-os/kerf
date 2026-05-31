@@ -167,6 +167,8 @@ def _register_tools(ctx, provides: list) -> None:
         "kerf_electronics.tools.voltage_drop",
         # NEC 2023 Article 240.4 + Table 310.16 + 215 circuit-protection check
         "kerf_electronics.tools.circuit_protection",
+        # NEC 2023 Article 310 wire ampacity derating — ambient + bundling
+        "kerf_electronics.tools.wire_ampacity_derate",
     ]
 
     for module_path in tool_modules:

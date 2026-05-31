@@ -5,3 +5,9 @@ from kerf_electronics.voltage_drop import (  # noqa: F401
     VoltageDropReport,
     check_voltage_drop,
 )
+from kerf_electronics.wire_ampacity_derate import (  # noqa: F401
+    WireSpec,
+    InstallationConditions,
+    DeratedAmpacityReport,
+    compute_derated_ampacity,
+)

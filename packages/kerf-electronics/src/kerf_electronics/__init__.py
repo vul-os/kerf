@@ -82,3 +82,9 @@ from kerf_electronics.optocoupler_ctr import (  # noqa: F401
     OptocouplerReport,
     analyze_optocoupler,
 )
+from kerf_electronics.zener_tc_drift import (  # noqa: F401
+    ZenerSpec,
+    OperatingSpec as ZenerOperatingSpec,
+    ZenerDriftReport,
+    compute_zener_drift,
+)

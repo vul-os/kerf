@@ -215,6 +215,10 @@ def _register_tools(ctx, provides: list) -> None:
         # elec_analyze_optocoupler: IF_mA, CTR_min/typ/max, R_pullup, Vcc → IC min/typ/max,
         #   IC_sat, saturated_min_case, Vout_low, Vout_high, t_rise/fall, headroom_factor
         "kerf_electronics.optocoupler_ctr",
+        # Zener temperature-coefficient drift model — Sze §4.5 + Vishay AN-2014-3 §2.4 + ON AN-961 §3
+        # elec_compute_zener_drift: Vz(T)=Vz_nom+TC×(T−T_test); rZ≈0.01×Vz/Iz_test;
+        #   zero-TC crossing near 5.6V (avalanche vs tunneling); drift>5%→recommend Vref IC
+        "kerf_electronics.zener_tc_drift",
     ]
 
     for module_path in tool_modules:

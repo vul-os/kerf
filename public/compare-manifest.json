@@ -3170,6 +3170,19 @@
           }
         },
         {
+          "name": "Zener TC drift (voltage vs temperature)",
+          "domain": "D6",
+          "competitor": {
+            "status": "no",
+            "notes": "Altium Designer has no built-in Zener TC drift calculator; Vz vs T analysis requires manual SPICE temperature sweep or datasheet lookup"
+          },
+          "kerf": {
+            "status": "[x]",
+            "notes": "elec_compute_zener_drift: linear TC model Vz(T)=Vz_nom+ΔVz_current+TC×10⁻³×(T−T_test); rZ≈0.01×Vz/Iz_test [Ω] (Vishay AN-2014-3 §2.2); current deviation>50% warns; drift>5%→recommends 5.6V near-zero-TC Zener or bandgap Vref IC (LM4040, ADR4550). Physical basis: negative TC (tunneling, Vz<5V) vs positive TC (avalanche, Vz>7V) with zero-TC crossing near 5.6V (Sze §4.5). HONEST: LINEAR TC ONLY — real Vz vs T is mildly quadratic in 5–7V transition region (±0.1–0.3 mV / 100°C second-order term, Sze §4.5 Fig. 4.5-6); TC is current-dependent (±10–20% at significantly different Iz); thermal self-heating NOT modelled; rZ linearisation valid within ~50% of Iz_test. 24 tests. Refs: Sze §4.5; H&H §2.2.4 Table 2.1; Vishay AN-2014-3 §2.4; ON AN-961 §3.",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/zener_tc_drift.py"
+          }
+        },
+        {
           "name": "Zener clamp / shunt voltage regulator design",
           "domain": "D6",
           "competitor": {

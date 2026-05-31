@@ -83,12 +83,24 @@ async def register(app: FastAPI, ctx):
     ctx.tools.register("trochoidal_slot",  trochoidal_slot_spec,  run_trochoidal_slot)
     ctx.tools.register("rest_machining",   rest_machining_spec,   run_rest_machining)
 
+    # G83 peck-drilling canned cycle — NIST RS-274/NGC §3.8.4 (2026-05-31)
+    from kerf_cam.peck_drill_cycle import (
+        cam_generate_peck_drill_cycle_spec,
+        run_cam_generate_peck_drill_cycle,
+    )
+    ctx.tools.register(
+        "cam_generate_peck_drill_cycle",
+        cam_generate_peck_drill_cycle_spec,
+        run_cam_generate_peck_drill_cycle,
+    )
+
     # Capabilities depend on available deps
     provides = [
         "cam.2_5d",
         "cam.adaptive-pocket",
         "cam.trochoidal-slot",
         "cam.rest-machining",
+        "cam.g83-peck-drill",
     ]   # pure-Python ops always available
     if _OCL_AVAILABLE:
         provides += ["cam.parallel-3d", "cam.waterline", "cam.lathe"]

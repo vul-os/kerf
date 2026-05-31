@@ -5395,6 +5395,20 @@
         },
         {
           "domain": "D7",
+          "feature": "G83 peck-drilling canned cycle",
+          "competitor": {
+            "status": "yes",
+            "note": "G83 full-retract peck drill supported; post-processor configurable",
+            "source": "https://cam.autodesk.com/hsmposts"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "NIST RS-274/NGC §3.8.4 G83 (full-retract peck); MH 31e §1132 peck count; time estimate excludes acceleration ramps",
+            "evidence": "packages/kerf-cam/src/kerf_cam/peck_drill_cycle.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "G-code post (Fanuc/GRBL/LinuxCNC/Mach3)",
           "competitor": {
             "status": "yes",

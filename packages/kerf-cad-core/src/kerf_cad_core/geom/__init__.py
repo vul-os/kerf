@@ -509,6 +509,11 @@ from kerf_cad_core.geom.degree_op import (
     degree_lower_surface,
     elevate_to_match,
 )
+# NURBS-CURVE-DEGREE-LOWER: Piegl-Tiller §6.5 + Schumaker §6 degree reduction with deviation reporting
+from kerf_cad_core.geom.curve_degree_lower import (
+    DegreeLowerResult,
+    lower_curve_degree,
+)
 # GK-102: knot removal / minimal-CP refit
 from kerf_cad_core.geom.nurbs import remove_knot, minimal_cp_refit
 # GK-P: NURBS seam control for periodic (closed) surfaces
@@ -924,6 +929,8 @@ __all__ = [
     "degree_raise_curve","degree_raise_surface",
     "degree_lower_curve","degree_lower_surface",
     "elevate_to_match",
+    # NURBS-CURVE-DEGREE-LOWER: Piegl-Tiller §6.5 + Schumaker §6
+    "DegreeLowerResult","lower_curve_degree",
     # GK-102
     "remove_knot","minimal_cp_refit",
     # GK-83 / GK-P-NURBS-OFFSET

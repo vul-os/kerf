@@ -332,6 +332,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.brep_heal",                     # brep_heal, brep_compute_inertia — industrial heal pipeline + inertia tensor
     # GK-P: degree raise + lower (Cohen-Lyche-Schumaker 1985)
     "kerf_cad_core.geom.degree_op",
+    # NURBS-CURVE-DEGREE-LOWER: Piegl-Tiller §6.5 + Schumaker §6 degree reduction with deviation reporting
+    "kerf_cad_core.geom.curve_degree_lower",
     # GK-P49: geodesic distance via heat method (Crane, Weischedel & Wardetzky 2013)
     "kerf_cad_core.geom.subd_geodesic",
     # GK-P: fillet chain propagation (Vida-Martin-Varady 1994) — brep_fillet_chain + brep_auto_fillet_all

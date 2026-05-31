@@ -237,6 +237,17 @@ async def register(app: FastAPI, ctx):
         run_cam_check_coolant_flow,
     )
 
+    # G02/G03 arc lineariser — NIST RS-274/NGC §3.5.3 + MH 31e §1130
+    from kerf_cam.arc_linearize import (
+        cam_linearize_arcs_spec,
+        run_cam_linearize_arcs,
+    )
+    ctx.tools.register(
+        "cam_linearize_arcs",
+        cam_linearize_arcs_spec,
+        run_cam_linearize_arcs,
+    )
+
     # Capabilities depend on available deps
     provides = [
         "cam.2_5d",
@@ -257,6 +268,7 @@ async def register(app: FastAPI, ctx):
         "cam.grinding-dress-cycle",
         "cam.dwell-audit",
         "cam.coolant-flow-check",
+        "cam.arc-linearize",
     ]   # pure-Python ops always available
     if _OCL_AVAILABLE:
         provides += ["cam.parallel-3d", "cam.waterline", "cam.lathe"]

@@ -276,6 +276,12 @@
           "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/shear_wall_oop.py\"; note: \"ACI 318-19 \u00a711.5.3 h/t\u226430 slenderness; \u00a711.7.5.1 empirical axial \u03c6Pn=0.55\u00b7\u03c6\u00b7f'c\u00b7Ag\u00b7[1\u2212(k\u00b7h/(32\u00b7t))\u00b2] (k=0.8 fixed-fixed); \u00a722.3 OOP unit-strip flexure a=(As_total\u00b7fy)/(0.85\u00b7f'c\u00b71000); \u03c6Mn=\u03c6\u00b7As_total\u00b7fy\u00b7(d\u2212a/2); Bresler linear DCR=Pu/\u03c6Pn+Mu/\u03c6Mn; oracle t=200mm h=3000mm f'c=30MPa fy=420MPa As_each_face=300mm\u00b2/m\u2192\u03c6Pn=1843kN/m \u03c6Mn=27.1kNm/m DCR=0.791 (adequate); h/t>30\u2192slenderness fail; Mu=40kNm/m\u2192DCR=1.53 (FAIL); arch_check_shear_wall_oop LLM tool; SCOPE: empirical \u00a711.7.5 only \u2014 slender-wall moment-magnifier (\u00a711.8/\u00a76.7.3) NOT implemented; no P-delta; no biaxial bending; no in-plane shear (\u00a711.6/\u00a718.10); Bresler linear interaction only (not full PM curve); Wight \u00a713.13; 34 tests pass\""
         },
         {
+          "name": "Horizontal diaphragm in-plane shear capacity (AWC SDPWS-2021 §4.2 / SDI DDM04)",
+          "domain": "D2",
+          "competitor": "paid: true",
+          "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/diaphragm_shear.py\"; note: \"AWC SDPWS-2021 §4.2 wood structural panel + SDI DDM04 metal deck in-plane shear (ASD basis); v=V/L (plf); v_allow from SDPWS Table 4.2A (plywood 15/32\": 6\"oc→510 plf, 4\"oc→665 plf, 2.5\"oc→870 plf, 2\"oc→1000 plf; plywood 19/32\": 6\"oc→640 plf; OSB 15/32\"=plywood); species factor C_s (DF_L/SP=1.00, HF=0.90, SPF=0.80); unblocked×0.50 (§4.2.7 Case 1); linear nail-spacing interpolation; metal deck 22ga→480 plf, 18ga→760 plf (SDI DDM04 36/6 ASD); AR≤4:1 wood (SDPWS Table 4.2.4), ≤2:1 steel deck (IBC §2209.2); oracle 30×40ft plywood 15/32\" blocked 6\"oc DF_L V=20000lbs→v=667 plf>510→DCR=1.307 (FAIL); arch_check_diaphragm_shear LLM tool; SCOPE: in-plane unit shear ONLY — chord forces NOT computed; deflection NOT computed (use SDPWS Eq.4.2-1 separately); ASD only; SDC A–C only without §4.2.4 review; metal deck 36/6 weld pattern only; 41 tests pass\""
+        },
+        {
           "name": "ASCE 7 seismic loads",
           "domain": "D2",
           "competitor": "paid: true",
@@ -10903,6 +10909,20 @@
             "status": "yes",
             "note": "Beaumont (2007) \u00a76.5 optimal runner diameter: D=(W^0.25\u00d7\u221aL)/3.7 with material-viscosity adjustments (ABS+10%, PC+15%, PP-5%, PA66\u00b10%); cold-runner waste (cylindrical volume \u00d7 polymer density); fill-pressure proxy (Hagen-Poiseuille K_mat\u00b7L/D^4); LLM tool `mold_optimize_runner_diameter`; 28 oracle tests; HONEST: single runner segment only \u2014 does NOT optimise filling balance in multi-cavity molds; empirical formula only (not Hele-Shaw/Cross-WLF rheological simulation); fill-pressure is order-of-magnitude proxy; confirm with Moldflow/Moldex3D fill simulation + mold trial. Refs: Beaumont 2007 \u00a76.5; Menges 2001 \u00a76.5",
             "evidence": "packages/kerf-mold/src/kerf_mold/runner_diameter_optimize.py"
+          }
+        },
+        {
+          "domain": "D7",
+          "feature": "Warpage-risk index (heuristic screening tool)",
+          "competitor": {
+            "status": "partial",
+            "note": "Cimatron and Mastercam include basic warpage-risk guidance but do not expose a quantitative 0–100 heuristic index with weighted sub-scores (wall uniformity, gate location, polymer grade, cooling time, mold temperature) or automated mitigation suggestions; full warpage simulation requires a separate Moldflow/Moldex3D licence",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Heuristic warpage-risk index 0–100 (Beaumont 2007 §10 + Menges 2001 §8): wall-uniformity penalty (0–30 pts; 100%=0, 80%=6, 0%=30); gate-location penalty (0–25 pts: centered=3, edge=14, corner=22, unbalanced=25); polymer grade (0–20 pts: PC=5 low, GF-PA66=20 max — Menges 2001 Table 8.2 shrinkage anisotropy); post-eject cooling time (0–15 pts; exponential 15·exp(−t/40)); mold temp deviation from recommended range (0–10 pts; Menges 2001 §5.4 Table 5.3). Risk thresholds: 0–24 low / 25–49 medium / 50–74 high / 75–100 severe. Prioritised mitigation suggestions per dominant factor. LLM tool `mold_compute_warpage_index`; 39 oracle tests. HONEST: screening tool only (±15 pts uncertainty typical) — real warpage prediction requires Moldflow/Moldex3D/SigmaSoft FEM; orientation-dependent shrinkage tensors, part geometry, packing pressure, injection speed, hold time, and residual-stress relaxation are NOT modelled. Refs: Beaumont 2007 §10; Menges 2001 §8",
+            "evidence": "packages/kerf-mold/src/kerf_mold/warpage_index.py"
           }
         },
         {

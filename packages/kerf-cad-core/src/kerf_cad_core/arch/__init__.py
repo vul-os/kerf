@@ -29,6 +29,8 @@ To avoid collision this package re-exports the structural one as ``SlabDeflSpec`
   base_plate_aisc_tools — LLM tool arch_design_base_plate
   shear_wall_oop    — ACI 318-19 §11.7 RC shear wall out-of-plane flexural + slenderness check
   shear_wall_oop_tools — LLM tool arch_check_shear_wall_oop
+  diaphragm_shear   — AWC SDPWS-2021 §4.2 wood + SDI DDM04 metal-deck in-plane shear check
+  diaphragm_shear_tools — LLM tool arch_check_diaphragm_shear
 """
 from __future__ import annotations
 
@@ -94,6 +96,11 @@ from kerf_cad_core.arch.shear_wall_oop import (
     ShearWallOOPReport,
     check_shear_wall_oop,
 )
+from kerf_cad_core.arch.diaphragm_shear import (
+    DiaphragmSpec,
+    DiaphragmShearReport,
+    check_diaphragm_shear,
+)
 
 __all__ = [
     "WallLayer",
@@ -148,4 +155,8 @@ __all__ = [
     "ShearWallSpec",
     "ShearWallOOPReport",
     "check_shear_wall_oop",
+    # AWC SDPWS-2021 §4.2 + SDI DDM04 horizontal diaphragm in-plane shear check
+    "DiaphragmSpec",
+    "DiaphragmShearReport",
+    "check_diaphragm_shear",
 ]

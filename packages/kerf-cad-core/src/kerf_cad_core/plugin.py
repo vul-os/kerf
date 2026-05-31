@@ -570,6 +570,11 @@ _TOOL_MODULES = [
     # SSIHardenedMarcher: near-tangent bisection fallback (Patrikalakis & Maekawa §5).
     # LLM tool: nurbs_surface_derivatives_analytic
     "kerf_cad_core.geom.surface_analytic_derivatives",
+    # GK-P16: NURBS loft with cross-section curves + guide rails
+    # (Piegl & Tiller §10.3 skinning + Gaussian displacement-blend guide deformation).
+    # HONEST: approximate guide-rail constraint; deviations reported for QC.
+    # LLM tool: nurbs_loft_with_guide_rails
+    "kerf_cad_core.geom.loft_guide_rails",
     # GK-P22: sculpt brushes for SubD cages + triangle meshes (inflate/crease/smooth/pinch)
     # Wendland C2 falloff w(t)=(1-t^2)^2; Botsch-Sorkine 2008 S3; Sculptris/ZBrush brush math.
     # LLM tool: mesh_sculpt_brush

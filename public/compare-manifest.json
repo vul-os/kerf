@@ -6636,6 +6636,20 @@
         },
         {
           "domain": "D7",
+          "feature": "Chip-load catalog validator with thinning detection",
+          "competitor": {
+            "status": "yes",
+            "note": "Fusion 360 CAM workspace shows in-range chip-load indicators per CoroPlus ToolGuide integration",
+            "source": "https://www.autodesk.com/products/fusion-360/cam"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "validate_chip_load(ChipLoadSpec) → ChipLoadReport: catalog fz ranges from Sandvik CoroPlus 2024 + Kennametal 2024 + Harvey Tool 2024 for 7 materials (steel-1018, steel-4140-soft, stainless-304, aluminum-6061, titanium-Ti6Al4V, cast-iron-grey, plastic-acetal) × 5 diameter buckets; chip-thinning fz_eff = fz_nom × D/(2·ae) (Sandvik simplified formula); n = vc×1000/(π×D); feed = fz×flutes×n; warnings: OVER-FEED / RUBBING-WORK-HARDENING / chip-thinning active / high-engagement; cam_validate_chip_load LLM tool; 46 tests green. HONEST: mid-field catalog averages only — tool deflection, runout, harmonics NOT modelled; peripheral end-milling only",
+            "evidence": "packages/kerf-cam/src/kerf_cam/chip_load_validate.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "Turning depth-of-cut + roughing pass calculator",
           "competitor": {
             "status": "yes",

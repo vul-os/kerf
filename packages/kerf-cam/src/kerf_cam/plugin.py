@@ -259,6 +259,17 @@ async def register(app: FastAPI, ctx):
         run_cam_check_dry_machining,
     )
 
+    # Chip-load validator — catalog ranges + thinning detection — Sandvik/Kennametal/Harvey (2024)
+    from kerf_cam.chip_load_validate import (
+        cam_validate_chip_load_spec,
+        run_cam_validate_chip_load,
+    )
+    ctx.tools.register(
+        "cam_validate_chip_load",
+        cam_validate_chip_load_spec,
+        run_cam_validate_chip_load,
+    )
+
     # Capabilities depend on available deps
     provides = [
         "cam.2_5d",
@@ -281,6 +292,7 @@ async def register(app: FastAPI, ctx):
         "cam.coolant-flow-check",
         "cam.arc-linearize",
         "cam.dry-machining-check",
+        "cam.chip-load-validate",
     ]   # pure-Python ops always available
     if _OCL_AVAILABLE:
         provides += ["cam.parallel-3d", "cam.waterline", "cam.lathe"]

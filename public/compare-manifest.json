@@ -3890,6 +3890,19 @@
         },
         {
           "domain": "D6",
+          "feature": "Flash wear-level endurance estimator (sector erase cycles, time-to-failure, recommended N-sector pool)",
+          "competitor": {
+            "status": "no",
+            "note": "OpenPLC has no flash endurance or wear-level analysis; engineers manually calculate erase cycle budgets from datasheets"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "firmware_compute_flash_wear: total_writes = writes_per_second × 31,557,600 s/yr × lifetime_years; cycles_per_sector = ceil(total_writes / WA) / N; adequate = cycles_per_sector ≤ endurance_cycles; recommended_sectors = ceil(sector_erases / endurance); STM32F411 128 KB sector (RM0383 §3, 10k cycles), 1 write/s, 10yr, 1 sector → 3.15e8 cycles (inadequate, need ~31,558 sectors); ATmega328P EEPROM (§11, 100k cycles), 0.0001 write/s, 10yr → 31,558 cycles (adequate); 26 tests. HONEST: assumes perfect uniform wear distribution — real algorithms (NuttX MTD, Zephyr NVS, ST AN2594) achieve ~80–90% of ideal; WA model is worst-case; temperature derating not modelled.",
+            "evidence": "packages/kerf-firmware/src/kerf_firmware/flash_wear_level.py"
+          }
+        },
+        {
+          "domain": "D6",
           "feature": "Schematic capture (KiCad round-trip, ERC)",
           "competitor": {
             "status": "no",

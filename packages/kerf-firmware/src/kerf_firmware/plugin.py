@@ -446,3 +446,20 @@ def _register_tools(ctx, provides: list) -> None:
         logger.warning(
             "kerf-firmware: failed to load firmware_check_watchdog_interval tool: %s", exc
         )
+
+    # firmware_compute_flash_wear — MCU flash endurance / wear-level estimator
+    try:
+        from kerf_firmware.tools.firmware_compute_flash_wear import (
+            _spec as _flash_wear_spec,
+            run_firmware_compute_flash_wear_async as _flash_wear_fn,
+        )
+        ctx.tools.register(
+            "firmware_compute_flash_wear",
+            _flash_wear_spec,
+            _flash_wear_fn,
+        )
+        provides.append("firmware.flash_wear_level")
+    except Exception as exc:
+        logger.warning(
+            "kerf-firmware: failed to load firmware_compute_flash_wear tool: %s", exc
+        )

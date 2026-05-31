@@ -4457,6 +4457,19 @@
         },
         {
           "domain": "D6",
+          "feature": "PWM resolution and frequency-error analysis (timer clock, target frequency, counter bit-width)",
+          "competitor": {
+            "status": "no",
+            "note": "No PWM resolution or frequency-error analysis built into OpenPLC or any standard EDA suite; engineers manually compute ARR from datasheets"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "firmware_check_pwm_resolution: searches integer prescaler P ∈ [1..65536] to maximise resolution_bits=log2(ARR+1) with |freq_error|<1%; ARR=round(clock/(P×freq)−1) clamped to [1,2^bits−1]; oracle: 16 MHz/1 kHz/16-bit → P=1,ARR=15999,13.97 bits; 16 MHz/20 kHz/16-bit → P=1,ARR=799,9.64 bits; STM32F411 100 MHz/20 kHz/16-bit → P=1,ARR=4999,12.29 bits; 100 MHz/50 Hz/32-bit → >20 bits; 25 tests. HONEST: integer-prescaler model is exact for STM32F411 (PSC ∈ [0..65535], RM0383 §13) — ATmega328P Timer1 uses discrete {1,8,64,256,1024} only (§15); interrupt latency, dead-time insertion (TIM1/TIM8 BDTR), and complementary PWM NOT modelled. Refs: STM32F411 RM0383 §13 (TIM2–TIM5); ATmega328P §15 (Timer/Counter1 Fast PWM, ICR1 mode).",
+            "evidence": "packages/kerf-firmware/src/kerf_firmware/pwm_resolution_check.py"
+          }
+        },
+        {
+          "domain": "D6",
           "feature": "Schematic capture (KiCad round-trip, ERC)",
           "competitor": {
             "status": "no",

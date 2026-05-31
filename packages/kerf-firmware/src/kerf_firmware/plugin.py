@@ -531,3 +531,20 @@ def _register_tools(ctx, provides: list) -> None:
         logger.warning(
             "kerf-firmware: failed to load firmware_compute_crc tool: %s", exc
         )
+
+    # firmware_check_pwm_resolution — MCU PWM resolution and frequency-error analyser
+    try:
+        from kerf_firmware.tools.firmware_check_pwm_resolution import (
+            _spec as _pwm_res_spec,
+            run_firmware_check_pwm_resolution_async as _pwm_res_fn,
+        )
+        ctx.tools.register(
+            "firmware_check_pwm_resolution",
+            _pwm_res_spec,
+            _pwm_res_fn,
+        )
+        provides.append("firmware.pwm_resolution_check")
+    except Exception as exc:
+        logger.warning(
+            "kerf-firmware: failed to load firmware_check_pwm_resolution tool: %s", exc
+        )

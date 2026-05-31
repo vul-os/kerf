@@ -4346,3 +4346,164 @@ async def run_compute_lens_volume(ctx: "ProjectCtx", args: bytes) -> str:
     if isinstance(result, dict):
         return json.dumps(result)
     return ok_payload(result.to_dict())
+
+
+# ---------------------------------------------------------------------------
+# Tool: optics_trace_chief_ray  (OPTICS-CHIEF-RAY-HEIGHT)
+# ---------------------------------------------------------------------------
+
+from kerf_cad_core.optics.chief_ray_height import (  # noqa: E402
+    trace_chief_ray,
+)
+
+_trace_chief_ray_spec = ToolSpec(
+    name="optics_trace_chief_ray",
+    description=(
+        "Trace the paraxial chief ray through a sequential optical system and\n"
+        "report the chief-ray height at each surface.\n"
+        "\n"
+        "The chief ray (principal ray) is the ray from an off-axis object point\n"
+        "that passes through the *centre* of the aperture stop (h_stop = 0).\n"
+        "Chief-ray heights are the fundamental input to vignetting analysis,\n"
+        "field-of-view design, and Seidel distortion/coma computation.\n"
+        "\n"
+        "Theory (Welford 'Aberrations of Optical Systems' §3 / Mahajan §2):\n"
+        "\n"
+        "  Paraxial nu-form trace (per surface j):\n"
+        "    n u = n u - h c (n - n)       [refraction]\n"
+        "    h_{j+1} = h_j + t_j u_j       [transfer]\n"
+        "\n"
+        "  Chief-ray initial conditions solved by superposition:\n"
+        "    h_stop = 0  <->  u_obj = -h_A_stop / h_B_stop\n"
+        "\n"
+        "Oracle (single thin lens, f=50mm, stop at lens surface, field=5 deg):\n"
+        "  image_height = f * tan(5 deg) ~= 4.37 mm.\n"
+        "  Chief ray height at stop surface ~= 0 (passes through centre).\n"
+        "\n"
+        "Surface definition (same as optics_ray_trace_lens_stack):\n"
+        "  c  : curvature 1/R (mm^-1). 0 = flat.\n"
+        "  t  : thickness to NEXT surface vertex (mm). Last surface: 0.\n"
+        "  n  : refractive index of medium AFTER this surface.\n"
+        "  k  : conic constant (default 0 = sphere, unused for paraxial).\n"
+        "\n"
+        "Returns:\n"
+        "  per_surface_heights : list of {surface_idx, ray_height_mm,\n"
+        "                        ray_angle_deg} - chief-ray data at each surface\n"
+        "  image_height_mm     : chief-ray height at paraxial image plane (mm)\n"
+        "  magnification       : paraxial lateral magnification (NaN for inf conj.)\n"
+        "  stop_surface_idx    : aperture stop surface index (as supplied)\n"
+        "  chief_ray_at_stop_mm: chief-ray height at stop (should be ~= 0)\n"
+        "  object_angle_deg    : chief-ray angle in object space (degrees)\n"
+        "  image_angle_deg     : chief-ray angle in image space (degrees)\n"
+        "  honest_caveat       : scope limitations\n"
+        "\n"
+        "HONEST LIMITATIONS:\n"
+        "  PARAXIAL ONLY - first-order heights. Exact chief ray requires Newton-\n"
+        "    Raphson conic intersect (use optics_ray_trace_lens_stack for that).\n"
+        "  STOP POSITION MUST BE SUPPLIED - no automatic stop detection.\n"
+        "  ROTATIONALLY SYMMETRIC - meridional plane only.\n"
+        "  IMAGE HEIGHT = f*tan(theta) - no distortion correction.\n"
+        "\n"
+        "Errors: {ok:false, reason} for invalid inputs.  Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "lens_system_dict": {
+                "type": "object",
+                "description": (
+                    "Optical system specification.  Required: surfaces (list of "
+                    "{c, t, n, optional k}). Optional: n_object (default 1.0), "
+                    "object_distance_mm (default 1e9 = infinity), "
+                    "object_height_mm (default 1.0, finite conjugate only)."
+                ),
+                "properties": {
+                    "surfaces": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "c": {
+                                    "type": "number",
+                                    "description": "Curvature 1/R (mm^-1). 0 = flat.",
+                                },
+                                "t": {
+                                    "type": "number",
+                                    "description": "Thickness to next surface (mm).",
+                                },
+                                "n": {
+                                    "type": "number",
+                                    "description": "Refractive index after surface (>= 1.0).",
+                                },
+                                "k": {
+                                    "type": "number",
+                                    "description": "Conic constant (default 0 = sphere).",
+                                },
+                            },
+                            "required": ["c", "t", "n"],
+                        },
+                    },
+                    "n_object": {
+                        "type": "number",
+                        "description": "Refractive index of object space (default 1.0 = air).",
+                    },
+                    "object_distance_mm": {
+                        "type": "number",
+                        "description": (
+                            "Object distance from first surface (mm). "
+                            "Default 1e9 (infinity conjugate)."
+                        ),
+                    },
+                    "object_height_mm": {
+                        "type": "number",
+                        "description": (
+                            "Off-axis object height (mm) for magnification. "
+                            "Default 1.0."
+                        ),
+                    },
+                },
+                "required": ["surfaces"],
+            },
+            "field_angle_deg": {
+                "type": "number",
+                "description": (
+                    "Half-field angle in object space (degrees). "
+                    "Range [0, 90). 0 = on-axis."
+                ),
+            },
+            "stop_surface_idx": {
+                "type": "integer",
+                "description": (
+                    "Index (0-based) of the aperture stop surface. "
+                    "Chief ray is constrained to h=0 at this surface."
+                ),
+            },
+        },
+        "required": ["lens_system_dict", "field_angle_deg", "stop_surface_idx"],
+    },
+)
+
+
+@register(_trace_chief_ray_spec, write=False)
+async def run_trace_chief_ray(ctx: "ProjectCtx", args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    for field_name in ("lens_system_dict", "field_angle_deg", "stop_surface_idx"):
+        if a.get(field_name) is None:
+            return json.dumps({"ok": False, "reason": f"{field_name} is required"})
+
+    try:
+        result = trace_chief_ray(
+            a["lens_system_dict"],
+            float(a["field_angle_deg"]),
+            int(a["stop_surface_idx"]),
+        )
+    except Exception as exc:
+        return json.dumps({"ok": False, "reason": str(exc)})
+
+    if isinstance(result, dict):
+        return json.dumps(result)
+    return ok_payload(result.to_dict())

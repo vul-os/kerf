@@ -123,6 +123,10 @@ from kerf_cad_core.optics.lens_volume import (
     LensVolumeReport,
     compute_lens_volume,
 )
+from kerf_cad_core.optics.chief_ray_height import (
+    ChiefRayHeightReport,
+    trace_chief_ray,
+)
 
 __all__ = [
     "lensmaker",
@@ -185,4 +189,6 @@ __all__ = [
     "SingletLensSpec",
     "LensVolumeReport",
     "compute_lens_volume",
+    "ChiefRayHeightReport",
+    "trace_chief_ray",
 ]

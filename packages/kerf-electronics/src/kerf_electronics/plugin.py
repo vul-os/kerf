@@ -206,6 +206,11 @@ def _register_tools(ctx, provides: list) -> None:
         # electronics_check_fuse_i2t: applied_I2t, ratio_pct, clears_safely,
         #   breaking_capacity_adequate, recommended_fuse_class
         "kerf_electronics.tools.fuse_i2t",
+        # IPC-2152 §6.3 + IPC-2221A §6 PCB via current-carrying capacity
+        # electronics_compute_pcb_via_current: drill_diameter_mm, plating_thickness_um,
+        #   via_length_mm, temp_rise_C, target_current_A → max_current_A,
+        #   via_cross_section_um2, equivalent_trace_width_mm, N_vias_recommended
+        "kerf_electronics.tools.pcb_via_current",
     ]
 
     for module_path in tool_modules:

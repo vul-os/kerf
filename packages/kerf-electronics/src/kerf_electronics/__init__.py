@@ -71,3 +71,8 @@ from kerf_electronics.fuse_i2t_check import (  # noqa: F401
     FuseI2tReport,
     check_fuse_i2t,
 )
+from kerf_electronics.pcb_via_current import (  # noqa: F401
+    PcbViaSpec,
+    PcbViaCurrentReport,
+    compute_pcb_via_max_current,
+)

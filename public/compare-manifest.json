@@ -3409,6 +3409,21 @@
           }
         },
         {
+          "name": "Via current capacity / IPC-2152 §6.3",
+          "domain": "D7",
+          "competitor": {
+            "status": "partial",
+            "notes": "Altium PCB Calculator includes a via current estimator but does not implement the full IPC-2152 §6.3 thin-wall barrel model; no N_vias recommendation or plane-proximity caveat",
+            "source": "https://www.altium.com/documentation/altium-designer/pcb-calculator",
+            "tier": "paid"
+          },
+          "kerf": {
+            "status": "[x]",
+            "notes": "IPC-2152 §6.3 + IPC-2221A §6 via current: A_barrel=π·D·t (thin-wall); I_via=0.048·ΔT^0.44·A_mil²^0.725; equiv 1oz trace width; N_vias=ceil(target/I_per_via). electronics_compute_pcb_via_current LLM tool. Honest: IPC empirical model; plane proximity (cf_pl +10–30%) NOT modelled (conservative); dense array mutual heating NOT applied (IPC-7093 §4.1 — derate 0.80–0.90 manually); resin/Cu fill increases capacity (air-fill assumed). 27 tests.",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/pcb_via_current.py"
+          }
+        },
+        {
           "name": "Voltage-drop check / NEC 210.19(A) compliance",
           "domain": "D7",
           "competitor": {

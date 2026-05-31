@@ -18997,6 +18997,19 @@
         },
         {
           "domain": "D1",
+          "feature": "SubD control-cage surface area + CC limit-surface area estimate",
+          "competitor": {
+            "status": "no",
+            "note": "Maya/Blender/Rhino do not expose a programmatic cage-polygon area API with per-face distribution, degenerate-face flagging, and an explicit honest caveat on the limit-surface estimate accuracy."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "compute_cage_area(cage): total piecewise-planar area of control polygon (mm²); per-face areas; degenerate face flagging (area < 1e-6 mm²); face-type counts (quads/tris/n-gons); limit-surface estimate = cage_area × 0.94 (empirical Catmull-Clark shrinkage; Catmull-Clark 1978 CAD §10(6); Stam 1998 SIGGRAPH §2; Zorin-Schröder 2000 §3); triangle area = 0.5·|cross|; quad area = diagonal cross-product (exact for planar, approx non-planar); n-gon = centroid fan; unit cube: 6 mm² cage, 5.64 mm² estimate ✓; degenerate-triangle flagged ✓; pyramid (1 quad + 4 tris) oracle ✓; pentagon n-gon exact formula ✓; hexagon ✓; scales k² ✓; CageAreaReport dataclass; LLM tool subd_compute_cage_area; 23 oracle-asserted tests. HONEST: LIMIT-SURFACE AREA IS AN EMPIRICAL ESTIMATE ONLY (×0.94) — exact value requires Stam 1998 eigenanalysis at each extraordinary vertex or numerical GL integration; empirical 0.92–0.95 range for typical organic all-quad cages; error vs exact can exceed 5% for extraordinary-vertex-heavy or highly non-planar cages.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/subd/cage_area.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "Shell wall-thickness DFM check",
           "competitor": {
             "status": "partial",

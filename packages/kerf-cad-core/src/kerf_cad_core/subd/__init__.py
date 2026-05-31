@@ -43,6 +43,12 @@ edge_flip
     replacing (v_a, v_b) with (v_c, v_d) where v_c and v_d are the opposite
     vertices. Purely topological — no Delaunay in-circle test. Triangles only.
     (Bommes-Lévy-Pietroni 2013 §3; Edelsbrunner 2001 §2).
+cage_area
+    SUBD-CAGE-AREA: compute total surface area of the control polygon and
+    estimate the asymptotic Catmull-Clark limit-surface area via empirical
+    0.94× cage-shrinkage ratio; per-face area distribution; degenerate face
+    flagging (area < 1e-6 mm²).
+    (Catmull-Clark 1978; Stam 1998 §2; Zorin-Schröder 2000 §3).
 """
 
 from kerf_cad_core.subd.limit_walk_cross_curve import (
@@ -77,6 +83,11 @@ from kerf_cad_core.subd.edge_flip import (
     EdgeFlipResult,
     flip_edge,
 )
+from kerf_cad_core.subd.cage_area import (
+    SubdCage,
+    CageAreaReport,
+    compute_cage_area,
+)
 
 __all__ = [
     "CrossCurveResult",
@@ -95,4 +106,7 @@ __all__ = [
     "compute_dual_mesh",
     "EdgeFlipResult",
     "flip_edge",
+    "SubdCage",
+    "CageAreaReport",
+    "compute_cage_area",
 ]

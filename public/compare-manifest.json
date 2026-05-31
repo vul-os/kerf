@@ -4240,6 +4240,19 @@
         },
         {
           "domain": "D6",
+          "feature": "RTOS task priority check (Liu-Layland RM bound, hyperbolic bound, FreeRTOS/Zephyr/ChibiOS)",
+          "competitor": {
+            "status": "no",
+            "note": "OpenPLC has no RTOS schedulability analysis; engineers must manually compute utilisation and verify rate-monotonic priority assignments"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "firmware_check_rtos_priorities: Liu-Layland (1973) RM bound U=Σ Cᵢ/Tᵢ ≤ n·(2^(1/n)−1); Bini-Buttazzo (2001) hyperbolic bound Π(Uᵢ+1)≤2; RM priority assignment check (shorter period → higher priority integer); depth-bar: 2 tasks T1 10ms/4ms P2, T2 20ms/8ms P1 → U=80%, bound=82.84%, schedulable, assignment correct; 43 tests. HONEST: sufficient condition for independent periodic tasks only — does NOT model shared resources (PCP/PIP), aperiodic tasks, interrupt latency, context-switch overhead, or Di≠Ti deadlines. Refs: Liu-Layland (1973) J. ACM 20(1); Bini-Buttazzo (2001) ECRTS; ARM FreeRTOS Kernel Docs; Renesas R01AN5545; Zephyr Scheduling Docs.",
+            "evidence": "packages/kerf-firmware/src/kerf_firmware/rtos_priority_check.py"
+          }
+        },
+        {
+          "domain": "D6",
           "feature": "Schematic capture (KiCad round-trip, ERC)",
           "competitor": {
             "status": "no",

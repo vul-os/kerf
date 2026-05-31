@@ -300,6 +300,12 @@
           "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/lintel_design.py\"; note: \"AISC Table 3-23 + ACI 318-19 §9 + TMS 402-22 §5; materials: steel/reinforced_concrete/reinforced_masonry; load model: w_u=1.2·DL+1.6·LL (ASCE 7-16 §2.3.1 combo 2) + masonry arching action (45° triangle when h_masonry≥L/2, TMS 402-22 Commentary §5.3.1; BIA TN-31B); steel: φ·Mn=0.90·Fy·S_x (rectangle approx), φ·Vn=1.00·0.6·Fy·0.5·b·h; RC ACI §9: ρ_max=0.018, φ·Mn=0.90·As·fy·(d−a/2), φ·Vn=0.75·0.17·√f'c·b·d (V_c only); RM TMS §9.3: ρ_max=0.010, φ·Mn=0.90·As·fy·(d−a/2), φ·Vn=0.80·A_n·√f'm/3; deflection L/240 (wall/roof) or L/360 (floor); oracle steel L=1200mm 101.6×101.6mm Fy=250MPa DL=5 LL=3: M_factored=1.944kN·m, service M=1.44kN·m, φ·Mn=39.33kN·m, adequate=True; arch_design_lintel LLM tool; SCOPE: simple span ONLY — continuous-beam moment redistribution NOT modelled; steel: rectangle approx (actual W/L-shapes have higher S_x/I_x); LTB not checked; RC: ρ_max estimate, V_c only (no stirrups); RM: ρ_max estimate, no shear rebar; combo 1.2D+1.6L only; 53 tests pass\""
         },
         {
+          "name": "Cast-in-place headed anchor bolt tensile pullout (ACI 318-19 §17.6 + ACI 355.2)",
+          "domain": "D2",
+          "competitor": "paid: true",
+          "kerf": "evidence: \"packages/kerf-cad-core/src/kerf_cad_core/arch/anchor_bolt_pullout.py\"; note: \"ACI 318-19 §17.6 + ACI 355.2: three limit states — steel §17.6.1: A_se=0.85·π·d²/4, φ·N_sa=φ_s·A_se·fy (φ_s=0.75); concrete breakout §17.6.2: N_b=k_c_SI·λ·√f'c·hef^1.5 (k_c_SI=2.40 cracked/3.40 uncracked, SI equiv. of ACI imperial k_c=24/34; N,MPa,mm), A_Nco=9·hef², A_Nc from projected-cone geometry clipped at edges, ψ_ed=1.0 if c_a,min≥1.5·hef else 0.7+0.3·c_a,min/(1.5·hef) (§17.6.2.4.1), ψ_c=1.0 cracked/1.25 uncracked, φ·N_cb=φ_c·(A_Nc/A_Nco)·ψ_ed·ψ_c·N_b; pullout §17.6.3: N_p=8·A_brg·f'c, φ·N_pn=φ_c·N_p; governing=min(φ·N_sa,φ·N_cb,φ·N_pn); oracle 16mm bolt hef=200mm edge=300mm fc=25MPa fy=420MPa A_brg=400mm² cracked: N_b=33941N, φ·N_cb=22.06kN governs, N=15kN→adequate, N=50kN→FAILS; arch_check_anchor_pullout LLM tool; SCOPE: tension-only (no shear §17.7); cracked concrete default (k_c=2.40, ψ_c=1.0); λ=1.0 NW concrete; ψ_ec=1.0 concentric; splitting/side-face-blowout/adhesive NOT checked; one close edge assumed; 52 tests pass\""
+        },
+        {
           "name": "Plain/masonry bearing wall axial capacity + DCR (ACI 318-19 §11.5.3.1 + TMS 402-22 §8.3)",
           "domain": "D2",
           "competitor": "paid: true",

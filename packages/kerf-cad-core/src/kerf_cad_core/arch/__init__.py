@@ -39,6 +39,8 @@ To avoid collision this package re-exports the structural one as ``SlabDeflSpec`
   bearing_wall_axial_tools — LLM tool arch_check_bearing_wall_axial
   lintel_design     — AISC Table 3-23 + ACI 318-19 §9 + TMS 402-22 §5 lintel design (steel/RC/RM)
   lintel_design_tools — LLM tool arch_design_lintel
+  anchor_bolt_pullout — ACI 318-19 §17.6 cast-in-place headed bolt tension (steel §17.6.1 + breakout §17.6.2 + pullout §17.6.3)
+  anchor_bolt_pullout_tools — LLM tool arch_check_anchor_pullout
 """
 from __future__ import annotations
 
@@ -130,6 +132,11 @@ from kerf_cad_core.arch.lintel_design import (
     LintelDesignReport,
     design_lintel,
 )
+from kerf_cad_core.arch.anchor_bolt_pullout import (
+    AnchorBoltSpec,
+    AnchorPulloutReport,
+    check_anchor_pullout,
+)
 
 __all__ = [
     "WallLayer",
@@ -205,4 +212,8 @@ __all__ = [
     "LintelSpec",
     "LintelDesignReport",
     "design_lintel",
+    # ACI 318-19 §17.6 cast-in-place headed anchor bolt tensile pullout
+    "AnchorBoltSpec",
+    "AnchorPulloutReport",
+    "check_anchor_pullout",
 ]

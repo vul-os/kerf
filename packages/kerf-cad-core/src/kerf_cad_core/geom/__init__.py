@@ -1167,6 +1167,9 @@ __all__ = [
     "PrincipalCurvatureSample",
     "PrincipalCurvatureVizResult",
     "sample_principal_curvatures",
+    # NURBS-CURVE-CIRCLE-FIT: Kasa (1976) + Taubin (1991) algebraic circle fit
+    "CircleFitResult",
+    "fit_circle_to_curve",
 ]
 
 # Variable-section edge blend (Vida-Martin-Varady 1994 §4)
@@ -1689,3 +1692,6 @@ from kerf_cad_core.geom.edge_chamfer_variable import (  # noqa: E402
     ChamferVariableResult,
     generate_variable_chamfer,
 )
+# NURBS-CURVE-CIRCLE-FIT: Kasa (1976) + Taubin (1991) circle fit for 2D NurbsCurves
+# — snap-to-circle in sketcher, circular region detection, near-arc classification.
+from kerf_cad_core.geom.curve_circle_fit import CircleFitResult, fit_circle_to_curve

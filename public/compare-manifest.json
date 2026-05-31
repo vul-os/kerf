@@ -5164,6 +5164,20 @@
         },
         {
           "domain": "D1",
+          "feature": "Circle fit to curve (Kasa/Taubin)",
+          "competitor": {
+            "status": "partial",
+            "note": "Rhino has circle-from-3pts but no algebraic least-squares residual analysis for arc detection",
+            "source": "https://docs.mcneel.com/rhino/8/help/en-us/commands/circle.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "fit_circle_to_curve (Kasa 1976 + Taubin 1991); CircleFitResult with rms/max residual; LLM tool nurbs_fit_circle_to_curve; 2D only — for 3D space curves use planar projection first",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_circle_fit.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "Assemblies — mates",
           "competitor": {
             "status": "yes",
@@ -6617,6 +6631,20 @@
             "status": "yes",
             "note": "blend/network/patch/match-srf + G3 blends + Class-A continuity harness wired",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "Circle fit to curve (Kasa/Taubin)",
+          "competitor": {
+            "status": "partial",
+            "note": "Rhino has circle-from-3pts but no algebraic least-squares residual analysis for arc detection",
+            "source": "https://docs.mcneel.com/rhino/8/help/en-us/commands/circle.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "fit_circle_to_curve (Kasa 1976 + Taubin 1991); CircleFitResult with rms/max residual; LLM tool nurbs_fit_circle_to_curve; 2D only — for 3D space curves use planar projection first",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_circle_fit.py"
           }
         },
         {
@@ -9834,6 +9862,20 @@
         },
         {
           "domain": "D1",
+          "feature": "Circle fit to curve (Kasa/Taubin)",
+          "competitor": {
+            "status": "partial",
+            "note": "Rhino has circle-from-3pts but no algebraic least-squares residual analysis for arc detection",
+            "source": "https://docs.mcneel.com/rhino/8/help/en-us/commands/circle.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "fit_circle_to_curve (Kasa 1976 + Taubin 1991); CircleFitResult with rms/max residual; LLM tool nurbs_fit_circle_to_curve; 2D only — for 3D space curves use planar projection first",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_circle_fit.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "Assemblies — mates",
           "competitor": "{ status: yes, note: \"Assembly Design — coincident, offset, angle, user-defined constraints\", source: \"https://www.3ds.com/products/catia/assembly-design\" }",
           "kerf": "{ status: yes, evidence: \"packages/kerf-cad-core/src/kerf_cad_core/plugin.py\" }"
@@ -10901,6 +10943,20 @@
             "status": "partial",
             "note": "blend/network/patch/match-srf + G3 + Class-A harness wired; not Creo Style ISDX depth",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "Circle fit to curve (Kasa/Taubin)",
+          "competitor": {
+            "status": "partial",
+            "note": "Rhino has circle-from-3pts but no algebraic least-squares residual analysis for arc detection",
+            "source": "https://docs.mcneel.com/rhino/8/help/en-us/commands/circle.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "fit_circle_to_curve (Kasa 1976 + Taubin 1991); CircleFitResult with rms/max residual; LLM tool nurbs_fit_circle_to_curve; 2D only — for 3D space curves use planar projection first",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_circle_fit.py"
           }
         },
         {
@@ -12177,6 +12233,20 @@
           "nx_tier": "paid",
           "competitor": "source: https://plm.automation.siemens.com/global/en/products/nx/nx-design.html",
           "kerf": "evidence: packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py"
+        },
+        {
+          "domain": "D1",
+          "feature": "Circle fit to curve (Kasa/Taubin)",
+          "competitor": {
+            "status": "partial",
+            "note": "Rhino has circle-from-3pts but no algebraic least-squares residual analysis for arc detection",
+            "source": "https://docs.mcneel.com/rhino/8/help/en-us/commands/circle.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "fit_circle_to_curve (Kasa 1976 + Taubin 1991); CircleFitResult with rms/max residual; LLM tool nurbs_fit_circle_to_curve; 2D only — for 3D space curves use planar projection first",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_circle_fit.py"
+          }
         },
         {
           "domain": "D1",
@@ -16757,6 +16827,20 @@
             "status": "yes",
             "note": "blend_srf, network_srf (Gordon), patch_srf_fit all wired as feature ops",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "Circle fit to curve (Kasa/Taubin)",
+          "competitor": {
+            "status": "partial",
+            "note": "Rhino has circle-from-3pts but no algebraic least-squares residual analysis for arc detection",
+            "source": "https://docs.mcneel.com/rhino/8/help/en-us/commands/circle.htm"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "fit_circle_to_curve (Kasa 1976 + Taubin 1991); CircleFitResult with rms/max residual; LLM tool nurbs_fit_circle_to_curve; 2D only — for 3D space curves use planar projection first",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_circle_fit.py"
           }
         },
         {

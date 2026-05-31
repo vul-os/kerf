@@ -466,6 +466,8 @@ _TOOL_MODULES = [
     # Mortenson §9.3). LLM tool: brep_generate_variable_chamfer.
     # Honest: 2D polyline only; 3D B-rep solid edge chamfer is P2/P3 scope.
     "kerf_cad_core.geom.edge_chamfer_variable",
+    # NURBS-CURVE-CIRCLE-FIT: snap-to-circle + circular region detection
+    "kerf_cad_core.geom.curve_circle_fit",              # nurbs_fit_circle_to_curve
 ]
 # NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
 # (already in _TOOL_MODULES above at line 128); sagitta_arrow_chart module is imported

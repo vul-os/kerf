@@ -171,6 +171,8 @@ def _register_tools(ctx, provides: list) -> None:
         "kerf_electronics.tools.wire_ampacity_derate",
         # IPC-2221B simplified PCB trace maximum current (trace_width, copper_oz, dT, location)
         "kerf_electronics.tools.pcb_trace_current",
+        # Decoupling cap sizing: Z_target + bulk/bypass recommendation (Ott §13.3 + HJ §8.3)
+        "kerf_electronics.decoupling_cap_size",
     ]
 
     for module_path in tool_modules:

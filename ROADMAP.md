@@ -157,7 +157,7 @@ The sector work only matters if you **own your work, are not locked in, and can 
 
 **Thermo-fluid depth** ✅ — IAPWS-IF97 steam Regions 1/2/4; Bell-Delaware shell-and-tube HX (TEMA + 5 correction factors); transient pipe-network (MOC waterhammer + surge-tank); ASHRAE CLTD/RTS transient cooling loads; equal-friction duct sizing optimizer (ASHRAE §35) ✅.
 
-**Electronics / power depth** ✅ — IBIS-AMI signal integrity (Bergeron + PRBS eye); AC PDN impedance + decap optimiser; Newton-Raphson AC load-flow; IEC 60255 + IEEE C37.112 protection coordination + IEEE 1584-2018 arc-flash; fibre-optic link budget.
+**Electronics / power depth** ✅ — IBIS-AMI signal integrity (Bergeron + PRBS eye); AC PDN impedance + decap optimiser; Newton-Raphson AC load-flow; IEC 60255 + IEEE C37.112 protection coordination + IEEE 1584-2018 arc-flash; fibre-optic link budget; **ELEC-DECOUPLING-CAP-SIZE** decoupling capacitor sizing (Z_target + bulk/bypass) ✅.
 
 **Aero / marine / space depth** ✅ — 3D VLM + viscous strip drag + Prandtl-Glauert/Kármán-Tsien + Korn-Lock wave-drag; strip-theory seakeeping RAOs (Lewis-form + JONSWAP); Holtrop-Mennen resistance + EHP; multi-revolution Lambert (Lancaster-Blanchard/Izzo 2015); hull fairness audit + fair-hull (Lackenby 1950) ✅.
 **Aero / marine / space depth** ✅ — 3D VLM + viscous strip drag + Prandtl-Glauert/Kármán-Tsien + Korn-Lock wave-drag; strip-theory seakeeping RAOs (Lewis-form + JONSWAP); Holtrop-Mennen resistance + EHP; multi-revolution Lambert (Lancaster-Blanchard/Izzo 2015); drag-coefficient estimation (Hoerner 1965) ✅ — frontal area + Schultz-Grunow Cf + form-factor; LLM tool `aero_estimate_drag`.
@@ -519,6 +519,7 @@ The pure-Python kernel (`packages/kerf-cad-core/src/kerf_cad_core/geom/`) now ma
 
 | # | Gap | vs | Status |
 |---|---|---|---|
+| G-2 | **ELEC-DECOUPLING-CAP-SIZE: decoupling capacitor sizing for digital ICs** — Z_target = ΔV/I_transient (Howard Johnson §8.3); C_bulk = I·t_rise/ΔV (Ott §13.3.3 charge balance); bypass 100 nF/IC (≤50 MHz) or 10 nF/IC (>50 MHz); max ESL per cap = Z_target/(2π·f_bw); `PowerRailSpec` + `DecouplingRecommendation` dataclasses; `electronics_recommend_decoupling_caps` LLM tool. Honest: target-impedance heuristic only; PDN simulation (SPICE/pdn_decap_wizard) required for anti-resonance validation. | Altium PDN Analyzer | ✅ shipped — `kerf-electronics/decoupling_cap_size.py`; 32 tests |
 | G-3 | **Interactive push-and-shove diff-pair tuning** — full diff-pair routing, length-skew tuning, and push-shove | KiCad / Altium | ✅ shipped — `route_diff_pair` + `tune_diff_pair_skew` + `validate_diff_pair` + `push_shove_segment` — `kerf-electronics/routing/push_shove.py` |
 | G-4 | **Broader ECAD import** — Allegro / PADS / gEDA / Eagle v10 | Altium / Cadence | ✅ shipped — four dedicated readers with tests — `kerf-imports/src/kerf_imports/{allegro_reader,pads_reader,geda_reader,eagle_reader}.py` |
 | G-5 | **Kernel G3 / class-A leading** — wired G3 blends + curvature-comb + imprint | Alias / ICEM Surf | ✅ frontend wiring shipped — Class-A viewport toggle (Render menu → "Class-A": zebra stripes + G2/G3 per-edge audit panel) + ImprintCurve inspector entry in FeatureView; backend `feature_global_continuity_audit` + `edge_continuity_report` + `imprint_curve_on_face` all pre-existing |

@@ -2718,6 +2718,21 @@
           }
         },
         {
+          "name": "Decoupling capacitor sizing (Z_target + bulk/bypass)",
+          "domain": "D6",
+          "competitor": {
+            "status": "yes",
+            "notes": "PDN Analyzer provides decoupling cap guidance; full SPICE-level simulation",
+            "source": "https://www.altium.com/documentation/altium-designer/pdn-analyzer",
+            "tier": "paid"
+          },
+          "kerf": {
+            "status": "[x]",
+            "notes": "Z_target = ΔV/I (Howard Johnson §8.3); C_bulk = I·t_rise/ΔV (Ott §13.3); bypass 100 nF/10 nF per IC; max ESL per cap = Z_target/(2π·f_bw); honest: target-impedance heuristic only — PDN simulation (SPICE) required for anti-resonance validation",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/decoupling_cap_size.py"
+          }
+        },
+        {
           "name": "EMC (radiated/shielding/limits)",
           "domain": "D6",
           "competitor": {

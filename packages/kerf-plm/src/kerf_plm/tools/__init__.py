@@ -37,4 +37,6 @@ from kerf_plm._tools_module import (  # noqa: F401
     run_plm_analyze_ecn_impact,
     plm_assess_bom_maturity_spec,
     run_plm_assess_bom_maturity,
+    plm_export_change_log_spec,
+    run_plm_export_change_log,
 )

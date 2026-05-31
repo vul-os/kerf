@@ -199,18 +199,32 @@ async def register(app: FastAPI, ctx):
     except Exception:
         pass  # bom-maturity tool optional — fail silently if symbol missing.
 
+    # Change-Log Export (ISO 10007 §6 + PMI PMBOK §4.6).
+    try:
+        from kerf_plm.tools import (
+            plm_export_change_log_spec,
+            run_plm_export_change_log,
+        )
+        ctx.tools.register(
+            "plm_export_change_log",
+            plm_export_change_log_spec,
+            run_plm_export_change_log,
+        )
+    except Exception:
+        pass  # change-log-export tool optional — fail silently if symbol missing.
+
     try:
         from kerf_core.plugin import PluginManifest
         return PluginManifest(
             name="plm",
             version="0.1.0",
-            provides=["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.sysml-traceability", "plm.xmi-export", "plm.where-used", "plm.document-version-diff", "plm.multi-cavity-effectivity", "plm.part-numbering-schema", "plm.change-notification-distribution", "plm.bom-cost-rollup", "plm.component-whereused", "plm.ecn-impact-analysis", "plm.bom-maturity-check"],
+            provides=["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.sysml-traceability", "plm.xmi-export", "plm.where-used", "plm.document-version-diff", "plm.multi-cavity-effectivity", "plm.part-numbering-schema", "plm.change-notification-distribution", "plm.bom-cost-rollup", "plm.component-whereused", "plm.ecn-impact-analysis", "plm.bom-maturity-check", "plm.change-log-export"],
             depends=[],
         )
     except ImportError:
         return {
             "name": "plm",
             "version": "0.1.0",
-            "provides": ["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.multi-cavity-effectivity", "plm.part-numbering-schema", "plm.change-notification-distribution", "plm.bom-cost-rollup", "plm.component-whereused", "plm.ecn-impact-analysis", "plm.bom-maturity-check"],
+            "provides": ["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.multi-cavity-effectivity", "plm.part-numbering-schema", "plm.change-notification-distribution", "plm.bom-cost-rollup", "plm.component-whereused", "plm.ecn-impact-analysis", "plm.bom-maturity-check", "plm.change-log-export"],
             "depends": [],
         }

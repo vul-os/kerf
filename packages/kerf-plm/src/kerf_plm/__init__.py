@@ -59,6 +59,11 @@ from kerf_plm.maturity_check import (
     MaturityReport,
     assess_bom_maturity,
 )
+from kerf_plm.change_log_export import (
+    EcnLogEntry,
+    ChangeLogExportResult,
+    export_change_log,
+)
 
 __all__ = [
     "Rule",
@@ -87,4 +92,7 @@ __all__ = [
     "ComponentMaturity",
     "MaturityReport",
     "assess_bom_maturity",
+    "EcnLogEntry",
+    "ChangeLogExportResult",
+    "export_change_log",
 ]

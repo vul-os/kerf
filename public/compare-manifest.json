@@ -2461,6 +2461,20 @@
           }
         },
         {
+          "name": "ECN change-log export (CSV + HTML)",
+          "domain": "D6",
+          "competitor": {
+            "status": "no",
+            "notes": "No built-in ECN change-log export to CSV/HTML; requires external PLM suite (Windchill, Teamcenter) or custom scripting",
+            "tier": "paid"
+          },
+          "kerf": {
+            "status": "[x]",
+            "notes": "EcnLogEntry dataclass (ecn_id, summary, approval_date ISO 8601, status draft/approved/in_progress/closed/cancelled, urgency emergency/normal/deferred, affected_components, requester, approver); export_change_log() — optional date-range filter (ISO 8601 inclusive bounds, empty-date entries excluded when bounds set); sort by approval_date / urgency (emergency first) / status / ecn_id; CSV RFC 4180-quoted; HTML table with thead/tbody; summary_stats {total, by_status, by_urgency}. LLM tool: plm_export_change_log. Honest caveat: in-memory export only — no DB pagination for large change-log sets; all entries must fit in RAM. References: ISO 10007:2003 §6; PMI PMBOK 7th ed. §4.6. 24 tests.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/change_log_export.py"
+          }
+        },
+        {
           "name": "Interactive PCB editing (route/place)",
           "domain": "D6",
           "competitor": {

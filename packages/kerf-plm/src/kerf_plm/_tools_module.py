@@ -2414,3 +2414,169 @@ async def run_plm_assess_bom_maturity(ctx, args: bytes) -> str:
         "recommendation": report.recommendation,
         "honest_caveat": report.honest_caveat,
     })
+
+
+# ===========================================================================
+# PLM Change-Log Export (ISO 10007 §6 + PMI PMBOK §4.6)
+# ===========================================================================
+
+plm_export_change_log_spec = ToolSpec(
+    name="plm_export_change_log",
+    description=(
+        "Export a structured Engineering Change Notice (ECN) change log as CSV "
+        "and HTML.\n\n"
+        "Per ISO 10007:2003 §6 (Change control) and PMI PMBOK 7th ed. §4.6 "
+        "(Integrated Change Control), a change log must record each ECN's "
+        "identifier, summary, status, approval date, affected components, and "
+        "urgency.\n\n"
+        "Supported fields per ECN entry:\n"
+        "  ecn_id             — unique ECN identifier (required).\n"
+        "  summary            — free-text description (commas RFC 4180-escaped in CSV).\n"
+        "  approval_date      — ISO 8601 date (YYYY-MM-DD); empty for unapproved.\n"
+        "  status             — draft | approved | in_progress | closed | cancelled.\n"
+        "  urgency            — emergency | normal | deferred (ISO 10007 §6.3).\n"
+        "  affected_components — list of part numbers; rendered as semicolon list.\n"
+        "  requester          — user or team that initiated the ECN.\n"
+        "  approver           — user or team that approved (empty if not yet approved).\n\n"
+        "Filtering: optional start_date / end_date (ISO 8601) bound the "
+        "approval_date range; entries without a date are excluded when bounds given.\n\n"
+        "Sorting: sort_by = 'approval_date' (default, ascending), 'urgency' "
+        "(emergency first), 'status', or 'ecn_id'.\n\n"
+        "Outputs:\n"
+        "  csv_content  — RFC 4180 CSV string with header row.\n"
+        "  html_content — HTML <table> with <thead> and <tbody>.\n"
+        "  summary_stats — {total, by_status, by_urgency} counts.\n\n"
+        "HONEST FLAG: in-memory export only — no DB pagination for large "
+        "change-log sets; all entries must fit in RAM."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "entries": {
+                "type": "array",
+                "description": "List of ECN log entries.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "ecn_id": {
+                            "type": "string",
+                            "description": "Unique ECN identifier, e.g. 'ECN-2026-001'.",
+                        },
+                        "summary": {
+                            "type": "string",
+                            "description": "Short change description.",
+                        },
+                        "approval_date": {
+                            "type": "string",
+                            "description": "ISO 8601 date (YYYY-MM-DD) or empty string.",
+                        },
+                        "status": {
+                            "type": "string",
+                            "enum": ["draft", "approved", "in_progress", "closed", "cancelled"],
+                        },
+                        "urgency": {
+                            "type": "string",
+                            "enum": ["emergency", "normal", "deferred"],
+                            "default": "normal",
+                        },
+                        "affected_components": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Part numbers affected.",
+                        },
+                        "requester": {"type": "string"},
+                        "approver": {"type": "string"},
+                    },
+                    "required": ["ecn_id", "summary", "approval_date", "status"],
+                },
+            },
+            "start_date": {
+                "type": "string",
+                "description": "Inclusive lower bound on approval_date (YYYY-MM-DD). Optional.",
+            },
+            "end_date": {
+                "type": "string",
+                "description": "Inclusive upper bound on approval_date (YYYY-MM-DD). Optional.",
+            },
+            "sort_by": {
+                "type": "string",
+                "enum": ["approval_date", "urgency", "status", "ecn_id"],
+                "description": "Sort key. Default: 'approval_date'.",
+                "default": "approval_date",
+            },
+        },
+        "required": ["entries"],
+    },
+)
+
+
+@register(plm_export_change_log_spec)
+async def run_plm_export_change_log(ctx, args: bytes) -> str:
+    """Tool handler for plm_export_change_log (ISO 10007 §6 + PMI PMBOK §4.6)."""
+    import json as _json
+    try:
+        a = _json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+    raw_entries = a.get("entries")
+    if not isinstance(raw_entries, list):
+        return err_payload("'entries' must be an array", "BAD_ARGS")
+
+    start_date = a.get("start_date") or None
+    end_date = a.get("end_date") or None
+    sort_by = a.get("sort_by", "approval_date") or "approval_date"
+
+    from kerf_plm.change_log_export import EcnLogEntry, export_change_log
+
+    entries = []
+    for i, raw in enumerate(raw_entries):
+        if not isinstance(raw, dict):
+            return err_payload(f"entries[{i}] must be an object", "BAD_ARGS")
+        ecn_id = raw.get("ecn_id")
+        if not ecn_id:
+            return err_payload(f"entries[{i}].ecn_id is required", "BAD_ARGS")
+        summary = raw.get("summary", "")
+        approval_date = raw.get("approval_date", "")
+        status = raw.get("status")
+        if not status:
+            return err_payload(f"entries[{i}].status is required", "BAD_ARGS")
+        urgency = raw.get("urgency", "normal")
+        affected_components = raw.get("affected_components") or []
+        if not isinstance(affected_components, list):
+            return err_payload(f"entries[{i}].affected_components must be an array", "BAD_ARGS")
+        requester = raw.get("requester", "")
+        approver = raw.get("approver", "")
+        try:
+            entries.append(EcnLogEntry(
+                ecn_id=ecn_id,
+                summary=summary,
+                approval_date=approval_date,
+                status=status,
+                affected_components=[str(c) for c in affected_components],
+                urgency=urgency,
+                requester=requester,
+                approver=approver,
+            ))
+        except ValueError as exc:
+            return err_payload(f"entries[{i}] invalid: {exc}", "BAD_ARGS")
+
+    try:
+        result = export_change_log(
+            entries=entries,
+            start_date=start_date,
+            end_date=end_date,
+            sort_by=sort_by,
+        )
+    except Exception as exc:
+        return err_payload(f"export error: {exc}", "EXPORT_ERROR")
+
+    return ok_payload({
+        "csv_content": result.csv_content,
+        "html_content": result.html_content,
+        "num_entries": result.num_entries,
+        "date_range_start": result.date_range_start,
+        "date_range_end": result.date_range_end,
+        "summary_stats": result.summary_stats,
+        "honest_caveat": result.honest_caveat,
+    })

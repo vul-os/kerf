@@ -14679,6 +14679,20 @@
         },
         {
           "domain": "D12",
+          "feature": "Working f-number for finite-conjugate systems",
+          "competitor": {
+            "status": "yes",
+            "note": "OpticStudio computes effective F/# from image-side NA for finite-conjugate systems; exact pupil-aberration-corrected working f-number via ray tracing",
+            "source": "https://www.zemax.com/pages/opticstudio"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Working f-number (OPTICS-FNO-WORKING): FnoWorkingSpec(nominal_f_number, magnification) -> FnoWorkingReport(nominal_f_number, working_f_number, exposure_loss_stops, image_irradiance_factor, honest_caveat); thin-lens formula N_w = N*(1+|m|) (Hecht S6.4 / Smith MOE S4.5); m = -s_i/s_o (negative for real images); oracle f/4 at 1:1 macro (m=-1) -> N_w=8.0, loss=2.0 stops exactly; f/2.8 at 1:2 (m=-0.5) -> N_w=4.2, loss~1.17 stops; image irradiance factor = (N/N_w)^2 = 1/(1+|m|)^2; exposure_loss_stops = 2*log2(1+|m|); m=0 -> N_w=N, loss=0 (no penalty); LLM tool optics_compute_working_fno; 28 hermetic tests. Honest: thin-lens (symmetric-pupil) approximation ONLY — for asymmetric lenses (retrofocus, telephoto, macro with floating elements) pupil magnification p = D_exit/D_entrance != 1; exact formula N_w = (1/p)*N*(1+|m|/p) (Smith MOE S4.5) can differ by 0.5-1 stop for extreme retrofocus designs; pupil-position measurement requires aperture-stop trace not in scope. Ref: Hecht (2017) S6.4; Smith (2008) S4.5; Ray (2002) S2.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/fno_working.py"
+          }
+        },
+        {
+          "domain": "D12",
           "feature": "Non-sequential ray tracing (stray light)",
           "competitor": {
             "status": "yes",

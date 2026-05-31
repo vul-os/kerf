@@ -3844,3 +3844,99 @@ async def run_compute_telecentricity(ctx: "ProjectCtx", args: bytes) -> str:
     if isinstance(result, TelecentricityReport):
         return ok_payload(result.to_dict())
     return ok_payload(result)
+
+
+# ---------------------------------------------------------------------------
+# Tool: optics_compute_working_fno  (OPTICS-FNO-WORKING)
+# ---------------------------------------------------------------------------
+
+from kerf_cad_core.optics.fno_working import (  # noqa: E402
+    FnoWorkingSpec,
+    compute_working_fno,
+)
+
+_working_fno_spec = ToolSpec(
+    name="optics_compute_working_fno",
+    description=(
+        "Compute the working f-number N_w for a finite-conjugate optical system.\n"
+        "\n"
+        "The nominal f-number N = f/D describes a lens focused at infinity.\n"
+        "When focused at a finite object distance, the image-side cone of light\n"
+        "is slower (larger effective f-number), reducing image irradiance.\n"
+        "\n"
+        "Formula (Hecht §6.4 / Smith MOE §4.5 — thin-lens approximation):\n"
+        "\n"
+        "  N_w = N * (1 + |m|)\n"
+        "\n"
+        "where m = image-to-object magnification = -s_i / s_o.\n"
+        "Convention: m is negative for real (inverted) images.\n"
+        "  m = 0.0  → infinity focus; N_w = N (no penalty)\n"
+        "  m = -1.0 → 1:1 macro (life-size); N_w = 2N (+2 stops)\n"
+        "  m = -0.5 → 1:2 (half life-size); N_w = 1.5N (+1.17 stops)\n"
+        "  m = -2.0 → 2:1 photomacrography; N_w = 3N (+3.17 stops)\n"
+        "\n"
+        "Image irradiance relative to infinity focus:\n"
+        "  factor = (N / N_w)²  =  1 / (1 + |m|)²\n"
+        "\n"
+        "Exposure loss in photographic stops:\n"
+        "  loss = 2 · log₂(N_w / N)  =  2 · log₂(1 + |m|)\n"
+        "\n"
+        "Returns:\n"
+        "  nominal_f_number       : input N\n"
+        "  working_f_number       : N_w = N*(1+|m|)\n"
+        "  exposure_loss_stops    : stops lost vs infinity focus (0 = no loss)\n"
+        "  image_irradiance_factor: relative sensor irradiance in [0, 1]\n"
+        "  honest_caveat          : thin-lens caveat; pupil-asymmetry warning\n"
+        "\n"
+        "HONEST FLAG: Thin-lens (symmetric-pupil) formula ONLY.  For asymmetric\n"
+        "lenses (retrofocus, telephoto, macro with floating elements) the pupil\n"
+        "magnification p = D_exit/D_entrance differs from 1; exact formula is\n"
+        "N_w = (1/p)*N*(1+|m|/p) (Smith MOE §4.5).  Error can reach 0.5–1 stop.\n"
+        "\n"
+        "Errors: {ok:false, reason} for invalid inputs.  Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "nominal_f_number": {
+                "type": "number",
+                "description": (
+                    "Lens nominal (infinity-focus) f-number N = f/D.  Must be > 0.  "
+                    "Examples: 1.4, 2.8, 4.0, 8.0."
+                ),
+            },
+            "magnification": {
+                "type": "number",
+                "description": (
+                    "Transverse image-to-object magnification m = -s_i/s_o.  "
+                    "Negative for real (inverted) images.  "
+                    "0.0 = infinity focus; -1.0 = 1:1 macro; -0.5 = 1:2 half life-size."
+                ),
+            },
+        },
+        "required": ["nominal_f_number", "magnification"],
+    },
+)
+
+
+@register(_working_fno_spec, write=False)
+async def run_compute_working_fno(ctx: "ProjectCtx", args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    for field_name in ("nominal_f_number", "magnification"):
+        if a.get(field_name) is None:
+            return json.dumps({"ok": False, "reason": f"{field_name} is required"})
+
+    try:
+        spec = FnoWorkingSpec(
+            nominal_f_number=float(a["nominal_f_number"]),
+            magnification=float(a["magnification"]),
+        )
+        result = compute_working_fno(spec)
+    except ValueError as exc:
+        return json.dumps({"ok": False, "reason": str(exc)})
+
+    return ok_payload(result.to_dict())

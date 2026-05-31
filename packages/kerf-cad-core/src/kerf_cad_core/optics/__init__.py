@@ -103,6 +103,11 @@ from kerf_cad_core.optics.telecentricity_check import (
     TelecentricityReport,
     compute_telecentricity,
 )
+from kerf_cad_core.optics.fno_working import (
+    FnoWorkingSpec,
+    FnoWorkingReport,
+    compute_working_fno,
+)
 
 __all__ = [
     "lensmaker",
@@ -153,4 +158,7 @@ __all__ = [
     "compute_depth_of_field",
     "TelecentricityReport",
     "compute_telecentricity",
+    "FnoWorkingSpec",
+    "FnoWorkingReport",
+    "compute_working_fno",
 ]

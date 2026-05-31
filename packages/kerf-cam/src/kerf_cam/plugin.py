@@ -116,6 +116,17 @@ async def register(app: FastAPI, ctx):
         run_cam_generate_boring_cycle,
     )
 
+    # Rigid-tap operation validator — Sandvik CoroPlus 2024 + MH 31e §1934
+    from kerf_cam.rigid_tapping_check import (
+        cam_check_rigid_tap_spec,
+        run_cam_check_rigid_tap,
+    )
+    ctx.tools.register(
+        "cam_check_rigid_tap",
+        cam_check_rigid_tap_spec,
+        run_cam_check_rigid_tap,
+    )
+
     # Zig-zag face-mill toolpath — MH 31e §1136 + NIST RS-274/NGC §3.5
     from kerf_cam.face_mill_path import (
         cam_generate_face_mill_path_spec,
@@ -137,6 +148,7 @@ async def register(app: FastAPI, ctx):
         "cam.g84-g74-tap-cycle",
         "cam.g85-g86-g89-boring-cycles",
         "cam.face-mill-path",
+        "cam.rigid-tap-check",
     ]   # pure-Python ops always available
     if _OCL_AVAILABLE:
         provides += ["cam.parallel-3d", "cam.waterline", "cam.lathe"]

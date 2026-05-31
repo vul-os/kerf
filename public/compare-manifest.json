@@ -5555,6 +5555,20 @@
         },
         {
           "domain": "D7",
+          "feature": "Rigid-tap pre-run check (sync + torque + breakage risk)",
+          "competitor": {
+            "status": "partial",
+            "note": "CAM tools validate feed/speed but do not expose per-operation spindle sync compliance or tap breakage risk as a structured check; requires manual review of machine limits",
+            "source": "https://cam.autodesk.com/hsmposts"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "check_rigid_tap(RigidTapSpec) → RigidTapReport: T = K·D³ torque (Sandvik CoroPlus 2024 + MH 31e §1934 empirical K; HSS-steel=0.35, cobalt-steel=0.30, carbide-steel=0.25, HSS-aluminum=0.10; 4 materials × 3 tool classes); F = pitch × rpm; sync_compliant = rpm ≤ machine_max_sync_rpm; tap_breakage_risk low/medium/high; recommended_feed_override_pct; metric + UNC/UNF thread parser; cam_check_rigid_tap LLM tool; 58 tests. Honest caveat: K coefficients ±35 % — coolant, tap geometry (spiral-flute vs spiral-point), thread-fit class, and worn tool state NOT modelled",
+            "evidence": "packages/kerf-cam/src/kerf_cam/rigid_tapping_check.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "G85/G86/G89 boring canned cycles",
           "competitor": {
             "status": "yes",

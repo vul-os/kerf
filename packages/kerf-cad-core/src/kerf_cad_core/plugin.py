@@ -48,6 +48,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.sheet_metal",
     "kerf_cad_core.gdt.tools",
     "kerf_cad_core.gdt.composite_tolerance_check",  # gdt_validate_composite_frame (§10.5.2 + §11.6)
+    "kerf_cad_core.gdt.datum_shift_check",          # gdt_compute_datum_shift (§4.5 + §7.3.5 MMC/LMC datum shift)
     "kerf_cad_core.arch.tools",
     "kerf_cad_core.struct.tools",
     "kerf_cad_core.feature_thread",

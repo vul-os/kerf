@@ -6500,6 +6500,19 @@
         },
         {
           "domain": "D11",
+          "feature": "GD&T datum shift check — MMC/LMC modifier bonus tolerance (ASME Y14.5-2018 §4.5 + §7.3.5)",
+          "competitor": {
+            "status": "no",
+            "note": "Fusion 360 does not compute per-datum shift (bonus tolerance) for MMC/LMC-modified datum features of size programmatically"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "compute_datum_shift(DatumFeatureSpec, base_tol_mm): MMC shift=|measured-MMC|; LMC shift=|measured-LMC|; RFS shift=0; total=base+shift. DatumShiftReport carries bonus_shift_mm, total_available_tolerance_mm, shift_allowed. gdt_compute_datum_shift LLM tool registered. Per-feature check; multi-datum DRF secondary/tertiary cascade computed datum-by-datum (§4.11.4); composite frame validation (§10.5.2 PLTZF/FRTZF) is separate. 30 tests.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gdt/datum_shift_check.py"
+          }
+        },
+        {
+          "domain": "D11",
           "feature": "GD&T composite tolerance frame (ASME Y14.5-2018 §10.5.2 PLTZF/FRTZF + §11.6)",
           "competitor": {
             "status": "no",

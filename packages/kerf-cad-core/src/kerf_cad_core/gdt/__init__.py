@@ -11,6 +11,8 @@ Submodules:
   report                    — gdt_callout_report() formatted-text builder
   tools                     — LLM tool wrappers registered with the tool registry
   composite_tolerance_check — Composite frame validator (ASME Y14.5-2018 §10.5.2 / §11.6)
+  datum_shift_check         — Datum shift (bonus tolerance) for MMC/LMC datum features
+                              (ASME Y14.5-2018 §4.5 + §7.3.5)
 """
 from __future__ import annotations
 
@@ -23,6 +25,11 @@ from kerf_cad_core.gdt.composite_tolerance_check import (
     CompositeFrameValidationReport,
     validate_composite_frame,
 )
+from kerf_cad_core.gdt.datum_shift_check import (
+    DatumFeatureSpec,
+    DatumShiftReport,
+    compute_datum_shift,
+)
 
 __all__ = [
     "Datum",
@@ -34,4 +41,7 @@ __all__ = [
     "CompositeFrameSpec",
     "CompositeFrameValidationReport",
     "validate_composite_frame",
+    "DatumFeatureSpec",
+    "DatumShiftReport",
+    "compute_datum_shift",
 ]

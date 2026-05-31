@@ -82,6 +82,12 @@ from kerf_mold.runner_balance_check import (
     RunnerBalanceReport,
     check_runner_balance,
 )
+from kerf_mold.gate_vestige_check import (
+    GateSpec,
+    GateVestigeReport,
+    COSMETIC_CLASS_LIMITS_MM,
+    check_gate_vestige,
+)
 
 __all__ = [
     # mold.py
@@ -155,4 +161,9 @@ __all__ = [
     "BalanceRunnerSegment",
     "RunnerBalanceReport",
     "check_runner_balance",
+    # gate_vestige_check.py
+    "GateSpec",
+    "GateVestigeReport",
+    "COSMETIC_CLASS_LIMITS_MM",
+    "check_gate_vestige",
 ]

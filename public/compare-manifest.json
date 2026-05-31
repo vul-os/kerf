@@ -10156,6 +10156,20 @@
             "note": "Chat-native editing; Moldflow results describable in plain language",
             "evidence": "src/components/ChatPanel.jsx"
           }
+        },
+        {
+          "domain": "D7",
+          "feature": "Gate vestige estimation and cosmetic-class compliance",
+          "competitor": {
+            "status": "partial",
+            "note": "Cimatron provides gate geometry design tools but no automatic vestige height prediction or cosmetic-class compliance report",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Empirical vestige estimates per Beaumont 2007 §7.6 Table 7.4 for edge, tunnel, submarine, hot_tip, pin_point, fan, film gates; checks against A1/A2/A3/B/C cosmetic classes (SPI/Beaumont); removal method guidance per gate type. Honest caveat: estimates only — actual vestige depends on degating tool sharpness, melt temperature, and resin grade ductility; confirm by molding trial for A1/A2 surfaces.",
+            "evidence": "packages/kerf-mold/src/kerf_mold/gate_vestige_check.py"
+          }
         }
       ]
     },

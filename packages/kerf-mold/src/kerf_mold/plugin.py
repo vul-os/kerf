@@ -28,6 +28,9 @@ Registers:
   - LLM tool:  mold_check_runner_balance
                (Beaumont 2007 §6.6 + Menges 2001 §6.6.4 naturally balanced
                 runner network check via Hagen-Poiseuille path resistance)
+  - LLM tool:  mold_check_gate_vestige
+               (Beaumont 2007 §7.6 + Table 7.4 + Menges 2001 §6.6 gate-vestige
+                estimation and cosmetic-class compliance check)
 """
 from __future__ import annotations
 
@@ -164,6 +167,17 @@ async def register(app: FastAPI, ctx):
         mold_runner_balance_check_spec,
         run_mold_check_runner_balance,
     )
+    # Register gate vestige check tool
+    # (Beaumont 2007 §7.6 + Table 7.4 + Menges 2001 §6.6)
+    from kerf_mold.gate_vestige_check_tool import (
+        mold_check_gate_vestige_spec,
+        run_mold_check_gate_vestige,
+    )
+    ctx.tools.register(
+        "mold_check_gate_vestige",
+        mold_check_gate_vestige_spec,
+        run_mold_check_gate_vestige,
+    )
 
     provides = [
         "mold.moldability",
@@ -181,6 +195,7 @@ async def register(app: FastAPI, ctx):
         "mold.flow_length_check",
         "mold.cooling_time_chen_chiang",
         "mold.runner_balance_check",
+        "mold.gate_vestige_check",
     ]
 
     try:

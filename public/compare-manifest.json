@@ -6954,6 +6954,19 @@
         },
         {
           "domain": "D11",
+          "feature": "GD&T dimension chain tolerance stack-up — WC + RSS (ASME Y14.5-2018 §5.3)",
+          "competitor": {
+            "status": "no",
+            "note": "Fusion 360 has no programmatic dimension chain WC/RSS stack-up API; Inventor Tolerance Analysis is a separate product"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "compute_dimension_chain(list[DimensionLink], target_gap_min_mm, target_gap_max_mm) -> DimensionChainReport: nominal_gap=Σs_i·d_i; WC T_WC=Σmax(t⁺,t⁻)→G_wc_min/max; RSS T_RSS=√(Σmax(t⁺,t⁻)²) at 3σ→G_rss_min/max (99.73% assemblability); dominant_link=link with largest half-tolerance. Oracle: +100±0.5/−30±0.2/−20±0.1→nominal=50 mm; WC=[49.2,50.8]; RSS=√0.30=0.5477→[49.452,50.548]. gdt_compute_dimension_chain LLM tool registered via gated import; 24 tests green. HONEST FLAG: RSS assumes independent normal distributions centred on nominal (Cpk=1.0); correlation + non-normal distributions not modelled — unconservative in those cases; Monte Carlo is more accurate per Bralla §1.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gdt/dimension_chain.py"
+          }
+        },
+        {
+          "domain": "D11",
           "feature": "GD&T datum reference frame validator (ASME Y14.5-2018 §4.11)",
           "competitor": {
             "status": "no",

@@ -16,6 +16,8 @@ Submodules:
   feature_of_size_dof       — Feature of Size DOF enumerator (ASME Y14.5-2018 §4.7 + §7.3)
   runout_check              — Circular / total runout compliance check
                               (ASME Y14.5-2018 §13 / ISO 1101 §18)
+  dimension_chain           — WC + RSS tolerance stack-up for linear dimension chains
+                              (ASME Y14.5-2018 §5.3 + Bralla §1)
 """
 from __future__ import annotations
 
@@ -44,6 +46,11 @@ from kerf_cad_core.gdt.runout_check import (
     RunoutCheckReport,
     check_runout,
 )
+from kerf_cad_core.gdt.dimension_chain import (
+    DimensionLink,
+    DimensionChainReport,
+    compute_dimension_chain,
+)
 
 __all__ = [
     "Datum",
@@ -65,4 +72,7 @@ __all__ = [
     "RunoutCheckSpec",
     "RunoutCheckReport",
     "check_runout",
+    "DimensionLink",
+    "DimensionChainReport",
+    "compute_dimension_chain",
 ]

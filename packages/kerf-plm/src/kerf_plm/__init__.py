@@ -77,6 +77,12 @@ from kerf_plm.variant_config import (
     VariantConfigReport,
     resolve_variant_bom,
 )
+from kerf_plm.bom_compare_diff import (
+    BomLineItem,
+    BomDiffEntry,
+    BomDiffReport,
+    compare_boms,
+)
 
 __all__ = [
     "Rule",
@@ -117,4 +123,8 @@ __all__ = [
     "VariantResolvedBomEntry",
     "VariantConfigReport",
     "resolve_variant_bom",
+    "BomLineItem",
+    "BomDiffEntry",
+    "BomDiffReport",
+    "compare_boms",
 ]

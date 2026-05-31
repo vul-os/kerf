@@ -2533,6 +2533,20 @@
           }
         },
         {
+          "name": "BOM revision compare diff (added / removed / qty changed)",
+          "domain": "D6",
+          "competitor": {
+            "status": "partial",
+            "notes": "Windchill and Teamcenter include BOM redline reports; limited to licensed PLM suite — no standalone CLI/API; no structured JSON output",
+            "tier": "paid"
+          },
+          "kerf": {
+            "status": "[x]",
+            "notes": "BomLineItem (part_number, qty, description); compare_boms() diffs two flat BOMs keyed by part_number — classifies each line as added/removed/qty_increased/qty_decreased/unchanged; BomDiffReport (total_parts_old, total_parts_new, num_added, num_removed, num_qty_changed, num_unchanged, diff_entries sorted by part_number, honest_caveat); qty_delta signed; duplicate part_numbers collapsed (last-write-wins). LLM tool: plm_compare_boms. Honest caveat: flat single-level BOM diff only — no hierarchy traversal, no where-used cascade, no effectivity/variant expansion, no description-change detection, no PN alias normalisation. References: ISO 10303-44:2021 §6; PLM Dictionary 'BOM rev compare'. 18 tests.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/bom_compare_diff.py"
+          }
+        },
+        {
           "name": "Interactive PCB editing (route/place)",
           "domain": "D6",
           "competitor": {

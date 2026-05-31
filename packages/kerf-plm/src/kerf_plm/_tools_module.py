@@ -3016,3 +3016,147 @@ async def run_plm_resolve_variant_bom(ctx, args: bytes) -> str:
         ],
         "honest_caveat": HONEST_CAVEAT,
     })
+
+
+# ---------------------------------------------------------------------------
+# plm_compare_boms — BOM revision diff (ISO 10303-44 §6)
+# ---------------------------------------------------------------------------
+
+plm_compare_boms_spec = ToolSpec(
+    name="plm_compare_boms",
+    description=(
+        "Compare two flat BOM revisions and return a structured diff report.\n\n"
+        "Per ISO 10303-44 §6 (product structure change documentation) and the PLM "
+        "dictionary 'BOM rev compare' definition.\n\n"
+        "Each BOM is a flat list of part-number + quantity pairs.  The diff "
+        "classifies every line as:\n"
+        "  added         — part in new_bom only\n"
+        "  removed       — part in old_bom only\n"
+        "  qty_increased — present in both; new qty > old qty\n"
+        "  qty_decreased — present in both; new qty < old qty\n"
+        "  unchanged     — present in both; same qty\n\n"
+        "HONEST FLAG — flat BOM only:\n"
+        "  - Single-level part_number / quantity comparison.\n"
+        "  - No multi-level hierarchy traversal.\n"
+        "  - No where-used cascade or effectivity expansion.\n"
+        "  - Duplicate part_numbers collapsed (last-write-wins).\n"
+        "  - Description changes are NOT detected.\n\n"
+        "References: ISO 10303-44:2021 §6; PLM Dictionary 'BOM rev compare'."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "old_bom": {
+                "type": "array",
+                "description": (
+                    "Flat BOM for the older revision.  Each entry:\n"
+                    "  part_number (str, required) — unique part identifier.\n"
+                    "  qty (number, required) — quantity (>= 0).\n"
+                    "  description (str, optional) — human-readable description."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "part_number": {"type": "string"},
+                        "qty": {"type": "number"},
+                        "description": {"type": "string"},
+                    },
+                    "required": ["part_number", "qty"],
+                },
+            },
+            "new_bom": {
+                "type": "array",
+                "description": (
+                    "Flat BOM for the newer revision.  Same schema as old_bom."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "part_number": {"type": "string"},
+                        "qty": {"type": "number"},
+                        "description": {"type": "string"},
+                    },
+                    "required": ["part_number", "qty"],
+                },
+            },
+        },
+        "required": ["old_bom", "new_bom"],
+    },
+)
+
+
+@register(plm_compare_boms_spec)
+async def run_plm_compare_boms(ctx, args: bytes) -> str:
+    """Tool handler for plm_compare_boms (ISO 10303-44 §6 BOM rev compare)."""
+    import json as _json
+    try:
+        a = _json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+    raw_old = a.get("old_bom")
+    raw_new = a.get("new_bom")
+
+    if not isinstance(raw_old, list):
+        return err_payload("'old_bom' must be an array", "BAD_ARGS")
+    if not isinstance(raw_new, list):
+        return err_payload("'new_bom' must be an array", "BAD_ARGS")
+
+    from kerf_plm.bom_compare_diff import BomLineItem, compare_boms
+
+    def _parse_items(raw_list: list, field_name: str) -> "list[BomLineItem]":
+        items = []
+        for i, entry in enumerate(raw_list):
+            if not isinstance(entry, dict):
+                raise ValueError(
+                    f"{field_name}[{i}] must be an object, got {type(entry).__name__}"
+                )
+            pn = entry.get("part_number")
+            if not pn:
+                raise ValueError(
+                    f"{field_name}[{i}] missing required 'part_number'"
+                )
+            qty_raw = entry.get("qty")
+            if qty_raw is None:
+                raise ValueError(
+                    f"{field_name}[{i}] (part '{pn}') missing required 'qty'"
+                )
+            qty = float(qty_raw)
+            description = entry.get("description")
+            items.append(BomLineItem(
+                part_number=str(pn),
+                qty=qty,
+                description=description,
+            ))
+        return items
+
+    try:
+        old_items = _parse_items(raw_old, "old_bom")
+        new_items = _parse_items(raw_new, "new_bom")
+    except (ValueError, TypeError) as exc:
+        return err_payload(str(exc), "BAD_ARGS")
+
+    try:
+        report = compare_boms(old_items, new_items)
+    except Exception as exc:
+        return err_payload(f"diff error: {exc}", "DIFF_ERROR")
+
+    return ok_payload({
+        "total_parts_old": report.total_parts_old,
+        "total_parts_new": report.total_parts_new,
+        "num_added": report.num_added,
+        "num_removed": report.num_removed,
+        "num_qty_changed": report.num_qty_changed,
+        "num_unchanged": report.num_unchanged,
+        "diff_entries": [
+            {
+                "part_number": e.part_number,
+                "change_type": e.change_type,
+                "old_qty": e.old_qty,
+                "new_qty": e.new_qty,
+                "qty_delta": e.qty_delta,
+            }
+            for e in report.diff_entries
+        ],
+        "honest_caveat": report.honest_caveat,
+    })

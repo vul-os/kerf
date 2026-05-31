@@ -70,6 +70,11 @@ from kerf_cad_core.optics.spot_diagram import (
     SpotDiagramResult,
     compute_spot_diagram,
 )
+from kerf_cad_core.optics.sagitta_arrow_chart import (
+    AsphericSurfaceSpec,
+    SagittaArrowChartResult,
+    compute_sagitta_arrow_chart,
+)
 
 __all__ = [
     "lensmaker",
@@ -101,4 +106,7 @@ __all__ = [
     "fit_zernike_wavefront",
     "SpotDiagramResult",
     "compute_spot_diagram",
+    "AsphericSurfaceSpec",
+    "SagittaArrowChartResult",
+    "compute_sagitta_arrow_chart",
 ]

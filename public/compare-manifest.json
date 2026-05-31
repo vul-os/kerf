@@ -14353,6 +14353,20 @@
           }
         },
         {
+          "domain": "D12",
+          "feature": "Aspheric surface sagitta z(r) + arrow chart (ISO 10110-12)",
+          "competitor": {
+            "status": "yes",
+            "note": "Aspheric surface editor with sag profile display and ISO 10110-12 export; supports conic, even asphere, Q-polynomial (Forbes), XY polynomial, and freeform (Zernike) surface types",
+            "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "Sagitta arrow chart (OPTICS-SAGITTA-ARROW-CHART): conic + even-power aspheric surface z(r) = c*r^2/(1+sqrt(1-(1+k)*c^2*r^2)) + sum(a_i*r^(2i+4)) sampled across clear aperture; SVG chart with radius/sagitta axes + slope arrow markers at every 5th sample (dz/dr); AsphericSurfaceSpec dataclass; SagittaArrowChartResult (sagitta_samples, max_sagitta_mm, conic_only_sagitta_mm, aspheric_contribution_mm, svg_chart, honest_caveat); sphere R=50 r=10 oracle z~1.0102 verified <1e-6; paraboloid k=-1 z=r^2/(2R) exact; hemisphere z=R at edge; domain-violation guard; LLM tool optics_compute_sagitta_arrow_chart; 28 hermetic tests. Honest: conic + even-power polynomial asphere ONLY (ISO 10110-12 S6.2); no Zernike / freeform / Q-polynomial / XY-polynomial / off-axis / tilted surfaces. Ref: Welford (1986) S3.3; ISO 10110-12:2019.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/sagitta_arrow_chart.py"
+          }
+        },
+        {
           "domain": "D1",
           "feature": "LLM / chat-native editing",
           "competitor": {

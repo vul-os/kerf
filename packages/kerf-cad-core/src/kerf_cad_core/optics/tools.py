@@ -2997,3 +2997,128 @@ async def run_compute_spot_diagram(ctx: ProjectCtx, args: bytes) -> str:
     if isinstance(result, dict):
         return json.dumps(result)
     return ok_payload(result.to_dict())
+    return ok_payload(result)
+
+
+# ---------------------------------------------------------------------------
+# Tool: optics_compute_sagitta_arrow_chart
+# ---------------------------------------------------------------------------
+
+from kerf_cad_core.optics.sagitta_arrow_chart import (  # noqa: E402
+    AsphericSurfaceSpec,
+    compute_sagitta_arrow_chart,
+)
+
+_sagitta_arrow_chart_spec = ToolSpec(
+    name="optics_compute_sagitta_arrow_chart",
+    description=(
+        "Compute the sagitta z(r) of a conic + even-power aspheric optical surface\n"
+        "across the clear aperture radius and produce an SVG chart with sagittal\n"
+        "arrow markers showing local slope dz/dr.\n"
+        "\n"
+        "Standard surface formula (ISO 10110-12 §6.2 / Welford §3.3):\n"
+        "\n"
+        "  z(r) = c·r² / (1 + √(1−(1+k)·c²·r²))  +  Σ aᵢ·r^(2i+4)\n"
+        "\n"
+        "where c = 1/R, k = conic constant, and aᵢ are even-power aspheric\n"
+        "coefficients (a₀ multiplies r⁴, a₁ → r⁶, etc.).\n"
+        "\n"
+        "Conic constant guide:\n"
+        "  k =  0   → sphere\n"
+        "  k = -1   → paraboloid\n"
+        "  k < -1   → hyperboloid\n"
+        "  k > -1 (≠0) → oblate / prolate ellipsoid\n"
+        "\n"
+        "Returns:\n"
+        "  sagitta_samples         : list of [r, z] pairs (mm)\n"
+        "  max_sagitta_mm          : z at the aperture edge\n"
+        "  conic_only_sagitta_mm   : edge z from conic term only\n"
+        "  aspheric_contribution_mm: max_sagitta − conic_only\n"
+        "  svg_chart               : SVG string (polyline + arrow markers + axes)\n"
+        "  honest_caveat           : scope limitations\n"
+        "\n"
+        "HONEST FLAGS:\n"
+        "  * Conic + even-power polynomial asphere only (ISO 10110-12 §6.2).\n"
+        "  * NO Zernike surfaces, freeform/XY polynomial, Q-polynomial, or\n"
+        "    off-axis / tilted / decentred surfaces.\n"
+        "  * Arrow markers show dz/dr (local slope), not the surface normal.\n"
+        "  * Validity requires (1+k)·c²·r² ≤ 1 at the aperture edge.\n"
+        "\n"
+        "References: Welford §3.3; ISO 10110-12:2019.\n"
+        "\n"
+        "Errors: {ok:false, reason} for invalid inputs.  Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "radius_mm": {
+                "type": "number",
+                "description": (
+                    "Paraxial radius of curvature R (mm). Non-zero and finite. "
+                    "c = 1/R. Use a large value (e.g. 1e12) for a flat surface."
+                ),
+            },
+            "conic_k": {
+                "type": "number",
+                "description": (
+                    "Conic constant k. 0 = sphere, -1 = paraboloid, "
+                    "< -1 = hyperboloid, > 0 = oblate ellipsoid."
+                ),
+            },
+            "aspheric_coeffs": {
+                "type": "array",
+                "description": (
+                    "Even-power aspheric coefficients [a₀, a₁, a₂, …] (mm^-3, mm^-5, …). "
+                    "a₀ multiplies r⁴, a₁ multiplies r⁶, etc. "
+                    "Pass [] for a pure conic surface."
+                ),
+                "items": {"type": "number"},
+            },
+            "clear_aperture_radius_mm": {
+                "type": "number",
+                "description": "Semi-diameter of the clear aperture (mm). Must be > 0.",
+            },
+            "num_samples": {
+                "type": "integer",
+                "description": (
+                    "Number of radial sample points (default 50). "
+                    "Samples are at r = i·R_ap/num_samples for i = 0…num_samples."
+                ),
+            },
+        },
+        "required": [
+            "radius_mm",
+            "conic_k",
+            "aspheric_coeffs",
+            "clear_aperture_radius_mm",
+        ],
+    },
+)
+
+
+@register(_sagitta_arrow_chart_spec, write=False)
+async def run_compute_sagitta_arrow_chart(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    for _fname in ("radius_mm", "conic_k", "aspheric_coeffs", "clear_aperture_radius_mm"):
+        if a.get(_fname) is None:
+            return json.dumps({"ok": False, "reason": f"{_fname} is required"})
+
+    spec = AsphericSurfaceSpec(
+        radius_mm=float(a["radius_mm"]),
+        conic_k=float(a["conic_k"]),
+        aspheric_coeffs=[float(x) for x in a["aspheric_coeffs"]],
+        clear_aperture_radius_mm=float(a["clear_aperture_radius_mm"]),
+    )
+
+    kwargs: dict = {}
+    if "num_samples" in a:
+        kwargs["num_samples"] = int(a["num_samples"])
+
+    result = compute_sagitta_arrow_chart(spec, **kwargs)
+    if isinstance(result, dict):
+        return json.dumps(result)
+    return ok_payload(result.to_dict())

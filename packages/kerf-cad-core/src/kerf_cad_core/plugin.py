@@ -49,6 +49,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.gdt.tools",
     "kerf_cad_core.gdt.composite_tolerance_check",  # gdt_validate_composite_frame (§10.5.2 + §11.6)
     "kerf_cad_core.gdt.datum_shift_check",          # gdt_compute_datum_shift (§4.5 + §7.3.5 MMC/LMC datum shift)
+    "kerf_cad_core.gdt.feature_of_size_dof",        # gdt_compute_fos_dof (§4.7 + §7.3 FOS DOF enumerator)
     "kerf_cad_core.arch.tools",
     "kerf_cad_core.struct.tools",
     "kerf_cad_core.feature_thread",
@@ -492,6 +493,12 @@ _TOOL_MODULES = [
     # Classifies: circle|ellipse|parabola|hyperbola|line|free_form.
     # LLM tool: nurbs_detect_conic_type
     "kerf_cad_core.geom.curve_conic_detect",
+    # BREP-VERTEX-DEGREE-CHECK: count incident edges per vertex; flag boundary
+    # (degree < expected_degree) and non-manifold (degree > expected_degree + 2).
+    # Returns per-vertex degree histogram + irregular vertex indices.
+    # HONEST: edge-based degree only; does NOT analyse face-fan angular order.
+    # Refs: Mantyla 1988 §3.4; Hoffmann 1989 §4. LLM tool: brep_check_vertex_degrees
+    "kerf_cad_core.geom.vertex_degree_check_tools",
 ]
 # NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
 # (already in _TOOL_MODULES above at line 128); sagitta_arrow_chart module is imported

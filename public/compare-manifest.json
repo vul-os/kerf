@@ -6547,6 +6547,19 @@
         },
         {
           "domain": "D11",
+          "feature": "GD&T Feature of Size DOF enumerator — constrained vs released DOF per tolerance (ASME Y14.5-2018 §4.7 + §7.3)",
+          "competitor": {
+            "status": "no",
+            "note": "Fusion 360 does not enumerate constrained/released degrees of freedom per FOS + tolerance type programmatically for inspection planning"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "compute_fos_dof(FOSSpec) -> FOSDoFReport: cylinder/hole+position→TX,TY; cylinder/hole+perpendicularity/parallelism/angularity→RX,RY; cylinder/hole+runout/total_runout→TX,TY,RX,RY (§7.3.4/§7.3.5 coupling); slot/planar_pair+position→TX; slot+orientation→RX,RY; sphere+position→TX,TY,TZ; sphere+orientation→nothing. gdt_compute_fos_dof LLM tool; 35 tests. HONEST FLAG: feature-class lookup table only — does not handle pattern-of-features compositions (§11.3) or PLTZF/FRTZF interactions (§10.5).",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gdt/feature_of_size_dof.py"
+          }
+        },
+        {
+          "domain": "D11",
           "feature": "GD&T datum shift check — MMC/LMC modifier bonus tolerance (ASME Y14.5-2018 §4.5 + §7.3.5)",
           "competitor": {
             "status": "no",

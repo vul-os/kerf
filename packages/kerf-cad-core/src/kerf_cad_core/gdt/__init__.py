@@ -13,6 +13,7 @@ Submodules:
   composite_tolerance_check — Composite frame validator (ASME Y14.5-2018 §10.5.2 / §11.6)
   datum_shift_check         — Datum shift (bonus tolerance) for MMC/LMC datum features
                               (ASME Y14.5-2018 §4.5 + §7.3.5)
+  feature_of_size_dof       — Feature of Size DOF enumerator (ASME Y14.5-2018 §4.7 + §7.3)
 """
 from __future__ import annotations
 
@@ -30,6 +31,11 @@ from kerf_cad_core.gdt.datum_shift_check import (
     DatumShiftReport,
     compute_datum_shift,
 )
+from kerf_cad_core.gdt.feature_of_size_dof import (
+    FOSSpec,
+    FOSDoFReport,
+    compute_fos_dof,
+)
 
 __all__ = [
     "Datum",
@@ -44,4 +50,7 @@ __all__ = [
     "DatumFeatureSpec",
     "DatumShiftReport",
     "compute_datum_shift",
+    "FOSSpec",
+    "FOSDoFReport",
+    "compute_fos_dof",
 ]

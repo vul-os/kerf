@@ -75,6 +75,10 @@ from kerf_cad_core.optics.sagitta_arrow_chart import (
     SagittaArrowChartResult,
     compute_sagitta_arrow_chart,
 )
+from kerf_cad_core.optics.piston_tip_tilt import (
+    PistonTipTiltReport,
+    analyze_wavefront_alignment,
+)
 
 __all__ = [
     "lensmaker",
@@ -109,4 +113,6 @@ __all__ = [
     "AsphericSurfaceSpec",
     "SagittaArrowChartResult",
     "compute_sagitta_arrow_chart",
+    "PistonTipTiltReport",
+    "analyze_wavefront_alignment",
 ]

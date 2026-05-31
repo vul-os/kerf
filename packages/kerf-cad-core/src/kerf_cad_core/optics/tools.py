@@ -2844,6 +2844,141 @@ async def run_fit_zernike_wavefront(ctx: ProjectCtx, args: bytes) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Tool: optics_analyze_wavefront_alignment
+# ---------------------------------------------------------------------------
+
+try:
+    from kerf_cad_core.optics.piston_tip_tilt import (  # noqa: E402
+        PistonTipTiltReport,
+        analyze_wavefront_alignment,
+    )
+    _PISTON_TIP_TILT_AVAILABLE = True
+except ImportError:
+    _PISTON_TIP_TILT_AVAILABLE = False
+
+_wavefront_alignment_spec = ToolSpec(
+    name="optics_analyze_wavefront_alignment",
+    description=(
+        "Extract piston (Z₁), tip (Z₂), tilt (Z₃), and defocus (Z₄) Zernike\n"
+        "alignment components from a sampled wavefront W(ρ,θ) and report each\n"
+        "in waves at the specified wavelength.\n"
+        "\n"
+        "This is the most common alignment-quality metric in optical-shop testing\n"
+        "(Hecht §11.3; Born & Wolf §9.2; Wyant & Creath 1992 §3).\n"
+        "\n"
+        "Noll j-index mapping for the four alignment terms:\n"
+        "  Z₁ (j=1)  piston  = 1                    [constant OPD offset]\n"
+        "  Z₂ (j=2)  tip     = 2ρ cosθ              [wavefront tilt about y-axis]\n"
+        "  Z₃ (j=3)  tilt    = 2ρ sinθ              [wavefront tilt about x-axis]\n"
+        "  Z₄ (j=4)  defocus = √3(2ρ²−1)            [longitudinal focus error]\n"
+        "\n"
+        "Input wavefront W must be in nanometres (nm). The tool divides each\n"
+        "Zernike coefficient by wavelength_nm to express results in waves.\n"
+        "\n"
+        "Returns:\n"
+        "  piston_waves         : Z₁ coefficient in waves\n"
+        "  tip_waves            : Z₂ coefficient in waves\n"
+        "  tilt_waves           : Z₃ coefficient in waves\n"
+        "  defocus_waves        : Z₄ coefficient in waves\n"
+        "  residual_rms_waves   : RMS of (W_measured − W_fitted_4terms) in waves;\n"
+        "                         non-zero → higher-order aberration content present\n"
+        "  dominant_misalignment: 'piston'|'tip'|'tilt'|'defocus'|'none'\n"
+        "  honest_caveat        : scope limitations\n"
+        "\n"
+        "Honest limits:\n"
+        "  * Circular unit-disk pupil only (ρ ∈ [0,1]); no obscuration or\n"
+        "    elliptical aperture.\n"
+        "  * Alignment analysis only: corrects rigid-body misalignment (piston,\n"
+        "    tip, tilt, defocus). Does NOT characterise higher-order aberrations\n"
+        "    (coma, astigmatism, spherical, etc.) — use optics_fit_zernike_wavefront\n"
+        "    for full 15-term decomposition.\n"
+        "  * Requires ≥ 4 wavefront samples (minimum for a 4-term fit).\n"
+        "\n"
+        "References: Hecht (2017) §11.3; Born & Wolf (1999) §9.2;\n"
+        "Wyant & Creath (1992) Applied Optics and Optical Engineering XI ch.1;\n"
+        "Noll (1976) J. Opt. Soc. Am. 66 207.\n"
+        "\n"
+        "Errors: {ok: false, reason} for invalid inputs.  Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "samples": {
+                "type": "array",
+                "description": (
+                    "List of wavefront sample points.  Each element must be a\n"
+                    "3-element array [rho, theta, W_nm] where:\n"
+                    "  rho   : normalised pupil radius in [0, 1]\n"
+                    "  theta : pupil angle (radians)\n"
+                    "  W_nm  : wavefront OPD at this point in nanometres (nm)"
+                ),
+                "items": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 3,
+                    "maxItems": 3,
+                },
+                "minItems": 4,
+            },
+            "wavelength_nm": {
+                "type": "number",
+                "description": (
+                    "Reference wavelength in nanometres (nm). E.g. 632.8 for HeNe. "
+                    "All wave values in the report are W_nm / wavelength_nm. "
+                    "Must be > 0."
+                ),
+            },
+        },
+        "required": ["samples", "wavelength_nm"],
+    },
+)
+
+
+@register(_wavefront_alignment_spec, write=False)
+async def run_wavefront_alignment(ctx: ProjectCtx, args: bytes) -> str:
+    if not _PISTON_TIP_TILT_AVAILABLE:
+        return err_payload("numpy is required for wavefront alignment analysis", "MISSING_DEP")
+
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    if a.get("samples") is None:
+        return json.dumps({"ok": False, "reason": "samples is required"})
+    if a.get("wavelength_nm") is None:
+        return json.dumps({"ok": False, "reason": "wavelength_nm is required"})
+
+    raw_samples = a["samples"]
+    if not isinstance(raw_samples, list) or len(raw_samples) == 0:
+        return json.dumps({"ok": False, "reason": "samples must be a non-empty list"})
+
+    try:
+        wavelength_nm = float(a["wavelength_nm"])
+    except (TypeError, ValueError) as exc:
+        return json.dumps({"ok": False, "reason": f"wavelength_nm must be a number: {exc}"})
+
+    try:
+        sample_tuples = [(float(s[0]), float(s[1]), float(s[2])) for s in raw_samples]
+    except (TypeError, IndexError, ValueError) as exc:
+        return json.dumps({
+            "ok": False,
+            "reason": f"each sample must be [rho, theta, W_nm]: {exc}",
+        })
+
+    try:
+        report = analyze_wavefront_alignment(sample_tuples, wavelength_nm=wavelength_nm)
+    except ValueError as exc:
+        return json.dumps({"ok": False, "reason": str(exc)})
+    except TypeError as exc:
+        return json.dumps({"ok": False, "reason": str(exc)})
+    except Exception as exc:
+        return json.dumps({"ok": False, "reason": f"unexpected error: {exc}"})
+
+    return ok_payload(report.to_dict())
+
+
+# ---------------------------------------------------------------------------
 # Tool: optics_compute_spot_diagram
 # ---------------------------------------------------------------------------
 

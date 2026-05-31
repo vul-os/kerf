@@ -128,6 +128,11 @@ from kerf_mold.warpage_index import (
     WarpageIndexReport,
     compute_warpage_index,
 )
+from kerf_mold.melt_flow_ratio_check import (
+    MeltFlowSpec,
+    MeltFlowRatioReport,
+    check_melt_flow_ratio,
+)
 
 __all__ = [
     # mold.py
@@ -239,4 +244,8 @@ __all__ = [
     "WarpageSpec",
     "WarpageIndexReport",
     "compute_warpage_index",
+    # melt_flow_ratio_check.py
+    "MeltFlowSpec",
+    "MeltFlowRatioReport",
+    "check_melt_flow_ratio",
 ]

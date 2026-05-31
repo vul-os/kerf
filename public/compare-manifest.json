@@ -11016,6 +11016,20 @@
           }
         },
         {
+          "domain": "D7",
+          "feature": "Injection-speed envelope from MFR (jetting / sink / gate freeze)",
+          "competitor": {
+            "status": "no",
+            "note": "No MFR-driven injection-speed recommendation in Cimatron; requires separate Moldflow/Sigmasoft analysis",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "mold_check_melt_flow_ratio: from polymer MFR (ASTM D1238 g/10 min), wall thickness, and gate type → recommended injection-speed envelope (mm/s) + qualitative jetting / sink-mark / gate-freeze risk flags. References: Beaumont 2007 §4 + Menges 2001 §6.2. HONEST: heuristic envelope only; MFR is a single-point viscosity proxy; real speed tuning needs full viscosity curve + on-tool DOE.",
+            "evidence": "packages/kerf-mold/src/kerf_mold/melt_flow_ratio_check.py"
+          }
+        },
+        {
           "domain": "D1",
           "feature": "Assembly and collision detection",
           "competitor": {

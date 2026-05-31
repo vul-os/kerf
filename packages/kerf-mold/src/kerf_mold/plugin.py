@@ -62,6 +62,10 @@ Registers:
                 uniformity, gate location, polymer grade, post-ejection cooling
                 time, and mold temperature; HONEST: screening tool only —
                 real warpage prediction requires Moldflow/Moldex3D FEM)
+  - LLM tool:  mold_check_melt_flow_ratio
+               (Beaumont 2007 §4 + Menges 2001 §6.2 + ASTM D1238 MFR/MVR
+                injection-speed envelope to avoid jetting, sink marks, and gate
+                freeze-off; heuristic — real speed tuning needs mold trial DOE)
 """
 from __future__ import annotations
 
@@ -292,6 +296,17 @@ async def register(app: FastAPI, ctx):
         mold_compute_warpage_index_spec,
         run_mold_compute_warpage_index,
     )
+    # Register melt-flow-ratio injection-speed envelope tool
+    # (Beaumont 2007 §4 + Menges 2001 §6.2 + ASTM D1238)
+    from kerf_mold.melt_flow_ratio_check_tool import (
+        mold_check_melt_flow_ratio_spec,
+        run_mold_check_melt_flow_ratio,
+    )
+    ctx.tools.register(
+        "mold_check_melt_flow_ratio",
+        mold_check_melt_flow_ratio_spec,
+        run_mold_check_melt_flow_ratio,
+    )
 
     provides = [
         "mold.moldability",
@@ -317,6 +332,7 @@ async def register(app: FastAPI, ctx):
         "mold.cooling_pressure_drop",
         "mold.runner_diameter_optimize",
         "mold.warpage_index",
+        "mold.melt_flow_ratio_check",
     ]
 
     try:

@@ -38,6 +38,11 @@ Registers:
                (Beaumont 2007 §8.3 Table 8.2 + Menges 2001 §6.4 Table 6.7
                 polymer-specific parting-line vent depth verification;
                 too_shallow → short shot / burn marks; too_deep → flash)
+  - LLM tool:  mold_check_cold_slug_design
+               (Beaumont 2007 §6.7 + Menges 2001 §6.5 cold-slug well
+                dimension check at runner junctions; diameter = 1.5× runner,
+                depth = 2× runner, ±20 % tolerance; prevents flow lines and
+                weak welds from cold leading-edge polymer slug)
 """
 from __future__ import annotations
 
@@ -209,6 +214,18 @@ async def register(app: FastAPI, ctx):
         run_mold_check_vent_depth,
     )
 
+    # Register cold-slug well check tool
+    # (Beaumont 2007 §6.7 + Menges 2001 §6.5)
+    from kerf_mold.cold_slug_check_tool import (
+        mold_check_cold_slug_design_spec,
+        run_mold_check_cold_slug_design,
+    )
+    ctx.tools.register(
+        "mold_check_cold_slug_design",
+        mold_check_cold_slug_design_spec,
+        run_mold_check_cold_slug_design,
+    )
+
     provides = [
         "mold.moldability",
         "mold.parting_surface",
@@ -228,6 +245,7 @@ async def register(app: FastAPI, ctx):
         "mold.gate_vestige_check",
         "mold.demold_force_check",
         "mold.vent_depth_check",
+        "mold.cold_slug_check",
     ]
 
     try:

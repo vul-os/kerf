@@ -101,6 +101,11 @@ from kerf_mold.vent_depth_check import (
     VENT_DEPTH_DB,
     check_vent_depth,
 )
+from kerf_mold.cold_slug_check import (
+    RunnerJunctionSpec,
+    ColdSlugReport,
+    check_cold_slug_design,
+)
 
 __all__ = [
     # mold.py
@@ -190,4 +195,8 @@ __all__ = [
     "VentDepthReport",
     "VENT_DEPTH_DB",
     "check_vent_depth",
+    # cold_slug_check.py
+    "RunnerJunctionSpec",
+    "ColdSlugReport",
+    "check_cold_slug_design",
 ]

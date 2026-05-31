@@ -10237,6 +10237,20 @@
         },
         {
           "domain": "D7",
+          "feature": "Cold-slug well design check (runner junctions)",
+          "competitor": {
+            "status": "no",
+            "note": "Cimatron provides runner system design tools but no automated per-junction cold-slug well sizing compliance check",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Cold-slug well checker (Beaumont 2007 §6.7 + Menges 2001 §6.5): verify slug-well diameter = 1.5× and depth = 2.0× runner diameter at each junction; ±20% tolerance band (1.2×–1.8× dia, 1.6×–2.4× depth); RunnerJunctionSpec dataclass (junction_id, runner_diameter_mm, slug_well_diameter_mm, slug_well_depth_mm, polymer_grade); ColdSlugReport with per-junction slug_well_compliant, recommended dims, reason string; LLM tool `mold_check_cold_slug_design`; 32 oracle tests; honest-flagged: geometric rule-of-thumb only — actual cold-slug capture depends on melt temperature, injection speed, and resin freeze-off time; fast-crystallising/filled grades may need larger wells; confirm by mold trial + gate-area visual inspection",
+            "evidence": "packages/kerf-mold/src/kerf_mold/cold_slug_check.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "Draft angle validation",
           "competitor": {
             "status": "yes",

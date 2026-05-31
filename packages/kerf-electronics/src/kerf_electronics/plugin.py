@@ -187,6 +187,9 @@ def _register_tools(ctx, provides: list) -> None:
         # LDO dropout + thermal compliance check — TI Power Ref §3 + Sandler §4
         # electronics_check_ldo_dropout: headroom, dropout_compliant, P_diss, T_j, thermal_compliant
         "kerf_electronics.ldo_dropout_check",
+        # MOSFET Safe Operating Area (SOA) check — IRF Hexfet Designer's Manual §5 + IPC-9701
+        # electronics_check_fet_soa: within_soa, P_diss, T_J, soa_violation_modes, headroom_pct
+        "kerf_electronics.fet_soa_check",
     ]
 
     for module_path in tool_modules:

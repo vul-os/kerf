@@ -42,3 +42,9 @@ from kerf_electronics.ldo_dropout_check import (  # noqa: F401
     LDODropoutReport,
     check_ldo_dropout,
 )
+from kerf_electronics.fet_soa_check import (  # noqa: F401
+    FETSpec,
+    FETOperatingPoint,
+    FETSOAReport,
+    check_fet_soa,
+)

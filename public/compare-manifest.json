@@ -2968,6 +2968,20 @@
           }
         },
         {
+          "name": "MOSFET Safe Operating Area (SOA) check",
+          "domain": "D6",
+          "competitor": {
+            "status": "no",
+            "notes": "Altium Designer has no built-in MOSFET SOA checker; requires manual datasheet SOA graph lookup or external SPICE/LTspice simulation with SOA measurement macros",
+            "source": "https://www.altium.com/documentation/altium-designer/power-integrity"
+          },
+          "kerf": {
+            "status": "[x]",
+            "notes": "electronics_check_fet_soa: P_diss=V_DS×I_D×duty; T_J=T_amb+P_diss×R_θJA (Jedec JESD51 single-node); violation checks: V_DSS_exceeded, I_D_continuous_exceeded (duty==1), I_D_pulsed_exceeded (duty<1), T_J_exceeded, P_D_exceeded; headroom_pct=(1−max_utilisation)×100. Honest: LINEARISED SOA only — real datasheet SOA curves are non-linear (IRF Hexfet Designer’s Manual §5 Fig 5-1); pulse-width SOA NOT interpolated (short pulses allow higher peak I_D×V_DS before thermal integral exceeded); second-breakdown/UIS NOT explicitly modelled (verify E_AS=½L·I_peak² separately); thermal model is single-node JESD51 steady-state R_θJA (not transient Z_θJC(t)); R_DS_on is room-temperature value (increases with T_J per Infineon AN 2015-11); switching losses NOT included. Refs: IRF Hexfet Designer’s Manual §5; IPC-9701A; Jedec JESD51-1; Infineon AN 2015-11.",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/fet_soa_check.py"
+          }
+        },
+        {
           "name": "LDO linear regulator dropout and thermal compliance check",
           "domain": "D6",
           "competitor": {

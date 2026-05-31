@@ -3940,3 +3940,156 @@ async def run_compute_working_fno(ctx: "ProjectCtx", args: bytes) -> str:
         return json.dumps({"ok": False, "reason": str(exc)})
 
     return ok_payload(result.to_dict())
+
+
+# ---------------------------------------------------------------------------
+# Tool: optics_compute_iris_diameter_map  (OPTICS-IRIS-DIAMETER-MAP)
+# ---------------------------------------------------------------------------
+
+from kerf_cad_core.optics.iris_diameter_map import (  # noqa: E402
+    IrisMapSpec,
+    IrisDiameterReport,
+    compute_iris_diameter,
+)
+
+_iris_diameter_map_spec = ToolSpec(
+    name="optics_compute_iris_diameter_map",
+    description=(
+        "Compute the required iris (aperture stop) physical diameter for a sequential\n"
+        "lens system given a target f-number and verify that the marginal ray does not\n"
+        "clip any other surface's clear aperture.\n"
+        "\n"
+        "Formula (Welford 'Aberrations' §3.4 / Smith 'Modern Optical Engineering' §6):\n"
+        "\n"
+        "  D_iris = EFL / f#     (paraxial, infinity-conjugate)\n"
+        "\n"
+        "EFL is computed by a canonical paraxial marginal-ray trace (h=1, u=0) unless\n"
+        "target_efl_mm is supplied explicitly.\n"
+        "\n"
+        "Marginal-ray clearance check:\n"
+        "  A paraxial marginal ray (h = D_iris/2 at the stop, u = 0) is traced through\n"
+        "  all surfaces.  For each surface with a specified clear aperture CA, the\n"
+        "  clearance_ratio = CA_radius / |h_at_surface|.  If h > 0.95 * CA_radius the\n"
+        "  surface is flagged and clipped=True is set in the report.\n"
+        "\n"
+        "lens_system_dict keys:\n"
+        "  surfaces            : list[dict]  — c (mm^-1), t (mm), n (>=1), k (opt)\n"
+        "  stop_surface_index  : int  — aperture-stop surface (default 0)\n"
+        "  clear_apertures_mm  : list[float] — per-surface CA diameter (mm); omit to\n"
+        "                         skip clipping check\n"
+        "  n_object            : float — object-space index (default 1.0)\n"
+        "\n"
+        "Returns:\n"
+        "  iris_diameter_mm          — D = EFL/f# (mm)\n"
+        "  effective_f_number        — EFL / D (equals target when EFL not overridden)\n"
+        "  efl_mm                    — effective focal length used\n"
+        "  surface_clearance_check   — per-surface list:\n"
+        "      surface_idx, clear_aperture_mm, marginal_ray_height_mm,\n"
+        "      clearance_ratio (>1 = clears), flagged\n"
+        "  clipped                   — True if any surface marginal ray > 0.95 × CA\n"
+        "  honest_caveat             — paraxial limitations\n"
+        "\n"
+        "HONEST FLAG: Paraxial marginal-ray trace only.  D = EFL/f# is the\n"
+        "infinity-conjugate formula; finite-conjugate systems require the working\n"
+        "f-number (N_w = N*(1+|m|), Smith MOE §4.5).  Aspheric higher-order sag\n"
+        "terms are ignored; for production design use exact ray analysis (Zemax /\n"
+        "CODE V / Welford §5).  Clear apertures must be supplied by the caller.\n"
+        "\n"
+        "Ref: Welford (1986) §3.4; Smith (2008) §6; Hecht (2017) §6.4.\n"
+        "\n"
+        "Errors: {ok:false, reason} for invalid inputs.  Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "lens_system_dict": {
+                "type": "object",
+                "description": (
+                    "Optical system descriptor.  Required: 'surfaces' list.  "
+                    "Optional: 'stop_surface_index' (int), 'clear_apertures_mm' "
+                    "(list[float], per-surface CA diameter in mm), "
+                    "'n_object' (float, default 1.0)."
+                ),
+                "properties": {
+                    "surfaces": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "c": {"type": "number", "description": "Curvature 1/R (mm^-1)."},
+                                "t": {"type": "number", "description": "Thickness to next surface (mm)."},
+                                "n": {"type": "number", "description": "Refractive index after surface (>= 1.0)."},
+                                "k": {"type": "number", "description": "Conic constant (default 0)."},
+                            },
+                            "required": ["c", "t", "n"],
+                        },
+                    },
+                    "stop_surface_index": {
+                        "type": "integer",
+                        "description": "0-based index of the aperture-stop surface (default 0).",
+                    },
+                    "clear_apertures_mm": {
+                        "type": "array",
+                        "description": (
+                            "Per-surface clear aperture DIAMETER (mm).  Length must "
+                            "equal the number of surfaces.  Omit to skip clipping check."
+                        ),
+                        "items": {"type": "number"},
+                    },
+                    "n_object": {
+                        "type": "number",
+                        "description": "Refractive index of object space (default 1.0 = air).",
+                    },
+                },
+                "required": ["surfaces"],
+            },
+            "target_f_number": {
+                "type": "number",
+                "description": (
+                    "Target f-number N = EFL / D.  Must be > 0.  "
+                    "Examples: 1.4, 2.8, 4.0, 8.0, 22."
+                ),
+            },
+            "target_efl_mm": {
+                "type": "number",
+                "description": (
+                    "Override effective focal length (mm).  If omitted the EFL is "
+                    "computed from the surface data via the canonical marginal-ray "
+                    "trace.  Must be > 0."
+                ),
+            },
+        },
+        "required": ["lens_system_dict", "target_f_number"],
+    },
+)
+
+
+@register(_iris_diameter_map_spec, write=False)
+async def run_compute_iris_diameter_map(ctx: "ProjectCtx", args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    if a.get("lens_system_dict") is None:
+        return json.dumps({"ok": False, "reason": "lens_system_dict is required"})
+    if a.get("target_f_number") is None:
+        return json.dumps({"ok": False, "reason": "target_f_number is required"})
+
+    kwargs: dict = {}
+    if "target_efl_mm" in a:
+        kwargs["target_efl_mm"] = a["target_efl_mm"]
+
+    try:
+        spec = IrisMapSpec(
+            lens_system_dict=a["lens_system_dict"],
+            target_f_number=float(a["target_f_number"]),
+            **kwargs,
+        )
+        result = compute_iris_diameter(spec)
+    except Exception as exc:
+        return json.dumps({"ok": False, "reason": str(exc)})
+
+    if isinstance(result, dict):
+        return json.dumps(result)
+    return ok_payload(result.to_dict())

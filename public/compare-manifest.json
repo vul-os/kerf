@@ -14809,6 +14809,20 @@
         },
         {
           "domain": "D12",
+          "feature": "Iris (aperture stop) diameter map",
+          "competitor": {
+            "status": "yes",
+            "note": "OpticStudio computes aperture stop diameter from system f/# and entrance-pupil position; exact marginal-ray-based clear-aperture clipping check via ray tracing",
+            "source": "https://www.zemax.com/pages/opticstudio"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Iris diameter map (OPTICS-IRIS-DIAMETER-MAP): IrisMapSpec(lens_system_dict, target_f_number, target_efl_mm=None) -> IrisDiameterReport(iris_diameter_mm, effective_f_number, efl_mm, surface_clearance_check, clipped, honest_caveat); paraxial formula D = EFL/f# (Welford S3.4 / Smith MOE S6); EFL computed via canonical marginal-ray trace (h=1, u=0) or overridden via target_efl_mm; marginal ray (h=D/2 at stop, u=0) traced forward through surfaces after the stop and backward through reversed sub-system for surfaces before stop; per-surface clearance_ratio = CA_radius / |h| (>1 = clears; <1 = clips); clipping flag when h > 0.95 * CA_radius; oracle: EFL=50 mm, f/4 -> D=12.5 mm; f/1.4 fast lens -> D~35.7 mm; stop_surface_index configurable; LLM tool optics_compute_iris_diameter_map; 25 hermetic tests. Honest: paraxial (first-order) marginal-ray trace only — aspheric higher-order sag terms ignored; D=EFL/f# is infinity-conjugate formula (finite-conjugate requires working f-number N_w=N*(1+|m|), Smith MOE S4.5); clear apertures are caller-supplied; production design requires exact skew-ray analysis (Zemax / CODE V / Welford S5). Ref: Welford (1986) S3.4; Smith (2008) S6; Hecht (2017) S6.4.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/iris_diameter_map.py"
+          }
+        },
+        {
+          "domain": "D12",
           "feature": "Non-sequential ray tracing (stray light)",
           "competitor": {
             "status": "yes",

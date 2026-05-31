@@ -108,6 +108,11 @@ from kerf_cad_core.optics.fno_working import (
     FnoWorkingReport,
     compute_working_fno,
 )
+from kerf_cad_core.optics.iris_diameter_map import (
+    IrisMapSpec,
+    IrisDiameterReport,
+    compute_iris_diameter,
+)
 
 __all__ = [
     "lensmaker",
@@ -161,4 +166,7 @@ __all__ = [
     "FnoWorkingSpec",
     "FnoWorkingReport",
     "compute_working_fno",
+    "IrisMapSpec",
+    "IrisDiameterReport",
+    "compute_iris_diameter",
 ]

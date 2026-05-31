@@ -2513,6 +2513,20 @@
           }
         },
         {
+          "name": "Variant configuration / variant-resolved BOM",
+          "domain": "D5",
+          "competitor": {
+            "status": "partial",
+            "notes": "Windchill Variant Management: attribute-gated BOM selection; requires licensed Windchill PDMLink; no standalone CLI/API",
+            "tier": "paid"
+          },
+          "kerf": {
+            "status": "[x]",
+            "notes": "VariantRule (part_number, variant_attribute_key, variant_attribute_value, condition include|exclude); VariantSelection (variant_id, attributes dict); resolve_variant_bom() — first-match-per-part, open-world default (no matching rule → always included); VariantConfigReport (num_total_parts, num_included_parts, num_excluded_parts, resolved_bom). LLM tool: plm_resolve_variant_bom. Honest caveat: simple rule-based variant selection — NO formal feature-model solver, NO constraint propagation, NO mutual-exclusion groups; complex AND/OR/NOT variant expressions not supported in v1. References: PTC Windchill Variant Management; ISO 10303-44 §6; Saaksvuori & Immonen §4.3. 18 tests.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/variant_config.py"
+          }
+        },
+        {
           "name": "Interactive PCB editing (route/place)",
           "domain": "D6",
           "competitor": {
@@ -5193,6 +5207,19 @@
             "status": "yes",
             "note": "fit_circle_to_curve (Kasa 1976 + Taubin 1991); CircleFitResult with rms/max residual; LLM tool nurbs_fit_circle_to_curve; 2D only — for 3D space curves use planar projection first",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_circle_fit.py"
+          }
+        },
+        {
+          "domain": "D1",
+          "feature": "Line fit to curve (TLS/SVD)",
+          "competitor": {
+            "status": "no",
+            "note": "No dedicated least-squares line fit with residual analysis for linear segment detection in Rhino/Fusion"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "fit_line_to_curve (TLS via SVD; Press §15.7; Lawson-Hanson §6); LineFitResult with origin, direction, rms/max residual, is_planar_line; LLM tool nurbs_fit_line_to_curve; 2D only — for 3D space curves project onto plane first",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_line_fit.py"
           }
         },
         {

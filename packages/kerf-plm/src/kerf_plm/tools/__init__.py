@@ -41,4 +41,6 @@ from kerf_plm._tools_module import (  # noqa: F401
     run_plm_export_change_log,
     plm_check_part_obsolescence_spec,
     run_plm_check_part_obsolescence,
+    plm_resolve_variant_bom_spec,
+    run_plm_resolve_variant_bom,
 )

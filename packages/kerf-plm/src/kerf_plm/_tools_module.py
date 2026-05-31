@@ -2784,3 +2784,235 @@ async def run_plm_check_part_obsolescence(ctx, args: bytes) -> str:
         "affected_assemblies": report.affected_assemblies,
         "honest_caveat": report.honest_caveat,
     })
+
+
+# ===========================================================================
+# PLM Variant Configuration (PTC Windchill + ISO 10303-44 §6)
+# ===========================================================================
+
+plm_resolve_variant_bom_spec = ToolSpec(
+    name="plm_resolve_variant_bom",
+    description=(
+        "Resolve a variant-specific BOM by selecting which parts/components are "
+        "active for a given product variant (color, region, market segment, etc.).\n\n"
+        "Methodology: PTC Windchill Variant Management + ISO 10303-44 §6 "
+        "(Product structure configuration).\n\n"
+        "Resolution rules:\n"
+        "  1. For each part in the base BOM, collect all VariantRules whose "
+        "     part_number matches AND whose attribute key=value matches the "
+        "     supplied variant attributes.\n"
+        "  2. First-match semantics: the first matching rule (declaration order) "
+        "     determines include or exclude.\n"
+        "  3. If NO rule matches a part it is ALWAYS INCLUDED (open-world default "
+        "     per ISO 10303-44 §6.2).\n\n"
+        "Variant rule shape:\n"
+        "  {part_number, variant_attribute_key, variant_attribute_value, "
+        "condition ('include'|'exclude')}\n\n"
+        "Example:\n"
+        "  base_bom = [['P-001',1],['P-002',1],['P-003',1]]\n"
+        "  rules = [{part_number:'P-002', key:'color', value:'red', "
+        "condition:'exclude'}]\n"
+        "  variant = {id:'RED', attrs:{color:'red'}} → 2 included (P-002 excluded)\n"
+        "  variant = {id:'BLUE', attrs:{color:'blue'}} → 3 included (no match)\n\n"
+        "Honest caveat: rule matching is exact-match key=value only; no constraint "
+        "propagation, no feature-model solver, no mutual-exclusion groups. Complex "
+        "AND/OR/NOT variant expressions are NOT supported in v1."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "base_bom": {
+                "type": "array",
+                "description": (
+                    "The base (150%) BOM superset.  Each entry is a two-element "
+                    "array: [part_number (string), qty (number)].  Represents the "
+                    "universe of all possible parts across all variants."
+                ),
+                "items": {
+                    "type": "array",
+                    "prefixItems": [
+                        {"type": "string", "description": "Part number"},
+                        {"type": "number", "description": "Quantity"},
+                    ],
+                    "minItems": 2,
+                    "maxItems": 2,
+                },
+            },
+            "variant_rules": {
+                "type": "array",
+                "description": (
+                    "List of variant rules.  Each rule: "
+                    "{part_number (string), variant_attribute_key (string), "
+                    "variant_attribute_value (string), condition ('include'|'exclude')}. "
+                    "Rules are evaluated in declaration order; first match per part wins."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "part_number": {
+                            "type": "string",
+                            "description": "Exact part number this rule targets.",
+                        },
+                        "variant_attribute_key": {
+                            "type": "string",
+                            "description": (
+                                "Attribute dimension, e.g. 'color', 'region', "
+                                "'market_segment'."
+                            ),
+                        },
+                        "variant_attribute_value": {
+                            "type": "string",
+                            "description": "Required attribute value for rule to fire.",
+                        },
+                        "condition": {
+                            "type": "string",
+                            "enum": ["include", "exclude"],
+                            "description": "Effect when rule fires.",
+                        },
+                    },
+                    "required": [
+                        "part_number",
+                        "variant_attribute_key",
+                        "variant_attribute_value",
+                        "condition",
+                    ],
+                },
+            },
+            "variant": {
+                "type": "object",
+                "description": (
+                    "The variant selection to resolve against. "
+                    "{variant_id (string), attributes: {key: value, ...}}. "
+                    "Example: {variant_id: 'RED_EU', attributes: {color: 'red', "
+                    "region: 'EU'}}."
+                ),
+                "properties": {
+                    "variant_id": {
+                        "type": "string",
+                        "description": "Human-readable variant identifier.",
+                    },
+                    "attributes": {
+                        "type": "object",
+                        "description": "Attribute key→value map for this variant.",
+                        "additionalProperties": {"type": "string"},
+                    },
+                },
+                "required": ["variant_id"],
+            },
+        },
+        "required": ["base_bom", "variant_rules", "variant"],
+    },
+)
+
+
+@register(plm_resolve_variant_bom_spec)
+async def run_plm_resolve_variant_bom(ctx, args: bytes) -> str:
+    """Tool handler for plm_resolve_variant_bom (PTC Windchill + ISO 10303-44 §6)."""
+    import json as _json
+
+    try:
+        a = _json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+    raw_bom = a.get("base_bom")
+    raw_rules = a.get("variant_rules")
+    raw_variant = a.get("variant")
+
+    if not isinstance(raw_bom, list):
+        return err_payload("'base_bom' must be an array", "BAD_ARGS")
+    if not isinstance(raw_rules, list):
+        return err_payload("'variant_rules' must be an array", "BAD_ARGS")
+    if not isinstance(raw_variant, dict):
+        return err_payload("'variant' must be an object", "BAD_ARGS")
+
+    from kerf_plm.variant_config import (
+        VariantRule,
+        VariantSelection,
+        resolve_variant_bom,
+        HONEST_CAVEAT,
+    )
+
+    # Parse base BOM
+    base_bom: list[tuple[str, float]] = []
+    for i, entry in enumerate(raw_bom):
+        if not isinstance(entry, (list, tuple)) or len(entry) != 2:
+            return err_payload(
+                f"base_bom[{i}] must be a two-element array [part_number, qty]",
+                "BAD_ARGS",
+            )
+        pn, qty = entry
+        if not isinstance(pn, str) or not pn:
+            return err_payload(f"base_bom[{i}][0] must be a non-empty string", "BAD_ARGS")
+        try:
+            qty = float(qty)
+        except (TypeError, ValueError):
+            return err_payload(f"base_bom[{i}][1] must be a number", "BAD_ARGS")
+        base_bom.append((pn, qty))
+
+    # Parse variant rules
+    rules: list[VariantRule] = []
+    for i, raw in enumerate(raw_rules):
+        if not isinstance(raw, dict):
+            return err_payload(f"variant_rules[{i}] must be an object", "BAD_ARGS")
+        pn = raw.get("part_number")
+        key = raw.get("variant_attribute_key")
+        val = raw.get("variant_attribute_value")
+        cond = raw.get("condition")
+
+        if not pn:
+            return err_payload(
+                f"variant_rules[{i}].part_number is required", "BAD_ARGS"
+            )
+        if not key:
+            return err_payload(
+                f"variant_rules[{i}].variant_attribute_key is required", "BAD_ARGS"
+            )
+        if val is None:
+            return err_payload(
+                f"variant_rules[{i}].variant_attribute_value is required", "BAD_ARGS"
+            )
+        if cond not in ("include", "exclude"):
+            return err_payload(
+                f"variant_rules[{i}].condition must be 'include' or 'exclude'",
+                "BAD_ARGS",
+            )
+
+        rules.append(VariantRule(
+            part_number=pn,
+            variant_attribute_key=key,
+            variant_attribute_value=str(val),
+            condition=cond,
+        ))
+
+    # Parse variant selection
+    variant_id = raw_variant.get("variant_id", "")
+    if not variant_id:
+        return err_payload("'variant.variant_id' is required", "BAD_ARGS")
+    attrs = raw_variant.get("attributes") or {}
+    if not isinstance(attrs, dict):
+        return err_payload("'variant.attributes' must be an object", "BAD_ARGS")
+
+    variant = VariantSelection(variant_id=variant_id, attributes=attrs)
+
+    try:
+        report = resolve_variant_bom(base_bom, rules, variant)
+    except Exception as exc:
+        return err_payload(f"variant resolution error: {exc}", "RESOLUTION_ERROR")
+
+    return ok_payload({
+        "variant_id": report.variant_id,
+        "num_total_parts": report.num_total_parts,
+        "num_included_parts": report.num_included_parts,
+        "num_excluded_parts": report.num_excluded_parts,
+        "resolved_bom": [
+            {
+                "part_number": e.part_number,
+                "qty": e.qty,
+                "included": e.included,
+                "reason": e.reason,
+            }
+            for e in report.resolved_bom
+        ],
+        "honest_caveat": HONEST_CAVEAT,
+    })

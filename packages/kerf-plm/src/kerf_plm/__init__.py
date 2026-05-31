@@ -70,6 +70,13 @@ from kerf_plm.part_obsolescence_check import (
     ObsolescenceReport,
     check_part_obsolescence,
 )
+from kerf_plm.variant_config import (
+    VariantRule,
+    VariantSelection,
+    VariantResolvedBomEntry,
+    VariantConfigReport,
+    resolve_variant_bom,
+)
 
 __all__ = [
     "Rule",
@@ -105,4 +112,9 @@ __all__ = [
     "PartLifecycleEntry",
     "ObsolescenceReport",
     "check_part_obsolescence",
+    "VariantRule",
+    "VariantSelection",
+    "VariantResolvedBomEntry",
+    "VariantConfigReport",
+    "resolve_variant_bom",
 ]

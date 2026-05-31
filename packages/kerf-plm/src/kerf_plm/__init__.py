@@ -12,6 +12,10 @@ Public API:
     from kerf_plm.bom_cost_rollup import (
         BomNode, RollupReport, rollup_bom_cost,
     )
+    from kerf_plm.component_whereused import (
+        BomRelationship, WhereUsedEntry, WhereUsedReport,
+        find_component_whereused,
+    )
 """
 
 from kerf_plm.configurator import (
@@ -36,6 +40,12 @@ from kerf_plm.bom_cost_rollup import (
     RollupReport,
     rollup_bom_cost,
 )
+from kerf_plm.component_whereused import (
+    BomRelationship,
+    WhereUsedEntry,
+    WhereUsedReport,
+    find_component_whereused,
+)
 
 __all__ = [
     "Rule",
@@ -54,4 +64,8 @@ __all__ = [
     "BomNode",
     "RollupReport",
     "rollup_bom_cost",
+    "BomRelationship",
+    "WhereUsedEntry",
+    "WhereUsedReport",
+    "find_component_whereused",
 ]

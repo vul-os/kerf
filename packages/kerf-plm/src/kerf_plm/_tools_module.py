@@ -1878,3 +1878,143 @@ async def run_plm_rollup_bom_cost(ctx, args: bytes) -> str:
         "cost_breakdown_by_node": report.cost_breakdown_by_node,
         "honest_caveat": report.honest_caveat,
     })
+
+
+# ===========================================================================
+# PLM Component Where-Used (ISO 10303-44 + APICS "where-used")
+# ===========================================================================
+
+plm_component_whereused_spec = ToolSpec(
+    name="plm_component_whereused",
+    description=(
+        "Produce a Where-Used report for a component: every parent assembly "
+        "that references it (directly or transitively) with quantity and level.\n\n"
+        "This is the *component-centric* inverse-BOM traversal defined by:\n"
+        "  ISO 10303-44:2021 (STEP AP44) — next_assembly_usage_occurrence traversal.\n"
+        "  APICS Dictionary 16th ed. — 'where-used': determination of every higher-level "
+        "item that incorporates a given component in its bill of material.\n\n"
+        "Input: a flat list of BOM relationships (parent_pn, child_pn, qty).  "
+        "Output: every assembly that contains the queried component, with:\n"
+        "  - qty: direct quantity consumed at that parent level.\n"
+        "  - level: BFS depth (1 = direct parent, 2 = grandparent, …).\n\n"
+        "Quantity semantics:\n"
+        "  qty per entry is the *direct* usage at that BFS hop.  For extended "
+        "path-multiplied quantities, multiply down the path manually.\n"
+        "  Multiple BomRelationship rows with the same (parent, child) are "
+        "summed into a single qty.\n\n"
+        "Cycle detection:\n"
+        "  The tool returns an error if the BOM graph contains a cycle.  "
+        "BOM cycles violate ISO 10303-44 constraints.\n\n"
+        "HONEST FLAG — in-memory traversal only:\n"
+        "  - No DB pagination or live PDM sync.\n"
+        "  - No effectivity, variant, or revision filtering.\n"
+        "  - qty per entry is direct (not path-multiplied extended quantity).\n"
+        "  - Cycles raise an error (not silently truncated)."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "component_pn": {
+                "type": "string",
+                "description": "Part number of the component to query.",
+            },
+            "relationships": {
+                "type": "array",
+                "description": (
+                    "Flat list of BOM relationships. Each entry:\n"
+                    "  parent_pn (str, required) — part number of the parent assembly.\n"
+                    "  child_pn  (str, required) — part number of the child component.\n"
+                    "  qty       (number, required) — quantity of child_pn used in "
+                    "one unit of parent_pn."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "parent_pn": {"type": "string"},
+                        "child_pn": {"type": "string"},
+                        "qty": {"type": "number"},
+                    },
+                    "required": ["parent_pn", "child_pn", "qty"],
+                },
+            },
+            "names": {
+                "type": "object",
+                "description": (
+                    "Optional map of part_number → human-readable name.  "
+                    "Used to populate parent_name in each entry."
+                ),
+                "additionalProperties": {"type": "string"},
+            },
+        },
+        "required": ["component_pn", "relationships"],
+    },
+)
+
+
+@register(plm_component_whereused_spec)
+async def run_plm_component_whereused(ctx, args: bytes) -> str:
+    """Tool handler for plm_component_whereused (ISO 10303-44 + APICS where-used)."""
+    import json as _json
+    try:
+        a = _json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+    component_pn = a.get("component_pn", "")
+    raw_relationships = a.get("relationships")
+    names = a.get("names") or {}
+
+    if not component_pn:
+        return err_payload("'component_pn' is required", "BAD_ARGS")
+    if not isinstance(raw_relationships, list):
+        return err_payload("'relationships' must be an array", "BAD_ARGS")
+    if not isinstance(names, dict):
+        return err_payload("'names' must be an object", "BAD_ARGS")
+
+    from kerf_plm.component_whereused import BomRelationship, find_component_whereused
+
+    try:
+        relationships = []
+        for i, raw in enumerate(raw_relationships):
+            if not isinstance(raw, dict):
+                return err_payload(f"relationships[{i}] must be an object", "BAD_ARGS")
+            parent_pn = raw.get("parent_pn")
+            child_pn = raw.get("child_pn")
+            qty_raw = raw.get("qty")
+            if not parent_pn:
+                return err_payload(f"relationships[{i}].parent_pn is required", "BAD_ARGS")
+            if not child_pn:
+                return err_payload(f"relationships[{i}].child_pn is required", "BAD_ARGS")
+            if qty_raw is None:
+                return err_payload(f"relationships[{i}].qty is required", "BAD_ARGS")
+            try:
+                qty = float(qty_raw)
+            except (TypeError, ValueError) as exc:
+                return err_payload(f"relationships[{i}].qty must be a number: {exc}", "BAD_ARGS")
+            relationships.append(BomRelationship(parent_pn=parent_pn, child_pn=child_pn, qty=qty))
+    except Exception as exc:
+        return err_payload(f"invalid relationships: {exc}", "BAD_ARGS")
+
+    try:
+        report = find_component_whereused(component_pn, relationships, names=names)
+    except ValueError as exc:
+        return err_payload(str(exc), "CYCLE_DETECTED")
+    except Exception as exc:
+        return err_payload(f"where-used error: {exc}", "ANALYSIS_ERROR")
+
+    return ok_payload({
+        "component_pn": report.component_pn,
+        "num_unique_parents": report.num_unique_parents,
+        "num_total_usages": report.num_total_usages,
+        "max_depth": report.max_depth,
+        "honest_caveat": report.honest_caveat,
+        "entries": [
+            {
+                "parent_pn": e.parent_pn,
+                "parent_name": e.parent_name,
+                "qty": e.qty,
+                "level": e.level,
+            }
+            for e in report.entries
+        ],
+    })

@@ -6089,6 +6089,19 @@
         },
         {
           "domain": "D14",
+          "feature": "Component Where-Used Report — flat BOM inverse traversal with qty and level (ISO 10303-44 + APICS 'where-used')",
+          "competitor": {
+            "status": "partial",
+            "note": "Component where-used available only through full PDM/PLM add-ons; not natively available in base modeller from flat BOM input."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Given a flat list of BomRelationship(parent_pn, child_pn, qty), BFS upward from queried component to root assemblies. WhereUsedReport: component_pn, num_unique_parents, num_total_usages, max_depth, entries (WhereUsedEntry: parent_pn, parent_name, qty, level). Qty aggregation: multiple rows for same (parent, child) summed. Diamond BOM: shallowest BFS level wins. Cycle detection raises ValueError. Honest-flagged: in-memory traversal — no DB pagination, live PDM sync, effectivity filtering, or path-multiplied extended-qty. LLM tool: plm_component_whereused. 17 tests.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/component_whereused.py"
+          }
+        },
+        {
+          "domain": "D14",
           "feature": "Document Version Diff — controlled document delta (ISO 10303-44 §5.2 + Borst-Lahti §6.3)",
           "competitor": {
             "status": "no",
@@ -7006,6 +7019,19 @@
         },
         {
           "domain": "D14",
+          "feature": "Component Where-Used Report — flat BOM inverse traversal with qty and level (ISO 10303-44 + APICS 'where-used')",
+          "competitor": {
+            "status": "partial",
+            "note": "Component where-used available only through full PDM/PLM add-ons; not natively available in base modeller from flat BOM input."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Given a flat list of BomRelationship(parent_pn, child_pn, qty), BFS upward from queried component to root assemblies. WhereUsedReport: component_pn, num_unique_parents, num_total_usages, max_depth, entries (WhereUsedEntry: parent_pn, parent_name, qty, level). Qty aggregation: multiple rows for same (parent, child) summed. Diamond BOM: shallowest BFS level wins. Cycle detection raises ValueError. Honest-flagged: in-memory traversal — no DB pagination, live PDM sync, effectivity filtering, or path-multiplied extended-qty. LLM tool: plm_component_whereused. 17 tests.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/component_whereused.py"
+          }
+        },
+        {
+          "domain": "D14",
           "feature": "Document Version Diff — controlled document delta (ISO 10303-44 §5.2 + Borst-Lahti §6.3)",
           "competitor": {
             "status": "no",
@@ -7878,6 +7904,19 @@
             "status": "yes",
             "note": "Where-Used Analysis: reverse-traverses the assembly hierarchy from a target part. Returns all parent assemblies with occurrence multiplicity and depth (depth=1 immediate parent, depth=2 grandparent, …). Cycle detection with cap at depth=20. LLM tool: plm_where_used.",
             "evidence": "packages/kerf-plm/src/kerf_plm/where_used.py"
+          }
+        },
+        {
+          "domain": "D14",
+          "feature": "Component Where-Used Report — flat BOM inverse traversal with qty and level (ISO 10303-44 + APICS 'where-used')",
+          "competitor": {
+            "status": "partial",
+            "note": "Component where-used available only through full PDM/PLM add-ons; not natively available in base modeller from flat BOM input."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Given a flat list of BomRelationship(parent_pn, child_pn, qty), BFS upward from queried component to root assemblies. WhereUsedReport: component_pn, num_unique_parents, num_total_usages, max_depth, entries (WhereUsedEntry: parent_pn, parent_name, qty, level). Qty aggregation: multiple rows for same (parent, child) summed. Diamond BOM: shallowest BFS level wins. Cycle detection raises ValueError. Honest-flagged: in-memory traversal — no DB pagination, live PDM sync, effectivity filtering, or path-multiplied extended-qty. LLM tool: plm_component_whereused. 17 tests.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/component_whereused.py"
           }
         },
         {
@@ -9737,6 +9776,19 @@
         },
         {
           "domain": "D14",
+          "feature": "Component Where-Used Report — flat BOM inverse traversal with qty and level (ISO 10303-44 + APICS 'where-used')",
+          "competitor": {
+            "status": "partial",
+            "note": "Component where-used available only through full PDM/PLM add-ons; not natively available in base modeller from flat BOM input."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Given a flat list of BomRelationship(parent_pn, child_pn, qty), BFS upward from queried component to root assemblies. WhereUsedReport: component_pn, num_unique_parents, num_total_usages, max_depth, entries (WhereUsedEntry: parent_pn, parent_name, qty, level). Qty aggregation: multiple rows for same (parent, child) summed. Diamond BOM: shallowest BFS level wins. Cycle detection raises ValueError. Honest-flagged: in-memory traversal — no DB pagination, live PDM sync, effectivity filtering, or path-multiplied extended-qty. LLM tool: plm_component_whereused. 17 tests.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/component_whereused.py"
+          }
+        },
+        {
+          "domain": "D14",
           "feature": "Document Version Diff — controlled document delta (ISO 10303-44 §5.2 + Borst-Lahti §6.3)",
           "competitor": {
             "status": "no",
@@ -11072,6 +11124,19 @@
         },
         {
           "domain": "D14",
+          "feature": "Component Where-Used Report — flat BOM inverse traversal with qty and level (ISO 10303-44 + APICS 'where-used')",
+          "competitor": {
+            "status": "partial",
+            "note": "Component where-used available only through full PDM/PLM add-ons; not natively available in base modeller from flat BOM input."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Given a flat list of BomRelationship(parent_pn, child_pn, qty), BFS upward from queried component to root assemblies. WhereUsedReport: component_pn, num_unique_parents, num_total_usages, max_depth, entries (WhereUsedEntry: parent_pn, parent_name, qty, level). Qty aggregation: multiple rows for same (parent, child) summed. Diamond BOM: shallowest BFS level wins. Cycle detection raises ValueError. Honest-flagged: in-memory traversal — no DB pagination, live PDM sync, effectivity filtering, or path-multiplied extended-qty. LLM tool: plm_component_whereused. 17 tests.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/component_whereused.py"
+          }
+        },
+        {
+          "domain": "D14",
           "feature": "Document Version Diff — controlled document delta (ISO 10303-44 §5.2 + Borst-Lahti §6.3)",
           "competitor": {
             "status": "no",
@@ -12045,6 +12110,19 @@
             "status": "yes",
             "note": "Where-Used Analysis: reverse-traverses the assembly hierarchy from a target part. Returns all parent assemblies with occurrence multiplicity and depth (depth=1 immediate parent, depth=2 grandparent, …). Cycle detection with cap at depth=20. LLM tool: plm_where_used.",
             "evidence": "packages/kerf-plm/src/kerf_plm/where_used.py"
+          }
+        },
+        {
+          "domain": "D14",
+          "feature": "Component Where-Used Report — flat BOM inverse traversal with qty and level (ISO 10303-44 + APICS 'where-used')",
+          "competitor": {
+            "status": "partial",
+            "note": "Component where-used available only through full PDM/PLM add-ons; not natively available in base modeller from flat BOM input."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Given a flat list of BomRelationship(parent_pn, child_pn, qty), BFS upward from queried component to root assemblies. WhereUsedReport: component_pn, num_unique_parents, num_total_usages, max_depth, entries (WhereUsedEntry: parent_pn, parent_name, qty, level). Qty aggregation: multiple rows for same (parent, child) summed. Diamond BOM: shallowest BFS level wins. Cycle detection raises ValueError. Honest-flagged: in-memory traversal — no DB pagination, live PDM sync, effectivity filtering, or path-multiplied extended-qty. LLM tool: plm_component_whereused. 17 tests.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/component_whereused.py"
           }
         },
         {
@@ -13789,8 +13867,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Seidel aberrations S1-S5 (corrected 2026-05-24); no Zernike decomposition. MTF across field: ray-bundle PSF histogram + numpy.fft.rfft; tangential MTF at arbitrary field angles; BK7 biconvex off-axis MTF drop verified (coma+astigmatism); LLM tool optics_mtf_across_field. Monochromatic only; polychromatic MTF = integral W(lambda) MTF(lambda) dlambda -- not implemented.",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/mtf_across_field.py"
+            "note": "Seidel aberrations S_I..S_V (five Seidel coefficients, Welford 1986 §6.2 / Born & Wolf §5.3); Zernike polynomial wavefront fitting (OPTICS-ZERNIKE-WAVEFRONT-FIT): first 15 Noll-ordered terms (j=1..15, piston through tetrafoil); explicit Z_j(ρ,θ) formulas (Noll 1976 Table 1 orthonormal basis); least-squares fit via numpy.linalg.lstsq; RMS residual in waves; dominant aberration = argmax(|c_j|) for j≥2 (piston excluded); LLM tool optics_fit_zernike_wavefront; 32 hermetic tests. MTF across field: ray-bundle PSF histogram + numpy.fft.rfft; tangential MTF at arbitrary field angles; BK7 biconvex off-axis MTF drop verified; LLM tool optics_mtf_across_field. Honest: Zernike fit is first 15 terms only (unit-disk pupil; no higher-order surface fitting; no wavefront OPD tracing -- sampled W(ρ,θ) input only). Ref: Noll (1976) J. Opt. Soc. Am. 66 207; Born & Wolf §9.2; Wyant & Creath (1992).",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/zernike_fit.py; packages/kerf-cad-core/src/kerf_cad_core/optics/seidel_aberrations.py"
           }
         },
         {

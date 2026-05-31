@@ -429,3 +429,20 @@ def _register_tools(ctx, provides: list) -> None:
         logger.warning(
             "kerf-firmware: failed to load firmware_check_uart_baud_drift tool: %s", exc
         )
+
+    # firmware_check_watchdog_interval — MCU watchdog timeout interval verifier
+    try:
+        from kerf_firmware.tools.firmware_check_watchdog_interval import (
+            _spec as _wdg_spec,
+            run_firmware_check_watchdog_interval_async as _wdg_fn,
+        )
+        ctx.tools.register(
+            "firmware_check_watchdog_interval",
+            _wdg_spec,
+            _wdg_fn,
+        )
+        provides.append("firmware.watchdog_interval_check")
+    except Exception as exc:
+        logger.warning(
+            "kerf-firmware: failed to load firmware_check_watchdog_interval tool: %s", exc
+        )

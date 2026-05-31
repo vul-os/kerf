@@ -40,7 +40,11 @@ The sector work only matters if you **own your work, are not locked in, and can 
 
 ## What shipped
 
-### Latest delta — 2026-05-30
+### Latest delta — 2026-05-31
+
+**Firmware watchdog interval checker** ✅ — `firmware_check_watchdog_interval` LLM tool: computes actual IWDG/WDT timeout (`prescaler × (reload+1) / clock_hz`) and verifies it covers the application's worst-case loop latency with a 2× minimum safety margin (ARM Keil AN259). STM32F411 IWDG (RM0383 §17) + ATmega328P WDT (§11) supported. Reports `actual_timeout_ms`, `headroom_ms`, `safety_margin_pct`, `adequate`, and — when inadequate — `recommended_reload` sized for exactly 2.5× margin. HONEST: assumes ideal LSI/internal RC at nominal frequency; STM32F411 LSI ±10–15% over temperature/process, ATmega WDT ±10–15%; real margin should subtract ≥10%. WWDG window constraint NOT modelled. 40 tests — `packages/kerf-firmware/src/kerf_firmware/watchdog_interval_check.py`.
+
+### Previous delta — 2026-05-30
 
 **Compare-matrix flip pass** ✅ — Comprehensive audit of `compare-manifest.json` against 50+ SHAs shipped since 2026-05-29. 45 Kerf rows flipped from `partial`/`no` → `yes` across 14 competitor pages: clash-detection UI (`ClashPanel.jsx`, SHA 0c78f08d) → Fusion/SolidWorks/FreeCAD; assembly-motion UI (`AssemblyMotionPanel.jsx`, SHA 567cc619) → Fusion/SolidWorks/Inventor; 5-axis CAM UI (`CAMView.jsx`, SHA f18c927c) → SolidWorks/FreeCAD; GD&T toolbar + 3D PMI (`GdntToolbar.jsx` + `Pmi3DOverlay.jsx`, SHA 0d74e89c) → SolidWorks/Onshape/Inventor/Creo/FreeCAD/Blender; FEA solve panels (linear-static/modal/buckling/fatigue/vibration, SHA 7e2530e8) → SolidWorks/Onshape; nonlinear static Total-Lagrangian + arc-length (SHA 709fa568) + explicit dynamics (SHA 8b7ad261) → SolidWorks nonlinear row; dental UI (SHA 480afca5) + watertight surgical guide (SHA 163fcf75) → Fusion dental + all 3Shape rows; AFP CNC export (SHA 730f05c6) + laminate weight UI (SHA 9a222c43) → Fibersim; OpenFOAM bridge + k-ε RANS (SHAs c9008860, f9c33663) → OpenFOAM/SolidWorks/Onshape CFD; HVAC duct UI (SHA 9cbaec76) → SolidWorks HVAC; NURBS×NURBS boolean (SHA 419043fe) → Vectorworks NURBS; Gordon-surface guide-rail loft (SHA a468c5e1) → Creo NURBS; daylighting tool → IES-VE no→partial. 165 rows remain partial/no (interactive PCB routing, archviz rendering, entertainment design, federated BIM XRef, etc. — legitimately not shipped).
 

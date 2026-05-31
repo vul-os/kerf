@@ -3851,6 +3851,19 @@
         },
         {
           "domain": "D6",
+          "feature": "Watchdog timeout interval check (IWDG/WDT: prescaler \u00d7 (reload+1) / clock vs 2\u00d7 worst-case loop latency)",
+          "competitor": {
+            "status": "no",
+            "note": "No watchdog timeout interval verification built into OpenPLC or any standard EDA suite; engineers manually calculate IWDG/WDT timeout and check against loop latency"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "firmware_check_watchdog_interval: STM32F411 IWDG (RM0383 \u00a717) + ATmega328P WDT (\u00a711); timeout_s = prescaler\u00d7(reload+1)/clock_hz; adequate = timeout_ms > 2\u00d7worst_case_ms (ARM Keil AN259); reports actual_timeout_ms, headroom_ms, safety_margin_pct, adequate; recommends reload for 2.5\u00d7 margin when inadequate; 40 tests. HONEST: assumes ideal LSI/internal RC at nominal frequency \u2014 STM32F411 LSI \u00b110\u201315% over temperature/process (RM0383 Table 54), ATmega WDT \u00b110\u201315%; real margin should subtract \u226510%. WWDG window-watchdog upper-bound NOT modelled.",
+            "evidence": "packages/kerf-firmware/src/kerf_firmware/watchdog_interval_check.py"
+          }
+        },
+        {
+          "domain": "D6",
           "feature": "Schematic capture (KiCad round-trip, ERC)",
           "competitor": {
             "status": "no",

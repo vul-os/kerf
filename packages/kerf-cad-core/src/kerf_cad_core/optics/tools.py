@@ -2591,3 +2591,118 @@ async def run_compute_petzval_curvature(ctx: ProjectCtx, args: bytes) -> str:
     if isinstance(result, dict):
         return json.dumps(result)
     return ok_payload(result.to_dict())
+
+
+# ---------------------------------------------------------------------------
+# Tool: optics_compute_diffraction_mtf
+# ---------------------------------------------------------------------------
+
+from kerf_cad_core.optics.mtf_diffraction import (  # noqa: E402
+    MTFReport,
+    compute_diffraction_mtf,
+)
+
+_diffraction_mtf_spec = ToolSpec(
+    name="optics_compute_diffraction_mtf",
+    description=(
+        "Compute the diffraction-limited Modulation Transfer Function MTF(ν) for a\n"
+        "circular aperture as a function of spatial frequency (cyc/mm).\n"
+        "\n"
+        "Theory (Goodman 'Introduction to Fourier Optics' §6.4, eq. 6-49;\n"
+        "        Hecht 'Optics' 5e §11.3.3):\n"
+        "\n"
+        "  ν_0 = 1 / (λ · F#)               [diffraction cutoff, cyc/mm]\n"
+        "\n"
+        "  MTF(ν) = (2/π)·[arccos(ν/ν_0) − (ν/ν_0)·√(1−(ν/ν_0)²)]   ν ≤ ν_0\n"
+        "  MTF(ν) = 0                                                   ν > ν_0\n"
+        "\n"
+        "This is the theoretical UPPER BOUND for a perfect, aberration-free lens.\n"
+        "Any real system will have lower MTF due to aberrations, defocus, or sensor\n"
+        "blur.  See honest_caveat in the response.\n"
+        "\n"
+        "Parameters\n"
+        "----------\n"
+        "wavelength_nm         : wavelength of light in nm (e.g. 550 for green).\n"
+        "f_number              : F-number of the system (e.g. 4 for f/4).\n"
+        "num_samples           : frequency samples in [0, max_freq] (default 200).\n"
+        "max_freq_cyc_per_mm   : upper frequency limit (default 1.05 × ν_0).\n"
+        "\n"
+        "Returns\n"
+        "-------\n"
+        "cutoff_freq_cyc_per_mm : ν_0 = 1/(λ·F#) in cyc/mm.\n"
+        "mtf_curve              : list of [ν, MTF(ν)] pairs.\n"
+        "mtf_at_50_percent      : frequency at which MTF ≈ 0.50.\n"
+        "honest_caveat          : plain-English scope limitations.\n"
+        "\n"
+        "Analytic oracle (λ=550 nm, F/4):\n"
+        "  ν_0 = 454.5 cyc/mm; MTF(0)=1.0; MTF(ν_0)=0; MTF(ν_0/2)≈0.391.\n"
+        "\n"
+        "HONEST: diffraction-limited only — no aberrations, no defocus, no sensor MTF,\n"
+        "no polychromatic weighting, on-axis only, circular aperture only.\n"
+        "\n"
+        "Errors: {ok:false, reason} for invalid inputs. Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "wavelength_nm": {
+                "type": "number",
+                "description": (
+                    "Wavelength of light in nanometres (nm). "
+                    "E.g. 550 for green, 486 for blue (F-line), 656 for red (C-line). "
+                    "Must be > 0."
+                ),
+            },
+            "f_number": {
+                "type": "number",
+                "description": (
+                    "System F-number (f/#). E.g. 4 for f/4, 1.4 for f/1.4. "
+                    "Must be > 0."
+                ),
+            },
+            "num_samples": {
+                "type": "integer",
+                "description": (
+                    "Number of equally-spaced frequency samples from 0 to "
+                    "max_freq_cyc_per_mm. Default 200. Must be >= 2."
+                ),
+            },
+            "max_freq_cyc_per_mm": {
+                "type": "number",
+                "description": (
+                    "Upper frequency limit for the output curve (cyc/mm). "
+                    "If omitted, defaults to 1.05 × ν_0 so the zero-crossing "
+                    "is visible. Must be > 0 if provided."
+                ),
+            },
+        },
+        "required": ["wavelength_nm", "f_number"],
+    },
+)
+
+
+@register(_diffraction_mtf_spec, write=False)
+async def run_diffraction_mtf(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    for field_name in ("wavelength_nm", "f_number"):
+        if a.get(field_name) is None:
+            return json.dumps({"ok": False, "reason": f"{field_name} is required"})
+
+    kwargs: dict = {}
+    if "num_samples" in a:
+        kwargs["num_samples"] = int(a["num_samples"])
+    if "max_freq_cyc_per_mm" in a:
+        kwargs["max_freq_cyc_per_mm"] = float(a["max_freq_cyc_per_mm"])
+
+    result = compute_diffraction_mtf(
+        wavelength_nm=float(a["wavelength_nm"]),
+        f_number=float(a["f_number"]),
+        **kwargs,
+    )
+    if isinstance(result, dict):
+        return json.dumps(result)
+    return ok_payload(result.to_dict())

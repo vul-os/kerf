@@ -13861,6 +13861,20 @@
         },
         {
           "domain": "D12",
+          "feature": "Diffraction-limited MTF for circular aperture",
+          "competitor": {
+            "status": "yes",
+            "note": "Diffraction-limited MTF analysis: OTF/MTF/PTF for arbitrary pupil shapes; aberration-weighted MTF via wavefront integration; polychromatic MTF",
+            "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Diffraction-limited MTF for circular aperture (OPTICS-MTF-DIFFRACTION-LIMITED): closed-form on-axis MTF(ν) = (2/π)[arccos(ν/ν₀) − (ν/ν₀)·√(1−(ν/ν₀)²)] for ν ≤ ν₀, 0 otherwise; cutoff ν₀ = 1/(λ·F#) (Goodman §6.4 eq. 6-49; Hecht 5e §11.3.3); oracle: λ=550nm, F/4 → ν₀=454.5 cyc/mm, MTF(0)=1.0, MTF(ν₀/2)≈0.391 — all validated to <0.1%; mtf_at_50_percent Nyquist metric; LLM tool optics_compute_diffraction_mtf; 36 hermetic tests. Honest: diffraction-limited upper bound only — no aberrations (Seidel S_I–S_V), no defocus, no sensor MTF, no polychromatic weighting (polychromatic MTF = ∫W(λ)·MTF(λ)dλ, not implemented), on-axis only, circular aperture only.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/mtf_diffraction.py"
+          }
+        },
+        {
+          "domain": "D12",
           "feature": "Non-sequential ray tracing (stray light)",
           "competitor": {
             "status": "yes",

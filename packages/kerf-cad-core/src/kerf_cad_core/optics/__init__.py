@@ -58,6 +58,10 @@ from kerf_cad_core.optics.petzval_curvature import (
     PetzvalReport,
     compute_petzval_curvature,
 )
+from kerf_cad_core.optics.mtf_diffraction import (
+    MTFReport,
+    compute_diffraction_mtf,
+)
 
 __all__ = [
     "lensmaker",
@@ -83,4 +87,6 @@ __all__ = [
     "achromat_powers",
     "PetzvalReport",
     "compute_petzval_curvature",
+    "MTFReport",
+    "compute_diffraction_mtf",
 ]

@@ -52,6 +52,10 @@ Registers:
                (Beaumont 2007 §11.2 + White "Fluid Mechanics" §6.7
                 Darcy-Weisbach multi-segment cooling-channel pressure drop +
                 minor-loss K-factors; chiller pump head verification)
+  - LLM tool:  mold_optimize_runner_diameter
+               (Beaumont 2007 §6.5 + Menges 2001 §6.5 optimal cold-runner
+                diameter: D=(W^0.25×√L)/3.7 with material-viscosity
+                adjustment; cold-runner waste + fill-pressure proxy)
 """
 from __future__ import annotations
 
@@ -259,6 +263,18 @@ async def register(app: FastAPI, ctx):
         run_mold_compute_cooling_pressure_drop,
     )
 
+    # Register runner-diameter optimisation tool
+    # (Beaumont 2007 §6.5 + Menges 2001 §6.5)
+    from kerf_mold.runner_diameter_optimize_tool import (
+        mold_optimize_runner_diameter_spec,
+        run_mold_optimize_runner_diameter,
+    )
+    ctx.tools.register(
+        "mold_optimize_runner_diameter",
+        mold_optimize_runner_diameter_spec,
+        run_mold_optimize_runner_diameter,
+    )
+
     provides = [
         "mold.moldability",
         "mold.parting_surface",
@@ -281,6 +297,7 @@ async def register(app: FastAPI, ctx):
         "mold.cold_slug_check",
         "mold.vent_slot_layout",
         "mold.cooling_pressure_drop",
+        "mold.runner_diameter_optimize",
     ]
 
     try:

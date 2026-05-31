@@ -118,6 +118,11 @@ from kerf_mold.cooling_pressure_drop import (
     CoolingPressureDropReport,
     compute_cooling_pressure_drop,
 )
+from kerf_mold.runner_diameter_optimize import (
+    RunnerOptimizeSpec,
+    RunnerOptimizeReport,
+    optimize_runner_diameter,
+)
 
 __all__ = [
     # mold.py
@@ -221,4 +226,8 @@ __all__ = [
     "CoolantSpec",
     "CoolingPressureDropReport",
     "compute_cooling_pressure_drop",
+    # runner_diameter_optimize.py
+    "RunnerOptimizeSpec",
+    "RunnerOptimizeReport",
+    "optimize_runner_diameter",
 ]

@@ -2844,6 +2844,20 @@
           }
         },
         {
+          "name": "Buck DC-DC converter output voltage ripple (CCM)",
+          "domain": "D6",
+          "competitor": {
+            "status": "partial",
+            "notes": "Altium Designer has no built-in CCM ripple calculator; requires SPICE/SIwave simulation",
+            "source": "https://www.altium.com/documentation/altium-designer/signal-integrity"
+          },
+          "kerf": {
+            "status": "[x]",
+            "notes": "electronics_compute_buck_ripple: D=V_out/V_in; ΔiL=(V_in−V_out)·D/(L·f_sw); ΔV_cap=ΔiL/(8·C·f_sw); ΔV_ESR=ΔiL·ESR; ΔV_out=ΔV_cap+ΔV_ESR (worst-case linear sum, Erickson §2.4). CCM validity flag (iL_min=I_load−ΔiL/2>0); DCM warning; ESR-dominance flag; small-ripple approximation warning >30% load variation. Honest: CCM only — DCM NOT modelled; D=V_out/V_in ideal (no deadtime/drop); ESR flat (use datasheet at f_sw); linear sum pessimistic vs RSS. Refs: Erickson 3e §2.4; Sandler §3.",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/dc_dc_ripple.py"
+          }
+        },
+        {
           "name": "PCB thermal (board-level)",
           "domain": "D6",
           "competitor": {
@@ -10548,6 +10562,20 @@
             "status": "yes",
             "note": "Hagen-Poiseuille path-resistance balance checker (Beaumont 2007 §6.6 + Menges 2001 §6.6.4): R_norm = L/r⁴ per segment (μ cancels in ratios); path resistance summed sprue→gate via parent-pointer walk; max_imbalance_pct = 100×(R_max−R_min)/R_mean; balanced=True iff max_imbalance_pct < 5%; fill_ratio per cavity; LLM tool `mold_check_runner_balance`; 42 oracle tests; honest-flag: geometric resistance only — does NOT model temperature-dependent or shear-thinning viscosity, shear-heating asymmetry in graduated-diameter runners (Beaumont RPI runner), or transient filling inertia; use Moldflow/Moldex3D/SigmaSoft for full rheological fill simulation",
             "evidence": "packages/kerf-mold/src/kerf_mold/runner_balance_check.py"
+          }
+        },
+        {
+          "domain": "D7",
+          "feature": "Runner diameter optimisation (Beaumont empirical formula)",
+          "competitor": {
+            "status": "partial",
+            "note": "Cimatron includes runner diameter sizing tools based on empirical guidelines but does not expose the Beaumont §6.5 W^0.25×√L/3.7 formula explicitly; no polymer-specific viscosity adjustment or cold-runner waste output",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Beaumont (2007) §6.5 optimal runner diameter: D=(W^0.25×√L)/3.7 with material-viscosity adjustments (ABS+10%, PC+15%, PP-5%, PA66±0%); cold-runner waste (cylindrical volume × polymer density); fill-pressure proxy (Hagen-Poiseuille K_mat·L/D^4); LLM tool `mold_optimize_runner_diameter`; 28 oracle tests; HONEST: single runner segment only — does NOT optimise filling balance in multi-cavity molds; empirical formula only (not Hele-Shaw/Cross-WLF rheological simulation); fill-pressure is order-of-magnitude proxy; confirm with Moldflow/Moldex3D fill simulation + mold trial. Refs: Beaumont 2007 §6.5; Menges 2001 §6.5",
+            "evidence": "packages/kerf-mold/src/kerf_mold/runner_diameter_optimize.py"
           }
         },
         {

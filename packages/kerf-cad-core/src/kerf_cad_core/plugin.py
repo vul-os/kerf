@@ -109,6 +109,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.arch.diaphragm_shear_tools",  # arch_check_diaphragm_shear: AWC SDPWS-2021 §4.2 wood + SDI DDM04 metal-deck in-plane shear (chord forces + deflection separate)
     "kerf_cad_core.arch.retaining_wall_stability_tools",  # arch_check_retaining_wall_stability: Rankine active Ka=tan²(45-φ/2); FoS_overt/slide/bearing (Bowles 5e §12.3; Das §13)
     "kerf_cad_core.arch.pier_axial_capacity_tools",     # arch_check_pier_axial: TMS 402-22 §8.3 + ACI 318-19 §22.4.2.2 masonry/RC pier axial capacity with h/r slenderness factor
+    "kerf_cad_core.arch.bearing_wall_axial_tools",     # arch_check_bearing_wall_axial: ACI 318-19 §11.5.3.1 + TMS 402-22 §8.3 plain/masonry bearing wall axial capacity + DCR
     "kerf_cad_core.civil.hydraulics_tools",
     "kerf_cad_core.tolstack.tools",
     "kerf_cad_core.kinematics.tools",

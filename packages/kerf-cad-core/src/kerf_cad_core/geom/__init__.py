@@ -1731,3 +1731,13 @@ from kerf_cad_core.geom.curve_inflection import (  # noqa: E402
     InflectionResult,
     find_curve_inflections,
 )
+# BREP-VERTEX-DEGREE-CHECK: count incident edges per vertex; flag boundary
+# (degree < expected) and non-manifold (degree > expected + 2) vertices.
+# Degree histogram + irregular vertex list for topology repair triage.
+# HONEST: edge-based degree only; does NOT analyse face-fan angular order
+# or non-manifold edges. Refs: Mantyla 1988 §3.4; Hoffmann 1989 §4.
+# LLM tool: brep_check_vertex_degrees.
+from kerf_cad_core.geom.vertex_degree_check import (  # noqa: E402
+    VertexDegreeReport,
+    check_vertex_degrees,
+)

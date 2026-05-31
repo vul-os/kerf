@@ -2926,8 +2926,8 @@
           },
           "kerf": {
             "status": "[x]",
-            "notes": "IPC-2221 trace ampacity calculator",
-            "evidence": "packages/kerf-electronics/src/kerf_electronics/tracecurrent/ampacity.py"
+            "notes": "IPC-2221B simplified trace current calculator (pcb_trace_current.py): I = k · ΔT^0.44 · A^0.725; k_ext=0.048, k_int=0.024; copper weights 0.5–3 oz; electronics_compute_pcb_trace_current LLM tool. Full IPC-2152 corrected model also available (tracecurrent_ipc2152 — copper-weight correction cf_cw, board-k correction cf_th, plane-proximity correction cf_pl). Honest: IPC-2221B simplified formula only; IPC-2152 detailed thermal curves not modelled in the simplified tool.",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/pcb_trace_current.py"
           }
         },
         {

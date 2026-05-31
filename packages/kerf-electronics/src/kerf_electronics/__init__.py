@@ -11,3 +11,8 @@ from kerf_electronics.wire_ampacity_derate import (  # noqa: F401
     DeratedAmpacityReport,
     compute_derated_ampacity,
 )
+from kerf_electronics.pcb_trace_current import (  # noqa: F401
+    PcbTraceSpec,
+    PcbTraceCurrentReport,
+    compute_pcb_trace_max_current,
+)

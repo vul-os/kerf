@@ -14265,8 +14265,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Chief-ray vignetting (OPTICS-CHIEF-RAY-VIGNETTING): marginal-ray bundle sampled around entrance pupil at each field angle; per-surface clear-aperture clipping check; relative illumination = surviving fraction; cos4(theta) photometric baseline; excess-vignetting ratio RI/cos4; LLM tool optics_compute_vignetting. Welford 1986 §4.5 / Hecht §6.6. Circular symmetric apertures; anamorphic/off-axis stops not modelled.",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/chief_ray_vignetting.py"
+            "note": "Chief-ray vignetting (OPTICS-CHIEF-RAY-VIGNETTING): marginal-ray bundle sampled around entrance pupil at each field angle; per-surface clear-aperture clipping check; relative illumination = surviving fraction; cos4(theta) photometric baseline; excess-vignetting ratio RI/cos4; LLM tool optics_compute_vignetting. Welford 1986 §4.5 / Hecht §6.6. Circular symmetric apertures; anamorphic/off-axis stops not modelled. PLUS: vignetting fraction check (OPTICS-VIGNETTING-CHECK): LensClearApertureSpec + VignettingReport dataclasses; paraxial chief-ray displacement Δ=z·tan(θ); exact two-circle intersection area (Weisstein) of pupil disk vs per-surface CA disk; vignetting_pct = (1−A_eff/A_full)×100; limiting_surface_idx identified; LLM tool optics_compute_vignetting_check; 34 hermetic tests. Honest: paraxial only; circular CAs only; diffraction-induced vignetting NOT modelled; chromatic pupil walk NOT modelled. Ref: Welford 1986 §3.7; Hecht §5.7.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/vignetting_check.py"
           }
         },
         {

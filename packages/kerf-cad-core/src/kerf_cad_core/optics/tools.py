@@ -3379,3 +3379,127 @@ async def run_compute_seidel_coma(ctx: ProjectCtx, args: bytes) -> str:
     if isinstance(result, dict):
         return json.dumps(result)
     return ok_payload(result.to_dict())
+
+
+# ---------------------------------------------------------------------------
+# Tool: optics_compute_vignetting_check
+# ---------------------------------------------------------------------------
+
+from kerf_cad_core.optics.vignetting_check import (  # noqa: E402
+    LensClearApertureSpec,
+    VignettingReport as VignettingCheckReport,
+    compute_vignetting as compute_vignetting_check,
+)
+
+_vignetting_check_spec = ToolSpec(
+    name="optics_compute_vignetting_check",
+    description=(
+        "Compute the vignetting fraction (fraction of entrance-pupil area occluded\n"
+        "by clear-aperture limits) at a given field angle for a sequential lens\n"
+        "system.\n"
+        "\n"
+        "Theory (Welford 'Aberrations of Optical Systems' §3.7 / Hecht §5.7):\n"
+        "  For a field angle θ, the chief ray is displaced at each surface z_j by:\n"
+        "    Δ_j = z_j · tan(θ)     (paraxial, object at infinity, stop at z=0)\n"
+        "\n"
+        "  The effective entrance-pupil area at each surface is the intersection\n"
+        "  of two circles:\n"
+        "    • Entrance-pupil disk: radius R = marginal_ray_at_stop_mm, centred at 0\n"
+        "    • CA disk at surface j: radius r_j, centred at Δ_j\n"
+        "\n"
+        "  Using the exact two-circle intersection-area formula (Weisstein).\n"
+        "\n"
+        "  vignetting_pct = (1 − A_eff / A_full) × 100\n"
+        "  where A_eff = minimum intersection area over all surfaces.\n"
+        "\n"
+        "HONEST FLAG:\n"
+        "  Paraxial chief-ray displacement only (no exact ray trace through glass).\n"
+        "  Circular, rotationally-symmetric CAs only.\n"
+        "  Diffraction-induced vignetting: NOT modelled.\n"
+        "  Chromatic pupil walk: NOT modelled.\n"
+        "\n"
+        "Surface specification (each element of 'surfaces'):\n"
+        "  clear_aperture_radius_mm : float  — physical rim half-diameter (mm). > 0.\n"
+        "  axial_position_mm        : float  — vertex Z along optical axis (mm).\n"
+        "                                       Stop assumed at z = 0.\n"
+        "\n"
+        "Returns:\n"
+        "  field_angle_deg       : input field angle (degrees)\n"
+        "  vignetting_pct        : % of pupil area blocked [0, 100]\n"
+        "  limiting_surface_idx  : surface index causing max vignetting (null if none)\n"
+        "  effective_pupil_area_pct : surviving pupil area % [0, 100]\n"
+        "  honest_caveat         : scope disclaimer\n"
+        "\n"
+        "Errors: {ok:false, reason} for invalid inputs. Never raises.\n"
+        "\n"
+        "References: Welford (1986) §3.7; Hecht (2017) §5.7."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "surfaces": {
+                "type": "array",
+                "description": (
+                    "Ordered list of surface dicts for the lens system. "
+                    "Each must have: "
+                    "clear_aperture_radius_mm (float, > 0, mm) and "
+                    "axial_position_mm (float, mm). "
+                    "The aperture stop should be at axial_position_mm = 0."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "clear_aperture_radius_mm": {
+                            "type": "number",
+                            "description": "Physical rim half-diameter (mm). Must be > 0.",
+                        },
+                        "axial_position_mm": {
+                            "type": "number",
+                            "description": "Surface vertex Z position along optical axis (mm).",
+                        },
+                    },
+                    "required": ["clear_aperture_radius_mm", "axial_position_mm"],
+                },
+            },
+            "field_angle_deg": {
+                "type": "number",
+                "description": (
+                    "Field angle in degrees. 0 = on-axis. Range: (-90, +90). "
+                    "Typical: 0–30° for most lens systems."
+                ),
+            },
+            "marginal_ray_at_stop_mm": {
+                "type": "number",
+                "description": (
+                    "Entrance-pupil half-diameter (mm). Default 10.0 mm. Must be > 0. "
+                    "Should be <= the clear_aperture_radius_mm of the aperture-stop surface."
+                ),
+            },
+        },
+        "required": ["surfaces", "field_angle_deg"],
+    },
+)
+
+
+@register(_vignetting_check_spec, write=False)
+async def run_compute_vignetting_check(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    if a.get("surfaces") is None:
+        return json.dumps({"ok": False, "reason": "surfaces is required"})
+    if a.get("field_angle_deg") is None:
+        return json.dumps({"ok": False, "reason": "field_angle_deg is required"})
+
+    spec = LensClearApertureSpec(surfaces=a["surfaces"])
+
+    kwargs: dict = {}
+    if "marginal_ray_at_stop_mm" in a:
+        kwargs["marginal_ray_at_stop_mm"] = float(a["marginal_ray_at_stop_mm"])
+
+    result = compute_vignetting_check(spec, a["field_angle_deg"], **kwargs)
+    if isinstance(result, dict):
+        return json.dumps(result)
+    return ok_payload(result.to_dict())

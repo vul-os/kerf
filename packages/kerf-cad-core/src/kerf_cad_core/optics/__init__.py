@@ -83,6 +83,11 @@ from kerf_cad_core.optics.seidel_coma import (
     SeidelComaReport,
     compute_seidel_coma,
 )
+from kerf_cad_core.optics.vignetting_check import (
+    LensClearApertureSpec,
+    VignettingReport as VignettingCheckReport,
+    compute_vignetting as compute_vignetting_check,
+)
 
 __all__ = [
     "lensmaker",
@@ -121,4 +126,7 @@ __all__ = [
     "analyze_wavefront_alignment",
     "SeidelComaReport",
     "compute_seidel_coma",
+    "LensClearApertureSpec",
+    "VignettingCheckReport",
+    "compute_vignetting_check",
 ]

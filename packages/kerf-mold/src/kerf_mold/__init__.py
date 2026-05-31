@@ -161,6 +161,11 @@ from kerf_mold.core_pin_cooling import (
     CorePinCoolingReport,
     design_core_pin_cooling,
 )
+from kerf_mold.tunnel_gate_design import (
+    TunnelGateSpec,
+    TunnelGateReport,
+    design_tunnel_gate,
+)
 
 __all__ = [
     # mold.py
@@ -300,4 +305,8 @@ __all__ = [
     "CorePinSpec",
     "CorePinCoolingReport",
     "design_core_pin_cooling",
+    # tunnel_gate_design.py
+    "TunnelGateSpec",
+    "TunnelGateReport",
+    "design_tunnel_gate",
 ]

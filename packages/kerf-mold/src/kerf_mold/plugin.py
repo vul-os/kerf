@@ -97,6 +97,15 @@ Registers:
                 HONEST: Euler non-conservative for K·L/d < 30 — use Johnson
                 formula in short-column regime; bushing friction and pin
                 eccentricity NOT modelled)
+  - LLM tool:  mold_design_tunnel_gate
+               (Beaumont 2007 §7.4 + Menges 2001 §6.6.5: tunnel/submarine
+                gate design — diameter from D=0.5·wall_thickness with
+                high-viscosity +10% correction; break-off force from
+                Menges Table 6.3 shear strength; shear rate via Hagen-
+                Poiseuille γ̇=4Q/(π·r³); shear limit 50000 s⁻¹; gate
+                freeze time from 1-D Fourier Chen-Chiang/Menges §7.3.3;
+                angle recommendation 30°–45° per Menges §6.6.5; HONEST:
+                Beaumont heuristic — multi-cavity timing needs Moldflow)
 """
 from __future__ import annotations
 
@@ -387,6 +396,18 @@ async def register(app: FastAPI, ctx):
         run_mold_design_core_pin_cooling,
     )
 
+    # Register tunnel (submarine) gate design tool
+    # (Beaumont 2007 §7.4 + Menges 2001 §6.6.5)
+    from kerf_mold.tunnel_gate_design_tool import (
+        mold_design_tunnel_gate_spec,
+        run_mold_design_tunnel_gate,
+    )
+    ctx.tools.register(
+        "mold_design_tunnel_gate",
+        mold_design_tunnel_gate_spec,
+        run_mold_design_tunnel_gate,
+    )
+
     provides = [
         "mold.moldability",
         "mold.parting_surface",
@@ -416,6 +437,7 @@ async def register(app: FastAPI, ctx):
         "mold.cooling_turbulent_re_check",
         "mold.ejector_pin_push",
         "mold.core_pin_cooling",
+        "mold.tunnel_gate_design",
     ]
 
     try:

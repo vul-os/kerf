@@ -11431,6 +11431,20 @@
         },
         {
           "domain": "D7",
+          "feature": "Tunnel (submarine) gate design — diameter, break-off force, shear rate, freeze time",
+          "competitor": {
+            "status": "partial",
+            "note": "Cimatron Mold Wizard provides tunnel-gate geometry wizard (diameter, angle inputs) but does not expose standalone analytical calculations for break-off force, gate shear rate, or gate freeze time; full fill simulation requires separate Autodesk Moldflow product",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Tunnel gate design (Beaumont 2007 §7.4 + Menges 2001 §6.6.5): D = 0.5×wall_thickness; +10% viscosity correction for PC/PA66/PMMA/POM/PEI/PPO; lower bound 0.8 mm; upper cap 2/3×wall. Break-off force: F = τ_shear × π/4·D² (Menges Table 6.3: ABS=30, PC=45, PP=22, PA66=40 MPa). Shear rate: γ̇ = 4Q/(π·r³) Hagen-Poiseuille; limit 50000 s⁻¹. Freeze time: Chen-Chiang/Menges §7.3.3 1-D Fourier. Angle: 30° flexible / 45° stiff (Menges §6.6.5). Oracle: ABS 30 g, wall 2 mm → D=1.0 mm, F_break=23.6 N, freeze≈1.42 s. LLM tool `mold_design_tunnel_gate`; 35 tests. HONEST: Beaumont heuristic — multi-cavity timing and fill-pressure balance require Moldflow/Moldex3D 3-D fill simulation; shear rate is Newtonian (actual shear-thinning 1.25–1.5× higher); freeze time is 1-D constant-diffusivity (PP/PA66/POM 15–25% longer due to crystallisation latent heat); confirm by mold trial",
+            "evidence": "packages/kerf-mold/src/kerf_mold/tunnel_gate_design.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "Demolding (ejection) force estimation",
           "competitor": {
             "status": "partial",

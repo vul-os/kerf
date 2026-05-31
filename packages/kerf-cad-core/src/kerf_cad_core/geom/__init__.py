@@ -605,6 +605,13 @@ from kerf_cad_core.geom.offset_distance_field import (
     DistanceFieldResult,
     compute_offset_distance_field,
 )
+# NURBS-CURVE-FOOTPRINT-ON-PLANE: orthographic projection of a 3-D NurbsCurve onto a plane
+# (Piegl & Tiller §6.1; Mortenson §4.4) — drawing-projection, CNC toolpath flattening, PV layout
+from kerf_cad_core.geom.curve_footprint_on_plane import (
+    FootprintResult,
+    project_curve_to_plane,
+    lift_footprint_to_3d,
+)
 
 __all__ = [
     "read_3dm","write_3dm","Rhino3dmReadError",
@@ -1129,6 +1136,10 @@ __all__ = [
     # SUBD-LIMIT-MESH-EXPORT-OBJ
     "export_limit_to_obj",
     "parse_subd_obj",
+    # NURBS-CURVE-FOOTPRINT-ON-PLANE: orthographic projection → 2-D UV footprint
+    "FootprintResult",
+    "project_curve_to_plane",
+    "lift_footprint_to_3d",
 ]
 
 # Variable-section edge blend (Vida-Martin-Varady 1994 §4)

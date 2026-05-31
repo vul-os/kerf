@@ -58,6 +58,9 @@ _TOOL_MODULES = [
     "kerf_cad_core.gears",
     "kerf_cad_core.geom.surface_boolean_robust",
     "kerf_cad_core.geom.nurbs_boolean",
+    # NURBS-CURVE-FOOTPRINT-ON-PLANE: orthographic projection of a 3-D NurbsCurve onto a plane
+    # (Piegl & Tiller §6.1; Mortenson §4.4) — nurbs_curve_project_to_plane LLM tool
+    "kerf_cad_core.geom.curve_footprint_on_plane",
     # NURBS-CURVE-CURVATURE-OSCULATING-CIRCLE: osculating circle at param t
     "kerf_cad_core.geom.osculating_circle",
     # BREP-FACE-DEVELOPABLE-CHECK: K=0 sampling test (do Carmo §3.6; Pottmann-Wallner §4)

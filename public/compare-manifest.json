@@ -4043,6 +4043,20 @@
           }
         },
         {
+          "name": "NURBS curve footprint on plane (orthographic projection to 2-D)",
+          "domain": "D01",
+          "competitor": {
+            "status": "no",
+            "source": "https://wiki.freecad.org/Part_Module",
+            "note": "No native NURBS-curve-to-plane perpendicular projection producing a 2-D footprint NurbsCurve in UV coordinates"
+          },
+          "kerf": {
+            "status": "partial",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_footprint_on_plane.py",
+            "note": "project_curve_to_plane(curve, plane_point, plane_normal) -> FootprintResult; orthographic (linear) projection preserving degree, knots, and weights exactly (P&T §6.1 Theorem 6.1); FootprintResult.footprint_curve_2d is a NurbsCurve in plane-local UV coordinates; degenerate flag for perpendicular curves; lift_footprint_to_3d inverse; LLM tool nurbs_curve_project_to_plane; 17 hermetic tests. HONEST: orthographic only — no perspective; for rational NURBS the footprint CPs are correct homogeneous images but the Euclidean evaluated curve may differ from a naive point-by-point projection. Refs: Piegl & Tiller §6.1; Mortenson §4.4."
+          }
+        },
+        {
           "name": "Clothoid / Fresnel curve re-parameterization (road/rail transition)",
           "domain": "D01",
           "competitor": {

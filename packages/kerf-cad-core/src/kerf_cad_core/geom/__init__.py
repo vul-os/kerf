@@ -638,6 +638,15 @@ from kerf_cad_core.geom.principal_curvature_viz import (
     sample_principal_curvatures,
 )
 
+# NURBS-SURFACE-CURVATURE-MAP: scalar Gaussian/mean/|κ₁|/|κ₂| heatmap
+# Complementary to principal_curvature_viz (scalar field vs per-sample κ₁/κ₂)
+# (do Carmo §3.3 / Mortenson §6.5) — nurbs_sample_surface_curvature_map LLM tool
+from kerf_cad_core.geom.surface_curvature_map import (
+    CurvatureMapSpec,
+    CurvatureMapResult,
+    sample_surface_curvature_map,
+)
+
 # BREP-WIRE-CLOSED-CHECK: ordered edge-list closure + planarity (Mantyla §3; Hoffmann §4)
 from kerf_cad_core.geom.wire_closed_check import (
     EdgeSegment,
@@ -1187,6 +1196,10 @@ __all__ = [
     # NURBS-CURVE-INFLECTION: κ-sign change inflection point detection
     "InflectionResult",
     "find_curve_inflections",
+    # NURBS-SURFACE-CURVATURE-MAP: scalar K/H/|κ₁|/|κ₂| heatmap (do Carmo §3.3 / Mortenson §6.5)
+    "CurvatureMapSpec",
+    "CurvatureMapResult",
+    "sample_surface_curvature_map",
     # BREP-WIRE-CLOSED-CHECK: ordered edge-list closure + planarity (Mantyla §3; Hoffmann §4)
     "EdgeSegment",
     "WireCheckReport",

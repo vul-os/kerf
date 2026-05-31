@@ -115,6 +115,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.arch.lintel_design_tools",          # arch_design_lintel: AISC Table 3-23 + ACI 318-19 §9 + TMS 402-22 §5 lintel design (steel/RC/RM; 45° arching; L/240 or L/360)
     "kerf_cad_core.arch.anchor_bolt_pullout_tools",   # arch_check_anchor_pullout: ACI 318-19 §17.6 cast-in-place headed bolt tension — steel §17.6.1 + concrete breakout §17.6.2 + pullout §17.6.3
     "kerf_cad_core.arch.opening_in_wall_tools",       # arch_check_opening_in_wall: IBC §2308.4 + ACI 318-19 §11.5.3.1 + TMS 402-22 §8.3 wall opening tributary jamb load + capacity + lintel DCR
+    "kerf_cad_core.arch.slab_on_grade_tools",        # arch_check_slab_on_grade: ACI 360R-10 + Westergaard (1948) slab-on-grade concentrated interior load; l, σ_max, MR, DCR, joint spacing (30·h PCA rule)
     "kerf_cad_core.civil.hydraulics_tools",
     "kerf_cad_core.tolstack.tools",
     "kerf_cad_core.kinematics.tools",
@@ -484,6 +485,10 @@ _TOOL_MODULES = [
     # BREP-FACE-PRINCIPAL-CURVATURE-VIZ: sample κ₁, κ₂ over a B-rep Face UV grid;
     # SVG/PNG heatmap overlay (do Carmo §3.4 / Mortenson §6.5 / Pottmann-Wallner §4)
     "kerf_cad_core.geom.principal_curvature_viz",       # brep_face_principal_curvature_viz
+    # NURBS-SURFACE-CURVATURE-MAP: scalar Gaussian/mean/|κ₁|/|κ₂| heatmap over UV grid;
+    # viridis or RdBu colourmap; complements principal_curvature_viz (scalar field only)
+    # (do Carmo §3.3 / Mortenson §6.5) — nurbs_sample_surface_curvature_map LLM tool
+    "kerf_cad_core.geom.surface_curvature_map",         # nurbs_sample_surface_curvature_map
     # GK-P50: arc-length inversion (Newton–Raphson, chord-length param, even-spaced CAM)
     "kerf_cad_core.geom.arc_length_invert",
     # BREP-EDGE-CURVE-EXTEND: extend B-rep edge NurbsCurve beyond domain by ΔL mm,

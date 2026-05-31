@@ -2435,6 +2435,20 @@
           }
         },
         {
+          "name": "BOM maturity assessment (NASA TRL roll-up)",
+          "domain": "D6",
+          "competitor": {
+            "status": "no",
+            "notes": "No built-in TRL-based BOM maturity scoring; requires external systems engineering tooling (DOORS, Cameo, or custom spreadsheet)",
+            "tier": "paid"
+          },
+          "kerf": {
+            "status": "[x]",
+            "notes": "ComponentMaturity (trl_level 1\u20139, manufacturer_qualified, has_drawings, has_supplier, has_test_data); quantity-weighted average TRL roll-up to MaturityReport; blocker_count (TRL < 5); risk bands: \u22657 low / 5\u20136 medium / 3\u20134 high / <3 or any TRL\u22642 critical. LLM tool: plm_assess_bom_maturity. Honest caveat: TRL weighted average is a simplified proxy \u2014 real assessments also require test heritage, supplier CMMI/AS9100 capability, FMEA closure, and PPAP evidence; a single low-TRL component can block a programme regardless of the mean score. References: NASA SP-2016-6105 Rev 2; ISO/IEC 15288:2023 \u00a76.3; INCOSE SE Handbook v4 \u00a74.1. 24 tests.",
+            "evidence": "packages/kerf-plm/src/kerf_plm/maturity_check.py"
+          }
+        },
+        {
           "name": "Interactive PCB editing (route/place)",
           "domain": "D6",
           "competitor": {

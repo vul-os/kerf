@@ -185,18 +185,32 @@ async def register(app: FastAPI, ctx):
     except Exception:
         pass  # ecn-impact tool optional — fail silently if symbol missing.
 
+    # BOM Maturity Check (NASA TRL 1–9 + ISO/IEC 15288 §6.3).
+    try:
+        from kerf_plm.tools import (
+            plm_assess_bom_maturity_spec,
+            run_plm_assess_bom_maturity,
+        )
+        ctx.tools.register(
+            "plm_assess_bom_maturity",
+            plm_assess_bom_maturity_spec,
+            run_plm_assess_bom_maturity,
+        )
+    except Exception:
+        pass  # bom-maturity tool optional — fail silently if symbol missing.
+
     try:
         from kerf_core.plugin import PluginManifest
         return PluginManifest(
             name="plm",
             version="0.1.0",
-            provides=["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.sysml-traceability", "plm.xmi-export", "plm.where-used", "plm.document-version-diff", "plm.multi-cavity-effectivity", "plm.part-numbering-schema", "plm.change-notification-distribution", "plm.bom-cost-rollup", "plm.component-whereused", "plm.ecn-impact-analysis"],
+            provides=["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.sysml-traceability", "plm.xmi-export", "plm.where-used", "plm.document-version-diff", "plm.multi-cavity-effectivity", "plm.part-numbering-schema", "plm.change-notification-distribution", "plm.bom-cost-rollup", "plm.component-whereused", "plm.ecn-impact-analysis", "plm.bom-maturity-check"],
             depends=[],
         )
     except ImportError:
         return {
             "name": "plm",
             "version": "0.1.0",
-            "provides": ["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.multi-cavity-effectivity", "plm.part-numbering-schema", "plm.change-notification-distribution", "plm.bom-cost-rollup", "plm.component-whereused", "plm.ecn-impact-analysis"],
+            "provides": ["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.multi-cavity-effectivity", "plm.part-numbering-schema", "plm.change-notification-distribution", "plm.bom-cost-rollup", "plm.component-whereused", "plm.ecn-impact-analysis", "plm.bom-maturity-check"],
             "depends": [],
         }

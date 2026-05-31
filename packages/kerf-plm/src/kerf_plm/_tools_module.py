@@ -2234,3 +2234,183 @@ async def run_plm_analyze_ecn_impact(ctx, args: bytes) -> str:
         "affected_parent_tree": report.affected_parent_tree,
         "honest_caveat": report.honest_caveat,
     })
+
+
+# ---------------------------------------------------------------------------
+# plm_assess_bom_maturity
+# ---------------------------------------------------------------------------
+
+plm_assess_bom_maturity_spec = ToolSpec(
+    name="plm_assess_bom_maturity",
+    description=(
+        "Assess BOM completeness maturity using a NASA TRL-style (Technology "
+        "Readiness Level) scoring model rolled up to a parent assembly score.\n\n"
+        "References: NASA SP-2016-6105 Rev 2 (TRL 1–9); ISO/IEC 15288:2023 §6.3 "
+        "(system maturity); INCOSE SE Handbook v4 §4.1.\n\n"
+        "Supply a *parent_pn* (assembly part number), a *children* list "
+        "(one entry per child component with trl_level 1–9 and boolean "
+        "completeness flags), and an optional *qty_per_child* map.\n\n"
+        "Returns weighted_avg_trl, blocker_count (TRL < 5), risk_level "
+        "(low / medium / high / critical), recommendation, and honest_caveat.\n\n"
+        "Honest caveat: TRL weighted average is a simplified proxy. Real maturity "
+        "assessments also include test heritage, supplier capability maturity "
+        "(AS9100 / CMMI), demonstrated performance in operational environment, "
+        "FMEA closure, and PPAP evidence packages."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "parent_pn": {
+                "type": "string",
+                "description": "Part number of the parent assembly being assessed.",
+            },
+            "children": {
+                "type": "array",
+                "description": (
+                    "List of child component maturity records. Each record has:\n"
+                    "  part_number: str — unique part identifier.\n"
+                    "  trl_level: int 1–9 — NASA TRL score.\n"
+                    "  manufacturer_qualified: bool — holds AS9100 / QPL cert.\n"
+                    "  has_drawings: bool — released engineering drawing exists.\n"
+                    "  has_supplier: bool — confirmed supplier on record.\n"
+                    "  has_test_data: bool — DV/PV or acceptance test data exists."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "part_number": {"type": "string"},
+                        "trl_level": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9,
+                            "description": "NASA TRL 1–9.",
+                        },
+                        "manufacturer_qualified": {"type": "boolean"},
+                        "has_drawings": {"type": "boolean"},
+                        "has_supplier": {"type": "boolean"},
+                        "has_test_data": {"type": "boolean"},
+                    },
+                    "required": [
+                        "part_number",
+                        "trl_level",
+                        "manufacturer_qualified",
+                        "has_drawings",
+                        "has_supplier",
+                        "has_test_data",
+                    ],
+                },
+            },
+            "qty_per_child": {
+                "type": "object",
+                "description": (
+                    "Optional mapping of part_number → quantity in the assembly. "
+                    "Missing entries default to 1.0. Quantities must be > 0."
+                ),
+                "additionalProperties": {"type": "number"},
+            },
+        },
+        "required": ["parent_pn", "children"],
+    },
+)
+
+
+@register(plm_assess_bom_maturity_spec)
+async def run_plm_assess_bom_maturity(ctx, args: bytes) -> str:
+    """Tool handler for plm_assess_bom_maturity."""
+    import json as _json
+    try:
+        a = _json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+    parent_pn = a.get("parent_pn", "")
+    children_raw = a.get("children")
+    qty_raw = a.get("qty_per_child") or {}
+
+    if not parent_pn:
+        return err_payload("'parent_pn' is required", "BAD_ARGS")
+    if not isinstance(children_raw, list):
+        return err_payload("'children' must be an array", "BAD_ARGS")
+    if not isinstance(qty_raw, dict):
+        return err_payload("'qty_per_child' must be an object", "BAD_ARGS")
+
+    from kerf_plm.maturity_check import ComponentMaturity, assess_bom_maturity
+
+    # Parse children
+    children = []
+    for i, raw in enumerate(children_raw):
+        if not isinstance(raw, dict):
+            return err_payload(f"children[{i}] must be an object", "BAD_ARGS")
+        pn = raw.get("part_number")
+        trl_raw = raw.get("trl_level")
+        mfr_q = raw.get("manufacturer_qualified")
+        has_dr = raw.get("has_drawings")
+        has_sup = raw.get("has_supplier")
+        has_td = raw.get("has_test_data")
+
+        if not pn:
+            return err_payload(f"children[{i}].part_number is required", "BAD_ARGS")
+        if trl_raw is None:
+            return err_payload(f"children[{i}].trl_level is required", "BAD_ARGS")
+        for fname, fval in [
+            ("manufacturer_qualified", mfr_q),
+            ("has_drawings", has_dr),
+            ("has_supplier", has_sup),
+            ("has_test_data", has_td),
+        ]:
+            if fval is None:
+                return err_payload(
+                    f"children[{i}].{fname} is required", "BAD_ARGS"
+                )
+
+        try:
+            trl = int(trl_raw)
+        except (TypeError, ValueError) as exc:
+            return err_payload(
+                f"children[{i}].trl_level must be an integer: {exc}", "BAD_ARGS"
+            )
+
+        try:
+            comp = ComponentMaturity(
+                part_number=pn,
+                trl_level=trl,
+                manufacturer_qualified=bool(mfr_q),
+                has_drawings=bool(has_dr),
+                has_supplier=bool(has_sup),
+                has_test_data=bool(has_td),
+            )
+        except (TypeError, ValueError) as exc:
+            return err_payload(f"children[{i}] invalid: {exc}", "BAD_ARGS")
+
+        children.append(comp)
+
+    # Parse qty_per_child
+    qty_per_child: dict[str, float] = {}
+    for pn_key, qty_val in qty_raw.items():
+        try:
+            qty_f = float(qty_val)
+        except (TypeError, ValueError) as exc:
+            return err_payload(
+                f"qty_per_child['{pn_key}'] must be a number: {exc}", "BAD_ARGS"
+            )
+        qty_per_child[pn_key] = qty_f
+
+    try:
+        report = assess_bom_maturity(
+            parent_pn=parent_pn,
+            children=children,
+            qty_per_child=qty_per_child,
+        )
+    except (TypeError, ValueError) as exc:
+        return err_payload(str(exc), "BAD_ARGS")
+    except Exception as exc:
+        return err_payload(f"assessment error: {exc}", "ASSESSMENT_ERROR")
+
+    return ok_payload({
+        "parent_pn": report.parent_pn,
+        "weighted_avg_trl": report.weighted_avg_trl,
+        "blocker_count": report.blocker_count,
+        "risk_level": report.risk_level,
+        "recommendation": report.recommendation,
+        "honest_caveat": report.honest_caveat,
+    })

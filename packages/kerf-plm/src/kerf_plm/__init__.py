@@ -16,6 +16,9 @@ Public API:
         BomRelationship, WhereUsedEntry, WhereUsedReport,
         find_component_whereused,
     )
+    from kerf_plm.maturity_check import (
+        ComponentMaturity, MaturityReport, assess_bom_maturity,
+    )
 """
 
 from kerf_plm.configurator import (
@@ -51,6 +54,11 @@ from kerf_plm.ecn_impact_analysis import (
     EcnImpactReport,
     analyze_ecn_impact,
 )
+from kerf_plm.maturity_check import (
+    ComponentMaturity,
+    MaturityReport,
+    assess_bom_maturity,
+)
 
 __all__ = [
     "Rule",
@@ -76,4 +84,7 @@ __all__ = [
     "EcnInput",
     "EcnImpactReport",
     "analyze_ecn_impact",
+    "ComponentMaturity",
+    "MaturityReport",
+    "assess_bom_maturity",
 ]

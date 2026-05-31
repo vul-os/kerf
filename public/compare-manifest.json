@@ -2804,6 +2804,20 @@
           }
         },
         {
+          "name": "EMI power-line filter design (LC/RC)",
+          "domain": "D6",
+          "competitor": {
+            "status": "partial",
+            "notes": "Altium Designer has no built-in EMI power-line filter wizard; requires SPICE or external tools",
+            "source": "https://www.altium.com/documentation/altium-designer/signal-integrity"
+          },
+          "kerf": {
+            "status": "[x]",
+            "notes": "electronics_design_emi_filter: LC_low_pass (−40 dB/dec, f_c = f_t/10^(A/40), C=1/((2π·f_c)²·L)); PI_LC_L (π-section −60 dB/dec); RC_low_pass (−20 dB/dec); X2 E12 cap recommendation (IEC 60384-14). Honest: ideal passive only — no ESR/stray; DM-only; CISPR 22 Class B limits for context; accredited lab required for compliance. Refs: Ott §15.3; CISPR 22/EN 55022.",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/emi_filter_design.py"
+          }
+        },
+        {
           "name": "PCB thermal (board-level)",
           "domain": "D6",
           "competitor": {

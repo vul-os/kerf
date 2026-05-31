@@ -178,6 +178,9 @@ def _register_tools(ctx, provides: list) -> None:
         # Pierce crystal oscillator external load capacitor calculator
         # (NXP AN-2867 §3 + AVR ATmega §28.5: CL=(C1·C2)/(C1+C2)+C_stray)
         "kerf_electronics.crystal_load_cap",
+        # Passive LC / RC power-line EMI filter design — Ott §15.3 + CISPR 22
+        # electronics_design_emi_filter: corner freq, L, C, attenuation
+        "kerf_electronics.emi_filter_design",
     ]
 
     for module_path in tool_modules:

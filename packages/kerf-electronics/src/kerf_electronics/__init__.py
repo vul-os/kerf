@@ -27,3 +27,8 @@ from kerf_electronics.crystal_load_cap import (  # noqa: F401
     CrystalLoadCapReport,
     compute_crystal_load_caps,
 )
+from kerf_electronics.emi_filter_design import (  # noqa: F401
+    EmiFilterSpec,
+    EmiFilterReport,
+    design_emi_filter,
+)

@@ -88,6 +88,13 @@ from kerf_mold.gate_vestige_check import (
     COSMETIC_CLASS_LIMITS_MM,
     check_gate_vestige,
 )
+from kerf_mold.demold_force_check import (
+    MoldedPartSpec,
+    DemoldForceReport,
+    SHRINKAGE_STRESS_MPA,
+    FRICTION_COEFF,
+    compute_demold_force,
+)
 
 __all__ = [
     # mold.py
@@ -166,4 +173,10 @@ __all__ = [
     "GateVestigeReport",
     "COSMETIC_CLASS_LIMITS_MM",
     "check_gate_vestige",
+    # demold_force_check.py
+    "MoldedPartSpec",
+    "DemoldForceReport",
+    "SHRINKAGE_STRESS_MPA",
+    "FRICTION_COEFF",
+    "compute_demold_force",
 ]

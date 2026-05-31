@@ -31,6 +31,9 @@ Registers:
   - LLM tool:  mold_check_gate_vestige
                (Beaumont 2007 §7.6 + Table 7.4 + Menges 2001 §6.6 gate-vestige
                 estimation and cosmetic-class compliance check)
+  - LLM tool:  mold_compute_demold_force
+               (Beaumont 2007 §9.3 + Menges 2001 §7.4 + Table 7.6 demolding /
+                ejection force per cavity; ejector pin count verification)
 """
 from __future__ import annotations
 
@@ -178,6 +181,17 @@ async def register(app: FastAPI, ctx):
         mold_check_gate_vestige_spec,
         run_mold_check_gate_vestige,
     )
+    # Register demolding / ejection force tool
+    # (Beaumont 2007 §9.3 + Menges 2001 §7.4 + Table 7.6)
+    from kerf_mold.demold_force_check_tool import (
+        mold_compute_demold_force_spec,
+        run_mold_compute_demold_force,
+    )
+    ctx.tools.register(
+        "mold_compute_demold_force",
+        mold_compute_demold_force_spec,
+        run_mold_compute_demold_force,
+    )
 
     provides = [
         "mold.moldability",
@@ -196,6 +210,7 @@ async def register(app: FastAPI, ctx):
         "mold.cooling_time_chen_chiang",
         "mold.runner_balance_check",
         "mold.gate_vestige_check",
+        "mold.demold_force_check",
     ]
 
     try:

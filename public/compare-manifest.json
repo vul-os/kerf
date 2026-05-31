@@ -10071,6 +10071,20 @@
         },
         {
           "domain": "D7",
+          "feature": "Demolding (ejection) force estimation",
+          "competitor": {
+            "status": "partial",
+            "note": "Cimatron provides ejector-plate force output only as part of full fill simulation (Moldflow coupling); no standalone analytical formula tool",
+            "source": "https://www.cimatron.com/en/cimatron-mold"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Demolding force checker (Beaumont 2007 §9.3 + Menges 2001 §7.4 + Table 7.6): cavity-ejection formula F = μ·σ_h·A·cosα/(cosα + μ·sinα); shrinkage stress σ_h from Menges Table 7.6 (ABS=4.0, PC=3.0, PP=5.0, PA66=3.5, POM=4.5 MPa); friction μ from SPI finish class (SPI_A1=0.15 polished … SPI_D1=0.40 textured); ejector pin count = ceil(F / single_pin_capacity_N); LLM tool `mold_compute_demold_force`; 28 oracle tests; honest-flagged: empirical formula only — ignores chemical adhesion (resin stick, relevant for PC/POM on polished steel), undercut/side-action geometry, dynamic ejection force, and pin fatigue; confirm by mold-trial load-cell measurement",
+            "evidence": "packages/kerf-mold/src/kerf_mold/demold_force_check.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "Draft angle validation",
           "competitor": {
             "status": "yes",
@@ -14095,6 +14109,20 @@
             "status": "yes",
             "note": "Spot diagrams + pupil illumination maps (OPTICS-PUPIL-DIAGRAM): uniform pupil-grid ray trace (Welford 1986 \u00a78.2); per-field (x,y) intercepts at image plane; 2-D RMS and meridional y-only RMS spot radius; max ray distance from chief ray; exit-pupil illumination map (surviving pupil coords); paraxial exit-pupil position estimate (Welford 1986 \u00a73.5 / Hecht \u00a75.7); stigmatic stack RMS < 1e-6 mm; BK7 biconvex at 14deg y-RMS > 3x on-axis (coma verified); Seidel S_II cross-check; LLM tool optics_pupil_diagram. PLUS: OPTICS-SPOT-DIAGRAM \u2014 dedicated spot-diagram module: SpotDiagramResult dataclass (image_points_xy, rms_radius_mm, encircled_80pct_radius_mm, centroid_xy, svg_diagram, honest_caveat); geometric EE80 radius (Hecht \u00a76.3); Airy-disk reference ring (Hecht \u00a710.2); SVG with RMS/EE80/Airy rings + centroid + scale bar; LLM tool optics_compute_spot_diagram; 24 hermetic tests. Honest: monochromatic only; sagittal x = first-order paraxial estimate; no chromatic dispersion; single wavelength; stop at first surface. Ref: Hecht (2017) \u00a76.3, \u00a710.2; Welford (1986) \u00a75.2-5.3, \u00a76, \u00a78.2.",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/spot_diagram.py"
+          }
+        },
+        {
+          "domain": "D12",
+          "feature": "Aspheric surface sagitta z(r) + arrow chart (ISO 10110-12)",
+          "competitor": {
+            "status": "yes",
+            "note": "Aspheric surface editor with sag profile display and ISO 10110-12 export; supports conic, even asphere, Q-polynomial (Forbes), XY polynomial, and freeform (Zernike) surface types",
+            "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "Sagitta arrow chart (OPTICS-SAGITTA-ARROW-CHART): conic + even-power aspheric surface z(r) = c*r^2/(1+sqrt(1-(1+k)*c^2*r^2)) + sum(a_i*r^(2i+4)) sampled across clear aperture; SVG chart with radius/sagitta axes + slope arrow markers at every 5th sample (dz/dr); AsphericSurfaceSpec dataclass; SagittaArrowChartResult (sagitta_samples, max_sagitta_mm, conic_only_sagitta_mm, aspheric_contribution_mm, svg_chart, honest_caveat); sphere R=50 r=10 oracle z~1.0102 verified <1e-6; paraboloid k=-1 z=r^2/(2R) exact; hemisphere z=R at edge; domain-violation guard; LLM tool optics_compute_sagitta_arrow_chart; 28 hermetic tests. Honest: conic + even-power polynomial asphere ONLY (ISO 10110-12 S6.2); no Zernike / freeform / Q-polynomial / XY-polynomial / off-axis / tilted surfaces. Ref: Welford (1986) S3.3; ISO 10110-12:2019.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/sagitta_arrow_chart.py"
           }
         },
         {

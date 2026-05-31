@@ -50,6 +50,13 @@ cage_area
     0.94× cage-shrinkage ratio; per-face area distribution; degenerate face
     flagging (area < 1e-6 mm²).
     (Catmull-Clark 1978; Stam 1998 §2; Zorin-Schröder 2000 §3).
+stam_limit_tangents
+    GK-P12 SUBD-STAM-LIMIT-TANGENTS: exact limit tangent vectors at
+    extraordinary Catmull-Clark vertices (valence n != 4) using the
+    eigenstructure decomposition from Stam (1998) §3.2-3.3.
+    T_u = Σ cos(2πi/n)·(P_i − V_inf); T_v = Σ sin(2πi/n)·(P_i − V_inf);
+    N = T_u × T_v; approximate Gaussian and mean curvature estimates.
+    (Stam 1998 §3.2-3.3; Reif 1995; Meyer et al. 2003).
 """
 
 from kerf_cad_core.subd.limit_walk_cross_curve import (
@@ -89,6 +96,11 @@ from kerf_cad_core.subd.cage_area import (
     CageAreaReport,
     compute_cage_area,
 )
+from kerf_cad_core.subd.stam_limit_tangents import (
+    ExtraordinaryVertex,
+    LimitTangentReport,
+    compute_stam_limit_tangents,
+)
 
 __all__ = [
     "CrossCurveResult",
@@ -110,4 +122,7 @@ __all__ = [
     "SubdCage",
     "CageAreaReport",
     "compute_cage_area",
+    "ExtraordinaryVertex",
+    "LimitTangentReport",
+    "compute_stam_limit_tangents",
 ]

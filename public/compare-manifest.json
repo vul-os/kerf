@@ -19070,6 +19070,19 @@
         },
         {
           "domain": "D1",
+          "feature": "SubD exact limit tangents at extraordinary vertices (Stam 1998 §3.2-3.3)",
+          "competitor": {
+            "status": "no",
+            "note": "Maya/Blender/Rhino do not expose a closed-form programmatic API for the exact limit tangent vectors T_u, T_v at extraordinary (valence != 4) vertices using Stam 1998 eigenstructure; the surface is only C¹ there and most tools only sample finite-difference tangents."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "GK-P12: compute_stam_limit_tangents(ev) — closed-form exact limit tangents at extraordinary CC vertex using Stam (1998) §3.2-3.3 eigenstructure: V_inf = w_V·V + w_e·ΣP_i + w_f·ΣQ_i; T_u = Σ cos(2πi/n)·(P_i−V_inf); T_v = Σ sin(2πi/n)·(P_i−V_inf); N = T_u×T_v (unit, C¹ per Reif 1995); λ_n = (1/4)(1+cos(2π/n)) subdominant eigenvalue; approximate K (angle-deficit Gauss-Bonnet) and H (cotangent-weight Laplace-Beltrami); ExtraordinaryVertex + LimitTangentReport dataclasses; LLM tool subd_compute_stam_limit_tangents; re-exported from kerf_cad_core.subd; 30 tests green. DISTINCT from limit_normal_fit.py (face-grid sampling) — this is the closed-form formula AT the extraordinary vertex. HONEST: tangents EXACT per Stam §3.3; K/H estimates APPROXIMATE (CC surface is only C¹ at EV). Refs: Stam (1998) SIGGRAPH §3.2-3.3; Reif (1995) CAGD; Meyer et al. (2003) §3-4.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/subd/stam_limit_tangents.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "SubD control-cage surface area + CC limit-surface area estimate",
           "competitor": {
             "status": "no",

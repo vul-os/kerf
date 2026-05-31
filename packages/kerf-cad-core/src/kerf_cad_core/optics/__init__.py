@@ -118,6 +118,11 @@ from kerf_cad_core.optics.diffraction_psf import (
     DiffractionPSFReport,
     compute_diffraction_psf,
 )
+from kerf_cad_core.optics.lens_volume import (
+    SingletLensSpec,
+    LensVolumeReport,
+    compute_lens_volume,
+)
 
 __all__ = [
     "lensmaker",
@@ -177,4 +182,7 @@ __all__ = [
     "DiffractionPSFSpec",
     "DiffractionPSFReport",
     "compute_diffraction_psf",
+    "SingletLensSpec",
+    "LensVolumeReport",
+    "compute_lens_volume",
 ]

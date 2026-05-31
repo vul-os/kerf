@@ -15464,6 +15464,20 @@
         },
         {
           "domain": "D12",
+          "feature": "Singlet lens glass volume and weight (cost / weight budget)",
+          "competitor": {
+            "status": "yes",
+            "note": "Zemax OpticStudio reports lens volume and mass via 3D CAD export or macro scripting; built-in catalog includes glass densities",
+            "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "Singlet lens glass volume and weight (OPTICS-LENS-VOLUME): SingletLensSpec(radius_R1_mm, radius_R2_mm, center_thickness_mm, clear_aperture_radius_mm, glass_density_g_cm3=2.51) -> LensVolumeReport(volume_mm3, weight_g, edge_thickness_mm, sag1_mm, sag2_mm, lens_form, honest_caveat); sag h=|R|-sqrt(|R|^2-r^2) (Smith MOE §13.3 eq. 13.6 / Mahajan §1.2); cap V_cap=pi*h^2*(3|R|-h)/3; lens V=pi*r^2*ct +/- caps (Cartesian sign: convex subtracts, concave adds); oracle BK7 plano-convex R1=+100mm, R2=inf, ct=5mm, CA_r=12.5mm -> sag1=0.7843mm, V=2261.6mm^3, weight=5.677g verified analytically; lens_form in {biconvex, biconcave, plano_convex, plano_concave, meniscus, plano_plano}; BK7 density default 2.51 g/cm^3; LLM tool optics_compute_lens_volume; 35 hermetic tests. HONEST: SPHERICAL SURFACES ONLY -- aspheric sag h=Rc*r^2/(1+sqrt(1-(1+k)*c^2*r^2))+SUM(A_i*r^(2i)) requires numerical integration (out of scope); no AR coating mass (100-500 nm, negligible); homogeneous density (GRIN/melt-gradient differs <= 0.3%, Schott TIE-31); clear_aperture_radius != physical blank radius -- blank larger, weight higher. Ref: Smith (2008) §13.3; Mahajan (2011) §1.2; Schott TIE-31 (2023).",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/lens_volume.py"
+          }
+        },
+        {
+          "domain": "D12",
           "feature": "Wave optics / diffraction / polarisation",
           "competitor": {
             "status": "yes",

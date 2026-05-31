@@ -4210,3 +4210,139 @@ async def run_compute_diffraction_psf(ctx: "ProjectCtx", args: bytes) -> str:
     if isinstance(result, dict):
         return json.dumps(result)
     return ok_payload(result.to_dict())
+
+
+# ---------------------------------------------------------------------------
+# Tool: optics_compute_lens_volume  (OPTICS-LENS-VOLUME)
+# ---------------------------------------------------------------------------
+
+from kerf_cad_core.optics.lens_volume import (  # noqa: E402
+    SingletLensSpec,
+    LensVolumeReport,
+    compute_lens_volume,
+)
+
+_lens_volume_spec = ToolSpec(
+    name="optics_compute_lens_volume",
+    description=(
+        "Compute the glass volume (mm³) and weight (g) of a spherical-surface singlet\n"
+        "lens from its radii, center thickness, clear aperture, and glass density.\n"
+        "\n"
+        "Theory (Smith 'Modern Optical Engineering' §13.3 / Mahajan §1.2):\n"
+        "\n"
+        "  Sagitta:    h = |R| − √(|R|² − r²)          r = clear_aperture_radius\n"
+        "  Cap volume: V_cap = π·h²·(3·|R| − h) / 3\n"
+        "  Lens vol:   V = π·r²·t_c  ± V_cap1 ± V_cap2\n"
+        "\n"
+        "  Sign convention (Cartesian):\n"
+        "    R1 > 0: front surface convex toward object → subtract V_cap1\n"
+        "    R1 < 0: front surface concave toward object → add V_cap1\n"
+        "    R2 < 0: rear  surface convex toward image   → subtract V_cap2\n"
+        "    R2 > 0: rear  surface concave toward image  → add V_cap2\n"
+        "    R = ±∞ (use 1e18): flat (plano) surface, no cap contribution.\n"
+        "\n"
+        "  Weight = V × ρ    where ρ = glass_density_g_cm3 × 1e−3 g/mm³\n"
+        "\n"
+        "Depth-bar oracle (BK7 plano-convex):\n"
+        "  R1=+100 mm, R2=∞, t_c=5 mm, CA_r=12.5 mm, ρ=2.51 g/cm³\n"
+        "  → sag1 ≈ 0.7843 mm, V ≈ 2262 mm³, weight ≈ 5.68 g\n"
+        "\n"
+        "Returns:\n"
+        "  volume_mm3         : total glass volume (mm³)\n"
+        "  weight_g           : glass weight (g)\n"
+        "  edge_thickness_mm  : lens thickness at clear-aperture edge (mm)\n"
+        "  sag1_mm, sag2_mm   : sagitta of each surface at CA radius (mm)\n"
+        "  lens_form          : 'biconvex'|'biconcave'|'plano_convex'|\n"
+        "                       'plano_concave'|'meniscus'|'plano_plano'\n"
+        "  honest_caveat      : scope limitations\n"
+        "\n"
+        "HONEST LIMITATIONS:\n"
+        "  SPHERICAL SURFACES ONLY — aspheric sag h=Rc·r²/(1+√(1−(1+k)c²r²))\n"
+        "    requires numerical integration; out of scope.\n"
+        "  NO AR COATING — anti-reflection layers (100–500 nm) are not modelled.\n"
+        "  HOMOGENEOUS DENSITY — GRIN / melt-inhomogeneous glass may differ ~0.3%.\n"
+        "  CLEAR APERTURE ≠ BLANK — physical blank is larger; weight will be higher.\n"
+        "\n"
+        "Errors: {ok:false, reason} for invalid inputs.  Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "radius_R1_mm": {
+                "type": "number",
+                "description": (
+                    "Radius of curvature of the first (object-side) surface (mm). "
+                    "Positive = convex toward object (Cartesian sign convention). "
+                    "Use 1e18 for a flat (plano) surface."
+                ),
+            },
+            "radius_R2_mm": {
+                "type": "number",
+                "description": (
+                    "Radius of curvature of the second (image-side) surface (mm). "
+                    "Negative = convex toward image. "
+                    "Use 1e18 for a flat (plano) surface."
+                ),
+            },
+            "center_thickness_mm": {
+                "type": "number",
+                "description": "Axial center thickness (mm). Must be > 0.",
+            },
+            "clear_aperture_radius_mm": {
+                "type": "number",
+                "description": (
+                    "Semi-diameter of the optically-used zone (mm). "
+                    "Must be > 0 and < |R1|, |R2|. "
+                    "For weight budgets, use the physical blank semi-diameter."
+                ),
+            },
+            "glass_density_g_cm3": {
+                "type": "number",
+                "description": (
+                    "Glass density in g/cm³. Default = 2.51 (Schott BK7). "
+                    "Other common values: SF11 ≈ 4.74, CaF2 ≈ 3.18, fused silica ≈ 2.20, "
+                    "N-LAK22 ≈ 3.67."
+                ),
+            },
+        },
+        "required": [
+            "radius_R1_mm",
+            "radius_R2_mm",
+            "center_thickness_mm",
+            "clear_aperture_radius_mm",
+        ],
+    },
+)
+
+
+@register(_lens_volume_spec, write=False)
+async def run_compute_lens_volume(ctx: "ProjectCtx", args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    for field_name in (
+        "radius_R1_mm",
+        "radius_R2_mm",
+        "center_thickness_mm",
+        "clear_aperture_radius_mm",
+    ):
+        if a.get(field_name) is None:
+            return json.dumps({"ok": False, "reason": f"{field_name} is required"})
+
+    try:
+        spec = SingletLensSpec(
+            radius_R1_mm=float(a["radius_R1_mm"]),
+            radius_R2_mm=float(a["radius_R2_mm"]),
+            center_thickness_mm=float(a["center_thickness_mm"]),
+            clear_aperture_radius_mm=float(a["clear_aperture_radius_mm"]),
+            glass_density_g_cm3=float(a.get("glass_density_g_cm3", 2.51)),
+        )
+        result = compute_lens_volume(spec)
+    except Exception as exc:
+        return json.dumps({"ok": False, "reason": str(exc)})
+
+    if isinstance(result, dict):
+        return json.dumps(result)
+    return ok_payload(result.to_dict())

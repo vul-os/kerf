@@ -5755,6 +5755,20 @@
         },
         {
           "domain": "D7",
+          "feature": "3D parallel-offset surface milling (constant offset raster)",
+          "competitor": {
+            "status": "yes",
+            "note": "Parallel / scallop / radial 3D surface strategies with constant stepover and configurable scallop height; full gouge detection and 5-axis tilt available",
+            "source": "https://www.autodesk.com/products/fusion-360/cam"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "MH 31e §1139 + Held & Klingenstein (1991) 3-axis Z-axis-aligned parallel-offset raster; Offset3DSpec + Offset3DResult + generate_offset_3d_path(spec); scallop h = R−sqrt(R²−(ae/2)²) (Chuang & Yang 1995); bilinear z(x,y) interpolation; cam_generate_offset_3d_path LLM tool; 71 tests. HONEST LIMITS: 3-axis only (no 5-axis tilt; steep walls >45° may micro-gouge); no gouge checking; raster passes only (no waterline/z-level contouring); G01 linear segments only (no arc fitting); scallop formula is flat-surface first-order estimate",
+            "evidence": "packages/kerf-cam/src/kerf_cam/offset_3d_path.py"
+          }
+        },
+        {
+          "domain": "D7",
           "feature": "G-code post (Fanuc/GRBL/LinuxCNC/Mach3)",
           "competitor": {
             "status": "yes",

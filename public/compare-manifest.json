@@ -16471,6 +16471,20 @@
         },
         {
           "domain": "D1",
+          "feature": "SubD cage directional edge-loop selection (Bommes-Lévy-Pietroni §3.2)",
+          "competitor": {
+            "status": "yes",
+            "note": "Maya Select Edge Loop (Alt+click), Blender Alt+click edge loop — walks opposite edges of adjacent quads; terminates at irregular vertex (valence≠4) or mesh boundary; basis for loop-cut, bevel, quad-strip extraction",
+            "source": "https://docs.blender.org/manual/en/latest/modeling/meshes/selecting/edge_loops.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "select_edge_loop(cage_mesh, start_edge_idx): traverses opposite edges of each quad face (skip-2 rule, Bommes-Lévy-Pietroni 2013 §3.2); terminates at irregular vertex (valence≠4), boundary, or non-quad face; EdgeLoopResult with edge_indices, vertex_indices (flat), closed, terminated_at_irregular, irregular_vertex_valences, honest_caveat; oracles: 4×4 torus closed length 4; 6×8 torus lengths {6,8}; cube (valence-3) terminates; cylinder axial-interior edge closes length nu; LLM tool subd_select_edge_loop; quads only (no tris); manifold assumed; 25 tests.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/subd/edge_loop_select.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "SubD cage single-edge subdivide (localized refinement)",
           "competitor": {
             "status": "partial",

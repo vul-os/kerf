@@ -269,6 +269,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.spc.tools",
     # SUBD-LIMIT-WALK-CROSS-CURVE: walk CC limit surface + planar cross-section (Stam 1998 + 5-iter bisection)
     "kerf_cad_core.subd.limit_walk_cross_curve",
+    # SUBD-CAGE-EDGE-LOOP-SELECT: directional edge-loop walk on quad cage; stops at irregular vertex (Bommes-Lévy-Pietroni 2013 §3.2)
+    "kerf_cad_core.subd.edge_loop_select",
     # GK-P-B: Stam exact limit-position + limit-tangent evaluation (subd_eval_limit tool)
     "kerf_cad_core.geom.subd_stam",
     # GK-P45: SubD/mesh authoring ops (subd_poke, subd_extrude_along, sculpt_brush, multires_evaluate)

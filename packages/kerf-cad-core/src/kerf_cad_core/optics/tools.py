@@ -18,6 +18,7 @@ Registers tools with the Kerf tool registry:
   optics_prism_deviation    — prism deviation angle
   optics_chromatic_aberration — longitudinal chromatic aberration (Abbe)
   optics_achromat_powers    — achromatic doublet element powers
+  optics_compute_spot_diagram — fan-of-rays spot diagram; RMS + EE80 radius; SVG
 
 All tools are pure-Python; no OCC dependency.
 Errors returned as {"ok": false, "reason": "..."} — tools never raise.
@@ -2840,3 +2841,159 @@ async def run_fit_zernike_wavefront(ctx: ProjectCtx, args: bytes) -> str:
         return json.dumps({"ok": False, "reason": f"unexpected error: {exc}"})
 
     return ok_payload(report.to_dict())
+
+
+# ---------------------------------------------------------------------------
+# Tool: optics_compute_spot_diagram
+# ---------------------------------------------------------------------------
+
+from kerf_cad_core.optics.spot_diagram import (  # noqa: E402
+    SpotDiagramResult,
+    compute_spot_diagram,
+)
+
+_spot_diagram_spec = ToolSpec(
+    name="optics_compute_spot_diagram",
+    description=(
+        "Trace a fan of rays through a sequential lens system and compute the\n"
+        "spot diagram at the paraxial image plane.\n"
+        "\n"
+        "Algorithm (Hecht 'Optics' 5e §6.3 / Welford 'Aberrations' §6):\n"
+        "  1. Generate a ceil(sqrt(num_rays)) × ceil(sqrt(num_rays)) Cartesian\n"
+        "     pupil grid over the unit disk (Welford §8.2 uniform sampling).\n"
+        "  2. Trace each ray through the lens stack using exact meridional Snell\n"
+        "     + Newton-Raphson conic intersect (Welford §5.2-5.3).\n"
+        "  3. Collect (x, y) intercepts at the paraxial image plane:\n"
+        "       y_img : exact meridional trace result\n"
+        "       x_img : first-order sagittal estimate (Hecht §5.7)\n"
+        "  4. Compute:\n"
+        "       centroid          = (mean_x, mean_y)\n"
+        "       rms_radius_mm     = sqrt(mean((xi-cx)^2 + (yi-cy)^2))  [Welford §8.2]\n"
+        "       encircled_80pct   = radius enclosing 80% of rays from centroid [Hecht §6.3]\n"
+        "  5. Render SVG with RMS ring (red), EE80 ring (green), Airy-disk ring (orange),\n"
+        "     centroid marker, and scale bar.\n"
+        "\n"
+        "Surface definition (lens_system_dict.surfaces list):\n"
+        "  c  : curvature 1/R (mm^-1). 0 = flat.\n"
+        "  t  : thickness to NEXT surface vertex (mm). Last surface: 0.\n"
+        "  n  : refractive index of medium AFTER this surface (>= 1.0).\n"
+        "  k  : conic constant (default 0 = sphere).\n"
+        "\n"
+        "Optional lens_system_dict keys:\n"
+        "  aperture_radius_mm : entrance-pupil half-diameter (mm, default 10).\n"
+        "  n_object           : object-space refractive index (default 1.0).\n"
+        "\n"
+        "Oracle (Hecht §6.3):\n"
+        "  BK7 biconvex (R1=+50, R2=-50, n=1.5168, t=5mm), 0° field, aperture 5mm:\n"
+        "    rms_radius_mm > 0 (spherical aberration).\n"
+        "  Same lens at 10° field: rms_radius > on-axis rms (coma grows off-axis).\n"
+        "  Ideal thin lens (paraxial, no aberrations): rms ≈ 0.\n"
+        "\n"
+        "Returns:\n"
+        "  image_points_xy           : list of [x_mm, y_mm] intercepts\n"
+        "  rms_radius_mm             : 2-D RMS spot radius (mm)\n"
+        "  encircled_80pct_radius_mm : radius enclosing 80% of rays (mm)\n"
+        "  centroid_xy               : [x_mean, y_mean] (mm)\n"
+        "  svg_diagram               : SVG string\n"
+        "  honest_caveat             : scope limitations\n"
+        "  n_rays                    : number of rays successfully traced\n"
+        "\n"
+        "HONEST FLAGS:\n"
+        "  * Monochromatic only — wavelength_nm used for Airy reference only;\n"
+        "    chromatic aberration NOT modelled.\n"
+        "  * Sagittal (x) intercepts are first-order estimates; rigorous x requires\n"
+        "    full 3-D skew-ray tracing.\n"
+        "  * Physical aperture clipping not applied.\n"
+        "  * encircled_80pct is geometric (ray-counting), not diffraction-based.\n"
+        "  * Stop assumed at first surface.\n"
+        "\n"
+        "References: Hecht (2017) §6.3, §10.2; Welford (1986) §5.2-5.3, §6, §8.2.\n"
+        "\n"
+        "Errors: {ok:false, reason} for invalid inputs. Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "lens_system_dict": {
+                "type": "object",
+                "description": (
+                    "Lens system description with key 'surfaces' (list of surface dicts, "
+                    "each with c, t, n; optional k). "
+                    "Optional keys: aperture_radius_mm (default 10), n_object (default 1.0)."
+                ),
+                "properties": {
+                    "surfaces": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "c": {"type": "number", "description": "Curvature 1/R (mm^-1). 0 = flat."},
+                                "t": {"type": "number", "description": "Thickness to next surface (mm)."},
+                                "n": {"type": "number", "description": "Refractive index after surface (>= 1.0)."},
+                                "k": {"type": "number", "description": "Conic constant (default 0 = sphere)."},
+                            },
+                            "required": ["c", "t", "n"],
+                        },
+                    },
+                    "aperture_radius_mm": {
+                        "type": "number",
+                        "description": "Entrance-pupil half-diameter (mm). Default 10.",
+                    },
+                    "n_object": {
+                        "type": "number",
+                        "description": "Refractive index of object space. Default 1.0.",
+                    },
+                },
+                "required": ["surfaces"],
+            },
+            "field_angle_deg": {
+                "type": "number",
+                "description": "Field angle (degrees). 0 = on-axis.",
+            },
+            "wavelength_nm": {
+                "type": "number",
+                "description": (
+                    "Wavelength (nm). Used for Airy-disk reference only; "
+                    "chromatic aberration not modelled. E.g. 550.0 for green."
+                ),
+            },
+            "num_rays": {
+                "type": "integer",
+                "description": (
+                    "Target number of rays to trace (default 49). "
+                    "A ceil(sqrt(num_rays)) grid is built; actual count may be slightly less."
+                ),
+            },
+        },
+        "required": ["lens_system_dict", "field_angle_deg", "wavelength_nm"],
+    },
+)
+
+
+@register(_spot_diagram_spec, write=False)
+async def run_compute_spot_diagram(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    if a.get("lens_system_dict") is None:
+        return json.dumps({"ok": False, "reason": "lens_system_dict is required"})
+    if a.get("field_angle_deg") is None:
+        return json.dumps({"ok": False, "reason": "field_angle_deg is required"})
+    if a.get("wavelength_nm") is None:
+        return json.dumps({"ok": False, "reason": "wavelength_nm is required"})
+
+    kwargs: dict = {}
+    if "num_rays" in a:
+        kwargs["num_rays"] = int(a["num_rays"])
+
+    result = compute_spot_diagram(
+        a["lens_system_dict"],
+        a["field_angle_deg"],
+        a["wavelength_nm"],
+        **kwargs,
+    )
+    if isinstance(result, dict):
+        return json.dumps(result)
+    return ok_payload(result.to_dict())

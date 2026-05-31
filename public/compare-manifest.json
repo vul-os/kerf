@@ -14079,8 +14079,8 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Spot diagrams + pupil illumination maps (OPTICS-PUPIL-DIAGRAM): uniform pupil-grid ray trace (Welford 1986 §8.2); per-field (x,y) intercepts at image plane; 2-D RMS and meridional y-only RMS spot radius; max ray distance from chief ray; exit-pupil illumination map (surviving pupil coords); paraxial exit-pupil position estimate (Welford 1986 §3.5 / Hecht §5.7); stigmatic stack RMS < 1e-6 mm; BK7 biconvex at 14deg y-RMS > 3x on-axis (coma verified); Seidel S_II cross-check; LLM tool optics_pupil_diagram. Monochromatic only; sagittal x intercepts are first-order estimates (full 3-D skew-ray trace not implemented); 33 hermetic tests.",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/pupil_diagram.py"
+            "note": "Spot diagrams + pupil illumination maps (OPTICS-PUPIL-DIAGRAM): uniform pupil-grid ray trace (Welford 1986 §8.2); per-field (x,y) intercepts at image plane; 2-D RMS and meridional y-only RMS spot radius; max ray distance from chief ray; exit-pupil illumination map (surviving pupil coords); paraxial exit-pupil position estimate (Welford 1986 §3.5 / Hecht §5.7); stigmatic stack RMS < 1e-6 mm; BK7 biconvex at 14deg y-RMS > 3x on-axis (coma verified); Seidel S_II cross-check; LLM tool optics_pupil_diagram. PLUS: OPTICS-SPOT-DIAGRAM — dedicated spot-diagram module: SpotDiagramResult dataclass (image_points_xy, rms_radius_mm, encircled_80pct_radius_mm, centroid_xy, svg_diagram, honest_caveat); geometric EE80 radius (Hecht §6.3); Airy-disk reference ring (Hecht §10.2); SVG with RMS/EE80/Airy rings + centroid + scale bar; LLM tool optics_compute_spot_diagram; 24 hermetic tests. Honest: monochromatic only; sagittal x = first-order paraxial estimate; no chromatic dispersion; single wavelength; stop at first surface. Ref: Hecht (2017) §6.3, §10.2; Welford (1986) §5.2-5.3, §6, §8.2.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/spot_diagram.py"
           }
         },
         {

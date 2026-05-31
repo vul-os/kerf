@@ -66,6 +66,10 @@ from kerf_cad_core.optics.zernike_fit import (
     ZernikeFitReport,
     fit_zernike_wavefront,
 )
+from kerf_cad_core.optics.spot_diagram import (
+    SpotDiagramResult,
+    compute_spot_diagram,
+)
 
 __all__ = [
     "lensmaker",
@@ -95,4 +99,6 @@ __all__ = [
     "compute_diffraction_mtf",
     "ZernikeFitReport",
     "fit_zernike_wavefront",
+    "SpotDiagramResult",
+    "compute_spot_diagram",
 ]

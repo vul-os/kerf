@@ -32,6 +32,12 @@ vertex_merge
     their centroid, updating all adjacent face indices and removing
     degenerate faces. Generalisation of edge collapse to N vertices
     (Hoppe 1996 §3.2; Garland-Heckbert 1997 QEM §3).
+dual_mesh
+    SUBD-CAGE-DUAL-MESH: compute the combinatorial dual mesh of a quad
+    subdivision cage; each face becomes a dual vertex (at its centroid),
+    each primal vertex becomes a dual face whose corners are the neighboring
+    face centroids ordered CCW. Used for ringing analysis, mesh smoothing,
+    and visualization (Bossen-Heckbert 1996; Bommes-Lévy-Pietroni 2013 §3.2).
 """
 
 from kerf_cad_core.subd.limit_walk_cross_curve import (
@@ -58,6 +64,10 @@ from kerf_cad_core.subd.vertex_merge import (
     VertexMergeResult,
     merge_vertices,
 )
+from kerf_cad_core.subd.dual_mesh import (
+    DualMeshResult,
+    compute_dual_mesh,
+)
 
 __all__ = [
     "CrossCurveResult",
@@ -72,4 +82,6 @@ __all__ = [
     "collapse_edge",
     "VertexMergeResult",
     "merge_vertices",
+    "DualMeshResult",
+    "compute_dual_mesh",
 ]

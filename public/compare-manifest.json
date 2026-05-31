@@ -18105,6 +18105,19 @@
         },
         {
           "domain": "D1",
+          "feature": "SubD cage dual mesh (face-centroid dual vertices + CCW vertex-star dual faces)",
+          "competitor": {
+            "status": "no",
+            "note": "Neither Fusion 360 nor Blender/Maya expose a programmatic dual-mesh API for SubD cages with boundary-handling guarantees and honest caveats."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "compute_dual_mesh(cage_mesh): one dual vertex per primal face (face centroid); one dual face per primal vertex (CCW-ordered ring of neighboring face centroids via atan2 angular sort on tangent plane); DualMeshResult(dual_vertices, dual_faces, num_irregular_dual_faces, honest_caveat); cube oracle: 6 dual verts + 8 triangular dual faces (combinatorial octahedron), 0 irregular; 4×4 torus (valence-4) → 16 quad dual faces, 0 irregular; plane 2×2 → boundary vertices flagged irregular; cylinder barrel → correct dual vertex/face count; LLM tool subd_compute_dual_mesh; 28 oracle-asserted tests. HONEST: closed manifold meshes only for complete dual faces — boundary primal edges produce incomplete (open) dual faces; angular sort may mis-order concave vertex stars; dual vertices are face centroids only (not CC limit-surface points); non-manifold input produces topologically undefined dual faces.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/subd/dual_mesh.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "Shell wall-thickness DFM check",
           "competitor": {
             "status": "partial",

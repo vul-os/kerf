@@ -65,6 +65,9 @@ _TOOL_MODULES = [
     "kerf_cad_core.gears",
     "kerf_cad_core.geom.surface_boolean_robust",
     "kerf_cad_core.geom.nurbs_boolean",
+    # GK-P09: general pure-Python solid boolean for convex planar polyhedra
+    # (Mantyla §6 + Hoffmann §3 — brep_general_boolean LLM tool)
+    "kerf_cad_core.geom.general_boolean",
     # NURBS-CURVE-FOOTPRINT-ON-PLANE: orthographic projection of a 3-D NurbsCurve onto a plane
     # (Piegl & Tiller §6.1; Mortenson §4.4) — nurbs_curve_project_to_plane LLM tool
     "kerf_cad_core.geom.curve_footprint_on_plane",
@@ -328,6 +331,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.subd.cage_area",
     # GK-P12: Stam exact limit tangents at extraordinary CC vertices (valence n!=4) via eigenstructure (Stam 1998 §3.2-3.3; Reif 1995; Meyer et al. 2003)
     "kerf_cad_core.subd.stam_limit_tangents",
+    # GK-P14: fractional crease sharpness decay s_new=max(0,s-1) per level (DeRose-Kass-Truong 1998 §4; OpenSubdiv hierarchical edits)
+    "kerf_cad_core.subd.crease_fractional_decay",
     # GK-P-B: Stam exact limit-position + limit-tangent evaluation (subd_eval_limit tool)
     "kerf_cad_core.geom.subd_stam",
     # GK-P45: SubD/mesh authoring ops (subd_poke, subd_extrude_along, sculpt_brush, multires_evaluate)
@@ -342,6 +347,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.subd_edge_flow",
     # GK-P46: mesh/implicit ops (sdf_csg, uv_unwrap, isotropic_remesh, retopo_snap)
     "kerf_cad_core.mesh_implicit_tools",
+    # GK-P23: in-process isotropic remesh fallback (Botsch-Kobbelt 2004) — dataclass API
+    "kerf_cad_core.mesh_isotropic_remesh",
     # GK-P58: B-rep UV unwrap atlas (brep_uv_unwrap, brep_uv_distortion_report)
     "kerf_cad_core.geom.brep_uv_tools",
     # GK-P11: isophote / EMap continuity analyser (IsophoteSpec / IsophoteReport / analyze_isophotes)

@@ -1847,3 +1847,14 @@ from kerf_cad_core.geom.surface_analytic_derivatives import (  # noqa: E402
     compute_analytic_derivatives,
     SSIHardenedMarcher,
 )
+# GK-P09: general pure-Python solid boolean for convex planar polyhedra.
+# Extends the limited-primitive boolean (boolean.py) to arbitrary trimmed-plane
+# body pairs.  Algorithm: Mantyla §6 + Hoffmann "Geometric & Solid Modeling" §3.
+# HONEST: convex planar faces only — non-convex / curved-face bodies need OCCT.
+# LLM tool: brep_general_boolean.
+from kerf_cad_core.geom.general_boolean import (  # noqa: E402
+    PlanarPolyhedron,
+    BooleanResult,
+    boolean_polyhedra,
+    polyhedron_volume,
+)

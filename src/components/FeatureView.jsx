@@ -59,6 +59,11 @@ import {
   Workflow, Shuffle, Merge,
   Cuboid, Navigation, Share2, PackageOpen,
   BrainCircuit, Compass, Ungroup, Boxes,
+  Pencil, PenLine, Eraser, ScanLine,
+  Triangle, Hexagon, Minus, ChevronsUp,
+  Scan, FileSearch, FileCog, FileOutput,
+  Network, Component, LayoutDashboard, AlignCenter,
+  ScanSearch, Sticker, FileText, LayoutTemplate,
 } from 'lucide-react'
 import FeatureRenderer from './FeatureRenderer.jsx'
 import {
@@ -4522,6 +4527,531 @@ const FEATURE_KINDS = [
       { key: 'grid_resolution_mm',     kind: 'number', label: 'Grid resolution (mm)', min: 0.01, step: 0.1 },
     ],
   },
+
+  // ── Sketch ops ────────────────────────────────────────────────────────────
+  // sketch_add_entity: add a geometric entity (point/line/circle/arc/ellipse/bspline)
+  {
+    op: 'sketch_add_entity',
+    label: 'Add Entity',
+    icon: Pencil,
+    caption: 'Add a geometric entity (point, line, circle, arc, ellipse, bspline) to a .sketch file.',
+    defaults: {
+      file_path: '',
+      entity: { type: 'line', x1: 0, y1: 0, x2: 10, y2: 0 },
+      construction: false,
+    },
+    fields: [
+      { key: 'file_path',    kind: 'sketch_picker', label: 'Sketch file' },
+      { key: 'entity.type',  kind: 'select', label: 'Entity type', options: [
+        { value: 'point',   label: 'Point' },
+        { value: 'line',    label: 'Line' },
+        { value: 'circle',  label: 'Circle' },
+        { value: 'arc',     label: 'Arc' },
+        { value: 'ellipse', label: 'Ellipse' },
+        { value: 'bspline', label: 'B-Spline' },
+      ] },
+      { key: 'construction', kind: 'boolean', label: 'Construction geometry' },
+    ],
+  },
+  // sketch_add_constraint: add a geometric or dimensional constraint
+  {
+    op: 'sketch_add_constraint',
+    label: 'Add Constraint',
+    icon: PenLine,
+    caption: 'Add a geometric or dimensional constraint to a .sketch file.',
+    defaults: {
+      file_path: '',
+      constraint: { type: 'coincident', entity_ids: [] },
+    },
+    fields: [
+      { key: 'file_path',         kind: 'sketch_picker', label: 'Sketch file' },
+      { key: 'constraint.type',   kind: 'select', label: 'Constraint type', options: [
+        { value: 'coincident',    label: 'Coincident' },
+        { value: 'horizontal',    label: 'Horizontal' },
+        { value: 'vertical',      label: 'Vertical' },
+        { value: 'parallel',      label: 'Parallel' },
+        { value: 'perpendicular', label: 'Perpendicular' },
+        { value: 'tangent',       label: 'Tangent' },
+        { value: 'equal',         label: 'Equal' },
+        { value: 'distance',      label: 'Distance' },
+        { value: 'angle',         label: 'Angle' },
+        { value: 'radius',        label: 'Radius' },
+        { value: 'diameter',      label: 'Diameter' },
+        { value: 'fixed',         label: 'Fixed (fully lock)' },
+      ] },
+    ],
+  },
+  // sketch_set_constraint_value: update a dimensional constraint value
+  {
+    op: 'sketch_set_constraint_value',
+    label: 'Set Constraint Value',
+    icon: SlidersHorizontal,
+    caption: 'Update the value of a dimensional constraint (distance/angle/radius/diameter).',
+    defaults: {
+      file_path: '',
+      constraint_id: '',
+      value: 10,
+    },
+    fields: [
+      { key: 'file_path',     kind: 'sketch_picker', label: 'Sketch file' },
+      { key: 'constraint_id', kind: 'text',          label: 'Constraint id' },
+      { key: 'value',         kind: 'number',        label: 'Value (mm or °)', min: 0 },
+    ],
+  },
+  // sketch_delete_entity: delete an entity (cascade to constraints)
+  {
+    op: 'sketch_delete_entity',
+    label: 'Delete Entity',
+    icon: Eraser,
+    caption: 'Delete a sketch entity by id — cascades to any edges/constraints referencing it.',
+    defaults: {
+      file_path: '',
+      entity_id: '',
+    },
+    fields: [
+      { key: 'file_path', kind: 'sketch_picker', label: 'Sketch file' },
+      { key: 'entity_id', kind: 'text',          label: 'Entity id' },
+    ],
+  },
+  // sketch_validate: check a sketch is fully constrained + closed
+  {
+    op: 'sketch_validate',
+    label: 'Validate Sketch',
+    icon: ScanLine,
+    caption: 'Validate a sketch for constraint completeness and closed-wire topology.',
+    defaults: { file_path: '' },
+    fields: [
+      { key: 'file_path', kind: 'sketch_picker', label: 'Sketch file' },
+    ],
+  },
+  // sketch_carbon_copy: import all entities from another sketch as construction geometry
+  {
+    op: 'sketch_carbon_copy',
+    label: 'Carbon Copy',
+    icon: Sticker,
+    caption: 'Import all entities from a source sketch into this sketch as construction geometry.',
+    defaults: { file_path: '', source_path: '' },
+    fields: [
+      { key: 'file_path',   kind: 'sketch_picker', label: 'Target sketch' },
+      { key: 'source_path', kind: 'sketch_picker', label: 'Source sketch' },
+    ],
+  },
+
+  // ── Mesh ops ──────────────────────────────────────────────────────────────
+  // mesh_repair_run: weld + unify normals + fill holes + remove degenerate faces
+  {
+    op: 'mesh_repair_run',
+    label: 'Mesh Repair',
+    icon: Wrench,
+    caption: 'Full mesh repair pipeline: weld vertices → unify normals → fill holes → remove degenerate faces.',
+    defaults: {
+      verts: [],
+      faces: [],
+      tol: 1e-6,
+    },
+    fields: [
+      { key: 'tol', kind: 'number', label: 'Weld tolerance (mm)', min: 1e-9, step: 1e-6 },
+    ],
+  },
+  // mesh_boolean_run: CSG union/difference/intersection on two triangle meshes
+  {
+    op: 'mesh_boolean_run',
+    label: 'Mesh Boolean',
+    icon: Combine,
+    caption: 'Triangle-mesh CSG boolean (union / difference / intersection) between mesh A and mesh B.',
+    defaults: {
+      verts_a: [],
+      faces_a: [],
+      verts_b: [],
+      faces_b: [],
+      operation: 'difference',
+    },
+    fields: [
+      { key: 'operation', kind: 'select', label: 'Operation', options: [
+        { value: 'union',        label: 'Union (A ∪ B)' },
+        { value: 'difference',   label: 'Difference (A − B)' },
+        { value: 'intersection', label: 'Intersection (A ∩ B)' },
+      ] },
+    ],
+  },
+  // mesh_diagnostics: volume, area, closed, manifold checks
+  {
+    op: 'mesh_diagnostics',
+    label: 'Mesh Diagnostics',
+    icon: ScanSearch,
+    caption: 'Run volume, area, is_closed, and is_manifold diagnostics on a triangle mesh.',
+    defaults: { verts: [], faces: [] },
+    fields: [],
+  },
+  // mesh_to_nurbs_convert: fit NURBS patches to a triangle mesh
+  {
+    op: 'mesh_to_nurbs_convert',
+    label: 'Mesh → NURBS',
+    icon: Spline,
+    caption: 'Fit NURBS patches to a triangle mesh — required before OCCT Boolean / fillet ops.',
+    defaults: {
+      feature_ref: '',
+      tolerance_mm: 0.1,
+      max_degree: 5,
+    },
+    fields: [
+      { key: 'feature_ref',  kind: 'feature_picker', label: 'Source mesh body' },
+      { key: 'tolerance_mm', kind: 'number', label: 'Fit tolerance (mm)', min: 1e-4, step: 0.01 },
+      { key: 'max_degree',   kind: 'number', label: 'Max NURBS degree',  min: 1, max: 9, step: 1 },
+    ],
+  },
+  // mesh_apply_displacement_stack: multi-layer displacement map application
+  {
+    op: 'mesh_apply_displacement_stack',
+    label: 'Displacement Stack',
+    icon: Layers3,
+    caption: 'Apply an ordered multi-layer displacement stack (add/subtract/multiply/replace) to a base mesh.',
+    defaults: {
+      base_vertices_xyz: [],
+      base_normals_xyz: [],
+      layers: [],
+    },
+    fields: [],
+  },
+  // mesh_sculpt_brush: Inflate / Crease / Smooth / Pinch sculpt stroke
+  {
+    op: 'mesh_sculpt_brush',
+    label: 'Sculpt Brush',
+    icon: Wand2,
+    caption: 'Apply a single sculpt-brush stroke (Inflate/Crease/Smooth/Smooth-Taubin/Pinch) to a mesh.',
+    defaults: {
+      position_xyz_mm: [0, 0, 0],
+      radius_mm: 5,
+      brush_type: 'inflate',
+      strength: 0.5,
+    },
+    fields: [
+      { key: 'radius_mm',  kind: 'number', label: 'Brush radius (mm)', min: 0.001 },
+      { key: 'brush_type', kind: 'select', label: 'Brush type', options: [
+        { value: 'inflate',       label: 'Inflate' },
+        { value: 'crease',        label: 'Crease' },
+        { value: 'smooth',        label: 'Smooth (centroid)' },
+        { value: 'smooth-taubin', label: 'Smooth Taubin (anti-shrink)' },
+        { value: 'pinch',         label: 'Pinch' },
+      ] },
+      { key: 'strength', kind: 'number', label: 'Strength (−1..1)', min: -1, max: 1, step: 0.05 },
+    ],
+  },
+
+  // ── Assembly ops ──────────────────────────────────────────────────────────
+  // assembly_create: create a new empty assembly
+  {
+    op: 'assembly_create',
+    label: 'New Assembly',
+    icon: Boxes,
+    caption: 'Create a new empty assembly and return its serialised state. Pass the assembly dict to subsequent assembly calls.',
+    defaults: { name: 'assembly' },
+    fields: [
+      { key: 'name', kind: 'text', label: 'Assembly name' },
+    ],
+  },
+  // assembly_add_component: add a part instance to an assembly
+  {
+    op: 'assembly_add_component',
+    label: 'Add Component',
+    icon: Component,
+    caption: 'Add a part instance (Component) to an assembly. The first component is fixed (ground).',
+    defaults: {
+      part_ref: '',
+      label: '',
+    },
+    fields: [
+      { key: 'part_ref', kind: 'text', label: 'Part reference (file id or part number)' },
+      { key: 'label',    kind: 'text', label: 'Instance label (optional)' },
+    ],
+  },
+  // assembly_add_mate: add a constraint between two components
+  {
+    op: 'assembly_add_mate',
+    label: 'Add Mate',
+    icon: GitMerge,
+    caption: 'Add a geometric constraint (Mate) between two component instances in the assembly.',
+    defaults: {
+      component_a_id: '',
+      component_b_id: '',
+      mate_type: 'coincident',
+      offset_mm: 0,
+      angle_deg: 0,
+    },
+    fields: [
+      { key: 'component_a_id', kind: 'text', label: 'Component A id' },
+      { key: 'component_b_id', kind: 'text', label: 'Component B id' },
+      { key: 'mate_type', kind: 'select', label: 'Mate type', options: [
+        { value: 'coincident',    label: 'Coincident (face-face flush)' },
+        { value: 'parallel',      label: 'Parallel' },
+        { value: 'perpendicular', label: 'Perpendicular' },
+        { value: 'concentric',    label: 'Concentric (axis-axis)' },
+        { value: 'distance',      label: 'Distance (offset)' },
+        { value: 'angle',         label: 'Angle' },
+        { value: 'tangent',       label: 'Tangent' },
+        { value: 'fixed',         label: 'Fixed (lock all DOF)' },
+      ] },
+      { key: 'offset_mm',  kind: 'number', label: 'Offset (mm)',  min: 0, step: 0.1,
+        showWhen: (n) => n.mate_type === 'distance' },
+      { key: 'angle_deg',  kind: 'number', label: 'Angle (°)', min: -180, max: 180, step: 1,
+        showWhen: (n) => n.mate_type === 'angle' },
+    ],
+  },
+  // assembly_solve: solve the assembly and return resolved transforms + DOF
+  {
+    op: 'assembly_solve',
+    label: 'Solve Assembly',
+    icon: Workflow,
+    caption: 'Solve all mate constraints and return resolved 4×4 transforms + per-component DOF status.',
+    defaults: {},
+    fields: [],
+  },
+  // assembly_bom: generate flat and indented BOM with quantity roll-up
+  {
+    op: 'assembly_bom',
+    label: 'Bill of Materials',
+    icon: LayoutDashboard,
+    caption: 'Generate a flat and indented BOM from the assembly with quantity roll-up.',
+    defaults: {},
+    fields: [],
+  },
+  // brep_assembly_interference: detect volume overlap between bodies in an assembly
+  {
+    op: 'brep_assembly_interference',
+    label: 'Interference Check',
+    icon: AlertTriangle,
+    caption: 'Detect geometric interference (volume overlap) between assembly bodies. Returns severity and intersection volume.',
+    defaults: {
+      bodies: [],
+      tol: 1e-6,
+      clearance_min: 0,
+    },
+    fields: [
+      { key: 'tol',           kind: 'number', label: 'Tolerance (mm)',            min: 1e-9, step: 1e-6 },
+      { key: 'clearance_min', kind: 'number', label: 'Min clearance warning (mm)', min: 0, step: 0.1 },
+    ],
+  },
+
+  // ── Drawing ops ───────────────────────────────────────────────────────────
+  // drawing_auto_views: 6-view orthographic + isometric drawing
+  {
+    op: 'drawing_auto_views',
+    label: 'Auto Views',
+    icon: LayoutTemplate,
+    caption: 'Generate 6-view orthographic + isometric drawing (ISO 128-30). Returns per-view visible/hidden polylines.',
+    defaults: {
+      projection_type: 'third_angle',
+      include_iso: true,
+      sheet: 'A3',
+    },
+    fields: [
+      { key: 'projection_type', kind: 'select', label: 'Projection type', options: [
+        { value: 'third_angle', label: 'Third angle (ANSI/ASME Y14.3)' },
+        { value: 'first_angle', label: 'First angle (ISO/DIN)' },
+      ] },
+      { key: 'include_iso', kind: 'boolean', label: 'Include isometric view' },
+      { key: 'sheet', kind: 'select', label: 'Sheet size', options: [
+        { value: 'A0', label: 'A0' }, { value: 'A1', label: 'A1' },
+        { value: 'A2', label: 'A2' }, { value: 'A3', label: 'A3' },
+        { value: 'A4', label: 'A4' }, { value: 'LETTER', label: 'Letter' },
+      ] },
+      { key: 'scale', kind: 'number', label: 'Scale (0.5=1:2, auto if blank)', min: 0.01, step: 0.1 },
+    ],
+  },
+  // drawing_auto_dimension_iso: ISO 129-1:2018 chain/baseline/mixed dimensioning
+  {
+    op: 'drawing_auto_dimension_iso',
+    label: 'ISO Auto-Dim',
+    icon: Ruler,
+    caption: 'Generate ISO 129-1:2018 chain / baseline / mixed dimension lines for a drawing view.',
+    defaults: {
+      mode: 'chain',
+    },
+    fields: [
+      { key: 'mode', kind: 'select', label: 'Dimensioning mode', options: [
+        { value: 'chain',    label: 'Chain (§5.1)' },
+        { value: 'baseline', label: 'Baseline (§5.1)' },
+        { value: 'mixed',    label: 'Mixed' },
+      ] },
+    ],
+  },
+  // drawing_measurement_chain: extract inspection measurement chain from a part
+  {
+    op: 'drawing_measurement_chain',
+    label: 'Measurement Chain',
+    icon: Activity,
+    caption: 'Extract a complete inspection measurement chain from a part — holes, faces, threads, GD&T anchored to a 3-datum frame (ASME Y14.5-2018 §3.4).',
+    defaults: {
+      body: { name: '', bbox: { length: 100, width: 50, height: 30 }, holes: [] },
+    },
+    fields: [],
+  },
+  // drawing_inspection_report: render inspection chain as structured text report
+  {
+    op: 'drawing_inspection_report',
+    label: 'Inspection Report',
+    icon: FileText,
+    caption: 'Render an inspection measurement chain as a structured text report (ISO 129-1:2018 or ASME Y14.5-2018).',
+    defaults: {
+      format: 'iso129',
+    },
+    fields: [
+      { key: 'format', kind: 'select', label: 'Report format', options: [
+        { value: 'iso129',  label: 'ISO 129-1:2018' },
+        { value: 'asme145', label: 'ASME Y14.5-2018' },
+      ] },
+    ],
+  },
+  // drawing_validate_iso: validate ISO 129-1:2018 compliance
+  {
+    op: 'drawing_validate_iso',
+    label: 'Validate ISO Dims',
+    icon: FileSearch,
+    caption: 'Check a drawing view dict for ISO 129-1:2018 compliance: extension-line lengths, spacing, leader angles, orientation.',
+    defaults: {},
+    fields: [],
+  },
+  // drawing_oblique_projection: oblique cabinet / cavalier projection
+  {
+    op: 'drawing_oblique_projection',
+    label: 'Oblique Projection',
+    icon: SplitSquareHorizontal,
+    caption: 'Generate a 2D oblique (cabinet or cavalier) projection of a body — useful for pictorial drawings.',
+    defaults: {
+      angle_deg: 45,
+      scale_receding: 0.5,
+    },
+    fields: [
+      { key: 'angle_deg',        kind: 'number', label: 'Recession angle (°)', min: 0, max: 90, step: 5 },
+      { key: 'scale_receding',   kind: 'number', label: 'Receding scale (0.5=cabinet, 1=cavalier)', min: 0.1, max: 1, step: 0.1 },
+    ],
+  },
+  // drawing_silhouette_projection: silhouette + visible edges for a given view
+  {
+    op: 'drawing_silhouette_projection',
+    label: 'Silhouette',
+    icon: Scan,
+    caption: 'Extract silhouette curves + visible feature edges for a given view direction.',
+    defaults: {
+      view_direction: [0, 0, -1],
+    },
+    fields: [
+      { key: 'view_direction[0]', kind: 'number', label: 'View dir X' },
+      { key: 'view_direction[1]', kind: 'number', label: 'View dir Y' },
+      { key: 'view_direction[2]', kind: 'number', label: 'View dir Z' },
+    ],
+  },
+
+  // ── Geom / B-rep utility ops ──────────────────────────────────────────────
+  // geom_check_face_planarity: check if a face is planar within tolerance
+  {
+    op: 'geom_check_face_planarity',
+    label: 'Face Planarity',
+    icon: AlignCenter,
+    caption: 'Check whether a B-rep face is planar within a given tolerance — flags non-planar faces for downstream sheet-metal or drawing ops.',
+    defaults: {
+      target_id: '',
+      face_id: -1,
+      tolerance_mm: 0.01,
+    },
+    fields: [
+      { key: 'target_id',    kind: 'feature_picker', label: 'Target body' },
+      { key: 'face_id',      kind: 'face_picker_single', label: 'Face' },
+      { key: 'tolerance_mm', kind: 'number', label: 'Planarity tolerance (mm)', min: 1e-6, step: 0.001 },
+    ],
+  },
+  // geom_classify_edge_convexity: classify edges as convex / concave / flat
+  {
+    op: 'geom_classify_edge_convexity',
+    label: 'Edge Convexity',
+    icon: TrendingUp,
+    caption: 'Classify B-rep edges as convex / concave / flat — useful for auto-fillet and DFM analysis.',
+    defaults: {
+      target_id: '',
+      angle_tolerance_deg: 1,
+    },
+    fields: [
+      { key: 'target_id',            kind: 'feature_picker', label: 'Target body' },
+      { key: 'angle_tolerance_deg',  kind: 'number', label: 'Angle tolerance (°)', min: 0, step: 0.5 },
+    ],
+  },
+  // brep_analyze_wall_thickness: minimum wall thickness + thin-region detection
+  {
+    op: 'brep_analyze_wall_thickness',
+    label: 'Wall Thickness',
+    icon: SlidersHorizontal,
+    caption: 'Ray-cast minimum wall thickness analysis — detects thin regions below the manufacturable minimum.',
+    defaults: {
+      target_id: '',
+      min_acceptable_mm: 1.0,
+      ray_count: 500,
+    },
+    fields: [
+      { key: 'target_id',        kind: 'feature_picker', label: 'Target body' },
+      { key: 'min_acceptable_mm',kind: 'number', label: 'Min acceptable wall (mm)', min: 0.001 },
+      { key: 'ray_count',        kind: 'number', label: 'Ray count', min: 100, max: 5000, step: 100 },
+    ],
+  },
+  // brep_check_clearance: minimum gap between two bodies
+  {
+    op: 'brep_check_clearance',
+    label: 'Clearance Check',
+    icon: Maximize2,
+    caption: 'Compute the minimum clearance (gap) between two B-rep bodies — flags collisions and tight fits.',
+    defaults: {
+      body_a_id: '',
+      body_b_id: '',
+      min_clearance_mm: 0.5,
+    },
+    fields: [
+      { key: 'body_a_id',        kind: 'feature_picker', label: 'Body A' },
+      { key: 'body_b_id',        kind: 'feature_picker', label: 'Body B' },
+      { key: 'min_clearance_mm', kind: 'number', label: 'Required clearance (mm)', min: 0, step: 0.1 },
+    ],
+  },
+  // brep_recognize_holes: detect cylindrical hole features
+  {
+    op: 'brep_recognize_holes',
+    label: 'Recognize Holes',
+    icon: Drill,
+    caption: 'Detect and classify cylindrical hole features (through, blind, countersink, counterbore, thread) in a B-rep body.',
+    defaults: {
+      target_id: '',
+      min_diameter_mm: 0.5,
+    },
+    fields: [
+      { key: 'target_id',      kind: 'feature_picker', label: 'Target body' },
+      { key: 'min_diameter_mm',kind: 'number', label: 'Min diameter (mm)', min: 0.001 },
+    ],
+  },
+  // brep_verify_euler_topology: V − E + F = 2 (closed shell) Euler check
+  {
+    op: 'brep_verify_euler_topology',
+    label: 'Euler Topology',
+    icon: Network,
+    caption: 'Verify B-rep Euler topology: V − E + F = 2 for a closed shell, flags non-manifold or invalid topology.',
+    defaults: {
+      target_id: '',
+    },
+    fields: [
+      { key: 'target_id', kind: 'feature_picker', label: 'Target body' },
+    ],
+  },
+  // brep_compute_inertia: mass, CG, inertia tensor
+  {
+    op: 'brep_compute_inertia',
+    label: 'Mass Properties',
+    icon: BarChart2,
+    caption: 'Compute mass, centre of gravity, and inertia tensor for a B-rep solid given material density.',
+    defaults: {
+      target_id: '',
+      density_g_per_cm3: 7.85,
+    },
+    fields: [
+      { key: 'target_id',          kind: 'feature_picker', label: 'Target body' },
+      { key: 'density_g_per_cm3',  kind: 'number', label: 'Density (g/cm³)', min: 0.001, step: 0.1 },
+    ],
+  },
 ]
 
 const KIND_BY_OP = Object.fromEntries(FEATURE_KINDS.map((k) => [k.op, k]))
@@ -4587,6 +5117,28 @@ const FEATURE_CATEGORIES = [
     'subd_geodesic_distance', 'subd_csg_union', 'subd_csg_difference', 'subd_csg_intersection',
     'subd_project_primitive', 'subd_symmetrize',
     'sdf_csg', 'retopo_snap',
+  ] },
+  { id: 'sketch_ops', label: 'Sketch Tools', ops: [
+    'sketch_add_entity', 'sketch_add_constraint', 'sketch_set_constraint_value',
+    'sketch_delete_entity', 'sketch_validate', 'sketch_carbon_copy',
+  ] },
+  { id: 'mesh_ops',   label: 'Mesh Ops',    ops: [
+    'mesh_repair_run', 'mesh_boolean_run', 'mesh_diagnostics',
+    'mesh_to_nurbs_convert', 'mesh_apply_displacement_stack', 'mesh_sculpt_brush',
+  ] },
+  { id: 'assembly',   label: 'Assembly',    ops: [
+    'assembly_create', 'assembly_add_component', 'assembly_add_mate',
+    'assembly_solve', 'assembly_bom', 'brep_assembly_interference',
+  ] },
+  { id: 'drawing',    label: 'Drawing',     ops: [
+    'drawing_auto_views', 'drawing_auto_dimension_iso',
+    'drawing_measurement_chain', 'drawing_inspection_report',
+    'drawing_validate_iso', 'drawing_oblique_projection', 'drawing_silhouette_projection',
+  ] },
+  { id: 'brep_utils', label: 'B-rep Utils', ops: [
+    'geom_check_face_planarity', 'geom_classify_edge_convexity',
+    'brep_analyze_wall_thickness', 'brep_check_clearance',
+    'brep_recognize_holes', 'brep_verify_euler_topology', 'brep_compute_inertia',
   ] },
   { id: 'weldment',  label: 'Weldment',     ops: ['gusset_plate', 'cope_notch'] },
   { id: 'bim',       label: 'BIM',          ops: ['bim_make_grid', 'bim_make_framing', 'bim_make_wall', 'bim_make_slab'] },

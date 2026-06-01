@@ -62,6 +62,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.weldment",
     "kerf_cad_core.civil.tools",
     "kerf_cad_core.civil.alignment_tools",
+    "kerf_cad_core.civil.corridor_sheet_tools",
     "kerf_cad_core.gears",
     "kerf_cad_core.geom.surface_boolean_robust",
     "kerf_cad_core.geom.nurbs_boolean",

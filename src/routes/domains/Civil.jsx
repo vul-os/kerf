@@ -59,6 +59,11 @@ const COMPARISON = {
       values: [false, false, false, true],
     },
     {
+      feature: 'Plan + profile + cross-section sheets (DXF)',
+      note: 'civil_generate_corridor_sheets',
+      values: [true, null, null, true],
+    },
+    {
       feature: 'Chat-driven design',
       note: 'Kerf-exclusive',
       values: [false, false, false, true],

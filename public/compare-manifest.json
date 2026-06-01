@@ -473,9 +473,9 @@
             "source": "https://help.autodesk.com/view/CIV3D/2026/ENU/?guid=GUID-E9F0A1B2-3C4D-5E6F-7A8B-9C0D1E2F3A4B"
           },
           "kerf": {
-            "status": "no",
-            "note": "No automated civil plan/profile sheet generation; corridor DXF export exists but no sheet-set workflow",
-            "evidence": "packages/kerf-civil/src/kerf_civil/"
+            "status": "yes",
+            "note": "civil_generate_corridor_sheets — multi-sheet DXF with plan view (horizontal alignment + edge strings), profile view (FG + EG + grade stubs), and cross-sections at configurable station interval; AASHTO-compliant cut/fill slopes; AutoCAD R12/R14 ASCII DXF",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/civil/corridor_sheet_generator.py"
           }
         },
         {

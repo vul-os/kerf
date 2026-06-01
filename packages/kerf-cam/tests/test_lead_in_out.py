@@ -30,6 +30,9 @@ from kerf_cam.lead_in_out import (
     _rotate_90_cw,
     _rotate_deg,
     _compute_arc_lead_in,
+    compute_helical_ramp_points,
+    compute_ramp_on_points,
+    compute_arc_tangent_points,
     generate_lead_in_out,
     cam_generate_lead_in_out_spec,
     run_cam_generate_lead_in_out,
@@ -502,3 +505,510 @@ class TestHonestCaveat:
     def test_line_caveat_present(self):
         result = generate_lead_in_out(_spec("line"), cutter_comp="G41")
         assert len(result.honest_caveat) > 20
+
+
+# ---------------------------------------------------------------------------
+# 12. Helical-ramp lead-in
+# ---------------------------------------------------------------------------
+
+def _spec_helical(
+    R: float = 5.0,
+    ramp_angle_deg: float = 3.0,
+    target_z_mm: float = -5.0,
+    num_turns: int = 1,
+    pts_per_turn: int = 36,
+    contour_start_xy: tuple = (10.0, 0.0),
+    contour_tangent_xy: tuple = (1.0, 0.0),
+) -> LeadSpec:
+    return LeadSpec(
+        contour_start_xy=contour_start_xy,
+        contour_tangent_xy=contour_tangent_xy,
+        cutter_diameter_mm=10.0,
+        lead_radius_mm=R,
+        lead_angle_deg=90.0,  # not used for helical-ramp
+        feed_mm_per_min=400.0,
+        lead_type="helical-ramp",
+        target_z_mm=target_z_mm,
+        ramp_angle_deg=ramp_angle_deg,
+        num_helix_turns=num_turns,
+        helix_points_per_turn=pts_per_turn,
+    )
+
+
+class TestHelicalRamp:
+    def test_helical_ramp_result_type(self):
+        """generate_lead_in_out returns LeadResult for helical-ramp."""
+        result = generate_lead_in_out(_spec_helical(), cutter_comp="G41")
+        assert isinstance(result, LeadResult)
+
+    def test_helical_ramp_has_toolpath_points(self):
+        """lead_in_toolpath_points must be non-empty and contain 3-tuples."""
+        result = generate_lead_in_out(_spec_helical(), cutter_comp="G41")
+        pts = result.lead_in_toolpath_points
+        assert len(pts) > 0
+        assert len(pts[0]) == 3, f"Expected 3-tuple (x,y,z), got {pts[0]}"
+
+    def test_helical_ramp_z_decreases_over_revolution(self):
+        """Over one full revolution the Z coordinate must strictly decrease from
+        z_start to target_z_mm (pitch_per_turn > 0)."""
+        target_z = -4.0
+        result = generate_lead_in_out(
+            _spec_helical(R=5.0, ramp_angle_deg=3.0, target_z_mm=target_z, num_turns=1),
+            cutter_comp="G41",
+        )
+        pts = result.lead_in_toolpath_points
+        z_values = [p[2] for p in pts]
+        # First Z > last Z (descent)
+        assert z_values[0] > z_values[-1], (
+            f"Expected z_start > z_end; got z_start={z_values[0]}, z_end={z_values[-1]}"
+        )
+        # Last Z must equal target_z_mm within tolerance
+        assert abs(z_values[-1] - target_z) < 1e-6, (
+            f"Last Z should be target_z={target_z}, got {z_values[-1]}"
+        )
+
+    def test_helical_ramp_z_descent_monotone(self):
+        """Z must decrease monotonically (not increase) along the helix."""
+        result = generate_lead_in_out(
+            _spec_helical(R=4.0, ramp_angle_deg=5.0, target_z_mm=-3.0, num_turns=2),
+            cutter_comp="G41",
+        )
+        pts = result.lead_in_toolpath_points
+        z_vals = [p[2] for p in pts]
+        for i in range(1, len(z_vals)):
+            assert z_vals[i] <= z_vals[i - 1] + 1e-10, (
+                f"Z not monotone at index {i}: z[{i}]={z_vals[i]} > z[{i-1}]={z_vals[i-1]}"
+            )
+
+    def test_helical_ramp_pitch_matches_formula(self):
+        """pitch_per_turn = 2π × R × tan(angle); verify via Z span."""
+        R = 6.0
+        angle_deg = 4.0
+        target_z = 0.0
+        n_turns = 1
+        spec = _spec_helical(R=R, ramp_angle_deg=angle_deg, target_z_mm=target_z, num_turns=n_turns)
+        result = generate_lead_in_out(spec, cutter_comp="G41")
+        pts = result.lead_in_toolpath_points
+        z_start = pts[0][2]
+        z_end = pts[-1][2]
+        z_span = abs(z_start - z_end)
+        expected_pitch = 2.0 * math.pi * R * math.tan(math.radians(angle_deg))
+        assert abs(z_span - expected_pitch * n_turns) < 1e-6, (
+            f"Z span {z_span} should equal pitch × turns = {expected_pitch * n_turns}"
+        )
+
+    def test_helical_ramp_xy_radius_constant(self):
+        """All XY points must lie on a circle of radius R from the helix centre."""
+        R = 5.0
+        spec = _spec_helical(R=R, ramp_angle_deg=3.0, target_z_mm=0.0)
+        result = generate_lead_in_out(spec, cutter_comp="G41")
+        pts = result.lead_in_toolpath_points
+        # Get centre from result
+        cx, cy = result.arc_centre_xy
+        for x, y, z in pts:
+            dist = math.hypot(x - cx, y - cy)
+            assert abs(dist - R) < 1e-6, (
+                f"Point ({x},{y}) is {dist:.6f} mm from centre, expected R={R}"
+            )
+
+    def test_helical_ramp_lead_out_ascends(self):
+        """Lead-out toolpath must go from target_z back up to z_start."""
+        target_z = -3.0
+        result = generate_lead_in_out(
+            _spec_helical(R=5.0, ramp_angle_deg=3.0, target_z_mm=target_z),
+            cutter_comp="G41",
+        )
+        out_pts = result.lead_out_toolpath_points
+        assert out_pts[0][2] <= out_pts[-1][2], (
+            f"Lead-out should ascend: z_start={out_pts[0][2]}, z_end={out_pts[-1][2]}"
+        )
+
+    def test_helical_ramp_gcode_mentions_pitch(self):
+        """Lead-in G-code comment must mention pitch_angle."""
+        result = generate_lead_in_out(_spec_helical(), cutter_comp="G41")
+        assert "pitch_angle" in result.gcode_lead_in or "helical" in result.gcode_lead_in.lower()
+
+    def test_helical_ramp_lead_in_length_positive(self):
+        """lead_in_length_mm must be > 0."""
+        result = generate_lead_in_out(_spec_helical(), cutter_comp="G41")
+        assert result.lead_in_length_mm > 0.0
+
+    def test_helical_ramp_multi_turn_more_points(self):
+        """2-turn helix must have approximately 2× the points of 1-turn."""
+        r1 = generate_lead_in_out(_spec_helical(num_turns=1, pts_per_turn=36), cutter_comp="G41")
+        r2 = generate_lead_in_out(_spec_helical(num_turns=2, pts_per_turn=36), cutter_comp="G41")
+        assert len(r2.lead_in_toolpath_points) > len(r1.lead_in_toolpath_points)
+
+    def test_helical_ramp_validation_bad_ramp_angle(self):
+        """ramp_angle_deg > 45 must raise ValueError."""
+        with pytest.raises(ValueError, match="ramp_angle_deg"):
+            LeadSpec(
+                contour_start_xy=(0, 0), contour_tangent_xy=(1, 0),
+                cutter_diameter_mm=10.0, lead_radius_mm=5.0,
+                lead_angle_deg=90.0, feed_mm_per_min=500.0,
+                lead_type="helical-ramp",
+                ramp_angle_deg=50.0,
+            )
+
+    def test_helical_ramp_validation_zero_turns(self):
+        """num_helix_turns < 1 must raise ValueError."""
+        with pytest.raises(ValueError, match="num_helix_turns"):
+            LeadSpec(
+                contour_start_xy=(0, 0), contour_tangent_xy=(1, 0),
+                cutter_diameter_mm=10.0, lead_radius_mm=5.0,
+                lead_angle_deg=90.0, feed_mm_per_min=500.0,
+                lead_type="helical-ramp",
+                num_helix_turns=0,
+            )
+
+
+# ---------------------------------------------------------------------------
+# 13. Ramp-on lead-in
+# ---------------------------------------------------------------------------
+
+def _spec_ramp_on(
+    depth_mm: float = 5.0,
+    ramp_angle_deg: float = 5.0,
+    target_z_mm: float = -5.0,
+    contour_start_xy: tuple = (10.0, 0.0),
+    contour_tangent_xy: tuple = (1.0, 0.0),
+) -> LeadSpec:
+    return LeadSpec(
+        contour_start_xy=contour_start_xy,
+        contour_tangent_xy=contour_tangent_xy,
+        cutter_diameter_mm=10.0,
+        lead_radius_mm=depth_mm,
+        lead_angle_deg=90.0,  # not used for ramp-on
+        feed_mm_per_min=400.0,
+        lead_type="ramp-on",
+        target_z_mm=target_z_mm,
+        ramp_angle_deg=ramp_angle_deg,
+    )
+
+
+class TestRampOn:
+    def test_ramp_on_has_two_toolpath_points(self):
+        """Ramp-on lead-in must have exactly 2 toolpath points (start, end)."""
+        result = generate_lead_in_out(_spec_ramp_on(), cutter_comp="G41")
+        assert len(result.lead_in_toolpath_points) == 2
+
+    def test_ramp_on_end_at_contour_start(self):
+        """Last toolpath point must be at contour_start_xy at target_z_mm."""
+        px, py = 10.0, 0.0
+        target_z = -5.0
+        result = generate_lead_in_out(
+            _spec_ramp_on(target_z_mm=target_z, contour_start_xy=(px, py)),
+            cutter_comp="G41",
+        )
+        last = result.lead_in_toolpath_points[-1]
+        assert abs(last[0] - px) < 1e-9
+        assert abs(last[1] - py) < 1e-9
+        assert abs(last[2] - target_z) < 1e-9
+
+    def test_ramp_on_z_decreases(self):
+        """Z must decrease from start to end of lead-in."""
+        result = generate_lead_in_out(_spec_ramp_on(), cutter_comp="G41")
+        pts = result.lead_in_toolpath_points
+        assert pts[0][2] > pts[-1][2], (
+            f"Expected z_start > z_end; got {pts[0][2]} vs {pts[-1][2]}"
+        )
+
+    def test_ramp_on_xy_length_matches_formula(self):
+        """XY ramp length = depth / tan(angle)."""
+        depth = 4.0
+        angle_deg = 5.0
+        px, py = 0.0, 0.0
+        result = generate_lead_in_out(
+            _spec_ramp_on(depth_mm=depth, ramp_angle_deg=angle_deg,
+                          contour_start_xy=(px, py),
+                          contour_tangent_xy=(1.0, 0.0)),
+            cutter_comp="G41",
+        )
+        pts = result.lead_in_toolpath_points
+        xy_dist = math.hypot(pts[0][0] - pts[1][0], pts[0][1] - pts[1][1])
+        expected = depth / math.tan(math.radians(angle_deg))
+        assert abs(xy_dist - expected) < 1e-6, (
+            f"XY length {xy_dist} should equal depth/tan(angle) = {expected}"
+        )
+
+    def test_ramp_on_3d_path_length(self):
+        """3D path length = ramp_xy / cos(angle)."""
+        depth = 4.0
+        angle_deg = 5.0
+        result = generate_lead_in_out(
+            _spec_ramp_on(depth_mm=depth, ramp_angle_deg=angle_deg),
+            cutter_comp="G41",
+        )
+        ramp_xy = depth / math.tan(math.radians(angle_deg))
+        expected_3d = ramp_xy / math.cos(math.radians(angle_deg))
+        assert abs(result.lead_in_length_mm - expected_3d) < 1e-6
+
+    def test_ramp_on_start_behind_contour_along_negative_tangent(self):
+        """Ramp start must be behind P_c along -tangent direction."""
+        px, py = 0.0, 0.0
+        depth = 3.0
+        angle_deg = 10.0
+        result = generate_lead_in_out(
+            _spec_ramp_on(depth_mm=depth, ramp_angle_deg=angle_deg,
+                          contour_start_xy=(px, py),
+                          contour_tangent_xy=(1.0, 0.0)),
+            cutter_comp="G41",
+        )
+        start = result.lead_in_toolpath_points[0]
+        # tangent is (1,0) so ramp start must be at negative x from P_c
+        assert start[0] < px, f"Ramp start X {start[0]} should be < P_c X {px}"
+
+    def test_ramp_on_lead_out_ascends(self):
+        """Lead-out must ramp upward (last Z > first Z)."""
+        result = generate_lead_in_out(_spec_ramp_on(), cutter_comp="G41")
+        out_pts = result.lead_out_toolpath_points
+        assert out_pts[-1][2] > out_pts[0][2], (
+            f"Lead-out should ascend: z_start={out_pts[0][2]}, z_end={out_pts[-1][2]}"
+        )
+
+    def test_ramp_on_gcode_mentions_ramp(self):
+        """Lead-in G-code comment must mention ramp."""
+        result = generate_lead_in_out(_spec_ramp_on(), cutter_comp="G41")
+        assert "ramp" in result.gcode_lead_in.lower()
+
+    def test_ramp_on_validation_bad_angle(self):
+        """ramp_angle_deg > 45 must raise ValueError."""
+        with pytest.raises(ValueError, match="ramp_angle_deg"):
+            LeadSpec(
+                contour_start_xy=(0, 0), contour_tangent_xy=(1, 0),
+                cutter_diameter_mm=10.0, lead_radius_mm=5.0,
+                lead_angle_deg=90.0, feed_mm_per_min=500.0,
+                lead_type="ramp-on",
+                ramp_angle_deg=50.0,
+            )
+
+    def test_ramp_on_lead_in_lead_out_lengths_equal(self):
+        """lead_in_length_mm == lead_out_length_mm (symmetric ramp)."""
+        result = generate_lead_in_out(_spec_ramp_on(), cutter_comp="G41")
+        assert abs(result.lead_in_length_mm - result.lead_out_length_mm) < 1e-9
+
+
+# ---------------------------------------------------------------------------
+# 14. Arc-tangent lead-in
+# ---------------------------------------------------------------------------
+
+def _spec_arc_tangent(
+    R: float = 5.0,
+    n_pts: int = 32,
+    contour_start_xy: tuple = (10.0, 20.0),
+    contour_tangent_xy: tuple = (1.0, 0.0),
+) -> LeadSpec:
+    return LeadSpec(
+        contour_start_xy=contour_start_xy,
+        contour_tangent_xy=contour_tangent_xy,
+        cutter_diameter_mm=10.0,
+        lead_radius_mm=R,
+        lead_angle_deg=90.0,  # not used for arc-tangent (always 90°)
+        feed_mm_per_min=500.0,
+        lead_type="arc-tangent",
+        arc_points=n_pts,
+    )
+
+
+class TestArcTangent:
+    def test_arc_tangent_has_toolpath_points(self):
+        """lead_in_toolpath_points must be non-empty 2-tuples."""
+        result = generate_lead_in_out(_spec_arc_tangent(), cutter_comp="G41")
+        pts = result.lead_in_toolpath_points
+        assert len(pts) > 0
+        assert len(pts[0]) == 2, f"Expected 2-tuple (x,y), got {pts[0]}"
+
+    def test_arc_tangent_last_point_is_contour_start(self):
+        """Last toolpath point must be contour_start_xy."""
+        px, py = 10.0, 20.0
+        result = generate_lead_in_out(
+            _spec_arc_tangent(contour_start_xy=(px, py)),
+            cutter_comp="G41",
+        )
+        last = result.lead_in_toolpath_points[-1]
+        assert abs(last[0] - px) < 1e-6
+        assert abs(last[1] - py) < 1e-6
+
+    def test_arc_tangent_arc_centre_populated(self):
+        """arc_centre_xy must be a 2-tuple for arc-tangent type."""
+        result = generate_lead_in_out(_spec_arc_tangent(), cutter_comp="G41")
+        assert result.arc_centre_xy is not None
+        assert len(result.arc_centre_xy) == 2
+
+    def test_arc_tangent_arc_radius_equals_spec_radius(self):
+        """arc_radius_mm must equal lead_radius_mm."""
+        R = 7.0
+        result = generate_lead_in_out(_spec_arc_tangent(R=R), cutter_comp="G41")
+        assert abs(result.arc_radius_mm - R) < 1e-9
+
+    def test_arc_tangent_all_points_on_circle(self):
+        """All toolpath points must lie on the arc circle within tolerance."""
+        R = 5.0
+        result = generate_lead_in_out(_spec_arc_tangent(R=R, n_pts=64), cutter_comp="G41")
+        cx, cy = result.arc_centre_xy
+        for x, y in result.lead_in_toolpath_points:
+            dist = math.hypot(x - cx, y - cy)
+            assert abs(dist - R) < 1e-6, (
+                f"Point ({x},{y}) is {dist:.6f} mm from centre, expected R={R}"
+            )
+
+    def test_arc_tangent_centre_perpendicular_to_contour_start_g41(self):
+        """For G41 +X tangent: arc centre must be directly above P_c (+Y direction)
+        by exactly R, i.e. centre = (px, py + R)."""
+        R = 5.0
+        px, py = 10.0, 20.0
+        result = generate_lead_in_out(
+            _spec_arc_tangent(R=R, contour_start_xy=(px, py),
+                               contour_tangent_xy=(1.0, 0.0)),
+            cutter_comp="G41",
+        )
+        cx, cy = result.arc_centre_xy
+        assert abs(cx - px) < 1e-6
+        assert abs(cy - (py + R)) < 1e-6
+
+    def test_arc_tangent_arc_length_is_pi_r_over_2(self):
+        """90° arc length = R × π/2."""
+        R = 6.0
+        result = generate_lead_in_out(_spec_arc_tangent(R=R), cutter_comp="G41")
+        expected = R * math.pi / 2.0
+        assert abs(result.lead_in_length_mm - expected) < 1e-4, (
+            f"Arc length {result.lead_in_length_mm} should be π×R/2 = {expected}"
+        )
+
+    def test_arc_tangent_lead_out_reversed(self):
+        """Lead-out toolpath must be reverse of lead-in toolpath."""
+        result = generate_lead_in_out(_spec_arc_tangent(n_pts=16), cutter_comp="G41")
+        in_pts = result.lead_in_toolpath_points
+        out_pts = result.lead_out_toolpath_points
+        assert len(in_pts) == len(out_pts)
+        # First point of lead-out == last point of lead-in
+        assert abs(out_pts[0][0] - in_pts[-1][0]) < 1e-9
+        assert abs(out_pts[0][1] - in_pts[-1][1]) < 1e-9
+
+    def test_arc_tangent_gcode_mentions_centre(self):
+        """Lead-in G-code comment must mention centre coordinates."""
+        result = generate_lead_in_out(_spec_arc_tangent(), cutter_comp="G41")
+        assert "centre" in result.gcode_lead_in.lower() or "center" in result.gcode_lead_in.lower()
+
+    def test_arc_tangent_g40_in_lead_out(self):
+        """G40 must appear in lead-out block."""
+        result = generate_lead_in_out(_spec_arc_tangent(), cutter_comp="G41")
+        assert "G40" in result.gcode_lead_out
+
+    def test_arc_tangent_validation_too_few_arc_points(self):
+        """arc_points < 4 must raise ValueError."""
+        with pytest.raises(ValueError, match="arc_points"):
+            LeadSpec(
+                contour_start_xy=(0, 0), contour_tangent_xy=(1, 0),
+                cutter_diameter_mm=10.0, lead_radius_mm=5.0,
+                lead_angle_deg=90.0, feed_mm_per_min=500.0,
+                lead_type="arc-tangent",
+                arc_points=2,
+            )
+
+    def test_arc_tangent_g42_centre_below_contour_start(self):
+        """For G42 +X tangent: arc centre must be directly below P_c (−Y direction)."""
+        R = 5.0
+        px, py = 10.0, 20.0
+        result = generate_lead_in_out(
+            _spec_arc_tangent(R=R, contour_start_xy=(px, py),
+                               contour_tangent_xy=(1.0, 0.0)),
+            cutter_comp="G42",
+        )
+        cx, cy = result.arc_centre_xy
+        assert abs(cx - px) < 1e-6
+        assert abs(cy - (py - R)) < 1e-6
+
+    def test_arc_tangent_lead_in_lead_out_lengths_equal(self):
+        """lead_in_length_mm == lead_out_length_mm (symmetric arc)."""
+        result = generate_lead_in_out(_spec_arc_tangent(), cutter_comp="G41")
+        assert abs(result.lead_in_length_mm - result.lead_out_length_mm) < 1e-9
+
+
+# ---------------------------------------------------------------------------
+# 15. LLM tool — new types round-trip
+# ---------------------------------------------------------------------------
+
+class TestLLMToolNewTypes:
+    def test_llm_tool_helical_ramp_returns_ok(self):
+        payload = json.dumps({
+            "contour_start_xy": [10.0, 0.0],
+            "contour_tangent_xy": [1.0, 0.0],
+            "cutter_diameter_mm": 10.0,
+            "lead_radius_mm": 5.0,
+            "lead_angle_deg": 90.0,
+            "feed_mm_per_min": 400.0,
+            "lead_type": "helical-ramp",
+            "target_z_mm": -5.0,
+            "ramp_angle_deg": 3.0,
+            "num_helix_turns": 1,
+            "cutter_comp": "G41",
+        }).encode()
+        result_str = _run_async(run_cam_generate_lead_in_out(_ctx(), payload))
+        result = json.loads(result_str)
+        assert "gcode_lead_in" in result
+        assert "lead_in_toolpath_points" in result
+        assert len(result["lead_in_toolpath_points"]) > 0
+
+    def test_llm_tool_ramp_on_returns_ok(self):
+        payload = json.dumps({
+            "contour_start_xy": [0.0, 0.0],
+            "contour_tangent_xy": [1.0, 0.0],
+            "cutter_diameter_mm": 10.0,
+            "lead_radius_mm": 5.0,
+            "lead_angle_deg": 90.0,
+            "feed_mm_per_min": 400.0,
+            "lead_type": "ramp-on",
+            "target_z_mm": -5.0,
+            "ramp_angle_deg": 5.0,
+            "cutter_comp": "G41",
+        }).encode()
+        result_str = _run_async(run_cam_generate_lead_in_out(_ctx(), payload))
+        result = json.loads(result_str)
+        assert "gcode_lead_in" in result
+        assert "lead_in_toolpath_points" in result
+        assert len(result["lead_in_toolpath_points"]) == 2
+
+    def test_llm_tool_arc_tangent_returns_ok(self):
+        payload = json.dumps({
+            "contour_start_xy": [10.0, 20.0],
+            "contour_tangent_xy": [1.0, 0.0],
+            "cutter_diameter_mm": 10.0,
+            "lead_radius_mm": 5.0,
+            "lead_angle_deg": 90.0,
+            "feed_mm_per_min": 500.0,
+            "lead_type": "arc-tangent",
+            "cutter_comp": "G41",
+        }).encode()
+        result_str = _run_async(run_cam_generate_lead_in_out(_ctx(), payload))
+        result = json.loads(result_str)
+        assert "gcode_lead_in" in result
+        assert "arc_centre_xy" in result
+        assert result["arc_centre_xy"] is not None
+        assert "arc_radius_mm" in result
+        assert abs(result["arc_radius_mm"] - 5.0) < 1e-9
+
+    def test_llm_tool_new_types_in_spec_enum(self):
+        """ToolSpec enum for lead_type must include all 6 types."""
+        enum_vals = (
+            cam_generate_lead_in_out_spec.input_schema["properties"]["lead_type"]["enum"]
+        )
+        for t in ("arc", "line", "perpendicular", "helical-ramp", "ramp-on", "arc-tangent"):
+            assert t in enum_vals, f"lead_type enum missing: {t}"
+
+    def test_llm_tool_helical_ramp_arc_centre_populated(self):
+        """helical-ramp result must include arc_centre_xy (helix centre)."""
+        payload = json.dumps({
+            "contour_start_xy": [10.0, 0.0],
+            "contour_tangent_xy": [1.0, 0.0],
+            "cutter_diameter_mm": 10.0,
+            "lead_radius_mm": 5.0,
+            "lead_angle_deg": 90.0,
+            "feed_mm_per_min": 400.0,
+            "lead_type": "helical-ramp",
+            "target_z_mm": 0.0,
+            "ramp_angle_deg": 3.0,
+        }).encode()
+        result_str = _run_async(run_cam_generate_lead_in_out(_ctx(), payload))
+        result = json.loads(result_str)
+        assert result.get("arc_centre_xy") is not None

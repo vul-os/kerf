@@ -1,6 +1,9 @@
 """
 kerf_cam.lead_in_out — G-code lead-in / lead-out arc and line segments for
 2D contour milling, avoiding witness marks at the cutter entry/exit points.
+Also provides 3D entry types: helical-ramp (spiral descent), ramp-on (linear
+angled descent), and arc-tangent (arc tangent to both surface and first cut
+direction).
 
 Reference standards
 -------------------
@@ -13,6 +16,15 @@ Reference standards
     with a tangent join.
   - Lead-out (exit): mirror image of lead-in; exit arc departs tangent to the
     contour to avoid the step that occurs when the cutter leaves suddenly.
+
+* Machinery's Handbook 31e §1109 — Helical interpolation entry (helical ramp):
+  - Helical lead-in: the cutter spirals down at a constant pitch angle (typically
+    2–5° for aluminium, 1–3° for steel; must not exceed chip-load or side-load
+    limits). The helix axis is centred on a clearance circle of radius
+    lead_radius_mm; one or more full revolutions bring the cutter to depth.
+  - Ramp-on entry: linear Z-descent across the XY lead-in segment at a fixed
+    plunge angle (ramp_angle_deg, typically 3–7°, max 15° for hard materials).
+    The ramp length is lead_radius_mm / tan(ramp_angle_deg).
 
 * Fanuc Operator Manual — G41/G42 Cutter Compensation:
   - G41: cutter compensation LEFT of programmed path (climb milling, outside
@@ -74,12 +86,49 @@ Perpendicular lead-in (lead_type="perpendicular")
 Approach P_c from a point offset perpendicular to the tangent by lead_radius_mm.
 Emit G01.  Equivalent to a line entry but at 90° to the contour.
 
+Helical-ramp lead-in (lead_type="helical-ramp")
+------------------------------------------------
+The cutter spirals downward at a constant pitch angle onto the XY plane of the
+contour.  Parameters: lead_radius_mm = helix radius; ramp_angle_deg = pitch
+angle in degrees (default 3°); num_helix_turns = number of full revolutions
+(default 1).  The helix centre is offset from P_c perpendicular to the tangent
+(same side as cutter compensation).  Each revolution is sampled into
+helix_points (default 36) linear G01 segments approximating the helix.
+Z descends from (target_z_mm + pitch_per_turn) to target_z_mm over one
+revolution.  Returns a list of (x, y, z) toolpath points.  The lead-out is a
+simple retract back up the helix axis (reversed).
+
+MH 31e §1109: pitch angle 2–5° aluminium, 1–3° steel; max 15° hard materials.
+Pitch per turn = 2π × R × tan(ramp_angle_deg).
+
+Ramp-on lead-in (lead_type="ramp-on")
+--------------------------------------
+Linear Z-descent across a straight XY lead-in segment at a fixed plunge angle
+(ramp_angle_deg, default 5°).  Ramp length in XY =
+target_depth_mm / tan(ramp_angle_deg).  The ramp starts at clearance height
+(target_z_mm + target_depth_mm) and descends to target_z_mm.  The XY segment
+starts behind P_c along the negative tangent direction by the ramp length.
+Returns a list of (x, y, z) toolpath points.  Lead-out is the mirror: ramp up
+along the positive tangent direction.
+
+Arc-tangent lead-in (lead_type="arc-tangent")
+---------------------------------------------
+Arc tangent to both the surface (the tool approaches perpendicular to the XY
+plane, so the arc must be tangent at 90° to the plunge axis) and to the first
+cut direction (the arc exits tangent to the contour tangent).  This is the
+classic MH 31e §1131 "tangent arc entry" in 2D with explicit geometry points
+returned as a list of (x, y) arc samples plus the arc centre and radius.
+Equivalent to lead_type="arc" at lead_angle_deg=90° but exposes the arc
+geometry (centre, radius, start, end) as structured output rather than G-code
+strings.  The returned toolpath points trace the arc from the start point to
+the contour start.  Lead-out is the reverse arc.
+
 Honest caveats
 --------------
-- **2D contours only** (XY plane, constant Z): 3D ramp entry and helical
-  entry are not implemented.
 - Lead-in geometry is computed in the XY plane; the caller is responsible for
-  setting the correct Z depth before the lead-in begins.
+  setting the correct Z depth before the 2D lead-in begins.
+- For "helical-ramp" and "ramp-on": 3D toolpath points are returned; Z values
+  assume a flat XY contour at target_z_mm (specified in the spec).
 - Cutter compensation (G41/G42) is activated by the emitted block; the
   caller must ensure the D-offset register is set beforehand (typically
   D = tool_radius in the controller's offset table).
@@ -110,7 +159,7 @@ except ImportError:
 # Constants
 # ---------------------------------------------------------------------------
 
-_VALID_LEAD_TYPES = frozenset({"arc", "line", "perpendicular"})
+_VALID_LEAD_TYPES = frozenset({"arc", "line", "perpendicular", "helical-ramp", "ramp-on", "arc-tangent"})
 _VALID_CUTTER_COMP = frozenset({"G41", "G42"})
 
 # Minimum lead angle to avoid a degenerate arc (< 1° treated as line).
@@ -140,17 +189,43 @@ class LeadSpec:
     lead_radius_mm     : Radius of the lead-in arc, or length of the lead-in
                          line segment, in mm.  MH 31e §1131: typically
                          50–100 % of cutter radius; must be > 0.
+                         For "helical-ramp": helix radius.
     lead_angle_deg     : Angle of the lead-in arc (degrees, 0 < angle ≤ 90).
                          90° = classic perpendicular tangent arc entry
                          (most common; recommended by MH 31e §1131).
                          Smaller values produce a shallower arc entry.
                          Ignored for "line" and "perpendicular" types.
+                         For "helical-ramp" and "ramp-on": the pitch/plunge
+                         angle in degrees (typically 3–7°; default 3.0°).
     feed_mm_per_min    : Feed rate for the lead-in/lead-out moves (mm/min).
-    lead_type          : "arc" | "line" | "perpendicular".
+    lead_type          : "arc" | "line" | "perpendicular" |
+                         "helical-ramp" | "ramp-on" | "arc-tangent".
                          arc          — tangent arc entry/exit (MH 31e §1131).
                          line         — straight entry along contour tangent.
                          perpendicular — straight entry from the side
                                         (perpendicular to tangent).
+                         helical-ramp  — spiral descent at constant pitch angle
+                                        to target Z (MH 31e §1109).
+                         ramp-on       — linear Z descent at fixed plunge angle
+                                        toward first cut point.
+                         arc-tangent   — arc tangent to both surface (90°) and
+                                        first cut direction; returns structured
+                                        arc geometry as toolpath points.
+    target_z_mm        : Z depth of the contour plane (mm).  Required for
+                         "helical-ramp" and "ramp-on" types (ignored otherwise;
+                         default 0.0).
+    ramp_angle_deg     : Pitch/plunge angle for "helical-ramp" and "ramp-on"
+                         (degrees, 0 < angle ≤ 45; default 3.0°).
+                         Overrides lead_angle_deg for those types when provided.
+                         For "helical-ramp": helix pitch angle (MH 31e §1109
+                         recommends 2–5° Al, 1–3° steel).
+                         For "ramp-on": linear plunge angle (typically 5°).
+    num_helix_turns    : Number of full helix revolutions for "helical-ramp"
+                         (default 1; must be ≥ 1).
+    helix_points_per_turn : Number of linear G01 segments per helix revolution
+                         (default 36; must be ≥ 4).
+    arc_points         : Number of sample points along the arc for "arc-tangent"
+                         toolpath output (default 32; must be ≥ 4).
     """
     contour_start_xy: tuple
     contour_tangent_xy: tuple
@@ -159,6 +234,11 @@ class LeadSpec:
     lead_angle_deg: float
     feed_mm_per_min: float
     lead_type: str
+    target_z_mm: float = 0.0
+    ramp_angle_deg: float = 3.0
+    num_helix_turns: int = 1
+    helix_points_per_turn: int = 36
+    arc_points: int = 32
 
     def __post_init__(self):
         if self.cutter_diameter_mm <= 0:
@@ -189,6 +269,26 @@ class LeadSpec:
                     f"lead_angle_deg must be in [{_MIN_LEAD_ANGLE_DEG}, 90] for arc type, "
                     f"got {self.lead_angle_deg!r}"
                 )
+        if self.lead_type in ("helical-ramp", "ramp-on"):
+            if not (0 < self.ramp_angle_deg <= 45.0):
+                raise ValueError(
+                    f"ramp_angle_deg must be in (0, 45] for {self.lead_type!r}, "
+                    f"got {self.ramp_angle_deg!r}"
+                )
+        if self.lead_type == "helical-ramp":
+            if self.num_helix_turns < 1:
+                raise ValueError(
+                    f"num_helix_turns must be >= 1, got {self.num_helix_turns!r}"
+                )
+            if self.helix_points_per_turn < 4:
+                raise ValueError(
+                    f"helix_points_per_turn must be >= 4, got {self.helix_points_per_turn!r}"
+                )
+        if self.lead_type == "arc-tangent":
+            if self.arc_points < 4:
+                raise ValueError(
+                    f"arc_points must be >= 4, got {self.arc_points!r}"
+                )
 
 
 @dataclass
@@ -199,19 +299,44 @@ class LeadResult:
     ----------
     gcode_lead_in    : G-code block for the lead-in move (activates cutter
                        compensation, then arcs/lines to the contour start).
+                       For "helical-ramp", "ramp-on", and "arc-tangent" types
+                       this is a descriptive comment block; use
+                       lead_in_toolpath_points for the actual geometry.
     gcode_lead_out   : G-code block for the lead-out move (arcs/lines away
                        from the contour end, then cancels cutter compensation).
     lead_in_length_mm  : Path length of the lead-in move in mm.
                          For arc: R × angle_rad.  For line: lead_radius_mm.
+                         For helical-ramp: helix arc length (2π × R × turns /
+                         cos(pitch_angle)).  For ramp-on: ramp XY distance /
+                         cos(angle).  For arc-tangent: R × pi/2.
     lead_out_length_mm : Path length of the lead-out move in mm (same formula,
                          mirrored).
     honest_caveat    : Plain-English note on assumptions and limitations.
+    lead_in_toolpath_points  : List of (x, y) or (x, y, z) tuples tracing the
+                               lead-in path (populated for all types; 2-tuples
+                               for 2D types, 3-tuples for 3D types).
+    lead_out_toolpath_points : List of (x, y) or (x, y, z) tuples tracing the
+                               lead-out path.
+    arc_centre_xy    : (cx, cy) arc centre for "arc" and "arc-tangent" types;
+                       None for other types.
+    arc_radius_mm    : Arc radius for "arc" and "arc-tangent" types; None
+                       otherwise.
     """
     gcode_lead_in: str
     gcode_lead_out: str
     lead_in_length_mm: float
     lead_out_length_mm: float
     honest_caveat: str
+    lead_in_toolpath_points: list = None
+    lead_out_toolpath_points: list = None
+    arc_centre_xy: tuple = None
+    arc_radius_mm: float = None
+
+    def __post_init__(self):
+        if self.lead_in_toolpath_points is None:
+            self.lead_in_toolpath_points = []
+        if self.lead_out_toolpath_points is None:
+            self.lead_out_toolpath_points = []
 
 
 # ---------------------------------------------------------------------------
@@ -271,6 +396,221 @@ def _arc_ij(start_x: float, start_y: float,
 def _arc_length(radius_mm: float, angle_deg: float) -> float:
     """Return arc length = R × |θ| in mm (angle in degrees)."""
     return radius_mm * abs(math.radians(angle_deg))
+
+
+# ---------------------------------------------------------------------------
+# 3D lead-in geometry helpers
+# ---------------------------------------------------------------------------
+
+def compute_helical_ramp_points(
+    spec: LeadSpec,
+    cutter_comp: str,
+) -> tuple:
+    """Compute toolpath points for a helical-ramp lead-in.
+
+    The helix axis is centred offset from the contour start point, perpendicular
+    to the contour tangent (same side as cutter_comp).  The cutter spirals down
+    from (target_z_mm + pitch_per_turn * num_helix_turns) to target_z_mm over
+    num_helix_turns full revolutions.
+
+    Algorithm (MH 31e §1109 helical interpolation entry):
+      pitch_per_turn = 2π × R × tan(ramp_angle_deg)
+      For each turn t in [0, num_helix_turns]:
+        For each sample s in [0, helix_points_per_turn]:
+          θ = 2π × (t + s/helix_points_per_turn)
+          x = cx + R × cos(θ_start + θ × direction)
+          y = cy + R × sin(θ_start + θ × direction)
+          z = z_start - pitch_per_turn × (t + s/helix_points_per_turn)
+
+    Returns
+    -------
+    (lead_in_pts, lead_out_pts, centre_xy, helix_length_mm)
+
+    lead_in_pts  : list of (x, y, z) tuples — helical descent
+    lead_out_pts : list of (x, y, z) tuples — reversed (ascent)
+    centre_xy    : (cx, cy) helix centre
+    helix_length_mm : arc length of the helix (chord approximation)
+    """
+    px, py = spec.contour_start_xy
+    tx, ty = _normalise(*spec.contour_tangent_xy)
+    R = spec.lead_radius_mm
+    z_target = spec.target_z_mm
+    pitch_angle_rad = math.radians(spec.ramp_angle_deg)
+    n_turns = spec.num_helix_turns
+    n_pts = spec.helix_points_per_turn
+
+    # Pitch per full revolution: p = 2π × R × tan(α)
+    pitch_per_turn = 2.0 * math.pi * R * math.tan(pitch_angle_rad)
+    z_start = z_target + pitch_per_turn * n_turns
+
+    # Helix centre: offset from P_c perpendicular to tangent (same side as comp)
+    if cutter_comp == "G41":
+        nx, ny = _rotate_90_ccw(tx, ty)
+    else:
+        nx, ny = _rotate_90_cw(tx, ty)
+    cx = px + R * nx
+    cy = py + R * ny
+
+    # θ at the contour start: angle from centre to P_c
+    theta_end = math.atan2(py - cy, px - cx)
+
+    # Helix direction: G41 → CCW (positive θ direction = +1); G42 → CW (−1)
+    direction = 1 if cutter_comp == "G41" else -1
+
+    # θ at helix start (before the descent begins)
+    total_angle = 2.0 * math.pi * n_turns
+    theta_start = theta_end - direction * total_angle
+
+    total_samples = n_turns * n_pts
+    pts: list = []
+    for i in range(total_samples + 1):
+        frac = i / total_samples
+        theta = theta_start + direction * total_angle * frac
+        x = cx + R * math.cos(theta)
+        y = cy + R * math.sin(theta)
+        z = z_start - pitch_per_turn * n_turns * frac
+        pts.append((x, y, z))
+
+    # Helix arc length: √((2πR)² + p²) per turn × num_turns
+    helix_length_mm = (
+        math.hypot(2.0 * math.pi * R, pitch_per_turn) * n_turns
+    )
+
+    lead_out_pts = list(reversed(pts))
+    return pts, lead_out_pts, (cx, cy), helix_length_mm
+
+
+def compute_ramp_on_points(
+    spec: LeadSpec,
+) -> tuple:
+    """Compute toolpath points for a linear ramp-on lead-in.
+
+    The cutter descends linearly from (P_start_xy, z_clearance) to
+    (P_c, target_z_mm) along the negative contour tangent direction.
+
+    Algorithm (MH 31e §1109 ramp entry):
+      ramp_length_xy = target_depth / tan(ramp_angle_deg)
+        where target_depth = z_clearance − target_z_mm
+        and z_clearance = target_z_mm + target_depth
+      P_start = P_c − ramp_length_xy × t̂_c
+      Z descends linearly from z_clearance to target_z_mm.
+
+    The target_depth is computed from the spec: it is lead_radius_mm
+    (reused as the desired depth of cut for the ramp — the caller sets
+    lead_radius_mm to the axial depth, and ramp_angle_deg to the plunge angle;
+    the XY ramp length follows automatically).
+
+    Returns
+    -------
+    (lead_in_pts, lead_out_pts, ramp_xy_length_mm, ramp_3d_length_mm)
+
+    lead_in_pts  : list of (x, y, z) tuples
+    lead_out_pts : list of (x, y, z) tuples (ramp up along +tangent direction)
+    ramp_xy_length_mm : horizontal length of the ramp
+    ramp_3d_length_mm : total 3D path length = ramp_xy / cos(angle)
+    """
+    px, py = spec.contour_start_xy
+    tx, ty = _normalise(*spec.contour_tangent_xy)
+    target_depth = spec.lead_radius_mm  # axial depth to ramp through
+    z_target = spec.target_z_mm
+    angle_rad = math.radians(spec.ramp_angle_deg)
+
+    # Horizontal distance: L_xy = depth / tan(α)
+    ramp_xy_length = target_depth / math.tan(angle_rad)
+
+    # Start point: behind P_c along negative tangent
+    sx = px - ramp_xy_length * tx
+    sy = py - ramp_xy_length * ty
+    z_start = z_target + target_depth
+
+    lead_in_pts = [(sx, sy, z_start), (px, py, z_target)]
+
+    # Lead-out: ramp up along +tangent from P_c
+    lox = px + ramp_xy_length * tx
+    loy = py + ramp_xy_length * ty
+    lead_out_pts = [(px, py, z_target), (lox, loy, z_start)]
+
+    ramp_3d_length = ramp_xy_length / math.cos(angle_rad)
+    return lead_in_pts, lead_out_pts, ramp_xy_length, ramp_3d_length
+
+
+def compute_arc_tangent_points(
+    spec: LeadSpec,
+    cutter_comp: str,
+) -> tuple:
+    """Compute toolpath points for an arc-tangent lead-in (2D).
+
+    This is the classic MH 31e §1131 90° tangent arc entry, exposing structured
+    arc geometry: centre (cx, cy), radius R, and sampled (x, y) toolpath points
+    tracing the arc from the lead-in start to the contour start.
+
+    The arc is tangent to the contour at the contour start point (contour_start_xy)
+    and the lead-in start is positioned such that the arc is a 90° sweep.
+
+    Algorithm:
+      1. Centre C = P_c + R × n̂  (perpendicular offset, same side as cutter_comp)
+      2. Arc start Q = C − R × t̂_c  (90° back along tangent from P_c)
+      3. Sample n_pts evenly along the arc Q → P_c.
+
+    Returns
+    -------
+    (lead_in_pts, lead_out_pts, centre_xy, radius_mm, arc_length_mm)
+
+    lead_in_pts  : list of (x, y) tuples from Q to P_c
+    lead_out_pts : list of (x, y) tuples from P_c to Q (reversed)
+    centre_xy    : (cx, cy) arc centre
+    radius_mm    : arc radius
+    arc_length_mm : R × π/2 (90° arc)
+    """
+    px, py = spec.contour_start_xy
+    tx, ty = _normalise(*spec.contour_tangent_xy)
+    R = spec.lead_radius_mm
+    n_pts = spec.arc_points
+
+    if cutter_comp == "G41":
+        nx, ny = _rotate_90_ccw(tx, ty)
+    else:
+        nx, ny = _rotate_90_cw(tx, ty)
+
+    # Arc centre
+    cx = px + R * nx
+    cy = py + R * ny
+
+    # Arc start Q (90° back along negative tangent from C)
+    qx = cx - R * tx
+    qy = cy - R * ty
+
+    # Sample the arc from Q to P_c
+    theta_start = math.atan2(qy - cy, qx - cx)
+    theta_end = math.atan2(py - cy, px - cx)
+
+    # Determine sweep direction: G41 → CCW (+θ), G42 → CW (−θ)
+    if cutter_comp == "G41":
+        # CCW: normalise delta to (0, 2π]
+        delta = theta_end - theta_start
+        while delta <= 0:
+            delta += 2.0 * math.pi
+        while delta > 2.0 * math.pi:
+            delta -= 2.0 * math.pi
+    else:
+        # CW: normalise delta to [-2π, 0)
+        delta = theta_end - theta_start
+        while delta >= 0:
+            delta -= 2.0 * math.pi
+        while delta < -2.0 * math.pi:
+            delta += 2.0 * math.pi
+
+    pts: list = []
+    for i in range(n_pts + 1):
+        frac = i / n_pts
+        theta = theta_start + delta * frac
+        x = cx + R * math.cos(theta)
+        y = cy + R * math.sin(theta)
+        pts.append((x, y))
+
+    arc_length_mm = R * abs(delta)
+    lead_out_pts = list(reversed(pts))
+    return pts, lead_out_pts, (cx, cy), R, arc_length_mm
 
 
 def _compute_arc_lead_in(
@@ -468,6 +808,11 @@ def generate_lead_in_out(
             f"G00 X{_fmt(ex)} Y{_fmt(ey)}  (rapid clear)",
         ]
 
+        lead_in_toolpath_pts = [(qx, qy), (px, py)]
+        lead_out_toolpath_pts = [(px, py), (ex, ey)]
+        arc_centre = (cx, cy)
+        arc_radius = R
+
     elif spec.lead_type == "line":
         # Straight line along the tangent direction, entering from behind
         sx = px - R * tx
@@ -493,7 +838,12 @@ def generate_lead_in_out(
             "G40  (cancel cutter compensation)",
         ]
 
-    else:  # "perpendicular"
+        lead_in_toolpath_pts = [(sx, sy), (px, py)]
+        lead_out_toolpath_pts = [(px, py), (lox, loy)]
+        arc_centre = None
+        arc_radius = None
+
+    elif spec.lead_type == "perpendicular":
         # Approach from the side: perpendicular to the tangent (from the
         # same side as cutter_comp dictates).
         if cutter_comp == "G41":
@@ -524,10 +874,103 @@ def generate_lead_in_out(
             "G40  (cancel cutter compensation)",
         ]
 
+        lead_in_toolpath_pts = [(sx, sy), (px, py)]
+        lead_out_toolpath_pts = [(px, py), (lox, loy)]
+        arc_centre = None
+        arc_radius = None
+
+    elif spec.lead_type == "helical-ramp":
+        # Helical-ramp: spiral descent at constant pitch angle to target Z.
+        # MH 31e §1109.
+        (lead_in_toolpath_pts, lead_out_toolpath_pts,
+         arc_centre, helix_length) = compute_helical_ramp_points(spec, cutter_comp)
+        arc_radius = spec.lead_radius_mm
+        lead_in_length = helix_length
+        lead_out_length = helix_length
+
+        pitch_per_turn = (
+            2.0 * math.pi * R * math.tan(math.radians(spec.ramp_angle_deg))
+        )
+        z_start = spec.target_z_mm + pitch_per_turn * spec.num_helix_turns
+
+        lead_in_lines = [
+            f"(Lead-in helical-ramp — MH 31e §1109; R={_fmt(R)} mm; "
+            f"pitch_angle={_fmt(spec.ramp_angle_deg)}°; "
+            f"turns={spec.num_helix_turns}; "
+            f"pitch_per_turn={_fmt(pitch_per_turn)} mm; "
+            f"Z_start={_fmt(z_start)} → Z_target={_fmt(spec.target_z_mm)}; {cutter_comp})",
+            f"(Use lead_in_toolpath_points for actual G01 segments)",
+            f"{cutter_comp} D  (activate cutter compensation)",
+        ]
+        lead_out_lines = [
+            f"(Lead-out helical-ramp — reverse helix ascent; R={_fmt(R)} mm)",
+            f"(Use lead_out_toolpath_points for actual G01 segments)",
+            "G40  (cancel cutter compensation)",
+        ]
+
+    elif spec.lead_type == "ramp-on":
+        # Ramp-on: linear Z descent at fixed plunge angle toward first cut point.
+        # MH 31e §1109.
+        (lead_in_toolpath_pts, lead_out_toolpath_pts,
+         ramp_xy_length, ramp_3d_length) = compute_ramp_on_points(spec)
+        arc_centre = None
+        arc_radius = None
+        lead_in_length = ramp_3d_length
+        lead_out_length = ramp_3d_length
+
+        sx, sy, z_s = lead_in_toolpath_pts[0]
+        lead_in_lines = [
+            f"(Lead-in ramp-on — MH 31e §1109; depth={_fmt(R)} mm; "
+            f"angle={_fmt(spec.ramp_angle_deg)}°; "
+            f"XY_length={_fmt(ramp_xy_length)} mm; "
+            f"Z_start={_fmt(z_s)} → Z_target={_fmt(spec.target_z_mm)}; {cutter_comp})",
+            f"G00 X{_fmt(sx)} Y{_fmt(sy)}  (rapid to ramp start)",
+            f"{cutter_comp} D  (activate cutter compensation)",
+            f"G01 X{_fmt(px)} Y{_fmt(py)} Z{_fmt(spec.target_z_mm)} F{_fmt(F)}"
+            f"  (ramp descent → contour start)",
+        ]
+        lox, loy, loz = lead_out_toolpath_pts[-1]
+        lead_out_lines = [
+            f"(Lead-out ramp-on — ramp ascent along +tangent; angle={_fmt(spec.ramp_angle_deg)}°)",
+            f"G01 X{_fmt(lox)} Y{_fmt(loy)} Z{_fmt(loz)} F{_fmt(F)}  (ramp ascent)",
+            "G40  (cancel cutter compensation)",
+        ]
+
+    else:  # "arc-tangent"
+        # Arc-tangent: 2D arc tangent to both surface (90° to plunge axis) and
+        # first cut direction. MH 31e §1131.  Returns structured geometry.
+        (lead_in_toolpath_pts, lead_out_toolpath_pts,
+         arc_centre, arc_radius, arc_length_mm) = compute_arc_tangent_points(
+            spec, cutter_comp
+        )
+        lead_in_length = arc_length_mm
+        lead_out_length = arc_length_mm
+
+        cx_at, cy_at = arc_centre
+        qx_at, qy_at = lead_in_toolpath_pts[0]
+        lead_in_lines = [
+            f"(Lead-in arc-tangent — MH 31e §1131; R={_fmt(R)} mm; "
+            f"sweep=90°; centre=({_fmt(cx_at)},{_fmt(cy_at)}); {cutter_comp})",
+            f"G00 X{_fmt(qx_at)} Y{_fmt(qy_at)}  (rapid to arc-tangent lead-in start)",
+            f"{cutter_comp} D  (activate cutter compensation)",
+            f"(Use lead_in_toolpath_points for sampled arc G01 segments)",
+        ]
+        lead_out_lines = [
+            f"(Lead-out arc-tangent — reverse arc; R={_fmt(R)} mm)",
+            f"(Use lead_out_toolpath_points for sampled arc G01 segments)",
+            "G40  (cancel cutter compensation)",
+        ]
+
+    _2d_types = ("arc", "line", "perpendicular", "arc-tangent")
     caveat = (
-        "2D contours only (XY plane, constant Z): 3D ramp entry and helical entry "
-        "are NOT implemented. "
-        "Cutter compensation (G41/G42) is activated in the lead-in block; "
+        (
+            "2D contours only (XY plane, constant Z): arc and line lead-in/out "
+            "are computed in the XY plane; the caller must set the correct Z "
+            "depth before the lead-in begins. "
+            if spec.lead_type in _2d_types
+            else ""
+        )
+        + "Cutter compensation (G41/G42) is activated in the lead-in block; "
         "ensure the D-offset register (D = tool_radius) is set in the controller "
         "offset table before execution. "
         "I/J offsets are relative to the arc start point (Fanuc RS-274/NGC "
@@ -535,8 +978,19 @@ def generate_lead_in_out(
         "absolute arc centre mode (G91.1). "
         "No gouge or collision checking is performed — verify path visually or "
         "via cam_verify_toolpath_collision before running on the machine. "
-        f"Lead-in arc direction: {'G03 (CCW) for G41' if cutter_comp == 'G41' else 'G02 (CW) for G42'}. "
-        "Refs: MH 31e §1131; Fanuc Operator Manual §G41/G42."
+        + (
+            f"Lead-in arc direction: {'G03 (CCW) for G41' if cutter_comp == 'G41' else 'G02 (CW) for G42'}. "
+            if spec.lead_type in ("arc", "arc-tangent")
+            else ""
+        )
+        + (
+            "For helical-ramp and ramp-on: Z values assume a flat XY contour at "
+            "target_z_mm; 3D toolpath points are in lead_in_toolpath_points. "
+            "Pitch angle recommendation: 2–5° Al, 1–3° steel (MH 31e §1109). "
+            if spec.lead_type in ("helical-ramp", "ramp-on")
+            else ""
+        )
+        + "Refs: MH 31e §1131, §1109; Fanuc Operator Manual §G41/G42."
     )
 
     return LeadResult(
@@ -545,6 +999,10 @@ def generate_lead_in_out(
         lead_in_length_mm=round(lead_in_length, 6),
         lead_out_length_mm=round(lead_out_length, 6),
         honest_caveat=caveat,
+        lead_in_toolpath_points=lead_in_toolpath_pts,
+        lead_out_toolpath_points=lead_out_toolpath_pts,
+        arc_centre_xy=arc_centre,
+        arc_radius_mm=arc_radius,
     )
 
 
@@ -555,16 +1013,19 @@ def generate_lead_in_out(
 cam_generate_lead_in_out_spec = ToolSpec(
     name="cam_generate_lead_in_out",
     description=(
-        "Generate G-code lead-in and lead-out arc or line segments for 2D contour "
-        "milling, avoiding witness marks at the cutter entry/exit points. "
-        "Follows MH 31e §1131 (cutter entry strategies) and Fanuc §G41/G42 cutter "
-        "compensation. "
-        "Supports three lead types: 'arc' (tangent-arc entry, most common), "
-        "'line' (straight entry along contour tangent), and 'perpendicular' "
-        "(straight entry 90° to tangent). "
+        "Generate G-code lead-in and lead-out segments for 2D or 3D contour milling, "
+        "avoiding witness marks at the cutter entry/exit points. "
+        "Follows MH 31e §1131 (cutter entry strategies), §1109 (helical/ramp entry), "
+        "and Fanuc §G41/G42 cutter compensation. "
+        "Supports six lead types: 'arc' (tangent-arc entry, most common), "
+        "'line' (straight entry along contour tangent), 'perpendicular' "
+        "(straight entry 90° to tangent), 'helical-ramp' (spiral descent at constant "
+        "pitch angle to target Z), 'ramp-on' (linear descent at fixed plunge angle), "
+        "and 'arc-tangent' (arc tangent to both surface and first cut direction with "
+        "structured geometry output). "
         "Emits G02/G03 arc blocks with I/J offsets and G41/G42 cutter compensation. "
-        "Returns lead-in and lead-out G-code blocks, path lengths, and honest "
-        "caveats (2D only; no gouge check; I/J are incremental/Fanuc convention)."
+        "Returns lead-in and lead-out G-code blocks, path lengths, toolpath points "
+        "list, arc centre/radius, and honest caveats."
     ),
     input_schema={
         "type": "object",
@@ -597,15 +1058,17 @@ cam_generate_lead_in_out_spec = ToolSpec(
                 "type": "number",
                 "description": (
                     "Radius of the lead-in arc, or length of the lead-in line, "
-                    "in mm.  MH 31e §1131: typically 50–100 % of cutter radius."
+                    "in mm.  MH 31e §1131: typically 50–100 % of cutter radius. "
+                    "For 'helical-ramp': helix radius.  "
+                    "For 'ramp-on': axial depth to ramp through."
                 ),
             },
             "lead_angle_deg": {
                 "type": "number",
                 "description": (
                     "Arc sweep angle in degrees (1–90).  90° = classic perpendicular "
-                    "tangent arc entry (recommended).  Ignored for 'line' and "
-                    "'perpendicular' types."
+                    "tangent arc entry (recommended).  Ignored for 'line', "
+                    "'perpendicular', 'helical-ramp', and 'ramp-on' types."
                 ),
             },
             "feed_mm_per_min": {
@@ -614,11 +1077,15 @@ cam_generate_lead_in_out_spec = ToolSpec(
             },
             "lead_type": {
                 "type": "string",
-                "enum": ["arc", "line", "perpendicular"],
+                "enum": ["arc", "line", "perpendicular", "helical-ramp", "ramp-on", "arc-tangent"],
                 "description": (
                     "'arc' — tangent arc entry/exit (MH 31e §1131, recommended). "
                     "'line' — straight entry along contour tangent. "
-                    "'perpendicular' — straight entry 90° to tangent."
+                    "'perpendicular' — straight entry 90° to tangent. "
+                    "'helical-ramp' — spiral descent at constant pitch angle to target Z (MH 31e §1109). "
+                    "'ramp-on' — linear descent at fixed plunge angle toward first cut point. "
+                    "'arc-tangent' — arc tangent to both surface and first cut direction; "
+                    "returns structured arc geometry as toolpath points."
                 ),
             },
             "cutter_comp": {
@@ -630,6 +1097,26 @@ cam_generate_lead_in_out_spec = ToolSpec(
                     "G42 = RIGHT of path (conventional or inside profile). "
                     "Default: G41."
                 ),
+            },
+            "target_z_mm": {
+                "type": "number",
+                "description": (
+                    "Z depth of the contour plane (mm).  Required for "
+                    "'helical-ramp' and 'ramp-on' types (default 0.0)."
+                ),
+            },
+            "ramp_angle_deg": {
+                "type": "number",
+                "description": (
+                    "Pitch/plunge angle in degrees (0 < angle ≤ 45, default 3.0°). "
+                    "For 'helical-ramp': helix pitch angle "
+                    "(MH 31e §1109 rec: 2–5° Al, 1–3° steel). "
+                    "For 'ramp-on': linear plunge angle (typically 5°)."
+                ),
+            },
+            "num_helix_turns": {
+                "type": "integer",
+                "description": "Number of full helix revolutions for 'helical-ramp' (default 1, min 1).",
             },
         },
         "required": [
@@ -655,7 +1142,7 @@ async def run_cam_generate_lead_in_out(ctx: ProjectCtx, args: bytes) -> str:
     try:
         cxy = a["contour_start_xy"]
         txy = a["contour_tangent_xy"]
-        spec = LeadSpec(
+        spec_kwargs = dict(
             contour_start_xy=(float(cxy[0]), float(cxy[1])),
             contour_tangent_xy=(float(txy[0]), float(txy[1])),
             cutter_diameter_mm=float(a["cutter_diameter_mm"]),
@@ -664,6 +1151,13 @@ async def run_cam_generate_lead_in_out(ctx: ProjectCtx, args: bytes) -> str:
             feed_mm_per_min=float(a["feed_mm_per_min"]),
             lead_type=str(a["lead_type"]),
         )
+        if "target_z_mm" in a:
+            spec_kwargs["target_z_mm"] = float(a["target_z_mm"])
+        if "ramp_angle_deg" in a:
+            spec_kwargs["ramp_angle_deg"] = float(a["ramp_angle_deg"])
+        if "num_helix_turns" in a:
+            spec_kwargs["num_helix_turns"] = int(a["num_helix_turns"])
+        spec = LeadSpec(**spec_kwargs)
         cutter_comp = str(a.get("cutter_comp", "G41"))
         result = generate_lead_in_out(spec, cutter_comp=cutter_comp)
     except (KeyError, IndexError, TypeError) as e:
@@ -678,5 +1172,9 @@ async def run_cam_generate_lead_in_out(ctx: ProjectCtx, args: bytes) -> str:
         "gcode_lead_out": result.gcode_lead_out,
         "lead_in_length_mm": result.lead_in_length_mm,
         "lead_out_length_mm": result.lead_out_length_mm,
+        "lead_in_toolpath_points": result.lead_in_toolpath_points,
+        "lead_out_toolpath_points": result.lead_out_toolpath_points,
+        "arc_centre_xy": result.arc_centre_xy,
+        "arc_radius_mm": result.arc_radius_mm,
         "honest_caveat": result.honest_caveat,
     })

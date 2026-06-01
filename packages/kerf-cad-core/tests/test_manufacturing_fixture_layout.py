@@ -34,7 +34,12 @@ from kerf_cad_core.manufacturing_fixture_layout import (
     BoundingBox,
     FixtureLayout,
     Locator,
+    ContactPoint,
+    FormClosureReport,
+    ForceClosureReport,
     auto_fixture_layout,
+    check_form_closure,
+    check_force_closure_with_friction,
     _build_wrench_matrix,
     _matrix_rank,
     _estimate_clamp_force,
@@ -450,3 +455,327 @@ class TestLLMTool:
         )))
         d = json.loads(raw)
         assert d.get("ok") is False or "error" in d
+
+
+# ---------------------------------------------------------------------------
+# 8. Asada-By §6 Form-closure analysis — helpers
+# ---------------------------------------------------------------------------
+
+def _make_contact(pos, normal, friction=False) -> ContactPoint:
+    """Convenience factory for ContactPoint."""
+    return ContactPoint(
+        position_xyz_mm=pos,
+        normal_xyz=normal,
+        is_friction=friction,
+    )
+
+
+def _form_closed_contacts() -> list:
+    """
+    Nine frictionless contacts that are form-closed.
+
+    We use a 3-2-1 layout (6 locators on 3 faces) PLUS 3 opposing clamp
+    contacts (top, back, right).  The 6 locators push inward; the 3 clamps
+    push from the opposite direction — together they positively span all 6
+    wrench-space dimensions, giving a form-closed fixture.
+
+    This mirrors the standard 3-2-1 + strap-clamp configuration from
+    ASME B5.18-2018 §4.2 (analysed here frictionlessly for clarity).
+    """
+    bb = BoundingBox(0, 0, 0, 100, 50, 20)
+    layout = auto_fixture_layout(bb)
+    contacts = []
+    for loc in layout.locators:
+        contacts.append(_make_contact(
+            tuple(loc.position), tuple(loc.normal), friction=False))
+    # Add 3 opposing clamp contacts
+    for clamp in layout.clamps:
+        contacts.append(_make_contact(
+            tuple(clamp.position), tuple(clamp.direction), friction=False))
+    return contacts
+
+
+# ---------------------------------------------------------------------------
+# 8a. Form-closure: frictionless tests
+# ---------------------------------------------------------------------------
+
+class TestFormClosure:
+    """Asada-By (1985) §6 frictionless form-closure tests."""
+
+    def test_returns_form_closure_report(self):
+        contacts = _form_closed_contacts()
+        result = check_form_closure(contacts)
+        assert isinstance(result, FormClosureReport)
+
+    def test_3_2_1_plus_clamps_is_form_closed(self):
+        """
+        3-2-1 locators (6 contacts) PLUS 3 opposing clamp contacts (9 total)
+        positively span R^6: the fixture is form-closed (Asada-By §6).
+        """
+        contacts = _form_closed_contacts()
+        result = check_form_closure(contacts)
+        assert result.form_closed is True, (
+            f"Expected form-closed, missing: {result.missing_dof_directions}"
+        )
+
+    def test_form_closed_positive_margin(self):
+        """Form-closed set must have margin ≥ 0."""
+        contacts = _form_closed_contacts()
+        result = check_form_closure(contacts)
+        assert result.margin >= -1e-9  # allow tiny numerical noise
+
+    def test_colinear_contacts_not_form_closed(self):
+        """
+        3 colinear contacts with parallel normals (all pointing +Z)
+        cannot resist -Z forces, nor any torque about X or Y.
+        The fixture is NOT form-closed (missing at least 3 DoF).
+        """
+        contacts = [
+            _make_contact((10.0, 10.0, 0.0), (0.0, 0.0, 1.0)),
+            _make_contact((50.0, 10.0, 0.0), (0.0, 0.0, 1.0)),
+            _make_contact((90.0, 10.0, 0.0), (0.0, 0.0, 1.0)),
+        ]
+        result = check_form_closure(contacts)
+        assert result.form_closed is False
+
+    def test_colinear_contacts_missing_directions(self):
+        """Parallel-normal contacts must flag specific missing DoF."""
+        contacts = [
+            _make_contact((10.0, 10.0, 0.0), (0.0, 0.0, 1.0)),
+            _make_contact((50.0, 10.0, 0.0), (0.0, 0.0, 1.0)),
+            _make_contact((90.0, 10.0, 0.0), (0.0, 0.0, 1.0)),
+        ]
+        result = check_form_closure(contacts)
+        # At minimum -Z force is not resistible (no contact can push in -Z)
+        assert "-Fz" in result.missing_dof_directions
+
+    def test_colinear_contacts_missing_count_ge_3(self):
+        """3 parallel-normal contacts miss at least 3 of 12 directions."""
+        contacts = [
+            _make_contact((10.0, 10.0, 0.0), (0.0, 0.0, 1.0)),
+            _make_contact((50.0, 10.0, 0.0), (0.0, 0.0, 1.0)),
+            _make_contact((90.0, 10.0, 0.0), (0.0, 0.0, 1.0)),
+        ]
+        result = check_form_closure(contacts)
+        assert len(result.missing_dof_directions) >= 3
+
+    def test_empty_contacts_not_closed(self):
+        """Empty contact list must return not-closed with all directions missing."""
+        result = check_form_closure([])
+        assert result.form_closed is False
+        assert result.n_contacts == 0
+        assert len(result.missing_dof_directions) == 12
+
+    def test_single_contact_not_closed(self):
+        """A single contact can resist only one force direction."""
+        result = check_form_closure([
+            _make_contact((50.0, 25.0, 0.0), (0.0, 0.0, 1.0)),
+        ])
+        assert result.form_closed is False
+        assert result.n_contacts == 1
+
+    def test_n_contacts_reported_correctly(self):
+        """n_contacts in report must match input length."""
+        contacts = _form_closed_contacts()
+        result = check_form_closure(contacts)
+        assert result.n_contacts == len(contacts)
+
+    def test_not_form_closed_negative_margin(self):
+        """Non-form-closed fixture must have margin < 0 or == 0."""
+        contacts = [
+            _make_contact((10.0, 10.0, 0.0), (0.0, 0.0, 1.0)),
+            _make_contact((50.0, 10.0, 0.0), (0.0, 0.0, 1.0)),
+        ]
+        result = check_form_closure(contacts)
+        assert result.form_closed is False
+        # margin must be non-positive for an infeasible direction
+        assert result.margin <= 1e-9
+
+    def test_honest_caveat_present(self):
+        """FormClosureReport must carry a non-empty honest_caveat."""
+        result = check_form_closure(_form_closed_contacts())
+        assert isinstance(result.honest_caveat, str)
+        assert len(result.honest_caveat) > 20
+
+    def test_3_2_1_locators_alone_not_form_closed(self):
+        """
+        A 3-2-1 locator set (6 frictionless contacts, all pushing inward)
+        is NOT form-closed by itself: the wrench set lacks opposing generators
+        needed to resist forces in the outward directions.  Adding the 3 strap
+        clamps (opposing contacts) closes the fixture — see
+        test_3_2_1_plus_clamps_is_form_closed above.
+        """
+        bb = BoundingBox(0, 0, 0, 100, 50, 20)
+        layout = auto_fixture_layout(bb)
+        contacts = [
+            ContactPoint(
+                position_xyz_mm=tuple(loc.position),
+                normal_xyz=tuple(loc.normal),
+                is_friction=False,
+            )
+            for loc in layout.locators
+        ]
+        result = check_form_closure(contacts)
+        # 6 one-sided locators cannot positively span all of R^6 —
+        # there are always directions not resisted without the clamps.
+        assert result.form_closed is False
+
+    def test_two_parallel_opposite_contacts_only_one_axis(self):
+        """
+        Two opposing contacts (one +Z, one -Z) resist Fz but nothing else.
+        """
+        contacts = [
+            _make_contact((50.0, 25.0, 0.0),  (0.0, 0.0,  1.0)),
+            _make_contact((50.0, 25.0, 20.0), (0.0, 0.0, -1.0)),
+        ]
+        result = check_form_closure(contacts)
+        assert result.form_closed is False
+        # Fx, Fy directions should be missing
+        assert "+Fx" in result.missing_dof_directions
+        assert "+Fy" in result.missing_dof_directions
+
+
+# ---------------------------------------------------------------------------
+# 8b. Force-closure with friction tests
+# ---------------------------------------------------------------------------
+
+class TestForceClosureWithFriction:
+    """Asada-By (1985) §6 force-closure (Coulomb friction) tests."""
+
+    def test_returns_force_closure_report(self):
+        contacts = _form_closed_contacts()
+        result = check_force_closure_with_friction(contacts, mu=0.3)
+        assert isinstance(result, ForceClosureReport)
+
+    def test_four_frictional_contacts_mu03_force_closed(self):
+        """
+        4 frictional contacts μ=0.3 arranged on 4 faces of a cube — classic
+        Mishra et al. 1987 force-closure configuration.  With μ=0.3 and
+        well-spread normals the fixture should be force-closed.
+        """
+        # 4 contacts on a 100×50×20 box: bottom, top, front, back
+        contacts = [
+            _make_contact((25.0, 25.0, 0.0),  (0.0, 0.0,  1.0), friction=True),
+            _make_contact((75.0, 25.0, 20.0), (0.0, 0.0, -1.0), friction=True),
+            _make_contact((50.0, 0.0, 10.0),  (0.0, 1.0,  0.0), friction=True),
+            _make_contact((50.0, 50.0, 10.0), (0.0, -1.0, 0.0), friction=True),
+        ]
+        result = check_force_closure_with_friction(contacts, mu=0.3)
+        assert result.force_closed is True, (
+            f"Expected force-closed, missing: {result.missing_dof_directions}"
+        )
+
+    def test_mu_stored_in_report(self):
+        """mu used must be reflected in the report."""
+        contacts = _form_closed_contacts()
+        result = check_force_closure_with_friction(contacts, mu=0.5)
+        assert result.mu == pytest.approx(0.5)
+
+    def test_mu_zero_frictionless_colinear_not_closed(self):
+        """
+        4 contacts, μ=0 (frictionless): parallel-normal contacts are still
+        not force-closed without the friction boost.
+        """
+        contacts = [
+            _make_contact((10.0, 10.0, 0.0), (0.0, 0.0, 1.0), friction=True),
+            _make_contact((90.0, 10.0, 0.0), (0.0, 0.0, 1.0), friction=True),
+            _make_contact((10.0, 40.0, 0.0), (0.0, 0.0, 1.0), friction=True),
+            _make_contact((90.0, 40.0, 0.0), (0.0, 0.0, 1.0), friction=True),
+        ]
+        result = check_force_closure_with_friction(contacts, mu=0.0)
+        assert result.force_closed is False
+
+    def test_mu_zero_equals_frictionless(self):
+        """
+        With μ=0 force-closure should agree with check_form_closure for
+        the same set of contacts (regardless of is_friction flag).
+        """
+        contacts = _form_closed_contacts()
+        fc_result = check_form_closure(contacts)
+        ff_result = check_force_closure_with_friction(contacts, mu=0.0)
+        assert fc_result.form_closed == ff_result.force_closed
+
+    def test_friction_improves_closure(self):
+        """
+        4 frictional contacts on 4 faces of the workpiece (top, bottom, front,
+        back) — frictionless each face alone cannot span R^6; with μ=0.3
+        the 4-edge friction-cone expansion adds tangential generators that
+        collectively span all 6 wrench dimensions.
+
+        This matches the classic Mishra et al. (1987) result: 4 frictional
+        contacts can achieve force-closure in 3D when placed on opposing faces.
+        """
+        # 4 contacts on 4 faces of a 100×50×20 workpiece
+        contacts = [
+            _make_contact((25.0, 25.0, 0.0),  (0.0, 0.0,  1.0), friction=True),
+            _make_contact((75.0, 25.0, 20.0), (0.0, 0.0, -1.0), friction=True),
+            _make_contact((50.0, 0.0, 10.0),  (0.0, 1.0,  0.0), friction=True),
+            _make_contact((50.0, 50.0, 10.0), (0.0, -1.0, 0.0), friction=True),
+        ]
+        # Frictionless: NOT form-closed (missing X-force and several torques)
+        fc = check_form_closure(contacts)
+        assert fc.form_closed is False
+
+        # With friction μ=0.3: force-closed (same configuration as
+        # test_four_frictional_contacts_mu03_force_closed)
+        ff = check_force_closure_with_friction(contacts, mu=0.3)
+        assert ff.force_closed is True, (
+            f"4-face frictional contacts (μ=0.3) should be force-closed. "
+            f"Missing: {ff.missing_dof_directions}"
+        )
+
+    def test_n_wrench_generators_with_friction(self):
+        """
+        4 frictional contacts → 4×4 = 16 generators.
+        """
+        contacts = [
+            _make_contact((25.0, 25.0, 0.0),  (0.0, 0.0, 1.0),  friction=True),
+            _make_contact((75.0, 25.0, 20.0), (0.0, 0.0, -1.0), friction=True),
+            _make_contact((50.0, 0.0, 10.0),  (0.0, 1.0, 0.0),  friction=True),
+            _make_contact((50.0, 50.0, 10.0), (0.0, -1.0, 0.0), friction=True),
+        ]
+        result = check_force_closure_with_friction(contacts, mu=0.3)
+        assert result.n_wrench_generators == 16
+
+    def test_n_wrench_generators_without_friction(self):
+        """
+        Frictionless contacts (is_friction=False): generator count == n_contacts
+        regardless of mu, because no friction-cone expansion is applied.
+        """
+        contacts = _form_closed_contacts()  # all is_friction=False, 9 contacts
+        result = check_force_closure_with_friction(contacts, mu=0.3)
+        assert result.n_wrench_generators == len(contacts)
+
+    def test_empty_contacts_not_closed(self):
+        """Empty contacts → not force-closed, 12 missing directions."""
+        result = check_force_closure_with_friction([], mu=0.3)
+        assert result.force_closed is False
+        assert result.n_contacts == 0
+        assert len(result.missing_dof_directions) == 12
+
+    def test_honest_caveat_present(self):
+        """ForceClosureReport must carry a non-empty honest_caveat."""
+        contacts = _form_closed_contacts()
+        result = check_force_closure_with_friction(contacts, mu=0.3)
+        assert isinstance(result.honest_caveat, str)
+        assert len(result.honest_caveat) > 20
+
+    def test_mixed_friction_frictionless(self):
+        """
+        Mix of frictional and frictionless contacts: only frictional contacts
+        get 4-edge cone expansion.  Generator count = 4*n_fric + n_no_fric.
+        """
+        contacts = [
+            _make_contact((25.0, 25.0, 0.0),  (0.0, 0.0, 1.0),  friction=True),
+            _make_contact((75.0, 25.0, 0.0),  (0.0, 0.0, 1.0),  friction=False),
+        ]
+        result = check_force_closure_with_friction(contacts, mu=0.3)
+        # 1 frictional × 4 + 1 frictionless × 1 = 5
+        assert result.n_wrench_generators == 5
+
+    def test_negative_mu_clamped_to_zero(self):
+        """Negative mu is equivalent to μ=0 (frictionless)."""
+        contacts = _form_closed_contacts()
+        result_neg = check_force_closure_with_friction(contacts, mu=-0.5)
+        result_zero = check_force_closure_with_friction(contacts, mu=0.0)
+        assert result_neg.force_closed == result_zero.force_closed

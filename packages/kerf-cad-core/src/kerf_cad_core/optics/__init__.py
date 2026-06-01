@@ -138,6 +138,12 @@ from kerf_cad_core.optics.coma_coefficient import (
     ComaCoefficientReport,
     compute_coma_coefficient,
 )
+from kerf_cad_core.optics.skew_ray_tracer import (
+    Ray3D,
+    OpticalSurface,
+    RayTraceResult,
+    trace_skew_ray,
+)
 
 __all__ = [
     "lensmaker",
@@ -209,4 +215,8 @@ __all__ = [
     "ImageSpec",
     "ComaCoefficientReport",
     "compute_coma_coefficient",
+    "Ray3D",
+    "OpticalSurface",
+    "RayTraceResult",
+    "trace_skew_ray",
 ]

@@ -68,6 +68,12 @@ from kerf_cad_core.optics.lens import (
     chromatic_aberration,
     achromat_powers,
 )
+from kerf_cad_core.optics.skew_ray_tracer import (
+    Ray3D,
+    OpticalSurface,
+    RayTraceResult,
+    trace_skew_ray,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -1336,7 +1342,7 @@ _pupil_diagram_spec = ToolSpec(
         "  * Monochromatic only. Polychromatic spot diagrams require per-wavelength\n"
         "    tracing weighted by spectral power density (out of scope).\n"
         "  * Sagittal (x) intercepts are first-order estimates; rigorous x requires\n"
-        "    full 3-D skew-ray tracing (not implemented).\n"
+        "    full 3-D skew-ray tracing — use optics_trace_skew_ray for exact results.\n"
         "  * Exit-pupil position is a paraxial estimate (BFL); rigorous location\n"
         "    requires chief-ray back-trace from image space (Welford 1986 §3.5).\n"
         "  * Physical aperture clipping not applied; use optics_compute_vignetting.\n"
@@ -1469,7 +1475,7 @@ _defocus_curve_spec = ToolSpec(
         "  * MONOCHROMATIC ONLY. Polychromatic defocus curves require per-wavelength\n"
         "    traces weighted by spectral power density (not implemented).\n"
         "  * MERIDIONAL (tangential) RMS only. Astigmatic sagittal/tangential focus\n"
-        "    splitting requires full 3-D skew-ray trace (not implemented).\n"
+        "    splitting requires full 3-D skew-ray trace — use optics_trace_skew_ray.\n"
         "  * Dz=0 is the paraxial BFL. For aberrated systems the RMS minimum may lie\n"
         "    at Dz != 0; best_focus_shift_mm quantifies this offset.\n"
         "\n"
@@ -4638,3 +4644,223 @@ async def run_design_schmidt_corrector(ctx: "ProjectCtx", args: bytes) -> str:
         return json.dumps({"ok": False, "reason": f"unexpected error: {exc}"})
 
     return ok_payload(result.to_dict())
+
+
+# ---------------------------------------------------------------------------
+# Tool: optics_trace_skew_ray
+# ---------------------------------------------------------------------------
+
+_trace_skew_ray_spec = ToolSpec(
+    name="optics_trace_skew_ray",
+    description=(
+        "Trace a 3-D skew ray through a sequential conicoid lens stack "
+        "(Born & Wolf §4.6 / Welford 1986 §5).\n"
+        "\n"
+        "A skew ray is any ray that does not lie in the meridional (Y-Z) plane.\n"
+        "Skew rays are essential for off-axis aberrations (sagittal coma,\n"
+        "astigmatism, field curvature) that are invisible to 2-D meridional\n"
+        "tracing.  This tool implements full 6-DOF 3-D ray tracing.\n"
+        "\n"
+        "Algorithm (Born & Wolf §4.6; Welford §5):\n"
+        "  1. Each surface is a conicoid of revolution about z with vertex at\n"
+        "     vertex_z_mm. Implicit form:\n"
+        "       F(x,y,z') = c(x²+y²) + c(1+k)z'² - 2z' = 0,  z'=z−vertex_z\n"
+        "  2. Ray-surface intersection: parametric quadratic P(t)=origin+t·d;\n"
+        "     smallest positive t taken.\n"
+        "  3. Surface normal at intersection: grad F, normalised and oriented\n"
+        "     to oppose the incoming ray.\n"
+        "  4. 3-D vector Snell's law (Born & Wolf §1.5.3 eq. 1.5.23):\n"
+        "       d' = (n1/n2)·d + (n1/n2·cos_i − cos_t)·N̂\n"
+        "     where cos_i = −d·N̂ (angle of incidence), N̂ points into medium 1.\n"
+        "  5. TIR detected when sin²(θ_t) > 1.\n"
+        "\n"
+        "Input ray:\n"
+        "  origin_xyz    : [x, y, z] starting position (mm)\n"
+        "  direction_xyz : [dx, dy, dz] direction vector (auto-normalised)\n"
+        "  wavelength_nm : float, default 587.6 (Fraunhofer d-line)\n"
+        "\n"
+        "Surface definition (list, in order):\n"
+        "  vertex_z_mm            : z-position of surface vertex (mm)\n"
+        "  radius_mm              : signed radius of curvature (mm); 0 = flat\n"
+        "  refractive_index_after : n of medium AFTER this surface (>= 1.0)\n"
+        "  conic_k                : conic constant (default 0 = sphere;\n"
+        "                           -1 = paraboloid, <-1 = hyperboloid)\n"
+        "\n"
+        "n_before_first : refractive index of object-space medium (default 1.0)\n"
+        "\n"
+        "Returns:\n"
+        "  ray_history    : list of {origin_xyz, direction_xyz, wavelength_nm}\n"
+        "                   — one entry per surface + initial ray\n"
+        "  final_position_xyz  : [x,y,z] at last intersection (mm)\n"
+        "  final_direction_xyz : [dx,dy,dz] after last refraction\n"
+        "  tir_occurred   : bool — true if TIR stopped the trace\n"
+        "  honest_caveat  : str — scope/limitation notes\n"
+        "\n"
+        "HONEST FLAGS:\n"
+        "  * Monochromatic only; polychromatic requires one ray per wavelength.\n"
+        "  * Conic surfaces only — no higher-order aspheric terms (A4, A6, ...).\n"
+        "  * Sequential only — no non-sequential paths or ghost-ray detection.\n"
+        "  * No aperture-stop clipping; caller must test ray height vs CA.\n"
+        "\n"
+        "Errors: {ok:false, reason} for invalid inputs. Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "ray": {
+                "type": "object",
+                "description": "Incident ray specification.",
+                "properties": {
+                    "origin_xyz": {
+                        "type": "array",
+                        "items": {"type": "number"},
+                        "minItems": 3,
+                        "maxItems": 3,
+                        "description": "Starting position [x, y, z] in mm.",
+                    },
+                    "direction_xyz": {
+                        "type": "array",
+                        "items": {"type": "number"},
+                        "minItems": 3,
+                        "maxItems": 3,
+                        "description": (
+                            "Direction vector [dx, dy, dz]. "
+                            "Need not be unit-length; auto-normalised."
+                        ),
+                    },
+                    "wavelength_nm": {
+                        "type": "number",
+                        "description": (
+                            "Vacuum wavelength in nm. Default 587.6 (d-line)."
+                        ),
+                    },
+                },
+                "required": ["origin_xyz", "direction_xyz"],
+            },
+            "surfaces": {
+                "type": "array",
+                "description": (
+                    "Ordered list of optical surfaces. Each must have "
+                    "vertex_z_mm, radius_mm, refractive_index_after. "
+                    "Optional: conic_k (default 0 = sphere)."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "vertex_z_mm": {
+                            "type": "number",
+                            "description": "z-position of surface vertex (mm).",
+                        },
+                        "radius_mm": {
+                            "type": "number",
+                            "description": (
+                                "Signed radius of curvature (mm). "
+                                "0 = flat plane. R>0: centre to right."
+                            ),
+                        },
+                        "refractive_index_after": {
+                            "type": "number",
+                            "description": (
+                                "Refractive index of medium after surface (>= 1.0)."
+                            ),
+                        },
+                        "conic_k": {
+                            "type": "number",
+                            "description": (
+                                "Conic constant. 0=sphere, -1=paraboloid, "
+                                "<-1=hyperboloid, >0=oblate ellipsoid. Default 0."
+                            ),
+                        },
+                    },
+                    "required": ["vertex_z_mm", "radius_mm", "refractive_index_after"],
+                },
+            },
+            "n_before_first": {
+                "type": "number",
+                "description": (
+                    "Refractive index of object-space medium (before first surface). "
+                    "Default 1.0 (air/vacuum)."
+                ),
+            },
+        },
+        "required": ["ray", "surfaces"],
+    },
+)
+
+
+@register(_trace_skew_ray_spec, write=False)
+async def run_trace_skew_ray(ctx: "ProjectCtx", args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    # Validate required fields
+    if "ray" not in a:
+        return json.dumps({"ok": False, "reason": "ray is required"})
+    if "surfaces" not in a:
+        return json.dumps({"ok": False, "reason": "surfaces is required"})
+
+    ray_spec = a["ray"]
+    for req_field in ("origin_xyz", "direction_xyz"):
+        if req_field not in ray_spec:
+            return json.dumps({"ok": False,
+                               "reason": f"ray.{req_field} is required"})
+        val = ray_spec[req_field]
+        if not isinstance(val, list) or len(val) != 3:
+            return json.dumps({"ok": False,
+                               "reason": f"ray.{req_field} must be a list of 3 numbers"})
+
+    try:
+        ray_obj = Ray3D(
+            origin_xyz=tuple(float(v) for v in ray_spec["origin_xyz"]),
+            direction_xyz=tuple(float(v) for v in ray_spec["direction_xyz"]),
+            wavelength_nm=float(ray_spec.get("wavelength_nm", 587.6)),
+        )
+    except ValueError as exc:
+        return json.dumps({"ok": False, "reason": str(exc)})
+
+    surfs = []
+    for idx, s in enumerate(a["surfaces"]):
+        for req_field in ("vertex_z_mm", "radius_mm", "refractive_index_after"):
+            if req_field not in s:
+                return json.dumps({"ok": False,
+                                   "reason": f"surface[{idx}] missing {req_field}"})
+        n_after = float(s["refractive_index_after"])
+        if n_after < 1.0:
+            return json.dumps({
+                "ok": False,
+                "reason": f"surface[{idx}].refractive_index_after must be >= 1.0",
+            })
+        surfs.append(OpticalSurface(
+            vertex_z_mm=float(s["vertex_z_mm"]),
+            radius_mm=float(s["radius_mm"]),
+            refractive_index_after=n_after,
+            conic_k=float(s.get("conic_k", 0.0)),
+        ))
+
+    n_before = float(a.get("n_before_first", 1.0))
+    if n_before < 1.0:
+        return json.dumps({"ok": False, "reason": "n_before_first must be >= 1.0"})
+
+    try:
+        result = trace_skew_ray(ray_obj, surfs, n_before_first=n_before)
+    except Exception as exc:
+        return json.dumps({"ok": False, "reason": f"unexpected error: {exc}"})
+
+    history = [
+        {
+            "origin_xyz": list(r.origin_xyz),
+            "direction_xyz": list(r.direction_xyz),
+            "wavelength_nm": r.wavelength_nm,
+        }
+        for r in result.ray_history
+    ]
+
+    return ok_payload({
+        "ray_history": history,
+        "final_position_xyz": list(result.final_position_xyz),
+        "final_direction_xyz": list(result.final_direction_xyz),
+        "tir_occurred": result.tir_occurred,
+        "honest_caveat": result.honest_caveat,
+    })

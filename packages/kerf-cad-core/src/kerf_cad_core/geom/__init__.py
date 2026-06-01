@@ -1847,6 +1847,16 @@ from kerf_cad_core.geom.surface_analytic_derivatives import (  # noqa: E402
     compute_analytic_derivatives,
     SSIHardenedMarcher,
 )
+# GK-P16: NURBS loft with cross-section curves + guide rails
+# (Piegl & Tiller §10.3 skinning + guide-deformation blend).
+# HONEST: approximate guide-rail constraint (Gaussian displacement blend);
+# NOT an exact constrained-NURBS solver; deviations reported for QC.
+# LLM tool: nurbs_loft_with_guide_rails.
+from kerf_cad_core.geom.loft_guide_rails import (  # noqa: E402
+    GuideRailLoftSpec,
+    GuideRailLoftReport,
+    loft_with_guide_rails,
+)
 # GK-P09: general pure-Python solid boolean for convex planar polyhedra.
 # Extends the limited-primitive boolean (boolean.py) to arbitrary trimmed-plane
 # body pairs.  Algorithm: Mantyla §6 + Hoffmann "Geometric & Solid Modeling" §3.

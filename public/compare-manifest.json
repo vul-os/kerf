@@ -19137,6 +19137,19 @@
         },
         {
           "domain": "D1",
+          "feature": "SubD→NURBS G1 patch conversion at extraordinary vertices (Loop 1987)",
+          "competitor": {
+            "status": "no",
+            "note": "Maya/Blender/Rhino do not expose a programmatic API to extract G1-continuous bicubic Bézier patches around an extraordinary vertex (valence != 4) with Loop (1987) tangent-plane enforcement and per-patch 4×4 CP output. Maya's subdivision-to-NURBS export is opaque; Peters-Reif G2 patches are not available in any major DCC tool as a public API."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "GK-P13: convert_subd_to_g1_patches(spec) — Loop (1987) §4 G1 patch construction around extraordinary CC vertices. Applies num_iterations CC subdivisions, computes EV limit point V_inf (Stam 1998 §3.1), builds n bicubic Bézier 4×4 CP grids in the Stam tangent plane, projects second-row CPs of adjacent patches onto the tangent plane at V_inf to enforce G1 across all n shared edges. ExtraordinaryPatchSpec (cage_mesh: SubdCage, extraordinary_vertex_idx: int, num_iterations: int=2); G1PatchResult (n_patches=valence, patch_control_points_per_patch: list[4×4 CP grids], max_g1_residual_deg, mean_g1_residual_deg, valence, honest_caveat). G1 residual < 1° achieved for valence-3 cube corner and valence-5 dome EV. LLM tool subd_convert_to_g1_patches; re-exported from kerf_cad_core.subd; 32 tests green. HONEST: Loop (1987) G1 only — Peters-Reif G2 (curvature continuity, Subdivision Surfaces §7.4) NOT implemented (requires degree ≥ 5 patches); high-valence EVs (n ≥ 8) may exhibit curvature inflation (bulging) due to convex-hull property of bicubic Bezier. Refs: Loop (1987) MS Thesis §4 Utah; Stam (1998) §3.1-3.3 SIGGRAPH; Peters-Reif (2008) §7.4; Reif (1995) CAGD 12(2).",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/subd/g1_extraordinary_patches.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "SubD fractional crease sharpness decay (semi-sharp creases)",
           "competitor": {
             "status": "partial",

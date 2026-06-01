@@ -107,6 +107,11 @@ from kerf_cad_core.subd.crease_fractional_decay import (
     CreaseDecayResult,
     apply_fractional_crease_decay,
 )
+from kerf_cad_core.subd.g1_extraordinary_patches import (
+    ExtraordinaryPatchSpec,
+    G1PatchResult,
+    convert_subd_to_g1_patches,
+)
 
 __all__ = [
     "CrossCurveResult",
@@ -135,4 +140,7 @@ __all__ = [
     "FractionalCreaseSpec",
     "CreaseDecayResult",
     "apply_fractional_crease_decay",
+    "ExtraordinaryPatchSpec",
+    "G1PatchResult",
+    "convert_subd_to_g1_patches",
 ]

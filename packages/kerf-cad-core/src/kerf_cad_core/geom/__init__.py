@@ -1714,6 +1714,7 @@ from kerf_cad_core.geom.curvature_profile_export import (  # noqa: E402
     CurvatureProfileResult,
     export_curvature_profile,
     export_curvature_profile_result,
+    export_curvature_profile_csv,
 )
 # BREP-FACE-DEVELOPABLE-CHECK: Gaussian curvature sampling test for developability
 # (do Carmo §3.6 "Ruled and Developable Surfaces"; Pottmann-Wallner §4)

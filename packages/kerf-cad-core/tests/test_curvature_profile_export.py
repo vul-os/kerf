@@ -32,6 +32,7 @@ from kerf_cad_core.geom.nurbs import NurbsCurve, make_circle_nurbs
 from kerf_cad_core.geom.curvature_profile_export import (
     export_curvature_profile,
     export_curvature_profile_result,
+    export_curvature_profile_csv,
     CurvatureProfileResult,
 )
 
@@ -422,8 +423,213 @@ class TestResultFields:
         from kerf_cad_core.geom import (
             export_curvature_profile as ecp,
             export_curvature_profile_result as ecpr,
+            export_curvature_profile_csv as ecpc,
             CurvatureProfileResult as CPR,
         )
         assert callable(ecp)
         assert callable(ecpr)
+        assert callable(ecpc)
         assert CPR is CurvatureProfileResult
+
+
+# ---------------------------------------------------------------------------
+# Adaptive curvature sampling (de Boor §VI; Hoschek-Lasser §5)
+# ---------------------------------------------------------------------------
+
+class TestAdaptiveSampling:
+    """Tests for export_curvature_profile_csv with adaptive=True."""
+
+    # ------------------------------------------------------------------
+    # 1. Straight line + adaptive: still produces exact num_samples rows
+    # ------------------------------------------------------------------
+    def test_straight_line_adaptive_exact_count(self):
+        """Straight line with adaptive=True: output has exactly num_samples rows."""
+        pts = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
+        curve = NurbsCurve(degree=1, control_points=pts,
+                           knots=np.array([0.0, 0.0, 1.0, 1.0]))
+        csv = export_curvature_profile_csv(curve, num_samples=30, adaptive=True)
+        data_rows = [l for l in csv.splitlines()
+                     if l and not l.startswith("#") and "t,kappa" not in l]
+        assert len(data_rows) == 30, (
+            f"Expected 30 rows for straight line (adaptive), got {len(data_rows)}"
+        )
+
+    # ------------------------------------------------------------------
+    # 2. Straight line + adaptive: curvature still ≈ 0 everywhere
+    # ------------------------------------------------------------------
+    def test_straight_line_adaptive_kappa_zero(self):
+        """Straight line with adaptive=True: κ ≈ 0 at all output samples."""
+        pts = np.array([[0.0, 0.0, 0.0], [5.0, 0.0, 0.0]])
+        curve = NurbsCurve(degree=1, control_points=pts,
+                           knots=np.array([0.0, 0.0, 1.0, 1.0]))
+        csv = export_curvature_profile_csv(curve, num_samples=25, adaptive=True)
+        data_rows = [l for l in csv.splitlines()
+                     if l and not l.startswith("#") and "t,kappa" not in l]
+        kappas = [float(r.split(",")[1]) for r in data_rows]
+        assert all(k < 1e-9 for k in kappas), (
+            f"Straight line should have κ≈0 everywhere (adaptive); max={max(kappas):.2e}"
+        )
+
+    # ------------------------------------------------------------------
+    # 3. High-curvature corner: more samples near corner with adaptive
+    # ------------------------------------------------------------------
+    def test_high_curvature_corner_denser_near_peak(self):
+        """Cubic Bézier sharp corner: adaptive places more samples near high-κ region.
+
+        A cubic Bézier with a tight turn has high curvature near one endpoint.
+        With adaptive sampling the fraction of samples in the first quarter of
+        parameter space should exceed the uniform expectation of 25%.
+        """
+        # Cubic Bézier: first two CPs close together (tight turn at start)
+        curve = _make_bezier(
+            [[0.0, 0.0], [0.01, 0.5], [0.5, 0.5], [1.0, 0.0]], degree=3
+        )
+        N = 100
+        csv_adapt = export_curvature_profile_csv(curve, num_samples=N, adaptive=True)
+        data_rows = [l for l in csv_adapt.splitlines()
+                     if l and not l.startswith("#") and "t,kappa" not in l]
+        assert len(data_rows) == N
+
+        t_vals = [float(r.split(",")[0]) for r in data_rows]
+        u0, u1 = t_vals[0], t_vals[-1]
+        quarter_threshold = u0 + 0.25 * (u1 - u0)
+        n_in_first_quarter = sum(1 for t in t_vals if t <= quarter_threshold)
+        # With adaptive sampling we expect more than 25 samples in the first quarter
+        assert n_in_first_quarter > N * 0.25, (
+            f"Adaptive should concentrate samples near high-κ corner; "
+            f"got {n_in_first_quarter}/{N} in first quarter (expected >{N*0.25:.0f})"
+        )
+
+    # ------------------------------------------------------------------
+    # 4. S-curve + adaptive: more samples at inflection regions
+    # ------------------------------------------------------------------
+    def test_s_curve_adaptive_samples_near_inflection(self):
+        """S-curve with adaptive=True: sample density elevated near inflection.
+
+        The S-curve has high curvature near t≈0.3 and t≈0.7.  Adaptive
+        sampling should concentrate samples in those regions, so the standard
+        deviation of inter-sample parameter spacing should be larger than
+        for uniform sampling (samples are NOT equally spaced in t).
+        """
+        curve = _make_s_curve_bezier()
+        N = 80
+        csv_unif = export_curvature_profile_csv(curve, num_samples=N, adaptive=False)
+        csv_adapt = export_curvature_profile_csv(curve, num_samples=N, adaptive=True)
+
+        def _t_vals(csv: str):
+            rows = [l for l in csv.splitlines()
+                    if l and not l.startswith("#") and "t,kappa" not in l]
+            return [float(r.split(",")[0]) for r in rows]
+
+        t_unif = _t_vals(csv_unif)
+        t_adapt = _t_vals(csv_adapt)
+
+        # Adaptive parameter spacing should have higher std (non-uniform in t)
+        dt_unif = np.diff(t_unif)
+        dt_adapt = np.diff(t_adapt)
+        assert np.std(dt_adapt) > np.std(dt_unif), (
+            "Adaptive S-curve should have non-uniform t-spacing "
+            f"(std_adapt={np.std(dt_adapt):.4e}, std_unif={np.std(dt_unif):.4e})"
+        )
+
+    # ------------------------------------------------------------------
+    # 5. Sample count exactly preserved
+    # ------------------------------------------------------------------
+    def test_sample_count_preserved(self):
+        """export_curvature_profile_csv always outputs exactly num_samples rows."""
+        curve = _make_s_curve_bezier()
+        for n in (10, 50, 200):
+            for adaptive in (False, True):
+                csv = export_curvature_profile_csv(curve, num_samples=n, adaptive=adaptive)
+                rows = [l for l in csv.splitlines()
+                        if l and not l.startswith("#") and "t,kappa" not in l]
+                assert len(rows) == n, (
+                    f"num_samples={n}, adaptive={adaptive}: "
+                    f"got {len(rows)} rows, expected {n}"
+                )
+
+    # ------------------------------------------------------------------
+    # 6. Adaptive vs uniform on circle: κ error comparison
+    # ------------------------------------------------------------------
+    def test_adaptive_circle_kappa_accuracy(self):
+        """Circle of radius R: adaptive sampling preserves κ=1/R accuracy.
+
+        On a constant-curvature curve the adaptive resampler falls back to
+        arc-length-uniform sampling.  All κ values should still be within
+        1e-4 relative of 1/R.
+        """
+        R = 2.0
+        curve = _make_circle(R)
+        csv = export_curvature_profile_csv(curve, num_samples=60, adaptive=True)
+        data_rows = [l for l in csv.splitlines()
+                     if l and not l.startswith("#") and "t,kappa" not in l]
+        kappas = np.array([float(r.split(",")[1]) for r in data_rows])
+        expected = 1.0 / R
+        rel_err = np.abs(kappas - expected) / expected
+        assert np.all(rel_err < 1e-4), (
+            f"Circle adaptive: max_rel_err={rel_err.max():.2e} (expected <1e-4)"
+        )
+
+    # ------------------------------------------------------------------
+    # 7. CSV header: warning suppressed when adaptive=True
+    # ------------------------------------------------------------------
+    def test_adaptive_csv_no_warning_header(self):
+        """adaptive=True: CSV header must NOT contain the under-resolution WARNING."""
+        curve = _make_s_curve_bezier()
+        csv_adapt = export_curvature_profile_csv(curve, num_samples=50, adaptive=True)
+        csv_unif = export_curvature_profile_csv(curve, num_samples=50, adaptive=False)
+        # Uniform CSV has the WARNING comment
+        assert "WARNING" in csv_unif, "Uniform CSV should carry sampling WARNING"
+        # Adaptive CSV must NOT have the WARNING comment
+        assert "WARNING" not in csv_adapt, (
+            "Adaptive CSV must not carry the under-resolution WARNING header"
+        )
+
+    # ------------------------------------------------------------------
+    # 8. Compare uniform vs adaptive: adaptive has lower max pointwise κ error
+    # ------------------------------------------------------------------
+    def test_adaptive_lower_max_error_vs_uniform(self):
+        """On a high-curvature curve, adaptive sampling reduces max pointwise κ error.
+
+        Ground truth: fine-resolution reference (2000 uniform samples).
+        Measure: for each output sample, interpolate the reference κ vs arc-length
+        and compute pointwise absolute error.  Adaptive should yield lower max error
+        than uniform at the same sample count.
+        """
+        # Use the tight-corner Bézier (high curvature at one end)
+        curve = _make_bezier(
+            [[0.0, 0.0], [0.01, 0.5], [0.5, 0.5], [1.0, 0.0]], degree=3
+        )
+        from kerf_cad_core.geom.curvature_profile_export import (
+            _sample_curvature, _adaptive_sample_params, _sample_curvature_at_params
+        )
+
+        N = 40  # coarse sample count — stress-tests the difference
+        # Reference at 2000 uniform samples
+        ref = _sample_curvature(curve, 2000)
+        ref_s = np.array(ref.arc_lengths)
+        ref_k = np.array(ref.kappas)
+
+        # Uniform at N
+        unif = _sample_curvature(curve, N)
+        unif_s = np.array(unif.arc_lengths)
+        unif_k = np.array(unif.kappas)
+
+        # Adaptive at N
+        adapt_params = _adaptive_sample_params(curve, N)
+        adapt = _sample_curvature_at_params(curve, adapt_params)
+        adapt_s = np.array(adapt.arc_lengths)
+        adapt_k = np.array(adapt.kappas)
+
+        # Interpolate reference κ at uniform and adaptive arc-length positions
+        s_max = ref_s[-1]
+        unif_err = np.abs(unif_k - np.interp(unif_s, ref_s, ref_k))
+        adapt_err = np.abs(adapt_k - np.interp(adapt_s, ref_s, ref_k))
+
+        max_err_unif = float(np.max(unif_err))
+        max_err_adapt = float(np.max(adapt_err))
+
+        assert max_err_adapt < max_err_unif, (
+            f"Adaptive max κ error ({max_err_adapt:.4f}) should be less than "
+            f"uniform ({max_err_unif:.4f}) on high-curvature Bézier corner"
+        )

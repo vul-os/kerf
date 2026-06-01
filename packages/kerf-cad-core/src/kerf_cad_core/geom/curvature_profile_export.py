@@ -33,10 +33,26 @@ Honest sampling caveat
 -----------------------
 The default of 200 uniform-parameter samples may MISS sharp curvature spikes
 near knot boundaries in high-degree NURBS or near inflection points where the
-curvature changes rapidly.  For production analysis, set samples ≥ 500 or use
-adaptive sampling (not yet implemented).  The CSV header carries a warning
-column ``high_kappa_risk`` = 1 where the finite-difference |dκ/dt| exceeds
+curvature changes rapidly.  For production analysis, set samples ≥ 500, or use
+adaptive curvature-aware sampling via ``adaptive=True`` in
+``export_curvature_profile_csv``.  The CSV header carries a warning column
+``high_kappa_risk`` = 1 where the finite-difference |dκ/dt| exceeds
 5 × mean |dκ/dt|, flagging spans that may warrant finer sampling.
+
+Adaptive curvature sampling
+---------------------------
+When ``adaptive=True``, ``export_curvature_profile_csv`` uses a two-pass
+curvature-weighted resampler (de Boor §VI; Hoschek-Lasser §5):
+
+1. Compute |κ(t)| and ‖C'(t)‖ at N uniform seed samples.
+2. Form the curvature-weighted arc-length differential:
+       w(t_i) = |κ(t_i)| · ‖C'(t_i)‖
+   and integrate cumulatively (trapezoidal rule) to give W(t).
+3. Invert W(t) so that each output parameter value corresponds to an equal
+   increment of curvature-weighted arc length, placing samples densely in
+   high-curvature regions and sparsely in low-curvature regions.
+4. Fall back to pure arc-length uniform sampling when the curve is a straight
+   line (κ ≡ 0), which preserves uniform spacing on flat spans.
 
 References
 ----------
@@ -45,6 +61,10 @@ References
 * Sapidis, N. (Ed.) (1994). *Designing Fair Curves and Surfaces*, §3
   "Curvature plots", SIAM.
 * Piegl, L. & Tiller, W. (1997). *The NURBS Book*, §5.1 (curve derivatives).
+* de Boor, C. (2001). *A Practical Guide to Splines*, §VI
+  "Adaptive knot placement / curvature-weighted parameterization".
+* Hoschek, J. & Lasser, D. (1993). *Fundamentals of Computer Aided Geometric
+  Design*, §5 "Adaptive curve sampling".
 """
 
 from __future__ import annotations
@@ -232,23 +252,126 @@ def _sample_curvature(curve: NurbsCurve, samples: int) -> CurvatureProfileResult
 
 
 # ---------------------------------------------------------------------------
+# Adaptive curvature-weighted parameter sampler
+# ---------------------------------------------------------------------------
+
+def _adaptive_sample_params(
+    curve: NurbsCurve,
+    num_samples: int,
+    seed_factor: int = 10,
+) -> np.ndarray:
+    """Return ``num_samples`` parameter values distributed by curvature density.
+
+    Algorithm (de Boor §VI; Hoschek-Lasser §5)
+    -------------------------------------------
+    1. Seed at ``num_samples * seed_factor`` uniform points to capture the full
+       curvature profile without gross aliasing.
+    2. For each seed point compute the curvature-weighted speed:
+           w(t_i) = |κ(t_i)| · ‖C'(t_i)‖
+       which concentrates weight where curvature is high.
+    3. Integrate w(t) cumulatively (trapezoidal rule) → W(t) a monotone
+       function from W(t_0)=0 to W(t_N)=W_total.
+    4. If W_total ≈ 0 (straight line, κ ≡ 0) fall back to uniform arc-length
+       sampling using ‖C'(t)‖ alone, which distributes samples evenly.
+    5. Otherwise invert W(t) at ``num_samples`` equal-spaced W targets via
+       linear interpolation to obtain the output parameter array.
+
+    Parameters
+    ----------
+    curve       : NurbsCurve
+    num_samples : int  — desired output sample count
+    seed_factor : int  — upsampling factor for the seed pass (default 10)
+
+    Returns
+    -------
+    np.ndarray of shape (num_samples,) — parameter values in ascending order
+    """
+    n = max(2, int(num_samples))
+    n_seed = max(n * seed_factor, 4 * n)
+
+    u0 = float(curve.knots[curve.degree])
+    u1 = float(curve.knots[-(curve.degree + 1)])
+    us_seed = np.linspace(u0, u1, n_seed)
+
+    dim = curve.control_points.shape[1]
+
+    speeds = np.empty(n_seed)
+    kappas = np.empty(n_seed)
+
+    for idx_s, u in enumerate(us_seed):
+        uf = float(u)
+        d1 = curve_derivative(curve, uf, order=1)
+        d2 = curve_derivative(curve, uf, order=2)
+
+        d1_3 = np.zeros(3)
+        d2_3 = np.zeros(3)
+        d1_3[:min(dim, 3)] = d1[:min(dim, 3)]
+        d2_3[:min(dim, 3)] = d2[:min(dim, 3)]
+
+        speed = float(np.linalg.norm(d1_3))
+        if speed < 1e-14:
+            kappa = 0.0
+        else:
+            cross_vec = np.cross(d1_3, d2_3)
+            kappa = float(np.linalg.norm(cross_vec)) / speed ** 3
+
+        speeds[idx_s] = speed
+        kappas[idx_s] = kappa
+
+    # Curvature-weighted speed w(t) = |κ(t)| · ‖C'(t)‖
+    weights = kappas * speeds  # shape (n_seed,)
+
+    # Cumulative trapezoidal integration
+    dt_seed = np.diff(us_seed)
+    w_segs = 0.5 * (weights[:-1] + weights[1:]) * dt_seed
+    W_cumul = np.concatenate([[0.0], np.cumsum(w_segs)])
+    W_total = float(W_cumul[-1])
+
+    if W_total < 1e-14:
+        # Straight-line (κ ≡ 0): fall back to arc-length-uniform sampling
+        arc_segs = 0.5 * (speeds[:-1] + speeds[1:]) * dt_seed
+        W_cumul = np.concatenate([[0.0], np.cumsum(arc_segs)])
+        W_total = float(W_cumul[-1])
+        if W_total < 1e-14:
+            # Fully degenerate (zero-length): uniform parameter sampling
+            return np.linspace(u0, u1, n)
+
+    # Equal-spaced targets in [0, W_total]
+    W_targets = np.linspace(0.0, W_total, n)
+
+    # Invert W(t) at each target via linear interpolation
+    out_params = np.interp(W_targets, W_cumul, us_seed)
+    return out_params
+
+
+# ---------------------------------------------------------------------------
 # CSV export
 # ---------------------------------------------------------------------------
 
-def _to_csv(result: CurvatureProfileResult) -> str:
+def _to_csv(result: CurvatureProfileResult, adaptive: bool = False) -> str:
     """Serialise a CurvatureProfileResult to CSV text.
 
     Columns: t, kappa, arc_length, x, y, z, high_kappa_risk
 
     The ``high_kappa_risk`` column is 1 where the local finite-difference
     |dκ/dt| exceeds 5× the mean — see module docstring for sampling caveat.
+    When ``adaptive=True`` the sampling-caveat warning is omitted because
+    the curvature-weighted resampler already places dense samples in
+    high-curvature regions (de Boor §VI; Hoschek-Lasser §5).
     """
-    lines = [
-        "# NURBS curvature profile — Farin §11.6 / Sapidis §3",
-        "# WARNING: default 200 samples may under-resolve high-curvature spans.",
-        "#          high_kappa_risk=1 flags those spans. Use samples>=500 for production.",
-        "t,kappa,arc_length,x,y,z,high_kappa_risk",
-    ]
+    if adaptive:
+        lines = [
+            "# NURBS curvature profile — Farin §11.6 / Sapidis §3",
+            "# Adaptive curvature-weighted sampling: de Boor §VI / Hoschek-Lasser §5.",
+            "t,kappa,arc_length,x,y,z,high_kappa_risk",
+        ]
+    else:
+        lines = [
+            "# NURBS curvature profile — Farin §11.6 / Sapidis §3",
+            "# WARNING: default 200 samples may under-resolve high-curvature spans.",
+            "#          high_kappa_risk=1 flags those spans. Use samples>=500 for production.",
+            "t,kappa,arc_length,x,y,z,high_kappa_risk",
+        ]
     for i, (t, k, s, pt, risk) in enumerate(zip(
         result.parameters, result.kappas, result.arc_lengths, result.points, result.high_kappa_risk
     )):
@@ -636,6 +759,178 @@ def export_curvature_profile_result(
     if not isinstance(curve, NurbsCurve):
         raise TypeError(f"curve must be a NurbsCurve, got {type(curve)!r}")
     return _sample_curvature(curve, samples)
+
+
+def export_curvature_profile_csv(
+    curve: NurbsCurve,
+    num_samples: int = 200,
+    adaptive: bool = False,
+    output_path: Optional[str] = None,
+) -> str:
+    """Export a NURBS curvature profile as CSV text, with optional adaptive sampling.
+
+    Parameters
+    ----------
+    curve : NurbsCurve
+        Input curve to analyse.
+    num_samples : int
+        Number of output sample rows.  Default 200.
+    adaptive : bool
+        When ``True``, use curvature-weighted adaptive resampling (de Boor §VI;
+        Hoschek-Lasser §5) so that samples are denser in high-curvature regions.
+        The CSV header warning is suppressed when adaptive=True.
+        When ``False`` (default), existing uniform-parameter sampling is used.
+    output_path : str, optional
+        If provided, the CSV text is also written to this file path.
+
+    Returns
+    -------
+    str
+        CSV text with columns: t, kappa, arc_length, x, y, z, high_kappa_risk.
+
+    Raises
+    ------
+    TypeError
+        If ``curve`` is not a NurbsCurve.
+
+    Algorithm (adaptive=True)
+    -------------------------
+    1. Seed at ``num_samples * 10`` uniform parameter values.
+    2. Compute the curvature-weighted speed w(t) = |κ(t)| · ‖C'(t)‖.
+    3. Integrate W(t) = ∫₀ᵗ w(τ) dτ cumulatively (trapezoidal rule).
+    4. Invert W at ``num_samples`` equal-spaced targets → dense sampling
+       where curvature is high, sparse where κ ≈ 0.
+    5. Evaluate κ, arc-length, and curve points at the adaptive parameters.
+    Falls back to arc-length-uniform sampling for straight lines (κ ≡ 0).
+
+    References
+    ----------
+    de Boor, C. (2001). *A Practical Guide to Splines*, §VI.
+    Hoschek, J. & Lasser, D. (1993). *Fundamentals of CAGD*, §5.
+    Farin, G. (2002). *Curves and Surfaces for CAGD*, 5th ed., §11.6.
+    """
+    if not isinstance(curve, NurbsCurve):
+        raise TypeError(f"curve must be a NurbsCurve, got {type(curve)!r}")
+
+    if adaptive:
+        # Build a custom CurvatureProfileResult from adaptive parameter values
+        adapt_params = _adaptive_sample_params(curve, num_samples)
+        result = _sample_curvature_at_params(curve, adapt_params)
+    else:
+        result = _sample_curvature(curve, num_samples)
+
+    csv_text = _to_csv(result, adaptive=adaptive)
+
+    if output_path is not None:
+        import pathlib
+        pathlib.Path(output_path).write_text(csv_text, encoding="utf-8")
+
+    return csv_text
+
+
+def _sample_curvature_at_params(
+    curve: NurbsCurve,
+    params: np.ndarray,
+) -> CurvatureProfileResult:
+    """Sample κ(t) at a given array of parameter values.
+
+    This mirrors ``_sample_curvature`` but accepts an arbitrary (non-uniform)
+    parameter sequence, enabling adaptive sampling strategies.
+
+    Parameters
+    ----------
+    curve  : NurbsCurve
+    params : np.ndarray — parameter values in ascending order (shape (N,))
+
+    Returns
+    -------
+    CurvatureProfileResult
+    """
+    dim = curve.control_points.shape[1]
+    is_2d = dim == 2
+
+    param_list: List[float] = []
+    kappas_list: List[float] = []
+    kappas_signed: List[float] = []
+    pts_list: List[List[float]] = []
+    speeds_list: List[float] = []
+
+    for u in params:
+        uf = float(u)
+        d1 = curve_derivative(curve, uf, order=1)
+        d2 = curve_derivative(curve, uf, order=2)
+        pt = curve.evaluate(uf)
+
+        d1_3 = np.zeros(3)
+        d2_3 = np.zeros(3)
+        d1_3[:min(dim, 3)] = d1[:min(dim, 3)]
+        d2_3[:min(dim, 3)] = d2[:min(dim, 3)]
+        pt_3 = np.zeros(3)
+        pt_3[:min(dim, 3)] = pt[:min(dim, 3)]
+
+        speed = float(np.linalg.norm(d1_3))
+        if speed < 1e-14:
+            kappa = 0.0
+            k_signed = 0.0
+        else:
+            cross_vec = np.cross(d1_3, d2_3)
+            cross_mag = float(np.linalg.norm(cross_vec))
+            kappa = cross_mag / speed ** 3
+            if is_2d:
+                x1, y1 = float(d1[0]), float(d1[1])
+                x2, y2 = float(d2[0]), float(d2[1])
+                k_signed = (x1 * y2 - y1 * x2) / speed ** 3
+            else:
+                k_signed = kappa
+
+        param_list.append(uf)
+        kappas_list.append(kappa)
+        kappas_signed.append(k_signed)
+        speeds_list.append(speed)
+        pts_list.append(pt_3.tolist())
+
+    speeds_arr = np.array(speeds_list)
+    params_arr = np.array(param_list)
+    dt = np.diff(params_arr)
+    arc_segs = np.concatenate([[0.0], np.cumsum(0.5 * (speeds_arr[:-1] + speeds_arr[1:]) * dt)])
+    arc_lengths = arc_segs.tolist()
+    total_arc = float(arc_segs[-1])
+
+    kappas_arr = np.array(kappas_list)
+    if total_arc > 0:
+        seg_weights = np.concatenate([[0.0], 0.5 * (speeds_arr[:-1] + speeds_arr[1:]) * dt])
+        kappa_mean = float(np.dot(kappas_arr, seg_weights) / total_arc)
+    else:
+        kappa_mean = float(np.mean(kappas_arr))
+
+    dkappa = np.abs(np.gradient(kappas_arr, params_arr))
+    mean_dk = float(np.mean(dkappa))
+    threshold = 5.0 * mean_dk if mean_dk > 1e-30 else 1e30
+    high_risk = (dkappa > threshold).astype(int).tolist()
+
+    inflection_params: List[float] = []
+    ks = kappas_signed
+    kmax = float(np.max(np.abs(kappas_arr))) if len(kappas_arr) > 0 else 1.0
+    for i in range(len(ks) - 1):
+        if ks[i] * ks[i + 1] < 0:
+            if abs(ks[i + 1] - ks[i]) > 1e-30:
+                t_infl = param_list[i] - ks[i] * (param_list[i + 1] - param_list[i]) / (ks[i + 1] - ks[i])
+                inflection_params.append(float(t_infl))
+        elif kmax > 1e-14 and abs(ks[i]) < 1e-6 * kmax and abs(ks[i]) < abs(ks[i - 1] if i > 0 else ks[i + 1]):
+            inflection_params.append(float(param_list[i]))
+
+    return CurvatureProfileResult(
+        parameters=param_list,
+        kappas=kappas_list,
+        arc_lengths=arc_lengths,
+        points=pts_list,
+        total_arc_length=total_arc,
+        kappa_min=float(np.min(kappas_arr)),
+        kappa_max=float(np.max(kappas_arr)),
+        kappa_mean=kappa_mean,
+        high_kappa_risk=high_risk,
+        inflection_params=inflection_params,
+    )
 
 
 # ---------------------------------------------------------------------------

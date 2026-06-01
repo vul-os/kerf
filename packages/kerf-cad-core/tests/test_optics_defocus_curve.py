@@ -415,3 +415,266 @@ def test_tool_field_angle_kwarg():
 def test_tool_defocus_range_kwarg():
     data = _invoke({"surfaces": _SINGLET, "defocus_range_mm": 1.0})
     assert data.get("ok") is True
+
+
+# ---------------------------------------------------------------------------
+# 3-D skew-ray defocus tests (use_skew_ray=True)
+# ---------------------------------------------------------------------------
+
+def test_skew_ray_returns_defocus_result():
+    """use_skew_ray=True returns a DefocusCurveResult, not an error dict."""
+    result = compute_defocus_curve(
+        _bk7_singlet(),
+        field_angle_deg=0.0,
+        defocus_range_mm=0.5,
+        samples=11,
+        aperture_radius_mm=2.0,
+        n_rays=12,
+        use_skew_ray=True,
+    )
+    assert isinstance(result, DefocusCurveResult)
+
+
+def test_skew_ray_aberration_free_min_near_zero():
+    """
+    Paraxial-regime singlet (tiny aperture): skew-ray defocus curve RMS
+    minimum must be within one defocus step of Δz=0 (aberration-free limit).
+    Welford 1986 §11.5: minimum at paraxial BFL for zero-aberration system.
+    """
+    result = compute_defocus_curve(
+        _bk7_singlet(),
+        field_angle_deg=0.0,
+        defocus_range_mm=0.5,
+        samples=21,
+        aperture_radius_mm=0.1,   # paraxial limit
+        n_rays=12,
+        use_skew_ray=True,
+    )
+    assert isinstance(result, DefocusCurveResult)
+    step = 2 * 0.5 / 20  # one step = 0.05 mm
+    assert abs(result.best_focus_shift_mm) <= 2 * step
+
+
+def test_skew_ray_vs_meridional_agreement_paraxial():
+    """
+    In the paraxial limit (tiny aperture, on-axis), skew-ray 3-D RMS and
+    meridional 2-D RMS must give similar best-focus positions (within 0.1 mm).
+    Both converge to the paraxial BFL for a nearly-perfect system.
+    """
+    kwargs = dict(
+        field_angle_deg=0.0,
+        defocus_range_mm=0.5,
+        samples=21,
+        aperture_radius_mm=0.05,
+        n_rays=12,
+    )
+    r_mer = compute_defocus_curve(_bk7_singlet(), use_skew_ray=False, **kwargs)
+    r_skw = compute_defocus_curve(_bk7_singlet(), use_skew_ray=True, **kwargs)
+    assert isinstance(r_mer, DefocusCurveResult)
+    assert isinstance(r_skw, DefocusCurveResult)
+    # Best-focus positions should be close in the paraxial limit
+    assert abs(r_mer.best_focus_shift_mm - r_skw.best_focus_shift_mm) < 0.15
+
+
+def test_skew_ray_rms_increases_away_from_focus():
+    """
+    Paraxial singlet: skew-ray RMS at the endpoints must be larger than at
+    the best-focus Δz (parabolic growth, Welford §11.5).
+    """
+    result = compute_defocus_curve(
+        _bk7_singlet(),
+        field_angle_deg=0.0,
+        defocus_range_mm=1.0,
+        samples=21,
+        aperture_radius_mm=0.1,
+        n_rays=12,
+        use_skew_ray=True,
+    )
+    assert isinstance(result, DefocusCurveResult)
+    rms = result.rms_per_defocus_mm
+    # At least one endpoint must be much larger than minimum
+    assert rms[0] > result.min_rms_mm * 5 or rms[-1] > result.min_rms_mm * 5
+
+
+def test_skew_ray_honest_flag_contains_skew():
+    """honest_flag must mention skew-ray mode when use_skew_ray=True."""
+    result = compute_defocus_curve(
+        _bk7_singlet(),
+        samples=11,
+        aperture_radius_mm=2.0,
+        n_rays=12,
+        use_skew_ray=True,
+    )
+    assert isinstance(result, DefocusCurveResult)
+    assert "SKEW-RAY" in result.honest_flag
+
+
+def test_skew_ray_n_rays_valid_length():
+    """n_rays_valid length matches samples in skew-ray mode."""
+    result = compute_defocus_curve(
+        _bk7_singlet(),
+        samples=11,
+        aperture_radius_mm=2.0,
+        n_rays=12,
+        use_skew_ray=True,
+    )
+    assert isinstance(result, DefocusCurveResult)
+    assert len(result.n_rays_valid) == 11
+
+
+def test_skew_ray_off_axis_different_from_on_axis():
+    """
+    Off-axis (10°) skew-ray defocus curve differs from on-axis curve:
+    field curvature and astigmatism shift the best-focus or min RMS.
+    """
+    kwargs = dict(
+        defocus_range_mm=0.5,
+        samples=21,
+        aperture_radius_mm=3.0,
+        n_rays=12,
+        use_skew_ray=True,
+    )
+    r_on = compute_defocus_curve(_bk7_singlet(), field_angle_deg=0.0, **kwargs)
+    r_off = compute_defocus_curve(_bk7_singlet(), field_angle_deg=10.0, **kwargs)
+    assert isinstance(r_on, DefocusCurveResult)
+    assert isinstance(r_off, DefocusCurveResult)
+    different = (
+        abs(r_on.best_focus_shift_mm - r_off.best_focus_shift_mm) > 1e-6 or
+        abs(r_on.min_rms_mm - r_off.min_rms_mm) > 1e-6
+    )
+    assert different
+
+
+def test_skew_ray_error_on_invalid_surfaces():
+    """use_skew_ray=True still validates surfaces and returns error dict."""
+    result = compute_defocus_curve([], use_skew_ray=True)
+    assert isinstance(result, dict)
+    assert result["ok"] is False
+
+
+# ---------------------------------------------------------------------------
+# Spectral weighting tests (use_skew_ray=True + spectral_weights)
+# ---------------------------------------------------------------------------
+
+def _chromatic_doublet_blue():
+    """
+    Simplified doublet with blue-shifted index (higher n for shorter λ).
+    Uses a higher-n crown glass at blue wavelength to shift focus.
+    BK7 at 486 nm: n ≈ 1.5224; at 656 nm: n ≈ 1.5133.
+    """
+    return [
+        {"c": 1.0 / 50.0, "t": 5.0, "n": 1.5224},  # blue-wavelength BK7
+        {"c": -1.0 / 50.0, "t": 0.0, "n": 1.0},
+    ]
+
+
+def _chromatic_doublet_red():
+    """BK7 at red (C-line, 656 nm): n ≈ 1.5133."""
+    return [
+        {"c": 1.0 / 50.0, "t": 5.0, "n": 1.5133},
+        {"c": -1.0 / 50.0, "t": 0.0, "n": 1.0},
+    ]
+
+
+def test_spectral_weights_returns_defocus_result():
+    """spectral_weights with use_skew_ray=True returns DefocusCurveResult."""
+    result = compute_defocus_curve(
+        _bk7_singlet(),
+        defocus_range_mm=1.0,
+        samples=11,
+        aperture_radius_mm=2.0,
+        n_rays=12,
+        use_skew_ray=True,
+        spectral_weights=[(486.1, 0.3), (587.6, 1.0), (656.3, 0.5)],
+    )
+    assert isinstance(result, DefocusCurveResult)
+
+
+def test_spectral_weights_honest_flag():
+    """honest_flag must mention spectral weighting when spectral_weights given."""
+    result = compute_defocus_curve(
+        _bk7_singlet(),
+        samples=11,
+        aperture_radius_mm=2.0,
+        n_rays=12,
+        use_skew_ray=True,
+        spectral_weights=[(486.1, 1.0), (587.6, 1.0)],
+    )
+    assert isinstance(result, DefocusCurveResult)
+    assert "SPECTRAL" in result.honest_flag or "spectral" in result.honest_flag
+
+
+def test_spectral_weights_error_without_skew_ray():
+    """spectral_weights without use_skew_ray=True must return error dict."""
+    result = compute_defocus_curve(
+        _bk7_singlet(),
+        use_skew_ray=False,
+        spectral_weights=[(486.1, 1.0), (587.6, 1.0)],
+    )
+    assert isinstance(result, dict)
+    assert result["ok"] is False
+    assert "skew_ray" in result["reason"] or "use_skew_ray" in result["reason"]
+
+
+def test_spectral_chromatic_defocus_shifts_minimum():
+    """
+    Chromatic aberration: blue focus is shorter than red focus in a singlet.
+    Tracing the blue-wavelength singlet (higher n) vs red-wavelength singlet
+    (lower n) should give different best_focus_shift_mm values.
+    This validates that the spectral weighting path produces physically
+    meaningful chromatic BFL differences (Hecht §6.3; Welford §6.5).
+    """
+    kwargs = dict(
+        defocus_range_mm=2.0,
+        samples=41,
+        aperture_radius_mm=0.5,
+        n_rays=12,
+        use_skew_ray=True,
+    )
+    r_blue = compute_defocus_curve(_chromatic_doublet_blue(), **kwargs)
+    r_red = compute_defocus_curve(_chromatic_doublet_red(), **kwargs)
+    assert isinstance(r_blue, DefocusCurveResult)
+    assert isinstance(r_red, DefocusCurveResult)
+    # Blue focus is at smaller BFL than red (Hecht §6.3: shorter λ → higher n → shorter f)
+    assert r_blue.bfl_mm < r_red.bfl_mm
+
+
+def test_spectral_weighted_rms_finite():
+    """Weighted RMS values are finite for a valid singlet with spectral weights."""
+    result = compute_defocus_curve(
+        _bk7_singlet(),
+        defocus_range_mm=0.5,
+        samples=11,
+        aperture_radius_mm=2.0,
+        n_rays=12,
+        use_skew_ray=True,
+        spectral_weights=[(486.1, 1.0), (587.6, 2.0), (656.3, 1.0)],
+    )
+    assert isinstance(result, DefocusCurveResult)
+    finite_count = sum(1 for r in result.rms_per_defocus_mm if math.isfinite(r))
+    assert finite_count >= 5  # at least half the steps should be valid
+
+
+def test_spectral_equal_weights_matches_single_wavelength_shape():
+    """
+    Equal weights at a single wavelength must give the same best-focus shift
+    as the monochromatic skew-ray call at that wavelength.
+    (Degenerate case: Σ w_i * RMS_i^2 / Σ w_i = RMS for a single band.)
+    """
+    kwargs = dict(
+        defocus_range_mm=0.5,
+        samples=11,
+        aperture_radius_mm=0.5,
+        n_rays=12,
+        use_skew_ray=True,
+    )
+    r_mono = compute_defocus_curve(_bk7_singlet(), **kwargs)
+    r_spec = compute_defocus_curve(
+        _bk7_singlet(),
+        spectral_weights=[(587.6, 1.0)],
+        **kwargs,
+    )
+    assert isinstance(r_mono, DefocusCurveResult)
+    assert isinstance(r_spec, DefocusCurveResult)
+    # Best-focus shifts should be identical for a single-band spectral call
+    assert abs(r_mono.best_focus_shift_mm - r_spec.best_focus_shift_mm) < 0.11

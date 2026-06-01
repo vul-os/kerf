@@ -53,7 +53,12 @@ import pytest
 
 from kerf_cad_core.optics.distortion_map import (
     DistortionMapReport,
+    SpectralDistortionReport,
+    blackbody_spd,
     compute_distortion_map,
+    compute_spectral_distortion,
+    d65_spd,
+    photopic_spd,
 )
 from kerf_cad_core.optics.tools import run_distortion_map
 
@@ -421,3 +426,236 @@ def test_seidel_list_values_finite():
     for i, s in enumerate(r.seidel_distortion_percent):
         assert math.isfinite(s), \
             f"Seidel prediction at angle index {i} is not finite: {s}"
+
+
+# ===========================================================================
+# Spectral distortion tests (31–40)
+# ===========================================================================
+
+# Shared wavelength grid: 400–700 nm, 31 samples (10 nm step)
+_LAMBDAS = [float(400 + 10 * i) for i in range(31)]  # 400..700 nm
+_UNIFORM_SPD = [1.0] * len(_LAMBDAS)
+
+
+# ---------------------------------------------------------------------------
+# 31. Constant distortion across λ → spectral average == monochromatic value
+# ---------------------------------------------------------------------------
+
+def test_spectral_constant_distortion_equals_mono():
+    """D(θ,λ) = const → D̄(θ) == D(θ,λ_design) for any SPD."""
+    constant_d = 0.035  # arbitrary constant distortion fraction
+
+    def D(theta, lam):  # noqa: N802
+        return constant_d
+
+    r = compute_spectral_distortion(D, [5.0, 10.0, 15.0], _LAMBDAS, _UNIFORM_SPD)
+    assert isinstance(r, SpectralDistortionReport)
+    for i, d_bar in enumerate(r.spectral_avg_distortion):
+        assert math.isfinite(d_bar), f"D̄ at index {i} is not finite"
+        assert d_bar == pytest.approx(constant_d, rel=1e-6), \
+            f"Expected {constant_d}, got {d_bar}"
+    for res in r.chromatic_residual:
+        assert res == pytest.approx(0.0, abs=1e-10), \
+            "Chromatic residual should be 0 for constant D"
+
+
+# ---------------------------------------------------------------------------
+# 32. Wavelength-varying D → spectral ≠ any single-λ value
+# ---------------------------------------------------------------------------
+
+def test_spectral_varying_distortion_differs_from_single_lambda():
+    """D varies linearly with λ: spectral average differs from extreme λ values."""
+
+    def D(theta, lam):  # noqa: N802
+        # Linearly increasing: D = 0 at 400 nm, 0.1 at 700 nm
+        return (lam - 400.0) / 3000.0
+
+    r = compute_spectral_distortion(D, [10.0], _LAMBDAS, _UNIFORM_SPD)
+    assert isinstance(r, SpectralDistortionReport)
+    d_bar = r.spectral_avg_distortion[0]
+    d_at_400 = D(10.0, 400.0)
+    d_at_700 = D(10.0, 700.0)
+    # Mean of uniform distribution over 400–700 = 0.05
+    assert d_bar == pytest.approx(0.05, rel=1e-3), \
+        f"Expected ~0.05 for uniform average, got {d_bar}"
+    assert d_bar != pytest.approx(d_at_400, abs=1e-6), \
+        "Spectral average should differ from D at 400 nm"
+    assert d_bar != pytest.approx(d_at_700, abs=1e-6), \
+        "Spectral average should differ from D at 700 nm"
+
+
+# ---------------------------------------------------------------------------
+# 33. Photopic-weighted SPD: peak weight near 555 nm
+# ---------------------------------------------------------------------------
+
+def test_photopic_spd_peak_near_555nm():
+    """photopic_spd() returns maximum weight at ~555 nm."""
+    lambdas = [float(400 + 5 * i) for i in range(61)]  # 400..700 nm, 5 nm step
+    v = photopic_spd(lambdas)
+    assert len(v) == len(lambdas)
+    peak_lam = lambdas[v.index(max(v))]
+    assert 545.0 <= peak_lam <= 565.0, \
+        f"Photopic V(λ) peak should be near 555 nm, got {peak_lam}"
+    assert max(v) == pytest.approx(1.0, rel=0.02), \
+        "Photopic V(λ) max should be close to 1.0"
+
+
+# ---------------------------------------------------------------------------
+# 34. Photopic-weighted spectral distortion: dominated by 555 nm region
+# ---------------------------------------------------------------------------
+
+def test_photopic_weighted_distortion_near_555nm():
+    """Photopic SPD weights 555 nm; D̄ should be close to D(θ, 555 nm)."""
+    # D(θ, λ) = A + B·(λ-555)/100  → linear chromatic variation, centred at 555 nm
+    A, B = 0.02, 0.005
+
+    def D(theta, lam):  # noqa: N802
+        return A + B * (lam - 555.0) / 100.0
+
+    lambdas = [float(400 + 5 * i) for i in range(61)]
+    v_lam = photopic_spd(lambdas)
+
+    r = compute_spectral_distortion(D, [10.0], lambdas, v_lam)
+    assert isinstance(r, SpectralDistortionReport)
+    d_bar = r.spectral_avg_distortion[0]
+    # Photopic SPD is symmetric-ish around 555 nm → mean chromatic shift ≈ 0
+    # D̄ should be close to A (the on-peak value)
+    assert d_bar == pytest.approx(A, abs=0.003), \
+        f"Photopic-weighted D̄ should be near {A} (on-peak), got {d_bar}"
+    # Design wavelength should be within the 540–570 nm band
+    assert 540.0 <= r.design_wavelength_nm <= 570.0, \
+        f"Design wavelength should be near 555 nm, got {r.design_wavelength_nm}"
+
+
+# ---------------------------------------------------------------------------
+# 35. D65 SPD: integrates without error, returns finite results
+# ---------------------------------------------------------------------------
+
+def test_d65_spd_integration_finite():
+    """D65 SPD weighted spectral distortion returns finite values."""
+    lambdas = [float(400 + 10 * i) for i in range(31)]
+    d65 = d65_spd(lambdas)
+    assert len(d65) == len(lambdas)
+    assert all(v >= 0.0 for v in d65), "D65 SPD must be non-negative"
+    assert max(d65) > 0.0, "D65 SPD must not be all zeros over 400–700 nm"
+
+    def D(theta, lam):  # noqa: N802
+        return 0.01 * math.sin(theta * lam / 1e5)
+
+    r = compute_spectral_distortion(D, [5.0, 15.0], lambdas, d65)
+    assert isinstance(r, SpectralDistortionReport)
+    for d_bar in r.spectral_avg_distortion:
+        assert math.isfinite(d_bar), "D65-weighted D̄ must be finite"
+
+
+# ---------------------------------------------------------------------------
+# 36. Blackbody SPD: peak shifts with temperature (Wien's law)
+# ---------------------------------------------------------------------------
+
+def test_blackbody_spd_peak_shifts_with_temperature():
+    """Blackbody SPD peak ≈ 2.898e6 nm·K / T (Wien's displacement law)."""
+    lambdas = [float(200 + 10 * i) for i in range(181)]  # 200–2000 nm
+    for T_K, expected_peak_nm in [(5778.0, 501.0), (3000.0, 966.0)]:
+        bb = blackbody_spd(lambdas, T_K)
+        peak_lam = lambdas[bb.index(max(bb))]
+        wien_peak = 2.8977721e6 / T_K
+        # Allow ±2× grid step tolerance
+        assert abs(peak_lam - wien_peak) < 30.0, \
+            f"Wien peak at T={T_K}K: expected ~{wien_peak:.0f} nm, got {peak_lam} nm"
+
+
+# ---------------------------------------------------------------------------
+# 37. Blackbody T<=0 raises ValueError
+# ---------------------------------------------------------------------------
+
+def test_blackbody_spd_zero_temperature_raises():
+    """blackbody_spd raises ValueError for T_K <= 0."""
+    with pytest.raises(ValueError, match="T_K"):
+        blackbody_spd([500.0, 600.0], T_K=0.0)
+
+    with pytest.raises(ValueError, match="T_K"):
+        blackbody_spd([500.0, 600.0], T_K=-100.0)
+
+
+# ---------------------------------------------------------------------------
+# 38. compute_spectral_distortion: output list lengths match input
+# ---------------------------------------------------------------------------
+
+def test_spectral_distortion_output_lengths():
+    """Output lists all match the length of field_angles_deg input."""
+    angles = [0.0, 5.0, 10.0, 15.0, 20.0]
+
+    def D(theta, lam):  # noqa: N802
+        return 0.01
+
+    r = compute_spectral_distortion(D, angles, _LAMBDAS, _UNIFORM_SPD)
+    assert isinstance(r, SpectralDistortionReport)
+    assert len(r.field_angles_deg) == len(angles)
+    assert len(r.spectral_avg_distortion) == len(angles)
+    assert len(r.monochromatic_d_at_design_wavelength) == len(angles)
+    assert len(r.chromatic_residual) == len(angles)
+
+
+# ---------------------------------------------------------------------------
+# 39. compute_spectral_distortion: input validation errors
+# ---------------------------------------------------------------------------
+
+def test_spectral_distortion_input_errors():
+    """compute_spectral_distortion returns error dicts for bad inputs."""
+
+    def D(theta, lam):  # noqa: N802
+        return 0.0
+
+    # Non-callable distortion_func
+    r = compute_spectral_distortion("not_callable", [5.0], _LAMBDAS, _UNIFORM_SPD)
+    assert isinstance(r, dict) and r["ok"] is False
+
+    # Too few wavelength samples
+    r = compute_spectral_distortion(D, [5.0], [550.0], [1.0])
+    assert isinstance(r, dict) and r["ok"] is False
+    assert "2" in r["reason"]
+
+    # Mismatched spd_weights length
+    r = compute_spectral_distortion(D, [5.0], _LAMBDAS, [1.0] * 5)
+    assert isinstance(r, dict) and r["ok"] is False
+    assert "length" in r["reason"]
+
+    # All-zero SPD weights
+    r = compute_spectral_distortion(D, [5.0], _LAMBDAS, [0.0] * len(_LAMBDAS))
+    assert isinstance(r, dict) and r["ok"] is False
+    assert "zero" in r["reason"]
+
+    # Non-monotone wavelengths
+    r = compute_spectral_distortion(D, [5.0], [600.0, 550.0, 700.0], [1.0, 1.0, 1.0])
+    assert isinstance(r, dict) and r["ok"] is False
+    assert "monoton" in r["reason"]
+
+    # Empty field angles
+    r = compute_spectral_distortion(D, [], _LAMBDAS, _UNIFORM_SPD)
+    assert isinstance(r, dict) and r["ok"] is False
+
+
+# ---------------------------------------------------------------------------
+# 40. to_dict() on SpectralDistortionReport has ok=True and correct keys
+# ---------------------------------------------------------------------------
+
+def test_spectral_distortion_to_dict():
+    """SpectralDistortionReport.to_dict() returns ok=True with expected keys."""
+
+    def D(theta, lam):  # noqa: N802
+        return 0.02
+
+    r = compute_spectral_distortion(D, [5.0, 10.0], _LAMBDAS, _UNIFORM_SPD)
+    assert isinstance(r, SpectralDistortionReport)
+    d = r.to_dict()
+    assert d["ok"] is True
+    for key in (
+        "field_angles_deg",
+        "spectral_avg_distortion",
+        "monochromatic_d_at_design_wavelength",
+        "chromatic_residual",
+        "design_wavelength_nm",
+        "honest_caveat",
+    ):
+        assert key in d, f"Missing key: {key}"
+    assert isinstance(d["honest_caveat"], str) and len(d["honest_caveat"]) > 20

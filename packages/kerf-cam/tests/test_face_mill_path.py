@@ -22,9 +22,12 @@ import pytest
 from kerf_cam.face_mill_path import (
     FaceMillSpec,
     FaceMillResult,
+    FaceMillPathSpec,
+    FaceMillRoughFinishResult,
     _fmt,
     _compute_passes,
     generate_face_mill_path,
+    generate_face_mill_rough_finish_path,
     cam_generate_face_mill_path_spec,
     run_cam_generate_face_mill_path,
 )
@@ -561,3 +564,336 @@ class TestLLMTool:
         result = json.loads(raw)
         assert "machining_time_s" in result
         assert result["machining_time_s"] > 0.0
+
+
+# ---------------------------------------------------------------------------
+# 11. FaceMillPathSpec validation
+# ---------------------------------------------------------------------------
+
+def _path_spec(**kw) -> FaceMillPathSpec:
+    """Return a FaceMillPathSpec with sensible 100×60 pocket defaults."""
+    defaults = dict(
+        xmin_mm=0.0,
+        ymin_mm=0.0,
+        xmax_mm=100.0,
+        ymax_mm=60.0,
+        total_depth_mm=5.0,
+        tool_diameter_mm=12.0,
+        stepdown_mm=1.0,
+        stock_allowance_mm=0.2,
+        roughing_feedrate_mm_per_min=1500.0,
+        finishing_feedrate_mm_per_min=800.0,
+        stepover_pct=70.0,
+        finishing_stepover_pct=50.0,
+        spindle_rpm=3000.0,
+        rapid_z_mm=10000.0,
+        work_top_z_mm=0.0,
+        rapid_clearance_mm=5.0,
+    )
+    defaults.update(kw)
+    return FaceMillPathSpec(**defaults)
+
+
+class TestFaceMillPathSpecValidation:
+    def test_valid_spec_no_error(self):
+        s = _path_spec()
+        assert s.total_depth_mm == 5.0
+        assert s.stepdown_mm == 1.0
+
+    def test_zero_total_depth_raises(self):
+        with pytest.raises(ValueError, match="total_depth_mm"):
+            _path_spec(total_depth_mm=0.0)
+
+    def test_negative_stepdown_raises(self):
+        with pytest.raises(ValueError, match="stepdown_mm"):
+            _path_spec(stepdown_mm=-0.5)
+
+    def test_zero_stepdown_raises(self):
+        with pytest.raises(ValueError, match="stepdown_mm"):
+            _path_spec(stepdown_mm=0.0)
+
+    def test_stock_allowance_ge_total_depth_raises(self):
+        with pytest.raises(ValueError, match="stock_allowance_mm"):
+            _path_spec(total_depth_mm=1.0, stock_allowance_mm=1.0)
+
+    def test_negative_stock_allowance_raises(self):
+        with pytest.raises(ValueError, match="stock_allowance_mm"):
+            _path_spec(stock_allowance_mm=-0.1)
+
+    def test_zero_roughing_feedrate_raises(self):
+        with pytest.raises(ValueError, match="roughing_feedrate_mm_per_min"):
+            _path_spec(roughing_feedrate_mm_per_min=0.0)
+
+    def test_zero_finishing_feedrate_raises(self):
+        with pytest.raises(ValueError, match="finishing_feedrate_mm_per_min"):
+            _path_spec(finishing_feedrate_mm_per_min=0.0)
+
+    def test_finishing_stepover_out_of_range_raises(self):
+        with pytest.raises(ValueError, match="finishing_stepover_pct"):
+            _path_spec(finishing_stepover_pct=0.0)
+
+
+# ---------------------------------------------------------------------------
+# 12. generate_face_mill_rough_finish_path — layer counts
+# ---------------------------------------------------------------------------
+
+class TestRoughFinishLayerCounts:
+    def test_5mm_depth_1mm_stepdown_gives_5_roughing_layers(self):
+        """
+        total_depth=5 mm, stock_allowance=0.2 mm → roughing_depth=4.8 mm.
+        stepdown=1.0 mm → num_roughing_layers = ceil(4.8/1.0) = 5.
+        """
+        r = generate_face_mill_rough_finish_path(_path_spec(
+            total_depth_mm=5.0,
+            stepdown_mm=1.0,
+            stock_allowance_mm=0.2,
+        ))
+        assert r.num_roughing_layers == 5, (
+            f"Expected 5 roughing layers, got {r.num_roughing_layers}"
+        )
+
+    def test_5mm_depth_1mm_stepdown_has_finishing_pass(self):
+        """Result must include exactly 1 finishing layer (num_finishing_passes >= 1)."""
+        r = generate_face_mill_rough_finish_path(_path_spec())
+        assert r.num_finishing_passes >= 1
+
+    def test_total_layers_is_roughing_plus_one_finish(self):
+        """Total Z passes = num_roughing_layers + 1 (finish)."""
+        r = generate_face_mill_rough_finish_path(_path_spec(
+            total_depth_mm=6.0,
+            stepdown_mm=2.0,
+            stock_allowance_mm=0.3,
+        ))
+        # roughing_depth = 5.7, stepdown=2.0 → ceil(5.7/2.0) = 3 roughing layers
+        assert r.num_roughing_layers == 3
+        # Plus finishing = 4 Z levels total (implicit in gcode layers)
+        assert r.num_finishing_passes >= 1
+
+    def test_larger_stepdown_gives_fewer_roughing_layers(self):
+        """Bigger stepdown → fewer roughing layers."""
+        r_small = generate_face_mill_rough_finish_path(_path_spec(stepdown_mm=0.5))
+        r_large = generate_face_mill_rough_finish_path(_path_spec(stepdown_mm=2.0))
+        assert r_small.num_roughing_layers > r_large.num_roughing_layers
+
+    def test_roughing_z_levels_count_matches_num_roughing_layers(self):
+        r = generate_face_mill_rough_finish_path(_path_spec())
+        assert len(r.roughing_z_levels) == r.num_roughing_layers
+
+    def test_last_roughing_z_preserves_stock_allowance(self):
+        """
+        Last roughing floor = work_top_z_mm − (total_depth_mm − stock_allowance_mm).
+        Stock allowance must remain between last roughing Z and final finishing Z.
+        """
+        spec = _path_spec(
+            total_depth_mm=5.0,
+            stepdown_mm=1.0,
+            stock_allowance_mm=0.2,
+            work_top_z_mm=0.0,
+        )
+        r = generate_face_mill_rough_finish_path(spec)
+        last_roughing_z = r.roughing_z_levels[-1]
+        finishing_z = r.finishing_z
+        # Stock on floor = distance between last roughing pass and finish floor
+        remaining_stock = abs(last_roughing_z - finishing_z)
+        assert abs(remaining_stock - spec.stock_allowance_mm) < 1e-6, (
+            f"Stock allowance={remaining_stock:.6f} mm, "
+            f"expected {spec.stock_allowance_mm} mm"
+        )
+
+    def test_finishing_z_equals_total_depth_below_work_top(self):
+        """Finishing Z = work_top_z_mm − total_depth_mm."""
+        spec = _path_spec(work_top_z_mm=10.0, total_depth_mm=5.0)
+        r = generate_face_mill_rough_finish_path(spec)
+        expected = 10.0 - 5.0
+        assert abs(r.finishing_z - expected) < 1e-9, (
+            f"finishing_z={r.finishing_z}, expected {expected}"
+        )
+
+    def test_roughing_z_levels_monotonically_decreasing(self):
+        """Each roughing layer must be deeper than the previous."""
+        r = generate_face_mill_rough_finish_path(_path_spec())
+        for i in range(1, len(r.roughing_z_levels)):
+            assert r.roughing_z_levels[i] < r.roughing_z_levels[i - 1], (
+                f"Layer {i} Z={r.roughing_z_levels[i]} not deeper than "
+                f"layer {i-1} Z={r.roughing_z_levels[i-1]}"
+            )
+
+    def test_all_roughing_z_levels_above_finishing_z(self):
+        """Every roughing layer must be shallower than finishing_z (stock preserved)."""
+        r = generate_face_mill_rough_finish_path(_path_spec())
+        for i, z in enumerate(r.roughing_z_levels):
+            assert z > r.finishing_z, (
+                f"Roughing layer {i} Z={z} is at or below finishing_z={r.finishing_z}"
+            )
+
+
+# ---------------------------------------------------------------------------
+# 13. Roughing uses faster feedrate than finishing
+# ---------------------------------------------------------------------------
+
+class TestRoughingFeedrate:
+    def test_roughing_gcode_uses_roughing_feedrate(self):
+        """G-code for roughing layers must include the roughing feedrate F-word."""
+        spec = _path_spec(
+            roughing_feedrate_mm_per_min=1500.0,
+            finishing_feedrate_mm_per_min=800.0,
+        )
+        r = generate_face_mill_rough_finish_path(spec)
+        assert "F1500.0" in r.gcode or "F1500" in r.gcode, (
+            "Roughing feedrate 1500 mm/min not found in G-code"
+        )
+
+    def test_finishing_gcode_uses_finishing_feedrate(self):
+        """G-code for finishing pass must include the finishing feedrate F-word."""
+        spec = _path_spec(
+            roughing_feedrate_mm_per_min=1500.0,
+            finishing_feedrate_mm_per_min=800.0,
+        )
+        r = generate_face_mill_rough_finish_path(spec)
+        assert "F800.0" in r.gcode or "F800" in r.gcode, (
+            "Finishing feedrate 800 mm/min not found in G-code"
+        )
+
+    def test_roughing_feedrate_gt_finishing_feedrate_by_default(self):
+        """Default roughing feed (1500) > finishing feed (800) for higher MRR."""
+        spec = _path_spec()
+        assert spec.roughing_feedrate_mm_per_min > spec.finishing_feedrate_mm_per_min
+
+    def test_machining_time_increases_with_more_layers(self):
+        """More roughing layers → longer total machining time."""
+        r_shallow = generate_face_mill_rough_finish_path(_path_spec(
+            total_depth_mm=2.0, stepdown_mm=1.0, stock_allowance_mm=0.2,
+        ))
+        r_deep = generate_face_mill_rough_finish_path(_path_spec(
+            total_depth_mm=8.0, stepdown_mm=1.0, stock_allowance_mm=0.2,
+        ))
+        assert r_deep.machining_time_s > r_shallow.machining_time_s
+
+
+# ---------------------------------------------------------------------------
+# 14. G-code structure for roughing + finishing
+# ---------------------------------------------------------------------------
+
+class TestRoughFinishGcodeStructure:
+    def test_gcode_has_percent_delimiters(self):
+        r = generate_face_mill_rough_finish_path(_path_spec())
+        lines = r.gcode.strip().split("\n")
+        assert lines[0].strip() == "%"
+        assert lines[-1].strip() == "%"
+
+    def test_gcode_has_g21_metric(self):
+        r = generate_face_mill_rough_finish_path(_path_spec())
+        assert "G21" in r.gcode
+
+    def test_gcode_has_m03_spindle_on(self):
+        r = generate_face_mill_rough_finish_path(_path_spec())
+        assert "M03" in r.gcode
+
+    def test_gcode_has_m05_spindle_off(self):
+        r = generate_face_mill_rough_finish_path(_path_spec())
+        assert "M05" in r.gcode
+
+    def test_gcode_has_m30_program_end(self):
+        r = generate_face_mill_rough_finish_path(_path_spec())
+        assert "M30" in r.gcode
+
+    def test_gcode_mentions_roughing_layer(self):
+        r = generate_face_mill_rough_finish_path(_path_spec())
+        assert "Roughing layer" in r.gcode
+
+    def test_gcode_mentions_finishing_pass(self):
+        r = generate_face_mill_rough_finish_path(_path_spec())
+        assert "Finishing pass" in r.gcode
+
+    def test_finishing_z_present_in_gcode(self):
+        """The final depth Z value must appear in a G01 plunge."""
+        spec = _path_spec(total_depth_mm=5.0, work_top_z_mm=0.0)
+        r = generate_face_mill_rough_finish_path(spec)
+        # finishing_z = -5.0
+        assert "Z-5.0" in r.gcode, (
+            f"Expected Z-5.0 (finishing floor) in gcode. finishing_z={r.finishing_z}"
+        )
+
+    def test_material_removal_equals_pocket_area_times_total_depth(self):
+        """MRR = pocket_area × total_depth_mm."""
+        spec = _path_spec(total_depth_mm=5.0)
+        r = generate_face_mill_rough_finish_path(spec)
+        expected_mm3 = 100.0 * 60.0 * 5.0
+        assert abs(r.material_removal_mm3 - expected_mm3) < 1e-3, (
+            f"MRR={r.material_removal_mm3} ≠ {expected_mm3}"
+        )
+
+    def test_total_path_length_positive(self):
+        r = generate_face_mill_rough_finish_path(_path_spec())
+        assert r.total_path_length_mm > 0.0
+
+    def test_machining_time_positive(self):
+        r = generate_face_mill_rough_finish_path(_path_spec())
+        assert r.machining_time_s > 0.0
+
+    def test_honest_caveat_mentions_stock_allowance(self):
+        spec = _path_spec(stock_allowance_mm=0.2)
+        r = generate_face_mill_rough_finish_path(spec)
+        # The caveat embeds the stock_allowance value
+        assert "0.2" in r.honest_caveat
+
+    def test_honest_caveat_mentions_mh_reference(self):
+        r = generate_face_mill_rough_finish_path(_path_spec())
+        assert "MH" in r.honest_caveat or "Handbook" in r.honest_caveat
+
+    def test_result_type_is_face_mill_rough_finish_result(self):
+        r = generate_face_mill_rough_finish_path(_path_spec())
+        assert isinstance(r, FaceMillRoughFinishResult)
+
+    def test_finishing_stepover_smaller_than_roughing_produces_more_finish_passes(self):
+        """Finishing pass with tighter stepover should produce >= roughing passes."""
+        spec_tight = _path_spec(finishing_stepover_pct=30.0, stepover_pct=70.0)
+        spec_same = _path_spec(finishing_stepover_pct=70.0, stepover_pct=70.0)
+        r_tight = generate_face_mill_rough_finish_path(spec_tight)
+        r_same = generate_face_mill_rough_finish_path(spec_same)
+        assert r_tight.num_finishing_passes >= r_same.num_finishing_passes
+
+
+# ---------------------------------------------------------------------------
+# 15. Edge cases for roughing + finishing
+# ---------------------------------------------------------------------------
+
+class TestRoughFinishEdgeCases:
+    def test_stepdown_larger_than_roughing_depth_gives_one_roughing_layer(self):
+        """stepdown > roughing_depth → ceil(roughing_depth/stepdown) = 1 layer."""
+        spec = _path_spec(total_depth_mm=3.0, stepdown_mm=5.0, stock_allowance_mm=0.5)
+        r = generate_face_mill_rough_finish_path(spec)
+        assert r.num_roughing_layers == 1
+
+    def test_zero_stock_allowance_valid(self):
+        """stock_allowance_mm=0 is allowed (all depth removed in roughing)."""
+        spec = _path_spec(stock_allowance_mm=0.0)
+        r = generate_face_mill_rough_finish_path(spec)
+        # finishing_z should equal the last roughing z
+        assert abs(r.finishing_z - r.roughing_z_levels[-1]) < 1e-9
+
+    def test_non_zero_work_top_shifts_all_z(self):
+        """work_top_z_mm offset shifts all Z levels accordingly."""
+        spec = _path_spec(work_top_z_mm=20.0, total_depth_mm=5.0)
+        r = generate_face_mill_rough_finish_path(spec)
+        # All roughing Z levels must be < 20.0 (below work surface)
+        for z in r.roughing_z_levels:
+            assert z < spec.work_top_z_mm
+        assert r.finishing_z == pytest.approx(20.0 - 5.0, abs=1e-9)
+
+    def test_exact_stepdown_divisible_no_extra_layers(self):
+        """roughing_depth exactly divisible by stepdown → no extra thin layer."""
+        # roughing_depth = 4.0 - 0.0 = 4.0, stepdown = 1.0 → 4 layers
+        spec = _path_spec(total_depth_mm=4.0, stepdown_mm=1.0, stock_allowance_mm=0.0)
+        r = generate_face_mill_rough_finish_path(spec)
+        assert r.num_roughing_layers == 4
+
+    def test_path_length_scales_with_num_layers(self):
+        """More layers → proportionally more total path length."""
+        r_few = generate_face_mill_rough_finish_path(_path_spec(
+            total_depth_mm=2.0, stepdown_mm=1.0, stock_allowance_mm=0.1,
+        ))
+        r_many = generate_face_mill_rough_finish_path(_path_spec(
+            total_depth_mm=10.0, stepdown_mm=1.0, stock_allowance_mm=0.1,
+        ))
+        assert r_many.total_path_length_mm > r_few.total_path_length_mm

@@ -33,6 +33,15 @@ F06 output parsing
 MYSTRAN writes eigenvalues in the "R E A L   E I G E N V A L U E S" table:
     MODE  EXTRACTION ORDER  EIGENVALUE      RADIANS         CYCLES
      1         1           1.000000E+06    1.000000E+03    1.591549E+02
+
+PCH (punch) output parsing
+---------------------------
+When ``STRESS(PUNCH)=ALL`` is added to the case control deck, MYSTRAN writes
+a ``<basename>.pch`` (or ``.PCH``) file beside the F06.  Cards are 80-char
+fixed-format NASTRAN punch output.  Stress sections are introduced by a
+comment header ``$ELEMENT STRESSES`` and each element occupies one or more
+80-char data records.  ``_parse_pch_stresses`` recovers the full six-component
+stress tensor and the von-Mises scalar per element.
 """
 
 from __future__ import annotations
@@ -105,6 +114,62 @@ class MystranResult:
             "warnings": self.warnings,
             "errors": self.errors,
             "status": self.status,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Stress result per element
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class StressResult:
+    """
+    Full stress state for a single element recovered from PCH punch output.
+
+    Attributes
+    ----------
+    eid:
+        Element ID (NASTRAN 1-based integer).
+    sigma_xx, sigma_yy, sigma_zz:
+        Normal stress components [Pa].
+    tau_xy, tau_yz, tau_zx:
+        Shear stress components [Pa].
+    von_mises:
+        Von Mises equivalent stress [Pa], computed as:
+            σ_vm = √½[(σ_xx−σ_yy)²+(σ_yy−σ_zz)²+(σ_zz−σ_xx)²
+                       + 6(τ_xy²+τ_yz²+τ_zx²)]
+    principal_1, principal_2, principal_3:
+        Eigenvalues of the symmetric 3×3 stress tensor [Pa], sorted
+        descending (σ₁ ≥ σ₂ ≥ σ₃).
+    """
+
+    eid: int
+    sigma_xx: float = 0.0
+    sigma_yy: float = 0.0
+    sigma_zz: float = 0.0
+    tau_xy: float = 0.0
+    tau_yz: float = 0.0
+    tau_zx: float = 0.0
+    von_mises: float = 0.0
+    principal_1: float = 0.0
+    principal_2: float = 0.0
+    principal_3: float = 0.0
+
+    def as_stress_dict(self) -> dict[str, float]:
+        """Return a plain dict suitable for embedding in MystranResult.stresses."""
+        return {
+            "eid": float(self.eid),
+            "sigma_xx": self.sigma_xx,
+            "sigma_yy": self.sigma_yy,
+            "sigma_zz": self.sigma_zz,
+            "tau_xy": self.tau_xy,
+            "tau_yz": self.tau_yz,
+            "tau_zx": self.tau_zx,
+            "von_mises": self.von_mises,
+            "principal_1": self.principal_1,
+            "principal_2": self.principal_2,
+            "principal_3": self.principal_3,
         }
 
 
@@ -416,6 +481,304 @@ def _parse_f06_displacements(content: str) -> list[dict[str, float]]:
 
 
 # ---------------------------------------------------------------------------
+# PCH (punch) output helpers
+# ---------------------------------------------------------------------------
+
+def _compute_von_mises(sxx: float, syy: float, szz: float,
+                        txy: float, tyz: float, tzx: float) -> float:
+    """
+    Compute von Mises equivalent stress from the 6 independent tensor
+    components.
+
+    σ_vm = √½ [(σ_xx−σ_yy)² + (σ_yy−σ_zz)² + (σ_zz−σ_xx)²
+                + 6(τ_xy² + τ_yz² + τ_zx²)]
+    """
+    return math.sqrt(0.5 * (
+        (sxx - syy) ** 2 + (syy - szz) ** 2 + (szz - sxx) ** 2
+        + 6.0 * (txy ** 2 + tyz ** 2 + tzx ** 2)
+    ))
+
+
+def _compute_principal_stresses(sxx: float, syy: float, szz: float,
+                                  txy: float, tyz: float, tzx: float,
+                                  ) -> tuple[float, float, float]:
+    """
+    Return the three principal stresses (eigenvalues of the symmetric 3×3
+    stress tensor) sorted in descending order (σ₁ ≥ σ₂ ≥ σ₃).
+
+    Uses the closed-form Cardano / trigonometric approach to avoid
+    importing numpy.  Follows Kopp (2008) arXiv:physics/0610206 §2.
+    """
+    # Characteristic equation coefficients:
+    #   λ³ - I1·λ² + I2·λ - I3 = 0
+    I1 = sxx + syy + szz
+    I2 = (sxx * syy + syy * szz + szz * sxx
+          - txy * txy - tyz * tyz - tzx * tzx)
+    I3 = (sxx * (syy * szz - tyz * tyz)
+          - txy * (txy * szz - tyz * tzx)
+          + tzx * (txy * tyz - syy * tzx))
+
+    p1 = I1 / 3.0
+    # Shift: μ = (λ - p1), gives  μ³ + q·μ + r = 0
+    q = I2 - I1 * I1 / 3.0  # = -(s₁₁²+s₂₂²+s₃₃²+2τ²)/3  (≤ 0 for real tensor)
+    r = -2.0 * p1 ** 3 + I1 * I2 / 3.0 - I3
+
+    # Discriminant for depressed cubic  μ³ + q·μ + r = 0
+    disc = (r / 2.0) ** 2 + (q / 3.0) ** 3  # ≤ 0 for three real roots
+
+    if disc > 1e-30:
+        # Numerically near-degenerate (e.g. uniaxial): fall back to one real root
+        A = _cbrt(-r / 2.0 + math.sqrt(disc))
+        B = _cbrt(-r / 2.0 - math.sqrt(disc))
+        lam = A + B + p1
+        # Other two roots are complex; approximate as equal to lam
+        eigs = sorted([lam, lam, lam], reverse=True)
+    else:
+        # Three real roots via trigonometric method
+        rho = math.sqrt(-(q / 3.0) ** 3)
+        if rho < 1e-30:
+            eigs = [p1, p1, p1]
+        else:
+            cos_arg = max(-1.0, min(1.0, -r / (2.0 * rho)))
+            theta = math.acos(cos_arg) / 3.0
+            two_rho13 = 2.0 * rho ** (1.0 / 3.0)
+            lam1 = two_rho13 * math.cos(theta) + p1
+            lam2 = two_rho13 * math.cos(theta + 2.0 * math.pi / 3.0) + p1
+            lam3 = two_rho13 * math.cos(theta + 4.0 * math.pi / 3.0) + p1
+            eigs = sorted([lam1, lam2, lam3], reverse=True)
+
+    return eigs[0], eigs[1], eigs[2]
+
+
+def _cbrt(x: float) -> float:
+    """Cube root preserving sign (math.cbrt added in Python 3.11; this works on 3.9+)."""
+    if x >= 0.0:
+        return x ** (1.0 / 3.0)
+    return -((-x) ** (1.0 / 3.0))
+
+
+def _emit_punch_request(deck_str: str) -> str:
+    """
+    Inject ``STRESS(PUNCH)=ALL`` into the case-control section of a BDF deck
+    string if not already present.  The injection occurs immediately before
+    ``BEGIN BULK`` so it lands inside the case control section and is valid for
+    all subcases.
+
+    Parameters
+    ----------
+    deck_str:
+        Complete BDF deck as a multi-line string.
+
+    Returns
+    -------
+    str
+        Modified deck with the PUNCH directive added (or unchanged if already
+        present).
+    """
+    # Check idempotency: if any variant of STRESS(PUNCH) is already there, skip.
+    if re.search(r"STRESS\s*\(\s*PUNCH", deck_str, re.IGNORECASE):
+        return deck_str
+
+    # Inject before BEGIN BULK line.
+    return re.sub(
+        r"(?m)^(BEGIN BULK\s*)$",
+        r"STRESS(PUNCH)=ALL\n\1",
+        deck_str,
+        count=1,
+    )
+
+
+def _parse_pch_stresses(pch_path: "Path") -> "dict[int, StressResult]":
+    """
+    Parse element stresses from a NASTRAN/MYSTRAN punch (.pch) file.
+
+    The punch file uses 80-character fixed-format records.  Stress output
+    sections are introduced by a ``$ELEMENT STRESSES`` or
+    ``$ELEMENT STRAINS`` comment header.  Within a section each element
+    appears as one or more records.
+
+    MYSTRAN punch stress format (free-field variant, comma-separated):
+        $ELEMENT STRESSES
+        $ EID       SIGMA_XX   SIGMA_YY   SIGMA_ZZ   TAU_XY     TAU_YZ     TAU_ZX
+        1,          1.000E+03, 2.000E+03, ...
+
+    Fixed-format NASTRAN punch records (alternative):
+        Record 1 (columns 1-8: EID, 9-16: type, 17-80: values...)
+
+    Both layouts are handled: the parser first tries comma-split (free-field),
+    falling back to fixed-field column slicing.
+
+    Parameters
+    ----------
+    pch_path:
+        Path to the .pch file.
+
+    Returns
+    -------
+    dict[int, StressResult]
+        Keyed by integer element ID.  Empty dict if the file contains no
+        recognisable stress output.
+    """
+    results: dict[int, StressResult] = {}
+
+    try:
+        text = pch_path.read_text(errors="replace")
+    except OSError:
+        return results
+
+    in_stress_section = False
+    # A two-line buffer for fixed-format records that span continuation cards.
+    _pending: list[float] = []
+    _pending_eid: int = -1
+
+    for raw_line in text.splitlines():
+        line = raw_line.rstrip()
+
+        # --- Section header detection ---
+        if line.startswith("$"):
+            upper = line.upper()
+            if "ELEMENT STRESSES" in upper or "ELEMENT STRAINS" in upper:
+                in_stress_section = True
+                _pending.clear()
+                _pending_eid = -1
+            elif in_stress_section:
+                # A $ line that looks like a *different* NASTRAN output-section
+                # title (e.g. "$ELEMENT FORCES", "$DISPLACEMENTS") ends the
+                # current stress section.  Plain column-header comment lines
+                # (e.g. "$ EID, SXX, SYY ...") must NOT end the section — we
+                # distinguish by checking for a known section keyword.
+                _SECTION_KEYWORDS = (
+                    "ELEMENT FORCES", "DISPLACEMENTS", "GRID POINT",
+                    "APPLIED LOADS", "REACTIONS", "MPC FORCES",
+                    "ELEMENT STRAINS",  # starts a strain section (still ok)
+                )
+                if any(kw in upper for kw in _SECTION_KEYWORDS):
+                    in_stress_section = False
+                    _pending.clear()
+                    _pending_eid = -1
+                # else: it's just an intra-section comment line — stay in section
+            continue
+
+        if not in_stress_section:
+            continue
+
+        # Strip trailing blanks; skip blank lines
+        stripped = line.strip()
+        if not stripped:
+            continue
+
+        # --- Try comma-separated (free-field) parse ---
+        if "," in stripped:
+            tokens = [t.strip() for t in stripped.split(",") if t.strip()]
+            try:
+                eid = int(tokens[0])
+                floats = [float(t) for t in tokens[1:]]
+            except (ValueError, IndexError):
+                continue
+            _store_element_stress(results, eid, floats)
+            continue
+
+        # --- Fixed-format (80-col) parse ---
+        # NASTRAN punch records: first 8 cols = EID (or continuation marker),
+        # then 8-char fields.
+        try:
+            col0 = stripped[:8].strip()
+            # Continuation record: starts with '+' or '-' or is pure whitespace
+            if col0.startswith("+") or col0.startswith("-"):
+                # Continuation: append value fields to pending
+                field_vals = _extract_fixed_fields(stripped, start_col=8)
+                _pending.extend(field_vals)
+                if _pending_eid >= 0 and len(_pending) >= 6:
+                    _store_element_stress(results, _pending_eid, _pending[:6])
+                    _pending.clear()
+                    _pending_eid = -1
+            else:
+                # First record for this element
+                eid = int(col0)
+                field_vals = _extract_fixed_fields(stripped, start_col=8)
+                if len(field_vals) >= 6:
+                    _store_element_stress(results, eid, field_vals[:6])
+                elif field_vals:
+                    _pending_eid = eid
+                    _pending = list(field_vals)
+        except (ValueError, IndexError):
+            continue
+
+    return results
+
+
+def _extract_fixed_fields(line: str, start_col: int = 8) -> list[float]:
+    """
+    Extract floating-point values from 8-character fixed-format fields
+    starting at *start_col* (0-indexed).
+    """
+    vals: list[float] = []
+    i = start_col
+    while i + 8 <= len(line):
+        field = line[i:i + 8].strip()
+        if field:
+            try:
+                # NASTRAN uses 'D' as exponent separator in some versions
+                vals.append(float(field.replace("D", "E").replace("d", "e")))
+            except ValueError:
+                pass
+        i += 8
+    return vals
+
+
+def _store_element_stress(
+    results: "dict[int, StressResult]",
+    eid: int,
+    floats: list[float],
+) -> None:
+    """
+    Build a StressResult from a list of at least 1 float and insert into
+    *results*.  Fills missing components with 0.0.  Computes von Mises and
+    principal stresses.
+
+    Expected order (6-component solid):
+        [sigma_xx, sigma_yy, sigma_zz, tau_xy, tau_yz, tau_zx]
+    Expected order (3-component 2-D shell / plane-stress):
+        [sigma_xx, sigma_yy, tau_xy]  — sigma_zz = tau_yz = tau_zx = 0.
+
+    When exactly 3 components are supplied the record is treated as a
+    2-D shell centroid result (NASTRAN CQUAD4/CTRIA3 punch convention).
+    """
+    n = len(floats)
+    sxx = floats[0] if n > 0 else 0.0
+    syy = floats[1] if n > 1 else 0.0
+
+    if n == 3:
+        # 2-D shell: (sxx, syy, tau_xy) — sigma_zz and out-of-plane shears = 0
+        szz = 0.0
+        txy = floats[2]
+        tyz = 0.0
+        tzx = 0.0
+    else:
+        szz = floats[2] if n > 2 else 0.0
+        txy = floats[3] if n > 3 else 0.0
+        tyz = floats[4] if n > 4 else 0.0
+        tzx = floats[5] if n > 5 else 0.0
+
+    vm = _compute_von_mises(sxx, syy, szz, txy, tyz, tzx)
+    p1, p2, p3 = _compute_principal_stresses(sxx, syy, szz, txy, tyz, tzx)
+
+    results[eid] = StressResult(
+        eid=eid,
+        sigma_xx=sxx,
+        sigma_yy=syy,
+        sigma_zz=szz,
+        tau_xy=txy,
+        tau_yz=tyz,
+        tau_zx=tzx,
+        von_mises=vm,
+        principal_1=p1,
+        principal_2=p2,
+        principal_3=p3,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Main bridge class
 # ---------------------------------------------------------------------------
 
@@ -429,9 +792,11 @@ class MystranBridge:
     "modal"         — SOL 103 real normal modes.  Result contains
                       ``frequencies`` [Hz] and ``eigenvalues`` [rad²/s²].
     "linear_static" — SOL 101 linear statics.  Result contains
-                      ``displacements``, ``max_displacement``, and stub
-                      stress fields (full parsing requires PCH output,
-                      not yet implemented).
+                      ``displacements``, ``max_displacement``, and full
+                      stress fields (``stresses``, ``max_vonmises_stress``)
+                      recovered from PCH punch output when available;
+                      gracefully falls back to empty stress list with a
+                      warning when the PCH file is absent or unparseable.
 
     When MYSTRAN is not on PATH the bridge returns immediately with
     ``status="pending"`` and a descriptive warning so callers can degrade
@@ -562,8 +927,12 @@ class MystranBridge:
             nodes, elements, materials, boundary_conditions, loads,
             shell_thickness=shell_thickness,
         )
+        # Inject STRESS(PUNCH)=ALL so MYSTRAN writes a .pch file.
+        deck = _emit_punch_request(deck)
+
+        result_warnings: list[str] = []
         try:
-            f06_content = self._run_mystran(deck)
+            f06_content, pch_path = self._run_mystran_with_pch(deck)
         except RuntimeError as exc:
             return MystranResult(
                 ok=False,
@@ -577,18 +946,67 @@ class MystranBridge:
             (math.sqrt(d["ux"] ** 2 + d["uy"] ** 2 + d["uz"] ** 2) for d in disps),
             default=0.0,
         )
+
+        # --- PCH stress recovery ---
+        stress_list: list[dict] = []
+        max_vm: float = 0.0
+        if pch_path is not None and pch_path.exists():
+            try:
+                stress_map = _parse_pch_stresses(pch_path)
+                if stress_map:
+                    stress_list = [sr.as_stress_dict() for sr in stress_map.values()]
+                    max_vm = max(sr.von_mises for sr in stress_map.values())
+                else:
+                    result_warnings.append(
+                        "PCH file found but contained no parseable stress records."
+                    )
+            except Exception as exc:  # pragma: no cover — defensive
+                result_warnings.append(
+                    f"PCH stress parse failed ({exc!s}); stress fields omitted."
+                )
+        else:
+            result_warnings.append(
+                "No PCH output file found; stress fields unavailable. "
+                "Ensure MYSTRAN supports STRESS(PUNCH)=ALL for this model."
+            )
+
         return MystranResult(
             ok=True,
             analysis_type="linear_static",
             displacements=disps,
             max_displacement=max_disp,
+            stresses=stress_list,
+            max_vonmises_stress=max_vm,
+            warnings=result_warnings,
         )
 
     def _run_mystran(self, bdf_content: str) -> str:
         """
         Write the BDF deck to a temp dir, invoke ``mystran``, and return the
         F06 output as a string.  Raises RuntimeError on non-zero exit.
+
+        This variant discards any PCH output.  For linear-static analyses
+        that need stress recovery, use ``_run_mystran_with_pch`` instead.
         """
+        f06_content, _ = self._run_mystran_with_pch(bdf_content)
+        return f06_content
+
+    def _run_mystran_with_pch(
+        self, bdf_content: str
+    ) -> "tuple[str, Optional[Path]]":
+        """
+        Write the BDF deck to a temp dir, invoke ``mystran``, and return
+        ``(f06_content, pch_path)`` where *pch_path* is the Path to the punch
+        file (or None when not produced).  Raises RuntimeError on non-zero
+        exit or missing F06.
+
+        The temporary directory is **not** cleaned up before the caller has
+        read the PCH; this method uses a context-manager that copies the PCH
+        into a sibling temp file so the caller can access it after the
+        TemporaryDirectory is deleted.
+        """
+        import tempfile as _tempfile
+
         with tempfile.TemporaryDirectory() as tmp:
             tmpdir = Path(tmp)
             bdf_path = tmpdir / "analysis.bdf"
@@ -607,15 +1025,29 @@ class MystranBridge:
                     f"{proc.stderr[:2000]}"
                 )
 
-            # MYSTRAN writes output as <basename>.F06
+            # MYSTRAN writes output as <basename>.F06 (uppercase or lowercase)
             f06_path = tmpdir / "analysis.F06"
             if not f06_path.exists():
-                # Some versions write lowercase
                 f06_path = tmpdir / "analysis.f06"
             if not f06_path.exists():
                 raise RuntimeError(
                     "MYSTRAN did not produce an F06 output file. "
                     f"stdout: {proc.stdout[:500]}"
                 )
+            f06_content = f06_path.read_text(errors="replace")
 
-            return f06_path.read_text(errors="replace")
+            # Look for PCH output (case-insensitive: .PCH or .pch)
+            pch_result: Optional[Path] = None
+            for suffix in ("analysis.PCH", "analysis.pch"):
+                candidate = tmpdir / suffix
+                if candidate.exists():
+                    # Copy to a named temp file that survives the TemporaryDirectory.
+                    fd, tmp_pch = _tempfile.mkstemp(suffix=".pch")
+                    import os
+                    os.close(fd)
+                    pch_result_path = Path(tmp_pch)
+                    pch_result_path.write_bytes(candidate.read_bytes())
+                    pch_result = pch_result_path
+                    break
+
+            return f06_content, pch_result

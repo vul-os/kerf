@@ -100,6 +100,827 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+
+# ---------------------------------------------------------------------------
+# T-101-C: OpenFOAMCaseSpec / OpenFOAMExportResult / export_to_openfoam
+# ---------------------------------------------------------------------------
+
+@dataclass
+class OpenFOAMCaseSpec:
+    """
+    Specification for exporting a Kerf CFD case to an OpenFOAM 11 case directory.
+
+    Parameters
+    ----------
+    case_name : str
+        Name of the case (used as the root directory name when *output_dir* is
+        a parent; not enforced on the filesystem path).
+    mesh_vertices_xyz : list[tuple[float, float, float]]
+        List of (x, y, z) vertex coordinates.
+    mesh_cells : list[list[int]]
+        Cell connectivity — each entry is a list of vertex indices (hex: 8
+        nodes; tet: 4 nodes).  Mixed element types are supported.
+    boundary_patches : dict[str, dict]
+        Mapping of patch name → patch descriptor.  Each descriptor must contain:
+          ``type``  — one of ``"wall"``, ``"inlet"``, ``"outlet"``, ``"symmetry"``
+          ``faces`` — list of face indices (into a face list derived from cells)
+                      OR list of vertex-index lists defining the patch faces.
+    inlet_velocity_m_per_s : float
+        Mean inlet velocity magnitude (m/s, x-direction).
+    outlet_pressure_pa : float
+        Static pressure at the outlet patch (Pa).
+    fluid_density_kg_m3 : float
+        Fluid density (kg/m³).  Default 1.225 (air at 15 °C, 1 atm).
+    fluid_viscosity_pa_s : float
+        Dynamic viscosity (Pa·s).  Default 1.8e-5 (air).
+    turbulence_model : str
+        RANS turbulence model.  One of ``"kEpsilon"`` (default), ``"kOmegaSST"``,
+        ``"laminar"``.
+    solver : str
+        OpenFOAM solver application.  Default ``"simpleFoam"`` (steady RANS).
+    end_time_s : float
+        End time / iteration count.  Default 1000.0.
+    write_interval : int
+        Write interval (time steps).  Default 100.
+
+    Notes
+    -----
+    Physical pressure:  OpenFOAM's ``p`` field is kinematic pressure p/ρ
+    (m²/s²).  ``outlet_pressure_pa`` is divided by ``fluid_density_kg_m3``
+    internally when writing the 0/p boundary condition.
+
+    Reference: OpenFOAM 11 User Guide §4 — case structure.
+    """
+    case_name: str
+    mesh_vertices_xyz: list
+    mesh_cells: list
+    boundary_patches: dict
+    inlet_velocity_m_per_s: float
+    outlet_pressure_pa: float
+    fluid_density_kg_m3: float = 1.225
+    fluid_viscosity_pa_s: float = 1.8e-5
+    turbulence_model: str = "kEpsilon"
+    solver: str = "simpleFoam"
+    end_time_s: float = 1000.0
+    write_interval: int = 100
+
+
+@dataclass
+class OpenFOAMExportResult:
+    """
+    Result of :func:`export_to_openfoam`.
+
+    Parameters
+    ----------
+    output_dir_path : str
+        Absolute path to the generated OpenFOAM case root directory.
+    files_generated : list[str]
+        Relative paths (from the case root) of every file written.
+    num_cells : int
+        Number of mesh cells in the exported case.
+    num_boundary_patches : int
+        Number of named boundary patches.
+    mesh_quality_warnings : list[str]
+        Non-fatal mesh quality observations (e.g. degenerate faces, large
+        aspect-ratio cells).  Empty list if no warnings.
+    honest_caveat : str
+        Plain-language description of what was NOT done and what the user must
+        do manually to run the case with OpenFOAM.
+    """
+    output_dir_path: str
+    files_generated: list
+    num_cells: int
+    num_boundary_patches: int
+    mesh_quality_warnings: list
+    honest_caveat: str
+
+
+# ---------------------------------------------------------------------------
+# polyMesh helpers for export_to_openfoam
+# ---------------------------------------------------------------------------
+
+def _cells_to_polymesh_dict(
+    vertices: list,
+    cells: list,
+    boundary_patches: dict,
+) -> dict:
+    """
+    Convert vertex + cell connectivity to a dict-of-arrays suitable for
+    :func:`write_polymesh`.
+
+    Supports:
+    - Tet cells (4 vertices) — 4 triangular faces
+    - Hex cells (8 vertices) — 6 quadrilateral faces
+
+    Mixed-element meshes are accepted.  Face orientation is not guaranteed to
+    follow the OpenFOAM right-hand-rule normal pointing outward from the owner
+    cell; for real CFD runs the user should run ``checkMesh`` after importing.
+
+    Boundary patches in *boundary_patches* may specify ``"faces"`` as:
+    - list[int]  — face indices into the computed face list (applied after
+                   internal faces are determined)
+    - list[list[int]]  — explicit per-face vertex-index lists (matched by
+                         sorted vertex tuple)
+
+    When ``"faces"`` is absent or empty the patch is registered with 0 faces
+    (placeholder).
+    """
+    # Build all cell faces
+    def _tet_faces(cell):
+        """Return the 4 triangular faces of a tet in counter-clockwise order."""
+        a, b, c, d = cell[0], cell[1], cell[2], cell[3]
+        return [(a, b, c), (a, b, d), (a, c, d), (b, c, d)]
+
+    def _hex_faces(cell):
+        """Return the 6 quadrilateral faces of a hex (0-indexed as blockMesh)."""
+        v = cell
+        return [
+            (v[0], v[3], v[2], v[1]),  # bottom
+            (v[4], v[5], v[6], v[7]),  # top
+            (v[0], v[1], v[5], v[4]),  # front
+            (v[2], v[3], v[7], v[6]),  # back
+            (v[0], v[4], v[7], v[3]),  # left
+            (v[1], v[2], v[6], v[5]),  # right
+        ]
+
+    # face_key (sorted tuple) → list of (cell_id, face_vertices)
+    face_owners_raw: dict[tuple, list] = {}
+    for cell_id, cell in enumerate(cells):
+        n = len(cell)
+        if n == 4:
+            raw_faces = _tet_faces(cell)
+        elif n == 8:
+            raw_faces = _hex_faces(cell)
+        else:
+            # Generic: treat each (n-1)-combination as a face
+            from itertools import combinations
+            raw_faces = [tuple(combo) for combo in combinations(cell, n - 1)]
+        for fverts in raw_faces:
+            key = tuple(sorted(fverts))
+            if key not in face_owners_raw:
+                face_owners_raw[key] = []
+            face_owners_raw[key].append((cell_id, fverts))
+
+    # Separate internal (shared) and boundary faces
+    internal_faces = []
+    internal_owner = []
+    internal_neighbour = []
+    boundary_face_list = []
+    boundary_owner_list = []
+
+    for key, owners in sorted(face_owners_raw.items()):
+        if len(owners) == 2:
+            (oid, ofverts), (nid, _) = owners
+            if oid > nid:
+                oid, nid = nid, oid
+                ofverts = owners[1][1]
+            internal_faces.append(tuple(ofverts))
+            internal_owner.append(oid)
+            internal_neighbour.append(nid)
+        else:
+            cell_id, fverts = owners[0]
+            boundary_face_list.append(tuple(fverts))
+            boundary_owner_list.append(cell_id)
+
+    # Build a lookup: sorted-key → boundary face index (into boundary_face_list)
+    boundary_key_to_idx: dict[tuple, int] = {
+        tuple(sorted(f)): i for i, f in enumerate(boundary_face_list)
+    }
+
+    # Assign boundary patch names to boundary face indices
+    n_internal = len(internal_faces)
+    patch_assignments: dict[str, list[int]] = {}  # patch_name → boundary face indices
+
+    for pname, pdef in boundary_patches.items():
+        faces_spec = pdef.get("faces", [])
+        assigned: list[int] = []
+        if faces_spec:
+            first = faces_spec[0]
+            if isinstance(first, (list, tuple)):
+                # Explicit vertex lists
+                for fv in faces_spec:
+                    k = tuple(sorted(fv))
+                    if k in boundary_key_to_idx:
+                        assigned.append(boundary_key_to_idx[k])
+            else:
+                # Integers: treat as raw boundary face indices
+                for fi in faces_spec:
+                    if isinstance(fi, int) and 0 <= fi < len(boundary_face_list):
+                        assigned.append(fi)
+        patch_assignments[pname] = sorted(set(assigned))
+
+    # Collect all assigned boundary face indices in patch order
+    assigned_set: set[int] = set()
+    for idxs in patch_assignments.values():
+        assigned_set.update(idxs)
+
+    # Unassigned boundary faces → implicit "default" wall patch
+    unassigned = [
+        i for i in range(len(boundary_face_list)) if i not in assigned_set
+    ]
+
+    # Build ordered face list: internal | patch_0 | patch_1 | … | unassigned
+    all_faces = list(internal_faces)
+    all_owner = list(internal_owner)
+    all_neighbour_arr = list(internal_neighbour)
+
+    patches_dict: dict[str, Any] = {}
+    offset = n_internal
+
+    for pname, idxs in patch_assignments.items():
+        ptype = boundary_patches[pname].get("type", "wall")
+        patches_dict[pname] = {
+            "start": offset,
+            "nFaces": len(idxs),
+            "type": ptype,
+        }
+        for bi in idxs:
+            all_faces.append(boundary_face_list[bi])
+            all_owner.append(boundary_owner_list[bi])
+        offset += len(idxs)
+
+    if unassigned:
+        patches_dict["defaultWalls"] = {
+            "start": offset,
+            "nFaces": len(unassigned),
+            "type": "wall",
+        }
+        for bi in unassigned:
+            all_faces.append(boundary_face_list[bi])
+            all_owner.append(boundary_owner_list[bi])
+
+    return {
+        "points": list(vertices),
+        "faces": all_faces,
+        "owner": all_owner,
+        "neighbour": all_neighbour_arr,
+        "patches": patches_dict,
+    }
+
+
+def _mesh_quality_warnings(vertices: list, cells: list) -> list[str]:
+    """Return non-fatal mesh quality warnings without raising."""
+    warnings = []
+    if not vertices:
+        warnings.append("Mesh has no vertices.")
+        return warnings
+    if not cells:
+        warnings.append("Mesh has no cells.")
+        return warnings
+
+    # Check for degenerate cells (duplicate vertex indices)
+    for i, cell in enumerate(cells):
+        if len(set(cell)) < len(cell):
+            warnings.append(
+                f"Cell {i} has duplicate vertex indices — degenerate element."
+            )
+            if len(warnings) >= 10:
+                warnings.append("(further quality warnings suppressed)")
+                break
+
+    # Rough aspect-ratio check for tet/hex cells
+    if len(warnings) < 10:
+        for i, cell in enumerate(cells[:500]):
+            coords = [vertices[v] for v in cell if v < len(vertices)]
+            if len(coords) < 2:
+                continue
+            from_origin = coords[0]
+            dists = [
+                math.sqrt(
+                    (c[0] - coords[0][0]) ** 2
+                    + (c[1] - coords[0][1]) ** 2
+                    + (c[2] - coords[0][2]) ** 2
+                )
+                for c in coords[1:]
+            ]
+            if dists and max(dists) > 0 and min(dists) / max(dists) < 0.001:
+                warnings.append(
+                    f"Cell {i} has high aspect ratio "
+                    f"(min_edge/max_edge < 0.001)."
+                )
+    return warnings
+
+
+# ---------------------------------------------------------------------------
+# Primary public export API
+# ---------------------------------------------------------------------------
+
+def export_to_openfoam(
+    spec: "OpenFOAMCaseSpec",
+    output_dir: str,
+) -> "OpenFOAMExportResult":
+    """
+    Export a Kerf CFD case to a valid OpenFOAM 11 case directory structure.
+
+    This function writes the complete case tree that an external OpenFOAM
+    installation can run without modification (assuming a valid mesh).  It is
+    a pure file-I/O adapter — it does NOT invoke OpenFOAM binaries, does NOT
+    validate the mesh against OpenFOAM's own checkers, and does NOT guarantee
+    convergence of the chosen solver.
+
+    Directory tree written
+    ----------------------
+    ::
+
+        <output_dir>/
+            0/
+                U            (velocity field, fixedValue at inlet)
+                p            (kinematic pressure, fixedValue at outlet)
+                k            (TKE — kEpsilon or kOmegaSST only)
+                epsilon      (ε — kEpsilon only)
+                omega        (ω — kOmegaSST only)
+                nut          (turbulent viscosity)
+            constant/
+                transportProperties
+                turbulenceProperties
+                polyMesh/
+                    points
+                    faces
+                    owner
+                    neighbour
+                    boundary
+            system/
+                controlDict
+                fvSchemes
+                fvSolution
+
+    Parameters
+    ----------
+    spec : OpenFOAMCaseSpec
+        Case specification (mesh, BCs, fluid properties, solver settings).
+    output_dir : str
+        Absolute path to the destination directory (created if absent).
+
+    Returns
+    -------
+    OpenFOAMExportResult
+        Result dataclass with path, file manifest, cell count, and honest
+        caveats.
+
+    Raises
+    ------
+    ValueError
+        If the mesh is empty (no vertices or no cells).
+    OSError
+        If the output directory cannot be created or files cannot be written.
+
+    Notes
+    -----
+    Kinematic pressure convention: OpenFOAM's ``p`` field stores p/ρ (m²/s²).
+    ``outlet_pressure_pa`` is divided by ``fluid_density_kg_m3`` before writing.
+
+    Kinematic viscosity: ν = μ/ρ is computed from ``fluid_viscosity_pa_s`` and
+    ``fluid_density_kg_m3``.
+
+    Reference: OpenFOAM 11 User Guide §4 (case structure); White §6.4.
+    """
+    if not spec.mesh_vertices_xyz:
+        raise ValueError(
+            "export_to_openfoam: mesh_vertices_xyz is empty — cannot export a case "
+            "with no vertices."
+        )
+    if not spec.mesh_cells:
+        raise ValueError(
+            "export_to_openfoam: mesh_cells is empty — cannot export a case "
+            "with no cells."
+        )
+
+    root = Path(output_dir).resolve()
+    system_dir = root / "system"
+    constant_dir = root / "constant"
+    poly_dir = constant_dir / "polyMesh"
+    zero_dir = root / "0"
+
+    for d in (system_dir, constant_dir, poly_dir, zero_dir):
+        d.mkdir(parents=True, exist_ok=True)
+
+    # Derived quantities
+    nu = spec.fluid_viscosity_pa_s / spec.fluid_density_kg_m3  # kinematic viscosity
+    p_outlet_kinematic = spec.outlet_pressure_pa / spec.fluid_density_kg_m3
+    u_inlet = spec.inlet_velocity_m_per_s
+
+    # Turbulence initial conditions (reasonable defaults)
+    turb_intensity = 0.05  # 5%
+    k_inlet = 1.5 * (turb_intensity * u_inlet) ** 2
+    epsilon_inlet = 0.09 * k_inlet ** 1.5 / 0.1  # assuming L_turb = 0.1 m
+    omega_inlet = math.sqrt(k_inlet) / 0.1 if k_inlet > 0 else 1.0
+
+    # Patch names by type
+    inlet_patches = [
+        n for n, d in spec.boundary_patches.items() if d.get("type") == "inlet"
+    ]
+    outlet_patches = [
+        n for n, d in spec.boundary_patches.items() if d.get("type") == "outlet"
+    ]
+
+    # Mesh quality check (non-fatal)
+    quality_warnings = _mesh_quality_warnings(
+        spec.mesh_vertices_xyz, spec.mesh_cells
+    )
+
+    # Build polyMesh dict from spec
+    mesh_dict = _cells_to_polymesh_dict(
+        spec.mesh_vertices_xyz,
+        spec.mesh_cells,
+        spec.boundary_patches,
+    )
+
+    # 1. Write polyMesh files
+    write_polymesh(poly_dir, mesh_dict)
+
+    # 2. Write 0/ field files
+    _export_write_fields(
+        zero_dir,
+        bcs=spec.boundary_patches,
+        turbulence_model=spec.turbulence_model,
+        u_inlet=u_inlet,
+        p_outlet_kinematic=p_outlet_kinematic,
+        k_inlet=k_inlet,
+        epsilon_inlet=epsilon_inlet,
+        omega_inlet=omega_inlet,
+    )
+
+    # 3. Write constant/ files
+    _export_write_transport(constant_dir / "transportProperties", nu)
+    _export_write_turbulence(
+        constant_dir / "turbulenceProperties", spec.turbulence_model
+    )
+
+    # 4. Write system/ files
+    solver = spec.solver
+    if solver == "pisoFoam":
+        solver = "pimpleFoam"
+    _export_write_control_dict(
+        system_dir / "controlDict",
+        solver=solver,
+        end_time=spec.end_time_s,
+        write_interval=spec.write_interval,
+    )
+    _export_write_fv_schemes(system_dir / "fvSchemes", solver=solver)
+    _export_write_fv_solution(system_dir / "fvSolution", solver=solver)
+
+    # Collect manifest
+    files_generated: list[str] = []
+    for f in sorted(root.rglob("*")):
+        if f.is_file():
+            files_generated.append(str(f.relative_to(root)))
+
+    num_cells = len(spec.mesh_cells)
+    num_patches = len(spec.boundary_patches)
+
+    honest_caveat = (
+        "This is a file-export adapter only.  OpenFOAM was NOT invoked and the "
+        "mesh was NOT validated.  To run the case: (1) install OpenFOAM 11; "
+        "(2) run 'checkMesh -case {out}' to verify mesh quality; (3) run "
+        "'{solver} -case {out}' to solve; (4) post-process with ParaView or "
+        "'foamToVTK'.  Note: polyMesh is written from Kerf cell connectivity — "
+        "face orientation may require correction via 'renumberMesh'.  "
+        "Turbulence initial conditions (k, ε, ω) are estimated from 5% inlet "
+        "turbulence intensity with L_turb = 0.1 m; adjust in 0/ if needed."
+    ).format(out=str(root), solver=spec.solver)
+
+    return OpenFOAMExportResult(
+        output_dir_path=str(root),
+        files_generated=files_generated,
+        num_cells=num_cells,
+        num_boundary_patches=num_patches,
+        mesh_quality_warnings=quality_warnings,
+        honest_caveat=honest_caveat,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Field writers for export_to_openfoam (independent of write_case / build_case)
+# ---------------------------------------------------------------------------
+
+def _export_foam_header(foam_class: str, location: str, obj: str) -> str:
+    return (
+        "FoamFile\n{\n"
+        "    version     2.0;\n"
+        "    format      ascii;\n"
+        f"    class       {foam_class};\n"
+        f"    location    \"{location}\";\n"
+        f"    object      {obj};\n"
+        "}"
+    )
+
+
+_EXPORT_PATCH_TYPE: dict[str, str] = {
+    "inlet": "patch",
+    "outlet": "patch",
+    "wall": "wall",
+    "symmetry": "symmetry",
+    "empty": "empty",
+    "patch": "patch",
+    "cyclic": "cyclic",
+}
+
+
+def _export_write_fields(
+    zero_dir: Path,
+    *,
+    bcs: dict,
+    turbulence_model: str,
+    u_inlet: float,
+    p_outlet_kinematic: float,
+    k_inlet: float,
+    epsilon_inlet: float,
+    omega_inlet: float,
+) -> None:
+    """Write 0/ field files for export_to_openfoam."""
+
+    def _bc_lines_U(patch_name: str, bc_type: str) -> list[str]:
+        lines = [f"    {patch_name}", "    {"]
+        if bc_type == "inlet":
+            lines += [
+                "        type            fixedValue;",
+                f"        value           uniform ({u_inlet:g} 0 0);",
+            ]
+        elif bc_type == "outlet":
+            lines += ["        type            zeroGradient;"]
+        elif bc_type == "wall":
+            lines += ["        type            noSlip;"]
+        elif bc_type == "symmetry":
+            lines += ["        type            symmetry;"]
+        else:
+            lines += ["        type            zeroGradient;"]
+        lines.append("    }")
+        return lines
+
+    def _bc_lines_p(patch_name: str, bc_type: str) -> list[str]:
+        lines = [f"    {patch_name}", "    {"]
+        if bc_type == "outlet":
+            lines += [
+                "        type            fixedValue;",
+                f"        value           uniform {p_outlet_kinematic:g};",
+            ]
+        elif bc_type == "symmetry":
+            lines += ["        type            symmetry;"]
+        else:
+            lines += ["        type            zeroGradient;"]
+        lines.append("    }")
+        return lines
+
+    def _bc_lines_k(patch_name: str, bc_type: str) -> list[str]:
+        lines = [f"    {patch_name}", "    {"]
+        if bc_type == "inlet":
+            lines += [
+                "        type            fixedValue;",
+                f"        value           uniform {k_inlet:g};",
+            ]
+        elif bc_type == "wall":
+            lines += [
+                "        type            kqRWallFunction;",
+                f"        value           uniform {k_inlet:g};",
+            ]
+        elif bc_type == "symmetry":
+            lines += ["        type            symmetry;"]
+        else:
+            lines += ["        type            zeroGradient;"]
+        lines.append("    }")
+        return lines
+
+    def _bc_lines_epsilon(patch_name: str, bc_type: str) -> list[str]:
+        lines = [f"    {patch_name}", "    {"]
+        if bc_type == "inlet":
+            lines += [
+                "        type            fixedValue;",
+                f"        value           uniform {epsilon_inlet:g};",
+            ]
+        elif bc_type == "wall":
+            lines += [
+                "        type            epsilonWallFunction;",
+                f"        value           uniform {epsilon_inlet:g};",
+            ]
+        elif bc_type == "symmetry":
+            lines += ["        type            symmetry;"]
+        else:
+            lines += ["        type            zeroGradient;"]
+        lines.append("    }")
+        return lines
+
+    def _bc_lines_omega(patch_name: str, bc_type: str) -> list[str]:
+        lines = [f"    {patch_name}", "    {"]
+        if bc_type == "inlet":
+            lines += [
+                "        type            fixedValue;",
+                f"        value           uniform {omega_inlet:g};",
+            ]
+        elif bc_type == "wall":
+            lines += [
+                "        type            omegaWallFunction;",
+                f"        value           uniform {omega_inlet:g};",
+            ]
+        elif bc_type == "symmetry":
+            lines += ["        type            symmetry;"]
+        else:
+            lines += ["        type            zeroGradient;"]
+        lines.append("    }")
+        return lines
+
+    def _bc_lines_nut(patch_name: str, bc_type: str) -> list[str]:
+        lines = [f"    {patch_name}", "    {"]
+        if bc_type == "wall":
+            lines += [
+                "        type            nutkWallFunction;",
+                "        value           uniform 0;",
+            ]
+        elif bc_type == "symmetry":
+            lines += ["        type            symmetry;"]
+        else:
+            lines += [
+                "        type            calculated;",
+                "        value           uniform 0;",
+            ]
+        lines.append("    }")
+        return lines
+
+    def _build_bc_block(bc_fn) -> str:
+        lines = ["boundaryField", "{"]
+        for pname, pdef in bcs.items():
+            ptype = pdef.get("type", "wall") if isinstance(pdef, dict) else "wall"
+            lines.extend(bc_fn(pname, ptype))
+        lines.append("}")
+        return "\n".join(lines)
+
+    # U
+    (zero_dir / "U").write_text(
+        f"{_export_foam_header('volVectorField', '0', 'U')}\n\n"
+        f"dimensions      [0 1 -1 0 0 0 0];\n\n"
+        f"internalField   uniform (0 0 0);\n\n"
+        f"{_build_bc_block(_bc_lines_U)}\n"
+    )
+
+    # p
+    (zero_dir / "p").write_text(
+        f"{_export_foam_header('volScalarField', '0', 'p')}\n\n"
+        f"dimensions      [0 2 -2 0 0 0 0];\n\n"
+        f"internalField   uniform 0;\n\n"
+        f"{_build_bc_block(_bc_lines_p)}\n"
+    )
+
+    # nut
+    (zero_dir / "nut").write_text(
+        f"{_export_foam_header('volScalarField', '0', 'nut')}\n\n"
+        f"dimensions      [0 2 -1 0 0 0 0];\n\n"
+        f"internalField   uniform 0;\n\n"
+        f"{_build_bc_block(_bc_lines_nut)}\n"
+    )
+
+    # k (kEpsilon or kOmegaSST)
+    if turbulence_model in ("kEpsilon", "kOmegaSST"):
+        (zero_dir / "k").write_text(
+            f"{_export_foam_header('volScalarField', '0', 'k')}\n\n"
+            f"dimensions      [0 2 -2 0 0 0 0];\n\n"
+            f"internalField   uniform {k_inlet:g};\n\n"
+            f"{_build_bc_block(_bc_lines_k)}\n"
+        )
+
+    # epsilon
+    if turbulence_model == "kEpsilon":
+        (zero_dir / "epsilon").write_text(
+            f"{_export_foam_header('volScalarField', '0', 'epsilon')}\n\n"
+            f"dimensions      [0 2 -3 0 0 0 0];\n\n"
+            f"internalField   uniform {epsilon_inlet:g};\n\n"
+            f"{_build_bc_block(_bc_lines_epsilon)}\n"
+        )
+
+    # omega
+    if turbulence_model == "kOmegaSST":
+        (zero_dir / "omega").write_text(
+            f"{_export_foam_header('volScalarField', '0', 'omega')}\n\n"
+            f"dimensions      [0 0 -1 0 0 0 0];\n\n"
+            f"internalField   uniform {omega_inlet:g};\n\n"
+            f"{_build_bc_block(_bc_lines_omega)}\n"
+        )
+
+
+def _export_write_transport(path: Path, nu: float) -> None:
+    path.write_text(
+        f"{_export_foam_header('dictionary', 'constant', 'transportProperties')}\n\n"
+        f"transportModel  Newtonian;\n\n"
+        f"nu              {nu:g};\n"
+    )
+
+
+def _export_write_turbulence(path: Path, turbulence_model: str) -> None:
+    model_map = {
+        "kEpsilon": ("kEpsilon", "on"),
+        "kOmegaSST": ("kOmegaSST", "on"),
+        "laminar": ("laminar", "off"),
+    }
+    ras_model, turb_on = model_map.get(turbulence_model, ("kEpsilon", "on"))
+    path.write_text(
+        f"{_export_foam_header('dictionary', 'constant', 'turbulenceProperties')}\n\n"
+        f"simulationType  RAS;\n\n"
+        f"RAS\n{{\n"
+        f"    RASModel    {ras_model};\n"
+        f"    turbulence  {turb_on};\n"
+        f"    printCoeffs on;\n"
+        f"}}\n"
+    )
+
+
+def _export_write_control_dict(
+    path: Path, *, solver: str, end_time: float, write_interval: int
+) -> None:
+    path.write_text(
+        f"{_export_foam_header('dictionary', 'system', 'controlDict')}\n\n"
+        f"application     {solver};\n\n"
+        f"startFrom       startTime;\n"
+        f"startTime       0;\n"
+        f"stopAt          endTime;\n"
+        f"endTime         {end_time:g};\n\n"
+        f"deltaT          1;\n\n"
+        f"writeControl    timeStep;\n"
+        f"writeInterval   {write_interval};\n\n"
+        f"purgeWrite      0;\n"
+        f"writeFormat     ascii;\n"
+        f"writePrecision  6;\n"
+        f"writeCompression off;\n\n"
+        f"timeFormat      general;\n"
+        f"timePrecision   6;\n\n"
+        f"runTimeModifiable true;\n"
+    )
+
+
+def _export_write_fv_schemes(path: Path, *, solver: str) -> None:
+    time_scheme = "steadyState" if solver == "simpleFoam" else "Euler"
+    path.write_text(
+        f"{_export_foam_header('dictionary', 'system', 'fvSchemes')}\n\n"
+        f"ddtSchemes\n{{\n"
+        f"    default         {time_scheme};\n"
+        f"}}\n\n"
+        f"gradSchemes\n{{\n"
+        f"    default         Gauss linear;\n"
+        f"}}\n\n"
+        f"divSchemes\n{{\n"
+        f"    default         none;\n"
+        f"    div(phi,U)      Gauss linearUpwind grad(U);\n"
+        f"    div(phi,k)      Gauss linearUpwind grad(k);\n"
+        f"    div(phi,epsilon) Gauss linearUpwind grad(epsilon);\n"
+        f"    div(phi,omega)  Gauss linearUpwind grad(omega);\n"
+        f"    div((nuEff*dev2(T(grad(U))))) Gauss linear;\n"
+        f"}}\n\n"
+        f"laplacianSchemes\n{{\n"
+        f"    default         Gauss linear corrected;\n"
+        f"}}\n\n"
+        f"interpolationSchemes\n{{\n"
+        f"    default         linear;\n"
+        f"}}\n\n"
+        f"snGradSchemes\n{{\n"
+        f"    default         corrected;\n"
+        f"}}\n\n"
+        f"wallDist\n{{\n"
+        f"    method          meshWave;\n"
+        f"}}\n"
+    )
+
+
+def _export_write_fv_solution(path: Path, *, solver: str) -> None:
+    if solver == "simpleFoam":
+        algo = (
+            "SIMPLE\n{\n"
+            "    nNonOrthogonalCorrectors 0;\n"
+            "    consistent      yes;\n"
+            "    residualControl\n    {\n"
+            "        p               1e-4;\n"
+            "        U               1e-4;\n"
+            "        \"(k|omega|epsilon)\" 1e-4;\n"
+            "    }\n}\n\n"
+            "relaxationFactors\n{\n"
+            "    fields { p 0.3; }\n"
+            "    equations { U 0.7; k 0.7; omega 0.7; epsilon 0.7; }\n"
+            "}"
+        )
+    else:
+        algo = (
+            "PIMPLE\n{\n"
+            "    nOuterCorrectors 1;\n"
+            "    nCorrectors      2;\n"
+            "    nNonOrthogonalCorrectors 0;\n"
+            "}"
+        )
+
+    path.write_text(
+        f"{_export_foam_header('dictionary', 'system', 'fvSolution')}\n\n"
+        f"solvers\n{{\n"
+        f"    p\n    {{\n"
+        f"        solver          GAMG;\n"
+        f"        smoother        GaussSeidel;\n"
+        f"        tolerance       1e-7;\n"
+        f"        relTol          0.01;\n"
+        f"    }}\n\n"
+        f"    \"(U|k|omega|epsilon|nut)\"\n    {{\n"
+        f"        solver          smoothSolver;\n"
+        f"        smoother        symGaussSeidel;\n"
+        f"        tolerance       1e-8;\n"
+        f"        relTol          0.1;\n"
+        f"    }}\n"
+        f"}}\n\n"
+        f"{algo}\n"
+    )
+
 # ---------------------------------------------------------------------------
 # Optional numpy (result parser returns lists when absent)
 # ---------------------------------------------------------------------------

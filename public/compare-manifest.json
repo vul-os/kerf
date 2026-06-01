@@ -6242,7 +6242,7 @@
           },
           "kerf": {
             "status": "yes",
-            "note": "Real OpenFOAM bridge (needs install; backend)",
+            "note": "OpenFOAM bridge — file export only (does NOT invoke OpenFOAM or validate the case; user must have OpenFOAM 11 installed and run simpleFoam themselves); exports 0/{U,p,k,epsilon,omega,nut} + constant/polyMesh + system/{controlDict,fvSchemes,fvSolution} from Kerf CFD case spec; LLM tool: cfd_export_openfoam",
             "evidence": "packages/kerf-cfd/src/kerf_cfd/openfoam_bridge.py"
           }
         },

@@ -28,8 +28,8 @@ async def register(app: FastAPI, ctx):
     # cfd_rans_keps_solve — standard k-ε turbulence model (Launder-Spalding 1974)
     from kerf_cfd.rans_keps import cfd_rans_keps_spec, run_cfd_rans_keps_solve
     ctx.tools.register("cfd_rans_keps_solve", cfd_rans_keps_spec, run_cfd_rans_keps_solve)
-    # T-101-C: OpenFOAM bridge — case generator + result parser
-    import kerf_cfd.openfoam_llm_tools  # noqa: F401 — triggers @register decorators
+    # T-101-C: OpenFOAM bridge — case generator + result parser + export adapter
+    import kerf_cfd.openfoam_llm_tools  # noqa: F401 — triggers @register decorators (cfd_openfoam_export, cfd_openfoam_import, cfd_export_openfoam)
     # New: cfd_mesh_unstructured (3-D Delaunay tet mesh + Voronoi dual)
     from kerf_cfd.mesh_unstructured_tool import (
         cfd_mesh_unstructured_spec,

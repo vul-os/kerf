@@ -653,3 +653,379 @@ class TestRunCaseIntegration:
         assert math.isclose(f_oracle, f_analytic, rel_tol=1e-12), (
             f"Oracle deviation: got {f_oracle}, expected {f_analytic}"
         )
+
+
+# ===========================================================================
+# 7. OpenFOAMCaseSpec / OpenFOAMExportResult / export_to_openfoam  (T-101-C)
+# ===========================================================================
+
+def _channel_flow_spec(case_name: str = "channel") -> "object":
+    """
+    A minimal 2-hex-cell channel flow case.
+
+    Geometry: unit-cube split into two hexahedra sharing a face at x=0.5.
+    Points 0-7 are the first cube; points 4-11 share the mid-plane face.
+
+        0--1--8
+        |  |  |
+        3--2--9   (bottom plane z=0)
+        ===split===
+        4--5--10
+        |  |  |
+        7--6--11  (top plane z=1)
+    """
+    from kerf_cfd.openfoam_bridge import OpenFOAMCaseSpec
+
+    # Two hex cells, 12 unique vertices
+    verts = [
+        # cell 0 (x=0..0.5)
+        (0.0, 0.0, 0.0),  # 0
+        (0.5, 0.0, 0.0),  # 1
+        (0.5, 1.0, 0.0),  # 2
+        (0.0, 1.0, 0.0),  # 3
+        (0.0, 0.0, 1.0),  # 4
+        (0.5, 0.0, 1.0),  # 5
+        (0.5, 1.0, 1.0),  # 6
+        (0.0, 1.0, 1.0),  # 7
+        # cell 1 (x=0.5..1)
+        # shares vertices 1,2,5,6 with cell 0
+        (1.0, 0.0, 0.0),  # 8
+        (1.0, 1.0, 0.0),  # 9
+        (1.0, 0.0, 1.0),  # 10
+        (1.0, 1.0, 1.0),  # 11
+    ]
+    cells = [
+        [0, 1, 2, 3, 4, 5, 6, 7],       # hex cell 0 (left half)
+        [1, 8, 9, 2, 5, 10, 11, 6],     # hex cell 1 (right half)
+    ]
+    patches = {
+        "inlet": {"type": "inlet", "faces": []},
+        "outlet": {"type": "outlet", "faces": []},
+        "walls": {"type": "wall", "faces": []},
+    }
+    return OpenFOAMCaseSpec(
+        case_name=case_name,
+        mesh_vertices_xyz=verts,
+        mesh_cells=cells,
+        boundary_patches=patches,
+        inlet_velocity_m_per_s=1.0,
+        outlet_pressure_pa=0.0,
+        fluid_density_kg_m3=1.225,
+        fluid_viscosity_pa_s=1.8e-5,
+        turbulence_model="kEpsilon",
+        solver="simpleFoam",
+        end_time_s=1000.0,
+        write_interval=100,
+    )
+
+
+class TestExportToOpenFOAM:
+    """
+    Tests for OpenFOAMCaseSpec / export_to_openfoam / OpenFOAMExportResult.
+
+    Per T-101-C DoD:
+    - 12+ tests
+    - channel flow: directory structure complete, 7+ files written
+    - 0/U has correct format with patches
+    - constant/polyMesh/points has vertex count
+    - bad input (empty mesh) → ValueError
+    - use tmp_path for output
+    """
+
+    def test_export_returns_result_type(self, tmp_path):
+        from kerf_cfd.openfoam_bridge import OpenFOAMExportResult, export_to_openfoam
+        spec = _channel_flow_spec()
+        result = export_to_openfoam(spec, str(tmp_path / "case"))
+        assert isinstance(result, OpenFOAMExportResult)
+
+    def test_export_output_dir_path_is_absolute(self, tmp_path):
+        from kerf_cfd.openfoam_bridge import export_to_openfoam
+        spec = _channel_flow_spec()
+        result = export_to_openfoam(spec, str(tmp_path / "case"))
+        assert os.path.isabs(result.output_dir_path)
+
+    def test_export_directory_structure_complete(self, tmp_path):
+        """Case directory must have system/, constant/, 0/."""
+        from kerf_cfd.openfoam_bridge import export_to_openfoam
+        spec = _channel_flow_spec()
+        result = export_to_openfoam(spec, str(tmp_path / "case"))
+        root = Path(result.output_dir_path)
+        assert (root / "system").is_dir(), "system/ missing"
+        assert (root / "constant").is_dir(), "constant/ missing"
+        assert (root / "0").is_dir(), "0/ missing"
+        assert (root / "constant" / "polyMesh").is_dir(), "constant/polyMesh/ missing"
+
+    def test_export_at_least_seven_files(self, tmp_path):
+        """Channel flow case must produce 7+ files."""
+        from kerf_cfd.openfoam_bridge import export_to_openfoam
+        spec = _channel_flow_spec()
+        result = export_to_openfoam(spec, str(tmp_path / "case"))
+        assert len(result.files_generated) >= 7, (
+            f"Expected >=7 files, got {len(result.files_generated)}: "
+            f"{result.files_generated}"
+        )
+
+    def test_export_files_manifest_matches_disk(self, tmp_path):
+        """Every file in files_generated must actually exist on disk."""
+        from kerf_cfd.openfoam_bridge import export_to_openfoam
+        spec = _channel_flow_spec()
+        result = export_to_openfoam(spec, str(tmp_path / "case"))
+        root = Path(result.output_dir_path)
+        for rel in result.files_generated:
+            assert (root / rel).is_file(), f"Manifest entry {rel!r} not found on disk"
+
+    def test_export_zero_U_has_foam_header(self, tmp_path):
+        """0/U must contain a valid FoamFile header."""
+        from kerf_cfd.openfoam_bridge import export_to_openfoam
+        spec = _channel_flow_spec()
+        result = export_to_openfoam(spec, str(tmp_path / "case"))
+        u_text = (Path(result.output_dir_path) / "0" / "U").read_text()
+        assert "FoamFile" in u_text
+        assert "volVectorField" in u_text
+
+    def test_export_zero_U_has_patches(self, tmp_path):
+        """0/U must contain patch names from boundary_patches."""
+        from kerf_cfd.openfoam_bridge import export_to_openfoam
+        spec = _channel_flow_spec()
+        result = export_to_openfoam(spec, str(tmp_path / "case"))
+        u_text = (Path(result.output_dir_path) / "0" / "U").read_text()
+        assert "inlet" in u_text
+        assert "outlet" in u_text
+        assert "walls" in u_text
+
+    def test_export_zero_U_inlet_fixedValue(self, tmp_path):
+        """0/U inlet patch must use fixedValue with the specified velocity."""
+        from kerf_cfd.openfoam_bridge import export_to_openfoam
+        spec = _channel_flow_spec()
+        result = export_to_openfoam(spec, str(tmp_path / "case"))
+        u_text = (Path(result.output_dir_path) / "0" / "U").read_text()
+        assert "fixedValue" in u_text
+        assert "1 0 0" in u_text or "1.0 0 0" in u_text or "1 0.0 0" in u_text
+
+    def test_export_polymesh_points_has_vertex_count(self, tmp_path):
+        """constant/polyMesh/points must contain the correct vertex count line."""
+        from kerf_cfd.openfoam_bridge import export_to_openfoam
+        spec = _channel_flow_spec()
+        result = export_to_openfoam(spec, str(tmp_path / "case"))
+        points_text = (
+            Path(result.output_dir_path) / "constant" / "polyMesh" / "points"
+        ).read_text()
+        # The spec has 12 vertices
+        import re as _re
+        assert _re.search(r"^12\s*$", points_text, _re.MULTILINE), (
+            "Expected '12' vertex count in points file"
+        )
+
+    def test_export_polymesh_all_five_files(self, tmp_path):
+        """constant/polyMesh must contain points, faces, owner, neighbour, boundary."""
+        from kerf_cfd.openfoam_bridge import export_to_openfoam
+        spec = _channel_flow_spec()
+        result = export_to_openfoam(spec, str(tmp_path / "case"))
+        poly_dir = Path(result.output_dir_path) / "constant" / "polyMesh"
+        for fname in ("points", "faces", "owner", "neighbour", "boundary"):
+            assert (poly_dir / fname).is_file(), f"polyMesh/{fname} not written"
+
+    def test_export_kepsilon_writes_k_and_epsilon(self, tmp_path):
+        """kEpsilon turbulence model must produce 0/k and 0/epsilon."""
+        from kerf_cfd.openfoam_bridge import export_to_openfoam
+        spec = _channel_flow_spec()
+        spec.turbulence_model = "kEpsilon"
+        result = export_to_openfoam(spec, str(tmp_path / "case"))
+        root = Path(result.output_dir_path)
+        assert (root / "0" / "k").is_file(), "0/k missing for kEpsilon"
+        assert (root / "0" / "epsilon").is_file(), "0/epsilon missing for kEpsilon"
+        assert not (root / "0" / "omega").is_file(), "0/omega should not exist for kEpsilon"
+
+    def test_export_komegasst_writes_k_and_omega(self, tmp_path):
+        """kOmegaSST turbulence model must produce 0/k and 0/omega."""
+        from kerf_cfd.openfoam_bridge import export_to_openfoam, OpenFOAMCaseSpec
+        spec = _channel_flow_spec()
+        spec.turbulence_model = "kOmegaSST"
+        result = export_to_openfoam(spec, str(tmp_path / "case"))
+        root = Path(result.output_dir_path)
+        assert (root / "0" / "k").is_file(), "0/k missing for kOmegaSST"
+        assert (root / "0" / "omega").is_file(), "0/omega missing for kOmegaSST"
+        assert not (root / "0" / "epsilon").is_file(), "0/epsilon should not exist for kOmegaSST"
+
+    def test_export_empty_vertices_raises_value_error(self, tmp_path):
+        """Empty mesh_vertices_xyz must raise ValueError."""
+        from kerf_cfd.openfoam_bridge import export_to_openfoam, OpenFOAMCaseSpec
+        spec = OpenFOAMCaseSpec(
+            case_name="bad",
+            mesh_vertices_xyz=[],
+            mesh_cells=[[0, 1, 2, 3]],
+            boundary_patches={"wall": {"type": "wall"}},
+            inlet_velocity_m_per_s=1.0,
+            outlet_pressure_pa=0.0,
+        )
+        with pytest.raises(ValueError, match="mesh_vertices_xyz"):
+            export_to_openfoam(spec, str(tmp_path / "bad"))
+
+    def test_export_empty_cells_raises_value_error(self, tmp_path):
+        """Empty mesh_cells must raise ValueError."""
+        from kerf_cfd.openfoam_bridge import export_to_openfoam, OpenFOAMCaseSpec
+        spec = OpenFOAMCaseSpec(
+            case_name="bad",
+            mesh_vertices_xyz=[(0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1)],
+            mesh_cells=[],
+            boundary_patches={"wall": {"type": "wall"}},
+            inlet_velocity_m_per_s=1.0,
+            outlet_pressure_pa=0.0,
+        )
+        with pytest.raises(ValueError, match="mesh_cells"):
+            export_to_openfoam(spec, str(tmp_path / "bad"))
+
+    def test_export_num_cells_matches_spec(self, tmp_path):
+        """result.num_cells must equal len(spec.mesh_cells)."""
+        from kerf_cfd.openfoam_bridge import export_to_openfoam
+        spec = _channel_flow_spec()
+        result = export_to_openfoam(spec, str(tmp_path / "case"))
+        assert result.num_cells == len(spec.mesh_cells)
+
+    def test_export_num_boundary_patches_matches_spec(self, tmp_path):
+        """result.num_boundary_patches must equal len(spec.boundary_patches)."""
+        from kerf_cfd.openfoam_bridge import export_to_openfoam
+        spec = _channel_flow_spec()
+        result = export_to_openfoam(spec, str(tmp_path / "case"))
+        assert result.num_boundary_patches == len(spec.boundary_patches)
+
+    def test_export_honest_caveat_present(self, tmp_path):
+        """result.honest_caveat must be a non-empty string."""
+        from kerf_cfd.openfoam_bridge import export_to_openfoam
+        spec = _channel_flow_spec()
+        result = export_to_openfoam(spec, str(tmp_path / "case"))
+        assert isinstance(result.honest_caveat, str)
+        assert len(result.honest_caveat) > 20
+
+    def test_export_system_controldict_has_application(self, tmp_path):
+        """system/controlDict must name the solver application."""
+        from kerf_cfd.openfoam_bridge import export_to_openfoam
+        spec = _channel_flow_spec()
+        result = export_to_openfoam(spec, str(tmp_path / "case"))
+        text = (Path(result.output_dir_path) / "system" / "controlDict").read_text()
+        assert "simpleFoam" in text
+
+    def test_export_transport_properties_has_nu(self, tmp_path):
+        """constant/transportProperties must contain ν = μ/ρ."""
+        from kerf_cfd.openfoam_bridge import export_to_openfoam
+        spec = _channel_flow_spec()
+        result = export_to_openfoam(spec, str(tmp_path / "case"))
+        text = (
+            Path(result.output_dir_path) / "constant" / "transportProperties"
+        ).read_text()
+        # nu = 1.8e-5 / 1.225 ≈ 1.469e-5
+        assert "nu" in text
+
+    def test_export_tet_mesh(self, tmp_path):
+        """Tet mesh (4-node cells) must export without error."""
+        from kerf_cfd.openfoam_bridge import export_to_openfoam, OpenFOAMCaseSpec
+        verts = [
+            (0.0, 0.0, 0.0),
+            (1.0, 0.0, 0.0),
+            (0.0, 1.0, 0.0),
+            (0.0, 0.0, 1.0),
+            (1.0, 1.0, 1.0),
+        ]
+        cells = [[0, 1, 2, 3], [1, 2, 3, 4]]
+        spec = OpenFOAMCaseSpec(
+            case_name="tet_test",
+            mesh_vertices_xyz=verts,
+            mesh_cells=cells,
+            boundary_patches={
+                "inlet": {"type": "inlet"},
+                "outlet": {"type": "outlet"},
+                "wall": {"type": "wall"},
+            },
+            inlet_velocity_m_per_s=2.0,
+            outlet_pressure_pa=0.0,
+            turbulence_model="laminar",
+        )
+        result = export_to_openfoam(spec, str(tmp_path / "tet_case"))
+        assert len(result.files_generated) >= 7
+
+    def test_export_result_dataclass_fields(self, tmp_path):
+        """OpenFOAMExportResult must have all required fields."""
+        from kerf_cfd.openfoam_bridge import export_to_openfoam
+        spec = _channel_flow_spec()
+        result = export_to_openfoam(spec, str(tmp_path / "case"))
+        assert hasattr(result, "output_dir_path")
+        assert hasattr(result, "files_generated")
+        assert hasattr(result, "num_cells")
+        assert hasattr(result, "num_boundary_patches")
+        assert hasattr(result, "mesh_quality_warnings")
+        assert hasattr(result, "honest_caveat")
+
+    def test_export_spec_defaults(self):
+        """OpenFOAMCaseSpec must have correct default field values."""
+        from kerf_cfd.openfoam_bridge import OpenFOAMCaseSpec
+        spec = OpenFOAMCaseSpec(
+            case_name="defaults",
+            mesh_vertices_xyz=[],
+            mesh_cells=[],
+            boundary_patches={},
+            inlet_velocity_m_per_s=1.0,
+            outlet_pressure_pa=0.0,
+        )
+        assert spec.fluid_density_kg_m3 == 1.225
+        assert spec.fluid_viscosity_pa_s == 1.8e-5
+        assert spec.turbulence_model == "kEpsilon"
+        assert spec.solver == "simpleFoam"
+        assert spec.end_time_s == 1000.0
+        assert spec.write_interval == 100
+
+
+# ===========================================================================
+# 8. LLM tool: cfd_export_openfoam (T-101-C)
+# ===========================================================================
+
+class TestCfdExportOpenFoamTool:
+    """Smoke tests for the cfd_export_openfoam LLM tool."""
+
+    def test_tool_spec_importable(self):
+        from kerf_cfd.openfoam_llm_tools import _cfd_export_openfoam_spec
+        assert _cfd_export_openfoam_spec.name == "cfd_export_openfoam"
+
+    def test_tool_spec_required_fields(self):
+        from kerf_cfd.openfoam_llm_tools import _cfd_export_openfoam_spec
+        required = _cfd_export_openfoam_spec.input_schema.get("required", [])
+        assert "case_name" in required
+        assert "mesh_vertices_xyz" in required
+        assert "mesh_cells" in required
+        assert "boundary_patches" in required
+        assert "inlet_velocity_m_per_s" in required
+
+    def test_tool_sync_success(self, tmp_path):
+        from kerf_cfd.openfoam_llm_tools import _cfd_export_openfoam_sync
+        verts = [
+            [0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0],
+            [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1],
+        ]
+        cells = [[0, 1, 2, 3, 4, 5, 6, 7]]
+        result = _cfd_export_openfoam_sync({
+            "case_name": "test",
+            "output_dir": str(tmp_path / "foam_case"),
+            "mesh_vertices_xyz": verts,
+            "mesh_cells": cells,
+            "boundary_patches": {
+                "inlet": {"type": "inlet"},
+                "outlet": {"type": "outlet"},
+                "walls": {"type": "wall"},
+            },
+            "inlet_velocity_m_per_s": 1.0,
+            "outlet_pressure_pa": 0.0,
+        })
+        assert result.get("ok") is True
+        assert result.get("num_cells") == 1
+        assert result.get("num_files", 0) >= 7
+
+    def test_tool_sync_empty_mesh_error(self, tmp_path):
+        from kerf_cfd.openfoam_llm_tools import _cfd_export_openfoam_sync
+        result = _cfd_export_openfoam_sync({
+            "case_name": "bad",
+            "output_dir": str(tmp_path / "bad"),
+            "mesh_vertices_xyz": [],
+            "mesh_cells": [],
+            "boundary_patches": {},
+            "inlet_velocity_m_per_s": 1.0,
+        })
+        assert result.get("ok") is False

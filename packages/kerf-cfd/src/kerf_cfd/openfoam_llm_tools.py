@@ -384,3 +384,168 @@ async def cfd_openfoam_import(ctx: ProjectCtx, args: bytes) -> str:
     if not result.get("ok"):
         return err_payload(result.get("error", "unknown error"), result.get("code", "ERROR"))
     return ok_payload(result)
+
+
+# ---------------------------------------------------------------------------
+# 3. cfd_export_openfoam  (T-101-C — OpenFOAMCaseSpec-based export adapter)
+# ---------------------------------------------------------------------------
+
+_cfd_export_openfoam_spec = ToolSpec(
+    name="cfd_export_openfoam",
+    description=(
+        "Export a Kerf CFD case (3-D mesh + boundary conditions + solver "
+        "configuration) to a valid OpenFOAM 11 case directory structure so that "
+        "an external OpenFOAM installation can run it.  "
+        "Writes 0/{U,p,k,epsilon|omega,nut}, "
+        "constant/{transportProperties,turbulenceProperties,polyMesh/{points,faces,owner,neighbour,boundary}}, "
+        "and system/{controlDict,fvSchemes,fvSolution}.  "
+        "HONEST CAVEATS: (1) This is a file-export adapter — OpenFOAM is NOT "
+        "invoked and the mesh is NOT validated by checkMesh.  "
+        "(2) The user must have OpenFOAM 11 installed and run "
+        "'simpleFoam -case <output_dir>' themselves.  "
+        "(3) polyMesh face orientation is derived from cell connectivity; "
+        "run 'renumberMesh' if checkMesh reports face-orientation errors.  "
+        "(4) Turbulence initial conditions (k, ε, ω) are estimated from 5% "
+        "inlet turbulence intensity with L_turb = 0.1 m; adjust in 0/ if needed."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "case_name": {
+                "type": "string",
+                "description": "Case name (used for the output directory name if output_dir is omitted).",
+            },
+            "output_dir": {
+                "type": "string",
+                "description": "Absolute path for the output case directory.  Created if absent.",
+            },
+            "mesh_vertices_xyz": {
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 3,
+                    "maxItems": 3,
+                },
+                "description": "List of [x, y, z] vertex coordinates.",
+            },
+            "mesh_cells": {
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                },
+                "description": (
+                    "Cell connectivity.  Each entry is a list of vertex indices.  "
+                    "4 indices = tetrahedron; 8 indices = hexahedron."
+                ),
+            },
+            "boundary_patches": {
+                "type": "object",
+                "description": (
+                    "Mapping of patch name → patch descriptor.  "
+                    "Descriptor keys: 'type' (wall|inlet|outlet|symmetry), "
+                    "'faces' (list of face vertex-index lists, optional)."
+                ),
+                "additionalProperties": {"type": "object"},
+            },
+            "inlet_velocity_m_per_s": {
+                "type": "number",
+                "description": "Mean inlet velocity magnitude (m/s, x-direction).",
+            },
+            "outlet_pressure_pa": {
+                "type": "number",
+                "description": "Static pressure at the outlet patch (Pa).  Default 0.",
+            },
+            "fluid_density_kg_m3": {
+                "type": "number",
+                "description": "Fluid density (kg/m³).  Default 1.225 (air).",
+            },
+            "fluid_viscosity_pa_s": {
+                "type": "number",
+                "description": "Dynamic viscosity (Pa·s).  Default 1.8e-5 (air).",
+            },
+            "turbulence_model": {
+                "type": "string",
+                "enum": ["kEpsilon", "kOmegaSST", "laminar"],
+                "description": "RANS turbulence model.  Default 'kEpsilon'.",
+            },
+            "solver": {
+                "type": "string",
+                "enum": ["simpleFoam", "pimpleFoam", "pisoFoam"],
+                "description": "OpenFOAM solver.  Default 'simpleFoam'.",
+            },
+            "end_time_s": {
+                "type": "number",
+                "description": "End time / iteration count.  Default 1000.",
+            },
+            "write_interval": {
+                "type": "integer",
+                "description": "Write interval (time steps).  Default 100.",
+            },
+        },
+        "required": ["case_name", "mesh_vertices_xyz", "mesh_cells",
+                     "boundary_patches", "inlet_velocity_m_per_s"],
+    },
+)
+
+
+def _cfd_export_openfoam_sync(a: dict) -> dict[str, Any]:
+    import tempfile
+    from kerf_cfd.openfoam_bridge import OpenFOAMCaseSpec, export_to_openfoam
+
+    case_name = a.get("case_name", "kerf_cfd_case")
+    output_dir = a.get("output_dir")
+    if not output_dir:
+        output_dir = os.path.join(tempfile.mkdtemp(prefix="kerf_of_"), case_name)
+
+    try:
+        spec = OpenFOAMCaseSpec(
+            case_name=str(case_name),
+            mesh_vertices_xyz=[tuple(v) for v in a.get("mesh_vertices_xyz", [])],
+            mesh_cells=[list(c) for c in a.get("mesh_cells", [])],
+            boundary_patches={
+                k: (v if isinstance(v, dict) else {"type": str(v)})
+                for k, v in a.get("boundary_patches", {}).items()
+            },
+            inlet_velocity_m_per_s=float(a.get("inlet_velocity_m_per_s", 1.0)),
+            outlet_pressure_pa=float(a.get("outlet_pressure_pa", 0.0)),
+            fluid_density_kg_m3=float(a.get("fluid_density_kg_m3", 1.225)),
+            fluid_viscosity_pa_s=float(a.get("fluid_viscosity_pa_s", 1.8e-5)),
+            turbulence_model=str(a.get("turbulence_model", "kEpsilon")),
+            solver=str(a.get("solver", "simpleFoam")),
+            end_time_s=float(a.get("end_time_s", 1000.0)),
+            write_interval=int(a.get("write_interval", 100)),
+        )
+    except (TypeError, ValueError) as exc:
+        return {"ok": False, "error": str(exc), "code": "BAD_ARGS"}
+
+    try:
+        result = export_to_openfoam(spec, output_dir)
+    except (ValueError, OSError) as exc:
+        return {"ok": False, "error": str(exc), "code": "EXPORT_ERROR"}
+
+    return {
+        "ok": True,
+        "output_dir": result.output_dir_path,
+        "files_generated": result.files_generated,
+        "num_files": len(result.files_generated),
+        "num_cells": result.num_cells,
+        "num_boundary_patches": result.num_boundary_patches,
+        "mesh_quality_warnings": result.mesh_quality_warnings,
+        "honest_caveat": result.honest_caveat,
+    }
+
+
+@register(_cfd_export_openfoam_spec, write=True)
+async def cfd_export_openfoam(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid JSON: {exc}", "BAD_ARGS")
+
+    import asyncio
+    result = await asyncio.to_thread(_cfd_export_openfoam_sync, a)
+    if not result.get("ok"):
+        return err_payload(result.get("error", "unknown error"), result.get("code", "ERROR"))
+    return ok_payload(result)

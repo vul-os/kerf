@@ -74,6 +74,7 @@ const MotionSimPage = lazy(() => import('./routes/domains/MotionSim.jsx'))
 const FemCfdPage = lazy(() => import('./routes/domains/FemCfd.jsx'))
 const TextilesPage = lazy(() => import('./routes/domains/Textiles.jsx'))
 const NotFound = lazy(() => import('./routes/NotFound.jsx'))
+const GeometryInspect = lazy(() => import('./routes/GeometryInspect.jsx'))
 
 // Cloud surface — these come from the cloud/ open-core split and may be
 // stubs on OSS builds. useCloudConfig stays eager (we need it before any
@@ -187,6 +188,7 @@ export default function App() {
       <Route path="/auth/callback" element={<AuthCallback />} />
       {cloudEnabled && <Route path="/pricing" element={<Pricing />} />}
       <Route path="/roadmap" element={<Roadmap />} />
+      <Route path="/inspect" element={<GeometryInspect />} />
       <Route path="/domains" element={<DomainsHub />} />
       <Route path="/domains/automotive" element={<Automotive />} />
       <Route path="/docs" element={<DocsHome />} />

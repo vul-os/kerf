@@ -37,12 +37,28 @@ Test plan
 32. tool_bad_json                    -- LLM tool handles invalid JSON
 33. tool_optional_kwargs             -- tool accepts n_rays_per_field and aperture
 
+Skew-ray and chief-ray exit-pupil tests (34-45):
+34. skew_symmetric_rms_nonzero       -- use_skew_ray=True: on-axis BK7 RMS > 0
+35. skew_rms_grows_with_field        -- use_skew_ray=True: RMS at 14deg > 0deg
+36. skew_use_skew_ray_flag           -- report.use_skew_ray == True
+37. skew_rays_traced_positive        -- skew mode: at least one ray per field
+38. skew_vignetting_zero_bk7         -- BK7 singlet: no vignetting (no clear-ap limits)
+39. skew_pupil_coords_count          -- surviving pupil coords == n_rays_traced
+40. exit_pupil_chief_ray_symmetric   -- symmetric singlet (stop at 0): EP behind last surface
+41. exit_pupil_asymmetric            -- stop at different surface: EP position differs
+42. exit_pupil_error_bad_stop_index  -- stop_index out of range returns error
+43. exit_pupil_to_dict_ok            -- ExitPupilReport.to_dict() has ok=True
+44. skew_vs_meridional_rms_comparable -- skew and meridional give broadly similar on-axis RMS
+45. skew_intercepts_finite           -- all skew intercepts are finite
+
 All tests are pure-Python and hermetic (no OCC, DB, or network).
 
 References
 ----------
-Welford, W.T. -- "Aberrations of Optical Systems", Adam Hilger, 1986, §8.2.
+Welford, W.T. -- "Aberrations of Optical Systems", Adam Hilger, 1986,
+    §8.2 (spot diagrams), §3.5 (exit-pupil via chief ray).
 Hecht, E. -- "Optics", 5th ed., Addison-Wesley, 2017, §5.7.
+Born, M. & Wolf, E. -- "Principles of Optics", 7th ed. (1999), §4.6.
 
 Author: imranparuk
 """
@@ -56,9 +72,11 @@ import pytest
 
 from kerf_cad_core.optics.lens_stack_trace import paraxial_properties
 from kerf_cad_core.optics.pupil_diagram import (
+    ExitPupilReport,
     PupilDiagramReport,
     SpotFieldData,
     _pupil_grid,
+    compute_exit_pupil_chief_ray,
     compute_pupil_diagram,
 )
 from kerf_cad_core.optics.tools import run_pupil_diagram
@@ -556,3 +574,296 @@ def test_tool_optional_kwargs():
     d = json.loads(result_str)
     assert d.get("ok") is True
     assert abs(d["aperture_radius_mm"] - 3.0) < 1e-9
+
+
+# ===========================================================================
+# New tests 34-45: skew-ray mode + chief-ray exit-pupil
+# ===========================================================================
+
+
+# ---------------------------------------------------------------------------
+# 34. skew_symmetric_rms_nonzero
+# ---------------------------------------------------------------------------
+
+def test_skew_symmetric_rms_nonzero():
+    """
+    use_skew_ray=True, BK7 biconvex on-axis: 2-D RMS > 0 (spherical aberration
+    shows up in the full 3-D spot when skew rays are used).
+
+    References: Born & Wolf §4.6; Welford §8.2.
+    """
+    result = compute_pupil_diagram(
+        _BK7_SURFACES, [0.0], aperture_radius_mm=5.0,
+        n_rays_per_field=37, use_skew_ray=True
+    )
+    assert isinstance(result, PupilDiagramReport)
+    rms = result.spots_per_field[0].rms_spot_radius_mm
+    assert math.isfinite(rms)
+    assert rms > 0.0, f"Expected non-zero 3-D RMS for BK7 on-axis (skew), got {rms}"
+
+
+# ---------------------------------------------------------------------------
+# 35. skew_rms_grows_with_field
+# ---------------------------------------------------------------------------
+
+def test_skew_rms_grows_with_field():
+    """
+    use_skew_ray=True: RMS spot at 14° must exceed RMS at 0° (coma grows).
+
+    The skew-ray bundle captures both tangential and sagittal coma contributions
+    so the 2-D RMS growth with field should be more pronounced than meridional-only.
+    """
+    result = compute_pupil_diagram(
+        _BK7_SURFACES, [0.0, 14.0], aperture_radius_mm=5.0,
+        n_rays_per_field=37, use_skew_ray=True
+    )
+    assert isinstance(result, PupilDiagramReport)
+    rms_0 = result.rms_spot_size_per_field[0]
+    rms_14 = result.rms_spot_size_per_field[1]
+    assert rms_14 > rms_0, (
+        f"Expected skew-ray RMS(14°) > RMS(0°), got {rms_14:.4f} vs {rms_0:.4f}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 36. skew_use_skew_ray_flag
+# ---------------------------------------------------------------------------
+
+def test_skew_use_skew_ray_flag():
+    """
+    PupilDiagramReport.use_skew_ray must be True when use_skew_ray=True is
+    passed, and False when the default (meridional) path is used.
+    """
+    r_skew = compute_pupil_diagram(
+        _BK7_SURFACES, [0.0], aperture_radius_mm=5.0, use_skew_ray=True
+    )
+    r_merid = compute_pupil_diagram(
+        _BK7_SURFACES, [0.0], aperture_radius_mm=5.0
+    )
+    assert isinstance(r_skew, PupilDiagramReport)
+    assert isinstance(r_merid, PupilDiagramReport)
+    assert r_skew.use_skew_ray is True
+    assert r_merid.use_skew_ray is False
+
+
+# ---------------------------------------------------------------------------
+# 37. skew_rays_traced_positive
+# ---------------------------------------------------------------------------
+
+def test_skew_rays_traced_positive():
+    """
+    use_skew_ray=True: n_rays_traced must be > 0 for each field angle.
+    """
+    result = compute_pupil_diagram(
+        _BK7_SURFACES, [0.0, 5.0, 14.0], aperture_radius_mm=5.0,
+        n_rays_per_field=19, use_skew_ray=True
+    )
+    assert isinstance(result, PupilDiagramReport)
+    for sfd in result.spots_per_field:
+        assert sfd.n_rays_traced > 0, (
+            f"Expected > 0 traced rays at {sfd.field_angle_deg}°"
+        )
+
+
+# ---------------------------------------------------------------------------
+# 38. skew_vignetting_zero_bk7
+# ---------------------------------------------------------------------------
+
+def test_skew_vignetting_zero_bk7():
+    """
+    BK7 biconvex singlet with no TIR at moderate aperture: vignetting fraction
+    should be 0.0 (no rays lost) for use_skew_ray=True.
+
+    The skew-ray engine does not apply physical clear-aperture clipping at
+    intermediate surfaces; all non-TIR rays survive (Welford §3.7 note).
+    """
+    result = compute_pupil_diagram(
+        _BK7_SURFACES, [0.0], aperture_radius_mm=5.0,
+        n_rays_per_field=37, use_skew_ray=True
+    )
+    assert isinstance(result, PupilDiagramReport)
+    sfd = result.spots_per_field[0]
+    assert sfd.vignetting_fraction == 0.0, (
+        f"Expected 0 vignetting for BK7 at 5mm aperture, got {sfd.vignetting_fraction}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 39. skew_pupil_coords_count
+# ---------------------------------------------------------------------------
+
+def test_skew_pupil_coords_count():
+    """
+    In skew-ray mode: len(pupil_coords_surviving) == n_rays_traced for all fields.
+    """
+    result = compute_pupil_diagram(
+        _BK7_SURFACES, [0.0, 14.0], aperture_radius_mm=5.0,
+        n_rays_per_field=37, use_skew_ray=True
+    )
+    assert isinstance(result, PupilDiagramReport)
+    for sfd in result.spots_per_field:
+        assert len(sfd.pupil_coords_surviving) == sfd.n_rays_traced, (
+            f"pupil_coords_surviving length mismatch at {sfd.field_angle_deg}°"
+        )
+
+
+# ---------------------------------------------------------------------------
+# 40. exit_pupil_chief_ray_symmetric
+# ---------------------------------------------------------------------------
+
+def test_exit_pupil_chief_ray_symmetric():
+    """
+    Symmetric BK7 biconvex singlet (stop at first surface, index 0):
+    The exit pupil is a virtual image behind the last surface.
+
+    For a symmetric BK7 singlet with stop at the front surface (index 0), the
+    exit pupil is behind the last surface (ep_from_last < 0), consistent with a
+    virtual exit pupil.  Welford 1986 §3.5 / Hecht §5.7.
+    """
+    ep = compute_exit_pupil_chief_ray(
+        _BK7_SURFACES, stop_index=0, aperture_radius_mm=5.0
+    )
+    assert isinstance(ep, ExitPupilReport)
+    assert ep.ok, f"Expected ok=True, got reason={ep.reason}"
+    assert math.isfinite(ep.exit_pupil_z_mm), "exit_pupil_z_mm must be finite"
+    # Virtual exit pupil: behind the last surface (negative distance from last)
+    assert ep.exit_pupil_distance_from_last_surface_mm < 0.0, (
+        f"Expected virtual EP (negative from-last distance) for BK7 stop@0, "
+        f"got {ep.exit_pupil_distance_from_last_surface_mm:.3f} mm"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 41. exit_pupil_asymmetric
+# ---------------------------------------------------------------------------
+
+def test_exit_pupil_asymmetric():
+    """
+    For an asymmetric 3-surface stack, moving the stop changes the exit-pupil
+    position.  EP with stop at index 0 != EP with stop at index 1.
+
+    Triplet: front crown, air gap, rear crown — stop position changes EP.
+    """
+    # Simple 3-surface asymmetric stack: plano-convex + gap + flat
+    asymmetric = [
+        {"c": 1.0 / 40.0, "t": 3.0, "n": 1.5168},  # BK7 front surface
+        {"c": 0.0,         "t": 10.0, "n": 1.0},    # air gap
+        {"c": 1.0 / 60.0, "t": 0.0,  "n": 1.0},    # rear surface (exit)
+    ]
+    ep0 = compute_exit_pupil_chief_ray(asymmetric, stop_index=0, aperture_radius_mm=5.0)
+    ep1 = compute_exit_pupil_chief_ray(asymmetric, stop_index=1, aperture_radius_mm=5.0)
+
+    assert ep0.ok and ep1.ok, f"EP traces failed: ep0={ep0.reason}, ep1={ep1.reason}"
+    assert math.isfinite(ep0.exit_pupil_z_mm) and math.isfinite(ep1.exit_pupil_z_mm)
+    # Different stop positions must yield different exit-pupil positions
+    assert abs(ep0.exit_pupil_z_mm - ep1.exit_pupil_z_mm) > 0.1, (
+        f"Expected EP positions to differ significantly with stop change: "
+        f"ep0.z={ep0.exit_pupil_z_mm:.3f}, ep1.z={ep1.exit_pupil_z_mm:.3f}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 42. exit_pupil_error_bad_stop_index
+# ---------------------------------------------------------------------------
+
+def test_exit_pupil_error_bad_stop_index():
+    """
+    stop_index out of range must return ExitPupilReport with ok=False.
+    """
+    ep = compute_exit_pupil_chief_ray(
+        _BK7_SURFACES, stop_index=99, aperture_radius_mm=5.0
+    )
+    assert isinstance(ep, ExitPupilReport)
+    assert ep.ok is False
+    assert "out of range" in ep.reason or "stop_index" in ep.reason
+
+
+# ---------------------------------------------------------------------------
+# 43. exit_pupil_to_dict_ok
+# ---------------------------------------------------------------------------
+
+def test_exit_pupil_to_dict_ok():
+    """
+    ExitPupilReport.to_dict() must have ok=True and required keys when successful.
+    """
+    ep = compute_exit_pupil_chief_ray(
+        _BK7_SURFACES, stop_index=0, aperture_radius_mm=5.0
+    )
+    assert ep.ok
+    d = ep.to_dict()
+    assert d.get("ok") is True
+    assert "exit_pupil_z_mm" in d
+    assert "exit_pupil_distance_from_last_surface_mm" in d
+    assert "stop_index" in d
+    assert "chief_ray_angle_image_deg" in d
+    assert "honest_caveat" in d
+    assert math.isfinite(d["exit_pupil_z_mm"])
+
+
+# ---------------------------------------------------------------------------
+# 44. skew_vs_meridional_rms_comparable
+# ---------------------------------------------------------------------------
+
+def test_skew_vs_meridional_rms_comparable():
+    """
+    Skew-ray and meridional modes should give broadly similar on-axis meridional
+    (y-only) RMS for BK7 biconvex at 5mm aperture: within a factor of 20.
+
+    The skew-ray 2-D RMS includes the full sagittal contribution from the 3-D
+    bundle; the meridional 2-D RMS includes a first-order sagittal x estimate
+    (which can be significantly larger than the real sagittal spot due to the
+    BFL/EFL scaling of non-paraxial pupils).  The y-only RMS is the pure
+    aberration signal and should agree between the two modes.
+
+    References: Welford §8.2 (spot diagram); Hecht §5.7 (pupil coordinates).
+    """
+    r_skew = compute_pupil_diagram(
+        _BK7_SURFACES, [0.0], aperture_radius_mm=5.0,
+        n_rays_per_field=37, use_skew_ray=True
+    )
+    r_merid = compute_pupil_diagram(
+        _BK7_SURFACES, [0.0], aperture_radius_mm=5.0,
+        n_rays_per_field=37, use_skew_ray=False
+    )
+    assert isinstance(r_skew, PupilDiagramReport)
+    assert isinstance(r_merid, PupilDiagramReport)
+
+    # Use y-only (meridional) RMS for comparison — the true aberration signal
+    rms_skew_y = r_skew.rms_spot_y_per_field[0]
+    rms_merid_y = r_merid.rms_spot_y_per_field[0]
+
+    # Both should be positive and finite
+    assert rms_skew_y > 0.0 and math.isfinite(rms_skew_y)
+    assert rms_merid_y > 0.0 and math.isfinite(rms_merid_y)
+
+    # Within a factor of 20 of each other (modes differ in sampling + ray directions)
+    ratio = rms_skew_y / rms_merid_y if rms_merid_y > 0 else float("inf")
+    assert 0.05 < ratio < 20.0, (
+        f"Skew vs meridional y-RMS ratio {ratio:.2f} out of expected [0.05, 20]; "
+        f"skew_y={rms_skew_y:.6f}, merid_y={rms_merid_y:.6f}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 45. skew_intercepts_finite
+# ---------------------------------------------------------------------------
+
+def test_skew_intercepts_finite():
+    """
+    All (x, y) intercepts from use_skew_ray=True must be finite numbers.
+
+    No NaN or inf should appear in the surviving intercept list.
+    """
+    result = compute_pupil_diagram(
+        _BK7_SURFACES, [0.0, 5.0, 14.0], aperture_radius_mm=5.0,
+        n_rays_per_field=37, use_skew_ray=True
+    )
+    assert isinstance(result, PupilDiagramReport)
+    for sfd in result.spots_per_field:
+        for xi, yi in sfd.intercepts_mm:
+            assert math.isfinite(xi), (
+                f"Non-finite x intercept {xi} at field {sfd.field_angle_deg}°"
+            )
+            assert math.isfinite(yi), (
+                f"Non-finite y intercept {yi} at field {sfd.field_angle_deg}°"
+            )

@@ -59,6 +59,7 @@ const CompositesPage = lazy(() => import('./routes/domains/Composites.jsx'))
 const DentalPage = lazy(() => import('./routes/domains/Dental.jsx'))
 const OpticsPage = lazy(() => import('./routes/domains/Optics.jsx'))
 const OpticsDesignPanel = lazy(() => import('./components/optics/OpticsDesignPanel.jsx'))
+const StructuralPanel = lazy(() => import('./components/arch/StructuralPanel.jsx'))
 const HorologyPage = lazy(() => import('./routes/domains/Horology.jsx'))
 const PipingPage = lazy(() => import('./routes/domains/Piping.jsx'))
 const PackagingPage = lazy(() => import('./routes/domains/Packaging.jsx'))
@@ -72,9 +73,11 @@ const AerospacePage = lazy(() => import('./routes/domains/Aerospace.jsx'))
 const PLCPage = lazy(() => import('./routes/domains/PLC.jsx'))
 const MotionSimPage = lazy(() => import('./routes/domains/MotionSim.jsx'))
 const FemCfdPage = lazy(() => import('./routes/domains/FemCfd.jsx'))
+const SimulationPage = lazy(() => import('./routes/Simulation.jsx'))
 const TextilesPage = lazy(() => import('./routes/domains/Textiles.jsx'))
 const NotFound = lazy(() => import('./routes/NotFound.jsx'))
 const GeometryInspect = lazy(() => import('./routes/GeometryInspect.jsx'))
+const GDTPanel = lazy(() => import('./components/GDTPanel.jsx'))
 
 // Cloud surface — these come from the cloud/ open-core split and may be
 // stubs on OSS builds. useCloudConfig stays eager (we need it before any
@@ -189,6 +192,7 @@ export default function App() {
       {cloudEnabled && <Route path="/pricing" element={<Pricing />} />}
       <Route path="/roadmap" element={<Roadmap />} />
       <Route path="/inspect" element={<GeometryInspect />} />
+      <Route path="/gdt" element={<GDTPanel />} />
       <Route path="/domains" element={<DomainsHub />} />
       <Route path="/domains/automotive" element={<Automotive />} />
       <Route path="/docs" element={<DocsHome />} />
@@ -216,6 +220,8 @@ export default function App() {
       <Route path="/domains/dental" element={<DentalPage />} />
       <Route path="/domains/optics" element={<OpticsPage />} />
       <Route path="/optics" element={<OpticsDesignPanel />} />
+      <Route path="/structural" element={<StructuralPanel />} />
+      <Route path="/arch" element={<StructuralPanel />} />
       <Route path="/domains/horology" element={<HorologyPage />} />
       <Route path="/domains/piping" element={<PipingPage />} />
       <Route path="/domains/packaging" element={<PackagingPage />} />

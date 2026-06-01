@@ -57,6 +57,8 @@ import {
   Spline, TrendingUp, Maximize2, Wand2, FlipVertical,
   GitMerge, SplitSquareHorizontal, Route, Ruler, ArrowUpDown,
   Workflow, Shuffle, Merge,
+  Cuboid, Navigation, Share2, PackageOpen,
+  BrainCircuit, Compass, Ungroup, Boxes,
 } from 'lucide-react'
 import FeatureRenderer from './FeatureRenderer.jsx'
 import {
@@ -1931,6 +1933,256 @@ const FEATURE_KINDS = [
         { value: 'convex_hull',    label: 'Convex hull' },
         { value: 'simplification', label: 'Simplified hull' },
       ] },
+    ],
+  },
+
+  // ── GK-P SubD extended ops (inset, bridge, loop-subdiv, limit, crease, CSG, etc.) ──
+
+  // subd_inset_faces — inset selected faces by ratio (GK-P)
+  {
+    op: 'subd_inset_faces',
+    label: 'SubD Inset Faces',
+    icon: Cuboid,
+    caption: 'Inset selected SubD cage faces by a ratio, creating an inner polygon ring per face. Useful for adding local control loops before sculpting.',
+    defaults: { target_id: '', face_ids: [], inset_ratio: 0.25 },
+    fields: [
+      { key: 'target_id',   kind: 'feature_picker', label: 'SubD cage' },
+      { key: 'inset_ratio', kind: 'number', label: 'Inset ratio (0–0.5)', min: 0.01, max: 0.5, step: 0.01 },
+    ],
+  },
+
+  // subd_bridge_loops — bridge two edge loops into a connecting quad strip (GK-P)
+  {
+    op: 'subd_bridge_loops',
+    label: 'SubD Bridge Loops',
+    icon: GitMerge,
+    caption: 'Bridge two open edge loops on a SubD cage with a quad-strip tube. Connects separate shells or fills a gap between loops.',
+    defaults: { target_id: '', loop_a_edges: [], loop_b_edges: [], segments: 1 },
+    fields: [
+      { key: 'target_id', kind: 'feature_picker', label: 'SubD cage' },
+      { key: 'segments',  kind: 'number', label: 'Bridge segments', min: 1, max: 32, step: 1 },
+    ],
+  },
+
+  // subd_loop_subdivision — apply n rounds of Catmull-Clark subdivision (GK-P)
+  {
+    op: 'subd_loop_subdivision',
+    label: 'SubD Loop Subdivide',
+    icon: Layers,
+    caption: 'Apply n rounds of Catmull-Clark Loop subdivision to a SubD cage, increasing polygon density uniformly.',
+    defaults: { target_id: '', levels: 1 },
+    fields: [
+      { key: 'target_id', kind: 'feature_picker', label: 'SubD cage' },
+      { key: 'levels',    kind: 'number', label: 'Subdivision levels', min: 1, max: 4, step: 1 },
+    ],
+  },
+
+  // subd_compute_stam_limit_tangents — Stam 1998 exact limit tangents at extraordinary vertices (GK-P12)
+  {
+    op: 'subd_compute_stam_limit_tangents',
+    label: 'SubD Limit Tangents',
+    icon: Navigation,
+    caption: 'Compute Stam 1998 exact limit-surface tangents (T1, T2) at extraordinary vertices. Inputs eigenvalues from the subdivision matrix; returns tangent-plane normal and G1 patch coefficients.',
+    defaults: { target_id: '', vertex_ids: [] },
+    fields: [
+      { key: 'target_id', kind: 'feature_picker', label: 'SubD cage' },
+    ],
+  },
+
+  // subd_convert_to_g1_patches — convert SubD cage to G1 Bezier patches (GK-P13)
+  {
+    op: 'subd_convert_to_g1_patches',
+    label: 'SubD → G1 Patches',
+    icon: Share2,
+    caption: 'Convert a Catmull-Clark SubD cage to a set of bicubic Bézier patches that are G1-continuous at extraordinary vertices (Loop-Schaefer 2008 construction).',
+    defaults: { target_id: '' },
+    fields: [
+      { key: 'target_id', kind: 'feature_picker', label: 'SubD cage' },
+    ],
+  },
+
+  // subd_apply_crease_decay — fractional crease sharpness decay per subdivision level (GK-P14)
+  {
+    op: 'subd_apply_crease_decay',
+    label: 'SubD Crease Decay',
+    icon: Layers,
+    caption: 'Apply fractional crease-sharpness decay to SubD cage edges across subdivision levels. Partial crease values between 0 (smooth) and 1 (sharp corner) blend tangent directions for product-design fillets.',
+    defaults: { target_id: '', edge_ids: [], sharpness: 1.0, decay_rate: 0.5 },
+    fields: [
+      { key: 'target_id',  kind: 'feature_picker', label: 'SubD cage' },
+      { key: 'sharpness',  kind: 'number', label: 'Initial sharpness (0–3)', min: 0, max: 3, step: 0.1 },
+      { key: 'decay_rate', kind: 'number', label: 'Decay rate per level', min: 0.1, max: 1.0, step: 0.05 },
+    ],
+  },
+
+  // subd_collapse_edge — collapse a cage edge, merging its two vertices (GK-P)
+  {
+    op: 'subd_collapse_edge',
+    label: 'SubD Collapse Edge',
+    icon: Merge,
+    caption: 'Collapse a SubD cage edge, merging its two endpoint vertices to their midpoint. Reduces polygon count locally and simplifies topology.',
+    defaults: { target_id: '', edge_id: 0 },
+    fields: [
+      { key: 'target_id', kind: 'feature_picker', label: 'SubD cage' },
+      { key: 'edge_id',   kind: 'number', label: 'Edge index', min: 0, step: 1 },
+    ],
+  },
+
+  // subd_sample_limit_normals — sample limit-surface normals on a regular UV grid (GK-P)
+  {
+    op: 'subd_sample_limit_normals',
+    label: 'SubD Sample Limit Normals',
+    icon: BrainCircuit,
+    caption: 'Sample Stam exact limit-surface normals on each face at a regular (u,v) grid. Returns per-point normal vectors for rendering, G1 analysis, or normal-map baking.',
+    defaults: { target_id: '', grid_u: 4, grid_v: 4 },
+    fields: [
+      { key: 'target_id', kind: 'feature_picker', label: 'SubD cage' },
+      { key: 'grid_u',    kind: 'number', label: 'Grid U samples', min: 2, max: 32, step: 1 },
+      { key: 'grid_v',    kind: 'number', label: 'Grid V samples', min: 2, max: 32, step: 1 },
+    ],
+  },
+
+  // subd_compute_cage_area — compute total cage polygon area (GK-P)
+  {
+    op: 'subd_compute_cage_area',
+    label: 'SubD Cage Area',
+    icon: Compass,
+    caption: 'Compute the total surface area of a SubD cage by summing signed triangle areas for each polygon (fan-triangulation). Useful for material estimation before expensive limit-surface evaluation.',
+    defaults: { target_id: '' },
+    fields: [
+      { key: 'target_id', kind: 'feature_picker', label: 'SubD cage' },
+    ],
+  },
+
+  // subd_evaluate_limit_normal — evaluate the exact limit-surface normal at one (u,v) (GK-P)
+  {
+    op: 'subd_evaluate_limit_normal',
+    label: 'SubD Eval Limit Normal',
+    icon: Navigation,
+    caption: 'Evaluate the exact Stam limit-surface normal at a single (face_id, u, v) coordinate. Returns position + normal for high-precision shading or inspection.',
+    defaults: { target_id: '', face_id: 0, u: 0.5, v: 0.5 },
+    fields: [
+      { key: 'target_id', kind: 'feature_picker', label: 'SubD cage' },
+      { key: 'face_id',   kind: 'number', label: 'Face index', min: 0, step: 1 },
+      { key: 'u',         kind: 'number', label: 'U parameter (0–1)', min: 0, max: 1, step: 0.01 },
+      { key: 'v',         kind: 'number', label: 'V parameter (0–1)', min: 0, max: 1, step: 0.01 },
+    ],
+  },
+
+  // subd_extract_feature_curves — extract sharp-crease feature curves from cage (GK-P19)
+  {
+    op: 'subd_extract_feature_curves',
+    label: 'SubD Extract Feature Curves',
+    icon: Route,
+    caption: 'Extract continuous polyline feature curves from sharp-crease edges of a SubD cage. Curves can be used as spine guides for sweep surfaces or sectioning.',
+    defaults: { target_id: '', min_sharpness: 0.5 },
+    fields: [
+      { key: 'target_id',     kind: 'feature_picker', label: 'SubD cage' },
+      { key: 'min_sharpness', kind: 'number', label: 'Minimum crease sharpness', min: 0, max: 3, step: 0.1 },
+    ],
+  },
+
+  // subd_export_usdc — export limit surface as USDC binary crate (GK-P)
+  {
+    op: 'subd_export_usdc',
+    label: 'SubD Export USDC',
+    icon: PackageOpen,
+    caption: 'Export a SubD cage limit surface as a minimal-conforming USDC binary crate (Pixar PXR-USDC 0.6.0). Targets HdStorm / Houdini / Maya USD workflows.',
+    defaults: { target_id: '', levels: 2 },
+    fields: [
+      { key: 'target_id', kind: 'feature_picker', label: 'SubD cage' },
+      { key: 'levels',    kind: 'number', label: 'Subdivision levels for export', min: 0, max: 4, step: 1 },
+    ],
+  },
+
+  // subd_geodesic_distance — heat-method geodesic distance from source vertices (GK-P49)
+  {
+    op: 'subd_geodesic_distance',
+    label: 'SubD Geodesic Distance',
+    icon: Compass,
+    caption: 'Compute geodesic distances from one or more source vertices on a SubD cage using the heat method (Crane et al. 2013). Returns per-vertex distance field.',
+    defaults: { target_id: '', source_vertex_ids: [0], t_scale: 1.0 },
+    fields: [
+      { key: 'target_id', kind: 'feature_picker', label: 'SubD cage' },
+      { key: 't_scale',   kind: 'number', label: 'Heat diffusion time scale', min: 0.01, step: 0.1 },
+    ],
+  },
+
+  // subd_csg_union — SubD cage boolean union (transversal case) (GK-P)
+  {
+    op: 'subd_csg_union',
+    label: 'SubD CSG Union',
+    icon: Ungroup,
+    caption: 'Boolean union of two SubD cage meshes (transversal-contact case, Cohen-Or-Sheffer 2003). Detects intersection loop and stitches the two cage meshes.',
+    defaults: { target_a_id: '', target_b_id: '' },
+    fields: [
+      { key: 'target_a_id', kind: 'feature_picker', label: 'SubD cage A' },
+      { key: 'target_b_id', kind: 'feature_picker', label: 'SubD cage B' },
+    ],
+  },
+
+  // subd_csg_difference — SubD cage boolean difference (GK-P)
+  {
+    op: 'subd_csg_difference',
+    label: 'SubD CSG Difference',
+    icon: Scissors,
+    caption: 'Boolean difference (A minus B) of two SubD cage meshes (transversal case). Cuts cage B out of cage A.',
+    defaults: { target_a_id: '', target_b_id: '' },
+    fields: [
+      { key: 'target_a_id', kind: 'feature_picker', label: 'SubD cage A (base)' },
+      { key: 'target_b_id', kind: 'feature_picker', label: 'SubD cage B (cutter)' },
+    ],
+  },
+
+  // subd_csg_intersection — SubD cage boolean intersection (GK-P)
+  {
+    op: 'subd_csg_intersection',
+    label: 'SubD CSG Intersection',
+    icon: Boxes,
+    caption: 'Boolean intersection of two SubD cage meshes — keeps only the volume common to both. Transversal case (Cohen-Or-Sheffer 2003).',
+    defaults: { target_a_id: '', target_b_id: '' },
+    fields: [
+      { key: 'target_a_id', kind: 'feature_picker', label: 'SubD cage A' },
+      { key: 'target_b_id', kind: 'feature_picker', label: 'SubD cage B' },
+    ],
+  },
+
+  // subd_project_primitive — project a SDF primitive onto cage surface (GK-P)
+  {
+    op: 'subd_project_primitive',
+    label: 'SubD Project Primitive',
+    icon: Wand2,
+    caption: 'Project a SDF primitive (sphere / box / cylinder) onto the nearest-point surface of a SubD cage. Embeds the primitive silhouette as a crease loop.',
+    defaults: { target_id: '', primitive_type: 'sphere', cx: 0, cy: 0, cz: 0, r: 5 },
+    fields: [
+      { key: 'target_id', kind: 'feature_picker', label: 'SubD cage' },
+      { key: 'primitive_type', kind: 'select', label: 'Primitive', options: [
+        { value: 'sphere',   label: 'Sphere' },
+        { value: 'box',      label: 'Box' },
+        { value: 'cylinder', label: 'Cylinder' },
+      ] },
+      { key: 'cx', kind: 'number', label: 'Centre X (mm)' },
+      { key: 'cy', kind: 'number', label: 'Centre Y (mm)' },
+      { key: 'cz', kind: 'number', label: 'Centre Z (mm)' },
+      { key: 'r',  kind: 'number', label: 'Radius / half-size (mm)', min: 0.001 },
+    ],
+  },
+
+  // subd_symmetrize — enforce bilateral symmetry across a mirror plane (GK-P)
+  {
+    op: 'subd_symmetrize',
+    label: 'SubD Symmetrize',
+    icon: FlipHorizontal,
+    caption: 'Enforce bilateral mirror symmetry on a SubD cage across a chosen plane (XY / YZ / XZ). Snaps vertices to the nearest symmetric position and welds mid-plane vertices.',
+    defaults: { target_id: '', plane: 'YZ', tolerance: 0.001 },
+    fields: [
+      { key: 'target_id', kind: 'feature_picker', label: 'SubD cage' },
+      { key: 'plane', kind: 'select', label: 'Mirror plane', options: [
+        { value: 'YZ', label: 'YZ (left↔right)' },
+        { value: 'XZ', label: 'XZ (front↔back)' },
+        { value: 'XY', label: 'XY (top↔bottom)' },
+      ] },
+      { key: 'tolerance', kind: 'number', label: 'Mid-plane weld tolerance (mm)', min: 0.0001, step: 0.0001 },
     ],
   },
 
@@ -4326,7 +4578,16 @@ const FEATURE_CATEGORIES = [
     // Coverage sweep additions
     'sheet_metal_flat_pattern', 'sheet_metal_unfold',
   ] },
-  { id: 'subd',      label: 'SubD / Mesh',  ops: ['subd_poke', 'subd_extrude_along', 'sculpt_brush', 'multires_evaluate', 'subd_deform_with_cage', 'sdf_csg', 'retopo_snap'] },
+  { id: 'subd',      label: 'SubD / Mesh',  ops: [
+    'subd_poke', 'subd_extrude_along', 'sculpt_brush', 'multires_evaluate', 'subd_deform_with_cage',
+    'subd_inset_faces', 'subd_bridge_loops', 'subd_loop_subdivision',
+    'subd_compute_stam_limit_tangents', 'subd_convert_to_g1_patches', 'subd_apply_crease_decay',
+    'subd_collapse_edge', 'subd_sample_limit_normals', 'subd_compute_cage_area',
+    'subd_evaluate_limit_normal', 'subd_extract_feature_curves', 'subd_export_usdc',
+    'subd_geodesic_distance', 'subd_csg_union', 'subd_csg_difference', 'subd_csg_intersection',
+    'subd_project_primitive', 'subd_symmetrize',
+    'sdf_csg', 'retopo_snap',
+  ] },
   { id: 'weldment',  label: 'Weldment',     ops: ['gusset_plate', 'cope_notch'] },
   { id: 'bim',       label: 'BIM',          ops: ['bim_make_grid', 'bim_make_framing', 'bim_make_wall', 'bim_make_slab'] },
   { id: 'cam', label: 'CAM / Manufacturing', ops: [

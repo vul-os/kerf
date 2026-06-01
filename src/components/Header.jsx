@@ -10,11 +10,13 @@ import { useAuth } from '../store/auth.js'
 // straight into the app.
 const MARKETING_LINKS = [
   { label: 'Domains', to: '/domains' },
+  { label: 'Tools', to: '/tools' },
   { label: 'Compare', to: '/compare' },
   { label: 'Roadmap', to: '/roadmap' },
   { label: 'Docs', to: '/docs' },
 ]
 const APP_LINKS = [
+  { label: 'Tools', to: '/tools' },
   { label: 'Docs', to: '/docs' },
   { label: 'Workshop', to: '/workshop' },
   { label: 'Library', to: '/library' },

@@ -32,9 +32,12 @@ from kerf_cad_core.arch.wind_load_asce7 import WindSiteSpec, BuildingSpec
 from kerf_cad_core.arch.wind_component_cladding import (
     ComponentSpec,
     WindCCPressureReport,
+    ParapetPressureReport,
     compute_wind_cc_pressure,
+    compute_parapet_pressure,
     _interpolate_gcp,
     _GCP_ANCHORS,
+    _steep_roof_gcp_anchors,
 )
 
 
@@ -404,3 +407,268 @@ class TestInterpolateGcp:
         mid_area = math.sqrt(10.0 * 500.0)  # geometric mean ≈ 70.71
         result = _interpolate_gcp(1.0, 0.8, mid_area, 500.0)
         assert abs(result - 0.9) < 0.001  # exactly halfway in log space → 0.9
+
+
+# ---------------------------------------------------------------------------
+# 13. Parapet pressures — ASCE 7-22 §30.9
+# ---------------------------------------------------------------------------
+
+class TestParapetPressures:
+    """
+    compute_parapet_pressure() tests.
+
+    Reference:
+      §30.9 GCp,parap: windward = +1.5, leeward = -1.0 (area-independent).
+      p_design = qh · GCp,parap   (no GCpi addition).
+    """
+
+    def test_windward_GCp_parap_is_positive_1_5(self):
+        """Windward parapet: GCp,parap must equal exactly +1.5 per §30.9."""
+        r = compute_parapet_pressure(_site(), _bldg(), "windward")
+        assert isinstance(r, ParapetPressureReport)
+        assert abs(r.GCp_parap - 1.5) < 1e-9
+
+    def test_leeward_GCp_parap_is_negative_1_0(self):
+        """Leeward parapet: GCp,parap must equal exactly −1.0 per §30.9."""
+        r = compute_parapet_pressure(_site(), _bldg(), "leeward")
+        assert abs(r.GCp_parap - (-1.0)) < 1e-9
+
+    def test_windward_pressure_positive(self):
+        """Windward parapet design pressure must be positive (net inward)."""
+        r = compute_parapet_pressure(_site(), _bldg(), "windward")
+        assert r.p_design_psf > 0.0
+
+    def test_leeward_pressure_negative(self):
+        """Leeward parapet design pressure must be negative (net suction)."""
+        r = compute_parapet_pressure(_site(), _bldg(), "leeward")
+        assert r.p_design_psf < 0.0
+
+    def test_windward_pressure_is_qh_times_1_5(self):
+        """p_design = qh · 1.5 for windward (no GCpi per §30.9)."""
+        r = compute_parapet_pressure(_site(), _bldg(), "windward")
+        assert abs(r.p_design_psf - r.qh_psf * 1.5) < 0.01
+
+    def test_leeward_pressure_is_qh_times_neg_1_0(self):
+        """p_design = qh · (-1.0) for leeward."""
+        r = compute_parapet_pressure(_site(), _bldg(), "leeward")
+        assert abs(r.p_design_psf - r.qh_psf * (-1.0)) < 0.01
+
+    def test_windward_magnitude_greater_than_leeward(self):
+        """Windward |p| > leeward |p| because GCp,parap 1.5 > 1.0."""
+        rw = compute_parapet_pressure(_site(), _bldg(), "windward")
+        rl = compute_parapet_pressure(_site(), _bldg(), "leeward")
+        assert abs(rw.p_design_psf) > abs(rl.p_design_psf)
+
+    def test_parapet_position_stored_lowercase(self):
+        r = compute_parapet_pressure(_site(), _bldg(), "Windward")
+        assert r.parapet_position == "windward"
+
+    def test_parapet_code_section_contains_30_9(self):
+        r = compute_parapet_pressure(_site(), _bldg(), "leeward")
+        combined = " ".join(r.code_section)
+        assert "30.9" in combined
+
+    def test_parapet_LRFD_label(self):
+        r = compute_parapet_pressure(_site(), _bldg(), "windward")
+        assert r.ASD_or_LRFD == "LRFD"
+
+    def test_invalid_parapet_position_raises(self):
+        with pytest.raises(ValueError, match="parapet_position"):
+            compute_parapet_pressure(_site(), _bldg(), "side")
+
+    def test_parapet_higher_V_higher_pressure(self):
+        """Parapet pressure scales with V² via qh."""
+        r_lo = compute_parapet_pressure(_site(V=90.0), _bldg(), "windward")
+        r_hi = compute_parapet_pressure(_site(V=150.0), _bldg(), "windward")
+        assert r_hi.p_design_psf > r_lo.p_design_psf
+
+    def test_parapet_no_GCpi_added(self):
+        """
+        Parapet §30.9: p = qh·GCp,parap only; GCpi (0.18) is NOT added.
+        Verify by checking p != qh·(GCp_parap + 0.18).
+        """
+        r = compute_parapet_pressure(_site(), _bldg(), "windward")
+        # If GCpi were incorrectly added, p would be qh*(1.5+0.18)=qh*1.68
+        p_with_gcpi = r.qh_psf * (1.5 + 0.18)
+        assert abs(r.p_design_psf - p_with_gcpi) > 0.1  # NOT equal
+
+
+# ---------------------------------------------------------------------------
+# 14. Steep-roof GCp — ASCE 7-22 Fig 30.3-2D (7° < θ ≤ 45°)
+# ---------------------------------------------------------------------------
+
+class TestSteepRoofGCp:
+    """
+    Tests for Fig 30.3-2D steep-roof GCp table (θ in [7°, 45°]).
+
+    Reference anchors used:
+      Zone 1: GCp_neg@10=−1.0, @100=−0.9  (constant across θ)
+      Zone 2: GCp_neg@10 interpolates −2.3 (θ=7°) → −1.2 (θ=45°)
+      Zone 3: GCp_neg@10 interpolates −3.0 (θ=7°) → −2.0 (θ=45°)
+    """
+
+    def _roof_spec(self, zone, area=10.0, slope=20.0):
+        return ComponentSpec(area_ft2=area, zone=zone, component_type="roof",
+                             roof_slope_deg=slope)
+
+    # ---- Zone 1 ----
+
+    def test_zone1_neg_at_10ft2_is_neg_1_0(self):
+        """Zone 1 at A=10 ft² must give GCp_neg = −1.0 (constant anchor)."""
+        r = compute_wind_cc_pressure(_site(), _bldg(), self._roof_spec("Zone_1_roof_interior"))
+        assert abs(r.GCp_negative - (-1.0)) < 1e-6
+
+    def test_zone1_neg_at_100ft2_is_neg_0_9(self):
+        """Zone 1 at A=100 ft² must give GCp_neg = −0.9."""
+        r = compute_wind_cc_pressure(_site(), _bldg(),
+                                     self._roof_spec("Zone_1_roof_interior", area=100.0))
+        assert abs(r.GCp_negative - (-0.9)) < 1e-6
+
+    # ---- Zone 2: θ=7° boundary (near-flat, highest suction) ----
+
+    def test_zone2_theta_7_neg_at_10ft2(self):
+        """At boundary θ=7°, Zone 2 GCp_neg@10ft² = −2.3 per Fig 30.3-2D."""
+        r = compute_wind_cc_pressure(_site(), _bldg(),
+                                     self._roof_spec("Zone_2_roof_edge", slope=7.0))
+        assert abs(r.GCp_negative - (-2.3)) < 1e-6
+
+    def test_zone2_theta_45_neg_at_10ft2(self):
+        """At θ=45°, Zone 2 GCp_neg@10ft² = −1.2 per Fig 30.3-2D."""
+        r = compute_wind_cc_pressure(_site(), _bldg(),
+                                     self._roof_spec("Zone_2_roof_edge", slope=45.0))
+        assert abs(r.GCp_negative - (-1.2)) < 1e-6
+
+    def test_zone2_theta_20_neg_interpolated(self):
+        """
+        At θ=20°, Zone 2 GCp_neg@10ft² should interpolate linearly between
+        −2.3 (7°) and −1.2 (45°).
+        t = (20-7)/(45-7) = 13/38 ≈ 0.3421
+        GCp_neg = −2.3 + 0.3421*(−1.2 − (−2.3)) = −2.3 + 0.3421*1.1 ≈ −1.924
+        """
+        r = compute_wind_cc_pressure(_site(), _bldg(),
+                                     self._roof_spec("Zone_2_roof_edge", slope=20.0))
+        t = (20.0 - 7.0) / (45.0 - 7.0)
+        expected = -2.3 + t * (-1.2 - (-2.3))
+        assert abs(r.GCp_negative - expected) < 0.01
+
+    # ---- Zone 3: highest suction corner ----
+
+    def test_zone3_theta_7_neg_at_10ft2(self):
+        """At θ=7°, Zone 3 GCp_neg@10ft² = −3.0 — highest suction anchor."""
+        r = compute_wind_cc_pressure(_site(), _bldg(),
+                                     self._roof_spec("Zone_3_roof_corner", slope=7.0))
+        assert abs(r.GCp_negative - (-3.0)) < 1e-6
+
+    def test_zone3_theta_45_neg_at_10ft2(self):
+        """At θ=45°, Zone 3 GCp_neg@10ft² = −2.0."""
+        r = compute_wind_cc_pressure(_site(), _bldg(),
+                                     self._roof_spec("Zone_3_roof_corner", slope=45.0))
+        assert abs(r.GCp_negative - (-2.0)) < 1e-6
+
+    def test_zone3_highest_suction_vs_zone2(self):
+        """Zone 3 must always produce more suction (lower GCp_neg) than Zone 2."""
+        for slope in (7.0, 20.0, 45.0):
+            r2 = compute_wind_cc_pressure(_site(), _bldg(),
+                                          self._roof_spec("Zone_2_roof_edge", slope=slope))
+            r3 = compute_wind_cc_pressure(_site(), _bldg(),
+                                          self._roof_spec("Zone_3_roof_corner", slope=slope))
+            assert r3.GCp_negative < r2.GCp_negative, (
+                f"Zone 3 should have lower GCp_neg than Zone 2 at θ={slope}°"
+            )
+
+    def test_steep_roof_uses_fig_30_3_2D_in_caveat(self):
+        """Caveat must reference Fig 30.3-2D when slope >= 7°."""
+        r = compute_wind_cc_pressure(_site(), _bldg(),
+                                     self._roof_spec("Zone_2_roof_edge", slope=15.0))
+        assert "30.3-2D" in r.honest_caveat or "Fig 30.3-2D" in " ".join(r.code_section)
+
+    # ---- Boundary: exactly θ=7° routes to steep-roof table ----
+
+    def test_slope_exactly_7_routes_to_steep_table(self):
+        """
+        At roof_slope_deg=7.0, the steep-roof branch is taken.
+        Zone 1 at θ=7°: GCp_neg@10ft² = −1.0 (same as low-slope anchor,
+        but the code path is via _steep_roof_gcp_anchors, not _GCP_ANCHORS).
+        Verify using code_section reference.
+        """
+        r = compute_wind_cc_pressure(
+            _site(), _bldg(),
+            ComponentSpec(area_ft2=10.0, zone="Zone_1_roof_interior",
+                          component_type="roof", roof_slope_deg=7.0)
+        )
+        # Steep table zone 1 neg@10 = −1.0 (same value as flat-roof anchor)
+        assert abs(r.GCp_negative - (-1.0)) < 1e-6
+        # Code section must mention 30.3-2D
+        assert any("30.3-2D" in s for s in r.code_section)
+
+    def test_slope_below_7_uses_flat_roof_table(self):
+        """
+        At roof_slope_deg=6.0 (< 7°), the standard low-slope table is used.
+        Zone 2 flat anchor: GCp_neg@10ft² = −1.8 per Fig 30.3-2C.
+        """
+        r = compute_wind_cc_pressure(
+            _site(), _bldg(),
+            ComponentSpec(area_ft2=10.0, zone="Zone_2_roof_edge",
+                          component_type="roof", roof_slope_deg=6.0)
+        )
+        assert abs(r.GCp_negative - (-1.8)) < 1e-6
+        assert any("30.3-2C" in s for s in r.code_section)
+
+    # ---- Steep-roof positive GCp ----
+
+    def test_steep_roof_positive_GCp_at_10ft2(self):
+        """Positive GCp at 10ft² for steep roof: +0.5 (Fig 30.3-2D note 3)."""
+        r = compute_wind_cc_pressure(_site(), _bldg(),
+                                     self._roof_spec("Zone_1_roof_interior", slope=30.0))
+        assert abs(r.GCp_positive - 0.5) < 1e-6
+
+    def test_steep_roof_positive_GCp_at_100ft2(self):
+        """Positive GCp at 100ft² for steep roof: +0.4."""
+        r = compute_wind_cc_pressure(_site(), _bldg(),
+                                     self._roof_spec("Zone_1_roof_interior", area=100.0, slope=30.0))
+        assert abs(r.GCp_positive - 0.4) < 1e-6
+
+    # ---- _steep_roof_gcp_anchors unit tests ----
+
+    def test_steep_anchors_zone1_constant_across_slopes(self):
+        """Zone 1 negative anchors are constant (−1.0/−0.9) regardless of slope."""
+        for slope in (7.0, 20.0, 45.0):
+            pos10, pos100, neg10, neg100, amax = _steep_roof_gcp_anchors(
+                "Zone_1_roof_interior", slope
+            )
+            assert abs(neg10 - (-1.0)) < 1e-9
+            assert abs(neg100 - (-0.9)) < 1e-9
+            assert amax == 100.0
+
+    def test_steep_anchors_slope_clamped_above_45(self):
+        """Slope above 45° is clamped to 45° anchors."""
+        _50, _, neg10_50, _, _ = _steep_roof_gcp_anchors("Zone_2_roof_edge", 50.0)
+        _45, _, neg10_45, _, _ = _steep_roof_gcp_anchors("Zone_2_roof_edge", 45.0)
+        assert abs(neg10_50 - neg10_45) < 1e-9
+
+    def test_steep_anchors_slope_clamped_below_7(self):
+        """Slope below 7° is clamped to 7° anchors."""
+        _, _, neg10_0, _, _ = _steep_roof_gcp_anchors("Zone_3_roof_corner", 0.0)
+        _, _, neg10_7, _, _ = _steep_roof_gcp_anchors("Zone_3_roof_corner", 7.0)
+        assert abs(neg10_0 - neg10_7) < 1e-9
+
+
+# ---------------------------------------------------------------------------
+# 15. compute_parapet_pressure + compute_wind_cc_pressure re-exported via arch
+# ---------------------------------------------------------------------------
+
+class TestArchInitParapetExports:
+
+    def test_parapet_importable_via_arch(self):
+        from kerf_cad_core.arch import (
+            ParapetPressureReport as PPR,
+            compute_parapet_pressure as cpp,
+        )
+        from kerf_cad_core.arch.wind_load_asce7 import WindSiteSpec, BuildingSpec
+        r = cpp(
+            WindSiteSpec(V_basic_mph=115.0, exposure_category="C"),
+            BuildingSpec(mean_height_h_ft=30.0, length_ft=50.0, width_ft=40.0),
+            "windward",
+        )
+        assert isinstance(r, PPR)
+        assert r.GCp_parap == 1.5

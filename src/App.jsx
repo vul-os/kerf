@@ -58,6 +58,7 @@ const CompareByDomain = lazy(() => import('./routes/compare/CompareByDomain.jsx'
 const CompositesPage = lazy(() => import('./routes/domains/Composites.jsx'))
 const DentalPage = lazy(() => import('./routes/domains/Dental.jsx'))
 const OpticsPage = lazy(() => import('./routes/domains/Optics.jsx'))
+const OpticsDesignPanel = lazy(() => import('./components/optics/OpticsDesignPanel.jsx'))
 const HorologyPage = lazy(() => import('./routes/domains/Horology.jsx'))
 const PipingPage = lazy(() => import('./routes/domains/Piping.jsx'))
 const PackagingPage = lazy(() => import('./routes/domains/Packaging.jsx'))
@@ -212,6 +213,7 @@ export default function App() {
       <Route path="/domains/composites" element={<CompositesPage />} />
       <Route path="/domains/dental" element={<DentalPage />} />
       <Route path="/domains/optics" element={<OpticsPage />} />
+      <Route path="/optics" element={<OpticsDesignPanel />} />
       <Route path="/domains/horology" element={<HorologyPage />} />
       <Route path="/domains/piping" element={<PipingPage />} />
       <Route path="/domains/packaging" element={<PackagingPage />} />

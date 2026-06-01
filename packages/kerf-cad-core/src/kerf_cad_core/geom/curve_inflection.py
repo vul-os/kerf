@@ -49,8 +49,9 @@ Honest caveats
   `num_inflections = 0` and `honest_caveat` states the reason.
 * Sample density controls detection reliability: undersampled curves may miss
   inflections that occur within a single sample interval.
-* Sampling-based — does NOT solve κ=0 analytically.  Algebraic root-finding
-  (Sturm sequences on B-spline coefficients) is not implemented.
+* Sampling-based — does NOT solve κ=0 analytically.  For analytic root-finding
+  via Sturm sequences on the polynomial numerator of κ_signed, see
+  :func:`find_curve_inflections_sturm`.
 
 Applications
 ------------
@@ -694,6 +695,664 @@ def find_curve_inflections(
         is_fair_class_a=is_fair,
         warnings=warnings_out,
         honest_caveat=_HONEST_CAVEAT_V2,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Sturm-sequence analytic inflection finder (v3)
+# ---------------------------------------------------------------------------
+#
+# Theory (Marden §1.4; Uspensky "Theory of Equations" §5)
+# --------------------------------------------------------
+# For a 2D non-rational B-spline of degree d on knot span [u_lo, u_hi]:
+#   C(t) = (x(t), y(t))  is a degree-d polynomial in t.
+#   x'(t), y'(t) have degree d-1;  x''(t), y''(t) have degree d-2.
+#   p(t) := x'(t)·y''(t) - y'(t)·x''(t)  has degree 2d-3.
+#
+# Sturm's theorem gives the exact count of distinct real roots of p in (a, b]:
+#   V(t) = number of sign changes in the Sturm sequence (p_0, p_1, …, p_k)
+#          evaluated at t (zeros excluded from the sign-change count).
+#   count of distinct roots in (a, b] = V(a) - V(b).
+#
+# Polynomial conventions
+# ----------------------
+# A polynomial p(t) is represented as a 1-D numpy array of coefficients
+# *in ascending order*: p[0] + p[1]*t + p[2]*t^2 + ... + p[n]*t^n.
+# (This is the convention of numpy.polynomial.polynomial, NOT numpy.polyval.)
+#
+# Bernstein-to-power basis conversion
+# ------------------------------------
+# For a degree-d Bezier segment with Bernstein control points B[0..d]:
+#   x(t) = Σ_{i=0}^{d}  B[i]  * C(d,i) * t^i * (1-t)^(d-i)   for t in [0,1]
+# We first map [u_lo, u_hi] → [0, 1] and convert to monomial (power) basis
+# using the change-of-basis matrix M[i,j] = (-1)^(j-i) * C(d-i, j-i) * C(d, i)
+# (Farin §5.1; Farouki-Rajan 1987).
+#
+# Refs: Marden (1966) "Geometry of Polynomials" §1.4;
+#       Uspensky (1948) "Theory of Equations" §5 (Sturm chains);
+#       Farin (2002) §5.1 (Bernstein → monomial);
+#       Farouki & Rajan (1987) CAGD 4(4) pp. 229-254.
+
+
+def _poly_mul(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """Multiply two polynomials in ascending-coefficient form."""
+    if len(a) == 0 or len(b) == 0:
+        return np.zeros(1)
+    return np.polymul(a[::-1], b[::-1])[::-1]
+
+
+def _poly_sub(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """Subtract polynomial b from a, ascending-coefficient form."""
+    la, lb = len(a), len(b)
+    n = max(la, lb)
+    out = np.zeros(n)
+    out[:la] += a
+    out[:lb] -= b
+    return out
+
+
+def _poly_deriv(p: np.ndarray) -> np.ndarray:
+    """Differentiate polynomial in ascending-coefficient form.
+
+    Returns zero polynomial (array([0.])) for degree-0 (constant) input.
+    """
+    if len(p) <= 1:
+        return np.array([0.0])
+    return np.array([p[i] * i for i in range(1, len(p))], dtype=float)
+
+
+def _poly_trim(p: np.ndarray, atol: float = 1e-14) -> np.ndarray:
+    """Remove trailing near-zero coefficients (leading terms in ascending order)."""
+    arr = np.asarray(p, dtype=float)
+    while len(arr) > 1 and abs(arr[-1]) <= atol:
+        arr = arr[:-1]
+    return arr
+
+
+def _poly_divrem(a: np.ndarray, b: np.ndarray) -> tuple:
+    """Polynomial division a / b.  Returns (quotient, remainder) in ascending form."""
+    a = _poly_trim(np.asarray(a, dtype=float))
+    b = _poly_trim(np.asarray(b, dtype=float))
+    if len(b) == 0 or (len(b) == 1 and abs(b[0]) < 1e-15):
+        raise ZeroDivisionError("Divisor polynomial is zero")
+    # Use numpy's polynomial in descending form then reverse back.
+    q_desc, r_desc = np.polydiv(a[::-1], b[::-1])
+    q = _poly_trim(q_desc[::-1])
+    r = _poly_trim(r_desc[::-1])
+    return q, r
+
+
+def _poly_eval(p: np.ndarray, t: float) -> float:
+    """Evaluate polynomial in ascending-coefficient form at scalar t."""
+    # Horner's method (ascending → reverse for polyval direction)
+    return float(np.polyval(p[::-1], t))
+
+
+def _poly_degree(p: np.ndarray) -> int:
+    """Degree of trimmed polynomial."""
+    arr = _poly_trim(p)
+    return max(0, len(arr) - 1)
+
+
+def _sturm_sequence(p: np.ndarray) -> list:
+    """Build the Sturm sequence for polynomial p.
+
+    Returns [p_0, p_1, p_2, ...] where:
+      p_0 = p  (trimmed)
+      p_1 = p' (formal derivative)
+      p_{k+1} = -rem(p_{k-1}, p_k)
+
+    Terminates when the remainder is the zero polynomial.
+    All polynomials are in ascending-coefficient form.
+    Coefficients are normalized by the leading coefficient of p_1 to avoid
+    exponential growth (sign is all that matters for Sturm counting).
+    """
+    p0 = _poly_trim(p)
+    p1 = _poly_trim(_poly_deriv(p0))
+
+    if _poly_degree(p1) == 0 and abs(_poly_eval(p1, 0.0)) < 1e-15:
+        # p is a constant — no roots.
+        return [p0]
+
+    seq = [p0, p1]
+    max_steps = _poly_degree(p0) + 2
+    for _ in range(max_steps):
+        prev = seq[-2]
+        cur = seq[-1]
+        if _poly_degree(cur) == 0:
+            break
+        try:
+            _, r = _poly_divrem(prev, cur)
+        except ZeroDivisionError:
+            break
+        neg_r = _poly_trim(-r)
+        if _poly_degree(neg_r) == 0 and abs(_poly_eval(neg_r, 0.0)) < 1e-15:
+            break
+        seq.append(neg_r)
+
+    return seq
+
+
+def _sturm_sign_changes(seq: list, t: float) -> int:
+    """Count sign changes in the Sturm sequence evaluated at t.
+
+    Zeros are excluded from the sign-change count (standard Sturm convention).
+    """
+    signs = []
+    for p in seq:
+        v = _poly_eval(p, t)
+        if v > 0.0:
+            signs.append(1)
+        elif v < 0.0:
+            signs.append(-1)
+        # v == 0 → skip (standard convention)
+
+    count = 0
+    for i in range(len(signs) - 1):
+        if signs[i] * signs[i + 1] < 0:
+            count += 1
+    return count
+
+
+def _bernstein_to_monomial(ctrl: np.ndarray) -> np.ndarray:
+    """Convert Bernstein control points to monomial (power) basis.
+
+    Parameters
+    ----------
+    ctrl : 1-D array of length d+1
+        Bernstein control-point values for one coordinate (x or y) on [0,1].
+
+    Returns
+    -------
+    p : 1-D array of length d+1
+        Monomial coefficients in ascending order: p[0] + p[1]*t + ... + p[d]*t^d.
+
+    Algorithm: B(t) = Σ_i ctrl[i] * C(d,i) * t^i * (1-t)^(d-i).
+    Expand (1-t)^(d-i) via binomial theorem → collect powers of t.
+    Change-of-basis: M[j, i] = C(d,i) * C(d-i, j-i) * (-1)^(j-i)  for j>=i,
+    else 0.  Coefficient of t^j is Σ_i M[j,i] * ctrl[i].
+    (Farin 2002 §5.1; Farouki-Rajan 1987.)
+    """
+    ctrl = np.asarray(ctrl, dtype=float)
+    d = len(ctrl) - 1
+    from math import comb
+    mono = np.zeros(d + 1)
+    for j in range(d + 1):
+        s = 0.0
+        for i in range(j + 1):
+            s += comb(d, i) * comb(d - i, j - i) * ((-1) ** (j - i)) * ctrl[i]
+        mono[j] = s
+    return mono
+
+
+def _bezier_span_poly(bezier_cps: np.ndarray, coord_idx: int) -> np.ndarray:
+    """Extract monomial polynomial for one coordinate from Bezier CPs on [0,1].
+
+    Parameters
+    ----------
+    bezier_cps : array of shape (d+1, dim)
+        Bernstein control points for a single Bezier segment.
+    coord_idx : int
+        0 for x, 1 for y.
+
+    Returns
+    -------
+    Monomial coefficients in ascending order for the segment's coordinate.
+    """
+    ctrl = bezier_cps[:, coord_idx]
+    return _bernstein_to_monomial(ctrl)
+
+
+def _count_roots_sturm(
+    p: np.ndarray,
+    a: float,
+    b: float,
+    seq: list,
+) -> int:
+    """Count distinct real roots of p in the open interval (a, b).
+
+    Uses the pre-computed Sturm sequence `seq`.
+    """
+    va = _sturm_sign_changes(seq, a)
+    vb = _sturm_sign_changes(seq, b)
+    return max(0, va - vb)
+
+
+def _bisect_poly_root(
+    p: np.ndarray,
+    a: float,
+    b: float,
+    tol: float,
+) -> float:
+    """Bisect to find one root of p in [a, b] (assumes sign change exists).
+
+    Runs until interval width < tol or max 64 iterations.
+    """
+    fa = _poly_eval(p, a)
+    fb = _poly_eval(p, b)
+
+    # If no sign change, return midpoint (numerical precision edge case)
+    if fa * fb > 0.0:
+        return 0.5 * (a + b)
+
+    for _ in range(64):
+        if b - a < tol:
+            break
+        mid = 0.5 * (a + b)
+        fm = _poly_eval(p, mid)
+        if fa * fm <= 0.0:
+            b = mid
+            fb = fm
+        else:
+            a = mid
+            fa = fm
+    return 0.5 * (a + b)
+
+
+def _isolate_roots_in_span(
+    p: np.ndarray,
+    seq: list,
+    a: float,
+    b: float,
+    tol: float,
+    depth: int = 0,
+    max_depth: int = 52,
+) -> list:
+    """Recursively isolate all roots of p in (a, b) using Sturm count.
+
+    Returns list of root values (float) in ascending order, each refined to
+    within tol via bisection.
+    """
+    n_roots = _count_roots_sturm(p, a, b, seq)
+    if n_roots == 0:
+        return []
+    if b - a < tol or depth >= max_depth:
+        # One root in this tiny interval — bisect to refine.
+        return [_bisect_poly_root(p, a, b, tol)]
+    if n_roots == 1:
+        return [_bisect_poly_root(p, a, b, tol)]
+
+    # Multiple roots: subdivide and recurse.
+    mid = 0.5 * (a + b)
+    left_roots = _isolate_roots_in_span(p, seq, a, mid, tol, depth + 1, max_depth)
+    right_roots = _isolate_roots_in_span(p, seq, mid, b, tol, depth + 1, max_depth)
+    return left_roots + right_roots
+
+
+def _get_unique_knot_spans(curve: NurbsCurve) -> list:
+    """Return list of (u_lo, u_hi) for each distinct non-zero knot span."""
+    knots = np.asarray(curve.knots, dtype=float)
+    t_min = float(knots[curve.degree])
+    t_max = float(knots[-(curve.degree + 1)])
+    seen = []
+    prev = None
+    for u in knots:
+        u = float(u)
+        if u < t_min - 1e-14 or u > t_max + 1e-14:
+            continue
+        if prev is not None and u - prev > 1e-14:
+            seen.append((prev, u))
+        prev = u
+    # Ensure full domain is covered even for single-span curves
+    if not seen and t_max - t_min > 1e-14:
+        seen.append((t_min, t_max))
+    return seen
+
+
+_HONEST_CAVEAT_STURM: str = (
+    "HONEST: Analytic Sturm-sequence method (method='sturm-analytic').  "
+    "2D non-rational curves only — rational NURBS (weights ≠ 1) are NOT "
+    "supported by this method (the numerator κ_signed is no longer a "
+    "polynomial in t for rational curves); use find_curve_inflections for "
+    "those.  Each Bezier segment's coordinate polynomials are converted from "
+    "Bernstein to monomial (power) basis (Farin §5.1; Farouki-Rajan 1987), "
+    "and inflection roots are determined by Sturm's theorem (Marden §1.4; "
+    "Uspensky §5) applied to p(t) = x'(t)·y''(t) − y'(t)·x''(t).  "
+    "Roots are isolated by recursive interval bisection to tol.  "
+    "Roots within tol of a knot boundary are attributed to the left span "
+    "(open-right intervals).  "
+    "is_fair_class_a = True iff ≤ 1 inflection AND no abrupt κ-jump (>5× mean).  "
+    "Refs: Marden (1966) §1.4; Uspensky (1948) §5; Farin (2002) §5.1; "
+    "Farouki-Rajan (1987) CAGD 4(4)."
+)
+
+
+def find_curve_inflections_sturm(
+    curve: NurbsCurve,
+    tol: float = 1e-9,
+) -> "CurveInflectionReport":
+    """Find inflection points of a 2D NURBS curve using Sturm sequences.
+
+    Computes the *analytic* roots of the signed-curvature numerator
+    p(t) = x'(t)·y''(t) − y'(t)·x''(t) on each Bezier span of the
+    B-spline, using Sturm's theorem for exact root counting followed by
+    recursive bisection for isolation.
+
+    This is a *v3* method (Sturm-analytic) complementary to:
+      - v1: find_curve_inflections_v1 — sampling + bisection (legacy)
+      - v2: find_curve_inflections   — sampling + bisection (current, Class-A)
+
+    Parameters
+    ----------
+    curve : NurbsCurve
+        2D non-rational NURBS curve.  Control points may be 2D or 3D with
+        z-components negligible.  *Rational NURBS (non-unit weights) are
+        not supported — a warning is added and the method falls back to
+        returning a report with an honest_caveat explaining the limitation.*
+    tol : float
+        Bisection tolerance for root isolation (default 1e-9).
+
+    Returns
+    -------
+    CurveInflectionReport
+        Same structure as v2 ``find_curve_inflections``.  The
+        ``honest_caveat`` field notes ``method='sturm-analytic'``.
+        Never raises — degenerate inputs return zero-inflection report.
+
+    Algorithm
+    ---------
+    1. Decompose the non-rational B-spline into Bezier segments (one per
+       knot span) by raising each internal knot to multiplicity d.
+    2. For each Bezier segment (Bernstein CPs on [u_lo, u_hi]):
+       a. Map local parameter s ∈ [0, 1] to global u ∈ [u_lo, u_hi].
+       b. Convert x(s), y(s) from Bernstein to monomial basis.
+       c. Differentiate to get x'(s), y'(s), x''(s), y''(s).
+       d. Form p(s) = x'(s)·y''(s) − y'(s)·x''(s) (degree 2d−3).
+       e. Build Sturm sequence {p_0=p, p_1=p', p_{k+1}=−rem(p_{k-1},p_k)}.
+       f. Count roots in (0, 1) via V(0) − V(1).
+       g. If n_roots > 0, isolate each root by recursive Sturm-bisection.
+    3. Map isolated roots from [0, 1] back to [u_lo, u_hi].
+    4. Evaluate InflectionPoint fields (xy_mm, curvature_left/right,
+       sign_change) using the NURBS evaluator.
+    5. Fairness check (Farin §10.6; Sapidis §3): fair iff ≤ 1 inflection
+       AND no abrupt κ-jump (|κ| > 5× mean at any inflection).
+
+    References
+    ----------
+    Marden, M. (1966) "Geometry of Polynomials" §1.4.
+    Uspensky, J.V. (1948) "Theory of Equations" §5.
+    Farin, G. (2002) "Curves and Surfaces for CAGD" §5.1.
+    Farouki, R.T. & Rajan, V.T. (1987) CAGD 4(4) 229-254.
+    Piegl, L. & Tiller, W. (1997) "The NURBS Book" §5.4.
+    """
+    warnings_out: list = []
+
+    # ------------------------------------------------------------------
+    # Guard: must be a NurbsCurve
+    # ------------------------------------------------------------------
+    if not isinstance(curve, NurbsCurve):
+        warnings_out.append(
+            f"Input is not a NurbsCurve (got {type(curve).__name__!r}); "
+            "returning empty report."
+        )
+        return CurveInflectionReport(
+            inflection_points=[],
+            num_inflections=0,
+            max_curvature=0.0,
+            min_curvature=0.0,
+            is_fair_class_a=True,
+            warnings=warnings_out,
+            honest_caveat=_HONEST_CAVEAT_STURM,
+        )
+
+    # ------------------------------------------------------------------
+    # Guard: rational NURBS not supported (polynomial assumption breaks)
+    # ------------------------------------------------------------------
+    if curve.is_rational:
+        warnings_out.append(
+            "find_curve_inflections_sturm: rational NURBS detected (non-unit "
+            "weights).  Sturm method requires a polynomial numerator; for rational "
+            "curves the numerator of κ_signed is rational, not polynomial.  "
+            "Returning zero-inflection report.  Use find_curve_inflections instead."
+        )
+        return CurveInflectionReport(
+            inflection_points=[],
+            num_inflections=0,
+            max_curvature=0.0,
+            min_curvature=0.0,
+            is_fair_class_a=True,
+            warnings=warnings_out,
+            honest_caveat=_HONEST_CAVEAT_STURM,
+        )
+
+    # ------------------------------------------------------------------
+    # Guard: degree < 3 means p(t) has degree 2d-3 < 0, so no inflections
+    # ------------------------------------------------------------------
+    d = curve.degree
+    if d < 3:
+        warnings_out.append(
+            f"Curve degree is {d} < 3; p(t) = x'·y'' − y'·x'' has degree "
+            f"2d−3 = {2*d-3} ≤ 0.  No inflections for degree < 3 B-splines "
+            "(plane curves of degree < 3 have monotone curvature sign per span)."
+        )
+        return CurveInflectionReport(
+            inflection_points=[],
+            num_inflections=0,
+            max_curvature=0.0,
+            min_curvature=0.0,
+            is_fair_class_a=True,
+            warnings=warnings_out,
+            honest_caveat=_HONEST_CAVEAT_STURM,
+        )
+
+    tol = float(tol)
+    t_min, t_max = _param_range(curve)
+
+    # ------------------------------------------------------------------
+    # Decompose into Bezier segments (one per distinct knot span)
+    # ------------------------------------------------------------------
+    # Build homogeneous control-point array (weights all 1 for non-rational)
+    cps = np.asarray(curve.control_points, dtype=float)
+    if cps.ndim == 1:
+        cps = cps.reshape(-1, 1)
+    # Ensure at least 2 columns (x, y)
+    if cps.shape[1] < 2:
+        warnings_out.append("Control points have fewer than 2 dimensions; cannot compute 2D inflections.")
+        return CurveInflectionReport(
+            inflection_points=[],
+            num_inflections=0,
+            max_curvature=0.0,
+            min_curvature=0.0,
+            is_fair_class_a=True,
+            warnings=warnings_out,
+            honest_caveat=_HONEST_CAVEAT_STURM,
+        )
+
+    # Use _decompose_to_bezier from nurbs.py
+    from kerf_cad_core.geom.nurbs import _decompose_to_bezier
+    try:
+        bezier_segs = _decompose_to_bezier(cps, curve.knots, d)
+    except Exception as exc:  # noqa: BLE001
+        warnings_out.append(f"Bezier decomposition failed: {exc}")
+        return CurveInflectionReport(
+            inflection_points=[],
+            num_inflections=0,
+            max_curvature=0.0,
+            min_curvature=0.0,
+            is_fair_class_a=True,
+            warnings=warnings_out,
+            honest_caveat=_HONEST_CAVEAT_STURM,
+        )
+
+    # ------------------------------------------------------------------
+    # For each Bezier segment, find roots of p(s) in (0, 1)
+    # ------------------------------------------------------------------
+    all_inflection_u: list = []
+
+    for seg_cps, u_lo, u_hi in bezier_segs:
+        span_len = u_hi - u_lo
+        if span_len < 1e-14:
+            continue
+
+        # seg_cps has shape (d+1, dim), representing the curve on [u_lo, u_hi].
+        # The Bezier decomposition uses the global parameterization, so we must
+        # interpret the Bernstein parameter s as mapping [0,1] -> [u_lo, u_hi].
+        # x'(u) = dx/du = (1/span_len) * dx/ds  (chain rule)
+        # so κ numerator w.r.t. global u is:
+        #   p_u(u) = x'_u(u)·y''_u(u) - y'_u(u)·x''_u(u)
+        # With s = (u - u_lo)/span_len:
+        #   x'_s = span_len * x'_u    →  x'_u = x'_s / span_len
+        #   x''_u = x''_s / span_len^2
+        # Therefore:
+        #   p_u = (x'_s/L)·(y''_s/L^2) - (y'_s/L)·(x''_s/L^2)
+        #       = (x'_s·y''_s - y'_s·x''_s) / L^3
+        # Since L^3 > 0, the sign of p_u equals the sign of p_s.
+        # Thus we can find roots of p_s(s) in s ∈ (0, 1) and they correspond
+        # to roots of p_u(u) in u ∈ (u_lo, u_hi).
+
+        seg_cps_f = np.asarray(seg_cps, dtype=float)
+        if seg_cps_f.shape[1] < 2:
+            continue
+
+        # Build monomial polynomials for x(s) and y(s) on [0,1]
+        x_poly = _bernstein_to_monomial(seg_cps_f[:, 0])
+        y_poly = _bernstein_to_monomial(seg_cps_f[:, 1])
+
+        # Derivatives w.r.t. s
+        xp = _poly_deriv(x_poly)   # x'(s), degree d-1
+        yp = _poly_deriv(y_poly)   # y'(s), degree d-1
+        xpp = _poly_deriv(xp)      # x''(s), degree d-2
+        ypp = _poly_deriv(yp)      # y''(s), degree d-2
+
+        # p(s) = x'(s)·y''(s) - y'(s)·x''(s), degree 2d-3
+        term1 = _poly_mul(xp, ypp)
+        term2 = _poly_mul(yp, xpp)
+        p_poly = _poly_trim(_poly_sub(term1, term2))
+
+        if _poly_degree(p_poly) == 0:
+            # Constant — either always zero (degenerate) or never zero
+            continue
+
+        # Build Sturm sequence for p_poly
+        try:
+            sturm_seq = _sturm_sequence(p_poly)
+        except Exception:  # noqa: BLE001
+            continue
+
+        # Collect roots in this span.
+        # Sturm counts roots in the OPEN interval (a, b) — roots exactly at
+        # s=0 or s=1 are NOT counted by V(a) − V(b).  We handle them
+        # explicitly below to avoid missing inflections at knot boundaries.
+        roots_s: list = []
+
+        # ---- Interior roots: s in (0, 1) ----
+        eps_guard = tol * 0.1
+        n_interior = _count_roots_sturm(p_poly, eps_guard, 1.0 - eps_guard, sturm_seq)
+        if n_interior > 0:
+            try:
+                interior_roots = _isolate_roots_in_span(
+                    p_poly, sturm_seq, eps_guard, 1.0 - eps_guard, tol
+                )
+                roots_s.extend(interior_roots)
+            except Exception:  # noqa: BLE001
+                pass
+
+        # ---- Endpoint s=0: check if p(0) ≈ 0 (only if not the first span,
+        #      to avoid attributing the domain start twice) ----
+        # We do NOT add s=0 roots here — the previous span's s=1 root covers it.
+
+        # ---- Endpoint s=1: check if p(1) ≈ 0 ----
+        # Add only when s=1 corresponds to an interior knot of the domain
+        # (i.e. u_hi < t_max), so the last span's endpoint is excluded.
+        p_at_1 = abs(_poly_eval(p_poly, 1.0))
+        if p_at_1 < tol and u_hi < t_max - tol:
+            roots_s.append(1.0)
+
+        # Map roots from [0,1] back to [u_lo, u_hi]
+        for s_root in roots_s:
+            u_root = u_lo + s_root * span_len
+            if t_min - tol <= u_root <= t_max + tol:
+                all_inflection_u.append(float(u_root))
+
+    # Deduplicate roots that are within tol of each other (can appear at
+    # knot boundaries when adjacent spans both see the same endpoint root).
+    all_inflection_u.sort()
+    deduped: list = []
+    for u in all_inflection_u:
+        if not deduped or abs(u - deduped[-1]) > tol * 10:
+            deduped.append(u)
+    all_inflection_u = deduped
+
+    # ------------------------------------------------------------------
+    # Compute curvature statistics for fairness check (using sampled κ)
+    # ------------------------------------------------------------------
+    _N_STAT = 200
+    ts_stat = np.linspace(t_min, t_max, _N_STAT)
+    kappa_stat = np.array([_signed_kappa(curve, float(t)) for t in ts_stat])
+    kappa_abs = np.abs(kappa_stat)
+    max_kappa = float(np.max(kappa_abs))
+    min_kappa = float(np.min(kappa_abs))
+    mean_kappa = float(np.mean(kappa_abs))
+
+    # ------------------------------------------------------------------
+    # Build InflectionPoint objects
+    # ------------------------------------------------------------------
+    param_range_size = t_max - t_min
+    flank_eps = _KAPPA_FLANK_FRAC * param_range_size
+
+    inflection_points: list = []
+    for t_star in all_inflection_u:
+        try:
+            pos = np.asarray(curve.evaluate(float(t_star)), dtype=float).ravel()
+            xy: tuple = (float(pos[0]), float(pos[1] if pos.size > 1 else 0.0))
+        except Exception:  # noqa: BLE001
+            xy = (float("nan"), float("nan"))
+
+        t_left = max(t_min, t_star - flank_eps)
+        t_right = min(t_max, t_star + flank_eps)
+        k_left = _signed_kappa(curve, t_left)
+        k_right = _signed_kappa(curve, t_right)
+        sign_chg = (k_left * k_right < 0.0)
+
+        inflection_points.append(InflectionPoint(
+            parameter_u=t_star,
+            xy_mm=xy,
+            curvature_left=k_left,
+            curvature_right=k_right,
+            sign_change=sign_chg,
+        ))
+
+    # ------------------------------------------------------------------
+    # Fairness / Class-A check (Farin §10.6; Sapidis §3)
+    # ------------------------------------------------------------------
+    is_fair = True
+    if len(inflection_points) > 1:
+        is_fair = False
+        warnings_out.append(
+            f"Curve has {len(inflection_points)} inflection points — NOT Class-A fair "
+            "(Farin §10.6 requires ≤ 1 inflection for a fair curve). "
+            "[method=sturm-analytic]"
+        )
+
+    if mean_kappa > 0.0:
+        for ip in inflection_points:
+            left_ratio = abs(ip.curvature_left) / mean_kappa
+            right_ratio = abs(ip.curvature_right) / mean_kappa
+            if left_ratio > _ABRUPT_JUMP_FACTOR or right_ratio > _ABRUPT_JUMP_FACTOR:
+                is_fair = False
+                warnings_out.append(
+                    f"Abrupt curvature jump at t={ip.parameter_u:.4f}: "
+                    f"|κ_left|={abs(ip.curvature_left):.3e}, "
+                    f"|κ_right|={abs(ip.curvature_right):.3e}, "
+                    f"mean |κ|={mean_kappa:.3e} [method=sturm-analytic]"
+                )
+
+    for ip in inflection_points:
+        if not ip.sign_change:
+            warnings_out.append(
+                f"Sturm root at t={ip.parameter_u:.4f} has no confirmed sign change "
+                "(may be a double root or numerical artefact near endpoint). "
+                "[method=sturm-analytic]"
+            )
+
+    return CurveInflectionReport(
+        inflection_points=inflection_points,
+        num_inflections=len(inflection_points),
+        max_curvature=max_kappa,
+        min_curvature=min_kappa,
+        is_fair_class_a=is_fair,
+        warnings=warnings_out,
+        honest_caveat=_HONEST_CAVEAT_STURM,
     )
 
 

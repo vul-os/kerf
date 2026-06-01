@@ -695,3 +695,361 @@ class TestIntegration:
                            drill_d=2.0, cbore_d=4.0, cbore_depth=3.0, total_depth=11.0)
         results = recognize_holes_in_body(body)
         assert len(results) > 0, "Expected at least 1 hole recognised from counterbore"
+
+
+# ---------------------------------------------------------------------------
+# Tang-Pratt (1995) helical thread detection tests
+# Tests 16-24+: detect_thread_geometry() + end-to-end threaded recognition
+# ---------------------------------------------------------------------------
+
+import dataclasses
+
+
+@dataclasses.dataclass
+class _ThreadedCylinderSurface:
+    """Synthetic threaded cylinder surface for Tang-Pratt tests.
+
+    evaluate(u, v) returns a point on a cylinder of radius
+        r(v) = nominal_radius + amplitude * cos(2 * pi * v / pitch_mm)
+    where v is the axial parameter (mm from the cylinder base).
+    This models the radial profile of an ISO metric thread.
+    """
+
+    center: np.ndarray
+    axis: np.ndarray
+    nominal_radius: float
+    amplitude: float    # half thread height (H/2 in ISO 68-1 terms)
+    pitch_mm: float     # axial pitch (mm)
+    x_ref: np.ndarray
+
+    def __post_init__(self):
+        self.center = np.asarray(self.center, dtype=float)
+        self.axis = np.asarray(self.axis, dtype=float)
+        n = np.linalg.norm(self.axis)
+        self.axis = self.axis / n if n > 1e-14 else self.axis
+        self.x_ref = np.asarray(self.x_ref, dtype=float)
+        xn = np.linalg.norm(self.x_ref)
+        self.x_ref = self.x_ref / xn if xn > 1e-14 else self.x_ref
+        self._y = np.cross(self.axis, self.x_ref)
+        yn = np.linalg.norm(self._y)
+        self._y = self._y / yn if yn > 1e-14 else self._y
+        # Expose radius attribute for CylinderSurface-compatible duck typing.
+        self.radius = self.nominal_radius
+
+    def evaluate(self, u: float, v: float) -> np.ndarray:
+        r = self.nominal_radius + self.amplitude * math.cos(2.0 * math.pi * v / self.pitch_mm)
+        return (
+            self.center
+            + r * math.cos(u) * self.x_ref
+            + r * math.sin(u) * self._y
+            + v * self.axis
+        )
+
+
+def _make_threaded_cylinder_surface(
+    nominal_radius: float,
+    pitch_mm: float,
+    amplitude: float,
+    center=(0.0, 0.0, 0.0),
+    axis=(0.0, 0.0, 1.0),
+) -> "_ThreadedCylinderSurface":
+    """Build a synthetic threaded cylinder surface."""
+    ax = np.asarray(axis, dtype=float)
+    ax = ax / np.linalg.norm(ax)
+    ref = np.array([1.0, 0.0, 0.0])
+    if abs(np.dot(ref, ax)) > 0.9:
+        ref = np.array([0.0, 1.0, 0.0])
+    x_ref = np.cross(ax, ref)
+    x_ref = x_ref / np.linalg.norm(x_ref)
+    return _ThreadedCylinderSurface(
+        center=np.asarray(center, dtype=float),
+        axis=ax,
+        nominal_radius=nominal_radius,
+        amplitude=amplitude,
+        pitch_mm=pitch_mm,
+        x_ref=x_ref,
+    )
+
+
+def _make_smooth_cylinder_surface(
+    radius: float,
+    center=(0.0, 0.0, 0.0),
+    axis=(0.0, 0.0, 1.0),
+) -> "CylinderSurface":
+    """Build a smooth (non-threaded) CylinderSurface."""
+    ax = np.asarray(axis, dtype=float)
+    ax = ax / np.linalg.norm(ax)
+    return CylinderSurface(center=np.asarray(center, dtype=float), axis=ax, radius=radius)
+
+
+class TestDetectThreadGeometry:
+    """Unit tests for detect_thread_geometry() — the Tang-Pratt 1995 pass."""
+
+    def _import_dt(self):
+        from kerf_cad_core.geom.hole_recognition import detect_thread_geometry
+        return detect_thread_geometry
+
+    # Test 16: smooth cylinder returns None (not threaded)
+    def test_smooth_cylinder_returns_none(self):
+        """A plain CylinderSurface with constant radius must NOT be detected as threaded."""
+        detect_thread_geometry = self._import_dt()
+        surf = _make_smooth_cylinder_surface(radius=3.0)
+        result = detect_thread_geometry(surf, hole_depth=20.0)
+        assert result is None, (
+            f"Smooth cylinder should return None; got {result}"
+        )
+
+    # Test 17: synthetic 1mm-pitch thread — pitch detected within 5%
+    def test_synthetic_1mm_pitch_detected(self):
+        """Threaded surface with 1mm pitch -> pitch returned within 5% tolerance."""
+        detect_thread_geometry = self._import_dt()
+        pitch = 1.0
+        depth = 20.0   # 20 full turns
+        surf = _make_threaded_cylinder_surface(
+            nominal_radius=3.0, pitch_mm=pitch, amplitude=0.05
+        )
+        result = detect_thread_geometry(surf, hole_depth=depth)
+        assert result is not None, "1mm-pitch threaded surface not detected"
+        assert abs(result.pitch_mm - pitch) / pitch < 0.05, (
+            f"Pitch {result.pitch_mm:.4f} mm not within 5% of {pitch} mm"
+        )
+
+    # Test 18: M6x1.0 — 6mm OD, 1mm pitch
+    def test_m6_thread_pitch_and_diameter(self):
+        """M6x1.0: nominal_radius=3mm, pitch=1mm -> correct pitch and diameter."""
+        detect_thread_geometry = self._import_dt()
+        # ISO 68-1 M6: major diameter 6mm, pitch 1.0mm, H = pitch * sqrt(3)/2 ≈ 0.866mm
+        # Effective thread depth amplitude (root-to-crest/2) ~ H * 5/8 / 2 ≈ 0.27mm
+        pitch = 1.0
+        nominal_r = 3.0
+        amplitude = 0.13  # realistic thread height amplitude for M6
+        depth = 15.0      # 15mm engagement = 15 turns
+
+        surf = _make_threaded_cylinder_surface(
+            nominal_radius=nominal_r, pitch_mm=pitch, amplitude=amplitude
+        )
+        result = detect_thread_geometry(surf, hole_depth=depth)
+        assert result is not None, "M6x1.0 thread not detected"
+        # Pitch within 5%
+        assert abs(result.pitch_mm - pitch) / pitch < 0.05, (
+            f"M6 pitch {result.pitch_mm:.4f} not within 5% of {pitch}"
+        )
+        # Nominal diameter within 2% (mean radius should be ~3mm -> ~6mm dia)
+        assert abs(result.nominal_diameter_mm - 2 * nominal_r) / (2 * nominal_r) < 0.02, (
+            f"M6 nominal_diameter {result.nominal_diameter_mm:.4f} not near {2*nominal_r}"
+        )
+
+    # Test 19: M10x1.5 — 10mm OD, 1.5mm pitch
+    def test_m10x1p5_pitch(self):
+        """M10x1.5: nominal_radius=5mm, pitch=1.5mm -> pitch detected within 5%."""
+        detect_thread_geometry = self._import_dt()
+        pitch = 1.5
+        depth = 18.0  # 12 full turns
+        surf = _make_threaded_cylinder_surface(
+            nominal_radius=5.0, pitch_mm=pitch, amplitude=0.15
+        )
+        result = detect_thread_geometry(surf, hole_depth=depth)
+        assert result is not None, "M10x1.5 thread not detected"
+        assert abs(result.pitch_mm - pitch) / pitch < 0.05, (
+            f"M10x1.5 pitch {result.pitch_mm:.4f} not within 5% of {pitch}"
+        )
+
+    # Test 20: thread_count_estimate reasonable
+    def test_thread_count_estimate(self):
+        """Thread count estimate = depth / pitch within 10%."""
+        detect_thread_geometry = self._import_dt()
+        pitch = 1.0
+        depth = 10.0   # 10 turns
+        surf = _make_threaded_cylinder_surface(
+            nominal_radius=3.0, pitch_mm=pitch, amplitude=0.05
+        )
+        result = detect_thread_geometry(surf, hole_depth=depth)
+        assert result is not None
+        expected_count = depth / pitch
+        assert abs(result.thread_count_estimate - expected_count) / expected_count < 0.10, (
+            f"thread_count_estimate {result.thread_count_estimate:.2f} vs expected {expected_count}"
+        )
+
+    # Test 21: thread_depth_mm (amplitude) is positive and reasonable
+    def test_thread_depth_positive(self):
+        """Thread depth (amplitude) is positive and in a sensible range."""
+        detect_thread_geometry = self._import_dt()
+        amplitude = 0.08
+        surf = _make_threaded_cylinder_surface(
+            nominal_radius=4.0, pitch_mm=1.25, amplitude=amplitude
+        )
+        result = detect_thread_geometry(surf, hole_depth=15.0)
+        assert result is not None
+        assert result.thread_depth_mm > 0.0, "thread_depth_mm must be positive"
+
+    # Test 22: SNR above threshold for threaded surface
+    def test_snr_above_threshold_for_threaded(self):
+        """SNR must exceed _THREAD_SNR_THRESHOLD for a detected thread."""
+        from kerf_cad_core.geom.hole_recognition import (
+            detect_thread_geometry, _THREAD_SNR_THRESHOLD
+        )
+        surf = _make_threaded_cylinder_surface(
+            nominal_radius=3.0, pitch_mm=1.0, amplitude=0.1
+        )
+        result = detect_thread_geometry(surf, hole_depth=20.0)
+        assert result is not None
+        assert result.snr >= _THREAD_SNR_THRESHOLD, (
+            f"SNR {result.snr:.2f} should be >= {_THREAD_SNR_THRESHOLD}"
+        )
+
+    # Test 23: zero-depth cylinder returns None
+    def test_zero_depth_returns_none(self):
+        """hole_depth=0 -> returns None (no profile to analyse)."""
+        detect_thread_geometry = self._import_dt()
+        surf = _make_threaded_cylinder_surface(
+            nominal_radius=3.0, pitch_mm=1.0, amplitude=0.05
+        )
+        result = detect_thread_geometry(surf, hole_depth=0.0)
+        assert result is None, "Zero depth should return None"
+
+    # Test 24: fine pitch M8x1.0 (fine thread)
+    def test_m8x1p0_fine_thread(self):
+        """M8x1.0 fine thread: pitch=1.0mm, nominal_radius=4mm -> detected."""
+        detect_thread_geometry = self._import_dt()
+        pitch = 1.0
+        surf = _make_threaded_cylinder_surface(
+            nominal_radius=4.0, pitch_mm=pitch, amplitude=0.10
+        )
+        result = detect_thread_geometry(surf, hole_depth=12.0)
+        assert result is not None, "M8x1.0 fine thread not detected"
+        assert abs(result.pitch_mm - pitch) / pitch < 0.05
+
+
+class TestThreadedHoleRecognition:
+    """End-to-end tests: threaded blind-hole face set -> kind='threaded'."""
+
+    def _build_threaded_blind_hole_faces(
+        self,
+        nominal_radius: float,
+        pitch_mm: float,
+        amplitude: float,
+        depth: float = 15.0,
+        axis=(0.0, 0.0, 1.0),
+        centre=(5.0, 5.0, 0.0),
+    ):
+        """Build blind-hole faces where the cylinder wall is a _ThreadedCylinderSurface."""
+        ax = _unit(np.asarray(axis, dtype=float))
+        c_top = np.asarray(centre, dtype=float)
+        c_bot = c_top - depth * ax
+        xref = _perp(ax)
+        yref = _unit(np.cross(ax, xref))
+
+        top_arc = CircleArc3(c_top, nominal_radius, xref, yref, 0.0, 2.0 * math.pi)
+        vt = Vertex(c_top + nominal_radius * xref)
+        e_top = Edge(top_arc, 0.0, 2.0 * math.pi, vt, vt)
+
+        bot_arc = CircleArc3(c_bot, nominal_radius, xref, yref, 0.0, 2.0 * math.pi)
+        vb = Vertex(c_bot + nominal_radius * xref)
+        e_bot = Edge(bot_arc, 0.0, 2.0 * math.pi, vb, vb)
+
+        hw = 20.0
+        top_plane = Plane(origin=c_top, x_axis=xref, y_axis=yref)
+        pts = [c_top + hw * xref + hw * yref, c_top - hw * xref + hw * yref,
+               c_top - hw * xref - hw * yref, c_top + hw * xref - hw * yref]
+        vs = [Vertex(p) for p in pts]
+        es = [Edge(Line3(vs[i].point, vs[(i + 1) % 4].point),
+                   0.0, 1.0, vs[i], vs[(i + 1) % 4]) for i in range(4)]
+        outer_top = Loop([Coedge(e, True) for e in es], is_outer=True)
+        outer_top._relink()
+        inner_top = Loop([Coedge(e_top, False)], is_outer=False)
+        inner_top._relink()
+        face_top = Face(top_plane, [outer_top, inner_top], orientation=True)
+        for lp in face_top.loops:
+            lp.face = face_top
+
+        # Threaded cylinder wall face using _ThreadedCylinderSurface
+        threaded_surf = _make_threaded_cylinder_surface(
+            nominal_radius=nominal_radius,
+            pitch_mm=pitch_mm,
+            amplitude=amplitude,
+            center=c_bot.tolist(),
+            axis=ax.tolist(),
+        )
+        sv0 = Vertex(c_bot + nominal_radius * xref)
+        sv1 = Vertex(c_top + nominal_radius * xref)
+        e_seam = Edge(Line3(c_bot + nominal_radius * xref, c_top + nominal_radius * xref),
+                      0.0, 1.0, sv0, sv1)
+        side_loop = Loop(
+            [Coedge(e_bot, True), Coedge(e_seam, True),
+             Coedge(e_top, False), Coedge(e_seam, False)],
+            is_outer=True,
+        )
+        side_loop._relink()
+        face_cyl = Face(threaded_surf, [side_loop], orientation=True)
+        for lp in face_cyl.loops:
+            lp.face = face_cyl
+
+        bot_plane = Plane(origin=c_bot, x_axis=xref, y_axis=-yref)
+        bot_outer = Loop([Coedge(e_bot, False)], is_outer=True)
+        bot_outer._relink()
+        face_bot = Face(bot_plane, [bot_outer], orientation=True)
+        for lp in face_bot.loops:
+            lp.face = face_bot
+
+        return [face_top, face_cyl, face_bot]
+
+    # Test 25: threaded blind hole kind='threaded'
+    def test_threaded_blind_hole_kind(self):
+        """Threaded blind-hole faces -> kind='threaded'."""
+        faces = self._build_threaded_blind_hole_faces(
+            nominal_radius=3.0, pitch_mm=1.0, amplitude=0.05, depth=15.0
+        )
+        results = recognize_holes(faces)
+        kinds = [h.kind for h in results]
+        assert "threaded" in kinds, f"Expected 'threaded' in {kinds}"
+
+    # Test 26: pitch populated
+    def test_threaded_hole_pitch_populated(self):
+        """Threaded hole feature has pitch_mm populated."""
+        faces = self._build_threaded_blind_hole_faces(
+            nominal_radius=3.0, pitch_mm=1.0, amplitude=0.05, depth=15.0
+        )
+        results = recognize_holes(faces)
+        th = [h for h in results if h.kind == "threaded"]
+        assert th, "No threaded hole found"
+        assert th[0].pitch_mm is not None
+        assert th[0].pitch_mm > 0.0
+
+    # Test 27: smooth blind hole does NOT get classified as threaded
+    def test_smooth_blind_hole_not_threaded(self):
+        """Smooth (non-threaded) blind hole -> kind != 'threaded'."""
+        faces = _build_blind_hole_faces(radius=3.0, depth=15.0)
+        results = recognize_holes(faces)
+        for h in results:
+            assert h.kind != "threaded", (
+                f"Smooth blind hole wrongly classified as threaded: {h}"
+            )
+
+    # Test 28: M6x1.0 end-to-end pitch within 5%
+    def test_m6x1_end_to_end_pitch(self):
+        """M6x1.0 threaded hole: end-to-end pitch detected within 5%."""
+        faces = self._build_threaded_blind_hole_faces(
+            nominal_radius=3.0, pitch_mm=1.0, amplitude=0.13, depth=15.0
+        )
+        results = recognize_holes(faces)
+        th = [h for h in results if h.kind == "threaded"]
+        assert th, "M6x1.0 hole not classified as threaded"
+        assert abs(th[0].pitch_mm - 1.0) / 1.0 < 0.05, (
+            f"M6 pitch {th[0].pitch_mm:.4f} not within 5% of 1.0"
+        )
+
+    # Test 29: to_dict includes thread fields when threaded
+    def test_threaded_to_dict_fields(self):
+        """HoleFeature.to_dict() includes pitch_mm etc. for kind='threaded'."""
+        faces = self._build_threaded_blind_hole_faces(
+            nominal_radius=3.0, pitch_mm=1.0, amplitude=0.05, depth=15.0
+        )
+        results = recognize_holes(faces)
+        th = [h for h in results if h.kind == "threaded"]
+        assert th
+        d = th[0].to_dict()
+        assert d["kind"] == "threaded"
+        assert "pitch_mm" in d
+        assert "nominal_diameter_mm" in d
+        assert "thread_depth_mm" in d
+        assert "thread_count_estimate" in d

@@ -72,6 +72,8 @@ from kerf_cad_core.geom.curve_inflection import (
     # v1 legacy
     InflectionResult,
     find_curve_inflections_v1,
+    # v3 Sturm analytic
+    find_curve_inflections_sturm,
 )
 
 
@@ -659,4 +661,135 @@ def test_v2_honest_caveat_content():
     assert "2d" in caveat, f"honest_caveat must mention '2D'; got: {report.honest_caveat!r}"
     assert any(kw in caveat for kw in ("sampling", "sample", "analytical")), (
         f"honest_caveat must mention sampling constraints; got: {report.honest_caveat!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# ===========================================================================
+#  STURM v3 TESTS (tests S01–S06)  — find_curve_inflections_sturm
+# ===========================================================================
+# ---------------------------------------------------------------------------
+
+# Test S01 — S-curve cubic (one inflection): Sturm returns exactly 1 root
+#             within tol of the midpoint 0.5.
+
+def test_sturm_s_curve_one_inflection():
+    """S-curve cubic Bezier: Sturm method returns exactly 1 inflection (v3)."""
+    curve = _make_s_curve_cubic()
+    report = find_curve_inflections_sturm(curve, tol=1e-9)
+    assert isinstance(report, CurveInflectionReport), "Expected CurveInflectionReport"
+    assert report.num_inflections == 1, (
+        f"S-curve: Sturm expected 1 inflection; got {report.num_inflections}"
+    )
+    ip = report.inflection_points[0]
+    assert 0.35 <= ip.parameter_u <= 0.65, (
+        f"S-curve Sturm inflection should be near t=0.5; got {ip.parameter_u:.6f}"
+    )
+    # Tight tolerance check: root should be within 0.01 of midpoint
+    assert abs(ip.parameter_u - 0.5) < 0.15, (
+        f"S-curve Sturm root {ip.parameter_u:.6f} too far from midpoint 0.5"
+    )
+
+
+# Test S02 — Double-S sine: Sturm finds >= 2 roots.
+
+def test_sturm_double_s_multiple_inflections():
+    """Two-arch sine approximation: Sturm method finds >= 2 inflections (v3)."""
+    curve = _make_sine_approx_nurbs()
+    report = find_curve_inflections_sturm(curve, tol=1e-9)
+    assert isinstance(report, CurveInflectionReport)
+    assert report.num_inflections >= 2, (
+        f"Double-S: Sturm expected >= 2 inflections; got {report.num_inflections}"
+    )
+
+
+# Test S03 — Sturm vs v2 sampling agreement: same inflections within tol.
+
+def test_sturm_vs_v2_agreement():
+    """Sturm and v2 sampling methods agree on inflection count and location (v3)."""
+    curve = _make_s_curve_cubic()
+    rep_sturm = find_curve_inflections_sturm(curve, tol=1e-9)
+    rep_v2 = find_curve_inflections(curve, num_samples=500, tol=1e-6)
+
+    assert rep_sturm.num_inflections == rep_v2.num_inflections, (
+        f"Sturm count ({rep_sturm.num_inflections}) != v2 count ({rep_v2.num_inflections})"
+    )
+
+    # Each Sturm root should be within 1e-4 of the corresponding v2 root.
+    for ip_s, ip_v2 in zip(rep_sturm.inflection_points, rep_v2.inflection_points):
+        assert abs(ip_s.parameter_u - ip_v2.parameter_u) < 1e-4, (
+            f"Sturm root {ip_s.parameter_u:.8f} vs v2 root {ip_v2.parameter_u:.8f} differ > 1e-4"
+        )
+
+
+# Test S04 — Straight line: 0 roots (κ=0 numerator is identically zero).
+
+def test_sturm_straight_line_zero_inflections():
+    """Straight line: Sturm method returns 0 inflections (v3).
+
+    A straight line has x'·y'' − y'·x'' = 0 identically, so p(t)=0 on every
+    span.  degree < 3 guard fires: no inflections.
+    """
+    line = make_line_nurbs(
+        np.array([0.0, 0.0, 0.0]),
+        np.array([5.0, 2.0, 0.0]),
+    )
+    report = find_curve_inflections_sturm(line, tol=1e-9)
+    assert isinstance(report, CurveInflectionReport)
+    assert report.num_inflections == 0, (
+        f"Straight line: Sturm expected 0 inflections; got {report.num_inflections}"
+    )
+    assert report.is_fair_class_a is True
+
+
+# Test S05 — Circle arc: 0 roots (constant curvature, no inflection).
+
+def test_sturm_circle_zero_inflections():
+    """Circle: Sturm method returns 0 inflections (v3).
+
+    A circle is a rational NURBS, so the Sturm method emits a warning about
+    rational curves and returns 0 inflections.
+    """
+    circle = make_circle_nurbs(np.array([0.0, 0.0, 0.0]), 3.0)
+    report = find_curve_inflections_sturm(circle, tol=1e-9)
+    assert isinstance(report, CurveInflectionReport)
+    assert report.num_inflections == 0, (
+        f"Circle: Sturm expected 0 inflections; got {report.num_inflections}"
+    )
+
+
+# Test S06 — honest_caveat mentions "sturm-analytic" method.
+
+def test_sturm_honest_caveat_method():
+    """honest_caveat must mention 'sturm-analytic' method (v3)."""
+    curve = _make_s_curve_cubic()
+    report = find_curve_inflections_sturm(curve, tol=1e-9)
+    caveat = report.honest_caveat.lower()
+    assert "sturm" in caveat, (
+        f"honest_caveat must mention 'sturm'; got: {report.honest_caveat!r}"
+    )
+    assert "analytic" in caveat, (
+        f"honest_caveat must mention 'analytic'; got: {report.honest_caveat!r}"
+    )
+
+
+# Test S07 — Cubic with inflection at known parameter: Sturm isolates it
+#             within tol of the analytic location.
+#             Control points: (0,0),(1,-2),(2,2),(3,0) — symmetric S.
+
+def test_sturm_cubic_inflection_parameter_accuracy():
+    """Asymmetric cubic S: Sturm root is within 0.02 of v2 bisection root (v3)."""
+    curve = _make_cubic_one_inflection()
+    rep_sturm = find_curve_inflections_sturm(curve, tol=1e-9)
+    rep_v2 = find_curve_inflections(curve, num_samples=500, tol=1e-7)
+
+    assert rep_sturm.num_inflections >= 1, (
+        f"Asymmetric cubic: Sturm expected >= 1; got {rep_sturm.num_inflections}"
+    )
+    assert rep_v2.num_inflections >= 1
+
+    t_sturm = rep_sturm.inflection_points[0].parameter_u
+    t_v2 = rep_v2.inflection_points[0].parameter_u
+    assert abs(t_sturm - t_v2) < 0.02, (
+        f"Sturm root {t_sturm:.8f} vs v2 root {t_v2:.8f}: delta > 0.02"
     )

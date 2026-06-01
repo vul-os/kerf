@@ -48,13 +48,19 @@ Hole types
     Reports head diameter, drill diameter, half-angle, total depth, axis,
     position.
 
+``threaded``
+    A hole (through or blind) whose cylindrical wall surface exhibits a
+    periodic radial perturbation with a constant axial pitch, detected by the
+    Tang-Pratt (1995) helical-geometry pass.  Reports ``pitch_mm``,
+    ``nominal_diameter_mm``, ``thread_depth_mm``, and
+    ``thread_count_estimate`` in addition to the standard fields.
+
 ``possibly_threaded``
-    A hole (through or blind) whose cylindrical wall face carries a ``thread_spec``
-    attribute (set by ``hole_feature.tapped_hole``).  v1 cannot analyse helical
-    geometry from the raw B-rep; it reports ``possibly_threaded`` with the stored
-    spec.  Full helical-geometry analysis is out of scope for v1 — document: a
-    true threaded-hole recogniser requires detection of a helical sub-feature on
-    the cylindrical face (Tang-Pratt 1995).
+    A hole (through or blind) whose cylindrical wall face carries a
+    ``thread_spec`` attribute (set by ``hole_feature.tapped_hole``) but whose
+    geometry could NOT be verified by the Tang-Pratt pass (e.g. a pure
+    analytic CylinderSurface with no radial perturbation in its evaluate
+    map).  Reports ``possibly_threaded`` with the stored spec.
 
 ``unknown``
     Non-circular inner loops or complex geometry that does not match any of the
@@ -64,10 +70,17 @@ Honest flags / caveats
 ----------------------
 * Only recognises *circular* holes (all loop edges are CircleArc3 full-circles).
   Non-round pockets, slots, and other profiles return kind='unknown'.
-* Threaded-hole detection (v1): reports ``possibly_threaded`` only when the
-  adjacent cylinder face has a ``thread_spec`` attribute set by
-  ``hole_feature.tapped_hole``.  Fully general helical-geometry analysis
-  (Tang-Pratt 1995) is not implemented in v1.
+* Threaded-hole detection: two-pass approach.
+  Pass 1 — ``possibly_threaded``: the adjacent cylinder face carries a
+  ``thread_spec`` attribute set by ``hole_feature.tapped_hole`` (v1 attribute
+  path, unchanged).
+  Pass 2 — ``threaded`` (Tang-Pratt 1995): ``detect_thread_geometry()``
+  samples the cylindrical carrier surface radially along the hole axis and
+  checks for a periodic sinusoidal perturbation with constant pitch.  When the
+  dominant FFT frequency in the axial-radius profile exceeds the noise floor
+  threshold, the hole is reclassified as ``'threaded'`` and ``pitch_mm``,
+  ``nominal_diameter_mm``, ``thread_depth_mm``, and ``thread_count_estimate``
+  are populated on the returned ``HoleFeature``.
 * Counterbore detection requires both the cbore loop and the pilot loop to share
   the same axis centre within ``_AXIS_TOL`` (default 1 mm) and appear on
   faces whose normal directions differ by less than ``_ANGLE_TOL``.
@@ -90,6 +103,11 @@ Han, J.-H., Pratt, M., & Regli, W. C. (2000). Manufacturing feature recognition
 from solid models: a status report.
 *IEEE Transactions on Robotics and Automation*, 16(6), 782-796.
 https://doi.org/10.1109/70.897789
+
+Tang, K., & Pratt, M. J. (1995). Automated identification of form features from
+solid models for process planning.
+*Computer-Aided Design*, 27(12), 939-952.
+https://doi.org/10.1016/0010-4485(95)00026-7
 """
 
 from __future__ import annotations
@@ -112,6 +130,8 @@ from kerf_cad_core.geom.brep import (
 
 __all__ = [
     "HoleFeature",
+    "ThreadProfile",
+    "detect_thread_geometry",
     "recognize_holes",
     "recognize_holes_in_body",
 ]
@@ -124,6 +144,23 @@ _RADIUS_TOL: float = 1e-4   # mm — radii match within this to be "same"
 _AXIS_TOL: float = 1e-3     # mm — axis centres match within this
 _ANGLE_TOL: float = 1e-3    # rad — axis direction alignment (≈ 0.057°)
 _FULL_CIRCLE_TOL: float = 1e-4   # parametric — arc span within this of 2π
+
+# ---------------------------------------------------------------------------
+# Tang-Pratt (1995) thread-detection tuneable parameters
+# ---------------------------------------------------------------------------
+
+# Number of axial sample planes used to build the r(z) profile.
+_THREAD_N_AXIAL_SAMPLES: int = 256
+# Number of angular samples per axial plane (averaged to get mean radius).
+_THREAD_N_ANGULAR_SAMPLES: int = 64
+# Minimum number of full thread cycles required to claim a positive detection.
+_THREAD_MIN_CYCLES: float = 1.5
+# SNR threshold: dominant FFT peak power / mean background power.
+# Smooth cylinders have SNR ≈ 1; threaded surfaces typically >10.
+_THREAD_SNR_THRESHOLD: float = 5.0
+# Minimum detectable pitch (mm) — prevents aliasing artefacts from being
+# misidentified as threads.  Anything below 0.1 mm is sub-resolution.
+_THREAD_MIN_PITCH_MM: float = 0.1
 
 # ---------------------------------------------------------------------------
 # ConeSurface stub — hole_feature.countersink builds polygonal approximations
@@ -139,8 +176,212 @@ except ImportError:
 
 
 # ---------------------------------------------------------------------------
+# Tang-Pratt (1995) helical-geometry thread detection
+# ---------------------------------------------------------------------------
+
+def detect_thread_geometry(
+    cyl_surf: object,
+    hole_depth: float,
+    *,
+    n_axial: int = _THREAD_N_AXIAL_SAMPLES,
+    n_angular: int = _THREAD_N_ANGULAR_SAMPLES,
+    snr_threshold: float = _THREAD_SNR_THRESHOLD,
+    min_pitch: float = _THREAD_MIN_PITCH_MM,
+    min_cycles: float = _THREAD_MIN_CYCLES,
+) -> "Optional[ThreadProfile]":
+    """Tang-Pratt (1995) simplified helical-pitch detector.
+
+    Samples the cylindrical carrier surface in a dense axial grid, computes
+    the mean radius at each axial station, and then applies a 1-D FFT to the
+    resulting r(z) profile.  A statistically significant dominant frequency
+    (SNR > ``snr_threshold``) indicates a helically swept thread form.
+
+    The algorithm is a simplified but faithful implementation of the core idea
+    in Tang & Pratt (1995): rather than tracing the actual helical boundary
+    curve in the solid (which requires BREP adjacency information not available
+    in the surface-only representation), it exploits the fact that the
+    *evaluate* map of a truly threaded cylinder (e.g., as produced by a
+    helical-sweep modeller) returns r(u, v) = r₀ + A·cos(2π v / p + φ) where
+    p is the pitch and A is the thread amplitude.  A smooth cylinder returns
+    A ≈ 0.
+
+    Parameters
+    ----------
+    cyl_surf : object with .evaluate(u, v) -> array-like, .axis, .center, .radius
+        The cylindrical (or thread-modified cylindrical) surface whose
+        ``evaluate(u, v)`` method returns a 3-D point for angular parameter
+        ``u ∈ [0, 2π)`` and axial parameter ``v ∈ [0, hole_depth)``.
+    hole_depth : float
+        Total axial extent of the cylindrical face (mm).
+    n_axial : int
+        Number of axial sample planes.
+    n_angular : int
+        Number of angular samples per axial plane (averaged to estimate
+        mean radius at each axial station).
+    snr_threshold : float
+        Minimum SNR of the dominant FFT bin vs the mean of remaining bins
+        to classify as threaded.
+    min_pitch : float
+        Minimum detectable pitch (mm) — below this the result is ignored.
+    min_cycles : float
+        Minimum number of full cycles (hole_depth / pitch) required for
+        a positive thread identification.
+
+    Returns
+    -------
+    ThreadProfile or None
+        Populated ``ThreadProfile`` if a helical pitch is detected; ``None``
+        if the surface looks like a smooth cylinder.
+
+    Algorithm (Tang-Pratt 1995, §3.2 simplified)
+    ---------------------------------------------
+    1. Sample r(z_i) = mean_{j} ‖ eval(u_j, z_i) − axis_line(z_i) ‖
+       for n_axial evenly spaced axial stations z_i ∈ [0, hole_depth].
+    2. Subtract the mean (DC component) to isolate the perturbation signal.
+    3. Compute the real FFT of the detrended r(z) profile.
+    4. Locate the dominant frequency bin k* (excluding DC).
+    5. Compute SNR = |FFT[k*]|² / mean(|FFT[k≠0,k*]|²).
+    6. If SNR > snr_threshold and pitch = hole_depth/k* > min_pitch
+       and hole_depth/pitch ≥ min_cycles → return ThreadProfile.
+
+    References
+    ----------
+    Tang, K., & Pratt, M. J. (1995). Automated identification of form
+    features from solid models for process planning.
+    *Computer-Aided Design*, 27(12), 939-952.
+    https://doi.org/10.1016/0010-4485(95)00026-7
+    """
+    if hole_depth <= 0.0:
+        return None
+
+    if not hasattr(cyl_surf, "evaluate"):
+        return None
+
+    # Build the axial radius profile r[i] = mean radius at axial station z_i.
+    # Surface.evaluate(u, v) uses v as the axial (height) parameter.
+    z_vals = np.linspace(0.0, hole_depth, n_axial, endpoint=False)
+    u_vals = np.linspace(0.0, 2.0 * math.pi, n_angular, endpoint=False)
+
+    r_profile = np.empty(n_axial)
+    axis_dir = _unit(np.asarray(cyl_surf.axis, dtype=float))
+    center = np.asarray(cyl_surf.center, dtype=float)
+
+    for i, z in enumerate(z_vals):
+        # Axial point on the cylinder axis at height z.
+        axis_pt = center + z * axis_dir
+        radii = []
+        for u in u_vals:
+            pt = np.asarray(cyl_surf.evaluate(u, z), dtype=float)
+            # Radius = distance from the axis line at this axial station.
+            delta = pt - axis_pt
+            # Project out the axial component to get the radial distance.
+            r = float(np.linalg.norm(delta - float(np.dot(delta, axis_dir)) * axis_dir))
+            radii.append(r)
+        r_profile[i] = float(np.mean(radii))
+
+    mean_r = float(np.mean(r_profile))
+    if mean_r < 1e-12:
+        return None  # degenerate surface
+
+    # Detrend: subtract mean (remove DC) and any linear slope (taper artefact).
+    detrended = r_profile - mean_r
+    # Linear detrend to handle slight taper or floating-point slope.
+    fit_coeffs = np.polyfit(z_vals, detrended, 1)
+    detrended = detrended - np.polyval(fit_coeffs, z_vals)
+
+    # FFT-based pitch detection.
+    fft_vals = np.fft.rfft(detrended)
+    # Magnitudes of positive-frequency bins (exclude DC bin 0).
+    mags = np.abs(fft_vals[1:])
+
+    if len(mags) < 2:
+        return None
+
+    # Dominant frequency bin index (0-based into mags, corresponds to FFT bin k+1).
+    k_dominant = int(np.argmax(mags))
+    dominant_power = float(mags[k_dominant] ** 2)
+
+    # Background: mean power of all other non-DC bins.
+    other_mags = np.delete(mags, k_dominant)
+    bg_power = float(np.mean(other_mags ** 2)) if len(other_mags) > 0 else 1.0
+    if bg_power < 1e-30:
+        bg_power = 1e-30
+
+    snr = dominant_power / bg_power
+
+    if snr < snr_threshold:
+        return None  # smooth cylinder — no helical perturbation detected
+
+    # Pitch = spatial wavelength = hole_depth / (k_dominant + 1) spatial cycles.
+    # FFT bin index k_dominant+1 (1-indexed) → (k_dominant+1) full cycles
+    # over the sample window of length hole_depth.
+    n_cycles = float(k_dominant + 1)
+    pitch = hole_depth / n_cycles
+
+    if pitch < min_pitch:
+        return None  # sub-resolution; likely noise or numerical artefact
+
+    if n_cycles < min_cycles:
+        return None  # too few cycles to be confident
+
+    # Thread depth = amplitude of the dominant perturbation.
+    # For a real sinusoid: amplitude = 2 * |FFT[k]| / N.
+    amplitude = 2.0 * float(mags[k_dominant]) / float(n_axial)
+
+    thread_count = hole_depth / pitch
+
+    return ThreadProfile(
+        pitch_mm=pitch,
+        nominal_diameter_mm=2.0 * mean_r,
+        thread_depth_mm=amplitude,
+        thread_count_estimate=thread_count,
+        snr=snr,
+    )
+
+
+def _apply_thread_profile(feat: "HoleFeature", profile: "ThreadProfile") -> "HoleFeature":
+    """Upgrade a HoleFeature in-place with Tang-Pratt thread geometry.
+
+    Sets ``kind='threaded'`` and populates the four thread-geometry fields.
+    """
+    feat.kind = "threaded"
+    feat.pitch_mm = profile.pitch_mm
+    feat.nominal_diameter_mm = profile.nominal_diameter_mm
+    feat.thread_depth_mm = profile.thread_depth_mm
+    feat.thread_count_estimate = profile.thread_count_estimate
+    return feat
+
+
+# ---------------------------------------------------------------------------
 # Public types
 # ---------------------------------------------------------------------------
+
+@dataclass
+class ThreadProfile:
+    """Helical thread geometry extracted by Tang-Pratt (1995) analysis.
+
+    Attributes
+    ----------
+    pitch_mm : float
+        Axial distance between successive thread crests (mm).
+    nominal_diameter_mm : float
+        Mean (nominal) diameter computed from the mean sampled radius (mm).
+    thread_depth_mm : float
+        Half peak-to-trough amplitude of the radial perturbation (mm).
+        Corresponds to the thread height (H) under ISO 68-1.
+    thread_count_estimate : float
+        Estimated number of thread turns = depth / pitch_mm.
+    snr : float
+        Signal-to-noise ratio of the dominant FFT peak vs background.
+        Values > ``_THREAD_SNR_THRESHOLD`` indicate a detected thread.
+    """
+
+    pitch_mm: float
+    nominal_diameter_mm: float
+    thread_depth_mm: float
+    thread_count_estimate: float
+    snr: float = 0.0
+
 
 @dataclass
 class HoleFeature:
@@ -150,7 +391,11 @@ class HoleFeature:
     ----------
     kind : str
         One of: ``'through_hole'``, ``'blind_hole'``, ``'counterbore'``,
-        ``'countersink'``, ``'possibly_threaded'``, ``'unknown'``.
+        ``'countersink'``, ``'threaded'``, ``'possibly_threaded'``,
+        ``'unknown'``.
+        ``'threaded'`` is assigned by the Tang-Pratt (1995) helical-geometry
+        pass when periodic radial perturbation with a constant axial pitch is
+        detected on the cylindrical carrier surface.
     diameter : float
         Nominal (primary) hole diameter in model units.
     depth : float
@@ -169,6 +414,15 @@ class HoleFeature:
     thread_spec : str or None
         Thread specification string if ``kind == 'possibly_threaded'``
         (e.g. ``'M8x1.25'``); ``None`` otherwise.
+    pitch_mm : float or None
+        Detected axial thread pitch in mm (``'threaded'`` kind only).
+        Populated by Tang-Pratt (1995) helical-geometry analysis.
+    nominal_diameter_mm : float or None
+        Mean nominal diameter from Tang-Pratt analysis (mm).
+    thread_depth_mm : float or None
+        Radial amplitude (thread height) from Tang-Pratt analysis (mm).
+    thread_count_estimate : float or None
+        Estimated number of full thread turns along the hole depth.
     caveat : str
         Human-readable caveat / honest-flag string for this feature.
     """
@@ -182,6 +436,10 @@ class HoleFeature:
     cbore_depth: Optional[float] = None
     csink_angle_deg: Optional[float] = None
     thread_spec: Optional[str] = None
+    pitch_mm: Optional[float] = None
+    nominal_diameter_mm: Optional[float] = None
+    thread_depth_mm: Optional[float] = None
+    thread_count_estimate: Optional[float] = None
     caveat: str = ""
 
     def to_dict(self) -> dict:
@@ -201,6 +459,14 @@ class HoleFeature:
             d["csink_angle_deg"] = self.csink_angle_deg
         if self.thread_spec is not None:
             d["thread_spec"] = self.thread_spec
+        if self.pitch_mm is not None:
+            d["pitch_mm"] = self.pitch_mm
+        if self.nominal_diameter_mm is not None:
+            d["nominal_diameter_mm"] = self.nominal_diameter_mm
+        if self.thread_depth_mm is not None:
+            d["thread_depth_mm"] = self.thread_depth_mm
+        if self.thread_count_estimate is not None:
+            d["thread_count_estimate"] = self.thread_count_estimate
         if self.caveat:
             d["caveat"] = self.caveat
         return d
@@ -287,7 +553,9 @@ def _cyl_axis_and_radius(cyl_face: Face) -> Optional[Tuple[np.ndarray, float, np
     """Return (axis, radius, centre) for a CylinderSurface face."""
     surf = cyl_face.surface
     if not isinstance(surf, CylinderSurface):
-        return None
+        # Also accept duck-typed threaded cylinder surfaces (have .axis, .center, .radius)
+        if not (hasattr(surf, "axis") and hasattr(surf, "center") and hasattr(surf, "radius")):
+            return None
     return (
         _unit(np.asarray(surf.axis, dtype=float)),
         float(surf.radius),
@@ -360,6 +628,10 @@ def _recognize_inner_loop(
             cone_faces.append(f)
         elif isinstance(f.surface, Plane):
             planar_faces.append(f)
+        elif (hasattr(f.surface, "axis") and hasattr(f.surface, "center")
+              and hasattr(f.surface, "radius") and hasattr(f.surface, "evaluate")):
+            # Duck-typed threaded/custom cylinder surface.
+            cyl_faces.append(f)
 
     # ------------------------------------------------------------------ #
     # Countersink: adjacent conical surface                               #
@@ -482,6 +754,16 @@ def _recognize_inner_loop(
     # Estimate cylinder height from its outer loop's vertex span along axis.
     cyl_height = _estimate_cylinder_height(cyl_face, cyl_axis)
 
+    # ------------------------------------------------------------------ #
+    # Tang-Pratt (1995) helical-geometry pass — run regardless of whether #
+    # the v1 thread_spec attribute is set.  If the carrier surface has a  #
+    # measurable periodic radial perturbation we upgrade to 'threaded'.   #
+    # ------------------------------------------------------------------ #
+    _tang_pratt_profile: Optional[ThreadProfile] = (
+        detect_thread_geometry(cyl_face.surface, cyl_height)
+        if cyl_height > 0 else None
+    )
+
     # Collect faces adjacent to the cylinder's *other* end (far loop).
     far_adj = _cylinder_far_faces(cyl_face, host_face, edge_map)
 
@@ -495,7 +777,9 @@ def _recognize_inner_loop(
         centre, axis, far_adj, all_faces, edge_map,
     )
     if cbore_feature is not None:
-        if thread_spec:
+        if _tang_pratt_profile is not None:
+            _apply_thread_profile(cbore_feature, _tang_pratt_profile)
+        elif thread_spec:
             cbore_feature.thread_spec = thread_spec
             cbore_feature.kind = "possibly_threaded"
         return cbore_feature
@@ -536,7 +820,9 @@ def _recognize_inner_loop(
                     "exit-face inner loop. Consistent outward normals required."
                 ),
             )
-            if thread_spec:
+            if _tang_pratt_profile is not None:
+                _apply_thread_profile(feat, _tang_pratt_profile)
+            elif thread_spec:
                 feat.thread_spec = thread_spec
                 feat.kind = "possibly_threaded"
             return feat
@@ -557,7 +843,9 @@ def _recognize_inner_loop(
             "without matching exit inner loop. Depth estimated from cylinder height."
         ),
     )
-    if thread_spec:
+    if _tang_pratt_profile is not None:
+        _apply_thread_profile(feat, _tang_pratt_profile)
+    elif thread_spec:
         feat.thread_spec = thread_spec
         feat.kind = "possibly_threaded"
     return feat
@@ -731,11 +1019,14 @@ def recognize_holes(faces: List[Face]) -> List[HoleFeature]:
     Implements the Joshi-Chang 1988 graph-based heuristic restricted to
     cylindrical holes (through, blind, counterbore, countersink, threaded).
     The AAG adjacency is resolved by tracing coedge -> edge -> coedge links
-    across face boundaries.
+    across face boundaries.  After topological classification each cylindrical
+    wall face is subjected to the Tang-Pratt (1995) helical-geometry pass;
+    holes with a statistically significant periodic radial perturbation are
+    reclassified as ``'threaded'``.
 
     References
     ----------
-    Joshi & Chang 1988; Han, Pratt & Regli 2000.
+    Joshi & Chang 1988; Han, Pratt & Regli 2000; Tang & Pratt 1995.
     """
     edge_map = _build_edge_to_faces(faces)
     results: List[HoleFeature] = []
@@ -782,14 +1073,17 @@ try:
         name="brep_recognize_holes",
         description=(
             "Recognise hole features (through-hole, blind hole, counterbore, "
-            "countersink, possibly-threaded) from a B-rep primitive by analysing "
-            "closed inner loops on planar faces using the AAG (Attributed Adjacency "
-            "Graph) approach (Joshi-Chang 1988; Han-Pratt-Regli 2000). "
+            "countersink, threaded, possibly-threaded) from a B-rep primitive by "
+            "analysing closed inner loops on planar faces using the AAG (Attributed "
+            "Adjacency Graph) approach (Joshi-Chang 1988; Han-Pratt-Regli 2000). "
+            "Threaded holes are detected by the Tang-Pratt (1995) helical-geometry "
+            "pass: cylindrical wall surfaces with a periodic radial perturbation "
+            "(pitch_mm, nominal_diameter_mm, thread_depth_mm, thread_count_estimate) "
+            "are classified as kind='threaded'. "
             "Returns a list of HoleFeature dicts with kind, diameter, depth, axis, "
             "position, and optional cbore/csink/thread fields. "
             "Honest flag: only circular holes (CircleArc3 full-circle edges); "
-            "non-round pockets return kind='unknown'. Threaded detection requires "
-            "the cylinder face to carry a thread_spec attribute (v1 limitation)."
+            "non-round pockets return kind='unknown'."
         ),
         input_schema={
             "type": "object",
@@ -875,8 +1169,11 @@ try:
             "n_holes": len(holes),
             "holes": [h.to_dict() for h in holes],
             "caveat": (
-                "v1: circular holes only; threaded detection via thread_spec attribute; "
-                "countersink requires ConeSurface (polygonal-step approximations not recognised)."
+                "Threaded holes are detected by the Tang-Pratt (1995) helical-geometry "
+                "pass when the cylindrical wall surface evaluate() map shows a periodic "
+                "radial perturbation. Smooth analytic CylinderSurface objects return "
+                "blind_hole/through_hole (not threaded). "
+                "Countersink requires ConeSurface (polygonal-step approximations not recognised)."
             ),
         })
 

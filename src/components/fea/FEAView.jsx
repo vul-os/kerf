@@ -1,6 +1,12 @@
-// FEAView.jsx — tabbed container for all 5 FEA solve panels.
+// FEAView.jsx — tabbed container for all FEA / FEM solve panels.
 //
-// Tabs: Linear Static | Modal | Buckling | Fatigue | Vibration
+// Tabs: Linear Static | Modal | Buckling | Fatigue | Vibration | Advanced FEM
+//
+// "Advanced FEM" hosts FEMSolverPanel (20+ extra tools):
+//   Nonlinear Static, NL Bar, Truss Plastic, Explicit Dynamics,
+//   Thermal (steady/transient), Acoustics FEM/BEM, Electrostatics,
+//   Magnetostatics, High-Freq EM, CFD Navier-Stokes, Potential Flow,
+//   Plate/Shell MITC4, Probabilistic FEA (LHS/Monte-Carlo).
 //
 // Props:
 //   file       — current workspace file { id, kind, name }
@@ -15,6 +21,7 @@ import ModalPanel        from './ModalPanel.jsx'
 import BucklingPanel     from './BucklingPanel.jsx'
 import FatiguePanel      from './FatiguePanel.jsx'
 import VibrationPanel    from './VibrationPanel.jsx'
+import FEMSolverPanel    from './FEMSolverPanel.jsx'
 
 const TABS = [
   { id: 'linear_static',    label: 'Linear Static', color: '#22d3ee' },
@@ -22,6 +29,7 @@ const TABS = [
   { id: 'buckling',         label: 'Buckling',       color: '#fbbf24' },
   { id: 'fatigue',          label: 'Fatigue',        color: '#f472b6' },
   { id: 'vibration',        label: 'Vibration',      color: '#34d399' },
+  { id: 'advanced',         label: 'Advanced FEM',   color: '#fb923c' },
 ]
 
 export default function FEAView({ file, projectId }) {
@@ -99,6 +107,11 @@ export default function FEAView({ file, projectId }) {
         {activeTab === 'vibration' && (
           <div role="tabpanel" id="fea-panel-vibration" aria-labelledby="fea-tab-vibration">
             <VibrationPanel projectId={projectId} fileId={fileId} />
+          </div>
+        )}
+        {activeTab === 'advanced' && (
+          <div role="tabpanel" id="fea-panel-advanced" aria-labelledby="fea-tab-advanced">
+            <FEMSolverPanel projectId={projectId} fileId={fileId} />
           </div>
         )}
       </div>

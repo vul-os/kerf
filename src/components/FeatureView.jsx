@@ -52,6 +52,11 @@ import {
   X, ChevronRight, LayoutGrid, Combine, Scissors, Grid3x3,
   MoreHorizontal, SlidersHorizontal, Zap, Eye, Shield,
   Wrench, AlignLeft, Activity,
+  Code, Settings, Cpu, FlaskConical, BarChart2, Filter,
+  RefreshCw, ChevronLast, Droplets, Wind, Gauge,
+  Spline, TrendingUp, Maximize2, Wand2, FlipVertical,
+  GitMerge, SplitSquareHorizontal, Route, Ruler, ArrowUpDown,
+  Workflow, Shuffle, Merge,
 } from 'lucide-react'
 import FeatureRenderer from './FeatureRenderer.jsx'
 import {
@@ -2967,6 +2972,772 @@ const FEATURE_KINDS = [
       ] },
     ],
   },
+
+  // ── NURBS curve / surface analysis + editing tools ──────────────────────
+
+  // nurbs_degree_raise — Cohen-Lyche-Schumaker 1985 degree elevation
+  {
+    op: 'nurbs_degree_raise',
+    label: 'Degree Raise',
+    icon: TrendingUp,
+    category: 'nurbs',
+    caption: (
+      'Raise the degree of a NURBS curve or surface (Cohen-Lyche-Schumaker 1985). ' +
+      'Exact — evaluated geometry is preserved to floating-point precision. ' +
+      'Supply is_surface=true for surfaces (provides degree_u/v, knots_u/v).'
+    ),
+    defaults: {
+      is_surface: false,
+      degree: 3,
+      target_degree: 4,
+      control_points: [],
+      knots: [],
+    },
+    fields: [
+      { key: 'is_surface',    kind: 'boolean', label: 'Surface mode (vs curve)' },
+      { key: 'degree',        kind: 'number',  label: 'Current degree (curve)', min: 1, max: 9, step: 1 },
+      { key: 'target_degree', kind: 'number',  label: 'Target degree (curve)', min: 2, max: 10, step: 1 },
+      { key: 'degree_u',      kind: 'number',  label: 'Current degree U (srf)', min: 1, max: 9, step: 1 },
+      { key: 'degree_v',      kind: 'number',  label: 'Current degree V (srf)', min: 1, max: 9, step: 1 },
+      { key: 'target_degree_u', kind: 'number', label: 'Target degree U (srf)', min: 2, max: 10, step: 1 },
+      { key: 'target_degree_v', kind: 'number', label: 'Target degree V (srf)', min: 2, max: 10, step: 1 },
+    ],
+  },
+
+  // nurbs_degree_lower — least-squares degree reduction
+  {
+    op: 'nurbs_degree_lower',
+    label: 'Degree Lower',
+    icon: ArrowUpDown,
+    category: 'nurbs',
+    caption: (
+      'Lower the degree of a NURBS curve (Cohen-Lyche-Schumaker 1985 least-squares). ' +
+      'Approximate — a tolerance parameter controls maximum deviation. ' +
+      'Use to reduce control-point count while preserving shape within tolerance.'
+    ),
+    defaults: {
+      degree: 4,
+      target_degree: 3,
+      control_points: [],
+      knots: [],
+      tolerance: 1e-4,
+    },
+    fields: [
+      { key: 'degree',        kind: 'number', label: 'Current degree', min: 2, max: 10, step: 1 },
+      { key: 'target_degree', kind: 'number', label: 'Target degree',  min: 1, max: 9,  step: 1 },
+      { key: 'tolerance',     kind: 'number', label: 'Max deviation tolerance (mm)', min: 1e-9, step: 1e-5 },
+    ],
+  },
+
+  // nurbs_surface_offset — Tiller-Hanson offset surface
+  {
+    op: 'nurbs_surface_offset',
+    label: 'Surface Offset',
+    icon: Maximize2,
+    category: 'nurbs',
+    caption: (
+      'Offset a NURBS surface by a signed distance (positive = along normal). ' +
+      'Uses the Tiller-Hanson control-point displacement method. ' +
+      'For large distances with high-curvature surfaces use nurbs_surface_offset_robust.'
+    ),
+    defaults: {
+      distance: 1.0,
+      num_u: 4,
+      num_v: 4,
+      degree_u: 3,
+      degree_v: 3,
+      control_points: [],
+      knots_u: [],
+      knots_v: [],
+    },
+    fields: [
+      { key: 'distance',  kind: 'number', label: 'Offset distance (mm)', step: 0.1 },
+      { key: 'degree_u',  kind: 'number', label: 'Degree U', min: 1, max: 9, step: 1 },
+      { key: 'degree_v',  kind: 'number', label: 'Degree V', min: 1, max: 9, step: 1 },
+      { key: 'num_u',     kind: 'number', label: 'CP count U', min: 2, max: 100, step: 1 },
+      { key: 'num_v',     kind: 'number', label: 'CP count V', min: 2, max: 100, step: 1 },
+    ],
+  },
+
+  // nurbs_surface_offset_robust — far-offset with Maekawa 1999 robustness
+  {
+    op: 'nurbs_surface_offset_robust',
+    label: 'Surface Offset (Robust)',
+    icon: Maximize2,
+    category: 'nurbs',
+    caption: (
+      'Far-distance robust NURBS surface offset (Maekawa 1999). ' +
+      'Handles self-intersection trimming and high-curvature regions that the ' +
+      'standard offset fails on. Slower but more reliable for large offsets.'
+    ),
+    defaults: {
+      distance: 2.0,
+      degree_u: 3,
+      degree_v: 3,
+      num_u: 4,
+      num_v: 4,
+      control_points: [],
+      knots_u: [],
+      knots_v: [],
+    },
+    fields: [
+      { key: 'distance',    kind: 'number', label: 'Offset distance (mm)', step: 0.5 },
+      { key: 'degree_u',    kind: 'number', label: 'Degree U', min: 1, max: 9, step: 1 },
+      { key: 'degree_v',    kind: 'number', label: 'Degree V', min: 1, max: 9, step: 1 },
+      { key: 'num_u',       kind: 'number', label: 'CP count U', min: 2, step: 1 },
+      { key: 'num_v',       kind: 'number', label: 'CP count V', min: 2, step: 1 },
+    ],
+  },
+
+  // nurbs_project_curve_to_surface — Newton-Raphson UV-trace projection
+  {
+    op: 'nurbs_project_curve_to_surface',
+    label: 'Project Curve to Surface',
+    icon: Route,
+    category: 'nurbs',
+    caption: (
+      'Project a 3D NURBS curve onto a NURBS surface, tracing the closest-point ' +
+      'UV locus via Newton-Raphson (Piegl-Tiller §6.1). ' +
+      'Returns the projected curve as a degree-3 NURBS in UV parameter space.'
+    ),
+    defaults: {
+      tol: 1e-4,
+      samples: 20,
+    },
+    fields: [
+      { key: 'tol',     kind: 'number', label: 'Projection tolerance (mm)', min: 1e-9, step: 1e-4 },
+      { key: 'samples', kind: 'number', label: 'Seed sample count', min: 4, max: 200, step: 4 },
+    ],
+  },
+
+  // nurbs_extract_iso_u / nurbs_extract_iso_v — iso-curve extraction
+  {
+    op: 'nurbs_extract_iso_u',
+    label: 'Extract Iso-U Curve',
+    icon: Spline,
+    category: 'nurbs',
+    caption: (
+      'Extract the u-iso-curve C(t) = S(u₀, t) from a NURBS surface as a full ' +
+      'parametric NurbsCurve (Piegl-Tiller §5.3 knot-insertion algorithm). ' +
+      'The extracted curve has degree = surface degree_v and the v knot vector.'
+    ),
+    defaults: {
+      degree_u: 3,
+      degree_v: 3,
+      num_u: 4,
+      num_v: 4,
+      u: 0.5,
+      control_points: [],
+      knots_u: [],
+      knots_v: [],
+    },
+    fields: [
+      { key: 'degree_u', kind: 'number', label: 'Surface degree U', min: 1, max: 9, step: 1 },
+      { key: 'degree_v', kind: 'number', label: 'Surface degree V', min: 1, max: 9, step: 1 },
+      { key: 'num_u',    kind: 'number', label: 'CP count U', min: 2, step: 1 },
+      { key: 'num_v',    kind: 'number', label: 'CP count V', min: 2, step: 1 },
+      { key: 'u',        kind: 'number', label: 'u parameter value', min: 0, max: 1, step: 0.05 },
+    ],
+  },
+
+  {
+    op: 'nurbs_extract_iso_v',
+    label: 'Extract Iso-V Curve',
+    icon: Spline,
+    category: 'nurbs',
+    caption: (
+      'Extract the v-iso-curve C(t) = S(t, v₀) from a NURBS surface as a full ' +
+      'parametric NurbsCurve (Piegl-Tiller §5.3 knot-insertion algorithm). ' +
+      'The extracted curve has degree = surface degree_u and the u knot vector.'
+    ),
+    defaults: {
+      degree_u: 3,
+      degree_v: 3,
+      num_u: 4,
+      num_v: 4,
+      v: 0.5,
+      control_points: [],
+      knots_u: [],
+      knots_v: [],
+    },
+    fields: [
+      { key: 'degree_u', kind: 'number', label: 'Surface degree U', min: 1, max: 9, step: 1 },
+      { key: 'degree_v', kind: 'number', label: 'Surface degree V', min: 1, max: 9, step: 1 },
+      { key: 'num_u',    kind: 'number', label: 'CP count U', min: 2, step: 1 },
+      { key: 'num_v',    kind: 'number', label: 'CP count V', min: 2, step: 1 },
+      { key: 'v',        kind: 'number', label: 'v parameter value', min: 0, max: 1, step: 0.05 },
+    ],
+  },
+
+  // nurbs_split_curve — split a curve at one or more parameter values
+  {
+    op: 'nurbs_split_curve',
+    label: 'Split Curve',
+    icon: SplitSquareHorizontal,
+    category: 'nurbs',
+    caption: (
+      'Split a NURBS curve into two or more segments at given parameter values ' +
+      '(Piegl-Tiller knot insertion). Returns a list of NurbsCurve segments. ' +
+      'The split preserves exact geometry (no approximation).'
+    ),
+    defaults: {
+      degree: 3,
+      t_values: [0.5],
+      control_points: [],
+      knots: [],
+    },
+    fields: [
+      { key: 'degree',   kind: 'number', label: 'Curve degree', min: 1, max: 9, step: 1 },
+    ],
+  },
+
+  // nurbs_split_surface — split a surface at u or v parameter
+  {
+    op: 'nurbs_split_surface',
+    label: 'Split Surface',
+    icon: SplitSquareHorizontal,
+    category: 'nurbs',
+    caption: (
+      'Split a NURBS surface at a given u or v parameter value. ' +
+      'Returns two NurbsSurface halves. Exact — knot insertion preserves geometry. ' +
+      'direction: "u" splits along iso-v; "v" splits along iso-u.'
+    ),
+    defaults: {
+      degree_u: 3,
+      degree_v: 3,
+      num_u: 4,
+      num_v: 4,
+      direction: 'u',
+      t: 0.5,
+      control_points: [],
+      knots_u: [],
+      knots_v: [],
+    },
+    fields: [
+      { key: 'degree_u',  kind: 'number', label: 'Degree U', min: 1, max: 9, step: 1 },
+      { key: 'degree_v',  kind: 'number', label: 'Degree V', min: 1, max: 9, step: 1 },
+      { key: 'num_u',     kind: 'number', label: 'CP count U', min: 2, step: 1 },
+      { key: 'num_v',     kind: 'number', label: 'CP count V', min: 2, step: 1 },
+      { key: 'direction', kind: 'select', label: 'Split direction', options: [
+        { value: 'u', label: 'U (split at constant u)' },
+        { value: 'v', label: 'V (split at constant v)' },
+      ] },
+      { key: 't', kind: 'number', label: 'Split parameter', min: 0.001, max: 0.999, step: 0.05 },
+    ],
+  },
+
+  // nurbs_find_curve_inflections — Sturm-sequence / bisection inflection finder
+  {
+    op: 'nurbs_find_curve_inflections',
+    label: 'Curve Inflections',
+    icon: Workflow,
+    category: 'nurbs',
+    caption: (
+      'Locate inflection points (κ = 0) on a planar NURBS curve via Sturm-sequence ' +
+      'sign-change counting + bisection root finding. ' +
+      'Returns parameter values and XYZ coordinates of all inflections.'
+    ),
+    defaults: {
+      degree: 3,
+      control_points: [],
+      knots: [],
+      samples: 64,
+    },
+    fields: [
+      { key: 'degree',  kind: 'number', label: 'Curve degree', min: 1, max: 9, step: 1 },
+      { key: 'samples', kind: 'number', label: 'Search sample count', min: 8, max: 512, step: 8 },
+    ],
+  },
+
+  // nurbs_match_srf_g3 — curvature-rate-continuity MatchSrf
+  {
+    op: 'nurbs_match_srf_g3',
+    label: 'Match Surface G3',
+    icon: GitMerge,
+    category: 'nurbs',
+    caption: (
+      'Match a NURBS surface edge to a target surface with G3 (curvature-rate) ' +
+      'continuity. Modifies the first 4 rows of control points of the source ' +
+      'surface. Requires degree ≥ 3 and ≥ 4 CP rows.'
+    ),
+    defaults: {
+      match_edge: 'u0',
+      degree_u: 5,
+      degree_v: 3,
+    },
+    fields: [
+      { key: 'match_edge', kind: 'select', label: 'Match edge', options: [
+        { value: 'u0', label: 'u = 0 (south edge)' },
+        { value: 'u1', label: 'u = 1 (north edge)' },
+        { value: 'v0', label: 'v = 0 (west edge)' },
+        { value: 'v1', label: 'v = 1 (east edge)' },
+      ] },
+      { key: 'degree_u', kind: 'number', label: 'Source degree U', min: 3, max: 9, step: 1 },
+      { key: 'degree_v', kind: 'number', label: 'Source degree V', min: 3, max: 9, step: 1 },
+    ],
+  },
+
+  // nurbs_match_surface_g3 — full MatchSurface G3 (match_srf.py)
+  {
+    op: 'nurbs_match_surface_g3',
+    label: 'Match Surface G3 (Full)',
+    icon: GitMerge,
+    category: 'nurbs',
+    caption: (
+      'Full G3 surface matching: adjust one surface to meet a target with G3 ' +
+      'continuity along a shared boundary. Supports tangent scale and ' +
+      'curvature rate controls. More flexible than the compact nurbs_match_srf_g3.'
+    ),
+    defaults: {
+      target_edge: 'u0',
+      match_continuity: 'G3',
+    },
+    fields: [
+      { key: 'target_edge', kind: 'select', label: 'Target shared edge', options: [
+        { value: 'u0', label: 'u = 0' },
+        { value: 'u1', label: 'u = 1' },
+        { value: 'v0', label: 'v = 0' },
+        { value: 'v1', label: 'v = 1' },
+      ] },
+      { key: 'match_continuity', kind: 'select', label: 'Continuity target', options: [
+        { value: 'G1', label: 'G1 (tangent)' },
+        { value: 'G2', label: 'G2 (curvature)' },
+        { value: 'G3', label: 'G3 (curvature-rate)' },
+      ] },
+    ],
+  },
+
+  // nurbs_analyze_isophotes — marching-squares isophote extractor
+  {
+    op: 'nurbs_analyze_isophotes',
+    label: 'Isophote Analysis',
+    icon: Eye,
+    category: 'nurbs',
+    caption: (
+      'Compute isophote (constant normal-angle) lines on a NURBS surface via ' +
+      'marching squares. Reports discontinuity count and fairness score ∈ [0,1]. ' +
+      'Standard Class-A surface quality metric — complements zebra/curvature-comb analysis.'
+    ),
+    defaults: {
+      degree_u: 3,
+      degree_v: 3,
+      num_u: 4,
+      num_v: 4,
+      view_direction: [0, 0, 1],
+      angle_bands_deg: [0, 30, 60, 90],
+      uv_samples_u: 80,
+      uv_samples_v: 80,
+      control_points: [],
+      knots_u: [],
+      knots_v: [],
+    },
+    fields: [
+      { key: 'degree_u',      kind: 'number', label: 'Degree U', min: 1, max: 9, step: 1 },
+      { key: 'degree_v',      kind: 'number', label: 'Degree V', min: 1, max: 9, step: 1 },
+      { key: 'num_u',         kind: 'number', label: 'CP count U', min: 2, step: 1 },
+      { key: 'num_v',         kind: 'number', label: 'CP count V', min: 2, step: 1 },
+      { key: 'uv_samples_u',  kind: 'number', label: 'UV grid resolution U', min: 8, max: 400, step: 8 },
+      { key: 'uv_samples_v',  kind: 'number', label: 'UV grid resolution V', min: 8, max: 400, step: 8 },
+    ],
+  },
+
+  // nurbs_surface_derivatives_analytic — analytic first/second partial derivatives
+  {
+    op: 'nurbs_surface_derivatives_analytic',
+    label: 'Surface Derivatives',
+    icon: Ruler,
+    category: 'nurbs',
+    caption: (
+      'Compute analytic first and second partial derivatives (∂S/∂u, ∂S/∂v, ' +
+      '∂²S/∂u², ∂²S/∂v², ∂²S/∂u∂v) at a UV point on a NURBS surface. ' +
+      'Returns unit normal, Gaussian curvature K, and mean curvature H.'
+    ),
+    defaults: {
+      degree_u: 3,
+      degree_v: 3,
+      control_points: [],
+      knots_u: [],
+      knots_v: [],
+      u: 0.5,
+      v: 0.5,
+    },
+    fields: [
+      { key: 'degree_u', kind: 'number', label: 'Degree U', min: 1, max: 9, step: 1 },
+      { key: 'degree_v', kind: 'number', label: 'Degree V', min: 1, max: 9, step: 1 },
+      { key: 'u',        kind: 'number', label: 'u parameter', min: 0, max: 1, step: 0.01 },
+      { key: 'v',        kind: 'number', label: 'v parameter', min: 0, max: 1, step: 0.01 },
+    ],
+  },
+
+  // nurbs_loft_with_guide_rails — guide-rail loft (Piegl-Tiller §10.3)
+  {
+    op: 'nurbs_loft_with_guide_rails',
+    label: 'Loft with Guide Rails',
+    icon: Workflow,
+    category: 'nurbs',
+    caption: (
+      'Loft a NURBS surface through cross-section curves while following guide rail ' +
+      'curves (Piegl-Tiller §10.3 skinning + Gaussian displacement-blend). ' +
+      'Mirrors the "guide-rail loft" in Rhino / Fusion 360.'
+    ),
+    defaults: {
+      num_v_samples: 20,
+      degree_v: 3,
+      closed_v: false,
+      cross_section_curves: [],
+      guide_rail_curves: [],
+    },
+    fields: [
+      { key: 'degree_v',       kind: 'number',  label: 'Loft direction degree', min: 1, max: 9, step: 1 },
+      { key: 'num_v_samples',  kind: 'number',  label: 'V sample density', min: 4, max: 200, step: 4 },
+      { key: 'closed_v',       kind: 'boolean', label: 'Close loft (periodic)' },
+    ],
+  },
+
+  // nurbs_loft_with_rails_variable — variable rail-tangent Gordon loft
+  {
+    op: 'nurbs_loft_with_rails_variable',
+    label: 'Loft with Variable Rails',
+    icon: Workflow,
+    category: 'nurbs',
+    caption: (
+      'Variable rail-tangent Gordon loft (Piegl-Tiller §10.4.3). ' +
+      'Rail tangents can vary along each cross-section to match complex transitions. ' +
+      'More flexible than guide-rail loft for swept-blend surfaces.'
+    ),
+    defaults: {
+      sections: [],
+      rails: [],
+    },
+    fields: [],
+  },
+
+  // nurbs_surface_area_exact — exact Gauss-Legendre surface area
+  {
+    op: 'nurbs_surface_area_exact',
+    label: 'Surface Area (Exact)',
+    icon: Ruler,
+    category: 'nurbs',
+    caption: (
+      'Compute the exact surface area of a NURBS patch via Gauss-Legendre quadrature. ' +
+      'More accurate than mesh-based approximation for smooth NURBS surfaces. ' +
+      'Returns area_mm2, centroid_xyz, and error_estimate_mm2.'
+    ),
+    defaults: {
+      degree_u: 3,
+      degree_v: 3,
+      control_points: [],
+      knots_u: [],
+      knots_v: [],
+      quadrature_order: 8,
+    },
+    fields: [
+      { key: 'degree_u',        kind: 'number', label: 'Degree U', min: 1, max: 9, step: 1 },
+      { key: 'degree_v',        kind: 'number', label: 'Degree V', min: 1, max: 9, step: 1 },
+      { key: 'quadrature_order', kind: 'number', label: 'Gauss quadrature order', min: 2, max: 20, step: 1 },
+    ],
+  },
+
+  // nurbs_offset_curve_2d — 2D planar curve offset
+  {
+    op: 'nurbs_offset_curve_2d',
+    label: 'Offset Curve 2D',
+    icon: Maximize2,
+    category: 'nurbs',
+    caption: (
+      'Offset a 2D NURBS curve by a signed distance (positive = left of travel). ' +
+      'Uses the Tiller-Hanson approximate offset + least-squares re-fit. ' +
+      'Returns a new NurbsCurve of the same or higher degree.'
+    ),
+    defaults: {
+      degree: 3,
+      offset_distance_mm: 1.0,
+      control_points: [],
+      knots: [],
+      samples: 32,
+    },
+    fields: [
+      { key: 'degree',             kind: 'number', label: 'Curve degree', min: 1, max: 9, step: 1 },
+      { key: 'offset_distance_mm', kind: 'number', label: 'Offset distance (mm)', step: 0.1 },
+      { key: 'samples',            kind: 'number', label: 'Sample count for re-fit', min: 8, max: 256, step: 8 },
+    ],
+  },
+
+  // nurbs_reparametrize_optimal — LSCM / ARAP optimal reparametrisation
+  {
+    op: 'nurbs_reparametrize_optimal',
+    label: 'Reparametrize Optimal',
+    icon: Shuffle,
+    category: 'nurbs',
+    caption: (
+      'Reparametrize a NURBS surface to minimise UV distortion. ' +
+      'Supports LSCM (angle-preserving, Lévy 2002) and ARAP (shape-preserving, Liu 2008). ' +
+      'Returns distortion metrics and the reparametrized surface.'
+    ),
+    defaults: {
+      degree_u: 3,
+      degree_v: 3,
+      control_points: [],
+      knots_u: [],
+      knots_v: [],
+      method: 'lscm',
+    },
+    fields: [
+      { key: 'degree_u', kind: 'number', label: 'Degree U', min: 1, max: 9, step: 1 },
+      { key: 'degree_v', kind: 'number', label: 'Degree V', min: 1, max: 9, step: 1 },
+      { key: 'method',   kind: 'select', label: 'Method', options: [
+        { value: 'lscm', label: 'LSCM (angle-preserving)' },
+        { value: 'arap', label: 'ARAP (shape-preserving)' },
+      ] },
+    ],
+  },
+
+  // nurbs_sample_surface_curvature_map — Gaussian / mean curvature heatmap
+  {
+    op: 'nurbs_sample_surface_curvature_map',
+    label: 'Curvature Map',
+    icon: Wand2,
+    category: 'nurbs',
+    caption: (
+      'Sample Gaussian (K) and mean (H) curvature at a grid of UV points on a NURBS surface. ' +
+      'Returns per-sample curvature values suitable for heatmap rendering. ' +
+      'Uses analytic first and second partial derivatives.'
+    ),
+    defaults: {
+      degree_u: 3,
+      degree_v: 3,
+      control_points: [],
+      knots_u: [],
+      knots_v: [],
+      samples_u: 20,
+      samples_v: 20,
+    },
+    fields: [
+      { key: 'degree_u',  kind: 'number', label: 'Degree U', min: 1, max: 9, step: 1 },
+      { key: 'degree_v',  kind: 'number', label: 'Degree V', min: 1, max: 9, step: 1 },
+      { key: 'samples_u', kind: 'number', label: 'Sample count U', min: 4, max: 200, step: 4 },
+      { key: 'samples_v', kind: 'number', label: 'Sample count V', min: 4, max: 200, step: 4 },
+    ],
+  },
+
+  // nurbs_compute_surface_cross_section — planar cross-section of a NURBS surface
+  {
+    op: 'nurbs_compute_surface_cross_section',
+    label: 'Surface Cross-Section',
+    icon: Scissors,
+    category: 'nurbs',
+    caption: (
+      'Compute the planar cross-section of a NURBS surface with a cutting plane ' +
+      '(Sederberg §7.3). Returns intersection points / polyline in 3D space. ' +
+      'Use for generating section contours on freeform surfaces.'
+    ),
+    defaults: {
+      degree_u: 3,
+      degree_v: 3,
+      control_points: [],
+      knots_u: [],
+      knots_v: [],
+      plane_point: [0, 0, 0],
+      plane_normal: [0, 0, 1],
+      samples: 40,
+    },
+    fields: [
+      { key: 'degree_u',       kind: 'number', label: 'Degree U', min: 1, max: 9, step: 1 },
+      { key: 'degree_v',       kind: 'number', label: 'Degree V', min: 1, max: 9, step: 1 },
+      { key: 'plane_point[0]', kind: 'number', label: 'Plane point X (mm)' },
+      { key: 'plane_point[1]', kind: 'number', label: 'Plane point Y (mm)' },
+      { key: 'plane_point[2]', kind: 'number', label: 'Plane point Z (mm)' },
+      { key: 'plane_normal[0]', kind: 'number', label: 'Normal X' },
+      { key: 'plane_normal[1]', kind: 'number', label: 'Normal Y' },
+      { key: 'plane_normal[2]', kind: 'number', label: 'Normal Z' },
+      { key: 'samples',        kind: 'number', label: 'UV sample count', min: 8, max: 200, step: 8 },
+    ],
+  },
+
+  // nurbs_shift_seam — shift the seam of a closed NURBS surface
+  {
+    op: 'nurbs_shift_seam',
+    label: 'Shift Seam',
+    icon: Shuffle,
+    category: 'nurbs',
+    caption: (
+      'Shift the parametric seam of a closed (periodic) NURBS curve or surface. ' +
+      'Useful for aligning the seam location before a boolean or loft. ' +
+      'Exact — reparametrises the knot vector without changing geometry.'
+    ),
+    defaults: {
+      surface: {},
+      seam_u: 0.5,
+    },
+    fields: [
+      { key: 'seam_u', kind: 'number', label: 'New seam u parameter', min: 0, max: 1, step: 0.05 },
+    ],
+  },
+
+  // nurbs_trim_loop_heal — heal degenerate trim loops
+  {
+    op: 'nurbs_trim_loop_heal',
+    label: 'Trim Loop Heal',
+    icon: Wand2,
+    category: 'nurbs',
+    caption: (
+      'Heal a degenerate or self-intersecting NURBS trim loop by closing gaps, ' +
+      'removing spikes, and re-ordering edge segments. ' +
+      'Returns a cleaned outer trim loop suitable for surface trimming.'
+    ),
+    defaults: {
+      outer: [],
+      tolerance: 1e-4,
+      remove_spikes: true,
+    },
+    fields: [
+      { key: 'tolerance',     kind: 'number',  label: 'Gap close tolerance (mm)', min: 1e-9, step: 1e-4 },
+      { key: 'remove_spikes', kind: 'boolean', label: 'Remove spike segments' },
+    ],
+  },
+
+  // nurbs_composite_g2_audit — audit G0/G1/G2 joints in a curve chain
+  {
+    op: 'nurbs_composite_g2_audit',
+    label: 'Composite G2 Audit',
+    icon: Shield,
+    category: 'nurbs',
+    caption: (
+      'Audit the G0/G1/G2 continuity at every joint in a composite NURBS curve chain. ' +
+      'Returns per-joint residuals and a pass/fail summary for each continuity class. ' +
+      'Pairs with nurbs_composite_g2_upgrade to fix failing joints.'
+    ),
+    defaults: {
+      segments: [],
+    },
+    fields: [],
+  },
+
+  // nurbs_composite_g2_upgrade — upgrade joints to G2 continuity
+  {
+    op: 'nurbs_composite_g2_upgrade',
+    label: 'Composite G2 Upgrade',
+    icon: Wand2,
+    category: 'nurbs',
+    caption: (
+      'Upgrade failing G0/G1/G2 joints in a composite NURBS curve chain to G2 ' +
+      'by inserting a cubic Hermite or quintic Bézier blend segment at each joint. ' +
+      'Returns the repaired chain with per-joint improvement statistics.'
+    ),
+    defaults: {
+      segments: [],
+      method: 'quintic_bezier',
+    },
+    fields: [
+      { key: 'method', kind: 'select', label: 'Blend method', options: [
+        { value: 'quintic_bezier',  label: 'Quintic Bézier (G2 exact)' },
+        { value: 'cubic_hermite',   label: 'Cubic Hermite (G1 only)' },
+      ] },
+    ],
+  },
+
+  // nurbs_solid_boolean — NURBS-native solid CSG boolean
+  {
+    op: 'nurbs_solid_boolean',
+    label: 'NURBS Solid Boolean',
+    icon: Combine,
+    category: 'nurbs',
+    caption: (
+      'Perform a CSG boolean (cut / fuse / common) on NURBS-faced solid bodies. ' +
+      'Operates on axis-aligned bounding-box octants for simple convex bodies. ' +
+      'For general non-convex bodies use the regular Boolean op with to_solid pre-step.'
+    ),
+    defaults: {
+      lo_a: [0, 0, 0],
+      hi_a: [10, 10, 10],
+      lo_b: [5, 5, 5],
+      hi_b: [15, 15, 15],
+      op: 'cut',
+    },
+    fields: [
+      { key: 'op', kind: 'select', label: 'Operation', options: [
+        { value: 'cut',    label: 'Cut (A − B)' },
+        { value: 'fuse',   label: 'Fuse (A ∪ B)' },
+        { value: 'common', label: 'Common (A ∩ B)' },
+      ] },
+    ],
+  },
+
+  // nurbs_fillet_variable_g2 — variable-radius G2 fillet between two surfaces
+  {
+    op: 'nurbs_fillet_variable_g2',
+    label: 'Variable Fillet G2',
+    icon: Waves,
+    category: 'nurbs',
+    caption: (
+      'Compute a variable-radius G2-continuous fillet strip between two NURBS surfaces. ' +
+      'Radius can vary along the shared edge according to a ramp profile. ' +
+      'Returns a trimmed blend surface sewn to both input faces.'
+    ),
+    defaults: {
+      radius_start: 2.0,
+      radius_end: 5.0,
+      samples: 20,
+    },
+    fields: [
+      { key: 'radius_start', kind: 'number', label: 'Radius at start (mm)', min: 0.001, step: 0.1 },
+      { key: 'radius_end',   kind: 'number', label: 'Radius at end (mm)',   min: 0.001, step: 0.1 },
+      { key: 'samples',      kind: 'number', label: 'Sample count', min: 4, max: 128, step: 4 },
+    ],
+  },
+
+  // nurbs_normal_curvature_at_point — Meusnier normal curvature at UV point
+  {
+    op: 'nurbs_normal_curvature_at_point',
+    label: 'Normal Curvature at Point',
+    icon: Ruler,
+    category: 'nurbs',
+    caption: (
+      'Compute normal curvature κ_n at a UV point on a NURBS surface in a given ' +
+      'direction (Meusnier\'s theorem, do Carmo §3.2). ' +
+      'Returns κ_n, principal curvatures κ₁/κ₂, Gaussian K, mean H, and principal directions.'
+    ),
+    defaults: {
+      degree_u: 3,
+      degree_v: 3,
+      control_points: [],
+      knots_u: [],
+      knots_v: [],
+      u: 0.5,
+      v: 0.5,
+      direction_uv: [1, 0],
+    },
+    fields: [
+      { key: 'degree_u',        kind: 'number', label: 'Degree U', min: 1, max: 9, step: 1 },
+      { key: 'degree_v',        kind: 'number', label: 'Degree V', min: 1, max: 9, step: 1 },
+      { key: 'u',               kind: 'number', label: 'u parameter', min: 0, max: 1, step: 0.01 },
+      { key: 'v',               kind: 'number', label: 'v parameter', min: 0, max: 1, step: 0.01 },
+      { key: 'direction_uv[0]', kind: 'number', label: 'Direction U component' },
+      { key: 'direction_uv[1]', kind: 'number', label: 'Direction V component' },
+    ],
+  },
+
+  // nurbs_curvature_metrics — curvature comb analysis on a curve
+  {
+    op: 'nurbs_curvature_metrics',
+    label: 'Curvature Metrics',
+    icon: Wand2,
+    category: 'nurbs',
+    caption: (
+      'Compute curvature metrics along a NURBS curve: κ(t) comb, min/max/mean curvature, ' +
+      'inflection parameter values, and fairness index. ' +
+      'Use to assess smoothness and spot unwanted oscillations.'
+    ),
+    defaults: {
+      degree: 3,
+      control_points: [],
+      samples: 64,
+    },
+    fields: [
+      { key: 'degree',  kind: 'number', label: 'Curve degree', min: 1, max: 9, step: 1 },
+      { key: 'samples', kind: 'number', label: 'Sample count', min: 8, max: 512, step: 8 },
+    ],
+  },
 ]
 
 const KIND_BY_OP = Object.fromEntries(FEATURE_KINDS.map((k) => [k.op, k]))
@@ -3026,6 +3797,41 @@ const FEATURE_CATEGORIES = [
   { id: 'subd',      label: 'SubD / Mesh',  ops: ['subd_poke', 'subd_extrude_along', 'sculpt_brush', 'multires_evaluate', 'subd_deform_with_cage', 'sdf_csg', 'retopo_snap'] },
   { id: 'weldment',  label: 'Weldment',     ops: ['gusset_plate', 'cope_notch'] },
   { id: 'bim',       label: 'BIM',          ops: ['bim_make_grid', 'bim_make_framing', 'bim_make_wall', 'bim_make_slab'] },
+  { id: 'nurbs',    label: 'NURBS',        ops: [
+    // Degree manipulation
+    'nurbs_degree_raise', 'nurbs_degree_lower',
+    // Surface offset
+    'nurbs_surface_offset', 'nurbs_surface_offset_robust',
+    // Curve/surface projection + iso-curve extraction
+    'nurbs_project_curve_to_surface',
+    'nurbs_extract_iso_u', 'nurbs_extract_iso_v',
+    // Split operations
+    'nurbs_split_curve', 'nurbs_split_surface',
+    // Curve analysis
+    'nurbs_find_curve_inflections',
+    'nurbs_curvature_metrics',
+    'nurbs_offset_curve_2d',
+    // Surface matching
+    'nurbs_match_srf_g3', 'nurbs_match_surface_g3',
+    // Surface analysis
+    'nurbs_analyze_isophotes',
+    'nurbs_surface_derivatives_analytic',
+    'nurbs_surface_area_exact',
+    'nurbs_sample_surface_curvature_map',
+    'nurbs_normal_curvature_at_point',
+    // Loft with rails
+    'nurbs_loft_with_guide_rails', 'nurbs_loft_with_rails_variable',
+    // Reparametrize + seam
+    'nurbs_reparametrize_optimal', 'nurbs_shift_seam',
+    // Cross-section + trim
+    'nurbs_compute_surface_cross_section',
+    'nurbs_trim_loop_heal',
+    // Composite curve quality
+    'nurbs_composite_g2_audit', 'nurbs_composite_g2_upgrade',
+    // Boolean + fillet
+    'nurbs_solid_boolean',
+    'nurbs_fillet_variable_g2',
+  ] },
 ]
 
 const DEBOUNCE_MS = 300

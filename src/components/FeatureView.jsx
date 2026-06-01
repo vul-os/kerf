@@ -5130,6 +5130,252 @@ const FEATURE_KINDS = [
       { key: 'density_g_per_cm3',  kind: 'number', label: 'Density (g/cm³)', min: 0.001, step: 0.1 },
     ],
   },
+
+  // ── Orphan wire-up batch (2026-06-01) ────────────────────────────────────
+  // brep_check_face_developable: test if a face can be unrolled flat
+  {
+    op: 'brep_check_face_developable',
+    label: 'Face Developability',
+    icon: ScanLine,
+    caption: 'Test whether a B-rep face is developable (Gaussian curvature ≈ 0 everywhere) — required for flat-pattern sheet metal or fabric cutting.',
+    defaults: { target_id: '', tol_k: 1e-4 },
+    fields: [
+      { key: 'target_id', kind: 'feature_picker', label: 'Target face / body' },
+      { key: 'tol_k',     kind: 'number', label: 'Curvature tolerance (1/mm²)', min: 1e-9, step: 1e-5 },
+    ],
+  },
+  // brep_detect_undercuts: pull-direction undercut detection for mold / casting
+  {
+    op: 'brep_detect_undercuts',
+    label: 'Undercut Detection',
+    icon: Eye,
+    caption: 'Detect faces that create undercuts relative to a pull direction — critical for injection-mold and casting DFM.',
+    defaults: { target_id: '', pull_direction_xyz: [0, 0, 1] },
+    fields: [
+      { key: 'target_id',          kind: 'feature_picker', label: 'Target body' },
+      { key: 'pull_direction_xyz', kind: 'text',           label: 'Pull direction [x,y,z]' },
+    ],
+  },
+  // brep_non_manifold_check: detect T-junction edges and touching-cone vertices
+  {
+    op: 'brep_non_manifold_check',
+    label: 'Non-Manifold Check',
+    icon: AlertTriangle,
+    caption: 'Detect T-junction edges, touching-cone vertices, and self-intersecting loops that make a B-rep body non-manifold.',
+    defaults: { target_id: '' },
+    fields: [
+      { key: 'target_id', kind: 'feature_picker', label: 'Target body' },
+    ],
+  },
+  // brep_detect_features: feature recognition (pockets, bosses, ribs, holes)
+  {
+    op: 'brep_detect_features',
+    label: 'Feature Recognition',
+    icon: Scan,
+    caption: 'Automatically recognise manufacturing features — pockets, bosses, ribs, slots, holes — from a B-rep body using face-adjacency topology.',
+    defaults: { target_id: '' },
+    fields: [
+      { key: 'target_id', kind: 'feature_picker', label: 'Target body' },
+    ],
+  },
+  // brep_export_step_with_colors: STEP AP214 with per-face RGB color
+  {
+    op: 'brep_export_step_with_colors',
+    label: 'STEP Export (colors)',
+    icon: FileOutput,
+    caption: 'Export B-rep body to STEP AP214 with per-face RGB colour annotations — compatible with CATIA, NX, and SolidWorks color import.',
+    defaults: { target_id: '', output_path: 'export.step' },
+    fields: [
+      { key: 'target_id',   kind: 'feature_picker', label: 'Target body' },
+      { key: 'output_path', kind: 'text',            label: 'Output file path' },
+    ],
+  },
+  // brep_generate_variable_chamfer: variable-width chamfer along edge
+  {
+    op: 'brep_generate_variable_chamfer',
+    label: 'Variable Chamfer',
+    icon: Scissors,
+    caption: 'Generate a variable-width chamfer along selected edges — width defined by start/end distances (linear blend) or by a control polygon.',
+    defaults: { target_id: '', edge_ids: [], start_distance_mm: 1.0, end_distance_mm: 2.0 },
+    fields: [
+      { key: 'target_id',        kind: 'feature_picker', label: 'Target body' },
+      { key: 'edge_ids',         kind: 'text',           label: 'Edge IDs (comma-separated)' },
+      { key: 'start_distance_mm',kind: 'number', label: 'Start distance (mm)', min: 0.001, step: 0.1 },
+      { key: 'end_distance_mm',  kind: 'number', label: 'End distance (mm)',   min: 0.001, step: 0.1 },
+    ],
+  },
+  // brep_check_wire_closed: verify a wire forms a closed loop
+  {
+    op: 'brep_check_wire_closed',
+    label: 'Wire Closed Check',
+    icon: Route,
+    caption: 'Verify that an ordered list of B-rep edges forms a closed, planar loop — used as a pre-condition before creating face geometry.',
+    defaults: { edge_ids: [] },
+    fields: [
+      { key: 'edge_ids', kind: 'text', label: 'Edge IDs (comma-separated)' },
+    ],
+  },
+  // geometry_topology_integrity_check: full body validity check
+  {
+    op: 'geometry_topology_integrity_check',
+    label: 'Topology Integrity',
+    icon: Shield,
+    caption: 'Run a full B-rep body validity check: Euler characteristic, manifold edges, face orientation, and self-intersections.',
+    defaults: { target_id: '' },
+    fields: [
+      { key: 'target_id', kind: 'feature_picker', label: 'Target body' },
+    ],
+  },
+  // surface_deviation_check: two-surface Hausdorff deviation measurement
+  {
+    op: 'surface_deviation_check',
+    label: 'Surface Deviation',
+    icon: Ruler,
+    caption: 'Compute max / mean / RMS Hausdorff deviation between two surfaces — quality control for machined parts vs. nominal CAD.',
+    defaults: { ref_id: '', meas_id: '', samples: 1000 },
+    fields: [
+      { key: 'ref_id',  kind: 'feature_picker', label: 'Reference surface' },
+      { key: 'meas_id', kind: 'feature_picker', label: 'Measured surface' },
+      { key: 'samples', kind: 'number', label: 'Sample count', min: 100, max: 10000, step: 100 },
+    ],
+  },
+  // surface_naked_edge_detect: find open boundary edges on a surface body
+  {
+    op: 'surface_naked_edge_detect',
+    label: 'Naked Edge Detect',
+    icon: ScanSearch,
+    caption: 'Detect naked (open boundary) edges on a surface body — essential before converting surfaces to a solid B-rep.',
+    defaults: { target_id: '' },
+    fields: [
+      { key: 'target_id', kind: 'feature_picker', label: 'Target surface body' },
+    ],
+  },
+  // subd_apply_displacement: apply displacement map to SubD limit mesh
+  {
+    op: 'subd_apply_displacement',
+    label: 'SubD Displacement',
+    icon: Layers,
+    caption: 'Apply a procedural or image-based displacement map to the SubD limit surface — creates fine surface detail without topology editing.',
+    defaults: { target_id: '', amplitude_mm: 0.5, frequency: 8 },
+    fields: [
+      { key: 'target_id',    kind: 'feature_picker', label: 'Target SubD cage' },
+      { key: 'amplitude_mm', kind: 'number', label: 'Amplitude (mm)', min: 0, step: 0.1 },
+      { key: 'frequency',    kind: 'number', label: 'Frequency (waves)', min: 1, step: 1 },
+    ],
+  },
+  // subd_check_osd_compatibility: verify cage is OpenSubDiv 3.5 compatible
+  {
+    op: 'subd_check_osd_compatibility',
+    label: 'OSD Compatibility',
+    icon: Boxes,
+    caption: 'Check that a SubD cage is Pixar OpenSubDiv 3.5 compatible — validates vertex valence, crease sharpness range, and dart constraints.',
+    defaults: { target_id: '' },
+    fields: [
+      { key: 'target_id', kind: 'feature_picker', label: 'Target SubD cage' },
+    ],
+  },
+  // sheetmetal_compute_flat_pattern: DIN 6935 / K-factor flat-pattern calculation
+  {
+    op: 'sheetmetal_compute_flat_pattern',
+    label: 'Flat Pattern',
+    icon: Layers3,
+    caption: 'Compute the flat-pattern (unfold) dimensions for a multi-bend sheet metal part using DIN 6935 K-factor bend allowance.',
+    defaults: {
+      material: 'steel-cold-rolled',
+      thickness_mm: 2.0,
+      length_mm: 100.0,
+      width_mm: 50.0,
+      bend_radius_mm: 3.0,
+      bend_angle_deg: 90,
+      flange_lengths_mm: [30, 40],
+    },
+    fields: [
+      { key: 'material',          kind: 'select', label: 'Material', options: ['steel-cold-rolled','stainless-304','aluminum-5052','copper'] },
+      { key: 'thickness_mm',      kind: 'number', label: 'Thickness (mm)',     min: 0.1, step: 0.1 },
+      { key: 'length_mm',         kind: 'number', label: 'Part length (mm)',   min: 1 },
+      { key: 'width_mm',          kind: 'number', label: 'Part width (mm)',    min: 1 },
+      { key: 'bend_radius_mm',    kind: 'number', label: 'Bend radius (mm)',   min: 0.1, step: 0.1 },
+      { key: 'bend_angle_deg',    kind: 'number', label: 'Bend angle (°)',     min: 1, max: 180 },
+      { key: 'flange_lengths_mm', kind: 'text',   label: 'Flange lengths mm (JSON array)' },
+    ],
+  },
+  // tolstack_analyze: 1-D tolerance stackup WC/RSS/Monte Carlo
+  {
+    op: 'tolstack_analyze',
+    label: 'Tolerance Stackup',
+    icon: SlidersHorizontal,
+    caption: 'Analyze a 1-D tolerance chain: Worst Case, RSS, and Monte Carlo simulation to predict assembly variation.',
+    defaults: { loop_closing_dimensions: [], required_gap_min_mm: 0.1, required_gap_max_mm: 1.0 },
+    fields: [
+      { key: 'loop_closing_dimensions', kind: 'text', label: 'Dimensions JSON (array of {nominal,tol} objects)' },
+      { key: 'required_gap_min_mm',     kind: 'number', label: 'Min gap (mm)', step: 0.01 },
+      { key: 'required_gap_max_mm',     kind: 'number', label: 'Max gap (mm)', step: 0.01 },
+    ],
+  },
+  // brep_check_moldability: full mold DFM check (draft, undercuts, wall thickness)
+  {
+    op: 'brep_check_moldability',
+    label: 'Moldability Check',
+    icon: Wrench,
+    caption: 'Full injection-mold DFM check: draft angle per face, undercut detection, parting line, and wall-thickness uniformity.',
+    defaults: { target_id: '', pull_direction_xyz: [0, 0, 1], min_draft_deg: 1.0 },
+    fields: [
+      { key: 'target_id',          kind: 'feature_picker', label: 'Target body' },
+      { key: 'pull_direction_xyz', kind: 'text',           label: 'Pull direction [x,y,z]' },
+      { key: 'min_draft_deg',      kind: 'number', label: 'Min draft angle (°)', min: 0, step: 0.5 },
+    ],
+  },
+  // brep_check_shell_walls: detect thin walls below manufacturing minimum
+  {
+    op: 'brep_check_shell_walls',
+    label: 'Shell Wall Check',
+    icon: Activity,
+    caption: 'Detect shell / thin-wall regions below the minimum manufacturable thickness for milling, casting, or injection moulding.',
+    defaults: { target_id: '', min_wall_mm: 1.0 },
+    fields: [
+      { key: 'target_id',  kind: 'feature_picker', label: 'Target body' },
+      { key: 'min_wall_mm',kind: 'number', label: 'Min wall (mm)', min: 0.001, step: 0.1 },
+    ],
+  },
+  // brep_apply_chamfer_recommendations: DFM-guided chamfer auto-apply
+  {
+    op: 'brep_apply_chamfer_recommendations',
+    label: 'Auto Chamfer (DFM)',
+    icon: Zap,
+    caption: 'Automatically apply DFM-recommended chamfers to sharp-entry edges (tool runout relief, deburring allowance) based on manufacturing process.',
+    defaults: { target_id: '', process: 'milling', chamfer_mm: 0.5 },
+    fields: [
+      { key: 'target_id',  kind: 'feature_picker', label: 'Target body' },
+      { key: 'process',    kind: 'select', label: 'Process', options: ['milling','turning','casting','injection_mold'] },
+      { key: 'chamfer_mm', kind: 'number', label: 'Chamfer size (mm)', min: 0.1, step: 0.1 },
+    ],
+  },
+  // brep_apply_fillet_recommendations: DFM-guided fillet auto-apply
+  {
+    op: 'brep_apply_fillet_recommendations',
+    label: 'Auto Fillet (DFM)',
+    icon: Wand2,
+    caption: 'Automatically apply DFM-recommended fillets to internal corners based on tool radius constraints for the target manufacturing process.',
+    defaults: { target_id: '', process: 'milling', fillet_mm: 1.0 },
+    fields: [
+      { key: 'target_id',  kind: 'feature_picker', label: 'Target body' },
+      { key: 'process',    kind: 'select', label: 'Process', options: ['milling','casting','injection_mold'] },
+      { key: 'fillet_mm',  kind: 'number', label: 'Fillet radius (mm)', min: 0.1, step: 0.1 },
+    ],
+  },
+  // surface_isocurve_extract: extract U/V iso-parameter curves from NURBS surface
+  {
+    op: 'surface_isocurve_extract',
+    label: 'Extract Isocurves',
+    icon: GitBranch,
+    caption: 'Extract U-parameter or V-parameter iso-curves from a NURBS surface at specified parameter values — useful for toolpath seeding and surface analysis.',
+    defaults: { target_id: '', direction: 'u', param_values: [0.25, 0.5, 0.75] },
+    fields: [
+      { key: 'target_id',    kind: 'feature_picker', label: 'Target surface' },
+      { key: 'direction',    kind: 'select', label: 'Direction', options: ['u','v'] },
+      { key: 'param_values', kind: 'text',           label: 'Parameter values (JSON array)' },
+    ],
+  },
 ]
 
 const KIND_BY_OP = Object.fromEntries(FEATURE_KINDS.map((k) => [k.op, k]))
@@ -5195,6 +5441,8 @@ const FEATURE_CATEGORIES = [
     'subd_geodesic_distance', 'subd_csg_union', 'subd_csg_difference', 'subd_csg_intersection',
     'subd_project_primitive', 'subd_symmetrize',
     'sdf_csg', 'retopo_snap',
+    // Orphan wire-up 2026-06-01
+    'subd_apply_displacement', 'subd_check_osd_compatibility',
   ] },
   { id: 'sketch_ops', label: 'Sketch Tools', ops: [
     'sketch_add_entity', 'sketch_add_constraint', 'sketch_set_constraint_value',
@@ -5217,6 +5465,18 @@ const FEATURE_CATEGORIES = [
     'geom_check_face_planarity', 'geom_classify_edge_convexity',
     'brep_analyze_wall_thickness', 'brep_check_clearance',
     'brep_recognize_holes', 'brep_verify_euler_topology', 'brep_compute_inertia',
+    // Orphan wire-up 2026-06-01
+    'brep_check_face_developable', 'brep_detect_undercuts', 'brep_non_manifold_check',
+    'brep_detect_features', 'brep_export_step_with_colors', 'brep_generate_variable_chamfer',
+    'brep_check_wire_closed', 'geometry_topology_integrity_check',
+    'brep_check_moldability', 'brep_check_shell_walls',
+    'brep_apply_chamfer_recommendations', 'brep_apply_fillet_recommendations',
+  ] },
+  { id: 'surface_analysis', label: 'Surface Analysis', ops: [
+    'surface_deviation_check', 'surface_naked_edge_detect', 'surface_isocurve_extract',
+  ] },
+  { id: 'manufacturing_dfm', label: 'Manufacturing / DFM', ops: [
+    'sheetmetal_compute_flat_pattern', 'tolstack_analyze',
   ] },
   { id: 'weldment',  label: 'Weldment',     ops: ['gusset_plate', 'cope_notch'] },
   { id: 'bim',       label: 'BIM',          ops: ['bim_make_grid', 'bim_make_framing', 'bim_make_wall', 'bim_make_slab'] },

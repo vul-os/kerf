@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-01T14:07:03.776Z",
+  "generatedAt": "2026-06-01T14:14:23.965Z",
   "items": [
     {
       "slug": "revit",
@@ -473,9 +473,9 @@
             "source": "https://help.autodesk.com/view/CIV3D/2026/ENU/?guid=GUID-E9F0A1B2-3C4D-5E6F-7A8B-9C0D1E2F3A4B"
           },
           "kerf": {
-            "status": "yes",
-            "note": "civil_generate_corridor_sheets — multi-sheet DXF with plan view (horizontal alignment + edge strings), profile view (FG + EG + grade stubs), and cross-sections at configurable station interval; AASHTO-compliant cut/fill slopes; AutoCAD R12/R14 ASCII DXF",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/civil/corridor_sheet_generator.py"
+            "status": "no",
+            "note": "No automated civil plan/profile sheet generation; corridor DXF export exists but no sheet-set workflow",
+            "evidence": "packages/kerf-civil/src/kerf_civil/"
           }
         },
         {
@@ -4249,9 +4249,9 @@
             "note": "CAM WB supports up to 3-axis; no official 5-axis"
           },
           "kerf": {
-            "status": "yes",
-            "evidence": "packages/kerf-cam/src/",
-            "note": "5-axis engine + FeatureView inspector wired (cam_5axis_finish, cam_3plus2, hsm_adaptive_pocket, hsm_trochoidal_slot, hsm_rest_machining + 14 other CAM/HSM ops); 3-axis CAMView also wired"
+            "status": "partial",
+            "evidence": "packages/kerf-cam/src/kerf_cam/five_axis/__init__.py",
+            "note": "5-axis engine solid; no UI"
           }
         },
         {
@@ -5200,9 +5200,9 @@
             "source": "https://www.autodesk.com/products/fusion-360/manufacturing-extension"
           },
           "kerf": {
-            "status": "yes",
-            "note": "5-axis engine + FeatureView inspector wired (cam_5axis_finish, cam_3plus2 simultaneous/indexed; hsm_adaptive_pocket, hsm_trochoidal_slot, hsm_rest_machining)",
-            "evidence": "packages/kerf-cam/src/kerf_cam/worker.py"
+            "status": "partial",
+            "note": "Engine solid (5-axis 3+2); no UI",
+            "evidence": "packages/kerf-cam/src/kerf_cam/five_axis"
           }
         },
         {
@@ -5995,9 +5995,9 @@
             "source": "https://help.solidworks.com/2024/english/SolidWorks/sldworks/c_features_top.htm"
           },
           "kerf": {
-            "status": "yes",
-            "note": "Full per-code backend (AISC 360-22 + ACI 318-19 + TMS 402-22 + ASCE 7-22); StructuralPanel.jsx tabbed UI wired (24 arch_* tools in 5 tabs, incl. arch_check_lateral_bracing)",
-            "evidence": "packages/kerf-structural/"
+            "status": "partial",
+            "note": "Full per-code backend; no UI panel",
+            "evidence": "packages/kerf-structural/src/kerf_structural/aisc_member.py"
           }
         },
         {
@@ -6205,9 +6205,9 @@
             "source": "https://help.solidworks.com/2025/English/WhatsNew/c_wn_cam.htm"
           },
           "kerf": {
-            "status": "yes",
-            "note": "5-axis 3+2 engine + FeatureView inspector wired (cam_5axis_finish, cam_3plus2, hsm_adaptive_pocket + 16 other CAM/HSM tools)",
-            "evidence": "packages/kerf-cam/src/"
+            "status": "partial",
+            "note": "5-axis 3+2 engine solid; no UI",
+            "evidence": "packages/kerf-cam/src/kerf_cam/five_axis/constant_tilt.py"
           }
         },
         {
@@ -6986,9 +6986,9 @@
             "source": "https://www.onshape.com/en/blog/cam-studio-comprehensive-milling"
           },
           "kerf": {
-            "status": "yes",
-            "note": "5-axis engine + FeatureView inspector wired (cam_5axis_finish, cam_3plus2, hsm_adaptive_pocket, hsm_trochoidal_slot, hsm_rest_machining)",
-            "evidence": "packages/kerf-cam/src/"
+            "status": "partial",
+            "note": "5-axis engine solid; no UI",
+            "evidence": "packages/kerf-cam/src/kerf_cam/adaptive.py"
           }
         },
         {
@@ -7935,9 +7935,9 @@
             "source": "https://help.autodesk.com/view/INVNTOR/2025/ENU/?guid=GUID-CAM"
           },
           "kerf": {
-            "status": "yes",
-            "note": "5-axis engine + FeatureView inspector wired (cam_5axis_finish, cam_3plus2, hsm_adaptive_pocket + 16 other CAM/HSM tools)",
-            "evidence": "packages/kerf-cam/src/kerf_cam/worker.py"
+            "status": "partial",
+            "note": "Engine solid (5-axis 3+2); no UI",
+            "evidence": "packages/kerf-cam/src/kerf_cam/five_axis"
           }
         },
         {
@@ -9039,7 +9039,7 @@
           "domain": "D7",
           "feature": "5-axis (kinematics + posts)",
           "competitor": "{ status: paid, note: \"CATIA Multi-Axis Surface Machining — full 5-axis; paid workbench\", source: \"https://www.3ds.com/products/catia/multi-axis-surface-machining\" }",
-          "kerf": "{ status: yes, note: \"5-axis engine + UI: CAMView axis-mode switch, drive face, tilt/lead/TCP, LinuxCNC/Fanuc posts; cam_5axis_finish + cam_3plus2 FeatureKinds\", evidence: \"src/components/CAMView.jsx\" }"
+          "kerf": "{ status: partial, note: \"Engine solid; no UI\", evidence: \"packages/kerf-cam/src/kerf_cam/worker.py\" }"
         },
         {
           "domain": "D7",
@@ -9275,8 +9275,8 @@
             "source": "https://www.cimatron.com/en/cimatron-mold"
           },
           "kerf": {
-            "status": "yes",
-            "note": "5-axis engine + FeatureView inspector wired (cam_5axis_finish, cam_3plus2, hsm_adaptive_pocket + 16 others); 3-axis CAMView also wired",
+            "status": "partial",
+            "note": "5-axis engine (backend); no UI; 3-axis CAMView wired in browser",
             "evidence": "packages/kerf-cam/src/"
           }
         },
@@ -9675,8 +9675,8 @@
             "source": "https://www.ptc.com/en/products/creo/options/style"
           },
           "kerf": {
-            "status": "yes",
-            "note": "blend/network/patch/match-srf (G3 dedicated API wired: nurbs_match_srf_g3) + Stam limit-tangents + G1 SubD patches + G2 curve-fit + loft guide rails (closed_v=True); not Creo Style ISDX depth",
+            "status": "partial",
+            "note": "blend/network/patch/match-srf + G3 + Class-A harness wired; not Creo Style ISDX depth",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py"
           }
         },
@@ -9941,8 +9941,8 @@
             "source": "https://www.ptc.com/en/products/creo/options/nc"
           },
           "kerf": {
-            "status": "yes",
-            "note": "5-axis engine + FeatureView inspector wired (cam_5axis_finish, cam_3plus2, kinematics + posts); hsm_adaptive_pocket, hsm_trochoidal_slot, hsm_rest_machining all wired",
+            "status": "partial",
+            "note": "5-axis engine solid; no UI; kinematics + posts (backend)",
             "evidence": "packages/kerf-cam/src/kerf_cam/worker.py"
           }
         },
@@ -13507,9 +13507,9 @@
             "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
           },
           "kerf": {
-            "status": "yes",
-            "note": "Sequential ray tracing + full lens stack (paraxial ABCD, Seidel aberrations, Gaussian beam, MTF/PSF, polychromatic PSF, Schmidt corrector); OpticsDesignPanel.jsx wired (42 optics tools in 5 tabs); no merit function optimiser",
-            "evidence": "packages/kerf-optics/src/"
+            "status": "partial",
+            "note": "Sequential ray tracing via ray_transfer.py + lens_system.py (backend); no merit function optimiser",
+            "evidence": "packages/kerf-optics/src/kerf_optics/lens_system.py"
           }
         },
         {
@@ -14263,8 +14263,8 @@
             "source": "https://www.blender.org/features/sculpt-paint/"
           },
           "kerf": {
-            "status": "yes",
-            "note": "sculpt_brush (grab/smooth/inflate/Taubin) + Taubin cotangent smoothing + isotropic remesh + multires; FeatureView wired (mesh_sculpt_brush); no Dyntopo/30+ brushes",
+            "status": "partial",
+            "note": "sculpt_brush (grab/smooth/inflate) + multires + isotropic remesh; no dyntopo/30+ brushes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/subd_tools.py"
           }
         },
@@ -14456,8 +14456,8 @@
             "source": "https://help.autodesk.com/view/3DSMAX/2025/ENU/"
           },
           "kerf": {
-            "status": "yes",
-            "note": "SubD authoring + poke/extrude/subdivide/sculpt (incl. Taubin smooth) + quad/isotropic remesh; USDC binary crate export (subd_export_usdc) wired in FeatureView; no Modifier Stack depth",
+            "status": "partial",
+            "note": "SubD authoring + poke/extrude/subdivide/sculpt + quad/isotropic remesh; no Modifier Stack depth",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/subd_tools.py"
           }
         },
@@ -16338,9 +16338,9 @@
             "source": "https://mecsoft.com/products/rhinocam/rhinocammill/"
           },
           "kerf": {
-            "status": "yes",
-            "note": "5-axis 3+2 engine + FeatureView inspector wired (cam_5axis_finish, cam_3plus2 simultaneous/indexed; all 19 CAM/HSM ops surfaced in UI)",
-            "evidence": "packages/kerf-cam/src/"
+            "status": "partial",
+            "note": "5-axis 3+2 engine solid; no UI panel",
+            "evidence": "packages/kerf-cam/src/kerf_cam/five_axis/indexed_3_2.py"
           }
         },
         {

@@ -3738,6 +3738,538 @@ const FEATURE_KINDS = [
       { key: 'samples', kind: 'number', label: 'Sample count', min: 8, max: 512, step: 8 },
     ],
   },
+
+  // ── CAM — G-code emission, toolpath generation & analysis ─────────────────
+
+  {
+    op: 'cam_emit_gcode',
+    label: 'Emit G-code',
+    icon: Code,
+    caption: (
+      'Emit Fanuc RS-274/NGC G-code from a waypoint toolpath. ' +
+      'Supports rapid (G00), linear (G01), arc CW/CCW (G02/G03), spindle on/off, tool change. ' +
+      'Dialect: Fanuc 0i/18i/21i/30i + Haas + GRBL ≥1.1. ' +
+      'Refs: NIST RS-274/NGC (Kramer et al. 2000); Smid CNC Programming Handbook (2008) §3.'
+    ),
+    defaults: { header_comment: '', program_number: 1, coord_decimals: 4 },
+    fields: [
+      { key: 'header_comment', kind: 'text',   label: 'Header comment' },
+      { key: 'program_number', kind: 'number', label: 'Fanuc O-number (1–9999)', min: 1, max: 9999, step: 1 },
+      { key: 'coord_decimals', kind: 'number', label: 'Coordinate decimal places', min: 1, max: 6, step: 1 },
+    ],
+  },
+
+  {
+    op: 'cam_emit_lathe_gcode',
+    label: 'Lathe G-code (G71/G70)',
+    icon: RotateCcw,
+    caption: (
+      'Emit Fanuc RS-274 lathe G-code (G71 rough turning + G70 finish turning) from a 2-D axis-symmetric profile. ' +
+      'Profile: [[Z_mm, X_radius_mm], ...] pairs. stock_x_mm: initial stock radius. ' +
+      'Dialect: Fanuc 0i-TF/30i ONLY. ' +
+      'Refs: NIST RS-274/NGC (Kramer et al. 2000); Smid CNC Programming Handbook (2008) §6.'
+    ),
+    defaults: {
+      stock_x_mm: 25.0, stock_z_mm: 2.0, tool_id: 1, sfm: 600,
+      ipr: 0.25, finish_ipr: 0.10, doc_mm: 2.0,
+      finish_allow_x_mm: 0.5, finish_allow_z_mm: 0.1,
+      retract_mm: 5.0, program_number: 1, header_comment: '',
+    },
+    fields: [
+      { key: 'stock_x_mm',        kind: 'number', label: 'Stock radius (mm)', min: 0.001 },
+      { key: 'stock_z_mm',        kind: 'number', label: 'Facing stock (mm)', min: 0 },
+      { key: 'tool_id',           kind: 'number', label: 'Tool number (1–99)', min: 1, max: 99, step: 1 },
+      { key: 'sfm',               kind: 'number', label: 'Surface speed (ft/min)', min: 1 },
+      { key: 'ipr',               kind: 'number', label: 'Roughing feed (mm/rev)', min: 0.001, step: 0.01 },
+      { key: 'finish_ipr',        kind: 'number', label: 'Finishing feed (mm/rev)', min: 0.001, step: 0.01 },
+      { key: 'doc_mm',            kind: 'number', label: 'Depth of cut per pass (mm)', min: 0.001 },
+      { key: 'finish_allow_x_mm', kind: 'number', label: 'Finish allowance X (mm)', min: 0 },
+      { key: 'finish_allow_z_mm', kind: 'number', label: 'Finish allowance Z (mm)', min: 0 },
+      { key: 'retract_mm',        kind: 'number', label: 'Rapid clearance (mm)', min: 0 },
+      { key: 'program_number',    kind: 'number', label: 'Fanuc O-number', min: 1, max: 9999, step: 1 },
+      { key: 'header_comment',    kind: 'text',   label: 'Header comment' },
+    ],
+  },
+
+  {
+    op: 'cam_verify_toolpath_collision',
+    label: 'Collision Check',
+    icon: Shield,
+    caption: (
+      'Segment-by-segment holder/spindle collision verifier. ' +
+      'Builds flute + holder capsules at each sample point; checks against stock AABB and optional fixture mesh. ' +
+      'Refs: Ericson (2005) §5.5 capsule-AABB; Möller (1997) §6 capsule-triangle.'
+    ),
+    defaults: {
+      step_mm: 1.0, safety_margin_mm: 0.5,
+      flute_radius_mm: 4.0, flute_length_mm: 20.0,
+      holder_radius_mm: 10.0, holder_length_mm: 40.0,
+    },
+    fields: [
+      { key: 'step_mm',          kind: 'number', label: 'Sample step (mm)', min: 0.01, step: 0.1 },
+      { key: 'safety_margin_mm', kind: 'number', label: 'Safety margin (mm)', min: 0 },
+      { key: 'flute_radius_mm',  kind: 'number', label: 'Flute radius (mm)', min: 0.001 },
+      { key: 'flute_length_mm',  kind: 'number', label: 'Flute length (mm)', min: 0.001 },
+      { key: 'holder_radius_mm', kind: 'number', label: 'Holder radius (mm)', min: 0.001 },
+      { key: 'holder_length_mm', kind: 'number', label: 'Holder length (mm)', min: 0.001 },
+    ],
+  },
+
+  {
+    op: 'cam_optimize_feedrate_lookahead',
+    label: 'Feedrate Lookahead',
+    icon: Gauge,
+    caption: (
+      'Two-pass feedrate optimiser (forward accel + backward decel) with corner-blend velocity capping. ' +
+      'Optional S-curve (jerk-limited) scheduling per Erkorkmaz-Altintas (2001) §3.3. ' +
+      'Refs: Erkorkmaz & Altintas (2001) IJMTM 41(9); Altintas (2012) Manufacturing Automation §5.7.'
+    ),
+    defaults: {
+      target_feedrate_mm_per_min: 3000,
+      max_accel_mm_per_s2: 500,
+      blend_radius_mm: 0.5,
+      profile_type: 'trapezoidal',
+    },
+    fields: [
+      { key: 'target_feedrate_mm_per_min', kind: 'number', label: 'Target feedrate (mm/min)', min: 1 },
+      { key: 'max_accel_mm_per_s2',        kind: 'number', label: 'Max acceleration (mm/s²)', min: 0.001 },
+      { key: 'blend_radius_mm',            kind: 'number', label: 'Corner blend radius (mm)', min: 0 },
+      { key: 'profile_type', kind: 'select', label: 'Velocity profile', options: [
+        { value: 'trapezoidal', label: 'Trapezoidal' },
+        { value: 's-curve',     label: 'S-curve (jerk-limited)' },
+      ] },
+    ],
+  },
+
+  {
+    op: 'cam_linearize_arcs',
+    label: 'Linearise Arcs',
+    icon: RefreshCw,
+    caption: (
+      'Convert G02/G03 arc commands to G01 linear segments using chord-error tolerance. ' +
+      'For legacy controllers without circular interpolation (Mach3, plasma, laser). ' +
+      'Refs: NIST RS-274/NGC §3.5.3; MH 31e §1130.'
+    ),
+    defaults: { max_chord_error_mm: 0.025, min_segment_length_mm: 0.05 },
+    fields: [
+      { key: 'gcode_text',            kind: 'text',   label: 'G-code program text' },
+      { key: 'max_chord_error_mm',    kind: 'number', label: 'Max chord error (mm)', min: 0.001, step: 0.001 },
+      { key: 'min_segment_length_mm', kind: 'number', label: 'Min segment length (mm)', min: 0.001, step: 0.001 },
+    ],
+  },
+
+  {
+    op: 'cam_validate_chip_load',
+    label: 'Validate Chip Load',
+    icon: BarChart2,
+    caption: (
+      'Validate feed-per-tooth against Sandvik / Kennametal / Harvey Tool catalog ranges. ' +
+      'Detects radial chip thinning (ae < D/2) and warns on over-feed or rubbing. ' +
+      'Refs: Sandvik CoroPlus Milling Technical Guide (2024); MH 31e §1136.'
+    ),
+    defaults: {
+      material: 'steel-1018', tool_diameter_mm: 12.0, num_flutes: 4,
+      vc_m_per_min: 100, fz_mm_per_tooth: 0.05, ae_mm: 6.0, ap_mm: 5.0,
+      tool_coating: 'TiAlN',
+    },
+    fields: [
+      { key: 'material', kind: 'select', label: 'Workpiece material', options: [
+        { value: 'steel-1018',       label: 'Steel 1018 (low carbon)' },
+        { value: 'steel-4140-soft',  label: 'Steel 4140 soft' },
+        { value: 'stainless-304',    label: 'Stainless 304' },
+        { value: 'aluminum-6061',    label: 'Aluminium 6061' },
+        { value: 'titanium-Ti6Al4V', label: 'Titanium Ti6Al4V' },
+        { value: 'cast-iron-grey',   label: 'Cast iron (grey)' },
+        { value: 'plastic-acetal',   label: 'Plastic (acetal)' },
+      ] },
+      { key: 'tool_diameter_mm', kind: 'number', label: 'Tool diameter (mm)', min: 0.1 },
+      { key: 'num_flutes',       kind: 'number', label: 'Flute count', min: 1, max: 12, step: 1 },
+      { key: 'vc_m_per_min',     kind: 'number', label: 'Cutting speed Vc (m/min)', min: 1 },
+      { key: 'fz_mm_per_tooth',  kind: 'number', label: 'Feed per tooth fz (mm)', min: 0.001, step: 0.001 },
+      { key: 'ae_mm',            kind: 'number', label: 'Radial DOC ae (mm)', min: 0.001 },
+      { key: 'ap_mm',            kind: 'number', label: 'Axial DOC ap (mm)', min: 0.001 },
+      { key: 'tool_coating', kind: 'select', label: 'Tool coating', options: [
+        { value: 'TiAlN',       label: 'TiAlN' },
+        { value: 'TiN',         label: 'TiN' },
+        { value: 'AlCrN',       label: 'AlCrN' },
+        { value: 'diamond-CVD', label: 'Diamond CVD' },
+        { value: 'uncoated',    label: 'Uncoated' },
+      ] },
+    ],
+  },
+
+  {
+    op: 'cam_check_dry_machining',
+    label: 'Dry Machining Check',
+    icon: Wind,
+    caption: (
+      'Check whether dry machining is feasible for the given material, coating, and cutting conditions. ' +
+      'Returns recommendation, tool-life reduction factor, and minimum coating required. ' +
+      'Refs: Sandvik Coromant Dry Machining Guide (2024); ISO 8688-1:1989.'
+    ),
+    defaults: {
+      workpiece_material: 'steel-low-carbon', tool_coating: 'TiAlN',
+      vc_m_per_min: 80, fz_mm_per_tooth: 0.05, ae_mm: 6.0, ap_mm: 5.0,
+      tool_diameter_mm: 12.0, operation: 'milling-roughing',
+    },
+    fields: [
+      { key: 'workpiece_material', kind: 'select', label: 'Workpiece material', options: [
+        { value: 'steel-low-carbon',           label: 'Steel — low carbon' },
+        { value: 'steel-medium-carbon',         label: 'Steel — medium carbon' },
+        { value: 'steel-stainless-austenitic',  label: 'Stainless (austenitic)' },
+        { value: 'cast-iron-grey',              label: 'Cast iron (grey)' },
+        { value: 'aluminum-wrought',            label: 'Aluminium (wrought)' },
+        { value: 'aluminum-cast',               label: 'Aluminium (cast)' },
+        { value: 'titanium-Ti6Al4V',            label: 'Titanium Ti6Al4V' },
+        { value: 'nickel-inconel-718',          label: 'Nickel / Inconel 718' },
+      ] },
+      { key: 'tool_coating', kind: 'select', label: 'Tool coating', options: [
+        { value: 'TiAlN', label: 'TiAlN' }, { value: 'TiN', label: 'TiN' },
+        { value: 'AlCrN', label: 'AlCrN' }, { value: 'diamond-CVD', label: 'Diamond CVD' },
+        { value: 'uncoated', label: 'Uncoated' },
+      ] },
+      { key: 'vc_m_per_min',     kind: 'number', label: 'Cutting speed Vc (m/min)', min: 1 },
+      { key: 'fz_mm_per_tooth',  kind: 'number', label: 'Feed per tooth fz (mm)', min: 0.001, step: 0.001 },
+      { key: 'ae_mm',            kind: 'number', label: 'Radial DOC ae (mm)', min: 0.001 },
+      { key: 'ap_mm',            kind: 'number', label: 'Axial DOC ap (mm)', min: 0.001 },
+      { key: 'tool_diameter_mm', kind: 'number', label: 'Tool diameter (mm)', min: 0.1 },
+      { key: 'operation', kind: 'select', label: 'Operation', options: [
+        { value: 'milling-roughing',  label: 'Milling — roughing' },
+        { value: 'milling-finishing', label: 'Milling — finishing' },
+        { value: 'drilling',          label: 'Drilling' },
+        { value: 'turning',           label: 'Turning' },
+      ] },
+    ],
+  },
+
+  {
+    op: 'cam_generate_face_mill_path',
+    label: 'Face Mill Path',
+    icon: Layers,
+    caption: (
+      'Zig-zag face-milling G-code toolpath for a rectangular pocket. ' +
+      '70 % stepover default; climb milling preferred (MH 31e §1136). ' +
+      'LIMITATION: 2.5D pocket only; no helical entry; no G41/G42.'
+    ),
+    defaults: {
+      xmin_mm: 0, ymin_mm: 0, xmax_mm: 100, ymax_mm: 80,
+      depth_mm: 3.0, tool_diameter_mm: 16.0, stepover_pct: 70,
+      feed_mm_per_min: 800, spindle_rpm: 3000,
+      rapid_clearance_mm: 5.0, climb_milling: true,
+    },
+    fields: [
+      { key: 'xmin_mm',            kind: 'number', label: 'Pocket Xmin (mm)' },
+      { key: 'ymin_mm',            kind: 'number', label: 'Pocket Ymin (mm)' },
+      { key: 'xmax_mm',            kind: 'number', label: 'Pocket Xmax (mm)' },
+      { key: 'ymax_mm',            kind: 'number', label: 'Pocket Ymax (mm)' },
+      { key: 'depth_mm',           kind: 'number', label: 'Axial depth (mm)', min: 0.001 },
+      { key: 'tool_diameter_mm',   kind: 'number', label: 'Tool diameter (mm)', min: 0.1 },
+      { key: 'stepover_pct',       kind: 'number', label: 'Stepover (%)', min: 10, max: 100, step: 1 },
+      { key: 'feed_mm_per_min',    kind: 'number', label: 'Feed (mm/min)', min: 1 },
+      { key: 'spindle_rpm',        kind: 'number', label: 'Spindle RPM', min: 1 },
+      { key: 'rapid_clearance_mm', kind: 'number', label: 'Rapid clearance (mm)', min: 0 },
+      { key: 'climb_milling',      kind: 'boolean', label: 'Climb milling' },
+    ],
+  },
+
+  {
+    op: 'cam_generate_peck_drill_cycle',
+    label: 'Peck Drill (G83)',
+    icon: Drill,
+    caption: (
+      'G83 deep-hole peck-drilling canned cycle. ' +
+      'Follows NIST RS-274/NGC §3.8.4 and MH 31e §1132 peck-depth guidelines. ' +
+      'Returns G-code, peck count, and cycle-time estimate.'
+    ),
+    defaults: {
+      x_mm: 0, y_mm: 0, depth_mm: 20,
+      peck_depth_mm: 5, retract_mm: 2.0,
+      feed_mm_per_min: 120, dwell_s: 0,
+    },
+    fields: [
+      { key: 'x_mm',            kind: 'number', label: 'Hole centre X (mm)' },
+      { key: 'y_mm',            kind: 'number', label: 'Hole centre Y (mm)' },
+      { key: 'depth_mm',        kind: 'number', label: 'Hole depth (mm)', min: 0.001 },
+      { key: 'peck_depth_mm',   kind: 'number', label: 'Peck depth per stroke (mm)', min: 0.001 },
+      { key: 'retract_mm',      kind: 'number', label: 'R-plane clearance (mm)', min: 0 },
+      { key: 'feed_mm_per_min', kind: 'number', label: 'Feed (mm/min)', min: 1 },
+      { key: 'dwell_s',         kind: 'number', label: 'Dwell at bottom (s)', min: 0 },
+    ],
+  },
+
+  {
+    op: 'cam_generate_tap_cycle',
+    label: 'Tap Cycle (G84/G74)',
+    icon: Wrench,
+    caption: (
+      'G84 (right-hand) / G74 (left-hand) rigid tapping canned cycle. ' +
+      'Feed = pitch × rpm per MH 31e §1934. M29 Sxxxx emitted for Fanuc rigid-tap mode. ' +
+      'Refs: NIST RS-274/NGC §3.8.4; Fanuc 0i/30i rigid-tap conventions.'
+    ),
+    defaults: {
+      x_mm: 0, y_mm: 0, depth_mm: 15,
+      thread_pitch_mm: 1.0, spindle_rpm: 800,
+      direction: 'right', rigid_tap: true,
+    },
+    fields: [
+      { key: 'x_mm',            kind: 'number', label: 'Hole centre X (mm)' },
+      { key: 'y_mm',            kind: 'number', label: 'Hole centre Y (mm)' },
+      { key: 'depth_mm',        kind: 'number', label: 'Tap depth (mm)', min: 0.001 },
+      { key: 'thread_pitch_mm', kind: 'number', label: 'Thread pitch (mm)', min: 0.001, step: 0.05 },
+      { key: 'spindle_rpm',     kind: 'number', label: 'Spindle RPM', min: 1 },
+      { key: 'direction', kind: 'select', label: 'Thread direction', options: [
+        { value: 'right', label: 'Right-hand (G84)' },
+        { value: 'left',  label: 'Left-hand (G74)' },
+      ] },
+      { key: 'rigid_tap', kind: 'boolean', label: 'Rigid tap (emit M29)' },
+    ],
+  },
+
+  {
+    op: 'cam_generate_boring_cycle',
+    label: 'Boring Cycle (G85/G86/G89)',
+    icon: Drill,
+    caption: (
+      'G85/G86/G89 boring canned cycles. ' +
+      'G85 = feed-out (Ra 0.8 µm); G86 = spindle-stop + rapid-out (Ra 1.6 µm); G89 = dwell + feed-out (Ra 0.4 µm). ' +
+      'Refs: NIST RS-274/NGC §3.8.4; MH 31e §1162.'
+    ),
+    defaults: {
+      x_mm: 0, y_mm: 0, depth_mm: 30,
+      feed_mm_per_min: 50, spindle_rpm: 500,
+      cycle_type: 'G85', dwell_s: 0, retract_mm: 2.0,
+    },
+    fields: [
+      { key: 'x_mm',            kind: 'number', label: 'Hole centre X (mm)' },
+      { key: 'y_mm',            kind: 'number', label: 'Hole centre Y (mm)' },
+      { key: 'depth_mm',        kind: 'number', label: 'Bore depth (mm)', min: 0.001 },
+      { key: 'feed_mm_per_min', kind: 'number', label: 'Feed (mm/min)', min: 1 },
+      { key: 'spindle_rpm',     kind: 'number', label: 'Spindle RPM', min: 1 },
+      { key: 'cycle_type', kind: 'select', label: 'Cycle type', options: [
+        { value: 'G85', label: 'G85 — feed-out precision bore (Ra 0.8 µm)' },
+        { value: 'G86', label: 'G86 — spindle-stop + rapid-out (Ra 1.6 µm)' },
+        { value: 'G89', label: 'G89 — dwell + feed-out finish bore (Ra 0.4 µm)' },
+      ] },
+      { key: 'dwell_s',    kind: 'number', label: 'Dwell at bottom (s, G89)', min: 0,
+        showWhen: (n) => n.cycle_type === 'G89' },
+      { key: 'retract_mm', kind: 'number', label: 'R-plane clearance (mm)', min: 0 },
+    ],
+  },
+
+  {
+    op: 'cam_generate_profile_roughing',
+    label: 'Profile Roughing',
+    icon: Layers,
+    caption: (
+      'Multi-pass 2D profile roughing: successive inward radial passes from stock offset to finish allowance. ' +
+      'Implements MH 31e §1131 + Sandvik CoroPlus Contour Roughing (2024). ' +
+      'LIMITATION: 2D polygon profile only; no pocket-with-islands.'
+    ),
+    defaults: {
+      stock_offset_mm: 5.0, finish_allowance_mm: 0.3,
+      cutter_diameter_mm: 10.0, depth_per_pass_mm: 3.0,
+      total_depth_mm: 15.0, feed_mm_per_min: 600,
+      spindle_rpm: 4000, rapid_clearance_mm: 5.0,
+    },
+    fields: [
+      { key: 'stock_offset_mm',     kind: 'number', label: 'Stock offset (mm)', min: 0.001 },
+      { key: 'finish_allowance_mm', kind: 'number', label: 'Finish allowance (mm)', min: 0 },
+      { key: 'cutter_diameter_mm',  kind: 'number', label: 'Cutter diameter (mm)', min: 0.1 },
+      { key: 'depth_per_pass_mm',   kind: 'number', label: 'Axial depth per pass (mm)', min: 0.001 },
+      { key: 'total_depth_mm',      kind: 'number', label: 'Total depth (mm)', min: 0.001 },
+      { key: 'feed_mm_per_min',     kind: 'number', label: 'Feed (mm/min)', min: 1 },
+      { key: 'spindle_rpm',         kind: 'number', label: 'Spindle RPM', min: 1 },
+      { key: 'rapid_clearance_mm',  kind: 'number', label: 'Rapid clearance (mm)', min: 0 },
+    ],
+  },
+
+  {
+    op: 'cam_compute_chip_load',
+    label: 'Chip Load Calc',
+    icon: BarChart2,
+    caption: (
+      'Compute feed-per-tooth, radial chip-thinning factor (Krad), and MRR. ' +
+      'Verifies against Sandvik CoroPlus recommended ranges. ' +
+      'Refs: MH 31e §1136; Sandvik CoroPlus (2024); Stephenson-Agapiou §6.'
+    ),
+    defaults: {
+      tool_diameter_mm: 12.0, num_flutes: 4,
+      spindle_rpm: 5000, feed_mm_per_min: 800,
+      radial_engagement_mm: 6.0, axial_depth_mm: 10.0,
+      tool_material: 'carbide',
+    },
+    fields: [
+      { key: 'tool_diameter_mm',     kind: 'number', label: 'Tool diameter (mm)', min: 0.1 },
+      { key: 'num_flutes',           kind: 'number', label: 'Flute count', min: 1, step: 1 },
+      { key: 'spindle_rpm',          kind: 'number', label: 'Spindle RPM', min: 1 },
+      { key: 'feed_mm_per_min',      kind: 'number', label: 'Table feed Vf (mm/min)', min: 1 },
+      { key: 'radial_engagement_mm', kind: 'number', label: 'Radial DOC ae (mm)', min: 0.001 },
+      { key: 'axial_depth_mm',       kind: 'number', label: 'Axial DOC ap (mm)', min: 0.001 },
+      { key: 'tool_material', kind: 'select', label: 'Tool material', options: [
+        { value: 'carbide', label: 'Carbide' },
+        { value: 'HSS',     label: 'HSS' },
+        { value: 'ceramic', label: 'Ceramic' },
+      ] },
+      { key: 'work_material', kind: 'text', label: 'Work material (optional, e.g. steel_1018)' },
+    ],
+  },
+
+  {
+    op: 'cam_compute_turning_depth',
+    label: 'Turning Depth Calc',
+    icon: Settings,
+    caption: (
+      'Compute optimal radial DOC per pass and total roughing passes for a lathe turning operation. ' +
+      'Refs: MH 31e §1148; Sandvik CoroPlus Turning Catalogue (2024). ' +
+      'HONEST: straight cylindrical turning only — no CSS, profile, taper, or threading.'
+    ),
+    defaults: {
+      stock_diameter_mm: 50.0, final_diameter_mm: 40.0,
+      material: 'steel_1018', tool_nose_radius_mm: 0.8,
+      feed_mm_per_rev: 0.25, spindle_rpm: 800,
+      finish_pass_doc_mm: 0.5, max_roughing_doc_mm: 3.0,
+      workpiece_length_mm: 100,
+    },
+    fields: [
+      { key: 'stock_diameter_mm',   kind: 'number', label: 'Stock OD (mm)', min: 0.001 },
+      { key: 'final_diameter_mm',   kind: 'number', label: 'Final OD (mm)', min: 0 },
+      { key: 'material', kind: 'select', label: 'Material', options: [
+        { value: 'steel_1018',    label: 'Steel 1018' },
+        { value: 'aluminum_6061', label: 'Aluminium 6061' },
+        { value: 'stainless_303', label: 'Stainless 303' },
+      ] },
+      { key: 'tool_nose_radius_mm', kind: 'number', label: 'Insert nose radius rε (mm)', min: 0.001, step: 0.1 },
+      { key: 'feed_mm_per_rev',     kind: 'number', label: 'Feed (mm/rev)', min: 0.001, step: 0.01 },
+      { key: 'spindle_rpm',         kind: 'number', label: 'Spindle RPM', min: 1 },
+      { key: 'finish_pass_doc_mm',  kind: 'number', label: 'Finish pass DOC (mm)', min: 0 },
+      { key: 'max_roughing_doc_mm', kind: 'number', label: 'Max roughing DOC (mm)', min: 0.001 },
+      { key: 'workpiece_length_mm', kind: 'number', label: 'Workpiece length (mm)', min: 0.001 },
+    ],
+  },
+
+  {
+    op: 'cam_audit_milling_dwells',
+    label: 'Audit Dwells (G04)',
+    icon: Activity,
+    caption: (
+      'Audit G04 dwell blocks in a G-code program: detect unnecessary dwells, ' +
+      'compute total dwell time, flag dwells at unsafe Z heights. ' +
+      'Refs: MH 31e §1140; NIST RS-274/NGC §3.5.'
+    ),
+    defaults: { max_dwell_s: 2.0 },
+    fields: [
+      { key: 'gcode_text',  kind: 'text',   label: 'G-code program text' },
+      { key: 'max_dwell_s', kind: 'number', label: 'Max acceptable dwell (s)', min: 0, step: 0.1 },
+    ],
+  },
+
+  {
+    op: 'cam_check_coolant_flow',
+    label: 'Coolant Flow Check',
+    icon: Droplets,
+    caption: (
+      'Check coolant flow-rate and pressure adequacy for the cutting conditions. ' +
+      'Refs: Sandvik CoroPlus §3; MH 31e §1140.'
+    ),
+    defaults: {
+      flow_rate_l_per_min: 20.0, pressure_bar: 10.0,
+      operation: 'milling-roughing',
+      workpiece_material: 'steel-low-carbon',
+      tool_diameter_mm: 12.0,
+    },
+    fields: [
+      { key: 'flow_rate_l_per_min', kind: 'number', label: 'Flow rate (L/min)', min: 0 },
+      { key: 'pressure_bar',        kind: 'number', label: 'Pressure (bar)', min: 0 },
+      { key: 'operation', kind: 'select', label: 'Operation', options: [
+        { value: 'milling-roughing',  label: 'Milling — roughing' },
+        { value: 'milling-finishing', label: 'Milling — finishing' },
+        { value: 'drilling',          label: 'Drilling' },
+        { value: 'turning',           label: 'Turning' },
+      ] },
+      { key: 'workpiece_material', kind: 'select', label: 'Workpiece material', options: [
+        { value: 'steel-low-carbon',           label: 'Steel — low carbon' },
+        { value: 'steel-medium-carbon',         label: 'Steel — medium carbon' },
+        { value: 'steel-stainless-austenitic',  label: 'Stainless (austenitic)' },
+        { value: 'cast-iron-grey',              label: 'Cast iron (grey)' },
+        { value: 'aluminum-wrought',            label: 'Aluminium (wrought)' },
+        { value: 'aluminum-cast',               label: 'Aluminium (cast)' },
+        { value: 'titanium-Ti6Al4V',            label: 'Titanium Ti6Al4V' },
+        { value: 'nickel-inconel-718',          label: 'Nickel / Inconel 718' },
+      ] },
+      { key: 'tool_diameter_mm', kind: 'number', label: 'Tool diameter (mm)', min: 0.1 },
+    ],
+  },
+
+  {
+    op: 'hsm_adaptive_pocket',
+    label: 'Adaptive Pocket (HSM)',
+    icon: Cpu,
+    caption: (
+      'Constant tool-engagement 2D pocket clearing via iterative inward polygon offsetting. ' +
+      'Corner arcs inserted to keep engagement bounded. Pure Python; no opencamlib required.'
+    ),
+    defaults: {
+      pocket_width_mm: 50.0, pocket_height_mm: 40.0,
+      tool_diameter_mm: 10.0, step_over_mm: 4.0,
+      feed_mm_per_min: 1200, plunge_feed_mm_per_min: 200,
+    },
+    fields: [
+      { key: 'pocket_width_mm',        kind: 'number', label: 'Pocket width (mm)', min: 0.001 },
+      { key: 'pocket_height_mm',       kind: 'number', label: 'Pocket height (mm)', min: 0.001 },
+      { key: 'tool_diameter_mm',       kind: 'number', label: 'Tool diameter (mm)', min: 0.1 },
+      { key: 'step_over_mm',           kind: 'number', label: 'Step-over (mm)', min: 0.001 },
+      { key: 'feed_mm_per_min',        kind: 'number', label: 'Cutting feed (mm/min)', min: 1 },
+      { key: 'plunge_feed_mm_per_min', kind: 'number', label: 'Plunge feed (mm/min)', min: 1 },
+    ],
+  },
+
+  {
+    op: 'hsm_trochoidal_slot',
+    label: 'Trochoidal Slot (HSM)',
+    icon: Cpu,
+    caption: (
+      'Trochoidal (looping) slot milling — full circles advancing along slot centreline. ' +
+      'Keeps radial engagement small, exploiting chip-thinning throughout. ' +
+      'Pure Python; no opencamlib required.'
+    ),
+    defaults: {
+      slot_length_mm: 80.0, slot_width_mm: 12.0,
+      tool_diameter_mm: 10.0, trochoid_radius_mm: 3.0,
+      step_over_mm: 2.5, feed_mm_per_min: 2500,
+    },
+    fields: [
+      { key: 'slot_length_mm',     kind: 'number', label: 'Slot length (mm)', min: 0.001 },
+      { key: 'slot_width_mm',      kind: 'number', label: 'Slot width (mm)', min: 0.001 },
+      { key: 'tool_diameter_mm',   kind: 'number', label: 'Tool diameter (mm)', min: 0.1 },
+      { key: 'trochoid_radius_mm', kind: 'number', label: 'Trochoid radius (mm)', min: 0.001 },
+      { key: 'step_over_mm',       kind: 'number', label: 'Step-over per loop (mm)', min: 0.001 },
+      { key: 'feed_mm_per_min',    kind: 'number', label: 'Feed (mm/min)', min: 1 },
+    ],
+  },
+
+  {
+    op: 'hsm_rest_machining',
+    label: 'Rest Machining (HSM)',
+    icon: Cpu,
+    caption: (
+      'Raster-based uncleared-region detection + small-tool clearing. ' +
+      'Marks pixels not swept by prior large-tool toolpath; connects uncleared clusters and clears with zigzag. ' +
+      'Pure Python; no opencamlib required.'
+    ),
+    defaults: {
+      large_tool_diameter_mm: 16.0, small_tool_diameter_mm: 6.0,
+      pocket_width_mm: 100.0, pocket_height_mm: 80.0,
+      feed_mm_per_min: 800, grid_resolution_mm: 0.5,
+    },
+    fields: [
+      { key: 'large_tool_diameter_mm', kind: 'number', label: 'Prior tool diameter (mm)', min: 0.1 },
+      { key: 'small_tool_diameter_mm', kind: 'number', label: 'Small tool diameter (mm)', min: 0.1 },
+      { key: 'pocket_width_mm',        kind: 'number', label: 'Pocket width (mm)', min: 0.001 },
+      { key: 'pocket_height_mm',       kind: 'number', label: 'Pocket height (mm)', min: 0.001 },
+      { key: 'feed_mm_per_min',        kind: 'number', label: 'Feed (mm/min)', min: 1 },
+      { key: 'grid_resolution_mm',     kind: 'number', label: 'Grid resolution (mm)', min: 0.01, step: 0.1 },
+    ],
+  },
 ]
 
 const KIND_BY_OP = Object.fromEntries(FEATURE_KINDS.map((k) => [k.op, k]))
@@ -3797,6 +4329,24 @@ const FEATURE_CATEGORIES = [
   { id: 'subd',      label: 'SubD / Mesh',  ops: ['subd_poke', 'subd_extrude_along', 'sculpt_brush', 'multires_evaluate', 'subd_deform_with_cage', 'sdf_csg', 'retopo_snap'] },
   { id: 'weldment',  label: 'Weldment',     ops: ['gusset_plate', 'cope_notch'] },
   { id: 'bim',       label: 'BIM',          ops: ['bim_make_grid', 'bim_make_framing', 'bim_make_wall', 'bim_make_slab'] },
+  { id: 'cam', label: 'CAM / Manufacturing', ops: [
+    // G-code emission
+    'cam_emit_gcode', 'cam_emit_lathe_gcode',
+    // Toolpath generation
+    'cam_generate_face_mill_path', 'cam_generate_peck_drill_cycle',
+    'cam_generate_tap_cycle', 'cam_generate_boring_cycle',
+    'cam_generate_profile_roughing',
+    // HSM strategies
+    'hsm_adaptive_pocket', 'hsm_trochoidal_slot', 'hsm_rest_machining',
+    // Toolpath analysis & validation
+    'cam_verify_toolpath_collision', 'cam_optimize_feedrate_lookahead',
+    'cam_linearize_arcs', 'cam_audit_milling_dwells',
+    // Cutting physics
+    'cam_compute_chip_load', 'cam_validate_chip_load',
+    'cam_check_dry_machining', 'cam_check_coolant_flow',
+    // Turning
+    'cam_compute_turning_depth',
+  ] },
   { id: 'nurbs',    label: 'NURBS',        ops: [
     // Degree manipulation
     'nurbs_degree_raise', 'nurbs_degree_lower',

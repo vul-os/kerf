@@ -47,8 +47,15 @@ HONEST LIMITATIONS
   returned as ``float('nan')`` — the shape operator is undefined there.
 * For rational NURBS with near-zero weights the quotient-rule expansion
   can have large numerical condition numbers; the honest_caveat reports this.
-* SSI marcher assumes the intersection is a smooth curve; branch-point
-  (bifurcation) handling is not implemented — each seed produces one branch.
+* SSI marcher assumes the intersection is a smooth curve per branch.
+  ``march()`` traces one branch per seed (backward-compatible, unchanged).
+  ``march_all_branches()`` implements Patrikalakis-Maekawa §5.4 bifurcation
+  detection: at each step the tangent cross-product magnitude is checked; when
+  it drops below ``tangent_threshold`` the curvature tensor is probed to
+  determine whether the intersection has two locally distinct tangent directions
+  (transversal bifurcation).  If so, two new seed marchers are spawned in the
+  two principal directions; a work-list of unresolved seeds is maintained until
+  exhausted or ``max_branches`` is reached.
 * Bisection fallback converges to O(step²) accuracy but uses more evaluations.
 
 References
@@ -382,6 +389,366 @@ class SSIHardenedMarcher:
                 break
 
         return points
+
+    # ------------------------------------------------------------------
+    # Bifurcation-aware multi-branch marcher (Patrikalakis-Maekawa §5.4)
+    # ------------------------------------------------------------------
+
+    def march_all_branches(
+        self,
+        surface_a: NurbsSurface,
+        surface_b: NurbsSurface,
+        initial_seeds: List[Tuple[Tuple[float, float], Tuple[float, float]]],
+        step_mm: float = 0.5,
+        max_steps: int = 1000,
+        max_branches: int = 8,
+    ) -> List[List[Tuple[float, float, float]]]:
+        """Trace all branches of the SSI curve, handling bifurcation points.
+
+        Implements Patrikalakis & Maekawa §5.4: at each marching step the
+        cross-product magnitude ``|n̂_A × n̂_B|`` is monitored.  When it drops
+        below ``tangent_threshold`` the local curvature tensor of the
+        intersection is interrogated to decide whether the point is a
+        *transversal bifurcation* — a point where the curve branches into two
+        distinct directions.  If a bifurcation is detected, two new seeds are
+        spawned (one in each principal tangent direction) and added to a
+        work-list.  The marcher pops seeds from the list and traces each branch
+        with the single-branch ``march()`` until the list is exhausted or
+        ``max_branches`` is reached.
+
+        Parameters
+        ----------
+        surface_a, surface_b : NurbsSurface
+            The two surfaces to intersect.
+        initial_seeds : list of ((ua, va), (ub, vb))
+            One or more seed pairs.  Each seed pair is a starting parameter on
+            surface_a and surface_b that correspond to the same 3-D point.
+        step_mm : float
+            Step size (model units, mm).  Default 0.5.
+        max_steps : int
+            Maximum marching steps per branch.  Default 1000.
+        max_branches : int
+            Hard cap on the total number of branches returned.  Default 8.
+
+        Returns
+        -------
+        list of list of (x, y, z)
+            Each inner list is one traced branch (ordered from its seed).
+            Branches are de-duplicated: a new seed is skipped if it is within
+            ``step_mm * 2`` of a point already covered by an existing branch.
+        """
+        # Work-list: each entry is (seed_uv_a, seed_uv_b).
+        pending: List[Tuple[Tuple[float, float], Tuple[float, float]]] = list(
+            initial_seeds
+        )
+        branches: List[List[Tuple[float, float, float]]] = []
+
+        # Flat list of all 3-D points already committed to branches (for
+        # proximity de-duplication of candidate seeds).
+        covered: List[np.ndarray] = []
+
+        def _is_covered(pt: np.ndarray) -> bool:
+            """Return True if *pt* is within step_mm*2 of any covered point."""
+            thresh2 = (step_mm * 2.0) ** 2
+            for cp in covered:
+                if float(np.dot(pt - cp, pt - cp)) < thresh2:
+                    return True
+            return False
+
+        while pending and len(branches) < max_branches:
+            seed_a, seed_b = pending.pop(0)
+
+            # Evaluate the seed 3-D position.
+            ua0, va0 = self._clamp_uv(surface_a, float(seed_a[0]), float(seed_a[1]))
+            ub0, vb0 = self._clamp_uv(surface_b, float(seed_b[0]), float(seed_b[1]))
+            Pa0 = surface_evaluate(surface_a, ua0, va0)[:3]
+            Pb0 = surface_evaluate(surface_b, ub0, vb0)[:3]
+            seed_3d = 0.5 * (Pa0 + Pb0)
+
+            if _is_covered(seed_3d):
+                continue
+
+            # Trace this branch with the single-branch marcher.
+            branch = self._march_with_bifurcation_detection(
+                surface_a, surface_b,
+                (ua0, va0), (ub0, vb0),
+                step_mm=step_mm,
+                max_steps=max_steps,
+                pending_seeds=pending,
+                max_branches=max_branches,
+                branches_so_far=branches,
+                covered=covered,
+            )
+
+            if branch:
+                branches.append(branch)
+                for pt in branch:
+                    covered.append(np.array(pt, dtype=float))
+
+        return branches
+
+    def _march_with_bifurcation_detection(
+        self,
+        surface_a: NurbsSurface,
+        surface_b: NurbsSurface,
+        seed_uv_a: Tuple[float, float],
+        seed_uv_b: Tuple[float, float],
+        step_mm: float,
+        max_steps: int,
+        pending_seeds: List[Tuple[Tuple[float, float], Tuple[float, float]]],
+        max_branches: int,
+        branches_so_far: List[List[Tuple[float, float, float]]],
+        covered: List[np.ndarray],
+    ) -> List[Tuple[float, float, float]]:
+        """Single-branch march that emits bifurcation seeds onto *pending_seeds*.
+
+        Identical marching logic to ``march()`` but at each near-tangent step
+        ``_detect_bifurcation`` is called.  If a bifurcation is found the two
+        new seeds are pushed onto *pending_seeds* for the caller to pick up,
+        and marching of the current branch stops at the bifurcation point.
+
+        Returns the list of points traced on this branch (may be empty if the
+        seed is degenerate).
+        """
+        ua, va = float(seed_uv_a[0]), float(seed_uv_a[1])
+        ub, vb = float(seed_uv_b[0]), float(seed_uv_b[1])
+
+        ua, va = self._clamp_uv(surface_a, ua, va)
+        ub, vb = self._clamp_uv(surface_b, ub, vb)
+
+        Pa = surface_evaluate(surface_a, ua, va)[:3]
+        Pb = surface_evaluate(surface_b, ub, vb)[:3]
+        P_cur = 0.5 * (Pa + Pb)
+        points: List[Tuple[float, float, float]] = [tuple(P_cur)]  # type: ignore[arg-type]
+
+        seed_start = P_cur.copy()
+        step = float(step_mm)
+
+        def _covered_quick(pt: np.ndarray) -> bool:
+            thresh2 = (step * 2.0) ** 2
+            for cp in covered:
+                if float(np.dot(pt - cp, pt - cp)) < thresh2:
+                    return True
+            return False
+
+        for _ in range(max_steps):
+            na = surface_normal(surface_a, ua, va)[:3]
+            nb = surface_normal(surface_b, ub, vb)[:3]
+            cross = np.cross(na, nb)
+            cross_mag = float(np.linalg.norm(cross))
+
+            if cross_mag < self.tangent_threshold:
+                # Near-tangent: check for bifurcation before bisection.
+                bif_seeds = self._detect_bifurcation(
+                    surface_a, surface_b, ua, va, ub, vb, P_cur, step
+                )
+                if bif_seeds is not None:
+                    # Bifurcation found — enqueue both new seeds and stop
+                    # this branch so the caller can trace each independently.
+                    total = len(branches_so_far) + len(pending_seeds) + 1
+                    for s_a, s_b in bif_seeds:
+                        s3d = 0.5 * (
+                            surface_evaluate(surface_a, s_a[0], s_a[1])[:3]
+                            + surface_evaluate(surface_b, s_b[0], s_b[1])[:3]
+                        )
+                        if (not _covered_quick(s3d)
+                                and total < max_branches):
+                            pending_seeds.append((s_a, s_b))
+                            total += 1
+                    break
+
+                # No bifurcation — use bisection fallback.
+                result = self._bisection_step(
+                    surface_a, surface_b, ua, va, ub, vb, step
+                )
+                if result is None:
+                    break
+                ua, va, ub, vb, P_cur = result
+                points.append(tuple(P_cur))  # type: ignore[arg-type]
+                if (len(points) > 5
+                        and float(np.linalg.norm(P_cur - seed_start)) < step * 1.5):
+                    break
+                continue
+
+            # Normal marching step.
+            t = cross / cross_mag
+            P_next = P_cur + step * t
+
+            ua_n, va_n, ub_n, vb_n = self._newton_correct(
+                surface_a, surface_b, P_next, ua, va, ub, vb
+            )
+            ua_n, va_n = self._clamp_uv(surface_a, ua_n, va_n)
+            ub_n, vb_n = self._clamp_uv(surface_b, ub_n, vb_n)
+
+            Pa_n = surface_evaluate(surface_a, ua_n, va_n)[:3]
+            Pb_n = surface_evaluate(surface_b, ub_n, vb_n)[:3]
+            P_cur = 0.5 * (Pa_n + Pb_n)
+            ua, va, ub, vb = ua_n, va_n, ub_n, vb_n
+
+            points.append(tuple(P_cur))  # type: ignore[arg-type]
+
+            if (len(points) > 10
+                    and float(np.linalg.norm(P_cur - seed_start)) < step * 1.5):
+                break
+
+            if self._at_boundary(surface_a, ua, va) or self._at_boundary(
+                surface_b, ub, vb
+            ):
+                break
+
+        return points
+
+    def _detect_bifurcation(
+        self,
+        surf_a: NurbsSurface,
+        surf_b: NurbsSurface,
+        ua: float,
+        va: float,
+        ub: float,
+        vb: float,
+        P_cur: np.ndarray,
+        step: float,
+    ) -> Optional[
+        List[Tuple[Tuple[float, float], Tuple[float, float]]]
+    ]:
+        """Determine whether the current near-tangent point is a transversal
+        bifurcation and, if so, return two seed pairs for the two branches.
+
+        Algorithm (Patrikalakis-Maekawa §5.4):
+        At a bifurcation point the intersection curve has two distinct tangent
+        directions t₁ and t₂ in the common tangent plane.  These satisfy the
+        condition that the *second-order* term of the Taylor expansion of the
+        distance function between the two surfaces vanishes in both directions.
+
+        In practice we probe the curvature tensor by perturbing the parameter
+        in several directions in the tangent plane of surface_a, evaluating the
+        signed distance to surface_b, and checking whether the distance function
+        has two sign-changing zero crossings (indicating two separate tangent
+        branches) rather than a single touching point (ordinary tangency).
+
+        Returns
+        -------
+        list of two seed pairs  [ ((ua1,va1),(ub1,vb1)), ((ua2,va2),(ub2,vb2)) ]
+            if a transversal bifurcation is detected, otherwise ``None``.
+        """
+        # --- Gather local geometry at the candidate bifurcation point --------
+        SKL_a = surface_derivatives(surf_a, ua, va, d=2)
+        su_a = SKL_a[1, 0][:3]
+        sv_a = SKL_a[0, 1][:3]
+        na = surface_normal(surf_a, ua, va)[:3]
+        nb = surface_normal(surf_b, ub, vb)[:3]
+
+        # Build an orthonormal basis for the tangent plane of surface_a.
+        su_mag = float(np.linalg.norm(su_a))
+        sv_mag = float(np.linalg.norm(sv_a))
+        if su_mag < 1e-12 or sv_mag < 1e-12:
+            return None  # Degenerate surface patch.
+
+        e1 = su_a / su_mag
+        e2_raw = sv_a - float(np.dot(sv_a, e1)) * e1
+        e2_mag = float(np.linalg.norm(e2_raw))
+        if e2_mag < 1e-12:
+            return None
+        e2 = e2_raw / e2_mag
+
+        # --- Probe the signed distance in N radial directions ----------------
+        # Signed distance = (S_b(closest) - S_a(P+δ)) · n̂_b evaluated as a
+        # scalar.  We use a simpler proxy: for each probe direction d in the
+        # tangent plane, step to P + step*d on surf_a and measure the signed
+        # distance from the resulting 3-D point to surf_b (via n̂_b · (P_a - P_b)).
+        n_probe = 12
+        probe_step = step * 0.3
+        signed_dists: List[float] = []
+
+        pu_a, pv_a = surf_a.degree_u, surf_a.degree_v
+        u_min_a = float(surf_a.knots_u[pu_a])
+        u_max_a = float(surf_a.knots_u[-pu_a - 1])
+        v_min_a = float(surf_a.knots_v[pv_a])
+        v_max_a = float(surf_a.knots_v[-pv_a - 1])
+
+        for k in range(n_probe):
+            angle = 2.0 * math.pi * k / n_probe
+            d = math.cos(angle) * e1 + math.sin(angle) * e2
+            # Parameter step on surf_a.
+            du_a = probe_step * float(np.dot(d, su_a)) / max(su_mag ** 2, 1e-20)
+            dv_a = probe_step * float(np.dot(d, sv_a)) / max(sv_mag ** 2, 1e-20)
+            ua_p = max(u_min_a, min(u_max_a, ua + du_a))
+            va_p = max(v_min_a, min(v_max_a, va + dv_a))
+            Pa_p = surface_evaluate(surf_a, ua_p, va_p)[:3]
+            # Signed distance to surf_b (using fixed nb evaluated at current ub,vb).
+            ub_p, vb_p = self._closest_uv(surf_b, Pa_p, ub, vb, n_grid=3, n_iter=5)
+            Pb_p = surface_evaluate(surf_b, ub_p, vb_p)[:3]
+            sd = float(np.dot(nb, Pa_p - Pb_p))
+            signed_dists.append(sd)
+
+        # --- Count sign changes in the circular probe sequence ---------------
+        n_sign_changes = 0
+        for k in range(n_probe):
+            a_val = signed_dists[k]
+            b_val = signed_dists[(k + 1) % n_probe]
+            if a_val * b_val < 0.0:
+                n_sign_changes += 1
+
+        # A transversal bifurcation has exactly 4 sign changes (two branches
+        # cross the zero line twice each around the circle).
+        # An ordinary smooth intersection has 2 sign changes.
+        # A tangent-only contact has 0 sign changes.
+        if n_sign_changes < 4:
+            return None  # Not a bifurcation — ordinary tangency or smooth crossing.
+
+        # --- Locate the two bifurcation tangent directions -------------------
+        # Find the two pairs of adjacent probes that straddle the zero line
+        # (one from positive-going, one from negative-going), then average
+        # the directions in each pair to obtain the two principal tangents.
+        zero_crossings: List[float] = []  # angles of zero crossings
+        for k in range(n_probe):
+            a_val = signed_dists[k]
+            b_val = signed_dists[(k + 1) % n_probe]
+            if a_val * b_val < 0.0:
+                # Linear interpolation for the crossing angle.
+                frac = abs(a_val) / (abs(a_val) + abs(b_val) + 1e-30)
+                angle_k = 2.0 * math.pi * k / n_probe
+                angle_k1 = 2.0 * math.pi * ((k + 1) % n_probe) / n_probe
+                if k + 1 == n_probe:
+                    angle_k1 += 2.0 * math.pi  # wrap
+                zero_crossings.append(angle_k + frac * (angle_k1 - angle_k))
+
+        if len(zero_crossings) < 2:
+            return None
+
+        # Group crossings into two pairs (opposite pairs define the same branch).
+        # Take the first crossing and the one most nearly opposite as branch 1,
+        # and the second + its opposite as branch 2.
+        # Simpler: just use crossing[0] and crossing[len//2] as the two tangents.
+        mid = len(zero_crossings) // 2
+        angles_t = [zero_crossings[0], zero_crossings[mid]]
+
+        seeds: List[Tuple[Tuple[float, float], Tuple[float, float]]] = []
+        seed_step = step * 0.5
+
+        for angle_t in angles_t:
+            # Direction in 3-D tangent plane.
+            d = math.cos(angle_t) * e1 + math.sin(angle_t) * e2
+            # New 3-D seed position.
+            P_seed = P_cur + seed_step * d
+
+            # Project onto both surfaces to get parameter pairs.
+            ua_s, va_s = self._closest_uv(surf_a, P_seed, ua, va, n_grid=3, n_iter=6)
+            ub_s, vb_s = self._closest_uv(surf_b, P_seed, ub, vb, n_grid=3, n_iter=6)
+            ua_s, va_s = self._clamp_uv(surf_a, ua_s, va_s)
+            ub_s, vb_s = self._clamp_uv(surf_b, ub_s, vb_s)
+
+            # Verify the projected point is reasonably close on both surfaces.
+            Pa_s = surface_evaluate(surf_a, ua_s, va_s)[:3]
+            Pb_s = surface_evaluate(surf_b, ub_s, vb_s)[:3]
+            dist = float(np.linalg.norm(Pa_s - Pb_s))
+            if dist < seed_step * 2.0:
+                seeds.append(((ua_s, va_s), (ub_s, vb_s)))
+
+        if len(seeds) < 2:
+            return None
+
+        return seeds[:2]
 
     # ------------------------------------------------------------------
     # Private helpers

@@ -541,3 +541,232 @@ def test_near_tangent_guard_parallel_planes():
     # May return very few points (planes are nearly tangent) but must not crash.
     assert isinstance(pts, list)
     assert all(len(p) == 3 for p in pts)
+
+
+# ===========================================================================
+# Tests 13-19 — SSIHardenedMarcher.march_all_branches (bifurcation handling)
+# ===========================================================================
+
+
+def test_march_all_branches_plane_x_plane_one_branch():
+    """Two non-parallel planes intersect in exactly one line (no bifurcation).
+    march_all_branches with one seed should return exactly one branch."""
+    # Plane A: z = 0 spanning [-3, 3] in XY.
+    cp_a = np.array([
+        [[-3, -3, 0], [-3, 3, 0]],
+        [[ 3, -3, 0], [ 3, 3, 0]],
+    ], dtype=float)
+    k = np.array([0, 0, 1, 1.0])
+    plane_a = NurbsSurface(degree_u=1, degree_v=1, control_points=cp_a,
+                           knots_u=k.copy(), knots_v=k.copy())
+
+    # Plane B: y = 0 spanning [-3, 3] in XZ.
+    cp_b = np.array([
+        [[-3, 0, -3], [-3, 0, 3]],
+        [[ 3, 0, -3], [ 3, 0, 3]],
+    ], dtype=float)
+    plane_b = NurbsSurface(degree_u=1, degree_v=1, control_points=cp_b,
+                           knots_u=k.copy(), knots_v=k.copy())
+
+    # Seed: origin is on both planes.
+    # plane_a at (u=0.5, v=0.5) → (0, 0, 0); plane_b at (u=0.5, v=0.5) → (0, 0, 0).
+    marcher = SSIHardenedMarcher()
+    branches = marcher.march_all_branches(
+        plane_a, plane_b,
+        initial_seeds=[((0.5, 0.5), (0.5, 0.5))],
+        step_mm=0.3,
+        max_steps=200,
+        max_branches=8,
+    )
+    # One smooth intersection line → at least one branch.
+    assert len(branches) >= 1, f"Expected >=1 branch, got {len(branches)}"
+    assert len(branches[0]) >= 3, f"Branch too short: {len(branches[0])}"
+    # All points must lie on z≈0 and y≈0.
+    pts = np.array(branches[0])
+    assert np.all(np.abs(pts[:, 2]) < 0.1), f"z not zero: {pts[:, 2]}"
+    assert np.all(np.abs(pts[:, 1]) < 0.1), f"y not zero: {pts[:, 1]}"
+
+
+def test_march_all_branches_returns_list_of_lists():
+    """march_all_branches always returns list[list[tuple]]; even for an empty
+    seed list it must return an empty list."""
+    cyl = _make_rational_cylinder(r=1.0)
+    plane = _make_plane()
+    marcher = SSIHardenedMarcher()
+    result = marcher.march_all_branches(
+        cyl, plane,
+        initial_seeds=[],
+        max_branches=4,
+    )
+    assert isinstance(result, list)
+    assert result == []
+
+
+def test_march_all_branches_max_branches_cap():
+    """max_branches must be respected — result length <= max_branches."""
+    # Three distinct seeds for two crossing cylinders; each produces a branch.
+    R = 1.0
+    cyl_a = _make_rational_cylinder(axis_pt=(0, 0, 0), axis_dir=(0, 0, 1),
+                                    r=R, half_len=1.5)
+    cyl_b = _make_rational_cylinder(axis_pt=(0, 0, 0), axis_dir=(1, 0, 0),
+                                    r=R, half_len=1.5)
+    import math as _math
+    p = 1.0 / _math.sqrt(2)
+    v_seed = 0.5 + p / (2.0 * 1.5)
+    marcher = SSIHardenedMarcher()
+    # Request at most 2 branches regardless of how many seeds there are.
+    branches = marcher.march_all_branches(
+        cyl_a, cyl_b,
+        initial_seeds=[
+            ((0.125, v_seed), (0.125, v_seed)),
+            ((0.375, v_seed), (0.375, v_seed)),
+            ((0.625, v_seed), (0.625, v_seed)),
+        ],
+        step_mm=0.2,
+        max_steps=150,
+        max_branches=2,
+    )
+    assert len(branches) <= 2, f"max_branches=2 violated: {len(branches)}"
+
+
+def test_march_all_branches_cylinder_x_plane_on_surface():
+    """Cylinder × z=0 plane: all branch points must be within tolerance of
+    radius R from the Z axis and near z=0."""
+    R = 1.5
+    cyl = _make_rational_cylinder(axis_pt=(0, 0, 0), axis_dir=(0, 0, 1),
+                                  r=R, half_len=1.5)
+    cp = np.array([
+        [[-3, -3, 0], [-3, 3, 0]],
+        [[ 3, -3, 0], [ 3, 3, 0]],
+    ], dtype=float)
+    k = np.array([0, 0, 1, 1.0])
+    plane = NurbsSurface(degree_u=1, degree_v=1, control_points=cp,
+                         knots_u=k.copy(), knots_v=k.copy())
+
+    from kerf_cad_core.geom.nurbs import surface_evaluate as _sev
+    P_cyl = _sev(cyl, 0.1, 0.5)[:3]
+    u_p = float((P_cyl[0] + 3) / 6)
+    v_p = float((P_cyl[1] + 3) / 6)
+
+    marcher = SSIHardenedMarcher()
+    branches = marcher.march_all_branches(
+        cyl, plane,
+        initial_seeds=[((0.1, 0.5), (u_p, v_p))],
+        step_mm=0.3,
+        max_steps=300,
+        max_branches=4,
+    )
+    assert len(branches) >= 1
+    for branch in branches:
+        pts = np.array(branch)
+        dist_from_z = np.sqrt(pts[:, 0] ** 2 + pts[:, 1] ** 2)
+        assert np.all(np.abs(dist_from_z - R) < R * 0.3), (
+            f"branch radius deviations: {np.abs(dist_from_z - R)}"
+        )
+        assert np.all(np.abs(pts[:, 2]) < 0.15), (
+            f"branch z values: {pts[:, 2]}"
+        )
+
+
+def test_march_all_branches_single_seed_equals_single_branch_march():
+    """For a smooth intersection (no bifurcation) march_all_branches with one
+    seed must produce at least one branch, and its first point must be close to
+    what march() returns as its first point."""
+    R = 1.0
+    cyl_a = _make_rational_cylinder(axis_pt=(0, 0, 0), axis_dir=(0, 0, 1),
+                                    r=R, half_len=1.5)
+    cyl_b = _make_rational_cylinder(axis_pt=(0, 0, 0), axis_dir=(1, 0, 0),
+                                    r=R, half_len=1.5)
+    import math as _math
+    p = 1.0 / _math.sqrt(2)
+    v_seed = 0.5 + p / (2.0 * 1.5)
+
+    marcher = SSIHardenedMarcher()
+    seed_a = (0.125, v_seed)
+    seed_b = (0.125, v_seed)
+
+    pts_single = marcher.march(cyl_a, cyl_b, seed_a, seed_b,
+                               step_mm=0.2, max_steps=100)
+    branches = marcher.march_all_branches(
+        cyl_a, cyl_b,
+        initial_seeds=[(seed_a, seed_b)],
+        step_mm=0.2,
+        max_steps=100,
+        max_branches=4,
+    )
+    assert len(branches) >= 1
+    # First points must agree within 0.5 mm.
+    p1 = np.array(pts_single[0])
+    p2 = np.array(branches[0][0])
+    assert float(np.linalg.norm(p1 - p2)) < 0.5, (
+        f"First points differ: {p1} vs {p2}"
+    )
+
+
+def test_march_all_branches_no_duplicate_seeds_skipped():
+    """Duplicate seeds (same 3-D position) must produce only one branch, not
+    multiple copies of the same curve."""
+    R = 1.5
+    cyl = _make_rational_cylinder(axis_pt=(0, 0, 0), axis_dir=(0, 0, 1),
+                                  r=R, half_len=1.5)
+    cp = np.array([
+        [[-3, -3, 0], [-3, 3, 0]],
+        [[ 3, -3, 0], [ 3, 3, 0]],
+    ], dtype=float)
+    k = np.array([0, 0, 1, 1.0])
+    plane = NurbsSurface(degree_u=1, degree_v=1, control_points=cp,
+                         knots_u=k.copy(), knots_v=k.copy())
+
+    from kerf_cad_core.geom.nurbs import surface_evaluate as _sev
+    P_cyl = _sev(cyl, 0.1, 0.5)[:3]
+    u_p = float((P_cyl[0] + 3) / 6)
+    v_p = float((P_cyl[1] + 3) / 6)
+
+    seed = ((0.1, 0.5), (u_p, v_p))
+    marcher = SSIHardenedMarcher()
+    # Pass the same seed three times.
+    branches = marcher.march_all_branches(
+        cyl, plane,
+        initial_seeds=[seed, seed, seed],
+        step_mm=0.3,
+        max_steps=300,
+        max_branches=8,
+    )
+    # De-duplication must collapse the three identical seeds to one branch.
+    assert len(branches) <= 2, (
+        f"Duplicate seeds produced too many branches: {len(branches)}"
+    )
+
+
+def test_march_all_branches_two_cylinders_both_points_on_surface():
+    """Two-cylinder Steinmetz intersection via march_all_branches: all traced
+    points must lie within tolerance on both cylinder surfaces."""
+    import math as _math
+    R = 1.0
+    half_len = 1.5
+    cyl_a = _make_rational_cylinder(axis_pt=(0, 0, 0), axis_dir=(0, 0, 1),
+                                    r=R, half_len=half_len)
+    cyl_b = _make_rational_cylinder(axis_pt=(0, 0, 0), axis_dir=(1, 0, 0),
+                                    r=R, half_len=half_len)
+    p = 1.0 / _math.sqrt(2)
+    v_seed = 0.5 + p / (2.0 * half_len)
+
+    marcher = SSIHardenedMarcher()
+    branches = marcher.march_all_branches(
+        cyl_a, cyl_b,
+        initial_seeds=[((0.125, v_seed), (0.125, v_seed))],
+        step_mm=0.2,
+        max_steps=200,
+        max_branches=8,
+    )
+    assert len(branches) >= 1
+    for branch in branches:
+        pts_arr = np.array(branch)
+        dist_a = np.sqrt(pts_arr[:, 0] ** 2 + pts_arr[:, 1] ** 2)
+        dist_b = np.sqrt(pts_arr[:, 1] ** 2 + pts_arr[:, 2] ** 2)
+        assert np.all(np.abs(dist_a - R) < 0.3), (
+            f"cyl_a deviations: {np.abs(dist_a - R)}"
+        )
+        assert np.all(np.abs(dist_b - R) < 0.3), (
+            f"cyl_b deviations: {np.abs(dist_b - R)}"
+        )

@@ -17217,8 +17217,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "inflate/crease/smooth/pinch sculpt brushes (GK-P22) + multires + isotropic remesh; Wendland C2 falloff; no dyntopo/30+ brushes; no stroke history/undo stack",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/mesh_sculpt_brushes.py"
+            "note": "inflate/crease/smooth/pinch sculpt brushes (GK-P22) + multires + isotropic remesh; Wendland C2 falloff; no dyntopo/30+ brushes; no stroke history/undo stack. PLUS: multi-layer displacement stack (GK-P21): per-vertex displacement maps with add/subtract/multiply/replace blend modes + per-vertex mask + strength — combines low-freq form with high-freq texture detail. HONEST: per-vertex only (no barycentric face interpolation); assumes unit-length input normals; no fractional indexing.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/mesh_sculpt_brushes.py packages/kerf-cad-core/src/kerf_cad_core/mesh_displacement_stack.py"
           }
         },
         {
@@ -17868,8 +17868,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "inflate/crease/smooth/pinch sculpt brushes (GK-P22, Botsch-Sorkine 2008 S3); Wendland C2 falloff; single-stroke stateless -- no dyntopo, no 30+ brushes, no ZRemesher-grade tool",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/mesh_sculpt_brushes.py"
+            "note": "inflate/crease/smooth/pinch sculpt brushes (GK-P22, Botsch-Sorkine 2008 S3); Wendland C2 falloff; single-stroke stateless -- no dyntopo, no 30+ brushes, no ZRemesher-grade tool. PLUS: multi-layer displacement stack (GK-P21): ordered per-vertex displacement maps, 4 blend modes (add/subtract/multiply/replace), per-vertex mask, strength — ZBrush layer stack model (Pixologic 2024; Aumann-McNamara 2009; Lee-Moreton-Hoppe 2000). HONEST: per-vertex only; no fractional barycentric indexing; assumes unit-length input normals.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/mesh_sculpt_brushes.py packages/kerf-cad-core/src/kerf_cad_core/mesh_displacement_stack.py"
           }
         },
         {

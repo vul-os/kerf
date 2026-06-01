@@ -337,6 +337,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.subd.g1_extraordinary_patches",
     # GK-P14: fractional crease sharpness decay s_new=max(0,s-1) per level (DeRose-Kass-Truong 1998 §4; OpenSubdiv hierarchical edits)
     "kerf_cad_core.subd.crease_fractional_decay",
+    # GK-P19: SubD feature curves — ridge/valley polylines from CC limit surface via discrete principal-curvature analysis (Ohtake et al. 2004 SIGGRAPH; Meyer et al. 2003 cotangent Laplacian; Taubin 1995 curvature tensor)
+    "kerf_cad_core.subd.feature_curves",
     # GK-P-B: Stam exact limit-position + limit-tangent evaluation (subd_eval_limit tool)
     "kerf_cad_core.geom.subd_stam",
     # GK-P45: SubD/mesh authoring ops (subd_poke, subd_extrude_along, sculpt_brush, multires_evaluate)

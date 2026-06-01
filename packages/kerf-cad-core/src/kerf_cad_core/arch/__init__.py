@@ -14,6 +14,7 @@ Submodules:
   slab_deflection   — Two-way slab deflection (Timoshenko §44 Tables 41–42; Roark 9e Table 11.4)
   slab_deflection_tools — LLM tool arch_compute_slab_deflection
   wind_load_asce7   — ASCE 7-22 §26–27 Directional Procedure wall wind pressures
+                      + §32 Tornado Loads (RC III/IV, tornado-prone region)
   wind_load_asce7_tools — LLM tool arch_compute_wind_load
   lateral_bracing_check — AISC 360-22 §F2 lateral-torsional buckling (LTB) check
   lateral_bracing_check_tools — LLM tool arch_check_lateral_bracing
@@ -88,6 +89,9 @@ from kerf_cad_core.arch.wind_load_asce7 import (
     BuildingSpec as WindBuildingSpec,
     WindPressureReport,
     compute_wind_load,
+    TornadoLoadSpec,
+    TornadoLoadReport,
+    compute_tornado_load,
 )
 from kerf_cad_core.arch.lateral_bracing_check import (
     WSectionSpec,
@@ -102,7 +106,9 @@ from kerf_cad_core.arch.punching_shear import (
 from kerf_cad_core.arch.wind_component_cladding import (
     ComponentSpec as CCComponentSpec,
     WindCCPressureReport,
+    ParapetPressureReport,
     compute_wind_cc_pressure,
+    compute_parapet_pressure,
 )
 from kerf_cad_core.arch.base_plate_aisc import (
     ColumnSpec,
@@ -200,6 +206,10 @@ __all__ = [
     "WindBuildingSpec",
     "WindPressureReport",
     "compute_wind_load",
+    # ASCE 7-22 §32 tornado loads (RC III/IV, tornado-prone region)
+    "TornadoLoadSpec",
+    "TornadoLoadReport",
+    "compute_tornado_load",
     # AISC 360-22 §F2 lateral-torsional buckling check
     "WSectionSpec",
     "LateralBracingReport",
@@ -208,11 +218,13 @@ __all__ = [
     "ColumnSlabSpec",
     "PunchingShearReport",
     "check_punching_shear",
-    # ASCE 7-22 §30.3 Components and Cladding wind pressures
+    # ASCE 7-22 §30.3 Components and Cladding wind pressures + §30.9 parapets
     # (CCComponentSpec avoids name clash with BIM ComponentSpec)
     "CCComponentSpec",
     "WindCCPressureReport",
+    "ParapetPressureReport",
     "compute_wind_cc_pressure",
+    "compute_parapet_pressure",
     # AISC DG-1 §3.1 + AISC 360-22 §J8 column base plate (concentric axial only)
     "ColumnSpec",
     "ConcreteSpec",

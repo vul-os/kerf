@@ -589,6 +589,11 @@ _TOOL_MODULES = [
     # HONEST: per-vertex only (no barycentric interpolation); assumes unit-length input normals.
     # LLM tool: mesh_apply_displacement_stack
     "kerf_cad_core.mesh_displacement_stack",
+    # GK-P20: UV-unwrap hardening — seam-cut + shelf pack + distortion stats.
+    # Sander et al. (2003) Multi-Chart Geometry Images + Lévy et al. (2002) LSCM.
+    # HONEST: shelf packing only; 90°-increment rotation; sampling-based distortion.
+    # LLM tool: nurbs_harden_uv_unwrap
+    "kerf_cad_core.geom.uv_unwrap_hardening",
 ]
 # NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
 # (already in _TOOL_MODULES above at line 128); sagitta_arrow_chart module is imported

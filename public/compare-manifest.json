@@ -17223,6 +17223,19 @@
         },
         {
           "domain": "D13",
+          "feature": "UV unwrap hardening — seam-cut + chart pack + distortion stats",
+          "competitor": {
+            "status": "yes",
+            "note": "Blender UV Unwrap (angle-based / smart projection / seam-based), RizomUV, Marvelous Designer — GPU-accelerated, optimal ARAP pack, sub-degree rotation (benchmark)"
+          },
+          "kerf": {
+            "status": "partial",
+            "note": "GK-P20: harden_uv_unwrap(spec) — cuts mesh at seam edges into UV charts (BFS face-adjacency flood-fill); 0°/90°/180°/270° bbox-minimising rotation; shelf-first-fit bin-pack into unit square; per-chart angle/area distortion stats (Sander et al. 2003 Multi-Chart §3 + Lévy et al. 2002 LSCM §5); nurbs_harden_uv_unwrap LLM tool; 21 hermetic tests. HONEST CAVEATS: shelf packing only (not optimal guillotine / VLSI / simulated-annealing); rotation at 90° increments only (no fractional-angle SAT minimisation); distortion = per-face Jacobian residual (sampling-based lower bound, NOT continuous LSCM energy).",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/uv_unwrap_hardening.py"
+          }
+        },
+        {
+          "domain": "D13",
           "feature": "Animation / rigging",
           "competitor": {
             "status": "yes",

@@ -1868,3 +1868,13 @@ from kerf_cad_core.geom.general_boolean import (  # noqa: E402
     boolean_polyhedra,
     polyhedron_volume,
 )
+# GK-P20: UV-unwrap post-processing — seam-cut + chart pack + distortion stats.
+# Sander et al. (2003) Multi-Chart Geometry Images + Lévy et al. (2002) LSCM.
+# HONEST: shelf packing only; 90°-increment rotation; sampling-based distortion.
+# LLM tool: nurbs_harden_uv_unwrap.
+from kerf_cad_core.geom.uv_unwrap_hardening import (  # noqa: E402
+    UVUnwrapHardeningSpec,
+    UVChart,
+    HardenedUVResult,
+    harden_uv_unwrap,
+)

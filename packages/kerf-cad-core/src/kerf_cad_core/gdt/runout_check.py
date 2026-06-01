@@ -58,7 +58,9 @@ relative to their best-fit axis before passing them to this function.
 Additionally, total runout as defined here is the radial-only variant (max R -
 min R over all points), which corresponds to the common CMM single-axis traversal
 measure.  The full ASME §13.3 total runout also includes axial deviation for
-face runout surfaces; axial deviation checking is not implemented.
+face runout surfaces; axial face runout is now implemented via
+``check_axial_runout()`` and ``AxialRunoutMeasurement`` — see §12.5 / §13.3
+axial-deviation path below.
 """
 from __future__ import annotations
 
@@ -73,10 +75,24 @@ _HONEST_CAVEAT = (
     "perfectly-defined datum axis. Chebyshev-optimal (minimum zone) axis fit "
     "(ASME B89.3.1 / ISO 12181-1 §4.3) is not performed — callers must "
     "pre-process CMM point clouds to radii relative to their best-fit axis. "
-    "Total runout is radial-only (max R - min R over all points); axial "
-    "deviation for face-runout surfaces (ASME §13.3 full definition) is not "
-    "checked. Circular runout per-section uses grouping by exact z value; "
-    "real CMM data may require z-binning tolerance before passing."
+    "Total runout (check_runout) is radial-only (max R - min R over all "
+    "points). Axial deviation for face-runout surfaces (ASME Y14.5-2018 §12.5 "
+    "/ §13.3) is implemented separately via check_axial_runout(). Circular "
+    "runout per-section uses grouping by exact z value; real CMM data may "
+    "require z-binning tolerance before passing."
+)
+
+_AXIAL_HONEST_CAVEAT = (
+    "Ideal datum axis (z-axis) assumed: all measurements are taken on a face "
+    "nominally perpendicular to the datum axis. The datum axis direction is "
+    "not fitted from the point cloud — callers must orient measurement data so "
+    "that z corresponds to the axial direction before calling this function. "
+    "Axial FIM = max(z) − min(z) across all measurements; this scalar FIM "
+    "captures face wobble / run-out but does NOT resolve the tilt axis or the "
+    "angular phase of worst deviation. Probe offset, stylus cosine error, and "
+    "datum simulator computation (ASME B89.3.1 / ISO 12781-1) are not "
+    "performed. Corresponds to ASME Y14.5-2018 §12.5 (face runout) / §13.3 "
+    "axial-deviation component of total runout."
 )
 
 _VALID_RUNOUT_TYPES = frozenset({"circular", "total"})
@@ -269,6 +285,232 @@ class RunoutCheckReport:
             "per_section_runout": self.per_section_runout,
             "honest_caveat": self.honest_caveat,
         }
+
+
+# ---------------------------------------------------------------------------
+# Axial face runout data model (ASME Y14.5-2018 §12.5 / §13.3 axial component)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class AxialRunoutMeasurement:
+    """
+    A single measurement point on a face perpendicular to the datum axis during
+    axial (face) runout inspection per ASME Y14.5-2018 §12.5 / §13.3.
+
+    The face is nominally perpendicular to the datum axis (z-axis).  Each point
+    records its angular position, its radial distance from the datum axis, and
+    its measured axial z-coordinate (the quantity that varies for a face with
+    wobble or form error).
+
+    Attributes
+    ----------
+    angular_position_deg:
+        Angular position of the measurement around the datum axis, in degrees
+        [0, 360).  Used for documentation and per-ring grouping; the axial FIM
+        computation uses the scalar z values only.
+    radial_position_mm:
+        Radial distance from the datum axis to where the measurement was taken
+        (mm, >= 0).  For a flat annular face this is the r-coordinate of the
+        measurement point.  Zero is valid (measurement at the axis).
+    axial_z_mm:
+        Measured axial position (z-coordinate) of the surface at this point
+        (mm).  For a perfectly flat face perpendicular to the datum axis, all
+        points share the same z value.  Deviations (wobble, tilt, form error)
+        produce spread in z — the axial FIM = max(z) − min(z).
+    """
+    angular_position_deg: float
+    radial_position_mm: float
+    axial_z_mm: float
+
+    def __post_init__(self) -> None:
+        try:
+            self.angular_position_deg = float(self.angular_position_deg)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"AxialRunoutMeasurement: angular_position_deg must be numeric, "
+                f"got '{self.angular_position_deg}'"
+            ) from exc
+
+        try:
+            r = float(self.radial_position_mm)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"AxialRunoutMeasurement: radial_position_mm must be numeric, "
+                f"got '{self.radial_position_mm}'"
+            ) from exc
+        if r < 0.0:
+            raise ValueError(
+                f"AxialRunoutMeasurement: radial_position_mm must be >= 0, got {r}"
+            )
+        self.radial_position_mm = r
+
+        try:
+            self.axial_z_mm = float(self.axial_z_mm)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"AxialRunoutMeasurement: axial_z_mm must be numeric, "
+                f"got '{self.axial_z_mm}'"
+            ) from exc
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "angular_position_deg": self.angular_position_deg,
+            "radial_position_mm": self.radial_position_mm,
+            "axial_z_mm": self.axial_z_mm,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> "AxialRunoutMeasurement":
+        return cls(
+            angular_position_deg=d["angular_position_deg"],
+            radial_position_mm=d["radial_position_mm"],
+            axial_z_mm=d["axial_z_mm"],
+        )
+
+
+@dataclass
+class AxialRunoutReport:
+    """
+    Result of an axial (face) runout check per ASME Y14.5-2018 §12.5 / §13.3.
+
+    Attributes
+    ----------
+    axial_fim_mm:
+        Full Indicator Movement in the axial (z) direction:
+        axial_fim_mm = max(z_i) − min(z_i) over all measurement points.
+    z_max_mm:
+        Maximum measured axial z value across all points (mm).
+    z_min_mm:
+        Minimum measured axial z value across all points (mm).
+    fom:
+        Figure of Merit = axial_fim_mm / tolerance_mm.
+        fom < 1.0 → compliant; fom >= 1.0 → non-compliant.
+    compliant:
+        True when axial_fim_mm <= tolerance_mm (i.e. fom <= 1.0).
+    n_points:
+        Number of measurement points used in the check.
+    datum_axis_id:
+        Datum axis identifier cited in the feature control frame (informational).
+    honest_caveat:
+        Scope limitation notice.
+    """
+    axial_fim_mm: float
+    z_max_mm: float
+    z_min_mm: float
+    fom: float
+    compliant: bool
+    n_points: int
+    datum_axis_id: str = "A"
+    honest_caveat: str = _AXIAL_HONEST_CAVEAT
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "axial_fim_mm": self.axial_fim_mm,
+            "z_max_mm": self.z_max_mm,
+            "z_min_mm": self.z_min_mm,
+            "fom": self.fom,
+            "compliant": self.compliant,
+            "n_points": self.n_points,
+            "datum_axis_id": self.datum_axis_id,
+            "honest_caveat": self.honest_caveat,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Axial face runout computation (ASME Y14.5-2018 §12.5 / §13.3)
+# ---------------------------------------------------------------------------
+
+def check_axial_runout(
+    measurements: list[AxialRunoutMeasurement],
+    tolerance_mm: float,
+    datum_axis_id: str = "A",
+) -> AxialRunoutReport:
+    """
+    Check axial (face) runout per ASME Y14.5-2018 §12.5 / §13.3.
+
+    Measures axial deviation on a face perpendicular to the datum axis by
+    computing the Full Indicator Movement (FIM) in the axial direction:
+
+        axial_FIM = max(z_i) − min(z_i)   over all measurement points
+
+    The feature is compliant when axial_FIM ≤ tolerance_mm.
+
+    Parameters
+    ----------
+    measurements:
+        List of AxialRunoutMeasurement points taken on the face.  Must have
+        at least 2 points for a meaningful FIM.
+    tolerance_mm:
+        Axial runout tolerance from the feature control frame (mm, > 0).
+    datum_axis_id:
+        Datum axis identifier cited in the feature control frame, e.g. "A".
+        Informational — used in the report and honest caveat only.
+
+    Returns
+    -------
+    AxialRunoutReport
+        Contains axial_fim_mm, z_max_mm, z_min_mm, fom, compliant, n_points,
+        datum_axis_id, and honest_caveat.
+
+    Raises
+    ------
+    ValueError
+        If measurements is empty or has fewer than 2 points, or if
+        tolerance_mm is not > 0.
+
+    Algorithm
+    ---------
+    ASME Y14.5-2018 §12.5 face runout:
+        - Each point on the face has an axial z-coordinate.
+        - For a perfect flat face perpendicular to the datum axis all z values
+          are equal → FIM = 0.
+        - Face wobble (tilt), form error, or waviness produce spread in z.
+        - axial_FIM = max(z) − min(z) = Full Indicator Movement as the
+          indicator traverses the face while the part rotates.
+        - Compliant when axial_FIM ≤ tolerance_mm.
+        - fom = axial_FIM / tolerance_mm; fom < 1.0 → pass.
+    """
+    if not measurements:
+        raise ValueError("check_axial_runout: measurements list must not be empty")
+    if len(measurements) < 2:
+        raise ValueError(
+            f"check_axial_runout: need at least 2 measurement points, "
+            f"got {len(measurements)}"
+        )
+
+    try:
+        tol = float(tolerance_mm)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"check_axial_runout: tolerance_mm must be numeric, "
+            f"got '{tolerance_mm}'"
+        ) from exc
+    if tol <= 0.0:
+        raise ValueError(
+            f"check_axial_runout: tolerance_mm must be > 0, got {tol}"
+        )
+
+    z_values = [m.axial_z_mm for m in measurements]
+    z_max = max(z_values)
+    z_min = min(z_values)
+    axial_fim = round(z_max - z_min, 10)
+    z_max = round(z_max, 10)
+    z_min = round(z_min, 10)
+
+    fom = round(axial_fim / tol, 10) if tol > 0 else math.inf
+    compliant = axial_fim <= tol
+
+    datum_id = str(datum_axis_id).strip().upper() or "A"
+
+    return AxialRunoutReport(
+        axial_fim_mm=axial_fim,
+        z_max_mm=z_max,
+        z_min_mm=z_min,
+        fom=fom,
+        compliant=compliant,
+        n_points=len(measurements),
+        datum_axis_id=datum_id,
+    )
 
 
 # ---------------------------------------------------------------------------

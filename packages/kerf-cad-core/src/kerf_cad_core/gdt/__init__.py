@@ -16,8 +16,8 @@ Submodules:
   datum_shift_check         — Datum shift (bonus tolerance) for MMC/LMC datum features
                               (ASME Y14.5-2018 §4.5 + §7.3.5)
   feature_of_size_dof       — Feature of Size DOF enumerator (ASME Y14.5-2018 §4.7 + §7.3)
-  runout_check              — Circular / total runout compliance check
-                              (ASME Y14.5-2018 §13 / ISO 1101 §18)
+  runout_check              — Circular / total runout + axial face runout check
+                              (ASME Y14.5-2018 §12.5 / §13 / ISO 1101 §18)
   runout_circular           — Single-plane circular runout (§12.4): section-oriented FIM
                               evaluation; distinct from runout_check total/circular sweep
   dimension_chain           — WC + RSS tolerance stack-up for linear dimension chains
@@ -49,6 +49,9 @@ from kerf_cad_core.gdt.runout_check import (
     RunoutCheckSpec,
     RunoutCheckReport,
     check_runout,
+    AxialRunoutMeasurement,
+    AxialRunoutReport,
+    check_axial_runout,
 )
 from kerf_cad_core.gdt.dimension_chain import (
     DimensionLink,
@@ -88,6 +91,9 @@ __all__ = [
     "RunoutCheckSpec",
     "RunoutCheckReport",
     "check_runout",
+    "AxialRunoutMeasurement",
+    "AxialRunoutReport",
+    "check_axial_runout",
     "DimensionLink",
     "DimensionChainReport",
     "compute_dimension_chain",

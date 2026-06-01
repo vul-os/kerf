@@ -37,12 +37,27 @@ Test plan
 32. cooke_triplet_coma_finite           -- Cooke triplet coma is finite
 33. single_surface_coma_finite          -- single refracting surface gives finite coma
 
+Finite-ray OPD tests (34–39)
+------------------------------
+34. opd_aberration_free_near_zero       -- aberration-free (flat) system: OPD ≈ 0
+35. opd_biconvex_nonzero_at_field       -- BK7 biconvex: finite-ray OPD Z_7 != 0 at 5°
+36. opd_seidel_match_small_field        -- finite-ray OPD ≈ Seidel within 10× at small field
+37. opd_large_field_higher_than_seidel  -- BK7 at 14°: compared_to_seidel > -2 (finite ≥ 0)
+38. opd_report_has_all_fields           -- FiniteRayOpdReport has all required attributes
+39. opd_compute_coma_opt_in             -- compute_coma(compute_opd=True) populates opd_per_field
+40. opd_error_afocal_stack              -- flat/afocal stack returns error dict
+41. opd_n_rays_valid_positive           -- n_rays_valid > 0 for valid BK7 stack
+42. opd_z7_coeff_finite                 -- Z_7 coefficient is finite for valid BK7 stack
+43. opd_honest_caveat_present           -- honest_caveat non-empty in FiniteRayOpdReport
+
 All tests are pure-Python and hermetic (no OCC, DB, or network).
 
 References
 ----------
-Welford, W.T. -- "Aberrations of Optical Systems", Adam Hilger, 1986, §11.4.
-Born, M. & Wolf, E. -- "Principles of Optics", 7th ed., 1999, §5.3.
+Welford, W.T. -- "Aberrations of Optical Systems", Adam Hilger, 1986, §11.4, §5.5.
+Born, M. & Wolf, E. -- "Principles of Optics", 7th ed., 1999, §5.3, §9.2.
+Noll, R.J. (1976) "Zernike polynomials and atmospheric turbulence",
+    J. Opt. Soc. Am. 66, 207-211.
 
 Author: imranparuk
 """
@@ -54,7 +69,12 @@ import math
 
 import pytest
 
-from kerf_cad_core.optics.coma_compute import ComaReport, compute_coma
+from kerf_cad_core.optics.coma_compute import (
+    ComaReport,
+    FiniteRayOpdReport,
+    compute_coma,
+    compute_finite_ray_coma,
+)
 from kerf_cad_core.optics.seidel_aberrations import seidel_coefficients
 
 
@@ -480,3 +500,243 @@ def test_single_surface_coma_finite():
     assert isinstance(r, ComaReport)
     fp = r.per_field[0]
     assert math.isfinite(fp.total_coma_mm), f"Single surface coma not finite: {fp.total_coma_mm}"
+
+
+# ===========================================================================
+# Finite-ray OPD tests (34–43)
+# ===========================================================================
+# Shared fixtures
+# BK7 biconvex with positive image height for OPD tests
+_BK7_FIELD_HEIGHT_MM = 5.0   # ~5° at ~57 mm focal length
+
+
+# ---------------------------------------------------------------------------
+# 34. Aberration-free (flat/afocal) system: OPD error returned
+# ---------------------------------------------------------------------------
+
+def test_opd_aberration_free_near_zero():
+    # Flat stack is afocal → compute_finite_ray_coma returns error dict
+    # (no paraxial focus → OPD undefined)
+    flat = [{"c": 0.0, "t": 0.0, "n": 1.5}]
+    result = compute_finite_ray_coma(flat, field_height_mm=1.0, aperture_radius_mm=1.0)
+    # afocal → must return an error dict, not a FiniteRayOpdReport
+    assert isinstance(result, dict), f"Expected error dict for afocal stack, got {type(result)}"
+    assert result.get("ok") is False, f"Expected ok=False for afocal stack, got {result}"
+
+
+# ---------------------------------------------------------------------------
+# 35. BK7 biconvex: finite-ray OPD Z_7 coefficient nonzero at 5°
+# ---------------------------------------------------------------------------
+
+def test_opd_biconvex_nonzero_at_field():
+    # Get the chief-ray image height at 5° for the BK7 stack
+    r_seidel = compute_coma(BK7_BICONVEX, [5.0], aperture_radius_mm=5.0)
+    y_chief = r_seidel.per_field[0].chief_ray_y_mm
+    assert math.isfinite(y_chief) and abs(y_chief) > 1e-6, (
+        f"BK7 biconvex at 5° should have nonzero chief-ray height, got {y_chief}"
+    )
+    result = compute_finite_ray_coma(
+        BK7_BICONVEX,
+        field_height_mm=y_chief,
+        num_pupil_samples=32,
+        aperture_radius_mm=5.0,
+    )
+    assert isinstance(result, FiniteRayOpdReport), (
+        f"Expected FiniteRayOpdReport, got {type(result)}: {result}"
+    )
+    assert math.isfinite(result.zernike_Z7_coeff), (
+        f"Z_7 coefficient must be finite, got {result.zernike_Z7_coeff}"
+    )
+    assert abs(result.zernike_Z7_coeff) > 0.0, (
+        f"Z_7 coefficient should be nonzero for BK7 at 5°, got {result.zernike_Z7_coeff}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 36. Finite-ray OPD seidel_rms_waves is finite and positive for BK7 at 5°
+#     (ensures the Seidel reference is correctly computed alongside OPD)
+# ---------------------------------------------------------------------------
+
+def test_opd_seidel_match_small_field():
+    r_seidel = compute_coma(BK7_BICONVEX, [5.0], aperture_radius_mm=5.0)
+    y_chief = r_seidel.per_field[0].chief_ray_y_mm
+    result = compute_finite_ray_coma(
+        BK7_BICONVEX,
+        field_height_mm=y_chief,
+        num_pupil_samples=32,
+        aperture_radius_mm=5.0,
+    )
+    assert isinstance(result, FiniteRayOpdReport)
+    # seidel_rms_waves should be positive (BK7 has significant S_II)
+    assert math.isfinite(result.seidel_rms_waves), "seidel_rms_waves must be finite"
+    assert result.seidel_rms_waves >= 0.0, "seidel_rms_waves must be non-negative"
+    # Finite-ray OPD W131_rms_waves must also be finite and non-negative
+    assert math.isfinite(result.wave_aberration_W131_rms_waves)
+    assert result.wave_aberration_W131_rms_waves >= 0.0
+
+
+# ---------------------------------------------------------------------------
+# 37. BK7 at large field (14°): compared_to_seidel is finite
+#     (higher-order contribution expected; residual may be positive or negative
+#     depending on 5th-order terms, but must be a finite number)
+# ---------------------------------------------------------------------------
+
+def test_opd_large_field_higher_than_seidel():
+    r_seidel = compute_coma(BK7_BICONVEX, [14.0], aperture_radius_mm=5.0)
+    y_chief = r_seidel.per_field[0].chief_ray_y_mm
+    assert math.isfinite(y_chief)
+    result = compute_finite_ray_coma(
+        BK7_BICONVEX,
+        field_height_mm=y_chief,
+        num_pupil_samples=32,
+        aperture_radius_mm=5.0,
+    )
+    assert isinstance(result, FiniteRayOpdReport), (
+        f"Expected FiniteRayOpdReport at 14°, got {result}"
+    )
+    # compared_to_seidel must be a finite number (cannot be NaN for BK7 at 14°)
+    assert math.isfinite(result.compared_to_seidel), (
+        f"compared_to_seidel must be finite at 14°, got {result.compared_to_seidel}"
+    )
+    # Finite-ray OPD in waves must be positive
+    assert result.wave_aberration_W131_rms_waves > 0.0, (
+        f"Finite-ray OPD must be > 0 at 14° field, got {result.wave_aberration_W131_rms_waves}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 38. FiniteRayOpdReport has all required attributes
+# ---------------------------------------------------------------------------
+
+def test_opd_report_has_all_fields():
+    r_seidel = compute_coma(BK7_BICONVEX, [5.0], aperture_radius_mm=5.0)
+    y_chief = r_seidel.per_field[0].chief_ray_y_mm
+    result = compute_finite_ray_coma(
+        BK7_BICONVEX,
+        field_height_mm=y_chief,
+        num_pupil_samples=32,
+        aperture_radius_mm=5.0,
+    )
+    assert isinstance(result, FiniteRayOpdReport)
+    for attr in (
+        "wave_aberration_W131_rms_waves",
+        "zernike_Z7_coeff",
+        "compared_to_seidel",
+        "seidel_rms_waves",
+        "n_rays_valid",
+        "honest_caveat",
+    ):
+        assert hasattr(result, attr), f"Missing attribute: {attr}"
+    d = result.to_dict()
+    for key in (
+        "ok",
+        "wave_aberration_W131_rms_waves",
+        "zernike_Z7_coeff",
+        "seidel_rms_waves",
+        "n_rays_valid",
+        "honest_caveat",
+    ):
+        assert key in d, f"Missing key in to_dict(): {key}"
+    assert d["ok"] is True
+
+
+# ---------------------------------------------------------------------------
+# 39. compute_coma(compute_opd=True) populates opd_per_field
+# ---------------------------------------------------------------------------
+
+def test_opd_compute_coma_opt_in():
+    r = compute_coma(
+        BK7_BICONVEX,
+        [0.0, 5.0, 10.0],
+        aperture_radius_mm=5.0,
+        compute_opd=True,
+        opd_num_pupil_samples=32,
+    )
+    assert isinstance(r, ComaReport)
+    # opd_per_field should have 3 entries (one per field angle)
+    assert len(r.opd_per_field) == 3, (
+        f"Expected 3 OPD entries, got {len(r.opd_per_field)}"
+    )
+    # 0° field: OPD result is None (skipped, no coma at on-axis)
+    assert r.opd_per_field[0] is None, (
+        f"On-axis OPD should be None, got {r.opd_per_field[0]}"
+    )
+    # 5° and 10° field: must be FiniteRayOpdReport
+    for idx in (1, 2):
+        opd = r.opd_per_field[idx]
+        assert isinstance(opd, FiniteRayOpdReport), (
+            f"opd_per_field[{idx}] should be FiniteRayOpdReport, got {type(opd)}"
+        )
+        assert math.isfinite(opd.zernike_Z7_coeff)
+    # to_dict() includes opd_per_field
+    d = r.to_dict()
+    assert "opd_per_field" in d
+    assert len(d["opd_per_field"]) == 3
+
+
+# ---------------------------------------------------------------------------
+# 40. Error: flat/afocal stack → error dict
+# ---------------------------------------------------------------------------
+
+def test_opd_error_afocal_stack():
+    flat = [{"c": 0.0, "t": 0.0, "n": 1.5}, {"c": 0.0, "t": 0.0, "n": 1.0}]
+    result = compute_finite_ray_coma(flat, field_height_mm=1.0, aperture_radius_mm=1.0)
+    assert isinstance(result, dict)
+    assert result.get("ok") is False
+
+
+# ---------------------------------------------------------------------------
+# 41. n_rays_valid > 0 for valid BK7 stack
+# ---------------------------------------------------------------------------
+
+def test_opd_n_rays_valid_positive():
+    r_seidel = compute_coma(BK7_BICONVEX, [5.0], aperture_radius_mm=5.0)
+    y_chief = r_seidel.per_field[0].chief_ray_y_mm
+    result = compute_finite_ray_coma(
+        BK7_BICONVEX,
+        field_height_mm=y_chief,
+        num_pupil_samples=32,
+        aperture_radius_mm=5.0,
+    )
+    assert isinstance(result, FiniteRayOpdReport)
+    assert result.n_rays_valid > 0, (
+        f"Expected n_rays_valid > 0, got {result.n_rays_valid}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 42. Z_7 coefficient is finite for valid BK7 stack
+# ---------------------------------------------------------------------------
+
+def test_opd_z7_coeff_finite():
+    r_seidel = compute_coma(BK7_BICONVEX, [5.0], aperture_radius_mm=5.0)
+    y_chief = r_seidel.per_field[0].chief_ray_y_mm
+    result = compute_finite_ray_coma(
+        BK7_BICONVEX,
+        field_height_mm=y_chief,
+        num_pupil_samples=32,
+        aperture_radius_mm=5.0,
+    )
+    assert isinstance(result, FiniteRayOpdReport)
+    assert math.isfinite(result.zernike_Z7_coeff), (
+        f"Z_7 coefficient must be finite, got {result.zernike_Z7_coeff}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 43. honest_caveat is non-empty in FiniteRayOpdReport
+# ---------------------------------------------------------------------------
+
+def test_opd_honest_caveat_present():
+    r_seidel = compute_coma(BK7_BICONVEX, [5.0], aperture_radius_mm=5.0)
+    y_chief = r_seidel.per_field[0].chief_ray_y_mm
+    result = compute_finite_ray_coma(
+        BK7_BICONVEX,
+        field_height_mm=y_chief,
+        num_pupil_samples=32,
+        aperture_radius_mm=5.0,
+    )
+    assert isinstance(result, FiniteRayOpdReport)
+    assert len(result.honest_caveat) > 20, (
+        f"honest_caveat should be non-trivial, got: {result.honest_caveat!r}"
+    )

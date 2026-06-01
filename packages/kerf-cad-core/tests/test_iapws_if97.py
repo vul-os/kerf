@@ -23,6 +23,9 @@ from kerf_cad_core.fluids.iapws_if97 import (
     region1_props,
     region2_props,
     steam_properties_if97,
+    _region3_properties,
+    _region3_inverse,
+    _region3_helmholtz_phi,
 )
 
 
@@ -231,3 +234,235 @@ class TestSteamPropertiesIF97:
         # Rough sanity: v ~ R*T/p for steam ≈ 461.5*374/101325 ≈ 1.70 m³/kg
         expected_v_rough = 461.526 * T / p
         assert abs(result["v_m3_per_kg"] - expected_v_rough) / expected_v_rough < 0.05
+
+
+# ---------------------------------------------------------------------------
+# Region 3 — Supercritical / near-critical region
+# ---------------------------------------------------------------------------
+
+class TestRegion3Supercritical:
+    """
+    Reference values: IAPWS-IF97 (2007 release), Table 33.
+
+    The three canonical verification points from Table 33 are specified
+    as (ρ, T) inputs, not (p, T), because Region 3 is a Helmholtz formulation:
+
+      T=650 K, ρ=500 kg/m³  → p=25.5837 MPa, h=1863.43 kJ/kg, s=4.05427 kJ/(kg·K),
+                               cv=3.19132 kJ/(kg·K), w=502.006 m/s
+      T=650 K, ρ=200 kg/m³  → p=22.2930 MPa, h=2375.12 kJ/kg, s=4.85438 kJ/(kg·K),
+                               cv=4.04118 kJ/(kg·K), w=383.444 m/s
+      T=750 K, ρ=500 kg/m³  → p=78.3096 MPa, h=2258.69 kJ/kg, s=4.46972 kJ/(kg·K)
+    """
+
+    # ------------------------------------------------------------------
+    # Direct Region 3 properties function tests (Table 33 reference points)
+    # ------------------------------------------------------------------
+
+    def test_helmholtz_phi_finite_at_critical(self):
+        """φ(ρ*, T*) must be finite and well-behaved at the critical point."""
+        phi, phi_d, phi_dd, phi_t, phi_tt = _region3_helmholtz_phi(322.0, 647.096)
+        assert math.isfinite(phi)
+        assert math.isfinite(phi_d)
+        assert math.isfinite(phi_t)
+        # φ_δ should be positive (pressure > 0)
+        assert phi_d > 0.0
+
+    def test_region3_pressure_T650_rho500(self):
+        """
+        T=650 K, ρ=500 kg/m³ → p = 25.5837 MPa (IAPWS-IF97 Table 33, point 1).
+        Tolerance 0.01% on pressure.
+        """
+        props = _region3_properties(500.0, 650.0)
+        p_ref = 25.5837e6  # Pa
+        assert abs(props["p"] - p_ref) / p_ref < 1e-4, (
+            f"p={props['p']/1e6:.5f} MPa, expected 25.5837 MPa"
+        )
+
+    def test_region3_enthalpy_T650_rho500(self):
+        """
+        T=650 K, ρ=500 kg/m³ → h = 1863.43 kJ/kg (Table 33, point 1).
+        Tolerance 0.01% on enthalpy.
+        """
+        props = _region3_properties(500.0, 650.0)
+        h_kJ = props["h"] / 1000.0
+        assert abs(h_kJ - 1863.43) / 1863.43 < 1e-4, (
+            f"h={h_kJ:.4f} kJ/kg, expected 1863.43 kJ/kg"
+        )
+
+    def test_region3_entropy_T650_rho500(self):
+        """
+        T=650 K, ρ=500 kg/m³ → s = 4.05427 kJ/(kg·K) (Table 33, point 1).
+        Tolerance 0.01%.
+        """
+        props = _region3_properties(500.0, 650.0)
+        s_kJ = props["s"] / 1000.0
+        assert abs(s_kJ - 4.05427) / 4.05427 < 1e-4, (
+            f"s={s_kJ:.6f} kJ/(kg·K), expected 4.05427"
+        )
+
+    def test_region3_cv_T650_rho500(self):
+        """
+        T=650 K, ρ=500 kg/m³ → cv = 3.19132 kJ/(kg·K) (Table 33, point 1).
+        Tolerance 0.01%.
+        """
+        props = _region3_properties(500.0, 650.0)
+        cv_kJ = props["cv"] / 1000.0
+        assert abs(cv_kJ - 3.19132) / 3.19132 < 1e-4, (
+            f"cv={cv_kJ:.5f} kJ/(kg·K), expected 3.19132"
+        )
+
+    def test_region3_sound_speed_T650_rho500(self):
+        """
+        T=650 K, ρ=500 kg/m³ → w = 502.006 m/s (Table 33, point 1).
+        Tolerance 0.01%.
+        """
+        props = _region3_properties(500.0, 650.0)
+        assert abs(props["w"] - 502.006) / 502.006 < 1e-4, (
+            f"w={props['w']:.3f} m/s, expected 502.006 m/s"
+        )
+
+    def test_region3_T650_rho200_pressure(self):
+        """
+        T=650 K, ρ=200 kg/m³ → p = 22.2930 MPa (Table 33, point 2).
+        Tolerance 0.01%.
+        """
+        props = _region3_properties(200.0, 650.0)
+        assert abs(props["p"] - 22.2930e6) / 22.2930e6 < 1e-4, (
+            f"p={props['p']/1e6:.5f} MPa, expected 22.2930 MPa"
+        )
+
+    def test_region3_T750_rho500_pressure(self):
+        """
+        T=750 K, ρ=500 kg/m³ → p = 78.3096 MPa (Table 33, point 3).
+        Tolerance 0.01%.
+        """
+        props = _region3_properties(500.0, 750.0)
+        assert abs(props["p"] - 78.3096e6) / 78.3096e6 < 1e-4, (
+            f"p={props['p']/1e6:.5f} MPa, expected 78.3096 MPa"
+        )
+
+    def test_region3_T750_rho500_enthalpy(self):
+        """
+        T=750 K, ρ=500 kg/m³ → h = 2258.69 kJ/kg (Table 33, point 3).
+        Tolerance 0.01%.
+        """
+        props = _region3_properties(500.0, 750.0)
+        h_kJ = props["h"] / 1000.0
+        assert abs(h_kJ - 2258.69) / 2258.69 < 1e-4, (
+            f"h={h_kJ:.4f} kJ/kg, expected 2258.69 kJ/kg"
+        )
+
+    def test_region3_specific_volume_positive(self):
+        """Specific volume must be positive and consistent with 1/rho."""
+        props = _region3_properties(500.0, 650.0)
+        assert props["v"] > 0.0
+        assert abs(props["v"] - 1.0 / 500.0) < 1e-12
+
+    def test_region3_cv_cp_positive(self):
+        """Heat capacities cv and cp must both be positive and finite."""
+        props = _region3_properties(500.0, 650.0)
+        assert props["cv"] > 0.0, f"cv={props['cv']}"
+        assert props["cp"] > 0.0, f"cp={props['cp']}"
+        assert math.isfinite(props["cv"])
+        assert math.isfinite(props["cp"])
+        # cp ≥ cv always (thermodynamic identity)
+        assert props["cp"] >= props["cv"]
+
+    def test_region3_sound_speed_positive(self):
+        """Speed of sound must be positive and physically plausible (> 100 m/s)."""
+        props = _region3_properties(500.0, 650.0)
+        assert math.isfinite(props["w"])
+        assert props["w"] > 100.0, f"w={props['w']:.1f} m/s"
+
+    # ------------------------------------------------------------------
+    # Inversion: _region3_inverse (p, T) → ρ
+    # ------------------------------------------------------------------
+
+    def test_inverse_roundtrip_T650_rho500(self):
+        """
+        Round-trip: _region3_inverse(p(500,650), 650) == 500 kg/m³.
+        The exact p=25.5837 MPa should invert back to ρ≈500 within 0.1%.
+        """
+        p_ref = _region3_properties(500.0, 650.0)["p"]
+        rho = _region3_inverse(p_ref, 650.0)
+        assert abs(rho - 500.0) / 500.0 < 0.001, (
+            f"rho={rho:.3f} kg/m³, expected 500.0 kg/m³"
+        )
+
+    def test_inverse_roundtrip_T650_rho200(self):
+        """
+        Round-trip for T=650 K, ρ=200 kg/m³ (near-critical, p≈22.29 MPa).
+        """
+        p_ref = _region3_properties(200.0, 650.0)["p"]
+        rho = _region3_inverse(p_ref, 650.0)
+        # Near-critical: looser tolerance
+        assert abs(rho - 200.0) / 200.0 < 0.05, (
+            f"rho={rho:.3f} kg/m³, expected 200.0 kg/m³"
+        )
+
+    def test_inverse_roundtrip_T750_rho500(self):
+        """
+        Round-trip for T=750 K, ρ=500 kg/m³ (high pressure, p≈78.31 MPa).
+        """
+        p_ref = _region3_properties(500.0, 750.0)["p"]
+        rho = _region3_inverse(p_ref, 750.0)
+        assert abs(rho - 500.0) / 500.0 < 0.001, (
+            f"rho={rho:.3f} kg/m³, expected 500.0 kg/m³"
+        )
+
+    def test_critical_point_density(self):
+        """
+        At the critical point (T=647.096 K, p=22.064 MPa), ρ ≈ 322 kg/m³.
+        Tolerance 2% (near-critical convergence is harder).
+        """
+        rho = _region3_inverse(22.064e6, 647.096)
+        assert abs(rho - 322.0) / 322.0 < 0.02, (
+            f"rho={rho:.2f} kg/m³, expected 322 kg/m³"
+        )
+
+    # ------------------------------------------------------------------
+    # Dispatcher integration tests
+    # ------------------------------------------------------------------
+
+    def test_dispatcher_region3_T650_p25mpa(self):
+        """
+        steam_properties_if97(650 K, 25.5837 MPa) → phase='supercritical',
+        h ≈ 1863.43 kJ/kg (within 1%).
+        """
+        result = steam_properties_if97(650.0, 25.5837e6)
+        assert result["phase"] == "supercritical"
+        assert abs(result["h_J_per_kg"] / 1e3 - 1863.43) / 1863.43 < 0.01, (
+            f"h={result['h_J_per_kg']/1e3:.2f} kJ/kg, expected 1863.43"
+        )
+
+    def test_dispatcher_region3_returns_all_fields(self):
+        """Region 3 results include all required SteamProperties fields."""
+        result = steam_properties_if97(700.0, 30.0e6)
+        for key in ("T_K", "p_Pa", "v_m3_per_kg", "h_J_per_kg",
+                    "s_J_per_kg_K", "cp_J_per_kg_K", "phase"):
+            assert key in result, f"Missing key: {key}"
+        assert result["phase"] == "supercritical"
+
+    def test_boundary_continuity_with_region1(self):
+        """
+        At T just below 623.15 K (Region 1 boundary) and high pressure,
+        properties should not jump discontinuously into Region 3.
+        Checks that both sides return finite, similar-order-of-magnitude
+        enthalpies (continuity check, not identity — a small jump is
+        expected from the two different formulations near the boundary).
+        """
+        p = 40.0e6  # 40 MPa — safely in the stable liquid/dense-fluid regime
+        T_r1 = 620.0   # Region 1
+        T_r3 = 630.0   # Region 3
+
+        res1 = steam_properties_if97(T_r1, p)
+        res3 = steam_properties_if97(T_r3, p)
+
+        assert res1["phase"] == "liquid"
+        assert res3["phase"] == "supercritical"
+        # Over a 10 K span, |Δh| < cp * ΔT ≈ 5000 * 10 = 50 kJ/kg = 50e3 J/kg
+        # Use a generous 500 kJ/kg bound for the formulation boundary
+        assert abs(res1["h_J_per_kg"] - res3["h_J_per_kg"]) < 500.0e3, (
+            f"h jump at boundary: R1={res1['h_J_per_kg']/1e3:.1f} kJ/kg, "
+            f"R3={res3['h_J_per_kg']/1e3:.1f} kJ/kg"
+        )

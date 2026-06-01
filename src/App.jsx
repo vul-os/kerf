@@ -235,6 +235,7 @@ export default function App() {
       <Route path="/domains/plc" element={<PLCPage />} />
       <Route path="/domains/motion" element={<MotionSimPage />} />
       <Route path="/domains/femcfd" element={<FemCfdPage />} />
+      <Route path="/simulation" element={<SimulationPage />} />
       <Route path="/domains/textiles" element={<TextilesPage />} />
 
       <Route element={<ProtectedRoute />}>

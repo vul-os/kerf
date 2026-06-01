@@ -1,7 +1,7 @@
 """
 kerf_cad_core.arch.beam_deflection — Architectural beam deflection and moment check.
 
-Implements closed-form Euler-Bernoulli beam deflection formulas for five
+Implements closed-form Euler-Bernoulli beam deflection formulas for six
 common structural load cases, referenced against:
   Roark's Formulas for Stress and Strain, 9th edition, §8 (Young, Budynas, Sadegh 2020)
   AISC Steel Construction Manual, 15th ed., Table 3-23
@@ -27,6 +27,12 @@ Supported cases:
   fixed_fixed + udl:
       δ_max = w·L⁴ / (384·E·I)          at mid-span     [Roark Table 8.1, case 15]
       M_max = w·L² / 12                   at supports (hogging)
+
+  fixed_fixed + point_center:
+      δ_max = P·L³ / (192·E·I)          at mid-span     [Roark Table 8.1, case 8]
+      M_support = -P·L / 8               at each fixed support (hogging, governing)
+      M_center  =  P·L / 8               at load point (sagging)
+      δ(x) = P·x²·(3L−4x) / (48·E·I)   for 0 ≤ x ≤ L/2; symmetric about mid-span
 
 All dimensions in **millimetres**, forces in **Newtons**, stresses in **MPa**.
 
@@ -265,7 +271,6 @@ def compute_beam_deflection(spec: BeamSpec) -> BeamDeflectionReport:
     elif support == "fixed_fixed" and load == "udl":
         # Roark 9e Table 8.1 case 15 (fixed-fixed + UDL)
         # AISC Manual Table 3-23 diagram 9
-        # Note: fixed-fixed + point_center is not implemented.
         w = val
         delta_max = (w * L ** 4) / (384.0 * EI)   # mm at mid-span
         # M_max at supports (hogging) = wL²/12; mid-span sagging = wL²/24
@@ -278,16 +283,35 @@ def compute_beam_deflection(spec: BeamSpec) -> BeamDeflectionReport:
             "δ=wL⁴/(384EI) at mid-span, M_support=wL²/12 (hogging, governs), "
             "M_midspan=wL²/24 (sagging, not reported). "
             "Linear-elastic Euler-Bernoulli; no shear deformation, "
-            "no buckling, no yield check. "
-            "fixed_fixed + point_center not implemented — use a frame solver."
+            "no buckling, no yield check."
         )
 
     elif support == "fixed_fixed" and load == "point_center":
-        raise ValueError(
-            "fixed_fixed + point_center is not implemented in this module. "
-            "Use a direct stiffness / frame solver for this case. "
-            "Supported: fixed_fixed + udl, simply_supported + point_center/udl, "
-            "cantilever + point_center/udl."
+        # Roark 9e Table 8.1 case 8 (fixed-fixed beam, centre point load P)
+        # AISC Manual Table 3-23 diagram 8
+        # Reactions: R = P/2 at each support.
+        # Max deflection at centre: δ_max = P·L³ / (192·E·I)
+        # Fixed-end moment (hogging, governing): M_support = -P·L / 8
+        # Mid-span sagging moment:               M_center  =  P·L / 8
+        # Max shear: V_max = P/2
+        # Deflection profile (0 ≤ x ≤ L/2):
+        #   δ(x) = P·x²·(3L − 4x) / (48·E·I)
+        # (symmetric: δ(L−x) = δ(x))
+        P = val
+        delta_max = (P * L ** 3) / (192.0 * EI)   # mm at mid-span
+        # M_max_Nmm is reported as absolute value of governing moment (support hogging)
+        M_max = (P * L) / 8.0                      # N·mm (magnitude; hogging at supports)
+        V_max = P / 2.0                             # N
+        x_delta = L / 2.0
+        case_desc = "fixed-fixed + centre point load P"
+        refs = "Roark 9e §8 Table 8.1 case 8; AISC Manual Table 3-23 diagram 8"
+        caveats = (
+            "δ_max=PL³/(192EI) at mid-span, M_support=−PL/8 (hogging, governs), "
+            "M_center=PL/8 (sagging, not reported separately). "
+            "Deflection profile: δ(x)=Px²(3L−4x)/(48EI) for 0≤x≤L/2, symmetric. "
+            "R=P/2 at each support. "
+            "Linear-elastic Euler-Bernoulli; no shear deformation, "
+            "no buckling, no yield check."
         )
 
     else:

@@ -2,17 +2,16 @@
 Tests for kerf_cad_core.arch.beam_deflection.
 
 Covers:
-  - All five supported load cases (formula verification against Roark 9e §8
+  - All six supported load cases (formula verification against Roark 9e §8
     Table 8.1 + AISC Manual Table 3-23), tolerance ≤ 0.1 %.
   - W14x90, L=6 m, P=100 kN centre load (hand-computed reference).
   - Zero load → zero deflection and zero moment.
-  - Unsupported case (fixed_fixed + point_center) → ValueError.
   - Invalid inputs (bad support/load type, non-positive L/E/I, negative load).
   - Report field types and signs.
   - deflection_location_mm correctness for each case.
   - Re-export from arch/__init__.py.
   - BeamDeflectionReport fields are all finite and non-negative for valid loads.
-  16 tests total.
+  - fixed_fixed + point_center: Roark Table 8.1 case 8 formula checks + symmetry.
 
 All dimensions mm, forces N, stresses MPa.
 """
@@ -314,6 +313,7 @@ class TestZeroLoad:
         ("cantilever", "point_center"),
         ("cantilever", "udl"),
         ("fixed_fixed", "udl"),
+        ("fixed_fixed", "point_center"),
     ])
     def test_zero_load_gives_zero_deflection(self, support, load):
         """Zero load must produce zero deflection, moment, and shear."""
@@ -328,21 +328,111 @@ class TestZeroLoad:
 
 
 # ---------------------------------------------------------------------------
-# Test 8: Unsupported case → ValueError
+# Test 8: Fixed-fixed + centre point load (Roark 9e Table 8.1 case 8)
 # ---------------------------------------------------------------------------
 
-class TestUnsupportedCase:
+class TestFixedFixedPointCenter:
+    """
+    Reference case: L=3 m, E=200 GPa, I=8.33e-6 m⁴, P=10 kN (centre load).
 
-    def test_fixed_fixed_point_center_raises(self):
-        """fixed_fixed + point_center is not implemented — must raise ValueError."""
-        spec = BeamSpec(
-            length_mm=6_000.0, E_MPa=200_000.0, I_mm4=1e8,
+    In mm / N / MPa units:
+      L = 3 000 mm, E = 200 000 MPa, I = 8 330 000 mm⁴, P = 10 000 N
+      EI = 200 000 × 8 330 000 = 1.666×10¹² N·mm²
+
+    Hand-computed:
+      δ_max = PL³/(192·EI) = 10000×27×10⁹ / (192×1.666×10¹²)
+             = 2.7×10¹³ / 3.199×10¹⁴ ≈ 0.8440 mm
+      M_support = PL/8 = 10000×3000/8 = 3 750 000 N·mm
+      V_max = P/2 = 5 000 N
+    """
+
+    _L = 3_000.0        # mm
+    _E = 200_000.0      # MPa
+    _I = 8_330_000.0    # mm⁴  (≈ 8.33×10⁻⁶ m⁴)
+    _P = 10_000.0       # N (10 kN)
+
+    def _spec(self):
+        return BeamSpec(
+            length_mm=self._L, E_MPa=self._E, I_mm4=self._I,
             support_type="fixed_fixed",
             load_type="point_center",
-            load_value=50_000.0,
+            load_value=self._P,
         )
-        with pytest.raises(ValueError, match="fixed_fixed.*point_center"):
-            compute_beam_deflection(spec)
+
+    def test_delta_max_formula(self):
+        """δ_max = PL³/(192EI)."""
+        report = compute_beam_deflection(self._spec())
+        expected = self._P * self._L**3 / (192.0 * self._E * self._I)
+        assert _rel_err(report.delta_max_mm, expected) < TOL
+
+    def test_delta_max_absolute_approx(self):
+        """Spot-check: δ_max ≈ 0.844 mm for given inputs (to 1%)."""
+        report = compute_beam_deflection(self._spec())
+        # EI = 200000 * 8330000 = 1.666e12;  PL³ = 10000 * 2.7e10 = 2.7e14
+        # δ = 2.7e14 / (192 * 1.666e12) = 2.7e14 / 3.198720e14 ≈ 0.8441 mm
+        assert abs(report.delta_max_mm - 0.8441) < 0.01  # ±1 % of ~0.84
+
+    def test_moment_support_formula(self):
+        """M_max (at supports) = PL/8."""
+        report = compute_beam_deflection(self._spec())
+        expected_M = self._P * self._L / 8.0  # = 3 750 000 N·mm
+        assert _rel_err(report.M_max_Nmm, expected_M) < TOL
+
+    def test_moment_support_absolute(self):
+        """M_support = 10000 × 3000 / 8 = 3 750 000 N·mm."""
+        report = compute_beam_deflection(self._spec())
+        assert abs(report.M_max_Nmm - 3_750_000.0) < 1.0
+
+    def test_shear_formula(self):
+        """V_max = P/2 = 5 000 N."""
+        report = compute_beam_deflection(self._spec())
+        assert _rel_err(report.V_max_N, self._P / 2.0) < TOL
+        assert abs(report.V_max_N - 5_000.0) < 0.01
+
+    def test_deflection_location_midspan(self):
+        """Max deflection occurs at L/2."""
+        report = compute_beam_deflection(self._spec())
+        assert abs(report.deflection_location_mm - self._L / 2.0) < 1e-9
+
+    def test_deflection_profile_symmetry(self):
+        """
+        δ(x) = P·x²·(3L−4x) / (48·E·I) for 0 ≤ x ≤ L/2.
+        Symmetry: δ(L/4) must equal δ(3L/4) when computed from each half.
+        """
+        L, E, I, P = self._L, self._E, self._I, self._P
+        EI = E * I
+        x1 = L / 4.0
+        x2 = L - x1  # = 3L/4; use mirror: δ(3L/4) = δ(L/4)
+        delta_quarter = P * x1**2 * (3 * L - 4 * x1) / (48.0 * EI)
+        delta_mirror  = P * x2**2 * (3 * L - 4 * x2) / (48.0 * EI)
+        # For x > L/2, the formula δ(x) = δ(L − x), so we test directly via formula:
+        # Actually for x2 = 3L/4, the "mirror" formula gives the same δ as x1 = L/4.
+        # Compute symmetrically: δ(3L/4) = δ at distance L/4 from right = δ(L/4).
+        delta_sym = P * (L - x2)**2 * (3 * L - 4 * (L - x2)) / (48.0 * EI)
+        assert _rel_err(delta_quarter, delta_sym) < TOL
+
+    def test_ff_point_center_deflection_is_quarter_of_ss(self):
+        """
+        Fixed-fixed centre point load has δ = PL³/(192EI).
+        Simply-supported centre load has δ = PL³/(48EI).
+        Ratio SS/FF = 192/48 = 4 exactly.
+        """
+        L, E, I, P = self._L, self._E, self._I, self._P
+        r_ff = compute_beam_deflection(BeamSpec(
+            length_mm=L, E_MPa=E, I_mm4=I,
+            support_type="fixed_fixed", load_type="point_center", load_value=P,
+        ))
+        r_ss = compute_beam_deflection(BeamSpec(
+            length_mm=L, E_MPa=E, I_mm4=I,
+            support_type="simply_supported", load_type="point_center", load_value=P,
+        ))
+        ratio = r_ss.delta_max_mm / r_ff.delta_max_mm
+        assert abs(ratio - 4.0) < 1e-9
+
+    def test_honest_caveat_contains_reference(self):
+        """honest_caveat must mention Roark case 8."""
+        report = compute_beam_deflection(self._spec())
+        assert "case 8" in report.honest_caveat.lower() or "case 8" in report.honest_caveat
 
 
 # ---------------------------------------------------------------------------
@@ -402,6 +492,7 @@ class TestReportFieldSanity:
         ("cantilever", "point_center", 15_000.0),
         ("cantilever", "udl", 4.0),
         ("fixed_fixed", "udl", 7.0),
+        ("fixed_fixed", "point_center", 30_000.0),
     ])
     def test_fields_finite_nonneg(self, support, load, val):
         spec = BeamSpec(

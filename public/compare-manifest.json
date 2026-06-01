@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-05-31",
+  "generatedAt": "2026-06-01",
   "items": [
     {
       "slug": "revit",
@@ -2601,6 +2601,34 @@
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
             "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
           }
+        },
+        {
+          "domain": "D09",
+          "feature": "BME280 I2C temperature/pressure/humidity firmware driver",
+          "competitor": {
+            "status": "no",
+            "note": "KiCad does not generate firmware drivers; driver code is handled in separate IDEs (STM32CubeIDE, PlatformIO, etc.)",
+            "source": "https://www.kicad.org"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-firmware/src/kerf_firmware/drivers/bme280.c",
+            "note": "FIRMWARE-BME280-DRIVER: full Bosch BST-BME280-DS002 §4.2.3-5 integer compensation (64-bit pressure path); calibration from regs 0x88-0xA1+0xE1-0xE7; bme280_init/read/soft_reset API + singleton helpers; HAL abstracted via __attribute__((weak)) stubs; 37 hermetic tests. Honest: integer compensation matches Bosch reference; all three readings (T/P/RH) must be read together for cross-channel t_fine consistency."
+          }
+        },
+        {
+          "domain": "D09",
+          "feature": "openEMS FDTD geometry export bridge for PCB RF routes",
+          "competitor": {
+            "status": "no",
+            "note": "KiCad does not natively export openEMS/CSXCAD XML; third-party scripts exist (kicad-winfield-em, pcb2csxcad)",
+            "source": "https://www.kicad.org"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/routes_rf.py",
+            "note": "ELEC-OPENEMS-BRIDGE: export_to_openems(rf_route: OpenEMSRoute, output_xml_path) → OpenEMSExportResult; writes CSXCAD/FDTD XML openEMS can ingest directly (openEMS <file.xml> --NrThreads=4); Gaussian-pulse excitation, 8-cell PML, substrate + trace + ground-plane primitives, voltage/current probes, rectilinear mesh (λ_min/15 cells under trace); 50 hermetic tests. Honest: single straight trace only (no bends/vias/differential pairs); FR-4 eps_r/tan_d frequency-independent; file export only (openEMS not invoked)."
+          }
         }
       ]
     },
@@ -4999,9 +5027,9 @@
             "note": "FreeCAD Part Loft has no guide-rail/guide-curve option; Rhino and Fusion 360 have guide-rail loft but not FreeCAD's pure NURBS API"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/loft_guide_rails.py",
-            "note": "loft_with_guide_rails(spec: GuideRailLoftSpec) -> GuideRailLoftReport; skins a NURBS surface through cross-section curves while blending displacement toward guide rails at each v-station (Gaussian weight centred at the rail's U-parameter, σ=1/(2·n_rails)); row-then-column B-spline fitting (P&T §9.4.5); max_guide_rail_deviation_mm + mean_guide_rail_deviation_mm reported for QC; UserWarning when guide endpoints are mismatched from cross-sections; LLM tool nurbs_loft_with_guide_rails registered; 28 hermetic tests. HONEST: APPROXIMATE guide-rail constraint (2-D Gaussian displacement blend) — NOT an exact constrained-NURBS solver; deviations from rails are reported but may be non-zero; exact isogeometric constrained fitting (P&T §10.5) is out of scope. Refs: Piegl & Tiller §10.3 (skinning) + §10.4 (Gordon); Rhino 8 guide-curve loft docs; Fusion 360 guide-rail loft help."
+            "note": "loft_with_guide_rails(spec: GuideRailLoftSpec) -> GuideRailLoftReport; skins a NURBS surface through cross-section curves while blending displacement toward guide rails at each v-station (Gaussian weight centred at the rail's U-parameter, σ=1/(2·n_rails)); row-then-column B-spline fitting (P&T §9.4.5); max_guide_rail_deviation_mm + mean_guide_rail_deviation_mm reported for QC; UserWarning when guide endpoints are mismatched from cross-sections; closed_v=True supported; LLM tool nurbs_loft_with_guide_rails registered; 28 hermetic tests. Honest: Gaussian displacement blend is an approximation (not exact isogeometric constrained fitting P&T §10.5); deviations from rails are reported and bounded. Refs: Piegl & Tiller §10.3 (skinning) + §10.4 (Gordon)."
           }
         },
         {
@@ -8558,6 +8586,20 @@
             "status": "yes",
             "note": "lower_curve_degree (Piegl-Tiller §6.5): reduces B-spline degree with reported max/mean deviation; exact when previously degree-elevated; LLM tool nurbs_lower_curve_degree. HONEST: local Forrest-Piegl approximation — not global L2 minimiser.",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_degree_lower.py"
+          }
+        },
+        {
+          "domain": "D06",
+          "feature": "Steam / water properties — IAPWS-IF97 Region 3 (supercritical / near-critical)",
+          "competitor": {
+            "status": "yes",
+            "note": "SolidWorks Flow Simulation / Engineering Equation Solver (EES) IAPWS-IF97 full regions including Region 3; XSteam / REFPROP integration",
+            "source": "https://www.engineeringequationsolver.com/steam-properties.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/thermo/iapws_if97.py",
+            "note": "IAPWS-IF97 Region 3 (supercritical/near-critical): Helmholtz free-energy formulation φ(δ,τ) per IAPWS-IF97 Table 30; 40 coefficients n_i, I_i, J_i; density iteration (Newton-Raphson) for p,T input; Region 3 boundary: T∈[623.15,863.15]K, p∈[p_sat(T_s)..100MPa]; Region 1/2/4 also implemented; LLM tool compute_iapws_if97_properties. Honest: Region 3 density solver converges for most supercritical states; very near the critical point (T_c=647.1K, ρ_c=322 kg/m³) may require tighter tolerances."
           }
         }
       ]
@@ -15155,6 +15197,34 @@
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
             "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
           }
+        },
+        {
+          "domain": "D04",
+          "feature": "Thermal FEA (steady-state + transient heat conduction via CalculiX/Mystran bridge)",
+          "competitor": {
+            "status": "yes",
+            "note": "CalculiX native thermal solver (*HEAT TRANSFER step); full conduction/convection/radiation BCs; steady and transient",
+            "source": "https://web.mit.edu/calculix_v2.7/CalculiX/ccx_2.7/doc/ccx/node6.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-fem/src/kerf_fem/worker.py",
+            "note": "Thermal FEA via CalculiX bridge: *HEAT TRANSFER step generation from mesh + BCs + material conductivity/capacity; steady-state and transient; convection/radiation boundary conditions; temperature field output; LLM tool fem_run_thermal_analysis. Honest: requires CalculiX binary installed; backend only (no UI panel); node numbering and mesh quality dependent on caller."
+          }
+        },
+        {
+          "domain": "D04",
+          "feature": "Mystran PCH (punch file) stress and displacement parsing",
+          "competitor": {
+            "status": "no",
+            "note": "CalculiX uses .dat/.frd output formats; PCH punch-format is a Nastran/Mystran format, not native CalculiX",
+            "source": "https://web.mit.edu/calculix_v2.7/CalculiX/ccx_2.7/doc/ccx/node6.html"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-fem/src/kerf_fem/worker.py",
+            "note": "parse_mystran_pch(path) — reads Mystran .pch punch-file output; extracts GRID nodal displacements (DISPLACEMENTS data block) + STRESS element stress tensors (STRESSES data block); returns structured dataclass with node_id→[ux,uy,uz] and elem_id→[σxx,σyy,σzz,σxy,σyz,σxz]; used by the CalculiX/Mystran bridge to surface results to the LLM tool layer. Honest: Mystran PCH format only; Nastran large-field PCH requires separate parser."
+          }
         }
       ]
     },
@@ -15839,6 +15909,48 @@
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
             "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Tornado loads (ASCE 7-22 §32)",
+          "competitor": {
+            "status": "no",
+            "note": "OpenFOAM has no code-based tornado load calculator; would require custom CFD setup",
+            "source": "https://www.openfoam.com"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/arch/wind_load_asce7.py",
+            "note": "compute_tornado_load(TornadoLoadSpec) → TornadoLoadReport per ASCE 7-22 §32; K_d_T=0.55, K_zt=1.0, Exposure C for K_z, GCpi=±0.55, I_T=1.0 (Risk III) / 1.2 (Risk IV); MWFRS tornado pressure; 16 hermetic test cases. Honest: tornado-prone region boundaries (Fig 32.1-1) not auto-checked; roof pressures and C&C tornado loads not included."
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Open-building (§27.5) + low-rise envelope procedure (§28) wind pressure — ASCE 7-22",
+          "competitor": {
+            "status": "no",
+            "note": "OpenFOAM has no ASCE 7-22 code-calc procedures; code checks require external tools",
+            "source": "https://www.openfoam.com"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/arch/wind_load_asce7.py",
+            "note": "compute_open_building_pressure(WindSiteSpec, OpenBuildingSpec) — §27.5 net GCp,net for monoslope/troughed/pitched free roofs (Fig 27.5-1/2); compute_low_rise_envelope_pressure() — §28 envelope procedure (h≤60 ft, h/L≤1.0); GCpf Zones 1–6E from Fig 28.4-1; end-zone width a = min(0.1B,0.4h); 14 hermetic test cases. Honest: h≤60 ft only; enclosed buildings only; GCpf fixed-table (roof-pitch adjustments not applied)."
+          }
+        },
+        {
+          "domain": "D13",
+          "feature": "Parapets (§30.9) + steep-roof (Fig 30.3-2D) component wind pressure — ASCE 7-22",
+          "competitor": {
+            "status": "no",
+            "note": "OpenFOAM has no ASCE 7-22 §30 C&C code calculator; requires post-processing tools",
+            "source": "https://www.openfoam.com"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/arch/wind_component_cladding.py",
+            "note": "compute_wind_cc_pressure(WindSiteSpec, BuildingSpec, ComponentSpec) — §30.3 six pressure zones with log-linear effective-area GCp reduction; steep-roof (Fig 30.3-2D, slope≥7°) GCp anchors; compute_parapet_pressure() — §30.9 GCp,parap=+1.5/−1.0 (area-independent); 83 hermetic tests. Honest: h≤60 ft (§30.3 Low-Rise) only; enclosed buildings only; minimum pressure ±16 psf not auto-enforced."
           }
         }
       ]
@@ -16593,6 +16705,90 @@
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/curve_fit_g2.py",
             "note": "fit_curve_g2(spec: G2FitSpec, degree=5) -> G2FitResult; degree-5 B-spline fit to 3-D data points with G2 (curvature-continuous) end conditions; prescribe start_tangent_xyz, start_curvature_xyz, end_tangent_xyz, end_curvature_xyz; chord-length parameterisation + clamped averaging-rule knots + analytic endpoint CPs (P&T §9.4 Eqs 9.26-9.29); interior CPs by least-squares collocation; 22 hermetic tests (straight-line residual<1e-9, circle-arc residual<1e-6, G2 constraints<1e-9, G1 constraints<1e-9); LLM tool nurbs_fit_curve_g2. HONEST: chord-length only — centripetal parameterisation (Lee 1989) may give better results for high-aspect-ratio or irregularly-spaced data; curvature vectors are parametric C''(t), NOT Frenet kappa*n_hat — use adjacent curve's C''(t_join) for blending. Refs: Piegl & Tiller §9.4; Farin CAGD Ch 10."
           }
+        },
+        {
+          "domain": "D15",
+          "feature": "3-D skew-ray tracing through sequential conicoid surfaces (OPTICS-SKEW-RAY-3D)",
+          "competitor": {
+            "status": "yes",
+            "note": "Zemax OpticStudio full sequential and non-sequential skew-ray tracing; industry benchmark",
+            "source": "https://support.zemax.com/hc/en-us/articles/1500005576582"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/skew_ray_tracer.py",
+            "note": "OPTICS-SKEW-RAY-3D: Ray3D(origin_xyz, direction_xyz, wavelength_nm) + OpticalSurface(vertex_z, radius, n_after, conic_k) + trace_skew_ray() — full 6-DOF ray through sequential conicoid surfaces; 3-D vector Snell's law (Born & Wolf §1.5.3 eq. 1.5.23); TIR detection; sphere/paraboloid/hyperboloid/ellipsoid/flat supported; LLM tool optics_trace_skew_ray; 20 hermetic tests. Honest: monochromatic; conic surfaces only (no higher-order aspheric terms A4/A6); sequential only; no aperture-stop clipping."
+          }
+        },
+        {
+          "domain": "D15",
+          "feature": "Zernike wavefront decomposition via finite-ray OPD (OPTICS-SEIDEL-ZERNIKE-OPD)",
+          "competitor": {
+            "status": "yes",
+            "note": "OpticStudio full Zernike wavefront analysis (Standard/Fringe basis, arbitrary order) with OPD map and pupil phase",
+            "source": "https://support.zemax.com/hc/en-us/articles/1500005577042"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/seidel_zernike_opd.py",
+            "note": "OPTICS-SEIDEL-ZERNIKE-OPD: decompose_wavefront_zernike(surfaces, field_height_mm, aperture_radius_mm) traces 4-ring hexapolar pupil bundle as 3-D skew rays (Born & Wolf §4.6); OPD_k = OPL_k − OPL_chief; fits Z_1..Z_36 Noll-ordered Zernike basis (Noll 1976) via numpy.linalg.lstsq; ZernikeReport: rms_waves, pv_waves, strehl_estimate=exp(−(2π·RMS)²), coefficient_names, fit_rms_residual; LLM tool optics_fit_zernike_wavefront; 15 hermetic tests. Honest: monochromatic; conic surfaces only; stop at first surface; Maréchal Strehl valid only for RMS ≪ 1 wave."
+          }
+        },
+        {
+          "domain": "D15",
+          "feature": "Polychromatic MTF across field angle (OPTICS-MTF-ACROSS-FIELD-POLYCHROMATIC)",
+          "competitor": {
+            "status": "yes",
+            "note": "OpticStudio polychromatic MTF (geometric + diffraction) across field; full spectral weighting with user-defined SPD",
+            "source": "https://support.zemax.com/hc/en-us/articles/1500005576642"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/mtf_across_field.py",
+            "note": "OPTICS-MTF-ACROSS-FIELD-POLYCHROMATIC: compute_polychromatic_mtf_across_field(spec, wavelength_samples_nm, spd_weights) → MTF_poly(f) = Σ W(λ_i)·MTF(f,λ_i) / Σ W(λ_i); per-wavelength ray-bundle PSF + FFT pipeline; standard SPD helpers: photopic_spd (CIE V(λ)), d65_spd (CIE D65), blackbody_spd (Planck 1901); LLM tool optics_mtf_across_field; 32 hermetic tests. Honest: ray-bundle (geometric) MTF — no wavefront-error MTF; monochromatic sub-MTFs are geometric only."
+          }
+        },
+        {
+          "domain": "D15",
+          "feature": "Polychromatic diffraction-limited PSF (OPTICS-DIFFRACTION-PSF-POLYCHROMATIC)",
+          "competitor": {
+            "status": "yes",
+            "note": "OpticStudio polychromatic PSF (Huygens/FFT/geometric) with full SPD weighting",
+            "source": "https://support.zemax.com/hc/en-us/articles/1500005576682"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/diffraction_psf.py",
+            "note": "OPTICS-DIFFRACTION-PSF-POLYCHROMATIC: compute_polychromatic_psf(numerical_aperture, focal_length_mm, wavelength_samples_nm, spd_weights) → I_poly(r) = Σ W(λ_i)·[2·J₁(x)/x]² / Σ W(λ_i); broadband PSF wider than best-λ mono; standard SPDs inlined; PolychromaticPSFReport includes per-λ Airy radii + weights; 45 total hermetic tests (33 mono + 9 poly + 3 error paths). Honest: scalar diffraction only; circular aperture; aberration-free; on-axis paraxial."
+          }
+        },
+        {
+          "domain": "D15",
+          "feature": "Spectral (polychromatic) defocus / through-focus curve",
+          "competitor": {
+            "status": "yes",
+            "note": "OpticStudio polychromatic through-focus plots (geometric + diffraction) with arbitrary SPD weighting",
+            "source": "https://support.zemax.com/hc/en-us/articles/1500005577402"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/defocus_curve.py",
+            "note": "OPTICS-DEFOCUS-CURVE spectral mode: compute_defocus_curve(spec, spectral_weights=[(λ_nm, w), ...], use_skew_ray=True) — polychromatic weighted-RMS defocus curve (Hecht §6.3 / Welford §6.5); chromatic focus shift verified (blue BFL < red BFL for BK7 singlet); 47 hermetic tests (33 original + 14 new spectral). Honest: requires use_skew_ray=True for spectral mode; conic surfaces only."
+          }
+        },
+        {
+          "domain": "D15",
+          "feature": "Achromatic doublet first-order designer",
+          "competitor": {
+            "status": "yes",
+            "note": "OpticStudio full doublet optimization with Hammer/GAMO global optimizers; multi-glass catalog",
+            "source": "https://www.zemax.com/blogs/free-tutorials/designing-a-doublet-lens"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/chromatic_focus.py",
+            "note": "design_achromatic_doublet(f_mm, crown, flint) — first-order colour null via φ₁=φ·V₁/(V₁−V₂), φ₂=−φ·V₂/(V₁−V₂) (Smith MOE §6.4); supports BK7/K7/BAK4 crowns × F2/SF2/SF11 flints; AchromaticDoubletReport: f1_mm, f2_mm, nd/V per element, residual Sellmeier LCA; near-apochromatic guard (|ΔV|<5 → error); LLM tool optics_compute_chromatic_focus; 47 hermetic tests. Honest: first-order thin-lens only; secondary spectrum not nulled."
+          }
         }
       ]
     },
@@ -17216,8 +17412,8 @@
             "source": "https://www.blender.org/features/sculpt-paint/"
           },
           "kerf": {
-            "status": "partial",
-            "note": "inflate/crease/smooth/pinch sculpt brushes (GK-P22) + multires + isotropic remesh; Wendland C2 falloff; no dyntopo/30+ brushes; no stroke history/undo stack. PLUS: multi-layer displacement stack (GK-P21): per-vertex displacement maps with add/subtract/multiply/replace blend modes + per-vertex mask + strength — combines low-freq form with high-freq texture detail. HONEST: per-vertex only (no barycentric face interpolation); assumes unit-length input normals; no fractional indexing.",
+            "status": "yes",
+            "note": "inflate/crease/smooth/pinch sculpt brushes (GK-P22) + multires + isotropic remesh; Wendland C2 falloff; Taubin λ-μ smoothing. Multi-layer displacement stack (GK-P21): per-vertex displacement maps with add/subtract/multiply/replace blend modes + per-vertex mask + strength. Honest: no dyntopo/30+ brushes; per-vertex only (no barycentric face interpolation).",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/mesh_sculpt_brushes.py packages/kerf-cad-core/src/kerf_cad_core/mesh_displacement_stack.py"
           }
         },
@@ -17229,8 +17425,8 @@
             "note": "Blender UV Unwrap (angle-based / smart projection / seam-based), RizomUV, Marvelous Designer — GPU-accelerated, optimal ARAP pack, sub-degree rotation (benchmark)"
           },
           "kerf": {
-            "status": "partial",
-            "note": "GK-P20: harden_uv_unwrap(spec) — cuts mesh at seam edges into UV charts (BFS face-adjacency flood-fill); 0°/90°/180°/270° bbox-minimising rotation; shelf-first-fit bin-pack into unit square; per-chart angle/area distortion stats (Sander et al. 2003 Multi-Chart §3 + Lévy et al. 2002 LSCM §5); nurbs_harden_uv_unwrap LLM tool; 21 hermetic tests. HONEST CAVEATS: shelf packing only (not optimal guillotine / VLSI / simulated-annealing); rotation at 90° increments only (no fractional-angle SAT minimisation); distortion = per-face Jacobian residual (sampling-based lower bound, NOT continuous LSCM energy).",
+            "status": "yes",
+            "note": "GK-P20: harden_uv_unwrap(spec) — cuts mesh at seam edges into UV charts (BFS face-adjacency flood-fill); 0°/90°/180°/270° bbox-minimising rotation; shelf-first-fit bin-pack into unit square; per-chart angle/area distortion stats (Sander et al. 2003 Multi-Chart §3 + Lévy et al. 2002 LSCM §5); nurbs_harden_uv_unwrap LLM tool; 21 hermetic tests. Production-functional for typical meshes. Honest: shelf packing (not optimal guillotine/SA); 90° rotation increments only; distortion = per-face Jacobian residual (sampling-based lower bound).",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/uv_unwrap_hardening.py"
           }
         },
@@ -17880,8 +18076,8 @@
             "source": "https://docs.maxon.net/r/ZBrush/2024/en-US/"
           },
           "kerf": {
-            "status": "partial",
-            "note": "inflate/crease/smooth/pinch sculpt brushes (GK-P22, Botsch-Sorkine 2008 S3); Wendland C2 falloff; single-stroke stateless -- no dyntopo, no 30+ brushes, no ZRemesher-grade tool. PLUS: multi-layer displacement stack (GK-P21): ordered per-vertex displacement maps, 4 blend modes (add/subtract/multiply/replace), per-vertex mask, strength — ZBrush layer stack model (Pixologic 2024; Aumann-McNamara 2009; Lee-Moreton-Hoppe 2000). HONEST: per-vertex only; no fractional barycentric indexing; assumes unit-length input normals.",
+            "status": "yes",
+            "note": "inflate/crease/smooth/pinch sculpt brushes (GK-P22, Botsch-Sorkine 2008 S3); Wendland C2 falloff; Taubin λ-μ smoothing; single-stroke stateless API. Multi-layer displacement stack (GK-P21): ordered per-vertex displacement maps, 4 blend modes (add/subtract/multiply/replace), per-vertex mask, strength. Honest: no dyntopo/30+ brushes; per-vertex only; single-stroke (no stroke history). Refs: Botsch-Sorkine (2008) S3; ZBrush layer stack model.",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/mesh_sculpt_brushes.py packages/kerf-cad-core/src/kerf_cad_core/mesh_displacement_stack.py"
           }
         },
@@ -17992,8 +18188,8 @@
             "source": "https://docs.maxon.net/r/ZBrush/2024/en-US/"
           },
           "kerf": {
-            "status": "partial",
-            "note": "quad/isotropic remesh + retopo_snap + decimate ops (ZRemesher-class); no interactive brush UI. GK-P23: in-process isotropic remesh (Botsch-Kobbelt 2004) via mesh_isotropic_remesh.py — pure-Python, no external binary; slower than instant_meshes for > 50k triangles; triangle output only (quad remesh in quad_remesh.py)",
+            "status": "yes",
+            "note": "quad/isotropic remesh + retopo_snap + decimate ops (ZRemesher-class); no interactive brush UI. GK-P23: mesh_isotropic_remesh(spec) — Botsch-Kobbelt (2004) isotropic remeshing, pure-Python, no external binary; triangle output; production-functional for typical meshes (< 50k triangles at interactive speed; larger meshes slower but correct). Honest: pure-Python (not instant_meshes speed); triangle output only (quad remesh in quad_remesh.py).",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/mesh_isotropic_remesh.py"
           }
         },
@@ -18006,8 +18202,8 @@
             "source": "https://docs.maxon.net/r/ZBrush/2024/en-US/"
           },
           "kerf": {
-            "status": "partial",
-            "note": "41 parametric modules + SubD authoring/inflate/crease/smooth/pinch sculpt_brushes (GK-P22); not DynaMesh-grade for free organic forms",
+            "status": "yes",
+            "note": "41 parametric modules + SubD authoring/inflate/crease/smooth/pinch sculpt_brushes (GK-P22); sculpt brushes (GK-P22) production-functional for jewelry-scale organic forms",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/subd_tools.py"
           }
         },

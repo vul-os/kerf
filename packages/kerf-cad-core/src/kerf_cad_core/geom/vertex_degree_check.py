@@ -412,3 +412,110 @@ def _make_tetrahedron_face_list() -> List[Dict]:
         {"face_id": "f123", "edges": [_edge("v1","v2"), _edge("v2","v3"), _edge("v1","v3")]},
     ]
     return faces
+
+
+# ---------------------------------------------------------------------------
+# LLM tool registration (gated import — works without kerf_chat installed)
+# ---------------------------------------------------------------------------
+
+try:
+    import json as _json
+
+    from kerf_chat.tools.registry import (  # type: ignore[import]
+        ToolSpec,
+        err_payload,
+        ok_payload,
+        register,
+    )
+    from kerf_core.utils.context import ProjectCtx  # type: ignore[import]
+
+    _FACE_SCHEMA_VD = {
+        "type": "array",
+        "description": (
+            "List of faces. Each face has a 'face_id' (string or int) and an "
+            "'edges' list. Each edge has 'edge_id', 'start' (vertex id), "
+            "and 'end' (vertex id)."
+        ),
+        "items": {
+            "type": "object",
+            "properties": {
+                "face_id": {"type": ["string", "integer"]},
+                "edges": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "edge_id": {"type": ["string", "integer"]},
+                            "start":   {"type": ["string", "integer"]},
+                            "end":     {"type": ["string", "integer"]},
+                        },
+                        "required": ["edge_id", "start", "end"],
+                    },
+                },
+            },
+            "required": ["face_id", "edges"],
+        },
+    }
+
+    _vertex_degree_spec = ToolSpec(
+        name="brep_check_vertex_degrees",
+        description=(
+            "Count the number of incident edges at each vertex of a B-rep "
+            "shell/solid and flag topologically irregular vertices "
+            "(Mantyla 1988 §3.4 + Hoffmann 1989 §4):\n\n"
+            "  • boundary vertex — degree < expected_degree (open mesh seam or "
+            "unsealed junction; needs topology repair before Boolean ops)\n"
+            "  • non-manifold vertex — degree > expected_degree + 2 (dense fan "
+            "from T-junction or bowtie; may need mesh surgery)\n\n"
+            "Returns a degree histogram (degree → vertex count), the total "
+            "boundary and non-manifold vertex counts, the maximum observed "
+            "degree, and the identifiers of irregular vertices (capped at 500).\n\n"
+            "CAVEATS: edge-based degree only — does NOT analyse face-fan "
+            "angular order or whether high-degree vertices have non-manifold "
+            "edges.  Combine with brep_inspect_connectivity for full diagnosis."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "faces": _FACE_SCHEMA_VD,
+                "expected_degree": {
+                    "type": "integer",
+                    "description": (
+                        "Expected (typical) vertex valence. "
+                        "3 for triangulated meshes / box corners, "
+                        "4 for quad-dominant B-rep solids (default), "
+                        "6 for interior vertices of a regular triangle mesh."
+                    ),
+                    "default": 4,
+                },
+            },
+            "required": ["faces"],
+        },
+    )
+
+    @register(_vertex_degree_spec, write=False)
+    async def _run_brep_check_vertex_degrees(ctx: ProjectCtx, args: bytes) -> str:
+        try:
+            a = _json.loads(args)
+        except Exception as e:
+            return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+        faces = a.get("faces")
+        if not isinstance(faces, list):
+            return err_payload("'faces' must be a list", "BAD_ARGS")
+
+        expected_degree = a.get("expected_degree", 4)
+        if not isinstance(expected_degree, int) or expected_degree < 1:
+            return err_payload(
+                "'expected_degree' must be a positive integer", "BAD_ARGS"
+            )
+
+        try:
+            report = check_vertex_degrees(faces, expected_degree=expected_degree)
+        except Exception as e:
+            return err_payload(f"vertex degree check failed: {e}", "ERROR")
+
+        return ok_payload(report.as_dict())
+
+except ImportError:
+    pass

@@ -84,7 +84,7 @@ _TOOL_MODULES = [
     # (do Carmo §1.5; Sapidis §3) — fairness QC, sketch QC, toolpath transitions
     "kerf_cad_core.geom.curve_inflection",
     # GK-P Wave 4P: far-offset robustness (Maekawa 1999) — nurbs_surface_offset_robust
-    "kerf_cad_core.geom.offset_far_tools",
+    "kerf_cad_core.geom.offset_far_correction",
     "kerf_cad_core.geom.trim_curve",
     "kerf_cad_core.geom.trim_loop_heal",   # GK-P: nurbs_trim_loop_heal tool
     "kerf_cad_core.geom.subd_decimate_to_cage_tool",
@@ -121,7 +121,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.arch.anchor_bolt_pullout_tools",   # arch_check_anchor_pullout: ACI 318-19 §17.6 cast-in-place headed bolt tension — steel §17.6.1 + concrete breakout §17.6.2 + pullout §17.6.3
     "kerf_cad_core.arch.opening_in_wall_tools",       # arch_check_opening_in_wall: IBC §2308.4 + ACI 318-19 §11.5.3.1 + TMS 402-22 §8.3 wall opening tributary jamb load + capacity + lintel DCR
     "kerf_cad_core.arch.slab_on_grade_tools",        # arch_check_slab_on_grade: ACI 360R-10 + Westergaard (1948) slab-on-grade concentrated interior load; l, σ_max, MR, DCR, joint spacing (30·h PCA rule)
-    "kerf_cad_core.arch.bolt_shear_aisc_tools",     # arch_check_bolt_shear: AISC 360-22 §J3.6 bolt-group shear (bearing-type/slip-critical; single/double shear; bearing §J3.10a + tearout §J3.10b + slip §J3.8)
+    "kerf_cad_core.arch.bolt_shear_aisc",     # arch_check_bolt_shear: AISC 360-22 §J3.6 bolt-group shear (bearing-type/slip-critical; single/double shear; bearing §J3.10a + tearout §J3.10b + slip §J3.8)
     "kerf_cad_core.arch.stair_stringer_tools",      # arch_design_stair_stringer: IBC §1011.5.2 rise/tread + AWC NDS-2018 §3.3 wood bending + AISC 360-22 §F2 steel bending; DCR bending + L/360 deflection
     "kerf_cad_core.civil.hydraulics_tools",
     "kerf_cad_core.tolstack.tools",
@@ -247,7 +247,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.patch_srf",
     "kerf_cad_core.geom.revolve_srf",
     # GK-P: N-sided Coons + Gregory + Hosaka-Kimura patch fit
-    "kerf_cad_core.geom.network_surface_tools",
+    "kerf_cad_core.geom.network_surface",
     "kerf_cad_core.jewelry.production",
     "kerf_cad_core.jewelry.gem_studio",
     "kerf_cad_core.jewelry.gallery",
@@ -411,7 +411,7 @@ _TOOL_MODULES = [
     # STEP import auto-heal pipeline (GK-P: STEP import + heal wiring)
     "kerf_cad_core.io.step_import_tool",               # step_import_brep — STEP import with auto-heal
     # GK-P49: assembly-level interference detection (Möller 1997 + AABB broad-phase)
-    "kerf_cad_core.geom.assembly_interference_tools",   # brep_assembly_interference, brep_check_clearance
+    "kerf_cad_core.geom.assembly_interference",   # brep_assembly_interference, brep_check_clearance
     # GK-P06: NURBS curve/surface split at parameter (nurbs_split_curve, nurbs_split_surface)
     "kerf_cad_core.geom.curve_split",
     # GK-P: NURBS rational conic detection + simplification (Lee 1987 / Piegl-Tiller §7.2)
@@ -424,7 +424,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.degree_2_to_3",                 # nurbs_elevate_to_cubic — degree-2 B-spline → degree-3, shape-preserving
     # BREP-CONNECT-INSPECTOR: radial-edge valence + shell connectivity
     # (Weiler 1985 §3 + Mantyla 1988 §6) — brep_inspect_connectivity, brep_is_manifold
-    "kerf_cad_core.geom.brep_connect_inspector_tools",
+    "kerf_cad_core.geom.brep_connect_inspector",
     # GK-P NURBS-DERIVATIVE-FIELD-VISUAL: 1st partial-derivative arrow-plot PNG/SVG
     "kerf_cad_core.geom.derivative_field_viz",           # nurbs_derivative_field_png, nurbs_derivative_field_svg
     # NURBS-CONVERT-TO-IGES-144: IGES 5.3 entity-144 export (§4.27 + §4.26 + §4.23 + §4.22)
@@ -451,7 +451,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.face_neighbor_walk",            # brep_face_neighbors, brep_shortest_face_path
     # BREP-FACE-PLANARITY-CHECK: SVD best-fit plane + max deviation + planarity score
     # (Pratt 1987 §3; Eberly §6.6) — brep_check_face_planarity
-    "kerf_cad_core.geom.face_planarity_tools",
+    "kerf_cad_core.geom.face_planarity",
     # SUBD-LIMIT-WALK-ALONG-EDGES: CC limit-surface curve along a cage edge chain
     "kerf_cad_core.geom.subd_edge_walk",               # subd_walk_edge_chain
     "kerf_cad_core.geom.half_space_volume",             # brep_volume_above_plane
@@ -490,7 +490,7 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.normal_curvature",
     # BREP-TOPOLOGY-EULER-CHECK: generalised Euler-Poincaré formula verifier
     # (Mantyla 1988 §6 + Hoffmann 1989 §5) — brep_verify_euler_topology
-    "kerf_cad_core.geom.topology_euler_check_tools",
+    "kerf_cad_core.geom.topology_euler_check",
     # GK-SUBD-LIMIT-INTEGRAL-METRIC: exact-as-feasible integrals over CC limit surface
     "kerf_cad_core.geom.subd_limit_integrals",          # subd_integrate_area, subd_integrate_mean_curvature, subd_integrate_gaussian_curvature
     # SUBD-LIMIT-INTEGRAL-GAUSS-BONNET-CHECK: verify ∫∫K dA = 2π·χ on closed CC limit surface
@@ -550,7 +550,7 @@ _TOOL_MODULES = [
     # Returns per-vertex degree histogram + irregular vertex indices.
     # HONEST: edge-based degree only; does NOT analyse face-fan angular order.
     # Refs: Mantyla 1988 §3.4; Hoffmann 1989 §4. LLM tool: brep_check_vertex_degrees
-    "kerf_cad_core.geom.vertex_degree_check_tools",
+    "kerf_cad_core.geom.vertex_degree_check",
     # NURBS-SURFACE-SHEAR-OFFSET: global linear shear transform on NurbsSurface
     # control points for warp compensation during finish-machining post-processing.
     # (Mortenson §4.8; Piegl & Tiller §6.1). LLM tool: nurbs_apply_surface_shear_offset

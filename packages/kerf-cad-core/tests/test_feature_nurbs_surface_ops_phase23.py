@@ -378,7 +378,7 @@ class TestSweep2Integration:
 
     # --- construction 22: sweep2 produces NurbsSurface ---
     def test_sweep2_produces_surface(self):
-        from kerf_cad_core.geom.sweep2 import sweep2
+        from kerf_cad_core.geom.sweep1 import sweep2
         rail1 = self._rail(0.0)
         rail2 = self._rail(1.0)
         profile = self._profile()
@@ -388,7 +388,7 @@ class TestSweep2Integration:
 
     # --- construction 23: CV count sanity for sweep2 ---
     def test_sweep2_cv_count(self):
-        from kerf_cad_core.geom.sweep2 import sweep2
+        from kerf_cad_core.geom.sweep1 import sweep2
         rail1 = self._rail(0.0, n=6)
         rail2 = self._rail(1.0, n=6)
         profile = self._profile(n=4)

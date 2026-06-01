@@ -30,7 +30,7 @@ import numpy as np
 import pytest
 
 from kerf_cad_core.geom.network_srf import loft_surface
-from kerf_cad_core.geom.sweep_n import loft_with_guides_sweep_n
+from kerf_cad_core.geom.sweep1 import loft_with_guides_sweep_n
 from kerf_cad_core.geom.nurbs import NurbsCurve, NurbsSurface
 from kerf_cad_core.feature_loft import (
     validate_loft_args,

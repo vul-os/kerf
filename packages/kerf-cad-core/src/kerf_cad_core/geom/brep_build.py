@@ -1925,7 +1925,7 @@ def sweep2_to_body(
         A validated open-shell Body.  ``validate_body(body, open=True)`` is
         ``True``.
     """
-    from kerf_cad_core.geom.sweep2 import sweep2
+    from kerf_cad_core.geom.sweep1 import sweep2
     surface = sweep2(profile, rail1, rail2)
     return _open_shell_body(surface, tol=tol)
 

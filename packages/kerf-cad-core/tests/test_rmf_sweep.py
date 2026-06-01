@@ -14,8 +14,12 @@ import math
 import numpy as np
 import pytest
 
-from kerf_cad_core.geom.sweep1 import compute_rmf_frames, _sample_path_tangents, sweep1_rmf
-from kerf_cad_core.geom.sweep2 import sweep2_rmf
+from kerf_cad_core.geom.sweep1 import (
+    compute_rmf_frames, _sample_path_tangents, sweep1_rmf,
+    sweep2_rmf,
+    sweep_n,
+    loft_with_guides_sweep_n,
+)
 from kerf_cad_core.geom.nurbs import make_circle_nurbs, NurbsCurve, NurbsSurface
 from kerf_cad_core.geom import sweep1, sweep2
 
@@ -407,3 +411,151 @@ class TestRmfFrameCount:
         _, tangents = _sample_path_tangents(helix, n)
         frames = compute_rmf_frames(tangents)
         assert len(frames) == n, f"Expected {n} frames, got {len(frames)}"
+
+
+# ===========================================================================
+# GK-90: N-rail sweep (sweep_n) — merged from test_gk90_sweep_n.py
+# ===========================================================================
+
+import math as _math  # noqa: E402 (already imported above, alias for clarity)
+
+
+def _make_vertical_line(z0: float, z1: float, n: int = 4, degree: int = 1) -> NurbsCurve:
+    """Linear NURBS from (0,0,z0) to (0,0,z1) with n control points."""
+    pts = np.array([[0.0, 0.0, z0 + (z1 - z0) * i / (n - 1)] for i in range(n)])
+    knots = np.concatenate([np.zeros(degree + 1),
+                            np.linspace(0.0, 1.0, n - degree + 1)[1:-1],
+                            np.ones(degree + 1)])
+    return NurbsCurve(degree=degree, control_points=pts, knots=knots)
+
+
+def _sample_surface(srf: "NurbsSurface", nu: int = 20, nv: int = 20) -> np.ndarray:
+    """Sample the surface on a uniform (nu x nv) grid, return (nu*nv, 3)."""
+    us = np.linspace(0.0, 1.0, nu)
+    vs = np.linspace(0.0, 1.0, nv)
+    pts = []
+    for u in us:
+        for v in vs:
+            pts.append(srf.evaluate(u, v))
+    return np.array(pts)
+
+
+def _cylinder_mean_radius(pts: np.ndarray, axis: np.ndarray) -> float:
+    """Estimate cylinder radius: mean radial distance from axis."""
+    axis = np.asarray(axis, dtype=float)
+    axis = axis / np.linalg.norm(axis)
+    radial = pts - np.outer(pts @ axis, axis)
+    return float(np.linalg.norm(radial, axis=1).mean())
+
+
+class TestSweepNExport:
+    def test_export_exists(self):
+        """sweep_n must be importable from kerf_cad_core.geom."""
+        from kerf_cad_core.geom import sweep_n as sweep_n_exported
+        assert callable(sweep_n_exported)
+        assert sweep_n_exported is sweep_n
+
+
+class TestSweepNErrors:
+    def test_too_few_rails(self):
+        profile = make_circle_nurbs(np.array([0.0, 0.0, 0.0]), 0.1)
+        rail = _make_vertical_line(0.0, 1.0)
+        with pytest.raises(ValueError, match="at least 2 rails"):
+            sweep_n(profile, [rail])
+
+    def test_zero_rails(self):
+        profile = make_circle_nurbs(np.array([0.0, 0.0, 0.0]), 0.1)
+        with pytest.raises(ValueError):
+            sweep_n(profile, [])
+
+    def test_unsupported_frame(self):
+        profile = make_circle_nurbs(np.array([0.0, 0.0, 0.0]), 0.1)
+        rail = _make_vertical_line(0.0, 1.0)
+        with pytest.raises(ValueError, match="frame"):
+            sweep_n(profile, [rail, rail, rail], frame="frenet")
+
+
+class TestSweepN2RailFallback:
+    """2-rail input must fall back to sweep2_rmf path and return a NurbsSurface."""
+
+    def test_two_rail_fallback_returns_surface(self):
+        profile = make_circle_nurbs(np.array([0.0, 0.0, 0.0]), 0.1)
+        rail1 = _make_vertical_line(0.0, 1.0)
+        rail2 = _make_vertical_line(0.0, 1.0, n=4)
+        rail2.control_points[:, 0] = 1.0
+
+        srf = sweep_n(profile, [rail1, rail2])
+        assert isinstance(srf, NurbsSurface)
+        assert not np.any(np.isnan(srf.control_points))
+
+        srf_ref = sweep2_rmf(profile, rail1, rail2)
+        assert isinstance(srf_ref, NurbsSurface)
+
+
+class TestSweepNCylinderOracle:
+    """3-rail sweep of three parallel circles → cylinder of equivalent radius."""
+
+    R = 1.0
+    H = 2.0
+
+    def _make_rail_at_angle(self, angle_deg: float) -> NurbsCurve:
+        x = self.R * _math.cos(_math.radians(angle_deg))
+        y = self.R * _math.sin(_math.radians(angle_deg))
+        pts = np.array([[x, y, 0.0], [x, y, self.H * 0.5], [x, y, self.H]])
+        knots = np.array([0.0, 0.0, 0.5, 1.0, 1.0])
+        return NurbsCurve(degree=2, control_points=pts, knots=knots)
+
+    def _make_profile_line(self) -> NurbsCurve:
+        x0 = self.R * _math.cos(_math.radians(0))
+        y0 = self.R * _math.sin(_math.radians(0))
+        x2 = self.R * _math.cos(_math.radians(240))
+        y2 = self.R * _math.sin(_math.radians(240))
+        pts = np.array([[x0, y0, 0.0], [x2, y2, 0.0]])
+        return NurbsCurve(degree=1, control_points=pts,
+                          knots=np.array([0.0, 0.0, 1.0, 1.0]))
+
+    def test_surface_is_nurbs_surface(self):
+        rails = [self._make_rail_at_angle(a) for a in (0, 120, 240)]
+        srf = sweep_n(self._make_profile_line(), rails)
+        assert isinstance(srf, NurbsSurface)
+
+    def test_no_nan_control_points(self):
+        rails = [self._make_rail_at_angle(a) for a in (0, 120, 240)]
+        srf = sweep_n(self._make_profile_line(), rails)
+        assert not np.any(np.isnan(srf.control_points))
+
+    def test_surface_height_spans_full_cylinder(self):
+        rails = [self._make_rail_at_angle(a) for a in (0, 120, 240)]
+        srf = sweep_n(self._make_profile_line(), rails)
+        pts = _sample_surface(srf, nu=10, nv=10)
+        tol = 0.1 * self.H
+        assert pts[:, 2].min() <= tol
+        assert pts[:, 2].max() >= self.H - tol
+
+    def test_equivalent_volume_cylinder(self):
+        rails = [self._make_rail_at_angle(a) for a in (0, 120, 240)]
+        srf = sweep_n(self._make_profile_line(), rails)
+        pts = _sample_surface(srf, nu=30, nv=30)
+        mean_r = _cylinder_mean_radius(pts, axis=np.array([0.0, 0.0, 1.0]))
+        assert abs(mean_r - self.R) <= 0.20 * self.R
+
+
+class TestSweepN4Rails:
+    """4-rail sweep produces a surface without NaN."""
+
+    def test_four_rails_no_nan(self):
+        H = 1.0
+        offsets = [(1, 0), (0, 1), (-1, 0), (0, -1)]
+        rails = []
+        for dx, dy in offsets:
+            pts = np.array([[dx, dy, 0.0], [dx, dy, H * 0.5], [dx, dy, H]])
+            knots = np.array([0.0, 0.0, 0.5, 1.0, 1.0])
+            rails.append(NurbsCurve(degree=2, control_points=pts, knots=knots))
+        profile = NurbsCurve(
+            degree=1,
+            control_points=np.array([[1.0, 0.0, 0.0], [-1.0, 0.0, 0.0]]),
+            knots=np.array([0.0, 0.0, 1.0, 1.0]),
+        )
+        srf = sweep_n(profile, rails)
+        assert isinstance(srf, NurbsSurface)
+        assert not np.any(np.isnan(srf.control_points))

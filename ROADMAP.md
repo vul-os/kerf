@@ -934,6 +934,16 @@ These are roadmap-level moats that span every sector simultaneously and compound
 
 ---
 
+## Code health
+
+Incremental refactors recorded here for traceability.
+
+| Date | Change | LOC saved |
+|---|---|---|
+| 2026-06-01 | Consolidated `geom/sweep1.py` + `geom/sweep2.py` + `geom/sweep_n.py` into a single `sweep1.py` with unified `sweep_along_rails(profile, rails)` dispatcher; backward-compat wrappers (`sweep1`, `sweep2`, `sweep_n`) kept; deleted 2 source files + 1 test file; merged GK-90 tests into `test_rmf_sweep.py`. | ~300 LOC |
+
+---
+
 ## Deliberately not building
 
 This list is only AI-redundant *authoring/UX interaction paradigms* — not skipped domains or correctness features.

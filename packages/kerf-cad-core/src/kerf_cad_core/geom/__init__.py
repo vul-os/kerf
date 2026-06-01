@@ -57,15 +57,15 @@ from kerf_cad_core.geom.sweep1 import (
     sweep1_helical,
     profile_along_path,
     compute_rmf_frames,
-)
-
-from kerf_cad_core.geom.sweep2 import (
+    # 2-rail API (formerly sweep2.py)
     sweep2,
     sweep2_rmf,
     sweep2_with_scaling,
     sweep2_with_twist,
     check_rail_compatibility,
     normalize_rails,
+    # unified dispatcher
+    sweep_along_rails,
 )
 
 # Variable-section extrude / morphing sweep (Piegl §10.5 skinning).
@@ -555,8 +555,8 @@ from kerf_cad_core.geom.body_heal import simplify_body, heal_body
 # GK-82: imprint 3D curve on face → split face creating new edges
 # GK-82 ext: body-body imprint with edge tagging
 from kerf_cad_core.geom.imprint import imprint_curve_on_face, imprint_body, ImprintTag, ImprintResult
-# GK-90: N-rail sweep (3+ rails)
-from kerf_cad_core.geom.sweep_n import sweep_n, loft_with_guides_sweep_n  # GK-P16
+# GK-90: N-rail sweep (3+ rails) — now in sweep1.py
+from kerf_cad_core.geom.sweep1 import sweep_n, loft_with_guides_sweep_n  # GK-P16
 # GK-P (variable rail-tangent): variable-tangent Gordon loft (Piegl-Tiller §10.4.3)
 from kerf_cad_core.geom.loft_rails_variable import (
     loft_with_rails_variable,
@@ -716,6 +716,8 @@ __all__ = [
     "sweep2_with_twist",
     "check_rail_compatibility",
     "normalize_rails",
+    # unified dispatcher (GK-90 consolidation)
+    "sweep_along_rails",
     "network_srf",
     "network_srf_with_compatibility",
     "network_srf_global",

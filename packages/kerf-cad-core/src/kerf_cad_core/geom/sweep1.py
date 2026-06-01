@@ -4,7 +4,16 @@ Frame computation methods:
 - Frenet (legacy): compute_frenet_frame — can flip at inflections.
 - RMF (Wang 2008): compute_rmf_frames — double-reflection parallel transport,
   torsion-free, zero accumulated twist for circles swept along helices.
+
+Also contains the unified multi-rail sweep dispatcher (sweep_along_rails),
+and absorbs the logic from the former sweep2.py (2-rail) and sweep_n.py
+(N-rail / centroid-spine) modules.  Those modules are now thin re-export
+shims that forward to functions defined here.
 """
+from __future__ import annotations
+
+from typing import List
+
 import numpy as np
 from kerf_cad_core.geom.nurbs import NurbsCurve, NurbsSurface
 
@@ -583,3 +592,469 @@ def sweep1_helical(
         path=helix_path,
         num_samples=helix_path.num_control_points,
     )
+
+
+# ===========================================================================
+# Unified multi-rail sweep  (absorbs sweep2.py + sweep_n.py)
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Shared helpers
+# ---------------------------------------------------------------------------
+
+def merge_knot_vectors(knot_vectors: list) -> np.ndarray:
+    """Average a list of knot vectors into a single merged vector."""
+    max_length = max(len(kv) for kv in knot_vectors)
+    merged = np.zeros(max_length)
+    counts = np.zeros(max_length)
+    for kv in knot_vectors:
+        for i, k in enumerate(kv):
+            merged[i] += k
+            counts[i] += 1
+    for i in range(max_length):
+        if counts[i] > 0:
+            merged[i] /= counts[i]
+    return merged
+
+
+def _midline_tangents(
+    rail1: NurbsCurve, rail2: NurbsCurve, n: int
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Sample n points on each rail and compute midline points + unit tangents.
+
+    Returns (pts1, pts2, midpoints, tangents) each of shape (n, 3).
+    """
+    ts = np.linspace(0.0, 1.0, n)
+    pts1 = np.array([rail1.evaluate(t) for t in ts])
+    pts2 = np.array([rail2.evaluate(t) for t in ts])
+    mids = 0.5 * (pts1 + pts2)
+
+    tangents = np.zeros_like(mids)
+    tangents[0] = mids[1] - mids[0]
+    tangents[-1] = mids[-1] - mids[-2]
+    tangents[1:-1] = mids[2:] - mids[:-2]
+
+    norms = np.linalg.norm(tangents, axis=1, keepdims=True)
+    norms = np.where(norms < 1e-15, 1.0, norms)
+    tangents = tangents / norms
+
+    return pts1, pts2, mids, tangents
+
+
+def _sample_rails(rails: List[NurbsCurve], n: int) -> np.ndarray:
+    """Sample *n* points on each rail uniformly.
+
+    Returns an array of shape (R, n, 3) where R = len(rails).
+    """
+    ts = np.linspace(0.0, 1.0, n)
+    return np.array([[rail.evaluate(t) for t in ts] for rail in rails])
+
+
+def _centroid_spine(rail_pts: np.ndarray) -> np.ndarray:
+    """Compute the centroid spine from rail_pts (R, n, 3) → (n, 3)."""
+    return rail_pts.mean(axis=0)
+
+
+def _spine_tangents(spine: np.ndarray) -> np.ndarray:
+    """Compute unit tangents along a polyline (n, 3) → (n, 3)."""
+    n = len(spine)
+    tangents = np.zeros_like(spine)
+    tangents[0] = spine[1] - spine[0]
+    tangents[-1] = spine[-1] - spine[-2]
+    tangents[1:-1] = spine[2:] - spine[:-2]
+    norms = np.linalg.norm(tangents, axis=1, keepdims=True)
+    norms = np.where(norms < 1e-15, 1.0, norms)
+    return tangents / norms
+
+
+def _build_knots_v(n: int, degree: int) -> np.ndarray:
+    """Build a clamped uniform knot vector for *n* control points at *degree*."""
+    interior = n - degree - 1
+    if interior <= 0:
+        inner = np.array([])
+    else:
+        inner = np.linspace(0.0, 1.0, interior + 2)[1:-1]
+    return np.concatenate([np.zeros(degree + 1), inner, np.ones(degree + 1)])
+
+
+# ---------------------------------------------------------------------------
+# Canonical unified entry-point
+# ---------------------------------------------------------------------------
+
+def sweep_along_rails(
+    profile: NurbsCurve,
+    rails: List[NurbsCurve],
+    frame: str = "rmf",
+) -> NurbsSurface:
+    """Sweep *profile* along *rails* using rail-count dispatch.
+
+    Dispatches to the canonical RMF implementation based on the number of
+    guide rails:
+
+    * 1 rail  — single-rail RMF sweep (Wang 2008, as in ``sweep1``).
+    * 2 rails — midline-tangent two-rail sweep (as in ``sweep2``).
+    * 3+ rails — centroid-spine N-rail sweep (as in ``sweep_n``).
+
+    Parameters
+    ----------
+    profile : NurbsCurve
+        Cross-section profile to sweep.
+    rails : list of NurbsCurve
+        One or more guide rails.
+    frame : {'rmf'}
+        Frame type.  Only ``'rmf'`` (rotation-minimising, Wang 2008) is
+        supported.
+
+    Returns
+    -------
+    NurbsSurface
+    """
+    if not isinstance(rails, (list, tuple)):
+        raise TypeError("rails must be a list of NurbsCurve")
+    R = len(rails)
+    if R < 1:
+        raise ValueError("sweep_along_rails requires at least 1 rail")
+    if any(r.degree < 1 for r in rails):
+        raise ValueError("All rails must have degree >= 1")
+    if profile.degree < 1:
+        raise ValueError("Profile must have degree >= 1")
+    if frame not in ("rmf",):
+        raise ValueError(f"Unsupported frame type: {frame!r}")
+
+    if R == 1:
+        return sweep1(profile, rails[0])
+
+    if R == 2:
+        return _sweep2_core(profile, rails[0], rails[1])
+
+    # R >= 3: centroid-spine path
+    return _sweep_n_core(profile, rails)
+
+
+# ---------------------------------------------------------------------------
+# 2-rail core (formerly sweep2.py)
+# ---------------------------------------------------------------------------
+
+def _sweep2_core(
+    profile: NurbsCurve,
+    rail1: NurbsCurve,
+    rail2: NurbsCurve,
+    num_samples: int | None = None,
+    initial_normal: np.ndarray | None = None,
+) -> NurbsSurface:
+    """Internal 2-rail sweep implementation (RMF along midline)."""
+    n = num_samples if num_samples is not None else rail1.num_control_points
+    n = max(n, 2)
+
+    pts1, pts2, mids, tangents = _midline_tangents(rail1, rail2, n)
+    rmf = compute_rmf_frames(tangents, initial_r=initial_normal, points=mids)
+
+    num_profile_pts = profile.num_control_points
+    control_points = np.zeros((num_profile_pts, n, 3))
+
+    for i in range(n):
+        p1 = pts1[i]
+        p2 = pts2[i]
+        frame_mat = rmf[i]
+        for j in range(num_profile_pts):
+            t = j / (num_profile_pts - 1) if num_profile_pts > 1 else 0.5
+            base_pt = (1 - t) * p1 + t * p2
+            world_pt = base_pt + frame_mat @ profile.control_points[j]
+            control_points[j, i] = world_pt
+
+    knots_u = profile.knots.copy()
+    degree_v = max(rail1.degree, rail2.degree)
+    knots_v = np.concatenate([
+        np.zeros(degree_v),
+        np.linspace(0.0, 1.0, n - degree_v + 1),
+        np.ones(degree_v),
+    ])
+
+    return NurbsSurface(
+        degree_u=profile.degree,
+        degree_v=degree_v,
+        control_points=control_points,
+        knots_u=knots_u,
+        knots_v=knots_v,
+    )
+
+
+# ---------------------------------------------------------------------------
+# N-rail core (formerly sweep_n.py)
+# ---------------------------------------------------------------------------
+
+def _sweep_n_core(
+    profile: NurbsCurve,
+    rails: List[NurbsCurve],
+) -> NurbsSurface:
+    """Internal N-rail sweep implementation (centroid spine RMF, N >= 3)."""
+    R = len(rails)
+    num_profile_pts = profile.num_control_points
+    n = max(r.num_control_points for r in rails)
+    n = max(n, 4)
+
+    rail_pts = _sample_rails(rails, n)          # (R, n, 3)
+    spine = _centroid_spine(rail_pts)            # (n, 3)
+    tangents = _spine_tangents(spine)            # (n, 3)
+    rmf_frames = compute_rmf_frames(tangents, points=spine)
+
+    profile_ts = (
+        np.linspace(0.0, 1.0, num_profile_pts)
+        if num_profile_pts > 1
+        else np.array([0.5])
+    )
+
+    control_points = np.zeros((num_profile_pts, n, 3))
+
+    for i in range(n):
+        rpts = rail_pts[:, i, :]    # (R, 3)
+        frame_mat = rmf_frames[i]   # (3, 3)
+
+        for j in range(num_profile_pts):
+            t_j = profile_ts[j]
+            rail_idx_float = t_j * (R - 1)
+            lo = int(np.floor(rail_idx_float))
+            hi = min(lo + 1, R - 1)
+            alpha = rail_idx_float - lo
+            base_pt = (1.0 - alpha) * rpts[lo] + alpha * rpts[hi]
+            local_offset = frame_mat @ profile.control_points[j]
+            control_points[j, i] = base_pt + local_offset
+
+    knots_u = profile.knots.copy()
+    degree_v = max(r.degree for r in rails)
+    degree_v = min(degree_v, n - 1)
+    knots_v = _build_knots_v(n, degree_v)
+
+    return NurbsSurface(
+        degree_u=profile.degree,
+        degree_v=degree_v,
+        control_points=control_points,
+        knots_u=knots_u,
+        knots_v=knots_v,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Public 2-rail API (backward compat, formerly in sweep2.py)
+# ---------------------------------------------------------------------------
+
+def sweep2(profile: NurbsCurve, rail1: NurbsCurve, rail2: NurbsCurve) -> NurbsSurface:
+    """Sweep *profile* between *rail1* and *rail2* using a rotation-minimising
+    frame (Wang 2008) propagated along the midline of the two rails.
+    """
+    if profile.degree < 1 or rail1.degree < 1 or rail2.degree < 1:
+        raise ValueError("Profile and rails must have degree >= 1")
+    if rail1.num_control_points != rail2.num_control_points:
+        raise ValueError("Rail1 and Rail2 must have same number of control points")
+    return _sweep2_core(profile, rail1, rail2,
+                        num_samples=rail1.num_control_points)
+
+
+def sweep2_rmf(
+    profile: NurbsCurve,
+    rail1: NurbsCurve,
+    rail2: NurbsCurve,
+    num_samples: int | None = None,
+    initial_normal: np.ndarray | None = None,
+) -> NurbsSurface:
+    """Public alias: sweep2 with explicit Wang 2008 RMF along the rail midline.
+
+    Parameters
+    ----------
+    profile, rail1, rail2 : NurbsCurve
+    num_samples : frame samples along rails; defaults to rail1.num_control_points.
+    initial_normal : optional seed normal for the first frame.
+    """
+    if profile.degree < 1 or rail1.degree < 1 or rail2.degree < 1:
+        raise ValueError("Profile and rails must have degree >= 1")
+    return _sweep2_core(profile, rail1, rail2,
+                        num_samples=num_samples,
+                        initial_normal=initial_normal)
+
+
+def sweep2_with_scaling(
+    profile: NurbsCurve, rail1: NurbsCurve, rail2: NurbsCurve,
+    scale1: float = 1.0, scale2: float = 1.0,
+) -> NurbsSurface:
+    """Two-rail sweep with linearly-interpolated per-section scaling, using RMF."""
+    if rail1.num_control_points != rail2.num_control_points:
+        raise ValueError("Rail1 and Rail2 must have same number of control points")
+
+    num_profile_pts = profile.num_control_points
+    num_path_pts = rail1.num_control_points
+    degree_v = max(rail1.degree, rail2.degree)
+
+    pts1, pts2, mids, tangents = _midline_tangents(rail1, rail2, num_path_pts)
+    rmf = compute_rmf_frames(tangents, points=mids)
+    control_points = np.zeros((num_profile_pts, num_path_pts, 3))
+
+    for i in range(num_path_pts):
+        p1 = pts1[i]
+        p2 = pts2[i]
+        frame_mat = rmf[i]
+        for j in range(num_profile_pts):
+            profile_pt = profile.control_points[j]
+            t = j / (num_profile_pts - 1) if num_profile_pts > 1 else 0.5
+            scale = (1 - t) * scale1 + t * scale2
+            base_pt = (1 - t) * p1 + t * p2
+            world_pt = base_pt + frame_mat @ (profile_pt * scale)
+            control_points[j, i] = world_pt
+
+    knots_u = profile.knots.copy()
+    knots_v = merge_knot_vectors([rail1.knots, rail2.knots])
+    return NurbsSurface(
+        degree_u=profile.degree,
+        degree_v=degree_v,
+        control_points=control_points,
+        knots_u=knots_u,
+        knots_v=knots_v,
+    )
+
+
+def sweep2_with_twist(
+    profile: NurbsCurve, rail1: NurbsCurve, rail2: NurbsCurve,
+    twist_per_unit: float = 0.0,
+) -> NurbsSurface:
+    """Two-rail sweep with arc-length-proportional twist applied on top of RMF."""
+    if rail1.num_control_points != rail2.num_control_points:
+        raise ValueError("Rail1 and Rail2 must have same number of control points")
+
+    num_profile_pts = profile.num_control_points
+    num_path_pts = rail1.num_control_points
+    degree_v = max(rail1.degree, rail2.degree)
+
+    pts1, pts2, mids, tangents = _midline_tangents(rail1, rail2, num_path_pts)
+    rmf = compute_rmf_frames(tangents, points=mids)
+    control_points = np.zeros((num_profile_pts, num_path_pts, 3))
+    accumulated_twist = 0.0
+
+    for i in range(num_path_pts):
+        p1 = pts1[i]
+        p2 = pts2[i]
+        frame_mat = rmf[i]
+        t_vec = tangents[i]
+        if i > 0:
+            accumulated_twist += twist_per_unit * np.linalg.norm(mids[i] - mids[i - 1])
+        twist_rot = _rotation_matrix_axis_angle(t_vec, accumulated_twist)
+        twisted_frame = frame_mat @ twist_rot
+        for j in range(num_profile_pts):
+            t = j / (num_profile_pts - 1) if num_profile_pts > 1 else 0.5
+            base_pt = (1 - t) * p1 + t * p2
+            control_points[j, i] = base_pt + twisted_frame @ profile.control_points[j]
+
+    knots_u = profile.knots.copy()
+    knots_v = merge_knot_vectors([rail1.knots, rail2.knots])
+    return NurbsSurface(
+        degree_u=profile.degree,
+        degree_v=degree_v,
+        control_points=control_points,
+        knots_u=knots_u,
+        knots_v=knots_v,
+    )
+
+
+def _rotation_matrix_axis_angle(axis: np.ndarray, angle: float) -> np.ndarray:
+    """Rodrigues rotation matrix about *axis* by *angle* radians (general)."""
+    axis = axis / (np.linalg.norm(axis) + 1e-10)
+    c = np.cos(angle)
+    s = np.sin(angle)
+    t = 1 - c
+    ax, ay, az = axis
+    return np.array([
+        [t * ax * ax + c,       t * ax * ay - s * az, t * ax * az + s * ay],
+        [t * ax * ay + s * az,  t * ay * ay + c,       t * ay * az - s * ax],
+        [t * ax * az - s * ay,  t * ay * az + s * ax,  t * az * az + c      ],
+    ])
+
+
+def check_rail_compatibility(rail1: NurbsCurve, rail2: NurbsCurve) -> bool:
+    """Return True if rail1 and rail2 have compatible degree and domain."""
+    if rail1.degree != rail2.degree:
+        return False
+    if abs(rail1.knots[-1] - rail2.knots[-1]) > 1e-6:
+        return False
+    if abs(rail1.knots[0] - rail2.knots[0]) > 1e-6:
+        return False
+    return True
+
+
+def normalize_rails(rail1: NurbsCurve, rail2: NurbsCurve) -> tuple:
+    """Attempt to normalise two rails to compatible parameterisation."""
+    if not check_rail_compatibility(rail1, rail2):
+        # Minimal placeholder: return rails unchanged (knot insertion not yet wired).
+        return rail1, rail2
+    return rail1, rail2
+
+
+# ---------------------------------------------------------------------------
+# Public N-rail API (backward compat, formerly in sweep_n.py)
+# ---------------------------------------------------------------------------
+
+def sweep_n(
+    profile: NurbsCurve,
+    rails: List[NurbsCurve],
+    frame: str = "rmf",
+) -> NurbsSurface:
+    """Sweep *profile* along *rails* (2 or more guide rails).
+
+    For exactly 2 rails delegates to the 2-rail midline RMF path; for 3+ rails
+    uses the centroid-spine RMF path.
+
+    Parameters
+    ----------
+    profile : NurbsCurve
+    rails : list of NurbsCurve (at least 2)
+    frame : {'rmf'} — only rotation-minimising frame is supported.
+
+    Returns
+    -------
+    NurbsSurface
+    """
+    if not isinstance(rails, (list, tuple)):
+        raise TypeError("rails must be a list of NurbsCurve")
+    R = len(rails)
+    if R < 2:
+        raise ValueError("sweep_n requires at least 2 rails")
+    if any(r.degree < 1 for r in rails):
+        raise ValueError("All rails must have degree >= 1")
+    if profile.degree < 1:
+        raise ValueError("Profile must have degree >= 1")
+    if frame not in ("rmf",):
+        raise ValueError(f"Unsupported frame type: {frame!r}")
+
+    if R == 2:
+        return _sweep2_core(profile, rails[0], rails[1])
+
+    return _sweep_n_core(profile, rails)
+
+
+def loft_with_guides_sweep_n(
+    profiles: List[NurbsCurve],
+    guide_curves: List[NurbsCurve],
+    *,
+    frame: str = "rmf",
+) -> NurbsSurface:
+    """Pure-Python fallback for guided loft using sweep_n semantics.
+
+    Treats the guide rails as the N rails of :func:`sweep_n` and selects the
+    first profile as the cross-section to sweep.
+
+    Parameters
+    ----------
+    profiles : list[NurbsCurve] — at least 2 cross-sections.
+    guide_curves : list[NurbsCurve] — at least 2 guide rails.
+    frame : str — only ``"rmf"`` is supported.
+
+    Returns
+    -------
+    NurbsSurface
+    """
+    if len(profiles) < 2:
+        raise ValueError(
+            f"loft_with_guides_sweep_n: at least 2 profiles required; got {len(profiles)}"
+        )
+    if len(guide_curves) < 2:
+        raise ValueError(
+            f"loft_with_guides_sweep_n: at least 2 guide curves required; got {len(guide_curves)}"
+        )
+    return sweep_n(profiles[0], list(guide_curves), frame=frame)

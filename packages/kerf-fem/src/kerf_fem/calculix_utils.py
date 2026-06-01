@@ -519,13 +519,315 @@ def _run_calculix_modal(mesh_path: str, material_props: dict,
 
 def _run_calculix_thermal(mesh_path: str, material_props: dict,
                            boundary_conditions: list, loads: list) -> dict:
-    # Thermal analysis — basic stub returning empty result.
-    # Full thermal deck writer is deferred until there are thermal BCs in the schema.
+    """
+    Run a CalculiX *HEAT TRANSFER analysis (steady-state or transient).
+
+    The mesh is read via meshio and converted to DC-type thermal elements.
+    BCs may specify prescribed temperatures (*BOUNDARY), convection (*FILM),
+    or heat-flux (*CFLUX).
+
+    Returns
+    -------
+    dict with keys: temperatures, heat_fluxes, warnings, errors.
+    temperatures : list of {"node": int, "T": float}
+    heat_fluxes  : list of {"elem": int, "HFL": float}
+    """
+    import meshio
+
+    msh = meshio.read(mesh_path)
+    nodes = msh.points
+
+    elements = []
+    elem_id = 1
+    # Thermal element type map: DC prefix = diffusion/conduction
+    thermal_elem_type_map = {"tetra": "DC3D4", "hexahedron": "DC3D8", "triangle": "DC2D3"}
+    for cell_block in msh.cells:
+        if cell_block.type in thermal_elem_type_map:
+            for row in cell_block.data:
+                elem_nodes = [int(n) + 1 for n in row]
+                elements.append((elem_id, cell_block.type, elem_nodes))
+                elem_id += 1
+
+    analysis_type = material_props.get("analysis_type", "steady-state")
+    dt = material_props.get("dt", 1.0)
+    t_end = material_props.get("t_end", 1.0)
+    initial_temp = material_props.get("initial_temp", 0.0)
+
+    inp_text = generate_thermal_input(
+        mesh={"nodes": nodes, "elements": elements},
+        materials=material_props,
+        boundary_conditions=boundary_conditions,
+        analysis_type=analysis_type,
+        dt=dt,
+        t_end=t_end,
+        initial_temp=initial_temp,
+    )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmpdir = Path(tmp)
+        inp_path = tmpdir / "analysis.inp"
+        inp_path.write_text(inp_text)
+
+        proc = _run_ccx(tmpdir)
+        if proc.returncode != 0:
+            raise RuntimeError(
+                f"CalculiX thermal failed (code {proc.returncode}): {proc.stderr[:1000]}"
+            )
+
+        dat_path = tmpdir / "analysis.dat"
+        parsed = _parse_dat_thermal(dat_path)
+        if "error" in parsed:
+            raise RuntimeError(parsed["error"])
+
     return {
-        "temperatures": [],
-        "warnings": ["CalculiX thermal analysis not yet implemented"],
+        "temperatures": parsed.get("temperatures", []),
+        "heat_fluxes": parsed.get("heat_fluxes", []),
+        "warnings": [],
         "errors": [],
     }
+
+
+# ---------------------------------------------------------------------------
+# Thermal element type map (module-level constant for reuse)
+# ---------------------------------------------------------------------------
+
+#: Maps meshio cell-block type strings to CalculiX thermal (DC-prefix) element types.
+#: Reference: CalculiX User Manual §6.2 — DC3D4 = 4-node tet, DC3D8 = 8-node hex.
+_THERMAL_ELEM_MAP: dict = {
+    "tetra": "DC3D4",
+    "tetra10": "DC3D10",
+    "hexahedron": "DC3D8",
+    "hexahedron20": "DC3D20",
+    "triangle": "DC2D3",
+    "quad": "DC2D4",
+}
+
+
+def generate_thermal_input(
+    mesh: dict,
+    materials: dict,
+    boundary_conditions: list,
+    analysis_type: str = "steady-state",
+    *,
+    dt: float = 1.0,
+    t_end: float = 1.0,
+    initial_temp: float = 0.0,
+) -> str:
+    """
+    Generate a CalculiX *HEAT TRANSFER INP deck for steady-state or transient
+    thermal analysis including conduction, prescribed temperatures, convection
+    (*FILM), and heat-flux (*CFLUX) boundary conditions.
+
+    Follows CalculiX User Manual §6.9.30 (*HEAT TRANSFER step definition).
+
+    Parameters
+    ----------
+    mesh : dict
+        ``{"nodes": list_of_[x,y,z], "elements": list_of_(eid, etype_str, [node_ids])}``
+    materials : dict
+        Must contain ``"conductivity"`` (W/(m·K)).  For transient analysis also
+        needs ``"density"`` (kg/m³) and ``"specific_heat"`` (J/(kg·K)).
+        Optional ``"name"`` (default ``"THMAT"``).
+    boundary_conditions : list of dicts
+        Each dict has at least a ``"type"`` key:
+
+        * ``{"type": "temperature", "node_ids": [...], "value": T}``
+          → *BOUNDARY (prescribed nodal temperature, DOF 11)
+        * ``{"type": "film", "node_ids": [...], "film_coeff": h, "sink_temp": T_inf}``
+          → *FILM (convective BC, surface film condition)
+        * ``{"type": "heat_flux", "node_ids": [...], "value": q}``
+          → *CFLUX (concentrated nodal heat flux, DOF 11)
+    analysis_type : str
+        ``"steady-state"`` or ``"transient"``
+    dt : float
+        Initial/fixed time increment (transient only).
+    t_end : float
+        End time for transient analysis.
+    initial_temp : float
+        Initial temperature applied to all nodes via *INITIAL CONDITIONS.
+
+    Returns
+    -------
+    str
+        Complete CalculiX INP deck ready to write to ``analysis.inp``.
+    """
+    nodes = mesh["nodes"]
+    elements = mesh["elements"]
+    mat_name = materials.get("name", "THMAT")
+    conductivity = float(materials.get("conductivity", 50.0))
+    density = float(materials.get("density", 7850.0))
+    specific_heat = float(materials.get("specific_heat", 500.0))
+
+    inp: list = []
+
+    # ------------------------------------------------------------------
+    # Header
+    # ------------------------------------------------------------------
+    inp.append("*HEADING")
+    inp.append("Kerf thermal analysis")
+
+    # ------------------------------------------------------------------
+    # Nodes
+    # ------------------------------------------------------------------
+    inp.append("*NODE, NSET=Nall")
+    for i, pt in enumerate(nodes):
+        inp.append(f"{i + 1},{pt[0]:.10g},{pt[1]:.10g},{pt[2]:.10g}")
+
+    # ------------------------------------------------------------------
+    # Elements (thermal DC-type)
+    # ------------------------------------------------------------------
+    by_type: dict = {}
+    for (eid, etype, enodes) in elements:
+        by_type.setdefault(etype, []).append((eid, enodes))
+
+    for etype, egroup in by_type.items():
+        ccx_type = _THERMAL_ELEM_MAP.get(etype, "DC3D4")
+        inp.append(f"*ELEMENT, TYPE={ccx_type}, ELSET=Eall")
+        for eid, enodes in egroup:
+            inp.append(f"{eid}," + ",".join(str(n) for n in enodes))
+
+    # ------------------------------------------------------------------
+    # Material
+    # ------------------------------------------------------------------
+    inp.append("**")
+    inp.append(f"*MATERIAL, NAME={mat_name}")
+    inp.append("*CONDUCTIVITY")
+    inp.append(f"{conductivity:.6g}")
+    inp.append("*DENSITY")
+    inp.append(f"{density:.6g}")
+    if analysis_type == "transient":
+        inp.append("*SPECIFIC HEAT")
+        inp.append(f"{specific_heat:.6g}")
+
+    # Solid section assigns material to the element set
+    inp.append(f"*SOLID SECTION, ELSET=Eall, MATERIAL={mat_name}")
+    inp.append("")
+
+    # ------------------------------------------------------------------
+    # Initial conditions
+    # ------------------------------------------------------------------
+    inp.append("*INITIAL CONDITIONS, TYPE=TEMPERATURE")
+    inp.append(f"Nall,{initial_temp:.6g}")
+
+    # ------------------------------------------------------------------
+    # Step definition
+    # ------------------------------------------------------------------
+    inp.append("**")
+    inp.append("*STEP")
+    if analysis_type == "transient":
+        inp.append(f"*HEAT TRANSFER, {dt:.6g}, {t_end:.6g}")
+    else:
+        inp.append("*HEAT TRANSFER, STEADY STATE")
+    inp.append("**")
+
+    # ------------------------------------------------------------------
+    # Boundary conditions inside the step
+    # ------------------------------------------------------------------
+    for bc in (boundary_conditions or []):
+        bc_type = bc.get("type", "")
+
+        if bc_type == "temperature":
+            # Prescribed nodal temperature — DOF 11 in CalculiX thermal
+            node_ids = bc.get("node_ids", [])
+            value = float(bc.get("value", 0.0))
+            if node_ids:
+                nset_name = f"NtempBC{boundary_conditions.index(bc) + 1}"
+                inp.append(f"*NSET, NSET={nset_name}")
+                # Chunk to 16 per line per CalculiX convention
+                for chunk_start in range(0, len(node_ids), 16):
+                    chunk = node_ids[chunk_start:chunk_start + 16]
+                    inp.append(",".join(str(n) for n in chunk))
+                inp.append("*BOUNDARY")
+                inp.append(f"{nset_name},11,11,{value:.6g}")
+
+        elif bc_type == "film":
+            # Convective boundary: *FILM
+            # Syntax: node_id, FxNy, film_coeff, sink_temp
+            # FxNy = film on face x of node set; we use individual nodes here.
+            film_coeff = float(bc.get("film_coeff", 10.0))
+            sink_temp = float(bc.get("sink_temp", 20.0))
+            node_ids = bc.get("node_ids", [])
+            for nid in node_ids:
+                inp.append("*FILM")
+                inp.append(f"{nid},F1,{film_coeff:.6g},{sink_temp:.6g}")
+
+        elif bc_type == "heat_flux":
+            # Concentrated heat flux: *CFLUX — DOF 11 = thermal DOF
+            node_ids = bc.get("node_ids", [])
+            value = float(bc.get("value", 0.0))
+            for nid in node_ids:
+                inp.append("*CFLUX")
+                inp.append(f"{nid},11,{value:.6g}")
+
+    # ------------------------------------------------------------------
+    # Output requests
+    # ------------------------------------------------------------------
+    inp.append("*NODE FILE, NSET=Nall")
+    inp.append("NT")
+    inp.append("*EL FILE, ELSET=Eall")
+    inp.append("HFL")
+    inp.append("*END STEP")
+
+    return "\n".join(inp)
+
+
+def _parse_dat_thermal(dat_path: "Path") -> dict:
+    """
+    Parse CalculiX .dat output from a *HEAT TRANSFER run.
+
+    Extracts:
+      temperatures : list of {"node": int, "T": float}
+      heat_fluxes  : list of {"elem": int, "HFL": float}
+
+    The .dat file from a thermal run typically contains:
+        TEMPERATURES
+         <node>  <T>
+    and optionally:
+        HEAT FLUX
+         <elem>  <HFLx>  <HFLy>  <HFLz>
+    """
+    if not dat_path.exists():
+        return {"error": f"CalculiX .dat file not found: {dat_path}"}
+
+    content = dat_path.read_text(errors="replace")
+    temperatures = []
+    heat_fluxes = []
+
+    # Temperature block
+    temp_match = re.search(
+        r"T\s*E\s*M\s*P\s*E\s*R\s*A\s*T\s*U\s*R\s*E\s*S(.*?)(?=\n\s*\n|\Z)",
+        content, re.DOTALL | re.IGNORECASE
+    )
+    if temp_match:
+        for line in temp_match.group(1).splitlines():
+            parts = line.split()
+            if len(parts) >= 2 and parts[0].isdigit():
+                try:
+                    temperatures.append({"node": int(parts[0]), "T": float(parts[1])})
+                except ValueError:
+                    pass
+
+    # Heat-flux block (HFL)
+    hfl_match = re.search(
+        r"H\s*E\s*A\s*T\s+F\s*L\s*U\s*X(.*?)(?=\n\s*\n|\Z)",
+        content, re.DOTALL | re.IGNORECASE
+    )
+    if hfl_match:
+        for line in hfl_match.group(1).splitlines():
+            parts = line.split()
+            if len(parts) >= 2 and parts[0].isdigit():
+                try:
+                    # Magnitude from vector components if available
+                    if len(parts) >= 4:
+                        hx, hy, hz = float(parts[1]), float(parts[2]), float(parts[3])
+                        hfl_mag = math.sqrt(hx ** 2 + hy ** 2 + hz ** 2)
+                    else:
+                        hfl_mag = float(parts[1])
+                    heat_fluxes.append({"elem": int(parts[0]), "HFL": hfl_mag})
+                except ValueError:
+                    pass
+
+    return {"temperatures": temperatures, "heat_fluxes": heat_fluxes}
 
 
 # ---------------------------------------------------------------------------

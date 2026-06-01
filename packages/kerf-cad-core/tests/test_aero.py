@@ -62,6 +62,7 @@ from kerf_cad_core.aero.flow import (
     propeller_ideal_efficiency,
     breguet_range,
     breguet_endurance,
+    breguet_range_jet,
 )
 
 # ---------------------------------------------------------------------------
@@ -712,3 +713,229 @@ class TestAeroAuthoritativeReferences:
         r = breguet_range(0.85, 8e-7, 15.0, 1.5e5, 1.0e5)
         expected = (0.85 / 8e-7) * 15.0 * math.log(1.5)
         assert r["range_m"] == pytest.approx(expected, rel=1e-9)
+
+
+# ===========================================================================
+# 14. Breguet range — jet/turbofan variant
+# ===========================================================================
+
+class TestBreguetRangeJet:
+    """
+    Tests for breguet_range_jet().
+
+    Equation (Anderson, "Aircraft Performance and Design" §5):
+        R = (V / c) × (L/D) × ln(W_i / W_f)   [metres]
+
+    c = TSFC in 1/s (fuel weight flow / thrust).
+    Conversion: TSFC [lb/(lbf·hr)] / 3600 → c [1/s].
+    """
+
+    # ------------------------------------------------------------------
+    # 14.1  747-class hand-calc cross-check
+    # ------------------------------------------------------------------
+
+    def test_747_class_range_formula(self):
+        """
+        747-class: V=250 m/s, L/D=18, TSFC=0.6 lb/(lbf·hr).
+        c = 0.6 / 3600 = 1.667e-4 /s.
+        W_i/W_f = 1.5  (e.g. 300 000 N → 200 000 N).
+        R = (250 / 1.667e-4) × 18 × ln(1.5)
+          ≈ 10 950 km — long-haul turbofan ballpark.
+        Anderson APD §5.
+        """
+        c = 0.6 / 3600.0          # 1/s
+        V = 250.0                  # m/s
+        LD = 18.0
+        Wi = 300_000.0             # N
+        Wf = 200_000.0             # N  (Wi/Wf = 1.5)
+        r = breguet_range_jet(
+            velocity_m_per_s=V,
+            lift_to_drag=LD,
+            tsfc_per_s=c,
+            weight_initial_n=Wi,
+            weight_final_n=Wf,
+        )
+        assert r["ok"] is True
+        expected_m = (V / c) * LD * math.log(Wi / Wf)
+        assert r["range_m"] == pytest.approx(expected_m, rel=1e-9)
+        # Ballpark: 10 000 – 15 000 km for long-haul jet at these parameters
+        assert 9_000_000 < r["range_m"] < 16_000_000, (
+            f"range {r['range_m']/1000:.0f} km out of plausible 747-class window"
+        )
+
+    def test_range_km_and_nm_conversion(self):
+        """range_km = range_m/1000; range_nm = range_m/1852."""
+        r = breguet_range_jet(
+            velocity_m_per_s=250.0,
+            lift_to_drag=18.0,
+            tsfc_per_s=0.6 / 3600.0,
+            weight_initial_n=300_000.0,
+            weight_final_n=200_000.0,
+        )
+        assert r["ok"] is True
+        assert r["range_km"] == pytest.approx(r["range_m"] / 1000.0, rel=1e-9)
+        assert r["range_nm"] == pytest.approx(r["range_m"] / 1852.0, rel=1e-9)
+
+    def test_cruise_time_equals_range_over_velocity(self):
+        """cruise_time_s = range_m / velocity_m_per_s."""
+        V = 240.0
+        r = breguet_range_jet(
+            velocity_m_per_s=V,
+            lift_to_drag=16.0,
+            tsfc_per_s=1.8e-4,
+            weight_initial_n=250_000.0,
+            weight_final_n=180_000.0,
+        )
+        assert r["ok"] is True
+        assert r["cruise_time_s"] == pytest.approx(r["range_m"] / V, rel=1e-9)
+
+    def test_fuel_fraction_used(self):
+        """fuel_fraction_used = (W_i - W_f) / W_i."""
+        Wi, Wf = 300_000.0, 200_000.0
+        r = breguet_range_jet(
+            velocity_m_per_s=250.0,
+            lift_to_drag=18.0,
+            tsfc_per_s=0.6 / 3600.0,
+            weight_initial_n=Wi,
+            weight_final_n=Wf,
+        )
+        assert r["ok"] is True
+        assert r["fuel_fraction_used"] == pytest.approx(
+            (Wi - Wf) / Wi, rel=1e-9
+        )
+
+    def test_boundary_equal_weights_zero_range(self):
+        """W_initial == W_final → range = 0, fuel_fraction = 0."""
+        r = breguet_range_jet(
+            velocity_m_per_s=250.0,
+            lift_to_drag=18.0,
+            tsfc_per_s=1.7e-4,
+            weight_initial_n=200_000.0,
+            weight_final_n=200_000.0,
+        )
+        assert r["ok"] is True
+        assert r["range_m"] == 0.0
+        assert r["fuel_fraction_used"] == 0.0
+        assert r["cruise_time_s"] == 0.0
+
+    def test_range_increases_with_ld(self):
+        """Higher L/D → longer range (all else equal)."""
+        common = dict(
+            velocity_m_per_s=250.0,
+            tsfc_per_s=1.7e-4,
+            weight_initial_n=300_000.0,
+            weight_final_n=200_000.0,
+        )
+        r_low = breguet_range_jet(lift_to_drag=14.0, **common)
+        r_high = breguet_range_jet(lift_to_drag=20.0, **common)
+        assert r_high["range_m"] > r_low["range_m"]
+
+    def test_range_decreases_with_tsfc(self):
+        """Higher TSFC → shorter range (more fuel burned per unit thrust)."""
+        common = dict(
+            velocity_m_per_s=250.0,
+            lift_to_drag=18.0,
+            weight_initial_n=300_000.0,
+            weight_final_n=200_000.0,
+        )
+        r_efficient = breguet_range_jet(tsfc_per_s=1.4e-4, **common)
+        r_thirsty = breguet_range_jet(tsfc_per_s=2.0e-4, **common)
+        assert r_efficient["range_m"] > r_thirsty["range_m"]
+
+    def test_range_increases_with_velocity(self):
+        """Higher cruise speed → longer range (jet, not prop: V appears in numerator)."""
+        common = dict(
+            lift_to_drag=18.0,
+            tsfc_per_s=1.7e-4,
+            weight_initial_n=300_000.0,
+            weight_final_n=200_000.0,
+        )
+        r_slow = breguet_range_jet(velocity_m_per_s=200.0, **common)
+        r_fast = breguet_range_jet(velocity_m_per_s=280.0, **common)
+        assert r_fast["range_m"] > r_slow["range_m"]
+
+    def test_jet_vs_prop_same_ld(self):
+        """
+        Jet and propeller Breguet at the same L/D: compare range formulae.
+
+        Propeller: R_prop = (η_p / c_prop) × LD × ln(Wi/Wf)
+        Jet:       R_jet  = (V   / c_jet)  × LD × ln(Wi/Wf)
+
+        At V=100 m/s, η_p=0.85, c_prop = 8e-8 kg/(N·s), LD=15,
+        and a representative turbofan c_jet = 1.7e-4 /s:
+          R_prop = (0.85/8e-8)*15*ln(1.5) ≈ 53 501 km  (high η_p turboprop)
+          R_jet  = (100/1.7e-4)*15*ln(1.5) ≈ 3 593 km   (faster but thirstier)
+
+        Anderson APD: jet trades velocity efficiency for TSFC penalty vs turboprop.
+        """
+        Wi, Wf = 150_000.0, 100_000.0  # Wi/Wf = 1.5
+        LD = 15.0
+
+        r_prop = breguet_range(
+            eta_p=0.85,
+            c_specific=8e-8,
+            LD=LD,
+            W_initial=Wi,
+            W_final=Wf,
+        )
+        r_jet = breguet_range_jet(
+            velocity_m_per_s=100.0,
+            lift_to_drag=LD,
+            tsfc_per_s=1.7e-4,
+            weight_initial_n=Wi,
+            weight_final_n=Wf,
+        )
+        assert r_prop["ok"] is True
+        assert r_jet["ok"] is True
+        # Both positive
+        assert r_prop["range_m"] > 0.0
+        assert r_jet["range_m"] > 0.0
+        # Turboprop with high η_p and low c wins at low speed vs high-TSFC jet
+        # (illustrates Anderson APD Fig 5.xx trade-off)
+        assert r_prop["range_m"] > r_jet["range_m"]
+
+    # ------------------------------------------------------------------
+    # 14.x  Input validation
+    # ------------------------------------------------------------------
+
+    def test_negative_velocity_error(self):
+        """V ≤ 0 → ok=False."""
+        r = breguet_range_jet(
+            velocity_m_per_s=-1.0, lift_to_drag=18.0,
+            tsfc_per_s=1.7e-4, weight_initial_n=300_000.0, weight_final_n=200_000.0,
+        )
+        assert r["ok"] is False
+
+    def test_negative_ld_error(self):
+        """L/D ≤ 0 → ok=False."""
+        r = breguet_range_jet(
+            velocity_m_per_s=250.0, lift_to_drag=-5.0,
+            tsfc_per_s=1.7e-4, weight_initial_n=300_000.0, weight_final_n=200_000.0,
+        )
+        assert r["ok"] is False
+
+    def test_negative_tsfc_error(self):
+        """TSFC ≤ 0 → ok=False."""
+        r = breguet_range_jet(
+            velocity_m_per_s=250.0, lift_to_drag=18.0,
+            tsfc_per_s=0.0, weight_initial_n=300_000.0, weight_final_n=200_000.0,
+        )
+        assert r["ok"] is False
+
+    def test_wi_less_than_wf_error(self):
+        """W_initial < W_final → ok=False (weight cannot increase in flight)."""
+        r = breguet_range_jet(
+            velocity_m_per_s=250.0, lift_to_drag=18.0,
+            tsfc_per_s=1.7e-4, weight_initial_n=100_000.0, weight_final_n=200_000.0,
+        )
+        assert r["ok"] is False
+
+    def test_honest_caveat_present(self):
+        """Result must include an honest_caveat string."""
+        r = breguet_range_jet(
+            velocity_m_per_s=250.0, lift_to_drag=18.0,
+            tsfc_per_s=1.7e-4, weight_initial_n=300_000.0, weight_final_n=200_000.0,
+        )
+        assert r["ok"] is True
+        assert isinstance(r["honest_caveat"], str)
+        assert len(r["honest_caveat"]) > 10

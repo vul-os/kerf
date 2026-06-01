@@ -78,7 +78,16 @@ Implements the following public functions (all return plain dicts):
       Breguet range (propeller / piston):
         R = (η_p/c) × (L/D) × ln(W_i/W_f)   (m)
       c_specific in (N/W) or (kg/(N·s)) — fuel flow per unit thrust × weight.
-      NOTE: for jet use breguet_range_jet (not implemented here; use LD/TSFC).
+      See breguet_range_jet for the jet/turbofan variant.
+
+  breguet_range_jet(velocity_m_per_s, lift_to_drag, tsfc_per_s, weight_initial_n, weight_final_n)
+      Breguet range for jet/turbofan aircraft (Anderson "Aircraft Performance
+      and Design" §5):
+        R = (V/c) × (L/D) × ln(W_i/W_f)   (m)
+      where c = TSFC in 1/s (fuel weight flow per unit thrust, dimensionless/s).
+      Conversion: TSFC [lb/(lbf·hr)] / 3600 → c [1/s].
+      Returns range_m, range_km, range_nm, fuel_fraction_used,
+              cruise_time_s, honest_caveat.
 
   breguet_endurance(eta_p, c_specific, CL, CD, rho, S, W_initial, W_final)
       Breguet endurance (propeller):
@@ -115,6 +124,7 @@ References
 ----------
 Anderson, J.D. — Introduction to Flight, 8th ed., McGraw-Hill (2016)
 Anderson, J.D. — Fundamentals of Aerodynamics, 6th ed., McGraw-Hill (2017)
+Anderson, J.D. — Aircraft Performance and Design, McGraw-Hill (1999)
 ICAO Doc 7488  — Manual of the ICAO Standard Atmosphere, 3rd ed. (1993)
 
 Author: imranparuk
@@ -1133,3 +1143,237 @@ def breguet_endurance(
         "W_initial": Wi,
         "W_final": Wf,
     }
+
+
+def breguet_range_jet(
+    velocity_m_per_s: float,
+    lift_to_drag: float,
+    tsfc_per_s: float,
+    weight_initial_n: float,
+    weight_final_n: float,
+) -> dict:
+    """
+    Breguet range equation for jet/turbofan aircraft.
+
+    Anderson, "Aircraft Performance and Design", §5:
+
+        R = (V / c) × (L/D) × ln(W_i / W_f)   (metres)
+
+    where:
+        V   — cruise true airspeed (m/s)
+        c   — thrust-specific fuel consumption, TSFC (1/s)
+              Defined as fuel *weight* flow per unit thrust (dimensionless/s).
+              Conversion from common imperial units:
+                  c [1/s] = TSFC [lb/(lbf·hr)] / 3600
+              Typical high-bypass turbofan cruise: c ≈ 1.5e-4 to 1.9e-4 1/s
+              (≈ 0.55–0.7 lb/(lbf·hr)).
+        L/D — lift-to-drag ratio at cruise condition
+        W_i — initial (take-off) weight (N)
+        W_f — final (landing / top-of-descent) weight (N); W_i > W_f > 0
+
+    The equation assumes:
+      - constant altitude and airspeed (cruise-climb neglected)
+      - constant L/D (cruise-optimised, not reoptimised as fuel burns)
+      - jet propulsion (thrust-based, no propeller efficiency term)
+
+    Parameters
+    ----------
+    velocity_m_per_s : float
+        Cruise true airspeed (m/s).  Must be > 0.
+    lift_to_drag : float
+        Lift-to-drag ratio (dimensionless).  Must be > 0.
+    tsfc_per_s : float
+        Thrust-specific fuel consumption in 1/s (fuel weight flow / thrust).
+        Must be > 0.
+        Convert: TSFC [lb/(lbf·hr)] / 3600 → c [1/s].
+    weight_initial_n : float
+        Initial (take-off) gross weight (N).  Must be > weight_final_n > 0.
+    weight_final_n : float
+        Final (landing) weight (N).  Must be > 0.
+
+    Returns
+    -------
+    dict with keys:
+        ok               — bool
+        range_m          — range in metres
+        range_km         — range in kilometres
+        range_nm         — range in nautical miles (1 NM = 1852 m)
+        fuel_fraction_used — (W_i − W_f) / W_i  (dimensionless)
+        cruise_time_s    — estimated cruise time R / V  (seconds)
+        honest_caveat    — text flag noting constant-altitude / constant-L/D
+                           simplifications; real cruise-climb adds ~1–3%
+        velocity_m_per_s, lift_to_drag, tsfc_per_s,
+        weight_initial_n, weight_final_n
+
+    References
+    ----------
+    Anderson, J.D. — Aircraft Performance and Design, §5, McGraw-Hill (1999).
+    """
+    err = _validate_positive("velocity_m_per_s", velocity_m_per_s)
+    if err:
+        return {"ok": False, "reason": err}
+    err = _validate_positive("lift_to_drag", lift_to_drag)
+    if err:
+        return {"ok": False, "reason": err}
+    err = _validate_positive("tsfc_per_s", tsfc_per_s)
+    if err:
+        return {"ok": False, "reason": err}
+    err = _validate_positive("weight_initial_n", weight_initial_n)
+    if err:
+        return {"ok": False, "reason": err}
+    err = _validate_positive("weight_final_n", weight_final_n)
+    if err:
+        return {"ok": False, "reason": err}
+
+    V = float(velocity_m_per_s)
+    LD = float(lift_to_drag)
+    c = float(tsfc_per_s)
+    Wi = float(weight_initial_n)
+    Wf = float(weight_final_n)
+
+    if Wi < Wf:
+        return {
+            "ok": False,
+            "reason": "weight_initial_n must be >= weight_final_n",
+        }
+    if Wi == Wf:
+        # No fuel burned → zero range (boundary case; not an error)
+        return {
+            "ok": True,
+            "range_m": 0.0,
+            "range_km": 0.0,
+            "range_nm": 0.0,
+            "fuel_fraction_used": 0.0,
+            "cruise_time_s": 0.0,
+            "honest_caveat": (
+                "W_initial equals W_final: no fuel burned, range is zero. "
+                "Breguet equation assumes W_i > W_f for non-trivial cruise."
+            ),
+            "velocity_m_per_s": V,
+            "lift_to_drag": LD,
+            "tsfc_per_s": c,
+            "weight_initial_n": Wi,
+            "weight_final_n": Wf,
+        }
+
+    R = (V / c) * LD * math.log(Wi / Wf)
+    fuel_fraction = (Wi - Wf) / Wi
+    cruise_time = R / V   # = (LD/c) * ln(Wi/Wf)  [s]
+
+    return {
+        "ok": True,
+        "range_m": R,
+        "range_km": R / 1000.0,
+        "range_nm": R / 1852.0,
+        "fuel_fraction_used": fuel_fraction,
+        "cruise_time_s": cruise_time,
+        "honest_caveat": (
+            "Breguet jet: constant-altitude, constant-airspeed, constant-L/D cruise "
+            "assumed (Anderson APD §5). Actual cruise-climb trajectories gain "
+            "approximately 1–3% additional range. TSFC is treated as constant; "
+            "real turbofan TSFC varies ≈ ±5% across cruise altitude band."
+        ),
+        "velocity_m_per_s": V,
+        "lift_to_drag": LD,
+        "tsfc_per_s": c,
+        "weight_initial_n": Wi,
+        "weight_final_n": Wf,
+    }
+
+
+# ---------------------------------------------------------------------------
+# LLM tool: aero_breguet_range_jet  (gated — only registered if kerf_chat present)
+# ---------------------------------------------------------------------------
+
+try:
+    import json as _json
+
+    from kerf_chat.tools.registry import ToolSpec, err_payload, ok_payload, register  # type: ignore[import]
+    from kerf_core.utils.context import ProjectCtx as _ProjectCtx  # type: ignore[import]
+
+    _breguet_jet_spec = ToolSpec(
+        name="aero_breguet_range_jet",
+        description=(
+            "Breguet range equation for jet/turbofan aircraft "
+            "(Anderson 'Aircraft Performance and Design' §5).\n\n"
+            "  R = (V / c) × (L/D) × ln(W_i / W_f)   (metres)\n\n"
+            "where c = TSFC in 1/s (fuel weight flow per unit thrust).\n"
+            "Convert: TSFC [lb/(lbf·hr)] / 3600 → c [1/s].\n\n"
+            "Returns range in metres, km, and nautical miles; fuel fraction used; "
+            "estimated cruise time; and an honest caveat on the constant-altitude "
+            "constant-L/D simplification (real cruise-climb adds ~1–3%).\n\n"
+            "Inputs:\n"
+            "  velocity_m_per_s   — cruise true airspeed (m/s); must be > 0\n"
+            "  lift_to_drag       — L/D ratio at cruise; must be > 0\n"
+            "  tsfc_per_s         — TSFC in 1/s; must be > 0\n"
+            "                       (TSFC [lb/(lbf·hr)] / 3600 → 1/s)\n"
+            "  weight_initial_n   — take-off gross weight (N); must be > 0\n"
+            "  weight_final_n     — landing weight (N); 0 < W_f ≤ W_i\n\n"
+            "Errors: {ok:false, reason} for invalid inputs.  Never raises."
+        ),
+        input_schema={
+            "type": "object",
+            "required": [
+                "velocity_m_per_s",
+                "lift_to_drag",
+                "tsfc_per_s",
+                "weight_initial_n",
+                "weight_final_n",
+            ],
+            "properties": {
+                "velocity_m_per_s": {
+                    "type": "number",
+                    "description": "Cruise true airspeed (m/s).  Must be > 0.",
+                },
+                "lift_to_drag": {
+                    "type": "number",
+                    "description": "Lift-to-drag ratio at cruise.  Must be > 0.",
+                },
+                "tsfc_per_s": {
+                    "type": "number",
+                    "description": (
+                        "Thrust-specific fuel consumption in 1/s "
+                        "(fuel weight flow / thrust).  Must be > 0.  "
+                        "Convert: TSFC [lb/(lbf·hr)] / 3600 → 1/s.  "
+                        "Typical turbofan cruise: 1.5e-4 to 1.9e-4 1/s."
+                    ),
+                },
+                "weight_initial_n": {
+                    "type": "number",
+                    "description": "Initial (take-off) gross weight (N).  Must be > 0.",
+                },
+                "weight_final_n": {
+                    "type": "number",
+                    "description": "Final (landing) weight (N).  Must be > 0 and <= weight_initial_n.",
+                },
+            },
+        },
+    )
+
+    @register(_breguet_jet_spec, write=False)
+    async def _run_aero_breguet_range_jet(ctx: _ProjectCtx, args: bytes) -> str:
+        try:
+            a = _json.loads(args)
+        except Exception as exc:
+            return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+        required = (
+            "velocity_m_per_s", "lift_to_drag", "tsfc_per_s",
+            "weight_initial_n", "weight_final_n",
+        )
+        for field in required:
+            if a.get(field) is None:
+                return _json.dumps({"ok": False, "reason": f"{field} is required"})
+        try:
+            result = breguet_range_jet(
+                velocity_m_per_s=float(a["velocity_m_per_s"]),
+                lift_to_drag=float(a["lift_to_drag"]),
+                tsfc_per_s=float(a["tsfc_per_s"]),
+                weight_initial_n=float(a["weight_initial_n"]),
+                weight_final_n=float(a["weight_final_n"]),
+            )
+        except (TypeError, ValueError) as exc:
+            return err_payload(f"bad parameter: {exc}", "BAD_ARGS")
+        return ok_payload(result) if result["ok"] else _json.dumps(result)
+
+except ImportError:
+    pass  # kerf_chat not available — tool not registered; module still importable

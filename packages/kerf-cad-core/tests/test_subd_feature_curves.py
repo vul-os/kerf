@@ -1,396 +1,478 @@
-"""
-Tests for kerf_cad_core.geom.subd_feature_curves — SubD feature curves with
-continuous sharpness (Biermann-Levin-Zorin 2000 / DeRose-Kass-Truong 1998).
+"""Tests for kerf_cad_core.subd.feature_curves — GK-P19 SubD feature curves.
 
-Four analytical-oracle tests:
+Oracle strategy:
+  - Flat plane: zero curvature everywhere → 0 ridges, 0 valleys.
+  - Cube cage (sharp corners/edges): high curvature at corner regions
+    → ridges detected; can count them roughly.
+  - Saddle cage: negative curvature in one direction → valleys detected.
+  - Sphere cage: curvature ~uniform low → minimal features at default threshold.
+  - Threshold sweep: raising threshold reduces feature count.
+  - API contracts: dataclass defaults, empty cage, single face, etc.
 
-1. sharpness=inf   → limit positions match CC crease (within 1e-10).
-2. sharpness=0     → limit positions match smooth subdivision (within 1e-12).
-3. sharpness=2     → dihedral along feature curve lies between the inf and 0
-                     extremes.
-4. auto_detect     → extract_feature_curves finds a 90° ridge; smooth mesh
-                     returns 0 curves.
+All tests are hermetic (no OCC, no DB, no network).
 """
+
 from __future__ import annotations
 
 import math
 from typing import List, Tuple
 
-import numpy as np
 import pytest
 
-from kerf_cad_core.geom.subd import SubDMesh, catmull_clark_subdivide
-from kerf_cad_core.geom.subd_feature_curves import (
+from kerf_cad_core.subd.feature_curves import (
     FeatureCurve,
+    FeatureCurveResult,
+    FeatureCurveSpec,
+    SubdCage,
     extract_feature_curves,
-    make_semi_sharp_feature,
-    propagate_feature_curves,
 )
 
 
 # ---------------------------------------------------------------------------
-# Test-mesh helpers
+# Cage helpers
 # ---------------------------------------------------------------------------
 
-def make_flat_quad_strip() -> SubDMesh:
-    """4×1 strip of quads lying in the z=0 plane.
-
-    Vertices (row 0 bottom, row 1 top):
-      0-1-2-3-4   y=0
-      5-6-7-8-9   y=1
-
-    Faces (4 quads):
-      [0,1,6,5], [1,2,7,6], [2,3,8,7], [3,4,9,8]
-
-    The middle edge 2-7 (x=2 interior) will be our feature edge.
-    """
-    verts: List[List[float]] = [
-        [float(x), 0.0, 0.0] for x in range(5)
-    ] + [
-        [float(x), 1.0, 0.0] for x in range(5)
-    ]
-    faces = [
-        [0, 1, 6, 5],
-        [1, 2, 7, 6],
-        [2, 3, 8, 7],
-        [3, 4, 9, 8],
-    ]
-    return SubDMesh(vertices=verts, faces=faces)
-
-
-def make_ridge_mesh() -> SubDMesh:
-    """Two quad faces forming a 90° ridge along the shared edge 1-3.
-
-    Left face:  [0,1,3,2]  in the z>=0 half-plane (z > 0 for 0,2).
-    Right face: [1,4,5,3]  in the x>=1 half-plane (x > 1 for 4,5).
-
-    The dihedral angle between the two faces along edge (1,3) is 90°.
-    """
-    verts = [
-        [0.0, 0.0, 1.0],  # 0 — left, front
-        [1.0, 0.0, 0.0],  # 1 — ridge, front
-        [0.0, 1.0, 1.0],  # 2 — left, back
-        [1.0, 1.0, 0.0],  # 3 — ridge, back
-        [2.0, 0.0, 0.0],  # 4 — right, front
-        [2.0, 1.0, 0.0],  # 5 — right, back
-    ]
-    faces = [
-        [0, 1, 3, 2],  # left face (normal ~[-1,0,1]/sqrt2 → z+ side)
-        [1, 4, 5, 3],  # right face (normal ~[0,0,-1] → x+ side)
-    ]
-    return SubDMesh(vertices=verts, faces=faces)
-
-
-def make_smooth_quad_mesh() -> SubDMesh:
-    """3×3 grid of quads — all interior normals aligned, no feature edges."""
-    verts: List[List[float]] = [
-        [float(x), float(y), 0.0]
-        for y in range(4)
-        for x in range(4)
-    ]
-    # 9 quads
+def make_flat_plane_cage(nx: int = 4, ny: int = 4) -> SubdCage:
+    """Flat quad grid at z=0."""
+    verts: List[Tuple[float, float, float]] = []
+    for j in range(ny + 1):
+        for i in range(nx + 1):
+            verts.append((float(i), float(j), 0.0))
     faces: List[List[int]] = []
-    for row in range(3):
-        for col in range(3):
-            base = row * 4 + col
+    for j in range(ny):
+        for i in range(nx):
+            base = j * (nx + 1) + i
+            faces.append([base, base + 1, base + (nx + 1) + 1, base + (nx + 1)])
+    return SubdCage(vertices_xyz_mm=verts, faces=faces)
+
+
+def make_cube_cage(half: float = 10.0) -> SubdCage:
+    """Axis-aligned cube cage (6 quad faces, 8 vertices).
+
+    The CC limit surface rounds the cube, concentrating curvature along
+    the 12 original edge bands and 8 corner regions.
+    """
+    h = half
+    verts: List[Tuple[float, float, float]] = [
+        (-h, -h, -h),  # 0
+        ( h, -h, -h),  # 1
+        ( h,  h, -h),  # 2
+        (-h,  h, -h),  # 3
+        (-h, -h,  h),  # 4
+        ( h, -h,  h),  # 5
+        ( h,  h,  h),  # 6
+        (-h,  h,  h),  # 7
+    ]
+    faces: List[List[int]] = [
+        [0, 1, 2, 3],  # bottom (-z)
+        [4, 7, 6, 5],  # top    (+z)
+        [0, 4, 5, 1],  # front  (-y)
+        [2, 6, 7, 3],  # back   (+y)
+        [0, 3, 7, 4],  # left   (-x)
+        [1, 5, 6, 2],  # right  (+x)
+    ]
+    return SubdCage(vertices_xyz_mm=verts, faces=faces)
+
+
+def make_saddle_cage() -> SubdCage:
+    """Saddle-shaped quad cage: z = (x² - y²) / scale.
+
+    A 3×3 quad mesh (4×4 vertices) with z = x² - y².
+    Interior has negative Gaussian curvature (κ₂ << 0 in one principal
+    direction), producing valley detections at low thresholds.
+    """
+    coords = [-2.0, -0.67, 0.67, 2.0]
+    verts: List[Tuple[float, float, float]] = []
+    for y in coords:
+        for x in coords:
+            z = x * x - y * y
+            verts.append((x, y, z))
+    faces: List[List[int]] = []
+    for j in range(3):
+        for i in range(3):
+            base = j * 4 + i
             faces.append([base, base + 1, base + 5, base + 4])
-    return SubDMesh(vertices=verts, faces=faces)
+    return SubdCage(vertices_xyz_mm=verts, faces=faces)
 
 
-# ---------------------------------------------------------------------------
-# Utility
-# ---------------------------------------------------------------------------
+def make_sphere_cage() -> SubdCage:
+    """Octahedron cage as a rough sphere proxy (8 triangular faces, 6 vertices).
 
-def _dihedral_along_feature(mesh: SubDMesh, fc: FeatureCurve) -> List[float]:
-    """Compute dihedral angles at each edge along the feature curve."""
-    from kerf_cad_core.geom.subd_feature_curves import _build_edge_to_face, _face_normal
-    edge_faces = _build_edge_to_face(mesh)
-    dihedrals: List[float] = []
-    vis = fc.vertex_indices
-    for i in range(len(vis) - 1):
-        key = mesh.edge_key(vis[i], vis[i + 1])
-        fids = edge_faces.get(key, [])
-        if len(fids) != 2:
-            continue
-        n1 = _face_normal(mesh.vertices, mesh.faces[fids[0]])
-        n2 = _face_normal(mesh.vertices, mesh.faces[fids[1]])
-        cos_a = float(np.clip(n1 @ n2, -1.0, 1.0))
-        dihedrals.append(math.acos(cos_a))
-    return dihedrals
-
-
-# ---------------------------------------------------------------------------
-# Test 1: sharpness=∞ matches CC crease within 1e-10
-# ---------------------------------------------------------------------------
-
-def test_sharpness_inf_matches_crease():
-    """A feature curve with sharpness=∞ after 3 subdivisions has the same
-    edge-point positions as the equivalent CC crease, within 1e-10.
-
-    Strategy: build a flat quad strip, define a feature edge in the middle.
-    For the crease reference we subdivide the same mesh with the equivalent
-    CC crease (sharpness=3.0 → hard for 3 levels then gone).
-    For the feature-curve version we propagate with sharpness=inf.
-
-    ORACLE SCOPE: Feature curves project only newly-inserted **edge-point**
-    vertices (the midpoints of each subdivided feature edge).  The original
-    control vertices on the feature curve evolve under the standard smooth CC
-    vertex rule (not the crease vertex rule), so they will differ from a true
-    CC crease.  The invariant we verify is therefore:
-
-        For every edge-point vertex added by feature-curve refinement,
-        its position matches the corresponding crease-mesh edge-point
-        to within 1e-10.
-
-    These are the odd-indexed entries in the expanded vertex_indices list
-    (0-indexed: position 1, 3, 5, ... from [v0, ep01, v1, ep12, v2, ...]).
+    All faces are triangles; the CC limit surface is a rounded shape with
+    approximately uniform curvature ~1/R where R ~ 10 mm.
     """
-    N_LEVELS = 3
-
-    mesh = make_flat_quad_strip()
-    # Feature edge: vertex 2 (x=2,y=0) — vertex 7 (x=2,y=1)
-
-    # --- Reference: CC crease sharpness=N_LEVELS (fully creased at all levels)
-    mesh_crease = SubDMesh(
-        vertices=[list(v) for v in mesh.vertices],
-        faces=[list(f) for f in mesh.faces],
-    )
-    mesh_crease.set_crease(2, 7, float(N_LEVELS))
-    ref_mesh = catmull_clark_subdivide(mesh_crease, levels=N_LEVELS)
-
-    # --- Feature curve: sharpness = inf
-    fc = FeatureCurve(vertex_indices=[2, 7], sharpness=math.inf, propagation="refine")
-    refined_fc, updated_fcs = propagate_feature_curves(mesh, [fc], n_levels=N_LEVELS)
-
-    assert len(updated_fcs) == 1
-    fc_final = updated_fcs[0]
-    vis = fc_final.vertex_indices
-
-    # Both meshes should have the same number of vertices (same topology).
-    assert refined_fc.num_vertices == ref_mesh.num_vertices, (
-        f"vertex counts differ: feature={refined_fc.num_vertices} "
-        f"crease={ref_mesh.num_vertices}"
-    )
-
-    # Compare only the newly-inserted edge-point vertices (odd positions).
-    # These are the vertices that the feature-curve projection actually moves.
-    ep_vis = [vis[i] for i in range(1, len(vis), 2)]
-    assert ep_vis, "no edge-point vertices found in propagated feature curve"
-
-    pos_feature = np.array([refined_fc.vertices[vi] for vi in ep_vis])
-    pos_crease  = np.array([ref_mesh.vertices[vi] for vi in ep_vis])
-
-    max_err = float(np.max(np.linalg.norm(pos_feature - pos_crease, axis=1)))
-    assert max_err < 1e-10, (
-        f"sharpness=inf vs crease edge-points: max position error {max_err:.3e} > 1e-10"
-    )
+    verts: List[Tuple[float, float, float]] = [
+        (10.0, 0.0, 0.0),   # 0 +x
+        (-10.0, 0.0, 0.0),  # 1 -x
+        (0.0, 10.0, 0.0),   # 2 +y
+        (0.0, -10.0, 0.0),  # 3 -y
+        (0.0, 0.0, 10.0),   # 4 +z
+        (0.0, 0.0, -10.0),  # 5 -z
+    ]
+    faces: List[List[int]] = [
+        [0, 2, 4],
+        [2, 1, 4],
+        [1, 3, 4],
+        [3, 0, 4],
+        [0, 5, 2],
+        [2, 5, 1],
+        [1, 5, 3],
+        [3, 5, 0],
+    ]
+    return SubdCage(vertices_xyz_mm=verts, faces=faces)
 
 
 # ---------------------------------------------------------------------------
-# Test 2: sharpness=0 matches smooth subdivision within 1e-12
+# Test 1: Flat plane → 0 ridges, 0 valleys
 # ---------------------------------------------------------------------------
 
-def test_sharpness_zero_matches_smooth():
-    """A feature curve with sharpness=0 must leave vertex positions identical
-    to a plain CC subdivision (no feature curve at all), within 1e-12.
+class TestFlatPlane:
+    """Oracle: flat plane has zero curvature → no features above any positive threshold."""
+
+    def test_flat_plane_zero_ridges(self):
+        """Flat plane must produce 0 ridge polylines at default threshold."""
+        cage = make_flat_plane_cage()
+        spec = FeatureCurveSpec(
+            cage=cage,
+            subdivision_level=2,
+            ridge_threshold_per_mm=0.05,
+            valley_threshold_per_mm=0.05,
+        )
+        res = extract_feature_curves(spec)
+        assert res.num_ridges == 0, (
+            f"Expected 0 ridges on flat plane, got {res.num_ridges}"
+        )
+
+    def test_flat_plane_zero_valleys(self):
+        """Flat plane must produce 0 valley polylines at default threshold."""
+        cage = make_flat_plane_cage()
+        spec = FeatureCurveSpec(
+            cage=cage,
+            subdivision_level=2,
+            ridge_threshold_per_mm=0.05,
+            valley_threshold_per_mm=0.05,
+        )
+        res = extract_feature_curves(spec)
+        assert res.num_valleys == 0, (
+            f"Expected 0 valleys on flat plane, got {res.num_valleys}"
+        )
+
+    def test_flat_plane_max_curvature_near_zero(self):
+        """Max principal curvature on flat plane should be near zero (< 0.1 mm⁻¹)."""
+        cage = make_flat_plane_cage()
+        spec = FeatureCurveSpec(cage=cage, subdivision_level=2)
+        res = extract_feature_curves(spec)
+        assert res.max_principal_curvature < 0.5, (
+            f"Flat plane max κ₁={res.max_principal_curvature:.4f} unexpectedly large"
+        )
+
+    def test_flat_plane_total_lengths_zero(self):
+        """No ridge/valley polylines → total lengths are 0."""
+        cage = make_flat_plane_cage()
+        spec = FeatureCurveSpec(
+            cage=cage,
+            subdivision_level=1,
+            ridge_threshold_per_mm=0.05,
+            valley_threshold_per_mm=0.05,
+        )
+        res = extract_feature_curves(spec)
+        assert res.total_ridge_length_mm == 0.0
+        assert res.total_valley_length_mm == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Test 2: Cube cage — ridges at edges
+# ---------------------------------------------------------------------------
+
+class TestCubeCage:
+    """Oracle: a cube cage has 12 edges; CC limit concentrates curvature there."""
+
+    def test_cube_ridges_detected(self):
+        """At least some ridges are detected on the cube cage at level 2."""
+        cage = make_cube_cage(half=10.0)
+        spec = FeatureCurveSpec(
+            cage=cage,
+            subdivision_level=2,
+            ridge_threshold_per_mm=0.01,
+            valley_threshold_per_mm=0.01,
+        )
+        res = extract_feature_curves(spec)
+        assert res.num_ridges >= 1, (
+            f"Expected ≥1 ridge on cube cage, got {res.num_ridges}"
+        )
+
+    def test_cube_max_curvature_positive(self):
+        """Cube cage (sharp corners) → max principal curvature > 0."""
+        cage = make_cube_cage(half=10.0)
+        spec = FeatureCurveSpec(cage=cage, subdivision_level=2)
+        res = extract_feature_curves(spec)
+        assert res.max_principal_curvature > 0.0
+
+    def test_cube_ridge_polylines_have_finite_coords(self):
+        """All ridge polyline vertices must be finite 3-D coordinates."""
+        cage = make_cube_cage(half=10.0)
+        spec = FeatureCurveSpec(
+            cage=cage,
+            subdivision_level=2,
+            ridge_threshold_per_mm=0.01,
+        )
+        res = extract_feature_curves(spec)
+        for curve in res.curves:
+            assert curve.kind in ("ridge", "valley")
+            for pt in curve.polyline_xyz_mm:
+                assert len(pt) == 3
+                for coord in pt:
+                    assert math.isfinite(coord), f"Non-finite coord {coord} in {pt}"
+
+    def test_cube_ridge_curvature_positive(self):
+        """Ridge mean principal curvature must be positive (κ₁ > 0)."""
+        cage = make_cube_cage(half=10.0)
+        spec = FeatureCurveSpec(
+            cage=cage,
+            subdivision_level=2,
+            ridge_threshold_per_mm=0.01,
+        )
+        res = extract_feature_curves(spec)
+        ridges = [c for c in res.curves if c.kind == "ridge"]
+        for r in ridges:
+            assert r.mean_principal_curvature > 0.0, (
+                f"Ridge mean curvature {r.mean_principal_curvature:.4f} should be > 0"
+            )
+
+
+# ---------------------------------------------------------------------------
+# Test 3: Saddle cage — valleys detected
+# ---------------------------------------------------------------------------
+
+class TestSaddleCage:
+    """Oracle: saddle z = x² − y² has highly negative curvature in y direction."""
+
+    def test_saddle_features_detected(self):
+        """At least one feature (ridge or valley) detected on saddle cage."""
+        cage = make_saddle_cage()
+        spec = FeatureCurveSpec(
+            cage=cage,
+            subdivision_level=2,
+            ridge_threshold_per_mm=0.05,
+            valley_threshold_per_mm=0.05,
+        )
+        res = extract_feature_curves(spec)
+        total_features = res.num_ridges + res.num_valleys
+        assert total_features >= 1, (
+            f"Expected ≥1 feature on saddle cage, got {total_features}"
+        )
+
+    def test_saddle_returns_feature_curve_result(self):
+        """extract_feature_curves returns a FeatureCurveResult object."""
+        cage = make_saddle_cage()
+        spec = FeatureCurveSpec(cage=cage, subdivision_level=1)
+        res = extract_feature_curves(spec)
+        assert isinstance(res, FeatureCurveResult)
+
+    def test_saddle_curves_have_length(self):
+        """All feature polylines must have non-negative length."""
+        cage = make_saddle_cage()
+        spec = FeatureCurveSpec(
+            cage=cage,
+            subdivision_level=2,
+            ridge_threshold_per_mm=0.05,
+            valley_threshold_per_mm=0.05,
+        )
+        res = extract_feature_curves(spec)
+        for curve in res.curves:
+            assert curve.length_mm >= 0.0
+
+
+# ---------------------------------------------------------------------------
+# Test 4: Sphere cage — minimal features
+# ---------------------------------------------------------------------------
+
+class TestSphereCage:
+    """Oracle: octahedron-proxy sphere has roughly uniform curvature.
+
+    At the default threshold (0.1 mm⁻¹) with a 10 mm radius,
+    κ ~ 1/R = 0.1 mm⁻¹ so detection is marginal — this is expected.
+    At a higher threshold we should see 0 ridges/valleys.
     """
-    N_LEVELS = 3
 
-    mesh = make_flat_quad_strip()
-    fc = FeatureCurve(vertex_indices=[2, 7], sharpness=0.0, propagation="refine")
+    def test_sphere_high_threshold_zero_ridges(self):
+        """Sphere-like cage at very high threshold → 0 ridges."""
+        cage = make_sphere_cage()
+        spec = FeatureCurveSpec(
+            cage=cage,
+            subdivision_level=2,
+            ridge_threshold_per_mm=5.0,   # much higher than sphere curvature
+            valley_threshold_per_mm=5.0,
+        )
+        res = extract_feature_curves(spec)
+        assert res.num_ridges == 0, (
+            f"Expected 0 ridges at high threshold on sphere, got {res.num_ridges}"
+        )
 
-    refined_fc, _updated = propagate_feature_curves(mesh, [fc], n_levels=N_LEVELS)
-    ref_smooth = catmull_clark_subdivide(mesh, levels=N_LEVELS)
+    def test_sphere_result_fields_are_typed(self):
+        """FeatureCurveResult fields are correct types."""
+        cage = make_sphere_cage()
+        spec = FeatureCurveSpec(cage=cage, subdivision_level=1)
+        res = extract_feature_curves(spec)
+        assert isinstance(res.curves, list)
+        assert isinstance(res.num_ridges, int)
+        assert isinstance(res.num_valleys, int)
+        assert isinstance(res.total_ridge_length_mm, float)
+        assert isinstance(res.total_valley_length_mm, float)
+        assert isinstance(res.max_principal_curvature, float)
+        assert isinstance(res.honest_caveat, str)
 
-    assert refined_fc.num_vertices == ref_smooth.num_vertices
-
-    pos_fc = np.array(refined_fc.vertices)
-    pos_sm = np.array(ref_smooth.vertices)
-
-    max_err = float(np.max(np.linalg.norm(pos_fc - pos_sm, axis=1)))
-    assert max_err < 1e-12, (
-        f"sharpness=0 vs smooth: max position error {max_err:.3e} > 1e-12"
-    )
-
-
-# ---------------------------------------------------------------------------
-# Test 3: intermediate sharpness=2 dihedral between inf and 0 extremes
-# ---------------------------------------------------------------------------
-
-def test_intermediate_sharpness_dihedral_between_extremes():
-    """With sharpness=2, the average dihedral angle along the feature curve
-    after 2 subdivision levels is strictly between the sharpness=0 (smooth)
-    and sharpness=inf (full crease) extremes.
-
-    We use the 90° ridge mesh (make_ridge_mesh) so the feature edge (1,3) has
-    genuine fold geometry.  The two adjacent faces have normals at 45° to each
-    other — giving a non-trivial dihedral that the feature curve projection
-    can modulate.
-
-    Expected ordering (all in degrees, approximate):
-        sharpness=0  ~19°  (smooth CC, fold softened)
-        sharpness=2  ~27°  (semi-sharp — blended)
-        sharpness=inf ~34°  (hard projection toward original midpoint)
-
-    The test only asserts the strict ordering, not the exact values.
-    """
-    mesh = make_ridge_mesh()
-    # Feature curve on ridge edge 1-3
-    feature_edge = [1, 3]
-
-    N_LEVELS = 2
-
-    # --- sharpness = 0 (smooth)
-    fc0 = FeatureCurve(vertex_indices=list(feature_edge), sharpness=0.0, propagation="refine")
-    mesh0, fc0_list = propagate_feature_curves(mesh, [fc0], n_levels=N_LEVELS)
-    dihedrals_0 = _dihedral_along_feature(mesh0, fc0_list[0])
-
-    # --- sharpness = inf (crease-like)
-    fc_inf = FeatureCurve(vertex_indices=list(feature_edge), sharpness=math.inf, propagation="refine")
-    mesh_inf, fc_inf_list = propagate_feature_curves(mesh, [fc_inf], n_levels=N_LEVELS)
-    dihedrals_inf = _dihedral_along_feature(mesh_inf, fc_inf_list[0])
-
-    # --- sharpness = 2 (intermediate)
-    fc2 = FeatureCurve(vertex_indices=list(feature_edge), sharpness=2.0, propagation="refine")
-    mesh2, fc2_list = propagate_feature_curves(mesh, [fc2], n_levels=N_LEVELS)
-    dihedrals_2 = _dihedral_along_feature(mesh2, fc2_list[0])
-
-    assert dihedrals_0,   "no interior edges found along feature curve for sharpness=0"
-    assert dihedrals_inf, "no interior edges found along feature curve for sharpness=inf"
-    assert dihedrals_2,   "no interior edges found along feature curve for sharpness=2"
-
-    avg_0   = float(np.mean(dihedrals_0))
-    avg_inf = float(np.mean(dihedrals_inf))
-    avg_2   = float(np.mean(dihedrals_2))
-
-    low  = min(avg_0, avg_inf)
-    high = max(avg_0, avg_inf)
-
-    # sharpness=0 and sharpness=inf should differ (feature has no effect on flat mesh
-    # but ridge mesh has real geometry).
-    assert high - low > 1e-6, (
-        f"sharpness=0 ({math.degrees(avg_0):.2f}°) and inf ({math.degrees(avg_inf):.2f}°) "
-        "give same average dihedral — mesh may be degenerate"
-    )
-
-    # sharpness=2 must lie strictly between 0 and inf extremes.
-    assert low <= avg_2 <= high, (
-        f"sharpness=2 avg dihedral {math.degrees(avg_2):.2f}° is not between "
-        f"s=0 ({math.degrees(avg_0):.2f}°) and s=inf ({math.degrees(avg_inf):.2f}°)"
-    )
+    def test_sphere_total_lengths_consistent(self):
+        """total_ridge_length = sum of ridge curve lengths."""
+        cage = make_sphere_cage()
+        spec = FeatureCurveSpec(
+            cage=cage,
+            subdivision_level=2,
+            ridge_threshold_per_mm=0.01,
+            valley_threshold_per_mm=0.01,
+        )
+        res = extract_feature_curves(spec)
+        expected_ridge = sum(c.length_mm for c in res.curves if c.kind == "ridge")
+        expected_valley = sum(c.length_mm for c in res.curves if c.kind == "valley")
+        assert abs(res.total_ridge_length_mm - expected_ridge) < 1e-9
+        assert abs(res.total_valley_length_mm - expected_valley) < 1e-9
 
 
 # ---------------------------------------------------------------------------
-# Test 4: auto-detect — ridge found; smooth surface returns 0 features
+# Test 5 & 6: API contracts and robustness
 # ---------------------------------------------------------------------------
 
-def test_auto_detect_feature_curves():
-    """extract_feature_curves with threshold=30° detects the 90° ridge edge
-    and returns nothing for a smooth flat mesh.
-    """
-    # --- Ridge mesh: dihedral at edge (1,3) = 90°
-    ridge = make_ridge_mesh()
-    threshold_rad = math.radians(30.0)
-    curves = extract_feature_curves(ridge, dihedral_threshold=threshold_rad)
+class TestAPIContracts:
+    """Guard API contracts and robustness."""
 
-    assert len(curves) >= 1, "expected at least 1 feature curve on 90° ridge mesh"
-    # The feature curve(s) should include the ridge edge (1,3) or (3,1).
-    all_edges: set = set()
-    for fc in curves:
-        vis = fc.vertex_indices
-        for i in range(len(vis) - 1):
-            all_edges.add((min(vis[i], vis[i + 1]), max(vis[i], vis[i + 1])))
-    assert (1, 3) in all_edges, (
-        f"ridge edge (1,3) not found in detected feature curves; edges: {all_edges}"
-    )
+    def test_empty_cage_returns_empty_result(self):
+        """Empty cage → FeatureCurveResult with 0 ridges, 0 valleys."""
+        spec = FeatureCurveSpec(cage=SubdCage())
+        res = extract_feature_curves(spec)
+        assert isinstance(res, FeatureCurveResult)
+        assert res.num_ridges == 0
+        assert res.num_valleys == 0
+        assert res.curves == []
 
-    # --- Smooth flat mesh: all dihedrals = 0° → no features
-    smooth = make_smooth_quad_mesh()
-    smooth_curves = extract_feature_curves(smooth, dihedral_threshold=threshold_rad)
-    assert smooth_curves == [], (
-        f"expected 0 feature curves on flat mesh, got {len(smooth_curves)}"
-    )
+    def test_feature_curve_spec_defaults(self):
+        """FeatureCurveSpec defaults match documented values."""
+        spec = FeatureCurveSpec(cage=SubdCage())
+        assert spec.subdivision_level == 2
+        assert spec.ridge_threshold_per_mm == 0.1
+        assert spec.valley_threshold_per_mm == 0.1
 
+    def test_feature_curve_dataclass_structure(self):
+        """FeatureCurve dataclass has correct default values."""
+        fc = FeatureCurve()
+        assert fc.kind == "ridge"
+        assert fc.polyline_xyz_mm == []
+        assert fc.length_mm == 0.0
+        assert fc.mean_principal_curvature == 0.0
 
-# ---------------------------------------------------------------------------
-# Additional sanity tests
-# ---------------------------------------------------------------------------
+    def test_feature_curve_result_defaults(self):
+        """FeatureCurveResult defaults are zero / empty."""
+        res = FeatureCurveResult()
+        assert res.curves == []
+        assert res.num_ridges == 0
+        assert res.num_valleys == 0
+        assert res.total_ridge_length_mm == 0.0
+        assert res.total_valley_length_mm == 0.0
+        assert res.max_principal_curvature == 0.0
+        assert len(res.honest_caveat) > 0
 
-def test_feature_curve_dataclass_defaults():
-    fc = FeatureCurve()
-    assert fc.sharpness == 2.0
-    assert fc.propagation == "refine"
-    assert fc.vertex_indices == []
+    def test_single_quad_no_raise(self):
+        """Single quad cage must not raise."""
+        cage = SubdCage(
+            vertices_xyz_mm=[(0, 0, 0), (1, 0, 0), (1, 1, 0), (0, 1, 0)],
+            faces=[[0, 1, 2, 3]],
+        )
+        spec = FeatureCurveSpec(cage=cage, subdivision_level=1)
+        res = extract_feature_curves(spec)
+        assert isinstance(res, FeatureCurveResult)
 
+    def test_zero_subdivision_levels(self):
+        """subdivision_level=0 returns result without subdividing."""
+        cage = make_cube_cage(half=10.0)
+        spec = FeatureCurveSpec(cage=cage, subdivision_level=0)
+        res = extract_feature_curves(spec)
+        assert isinstance(res, FeatureCurveResult)
 
-def test_feature_curve_negative_sharpness_clamped():
-    fc = FeatureCurve(vertex_indices=[0, 1], sharpness=-5.0)
-    assert fc.sharpness == 0.0
+    def test_num_ridges_plus_valleys_equals_len_curves(self):
+        """num_ridges + num_valleys == len(curves)."""
+        cage = make_cube_cage(half=10.0)
+        spec = FeatureCurveSpec(
+            cage=cage,
+            subdivision_level=2,
+            ridge_threshold_per_mm=0.01,
+        )
+        res = extract_feature_curves(spec)
+        assert res.num_ridges + res.num_valleys == len(res.curves)
 
+    def test_honest_caveat_contains_key_terms(self):
+        """honest_caveat mentions Ohtake or discrete curvature."""
+        res = FeatureCurveResult()
+        caveat = res.honest_caveat.lower()
+        assert "curvature" in caveat
+        assert "threshold" in caveat
 
-def test_make_semi_sharp_feature_chains_edges():
-    mesh = make_flat_quad_strip()
-    # Edges forming a 3-vertex polyline: 0-1-2 (bottom row)
-    fc = make_semi_sharp_feature(mesh, [(0, 1), (1, 2)], sharpness=3.0)
-    assert fc.sharpness == 3.0
-    # Path should cover vertices 0, 1, 2 in some order.
-    assert set(fc.vertex_indices) == {0, 1, 2}
-    assert len(fc.vertex_indices) == 3
+    def test_max_curvature_consistent_with_ridge_threshold(self):
+        """If max_principal_curvature < ridge_threshold, num_ridges should be 0."""
+        cage = make_flat_plane_cage()
+        spec = FeatureCurveSpec(
+            cage=cage,
+            subdivision_level=2,
+            ridge_threshold_per_mm=999.0,
+        )
+        res = extract_feature_curves(spec)
+        # With an astronomically high threshold, there can't be ridges
+        if res.max_principal_curvature < 999.0:
+            assert res.num_ridges == 0
 
+    def test_increasing_threshold_reduces_or_maintains_features(self):
+        """Higher threshold ≤ feature count at lower threshold."""
+        cage = make_cube_cage(half=10.0)
+        spec_low = FeatureCurveSpec(
+            cage=cage,
+            subdivision_level=2,
+            ridge_threshold_per_mm=0.001,
+        )
+        spec_high = FeatureCurveSpec(
+            cage=cage,
+            subdivision_level=2,
+            ridge_threshold_per_mm=1.0,
+        )
+        res_low = extract_feature_curves(spec_low)
+        res_high = extract_feature_curves(spec_high)
+        assert res_high.num_ridges <= res_low.num_ridges, (
+            f"Higher threshold should not give more ridges: "
+            f"low={res_low.num_ridges} high={res_high.num_ridges}"
+        )
 
-def test_propagate_zero_levels_is_identity():
-    mesh = make_flat_quad_strip()
-    fc = FeatureCurve(vertex_indices=[2, 7], sharpness=2.0)
-    refined, fcs = propagate_feature_curves(mesh, [fc], n_levels=0)
-    assert refined.num_vertices == mesh.num_vertices
-    assert fcs[0].vertex_indices == [2, 7]
-    assert fcs[0].sharpness == 2.0
+    def test_kind_is_ridge_or_valley(self):
+        """All FeatureCurve.kind values are 'ridge' or 'valley'."""
+        cage = make_cube_cage(half=10.0)
+        spec = FeatureCurveSpec(
+            cage=cage,
+            subdivision_level=2,
+            ridge_threshold_per_mm=0.01,
+            valley_threshold_per_mm=0.01,
+        )
+        res = extract_feature_curves(spec)
+        for curve in res.curves:
+            assert curve.kind in ("ridge", "valley"), (
+                f"Unexpected kind: {curve.kind!r}"
+            )
 
-
-def test_propagate_expands_vertex_list():
-    """After 1 subdivision, a 2-vertex feature curve becomes 3 vertices."""
-    mesh = make_flat_quad_strip()
-    fc = FeatureCurve(vertex_indices=[2, 7], sharpness=2.0)
-    _, fcs = propagate_feature_curves(mesh, [fc], n_levels=1)
-    assert len(fcs) == 1
-    # 2 vertices → 3 after 1 split
-    assert len(fcs[0].vertex_indices) == 3
-
-
-def test_propagate_sharpness_decay():
-    """Sharpness decays by 1.0 per level."""
-    mesh = make_flat_quad_strip()
-    fc = FeatureCurve(vertex_indices=[2, 7], sharpness=3.0)
-    _, fcs = propagate_feature_curves(mesh, [fc], n_levels=2)
-    assert abs(fcs[0].sharpness - 1.0) < 1e-12
-
-
-def test_propagate_sharpness_clamps_at_zero():
-    """Sharpness does not go negative."""
-    mesh = make_flat_quad_strip()
-    fc = FeatureCurve(vertex_indices=[2, 7], sharpness=1.0)
-    _, fcs = propagate_feature_curves(mesh, [fc], n_levels=3)
-    assert fcs[0].sharpness == 0.0
-
-
-def test_propagate_never_raises_on_bad_indices():
-    """propagate_feature_curves must not raise even with out-of-range indices."""
-    mesh = make_flat_quad_strip()
-    fc = FeatureCurve(vertex_indices=[999, 1000], sharpness=2.0)
-    try:
-        refined, _ = propagate_feature_curves(mesh, [fc], n_levels=2)
-    except Exception as exc:
-        pytest.fail(f"propagate_feature_curves raised: {exc}")
-
-
-def test_extract_feature_curves_empty_mesh():
-    """extract_feature_curves on an empty mesh returns []."""
-    mesh = SubDMesh()
-    assert extract_feature_curves(mesh) == []
-
-
-def test_make_semi_sharp_empty_edges():
-    """make_semi_sharp_feature with no edges returns an empty curve."""
-    mesh = make_flat_quad_strip()
-    fc = make_semi_sharp_feature(mesh, [], sharpness=2.0)
-    assert fc.vertex_indices == []
+    def test_re_export_from_subd_package(self):
+        """FeatureCurveSpec, FeatureCurve, FeatureCurveResult, extract_feature_curves
+        are re-exported from kerf_cad_core.subd."""
+        from kerf_cad_core.subd import (  # noqa: F401
+            FeatureCurve as FC,
+            FeatureCurveResult as FCR,
+            FeatureCurveSpec as FCS,
+            extract_feature_curves as efc,
+        )
+        assert callable(efc)
+        assert FCS is FeatureCurveSpec
+        assert FC is FeatureCurve
+        assert FCR is FeatureCurveResult

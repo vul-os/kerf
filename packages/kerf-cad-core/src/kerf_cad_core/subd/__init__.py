@@ -112,6 +112,12 @@ from kerf_cad_core.subd.g1_extraordinary_patches import (
     G1PatchResult,
     convert_subd_to_g1_patches,
 )
+from kerf_cad_core.subd.feature_curves import (
+    FeatureCurveSpec,
+    FeatureCurve,
+    FeatureCurveResult,
+    extract_feature_curves,
+)
 
 __all__ = [
     "CrossCurveResult",
@@ -143,4 +149,8 @@ __all__ = [
     "ExtraordinaryPatchSpec",
     "G1PatchResult",
     "convert_subd_to_g1_patches",
+    "FeatureCurveSpec",
+    "FeatureCurve",
+    "FeatureCurveResult",
+    "extract_feature_curves",
 ]

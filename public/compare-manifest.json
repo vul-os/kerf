@@ -19163,6 +19163,19 @@
         },
         {
           "domain": "D1",
+          "feature": "SubD feature-curve extraction: ridge and valley polylines from CC limit surface",
+          "competitor": {
+            "status": "partial",
+            "note": "ZBrush shows ridge/valley hints visually but does not expose them as extractable polylines. Maya/Blender have no built-in ridge-valley polyline extraction from SubD cages. OpenSubdiv has no feature-curve API."
+          },
+          "kerf": {
+            "status": "yes",
+            "note": "GK-P19: extract_feature_curves(spec: FeatureCurveSpec) -> FeatureCurveResult. Subdivides cage at spec.subdivision_level (CC 1978), computes Taubin (1995) curvature tensor at each vertex (edge normal-curvature accumulation -> 3x3 tensor projected to tangent plane -> eigenvalues k1 >= k2), classifies ridge (k1 > ridge_threshold_per_mm) / valley (k2 < -valley_threshold_per_mm), chains adjacent labelled vertices into polylines via BFS. Dataclasses: FeatureCurveSpec (cage, subdivision_level=2, ridge_threshold_per_mm=0.1, valley_threshold_per_mm=0.1); FeatureCurve (kind, polyline_xyz_mm, length_mm, mean_principal_curvature); FeatureCurveResult (curves, num_ridges, num_valleys, total_ridge_length_mm, total_valley_length_mm, max_principal_curvature, honest_caveat). LLM tool subd_extract_feature_curves; re-exported from kerf_cad_core.subd; 26 tests green. Use cases: ZBrush-style topology hints; automatic UV-seam generation; feature detection for re-meshing or CAM path planning. HONEST: DISCRETE CURVATURE APPROXIMATION — cotangent Laplacian (Meyer et al. 2003) not exact CC limit-surface evaluation; O(h^2) error; sufficient for UV-seam/topology hints. THRESHOLD TUNING — thresholds are scale-dependent (mm^-1); defaults (0.1 mm^-1) are a starting point. PERFORMANCE — vertex count scales O(4^L). Refs: Ohtake-Belyaev-Seidel (2004) SIGGRAPH; Meyer et al. (2003) VisMath; Taubin (1995) ICCV; Catmull-Clark (1978); Stam (1998) SIGGRAPH; OpenSubdiv docs.",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/subd/feature_curves.py"
+          }
+        },
+        {
+          "domain": "D1",
           "feature": "SubD control-cage surface area + CC limit-surface area estimate",
           "competitor": {
             "status": "no",

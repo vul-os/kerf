@@ -8,12 +8,22 @@ SpotDiagramResult
     80%-encircled-energy radius, centroid, SVG diagram, and honest caveat.
 
 compute_spot_diagram(lens_system_dict, field_angle_deg, wavelength_nm,
-                     num_rays=49) -> SpotDiagramResult | dict
+                     num_rays=49, use_skew_ray=False) -> SpotDiagramResult | dict
     Trace a grid of rays through a sequential lens system and compute the
     spot diagram at the paraxial image plane.
 
-Algorithm (Hecht "Optics" 5e §6.3 / Welford "Aberrations of Optical Systems" §6)
-----------------------------------------------------------------------------------
+    When ``use_skew_ray=False`` (default) the original paraxial-meridional
+    path is used for backward compatibility: exact Snell meridional y-intercept
+    plus first-order sagittal x estimate (Hecht §5.7).
+
+    When ``use_skew_ray=True`` a full 3-D hexapolar ray bundle is traced via
+    ``trace_skew_ray`` (Born & Wolf §4.6 / Welford §5): 8 rings × 6 azimuth
+    angles + pupil centre = up to 49 rays.  Both x and y image-plane
+    intercepts are rigorous.  This is the preferred path for off-axis
+    astigmatism and sagittal coma diagnosis.
+
+Paraxial algorithm (use_skew_ray=False)
+----------------------------------------
 1.  Parse the lens system: a dict with keys ``surfaces`` (list of surface
     dicts as used by ``lens_stack_trace``) and optionally ``aperture_radius_mm``
     and ``n_object``.
@@ -33,13 +43,39 @@ Algorithm (Hecht "Optics" 5e §6.3 / Welford "Aberrations of Optical Systems" §
 
 5.  Collect surviving (x, y) intercepts (excluding TIR / NaN rays).
 
-6.  Compute:
-      centroid = (mean_x, mean_y) over surviving intercepts
-      rms_radius = sqrt(mean((xi - cx)^2 + (yi - cy)^2))   [Welford §8.2]
-      encircled_80pct_radius = radius enclosing 80 % of rays, sorted by
-          distance from centroid  [Hecht §6.3 energy-in-circle metric]
+Skew-ray algorithm (use_skew_ray=True)
+---------------------------------------
+1.  Same lens system parse and paraxial image plane determination as above.
 
-7.  Render SVG: circle for each intercept, airy-disk circle for reference,
+2.  Generate a hexapolar pupil bundle: 1 centre + N_rings × 6 azimuth samples
+    (N_rings chosen so total ≈ num_rays).  Physical ray heights:
+        hx = px * aperture_radius_mm,  hy = py * aperture_radius_mm.
+
+3.  For each sample build a Ray3D:
+        origin = (hx, hy, 0)                   — at the entrance pupil (z=0)
+        direction = (−hx·tan_field/R, −hy·tan_field/R + tan_field, 1)
+            normalised
+    where tan_field = tan(field_angle_deg) and R ≈ aperture_radius_mm.
+    This aims each ray from a unit-sphere object point at (0, −tan_field·∞, −∞)
+    through the pupil sample.
+
+4.  Build OpticalSurface list from surfaces dict with cumulative vertex_z_mm
+    positions (using thickness t to advance the z-coordinate).
+
+5.  Call trace_skew_ray(ray, optical_surfaces, n_before_first=n_object) for
+    each sample.  For surviving (non-TIR) rays propagate the final ray to
+    z = BFL (the paraxial image plane) to obtain (x_img, y_img).
+
+6.  Collect, compute RMS / EE80 / centroid, render SVG.
+
+Metric computations (both paths)
+----------------------------------
+    centroid = (mean_x, mean_y) over surviving intercepts
+    rms_radius = sqrt(mean((xi - cx)^2 + (yi - cy)^2))   [Welford §8.2]
+    encircled_80pct_radius = radius enclosing 80 % of rays, sorted by
+        distance from centroid  [Hecht §6.3 energy-in-circle metric]
+
+SVG: circle for each intercept, airy-disk circle for reference,
     centroid marker, and scale bar.
 
 RMS spot radius (Welford §8.2)
@@ -56,8 +92,10 @@ HONEST LIMITATIONS
 ------------------
 * Monochromatic only — single wavelength (wavelength_nm used for Airy
   reference only; dispersion/chromatic aberration NOT modelled).
-* Sagittal (x) intercepts are first-order paraxial estimates.  Full 3-D
-  skew-ray tracing is required for rigorous off-axis x.
+* Paraxial path: sagittal (x) intercepts are first-order estimates (Hecht §5.7);
+  use use_skew_ray=True for rigorous x.
+* Skew-ray path: conic surfaces only (no higher-order aspheric A4/A6 terms);
+  sequential surfaces only; no vignetting clipping.
 * Physical aperture clipping (vignetting) is NOT applied.  Use
   ``optics_compute_vignetting`` separately.
 * No wavefront OPD analysis; Strehl ratio not computed.
@@ -72,6 +110,8 @@ Welford, W.T. — "Aberrations of Optical Systems", Adam Hilger, 1986,
     (exact Snell + Newton-Raphson conic intersect).
 Smith, W.J. — "Modern Optical Engineering", 4th ed., McGraw-Hill, 2008,
     §3.3 (spot-diagram construction).
+Born, M. & Wolf, E. — "Principles of Optics", 7th ed., 1999, §1.5.3, §4.6.
+Kingslake, R. — "Lens Design Fundamentals", Academic Press, 1978, §2.
 
 Units: lengths in mm, angles in degrees (where noted), wavelengths in nm.
 
@@ -332,8 +372,8 @@ class SpotDiagramResult:
     honest_caveat: str = (
         "Monochromatic only (single wavelength; wavelength_nm used for Airy reference "
         "only; chromatic aberration NOT modelled). "
-        "Sagittal (x) intercepts are first-order paraxial estimates — rigorous x "
-        "requires full 3-D skew-ray tracing (not implemented). "
+        "Sagittal (x) intercepts: paraxial path uses first-order estimates (Hecht §5.7); "
+        "use use_skew_ray=True for rigorous 3-D skew-ray x (Born & Wolf §4.6). "
         "Physical aperture clipping (vignetting) not applied. "
         "encircled_80pct_radius_mm is the geometric EE80 (ray-counting); it is NOT "
         "the diffraction-based encircled-energy radius. "
@@ -354,6 +394,204 @@ class SpotDiagramResult:
 
 
 # ---------------------------------------------------------------------------
+# Hexapolar pupil sampling (for skew-ray path)
+# ---------------------------------------------------------------------------
+
+def _hexapolar_pupil(num_rays: int) -> list[tuple[float, float]]:
+    """
+    Generate a hexapolar pupil grid of (px, py) normalised pupil samples.
+
+    Layout: 1 centre point + N_rings rings of 6*ring_number samples each.
+    The number of rings N_rings is chosen so that the total sample count is
+    as close to num_rays as possible (1 + 6*(1+2+...+N) = 1 + 3*N*(N+1)).
+
+    For num_rays=49: N_rings=3 gives 1+6+12+18=37 rays (close to 37);
+    N_rings=4 gives 1+6+12+18+24=61.  We use N_rings chosen to minimise
+    |total - num_rays| with the constraint total >= 7.
+
+    All returned points satisfy px² + py² <= 1.
+
+    References: Goodman "Introduction to Fourier Optics" §3.3 (hexapolar
+    sampling); Smith "Modern Optical Engineering" §3.3 (pupil grids).
+    """
+    # Find N_rings that gives a total count bracketing num_rays
+    best_n: int = 1
+    best_diff: float = float("inf")
+    for n in range(1, 20):
+        total = 1 + 3 * n * (n + 1)  # hexapolar count for n rings
+        diff = abs(total - num_rays)
+        if diff < best_diff:
+            best_diff = diff
+            best_n = n
+        if total >= num_rays:
+            break
+
+    pts: list[tuple[float, float]] = [(0.0, 0.0)]  # centre
+    for ring in range(1, best_n + 1):
+        r = ring / best_n  # normalised radius in [0, 1]
+        n_pts = 6 * ring   # points on this ring
+        for j in range(n_pts):
+            theta = 2.0 * math.pi * j / n_pts
+            px = r * math.cos(theta)
+            py = r * math.sin(theta)
+            pts.append((px, py))
+    return pts
+
+
+# ---------------------------------------------------------------------------
+# Convert lens_system_dict surfaces to OpticalSurface list
+# ---------------------------------------------------------------------------
+
+def _build_optical_surfaces(
+    surfaces: list[dict],
+    first_vertex_z: float = 0.0,
+) -> list:
+    """
+    Convert a list of surface dicts (kerf-cad-core format) to a list of
+    ``OpticalSurface`` objects for use with ``trace_skew_ray``.
+
+    Each surface dict has:
+        c  (float)  curvature 1/R in mm^-1 (0 = flat → R=∞)
+        t  (float)  thickness to next surface in mm
+        n  (float)  refractive index after this surface
+        k  (float, optional)  conic constant (default 0.0)
+
+    The vertex_z of each surface is accumulated from first_vertex_z using
+    the thickness values:
+        vertex_z[0] = first_vertex_z
+        vertex_z[i] = vertex_z[i-1] + surfaces[i-1]["t"]
+
+    Returns a list of OpticalSurface objects.
+    """
+    from kerf_cad_core.optics.skew_ray_tracer import OpticalSurface
+
+    result = []
+    z = first_vertex_z
+    for s in surfaces:
+        c = float(s["c"])
+        radius_mm = (1.0 / c) if abs(c) > 1e-18 else 0.0
+        n_after = float(s["n"])
+        k = float(s.get("k", 0.0))
+        result.append(OpticalSurface(
+            vertex_z_mm=z,
+            radius_mm=radius_mm,
+            refractive_index_after=n_after,
+            conic_k=k,
+        ))
+        z += float(s["t"])
+    # z after the loop is the z-coordinate at the exit of the last surface
+    # (it equals sum of all thicknesses from first_vertex_z)
+    return result, z
+
+
+# ---------------------------------------------------------------------------
+# Skew-ray spot computation
+# ---------------------------------------------------------------------------
+
+def _compute_skew_spot(
+    surfaces: list[dict],
+    field_angle_deg: float,
+    wavelength_nm: float,
+    aperture_radius_mm: float,
+    n_object: float,
+    bfl: float,
+    num_rays: int,
+) -> list[tuple[float, float]]:
+    """
+    Trace a hexapolar ray bundle through the optical system using the full
+    3-D skew-ray engine and collect (x, y) intercepts at the paraxial image
+    plane (z = bfl, measured from the last surface vertex).
+
+    Algorithm (Born & Wolf §4.6 / Welford §5 / Smith §3.3):
+    --------------------------------------------------------
+    1. Build a hexapolar pupil grid of normalised (px, py) samples.
+
+    2. For each sample, construct a Ray3D:
+         - Origin:    (hx, hy, 0) where hx = px * R_ap, hy = py * R_ap.
+           The entrance pupil is placed at z=0 (first surface vertex).
+         - Direction: the ray aims from an infinitely distant object point at
+           field angle θ, so the input direction cosines are:
+               dx = 0.0          (no x tilt for meridional field)
+               dy = sin(θ)
+               dz = cos(θ)
+           For a skew ray the origin offset (hx, hy) encodes the pupil
+           coordinate; the direction is the same for all rays in a field
+           (collimated object at infinity approximation).
+           Reference: Welford §5.1 (pupil coordinates for infinite-conjugate
+           trace); Kingslake §2.2 (ray bundle from infinity).
+
+    3. Trace each Ray3D through the OpticalSurface list.
+
+    4. Propagate the surviving ray's final position + direction to the image
+       plane at z_image = z_last_vertex + bfl:
+           t_img = (z_image - final_z) / final_dz
+           x_img = final_x + t_img * final_dx
+           y_img = final_y + t_img * final_dy
+
+    5. Return list of (x_img, y_img) for non-TIR rays.
+
+    References
+    ----------
+    Born & Wolf, "Principles of Optics", 7th ed., §4.6.
+    Welford, "Aberrations of Optical Systems", §5.1-5.3.
+    Kingslake, "Lens Design Fundamentals", §2.2.
+    """
+    from kerf_cad_core.optics.skew_ray_tracer import Ray3D, trace_skew_ray
+
+    optical_surfaces, z_after_last = _build_optical_surfaces(surfaces, first_vertex_z=0.0)
+    z_image = z_after_last + bfl  # absolute z of the paraxial image plane
+
+    field_rad = math.radians(field_angle_deg)
+    sin_f = math.sin(field_rad)
+    cos_f = math.cos(field_rad)
+
+    # Input ray direction: collimated beam from field angle θ (object at ∞)
+    # Direction: (dx=0, dy=sin(θ), dz=cos(θ)) — meridional plane tilt.
+    # Welford §5.1: for object at infinity, all rays in the bundle have the
+    # same direction; pupil sampling is encoded in origin offsets.
+    base_dir = (0.0, sin_f, cos_f)
+
+    pupil_pts = _hexapolar_pupil(num_rays)
+    intercepts: list[tuple[float, float]] = []
+
+    for px, py in pupil_pts:
+        hx = px * aperture_radius_mm
+        hy = py * aperture_radius_mm
+        try:
+            ray = Ray3D(
+                origin_xyz=(hx, hy, 0.0),
+                direction_xyz=base_dir,
+                wavelength_nm=wavelength_nm,
+            )
+        except ValueError:
+            continue  # degenerate direction (should not happen)
+
+        trace_result = trace_skew_ray(ray, optical_surfaces, n_before_first=n_object)
+
+        if trace_result.tir_occurred:
+            continue  # TIR — drop this ray
+
+        # Propagate to image plane
+        fx, fy, fz = trace_result.final_position_xyz
+        ddx, ddy, ddz = trace_result.final_direction_xyz
+
+        if abs(ddz) < 1e-18:
+            continue  # ray parallel to image plane — pathological
+
+        t_img = (z_image - fz) / ddz
+        if not math.isfinite(t_img):
+            continue
+
+        x_img = fx + t_img * ddx
+        y_img = fy + t_img * ddy
+
+        if math.isfinite(x_img) and math.isfinite(y_img):
+            intercepts.append((x_img, y_img))
+
+    return intercepts
+
+
+# ---------------------------------------------------------------------------
 # Main computation
 # ---------------------------------------------------------------------------
 
@@ -362,6 +600,7 @@ def compute_spot_diagram(
     field_angle_deg: float,
     wavelength_nm: float,
     num_rays: int = 49,
+    use_skew_ray: bool = False,
 ) -> "SpotDiagramResult | dict":
     """
     Trace a fan of rays through a sequential lens system and compute the
@@ -388,9 +627,18 @@ def compute_spot_diagram(
         and honest caveat.  Dispersion (chromatic aberration) is NOT modelled.
         E.g. 550.0 for green light.
     num_rays : int
-        Target number of rays to trace (default 49).  A ceil(sqrt(num_rays)) ×
-        ceil(sqrt(num_rays)) grid is built and points outside the unit disk are
-        excluded; actual traced count may be slightly less.
+        Target number of rays to trace (default 49).
+        Paraxial path: a ceil(sqrt(num_rays)) × ceil(sqrt(num_rays)) grid is
+        built and points outside the unit disk are excluded.
+        Skew-ray path: a hexapolar grid with approximately num_rays samples is
+        built (1 + 3*N*(N+1) for N rings).
+    use_skew_ray : bool
+        If False (default), use the original paraxial-meridional path (exact
+        meridional y via Snell; first-order sagittal x, Hecht §5.7).
+        If True, use the full 3-D skew-ray engine (``trace_skew_ray``,
+        Born & Wolf §4.6 / Welford §5) with a hexapolar pupil bundle.
+        Skew-ray mode gives rigorous x and y intercepts and is preferred for
+        off-axis field analysis (astigmatism, sagittal coma, field curvature).
 
     Returns
     -------
@@ -402,6 +650,7 @@ def compute_spot_diagram(
     Hecht "Optics" 5e §6.3 (spot diagrams, encircled energy, aberration diagnosis).
     Welford "Aberrations of Optical Systems" §6 (Seidel field dependence),
         §8.2 (spot diagram construction), §5.2-5.3 (exact Snell conic trace).
+    Born & Wolf "Principles of Optics" 7th ed. §1.5.3, §4.6.
     """
     # Lazy import to avoid circular dependencies and OCC
     from kerf_cad_core.optics.lens_stack_trace import (
@@ -480,44 +729,59 @@ def compute_spot_diagram(
     else:
         f_number = float("inf")
 
-    # ---- Pupil grid ---------------------------------------------------------
-    field_angle_rad = math.radians(field_angle_deg)
-    pupil_pts = _pupil_grid(num_rays)
-
-    # Chief-ray intercept: px=0, py=0 pupil centre
-    chief_result = trace_lens_stack(
-        surfaces, ray_h=0.0, ray_u=field_angle_rad, n_object=n_object
-    )
-    if chief_result.get("ok") and not math.isnan(
-        chief_result.get("meridional_image_Y_mm", math.nan)
-    ):
-        chief_y = chief_result["meridional_image_Y_mm"]
-    else:
-        chief_y = 0.0
-    chief_x = 0.0  # sagittal centre
-
-    # ---- Trace all pupil samples -------------------------------------------
+    # ---- Trace ray bundle ---------------------------------------------------
     intercepts: list[tuple[float, float]] = []
 
-    for px, py in pupil_pts:
-        ray_h = py * aperture_radius_mm
-        result = trace_lens_stack(
-            surfaces,
-            ray_h=ray_h,
-            ray_u=field_angle_rad,
+    if use_skew_ray:
+        # Full 3-D skew-ray bundle (Born & Wolf §4.6 / Welford §5).
+        # Hexapolar pupil grid; both x and y intercepts are rigorous.
+        intercepts = _compute_skew_spot(
+            surfaces=surfaces,
+            field_angle_deg=field_angle_deg,
+            wavelength_nm=wavelength_nm,
+            aperture_radius_mm=aperture_radius_mm,
             n_object=n_object,
+            bfl=bfl,
+            num_rays=num_rays,
         )
-        y_img = (
-            result.get("meridional_image_Y_mm", math.nan)
-            if result.get("ok")
-            else math.nan
-        )
-        if math.isnan(y_img) or result.get("tir"):
-            continue
+    else:
+        # Paraxial-meridional path (original algorithm; default for backward
+        # compatibility): exact meridional y via Snell; first-order sagittal x
+        # estimate (Hecht §5.7).
+        field_angle_rad = math.radians(field_angle_deg)
+        pupil_pts = _pupil_grid(num_rays)
 
-        # First-order sagittal x (Hecht §5.7)
-        x_img = chief_x - px * aperture_radius_mm * sag_scale
-        intercepts.append((x_img, y_img))
+        # Chief-ray intercept: px=0, py=0 pupil centre
+        chief_result = trace_lens_stack(
+            surfaces, ray_h=0.0, ray_u=field_angle_rad, n_object=n_object
+        )
+        if chief_result.get("ok") and not math.isnan(
+            chief_result.get("meridional_image_Y_mm", math.nan)
+        ):
+            chief_y = chief_result["meridional_image_Y_mm"]
+        else:
+            chief_y = 0.0
+        chief_x = 0.0  # sagittal centre
+
+        for px, py in pupil_pts:
+            ray_h = py * aperture_radius_mm
+            result = trace_lens_stack(
+                surfaces,
+                ray_h=ray_h,
+                ray_u=field_angle_rad,
+                n_object=n_object,
+            )
+            y_img = (
+                result.get("meridional_image_Y_mm", math.nan)
+                if result.get("ok")
+                else math.nan
+            )
+            if math.isnan(y_img) or result.get("tir"):
+                continue
+
+            # First-order sagittal x (Hecht §5.7)
+            x_img = chief_x - px * aperture_radius_mm * sag_scale
+            intercepts.append((x_img, y_img))
 
     if not intercepts:
         return _err(
@@ -547,11 +811,32 @@ def compute_spot_diagram(
     svg = _render_svg(intercepts, centroid, rms_radius, ee80_radius, airy_mm, plot_half)
 
     # ---- Build result -------------------------------------------------------
-    result_obj = SpotDiagramResult(
-        image_points_xy=intercepts,
-        rms_radius_mm=rms_radius,
-        encircled_80pct_radius_mm=ee80_radius,
-        centroid_xy=centroid,
-        svg_diagram=svg,
-    )
+    if use_skew_ray:
+        caveat = (
+            "Monochromatic only (single wavelength; chromatic aberration NOT modelled). "
+            "3-D skew-ray trace (Born & Wolf §4.6 / Welford §5): both x and y "
+            "intercepts are rigorous (hexapolar pupil bundle). "
+            "Conic surfaces only (no higher-order A4/A6 aspheric terms). "
+            "Sequential surfaces only; no non-sequential paths. "
+            "Physical aperture clipping (vignetting) not applied. "
+            "encircled_80pct_radius_mm is the geometric EE80 (ray-counting); it is NOT "
+            "the diffraction-based encircled-energy radius. "
+            "Stop assumed at first surface."
+        )
+        result_obj = SpotDiagramResult(
+            image_points_xy=intercepts,
+            rms_radius_mm=rms_radius,
+            encircled_80pct_radius_mm=ee80_radius,
+            centroid_xy=centroid,
+            svg_diagram=svg,
+            honest_caveat=caveat,
+        )
+    else:
+        result_obj = SpotDiagramResult(
+            image_points_xy=intercepts,
+            rms_radius_mm=rms_radius,
+            encircled_80pct_radius_mm=ee80_radius,
+            centroid_xy=centroid,
+            svg_diagram=svg,
+        )
     return result_obj

@@ -48,8 +48,12 @@ if _SRC not in sys.path:
     sys.path.insert(0, _SRC)
 
 from kerf_mold.draft_validation import (
+    FaceData,
     FaceInput,
     DraftValidationReport,
+    UndercutReport,
+    UndercutSpec,
+    detect_undercuts,
     validate_draft,
     _min_draft_for_finish,
 )
@@ -494,3 +498,450 @@ class TestPluginRegistration:
 
     def test_tool_spec_name(self):
         assert _VALIDATE_DRAFT_SPEC.name == "mold_validate_draft"
+
+
+# ===========================================================================
+# Undercut Detection Tests (detect_undercuts / Menges §6.4)
+# ===========================================================================
+#
+# 20. Simple cube — no undercuts
+# 21. Boss with negative draft — detected as direct undercut
+# 22. Side-action ribbed feature — requires_side_action=True
+# 23. Lifter for deep groove — requires_lifter=True
+# 24. Vertical walls classified correctly
+# 25. Empty face list — graceful no-undercut report
+# 26. Severity progression: none / minor / major / severe
+# 27. Hidden undercut via shadow region (bounding-box overlap)
+# 28. Pull direction other than +Z
+# 29. Faces above parting line are not undercuts even with back-facing normal
+# 30. UndercutReport dataclass fields present and correctly typed
+# ===========================================================================
+
+
+def _make_fd(
+    normal,
+    centroid_z=0.0,
+    face_id="face",
+    x_extent=None,
+    y_extent=None,
+):
+    """Convenience: build a FaceData."""
+    return FaceData(
+        normal=normal,
+        centroid_z=centroid_z,
+        face_id=face_id,
+        x_extent=x_extent,
+        y_extent=y_extent,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 20. Simple cube — no undercuts
+# ---------------------------------------------------------------------------
+
+class TestSimpleCubeNoUndercut:
+    """A cube whose six faces all have normals along ±X/Y/Z.
+
+    Pull direction = +Z, parting plane at z=0.
+    Top face (normal +Z, centroid_z=10) and bottom face (normal -Z, centroid_z=0)
+    are on the parting plane / above it.  The four side faces have θ=90° and are
+    classified as vertical walls, not undercuts.
+    """
+
+    def _cube_spec(self):
+        faces = [
+            _make_fd((0, 0, 1),  centroid_z=10.0, face_id="top"),
+            _make_fd((0, 0, -1), centroid_z=0.0,  face_id="bottom"),
+            _make_fd((1, 0, 0),  centroid_z=5.0,  face_id="side_x+"),
+            _make_fd((-1, 0, 0), centroid_z=5.0,  face_id="side_x-"),
+            _make_fd((0, 1, 0),  centroid_z=5.0,  face_id="side_y+"),
+            _make_fd((0, -1, 0), centroid_z=5.0,  face_id="side_y-"),
+        ]
+        return UndercutSpec(faces=faces, pull_direction_xyz=(0, 0, 1), parting_z_mm=0.0)
+
+    def test_no_direct_undercuts(self):
+        report = detect_undercuts(self._cube_spec())
+        assert report.undercut_face_indices == []
+
+    def test_no_hidden_undercuts(self):
+        report = detect_undercuts(self._cube_spec())
+        assert report.hidden_undercut_face_indices == []
+
+    def test_severity_none(self):
+        report = detect_undercuts(self._cube_spec())
+        assert report.severity == "none"
+
+    def test_no_side_action_required(self):
+        report = detect_undercuts(self._cube_spec())
+        assert report.requires_side_action is False
+
+    def test_no_lifter_required(self):
+        report = detect_undercuts(self._cube_spec())
+        assert report.requires_lifter is False
+
+
+# ---------------------------------------------------------------------------
+# 21. Boss with negative draft — detected as direct undercut
+# ---------------------------------------------------------------------------
+
+class TestBossNegativeDraft:
+    """A boss feature whose side wall has a back-draft (normal tilts back
+    toward the parting line — θ > 90°).
+
+    The face is below the parting plane → direct undercut.
+    """
+
+    def _boss_spec(self):
+        # Normal tilted 10° back into cavity: points roughly -Z + lateral.
+        # With pull +Z: dot = n̂·p̂ = -sin(10°) → θ = acos(-sin(10°)) ≈ 100°
+        angle_rad = math.radians(10.0)
+        boss_normal = (math.cos(angle_rad), 0.0, -math.sin(angle_rad))
+        # Place boss below parting plane (z=-5, parting at z=0)
+        faces = [
+            _make_fd(boss_normal, centroid_z=-5.0, face_id="boss_back_draft"),
+            _make_fd((0, 0, 1),   centroid_z=10.0,  face_id="top"),
+        ]
+        return UndercutSpec(faces=faces, pull_direction_xyz=(0, 0, 1), parting_z_mm=0.0)
+
+    def test_boss_is_undercut(self):
+        report = detect_undercuts(self._boss_spec())
+        assert 0 in report.undercut_face_indices
+
+    def test_top_not_undercut(self):
+        report = detect_undercuts(self._boss_spec())
+        assert 1 not in report.undercut_face_indices
+
+    def test_requires_lifter(self):
+        report = detect_undercuts(self._boss_spec())
+        assert report.requires_lifter is True
+
+    def test_severity_at_least_minor(self):
+        report = detect_undercuts(self._boss_spec())
+        assert report.severity in ("minor", "major", "severe")
+
+
+# ---------------------------------------------------------------------------
+# 22. Side-action ribbed feature — requires_side_action=True
+# ---------------------------------------------------------------------------
+
+class TestSideActionRib:
+    """A ribbed feature below the parting line.
+
+    Three back-drafted rib faces below the parting plane → major severity →
+    requires_side_action=True.
+    """
+
+    def _rib_spec(self, n_rib_faces=3):
+        angle_rad = math.radians(15.0)
+        rib_normal = (math.cos(angle_rad), 0.0, -math.sin(angle_rad))
+        faces = []
+        for k in range(n_rib_faces):
+            faces.append(_make_fd(
+                rib_normal, centroid_z=-10.0,
+                face_id=f"rib_{k}",
+            ))
+        faces.append(_make_fd((0, 0, 1), centroid_z=10.0, face_id="top"))
+        return UndercutSpec(faces=faces, pull_direction_xyz=(0, 0, 1), parting_z_mm=0.0)
+
+    def test_requires_side_action(self):
+        report = detect_undercuts(self._rib_spec(3))
+        assert report.requires_side_action is True
+
+    def test_severity_major_for_three_undercuts(self):
+        report = detect_undercuts(self._rib_spec(3))
+        assert report.severity in ("major", "severe")
+
+    def test_all_rib_faces_detected(self):
+        report = detect_undercuts(self._rib_spec(3))
+        assert len(report.undercut_face_indices) == 3
+
+
+# ---------------------------------------------------------------------------
+# 23. Lifter for deep groove — requires_lifter=True
+# ---------------------------------------------------------------------------
+
+class TestLifterForDeepGroove:
+    """One internal groove face has a back-draft below the parting line.
+
+    Single direct undercut → minor severity but requires_lifter=True.
+    """
+
+    def _groove_spec(self):
+        # Back-drafted by 5°
+        angle_rad = math.radians(5.0)
+        groove_normal = (0.0, math.cos(angle_rad), -math.sin(angle_rad))
+        faces = [
+            _make_fd(groove_normal, centroid_z=-3.0, face_id="groove_back"),
+            _make_fd((0, 0, 1),     centroid_z=10.0, face_id="top"),
+            _make_fd((0, 0, -1),    centroid_z=0.0,  face_id="bottom"),
+        ]
+        return UndercutSpec(faces=faces, pull_direction_xyz=(0, 0, 1), parting_z_mm=0.0)
+
+    def test_requires_lifter(self):
+        report = detect_undercuts(self._groove_spec())
+        assert report.requires_lifter is True
+
+    def test_groove_face_is_undercut(self):
+        report = detect_undercuts(self._groove_spec())
+        assert 0 in report.undercut_face_indices
+
+    def test_severity_minor_single_undercut(self):
+        report = detect_undercuts(self._groove_spec())
+        assert report.severity == "minor"
+
+
+# ---------------------------------------------------------------------------
+# 24. Vertical walls classified correctly
+# ---------------------------------------------------------------------------
+
+class TestVerticalWallClassification:
+    """Faces with θ ≈ 90° (normals exactly perpendicular to pull) should
+    appear in vertical_wall_face_indices and NOT in undercut indices."""
+
+    def _spec(self):
+        faces = [
+            _make_fd((1, 0, 0), centroid_z=5.0, face_id="side_x"),
+            _make_fd((0, 1, 0), centroid_z=5.0, face_id="side_y"),
+        ]
+        return UndercutSpec(faces=faces, pull_direction_xyz=(0, 0, 1), parting_z_mm=0.0)
+
+    def test_vertical_walls_detected(self):
+        report = detect_undercuts(self._spec())
+        assert len(report.vertical_wall_face_indices) == 2
+
+    def test_vertical_walls_not_undercuts(self):
+        report = detect_undercuts(self._spec())
+        for i in report.vertical_wall_face_indices:
+            assert i not in report.undercut_face_indices
+
+    def test_severity_none(self):
+        report = detect_undercuts(self._spec())
+        assert report.severity == "none"
+
+
+# ---------------------------------------------------------------------------
+# 25. Empty face list — graceful no-undercut report
+# ---------------------------------------------------------------------------
+
+class TestEmptyFaceList:
+    def test_empty_faces_severity_none(self):
+        spec = UndercutSpec(faces=[], pull_direction_xyz=(0, 0, 1), parting_z_mm=0.0)
+        report = detect_undercuts(spec)
+        assert report.severity == "none"
+        assert report.undercut_face_indices == []
+        assert report.hidden_undercut_face_indices == []
+        assert report.requires_side_action is False
+        assert report.requires_lifter is False
+
+
+# ---------------------------------------------------------------------------
+# 26. Severity progression: none / minor / major / severe
+# ---------------------------------------------------------------------------
+
+class TestSeverityProgression:
+    """Build specs with increasing numbers of back-drafted faces to exercise
+    each severity bucket."""
+
+    @staticmethod
+    def _back_drafted_faces(n: int):
+        angle_rad = math.radians(10.0)
+        normal = (math.cos(angle_rad), 0.0, -math.sin(angle_rad))
+        return [_make_fd(normal, centroid_z=-5.0, face_id=f"u{k}") for k in range(n)]
+
+    def test_zero_undercuts_is_none(self):
+        spec = UndercutSpec(
+            faces=[_make_fd((0, 0, 1), centroid_z=10.0)],
+            pull_direction_xyz=(0, 0, 1),
+            parting_z_mm=0.0,
+        )
+        report = detect_undercuts(spec)
+        assert report.severity == "none"
+
+    def test_one_undercut_is_minor(self):
+        spec = UndercutSpec(
+            faces=self._back_drafted_faces(1),
+            pull_direction_xyz=(0, 0, 1),
+            parting_z_mm=0.0,
+        )
+        report = detect_undercuts(spec)
+        assert report.severity == "minor"
+
+    def test_two_undercuts_is_minor(self):
+        spec = UndercutSpec(
+            faces=self._back_drafted_faces(2),
+            pull_direction_xyz=(0, 0, 1),
+            parting_z_mm=0.0,
+        )
+        report = detect_undercuts(spec)
+        assert report.severity == "minor"
+
+    def test_three_undercuts_is_major(self):
+        spec = UndercutSpec(
+            faces=self._back_drafted_faces(3),
+            pull_direction_xyz=(0, 0, 1),
+            parting_z_mm=0.0,
+        )
+        report = detect_undercuts(spec)
+        assert report.severity == "major"
+
+    def test_six_undercuts_is_severe(self):
+        spec = UndercutSpec(
+            faces=self._back_drafted_faces(6),
+            pull_direction_xyz=(0, 0, 1),
+            parting_z_mm=0.0,
+        )
+        report = detect_undercuts(spec)
+        assert report.severity == "severe"
+
+
+# ---------------------------------------------------------------------------
+# 27. Hidden undercut via shadow region (bounding-box overlap)
+# ---------------------------------------------------------------------------
+
+class TestHiddenUndercut:
+    """Face A is below the parting line, has positive draft (θ < 90°), but is
+    shadowed by an overhanging face B directly above it (same XY footprint,
+    higher centroid_z).  Face A → hidden undercut.
+    """
+
+    def _spec(self):
+        # Face A: below parting (z=-5), slight inward draft (θ ≈ 80° < 90°)
+        # Normal tilts toward +Z: dot = sin(10°) → θ = acos(sin(10°)) ≈ 80°
+        angle_rad = math.radians(10.0)
+        face_a_normal = (math.cos(angle_rad), 0.0, math.sin(angle_rad))
+        face_a = _make_fd(
+            face_a_normal, centroid_z=-5.0, face_id="under_shelf",
+            x_extent=(0.0, 10.0), y_extent=(0.0, 10.0),
+        )
+        # Face B: above (z=5), overhanging, same XY footprint
+        face_b = _make_fd(
+            (0.0, 0.0, 1.0), centroid_z=5.0, face_id="overhang",
+            x_extent=(0.0, 10.0), y_extent=(0.0, 10.0),
+        )
+        return UndercutSpec(
+            faces=[face_a, face_b],
+            pull_direction_xyz=(0, 0, 1),
+            parting_z_mm=0.0,
+        )
+
+    def test_hidden_undercut_detected(self):
+        report = detect_undercuts(self._spec())
+        assert 0 in report.hidden_undercut_face_indices
+
+    def test_overhang_not_flagged(self):
+        report = detect_undercuts(self._spec())
+        assert 1 not in report.hidden_undercut_face_indices
+        assert 1 not in report.undercut_face_indices
+
+    def test_requires_side_action(self):
+        report = detect_undercuts(self._spec())
+        assert report.requires_side_action is True
+
+    def test_non_overlapping_extents_no_hidden_undercut(self):
+        """If the overhanging face is laterally offset, no shadow → no hidden undercut."""
+        angle_rad = math.radians(10.0)
+        face_a_normal = (math.cos(angle_rad), 0.0, math.sin(angle_rad))
+        face_a = _make_fd(
+            face_a_normal, centroid_z=-5.0, face_id="under_shelf",
+            x_extent=(0.0, 10.0), y_extent=(0.0, 10.0),
+        )
+        # Face B shifted far away on X axis (no overlap)
+        face_b = _make_fd(
+            (0.0, 0.0, 1.0), centroid_z=5.0, face_id="overhang",
+            x_extent=(20.0, 30.0), y_extent=(0.0, 10.0),
+        )
+        spec = UndercutSpec(
+            faces=[face_a, face_b],
+            pull_direction_xyz=(0, 0, 1),
+            parting_z_mm=0.0,
+        )
+        report = detect_undercuts(spec)
+        assert 0 not in report.hidden_undercut_face_indices
+
+
+# ---------------------------------------------------------------------------
+# 28. Pull direction other than +Z
+# ---------------------------------------------------------------------------
+
+class TestCustomPullDirectionUndercut:
+    """With pull direction = +X, a face normal pointing -X below the parting
+    plane (here parting_z_mm is interpreted as parting coordinate in the
+    Z axis — but centroid_z is still the Z-coord; we use parting_z=0 and
+    place face with centroid_z < 0 to be "below" parting).
+
+    Face with normal (-1, 0, 0) and pull +X: dot = -1 → θ = 180° > 90° → undercut.
+    """
+
+    def _spec(self):
+        faces = [
+            _make_fd((-1, 0, 0), centroid_z=-5.0, face_id="back_x"),
+            _make_fd((1, 0, 0),  centroid_z=5.0,  face_id="front_x"),
+        ]
+        return UndercutSpec(
+            faces=faces,
+            pull_direction_xyz=(1, 0, 0),
+            parting_z_mm=0.0,
+        )
+
+    def test_back_face_is_undercut(self):
+        report = detect_undercuts(self._spec())
+        assert 0 in report.undercut_face_indices
+
+    def test_front_face_not_undercut(self):
+        report = detect_undercuts(self._spec())
+        assert 1 not in report.undercut_face_indices
+
+
+# ---------------------------------------------------------------------------
+# 29. Faces ABOVE parting line with back-facing normal are NOT undercuts
+# ---------------------------------------------------------------------------
+
+class TestAbovePartingNotUndercut:
+    """A face with a back-drafted normal (θ > 90°) but centroid_z >= parting_z
+    is on the cavity side and will not be scraped — not an undercut.
+    """
+
+    def _spec(self):
+        angle_rad = math.radians(10.0)
+        back_normal = (math.cos(angle_rad), 0.0, -math.sin(angle_rad))
+        faces = [
+            # centroid_z=5.0 which is >= parting_z_mm=0 → NOT below parting
+            _make_fd(back_normal, centroid_z=5.0, face_id="above_parting_back"),
+        ]
+        return UndercutSpec(faces=faces, pull_direction_xyz=(0, 0, 1), parting_z_mm=0.0)
+
+    def test_above_parting_not_undercut(self):
+        report = detect_undercuts(self._spec())
+        assert 0 not in report.undercut_face_indices
+
+    def test_severity_none(self):
+        report = detect_undercuts(self._spec())
+        assert report.severity == "none"
+
+
+# ---------------------------------------------------------------------------
+# 30. UndercutReport dataclass fields present and correctly typed
+# ---------------------------------------------------------------------------
+
+class TestUndercutReportFields:
+    def test_report_has_required_fields(self):
+        spec = UndercutSpec(
+            faces=[_make_fd((0, 0, 1), centroid_z=5.0)],
+            pull_direction_xyz=(0, 0, 1),
+            parting_z_mm=0.0,
+        )
+        report = detect_undercuts(spec)
+        assert isinstance(report.undercut_face_indices, list)
+        assert isinstance(report.hidden_undercut_face_indices, list)
+        assert isinstance(report.vertical_wall_face_indices, list)
+        assert report.severity in ("none", "minor", "major", "severe")
+        assert isinstance(report.requires_side_action, bool)
+        assert isinstance(report.requires_lifter, bool)
+        assert isinstance(report.honest_caveat, str)
+        assert len(report.honest_caveat) > 0
+
+    def test_undercut_spec_defaults(self):
+        spec = UndercutSpec(faces=[_make_fd((0, 0, 1))])
+        assert spec.pull_direction_xyz == (0.0, 0.0, 1.0)
+        assert spec.parting_z_mm == 0.0
+        assert spec.undercut_threshold_deg == 90.0

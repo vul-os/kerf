@@ -709,6 +709,387 @@ def compute_wind_load(site: WindSiteSpec, building: BuildingSpec) -> WindPressur
     )
 
 
+# ---------------------------------------------------------------------------
+# ASCE 7-22 §27.5 — Open Building free-roof net pressure coefficients
+# ---------------------------------------------------------------------------
+
+def _gcpnet_open_building(roof_type: str, pitch_deg: float) -> tuple[float, float]:
+    """
+    Return (GCp_net_pos, GCp_net_neg) controlling net pressure coefficients
+    for an open building free roof per ASCE 7-22 Fig 27.5-1 and Fig 27.5-2.
+
+    The returned pair represents the full-roof (envelope) governing values —
+    the maximum positive coefficient (downward) and the maximum negative
+    coefficient (uplift).  Near/far-half zone splitting per Fig 27.5-1/2 is
+    NOT modelled; designers must apply zone-based analysis for detailed work.
+
+    Monoslope free roof (Fig 27.5-1, top table):
+        θ ≤ 7.5°:  GCp_net ∈ [−0.8, +1.2]
+        θ > 7.5°:  GCp_net ∈ [−1.2, +1.4]   (steeper pitch → larger uplift)
+
+    Troughed free roof (Fig 27.5-1, bottom table — V-shape, centre lower):
+        All θ:     GCp_net ∈ [−1.4, +0.8]   (geometry biased to uplift)
+
+    Pitched free roof (Fig 27.5-2 — inverted-V, ridge higher):
+        θ ≤ 10°:   GCp_net ∈ [−0.8, +1.0]
+        10° < θ ≤ 30°: GCp_net ∈ [−1.2, +1.4]
+        30° < θ ≤ 45°: GCp_net ∈ [−1.4, +1.4]
+
+    Parameters
+    ----------
+    roof_type : str
+        ``"monoslope"``, ``"troughed"``, or ``"pitched"``.
+    pitch_deg : float
+        Roof pitch angle θ in degrees from horizontal.
+
+    Returns
+    -------
+    tuple[float, float]
+        (GCp_net_pos, GCp_net_neg) — positive is downward, negative is uplift.
+    """
+    if roof_type == "monoslope":
+        if pitch_deg <= 7.5:
+            return (1.2, -0.8)
+        else:
+            return (1.4, -1.2)
+    elif roof_type == "troughed":
+        # Troughed geometry has a reversed bias — centroid of GCp_net leans toward
+        # uplift across the full pitch range per Fig 27.5-1 (lower table).
+        return (0.8, -1.4)
+    else:  # pitched
+        if pitch_deg <= 10.0:
+            return (1.0, -0.8)
+        elif pitch_deg <= 30.0:
+            return (1.4, -1.2)
+        else:
+            return (1.4, -1.4)
+
+
+def compute_open_building_pressure(
+    site: WindSiteSpec,
+    spec: OpenBuildingSpec,
+) -> OpenBuildingPressureReport:
+    """
+    Compute MWFRS net roof pressures for an open building per ASCE 7-22 §27.5.
+
+    Open buildings (each wall ≥ 80% open) have no enclosed air volume, so there
+    is no internal pressure component.  Wind acts directly on the free roof.
+
+    Net pressure p_net = qh · GCp_net                 [§27.5, Eq 27.5-1]
+
+    where qh is the velocity pressure at mean roof height h and GCp_net is the
+    net pressure coefficient from ASCE 7-22 Fig 27.5-1 (monoslope, troughed)
+    or Fig 27.5-2 (pitched).
+
+    This function returns the controlling (envelope) pair:
+      • p_net_pos_psf  — maximum downward pressure (positive)
+      • p_net_neg_psf  — maximum uplift pressure (negative)
+
+    Parameters
+    ----------
+    site : WindSiteSpec
+        Site wind speed, exposure, topographic, and risk category data.
+    spec : OpenBuildingSpec
+        Open building roof geometry (type, pitch, height).
+
+    Returns
+    -------
+    OpenBuildingPressureReport
+        Velocity pressure qh, GCp_net bounds, net pressures, and caveat.
+
+    Raises
+    ------
+    ValueError
+        If any input parameter is invalid.
+    """
+    # ---------------------------------------------------------------- validation
+    if site.V_basic_mph <= 0.0:
+        raise ValueError(f"V_basic_mph must be > 0, got {site.V_basic_mph}")
+    if site.exposure_category not in _VALID_EXPOSURE:
+        raise ValueError(
+            f"exposure_category must be one of {sorted(_VALID_EXPOSURE)}, "
+            f"got {site.exposure_category!r}"
+        )
+    if site.K_zt < 1.0:
+        raise ValueError(
+            f"K_zt must be ≥ 1.0, got {site.K_zt}"
+        )
+    if site.risk_category not in _VALID_RISK_CAT:
+        raise ValueError(
+            f"risk_category must be one of {sorted(_VALID_RISK_CAT)}, "
+            f"got {site.risk_category!r}"
+        )
+    if spec.roof_type not in _VALID_OPEN_ROOF_TYPES:
+        raise ValueError(
+            f"roof_type must be one of {sorted(_VALID_OPEN_ROOF_TYPES)}, "
+            f"got {spec.roof_type!r}"
+        )
+    if not (0.0 <= spec.pitch_deg <= 45.0):
+        raise ValueError(
+            f"pitch_deg must be in [0, 45], got {spec.pitch_deg}"
+        )
+    if spec.building_height_ft <= 0.0:
+        raise ValueError(
+            f"building_height_ft must be > 0, got {spec.building_height_ft}"
+        )
+
+    # ---------------------------------------------------------------- qh at h
+    alpha, zg_ft = _EXPOSURE_PARAMS[site.exposure_category]
+    h = spec.building_height_ft
+    Kz = _compute_kz(h, alpha, zg_ft)
+    V = site.V_basic_mph
+    # Eq 26.10-1 (qh = velocity pressure at mean roof height h)
+    qh = 0.00256 * Kz * site.K_zt * _KD_BUILDING * V * V
+
+    # ---------------------------------------------------------------- GCp_net
+    GCp_net_pos, GCp_net_neg = _gcpnet_open_building(spec.roof_type, spec.pitch_deg)
+
+    # Net pressures — no internal pressure term (open building, §27.5)
+    p_net_pos = qh * GCp_net_pos   # downward
+    p_net_neg = qh * GCp_net_neg   # uplift (negative)
+
+    # ---------------------------------------------------------------- metadata
+    code_sections = [
+        "ASCE 7-22 §26.6 (Kd = 0.85 for buildings)",
+        "ASCE 7-22 §26.10 / Table 26.10-1 (Kz)",
+        "ASCE 7-22 Eq 26.10-1 (qh)",
+        "ASCE 7-22 §27.5 (Directional Procedure for Open Buildings)",
+        "ASCE 7-22 Fig 27.5-1 (GCp,net — monoslope / troughed free roofs)",
+        "ASCE 7-22 Fig 27.5-2 (GCp,net — pitched free roofs)",
+    ]
+
+    caveat = (
+        f"ARCH-WIND-LOAD-ASCE7 §27.5 Open Building: roof_type={spec.roof_type!r}, "
+        f"θ={spec.pitch_deg}°, h={h} ft, V={V} mph, Exposure {site.exposure_category}, "
+        f"Kz={Kz:.4f}, qh={qh:.2f} psf. "
+        f"GCp,net pos={GCp_net_pos} (downward), neg={GCp_net_neg} (uplift). "
+        f"p_net_pos={p_net_pos:.2f} psf (down), p_net_neg={p_net_neg:.2f} psf (uplift). "
+        f"SCOPE: envelope (controlling) GCp,net returned — near/far half-zone split per "
+        f"Fig 27.5-1/2 NOT computed; use for global MWFRS preliminary design only. "
+        f"No internal pressure term (open building per §26.12-1c). "
+        f"Kd=0.85 (Table 26.6-1), G not applied (§27.5 uses GCp,net directly, no separate G)."
+    )
+
+    return OpenBuildingPressureReport(
+        qh_psf=round(qh, 4),
+        Kz=round(Kz, 6),
+        GCp_net_pos=GCp_net_pos,
+        GCp_net_neg=GCp_net_neg,
+        p_net_pos_psf=round(p_net_pos, 4),
+        p_net_neg_psf=round(p_net_neg, 4),
+        roof_type=spec.roof_type,
+        pitch_deg=spec.pitch_deg,
+        code_section=code_sections,
+        honest_caveat=caveat,
+    )
+
+
+# ---------------------------------------------------------------------------
+# ASCE 7-22 §28 — Envelope Procedure (low-rise buildings)
+# ---------------------------------------------------------------------------
+
+# GCpf interior and end-zone values from ASCE 7-22 Fig 28.4-1 (flat / low-slope).
+# Load Case A (wind parallel to ridge):  Zones 1–4 interior + 1E–4E end zones
+# Load Case B (wind perpendicular to ridge): Zones 5–6 interior + 5E–6E end zones
+#
+# Fig 28.4-1 tabulated values (0° to 5° pitch range — conservative for all pitches
+# up to 45°; higher pitch adjustments from supplementary data NOT applied here):
+#   Zone 1  windward wall (int)  +0.40
+#   Zone 2  leeward wall (int)   -0.29
+#   Zone 3  side wall (int)      -0.37
+#   Zone 4  windward roof (int)  -0.45  (conservative envelope of Fig 28.4-1 near-ridge)
+#   Zone 1E windward wall (end)  +0.61
+#   Zone 2E leeward wall (end)   -0.43
+#   Zone 3E side wall (end)      -0.53
+#   Zone 4E windward roof (end)  -0.43
+#   Zone 5  windward wall LC-B   +0.40
+#   Zone 6  leeward wall LC-B    -0.29
+#   Zone 5E windward wall end    +0.61
+#   Zone 6E leeward wall end     -0.43
+
+_GCPF_INTERIOR: dict[str, float] = {
+    "1":  +0.40,   # windward wall (Load Case A)
+    "2":  -0.29,   # leeward wall (Load Case A)
+    "3":  -0.37,   # side wall
+    "4":  -0.45,   # windward roof (near-ridge, conservative)
+    "5":  +0.40,   # windward wall (Load Case B)
+    "6":  -0.29,   # leeward wall (Load Case B)
+}
+
+_GCPF_END_ZONE: dict[str, float] = {
+    "1E": +0.61,
+    "2E": -0.43,
+    "3E": -0.53,
+    "4E": -0.43,
+    "5E": +0.61,
+    "6E": -0.43,
+}
+
+# Internal pressure coefficient for enclosed buildings — §26.13 Table 26.13-1
+_GCPI_ENCLOSED = 0.18
+
+
+def compute_low_rise_envelope_pressure(
+    site: WindSiteSpec,
+    spec: LowRiseEnvelopeSpec,
+) -> LowRiseEnvelopePressureReport:
+    """
+    Compute MWFRS wall + roof design pressures for a low-rise building per
+    ASCE 7-22 §28 Envelope Procedure.
+
+    Applicability (§28.3.1):
+      • Mean roof height h ≤ 60 ft
+      • h / L ≤ 1.0
+
+    Design pressure (Eq 28.4-1):
+      p = qh · (GCpf) − qi · (GCpi)   where qi = qh  (§28.4.1)
+
+    The net design pressure is the algebraic combination that produces the
+    maximum (worst-case) effect:
+      Positive zones:  p = qh · GCpf − qh · (−GCpi) = qh · (GCpf + GCpi)
+      Negative zones:  p = qh · GCpf − qh · (+GCpi) = qh · (GCpf − GCpi)
+
+    This function returns net pressures for each zone (governing internal
+    pressure sign already applied).  GCpf from ASCE 7-22 Fig 28.4-1.
+    GCpi = ±0.18 (enclosed building, Table 26.13-1).
+
+    Parameters
+    ----------
+    site : WindSiteSpec
+        Site wind speed, exposure, topographic, and risk category data.
+    spec : LowRiseEnvelopeSpec
+        Building geometry and classification.
+
+    Returns
+    -------
+    LowRiseEnvelopePressureReport
+        Velocity pressure qh, end-zone dimension a, zone-by-zone net pressures
+        (psf), and caveat.
+
+    Raises
+    ------
+    ValueError
+        If applicability limits are exceeded or any input is invalid.
+    """
+    # ---------------------------------------------------------------- validation
+    if site.V_basic_mph <= 0.0:
+        raise ValueError(f"V_basic_mph must be > 0, got {site.V_basic_mph}")
+    if site.exposure_category not in _VALID_EXPOSURE:
+        raise ValueError(
+            f"exposure_category must be one of {sorted(_VALID_EXPOSURE)}, "
+            f"got {site.exposure_category!r}"
+        )
+    if site.K_zt < 1.0:
+        raise ValueError(f"K_zt must be ≥ 1.0, got {site.K_zt}")
+    if site.risk_category not in _VALID_RISK_CAT:
+        raise ValueError(
+            f"risk_category must be one of {sorted(_VALID_RISK_CAT)}, "
+            f"got {site.risk_category!r}"
+        )
+    if spec.building_length_ft <= 0.0:
+        raise ValueError(f"building_length_ft must be > 0, got {spec.building_length_ft}")
+    if spec.width_ft <= 0.0:
+        raise ValueError(f"width_ft must be > 0, got {spec.width_ft}")
+    if spec.height_ft <= 0.0:
+        raise ValueError(f"height_ft must be > 0, got {spec.height_ft}")
+    if spec.roof_type not in _VALID_LOW_RISE_ROOF_TYPES:
+        raise ValueError(
+            f"roof_type must be one of {sorted(_VALID_LOW_RISE_ROOF_TYPES)}, "
+            f"got {spec.roof_type!r}"
+        )
+    if spec.exposure not in _VALID_EXPOSURE:
+        raise ValueError(
+            f"exposure must be one of {sorted(_VALID_EXPOSURE)}, "
+            f"got {spec.exposure!r}"
+        )
+
+    # ---------------------------------------------------------------- §28.3.1 applicability
+    h = spec.height_ft
+    L = spec.building_length_ft
+    B = spec.width_ft
+    if h > 60.0:
+        raise ValueError(
+            f"§28 Envelope Procedure requires h ≤ 60 ft; got h={h} ft. "
+            f"Use §27 Directional Procedure for taller buildings."
+        )
+    h_over_L = h / L
+    if h_over_L > 1.0:
+        raise ValueError(
+            f"§28 Envelope Procedure requires h/L ≤ 1.0; got h/L={h_over_L:.3f} "
+            f"(h={h} ft, L={L} ft). Use §27 Directional Procedure."
+        )
+
+    # ---------------------------------------------------------------- qh at h
+    alpha, zg_ft = _EXPOSURE_PARAMS[site.exposure_category]
+    Kz = _compute_kz(h, alpha, zg_ft)
+    V = site.V_basic_mph
+    qh = 0.00256 * Kz * site.K_zt * _KD_BUILDING * V * V
+
+    # ---------------------------------------------------------------- end-zone dimension a
+    # §28.4-1 footnote: a = 10% of least horizontal dimension, but ≥ 0.4h and ≤ 0.04×min_dim
+    # Exact ASCE 7-22 definition:  a = min(0.1·B, 0.4·h), but ≥ max(0.04·B, 3.0 ft)
+    a_candidate = min(0.1 * B, 0.4 * h)
+    a_min = max(0.04 * B, 3.0)
+    end_zone_a = max(a_candidate, a_min)
+
+    # ---------------------------------------------------------------- zone pressures
+    # Governing net pressure per zone:
+    #   For GCpf > 0 (pressure toward surface): worst case = +GCpi (additive suction inside)
+    #     p_net = qh · (GCpf + GCpi)
+    #   For GCpf < 0 (suction away from surface): worst case = +GCpi (same direction)
+    #     p_net = qh · (GCpf - GCpi)   → more negative (higher suction)
+    #
+    # Both combinations are used simultaneously for MWFRS analysis; here we return the
+    # single governing (worst absolute effect) value per zone.
+    GCpi = _GCPI_ENCLOSED
+
+    zone_pressures: dict[str, float] = {}
+    all_zones = {**_GCPF_INTERIOR, **_GCPF_END_ZONE}
+    for zone, GCpf in all_zones.items():
+        if GCpf >= 0.0:
+            # Positive pressure — GCpi acts inward (+), maximises net inward load
+            p_net = qh * (GCpf + GCpi)
+        else:
+            # Negative pressure (suction) — GCpi acts outward (−), maximises net outward load
+            p_net = qh * (GCpf - GCpi)
+        zone_pressures[zone] = round(p_net, 4)
+
+    # ---------------------------------------------------------------- metadata
+    code_sections = [
+        "ASCE 7-22 §26.6 (Kd = 0.85 for buildings)",
+        "ASCE 7-22 §26.10 / Table 26.10-1 (Kz)",
+        "ASCE 7-22 Eq 26.10-1 (qh)",
+        "ASCE 7-22 §26.13 / Table 26.13-1 (GCpi = ±0.18 enclosed)",
+        "ASCE 7-22 §28.3.1 (Envelope Procedure applicability: h ≤ 60 ft, h/L ≤ 1.0)",
+        "ASCE 7-22 §28.4 / Eq 28.4-1 (p = qh·GCpf − qi·GCpi)",
+        "ASCE 7-22 Fig 28.4-1 (GCpf combined wall+roof zones, low-rise MWFRS)",
+    ]
+
+    caveat = (
+        f"ARCH-WIND-LOAD-ASCE7 §28 Envelope Procedure (low-rise): "
+        f"h={h} ft, L={L} ft, B={B} ft, h/L={h_over_L:.3f}, "
+        f"roof_type={spec.roof_type!r}, pitch={spec.roof_pitch_deg}°, "
+        f"V={V} mph, Exposure {site.exposure_category}, Kz={Kz:.4f}, qh={qh:.2f} psf. "
+        f"End-zone a={end_zone_a:.2f} ft. GCpi=±{GCpi} (enclosed). "
+        f"Zone pressures (governing sign): {zone_pressures}. "
+        f"SCOPE: GCpf from Fig 28.4-1 flat/low-slope base values — roof pitch adjustments "
+        f"from Fig 28.4-1 supplementary data NOT applied (conservative). "
+        f"Valid for enclosed buildings only (GCpi=0.18); use GCpi=0.55 for "
+        f"partially-enclosed. Load Case A (Zones 1–4E) and Load Case B (Zones 5–6E) "
+        f"both included. Minimum pressure check per §28.4.4 (16 psf walls, 8 psf roofs) "
+        f"not enforced here — verify separately."
+    )
+
+    return LowRiseEnvelopePressureReport(
+        qh_psf=round(qh, 4),
+        Kz=round(Kz, 6),
+        end_zone_a_ft=round(end_zone_a, 4),
+        zone_pressures_psf=zone_pressures,
+        code_section=code_sections,
+        honest_caveat=caveat,
+    )
+
+
 def compute_tornado_load(tornado_spec: TornadoLoadSpec) -> TornadoLoadReport:
     """
     Compute MWFRS wall design pressures under tornado loading per ASCE 7-22 §32.

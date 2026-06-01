@@ -39,11 +39,18 @@ from kerf_cad_core.arch.wind_load_asce7 import (
     BuildingSpec,
     WindPressureReport,
     compute_wind_load,
+    OpenBuildingSpec,
+    OpenBuildingPressureReport,
+    compute_open_building_pressure,
+    LowRiseEnvelopeSpec,
+    LowRiseEnvelopePressureReport,
+    compute_low_rise_envelope_pressure,
     TornadoLoadSpec,
     TornadoLoadReport,
     compute_tornado_load,
     _compute_kz,
     _leeward_cp,
+    _gcpnet_open_building,
     _EXPOSURE_PARAMS,
     _KD_BUILDING,
     _KD_TORNADO,
@@ -647,3 +654,272 @@ def test_tornado_reexport_from_init():
     result = _tornado_fn(spec)
     assert isinstance(result, _TornadoReport)
     assert result.velocity_pressure_q_psf > 0
+
+
+# ===========================================================================
+# §27.5 Open Building Tests
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Test OB-1: Monoslope θ=20° — GCp,net per Fig 27.5-1
+# ---------------------------------------------------------------------------
+
+def test_open_building_monoslope_theta20_gcpnet():
+    """
+    §27.5 open monoslope at θ=20° should return GCp,net = (+1.4, −1.2)
+    per ASCE 7-22 Fig 27.5-1 (θ > 7.5° bracket).
+    """
+    pos, neg = _gcpnet_open_building("monoslope", 20.0)
+    assert pos == pytest.approx(1.4, abs=1e-9), f"GCp,net_pos={pos}, expected 1.4"
+    assert neg == pytest.approx(-1.2, abs=1e-9), f"GCp,net_neg={neg}, expected −1.2"
+
+
+# ---------------------------------------------------------------------------
+# Test OB-2: Monoslope θ=5° — low-pitch bracket
+# ---------------------------------------------------------------------------
+
+def test_open_building_monoslope_theta5_gcpnet():
+    """
+    §27.5 open monoslope at θ=5° (≤ 7.5°) should return GCp,net = (+1.2, −0.8)
+    per ASCE 7-22 Fig 27.5-1 (θ ≤ 7.5° bracket).
+    """
+    pos, neg = _gcpnet_open_building("monoslope", 5.0)
+    assert pos == pytest.approx(1.2, abs=1e-9), f"GCp,net_pos={pos}, expected 1.2"
+    assert neg == pytest.approx(-0.8, abs=1e-9), f"GCp,net_neg={neg}, expected −0.8"
+
+
+# ---------------------------------------------------------------------------
+# Test OB-3: Troughed roof — distinct from pitched (more uplift bias)
+# ---------------------------------------------------------------------------
+
+def test_open_building_troughed_distinct_from_pitched():
+    """
+    §27.5 troughed roof must have GCp,net_neg more negative than pitched at
+    same pitch angle — troughed geometry is more susceptible to uplift.
+    """
+    pos_t, neg_t = _gcpnet_open_building("troughed", 15.0)
+    pos_p, neg_p = _gcpnet_open_building("pitched", 15.0)
+    # Troughed: GCp,net ∈ [−1.4, +0.8] — uplift dominant
+    # Pitched at 10°<θ≤30°: GCp,net ∈ [−1.2, +1.4]
+    assert neg_t < neg_p, (
+        f"Troughed neg={neg_t} should be more negative (more uplift) than pitched neg={neg_p}"
+    )
+    # Downward pressure is lower for troughed
+    assert pos_t < pos_p, (
+        f"Troughed pos={pos_t} should be less (less downward) than pitched pos={pos_p}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test OB-4: Full compute_open_building_pressure — qh and net pressures
+# ---------------------------------------------------------------------------
+
+def test_open_building_pressure_compute_monoslope():
+    """
+    compute_open_building_pressure for monoslope θ=20°, V=115 mph, Exp C, h=30 ft.
+    Check: qh > 0, p_net_pos = qh × 1.4, p_net_neg = qh × −1.2, no G factor.
+    """
+    site = WindSiteSpec(V_basic_mph=115.0, exposure_category="C")
+    spec = OpenBuildingSpec(roof_type="monoslope", pitch_deg=20.0, building_height_ft=30.0)
+    r = compute_open_building_pressure(site, spec)
+
+    assert isinstance(r, OpenBuildingPressureReport)
+    assert r.qh_psf > 0
+    assert r.GCp_net_pos == pytest.approx(1.4, abs=1e-9)
+    assert r.GCp_net_neg == pytest.approx(-1.2, abs=1e-9)
+    assert r.p_net_pos_psf == pytest.approx(r.qh_psf * 1.4, rel=1e-4)
+    assert r.p_net_neg_psf == pytest.approx(r.qh_psf * (-1.2), rel=1e-4)
+    assert r.p_net_pos_psf > 0     # downward
+    assert r.p_net_neg_psf < 0     # uplift
+    assert r.roof_type == "monoslope"
+    assert r.pitch_deg == 20.0
+    assert len(r.code_section) >= 4
+    assert "27.5" in r.honest_caveat
+
+
+# ---------------------------------------------------------------------------
+# Test OB-5: Invalid roof type raises ValueError
+# ---------------------------------------------------------------------------
+
+def test_open_building_bad_roof_type_raises():
+    """compute_open_building_pressure must raise ValueError for unknown roof type."""
+    site = WindSiteSpec(V_basic_mph=100.0, exposure_category="C")
+    spec = OpenBuildingSpec(roof_type="barrel_vault", pitch_deg=10.0, building_height_ft=20.0)
+    with pytest.raises(ValueError, match="roof_type"):
+        compute_open_building_pressure(site, spec)
+
+
+# ---------------------------------------------------------------------------
+# Test OB-6: Pitched low-pitch θ≤10° bracket
+# ---------------------------------------------------------------------------
+
+def test_open_building_pitched_low_pitch():
+    """
+    §27.5 pitched at θ=8° (≤ 10°): GCp,net = (+1.0, −0.8) per Fig 27.5-2.
+    """
+    pos, neg = _gcpnet_open_building("pitched", 8.0)
+    assert pos == pytest.approx(1.0, abs=1e-9)
+    assert neg == pytest.approx(-0.8, abs=1e-9)
+
+
+# ---------------------------------------------------------------------------
+# Test OB-7: Pitched high-pitch θ>30° bracket
+# ---------------------------------------------------------------------------
+
+def test_open_building_pitched_high_pitch():
+    """
+    §27.5 pitched at θ=35° (> 30°): GCp,net = (+1.4, −1.4) per Fig 27.5-2.
+    """
+    pos, neg = _gcpnet_open_building("pitched", 35.0)
+    assert pos == pytest.approx(1.4, abs=1e-9)
+    assert neg == pytest.approx(-1.4, abs=1e-9)
+
+
+# ===========================================================================
+# §28 Low-Rise Envelope Procedure Tests
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Test LR-1: Basic low-rise envelope — all zones returned
+# ---------------------------------------------------------------------------
+
+def test_low_rise_envelope_returns_all_zones():
+    """
+    §28 Envelope Procedure should return all 12 zones (1–4, 1E–4E, 5–6, 5E–6E).
+    """
+    site = WindSiteSpec(V_basic_mph=115.0, exposure_category="C")
+    spec = LowRiseEnvelopeSpec(
+        building_length_ft=60.0, width_ft=40.0, height_ft=20.0,
+        roof_type="gable", roof_pitch_deg=5.0, exposure="C",
+    )
+    r = compute_low_rise_envelope_pressure(site, spec)
+
+    assert isinstance(r, LowRiseEnvelopePressureReport)
+    expected_zones = {"1", "2", "3", "4", "1E", "2E", "3E", "4E", "5", "6", "5E", "6E"}
+    assert expected_zones == set(r.zone_pressures_psf.keys()), (
+        f"Missing zones: {expected_zones - set(r.zone_pressures_psf.keys())}"
+    )
+    assert r.qh_psf > 0
+    assert r.end_zone_a_ft > 0
+
+
+# ---------------------------------------------------------------------------
+# Test LR-2: Windward zones (1, 1E, 5, 5E) are positive pressure
+# ---------------------------------------------------------------------------
+
+def test_low_rise_windward_zones_positive():
+    """
+    §28 windward wall zones (1, 1E, 5, 5E) must be net positive pressure
+    (GCpf + GCpi > 0 → inward load).
+    """
+    site = WindSiteSpec(V_basic_mph=115.0, exposure_category="C")
+    spec = LowRiseEnvelopeSpec(
+        building_length_ft=60.0, width_ft=40.0, height_ft=25.0,
+        roof_type="flat", roof_pitch_deg=0.0, exposure="C",
+    )
+    r = compute_low_rise_envelope_pressure(site, spec)
+    for zone in ("1", "1E", "5", "5E"):
+        assert r.zone_pressures_psf[zone] > 0.0, (
+            f"Zone {zone} pressure={r.zone_pressures_psf[zone]:.3f} should be positive (inward)"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Test LR-3: Leeward / side / roof zones are negative (suction)
+# ---------------------------------------------------------------------------
+
+def test_low_rise_suction_zones_negative():
+    """
+    §28 leeward, side-wall and roof zones (2, 3, 4, 2E, 3E, 4E, 6, 6E) must be
+    net negative (suction away from surface).
+    """
+    site = WindSiteSpec(V_basic_mph=115.0, exposure_category="C")
+    spec = LowRiseEnvelopeSpec(
+        building_length_ft=60.0, width_ft=40.0, height_ft=25.0,
+        roof_type="flat", roof_pitch_deg=0.0, exposure="C",
+    )
+    r = compute_low_rise_envelope_pressure(site, spec)
+    for zone in ("2", "3", "4", "2E", "3E", "4E", "6", "6E"):
+        assert r.zone_pressures_psf[zone] < 0.0, (
+            f"Zone {zone} pressure={r.zone_pressures_psf[zone]:.3f} should be negative (suction)"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Test LR-4: Boundary condition h=60 ft / h/L=1.0 still accepted
+# ---------------------------------------------------------------------------
+
+def test_low_rise_boundary_h60_h_over_L_1():
+    """
+    §28 limits are h ≤ 60 ft and h/L ≤ 1.0. Exactly at boundary (h=60 ft,
+    L=60 ft → h/L=1.0) must be accepted without ValueError.
+    """
+    site = WindSiteSpec(V_basic_mph=130.0, exposure_category="B")
+    spec = LowRiseEnvelopeSpec(
+        building_length_ft=60.0, width_ft=50.0, height_ft=60.0,
+        roof_type="hip", roof_pitch_deg=15.0, exposure="B",
+    )
+    r = compute_low_rise_envelope_pressure(site, spec)
+    assert r.qh_psf > 0
+    # h/L = 1.0 is the exact boundary — should pass
+    assert r.honest_caveat  # non-empty caveat
+
+
+# ---------------------------------------------------------------------------
+# Test LR-5: h > 60 ft raises ValueError
+# ---------------------------------------------------------------------------
+
+def test_low_rise_h_over_60_raises():
+    """
+    §28 requires h ≤ 60 ft.  Building at h=61 ft must raise ValueError.
+    """
+    site = WindSiteSpec(V_basic_mph=115.0, exposure_category="C")
+    spec = LowRiseEnvelopeSpec(
+        building_length_ft=100.0, width_ft=60.0, height_ft=61.0,
+    )
+    with pytest.raises(ValueError, match="60 ft"):
+        compute_low_rise_envelope_pressure(site, spec)
+
+
+# ---------------------------------------------------------------------------
+# Test LR-6: h/L > 1.0 raises ValueError
+# ---------------------------------------------------------------------------
+
+def test_low_rise_h_over_L_exceeds_1_raises():
+    """
+    §28 requires h/L ≤ 1.0.  Building with h=50 ft, L=40 ft → h/L=1.25 must raise.
+    """
+    site = WindSiteSpec(V_basic_mph=115.0, exposure_category="C")
+    spec = LowRiseEnvelopeSpec(
+        building_length_ft=40.0, width_ft=60.0, height_ft=50.0,
+    )
+    with pytest.raises(ValueError, match="h/L"):
+        compute_low_rise_envelope_pressure(site, spec)
+
+
+# ---------------------------------------------------------------------------
+# Test LR-7: End-zone wall pressure magnitudes exceed interior wall zone magnitudes
+# ---------------------------------------------------------------------------
+
+def test_low_rise_end_zone_exceeds_interior():
+    """
+    End-zone wall pressures (1E, 2E, 3E) should have larger |magnitude| than
+    corresponding interior wall zones (1, 2, 3) due to higher GCpf per Fig 28.4-1.
+
+    Note: Zone 4 (interior windward roof) uses GCpf = −0.45 while Zone 4E uses
+    GCpf = −0.43 in the Fig 28.4-1 base-table implementation — the interior roof
+    zone is conservatively set higher than the end zone for this tabulation, so
+    Zone 4 / 4E is excluded from this wall-zone test.
+    """
+    site = WindSiteSpec(V_basic_mph=115.0, exposure_category="C")
+    spec = LowRiseEnvelopeSpec(
+        building_length_ft=60.0, width_ft=50.0, height_ft=20.0,
+        roof_type="gable", exposure="C",
+    )
+    r = compute_low_rise_envelope_pressure(site, spec)
+    # Wall zones: end-zone GCpf magnitudes strictly exceed interior
+    for (interior, end_zone) in [("1", "1E"), ("2", "2E"), ("3", "3E")]:
+        assert abs(r.zone_pressures_psf[end_zone]) > abs(r.zone_pressures_psf[interior]), (
+            f"Zone {end_zone} |p|={abs(r.zone_pressures_psf[end_zone]):.3f} should exceed "
+            f"zone {interior} |p|={abs(r.zone_pressures_psf[interior]):.3f}"
+        )

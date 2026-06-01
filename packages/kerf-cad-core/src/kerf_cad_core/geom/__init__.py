@@ -1589,11 +1589,14 @@ from kerf_cad_core.geom.shell_wall_check import (  # noqa: E402
 # BREP-CHAMFER-RECOMMEND-SIZE: per-edge chamfer dimension recommendation engine
 # (Drozda-Wick §3-7/§3-7.3; DIN 74:1974 Form A/B; ISO 13715:2017 §5)
 # Criteria: deburring 0.5mm×45°; chamfer mill; DIN 74 countersink; cosmetic 1.5mm×45°.
-# Honest: no production cost modelling; DIN 74 nominal only; 45° equal-leg only.
+# Asymmetric chamfers (e.g. 30°×60°, 1×2 leg ratio) supported via
+# recommend_asymmetric_chamfer() and the ratio= parameter on recommend_chamfer_size().
 from kerf_cad_core.geom.chamfer_recommend_size import (  # noqa: E402
+    AsymmetricChamferRecommendation,
     ChamferContext,
     ChamferRecommendation,
     DIN74_COUNTERSINK_TABLE,
+    recommend_asymmetric_chamfer,
     recommend_chamfer_size,
     recommend_chamfer_sizes_for_body,
 )

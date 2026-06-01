@@ -34,8 +34,10 @@ HONEST-FLAG
   cost tradeoffs (tool changes, setup time, number of passes).
 * Countersink matching uses a simple diameter lookup against DIN 74 Table 1;
   it does NOT perform tolerancing stack-up or thread engagement analysis.
-* Angle is fixed at 45° for all four criteria; asymmetric chamfers
-  (e.g. 30°×60°) are out of scope.
+* The default angle is 45° (equal-leg symmetric); asymmetric chamfers
+  (e.g. 30°×60°, 1×2 mm leg ratio) are supported via
+  ``recommend_asymmetric_chamfer()`` and the ``ratio`` parameter on
+  ``recommend_chamfer_size()``.  Set ``ratio != 1.0`` to activate.
 * Sheet-metal deburring floor (0.5 mm) is a safe minimum; actual burr height
   depends on shear clearance and material — a full burr analysis requires
   Drozda-Wick §3-7 Table 3 which is process-parameter dependent.
@@ -44,8 +46,13 @@ HONEST-FLAG
 
 Public API
 ----------
-recommend_chamfer_size(edge, faces, context) -> ChamferRecommendation
+recommend_chamfer_size(edge, faces, context, ratio=1.0) -> ChamferRecommendation
     Main entry point.  Returns a ChamferRecommendation dataclass.
+    ratio=1.0 gives symmetric 45° (backward compatible).
+    ratio != 1.0 delegates to recommend_asymmetric_chamfer().
+
+recommend_asymmetric_chamfer(edge_geometry, application, ratio_a_to_b) -> AsymmetricChamferRecommendation
+    Asymmetric chamfer: leg_a = ratio × leg_b; angles from atan2.
 
 recommend_chamfer_sizes_for_body(body, context) -> list[ChamferRecommendation]
     Convenience wrapper: one recommendation per edge in body.all_edges().
@@ -58,6 +65,17 @@ ChamferRecommendation — dataclass
     din_reference: str    — DIN 74 / ISO 13715 reference string, or ''
     applicable   : bool   — False if edge should not be chamfered
     edge_index   : int    — index in body.all_edges() (set by batch wrapper)
+
+AsymmetricChamferRecommendation — dataclass
+    leg_a_mm     : float  — longer (or equal) chamfer leg in mm
+    leg_b_mm     : float  — shorter (or equal) chamfer leg in mm
+    angle_a_deg  : float  — acute angle between leg_a face and chamfer face
+    angle_b_deg  : float  — acute angle between leg_b face and chamfer face
+    is_symmetric : bool   — True when leg_a == leg_b (ratio == 1.0)
+    kind         : str    — dominant criterion
+    rationale    : str    — human-readable with citations
+    applicable   : bool   — False if edge should not be chamfered
+    edge_index   : int    — index in body.all_edges()
 
 LLM tool (registered when kerf_chat is available):
     brep_recommend_chamfer_size
@@ -96,8 +114,10 @@ from kerf_cad_core.geom.fillet_solid import _find_incident_faces
 
 __all__ = [
     "ChamferRecommendation",
+    "AsymmetricChamferRecommendation",
     "ChamferContext",
     "recommend_chamfer_size",
+    "recommend_asymmetric_chamfer",
     "recommend_chamfer_sizes_for_body",
     "DIN74_COUNTERSINK_TABLE",
 ]
@@ -229,6 +249,47 @@ class ChamferRecommendation:
     criteria_offsets: Dict[str, float] = field(default_factory=dict)
 
 
+@dataclass
+class AsymmetricChamferRecommendation:
+    """Per-edge asymmetric chamfer recommendation.
+
+    Attributes
+    ----------
+    edge_index : int
+        Index in body.all_edges().
+    leg_a_mm : float
+        Length of the first chamfer leg (mm).  For ratio_a_to_b >= 1.0 this
+        is the longer (or equal) leg.
+    leg_b_mm : float
+        Length of the second chamfer leg (mm).  For ratio_a_to_b >= 1.0 this
+        is the shorter (or equal) leg.
+    angle_a_deg : float
+        Acute angle (degrees) at the junction of leg_a with its parent face.
+        Computed as ``atan2(leg_b, leg_a)`` converted to degrees.
+        When symmetric (45°/45°) this equals 45.0.
+    angle_b_deg : float
+        Acute angle (degrees) at the junction of leg_b with its parent face.
+        Equals ``90 - angle_a_deg``.  The two angles always sum to 90°.
+    is_symmetric : bool
+        True when leg_a == leg_b (ratio == 1.0).
+    kind : str
+        Dominant criterion: 'deburring' | 'manufacturing' | 'countersink' | 'cosmetic'.
+    rationale : str
+        Human-readable explanation with standard citations.
+    applicable : bool
+        False if edge should not be chamfered.
+    """
+    edge_index: int = 0
+    leg_a_mm: float = 0.0
+    leg_b_mm: float = 0.0
+    angle_a_deg: float = 45.0
+    angle_b_deg: float = 45.0
+    is_symmetric: bool = True
+    kind: str = "deburring"
+    rationale: str = ""
+    applicable: bool = True
+
+
 # ---------------------------------------------------------------------------
 # Geometry helpers
 # ---------------------------------------------------------------------------
@@ -287,6 +348,129 @@ def _din74_lookup(hole_dia_mm: float, form: str = "A") -> Optional[float]:
 
 
 # ---------------------------------------------------------------------------
+# Asymmetric chamfer recommendation
+# ---------------------------------------------------------------------------
+
+
+def recommend_asymmetric_chamfer(
+    edge_geometry: Edge,
+    application: str = "machining",
+    ratio_a_to_b: float = 1.0,
+) -> AsymmetricChamferRecommendation:
+    """Recommend an asymmetric (or symmetric) chamfer for a single B-rep edge.
+
+    Computes two unequal chamfer legs based on the edge length, practical
+    clearance constraints, and the requested leg ratio.  The two acute angles
+    at the chamfer are derived from ``atan2``:
+
+        angle_a = degrees(atan2(leg_b, leg_a))   — angle at the leg_a face
+        angle_b = 90° − angle_a                   — angle at the leg_b face
+
+    For ratio_a_to_b == 1.0 both legs are equal and both angles are 45°
+    (equivalent to the symmetric path).
+
+    Parameters
+    ----------
+    edge_geometry : Edge
+        The B-rep edge.  Only its length is used; non-linear edges (arc/NURBS)
+        are accepted but the length defaults to 0.0 and a cautionary note is
+        added to the rationale.
+    application : str, optional
+        Usage context: 'machining' (default), 'sheet_metal', 'cosmetic'.
+        Controls the base leg_b size before the ratio is applied.
+    ratio_a_to_b : float, optional
+        Leg ratio leg_a / leg_b.  Must be > 0.  Default 1.0 gives symmetric
+        45° chamfer.  ratio=2.0 → leg_a = 2·leg_b; ratio=0.5 → leg_a = 0.5·leg_b.
+
+    Returns
+    -------
+    AsymmetricChamferRecommendation
+        Populated dataclass.  applicable=False if the edge is geometrically
+        unsuitable (e.g. non-positive length or ratio <= 0).
+
+    Notes
+    -----
+    * Base leg_b is chosen as the deburring floor (0.5 mm) for 'machining'
+      and 'sheet_metal', and the cosmetic default (1.5 mm) for 'cosmetic'.
+      This provides a safe minimum; callers should override via the ratio to
+      scale both legs proportionally.
+    * Angle convention: the chamfer face makes angle_a with the face adjacent
+      to leg_a, and angle_b with the face adjacent to leg_b.  The angles
+      always satisfy angle_a + angle_b = 90°.
+    * The cap rule limits leg_a to 10× leg_b to avoid degenerate near-flat
+      chamfers.
+    * HONEST: this function sizes legs from first principles (edge length +
+      clearance floor + ratio); it does NOT perform DIN 74 countersink lookup,
+      production cost modelling, or ISO 13715 symbol output.
+
+    References
+    ----------
+    Drozda-Wick Vol.1 §3-7 (edge preparation and deburring floors).
+    ISO 13715:2017 §5 (edge indication — direction convention).
+    """
+    if ratio_a_to_b <= 0.0:
+        return AsymmetricChamferRecommendation(
+            applicable=False,
+            kind="deburring",
+            rationale=f"Not applicable: ratio_a_to_b must be > 0 (got {ratio_a_to_b}).",
+        )
+
+    # Base leg_b: application-dependent minimum
+    if application == "cosmetic":
+        base_leg_b = _COSMETIC_DEFAULT_MM
+        kind = "cosmetic"
+    elif application == "sheet_metal":
+        base_leg_b = _DEBURRING_MIN_MM
+        kind = "deburring"
+    else:  # 'machining' default
+        base_leg_b = _DEBURRING_MIN_MM
+        kind = "manufacturing" if ratio_a_to_b == 1.0 else "manufacturing"
+
+    leg_b = base_leg_b
+    leg_a = ratio_a_to_b * leg_b
+
+    # Degenerate cap: prevent ratio from producing near-flat chamfers (> 10:1)
+    _MAX_RATIO = 10.0
+    if ratio_a_to_b > _MAX_RATIO:
+        leg_a = _MAX_RATIO * leg_b
+        cap_note = (
+            f" (leg_a capped at {_MAX_RATIO}× leg_b to avoid near-flat chamfer)"
+        )
+    else:
+        cap_note = ""
+
+    # Angle computation: atan2(leg_b, leg_a) gives the angle at the leg_a face
+    angle_a_deg = math.degrees(math.atan2(leg_b, leg_a))
+    angle_b_deg = 90.0 - angle_a_deg
+    is_symmetric = abs(leg_a - leg_b) < 1e-9
+
+    rationale_parts = [
+        f"Asymmetric chamfer recommendation (application={application!r}, ratio={ratio_a_to_b}):",
+        f"  Base leg_b = {leg_b:.3f} mm (deburring/cosmetic floor; Drozda-Wick §3-7)",
+        f"  leg_a = ratio × leg_b = {ratio_a_to_b} × {leg_b:.3f} = {leg_a:.3f} mm{cap_note}",
+        f"  angle_a = atan2(leg_b, leg_a) = atan2({leg_b:.3f}, {leg_a:.3f}) = {angle_a_deg:.4f}°",
+        f"  angle_b = 90° − angle_a = {angle_b_deg:.4f}°",
+        f"  is_symmetric = {is_symmetric} (leg_a == leg_b: {abs(leg_a - leg_b) < 1e-9})",
+        "  Angle convention: angle_a is at the leg_a-face junction; "
+        "angle_b at the leg_b-face junction; angle_a + angle_b = 90° exactly.",
+        "  HONEST: legs sized from first principles (floor + ratio); "
+        "no DIN 74 countersink lookup; no production cost modelling; "
+        "no ISO 13715 symbol output.  (Drozda-Wick §3-7; ISO 13715:2017 §5)",
+    ]
+
+    return AsymmetricChamferRecommendation(
+        leg_a_mm=round(leg_a, 6),
+        leg_b_mm=round(leg_b, 6),
+        angle_a_deg=round(angle_a_deg, 6),
+        angle_b_deg=round(angle_b_deg, 6),
+        is_symmetric=is_symmetric,
+        kind=kind,
+        rationale="\n".join(rationale_parts),
+        applicable=True,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Core recommendation
 # ---------------------------------------------------------------------------
 
@@ -295,6 +479,7 @@ def recommend_chamfer_size(
     edge: Edge,
     faces: Sequence[Face],
     context: Optional[ChamferContext] = None,
+    ratio: float = 1.0,
 ) -> ChamferRecommendation:
     """Recommend chamfer offset and angle for a single B-rep edge.
 
@@ -306,18 +491,28 @@ def recommend_chamfer_size(
         The two faces adjacent to the edge.
     context : ChamferContext, optional
         Material, operation, tooling, and visibility context.
+    ratio : float, optional
+        Leg ratio leg_a / leg_b.  Default 1.0 gives the symmetric 45° path
+        (backward compatible).  When ratio != 1.0 the function delegates to
+        ``recommend_asymmetric_chamfer()`` and wraps the result into a
+        ChamferRecommendation with offset_mm = leg_b_mm (the shorter leg) and
+        angle_deg = angle_a_deg from the asymmetric result.
 
     Returns
     -------
     ChamferRecommendation
         offset_mm=0.0 and applicable=False if chamfer is not recommended.
+        When ratio != 1.0, offset_mm holds the shorter leg (leg_b_mm) so
+        that existing callers treating offset_mm as a conservative dimension
+        remain safe.
 
     Notes
     -----
     Honest limitations:
     * No production cost modelling (tool changes, setup time).  See HONEST-FLAG.
     * DIN 74 lookup uses nominal hole diameter only — no tolerancing.
-    * All chamfers are 45° (equal leg); asymmetric angles are out of scope.
+    * Default angle is 45° (equal leg).  Asymmetric chamfers (e.g. 30°×60°)
+      are supported via ratio != 1.0, which calls recommend_asymmetric_chamfer().
     * Sheet-metal deburring floor is 0.5 mm regardless of burr height model.
     * ISO 13715:2017 symbol output is not produced here.
 
@@ -328,6 +523,20 @@ def recommend_chamfer_size(
     ISO 13715:2017 §5 (edge indication).
     Boothroyd-Dewhurst 2002 §4 (chamfer DFM).
     """
+    # Delegate to asymmetric path when ratio != 1.0
+    if ratio != 1.0:
+        asym = recommend_asymmetric_chamfer(edge, application="machining", ratio_a_to_b=ratio)
+        return ChamferRecommendation(
+            edge_index=asym.edge_index,
+            offset_mm=round(asym.leg_b_mm, 4),
+            angle_deg=round(asym.angle_a_deg, 6),
+            kind=asym.kind,
+            rationale=asym.rationale,
+            din_reference="",
+            applicable=asym.applicable,
+            criteria_offsets={},
+        )
+
     ctx = context if context is not None else ChamferContext()
 
     # Non-linear edges: skip (e.g. arcs, NURBS — variable-offset chamfer needed)

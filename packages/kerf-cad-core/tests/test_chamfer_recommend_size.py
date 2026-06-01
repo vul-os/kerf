@@ -21,10 +21,12 @@ import math
 import pytest
 
 from kerf_cad_core.geom.chamfer_recommend_size import (
+    AsymmetricChamferRecommendation,
     ChamferContext,
     ChamferRecommendation,
     DIN74_COUNTERSINK_TABLE,
     DIN74_FORMB_TABLE,
+    recommend_asymmetric_chamfer,
     recommend_chamfer_size,
     recommend_chamfer_sizes_for_body,
     _din74_lookup,
@@ -396,3 +398,157 @@ class TestCriteriaOffsets:
         rec = recommend_chamfer_size(edge, faces, ctx)
         # 6mm mill → 3.0 mm offset
         assert abs(rec.criteria_offsets["manufacturing"] - 3.0) < 1e-9
+
+
+# ---------------------------------------------------------------------------
+# Asymmetric chamfer — recommend_asymmetric_chamfer()
+# ---------------------------------------------------------------------------
+
+
+class TestAsymmetricChamfer:
+    """Tests for recommend_asymmetric_chamfer() and the ratio= path."""
+
+    def _edge(self):
+        body = _box_body()
+        for e in body.all_edges():
+            from kerf_cad_core.geom.brep import Line3
+            if isinstance(e.curve, Line3):
+                return e
+        raise RuntimeError("no linear edge")
+
+    # ------------------------------------------------------------------
+    # Test 1: ratio=1.0 gives symmetric 45° result
+    # ------------------------------------------------------------------
+    def test_ratio_1_is_symmetric(self):
+        edge = self._edge()
+        rec = recommend_asymmetric_chamfer(edge, ratio_a_to_b=1.0)
+        assert rec.applicable
+        assert rec.is_symmetric
+        assert abs(rec.leg_a_mm - rec.leg_b_mm) < 1e-9
+        assert abs(rec.angle_a_deg - 45.0) < 1e-9
+        assert abs(rec.angle_b_deg - 45.0) < 1e-9
+
+    # ------------------------------------------------------------------
+    # Test 2: ratio=2.0 → leg_a = 2 × leg_b
+    # ------------------------------------------------------------------
+    def test_ratio_2_legs(self):
+        edge = self._edge()
+        rec = recommend_asymmetric_chamfer(edge, ratio_a_to_b=2.0)
+        assert rec.applicable
+        assert not rec.is_symmetric
+        assert abs(rec.leg_a_mm - 2.0 * rec.leg_b_mm) < 1e-9
+
+    # ------------------------------------------------------------------
+    # Test 3: ratio=0.5 → leg_b = 2 × leg_a
+    # ------------------------------------------------------------------
+    def test_ratio_0_5_legs(self):
+        edge = self._edge()
+        rec = recommend_asymmetric_chamfer(edge, ratio_a_to_b=0.5)
+        assert rec.applicable
+        assert not rec.is_symmetric
+        # leg_a = 0.5 * leg_b  →  leg_b = 2 * leg_a
+        assert abs(rec.leg_b_mm - 2.0 * rec.leg_a_mm) < 1e-9
+
+    # ------------------------------------------------------------------
+    # Test 4: angle computation — atan2(leg_b, leg_a)
+    # ------------------------------------------------------------------
+    def test_angle_computation_ratio_2(self):
+        edge = self._edge()
+        rec = recommend_asymmetric_chamfer(edge, ratio_a_to_b=2.0)
+        expected_a = math.degrees(math.atan2(rec.leg_b_mm, rec.leg_a_mm))
+        assert abs(rec.angle_a_deg - expected_a) < 1e-6
+
+    def test_angle_computation_ratio_0_5(self):
+        edge = self._edge()
+        rec = recommend_asymmetric_chamfer(edge, ratio_a_to_b=0.5)
+        expected_a = math.degrees(math.atan2(rec.leg_b_mm, rec.leg_a_mm))
+        assert abs(rec.angle_a_deg - expected_a) < 1e-6
+
+    # ------------------------------------------------------------------
+    # Test 5: angles always sum to 90°
+    # ------------------------------------------------------------------
+    def test_angles_sum_to_90(self):
+        edge = self._edge()
+        for ratio in [0.25, 0.5, 1.0, 2.0, 4.0]:
+            rec = recommend_asymmetric_chamfer(edge, ratio_a_to_b=ratio)
+            assert abs(rec.angle_a_deg + rec.angle_b_deg - 90.0) < 1e-9, (
+                f"ratio={ratio}: angles {rec.angle_a_deg} + {rec.angle_b_deg} != 90"
+            )
+
+    # ------------------------------------------------------------------
+    # Test 6: invalid ratio <= 0 → applicable=False
+    # ------------------------------------------------------------------
+    def test_invalid_ratio_zero(self):
+        edge = self._edge()
+        rec = recommend_asymmetric_chamfer(edge, ratio_a_to_b=0.0)
+        assert not rec.applicable
+
+    def test_invalid_ratio_negative(self):
+        edge = self._edge()
+        rec = recommend_asymmetric_chamfer(edge, ratio_a_to_b=-1.5)
+        assert not rec.applicable
+
+    # ------------------------------------------------------------------
+    # Test 7: ratio cap — ratio > 10 clips to 10
+    # ------------------------------------------------------------------
+    def test_ratio_cap_at_10(self):
+        edge = self._edge()
+        rec = recommend_asymmetric_chamfer(edge, ratio_a_to_b=100.0)
+        assert rec.applicable
+        # Must be capped: leg_a <= 10 * leg_b
+        assert rec.leg_a_mm <= 10.0 * rec.leg_b_mm + 1e-9
+
+    # ------------------------------------------------------------------
+    # Test 8: recommend_chamfer_size with ratio=2.0 delegates to asymmetric
+    # ------------------------------------------------------------------
+    def test_recommend_chamfer_size_ratio_2_delegates(self):
+        body = _box_body()
+        edge, faces = _first_linear_edge_and_faces(body)
+        rec = recommend_chamfer_size(edge, faces, ratio=2.0)
+        assert isinstance(rec, ChamferRecommendation)
+        assert rec.applicable
+        # angle_deg should be < 45 (because leg_a > leg_b, angle_a < 45)
+        assert rec.angle_deg < 45.0
+
+    # ------------------------------------------------------------------
+    # Test 9: backward compat — old API call (no ratio) still symmetric
+    # ------------------------------------------------------------------
+    def test_backward_compat_no_ratio(self):
+        body = _box_body()
+        edge, faces = _first_linear_edge_and_faces(body)
+        ctx = ChamferContext(hole_diameter_mm=3.0, din74_form="A")
+        rec = recommend_chamfer_size(edge, faces, ctx)
+        # No ratio arg → symmetric 45°
+        assert abs(rec.angle_deg - 45.0) < 1e-9
+        assert rec.kind == "countersink"
+
+    # ------------------------------------------------------------------
+    # Test 10: AsymmetricChamferRecommendation dataclass defaults
+    # ------------------------------------------------------------------
+    def test_asymmetric_dataclass_defaults(self):
+        rec = AsymmetricChamferRecommendation()
+        assert rec.leg_a_mm == 0.0
+        assert rec.leg_b_mm == 0.0
+        assert abs(rec.angle_a_deg - 45.0) < 1e-9
+        assert abs(rec.angle_b_deg - 45.0) < 1e-9
+        assert rec.is_symmetric is True
+        assert rec.applicable is True
+
+    # ------------------------------------------------------------------
+    # Test 11: application='cosmetic' uses cosmetic base leg
+    # ------------------------------------------------------------------
+    def test_cosmetic_application_base_leg(self):
+        edge = self._edge()
+        rec = recommend_asymmetric_chamfer(edge, application="cosmetic", ratio_a_to_b=1.0)
+        assert rec.applicable
+        # cosmetic base = 1.5 mm
+        assert abs(rec.leg_b_mm - 1.5) < 1e-9
+        assert abs(rec.leg_a_mm - 1.5) < 1e-9
+
+    # ------------------------------------------------------------------
+    # Test 12: rationale cites Drozda-Wick
+    # ------------------------------------------------------------------
+    def test_rationale_cites_drozda(self):
+        edge = self._edge()
+        rec = recommend_asymmetric_chamfer(edge, ratio_a_to_b=2.0)
+        assert "Drozda" in rec.rationale or "ISO 13715" in rec.rationale

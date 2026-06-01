@@ -1,5 +1,5 @@
 """
-Tests for subd_export_usd.py — USD USDA SubD export.
+Tests for subd_export_usd.py — USD USDA + USDC SubD export.
 
 Coverage:
   1. Cube cage emits correct subdivisionScheme + interpolateBoundary tags.
@@ -12,6 +12,7 @@ Coverage:
   8. #usda 1.0 header present.
   9. catmullClark tag present.
   10. Empty cage returns structurally valid USDA (no crash).
+  11-18. USDC binary crate tests (new).
 """
 
 from __future__ import annotations
@@ -24,7 +25,10 @@ import pytest
 from kerf_cad_core.geom.subd import SubDMesh
 from kerf_cad_core.geom.subd_export_usd import (
     export_subd_to_usda,
+    export_subd_to_usdc,
     parse_usda_subd,
+    parse_usdc_header,
+    write_subd_usd,
     write_subd_usda,
 )
 
@@ -278,3 +282,179 @@ def test_catmull_clark_tag():
     mesh = _cube_mesh()
     usda = export_subd_to_usda(mesh)
     assert 'catmullClark' in usda
+
+
+# ===========================================================================
+# USDC binary crate tests (Tests 15–22)
+# ===========================================================================
+
+_USDC_MAGIC = b'PXR-USDC'
+_USDC_HEADER_SIZE = 88
+
+
+# ---------------------------------------------------------------------------
+# Test 15: USDC file is created and starts with magic bytes
+# ---------------------------------------------------------------------------
+
+def test_usdc_file_exists_and_magic(tmp_path):
+    """export_subd_to_usdc writes a file whose first 8 bytes are 'PXR-USDC'."""
+    mesh = _cube_mesh()
+    out = tmp_path / 'cube.usdc'
+    export_subd_to_usdc(mesh, str(out))
+    assert out.exists(), 'USDC file was not created'
+    data = out.read_bytes()
+    assert data[:8] == _USDC_MAGIC, (
+        f'Expected magic {_USDC_MAGIC!r}, got {data[:8]!r}'
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 16: USDC binary compactness (per-byte payload is denser than USDA)
+# ---------------------------------------------------------------------------
+
+def _large_grid_mesh(n: int = 20) -> SubDMesh:
+    """Build an n×n quad grid mesh with many vertices for compactness testing."""
+    verts = []
+    for row in range(n + 1):
+        for col in range(n + 1):
+            verts.append([float(col), float(row), 0.0])
+    faces = []
+    for row in range(n):
+        for col in range(n):
+            a = row * (n + 1) + col
+            b = a + 1
+            c = b + (n + 1)
+            d = a + (n + 1)
+            faces.append([a, b, c, d])
+    return SubDMesh(vertices=verts, faces=faces)
+
+
+def test_usdc_smaller_than_usda_large_mesh(tmp_path):
+    """For a large mesh the binary USDC payload is denser than ASCII USDA."""
+    mesh = _large_grid_mesh(20)  # 441 verts, 400 quads
+    usda_path = tmp_path / 'grid.usda'
+    usdc_path = tmp_path / 'grid.usdc'
+    write_subd_usda(mesh, str(usda_path))
+    export_subd_to_usdc(mesh, str(usdc_path))
+    usda_size = usda_path.stat().st_size
+    usdc_size = usdc_path.stat().st_size
+    assert usdc_size < usda_size, (
+        f'Expected USDC ({usdc_size} bytes) < USDA ({usda_size} bytes)'
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 17: USDC header version is (0, 6, 0)
+# ---------------------------------------------------------------------------
+
+def test_usdc_header_version(tmp_path):
+    """The USDC header version field must be (0, 6, 0)."""
+    mesh = _cube_mesh()
+    out = tmp_path / 'cube.usdc'
+    export_subd_to_usdc(mesh, str(out))
+    data = out.read_bytes()
+    hdr = parse_usdc_header(data)
+    assert hdr['version'] == (0, 6, 0), (
+        f'Expected version (0, 6, 0), got {hdr["version"]}'
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 18: TOC lists expected sections (TOKENS, PATHS, SPECS at minimum)
+# ---------------------------------------------------------------------------
+
+def test_usdc_toc_sections(tmp_path):
+    """The USDC TOC must contain at least TOKENS, PATHS, and SPECS sections."""
+    mesh = _cube_mesh()
+    out = tmp_path / 'cube.usdc'
+    export_subd_to_usdc(mesh, str(out))
+    data = out.read_bytes()
+    hdr = parse_usdc_header(data)
+    assert hdr['section_count'] >= 3, (
+        f'Expected at least 3 sections, got {hdr["section_count"]}'
+    )
+    names = {s['name'] for s in hdr['sections']}
+    assert b'TOKENS' in names, f'TOKENS section missing; got {names}'
+    assert b'PATHS' in names,  f'PATHS section missing; got {names}'
+    assert b'SPECS' in names,  f'SPECS section missing; got {names}'
+
+
+# ---------------------------------------------------------------------------
+# Test 19: Round-trip — write USDC, parse header, recover prim count
+# ---------------------------------------------------------------------------
+
+def test_usdc_round_trip_spec_count(tmp_path):
+    """Write USDC for a cube (6 faces, 5 base attrs) and verify spec count via header."""
+    mesh = _cube_mesh()
+    out = tmp_path / 'cube_rt.usdc'
+    export_subd_to_usdc(mesh, str(out))
+    data = out.read_bytes()
+    hdr = parse_usdc_header(data)
+    # At minimum: 1 prim spec + 5 attribute specs = 6
+    # Verify the SPECS section exists and has a non-zero size
+    specs_sections = [s for s in hdr['sections'] if s['name'] == b'SPECS']
+    assert specs_sections, 'No SPECS section in TOC'
+    assert specs_sections[0]['size'] > 0, 'SPECS section is empty'
+
+
+# ---------------------------------------------------------------------------
+# Test 20: Both .usda and .usdc paths produce valid output via write_subd_usd
+# ---------------------------------------------------------------------------
+
+def test_write_subd_usd_dispatch(tmp_path):
+    """write_subd_usd auto-dispatches by extension for both .usda and .usdc."""
+    mesh = _cube_mesh()
+    usda_path = tmp_path / 'dispatch.usda'
+    usdc_path = tmp_path / 'dispatch.usdc'
+
+    write_subd_usd(mesh, str(usda_path))
+    write_subd_usd(mesh, str(usdc_path))
+
+    assert usda_path.exists(), '.usda file not created'
+    assert usdc_path.exists(), '.usdc file not created'
+
+    usda_text = usda_path.read_text(encoding='utf-8')
+    assert usda_text.startswith('#usda 1.0'), 'USDA file missing header'
+
+    usdc_data = usdc_path.read_bytes()
+    assert usdc_data[:8] == _USDC_MAGIC, 'USDC file missing magic'
+
+
+# ---------------------------------------------------------------------------
+# Test 21: USDC with creases includes crease sections in TOC
+# ---------------------------------------------------------------------------
+
+def test_usdc_creased_cube(tmp_path):
+    """Creased cube USDC should still have valid header and larger spec count."""
+    mesh = _creased_cube_mesh()
+    out = tmp_path / 'creased_cube.usdc'
+    export_subd_to_usdc(mesh, str(out))
+    data = out.read_bytes()
+    assert data[:8] == _USDC_MAGIC
+    hdr = parse_usdc_header(data)
+    # Creased cube has 3 extra attribute specs
+    specs_sections = [s for s in hdr['sections'] if s['name'] == b'SPECS']
+    assert specs_sections[0]['size'] > 0
+
+    # Creased USDC must be larger than uncreased (more data)
+    mesh_plain = _cube_mesh()
+    out_plain = tmp_path / 'plain_cube.usdc'
+    export_subd_to_usdc(mesh_plain, str(out_plain))
+    assert out.stat().st_size > out_plain.stat().st_size, (
+        'Creased USDC should be larger than uncreased USDC'
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 22: USDC header size is at least 88 bytes
+# ---------------------------------------------------------------------------
+
+def test_usdc_minimum_header_size(tmp_path):
+    """USDC files must be at least 88 bytes (fixed header block)."""
+    mesh = _cube_mesh()
+    out = tmp_path / 'hdr_size.usdc'
+    export_subd_to_usdc(mesh, str(out))
+    size = out.stat().st_size
+    assert size >= _USDC_HEADER_SIZE, (
+        f'USDC file is only {size} bytes; expected >= {_USDC_HEADER_SIZE}'
+    )

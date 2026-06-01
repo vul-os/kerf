@@ -1,6 +1,6 @@
 """Regression: migration runner CLI must accept DATABASE_URL env fallback.
 
-The Koyeb pre-deploy migration job (scripts/deploy-koyeb.sh) relies on the
+The pre-deploy migration step in fly.toml (`release_command`) relies on the
 runner reading the DSN from the environment — it can't inject secrets directly
 into the command string. We moved migrations into this pre-deploy hook to
 fix the race where in-process workers booted and crashed on UndefinedTableError

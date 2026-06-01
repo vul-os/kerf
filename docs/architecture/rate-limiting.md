@@ -2,9 +2,8 @@
 
 ## Why Postgres-first
 
-Kerf deploys as a single Koyeb service group. All app servers share the
-same managed Postgres instance already used for every other stateful
-operation. Adding Postgres-backed rate limiting requires:
+Kerf deploys as a Fly.io service. All app servers share the same managed
+Neon Postgres instance already used for every other stateful operation. Adding Postgres-backed rate limiting requires:
 
 - One new table (`rate_limit_buckets`, ~200 bytes per active bucket),
 - One UPSERT per rate-limited request,
@@ -63,8 +62,8 @@ RETURNING count;
 | `POST /api/projects/{pid}/files/{fid}/photos` | 60 | 60 s | user_id |
 | `POST /api/projects/{pid}/git/push` | 10 | 60 s | project_id |
 
-IP is taken from the `X-Forwarded-For` header (set by Koyeb's reverse
-proxy / nginx); if absent, the raw `request.client.host` is used.
+IP is taken from the `X-Forwarded-For` header (set by Fly.io's reverse
+proxy); if absent, the raw `request.client.host` is used.
 
 ---
 
@@ -120,8 +119,8 @@ Operational signals that justify adding a managed Redis (e.g. Upstash Redis):
 
 ### Migration path (same call site)
 
-1. Add `upstash_redis_url` to settings and the Koyeb service env vars
-   (via `koyeb secrets create` or the Koyeb dashboard).
+1. Add `upstash_redis_url` to settings and the Fly.io app secrets
+   (via `fly secrets set REDIS_URL=...`).
 2. Implement `kerf_core.rate_limit_redis.enforce(client, key, ...)` with
    the same signature as the Postgres `enforce`.
 3. In `kerf_core/rate_limit.py`, check a feature flag / env var and
@@ -132,6 +131,6 @@ Operational signals that justify adding a managed Redis (e.g. Upstash Redis):
 #### Managed Redis options
 
 - **Upstash Redis** — serverless Redis with a free tier; works from any
-  host including Koyeb. See https://upstash.com/docs/redis/overall/getstarted.
-- **Koyeb managed Redis** — if your provider offers a Redis addon, add it
-  via the Koyeb dashboard and inject the `REDIS_URL` as a secret.
+  host. See https://upstash.com/docs/redis/overall/getstarted.
+- **Fly.io Redis add-on** — Fly offers an Upstash Redis integration;
+  inject `REDIS_URL` via `fly secrets set`.

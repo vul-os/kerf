@@ -15,9 +15,9 @@ _Anchored at commit `ccb91c8` — 2026-05-19_
   wired to any HTTP endpoint yet, but it **will break** the moment a second instance
   is added or presence is exposed.
 
-  > This audit was written against the Koyeb deployment (`koyeb.yaml`).
-  > The multi-instance safety analysis below applies to any horizontally-scaled
-  > container deployment.
+  > This audit was written against a horizontally-scaled container deployment.
+  > The multi-instance safety analysis below applies equally to Fly.io or any
+  > container platform.
 
 - **IndexedDB save status: IMPLEMENTED but not wired to editors.** `localStash`,
   `autosaveScheduler`, and `dirtyStore` are fully coded and tested. `reconcile()` is
@@ -45,36 +45,18 @@ _Anchored at commit `ccb91c8` — 2026-05-19_
 
 ## 1 — Multi-instance Safety
 
-### Koyeb service config (current hosted tier)
+### Fly.io service config (current hosted tier)
 
-Kerf runs on Koyeb with a single `web` service instance by default.
-Koyeb scales horizontally by adding replicas; the same multi-instance
+Kerf runs on Fly.io (`fra` region) with a single machine by default.
+Fly scales horizontally by adding machines; the same multi-instance
 safety properties described below apply regardless of the number of
-replicas.
+machines.
 
-Key Koyeb knobs to review when scaling:
-- **Replicas**: set via the Koyeb dashboard or `koyeb service update --replicas N`.
-- **Health check path**: `/healthz` — Koyeb routes traffic only to healthy instances.
+Key Fly.io knobs to review when scaling:
+- **Machine count**: set via `fly scale count N` or `fly.toml` `[http_service].min_machines_running`.
+- **Health check path**: `/healthz` — Fly routes traffic only to healthy machines.
 - **No sticky-session config by default**: requests are round-robined across
-  replicas. Do not rely on in-process state surviving across requests.
-
-### koyeb.yaml audit
-
-```yaml
-# koyeb.yaml (relevant scaling fields)
-# replicas: 1          # single replica by default
-# min_scale: 1
-# max_scale: 3         # autoscale up to 3 on concurrency
-```
-
-- `min_scale: 1` → one replica kept running at all times; Koyeb autoscales
-  up under concurrency pressure up to `max_scale`.
-- **No sticky-session config by default**: Koyeb round-robins requests across
-  replicas. Do not rely on in-process state surviving across requests.
-- **Health check**: `/healthz` — Koyeb routes traffic only to healthy replicas.
-
-**Today** only one replica is realistic for the current traffic level, but
-Koyeb _can_ add a replica on concurrency spikes and the config does not prevent it.
+  machines. Do not rely on in-process state surviving across requests.
 
 ### In-memory state audit
 
@@ -113,7 +95,7 @@ as a stub: _"In production it would be backed by Redis pub/sub or a WebSocket fa
 JWT tokens are stateless. There are no in-memory caches that differ between
 instances, no WebSocket fan-out, no SSE persistent connections.
 
-**Risk window:** If the Koyeb autoscaler adds a second replica, requests will be
+**Risk window:** If a second Fly machine is added, requests will be
 round-robined without affinity. This is safe for current features, but the
 `auto_commit_loop` and `_sweep_loop` tasks will each run on every instance —
 wasted work, not corruption, because Postgres constraints make both idempotent.
@@ -121,14 +103,14 @@ wasted work, not corruption, because Postgres constraints make both idempotent.
 ### What would need to change for presence/cursor-sharing
 
 - `PresenceChannel` must be backed by **Redis pub/sub** (e.g. Upstash Redis, or
-  a managed Redis on Koyeb) rather than an in-process dict.
+  a managed Redis add-on) rather than an in-process dict.
 - Presence events must be pushed to clients via a persistent transport. The
   current `StreamingResponse` usages are one-shot downloads, not SSE streams.
   Real-time delivery would require a new SSE or WebSocket endpoint on the server
   plus a frontend EventSource/WebSocket connection.
 - Until that transport exists, a second instance means cursor events are silently
   dropped (they'd reach subscribers on the same instance only).
-- Sticky sessions (Koyeb session-affinity header) could be a short-term
+- Sticky sessions (via a load-balancer affinity header) could be a short-term
   workaround if presence is collocated with a long-lived SSE connection per
   user, but that breaks horizontal scale.
 
@@ -310,9 +292,9 @@ absent.
 5. **Redis-back `PresenceChannel` before enabling presence** — when cursor-sharing
    is added, replace the in-process `_slots`/`_subscribers` dicts with a Redis
    pub/sub channel keyed by `project_id`. Do this before enabling auto-scale
-   beyond 1 replica on Koyeb.
+   beyond 1 Fly machine.
 
-6. **Duplicate auto_commit/sweep_loop work on multi-instance** — if/when replica
-   count is raised above 1 on Koyeb, consider a Postgres advisory lock to avoid N
+6. **Duplicate auto_commit/sweep_loop work on multi-instance** — if/when machine
+   count is raised above 1 on Fly, consider a Postgres advisory lock to avoid N
    instances each polling all workspaces every 60 s. Not a correctness issue
    today, but will become noisy at scale.

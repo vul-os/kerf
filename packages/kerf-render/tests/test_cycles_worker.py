@@ -170,7 +170,7 @@ def test_write_output_s3_mode_not_a_local_path(tmp_path, monkeypatch):
     result = _write_output(cfg, "render123", "png", b"X")
     assert not result.startswith("/tmp"), (
         "S3 mode must not return a local /tmp path — "
-        f"ephemeral filesystem on Koyeb. Got: {result}"
+        f"ephemeral filesystem on the app server. Got: {result}"
     )
 
 

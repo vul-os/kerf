@@ -736,3 +736,29 @@ email. Specific choices:
 `ROADMAP.md` §7, `CHANGELOG.md`,
 `packages/kerf-pricing/llm_docs/pricing.md` (GPU rate table updated to
 RunPod), `decisions.md` (this entry).
+
+## 2026-06-01 — Koyeb migration withdrawn; Fly.io is the permanent home
+
+**Context:** T-400…T-410 added Koyeb config, deploy scripts, GPU billing
+rates, and code branches. T-405 (DNS cutover) was never executed.
+
+**Decision:** Withdraw the Koyeb migration in full. Remove all Koyeb
+config files (`koyeb.yaml`, `koyeb.worker.yaml`, `scripts/deploy-koyeb.sh`,
+`test_koyeb_predeploy_migration.py`) and every in-code Koyeb reference.
+Fly.io (`fra` region) remains the sole compute platform. Future GPU handoff
+will be via **RunPod Serverless** or **Modal** — decision pending; the
+architectural seam in `kerf_render.dispatch.select_gpu_sku()` is ready;
+the backend implementation is deferred until GPU demand justifies it.
+
+**Why:** The Koyeb migration was triggered by GPU access; that concern is
+resolved via RunPod/Modal handoff, which keeps Fly as the stateless
+application tier and GPU as a pure side-car. Platform unification (fewer
+vendors, simpler deploys, Fly's existing secrets/DNS/cert management)
+outweighs any Koyeb advantage now that GPU is decoupled.
+
+**Affected:** `koyeb.yaml` (deleted), `koyeb.worker.yaml` (deleted),
+`scripts/deploy-koyeb.sh` (deleted),
+`packages/kerf-core/tests/test_koyeb_predeploy_migration.py` (deleted),
+`docs/architecture/stack.md` (new — canonical stack doc),
+plus in-code comment sweeps across kerf-render, kerf-workers, kerf-api,
+kerf-core, scripts, docs, and src/routes.

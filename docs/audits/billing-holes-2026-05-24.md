@@ -32,8 +32,8 @@
 >   Postgres-stays-Neon decision (`32db4b54`).
 > Nothing from this audit remains open.
 
-**Context.** Pre-Koyeb-cutover audit ([T-401 in `tasks.md`](../../tasks.md),
-[ROADMAP § 7.1](../../ROADMAP.md#71--flyio--koyeb-p0-2026-05-24)).
+**Context.** Billing audit run 2026-05-24 ([T-401 in `tasks.md`](../../tasks.md),
+[ROADMAP § 7.1](../../ROADMAP.md)).
 
 Three Sonnet sub-agents read non-overlapping slices of the billing
 surface in parallel:
@@ -53,7 +53,7 @@ two agents — those are the highest-confidence holes.
 
 ## Findings — by severity
 
-### P0 — must fix before Koyeb cutover (revenue loss today)
+### P0 — revenue loss (all fixed 2026-05-24)
 
 | # | File:line | Hole | Found by |
 |---|---|---|---|
@@ -85,7 +85,7 @@ two agents — those are the highest-confidence holes.
 | **R16** | `packages/kerf-chat/src/kerf_chat/llm.py:295-313` | Expensive models in the catalogue (`gpt-4o`, `o3-mini`, etc.) have no explicit `paid_only` flag. UI relies entirely on the backend gate to block free-tier; a frontend bug or a direct API call routes through `pick_bucket` unsafely. Add an explicit `paid_only: bool` so the UI can disable them client-side. | Agent 2 |
 | **R17** | `packages/kerf-auth/src/kerf_auth/routes.py:396-416` | `/auth/forgot-password` has no rate limit. Compare `/register` (5/hr) and `/login` (10/min). Anonymous high-throughput endpoint that triggers transactional email cost. | Agent 2 |
 | **R18** | `packages/kerf-api/src/kerf_api/routes.py:3000, :3351` | Chat endpoints rate-limit `key_prefix="api:messages"` — confirm this keys off `user_id` (JWT sub) for authenticated requests, not just IP. Shared NAT / rotating IPs otherwise game the limit. | Agent 2 |
-| **R19** | `packages/kerf-render/src/kerf_render/cycles_worker.py:173-187` | Render output writes to local filesystem (`/tmp/kerf_render_cache`) and the "signed URL" is a local path. On Koyeb the file is lost on restart; serving via the app proxy means every render download is outbound bandwidth we pay for. | Agent 3 |
+| **R19** | `packages/kerf-render/src/kerf_render/cycles_worker.py:173-187` | Render output writes to local filesystem (`/tmp/kerf_render_cache`) and the "signed URL" is a local path. On Fly.io the file is lost on restart; serving via the app proxy means every render download is outbound bandwidth we pay for. | Agent 3 |
 | **R20** | `packages/kerf-cloud/src/kerf_cloud/usage.py:58-76` | `record_storage_event` writes the event row but the matching `cloud_debit_balance` call is not in the same transaction (compare `record_token_event` at :27). A crash between INSERT and debit leaves the event recorded but the balance untouched. | Agent 3 |
 | **R21** | `packages/kerf-billing/src/kerf_billing/blob_gc.py:305-308` | `BlobGCWorker` defaults to `dry_run=True` from env. Without `BLOB_GC_DRY_RUN=false` explicitly set, deleted blobs are never physically removed from Tigris. Combined with R3 this means physical storage grows even when bytes are GC-eligible. Ops setting. | Agent 3 |
 | **R22** | `packages/kerf-api/src/kerf_api/routes.py:2963-2991, :6316-6337, :6421-6436` | Auto-title (`_auto_title_thread`), `workshop_publish` README-gen, and `workshop_regenerate_readme` call Anthropic using the server key with no `commit_spend` call. Operator-cost LLM (haiku, low rate) but unbounded across workshop publish volume and invisible on the spend ledger. | Agent 1 |
@@ -145,7 +145,7 @@ subscriptions. GPU renders and storage growth are both $0 revenue
 today, even though Cycles already runs in production. Fixing R1–R3
 moves the hosted tier from "subscription-revenue only" to "subscription
 + per-render + per-GB" — directly improving the break-even target in
-[ROADMAP § 7.1](../../ROADMAP.md#71--flyio--koyeb-p0-2026-05-24).
+[ROADMAP § 7.1](../../ROADMAP.md).
 
 ## Methodology
 

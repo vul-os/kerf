@@ -3,8 +3,8 @@
 # loop_main.sh — GATED main/production-environment cycle.
 #
 # Mirrors loop_dev.sh but operates against MAIN (production):
-#   .env.main + kerf-prod Koyeb service.  This is a destructive script: it
-#   drops and recreates the prod Neon schema and triggers a Koyeb deploy.
+#   .env.main + kerf-prod Fly.io app. This is a destructive script: it
+#   drops and recreates the prod Neon schema and triggers a Fly deploy.
 #   It is the prod equivalent of loop_dev.sh.
 #
 # Usage:
@@ -13,8 +13,8 @@
 # Steps (only with --yes):
 #   1. Read DATABASE_URL from .env.main (without echoing it)
 #   2. DROP + recreate the prod Neon schema
-#   3. Deploy to Koyeb prod via  scripts/deploy-koyeb.sh  (runs migrations
-#      via the pre_deploy_command defined in koyeb.yaml)
+#   3. Deploy to Fly.io prod via  scripts/deploy-fly.sh  (runs migrations
+#      via the release_command defined in fly.toml)
 #   4. Smoke: curl /healthz + one API smoke hit
 #   5. Report
 #
@@ -26,8 +26,7 @@
 #
 # Prereqs:
 #   - .env.main exists (cp .env.z.example .env.main)
-#   - koyeb CLI installed and authenticated (`koyeb login`)
-#   - KOYEB_TOKEN set in environment or ~/.koyeb/config.yaml
+#   - flyctl installed and authenticated (`fly auth login`)
 
 set -uo pipefail
 _REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -43,7 +42,7 @@ if [[ "$YES" != "true" ]]; then
   echo "loop_main.sh: no-op. Pass --yes to proceed with the PROD cycle."
   echo ""
   echo "  CAUTION: this script drops and recreates the PRODUCTION Neon schema"
-  echo "  and triggers a Koyeb deploy of kerf-prod. It requires explicit"
+  echo "  and triggers a Fly.io deploy of kerf-prod. It requires explicit"
   echo "  opt-in. All production data is destroyed."
   echo ""
   echo "  Usage: ./scripts/loop_main.sh --yes"
@@ -76,13 +75,14 @@ if echo "$DATABASE_URL" | grep -qiE "(localhost|127\.0\.0\.1|kerf-dev|/dev|-dev\
   exit 1
 fi
 
-PROD_APP_NAME="kerf-prod"
+PROD_APP_NAME="${FLY_APP_NAME:-kerf-prod}"
+PROD_BASE_URL="https://${PROD_APP_NAME}.fly.dev"
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  loop_main.sh  [--yes confirmed]"
 echo "  env file : $ENV_FILE  (secrets not echoed)"
-echo "  koyeb app: $PROD_APP_NAME"
+echo "  fly app  : $PROD_APP_NAME"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # ── 1. DROP + recreate prod schema ───────────────────────────────────────────
@@ -90,20 +90,14 @@ echo ""
 echo "▸ dropping and recreating public schema on prod Neon …"
 psql "$DATABASE_URL" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;" 1>&2
 
-# ── 2. Deploy to Koyeb main (runs migrations via pre_deploy_command) ─────────
-# deploy-koyeb.sh has an interactive `PRODUCTION deploy ... continue? (yes/no)`
-# gate; loop_main.sh's own --yes already serves as the explicit opt-in, so we
-# pipe "yes" through to satisfy it. The --yes gate above is the user's actual
-# confirmation point.
+# ── 2. Deploy to Fly.io main (runs migrations via release_command in fly.toml) ──
 echo ""
-echo "▸ deploying to Koyeb main via scripts/deploy-koyeb.sh …"
-"$_REPO_ROOT/scripts/deploy-koyeb.sh" <<< "yes"
+echo "▸ deploying to Fly.io main via scripts/deploy-fly.sh …"
+"$_REPO_ROOT/scripts/deploy-fly.sh"
 
 # ── 3. Smoke: health + one API hit ───────────────────────────────────────────
 echo ""
 echo "▸ smoke checks …"
-
-PROD_BASE_URL="https://${PROD_APP_NAME}.koyeb.app"
 
 HEALTH_OK=false
 for i in $(seq 1 6); do
@@ -132,5 +126,5 @@ echo ""
 echo "════════════════════════════════════════════════════════════════════════"
 echo "  loop_main.sh complete"
 echo "  app  : ${PROD_BASE_URL}"
-echo "  logs : koyeb service logs $PROD_APP_NAME"
+echo "  logs : fly logs --app $PROD_APP_NAME"
 echo "════════════════════════════════════════════════════════════════════════"

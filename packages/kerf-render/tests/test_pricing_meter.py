@@ -1,7 +1,7 @@
 """Tests for kerf_render.pricing_meter (T-106d).
 
 Covers:
-- L4 30-second render → expected USD cost (Koyeb-grounded, 35% markup)
+- L4 30-second render → expected USD cost (placeholder rates, 35% markup)
 - DB mock receives the correct workspace_id and amount
 - Free path: 0 gpu_seconds → no debit
 - Self-hosted path: KERF_RENDER_BILLING_DISABLED=1 → no debit
@@ -56,19 +56,19 @@ class _FakePool:
 
 
 def test_l4_rate():
-    """L4 is the default Koyeb tier — grounded to $0.70/hr ÷ 3600."""
+    """L4 is the default GPU tier — placeholder rate ~$0.70/hr ÷ 3600."""
     assert gpu_rate("l4") == pytest.approx(0.000194)
     assert gpu_rate("L4") == pytest.approx(0.000194)
 
 
 def test_a100_rate():
-    """A100 80GB on Koyeb — $1.60/hr ÷ 3600."""
+    """A100 80GB — placeholder rate ~$1.60/hr ÷ 3600."""
     assert gpu_rate("a100") == pytest.approx(0.000444)
     assert gpu_rate("A100") == pytest.approx(0.000444)
 
 
 def test_h100_rate():
-    """H100 on Koyeb — $2.50/hr ÷ 3600."""
+    """H100 — placeholder rate ~$2.50/hr ÷ 3600."""
     assert gpu_rate("h100") == pytest.approx(0.000694)
 
 
@@ -106,7 +106,7 @@ def test_compute_usd_cost_applies_markup():
 
 
 def test_compute_usd_cost_default_markup_is_35():
-    """Post-Koyeb migration: default markup is 35%."""
+    """Default GPU markup is 35% (conservative placeholder until GPU backend is live)."""
     assert GPU_MARKUP_PCT == pytest.approx(35.0)
 
 

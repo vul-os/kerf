@@ -5457,7 +5457,14 @@ User-direction 2026-05-19. Extends T-179 (apparel pattern-making) with deeper te
 
 ---
 
-## Infrastructure migration — Fly.io → Koyeb (T-400 … T-410)
+## Infrastructure migration — Fly.io → Koyeb (T-400 … T-410) — SUPERSEDED / WITHDRAWN 2026-06-01
+
+> **WITHDRAWN.** The decision to migrate to Koyeb was reversed on 2026-06-01
+> before DNS cutover. Kerf stays on Fly.io. GPU handoff will be via RunPod
+> or Modal when GPU demand justifies it. All tasks below are preserved as
+> historical record only — do NOT execute them.
+
+
 
 ROADMAP § 7.1 ("Hosted infrastructure"). Fly.io discontinued GPU
 instances, blocking the Cycles render epic (and any future GPU-accel

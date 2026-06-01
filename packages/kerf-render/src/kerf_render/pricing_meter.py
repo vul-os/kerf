@@ -24,26 +24,31 @@ straightforward.  Operators can override the defaults at import time by
 mutating :data:`GPU_RATES_USD_PER_SECOND` — the dict is module-level and
 looked up at call time, not at import time.
 
-Grounded to live Koyeb GPU pricing (https://www.koyeb.com/pricing, fetched
-2026-05-24) as part of the Fly.io → Koyeb migration (ROADMAP § 7.1, T-400).
-Numbers are hourly Koyeb COGS divided by 3600.
+.. note::
+   **GPU pricing is a placeholder.**  Current Fly.io-only deploys use
+   CPU rendering on the app server (no GPU spend).  These rates will be
+   re-grounded to live RunPod Serverless or Modal pricing once a GPU
+   backend is integrated (see ``kerf_render.dispatch`` for the dispatch
+   seam and ``kerf_workers.compute_backend`` for the backend interface).
+   The table below uses representative market rates for common GPU SKUs;
+   treat them as estimates until the backend is confirmed.
 
-+----------------+-------+-------+----------------------+
-| model key      | VRAM  | $/hr  | rate (USD / GPU-sec) |
-+================+=======+=======+======================+
-| rtx_a4000      | 20 GB | 0.50  | 0.000139             |
-| l4 (default)   | 24 GB | 0.70  | 0.000194             |
-| a6000          | 48 GB | 0.75  | 0.000208             |
-| l40s           | 48 GB | 1.20  | 0.000333             |
-| a100           | 80 GB | 1.60  | 0.000444             |
-| a100_sxm       | 80 GB | 2.15  | 0.000597             |
-| rtx_pro_6000   | 96 GB | 2.20  | 0.000611             |
-| h100           | 80 GB | 2.50  | 0.000694             |
-| h200           |141 GB | 3.00  | 0.000833             |
-+----------------+-------+-------+----------------------+
++----------------+-------+--------------------+------------------------------+
+| model key      | VRAM  | est. $/hr (market) | est. rate (USD / GPU-second) |
++================+=======+====================+==============================+
+| rtx_a4000      | 20 GB | ~0.50              | 0.000139                     |
+| l4 (default)   | 24 GB | ~0.70              | 0.000194                     |
+| a6000          | 48 GB | ~0.75              | 0.000208                     |
+| l40s           | 48 GB | ~1.20              | 0.000333                     |
+| a100           | 80 GB | ~1.60              | 0.000444                     |
+| a100_sxm       | 80 GB | ~2.15              | 0.000597                     |
+| rtx_pro_6000   | 96 GB | ~2.20              | 0.000611                     |
+| h100           | 80 GB | ~2.50              | 0.000694                     |
+| h200           |141 GB | ~3.00              | 0.000833                     |
++----------------+-------+--------------------+------------------------------+
 
-Unknown GPU models fall back to the L4 rate — the entry-level Koyeb SKU
-that today serves as the default for Cycles render dispatch.
+Unknown GPU models fall back to the L4 rate — the entry-level SKU that
+serves as the default for Cycles render dispatch.
 
 Database contract
 -----------------
@@ -70,35 +75,37 @@ logger = logging.getLogger(__name__)
 
 #: Default GPU markup percentage (mirrors cloud_pricing_token_markup_pct).
 #: Operators may override this after import; the value is read at call time.
-#: Lifted from 20% → 35% with the Koyeb migration to absorb per-second
-#: billing variance, storage egress and the operational buffer
-#: (autoscale headroom, monitoring, cold-start). See ROADMAP § 7.1.
+#: TODO: re-calibrate once RunPod/Modal backend is live and per-second billing
+#: variance is known. 35% is a conservative placeholder that absorbs storage
+#: egress, autoscale buffer, and operational overhead.
 GPU_MARKUP_PCT: float = 35.0
 
 # ---------------------------------------------------------------------------
-# GPU rate table (USD per GPU-second) — grounded to Koyeb pricing 2026-05-24.
-# Source: https://www.koyeb.com/pricing  (rate = hourly $ / 3600)
+# GPU rate table (USD per GPU-second) — placeholder rates based on market
+# estimates for common GPU SKUs (rate = hourly $ / 3600).
+#
+# TODO: ground these to live RunPod Serverless or Modal pricing once the
+# GPU backend is integrated. See kerf_render.dispatch for the dispatch seam.
 # ---------------------------------------------------------------------------
 
 #: Maps GPU model name (case-insensitive lookup key) to USD per GPU-second.
 #: Callers may extend or override this dict before calling meter_render_job.
 GPU_RATES_USD_PER_SECOND: dict[str, float] = {
-    "rtx_a4000":    0.000139,  # 20 GB,  $0.50/hr — entry
-    "l4":           0.000194,  # 24 GB,  $0.70/hr — default
-    "a6000":        0.000208,  # 48 GB,  $0.75/hr
-    "l40s":         0.000333,  # 48 GB,  $1.20/hr
-    "a100":         0.000444,  # 80 GB,  $1.60/hr
-    "a100_sxm":     0.000597,  # 80 GB,  $2.15/hr — SXM interconnect
-    "rtx_pro_6000": 0.000611,  # 96 GB,  $2.20/hr
-    "h100":         0.000694,  # 80 GB,  $2.50/hr
-    "h200":         0.000833,  # 141 GB, $3.00/hr — top
-    # Back-compat aliases for the previous Modal-tier keys. Map to closest
-    # Koyeb SKU so existing callers and stored render rows keep resolving.
+    "rtx_a4000":    0.000139,  # 20 GB,  ~$0.50/hr — entry
+    "l4":           0.000194,  # 24 GB,  ~$0.70/hr — default
+    "a6000":        0.000208,  # 48 GB,  ~$0.75/hr
+    "l40s":         0.000333,  # 48 GB,  ~$1.20/hr
+    "a100":         0.000444,  # 80 GB,  ~$1.60/hr
+    "a100_sxm":     0.000597,  # 80 GB,  ~$2.15/hr — SXM interconnect
+    "rtx_pro_6000": 0.000611,  # 96 GB,  ~$2.20/hr
+    "h100":         0.000694,  # 80 GB,  ~$2.50/hr
+    "h200":         0.000833,  # 141 GB, ~$3.00/hr — top
+    # Back-compat aliases for legacy keys. Map to closest tier.
     "a10g":         0.000194,  # → l4 (24 GB, same tier)
 }
 
 #: Fallback rate applied when the reported gpu_model is not in the table.
-#: L4 — the entry-level Koyeb SKU that serves as the Cycles default.
+#: L4 — the default SKU used by the Cycles dispatch policy.
 _DEFAULT_GPU_RATE: float = GPU_RATES_USD_PER_SECOND["l4"]
 
 # ---------------------------------------------------------------------------
@@ -121,7 +128,7 @@ def gpu_rate(gpu_model: str) -> float:
     """Return the USD-per-GPU-second rate for *gpu_model*.
 
     The lookup is case-insensitive.  Unknown models fall back to the L4
-    (entry-level Koyeb GPU) rate so we never under-bill an unrecognised
+    (default GPU tier) rate so we never under-bill an unrecognised
     hardware type by accident.
     """
     return GPU_RATES_USD_PER_SECOND.get(gpu_model.lower(), _DEFAULT_GPU_RATE)
@@ -136,9 +143,8 @@ def compute_usd_cost(
     """Return the billed USD cost for *gpu_seconds* on *gpu_model*.
 
     The billed amount is COGS × (1 + markup/100).  When *markup_pct* is
-    ``None`` the module-level :data:`GPU_MARKUP_PCT` is used (default 35%
-    post-Koyeb migration — see ROADMAP § 7.1).  Pass ``markup_pct=0`` to
-    get the bare COGS figure.
+    ``None`` the module-level :data:`GPU_MARKUP_PCT` is used (default 35%).
+    Pass ``markup_pct=0`` to get the bare COGS figure.
 
     Returns ``0.0`` when ``gpu_seconds <= 0`` (free / browser path).
     """
@@ -178,14 +184,14 @@ async def meter_render_job(
         Measured GPU wall-clock seconds as reported by the cycles_worker.
         Pass ``0`` for cache hits or browser-fallback renders (free path).
     gpu_model:
-        GPU hardware identifier (e.g. ``"A10G"``, ``"A100"``).
-        Case-insensitive; unknown values fall back to the A10G rate.
+        GPU hardware identifier (e.g. ``"l4"``, ``"a100"``).
+        Case-insensitive; unknown values fall back to the L4 rate.
     job_id:
         Optional render job UUID for logging / traceability.  Also used as
         the primary key when writing a ``usage_events`` row.
     markup_pct:
         GPU markup percentage to apply on top of COGS.  ``None`` uses the
-        module-level :data:`GPU_MARKUP_PCT` (default 20%).  Pass ``0`` to
+        module-level :data:`GPU_MARKUP_PCT` (default 35%).  Pass ``0`` to
         charge bare COGS (useful for BYO / test scenarios).
 
     Returns

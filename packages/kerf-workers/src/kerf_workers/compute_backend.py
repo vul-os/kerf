@@ -12,11 +12,12 @@ Concrete implementations
 
 Future proprietary extension point (DO NOT implement here)
 ----------------------------------------------------------
-A ``KoyebGPUBackend`` that provisions on-demand Koyeb GPU instances for
-rendering belongs in the **proprietary cloud/ tree**, NOT in this module.
+A GPU backend (e.g. ``RunPodGPUBackend`` or ``ModalGPUBackend``) that
+provisions on-demand GPU instances for rendering belongs in the
+**proprietary cloud/ tree**, NOT in this module.
 It should subclass :class:`ComputeBackend` and live at::
 
-    cloud/kerf_cloud/compute/koyeb_gpu_backend.py
+    cloud/kerf_cloud/compute/runpod_gpu_backend.py   # or modal_gpu_backend.py
 
 The interface contract is intentionally minimal so the swap is transparent to
 callers.  Typical usage::
@@ -24,15 +25,15 @@ callers.  Typical usage::
     # MIT path (local / self-hosted):
     backend = LocalSubprocessBackend(pool=pool)
 
-    # Proprietary path (cloud/):
-    # from kerf_cloud.compute.koyeb_gpu_backend import KoyebGPUBackend
-    # backend = KoyebGPUBackend(koyeb_api_token=..., region=...)
+    # Proprietary path (cloud/) — implementation TBD once GPU backend lands:
+    # from kerf_cloud.compute.runpod_gpu_backend import RunPodGPUBackend
+    # backend = RunPodGPUBackend(api_key=..., region=...)
 
     job_id = await backend.submit("render", payload)
     status = await backend.poll(job_id)
 
 Open-core seam: nothing in this file may import the ``cloud`` package or any
-proprietary module.  The ``KoyebGPUBackend`` integration point is documented
+proprietary module.  The GPU backend integration point is documented
 here only as a docstring — no import, no reference at runtime.
 """
 
@@ -47,7 +48,7 @@ class ComputeBackend(ABC):
     """Abstract compute backend: submit a job, poll for its status/result.
 
     All methods are ``async`` so implementations can use asyncpg, aiohttp,
-    or the Koyeb GPU-provider API without blocking the event loop.
+    or a GPU-provider API (RunPod, Modal, etc.) without blocking the event loop.
     """
 
     @abstractmethod
@@ -116,8 +117,8 @@ class LocalSubprocessBackend(ComputeBackend):
 
     Extension point
     ~~~~~~~~~~~~~~~
-    For GPU rendering on Koyeb (on-demand, scale-to-zero GPU instances),
-    replace this backend with a ``KoyebGPUBackend`` from the proprietary
+    For GPU rendering (on-demand, scale-to-zero via RunPod or Modal),
+    replace this backend with a GPU backend from the proprietary
     ``cloud/`` tree. The swap is transparent to callers because both
     implement :class:`ComputeBackend`.
 

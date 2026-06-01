@@ -184,7 +184,7 @@ def _write_output(
     uploaded to the configured object-storage bucket under the key
     ``renders/<cache_key>.<ext>`` and a presigned GET URL (TTL 7 days) is
     returned.  This avoids storing render artefacts on the ephemeral local
-    filesystem of Koyeb instances and prevents serving them through the app
+    filesystem of the app server and prevents serving them through the app
     proxy.
 
     Local / self-host mode (any other ``STORAGE_BACKEND``)
@@ -438,9 +438,9 @@ def _build_render_script(
     compute device type, and enables all available CUDA devices.  If no CUDA
     devices are found at runtime Blender silently falls back to CPU rendering.
 
-    To use a future ``KoyebGPUBackend`` (see
-    ``kerf_workers.compute_backend.KoyebGPUBackend`` extension point in
-    ``cloud/``), set ``KERF_RENDER_GPU=1`` in the GPU instance environment.
+    To use a future GPU backend (RunPod or Modal — see
+    ``kerf_workers.compute_backend`` for the extension point),
+    set ``KERF_RENDER_GPU=1`` in the GPU instance environment.
     """
     # The translator's generated script defines ``main()`` but deliberately
     # does NOT call ``bpy.ops.render.render``.  We append that here together

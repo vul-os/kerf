@@ -109,7 +109,7 @@ export default function AdminMargin() {
             <h1 className="text-xl font-semibold text-ink-100">Break-even Monitor</h1>
           </div>
           <p className="text-sm text-ink-400">
-            Realised gross margin from <code className="text-ink-300 font-mono text-xs">usage_events</code> vs fixed Koyeb infrastructure cost.
+            Realised gross margin from <code className="text-ink-300 font-mono text-xs">usage_events</code> vs fixed infrastructure cost (Fly.io + Neon; planned RunPod/Modal GPU TBD).
             Goal: ROADMAP §7.1 — make the break-even target visible in under a minute.
           </p>
         </header>
@@ -175,7 +175,7 @@ export default function AdminMargin() {
             {/* Fixed cost vs margin */}
             <div className="rounded-lg border border-ink-800 bg-ink-900/60 px-4 py-3 mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
-                <div className="text-[10px] uppercase tracking-wider text-ink-500 font-medium mb-0.5">Fixed cost (Koyeb)</div>
+                <div className="text-[10px] uppercase tracking-wider text-ink-500 font-medium mb-0.5">Fixed cost (Fly + Neon)</div>
                 <div className="text-xl font-mono font-semibold text-ink-100">{fmt(data.fixed_cost_usd)}<span className="text-xs text-ink-500 font-sans font-normal ml-1">/mo</span></div>
               </div>
               <div className="hidden sm:block text-ink-700 text-xl">−</div>

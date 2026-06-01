@@ -11,7 +11,8 @@ other admin route in routes.py).
 
 Environment:
     KERF_FIXED_COST_USD  Monthly fixed infrastructure cost in USD.
-                         Defaults to 120 (ROADMAP §7.1: ~$120/mo Koyeb spend).
+                         Defaults to 50 (Fly.io shared-cpu-2x + Neon free tier).
+                         Override via env var as infrastructure costs change.
 """
 from __future__ import annotations
 
@@ -28,9 +29,11 @@ from kerf_core.dependencies import require_auth
 router = APIRouter()
 
 # ---------------------------------------------------------------------------
-# Fixed-cost default (ROADMAP §7.1: 1× Koyeb large engine ≈ $120/mo)
+# Fixed-cost default (Fly.io shared-cpu-2x + Neon free tier ≈ $50/mo)
+# Override via KERF_FIXED_COST_USD env var. GPU rendering is CPU-only on Fly
+# today; update this default when RunPod/Modal GPU spend is confirmed.
 # ---------------------------------------------------------------------------
-_DEFAULT_FIXED_COST_USD = 120.0
+_DEFAULT_FIXED_COST_USD = 50.0
 
 
 def _fixed_cost() -> float:

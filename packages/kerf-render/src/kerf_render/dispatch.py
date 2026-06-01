@@ -1,10 +1,14 @@
 """kerf-render: GPU-SKU dispatch policy for Cycles render jobs.
 
-Maps estimated scene complexity to a Koyeb GPU SKU so each render job is
+Maps estimated scene complexity to a GPU SKU so each render job is
 routed to hardware that can finish in a reasonable time without
 over-provisioning.
 
-The SKU keys here MUST match the ``GPU_RATES_USD_PER_SECOND`` rate table in
+This module is the architectural seam for future GPU handoff.  Current
+production renders are CPU-only on Fly.io; no GPU backend is wired yet.
+When a RunPod Serverless or Modal backend is integrated, ``select_gpu_sku``
+will drive the SKU selection for that backend.  The SKU keys here MUST
+match the ``GPU_RATES_USD_PER_SECOND`` rate table in
 :mod:`kerf_render.pricing_meter` (``rtx_a4000``, ``l4``, ``a6000``,
 ``l40s``, ``a100``, ``a100_sxm``, ``rtx_pro_6000``, ``h100``, ``h200``).
 
@@ -16,7 +20,7 @@ Complexity signal priority
 3. **Resolution** — pixel count moves the tier up when it signals
    a high-fidelity render.
 4. **Poly + light counts** — fine-grained upward nudge.
-5. **Fallback** → ``l4`` (the documented Koyeb default).
+5. **Fallback** → ``l4`` (the default entry-level GPU tier).
 
 Policy (complexity → SKU)
 --------------------------
@@ -88,7 +92,7 @@ _RES_LARGE      = 3840 * 2160      # 4K UHD
 # ---------------------------------------------------------------------------
 
 def select_gpu_sku(scene_metrics: Dict[str, Any]) -> str:
-    """Return the Koyeb GPU SKU best suited for *scene_metrics*.
+    """Return the GPU SKU best suited for *scene_metrics*.
 
     Parameters
     ----------
@@ -110,8 +114,8 @@ def select_gpu_sku(scene_metrics: Dict[str, Any]) -> str:
     str
         One of the rate-table keys from
         :data:`kerf_render.pricing_meter.GPU_RATES_USD_PER_SECOND`.
-        Guaranteed to be a valid key; falls back to ``"l4"`` when the
-        heuristic cannot determine a tier.
+        Guaranteed to be a valid key; falls back to ``"l4"`` (default
+        entry-level GPU tier) when the heuristic cannot determine a tier.
 
     Notes
     -----
@@ -261,7 +265,7 @@ def _light_tier(light_count: int) -> int:
 
 
 def _tier_to_sku(tier: int) -> str:
-    """Map a resolved tier integer to a Koyeb GPU SKU key."""
+    """Map a resolved tier integer to a GPU SKU key."""
     if tier < _TIER_TINY:
         # UNKNOWN / no signal → documented l4 fallback.
         return _SKU_FALLBACK

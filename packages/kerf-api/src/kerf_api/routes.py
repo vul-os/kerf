@@ -6070,7 +6070,7 @@ async def serve_project_blob(
 
     R15 (T-409): When ``STORAGE_BACKEND=s3``, redirects (HTTP 302) to a
     Tigris presigned GET URL instead of streaming bytes through the app.
-    This offloads egress bandwidth from Koyeb to Tigris/CDN.  For
+    This offloads egress bandwidth from the app server to Tigris/CDN.  For
     local/self-host mode (any other backend) the original stream-through
     path is preserved.
 
@@ -6122,7 +6122,7 @@ async def serve_project_blob(
     key = blob_storage_key(oid)
 
     # R15 (T-409): S3 backend → redirect to a presigned URL; avoids proxying
-    # bytes through the app and eliminates Koyeb egress cost.
+    # bytes through the app and reduces egress cost.
     from kerf_core.storage.s3 import S3Storage as _S3Storage
     if isinstance(storage, _S3Storage):
         try:

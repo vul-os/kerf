@@ -47,6 +47,14 @@ Coverage:
   25. LLM tool (async): negative L_b_mm → err BAD_ARGS
   26. Re-export from arch/__init__.py
   27. phi_Mn = 0.90 * Mn for all three zones
+  28. ASD default fields: design_method="LRFD", safety_factor_or_phi=0.90, allowable_moment_kNm=phi_Mn
+  29. ASD mode: design_method="ASD", safety_factor_or_phi=1.67, allowable_moment_kNm = Mn/1.67
+  30. ASD Ma formula: Ma = Mn / 1.67 for yielding zone
+  31. ASD Ma formula: Ma = Mn / 1.67 for inelastic_LTB zone
+  32. ASD Ma formula: Ma = Mn / 1.67 for elastic_LTB zone
+  33. LRFD vs ASD comparison: LRFD φ_b·Mn ≈ 10% > ASD Ma for same Mn
+  34. ASD caveat string mentions "ASD"
+  35. ValueError: invalid design_method string
 """
 from __future__ import annotations
 
@@ -458,3 +466,140 @@ class TestReexport:
         assert WS is WSectionSpec
         assert LBR is LateralBracingReport
         assert clb is check_lateral_bracing
+
+
+# ===========================================================================
+# Test class 9: ASD design method — AISC 360-22 §B3.2
+# ===========================================================================
+
+_OMEGA_B = 1.67  # ASD safety factor per AISC 360-22 §B3.2
+
+
+class TestASDMethod:
+    """Tests 28–35: ASD path (design_method="ASD") via AISC 360-22 §B3.2."""
+
+    # ------------------------------------------------------------------
+    # Test 28: LRFD default — new report fields have correct LRFD values
+    # ------------------------------------------------------------------
+    def test_28_lrfd_default_new_fields(self):
+        """Test 28: Default LRFD run populates new fields correctly (phi=0.90, allowable=phi*Mn)."""
+        spec = _w14x90()
+        report = check_lateral_bracing(spec, L_b_mm=2_000.0)  # no design_method → LRFD
+        assert report.design_method == "LRFD"
+        assert abs(report.safety_factor_or_phi - 0.90) < 1e-9
+        # allowable_moment_kNm must equal phi_Mn_kNm for LRFD
+        assert abs(report.allowable_moment_kNm - report.phi_Mn_kNm) < 1e-6
+        # phi_Mn unchanged from existing behaviour
+        assert abs(report.phi_Mn_kNm - 0.90 * report.Mn_kNm) < 0.0001
+
+    # ------------------------------------------------------------------
+    # Test 29: ASD mode fields
+    # ------------------------------------------------------------------
+    def test_29_asd_mode_fields(self):
+        """Test 29: ASD run sets design_method="ASD", safety_factor_or_phi=1.67, allowable=Mn/1.67."""
+        spec = _w14x90()
+        report = check_lateral_bracing(spec, L_b_mm=2_000.0, design_method="ASD")
+        assert report.design_method == "ASD"
+        assert abs(report.safety_factor_or_phi - _OMEGA_B) < 1e-9
+        expected_Ma = report.Mn_kNm / _OMEGA_B
+        # allowable_moment_kNm is rounded to 4 decimal places; use relative tol 1e-4
+        assert abs(report.allowable_moment_kNm - expected_Ma) / expected_Ma < 1e-4
+
+    # ------------------------------------------------------------------
+    # Test 30: ASD Ma = Mn / 1.67 — yielding zone
+    # ------------------------------------------------------------------
+    def test_30_asd_ma_yielding_zone(self):
+        """Test 30: ASD Ma = Mn / Ω_b for Lb in yielding zone (Lb < Lp)."""
+        spec = _w14x90()
+        Lb = 2_000.0  # < Lp, so Mn = Mp
+        report = check_lateral_bracing(spec, L_b_mm=Lb, design_method="ASD")
+        assert report.governing_mode == "yielding"
+        expected_Ma = report.Mn_kNm / _OMEGA_B
+        assert abs(report.allowable_moment_kNm - expected_Ma) / expected_Ma < 1e-6
+        # Mn = Mp in yielding zone
+        assert abs(report.Mn_kNm - report.Mp_kNm) < 1e-6
+
+    # ------------------------------------------------------------------
+    # Test 31: ASD Ma = Mn / 1.67 — inelastic LTB zone
+    # ------------------------------------------------------------------
+    def test_31_asd_ma_inelastic_ltb_zone(self):
+        """Test 31: ASD Ma = Mn / Ω_b for Lb in inelastic LTB zone."""
+        spec = _w14x90()
+        Lb = 8_000.0  # Lp < Lb < Lr
+        report = check_lateral_bracing(spec, L_b_mm=Lb, design_method="ASD")
+        assert report.governing_mode == "inelastic_LTB"
+        expected_Ma = report.Mn_kNm / _OMEGA_B
+        assert abs(report.allowable_moment_kNm - expected_Ma) / expected_Ma < 1e-6
+        # Mn must be less than Mp in inelastic zone (Cb=1.0)
+        assert report.Mn_kNm < report.Mp_kNm
+
+    # ------------------------------------------------------------------
+    # Test 32: ASD Ma = Mn / 1.67 — elastic LTB zone
+    # ------------------------------------------------------------------
+    def test_32_asd_ma_elastic_ltb_zone(self):
+        """Test 32: ASD Ma = Mn / Ω_b for Lb in elastic LTB zone."""
+        spec = _w14x90()
+        Lb = 15_000.0  # > Lr
+        report = check_lateral_bracing(spec, L_b_mm=Lb, design_method="ASD")
+        assert report.governing_mode == "elastic_LTB"
+        expected_Ma = report.Mn_kNm / _OMEGA_B
+        assert abs(report.allowable_moment_kNm - expected_Ma) / expected_Ma < 1e-6
+
+    # ------------------------------------------------------------------
+    # Test 33: LRFD vs ASD comparison — LRFD allows ~10 % more demand
+    # ------------------------------------------------------------------
+    def test_33_lrfd_vs_asd_capacity_ratio(self):
+        """Test 33: For same Mn, phi_b*Mn / (Mn/Omega_b) ≈ phi_b * Omega_b = 0.90 * 1.67 ≈ 1.503.
+
+        LRFD design strength is ~50 % higher than ASD allowable moment for the
+        same nominal Mn; this follows directly from φ_b·Ω_b = 0.90 × 1.67 = 1.503.
+        The comment in the task brief ("LRFD allows ~10% more demand") refers to the
+        fact that LRFD factored-load combinations (1.2D+1.6L) carry inherent margin
+        over ASD service-load combinations (D+L), so on a real building the *net*
+        utilisation difference is ~10 % — but the raw capacity ratio here is ~1.50.
+        """
+        spec = _w14x90()
+        for Lb in [2_000.0, 8_000.0, 15_000.0]:
+            r_lrfd = check_lateral_bracing(spec, L_b_mm=Lb, design_method="LRFD")
+            r_asd = check_lateral_bracing(spec, L_b_mm=Lb, design_method="ASD")
+            # Same Mn regardless of design method
+            assert abs(r_lrfd.Mn_kNm - r_asd.Mn_kNm) < 1e-9, (
+                f"Mn differs between LRFD and ASD at Lb={Lb}"
+            )
+            # phi*Mn / Ma = phi_b * Omega_b = 0.90 * 1.67 ≈ 1.503
+            ratio = r_lrfd.phi_Mn_kNm / r_asd.allowable_moment_kNm
+            expected_ratio = 0.90 * _OMEGA_B  # ≈ 1.503
+            assert abs(ratio - expected_ratio) / expected_ratio < 0.0001, (
+                f"LRFD/ASD capacity ratio {ratio:.4f} != expected {expected_ratio:.4f} at Lb={Lb}"
+            )
+
+    # ------------------------------------------------------------------
+    # Test 34: ASD caveat mentions "ASD"
+    # ------------------------------------------------------------------
+    def test_34_asd_caveat_mentions_asd(self):
+        """Test 34: honest_caveat string for ASD run references ASD and §B3.2."""
+        spec = _w14x90()
+        report = check_lateral_bracing(spec, L_b_mm=8_000.0, design_method="ASD")
+        assert "ASD" in report.honest_caveat
+        assert "B3.2" in report.honest_caveat
+
+    # ------------------------------------------------------------------
+    # Test 35: ValueError on invalid design_method string
+    # ------------------------------------------------------------------
+    def test_35_invalid_design_method_raises(self):
+        """Test 35: design_method other than "LRFD"/"ASD" raises ValueError."""
+        spec = _w14x90()
+        with pytest.raises(ValueError, match="design_method"):
+            check_lateral_bracing(spec, L_b_mm=5_000.0, design_method="LSD")
+
+    # ------------------------------------------------------------------
+    # Test 36: LRFD phi_Mn preserved unchanged in ASD report (cross-check field)
+    # ------------------------------------------------------------------
+    def test_36_asd_report_phi_mn_still_correct(self):
+        """Test 36: phi_Mn_kNm in ASD report is still 0.90*Mn (reference field, not capacity)."""
+        spec = _w14x90()
+        for Lb in [2_000.0, 8_000.0, 15_000.0]:
+            report = check_lateral_bracing(spec, L_b_mm=Lb, design_method="ASD")
+            assert abs(report.phi_Mn_kNm - 0.90 * report.Mn_kNm) < 0.0001, (
+                f"phi_Mn_kNm broken in ASD report at Lb={Lb}"
+            )

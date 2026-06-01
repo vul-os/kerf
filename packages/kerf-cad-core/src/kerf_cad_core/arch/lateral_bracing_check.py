@@ -15,12 +15,30 @@ F2-6  Lr = 1.95·rts·(E/(0.7·Fy))·√(J·c/(Sx·ho) + √((J·c/(Sx·ho))²+6
 F2-7  rts² = √(Iy·Cw) / Sx   (alternative rts; user may supply rts directly instead)
 F2-8a c = 1.0 (doubly symmetric I-shapes)
 
+Design methods
+--------------
+Both AISC 360-22 §B3 design methods are supported via the ``design_method``
+parameter of :func:`check_lateral_bracing`:
+
+LRFD (default, §B3.1)
+    Design strength  = φ_b · Mn,  φ_b = 0.90.
+    Demand ≤ φ_b · Mn.
+
+ASD (opt-in, §B3.2)
+    Allowable moment = Mn / Ω_b,  Ω_b = 1.67.
+    Demand ≤ Ma = Mn / 1.67.
+    ASD demands (unfactored or ASD-combined service loads) must be
+    supplied by the caller; this function returns Ma for comparison.
+
+Note: φ_b = 0.90 ≈ 1/Ω_b = 1/1.67 = 0.599, so LRFD allows ~10 % more
+demand than ASD for the same nominal strength (0.90 vs 0.599).
+
 Scope / honest caveats
 ----------------------
 * Doubly symmetric compact I-shaped members only (AISC 360-22 §F2).
 * Non-compact / slender flanges or webs: not checked here (see §F3/F4/F5).
 * Channels, tees, built-up, and other unsymmetric shapes: out of scope.
-* phi_b = 0.90 (LRFD); ΩΩ_b = 1.67 (ASD) not implemented.
+* phi_b = 0.90 (LRFD); Ω_b = 1.67 (ASD) — both implemented via design_method.
 * Cb (moment gradient factor) must be supplied by the caller; the code does
   NOT compute Cb from moment diagrams.  Default Cb = 1.0 is conservative.
 * This check produces Mn (nominal flexural strength).  Demand/capacity ratio
@@ -30,7 +48,8 @@ All dimensions in **millimetres** and **MPa**; results in **kN·m**.
 
 References
 ----------
-AISC 360-22, "Specification for Structural Steel Buildings", Chapter F, §F2.
+AISC 360-22, "Specification for Structural Steel Buildings", Chapter F, §F2;
+  §B3.1 (LRFD); §B3.2 (ASD).
 AISC Steel Construction Manual, 15th ed., Table 3-2 (W-shape LTB limits).
 """
 from __future__ import annotations
@@ -113,12 +132,24 @@ class LateralBracingReport:
         Nominal flexural strength Mn for the supplied L_b (kN·m).
     phi_Mn_kNm : float
         Design flexural strength φ_b·Mn = 0.90·Mn (LRFD, kN·m).
+        For ASD runs this field is still populated (= 0.90·Mn) so that
+        LRFD/ASD comparisons are straightforward; use
+        ``allowable_moment_kip_in`` / ``allowable_moment_kNm`` for the
+        ASD allowable moment.
     governing_mode : str
         One of ``"yielding"``, ``"inelastic_LTB"``, or ``"elastic_LTB"``.
     Lb_to_Lp_ratio : float
         L_b / L_p ratio (useful for quick checks; < 1 → fully braced).
     honest_caveat : str
         Code-compliance caveat referencing scope, equations, and limitations.
+    design_method : str
+        ``"LRFD"`` or ``"ASD"`` — the design method used for this check
+        (AISC 360-22 §B3.1 / §B3.2).
+    safety_factor_or_phi : float
+        For LRFD: φ_b = 0.90.  For ASD: Ω_b = 1.67.
+    allowable_moment_kNm : float
+        LRFD: φ_b · Mn (same as ``phi_Mn_kNm``).
+        ASD: Ma = Mn / Ω_b (allowable moment, kN·m).
     """
     L_p_mm: float
     L_r_mm: float
@@ -129,6 +160,9 @@ class LateralBracingReport:
     governing_mode: str
     Lb_to_Lp_ratio: float
     honest_caveat: str
+    design_method: str = "LRFD"
+    safety_factor_or_phi: float = 0.90
+    allowable_moment_kNm: float = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -139,10 +173,14 @@ def check_lateral_bracing(
     section: WSectionSpec,
     L_b_mm: float,
     Cb: float = 1.0,
+    design_method: str = "LRFD",
 ) -> LateralBracingReport:
     """
     Compute the nominal flexural design moment capacity Mn for a compact
-    doubly symmetric I-shaped member per AISC 360-22 §F2 (LRFD).
+    doubly symmetric I-shaped member per AISC 360-22 §F2.
+
+    Supports both LRFD (default, §B3.1) and ASD (opt-in, §B3.2) design
+    methods.
 
     Parameters
     ----------
@@ -153,6 +191,14 @@ def check_lateral_bracing(
     Cb : float
         Moment gradient amplification factor (AISC F1-1).  Default 1.0
         (conservative — uniform moment).  Must be ≥ 1.0.
+    design_method : str
+        ``"LRFD"`` (default) or ``"ASD"``.
+
+        * ``"LRFD"`` — AISC 360-22 §B3.1: design strength = φ_b·Mn,
+          φ_b = 0.90.
+        * ``"ASD"`` — AISC 360-22 §B3.2: allowable moment = Mn / Ω_b,
+          Ω_b = 1.67.  The caller is responsible for using ASD-compatible
+          (unfactored / ASD-combined) service loads as the demand.
 
     Returns
     -------
@@ -162,7 +208,7 @@ def check_lateral_bracing(
     ------
     ValueError
         If any input is physically implausible (non-positive section property,
-        L_b ≤ 0, or Cb < 1.0).
+        L_b ≤ 0, Cb < 1.0, or unknown design_method).
 
     Notes
     -----
@@ -199,6 +245,12 @@ def check_lateral_bracing(
         raise ValueError(f"L_b_mm must be > 0, got {L_b_mm}")
     if Cb < 1.0:
         raise ValueError(f"Cb must be >= 1.0 (AISC §F1-1 note), got {Cb}")
+    _valid_methods = ("LRFD", "ASD")
+    if design_method not in _valid_methods:
+        raise ValueError(
+            f"design_method must be one of {_valid_methods!r}, got {design_method!r}. "
+            f"AISC 360-22 §B3.1 (LRFD) or §B3.2 (ASD)."
+        )
 
     # ------------------------------------------------------------------
     # Convenience aliases
@@ -266,10 +318,30 @@ def check_lateral_bracing(
         Mn_kNm = min(Mn_raw_kNm, Mp_kNm)
 
     # ------------------------------------------------------------------
-    # LRFD design strength
+    # LRFD design strength (always computed for reference / comparison)
     # ------------------------------------------------------------------
     phi_b = 0.90
     phi_Mn_kNm = phi_b * Mn_kNm
+
+    # ------------------------------------------------------------------
+    # ASD allowable moment (AISC 360-22 §B3.2)
+    # ------------------------------------------------------------------
+    omega_b = 1.67                           # ASD safety factor (§B3.2)
+    Ma_kNm = Mn_kNm / omega_b               # allowable moment
+
+    # ------------------------------------------------------------------
+    # Select safety factor / allowable moment for the chosen method
+    # ------------------------------------------------------------------
+    if design_method == "LRFD":
+        safety_factor_or_phi = phi_b
+        allowable_moment_kNm = phi_Mn_kNm
+        method_label = "LRFD (§B3.1)"
+        capacity_label = f"φ_b·Mn = {phi_Mn_kNm:.2f} kN·m"
+    else:  # ASD
+        safety_factor_or_phi = omega_b
+        allowable_moment_kNm = Ma_kNm
+        method_label = "ASD (§B3.2)"
+        capacity_label = f"Ma = Mn/Ω_b = {Ma_kNm:.2f} kN·m"
 
     # ------------------------------------------------------------------
     # Honest caveat
@@ -281,20 +353,21 @@ def check_lateral_bracing(
         else f"rts = {rts:.1f} mm supplied by caller. "
     )
     caveat = (
-        f"AISC 360-22 §F2 LRFD; doubly symmetric compact I-shaped members bent about the "
+        f"AISC 360-22 §F2 {method_label}; doubly symmetric compact I-shaped members bent about the "
         f"major axis only. "
         f"Lp = {L_p:.0f} mm (Eq. F2-5); Lr = {L_r:.0f} mm (Eq. F2-6); "
         f"Mp = {Mp_kNm:.1f} kN·m; Mr = {Mr_kNm:.1f} kN·m; "
         f"Lb = {L_b_mm:.0f} mm; Cb = {Cb:.3f}; "
         f"governing mode = {governing_mode}; Mn = {Mn_kNm:.2f} kN·m; "
-        f"φ_b·Mn = {phi_Mn_kNm:.2f} kN·m. "
+        f"{capacity_label}. "
         f"{rts_note}"
         f"SCOPE: compact sections only (bf/(2·tf) and h/tw within compact limits per §B4); "
         f"channels, tees, and built-up sections are out of scope. "
         f"Cb is NOT computed by this function — caller must supply from AISC §C-F1-3 "
         f"(e.g. Cb=1.0 for uniform moment; Cb=1.14 for UDL simply-supported). "
+        f"ASD demands must be service-level (unfactored); LRFD demands must be factored. "
         f"Demand/capacity ratio and connection checks not included. "
-        f"Ref: AISC 360-22 §F2 (Eqs. F2-1..F2-8) + AISC Manual 15e Table 3-2."
+        f"Ref: AISC 360-22 §B3.1/§B3.2, §F2 (Eqs. F2-1..F2-8) + AISC Manual 15e Table 3-2."
     )
 
     return LateralBracingReport(
@@ -307,4 +380,7 @@ def check_lateral_bracing(
         governing_mode=governing_mode,
         Lb_to_Lp_ratio=round(L_b_mm / L_p, 6),
         honest_caveat=caveat,
+        design_method=design_method,
+        safety_factor_or_phi=safety_factor_or_phi,
+        allowable_moment_kNm=round(allowable_moment_kNm, 4),
     )

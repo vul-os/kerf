@@ -13,7 +13,8 @@ Scope / honest flags
   (transverse colour) is NOT computed (requires real chief-ray traces, out of scope).
 * Monochromatic Seidel aberrations are not included.
 * The BFL model used is the thin-lens sum-of-powers; thick-lens OPD chromatic
-  correction is not implemented.
+  shift is not modelled.  Achromatic-doublet design (first-order colour null)
+  is implemented via ``design_achromatic_doublet()`` (Smith MOE §6.4).
 * Sellmeier coefficients embedded here are from the Schott glass catalog
   (2023 edition) validated against published n_d / V-number values.
 
@@ -116,6 +117,33 @@ GLASS_SELLMEIER: Dict[str, Tuple[float, float, float, float, float, float]] = {
         0.00516900822,
         0.0161190045,
         99.7575331,
+    ),
+    # K7 (Schott): crown, nd≈1.5113, V≈60.41
+    "K7": (
+        1.06124145,
+        0.216687286,
+        0.965864985,
+        0.00636737975,
+        0.0226963062,
+        111.001876,
+    ),
+    # BAK4 (Schott): barium crown, nd≈1.5688, V≈55.98
+    "BAK4": (
+        1.28834642,
+        0.132817724,
+        0.945395373,
+        0.00779980626,
+        0.0315631177,
+        105.965875,
+    ),
+    # SF2 (Schott): dense flint, nd≈1.6477, V≈33.85
+    "SF2": (
+        1.40301821,
+        0.231767504,
+        0.939056586,
+        0.0105795466,
+        0.0493226978,
+        112.405955,
     ),
 }
 
@@ -431,4 +459,252 @@ def compute_chromatic_focus(
         lca_percent=lca_percent,
         V_number=v_number,
         mean_BFL_mm=mean_bfl,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Achromatic doublet design (Smith "Modern Optical Engineering" §6.4)
+# ---------------------------------------------------------------------------
+
+# Standard Schott Abbe V-numbers (d-line) for the supported achromat glasses.
+# Source: Schott Optical Glass Catalog 2023, V_d = (n_d − 1)/(n_F − n_C).
+# These are the catalogue-nominal values; the Sellmeier coefficients above
+# reproduce them to within ±0.5 (see GLASS_SELLMEIER header comment).
+ACHROMATIC_GLASS_ABBE: Dict[str, float] = {
+    "BK7":  64.17,
+    "K7":   60.40,
+    "BAK4": 55.98,
+    "F2":   36.43,
+    "SF2":  33.85,
+    "SF11": 25.76,
+}
+
+# nd values at d-line (587.6 nm) used when reporting element indices.
+_ND_NOMINAL: Dict[str, float] = {
+    "BK7":  1.51680,
+    "K7":   1.51112,
+    "BAK4": 1.56883,
+    "F2":   1.62004,
+    "SF2":  1.64769,
+    "SF11": 1.78472,
+}
+
+_ALLOWED_CROWNS = frozenset({"BK7", "K7", "BAK4"})
+_ALLOWED_FLINTS = frozenset({"F2", "SF2", "SF11"})
+
+# Abbe-number difference below which the doublet is considered near-apochromatic
+# (element powers blow up to infinity; we warn instead of returning NaN).
+_V_DIFF_WARN_THRESHOLD = 5.0
+
+
+@dataclass
+class AchromaticDoubletReport:
+    """
+    Design report for a thin achromatic doublet.
+
+    Achromatic condition (first-order colour null, Smith MOE §6.4):
+        φ₁/V₁ + φ₂/V₂ = 0   with   φ₁ + φ₂ = φ_total
+    =>  φ₁ = φ · V₁/(V₁ − V₂)
+        φ₂ = −φ · V₂/(V₁ − V₂)
+
+    Attributes
+    ----------
+    target_focal_length_mm : float
+        Requested system focal length (mm).
+    f1_mm : float
+        Crown element focal length = 1/φ₁ (mm). Positive for converging.
+    f2_mm : float
+        Flint element focal length = 1/φ₂ (mm). Negative for diverging.
+    nd_crown : float
+        Refractive index (d-line) of crown glass.
+    nd_flint : float
+        Refractive index (d-line) of flint glass.
+    V_crown : float
+        Abbe number of crown glass.
+    V_flint : float
+        Abbe number of flint glass.
+    residual_chromatic_shift_mm : float
+        Residual LCA of the doublet (BFL_F − BFL_C) computed via Sellmeier
+        dispersion through the thin-lens ABCD stack built from φ₁, φ₂.
+        Should be ≪ f/V for the equivalent singlet.
+    design_wavelength_nm : float
+        Reference wavelength at which element focal lengths are defined.
+    honest_caveat : str
+        Scope disclaimer.
+    """
+    target_focal_length_mm: float = 0.0
+    f1_mm: float = 0.0
+    f2_mm: float = 0.0
+    nd_crown: float = 0.0
+    nd_flint: float = 0.0
+    V_crown: float = 0.0
+    V_flint: float = 0.0
+    residual_chromatic_shift_mm: float = 0.0
+    design_wavelength_nm: float = 587.6
+    honest_caveat: str = (
+        "First-order achromatic condition only (Smith MOE §6.4 / Hecht §6.3). "
+        "Second-order (secondary) spectrum is NOT nulled — use an apochromat "
+        "(three-glass design) for that. Thin-lens model only; thick-lens principal-"
+        "plane chromatic shift is not modelled. Residual LCA computed via Sellmeier "
+        "dispersion (Fraunhofer C/d/F lines). Element radii are not specified here; "
+        "use the element focal lengths with the lensmaker equation to set R1/R2."
+    )
+
+    def to_dict(self) -> dict:
+        return {
+            "ok": True,
+            "target_focal_length_mm": self.target_focal_length_mm,
+            "f1_mm": self.f1_mm,
+            "f2_mm": self.f2_mm,
+            "nd_crown": self.nd_crown,
+            "nd_flint": self.nd_flint,
+            "V_crown": self.V_crown,
+            "V_flint": self.V_flint,
+            "residual_chromatic_shift_mm": self.residual_chromatic_shift_mm,
+            "design_wavelength_nm": self.design_wavelength_nm,
+            "honest_caveat": self.honest_caveat,
+        }
+
+
+def design_achromatic_doublet(
+    target_focal_length_mm: float,
+    crown_glass: str = "BK7",
+    flint_glass: str = "F2",
+    design_wavelength_nm: float = 587.6,
+) -> "AchromaticDoubletReport | dict":
+    """
+    Design a thin achromatic doublet that nulls first-order longitudinal colour.
+
+    Algorithm (Smith "Modern Optical Engineering", 4th ed., §6.4)
+    -------------------------------------------------------------
+    Given total power φ = 1/f and Abbe numbers V₁ (crown), V₂ (flint):
+
+        φ₁ = φ · V₁ / (V₁ − V₂)     [crown element power]
+        φ₂ = −φ · V₂ / (V₁ − V₂)    [flint element power]
+
+    This satisfies both the achromatic condition (φ₁/V₁ + φ₂/V₂ = 0) and the
+    total-power constraint (φ₁ + φ₂ = φ).
+
+    The residual chromatic shift (secondary spectrum) is then computed by
+    building thin symmetric biconvex/biconcave elements from φ₁, φ₂ and the
+    nominal nd of each glass, and running the full Sellmeier-based LCA engine.
+
+    Parameters
+    ----------
+    target_focal_length_mm : float
+        System focal length in mm.  Must be finite and non-zero.
+    crown_glass : str
+        Crown (low-dispersion) glass.  One of: "BK7", "K7", "BAK4".
+    flint_glass : str
+        Flint (high-dispersion) glass.  One of: "F2", "SF2", "SF11".
+    design_wavelength_nm : float
+        Reference wavelength (nm) at which element focal lengths are stated.
+        Default 587.6 nm (d-line, photopic peak).
+
+    Returns
+    -------
+    AchromaticDoubletReport
+        Dataclass with element focal lengths, glass properties, and residual LCA.
+    dict
+        ``{"ok": False, "reason": ...}`` on validation error.
+
+    References
+    ----------
+    Smith, W.J. — "Modern Optical Engineering", 4th ed., McGraw-Hill, 2008, §6.4.
+    Hecht, E. — "Optics", 5th ed., Addison-Wesley, 2017, §6.3.
+    Schott AG — Optical Glass Data Sheets, 2023 edition.
+    """
+    # ---- Input validation ---------------------------------------------------
+    if not isinstance(target_focal_length_mm, (int, float)) or not math.isfinite(
+        float(target_focal_length_mm)
+    ):
+        return {
+            "ok": False,
+            "reason": "target_focal_length_mm must be a finite number",
+        }
+    f = float(target_focal_length_mm)
+    if abs(f) < 1e-12:
+        return {"ok": False, "reason": "target_focal_length_mm must be non-zero"}
+
+    if crown_glass not in _ALLOWED_CROWNS:
+        return {
+            "ok": False,
+            "reason": (
+                f"crown_glass {crown_glass!r} not supported. "
+                f"Allowed: {sorted(_ALLOWED_CROWNS)}"
+            ),
+        }
+    if flint_glass not in _ALLOWED_FLINTS:
+        return {
+            "ok": False,
+            "reason": (
+                f"flint_glass {flint_glass!r} not supported. "
+                f"Allowed: {sorted(_ALLOWED_FLINTS)}"
+            ),
+        }
+
+    if not isinstance(design_wavelength_nm, (int, float)) or not math.isfinite(
+        float(design_wavelength_nm)
+    ) or float(design_wavelength_nm) <= 0:
+        return {
+            "ok": False,
+            "reason": "design_wavelength_nm must be a positive finite number",
+        }
+
+    # ---- Retrieve Abbe numbers ---------------------------------------------
+    V1 = ACHROMATIC_GLASS_ABBE[crown_glass]
+    V2 = ACHROMATIC_GLASS_ABBE[flint_glass]
+    delta_V = V1 - V2
+
+    # Near-apochromatic case: V values nearly equal → element powers → ∞
+    if abs(delta_V) < _V_DIFF_WARN_THRESHOLD:
+        return {
+            "ok": False,
+            "reason": (
+                f"V_crown − V_flint = {delta_V:.2f} < {_V_DIFF_WARN_THRESHOLD}. "
+                "Glass combination is near-apochromatic: element focal lengths "
+                "diverge toward ±∞ and the doublet cannot be physically built. "
+                "Choose a crown/flint pair with |ΔV| ≥ 5 (e.g. BK7 + F2 gives ΔV ≈ 27.7)."
+            ),
+        }
+
+    # ---- Smith MOE §6.4 achromatic power split -----------------------------
+    phi_total = 1.0 / f
+    phi1 = phi_total * V1 / delta_V   # crown power
+    phi2 = -phi_total * V2 / delta_V  # flint power (negative)
+
+    f1_mm = 1.0 / phi1
+    f2_mm = 1.0 / phi2
+
+    # ---- Retrieve nominal nd values ----------------------------------------
+    nd1 = _ND_NOMINAL[crown_glass]
+    nd2 = _ND_NOMINAL[flint_glass]
+
+    # ---- Build a symmetric thin-lens stack to evaluate residual LCA --------
+    # For a symmetric biconvex/biconcave: R = 2*(n-1)/phi
+    # (thin-lens power phi = (n-1)*(1/R1 - 1/R2) = (n-1)*2/R for symmetric)
+    R1_crown = 2.0 * (nd1 - 1.0) / phi1  # positive for converging crown
+    R1_flint = 2.0 * (nd2 - 1.0) / phi2  # negative for diverging flint
+
+    stack = [
+        LensElement(glass=crown_glass, R1=R1_crown, R2=-R1_crown, separation_mm=0.0),
+        LensElement(glass=flint_glass, R1=R1_flint, R2=-R1_flint, separation_mm=0.0),
+    ]
+    lca_report = compute_chromatic_focus(stack, wavelengths_nm=[486.0, 587.0, 656.0])
+    if isinstance(lca_report, dict):
+        # Should not happen with valid glass choices, but be defensive
+        residual = float("nan")
+    else:
+        residual = lca_report.lca_FC_mm
+
+    return AchromaticDoubletReport(
+        target_focal_length_mm=f,
+        f1_mm=f1_mm,
+        f2_mm=f2_mm,
+        nd_crown=nd1,
+        nd_flint=nd2,
+        V_crown=V1,
+        V_flint=V2,
+        residual_chromatic_shift_mm=residual,
+        design_wavelength_nm=float(design_wavelength_nm),
     )

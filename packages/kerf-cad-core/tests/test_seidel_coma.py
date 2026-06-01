@@ -57,7 +57,12 @@ import math
 
 import pytest
 
-from kerf_cad_core.optics.seidel_coma import SeidelComaReport, compute_seidel_coma
+from kerf_cad_core.optics.seidel_coma import (
+    ComaCompareReport,
+    SeidelComaReport,
+    compare_seidel_vs_finite_ray_coma,
+    compute_seidel_coma,
+)
 from kerf_cad_core.optics.tools import run_compute_seidel_coma
 
 
@@ -572,3 +577,181 @@ def test_SII_independent_of_wavelength():
         assert r633.coma_waves_at_lambda < r550.coma_waves_at_lambda, (
             "Longer wavelength → fewer waves at same physical coma"
         )
+
+
+# ---------------------------------------------------------------------------
+# 35–41: New tests for compare_seidel_to_finite_ray and
+#        compare_seidel_vs_finite_ray_coma
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# 35. Seidel-only mode: backward compatible — no finite-ray fields populated
+# ---------------------------------------------------------------------------
+
+def test_seidel_only_backward_compatible():
+    """compare_seidel_to_finite_ray=False (default): new fields stay None."""
+    r = compute_seidel_coma(BK7_BICONVEX, wavelength_nm=550, field_angle_deg=5.0)
+    assert isinstance(r, SeidelComaReport)
+    assert r.finite_ray_W131 is None
+    assert r.residual_higher_order_W131 is None
+    assert r.comparison_caveat is None
+    # Existing fields still present and finite
+    assert math.isfinite(r.S_II)
+    assert math.isfinite(r.coma_waves_at_lambda)
+
+
+# ---------------------------------------------------------------------------
+# 36. compare_seidel_to_finite_ray=True populates all three new fields
+# ---------------------------------------------------------------------------
+
+def test_compare_flag_populates_fields():
+    """When compare_seidel_to_finite_ray=True, finite_ray_W131 and residual are set."""
+    r = compute_seidel_coma(
+        BK7_BICONVEX, wavelength_nm=550, field_angle_deg=5.0,
+        compare_seidel_to_finite_ray=True,
+    )
+    assert isinstance(r, SeidelComaReport)
+    assert r.finite_ray_W131 is not None, "finite_ray_W131 should be populated"
+    assert isinstance(r.finite_ray_W131, float)
+    assert math.isfinite(r.finite_ray_W131)
+    assert r.residual_higher_order_W131 is not None
+    assert math.isfinite(r.residual_higher_order_W131)
+    assert r.comparison_caveat is not None
+    assert len(r.comparison_caveat) > 10
+
+
+# ---------------------------------------------------------------------------
+# 37. Low-aberration system: residual close to zero
+#     A flat slab (no power, no coma) should have Seidel=0 and finite-ray≈0
+#     → residual close to 0.
+# ---------------------------------------------------------------------------
+
+def test_low_aberration_residual_near_zero():
+    """Flat slab: both Seidel and finite-ray W131 ≈ 0 → residual ≈ 0."""
+    flat_slab = {
+        "surfaces": [
+            {"c": 0.0, "t": 5.0, "n": 1.5},
+            {"c": 0.0, "t": 0.0, "n": 1.0},
+        ],
+        "aperture_radius_mm": 1.0,
+    }
+    r = compute_seidel_coma(
+        flat_slab, wavelength_nm=550, field_angle_deg=5.0,
+        compare_seidel_to_finite_ray=True,
+    )
+    assert isinstance(r, SeidelComaReport)
+    # Flat slab has no power → afocal → finite-ray OPD undefined.
+    # Comparison caveat should note afocal.
+    if r.finite_ray_W131 is None:
+        assert r.comparison_caveat is not None
+        assert "afocal" in r.comparison_caveat.lower() or "focal" in r.comparison_caveat.lower()
+    else:
+        assert abs(r.residual_higher_order_W131) < 1.0, (
+            f"Flat slab residual should be near zero, got {r.residual_higher_order_W131}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# 38. Strong coma: residual is finite and measurable
+#     BK7 biconvex at large field angle (10°) → coma > 0.1 waves;
+#     finite-ray residual should be a finite number (not NaN).
+# ---------------------------------------------------------------------------
+
+def test_strong_coma_residual_finite():
+    """BK7 at 10° produces measurable coma; residual should be finite."""
+    r = compute_seidel_coma(
+        BK7_BICONVEX, wavelength_nm=550, field_angle_deg=10.0,
+        compare_seidel_to_finite_ray=True,
+    )
+    assert isinstance(r, SeidelComaReport)
+    assert r.coma_waves_at_lambda > 0.01, (
+        f"Expected substantial Seidel coma at 10°, got {r.coma_waves_at_lambda}"
+    )
+    # finite_ray_W131 should be populated and finite
+    assert r.finite_ray_W131 is not None
+    assert math.isfinite(r.finite_ray_W131), f"finite_ray_W131 should be finite, got {r.finite_ray_W131}"
+    assert r.residual_higher_order_W131 is not None
+    assert math.isfinite(r.residual_higher_order_W131)
+
+
+# ---------------------------------------------------------------------------
+# 39. to_dict() with compare_seidel_to_finite_ray=True includes new keys
+# ---------------------------------------------------------------------------
+
+def test_compare_to_dict_includes_new_keys():
+    """to_dict() should include finite_ray_W131 and residual when populated."""
+    r = compute_seidel_coma(
+        BK7_BICONVEX, wavelength_nm=550, field_angle_deg=5.0,
+        compare_seidel_to_finite_ray=True,
+    )
+    d = r.to_dict()
+    assert d["ok"] is True
+    assert "finite_ray_W131" in d, "to_dict() should include finite_ray_W131 when comparison run"
+    assert "residual_higher_order_W131" in d
+    assert "comparison_caveat" in d
+    assert d["comparison_caveat"] is not None
+
+
+# ---------------------------------------------------------------------------
+# 40. compare_seidel_vs_finite_ray_coma: returns ComaCompareReport
+# ---------------------------------------------------------------------------
+
+def test_compare_seidel_vs_finite_ray_coma_returns_report():
+    """compare_seidel_vs_finite_ray_coma() returns ComaCompareReport for valid system."""
+    surfaces = BK7_BICONVEX["surfaces"]
+    # Use a small positive field height (BK7 biconvex, EFL ≈ 50mm, 5° → y≈4.4mm)
+    r = compare_seidel_vs_finite_ray_coma(
+        surfaces=surfaces,
+        field_height_mm=4.0,
+        num_pupil_samples=32,
+        aperture_radius_mm=5.0,
+        wavelength_nm=550.0,
+    )
+    assert isinstance(r, ComaCompareReport), (
+        f"Expected ComaCompareReport, got {type(r)}: {r}"
+    )
+    assert math.isfinite(r.seidel_W131_waves)
+    assert math.isfinite(r.finite_ray_W131_waves)
+    assert math.isfinite(r.residual_W131_waves)
+    assert r.n_rays_valid >= 8
+    assert r.field_height_mm == pytest.approx(4.0)
+
+
+# ---------------------------------------------------------------------------
+# 41. compare_seidel_vs_finite_ray_coma to_dict contract
+# ---------------------------------------------------------------------------
+
+def test_compare_report_to_dict_contract():
+    """ComaCompareReport.to_dict() returns all expected keys."""
+    surfaces = BK7_BICONVEX["surfaces"]
+    r = compare_seidel_vs_finite_ray_coma(
+        surfaces=surfaces,
+        field_height_mm=4.0,
+        num_pupil_samples=32,
+        aperture_radius_mm=5.0,
+        wavelength_nm=550.0,
+    )
+    if isinstance(r, dict):
+        pytest.skip(f"compare_seidel_vs_finite_ray_coma returned error: {r}")
+    d = r.to_dict()
+    assert d["ok"] is True
+    for key in (
+        "seidel_W131_waves", "finite_ray_W131_waves", "residual_W131_waves",
+        "seidel_S_II", "finite_ray_zernike_Z7", "n_rays_valid",
+        "field_height_mm", "wavelength_mm", "comparison_caveat",
+    ):
+        assert key in d, f"Missing key in to_dict(): {key}"
+
+
+# ---------------------------------------------------------------------------
+# 42. compare_seidel_vs_finite_ray_coma: error on afocal stack
+# ---------------------------------------------------------------------------
+
+def test_compare_function_error_on_bad_input():
+    """compare_seidel_vs_finite_ray_coma returns error dict for invalid input."""
+    r = compare_seidel_vs_finite_ray_coma(
+        surfaces=[],
+        field_height_mm=4.0,
+    )
+    assert isinstance(r, dict)
+    assert r["ok"] is False

@@ -4,8 +4,13 @@ for a sequential thin-lens system from surface paraxial parameters.
 
 Public API
 ----------
-compute_seidel_coma(lens_system_dict, wavelength_nm=550, field_angle_deg=5.0)
+compute_seidel_coma(lens_system_dict, wavelength_nm=550, field_angle_deg=5.0,
+                    compare_seidel_to_finite_ray=False)
     -> SeidelComaReport | dict
+
+compare_seidel_vs_finite_ray_coma(surfaces, field_height_mm,
+                                   num_pupil_samples=64)
+    -> ComaCompareReport | dict
 
 Theory (Welford "Aberrations of Optical Systems" §7 / Born & Wolf §5.3)
 -----------------------------------------------------------------------
@@ -73,6 +78,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from kerf_cad_core.optics.lens_stack_trace import _paraxial_refract, _paraxial_transfer
+from kerf_cad_core.optics.coma_compute import compute_finite_ray_coma
 
 
 # ---------------------------------------------------------------------------
@@ -145,6 +151,16 @@ class SeidelComaReport:
     per_surface_contributions : list[dict]
         Per-surface breakdown: keys include surface, c_mm_inv, n_in,
         n_out, h_mm, ybar_mm, A, Abar, delta_un, SII_contrib.
+    finite_ray_W131 : float or None
+        Finite-ray OPD W_131 RMS (waves) from Zernike Z_7 fitting via
+        compute_finite_ray_coma().  None when compare_seidel_to_finite_ray=False
+        or when finite-ray trace fails.
+    residual_higher_order_W131 : float or None
+        Signed residual: finite_ray_W131 − coma_waves_at_lambda.
+        Positive = higher-order coma present beyond Seidel prediction.
+        None when finite_ray_W131 is None.
+    comparison_caveat : str or None
+        Scope note for the comparison.  None when compare_seidel_to_finite_ray=False.
     honest_caveat : str
         Scope and limitations statement.
     """
@@ -153,23 +169,105 @@ class SeidelComaReport:
     coma_waves_at_lambda: float = 0.0
     dominant_surface_idx: int = -1
     per_surface_contributions: list = field(default_factory=list)
+    finite_ray_W131: "float | None" = None
+    residual_higher_order_W131: "float | None" = None
+    comparison_caveat: "str | None" = None
     honest_caveat: str = (
         "Third-order (Seidel) coma only. "
         "Higher-order coma (Hopkins 5th-order, oblique spherical aberration) "
-        "requires finite-ray OPD analysis (not implemented). "
+        "is now available via compute_finite_ray_coma() — call "
+        "compute_seidel_coma(..., compare_seidel_to_finite_ray=True) or "
+        "compare_seidel_vs_finite_ray_coma() for direct head-to-head comparison. "
         "Monochromatic; chromatic coma excluded. "
         "No defocus residual computed. "
         "Stop assumed at first surface."
     )
 
     def to_dict(self) -> dict:
-        return {
+        d: dict = {
             "ok": True,
             "S_II": self.S_II,
             "coma_waves_at_lambda": self.coma_waves_at_lambda,
             "dominant_surface_idx": self.dominant_surface_idx,
             "per_surface_contributions": self.per_surface_contributions,
             "honest_caveat": self.honest_caveat,
+        }
+        if self.finite_ray_W131 is not None:
+            d["finite_ray_W131"] = self.finite_ray_W131
+        if self.residual_higher_order_W131 is not None:
+            d["residual_higher_order_W131"] = self.residual_higher_order_W131
+        if self.comparison_caveat is not None:
+            d["comparison_caveat"] = self.comparison_caveat
+        return d
+
+
+# ---------------------------------------------------------------------------
+# ComaCompareReport dataclass
+# ---------------------------------------------------------------------------
+
+@dataclass
+class ComaCompareReport:
+    """
+    Head-to-head comparison of Seidel third-order coma vs finite-ray OPD coma.
+
+    Attributes
+    ----------
+    seidel_W131_waves : float
+        Seidel third-order W_131 RMS (waves at wavelength_mm) computed from
+        compute_seidel_coma().  Equals |3·S_II·y_chief| / (8·λ).
+    finite_ray_W131_waves : float
+        Finite-ray OPD W_131 RMS (waves) from Zernike Z_7 fitting via
+        compute_finite_ray_coma().  Captures higher-order coma contributions.
+    residual_W131_waves : float
+        Signed residual: finite_ray_W131_waves − seidel_W131_waves.
+        Positive = finite-ray OPD predicts more coma than Seidel (higher-order
+        contributions present).  Negative = Seidel over-predicts (partial
+        cancellation by higher-order terms).
+    residual_fraction : float
+        residual_W131_waves / seidel_W131_waves.  math.nan when
+        seidel_W131_waves < 1e-15.
+    seidel_S_II : float
+        Raw Seidel coma sum Σ S_II_j (mm²), from the paraxial dual-ray trace.
+    finite_ray_zernike_Z7 : float
+        Fitted Noll Z_7 coefficient (mm) from the finite-ray OPD analysis.
+    n_rays_valid : int
+        Number of pupil sample rays successfully traced in the finite-ray pass.
+    field_height_mm : float
+        Off-axis image field height used for the comparison (mm).
+    wavelength_mm : float
+        Wavelength used for OPD-to-waves conversion (mm).
+    comparison_caveat : str
+        Scope and limitations of the comparison.
+    """
+
+    seidel_W131_waves: float = 0.0
+    finite_ray_W131_waves: float = 0.0
+    residual_W131_waves: float = 0.0
+    residual_fraction: float = math.nan
+    seidel_S_II: float = 0.0
+    finite_ray_zernike_Z7: float = 0.0
+    n_rays_valid: int = 0
+    field_height_mm: float = 0.0
+    wavelength_mm: float = 0.000550
+    comparison_caveat: str = ""
+
+    def to_dict(self) -> dict:
+        return {
+            "ok": True,
+            "seidel_W131_waves": self.seidel_W131_waves,
+            "finite_ray_W131_waves": self.finite_ray_W131_waves,
+            "residual_W131_waves": self.residual_W131_waves,
+            "residual_fraction": (
+                self.residual_fraction
+                if math.isfinite(self.residual_fraction)
+                else None
+            ),
+            "seidel_S_II": self.seidel_S_II,
+            "finite_ray_zernike_Z7": self.finite_ray_zernike_Z7,
+            "n_rays_valid": self.n_rays_valid,
+            "field_height_mm": self.field_height_mm,
+            "wavelength_mm": self.wavelength_mm,
+            "comparison_caveat": self.comparison_caveat,
         }
 
 
@@ -181,6 +279,8 @@ def compute_seidel_coma(
     lens_system_dict: dict,
     wavelength_nm: float = 550.0,
     field_angle_deg: float = 5.0,
+    compare_seidel_to_finite_ray: bool = False,
+    finite_ray_num_pupil_samples: int = 64,
 ) -> "SeidelComaReport | dict":
     """
     Compute the third-order Seidel coma coefficient S_II for a sequential
@@ -202,6 +302,9 @@ def compute_seidel_coma(
           tangential_coma = 3 * S_II * y_chief
           coma_waves = |tangential_coma| / (8 * lambda)
     7. Find dominant surface: argmax_j |S_II_j|.
+    8. Optionally (compare_seidel_to_finite_ray=True) call
+       compute_finite_ray_coma() and populate finite_ray_W131,
+       residual_higher_order_W131, and comparison_caveat fields.
 
     Parameters
     ----------
@@ -220,6 +323,13 @@ def compute_seidel_coma(
         Chief-ray field angle at first surface (degrees, default 5.0).
         Use 0 for on-axis (S_II will be nonzero but chief-ray image height = 0,
         so coma_waves = 0).
+    compare_seidel_to_finite_ray : bool
+        If True, additionally call compute_finite_ray_coma() and populate
+        finite_ray_W131, residual_higher_order_W131, and comparison_caveat
+        fields on the returned SeidelComaReport.  Default False.
+    finite_ray_num_pupil_samples : int
+        Number of pupil samples for the finite-ray OPD pass (default 64).
+        Ignored when compare_seidel_to_finite_ray=False.
 
     Returns
     -------
@@ -385,9 +495,212 @@ def compute_seidel_coma(
     tangential_coma_mm = 3.0 * S_II * y_chief
     coma_waves = abs(tangential_coma_mm) / (8.0 * lam_mm)
 
-    return SeidelComaReport(
+    report = SeidelComaReport(
         S_II=S_II,
         coma_waves_at_lambda=coma_waves,
         dominant_surface_idx=dominant_surface_idx,
         per_surface_contributions=per_surface_contributions,
+    )
+
+    # ---- Optional finite-ray OPD comparison ---------------------------------
+    if compare_seidel_to_finite_ray:
+        _COMPARE_CAVEAT = (
+            "Seidel-vs-finite-ray comparison: Seidel W_131 is third-order only "
+            "(Welford §7 eq. 7.42 / Born & Wolf §5.3 eq. 5.3.29); "
+            "finite-ray W_131 fitted from Zernike Z_7 (Noll 1976 coma_y) via "
+            "3-D skew ray OPD (compute_finite_ray_coma, Welford §5.5 / Born & Wolf §9.2). "
+            "Residual = finite_ray_W131 − seidel_W131 (waves). "
+            "Positive residual = higher-order coma present. "
+            "Monochromatic; stop at first surface; aspheric higher-order terms not modelled."
+        )
+        if not math.isfinite(img_dist):
+            # Afocal stack: finite-ray OPD undefined
+            report.finite_ray_W131 = None
+            report.residual_higher_order_W131 = None
+            report.comparison_caveat = (
+                "Afocal stack: no paraxial focus; finite-ray OPD undefined."
+            )
+        else:
+            opd_result = compute_finite_ray_coma(
+                surfaces=surfaces,
+                field_height_mm=y_chief,
+                num_pupil_samples=finite_ray_num_pupil_samples,
+                aperture_radius_mm=ap,
+                n_object=n0,
+                wavelength_mm=lam_mm,
+            )
+            if not isinstance(opd_result, dict):
+                finite_rms = opd_result.wave_aberration_W131_rms_waves
+                residual = finite_rms - coma_waves
+                report.finite_ray_W131 = finite_rms
+                report.residual_higher_order_W131 = residual
+                report.comparison_caveat = _COMPARE_CAVEAT
+            else:
+                # finite-ray trace failed (e.g. too few valid rays or TIR)
+                report.finite_ray_W131 = None
+                report.residual_higher_order_W131 = None
+                report.comparison_caveat = (
+                    _COMPARE_CAVEAT
+                    + f" [finite-ray trace failed: {opd_result.get('reason', 'unknown')}]"
+                )
+
+    return report
+
+
+# ---------------------------------------------------------------------------
+# Head-to-head comparison function
+# ---------------------------------------------------------------------------
+
+def compare_seidel_vs_finite_ray_coma(
+    surfaces: list,
+    field_height_mm: float,
+    num_pupil_samples: int = 64,
+    aperture_radius_mm: float = 1.0,
+    n_object: float = 1.0,
+    wavelength_nm: float = 550.0,
+) -> "ComaCompareReport | dict":
+    """
+    Direct head-to-head comparison of Seidel third-order coma vs finite-ray
+    OPD coma for a sequential lens stack at a given image field height.
+
+    Computes both the Seidel S_II prediction (paraxial dual-ray trace, Welford
+    §7 eq. 7.42) and the finite-ray OPD W_131 (Zernike Z_7, compute_finite_ray_coma,
+    Welford §5.5 / Born & Wolf §9.2), then reports both values and the
+    signed residual (finite_ray − seidel).
+
+    Parameters
+    ----------
+    surfaces : list of surface dicts
+        Each dict: c (mm^-1), t (mm), n (>= 1.0), optional k.
+    field_height_mm : float
+        Off-axis image field height (mm).  A small angle is derived from
+        field_height_mm / paraxial_image_distance.
+    num_pupil_samples : int
+        Number of pupil rays for finite-ray OPD analysis (default 64).
+    aperture_radius_mm : float
+        Entrance-pupil rim radius (mm).  Default 1.0.
+    n_object : float
+        Refractive index of object space.  Default 1.0.
+    wavelength_nm : float
+        Reference wavelength (nm).  Default 550.
+
+    Returns
+    -------
+    ComaCompareReport  on success.
+    dict {ok: False, reason: ...}  on input error or afocal stack.
+
+    References
+    ----------
+    Welford, W.T. -- "Aberrations of Optical Systems", Adam Hilger, 1986,
+        §7 (Seidel sums, eq. 7.42 coma S_II) and §5.5 (finite-ray OPD).
+    Born, M. & Wolf, E. -- "Principles of Optics", 7th ed., Cambridge, 1999,
+        §5.3 (eq. 5.3.29 tangential coma) and §9.2 (Zernike OPD expansion).
+    Noll, R.J. (1976) "Zernike polynomials and atmospheric turbulence",
+        J. Opt. Soc. Am. 66, 207-211.
+    """
+    # ---- Input validation ---------------------------------------------------
+    if not isinstance(surfaces, list) or len(surfaces) == 0:
+        return _err("surfaces must be a non-empty list of surface dicts")
+    for idx, s in enumerate(surfaces):
+        err = _validate_surface(s, idx)
+        if err:
+            return _err(err)
+
+    e = _guard("field_height_mm", field_height_mm)
+    if e:
+        return _err(e)
+    e = _guard("aperture_radius_mm", aperture_radius_mm, positive=True)
+    if e:
+        return _err(e)
+    e = _guard("n_object", n_object, positive=True)
+    if e:
+        return _err(e)
+    if float(n_object) < 1.0:
+        return _err("n_object must be >= 1.0")
+    e = _guard("wavelength_nm", wavelength_nm, positive=True)
+    if e:
+        return _err(e)
+
+    ap = float(aperture_radius_mm)
+    n0 = float(n_object)
+    fh = float(field_height_mm)
+    lam_mm = float(wavelength_nm) * 1e-6  # nm → mm
+
+    # ---- Derive field angle from field height / paraxial image distance ------
+    h_m = ap
+    u_m = 0.0
+    n_cur = n0
+    for surf in surfaces:
+        c_s = float(surf["c"])
+        t_s = float(surf["t"])
+        n_n = float(surf["n"])
+        u_m = _paraxial_refract(h_m, u_m, n_cur, n_n, c_s)
+        h_m = _paraxial_transfer(h_m, u_m, t_s)
+        n_cur = n_n
+
+    if abs(u_m) < 1e-18:
+        return _err("afocal stack: no paraxial focus; comparison undefined")
+    img_dist = -h_m / u_m
+
+    field_angle_deg = math.degrees(math.atan(abs(fh) / abs(img_dist))) if abs(img_dist) > 1e-10 else 0.0
+
+    # ---- Seidel S_II ---------------------------------------------------------
+    lens_dict = {
+        "surfaces": surfaces,
+        "aperture_radius_mm": ap,
+        "n_object": n0,
+    }
+    seidel_report = compute_seidel_coma(
+        lens_dict,
+        wavelength_nm=wavelength_nm,
+        field_angle_deg=field_angle_deg,
+        compare_seidel_to_finite_ray=False,
+    )
+    if isinstance(seidel_report, dict):
+        return seidel_report  # propagate error
+
+    seidel_waves = seidel_report.coma_waves_at_lambda
+
+    # ---- Finite-ray OPD W_131 -----------------------------------------------
+    opd_result = compute_finite_ray_coma(
+        surfaces=surfaces,
+        field_height_mm=fh,
+        num_pupil_samples=num_pupil_samples,
+        aperture_radius_mm=ap,
+        n_object=n0,
+        wavelength_mm=lam_mm,
+    )
+    if isinstance(opd_result, dict):
+        return opd_result  # propagate error (e.g. too few rays, TIR)
+
+    finite_waves = opd_result.wave_aberration_W131_rms_waves
+    residual = finite_waves - seidel_waves
+    if seidel_waves > 1e-15:
+        residual_frac = residual / seidel_waves
+    else:
+        residual_frac = math.nan
+
+    _CAVEAT = (
+        "Seidel vs finite-ray head-to-head: "
+        "Seidel W_131 (waves) = |3·S_II·y_chief|/(8·λ), paraxial dual-ray trace "
+        "(Welford §7 eq. 7.42 / Born & Wolf §5.3 eq. 5.3.29); "
+        "finite-ray W_131 (waves) = |Z_7 coefficient|/λ from 3-D skew ray OPD, "
+        "Zernike Z_7 projection (Welford §5.5 / Born & Wolf §9.2 / Noll 1976). "
+        "Residual = finite_ray − seidel (waves). "
+        "Positive: higher-order coma (5th-order Hopkins, oblique spherical) dominates. "
+        "Negative: Seidel over-predicts (partial cancellation by higher-order terms). "
+        "Monochromatic; stop at first surface; aspheric higher-order terms not modelled by skew tracer."
+    )
+
+    return ComaCompareReport(
+        seidel_W131_waves=seidel_waves,
+        finite_ray_W131_waves=finite_waves,
+        residual_W131_waves=residual,
+        residual_fraction=residual_frac,
+        seidel_S_II=seidel_report.S_II,
+        finite_ray_zernike_Z7=opd_result.zernike_Z7_coeff,
+        n_rays_valid=opd_result.n_rays_valid,
+        field_height_mm=fh,
+        wavelength_mm=lam_mm,
+        comparison_caveat=_CAVEAT,
     )

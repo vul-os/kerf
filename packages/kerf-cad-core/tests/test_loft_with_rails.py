@@ -131,11 +131,16 @@ class TestTwoProfilesOneRail:
         with pytest.raises(ValueError, match="at least 1"):
             loft_with_rails(profiles, [])
 
-    def test_closed_not_implemented(self):
-        """closed=True should raise NotImplementedError."""
+    def test_closed_produces_body(self):
+        """closed=True should produce a valid Body (not raise NotImplementedError)."""
         profiles, rails = self._setup()
-        with pytest.raises(NotImplementedError):
-            loft_with_rails(profiles, rails, closed=True)
+        # Make profiles wrap: first == last
+        p0 = _line([0, 0, 0], [1, 0, 0])
+        p1 = _line([0, 0, 1], [1, 0, 1])
+        p2 = _line([0, 0, 0], [1, 0, 0])  # same as p0 → closes
+        from kerf_cad_core.geom.brep import Body
+        body = loft_with_rails([p0, p1, p2], rails, closed=True)
+        assert isinstance(body, Body)
 
 
 # ---------------------------------------------------------------------------
@@ -562,3 +567,137 @@ class TestFeatureLoftWithRailsValidation:
             False, False, "perpendicular",
         )
         assert node["id"] == "lr-42"
+
+
+# ---------------------------------------------------------------------------
+# Tests: Closed periodic loft (closed=True)
+# ---------------------------------------------------------------------------
+
+def _approx_circle_xy(radius: float, z: float) -> NurbsCurve:
+    """Degree-2 approximate circle in XY at height z (3 control points)."""
+    import math
+    angles = [0.0, 2 * math.pi / 3, 4 * math.pi / 3]
+    pts = np.array([
+        [radius * math.cos(a), radius * math.sin(a), z]
+        for a in angles
+    ], dtype=float)
+    knots = np.array([0.0, 0.0, 0.0, 1.0, 1.0, 1.0])
+    return NurbsCurve(degree=2, control_points=pts, knots=knots)
+
+
+class TestClosedLoft:
+    """Closed periodic loft tests — closed=True path via Gordon surface.
+
+    Geometry: three circles (z=0, z=0.5, z=0) with first==last.
+    """
+
+    def _setup_closed(self):
+        p0 = _approx_circle_xy(1.0, z=0.0)
+        p1 = _approx_circle_xy(1.2, z=0.5)
+        p2 = _approx_circle_xy(1.0, z=0.0)  # same as p0 → closes loop
+        r0 = _line([1.0, 0.0, 0.0], [1.2, 0.0, 0.5])
+        return [p0, p1, p2], [r0]
+
+    def test_closed_returns_body(self):
+        from kerf_cad_core.geom.brep import Body
+        profiles, rails = self._setup_closed()
+        body = loft_with_rails(profiles, rails, closed=True)
+        assert isinstance(body, Body)
+
+    def test_closed_validate_body(self):
+        from kerf_cad_core.geom.brep import validate_body
+        profiles, rails = self._setup_closed()
+        body = loft_with_rails(profiles, rails, closed=True)
+        res = validate_body(body, open=True)
+        assert res["ok"], f"validate_body failed: {res['errors']}"
+
+    def test_closed_surface_is_nurbs(self):
+        profiles, rails = self._setup_closed()
+        body = loft_with_rails(profiles, rails, closed=True)
+        face = body.solids[0].shells[0].faces[0]
+        assert isinstance(face.surface, NurbsSurface)
+
+    def test_closed_surface_finite_cp(self):
+        profiles, rails = self._setup_closed()
+        body = loft_with_rails(profiles, rails, closed=True)
+        face = body.solids[0].shells[0].faces[0]
+        cp = face.surface.control_points
+        assert np.all(np.isfinite(cp)), "Closed loft control points contain NaN/Inf"
+
+    def test_closed_surface_has_periodic_knots_v(self):
+        """The closed loft knot vector in V should be uniformly spaced (periodic)."""
+        profiles, rails = self._setup_closed()
+        body = loft_with_rails(profiles, rails, closed=True)
+        face = body.solids[0].shells[0].faces[0]
+        srf = face.surface
+        diffs = np.diff(srf.knots_v)
+        assert np.allclose(diffs, diffs[0], rtol=1e-6), (
+            f"Closed loft knots_v should be uniform (periodic); diffs={diffs}"
+        )
+
+    def test_closed_seam_cp_wrap(self):
+        """Last degree_v CP columns should equal first degree_v columns."""
+        profiles, rails = self._setup_closed()
+        body = loft_with_rails(profiles, rails, closed=True)
+        face = body.solids[0].shells[0].faces[0]
+        srf = face.surface
+        cp = srf.control_points
+        d = srf.degree_v
+        wrap = min(d, cp.shape[1] - 1)
+        if wrap > 0:
+            assert np.allclose(cp[:, :wrap, :], cp[:, -wrap:, :], atol=1e-9), (
+                "Seam CP columns should be identical for a closed loft"
+            )
+
+    def test_closed_mismatched_profiles_warn(self):
+        """Mismatched first/last profiles should emit a UserWarning."""
+        import warnings as _w
+        p0 = _approx_circle_xy(1.0, z=0.0)
+        p1 = _approx_circle_xy(1.0, z=0.5)
+        p2 = _approx_circle_xy(3.0, z=0.0)  # very different from p0
+        rail = _line([1.0, 0.0, 0.0], [1.0, 0.0, 0.5])
+        with _w.catch_warnings(record=True) as w:
+            _w.simplefilter("always")
+            body = loft_with_rails([p0, p1, p2], [rail], closed=True)
+        seam_warns = [
+            x for x in w
+            if "differ" in str(x.message).lower() or "closed" in str(x.message).lower()
+        ]
+        assert len(seam_warns) >= 1, "Expected warning about mismatched first/last profiles"
+
+
+class TestClosedLoftTwoRails:
+    """Closed loft with two rails — torus-like topology."""
+
+    def _setup(self):
+        p0 = _approx_circle_xy(1.0, z=0.0)
+        p1 = _approx_circle_xy(1.0, z=1.0)
+        p2 = _approx_circle_xy(1.0, z=0.0)  # same as p0
+        r0 = _line([1.0, 0.0, 0.0], [1.0, 0.0, 1.0])
+        r1 = _line([-1.0, 0.0, 0.0], [-1.0, 0.0, 1.0])
+        return [p0, p1, p2], [r0, r1]
+
+    def test_returns_body_two_rails(self):
+        from kerf_cad_core.geom.brep import Body
+        profiles, rails = self._setup()
+        body = loft_with_rails(profiles, rails, closed=True)
+        assert isinstance(body, Body)
+
+    def test_cp_finite_two_rails(self):
+        profiles, rails = self._setup()
+        body = loft_with_rails(profiles, rails, closed=True)
+        face = body.solids[0].shells[0].faces[0]
+        assert np.all(np.isfinite(face.surface.control_points))
+
+
+def test_closed_feature_loft_with_rails_node_accepts_closed():
+    """feature_loft_with_rails node builder should accept closed=True now."""
+    from kerf_cad_core.feature_loft_with_rails import build_loft_with_rails_node
+    node = build_loft_with_rails_node(
+        "lr-99",
+        ["a.sketch", "b.sketch", "a.sketch"],  # first == last for closed loft
+        ["r0.sketch"],
+        False, True, "perpendicular",
+    )
+    assert node["closed"] is True
+    assert node["op"] == "loft_with_rails"

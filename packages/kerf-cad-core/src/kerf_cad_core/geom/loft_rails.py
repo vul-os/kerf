@@ -35,6 +35,16 @@ user-supplied normal field (``tangent_mode='normal'``).  In both cases the
 constraint is encoded as a derivative boundary condition on the B-spline
 interpolation grid (Piegl & Tiller §9.3.5).
 
+Closed loft (closed=True) — periodic V skinning
+------------------------------------------------
+When ``closed=True`` the first and last profiles should be identical so the
+surface wraps in V.  The algorithm:
+  1. Warns if first and last profiles are not coincident.
+  2. Appends the first profile at the end to create an extended profile list.
+  3. Builds an open Gordon surface on the extended list.
+  4. Clamps the seam by copying the first ``degree`` CP columns over the last.
+  5. Replaces knots_v with a periodic open-uniform knot vector (P&T §9.4.5).
+
 Output
 ------
 ``loft_with_rails`` returns a ``Body`` (open Shell) via ``_open_shell_body``.
@@ -52,6 +62,7 @@ _gordon_loft_surface(profiles, rails, *, degree, tol, grid_n)
 
 from __future__ import annotations
 
+import warnings
 from typing import List, Optional
 
 import numpy as np
@@ -170,6 +181,48 @@ def _make_clamped_knots(n: int, degree: int) -> np.ndarray:
     return knots
 
 
+def _make_periodic_knots(n_ctrl: int, degree: int) -> np.ndarray:
+    """Build a periodic (uniform) knot vector for n_ctrl control points.
+
+    For a periodic B-spline of degree *d* with *n* control points the knot
+    vector has ``n + d + 1`` entries uniformly spaced over an extended range.
+    The usable parameter domain is [knots[d], knots[n]] (open-periodic
+    convention, Piegl & Tiller §9.4.5).
+    """
+    m = n_ctrl + degree + 1
+    # Uniform spacing — no end clamping (open-periodic convention).
+    knots = np.linspace(-float(degree) / n_ctrl, 1.0, m)
+    return knots
+
+
+def _check_profiles_closed_coincidence(
+    profiles: List[NurbsCurve],
+    tol: float = 1e-3,
+    n_samp: int = 16,
+) -> None:
+    """Warn if first and last profiles are not coincident for a closed loft.
+
+    For a well-formed closed loft the caller should supply identical first and
+    last profiles.  A UserWarning is emitted if they differ by more than *tol*
+    mm mean distance; the loft proceeds regardless (seam-clamping still closes).
+    """
+    cs_first = profiles[0]
+    cs_last = profiles[-1]
+    ts = np.linspace(0.0, 1.0, n_samp)
+    pts_first = np.array([_eval_at(cs_first, float(t)) for t in ts])
+    pts_last = np.array([_eval_at(cs_last, float(t)) for t in ts])
+    mean_dist = float(np.linalg.norm(pts_first - pts_last, axis=1).mean())
+    if mean_dist > tol:
+        warnings.warn(
+            f"loft_with_rails: closed=True but first and last profiles differ by "
+            f"{mean_dist:.4g} mm (mean over {n_samp} samples). "
+            "For a clean closed loft supply identical first and last profiles. "
+            "The surface seam will be clamped but shape continuity may be degraded.",
+            UserWarning,
+            stacklevel=4,
+        )
+
+
 # ---------------------------------------------------------------------------
 # Core Gordon surface constructor
 # ---------------------------------------------------------------------------
@@ -264,7 +317,6 @@ def _gordon_loft_surface(
             # Use 10× tol as the Gordon intersection check here.
             _check_tol = max(tol * 10, 0.5)  # generous for general inputs
             if d1 > _check_tol or d2 > _check_tol:
-                import warnings
                 warnings.warn(
                     f"loft_with_rails: profile {i} / rail {j} intersection "
                     f"residual ({max(d1, d2):.4g}) exceeds tol ({_check_tol:.4g}); "
@@ -319,6 +371,68 @@ def _gordon_loft_surface(
     return surface
 
 
+def _gordon_closed_loft_surface(
+    profiles: List[NurbsCurve],
+    rails: List[NurbsCurve],
+    *,
+    degree: int = 3,
+    tol: float = 1e-4,
+    grid_n: int = 32,
+    tangent_mode: str = "perpendicular",
+    normal_field: Optional[np.ndarray] = None,
+) -> NurbsSurface:
+    """Build a closed (periodic in V) Gordon surface.
+
+    The profiles list may or may not already include the first profile at the
+    end.  This function:
+
+    1. Checks that first and last profiles are coincident (warns if not).
+    2. Appends the first profile at the end to form an (m+1)-length list
+       so that the grid's first and last v-rows are identical.
+    3. Calls ``_gordon_loft_surface`` on the extended list → open surface
+       whose first and last v-rows coincide.
+    4. Clamps the seam: last ``degree`` CP columns := first ``degree`` columns
+       (hard seam-clamping per P&T §9.4.5).
+    5. Replaces knots_v with a periodic open-uniform knot vector.
+
+    Parameters mirror those of ``_gordon_loft_surface``.
+    """
+    # Warn if first and last profiles are not coincident.
+    _check_profiles_closed_coincidence(profiles, tol=1e-3)
+
+    # Extend profile list so the Gordon grid wraps (first profile appended).
+    profiles_ext = list(profiles) + [profiles[0]]
+
+    # Build the open Gordon surface on the extended list.
+    surface_open = _gordon_loft_surface(
+        profiles_ext,
+        rails,
+        degree=degree,
+        tol=tol,
+        grid_n=grid_n,
+        tangent_mode=tangent_mode,
+        normal_field=normal_field,
+    )
+
+    # Clamp the seam: last `degree` CP columns := first `degree` columns.
+    cp = surface_open.control_points.copy()
+    n_cp_v = cp.shape[1]
+    wrap = min(surface_open.degree_v, n_cp_v - 1)
+    if wrap > 0:
+        cp[:, -wrap:, :] = cp[:, :wrap, :]
+
+    # Build a periodic knot vector in V.
+    knots_v_periodic = _make_periodic_knots(n_cp_v, surface_open.degree_v)
+
+    return NurbsSurface(
+        degree_u=surface_open.degree_u,
+        degree_v=surface_open.degree_v,
+        control_points=cp,
+        knots_u=surface_open.knots_u,
+        knots_v=knots_v_periodic,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -357,8 +471,9 @@ def loft_with_rails(
         Degree of the output NURBS surface in both parametric directions.
         Clamped to min(3, n_profiles-1, n_rails+1) automatically.
     closed : bool
-        If True the surface loops the last profile back to the first.
-        Not yet implemented — raises NotImplementedError.
+        If True the surface loops the last profile back to the first
+        (periodic V loft).  First and last profiles should be coincident
+        for a clean seam; a warning is issued if they differ.
     tol : float
         Intersection tolerance for the Gordon surface.  Profiles and rails
         do not need to mathematically intersect; the function snaps profile
@@ -385,8 +500,6 @@ def loft_with_rails(
     ------
     ValueError
         If fewer than 2 profiles or 1 rail are provided.
-    NotImplementedError
-        If ``closed=True`` (not yet implemented).
     BuildError
         If the resulting surface fails ``validate_body``.
 
@@ -408,19 +521,25 @@ def loft_with_rails(
     spaced in [0, 1] across the rail set.
     """
     if closed:
-        raise NotImplementedError(
-            "loft_with_rails: closed=True is not yet implemented."
+        surface = _gordon_closed_loft_surface(
+            profiles,
+            rails,
+            degree=degree,
+            tol=tol,
+            grid_n=grid_n,
+            tangent_mode=tangent_mode,
+            normal_field=normal_field,
         )
-
-    surface = _gordon_loft_surface(
-        profiles,
-        rails,
-        degree=degree,
-        tol=tol,
-        grid_n=grid_n,
-        tangent_mode=tangent_mode,
-        normal_field=normal_field,
-    )
+    else:
+        surface = _gordon_loft_surface(
+            profiles,
+            rails,
+            degree=degree,
+            tol=tol,
+            grid_n=grid_n,
+            tangent_mode=tangent_mode,
+            normal_field=normal_field,
+        )
 
     # Wrap in a validated open-shell Body.
     from kerf_cad_core.geom.brep_build import _open_shell_body

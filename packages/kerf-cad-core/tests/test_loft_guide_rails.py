@@ -356,20 +356,30 @@ def test_zero_guide_rails_raises():
 
 
 # ---------------------------------------------------------------------------
-# Test 7: closed_v=True raises NotImplementedError
+# Test 7: closed_v=True produces a valid NurbsSurface (not NotImplementedError)
 # ---------------------------------------------------------------------------
 
-def test_closed_v_raises():
-    cs0 = _line([0.0, 0.0, 0.0], [1.0, 0.0, 0.0])
-    cs1 = _line([0.0, 0.0, 1.0], [1.0, 0.0, 1.0])
-    guide = _line([0.0, 0.0, 0.0], [0.0, 0.0, 1.0])
+def test_closed_v_produces_surface():
+    """closed_v=True should produce a NurbsSurface, not raise NotImplementedError."""
+    cs0 = _approx_circle(1.0, z=0.0)
+    cs1 = _approx_circle(1.2, z=0.5)
+    cs2 = _approx_circle(1.0, z=0.0)  # Same as cs0 — closes the loop
+    guide = _line([1.0, 0.0, 0.0], [1.0, 0.0, 0.0])
+    # A vertical loop guide: same start and end since the surface is closed
+    guide = _line([1.0, 0.0, 0.0], [1.0, 0.0, 0.0])
+    # Actually use a straight guide that makes spatial sense
+    guide = _approx_circle(1.0, z=0.0)  # use the same circle as a guide
+    guide = _line([1.0, 0.0, 0.0], [1.2, 0.0, 0.5])
     spec = GuideRailLoftSpec(
-        cross_section_curves=[cs0, cs1],
+        cross_section_curves=[cs0, cs1, cs2],
         guide_rail_curves=[guide],
+        num_v_samples=10,
+        degree_v=2,
         closed_v=True,
     )
-    with pytest.raises(NotImplementedError):
-        loft_with_guide_rails(spec)
+    report = loft_with_guide_rails(spec)
+    assert isinstance(report.loft_surface, NurbsSurface)
+    assert np.all(np.isfinite(report.loft_surface.control_points))
 
 
 # ---------------------------------------------------------------------------
@@ -572,3 +582,181 @@ def test_deviation_non_negative():
     report = loft_with_guide_rails(spec)
     assert report.max_guide_rail_deviation_mm >= 0.0
     assert report.mean_guide_rail_deviation_mm >= 0.0
+
+
+# ---------------------------------------------------------------------------
+# Tests 18-25: Closed loft (closed_v=True) new tests
+# ---------------------------------------------------------------------------
+
+class TestClosedVLoft:
+    """Closed periodic loft: closed_v=True wraps the surface in V.
+
+    Uses approximate circles at z=0 and z=1 (torus / vase topology).
+    The first and last cross-sections are identical.
+    """
+
+    def _make_torus_spec(self, radius=1.0, height=0.5, n_cs=4) -> GuideRailLoftSpec:
+        """Create a torus-like spec: n_cs circles at equal z-intervals, first==last."""
+        cs = [_approx_circle(radius, z=0.0)]
+        zs = [height / (n_cs - 1) * i for i in range(1, n_cs - 1)]
+        for z in zs:
+            cs.append(_approx_circle(radius, z=z))
+        cs.append(_approx_circle(radius, z=0.0))  # first == last
+        guide = _line([radius, 0.0, 0.0], [radius, 0.0, height * (n_cs - 2) / (n_cs - 1)])
+        return GuideRailLoftSpec(
+            cross_section_curves=cs,
+            guide_rail_curves=[guide],
+            num_v_samples=12,
+            degree_v=2,
+            closed_v=True,
+        )
+
+    def test_returns_report(self):
+        report = loft_with_guide_rails(self._make_torus_spec())
+        assert isinstance(report, GuideRailLoftReport)
+
+    def test_surface_is_nurbs(self):
+        report = loft_with_guide_rails(self._make_torus_spec())
+        assert isinstance(report.loft_surface, NurbsSurface)
+
+    def test_control_points_finite(self):
+        report = loft_with_guide_rails(self._make_torus_spec())
+        cp = report.loft_surface.control_points
+        assert np.all(np.isfinite(cp)), "Control points contain NaN or Inf"
+
+    def test_closed_surface_has_periodic_knots(self):
+        """A closed loft should have a periodic (non-clamped) knot vector in V."""
+        report = loft_with_guide_rails(self._make_torus_spec())
+        srf = report.loft_surface
+        knots_v = srf.knots_v
+        # A periodic knot vector has no repeated end knots (start < knots[degree]).
+        # For a clamped knot vector, knots[0] == 0.0 and has degree+1 repetitions.
+        # For a periodic vector, spacing is uniform with no end clamping.
+        diffs = np.diff(knots_v)
+        # All spacings should be equal (uniform periodic).
+        assert np.allclose(diffs, diffs[0], rtol=1e-6), (
+            f"Periodic knot vector should be uniform; diffs={diffs}"
+        )
+
+    def test_num_cross_sections_stored(self):
+        n_cs = 5
+        spec = self._make_torus_spec(n_cs=n_cs)
+        report = loft_with_guide_rails(spec)
+        assert report.num_cross_sections == n_cs
+
+    def test_report_fields_present(self):
+        report = loft_with_guide_rails(self._make_torus_spec())
+        assert report.max_guide_rail_deviation_mm >= 0.0
+        assert report.mean_guide_rail_deviation_mm >= 0.0
+        assert isinstance(report.num_self_intersections, int)
+        assert len(report.honest_caveat) > 0
+
+    def test_closed_v_seam_cp_wrap(self):
+        """Last degree_v CP columns should equal first degree_v CP columns (seam clamp)."""
+        report = loft_with_guide_rails(self._make_torus_spec())
+        srf = report.loft_surface
+        cp = srf.control_points  # (nu, nv, 3)
+        d = srf.degree_v
+        wrap = min(d, cp.shape[1] - 1)
+        if wrap > 0:
+            first = cp[:, :wrap, :]
+            last = cp[:, -wrap:, :]
+            assert np.allclose(first, last, atol=1e-10), (
+                f"Seam CP wrap failed: first and last {wrap} columns differ"
+            )
+
+
+def test_closed_v_mismatched_sections_warn():
+    """closed_v=True with mismatched first/last cross-sections should warn."""
+    cs0 = _approx_circle(1.0, z=0.0)
+    cs1 = _approx_circle(0.8, z=0.5)
+    cs2 = _approx_circle(2.0, z=0.0)  # Different from cs0 → should warn
+    guide = _line([1.0, 0.0, 0.0], [1.0, 0.0, 0.5])
+    spec = GuideRailLoftSpec(
+        cross_section_curves=[cs0, cs1, cs2],
+        guide_rail_curves=[guide],
+        num_v_samples=8,
+        closed_v=True,
+    )
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        report = loft_with_guide_rails(spec)
+    # Should have warned about mismatched seam.
+    assert any("closed" in str(warning.message).lower() or "differ" in str(warning.message).lower()
+               for warning in w), "Expected a warning about mismatched seam"
+    # But should still produce a surface.
+    assert isinstance(report.loft_surface, NurbsSurface)
+
+
+def test_closed_v_coincident_sections_no_seam_warn():
+    """closed_v=True with identical first/last sections should not warn about the seam."""
+    cs0 = _approx_circle(1.0, z=0.0)
+    cs1 = _approx_circle(1.0, z=0.5)
+    cs2 = _approx_circle(1.0, z=0.0)  # Exactly the same as cs0
+    guide = _line([1.0, 0.0, 0.0], [1.0, 0.0, 0.5])
+    spec = GuideRailLoftSpec(
+        cross_section_curves=[cs0, cs1, cs2],
+        guide_rail_curves=[guide],
+        num_v_samples=10,
+        closed_v=True,
+    )
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        report = loft_with_guide_rails(spec)
+    seam_warns = [
+        x for x in w
+        if "differ" in str(x.message).lower() and "closed" in str(x.message).lower()
+    ]
+    assert len(seam_warns) == 0, f"Unexpected seam warnings: {[str(x.message) for x in seam_warns]}"
+    assert isinstance(report.loft_surface, NurbsSurface)
+
+
+def test_closed_v_vase_shape():
+    """A vase: circles of different radii at different heights, first==last at z=0."""
+    cs = [
+        _approx_circle(1.0, z=0.0),
+        _approx_circle(0.7, z=0.5),
+        _approx_circle(1.2, z=1.0),
+        _approx_circle(1.0, z=0.0),  # same as first → closes the vase
+    ]
+    guide = _line([1.0, 0.0, 0.0], [1.2, 0.0, 1.0])
+    spec = GuideRailLoftSpec(
+        cross_section_curves=cs,
+        guide_rail_curves=[guide],
+        num_v_samples=14,
+        degree_v=2,
+        closed_v=True,
+    )
+    report = loft_with_guide_rails(spec)
+    assert isinstance(report.loft_surface, NurbsSurface)
+    assert np.all(np.isfinite(report.loft_surface.control_points))
+
+
+def test_closed_v_tilted_ellipse_loop():
+    """Tilted ellipse cross-sections; first==last. Surface should wrap cleanly."""
+    def _ellipse(a, b, z) -> NurbsCurve:
+        pts = np.array([
+            [a, 0.0, z],
+            [0.0, b, z],
+            [-a, 0.0, z],
+        ], dtype=float)
+        knots = np.array([0.0, 0.0, 0.0, 1.0, 1.0, 1.0])
+        return NurbsCurve(degree=2, control_points=pts, knots=knots)
+
+    cs = [
+        _ellipse(1.0, 0.5, 0.0),
+        _ellipse(0.8, 0.6, 0.5),
+        _ellipse(1.0, 0.5, 0.0),  # same as first
+    ]
+    guide = _line([1.0, 0.0, 0.0], [0.8, 0.0, 0.5])
+    spec = GuideRailLoftSpec(
+        cross_section_curves=cs,
+        guide_rail_curves=[guide],
+        num_v_samples=10,
+        closed_v=True,
+    )
+    report = loft_with_guide_rails(spec)
+    assert isinstance(report.loft_surface, NurbsSurface)
+    srf = report.loft_surface
+    assert srf.control_points.ndim == 3
+    assert srf.control_points.shape[2] == 3

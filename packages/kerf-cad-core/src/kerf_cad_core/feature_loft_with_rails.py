@@ -204,8 +204,9 @@ feature_loft_with_rails_spec = ToolSpec(
             "closed": {
                 "type": "boolean",
                 "description": (
-                    "True = join last profile back to first (not yet "
-                    "implemented; will return BAD_ARGS). Default false."
+                    "True = join last profile back to first (closed periodic "
+                    "loft; first and last profiles should be coincident). "
+                    "Default false."
                 ),
             },
             "tangent_mode": {
@@ -266,12 +267,6 @@ async def run_feature_loft_with_rails(ctx: ProjectCtx, args: bytes) -> str:
     tangent_mode = a.get("tangent_mode", "perpendicular")
     name = a.get("name", "").strip() or ""
     node_id = a.get("id", "").strip()
-
-    # closed=True is not yet implemented
-    if closed:
-        return err_payload(
-            "loft_with_rails: closed=True is not yet implemented", "BAD_ARGS"
-        )
 
     # Validate
     err_msg, err_code = validate_loft_with_rails_args(

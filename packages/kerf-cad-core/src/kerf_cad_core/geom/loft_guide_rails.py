@@ -25,6 +25,19 @@ Algorithm (2D-deformation blend):
      and collect into a dense (n_u_samples × num_v_samples × 3) grid.
   6. Fit an interpolating NurbsSurface through the grid (Piegl & Tiller §9.4.5).
 
+Closed loft (closed_v=True) — Piegl & Tiller §9.4.5 periodic skinning
+-----------------------------------------------------------------------
+When ``closed_v=True`` the surface wraps in V so the first and last
+cross-sections are the same row.  Algorithm extension:
+  a. Pre-validate: warn if first and last cross-sections are not coincident.
+  b. Sample num_v+1 v-stations, with the last station duplicating v=0 so the
+     grid rows are literally the same at the seam.
+  c. Fit the surface normally through this extended grid (open fit, seam rows
+     coincident → the fitted first and last CP columns converge).
+  d. Replace the last ``degree_v`` CP columns with the first ``degree_v``
+     columns (hard seam-clamping, P&T §9.4.5).
+  e. Replace knots_v with a periodic (open-uniform) knot vector.
+
 HONEST CAVEATS
 --------------
 - This is an *approximate* guide-rail constraint, NOT an exact constrained-NURBS
@@ -87,8 +100,10 @@ class GuideRailLoftSpec:
         Degree of the output surface in the v (loft) direction.  Clamped
         to min(degree_v, num_cross_sections − 1).
     closed_v
-        If True the loft wraps from the last cross-section back to the
-        first.  Not yet implemented (raises NotImplementedError).
+        If True the loft wraps from the last cross-section back to the first
+        (periodic V loft, P&T §9.4.5).  First and last cross-sections should
+        be coincident for a clean seam; a warning is issued if they differ
+        significantly.
     """
 
     cross_section_curves: List[NurbsCurve]
@@ -222,6 +237,20 @@ def _make_clamped_knots(n_ctrl: int, degree: int) -> np.ndarray:
     return knots
 
 
+def _make_periodic_knots(n_ctrl: int, degree: int) -> np.ndarray:
+    """Build a periodic (uniform) knot vector for n_ctrl control points.
+
+    For a periodic B-spline of degree *d* with *n* control points the knot
+    vector has ``n + d + 1`` entries uniformly spaced over an extended range.
+    The usable parameter domain is [knots[d], knots[n]] which maps to [0, 1]
+    under the open-periodic convention (Piegl & Tiller §9.4.5).
+    """
+    m = n_ctrl + degree + 1
+    # Uniform spacing — no end clamping (open-periodic).
+    knots = np.linspace(-float(degree) / n_ctrl, 1.0, m)
+    return knots
+
+
 def _fit_curve_through_points(pts: np.ndarray, degree: int) -> NurbsCurve:
     """Fit a clamped B-spline of given degree through (n, 3) point sequence.
 
@@ -326,6 +355,49 @@ def _interpolating_surface_from_grid(
     )
 
 
+def _interpolating_surface_closed_v(
+    grid: np.ndarray,
+    degree_u: int,
+    degree_v: int,
+) -> NurbsSurface:
+    """Build a V-closed interpolating NurbsSurface (periodic in V).
+
+    For a closed loft the grid's first and last v-columns should be identical
+    (the caller ensures this).  We:
+      1. Fit the open surface normally through the full (nu, nv, 3) grid.
+      2. Overwrite the last ``degree_v`` CP columns with the first ``degree_v``
+         columns (hard seam-clamping per P&T §9.4.5).
+      3. Replace knots_v with a periodic open-uniform knot vector so the
+         parameter domain wraps continuously around the seam.
+
+    References: Piegl & Tiller, "The NURBS Book" §9.4.5 (periodic skinning).
+    """
+    nu, nv, _ = grid.shape
+    degree_u = max(1, min(degree_u, nu - 1))
+    degree_v = max(1, min(degree_v, nv - 1))
+
+    # Step 1: fit the open surface normally.
+    surface = _interpolating_surface_from_grid(grid, degree_u, degree_v)
+
+    # Step 2: clamp the seam.
+    cp = surface.control_points.copy()  # (n_cp_u, n_cp_v, 3)
+    n_cp_v = cp.shape[1]
+    wrap = min(degree_v, n_cp_v - 1)
+    if wrap > 0:
+        cp[:, -wrap:, :] = cp[:, :wrap, :]
+
+    # Step 3: build a periodic knot vector in V.
+    knots_v_periodic = _make_periodic_knots(n_cp_v, surface.degree_v)
+
+    return NurbsSurface(
+        degree_u=surface.degree_u,
+        degree_v=surface.degree_v,
+        control_points=cp,
+        knots_u=surface.knots_u,
+        knots_v=knots_v_periodic,
+    )
+
+
 def _closest_param_on_surface_row(
     surface_row: np.ndarray,
     point: np.ndarray,
@@ -333,6 +405,37 @@ def _closest_param_on_surface_row(
     """Return the index of the closest point in a (n,3) row to *point*."""
     dists = np.linalg.norm(surface_row - point[None, :], axis=1)
     return int(np.argmin(dists))
+
+
+def _check_closed_v_coincidence(
+    cross_sections: List[NurbsCurve],
+    tol: float = 1e-3,
+    n_samp: int = 16,
+) -> None:
+    """Warn if first and last cross-sections are not coincident for a closed loft.
+
+    For a well-formed closed loft the user should supply identical first and
+    last cross-sections.  This function samples both curves at ``n_samp``
+    uniform parameters and checks the mean point-to-point distance.  If the
+    distance exceeds *tol* a UserWarning is emitted, but the loft proceeds
+    (the seam-clamping step will still close the surface).
+    """
+    cs_first = cross_sections[0]
+    cs_last = cross_sections[-1]
+    ts = np.linspace(0.0, 1.0, n_samp)
+    pts_first = np.array([_eval_curve_at(cs_first, float(t)) for t in ts])
+    pts_last = np.array([_eval_curve_at(cs_last, float(t)) for t in ts])
+    dists = np.linalg.norm(pts_first - pts_last, axis=1)
+    mean_dist = float(dists.mean())
+    if mean_dist > tol:
+        warnings.warn(
+            f"loft_with_guide_rails: closed_v=True but first and last cross-sections "
+            f"differ by {mean_dist:.4g} mm (mean over {n_samp} samples). "
+            "For a clean closed loft supply identical first and last cross-sections. "
+            "The surface seam will be clamped closed but shape continuity may be degraded.",
+            UserWarning,
+            stacklevel=4,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -356,8 +459,6 @@ def loft_with_guide_rails(spec: GuideRailLoftSpec) -> GuideRailLoftReport:
     ------
     ValueError
         If fewer than 2 cross-sections or fewer than 1 guide rail is provided.
-    NotImplementedError
-        If ``spec.closed_v`` is True.
     """
     cross_sections = list(spec.cross_section_curves)
     guide_rails = list(spec.guide_rail_curves)
@@ -376,10 +477,10 @@ def loft_with_guide_rails(spec: GuideRailLoftSpec) -> GuideRailLoftReport:
         raise ValueError(
             f"loft_with_guide_rails: at least 1 guide rail required; got {n_rails}"
         )
+
     if closed_v:
-        raise NotImplementedError(
-            "loft_with_guide_rails: closed_v=True is not yet implemented."
-        )
+        # Pre-validate: warn if first and last cross-sections are not coincident.
+        _check_closed_v_coincidence(cross_sections)
 
     # Clamp degree_v.
     deg_v = min(deg_v, m - 1)
@@ -396,11 +497,18 @@ def loft_with_guide_rails(spec: GuideRailLoftSpec) -> GuideRailLoftReport:
     sigma = 1.0 / (2.0 * n_rails) if n_rails > 1 else 0.5
     sigma = max(sigma, 0.05)
 
-    # V-parameter samples.
-    v_samples = np.linspace(0.0, 1.0, num_v)
+    # For a closed loft, sample one extra v-column so v=0 and v=1 produce the
+    # same cross-section geometry (explicitly closes the grid loop at the seam).
+    num_v_grid = num_v + 1 if closed_v else num_v
 
-    # Build the dense grid: (n_u, num_v, 3).
-    grid = np.zeros((n_u, num_v, 3))
+    # V-parameter samples.
+    v_samples = np.linspace(0.0, 1.0, num_v_grid)
+    if closed_v:
+        # Force last sample to v=0 so the last grid column equals the first.
+        v_samples[-1] = 0.0
+
+    # Build the dense grid: (n_u, num_v_grid, 3).
+    grid = np.zeros((n_u, num_v_grid, 3))
 
     # Also track guide rail evaluation vs grid row for deviation measurement.
     deviation_samples: List[float] = []
@@ -454,10 +562,13 @@ def loft_with_guide_rails(spec: GuideRailLoftSpec) -> GuideRailLoftReport:
     # ---------------------------------------------------------------------------
     deg_u = min(3, n_u - 1)
     deg_u = max(1, deg_u)
-    deg_v_eff = min(deg_v, num_v - 1)
+    deg_v_eff = min(deg_v, num_v_grid - 1)
     deg_v_eff = max(1, deg_v_eff)
 
-    surface = _interpolating_surface_from_grid(grid, deg_u, deg_v_eff)
+    if closed_v:
+        surface = _interpolating_surface_closed_v(grid, deg_u, deg_v_eff)
+    else:
+        surface = _interpolating_surface_from_grid(grid, deg_u, deg_v_eff)
 
     # ---------------------------------------------------------------------------
     # QC: guide rail deviation on the fitted surface.
@@ -642,7 +753,11 @@ if _REGISTRY_AVAILABLE:
                 },
                 "closed_v": {
                     "type": "boolean",
-                    "description": "If true, the loft wraps from the last cross-section to the first. NOT YET IMPLEMENTED.",
+                    "description": (
+                        "If true, the loft wraps from the last cross-section back to the first "
+                        "(periodic V loft, P&T §9.4.5). First and last cross-sections should be "
+                        "coincident for a clean seam; a warning is issued if they differ."
+                    ),
                 },
             },
             "required": ["cross_section_curves", "guide_rail_curves"],

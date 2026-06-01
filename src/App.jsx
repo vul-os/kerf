@@ -62,6 +62,7 @@ const OpticsDesignPanel = lazy(() => import('./components/optics/OpticsDesignPan
 const ManufacturingPanel = lazy(() => import('./components/ManufacturingPanel.jsx'))
 const ProductLifecyclePanel = lazy(() => import('./components/ProductLifecyclePanel.jsx'))
 const StructuralPanel = lazy(() => import('./components/arch/StructuralPanel.jsx'))
+const BIMCivilPanel = lazy(() => import('./components/arch/BIMCivilPanel.jsx'))
 const HorologyPage = lazy(() => import('./routes/domains/Horology.jsx'))
 const PipingPage = lazy(() => import('./routes/domains/Piping.jsx'))
 const PackagingPage = lazy(() => import('./routes/domains/Packaging.jsx'))
@@ -229,6 +230,8 @@ export default function App() {
       <Route path="/lifecycle" element={<ProductLifecyclePanel />} />
       <Route path="/plm-fw" element={<ProductLifecyclePanel />} />
       <Route path="/structural" element={<StructuralPanel />} />
+      <Route path="/aec" element={<BIMCivilPanel />} />
+      <Route path="/bim" element={<BIMCivilPanel />} />
       <Route path="/arch" element={<StructuralPanel />} />
       <Route path="/domains/horology" element={<HorologyPage />} />
       <Route path="/domains/piping" element={<PipingPage />} />

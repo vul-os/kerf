@@ -16,6 +16,14 @@ Tests cover:
 - SculptStroke defaults
 - Invalid brush_type raises ValueError
 - Zero-radius raises ValueError
+- smooth-taubin: variance reduces on noisy sphere, volume preserved within 1%
+- smooth-taubin vs smooth-naive: taubin has less shrink on repeated passes
+- smooth-taubin single λ pass: low-pass effect
+- smooth-taubin two passes (λ + μ): no DC shift
+- smooth-taubin: brush_type_applied echo
+- smooth-taubin: out-of-radius vertices unchanged
+- smooth-taubin: strength=0 → no change
+- _taubin_smooth_one_pass: degenerate/isolated vertices do not crash
 """
 
 from __future__ import annotations
@@ -29,6 +37,7 @@ from kerf_cad_core.mesh_sculpt_brushes import (
     MeshSculptResult,
     SculptStroke,
     apply_sculpt_brush,
+    _taubin_smooth_one_pass,
 )
 
 
@@ -634,3 +643,444 @@ class TestMeshSculptResultFields:
         assert result.num_vertices_modified == 0
         assert result.max_displacement_mm == pytest.approx(0.0)
         assert result.mean_displacement_mm == pytest.approx(0.0)
+
+
+# ---------------------------------------------------------------------------
+# Helpers for Taubin tests
+# ---------------------------------------------------------------------------
+
+
+def _icosphere(radius: float = 5.0, subdivisions: int = 2):
+    """Generate a triangulated icosphere as (vertices, faces).
+
+    Starts from a regular icosahedron and subdivides each triangle into 4
+    sub-triangles ``subdivisions`` times.  All vertices are projected back onto
+    the sphere of the given *radius* after each subdivision.
+
+    Used for volume-preservation and shrinkage tests (a sphere has analytic
+    properties: volume = 4/3 π r³, centroid = origin).
+    """
+    # Golden ratio
+    phi = (1.0 + math.sqrt(5.0)) / 2.0
+    # 12 vertices of a regular icosahedron
+    raw = [
+        (-1,  phi, 0), ( 1,  phi, 0), (-1, -phi, 0), ( 1, -phi, 0),
+        (0, -1,  phi), (0,  1,  phi), (0, -1, -phi), (0,  1, -phi),
+        ( phi, 0, -1), ( phi, 0,  1), (-phi, 0, -1), (-phi, 0,  1),
+    ]
+    def norm_to_r(v):
+        l = math.sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2])
+        return (v[0]/l*radius, v[1]/l*radius, v[2]/l*radius)
+
+    vertices = [norm_to_r(v) for v in raw]
+    faces = [
+        [0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11],
+        [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8],
+        [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9],
+        [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1],
+    ]
+
+    edge_midpoints: dict = {}
+
+    def midpoint_idx(a, b):
+        key = (min(a, b), max(a, b))
+        if key not in edge_midpoints:
+            va = vertices[a]
+            vb = vertices[b]
+            mid = ((va[0]+vb[0])/2, (va[1]+vb[1])/2, (va[2]+vb[2])/2)
+            edge_midpoints[key] = len(vertices)
+            vertices.append(norm_to_r(mid))
+        return edge_midpoints[key]
+
+    for _ in range(subdivisions):
+        new_faces = []
+        edge_midpoints.clear()
+        for tri in faces:
+            a, b, c = tri
+            ab = midpoint_idx(a, b)
+            bc = midpoint_idx(b, c)
+            ca = midpoint_idx(c, a)
+            new_faces += [[a, ab, ca], [b, bc, ab], [c, ca, bc], [ab, bc, ca]]
+        faces = new_faces
+
+    return vertices, faces
+
+
+def _mesh_volume(vertices, faces):
+    """Compute signed mesh volume via the divergence theorem (triangle faces only).
+
+    V = (1/6) Σ (v0 · (v1 × v2))  — exact for closed triangle meshes.
+    """
+    total = 0.0
+    for face in faces:
+        if len(face) != 3:
+            continue
+        v0 = vertices[face[0]]
+        v1 = vertices[face[1]]
+        v2 = vertices[face[2]]
+        # Scalar triple product
+        total += (
+            v0[0] * (v1[1] * v2[2] - v1[2] * v2[1])
+            + v0[1] * (v1[2] * v2[0] - v1[0] * v2[2])
+            + v0[2] * (v1[0] * v2[1] - v1[1] * v2[0])
+        )
+    return abs(total) / 6.0
+
+
+def _add_sphere_noise(vertices, noise_amp: float = 0.3):
+    """Add per-vertex radial noise to a sphere mesh (reproducible seed)."""
+    import random
+    rng = random.Random(7)
+    result = []
+    for v in vertices:
+        r = math.sqrt(v[0]**2 + v[1]**2 + v[2]**2)
+        if r < 1e-12:
+            result.append(v)
+            continue
+        dr = rng.uniform(-noise_amp, noise_amp)
+        scale = (r + dr) / r
+        result.append((v[0]*scale, v[1]*scale, v[2]*scale))
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Test 14: smooth-taubin on noisy sphere — variance reduces, volume preserved
+# ---------------------------------------------------------------------------
+
+
+class TestSmoothTaubinNoisySphere:
+    """GK-P22 T14: smooth-taubin reduces noise while preserving volume.
+
+    Criteria:
+    - Z-variance (and total-radius variance) decreases after one brush pass.
+    - Volume of the smoothed sphere is within 1% of the input volume.
+      (Taubin λ|μ is specifically designed to prevent shrinkage.)
+    """
+
+    def setup_method(self):
+        self.sphere_verts, self.faces = _icosphere(radius=10.0, subdivisions=2)
+        self.noisy_verts = _add_sphere_noise(self.sphere_verts, noise_amp=1.5)
+        self.stroke = SculptStroke(
+            position_xyz_mm=(0.0, 0.0, 0.0),
+            radius_mm=20.0,  # covers the whole sphere
+            brush_type="smooth-taubin",
+            strength=1.0,
+        )
+        self.result = apply_sculpt_brush(self.noisy_verts, self.faces, self.stroke)
+
+    def test_radius_variance_reduces(self):
+        """Radial variance (noise indicator) should decrease after Taubin pass."""
+        def radii(verts):
+            return [math.sqrt(v[0]**2 + v[1]**2 + v[2]**2) for v in verts]
+
+        r_in = radii(self.noisy_verts)
+        r_out = radii(self.result.output_vertices)
+        var_in = statistics.variance(r_in)
+        var_out = statistics.variance(r_out)
+        assert var_out < var_in, (
+            f"smooth-taubin should reduce radius variance: {var_in:.6f} -> {var_out:.6f}"
+        )
+
+    def test_volume_preserved_within_1_percent(self):
+        """Volume must be preserved within 1% (Taubin anti-shrink guarantee)."""
+        vol_in = _mesh_volume(self.noisy_verts, self.faces)
+        vol_out = _mesh_volume(self.result.output_vertices, self.faces)
+        assert vol_in > 0.0, "Input volume should be positive"
+        assert vol_out > 0.0, "Output volume should be positive"
+        rel_diff = abs(vol_out - vol_in) / vol_in
+        assert rel_diff < 0.01, (
+            f"Volume changed by {rel_diff*100:.3f}% (must be < 1%): "
+            f"in={vol_in:.4f}, out={vol_out:.4f}"
+        )
+
+    def test_output_vertex_count_unchanged(self):
+        assert len(self.result.output_vertices) == len(self.noisy_verts)
+
+    def test_brush_type_applied_echo(self):
+        assert self.result.brush_type_applied == "smooth-taubin"
+
+    def test_num_vertices_modified_positive(self):
+        assert self.result.num_vertices_modified > 0
+
+
+# ---------------------------------------------------------------------------
+# Test 15: smooth-taubin vs smooth-naive — Taubin has less shrink
+# ---------------------------------------------------------------------------
+
+
+class TestTaubinVsNaiveShrink:
+    """GK-P22 T15: smooth-taubin causes less mesh shrinkage than smooth.
+
+    After multiple repeated brush passes over the full mesh, the Taubin variant
+    should produce a centroid closer to the origin (less shrink) compared to
+    repeated naive Laplacian smoothing.
+    """
+
+    def _apply_n_passes(self, vertices, faces, brush_type, n=5):
+        """Apply the same full-coverage brush n times in sequence."""
+        verts = list(vertices)
+        for _ in range(n):
+            stroke = SculptStroke(
+                position_xyz_mm=(0.0, 0.0, 0.0),
+                radius_mm=20.0,
+                brush_type=brush_type,
+                strength=1.0,
+            )
+            result = apply_sculpt_brush(verts, faces, stroke)
+            verts = list(result.output_vertices)
+        return verts
+
+    def _mean_radius(self, verts):
+        return sum(
+            math.sqrt(v[0]**2 + v[1]**2 + v[2]**2) for v in verts
+        ) / len(verts)
+
+    def test_taubin_preserves_mean_radius_better(self):
+        """After 5 full-mesh passes, Taubin mean radius > naive mean radius."""
+        sphere_verts, faces = _icosphere(radius=10.0, subdivisions=2)
+        noisy_verts = _add_sphere_noise(sphere_verts, noise_amp=1.0)
+
+        taubin_verts = self._apply_n_passes(noisy_verts, faces, "smooth-taubin", n=5)
+        naive_verts = self._apply_n_passes(noisy_verts, faces, "smooth", n=5)
+
+        mean_r_taubin = self._mean_radius(taubin_verts)
+        mean_r_naive = self._mean_radius(naive_verts)
+        mean_r_input = self._mean_radius(noisy_verts)
+
+        # Taubin should be closer to the original mean radius than naive
+        shrink_taubin = abs(mean_r_input - mean_r_taubin)
+        shrink_naive = abs(mean_r_input - mean_r_naive)
+        assert shrink_taubin < shrink_naive, (
+            f"Taubin shrink={shrink_taubin:.4f} should be < naive shrink={shrink_naive:.4f}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Test 16: _taubin_smooth_one_pass low-pass effect (standalone helper)
+# ---------------------------------------------------------------------------
+
+
+class TestTaubinSmoothOnePassLowPass:
+    """GK-P22 T16: _taubin_smooth_one_pass() applies a low-pass filter."""
+
+    def test_single_call_reduces_high_freq(self):
+        """High-frequency Z noise should be attenuated after one full pass."""
+        verts, faces = _flat_plane_grid(n=11, size=20.0)
+        # Add alternating +/- high-frequency noise in Z
+        noisy = []
+        for idx, v in enumerate(verts):
+            sign = 1 if idx % 2 == 0 else -1
+            noisy.append((v[0], v[1], v[2] + sign * 1.0))
+
+        smoothed = _taubin_smooth_one_pass(noisy, faces)
+
+        z_in = [v[2] for v in noisy]
+        z_out = [v[2] for v in smoothed]
+        var_in = statistics.variance(z_in)
+        var_out = statistics.variance(z_out)
+        assert var_out < var_in, (
+            f"Taubin one pass should reduce Z variance: {var_in:.4f} -> {var_out:.4f}"
+        )
+
+    def test_smooth_mesh_not_distorted(self):
+        """A perfectly flat mesh should remain nearly flat after a Taubin pass."""
+        verts, faces = _flat_plane_grid(n=7, size=10.0)
+        smoothed = _taubin_smooth_one_pass(verts, faces)
+        # Z values of a flat mesh are all 0; after Taubin they should stay ~0
+        for v in smoothed:
+            assert abs(v[2]) < 1e-10, f"Flat mesh Z drifted to {v[2]}"
+
+
+# ---------------------------------------------------------------------------
+# Test 17: Two-pass (λ + μ) — no DC shift on smooth mesh
+# ---------------------------------------------------------------------------
+
+
+class TestTaubinTwoPassNoDCShift:
+    """GK-P22 T17: Taubin λ|μ two-pass has minimal DC (mean) shift.
+
+    A single positive-λ pass shifts the mesh centroid (shrinks it).  The
+    subsequent negative-μ pass corrects that.  On a sphere the mean radius
+    should be closer to the original after two passes than after one pass only.
+    """
+
+    def test_two_pass_dc_shift_smaller_than_one_pass(self):
+        """Mean radius change after λ+μ < mean radius change after λ alone."""
+        sphere_verts, faces = _icosphere(radius=8.0, subdivisions=2)
+        noisy_verts = _add_sphere_noise(sphere_verts, noise_amp=0.8)
+
+        from kerf_cad_core.mesh_sculpt_brushes import _build_cotangent_weights
+
+        # Manually replicate the two internal passes from _taubin_smooth_one_pass
+        cot_w = _build_cotangent_weights(noisy_verts, faces)
+        nv = len(noisy_verts)
+
+        def _one_laplacian(verts, step):
+            out = list(verts)
+            for i in range(nv):
+                pairs = cot_w[i]
+                if not pairs:
+                    continue
+                total_w = sum(w for _, w in pairs)
+                if total_w < 1e-14:
+                    continue
+                inv_w = 1.0 / total_w
+                vi = verts[i]
+                dx = dy = dz = 0.0
+                for j, w in pairs:
+                    vj = verts[j]
+                    nw = w * inv_w
+                    dx += nw * (vj[0] - vi[0])
+                    dy += nw * (vj[1] - vi[1])
+                    dz += nw * (vj[2] - vi[2])
+                out[i] = (vi[0] + step*dx, vi[1] + step*dy, vi[2] + step*dz)
+            return out
+
+        def mean_r(verts):
+            return sum(
+                math.sqrt(v[0]**2 + v[1]**2 + v[2]**2) for v in verts
+            ) / len(verts)
+
+        mean_r_in = mean_r(noisy_verts)
+
+        after_lambda = _one_laplacian(noisy_verts, 0.5)
+        after_mu = _one_laplacian(after_lambda, -0.53)
+
+        shift_one_pass = abs(mean_r(after_lambda) - mean_r_in)
+        shift_two_pass = abs(mean_r(after_mu) - mean_r_in)
+
+        assert shift_two_pass < shift_one_pass, (
+            f"Two-pass DC shift {shift_two_pass:.6f} should be < "
+            f"one-pass DC shift {shift_one_pass:.6f}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Test 18: smooth-taubin out-of-radius vertices unchanged
+# ---------------------------------------------------------------------------
+
+
+class TestSmoothTaubinOutOfRadius:
+    """GK-P22 T18: smooth-taubin leaves out-of-radius vertices unchanged."""
+
+    def test_out_of_radius_vertices_not_moved(self):
+        vertices, faces = _flat_plane_grid(n=7, size=20.0)
+        # Tiny radius: only the exact-origin vertex is inside
+        stroke = SculptStroke(
+            position_xyz_mm=(0.0, 0.0, 0.0),
+            radius_mm=0.5,
+            brush_type="smooth-taubin",
+            strength=1.0,
+        )
+        result = apply_sculpt_brush(vertices, faces, stroke)
+        r = stroke.radius_mm
+        pos = stroke.position_xyz_mm
+        for i, v in enumerate(vertices):
+            dist = math.sqrt(sum((v[k] - pos[k])**2 for k in range(3)))
+            if dist >= r:
+                vo = result.output_vertices[i]
+                for k in range(3):
+                    assert vo[k] == pytest.approx(v[k], abs=1e-12), (
+                        f"Vertex {i} at dist={dist:.4f} was moved by smooth-taubin"
+                    )
+
+
+# ---------------------------------------------------------------------------
+# Test 19: smooth-taubin strength=0 → no change
+# ---------------------------------------------------------------------------
+
+
+class TestSmoothTaubinStrengthZero:
+    """GK-P22 T19: smooth-taubin with strength=0 must not move any vertex."""
+
+    def test_strength_zero_no_change(self):
+        vertices, faces = _noisy_plane(n=7, size=10.0, noise=1.0)
+        stroke = SculptStroke(
+            position_xyz_mm=(0.0, 0.0, 0.0),
+            radius_mm=20.0,
+            brush_type="smooth-taubin",
+            strength=0.0,
+        )
+        result = apply_sculpt_brush(vertices, faces, stroke)
+        for vo, vi in zip(result.output_vertices, vertices):
+            for k in range(3):
+                assert vo[k] == pytest.approx(vi[k], abs=1e-12), (
+                    "smooth-taubin with strength=0 should not move vertices"
+                )
+
+
+# ---------------------------------------------------------------------------
+# Test 20: _taubin_smooth_one_pass degenerate / isolated vertices
+# ---------------------------------------------------------------------------
+
+
+class TestTaubinDegenerateInputs:
+    """GK-P22 T20: _taubin_smooth_one_pass handles degenerate cases gracefully."""
+
+    def test_single_triangle_no_crash(self):
+        """A single isolated triangle should run without raising."""
+        verts = [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.5, 1.0, 0.0)]
+        faces = [[0, 1, 2]]
+        result = _taubin_smooth_one_pass(verts, faces)
+        assert len(result) == 3
+
+    def test_zero_area_triangle_no_nan(self):
+        """Degenerate (collinear) triangle must not produce NaN/Inf."""
+        # All three vertices collinear — zero area
+        verts = [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (2.0, 0.0, 0.0)]
+        faces = [[0, 1, 2]]
+        result = _taubin_smooth_one_pass(verts, faces)
+        assert len(result) == 3
+        for v in result:
+            for coord in v:
+                assert math.isfinite(coord), f"Got non-finite coordinate: {coord}"
+
+    def test_output_length_matches_input(self):
+        """Output vertex list must have the same length as input."""
+        verts, faces = _flat_plane_grid(n=5, size=10.0)
+        result = _taubin_smooth_one_pass(verts, faces)
+        assert len(result) == len(verts)
+
+    def test_default_lambda_mu(self):
+        """Default λ=0.5, μ=-0.53 should smooth a noisy mesh."""
+        verts, faces = _noisy_plane(n=9, size=20.0, noise=2.0)
+        result = _taubin_smooth_one_pass(verts, faces)
+        z_in = [v[2] for v in verts]
+        z_out = [v[2] for v in result]
+        var_in = statistics.variance(z_in)
+        var_out = statistics.variance(z_out)
+        assert var_out < var_in, "Default Taubin pass should reduce noise variance"
+
+
+# ---------------------------------------------------------------------------
+# Test 21: All five brush types (including smooth-taubin) validated
+# ---------------------------------------------------------------------------
+
+
+class TestAllFiveBrushTypesOnCube:
+    """GK-P22 T21: all five brush types including smooth-taubin run without error."""
+
+    def test_smooth_taubin_runs_on_cube(self):
+        vertices, faces = _cube_cage()
+        stroke = SculptStroke(
+            position_xyz_mm=(0.5, 0.5, 0.5),
+            radius_mm=2.0,
+            brush_type="smooth-taubin",
+            strength=0.5,
+        )
+        result = apply_sculpt_brush(vertices, faces, stroke)
+        assert isinstance(result, MeshSculptResult)
+        assert result.brush_type_applied == "smooth-taubin"
+        assert len(result.output_vertices) == len(vertices)
+
+    def test_invalid_brush_type_still_raises(self):
+        """Adding smooth-taubin should not accidentally accept other invalid types."""
+        vertices, faces = _cube_cage()
+        stroke = SculptStroke(
+            position_xyz_mm=(0.5, 0.5, 0.5),
+            radius_mm=2.0,
+            brush_type="taubin",  # wrong — must be "smooth-taubin"
+            strength=0.5,
+        )
+        with pytest.raises(ValueError, match="brush_type"):
+            apply_sculpt_brush(vertices, faces, stroke)

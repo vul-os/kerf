@@ -603,6 +603,8 @@ class AnalyticTrimLoop:
       - ``semi_axis_b``    : semi-axis b
       - ``is_circle``      : True when both semi-axes are equal (plane ⊥ cyl axis)
       - ``num_samples``    : number of UV samples stored in uv_on_* lists
+      - ``axis_a_dir``     : unit 3-D direction of the semi-major axis (None for circles)
+      - ``axis_b_dir``     : unit 3-D direction of the semi-minor axis (None for circles)
     """
     circle_center: "np.ndarray"
     circle_normal: "np.ndarray"
@@ -610,6 +612,8 @@ class AnalyticTrimLoop:
     semi_axis_b: float
     is_circle: bool
     num_samples: int
+    axis_a_dir: "Optional[np.ndarray]" = None
+    axis_b_dir: "Optional[np.ndarray]" = None
 
 
 def _analytic_plane_cylinder(
@@ -759,6 +763,37 @@ def _analytic_plane_cylinder(
     semi_axis_short = r           # always r
     is_circle = abs(abs_dA - 1.0) < 1e-9
 
+    # Compute the 3-D orientation axes of the ellipse.
+    #
+    #   The ellipse lies in the cutting plane (normal n).  The cylinder axis A
+    #   has a component in the plane (the "tilt direction") and a component
+    #   normal to the plane.  The semi-major axis (a = r/|n·A|) points along
+    #   the tilt direction; the semi-minor axis (b = r) points perpendicular to
+    #   both n and A within the plane.
+    #
+    #   axis_a_dir = normalize(A - (n·A)*n)   [projection of A into the plane]
+    #   axis_b_dir = normalize(n × A)          [perpendicular to A in the plane]
+    #
+    #   For the circle case (|dA| ≈ 1, plane ⊥ axis) A is nearly parallel to n,
+    #   so the projection is near-zero.  We store None for both axes in that case
+    #   and fall through to the existing circle arc path.
+    if is_circle:
+        axis_a_dir_val = None
+        axis_b_dir_val = None
+    else:
+        # Projection of A into the plane: A - (n·A)*n
+        a_in_plane = A - dA * n
+        nrm_a = float(np.linalg.norm(a_in_plane))
+        if nrm_a < 1e-12:
+            # Should not happen when is_circle=False, but guard defensively
+            axis_a_dir_val = None
+            axis_b_dir_val = None
+        else:
+            axis_a_dir_val = a_in_plane / nrm_a  # unit tilt direction
+            axis_b_cross = np.cross(n, A)
+            nrm_b = float(np.linalg.norm(axis_b_cross))
+            axis_b_dir_val = axis_b_cross / max(nrm_b, 1e-15)  # unit ⊥ tilt
+
     loop = AnalyticTrimLoop(
         circle_center=loop_centre,
         circle_normal=n.copy(),
@@ -766,6 +801,8 @@ def _analytic_plane_cylinder(
         semi_axis_b=float(semi_axis_short),
         is_circle=is_circle,
         num_samples=n_samples,
+        axis_a_dir=axis_a_dir_val,
+        axis_b_dir=axis_b_dir_val,
     )
 
     return {
@@ -1148,6 +1185,130 @@ def _build_circle_face(
     return face
 
 
+def _build_elliptic_face(
+    surface_a: "object",
+    loop_centre: "np.ndarray",
+    semi_a: float,
+    semi_b: float,
+    axis_a: "np.ndarray",
+    axis_b: "np.ndarray",
+    keep_side: str,
+    tol: float,
+    n_pts: int = 256,
+) -> "object":
+    """Build a B-rep Face on ``surface_a`` bounded by an elliptic trim loop.
+
+    The ellipse is sampled into a closed polyline (``n_pts`` points) and
+    represented as a ``_PolylineCurve3`` edge — the same strategy used by the
+    GK-P44 NURBS×NURBS trim path.  This avoids the need for a dedicated
+    ``EllipseArc3`` curve type while still producing a validate_body-clean Face.
+
+    Parameters
+    ----------
+    surface_a
+        The underlying surface of the trimmed face (typically a ``Plane``).
+    loop_centre
+        3-D centre of the ellipse.
+    semi_a
+        Semi-major axis length (≥ semi_b).
+    semi_b
+        Semi-minor axis length.
+    axis_a
+        Unit 3-D direction of the semi-major axis.
+    axis_b
+        Unit 3-D direction of the semi-minor axis.
+    keep_side
+        ``'inside'`` → disk face bounded by the ellipse;
+        ``'outside'`` → face with the ellipse as an inner hole.
+    tol
+        Geometric tolerance for vertex coincidence.
+    n_pts
+        Number of sample points on the ellipse polyline (default 256).
+
+    Returns
+    -------
+    Face
+        A ``brep.Face`` whose outer loop (or inner loop for ``'outside'``) is
+        the sampled ellipse polyline.
+
+    Raises
+    ------
+    BuildError
+        On topology-validation failure.
+    """
+    from kerf_cad_core.geom.brep import (  # noqa: PLC0415
+        Coedge as _Coedge,
+        Edge as _Edge,
+        Face as _Face,
+        Loop as _Loop,
+        Vertex as _Vertex,
+    )
+    from kerf_cad_core.geom.brep_build import (  # noqa: PLC0415
+        BuildError,
+        _natural_boundary,
+        _outer_loop_ccw,
+        _validate_face_local,
+    )
+
+    # Sample the ellipse as a closed polyline: P(t) = C + a*cos(t)*Xa + b*sin(t)*Xb
+    ts = np.linspace(0.0, 2.0 * math.pi, n_pts, endpoint=False)
+    pts = np.array([
+        loop_centre + semi_a * math.cos(t) * axis_a + semi_b * math.sin(t) * axis_b
+        for t in ts
+    ])  # shape (n_pts, 3)
+    # Close the polyline (first == last)
+    pts_closed = np.vstack([pts, pts[0]])
+
+    # Wrap as a _PolylineCurve3 edge (seam vertex = first point)
+    curve = _PolylineCurve3(pts_closed)
+    v_seam = _Vertex(pts_closed[0].copy(), tol)
+    e_loop = _Edge(curve, 0.0, 1.0, v_seam, v_seam, tol)
+
+    if keep_side == "inside":
+        # Disk face: outer loop = the ellipse boundary (oriented CCW w.r.t. normal)
+        coedges, _ = _outer_loop_ccw(surface_a, [(e_loop, True)])
+        outer = _Loop(coedges, is_outer=True)
+        face = _Face(surface_a, [outer], orientation=True, tol=tol)
+        errs = _validate_face_local(face)
+        if errs:
+            # Try reversed orientation
+            coedges_rev, _ = _outer_loop_ccw(surface_a, [(e_loop, False)])
+            outer_rev = _Loop(coedges_rev, is_outer=True)
+            face2 = _Face(surface_a, [outer_rev], orientation=True, tol=tol)
+            errs2 = _validate_face_local(face2)
+            if errs2:
+                raise BuildError(
+                    f"_build_elliptic_face (inside): validation failed: {errs}",
+                    {"ok": False, "errors": errs},
+                )
+            face = face2
+    else:
+        # Face-with-hole: natural surface boundary outer + ellipse as inner loop
+        _verts, edge_orients = _natural_boundary(surface_a, tol)
+        outer_coedges, _ = _outer_loop_ccw(surface_a, edge_orients)
+        outer = _Loop(outer_coedges, is_outer=True)
+
+        # Inner loop must be CW w.r.t. the surface normal
+        ce_inner = _Coedge(e_loop, False)
+        inner = _Loop([ce_inner], is_outer=False)
+        face = _Face(surface_a, [outer, inner], orientation=True, tol=tol)
+        errs = _validate_face_local(face)
+        if errs:
+            # Try CCW inner orientation
+            ce_inner2 = _Coedge(e_loop, True)
+            inner2 = _Loop([ce_inner2], is_outer=False)
+            face2 = _Face(surface_a, [outer, inner2], orientation=True, tol=tol)
+            errs2 = _validate_face_local(face2)
+            if errs2:
+                raise BuildError(
+                    f"_build_elliptic_face (outside): validation failed: {errs}",
+                    {"ok": False, "errors": errs},
+                )
+            face = face2
+
+    return face
+
+
 def _pullback_uv_analytic(
     surface: "object",
     pts_3d: "np.ndarray",
@@ -1525,19 +1686,55 @@ def _build_ssi_trimmed_face(
         return face
 
     else:
-        # Ellipse / oblique case — polyline approximation -------------------
-        # Build using the sampled 3-D points from the AnalyticTrimLoop.
-        # Since we don't store 3-D pts in AnalyticTrimLoop directly, we note
-        # that this path is not exercised by the oracle test.  For now, raise
-        # a structured error so callers can fall back to the OCCT path.
+        # Ellipse / oblique case — pure-Python polyline approximation --------
+        #
+        # When a plane cuts a cylinder at an oblique angle the SSI curve is an
+        # ellipse lying in the cutting plane.  ``AnalyticTrimLoop`` now carries
+        # the 3-D orientation axes (``axis_a_dir``, ``axis_b_dir``) computed in
+        # ``_analytic_plane_cylinder``.  We sample the ellipse into a closed
+        # polyline and wrap it as a ``_PolylineCurve3`` edge (the same strategy
+        # used by the GK-P44 NURBS×NURBS path), then build the B-rep Face via
+        # ``_build_elliptic_face``.
         from kerf_cad_core.geom.brep_build import BuildError  # noqa: PLC0415
-        raise BuildError(
-            "unsupported-input: elliptic SSI trim loop (oblique plane × cylinder) "
-            "is not yet implemented in the pure-Python carrier matrix; "
-            "use the OCCT feature_trim_by_curve path",
-            {"ok": False, "errors": [
-                "elliptic loop not implemented in pure-Python path"
-            ]},
+
+        axis_a = analytic_loop.axis_a_dir
+        axis_b = analytic_loop.axis_b_dir
+
+        if axis_a is None or axis_b is None:
+            # Defensive fallback: axes not populated (should not happen for
+            # valid oblique plane×cylinder pairs, but guard against future
+            # code paths that call _build_ssi_trimmed_face directly).
+            raise BuildError(
+                "unsupported-input: elliptic SSI trim loop: "
+                "axis_a_dir / axis_b_dir not populated in AnalyticTrimLoop; "
+                "use the OCCT feature_trim_by_curve path",
+                {"ok": False, "errors": [
+                    "elliptic loop: missing axis orientation in AnalyticTrimLoop"
+                ]},
+            )
+
+        axis_a = np.asarray(axis_a, dtype=float)
+        axis_b = np.asarray(axis_b, dtype=float)
+        semi_a = float(analytic_loop.semi_axis_a)
+        semi_b = float(analytic_loop.semi_axis_b)
+
+        # Use a finer polyline when the ellipse is elongated so that the chord
+        # error stays below tol.  Rough estimate: max chord error for N uniform
+        # samples of an ellipse is ≈ (π/N)² * semi_a / 2.  Solve for N:
+        #   N ≥ π * sqrt(semi_a / (2 * tol))
+        # capped to [64, 1024].
+        n_pts = int(max(64, min(1024, math.pi * math.sqrt(semi_a / (2.0 * max(tol, 1e-15))))))
+
+        return _build_elliptic_face(
+            surface_a,
+            loop_centre,
+            semi_a,
+            semi_b,
+            axis_a,
+            axis_b,
+            keep_side,
+            tol,
+            n_pts=n_pts,
         )
 
 

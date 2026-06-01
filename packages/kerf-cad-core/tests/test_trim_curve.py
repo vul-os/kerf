@@ -454,3 +454,271 @@ class TestUVDomainHelpers:
         u, v = _clamp_uv(1.5, 2.0, srf)
         assert u == 1.0
         assert v == 1.0
+
+
+# ---------------------------------------------------------------------------
+# 8. Elliptic SSI — oblique plane × cylinder intersection
+# ---------------------------------------------------------------------------
+
+def _make_plane(origin=(0, 0, 0), x_axis=(1, 0, 0), y_axis=(0, 1, 0)):
+    """Helper: build a Plane (brep) from origin and axes."""
+    from kerf_cad_core.geom.brep import Plane
+    import numpy as np
+    return Plane(
+        origin=np.array(origin, dtype=float),
+        x_axis=np.array(x_axis, dtype=float),
+        y_axis=np.array(y_axis, dtype=float),
+    )
+
+
+def _make_cylinder(center=(0, 0, 0), axis=(0, 0, 1), radius=1.0):
+    """Helper: build a CylinderSurface (brep)."""
+    from kerf_cad_core.geom.brep import CylinderSurface
+    import numpy as np
+    return CylinderSurface(
+        center=np.array(center, dtype=float),
+        axis=np.array(axis, dtype=float),
+        radius=float(radius),
+    )
+
+
+class TestEllipticSSI:
+    """Tests for the pure-Python elliptic SSI trim path (GK-40 oblique case).
+
+    Geometry:  A plane cutting a cylinder at an oblique angle produces an
+    ellipse whose semi-axes are:
+        semi_minor = r
+        semi_major = r / cos(theta)
+    where theta = angle between the plane normal and the cylinder axis.
+    """
+
+    # ------------------------------------------------------------------
+    # 1. AnalyticTrimLoop carries correct semi-axes
+    # ------------------------------------------------------------------
+
+    def test_45deg_unit_cylinder_semi_axes(self):
+        """45° cut of unit cylinder: semi_a = sqrt(2), semi_b = 1."""
+        from kerf_cad_core.geom.trim_curve import _analytic_plane_cylinder
+        import numpy as np
+        # Plane tilted 45° — normal is (0, sin(45°), cos(45°)) = (0, 1/√2, 1/√2)
+        sqrt2 = math.sqrt(2.0)
+        n = np.array([0.0, 1.0 / sqrt2, 1.0 / sqrt2])
+        # Build plane with x_axis=X, y_axis in the plane
+        x_ax = np.array([1.0, 0.0, 0.0])
+        y_ax = np.cross(n, x_ax)
+        y_ax /= np.linalg.norm(y_ax)
+        plane = _make_plane(origin=(0, 0, 0), x_axis=x_ax, y_axis=y_ax)
+        cyl = _make_cylinder(axis=(0, 0, 1), radius=1.0)
+
+        res = _analytic_plane_cylinder(plane, cyl)
+        assert res["ok"], f"Expected ok=True, got: {res['reason']}"
+        loop = res["loop"]
+        assert loop is not None
+        assert loop.is_circle is False
+        # semi_a = r / |n·A| = 1 / (1/√2) = √2
+        assert abs(loop.semi_axis_a - sqrt2) < 1e-9, (
+            f"Expected semi_a≈{sqrt2:.6f}, got {loop.semi_axis_a:.6f}"
+        )
+        assert abs(loop.semi_axis_b - 1.0) < 1e-9, (
+            f"Expected semi_b=1.0, got {loop.semi_axis_b:.6f}"
+        )
+
+    def test_30deg_plane_r5_cylinder_semi_axes(self):
+        """30° cut of R=5 cylinder: semi_a = 5/cos(60°) = 10, semi_b = 5."""
+        from kerf_cad_core.geom.trim_curve import _analytic_plane_cylinder
+        import numpy as np
+        # Plane normal makes 60° with Z: n = (0, sin(60°), cos(60°)) = (0, √3/2, 1/2)
+        # |n·A| = cos(60°) = 0.5
+        n = np.array([0.0, math.sqrt(3.0) / 2.0, 0.5])
+        x_ax = np.array([1.0, 0.0, 0.0])
+        y_ax = np.cross(n, x_ax)
+        y_ax /= np.linalg.norm(y_ax)
+        plane = _make_plane(origin=(0, 0, 0), x_axis=x_ax, y_axis=y_ax)
+        cyl = _make_cylinder(axis=(0, 0, 1), radius=5.0)
+
+        res = _analytic_plane_cylinder(plane, cyl)
+        assert res["ok"]
+        loop = res["loop"]
+        assert not loop.is_circle
+        # semi_a = r / |n·A| = 5 / 0.5 = 10
+        assert abs(loop.semi_axis_a - 10.0) < 1e-9, (
+            f"Expected semi_a=10, got {loop.semi_axis_a:.6f}"
+        )
+        assert abs(loop.semi_axis_b - 5.0) < 1e-9, (
+            f"Expected semi_b=5, got {loop.semi_axis_b:.6f}"
+        )
+
+    def test_semi_axis_ratio_45deg(self):
+        """semi_a / semi_b == 1/cos(theta) for 45° → √2."""
+        from kerf_cad_core.geom.trim_curve import _analytic_plane_cylinder
+        import numpy as np
+        sqrt2 = math.sqrt(2.0)
+        n = np.array([0.0, 1.0 / sqrt2, 1.0 / sqrt2])
+        x_ax = np.array([1.0, 0.0, 0.0])
+        y_ax = np.cross(n, x_ax)
+        y_ax /= np.linalg.norm(y_ax)
+        plane = _make_plane(origin=(0, 0, 0), x_axis=x_ax, y_axis=y_ax)
+        cyl = _make_cylinder(axis=(0, 0, 1), radius=2.5)
+        res = _analytic_plane_cylinder(plane, cyl)
+        loop = res["loop"]
+        ratio = loop.semi_axis_a / loop.semi_axis_b
+        assert abs(ratio - sqrt2) < 1e-9, f"Expected ratio={sqrt2:.6f}, got {ratio:.6f}"
+
+    def test_axis_dirs_populated_for_oblique(self):
+        """axis_a_dir and axis_b_dir are non-None for an oblique cut."""
+        from kerf_cad_core.geom.trim_curve import _analytic_plane_cylinder
+        import numpy as np
+        sqrt2 = math.sqrt(2.0)
+        n = np.array([0.0, 1.0 / sqrt2, 1.0 / sqrt2])
+        x_ax = np.array([1.0, 0.0, 0.0])
+        y_ax = np.cross(n, x_ax)
+        y_ax /= np.linalg.norm(y_ax)
+        plane = _make_plane(origin=(0, 0, 0), x_axis=x_ax, y_axis=y_ax)
+        cyl = _make_cylinder(axis=(0, 0, 1), radius=1.0)
+        loop = _analytic_plane_cylinder(plane, cyl)["loop"]
+        assert loop.axis_a_dir is not None, "axis_a_dir should be set for oblique cut"
+        assert loop.axis_b_dir is not None, "axis_b_dir should be set for oblique cut"
+        # Both directions should be unit vectors
+        assert abs(np.linalg.norm(loop.axis_a_dir) - 1.0) < 1e-9
+        assert abs(np.linalg.norm(loop.axis_b_dir) - 1.0) < 1e-9
+
+    def test_axis_dirs_none_for_circle(self):
+        """axis_a_dir / axis_b_dir are None when the cut is perpendicular (circle)."""
+        from kerf_cad_core.geom.trim_curve import _analytic_plane_cylinder
+        import numpy as np
+        # Plane perpendicular to Z axis → n = (0,0,1), dA = 1
+        plane = _make_plane(origin=(0, 0, 0), x_axis=(1, 0, 0), y_axis=(0, 1, 0))
+        cyl = _make_cylinder(axis=(0, 0, 1), radius=1.0)
+        loop = _analytic_plane_cylinder(plane, cyl)["loop"]
+        assert loop.is_circle is True
+        assert loop.axis_a_dir is None
+        assert loop.axis_b_dir is None
+
+    # ------------------------------------------------------------------
+    # 2. _build_ssi_trimmed_face no longer raises BuildError
+    # ------------------------------------------------------------------
+
+    def test_no_builderror_for_oblique_plane_cylinder(self):
+        """The elliptic else-branch must not raise BuildError anymore."""
+        from kerf_cad_core.geom.trim_curve import _analytic_plane_cylinder, _build_ssi_trimmed_face
+        from kerf_cad_core.geom.brep_build import BuildError
+        import numpy as np
+        sqrt2 = math.sqrt(2.0)
+        n = np.array([0.0, 1.0 / sqrt2, 1.0 / sqrt2])
+        x_ax = np.array([1.0, 0.0, 0.0])
+        y_ax = np.cross(n, x_ax)
+        y_ax /= np.linalg.norm(y_ax)
+        plane = _make_plane(origin=(0, 0, 0), x_axis=x_ax, y_axis=y_ax)
+        cyl = _make_cylinder(axis=(0, 0, 1), radius=1.0)
+        res = _analytic_plane_cylinder(plane, cyl)
+        assert res["ok"]
+        loop = res["loop"]
+        assert not loop.is_circle
+        # Must not raise
+        try:
+            face = _build_ssi_trimmed_face(plane, loop, "inside", 1e-7)
+        except BuildError as exc:
+            pytest.fail(f"_build_ssi_trimmed_face raised BuildError: {exc}")
+        except Exception as exc:
+            pytest.fail(f"_build_ssi_trimmed_face raised unexpected exception: {exc}")
+
+    # ------------------------------------------------------------------
+    # 3. trim_face_by_ssi produces a valid Face for oblique plane×cylinder
+    # ------------------------------------------------------------------
+
+    def test_trim_face_by_ssi_oblique_inside_returns_face(self):
+        """trim_face_by_ssi on an oblique plane×cylinder returns ok=True with a Face."""
+        from kerf_cad_core.geom.trim_curve import trim_face_by_ssi
+        from kerf_cad_core.geom.brep import Face
+        import numpy as np
+        sqrt2 = math.sqrt(2.0)
+        n = np.array([0.0, 1.0 / sqrt2, 1.0 / sqrt2])
+        x_ax = np.array([1.0, 0.0, 0.0])
+        y_ax = np.cross(n, x_ax)
+        y_ax /= np.linalg.norm(y_ax)
+        plane = _make_plane(origin=(0, 0, 0), x_axis=x_ax, y_axis=y_ax)
+        cyl = _make_cylinder(axis=(0, 0, 1), radius=1.0)
+        result = trim_face_by_ssi(plane, cyl, keep_side="inside", tol=1e-7)
+        assert result["ok"], f"trim_face_by_ssi failed: {result.get('reason', '')}"
+        assert result["face"] is not None
+        assert isinstance(result["face"], Face)
+
+    def test_trim_face_by_ssi_oblique_outside_returns_face(self):
+        """trim_face_by_ssi keep_side='outside' also works for oblique case."""
+        from kerf_cad_core.geom.trim_curve import trim_face_by_ssi
+        from kerf_cad_core.geom.brep import Face
+        import numpy as np
+        sqrt2 = math.sqrt(2.0)
+        n = np.array([0.0, 1.0 / sqrt2, 1.0 / sqrt2])
+        x_ax = np.array([1.0, 0.0, 0.0])
+        y_ax = np.cross(n, x_ax)
+        y_ax /= np.linalg.norm(y_ax)
+        plane = _make_plane(origin=(0, 0, 0), x_axis=x_ax, y_axis=y_ax)
+        cyl = _make_cylinder(axis=(0, 0, 1), radius=1.0)
+        result = trim_face_by_ssi(plane, cyl, keep_side="outside", tol=1e-7)
+        assert result["ok"], f"trim_face_by_ssi (outside) failed: {result.get('reason', '')}"
+        assert result["face"] is not None
+        assert isinstance(result["face"], Face)
+
+    def test_result_carries_analytic_loop(self):
+        """The returned dict carries the AnalyticTrimLoop with correct axes."""
+        from kerf_cad_core.geom.trim_curve import trim_face_by_ssi, AnalyticTrimLoop
+        import numpy as np
+        sqrt2 = math.sqrt(2.0)
+        n = np.array([0.0, 1.0 / sqrt2, 1.0 / sqrt2])
+        x_ax = np.array([1.0, 0.0, 0.0])
+        y_ax = np.cross(n, x_ax)
+        y_ax /= np.linalg.norm(y_ax)
+        plane = _make_plane(origin=(0, 0, 0), x_axis=x_ax, y_axis=y_ax)
+        cyl = _make_cylinder(axis=(0, 0, 1), radius=1.0)
+        result = trim_face_by_ssi(plane, cyl, keep_side="inside", tol=1e-7)
+        assert result["ok"]
+        loop = result["loop"]
+        assert isinstance(loop, AnalyticTrimLoop)
+        assert not loop.is_circle
+        assert abs(loop.semi_axis_a - sqrt2) < 1e-9
+        assert abs(loop.semi_axis_b - 1.0) < 1e-9
+
+    def test_ellipse_samples_lie_on_plane(self):
+        """All sampled ellipse points should lie exactly on the cutting plane."""
+        from kerf_cad_core.geom.trim_curve import _analytic_plane_cylinder
+        import numpy as np
+        sqrt2 = math.sqrt(2.0)
+        n = np.array([0.0, 1.0 / sqrt2, 1.0 / sqrt2])
+        x_ax = np.array([1.0, 0.0, 0.0])
+        y_ax = np.cross(n, x_ax)
+        y_ax /= np.linalg.norm(y_ax)
+        plane = _make_plane(origin=(0, 0, 0), x_axis=x_ax, y_axis=y_ax)
+        cyl = _make_cylinder(axis=(0, 0, 1), radius=1.0)
+        res = _analytic_plane_cylinder(plane, cyl, samples=64)
+        assert res["ok"]
+        loop = res["loop"]
+        # Regenerate the sample points using axis_a_dir / axis_b_dir
+        centre = np.asarray(loop.circle_center)
+        n_plane = np.asarray(loop.circle_normal)
+        Xa = np.asarray(loop.axis_a_dir)
+        Xb = np.asarray(loop.axis_b_dir)
+        a = loop.semi_axis_a
+        b = loop.semi_axis_b
+        ts = np.linspace(0.0, 2.0 * math.pi, 64, endpoint=False)
+        pts = np.array([centre + a * math.cos(t) * Xa + b * math.sin(t) * Xb for t in ts])
+        # Each point must satisfy n · (P - origin) ≈ 0
+        origin = np.array([0.0, 0.0, 0.0])
+        dists = np.abs(pts @ n_plane - float(np.dot(n_plane, origin)))
+        assert np.all(dists < 1e-9), f"Max plane-dist = {dists.max():.2e}"
+
+    def test_residual_max_small(self):
+        """The SSI residual for plane×cylinder must be near machine epsilon."""
+        from kerf_cad_core.geom.trim_curve import _analytic_plane_cylinder
+        import numpy as np
+        sqrt2 = math.sqrt(2.0)
+        n = np.array([0.0, 1.0 / sqrt2, 1.0 / sqrt2])
+        x_ax = np.array([1.0, 0.0, 0.0])
+        y_ax = np.cross(n, x_ax)
+        y_ax /= np.linalg.norm(y_ax)
+        plane = _make_plane(origin=(0, 0, 0), x_axis=x_ax, y_axis=y_ax)
+        cyl = _make_cylinder(axis=(0, 0, 1), radius=1.0)
+        res = _analytic_plane_cylinder(plane, cyl, samples=256)
+        assert res["residual_max"] < 1e-10, (
+            f"Residual too large: {res['residual_max']:.2e}"
+        )

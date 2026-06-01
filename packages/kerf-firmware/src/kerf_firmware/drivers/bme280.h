@@ -103,20 +103,20 @@ typedef struct {
  * ---------------------------------------------------------------------- */
 
 /**
- * bme280_init — Initialise the BME280 device.
+ * bme280_init_full — Initialise a BME280 device handle explicitly.
  *
  * @param dev      Pointer to an uninitialised bme280_t handle.
- * @param addr     I2C address (BME280_ADDR_LOW = 0x76 or BME280_ADDR_HIGH = 0x77).
+ * @param addr     I2C address (0x76 SDO=GND or 0x77 SDO=VCC).
  * @param i2c_bus  I2C bus/peripheral index (0 = first bus).
  * @param pin_sda  GPIO pin number for SDA.
  * @param pin_scl  GPIO pin number for SCL.
  * @return BME280_OK on success, negative error code otherwise.
  */
-int bme280_init(bme280_t *dev, uint8_t addr, uint8_t i2c_bus,
-                uint8_t pin_sda, uint8_t pin_scl);
+int bme280_init_full(bme280_t *dev, uint8_t addr, uint8_t i2c_bus,
+                     uint8_t pin_sda, uint8_t pin_scl);
 
 /**
- * bme280_read — Trigger a forced-mode measurement and read results.
+ * bme280_read — Read temperature, humidity, and pressure into a full handle.
  *
  * @param dev         Initialised device handle.
  * @param temp_c      Output: temperature in degrees Celsius (e.g. 23.51).
@@ -131,6 +131,45 @@ int bme280_read(bme280_t *dev, float *temp_c, float *humidity,
  * bme280_soft_reset — Send a soft reset command.
  */
 int bme280_soft_reset(bme280_t *dev);
+
+/* -------------------------------------------------------------------------
+ * Convenience API — single static device (bus 0, SDA pin 0, SCL pin 0).
+ * Useful on targets that have exactly one BME280.
+ * ---------------------------------------------------------------------- */
+
+/**
+ * bme280_init — Initialise the default singleton BME280.
+ *
+ * I2C bus 0, SDA pin 0, SCL pin 0 (override with bme280_init_full if needed).
+ *
+ * @param i2c_addr  0x76 (SDO=GND) or 0x77 (SDO=VCC).
+ * @return 0 on success, -1 on chip-ID mismatch or I2C error.
+ */
+int bme280_init(uint8_t i2c_addr);
+
+/**
+ * bme280_read_temperature_c — Read temperature in degrees Celsius.
+ *
+ * @param out_c  Receives the temperature value (e.g. 23.51 °C).
+ * @return 0 on success, -1 on error.
+ */
+int bme280_read_temperature_c(float *out_c);
+
+/**
+ * bme280_read_pressure_pa — Read barometric pressure in Pascals.
+ *
+ * @param out_pa  Receives the pressure value (e.g. 101325.0 Pa).
+ * @return 0 on success, -1 on error.
+ */
+int bme280_read_pressure_pa(float *out_pa);
+
+/**
+ * bme280_read_humidity_pct — Read relative humidity in percent.
+ *
+ * @param out_pct  Receives the humidity value (e.g. 54.3 %).
+ * @return 0 on success, -1 on error.
+ */
+int bme280_read_humidity_pct(float *out_pct);
 
 #ifdef __cplusplus
 }

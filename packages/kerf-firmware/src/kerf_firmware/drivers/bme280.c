@@ -23,11 +23,11 @@
 
 #include <string.h>
 
-/* Weak stub implementations — always fail unless overridden by the BSP. */
+/* Weak stub implementations — overridden at link time by the BSP. */
 __attribute__((weak))
 int kerf_i2c_write(uint8_t bus, uint8_t addr, const uint8_t *data, uint8_t len) {
     (void)bus; (void)addr; (void)data; (void)len;
-    return -1; /* not implemented */
+    return -1; /* BSP must provide a real implementation */
 }
 
 __attribute__((weak))
@@ -136,8 +136,8 @@ static uint32_t _compensate_humidity(const bme280_t *dev, int32_t adc_H) {
  * Public API implementation
  * ---------------------------------------------------------------------- */
 
-int bme280_init(bme280_t *dev, uint8_t addr, uint8_t i2c_bus,
-                uint8_t pin_sda, uint8_t pin_scl) {
+int bme280_init_full(bme280_t *dev, uint8_t addr, uint8_t i2c_bus,
+                     uint8_t pin_sda, uint8_t pin_scl) {
     if (!dev) return BME280_ERR_NULL;
     dev->i2c_addr = addr;
     dev->i2c_bus  = i2c_bus;
@@ -186,4 +186,86 @@ int bme280_read(bme280_t *dev, float *temp_c, float *humidity,
 int bme280_soft_reset(bme280_t *dev) {
     if (!dev) return BME280_ERR_NULL;
     return _write_reg(dev, BME280_REG_RESET, BME280_RESET_WORD);
+}
+
+/* ---------------------------------------------------------------------------
+ * Convenience API — single static device handle for targets with one BME280.
+ *
+ * bme280_init(addr)               → 0 on success, -1 on chip-ID mismatch
+ * bme280_read_temperature_c(out)  → temperature in degrees Celsius
+ * bme280_read_pressure_pa(out)    → pressure in Pascals
+ * bme280_read_humidity_pct(out)   → relative humidity in %
+ *
+ * All three read functions share a single HAL burst read so t_fine is
+ * always consistent between the three values.
+ * ---------------------------------------------------------------------- */
+
+static bme280_t _default_dev;
+static uint8_t  _default_dev_ready = 0;
+
+/* Cached last raw measurement; refreshed on every bme280_read_* call. */
+static float _last_temp_c   = 0.0f;
+static float _last_hum_pct  = 0.0f;
+static float _last_press_pa = 0.0f;
+
+/**
+ * bme280_init — Initialise the default singleton device at the given I2C addr.
+ *
+ * Uses I2C bus 0, SDA pin 0, SCL pin 0 (overridable by the BSP via
+ * bme280_init_full() if more control is needed).
+ *
+ * @param i2c_addr  0x76 (SDO=GND) or 0x77 (SDO=VCC)
+ * @return 0 on success, -1 on chip-ID mismatch or I2C error.
+ */
+int bme280_init(uint8_t i2c_addr) {
+    _default_dev_ready = 0;
+    int rc = bme280_init_full(&_default_dev, i2c_addr, 0, 0, 0);
+    if (rc == BME280_OK) _default_dev_ready = 1;
+    return (rc == BME280_OK) ? 0 : -1;
+}
+
+/* Internal helper: refresh all three measurements from the default device. */
+static int _refresh_default(void) {
+    if (!_default_dev_ready) return -1;
+    return bme280_read(&_default_dev,
+                       &_last_temp_c, &_last_hum_pct, &_last_press_pa);
+}
+
+/**
+ * bme280_read_temperature_c — Read temperature in degrees Celsius.
+ *
+ * @param out_c  Pointer to float that receives the value (e.g. 23.51).
+ * @return 0 on success, -1 on error.
+ */
+int bme280_read_temperature_c(float *out_c) {
+    if (!out_c) return -1;
+    if (_refresh_default() != BME280_OK) return -1;
+    *out_c = _last_temp_c;
+    return 0;
+}
+
+/**
+ * bme280_read_pressure_pa — Read barometric pressure in Pascals.
+ *
+ * @param out_pa  Pointer to float that receives the value (e.g. 101325.0).
+ * @return 0 on success, -1 on error.
+ */
+int bme280_read_pressure_pa(float *out_pa) {
+    if (!out_pa) return -1;
+    if (_refresh_default() != BME280_OK) return -1;
+    *out_pa = _last_press_pa;
+    return 0;
+}
+
+/**
+ * bme280_read_humidity_pct — Read relative humidity in percent.
+ *
+ * @param out_pct  Pointer to float that receives the value (e.g. 54.3).
+ * @return 0 on success, -1 on error.
+ */
+int bme280_read_humidity_pct(float *out_pct) {
+    if (!out_pct) return -1;
+    if (_refresh_default() != BME280_OK) return -1;
+    *out_pct = _last_hum_pct;
+    return 0;
 }

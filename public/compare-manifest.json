@@ -20475,6 +20475,20 @@
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/wire_closed_check.py",
             "note": "check_wire_closed(edges: list[EdgeSegment], tolerance_mm=1e-6) -> WireCheckReport; EdgeSegment dataclass: start_xyz, end_xyz, edge_id; WireCheckReport: closed (bool), planar (bool), max_endpoint_gap_mm, num_edges, plane_normal_xyz (SVD least-singular-vector), max_out_of_plane_deviation_mm, honest_caveat; closed = every consecutive pair connected AND last.end ≈ first.start within tolerance; planar = SVD best-fit plane over all endpoints (Pratt 1987; Eberly §6.6) has max_oop < tolerance; LLM tool brep_check_wire_closed registered (gated import); re-exported from geom/__init__.py; 26 hermetic tests (closed square closed=True/planar=True/normal=(0,0,1), open wire closed=False/gap>0, 3-D zig-zag planar=False, triangle closed+planar, hexagon, XZ-plane triangle normal=(0,1,0), large square, lifted vertex non-planar, tetrahedron-outline non-planar, tolerance sensitivity, empty ValueError). HONEST: edge order-dependent — scrambled/unordered edge lists are NOT automatically sorted; pass pre-ordered edges only; planarity is endpoint-only, curve interiors NOT sampled. Refs: Mantyla 'Solid Modeling' §3; Hoffmann §4."
           }
+        },
+        {
+          "name": "Parametric sheet-metal flat-pattern: K-factor lookup, bend allowance, bend deduction per DIN 6935 / ANSI Y14.5M",
+          "domain": "D03",
+          "competitor": {
+            "status": "partial",
+            "source": "https://www.solidworks.com/product/solidworks-sheet-metal",
+            "note": "SOLIDWORKS Sheet Metal computes flat patterns with K-factor but is not programmable via a standalone pure-Python API; Fusion 360 sheet-metal workspace similarly GUI-only; no competitor exposes a scriptable SheetMetalPart + FlatPatternResult dataclass API with per-bend BA/BD arrays and honest caveats"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/sheetmetal_features.py",
+            "note": "compute_flat_pattern(part: SheetMetalPart) -> FlatPatternResult; K-factor interpolated from r/t per DIN 6935 / Suchy §3: K=0.33 at r/t<1 (severe), K=0.44 at r/t>=3 (mild steel gentle), linear interp between. Materials: steel-cold-rolled (K 0.33-0.44), stainless-304 (0.31-0.38), aluminum-5052 (0.40-0.50), copper (0.40-0.50). BA=(pi*angle/180)*(r+K*t); OSSB=(r+t)*tan(angle/2); BD=2*OSSB-BA; flat_length=Σflange_lengths-ΣBD. LLM tool sheetmetal_compute_flat_pattern registered. 33 hermetic tests. HONEST CAVEATS: K-factor is empirical (tabulated DIN 6935 interpolation) — measured press-brake data preferred; bend-deduction assumes inside-set air-bend; spring-back NOT modelled; bottoming/coining process corrections in sheet_metal_bend_table.py."
+          }
         }
       ]
     }

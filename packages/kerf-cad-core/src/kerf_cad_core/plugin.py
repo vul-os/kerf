@@ -294,6 +294,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.sysml1d.network",
     "kerf_cad_core.frep.sdf",
     "kerf_cad_core.sheet_metal_bend_table",
+    # GK-P17: parametric sheet-metal flanges/bends/unfold + flat-pattern (Suchy §3 + DIN 6935)
+    "kerf_cad_core.sheetmetal_features",
     "kerf_cad_core.procsim.solidification",
     "kerf_cad_core.procsim.am_residual",
     "kerf_cad_core.jewelry.repair",
@@ -579,6 +581,12 @@ _TOOL_MODULES = [
     # Wendland C2 falloff w(t)=(1-t^2)^2; Botsch-Sorkine 2008 S3; Sculptris/ZBrush brush math.
     # LLM tool: mesh_sculpt_brush
     "kerf_cad_core.mesh_sculpt_brushes",
+    # GK-P21: displacement layer stack — multi-layer ordered displacement with per-layer mode
+    # (add/subtract/multiply/replace) + mask + strength. ZBrush/Mudbox layer-stack model.
+    # Aumann-McNamara 2009 Layered Displacement Maps; Lee-Moreton-Hoppe 2000 DSS.
+    # HONEST: per-vertex only (no barycentric interpolation); assumes unit-length input normals.
+    # LLM tool: mesh_apply_displacement_stack
+    "kerf_cad_core.mesh_displacement_stack",
 ]
 # NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
 # (already in _TOOL_MODULES above at line 128); sagitta_arrow_chart module is imported

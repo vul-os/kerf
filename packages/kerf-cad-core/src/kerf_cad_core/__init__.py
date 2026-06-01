@@ -24,6 +24,17 @@ from kerf_cad_core.mesh_sculpt_brushes import (
     SculptStroke,
     apply_sculpt_brush,
 )
+from kerf_cad_core.sheetmetal_features import (
+    SheetMetalPart,
+    FlatPatternResult,
+    compute_flat_pattern,
+)
+from kerf_cad_core.mesh_displacement_stack import (
+    DisplacementLayer,
+    DisplacementStackSpec,
+    DisplacementStackResult,
+    apply_displacement_stack,
+)
 
 __all__ = [
     "_OCC_AVAILABLE",
@@ -40,4 +51,13 @@ __all__ = [
     "SculptStroke",
     "MeshSculptResult",
     "apply_sculpt_brush",
+    # GK-P17: sheet-metal flat-pattern (Suchy §3 + DIN 6935)
+    "SheetMetalPart",
+    "FlatPatternResult",
+    "compute_flat_pattern",
+    # GK-P21: displacement layer stack (ZBrush/Mudbox layer model)
+    "DisplacementLayer",
+    "DisplacementStackSpec",
+    "DisplacementStackResult",
+    "apply_displacement_stack",
 ]

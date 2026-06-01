@@ -58,21 +58,29 @@ const OPERATION_DEFAULTS = {
 // Map UI 5-axis strategy + axisMode → backend operation string + extra fields.
 // The backend cam_run tool (registered in kerf_cam/plugin.py) dispatches on
 // operation: '5axis_finish' for continuous and '3plus2' for indexed.
-export function fiveAxisBackendArgs(axisMode, strategy, tiltAxis, tiltAngle) {
+export function fiveAxisBackendArgs(axisMode, strategy, tiltAxis, tiltAngle, leadDeg, driveFaceId, useTcp) {
+  const driveId = driveFaceId !== '' && driveFaceId != null ? parseInt(driveFaceId, 10) : undefined
   if (axisMode === '5axis_indexed' || strategy === 'indexed_rough') {
-    return {
+    const args = {
       operation: '3plus2',
       indexed_op: 'face',
     }
+    if (driveId != null && !Number.isNaN(driveId)) args.drive_face_id = driveId
+    return args
   }
   // Continuous: swarf uses tilt_deg=0 (tool axis = surface normal, side engage)
   // contour_tilted uses tilt_deg from user input
   const tilt = strategy === 'swarf' ? 0 : (parseFloat(tiltAngle) || 15)
-  return {
+  const args = {
     operation: '5axis_finish',
     tilt_deg: tilt,
     kinematic_family: 'head_table',
   }
+  const lead = parseFloat(leadDeg)
+  if (!Number.isNaN(lead) && lead !== 0) args.lead_deg = lead
+  if (driveId != null && !Number.isNaN(driveId)) args.drive_face_id = driveId
+  if (useTcp) args.use_tcp = true
+  return args
 }
 
 function fmtMm(v) {
@@ -113,6 +121,9 @@ export default function CAMView({ file, projectId, viewRef }) {
   // ── 5-axis fields ───────────────────────────────────────────────────────────
   const [tiltAxis, setTiltAxis] = useState('B')          // A / B / C
   const [tiltAngle, setTiltAngle] = useState('15')       // degrees
+  const [leadDeg, setLeadDeg] = useState('0')            // lead/lag angle along path
+  const [driveFaceId, setDriveFaceId] = useState('')     // zero-based face index for drive surface
+  const [useTcp, setUseTcp] = useState(false)            // G43.4 TCP mode in 5x G-code
   const [fiveAxisStrategy, setFiveAxisStrategy] = useState('contour_tilted')
   const [post5x, setPost5x] = useState('linuxcnc')       // linuxcnc | fanuc
 
@@ -233,7 +244,7 @@ export default function CAMView({ file, projectId, viewRef }) {
       body = { ...baseBody, operation }
     } else {
       // 5-axis: derive backend operation + extra fields from UI state
-      const extraFields = fiveAxisBackendArgs(axisMode, fiveAxisStrategy, tiltAxis, tiltAngle)
+      const extraFields = fiveAxisBackendArgs(axisMode, fiveAxisStrategy, tiltAxis, tiltAngle, leadDeg, driveFaceId, useTcp)
       body = {
         ...baseBody,
         ...extraFields,
@@ -466,6 +477,58 @@ export default function CAMView({ file, projectId, viewRef }) {
                   />
                 </div>
               </>
+            )}
+
+            {/* Drive face index — which solid face the tool follows */}
+            <div style={styles.row}>
+              <label style={styles.label}>Drive face index</label>
+              <input
+                type="number"
+                value={driveFaceId}
+                onChange={e => setDriveFaceId(e.target.value)}
+                style={styles.input}
+                step="1"
+                min="0"
+                placeholder="auto"
+                disabled={running}
+                data-testid="drive-face-id-input"
+              />
+            </div>
+
+            {/* Lead/lag angle — only for continuous (not swarf which forces 0) */}
+            {axisMode === '5axis_cont' && fiveAxisStrategy !== 'swarf' && (
+              <div style={styles.row}>
+                <label style={styles.label}>Lead angle (°)</label>
+                <input
+                  type="number"
+                  value={leadDeg}
+                  onChange={e => setLeadDeg(e.target.value)}
+                  style={styles.input}
+                  step="1"
+                  min="-30"
+                  max="30"
+                  disabled={running}
+                  data-testid="lead-deg-input"
+                />
+              </div>
+            )}
+
+            {/* TCP mode — G43.4 tool-centre-point compensation */}
+            {axisMode === '5axis_cont' && (
+              <div style={styles.row}>
+                <label style={styles.label}>TCP (G43.4)</label>
+                <input
+                  type="checkbox"
+                  checked={useTcp}
+                  onChange={e => setUseTcp(e.target.checked)}
+                  disabled={running}
+                  style={{ accentColor: '#a78bfa' }}
+                  data-testid="use-tcp-checkbox"
+                />
+                <span style={{ color: '#9ca3af', fontSize: 12, marginLeft: 4 }}>
+                  {useTcp ? 'Enabled (G43.4)' : 'Off'}
+                </span>
+              </div>
             )}
 
             {/* Post-processor */}

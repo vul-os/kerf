@@ -4457,6 +4457,84 @@ const FEATURE_KINDS = [
     ],
   },
 
+  // ── 5-axis CAM operations ─────────────────────────────────────────────────
+
+  {
+    op: 'cam_5axis_finish',
+    label: '5-axis Constant-Tilt Finish',
+    icon: Cpu,
+    caption: (
+      '5-axis constant-tilt surface finishing: tool axis is held at tilt_deg off the drive-face normal ' +
+      'while following iso-parametric paths. Kinematic family: head-table (A around X, B around Y). ' +
+      'Posts: LinuxCNC (G43.4 TCP optional) and Fanuc. ' +
+      'Strategy: contour_tilted for general surfaces; swarf (tilt=0) for side-cutting engagement. ' +
+      'Dispatches cam_run with operation="5axis_finish". ' +
+      'Refs: Altintas (2012) §7; Bohez (2002) Int J Mach Tools 42(7):827–840.'
+    ),
+    defaults: {
+      file_id: '', tool_diameter: 6.0, step_over: 0.5, step_down: 1.0,
+      feed_rate: 1200, spindle_speed: 12000, coolant: true,
+      drive_face_id: 0, tilt_deg: 15, lead_deg: 0,
+      kinematic_family: 'head_table', use_tcp: false,
+      post_processor_5x: 'linuxcnc',
+    },
+    fields: [
+      { key: 'file_id',          kind: 'text',   label: 'File ID (STEP)' },
+      { key: 'tool_diameter',    kind: 'number', label: 'Tool diameter (mm)', min: 0.1 },
+      { key: 'drive_face_id',    kind: 'number', label: 'Drive face index (0-based)', min: 0, step: 1 },
+      { key: 'tilt_deg',         kind: 'number', label: 'Tilt off surface normal (°)', min: 0, max: 30 },
+      { key: 'lead_deg',         kind: 'number', label: 'Lead/lag angle (°)', min: -30, max: 30 },
+      { key: 'step_over',        kind: 'number', label: 'Step-over (mm)', min: 0.01 },
+      { key: 'step_down',        kind: 'number', label: 'Step-down (mm)', min: 0.01 },
+      { key: 'feed_rate',        kind: 'number', label: 'Feed rate (mm/min)', min: 1 },
+      { key: 'spindle_speed',    kind: 'number', label: 'Spindle RPM', min: 1 },
+      { key: 'use_tcp',          kind: 'bool',   label: 'TCP G43.4 mode' },
+      { key: 'post_processor_5x', kind: 'select', label: 'Post-processor', options: [
+        { value: 'linuxcnc', label: 'LinuxCNC' },
+        { value: 'fanuc',    label: 'Fanuc' },
+      ] },
+    ],
+  },
+
+  {
+    op: 'cam_3plus2',
+    label: '3+2 Indexed (5-axis)',
+    icon: Cpu,
+    caption: (
+      '3+2 indexed 5-axis: tilts the spindle to a drive-face-aligned orientation, locks A/B rotaries, ' +
+      'then runs a standard 3-axis sub-operation (face/pocket/contour/parallel_3d/waterline). ' +
+      'No simultaneous 5-axis motion — safer for entry-level 5-axis machines. ' +
+      'Dispatches cam_run with operation="3plus2". ' +
+      'Refs: Altintas (2012) §7; Erdim & Lazoglu (2014) J Mach Sci Tech 18(3):472–491.'
+    ),
+    defaults: {
+      file_id: '', tool_diameter: 6.0, step_over: 1.0, step_down: 1.0,
+      feed_rate: 1000, spindle_speed: 10000, coolant: true,
+      drive_face_id: 0, indexed_op: 'face',
+      post_processor_5x: 'linuxcnc',
+    },
+    fields: [
+      { key: 'file_id',       kind: 'text',   label: 'File ID (STEP)' },
+      { key: 'tool_diameter', kind: 'number', label: 'Tool diameter (mm)', min: 0.1 },
+      { key: 'drive_face_id', kind: 'number', label: 'Drive face index (0-based)', min: 0, step: 1 },
+      { key: 'indexed_op', kind: 'select', label: '3-axis sub-operation', options: [
+        { value: 'face',        label: 'Face mill' },
+        { value: 'pocket',      label: 'Pocket' },
+        { value: 'contour',     label: 'Contour' },
+        { value: 'parallel_3d', label: 'Parallel 3D' },
+        { value: 'waterline',   label: 'Waterline' },
+      ] },
+      { key: 'step_over',     kind: 'number', label: 'Step-over (mm)', min: 0.01 },
+      { key: 'step_down',     kind: 'number', label: 'Step-down (mm)', min: 0.01 },
+      { key: 'feed_rate',     kind: 'number', label: 'Feed rate (mm/min)', min: 1 },
+      { key: 'spindle_speed', kind: 'number', label: 'Spindle RPM', min: 1 },
+      { key: 'post_processor_5x', kind: 'select', label: 'Post-processor', options: [
+        { value: 'linuxcnc', label: 'LinuxCNC' },
+        { value: 'fanuc',    label: 'Fanuc' },
+      ] },
+    ],
+  },
+
   {
     op: 'hsm_adaptive_pocket',
     label: 'Adaptive Pocket (HSM)',
@@ -5149,6 +5227,8 @@ const FEATURE_CATEGORIES = [
     'cam_generate_face_mill_path', 'cam_generate_peck_drill_cycle',
     'cam_generate_tap_cycle', 'cam_generate_boring_cycle',
     'cam_generate_profile_roughing',
+    // 5-axis operations
+    'cam_5axis_finish', 'cam_3plus2',
     // HSM strategies
     'hsm_adaptive_pocket', 'hsm_trochoidal_slot', 'hsm_rest_machining',
     // Toolpath analysis & validation

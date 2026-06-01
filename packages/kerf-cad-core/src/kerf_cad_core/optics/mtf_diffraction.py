@@ -65,7 +65,8 @@ MONOCHROMATIC compute_diffraction_mtf: single wavelength only.
 POLYCHROMATIC compute_polychromatic_diffraction_mtf: spectrally weighted sum
   MTF_poly(ν) = Σ W(λ)·MTF(ν,λ) / Σ W(λ) — implemented (Hopkins / Goodman §6.4).
 CIRCULAR APERTURE.  Obscured (annular) or non-circular pupils have a different
-  analytic form — not implemented.
+  analytic form — not implemented here; the Hopkins (1953) closed-form below
+  applies only to unobscured circular apertures.
 ON-AXIS (ZERO FIELD ANGLE).  The closed-form expression is valid only on the
   optical axis.  Off-axis MTF drops due to aberrations and vignetting.
 
@@ -470,6 +471,191 @@ class PolyMTFReport:
             "mtf_at_50_percent": self.mtf_at_50_percent,
             "honest_caveat": self.honest_caveat,
         }
+
+
+# ---------------------------------------------------------------------------
+# Analytic MTF result dataclass
+# ---------------------------------------------------------------------------
+
+@dataclass
+class AnalyticMTFReport:
+    """
+    Analytic (closed-form) diffraction-limited MTF for a circular aperture.
+
+    Uses the Hopkins (1953) / Goodman §6.4 formula directly — no numerical
+    integration.  Every value is computed from the exact expression:
+
+        MTF(ν) = (2/π) · [arccos(ν/ν_c) − (ν/ν_c)·√(1−(ν/ν_c)²)]   ν ≤ ν_c
+        MTF(ν) = 0                                                       ν > ν_c
+
+    where ν_c = 2·NA / λ_mm is the diffraction cutoff (cyc/mm).
+
+    Attributes
+    ----------
+    numerical_aperture : float
+        NA used for the computation.
+    wavelength_nm : float
+        Wavelength used (nm).
+    cutoff_freq_cyc_per_mm : float
+        Diffraction cutoff ν_c = 2·NA/λ_mm (cyc/mm).
+    mtf_curve : list[tuple[float, float]]
+        (ν, MTF(ν)) pairs.  ν in cyc/mm; MTF ∈ [0, 1].
+    mtf_at_zero : float
+        MTF(0) — always exactly 1.0 (analytic boundary condition).
+    mtf_at_half_cutoff : float
+        MTF(ν_c/2) — closed-form: (2/π)·[arccos(0.5)−0.5·√(3)/2] ≈ 0.3906.
+    mtf_at_cutoff : float
+        MTF(ν_c) — always exactly 0.0 (analytic boundary condition).
+    honest_caveat : str
+        Plain-English model limitations.
+
+    References
+    ----------
+    Hopkins, H.H. (1953) — "On the diffraction theory of optical images".
+        Proc. Royal Soc. London A 217, 408–432.
+    Goodman, J.W. — "Introduction to Fourier Optics", 3rd ed., §6.4, eq. 6-49.
+    """
+
+    numerical_aperture: float = 0.0
+    wavelength_nm: float = 0.0
+    cutoff_freq_cyc_per_mm: float = 0.0
+    mtf_curve: list = field(default_factory=list)
+    mtf_at_zero: float = 1.0
+    mtf_at_half_cutoff: float = 0.0
+    mtf_at_cutoff: float = 0.0
+    honest_caveat: str = _HONEST_CAVEAT
+
+    def to_dict(self) -> dict:
+        return {
+            "ok": True,
+            "numerical_aperture": self.numerical_aperture,
+            "wavelength_nm": self.wavelength_nm,
+            "cutoff_freq_cyc_per_mm": self.cutoff_freq_cyc_per_mm,
+            "mtf_curve": [list(pt) for pt in self.mtf_curve],
+            "mtf_at_zero": self.mtf_at_zero,
+            "mtf_at_half_cutoff": self.mtf_at_half_cutoff,
+            "mtf_at_cutoff": self.mtf_at_cutoff,
+            "honest_caveat": self.honest_caveat,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Analytic MTF — public API
+# ---------------------------------------------------------------------------
+
+def compute_diffraction_mtf_analytic(
+    numerical_aperture: float,
+    wavelength_nm: float,
+    num_spatial_freq: int = 128,
+) -> "AnalyticMTFReport | dict":
+    """
+    Compute the closed-form (analytic) diffraction-limited MTF for a circular
+    aperture using the Hopkins (1953) formula.
+
+    This function evaluates the exact Hopkins / Goodman §6.4 expression:
+
+        ν_c = 2·NA / λ_mm                    [diffraction cutoff, cyc/mm]
+
+        MTF(ν) = (2/π) · [arccos(ν/ν_c) − (ν/ν_c)·√(1−(ν/ν_c)²)]   ν ≤ ν_c
+        MTF(ν) = 0                                                       ν > ν_c
+
+    No numerical integration is performed — every sample is a direct
+    evaluation of the analytic formula.  The result is therefore exact to
+    floating-point precision.
+
+    Boundary values (analytic)
+    --------------------------
+    MTF(0)     = 1.0 exactly  (arccos(0)=π/2; (π/2)·2/π = 1)
+    MTF(ν_c/2) = (2/π)·[arccos(0.5) − 0.5·√(1−0.25)]
+               = (2/π)·[π/3 − (√3)/4]
+               ≈ 0.39087 (Hopkins 1953; Goodman §6.4)
+    MTF(ν_c)   = 0.0 exactly  (arccos(1)=0; sqrt(1−1)=0)
+
+    Numerical equivalence
+    ---------------------
+    Because both this function and compute_polychromatic_diffraction_mtf /
+    compute_diffraction_mtf call the same _mtf_value() kernel, analytic and
+    numerical results agree to machine precision (< 1e-10 absolute difference
+    over the entire frequency range).
+
+    Parameters
+    ----------
+    numerical_aperture : float
+        Image-space NA = n·sin(θ_max).  Must be in (0, 1].
+    wavelength_nm : float
+        Wavelength of light in nanometres.  Must be > 0.
+    num_spatial_freq : int
+        Number of equally-spaced frequency samples in [0, ν_c].
+        Default 128.  Must be ≥ 2.
+
+    Returns
+    -------
+    AnalyticMTFReport on success.
+    dict {"ok": False, "reason": "..."} on input error.
+
+    References
+    ----------
+    Hopkins, H.H. (1953) — "On the diffraction theory of optical images".
+        Proc. Royal Soc. London A 217, 408–432.
+    Goodman, J.W. — "Introduction to Fourier Optics", 3rd ed., §6.4, eq. 6-49.
+    Born, M. & Wolf, E. — "Principles of Optics", 7th ed., §9.5.2, eq. 9.80.
+    """
+    # --- Input validation ---
+    try:
+        na = float(numerical_aperture)
+    except (TypeError, ValueError):
+        return {"ok": False, "reason": "numerical_aperture must be a number"}
+    if not math.isfinite(na) or na <= 0.0 or na > 1.0:
+        return {"ok": False, "reason": "numerical_aperture must be in (0, 1]"}
+
+    try:
+        wl_nm = float(wavelength_nm)
+    except (TypeError, ValueError):
+        return {"ok": False, "reason": "wavelength_nm must be a number"}
+    if not math.isfinite(wl_nm) or wl_nm <= 0.0:
+        return {"ok": False, "reason": "wavelength_nm must be > 0"}
+
+    if not isinstance(num_spatial_freq, int) or num_spatial_freq < 2:
+        return {"ok": False, "reason": "num_spatial_freq must be an integer >= 2"}
+
+    # --- Diffraction cutoff -------------------------------------------------
+    # ν_c = 2·NA / λ_mm    (Hopkins 1953; Goodman §6.4, eq. 6-49)
+    wl_mm = wl_nm * 1.0e-6
+    nu_c = 2.0 * na / wl_mm
+
+    # --- Build analytic MTF curve -------------------------------------------
+    # Frequency grid: num_spatial_freq equally-spaced points in [0, nu_c]
+    step = nu_c / (num_spatial_freq - 1)
+    mtf_curve: list[tuple[float, float]] = []
+    for i in range(num_spatial_freq):
+        nu = i * step
+        s = nu / nu_c  # normalised frequency ∈ [0, 1]
+        mtf_val = _mtf_value(s)
+        mtf_curve.append((nu, mtf_val))
+
+    # --- Analytic boundary and landmark values ------------------------------
+    # MTF(0): s=0 → arccos(0)=π/2; (2/π)·π/2 = 1.0 exactly
+    mtf_at_zero = 1.0
+
+    # MTF(ν_c/2): s=0.5 → arccos(0.5)=π/3; sqrt(1−0.25)=sqrt(3)/2
+    #   = (2/π)·[π/3 − 0.5·sqrt(3)/2]
+    mtf_at_half = (2.0 / math.pi) * (
+        math.acos(0.5) - 0.5 * math.sqrt(1.0 - 0.25)
+    )
+
+    # MTF(ν_c): s=1 → arccos(1)=0; sqrt(1−1)=0 → 0.0 exactly
+    mtf_at_cutoff = 0.0
+
+    return AnalyticMTFReport(
+        numerical_aperture=na,
+        wavelength_nm=wl_nm,
+        cutoff_freq_cyc_per_mm=nu_c,
+        mtf_curve=mtf_curve,
+        mtf_at_zero=mtf_at_zero,
+        mtf_at_half_cutoff=mtf_at_half,
+        mtf_at_cutoff=mtf_at_cutoff,
+        honest_caveat=_HONEST_CAVEAT,
+    )
 
 
 # ---------------------------------------------------------------------------

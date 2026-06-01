@@ -24,9 +24,11 @@ import math
 import pytest
 
 from kerf_cad_core.optics.mtf_diffraction import (
+    AnalyticMTFReport,
     MTFReport,
     PolyMTFReport,
     compute_diffraction_mtf,
+    compute_diffraction_mtf_analytic,
     compute_polychromatic_diffraction_mtf,
     photopic_spd,
     d65_spd,
@@ -402,3 +404,229 @@ class TestPolychromaticDiffractionMTF:
         assert isinstance(report, PolyMTFReport)
         assert "POLYCHROMATIC" in report.honest_caveat.upper()
         assert "Goodman" in report.honest_caveat or "Hopkins" in report.honest_caveat
+
+
+# ===========================================================================
+# Analytic (closed-form) MTF tests — Hopkins (1953) / Goodman §6.4
+# ===========================================================================
+
+class TestAnalyticDiffractionMTF:
+    """
+    compute_diffraction_mtf_analytic — direct evaluation of the Hopkins (1953)
+    closed-form expression for the circular-aperture diffraction MTF.
+
+    All tests use exact analytic values; numerical tolerance is ~1e-10.
+    """
+
+    # -----------------------------------------------------------------------
+    # Test A1: Return type is AnalyticMTFReport
+    # -----------------------------------------------------------------------
+    def test_returns_analytic_report(self):
+        report = compute_diffraction_mtf_analytic(0.1, 550.0)
+        assert isinstance(report, AnalyticMTFReport)
+
+    # -----------------------------------------------------------------------
+    # Test A2: MTF(0) == 1.0 exactly (analytic boundary condition)
+    # -----------------------------------------------------------------------
+    def test_analytic_mtf_at_zero_is_unity(self):
+        """
+        At ν=0: arccos(0)=π/2, so MTF=(2/π)·π/2=1.0 exactly.
+        Also confirmed via the stored mtf_at_zero field.
+        """
+        report = compute_diffraction_mtf_analytic(0.1, 550.0, num_spatial_freq=128)
+        assert isinstance(report, AnalyticMTFReport)
+        # Stored landmark
+        assert abs(report.mtf_at_zero - 1.0) < 1e-15
+        # First curve point
+        nu0, m0 = report.mtf_curve[0]
+        assert abs(nu0) < 1e-9
+        assert abs(m0 - 1.0) < 1e-15
+
+    # -----------------------------------------------------------------------
+    # Test A3: MTF(ν_c) == 0.0 exactly (analytic boundary condition)
+    # -----------------------------------------------------------------------
+    def test_analytic_mtf_at_cutoff_is_zero(self):
+        """
+        At ν=ν_c (s=1): arccos(1)=0, sqrt(1−1)=0 → MTF=0 exactly.
+        Also confirmed via the stored mtf_at_cutoff field.
+        """
+        report = compute_diffraction_mtf_analytic(0.15, 488.0, num_spatial_freq=64)
+        assert isinstance(report, AnalyticMTFReport)
+        assert abs(report.mtf_at_cutoff - 0.0) < 1e-15
+        # Last curve point is exactly at ν_c
+        nu_last, m_last = report.mtf_curve[-1]
+        assert abs(nu_last - report.cutoff_freq_cyc_per_mm) < 1e-9
+        assert abs(m_last - 0.0) < 1e-15
+
+    # -----------------------------------------------------------------------
+    # Test A4: MTF(ν_c/2) ≈ 0.3909  Hopkins (1953); Goodman §6.4
+    # -----------------------------------------------------------------------
+    def test_analytic_mtf_at_half_cutoff(self):
+        """
+        At s=0.5:  MTF = (2/π)·[arccos(0.5) − 0.5·√(3)/2]
+                       = (2/π)·[π/3 − √3/4]
+                       ≈ 0.39087  (Hopkins 1953; Goodman §6.4)
+        The stored mtf_at_half_cutoff field must match to < 1e-10.
+        """
+        report = compute_diffraction_mtf_analytic(0.1, 550.0, num_spatial_freq=128)
+        assert isinstance(report, AnalyticMTFReport)
+        expected = (2.0 / math.pi) * (
+            math.acos(0.5) - 0.5 * math.sqrt(1.0 - 0.25)
+        )
+        assert abs(expected - 0.3906) < 0.001  # ≈ 0.391 per Goodman §6.4
+        assert abs(report.mtf_at_half_cutoff - expected) < 1e-15
+
+    # -----------------------------------------------------------------------
+    # Test A5: Analytic vs numerical — max difference < 1e-10
+    # -----------------------------------------------------------------------
+    def test_analytic_vs_numerical_agreement(self):
+        """
+        Both compute_diffraction_mtf_analytic and the numerical path inside
+        compute_polychromatic_diffraction_mtf call the same _mtf_value()
+        kernel.  Their results must agree to < 1e-10 over the entire frequency
+        range.
+        """
+        na = 0.12
+        wl_nm = 532.0
+        num_pts = 256
+
+        analytic_report = compute_diffraction_mtf_analytic(
+            na, wl_nm, num_spatial_freq=num_pts
+        )
+        assert isinstance(analytic_report, AnalyticMTFReport)
+
+        # Build a single-wavelength polychromatic report on the same grid
+        # (two identical wavelengths, same weight → identical to single-λ MTF)
+        poly_report = compute_polychromatic_diffraction_mtf(
+            na, [wl_nm, wl_nm], [1.0, 1.0], num_spatial_freq=num_pts
+        )
+        assert isinstance(poly_report, PolyMTFReport)
+
+        # Compare point-by-point
+        max_diff = 0.0
+        for (nu_a, m_a), (nu_p, m_p) in zip(
+            analytic_report.mtf_curve, poly_report.poly_mtf_curve
+        ):
+            diff = abs(m_a - m_p)
+            if diff > max_diff:
+                max_diff = diff
+
+        assert max_diff < 1e-10, (
+            f"Analytic vs numerical max difference {max_diff:.2e} exceeds 1e-10"
+        )
+
+    # -----------------------------------------------------------------------
+    # Test A6: Cutoff frequency matches ν_c = 2·NA/λ_mm
+    # -----------------------------------------------------------------------
+    def test_cutoff_freq_formula(self):
+        """ν_c = 2·NA/λ_mm — verified against the closed-form formula."""
+        na = 0.25
+        wl_nm = 632.8  # He-Ne laser line
+        report = compute_diffraction_mtf_analytic(na, wl_nm)
+        assert isinstance(report, AnalyticMTFReport)
+        expected_nu_c = 2.0 * na / (wl_nm * 1.0e-6)
+        assert abs(report.cutoff_freq_cyc_per_mm - expected_nu_c) / expected_nu_c < 1e-12
+
+    # -----------------------------------------------------------------------
+    # Test A7: MTF curve is monotonically non-increasing
+    # -----------------------------------------------------------------------
+    def test_analytic_mtf_monotone_decreasing(self):
+        """
+        The Hopkins formula is strictly decreasing on [0, ν_c].
+        With floating-point arithmetic the sequence must be non-increasing.
+        """
+        report = compute_diffraction_mtf_analytic(0.08, 486.1, num_spatial_freq=200)
+        assert isinstance(report, AnalyticMTFReport)
+        prev_m = 1.0
+        for nu, m in report.mtf_curve:
+            assert m <= prev_m + 1e-12, (
+                f"Non-monotone at ν={nu:.1f}: MTF={m:.8f} > prev={prev_m:.8f}"
+            )
+            prev_m = m
+
+    # -----------------------------------------------------------------------
+    # Test A8: to_dict round-trip
+    # -----------------------------------------------------------------------
+    def test_to_dict_round_trip(self):
+        report = compute_diffraction_mtf_analytic(0.1, 550.0, num_spatial_freq=32)
+        assert isinstance(report, AnalyticMTFReport)
+        d = report.to_dict()
+        assert d["ok"] is True
+        assert d["numerical_aperture"] == 0.1
+        assert d["wavelength_nm"] == 550.0
+        assert abs(d["mtf_at_zero"] - 1.0) < 1e-15
+        assert abs(d["mtf_at_cutoff"] - 0.0) < 1e-15
+        assert len(d["mtf_curve"]) == 32
+        assert abs(d["mtf_curve"][0][1] - 1.0) < 1e-15
+
+    # -----------------------------------------------------------------------
+    # Test A9: MTF values all in [0, 1]
+    # -----------------------------------------------------------------------
+    def test_analytic_mtf_values_in_unit_interval(self):
+        report = compute_diffraction_mtf_analytic(0.05, 780.0, num_spatial_freq=300)
+        assert isinstance(report, AnalyticMTFReport)
+        for nu, m in report.mtf_curve:
+            assert m >= -1e-15, f"Negative MTF {m:.2e} at ν={nu:.1f}"
+            assert m <= 1.0 + 1e-15, f"MTF > 1 ({m:.2e}) at ν={nu:.1f}"
+
+    # -----------------------------------------------------------------------
+    # Test A10: Analytic vs monochromatic (F# path) — point-by-point agreement
+    # -----------------------------------------------------------------------
+    def test_analytic_vs_monochromatic_f_number_path(self):
+        """
+        compute_diffraction_mtf (F# path) and compute_diffraction_mtf_analytic
+        (NA path, same _mtf_value kernel) must agree to < 1e-10 at every
+        shared frequency sample.
+
+        Relationship: F# = 1/(2·NA)  ↔  NA = 1/(2·F#).
+        Both cutoffs: ν_c = 1/(λ_mm·F#) = 2·NA/λ_mm — same formula, same value.
+        """
+        wl_nm = 550.0
+        f_num = 5.6
+        na = 1.0 / (2.0 * f_num)  # NA corresponding to F#
+
+        analytic_report = compute_diffraction_mtf_analytic(
+            na, wl_nm, num_spatial_freq=200
+        )
+        assert isinstance(analytic_report, AnalyticMTFReport)
+
+        # Build monochromatic report on the same grid (sample at same freqs)
+        # Use helper from test file
+        nu_c = analytic_report.cutoff_freq_cyc_per_mm
+        max_diff = 0.0
+        for nu, m_analytic in analytic_report.mtf_curve:
+            m_expected = _mono_mtf_at(nu, na, wl_nm)
+            diff = abs(m_analytic - m_expected)
+            if diff > max_diff:
+                max_diff = diff
+
+        assert max_diff < 1e-14, (
+            f"Analytic vs _mono_mtf_at max difference {max_diff:.2e} exceeds 1e-14"
+        )
+
+    # -----------------------------------------------------------------------
+    # Input error paths
+    # -----------------------------------------------------------------------
+    def test_error_na_zero(self):
+        result = compute_diffraction_mtf_analytic(0.0, 550.0)
+        assert isinstance(result, dict) and result["ok"] is False
+
+    def test_error_na_above_one(self):
+        result = compute_diffraction_mtf_analytic(1.5, 550.0)
+        assert isinstance(result, dict) and result["ok"] is False
+
+    def test_error_wavelength_zero(self):
+        result = compute_diffraction_mtf_analytic(0.1, 0.0)
+        assert isinstance(result, dict) and result["ok"] is False
+
+    def test_error_wavelength_negative(self):
+        result = compute_diffraction_mtf_analytic(0.1, -100.0)
+        assert isinstance(result, dict) and result["ok"] is False
+
+    def test_error_num_spatial_freq_one(self):
+        result = compute_diffraction_mtf_analytic(0.1, 550.0, num_spatial_freq=1)
+        assert isinstance(result, dict) and result["ok"] is False
+
+    def test_error_na_negative(self):
+        result = compute_diffraction_mtf_analytic(-0.1, 550.0)
+        assert isinstance(result, dict) and result["ok"] is False

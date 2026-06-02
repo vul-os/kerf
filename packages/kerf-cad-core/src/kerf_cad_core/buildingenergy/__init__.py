@@ -96,4 +96,13 @@ __all__ = [
     "solar_heat_gain_rts",
     "cooling_load_fenestration_rts",
     "zone_24h_cooling_load",
+    "ComplianceSpec",
+    "ComplianceReport",
+    "compute_compliance_report",
 ]
+
+from kerf_cad_core.buildingenergy.compliance_report import (
+    ComplianceSpec,
+    ComplianceReport,
+    compute_compliance_report,
+)

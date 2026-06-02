@@ -174,6 +174,11 @@ from kerf_cad_core.arch.stair_stringer import (
     StringerReport,
     design_stair_stringer,
 )
+from kerf_cad_core.arch.stair_code_check import (
+    StairCodeSpec,
+    StairCodeReport,
+    check_stair_codes,
+)
 
 __all__ = [
     "WallLayer",

@@ -52,6 +52,7 @@ def _register_tools(ctx, provides: list) -> None:
         ("kerf_bim.tools.xref", "bim.federated-xref"),
         ("kerf_bim.tools.phase_filter", "bim.renovation-phase"),
         ("kerf_bim.tools.element_lock", "bim.element-lock"),
+        ("kerf_bim.tools.drawing_list", "bim.drawing-list"),
         ("kerf_bim.tools.bim_categories", "bim.categories"),
         ("kerf_bim.tools.family", "bim.family"),
         ("kerf_bim.tools.schedule", "bim.schedule"),

@@ -86,6 +86,7 @@ const Tools = lazy(() => import('./routes/Tools.jsx'))
 const AssemblyClashPanel = lazy(() => import('./components/brep/AssemblyClashPanel.jsx'))
 const EcoDesignerPage = lazy(() => import('./routes/EcoDesigner.jsx'))
 const FamilyEditorRoute = lazy(() => import('./routes/FamilyEditorRoute.jsx'))
+const SheetsPage = lazy(() => import('./routes/Sheets.jsx'))
 
 // Cloud surface — these come from the cloud/ open-core split and may be
 // stubs on OSS builds. useCloudConfig stays eager (we need it before any
@@ -205,6 +206,7 @@ export default function App() {
       <Route path="/clash" element={<AssemblyClashPanel />} />
       <Route path="/energy" element={<EcoDesignerPage />} />
       <Route path="/families" element={<FamilyEditorRoute />} />
+      <Route path="/projects/:projectId/sheets" element={<SheetsPage />} />
       <Route path="/domains" element={<DomainsHub />} />
       <Route path="/domains/automotive" element={<Automotive />} />
       <Route path="/docs" element={<DocsHome />} />

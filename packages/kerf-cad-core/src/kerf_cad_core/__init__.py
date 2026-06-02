@@ -28,6 +28,16 @@ from kerf_cad_core.sheetmetal_features import (
     SheetMetalPart,
     FlatPatternResult,
     compute_flat_pattern,
+    HemSpec,
+    HemResult,
+    compute_hem_geometry,
+    JogSpec,
+    JogResult,
+    compute_jog_geometry,
+    FlangeSpec,
+    MultiFlangeSpec,
+    MultiFlangeResult,
+    compute_multi_flange_geometry,
 )
 from kerf_cad_core.mesh_displacement_stack import (
     DisplacementLayer,

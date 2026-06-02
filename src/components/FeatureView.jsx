@@ -5299,6 +5299,53 @@ const FEATURE_KINDS = [
       { key: 'flange_lengths_mm', kind: 'text',   label: 'Flange lengths mm (JSON array)' },
     ],
   },
+  // sheetmetal_compute_hem: open/closed/teardrop/rolled hem flat development
+  {
+    op: 'sheetmetal_compute_hem',
+    label: 'Hem Geometry',
+    icon: Layers,
+    caption: 'Compute the flat-pattern developed length for a sheet-metal hem (flange folded 180° back on itself). Supports open, closed, teardrop, and rolled hem types per Suchy §6 + DIN 6935 §4.3.',
+    defaults: { hem_type: 'open', hem_radius_mm: 2.0, hem_length_mm: 8.0, sheet_thickness_mm: 1.0, k_factor: 0.4 },
+    fields: [
+      { key: 'hem_type',           kind: 'select', label: 'Hem type', options: ['open', 'closed', 'teardrop', 'rolled'] },
+      { key: 'hem_radius_mm',      kind: 'number', label: 'Hem radius (mm)',      min: 0,   step: 0.1 },
+      { key: 'hem_length_mm',      kind: 'number', label: 'Hem leg length (mm)',  min: 0.1, step: 0.5 },
+      { key: 'sheet_thickness_mm', kind: 'number', label: 'Sheet thickness (mm)', min: 0.1, step: 0.1 },
+      { key: 'k_factor',           kind: 'number', label: 'K-factor',             min: 0.01, max: 0.99, step: 0.01 },
+    ],
+  },
+  // sheetmetal_compute_jog: Z-offset jog (two opposing bends) flat development
+  {
+    op: 'sheetmetal_compute_jog',
+    label: 'Jog Geometry',
+    icon: SlidersHorizontal,
+    caption: 'Compute the flat-pattern developed length for a sheet-metal jog (Z-offset, two opposing bends). Per Suchy §4.5 + DIN 6935: θ = arctan(h/L), flat = L + 2·BA.',
+    defaults: { jog_height_mm: 10.0, jog_length_mm: 20.0, sheet_thickness_mm: 1.5, bend_radius_mm: 2.0, k_factor: 0.4 },
+    fields: [
+      { key: 'jog_height_mm',      kind: 'number', label: 'Jog height (mm)',      min: 0.1, step: 0.5 },
+      { key: 'jog_length_mm',      kind: 'number', label: 'Jog land length (mm)', min: 0.1, step: 0.5 },
+      { key: 'sheet_thickness_mm', kind: 'number', label: 'Sheet thickness (mm)', min: 0.1, step: 0.1 },
+      { key: 'bend_radius_mm',     kind: 'number', label: 'Bend radius (mm)',     min: 0.1, step: 0.1 },
+      { key: 'k_factor',           kind: 'number', label: 'K-factor',             min: 0.01, max: 0.99, step: 0.01 },
+    ],
+  },
+  // sheetmetal_compute_multi_flange: chained N-bend flat development
+  {
+    op: 'sheetmetal_compute_multi_flange',
+    label: 'Multi-Flange',
+    icon: Repeat,
+    caption: 'Compute flat-pattern for a chain of N flanges with N-1 bends, each with its own angle, radius, K-factor, and sheet thickness. Per Suchy §3 + DIN 6935.',
+    defaults: {
+      flanges: [
+        { length_mm: 30, angle_deg: 90, radius_mm: 2, k_factor: 0.4, thickness_mm: 1.5 },
+        { length_mm: 50, angle_deg: 90, radius_mm: 2, k_factor: 0.4, thickness_mm: 1.5 },
+        { length_mm: 30, angle_deg: 90, radius_mm: 2, k_factor: 0.4, thickness_mm: 1.5 },
+      ],
+    },
+    fields: [
+      { key: 'flanges', kind: 'text', label: 'Flanges JSON (array of {length_mm, angle_deg, radius_mm, k_factor?, thickness_mm?})' },
+    ],
+  },
   // tolstack_analyze: 1-D tolerance stackup WC/RSS/Monte Carlo
   {
     op: 'tolstack_analyze',
@@ -5566,7 +5613,11 @@ const FEATURE_CATEGORIES = [
     'surface_deviation_check', 'surface_naked_edge_detect', 'surface_isocurve_extract',
   ] },
   { id: 'manufacturing_dfm', label: 'Manufacturing / DFM', ops: [
-    'sheetmetal_compute_flat_pattern', 'tolstack_analyze',
+    'sheetmetal_compute_flat_pattern',
+    'sheetmetal_compute_hem',
+    'sheetmetal_compute_jog',
+    'sheetmetal_compute_multi_flange',
+    'tolstack_analyze',
   ] },
   { id: 'weldment',  label: 'Weldment',     ops: ['gusset_plate', 'cope_notch'] },
   { id: 'bim',       label: 'BIM',          ops: ['bim_make_grid', 'bim_make_framing', 'bim_make_wall', 'bim_make_slab'] },

@@ -1,11 +1,21 @@
 """
 kerf-cad-core: GK-P17 — Sheet-metal features: parametric flanges, bends,
-and unfold-to-flat-pattern.
+hem, jog, multi-flange, and unfold-to-flat-pattern.
 
 Implements:
-  - ``SheetMetalPart``     — dataclass describing a multi-bend blank
-  - ``FlatPatternResult``  — dataclass returned by ``compute_flat_pattern``
+  - ``SheetMetalPart``              — dataclass describing a multi-bend blank
+  - ``FlatPatternResult``           — dataclass returned by ``compute_flat_pattern``
   - ``compute_flat_pattern(part)``  — K-factor + bend-allowance + flat-pattern
+  - ``HemSpec``                     — hem (flange folded back on itself)
+  - ``HemResult``                   — returned by ``compute_hem_geometry``
+  - ``compute_hem_geometry(spec)``  — open/closed/teardrop/rolled hem unfold
+  - ``JogSpec``                     — jog (Z-offset, two opposing bends)
+  - ``JogResult``                   — returned by ``compute_jog_geometry``
+  - ``compute_jog_geometry(spec)``  — two-bend jog flat-length calculation
+  - ``FlangeSpec``                  — single-flange descriptor for multi-flange
+  - ``MultiFlangeSpec``             — sequence of N flanges
+  - ``MultiFlangeResult``           — returned by ``compute_multi_flange_geometry``
+  - ``compute_multi_flange_geometry(spec)`` — chained N-bend flat development
 
 Formula reference
 -----------------
@@ -57,7 +67,8 @@ Honest caveats
 5. ``flat_width_mm`` is passed through unchanged; the module does NOT model
    notching, lancing, or width changes from corner reliefs.
 
-LLM tool: ``sheetmetal_compute_flat_pattern``
+LLM tools: ``sheetmetal_compute_flat_pattern``, ``sheetmetal_compute_hem``,
+    ``sheetmetal_compute_jog``, ``sheetmetal_compute_multi_flange``
     Gated import of ``kerf_chat.tools.registry`` so the module loads cleanly
     in pure-Python test environments that lack the chat-server runtime.
 
@@ -318,6 +329,491 @@ def compute_flat_pattern(part: SheetMetalPart) -> FlatPatternResult:
 
 
 # ---------------------------------------------------------------------------
+# Hem dataclasses + computation
+# ---------------------------------------------------------------------------
+
+@dataclass
+class HemSpec:
+    """
+    Describes a hem — a flange folded back onto itself along its free edge.
+
+    Parameters
+    ----------
+    hem_type : str
+        One of: ``"open"``, ``"closed"``, ``"teardrop"``, ``"rolled"``.
+
+        * ``open``      — the hem leaves a gap equal to ``sheet_thickness_mm``
+                          (Suchy §6.1, DIN 6935 §4.3 Type A).
+        * ``closed``    — the hem presses flat (gap ≈ 0); tightest form.
+        * ``teardrop``  — the folded edge forms a teardrop profile; radius
+                          controlled by ``hem_radius_mm`` (Suchy §6.3).
+        * ``rolled``    — a full-circle roll; the hem radius equals ≥ t/2
+                          (Suchy §6.4).
+
+    hem_radius_mm : float
+        Inside radius of the hem fold (mm).  Must be ≥ 0.  Ignored for
+        ``"closed"`` (treated as 0).  For ``"open"`` the effective radius is
+        ``max(hem_radius_mm, sheet_thickness_mm / 2)``.
+    hem_length_mm : float
+        Leg length of the hem measured from the bend tangent point to the
+        free edge (mm).  Must be > 0.
+    sheet_thickness_mm : float
+        Sheet thickness (mm).  Must be > 0.
+    k_factor : float
+        Neutral-axis offset fraction (0 < k < 1, default 0.4).
+        Used for the 180° hem fold bend-allowance calculation per Suchy §6:
+        BA_hem = π · (r + k · t).
+    """
+    hem_type: str
+    hem_radius_mm: float
+    hem_length_mm: float
+    sheet_thickness_mm: float
+    k_factor: float = 0.4
+
+
+@dataclass
+class HemResult:
+    """
+    Result returned by ``compute_hem_geometry``.
+
+    Attributes
+    ----------
+    developed_length_mm : float
+        Total flat blank length consumed by the hem (hem arc + leg), mm.
+    flat_pattern_segments : list[dict]
+        Ordered segments that make up the hem flat pattern.
+        Each dict has ``{"type": "straight"|"bend", "length_mm": float}``.
+    bend_allowance_mm : float
+        Arc length of the neutral axis through the 180° fold, mm.
+    gap_mm : float
+        Resulting air gap between the two sheet surfaces after folding (mm).
+        0.0 for ``"closed"``, ``sheet_thickness_mm`` for ``"open"``,
+        ``2·hem_radius_mm + sheet_thickness_mm`` for ``"teardrop"``.
+    honest_caveat : str
+        Human-readable caveats about model limitations.
+    """
+    developed_length_mm: float
+    flat_pattern_segments: List[dict]
+    bend_allowance_mm: float
+    gap_mm: float
+    honest_caveat: str
+
+
+_HEM_CAVEAT = (
+    "Hem developed-length formula from Suchy 'Handbook of Die Design' §6 + DIN 6935 §4.3. "
+    "BA_hem = π·(r + K·t) assumes 180° fold neutral-axis arc. "
+    "K-factor default 0.4 is an empirical midpoint; measured press-brake data is preferred. "
+    "Spring-back NOT modelled (hem tooling typically bottoms the fold). "
+    "Closed hem gap is nominally 0 but in practice ≈0.1–0.3 mm due to spring-back "
+    "unless coined. Rolled hem assumes r ≥ t/2; thicker stock requires a roller die. "
+    "No corner-relief geometry is modelled."
+)
+
+# Minimum gap per Suchy §6.1: open hem gap = sheet_thickness
+_HEM_OPEN_GAP_FACTOR = 1.0          # gap = 1 × t
+
+
+def compute_hem_geometry(spec: HemSpec) -> HemResult:
+    """
+    Compute the flat-pattern developed length for a sheet-metal hem.
+
+    Parameters
+    ----------
+    spec : HemSpec
+
+    Returns
+    -------
+    HemResult
+
+    Raises
+    ------
+    ValueError
+        On invalid inputs or unrecognised hem_type.
+
+    Notes
+    -----
+    Hem types and geometry (Suchy §6):
+    ┌──────────┬────────────────────────────────────────────────────┐
+    │ Type     │ Description                                        │
+    ├──────────┼────────────────────────────────────────────────────┤
+    │ open     │ gap = t; fold radius ≥ t/2                         │
+    │ closed   │ gap = 0; radius → 0 (press flat)                   │
+    │ teardrop │ gap = 2r + t; distinct teardrop profile            │
+    │ rolled   │ full-circle roll; r ≥ t/2                          │
+    └──────────┴────────────────────────────────────────────────────┘
+
+    BA_hem = π · (r_effective + K · t)    (180° neutral-axis arc)
+    developed_length = hem_length + BA_hem
+    """
+    valid_types = {"open", "closed", "teardrop", "rolled"}
+    if spec.hem_type not in valid_types:
+        raise ValueError(
+            f"hem_type must be one of {sorted(valid_types)}; got '{spec.hem_type}'"
+        )
+    t = float(spec.sheet_thickness_mm)
+    if t <= 0:
+        raise ValueError(f"sheet_thickness_mm must be > 0; got {t}")
+    hem_len = float(spec.hem_length_mm)
+    if hem_len <= 0:
+        raise ValueError(f"hem_length_mm must be > 0; got {hem_len}")
+    r_input = float(spec.hem_radius_mm)
+    if r_input < 0:
+        raise ValueError(f"hem_radius_mm must be ≥ 0; got {r_input}")
+    k = float(spec.k_factor)
+    if not (0 < k < 1):
+        raise ValueError(f"k_factor must be in (0, 1); got {k}")
+
+    if spec.hem_type == "closed":
+        # Closed hem: press flat — radius → 0, gap = 0
+        r_eff = 0.0
+        gap_mm = 0.0
+    elif spec.hem_type == "open":
+        # Open hem: gap = t; effective radius ≥ t/2 per DIN 6935
+        r_eff = max(r_input, t / 2.0)
+        gap_mm = _HEM_OPEN_GAP_FACTOR * t
+    elif spec.hem_type == "teardrop":
+        # Teardrop: user controls the radius; gap = 2r + t
+        r_eff = r_input if r_input > 0 else t / 2.0
+        gap_mm = 2.0 * r_eff + t
+    else:  # rolled
+        # Rolled (full circle): r ≥ t/2 mandatory
+        r_eff = max(r_input, t / 2.0)
+        gap_mm = 2.0 * r_eff + t  # the rolled tube OD minus sheet face
+
+    # BA = π · (r_eff + K · t)  — 180° fold
+    ba = math.pi * (r_eff + k * t)
+
+    # Total developed length: straight leg + bend arc
+    dev_len = hem_len + ba
+
+    segments = [
+        {"type": "straight", "length_mm": round(hem_len, 6)},
+        {"type": "bend",     "length_mm": round(ba, 6)},
+    ]
+
+    return HemResult(
+        developed_length_mm=round(dev_len, 6),
+        flat_pattern_segments=segments,
+        bend_allowance_mm=round(ba, 6),
+        gap_mm=round(gap_mm, 6),
+        honest_caveat=_HEM_CAVEAT,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Jog dataclasses + computation
+# ---------------------------------------------------------------------------
+
+@dataclass
+class JogSpec:
+    """
+    Describes a jog (Z-offset feature) — two opposing bends placed close
+    together so that one panel is shifted parallel to, but offset from, the
+    original panel.
+
+    Parameters
+    ----------
+    jog_height_mm : float
+        Desired Z-offset (offset between the two parallel planes) in mm.
+        Must be > 0.
+    jog_length_mm : float
+        Horizontal distance between the two bend tangent points (mm).
+        Also called the "jog land" or "step length".  Must be > 0.
+    sheet_thickness_mm : float
+        Sheet thickness (mm).  Must be > 0.
+    bend_radius_mm : float
+        Inside bend radius applied to both bends (mm).  Must be > 0.
+    k_factor : float
+        K-factor (default 0.4).  Applied to both bends symmetrically.
+    """
+    jog_height_mm: float
+    jog_length_mm: float
+    sheet_thickness_mm: float
+    bend_radius_mm: float
+    k_factor: float = 0.4
+
+
+@dataclass
+class JogResult:
+    """
+    Result returned by ``compute_jog_geometry``.
+
+    Attributes
+    ----------
+    flat_developed_length : float
+        Total flat length consumed by the jog (2 × BA + jog_land), mm.
+    bend_count : int
+        Always 2 for a single jog.
+    bend_allowances_mm : list[float]
+        [BA_first_bend, BA_second_bend].  Both are identical for a symmetric
+        jog.
+    jog_angle_deg : float
+        Actual bend angle (°) of each bend, derived from the geometry:
+        θ = arctan(jog_height / jog_length).
+    honest_caveat : str
+        Human-readable caveats.
+    """
+    flat_developed_length: float
+    bend_count: int
+    bend_allowances_mm: List[float]
+    jog_angle_deg: float
+    honest_caveat: str
+
+
+_JOG_CAVEAT = (
+    "Jog geometry per Suchy 'Handbook of Die Design' §4.5 + DIN 6935 §4. "
+    "Bend angle θ = arctan(h / L) where h = jog_height_mm, L = jog_length_mm. "
+    "Both bends assumed identical (symmetric jog). "
+    "BA = (π·θ/180)·(r + K·t) per DIN 6935. "
+    "K-factor default 0.4 is empirical; measured press-brake data preferred. "
+    "Minimum jog land L ≥ 4t recommended (DIN 6935 §4) to avoid "
+    "bend-interaction effects — not enforced here. "
+    "Spring-back NOT modelled."
+)
+
+
+def compute_jog_geometry(spec: JogSpec) -> JogResult:
+    """
+    Compute the flat-pattern developed length for a sheet-metal jog.
+
+    Parameters
+    ----------
+    spec : JogSpec
+
+    Returns
+    -------
+    JogResult
+
+    Raises
+    ------
+    ValueError
+        On invalid inputs.
+
+    Notes
+    -----
+    Jog geometry (Suchy §4.5 / DIN 6935):
+        θ   = arctan(jog_height / jog_length)   [bend angle of each opposing bend]
+        BA  = (π·θ/180) · (r + K·t)
+        flat_developed_length = jog_length + 2·BA
+    """
+    h = float(spec.jog_height_mm)
+    if h <= 0:
+        raise ValueError(f"jog_height_mm must be > 0; got {h}")
+    L = float(spec.jog_length_mm)
+    if L <= 0:
+        raise ValueError(f"jog_length_mm must be > 0; got {L}")
+    t = float(spec.sheet_thickness_mm)
+    if t <= 0:
+        raise ValueError(f"sheet_thickness_mm must be > 0; got {t}")
+    r = float(spec.bend_radius_mm)
+    if r <= 0:
+        raise ValueError(f"bend_radius_mm must be > 0; got {r}")
+    k = float(spec.k_factor)
+    if not (0 < k < 1):
+        raise ValueError(f"k_factor must be in (0, 1); got {k}")
+
+    # Bend angle from jog geometry
+    theta_rad = math.atan2(h, L)
+    theta_deg = math.degrees(theta_rad)
+
+    # Bend allowance — same formula as flat pattern
+    ba = theta_rad * (r + k * t)
+
+    # Two opposing bends + the jog land
+    flat_len = L + 2.0 * ba
+
+    return JogResult(
+        flat_developed_length=round(flat_len, 6),
+        bend_count=2,
+        bend_allowances_mm=[round(ba, 6), round(ba, 6)],
+        jog_angle_deg=round(theta_deg, 6),
+        honest_caveat=_JOG_CAVEAT,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Multi-flange dataclasses + computation
+# ---------------------------------------------------------------------------
+
+@dataclass
+class FlangeSpec:
+    """
+    Describes one flange segment in a multi-flange chain.
+
+    Parameters
+    ----------
+    length_mm : float
+        Straight-segment length of this flange (mm).  Must be > 0.
+    angle_deg : float
+        Bend angle at the trailing edge of this segment (degrees, 0–180].
+        The bend follows *this* flange — the first flange has no leading bend.
+    radius_mm : float
+        Inside bend radius at the trailing edge (mm).  Must be > 0.
+    k_factor : float
+        K-factor for this bend (default 0.4).
+    thickness_mm : float
+        Sheet thickness for this bend (mm, default 1.0).
+        Used in BA = angle_rad * (r + K * t).
+    """
+    length_mm: float
+    angle_deg: float
+    radius_mm: float
+    k_factor: float = 0.4
+    thickness_mm: float = 1.0
+
+
+@dataclass
+class MultiFlangeSpec:
+    """
+    Describes a chain of N straight-segment flanges joined by N−1 bends.
+
+    Parameters
+    ----------
+    flanges : list[FlangeSpec]
+        Ordered list of flange segments.  The bend after segment i uses
+        segment i's ``angle_deg``, ``radius_mm``, and ``k_factor``.  The
+        *last* flange's ``angle_deg`` and ``radius_mm`` are ignored (no
+        trailing bend on the final segment).
+        Length ≥ 1 required; a single entry produces a zero-bend flat blank.
+    """
+    flanges: List[FlangeSpec]
+
+
+@dataclass
+class MultiFlangeResult:
+    """
+    Result returned by ``compute_multi_flange_geometry``.
+
+    Attributes
+    ----------
+    total_flat_length_mm : float
+        Σ(flange lengths) − Σ(bend deductions), mm.
+    bend_allowances_mm : list[float]
+        Per-bend BA values (length = num_bends = len(flanges) − 1).
+    total_bend_deduction_mm : float
+        Σ BD = Σ(2·OSSB − BA) across all bends, mm.
+    num_bends : int
+        Number of bends = len(flanges) − 1.
+    honest_caveat : str
+        Human-readable caveats.
+    """
+    total_flat_length_mm: float
+    bend_allowances_mm: List[float]
+    total_bend_deduction_mm: float
+    num_bends: int
+    honest_caveat: str
+
+
+_MULTI_FLANGE_CAVEAT = (
+    "Multi-flange flat-development per Suchy 'Handbook of Die Design' §3 + DIN 6935. "
+    "Each bend uses its own angle, radius, and K-factor independently. "
+    "BA = (π·θ/180)·(r + K·t); OSSB = (r+t)·tan(θ/2); BD = 2·OSSB − BA. "
+    "flat_length = Σflange_lengths − ΣBD. "
+    "K-factor defaults 0.4 are empirical; measured press-brake data preferred. "
+    "Spring-back NOT modelled. "
+    "Bend-interaction for closely-spaced bends (< 4·t apart) is not captured. "
+    "No corner-relief or notch geometry modelled."
+)
+
+
+def compute_multi_flange_geometry(spec: MultiFlangeSpec) -> MultiFlangeResult:
+    """
+    Compute the flat-pattern developed length for a multi-flange chain.
+
+    Parameters
+    ----------
+    spec : MultiFlangeSpec
+
+    Returns
+    -------
+    MultiFlangeResult
+
+    Raises
+    ------
+    ValueError
+        On invalid inputs (empty flanges, non-positive dimensions, angle
+        out of range, invalid K-factor).
+
+    Notes
+    -----
+    Formula (DIN 6935 / Suchy §3 — same as ``compute_flat_pattern`` but
+    per-bend geometry is specified per flange rather than uniform):
+
+        For each bend i (0 ≤ i < N−1):
+            BA_i   = (π·θ_i/180) · (r_i + K_i·t_i)
+            OSSB_i = (r_i + t_i) · tan(θ_i/2)
+            BD_i   = 2·OSSB_i − BA_i
+
+        flat_length = Σ(flange lengths) − Σ(BD_i)
+
+    Each FlangeSpec carries its own ``thickness_mm`` (default 1.0 mm when
+    omitted).  The function raises ``ValueError`` if any ``radius_mm <= 0``,
+    ``angle_deg`` is out of range, ``thickness_mm <= 0``, or ``k_factor``
+    is outside (0, 1).
+    """
+    flanges = list(spec.flanges)
+    if len(flanges) == 0:
+        raise ValueError("MultiFlangeSpec.flanges must not be empty")
+
+    # Validate all flanges
+    for i, fs in enumerate(flanges):
+        if float(fs.length_mm) <= 0:
+            raise ValueError(
+                f"flanges[{i}].length_mm must be > 0; got {fs.length_mm}"
+            )
+
+    num_bends = len(flanges) - 1
+    bend_allowances: list[float] = []
+    bend_deductions: list[float] = []
+
+    for i in range(num_bends):
+        fs = flanges[i]
+        angle = float(fs.angle_deg)
+        if angle <= 0 or angle > 180:
+            raise ValueError(
+                f"flanges[{i}].angle_deg must be in (0, 180]; got {angle}"
+            )
+        r = float(fs.radius_mm)
+        if r <= 0:
+            raise ValueError(
+                f"flanges[{i}].radius_mm must be > 0; got {r}"
+            )
+        k = float(fs.k_factor)
+        if not (0 < k < 1):
+            raise ValueError(
+                f"flanges[{i}].k_factor must be in (0, 1); got {k}"
+            )
+
+        t = float(fs.thickness_mm)
+        if t <= 0:
+            raise ValueError(
+                f"flanges[{i}].thickness_mm must be > 0; got {t}"
+            )
+
+        angle_rad = math.radians(angle)
+        half_rad = math.radians(angle / 2.0)
+
+        ba = angle_rad * (r + k * t)
+        ossb = (r + t) * math.tan(half_rad)
+        bd = 2.0 * ossb - ba
+
+        bend_allowances.append(round(ba, 6))
+        bend_deductions.append(round(bd, 6))
+
+    total_bd = sum(bend_deductions)
+    total_fl = sum(float(fs.length_mm) for fs in flanges)
+    flat_len = total_fl - total_bd
+
+    return MultiFlangeResult(
+        total_flat_length_mm=round(flat_len, 6),
+        bend_allowances_mm=bend_allowances,
+        total_bend_deduction_mm=round(total_bd, 6),
+        num_bends=num_bends,
+        honest_caveat=_MULTI_FLANGE_CAVEAT,
+    )
+
+
+# ---------------------------------------------------------------------------
 # LLM tool (gated import — loads cleanly in pure-Python test envs)
 # ---------------------------------------------------------------------------
 
@@ -448,6 +944,282 @@ try:
             "total_bend_deduction_mm": result.total_bend_deduction_mm,
             "num_bends":               result.num_bends,
             "honest_caveat":           result.honest_caveat,
+        })
+
+    # ------------------------------------------------------------------
+    # sheetmetal_compute_hem
+    # ------------------------------------------------------------------
+
+    _sheetmetal_hem_spec = ToolSpec(
+        name="sheetmetal_compute_hem",
+        description=(
+            "Compute the flat-pattern developed length for a sheet-metal hem "
+            "(flange folded 180° back on itself). "
+            "Supports four hem types per Suchy §6 + DIN 6935 §4.3: "
+            "'open' (gap = sheet_thickness), 'closed' (gap = 0, pressed flat), "
+            "'teardrop' (gap = 2·radius + t, distinct teardrop profile), "
+            "'rolled' (full-circle roll, r ≥ t/2). "
+            "BA_hem = π·(r_eff + K·t). "
+            "Returns: developed_length_mm, flat_pattern_segments, bend_allowance_mm, gap_mm. "
+            "HONEST CAVEATS: BA formula is 180° neutral-axis arc (Suchy §6); "
+            "spring-back not modelled; closed hem gap is nominally 0 but "
+            "0.1–0.3 mm in practice without coining; rolled hem requires r ≥ t/2."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "hem_type": {
+                    "type": "string",
+                    "description": "Hem type: 'open', 'closed', 'teardrop', or 'rolled'.",
+                },
+                "hem_radius_mm": {
+                    "type": "number",
+                    "description": "Inside bend radius of the hem fold (mm). ≥ 0.",
+                },
+                "hem_length_mm": {
+                    "type": "number",
+                    "description": "Leg length of the hem from bend tangent to free edge (mm). > 0.",
+                },
+                "sheet_thickness_mm": {
+                    "type": "number",
+                    "description": "Sheet thickness (mm). > 0.",
+                },
+                "k_factor": {
+                    "type": "number",
+                    "description": "K-factor neutral-axis offset fraction (0–1, default 0.4).",
+                },
+            },
+            "required": ["hem_type", "hem_radius_mm", "hem_length_mm", "sheet_thickness_mm"],
+        },
+    )
+
+    @register(_sheetmetal_hem_spec, write=False)
+    async def run_sheetmetal_compute_hem(ctx, args: bytes) -> str:  # type: ignore[misc]
+        import json as _json
+        try:
+            a = _json.loads(args)
+        except Exception as exc:
+            return err_payload(f"invalid JSON args: {exc}", "BAD_ARGS")
+
+        hem_type           = a.get("hem_type", "")
+        hem_radius_mm      = a.get("hem_radius_mm")
+        hem_length_mm      = a.get("hem_length_mm")
+        sheet_thickness_mm = a.get("sheet_thickness_mm")
+        k_factor           = a.get("k_factor", 0.4)
+
+        if not hem_type:
+            return err_payload("hem_type is required", "BAD_ARGS")
+        if hem_radius_mm is None:
+            return err_payload("hem_radius_mm is required", "BAD_ARGS")
+        if hem_length_mm is None:
+            return err_payload("hem_length_mm is required", "BAD_ARGS")
+        if sheet_thickness_mm is None:
+            return err_payload("sheet_thickness_mm is required", "BAD_ARGS")
+
+        try:
+            spec = HemSpec(
+                hem_type=str(hem_type),
+                hem_radius_mm=float(hem_radius_mm),
+                hem_length_mm=float(hem_length_mm),
+                sheet_thickness_mm=float(sheet_thickness_mm),
+                k_factor=float(k_factor),
+            )
+        except (TypeError, ValueError) as exc:
+            return err_payload(f"numeric argument error: {exc}", "BAD_ARGS")
+
+        try:
+            result = compute_hem_geometry(spec)
+        except ValueError as exc:
+            return err_payload(str(exc), "BAD_ARGS")
+
+        return ok_payload({
+            "developed_length_mm":  result.developed_length_mm,
+            "flat_pattern_segments": result.flat_pattern_segments,
+            "bend_allowance_mm":    result.bend_allowance_mm,
+            "gap_mm":               result.gap_mm,
+            "honest_caveat":        result.honest_caveat,
+        })
+
+    # ------------------------------------------------------------------
+    # sheetmetal_compute_jog
+    # ------------------------------------------------------------------
+
+    _sheetmetal_jog_spec = ToolSpec(
+        name="sheetmetal_compute_jog",
+        description=(
+            "Compute the flat-pattern developed length for a sheet-metal jog "
+            "(Z-offset feature made from two opposing bends close together). "
+            "Per Suchy §4.5 + DIN 6935 §4: θ = arctan(height / length); "
+            "BA = (π·θ/180)·(r + K·t) applied to both bends; "
+            "flat_developed_length = jog_length + 2·BA. "
+            "Returns: flat_developed_length, bend_count=2, bend_allowances_mm, jog_angle_deg. "
+            "HONEST CAVEATS: symmetric jog only (both bends identical); "
+            "minimum jog land ≥ 4t recommended to avoid bend-interaction effects; "
+            "spring-back NOT modelled."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "jog_height_mm": {
+                    "type": "number",
+                    "description": "Desired Z-offset between parallel panels (mm). > 0.",
+                },
+                "jog_length_mm": {
+                    "type": "number",
+                    "description": "Horizontal distance between the two bend tangent points (mm). > 0.",
+                },
+                "sheet_thickness_mm": {
+                    "type": "number",
+                    "description": "Sheet thickness (mm). > 0.",
+                },
+                "bend_radius_mm": {
+                    "type": "number",
+                    "description": "Inside bend radius (applied to both bends, mm). > 0.",
+                },
+                "k_factor": {
+                    "type": "number",
+                    "description": "K-factor neutral-axis offset fraction (0–1, default 0.4).",
+                },
+            },
+            "required": ["jog_height_mm", "jog_length_mm", "sheet_thickness_mm", "bend_radius_mm"],
+        },
+    )
+
+    @register(_sheetmetal_jog_spec, write=False)
+    async def run_sheetmetal_compute_jog(ctx, args: bytes) -> str:  # type: ignore[misc]
+        import json as _json
+        try:
+            a = _json.loads(args)
+        except Exception as exc:
+            return err_payload(f"invalid JSON args: {exc}", "BAD_ARGS")
+
+        jog_height_mm      = a.get("jog_height_mm")
+        jog_length_mm      = a.get("jog_length_mm")
+        sheet_thickness_mm = a.get("sheet_thickness_mm")
+        bend_radius_mm     = a.get("bend_radius_mm")
+        k_factor           = a.get("k_factor", 0.4)
+
+        if jog_height_mm is None:
+            return err_payload("jog_height_mm is required", "BAD_ARGS")
+        if jog_length_mm is None:
+            return err_payload("jog_length_mm is required", "BAD_ARGS")
+        if sheet_thickness_mm is None:
+            return err_payload("sheet_thickness_mm is required", "BAD_ARGS")
+        if bend_radius_mm is None:
+            return err_payload("bend_radius_mm is required", "BAD_ARGS")
+
+        try:
+            spec = JogSpec(
+                jog_height_mm=float(jog_height_mm),
+                jog_length_mm=float(jog_length_mm),
+                sheet_thickness_mm=float(sheet_thickness_mm),
+                bend_radius_mm=float(bend_radius_mm),
+                k_factor=float(k_factor),
+            )
+        except (TypeError, ValueError) as exc:
+            return err_payload(f"numeric argument error: {exc}", "BAD_ARGS")
+
+        try:
+            result = compute_jog_geometry(spec)
+        except ValueError as exc:
+            return err_payload(str(exc), "BAD_ARGS")
+
+        return ok_payload({
+            "flat_developed_length": result.flat_developed_length,
+            "bend_count":            result.bend_count,
+            "bend_allowances_mm":    result.bend_allowances_mm,
+            "jog_angle_deg":         result.jog_angle_deg,
+            "honest_caveat":         result.honest_caveat,
+        })
+
+    # ------------------------------------------------------------------
+    # sheetmetal_compute_multi_flange
+    # ------------------------------------------------------------------
+
+    _sheetmetal_multi_flange_spec = ToolSpec(
+        name="sheetmetal_compute_multi_flange",
+        description=(
+            "Compute the flat-pattern developed length for a multi-flange "
+            "sheet-metal part — a chain of N straight-segment flanges joined "
+            "by N−1 bends, each with its own angle, radius, and K-factor. "
+            "Per Suchy §3 + DIN 6935: "
+            "BA_i = (π·θ_i/180)·(r_i + K_i·t); "
+            "OSSB_i = (r_i + t)·tan(θ_i/2); BD_i = 2·OSSB_i − BA_i; "
+            "flat_length = Σlengths − ΣBD. "
+            "Returns: total_flat_length_mm, bend_allowances_mm (list), "
+            "total_bend_deduction_mm, num_bends. "
+            "Flanges array: each entry has length_mm, angle_deg, radius_mm, "
+            "k_factor (opt, default 0.4), thickness_mm (opt, default 1.0). "
+            "The last flange's angle/radius are ignored (no trailing bend). "
+            "HONEST CAVEATS: K-factors empirical; spring-back NOT modelled; "
+            "bend-interaction for closely-spaced bends (< 4t) not captured."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "flanges": {
+                    "type": "array",
+                    "description": (
+                        "Ordered list of flange specs. Each entry: "
+                        "{length_mm, angle_deg, radius_mm, k_factor (opt), thickness_mm (opt)}. "
+                        "Minimum 1 entry. Last entry's angle/radius ignored."
+                    ),
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "length_mm":    {"type": "number"},
+                            "angle_deg":    {"type": "number"},
+                            "radius_mm":    {"type": "number"},
+                            "k_factor":     {"type": "number"},
+                            "thickness_mm": {"type": "number"},
+                        },
+                        "required": ["length_mm", "angle_deg", "radius_mm"],
+                    },
+                },
+            },
+            "required": ["flanges"],
+        },
+    )
+
+    @register(_sheetmetal_multi_flange_spec, write=False)
+    async def run_sheetmetal_compute_multi_flange(ctx, args: bytes) -> str:  # type: ignore[misc]
+        import json as _json
+        try:
+            a = _json.loads(args)
+        except Exception as exc:
+            return err_payload(f"invalid JSON args: {exc}", "BAD_ARGS")
+
+        flanges_raw = a.get("flanges")
+        if not isinstance(flanges_raw, list) or len(flanges_raw) == 0:
+            return err_payload("flanges must be a non-empty array", "BAD_ARGS")
+
+        try:
+            flange_specs = []
+            for fi, fd in enumerate(flanges_raw):
+                if not isinstance(fd, dict):
+                    return err_payload(f"flanges[{fi}] must be an object", "BAD_ARGS")
+                fs = FlangeSpec(
+                    length_mm=float(fd.get("length_mm", 0)),
+                    angle_deg=float(fd.get("angle_deg", 90)),
+                    radius_mm=float(fd.get("radius_mm", 1)),
+                    k_factor=float(fd.get("k_factor", 0.4)),
+                    thickness_mm=float(fd.get("thickness_mm", 1.0)),
+                )
+                flange_specs.append(fs)
+        except (TypeError, ValueError) as exc:
+            return err_payload(f"numeric argument error: {exc}", "BAD_ARGS")
+
+        try:
+            result = compute_multi_flange_geometry(MultiFlangeSpec(flanges=flange_specs))
+        except ValueError as exc:
+            return err_payload(str(exc), "BAD_ARGS")
+
+        return ok_payload({
+            "total_flat_length_mm":     result.total_flat_length_mm,
+            "bend_allowances_mm":       result.bend_allowances_mm,
+            "total_bend_deduction_mm":  result.total_bend_deduction_mm,
+            "num_bends":                result.num_bends,
+            "honest_caveat":            result.honest_caveat,
         })
 
 except ImportError:

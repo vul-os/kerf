@@ -24,6 +24,16 @@ from kerf_cad_core.sheetmetal_features import (
     compute_flat_pattern,
     _k_factor_from_r_over_t,
     _resolve_material,
+    HemSpec,
+    HemResult,
+    compute_hem_geometry,
+    JogSpec,
+    JogResult,
+    compute_jog_geometry,
+    FlangeSpec,
+    MultiFlangeSpec,
+    MultiFlangeResult,
+    compute_multi_flange_geometry,
 )
 
 
@@ -525,3 +535,386 @@ def test_reexport_from_init():
     assert _SMP is SheetMetalPart
     assert _FPR is FlatPatternResult
     assert _CPF is compute_flat_pattern
+
+
+# ===========================================================================
+# 13. Hem geometry -- HemSpec / HemResult / compute_hem_geometry
+# ===========================================================================
+
+# --- open hem ---
+
+def test_open_hem_gap_equals_thickness():
+    """Open hem: gap_mm == sheet_thickness_mm (Suchy S6.1)."""
+    spec = HemSpec(
+        hem_type="open",
+        hem_radius_mm=2.0,
+        hem_length_mm=8.0,
+        sheet_thickness_mm=1.0,
+        k_factor=0.4,
+    )
+    result = compute_hem_geometry(spec)
+    assert result.gap_mm == pytest.approx(1.0, abs=1e-9)
+
+
+def test_open_hem_ba_formula():
+    """Open hem BA = pi*(r_eff + K*t), r_eff = max(r, t/2)."""
+    t, r, k = 1.0, 2.0, 0.4
+    r_eff = max(r, t / 2)
+    expected_ba = math.pi * (r_eff + k * t)
+    spec = HemSpec(
+        hem_type="open",
+        hem_radius_mm=r,
+        hem_length_mm=10.0,
+        sheet_thickness_mm=t,
+        k_factor=k,
+    )
+    result = compute_hem_geometry(spec)
+    assert result.bend_allowance_mm == pytest.approx(expected_ba, rel=1e-5)
+
+
+def test_open_hem_developed_length():
+    """developed_length = hem_length + BA."""
+    t, r, k, L = 1.0, 2.0, 0.4, 10.0
+    r_eff = max(r, t / 2)
+    ba = math.pi * (r_eff + k * t)
+    spec = HemSpec(
+        hem_type="open",
+        hem_radius_mm=r,
+        hem_length_mm=L,
+        sheet_thickness_mm=t,
+        k_factor=k,
+    )
+    result = compute_hem_geometry(spec)
+    assert result.developed_length_mm == pytest.approx(L + ba, rel=1e-5)
+
+
+# --- closed hem ---
+
+def test_closed_hem_gap_is_zero():
+    """Closed hem: gap_mm == 0."""
+    spec = HemSpec(
+        hem_type="closed",
+        hem_radius_mm=0.0,
+        hem_length_mm=8.0,
+        sheet_thickness_mm=1.5,
+        k_factor=0.4,
+    )
+    result = compute_hem_geometry(spec)
+    assert result.gap_mm == pytest.approx(0.0, abs=1e-9)
+
+
+def test_closed_hem_radius_is_zero():
+    """Closed hem: effective radius = 0 regardless of input."""
+    spec = HemSpec(
+        hem_type="closed",
+        hem_radius_mm=5.0,
+        hem_length_mm=6.0,
+        sheet_thickness_mm=1.0,
+        k_factor=0.4,
+    )
+    result = compute_hem_geometry(spec)
+    expected_ba = math.pi * (0.0 + 0.4 * 1.0)
+    assert result.bend_allowance_mm == pytest.approx(expected_ba, rel=1e-5)
+    assert result.gap_mm == pytest.approx(0.0, abs=1e-9)
+
+
+# --- teardrop hem ---
+
+def test_teardrop_hem_gap_formula():
+    """Teardrop hem: gap = 2*r + t (Suchy S6.3)."""
+    t, r = 1.0, 3.0
+    spec = HemSpec(
+        hem_type="teardrop",
+        hem_radius_mm=r,
+        hem_length_mm=10.0,
+        sheet_thickness_mm=t,
+        k_factor=0.4,
+    )
+    result = compute_hem_geometry(spec)
+    assert result.gap_mm == pytest.approx(2.0 * r + t, rel=1e-6)
+
+
+def test_teardrop_hem_radius_in_result():
+    """Teardrop: bend_allowance uses the specified radius."""
+    t, r, k = 1.0, 3.0, 0.4
+    expected_ba = math.pi * (r + k * t)
+    spec = HemSpec(
+        hem_type="teardrop",
+        hem_radius_mm=r,
+        hem_length_mm=10.0,
+        sheet_thickness_mm=t,
+        k_factor=k,
+    )
+    result = compute_hem_geometry(spec)
+    assert result.bend_allowance_mm == pytest.approx(expected_ba, rel=1e-5)
+
+
+# --- hem result structure ---
+
+def test_hem_result_is_dataclass():
+    """HemResult has all expected fields."""
+    spec = HemSpec(
+        hem_type="open",
+        hem_radius_mm=2.0,
+        hem_length_mm=8.0,
+        sheet_thickness_mm=1.0,
+        k_factor=0.4,
+    )
+    result = compute_hem_geometry(spec)
+    assert isinstance(result, HemResult)
+    assert isinstance(result.developed_length_mm, float)
+    assert isinstance(result.flat_pattern_segments, list)
+    assert len(result.flat_pattern_segments) == 2
+    assert result.flat_pattern_segments[0]["type"] == "straight"
+    assert result.flat_pattern_segments[1]["type"] == "bend"
+    assert isinstance(result.honest_caveat, str)
+    assert "spring" in result.honest_caveat.lower()
+
+
+def test_hem_invalid_type_raises():
+    """Unknown hem_type raises ValueError."""
+    with pytest.raises(ValueError, match="hem_type"):
+        compute_hem_geometry(HemSpec(
+            hem_type="squiggly",
+            hem_radius_mm=1.0,
+            hem_length_mm=5.0,
+            sheet_thickness_mm=1.0,
+        ))
+
+
+# ===========================================================================
+# 14. Jog geometry -- JogSpec / JogResult / compute_jog_geometry
+# ===========================================================================
+
+def test_jog_bend_count_is_2():
+    """A jog always has exactly 2 bends."""
+    spec = JogSpec(
+        jog_height_mm=10.0,
+        jog_length_mm=20.0,
+        sheet_thickness_mm=1.5,
+        bend_radius_mm=2.0,
+        k_factor=0.4,
+    )
+    result = compute_jog_geometry(spec)
+    assert result.bend_count == 2
+    assert len(result.bend_allowances_mm) == 2
+
+
+def test_jog_symmetric_bend_allowances():
+    """Both bend allowances are identical for a symmetric jog."""
+    spec = JogSpec(
+        jog_height_mm=10.0,
+        jog_length_mm=20.0,
+        sheet_thickness_mm=1.5,
+        bend_radius_mm=2.0,
+        k_factor=0.4,
+    )
+    result = compute_jog_geometry(spec)
+    assert result.bend_allowances_mm[0] == pytest.approx(
+        result.bend_allowances_mm[1], abs=1e-9
+    )
+
+
+def test_jog_flat_length_formula():
+    """flat_developed_length = jog_length + 2*BA."""
+    h, L, t, r, k = 10.0, 20.0, 1.5, 2.0, 0.4
+    theta_rad = math.atan2(h, L)
+    ba = theta_rad * (r + k * t)
+    expected_flat = L + 2.0 * ba
+    spec = JogSpec(
+        jog_height_mm=h,
+        jog_length_mm=L,
+        sheet_thickness_mm=t,
+        bend_radius_mm=r,
+        k_factor=k,
+    )
+    result = compute_jog_geometry(spec)
+    assert result.flat_developed_length == pytest.approx(expected_flat, rel=1e-5)
+
+
+def test_jog_angle_computed_correctly():
+    """jog_angle_deg = degrees(atan2(height, length))."""
+    h, L = 10.0, 20.0
+    expected_angle = math.degrees(math.atan2(h, L))
+    spec = JogSpec(
+        jog_height_mm=h,
+        jog_length_mm=L,
+        sheet_thickness_mm=1.0,
+        bend_radius_mm=1.0,
+    )
+    result = compute_jog_geometry(spec)
+    assert result.jog_angle_deg == pytest.approx(expected_angle, rel=1e-5)
+
+
+def test_jog_result_is_dataclass():
+    """JogResult has all expected fields and correct types."""
+    spec = JogSpec(
+        jog_height_mm=5.0,
+        jog_length_mm=15.0,
+        sheet_thickness_mm=1.2,
+        bend_radius_mm=1.5,
+        k_factor=0.38,
+    )
+    result = compute_jog_geometry(spec)
+    assert isinstance(result, JogResult)
+    assert isinstance(result.flat_developed_length, float)
+    assert isinstance(result.bend_count, int)
+    assert isinstance(result.bend_allowances_mm, list)
+    assert isinstance(result.jog_angle_deg, float)
+    assert isinstance(result.honest_caveat, str)
+    assert "bend" in result.honest_caveat.lower()
+
+
+def test_jog_zero_height_raises():
+    """jog_height_mm=0 raises ValueError."""
+    with pytest.raises(ValueError, match="jog_height_mm"):
+        compute_jog_geometry(JogSpec(
+            jog_height_mm=0.0,
+            jog_length_mm=20.0,
+            sheet_thickness_mm=1.0,
+            bend_radius_mm=1.0,
+        ))
+
+
+# ===========================================================================
+# 15. Multi-flange geometry -- FlangeSpec / MultiFlangeSpec /
+#     MultiFlangeResult / compute_multi_flange_geometry
+# ===========================================================================
+
+def _make_flange(length_mm, angle_deg, radius_mm, k_factor=0.4, thickness_mm=1.0):
+    return FlangeSpec(
+        length_mm=length_mm,
+        angle_deg=angle_deg,
+        radius_mm=radius_mm,
+        k_factor=k_factor,
+        thickness_mm=thickness_mm,
+    )
+
+
+def test_multi_flange_zero_bends_single_segment():
+    """One flange => 0 bends; flat_length == flange_length."""
+    spec = MultiFlangeSpec(flanges=[_make_flange(100.0, 90.0, 2.0)])
+    result = compute_multi_flange_geometry(spec)
+    assert result.num_bends == 0
+    assert result.total_flat_length_mm == pytest.approx(100.0, abs=1e-6)
+    assert result.total_bend_deduction_mm == pytest.approx(0.0, abs=1e-9)
+    assert result.bend_allowances_mm == []
+
+
+def test_multi_flange_u_shape_num_bends():
+    """[side, base, side] => 2 bends."""
+    flanges = [
+        _make_flange(20.0, 90.0, 2.0),
+        _make_flange(40.0, 90.0, 2.0),
+        _make_flange(20.0, 90.0, 2.0),
+    ]
+    result = compute_multi_flange_geometry(MultiFlangeSpec(flanges=flanges))
+    assert result.num_bends == 2
+
+
+def test_multi_flange_u_shape_flat_length_formula():
+    """U-shape flat = Sum(flanges) - 2*BD."""
+    t = 1.5
+    r = 3.0
+    k = 0.4
+    flanges = [
+        _make_flange(20.0, 90.0, r, k, t),
+        _make_flange(40.0, 90.0, r, k, t),
+        _make_flange(20.0, 90.0, r, k, t),
+    ]
+    result = compute_multi_flange_geometry(MultiFlangeSpec(flanges=flanges))
+    angle_rad = math.radians(90.0)
+    ba = angle_rad * (r + k * t)
+    ossb = (r + t) * math.tan(math.radians(45.0))
+    bd = 2.0 * ossb - ba
+    expected_flat = (20.0 + 40.0 + 20.0) - 2.0 * bd
+    assert result.total_flat_length_mm == pytest.approx(expected_flat, rel=1e-5)
+
+
+def test_multi_flange_u_shape_equal_allowances():
+    """Uniform geometry => all bend allowances equal."""
+    flanges = [
+        _make_flange(20.0, 90.0, 2.0, 0.4, 1.5),
+        _make_flange(40.0, 90.0, 2.0, 0.4, 1.5),
+        _make_flange(20.0, 90.0, 2.0, 0.4, 1.5),
+    ]
+    result = compute_multi_flange_geometry(MultiFlangeSpec(flanges=flanges))
+    assert result.bend_allowances_mm[0] == pytest.approx(
+        result.bend_allowances_mm[1], abs=1e-9
+    )
+
+
+def test_multi_flange_3segment_90deg():
+    """3-segment U-shape 90 degree bends: flat_length positive, 2 BAs."""
+    t, r, k = 1.0, 2.0, 0.385
+    flanges = [
+        _make_flange(30.0, 90.0, r, k, t),
+        _make_flange(50.0, 90.0, r, k, t),
+        _make_flange(30.0, 90.0, r, k, t),
+    ]
+    result = compute_multi_flange_geometry(MultiFlangeSpec(flanges=flanges))
+    assert result.num_bends == 2
+    assert result.total_flat_length_mm > 0
+    assert len(result.bend_allowances_mm) == 2
+
+
+def test_multi_flange_result_is_dataclass():
+    """MultiFlangeResult has all expected fields."""
+    flanges = [
+        _make_flange(50.0, 90.0, 2.0),
+        _make_flange(50.0, 90.0, 2.0),
+    ]
+    result = compute_multi_flange_geometry(MultiFlangeSpec(flanges=flanges))
+    assert isinstance(result, MultiFlangeResult)
+    assert isinstance(result.total_flat_length_mm, float)
+    assert isinstance(result.bend_allowances_mm, list)
+    assert isinstance(result.total_bend_deduction_mm, float)
+    assert isinstance(result.num_bends, int)
+    assert isinstance(result.honest_caveat, str)
+    assert len(result.honest_caveat) > 20
+
+
+def test_multi_flange_empty_raises():
+    """Empty flanges list raises ValueError."""
+    with pytest.raises(ValueError, match="flanges"):
+        compute_multi_flange_geometry(MultiFlangeSpec(flanges=[]))
+
+
+def test_multi_flange_bad_angle_raises():
+    """angle_deg > 180 raises ValueError."""
+    flanges = [
+        _make_flange(50.0, 200.0, 2.0),
+        _make_flange(50.0, 90.0, 2.0),
+    ]
+    with pytest.raises(ValueError, match="angle_deg"):
+        compute_multi_flange_geometry(MultiFlangeSpec(flanges=flanges))
+
+
+# ===========================================================================
+# 16. Re-export of new types from kerf_cad_core.__init__
+# ===========================================================================
+
+def test_reexport_hem_jog_multi_from_init():
+    """HemSpec, JogSpec, FlangeSpec etc. re-exported from package root."""
+    from kerf_cad_core import (  # noqa: F401
+        HemSpec as _HS,
+        HemResult as _HR,
+        compute_hem_geometry as _CHG,
+        JogSpec as _JS,
+        JogResult as _JR,
+        compute_jog_geometry as _CJG,
+        FlangeSpec as _FS,
+        MultiFlangeSpec as _MFS,
+        MultiFlangeResult as _MFR,
+        compute_multi_flange_geometry as _CMFG,
+    )
+    assert _HS is HemSpec
+    assert _HR is HemResult
+    assert _CHG is compute_hem_geometry
+    assert _JS is JogSpec
+    assert _JR is JogResult
+    assert _CJG is compute_jog_geometry
+    assert _FS is FlangeSpec
+    assert _MFS is MultiFlangeSpec
+    assert _MFR is MultiFlangeResult
+    assert _CMFG is compute_multi_flange_geometry

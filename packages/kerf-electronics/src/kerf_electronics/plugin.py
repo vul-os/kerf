@@ -92,6 +92,7 @@ async def register(app: "FastAPI", ctx):
 def _register_tools(ctx, provides: list) -> None:
     """Register all electronics LLM tools into ctx.tools."""
     tool_modules = [
+        "kerf_electronics.tools.kicad_bridge_tools",
         "kerf_electronics.tools.erc",
         "kerf_electronics.tools.buses",
         "kerf_electronics.tools.net_classes",

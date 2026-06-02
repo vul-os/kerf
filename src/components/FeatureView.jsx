@@ -5376,6 +5376,96 @@ const FEATURE_KINDS = [
       { key: 'param_values', kind: 'text',           label: 'Parameter values (JSON array)' },
     ],
   },
+
+  // ── GD&T annotation ops (ASME Y14.5-2018) ─────────────────────────────────
+  // gdt_apply_datum — attach A/B/C datum to a face/edge/point on a drawing
+  {
+    op: 'gdt_apply_datum',
+    label: 'Apply Datum',
+    icon: AlignLeft,
+    category: 'gdt',
+    caption: 'Attach a datum reference (A/B/C/D) to a face, edge, or point on a drawing sheet or 3D body (MBD). Registers the datum label in the drawing datum registry per ASME Y14.5-2018 §4.',
+    defaults: {
+      feature_id:   'face-0',
+      datum_letter: 'A',
+      datum_role:   'primary',
+      mbd_mode:     false,
+    },
+    fields: [
+      { key: 'feature_id',   kind: 'text',    label: 'Feature ID (face/edge/point)' },
+      { key: 'datum_letter', kind: 'select',  label: 'Datum letter',
+        options: ['A','B','C','D','E','F'].map((l) => ({ value: l, label: l })) },
+      { key: 'datum_role',   kind: 'select',  label: 'Role',
+        options: [
+          { value: 'primary',   label: 'Primary' },
+          { value: 'secondary', label: 'Secondary' },
+          { value: 'tertiary',  label: 'Tertiary' },
+        ] },
+      { key: 'mbd_mode',     kind: 'bool',    label: 'MBD mode (attach to 3D body)' },
+    ],
+  },
+  // gdt_apply_tolerance — attach a feature control frame to a feature
+  {
+    op: 'gdt_apply_tolerance',
+    label: 'Apply Tolerance (FCF)',
+    icon: FileText,
+    category: 'gdt',
+    caption: 'Attach a feature control frame (FCF) tolerance to a drawing feature. Validates the FCF string, computes bonus tolerance for MMC/LMC modifiers, and writes the annotation node to the drawing model per ASME Y14.5-2018 §6.',
+    defaults: {
+      feature_id: 'hole-0',
+      fcf_string: '⊕|⌀0.100Ⓜ|A|B|C',
+      mbd_mode:   false,
+    },
+    fields: [
+      { key: 'feature_id', kind: 'text', label: 'Feature ID' },
+      { key: 'fcf_string', kind: 'text', label: 'FCF string (e.g. ⊕|⌀0.1Ⓜ|A|B|C)' },
+      { key: 'mbd_mode',   kind: 'bool', label: 'MBD mode (attach to 3D body)' },
+    ],
+  },
+  // gdt_validate_frame — structural well-formedness check per Y14.5-2018
+  {
+    op: 'gdt_validate_frame',
+    label: 'Validate FCF',
+    icon: Shield,
+    category: 'gdt',
+    caption: 'Structural well-formedness check for a GD&T feature control frame: symbol-modifier compatibility, datum requirements by tolerance category, duplicate-datum detection, bonus tolerance (MMC/LMC §6.3), and canonical string round-trip per ASME Y14.5-2018.',
+    defaults: {
+      fcf_string: '⊕|⌀0.500|A|B|C',
+    },
+    fields: [
+      { key: 'fcf_string', kind: 'text', label: 'FCF string (e.g. ⊕|⌀0.5|A|B|C)' },
+    ],
+  },
+  // gdt_validate_composite_frame — PLTZF/FRTZF composite frame check
+  {
+    op: 'gdt_validate_composite_frame',
+    label: 'Validate Composite Frame',
+    icon: Shield,
+    category: 'gdt',
+    caption: 'Validate stacked PLTZF/FRTZF composite feature control frames: R1 symbol match, R2 FRTZF ≤ PLTZF tolerance, R3 FRTZF datum refs are a subset of PLTZF datum refs per ASME Y14.5-2018 §10.5.2.',
+    defaults: {
+      feature_id: 'pattern-1',
+    },
+    fields: [
+      { key: 'feature_id', kind: 'text', label: 'Feature ID' },
+    ],
+  },
+  // gdt_compute_dimension_chain — tolerance stackup WC + RSS
+  {
+    op: 'gdt_compute_dimension_chain',
+    label: 'Dimension Chain Stackup',
+    icon: Ruler,
+    category: 'gdt',
+    caption: 'Compute worst-case (WC) and RSS statistical tolerance stack-up for a linear dimension chain. Returns nominal gap, WC min/max, and RSS min/max (3σ, 99.73%). Identifies the dominant link per ASME Y14.5-2018 §5.3 + Bralla §1.',
+    defaults: {
+      target_gap_min_mm: 0.0,
+      target_gap_max_mm: 1.0,
+    },
+    fields: [
+      { key: 'target_gap_min_mm', kind: 'number', label: 'Min acceptable gap (mm)', min: 0 },
+      { key: 'target_gap_max_mm', kind: 'number', label: 'Max acceptable gap (mm)', min: 0 },
+    ],
+  },
 ]
 
 const KIND_BY_OP = Object.fromEntries(FEATURE_KINDS.map((k) => [k.op, k]))
@@ -5534,6 +5624,14 @@ const FEATURE_CATEGORIES = [
     // Boolean + fillet
     'nurbs_solid_boolean',
     'nurbs_fillet_variable_g2',
+  ] },
+  { id: 'gdt', label: 'GD&T / MBD', ops: [
+    // Datum + FCF placement (drawing annotation + MBD)
+    'gdt_apply_datum',
+    'gdt_apply_tolerance',
+    'gdt_validate_frame',
+    'gdt_validate_composite_frame',
+    'gdt_compute_dimension_chain',
   ] },
 ]
 

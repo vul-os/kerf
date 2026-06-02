@@ -29,9 +29,9 @@ import { useState } from 'react'
 import {
   Shield, ChevronRight, CheckCircle, XCircle, AlertTriangle,
   Ruler, RotateCcw, Layers, Activity, Filter, AlignLeft,
-  Play, Loader2, FileText, PlusCircle, Trash2, Database,
-  Layout, BarChart2, ChevronDown, ChevronUp, Box,
-  ToggleLeft, ToggleRight, List, Table,
+  Play, Loader2, FileText, PlusCircle, Trash2,
+  Layout, BarChart2, ChevronDown, ChevronUp,
+  ToggleLeft, ToggleRight,
 } from 'lucide-react'
 
 // ---------------------------------------------------------------------------

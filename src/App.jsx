@@ -83,6 +83,7 @@ const NotFound = lazy(() => import('./routes/NotFound.jsx'))
 const GeometryInspect = lazy(() => import('./routes/GeometryInspect.jsx'))
 const GDTPanel = lazy(() => import('./components/GDTPanel.jsx'))
 const Tools = lazy(() => import('./routes/Tools.jsx'))
+const AssemblyClashPanel = lazy(() => import('./components/brep/AssemblyClashPanel.jsx'))
 
 // Cloud surface — these come from the cloud/ open-core split and may be
 // stubs on OSS builds. useCloudConfig stays eager (we need it before any
@@ -199,6 +200,7 @@ export default function App() {
       <Route path="/tools" element={<Tools />} />
       <Route path="/inspect" element={<GeometryInspect />} />
       <Route path="/gdt" element={<GDTPanel />} />
+      <Route path="/clash" element={<AssemblyClashPanel />} />
       <Route path="/domains" element={<DomainsHub />} />
       <Route path="/domains/automotive" element={<Automotive />} />
       <Route path="/docs" element={<DocsHome />} />

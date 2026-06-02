@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-02T22:06:30.592Z",
+  "generatedAt": "2026-06-02T22:09:38.878Z",
   "items": [
     {
       "slug": "revit",
@@ -5911,9 +5911,9 @@
             "source": "https://help.solidworks.com/2020/English/SolidWorks/sldworks/c_dimxpert_for_parts.htm"
           },
           "kerf": {
-            "status": "yes",
-            "note": "Drawing annotation editor (GDTPanel.jsx): datum apply, FCF builder, validate frame, FCF SVG preview, MBD toggle; gdt_apply_datum / gdt_apply_tolerance / gdt_validate_frame wired",
-            "evidence": "src/components/GDTPanel.jsx"
+            "status": "partial",
+            "note": "Data model + auto-propose only; no UI for placement",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gdt/tools.py"
           }
         },
         {
@@ -6692,9 +6692,9 @@
             "source": "https://cad.onshape.com/help/Content/drawings-gdt.htm"
           },
           "kerf": {
-            "status": "yes",
-            "note": "Drawing annotation editor (GDTPanel.jsx): datum apply, FCF builder, validate frame, FCF SVG preview, MBD toggle; gdt_apply_datum / gdt_apply_tolerance / gdt_validate_frame wired",
-            "evidence": "src/components/GDTPanel.jsx"
+            "status": "partial",
+            "note": "Data model + auto-propose only; no UI placement",
+            "evidence": "packages/kerf-gdnt/src/kerf_gdnt/feature_control_frame.py"
           }
         },
         {
@@ -7529,9 +7529,9 @@
             "source": "https://help.autodesk.com/view/INVNTOR/2025/ENU/?guid=GUID-A44C5B4C-7BA6-4E56-B5E5-5B3D6F1A4A49"
           },
           "kerf": {
-            "status": "yes",
-            "note": "Drawing annotation editor (GDTPanel.jsx): datum apply, FCF builder, validate frame, FCF SVG preview, MBD toggle; gdt_apply_datum / gdt_apply_tolerance / gdt_validate_frame wired",
-            "evidence": "src/components/GDTPanel.jsx"
+            "status": "partial",
+            "note": "GD&T data model only; no MBD/PMI UI",
+            "evidence": "packages/kerf-gdnt/src/kerf_gdnt/feature_control_frame.py"
           }
         },
         {
@@ -8895,7 +8895,7 @@
           "domain": "D1",
           "feature": "GD&T on drawings / MBD / PMI",
           "competitor": "{ status: yes, note: \"Functional Tolerancing & Annotation (FTA) — full ISO / ASME PMI on 3D model; 3DEXPERIENCE MBD\", source: \"https://www.3ds.com/products/catia/functional-tolerancing-and-annotation\" }",
-          "kerf": "{ status: yes, note: \"Drawing annotation editor (GDTPanel.jsx): datum apply, FCF builder, validate frame, FCF SVG preview, MBD toggle; gdt_apply_datum / gdt_apply_tolerance / gdt_validate_frame wired\", evidence: \"src/components/GDTPanel.jsx\" }"
+          "kerf": "{ status: partial, note: \"Data model only; no UI panel\", evidence: \"packages/kerf-gdnt/src/kerf_gdnt/feature_control_frame.py\" }"
         },
         {
           "domain": "D1",

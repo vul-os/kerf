@@ -21,6 +21,7 @@ import {
   ArrowRight,
   Telescope,
   Cpu,
+  FileText,
 } from 'lucide-react'
 import Header from '../components/Header.jsx'
 import Footer from '../components/Footer.jsx'
@@ -53,6 +54,16 @@ const META = {
 /* -------------------------------------------------------------------------- */
 
 const PANELS = [
+  {
+    slug: 'drawings',
+    name: 'Engineering Drawings',
+    Icon: FileText,
+    accent: 'cyan',
+    route: '/drawings',
+    toolCount: 8,
+    blurb:
+      'HLR auto-views (ISO 128-30), ISO 129-1:2018 auto-dim, measurement chains, oblique/silhouette projections, inspection reports, and PDF/DXF/SVG export — 8 drawing tools.',
+  },
   {
     slug: 'optics',
     name: 'Optics Design',

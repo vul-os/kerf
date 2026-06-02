@@ -59,6 +59,7 @@ const CompositesPage = lazy(() => import('./routes/domains/Composites.jsx'))
 const DentalPage = lazy(() => import('./routes/domains/Dental.jsx'))
 const OpticsPage = lazy(() => import('./routes/domains/Optics.jsx'))
 const OpticsDesignPanel = lazy(() => import('./components/optics/OpticsDesignPanel.jsx'))
+const DrawingPanel = lazy(() => import('./components/drawings/DrawingPanel.jsx'))
 const ManufacturingPanel = lazy(() => import('./components/ManufacturingPanel.jsx'))
 const ProductLifecyclePanel = lazy(() => import('./components/ProductLifecyclePanel.jsx'))
 const StructuralPanel = lazy(() => import('./components/arch/StructuralPanel.jsx'))
@@ -225,6 +226,7 @@ export default function App() {
       <Route path="/domains/dental" element={<DentalPage />} />
       <Route path="/domains/optics" element={<OpticsPage />} />
       <Route path="/optics" element={<OpticsDesignPanel />} />
+      <Route path="/drawings" element={<DrawingPanel />} />
       <Route path="/mfg" element={<ManufacturingPanel />} />
       <Route path="/manufacturing" element={<ManufacturingPanel />} />
       <Route path="/lifecycle" element={<ProductLifecyclePanel />} />

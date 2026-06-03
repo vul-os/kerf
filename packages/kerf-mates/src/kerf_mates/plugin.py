@@ -61,6 +61,20 @@ async def register(app: FastAPI, ctx):
     ctx.tools.register("synthesise_cam", synthesise_cam_spec, run_synthesise_cam)
     ctx.tools.register("synthesise_gear_train", synthesise_gear_train_spec, run_synthesise_gear_train)
 
+    # Wave 9C: Adams flex-body + vehicle + machinery MBD
+    from kerf_mates.mbd.mbd_tools import (
+        craig_bampton_reduce_spec, run_craig_bampton_reduce,
+        step_vehicle_spec, run_step_vehicle,
+        steady_state_cornering_spec, run_steady_state_cornering,
+        gear_mesh_force_spec, run_gear_mesh_force,
+        belt_drive_force_spec, run_belt_drive_force,
+    )
+    ctx.tools.register("craig_bampton_reduce", craig_bampton_reduce_spec, run_craig_bampton_reduce)
+    ctx.tools.register("step_vehicle_dynamics", step_vehicle_spec, run_step_vehicle)
+    ctx.tools.register("steady_state_cornering", steady_state_cornering_spec, run_steady_state_cornering)
+    ctx.tools.register("gear_mesh_force", gear_mesh_force_spec, run_gear_mesh_force)
+    ctx.tools.register("belt_drive_force", belt_drive_force_spec, run_belt_drive_force)
+
     # Pure-Python gradient-descent solver always available;
     # python-solvespace is the optional fast-path.
     provides = ["mates.gradient-descent"]

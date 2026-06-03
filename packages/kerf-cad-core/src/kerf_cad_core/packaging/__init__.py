@@ -37,6 +37,16 @@ from kerf_cad_core.packaging.design import (
     container_fill,
     stretch_wrap,
 )
+from kerf_cad_core.packaging.pre_press import (
+    BleedTrimSpec,
+    RegistrationMark,
+    SpotColorLayer,
+    PrePressJob,
+    PrePressReport,
+    check_pre_press,
+    generate_registration_marks,
+    export_pdf_x_1a,
+)
 
 __all__ = [
     "box_compression_strength",
@@ -46,4 +56,13 @@ __all__ = [
     "shock_transmissibility",
     "container_fill",
     "stretch_wrap",
+    # Pre-press / graphics
+    "BleedTrimSpec",
+    "RegistrationMark",
+    "SpotColorLayer",
+    "PrePressJob",
+    "PrePressReport",
+    "check_pre_press",
+    "generate_registration_marks",
+    "export_pdf_x_1a",
 ]

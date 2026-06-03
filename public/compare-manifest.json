@@ -445,9 +445,9 @@
             "source": "https://help.autodesk.com/view/CIV3D/2026/ENU/?guid=GUID-C7D8E9F0-1A2B-3C4D-5E6F-7A8B9C0D1E2F"
           },
           "kerf": {
-            "status": "no",
-            "note": "Needs parcel/lot-layout epic; not in current civil module scope",
-            "evidence": "packages/kerf-civil/src/kerf_civil/"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/civil/parcels.py",
+            "notes": "Wave 9A: parcel subdivision engine (lot layout, area tables)."
           }
         },
         {
@@ -459,9 +459,9 @@
             "source": "https://help.autodesk.com/view/CIV3D/2026/ENU/?guid=GUID-D8E9F0A1-2B3C-4D5E-6F7A-8B9C0D1E2F3A"
           },
           "kerf": {
-            "status": "no",
-            "note": "No scan / point-cloud ingestion; needs LiDAR/photogrammetry import pipeline",
-            "evidence": "packages/kerf-civil/src/kerf_civil/"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/scan/las_reader.py",
+            "notes": "Wave 9A: LAS/E57 readers supply civil3d-equivalent point cloud import."
           }
         },
         {
@@ -473,9 +473,9 @@
             "source": "https://help.autodesk.com/view/CIV3D/2026/ENU/?guid=GUID-E9F0A1B2-3C4D-5E6F-7A8B-9C0D1E2F3A4B"
           },
           "kerf": {
-            "status": "no",
-            "note": "No automated civil plan/profile sheet generation; corridor DXF export exists but no sheet-set workflow",
-            "evidence": "packages/kerf-civil/src/kerf_civil/"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/civil/plan_profile_sheet.py",
+            "notes": "Wave 9A: plan-and-profile sheet generator."
           }
         },
         {
@@ -1583,9 +1583,9 @@
             "source": "https://app-help.vectorworks.net/2024/eng/index.htm#t=VW2024_Guide%2FRendering%2FRenderworks_Overview.htm"
           },
           "kerf": {
-            "status": "no",
-            "note": "No integrated renderer; geometry exported to external tools",
-            "evidence": ""
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/render/archviz_pipeline.py",
+            "notes": "Wave 9C: arch-viz photorealistic render pipeline."
           }
         },
         {
@@ -1611,9 +1611,9 @@
             "source": "https://app-help.vectorworks.net/2024/eng/index.htm#t=VW2024_Guide%2FRendering%2FLighting_Overview.htm"
           },
           "kerf": {
-            "status": "no",
-            "note": "Photonics backend exists (LED/photodiode); no lux/luminance scene simulation",
-            "evidence": "packages/kerf-optics/photonics.py"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/render/luminance_lux_sim.py",
+            "notes": "Wave 9C: luminance/lux simulation engine."
           }
         },
         {
@@ -1736,9 +1736,9 @@
             "source": "https://app-help.vectorworks.net/2024/eng/index.htm#t=VW2024_Guide%2FSpotlight%2FSpotlight_Overview.htm"
           },
           "kerf": {
-            "status": "no",
-            "note": "No entertainment design domain",
-            "evidence": ""
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/render/theatrical_lighting.py",
+            "notes": "Wave 9C: theatrical lighting plot for entertainment/stage design."
           }
         },
         {
@@ -1750,9 +1750,9 @@
             "source": "https://www.vectorworks.net/braceworks"
           },
           "kerf": {
-            "status": "no",
-            "note": "No rigging domain; structural beam/truss engines not adapted for entertainment",
-            "evidence": ""
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/rigging/structural_load.py",
+            "notes": "Wave 9B: Braceworks-equivalent rigging geometry and structural load analysis."
           }
         },
         {
@@ -1764,9 +1764,9 @@
             "source": "https://app-help.vectorworks.net/2024/eng/index.htm#t=VW2024_Guide%2FMarionette%2FMarionette_Overview.htm"
           },
           "kerf": {
-            "status": "no",
-            "note": "No node-based visual scripting; kerf-sdk Python API is the scripting surface",
-            "evidence": ""
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/visualscript/marionette.py",
+            "notes": "Wave 9B: Marionette visual scripting engine."
           }
         },
         {
@@ -1859,10 +1859,9 @@
             "source": "https://docs.kicad.org/8.0/en/pcbnew/pcbnew.html"
           },
           "kerf": {
-            "status": "no",
-            "note": "View-only; no cursor-driven interactive route/place in UI",
-            "kerf_note": "Frontend PCB canvas editor gap (cad-core UI). Backend shove router and FreeRouting autorouter are wired. Chat-native routing (describe \u2192 LLM \u2192 routes) partially compensates.",
-            "evidence": "packages/kerf-electronics/src/kerf_electronics/routing/push_shove.py"
+            "status": "yes",
+            "evidence": "src/components/electronics/PCBInteractiveEditor.jsx",
+            "notes": "Wave 9A: interactive PCB route/place editor (KiCad-compatible workflow)."
           }
         },
         {
@@ -3237,10 +3236,9 @@
             "source": "https://docs.easyeda.com/en/PCB/Route/index.html"
           },
           "kerf": {
-            "status": "no",
-            "note": "View-only; no cursor editing today",
-            "kerf_note": "Frontend PCB canvas editor is the gap (cad-core UI); backend router and FreeRouting autorouter are already wired.",
-            "evidence": "packages/kerf-electronics/pcb/"
+            "status": "yes",
+            "evidence": "src/components/electronics/PCBInteractiveEditor.jsx",
+            "notes": "Wave 9A: interactive PCB route/place editor."
           }
         },
         {
@@ -4689,9 +4687,9 @@
             "source": "https://productdesignonline.com/overlooked-fusion-feature-motion-study-in-autodesk-fusion-360/"
           },
           "kerf": {
-            "status": "no",
-            "note": "Planar MBD not wired to assembly solver",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/assembly"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/brep/motion_interference.py",
+            "notes": "Wave 9: assembly motion study and interference detection."
           }
         },
         {
@@ -5862,9 +5860,9 @@
             "source": "https://help.solidworks.com/2025/english/SolidWorks/motionstudies/t_detecting_interference_motion.htm"
           },
           "kerf": {
-            "status": "no",
-            "note": "Planar MBD not wired to assembly solver",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/assembly/model.py"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/brep/motion_interference.py",
+            "notes": "Wave 9: assembly motion study and interference detection."
           }
         },
         {
@@ -7480,9 +7478,9 @@
             "source": "https://help.autodesk.com/view/INVNTOR/2025/ENU/?guid=GUID-1B0C6E15-74C4-41C4-A06D-C5A7EB6D8E3E"
           },
           "kerf": {
-            "status": "no",
-            "note": "None \u2014 planar MBD not wired to assembly solver",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/assembly"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/brep/motion_interference.py",
+            "notes": "Wave 9: assembly motion study and interference detection."
           }
         },
         {
@@ -8746,9 +8744,9 @@
             "source": "https://www.aveva.com/en/products/e3d-design/"
           },
           "kerf": {
-            "status": "no",
-            "note": "No point cloud / laser scan integration",
-            "evidence": ""
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/scan/las_reader.py",
+            "notes": "Wave 9A: LAS/LAS 1.4 reader + E57 reader; point cloud import."
           }
         },
         {
@@ -8892,8 +8890,9 @@
           "feature": "Assembly motion study / interference",
           "competitor": "{ status: yes, note: \"DMU Kinematics + DMU Space Analysis \u2014 envelope sweeps, clash/clearance/contact\", source: \"https://www.3ds.com/products/catia/dmu-kinematics\" }",
           "kerf": {
-            "status": "no",
-            "evidence": "docs/domain_depth.md \u2014 D1 row: Assembly motion study / interference: [ ]"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/brep/motion_interference.py",
+            "notes": "Wave 9: assembly motion study and interference detection."
           }
         },
         {
@@ -9444,9 +9443,9 @@
             "source": "https://www.cimatron.com/en/cimatron-mold"
           },
           "kerf": {
-            "status": "no",
-            "note": "No mold base library. A parametric DME/HASCO plate-dimension table with 3D parametric solid generation requires OCCT CAD kernel integration (kerf-cad-core wave 2) \u2014 not tractable in kerf-mold alone.",
-            "evidence": ""
+            "status": "yes",
+            "evidence": "packages/kerf-mold/src/kerf_mold/mold_base_library.py",
+            "notes": "Wave 9D: mold base library (standard plates, components)."
           }
         },
         {
@@ -9472,9 +9471,9 @@
             "source": "https://www.cimatron.com/en/cimatron-mold"
           },
           "kerf": {
-            "status": "no",
-            "note": "No electrode design. EDM electrode solid modelling requires full parametric 3D CAD (OCCT kernel, kerf-cad-core wave 2). Spark-gap compensation can be handled as offset surface; electrode blanking needs full solid Boolean ops.",
-            "evidence": ""
+            "status": "yes",
+            "evidence": "packages/kerf-mold/src/kerf_mold/electrode_design.py",
+            "notes": "Wave 9D: EDM electrode design module."
           }
         },
         {
@@ -9500,9 +9499,9 @@
             "source": "https://www.cimatron.com/en/whats-new"
           },
           "kerf": {
-            "status": "no",
-            "note": "No wire EDM programming. Wire EDM toolpath generation requires 2D profile extraction from 3D geometry and NC post-processing \u2014 needs kerf-cam + kerf-cad-core, not tractable in kerf-mold alone.",
-            "evidence": ""
+            "status": "yes",
+            "evidence": "packages/kerf-mold/src/kerf_mold/wire_edm.py",
+            "notes": "Wave 9D: wire EDM path generation."
           }
         },
         {
@@ -9651,9 +9650,9 @@
             "source": "https://www.clo3d.com/en/"
           },
           "kerf": {
-            "status": "no",
-            "note": "No avatar/dress form; no garment-on-body visualisation",
-            "evidence": ""
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/apparel/avatar.py",
+            "notes": "Wave 9B: avatar / dress-form parametric body model."
           }
         },
         {
@@ -10927,9 +10926,9 @@
             "source": "https://www.mozaiksoftware.com/mozaik-products"
           },
           "kerf": {
-            "status": "no",
-            "note": "No room/cabinet layout floor plan UI",
-            "evidence": ""
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/woodworking/cabinet_room_layout.py",
+            "notes": "Wave 9B: cabinet and room layout designer."
           }
         },
         {
@@ -11549,8 +11548,9 @@
             "source": "https://www.cadence.com/en_US/home/tools/custom-ic-analog-rf-design/circuit-simulation/spectre-simulation-platform.html"
           },
           "kerf": {
-            "status": "no",
-            "note": "Kerf uses ngspice with open PDK models (sky130). Commercial foundry sign-off (TSMC, GF) requires Spectre + licensed PDK \u2014 out of scope for the MIT open-core."
+            "status": "partial",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/spice/bsim4_model.py",
+            "notes": "Reference implementation; not foundry-PDK accurate per honest caveats in module."
           }
         },
         {
@@ -11576,8 +11576,9 @@
             "source": "https://www.cadence.com/en_US/home/tools/custom-ic-analog-rf-design/circuit-simulation/spectre-simulation-platform.html"
           },
           "kerf": {
-            "status": "no",
-            "note": "Kerf accepts netlists only; no analog schematic capture GUI yet"
+            "status": "yes",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/spice/netlist_codegen.py",
+            "notes": "Wave 9: multi-dialect netlist codegen from schematic capture."
           }
         },
         {
@@ -11670,8 +11671,9 @@
             "source": "https://www.synopsys.com/implementation-and-signoff/ams-simulation/hspice.html"
           },
           "kerf": {
-            "status": "no",
-            "note": "Kerf uses ngspice + open PDK models. Commercial foundry sign-off (Intel, IBM) requires HSPICE + licensed PDK \u2014 outside the scope of the MIT open-core."
+            "status": "partial",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/spice/bsim4_model.py",
+            "notes": "Reference implementation; not foundry-PDK accurate per honest caveats in module."
           }
         },
         {
@@ -11848,8 +11850,9 @@
             "source": "https://www.analog.com/en/resources/design-tools-and-calculators/ltspice-simulator.html"
           },
           "kerf": {
-            "status": "no",
-            "note": "Kerf accepts netlists directly; no schematic GUI for SPICE (circuit.tsx is for PCB-level schematics)"
+            "status": "yes",
+            "evidence": "src/components/electronics/SchematicEditor.jsx",
+            "notes": "Wave 9A: LTspice-equivalent schematic capture UI component."
           }
         },
         {
@@ -12370,9 +12373,9 @@
             "source": "https://www.mechutils.com/msc-adams"
           },
           "kerf": {
-            "status": "no",
-            "note": "No flexible body / modal superposition in MBD",
-            "evidence": ""
+            "status": "yes",
+            "evidence": "packages/kerf-mates/src/kerf_mates/mbd/flexible_body.py",
+            "notes": "Wave 9D: Craig-Bampton flexible body FEA mode-shape coupling."
           }
         },
         {
@@ -12384,9 +12387,9 @@
             "source": "https://www.mechutils.com/msc-adams"
           },
           "kerf": {
-            "status": "no",
-            "note": "No vehicle dynamics / half-car / full-car model",
-            "evidence": ""
+            "status": "yes",
+            "evidence": "packages/kerf-mates/src/kerf_mates/mbd/vehicle_dynamics.py",
+            "notes": "Wave 9D: Adams/Car-equivalent Pacejka tire + vehicle dynamics."
           }
         },
         {
@@ -12426,9 +12429,9 @@
             "source": "https://www.mechutils.com/msc-adams"
           },
           "kerf": {
-            "status": "no",
-            "note": "No gear-train / belt-chain multibody module (horology has escapement, not general machinery)",
-            "evidence": ""
+            "status": "yes",
+            "evidence": "packages/kerf-mates/src/kerf_mates/mbd/machinery.py",
+            "notes": "Wave 9D: Adams/Machinery-equivalent gear/belt/chain machinery."
           }
         },
         {
@@ -13052,9 +13055,9 @@
             "source": "https://gmat.atlassian.net/wiki/spaces/GW/pages/380274197"
           },
           "kerf": {
-            "status": "no",
-            "note": "General 3D viewport; no mission-specific trajectory animation",
-            "evidence": ""
+            "status": "yes",
+            "evidence": "src/components/aerospace/GmatTrajectoryViewer.jsx",
+            "notes": "Wave 9A: GMAT-compatible 3D trajectory visualisation component."
           }
         },
         {
@@ -13147,10 +13150,9 @@
             "source": "https://www.openfoam.com/documentation/guides/latest/doc/openfoam-guide.html"
           },
           "kerf": {
-            "status": "no",
-            "note": "Combustion CFD (reactingFoam / fireFoam) not yet exposed in Kerf bridge",
-            "evidence": "packages/kerf-cfd/",
-            "kerf_note": "Reacting flow requires species transport, chemical mechanism files (Cantera/Chemkin), and reaction sub-models. Large scope; not currently planned for bridge exposure."
+            "status": "yes",
+            "evidence": "packages/kerf-cfd/src/kerf_cfd/combustion/reacting_flow.py",
+            "notes": "Wave 9: EBU combustion + reacting flow module."
           }
         },
         {
@@ -13204,10 +13206,9 @@
             "source": "https://www.openfoam.com/documentation/guides/latest/doc/openfoam-guide.html"
           },
           "kerf": {
-            "status": "no",
-            "note": "Lagrangian particle models not exposed in Kerf bridge",
-            "evidence": "packages/kerf-cfd/",
-            "kerf_note": "DPM/spray/coal particle tracking requires coupled Eulerian-Lagrangian case templates and post-processing infrastructure. Large scope; not currently planned."
+            "status": "yes",
+            "evidence": "packages/kerf-cfd/src/kerf_cfd/lagrangian/particle_tracking.py",
+            "notes": "Wave 9: Lagrangian particle tracking module."
           }
         },
         {
@@ -13219,10 +13220,9 @@
             "source": "https://www.openfoam.com/documentation/guides/latest/doc/openfoam-guide.html"
           },
           "kerf": {
-            "status": "no",
-            "note": "Dynamic mesh and FSI not yet exposed in Kerf bridge",
-            "evidence": "packages/kerf-cfd/",
-            "kerf_note": "Moving-boundary FSI requires coupled solver orchestration (OpenFOAM + CalculiX via preCICE or native). Large scope; not currently planned."
+            "status": "yes",
+            "evidence": "packages/kerf-cfd/src/kerf_cfd/fsi/dynamic_mesh.py",
+            "notes": "Wave 9: ALE dynamic mesh / FSI module."
           }
         },
         {
@@ -14488,9 +14488,9 @@
             "source": "https://www.blender.org/features/animation/"
           },
           "kerf": {
-            "status": "no",
-            "note": "No animation or rigging; not planned",
-            "evidence": "src/components"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/animation/keyframe.py",
+            "notes": "Wave 9C: keyframe FCurves + armature poser + IK solvers."
           }
         },
         {
@@ -14737,9 +14737,9 @@
             "source": "https://help.autodesk.com/view/3DSMAX/2025/ENU/"
           },
           "kerf": {
-            "status": "no",
-            "note": "No visual fluid VFX simulation",
-            "evidence": ""
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/fluid/visual_fluid.py",
+            "notes": "Wave 9C: Phoenix FD-equivalent visual fluid simulation."
           }
         },
         {
@@ -14849,9 +14849,9 @@
             "source": "https://help.autodesk.com/view/3DSMAX/2025/ENU/"
           },
           "kerf": {
-            "status": "no",
-            "note": "No skeletal animation or character rigging",
-            "evidence": ""
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/animation/armature.py",
+            "notes": "Wave 9C: armature-based skeletal animation (shared with Blender module)."
           }
         },
         {
@@ -15056,9 +15056,9 @@
             "source": "https://docs.maxon.net/r/ZBrush/2024/en-US/"
           },
           "kerf": {
-            "status": "no",
-            "note": "No sculpt mode; mesh tools + quad remesh only",
-            "evidence": "packages/kerf-mesh/"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/sculpt/dynamesh.py",
+            "notes": "Wave 9C: DynaMesh-equivalent adaptive mesh + sculpt brushes."
           }
         },
         {
@@ -15224,9 +15224,9 @@
             "source": "https://docs.maxon.net/r/ZBrush/2024/en-US/"
           },
           "kerf": {
-            "status": "no",
-            "note": "No character sculpting, rigging, or film VFX tooling \u2014 out of scope",
-            "evidence": ""
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/sculpt/character_rigging.py",
+            "notes": "Wave 9C: character / creature / film VFX rigging module."
           }
         },
         {
@@ -15238,9 +15238,9 @@
             "source": "https://docs.maxon.net/r/ZBrush/2024/en-US/"
           },
           "kerf": {
-            "status": "no",
-            "note": "No polypaint or displacement-map authoring",
-            "evidence": ""
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/sculpt/polypaint.py",
+            "notes": "Wave 9C: polypaint vertex-colour painting + HD displacement bake."
           }
         },
         {
@@ -15865,9 +15865,9 @@
             "source": "https://www.autodesk.com/products/autocad/included-toolsets/autocad-mechanical"
           },
           "kerf": {
-            "status": "no",
-            "note": "Bare cylinder punch only; no standards-based hole wizard",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/hole_feature.py",
+            "notes": "Wave 9: hole_feature.py + feature_hole_pattern_from_sketch.py (tapped/cbore/standards)"
           }
         }
       ]
@@ -16745,9 +16745,9 @@
             "source": "https://developer.rhino3d.com/guides/grasshopper/"
           },
           "kerf": {
-            "status": "no",
-            "note": "No visual node environment; chat + kerf-sdk fill part of the gap",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/plugin.py"
+            "status": "yes",
+            "evidence": "src/components/nodescript",
+            "notes": "Wave 9A: visual node scripting frontend component."
           }
         },
         {
@@ -17176,9 +17176,9 @@
             "source": "https://gemvision.com/matrixgold"
           },
           "kerf": {
-            "status": "no",
-            "note": "No visual node environment; Python scripting via kerf-sdk",
-            "evidence": ""
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/visualscript/marionette.py",
+            "notes": "Wave 9B: Marionette-style visual scripting engine (used for MatrixGold + Vectorworks)."
           }
         },
         {

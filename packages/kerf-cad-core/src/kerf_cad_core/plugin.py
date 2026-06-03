@@ -595,6 +595,9 @@ _TOOL_MODULES = [
     # HONEST: shelf packing only; 90°-increment rotation; sampling-based distortion.
     # LLM tool: nurbs_harden_uv_unwrap
     "kerf_cad_core.geom.uv_unwrap_hardening",
+    # Wave 8B: LSCM UV unwrap LLM tool wrapper (Lévy et al. 2002)
+    # LLM tool: lscm_uv_unwrap
+    "kerf_cad_core.sculpt.lscm_uv_tool",
 ]
 # NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
 # (already in _TOOL_MODULES above at line 128); sagitta_arrow_chart module is imported

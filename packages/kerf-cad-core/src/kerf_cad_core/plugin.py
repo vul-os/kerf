@@ -643,6 +643,12 @@ _TOOL_MODULES = [
     "kerf_cad_core.visualscript.marionette_tools",         # visualscript_evaluate_graph + visualscript_topological_order + visualscript_list_node_types
     # Wave 9B: archviz render + theatrical lighting + luminance sim + Phoenix-FD visual fluid
     "kerf_cad_core.render.render_tools",   # render_parse_ies_file + render_theatrical_lighting_plot + render_lux_simulation + render_archviz_scene + render_fluid_smoke_step + render_fluid_flip_step
+    # Wave 9D: Zemax metalens + STOP multiphysics
+    "kerf_cad_core.optics.advanced_optics_tools",  # optics_design_metalens + optics_metalens_chromatic_efficiency + optics_stop_analysis + optics_thermal_expansion
+    # Wave 9D: 8760-hr ASHRAE compliance + Title 24 + LEED v4 EAp2 + HVAC plant
+    "kerf_cad_core.buildingenergy.compliance_8760_tools",  # be_simulate_8760, be_check_title24, be_evaluate_leed_eap2, be_simulate_hvac_plant
+    # Wave 9D: FiberSim AFP/ATL composite paths + laser projection
+    "kerf_cad_core.composites.afp_atl_tools",  # composites_generate_afp_paths + composites_export_apt_cl + composites_laser_projection + composites_develop_flat_pattern + composites_export_flat_dxf
 ]
 # NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
 # (already in _TOOL_MODULES above at line 128); sagitta_arrow_chart module is imported

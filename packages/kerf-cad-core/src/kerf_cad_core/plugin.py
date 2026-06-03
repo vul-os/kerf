@@ -641,6 +641,8 @@ _TOOL_MODULES = [
     # Wave 9B: vectorworks Marionette + Braceworks rigging + matrixgold visual scripting
     "kerf_cad_core.rigging.structural_load_tools",         # rigging_analyze_structural_load + rigging_cable_catenary_tension (BS 7905, ANSI E1.2)
     "kerf_cad_core.visualscript.marionette_tools",         # visualscript_evaluate_graph + visualscript_topological_order + visualscript_list_node_types
+    # Wave 9B: archviz render + theatrical lighting + luminance sim + Phoenix-FD visual fluid
+    "kerf_cad_core.render.render_tools",   # render_parse_ies_file + render_theatrical_lighting_plot + render_lux_simulation + render_archviz_scene + render_fluid_smoke_step + render_fluid_flip_step
 ]
 # NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
 # (already in _TOOL_MODULES above at line 128); sagitta_arrow_chart module is imported

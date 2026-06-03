@@ -8,6 +8,11 @@ Registers:
   - LLM tool:  cfd_rans_solve  (SIMPLE RANS — run cavity/channel case)
   - LLM tools: cfd_openfoam_export, cfd_openfoam_import  (T-101-C OpenFOAM bridge)
   - LLM tool:  cfd_mesh_unstructured  (3-D unstructured mesh generation)
+  - LLM tool:  cfd_combustion_ebu     (Magnussen-Hjertager EBU non-premixed combustion)
+  - LLM tool:  cfd_lagrangian_track   (Lagrangian particle tracking, Schiller-Naumann drag)
+  - LLM tool:  cfd_fsi_displace_mesh  (ALE dynamic mesh, Laplacian smoothing, GCL)
+
+# Wave 9C: OpenFOAM combustion + Lagrangian + FSI
 """
 
 from __future__ import annotations
@@ -41,6 +46,9 @@ async def register(app: FastAPI, ctx):
         run_cfd_mesh_unstructured,
     )
 
+    # Wave 9C: OpenFOAM combustion + Lagrangian + FSI
+    import kerf_cfd.cfd_advanced_tools  # noqa: F401 — triggers @register decorators
+
     provides = [
         "cfd.simple_rans",
         "cfd.turbulence_model",
@@ -50,6 +58,9 @@ async def register(app: FastAPI, ctx):
         "cfd.k_epsilon_rans",
         "cfd.openfoam_bridge",
         "cfd.mesh_unstructured_3d",
+        "cfd.combustion_ebu",
+        "cfd.lagrangian_particles",
+        "cfd.fsi_dynamic_mesh",
     ]
 
     try:

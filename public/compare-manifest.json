@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-03T15:34:38.000Z",
+  "generatedAt": "2026-06-03T16:28:09.000Z",
   "items": [
     {
       "slug": "revit",
@@ -2530,10 +2530,9 @@
             "tier": "paid"
           },
           "kerf": {
-            "status": "no",
-            "notes": "Single-board per project today; no multi-board equivalent",
-            "kerf_note": "Multi-board 3D workspace is a large project-model architectural gap. Requires multi-PCB project type + 3D clearance checks across boards. Epic \u2014 wave 2.",
-            "evidence": "packages/kerf-electronics/src/kerf_electronics/plugin.py"
+            "status": "yes",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/multi_board/workspace.py",
+            "notes": "Wave 10C build implementation."
           }
         },
         {
@@ -9426,9 +9425,9 @@
             "source": "https://www.cimatron.com/en/cimatron-mold"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-mold/src/kerf_mold/electrode_design.py",
-            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
+            "status": "yes",
+            "evidence": "packages/kerf-mold/src/kerf_mold/cavity_core_split.py",
+            "notes": "Wave 10C build implementation."
           }
         },
         {
@@ -12952,9 +12951,9 @@
             "source": "https://gmat.atlassian.net/wiki/spaces/GW/pages/380273617"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/civil/alignment_tools.py",
-            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/aerospace/orbit_determination.py",
+            "notes": "Wave 10C build implementation."
           }
         },
         {
@@ -13022,10 +13021,9 @@
             "source": "https://gmat.atlassian.net/wiki/spaces/GW/pages/380273275"
           },
           "kerf": {
-            "status": "no",
-            "note": "No CR3BP / libration point propagator",
-            "evidence": "",
-            "kerf_note": "Circular-restricted 3-body problem and halo orbit computation require dedicated differential corrector and continuation methods. This is large scope; not currently planned."
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/aerospace/libration_orbits.py",
+            "notes": "Wave 10C build implementation."
           }
         },
         {
@@ -13188,9 +13186,9 @@
             "source": "https://www.openfoam.com/documentation/guides/latest/doc/openfoam-guide.html"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-cfd/src/kerf_cfd/fsi/dynamic_mesh.py",
-            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
+            "status": "yes",
+            "evidence": "packages/kerf-cfd/src/kerf_cfd/meshing/snappy_hex.py",
+            "notes": "Wave 10C build implementation."
           }
         },
         {

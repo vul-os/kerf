@@ -649,6 +649,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.buildingenergy.compliance_8760_tools",  # be_simulate_8760, be_check_title24, be_evaluate_leed_eap2, be_simulate_hvac_plant
     # Wave 9D: FiberSim AFP/ATL composite paths + laser projection
     "kerf_cad_core.composites.afp_atl_tools",  # composites_generate_afp_paths + composites_export_apt_cl + composites_laser_projection + composites_develop_flat_pattern + composites_export_flat_dxf
+    # Wave 10C: GMAT libration orbits + orbit determination
+    "kerf_cad_core.aerospace.aerospace_tools",  # aerospace_compute_lagrange_points + aerospace_design_halo_orbit + aerospace_design_lyapunov_orbit + aerospace_design_lissajous_orbit + aerospace_batch_od + aerospace_ekf_od
 ]
 # NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
 # (already in _TOOL_MODULES above at line 128); sagitta_arrow_chart module is imported

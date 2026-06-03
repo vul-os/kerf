@@ -226,6 +226,13 @@ def _register_tools(ctx, provides: list) -> None:
         # electronics_generate_netlist: schematic → Spectre / ngspice / HSPICE netlist
         # electronics_parse_netlist: parse SPICE netlist → structured schematic graph
         "kerf_electronics.spice.foundry_tools",
+        # Wave 10C: Altium MB3D multi-board workspace
+        # electronics_mb3d_create_workspace: create workspace + placed boards
+        # electronics_mb3d_add_connector: declare J1↔J2 mating connector pair
+        # electronics_mb3d_validate_workspace: pin-count + overlap validation
+        # electronics_mb3d_net_map: cross-board net map + floating pin + Z0 mismatch
+        # electronics_mb3d_export_step: full STEP AP242 multi-board assembly export
+        "kerf_electronics.multi_board.multi_board_tools",
     ]
 
     for module_path in tool_modules:

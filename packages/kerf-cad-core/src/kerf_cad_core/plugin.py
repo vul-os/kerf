@@ -631,6 +631,16 @@ _TOOL_MODULES = [
     # Wave 9A: civil parcel subdivision (BLM Manual §6) + plan-and-profile sheet (ASCE Manual 21)
     "kerf_cad_core.civil.parcels_tools",                # parcel_polygon_stats + parcel_subdivide
     "kerf_cad_core.civil.plan_profile_sheet_tools",     # civil_plan_profile_sheet
+    # Wave 9B: ZBrush-equivalent organic sculpt depth
+    "kerf_cad_core.sculpt.sculpt_extended_tools",       # dynamesh + polypaint + displacement_bake + character_rigging
+    # Wave 9B: animation + skeletal rig
+    "kerf_cad_core.animation.tools",                    # animation_evaluate_clip + animation_solve_ik + animation_apply_pose
+    # Wave 9B: clo3d avatar + mozaik cabinet room layout
+    "kerf_cad_core.apparel.avatar_tools",               # apparel_build_avatar + apparel_fit_dress_form (ISO 8559-1:2017)
+    "kerf_cad_core.woodworking.cabinet_room_layout_tools",  # woodworking_auto_layout_cabinets + woodworking_detect_collisions (NKBA 2021)
+    # Wave 9B: vectorworks Marionette + Braceworks rigging + matrixgold visual scripting
+    "kerf_cad_core.rigging.structural_load_tools",         # rigging_analyze_structural_load + rigging_cable_catenary_tension (BS 7905, ANSI E1.2)
+    "kerf_cad_core.visualscript.marionette_tools",         # visualscript_evaluate_graph + visualscript_topological_order + visualscript_list_node_types
 ]
 # NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
 # (already in _TOOL_MODULES above at line 128); sagitta_arrow_chart module is imported

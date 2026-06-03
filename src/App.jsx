@@ -96,6 +96,7 @@ const PathTracer = lazy(() => import('./routes/PathTracer.jsx'))
 const NodeScript = lazy(() => import('./routes/NodeScript.jsx'))
 const PCBEditor = lazy(() => import('./routes/PCBEditor.jsx'))
 const GmatViewer = lazy(() => import('./routes/GmatViewer.jsx'))
+const SchematicEditor = lazy(() => import('./routes/SchematicEditor.jsx'))
 
 // Cloud surface — these come from the cloud/ open-core split and may be
 // stubs on OSS builds. useCloudConfig stays eager (we need it before any
@@ -296,6 +297,7 @@ export default function App() {
       <Route path="/nodescript" element={<NodeScript />} />
       <Route path="/pcb-editor" element={<PCBEditor />} />
       <Route path="/gmat-viewer" element={<GmatViewer />} />
+      <Route path="/schematic-editor" element={<SchematicEditor />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
     </Suspense>

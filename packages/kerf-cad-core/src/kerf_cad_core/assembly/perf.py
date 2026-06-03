@@ -402,6 +402,72 @@ def _tri_count_for(part_ref: str) -> int:
     return 96 + (h % 3505)
 
 
+def triangle_count_from_mesh_url(
+    mesh_url: str,
+    default_estimate: int = 1000,
+    byte_count_hint: int | None = None,
+) -> int:
+    """Estimate triangle count from a mesh URL or file path.
+
+    Parameters
+    ----------
+    mesh_url : str
+        URL or local file path to a mesh asset.  Empty/None → ``default_estimate``.
+    default_estimate : int
+        Fallback triangle count when no URL or byte count is available.  Default 1000.
+    byte_count_hint : int | None
+        Pre-computed byte size for HTTP URLs (avoids I/O in tests).  When supplied
+        it takes precedence over reading the local file.
+
+    Returns
+    -------
+    int
+        Estimated triangle count.  Always >= 1.
+
+    Notes
+    -----
+    Estimation formula for GLB/glTF:
+      triangles ≈ byte_count // 36
+    Rationale: each triangle in a typical interleaved buffer consumes ≈36 bytes
+    (3 × vec3 position @ 12 bytes each = 36 bytes/tri unindexed, or 3 × uint16
+    index + padded attribute stride — 36 bytes/tri is the conservative midpoint).
+
+    Pure function: no network I/O is performed.  Local file access is attempted
+    for ``file://`` or bare path URLs when no ``byte_count_hint`` is supplied.
+    """
+    if not mesh_url:
+        return default_estimate
+
+    import os as _os
+
+    lower = mesh_url.lower()
+    is_mesh = lower.endswith(".glb") or lower.endswith(".gltf")
+
+    if not is_mesh:
+        return default_estimate
+
+    # Resolve byte count
+    byte_count: int | None = byte_count_hint
+
+    if byte_count is None:
+        # Try local file access (strips file:// prefix if present)
+        path = mesh_url
+        if path.startswith("file://"):
+            path = path[len("file://"):]
+        if _os.path.isfile(path):
+            try:
+                byte_count = _os.path.getsize(path)
+            except OSError:
+                byte_count = None
+
+    if byte_count is None or byte_count <= 0:
+        return default_estimate
+
+    # triangles ≈ byte_count // 36  (3 × vec3 = 36 bytes/tri)
+    estimated = byte_count // 36
+    return max(1, estimated)
+
+
 def _bbox_half_for(part_ref: str) -> tuple[float, float, float]:
     """Return a deterministic bounding-box half-extent for a part_ref."""
     if part_ref in _BBOX_HALF:
@@ -436,6 +502,8 @@ def _importance_for(comp: Component) -> float:
 def lod_plan(
     assembly: Assembly,
     budget: ViewportBudget,
+    mesh_url: str = "",
+    byte_count_hint: int | None = None,
 ) -> LodPlan:
     """
     Compute a deterministic LOD plan for *assembly* subject to *budget*.
@@ -458,6 +526,13 @@ def lod_plan(
         If max_triangles <= 0 or max_visible_parts <= 0 the budget is
         invalid and a friendly error LodPlan is returned with all entries
         culled and a non-empty ``error`` attribute.
+    mesh_url : str
+        Optional URL (or local path) to the assembly's primary mesh asset
+        (GLB/glTF).  When provided and ends in .glb/.gltf, the first
+        component's triangle estimate is overridden via
+        ``triangle_count_from_mesh_url`` for a more accurate LOD tier.
+    byte_count_hint : int | None
+        Pre-computed byte size for HTTP mesh URLs (avoids network I/O).
 
     Returns
     -------
@@ -465,6 +540,17 @@ def lod_plan(
         Always returns; never raises.
     """
     all_comps = assembly.all_components()
+
+    # When a mesh_url is provided, use it to override the tri estimate for the
+    # first (highest-importance) component — gives a more accurate LOD tier for
+    # real mesh assets rather than relying on the synthetic _TRI_PER_PART table.
+    mesh_tri_override: int | None = None
+    if mesh_url:
+        est = triangle_count_from_mesh_url(
+            mesh_url, default_estimate=0, byte_count_hint=byte_count_hint
+        )
+        if est > 0:
+            mesh_tri_override = est
 
     entries: list[ComponentLodEntry] = []
     for comp in all_comps:
@@ -494,9 +580,14 @@ def lod_plan(
 
     tri_used = 0
     visible_used = 0
+    _mesh_override_used = False  # apply mesh_tri_override to first full-detail entry only
 
     for entry in entries:
-        tris = _tri_count_for(entry.part_ref)
+        if mesh_tri_override is not None and not _mesh_override_used:
+            tris = mesh_tri_override
+            _mesh_override_used = True
+        else:
+            tris = _tri_count_for(entry.part_ref)
         if (
             tri_used + tris <= budget.max_triangles
             and visible_used < budget.max_visible_parts
@@ -721,6 +812,18 @@ _lod_plan_spec = ToolSpec(
             "camera_x": {"type": "number", "description": "Camera X position (mm). Default 0."},
             "camera_y": {"type": "number", "description": "Camera Y position (mm). Default 0."},
             "camera_z": {"type": "number", "description": "Camera Z position (mm). Default 0."},
+            "mesh_url": {
+                "type": "string",
+                "description": (
+                    "Optional URL or local path to the assembly's primary mesh asset (.glb/.gltf). "
+                    "When provided, the first component's triangle estimate is derived from the "
+                    "file byte count (triangles ≈ bytes // 36) for a more accurate LOD tier."
+                ),
+            },
+            "mesh_byte_count": {
+                "type": "integer",
+                "description": "Pre-computed byte size for an HTTP mesh_url (avoids network I/O).",
+            },
         },
         "required": ["assembly", "max_triangles", "max_visible_parts"],
     },
@@ -761,8 +864,17 @@ async def run_assembly_lod_plan(ctx: "ProjectCtx", args: bytes) -> str:
     cam_y = float(a.get("camera_y", 0.0))
     cam_z = float(a.get("camera_z", 0.0))
 
+    mesh_url = str(a.get("mesh_url", ""))
+    mesh_byte_count_raw = a.get("mesh_byte_count")
+    mesh_byte_count: int | None = None
+    if mesh_byte_count_raw is not None:
+        try:
+            mesh_byte_count = int(mesh_byte_count_raw)
+        except (TypeError, ValueError):
+            pass
+
     budget = ViewportBudget(max_triangles=max_tri, max_visible_parts=max_vis)
-    plan = lod_plan(asm, budget)
+    plan = lod_plan(asm, budget, mesh_url=mesh_url, byte_count_hint=mesh_byte_count)
 
     load_order = lazy_load_order(plan, camera_pos=(cam_x, cam_y, cam_z))
 

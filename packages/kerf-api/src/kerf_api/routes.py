@@ -1286,6 +1286,10 @@ async def create_project(req: CreateProjectRequest, payload: dict = Depends(requ
 _IMPORT_EXT_KIND: dict[str, str] = {
     # CAD / geometry
     ".step": "step", ".stp": "step",
+    ".iges": "iges", ".igs": "iges",
+    ".stl": "stl",
+    ".3dm": "rhino",
+    ".dxf": "dxf",
     ".jscad": "script",
     ".assembly": "assembly",
     ".feature": "feature",
@@ -1354,8 +1358,8 @@ _IMPORT_EXT_KIND: dict[str, str] = {
     ".sheet": "sheet",
 }
 
-_IMPORT_MAX_FILE_COUNT = 10_000
-_IMPORT_HARD_CAP_BYTES = 2 * 1024 * 1024 * 1024  # 2 GB absolute hard cap
+_IMPORT_MAX_FILE_COUNT = 5_000
+_IMPORT_HARD_CAP_BYTES = 200 * 1024 * 1024  # 200 MB uncompressed hard cap (OWASP DoS guard)
 
 
 def _kind_from_ext(filename: str) -> str:
@@ -1465,6 +1469,12 @@ async def import_project_zip(
             with zf:
                 entries = zf.infolist()
 
+                if len(entries) == 0:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="ZIP archive is empty",
+                    )
+
                 if len(entries) > _IMPORT_MAX_FILE_COUNT:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
@@ -1519,7 +1529,10 @@ async def import_project_zip(
                         if entry.is_dir():
                             continue
 
-                        # Path traversal check
+                        # Path traversal guard — OWASP Path Traversal (A01:2021 / CWE-22):
+                        # Reject any entry whose normalised path escapes the extraction root.
+                        # Covers "../", absolute paths, and Windows-style "\\" prefixes.
+                        # Ref: https://owasp.org/www-community/attacks/Path_Traversal
                         norm = os.path.normpath(entry_path)
                         if (
                             os.path.isabs(norm)
@@ -1528,6 +1541,14 @@ async def import_project_zip(
                             or entry_path.startswith("\\")
                         ):
                             skipped.append({"path": entry_path, "reason": "path traversal rejected"})
+                            continue
+
+                        # Symlink guard: reject symlink entries.
+                        # ZIP external_attr upper 16 bits hold Unix mode; stat.S_ISLNK tests bit.
+                        import stat as _stat
+                        unix_mode = (entry.external_attr >> 16) & 0xFFFF
+                        if unix_mode and _stat.S_ISLNK(unix_mode):
+                            skipped.append({"path": entry_path, "reason": "symlink rejected"})
                             continue
 
                         # Use just the basename as the file name (flatten hierarchy
@@ -1606,6 +1627,7 @@ async def import_project_zip(
         "project_id": project_id,
         "file_count": file_count,
         "total_bytes": total_bytes,
+        "total_size_bytes": total_bytes,
         "skipped": skipped,
     }
 
@@ -8129,13 +8151,6 @@ async def building_energy_sim(pid: str, request: Request, payload: dict = Depend
     SCHED_FRAC = {k: min(v, 1.0) for k, v in SCHED_HOURS.items()}
 
     # Annual totals
-        "office": 8 * 5 / (24 * 7),
-        "residential": 0.70,
-        "retail": 12 * 6 / (24 * 7),
-        "warehouse": 12 * 5 / (24 * 7),
-    }
-    SCHED_FRAC = {k: min(v, 1.0) for k, v in SCHED_HOURS.items()}
-
     total_heating_kWh = 0.0
     total_cooling_kWh = 0.0
     total_lighting_kWh = 0.0
@@ -8299,14 +8314,6 @@ async def pv_shading_sim(pid: str, request: Request, payload: dict = Depends(req
 
     # Import the PV tools (kerf-cad-core must be installed)
     try:
-        from kerf_cad_core.solarpv.shading_tools import (
-            _parse_cell_params, CellParams,
-        )
-        from kerf_cad_core.solarpv.shading import (
-            module_iv_shaded, mppt_global,
-        )
-        from kerf_cad_core.solarpv.sizing import energy_yield
-    try:
         from kerf_cad_core.solarpv.shading_tools import _parse_cell_params
         from kerf_cad_core.solarpv.shading import module_iv_shaded, mppt_global
         from kerf_cad_core.solarpv.sizing import energy_yield
@@ -8370,12 +8377,6 @@ async def pv_shading_sim(pid: str, request: Request, payload: dict = Depends(req
     n_pts = max(20, min(N_PTS, 500))
 
     try:
-        # Compute module IV curve (with partial shading + bypass diodes)
-        module_curve = module_iv_shaded(
-            cell_irr, params, n_cells=n_cells,
-    n_pts = 200
-
-    try:
         module_curve = module_iv_shaded(
             cell_irr, params,
             cells_per_bypass=cells_per_bypass,
@@ -8388,9 +8389,6 @@ async def pv_shading_sim(pid: str, request: Request, payload: dict = Depends(req
         # Approximate string GMPP = module GMPP × modules_per_string
         # (exact would require full string-series IV convolution — acceptable approximation here)
         # For mismatch loss: compare with ideal (unshaded) module
-        unshaded_irr = [1000.0] * n_cells
-        unshaded_curve = module_iv_shaded(
-            unshaded_irr, params, n_cells=n_cells,
         unshaded_irr = [1000.0] * n_cells
         unshaded_curve = module_iv_shaded(
             unshaded_irr, params,
@@ -8412,23 +8410,12 @@ async def pv_shading_sim(pid: str, request: Request, payload: dict = Depends(req
         poa_annual = float(body.get("poa_annual_kWh_m2", 1200))
         pr = float(body.get("pr", 0.80))
         pr_eff = pr * (1.0 - mismatch_loss_pct / 100.0)  # mismatch reduces effective PR
-        array_kWp = unshaded_gmpp_p * modules_per_string * strings_in_parallel / 1000.0
-
-        poa_annual = float(body.get("poa_annual_kWh_m2", 1200))
-        pr = float(body.get("pr", 0.80))
-        pr_eff = pr * (1.0 - mismatch_loss_pct / 100.0)
         yield_result = energy_yield(array_kWp, poa_annual, pr_eff)
 
         annual_yield_kWh = yield_result.get("annual_yield_yr1_kWh", 0)
         specific_yield = yield_result.get("specific_yield_kWh_kWp", 0)
 
         # Monthly yield (approximate: scale annual by solar fraction per month)
-        SOLAR_FRAC = [0.04, 0.06, 0.08, 0.09, 0.11, 0.12, 0.12, 0.11, 0.09, 0.08, 0.06, 0.04]
-        monthly_yield = [
-            {"month": m, "yield_kWh": round(annual_yield_kWh * f, 1)}
-            for m, f in zip(
-                ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
-                SOLAR_FRAC,
         # Monthly yield: latitude-aware TMY fractions
         solar_frac = monthly_yield_factors(latitude)
         monthly_yield = [
@@ -8450,16 +8437,7 @@ async def pv_shading_sim(pid: str, request: Request, payload: dict = Depends(req
             "specific_yield_kWh_kWp": round(specific_yield, 1),
             "monthly_yield": monthly_yield,
             "per_module_gmpps": [round(mod_gmpp_p, 4)],
-            "string_gmpp_p_w":         round(string_gmpp, 2),
-            "sum_module_gmpp_p_w":      round(sum_module_gmpp, 2),
-            "mismatch_loss_w":          round(mismatch_loss_w, 2),
-            "mismatch_loss_pct":        round(mismatch_loss_pct, 3),
-            "array_kWp":               round(array_kWp, 4),
-            "annual_yield_yr1_kWh":    round(annual_yield_kWh, 1),
-            "specific_yield_kWh_kWp":  round(specific_yield, 1),
-            "monthly_yield":           monthly_yield,
-            "per_module_gmpps":        [round(mod_gmpp_p, 4)],
-            "latitude_deg":            latitude,
+            "latitude_deg": latitude,
         }
 
     except Exception as exc:

@@ -124,6 +124,29 @@ Registers:
                 high; SPI LDR range 1–5 %; HONEST: mixing index is a
                 proxy — trial colour plaques + L*a*b* measurement required)
 
+# Wave 10C: parting line + cavity-core split
+  - LLM tool:  mold_detect_parting_line
+               (Hayrettin et al. 2003 CAD 35 + Chen-Rosen 1999 JMSE 121:
+                walk B-rep edges; classify as silhouette / undercut_boundary /
+                draft-deficient via signed dot-product projection onto pull
+                direction; returns segments, total_length_mm, closed_loops,
+                has_undercuts, undercut_face_ids, draft_deficient_face_ids;
+                HONEST: planar pull direction only; does not auto-design side
+                actions; requires designer review before tooling commitment)
+  - LLM tool:  mold_split_cavity_core
+               (Sanford 2017 Ch. 7 + Hayrettin 2003 §5 + Chougule-Ravi 2006 §3:
+                split body into cavity (concave, pull-side) + core (convex,
+                ejection-side); parting surface from mean silhouette midpoints;
+                side-action detection (sliders/lifters) from undercut analysis;
+                HONEST: bbox descriptors only — full Boolean B-rep split
+                requires CAD kernel; free-form parting not auto-generated)
+  - LLM tool:  mold_estimate_mold_complexity
+               (Chougule-Ravi 2006 §3 + Sanford 2017 Ch. 7: heuristic
+                complexity score 1–10; tooling recommendation 2-plate /
+                3-plate / hot_runner; slides_count;
+                HONEST: heuristic model — real DFM requires full machine-rate
+                cost analysis)
+
 # Wave 9C: Cimatron mold base + EDM electrode + wire EDM
   - LLM tool:  mold_select_standard_base
                (Sanford 2017 §3 + DME/Hasco/Misumi public catalogs:
@@ -468,6 +491,29 @@ async def register(app: FastAPI, ctx):
         run_mold_check_surface_finish,
     )
 
+    # Wave 10C: parting line + cavity-core split
+    # Register parting-line detection tool (Hayrettin 2003; Chen-Rosen 1999)
+    from kerf_mold.parting_cavity_tools import (
+        mold_detect_parting_line_spec, run_mold_detect_parting_line,
+        mold_split_cavity_core_spec, run_mold_split_cavity_core,
+        mold_estimate_mold_complexity_spec, run_mold_estimate_mold_complexity,
+    )
+    ctx.tools.register(
+        "mold_detect_parting_line",
+        mold_detect_parting_line_spec,
+        run_mold_detect_parting_line,
+    )
+    ctx.tools.register(
+        "mold_split_cavity_core",
+        mold_split_cavity_core_spec,
+        run_mold_split_cavity_core,
+    )
+    ctx.tools.register(
+        "mold_estimate_mold_complexity",
+        mold_estimate_mold_complexity_spec,
+        run_mold_estimate_mold_complexity,
+    )
+
     # Wave 9C: Cimatron mold base + EDM electrode + wire EDM
     # Register standard mold base library tool (Sanford 2017; DME/Hasco/Misumi catalogs)
     from kerf_mold.mold_base_library_tool import (
@@ -537,6 +583,9 @@ async def register(app: FastAPI, ctx):
         "mold.mold_base_library",
         "mold.edm_electrode_design",
         "mold.wire_edm",
+        "mold.parting_line_detection",
+        "mold.cavity_core_split",
+        "mold.mold_complexity_estimate",
     ]
 
     try:

@@ -92,6 +92,7 @@ const MarkupPanel = lazy(() => import('./components/bim/MarkupPanel.jsx'))
 const COBiePage = lazy(() => import('./routes/COBie.jsx'))
 const ConfiguratorPage = lazy(() => import('./routes/Configurator.jsx'))
 const SysMLTracePage = lazy(() => import('./routes/SysMLTrace.jsx'))
+const PathTracer = lazy(() => import('./routes/PathTracer.jsx'))
 
 // Cloud surface — these come from the cloud/ open-core split and may be
 // stubs on OSS builds. useCloudConfig stays eager (we need it before any
@@ -288,6 +289,7 @@ export default function App() {
         {cloudEnabled && <Route path="/usage" element={<UsagePage />} />}
       </Route>
 
+      <Route path="/pathtracer" element={<PathTracer />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
     </Suspense>

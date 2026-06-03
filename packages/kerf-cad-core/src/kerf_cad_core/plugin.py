@@ -628,6 +628,9 @@ _TOOL_MODULES = [
     "kerf_cad_core.brep.motion_interference_tools",
     # Wave 9A: LAS / E57 point cloud readers
     "kerf_cad_core.scan.las_e57_tools",  # scan_load_las + scan_load_e57
+    # Wave 9A: civil parcel subdivision (BLM Manual §6) + plan-and-profile sheet (ASCE Manual 21)
+    "kerf_cad_core.civil.parcels_tools",                # parcel_polygon_stats + parcel_subdivide
+    "kerf_cad_core.civil.plan_profile_sheet_tools",     # civil_plan_profile_sheet
 ]
 # NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
 # (already in _TOOL_MODULES above at line 128); sagitta_arrow_chart module is imported

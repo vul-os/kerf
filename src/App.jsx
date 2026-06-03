@@ -93,6 +93,7 @@ const COBiePage = lazy(() => import('./routes/COBie.jsx'))
 const ConfiguratorPage = lazy(() => import('./routes/Configurator.jsx'))
 const SysMLTracePage = lazy(() => import('./routes/SysMLTrace.jsx'))
 const PathTracer = lazy(() => import('./routes/PathTracer.jsx'))
+const NodeScript = lazy(() => import('./routes/NodeScript.jsx'))
 
 // Cloud surface — these come from the cloud/ open-core split and may be
 // stubs on OSS builds. useCloudConfig stays eager (we need it before any
@@ -290,6 +291,7 @@ export default function App() {
       </Route>
 
       <Route path="/pathtracer" element={<PathTracer />} />
+      <Route path="/nodescript" element={<NodeScript />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
     </Suspense>

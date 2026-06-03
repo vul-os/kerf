@@ -11,8 +11,12 @@ Registers:
   - LLM tool:  cfd_combustion_ebu     (Magnussen-Hjertager EBU non-premixed combustion)
   - LLM tool:  cfd_lagrangian_track   (Lagrangian particle tracking, Schiller-Naumann drag)
   - LLM tool:  cfd_fsi_displace_mesh  (ALE dynamic mesh, Laplacian smoothing, GCL)
+  - LLM tool:  cfd_snappy_hex_mesh   (Cartesian + snap hex mesher, Aftosmis 1998)
+  - LLM tool:  cfd_wind_load         (ASCE 7-22 building wind pressures + drag)
+  - LLM tool:  cfd_vortex_shedding   (Bearman 1984 St vortex shedding frequency)
 
 # Wave 9C: OpenFOAM combustion + Lagrangian + FSI
+# Wave 10C: snappyHexMesh-style mesher + wind engineering
 """
 
 from __future__ import annotations
@@ -49,6 +53,9 @@ async def register(app: FastAPI, ctx):
     # Wave 9C: OpenFOAM combustion + Lagrangian + FSI
     import kerf_cfd.cfd_advanced_tools  # noqa: F401 — triggers @register decorators
 
+    # Wave 10C: snappyHexMesh-style mesher + wind engineering
+    import kerf_cfd.cfd_advanced_tools_v2  # noqa: F401 — triggers @register decorators
+
     provides = [
         "cfd.simple_rans",
         "cfd.turbulence_model",
@@ -61,6 +68,8 @@ async def register(app: FastAPI, ctx):
         "cfd.combustion_ebu",
         "cfd.lagrangian_particles",
         "cfd.fsi_dynamic_mesh",
+        "cfd.snappy_hex_mesh",
+        "cfd.wind_engineering",
     ]
 
     try:

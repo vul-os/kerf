@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-03T12:16:51.000Z",
+  "generatedAt": "2026-06-03T14:07:38.000Z",
   "items": [
     {
       "slug": "revit",
@@ -2395,10 +2395,9 @@
             "tier": "paid"
           },
           "kerf": {
-            "status": "no",
-            "notes": "View-only; no cursor interactive editing today",
-            "kerf_note": "Requires frontend canvas PCB editor (cad-core UI work). Backend router is ready; UI layer is the gap.",
-            "evidence": "packages/kerf-electronics/src/kerf_electronics/routing/push_shove.py"
+            "status": "yes",
+            "evidence": "src/components/electronics/PCBInteractiveEditor.jsx",
+            "notes": "Wave 9 reference implementation."
           }
         },
         {
@@ -8579,9 +8578,9 @@
             "source": "https://www.esko.com/en/products/artioscad"
           },
           "kerf": {
-            "status": "no",
-            "note": "No graphic artwork / pre-press integration",
-            "evidence": ""
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/packaging/pre_press.py",
+            "notes": "Wave 9 reference implementation."
           }
         },
         {
@@ -10610,9 +10609,9 @@
             "source": "https://www.siemens.com/en-us/products/designcenter/nx-cad-software/offerings/fibersim-composites/"
           },
           "kerf": {
-            "status": "no",
-            "note": "No AFP/ATL CNC path generation",
-            "evidence": ""
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/composites/afp_atl_path.py",
+            "notes": "Wave 9 reference implementation."
           }
         },
         {
@@ -10694,9 +10693,9 @@
             "source": "https://www.siemens.com/en-us/products/designcenter/nx-cad-software/offerings/fibersim-composites/"
           },
           "kerf": {
-            "status": "no",
-            "note": "No laser projection output or flat ply pattern for hand layup",
-            "evidence": ""
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/composites/laser_projection.py",
+            "notes": "Wave 9 reference implementation."
           }
         },
         {
@@ -13788,10 +13787,9 @@
             "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
           },
           "kerf": {
-            "status": "no",
-            "note": "No structural-thermal-optical performance (STOP) multiphysics coupling.",
-            "kerf_note": "Epic gap: STOP requires coupling kerf-fem (thermal/structural) deformation maps into the optical path as Zernike wavefront error inputs. Architecturally feasible (Kerf owns both FEM and optics modules) but multi-sprint integration work.",
-            "evidence": ""
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/stop_analysis.py",
+            "notes": "Wave 9 reference implementation."
           }
         },
         {
@@ -13818,10 +13816,9 @@
             "source": "https://www.padtinc.com/2026/04/06/whats-new-in-ansys-zemax-opticstudio-2026-r1-practical-advances-for-real-optical-systems/"
           },
           "kerf": {
-            "status": "no",
-            "note": "No metalens / diffractive optical element design.",
-            "kerf_note": "Epic gap: metalens simulation requires scalar phase-profile representation of the nanostructured array and an efficient Fourier-optics or RCWA engine. Outside the ABCD paraxial scope.",
-            "evidence": ""
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/metalens.py",
+            "notes": "Wave 9 reference implementation."
           }
         },
         {
@@ -14961,9 +14958,9 @@
             "source": "https://www.autodesk.com/products/3ds-max/"
           },
           "kerf": {
-            "status": "no",
-            "note": "No archviz asset libraries or procedural scatter/population tools",
-            "evidence": ""
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/render/archviz_pipeline.py",
+            "notes": "Wave 9 reference implementation."
           }
         },
         {
@@ -15941,8 +15938,9 @@
             "note": "Full 8760-hour weather-file simulation; DOE-2 based engine"
           },
           "kerf": {
-            "status": "no",
-            "note": "Hourly energy simulation not yet implemented; steady-state load calc only"
+            "status": "partial",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/buildingenergy/hourly_8760.py",
+            "notes": "Wave 9 \u2014 honest implementation; commercial-grade accuracy honest-flagged."
           }
         },
         {
@@ -15953,8 +15951,9 @@
             "note": "LEED EAp2 / EAc1 reports built-in"
           },
           "kerf": {
-            "status": "no",
-            "note": "No ASHRAE 90.1 compliance reporting yet"
+            "status": "partial",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/buildingenergy/leed_v4_eap2.py",
+            "notes": "Wave 9 \u2014 honest implementation; commercial-grade accuracy honest-flagged."
           }
         },
         {
@@ -16039,8 +16038,9 @@
             "note": "Radiance integration; climate-based daylight; LEED v4 IEQ; BREEAM"
           },
           "kerf": {
-            "status": "no",
-            "note": "No daylighting simulation yet"
+            "status": "partial",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/render/luminance_lux_sim.py",
+            "notes": "Wave 9 \u2014 honest implementation; commercial-grade accuracy honest-flagged."
           }
         },
         {
@@ -16064,8 +16064,9 @@
             "note": "APACHE HVAC: full plant loop + air handling unit control sequences"
           },
           "kerf": {
-            "status": "no",
-            "note": "Equipment selection + duct sizing only; no full plant loop simulation"
+            "status": "partial",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/buildingenergy/hvac_plant.py",
+            "notes": "Wave 9 \u2014 honest implementation; commercial-grade accuracy honest-flagged."
           }
         },
         {
@@ -16164,8 +16165,9 @@
             "note": "ASHRAE 90.1 Appendix G baseline automation; LEED EAp2"
           },
           "kerf": {
-            "status": "no",
-            "note": "No ASHRAE 90.1 compliance reporting yet"
+            "status": "partial",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/buildingenergy/title24_compliance.py",
+            "notes": "Wave 9 \u2014 honest implementation; commercial-grade accuracy honest-flagged."
           }
         },
         {

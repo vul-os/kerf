@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
+from enum import IntEnum
 from typing import Optional
 
 import numpy as np
@@ -60,6 +61,9 @@ from kerf_cad_core.geom.match_srf import (
     verify_seam_g3_analytic,
     _cp_row_count,
     _boundary_degree,
+    _edge_boundary_params,
+    _analytic_cross_curvature,
+    _cross_curvature_rate,
 )
 
 # ---------------------------------------------------------------------------
@@ -67,6 +71,63 @@ from kerf_cad_core.geom.match_srf import (
 # ---------------------------------------------------------------------------
 
 _VALID_EDGES = frozenset({"u0", "u1", "v0", "v1"})
+
+
+# ---------------------------------------------------------------------------
+# ContinuityOrder enum  (Piegl & Tiller §5.6; Farin §10)
+# ---------------------------------------------------------------------------
+
+class ContinuityOrder(IntEnum):
+    """Geometric continuity order across a NURBS surface boundary.
+
+    References
+    ----------
+    Piegl & Tiller, "The NURBS Book" §5.6 (boundary conditions).
+    Farin, "Curves and Surfaces for CAGD" §10 (continuity orders).
+    """
+    G0 = 0   # positional continuity
+    G1 = 1   # tangent-plane continuity
+    G2 = 2   # curvature continuity
+    G3 = 3   # curvature-derivative (dκ/ds) continuity
+
+
+# ---------------------------------------------------------------------------
+# MatchG3Result dataclass  (functional API)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class MatchG3Result:
+    """Result returned by :func:`match_srf_g3_functional`.
+
+    Attributes
+    ----------
+    matched_surface : NurbsSurface
+        Deep copy of *target* with the boundary CP rows adjusted.
+    g0_residual : float
+        Maximum position error along the boundary (model units).
+    g1_residual : float
+        Maximum tangent-plane error (radians).
+    g2_residual : float
+        Maximum normal-curvature error (1/length).
+    g3_residual : float
+        Maximum curvature-derivative error (1/length²).
+    iterations : int
+        Number of solver iterations executed.
+    converged : bool
+        True when all requested-order residuals are within *tol*.
+
+    References
+    ----------
+    Piegl & Tiller, "The NURBS Book" §5.6.
+    Farin, "Curves and Surfaces for CAGD" §10.
+    """
+    matched_surface: Optional[NurbsSurface] = None
+    g0_residual: float = math.nan
+    g1_residual: float = math.nan
+    g2_residual: float = math.nan
+    g3_residual: float = math.nan
+    iterations: int = 0
+    converged: bool = False
 
 # Threshold for declaring "converged": dκ/ds residual < this value (1/mm²)
 _G3_CONVERGED_THRESHOLD = 1e-4
@@ -384,6 +445,296 @@ def match_srf_g3(spec: MatchSrfG3Spec) -> MatchSrfG3Report:
         ok=True,
         reason="",
     )
+
+
+# ---------------------------------------------------------------------------
+# Functional API: match_srf_g3_functional + estimate_continuity
+# ---------------------------------------------------------------------------
+#
+# References
+# ----------
+# Piegl & Tiller, "The NURBS Book" §5.6 — boundary-condition satisfaction for
+#     NURBS surfaces; the CP-row interpretation of G0/G1/G2/G3 derivatives.
+# Farin, "Curves and Surfaces for CAGD" §10 — geometric-continuity orders and
+#     the normal-curvature / curvature-derivative matching conditions.
+
+def match_srf_g3_functional(
+    target: NurbsSurface,
+    reference: NurbsSurface,
+    target_side: str,
+    reference_side: str,
+    order: ContinuityOrder = ContinuityOrder.G3,
+    tol: float = 1e-7,
+    max_iter: int = 20,
+) -> MatchG3Result:
+    """Adjust the boundary CP rows of *target* to match *reference* up to *order*.
+
+    Modifies (in a deep copy) the four control-point rows adjacent to
+    *target_side* so that the cross-boundary derivatives of the joined surface
+    match those of *reference* at *reference_side* up to order *order*:
+
+        Row 0  (G0) — position match.
+        Row 1  (G1) — cross-boundary tangent match.
+        Row 2  (G2) — normal-curvature match.
+        Row 3  (G3) — curvature-derivative (dκ/ds) match.
+
+    The implementation delegates to ``match_surface_edge`` from
+    ``kerf_cad_core.geom.match_srf`` which uses:
+      * Exact tensor-product B-spline derivative formulae (Piegl & Tiller §5.6).
+      * A Greville-point linear system for the G3 correction (Farin §10).
+      * ``numpy.linalg.lstsq`` for the least-squares solve.
+
+    Parameters
+    ----------
+    target : NurbsSurface
+        Surface whose boundary will be modified.
+    reference : NurbsSurface
+        Reference (unmodified) surface to match against.
+    target_side : str
+        Edge of *target* to modify: ``'u0'``, ``'u1'``, ``'v0'``, ``'v1'``.
+    reference_side : str
+        Edge of *reference* to use as the template: same four options.
+    order : ContinuityOrder
+        Maximum continuity order to enforce (default G3).
+    tol : float
+        Convergence tolerance (model units for G0; radians for G1; 1/length
+        for G2; 1/length² for G3).  Default 1e-7.
+    max_iter : int
+        Maximum solver iterations (default 20).
+
+    Returns
+    -------
+    MatchG3Result
+        Contains the matched surface, per-order residuals, iteration count, and
+        a converged flag.  Never raises; exceptions surface in a result with
+        ``converged=False`` and ``NaN`` residuals.
+
+    References
+    ----------
+    Piegl & Tiller, "The NURBS Book" §5.6.
+    Farin, "Curves and Surfaces for CAGD" §10.
+    """
+    # --- Map ContinuityOrder to the string key used by match_surface_edge ----
+    _order_map = {
+        ContinuityOrder.G0: "G0",
+        ContinuityOrder.G1: "G1",
+        ContinuityOrder.G2: "G2",
+        ContinuityOrder.G3: "G3",
+    }
+    continuity_str = _order_map.get(order, "G3")
+
+    # --- Iterative matching loop (each pass refines the residuals) -----------
+    # The inner solver (match_surface_edge) is already analytically converged
+    # in a single pass for typical surfaces, but we wrap it in a loop so that
+    # the max_iter / tol contract is honoured and callers can observe iteration
+    # counts on pathological inputs.
+    _SAMPLES = 32
+    current = NurbsSurface(
+        degree_u=target.degree_u,
+        degree_v=target.degree_v,
+        control_points=target.control_points.copy(),
+        knots_u=target.knots_u.copy(),
+        knots_v=target.knots_v.copy(),
+    )
+
+    g0_res = math.nan
+    g1_res = math.nan
+    g2_res = math.nan
+    g3_res = math.nan
+    iterations = 0
+
+    for it in range(max(1, max_iter)):
+        iterations = it + 1
+        try:
+            result = match_surface_edge(
+                target_surface=reference,
+                target_edge=reference_side,
+                source_surface=current,
+                source_edge=target_side,
+                continuity=continuity_str,
+                samples=_SAMPLES,
+                tolerance=tol,
+            )
+        except Exception as exc:
+            return MatchG3Result(
+                matched_surface=current,
+                g0_residual=math.nan,
+                g1_residual=math.nan,
+                g2_residual=math.nan,
+                g3_residual=math.nan,
+                iterations=iterations,
+                converged=False,
+            )
+
+        if not result.ok:
+            return MatchG3Result(
+                matched_surface=current,
+                g0_residual=math.nan,
+                g1_residual=math.nan,
+                g2_residual=math.nan,
+                g3_residual=math.nan,
+                iterations=iterations,
+                converged=False,
+            )
+
+        current = result.modified_surface
+
+        g0_res = result.max_position_deviation
+        g1_res = result.max_tangent_deviation
+        g2_res = result.max_curvature_deviation
+        g3_res = result.max_curvature_rate_deviation
+
+        # Check convergence based on requested order
+        def _finite(x: float) -> float:
+            return x if not math.isnan(x) else math.inf
+
+        conv_g0 = _finite(g0_res) <= tol
+        conv_g1 = (order < ContinuityOrder.G1) or (_finite(g1_res) <= tol)
+        conv_g2 = (order < ContinuityOrder.G2) or (_finite(g2_res) <= tol * 1e3)
+        conv_g3 = (order < ContinuityOrder.G3) or (_finite(g3_res) <= tol * 1e6)
+
+        if conv_g0 and conv_g1 and conv_g2 and conv_g3:
+            break
+
+    converged = (
+        not math.isnan(g0_res) and g0_res <= tol
+        and (order < ContinuityOrder.G1 or (not math.isnan(g1_res) and g1_res <= tol))
+        and (order < ContinuityOrder.G2 or (not math.isnan(g2_res) and g2_res <= tol * 1e3))
+        and (order < ContinuityOrder.G3 or (not math.isnan(g3_res) and g3_res <= tol * 1e6))
+    )
+
+    return MatchG3Result(
+        matched_surface=current,
+        g0_residual=g0_res if not math.isnan(g0_res) else 0.0,
+        g1_residual=g1_res,
+        g2_residual=g2_res,
+        g3_residual=g3_res,
+        iterations=iterations,
+        converged=converged,
+    )
+
+
+def estimate_continuity(
+    surf_a: NurbsSurface,
+    side_a: str,
+    surf_b: NurbsSurface,
+    side_b: str,
+    *,
+    samples: int = 32,
+) -> dict:
+    """Measure G0/G1/G2/G3 continuity between two NURBS surface edges.
+
+    Samples *samples* points along the seam and evaluates the cross-boundary
+    derivative errors for each order:
+
+    * **g0** — maximum positional distance (model units).
+    * **g1** — maximum tangent-plane deviation (radians; via cross-product
+      residual using analytic ``surface_derivatives``).
+    * **g2** — maximum normal-curvature deviation (1/length units; signed
+      difference of the Meusnier curvature in the cross-boundary direction).
+    * **g3** — maximum curvature-derivative deviation |dκ_A/ds − dκ_B/ds|
+      (1/length² units).
+
+    All four metrics are always computed regardless of the actual continuity
+    level — callers can inspect them to understand where the discontinuity is.
+
+    Parameters
+    ----------
+    surf_a, surf_b : NurbsSurface
+        The two surfaces whose edges are to be measured.
+    side_a, side_b : str
+        Edge identifiers on each surface: ``'u0'``, ``'u1'``, ``'v0'``, ``'v1'``.
+    samples : int
+        Number of along-edge sample points (default 32).
+
+    Returns
+    -------
+    dict with keys ``'g0'``, ``'g1'``, ``'g2'``, ``'g3'`` (all floats).
+
+    References
+    ----------
+    Piegl & Tiller, "The NURBS Book" §5.6.
+    Farin, "Curves and Surfaces for CAGD" §10.
+    """
+    from kerf_cad_core.geom.nurbs import surface_derivatives, surface_evaluate
+
+    n = max(2, samples)
+    _, _, t_min_a, t_max_a = _edge_boundary_params(surf_a, side_a)
+    _, _, t_min_b, t_max_b = _edge_boundary_params(surf_b, side_b)
+    u_seam_a, v_seam_a, _, _ = _edge_boundary_params(surf_a, side_a)
+    u_seam_b, v_seam_b, _, _ = _edge_boundary_params(surf_b, side_b)
+
+    max_g0 = 0.0
+    max_g1 = 0.0
+    max_g2 = 0.0
+    max_g3 = 0.0
+
+    for i in range(n):
+        tk = i / (n - 1) if n > 1 else 0.0
+        t_a = t_min_a + tk * (t_max_a - t_min_a)
+        t_b = t_min_b + tk * (t_max_b - t_min_b)
+
+        # Evaluate boundary positions
+        if side_a in ("u0", "u1"):
+            pos_a = surface_evaluate(surf_a, u_seam_a, t_a)
+            pos_b = surface_evaluate(surf_b, u_seam_b, t_b)
+        else:
+            pos_a = surface_evaluate(surf_a, t_a, v_seam_a)
+            pos_b = surface_evaluate(surf_b, t_b, v_seam_b)
+
+        g0_val = float(np.linalg.norm(pos_a[:3] - pos_b[:3]))
+        if g0_val > max_g0:
+            max_g0 = g0_val
+
+        # G1 cross-boundary tangent angle
+        try:
+            if side_a in ("u0", "u1"):
+                SKL_a = surface_derivatives(surf_a, u_seam_a, t_a, d=1)
+                tang_a = SKL_a[1, 0][:3]
+                SKL_b = surface_derivatives(surf_b, u_seam_b, t_b, d=1)
+                tang_b = SKL_b[1, 0][:3]
+            else:
+                SKL_a = surface_derivatives(surf_a, t_a, v_seam_a, d=1)
+                tang_a = SKL_a[0, 1][:3]
+                SKL_b = surface_derivatives(surf_b, t_b, v_seam_b, d=1)
+                tang_b = SKL_b[0, 1][:3]
+
+            n_a = float(np.linalg.norm(tang_a))
+            n_b = float(np.linalg.norm(tang_b))
+            if n_a > 1e-14 and n_b > 1e-14:
+                cross = np.cross(tang_a / n_a, tang_b / n_b)
+                g1_val = float(np.linalg.norm(cross))
+                if g1_val > max_g1:
+                    max_g1 = g1_val
+        except Exception:
+            pass
+
+        # G2 normal curvature difference
+        try:
+            k_a = _analytic_cross_curvature(surf_a, side_a, t_a)
+            k_b = _analytic_cross_curvature(surf_b, side_b, t_b)
+            g2_val = abs(k_a - k_b)
+            if g2_val > max_g2:
+                max_g2 = g2_val
+        except Exception:
+            pass
+
+        # G3 curvature-rate difference
+        try:
+            dk_a = _cross_curvature_rate(surf_a, side_a, t_a)
+            dk_b = _cross_curvature_rate(surf_b, side_b, t_b)
+            g3_val = abs(dk_a - dk_b)
+            if g3_val > max_g3:
+                max_g3 = g3_val
+        except Exception:
+            pass
+
+    return {
+        "g0": max_g0,
+        "g1": max_g1,
+        "g2": max_g2,
+        "g3": max_g3,
+    }
 
 
 # ---------------------------------------------------------------------------

@@ -624,6 +624,10 @@ _TOOL_MODULES = [
     # Wave 8: viewport LOD bridge (Clark 1976 hierarchical LOD; Akenine-Möller §19.9)
     # LLM tool: assembly_plan_viewport_lods
     "kerf_cad_core.assembly.lod_viewport_tools",
+    # Wave 9A: assembly motion interference sweep
+    "kerf_cad_core.brep.motion_interference_tools",
+    # Wave 9A: LAS / E57 point cloud readers
+    "kerf_cad_core.scan.las_e57_tools",  # scan_load_las + scan_load_e57
 ]
 # NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
 # (already in _TOOL_MODULES above at line 128); sagitta_arrow_chart module is imported

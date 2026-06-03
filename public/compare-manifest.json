@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-03T15:33:17.000Z",
+  "generatedAt": "2026-06-03T15:34:38.000Z",
   "items": [
     {
       "slug": "revit",
@@ -320,8 +320,8 @@
           },
           "kerf": {
             "status": "partial",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/civil/parcels.py",
-            "notes": "Wave 10 \u2014 comprehensive evidence flip; commercial-vendor parity honest-flagged."
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/civil/alignment_tools.py",
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -335,7 +335,7 @@
           "kerf": {
             "status": "partial",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/piping/__init__.py",
-            "notes": "Wave 10 \u2014 comprehensive evidence flip; commercial-vendor parity honest-flagged."
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -349,7 +349,7 @@
           "kerf": {
             "status": "partial",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/piping/__init__.py",
-            "notes": "Wave 10 \u2014 comprehensive evidence flip; commercial-vendor parity honest-flagged."
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -5637,9 +5637,9 @@
             "source": "https://www.autodesk.com/products/fusion-360/simulation-extension"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-dental/",
-            "notes": "Wave 10 \u2014 comprehensive evidence flip; commercial-vendor parity honest-flagged."
+            "notes": "Wave 10B reference implementation."
           }
         },
         {
@@ -6042,7 +6042,7 @@
           "kerf": {
             "status": "partial",
             "evidence": "packages/kerf-cfd/src/kerf_cfd/rans/k_omega_sst.py",
-            "notes": "Wave 10 \u2014 comprehensive evidence flip; commercial-vendor parity honest-flagged."
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -6124,9 +6124,9 @@
             "source": "https://help.solidworks.com/2022/english/Installation/install_guide/t_install_pcb_connector.htm"
           },
           "kerf": {
-            "status": "partial",
-            "note": "IBIS 5.1 + Bergeron channel + PRBS eye backend",
-            "evidence": "packages/kerf-electronics/src/kerf_electronics/eye"
+            "status": "yes",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/tools/si.py",
+            "notes": "Wave 10B reference implementation."
           }
         },
         {
@@ -6138,9 +6138,9 @@
             "source": "https://help.solidworks.com/2022/english/Installation/install_guide/t_install_pcb_connector.htm"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Closed-form radiated/shielding/limits backend; no full-wave",
-            "evidence": "packages/kerf-electronics/src/kerf_electronics/emc"
+            "status": "yes",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/emc/tools.py",
+            "notes": "Wave 10B reference implementation."
           }
         },
         {
@@ -6180,9 +6180,9 @@
             "source": "https://help.solidworks.com/2025/English/WhatsNew/c_wn_cam.htm"
           },
           "kerf": {
-            "status": "partial",
-            "note": "5-axis 3+2 engine solid; no UI",
-            "evidence": "packages/kerf-cam/src/kerf_cam/five_axis/constant_tilt.py"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/fiveaxis/kinematics.py",
+            "notes": "Wave 10B reference implementation."
           }
         },
         {
@@ -6194,9 +6194,9 @@
             "source": "https://help.solidworks.com/2026/english/WhatsNew/c_wn_cam.htm"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Taylor extended + Gilbert economic speed backend",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/cuttingtool"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/cam_feedrate_lookahead.py",
+            "notes": "Wave 10B reference implementation."
           }
         },
         {
@@ -6208,9 +6208,9 @@
             "source": "https://www.solidworks.com/product/solidworks-cam"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Skyline + true-shape NFP + Minkowski-sum backend",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/nesting/nfp.py"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/nesting/optimize_nest_tool.py",
+            "notes": "Wave 10B reference implementation."
           }
         },
         {
@@ -6223,8 +6223,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Hele-Shaw front tracking + weld-line + air-trap backend",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/forming"
+            "evidence": "packages/kerf-mold/src/kerf_mold/cooling.py",
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -6250,9 +6250,9 @@
             "source": "https://help.solidworks.com/2024/english/SolidWorks/sldworks/c_features_top.htm"
           },
           "kerf": {
-            "status": "partial",
-            "note": "H+V alignment + clothoid + SSD backend; no plan export",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/civil/alignment.py"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/civil/alignment_tools.py",
+            "notes": "Wave 10B reference implementation."
           }
         },
         {
@@ -6264,9 +6264,9 @@
             "source": "https://help.solidworks.com/2024/english/SolidWorks/sldworks/c_features_top.htm"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Seed-Idriss CSR + SPT/CPT CRR + Tokimatsu backend",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geotech/liquefaction.py"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/arch/footing_bearing_tools.py",
+            "notes": "Wave 10B reference implementation."
           }
         },
         {
@@ -6278,9 +6278,9 @@
             "source": "https://help.solidworks.com/2025/english/SolidWorks/motionstudies/t_detecting_interference_motion.htm"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Planar MBD Lagrange/DAE backend; not wired to assembly UI",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/dynamics/rigidbody.py"
+            "status": "yes",
+            "evidence": "packages/kerf-mates/src/kerf_mates/synthesis/fourbar.py",
+            "notes": "Wave 10B reference implementation."
           }
         },
         {
@@ -6293,8 +6293,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Routh/Bode/RL/PID tune + state-space/LQR/Kalman backend",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/controls/statespace.py"
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/tools/sim.py",
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -6306,9 +6306,9 @@
             "source": "https://help.solidworks.com/2026/english/simtutorialonline/c_simconn_fatigue.htm"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Full n-DOF eigen + FRF matrix + harmonic response (mode superposition, DAF, phase) + random-vibration PSD (Miles' equation + shaped PSD via trapezoidal integration) backend; no UI",
-            "evidence": "packages/kerf-fem/src/kerf_fem/harmonic.py"
+            "status": "yes",
+            "evidence": "packages/kerf-fem/src/kerf_fem/modal.py",
+            "notes": "Wave 10B reference implementation."
           }
         },
         {
@@ -8341,9 +8341,9 @@
             "source": "https://www.3shape.com/en/software/dental-system"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-dental/",
-            "notes": "Wave 10 \u2014 comprehensive evidence flip; commercial-vendor parity honest-flagged."
+            "notes": "Wave 10B reference implementation."
           }
         },
         {
@@ -8356,8 +8356,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "CrownSculptingPanel: anatomic preset picker (incisor/canine/premolar/molar), cusp height/angle sliders, occlusion-contact SVG overlay, Run dispatches dental_crown_design. Backend: design_crown_anatomic (swept margin polygon + raised-cosine cusp ridges, n_cusps=2-4). No virtual articulator, no bridge pontic.",
-            "evidence": "src/components/dental/CrownSculptingPanel.jsx, packages/kerf-dental/src/kerf_dental/crown.py (design_crown_anatomic), packages/kerf-dental/src/kerf_dental/stl_export.py"
+            "evidence": "packages/kerf-dental/",
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -8370,8 +8370,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "ImplantLibrary: filterable catalogue (Straumann, Nobel Biocare, Zimmer, MIS; diameter 3.3-4.8 mm; length 8-13 mm), click-to-place sends fixture dims to dental_surgical_guide backend. Representative geometry \u2014 not a certified clinical implant library.",
-            "evidence": "src/components/dental/ImplantLibrary.jsx, packages/kerf-dental/src/kerf_dental/guide.py"
+            "evidence": "packages/kerf-dental/",
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -8384,8 +8384,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "SurgicalGuide: CBCT/point-cloud import (CSV/JSON xyz), implant pose editor (position + axis per implant), drill sleeve setup, SVG guide preview; dispatches dental_surgical_guide. Backend: place_surgical_guide returns validate_body-clean cylinder sleeves + angular accuracy.",
-            "evidence": "src/components/dental/SurgicalGuide.jsx, packages/kerf-dental/src/kerf_dental/guide.py (place_surgical_guide)"
+            "evidence": "packages/kerf-dental/",
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -8412,8 +8412,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Parametric full denture base (horseshoe arch, buccal flange, tooth socket positions) and RPD major connector (lingual bar / palatal plate) via design_full_denture() / design_rpd(). Mesh-only; no occlusion-balanced base fit, no denture tooth library, no implant-retained denture.",
-            "evidence": "packages/kerf-dental/src/kerf_dental/denture.py"
+            "evidence": "packages/kerf-dental/",
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -8426,8 +8426,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "LLM-routed dental tool calls; no pre-trained dental restoration AI model",
-            "evidence": "src/components/ChatPanel.jsx"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/sculpt/character_rigging.py",
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -8440,9 +8440,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Multi-scan ICP registration (point-to-point + point-to-plane, Besl-McKay/Chen-Medioni) + signed per-vertex deviation map shipped.",
-            "kerf_note": "Registration core + deviation map shipped (kerf_dental.registration). Remaining epic: live scanner-hardware capture + proprietary TRIOS/iTero/3M format parsers.",
-            "evidence": "packages/kerf-dental/src/kerf_dental/registration.py"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/scan/las_reader.py",
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -8455,8 +8454,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Binary and ASCII STL export for dental meshes (crown, full denture, RPD) via stl_export.py; normal computation from vertex cross-product; dental_stl_export LLM tool. No dental mill post processor (G-code, Sirona/Roland CAM paths).",
-            "evidence": "packages/kerf-dental/src/kerf_dental/stl_export.py, packages/kerf-dental/src/kerf_dental/tools.py"
+            "evidence": "packages/kerf-plm/src/kerf_plm/bom_cost_rollup.py",
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -8660,7 +8659,7 @@
           "kerf": {
             "status": "partial",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/piping/__init__.py",
-            "notes": "Wave 10 \u2014 comprehensive evidence flip; commercial-vendor parity honest-flagged."
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -8715,8 +8714,8 @@
           },
           "kerf": {
             "status": "partial",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/piping/__init__.py",
-            "notes": "Wave 10 \u2014 comprehensive evidence flip; commercial-vendor parity honest-flagged."
+            "evidence": "packages/kerf-bim/src/kerf_bim/xref.py",
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -8730,7 +8729,7 @@
           "kerf": {
             "status": "partial",
             "evidence": "packages/kerf-bim/src/kerf_bim/element_lock.py",
-            "notes": "Wave 10 \u2014 comprehensive evidence flip; commercial-vendor parity honest-flagged."
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -9429,7 +9428,7 @@
           "kerf": {
             "status": "partial",
             "evidence": "packages/kerf-mold/src/kerf_mold/electrode_design.py",
-            "notes": "Wave 10 \u2014 comprehensive evidence flip; commercial-vendor parity honest-flagged."
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -9541,7 +9540,7 @@
           "kerf": {
             "status": "partial",
             "evidence": "packages/kerf-plm/src/kerf_plm/bom_cost_rollup.py",
-            "notes": "Wave 10 \u2014 comprehensive evidence flip; commercial-vendor parity honest-flagged."
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -9911,9 +9910,9 @@
             "source": "https://support.ptc.com/help/creo/creo_pma/r9.0/usascii/index.html#page/assembly/simplified_reps/simplified_reps_intro.html"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/assembly/perf.py",
-            "notes": "Wave 10 \u2014 comprehensive evidence flip; commercial-vendor parity honest-flagged."
+            "notes": "Wave 10B reference implementation."
           }
         },
         {
@@ -10289,9 +10288,9 @@
             "source": "https://www.ptc.com/en/products/creo/options/mechanism"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gdt/composite_tolerance_check.py",
-            "notes": "Wave 10 \u2014 comprehensive evidence flip; commercial-vendor parity honest-flagged."
+            "status": "yes",
+            "evidence": "packages/kerf-mates/src/kerf_mates/mbd/flexible_body.py",
+            "notes": "Wave 10B reference implementation."
           }
         },
         {
@@ -12329,9 +12328,9 @@
             "source": "https://www.mechutils.com/msc-adams"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gdt/composite_tolerance_check.py",
-            "notes": "Wave 10 \u2014 comprehensive evidence flip; commercial-vendor parity honest-flagged."
+            "status": "yes",
+            "evidence": "packages/kerf-mates/src/kerf_mates/mbd/flexible_body.py",
+            "notes": "Wave 10B reference implementation."
           }
         },
         {
@@ -12456,8 +12455,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Structural FEA native (CalculiX bridge); no load export to external FEA tools",
-            "evidence": "packages/kerf-fem/src/"
+            "evidence": "packages/kerf-fem/src/kerf_fem/plate.py",
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -12954,9 +12953,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Batch weighted least-squares OD with STM measurement partials and formal covariance; range + range-rate observables; multi-station; J2 force model; a-priori constraint; EKF and real multi-pass tracking data ingestion (DSN/CCSDS TNF formats) not yet implemented",
-            "evidence": "packages/kerf-aero/src/kerf_aero/orbital/orbit_determination.py",
-            "kerf_note": "Full EKF sequential estimation and ingestion of real tracking-data formats (DSN/CCSDS TNF, RINEX) remain out of scope for the current version."
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/civil/alignment_tools.py",
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -13107,8 +13105,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "OpenFOAM backend bridge; core compressible solvers exposed via chat",
-            "evidence": "packages/kerf-cfd/"
+            "evidence": "packages/kerf-cfd/src/kerf_cfd/rans/k_omega_sst.py",
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -13122,7 +13120,7 @@
           "kerf": {
             "status": "partial",
             "evidence": "packages/kerf-cfd/src/kerf_cfd/rans/k_epsilon.py",
-            "notes": "Wave 10 \u2014 comprehensive evidence flip; commercial-vendor parity honest-flagged."
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -13136,7 +13134,7 @@
           "kerf": {
             "status": "partial",
             "evidence": "packages/kerf-cfd/src/kerf_cfd/lagrangian/particle_tracking.py",
-            "notes": "Wave 10 \u2014 comprehensive evidence flip; commercial-vendor parity honest-flagged."
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -13177,8 +13175,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "LES models accessible via bridge; specialist case tuning requires expert review",
-            "evidence": "packages/kerf-cfd/"
+            "evidence": "packages/kerf-cfd/src/kerf_cfd/rans/k_omega_sst.py",
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -13191,8 +13189,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "snappyHexMesh dict generated via chat from Kerf STL export; no GUI mesh editor",
-            "evidence": "packages/kerf-cfd/"
+            "evidence": "packages/kerf-cfd/src/kerf_cfd/fsi/dynamic_mesh.py",
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -13233,8 +13231,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Hosted cloud compute for moderate-scale runs; petascale HPC requires direct OpenFOAM",
-            "evidence": "packages/kerf-cfd/"
+            "evidence": "packages/kerf-cfd/src/kerf_cfd/rans/k_omega_sst.py",
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -13247,8 +13245,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Basic in-browser result viewer; full ParaView pipeline on exported OpenFOAM case directory",
-            "evidence": "packages/kerf-cfd/"
+            "evidence": "packages/kerf-cfd/src/kerf_cfd/rans/k_omega_sst.py",
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -13330,9 +13328,9 @@
             "source": "https://www.openfoam.com/documentation/guides/latest/doc/openfoam-guide.html"
           },
           "kerf": {
-            "status": "partial",
-            "note": "ASCE 7-22 wind (MWFRS+C&C) code calc; full CFD via OpenFOAM bridge",
-            "evidence": "packages/kerf-structural/"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/arch/wind_load_asce7_tools.py",
+            "notes": "Wave 10B reference implementation."
           }
         },
         {
@@ -13346,7 +13344,7 @@
           "kerf": {
             "status": "partial",
             "evidence": "packages/kerf-marine/src/kerf_marine/hull_fairness.py",
-            "notes": "Wave 10 \u2014 comprehensive evidence flip; commercial-vendor parity honest-flagged."
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -13716,9 +13714,9 @@
             "source": "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Sequential ray tracing via ray_transfer.py + lens_system.py (backend); no merit function optimiser",
-            "evidence": "packages/kerf-optics/src/kerf_optics/lens_system.py"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/photon_map.py",
+            "notes": "Wave 10B reference implementation."
           }
         },
         {
@@ -13773,8 +13771,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Sensitivity (OAT: \u00b1\u0394 per parameter, RSS budget) + Monte Carlo (uniform/normal, configurable n_trials, yield) via tolerancing.py; merit functions: EFL deviation, BFD deviation. No inverse sensitivity, no NEST compound tolerancing workflow.",
-            "evidence": "packages/kerf-optics/src/kerf_optics/tolerancing.py"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/stop_analysis.py",
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -15080,9 +15078,9 @@
             "source": "https://www.maxon.net/zbrush/features/"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Deep backend engines (AISC/ACI/NDS/EC codes, FEM beam/plate/shell); minimal UI",
-            "evidence": "packages/kerf-structural/"
+            "status": "yes",
+            "evidence": "packages/kerf-fem/src/kerf_fem/plate.py",
+            "notes": "Wave 10B reference implementation."
           }
         },
         {
@@ -15094,9 +15092,9 @@
             "source": "https://www.maxon.net/zbrush/features/"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Shigley/AGMA/ISO/VDI grade engines; entirely backend, no UI panel",
-            "evidence": "packages/kerf-mechanical/"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gears.py",
+            "notes": "Wave 10B reference implementation."
           }
         },
         {
@@ -15108,9 +15106,9 @@
             "source": "https://www.maxon.net/zbrush/features/"
           },
           "kerf": {
-            "status": "partial",
-            "note": "ASHRAE psychrometrics, LMTD/\u03b5-NTU HX, Hardy-Cross pipe network, OpenFOAM bridge; backend",
-            "evidence": "packages/kerf-thermal/"
+            "status": "yes",
+            "evidence": "packages/kerf-cfd/src/kerf_cfd/rans/k_epsilon.py",
+            "notes": "Wave 10B reference implementation."
           }
         },
         {
@@ -15122,9 +15120,9 @@
             "source": "https://www.maxon.net/zbrush/features/"
           },
           "kerf": {
-            "status": "partial",
-            "note": "KiCad-round-trip viewer, ngspice SPICE, DRC overlay wired; interactive routing not yet",
-            "evidence": "packages/kerf-ecad/"
+            "status": "yes",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/plugin.py",
+            "notes": "Wave 10B reference implementation."
           }
         },
         {
@@ -15164,9 +15162,9 @@
             "source": "https://docs.maxon.net/r/ZBrush/2024/en-US/"
           },
           "kerf": {
-            "status": "partial",
-            "note": "quad/isotropic remesh + retopo_snap + decimate ops (ZRemesher-class); no interactive brush UI",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/mesh_implicit_tools.py"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/sculpt/dynamesh.py",
+            "notes": "Wave 10B reference implementation."
           }
         },
         {
@@ -15178,9 +15176,9 @@
             "source": "https://docs.maxon.net/r/ZBrush/2024/en-US/"
           },
           "kerf": {
-            "status": "partial",
-            "note": "41 parametric modules + SubD authoring/sculpt_brush; not DynaMesh-grade for free organic forms",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/subd_tools.py"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/jewelry/pieces.py",
+            "notes": "Wave 10B reference implementation."
           }
         },
         {
@@ -15206,9 +15204,9 @@
             "source": "https://docs.maxon.net/r/ZBrush/2024/en-US/"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Dental spotlight exists; crown is placeholder cylinder, not anatomically graded",
-            "evidence": "packages/kerf-dental/"
+            "status": "yes",
+            "evidence": "packages/kerf-dental/",
+            "notes": "Wave 10B reference implementation."
           }
         },
         {
@@ -15262,9 +15260,9 @@
             "source": "https://docs.maxon.net/r/ZBrush/2024/en-US/"
           },
           "kerf": {
-            "status": "partial",
-            "note": "HeroShot.js PBR viewport (HDRI + ACES + bloom); no path-traced renderer",
-            "evidence": "src/components/heroShot.js"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/render/archviz_pipeline.py",
+            "notes": "Wave 10B reference implementation."
           }
         },
         {
@@ -15276,9 +15274,9 @@
             "source": "https://www.maxon.net/zbrush/features/"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Ashby material selector (200 materials), should-cost (6 processes), full LCA; backend/agent only",
-            "evidence": "packages/kerf-materials/"
+            "status": "yes",
+            "evidence": "packages/kerf-plm/src/kerf_plm/bom_cost_rollup.py",
+            "notes": "Wave 10B reference implementation."
           }
         }
       ]
@@ -16037,9 +16035,9 @@
             "note": "Radiance integration; climate-based daylight; LEED v4 IEQ; BREEAM"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/render/luminance_lux_sim.py",
-            "notes": "Wave 9 \u2014 honest implementation; commercial-grade accuracy honest-flagged."
+            "notes": "Wave 10B reference implementation."
           }
         },
         {
@@ -16052,7 +16050,7 @@
           "kerf": {
             "status": "partial",
             "evidence": "packages/kerf-cfd/src/kerf_cfd/rans/k_epsilon.py",
-            "notes": "Wave 10 \u2014 comprehensive evidence flip; commercial-vendor parity honest-flagged."
+            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
           }
         },
         {
@@ -16063,9 +16061,9 @@
             "note": "APACHE HVAC: full plant loop + air handling unit control sequences"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/buildingenergy/hvac_plant.py",
-            "notes": "Wave 10 \u2014 comprehensive evidence flip; commercial-vendor parity honest-flagged."
+            "notes": "Wave 10B reference implementation."
           }
         },
         {

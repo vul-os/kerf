@@ -99,6 +99,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.marine.tools",
     "kerf_cad_core.scan.tools",
     "kerf_cad_core.scan.nurbs_fit_tools",    # scan_fit_nurbs_surface — NURBS freeform fit
+    # Wave 8D: RE freeform NURBS fit
+    "kerf_cad_core.reverse_engineering.tools",  # re_fit_freeform_nurbs — freeform cluster → NURBS (P&T §9.2/§9.4 + Hausdorff oracle)
     "kerf_cad_core.gdt_callouts.tools",
     "kerf_cad_core.family.tools",
     "kerf_cad_core.shaft.tools",

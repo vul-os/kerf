@@ -135,6 +135,36 @@ const PANELS = [
       'NURBS surfacing, Class-A G2/G3 blends, 5-axis CAM, SubD authoring, and full parametric feature tree inside the editor — 80+ tools.',
     cta: 'Open editor',
   },
+  {
+    slug: 'configurator',
+    name: 'PLM Configurator',
+    Icon: Cpu,
+    accent: 'kerf',
+    route: '/configurator',
+    toolCount: 6,
+    blurb:
+      'Variant BOM configurator — rule-driven option selection, BOM diff, part-number generation, and costing rollup for product families.',
+  },
+  {
+    slug: 'sysml-trace',
+    name: 'SysML Traceability',
+    Icon: Activity,
+    accent: 'cyan',
+    route: '/sysml-trace',
+    toolCount: 4,
+    blurb:
+      'Requirement-to-test traceability matrix, SysML block diagram import, coverage gap analysis, and NASA-style verification cross-reference.',
+  },
+  {
+    slug: 'pathtracer',
+    name: 'WebGPU Path Tracer',
+    Icon: Eye,
+    accent: 'magenta',
+    route: '/pathtracer',
+    toolCount: 1,
+    blurb:
+      'Spectral WebGPU path tracer — physically-based rendering directly in the browser. HDR environment maps, glass refraction, and subsurface scattering (preview).',
+  },
 ]
 
 /* -------------------------------------------------------------------------- */

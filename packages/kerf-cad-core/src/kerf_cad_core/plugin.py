@@ -600,6 +600,30 @@ _TOOL_MODULES = [
     # Wave 8B: LSCM UV unwrap LLM tool wrapper (Lévy et al. 2002)
     # LLM tool: lscm_uv_unwrap
     "kerf_cad_core.sculpt.lscm_uv_tool",
+    # Wave 8: SubD limit tangent (Stam 1998 exact evaluation at extraordinary vertices)
+    # LLM tools: subd_limit_tangent, subd_fractional_crease, subd_multires_eval
+    "kerf_cad_core.subd.tools",
+    # Wave 8: NURBS surface analytic derivative + fundamental forms (P&T §3.3 / do Carmo §3.2)
+    # LLM tool: nurbs_surface_derivative
+    "kerf_cad_core.geom.nurbs_derivative_tools",
+    # Wave 8: B-rep HLR drawing projection (Appel 1967 QI + Markosian 1997 silhouette)
+    # LLM tool: brep_to_2d_hlr
+    "kerf_cad_core.drawings.tools",
+    # Wave 8: SDF CSG + Marching Cubes polygonizer (Lorensen-Cline 1987 / Quilez 2008)
+    # LLM tool: sdf_polygonize
+    "kerf_cad_core.sdf.tools",
+    # Wave 8: sculpt brush (grab/smooth/inflate/crease/pinch on triangle mesh)
+    # LLM tool: sculpt_apply_brush  (distinct from mesh_sculpt_brush in mesh_sculpt_brushes.py)
+    "kerf_cad_core.sculpt.tools",
+    # Wave 8: AFR parametric DAG ordering (Han-Pratt-Regli 2000 + ISO 10303-224 AP224)
+    # LLM tool: afr_topology_dag
+    "kerf_cad_core.afr.tools",
+    # Wave 8: photon-map caustic render (Jensen 1996 two-pass; Sellmeier dispersion)
+    # LLM tool: optics_render_caustic
+    "kerf_cad_core.optics.caustic_tools",
+    # Wave 8: viewport LOD bridge (Clark 1976 hierarchical LOD; Akenine-Möller §19.9)
+    # LLM tool: assembly_plan_viewport_lods
+    "kerf_cad_core.assembly.lod_viewport_tools",
 ]
 # NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
 # (already in _TOOL_MODULES above at line 128); sagitta_arrow_chart module is imported

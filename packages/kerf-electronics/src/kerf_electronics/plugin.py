@@ -220,6 +220,12 @@ def _register_tools(ctx, provides: list) -> None:
         # elec_compute_zener_drift: Vz(T)=Vz_nom+TC×(T−T_test); rZ≈0.01×Vz/Iz_test;
         #   zero-TC crossing near 5.6V (avalanche vs tunneling); drift>5%→recommend Vref IC
         "kerf_electronics.zener_tc_drift",
+        # Wave 9C: SPICE foundry sign-off (BSIM4 + corner MC + multi-syntax netlist)
+        # electronics_bsim4_iv: BSIM4.8 I-V point (Id, gm, Cgs, Vth)
+        # electronics_bsim4_corner: PVT / Monte-Carlo corner sweep (TT/SS/FF/SF/FS + temp + Pelgrom)
+        # electronics_generate_netlist: schematic → Spectre / ngspice / HSPICE netlist
+        # electronics_parse_netlist: parse SPICE netlist → structured schematic graph
+        "kerf_electronics.spice.foundry_tools",
     ]
 
     for module_path in tool_modules:

@@ -123,6 +123,25 @@ Registers:
                 1−exp(−residence_s·L/D/200); streaking risk low/moderate/
                 high; SPI LDR range 1–5 %; HONEST: mixing index is a
                 proxy — trial colour plaques + L*a*b* measurement required)
+
+# Wave 9C: Cimatron mold base + EDM electrode + wire EDM
+  - LLM tool:  mold_select_standard_base
+               (Sanford 2017 §3 + DME/Hasco/Misumi public catalogs:
+                select smallest standard mold base (TCP/A/B/BB/BC/EJ plates)
+                accommodating a given cavity; leader pins, bushings, return
+                pins, screws; HONEST: heuristic public-catalog subset — verify
+                against current vendor catalog before ordering)
+  - LLM tool:  mold_design_edm_electrode
+               (Hassan-Boothroyd 1989 §14 Table 14.3–14.4 + VDI 3402 +
+                POCO EDM-3 specs: offset cavity face by spark_gap_mm; estimate
+                burning time from MRR table; recommend current/voltage for
+                F0–F3 finish class on graphite/copper electrodes;
+                HONEST: planar-area offset approximation ±50% burn time)
+  - LLM tool:  mold_generate_wire_edm_gcode
+               (ISO 14117:2018 + Fanuc B-59064EN/01: G41/G42 cutter
+                compensation, G01/G02/G03 interpolation, M50/M51 wire feed,
+                4-axis taper XY+UV; HONEST: one pass, no skim cuts,
+                taper is radial approximation)
 """
 from __future__ import annotations
 
@@ -449,6 +468,40 @@ async def register(app: FastAPI, ctx):
         run_mold_check_surface_finish,
     )
 
+    # Wave 9C: Cimatron mold base + EDM electrode + wire EDM
+    # Register standard mold base library tool (Sanford 2017; DME/Hasco/Misumi catalogs)
+    from kerf_mold.mold_base_library_tool import (
+        mold_select_standard_base_spec,
+        run_mold_select_standard_base,
+    )
+    ctx.tools.register(
+        "mold_select_standard_base",
+        mold_select_standard_base_spec,
+        run_mold_select_standard_base,
+    )
+
+    # Register EDM electrode design tool (Hassan-Boothroyd 1989 §14; VDI 3402)
+    from kerf_mold.electrode_design_tool import (
+        mold_design_edm_electrode_spec,
+        run_mold_design_edm_electrode,
+    )
+    ctx.tools.register(
+        "mold_design_edm_electrode",
+        mold_design_edm_electrode_spec,
+        run_mold_design_edm_electrode,
+    )
+
+    # Register wire EDM G-code generator tool (ISO 14117:2018; Fanuc B-59064EN/01)
+    from kerf_mold.wire_edm_tool import (
+        mold_generate_wire_edm_gcode_spec,
+        run_mold_generate_wire_edm_gcode,
+    )
+    ctx.tools.register(
+        "mold_generate_wire_edm_gcode",
+        mold_generate_wire_edm_gcode_spec,
+        run_mold_generate_wire_edm_gcode,
+    )
+
     provides = [
         "mold.moldability",
         "mold.parting_surface",
@@ -481,6 +534,9 @@ async def register(app: FastAPI, ctx):
         "mold.tunnel_gate_design",
         "mold.color_concentrate_ratio",
         "mold.surface_finish_check",
+        "mold.mold_base_library",
+        "mold.edm_electrode_design",
+        "mold.wire_edm",
     ]
 
     try:

@@ -185,6 +185,31 @@ from kerf_mold.surface_finish_check import (
     check_surface_finish,
 )
 
+# Wave 9C: Cimatron mold base + EDM electrode + wire EDM
+from kerf_mold.mold_base_library import (
+    MoldBasePlate,
+    MoldBaseAssembly,
+    standard_mold_base,
+    list_catalog_sizes,
+    DME_CD_SERIES_SIZES_MM,
+)
+from kerf_mold.electrode_design import (
+    EdmElectrodeSpec,
+    EdmElectrodeReport,
+    design_edm_electrode,
+    FINISH_CLASS_MRR_MM3_PER_MIN,
+    FINISH_CLASS_CURRENT_A,
+    FINISH_CLASS_VOLTAGE_V,
+    ELECTRODE_WEAR_RATIO,
+)
+from kerf_mold.wire_edm import (
+    WireEdmPath,
+    WireEdmGcode,
+    generate_wire_edm_gcode,
+    rectangular_profile,
+    circular_profile,
+)
+
 __all__ = [
     # mold.py
     "Face",
@@ -343,4 +368,24 @@ __all__ = [
     "MoldSpec",
     "SurfaceFinishReport",
     "check_surface_finish",
+    # mold_base_library.py — Wave 9C
+    "MoldBasePlate",
+    "MoldBaseAssembly",
+    "standard_mold_base",
+    "list_catalog_sizes",
+    "DME_CD_SERIES_SIZES_MM",
+    # electrode_design.py — Wave 9C
+    "EdmElectrodeSpec",
+    "EdmElectrodeReport",
+    "design_edm_electrode",
+    "FINISH_CLASS_MRR_MM3_PER_MIN",
+    "FINISH_CLASS_CURRENT_A",
+    "FINISH_CLASS_VOLTAGE_V",
+    "ELECTRODE_WEAR_RATIO",
+    # wire_edm.py — Wave 9C
+    "WireEdmPath",
+    "WireEdmGcode",
+    "generate_wire_edm_gcode",
+    "rectangular_profile",
+    "circular_profile",
 ]

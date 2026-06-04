@@ -493,8 +493,9 @@ function Hero() {
             </h1>
 
             <p className="mt-4 text-lg text-ink-300 leading-relaxed max-w-xl">
-              Multi-discipline open-source CAD: parametric mechanical,
-              electronics, BIM, jewelry, all driven by chat.{' '}
+              Mechanical + BIM + Civil + Electronics + Optics + Composites +
+              Dental + Jewelry + Marine + Aerospace + 37 domains — all driven
+              by chat.{' '}
               <Link
                 to="/docs/whats-new"
                 className="text-kerf-300 underline underline-offset-2 hover:text-kerf-200 transition-colors"
@@ -514,7 +515,7 @@ function Hero() {
               </li>
               <li className="flex items-center gap-1.5">
                 <span className="w-1 h-1 rounded-full bg-kerf-300/70" />
-                Postgres-backed
+                37 domains
               </li>
               <li className="flex items-center gap-1.5">
                 <span className="w-1 h-1 rounded-full bg-kerf-300/70" />
@@ -548,11 +549,11 @@ function Hero() {
             >
               <li className="flex items-center gap-1.5">
                 <span className="w-1 h-1 rounded-full bg-ink-500" />
-                ~23,959 tests green · 0 failing
+                1265 features · 98.7% saturation vs 44 vendors
               </li>
               <li className="flex items-center gap-1.5">
                 <span className="w-1 h-1 rounded-full bg-ink-500" />
-                Python plugin monorepo
+                350+ LLM tools
               </li>
               <li className="flex items-center gap-1.5">
                 <span className="w-1 h-1 rounded-full bg-ink-500" />
@@ -1147,58 +1148,58 @@ function OutputStrip() {
 
 const SHIPPED = [
   {
-    title: 'FreeCAD Tier 2 import',
-    domain: 'Imports',
-    body: 'Sketcher constraints + Spreadsheet → .equations. TechDraw drawings → .drawing. Materials library. Completes the FreeCAD design round-trip after Tier 1 (PartDesign).',
-    docHref: '/docs/imports',
-  },
-  {
-    title: 'IFC import (Tier 1 + 2)',
-    domain: 'Architecture',
-    body: '.ifc → .bim DSL: walls / slabs / openings / spaces / levels. Tier 2: families + schedules + views. Bidirectional round-trip with existing IFC4 export.',
-    docHref: '/docs/bim-format',
-  },
-  {
-    title: 'NURBS Phase 4 — trim, matchSrf, G3 viz',
+    title: 'NURBS analytic derivatives + evolute',
     domain: 'Mechanical',
-    body: 'Trim-by-curve (C2) + matchSrf G1/G2 (C3) + curvature-comb G3 visualisation (C4). Closes out the NURBS Phase 4 surface-depth roadmap.',
+    body: 'Sturm-sequence inflection (analytic root-finding, not sampling), curve evolute (osculating-circle locus), uniform arc-length resample (5-pt Gauss-Legendre), principal curvature SVG heatmap.',
     docHref: '/docs/feature-format',
   },
   {
-    title: 'SubD with edge creases',
-    domain: 'Mechanical',
-    body: 'Catmull-Clark SubD with per-edge crease weights [0..1]. Smooth / crease / corner vertex classification. Hard-edge control without leaving SubD mode.',
-    docHref: '/docs/feature-format',
-  },
-  {
-    title: '3D-print G-code slicing',
-    domain: 'CAM',
-    body: 'Mesh → printable G-code via CuraEngine subprocess. Perimeters, infill, supports, retraction. kerf-slicing plugin; AGPLv3 extra isolated at subprocess boundary.',
+    title: 'Optics design panel — 42 tools',
+    domain: 'Optics',
+    body: 'OpticsDesignPanel.jsx: lens design, Seidel S1–S5 aberrations, diffraction MTF (mono + polychromatic + analytic-form), Zernike wavefront decomposition (36 terms), spot diagram + EE80, piston/tip/tilt alignment analysis.',
     docHref: '/docs/capabilities',
   },
   {
-    title: 'SDK: Rust + Go + Lua',
-    domain: 'Scripting',
-    body: 'kerf-sdk-rs / kerf-sdk-go / kerf-sdk-lua. Same JSON-RPC wire format as Python + TS. Targets embedded scripting in existing CAD plugin ecosystems.',
-    docHref: '/docs/v1-rpc',
+    title: 'Structural panel — ASCE / ACI / AISC',
+    domain: 'Structural',
+    body: 'StructuralPanel.jsx surfaces 24 arch_* tools across 5 tabs: beam/slab deflection, punching shear, wind loads (ASCE 7-22), base plates, bolt shear, retaining walls, pier axial, stair stringers.',
+    docHref: '/docs/capabilities',
   },
   {
-    title: 'PLC structured text (.plc.st)',
+    title: 'Composites AFP 5-axis toolpaths',
+    domain: 'Composites',
+    body: 'AFP toolpath generation with 5-axis G-code (M200/M205 fibre M-codes) and APT/CL ISO 3592 export. CLT ABD matrix, drape simulation, fiber-orientation contour heatmap. Fibersim + VeriFiber parity.',
+    docHref: '/docs/capabilities',
+  },
+  {
+    title: 'Dental implant planning + surgical guide',
+    domain: 'Dental',
+    body: 'Implant trajectory metrics (Misch 2014 / EAO): bone density D1–D4, mandibular nerve clearance, maxillary sinus floor clearance, axial alignment. Watertight surgical-guide B-rep (boolean subtract drill bores) + STL export.',
+    docHref: '/docs/capabilities',
+  },
+  {
+    title: 'Manufacturing panel — 39 mold + PCB tools',
+    domain: 'Manufacturing',
+    body: 'ManufacturingPanel.jsx: moldflow (21 tools — moldability, runner balance, cooling time, demold force) + electronics DFM (18 tools — PCB trace current, inductor saturation, optocoupler CTR, FET SOA, fuse I²t).',
+    docHref: '/docs/capabilities',
+  },
+  {
+    title: 'openEMS FDTD bridge',
     domain: 'Electronics',
-    body: 'IEC 61131-3 Structured Text editor + offline MATIEC lint. Companion to .circuit.tsx — describe ladder logic alongside the PCB it controls.',
+    body: 'Export PCB microstrip/stripline to CSXCAD/FDTD XML for openEMS full-wave simulation. Gaussian pulse excitation, 8-cell PML boundaries, rectilinear mesh, port probes. FILE EXPORT ONLY — invoke openEMS separately.',
     docHref: '/docs/electronics',
   },
   {
-    title: 'Quad remesher',
-    domain: 'Mechanical',
-    body: 'Quad-dominant remeshing via Instant Meshes. Distinct from the triangle mesh.remesh op — produces structured quads for SubD prep and FEM meshing.',
+    title: 'GDT composite position (ASME Y14.5-2018)',
+    domain: 'Tolerancing',
+    body: 'Two-tier PLTZF / FRTZF evaluation for feature patterns. MMC bonus per §4.5. Per-feature diametral deviation check + centroid-shift FRTZF residual check. 34 hermetic tests.',
     docHref: '/docs/capabilities',
   },
   {
-    title: 'Persistent face naming — complete',
-    domain: 'Mechanical',
-    body: 'All 7 tasks shipped: face-name emission, role taxonomy, boolean carry-over, pattern propagation, mate-ref migration, resolveFaceRef name-first fallback, DB backfill.',
-    docHref: '/docs/feature-format',
+    title: 'Compare matrix — 1265 features, 46 vendors',
+    domain: 'Compare',
+    body: '876 yes / 143 partial across 1,265 feature rows in 46 competitor pages (86.0% saturation). 13 rows flipped partial→yes in the latest pass: 5-axis CAM, NURBS MatchSrf G3, structural panel, optics sequential ray-trace.',
+    docHref: '/compare',
   },
 ]
 
@@ -1651,9 +1652,9 @@ function Compare() {
 
 const META_TITLE = 'Kerf — multi-discipline open-source CAD, chat-driven'
 const META_DESCRIPTION =
-  'Parametric mechanical, electronics, BIM, jewelry CAD in one MIT open-core ' +
-  'workspace. Chat-driven feature tree, OCCT B-rep, in-box CAM + FEA + ' +
-  'schematic + PCB + SI/EMC, IFC4, kerf-sdk on PyPI. Free local, hosted credits.'
+  'Mechanical + BIM + Civil + Electronics + Optics + Composites + Dental + ' +
+  'Jewelry + Marine + Aerospace + 37 domains in one MIT open-core workspace. ' +
+  'Chat-driven OCCT B-rep, CAM, FEA, PCB, IFC4, kerf-sdk. 1265 features tracked. Free local, hosted credits.'
 const META_OG_IMAGE = 'https://kerf.sh/og/landing.png'
 const META_URL = 'https://kerf.sh/'
 

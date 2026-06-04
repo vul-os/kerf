@@ -104,3 +104,5 @@ def _register_tools(ctx, provides: list) -> None:
     provides.append("bim.text-dsl")
     provides.append("bim.revit-parity")
     provides.append("bim.site-toposolid")
+    # Wave 12B: AVEVA E3D parity (piping catalog + multi-discipline + concurrent)
+    provides.append("bim.aveva-e3d-parity")

@@ -4,7 +4,7 @@
 
 # Kerf
 
-**Chat-driven, multi-discipline CAD across 22 engineering domains — mechanical, electronics, BIM, aerospace, silicon, civil, piping, mold, packaging, and more — MIT open-core.**
+**Chat-driven, multi-discipline CAD across 37 engineering domains — mechanical, BIM, civil, electronics, optics, composites, dental, jewelry, marine, aerospace, silicon, firmware, controls, and more — MIT open-core.**
 
 JSCAD code · OpenCascade B-rep features · planegcs sketcher · tscircuit electronics · TechDraw drawings · assemblies · library + BOM · workshop sharing · workspace billing — with an LLM editing the source for you.
 
@@ -36,7 +36,7 @@ JSCAD code · OpenCascade B-rep features · planegcs sketcher · tscircuit elect
 
 ## What it is
 
-A single workspace for 22 engineering domains — mechanical, electronics / PCB / silicon, structural / FEA, thermal / fluid / HVAC, aerospace / marine / space, manufacturing / CAM, civil / geotechnical / hydraulics, dynamics / controls, electrical / PLC / firmware, tolerancing / QA, optics / acoustics, jewelry, BIM, cost / materials / LCA, injection mold, piping / P&ID, packaging / dieline, and more — written entirely in code (JSCAD / `.feature` JSON / `.circuit.tsx` / `.sketch` / `.drawing`) so an LLM can read, diff, and edit it. Multi-domain projects via free-form tags. Browser-native. Local install or hosted at [kerf.sh](https://kerf.sh).
+A single workspace for 37 engineering domains — mechanical, electronics / PCB / silicon, structural / FEA, thermal / fluid / HVAC, aerospace / marine / space, manufacturing / CAM, civil / geotechnical / hydraulics, dynamics / controls, electrical / PLC / firmware, tolerancing / QA, optics / acoustics, jewelry, BIM, cost / materials / LCA, injection mold, piping / P&ID, packaging / dieline, dental, composites, horology, and more — written entirely in code (JSCAD / `.feature` JSON / `.circuit.tsx` / `.sketch` / `.drawing`) so an LLM can read, diff, and edit it. Multi-domain projects via free-form tags. Browser-native. Local install or hosted at [kerf.sh](https://kerf.sh).
 
 ## Why
 
@@ -47,27 +47,36 @@ A single workspace for 22 engineering domains — mechanical, electronics / PCB 
 - **Open source** — MIT for the core. The hosted-tier plugins (`kerf-billing`, `kerf-cloud`) are proprietary but separable; everything else self-hosts MIT.
 - **Local-first** — no telemetry, no phone-home. The hosted tier exists for convenience, not lock-in.
 
-## Coverage
+## What shipped recently (Waves 8–12)
 
-Kerf tracks feature parity against 39 professional CAD / CAE / EDA tools in [`docs/domain_depth.md`](./docs/domain_depth.md). That file is updated in the same PR as the corresponding code change and includes a checkbox-level audit of every shipped capability.
+These are the major capabilities that landed across the most recent development waves:
 
-Recent additions (2026-05-24):
+- **NURBS kernel depth** — analytic curve derivatives (Sturm inflection, evolute, arc-length), MatchSrf G3 continuity, surface-direct booleans, trim-by-curve, Stam limit-tangents + G1 at extraordinary SubD points, surface offset (Tiller-Hanson), iso-curve extraction, principal curvature heatmaps.
+- **Optics panel** — `OpticsDesignPanel.jsx` wires 42 optics tools into 5 tabs: lens design, Seidel aberrations, diffraction MTF (mono + polychromatic + analytic-form), spot diagram + encircled energy, Zernike wavefront decomposition, piston/tip/tilt/defocus alignment analysis, pupil/vignetting tools, Schmidt corrector design.
+- **Structural panel** — `StructuralPanel.jsx` surfaces 24 arch_* tools (ASCE 7-22 / ACI 318-19 / AISC 360-22 / TMS 402-22): beam/slab deflection, punching shear, wind loads, connections, base plates, retaining walls, stair stringers.
+- **Manufacturing panel** — `ManufacturingPanel.jsx` wires 39 mold + electronics manufacturing-prep tools: moldflow checks, cooling pressure-drop, demold force, PCB trace current, differential-pair skew, FET SOA, inductor saturation, optocoupler CTR, EMI filter design, fuse I²t.
+- **Composites depth** — AFP toolpath generation (5-axis G-code + APT export), CLT ABD matrix, drape simulation, fiber-orientation contour heatmap; full `LaminateStackup` UI.
+- **Dental vertical** — anatomic multi-cusp crown, implant trajectory planning (Misch 2014 / EAO bone density D1–D4, nerve/sinus clearance), watertight surgical-guide B-rep + STL, occlusal contact analysis, full crown/implant/guide UI panels.
+- **Electronics depth** — openEMS FDTD bridge for PCB microstrip/stripline, optocoupler CTR analysis (IEC 60747-5-5), inductor core saturation (temperature derating), GDT composite position tolerance (ASME Y14.5-2018 §10.5), IBIS-AMI signal integrity, AC PDN impedance sweep, arc-flash (IEEE 1584).
+- **Controls / motion** — Adams MBD parity: multibody dynamics (rigid bodies + joints + RK4), 6 joint types, IK/FK, cam profiles, gear trains with undercutting checks, robot trajectory YAML export.
+- **Civil / geotechnical** — LandXML 1.2 I/O, pressurised water-distribution (Hazen-Williams + Darcy-Weisbach), gravity sewer / storm drainage, Manning partial-flow, rational-method hydrographs + detention pond routing.
+- **Compare coverage** — 876 yes / 143 partial across 1,265 feature rows in 46 competitor pages (86.0% saturation); 350+ LLM tools registered; 37 domains.
 
-- **Structural codes** — full Eurocode EC2/3/5/8 + AISC 360-22 (members + connections) + ACI 318-19 (flexure / shear / PM / punching shear / torsion) + NDS 2018 timber + ASCE 7-22 (LRFD+ASD, ELF, RSA SRSS+CQC, Newmark time-history) + AISI S100-16 cold-formed steel (flexure / web crippling / compression) + TMS 402 masonry ASD (flexure / shear / axial).
-- **FEM dynamics** — linear buckling (geometric stiffness, iterative Krylov solver); harmonic / frequency-response analysis (direct and modal superposition); random-vibration PSD (Miles' equation + full spectral integration) — all in addition to the existing linear-static / modal / thermal / nonlinear solvers.
-- **Native FE** — MITC4 (Bathe-Dvorkin) plate/shell element with consistent mass + modal via inverse iteration; 2D/3D frame stiffness solver; geotech liquefaction (Seed-Idriss); multi-axial fatigue (Findley / SWT / Brown-Miller).
-- **Civil hydraulics** — LandXML 1.2 I/O (alignment / TIN / parcel round-trip); steady-state pressurised water-distribution network (Hazen-Williams + Darcy-Weisbach); gravity sewer / drainage (Manning full-pipe + partial-flow); storm-water routing (rational method + time-area hydrograph + detention pond routing).
-- **Machine elements** — ISO 6336 gear rating (Method B), ISO/TS 16281 bearing aISO life modification, planetary gearbox (3 Willis modes + compound).
-- **Thermo-fluid** — IAPWS-IF97 steam properties (Regions 1/2/4, validated to <1e-3 vs reference tables), Bell-Delaware shell-and-tube HX, transient pipe-network (MOC waterhammer), ASHRAE CLTD/RTS transient cooling loads.
-- **Electronics depth** — IBIS-AMI signal integrity (Bergeron channel + PRBS eye), AC PDN impedance sweep, AC load-flow (Newton-Raphson, 3+5-bus validated), protection coordination (IEC 60255 + IEEE C37.112), arc-flash (IEEE 1584), photonics fibre link budget.
-- **Aero / marine / space** — 3D VLM with viscous strip drag + Prandtl-Glauert/Kármán-Tsien compressibility, strip-theory seakeeping RAOs (Wigley validated), Holtrop-Mennen naval resistance, multi-revolution Lambert (Izzo 2015), 6-DOF flight dynamics + ADCS.
-- **Manufacturing depth** — adaptive/trochoidal CAM (HSM), Taylor extended tool-life + Gilbert economics, moldflow Hele-Shaw front tracking (weld-line + air-trap), casting Chvorinov/risers/gating, NFP (Minkowski-sum) polygon nesting, sheet-metal bend table (K-factor/BD/spring-back).
-- **Verticals** — dental anatomic multi-cusp crown, horology Swiss escapement + mainspring + balance oscillator (isochronism), photovoltaic partial shading + bypass-diode IV + global MPPT.
-- **Tolerancing / QA** — 3D vector-loop tolerance stackup (6-DOF Jacobian), SPC charts (Shewhart/CUSUM/EWMA + Nelson/WECO rules), ISO 286 limits & fits.
-- **Optics / acoustics** — Gaussian beam (M², complex-q, ISO 11146-1), non-sequential ray tracing with Fresnel split (stray/ghost), wave acoustics (image-source IR + Schroeder RT60 + SEA), Seidel aberrations (corrected S5).
-- **Silicon** — analog PVT corner simulation (60 corners × Monte-Carlo mismatch, Pelgrom σ matched), full RTL-to-GDS flow (Yosys + OpenROAD + Magic/KLayout/STA).
-- **Materials + LCA** — Ashby database (~200 materials, Pareto frontier multi-objective selection), full ISO 14040/44 LCA (cradle/use/transport/EoL: GWP/AP/EP/HTP/water/PM2.5 + uncertainty).
-- **Compare matrices** — 39 reference CADs have grounded D1-D14 feature matrices (1,200+ rows) sourced to vendor documentation, every claim with a source URL: the MCAD/surfacing tools (Fusion 360, SolidWorks, Onshape, FreeCAD, Rhino, CATIA, Creo, NX, Inventor, AutoCAD), EDA (KiCad, Altium, Eagle, EasyEDA), BIM (Revit, ArchiCAD, Vectorworks, Civil 3D), DCC/SubD (Blender, ZBrush, 3ds Max, SketchUp), and domain specialists (ArtiosCAD, CLO3D, Mozaik, AVEVA E3D, Cimatron, MSC Adams, Zemax, 3Shape, Fibersim, Maxsurf, OpenFOAM, CalculiX, GMAT, OpenRocket, OpenROAD, OpenPLC, MatrixGold).
+## Domains we cover
+
+| Domain | Domain | Domain |
+|---|---|---|
+| Mechanical | Electronics / PCB | BIM / Architecture |
+| Civil / Geotechnical | Aerospace | Marine / Naval |
+| Silicon / IC | Firmware / Embedded | PLC / Industrial |
+| Composites (CFRP/GFRP) | Optics / Acoustics | Dental / Medical |
+| Jewelry / Horology | FEM + CFD | CAM / Manufacturing |
+| Piping / P&ID | Packaging / Dieline | Mold / Injection |
+| Motion / Dynamics | Textiles / Apparel | Materials + LCA |
+| Tolerancing / QA | Structural codes | RF / Microwave |
+| Solar PV | Woodworking | ... |
+
+Full per-domain pages live at `/domains/<slug>` with a capability grid, file types, and LLM prompt examples.
 
 ## Install
 
@@ -143,7 +152,7 @@ The Python backend uses environment variables and optional feature flags to gate
 # OSS build (default) — local install, no billing, no Workshop
 pip install -e .[full] && kerf-server --reload
 
-# Cloud build — adds Workshop sharing, Paystack billing, git, transactional email
+# Cloud build — adds Workshop sharing, billing, git, transactional email
 CLOUD_ENABLED=true kerf-server --reload
 
 # Or via npm
@@ -165,13 +174,12 @@ The same source tree runs both. Cloud-only plugins (`kerf-billing`, `kerf-cloud`
 | `[storage].backend = "s3"` | S3 / R2 / MinIO; set credentials in `[storage.s3]` |
 | `[llm.anthropic].api_key` / `[llm.openai].api_key` / etc. | Activate that LLM provider |
 | `[limits].file_revisions_max` | Per-file undo history cap (default 200) |
-| `[cloud.paystack].secret_key` | (cloud build only) billing |
 
 Full schema: see [`kerf.example.toml`](./kerf.example.toml).
 
 ## Domains
 
-Kerf is a single chat-driven tool across 22 engineering disciplines. Each
+Kerf is a single chat-driven tool across 37 engineering disciplines. Each
 domain has a dedicated page (`/domains/<slug>`) with a hero illustration,
 file types, capability grid, and an LLM-prompt example.
 
@@ -186,14 +194,14 @@ file types, capability grid, and an LLM-prompt example.
 | **Silicon / IC** (`/domains/silicon`) | `.vhd` `.v` `.gds` `.lef` `.lib` | RTL synthesis (Yosys), PnR (OpenROAD), DRC/LVS, GDS-II, Sky130 PDK |
 | **Firmware** (`/domains/firmware`) | `.ino` `.c` `.cpp` `.fw.json` | Arduino + ESP32 + RP2040 + STM32 — build, upload, monitor, OTA |
 | **PLC / Industrial** (`/domains/plc`) | `.plc` `.st` `.iec` | Ladder + ST + FBD + simulator + HMI tester, PLCopen XML |
-| **Composites** (`/domains/composites`) | `.layup` `.cmh17` | CFRP/GFRP layup, ABD matrix, Tsai-Wu/Hill, drape sim |
-| **Dental** (`/domains/dental`) | `.feature` `.stl` | Crowns, aligners, surgical guides, DICOM ingest |
-| **Optics** (`/domains/optics`) | `.lens` `.zmx` | Lens design, paraxial + real ray-trace, Zemax import |
+| **Composites** (`/domains/composites`) | `.layup` `.cmh17` `.afp_plan` | CFRP/GFRP layup, ABD matrix, Tsai-Wu/Hill, AFP 5-axis toolpaths |
+| **Dental** (`/domains/dental`) | `.feature` `.stl` | Crowns, aligners, implant planning, surgical guides, CBCT ingest |
+| **Optics** (`/domains/optics`) | `.lens` `.zmx` | Lens design, Seidel + Zernike aberrations, MTF/PSF, Zemax import |
 | **Horology** (`/domains/horology`) | `.feature` `.step` | Swiss-lever escapement, gear train, mainspring barrel |
-| **Marine** (`/domains/marine`) | `.feature` `.iges` | Hull hydrostatics, GZ stability, IMO criteria |
+| **Marine** (`/domains/marine`) | `.feature` `.iges` | Hull hydrostatics, GZ stability, strip-theory seakeeping RAOs, Holtrop-Mennen resistance |
 | **Woodworking** (`/domains/woodworking`) | `.feature` `.dxf` | Joinery, cabinet designer, CNC router, cut list |
 | **Textiles** (`/domains/textiles`) | `.pat` `.dxf` `.svg` | Pattern blocks, grading, marker making, drape sim |
-| **Civil** (`/domains/civil`) | `.civ` `.ifc` `.dxf` `.landxml` | Horizontal/vertical alignment, corridor sweep, earthwork, LandXML I/O, water-distribution / sewer / storm hydraulics |
+| **Civil** (`/domains/civil`) | `.civ` `.ifc` `.dxf` `.landxml` | Horizontal/vertical alignment, corridor, earthwork, LandXML I/O, water-distribution / sewer / storm hydraulics |
 | **Motion sim** (`/domains/motion`) | `.motion` `.urdf` | Multibody dynamics (RK4), 6 joint types, IK/FK |
 | **FEM + CFD** (`/domains/femcfd`) | `.fem` `.cfd` `.bdf` | Linear/modal/nonlinear FEM, buckling, harmonic, random-vibration PSD, k-ω SST CFD, OpenFOAM bridge |
 | **Mold** (`/domains/mold`) | `.feature` `.step` | Core/cavity split, parting surface, gate/runner design, cooling channels, moldflow |
@@ -223,18 +231,18 @@ file types, capability grid, and an LLM-prompt example.
 | Workshop sharing (free-tier social gallery, like + fork) | ✅ |
 | Git (commits / branches / merge / GitHub sync) — S3-backed bare-repo storer | ✅ |
 | STEP import/export, chunked resumable uploads, server-side pre-tessellation | ✅ |
-| Imports: KiCad (Tier 1 + 2 libraries), OpenSCAD, Rhino3DM, **FreeCAD** (Tier 1: BRep-lift + Sketcher + PartDesign metadata + multi-Body) | ✅ |
+| Imports: KiCad (Tier 1 + 2 libraries), OpenSCAD, Rhino3DM, FreeCAD (Tier 1: BRep-lift + Sketcher + PartDesign metadata + multi-Body) | ✅ |
 | Scripting via `kerf-sdk` (PyPI, JSON-RPC to `/v1/rpc`) | ✅ |
 | Sketch → JSCAD workflow (`extrude_sketch_to_jscad` + reactive re-eval) | ✅ |
 | File revisions (Cmd+Z + diff-based gzip compression + SHA-256 dedup) | ✅ |
 | Filesystem / S3 / R2 / MinIO storage | ✅ |
 | Viewport perf — frustum culling + InstancedMesh batching for big assemblies | ✅ |
-| NURBS booleans v1 (`feature_to_solid` cap-then-boolean + `feature_boolean`) | ✅ |
-| Persistent face naming (sketch-anchored + topo-hash fallback; survives upstream sketch edits) | ✅ |
-| 5-axis CAM v1 (constant-tilt finishing + 3+2 indexed) | ✅ |
-| Wiring / harness diagrams (`.wiring` via WireViz YAML → SVG) | ✅ |
-| Quad remesher (Instant Meshes, optional binary) | ✅ |
-| NURBS Phase 4 — surface-direct booleans (`feature_surface_boolean`) + trim-by-curve + matchSrf G3 continuity (`feature_blend_srf_g3`, `feature_g3_chain_blend`) | ✅ |
+| NURBS Phase 4 — surface-direct booleans + trim-by-curve + matchSrf G3 continuity + analytic curve derivatives | ✅ |
+| Optics panel — 42 tools: lens design, Seidel aberrations, diffraction MTF, Zernike decomposition, spot diagram | ✅ |
+| Composites — AFP 5-axis toolpaths (G-code + APT), CLT ABD, drape sim, fiber orientation | ✅ |
+| Dental — multi-cusp crown, implant trajectory planning (Misch / EAO), watertight surgical guide | ✅ |
+| Manufacturing panel — 39 mold + electronics DFM tools unified in one UI | ✅ |
+| Structural panel — 24 arch tools (ASCE 7-22 / ACI 318-19 / AISC 360-22 / TMS 402-22) | ✅ |
 | PLC structured text (`.plc` / `.st` via IEC 61131-3 + PLCopen XML, Ladder + ST + FBD + simulator) | ✅ |
 | Slicing — 3D-print G-code via Cura engine (`run_print_slice`) | ✅ |
 | SubD modelling (Catmull-Clark, create / extrude-face / bevel-edge / crease) | ✅ |
@@ -251,7 +259,7 @@ packages/
 ├── kerf-api/          — core REST surface + ~50 LLM tools
 ├── kerf-chat/         — LLM agent loop + tool dispatch + llm_docs corpus
 ├── kerf-v1/           — `/v1/rpc` JSON-RPC for kerf-sdk
-├── kerf-billing/      — Paystack billing (PROPRIETARY, cloud-only)
+├── kerf-billing/      — billing (PROPRIETARY, cloud-only)
 ├── kerf-cloud/        — Workshop, git, GitHub sync, email, distributors (PROPRIETARY)
 ├── kerf-cad-core/     — pythonOCC: sketch, BREP, surfacing, .feature ops
 ├── kerf-tess/         — STEP → GLB tessellation worker
@@ -262,6 +270,8 @@ packages/
 ├── kerf-bim/          — IFC compiler + Revit-parity families/schedules/views
 ├── kerf-electronics/  — ngspice, scikit-rf, FreeRouting, KiCad-parity
 ├── kerf-imports/      — KiCad, FreeCAD, OpenSCAD, Rhino3DM
+├── kerf-dental/       — Crown, aligner, implant planning, surgical guide
+├── kerf-composites/   — AFP toolpath, CLT, drape simulation
 ├── kerf-render/       — render route
 ├── kerf-workers/      — background-worker harness
 └── kerf-sdk/          — Python SDK (PyPI: kerf-sdk) for scripting
@@ -293,15 +303,14 @@ docs/capabilities.md   — plugin capability-tag reference
 - **Backend**: Python 3.11, FastAPI, asyncpg, SQLAlchemy, Alembic, PyJWT, `httpx`
 - **DB**: Postgres 14+ (Supabase-compatible)
 - **LLM**: multi-provider — Anthropic, OpenAI, Moonshot, Gemini (default `claude-opus-4-7`)
-- **Cloud-only**: Paystack (USD-priced, ZAR-settled), bunny.net CDN, pygit2 + S3GitStorer
 
 ## Testing
 
 ```sh
-# Backend — auto-discovered from every plugin's tests/
-pytest                                  # full suite (~864 tests)
-pytest packages/kerf-api/tests/         # one plugin
-pytest packages/kerf-fem/tests/         # FEM (skips dolfinx tests if not installed)
+# Backend — run from repo root so the root conftest loads
+PYTHONHASHSEED=0 pytest packages/ -n auto        # full suite (~23,000+ tests)
+pytest packages/kerf-api/tests/                  # one plugin
+pytest packages/kerf-fem/tests/                  # FEM (skips dolfinx tests if not installed)
 
 # Frontend (vitest)
 npm test
@@ -310,10 +319,11 @@ npm test
 npm run lint
 ```
 
-## Contributing
+## Get involved
 
 PRs welcome. Pick anything marked `📋 next` or `🔮 planned` in [ROADMAP.md](./ROADMAP.md). For larger work, open an issue first so we can align scope.
 
+- **Issues + discussions**: [github.com/kerf-sh/kerf/issues](https://github.com/kerf-sh/kerf/issues) · [github.com/kerf-sh/kerf/discussions](https://github.com/kerf-sh/kerf/discussions)
 - **Style**: ESLint + Prettier defaults. Match the surrounding code; we don't bikeshed.
 - **Tests**: every PR that touches a plugin should add or extend a test in `packages/kerf-<plugin>/tests/`. Frontend changes: add a vitest if the logic isn't UI-only.
 - **Commits**: imperative tense, ~70 chars (`fix sketcher line-tool double-commit`).
@@ -327,7 +337,7 @@ Dual-licensed:
 - **MIT** for the core — see [LICENSE](./LICENSE). Covers everything outside `packages/kerf-billing/`, `packages/kerf-cloud/`, and `src/cloud/`.
 - **Proprietary** for the hosted-tier bundle — see [LICENSE-CLOUD](./LICENSE-CLOUD).
 
-Built in Durban 🇿🇦 by a small team. Engineered for engineers everywhere.
+Built in Durban by a small team. Engineered for engineers everywhere.
 
 ## Links
 
@@ -337,5 +347,3 @@ Built in Durban 🇿🇦 by a small team. Engineered for engineers everywhere.
 - [docs/capabilities.md](./docs/capabilities.md) — plugin capability-tag taxonomy
 - [docs/cloud-operator.md](./docs/cloud-operator.md) — hosted-tier build/deploy notes
 - [Issues](https://github.com/kerf-sh/kerf/issues) · [Discussions](https://github.com/kerf-sh/kerf/discussions)
-</content>
-</invoke>

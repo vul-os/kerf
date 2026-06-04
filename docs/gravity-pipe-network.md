@@ -1,49 +1,74 @@
-# Gravity Pipe Network (Manning / Hydraulics)
+# Gravity Pipe Network (Sewer / Drainage)
 
-*Domain: Civil · Module: `packages/kerf-civil/src/kerf_civil/hydraulics_gravity.py` · Shipped: Wave 10*
+> Manning's equation for part-full circular sewers and trapezoidal channels — normal depth, capacity, and storm runoff sizing.
 
-## Overview
+**Module**: `packages/kerf-civil/src/kerf_civil/hydraulics_gravity.py`, `storm.py`
+**Shipped**: Wave 11B2
+**LLM tools**: `civil_sewer_manning_capacity`, `civil_storm_rational`
 
-Computes normal depth, full-flow capacity, and flow at partial depth for circular pipes and trapezoidal open channels using Manning's equation. Supports the standard hydraulic geometry relations (hydraulic radius, wetted perimeter, area). Used for stormwater drainage design and sanitary sewer sizing per ASCE gravity pipe design standards.
+---
 
-## When to use
+## What it is
 
-- Sizing a circular storm drain for a given peak discharge.
-- Computing normal depth for a partially full pipe at a given flow.
-- Designing open channels (roadside swales, ditches) for uniform flow.
+Gravity sewers and storm drains operate under open-channel flow where the driving force is gravity rather than pressure. The key design question is: for a given pipe diameter, slope, and roughness, what is the normal (full) flow capacity, and at what depth does the design flow actually run? Getting this wrong leads to either surcharging (flooding) or oversized, expensive pipes. This module implements the standard Manning's equation for circular sections (part-full and full) and trapezoidal channels, plus the Rational Method for peak runoff estimation.
 
-## API
+## How to use it
+
+### From chat
+
+> "Size a 600 mm diameter concrete sewer (n = 0.013) at 0.5% slope for a peak flow of 150 L/s. What is the normal-depth ratio y/D?"
+
+### From Python
 
 ```python
 from kerf_civil.hydraulics_gravity import (
-    circular_section_geometry,
-    circular_full_flow,
-    circular_capacity_at_depth,
-    circular_normal_depth,
-    trapezoidal_geometry,
-    trapezoidal_capacity,
-    trapezoidal_normal_depth,
+    circular_full_flow, circular_normal_depth, circular_capacity_at_depth
 )
 
-# 600mm diameter pipe, n=0.013, slope=0.005
-Q_full = circular_full_flow(d=0.600, n=0.013, slope=0.005)
+d = 0.6   # 600 mm pipe, metres
+Q_full = circular_full_flow(d, n=0.013, slope=0.005)
+print(f"Full-flow capacity: {Q_full*1000:.1f} L/s")
 
-# Normal depth for Q=0.05 m³/s in the same pipe
-yn = circular_normal_depth(Q=0.05, d=0.600, n=0.013, slope=0.005)
-
-# Trapezoidal channel: 1.0m base, 2:1 side slopes
-Q_trap = trapezoidal_capacity(b=1.0, z=2.0, n=0.025, slope=0.002, y=0.8)
+yd = circular_normal_depth(d, n=0.013, slope=0.005, Q=0.150)
+print(f"Normal depth y/D: {yd:.3f}  ({yd*d*1000:.0f} mm)")
 ```
 
-## LLM tools
+### From an LLM tool spec
 
-`civil_gravity_pipe_size`, `civil_open_channel`
+```json
+{"diameter_m": 0.6, "manning_n": 0.013, "slope": 0.005,
+ "design_flow_m3s": 0.150, "check": "normal_depth"}
+```
 
-## References
+## How it works
 
-- Manning, "On the flow of water in open channels and pipes", *Trans. ICE Ireland* 20, 1891.
-- ASCE/WEF MOP No. 36, *Design of Urban Stormwater Controls* (2012).
+Manning's equation in SI: Q = (1/n) × A × R^(2/3) × S^(1/2). For a circular pipe at depth y: θ = 2 arccos(1 − 2y/d), A = d²(θ − sin θ)/8, R = A/P where P = dθ/2. Normal depth is found by Newton–Raphson iteration on Q(y) = Q_design (converges in < 60 iterations to tolerance 10⁻⁸). For trapezoidal channels: A = (b + zy)y, P = b + 2y√(1 + z²). Storm runoff: Q = C·i·A using the Rational Method (SI: C dimensionless, i in mm/hr, A in ha), standard for urban drainage catchments up to ~80 ha.
+
+## API reference
+
+| Function | Returns | Purpose |
+|---|---|---|
+| `circular_full_flow(d, n, slope)` | `float` (m³/s) | Full-pipe capacity |
+| `circular_normal_depth(d, n, slope, Q)` | `float` (y/D ratio) | Normal-depth solve |
+| `circular_capacity_at_depth(d, n, slope, y)` | `float` (m³/s) | Capacity at given depth |
+| `circular_section_geometry(d, y)` | `dict` | Area, P, R, top-width |
+| `trapezoidal_normal_depth(b, z, n, slope, Q)` | `float` (depth m) | Open-channel normal depth |
+| `rational_method(C, i_mm_hr, area_ha)` | `float` (m³/s) | Peak storm runoff |
+
+## Example
+
+```python
+from kerf_civil.hydraulics_gravity import circular_section_geometry
+geom = circular_section_geometry(d=0.9, y=0.675)  # 75% full
+print(f"Area: {geom['area']:.4f} m², R: {geom['hydraulic_radius']:.4f} m")
+```
 
 ## Honest caveats
 
-Manning's equation applies to uniform, steady-state flow only. Energy and hydraulic grade line profiles (gradually-varied flow) are not computed by this module. For pressure-grade calculations use `hydraulics_pressure.py`. The normal-depth solver uses bisection and may require up to 50 iterations for convergence to 0.1mm.
+Manning's n values must be supplied by the caller — Kerf does not include a pipe-material roughness database. Normal-depth iteration may not converge for extremely low slopes (< 0.0001) or near-full pipes; the function returns the last iterate with a warning flag. The Rational Method is valid only for catchments where the time of concentration equals the storm duration; it overestimates peak flow for large or irregular catchments.
+
+## References
+
+- Chaudhry, M.H. (2008). *Open-Channel Hydraulics*, 2nd ed. Springer. §2.5.
+- Mays, L.W. (2011). *Water Resources Engineering*, 2nd ed. Wiley. Table 4.1 (circular section).
+- Kuichling, E. (1889). The relation between the rainfall and the discharge of sewers. *Trans. ASCE* 20, 1–56.

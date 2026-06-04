@@ -1,53 +1,77 @@
-# PDN Wizard (Power Delivery Network)
+# PDN Decoupling-Cap Wizard
 
-*Domain: Electronics · Module: `packages/kerf-electronics/src/kerf_electronics/pdn_wizard.py` · Shipped: Wave 10*
+> Power delivery network impedance analysis — select the minimum decoupling capacitor set that keeps |Z(f)| ≤ Z_target across DC to target bandwidth.
 
-## Overview
+**Module**: `packages/kerf-electronics/src/kerf_electronics/pdn_wizard.py`, `pdn/ac_impedance.py`
+**Shipped**: Wave 9
+**LLM tools**: `pdn_analyse`, `pdn_recommend_decaps`
 
-Analyses and optimises a PCB power delivery network (PDN) by sweeping impedance versus frequency across capacitor bank combinations. Computes the target impedance from the transient current spec, sweeps the bank network at each frequency, finds resonance peaks exceeding the target, and recommends capacitor additions or re-sizing to flatten the impedance profile. Covers bulk, mid-band, and high-frequency (HF) decoupling stages.
+---
 
-## When to use
+## What it is
 
-- Checking whether a decoupling scheme meets the target impedance spec for an FPGA or processor.
-- Recommending bulk/ceramic/HF capacitor placements to suppress PDN resonances.
-- Generating impedance plots for PI (power integrity) review.
+A high-speed IC's power pin sees load-current transients in the hundreds-of-MHz range. The PDN must supply those transients without causing excessive voltage droop (ripple). The target impedance is Z_target = V_supply × ripple_fraction / I_transient. Decoupling capacitors are placed to keep the PDN impedance below Z_target across the entire frequency range. Choosing too few caps leaves the PDN non-compliant; choosing too many wastes board area and cost. This wizard analyses the impedance spectrum and recommends the minimum cap set.
 
-## API
+## How to use it
+
+### From chat
+
+> "Design the PDN decoupling for a 1.8 V rail, 3 A transient, 1% ripple budget, bandwidth 500 MHz. I have 100 µF bulk caps and 100 nF MLCC 0402s available."
+
+### From Python
 
 ```python
-from kerf_electronics.pdn_wizard import (
-    z_target_from_spec,
-    characterise_cap,
-    pdn_wizard,
-)
+from kerf_electronics.pdn_wizard import analyse_pdn, recommend_decaps
 
-z_target = z_target_from_spec(
-    vdd_v=1.8, ripple_frac=0.05, i_transient_a=2.0
-)
-
-result = pdn_wizard({
-    "vdd_v": 1.8,
-    "ripple_frac": 0.05,
-    "i_transient_a": 2.0,
+spec = {
+    "v_supply": 1.8, "ripple_fraction": 0.01, "i_transient_a": 3.0,
     "bandwidth_hz": 500e6,
-    "banks": [
-        {"C_f": 100e-6, "ESR": 0.005, "ESL": 2e-9, "count": 4},
-        {"C_f": 10e-9,  "ESR": 0.02,  "ESL": 0.5e-9, "count": 8},
-    ],
-})
-print(result["peaks_above_target"])
-print(result["recommendations"])
+    "vrm": {"r_out": 0.02, "l_out": 5e-9},
+    "caps": [
+        {"C": 100e-6, "R_esr": 0.05, "L_esl": 3e-9, "count": 4},
+        {"C": 100e-9, "R_esr": 0.005, "L_esl": 0.5e-9, "count": 10},
+    ]
+}
+result = analyse_pdn(spec)
+print(f"Z_target: {result['z_target_ohm']:.4f} Ω")
+print(f"Max |Z|: {result['max_z_ohm']:.4f} Ω at {result['worst_freq_hz']/1e6:.0f} MHz")
 ```
 
-## LLM tools
+### From an LLM tool spec
 
-`feature_pdn_wizard`
+```json
+{"v_supply": 1.8, "ripple_fraction": 0.01, "i_transient_a": 3.0,
+ "bandwidth_hz": 500e6,
+ "vrm_l_out_h": 5e-9, "vrm_r_out": 0.02}
+```
 
-## References
+## How it works
 
-- Ott, *Electromagnetic Compatibility Engineering*, ch. 10 (PDN).
-- Novak & Miller, *Frequency-Domain Characterization of Power Distribution Networks* (2007).
+Each capacitor is modelled as a series RLC: Z_cap(f) = R_esr + j2πf(L_esl + L_mount) + 1/(j2πfC). The VRM is a series RL; above its loop bandwidth it is an open circuit. PDN impedance: Z_pdn = 1/Σ(1/Z_i) (admittances add in parallel). Anti-resonance peaks occur where the inductive tail of one cap bank overlaps the capacitive region of the next — these are detected by scanning the swept spectrum for local maxima above Z_target. The recommendation engine adds intermediate-value caps to fill anti-resonance peaks and increases bank count when the inductive tail is too high.
+
+## API reference
+
+| Function | Returns | Purpose |
+|---|---|---|
+| `analyse_pdn(spec)` | `dict` | Impedance spectrum + compliance check |
+| `recommend_decaps(spec)` | `dict` | Minimum recommended cap set |
+| `pdn_impedance_sweep(components, freq_points)` | `list[dict]` | Raw Z(f) data |
+
+## Example
+
+```python
+from kerf_electronics.pdn.ac_impedance import pdn_impedance_sweep
+z = pdn_impedance_sweep([{"C":100e-9,"R_esr":0.005,"L_esl":0.5e-9,"count":10}],
+                         freq_points=[1e6,10e6,100e6,500e6])
+for pt in z:
+    print(f"{pt['freq_hz']/1e6:.0f} MHz: |Z| = {pt['z_mag_ohm']:.4f} Ω")
+```
 
 ## Honest caveats
 
-PDN modelling is a lumped-element approximation. Spreading inductance, board stackup geometry, and via inductance are not automatically extracted — supply them as `ESL` per bank. The optimiser assumes all capacitors in a bank are placed at the same location; split placement is not modelled.
+The PDN model does not account for package inductance between the board decaps and the die — this is typically 0.1–0.5 nH and can be the dominant impedance above 300 MHz. Via inductance is modelled with a simplified Grover formula; actual via placement pattern matters for >500 MHz designs. The recommendation engine is greedy and may not find the globally minimum-cost cap set.
+
+## References
+
+- Ott, H.W. (2009). *Electromagnetic Compatibility Engineering*. Wiley. §11 (power distribution).
+- Novak, I. & Miller, J.R. (2007). *Frequency-Domain Characterization of Power Distribution Networks*. Artech House.

@@ -1,46 +1,88 @@
-# F-Rep Implicit Modelling
+# F-Rep Implicit Modelling (TPMS Lattices)
 
-*Domain: Geometry kernel · Module: `packages/kerf-cad-core/src/kerf_cad_core/frep/` · Shipped: Wave 7*
+> Design Gyroid, Schwartz-P, and Diamond infill lattices for additive manufacturing using R-function CSG and marching-cubes mesh extraction.
 
-## Overview
+**Module**: `packages/kerf-cad-core/src/kerf_cad_core/frep/sdf.py`
+**Shipped**: Wave 7
+**LLM tools**: `feature_frep_tpms`, `feature_frep_csg`
 
-Function-representation (F-Rep) implicit solid modelling: R-function CSG (R-union, R-intersection, R-difference) with smooth blending, TPMS (Triply Periodic Minimal Surface) lattice generation (Gyroid, Schwartz-P, Diamond, Lidinoid), and implicit-to-mesh extraction via marching cubes. Used for designing lightweight infill lattices and topology-optimised bio-inspired structures.
+---
 
-## When to use
+## What it is
 
-- Designing Gyroid or Schwartz-P infill lattices for additive manufacturing.
-- Creating smooth blend primitives using R-function algebra.
-- Generating heterogeneous density lattices for bone-scaffold or heat-exchanger applications.
+Function-representation (F-Rep) treats solids as the zero set of a continuous scalar function f(x,y,z). Triply Periodic Minimal Surfaces (TPMS) — Gyroid, Schwartz-P, Diamond, Fischer-Koch S, IWP — are a class of F-Rep solids with near-zero mean curvature everywhere, making them excellent infill lattices: high surface area, uniform wall thickness, and smooth stress distribution.
 
-## API
+This module provides analytic TPMS functions, R-function CSG (smooth boolean algebra), and mesh extraction via marching cubes. Engineers use it to design lightweight infill for AM parts, bone scaffolds, and heat-exchanger surfaces.
+
+## How to use it
+
+### From chat (natural language)
+
+> "Generate a Gyroid lattice in a 30mm cube with 2.5mm cell size, iso=0.0"
+
+The LLM calls `feature_frep_tpms` and returns a triangle mesh.
+
+### From Python
 
 ```python
-from kerf_cad_core.frep.tpms import (
-    gyroid, schwartz_p, diamond, lidinoid,
-    tpms_to_mesh,
+from kerf_cad_core.frep.sdf import (
+    sdf_gyroid, sdf_schwarz_p, sdf_diamond,
+    csg_union, csg_intersection, csg_difference,
+    csg_smooth_union,
 )
+from kerf_cad_core.geom.sdf_csg import marching_cubes
 
-# Generate a Gyroid lattice in a 30mm cube, 2.5mm cell size
-mesh = tpms_to_mesh(
-    tpms_fn=gyroid,
+# Gyroid at cell period 5mm, iso=0 (equal solid/void split)
+gyroid_fn = sdf_gyroid(period=5.0, iso=0.0)
+mesh = marching_cubes(
+    gyroid_fn,
     bounds=((-15,-15,-15), (15,15,15)),
-    cell_size_mm=2.5,
     resolution=64,
-    isovalue=0.0,
-    wall_thickness=0.5,
 )
+print(f"{len(mesh['faces'])} triangles")
 ```
 
-## LLM tools
+### From an LLM tool spec
 
-`feature_frep_tpms`, `feature_frep_csg`
+```json
+{"tool": "feature_frep_tpms", "type": "gyroid", "cell_size_mm": 2.5,
+ "bounds": [[-15,-15,-15],[15,15,15]], "resolution": 64}
+```
 
-## References
+## How it works
 
-- Schwartz, "Gesammelte Mathematische Abhandlungen" (1890) — minimal surfaces.
-- Schoen, "Infinite periodic minimal surfaces without self-intersections", *NASA TN D-5541*, 1970.
-- Rvachev, "On analytical description of some geometric objects", *Rep. Ukr. SSR* 153, 1963 (R-functions).
+TPMS functions are trigonometric level sets. For the Gyroid: f(x,y,z) = sin(2πx/p)cos(2πy/p) + sin(2πy/p)cos(2πz/p) + sin(2πz/p)cos(2πx/p), where p is the cell period. The iso-surface f = C gives a surface with adjustable solid/void fraction as C varies. R-function operations (Rvachev 1963) combine F-Rep solids while preserving the function's sign semantics.
+
+Mesh extraction uses the marching-cubes algorithm on a regular grid, evaluated over the function domain.
+
+## API reference
+
+| Function | Returns | Purpose |
+|---|---|---|
+| `sdf_gyroid(period, iso)` | `SDF` | Gyroid TPMS |
+| `sdf_schwarz_p(period, iso)` | `SDF` | Schwarz-P TPMS |
+| `sdf_diamond(period, iso)` | `SDF` | Diamond TPMS |
+| `sdf_fischer_koch_s(period, iso)` | `SDF` | Fischer-Koch S |
+| `sdf_iwp(period, iso)` | `SDF` | Schoen IWP |
+| `csg_union(a, b)` | `SDF` | Boolean union |
+| `csg_smooth_union(a, b, k)` | `SDF` | Smooth union |
+
+## Example
+
+```python
+gyroid = sdf_gyroid(period=4.0, iso=0.3)  # more solid than void
+diamond = sdf_diamond(period=4.0, iso=0.0)
+blended = csg_smooth_union(gyroid, diamond, k=0.5)
+mesh = marching_cubes(blended, bounds=((-12,-12,-12),(12,12,12)), resolution=64)
+print(f"Blended lattice: {len(mesh['faces'])} triangles")
+```
 
 ## Honest caveats
 
-TPMS isovalue selection controls the solid/void balance: isovalue = 0 produces an equal-volume split for Gyroid and Schwartz-P, but this varies by surface type. Mesh extraction via marching cubes at resolution 64 produces approximately 200k triangles per 30mm cube; increase to 128 for smoother results at the cost of higher polygon count. The F-Rep CSG does not produce exact-distance SDFs; apply `mesh_repair` before downstream operations requiring watertight meshes.
+Isovalue 0 gives a near-equal solid/void split for Gyroid and Schwartz-P, but the exact split depends on the surface type. Mesh extraction at resolution 64 produces ~200k triangles per 30mm cube; increase to 128 for smoother results at higher polygon counts. F-Rep CSG does not maintain exact Euclidean distance; apply mesh repair before watertight BRep conversion.
+
+## References
+
+- Schwartz (1890). *Gesammelte Mathematische Abhandlungen*. Minimal surfaces.
+- Schoen (1970). "Infinite periodic minimal surfaces without self-intersections." *NASA TN D-5541*.
+- Rvachev (1963). "On analytical description of some geometric objects." *Rep. Ukr. SSR* 153.

@@ -1,51 +1,78 @@
-# EMC, Signal Integrity, and PDN Wizards
+# EMC / Signal Integrity Pre-Compliance
 
-*Domain: Electronics · Module: `packages/kerf-electronics/src/kerf_electronics/emc_wizard.py` · Shipped: Wave 10*
+> Pre-scan EMC wizard — radiated emission estimates, crosstalk, shielding effectiveness, and actionable fix recommendations before the test lab.
 
-## Overview
+**Module**: `packages/kerf-electronics/src/kerf_electronics/emc_wizard.py`, `emc/estimate.py`, `si/solver.py`
+**Shipped**: Wave 10
+**LLM tools**: `electronics_emc_wizard`, `electronics_si_analyse`
 
-Pre-compliance EMC analysis: radiated emission estimation (horizontal and vertical dipole radiation from PCB traces), conducted emission check (LISN model), and ESD susceptibility assessment. Signal integrity: eye-diagram prediction from IBIS driver models and transmission-line parameters, differential pair skew and pre-emphasis sizing. PDN analysis is covered separately in `pdn_wizard.py`.
+---
 
-## When to use
+## What it is
 
-- Early-stage radiated emission screening before sending a board to an EMC lab.
-- Checking if a clock trace layout is likely to cause FCC Class B failures.
-- Sizing pre-emphasis for a high-speed serial link to hit a target eye opening.
+EMC test failures are expensive: re-spins, lab fees, re-testing. Pre-compliance analysis catches likely failures on a laptop before booking the chamber. This module estimates radiated emissions from differential-mode loops and common-mode cable radiation, checks clock harmonics against CISPR 32 / FCC Part 15 Class B limits, and quantifies PCB trace crosstalk and shielding effectiveness — then produces prioritised, quantified fix recommendations.
 
-## API
+## How to use it
+
+### From chat
+
+> "Pre-compliance check for my 100 MHz clock board: 50 mm × 30 mm loop area, 2 m USB cable, plastic enclosure (no shielding). Target: CISPR 32 Class B."
+
+### From Python
 
 ```python
-from kerf_electronics.emc_wizard import (
-    radiated_emission_estimate,
-    conducted_emission_lisn,
-    differential_pair_skew,
-)
-from kerf_electronics.si_eye_wizard import (
-    eye_diagram_estimate,
-)
+from kerf_electronics.emc_wizard import run_emc_wizard
 
-# Estimate radiated emission from a 100mm loop at 100MHz
-em = radiated_emission_estimate(
-    loop_area_m2=0.001,
-    frequency_hz=100e6,
-    current_A=0.01,
-    distance_m=3.0,
-)
-print(em["E_field_dBuVm"])
-print(em["fcc_class_b_limit_dBuVm"])
-print(em["margin_dB"])
+result = run_emc_wizard({
+    "clock_freq_hz": 100e6,
+    "loop_area_m2": 50e-3 * 30e-3,
+    "loop_current_a": 0.01,
+    "cable_length_m": 2.0,
+    "cable_current_a": 0.001,
+    "standard": "CISPR32_ClassB",
+    "distance_m": 10.0,
+})
+for finding in result["findings"]:
+    print(f"[{finding['severity']}] {finding['description']}")
+    print(f"  Fix: {finding['recommendation']}")
 ```
 
-## LLM tools
+### From an LLM tool spec
 
-`pcb_emc_check`, `pcb_si_eye`, `pcb_pdn_wizard`
+```json
+{"clock_freq_hz": 100e6, "loop_area_m2": 1.5e-3,
+ "loop_current_a": 0.01, "cable_length_m": 2.0,
+ "cable_current_a": 0.001, "standard": "CISPR32_ClassB"}
+```
 
-## References
+## How it works
 
-- Paul, *Introduction to Electromagnetic Compatibility*, 2nd ed. (2006).
-- Ott, *Electromagnetic Compatibility Engineering* (2009).
-- IEC CISPR 32:2015, *Multimedia equipment — EMC requirements*.
+Differential-mode radiation (loop): E = (263×10⁻¹⁶ × A × I × f²) / r dBμV/m. Common-mode cable: E = (1.257×10⁻⁶ × I_cm × f × L) / r dBμV/m. Both are evaluated at each harmonic up to the 10th. `emission_margin_db` compares the result to the CISPR/FCC limit. Crosstalk uses IPC-2141A lumped-capacitance coupled-line models. Signal integrity (SI) calculates microstrip/stripline impedance via IPC-2141A and Wadell formulas and propagation delay. The wizard applies mitigation deltas: adding a common-mode choke adds 20 dB CM attenuation; halving loop area reduces DM radiation by 6 dB.
+
+## API reference
+
+| Function | Returns | Purpose |
+|---|---|---|
+| `run_emc_wizard(spec)` | `dict` | Full pre-compliance report + fixes |
+| `emission_margin_db(e_dbuvpm, limit_dbuvpm)` | `float` | Margin to limit |
+| `radiated_emission_differential(A, I, f, r)` | `float` | DM E-field (dBμV/m) |
+| `radiated_emission_common_mode(I_cm, f, L, r)` | `float` | CM E-field (dBμV/m) |
+| `near_field_crosstalk(w, s, h, length, td)` | `dict` | NEXT/FEXT coupling |
+
+## Example
+
+```python
+from kerf_electronics.si.solver import microstrip_impedance_ipc2141a
+z0 = microstrip_impedance_ipc2141a(W=0.15e-3, H=0.1e-3, T=0.035e-3, er=4.3)
+print(f"Z0 = {z0:.1f} Ω")
+```
 
 ## Honest caveats
 
-Radiated emission estimates use simplified dipole antenna models and are order-of-magnitude accuracy only (±6 dB typical). They indicate risk, not compliance. Actual EMC compliance requires accredited laboratory testing per CISPR/FCC/CE. The IBIS eye-diagram model uses simplified channel models without crosstalk or power-plane resonance — add SI simulation tool (HyperLynx, Sigrity) for production-level SI analysis.
+All EMC estimates use simplified analytical models — they give ±6–10 dB accuracy, sufficient for go/no-go risk assessment but not for compliance certification. Shielding effectiveness uses a Schelkunoff plane-wave model; aperture coupling and seam leakage require full-wave EM simulation. CISPR 32 vs FCC Part 15 limits differ; ensure the correct standard is selected.
+
+## References
+
+- Ott, H.W. (2009). *Electromagnetic Compatibility Engineering*. Wiley. §6–9.
+- IPC-2141A (2004). *Controlled Impedance Circuit Boards and High Speed Logic Design*.
+- CISPR 32:2015/AMD2:2019 — Multimedia equipment emissions standard.

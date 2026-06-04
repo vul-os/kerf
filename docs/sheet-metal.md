@@ -1,49 +1,76 @@
-# Sheet Metal Bend and Flat Pattern
+# Sheet Metal Flange & Flat-Pattern
 
-*Domain: Manufacturing · Module: `packages/kerf-cad-core/src/kerf_cad_core/sheet_metal.py` · Shipped: Wave 6*
+> K-factor-aware bend-allowance unfolding and minimal DXF R12 flat-pattern export for sheet metal parts.
 
-## Overview
+**Module**: `packages/kerf-cad-core/src/kerf_cad_core/sheet_metal.py`
+**Shipped**: Wave 7
+**LLM tools**: `sheet_metal_flange`, `sheet_metal_unfold`, `sheet_metal_flat_pattern`
 
-Parametric sheet metal design: bend relief, flange, hem, joggle, and corner relief features; K-factor and bend deduction calculation per the Machinery's Handbook bend allowance table; flat pattern unfolding; and DXF export for laser or plasma cutting. Integrated bend table (`sheet_metal_bend_table.py`) covers common material/thickness/tooling combinations.
+---
 
-## When to use
+## What it is
 
-- Designing a bent sheet metal bracket with accurate flat-pattern dimensions.
-- Computing the blank size for a formed sheet metal part.
-- Exporting a flat pattern for laser cutting or waterjet programming.
+Sheet metal parts are designed folded but fabricated flat. The critical calculation is bend allowance: how much flat material is consumed by a bend, given the neutral-axis position (K-factor). Get it wrong and the flanges come out the wrong length after press-braking. This module handles flange creation, neutral-axis unfolding, and DXF export for the flat blank — no external DXF library required.
 
-## API
+## How to use it
+
+### From chat
+
+> "Create a sheet metal flange: 2 mm thick mild steel, 4 mm bend radius, 90° bend along the top edge, 30 mm flange length. Then export the flat pattern as DXF."
+
+### From Python
 
 ```python
 from kerf_cad_core.sheet_metal import (
-    SheetMetalPart, BendFeature, FlangeFeature,
-    compute_bend_allowance, compute_flat_pattern,
-    export_flat_dxf,
+    sheet_metal_unfold, sheet_metal_flat_pattern
 )
-from kerf_cad_core.sheet_metal_bend_table import lookup_k_factor
 
-# K-factor from bend table (1.5mm aluminium, 1.5mm die radius)
-K = lookup_k_factor(material="aluminium", thickness_mm=1.5, die_radius_mm=1.5)
+unfold_result = sheet_metal_unfold(
+    base_width=80.0, base_depth=60.0,
+    flange_length=30.0, bend_angle_deg=90.0,
+    bend_radius=4.0, thickness=2.0, k_factor=0.45
+)
+print("Developed length:", unfold_result["developed_length_mm"])
 
-# Flat pattern for a U-channel
-part = SheetMetalPart(thickness_mm=1.5, K_factor=K)
-part.add_base(width=50, length=100)
-part.add_flange(BendFeature(angle=90, radius=1.5, length=30))
-part.add_flange(BendFeature(angle=90, radius=1.5, length=30))
-
-flat = compute_flat_pattern(part)
-export_flat_dxf(flat, path="u_channel_flat.dxf")
+dxf = sheet_metal_flat_pattern(unfold_result)
+with open("blank.dxf", "w") as f:
+    f.write(dxf["dxf_string"])
 ```
 
-## LLM tools
+### From an LLM tool spec
 
-`feature_sheet_metal`, `feature_sheet_metal_flat_pattern`
+```json
+{"base_width": 80, "base_depth": 60,
+ "flange_length": 30, "bend_angle_deg": 90,
+ "bend_radius": 4.0, "thickness": 2.0,
+ "edge_ref": "top", "k_factor": 0.45}
+```
 
-## References
+## How it works
 
-- Machinery's Handbook, 32nd ed., "Bending Sheet Metal" (K-factor and bend allowance).
-- ASME Y14.5M-2018, *Dimensioning and Tolerancing* (bend radius callouts).
+Bend allowance is computed as `BA = angle_rad × (bend_radius + k_factor × thickness)`. The K-factor (0–1) represents the neutral-axis position as a fraction of the stock thickness from the inside surface. The folded B-rep is built in OCCT: a base plate fused with a quarter-cylinder (or partial arc) bend zone and the flange wall. The flat-pattern DXF uses a minimal inline R12 writer — the outline is a closed POLYLINE on layer "0" and bend lines are LINE entities on layer "BEND", producing files compatible with all CAM systems.
+
+## API reference
+
+| Function | Returns | Purpose |
+|---|---|---|
+| `sheet_metal_unfold(base_width, base_depth, flange_length, bend_angle_deg, bend_radius, thickness, k_factor)` | `dict` | Compute developed length + bend-line table |
+| `sheet_metal_flat_pattern(unfold_result)` | `dict` | Emit flat-pattern as DXF R12 string |
+| `sheet_metal_flange(...)` | `dict` | Append flange feature to `.feature` file |
+
+## Example
+
+```python
+r = sheet_metal_unfold(100, 50, 40, 90, 3.0, 1.5, 0.33)
+# r["developed_length_mm"] = 100 + BA(90°, r=3, t=1.5, k=0.33)
+# r["bend_lines"] = [{"position_mm": ..., "angle_deg": 90}]
+```
 
 ## Honest caveats
 
-K-factor values in the bend table are typical mid-thickness values for common material/tooling combinations. Actual K-factors depend on punch angle, die opening, and material lot — measure from physical sample bends for production tooling setup. The flat-pattern algorithm unfolds in reverse-bend order; complex flanged parts with multiple bends at different axes may not unfold correctly and require manual sequence specification.
+Multi-flange sequences (successive bends on the same blank) are deferred to T-4. Material-specific K-factor lookup from a database is not yet implemented — pass k_factor explicitly (0.33 for soft metals, 0.45 for mild steel, 0.50 for stiff alloys). The OCCT flange B-rep requires `pythonocc-core`; the unfold/DXF functions are pure Python and always available.
+
+## References
+
+- SMACNA (2005). *Architectural Sheet Metal Manual*, 7th ed. §2 (bend allowance).
+- Oehler, L.K. & Kaiser, R.E. (1966). Bending in sheet metal. *Trans. ASME B*, 88(4).

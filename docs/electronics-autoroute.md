@@ -1,50 +1,74 @@
-# PCB Autorouting and Push-Shove
+# PCB Auto-Routing (FreeRouting)
 
-*Domain: Electronics · Module: `packages/kerf-electronics/src/kerf_electronics/routes_autoroute.py` · Shipped: Wave 9*
+> Automatic PCB trace routing via the FreeRouting push-and-shove router, driven from CircuitJSON netlists through a Specctra DSN/SES pipeline.
 
-## Overview
+**Module**: `packages/kerf-electronics/src/kerf_electronics/freerouting/freerouting.py`
+**Shipped**: Wave 8
+**LLM tools**: `electronics_autoroute`
 
-PCB autorouting via FreeRouting (external JVM-based router) with a push-shove pre-pass for congestion relief. Takes a CircuitJSON netlist, places components (or uses existing placements), runs FreeRouting with configurable design rules (clearance, via drill, copper weight), and returns a fully-routed CircuitJSON with trace geometry, via placements, and DRC status. The push-shove pre-pass implements the KiCad-compatible shove algorithm in Python for trace rip-up and re-route.
+---
 
-## When to use
+## What it is
 
-- Automatically routing all nets on a new PCB design.
-- Rerouting a specific net after a component change.
-- Checking if a board is routable under given design rules before manual routing.
+Manual PCB routing is tedious for boards with more than a few dozen nets. FreeRouting is a mature open-source push-and-shove auto-router that produces high completion rates on multi-layer boards. Kerf wraps it in a subprocess pipeline: the CircuitJSON board is exported to Specctra DSN format, FreeRouting routes it, the SES session file is read back, and the resulting traces are merged into the CircuitJSON.
 
-## API
+## How to use it
+
+### From chat
+
+> "Auto-route all unrouted connections on my PCB using FreeRouting with 0.15 mm minimum trace width. Show me the completion rate."
+
+### From Python
 
 ```python
-from kerf_electronics.routes_autoroute import (
-    autoroute_board, AutorouteConfig,
-)
+from kerf_electronics.freerouting.freerouting import run_freerouting
 
-config = AutorouteConfig(
-    clearance_mm=0.15,
-    trace_width_mm=0.2,
-    via_drill_mm=0.3,
-    via_annular_mm=0.5,
-    max_passes=10,
-)
-
-result = autoroute_board(
+result = run_freerouting(
     circuit_json=circuit,
-    config=config,
+    min_trace_width_mm=0.15,
+    passes=3
 )
-
-print(result["completion_pct"])
-print(result["unrouted_nets"])
+print(f"Routed: {result['routed_count']}/{result['total_count']} nets")
+print(f"Completion: {result['completion_pct']:.1f}%")
 ```
 
-## LLM tools
+### From an LLM tool spec
 
-`pcb_autoroute`, `pcb_push_shove`
+```json
+{"circuit_json_id": "<uuid>", "min_trace_width_mm": 0.15,
+ "passes": 3, "layer_count": 2}
+```
 
-## References
+## How it works
 
-- FreeRouting, Alfons Wirtz, open-source PCB router (github.com/freerouting/freerouting).
-- Mikami-Tabuchi algorithm for maze routing (Mikami & Tabuchi, 1968).
+1. `dsn_writer.py` converts CircuitJSON board geometry (components, pads, keepouts) to a Specctra DSN text file in the FreeRouting format.
+2. FreeRouting JAR (v1.9.0, SHA-256 pinned) is invoked as a subprocess: `java -jar freerouting.jar -de input.dsn -do output.ses`.
+3. `ses_reader.py` parses the resulting Specctra SES session file and extracts routed wire coordinates.
+4. Routes are merged back into the CircuitJSON as `pcb_trace` elements.
+
+Java 17+ must be installed. The JAR is downloaded and cached at `~/.cache/kerf/freerouting/` on first use with SHA-256 integrity verification.
+
+## API reference
+
+| Function | Returns | Purpose |
+|---|---|---|
+| `run_freerouting(circuit_json, min_trace_width_mm, passes)` | `dict` | Full auto-route pipeline |
+| `write_dsn(circuit_json)` | `str` | CircuitJSON → Specctra DSN |
+| `read_ses(ses_text, circuit_json)` | `dict` | Merge SES routes back |
+
+## Example
+
+```python
+from kerf_electronics.freerouting.dsn_writer import write_dsn
+dsn = write_dsn(circuit_json)
+print(dsn[:200])  # Specctra DSN preamble
+```
 
 ## Honest caveats
 
-Autorouting quality depends on component placement and board density. FreeRouting is a Java process and requires JVM 17+ to be available on the server. Differential pair routing and length-matching are not supported by the autorouter integration — route these manually. High-speed signals should have their routing reviewed by a signal integrity engineer regardless of DRC pass status.
+FreeRouting requires Java 17+ on the host — Kerf does not bundle a JRE. The JAR is downloaded automatically but blocked by corporate firewalls; manual placement at the cache path bypasses the download. Differential pairs, length-matched nets, and controlled-impedance rules require net class annotations in the DSN that Kerf does not yet emit — route these manually. Completion rate on dense 4+ layer boards is typically 85–95%.
+
+## References
+
+- Muller, A. (2008). FreeRouting open-source auto-router. *EDA Café* community project.
+- IPC-2141A (2004). *Controlled Impedance Circuit Boards and High Speed Logic Design*. §5.

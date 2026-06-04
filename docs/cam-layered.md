@@ -1,54 +1,75 @@
-# CAM Layered Toolpath Generation
+# Layered CAM (HSM Pocket / Slot / Rest)
 
-*Domain: CAM · Module: `packages/kerf-cad-core/src/kerf_cad_core/cam_layered.py` · Shipped: Wave 6*
+> High-speed machining strategies — constant engagement, trochoidal, and rest passes — with no external CAM library required.
 
-## Overview
+**Module**: `packages/kerf-cam/src/kerf_cam/adaptive.py`
+**Shipped**: Wave 7
+**LLM tools**: `hsm_adaptive_pocket`, `hsm_trochoidal_slot`, `hsm_rest_machining`
 
-Generates 2.5D layered toolpaths (pocket clearing, contour finishing, drilling) from a 2-D sketch or BRep face boundary. Produces G-code for CNC mills and routers with configurable stepdown, stepover, climb/conventional milling, lead-in/out, and tool-change macros. Used as the primary toolpath generator for 2.5D prismatic parts; 3-D surface toolpaths are handled by the CAM wizard's parallel-finishing and waterline strategies.
+---
 
-## When to use
+## What it is
 
-- Generating a pocket-clearing toolpath for a machined pocket from a sketch.
-- Contouring the perimeter of a 2-D profile with finish allowance.
-- Drilling a pattern of holes at specified depths and feed/speed conditions.
+Layered CAM covers the three most common 2.5D HSM strategies for milling flat pockets and slots in soft-to-hard metals. Traditional raster clearing forces the tool through abrupt direction reversals that spike radial chip load; HSM keeps engagement bounded throughout, enabling high feedrates and long tool life.
 
-## API
+Use this when you need: (1) adaptive pocket clearing where the boundary is a closed polygon, (2) trochoidal slot milling where a slot is narrower than ~2× tool diameter, or (3) a clean-up pass after a large tool leaves material in corners.
+
+## How to use it
+
+### From chat
+
+> "Generate an adaptive clearing toolpath for a 100 mm × 80 mm rectangular pocket using a 10 mm end-mill, 30% engagement, 2 mm depth, 2000 mm/min feed."
+
+### From Python
 
 ```python
-from kerf_cad_core.cam_layered import (
-    LayeredCAMConfig, generate_pocket_toolpath,
-    generate_contour_toolpath, toolpath_to_gcode,
-)
+from kerf_cam.adaptive import adaptive_pocket, trochoidal_slot, rest_machining
 
-config = LayeredCAMConfig(
-    tool_diameter_mm=6.0,
-    spindle_rpm=18000,
-    feed_mm_min=1200,
-    plunge_mm_min=400,
-    stepdown_mm=2.0,
-    stepover_frac=0.45,
-    milling_direction="climb",
-    finish_allowance_mm=0.1,
-)
-
-tp = generate_pocket_toolpath(
-    boundary_polyline=[[0,0],[60,0],[60,40],[0,40],[0,0]],
-    depth_mm=10.0,
-    config=config,
-)
-
-gcode = toolpath_to_gcode(tp, machine="grbl")
+boundary = [(0,0),(100,0),(100,80),(0,80)]
+result = adaptive_pocket(boundary, tool_diameter=10.0,
+                         engagement_fraction=0.30, depth=2.0, feed=2000.0)
+print(result["metadata"])  # rings, actual_max_engagement_mm
 ```
 
-## LLM tools
+### From an LLM tool spec
 
-`cam_layered_pocket`, `cam_layered_contour`, `cam_layered_drill`
+```json
+{"boundary": [[0,0],[100,0],[100,80],[0,80]],
+ "tool_diameter": 10.0, "engagement_fraction": 0.30,
+ "depth": 2.0, "feed": 2000.0}
+```
 
-## References
+## How it works
 
-- Smid, *CNC Programming Handbook*, 3rd ed. (2008).
-- Nee et al., *Computer-Aided Process Planning* (1995).
+`adaptive_pocket` iteratively offsets the pocket boundary inward by `step_over = engagement_fraction × D` using vertex-normal bisector averaging. Self-intersecting rings are screened by a raster point-in-polygon filter. Consecutive rings connect via short chord transitions to avoid retract overhead; corner transitions run at 60% nominal feed.
+
+`trochoidal_slot` walks the slot centreline in increments of `trochoid_radius` and emits one full circle per step. Successive circles overlap by 50%, guaranteeing full slot width coverage while peak radial engagement equals `trochoid_radius`.
+
+`rest_machining` builds a pixel grid at 0.5 mm resolution, marks every cell inside the boundary not swept by the prior large-tool path, and generates a zigzag small-tool clearing pass over those regions.
+
+## API reference
+
+| Function | Returns | Purpose |
+|---|---|---|
+| `adaptive_pocket(boundary, tool_diameter, engagement_fraction, depth, feed)` | `dict` | Inward-spiral adaptive clearing |
+| `trochoidal_slot(slot_polyline, tool_diameter, trochoid_radius, feed)` | `dict` | Loop-based slot milling |
+| `rest_machining(prior_toolpaths, boundary, large_tool_diameter, small_tool_diameter, feed)` | `dict` | Corner/remnant clearing |
+
+All return `{polylines, feeds, total_length, metadata}`.
+
+## Example
+
+```python
+slot = [(0, 0), (150, 0)]
+r = trochoidal_slot(slot, tool_diameter=6.0, trochoid_radius=2.5, feed=1800.0)
+print(f"{r['metadata']['circles']} circles, {r['total_length']:.1f} mm path")
+```
 
 ## Honest caveats
 
-Toolpaths are generated in 2.5D (constant Z layers). 3-D simultaneous 5-axis moves require the `cam_wizard` 3-D strategies. Lead-in/out geometry is a simple ramp or arc; sophisticated tool engagement control (adaptive clearing) is not implemented. Tool radius compensation (G41/G42) is applied at the G-code level using the configured tool diameter.
+The polygon-offset method uses first-order vertex-normal averaging; very tight concave corners (< 8.6°) are clamped. No 3D gouge check — verify the toolpath in a simulator before cutting. The grid resolution for rest machining defaults to 0.5 mm; for large parts reduce it or the grid becomes slow. G-code emission requires kerf-cam posts.
+
+## References
+
+- Ibaraki, S. et al. (2010). Cutting performance of a new adaptive control system for milling. *Int. J. Mach. Tools Manuf.* 50(7), 649–656.
+- Yao, Z. et al. (2018). Trochoidal milling review. *Int. J. Adv. Manuf. Technol.* 98, 2767–2786.

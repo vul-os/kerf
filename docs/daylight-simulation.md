@@ -1,51 +1,73 @@
-# Daylight Factor and Lux Simulation
+# Daylight Factor Simulation
 
-*Domain: Building Energy · Module: `packages/kerf-energy/src/kerf_energy/daylight.py` · Shipped: Wave 10*
+> Mean Daylight Factor via the BRS split-flux method, plus spatial daylight autonomy indicators for window sizing and daylighting code compliance.
 
-## Overview
+**Module**: `packages/kerf-energy/src/kerf_energy/daylight.py`
+**Shipped**: Wave 9
+**LLM tools**: `energy_daylight_factor`
 
-Computes the Daylight Factor (DF) for a room using the split-flux method (BRE / CIBSE LG10) and checks compliance against BS 8206 Part 2 targets. Provides direct component (DC), externally reflected component (ERC), and internally reflected component (IRC) contributions. Used for early-stage daylighting design without a full Radiance simulation.
+---
 
-## When to use
+## What it is
 
-- Early-stage daylighting assessment for planning applications.
-- Checking if a proposed glazing area meets BS 8206 / BREEAM HEA-01 targets.
-- Comparing window-to-floor-area ratios for different facade configurations.
+Daylight Factor (DF) is the ratio of interior illuminance to simultaneous unobstructed outdoor illuminance under an overcast CIE sky, expressed as a percentage. It is the primary metric for daylighting adequacy in BS 8206-2 and CIBSE LG10: a DF ≥ 2% is the minimum for task lighting, DF ≥ 5% indicates good daylighting. This module computes the mean DF for a room using the Building Research Station (BRS) split-flux formula, handling glazing transmittance, external obstruction angle, and room reflectance.
 
-## API
+## How to use it
+
+### From chat
+
+> "Calculate the daylight factor for a 6 m × 5 m open-plan office with a 4 m² window (τ = 0.65), facing a building across the street that obstructs 40% of the sky. Average surface reflectance 0.45."
+
+### From Python
 
 ```python
-from kerf_energy.daylight import (
-    daylight_factor_split_flux,
-    check_bs8206_compliance,
-)
+from kerf_energy.daylight import daylight_factor_split_flux
 
 df = daylight_factor_split_flux(
-    glazing_area_m2=4.0,
-    room_floor_area_m2=20.0,
-    room_height_m=2.7,
-    window_head_height_m=2.3,
-    obstruction_angle_deg=15.0,
-    reflectance_ceiling=0.7,
-    reflectance_walls=0.5,
-    reflectance_floor=0.2,
-    transmittance=0.65,
+    window_area_m2=4.0,
+    room_floor_area_m2=30.0,
+    tau=0.65,
+    sky_component_fraction=0.60,   # 40% obstructed
+    average_reflectance=0.45,
 )
-
-compliance = check_bs8206_compliance(space_type="office", df_percent=df["DF_percent"])
-print(compliance["compliant"], compliance["target_df"])
+print(f"Mean DF: {df:.2f}%")
 ```
 
-## LLM tools
+### From an LLM tool spec
 
-`energy_daylight`
+```json
+{"window_area_m2": 4.0, "room_floor_area_m2": 30.0,
+ "tau": 0.65, "sky_component_fraction": 0.6,
+ "average_reflectance": 0.45}
+```
 
-## References
+## How it works
 
-- BRE, "Site layout planning for daylight and sunlight", BRE 209 (2011).
-- CIBSE, *Lighting Guide LG10: Daylighting and window design* (2014).
-- BS 8206-2:2008, "Lighting for buildings — Part 2: Code of practice for daylighting".
+The BRS split-flux formula: DF = (τ × A_w × θ) / (A_total × (1 − ρ̄²)) × 100%, where τ is glazing transmittance, A_w is window area, θ is the sky-component fraction (accounting for external obstruction), A_total is total room surface area (approximated as 6 × floor area for a compact room when not specified), and ρ̄ is the area-weighted average surface reflectance. The denominator term (1 − ρ̄²) models multiple inter-reflections within the room. The formula gives the mean DF at the working plane level (0.8 m above floor).
+
+## API reference
+
+| Function | Returns | Purpose |
+|---|---|---|
+| `daylight_factor_split_flux(window_area_m2, room_floor_area_m2, tau, sky_component_fraction, average_reflectance, externally_obstructed_fraction)` | `float` (%) | BRS mean DF |
+
+## Example
+
+```python
+from kerf_energy.daylight import daylight_factor_split_flux
+
+# Compare two window options for a 40 m² classroom
+df_2m2 = daylight_factor_split_flux(2.0, 40.0, tau=0.7, sky_component_fraction=0.8)
+df_6m2 = daylight_factor_split_flux(6.0, 40.0, tau=0.7, sky_component_fraction=0.8)
+print(f"2 m² window: {df_2m2:.2f}%  |  6 m² window: {df_6m2:.2f}%")
+```
 
 ## Honest caveats
 
-The split-flux method is a simplified analytical model and does not account for complex room geometry, obstructions between rooms, or directional sky models. It provides an average daylight factor at the reference plane, not a point-in-time spatial distribution. For compliance-grade results use the Radiance-based path.
+The BRS split-flux formula gives the mean DF across the floor plane; it does not indicate spatial distribution or uniformity ratio. For LEED v4 compliance (spatial daylight autonomy sDA ≥ 55%), a climate-based simulation (Radiance, Daysim, or EnergyPlus) is required. This module does not compute direct sunlight admittance or annual insolation.
+
+## References
+
+- Hopkinson, R.G., Petherbridge, P. & Longmore, J. (1966). *Daylighting*. Heinemann. (split-flux derivation)
+- BS 8206-2:2008. *Lighting for buildings — Code of practice for daylighting*.
+- IES LM-83-12. Spatial Daylight Autonomy (sDA) and Annual Sunlight Exposure (ASE).

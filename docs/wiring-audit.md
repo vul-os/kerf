@@ -152,7 +152,7 @@ Legend:
 | Package | Capability | Frontend Status | Notes |
 |---------|-----------|-----------------|-------|
 | kerf-cad-core | OCCT B-rep kernel (Phase 2–3) | **Wired** | `occtWorker.js` + `occtRunner.js`; full Pad/Pocket/Fillet pipeline |
-| kerf-cad-core | NURBS surfacing (Phase 4) | **Wired** | MatchSrf G3, trim-by-curve, surface booleans, analytic derivatives, Stam limit-tangents, far-offset, iso-curve extraction — all shipped; frontend via `subd.js` + `occtWorker.js` |
+| kerf-cad-core | NURBS surfacing (Phase 4) | Partial | `surfacing.py`; frontend `subd.js`; NURBS long-tail |
 | kerf-cad-core | Sketch solver (PlaneGCS) | **Wired** | `sketchSolver.js` + WASM; full constraint solving |
 | kerf-cad-core | Sheet metal (bend table) | Partial | `sheet_metal.py`; no dedicated UI panel |
 | kerf-cad-core | Thread features | No route | `feature_thread.py`; OCCT only |

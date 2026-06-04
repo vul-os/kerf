@@ -182,7 +182,7 @@ Legend: ✅ solid · ⚠️ partial / sampling-grade / unwired · ❌ missing.
 | Rational derivatives | ✅ `nurbs.py:rational_curve_derivative` | correct quotient rule |
 | `curve_derivative` (public) | ⚠️ `nurbs.py:126` | wrongly normalises; callers must use rational variant |
 | Knot insert/refine/remove/elevate/reduce | ✅ `nurbs.py` | Tiller removal w/ exact test; reduction gated |
-| Split / reparam | ✅ `geom/curve_split.py:split_curve_at, split_curve_at_multiple, split_surface_at_u/v` (GK-P06) | Piegl–Tiller §5.3 full-mult knot insertion; rational-correct; 25 tests |
+| Split / reparam | ✅ `nurbs.py:split_curve, reparameterize` | |
 | Exact circle / conic (rational) | ⚠️ `nurbs.py:make_circle_nurbs` non-rational; `curve_toolkit.conic` | circle is an approximation — breaks "exact radius" oracles |
 | Interpolate / fit to tolerance | ⚠️ `curve_toolkit.interp_curve, fit_curve` | uniform knots, brute CP count; no Piegl–Tiller knot placement |
 | Fair / rebuild / simplify | ⚠️ `curve_toolkit.fair_curve, rebuild_curve, simplify_curve` | smoothing only, no curvature target |
@@ -200,7 +200,7 @@ Legend: ✅ solid · ⚠️ partial / sampling-grade / unwired · ❌ missing.
 | Rhino / OpenNURBS capability | Kerf status | Gap notes |
 |---|---|---|
 | Evaluate | ⚠️ two evaluators: `nurbs.surface_evaluate` (buggy basis, per `intersection.py` docstring) vs `intersection._nurbs_surface_eval` (correct) | duplicate, one wrong; must unify |
-| Surface derivatives / normal | ✅ `geom/surface_analytic_derivatives.py` (P&T A3.6/A4.4) + `geom/nurbs_derivative.py` | analytic derivatives; K/H curvature; SSI marcher (Wave 8A4) |
+| Surface derivatives / normal | ⚠️ `nurbs.surface_derivative` FD only | caps curvature/continuity accuracy |
 | Loft / network / skin | ✅ `network_srf.py` | broad |
 | Sweep1 / Sweep2 (twist, scale) | ✅ `sweep1.py`, `sweep2.py` | Frenet frame; no rotation-minimising frame |
 | Revolve / rail-revolve | ✅ `revolve_srf.py` | true arc CPs |
@@ -211,7 +211,7 @@ Legend: ✅ solid · ⚠️ partial / sampling-grade / unwired · ❌ missing.
 | Match surface G0/G1/G2 | ✅⚠️ `match_srf.py` | applies + classifies; needs analytic verification |
 | Fillet / chamfer (surface) | ⚠️ `surface_fillet.py` | not G1/G2, no support trim, no body |
 | Variable-radius fillet | ⚠️ `surface_fillet.variable_radius_surface_fillet` | rail only, no continuity |
-| Trim / split by curve | ✅ `trim_curve.py` + `trim_loop_heal.py` + `trim_validation.py` | UV Newton projection; OCCT BRepFeat_SplitShape/BRepProj bridge in `occtBridge.js`; loop healing + validation shipped (Wave 8A2) |
+| Trim / split by curve | ⚠️ `trim_curve.py` | UV projection FD Newton; no SSI-driven trim |
 | Untrim / shrink trimmed srf | ❌ | missing |
 | Offset surface | ❌ | missing (only `mesh_repair.mesh_offset`) |
 | Curvature (Gaussian/mean/principal) | ⚠️ `surface_analysis.gaussian_mean_curvature` | not validated vs analytic K |
@@ -1197,7 +1197,6 @@ layer (history/UI/CAM/FEM packages), not the geometry kernel.
 | Knot insertion / refinement | ✅ |
 | Degree elevation | ✅ · reduction 🟡 GK-135 |
 | Knot removal / minimal-CP refit | 🟡 GK-102 |
-| Bezier extraction (B-spline → multi-Bezier, FEA/GPU/IGES) | ✅ GK-P (bezier_extract.py) |
 
 ### B. Curves
 | Capability | Status |
@@ -1224,7 +1223,6 @@ layer (history/UI/CAM/FEM packages), not the geometry kernel.
 | Sweep1 / Sweep2 / SweepN | ✅ GK-14/15/16/90 |
 | Loft / skin / revolve | ✅ |
 | Coons / patch / network / Gordon | ✅ GK-42 |
-| N-sided patch (Coons + Gregory + Hosaka-Kimura) | ✅ GK-P (`network_surface.py`) |
 | Blend G1 / G2 / G3 | ✅ GK-43/62 (G3 wired GK-P01) |
 | Variable-radius fillet (G1) | ✅ GK-28 |
 | Match-surface (G1/G2 verify) | ✅ GK-44 |
@@ -1241,7 +1239,6 @@ layer (history/UI/CAM/FEM packages), not the geometry kernel.
 | Hausdorff deviation | ✅ GK-37 |
 | Class-A hotspot report | ✅ (`leading.py`, wired GK-P03) |
 | Global continuity audit (whole body) | ✅ GK-138 (wired GK-P04) |
-| Characteristic curve extraction (Pottmann-Wallner §11) | ✅ GK-P49 — ridge/valley/parabolic/umbilic wired |
 
 ### D. Solid B-rep
 | Capability | Status |
@@ -1267,9 +1264,7 @@ layer (history/UI/CAM/FEM packages), not the geometry kernel.
 | Direct edit (move-face / push-pull) | 🟡 GK-134 |
 | Tangent-chain edge select | 🟡 GK-131 |
 | G3 chain blend | ✅ GK-132 (wired GK-P05) |
-| NURBS curve/surface split at parameter | ✅ `geom/curve_split.py` (GK-P06) |
 | Mass properties | ✅ GK-23 |
-| Multi-density assembly + void mass props (Mortenson §11) | ✅ GK-P mass_props_multi |
 | Wall thickness | ✅ GK-76 |
 | Draft analysis | ✅ GK-92 |
 | Undercut detection | 🟡 GK-121 |
@@ -1282,16 +1277,11 @@ layer (history/UI/CAM/FEM packages), not the geometry kernel.
 | Cage authoring + primitives | ✅ |
 | Extrude / bevel / loop-cut / crease | ✅ |
 | SubD ↔ NURBS (Catmull-Clark limit, Stam) | ✅ GK-52/53 |
-| SubD limit principal directions (κ_1, κ_2, d_1, d_2) | ✅ GK-P (subd_limit_principal_dirs) |
 | Loop slide | ✅ GK-88 |
-| Stam-exact limit curvature evaluation (K, H, κ₁/κ₂, extraordinary verts) | ✅ GK-P |
-| Ridge / valley / parabolic-line detection (limit surface) | ✅ GK-P (`subd_ridge_valley.py`) |
 | Edge slide / vertex slide | 🟡 GK-104/105 |
 | Edge split | 🟡 GK-106 |
 | Bevel weight (graded crease) | 🟡 GK-107 |
 | Loop subdivision (triangle scheme) | 🟡 GK-108 |
-| SubD limit-surface area + volume (Stam-quadrature) | ✅ GK-P-area-vol |
-| Stam-exact arbitrary-order limit derivative | ✅ GK-P (`subd_limit_derivative.py`) |
 
 ### F. Mesh & implicit
 | Capability | Status |
@@ -1320,7 +1310,6 @@ layer (history/UI/CAM/FEM packages), not the geometry kernel.
 | Region boolean (planar loops) | ✅ GK-56 |
 | Hidden-line 2D projection | ✅ (`make2d.py`) |
 | Section / cross-section contour | ✅ (`section_contour.py`) |
-| NURBS silhouette projection to plane (Hertzmann 2000) | ✅ (`geom/nurbs_projection.py`) — sign-change grid locus trace, NURBS curve fit, visible/hidden layer output, LLM tool `drawing_silhouette_projection` |
 
 ### I. Manufacturing prep
 | Capability | Status |

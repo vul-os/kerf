@@ -1,50 +1,74 @@
-# PVT Corner and Monte Carlo SPICE Analysis
+# PVT Corner & Monte-Carlo Analysis
 
-*Domain: Electronics · Module: `packages/kerf-electronics/src/kerf_electronics/sim_corner.py` · Shipped: Wave 10*
+> Deterministic Monte-Carlo and worst-case corner simulation for small analog netlists — DC operating point, AC transfer function, sensitivity ranking.
 
-## Overview
+**Module**: `packages/kerf-electronics/src/kerf_electronics/sim_corner.py`
+**Shipped**: Wave 9
+**LLM tools**: `electronics_pvt_corner`, `electronics_monte_carlo`
 
-Runs DC operating point, AC transfer function, corner analysis, Monte Carlo yield, sensitivity analysis, and temperature sweep simulations on SPICE netlists using a pure-Python MNA (Modified Nodal Analysis) solver. Covers resistors, capacitors, inductors, voltage sources, current sources, and diodes. Monte Carlo sampling uses a seeded LCG with Box-Muller Gaussian transforms for yield estimation.
+---
 
-## When to use
+## What it is
 
-- Quick DC/AC verification of a netlist before running ngspice.
-- Corner analysis across process/voltage/temperature variations.
-- Monte Carlo yield estimation for tolerance-critical designs.
-- Sensitivity sweep to identify which component values affect the output most.
+Analog circuits must work not just at nominal component values but across all combinations of process (component tolerances), voltage (supply variation), and temperature (operating range) — collectively PVT corners. A filter that rolls off at 10 kHz at nominal could shift to 8 kHz or 12 kHz at worst-case component tolerance. This module runs pure-Python corner and Monte-Carlo analysis on R/C/L netlists using Modified Nodal Analysis (MNA), with no external SPICE required.
 
-## API
+## How to use it
+
+### From chat
+
+> "Run Monte-Carlo analysis on my RC low-pass filter: R1 = 10k ±5%, C1 = 10 nF ±10%. 1000 runs. What is the 3σ bandwidth spread?"
+
+### From Python
 
 ```python
-from kerf_electronics.sim_corner import (
-    run_dc_op, run_ac_transfer,
-    corner_analysis, monte_carlo,
-    sensitivity_analysis, tempco_sweep,
-)
+from kerf_electronics.sim_corner import run_monte_carlo
 
 netlist = [
-    {"type": "R", "name": "R1", "nodes": ["in", "out"], "value": 1e3},
-    {"type": "C", "name": "C1", "nodes": ["out", "gnd"], "value": 1e-9},
-    {"type": "V", "name": "Vin", "nodes": ["in", "gnd"], "value": 1.0},
+    {"ref": "R1", "type": "R", "nodes": ["in", "mid"], "value": 10e3, "tol_pct": 5.0},
+    {"ref": "C1", "type": "C", "nodes": ["mid", "0"], "value": 10e-9, "tol_pct": 10.0},
+    {"ref": "V1", "type": "V", "nodes": ["in", "0"], "value": 1.0},
 ]
-
-dc = run_dc_op(netlist, values={}, nodes_of_interest=["out"])
-ac = run_ac_transfer(netlist, values={}, f_start=1e3, f_stop=1e9, n_pts=50)
-
-# 3-corner analysis (min/typ/max)
-corners = corner_analysis(netlist, param="R1",
-                          nominal=1e3, spread_frac=0.05)
+result = run_monte_carlo(netlist, n_runs=1000, seed=42,
+                         output_node="mid", freq_hz=1591.5)
+print(f"|H| mean: {result['mean']:.4f}, σ: {result['std']:.4f}")
 ```
 
-## LLM tools
+### From an LLM tool spec
 
-`run_mc_corner_analysis`
+```json
+{"netlist": [{"ref":"R1","type":"R","nodes":["in","mid"],
+              "value":10000,"tol_pct":5},
+             {"ref":"C1","type":"C","nodes":["mid","0"],
+              "value":1e-8,"tol_pct":10}],
+ "n_runs": 1000, "output_node": "mid", "freq_hz": 1591.5}
+```
 
-## References
+## How it works
 
-- Nagel, "SPICE2: A computer program to simulate semiconductor circuits", *UCB/ERL M520*, 1975.
-- Tuinenga, *SPICE: A Guide to Circuit Simulation and Analysis*.
+The DC solver uses Modified Nodal Analysis (MNA): node voltages and branch currents are the unknowns; conductance and source matrices are assembled per element type. Nonlinear devices (diode, ideal opamp) use Newton iteration (≤ 50 steps, 10⁻⁹ V tolerance). AC analysis builds a complex admittance matrix at the specified frequency and solves for complex node voltages. Monte-Carlo uses a seeded LCG random-number generator with Box-Muller transform for Gaussian-distributed tolerances — results are deterministic and reproducible. Corner analysis sweeps all 2^N min/max combinations of tolerance parameters.
+
+## API reference
+
+| Function | Returns | Purpose |
+|---|---|---|
+| `run_monte_carlo(netlist, n_runs, seed, output_node, freq_hz)` | `dict` | MC statistics |
+| `run_corners(netlist, output_node, freq_hz)` | `dict` | Worst-case corners |
+| `run_dc(netlist)` | `dict` | DC operating point |
+| `sensitivity_analysis(netlist, output_node, freq_hz)` | `list[dict]` | Per-component dOut/dParam |
+
+## Example
+
+```python
+from kerf_electronics.sim_corner import run_corners
+r = run_corners(netlist, output_node="mid", freq_hz=1591.5)
+print("Min |H|:", r["min_output"], "Max |H|:", r["max_output"])
+```
 
 ## Honest caveats
 
-The MNA solver supports resistors, capacitors, inductors, voltage sources, current sources, and a piece-wise-linear diode. Bipolar transistors, MOSFETs, and transmission lines are not implemented — for those, use the ngspice bridge. AC analysis uses small-signal linearisation around the DC operating point; nonlinear behaviour under large signals is not captured.
+The netlist supports R, C, L, V, I, ideal diode, and ideal opamp only — no BJT, MOSFET, or controlled sources beyond the opamp model. Convergence is not guaranteed for strongly nonlinear circuits or circuits with positive feedback. AC analysis is single-frequency; swept-frequency Bode plots require calling `run_ac` in a loop.
+
+## References
+
+- Pilkington, M. (2004). *SPICE: A Guide to Circuit Simulation and Analysis*. Prentice Hall. §3 (MNA formulation).
+- Razavi, B. (2001). *Design of Analog CMOS Integrated Circuits*. McGraw-Hill. §2 (PVT corners).

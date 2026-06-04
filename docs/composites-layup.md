@@ -1,52 +1,79 @@
-# Composite Laminate Analysis (CLT)
+# Composite Laminate Layup
 
-*Domain: Manufacturing — Composites · Module: `packages/kerf-composites/src/kerf_composites/clt.py` · Shipped: Wave 9*
+> Classical Laminate Theory (CLT) ABD matrix, failure-index computation, and flat-to-surface drape simulation for fibre-reinforced composites.
 
-## Overview
+**Module**: `packages/kerf-composites/src/kerf_composites/layup.py`, `clt.py`, `failure.py`, `drape.py`
+**Shipped**: Wave 9
+**LLM tools**: `composites_clt`, `composites_failure`, `composites_drape`
 
-Classical Lamination Theory (CLT) analysis for fibre-reinforced polymer laminates. Computes the ABD stiffness matrix (membrane A, bending-membrane coupling B, bending D), effective engineering constants, per-ply stress/strain in material coordinates, and first-ply failure using Tsai-Wu, Tsai-Hill, Hashin, and max-stress criteria. Companion modules cover AFP/ATL drapeability, interlaminar shear stress, and thermal residual stress.
+---
 
-## When to use
+## What it is
 
-- Sizing a composite laminate for a given in-plane load and bending moment.
-- Computing effective stiffness and thermal expansion coefficients for FEA material inputs.
-- First-ply failure prediction under combined in-plane loading.
-- Optimising ply orientations for stiffness or strength targets.
+Composites layup design requires three concurrent decisions: stacking sequence (ply angles), material selection, and drapeability. Getting any one wrong leads to delamination, warp after cure, or off-spec mechanical properties. This module gives you: (1) the CLT ABD stiffness matrix for any laminate, (2) Tsai-Wu and max-stress failure indices under in-plane loads, and (3) a geodesic drape preview to catch shear lock-up before the layup is cut.
 
-## API
+## How to use it
+
+### From chat
+
+> "Calculate the CLT stiffness matrix and Tsai-Wu failure index for a [0/±45/90]s T300/5208 carbon-epoxy laminate, 0.125 mm plies, under Nx = 500 N/mm."
+
+### From Python
 
 ```python
-from kerf_composites.clt import (
-    LaminatePly, LaminateLayup,
-    build_abd, effective_engineering_constants,
-    compute_ply_stresses, first_ply_failure,
+from kerf_composites.layup import LaminateLayup, T300_5208
+from kerf_composites.clt import build_abd, laminate_stiffness
+from kerf_composites.failure import tsai_wu_index
+
+layup = LaminateLayup.from_angles(
+    angles=[0, 45, -45, 90, 90, -45, 45, 0],
+    material=T300_5208,
+    ply_thickness=0.125
 )
-
-layup = LaminateLayup(plies=[
-    LaminatePly(theta=0,   t=0.125, material="T300_epoxy"),
-    LaminatePly(theta=45,  t=0.125, material="T300_epoxy"),
-    LaminatePly(theta=-45, t=0.125, material="T300_epoxy"),
-    LaminatePly(theta=90,  t=0.125, material="T300_epoxy"),
-])
-
 abd = build_abd(layup)
-eff = effective_engineering_constants(abd, total_thickness=0.5)
-
-# Apply in-plane load Nx=10 kN/m
-failure = first_ply_failure(layup, Nx=10e3, Ny=0, Nxy=0, criterion="tsai_wu")
-print(failure["safety_factor"])
+result = laminate_stiffness(abd, Nx=500.0, Ny=0.0, Nxy=0.0)
+fi = tsai_wu_index(result["ply_stresses"], T300_5208)
+print("Max Tsai-Wu index:", max(fi))
 ```
 
-## LLM tools
+### From an LLM tool spec
 
-`layup_analysis`, `composites_drape`, `composites_interlaminar`, `composites_thermal`
+```json
+{"angles": [0, 45, -45, 90, 90, -45, 45, 0],
+ "material": "T300_5208", "ply_thickness": 0.125,
+ "loads": {"Nx": 500, "Ny": 0, "Nxy": 0}}
+```
 
-## References
+## How it works
 
-- Jones, *Mechanics of Composite Materials*, 2nd ed. (1999).
-- Tsai & Wu, "A general theory of strength for anisotropic materials", *J. Composite Materials* 5, 1971.
-- Hashin, "Failure criteria for unidirectional fibre composites", *J. Appl. Mech.* 47, 1980.
+CLT builds the laminate stiffness via standard ply-transformation: each ply's reduced stiffness matrix Q is rotated to the laminate axes using the transformation matrix T(θ), then integrated through the thickness to form A (extensional), B (coupling), and D (bending) sub-matrices. Tsai-Wu failure index combines all six components of the stress state into a single scalar: F₁σ₁ + F₂σ₂ + F₁₁σ₁² + F₂₂σ₂² + F₆₆τ₁₂² + 2F₁₂σ₁σ₂ ≤ 1. Drape uses a discrete pin-jointed fishing-net algorithm placing nodes at geodesic distances from pinned rows/columns on the target surface.
+
+## API reference
+
+| Function | Returns | Purpose |
+|---|---|---|
+| `build_abd(layup)` | `np.ndarray` (6×6) | ABD stiffness matrix |
+| `laminate_stiffness(abd, Nx, Ny, Nxy)` | `dict` | Mid-plane strains + ply stresses |
+| `tsai_wu_index(ply_stresses, material)` | `list[float]` | Tsai-Wu FI per ply |
+| `drape_flat_to_surface(surface_fn, u_range, v_range, nu, nv)` | `DrapeResult` | Geodesic drape mapping |
+
+## Example
+
+```python
+# Check shear lock-up: max shear angle < 45° is the rule of thumb
+from kerf_composites.drape import drape_flat_to_surface
+import numpy as np
+
+surface = lambda u, v: (u, v, 0.01 * u**2)  # parabolic crown
+dr = drape_flat_to_surface(surface, (0,500), (0,300), nu=20, nv=12)
+print("Max shear angle:", dr.shear_angles.max(), "°")
+```
 
 ## Honest caveats
 
-CLT assumes plane-stress and perfect bonding between plies. Progressive failure, delamination, and geometric nonlinearity (large deflections) are not modelled. The material database covers common aerospace-grade laminates; custom materials can be specified as orthotropic moduli. First-ply failure identifies the first ply to fail, not the laminate ultimate load.
+CLT assumes plane stress (σ₃ = τ₁₃ = τ₂₃ = 0); through-thickness interlaminar stresses need a separate 3D analysis. The Tsai-Wu criterion requires the interaction coefficient F₁₂; this module defaults to F₁₂ = −0.5√(F₁₁·F₂₂) (Tsai-Hahn suggestion) — verify for your specific material. Drape is an inextensible-fabric approximation; extensible or pre-preg materials need FEA drape.
+
+## References
+
+- Reddy, J.N. (2003). *Mechanics of Laminated Composite Plates and Shells*, 2nd ed. CRC. §1–3.
+- Tsai, S.W. & Wu, E.M. (1971). A general theory of strength for anisotropic materials. *J. Compos. Mater.* 5(1), 58–80.

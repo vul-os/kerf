@@ -1,49 +1,71 @@
-# PCB DRC and ERC
+# PCB DRC & Schematic ERC
 
-*Domain: Electronics · Module: `packages/kerf-electronics/src/kerf_electronics/drc.py` · Shipped: Wave 9*
+> Design Rule Check (clearance, unrouted nets, missing footprints) and Electrical Rules Check (unconnected pins, driver conflicts) for PCB and schematic validation.
 
-## Overview
+**Module**: `packages/kerf-electronics/src/kerf_electronics/drc.py`, `schematic/capture.py`
+**Shipped**: Wave 8
+**LLM tools**: `electronics_run_drc`, `electronics_validate_erc`
 
-Design Rule Check (DRC) for PCB layouts and Electrical Rule Check (ERC) for schematics against CircuitJSON. DRC checks trace-to-trace clearance, trace-to-pad clearance, minimum annular ring, drill-to-drill spacing, board-edge clearance, silk-to-copper violations, and copper-pour isolation. ERC checks for floating nets, missing power symbols, unconnected pins, and duplicate refdes.
+---
 
-## When to use
+## What it is
 
-- Verifying a PCB layout before sending Gerbers to a fabrication house.
-- Checking a schematic for net connectivity errors before running simulation.
-- Automating board quality checks in a design review pipeline.
+DRC and ERC are the last line of defence before sending Gerbers to the fabricator or schematics to review. DRC catches physical spacing violations (copper-to-copper clearance, minimum trace width, unrouted connections) that cause manufacturing yield issues. ERC catches logical errors (floating pins, multiple drivers on one net, net name collisions) that indicate design intent errors. Running both is mandatory before generating fab output.
 
-## API
+## How to use it
+
+### From chat
+
+> "Run DRC on my PCB with IPC-2221B Class B rules. List all violations and their severity."
+
+### From Python
 
 ```python
-from kerf_electronics.drc import (
-    DRCRuleSet, run_drc, run_erc,
-    DRCViolation, ERCViolation,
-)
+from kerf_electronics.drc import run_drc, DEFAULT_RULES
 
-rules = DRCRuleSet(
-    min_trace_clearance_mm=0.15,
-    min_trace_width_mm=0.10,
-    min_drill_mm=0.25,
-    min_annular_ring_mm=0.125,
-    board_edge_clearance_mm=0.5,
-)
-
-drc_results = run_drc(circuit_json=board, rules=rules)
-erc_results = run_erc(circuit_json=schematic)
-
-for v in drc_results.violations:
-    print(v.rule, v.location, v.measured, v.required)
+violations = run_drc(circuit_json, rules=DEFAULT_RULES)
+print(f"Errors: {violations['error_count']}, Warnings: {violations['warning_count']}")
+for v in violations["violations"]:
+    print(f"[{v['severity']}] {v['kind']}: {v['message']} at ({v['x']:.2f}, {v['y']:.2f})")
 ```
 
-## LLM tools
+### From an LLM tool spec
 
-`pcb_drc`, `pcb_erc`
+```json
+{"circuit_json_id": "<uuid>",
+ "rules": {"min_clearance_mm": 0.2, "min_trace_width_mm": 0.15}}
+```
 
-## References
+## How it works
 
-- IPC-2221B, *Generic Standard on Printed Board Design* (clearances, annular ring).
-- IPC-7351C, *Land Pattern Standard for SMT Components*.
+DRC runs three check families: (1) **clearance** — pad-to-pad, pad-to-trace, and trace-to-trace distances are computed using a segment-distance formula with bounding-box pre-filtering; violations fire when separation < `min_clearance_mm`. (2) **unconnected pads** — any pad carrying a net_id not appearing as a route endpoint is flagged as unrouted. (3) **missing footprints** — schematic components without a matching PCB component are listed. ERC (in `schematic/capture.py`) checks for unconnected pins (no wire at pin coordinate), multiple voltage drivers on one net, net name collisions across sheets, and dangling wire ends.
+
+## API reference
+
+| Function | Returns | Purpose |
+|---|---|---|
+| `run_drc(circuit_json, rules)` | `dict` | PCB physical design rule check |
+| `validate_erc(schematic)` | `dict` | Schematic electrical rules check |
+
+`run_drc` returns: `{"violations": [...], "error_count": int, "warning_count": int}`. Each violation: `{kind, message, x, y, severity}`.
+
+## Example
+
+```python
+from kerf_electronics.drc import run_drc, DEFAULT_RULES
+
+# Stricter rules for high-density board
+tight = {**DEFAULT_RULES, "min_clearance_mm": 0.1}
+r = run_drc(circuit_json, rules=tight)
+errors = [v for v in r["violations"] if v["severity"] == "error"]
+print(f"{len(errors)} DRC errors with 0.1 mm rules")
+```
 
 ## Honest caveats
 
-DRC clearance checks use the component footprint bounding boxes as an approximation when exact pad geometry is not available in CircuitJSON. Complex polygon copper pours require exact polygon-boolean clearance checks which are computed at reduced resolution for large boards. ERC does not perform netlist-level gate-swap equivalence checking.
+DRC clearance checks use a geometric segment-distance test, not polygon expansion — complex pad shapes (rotated rectangles, thermal reliefs) may produce false negatives. The trace-to-trace check uses bounding-box pre-filtering which can miss diagonal traces at near-threshold spacing. ERC driver-conflict detection covers simple voltage sources and power pins; open-collector and tri-state logic are not modelled.
+
+## References
+
+- IPC-2221B (2012). *Generic Standard on Printed Board Design*. §6.3 (spacing requirements).
+- KiCad (2024). *DRC and ERC Reference*. docs.kicad.org.

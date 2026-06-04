@@ -1,49 +1,82 @@
-# FEM Modal Analysis and Buckling
+# FEM Modal Analysis and Euler Buckling
 
-*Domain: Structural FEM · Module: `packages/kerf-fem/src/kerf_fem/modal.py` · Shipped: Wave 9*
+> Compute natural frequencies, mode shapes, and Euler buckling loads for beams and columns — with a pure-Python Cholesky-Jacobi eigensolver.
 
-## Overview
+**Module**: `packages/kerf-fem/src/kerf_fem/modal.py`
+**Shipped**: Wave 9
+**LLM tools**: `fem_run`, `fem_buckling_linear`
 
-Computes natural frequencies and mode shapes for Euler-Bernoulli beam structures, and Euler buckling loads for columns, via a pure-Python generalised eigensolver (Cholesky + Jacobi). The `beam_natural_frequencies` function assembles consistent mass and stiffness matrices and returns angular frequencies, Hz values, and mode shapes. `euler_buckling_load` handles the four classical end-condition cases. For full 3-D modal/buckling, `fem_run` dispatches to CalculiX.
+---
 
-## When to use
+## What it is
 
-- Checking natural frequencies of a beam or frame against excitation frequencies.
-- Euler critical load estimation for slender column design per AISC / Eurocode.
-- Modal verification before running a 3-D CalculiX eigensolution.
+Modal analysis identifies the natural frequencies and mode shapes of a structure — the frequencies at which it will resonate under dynamic excitation. Engineers compare these against operating excitation frequencies to ensure resonance margins and to inform damping design. Buckling analysis predicts the critical compressive load at which a slender column or plate becomes unstable.
 
-## API
+This module solves the generalised eigenvalue problem Kφ = ω² Mφ using a Cholesky factorisation of M and a Jacobi sweep diagonalisation for the transformed symmetric eigenvalue problem. It covers Euler-Bernoulli beams (consistent mass and stiffness matrices), classical column buckling (four end conditions), and simply-supported rectangular plate first mode. For 3D modal/buckling, `fem_run` dispatches to CalculiX.
+
+## How to use it
+
+### From chat (natural language)
+
+> "What are the first 3 natural frequencies of a 2m simply-supported steel beam with IPE 200 section?"
+
+The LLM calls `fem_run` (modal) and returns the frequency table.
+
+### From Python
 
 ```python
 from kerf_fem.modal import (
-    beam_natural_frequencies,
-    euler_buckling_load,
+    beam_natural_frequencies, euler_buckling_load,
     plate_first_mode_simply_supported,
 )
 
-# Simply-supported steel beam
+# Simply-supported steel beam, IPE 200
 modes = beam_natural_frequencies(
-    E=200e9, I=8.3e-6, rho=7850, A=6.45e-3, L=2.0,
+    E=200e9, I=1.943e-5, rho=7850, A=2.848e-3, L=2.0,
     supports="simply_supported", n_modes=5, n_elem=20,
 )
 for m in modes["modes"]:
-    print(f"  f = {m['freq_hz']:.2f} Hz")
+    print(f"  f{m['mode']} = {m['freq_hz']:.2f} Hz")
 
-# Euler buckling (fixed-free column)
-buck = euler_buckling_load(E=200e9, I=8.3e-6, L=3.0, K_factor=2.0)
-print(buck["P_cr"])  # Newtons
+# Euler buckling, fixed-free column
+buck = euler_buckling_load(E=200e9, I=1.943e-5, L=3.0, K_factor=2.0)
+print(f"P_cr = {buck['P_cr_N']/1000:.2f} kN")
 ```
 
-## LLM tools
+### From an LLM tool spec
 
-`fem_run`, `fem_buckling_linear`, `fem_harmonic_response`, `fem_random_vibration_psd`
+```json
+{"tool": "fem_run", "type": "modal", "E": 200e9, "I": 1.943e-5,
+ "rho": 7850, "A": 2.848e-3, "L": 2.0, "n_modes": 5}
+```
 
-## References
+## How it works
 
-- Thomson, *Theory of Vibration with Applications*, 5th ed.
-- Euler, "De curvis elasticis" (1744) — buckling of slender columns.
-- Timoshenko & Gere, *Theory of Elastic Stability*, 2nd ed.
+The generalised eigenvalue problem Kφ = ω²Mφ is transformed to a standard symmetric form via Cholesky: M = LLᵀ, then K' = L⁻¹K(Lᵀ)⁻¹, solved by Jacobi sweeps (off-diagonal annihilation). Consistent mass matrices are used (exact for Euler-Bernoulli fields). Euler buckling: P_cr = π²EI / (KL)², where K is the effective-length factor (1=pin-pin, 0.5=fixed-fixed, 0.7=pin-fixed, 2=fixed-free).
+
+## API reference
+
+| Function | Returns | Purpose |
+|---|---|---|
+| `beam_natural_frequencies(E, I, rho, A, L, supports, n_modes, n_elem)` | `dict` | Modal frequencies and shapes |
+| `euler_buckling_load(E, I, L, K_factor)` | `dict` | Critical buckling load |
+| `plate_first_mode_simply_supported(E, nu, rho, t, a, b)` | `dict` | Plate first natural frequency |
+
+`beam_natural_frequencies` returns `modes` list with `mode`, `freq_hz`, `omega_rad_s`, `shape`.
+
+## Example
+
+```python
+buck = euler_buckling_load(E=200e9, I=5e-6, L=2.5, K_factor=1.0)
+print(f"Pin-pin P_cr = {buck['P_cr_N']/1e3:.1f} kN")
+```
 
 ## Honest caveats
 
-The pure-Python modal solver covers 1-D Euler-Bernoulli beams only. Gyroscopic effects, damping matrices, and geometric stiffness from pre-stress are not included. For 3-D shell/solid modal analysis use `fem_run`. The plate first mode is derived from the Navier series for simply-supported rectangular plates — other boundary conditions require numerical methods.
+The Cholesky-Jacobi solver covers 1D Euler-Bernoulli beams. Gyroscopic effects, damping, and geometric stiffness from pre-stress are not included. For 3D modal and buckling (shells, solids), use `fem_run` dispatching to CalculiX. The plate first-mode formula is the Navier series for simply-supported rectangles — other boundary conditions require numerical methods.
+
+## References
+
+- Thomson (1997). *Theory of Vibration with Applications*, 5th ed. Prentice Hall.
+- Timoshenko & Gere (1961). *Theory of Elastic Stability*, 2nd ed. McGraw-Hill.
+- Euler (1744). "De curvis elasticis" — classical column buckling.

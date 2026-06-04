@@ -118,9 +118,8 @@ Kerf uses third-party services to deliver some features:
   your chat content is sent to whichever you choose.
 - **Paystack** — payment processing.
 - **Resend** — transactional email.
-- **Fly.io** — compute hosting (Frankfurt data centre; GDPR-compliant).
-- **Neon** — database hosting (eu-central-1).
-- **Cloudflare R2 / Tigris** — object storage.
+- **Koyeb** — hosting (Frankfurt data centre; GDPR-compliant).
+- **Tigris** — object storage (`fly.storage.tigris.dev`).
 - **GitHub** (if you connect git sync) — your project code mirrors to
   the repo you authorize.
 

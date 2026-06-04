@@ -1,44 +1,80 @@
 # Automatic Feature Recognition and DAG
 
-*Domain: Geometry kernel · Module: `packages/kerf-cad-core/src/kerf_cad_core/afr/dag.py` · Shipped: Wave 9*
+> Recognise machining features in an imported STEP body and build a parametric feature DAG — so imported parts can be edited like native Kerf models.
 
-## Overview
+**Module**: `packages/kerf-cad-core/src/kerf_cad_core/afr/dag.py`
+**Shipped**: Wave 9
+**LLM tools**: `feature_afr_recognize`, `feature_afr_dag_build`, `feature_afr_to_feature_log`
 
-Recognises machining features (pockets, holes, bosses, slots, chamfers, fillets) in an imported BRep and builds a directed acyclic graph (DAG) of their construction order. The DAG is then emitted as a Kerf `.feature` file, enabling parametric editing of imported STEP parts. This closes the import-and-edit loop for parts from CATIA, SolidWorks, and Siemens NX.
+---
 
-## When to use
+## What it is
 
-- Importing a STEP file and wanting to modify a feature without rebuilding from scratch.
-- Generating a parametric history tree from an unparameterised solid.
-- Inspecting the parent-child dependency order of machined features.
+When engineers import a STEP file from CATIA, SolidWorks, or NX, the solid arrives as a "dumb" BRep — geometry with no parametric history. Automatic Feature Recognition (AFR) analyses the topological structure and local geometry of each face group to infer the original machining intent: pocket, boss, hole, slot, chamfer, fillet, groove.
 
-## API
+The recognised features are assembled into a Directed Acyclic Graph (DAG) that encodes their construction dependency order — a pocket must precede the fillet on its edge, for example. The DAG is then serialised to a Kerf `.feature` log, enabling parametric re-editing of the depth, diameter, or position of any recognised feature.
+
+## How to use it
+
+### From chat (natural language)
+
+> "Recognise the features in the imported housing STEP and show me the feature tree"
+
+The LLM calls `feature_afr_recognize` then `feature_afr_dag_build`.
+
+### From Python
 
 ```python
 from kerf_cad_core.afr.dag import (
-    AFRFeatureDAG,
-    afr_to_dag,
-    afr_dag_to_feature_log,
-    emit_feature_log,
+    AFRFeatureDAG, afr_to_dag,
+    afr_dag_to_feature_log, emit_feature_log,
 )
 
-# Build a DAG from a recognised-feature topology dict
 dag: AFRFeatureDAG = afr_to_dag(feature_topology)
+print(f"Recognised {dag.node_count} features")
 
-# Export to a Kerf feature log (can be loaded back as parametric)
-feature_log = afr_dag_to_feature_log(dag, name="imported-part")
-emit_feature_log(feature_log, path="output.feature")
+# Export to a parametric feature log
+log = afr_dag_to_feature_log(dag, name="housing-v3")
+emit_feature_log(log, path="housing-v3.feature")
 ```
 
-## LLM tools
+### From an LLM tool spec
 
-`feature_afr_recognize`, `feature_afr_dag_build`, `feature_afr_to_feature_log`
+```json
+{"tool": "feature_afr_dag_build", "body_id": "housing_step",
+ "output_format": "feature_log"}
+```
 
-## References
+## How it works
 
-- Sunil & Pande, "Automatic recognition of features from freeform surface CAD models", *CAD* 40(5), 2008.
-- Woo, "Fast cell-based decomposition and its applications to solid modelling", *CAD* 35(11), 2003.
+AFR proceeds in three passes. First, face adjacency is computed — each face is connected to its neighbours via shared edges. Second, local topology patterns are matched against templates for known feature types (e.g. a cylindrical face surrounded by planar faces = blind hole; concave planar face with rectangular loop = pocket). Third, the dependency graph is constructed by identifying which features share faces with other features and applying a topological ordering (Kahn's algorithm) to produce a valid build sequence.
+
+The `_feature_key_sets` function computes a canonical signature for each face cluster for DAG node construction.
+
+## API reference
+
+| Function | Returns | Purpose |
+|---|---|---|
+| `afr_to_dag(feature_topology)` | `AFRFeatureDAG` | Build DAG from recognised features |
+| `afr_dag_to_feature_log(dag, name)` | `dict` | Serialise to feature log |
+| `emit_feature_log(log, path)` | `None` | Write to disk |
+
+`AFRFeatureDAG` attributes: `nodes`, `edges`, `node_count`, `topological_order()`.
+
+## Example
+
+```python
+dag = afr_to_dag(recognised_topology)
+for node in dag.topological_order():
+    print(f"  {node.feature_type}: {node.params}")
+```
+Output: `pocket: depth=12mm`, `hole: dia=8mm`, `fillet: r=2mm`
 
 ## Honest caveats
 
-Feature recognition is heuristic-based and works best on prismatic machined parts. Organic/freeform surfaces are classified as `unknown` features. Concave features nested inside other features (e.g. a pocket within a pocket) may not have their dependency order inferred correctly. The emitted feature log is a best-effort reconstruction, not a round-trip of the original parametric intent.
+AFR is heuristic-based and works best on prismatic machined parts. Organic and freeform surfaces are classified as `unknown`. Concave features nested within other features (pocket-in-pocket) may have incorrect dependency order. The emitted feature log is best-effort reconstruction, not a round-trip of the original parametric intent. Complex multi-body assemblies should be split into individual bodies first.
+
+## References
+
+- Sunil & Pande (2008). "Automatic recognition of features from freeform surface CAD models." *CAD* 40(5).
+- Woo (2003). "Fast cell-based decomposition and its applications to solid modelling." *CAD* 35(11).

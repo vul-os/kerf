@@ -1,51 +1,76 @@
-# TIN Surface (Triangulated Irregular Network)
+# TIN Terrain Surface
 
-*Domain: Civil · Module: `packages/kerf-civil/src/kerf_civil/tin.py` · Shipped: Wave 10*
+> Delaunay triangulated terrain model from survey points with contour extraction, slope, aspect, cut/fill volume and earthwork reports.
 
-## Overview
+**Module**: `packages/kerf-civil/src/kerf_civil/tin.py`
+**Shipped**: Wave 9
+**LLM tools**: `civil_build_tin`, `civil_contours`, `civil_earthwork_volume`
 
-Builds a Triangulated Irregular Network (TIN) from scattered survey points using Delaunay triangulation, then provides contour generation, slope and aspect analysis, 2-D area and volume-above-datum calculation, and LandXML export. Used as the terrain model backbone for corridor design, cut/fill earthwork, and landscape grading.
+---
 
-## When to use
+## What it is
 
-- Generating terrain contours from LiDAR or survey point data.
-- Computing cut/fill volumes between an existing and proposed grade.
-- Checking slope percentages across a site for drainage or accessibility analysis.
+A Triangulated Irregular Network (TIN) is the standard terrain representation for civil engineering. It connects irregularly distributed survey points into a triangulated mesh that exactly passes through all data points, unlike grid-based DEMs that interpolate. From a TIN you can extract contours at any interval, compute slope and aspect for any triangle, calculate cut-and-fill volumes between existing and design surfaces, and derive earthwork quantities for cost estimation.
 
-## API
+## How to use it
+
+### From chat
+
+> "Build a TIN from my 150-point survey and extract contours at 0.5 m intervals. What is the total cut volume if I grade to a flat platform at elevation 45.0 m?"
+
+### From Python
 
 ```python
-from kerf_civil.tin import (
-    TIN, build_tin,
-    contours, slope, aspect,
-    area_2d, volume_above,
-)
-
+from kerf_civil.tin import build_tin, contours, volume_above
 import numpy as np
-xy = np.array([[0,0],[10,0],[5,8],[0,10],[10,10]])
-z  = np.array([100.0, 101.5, 103.0, 100.5, 102.0])
 
-tin: TIN = build_tin(xy, z)
-
-# Generate contours at 0.5m interval
-c_lines = contours(tin, levels=[100.5, 101.0, 101.5, 102.0, 102.5])
-
-# Slope for triangle 0 (decimal fraction, not percent)
-s = slope(tin, triangle_index=0)
-
-# Volume above 100.0m datum
-vol = volume_above(tin, datum_z=100.0)
+# Survey points [x, y, z] in metres
+pts = np.array([[0,0,44.1],[10,0,44.8],[20,0,45.6],[10,15,46.2]])
+tin = build_tin(pts)
+lines = contours(tin, interval=0.5, z_min=44.0, z_max=47.0)
+print(f"{len(lines)} contour polylines")
+vol = volume_above(tin, datum_z=45.0)
+print(f"Volume above 45.0 m: {vol:.2f} m³")
 ```
 
-## LLM tools
+### From an LLM tool spec
 
-`civil_terrain_build`, `civil_earthwork_volume`
+```json
+{"points": [[0,0,44.1],[10,0,44.8],[20,0,45.6]],
+ "contour_interval_m": 0.5,
+ "datum_z": 45.0}
+```
 
-## References
+## How it works
 
-- Tsai, "Delaunay triangulations in TIN creation: an overview and a linear-time algorithm", *IJGIS* 7(6), 1993.
-- ASCE 2413-17, *Standard Practice for the Design and Review of Civil Engineering Projects* (earthwork volume).
+`build_tin` uses `scipy.spatial.Delaunay` to construct the triangulation in the XY plane, then assigns the Z-coordinates from the input survey points. Contours are extracted by a per-triangle linear interpolation: for each triangle edge that straddles a contour level, the crossing point is computed and line segments are assembled into polylines. Slope per triangle is the angle of the steepest descent vector (magnitude of the 3D face normal projected to horizontal). `volume_above` sums the prism volume for each triangle above the datum using the trapezoidal rule on the three vertex heights.
+
+## API reference
+
+| Function | Returns | Purpose |
+|---|---|---|
+| `build_tin(points)` | `TIN` | Delaunay triangulation from (N,3) survey points |
+| `contours(tin, interval, z_min, z_max)` | `list[list[tuple]]` | Iso-elevation polylines |
+| `slope(tin, triangle_index)` | `float` | Max slope angle of a triangle (degrees) |
+| `aspect(tin, triangle_index)` | `float` | Steepest downslope compass bearing (0–360°) |
+| `area_2d(tin)` | `float` | Horizontal projected area (m²) |
+| `volume_above(tin, datum_z)` | `float` | Volume above datum plane (m³) |
+
+## Example
+
+```python
+import numpy as np
+from kerf_civil.tin import build_tin, slope, aspect
+pts = np.array([[0,0,0],[10,0,2],[10,10,2],[0,10,1]])
+t = build_tin(pts)
+print(f"Triangle 0 slope: {slope(t,0):.1f}°, aspect: {aspect(t,0):.0f}°")
+```
 
 ## Honest caveats
 
-The Delaunay triangulation uses `scipy.spatial.Delaunay` when available; otherwise it falls back to a pure-Python incremental insertion which is O(n²). Breakline constraints (feature lines that must align with triangle edges) are not currently supported. Volume-above-datum uses the prismatoid formula per triangle and ignores points below datum.
+Delaunay triangulation minimises the maximum interior angle but does not enforce specific breaklines (roads, ridge lines). For accurate earthwork near breaklines, supply dense survey points along them or add breakline constraints manually. Very large survey files (>50 000 points) may be slow — the Delaunay construction is O(N log N) but SciPy's implementation uses QHULL which has high overhead for degenerate point sets.
+
+## References
+
+- Guibas, L. & Stolfi, J. (1985). Primitives for the manipulation of general subdivisions. *ACM TOCG* 4(2), 74–123.
+- Mays, L.W. (2011). *Water Resources Engineering*, 2nd ed. Wiley. §2 (terrain analysis).

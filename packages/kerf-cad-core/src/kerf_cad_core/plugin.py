@@ -663,6 +663,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.controls.tools",  # controls tools (already registered above; Wave 11B adds TF/PID/SS modules)
     # Wave 11B: civil — dynamic TIN + gravity pipe (Manning) + pressure pipe (Hazen-Williams) networks
     "kerf_cad_core.civil.civil_advanced_tools",
+    # Wave 11B: aerospace — openrocket motor DB (RASP .eng + Estes/AeroTech catalogs)
+    "kerf_cad_core.aerospace.motor_database",
 ]
 # NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
 # (already in _TOOL_MODULES above at line 128); sagitta_arrow_chart module is imported

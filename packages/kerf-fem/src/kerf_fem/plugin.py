@@ -80,6 +80,17 @@ async def register(app: FastAPI, ctx):
     import kerf_fem.cfd_navier_stokes  # kerf-fem: 2-D projection NS solver — self-registers cfd_navier_stokes_steady
     import kerf_fem.cfd_potential  # kerf-fem: potential-flow cylinder — self-registers cfd_potential_cylinder
     from kerf_fem.coupled_variation import fem_propagate_uncertainty_spec, run_fem_propagate_uncertainty; ctx.tools.register("fem_propagate_uncertainty", fem_propagate_uncertainty_spec, run_fem_propagate_uncertainty)  # kerf-fem: probabilistic FEA (LHS + Karhunen-Loève)
+    # Wave 12E: material plasticity (J2 / Drucker-Prager / Mohr-Coulomb / Hill anisotropic)
+    try:
+        import kerf_fem.plasticity.plasticity_tools as _pl
+        for name, spec, handler in _pl.TOOLS:
+            ctx.tools.register(name, spec, handler)
+        provides.append("fem.plasticity-j2")
+        provides.append("fem.plasticity-drucker-prager")
+        provides.append("fem.plasticity-mohr-coulomb")
+        provides.append("fem.plasticity-hill")
+    except Exception as exc:
+        logger.warning("kerf-fem: plasticity tools failed to load: %s", exc)
     # Wave 12E: thermal-structural coupled + composite laminate (CLT) + failure criteria
     try:
         import kerf_fem.multiphysics.multiphysics_tools as _mp

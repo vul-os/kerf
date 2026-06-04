@@ -651,6 +651,16 @@ _TOOL_MODULES = [
     "kerf_cad_core.composites.afp_atl_tools",  # composites_generate_afp_paths + composites_export_apt_cl + composites_laser_projection + composites_develop_flat_pattern + composites_export_flat_dxf
     # Wave 10C: GMAT libration orbits + orbit determination
     "kerf_cad_core.aerospace.aerospace_tools",  # aerospace_compute_lagrange_points + aerospace_design_halo_orbit + aerospace_design_lyapunov_orbit + aerospace_design_lissajous_orbit + aerospace_batch_od + aerospace_ekf_od
+    # Wave 11B: e-textiles + pattern grading + artioscad material cost
+    # kerf_cad_core.apparel.e_textiles — conductive thread routing + wearable electronics (Kazani et al. 2014)
+    # kerf_cad_core.apparel.pattern_grading — multi-size pattern grading (Aldrich 6e, Mullet 2e)
+    # kerf_cad_core.apparel.seam_layout — seam types + allowances (ISO 4916, ASTM D6193)
+    # kerf_cad_core.packaging.material_yield — sheet yield + material cost (PMMI handbook)
+    # Wave 11B: classical controls (Routh/Bode/PID/SS/LQR)
+    # transfer_function: TransferFunction, routh_hurwitz, bode_plot_data, nyquist_plot_data, gain_phase_margin, feedback
+    # pid_tuning: PidParams, step_pid, ziegler_nichols_open_loop, ziegler_nichols_closed_loop, imc_tuning, lambda_tuning
+    # state_space: StateSpace, is_controllable, is_observable, place_poles, lqr
+    "kerf_cad_core.controls.tools",  # controls tools (already registered above; Wave 11B adds TF/PID/SS modules)
 ]
 # NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
 # (already in _TOOL_MODULES above at line 128); sagitta_arrow_chart module is imported

@@ -233,6 +233,10 @@ def _register_tools(ctx, provides: list) -> None:
         # electronics_mb3d_net_map: cross-board net map + floating pin + Z0 mismatch
         # electronics_mb3d_export_step: full STEP AP242 multi-board assembly export
         "kerf_electronics.multi_board.multi_board_tools",
+        # Wave 11B: AC load-flow (Newton-Raphson)
+        # power_build_y_bus: build bus admittance matrix Y_bus (G+jB)
+        # power_ac_load_flow: Newton-Raphson AC load flow (Stevenson 1982 §9)
+        "kerf_electronics.power.load_flow_tools",
     ]
 
     for module_path in tool_modules:

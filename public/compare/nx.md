@@ -421,7 +421,7 @@ Kerf saturates **100%** of Siemens NX's feature surface (54 yes, 0 partial, 0 no
 | Constraint sketcher (geo + dim) | ✅ | Yes |  |
 | Pad / pocket / revolve | ✅ | Yes |  |
 | Variable-radius fillet | ✅ | Yes |  |
-| NURBS surfacing (blend/network/patch) | ✅ | Yes |  |
+| NURBS surfacing (blend/network/patch) | ✅ | Yes | blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends + MatchSrf G3 wired |
 | Direct edit (push-pull) | ✅ | Yes |  |
 | Assemblies — mates | ✅ | Yes |  |
 | Sheet metal | ✅ | Yes |  |

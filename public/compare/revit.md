@@ -400,7 +400,7 @@ Kerf saturates **100%** of Autodesk Revit's feature surface (41 yes, 0 partial, 
 | AISC 360 steel member design | ✅ | Yes (paid tier) |  |
 | ACI 318 concrete design | ✅ | Yes (paid tier) |  |
 | ASCE 7 wind and seismic loads | ✅ | Yes (paid tier) |  |
-| FEM linear static (3D solid) | ✅ | Yes (paid tier) |  |
+| FEM linear static (3D solid) | ✅ | Yes (paid tier) | linear static + modal + buckling + harmonic + PSD + fatigue + explicit dynamics + nonlinear (Total-Lagrangian, J2 pla... |
 | Civil 3D interoperability (site, alignment, corridor) | ✅ | Yes (paid tier) |  |
 | Geotech / site analysis | ✅ | Yes (paid tier) |  |
 | Autodesk Construction Cloud / BIM 360 (cloud hosting) | ✅ | Yes (paid tier) |  |
@@ -418,7 +418,7 @@ Kerf saturates **100%** of Autodesk Revit's feature surface (41 yes, 0 partial, 
 - **AISC 360 steel member design**
 - **ACI 318 concrete design**
 - **ASCE 7 wind and seismic loads**
-- **FEM linear static (3D solid)**
+- **FEM linear static (3D solid)** — linear static + modal + buckling + harmonic + PSD + fatigue + explicit dynamics + nonlinear (Total-Lagrangian, J2 plasticity) + thermal + solid tet/hex (H8 B-bar)
 - **Civil 3D interoperability (site, alignment, corridor)**
 - **Geotech / site analysis**
 - *(and 1 more features not covered by Autodesk Revit)*

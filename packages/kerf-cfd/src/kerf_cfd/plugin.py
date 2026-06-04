@@ -14,9 +14,16 @@ Registers:
   - LLM tool:  cfd_snappy_hex_mesh   (Cartesian + snap hex mesher, Aftosmis 1998)
   - LLM tool:  cfd_wind_load         (ASCE 7-22 building wind pressures + drag)
   - LLM tool:  cfd_vortex_shedding   (Bearman 1984 St vortex shedding frequency)
+  - LLM tool:  cfd_compressible_shock (Roe 1981 + Rankine-Hugoniot normal shock)
+  - LLM tool:  cfd_conjugate_ht       (Dirichlet-Neumann CHT coupling, Quarteroni-Valli 1999)
+  - LLM tool:  cfd_vof_mixture        (VOF mixture density, Hirt-Nichols 1981)
+  - LLM tool:  cfd_marine_resistance  (Holtrop-Mennen 1982 ship resistance)
+  - LLM tool:  cfd_marine_wave_spectrum (JONSWAP/P-M wave spectrum, Hasselmann 1973)
+  - LLM tool:  cfd_marine_wave_force  (Froude-Krylov + diffraction, Faltinsen 1990)
 
 # Wave 9C: OpenFOAM combustion + Lagrangian + FSI
 # Wave 10C: snappyHexMesh-style mesher + wind engineering
+# Wave 12B: CFD advanced physics (compressible/conjugate-HT/multiphase/marine)
 """
 
 from __future__ import annotations
@@ -56,6 +63,9 @@ async def register(app: FastAPI, ctx):
     # Wave 10C: snappyHexMesh-style mesher + wind engineering
     import kerf_cfd.cfd_advanced_tools_v2  # noqa: F401 — triggers @register decorators
 
+    # Wave 12B: CFD advanced physics (compressible/conjugate-HT/multiphase/marine)
+    import kerf_cfd.cfd_advanced_v3_tools  # noqa: F401 — triggers @register decorators
+
     provides = [
         "cfd.simple_rans",
         "cfd.turbulence_model",
@@ -70,6 +80,10 @@ async def register(app: FastAPI, ctx):
         "cfd.fsi_dynamic_mesh",
         "cfd.snappy_hex_mesh",
         "cfd.wind_engineering",
+        "cfd.compressible_flow",
+        "cfd.conjugate_heat_transfer",
+        "cfd.vof_multiphase",
+        "cfd.marine_hydrodynamics",
     ]
 
     try:

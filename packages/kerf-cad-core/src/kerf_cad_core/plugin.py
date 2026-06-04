@@ -661,6 +661,8 @@ _TOOL_MODULES = [
     # pid_tuning: PidParams, step_pid, ziegler_nichols_open_loop, ziegler_nichols_closed_loop, imc_tuning, lambda_tuning
     # state_space: StateSpace, is_controllable, is_observable, place_poles, lqr
     "kerf_cad_core.controls.tools",  # controls tools (already registered above; Wave 11B adds TF/PID/SS modules)
+    # Wave 11B: civil — dynamic TIN + gravity pipe (Manning) + pressure pipe (Hazen-Williams) networks
+    "kerf_cad_core.civil.civil_advanced_tools",
 ]
 # NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
 # (already in _TOOL_MODULES above at line 128); sagitta_arrow_chart module is imported

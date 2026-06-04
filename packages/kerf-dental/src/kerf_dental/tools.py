@@ -819,3 +819,231 @@ async def run_dental_recommend_implant(args: dict[str, Any], ctx: "ProjectCtx") 
         return ok_payload(payload)
     except Exception as exc:
         return err_payload(str(exc), "RECOMMEND_IMPLANT_ERROR")
+
+
+# ===========================================================================
+# Wave 11B: dental depth (3shape parity)
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# dental_crown_bridge_design
+# ---------------------------------------------------------------------------
+
+dental_crown_bridge_design_spec = ToolSpec(
+    name="dental_crown_bridge_design",
+    description=(
+        "Design a full-spec crown or multi-unit bridge using the 3shape-parity API. "
+        "Accepts FDI tooth number, margin line type, material, and interproximal contacts. "
+        "Returns outer_surface_mesh vertex/triangle counts, wall_thickness_min_mm, "
+        "margin_fit_um, and honest_caveat. "
+        "Wave 11B: dental depth (3shape parity). NOT FDA-cleared medical device."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "universal_tooth_number": {
+                "type": "integer",
+                "description": "Universal tooth number 1-32.",
+            },
+            "margin_points": {
+                "type": "array",
+                "items": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3},
+                "description": "3D margin line polygon (N≥3 points, mm).",
+                "minItems": 3,
+            },
+            "margin_type": {
+                "type": "string",
+                "enum": ["chamfer", "shoulder", "feather", "knife"],
+                "description": "Margin finish line type. Default 'chamfer'.",
+            },
+            "margin_width_mm": {
+                "type": "number",
+                "description": "Margin width in mm. Default 0.8.",
+            },
+            "material": {
+                "type": "string",
+                "description": "'zirconia' | 'lithium_disilicate' | 'metal_ceramic'. Default 'zirconia'.",
+            },
+            "occlusal_clearance_mm": {
+                "type": "number",
+                "description": "Occlusal clearance in mm. Default 1.5.",
+            },
+            "is_bridge": {
+                "type": "boolean",
+                "description": "True to design a multi-unit bridge (pontic_count required).",
+            },
+            "pontic_count": {
+                "type": "integer",
+                "description": "Number of pontics for bridge. Default 0.",
+            },
+        },
+        "required": ["universal_tooth_number", "margin_points"],
+    },
+)
+
+
+async def run_dental_crown_bridge_design(args: dict, ctx: "ProjectCtx") -> str:
+    try:
+        import numpy as np
+        from kerf_dental.crown_bridge import (
+            ToothNumber, MarginLine, CrownDesignSpec, design_crown, design_bridge,
+        )
+
+        tooth = ToothNumber.from_universal(int(args["universal_tooth_number"]))
+        margin = MarginLine(
+            points=np.array(args["margin_points"], dtype=float),
+            type=str(args.get("margin_type", "chamfer")),
+            width_mm=float(args.get("margin_width_mm", 0.8)),
+        )
+        spec = CrownDesignSpec(
+            tooth_number=tooth,
+            margin=margin,
+            occlusal_clearance_mm=float(args.get("occlusal_clearance_mm", 1.5)),
+            interproximal_contacts=[],
+            material=str(args.get("material", "zirconia")),
+        )
+
+        if args.get("is_bridge"):
+            pontic_count = int(args.get("pontic_count", 1))
+            designs = design_bridge([spec], pontic_count=pontic_count)
+            v_count = sum(len(d.outer_surface_mesh[0]) for d in designs)
+            t_count = sum(len(d.outer_surface_mesh[1]) for d in designs)
+            wall = min(d.wall_thickness_min_mm for d in designs)
+            fit = designs[0].margin_fit_um
+        else:
+            d = design_crown(spec)
+            v_count = len(d.outer_surface_mesh[0])
+            t_count = len(d.outer_surface_mesh[1])
+            wall = d.wall_thickness_min_mm
+            fit = d.margin_fit_um
+
+        return ok_payload({
+            "tooth": tooth.fdi,
+            "tooth_type": tooth.tooth_type,
+            "outer_vertices": v_count,
+            "outer_triangles": t_count,
+            "wall_thickness_min_mm": round(wall, 3),
+            "margin_fit_um": round(fit, 1),
+            "honest_caveat": "EDUCATIONAL/PLANNING ONLY — NOT FDA-cleared.",
+        })
+    except Exception as exc:
+        return err_payload(str(exc), "CROWN_BRIDGE_DESIGN_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# dental_implant_plan_v2
+# ---------------------------------------------------------------------------
+
+dental_implant_plan_v2_spec = ToolSpec(
+    name="dental_implant_plan_v2",
+    description=(
+        "Extended implant planning with brand catalogue (Straumann BLT/NobelActive/Astra EV), "
+        "prosthetic-driven placement, primary stability score (ISQ-based), and "
+        "estimated insertion torque (Misch 2014 Ch 5 / Turkyilmaz et al. 2007). "
+        "Wave 11B: dental depth (3shape parity). NOT FDA-cleared medical device."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "universal_tooth_number": {"type": "integer", "description": "1-32."},
+            "crown_emergence_target": {
+                "type": "array",
+                "items": {"type": "number"},
+                "minItems": 3, "maxItems": 3,
+                "description": "Crown emergence point (x,y,z) in mm.",
+            },
+            "cbct_volume": {
+                "type": "array",
+                "description": "3D CBCT volume [z][y][x] of HU values.",
+            },
+            "brand": {
+                "type": "string",
+                "description": "'Straumann BLT' | 'NobelActive' | 'Astra EV'. Default 'Straumann BLT'.",
+            },
+        },
+        "required": ["universal_tooth_number", "crown_emergence_target", "cbct_volume"],
+    },
+)
+
+
+async def run_dental_implant_plan_v2(args: dict, ctx: "ProjectCtx") -> str:
+    try:
+        import numpy as np
+        from kerf_dental.crown_bridge import ToothNumber
+        from kerf_dental.implant_plan_v2 import plan_implant
+
+        tooth = ToothNumber.from_universal(int(args["universal_tooth_number"]))
+        emergence = np.array(args["crown_emergence_target"], dtype=float)
+        volume = np.array(args["cbct_volume"], dtype=float)
+        brand = str(args.get("brand", "Straumann BLT"))
+
+        p = plan_implant(tooth, volume, emergence, brand=brand)
+
+        return ok_payload({
+            "tooth": tooth.fdi,
+            "brand": p.implant.brand,
+            "diameter_mm": p.implant.diameter_mm,
+            "length_mm": p.implant.length_mm,
+            "platform": p.implant.platform,
+            "bone_density_HU": round(p.bone_density_HU, 1),
+            "primary_stability_score": p.primary_stability_score,
+            "insertion_torque_n_cm": round(p.insertion_torque_estimate_n_cm, 1),
+            "distance_to_nerve_mm": round(p.distance_to_nerve_mm, 2),
+            "distance_to_sinus_mm": round(p.distance_to_sinus_mm, 2),
+            "honest_caveat": p.honest_caveat,
+        })
+    except Exception as exc:
+        return err_payload(str(exc), "IMPLANT_PLAN_V2_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# dental_lab_case_report
+# ---------------------------------------------------------------------------
+
+dental_lab_case_report_spec = ToolSpec(
+    name="dental_lab_case_report",
+    description=(
+        "Aggregate dental lab case status report. "
+        "Returns count by status, overdue cases, throughput by dentist, "
+        "average turnaround days, and next due date. Wave 11B."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "cases": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "case_id": {"type": "string"},
+                        "patient_id_hashed": {"type": "string"},
+                        "dentist_name": {"type": "string"},
+                        "lab_name": {"type": "string"},
+                        "case_type": {"type": "string"},
+                        "received_date_iso": {"type": "string"},
+                        "due_date_iso": {"type": "string"},
+                        "status": {"type": "string"},
+                    },
+                    "required": ["case_id", "patient_id_hashed", "dentist_name",
+                                  "lab_name", "case_type", "received_date_iso",
+                                  "due_date_iso", "status"],
+                },
+                "minItems": 1,
+            },
+        },
+        "required": ["cases"],
+    },
+)
+
+
+async def run_dental_lab_case_report(args: dict, ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_dental.lab_workflow import DentalCase, case_status_report
+
+        cases = [
+            DentalCase(**c) for c in args["cases"]
+        ]
+        report = case_status_report(cases)
+        return ok_payload(report)
+    except Exception as exc:
+        return err_payload(str(exc), "LAB_CASE_REPORT_ERROR")

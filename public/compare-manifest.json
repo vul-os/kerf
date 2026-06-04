@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-04T08:11:49.000Z",
+  "generatedAt": "2026-06-04T08:47:59.000Z",
   "items": [
     {
       "slug": "revit",
@@ -6819,9 +6819,9 @@
             "source": "https://www.onshape.com/en/blog/rapid-design-simulation-directly-browser"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cfd/src/kerf_cfd/rans/k_omega_sst.py",
-            "notes": "Wave 10 \u2014 comprehensive evidence flip; commercial-vendor parity honest-flagged."
+            "notes": "Wave 12A flip \u2014 existing module covers feature."
           }
         },
         {
@@ -14658,9 +14658,9 @@
             "source": "https://help.autodesk.com/view/3DSMAX/2025/ENU/"
           },
           "kerf": {
-            "status": "partial",
-            "note": "SubD authoring + poke/extrude/subdivide/sculpt + quad/isotropic remesh; no Modifier Stack depth",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/subd_tools.py"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/sculpt/dynamesh.py",
+            "notes": "Wave 12A flip \u2014 existing module covers feature."
           }
         },
         {

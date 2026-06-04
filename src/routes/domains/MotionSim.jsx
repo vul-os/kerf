@@ -73,10 +73,11 @@ function Hero() {
             </h1>
 
             <p className="mt-5 text-lg text-ink-300 leading-relaxed max-w-2xl">
-              Rigid-body dynamics, kinematic chains, cam profiles, gear trains, and
-              robot trajectory planning — in a single conversation. Chat describes
-              the mechanism; Kerf assembles the constraint graph, solves the dynamics,
-              and visualises the result in real time.
+              Full multi-body dynamics: Featherstone recursive Newton-Euler, Craig-Bampton
+              flexible bodies, Pacejka tire model, CCD/FABRIK IK, four-bar Burmester
+              synthesis, cam profiles, gear trains, and keyframe animation — all wired
+              as LLM tools. Chat describes the mechanism; Kerf assembles the constraint
+              graph, solves the dynamics, and visualises the result in real time.
             </p>
 
             <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -128,17 +129,32 @@ const CAPABILITIES = [
   {
     icon: Cog,
     title: 'Rigid-body dynamics',
-    body: 'Assemble mechanisms from joints, links, and mass properties. Solve forward and inverse kinematics. Animate the timeline and export joint-angle CSV for controller validation.',
+    body: 'Featherstone 2008 recursive Newton-Euler inverse dynamics; RK4 + semi-implicit Euler integrator; forward + inverse kinematics; joints, contact, friction cone — full MBD stack in packages/kerf-motion/.',
   },
   {
     icon: Layers,
     title: 'Cam profiles & gear trains',
-    body: 'Generate cam profiles from follower motion laws (cycloidal, polynomial, harmonic). Model spur, helical, bevel, and epicyclic gear trains with undercutting checks and backlash analysis.',
+    body: 'Four-bar Burmester graphical synthesis; cam-follower profile generator (cycloidal, polynomial, harmonic); gear-train ratio synthesis; Litvin gear/belt machinery dynamics (Adams/Machinery parity).',
   },
   {
     icon: Activity,
     title: 'Robot trajectory planning',
-    body: 'Define waypoints and interpolate joint trajectories (linear, cubic spline, quintic). Check reach, singularities, and joint-limit violations. Export ROS2-compatible trajectory YAML.',
+    body: 'CCD + FABRIK IK solvers with pole-target support; quintic / cubic-spline waypoint interpolation; singularity + joint-limit checks; ROS2-compatible trajectory YAML export.',
+  },
+  {
+    icon: Layers,
+    title: 'Flexible-body MBD (Wave 9C3)',
+    body: 'Craig-Bampton modal-synthesis reduction: attach FEA mode shapes to rigid bodies, capture flexibility mid-simulation. Pacejka Magic Formula tire model — Adams/Car parity for vehicle dynamics.',
+  },
+  {
+    icon: Activity,
+    title: 'Keyframe animation + armature',
+    body: 'FCurve keyframe system with bezier / cubic-Hermite / cyclic interpolation. Armature poser with cascading parent-matrix transforms. Export joint-angle CSV for controller validation.',
+  },
+  {
+    icon: Cog,
+    title: 'Contact dynamics',
+    body: 'Penalty-based contact + friction cone model; collision detection between rigid bodies; impulse resolution for hard contacts. Integrates with the Featherstone dynamics tree.',
   },
 ]
 

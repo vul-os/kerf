@@ -136,6 +136,13 @@ Compare-manifest saturation at time of writing: **1235 yes / 29 partial / 1 no**
 **Materials**
 - Ashby material selection: catalog + performance indices + Pareto front + multi-objective scoring (`packages/kerf-lca/src/kerf_lca/ashby_selection.py`).
 
+**Motion / dynamic simulation**
+- Multi-body dynamics: Featherstone recursive Newton-Euler inverse dynamics, integrator (RK4/semi-implicit Euler), forward + inverse kinematics, joints, contact + friction (`packages/kerf-motion/`).
+- Craig-Bampton flexible-body MBD: modal-synthesis reduction for FEA mode shapes; Pacejka Magic Formula tire model (Adams/Car parity); Litvin gear/belt machinery dynamics (Adams/Machinery parity) (`packages/kerf-mates/src/kerf_mates/mbd/`).
+- CCD + FABRIK inverse-kinematics solvers + pole-target support (`packages/kerf-cad-core/src/kerf_cad_core/animation/ik_solver.py`).
+- Mechanism synthesis: four-bar Burmester graphical synthesis, cam-follower profile generator, gear-train ratio synthesis (`packages/kerf-mates/src/kerf_mates/synthesis/`).
+- Animation system: keyframe FCurves with bezier/cubic-Hermite/cyclic interpolation, armature poser with cascading parent matrices (`packages/kerf-cad-core/src/kerf_cad_core/animation/`).
+
 ---
 
 ### 2026-05-26 / 2026-05-31 — Wave 7A–7D

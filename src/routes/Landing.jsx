@@ -1148,6 +1148,13 @@ function OutputStrip() {
 
 const SHIPPED = [
   {
+    title: 'Motion + dynamic simulation',
+    body: 'Full kinematics + dynamics stack: Featherstone recursive Newton-Euler, CCD/FABRIK IK, Craig-Bampton flexible bodies, Pacejka tire model, four-bar Burmester synthesis, cam profiles, gear-train rolling, contact dynamics — backend + AssemblyMotionPanel wired.',
+    evidence: 'packages/kerf-motion/',
+    domain: 'Motion',
+    docHref: '/domains/motion',
+  },
+  {
     title: 'NURBS analytic derivatives + evolute',
     domain: 'Mechanical',
     body: 'Sturm-sequence inflection (analytic root-finding, not sampling), curve evolute (osculating-circle locus), uniform arc-length resample (5-pt Gauss-Legendre), principal curvature SVG heatmap.',

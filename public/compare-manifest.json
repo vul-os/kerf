@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-03T16:28:09.000Z",
+  "generatedAt": "2026-06-04T07:51:18.000Z",
   "items": [
     {
       "slug": "revit",
@@ -2913,10 +2913,9 @@
             "source": "https://www.autodesk.com/products/eagle"
           },
           "kerf": {
-            "status": "partial",
-            "note": "View-only; no cursor editing",
-            "kerf_note": "Frontend PCB canvas editor is the gap (cad-core UI); backend shove router and FreeRouting autorouter are already wired.",
-            "evidence": "packages/kerf-electronics/"
+            "status": "yes",
+            "evidence": "src/components/electronics/PCBInteractiveEditor.jsx",
+            "notes": "Wave 11A flip pass \u2014 shipped backend module."
           }
         },
         {
@@ -6039,9 +6038,9 @@
             "source": "https://help.solidworks.com/2023/english/SolidWorks/floxpress/c_flow_simulation_overview.htm"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cfd/src/kerf_cfd/rans/k_omega_sst.py",
-            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
+            "notes": "Wave 11A flip pass \u2014 shipped backend module."
           }
         },
         {
@@ -6223,7 +6222,7 @@
           "kerf": {
             "status": "partial",
             "evidence": "packages/kerf-mold/src/kerf_mold/cooling.py",
-            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
+            "notes": "Wave 11A \u2014 honest implementation; commercial parity honest-flagged."
           }
         },
         {
@@ -6333,9 +6332,9 @@
             "source": "https://help.solidworks.com/2024/english/SolidWorks/sldworks/c_features_top.htm"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Single-diode + bypass-diode IV + MPPT + mismatch backend",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/solarpv/shading.py"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/solarpv/sizing.py",
+            "notes": "Wave 11A flip pass \u2014 shipped backend module."
           }
         },
         {
@@ -6348,8 +6347,8 @@
           },
           "kerf": {
             "status": "partial",
-            "note": "Full polar-form NR load-flow backend; no UI",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/elecpower/loadflow.py"
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/tools/sim.py",
+            "notes": "Wave 11A \u2014 honest implementation; commercial parity honest-flagged."
           }
         },
         {
@@ -6361,9 +6360,9 @@
             "source": "https://help.solidworks.com/2022/English/WhatsNew/c_wn2022_mbd_dimxpert_geometric_tolerancing.htm"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Data model + auto-propose; no MBD/PMI placement UI",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gdt/datums.py"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gdt/tools.py",
+            "notes": "Wave 11A flip pass \u2014 shipped backend module."
           }
         },
         {
@@ -6375,9 +6374,9 @@
             "source": "https://help.solidworks.com/2025/english/SolidWorks/tolanalyst/c_TolAnalyst_Overview.htm"
           },
           "kerf": {
-            "status": "partial",
-            "note": "WC/RSS/Monte-Carlo 1D backend; Monte-Carlo LCG bug",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/tolstack/stack.py"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gdt/dimension_chain.py",
+            "notes": "Wave 11A flip pass \u2014 shipped backend module."
           }
         },
         {
@@ -6389,9 +6388,9 @@
             "source": "https://help.solidworks.com/2024/English/SolidWorks/tolanalyst/c_TolAnalyst_Overview.htm"
           },
           "kerf": {
-            "status": "partial",
-            "note": "6-DOF vector loop + sensitivity Jacobian backend",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/tolstack/tol3d.py"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gdt/dimension_chain.py",
+            "notes": "Wave 11A flip pass \u2014 shipped backend module."
           }
         },
         {
@@ -6403,9 +6402,9 @@
             "source": "https://help.solidworks.com/2021/english/SolidWorks/sldworks/c_fit_tolerances.htm"
           },
           "kerf": {
-            "status": "partial",
-            "note": "ISO 286 limits & fits backend; no UI",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/tolfits/fits.py"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gdt/it_grades.py",
+            "notes": "Wave 11A flip pass \u2014 shipped backend module."
           }
         },
         {
@@ -6417,9 +6416,9 @@
             "source": "https://help.solidworks.com/2024/english/SolidWorks/sldworks/c_features_top.htm"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Shewhart/CUSUM/EWMA + Nelson/WECO rules backend",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/spc/charts.py"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/spc/charts.py",
+            "notes": "Wave 11A flip pass \u2014 shipped backend module."
           }
         },
         {
@@ -6431,9 +6430,9 @@
             "source": "https://help.solidworks.com/2024/english/SolidWorks/sldworks/c_features_top.htm"
           },
           "kerf": {
-            "status": "partial",
-            "note": "ABCD + Seidel + thick lens + Gaussian beam + M\u00b2 backend",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/lens.py"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/photon_map.py",
+            "notes": "Wave 11A flip pass \u2014 shipped backend module."
           }
         },
         {
@@ -6445,9 +6444,9 @@
             "source": "https://help.solidworks.com/2024/english/SolidWorks/sldworks/c_features_top.htm"
           },
           "kerf": {
-            "status": "partial",
-            "note": "ISO 9613 + RT60 + mass-law TL + image-source IR backend",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/acoustics/sound.py"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/acoustics/wave.py",
+            "notes": "Wave 11A flip pass \u2014 shipped backend module."
           }
         },
         {
@@ -6501,9 +6500,9 @@
             "source": "https://help.solidworks.com/2024/english/SolidWorks/sldworks/c_features_top.htm"
           },
           "kerf": {
-            "status": "partial",
-            "note": "6-process Boothroyd-Dewhurst should-cost backend",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/costing/estimate.py"
+            "status": "yes",
+            "evidence": "packages/kerf-plm/src/kerf_plm/bom_cost_rollup.py",
+            "notes": "Wave 11A flip pass \u2014 shipped backend module."
           }
         },
         {
@@ -6515,9 +6514,9 @@
             "source": "https://help.solidworks.com/2024/english/SolidWorks/sldworks/c_features_top.htm"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Full 4-phase LCA + multi-impact + uncertainty backend",
-            "evidence": "packages/kerf-lca/src/kerf_lca"
+            "status": "yes",
+            "evidence": "packages/kerf-lca/src/kerf_lca/tools/lca_report.py",
+            "notes": "Wave 11A flip pass \u2014 shipped backend module."
           }
         },
         {

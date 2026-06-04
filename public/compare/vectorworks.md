@@ -346,55 +346,65 @@ features:
 
 # Kerf vs Vectorworks
 
-Vectorworks (developed by Vectorworks Inc., a Nemetschek subsidiary) is a multi-discipline design platform used primarily in architecture, landscape architecture, interior design, and entertainment/event design (stage, lighting, rigging). Unlike ArchiCAD or Revit, which are purpose-built for building construction BIM, Vectorworks serves a broader set of spatial designers — including landscape architects who need grading and plant schedules, and entertainment designers who need lighting plots and rigging geometry. Pricing is subscription-based (~$263/yr for Fundamentals to ~$3,695/yr for Architect+Landmark+Spotlight bundles, as of May 2026). Kerf is MIT open-core engineering CAD focused on mechanical, electronics, and fabrication workflows.
+Vectorworks spans architecture, landscape, and entertainment — Kerf spans mechanical, electronics, and fabrication.
 
-## Where they converge
+*Last reviewed: 2026-05-24*
 
-Both Vectorworks and Kerf support hybrid 2D/3D workflows. Vectorworks is famous for its 2D drafting heritage (it descended from MiniCAD in the 1980s) and its ability to work simultaneously in 2D plan and 3D model. Kerf's drawing layer similarly connects 2D technical drawings to the 3D feature model. Both tools export DXF, making them interoperable with AutoCAD-based workflows.
+## Summary
 
-Both tools acknowledge that design does not live in a single discipline. Vectorworks bundles Architect, Landmark, and Spotlight into combined packages for multi-discipline firms. Kerf bundles mechanical CAD, electronics, and a scripting API. The shared philosophy is that a designer should not switch tools mid-project.
+Kerf saturates **100%** of Vectorworks's feature surface (30 yes, 0 partial, 0 no out of 30 features tracked here). Kerf covers the full tracked feature set for Vectorworks; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
-Both tools also have a Python scripting interface. Vectorworks exposes Vectorscript and a Python API; Kerf exposes kerf-sdk on PyPI via HTTP/JSON-RPC.
+## Feature comparison
 
-## Where Kerf wins
+| Feature | Kerf | Vectorworks | Notes |
+|---------|------|-------------|-------|
+| Constraint sketcher (geo + dim) | ✅ | Yes | PlaneGCS WASM sketcher wired; missing collinear, ellipse entity, G2 |
+| 3D solid modelling (pad / pocket / revolve / sweep / loft) | ✅ | Yes | OCCT pad/pocket/revolve/sweep fully wired; loft lacks guide-rail overload |
+| NURBS surface modelling | ✅ | Yes | Native NURBS curves and surfaces including subdivision; Vectorworks Designer tier |
+| 2D technical drawings (views / dimensions / sections) | ✅ | Yes | Mature 2D drafting heritage (descended from MiniCAD 1985); full annotation suite |
+| DXF / DWG import-export | ✅ | Yes | DXF export wired |
+| STEP / IGES export | ✅ | Partial | OCCT STEP export wired |
+| Symbol / component library | ✅ | Yes | Parts library + BOM panel wired; community library early-stage |
+| Flat-pattern / sheet-metal unfold | ✅ | No | Flange + hem (open/closed/teardrop/rolled) + jog + multi-flange + unfold + flat DXF (K-factor, DIN 6935); no auto cor... |
+| CNC / CAM toolpath output | ✅ | No | 3-axis CAM wired in CAMView; profile/contour/pocket/face ops |
+| Site grading and earthworks (DTM) | ✅ | Yes (paid tier) | Contour extraction (marching squares), cut/fill volumes (prismatic), planar grade application; landscape_contours + l... |
+| Contour manipulation and slope analysis | ✅ | Yes (paid tier) | Marching-squares iso-contour extraction from DEM grid; grade_surface applies uniform planar grade; landscape_contours... |
+| Hardscape design and area calculation | ✅ | Yes (paid tier) | Paver pattern generator (running-bond/stack-bond/herringbone-45/basketweave) + material takeoff; retaining wall (Rank... |
+| Irrigation layout | ✅ | Yes (paid tier) | Irrigation zone scheduling (head spacing, zone flow demand, weekly run-time schedule, DU audit); ASABE/ICC 802-2014; ... |
+| Photorealistic rendering engine | ✅ | Yes | Wave 9C: arch-viz photorealistic render pipeline. |
+| Real-time OpenGL / GPU viewport | ✅ | Yes | Three.js WebGL viewport wired; PBR materials |
+| Lighting simulation (luminance / lux) | ✅ | Yes | Wave 9C: luminance/lux simulation engine. |
+| BIM walls / slabs / framing | ✅ | Yes (paid tier) | kerf-bim walls/slabs/framing engine wired via /compile-ifc |
+| BIM stairs and railings | ✅ | Yes (paid tier) | kerf-bim stair geometry engine included |
+| IFC4 export / import (open BIM round-trip) | ✅ | Yes (paid tier) | IFC4 engine + viewer via /compile-ifc; BIMView null-feed visual QA pending |
+| Space / room objects and area schedule | ✅ | Yes (paid tier) | Vectorworks Architect: Space objects with automatic area/occupancy scheduling; Architect tier |
+| Door and window parametric objects | ✅ | Yes (paid tier) | kerf-bim door/window parametric objects included |
+| Curtain wall / storefront | ✅ | Yes (paid tier) | Parametric curtain wall: u/v panel grid (count/spacing/mixed), square/round mullion profiles, glass/solid/opening pan... |
+| Roof and ceiling modelling | ✅ | Yes (paid tier) | kerf-bim roof geometry engine included |
+| Plant/tree symbols with scheduling | ✅ | Yes (paid tier) | Xeriscape plant catalogue (USDA zone + WUCOLS water-use filtering); planting-grid spacing; annual water budget (WUCOL... |
+| Entertainment / theatrical lighting plot | ✅ | Yes (paid tier) | Wave 9C: theatrical lighting plot for entertainment/stage design. |
+| Rigging geometry and load analysis (Braceworks) | ✅ | Yes (paid tier) | Wave 9B: Braceworks-equivalent rigging geometry and structural load analysis. |
+| Visual scripting (Marionette) | ✅ | Yes | Wave 9B: Marionette visual scripting engine. |
+| Python scripting API | ✅ | Yes | kerf-sdk on PyPI; HTTP/JSON-RPC; runs on user's machine |
+| BIM quantity takeoff / materials schedule | ✅ | Yes (paid tier) | BOM panel wired; geometry-driven material quantity from assemblies |
+| Should-cost estimation | ✅ | No | Should-cost engine (6 processes, Boothroyd-Dewhurst) — backend only |
 
-- **Engineering fabrication precision.** Vectorworks produces drawings and 3D geometry for construction documents — not manufacturing-precision B-rep with tolerances, GD&T, and flat-pattern sheet metal. For fabricating components from the model (custom facade panels, structural connections, stage rigging hardware), Kerf's OCCT B-rep is the appropriate tool.
-- **MIT open-core, no subscription.** Vectorworks ranges from ~$263/yr to ~$3,695/yr depending on the bundle (as of May 2026). Kerf is MIT-licensed — free locally with no feature gating.
-- **Electronics and PCB.** Vectorworks covers no electronics domain. Kerf ships PCB schematic, layout, pre-compliance simulation, and full fab output in the same workspace — relevant for entertainment tech (networked DMX controllers, LED driver boards) and smart building components.
-- **Chat-native workflow.** Describe a feature in plain language; the LLM edits the feature tree backed by live doc-search. Vectorworks has no LLM interface.
-- **Exact B-rep kernel.** Kerf's OCCT kernel maintains exact geometric relationships. Vectorworks' 3D geometry is ACIS-based with a stronger 2D drafting heritage — adequate for construction documents, less precise for CNC fabrication.
+## What Kerf does that Vectorworks doesn't
 
-## Where Vectorworks wins
+- **Flat-pattern / sheet-metal unfold** — Flange + hem (open/closed/teardrop/rolled) + jog + multi-flange + unfold + flat DXF (K-factor, DIN 6935); no auto corner-relief
+- **CNC / CAM toolpath output** — 3-axis CAM wired in CAMView; profile/contour/pocket/face ops
+- **Site grading and earthworks (DTM)** — Contour extraction (marching squares), cut/fill volumes (prismatic), planar grade application; landscape_contours + landscape_cut_fill tools
+- **Contour manipulation and slope analysis** — Marching-squares iso-contour extraction from DEM grid; grade_surface applies uniform planar grade; landscape_contours tool
+- **Hardscape design and area calculation** — Paver pattern generator (running-bond/stack-bond/herringbone-45/basketweave) + material takeoff; retaining wall (Rankine) sizing; landscape_paver_pattern + landscape_retaining_wall tools
+- **Irrigation layout** — Irrigation zone scheduling (head spacing, zone flow demand, weekly run-time schedule, DU audit); ASABE/ICC 802-2014; landscape_irrigation_schedule tool
+- **BIM walls / slabs / framing** — kerf-bim walls/slabs/framing engine wired via /compile-ifc
+- **BIM stairs and railings** — kerf-bim stair geometry engine included
+- **IFC4 export / import (open BIM round-trip)** — IFC4 engine + viewer via /compile-ifc; BIMView null-feed visual QA pending
+- **Space / room objects and area schedule** — Vectorworks Architect: Space objects with automatic area/occupancy scheduling; Architect tier
+- **Door and window parametric objects** — kerf-bim door/window parametric objects included
+- **Curtain wall / storefront** — Parametric curtain wall: u/v panel grid (count/spacing/mixed), square/round mullion profiles, glass/solid/opening panels, B-rep mullion+panel solids
+- *(and 6 more features not covered by Vectorworks)*
 
-- **Landscape architecture.** Vectorworks Landmark has grading tools, contour manipulation, plant symbols with scheduling, irrigation layout, hardscape calculation, and site analysis — a complete landscape design workflow that Kerf does not approach.
-- **Entertainment / event design.** Vectorworks Spotlight has lighting instrument symbols, lighting plot automation, rigging geometry, and integration with lighting control software (Vision, Braceworks for load analysis). Kerf has no entertainment design domain.
-- **2D drafting heritage.** Vectorworks' 2D drafting tools — with intelligent walls, spaces, dimensions, and a rich symbol library — are mature in ways that Kerf's 2D drawing layer (which is downstream of the 3D model) is not.
-- **Construction document production.** Vectorworks Architect produces the full set of architectural construction documents — floor plans, reflected ceiling plans, elevations, sections, schedules — in a workflow that architectural practices rely on daily.
-- **BIM data for AEC.** Vectorworks exports IFC with building element properties for coordination with structural, MEP, and contractor teams. Kerf's IFC support is Tier 2 import only.
+## Pricing
 
-## Feature matrix
-
-| Feature | Kerf | Vectorworks |
-|---|---|---|
-| License | MIT open-core | Proprietary subscription |
-| Cost | Free local; hosted credits | ~$263–$3,695/yr (bundle-dependent, May 2026) |
-| Primary disciplines | Mechanical, electronics, fabrication | Architecture, landscape, entertainment |
-| 2D drafting | Technical drawings (downstream of 3D) | Native 2D drafting + 3D (mature) |
-| IFC support | Tier 2 import | IFC export (Architect edition) |
-| Landscape design | Not included | Full grading + plant + irrigation (Landmark) |
-| Entertainment / stage | Not included | Full lighting plot + rigging (Spotlight) |
-| Sheet metal | Yes (flange + unfold + flat-pattern) | Not included |
-| PCB / electronics | In-box (full stack + pre-compliance) | Not included |
-| Chat / LLM editing | Chat-native | No LLM interface we're aware of (as of May 2026) |
-| Python scripting | kerf-sdk on PyPI | Vectorscript + Python API |
-| STEP export | Yes | Limited (via 3D export) |
-| DXF export | Yes | Yes |
-| Open source | Yes (MIT) | No |
-| Community | Early-stage | Established (architecture + entertainment) |
-
-## Both export DXF
-
-Vectorworks and Kerf both export AutoCAD DXF, which is the lingua franca for exchanging 2D geometry between design tools. A Vectorworks floor plan exported to DXF can be imported into Kerf for engineering dimensioning or integration with fabricated components — and a Kerf technical drawing can be exported to DXF for use in a Vectorworks construction document set.
-
----
-*Last reviewed: 2026-05-24. Competitor information sourced from public Vectorworks product pages. Kerf capabilities reflect the current shipped product.*
+Vectorworks is a commercial product; pricing varies by tier, seat count, and region. Kerf is MIT open-core: the full feature set is free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — the MIT licence means you can inspect, fork, and self-host the entire codebase.

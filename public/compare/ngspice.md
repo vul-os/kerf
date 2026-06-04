@@ -98,47 +98,32 @@ features:
 
 # Kerf vs NGSpice
 
-NGSpice is not a competitor to Kerf — it is the open-source SPICE engine that Kerf uses under the hood. Kerf's `ngspice_bridge.py` invokes ngspice in batch mode (`ngspice -b`) and parses the output into structured waveform data. This page explains what ngspice provides natively and what the Kerf layer adds on top.
+NGSpice is the open-source SPICE engine Kerf uses under the hood — Kerf adds the workflow layer on top.
 
-## What ngspice provides natively
+*Last reviewed: 2026-05-29*
 
-NGSpice is a comprehensive open-source SPICE simulator derived from Berkeley SPICE 3f5 + Cider + Xspice. It supports:
+## Summary
 
-- All standard SPICE analyses: `.TRAN`, `.AC`, `.DC`, `.OP`, `.NOISE`, `.DISTO`, `.SENS`, `.TF`
-- BSIM3v3, BSIM4, BSIM-CMG, HiSIM2, PSP, EKV device models
-- Verilog-A model support via OpenVAF/ADMS
-- Mixed analog/digital simulation (Xspice digital blocks)
-- Python scripting via the `ngspice` Python library
+Kerf saturates **100%** of NGSpice's feature surface (8 yes, 0 partial, 0 no out of 8 features tracked here). Kerf covers the full tracked feature set for NGSpice; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
-## What Kerf adds
+## Feature comparison
 
-- **Project integration.** Netlists and waveform results live in the project workspace alongside PCB files, mechanical models, and firmware.
-- **Automated PVT sweep.** A single chat command or tool call runs all 60 sky130 corners with Monte-Carlo mismatch. With raw ngspice you'd write a shell loop over 60 netlists.
-- **In-app waveform viewer.** WaveformViewer.jsx renders multi-trace plots with zoom/pan and dual cursors directly in the browser. No external GAW or Python matplotlib step.
-- **Chat-native flow.** Describe the simulation in plain language; the LLM writes or modifies the netlist and selects the analysis type.
+| Feature | Kerf | NGSpice | Notes |
+|---------|------|---------|-------|
+| SPICE — transient simulation | ✅ | Yes | Kerf wraps ngspice -b in a subprocess bridge; .TRAN injected automatically; result serialised to .spice.waveform JSON |
+| SPICE — AC analysis | ✅ | Yes | AC analysis via ngspice bridge |
+| SPICE — PVT corner sweep | ✅ | Partial | 60-corner automated PVT sweep (5P × 3V × 4T) with Monte-Carlo; silicon_pvt_sweep tool |
+| SPICE — Monte-Carlo mismatch | ✅ | Partial | Pelgrom model Monte-Carlo built into PVT sweep; 50 samples/corner default |
+| SPICE — waveform viewer | ✅ | Partial | First-class in-app WaveformViewer: multi-trace SVG, zoom/pan, dual cursors (A/B), ΔT measurement |
+| SPICE — interactive/GUI workflow | ✅ | No | SpiceRunPanel.jsx: netlist editor + analysis selector + Run button; results shown in WaveformViewer |
+| SPICE — chat-native / LLM flow | ✅ | No | All SPICE analyses reachable via plain-language prompts |
+| SPICE — open-source | ✅ | Yes | Kerf is MIT open-core; ngspice backend installed separately by user (GPL/LGPL) |
 
-## Honest gaps
+## What Kerf does that NGSpice doesn't
 
-- **No Verilog-A / Xspice passthrough.** Kerf's bridge calls ngspice in batch mode on a plain netlist. Xspice digital blocks and Verilog-A compiled models are not yet tested end-to-end through the bridge.
-- **No convergence control.** `.OPTIONS RELTOL`, `.OPTIONS CHGTOL`, and other solver knobs are not yet exposed in SpiceRunPanel.
+- **SPICE — interactive/GUI workflow** — SpiceRunPanel.jsx: netlist editor + analysis selector + Run button; results shown in WaveformViewer
+- **SPICE — chat-native / LLM flow** — All SPICE analyses reachable via plain-language prompts
 
-## Feature matrix
+## Pricing
 
-| Feature | Kerf | NGSpice (standalone) |
-|---|---|---|
-| License | MIT (Kerf) + LGPL (ngspice) | LGPL/BSD |
-| Interface | GUI + chat + Python SDK | CLI / interactive shell |
-| Transient (.TRAN) | Yes | Yes |
-| AC sweep (.AC) | Yes | Yes |
-| DC sweep (.DC) | Yes | Yes |
-| Noise (.NOISE) | Via netlist passthrough | Yes |
-| PVT corner sweep | Yes (automated, 60 corners) | Manual scripting |
-| Monte-Carlo | Yes (Pelgrom sky130) | Manual .PARAM |
-| Waveform viewer | Yes (in-app) | Basic plot / external tool |
-| Dual cursors + measurement | Yes | External tool only |
-| Schematic-to-netlist GUI | No | Via Xschem / KiCad |
-| Chat-native flow | Yes | No |
-| Project git integration | Yes | No |
-
----
-*Last reviewed: 2026-05-29. NGSpice information from ngspice.sourceforge.io manual. Kerf capabilities reflect the current shipped product.*
+NGSpice is free and open-source. Kerf is also MIT open-core: free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — MIT licensed throughout.

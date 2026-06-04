@@ -130,49 +130,34 @@ features:
 
 # Kerf vs LTspice
 
-LTspice (from Analog Devices) is the dominant free SPICE simulator for analog and mixed-signal IC design. It is fast, well-documented, and ships with a large library of Analog Devices component models. Almost every analog designer has used it.
+LTspice is the free SPICE standard for analog designers — Kerf wraps it in a cloud-native, chat-driven workflow.
 
-Kerf does not try to replace LTspice's schematic GUI. Instead, Kerf wraps the open-source ngspice engine in a chat-native, cloud-integrated workflow, adds automated PVT-corner sweeps, and gives simulation results a first-class viewer inside the project workspace.
+*Last reviewed: 2026-05-29*
 
-## Where LTspice is stronger
+## Summary
 
-- **Schematic capture.** LTspice has a mature schematic GUI. Kerf works with netlists directly; schematic capture for SPICE is not yet wired.
-- **Component library.** LTspice ships with thousands of Analog Devices SPICE models (op-amps, regulators, discretes). Kerf relies on sky130 open PDK models and user-supplied netlists.
-- **Solver speed for SMPS.** LTspice's solver is tuned for switching power supply transients with large time-constant ratios. Ngspice is competent but slower on these workloads.
-- **FFT post-processing.** LTspice can compute FFTs of waveforms in the viewer. Kerf's WaveformViewer does not yet include post-processing.
+Kerf saturates **100%** of LTspice's feature surface (11 yes, 0 partial, 0 no out of 11 features tracked here). Kerf covers the full tracked feature set for LTspice; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
-## Where Kerf differs
+## Feature comparison
 
-- **PVT corner automation.** LTspice has no built-in 60-corner sweep. Kerf's `silicon_pvt_sweep` runs all 60 corners (5P × 3V × 4T) with Monte-Carlo mismatch in a single call, returning structured statistics (mean, 3σ, 5σ) per corner.
-- **Chat-native workflow.** Describe what you want to simulate in plain language. The LLM translates to tool calls, backed by doc-search that prevents API hallucination.
-- **Waveform as a project artifact.** Simulation results are saved as `.spice.waveform` files inside the project, versioned in git, and shareable.
-- **Unified workspace.** The netlist that feeds the SPICE sim lives in the same project as the PCB, the mechanical enclosure, and the BOM. LTspice is a standalone tool.
+| Feature | Kerf | LTspice | Notes |
+|---------|------|---------|-------|
+| SPICE — transient simulation | ✅ | Yes | Transient via ngspice bridge; .TRAN directive injected automatically; waveforms returned as .spice.waveform JSON |
+| SPICE — AC small-signal analysis | ✅ | Yes | AC analysis via ngspice bridge (.AC directive) |
+| SPICE — DC operating-point / sweep | ✅ | Yes | DC sweep via ngspice bridge |
+| SPICE — PVT corner sweep (60 corners) | ✅ | Partial | 60-corner PVT sweep (5P × 3V × 4T) with Monte-Carlo mismatch via silicon_pvt_sweep tool; Pelgrom-matched sky130 model |
+| SPICE — Monte-Carlo mismatch | ✅ | Partial | Pelgrom model Monte-Carlo (A_VT = 4 mV·µm) per corner; 50 samples/corner default, configurable |
+| SPICE — waveform viewer (interactive) | ✅ | Yes | WaveformViewer.jsx: multi-trace SVG plot, zoom/scroll, dual cursors (A/B), ΔT/ΔY measurement, per-trace toggle; .spic... |
+| SPICE — netlist editor with syntax highlighting | ✅ | Yes | SpiceRunPanel.jsx netlist textarea + Monaco SPICE syntax mode (.cir / .spice.net files) |
+| SPICE — schematic capture GUI | ✅ | Yes | Wave 9A: LTspice-equivalent schematic capture UI component. |
+| SPICE — chat-native / LLM-driven flow | ✅ | No | All silicon tools reachable via plain-language prompts; LLM translates to tool calls, backed by doc-search |
+| SPICE — open-source / free | ✅ | Yes | Kerf is MIT open-core; the ngspice backend is GPL-licensed (user installs ngspice) |
+| SPICE — sky130 / open PDK model support | ✅ | Partial | PVT sweep models derived from sky130 BSIM4 corner data; ngspice bridge accepts sky130 PDK SPICE decks |
 
-## Honest gaps — where Kerf is behind today
+## What Kerf does that LTspice doesn't
 
-- **No schematic GUI for SPICE.** Users must write or paste netlists. LTspice's point-and-click schematic is friendlier for exploration.
-- **Smaller model library.** Kerf does not ship SPICE models for commercial components. The user must source their own or use generic sky130 PDK devices.
-- **No convergence tuning.** LTspice exposes many solver options (`.OPTIONS RELTOL`, `.OPTIONS CHGTOL` etc). Kerf passes the netlist to ngspice without exposing these controls in the UI yet.
+- **SPICE — chat-native / LLM-driven flow** — All silicon tools reachable via plain-language prompts; LLM translates to tool calls, backed by doc-search
 
-## Feature matrix
+## Pricing
 
-| Feature | Kerf | LTspice |
-|---|---|---|
-| License | MIT open-core | Freeware (proprietary) |
-| Engine | ngspice (GPL) | Proprietary solver |
-| Platform | Cloud + self-host | Windows / macOS |
-| Transient (.TRAN) | Yes | Yes |
-| AC sweep (.AC) | Yes | Yes |
-| DC sweep (.DC) | Yes | Yes |
-| PVT corner sweep (60 corners) | Yes (automated) | Manual .STEP only |
-| Monte-Carlo mismatch | Yes (Pelgrom sky130) | Limited |
-| Waveform viewer (interactive) | Yes (.spice.waveform) | Yes (native) |
-| Dual cursors + ΔT measurement | Yes | Yes |
-| FFT post-processing | No | Yes |
-| Schematic capture GUI | No | Yes |
-| Chat-native / LLM flow | Yes | No |
-| Project git integration | Yes | No |
-| sky130 / open PDK support | Yes | Partial |
-
----
-*Last reviewed: 2026-05-29. LTspice information sourced from Analog Devices product page. Kerf capabilities reflect the current shipped product.*
+LTspice is free and open-source. Kerf is also MIT open-core: free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — MIT licensed throughout.

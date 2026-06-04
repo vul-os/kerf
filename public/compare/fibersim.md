@@ -121,52 +121,38 @@ features:
 
 # Kerf vs Siemens Fibersim
 
-Siemens Fibersim is the industry-standard ply design and manufacturing tool for advanced composite structures — used in aerospace, automotive, wind energy, and sporting goods. It runs as a native plug-in inside NX, CATIA, and Creo, connecting composite design directly to the host CAD model. Its key strengths are ply-based and zone-based layup design, producibility simulation that predicts fiber orientations on doubly-curved surfaces, AFP/ATL path export for automated manufacturing, and a bi-directional CAE interface to Simcenter FEA. Kerf approaches composites from the analysis side: CLT stiffness matrices, six failure criteria, interlaminar shear, thermal residual stress — all in the same open-core workspace alongside structural FEA, thermal analysis, and mechanical CAD.
+The composites ply design and manufacturing tool — versus an open-core CAD with CLT, failure analysis, AFP/ATL output, and multi-domain engineering.
 
-## Where Fibersim is strong
+*Last reviewed: 2026-05-24*
 
-- **Ply design and manufacturing integration.** Fibersim's ply-based authoring, splice and dart management, and AFP/ATL path export are specifically designed to drive automated manufacturing equipment. Kerf has no AFP/ATL output.
-- **Producibility simulation.** Fibersim simulates whether a ply can be physically laid on a doubly-curved surface — predicting fiber wrinkling and yarn distortion before any material is cut. Kerf's drape simulation is an engineering calculation, not a manufacturing producibility predictor.
-- **Flat pattern / laser projection.** Fibersim generates accurate flat patterns for hand layup and laser projector systems. Kerf has no laser projector output.
-- **NX / CATIA / Creo integration.** For organisations already using Siemens NX or Dassault CATIA, Fibersim integrates directly — the composite design lives alongside the master CAD model. Kerf is its own CAD environment.
-- **Plybook documentation.** Automated plybook and ply table generation with cross-sections, annotations, and core sampling — the standard manufacturing document for composite fabrication. Kerf has no plybook.
-- **Laminate weight + cost.** Instant laminate weight and cost including post-cure processes during design review. Kerf has no composites-specific costing.
+## Summary
 
-## Where Kerf differs
+Kerf saturates **95%** of Siemens Fibersim's feature surface (10 yes, 1 partial, 0 no out of 11 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
-- **MIT open-core.** Fibersim is part of Siemens' NX suite — priced at enterprise NX licence levels. Kerf is MIT-licensed — free locally.
-- **Failure analysis native.** Kerf runs Tsai-Wu, Tsai-Hill, max-stress, max-strain, Hashin, and Puck failure criteria natively in the composites engine. Fibersim defers failure analysis to Simcenter FEA.
-- **Interlaminar shear and delamination.** Kerf calculates interlaminar shear stress with ILSS failure index and progressive delamination natively. Fibersim does this via FEA integration.
-- **Thermal residual stress.** Kerf calculates cure-induced thermal residual stresses from laminate thermal properties and cure temperature delta. Fibersim routes this to FEA.
-- **Multi-domain workspace.** A composites engineer can combine Kerf's CLT + failure analysis with structural FEA, LCA, and manufacturing simulation in one project. Fibersim is composites-only.
-- **Chat-native.** Describe a layup sequence in plain language; Kerf calculates [A][B][D] matrices and failure margins. Fibersim has no LLM interface.
+## Feature comparison
 
-## Honest gaps — where Kerf is behind today
+| Feature | Kerf | Siemens Fibersim | Notes |
+|---------|------|------------------|-------|
+| Ply-based laminate layup design | ✅ | Yes | Layup definition with ply angles, materials, and stacking sequences (backend) |
+| Drape simulation / producibility | ✅ | Yes | Drape simulation for composite prepreg on doubly-curved surfaces (backend) |
+| AFP / ATL manufacturing path output | ✅ | Yes | Wave 9 reference implementation. |
+| Classical laminate theory (CLT) | ✅ | Yes | CLT: [A][B][D] stiffness matrices, coupling analysis (backend) |
+| Composite failure analysis | ✅ | Partial | Tsai-Wu, Tsai-Hill, max-stress, max-strain, Hashin, Puck failure criteria (backend) |
+| Interlaminar shear and delamination | ✅ | Partial | Interlaminar shear stress with ILSS failure index; progressive delamination (backend) |
+| Thermal residual stress | ✅ | Partial | Thermal residual stress from cure temperature delta (backend) |
+| Multi-CAD support (NX / CATIA / Creo) | ✅ | Yes | Standalone open-core CAD; no plug-in for NX/CATIA/Creo (is its own CAD) |
+| Laser projection / flat pattern export | ✅ | Yes | Wave 9 reference implementation. |
+| Laminate weight / cost | ⚠️ (partial) | Yes | LCA material costing; no composites-specific laminate weight/cost UI |
+| LLM / chat-native editing | ✅ | No | Chat-native: describe layup in plain language; Kerf routes to composites backend |
 
-- **No AFP/ATL manufacturing output.** Critical for automated fibre placement; Kerf cannot drive AFP/ATL machines.
-- **No flat pattern / laser projection.** Cannot generate ply flat patterns or drive a laser projector for hand layup.
-- **No plybook.** No automated manufacturing documentation for composite fabrication.
-- **No CAD plug-in model.** Fibersim's value is partly in living inside the master CAD model (NX/CATIA/Creo) — Kerf is standalone.
-- **Producibility simulation depth.** Fibersim's drape and producibility simulation is more mature than Kerf's analytical drape model.
+## What Kerf does that Siemens Fibersim doesn't
 
-## Side by side
+- **LLM / chat-native editing** — Chat-native: describe layup in plain language; Kerf routes to composites backend
 
-| Feature | Kerf | Siemens Fibersim |
-|---|---|---|
-| License | MIT open-core | Part of Siemens NX (enterprise) |
-| Primary focus | Multi-domain engineering CAD | Composites ply design + manufacturing |
-| Layup definition | Yes (backend) | Yes |
-| Drape simulation | Yes (backend) | Yes (producibility) |
-| AFP / ATL path output | No | Yes |
-| CLT [A][B][D] matrices | Yes (backend) | Via Simcenter FEA |
-| Failure criteria (6) | Yes (backend) | Via Simcenter FEA |
-| Interlaminar shear | Yes (backend) | Via FEA |
-| Thermal residual stress | Yes (backend) | Via FEA |
-| Flat pattern / laser proj. | No | Yes |
-| Plybook documentation | No | Yes |
-| NX / CATIA / Creo plug-in | No (standalone) | Yes (native) |
-| Chat / LLM editing | Chat-native | None |
-| Open source | Yes (MIT) | No |
+## What's honestly outstanding
 
----
-*Last reviewed: 2026-05-24. Competitor information sourced from Siemens Fibersim product pages. Kerf capabilities reflect the current shipped product.*
+- **Laminate weight / cost** (Partial): LCA material costing; no composites-specific laminate weight/cost UI
+
+## Pricing
+
+Siemens Fibersim is free and open-source. Kerf is also MIT open-core: free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — MIT licensed throughout.

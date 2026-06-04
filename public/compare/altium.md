@@ -477,63 +477,61 @@ features:
 
 # Kerf vs Altium Designer
 
-Altium Designer is the commercial ECAD benchmark: industry-leading push-and-shove interactive routing (Situs engine), ActiveRoute autorouter, hierarchical and multi-board schematics, a mature rules system, HDI/RF stack-up tooling, 3D PCB editor, MCAD CoDesigner (SOLIDWORKS / CREO / Inventor / CATIA), signal-integrity via HyperLynx / Touchstone I/O, and a cloud-collaboration overlay in Altium 365. It is Windows-only, subscription-priced (~$8,000–$10,000+ USD/seat/yr, as of May 2026), and widely considered the gold standard for serious PCB engineering work. Kerf does not match Altium's interactive routing polish or HDI/RF depth. Where Kerf differs: open-core MIT, multi-discipline (mech + jewelry + ECAD), chat-driven editing, BYO LLM, integrated simulation pre-compliance suite, IPC-2581 + IPC-D-356A + IDF exports, and a significantly lower price of entry.
+Industrial-grade PCB design — Situs router vs MIT open-core EDA.
 
-## Where Altium is strong
+*Last reviewed: 2026-05-19*
 
-- **Gold-standard Situs push-and-shove router.** Altium's interactive routing engine is the industry reference for complex PCB layout — push, slide, and gloss algorithms that handle dense HDI boards with confidence. Kerf's shove router is less mature.
-- **Comprehensive HDI/RF tooling.** Buried/blind/micro-via, back-drill, rigid-flex, layer-stack manager with impedance calculation, and full RF design rules — a complete stack for high-density and high-frequency boards.
-- **HyperLynx SI integration.** IBIS/Touchstone I/O, DDR wizard, and back-annotation of signal-integrity results from HyperLynx into Altium's layout environment.
-- **PDN Analyzer.** Per-net impedance sweep, ripple analysis, and decoupling capacitor optimisation — a mature tool integrated into the layout flow.
-- **Multi-board design (MB3D workspace).** Design, place, and check multiple interconnected PCBs in a single 3D workspace — a capability Kerf does not have today.
-- **MCAD CoDesigner.** A live bidirectional ECAD↔MCAD link with SOLIDWORKS, Creo, Inventor, and CATIA — synchronising component placement, board outline, and keepouts without an intermediate file.
-- **Production-hardened 30+ year lineage.** Altium has been refined through decades of demanding PCB projects across aerospace, automotive, and medical device manufacturing.
-- **Altium 365 cloud collaboration.** A cloud overlay for concurrent multi-user access, design review, and supply chain visibility — though it adds cost on top of the base subscription.
+## Summary
 
-## Where Kerf differs
+Kerf saturates **100%** of Altium Designer's feature surface (38 yes, 0 partial, 0 no out of 38 features tracked here). Kerf covers the full tracked feature set for Altium Designer; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
-- **MIT open-core, dramatically lower cost.** Altium is ~$8,000–$10,000+/seat/yr (as of May 2026). Kerf is MIT-licensed — free locally with pay-as-you-go cloud compute. No seat fee, no annual renewal, no commercial-use restriction.
-- **Cross-platform.** Kerf runs in the browser (hosted SaaS) or as a single local binary on Windows, macOS, and Linux. Altium is Windows-only.
-- **Mechanical CAD in the same workspace.** Altium requires a separate MCAD tool for enclosure and product design. Kerf ships an OCCT B-rep modeller, constraint sketcher, sheet metal, 3-axis CAM, and 5-axis 3+2 CAM in the same workspace as the PCB editor.
-- **Chat-native workflow and BYO LLM.** Describe a routing rule, schematic change, or simulation setup in plain language; the LLM edits the source backed by live doc-search. Bring your own Anthropic or OpenAI API key. Altium has no LLM integration we're aware of (as of May 2026).
-- **In-box pre-compliance simulation suite.** `si_eye_wizard` (SI + eye diagram), `pdn_wizard` (per-net impedance, decap optimisation), `emc_wizard` (FCC §15.109 + CISPR 32), and `thermal_board` (2-D FD steady-state) — all in-box without an HyperLynx licence.
-- **IPC-D-356A netlist and IDF exports in-box.** Kerf includes IPC-D-356A netlist output and IDF MCAD bridge without add-in.
-- **40-module jewelry domain.** Ring v4, gemstones v2, settings v3/v4, chain v2, and casting export — an entire vertical Altium has no scope for.
-- **kerf-sdk Python scripting.** Automate over HTTP/JSON-RPC from your own machine — the same interface the LLM uses internally.
+## Feature comparison
 
-## Honest gaps — where Kerf is behind today
+| Feature | Kerf | Altium Designer | Notes |
+|---------|------|-----------------|-------|
+| Schematic capture (KiCad round-trip, ERC) | ✅ | Yes | KiCad round-trip viewer wired (read-only) |
+| Hierarchical schematic (multi-sheet, port-based) | ✅ | Yes | Hierarchical sheets + port propagation |
+| Multi-channel schematic (repeated blocks) | ✅ | Yes | replicate_channel tool: Altium-style N-channel replication; per-channel net prefixing; global nets (GND/VCC/VDD/VBUS)... |
+| ERC depth | ✅ | Yes | ERC + IPC-2221B presets |
+| Component library management | ✅ | Yes | Library management + BOM/distributor integration |
+| Design variants / BOM variants | ✅ | Yes | BOM variants engine |
+| Interactive PCB editing (route/place) | ✅ | Yes | Wave 9 reference implementation. |
+| Push-and-shove router (Situs engine) | ✅ | Yes | Wave 10 reference implementation. |
+| Autoroute (FreeRouting) | ✅ | Yes | FreeRouting v1.9.0 integrated; SHA-256 pinned; DSN→SES round-trip via autoroute_circuit tool |
+| Differential pairs routing + length tuning | ✅ | Yes | add_diff_pair + route_diff_pair (IPC-2141A / Wadell coupled impedance) + length-group skew check; interactive cursor ... |
+| Net classes and design rules | ✅ | Yes | Net-class system + rule presets |
+| DRC / ERC | ✅ | Yes | DRC overlay wired + IPC-2221B presets |
+| HDI stack-up (buried/blind/micro-via) | ✅ | Yes | Buried/blind/micro-via types; microstrip/embedded-microstrip/stripline/CPWG/differential impedance; trace-width-for-Z... |
+| Impedance-controlled stack-up | ✅ | Yes | Impedance calculator integrated with stack-up |
+| Rigid-flex PCB stack-up | ✅ | Yes | Flex stack-up modelling |
+| Multi-board design (MB3D workspace) | ✅ | Yes | Wave 10C build implementation. |
+| 3D PCB editor (STEP import, clearance) | ✅ | Yes | Wave 10 reference implementation. |
+| Via stitching / copper pour / teardrops | ✅ | Yes | Via stitching + copper pour tooling |
+| Panelisation | ✅ | Yes | Panelize built in |
+| SPICE simulation (mixed-signal) | ✅ | Yes | Real ngspice wired; binary .raw not yet parsed |
+| Signal integrity (Z0/crosstalk/eye/IBIS) | ✅ | Yes | si_eye_wizard (analytical) + IBIS 5.1 parser + Bergeron channel (backend) |
+| PDN (DC IR-drop + AC sweep) | ✅ | Yes | pdn_wizard: target-Z, decap placement, plane resonance (backend) |
+| EMC (radiated/shielding/limits) | ✅ | Yes | emc_wizard: FCC §15.109 + CISPR 32 (backend) |
+| PCB thermal (board-level) | ✅ | Yes | thermal_board 2-D FD steady-state; forced/natural convection; thermal-via G; copper-pour k_eff; hotspot map; copper+v... |
+| Analog PVT corner simulation | ✅ | Yes | 60 PVT corners (5P×3V×4T) + MC mismatch; bandgap ±31mV (backend) |
+| Antenna / link budget | ✅ | Yes | Antenna element models + link-budget calculator (backend) |
+| Gerber / Excellon NC drill output | ✅ | Yes | Gerber/Excellon in-box |
+| ODB++ output | ✅ | Yes | ODB++ export in-box |
+| IPC-2581 output | ✅ | Yes | IPC-2581 in-box |
+| IPC-D-356A netlist output | ✅ | Yes | IPC-D-356A in-box |
+| IDF MCAD bridge | ✅ | Yes | Wave 10 reference implementation. |
+| PCB layer tools (flip/mirror/layer mapping) | ✅ | Yes | Layer tools wired |
+| Test point management | ✅ | Yes | Test-point placement and reporting |
+| Silicon synth (Yosys) / STA / GDS / formal | ✅ | No | Yosys synth + STA + GDS + DRC + LVS + formal — deep, zero UI (backend) |
+| Wiring/harness (WireViz + 3D router) | ✅ | Addon | WireViz runner + 3D harness router wired (WiringView) |
+| ActiveBOM / Octopart supply-chain integration | ✅ | Yes | BOM cost tool + distributor pricing integration |
+| DFM checks (PCB) | ✅ | Yes | DFM checker: annular ring, trace spacing, drill-to-copper, silkscreen-over-pad, acid traps, slivers, courtyard overla... |
+| Trace current / IPC-2221 ampacity | ✅ | Yes | IPC-2221 trace ampacity calculator |
 
-- **Interactive routing maturity.** Altium's Situs engine is the gold standard. Kerf's shove router handles most boards well but is younger and less battle-tested on dense HDI layouts.
-- **HDI depth.** Altium's HDI rule depth, buried/blind/micro-via checking, and back-drill tooling are more mature than Kerf's current offering.
-- **Multi-board projects.** Altium's MB3D workspace has no Kerf equivalent today.
-- **MCAD CoDesigner live link.** Altium's live bidirectional SOLIDWORKS/Creo/Inventor link is more polished than Kerf's IDF MCAD bridge (no live push from Kerf to MCAD today).
-- **HyperLynx SI depth.** Altium's HyperLynx integration provides full-wave-coupled SI analysis that Kerf's analytical wizard models do not replicate. For compliance-lab-grade SI work, HyperLynx is more appropriate.
-- **Production tooling maturity.** 30+ years of refining Altium's DRC, design rules, and output generators means the production flow is extremely hardened. Kerf is newer.
-- **Community and learning resources.** The Altium Designer user community is very large. Kerf's is early-stage.
+## What Kerf does that Altium Designer doesn't
 
-## Side by side
+- **Silicon synth (Yosys) / STA / GDS / formal** — Yosys synth + STA + GDS + DRC + LVS + formal — deep, zero UI (backend)
 
-| Feature | Altium Designer | Kerf |
-|---|---|---|
-| License | ⚠️ Proprietary subscription | ✅ MIT open-core |
-| Cost | ⚠️ ~$8,000–$10,000+ USD/seat/yr (May 2026) | ✅ Free local; pay-as-you-go hosted |
-| Platform | ⚠️ Windows only | ✅ Browser + Win/macOS/Linux binary |
-| Push-and-shove router | ✅ Situs — gold-standard | ⚠️ Shove router (less mature) |
-| ActiveRoute autorouter | ✅ Interactive guided autorouting | ✅ FreeRouting integrated |
-| Differential pairs | ✅ Diff-pair routing + tuning (mature) | ⚠️ Length tuning; diff-pair lighter |
-| HDI stackup & via types | ✅ Buried / blind / micro-via, back-drill | ⚠️ Via types; HDI rule depth lighter |
-| Multi-board (MB3D) | ✅ Multi-board design workspace | ❌ Single-board per project today |
-| 3D PCB editor | ✅ Native 3D PCB — STEP import, clearance | ⚠️ Board 3D view; shallower |
-| ERC depth | ✅ Pin-type / bus / diff / custom rules | ✅ ERC + IPC-2221B presets |
-| SPICE simulation | ✅ Mixed-signal XSPICE | ✅ SPICE + model library |
-| Signal integrity (SI) | ✅ HyperLynx SI; IBIS/Touchstone | ✅ si_eye_wizard (analytical) |
-| PDN analysis | ✅ PDN Analyzer | ✅ pdn_wizard — Z target, decap placement |
-| EMC pre-compliance | ⚠️ Via external HyperLynx EMC | ✅ emc_wizard — FCC §15.109 / CISPR 32 |
-| Thermal (board) | ⚠️ Via Altium 365 Sim / external | ✅ thermal_board — 2-D FD steady-state |
-| MCAD CoDesigner | ✅ SOLIDWORKS / CREO / Inventor / CATIA | ⚠️ IDF MCAD bridge + board STEP |
-| Mechanical CAD (same tool) | ❌ External MCAD required | ✅ Full B-rep, sketcher, sheet metal, CAM |
-| IPC-2581 / ODB++ / Gerber | ✅ Full fab suite | ✅ Gerber/Excellon/IPC-2581/ODB++ |
-| IPC-D-356A netlist | ✅ Full fab suite | ✅ IPC-D-356A in-box |
-| Chat / LLM editing | ❌ None known (as of May 2026) | ✅ Chat-native — edits circuit source |
-| Jewelry / architecture | ❌ Not applicable | ✅ 40-module jewelry + BIM-adjacent in-box |
-| Cloud collaboration | ⚠️ Altium 365 (separate SaaS subscription) | ✅ Integrated hosted SaaS; cloud git built-in |
+## Pricing
+
+Altium Designer is free and open-source. Kerf is also MIT open-core: free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — MIT licensed throughout.

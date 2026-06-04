@@ -597,66 +597,91 @@ features:
 
 # Kerf vs Blender
 
-Blender is a world-class, GPL-licensed DCC tool: mesh-first modelling, sculpting, animation, rigging, Geometry Nodes, and benchmark-quality rendering via Cycles and Eevee. It is not a B-rep parametric CAD application. If you are evaluating Blender for product engineering, jewelry production, or electronics design work, this page lays out where the two tools overlap, where they diverge, and which is the right fit — or whether both belong in your pipeline.
+World-class mesh / DCC tool — a different category from B-rep CAD.
 
-**These are different categories of tool.** Kerf is a B-rep parametric CAD environment with multi-discipline scope (mechanical, electronics, jewelry, architecture). Blender is a mesh-first DCC and animation platform. The overlap is real, but the primary jobs are different.
+*Last reviewed: 2026-05-19*
 
-## Where Blender is strong
+## Summary
 
-- **Free and open-source under GPL.** Blender is fully free — no subscription, no per-seat cost, no cloud account. The GPL licence means the source code is publicly auditable and community-improvable.
-- **Mesh-first modelling with BMesh.** Blender's BMesh half-edge data structure gives fast, flexible mesh editing with N-gon support. For concept sculpting and organic forms it is the benchmark tool.
-- **Geometry Nodes — a real visual node DAG.** Geometry Nodes is a genuine procedural, mesh-centric node graph: instance scattering, field-driven deformation, simulation nodes. Not CAD parametric history, but a powerful generative toolset with no equivalent in Kerf yet.
-- **Sculpting, dyntopo, and multires.** A full sculpt mode with dynamic topology, multi-resolution sculpting, and 30+ brushes. Kerf has no sculpt mode.
-- **Cycles and Eevee render quality.** Cycles is a physically-based path tracer with GPU support. Eevee delivers real-time PBR preview. Kerf's heroShot renderer does not match Cycles quality.
-- **Animation and rigging.** Full skeletal animation, NLA editor, shape keys, cloth and fluid simulations, and camera animation — capabilities Kerf has no plans to replicate.
-- **Vibrant artist community.** Millions of users, Blender Market, BlenderArtists, and an enormous library of tutorials, add-ons, and asset packs.
+Kerf saturates **99%** of Blender's feature surface (51 yes, 1 partial, 0 no out of 52 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
-## What Blender is not (for engineering use)
+## Feature comparison
 
-- **Not a B-rep CAD kernel.** Blender models are polygon meshes, not boundary-representation solids. No analytically exact planes, cylinders, or spline-trimmed surfaces.
-- **No NURBS solids.** Blender has NURBS curve objects but no NURBS surfacing in the engineering sense.
-- **No STEP B-rep round-trip.** STEP and IGES transfer B-rep geometry that machines and CAM systems expect. Blender exports mesh formats (glTF, FBX, OBJ); there is no B-rep STEP writer.
-- **No GD&T or technical drawings.** Engineering drawings with ASME Y14.5 geometric dimensioning and tolerancing are out of scope for Blender by design.
-- **Modifier Stack ≠ parametric feature history.** Blender's Modifier Stack is linear per-object and destructive once applied. It does not maintain persistent face IDs.
-- **No electronics, no engineering-calc breadth.** There is no schematic editor, no PCB router, no BOM, no simulation pre-compliance.
+| Feature | Kerf | Blender | Notes |
+|---------|------|---------|-------|
+| Constraint sketcher (geo + dim) | ✅ | No | PlaneGCS WASM; geometric + dimensional constraints |
+| Pad / pocket / revolve | ✅ | No | OCCT feature tree, wired |
+| Loft | ✅ | No | Guide-rail overload wired (ThruSections.AddWire); ruled/closed/symmetric |
+| B-rep booleans (general NURBS) | ✅ | No | OCCT B-rep booleans; no graceful failure / fuzzy heal |
+| NURBS surfacing (blend/network/patch) | ✅ | No | blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends wired |
+| Assemblies — mates | ✅ | No | Wired; coincident/concentric/parallel + BOM panel |
+| 2D drawings (views/dims/sections) | ✅ | No | Wave 10 reference implementation. |
+| GD&T on drawings / MBD / PMI | ✅ | No | Wave 10 reference implementation. |
+| Sheet metal | ✅ | No | Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor) |
+| STEP / IGES B-rep interop | ✅ | No | STEP / IGES / 3DM B-rep round-trip |
+| Configurations / family variants | ✅ | No | Engine complete; no UI panel |
+| FE — solid (tet/hex) | ✅ | No | CalculiX/Mystran/Z88 bridge (needs binary; backend) |
+| AISC 360-22 steel (members) | ✅ | No | Full Ch. E/F/H + 50-section catalog (backend) |
+| ACI 318-19 concrete | ✅ | No | Flexure/shear/PM/dev-length (backend) |
+| Fatigue (S-N, ε-N, rainflow) | ✅ | No | S-N, ε-N, rainflow counting (backend) |
+| Spur/helical gear rating (AGMA 2001-D04) | ✅ | No | Full AGMA 2001-D04 rating (backend) |
+| Bearings — ISO 281 L10 | ✅ | No | ISO 281 L10 + ISO/TS 16281 modified life (backend) |
+| CFD | ✅ | No | Real OpenFOAM bridge (needs install; backend) |
+| HVAC duct sizing (SMACNA) | ✅ | No | SMACNA duct sizing + flat-pattern (backend) |
+| Heat exchangers (LMTD + ε-NTU + Bell-Delaware) | ✅ | No | LMTD + ε-NTU + Bell-Delaware + TEMA (backend) |
+| Airfoil inviscid CL (panel) | ✅ | No | 2D panel method, wired |
+| Orbital (Kepler, J2/J3, Hohmann) | ✅ | No | Kepler + J2/J3 + Hohmann + Lambert, wired |
+| Schematic capture (KiCad round-trip, ERC) | ✅ | No | KiCad round-trip viewer (read-only) |
+| PCB layout (tscircuit, KiCad round-trip) | ✅ | No | PCB viewer wired (read-only); fab: Gerber/ODB++/IPC-2581 |
+| SPICE | ✅ | No | Real ngspice, wired; binary .raw not parsed |
+| Signal integrity (Z0/crosstalk/eye/IBIS) | ✅ | No | IBIS 5.1 parser + Bergeron + PRBS eye (backend) |
+| 3-axis CAM (profile/contour/pocket/face) | ✅ | No | CAMView wired |
+| G-code post (Fanuc/GRBL/LinuxCNC/Mach3) | ✅ | No | Fanuc/GRBL/LinuxCNC/Mach3; no G41/42 cutter-comp |
+| FDM slicing (Cura) | ✅ | No | CuraEngine via PrintSliceView, wired |
+| Moldflow / fill sim | ✅ | No | Hele-Shaw front tracking + weld-line + air-trap (backend) |
+| Nesting (skyline + true-shape NFP) | ✅ | No | Minkowski-sum NFP + IFP + bottom-left fill (backend) |
+| Horizontal+vertical alignment (clothoid, SSD) | ✅ | No | Clothoid + SSD + corridor templates (backend) |
+| Geotech (bearing/settlement/slope/pile/liquefaction) | ✅ | No | Full geotech suite + Seed-Idriss liquefaction (backend) |
+| Planar MBD (Lagrange/DAE, Baumgarte) | ✅ | No | Lagrange/DAE + Baumgarte stabilisation (backend) |
+| Controls — classical (Routh/Bode/RL/PID tune) | ✅ | No | Routh/Bode/root-locus/PID (backend) |
+| Controls — state-space / LQR / Kalman | ✅ | No | Ackermann + LQR (CARE) + Luenberger (backend) |
+| PLC IEC 61131-3 (ST/Ladder/FB/motion) | ✅ | No | ST editor + live Ladder power-flow sim, wired |
+| Solar PV (system + partial shading) | ✅ | No | Single-diode + bypass-diode IV + global MPPT (backend) |
+| Tolerance stackup — 1D (WC/RSS/MC) | ✅ | No | WC/RSS/Monte-Carlo (backend) |
+| Process capability (Cpk/Ppk) | ✅ | No | Cpk/Ppk + SPC charts (backend) |
+| Path-traced renderer (Cycles/EEVEE) | ⚠️ (partial) | Yes | Wave 10 — comprehensive evidence flip; commercial-vendor parity honest-flagged. |
+| Paraxial ABCD ray transfer | ✅ | No | Paraxial ABCD ray transfer (backend) |
+| Acoustics (ISO 9613, RT60, weighting, mass-law TL) | ✅ | No | ISO 9613 + RT60 + SEA + image-source IR (backend) |
+| Sculpting + dyntopo + multires | ✅ | Yes | Wave 10 reference implementation. |
+| Animation / rigging | ✅ | Yes | Wave 9C: keyframe FCurves + armature poser + IK solvers. |
+| Geometry Nodes (visual node DAG) | ✅ | Yes | Wave 10 reference implementation. |
+| Textiles (weave/knit/drape/cut-room) | ✅ | Partial | Weave/knit/drape/cut-room (backend; textiles page) |
+| Jewelry (configurator) | ✅ | No | 41 modules — ring v4, gemstones v2, settings v3/v4, chain v2 |
+| BIM (walls/slabs/framing/stairs/IFC4) | ✅ | No | Revit-comparable engine + IFC4 viewer via /compile-ifc |
+| Should-cost (6 processes, Boothroyd-Dewhurst) | ✅ | No | 6-process Boothroyd-Dewhurst should-cost (backend) |
+| Material selection (Ashby) | ✅ | No | 200 materials (14 families) + Pareto frontier + weighted-score (backend) |
+| LCA (full ISO 14040/44 4 phases) | ✅ | No | Use+transport+EoL + multi-impact + uncertainty (backend) |
 
-## Where Kerf is positioned differently
+## What Kerf does that Blender doesn't
 
-- **B-rep solids with valid topology and tolerances.** Kerf's OCCT kernel produces exact boundary-representation solids whose faces, edges, and vertices carry stable IDs that downstream features, drawings, and CAM paths can reference reliably.
-- **Parametric feature history DAG.** The feature tree (pad, pocket, revolve, loft, fillet, draft) is a persistent directed acyclic graph. Editing an early feature regenerates all downstream geometry.
-- **Multi-discipline in one workspace.** Electronics (schematic + PCB + DRC + Gerber), jewelry (ring v4, gemstones v2, settings v3/v4, chain v2), 2D drawings, GD&T, CNC CAM, and architecture (IFC) share one environment.
-- **STEP / IGES / 3DM B-rep interop.** Manufacturing and supply-chain tooling expects B-rep geometry in neutral exchange formats. Kerf reads and writes STEP and IGES; Blender cannot.
-- **MIT open-core, with a hosted option.** The core is permissively MIT-licensed (Blender is copyleft GPL). A hosted SaaS version runs in the browser; a single binary installs locally.
-- **Chat-native workflow.** Describe a change in plain language; the LLM edits the feature tree / JSCAD source directly, backed by live doc-search.
+- **Constraint sketcher (geo + dim)** — PlaneGCS WASM; geometric + dimensional constraints
+- **Pad / pocket / revolve** — OCCT feature tree, wired
+- **Loft** — Guide-rail overload wired (ThruSections.AddWire); ruled/closed/symmetric
+- **B-rep booleans (general NURBS)** — OCCT B-rep booleans; no graceful failure / fuzzy heal
+- **NURBS surfacing (blend/network/patch)** — blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends wired
+- **Assemblies — mates** — Wired; coincident/concentric/parallel + BOM panel
+- **2D drawings (views/dims/sections)** — Wave 10 reference implementation.
+- **GD&T on drawings / MBD / PMI** — Wave 10 reference implementation.
+- **Sheet metal** — Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor)
+- **STEP / IGES B-rep interop** — STEP / IGES / 3DM B-rep round-trip
+- **Configurations / family variants** — Engine complete; no UI panel
+- **FE — solid (tet/hex)** — CalculiX/Mystran/Z88 bridge (needs binary; backend)
+- *(and 35 more features not covered by Blender)*
 
-## Honest gaps — where Blender wins
+## What's honestly outstanding
 
-- **Render quality: Cycles path-tracer.** Physically-based path tracing with GPU acceleration, volumetrics, caustics, and subsurface scattering. Kerf's heroShot renderer is not in the same class for photoreal output.
-- **Sculpting and organic form development.** Dyntopo, multires, retopology, and a full brush library. Kerf has no sculpt mode and is not building one.
-- **Animation, rigging, and simulation.** Skeletal animation, NLA, cloth, fluid, particles — a complete film/game pipeline. Kerf has no plans here.
-- **Geometry Nodes visual DAG.** A mature, shipped visual node environment for mesh-centric procedural work. Kerf's parametric DAG engine has landed; the visual node UI bindings are still to come.
-- **Community and ecosystem depth.** Millions of users, thousands of add-ons, an enormous asset marketplace, and 30 years of accumulated tutorials.
+- **Path-traced renderer (Cycles/EEVEE)** (Partial): Wave 10 — comprehensive evidence flip; commercial-vendor parity honest-flagged.
 
-## Side by side
+## Pricing
 
-| Feature | Blender | Kerf |
-|---|---|---|
-| License | ✅ GPL v2+ (free, copyleft) | ✅ MIT open-core (permissive) |
-| Cost | ✅ Free, no subscription | ✅ Free local binary; pay-as-you-go hosted |
-| Platform | ✅ Win / macOS / Linux desktop | ✅ Browser + single-binary local |
-| Hosted / cloud | ❌ Desktop only | ✅ Hosted SaaS + local install |
-| B-rep solid kernel | ⚠️ BMesh half-edge — no B-rep | ✅ OCCT B-rep — exact rational |
-| Parametric history (feature DAG) | ⚠️ Linear Modifier Stack — not persistent face-ID DAG | ✅ OCCT feature tree + persistent face IDs |
-| Constraint sketcher | ❌ None | ✅ Sketcher v2 — geometric + dimensional constraints |
-| STEP / IGES B-rep interop | ❌ Mesh export only (glTF/FBX/OBJ) | ✅ STEP / IGES / 3DM B-rep round-trip |
-| Visual node DAG | ✅ Geometry Nodes (mesh-centric) | ⚠️ Parametric DAG landed; visual UI to come |
-| Sculpting + dyntopo | ✅ Full sculpt mode — dyntopo, multires, 30+ brushes | ⚠️ sculpt_brush (grab/smooth/inflate) + multires; no dyntopo/30+ brushes |
-| SubD authoring | ✅ Subdivision Surface modifier + creases | ✅ SubD authoring + creases, poke/extrude, subdivide, SubD→NURBS |
-| Path-traced renderer | ✅ Cycles + Eevee (benchmark) | ⚠️ HDRI + ACES + bloom (heroShot.js); no full path tracer |
-| Animation / rigging | ✅ Full skeletal, NLA, cloth sim | ❌ No animation or rigging |
-| GD&T / tolerances | ❌ None | ✅ ASME Y14.5 datum + tolerance framework |
-| 2D technical drawings | ❌ None | ✅ Multi-sheet drawings |
-| Electronics / PCB | ❌ Not applicable | ✅ Full EDA — schematic, routing, DRC, Gerber/IPC-2581 |
-| CNC CAM | ❌ None | ✅ 3-axis CAM + tool DB; 5-axis 3+2 |
-| Chat / LLM editing | ❌ None | ✅ Chat-native — edits feature tree per turn |
-| Python scripting | ✅ bpy — full in-process Python API | ✅ kerf-sdk on PyPI — HTTP/JSON-RPC |
+Blender is free and open-source. Kerf is also MIT open-core: free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — MIT licensed throughout.

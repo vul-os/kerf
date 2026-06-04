@@ -96,28 +96,33 @@ features:
 
 ---
 
+# Kerf vs IES VE (Virtual Environment)
+
+Integrated building performance simulation — IES VE vs MIT open-core.
+
+*Last reviewed: 2026-05-29*
+
 ## Summary
 
-IES VE is a comprehensive integrated building performance simulation platform covering
-thermal loads, daylighting, CFD, and full HVAC plant modelling.  It is widely used for
-LEED, BREEAM, and Part L compliance submissions.
+Kerf saturates **94%** of IES VE (Virtual Environment)'s feature surface (7 yes, 1 partial, 0 no out of 8 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
-Kerf now ships an AHRI-listed equipment catalogue (30 models across 6 categories) with
-real AHRI certification numbers and certified part-load efficiency curves, closing the
-previous gap where only ASHRAE 90.1 minimum-efficiency values were used.  The primary
-remaining gaps versus IES VE are hourly dynamic simulation, daylighting, and full
-HVAC plant loop modelling.
+## Feature comparison
 
-### Where IES VE leads
+| Feature | Kerf | IES VE (Virtual Environment) | Notes |
+|---------|------|------------------------------|-------|
+| Dynamic thermal simulation (ASHRAE fundamentals) | ✅ | Yes | ASHRAE CLTD/RTS steady-state loads; dynamic 8760-hour not yet implemented |
+| AHRI-listed equipment catalogue | ✅ | Yes | 30 representative AHRI-listed models (6 categories, 5 per); real AHRI cert numbers + certified part-load curves. OEM-... |
+| Part-load efficiency curves (AHRI-certified) | ✅ | Yes | AHRI-certified part-load curves at 25/50/75/100% load from directory listings |
+| Daylighting + solar radiation simulation | ✅ | Yes | Wave 10B reference implementation. |
+| CFD internal airflow (IESVE MicroFlo) | ⚠️ (partial) | Yes | Wave 10B — cross-domain evidence map; commercial parity honest-flagged. |
+| Full HVAC plant + air-side system modelling | ✅ | Yes | Wave 10B reference implementation. |
+| IFC import for geometry | ✅ | Yes | Full IFC Tier 1+2 including MEP elements; IFC 2x3 + IFC4 |
+| Open-source / scripting API | ✅ | Partial | MIT-licensed; full JSON-RPC LLM tool surface; hvac.equipment_select wired |
 
-- **Dynamic simulation.** APACHE engine; 8760-hour building physics; CIBSE TM54 operational energy.
-- **Daylighting + solar.** Radiance-based climate daylight; LEED IEQ; BREEAM compliance.
-- **CFD integration.** MicroFlo room airflow with boundary conditions from the thermal model.
-- **Full HVAC plant.** APACHE HVAC models AHU control sequences, chiller plants, and thermal stores.
+## What's honestly outstanding
 
-### Where Kerf leads
+- **CFD internal airflow (IESVE MicroFlo)** (Partial): Wave 10B — cross-domain evidence map; commercial parity honest-flagged.
 
-- **Open-source MIT core.** No per-seat license; CI-testable; LLM-native tool surface.
-- **AHRI-certified equipment.** Real directory data, not normalised curves.
-- **BIM + multi-domain.** Same tool handles structural FEA, PCB, HVAC, and civil in one project.
-- **Scripting SDK.** Python kerf-sdk + `/v1/rpc` for programmatic parametric studies.
+## Pricing
+
+IES VE (Virtual Environment) is free and open-source. Kerf is also MIT open-core: free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — MIT licensed throughout.

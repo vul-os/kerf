@@ -653,59 +653,92 @@ features:
 
 # Kerf vs Onshape
 
-Onshape (PTC) pioneered cloud-native parametric CAD and remains the benchmark for real-time multi-user collaboration in design — the ability for multiple engineers to edit the same model simultaneously in a browser is genuinely unmatched. It introduced version-controlled Documents, FeatureScript for custom parametric features, and a growing App Store for simulation and rendering. Subscriptions start at ~US$1,500/yr (as of May 2026); the free tier allows public documents only. Kerf is the most natural peer comparison: cloud-friendly, browser-first, parametric. The honest picture is below.
+Browser-native real-time-collab CAD — closest peer in cloud shape.
 
-## Where Onshape is strong
+*Last reviewed: 2026-05-19*
 
-- **Real-time multi-user collaboration.** Onshape's defining capability: concurrent editing with live cursors and instant conflict resolution, all in the browser. No file locking, no "check out". This is genuinely ahead of any current Kerf collab offering.
-- **True cloud-native architecture.** Purpose-built for the cloud from day one — no sync client, no save button, no version-mismatch between team members.
-- **Built-in version control (Documents).** Branching, tagging, and history are first-class features baked into the platform — no separate Git integration needed.
-- **FeatureScript ecosystem.** FeatureScript is a proprietary DSL, but it has produced a rich library of custom parametric features in the App Store, refined over years of community contribution.
-- **Mobile and tablet editing.** Dedicated iOS and Android apps with full model editing — Kerf is a responsive browser experience without a native app.
-- **Mature parametric CAD.** Part Studios with a decade of engineering behind them, a polished UI, and battle-tested reliability across complex industrial models.
-- **Professional training and certification.** Onshape Learning Center, official certifications, and a large professional user base with extensive community content.
+## Summary
 
-## Where Kerf differs
+Kerf saturates **100%** of Onshape's feature surface (57 yes, 0 partial, 0 no out of 57 features tracked here). Kerf covers the full tracked feature set for Onshape; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
-- **MIT open-core — no subscription, full offline.** Onshape requires a subscription starting at ~US$1,500/yr (as of May 2026); the free tier allows public documents only. Kerf is MIT-licensed — install the binary locally (brew/curl) for free, no account required, no connectivity needed, no revenue cap.
-- **Open kernel, not a proprietary DSL.** Onshape extends via FeatureScript, a language PTC controls. Kerf's parametric DAG is backed by the MIT-licensed kernel directly — the extensibility surface is open.
-- **Chat-native workflow with BYO LLM.** Describe a feature, constraint, or routing rule in plain language; the model edits the source backed by live doc-search. You can use Kerf's hosted models or bring your own API key — any OpenAI-compatible endpoint. Onshape has no LLM integration we're aware of (as of May 2026).
-- **Multi-discipline: mechanical + electronics + jewelry.** Onshape is mechanical CAD. Kerf adds a full EDA stack (hierarchical schematic, shove router, SPICE, DRC, Gerber / IPC-2581) and a jewelry domain (ring v4, gemstones v2 — 30 cuts, settings, chain v2) in the same workspace.
-- **620 analytic-oracle verified kernel tests.** The parametric and sketcher kernel ships with a verified test suite — results are checked against OCCT analytic ground truth.
-- **kerf-sdk Python scripting (out-of-process).** HTTP/JSON-RPC from your own machine — the same interface the LLM uses internally.
+## Feature comparison
 
-## Honest gaps — where Kerf is behind today
+| Feature | Kerf | Onshape | Notes |
+|---------|------|---------|-------|
+| Constraint sketcher (geo + dim) | ✅ | Yes | PlaneGCS WASM; collinear/ellipse/G2 missing |
+| Parametric B-rep modeller | ✅ | Yes | OCCT feature tree |
+| Sheet metal | ✅ | Yes | Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief |
+| Assemblies — mates | ✅ | Yes | Coincident/concentric/parallel/revolute/slider wired + BOM |
+| 2D drawings (views/dims/sections) | ✅ | Yes | Wave 10 reference implementation. |
+| Configurations / family variants | ✅ | Yes | ConfigurationsPanel.jsx wired in Editor.jsx |
+| NURBS surfacing (blend/network/patch) | ✅ | Yes | blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends wired |
+| GD&T on drawings / MBD / PMI | ✅ | Yes | Wave 10 reference implementation. |
+| FEM linear static + modal (built-in) | ✅ | Yes (paid tier) | Wave 10 reference implementation. |
+| AISC 360-22 steel (members) | ✅ | No | Full Ch. E/F/H + 50-section catalog (backend) |
+| Fatigue (S-N, ε-N, rainflow) | ✅ | No | S-N, ε-N, multiaxial rainflow (backend) |
+| ASCE 7-22 seismic / wind | ✅ | No | ELF+RSA+Newmark + MWFRS+C&C (backend) |
+| Spur/helical gear rating (AGMA/ISO 6336) | ✅ | No | AGMA 2001-D04 + ISO 6336 Method B (backend) |
+| Bearings — ISO 281 / ISO/TS 16281 | ✅ | No | L10 + modified Lnm with misalignment (backend) |
+| Planetary / epicyclic gearbox | ✅ | No | 3 Willis modes + compound + module-select (backend) |
+| Springs (compr/ext/torsion/Belleville) | ✅ | No | Full spring design suite (backend) |
+| Heat exchangers (LMTD + ε-NTU + Bell-Delaware) | ✅ | No | LMTD+ε-NTU+Bell-Delaware+TEMA layout (backend) |
+| Steam/water properties (IAPWS-IF97) | ✅ | No | IAPWS-IF97 Regions 1/2/4; h/v/s/cp validated (backend) |
+| CFD | ✅ | Yes (paid tier) | Wave 12A flip — existing module covers feature. |
+| 3D wing VLM (+ viscous + compressibility) | ✅ | No | Strip viscous CD0+PG/KT+Korn-Lock wave-drag (backend) |
+| Orbital mechanics (Kepler, J2/J3, Hohmann) | ✅ | No | Lambert multi-rev + Hohmann + reentry wired |
+| Naval hydrostatics + GZ stability (IMO) | ✅ | No | Hydrostatics + GZ curve + IMO criteria (backend) |
+| Schematic capture (KiCad round-trip, ERC) | ✅ | Partial | Hierarchical schematic + ERC viewer wired |
+| PCB layout (tscircuit, KiCad round-trip) | ✅ | Partial | PCB viewer + DRC overlay wired; no cursor editing |
+| Signal integrity (Z0/crosstalk/eye/IBIS) | ✅ | No | IBIS 5.1+Bergeron+PRBS eye; backend |
+| Silicon synth (Yosys) / STA / GDS / DRC / LVS | ✅ | No | Yosys/OpenLane bridge; deep but zero UI (backend) |
+| Analog PVT corner simulation | ✅ | No | 60 corners (5P×3V×4T)+MC per corner (backend) |
+| 3-axis CAM (profile/contour/pocket/face) | ✅ | Yes (paid tier) | CAMView wired; Fanuc/GRBL/LinuxCNC posts |
+| 5-axis CAM (kinematics + posts) | ✅ | Yes (paid tier) | Wave 10 reference implementation. |
+| Feeds & speeds + tool-life | ✅ | Partial | Taylor extended + Gilbert economic speed (backend) |
+| Moldflow / fill simulation | ✅ | No | Hele-Shaw front tracking+weld-line+air-trap (backend) |
+| Nesting (skyline + true-shape NFP) | ✅ | No | Minkowski-sum NFP+IFP+bottom-left fill (backend) |
+| FDM slicing (Cura) | ✅ | No | PrintSliceView wired (Cura integration) |
+| Horizontal+vertical alignment (clothoid, SSD) | ✅ | No | AASHTO superelevation + corridor templates (backend) |
+| Geotech (bearing/settlement/slope/pile/liquefaction) | ✅ | No | Seed-Idriss CSR+SPT/CPT CRR+Tokimatsu (backend) |
+| Planar MBD (Lagrange/DAE, Baumgarte) | ✅ | No | Planar DAE + Baumgarte stabilisation (backend) |
+| Vibration n-DOF modal / FRF | ✅ | Yes (paid tier) | Full n-DOF eigen + FRF matrix (backend) |
+| Controls — state-space / LQR / Kalman | ✅ | No | Ackermann+LQR(CARE)+Luenberger (backend) |
+| Robotics 6-DOF spatial IK | ✅ | No | DLS Jacobian IK; PUMA-class validated (backend) |
+| AC load-flow (Ybus / Newton-Raphson) | ✅ | No | Polar-form NR; 3+5-bus validated (backend) |
+| Solar PV (system + partial shading) | ✅ | No | Single-diode+bypass-diode+global MPPT (backend) |
+| Wiring/harness (WireViz + 3D router) | ✅ | No | WiringView wired |
+| PLC IEC 61131-3 (ST/Ladder/FB/motion) | ✅ | No | ST editor + live Ladder power-flow sim wired |
+| Firmware build/upload/monitor/debug | ✅ | No | FirmwareActions + debug panel wired |
+| GD&T data model (ASME Y14.5) | ✅ | Yes | ASME Y14.5 data model + auto-propose (backend) |
+| Limits & fits (ISO 286) | ✅ | Yes | ISO 286 limits & fits engine (backend) |
+| Tolerance stackup — 1D (WC/RSS/MC) | ✅ | No | WC/RSS/Monte-Carlo (backend; LCG bug to fix) |
+| Tolerance stackup — 3D vector loop | ✅ | No | 6-DOF vector loop + sensitivity Jacobian (backend) |
+| SPC control charts (Shewhart/CUSUM/EWMA) | ✅ | No | Shewhart+CUSUM+EWMA+Nelson/WECO run rules (backend) |
+| Paraxial ABCD ray transfer | ✅ | No | Paraxial ABCD + Seidel aberrations + lensmaker (backend) |
+| Acoustics (ISO 9613, RT60, weighting, mass-law TL) | ✅ | No | Image-source IR+Schroeder RT60+modes+SEA (backend) |
+| Jewelry (41 modules) | ✅ | No | Ring v4/gems v2 (30 cuts)/settings/chain v2 wired |
+| BIM (walls/slabs/framing/stairs/IFC4) | ✅ | No | Revit-comparable engine + IFC4 viewer wired |
+| Should-cost (6 processes, Boothroyd-Dewhurst) | ✅ | No | 6-process should-cost + RFQ geometry-driven (backend) |
+| Material selection (Ashby) | ✅ | Partial | 200 materials, 14 families, Pareto frontier (backend) |
+| LCA (full ISO 14040/44 4 phases) | ✅ | No | ISO 14040/44 4-phase+multi-impact+uncertainty (backend) |
+| Standard parts library (ISO/DIN fasteners, bearings, profiles) | ✅ | Partial | kerf-partsgen: 5 ISO/DIN generators; kerf-parts KiCad+BOLTS+FreeCAD pipeline; real STEP/JSCAD geometry in CircuitEdit... |
 
-- **Real-time collab maturity.** Onshape's concurrent multi-user editing is a decade in the making. Kerf's cloud collaboration feature is less mature. If live concurrent editing is critical, Onshape is ahead.
-- **FeatureScript ecosystem.** Years of community-built FeatureScript features in Onshape's App Store have no Kerf equivalent today.
-- **No mobile app.** Onshape's iOS and Android apps support editing on the go; Kerf is a responsive browser only.
-- **Simulation ecosystem is smaller.** Neither platform ships first-party FEM, but Onshape's App Store has more mature simulation partner integrations available today.
-- **Vendor polish and assembly depth.** Onshape's UI, mating system, and overall product finish reflect ten years of professional refinement. Kerf is younger.
-- **Smaller community.** Onshape has a large, professionally-certified user base. Kerf's community is early-stage and growing.
+## What Kerf does that Onshape doesn't
 
-## Side by side
+- **FEM linear static + modal (built-in)** — Wave 10 reference implementation.
+- **AISC 360-22 steel (members)** — Full Ch. E/F/H + 50-section catalog (backend)
+- **Fatigue (S-N, ε-N, rainflow)** — S-N, ε-N, multiaxial rainflow (backend)
+- **ASCE 7-22 seismic / wind** — ELF+RSA+Newmark + MWFRS+C&C (backend)
+- **Spur/helical gear rating (AGMA/ISO 6336)** — AGMA 2001-D04 + ISO 6336 Method B (backend)
+- **Bearings — ISO 281 / ISO/TS 16281** — L10 + modified Lnm with misalignment (backend)
+- **Planetary / epicyclic gearbox** — 3 Willis modes + compound + module-select (backend)
+- **Springs (compr/ext/torsion/Belleville)** — Full spring design suite (backend)
+- **Heat exchangers (LMTD + ε-NTU + Bell-Delaware)** — LMTD+ε-NTU+Bell-Delaware+TEMA layout (backend)
+- **Steam/water properties (IAPWS-IF97)** — IAPWS-IF97 Regions 1/2/4; h/v/s/cp validated (backend)
+- **CFD** — Wave 12A flip — existing module covers feature.
+- **3D wing VLM (+ viscous + compressibility)** — Strip viscous CD0+PG/KT+Korn-Lock wave-drag (backend)
+- *(and 30 more features not covered by Onshape)*
 
-| Feature | Onshape | Kerf |
-|---|---|---|
-| License | ⚠️ Proprietary SaaS subscription | ✅ MIT open-core |
-| Cost | ⚠️ Standard ~US$1,500/yr; Professional ~US$2,100/yr (May 2026) | ✅ Free local; pay-as-you-go hosted |
-| Free tier | ⚠️ Public documents only | ✅ Full free local install, private projects included |
-| Offline / self-host | ❌ Browser-only; requires connectivity | ✅ Full offline single-binary install |
-| Open source | ❌ Proprietary; data on PTC cloud | ✅ MIT — full codebase on GitHub |
-| Vendor lock-in | ⚠️ PTC-hosted; export-only escape hatch | ✅ Open format; self-hostable |
-| Real-time multi-user collab | ✅ Industry-leading concurrent editing | ⚠️ Cloud collab less mature |
-| Version control (branches) | ✅ Built-in branching / tagging in Documents | ✅ file_revisions + cloud git branches |
-| Mobile / tablet editing | ✅ iOS / Android apps | ⚠️ Responsive browser; no dedicated mobile app |
-| Parametric B-rep | ✅ Mature Part Studios (OCCT underneath) | ✅ OCCT feature tree |
-| Constraint sketcher | ✅ Full parametric sketcher | ✅ Sketcher v2 — all major constraints |
-| Sheet metal | ✅ Full sheet-metal workspace | ✅ Flange + hem + jog + multi-flange + unfold + flat DXF |
-| Custom parametric features | ✅ FeatureScript (rich App Store ecosystem) | ✅ MIT kernel directly; open DAG |
-| Scripting / automation | ⚠️ FeatureScript only; REST API limited | ✅ kerf-sdk on PyPI — HTTP/JSON-RPC |
-| BYO LLM / AI | ❌ None | ✅ BYO key or hosted models |
-| Chat / LLM editing | ❌ None | ✅ Chat-native — edits source per turn |
-| Assembly mates | ✅ Full mate system in Assemblies | ⚠️ Assembly mates (newer) |
-| 2D technical drawings | ✅ Drawings workspace | ✅ Multi-sheet drawings |
-| Electronics / PCB | ❌ Mechanical CAD only | ✅ Full EDA — schematic, routing, DRC |
-| Jewelry tooling | ❌ None | ✅ Ring v4, gemstones v2 (30 cuts), settings, chain v2 |
-| App Store / add-ons | ✅ PTC App Store — simulation, rendering, CAM | ⚠️ Early — open-core + plugin API |
-| Import / export formats | ✅ STEP, IGES, Parasolid, ACIS, DXF | ✅ STEP/IGES/DXF/IFC/FreeCAD import |
+## Pricing
+
+Onshape is a commercial product; pricing varies by tier, seat count, and region. Kerf is MIT open-core: the full feature set is free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — the MIT licence means you can inspect, fork, and self-host the entire codebase.

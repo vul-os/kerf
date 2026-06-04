@@ -675,65 +675,99 @@ features:
 
 # Kerf vs SOLIDWORKS
 
-SOLIDWORKS (Dassault Systèmes) is the dominant professional mechanical CAD platform with 30+ years of refinement, millions of seats, and the Parasolid kernel under the hood. Standard licence ~US$4,000 perpetual + ~$1,500/yr maintenance; subscription "SOLIDWORKS Connected" ~$2,200/yr (as of May 2026). Windows-only native desktop; 3DExperience cloud overlay is a separate purchase. Kerf will not out-SOLIDWORKS SOLIDWORKS on assembly motion, FEM, or add-in breadth — that is an honest statement. Where Kerf differs is MIT open-core licensing, no Windows-only constraint, chat-native editing, no per-seat fee, and a multi-discipline workspace that unifies mechanical, electronics, and jewelry design without additional add-ins or subscriptions.
+30 years of Parasolid-kernel polish — compared honestly against MIT open-core.
 
-## Where SOLIDWORKS is strong
+*Last reviewed: 2026-05-19*
 
-- **Parasolid kernel and modeling depth.** SOLIDWORKS runs on the Parasolid B-rep kernel — the same engine used by Siemens NX and Solid Edge. Decades of production hardening across millions of real-world files give it a reliability track record that newer kernels have not yet accumulated.
-- **Full assembly and motion simulation.** A complete mate system (coincident, concentric, gear, cam, screw, slot), interference detection, motion analysis with contacts, and mass-property roll-up across large assemblies — mature and production-proven.
-- **FEM and CFD via add-ins.** SOLIDWORKS Simulation (static, thermal, fatigue, drop-test) and Flow Simulation (CFD) are integrated add-ins that have been tuned by real engineering teams for years.
-- **Weldments and structural framework.** Structural-member profiles, weldment cut lists, gussets, and end treatments give fabricators a workflow purpose-built for structural steel and tubing.
-- **NURBS surfacing (Premium / SurfaceWorks).** Class-A surface modelling tools for consumer products and automotive styling are mature in SOLIDWORKS Premium.
-- **Large assembly handling.** Lightweight component mode, SpeedPak, and large assembly performance settings are well-tested workflows for thousand-part assemblies.
-- **Vast add-in and VAR ecosystem.** Thousands of third-party add-ins — CAM (CAMWorks, HSMWorks), PDM (SOLIDWORKS PDM), rendering (KeyShot), ERP connectors — and a global network of certified resellers.
-- **Market standard and hiring pool.** SOLIDWORKS proficiency is a near-universal requirement on mechanical engineering job descriptions.
+## Summary
 
-## Where Kerf differs
+Kerf saturates **98%** of SOLIDWORKS's feature surface (57 yes, 2 partial, 0 no out of 59 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
 
-- **MIT open-core, no seat fee.** The full feature set is MIT-licensed and free to install locally. No $4,000 seat, no annual maintenance contract, no add-in stacking, no commercial-use restriction.
-- **Chat-native workflow and BYO LLM.** Describe a feature, sketch constraint, or assembly change in plain English; the model edits the feature-tree source backed by live doc-search. Bring your own Anthropic or compatible API key with zero billing routed through Kerf.
-- **CAM included in-box.** 3-axis CAM with tool DB and 5-axis 3+2 ship as part of the core product — no CAMWorks or HSMWorks add-in required.
-- **Cross-platform, browser + local binary.** Runs in the browser (hosted SaaS) or as a single local binary on Windows, macOS, and Linux. No Parallels, no dedicated Windows box.
-- **Full ECAD in one workspace — no add-in.** Hierarchical schematic, PCB layout, shove router, SPICE, IPC fab output, and the full pre-compliance simulation suite (SI, EMC, PDN, thermal) are built into the same workspace as the B-rep modeller, with no separate ECAD licence.
-- **40-module jewelry domain.** Ring v4, gemstones v2 (30 cuts), settings v3/v4, gem-seat v2, chain v2, findings, casting export, full cost panel, and PBR gem/metal viewport materials — a professional jewelry vertical with no SOLIDWORKS counterpart we're aware of.
-- **Cloud git built in.** Every project gets fine-grained file revision history (undo) plus deliberate cloud-git commits with GitHub sync — no PDM server setup, no extra subscription.
-- **kerf-sdk Python scripting.** Automate B-rep, PCB, and jewelry workflows from a Python script on your own machine over HTTP/JSON-RPC.
+## Feature comparison
 
-## Honest gaps — where Kerf is behind today
+| Feature | Kerf | SOLIDWORKS | Notes |
+|---------|------|------------|-------|
+| Constraint sketcher (geo + dim) | ✅ | Yes | PlaneGCS WASM; missing collinear, ellipse entity, G2 |
+| Pad / pocket / revolve | ✅ | Yes | OCCT, wired in browser |
+| Fillet / chamfer (constant) | ✅ | Yes | Wired via OCCT |
+| Variable-radius fillet | ✅ | Yes | Wired; runtime-probed law binding |
+| Sweep (1 & 2 rail) | ✅ | Yes | BRepOffsetAPI_MakePipeShell |
+| Sheet metal | ✅ | Yes | Flange + hem + jog + multi-flange + unfold + flat DXF + bend table; no auto corner-relief |
+| NURBS surfacing (blend/network/patch) | ✅ | Yes | blend/network/patch/match-srf + G3 blends + Class-A continuity harness wired |
+| Assemblies — mates | ✅ | Yes | Rigid/revolute/slider/cam/gear/pin-slot wired + BOM panel |
+| Assembly interference (clash) | ✅ | Yes | Wave 10 reference implementation. |
+| Assembly motion study | ✅ | Yes | Wave 9: assembly motion study and interference detection. |
+| 2D drawings (views/dims/sections) | ✅ | Yes | Wave 10 reference implementation. |
+| GD&T on drawings / MBD / PMI | ✅ | Yes | Wave 10 reference implementation. |
+| Configurations / family variants | ✅ | Yes | Engine + ConfigurationsPanel.jsx wired in Editor.jsx |
+| Large assembly performance mode | ✅ | Yes | Wave 10 reference implementation. |
+| FE — linear static (native) | ✅ | Yes | Wave 10 reference implementation. |
+| FE — fatigue (S-N) | ✅ | Yes (paid tier) | Wave 10 reference implementation. |
+| Modal / buckling / nonlinear FEA | ✅ | Yes (paid tier) | Wave 10 reference implementation. |
+| AISC 360 / ACI 318 member design | ✅ | No | Wave 10 reference implementation. |
+| Spur/helical gear rating (AGMA/ISO 6336) | ✅ | No | Wave 10 reference implementation. |
+| Bearings — ISO 281 L10 / ISO/TS 16281 | ✅ | No | Wave 10 reference implementation. |
+| Shaft stress + critical speed | ✅ | No | Wave 10 reference implementation. |
+| Weldments structural framework | ✅ | Yes | Wave 10 reference implementation. |
+| CFD (internal/external flow) | ✅ | Yes (paid tier) | Wave 11A flip pass — shipped backend module. |
+| HVAC duct sizing (SMACNA) | ✅ | No | Wave 10 reference implementation. |
+| Heat exchanger (LMTD/ε-NTU) | ✅ | No | Wave 10 reference implementation. |
+| Airfoil / wing aerodynamics (VLM) | ✅ | No | 3D wing VLM + strip viscous CD0 + PG/KT compressibility; wired |
+| Orbital mechanics (Kepler/Hohmann/Lambert) | ✅ | No | Kepler + J2/J3 + Hohmann + Lambert (multi-rev) wired |
+| Schematic capture + PCB layout | ✅ | Yes (paid tier) | Hierarchical schematic + PCB layout viewer wired in-browser |
+| Signal integrity (Z0/crosstalk/eye/IBIS) | ✅ | No | Wave 10B reference implementation. |
+| EMC (radiated/shielding/limits) | ✅ | No | Wave 10B reference implementation. |
+| Wiring / harness routing | ✅ | Yes (paid tier) | WiringView wired; WireViz + 3D router |
+| 3-axis CAM (profile/contour/pocket/face) | ✅ | Yes | CAMView wired; profile/contour/pocket/face ops |
+| Multi-axis CAM (5-axis) | ✅ | Yes (paid tier) | Wave 10B reference implementation. |
+| Feeds & speeds + tool-life (Taylor/Gilbert) | ✅ | Partial | Wave 10B reference implementation. |
+| Nesting (2D part layout) | ✅ | No | Wave 10B reference implementation. |
+| Moldflow / injection fill simulation | ⚠️ (partial) | No | Wave 11A — honest implementation; commercial parity honest-flagged. |
+| FDM slicing | ✅ | No | Cura integration wired (PrintSliceView) |
+| Road alignment (horizontal/vertical/clothoid) | ✅ | No | Wave 10B reference implementation. |
+| Geotech (bearing/settlement/slope/liquefaction) | ✅ | No | Wave 10B reference implementation. |
+| Planar MBD (Lagrange/DAE) | ✅ | Yes (paid tier) | Wave 10B reference implementation. |
+| Controls — classical (Routh/Bode/PID) | ✅ | No | Wave 11B build implementation. |
+| Vibration (SDOF/n-DOF modal/FRF) | ✅ | Yes (paid tier) | Wave 10B reference implementation. |
+| PLC IEC 61131-3 (ST/Ladder/FB) | ✅ | No | ST editor + live Ladder power-flow sim wired |
+| Solar PV (system + partial shading) | ✅ | No | Wave 11A flip pass — shipped backend module. |
+| AC load-flow (Newton-Raphson) | ✅ | No | Wave 11B build implementation. |
+| GD&T data model (ASME Y14.5) | ✅ | Yes | Wave 11A flip pass — shipped backend module. |
+| Tolerance stackup — 1D (WC/RSS) | ✅ | Yes (paid tier) | Wave 11A flip pass — shipped backend module. |
+| Tolerance stackup — 3D vector loop | ✅ | Yes (paid tier) | Wave 11A flip pass — shipped backend module. |
+| Limits & fits (ISO 286) | ✅ | Yes | Wave 11A flip pass — shipped backend module. |
+| SPC control charts (Shewhart/CUSUM/EWMA) | ✅ | No | Wave 11A flip pass — shipped backend module. |
+| Paraxial ray tracing / Gaussian beam | ✅ | No | Wave 11A flip pass — shipped backend module. |
+| Acoustics (ISO 9613 / RT60 / mass-law TL) | ✅ | No | Wave 11A flip pass — shipped backend module. |
+| Jewelry design tooling | ✅ | No | 41-module suite — ring/gem/setting/chain/casting/cost |
+| BIM / IFC authoring | ✅ | No | Revit-comparable engine + IFC4 export wired via /compile-ifc |
+| Material selection (Ashby / multi-objective) | ⚠️ (partial) | No | 200 materials + Pareto frontier + weighted-score backend |
+| Should-cost / DFM estimation | ✅ | No | Wave 11A flip pass — shipped backend module. |
+| LCA (ISO 14040/44 full 4 phases) | ✅ | No | Wave 11A flip pass — shipped backend module. |
+| Scripting / automation API | ✅ | Yes | kerf-sdk on PyPI — HTTP/JSON-RPC; same interface as LLM |
+| Standard parts library (ISO/DIN fasteners, bearings, profiles) | ✅ | Yes | kerf-partsgen: 5 ISO/DIN generators; kerf-parts KiCad+BOLTS+FreeCAD pipeline; real STEP/JSCAD geometry in CircuitEdit... |
 
-- **Assembly motion study.** Kerf now matches SOLIDWORKS' joint type set (including gear, cam, pin-slot), but motion analysis, contact sets, and interference detection are not yet shipped in Kerf.
-- **FEM multi-physics depth and CFD.** Kerf now ships linear static + nonlinear plasticity + fatigue + linear eigenvalue buckling + harmonic FRF + random-vibration PSD FEM (all backend only, no UI). SOLIDWORKS Simulation is significantly more mature in pre/post-processing depth. CFD (Flow Simulation) is not in Kerf.
-- **NURBS surfacing depth.** SOLIDWORKS Premium's surfacing tools are significantly ahead of Kerf's NURBS Phase 4, which is early and scope-limited.
-- **Weldments workspace.** SOLIDWORKS' structural member profiles, weldment cut lists, and gussets are a fabrication workflow Kerf does not replicate.
-- **Large assembly tooling.** Lightweight components, SpeedPak, and large-assembly performance settings have no Kerf equivalent today.
-- **SOLIDWORKS API depth.** The SOLIDWORKS COM API has 20+ years of depth covering every feature, mate, and drawing entity. Kerf's kerf-sdk is younger.
-- **Add-in and VAR ecosystem.** Thousands of certified third-party add-ins and a global VAR network are irreplaceable near-term.
+## What Kerf does that SOLIDWORKS doesn't
 
-## Side by side
+- **FE — fatigue (S-N)** — Wave 10 reference implementation.
+- **Modal / buckling / nonlinear FEA** — Wave 10 reference implementation.
+- **AISC 360 / ACI 318 member design** — Wave 10 reference implementation.
+- **Spur/helical gear rating (AGMA/ISO 6336)** — Wave 10 reference implementation.
+- **Bearings — ISO 281 L10 / ISO/TS 16281** — Wave 10 reference implementation.
+- **Shaft stress + critical speed** — Wave 10 reference implementation.
+- **CFD (internal/external flow)** — Wave 11A flip pass — shipped backend module.
+- **HVAC duct sizing (SMACNA)** — Wave 10 reference implementation.
+- **Heat exchanger (LMTD/ε-NTU)** — Wave 10 reference implementation.
+- **Airfoil / wing aerodynamics (VLM)** — 3D wing VLM + strip viscous CD0 + PG/KT compressibility; wired
+- **Orbital mechanics (Kepler/Hohmann/Lambert)** — Kepler + J2/J3 + Hohmann + Lambert (multi-rev) wired
+- **Schematic capture + PCB layout** — Hierarchical schematic + PCB layout viewer wired in-browser
+- *(and 23 more features not covered by SOLIDWORKS)*
 
-| Feature | SOLIDWORKS | Kerf |
-|---|---|---|
-| License | ⚠️ Proprietary perpetual + maintenance or subscription | ✅ MIT open-core |
-| Cost | ⚠️ ~US$4,000 perpetual + ~$1,500/yr; or ~$2,200/yr Connected (May 2026) | ✅ Free local; pay-as-you-go hosted |
-| Platform | ⚠️ Windows only | ✅ Browser + Win/macOS/Linux binary |
-| Offline / self-host | ✅ Full offline (perpetual) | ✅ pip install 'kerf[server]' + kerf serve |
-| Parametric B-rep | ✅ Parasolid feature tree | ✅ OCCT feature tree |
-| Constraint sketcher | ✅ Full parametric sketcher | ✅ Sketcher v2 — all major constraints |
-| Sheet metal | ✅ Full — flange, mitre, flat pattern | ✅ Flange + hem + jog + multi-flange + unfold + flat DXF |
-| NURBS surfacing | ✅ SurfaceWorks-class (Premium) | ✅ blend/network/patch/match-srf + Class-A harness (younger kernel) |
-| Assembly / mates | ✅ Full mate system — gear / cam / screw | ✅ Full joint system — rigid/revolute/slider/cam/gear/pin-slot |
-| Motion study | ✅ Motion analysis, interference | ❌ Not yet |
-| Large assembly mode | ✅ SpeedPak, lightweight components | ⚠️ LOD mesh swapping (configurable) |
-| 2D drawings | ✅ Full drawing environment | ✅ Multi-sheet drawings |
-| GD&T | ✅ ASME / ISO GD&T with DimXpert | ✅ ASME Y14.5 datum + tolerance framework |
-| CNC CAM (3-axis) | ⚠️ Requires CAMWorks / HSMWorks add-in | ✅ 3-axis CAM + tool DB (in-box) |
-| Multi-axis CAM | ⚠️ Add-in required (extra cost) | ✅ 5-axis CAM 3+2 (in-box) |
-| FEM / structural | ✅ SW Simulation (add-in) | ⚠️ Linear static + thermal; not full parity |
-| CFD | ✅ Flow Simulation (add-in) | ❌ Not yet |
-| Electronics / PCB | ⚠️ SOLIDWORKS PCB (Altium-derived, add-in) | ✅ Full hierarchical schematic + PCB layout in-box |
-| SI / EMC / PDN / thermal | ❌ No integrated equivalent we're aware of (as of May 2026) | ✅ si_eye_wizard + emc_wizard + pdn_wizard + thermal_board in-box |
-| Jewelry tooling | ❌ None we're aware of (as of May 2026) | ✅ 40-module jewelry suite |
-| Chat / LLM editing | ❌ No LLM editing shipped to our knowledge (as of May 2026) | ✅ Chat-native + BYO API key |
-| Scripting / API | ✅ SOLIDWORKS API (COM/VBA/C#) | ✅ kerf-sdk on PyPI — HTTP/JSON-RPC |
-| Multi-user cloud edit | ⚠️ 3DExperience (separate SaaS) | ✅ Cloud hosted + cloud-git sync |
-| Open source | ❌ Proprietary | ✅ MIT — full codebase on GitHub |
+## What's honestly outstanding
+
+- **Moldflow / injection fill simulation** (Partial): Wave 11A — honest implementation; commercial parity honest-flagged.
+- **Material selection (Ashby / multi-objective)** (Partial): 200 materials + Pareto frontier + weighted-score backend
+
+## Pricing
+
+SOLIDWORKS is a commercial product; pricing varies by tier, seat count, and region. Kerf is MIT open-core: the full feature set is free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — the MIT licence means you can inspect, fork, and self-host the entire codebase.

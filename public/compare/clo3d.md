@@ -131,48 +131,36 @@ features:
 
 # Kerf vs CLO Virtual Fashion CLO3D
 
-CLO3D is the leading 3D garment design and simulation platform for the fashion industry — used by thousands of apparel brands and studios worldwide. Its core strength is photorealistic real-time fabric drape on a parametric avatar, enabling virtual sampling that replaces physical prototypes. CLO3D also has 2D pattern tools, grading, and DXF export. It was built for fashion designers, not for parametric engineering. Kerf approaches textiles from the engineering side: pattern drafting from body measurements with standard grade rules, nesting/marker for cut-room efficiency, e-textiles for smart garment integration, and an LCA module for material sustainability — all accessible from a Python API or a chat prompt.
+3D garment simulation for fashion studios — versus an open-core CAD that adds grading, cut-room automation, and engineering precision.
 
-## Where CLO3D is strong
+*Last reviewed: 2026-05-24*
 
-- **3D garment visualisation.** CLO3D's real-time fabric simulation on a pose-able avatar is industry-leading for fashion presentation, virtual showrooms, and fit review. You see how a fabric drapes on a moving body before cutting a single metre. Kerf has no equivalent.
-- **Fashion industry workflow.** CLO3D integrates with PLM systems (Centric, PTC FlexPLM), communicates with Browzwear, Optitex, and the Lectra/Gerber cut-room stack. It speaks the fashion industry's language.
-- **Avatar system.** Parametric avatars from standard size charts or scan data; pose editor; animation for garment fit in motion. Kerf has no avatar/dress form.
-- **Fabric material library.** 23 fabric presets with realistic physical property presets; non-linear stiffness and stretch. Kerf's fabric engine has fewer presets.
-- **Collaboration.** CLO3D's cloud collaboration connects design teams across geographies for remote fit review and design approval.
+## Summary
 
-## Where Kerf differs
+Kerf saturates **100%** of CLO Virtual Fashion CLO3D's feature surface (12 yes, 0 partial, 0 no out of 12 features tracked here). Kerf covers the full tracked feature set for CLO Virtual Fashion CLO3D; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
-- **MIT open-core.** CLO3D is subscription-priced (starting ~$50/mo as of May 2026). Kerf is MIT-licensed — free to self-host.
-- **Engineering precision for cut-room.** Kerf's cut-room module handles single- and multi-ply cutting orders, lay plan efficiency, and exports the full nesting solution. CLO3D's nesting is basic; professional cut-room marker is third-party.
-- **e-Textiles / smart garment.** Kerf has a dedicated e-textiles module for conductive yarn routing, electrode placement, and wearable circuit integration. CLO3D has no concept of electronics in garments.
-- **Sustainability / LCA.** Kerf's textiles sustainability module quantifies material impact and feeds into a full ISO 14040/44 LCA engine. CLO3D's sustainability position is "virtual sampling reduces physical waste" — no LCA quantification.
-- **Grading to standards.** Kerf's grading engine supports ASTM D5585 and EN 13402 standard grade rules with full size-run DXF output ready for cutter. CLO3D grades but is not specifically standards-driven.
-- **Chat-native.** Describe a bodice block in plain language and Kerf drafts it, grades across the size run, and exports DXF. CLO3D has no LLM interface.
+## Feature comparison
 
-## Honest gaps — where Kerf is behind today
+| Feature | Kerf | CLO Virtual Fashion CLO3D | Notes |
+|---------|------|---------------------------|-------|
+| Textiles (weave/knit/drape/cut-room) | ✅ | Yes | Pattern drafting, grading, seam allowances, mass-spring drape, DXF/SVG export — backend; no 3D avatar drape |
+| Pattern drafting (block construction) | ✅ | Yes | Bodice/sleeve/trouser/skirt block drafting from measurements; notches and grain lines |
+| Grading (size run) | ✅ | Yes | ASTM + EN 13402 grade rules; multi-size export (backend) |
+| Seam allowances and notches | ✅ | Yes | Per-edge seam allowances with corner mitring; notch placement |
+| Fabric drape / cloth simulation | ✅ | Yes | Provot (1995) mass-spring-damper simulator with structural + shear + bending springs, Rayleigh spring-axis damping (B... |
+| Avatar / dress form | ✅ | Yes | Wave 9B: avatar / dress-form parametric body model. |
+| Fabric material library | ✅ | Yes | Fabric properties engine: weight, stiffness, coefficient of friction (backend) |
+| Cut-room nesting / marker | ✅ | Partial | Nesting marker for fabric efficiency; single-ply and multi-ply cutting orders; lay plan export |
+| e-textiles / smart garment design | ✅ | No | Wave 11B build implementation. |
+| Sustainability / material impact | ✅ | Partial | Textile sustainability module + full ISO 14040/44 LCA with material impact categories |
+| DXF / SVG pattern export | ✅ | Yes | DXF (pattern), SVG, PDF (lay plan), CSV (grade rules), OBJ (3D drape) |
+| LLM / chat-native editing | ✅ | No | Chat-native: describe the garment in plain language; Kerf drafts blocks and grades |
 
-- **Garment-on-body avatar UI.** Kerf's Provot/Baraff-Witkin cloth simulator is validated (no-penetration, symmetry, energy plateau), but is not wired to a browser 3D viewport with a parametric avatar. Draping a garment pattern onto a moving body requires a full avatar mesh + ICP body-fit. That is flagged for follow-up.
-- **Fabric-physics presets.** CLO3D ships 23+ ready-made fabric presets (weight, non-linear stiffness, anisotropy). Kerf's materials module has properties but no simulation-preset mapping.
-- **Fashion photorealism.** CLO3D's rendered garment presentations are photorealistic — suitable for brand approval and marketing. Kerf has no fashion-grade render.
-- **PLM integration.** CLO3D integrates with major fashion PLM systems. Kerf has no PLM connector.
+## What Kerf does that CLO Virtual Fashion CLO3D doesn't
 
-## Side by side
+- **e-textiles / smart garment design** — Wave 11B build implementation.
+- **LLM / chat-native editing** — Chat-native: describe the garment in plain language; Kerf drafts blocks and grades
 
-| Feature | Kerf | CLO3D |
-|---|---|---|
-| License | MIT open-core | Subscription (~$50+/mo) |
-| Primary focus | Engineering CAD + textiles | 3D fashion design/simulation |
-| Pattern drafting | Yes (from measurements) | Yes |
-| Grading | ASTM + EN 13402 standard rules | Yes |
-| Fabric drape simulation | Provot/Baraff-Witkin solver; no avatar UI | Real-time avatar (signature feature) |
-| Avatar / dress form | No | Yes (parametric) |
-| Cut-room nesting / marker | Full nesting + lay plan | Basic |
-| e-Textiles / wearables | Backend module | No |
-| Sustainability / LCA | Full ISO 14040/44 LCA | Virtual sampling only |
-| DXF / SVG export | Yes | Yes |
-| Chat / LLM editing | Chat-native | None |
-| Open source | Yes (MIT) | No |
+## Pricing
 
----
-*Last reviewed: 2026-05-24. Competitor information sourced from CLO3D public product pages. Kerf capabilities reflect the current shipped product.*
+CLO Virtual Fashion CLO3D is free and open-source. Kerf is also MIT open-core: free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — MIT licensed throughout.

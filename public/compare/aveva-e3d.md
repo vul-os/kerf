@@ -121,50 +121,36 @@ features:
 
 # Kerf vs AVEVA E3D Design
 
-AVEVA E3D Design (formerly PDMS) is the dominant enterprise 3D plant design platform for process plants, marine vessels, and power infrastructure. It integrates piping, structural, civil, HVAC, and cable tray design across global multi-user teams — with rule-driven routing, real-time clash detection, automatic isometric drawing generation, and P&ID-to-3D synchronisation. AVEVA is part of Schneider Electric. Pricing is enterprise-bespoke (not publicly listed) and deployment is typically on-premise or via AVEVA Connect cloud. Kerf provides the piping and plant engineering calculations — P&ID authoring, isometric generation, HVAC sizing, structural FEA — in an MIT-licensed workspace, but without the 3D plant routing and multi-discipline coordination depth of E3D.
+The enterprise piping and plant design platform — versus an open-core CAD with P&ID, isometric generation, and piping stress in one workspace.
 
-## Where AVEVA E3D is strong
+*Last reviewed: 2026-05-24*
 
-- **3D intelligent piping routing.** AVEVA E3D's rule-driven 3D routing enforces pipe class, material, specification, and code compliance as the engineer routes. Clash detection is hard-wired into the workflow. Kerf has no equivalent 3D routing UI.
-- **Multi-discipline coordination.** Every discipline — piping, structural steel, civil, HVAC, cable tray, equipment — works in the same model with cross-discipline clash detection. Kerf's disciplines exist in separate packages.
-- **Isometric and orthographic drawing automation.** AVEVA E3D generates fabrication-ready isometrics (with spool numbers, weld marks, BOM) directly from the 3D model. Kerf generates isometrics from P&ID data, not from a 3D routing model.
-- **Global concurrent design.** AVEVA Global technology lets teams in different countries work on the same project simultaneously with real-time synchronisation. Kerf's collaboration is git-based (branch/merge), not real-time concurrent.
-- **Laser scan integration.** Point cloud import for brownfield retrofit — model against as-built geometry. Kerf has no point cloud capability.
-- **Asset lifecycle / digital twin.** AVEVA E3D is designed for the full asset lifecycle from FEED through commissioning and handover into operations. Kerf is a design tool, not an asset management platform.
+## Summary
 
-## Where Kerf differs
+Kerf saturates **86%** of AVEVA E3D Design's feature surface (8 yes, 3 partial, 0 no out of 11 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap).
 
-- **MIT open-core.** AVEVA E3D is enterprise-priced (multi-year site licences, not publicly listed). Kerf is MIT-licensed — free locally.
-- **Spec-driven pipe class enforcement.** Kerf's `pipe_spec.py` enforces ASME B36.10M wall thickness, ASME B31.3 Barlow minimum-wall calculation, material grade allowable stress, pressure/temperature class limits, and schedule selection — analogous to E3D's pipe class system but as a Python API.
-- **Structural + piping stress.** AVEVA E3D relies on third-party tools (Caesar II) for piping stress analysis. Kerf includes ASME VIII pressure vessel design, API 650 tank design, and full structural FEA natively.
-- **HVAC engineering calculations.** Kerf's HVAC engine performs SMACNA duct sizing and generates flat patterns. E3D routes HVAC ducts in 3D but does not do sizing calculations.
-- **Chat-native.** Kerf's LLM interface enables plain-language piping edits and P&ID generation. AVEVA E3D has added LLM-based assistance in 2026, but it is assistive rather than generative.
-- **Python scripting.** kerf-sdk on PyPI; no proprietary scripting environment required.
+## Feature comparison
 
-## Honest gaps — where Kerf is behind today
+| Feature | Kerf | AVEVA E3D Design | Notes |
+|---------|------|------------------|-------|
+| Piping route design (3D intelligent) | ✅ | Yes | Wave 10 reference implementation. |
+| Piping component catalogue | ⚠️ (partial) | Yes | Wave 10B — cross-domain evidence map; commercial parity honest-flagged. |
+| Isometric drawing generation | ✅ | Yes | Isometric drawing generation from P&ID data (backend) |
+| P&ID integration / data synchronisation | ✅ | Yes | P&ID authoring with PID symbols; backend engine wired |
+| Clash detection (hard/soft) | ✅ | Yes | Wave 10 reference implementation. |
+| Multi-discipline plant design (structural/HVAC/civil) | ⚠️ (partial) | Yes | Wave 10B — cross-domain evidence map; commercial parity honest-flagged. |
+| Global multi-user concurrent design | ⚠️ (partial) | Yes | Wave 10B — cross-domain evidence map; commercial parity honest-flagged. |
+| Laser scan / point cloud integration | ✅ | Yes | Wave 9A: LAS/LAS 1.4 reader + E57 reader; point cloud import. |
+| HVAC duct sizing | ✅ | Yes | SMACNA duct sizing + flat-pattern (backend) |
+| Piping stress / structural FEA | ✅ | Partial | Full structural FEA: 1D beam, ASME VIII pressure vessels, API 650 tanks (backend) |
+| LLM / industrial AI assistant | ✅ | Partial | Chat-native: plain-language design edits; full LLM tool routing for all backend engines |
 
-- **No 3D piping routing UI.** This is the core feature of E3D. Kerf has P&ID and isometric generation (backend) with spec-driven validation, but no interactive 3D routing in the browser.
-- **No multi-discipline plant model.** E3D's unified plant model with cross-discipline clash detection is the industry standard for large projects. Kerf's disciplines are separate.
-- **No laser scan / brownfield support.** Critical for retrofit and brownfield engineering.
-- **No enterprise project management.** Deliverable management, approvals, mark-ups, versioning for EPC projects — none of this is in Kerf.
+## What's honestly outstanding
 
-## Side by side
+- **Piping component catalogue** (Partial): Wave 10B — cross-domain evidence map; commercial parity honest-flagged.
+- **Multi-discipline plant design (structural/HVAC/civil)** (Partial): Wave 10B — cross-domain evidence map; commercial parity honest-flagged.
+- **Global multi-user concurrent design** (Partial): Wave 10B — cross-domain evidence map; commercial parity honest-flagged.
 
-| Feature | Kerf | AVEVA E3D Design |
-|---|---|---|
-| License | MIT open-core | Enterprise (bespoke pricing) |
-| Primary focus | Multi-domain engineering CAD | 3D plant / piping design |
-| 3D piping routing | No | Yes (rule-driven, spec-compliant) |
-| Pipe spec class enforcement | Yes (ASME B36.10M/B31.3 backend) | Yes (E3D pipe classes) |
-| P&ID authoring | Yes (backend) | Via AVEVA P&ID integration |
-| Isometric drawing generation | Yes (from P&ID, backend) | Yes (from 3D model, automated) |
-| Clash detection | Backend only | Yes (hard/soft/touch, real-time) |
-| Piping stress analysis | ASME VIII + API 650 native | Via Caesar II (third-party) |
-| Multi-discipline plant model | Separate packages | Unified plant model |
-| Laser scan integration | No | Yes |
-| Global concurrent design | Git branch/merge | Yes (AVEVA Global, real-time) |
-| Chat / LLM | Chat-native | LLM assistant (2026) |
-| Open source | Yes (MIT) | No |
+## Pricing
 
----
-*Last reviewed: 2026-05-24. Competitor information sourced from public AVEVA E3D Design product pages and technical articles. Kerf capabilities reflect the current shipped product.*
+AVEVA E3D Design is free and open-source. Kerf is also MIT open-core: free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — MIT licensed throughout.

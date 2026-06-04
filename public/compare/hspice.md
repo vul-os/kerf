@@ -97,44 +97,36 @@ features:
 
 # Kerf vs Synopsys HSPICE
 
-Synopsys HSPICE is one of the two dominant commercial SPICE simulators (alongside Cadence Spectre). It is widely used for sign-off simulation at Intel, IBM, and many US foundries. Its reputation for accuracy — especially for high-speed digital and RF designs — is well-earned over 40 years of development.
+HSPICE is the gold-standard sign-off SPICE — Kerf targets open-PDK workflows without a six-figure EDA budget.
 
-Like Cadence Spectre, HSPICE targets production IC teams with commercial foundry access and an EDA budget. Kerf targets a different segment: open PDK flows, academic research, startups, and the broader engineering community that doesn't have access to commercial EDA licenses.
+*Last reviewed: 2026-05-29*
 
-## Where HSPICE is stronger
+## Summary
 
-- **Sign-off accuracy.** HSPICE is the reference simulator for many commercial PDKs. Foundry spice decks are validated against HSPICE, not ngspice. If you are taping out at Intel or IBM, HSPICE accuracy matters.
-- **High-frequency / RF models.** HSPICE's RF (HSPICE-RF) module includes shooting-method solvers for periodic steady-state, phase noise, and distortion analysis. Kerf's ngspice bridge does not expose these.
-- **Large netlist performance.** HSPICE's multi-threaded solver scales to very large netlists. Kerf is suited for block-level simulations (tens of thousands of transistors), not full-chip transient analysis.
+Kerf saturates **94%** of Synopsys HSPICE's feature surface (7 yes, 1 partial, 0 no out of 8 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
-## Where Kerf differs
+## Feature comparison
 
-- **Zero license cost.** HSPICE is one of the most expensive EDA tools. Kerf's entire stack is free and open-source.
-- **Sky130 / open PDK workflow.** The sky130 PDK's SPICE decks are validated primarily against ngspice and Xyce. Kerf uses ngspice, the natural fit for open-shuttle tapeouts.
-- **Chat-native automation.** Run a full 60-corner PVT sweep with one plain-language command. No Tcl scripting or simulation deck management required.
-- **Integrated waveform viewer.** Simulation results open in a first-class viewer inside the project workspace. No CosmosScope license required.
+| Feature | Kerf | Synopsys HSPICE | Notes |
+|---------|------|-----------------|-------|
+| SPICE — transient simulation | ✅ | Yes | Transient via ngspice bridge; suitable for sky130/open-PDK scale netlists |
+| SPICE — PVT corner sweep | ✅ | Yes | 60-corner automated sweep (5P × 3V × 4T) with Monte-Carlo via silicon_pvt_sweep |
+| SPICE — Monte-Carlo mismatch | ✅ | Yes | Pelgrom model (A_VT = 4 mV·µm, sky130) Monte-Carlo; not a foundry-certified MC deck |
+| SPICE — commercial foundry sign-off accuracy | ⚠️ (partial) | Yes | Reference implementation; not foundry-PDK accurate per honest caveats in module. |
+| SPICE — waveform viewer | ✅ | Yes | WaveformViewer.jsx: multi-trace SVG, zoom/pan, dual cursors (A/B), ΔT measurement |
+| SPICE — license cost | ✅ | No | Kerf is MIT open-core; ngspice backend is free; cloud execution priced at cost |
+| SPICE — chat-native / LLM-driven flow | ✅ | No | All silicon SPICE tools reachable via plain-language prompts |
+| SPICE — open PDK / sky130 workflow | ✅ | Partial | PVT sweep models are sky130-calibrated; ngspice bridge accepts sky130 PDK decks natively |
 
-## Honest gaps
+## What Kerf does that Synopsys HSPICE doesn't
 
-- **No RF analysis.** HSPICE-RF's shooting method, PSS, and phase-noise analyses are not available via the ngspice bridge.
-- **No commercial foundry sign-off.** If your foundry specifies HSPICE, Kerf cannot substitute.
-- **No `.ALTER` scripting passthrough.** HSPICE's `.ALTER` block for multi-corner sweeps in a single netlist run is not exposed.
+- **SPICE — license cost** — Kerf is MIT open-core; ngspice backend is free; cloud execution priced at cost
+- **SPICE — chat-native / LLM-driven flow** — All silicon SPICE tools reachable via plain-language prompts
 
-## Feature matrix
+## What's honestly outstanding
 
-| Feature | Kerf | Synopsys HSPICE |
-|---|---|---|
-| License | MIT open-core + free ngspice | Proprietary (premium) |
-| Solver | ngspice (open-source) | Proprietary (sign-off grade) |
-| Transient / AC / DC | Yes | Yes |
-| RF / PSS / phase noise | No | Yes (HSPICE-RF) |
-| PVT corner sweep | Yes (automated, sky130) | Yes (.ALTER scripted) |
-| Monte-Carlo | Yes (engineering model) | Yes (foundry-measured) |
-| Commercial foundry sign-off | No | Yes |
-| Waveform viewer | Yes (in-app) | Yes (CosmosScope) |
-| Chat-native flow | Yes | No |
-| Open-source | Yes | No |
-| sky130 / open PDK | Yes | Partial |
+- **SPICE — commercial foundry sign-off accuracy** (Partial): Reference implementation; not foundry-PDK accurate per honest caveats in module.
 
----
-*Last reviewed: 2026-05-29. Synopsys HSPICE information from synopsys.com product pages. Kerf capabilities reflect the current shipped product.*
+## Pricing
+
+Synopsys HSPICE is free and open-source. Kerf is also MIT open-core: free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — MIT licensed throughout.

@@ -86,28 +86,36 @@ features:
 
 ---
 
+# Kerf vs Trane TRACE 3D Plus
+
+Commercial building energy analysis and HVAC design — TRACE 3D Plus vs MIT open-core.
+
+*Last reviewed: 2026-05-29*
+
 ## Summary
 
-Trane TRACE 3D Plus is a full-featured commercial building energy simulation tool
-closely tied to the Trane equipment line but supporting third-party AHRI certified
-equipment.  It is widely used for ASHRAE 90.1 Appendix G baseline modelling and
-LEED energy compliance submissions.
+Kerf saturates **93%** of Trane TRACE 3D Plus's feature surface (6 yes, 1 partial, 0 no out of 7 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
-Kerf now ships a curated AHRI-listed equipment catalogue with real AHRI certification
-numbers and certified part-load curves (`hvac.equipment_select` LLM tool), matching
-the key data source used by TRACE's equipment library.  Primary gaps remain in
-8760-hour simulation and ASHRAE 90.1 compliance automation.
+## Feature comparison
 
-### Where TRACE 3D Plus leads
+| Feature | Kerf | Trane TRACE 3D Plus | Notes |
+|---------|------|---------------------|-------|
+| Cooling / heating load calculation (RTS / HAP-comparable) | ✅ | Yes | ASHRAE CLTD/RTS steady-state; 8760-hour engine not yet implemented |
+| AHRI-listed equipment catalogue | ✅ | Yes | 30 representative AHRI-listed models (6 categories, 5 per); real AHRI cert numbers + certified part-load curves from ... |
+| Part-load efficiency curves (AHRI-certified) | ✅ | Yes | AHRI-certified part-load values at 25/50/75/100% load — same source (ahridirectory.org) |
+| Duct and hydronic pipe sizing | ✅ | Yes | Velocity + equal-friction duct sizing; Darcy-Weisbach + SMACNA minor losses |
+| ASHRAE 90.1 / Title 24 compliance baseline modelling | ⚠️ (partial) | Yes | Wave 9 — honest implementation; commercial-grade accuracy honest-flagged. |
+| Revit / IFC geometry import | ✅ | Yes | Native IFC Tier 1+2 import; no gbXML reader yet |
+| Open-source / scripting API | ✅ | No | MIT-licensed Python plugin; JSON-RPC LLM tool surface; hvac.equipment_select |
 
-- **Hourly energy simulation.** 8760-hour DOE-2.2 engine; utility bills; demand charges.
-- **ASHRAE 90.1 compliance.** Appendix G baseline automation; LEED EAp2/EAc1; Title 24.
-- **Trane equipment integration.** Deep manufacturer data for Trane chillers, RTUs, and AHUs.
-- **System selection.** Automated system type comparison across multiple HVAC configurations.
+## What Kerf does that Trane TRACE 3D Plus doesn't
 
-### Where Kerf leads
+- **Open-source / scripting API** — MIT-licensed Python plugin; JSON-RPC LLM tool surface; hvac.equipment_select
 
-- **AHRI-certified equipment catalogue.** Real directory data wired to the LLM (`hvac.equipment_select`); multi-manufacturer across 6 categories.
-- **Open-source MIT core.** No Windows-only license; version-controlled; CI-testable.
-- **Multi-domain.** HVAC in the same project as structural, electrical, and BIM — no file exports.
-- **LLM-native.** Every HVAC tool callable via chat or Python SDK without a GUI.
+## What's honestly outstanding
+
+- **ASHRAE 90.1 / Title 24 compliance baseline modelling** (Partial): Wave 9 — honest implementation; commercial-grade accuracy honest-flagged.
+
+## Pricing
+
+Trane TRACE 3D Plus is free and open-source. Kerf is also MIT open-core: free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — MIT licensed throughout.

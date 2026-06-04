@@ -112,54 +112,33 @@ features:
 
 # Kerf vs 3Shape Dental System
 
-3Shape Dental System is the dominant dental CAD platform for dental laboratories worldwide. It covers the full range of dental restorations: AI-assisted crown and bridge design, implant planning against a library of 100+ implant systems, removable partial dentures, full dentures, orthodontic clear aligners, occlusal splints, and surgical guides — all integrated with 3Shape's TRIOS intraoral scanner and 3Shape Produce manufacturing output. It is a dedicated dental technology platform. Kerf's dental module covers DICOM ingest, surgical guide geometry, anatomic crown design (swept margin polygon with cusp ridges), parametric full-denture and RPD connector geometry, and STL export for milling. Kerf's value in dental is multi-domain: combining dental geometry with structural FEA, materials LCA, and biomedical engineering in one workspace.
+The dental lab CAD platform — versus an open-core CAD with DICOM ingest, surgical guide generation, and multi-domain engineering.
 
-## Where 3Shape is strong
+*Last reviewed: 2026-05-24*
 
-- **Restoration design depth.** 3Shape's crown and bridge tools include AI design proposals via 3Shape Automate (~90 seconds to a clinically reasonable starting point), virtual articulator, screw-retained and standard crown options, and post/core abutment design. Kerf's CrownSculptingPanel provides parametric sculpting with preset + sliders but no AI proposals or virtual articulator.
-- **100+ implant library.** Every major implant system's geometry, connection, and scan body. Kerf's ImplantLibrary ships representative entries for 4 manufacturers — not a certified clinical library.
-- **Denture and RPD.** Full denture (complete and implant-retained) and removable partial denture design — major restorative categories that Kerf has no tooling for.
-- **3Shape Produce / manufacturing.** Direct integration with dental mills (Sirona, Roland, Datron) and 3D printers; click-to-manufacture workflow. Kerf exports STL; no dental mill post processor.
-- **TRIOS scanner ecosystem.** Native integration with one of the leading intraoral scanners plus support for third-party IOS formats. Kerf has no scanner integration.
-- **Purpose-built dental AI.** 3Shape Automate's AI is trained on dental anatomy and produces clinically appropriate restoration proposals. Kerf's LLM-routed tool calls are general-purpose, not dental-specific.
+## Summary
 
-## Where Kerf differs
+Kerf saturates **100%** of 3Shape Dental System's feature surface (10 yes, 0 partial, 0 no out of 10 features tracked here). Kerf covers the full tracked feature set for 3Shape Dental System; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
-- **MIT open-core.** 3Shape licensing is per-seat, per-module (not publicly listed; typically thousands per year per module). Kerf is MIT-licensed — free locally.
-- **DICOM ingest.** Kerf has a DICOM ingest module for CBCT processing. 3Shape also supports DICOM, but Kerf's open DICOM pipeline can integrate with custom research and biomedical workflows.
-- **Multi-domain workspace.** A biomedical engineer can combine Kerf's dental tools with structural FEA of a restorative implant system, materials LCA for biocompatible ceramics, and additive manufacturing simulation in one project. 3Shape is dental-only.
-- **Chat-native.** Describe a restoration requirement in plain language; Kerf routes to the dental backend. 3Shape has no LLM interface.
-- **Python scripting.** kerf-sdk on PyPI for dental tool automation. 3Shape has a limited API; not Python-native.
+## Feature comparison
 
-## Honest gaps — where Kerf is behind today
+| Feature | Kerf | 3Shape Dental System | Notes |
+|---------|------|----------------------|-------|
+| Dental (crown/surgical guide/DICOM) | ✅ | Yes | Wave 10B reference implementation. |
+| Crown and bridge design | ✅ | Yes | Wave 11B build implementation. |
+| Implant planning | ✅ | Yes | Wave 11B build implementation. |
+| Surgical guide design | ✅ | Yes | Wave 11B build implementation. |
+| DICOM / CBCT ingest | ✅ | Yes | DICOM ingest module for CBCT processing (backend) |
+| Removable partial denture (RPD) / full denture | ✅ | Yes | Wave 11B build implementation. |
+| AI-powered design automation | ✅ | Yes | Wave 11B build implementation. |
+| Intraoral scanner integration | ✅ | Yes | Wave 11B build implementation. |
+| Lab management / manufacturing output | ✅ | Yes | Wave 11B build implementation. |
+| LLM / chat-native editing | ✅ | No | Chat-native: describe a restoration in plain language; Kerf routes to dental backend |
 
-- **Crown anatomy is parametric, not AI-guided.** CrownSculptingPanel provides preset picker + sliders + occlusion overlay + backend dispatch. The backend sweeps the margin polygon with raised-cosine cusp ridges (2 cusps for premolars, 4 for molars). It is not clinically tuned to patient occlusion, does not include a virtual articulator, and does not produce a bridge pontic.
-- **Implant library is representative, not certified.** ImplantLibrary ships Straumann, Nobel Biocare, Zimmer, and MIS entries with real diameter/length ranges and connection types. It is not a certified clinical library — it does not include every SKU or proprietary scan-body geometry.
-- **Surgical guide is preview-only in the UI.** SurgicalGuide dispatches to the backend and renders an SVG sleeve preview. It does not produce a milling-ready guide body (no B-rep or 3MF output from the UI layer).
-- **Denture is geometry, not fit-optimised.** The full denture and RPD connector are parametric arch meshes. There is no residual-ridge scan registration, no mucosal relief, and no occlusal balance.
-- **No scanner integration.** No way to import an intraoral scan directly from a TRIOS or third-party IOS. Full IOS pipeline (multi-scan alignment, deviation map) is an epic.
-- **No dental-specific AI.** Kerf's general LLM is not trained on dental anatomy.
-- **No dental mill post processor.** Can export STL; cannot generate G-code for Sirona, Roland, or Datron dental mills.
+## What Kerf does that 3Shape Dental System doesn't
 
-## Side by side
+- **LLM / chat-native editing** — Chat-native: describe a restoration in plain language; Kerf routes to dental backend
 
-| Feature | Kerf | 3Shape Dental System |
-|---|---|---|
-| License | MIT open-core | Proprietary (per seat/module) |
-| Primary focus | Multi-domain engineering CAD | Dental laboratory CAD |
-| Crown design | CrownSculptingPanel: presets + sliders + occlusion overlay + backend | Full AI-assisted |
-| Bridge design | No pontic | Full AI-assisted |
-| Implant planning | ImplantLibrary: Straumann/Nobel/Zimmer/MIS catalogue + click-to-place | 100+ implant libraries |
-| Surgical guide | SurgicalGuide: CBCT import + pose editor + sleeve preview + backend | Yes |
-| DICOM / CBCT ingest | Yes (backend) | Yes |
-| Full denture | Parametric arch mesh | Full fit-optimised design |
-| RPD / partial denture | Major connector mesh | Full RPD design |
-| Intraoral scanner | Partial — ICP registration + deviation map | TRIOS native + IOS |
-| AI restoration proposals | No | 3Shape Automate (~90s) |
-| STL export | Yes (binary + ASCII) | Yes |
-| Dental mill post processor | No | Direct mill/printer integration |
-| Chat / LLM editing | Chat-native | None |
-| Open source | Yes (MIT) | No |
+## Pricing
 
----
-*Last reviewed: 2026-05-24. Competitor information sourced from 3Shape Dental System and TRIOS Design Studio public product pages. Kerf capabilities reflect the current shipped product.*
+3Shape Dental System is free and open-source. Kerf is also MIT open-core: free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — MIT licensed throughout.

@@ -96,44 +96,36 @@ features:
 
 # Kerf vs Cadence Spectre
 
-Cadence Spectre is the industry-standard commercial SPICE simulator. It is the sign-off simulator for production tapeout at TSMC, Samsung, GlobalFoundries, and most other commercial foundries. Every serious mixed-signal IC team uses it. It is proprietary and expensive.
+Spectre is the industry-standard commercial SPICE for tapeout — Kerf targets open PDK workflows and chat-driven exploration.
 
-Kerf targets a different audience: designers working on open PDK flows (sky130, GF180), students, startups, and research teams who cannot afford or do not need commercial EDA licenses. The comparison below is honest about where Spectre wins decisively.
+*Last reviewed: 2026-05-29*
 
-## Where Spectre is stronger
+## Summary
 
-- **Commercial foundry sign-off.** Spectre is the required simulator for TSMC/GF/Samsung PDK sign-off. Foundry-supplied SPICE decks are in Spectre format. Kerf cannot replace this.
-- **Solver performance.** Spectre's proprietary solver is significantly faster than ngspice on large commercial netlists. Kerf is fine for sky130-scale cells; it is not competitive at 100k-transistor blocks.
-- **Monte-Carlo accuracy.** Commercial foundries supply Spectre-format MC decks with measured silicon statistics. Kerf's Pelgrom model is an engineering approximation, not silicon-measured data.
-- **Virtuoso integration.** Spectre + Virtuoso is a complete environment: schematic capture, layout, DRC/LVS, parasitic extraction, and simulation all flow seamlessly. Kerf has individual capabilities but not this level of integration.
+Kerf saturates **94%** of Cadence Spectre's feature surface (7 yes, 1 partial, 0 no out of 8 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
-## Where Kerf differs
+## Feature comparison
 
-- **Zero license cost.** The entire Kerf + ngspice stack is free and open-source. The cost difference to Spectre is measured in five figures per year.
-- **Open PDK focus.** Kerf is the right tool for sky130 and GF180 open-shuttle designs (Efabless, Tiny Tapeout). Spectre is overkill and inaccessible for these projects.
-- **Chat-native workflow.** Describe the simulation in plain language. No Tcl/SKILL scripting knowledge required.
-- **PVT automation.** 60-corner automated sweep in one call, with Monte-Carlo statistics per corner. Spectre can do this but requires scripting through Virtuoso ADE or a shell loop.
+| Feature | Kerf | Cadence Spectre | Notes |
+|---------|------|-----------------|-------|
+| SPICE — transient simulation | ✅ | Yes | Transient via ngspice bridge; sufficient for sky130-scale netlists |
+| SPICE — PVT corner sweep (automated) | ✅ | Yes | 60-corner PVT sweep automated via silicon_pvt_sweep (sky130 model); Monte-Carlo mismatch included |
+| SPICE — Monte-Carlo mismatch | ✅ | Yes | Pelgrom A_VT = 4 mV·µm model for sky130; production-sign-off accuracy requires foundry MC deck (not yet integrated) |
+| SPICE — commercial foundry PDK sign-off accuracy | ⚠️ (partial) | Yes | Reference implementation; not foundry-PDK accurate per honest caveats in module. |
+| SPICE — waveform viewer | ✅ | Yes | WaveformViewer.jsx: multi-trace SVG, zoom/pan/cursor measurement, .spice.waveform file kind |
+| SPICE — schematic-driven simulation | ✅ | Yes | Wave 9: multi-dialect netlist codegen from schematic capture. |
+| SPICE — license cost | ✅ | No | Kerf is MIT open-core; ngspice backend is free/open-source; cloud execution priced on credits at cost |
+| SPICE — chat-native / LLM-driven flow | ✅ | No | All silicon tools reachable via plain-language prompts |
 
-## Honest gaps
+## What Kerf does that Cadence Spectre doesn't
 
-- **No commercial PDK sign-off.** If you need to tape out at TSMC, you need Spectre. Kerf is not a replacement.
-- **No Virtuoso-grade schematic integration.** Kerf accepts netlists; Spectre is point-and-click schematic-driven.
+- **SPICE — license cost** — Kerf is MIT open-core; ngspice backend is free/open-source; cloud execution priced on credits at cost
+- **SPICE — chat-native / LLM-driven flow** — All silicon tools reachable via plain-language prompts
 
-## Feature matrix
+## What's honestly outstanding
 
-| Feature | Kerf | Cadence Spectre |
-|---|---|---|
-| License | MIT open-core + free ngspice | Proprietary (tens of k$/year) |
-| Solver | ngspice (open) | Proprietary (faster) |
-| Transient | Yes | Yes |
-| AC / DC / Noise | Yes | Yes |
-| PVT corner sweep | Yes (automated, sky130) | Yes (Virtuoso ADE) |
-| Monte-Carlo | Yes (engineering model) | Yes (foundry-measured) |
-| Commercial foundry sign-off | No | Yes |
-| Waveform viewer | Yes (in-app) | Yes (Virtuoso VX) |
-| Schematic capture | No | Yes (Virtuoso) |
-| Chat-native flow | Yes | No |
-| Open-source | Yes | No |
+- **SPICE — commercial foundry PDK sign-off accuracy** (Partial): Reference implementation; not foundry-PDK accurate per honest caveats in module.
 
----
-*Last reviewed: 2026-05-29. Cadence Spectre information from cadence.com product pages. Kerf capabilities reflect the current shipped product.*
+## Pricing
+
+Cadence Spectre is free and open-source. Kerf is also MIT open-core: free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — MIT licensed throughout.

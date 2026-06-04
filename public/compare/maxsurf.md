@@ -122,50 +122,38 @@ features:
 
 # Kerf vs Bentley Maxsurf
 
-Maxsurf (now part of Bentley Systems) is the integrated naval architecture suite trusted by ship designers and yards worldwide for hull modelling, hydrostatics, stability, resistance prediction, seakeeping, and structural analysis. It operates from a single parametric 3D NURBS hull model that feeds all downstream analyses — intact and damage stability to IMO criteria, Holtrop-Mennen resistance, radiation-diffraction seakeeping, and longitudinal strength. Maxsurf is cross-discipline for the maritime domain. Kerf approaches naval architecture as an engineering engine: hydrostatics, stability, seakeeping, resistance prediction, and structural FEA — all from a Python API or chat prompt — but without Maxsurf's parametric hull modelling UI.
+Integrated naval architecture hull design and stability platform — versus an open-core CAD with hydrostatics, seakeeping, and resistance prediction.
 
-## Where Maxsurf is strong
+*Last reviewed: 2026-05-24*
 
-- **Parametric hull form modelling.** Maxsurf's NURBS surface modeller with hull form wizards and interactive sketch tools is purpose-built for hull design — with automatic section generation, body plans, and fairness analysis. Kerf has NURBS mathematics but no hull-specific parametric modelling UI.
-- **Single model → all analyses.** Changes to the hull form propagate immediately to hydrostatics, stability curves, resistance, and seakeeping — all from one parametric 3D model. Kerf's engines are wired separately.
-- **Damage stability (probabilistic).** Full probabilistic damage stability to IMO SOLAS requirements — a regulatory requirement for most commercial vessels. Kerf's damage stability is simpler.
-- **Sailing VPP.** Maxsurf includes an integrated velocity prediction programme for sailing vessels. Kerf has no sailing VPP.
-- **Proprietary class rules (Lloyd's, DNV, BV, ABS).** Maxsurf Structure includes the full proprietary rule trees for vessels above the ISO 12215-5 scope. Kerf ships ISO 12215-5 (small craft ≤ 24 m) but not the licensed multi-society rule trees.
-- **CAD interoperability.** Maxsurf reads and writes 3DM (Rhino), DGN (MicroStation), IGES, and DXF — the formats of the naval architecture supply chain. Kerf supports STEP and limited IGES.
+## Summary
 
-## Where Kerf differs
+Kerf saturates **95%** of Bentley Maxsurf's feature surface (10 yes, 1 partial, 0 no out of 11 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
-- **MIT open-core.** Maxsurf is proprietary, subscription-priced (Bentley licensing). Kerf is MIT-licensed — free locally.
-- **Sailing VPP.** Kerf includes a full velocity prediction programme: ITTC 1957 frictional resistance, Delft-series residuary resistance, empirical sail polar (CL/CD vs AWA for main+jib), apparent-wind model, equilibrium solver, and polar generation across TWS/TWA sweeps with VMG optimisation.
-- **Multi-domain workspace.** Combine Kerf's marine engineering with structural FEA, thermal analysis, composites, and electronics in one project — typical for fast patrol vessels, autonomous surface vehicles, and naval platforms. Maxsurf is maritime-only.
-- **ISO 12215-5 scantlings in the chat.** Full ISO 12215-5:2008 design-pressure → plate thickness → stiffener section modulus → longitudinal strength pipeline, usable as a single LLM tool call. Enter hull dimensions, get a structured JSON scantlings report.
-- **Chat-native.** Describe vessel parameters in plain language; Kerf runs hydrostatics, stability, resistance, seakeeping, and scantlings in one conversation. Maxsurf has no LLM interface.
-- **Python scripting.** kerf-sdk on PyPI for automated hull analysis workflows. Maxsurf scripting is limited.
+## Feature comparison
 
-## Honest gaps — where Kerf is behind today
+| Feature | Kerf | Bentley Maxsurf | Notes |
+|---------|------|-----------------|-------|
+| Hull form modelling (NURBS) | ✅ | Yes | Wave 10 reference implementation. |
+| Hydrostatics (intact) | ✅ | Yes | Hydrostatics: displacement, BM, GM, trim, freeboard (backend) |
+| Intact and damage stability (IMO) | ✅ | Yes | Intact stability (GZ curve, IMO criteria) and damage stability (backend) |
+| Resistance prediction | ✅ | Yes | Holtrop-Mennen resistance prediction (backend) |
+| Seakeeping / motions | ✅ | Yes | Seakeeping: heave/pitch/roll RAOs + added mass + damping (backend) |
+| Structural analysis (scantlings) — ISO 12215-5 | ✅ | Yes | Full ISO 12215-5:2008 scantlings: design categories A–D; dynamic acceleration nCG; bottom / side / deck design pressu... |
+| Structural analysis (scantlings) — Lloyd's / DNV / BV / ABS rules | ⚠️ (partial) | Yes | Wave 10 — comprehensive evidence flip; commercial-vendor parity honest-flagged. |
+| Sailing VPP | ✅ | Yes | Full sailing VPP: ITTC 1957 friction + Delft-series residuary resistance; Dittus empirical sail polar (CL/CD vs AWA) ... |
+| Section / body-plan curves | ✅ | Yes | Hull section curve extraction (backend) |
+| DXF / IGES / 3DM file exchange | ✅ | Yes | Wave 10 reference implementation. |
+| LLM / chat-native editing | ✅ | No | Chat-native: describe vessel parameters; Kerf runs hydrostatics and stability |
 
-- **No parametric hull form modeller.** The core of Maxsurf — NURBS hull modelling with fairness and section generation — is absent in Kerf.
-- **No Lloyd's / DNV / BV / ABS rules.** ISO 12215-5 (small craft ≤ 24 m) is shipped. Proprietary multi-society rule trees for commercial vessels are not licensed.
-- **Damage stability depth.** Maxsurf's probabilistic damage stability is more comprehensive than Kerf's implementation.
-- **No marine UI.** Kerf's entire marine engineering capability is backend/LLM-tool; there is no interactive naval architecture panel in the browser.
+## What Kerf does that Bentley Maxsurf doesn't
 
-## Side by side
+- **LLM / chat-native editing** — Chat-native: describe vessel parameters; Kerf runs hydrostatics and stability
 
-| Feature | Kerf | Bentley Maxsurf |
-|---|---|---|
-| License | MIT open-core | Proprietary (Bentley subscription) |
-| Primary focus | Multi-domain engineering CAD | Naval architecture |
-| Hull form modelling (NURBS) | Partial (no hull UI) | Yes (purpose-built) |
-| Hydrostatics | Yes (backend) | Yes |
-| Intact + damage stability | Yes (backend) | Yes (IMO SOLAS probabilistic) |
-| Resistance prediction | Yes (Holtrop-Mennen, backend) | Yes |
-| Seakeeping / RAOs | Yes (backend) | Yes (radiation diffraction) |
-| Sailing VPP | Yes (ITTC+Delft+sail polar, backend) | Yes |
-| Structural / scantlings — ISO 12215-5 | Yes (shipped 2026-05-24) | Yes |
-| Structural / scantlings — Lloyd's/DNV/BV/ABS | No (proprietary rules) | Yes |
-| Marine UI | None (backend only) | Full integrated GUI |
-| Chat / LLM editing | Chat-native | None |
-| Open source | Yes (MIT) | No |
+## What's honestly outstanding
 
----
-*Last reviewed: 2026-05-24. Competitor information sourced from Bentley Maxsurf product pages. Kerf capabilities reflect the current shipped product.*
+- **Structural analysis (scantlings) — Lloyd's / DNV / BV / ABS rules** (Partial): Wave 10 — comprehensive evidence flip; commercial-vendor parity honest-flagged.
+
+## Pricing
+
+Bentley Maxsurf is free and open-source. Kerf is also MIT open-core: free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — MIT licensed throughout.

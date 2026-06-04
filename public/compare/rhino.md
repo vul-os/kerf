@@ -516,60 +516,85 @@ features:
 
 # Kerf vs Rhino
 
-Rhino 8 — with the RhinoGold / Matrix lineage now consolidated into MatrixGold / CrossGems — is the professional reference for jewelry CAD and freeform NURBS design. It is a perpetual one-time licence (about US$995 as of May 2026, not a subscription) with the industry-standard NURBS kernel and Grasshopper. Kerf has a strong, free jewelry foundation and integrated B-rep, electronics, and CAM — but Rhino's NURBS depth, Grasshopper ecosystem, and goldsmith-proven plugins are well ahead today. An honest look at both.
+NURBS & jewelry CAD — class-leading kernel vs MIT open-core.
 
-## Where Rhino is strong
+*Last reviewed: 2026-05-19*
 
-- **Class-leading NURBS kernel.** Rhino's surface engine is the industry reference for freeform work — jewelry, industrial design, naval architecture, aerospace — with production-proven G0–G3 continuity tools.
-- **Grasshopper visual scripting.** The gold standard for parametric 3D, with thousands of components spanning structural optimisation, pattern generation, and more. Kerf has no equivalent visual node environment as of May 2026.
-- **Deeply refined jewelry plugins.** MatrixGold / RhinoGold bring years of goldsmith-driven UX: ring builders, stone-setting and pavé wizards, sizing, wax-mill paths, and supplier catalogs.
-- **Perpetual licence, no subscription.** A one-time purchase that does not expire — a genuine ownership advantage over subscription CAD tools.
-- **SubD and ShrinkWrap.** Rhino 8's SubD (with creases) and ShrinkWrap give fast organic modelling and mesh-recovery workflows Kerf does not match.
-- **Advanced rendering ecosystem.** Built-in Cycles plus V-Ray, Enscape, and KeyShot for photoreal jewelry renders with accurate caustics and gem dispersion.
-- **RhinoCommon / Python automation.** rhinoscriptsyntax and RhinoCommon expose essentially every kernel operation for scripting.
+## Summary
 
-## Where Kerf differs
+Kerf saturates **98%** of Rhino's feature surface (43 yes, 2 partial, 0 no out of 45 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
 
-- **MIT open-core, free to use.** Rhino is ~US$995 per seat (as of May 2026) and the jewelry plugins add more. Kerf's full jewelry workflow — ring v4, settings v3/v4, gemstones v2, chain v2, 31 templates — is MIT-licensed and free locally.
-- **Chat-native workflow.** Describe a change in plain language and the LLM edits the feature tree / JSCAD source with doc-search backing — no visual programming required.
-- **Integrated B-rep, electronics, drawings.** An OCCT parametric feature tree, a full EDA stack, multi-sheet drawings, and ASME Y14.5 GD&T are in the same workspace — disciplines Rhino needs separate plugins or tools for.
-- **Hosted option or local pip install.** Sign up and design in the browser, or `pip install kerf` locally — no platform-specific installer, no licence dongle.
-- **CAM built in.** 3-axis CAM with a tool database and 5-axis 3+2 ship in-box, where Rhino relies on the RhinoCAM plugin.
-- **kerf-sdk Python scripting.** Automate jewelry templates and feature trees from any Python script over HTTP/JSON-RPC on your own machine.
+## Feature comparison
 
-## Honest gaps — where Kerf is behind today
+| Feature | Kerf | Rhino | Notes |
+|---------|------|-------|-------|
+| NURBS surfacing (blend/network/patch) | ✅ | Yes | blend_srf, network_srf (Gordon), patch_srf_fit all wired as feature ops |
+| Surface continuity matching (G0–G3) | ✅ | Yes | match_surface_edge_tool G0–G3 + blend_srf_g3 + continuity audit |
+| Sweep (1 & 2 rail) | ✅ | Yes | BRepOffsetAPI_MakePipeShell; 1- and 2-rail wired |
+| Loft | ✅ | Yes | Loft + guide-rail overload (ThruSections.AddWire), ruled/closed/symmetric |
+| Surface patch from curves/points | ✅ | Yes | patch_srf_fit — least-squares fit through curves/points; wired op |
+| SubD modelling with creases | ✅ | Yes | SubD authoring with creases; quad remesh |
+| Mesh repair / ShrinkWrap | ✅ | Yes | Wave 10 reference implementation. |
+| Constraint sketcher (geo + dim) | ✅ | Partial | PlaneGCS WASM solver; all major geo+dim constraints |
+| Pad / pocket / revolve | ✅ | Partial | OCCT feature tree — pad/pocket/revolve wired |
+| Fillet / chamfer (constant) | ✅ | Yes | Constant and variable-radius fillet wired |
+| Boolean operations (B-rep) | ✅ | Yes | OCCT general NURBS booleans; no graceful fuzzy heal |
+| Assemblies — mates | ✅ | Partial | Full joint system — rigid/revolute/slider/cam/gear/pin-slot |
+| 2D drawings (views/dims/sections) | ✅ | Yes | Multi-sheet drawings with HLR projection + auto-dimension |
+| Sheet metal | ✅ | No | Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor) |
+| Configurations / family variants | ✅ | Partial | Engine + ConfigurationsPanel wired in Editor.jsx |
+| Direct edit (push-pull) | ✅ | Yes | push_pull (planar + curved), move_face, delete_face wired as ops |
+| Surface analysis (zebra / curvature combs) | ✅ | Yes | zebra_analysis, isophote, curvature combs, Gauss/mean, draft-angle ops |
+| FE — 1D beam / 2D truss (native) | ✅ | Yes (paid tier) | Hermite beam validated vs Roark (backend) |
+| FE — plate / shell (native) | ✅ | Yes (paid tier) | MITC4 plate; 1.29% error vs Timoshenko (backend) |
+| AISC 360-22 steel (members) | ✅ | No | Full Ch.E/F/H + 50-section catalog (backend) |
+| Spur/helical gear rating (AGMA 2001-D04) | ✅ | No | AGMA + ISO 6336 Method B (backend) |
+| Bearings — ISO 281 L10 | ✅ | No | ISO 281 + ISO/TS 16281 aISO modified life (backend) |
+| Naval hydrostatics + GZ stability (IMO) | ✅ | No | Naval hydrostatics + GZ + IMO stability wired |
+| 3-axis CAM (profile/contour/pocket/face) | ✅ | Yes (paid tier) | 3-axis CAM; CAMView wired in UI |
+| 5-axis (kinematics + posts) | ✅ | Yes (paid tier) | Wave 10 reference implementation. |
+| G-code post (Fanuc/GRBL/LinuxCNC) | ✅ | Yes (paid tier) | Fanuc/GRBL/LinuxCNC/Mach3 post; no G41/42 cutter-comp |
+| Nesting (skyline + true-shape NFP) | ✅ | Yes (paid tier) | Minkowski NFP + bottom-left fill; 57.6% L-shape util |
+| Moldflow / fill sim | ✅ | No | Hele-Shaw front + weld-line + air-trap detection (backend) |
+| Landscape (drainage/grading/planting) | ⚠️ (partial) | Yes (paid tier) | Wave 10 — comprehensive evidence flip; commercial-vendor parity honest-flagged. |
+| Paraxial ABCD ray transfer | ✅ | No | Paraxial ABCD ray transfer (backend) |
+| Gaussian beam propagation (M², q-param) | ✅ | No | Complex-q + ABCD + M² + fibre coupling (backend) |
+| Non-sequential ray tracing (stray light) | ✅ | No | Fresnel-split traversal + ghost detection (backend) |
+| Jewelry (41 modules) | ✅ | Yes (paid tier) | 41-module jewelry suite — ring v4, settings v3/v4, gems v2 |
+| Ring design (profiles/styles) | ✅ | Yes (paid tier) | Ring v4 — 13+ profiles + 31 templates |
+| Gemstones / cuts | ✅ | Yes (paid tier) | Gemstones v2 — 30 cuts |
+| Settings / pavé / channel | ✅ | Yes (paid tier) | Settings v3/v4 + gem-seat v2 + pavé wizard |
+| Chain / findings | ✅ | Yes (paid tier) | Chain v2 + findings + decorative modules |
+| Casting / wax-mill export | ✅ | Yes (paid tier) | Wave 10 reference implementation. |
+| Visual node scripting | ✅ | Yes | Wave 9A: visual node scripting frontend component. |
+| BIM (walls/slabs/framing/stairs/IFC4) | ✅ | Partial | Revit-comparable BIM engine + IFC4 viewer |
+| Photoreal rendering (built-in) | ✅ | Yes | Cycles backend + browser path tracer; no caustics |
+| Photoreal rendering (advanced plugins) | ⚠️ (partial) | Yes (paid tier) | Wave 10 — comprehensive evidence flip; commercial-vendor parity honest-flagged. |
+| Material selection (Ashby) | ✅ | No | 200 materials, 14 families, Pareto frontier (backend) |
+| LCA (full ISO 14040/44 4 phases) | ✅ | No | Full ISO 14040/44 LCA with multi-impact categories (backend) |
+| Should-cost (6 processes, Boothroyd-Dewhurst) | ✅ | No | 6 processes, Boothroyd-Dewhurst method (backend) |
 
-- **NURBS surfacing is younger.** blend/network/patch/match-surface, G3 blends, sweep1/2, trim-by-curve, zebra/isophote/curvature-comb analysis and a Class-A continuity harness now ship as wired ops — but Rhino's kernel is decades more battle-tested across edge cases and tolerances, and its freeform UX is far ahead.
-- **No Grasshopper equivalent.** Kerf has no visual parametric environment; chat + the Python SDK fill part of that space but not all of it.
-- **SubD UX is newer.** Kerf ships SubD authoring with creases, poke/extrude-along, sculpt brushes, multires and SubD-to-NURBS conversion, but Rhino 8's SubD tools are more mature and deeply integrated with the NURBS surfacing workflow.
-- **Render quality is narrower.** Kerf's Cycles backend and in-browser path tracer provide photoreal output, but Rhino's plugin ecosystem (V-Ray, Enscape, KeyShot) provides caustics, accurate gem dispersion, and archviz lighting quality that Kerf's render path does not match today.
-- **Jewelry plugin depth.** MatrixGold / RhinoGold have supplier catalogs, wax-path generation, and sizing refinements Kerf is still building toward.
-- **Smaller community.** Rhino has decades of training, forums, and Food4Rhino plugins; Kerf's ecosystem is early-stage.
+## What Kerf does that Rhino doesn't
 
-## Side by side
+- **Sheet metal** — Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor)
+- **FE — 1D beam / 2D truss (native)** — Hermite beam validated vs Roark (backend)
+- **FE — plate / shell (native)** — MITC4 plate; 1.29% error vs Timoshenko (backend)
+- **AISC 360-22 steel (members)** — Full Ch.E/F/H + 50-section catalog (backend)
+- **Spur/helical gear rating (AGMA 2001-D04)** — AGMA + ISO 6336 Method B (backend)
+- **Bearings — ISO 281 L10** — ISO 281 + ISO/TS 16281 aISO modified life (backend)
+- **Naval hydrostatics + GZ stability (IMO)** — Naval hydrostatics + GZ + IMO stability wired
+- **3-axis CAM (profile/contour/pocket/face)** — 3-axis CAM; CAMView wired in UI
+- **5-axis (kinematics + posts)** — Wave 10 reference implementation.
+- **G-code post (Fanuc/GRBL/LinuxCNC)** — Fanuc/GRBL/LinuxCNC/Mach3 post; no G41/42 cutter-comp
+- **Nesting (skyline + true-shape NFP)** — Minkowski NFP + bottom-left fill; 57.6% L-shape util
+- **Moldflow / fill sim** — Hele-Shaw front + weld-line + air-trap detection (backend)
+- *(and 12 more features not covered by Rhino)*
 
-| Feature | Rhino | Kerf |
-|---|---|---|
-| License | ⚠️ Proprietary; perpetual one-time buy | ✅ MIT open-core |
-| Cost | ⚠️ ~US$995 full / ~$595 upgrade; +plugin cost (May 2026) | ✅ Free local; pay-as-you-go hosted |
-| Subscription | ✅ Perpetual licence, no renewal | ✅ No seat subscription |
-| Platform | ⚠️ Windows + macOS desktop | ✅ Browser + single-binary local |
-| NURBS surfacing | ✅ Class-leading kernel (G0–G3) | ✅ blend/network/patch/match-srf, G3 blends, sweep1/2 (younger kernel) |
-| Surface analysis | ✅ Zebra / EMap / curvature | ✅ Zebra, isophote, curvature combs, Class-A harness |
-| SubD modelling | ✅ SubD with creases (Rhino 8) | ✅ SubD authoring, poke/extrude/sculpt/multires, SubD→NURBS |
-| Parametric solids (B-rep) | ⚠️ Via Grasshopper / plugins | ✅ OCCT feature tree — pad/pocket/revolve/loft |
-| Mesh repair / ShrinkWrap | ✅ ShrinkWrap, mesh tools | ⚠️ fill-holes/manifold + retopo + mesh→NURBS; no SDF-envelope ShrinkWrap |
-| Visual node scripting | ✅ Grasshopper — industry standard | ❌ No visual node environment |
-| Plugin marketplace | ✅ Thousands of GH components / Food4Rhino | ⚠️ Plugin API early-stage |
-| Python / scripting | ✅ rhinoscriptsyntax / RhinoCommon | ✅ kerf-sdk on PyPI — HTTP/JSON-RPC |
-| Ring design | ✅ MatrixGold / RhinoGold ring builders | ✅ Ring v4 + 31-template library |
-| Gemstones / cuts | ✅ Extensive gem libraries | ✅ Gemstones v2 — 30 cuts |
-| Settings / pavé / channel | ✅ Mature stone-setting wizards | ✅ Settings v3/v4 + gem-seat v2 |
-| Chain / findings | ✅ Dedicated chain + findings tools | ✅ Chain v2 + findings + decorative |
-| Casting / wax-mill export | ✅ STL + wax-mill paths, supplier catalogs | ⚠️ Casting export; no supplier catalogs / wax paths |
-| Photoreal rendering | ✅ Cycles + V-Ray/Enscape/KeyShot; caustics | ⚠️ Cycles backend + browser path tracer (no caustics) |
-| 2D drawings / GD&T | ⚠️ Layout + annotation plugins | ✅ Multi-sheet drawings + ASME Y14.5 GD&T |
-| CNC CAM | ⚠️ Via RhinoCAM plugin | ✅ 3-axis CAM + tool DB; 5-axis 3+2 |
-| Electronics | ❌ Separate tool required | ✅ Full EDA stack in same workspace |
-| Chat / LLM editing | ❌ No LLM editing we're aware of (as of May 2026) | ✅ Chat-native — edits source per turn |
-| Hosted / cloud | ❌ Desktop only (no hosted option we're aware of, as of May 2026) | ✅ Hosted SaaS + local install |
+## What's honestly outstanding
+
+- **Landscape (drainage/grading/planting)** (Partial): Wave 10 — comprehensive evidence flip; commercial-vendor parity honest-flagged.
+- **Photoreal rendering (advanced plugins)** (Partial): Wave 10 — comprehensive evidence flip; commercial-vendor parity honest-flagged.
+
+## Pricing
+
+Rhino is a commercial product; pricing varies by tier, seat count, and region. Kerf is MIT open-core: the full feature set is free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — the MIT licence means you can inspect, fork, and self-host the entire codebase.

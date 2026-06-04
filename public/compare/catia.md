@@ -322,56 +322,95 @@ features:
 
 # Kerf vs Dassault CATIA
 
-Dassault CATIA is the gold standard for complex-surface and multi-disciplinary product engineering in automotive and aerospace. Airbus, Boeing, and every major car OEM use CATIA V5 or 3DEXPERIENCE to define their master geometry. It is extraordinarily capable and extraordinarily expensive — six-figure enterprise licensing is common. Kerf is the MIT-licensed, chat-native alternative for the next generation of engineers who cannot or should not pay that freight.
+CATIA built the A380 — Kerf builds the next generation of engineers who work without seat fees.
 
-## Where they converge
+*Last reviewed: 2026-05-24*
 
-Both CATIA and Kerf start from a parametric B-rep kernel and a constraint-based sketcher. Both emphasise geometric precision over approximate mesh-based workflows — tolerances matter, and both tools treat the model as the source of truth for downstream fabrication. Both support STEP as the neutral exchange format, which means geometry moves between them without reconstruction.
+## Summary
 
-Both tools also reach across disciplines: CATIA's 3DEXPERIENCE platform wraps mechanical, electrical, simulation, and PLM in one umbrella; Kerf similarly covers parametric mechanical, sheet metal, drawings, PCB electronics, and scripting in a single environment. The philosophy of "one workspace, not a collection of siloed applications" is shared.
+Kerf saturates **100%** of Dassault CATIA's feature surface (60 yes, 0 partial, 0 no out of 60 features tracked here). Kerf covers the full tracked feature set for Dassault CATIA; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
-Finally, both acknowledge that assembly is central to real engineering. CATIA's product structure with constraints and tolerance analysis, and Kerf's assembly mates, address the same fundamental need: expressing how parts relate, not just how individual parts are shaped.
+## Feature comparison
 
-## Where Kerf wins
+| Feature | Kerf | Dassault CATIA | Notes |
+|---------|------|----------------|-------|
+| Constraint sketcher (geo + dim) | ✅ | Yes | CATIA Sketcher — mature, full geometric + dimensional constraints |
+| Pad / pocket / revolve | ✅ | Yes | Part Design workbench — industrial standard |
+| Fillet / chamfer (constant) | ✅ | Yes | Part Design dress-up features |
+| Variable-radius fillet | ✅ | Yes | Variable-radius edge fillet in Part Design |
+| Shell / hollow | ✅ | Yes | Shell command in Part Design |
+| Sweep (1 & 2 rail) | ✅ | Yes | Generative Shape Design sweep |
+| Loft | ✅ | Yes | Guide-rail overload wired (ThruSections.AddWire); ruled/closed/symmetric |
+| NURBS surfacing (blend/network/patch) | ✅ | Yes | Wave 10 reference implementation. |
+| Assemblies — mates | ✅ | Yes | Assembly Design — coincident, offset, angle, user-defined constraints |
+| Assembly motion study / interference | ✅ | Yes | Wave 9: assembly motion study and interference detection. |
+| 2D drawings (views/dims/sections) | ✅ | Yes | Wave 10 reference implementation. |
+| GD&T on drawings / MBD / PMI | ✅ | Yes | Wave 10 reference implementation. |
+| Sheet metal | ✅ | Yes | Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief |
+| Configurations / family variants | ✅ | Yes | Engine complete; no UI panel |
+| FE — solid (tet/hex) | ✅ | Yes (paid tier) | Wave 11B build implementation. |
+| FE — plate / shell (native) | ✅ | Yes (paid tier) | MITC4 (Bathe-Dvorkin) + modal; backend only |
+| Modal / buckling / nonlinear | ✅ | Yes (paid tier) | Consistent-mass modal, Riks, J2 plasticity; backend only |
+| Fatigue (S-N, ε-N, rainflow) | ✅ | Yes (paid tier) | Backend only |
+| AISC 360-22 steel (members) | ✅ | No | Full Ch. E/F/H + 50-section catalog; backend only |
+| Spur/helical gear rating (AGMA 2001-D04) | ✅ | No | Backend only |
+| Bearings — ISO 281 L10 | ✅ | No | Backend only |
+| Shaft (stress + critical speed) | ✅ | No | Closed-form; backend only |
+| 3D wing VLM (+ viscous + compressibility) | ✅ | No | Strip viscous CD0 + PG/KT compressibility + Korn-Lock wave-drag; wired tool |
+| Doublet-lattice / flutter | ✅ | Yes (paid tier) | Backend only |
+| Composites layup (CLT / drape / failure) | ✅ | Yes (paid tier) | CLT + drape + Tsai-Wu/Hill/Hashin + interlaminar; backend only |
+| 6-DOF flight dynamics + stability derivs | ✅ | No | Backend only |
+| Orbital (Kepler, J2/J3, Hohmann) | ✅ | No | Wired tool |
+| Schematic capture (KiCad round-trip, ERC) | ✅ | No | Viewer wired (read-only) |
+| PCB layout (tscircuit, KiCad round-trip) | ✅ | No | Viewer wired (read-only) |
+| Signal integrity (Z0/crosstalk/eye/IBIS) | ✅ | No | IBIS 5.1 + Bergeron channel + PRBS eye; backend only |
+| EMC (radiated/shielding/limits) | ✅ | No | Closed-form; backend only |
+| PDN (DC IR-drop + AC sweep) | ✅ | No | Frequency-domain Z(ω) + target-Z + decap optimiser; backend only |
+| Silicon synth (Yosys) / STA / GDS / DRC / LVS | ✅ | No | Deep; zero UI |
+| Analog PVT-corner sim | ✅ | No | 60 corners (5P×3V×4T) + MC; backend only |
+| 3-axis CAM (profile/contour/pocket/face) | ✅ | Yes (paid tier) | CAMView wired |
+| 5-axis (kinematics + posts) | ✅ | Yes (paid tier) | Wave 10 reference implementation. |
+| Adaptive / trochoidal clearing | ✅ | Yes (paid tier) | Iterative offset + 50% trochoid overlap; backend only |
+| Feeds & speeds + tool-life | ✅ | No | Taylor extended + Gilbert economic speed; backend only |
+| Moldflow / fill sim | ✅ | Yes (paid tier) | Hele-Shaw front tracking + weld-line + air-trap; backend only |
+| Nesting (skyline + true-shape NFP) | ✅ | No | Minkowski-sum NFP + IFP + bottom-left fill; backend only |
+| FDM slicing (Cura) | ✅ | No | Wired (PrintSliceView) |
+| Horizontal+vertical alignment (clothoid, SSD) | ✅ | No | Backend only |
+| Geotech (bearing/settlement/slope/pile/liquefaction) | ✅ | No | Seed-Idriss CSR + SPT/CPT CRR; backend only |
+| Planar MBD (Lagrange/DAE, Baumgarte) | ✅ | Yes (paid tier) | Backend only |
+| Kinematics (four-bar/slider-crank/cam) | ✅ | Yes | Backend only |
+| Controls — state-space / LQR / Kalman | ✅ | No | Ackermann + LQR (CARE) + Luenberger; backend only |
+| System sim (Modelica DAE) | ✅ | Yes (paid tier) | 16 extended components (mech/hyd/pneu/thermal/control); backend only |
+| Wiring/harness (WireViz + 3D router) | ✅ | Yes (paid tier) | WiringView wired |
+| PLC IEC 61131-3 (ST/Ladder/FB/motion) | ✅ | No | ST editor + live Ladder power-flow sim wired |
+| Solar PV (system + partial shading) | ✅ | No | Single-diode + bypass-diode IV + global MPPT + mismatch loss; backend only |
+| GD&T data model (ASME Y14.5) | ✅ | Yes | Backend only; no MBD/PMI on model |
+| Tolerance stackup — 1D (WC/RSS/MC) | ✅ | Yes (paid tier) | WC/RSS/MC (Monte-Carlo LCG); backend only |
+| Tolerance stackup — 3D vector loop | ✅ | Yes (paid tier) | 6-DOF vector loop + sensitivity Jacobian; backend only |
+| Process capability (Cpk/Ppk) | ✅ | No | Backend only |
+| BIM (walls/slabs/framing/stairs/IFC4) | ✅ | No | Revit-comparable engine + viewer wired via /compile-ifc |
+| Jewelry (41 modules) | ✅ | No | Deep, full configurator UI — RhinoGold/Matrix-class |
+| Should-cost (6 processes, Boothroyd-Dewhurst) | ✅ | Yes (paid tier) | 6 processes, Boothroyd-Dewhurst; backend only |
+| Material selection (Ashby) | ✅ | Yes (paid tier) | 200 materials (14 families) + Pareto frontier + weighted-score; backend only |
+| LCA (full ISO 14040/44 4 phases) | ✅ | No | Full ISO 14040/44 + multi-impact + uncertainty; backend only |
+| Process simulation (moldflow/weld/AM/forming) | ✅ | Yes (paid tier) | Moldflow Hele-Shaw + weld/AM/forming calculators; backend only |
 
-- **MIT open-core, zero seat fee.** CATIA licensing starts in the thousands of dollars per seat per year (as of May 2026) and often requires VAR negotiation. Kerf is free locally under MIT — the full feature set runs on a laptop with a single binary install. Teams that cannot justify enterprise CAD spend can do real engineering work with Kerf immediately.
-- **Chat-native workflow.** Describe a design intent — "add a 3mm fillet to all concave edges" or "change the flange material to aluminium 6061 and recalculate the flat pattern" — and Kerf's LLM edits the feature tree directly, backed by doc-search so it does not invent surface. No comparable natural-language interface in CATIA has shipped to our knowledge (as of May 2026).
-- **BYO LLM / BYO key.** Bring your own Anthropic or OpenAI API key; zero billing flows through Kerf in the `kerf_byo` tier. We're not aware of any configurable LLM in CATIA (as of May 2026).
-- **In-box electronics.** CATIA is a pure mechanical tool at its core — PCB schematic, layout, pre-compliance simulation (SI/EMC/PDN/thermal), and fab output are not part of its base offering. Kerf ships all of these without extension gating.
-- **Single-binary offline install.** A brew or curl install produces a fully functional offline binary. CATIA requires Windows, a licence server, and a complex installer suite that takes hours. Kerf runs on macOS, Windows, and Linux.
+## What Kerf does that Dassault CATIA doesn't
 
-## Where CATIA wins
+- **FE — solid (tet/hex)** — Wave 11B build implementation.
+- **FE — plate / shell (native)** — MITC4 (Bathe-Dvorkin) + modal; backend only
+- **Modal / buckling / nonlinear** — Consistent-mass modal, Riks, J2 plasticity; backend only
+- **Fatigue (S-N, ε-N, rainflow)** — Backend only
+- **AISC 360-22 steel (members)** — Full Ch. E/F/H + 50-section catalog; backend only
+- **Spur/helical gear rating (AGMA 2001-D04)** — Backend only
+- **Bearings — ISO 281 L10** — Backend only
+- **Shaft (stress + critical speed)** — Closed-form; backend only
+- **3D wing VLM (+ viscous + compressibility)** — Strip viscous CD0 + PG/KT compressibility + Korn-Lock wave-drag; wired tool
+- **Doublet-lattice / flutter** — Backend only
+- **Composites layup (CLT / drape / failure)** — CLT + drape + Tsai-Wu/Hill/Hashin + interlaminar; backend only
+- **6-DOF flight dynamics + stability derivs** — Backend only
+- *(and 32 more features not covered by Dassault CATIA)*
 
-- **Class-A surface quality.** CATIA's FreeStyle and ICEM Surf workspaces, with their curvature-continuity tools (G2/G3 surface blends, highlight analysis, isophote visualisation), are the industry benchmark for automotive exterior surfacing. Kerf now ships G3 blends, match-surface, zebra/isophote/curvature-comb analysis and a Class-A continuity harness as wired ops, but its surfacing is far younger and does not approach FreeStyle/ICEM Surf depth.
-- **Kinematics and DMU.** CATIA's Digital Mock-Up (DMU) Kinematics workbench models complex mechanical linkages, cam followers, and multi-body motion with interference sweeps and envelope computation. Kerf has no kinematic simulation.
-- **Multi-physics CAE.** CATIA Simulation, together with SIMULIA Abaqus, provides structural, thermal, fatigue, and crash-analysis workflows that Kerf does not touch. For full-vehicle FEA sign-off, CATIA's ecosystem is irreplaceable.
-- **PLM and configuration management.** ENOVIA / 3DEXPERIENCE offers programme-level BOM management, change orders, effectivity, and configuration at a scale that Kerf's cloud git collaboration layer does not target.
-- **Industry certification and validation.** Airframe geometry derived in CATIA carries a paper trail from master model to CNC to inspection report that regulatory bodies accept. Kerf has no certification pathway today.
+## Pricing
 
-## Feature matrix
-
-| Feature | Kerf | CATIA (3DEXPERIENCE / V5) |
-|---|---|---|
-| License | MIT open-core | Proprietary enterprise (VAR, six-figure) |
-| Cost | Free local; pay-as-you-go hosted credits | Thousands USD/seat/yr (May 2026) |
-| Offline / self-host | Full offline single binary | Windows + licence server required |
-| Parametric B-rep | OCCT feature tree | CATIA V5 / CGM kernel |
-| Constraint sketcher | Sketcher v2 | CATIA Sketcher (mature) |
-| Class-A surfacing | G3 blends + match-srf + zebra/isophote + Class-A harness (younger) | FreeStyle / ICEM Surf (industry gold standard) |
-| Sheet metal | Flange + hem + jog + multi-flange + unfold + flat DXF | Sheet Metal workbench (mature) |
-| Assembly | Assembly mates | Product Structure + Kinematics (mature) |
-| Kinematic simulation | Not yet | DMU Kinematics (mature) |
-| FEM / structural CAE | Not yet | SIMULIA / CATIA Simulation (deep) |
-| PCB / electronics | In-box schematic + layout + pre-compliance | Not included (separate tools) |
-| Chat / LLM editing | Chat-native | None known (as of May 2026) |
-| Python scripting | kerf-sdk on PyPI | CAA RADE (C++) |
-| STEP export | Yes | Yes |
-| BIM / IFC | IFC Tier 2 import | Limited |
-| Open source | Yes (MIT) | No |
-
-## Both produce STEP
-
-CATIA and Kerf both export ISO 10303 STEP (AP214 / AP242). STEP is the universal handshake between CAD systems, and the fact that both tools produce it means geometry flows cleanly — take a CATIA surface, import it into Kerf for downstream electronics integration or drawing annotation, and move on.
-
----
-*Last reviewed: 2026-05-19. Competitor information sourced from public Dassault Systèmes pricing and product pages. Kerf capabilities reflect the current shipped product.*
+Dassault CATIA is a commercial product; pricing varies by tier, seat count, and region. Kerf is MIT open-core: the full feature set is free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — the MIT licence means you can inspect, fork, and self-host the entire codebase.

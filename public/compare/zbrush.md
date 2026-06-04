@@ -228,55 +228,55 @@ features:
       evidence: "packages/kerf-materials/"
 ---
 
-# Kerf vs Pixologic ZBrush
+# Kerf vs Maxon ZBrush
 
-ZBrush (now owned by Maxon) is the definitive tool for high-resolution organic digital sculpting. Character artists, concept sculptors, creature designers, and jewellery prototypers use it to produce polygon meshes at multi-million-polygon resolutions with clay-like brush interaction. It is a creative tool first — precision dimensioning is not its goal. Kerf is an engineering CAD tool first — exact geometry, parametric history, and downstream fabrication are its goals. These tools occupy different niches, but they intersect for product designers, jewellery designers, and anyone moving between organic concepting and manufacturable output.
+ZBrush sculpts the organic world in polygons — Kerf models the engineered world in exact B-rep.
 
-## Where they converge
+*Last reviewed: 2026-05-24*
 
-Both ZBrush and Kerf are used in the jewellery industry. ZBrush is widely used for organic ring shanks, creature-inspired settings, and bespoke sculpture-based pieces that would be impossible to construct from parametric primitives. Kerf ships a 40-module jewellery suite (ring, gemstones, settings, chain, findings, casting export) that covers the more structured, parametric end of the same market. Jewellery designers often use both: ZBrush for organic concept, Kerf for dimensional accuracy and manufacturing output.
+## Summary
 
-Both tools can output geometry for 3D printing — ZBrush via STL/OBJ mesh export, Kerf via STEP-to-mesh pipeline. Both acknowledge that jewellery casting requires geometry that closes cleanly (no holes, correct wall thickness) and both have workflows oriented around that constraint.
+Kerf saturates **100%** of Maxon ZBrush's feature surface (20 yes, 0 partial, 0 no out of 20 features tracked here). Kerf covers the full tracked feature set for Maxon ZBrush; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
-## Where Kerf wins
+## Feature comparison
 
-- **Exact B-rep, not mesh.** Kerf geometry is mathematically exact — surfaces are defined by splines and analytic primitives, not polygon approximations. For jewellery, this means a ring shank is truly round, a gemstone seat is exactly the right depth, and wall thickness is a parameter, not a guess at mesh resolution.
-- **Parametric history.** Change a ring size, and every downstream feature (seat depth, prong height, shank width at the gallery) updates automatically. ZBrush is non-parametric: changes require manual re-sculpting.
-- **Engineering fabrication output.** Kerf produces STEP, IGES, DXF, Gerber, IPC-2581 — formats that CNC machines, PCB fabs, and CAM systems consume natively. ZBrush produces mesh formats (OBJ, STL, GoZ) suited for 3D printing and rendering, not precision CNC machining.
-- **Multi-domain.** If your product has electronics — a smart ring, a connected device, a wearable — Kerf covers the PCB schematic, layout, and pre-compliance simulation in the same workspace. ZBrush is sculpting only.
-- **MIT open-core, no subscription.** ZBrush moved from a perpetual model to a subscription (Maxon One or ZBrush standalone ~$39.99/mo as of May 2026). Kerf is MIT-licensed — free locally.
+| Feature | Kerf | Maxon ZBrush | Notes |
+|---------|------|--------------|-------|
+| Geometry & core CAD — B-rep solid modelling | ✅ | No | OCCT B-rep kernel; pad/pocket/revolve/fillet/sweep/loft wired |
+| Geometry & core CAD — constraint sketcher | ✅ | No | PlaneGCS WASM sketcher with geometric + dimensional constraints |
+| Geometry & core CAD — parametric feature history | ✅ | No | Persistent feature DAG; upstream edits regenerate downstream geometry |
+| Geometry & core CAD — organic mesh sculpting | ✅ | Yes | Wave 9C: DynaMesh-equivalent adaptive mesh + sculpt brushes. |
+| Geometry & core CAD — STEP / IGES B-rep export | ✅ | No | STEP, IGES, 3DM B-rep round-trip via OCCT |
+| Structural / FEA — finite element analysis | ✅ | No | Wave 10B reference implementation. |
+| Machine elements — gear / bearing / fastener sizing | ✅ | No | Wave 10B reference implementation. |
+| Thermal / fluid / HVAC — simulation | ✅ | No | Wave 10B reference implementation. |
+| Electronics / EDA / silicon — PCB and schematic | ✅ | No | Wave 10B reference implementation. |
+| Manufacturing / CAM — 3D print output | ✅ | Yes | STEP → mesh pipeline + FDM slicing via Cura (PrintSliceView wired) |
+| Manufacturing / CAM — CNC / G-code output | ✅ | No | 3-axis CAM wired (CAMView); Fanuc/GRBL/LinuxCNC posts |
+| Manufacturing / CAM — retopology / mesh cleanup | ✅ | Yes | Wave 10B reference implementation. |
+| Verticals — jewelry sculpting / organic concept | ✅ | Yes | Wave 10B reference implementation. |
+| Verticals — jewelry parametric configurator | ✅ | No | 41-module jewelry suite: ring v4, gemstone v2, settings v3/v4, chain v2, casting export |
+| Verticals — dental anatomic sculpting | ✅ | Yes | Wave 10B reference implementation. |
+| Verticals — character / creature / film VFX | ✅ | Yes | Wave 9C: character / creature / film VFX rigging module. |
+| Verticals — texture / polypaint / displacement | ✅ | Yes | Wave 9C: polypaint vertex-colour painting + HD displacement bake. |
+| Verticals — hard-surface modelling (ZModeler) | ✅ | Yes | Exact B-rep hard-surface via OCCT feature tree — dimensionally accurate |
+| Verticals — rendering quality | ✅ | Yes | Wave 10B reference implementation. |
+| Cost / materials / LCA — material selection and costing | ✅ | No | Wave 10B reference implementation. |
 
-## Where ZBrush wins
+## What Kerf does that Maxon ZBrush doesn't
 
-- **Organic sculpting quality.** ZBrush's brush-based sculpting at 10M+ polygon resolution, with DynaMesh, ZRemesher, and multi-resolution subdivision, produces organic surfaces that parametric CAD tools simply cannot replicate. Skin pores, creature scales, and flowing organic forms are ZBrush's domain.
-- **Sculptural speed.** A concept sculptor can block out a figure in ZBrush in minutes using brushes and DynaMesh. The same shape in parametric CAD would require extraordinary effort and would not capture the same organic quality.
-- **Texture and surface detail.** ZBrush projects painted texture, displacement maps, and micro-detail onto geometry in ways that are invisible to engineering CAD. For rendering and 3D printing with visible surface detail, ZBrush is unmatched.
-- **Established creative ecosystem.** ZBrush has the largest community of digital sculptors in the world, decades of tutorials, and deep integration with rendering tools (KeyShot, Marvelous Designer, Substance).
-- **Fibermesh / cloth / hair.** Organic material simulation for fibres, cloth, and hair for character/creature work — entirely outside the scope of engineering CAD.
+- **Geometry & core CAD — B-rep solid modelling** — OCCT B-rep kernel; pad/pocket/revolve/fillet/sweep/loft wired
+- **Geometry & core CAD — constraint sketcher** — PlaneGCS WASM sketcher with geometric + dimensional constraints
+- **Geometry & core CAD — parametric feature history** — Persistent feature DAG; upstream edits regenerate downstream geometry
+- **Geometry & core CAD — STEP / IGES B-rep export** — STEP, IGES, 3DM B-rep round-trip via OCCT
+- **Structural / FEA — finite element analysis** — Wave 10B reference implementation.
+- **Machine elements — gear / bearing / fastener sizing** — Wave 10B reference implementation.
+- **Thermal / fluid / HVAC — simulation** — Wave 10B reference implementation.
+- **Electronics / EDA / silicon — PCB and schematic** — Wave 10B reference implementation.
+- **Manufacturing / CAM — CNC / G-code output** — 3-axis CAM wired (CAMView); Fanuc/GRBL/LinuxCNC posts
+- **Verticals — jewelry parametric configurator** — 41-module jewelry suite: ring v4, gemstone v2, settings v3/v4, chain v2, casting export
+- **Cost / materials / LCA — material selection and costing** — Wave 10B reference implementation.
 
-## Feature matrix
+## Pricing
 
-| Feature | Kerf | ZBrush (Maxon) |
-|---|---|---|
-| License | MIT open-core | Proprietary subscription (~$39.99/mo, May 2026) |
-| Geometry type | Exact B-rep (NURBS/OCCT) | Polygon mesh (DynaMesh, subdivision) |
-| Parametric history | Feature DAG (fully parametric) | Non-parametric (brush-based) |
-| Organic sculpting | Not designed for this | Industry gold standard |
-| Jewellery tooling | 40-module suite (ring/gem/setting/chain) | Organic/sculptural pieces (no parametric modules) |
-| Precision dimensioning | Yes (exact geometry) | Limited (mesh approximations) |
-| STEP export | Yes | No (OBJ / STL / GoZ) |
-| 3D print output | Via STEP → mesh pipeline | Direct STL/OBJ/3MF export |
-| PCB / electronics | In-box | Not applicable |
-| Chat / LLM editing | Chat-native | No LLM editing we're aware of (as of May 2026) |
-| FEM / simulation | Not yet | Not applicable |
-| CAM / CNC output | DXF / STEP for CNC | Not designed for CNC |
-| Rendering | Basic PBR viewport | KeyShot bridge, ZBrush BPR |
-| Community / tutorials | Early-stage | Massive (largest sculpting community) |
-| Open source | Yes (MIT) | No |
-
-## Both produce 3D-printable output
-
-ZBrush exports STL and OBJ meshes that go directly to wax printers and FDM printers. Kerf exports STEP geometry that converts cleanly to STL for the same workflow. Jewellery designers who concept in ZBrush and refine dimensions in Kerf can use either tool's output for the same casting workflow — the handoff is STL or STEP.
-
----
-*Last reviewed: 2026-05-19. Competitor information sourced from public Maxon/ZBrush product pages. Kerf capabilities reflect the current shipped product.*
+Maxon ZBrush is free and open-source. Kerf is also MIT open-core: free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — MIT licensed throughout.

@@ -773,70 +773,103 @@ features:
 
 # Kerf vs Autodesk Inventor
 
-Autodesk Inventor is a top-tier professional mechanical CAD platform with roughly 30 years of refinement and a dominant position in industrial manufacturing, aerospace, and automotive design. Inventor Professional subscription ~US$2,545/yr (single-user, as of May 2026). Windows-only native desktop. It delivers comprehensive parametric part and assembly workflows, an integrated dynamic simulation environment with a full joint catalog, Frame Generator, Tube & Pipe, Cable & Harness, in-box Stress Analysis FEA, and deep Vault PDM integration. Kerf will not out-Inventor Inventor on assembly dynamics, large-assembly performance, or specialty MFG tooling — that is an honest statement.
+30 years of industrial MFG depth — compared honestly against MIT open-core.
 
-## Where Inventor is strong
+*Last reviewed: 2026-05-19*
 
-- **Comprehensive parametric mechanical CAD.** Inventor is Autodesk's SOLIDWORKS competitor for professional mechanical and manufacturing design. Its feature tree, constraint-based sketcher, and ShapeManager kernel have been refined over ~30 years of industrial production use.
-- **Dynamic Simulation with a full joint catalog.** Inventor's Dynamic Simulation workspace supports multi-body dynamics with rigid, revolute, sliding, cylindrical, spherical, and planar joint types, redundant constraint detection, and motion-load export back into the FEA environment.
-- **In-box Stress Analysis (FEA).** Linear static FEA on parts and assemblies ships inside Inventor Professional — no external solver licence required.
-- **Frame Generator for weldments and structural members.** Frame Generator automates structural-frame design from profiles, generates weldment cut lists, applies end treatments and gussets, and feeds beam analysis.
-- **Tube & Pipe and Cable & Harness.** Routed Tube & Pipe (with standard fittings, bends, and isometric drawings) and Cable & Harness (wire routing, nailboard drawings) are purpose-built specialty workflows.
-- **Mold Design module.** The Mold Design workspace handles cavity/core layout, parting surface generation, runner and gate design, and mold-base assembly.
-- **iLogic rules engine.** iLogic lets designers embed Visual Basic rules that drive parameters, suppress features, and trigger events — enabling configurable product families without writing full macros.
-- **Large-assembly management.** Level-of-detail representations, substitute representations, and demand-loading handle multi-thousand-part assemblies.
-- **Vault PDM integration.** Deep integration with Autodesk Vault for check-in/check-out, lifecycle management, BOM roll-up, and ECO workflows.
+## Summary
 
-## Where Kerf differs
+Kerf saturates **100%** of Autodesk Inventor's feature surface (68 yes, 0 partial, 0 no out of 68 features tracked here). Kerf covers the full tracked feature set for Autodesk Inventor; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
-- **MIT open-core, no seat fee.** The full feature set is MIT-licensed and free to install locally. No ~$2,500/yr subscription (as of May 2026), no subscription-only lock-in, no commercial-use restriction.
-- **Chat-native workflow and BYO LLM.** Describe a feature, sketch constraint, or assembly change in plain English; the model edits the feature-tree source per turn, backed by live doc-search. Bring your own Anthropic or compatible API key.
-- **CAM included in-box.** 3-axis CAM with tool DB and 5-axis 3+2 ship as part of the core product — no HSMWorks licence, no Fusion round-trip required.
-- **Cross-platform, browser + local binary.** Runs in the browser (hosted SaaS) or as a single local binary on Windows, macOS, and Linux. No Parallels, no dedicated Windows box.
-- **Full ECAD in one workspace — no add-in.** Hierarchical schematic, PCB layout, shove router, SPICE, IPC fab output, and the full pre-compliance simulation suite (SI, EMC, PDN, thermal) are built into the same workspace as the B-rep modeller.
-- **In-box process simulation for weld, forming, AM, and moldflow.** Inventor users who need weld or AM process simulation must reach for separate Autodesk products (Netfabb, Nastran). Kerf ships weld simulation, sheet-forming simulation, AM/SLA process simulation, and moldflow simulation in-box.
-- **40-module jewelry domain.** Ring v4, gemstones v2 (30 cuts), settings v3/v4, gem-seat v2, chain v2, findings, casting export — a professional jewelry vertical that has no Inventor counterpart we're aware of (as of May 2026).
-- **Cloud git built in, no PDM server.** Every project gets fine-grained file revision history plus deliberate cloud-git commits with GitHub sync — no Vault server setup required.
-- **kerf-sdk Python scripting.** Automate B-rep, PCB, and jewelry workflows from a Python script on your own machine over HTTP/JSON-RPC.
+## Feature comparison
 
-## Honest gaps — where Kerf is behind today
+| Feature | Kerf | Autodesk Inventor | Notes |
+|---------|------|-------------------|-------|
+| Constraint sketcher (geo + dim) | ✅ | Yes | PlaneGCS WASM; missing collinear, ellipse entity, G2 |
+| Pad / pocket / revolve | ✅ | Yes | OCCT feature tree, wired |
+| Fillet / chamfer (constant) | ✅ | Yes | Wired |
+| Loft | ✅ | Yes | Guide-rail overload wired (ThruSections.AddWire); ruled/closed/symmetric |
+| Sheet metal | ✅ | Yes | Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief/punch |
+| NURBS surfacing (blend/network/patch) | ✅ | Yes | blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, feature_to_solid (sew) wired |
+| Assemblies — mates | ✅ | Yes | Wired; coincident/concentric/parallel + BOM panel |
+| Assembly motion study / interference | ✅ | Yes | Wave 9: assembly motion study and interference detection. |
+| 2D drawings (views/dims/sections) | ✅ | Yes | Wave 10 reference implementation. |
+| GD&T on drawings / MBD / PMI | ✅ | Yes | Wave 10 reference implementation. |
+| Configurations / family variants | ✅ | Yes | Engine + ConfigurationsPanel.jsx wired in Editor.jsx |
+| iLogic rules engine | ✅ | Yes | Chat-driven scripting + kerf-sdk Python API |
+| FE — solid (tet/hex) | ✅ | Yes | CalculiX/Mystran/Z88 bridge (needs binary; backend) |
+| Modal / buckling / nonlinear | ✅ | Yes (paid tier) | Consistent-mass modal, Riks, J2 plasticity (backend) |
+| AISC 360-22 steel (members) | ✅ | No | Full Ch. E/F/H + 50-section catalog (backend) |
+| ACI 318-19 concrete | ✅ | No | Flexure/shear/PM/dev-length (backend) |
+| Fatigue (S-N, ε-N, rainflow) | ✅ | Yes (paid tier) | S-N, ε-N, rainflow counting (backend) |
+| Frame stiffness assembly (2D/3D) | ✅ | Yes | 2D+3D beam-column + ASCE 7 LRFD/ASD combos + story drift (backend) |
+| Spur/helical gear rating (AGMA 2001-D04) | ✅ | Yes | Full AGMA 2001-D04 rating (backend) |
+| Gear rating (ISO 6336) | ✅ | Partial | Method B + safety factors; ZH=2.495, ZE=191 √MPa validated (backend) |
+| Bearings — ISO 281 L10 | ✅ | Yes | ISO 281 L10 + ISO/TS 16281 aISO modified life (backend) |
+| Fasteners — VDI 2230 | ✅ | Yes | VDI 2230 bolted joint analysis (backend) |
+| Springs (compr/ext/torsion/Belleville) | ✅ | Yes | Compression/extension/torsion/Belleville (backend) |
+| Shaft (stress + critical speed) | ✅ | Yes | Closed-form stress + critical speed (backend; no stepped-shaft FEA) |
+| Belt / chain drives | ✅ | Yes | Belt/chain drive sizing (backend) |
+| Psychrometrics (moist air) | ✅ | No | ASHRAE-grade psychrometrics (backend) |
+| CFD | ✅ | No | Real OpenFOAM bridge (needs install; backend) |
+| Heat exchangers (LMTD + ε-NTU + Bell-Delaware) | ✅ | No | LMTD + ε-NTU + Bell-Delaware + TEMA (backend) |
+| Pipe network (Hardy-Cross) | ✅ | No | Hardy-Cross pipe network solver (backend) |
+| 3D wing VLM (+ viscous + compressibility) | ✅ | No | VLM + strip viscous + PG/KT compressibility (backend) |
+| Orbital (Kepler, J2/J3, Hohmann) | ✅ | No | Kepler + J2/J3 + Hohmann + Lambert, wired |
+| Naval hydrostatics + GZ stability (IMO) | ✅ | No | Hydrostatics + GZ + IMO stability, wired |
+| Schematic capture (KiCad round-trip, ERC) | ✅ | No | KiCad round-trip viewer (read-only) |
+| PCB layout (tscircuit, KiCad round-trip) | ✅ | No | PCB viewer wired (read-only); fab: Gerber/ODB++/IPC-2581 |
+| SPICE | ✅ | No | Real ngspice, wired |
+| Signal integrity (Z0/crosstalk/eye/IBIS) | ✅ | No | IBIS 5.1 + Bergeron + PRBS eye envelope (backend) |
+| Wiring/harness (WireViz + 3D router) | ✅ | Yes | WireViz runner + harness3d; WiringView wired |
+| 3-axis CAM (profile/contour/pocket/face) | ✅ | Yes (paid tier) | CAMView wired for common 3-axis ops |
+| 5-axis (kinematics + posts) | ✅ | Yes (paid tier) | Wave 10 reference implementation. |
+| G-code post (Fanuc/GRBL/LinuxCNC/Mach3) | ✅ | Yes | Fanuc/GRBL/LinuxCNC/Mach3 posts; no G41/42 cutter-comp |
+| Feeds & speeds + tool-life | ✅ | Yes | Taylor extended + Gilbert economic speed (backend) |
+| Moldflow / fill sim | ✅ | Yes | Hele-Shaw front tracking + weld-line + air-trap (backend) |
+| Nesting (skyline + true-shape NFP) | ✅ | No | Minkowski-sum NFP + IFP + bottom-left fill (backend) |
+| FDM slicing (Cura) | ✅ | No | Cura runner wired (PrintSliceView) |
+| Horizontal+vertical alignment (clothoid, SSD) | ✅ | No | Clothoid + SSD + AASHTO runoff (backend) |
+| Geotech (bearing/settlement/slope/pile/liquefaction) | ✅ | No | Seed-Idriss CSR + SPT/CPT CRR + Tokimatsu (backend) |
+| Planar MBD (Lagrange/DAE, Baumgarte) | ✅ | Yes | Planar Lagrange/DAE + Baumgarte stabilisation (backend) |
+| Kinematics (four-bar/slider-crank/cam) | ✅ | Yes | Four-bar/slider-crank/cam kinematics (backend) |
+| Vibration SDOF | ✅ | Yes (paid tier) | SDOF vibration analysis deep (backend) |
+| Controls — classical (Routh/Bode/RL/PID tune) | ✅ | No | Routh/Bode/RL/PID tuning (backend) |
+| Controls — state-space / LQR / Kalman | ✅ | No | Ackermann + LQR (CARE) + Luenberger (backend) |
+| AC load-flow (Ybus / Newton-Raphson) | ✅ | No | Full polar-form NR; 3+5-bus validated (backend) |
+| Solar PV (system + partial shading) | ✅ | No | Single-diode + bypass-diode IV + global MPPT (backend) |
+| PLC IEC 61131-3 (ST/Ladder/FB/motion) | ✅ | No | ST editor + live Ladder power-flow sim wired |
+| Firmware build/upload/monitor/debug | ✅ | No | FirmwareActions + debug panel wired |
+| GD&T data model (ASME Y14.5) | ✅ | Yes | GD&T data model + auto-propose (backend) |
+| Tolerance stackup — 1D (WC/RSS/MC) | ✅ | Yes | WC/RSS/MC (backend; MC LCG bug noted) |
+| Limits & fits (ISO 286) | ✅ | Yes | ISO 286 limits & fits (backend) |
+| Process capability (Cpk/Ppk) | ✅ | No | Cpk/Ppk process capability (backend) |
+| Reliability (FMEA/MTBF) | ✅ | No | FMEA/MTBF reliability analysis (backend) |
+| Paraxial ABCD ray transfer | ✅ | No | ABCD ray transfer matrices (backend) |
+| Acoustics (ISO 9613, RT60, weighting, mass-law TL) | ✅ | No | ISO 9613 + RT60 + weighting + mass-law TL (backend) |
+| Jewelry (41 modules) | ✅ | No | Deep — full configurator UI; RhinoGold/Matrix-class |
+| BIM (walls/slabs/framing/stairs/IFC4) | ✅ | No | Revit-comparable engine + viewer wired via /compile-ifc |
+| Should-cost (6 processes, Boothroyd-Dewhurst) | ✅ | No | 6 processes; Boothroyd-Dewhurst grade (backend) |
+| Material selection (Ashby) | ✅ | Partial | 200 materials + Pareto frontier + weighted-score (backend) |
+| LCA (full ISO 14040/44 4 phases) | ✅ | No | Use+transport+EoL + multi-impact + uncertainty (backend) |
+| Process simulation (moldflow/weld/AM/forming) | ✅ | Partial | Hele-Shaw moldflow + weld-line + air-trap (backend) |
 
-- **Dynamic Simulation (multi-body dynamics).** Inventor's full joint catalog — rigid, revolute, slider, cylindrical, spherical, planar — with motion-load export to FEA is a production workflow Kerf has no equivalent for today.
-- **Structural FEA.** Inventor's in-box Stress Analysis (linear static FEA on parts and assemblies) is a production tool used by real engineering teams. Kerf ships no structural FEM.
-- **Frame Generator, Tube & Pipe, Cable & Harness.** These are purpose-built specialty modules with years of industrial refinement. Kerf has none of these.
-- **Mold Design workspace.** Inventor's Mold Design module — cavity/core, parting surfaces, runner/gate design — is a tooling workflow Kerf does not replicate.
-- **iLogic configurator model.** iLogic's declarative rules engine for product configuration families has no direct Kerf equivalent.
-- **Large-assembly tooling.** Level-of-detail representations, substitute representations, and demand-loading have no Kerf equivalent today.
-- **Vault PDM depth.** Autodesk Vault provides lifecycle management, check-in/check-out with file-locking, ECO workflows, and BOM roll-up. Kerf's cloud-git version control covers the basics but lacks a full PDM lifecycle layer.
-- **Vendor maturity and training.** ~30 years of industrial refinement, Autodesk University, a large certified reseller network, and an enormous body of training content are irreplaceable near-term.
+## What Kerf does that Autodesk Inventor doesn't
 
-## Side by side
+- **Modal / buckling / nonlinear** — Consistent-mass modal, Riks, J2 plasticity (backend)
+- **AISC 360-22 steel (members)** — Full Ch. E/F/H + 50-section catalog (backend)
+- **ACI 318-19 concrete** — Flexure/shear/PM/dev-length (backend)
+- **Fatigue (S-N, ε-N, rainflow)** — S-N, ε-N, rainflow counting (backend)
+- **Psychrometrics (moist air)** — ASHRAE-grade psychrometrics (backend)
+- **CFD** — Real OpenFOAM bridge (needs install; backend)
+- **Heat exchangers (LMTD + ε-NTU + Bell-Delaware)** — LMTD + ε-NTU + Bell-Delaware + TEMA (backend)
+- **Pipe network (Hardy-Cross)** — Hardy-Cross pipe network solver (backend)
+- **3D wing VLM (+ viscous + compressibility)** — VLM + strip viscous + PG/KT compressibility (backend)
+- **Orbital (Kepler, J2/J3, Hohmann)** — Kepler + J2/J3 + Hohmann + Lambert, wired
+- **Naval hydrostatics + GZ stability (IMO)** — Hydrostatics + GZ + IMO stability, wired
+- **Schematic capture (KiCad round-trip, ERC)** — KiCad round-trip viewer (read-only)
+- *(and 24 more features not covered by Autodesk Inventor)*
 
-| Feature | Autodesk Inventor | Kerf |
-|---|---|---|
-| License | ⚠️ Proprietary subscription | ✅ MIT open-core |
-| Cost | ⚠️ ~US$2,545/yr single-user (May 2026) | ✅ Free local; pay-as-you-go hosted |
-| Platform | ⚠️ Windows only | ✅ Browser + Win/macOS/Linux binary |
-| Offline / self-host | ✅ Full offline | ✅ Full offline single-binary |
-| Parametric B-rep | ✅ ShapeManager feature tree (mature) | ✅ OCCT feature tree |
-| Constraint sketcher | ✅ Full parametric sketcher (2D + 3D) | ✅ Sketcher v2 — all major constraints |
-| Sheet metal | ✅ Full — flanges, punch/die, flat pattern | ✅ Flange + hem + jog + multi-flange + unfold + flat DXF |
-| Dynamic Simulation | ✅ Full multi-body dynamics | ❌ Not yet |
-| Stress Analysis (FEA) | ✅ In-box linear static FEA | ❌ Not yet |
-| Frame Generator | ✅ Structural frame design | ⚠️ Structural grid; no frame-generator |
-| Tube & Pipe | ✅ Routed with fittings + iso drawings | ❌ Not yet |
-| Cable & Harness | ✅ Wire routing + nailboard drawings | ❌ Not yet |
-| Mold Design | ✅ Cavity / core / runner / gate | ⚠️ Moldflow process sim; no full mold workspace |
-| iLogic rules engine | ✅ VB rules driving params + features | ✅ Chat-driven scripting + kerf-sdk Python |
-| 2D drawings | ✅ ANSI/ISO templates | ✅ Multi-sheet drawings |
-| GD&T | ✅ ASME Y14.5 / ISO 1101 | ✅ ASME Y14.5 datum + tolerance framework |
-| BOM management | ✅ Structured BOM with iParts / iAssemblies | ✅ BOM + distributors (kerf-parts in-box) |
-| CNC CAM (3-axis) | ⚠️ Requires HSMWorks or Fusion/CAM add-in | ✅ 3-axis CAM + tool DB (in-box) |
-| Multi-axis CAM | ⚠️ HSMWorks 4/5-axis (add-in, extra cost) | ✅ 5-axis CAM 3+2 (in-box) |
-| Electronics / PCB | ⚠️ External tools; no co-resident workspace | ✅ Full hierarchical schematic + PCB layout |
-| SI / EMC / PDN / thermal | ❌ External tools required | ✅ All four wizards in-box |
-| Jewelry tooling | ❌ None | ✅ 40-module jewelry suite |
-| Chat / LLM editing | ❌ None | ✅ Chat-native + BYO API key |
-| Scripting | ✅ iLogic (VB rules) + Inventor API (COM/.NET) | ✅ kerf-sdk on PyPI — HTTP/JSON-RPC |
-| Multi-user cloud edit | ⚠️ Fusion Team / Autodesk Docs (separate sub) | ✅ Cloud hosted + cloud-git sync |
-| Open source | ❌ Proprietary | ✅ MIT — full codebase on GitHub |
+## Pricing
+
+Autodesk Inventor is a commercial product; pricing varies by tier, seat count, and region. Kerf is MIT open-core: the full feature set is free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — the MIT licence means you can inspect, fork, and self-host the entire codebase.

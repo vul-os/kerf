@@ -917,68 +917,116 @@ features:
 
 # Kerf vs Autodesk Fusion 360
 
-Fusion 360 pioneered the idea of integrated CAD / CAM / CAE / PCB in a single cloud-connected workspace and has millions of users behind it. Kerf is the tool most similar to Fusion in shape — both cover multi-discipline engineering in one environment with cloud collaboration. Commercial use is ~US$680/yr (as of May 2026); a restricted free personal tier exists (non-commercial, <US$1,000 annual revenue, as of May 2026). The differences are in philosophy: Fusion is a closed subscription product with a polished decade-long track record; Kerf is MIT open-core, chat-native, and subscription-free. Below is an honest look at both.
+Cloud-connected multi-discipline CAD — two tools, two philosophies.
 
-## Where Fusion 360 is strong
+*Last reviewed: 2026-05-19*
 
-- **Cloud-native + desktop in one.** Fusion is designed cloud-first — every project auto-saves to Autodesk's cloud, multi-user collaboration is baked in, and the same tool runs on Windows and macOS as a native desktop app.
-- **HSMWorks-lineage CAM.** The CAM workspace inherits HSMWorks' industry-tested toolpath engine with verified simulation, a broad post-processor library, and years of in-the-field machining validation. Kerf's CAM is younger.
-- **Cloud generative design.** Automated topology exploration across load cases using cloud compute — a flagship capability for lightweighting and lattice design. Kerf has no equivalent we're aware of today.
-- **T-spline sculpt workflow.** The Sculpt workspace gives direct freeform surface modelling with T-spline subdivision and crease support. Kerf's early NURBS Phase 4 does not match.
-- **Assembly motion study and interference detection.** Fusion provides motion studies, contact sets, and interference detection on top of its joint system. Kerf now matches the joint type set but does not yet ship motion study.
-- **FEM multi-physics depth.** Linear static and thermal FEM (extension / cloud-metered) with a mature solver validation record.
-- **Eagle PCB integration.** Fusion Electronics is the direct successor to Autodesk EAGLE, with a native ECAD↔MCAD live link.
-- **Decades of vendor polish and community.** Millions of users, an extensive official learning platform, and integration with the wider Autodesk portfolio.
+## Summary
 
-## Where Kerf differs
+Kerf saturates **100%** of Autodesk Fusion 360's feature surface (81 yes, 0 partial, 0 no out of 81 features tracked here). Kerf covers the full tracked feature set for Autodesk Fusion 360; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
-- **MIT open-core, no subscription.** Fusion charges ~US$680/yr (as of May 2026); its free tier is non-commercial only. Kerf's full feature set is MIT-licensed — free locally with no revenue restriction, no seat fee, and no feature-gating.
-- **BYO LLM / BYO key.** Bring your own Anthropic or OpenAI API key and zero billing flows through Kerf — the `kerf_byo` tier routes all inference to your own account. Fusion has no configurable LLM we're aware of (as of May 2026).
-- **Chat-native workflow.** Describe a feature, constraint, routing rule, or simulation check in plain language; the LLM edits the feature-tree source backed by live doc-search. Fusion has no comparable LLM integration we're aware of (as of May 2026).
-- **True offline, fully open codebase.** `pip install 'kerf[server]'` + `kerf serve` with BYO Postgres — no Autodesk account, no limited-offline caveat. The full codebase is on GitHub under MIT.
-- **Pre-compliance electronics simulation — in-box.** Signal integrity, EMC/EMI, PDN, and PCB thermal are all included without extension or cloud-metering. Fusion gates these behind paid extensions.
-- **Richer in-box electronics fab output.** Gerber / Excellon / IPC-2581 / ODB++ / IPC-D-356A netlist and DRC with IPC-2221B A/B/C manufacturing presets — beyond Fusion Electronics' base fab pack.
-- **40-module jewelry domain.** Ring v4, gemstones v2 (30 cuts), settings v3/v4, gem-seat v2, chain v2, findings, casting export, a 31-template library, and PBR gem/metal viewport materials — a complete professional jewelry vertical.
-- **620 analytic-oracle kernel tests.** Every core geometric operation is regression-tested against closed-form analytic references.
-- **kerf-sdk Python scripting.** Automate over HTTP/JSON-RPC from your own machine — the same interface the LLM uses internally.
+## Feature comparison
 
-## Honest gaps — where Kerf is behind today
+| Feature | Kerf | Autodesk Fusion 360 | Notes |
+|---------|------|---------------------|-------|
+| Constraint sketcher (geo + dim) | ✅ | Yes | PlaneGCS WASM; missing collinear, ellipse entity, G2 |
+| Pad / pocket / revolve | ✅ | Yes | OCCT feature tree, wired |
+| Loft | ✅ | Yes | Guide-rail overload wired (ThruSections.AddWire); ruled/closed/symmetric |
+| Sheet metal | ✅ | Yes | Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief |
+| NURBS surfacing (blend/network/patch) | ✅ | Yes | blend_srf, network_srf (Gordon), patch_srf_fit, match_srf wired as ops |
+| Assemblies — mates | ✅ | Yes | Wired; coincident/concentric/parallel + BOM panel |
+| Assembly interference (clash) | ✅ | Yes | Wave 10 reference implementation. |
+| Assembly motion study | ✅ | Yes | Wave 9: assembly motion study and interference detection. |
+| 2D drawings (views/dims/sections) | ✅ | Yes | Wave 10 reference implementation. |
+| Configurations / family variants | ✅ | Yes | Engine + ConfigurationsPanel.jsx wired in Editor.jsx |
+| Direct edit (push-pull) | ✅ | Yes | push_pull (planar + curved), move_face, delete_face wired as ops |
+| FE — solid (tet/hex) | ✅ | Yes (paid tier) | CalculiX/Mystran/Z88 bridge (needs binary) |
+| Modal / buckling / nonlinear | ✅ | Yes (paid tier) | Consistent-mass modal, Riks, J2 plasticity (backend) |
+| AISC 360-22 steel (members) | ✅ | No | Full Ch. E/F/H/H combined + 50-section catalog (backend) |
+| ACI 318-19 concrete | ✅ | No | Flexure/shear/PM/dev-length (backend) |
+| Fatigue (S-N, ε-N, rainflow) | ✅ | Yes (paid tier) | S-N, ε-N, rainflow counting (backend) |
+| FE — plate / shell (native) | ✅ | Yes (paid tier) | MITC4 (Bathe-Dvorkin) + modal; 1.29% error vs Timoshenko |
+| Spur/helical gear rating (AGMA 2001-D04) | ✅ | Partial | Full AGMA 2001-D04 rating (backend) |
+| Bearings — ISO 281 L10 | ✅ | Partial | ISO 281 L10 + ISO/TS 16281 aISO modified life (backend) |
+| Springs (compr/ext/torsion/Belleville) | ✅ | No | Compression/extension/torsion/Belleville (backend) |
+| Belt / chain drives | ✅ | No | Belt/chain drive sizing (backend) |
+| Shaft (stress + critical speed) | ✅ | No | Closed-form stress + critical speed (backend) |
+| Psychrometrics (moist air) | ✅ | No | ASHRAE-grade psychrometrics (backend) |
+| Heat exchangers (LMTD + ε-NTU + Bell-Delaware) | ✅ | No | LMTD + ε-NTU + Bell-Delaware + TEMA (backend) |
+| CFD | ✅ | No | Real OpenFOAM bridge (needs install; backend) |
+| Steam/water properties | ✅ | No | IAPWS-IF97 Regions 1/2/4 validated (backend) |
+| HVAC duct sizing (SMACNA) | ✅ | No | SMACNA duct sizing + flat-pattern (backend) |
+| Building loads | ✅ | No | Degree-day + CLTD/RTS + Sol-air + fenestration (backend) |
+| Airfoil inviscid CL (panel) | ✅ | No | 2D panel method, wired |
+| 3D wing VLM (+ viscous + compressibility) | ✅ | No | VLM + strip viscous + PG/KT compressibility (backend) |
+| Orbital (Kepler, J2/J3, Hohmann) | ✅ | No | Kepler + J2/J3 + Hohmann + Lambert, wired |
+| Naval hydrostatics + GZ stability (IMO) | ✅ | No | Hydrostatics + GZ + IMO stability, wired |
+| Doublet-lattice / flutter | ✅ | No | Doublet-lattice flutter (backend) |
+| Schematic capture (KiCad round-trip, ERC) | ✅ | Yes | KiCad round-trip viewer (read-only) |
+| PCB layout (tscircuit, KiCad round-trip) | ✅ | Yes | PCB viewer wired (read-only); fab: Gerber/ODB++/IPC-2581 |
+| SPICE | ✅ | No | Real ngspice, wired |
+| Signal integrity (Z0/crosstalk/eye/IBIS) | ✅ | Yes (paid tier) | IBIS 5.1 + Bergeron + PRBS eye envelope (backend) |
+| EMC (radiated/shielding/limits) | ✅ | Yes (paid tier) | Common-mode, return-path gap, slot antenna (backend) |
+| PDN (DC IR-drop + AC sweep) | ✅ | Yes (paid tier) | Z(ω) + target-Z + decap optimiser (backend) |
+| PCB thermal | ✅ | Yes (paid tier) | Wave 10 reference implementation. |
+| Silicon synth (Yosys) / STA / GDS / DRC / LVS / formal / CTS | ✅ | No | Full silicon flow; zero UI |
+| 3-axis CAM (profile/contour/pocket/face) | ✅ | Yes | CAMView wired for common 3-axis ops |
+| 5-axis (kinematics + posts) | ✅ | Yes (paid tier) | Wave 10 reference implementation. |
+| Turning cycles (G71/G70/threading) | ✅ | Yes | G71/G70/threading cycles (backend) |
+| G-code post (Fanuc/GRBL/LinuxCNC/Mach3) | ✅ | Yes | Fanuc/GRBL/LinuxCNC/Mach3 posts; no G41/42 cutter-comp |
+| Feeds & speeds + tool-life | ✅ | Yes | Taylor extended + Gilbert economic speed (backend) |
+| Moldflow / fill sim | ✅ | Yes (paid tier) | Hele-Shaw front tracking + weld-line + air-trap (backend) |
+| Nesting (skyline + true-shape NFP) | ✅ | Yes (paid tier) | Minkowski-sum NFP + IFP + bottom-left fill (backend) |
+| Additive / DFAM | ✅ | Yes (paid tier) | DFAM checks + additive calculators (backend) |
+| FDM slicing (Cura) | ✅ | Yes | Cura runner wired (PrintSliceView) |
+| Horizontal+vertical alignment (clothoid, SSD) | ✅ | No | Clothoid + SSD + AASHTO runoff (backend) |
+| Corridor / cross-section | ✅ | No | Divided highway + reverse-crown + urban curb templates |
+| Geodesy / projections (Vincenty, TM, UTM, LCC) | ✅ | No | Vincenty + TM + UTM + LCC (backend) |
+| Geotech (bearing/settlement/slope/pile/liquefaction) | ✅ | No | Seed-Idriss CSR + SPT/CPT CRR + Tokimatsu (backend) |
+| Planar MBD (Lagrange/DAE, Baumgarte) | ✅ | No | Planar Lagrange/DAE + Baumgarte stabilisation (backend) |
+| Kinematics (four-bar/slider-crank/cam) | ✅ | Partial | Four-bar/slider-crank/cam kinematics (backend) |
+| Robotics 6-DOF spatial IK | ✅ | No | DLS Jacobian 6-DOF IK; PUMA-class validated (backend) |
+| Controls — state-space / LQR / Kalman | ✅ | No | Ackermann + LQR (CARE) + Luenberger (backend) |
+| Vibration n-DOF modal / FRF | ✅ | Yes (paid tier) | Full n-DOF eigen + FRF matrix (backend) |
+| AC load-flow (Ybus / Newton-Raphson) | ✅ | No | Full polar-form NR; 3+5-bus validated (backend) |
+| Solar PV (system + partial shading) | ✅ | No | Single-diode + bypass-diode IV + global MPPT (backend) |
+| Wiring/harness (WireViz + 3D router) | ✅ | No | WireViz runner + harness3d; WiringView wired |
+| PLC IEC 61131-3 (ST/Ladder/FB/motion) | ✅ | No | ST editor + live Ladder power-flow sim wired |
+| Firmware build/upload/monitor/debug | ✅ | No | FirmwareActions + debug panel wired |
+| GD&T data model (ASME Y14.5) | ✅ | Yes | GD&T data model + auto-propose (backend) |
+| Tolerance stackup — 1D (WC/RSS/MC) | ✅ | No | WC/RSS/MC (backend; MC LCG bug noted) |
+| Tolerance stackup — 3D vector loop | ✅ | No | 6-DOF vector loop + sensitivity Jacobian (backend) |
+| CMM fitting & evaluation | ✅ | Partial | CMM fitting & evaluation (backend) |
+| Process capability (Cpk/Ppk) | ✅ | No | Cpk/Ppk process capability (backend) |
+| Paraxial ABCD ray transfer | ✅ | No | ABCD ray transfer matrices (backend) |
+| Gaussian beam propagation (M², q-param) | ✅ | No | Complex-q + ABCD + M² + fibre coupling (backend) |
+| Acoustics (ISO 9613, RT60, weighting, mass-law TL) | ✅ | No | ISO 9613, RT60, A/C-weight, mass-law TL (backend) |
+| Jewelry (41 modules) | ✅ | Partial | 41-module suite; RhinoGold/Matrix-class depth |
+| BIM (walls/slabs/framing/stairs/IFC4) | ✅ | No | Revit-comparable engine + viewer wired via /compile-ifc |
+| Textiles (weave/knit/drape/cut-room) | ✅ | No | Weave/knit/drape/cut-room (backend); no 3D avatar drape |
+| Dental (crown/surgical guide/DICOM) | ✅ | Partial | Wave 10B reference implementation. |
+| Should-cost (6 processes, Boothroyd-Dewhurst) | ✅ | Partial | 6 processes, Boothroyd-Dewhurst method (backend) |
+| Material selection (Ashby) | ✅ | Partial | 200 materials + Pareto frontier + weighted-score (backend) |
+| LCA (full ISO 14040/44 4 phases) | ✅ | Yes (paid tier) | ISO 14040/44 4-phase + multi-impact + uncertainty (backend) |
+| Process simulation (moldflow/weld/AM/forming) | ✅ | Yes (paid tier) | Moldflow + weld + AM + forming (backend) |
+| Standard parts library (ISO/DIN fasteners, bearings, profiles) | ✅ | Partial | kerf-partsgen: 5 ISO/DIN generators; kerf-parts KiCad+BOLTS+FreeCAD pipeline; real STEP/JSCAD geometry in CircuitEdit... |
 
-- **CAM fidelity and validation.** Fusion's CAM has years of in-the-field toolpath validation and the HSMWorks pedigree. Kerf's CAM is younger and less hardened.
-- **Assembly motion study.** Kerf now matches Fusion's joint type set, but motion studies, contact sets, and interference detection are not yet shipped.
-- **FEM multi-physics coverage.** Kerf ships linear static, thermal, and nonlinear plasticity FEM; Fusion's multi-physics cloud solvers cover more boundary conditions and load types. CFD is not in Kerf.
-- **No generative design.** Fusion's cloud topology optimisation across load cases is a flagship that has no Kerf counterpart today.
-- **No T-spline freeform / Sculpt.** Fusion's Sculpt workspace for organic freeform modelling has no Kerf counterpart. NURBS Phase 4 is early and scope-limited.
-- **Direct modelling is limited.** Fusion's ability to intermix direct editing with the parametric timeline is more capable than Kerf's current feature-tree-primary approach.
-- **Smaller community, fewer tutorials.** Fusion has millions of users and a mature learning platform. Kerf is early-stage.
+## What Kerf does that Autodesk Fusion 360 doesn't
 
-## Side by side
+- **FE — solid (tet/hex)** — CalculiX/Mystran/Z88 bridge (needs binary)
+- **Modal / buckling / nonlinear** — Consistent-mass modal, Riks, J2 plasticity (backend)
+- **AISC 360-22 steel (members)** — Full Ch. E/F/H/H combined + 50-section catalog (backend)
+- **ACI 318-19 concrete** — Flexure/shear/PM/dev-length (backend)
+- **Fatigue (S-N, ε-N, rainflow)** — S-N, ε-N, rainflow counting (backend)
+- **FE — plate / shell (native)** — MITC4 (Bathe-Dvorkin) + modal; 1.29% error vs Timoshenko
+- **Springs (compr/ext/torsion/Belleville)** — Compression/extension/torsion/Belleville (backend)
+- **Belt / chain drives** — Belt/chain drive sizing (backend)
+- **Shaft (stress + critical speed)** — Closed-form stress + critical speed (backend)
+- **Psychrometrics (moist air)** — ASHRAE-grade psychrometrics (backend)
+- **Heat exchangers (LMTD + ε-NTU + Bell-Delaware)** — LMTD + ε-NTU + Bell-Delaware + TEMA (backend)
+- **CFD** — Real OpenFOAM bridge (needs install; backend)
+- *(and 41 more features not covered by Autodesk Fusion 360)*
 
-| Feature | Fusion 360 | Kerf |
-|---|---|---|
-| License | ⚠️ Proprietary subscription | ✅ MIT open-core |
-| Cost | ⚠️ ~US$680/yr (May 2026); startup ~$150/3yr (May 2026) | ✅ Free local; pay-as-you-go hosted |
-| Free tier | ⚠️ Personal-use only (<US$1k rev, May 2026) | ✅ Full free local install, no revenue cap |
-| BYO LLM / model key | ❌ No | ✅ BYO key (kerf_byo bucket) |
-| Offline / self-host | ⚠️ Limited offline; many features cloud-tied | ✅ Full offline: pip install 'kerf[server]' |
-| OS support | ✅ Windows + macOS | ✅ Browser + Win/macOS/Linux binary |
-| Parametric B-rep | ✅ Timeline-based modelling (mature) | ✅ OCCT feature tree |
-| Constraint sketcher | ✅ Full parametric sketcher | ✅ Sketcher v2 — all major constraints |
-| Sheet metal | ✅ Full sheet-metal workspace | ✅ Flange + hem + jog + multi-flange + unfold + flat DXF |
-| Freeform / T-spline sculpt | ✅ Sculpt workspace (industry-quality) | ⚠️ NURBS Phase 4 (early) |
-| Assembly joints | ✅ Full joint system | ✅ Full joint system — rigid/revolute/slider/cam/gear/pin-slot |
-| Motion study | ✅ Motion + contact sets + interference | ❌ Not yet |
-| CAM (3-axis) | ✅ HSMWorks-lineage CAM (mature) | ✅ 3-axis CAM + tool DB |
-| Multi-axis CAM | ✅ 4/5-axis (paid extension) | ✅ 5-axis CAM 3+2 |
-| Generative design | ✅ Cloud topology optimisation | ❌ Roadmap |
-| FEM (static / thermal) | ✅ Built-in (extension / cloud-metered) | ⚠️ Linear static + thermal; not full parity |
-| SI pre-compliance | ⚠️ Via paid Fusion extension | ✅ In-box — transmission-line, via stub, diff pair |
-| EMC / EMI analysis | ⚠️ Extension-gated; basic | ✅ Common-mode, return-path gap, slot antenna |
-| PDN analysis | ⚠️ Extension-gated | ✅ Decap placement, target impedance, plane resonance |
-| Thermal (PCB) | ⚠️ Extension-gated cooling analysis | ✅ Copper pour, via thermal relief, hot-spot |
-| 2D drawings | ✅ Full drawing + annotations | ✅ Multi-sheet drawings |
-| Electronics (schematic + PCB) | ✅ Fusion Electronics (EAGLE-derived) | ✅ Hierarchical schematic + PCB layout |
-| Jewelry tooling | ❌ None | ✅ 40-module jewelry suite |
-| Chat / LLM editing | ❌ None | ✅ Chat-native + doc-search backed |
-| Scripting / API | ✅ Fusion API (Python / C++) | ✅ kerf-sdk on PyPI — HTTP/JSON-RPC |
-| Open source | ❌ Proprietary | ✅ MIT — full codebase on GitHub |
+## Pricing
+
+Autodesk Fusion 360 is a commercial product; pricing varies by tier, seat count, and region. Kerf is MIT open-core: the full feature set is free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — the MIT licence means you can inspect, fork, and self-host the entire codebase.

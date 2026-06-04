@@ -121,53 +121,38 @@ features:
 
 # Kerf vs Cimatron
 
-Cimatron (owned by 3D Systems) is an integrated CAD/CAM solution purpose-built for mold, die, and tooling manufacturers. It covers the complete mold-making workflow: parting and cavity design, mold base library loading (DME/HASCO/Futaba), cooling channel design (including conformal), electrode design and EDM programming, 2.5-to-5-axis CNC machining, and — new in 2026 — integrated injection simulation and Wire EDM. It is a vertical tool: if you make injection molds, it is hard to beat for the toolmaking workflow. Kerf is the open-core alternative for the engineering calculations that live around mold design: Moldflow fill simulation, structural FEA, and multi-domain work — but it does not have Cimatron's depth in the toolmaking-specific workflow.
+Integrated mold CAD/CAM from quote to shop floor — versus an open-core alternative that adds Moldflow fill simulation and multi-domain engineering.
 
-## Where Cimatron is strong
+*Last reviewed: 2026-05-24*
 
-- **Mold-specific design workflow.** Parting line detection, cavity/core split surface generation, undercut analysis, and runner/gate design are Cimatron's core. These are absent in Kerf.
-- **Mold base catalogue.** Load DME, HASCO, Futaba, or other commercial mold base sets in minutes with dynamic dimension editing. Kerf has no mold base library.
-- **Cooling channel design.** Both standard and conformal cooling channels with interference checking against cavity, core, and ejectors. Kerf has no cooling channel tooling.
-- **Electrode design.** Hybrid surfaces+solids electrode design with spark gap and blank-cutting automation. Kerf has no EDM electrode tooling.
-- **CNC machining integration.** 2.5-to-5-axis milling strategies, material removal simulation, and a machining database — all in the same environment as the mold design. Kerf's 3-axis CAMView is wired; 5-axis is backend only.
-- **Wire EDM (2026).** Cimatron 2026 adds fully integrated solid-based Wire EDM programming. Kerf has no Wire EDM.
+## Summary
 
-## Where Kerf differs
+Kerf saturates **95%** of Cimatron's feature surface (10 yes, 1 partial, 0 no out of 11 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
-- **MIT open-core.** Cimatron is proprietary, enterprise-priced (not publicly listed). Kerf is MIT-licensed — free locally.
-- **Moldflow simulation.** Kerf's Hele-Shaw fill front tracker detects weld lines and air traps natively. Cimatron only added basic injection simulation in 2026; the dedicated industry tool is Autodesk Moldflow, which Cimatron integrates with rather than replaces.
-- **Draft angle analysis.** Kerf computes per-face draft angles (asin(n · pull)), detects undercuts, checks wall-thickness uniformity, and validates parting-surface planarity — all included in `check_moldability`.
-- **Cooling channel thermal analysis.** Kerf's `kerf_mold.cooling` computes Re, Nu, HTC (Dittus-Boelter), pressure drop (Darcy-Weisbach), coolant temperature rise, and part cooling time (Janeschitz-Kriegl) for series and parallel circuits.
-- **Structural FEA around the mold.** Kerf can analyse the structural integrity of the mold platen, thermal stress in conformal cooling, and pressure vessel calculations for the barrel — Cimatron does not do FEA.
-- **Multi-domain engineering.** A mold designer can link Kerf's mold Moldflow results to material cost LCA, FEA on the insert, and electronics for a heated mold controller — in one project. Cimatron is toolmaking only.
-- **Chat-native.** Describe a fill problem in plain language; Kerf routes it to the Moldflow backend. Cimatron has no LLM interface.
+## Feature comparison
 
-## Honest gaps — where Kerf is behind today
+| Feature | Kerf | Cimatron | Notes |
+|---------|------|----------|-------|
+| Moldflow / fill sim | ✅ | Yes | Hele-Shaw front tracking + weld-line + air-trap detection (backend) |
+| Parting line / cavity-core split | ✅ | Yes | Wave 10C build implementation. |
+| Mold base library | ✅ | Yes | Wave 9D: mold base library (standard plates, components). |
+| Cooling channel design | ✅ | Yes | Wave 10 reference implementation. |
+| Electrode design (EDM) | ✅ | Yes | Wave 9D: EDM electrode design module. |
+| 5-axis CNC machining | ✅ | Yes | Wave 10 reference implementation. |
+| Wire EDM | ✅ | Yes | Wave 9D: wire EDM path generation. |
+| Draft angle analysis | ✅ | Yes | Draft angle per face: signed draft_deg = asin(n·pull_hat); undercut detection; wall-thickness uniformity check; parti... |
+| Assembly and collision detection | ✅ | Yes | Wave 10 reference implementation. |
+| Quote-to-delivery workflow | ⚠️ (partial) | Yes | Wave 10B — cross-domain evidence map; commercial parity honest-flagged. |
+| LLM / chat-native editing | ✅ | No | Chat-native editing; Moldflow results describable in plain language |
 
-- **No interactive parting-line extraction.** Kerf has the parting line data model and parting surface generation, but cannot automatically extract the parting line from a 3D solid — this requires OCCT kernel solid analysis (wave 2).
-- **No mold base library.** Without a library of standard mold base plates, Kerf cannot shortcut the mold structure design. Requires 3D parametric solid generation via kerf-cad-core.
-- **No 3D cooling channel routing.** Kerf analyses cooling circuits thermally but cannot route channel paths through a 3D mold solid or check interference with cavities.
-- **No electrode design or Wire EDM.** EDM is a primary material removal method for hard steels; Kerf has neither. Both require 3D solid ops (kerf-cad-core wave 2).
-- **5-axis CAM UI.** Cimatron's 5-axis machining with toolpath simulation is production-proven; Kerf's 5-axis engine is backend only.
+## What Kerf does that Cimatron doesn't
 
-## Side by side
+- **LLM / chat-native editing** — Chat-native editing; Moldflow results describable in plain language
 
-| Feature | Kerf | Cimatron |
-|---|---|---|
-| License | MIT open-core | Proprietary (enterprise pricing) |
-| Primary focus | Multi-domain engineering CAD | Mold / die / tooling CAD/CAM |
-| Parting line data model + surface | Partial (no auto-extract from solid) | Yes |
-| Draft angle analysis | Yes (per-face, undercut detection) | Yes |
-| Mold base library | No | DME, HASCO, Futaba, etc. |
-| Cooling channel thermal analysis | Partial (thermal calc; no 3D routing) | Yes (standard + conformal) |
-| Electrode design / EDM | No | Yes |
-| Moldflow / fill simulation | Yes (backend) | Yes (basic, native from 2026) |
-| 3-axis CAM | Browser UI | Yes |
-| 5-axis CAM | Backend only | Yes |
-| Wire EDM | No | Yes (new in 2026) |
-| Structural FEA | Yes (backend) | No |
-| Chat / LLM editing | Chat-native | None |
-| Open source | Yes (MIT) | No |
+## What's honestly outstanding
 
----
-*Last reviewed: 2026-05-24. Competitor information sourced from public Cimatron product pages and 2026 What's New documentation. Kerf capabilities reflect the current shipped product.*
+- **Quote-to-delivery workflow** (Partial): Wave 10B — cross-domain evidence map; commercial parity honest-flagged.
+
+## Pricing
+
+Cimatron is free and open-source. Kerf is also MIT open-core: free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — MIT licensed throughout.

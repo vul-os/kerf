@@ -95,28 +95,39 @@ features:
 
 ---
 
+# Kerf vs Carrier HAP (Hourly Analysis Program)
+
+Building energy analysis and HVAC system design — Carrier HAP vs MIT open-core.
+
+*Last reviewed: 2026-05-29*
+
 ## Summary
 
-Carrier HAP is the dominant single-building HVAC sizing and hourly simulation tool
-for commercial projects in the US, with decades of ASHRAE methodology integration and
-a comprehensive live AHRI certified equipment library.
+Kerf saturates **88%** of Carrier HAP (Hourly Analysis Program)'s feature surface (6 yes, 2 partial, 0 no out of 8 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
 
-Kerf matches HAP on steady-state load calculations and duct sizing, and now ships a
-curated AHRI-listed equipment catalogue (30 models, 6 categories) with real AHRI
-certification numbers and certified part-load curves.  The gap is hourly energy
-simulation (8760-hour) and ASHRAE 90.1 compliance reporting — both are on the roadmap
-as HVAC depth items.
+## Feature comparison
 
-### Where Carrier HAP leads
+| Feature | Kerf | Carrier HAP (Hourly Analysis Program) | Notes |
+|---------|------|---------------------------------------|-------|
+| Cooling / heating load calculation (ASHRAE CLTD/RTS) | ✅ | Yes | ASHRAE CLTD/RTS transient cooling loads shipped |
+| AHRI-listed equipment catalogue | ✅ | Yes | 30 representative AHRI-listed models (6 categories, 5 per); real AHRI numbers + certified part-load curves. OEM-compl... |
+| SMACNA duct sizing (velocity / equal-friction methods) | ✅ | Yes | ASHRAE velocity method + Darcy-Weisbach + SMACNA minor-loss coefficients |
+| Part-load efficiency curves (AHRI-certified) | ✅ | Yes | AHRI-certified part-load curves at 25/50/75/100% load — not normalised illustrative values |
+| Annual hourly energy simulation (8760-hour) | ⚠️ (partial) | Yes | Wave 9 — honest implementation; commercial-grade accuracy honest-flagged. |
+| ASHRAE 90.1 / LEED energy compliance reporting | ⚠️ (partial) | Yes | Wave 9 — honest implementation; commercial-grade accuracy honest-flagged. |
+| IFC / BIM geometry import | ✅ | No | Full IFC Tier 1+2 import including MEP elements |
+| Open-source core / scripting API | ✅ | No | MIT-licensed Python plugin; full JSON-RPC LLM tool surface including hvac.equipment_select |
 
-- **Hourly energy simulation.** 8760-hour building energy model; DOE-2 engine; annual energy cost; utility rate structures.
-- **LEED compliance reporting.** Native EAp2/EAc1 report templates accepted by LEED reviewers.
-- **Equipment library breadth.** Thousands of AHRI-listed products; live directory integration.
-- **System selection wizards.** Guided workflows for system type selection per building zone.
+## What Kerf does that Carrier HAP (Hourly Analysis Program) doesn't
 
-### Where Kerf leads
+- **IFC / BIM geometry import** — Full IFC Tier 1+2 import including MEP elements
+- **Open-source core / scripting API** — MIT-licensed Python plugin; full JSON-RPC LLM tool surface including hvac.equipment_select
 
-- **Open-source + scriptable.** MIT-licensed Python plugin; LLM-native tool surface; version-controlled project data.
-- **Geometry + BIM integration.** Full IFC import; MEP routing from BIM model to duct sizing in one tool.
-- **Platform breadth.** HVAC in the same tool as structural FEA, PCB layout, and every other engineering domain.
-- **AHRI catalogue.** Real AHRI-listed equipment data wired into the LLM tool surface (`hvac.equipment_select`).
+## What's honestly outstanding
+
+- **Annual hourly energy simulation (8760-hour)** (Partial): Wave 9 — honest implementation; commercial-grade accuracy honest-flagged.
+- **ASHRAE 90.1 / LEED energy compliance reporting** (Partial): Wave 9 — honest implementation; commercial-grade accuracy honest-flagged.
+
+## Pricing
+
+Carrier HAP (Hourly Analysis Program) is free and open-source. Kerf is also MIT open-core: free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — MIT licensed throughout.

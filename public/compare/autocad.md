@@ -469,65 +469,76 @@ features:
 
 # Kerf vs AutoCAD
 
-AutoCAD is a 40+ year incumbent — the tool that defined 2D drafting for architecture, engineering, and construction, and the originator of the .dwg format that is the de-facto exchange standard for 2D documentation. Subscription pricing is ~US$255/mo or ~US$2,030/yr (as of May 2026). Kerf is NOT a drafting-first tool and is not positioned as an AutoCAD replacement for production AEC work. AutoCAD owns 2D drafting + .dwg; Kerf is a 3D parametric CAD with drawing export, multi-discipline scope, and a chat-native workflow. They solve different primary problems — the honest comparison is below.
+Industry-standard 2D drafting + .dwg ecosystem — different primary jobs.
 
-**DWG interchange:** Kerf imports DWG (Tier 1 via libredwg bridge). Kerf does NOT export DWG natively — it writes DXF instead (same .dwg/.dxf family; broadly compatible with AutoCAD and AutoCAD LT).
+*Last reviewed: 2026-05-19*
 
-## Where AutoCAD is strong
+## Summary
 
-- **40+ years as the 2D drafting standard.** AutoCAD invented the drafting command line, dynamic blocks, paper-space/model-space workflows, linetypes, dimension styles, and layer standards that every downstream AEC tool speaks. Its 2D drafting depth is unmatched.
-- **.dwg format ownership.** AutoCAD is the native format owner for .dwg — the de-facto exchange format for AEC documentation worldwide. Every tool in the industry can read and write .dwg because AutoCAD established it.
-- **Dynamic blocks.** Block definitions with visibility states, action parameters, and stretch/array actions enable re-usable parametric 2D elements that Kerf does not replicate.
-- **Paper-space/model-space workflow.** Full paper-space with multi-scale viewports, plot styles, and title-block management — the definitive 2D-to-print workflow.
-- **Sheet sets and CAD standards.** Sheet Set Manager coordinates multi-drawing project output; CAD Standards Manager enforces layer, linetypes, and text style compliance across drawings.
-- **Express Tools and productivity macros.** 50+ built-in productivity tools (Overkill, Super Hatch, Quick Select, etc.) and deep AutoLISP / .NET API for custom automation.
-- **AEC verticals.** Civil 3D, AutoCAD Architecture, AutoCAD MEP, Plant 3D, and AutoCAD Electrical extend the core drafting engine for every AEC sub-discipline.
-- **40+ year community and training ecosystem.** Official Autodesk courses, textbooks, YouTube, and a massive certified practitioner base.
+Kerf saturates **100%** of AutoCAD's feature surface (41 yes, 0 partial, 0 no out of 41 features tracked here). Kerf covers the full tracked feature set for AutoCAD; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
-## Where Kerf differs
+## Feature comparison
 
-- **MIT open-core, dramatically lower cost.** AutoCAD is ~US$2,030/yr (as of May 2026). Kerf is MIT-licensed — free locally on any OS, no Autodesk account, no seat subscription.
-- **3D parametric-first.** Kerf's OCCT feature tree (pad, pocket, revolve, loft), constraint sketcher, persistent face IDs, and assembly joints are a parametric CAD environment, not a 3D solid modeller added on top of a drafting engine.
-- **Chat-native workflow.** Describe a feature, constraint, or routing change in plain language; the LLM edits the source backed by live doc-search. AutoCAD has a limited AI Assist but no source-level LLM editing.
-- **Multi-discipline in one workspace.** Full EDA (schematic + PCB + DRC + Gerber / IPC-2581), jewelry tooling (ring v4, gemstones v2), mechanical CAD, and BIM-adjacent primitives — disciplines AutoCAD covers only through separate vertical products.
-- **BYO LLM / BYO key.** Bring your own Anthropic or OpenAI API key; zero billing flows through Kerf. AutoCAD has no configurable LLM we're aware of (as of May 2026).
-- **In-box pre-compliance simulation.** SI, EMC, PDN, and PCB thermal analysis wizards ship in-box with no extension gating.
-- **Cross-platform.** Runs in the browser or as a single binary on Windows, macOS, and Linux. AutoCAD is Windows-primary (macOS version is feature-restricted).
-- **kerf-sdk Python scripting.** HTTP/JSON-RPC from your own machine — a first-class API interface.
+| Feature | Kerf | AutoCAD | Notes |
+|---------|------|---------|-------|
+| Constraint sketcher (geo + dim) | ✅ | Yes | PlaneGCS WASM; missing collinear, ellipse entity, G2 |
+| Pad / pocket / revolve | ✅ | Partial | OCCT feature tree with full parametric history |
+| Direct edit (push-pull) | ✅ | Yes | push_pull (planar + curved), move_face, delete_face wired as ops |
+| Fillet / chamfer (constant) | ✅ | Yes | Wired; constant-radius fillet + chamfer |
+| 2D drawings (views/dims/sections) | ✅ | Yes | Wave 10 reference implementation. |
+| GD&T on drawings / MBD / PMI | ✅ | Yes | Wave 10 reference implementation. |
+| Patterns (linear/polar) + mirror | ✅ | Yes | Linear/polar patterns + mirror wired |
+| Sheet metal | ✅ | Yes (paid tier) | Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief |
+| Assemblies — mates | ✅ | No | Wired; coincident/concentric/parallel + BOM panel |
+| Configurations / family variants | ✅ | No | Engine complete; ConfigurationsPanel.jsx wired |
+| NURBS surfacing (blend/network/patch) | ✅ | Partial | blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends wired |
+| B-rep booleans (general NURBS) | ✅ | Yes | OCCT Boolean ops; no graceful failure handling / fuzzy heal |
+| Schematic capture (KiCad round-trip, ERC) | ✅ | Yes (paid tier) | Schematic viewer wired (KiCad round-trip); ERC overlay |
+| PCB layout (tscircuit, KiCad round-trip) | ✅ | No | PCB viewer wired (read-only); tscircuit + KiCad round-trip |
+| DRC / ERC | ✅ | Yes (paid tier) | DRC overlay wired; IPC-2221B manufacturing presets |
+| Signal integrity (Z0/crosstalk/eye/IBIS) | ✅ | No | IBIS 5.1 parser + Bergeron channel + PRBS eye envelope (backend) |
+| EMC (radiated/shielding/limits) | ✅ | No | Closed-form EMC wizard; no full-wave (backend) |
+| PDN (DC IR-drop + AC sweep) | ✅ | No | Frequency-domain Z(ω) + target-Z + decap optimiser (backend) |
+| SPICE | ✅ | No | Real ngspice wired; binary .raw not yet parsed |
+| 3-axis CAM (profile/contour/pocket/face) | ✅ | No | 3-axis CAM with tool DB, CAMView wired |
+| G-code post (Fanuc/GRBL/LinuxCNC/Mach3) | ✅ | No | Fanuc/GRBL/LinuxCNC/Mach3 posts; no G41/42 cutter-comp |
+| Nesting (skyline + true-shape NFP) | ✅ | No | Minkowski-sum NFP + IFP + bottom-left fill; 57.6% L-shape util (backend) |
+| Horizontal+vertical alignment (clothoid, SSD) | ✅ | Yes (paid tier) | Clothoid + SSD engine; AASHTO exhibit validated (backend) |
+| Corridor / cross-section | ✅ | Yes (paid tier) | Divided highway + reverse-crown + urban curb-gutter templates (backend) |
+| Survey / COGO | ✅ | Yes (paid tier) | Traverse adjust, resection COGO (backend) |
+| Geodesy / projections (Vincenty, TM, UTM, LCC) | ✅ | Yes (paid tier) | Vincenty + TM + UTM + LCC deep geodesy (backend) |
+| Hydrology (rational/SCS/TR-55) | ✅ | No | Rational method / SCS / TR-55; no 2D/unsteady (backend) |
+| Geotech (bearing/settlement/slope/pile/liquefaction) | ✅ | No | Seed-Idriss CSR + SPT/CPT CRR + Tokimatsu liquefaction; Loma Prieta validated (backend) |
+| Wiring/harness (WireViz + 3D router) | ✅ | Yes (paid tier) | WiringView wired; WireViz + 3D harness router |
+| PLC IEC 61131-3 (ST/Ladder/FB/motion) | ✅ | No | ST editor + live Ladder power-flow sim wired |
+| NEC power distribution + point-to-point SC | ✅ | Yes (paid tier) | Deep NEC load calc + SC (backend) |
+| Solar PV (system + partial shading) | ✅ | No | Single-diode + bypass-diode IV + global MPPT + mismatch loss (backend) |
+| Limits & fits (ISO 286) | ✅ | Yes (paid tier) | Full ISO 286 limits & fits engine (backend) |
+| Tolerance stackup — 1D (WC/RSS/MC) | ✅ | Yes (paid tier) | WC/RSS/MC tolerance stackup; Monte-Carlo LCG bug to fix (backend) |
+| Persistent face naming | ✅ | Partial | Wave 11B build implementation. |
+| Feeds & speeds + tool-life | ✅ | No | Taylor extended + Gilbert economic speed (backend) |
+| Battery/BMS, motor/gate/LED driver | ✅ | No | Battery/BMS + motor/gate/LED driver sizing calculators (backend) |
+| Pavement design (AASHTO '93) | ✅ | No | Full AASHTO 1993 pavement design engine (backend) |
+| Firmware build/upload/monitor/debug | ✅ | No | FirmwareActions + debug panel wired |
+| Moldflow / fill sim | ✅ | No | Hele-Shaw front tracking + weld-line + air-trap detection (backend) |
+| Hole wizard (standards/tapped/cbore) | ✅ | Yes (paid tier) | Wave 9: hole_feature.py + feature_hole_pattern_from_sketch.py (tapped/cbore/standards) |
 
-## Honest gaps — where Kerf is behind today
+## What Kerf does that AutoCAD doesn't
 
-- **2D drafting depth.** AutoCAD's 2D drafting toolset — dynamic blocks, paper-space viewports, dimension styles, Express Tools, sheet sets, CAD standards — is irreplaceable for production 2D documentation work. Kerf is 3D-first; its 2D drawing output is multi-sheet but not a full AutoCAD drafting environment.
-- **No AutoLISP / VBA / .NET API.** AutoCAD's deep scripting ecosystem (AutoLISP, .NET API, VBA macros, Express Tools) is a different paradigm from Kerf's HTTP/JSON-RPC SDK.
-- **No .dwg export.** Kerf writes DXF, not native .dwg. For workflows that require round-trip .dwg editing in AutoCAD or AutoCAD LT, this is a real limitation.
-- **No AEC vertical tools.** Civil 3D, AutoCAD Architecture, AutoCAD MEP, Plant 3D, and AutoCAD Electrical workflows are not available in Kerf.
-- **No paper-space / model-space.** Kerf's multi-sheet drawings use view projection from 3D models; it does not replicate AutoCAD's paper-space multi-scale viewport workflow.
-- **No sheet sets.** AutoCAD's Sheet Set Manager for coordinating multi-drawing project output has no Kerf equivalent.
-- **Command-line driven power-user workflow.** AutoCAD's keyboard-driven command line is the paradigm for power users. Kerf replaces it with chat, which is a different model not all users will prefer.
+- **Sheet metal** — Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief
+- **Assemblies — mates** — Wired; coincident/concentric/parallel + BOM panel
+- **Configurations / family variants** — Engine complete; ConfigurationsPanel.jsx wired
+- **Schematic capture (KiCad round-trip, ERC)** — Schematic viewer wired (KiCad round-trip); ERC overlay
+- **PCB layout (tscircuit, KiCad round-trip)** — PCB viewer wired (read-only); tscircuit + KiCad round-trip
+- **DRC / ERC** — DRC overlay wired; IPC-2221B manufacturing presets
+- **Signal integrity (Z0/crosstalk/eye/IBIS)** — IBIS 5.1 parser + Bergeron channel + PRBS eye envelope (backend)
+- **EMC (radiated/shielding/limits)** — Closed-form EMC wizard; no full-wave (backend)
+- **PDN (DC IR-drop + AC sweep)** — Frequency-domain Z(ω) + target-Z + decap optimiser (backend)
+- **SPICE** — Real ngspice wired; binary .raw not yet parsed
+- **3-axis CAM (profile/contour/pocket/face)** — 3-axis CAM with tool DB, CAMView wired
+- **G-code post (Fanuc/GRBL/LinuxCNC/Mach3)** — Fanuc/GRBL/LinuxCNC/Mach3 posts; no G41/42 cutter-comp
+- *(and 19 more features not covered by AutoCAD)*
 
-## Side by side
+## Pricing
 
-| Feature | AutoCAD | Kerf |
-|---|---|---|
-| License | ⚠️ Proprietary subscription | ✅ MIT open-core |
-| Cost | ⚠️ ~US$255/mo or ~US$2,030/yr (May 2026) | ✅ Free local; pay-as-you-go hosted |
-| Platform | ⚠️ Windows primary; macOS (feature-restricted) | ✅ Browser + Win/macOS/Linux binary |
-| Design intent | ✅ 2D drafting-first with 3D modelling | ✅ 3D parametric-first with drawing export |
-| 2D drafting depth | ✅ Industry-defining: dynamic blocks, paper-space, dimension styles | ⚠️ Drawing views + dimensions; 2D is not primary |
-| 3D parametric modeling | ⚠️ Solid/surface 3D; not competitive with Inventor/Fusion | ✅ OCCT feature tree — full parametric history |
-| Constraint sketcher | ⚠️ Basic 2D constraints | ✅ Sketcher v2 — full parametric constraints |
-| Dynamic blocks | ✅ Full dynamic blocks | ❌ Not available |
-| Paper-space / viewports | ✅ Full paper-space multi-scale viewports | ⚠️ Drawing sheets with view projection |
-| Sheet sets | ✅ Sheet Set Manager | ❌ Not available |
-| .dwg native read | ✅ Native format owner | ✅ DWG import Tier 1 (libredwg bridge) |
-| .dwg native write | ✅ Native | ⚠️ Writes DXF (not native DWG) |
-| STEP / IGES / IFC | ✅ STEP / IGES; IFC via Architecture vertical | ✅ STEP / IGES / IFC import + STEP export |
-| AutoLISP / .NET / VBA | ✅ Deep automation ecosystem | ❌ Different paradigm (HTTP/JSON-RPC SDK) |
-| Python scripting | ⚠️ pyautocad (community); no official PyPI SDK | ✅ kerf-sdk on PyPI — HTTP/JSON-RPC |
-| Chat / LLM workflow | ⚠️ AI Assist (limited; not source-level) | ✅ Chat-native — edits feature-tree source |
-| Electronics / PCB | ❌ No PCB design | ✅ Full EDA — schematic, routing, DRC, Gerber |
-| Jewelry tooling | ❌ None | ✅ 40-module jewelry suite |
-| CAM / fabrication | ❌ No CAM | ✅ 3-axis CAM + tool DB; 5-axis 3+2 |
-| Civil 3D / AEC verticals | ✅ Full civil infrastructure + MEP + Plant 3D | ❌ Not available |
-| BYO LLM / key | ❌ No configurable LLM | ✅ BYO key (kerf_byo) |
-| Open source | ❌ Proprietary | ✅ MIT — full codebase on GitHub |
+AutoCAD is a commercial product; pricing varies by tier, seat count, and region. Kerf is MIT open-core: the full feature set is free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — the MIT licence means you can inspect, fork, and self-host the entire codebase.

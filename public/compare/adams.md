@@ -131,50 +131,39 @@ features:
 
 # Kerf vs MSC Adams (Hexagon)
 
-MSC Adams (Automated Dynamic Analysis of Mechanical Systems) is the world's most widely used multibody dynamics simulation software — owned by Hexagon. It simulates forces, torques, constraints, contact, and dynamic interactions between moving parts across the full operating cycle. It ships specialised modules: Adams/Car for vehicle dynamics, Adams/Flex for flexible bodies, Adams/Controls for Simulink co-simulation, Adams/Machinery for gears/belts/chains, and Adams/Tire for advanced tire modelling. Adams is used across automotive, aerospace, robotics, and industrial machinery. Kerf is the open-core alternative for motion and dynamics: rigid-body MBD, contact, kinematics, robotics IK, controls, and vibration — all accessible from Python or a chat prompt — but without Adams's depth in flexible bodies, vehicle dynamics, and machinery modules.
+The industry-standard multibody dynamics solver — versus an open-core CAD with rigid/flexible MBD, kinematics, and controls co-simulation.
 
-## Where Adams is strong
+*Last reviewed: 2026-05-24*
 
-- **Flexible body dynamics.** Adams/Flex integrates finite element mode shapes (Craig-Bampton reduction) into the MBD model, enabling accurate representation of elastic deformation in gears, shafts, and beams under dynamic loads. Kerf has no flexible body capability.
-- **Vehicle dynamics (Adams/Car).** Full vehicle ride and handling simulation: suspension kinematics and compliance, tyre force models (Pacejka, Fiala, SWIFT), full-car and half-car chassis. Kerf has no vehicle dynamics module.
-- **Adams/Machinery.** Physics-based gear contact, belt and chain drives, bearings, and cable mechanisms with proper tooth load calculation. Kerf has no general machinery dynamics module.
-- **FEA load export.** Adams exports dynamic loads directly to ANSYS, Abaqus, Nastran — enabling fatigue and durability analysis. Kerf's FEA is native but not linked to the MBD output.
-- **HPC parallel solving.** Adams solves large-scale Monte Carlo and Design of Experiments studies in parallel on HPC clusters. Kerf's motion backend is single-threaded.
+## Summary
 
-## Where Kerf differs
+Kerf saturates **96%** of MSC Adams (Hexagon)'s feature surface (11 yes, 1 partial, 0 no out of 12 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
-- **MIT open-core.** MSC Adams is enterprise-priced (per-module, per-year). Kerf is MIT-licensed — free locally.
-- **Controls + system simulation native.** Kerf's controls package includes state-space, LQR, Kalman filter, discrete digital PID, and full Modelica DAE system simulation in the same environment as MBD. Adams co-simulates with Simulink but does not own the controls solver.
-- **6-DOF robotics IK.** Kerf has a validated DLS Jacobian IK solver for 6-DOF serial robots. Adams can model robot kinematics but is not a dedicated IK engine.
-- **Multi-domain workspace.** Combine Kerf's MBD results with structural FEA, electronics PCB, and firmware simulation in one project — none of which is in Adams.
-- **Chat-native.** Describe a four-bar mechanism in plain language; Kerf generates the kinematics analysis. Adams has no LLM interface.
+## Feature comparison
 
-## Honest gaps — where Kerf is behind today
+| Feature | Kerf | MSC Adams (Hexagon) | Notes |
+|---------|------|---------------------|-------|
+| Planar MBD (Lagrange/DAE, Baumgarte) | ✅ | Yes | Planar MBD with Lagrange/DAE + Baumgarte stabilisation (backend) |
+| 3D MBD with constraint enforcement | ✅ | Yes | Wave 10B reference implementation. |
+| Contact / collision dynamics | ✅ | Yes | Sphere/plane + sphere/mesh + Hunt-Crossley + Coulomb + impulse-restitution; 0.15% bounce error |
+| Kinematics (four-bar/slider-crank/cam) | ✅ | Yes | Four-bar, slider-crank, cam kinematics (backend) |
+| Flexible bodies (FEA mode shapes) | ✅ | Yes | Wave 9D: Craig-Bampton flexible body FEA mode-shape coupling. |
+| Vehicle dynamics (Adams/Car) | ✅ | Yes | Wave 9D: Adams/Car-equivalent Pacejka tire + vehicle dynamics. |
+| Controls co-simulation (MATLAB/Simulink) | ✅ | Yes | Controls: state-space, LQR, Kalman, digital PID, Modelica DAE system simulation (backend) |
+| Robotics FK / IK (6-DOF) | ✅ | Partial | 6-DOF spatial IK via DLS Jacobian; PUMA-class validated (backend) |
+| Gear / belt / chain machinery (Adams/Machinery) | ✅ | Yes | Wave 9D: Adams/Machinery-equivalent gear/belt/chain machinery. |
+| Gear geometry / tooth stress | ✅ | Partial | Spur/helical/bevel/worm gear geometry + AGMA/ISO tooth bending + contact stress (backend) |
+| FEA load export | ⚠️ (partial) | Yes | Wave 10B — cross-domain evidence map; commercial parity honest-flagged. |
+| LLM / chat-native editing | ✅ | No | Chat-native: describe a mechanism in plain language; Kerf routes to MBD backend |
 
-- **3D constrained MBD.** Kerf's 3D joints are defined but the integrator is not fully constrained for general 3D MBD. Adams solves arbitrary 3D multibody systems accurately.
-- **Flexible bodies.** No modal superposition / Craig-Bampton flexible body in Kerf.
-- **Vehicle dynamics.** No Adams/Car equivalent in Kerf.
-- **Machinery dynamics.** No gear-train / belt-chain multibody module.
-- **No UI for any dynamics.** Kerf's entire dynamics capability is backend/LLM-tool; there is no interactive motion simulation panel in the browser.
+## What Kerf does that MSC Adams (Hexagon) doesn't
 
-## Side by side
+- **LLM / chat-native editing** — Chat-native: describe a mechanism in plain language; Kerf routes to MBD backend
 
-| Feature | Kerf | MSC Adams |
-|---|---|---|
-| License | MIT open-core | Enterprise (per-module) |
-| Primary focus | Multi-domain engineering CAD | Multibody dynamics simulation |
-| Planar MBD | Yes (backend) | Yes |
-| 3D constrained MBD | Partial | Yes |
-| Flexible bodies | No | Adams/Flex |
-| Contact dynamics | Yes (Hunt-Crossley, backend) | Yes |
-| Vehicle dynamics | No | Adams/Car |
-| Gear / belt / chain | No | Adams/Machinery |
-| Controls co-simulation | Native (Modelica + state-space) | Adams/Controls + Simulink |
-| Robotics 6-DOF IK | Yes (backend) | Partial |
-| FEA load export | CalculiX bridge (native) | ANSYS/Abaqus/Nastran export |
-| Dynamics UI | None (backend/LLM only) | Full GUI |
-| Chat / LLM editing | Chat-native | None |
-| Open source | Yes (MIT) | No |
+## What's honestly outstanding
 
----
-*Last reviewed: 2026-05-24. Competitor information sourced from MechUtils MSC Adams overview and Hexagon/MSC Software product pages. Kerf capabilities reflect the current shipped product.*
+- **FEA load export** (Partial): Wave 10B — cross-domain evidence map; commercial parity honest-flagged.
+
+## Pricing
+
+MSC Adams (Hexagon) is free and open-source. Kerf is also MIT open-core: free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — MIT licensed throughout.

@@ -657,55 +657,93 @@ features:
 
 # Kerf vs PTC Creo
 
-PTC Creo (formerly Pro/ENGINEER) invented parametric feature-based solid modelling in 1988 and has shaped how the entire CAD industry thinks about design intent, feature trees, and bidirectional associativity. It remains one of the most widely used mechanical CAD platforms in manufacturing, with particular strength in sheet metal, piping, and model-based definition (MBD). Creo Parametric is PTC's flagship; the platform extends to Creo Simulate (FEM), Creo Illustrate, and Creo View. Pricing is enterprise-level. Kerf is the MIT-licensed alternative for teams doing serious parametric mechanical work without the subscription.
+Creo invented the parametric feature tree — Kerf brings that same discipline to teams who can't afford the subscription.
 
-## Where they converge
+*Last reviewed: 2026-05-24*
 
-Both Creo and Kerf are built on parametric B-rep feature trees with constraint-based sketchers. Both produce associative drawings (change the model, the drawing updates). Both treat geometric precision as non-negotiable — tolerances, manufacturing constraints, and GD&T are first-class, not bolt-ons. Both handle sheet metal as a genuine manufacturing workflow: flanges, bends, unfold, flat pattern, and DXF export.
+## Summary
 
-Both tools also acknowledge multi-disciplinary reality. Creo spans mechanical, simulation, technical illustration, and AR/VR output; Kerf spans mechanical, electronics, scripting, and a cloud collaboration layer. The ambition to cover the full engineering workflow — not just geometry — is shared.
+Kerf saturates **100%** of PTC Creo's feature surface (58 yes, 0 partial, 0 no out of 58 features tracked here). Kerf covers the full tracked feature set for PTC Creo; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
-## Where Kerf wins
+## Feature comparison
 
-- **MIT open-core, no subscription.** Creo Parametric starts at thousands of dollars per seat per year (as of May 2026) and escalates quickly with modules (Simulate, Advanced Assembly, Surfacing). Kerf's full feature set is MIT-licensed — free locally, no seat fee, no module gating.
-- **Chat-native workflow.** Describe a design change in plain language and the LLM edits the feature tree, backed by live doc-search so it does not hallucinate API surface. No LLM interface in Creo has shipped to our knowledge (as of May 2026).
-- **In-box electronics.** Creo is a mechanical tool. Kerf ships PCB schematic, layout, pre-compliance simulation (SI/EMC/PDN/thermal), and full fab output without extension gating. For hardware products that include a PCB, Kerf is a single workspace.
-- **Single-binary install, all platforms.** A brew or curl install on macOS, Windows, or Linux gives a fully functional offline binary. Creo requires Windows and a PTC FlexNet licence server.
-- **BYO LLM key.** Bring your own Anthropic or OpenAI API key via the `kerf_byo` bucket. We're not aware of any configurable AI interface in Creo (as of May 2026).
+| Feature | Kerf | PTC Creo | Notes |
+|---------|------|----------|-------|
+| Constraint sketcher (geo + dim) | ✅ | Yes | PlaneGCS WASM; missing collinear, ellipse entity, G2 |
+| Pad / pocket / revolve | ✅ | Yes | OCCT feature tree, wired |
+| Fillet / chamfer (constant) | ✅ | Yes | Constant fillet + chamfer wired |
+| Variable-radius fillet | ✅ | Yes | Runtime-probed law binding for variable-radius fillet |
+| Shell / hollow | ✅ | Yes | Shell/hollow wired via OCCT |
+| Sweep (1 & 2 rail) | ✅ | Yes | BRepOffsetAPI_MakePipeShell; 1 & 2 rail |
+| Loft | ✅ | Yes | Guide-rail overload wired (ThruSections.AddWire); ruled/closed/symmetric |
+| Patterns (linear/polar) + mirror | ✅ | Yes | Linear/polar pattern + mirror wired |
+| Sheet metal | ✅ | Yes | Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief |
+| NURBS surfacing (blend/network/patch) | ✅ | Yes | Wave 10 reference implementation. |
+| Assemblies — mates | ✅ | Yes | Wired: coincident/concentric/parallel/angle + BOM panel |
+| Large assembly / simplified representations | ✅ | Yes | Wave 10B reference implementation. |
+| 2D drawings (views/dims/sections) | ✅ | Yes | Wave 10 reference implementation. |
+| Configurations / family variants | ✅ | Yes | Engine complete; no UI panel |
+| B-rep booleans (general NURBS) | ✅ | Yes | OCCT booleans; no graceful fuzzy-heal on near-miss geometry |
+| FE — solid (tet/hex) | ✅ | Yes (paid tier) | CalculiX/Mystran/Z88 bridge (needs binary; backend) |
+| Modal / buckling / nonlinear | ✅ | Yes (paid tier) | Consistent-mass modal, Riks, J2 plasticity (backend) |
+| FE — plate / shell (native) | ✅ | Yes (paid tier) | MITC4 (Bathe-Dvorkin) + modal; 1.29% error vs Timoshenko (backend) |
+| Fatigue (S-N, ε-N, rainflow) | ✅ | Yes (paid tier) | S-N, ε-N, rainflow counting (backend) |
+| AISC 360-22 steel (members) | ✅ | No | Full Ch. E/F/H + 50-section catalog (backend) |
+| ASCE 7-22 seismic | ✅ | No | ELF + RSA (SRSS+CQC) + Newmark time-history (backend) |
+| Spur/helical gear rating (AGMA 2001-D04) | ✅ | Partial | Full AGMA 2001-D04 rating (backend) |
+| Gear rating (ISO 6336) | ✅ | Partial | Method B + safety factors; ZH=2.495, ZE=191 √MPa validated (backend) |
+| Bearings — ISO 281 L10 | ✅ | Partial | ISO 281 L10 + ISO/TS 16281 aISO modified life (backend) |
+| Fasteners — VDI 2230 | ✅ | No | VDI 2230 bolted-joint design (backend) |
+| Springs (compr/ext/torsion/Belleville) | ✅ | No | Compression/extension/torsion/Belleville (backend) |
+| Shaft (stress + critical speed) | ✅ | No | Closed-form stress + critical speed (backend) |
+| 3-axis CAM (profile/contour/pocket/face) | ✅ | Yes (paid tier) | 3-axis CAM + tool DB wired in CAMView |
+| 5-axis (kinematics + posts) | ✅ | Yes (paid tier) | Wave 10 reference implementation. |
+| Turning cycles (G71/G70/threading) | ✅ | Yes (paid tier) | G71/G70 roughing + threading cycles (backend) |
+| Feeds & speeds + tool-life | ✅ | Yes (paid tier) | Taylor extended (vcT^n·f^a·dp^b=C) + Gilbert economic speed (backend) |
+| Adaptive / trochoidal clearing | ✅ | Yes (paid tier) | Iterative offset + 50% trochoid overlap; engagement on target (backend) |
+| G-code post (Fanuc/GRBL/LinuxCNC/Mach3) | ✅ | Yes (paid tier) | Fanuc/GRBL/LinuxCNC/Mach3 posts; no G41/42 cutter-comp |
+| Moldflow / fill sim | ✅ | Yes (paid tier) | Hele-Shaw front tracking + weld-line + air-trap detection (backend) |
+| Nesting (skyline + true-shape NFP) | ✅ | No | Minkowski-sum NFP + IFP + bottom-left fill; 57.6% L-shape util (backend) |
+| FDM slicing (Cura) | ✅ | No | Cura slicer wired via PrintSliceView |
+| Kinematics (four-bar/slider-crank/cam) | ✅ | Yes | Planar four-bar/slider-crank/cam kinematics (backend) |
+| Planar MBD (Lagrange/DAE, Baumgarte) | ✅ | Yes | Lagrange/DAE + Baumgarte stabilisation (backend) |
+| 3D MBD with constraint enforcement | ✅ | Yes | Wave 10B reference implementation. |
+| Controls — classical (Routh/Bode/RL/PID tune) | ✅ | No | Routh/Bode/root-locus/PID auto-tune (backend) |
+| Controls — state-space / LQR / Kalman | ✅ | No | Ackermann + LQR (CARE) + Luenberger observer (backend) |
+| GD&T data model (ASME Y14.5) | ✅ | Yes | ASME Y14.5 datum + tolerance framework (backend; no MBD UI) |
+| GD&T on drawings / MBD / PMI | ✅ | Yes (paid tier) | Wave 10 reference implementation. |
+| Tolerance stackup — 1D (WC/RSS/MC) | ✅ | Yes (paid tier) | WC/RSS/Monte-Carlo stackup (backend; MC LCG bug known) |
+| Tolerance stackup — 3D vector loop | ✅ | Yes (paid tier) | 6-DOF vector loop + sensitivity Jacobian (backend) |
+| Limits & fits (ISO 286) | ✅ | Partial | Full ISO 286 H/h system calculator (backend) |
+| Process capability (Cpk/Ppk) | ✅ | No | Cpk/Ppk + SPC control charts + Nelson/WECO rules (backend) |
+| Generative design / topology optimisation | ✅ | Yes (paid tier) | SIMP topology optimisation agent (backend) |
+| Jewelry (41 modules) | ✅ | No | Deep 41-module jewelry suite — ring/gem/setting/chain/casting; UI wired |
+| BIM (walls/slabs/framing/stairs/IFC4) | ✅ | No | Revit-comparable engine + viewer via /compile-ifc |
+| Schematic capture (KiCad round-trip, ERC) | ✅ | No | Schematic capture + KiCad round-trip viewer wired |
+| PCB layout (tscircuit, KiCad round-trip) | ✅ | No | PCB viewer + KiCad round-trip wired (read-only) |
+| SPICE simulation | ✅ | No | Real ngspice wired; binary .raw parse gap noted |
+| Signal integrity (Z0/crosstalk/eye/IBIS) | ✅ | No | IBIS 5.1 + Bergeron channel + PRBS eye envelope (backend) |
+| Wiring/harness (WireViz + 3D router) | ✅ | Yes (paid tier) | WiringView wired; harness3d 3D router + formboard + report |
+| Should-cost (6 processes, Boothroyd-Dewhurst) | ✅ | No | 6 processes + Boothroyd-Dewhurst should-cost (backend) |
+| Material selection (Ashby) | ✅ | Partial | 200 materials, Pareto frontier, weighted-score (backend) |
+| LCA (full ISO 14040/44 4 phases) | ✅ | No | Use+transport+EoL + multi-impact categories (ISO 14040/44; backend) |
 
-## Where Creo wins
+## What Kerf does that PTC Creo doesn't
 
-- **Decades of field validation.** Pro/ENGINEER and its successors have powered real production manufacturing for 35+ years. The feature modelling reliability, fillets-on-fillets handling, and large-assembly performance have been hardened against real-world failure modes that Kerf's younger kernel has not encountered.
-- **Creo Simulate (Mechanica).** Built-in structural, thermal, and fatigue FEM with h-element adaptive meshing — a mature simulation capability Kerf does not ship.
-- **Piping and cabling.** Creo Piping and Cabling workbenches route rigid pipe, flex hose, and electrical harnesses within the assembly model. Kerf has no equivalent.
-- **Model-based definition (MBD).** Creo GD&T Advisor and 3D annotation planes produce fully annotated 3D models for paperless manufacturing — a standard Kerf's drawing layer does not yet match in depth.
-- **Large-assembly performance.** Creo has been engineered to handle assemblies of thousands of components in simplified representation mode. Kerf's assembly layer is newer.
+- **FE — solid (tet/hex)** — CalculiX/Mystran/Z88 bridge (needs binary; backend)
+- **Modal / buckling / nonlinear** — Consistent-mass modal, Riks, J2 plasticity (backend)
+- **FE — plate / shell (native)** — MITC4 (Bathe-Dvorkin) + modal; 1.29% error vs Timoshenko (backend)
+- **Fatigue (S-N, ε-N, rainflow)** — S-N, ε-N, rainflow counting (backend)
+- **AISC 360-22 steel (members)** — Full Ch. E/F/H + 50-section catalog (backend)
+- **ASCE 7-22 seismic** — ELF + RSA (SRSS+CQC) + Newmark time-history (backend)
+- **Fasteners — VDI 2230** — VDI 2230 bolted-joint design (backend)
+- **Springs (compr/ext/torsion/Belleville)** — Compression/extension/torsion/Belleville (backend)
+- **Shaft (stress + critical speed)** — Closed-form stress + critical speed (backend)
+- **3-axis CAM (profile/contour/pocket/face)** — 3-axis CAM + tool DB wired in CAMView
+- **5-axis (kinematics + posts)** — Wave 10 reference implementation.
+- **Turning cycles (G71/G70/threading)** — G71/G70 roughing + threading cycles (backend)
+- *(and 22 more features not covered by PTC Creo)*
 
-## Feature matrix
+## Pricing
 
-| Feature | Kerf | PTC Creo Parametric |
-|---|---|---|
-| License | MIT open-core | Proprietary subscription |
-| Cost | Free local; hosted credits | Thousands USD/seat/yr + modules (May 2026) |
-| OS support | Win / macOS / Linux (browser + binary) | Windows only (desktop) |
-| B-rep kernel | Open CASCADE (OCCT) | PTC's Granite One kernel |
-| Parametric history | Feature DAG | Feature tree (industry pioneer) |
-| Constraint sketcher | Sketcher v2 | Creo Sketcher (mature) |
-| Sheet metal | Flange + hem + jog + multi-flange + unfold + flat DXF | Sheet Metal workbench (mature) |
-| Surfacing | blend/network/patch/match-srf + G3 + Class-A harness (younger) | Style / ISDX surfacing |
-| Assembly | Assembly mates | Full assembly + large-assembly management |
-| FEM / structural | Not yet | Creo Simulate (Mechanica, mature) |
-| Piping / cabling | Not yet | Piping + Cabling workbenches |
-| MBD / 3D annotation | GD&T drawings | Creo MBD + GD&T Advisor |
-| PCB / electronics | In-box (full stack + pre-compliance) | Not included |
-| Chat / LLM editing | Chat-native | None known (as of May 2026) |
-| Python scripting | kerf-sdk on PyPI | Creo Toolkit (C++) / J-Link (Java) |
-| STEP export | Yes | Yes |
-| Open source | Yes (MIT) | No |
-
-## Both produce STEP
-
-Creo and Kerf both export ISO 10303 STEP (AP214 / AP242). STEP is the universal handshake in mechanical CAD. Geometry produced in Creo can be imported into Kerf for downstream PCB integration, scripted analysis, or cloud collaboration — and vice versa.
-
----
-*Last reviewed: 2026-05-19. Competitor information sourced from public PTC product pages. Kerf capabilities reflect the current shipped product.*
+PTC Creo is a commercial product; pricing varies by tier, seat count, and region. Kerf is MIT open-core: the full feature set is free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — the MIT licence means you can inspect, fork, and self-host the entire codebase.

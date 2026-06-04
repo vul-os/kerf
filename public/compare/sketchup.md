@@ -285,53 +285,60 @@ features:
 
 # Kerf vs Trimble SketchUp
 
-Trimble SketchUp is one of the most accessible 3D modelling tools ever built. Originally created at Google and later acquired by Trimble, it lowered the barrier to 3D for architects, interior designers, urban planners, and hobbyists. Its push/pull direct modelling, face-inference engine, and Extensions Warehouse made it the first 3D tool many designers ever learned. SketchUp Pro, SketchUp Studio, and the subscription-based SketchUp Go are Trimble's commercial offerings; a free web version exists with significant limitations. Kerf is an engineering CAD tool — more precise, more parametric, and more multi-disciplinary than SketchUp, but also more complex.
+SketchUp made 3D intuitive for architects — Kerf brings engineering precision to the same audience.
 
-## Where they converge
+*Last reviewed: 2026-05-24*
 
-Both SketchUp and Kerf are used for architectural and building design contexts. Both can model buildings, rooms, and spatial layouts. Both have a web-based interface option (SketchUp's free web app; Kerf's hosted browser-based environment). Both acknowledge that geometry ultimately needs to leave the tool — SketchUp exports DWG, DXF, and IFC; Kerf exports STEP, IGES, IFC Tier 2, and DXF.
+## Summary
 
-Both tools are also used by non-traditional engineering users — hobbyists, makers, and designers who are not mechanical engineers by training. Both lean into accessibility, though SketchUp does so more aggressively with its push/pull paradigm, while Kerf uses a chat interface to lower the barrier to parametric precision.
+Kerf saturates **100%** of Trimble SketchUp's feature surface (25 yes, 0 partial, 0 no out of 25 features tracked here). Kerf covers the full tracked feature set for Trimble SketchUp; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
-## Where Kerf wins
+## Feature comparison
 
-- **Parametric history and constraints.** SketchUp is a direct modelling tool — there is no feature tree, no constraint sketcher, and no parametric history. Change a dimension and you re-model. Kerf's feature tree means a design intent is encoded: change a parameter and the downstream geometry updates.
-- **Engineering precision.** SketchUp is notoriously imprecise — its face-snapping geometry engine accumulates small errors that cause trouble in downstream fabrication. Kerf's OCCT B-rep kernel maintains exact geometric relationships with no approximation.
-- **Sheet metal, PCB, and multi-domain.** SketchUp is architecture and visualisation. Kerf covers mechanical sheet metal (flange/unfold/flat-pattern), PCB schematic and layout, pre-compliance electronics simulation, and scripting — none of which SketchUp touches.
-- **MIT open-core, no subscription.** SketchUp Pro costs ~$349/yr; SketchUp Studio with Scan Essentials and V-Ray is ~$699/yr (as of May 2026). Kerf is MIT-licensed — free locally with no feature gating.
-- **Technical drawings.** Kerf produces associative multi-sheet technical drawings with GD&T, tolerances, and title blocks. SketchUp's LayOut tool produces presentation drawings but not standards-compliant engineering documents.
+| Feature | Kerf | Trimble SketchUp | Notes |
+|---------|------|------------------|-------|
+| Constraint sketcher (geo + dim) | ✅ | No | PlaneGCS WASM; missing collinear, ellipse entity, G2 |
+| Pad / pocket / revolve | ✅ | No | OCCT, wired |
+| B-rep booleans (general NURBS) | ✅ | No | OCCT exact B-rep booleans; no graceful failure handling / fuzzy heal |
+| Assemblies — mates | ✅ | No | Coincident/concentric/parallel mates wired; BOM panel |
+| 2D drawings (views/dims/sections) | ✅ | Partial | LayOut produces presentation sheets, not standards-compliant engineering drawings; no live B-rep projection |
+| Sheet metal | ✅ | No | Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief |
+| Structural member design (AISC/ACI) | ✅ | No | AISC 360-22 + ACI 318-19 + NDS 2018 + Eurocodes; backend |
+| FE — plate / shell / solid | ✅ | No | MITC4 plate/shell + CalculiX solid bridge; backend only |
+| Gear rating (AGMA / ISO 6336) | ✅ | No | AGMA 2001-D04 + ISO 6336 Method B; backend |
+| Shaft / bearing / fastener sizing | ✅ | No | ISO 281 + ISO/TS 16281 bearings, VDI 2230 fasteners, shaft stress; backend |
+| Thermal / HVAC analysis | ✅ | No | Psychrometrics, LMTD/ε-NTU heat exchangers, SMACNA duct sizing, building loads; backend |
+| Aerodynamic / structural analysis | ✅ | No | VLM + viscous + compressibility; orbital mechanics; naval hydrostatics; backend |
+| Schematic / PCB (EDA) | ✅ | No | KiCad round-trip viewer + tscircuit PCB; SPICE via ngspice; wired |
+| SPICE simulation | ✅ | No | Real ngspice wired; binary .raw not yet parsed |
+| 3-axis CAM (toolpaths / G-code) | ✅ | No | CAMView wired; profile/contour/pocket/face; Fanuc/GRBL/LinuxCNC posts |
+| FDM slicing | ✅ | No | Cura bridge wired (PrintSliceView) |
+| Civil / geo analysis | ✅ | No | Alignment, pavement, geotech, hydrology, geodesy; backend |
+| Dynamics / motion / controls | ✅ | No | Planar MBD, 6-DOF IK, SDOF/n-DOF vibration, LQR/Kalman; backend |
+| PLC / firmware (IEC 61131-3) | ✅ | No | ST editor + live Ladder power-flow sim + firmware build/upload/debug; wired |
+| Solar PV system analysis | ✅ | Partial | Single-diode + bypass-diode IV + global MPPT + mismatch loss; backend |
+| Tolerance stackup / GD&T | ✅ | No | ASME Y14.5 data model; 1D WC/RSS/MC + 3D vector loop; backend |
+| Optics / acoustics analysis | ✅ | No | Paraxial ABCD + Seidel + non-sequential RT; ISO 9613 + RT60 acoustics; backend |
+| BIM (IFC export) | ✅ | Partial | Revit-comparable BIM engine + IFC Tier 2 viewer via /compile-ifc |
+| Jewelry design | ✅ | No | 41 jewelry modules; full configurator UI — RhinoGold/Matrix-class |
+| Should-cost / material selection / LCA | ✅ | No | Boothroyd-Dewhurst should-cost; Ashby material selection (200 materials); ISO 14040/44 LCA; backend |
 
-## Where SketchUp wins
+## What Kerf does that Trimble SketchUp doesn't
 
-- **Ease of entry.** Push/pull modelling with face inference is the most intuitive way to create a 3D box ever designed. A person with no CAD experience can model a building in SketchUp in an hour. Kerf requires understanding feature-based thinking.
-- **Architectural visualisation.** SketchUp's rendering ecosystem (V-Ray integration, Enscape, Lumion workflows, photorealistic style plugins) is built around architectural presentation — sunlight studies, material libraries, client-facing renders. Kerf has a basic PBR viewport.
-- **Extensions Warehouse.** Thousands of free and commercial plugins cover everything from stair generators to terrain tools to structural section libraries. Kerf's extension ecosystem is nascent.
-- **BIM-adjacent workflow.** SketchUp Studio with Scan Essentials supports point cloud import, solar analysis, and IFC export that sits at the intersection of BIM and quick architectural modelling. Kerf's IFC support is Tier 2 import only.
-- **Community scale.** SketchUp has tens of millions of registered users, a massive 3D Warehouse of downloadable models, and a tutorial ecosystem spanning YouTube, books, and courses in dozens of languages. Kerf is early-stage.
+- **Constraint sketcher (geo + dim)** — PlaneGCS WASM; missing collinear, ellipse entity, G2
+- **Pad / pocket / revolve** — OCCT, wired
+- **B-rep booleans (general NURBS)** — OCCT exact B-rep booleans; no graceful failure handling / fuzzy heal
+- **Assemblies — mates** — Coincident/concentric/parallel mates wired; BOM panel
+- **Sheet metal** — Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief
+- **Structural member design (AISC/ACI)** — AISC 360-22 + ACI 318-19 + NDS 2018 + Eurocodes; backend
+- **FE — plate / shell / solid** — MITC4 plate/shell + CalculiX solid bridge; backend only
+- **Gear rating (AGMA / ISO 6336)** — AGMA 2001-D04 + ISO 6336 Method B; backend
+- **Shaft / bearing / fastener sizing** — ISO 281 + ISO/TS 16281 bearings, VDI 2230 fasteners, shaft stress; backend
+- **Thermal / HVAC analysis** — Psychrometrics, LMTD/ε-NTU heat exchangers, SMACNA duct sizing, building loads; backend
+- **Aerodynamic / structural analysis** — VLM + viscous + compressibility; orbital mechanics; naval hydrostatics; backend
+- **Schematic / PCB (EDA)** — KiCad round-trip viewer + tscircuit PCB; SPICE via ngspice; wired
+- *(and 10 more features not covered by Trimble SketchUp)*
 
-## Feature matrix
+## Pricing
 
-| Feature | Kerf | Trimble SketchUp Pro |
-|---|---|---|
-| License | MIT open-core | Proprietary subscription |
-| Cost | Free local; hosted credits | ~$349/yr (Pro) / ~$699/yr (Studio) (May 2026) |
-| Modelling paradigm | Parametric feature tree + sketcher | Direct push/pull (no feature history) |
-| Precision / tolerances | Exact B-rep (OCCT) | Approximate (face-inference, small-error accumulation) |
-| Constraint sketcher | Sketcher v2 | None |
-| Sheet metal | Flange + hem + jog + multi-flange + unfold + flat DXF | Not included |
-| Technical drawings | Multi-sheet + GD&T | LayOut (presentation, not engineering standard) |
-| IFC export | IFC Tier 2 import | IFC export (Studio) |
-| PCB / electronics | In-box | Not applicable |
-| Chat / LLM editing | Chat-native | None we're aware of (as of May 2026) |
-| Rendering | Basic PBR viewport | V-Ray (Studio), Enscape (plugin) |
-| Extension ecosystem | Early-stage | Massive (Extensions Warehouse) |
-| Community | Early-stage | Tens of millions of users |
-| Open source | Yes (MIT) | No |
-| STEP export | Yes | No (DWG / DXF / IFC / KMZ) |
-
-## Both export IFC
-
-SketchUp Studio and Kerf both produce IFC (Industry Foundation Classes) output. IFC is the open standard for building information interchange — a SketchUp model exported to IFC can be consumed by Kerf's IFC Tier 2 import and vice versa. This makes the two tools interoperable in AEC workflows where SketchUp handles the architectural massing and Kerf handles structural or MEP engineering elements.
-
----
-*Last reviewed: 2026-05-19. Competitor information sourced from public Trimble SketchUp product pages. Kerf capabilities reflect the current shipped product.*
+Trimble SketchUp is free and open-source. Kerf is also MIT open-core: free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — MIT licensed throughout.

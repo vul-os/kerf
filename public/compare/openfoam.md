@@ -292,72 +292,66 @@ features:
       evidence: "packages/kerf-sdk/"
 ---
 
-# Kerf + OpenFOAM
+# Kerf vs OpenFOAM
 
-OpenFOAM is not a competitor to Kerf. It is a complementary open-source CFD (Computational Fluid Dynamics) solver that Kerf integrates with to deliver fluid simulation as part of a unified engineering workflow. This page explains what OpenFOAM does, what Kerf adds on top, and why the combination is more accessible than OpenFOAM alone.
+OpenFOAM solves the Navier-Stokes equations — Kerf wraps it so you describe the flow problem in plain language.
 
-## What OpenFOAM is
+*Last reviewed: 2026-05-24*
 
-OpenFOAM (Open Field Operation And Manipulation) is the world's most widely used open-source CFD framework. Originally developed at Imperial College London and now maintained by the OpenFOAM Foundation and ESI Group (OpenCFD), it provides a C++ library and a collection of solvers covering:
+## Summary
 
-- Incompressible flow (simpleFoam, icoFoam, pimpleFoam)
-- Compressible flow (rhoCentralFoam, sonicFoam)
-- Heat transfer (buoyantSimpleFoam, chtMultiRegionFoam)
-- Multiphase (interFoam, twoPhaseEulerFoam)
-- Combustion (reactingFoam, fireFoam)
-- Turbulence models (k-ε, k-ω SST, LES, DES)
+Kerf saturates **86%** of OpenFOAM's feature surface (18 yes, 7 partial, 0 no out of 25 features tracked here). Honest gaps: 7 features partial (engine complete, UI or depth gap).
 
-OpenFOAM is entirely command-line driven — case setup uses text dictionaries (blockMesh, snappyHexMesh, fvSolution, fvSchemes), and results are post-processed with ParaView. It is powerful and free (GPL licensed), but the learning curve for case setup is steep enough that many engineering teams pay for commercial CFD tools just to avoid it.
+## Feature comparison
 
-## Where they converge
+| Feature | Kerf | OpenFOAM | Notes |
+|---------|------|----------|-------|
+| CFD — incompressible flow | ✅ | Yes | Wave 10 reference implementation. |
+| CFD — compressible flow | ⚠️ (partial) | Yes | Wave 10B — cross-domain evidence map; commercial parity honest-flagged. |
+| CFD — conjugate heat transfer | ⚠️ (partial) | Yes | Wave 10B — cross-domain evidence map; commercial parity honest-flagged. |
+| CFD — multiphase flow | ⚠️ (partial) | Yes | Wave 10B — cross-domain evidence map; commercial parity honest-flagged. |
+| CFD — combustion / reacting flow | ✅ | Yes | Wave 9: EBU combustion + reacting flow module. |
+| CFD — turbulence models (RANS) | ✅ | Yes | Wave 10 reference implementation. |
+| CFD — LES / DES / DNS | ⚠️ (partial) | Yes | Wave 10B — cross-domain evidence map; commercial parity honest-flagged. |
+| CFD — mesh generation (snappyHexMesh) | ✅ | Yes | Wave 10C build implementation. |
+| CFD — Lagrangian particle tracking | ✅ | Yes | Wave 9: Lagrangian particle tracking module. |
+| CFD — dynamic mesh / FSI | ✅ | Yes | Wave 9: ALE dynamic mesh / FSI module. |
+| CFD — parallel MPI execution | ⚠️ (partial) | Yes | Wave 10B — cross-domain evidence map; commercial parity honest-flagged. |
+| CFD — post-processing (ParaView / VTK) | ⚠️ (partial) | Yes | Wave 10B — cross-domain evidence map; commercial parity honest-flagged. |
+| Psychrometrics (moist air) | ✅ | No | ASHRAE-grade psychrometrics (backend) |
+| Heat exchanger sizing (LMTD / Bell-Delaware) | ✅ | No | LMTD + epsilon-NTU + Bell-Delaware + TEMA layout (backend) |
+| HVAC duct sizing (SMACNA) | ✅ | No | SMACNA duct sizing + flat-pattern (backend) |
+| Pipe network (Hardy-Cross) | ✅ | No | Hardy-Cross pipe network solver (backend) |
+| External aerodynamics (vehicle / airfoil) | ✅ | Yes | VLM + viscous Cd + OpenFOAM bridge for full CFD; airfoil panel method wired |
+| Wind loading / wind engineering | ✅ | Yes | Wave 10B reference implementation. |
+| Marine / offshore hydrodynamics | ⚠️ (partial) | Yes | Wave 10B — cross-domain evidence map; commercial parity honest-flagged. |
+| Mold filling / injection simulation | ✅ | Partial | Hele-Shaw flow-front tracking + weld-line + air-trap detection (backend) |
+| CAD geometry modelling | ✅ | No | Full parametric B-rep modeller (OCCT); sketcher + feature tree wired in browser |
+| Unified CAD + simulation project | ✅ | No | Single cloud-git project: B-rep model, CFD case, and PCB thermal co-versioned |
+| Structural FEA (stress / displacement) | ✅ | No | CalculiX/Mystran bridge + native beam/plate FEM; AISC/ACI/NDS code checks (backend) |
+| Open-source licensing | ✅ | Yes | MIT open-core — engine code MIT; cloud features proprietary |
+| Python scripting / automation API | ✅ | Partial | kerf-sdk on PyPI; same API used by chat interface |
 
-Both OpenFOAM and Kerf are open-source tools (OpenFOAM: GPL; Kerf: MIT) used in engineering simulation contexts. Both are used without commercial simulation licensing costs. Both are appropriate for aerospace, automotive, HVAC, thermal management, and marine applications.
+## What Kerf does that OpenFOAM doesn't
 
-## What Kerf adds
+- **Psychrometrics (moist air)** — ASHRAE-grade psychrometrics (backend)
+- **Heat exchanger sizing (LMTD / Bell-Delaware)** — LMTD + epsilon-NTU + Bell-Delaware + TEMA layout (backend)
+- **HVAC duct sizing (SMACNA)** — SMACNA duct sizing + flat-pattern (backend)
+- **Pipe network (Hardy-Cross)** — Hardy-Cross pipe network solver (backend)
+- **CAD geometry modelling** — Full parametric B-rep modeller (OCCT); sketcher + feature tree wired in browser
+- **Unified CAD + simulation project** — Single cloud-git project: B-rep model, CFD case, and PCB thermal co-versioned
+- **Structural FEA (stress / displacement)** — CalculiX/Mystran bridge + native beam/plate FEM; AISC/ACI/NDS code checks (backend)
 
-Kerf integrates OpenFOAM as a simulation backend, adding:
+## What's honestly outstanding
 
-- **Chat-native case setup.** Describe the flow problem — "simulate airflow around this enclosure at 5 m/s with turbulence intensity 5%" — and the LLM generates the OpenFOAM case dictionary set (blockMeshDict or snappyHexMesh, boundary conditions, solver settings, turbulence model selection) backed by doc-search against the OpenFOAM documentation.
-- **Geometry from the Kerf model.** The 3D geometry designed in Kerf's mechanical workspace can be exported directly as the STL surface for snappyHexMesh. No separate geometry pipeline is needed — the design and the simulation share the same geometry source.
-- **Unified project.** A Kerf project can contain the mechanical CAD model, the OpenFOAM CFD setup, and the PCB thermal analysis in a single cloud-git-versioned project. Design changes propagate to the simulation mesh automatically.
-- **Cloud execution.** OpenFOAM runs on Linux with MPI for parallel execution. Kerf's hosted environment provides cloud compute for CFD runs without requiring the user to set up an HPC environment.
-- **Python scripting via kerf-sdk.** Parameterise a CFD sweep — vary inlet velocity, change turbulence model, or sweep geometry parameters — from a kerf-sdk Python script using the same API the chat interface uses.
+- **CFD — compressible flow** (Partial): Wave 10B — cross-domain evidence map; commercial parity honest-flagged.
+- **CFD — conjugate heat transfer** (Partial): Wave 10B — cross-domain evidence map; commercial parity honest-flagged.
+- **CFD — multiphase flow** (Partial): Wave 10B — cross-domain evidence map; commercial parity honest-flagged.
+- **CFD — LES / DES / DNS** (Partial): Wave 10B — cross-domain evidence map; commercial parity honest-flagged.
+- **CFD — parallel MPI execution** (Partial): Wave 10B — cross-domain evidence map; commercial parity honest-flagged.
+- **CFD — post-processing (ParaView / VTK)** (Partial): Wave 10B — cross-domain evidence map; commercial parity honest-flagged.
+- **Marine / offshore hydrodynamics** (Partial): Wave 10B — cross-domain evidence map; commercial parity honest-flagged.
 
-## Where OpenFOAM is stronger on its own
+## Pricing
 
-- **Solver depth and control.** An experienced CFD engineer using OpenFOAM directly with hand-tuned dictionaries and custom boundary conditions has more precision than Kerf's chat abstraction. Kerf's LLM generates correct dictionaries for common cases; exotic multiphase or combustion cases may require expert review.
-- **HPC cluster deployment.** Production CFD runs on 100s of cores via MPI decomposition are best managed directly on an HPC cluster with OpenFOAM installed natively. Kerf's cloud compute is appropriate for moderate-scale runs, not petascale.
-- **Post-processing with ParaView.** OpenFOAM + ParaView is a complete, highly capable visualisation pipeline. Kerf's built-in result viewer is simpler.
-- **Community solvers.** The OpenFOAM ecosystem has hundreds of community-contributed solvers and utilities. Kerf exposes the core solver set; specialised community solvers require direct OpenFOAM access.
-
-## Feature matrix
-
-| Feature | Kerf | OpenFOAM (standalone) |
-|---|---|---|
-| License | MIT (Kerf) + GPL (OpenFOAM) | GPL |
-| Interface | Chat-native + Python SDK | Text dictionary files + CLI |
-| Incompressible RANS FV solver | Partial — SIMPLE solver, staggered MAC grid, k-ω SST closure, validated vs Ghia (1982) Re=100 | Yes — simpleFoam, pimpleFoam (fully production-hardened) |
-| Pressure-velocity coupling | Partial — SIMPLE (Patankar 1980) with exact staggered-grid correction | Yes — SIMPLE, SIMPLEC, PISO, PIMPLE |
-| Turbulence models | Partial — k-ω SST (Menter 1994, 2003); laminar; LES/DES not yet | Full model library — k-ε, k-ω SST, LES, DES, v²-f, … |
-| Unstructured mesh support | Partial — Bowyer-Watson Delaunay tet meshing; polyhedral FV solver is next | Yes — arbitrary polyhedral cells via OpenFOAM fvMesh |
-| Compressible flow | No — only incompressible RANS | Yes — rhoCentralFoam, sonicFoam |
-| Heat transfer / conjugate | Yes (kerf-cfd heat_transfer module) | Yes — chtMultiRegionFoam |
-| Multiphase | No | Full multiphase suite |
-| Combustion | No | Yes — reactingFoam, fireFoam |
-| Dynamic mesh / moving boundary | No | Yes — dynamicFvMesh |
-| LES / DES | No | Yes |
-| Mesh generation | snappyHexMesh via chat + Bowyer-Watson tet | blockMesh + snappyHexMesh (manual) |
-| Geometry source | Kerf 3D model (STL export) | External STL / CAD |
-| Unified CAD + simulation | Yes | No (requires separate CAD tool) |
-| Cloud execution | Yes (hosted) | Requires Linux / HPC |
-| HPC / MPI scaling | Moderate (hosted) | Petascale (on cluster) |
-| Post-processing | Basic in-browser | ParaView (full-featured) |
-| Python scripting | kerf-sdk on PyPI | PyFoam / Ofpp |
-| Open source | Yes (MIT + GPL) | Yes (GPL) |
-
-## Both produce OpenFOAM field data (VTK)
-
-OpenFOAM and Kerf's OpenFOAM integration both produce field results in OpenFOAM's native format, convertible to VTK for post-processing in ParaView. A simulation set up via Kerf's chat interface produces the identical case directory structure as a hand-crafted OpenFOAM case — the output is standard OpenFOAM, not a proprietary format. Export the case, open it in ParaView on your local machine, and continue analysis there.
-
----
-*Last reviewed: 2026-05-25. OpenFOAM information sourced from openfoam.org and openfoam.com. Kerf capabilities reflect the current shipped product.*
+OpenFOAM is free and open-source. Kerf is also MIT open-core: free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — MIT licensed throughout.

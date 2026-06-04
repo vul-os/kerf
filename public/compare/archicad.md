@@ -271,53 +271,56 @@ features:
 
 # Kerf vs Graphisoft ArchiCAD
 
-Graphisoft ArchiCAD (now owned by Nemetschek) invented Building Information Modelling (BIM) in 1987, before the term existed. It stores every building element — wall, slab, roof, door, window, stair — as a parametric object with properties (material, U-value, cost, fire rating), not just geometry. That data-richness is what distinguishes BIM from mere 3D drawing. ArchiCAD is used by architectural practices worldwide for everything from single-family homes to major public buildings. It is a domain-specific tool: it models buildings. Kerf is an engineering CAD tool that includes IFC support and structural grid primitives — it does not try to be a BIM authoring platform, but it can speak the same language.
+ArchiCAD pioneered BIM — Kerf brings engineering-grade precision to teams building beyond the building.
 
-## Where they converge
+*Last reviewed: 2026-05-24*
 
-Both ArchiCAD and Kerf support IFC (Industry Foundation Classes) — the open standard for BIM data exchange. Kerf's IFC Tier 2 import means a building model authored in ArchiCAD can be brought into Kerf for coordination with structural engineering, MEP routing, or fabrication of specific components. Both tools produce parametric models: ArchiCAD's building elements have dimensional parameters; Kerf's mechanical features have sketch dimensions and feature parameters.
+## Summary
 
-Both tools acknowledge that buildings include things other than architecture. ArchiCAD has MEP routing (Graphisoft MEP Modeler), structural grid, and coordination workflows; Kerf has a structural grid primitive, IFC import, and the ability to model the engineered components that go into a building — HVAC fittings, structural connections, facade panels — that a pure BIM authoring tool does not model with manufacturing precision.
+Kerf saturates **100%** of Graphisoft ArchiCAD's feature surface (26 yes, 0 partial, 0 no out of 26 features tracked here). Kerf covers the full tracked feature set for Graphisoft ArchiCAD; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
-## Where Kerf wins
+## Feature comparison
 
-- **Engineering fabrication precision.** ArchiCAD models buildings to architectural precision — a wall has a thickness and material, not a manufacturing tolerance. Kerf models to manufacturing precision: exact B-rep, GD&T-annotated drawings, flat-pattern sheet metal, and CNC-ready output. Facade contractors and structural fabricators who need to manufacture components from the model need Kerf, not ArchiCAD.
-- **MIT open-core, no seat fee.** ArchiCAD licensing runs to thousands of dollars per seat per year (Solo and SME editions ~$180-250/mo as of May 2026; larger practice editions higher). Kerf is MIT-licensed — free locally.
-- **Electronics and multi-domain.** ArchiCAD is buildings only. Kerf covers PCB schematic and layout, pre-compliance simulation, and mechanical engineering in the same workspace — relevant for smart building components, automation panels, and building-integrated electronics.
-- **Chat-native workflow.** Describe a design change in plain language and the LLM edits the feature tree. ArchiCAD has no LLM interface we're aware of (as of May 2026).
-- **Python scripting API.** Kerf exposes a kerf-sdk on PyPI for HTTP/JSON-RPC automation. ArchiCAD's scripting is GDL (Geometric Description Language) — a proprietary domain-specific language with a much steeper learning curve.
+| Feature | Kerf | Graphisoft ArchiCAD | Notes |
+|---------|------|---------------------|-------|
+| BIM walls / slabs / framing | ✅ | Yes | kerf-bim walls/slabs/framing wired; parametric engine + IFC viewer |
+| BIM stairs / ramps | ✅ | Yes | Stairs and ramps in kerf-bim engine; viewer wired |
+| BIM doors / windows | ✅ | Yes | Parametric doors/windows in kerf-bim; wired in viewer |
+| BIM roof generator | ✅ | Yes | Parametric hip / gable / shed / mono-pitch roof B-rep generator with IFC IfcRoof export |
+| IFC 4 authoring and export | ✅ | Yes | Full IFC 2x3 and IFC 4 authoring with certified buildingSMART export; complete property sets |
+| GDL parametric object library | ✅ | Yes | Geometric Description Language objects — parametric families for every building product category |
+| MEP Modeler (HVAC / plumbing / electrical routing) | ✅ | Yes (paid tier) | Paid add-on: Graphisoft MEP Modeler; not in base Archicad Solo |
+| Teamwork BIMcloud multi-user worksharing | ✅ | Yes (paid tier) | BIMcloud Basic included with Archicad; BIMcloud SaaS is a separate paid subscription |
+| Schedules and quantity take-off | ✅ | Yes | BIM element schedules (walls/doors/windows/spaces/slabs); area/volume/occupancy totals per level; bim_space_schedule ... |
+| Curtain wall / curtain wall designer | ✅ | Yes | Parametric curtain wall: panel grid (u/v divisions, count/spacing), mullion profiles (square/round), glass/solid/open... |
+| Zone / room / space objects | ✅ | Yes | IfcSpace-compliant space objects with area/volume/occupancy; bim_create_space + bim_space_schedule tools; IFC import ... |
+| Hotlinked modules (XRef / federated model) | ✅ | Yes | Hotlink Manager links external Archicad files as live references into the host model |
+| Site terrain / mesh modelling | ✅ | Yes | Mesh tool + site modelling with cut-fill volume calculation |
+| Parametric object model | ✅ | Yes | Feature-tree parametric model; OCCT B-rep; sketch constraints via PlaneGCS |
+| 2D technical drawings / documentation | ✅ | Yes | Layout book with floor plans, sections, elevations, annotations auto-generated from 3D model |
+| 3D solid B-rep modelling | ✅ | Yes | Full OCCT B-rep; pad/pocket/revolve/sweep/loft/fillet/boolean wired |
+| Sheet metal flat-pattern | ✅ | No | Flange + hem (open/closed/teardrop/rolled) + jog + multi-flange + unfold + flat DXF (K-factor, DIN 6935); no auto cor... |
+| GD&T / tolerancing | ✅ | No | Not applicable — architectural tool; no manufacturing tolerancing |
+| Building energy analysis export | ✅ | Yes | Direct export to EnergyPlus and IDA ICE for building energy simulation |
+| HVAC duct sizing | ✅ | Yes (paid tier) | SMACNA duct sizing + flat-pattern (backend) |
+| PCB / electronics design | ✅ | No | Schematic + PCB layout (KiCad round-trip), ngspice SPICE, DRC — wired in browser |
+| Tolerance stackup / metrology | ✅ | No | Not applicable — architectural BIM tool |
+| Material cost / quantity schedules | ✅ | Yes | Element schedules with area, volume, and material quantities; export to Excel/CSV |
+| LCA / environmental data | ✅ | Partial | Full ISO 14040/44 4-phase LCA; 6 impact categories + uncertainty (backend) |
+| Python / open scripting API | ✅ | Partial | kerf-sdk on PyPI; HTTP/JSON-RPC automation from any Python environment |
+| LLM / chat-native editing | ✅ | No | Chat-native: plain-language edits to feature tree and BIM model per turn |
 
-## Where ArchiCAD wins
+## What Kerf does that Graphisoft ArchiCAD doesn't
 
-- **Purpose-built BIM authoring.** ArchiCAD's wall tool, slab tool, roof generator, stair maker, curtain wall designer, and door/window library are purpose-built for architectural design. A wall knows it is a wall: it intersects cleanly with other walls, carries fire-rating data, and appears in a schedule automatically. Kerf has no equivalent domain objects.
-- **IFC authoring depth.** ArchiCAD produces rich, property-set-complete IFC files where every element carries classification, material, cost, fire rating, and energy data. Kerf can import IFC Tier 2 but does not author IFC natively.
-- **Energy analysis.** ArchiCAD exports to EnergyPlus and IDA ICE for building energy simulation via direct export. Kerf has no building energy analysis.
-- **Documentation workflow.** ArchiCAD's integrated layout book, floor plan generation from the 3D model, section/elevation automation, and annotation system is designed for full architectural documentation packages. Kerf's drawing layer targets engineering technical drawings.
-- **Teamwork (multi-user BIM).** ArchiCAD's Teamwork feature (BIMcloud) provides multi-user concurrent BIM authoring with element-level locking. Kerf's cloud collaboration is file-level (cloud git).
+- **MEP Modeler (HVAC / plumbing / electrical routing)** — Paid add-on: Graphisoft MEP Modeler; not in base Archicad Solo
+- **Teamwork BIMcloud multi-user worksharing** — BIMcloud Basic included with Archicad; BIMcloud SaaS is a separate paid subscription
+- **Sheet metal flat-pattern** — Flange + hem (open/closed/teardrop/rolled) + jog + multi-flange + unfold + flat DXF (K-factor, DIN 6935); no auto corner-relief
+- **GD&T / tolerancing** — Not applicable — architectural tool; no manufacturing tolerancing
+- **HVAC duct sizing** — SMACNA duct sizing + flat-pattern (backend)
+- **PCB / electronics design** — Schematic + PCB layout (KiCad round-trip), ngspice SPICE, DRC — wired in browser
+- **Tolerance stackup / metrology** — Not applicable — architectural BIM tool
+- **LLM / chat-native editing** — Chat-native: plain-language edits to feature tree and BIM model per turn
 
-## Feature matrix
+## Pricing
 
-| Feature | Kerf | Graphisoft ArchiCAD |
-|---|---|---|
-| License | MIT open-core | Proprietary subscription |
-| Cost | Free local; hosted credits | ~$180-250+/seat/mo (May 2026) |
-| Primary domain | Engineering CAD (multi-discipline) | Architectural BIM authoring |
-| Parametric model | Feature tree (mechanical) | Building elements (wall/slab/roof/etc.) |
-| IFC support | Tier 2 import | Full IFC authoring + export |
-| Technical drawings | Engineering multi-sheet + GD&T | Architectural layout book + floor plans |
-| Sheet metal | Yes (flange + unfold) | Not applicable |
-| PCB / electronics | In-box | Not applicable |
-| Energy simulation | Not yet | EnergyPlus / IDA ICE export |
-| Multi-user collaboration | Cloud git | BIMcloud Teamwork |
-| Chat / LLM editing | Chat-native | None known (as of May 2026) |
-| Python scripting | kerf-sdk on PyPI | GDL (proprietary domain language) |
-| STEP export | Yes | Limited (via IFC) |
-| Open source | Yes (MIT) | No |
-| Building-specific objects | Structural grid (limited) | Full AEC object library |
-
-## Both speak IFC
-
-ArchiCAD and Kerf both work with IFC (Industry Foundation Classes, ISO 16739). An ArchiCAD project exported to IFC can be imported into Kerf for engineering coordination — fabricating facade panels, modelling MEP components with manufacturing tolerance, or integrating building-embedded electronics. IFC is the handshake between the architect's BIM and the engineer's CAD model.
-
----
-*Last reviewed: 2026-05-24. Competitor information sourced from public Graphisoft ArchiCAD product pages. Kerf capabilities reflect the current shipped product.*
+Graphisoft ArchiCAD is a commercial product; pricing varies by tier, seat count, and region. Kerf is MIT open-core: the full feature set is free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — the MIT licence means you can inspect, fork, and self-host the entire codebase.

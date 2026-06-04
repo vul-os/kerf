@@ -16,6 +16,8 @@ logger = logging.getLogger(__name__)
 
 _TOOL_MODULES = [
     "kerf_woodworking.tools",
+    # Wave 12B: Moldflow injection-fill + cabinet cut-list/joinery/grain
+    "kerf_woodworking.woodworking_advanced_tools",
 ]
 
 
@@ -29,6 +31,10 @@ async def register(app: "FastAPI", ctx):
         "woodworking.joinery",
         "woodworking.cut_list",
         "woodworking.grain",
+        # Wave 12B: Moldflow injection-fill + cabinet cut-list/joinery/grain
+        "woodworking.cabinet_cut_list",
+        "woodworking.joinery_advanced",
+        "woodworking.grain_direction",
     ]
 
     try:

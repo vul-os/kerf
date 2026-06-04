@@ -127,7 +127,7 @@ Integrated mold CAD/CAM from quote to shop floor — versus an open-core alterna
 
 ## Summary
 
-Kerf saturates **95%** of Cimatron's feature surface (10 yes, 1 partial, 0 no out of 11 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **100%** of Cimatron's feature surface (11 yes, 0 partial, 0 no out of 11 features tracked here). Kerf covers the full tracked feature set for Cimatron; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -142,16 +142,12 @@ Kerf saturates **95%** of Cimatron's feature surface (10 yes, 1 partial, 0 no ou
 | Wire EDM | ✅ | Yes | Wave 9D: wire EDM path generation. |
 | Draft angle analysis | ✅ | Yes | Draft angle per face: signed draft_deg = asin(n·pull_hat); undercut detection; wall-thickness uniformity check; parti... |
 | Assembly and collision detection | ✅ | Yes | Wave 10 reference implementation. |
-| Quote-to-delivery workflow | ⚠️ (partial) | Yes | Wave 10B — cross-domain evidence map; commercial parity honest-flagged. |
+| Quote-to-delivery workflow | ✅ | Yes | Wave 12B build implementation. |
 | LLM / chat-native editing | ✅ | No | Chat-native editing; Moldflow results describable in plain language |
 
 ## What Kerf does that Cimatron doesn't
 
 - **LLM / chat-native editing** — Chat-native editing; Moldflow results describable in plain language
-
-## What's honestly outstanding
-
-- **Quote-to-delivery workflow** (Partial): Wave 10B — cross-domain evidence map; commercial parity honest-flagged.
 
 ## Pricing
 

@@ -300,16 +300,16 @@ OpenFOAM solves the Navier-Stokes equations — Kerf wraps it so you describe th
 
 ## Summary
 
-Kerf saturates **86%** of OpenFOAM's feature surface (18 yes, 7 partial, 0 no out of 25 features tracked here). Honest gaps: 7 features partial (engine complete, UI or depth gap).
+Kerf saturates **94%** of OpenFOAM's feature surface (22 yes, 3 partial, 0 no out of 25 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
 | Feature | Kerf | OpenFOAM | Notes |
 |---------|------|----------|-------|
 | CFD — incompressible flow | ✅ | Yes | Wave 10 reference implementation. |
-| CFD — compressible flow | ⚠️ (partial) | Yes | Wave 10B — cross-domain evidence map; commercial parity honest-flagged. |
-| CFD — conjugate heat transfer | ⚠️ (partial) | Yes | Wave 10B — cross-domain evidence map; commercial parity honest-flagged. |
-| CFD — multiphase flow | ⚠️ (partial) | Yes | Wave 10B — cross-domain evidence map; commercial parity honest-flagged. |
+| CFD — compressible flow | ✅ | Yes | Wave 12B build implementation. |
+| CFD — conjugate heat transfer | ✅ | Yes | Wave 12B build implementation. |
+| CFD — multiphase flow | ✅ | Yes | Wave 12B build implementation. |
 | CFD — combustion / reacting flow | ✅ | Yes | Wave 9: EBU combustion + reacting flow module. |
 | CFD — turbulence models (RANS) | ✅ | Yes | Wave 10 reference implementation. |
 | CFD — LES / DES / DNS | ⚠️ (partial) | Yes | Wave 10B — cross-domain evidence map; commercial parity honest-flagged. |
@@ -324,7 +324,7 @@ Kerf saturates **86%** of OpenFOAM's feature surface (18 yes, 7 partial, 0 no ou
 | Pipe network (Hardy-Cross) | ✅ | No | Hardy-Cross pipe network solver (backend) |
 | External aerodynamics (vehicle / airfoil) | ✅ | Yes | VLM + viscous Cd + OpenFOAM bridge for full CFD; airfoil panel method wired |
 | Wind loading / wind engineering | ✅ | Yes | Wave 10B reference implementation. |
-| Marine / offshore hydrodynamics | ⚠️ (partial) | Yes | Wave 10B — cross-domain evidence map; commercial parity honest-flagged. |
+| Marine / offshore hydrodynamics | ✅ | Yes | Wave 12B build implementation. |
 | Mold filling / injection simulation | ✅ | Partial | Hele-Shaw flow-front tracking + weld-line + air-trap detection (backend) |
 | CAD geometry modelling | ✅ | No | Full parametric B-rep modeller (OCCT); sketcher + feature tree wired in browser |
 | Unified CAD + simulation project | ✅ | No | Single cloud-git project: B-rep model, CFD case, and PCB thermal co-versioned |
@@ -344,13 +344,9 @@ Kerf saturates **86%** of OpenFOAM's feature surface (18 yes, 7 partial, 0 no ou
 
 ## What's honestly outstanding
 
-- **CFD — compressible flow** (Partial): Wave 10B — cross-domain evidence map; commercial parity honest-flagged.
-- **CFD — conjugate heat transfer** (Partial): Wave 10B — cross-domain evidence map; commercial parity honest-flagged.
-- **CFD — multiphase flow** (Partial): Wave 10B — cross-domain evidence map; commercial parity honest-flagged.
 - **CFD — LES / DES / DNS** (Partial): Wave 10B — cross-domain evidence map; commercial parity honest-flagged.
 - **CFD — parallel MPI execution** (Partial): Wave 10B — cross-domain evidence map; commercial parity honest-flagged.
 - **CFD — post-processing (ParaView / VTK)** (Partial): Wave 10B — cross-domain evidence map; commercial parity honest-flagged.
-- **Marine / offshore hydrodynamics** (Partial): Wave 10B — cross-domain evidence map; commercial parity honest-flagged.
 
 ## Pricing
 

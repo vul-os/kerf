@@ -104,7 +104,7 @@ Integrated building performance simulation — IES VE vs MIT open-core.
 
 ## Summary
 
-Kerf saturates **94%** of IES VE (Virtual Environment)'s feature surface (7 yes, 1 partial, 0 no out of 8 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **100%** of IES VE (Virtual Environment)'s feature surface (8 yes, 0 partial, 0 no out of 8 features tracked here). Kerf covers the full tracked feature set for IES VE (Virtual Environment); gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -114,14 +114,10 @@ Kerf saturates **94%** of IES VE (Virtual Environment)'s feature surface (7 yes,
 | AHRI-listed equipment catalogue | ✅ | Yes | 30 representative AHRI-listed models (6 categories, 5 per); real AHRI cert numbers + certified part-load curves. OEM-... |
 | Part-load efficiency curves (AHRI-certified) | ✅ | Yes | AHRI-certified part-load curves at 25/50/75/100% load from directory listings |
 | Daylighting + solar radiation simulation | ✅ | Yes | Wave 10B reference implementation. |
-| CFD internal airflow (IESVE MicroFlo) | ⚠️ (partial) | Yes | Wave 10B — cross-domain evidence map; commercial parity honest-flagged. |
+| CFD internal airflow (IESVE MicroFlo) | ✅ | Yes | Wave 12B build implementation. |
 | Full HVAC plant + air-side system modelling | ✅ | Yes | Wave 10B reference implementation. |
 | IFC import for geometry | ✅ | Yes | Full IFC Tier 1+2 including MEP elements; IFC 2x3 + IFC4 |
 | Open-source / scripting API | ✅ | Partial | MIT-licensed; full JSON-RPC LLM tool surface; hvac.equipment_select wired |
-
-## What's honestly outstanding
-
-- **CFD internal airflow (IESVE MicroFlo)** (Partial): Wave 10B — cross-domain evidence map; commercial parity honest-flagged.
 
 ## Pricing
 

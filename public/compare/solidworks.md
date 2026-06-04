@@ -681,7 +681,7 @@ features:
 
 ## Summary
 
-Kerf saturates **98%** of SOLIDWORKS's feature surface (57 yes, 2 partial, 0 no out of 59 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
+Kerf saturates **100%** of SOLIDWORKS's feature surface (59 yes, 0 partial, 0 no out of 59 features tracked here). Kerf covers the full tracked feature set for SOLIDWORKS; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -722,7 +722,7 @@ Kerf saturates **98%** of SOLIDWORKS's feature surface (57 yes, 2 partial, 0 no 
 | Multi-axis CAM (5-axis) | ✅ | Yes (paid tier) | Wave 10B reference implementation. |
 | Feeds & speeds + tool-life (Taylor/Gilbert) | ✅ | Partial | Wave 10B reference implementation. |
 | Nesting (2D part layout) | ✅ | No | Wave 10B reference implementation. |
-| Moldflow / injection fill simulation | ⚠️ (partial) | No | Wave 11A — honest implementation; commercial parity honest-flagged. |
+| Moldflow / injection fill simulation | ✅ | No | Wave 12B build implementation. |
 | FDM slicing | ✅ | No | Cura integration wired (PrintSliceView) |
 | Road alignment (horizontal/vertical/clothoid) | ✅ | No | Wave 10B reference implementation. |
 | Geotech (bearing/settlement/slope/liquefaction) | ✅ | No | Wave 10B reference implementation. |
@@ -741,7 +741,7 @@ Kerf saturates **98%** of SOLIDWORKS's feature surface (57 yes, 2 partial, 0 no 
 | Acoustics (ISO 9613 / RT60 / mass-law TL) | ✅ | No | Wave 11A flip pass — shipped backend module. |
 | Jewelry design tooling | ✅ | No | 41-module suite — ring/gem/setting/chain/casting/cost |
 | BIM / IFC authoring | ✅ | No | Revit-comparable engine + IFC4 export wired via /compile-ifc |
-| Material selection (Ashby / multi-objective) | ⚠️ (partial) | No | 200 materials + Pareto frontier + weighted-score backend |
+| Material selection (Ashby / multi-objective) | ✅ | No | Wave 12B build implementation. |
 | Should-cost / DFM estimation | ✅ | No | Wave 11A flip pass — shipped backend module. |
 | LCA (ISO 14040/44 full 4 phases) | ✅ | No | Wave 11A flip pass — shipped backend module. |
 | Scripting / automation API | ✅ | Yes | kerf-sdk on PyPI — HTTP/JSON-RPC; same interface as LLM |
@@ -761,12 +761,7 @@ Kerf saturates **98%** of SOLIDWORKS's feature surface (57 yes, 2 partial, 0 no 
 - **Airfoil / wing aerodynamics (VLM)** — 3D wing VLM + strip viscous CD0 + PG/KT compressibility; wired
 - **Orbital mechanics (Kepler/Hohmann/Lambert)** — Kepler + J2/J3 + Hohmann + Lambert (multi-rev) wired
 - **Schematic capture + PCB layout** — Hierarchical schematic + PCB layout viewer wired in-browser
-- *(and 23 more features not covered by SOLIDWORKS)*
-
-## What's honestly outstanding
-
-- **Moldflow / injection fill simulation** (Partial): Wave 11A — honest implementation; commercial parity honest-flagged.
-- **Material selection (Ashby / multi-objective)** (Partial): 200 materials + Pareto frontier + weighted-score backend
+- *(and 25 more features not covered by SOLIDWORKS)*
 
 ## Pricing
 

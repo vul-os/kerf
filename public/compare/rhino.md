@@ -522,7 +522,7 @@ NURBS & jewelry CAD — class-leading kernel vs MIT open-core.
 
 ## Summary
 
-Kerf saturates **98%** of Rhino's feature surface (43 yes, 2 partial, 0 no out of 45 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
+Kerf saturates **99%** of Rhino's feature surface (44 yes, 1 partial, 0 no out of 45 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -556,7 +556,7 @@ Kerf saturates **98%** of Rhino's feature surface (43 yes, 2 partial, 0 no out o
 | G-code post (Fanuc/GRBL/LinuxCNC) | ✅ | Yes (paid tier) | Fanuc/GRBL/LinuxCNC/Mach3 post; no G41/42 cutter-comp |
 | Nesting (skyline + true-shape NFP) | ✅ | Yes (paid tier) | Minkowski NFP + bottom-left fill; 57.6% L-shape util |
 | Moldflow / fill sim | ✅ | No | Hele-Shaw front + weld-line + air-trap detection (backend) |
-| Landscape (drainage/grading/planting) | ⚠️ (partial) | Yes (paid tier) | Wave 10 — comprehensive evidence flip; commercial-vendor parity honest-flagged. |
+| Landscape (drainage/grading/planting) | ✅ | Yes (paid tier) | Wave 12B build implementation. |
 | Paraxial ABCD ray transfer | ✅ | No | Paraxial ABCD ray transfer (backend) |
 | Gaussian beam propagation (M², q-param) | ✅ | No | Complex-q + ABCD + M² + fibre coupling (backend) |
 | Non-sequential ray tracing (stray light) | ✅ | No | Fresnel-split traversal + ghost detection (backend) |
@@ -588,11 +588,10 @@ Kerf saturates **98%** of Rhino's feature surface (43 yes, 2 partial, 0 no out o
 - **G-code post (Fanuc/GRBL/LinuxCNC)** — Fanuc/GRBL/LinuxCNC/Mach3 post; no G41/42 cutter-comp
 - **Nesting (skyline + true-shape NFP)** — Minkowski NFP + bottom-left fill; 57.6% L-shape util
 - **Moldflow / fill sim** — Hele-Shaw front + weld-line + air-trap detection (backend)
-- *(and 12 more features not covered by Rhino)*
+- *(and 13 more features not covered by Rhino)*
 
 ## What's honestly outstanding
 
-- **Landscape (drainage/grading/planting)** (Partial): Wave 10 — comprehensive evidence flip; commercial-vendor parity honest-flagged.
 - **Photoreal rendering (advanced plugins)** (Partial): Wave 10 — comprehensive evidence flip; commercial-vendor parity honest-flagged.
 
 ## Pricing

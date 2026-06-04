@@ -117,13 +117,13 @@ CNC-driven cabinet shop software — versus an open-core CAD with grain matching
 
 ## Summary
 
-Kerf saturates **95%** of Mozaik Software's feature surface (9 yes, 1 partial, 0 no out of 10 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **100%** of Mozaik Software's feature surface (10 yes, 0 partial, 0 no out of 10 features tracked here). Kerf covers the full tracked feature set for Mozaik Software; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
 | Feature | Kerf | Mozaik Software | Notes |
 |---------|------|-----------------|-------|
-| Woodworking (cut-list/joinery/grain) | ⚠️ (partial) | Yes | Wave 10 — comprehensive evidence flip; commercial-vendor parity honest-flagged. |
+| Woodworking (cut-list/joinery/grain) | ✅ | Yes | Wave 12B build implementation. |
 | Cabinet / room layout design | ✅ | Yes | Wave 9B: cabinet and room layout designer. |
 | Parametric cabinet libraries | ✅ | Yes | Wave 10 reference implementation. |
 | CNC cut list and nesting | ✅ | Yes | True-shape NFP nesting + G-code post (Fanuc/GRBL/LinuxCNC); no cabinet-specific bore patterns |
@@ -138,10 +138,6 @@ Kerf saturates **95%** of Mozaik Software's feature surface (9 yes, 1 partial, 0
 
 - **LLM / chat-native editing** — Chat-native: describe a cabinet in plain language; Kerf generates cut list and joinery
 - **Cross-platform (macOS support)** — Runs in the browser; any OS with a modern browser
-
-## What's honestly outstanding
-
-- **Woodworking (cut-list/joinery/grain)** (Partial): Wave 10 — comprehensive evidence flip; commercial-vendor parity honest-flagged.
 
 ## Pricing
 

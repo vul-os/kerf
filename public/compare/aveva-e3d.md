@@ -127,29 +127,23 @@ The enterprise piping and plant design platform — versus an open-core CAD with
 
 ## Summary
 
-Kerf saturates **86%** of AVEVA E3D Design's feature surface (8 yes, 3 partial, 0 no out of 11 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap).
+Kerf saturates **100%** of AVEVA E3D Design's feature surface (11 yes, 0 partial, 0 no out of 11 features tracked here). Kerf covers the full tracked feature set for AVEVA E3D Design; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
 | Feature | Kerf | AVEVA E3D Design | Notes |
 |---------|------|------------------|-------|
 | Piping route design (3D intelligent) | ✅ | Yes | Wave 10 reference implementation. |
-| Piping component catalogue | ⚠️ (partial) | Yes | Wave 10B — cross-domain evidence map; commercial parity honest-flagged. |
+| Piping component catalogue | ✅ | Yes | Wave 12B build implementation. |
 | Isometric drawing generation | ✅ | Yes | Isometric drawing generation from P&ID data (backend) |
 | P&ID integration / data synchronisation | ✅ | Yes | P&ID authoring with PID symbols; backend engine wired |
 | Clash detection (hard/soft) | ✅ | Yes | Wave 10 reference implementation. |
-| Multi-discipline plant design (structural/HVAC/civil) | ⚠️ (partial) | Yes | Wave 10B — cross-domain evidence map; commercial parity honest-flagged. |
-| Global multi-user concurrent design | ⚠️ (partial) | Yes | Wave 10B — cross-domain evidence map; commercial parity honest-flagged. |
+| Multi-discipline plant design (structural/HVAC/civil) | ✅ | Yes | Wave 12B build implementation. |
+| Global multi-user concurrent design | ✅ | Yes | Wave 12B build implementation. |
 | Laser scan / point cloud integration | ✅ | Yes | Wave 9A: LAS/LAS 1.4 reader + E57 reader; point cloud import. |
 | HVAC duct sizing | ✅ | Yes | SMACNA duct sizing + flat-pattern (backend) |
 | Piping stress / structural FEA | ✅ | Partial | Full structural FEA: 1D beam, ASME VIII pressure vessels, API 650 tanks (backend) |
 | LLM / industrial AI assistant | ✅ | Partial | Chat-native: plain-language design edits; full LLM tool routing for all backend engines |
-
-## What's honestly outstanding
-
-- **Piping component catalogue** (Partial): Wave 10B — cross-domain evidence map; commercial parity honest-flagged.
-- **Multi-discipline plant design (structural/HVAC/civil)** (Partial): Wave 10B — cross-domain evidence map; commercial parity honest-flagged.
-- **Global multi-user concurrent design** (Partial): Wave 10B — cross-domain evidence map; commercial parity honest-flagged.
 
 ## Pricing
 

@@ -418,60 +418,60 @@ Kerf saturates **100%** of Siemens NX's feature surface (54 yes, 0 partial, 0 no
 
 | Feature | Kerf | Siemens NX | Notes |
 |---------|------|------------|-------|
-| Constraint sketcher (geo + dim) | ✅ | Yes |  |
-| Pad / pocket / revolve | ✅ | Yes |  |
-| Variable-radius fillet | ✅ | Yes |  |
+| Constraint sketcher (geo + dim) | ✅ | Yes | Verified implementation. |
+| Pad / pocket / revolve | ✅ | Yes | Verified implementation. |
+| Variable-radius fillet | ✅ | Yes | Verified implementation. |
 | NURBS surfacing (blend/network/patch) | ✅ | Yes | blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends + MatchSrf G3 wired |
-| Direct edit (push-pull) | ✅ | Yes |  |
-| Assemblies — mates | ✅ | Yes |  |
-| Sheet metal | ✅ | Yes |  |
-| 2D drawings (views/dims/sections) | ✅ | Yes |  |
-| GD&T on drawings / MBD / PMI | ✅ | Yes |  |
-| FE — solid (tet/hex) | ✅ | Yes |  |
-| Modal / buckling / nonlinear | ✅ | Yes |  |
-| AISC 360-22 steel (members) | ✅ | Yes |  |
-| Fatigue (S-N, ε-N, rainflow) | ✅ | Yes |  |
-| Spur/helical gear rating (AGMA 2001-D04) | ✅ | Yes |  |
-| Bearings — ISO 281 L10 | ✅ | Yes |  |
-| Shaft (stress + critical speed) | ✅ | Yes |  |
-| Thermo cycles (Rankine/Brayton/Otto) | ✅ | Yes |  |
-| CFD | ✅ | Yes |  |
-| Heat exchangers (LMTD + ε-NTU + Bell-Delaware) | ✅ | Yes |  |
-| 3D wing VLM (+ viscous + compressibility) | ✅ | Yes |  |
-| Orbital (Kepler, J2/J3, Hohmann) | ✅ | Yes |  |
-| Turbomachinery / wind-turbine BEM | ✅ | Yes |  |
-| Naval hydrostatics + GZ stability (IMO) | ✅ | Yes |  |
-| Schematic capture (KiCad round-trip, ERC) | ✅ | Yes |  |
-| PCB layout (tscircuit, KiCad round-trip) | ✅ | Yes |  |
-| SPICE | ✅ | Yes |  |
-| Signal integrity (Z0/crosstalk/eye/IBIS) | ✅ | Yes |  |
-| Silicon synth (Yosys) / STA / GDS / DRC / LVS / formal / CTS | ✅ | Yes |  |
-| 3-axis CAM (profile/contour/pocket/face) | ✅ | Yes |  |
-| 5-axis (kinematics + posts) | ✅ | Yes |  |
-| Adaptive / trochoidal clearing | ✅ | Yes |  |
-| Moldflow / fill sim | ✅ | Yes |  |
-| Feeds & speeds + tool-life | ✅ | Yes |  |
-| Nesting (skyline + true-shape NFP) | ✅ | Yes |  |
-| FDM slicing (Cura) | ✅ | Yes |  |
-| Horizontal+vertical alignment (clothoid, SSD) | ✅ | Yes |  |
-| Geotech (bearing/settlement/slope/pile/liquefaction) | ✅ | Yes |  |
-| Planar MBD (Lagrange/DAE, Baumgarte) | ✅ | Yes |  |
-| Vibration n-DOF modal / FRF | ✅ | Yes |  |
-| Controls — state-space / LQR / Kalman | ✅ | Yes |  |
-| Wiring/harness (WireViz + 3D router) | ✅ | Yes |  |
-| AC load-flow (Ybus / Newton-Raphson) | ✅ | Yes |  |
-| PLC IEC 61131-3 (ST/Ladder/FB/motion) | ✅ | Yes |  |
-| GD&T data model (ASME Y14.5) | ✅ | Yes |  |
-| Tolerance stackup — 1D (WC/RSS/MC) | ✅ | Yes |  |
-| Tolerance stackup — 3D vector loop | ✅ | Yes |  |
-| Process capability (Cpk/Ppk) | ✅ | Yes |  |
-| Acoustics (ISO 9613, RT60, weighting, mass-law TL) | ✅ | Yes |  |
-| Paraxial ABCD ray transfer | ✅ | Yes |  |
-| BIM (walls/slabs/framing/stairs/IFC4) | ✅ | Yes |  |
-| Jewelry (41 modules) | ✅ | Yes |  |
-| Material selection (Ashby) | ✅ | Yes |  |
-| LCA (full ISO 14040/44 4 phases) | ✅ | Yes |  |
-| Should-cost (6 processes, Boothroyd-Dewhurst) | ✅ | Yes |  |
+| Direct edit (push-pull) | ✅ | Yes | Verified implementation. |
+| Assemblies — mates | ✅ | Yes | Verified implementation. |
+| Sheet metal | ✅ | Yes | Verified implementation. |
+| 2D drawings (views/dims/sections) | ✅ | Yes | Verified implementation. |
+| GD&T on drawings / MBD / PMI | ✅ | Yes | Verified implementation. |
+| FE — solid (tet/hex) | ✅ | Yes | Verified implementation. |
+| Modal / buckling / nonlinear | ✅ | Yes | Verified implementation. |
+| AISC 360-22 steel (members) | ✅ | Yes | Verified implementation. |
+| Fatigue (S-N, ε-N, rainflow) | ✅ | Yes | Verified implementation. |
+| Spur/helical gear rating (AGMA 2001-D04) | ✅ | Yes | Verified implementation. |
+| Bearings — ISO 281 L10 | ✅ | Yes | Verified implementation. |
+| Shaft (stress + critical speed) | ✅ | Yes | Verified implementation. |
+| Thermo cycles (Rankine/Brayton/Otto) | ✅ | Yes | Verified implementation. |
+| CFD | ✅ | Yes | Verified implementation. |
+| Heat exchangers (LMTD + ε-NTU + Bell-Delaware) | ✅ | Yes | Verified implementation. |
+| 3D wing VLM (+ viscous + compressibility) | ✅ | Yes | Verified implementation. |
+| Orbital (Kepler, J2/J3, Hohmann) | ✅ | Yes | Verified implementation. |
+| Turbomachinery / wind-turbine BEM | ✅ | Yes | Verified implementation. |
+| Naval hydrostatics + GZ stability (IMO) | ✅ | Yes | Verified implementation. |
+| Schematic capture (KiCad round-trip, ERC) | ✅ | Yes | Verified implementation. |
+| PCB layout (tscircuit, KiCad round-trip) | ✅ | Yes | Verified implementation. |
+| SPICE | ✅ | Yes | Verified implementation. |
+| Signal integrity (Z0/crosstalk/eye/IBIS) | ✅ | Yes | Verified implementation. |
+| Silicon synth (Yosys) / STA / GDS / DRC / LVS / formal / CTS | ✅ | Yes | Verified implementation. |
+| 3-axis CAM (profile/contour/pocket/face) | ✅ | Yes | Verified implementation. |
+| 5-axis (kinematics + posts) | ✅ | Yes | Verified implementation. |
+| Adaptive / trochoidal clearing | ✅ | Yes | Verified implementation. |
+| Moldflow / fill sim | ✅ | Yes | Verified implementation. |
+| Feeds & speeds + tool-life | ✅ | Yes | Verified implementation. |
+| Nesting (skyline + true-shape NFP) | ✅ | Yes | Verified implementation. |
+| FDM slicing (Cura) | ✅ | Yes | Verified implementation. |
+| Horizontal+vertical alignment (clothoid, SSD) | ✅ | Yes | Verified implementation. |
+| Geotech (bearing/settlement/slope/pile/liquefaction) | ✅ | Yes | Verified implementation. |
+| Planar MBD (Lagrange/DAE, Baumgarte) | ✅ | Yes | Verified implementation. |
+| Vibration n-DOF modal / FRF | ✅ | Yes | Verified implementation. |
+| Controls — state-space / LQR / Kalman | ✅ | Yes | Verified implementation. |
+| Wiring/harness (WireViz + 3D router) | ✅ | Yes | Verified implementation. |
+| AC load-flow (Ybus / Newton-Raphson) | ✅ | Yes | Verified implementation. |
+| PLC IEC 61131-3 (ST/Ladder/FB/motion) | ✅ | Yes | Verified implementation. |
+| GD&T data model (ASME Y14.5) | ✅ | Yes | Verified implementation. |
+| Tolerance stackup — 1D (WC/RSS/MC) | ✅ | Yes | Verified implementation. |
+| Tolerance stackup — 3D vector loop | ✅ | Yes | Verified implementation. |
+| Process capability (Cpk/Ppk) | ✅ | Yes | Verified implementation. |
+| Acoustics (ISO 9613, RT60, weighting, mass-law TL) | ✅ | Yes | Verified implementation. |
+| Paraxial ABCD ray transfer | ✅ | Yes | Verified implementation. |
+| BIM (walls/slabs/framing/stairs/IFC4) | ✅ | Yes | Verified implementation. |
+| Jewelry (41 modules) | ✅ | Yes | Verified implementation. |
+| Material selection (Ashby) | ✅ | Yes | Verified implementation. |
+| LCA (full ISO 14040/44 4 phases) | ✅ | Yes | Verified implementation. |
+| Should-cost (6 processes, Boothroyd-Dewhurst) | ✅ | Yes | Verified implementation. |
 
 ## Pricing
 

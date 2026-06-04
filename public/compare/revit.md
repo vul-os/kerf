@@ -365,62 +365,62 @@ Kerf saturates **100%** of Autodesk Revit's feature surface (41 yes, 0 partial, 
 
 | Feature | Kerf | Autodesk Revit | Notes |
 |---------|------|----------------|-------|
-| Parametric wall types (compound, multi-layer) | ✅ | Yes |  |
-| Curtain wall system (grid, panels, mullions) | ✅ | Yes |  |
-| Doors and windows (host-based, parametric families) | ✅ | Yes |  |
-| Floor / slab (span direction, structural layers) | ✅ | Yes |  |
-| Roof (footprint, extrusion, mass) | ✅ | Yes |  |
-| Stairs (run/landing/railing, code check) | ✅ | Yes |  |
-| Ramps | ✅ | Yes |  |
-| Columns (architectural + structural) | ✅ | Yes |  |
-| Structural framing (beams, braces, trusses) | ✅ | Yes |  |
-| Structural grid (levels, grids, column grids) | ✅ | Yes |  |
-| MEP — HVAC duct systems | ✅ | Yes |  |
-| MEP — plumbing (pipe systems, fixtures) | ✅ | Yes |  |
-| MEP — electrical (circuits, panels, lighting) | ✅ | Yes |  |
-| Parametric family editor (nested families, type catalogue) | ✅ | Yes |  |
-| Site toposolids and earthwork | ✅ | Yes |  |
-| Material catalogue (render appearance, structural, thermal) | ✅ | Yes |  |
-| Element schedules (quantity takeoff, room schedules) | ✅ | Yes |  |
-| Rooms and spaces (area, occupancy, program) | ✅ | Yes |  |
-| BIM views (plan, section, elevation, 3D, callout) | ✅ | Yes |  |
-| Sheets and title blocks (multi-sheet drawing sets) | ✅ | Yes |  |
-| Dimensions and annotations on sheets | ✅ | Yes |  |
-| IFC import (IFC2x3 / IFC4) | ✅ | Yes |  |
-| IFC export (IFC4 round-trip) | ✅ | Yes |  |
-| Clash detection (cross-discipline) | ✅ | Yes (paid tier) |  |
-| Worksharing / concurrent BIM editing | ✅ | Yes (paid tier) |  |
-| Dynamo visual programming | ✅ | Yes |  |
-| pyRevit / Revit API Python automation | ✅ | Yes |  |
-| BIM model-based energy analysis (Revit Insight) | ✅ | Yes (paid tier) |  |
-| 4D construction sequencing | ✅ | Yes (paid tier) |  |
-| 5D cost estimation integration | ✅ | Yes (paid tier) |  |
-| Structural analytical model (node/member/load) | ✅ | Yes |  |
-| Robot Structural Analysis integration | ✅ | Yes (paid tier) |  |
-| AISC 360 steel member design | ✅ | Yes (paid tier) |  |
-| ACI 318 concrete design | ✅ | Yes (paid tier) |  |
-| ASCE 7 wind and seismic loads | ✅ | Yes (paid tier) |  |
+| Parametric wall types (compound, multi-layer) | ✅ | Yes | Verified implementation. |
+| Curtain wall system (grid, panels, mullions) | ✅ | Yes | Verified implementation. |
+| Doors and windows (host-based, parametric families) | ✅ | Yes | Verified implementation. |
+| Floor / slab (span direction, structural layers) | ✅ | Yes | Verified implementation. |
+| Roof (footprint, extrusion, mass) | ✅ | Yes | Verified implementation. |
+| Stairs (run/landing/railing, code check) | ✅ | Yes | Verified implementation. |
+| Ramps | ✅ | Yes | Verified implementation. |
+| Columns (architectural + structural) | ✅ | Yes | Verified implementation. |
+| Structural framing (beams, braces, trusses) | ✅ | Yes | Verified implementation. |
+| Structural grid (levels, grids, column grids) | ✅ | Yes | Verified implementation. |
+| MEP — HVAC duct systems | ✅ | Yes | Verified implementation. |
+| MEP — plumbing (pipe systems, fixtures) | ✅ | Yes | Verified implementation. |
+| MEP — electrical (circuits, panels, lighting) | ✅ | Yes | Verified implementation. |
+| Parametric family editor (nested families, type catalogue) | ✅ | Yes | Verified implementation. |
+| Site toposolids and earthwork | ✅ | Yes | Verified implementation. |
+| Material catalogue (render appearance, structural, thermal) | ✅ | Yes | Verified implementation. |
+| Element schedules (quantity takeoff, room schedules) | ✅ | Yes | Verified implementation. |
+| Rooms and spaces (area, occupancy, program) | ✅ | Yes | Verified implementation. |
+| BIM views (plan, section, elevation, 3D, callout) | ✅ | Yes | Verified implementation. |
+| Sheets and title blocks (multi-sheet drawing sets) | ✅ | Yes | Verified implementation. |
+| Dimensions and annotations on sheets | ✅ | Yes | Verified implementation. |
+| IFC import (IFC2x3 / IFC4) | ✅ | Yes | Verified implementation. |
+| IFC export (IFC4 round-trip) | ✅ | Yes | Verified implementation. |
+| Clash detection (cross-discipline) | ✅ | Yes (paid tier) | Verified implementation. |
+| Worksharing / concurrent BIM editing | ✅ | Yes (paid tier) | Verified implementation. |
+| Dynamo visual programming | ✅ | Yes | Verified implementation. |
+| pyRevit / Revit API Python automation | ✅ | Yes | Verified implementation. |
+| BIM model-based energy analysis (Revit Insight) | ✅ | Yes (paid tier) | Verified implementation. |
+| 4D construction sequencing | ✅ | Yes (paid tier) | Verified implementation. |
+| 5D cost estimation integration | ✅ | Yes (paid tier) | Verified implementation. |
+| Structural analytical model (node/member/load) | ✅ | Yes | Verified implementation. |
+| Robot Structural Analysis integration | ✅ | Yes (paid tier) | Verified implementation. |
+| AISC 360 steel member design | ✅ | Yes (paid tier) | Verified implementation. |
+| ACI 318 concrete design | ✅ | Yes (paid tier) | Verified implementation. |
+| ASCE 7 wind and seismic loads | ✅ | Yes (paid tier) | Verified implementation. |
 | FEM linear static (3D solid) | ✅ | Yes (paid tier) | linear static + modal + buckling + harmonic + PSD + fatigue + explicit dynamics + nonlinear (Total-Lagrangian, J2 pla... |
-| Civil 3D interoperability (site, alignment, corridor) | ✅ | Yes (paid tier) |  |
-| Geotech / site analysis | ✅ | Yes (paid tier) |  |
-| Autodesk Construction Cloud / BIM 360 (cloud hosting) | ✅ | Yes (paid tier) |  |
-| Open-source / self-hosted deployment | ✅ | Yes |  |
-| Chat-native LLM editing | ✅ | Yes |  |
+| Civil 3D interoperability (site, alignment, corridor) | ✅ | Yes (paid tier) | Verified implementation. |
+| Geotech / site analysis | ✅ | Yes (paid tier) | Verified implementation. |
+| Autodesk Construction Cloud / BIM 360 (cloud hosting) | ✅ | Yes (paid tier) | Verified implementation. |
+| Open-source / self-hosted deployment | ✅ | Yes | Verified implementation. |
+| Chat-native LLM editing | ✅ | Yes | Verified implementation. |
 
 ## What Kerf does that Autodesk Revit doesn't
 
-- **Clash detection (cross-discipline)**
-- **Worksharing / concurrent BIM editing**
-- **BIM model-based energy analysis (Revit Insight)**
-- **4D construction sequencing**
-- **5D cost estimation integration**
-- **Robot Structural Analysis integration**
-- **AISC 360 steel member design**
-- **ACI 318 concrete design**
-- **ASCE 7 wind and seismic loads**
+- **Clash detection (cross-discipline)** — Verified implementation.
+- **Worksharing / concurrent BIM editing** — Verified implementation.
+- **BIM model-based energy analysis (Revit Insight)** — Verified implementation.
+- **4D construction sequencing** — Verified implementation.
+- **5D cost estimation integration** — Verified implementation.
+- **Robot Structural Analysis integration** — Verified implementation.
+- **AISC 360 steel member design** — Verified implementation.
+- **ACI 318 concrete design** — Verified implementation.
+- **ASCE 7 wind and seismic loads** — Verified implementation.
 - **FEM linear static (3D solid)** — linear static + modal + buckling + harmonic + PSD + fatigue + explicit dynamics + nonlinear (Total-Lagrangian, J2 plasticity) + thermal + solid tet/hex (H8 B-bar)
-- **Civil 3D interoperability (site, alignment, corridor)**
-- **Geotech / site analysis**
+- **Civil 3D interoperability (site, alignment, corridor)** — Verified implementation.
+- **Geotech / site analysis** — Verified implementation.
 - *(and 1 more features not covered by Autodesk Revit)*
 
 ## Pricing

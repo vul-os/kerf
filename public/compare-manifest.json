@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-04T09:06:37.000Z",
+  "generatedAt": "2026-06-04T10:38:14.000Z",
   "items": [
     {
       "slug": "revit",
@@ -225,7 +225,11 @@
           "name": "FEM linear static (3D solid)",
           "domain": "D2",
           "competitor": "paid: true",
-          "kerf": {"status": "yes", "note": "linear static + modal + buckling + harmonic + PSD + fatigue + explicit dynamics + nonlinear (Total-Lagrangian, J2 plasticity) + thermal + solid tet/hex (H8 B-bar)", "evidence": "packages/kerf-fem/src/kerf_fem/linear_static.py"}
+          "kerf": {
+            "status": "yes",
+            "note": "linear static + modal + buckling + harmonic + PSD + fatigue + explicit dynamics + nonlinear (Total-Lagrangian, J2 plasticity) + thermal + solid tet/hex (H8 B-bar)",
+            "evidence": "packages/kerf-fem/src/kerf_fem/linear_static.py"
+          }
         },
         {
           "name": "Civil 3D interoperability (site, alignment, corridor)",
@@ -11079,7 +11083,11 @@
           "nx": "NX Shape Studio \u2014 Class-A G2/G3 surfaces, reflection line analysis, curvature combs; automotive-grade",
           "nx_tier": "paid",
           "competitor": "source: https://plm.automation.siemens.com/global/en/products/nx/nx-design.html",
-          "kerf": {"status": "yes", "note": "blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends + MatchSrf G3 wired", "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/match_srf_g3.py"}
+          "kerf": {
+            "status": "yes",
+            "note": "blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends + MatchSrf G3 wired",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/match_srf_g3.py"
+          }
         },
         {
           "domain": "D1",

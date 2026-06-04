@@ -33,7 +33,6 @@ from kerf_dental.intraoral_scan import (
     detect_arch_landmarks,
     remove_artifacts,
     align_bite,
-    _compute_hu_moments,
     _icp_align,
 )
 

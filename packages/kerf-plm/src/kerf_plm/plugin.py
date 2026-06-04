@@ -269,6 +269,17 @@ async def register(app: FastAPI, ctx):
     except Exception:
         pass  # multi-currency-cost-rollup tool optional — fail silently if symbol missing.
 
+    # Wave 12B: Landscape + Quote-to-delivery + MicroFlo
+    # Cimatron quote-to-delivery workflow (ISA-95 + APICS OM 14e Ch 16)
+    # JobOrder state machine: QUOTED → QUOTE_ACCEPTED → DESIGN → MOLD_MAKING
+    # → SAMPLING → PRODUCTION ↔ QC_HOLD → SHIPPED → DELIVERED → INVOICED
+    try:
+        from kerf_plm.quote_to_delivery import (  # noqa: F401
+            JobOrder, JobStatus, transition_status, status_report, on_time_delivery_rate,
+        )
+    except Exception:
+        pass  # quote_to_delivery optional — fail silently if symbols missing
+
     try:
         from kerf_core.plugin import PluginManifest
         return PluginManifest(

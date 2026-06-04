@@ -66,6 +66,15 @@ async def register(app: FastAPI, ctx):
     # Wave 12B: CFD advanced physics (compressible/conjugate-HT/multiphase/marine)
     import kerf_cfd.cfd_advanced_v3_tools  # noqa: F401 — triggers @register decorators
 
+    # Wave 12B: Landscape + Quote-to-delivery + MicroFlo
+    # IES MicroFlo-style room airflow: preview-grade RANS + Fanger 1972 PMV/PPD
+    # References: Fanger (1972); ASHRAE 55-2020; ASHRAE 62.1-2022;
+    #             Launder-Spalding 1974 k-ε (reused from kerf_cfd.rans.k_epsilon)
+    try:
+        import kerf_cfd.internal_airflow.microflo  # noqa: F401
+    except Exception:
+        pass  # internal_airflow optional — fail silently
+
     provides = [
         "cfd.simple_rans",
         "cfd.turbulence_model",
@@ -84,6 +93,7 @@ async def register(app: FastAPI, ctx):
         "cfd.conjugate_heat_transfer",
         "cfd.vof_multiphase",
         "cfd.marine_hydrodynamics",
+        "cfd.internal_airflow_microflo",
     ]
 
     try:

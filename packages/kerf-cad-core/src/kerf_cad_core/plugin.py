@@ -673,6 +673,11 @@ _TOOL_MODULES = [
     # ashby_build_chart + ashby_pareto_front
     # Ashby (2017) "Materials Selection in Mechanical Design" 5e; Ashby (2018) 4e
     "kerf_cad_core.materials.material_tools",
+    # Wave 12B: Landscape + Quote-to-delivery + MicroFlo
+    # Rhino landscape: design_grading (ASCE-60 prismoidal cut/fill) +
+    # compute_drainage_network (D8/D-infinity; Tarboton 1997) +
+    # design_planting_plan (USDA Hardiness Zone + ASLA SITES v2)
+    "kerf_cad_core.civil.landscape",
 ]
 # NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
 # (already in _TOOL_MODULES above at line 128); sagitta_arrow_chart module is imported

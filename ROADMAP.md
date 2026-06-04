@@ -51,6 +51,7 @@ Compare-manifest saturation at time of writing: **1235 yes / 29 partial / 1 no**
 - Full NURBS analytic surface derivatives (Piegl & Tiller Algorithm A3.6 + rational quotient rule A4.4), Gaussian K and mean H curvature, hardened SSI differential-geometry marcher (`packages/kerf-cad-core/src/kerf_cad_core/geom/surface_analytic_derivatives.py`).
 - B-rep → 2D Hidden-Line Removal projection for technical drawings (`packages/kerf-cad-core/src/kerf_cad_core/drawings/brep_hlr.py`).
 - G1 continuity at extraordinary-vertex SubD → NURBS patch conversion (Loop 1987 §4) (`packages/kerf-cad-core/src/kerf_cad_core/subd/g1_extraordinary_patches.py`).
+- **OCCT Phase 4 NURBS surfacing — COMPLETE**: MatchSrf G3 (`geom/match_srf_g3.py`), trim-by-curve + loop heal + validation (`geom/trim_curve.py`, `geom/trim_loop_heal.py`, `geom/trim_validation.py`), surface-direct booleans + robustness layer (`geom/nurbs_boolean.py`, `geom/surface_boolean_robust.py`), analytic curve + surface derivatives (`geom/nurbs_derivative.py`, `geom/surface_analytic_derivatives.py`), Stam limit-tangents + G1 at EVs (`subd/limit_tangent.py`, `subd/g1_extraordinary_patches.py`), Tiller-Hanson far-offset (`geom/offset_far_correction.py`), iso-curve extraction (`geom/iso_curve_extract.py`).
 
 **SubD / mesh**
 - Multires displacement maps on Catmull-Clark limit surface (Krishnamurthy-Levoy 1996) (`packages/kerf-cad-core/src/kerf_cad_core/geom/multires_displacement.py`).
@@ -231,7 +232,7 @@ Full list of 139+ GK modules in `packages/kerf-cad-core/src/kerf_cad_core/geom/`
 - CAM: turning depth calculator, milling toolpath, G-code post-processor, lathe cycle simulation.
 - Sheet metal: flat-pattern, hem/jog/multi-flange, DXF export.
 - Wiring harness: 3D auto-routing (voxel A*), formboard flatten, NEC ampacity + voltage-drop checks.
-- FEM: linear static + modal + buckling + harmonic + PSD + acoustics + EM + fatigue + explicit dynamics + 3-D nonlinear static (H8 B-bar, Total-Lagrangian, J2 plasticity, arc-length) + coupled-field probabilistic (LHS + Karhunen-Loève).
+- FEM: linear static + modal + buckling + harmonic + PSD + acoustics + EM + fatigue (S-N / Coffin-Manson, rainflow, Goodman/Gerber/SWT mean-stress) + explicit dynamics (central-difference leapfrog, CFL time-step) + 3-D nonlinear static (H8 B-bar, Total-Lagrangian, J2 plasticity, Riks arc-length) + thermal (steady 1-D slab + fin efficiency + transient) + solid tet/hex elements (Tet4/Tet10, H8 B-bar, Wave 11B4) + coupled-field probabilistic (LHS + Karhunen-Loève). *Honest outstanding: J2/Drucker-Prager/Hill plasticity in full 3-D solid, thermal-structural coupling, composite layered shells (Tsai-Wu), contact mechanics (Hertz/penalty method), fracture mechanics (J-integral/XFEM).*
 
 **Simulation / manufacturing**
 - CFD: RANS k-ε + k-ω SST + wall functions; 3-D tet mesher; OpenFOAM export bridge; combustion EBU; Lagrangian particles; ALE/FSI; snappyHexMesh-style mesher; ASCE 7-22 wind engineering; Bearman vortex shedding; compressible Roe flux; conjugate HT; VOF multiphase; Holtrop-Mennen marine resistance.
@@ -285,7 +286,6 @@ Full list of 139+ GK modules in `packages/kerf-cad-core/src/kerf_cad_core/geom/`
 - **T-101 CFD depth** — LES/DES/DNS, parallel MPI execution, ParaView/VTK post-processing bridge, marine hydrodynamics at depth.
 - **Koyeb migration (T-400..T-410)** — Fly.io GPU fleet killed; Koyeb code complete; T-405 DNS/secrets/deploy cutover needs user action.
 - **Large-assembly DMU** — LOD heuristics use synthetic estimates; wiring to real tessellated part geometry would sharpen tier boundaries.
-- **OCCT Phase 4 NURBS surfacing** — long-tail; only remaining major kernel item.
 
 ---
 

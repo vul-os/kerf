@@ -200,7 +200,7 @@ Legend: ✅ solid · ⚠️ partial / sampling-grade / unwired · ❌ missing.
 | Rhino / OpenNURBS capability | Kerf status | Gap notes |
 |---|---|---|
 | Evaluate | ⚠️ two evaluators: `nurbs.surface_evaluate` (buggy basis, per `intersection.py` docstring) vs `intersection._nurbs_surface_eval` (correct) | duplicate, one wrong; must unify |
-| Surface derivatives / normal | ⚠️ `nurbs.surface_derivative` FD only | caps curvature/continuity accuracy |
+| Surface derivatives / normal | ✅ `geom/surface_analytic_derivatives.py` (P&T A3.6/A4.4) + `geom/nurbs_derivative.py` | analytic derivatives; K/H curvature; SSI marcher (Wave 8A4) |
 | Loft / network / skin | ✅ `network_srf.py` | broad |
 | Sweep1 / Sweep2 (twist, scale) | ✅ `sweep1.py`, `sweep2.py` | Frenet frame; no rotation-minimising frame |
 | Revolve / rail-revolve | ✅ `revolve_srf.py` | true arc CPs |
@@ -211,7 +211,7 @@ Legend: ✅ solid · ⚠️ partial / sampling-grade / unwired · ❌ missing.
 | Match surface G0/G1/G2 | ✅⚠️ `match_srf.py` | applies + classifies; needs analytic verification |
 | Fillet / chamfer (surface) | ⚠️ `surface_fillet.py` | not G1/G2, no support trim, no body |
 | Variable-radius fillet | ⚠️ `surface_fillet.variable_radius_surface_fillet` | rail only, no continuity |
-| Trim / split by curve | ⚠️ `trim_curve.py` | UV projection FD Newton; no SSI-driven trim |
+| Trim / split by curve | ✅ `trim_curve.py` + `trim_loop_heal.py` + `trim_validation.py` | UV Newton projection; OCCT BRepFeat_SplitShape/BRepProj bridge in `occtBridge.js`; loop healing + validation shipped (Wave 8A2) |
 | Untrim / shrink trimmed srf | ❌ | missing |
 | Offset surface | ❌ | missing (only `mesh_repair.mesh_offset`) |
 | Curvature (Gaussian/mean/principal) | ⚠️ `surface_analysis.gaussian_mean_curvature` | not validated vs analytic K |

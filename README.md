@@ -219,7 +219,7 @@ file types, capability grid, and an LLM-prompt example.
 | TechDraw-flavored drawings (multi-sheet, dimensions, GD&T, hatching, leaders, balloons) | ✅ |
 | Electronics via tscircuit (TSX → schematic + PCB + 3D board viewers) | ✅ |
 | SPICE simulation (ngspice), RF s-parameters (scikit-rf), autoroute (FreeRouting) | ✅ |
-| FEM (FEniCSx + CalculiX) — linear-static + modal + thermal + linear buckling + harmonic response + random-vibration PSD + deformed-shape overlay | ✅ |
+| FEM (FEniCSx + CalculiX) — linear static + modal + buckling + harmonic + random-vibration PSD + fatigue (S-N / Coffin-Manson, rainflow) + geometric-nonlinear (Total-Lagrangian) + material-nonlinear (J2 plasticity, Riks arc-length) + thermal (steady + transient fin) + explicit dynamics (central-difference leapfrog) + solid tet/hex elements (H8 B-bar, Wave 11B4); *Honest outstanding: J2/Drucker-Prager/Hill plasticity in 3-D solids, thermal-structural coupling, composite layered shells (Tsai-Wu), contact mechanics (Hertz/penalty), fracture (J-integral/XFEM)* | ✅ |
 | Topology optimization (FEniCSx SIMP + Gmsh mesh + NURBS STEP export) | ✅ |
 | CAM (OpenCAMlib) — 2.5D + 3D parallel/waterline + lathe; G-code posts | ✅ |
 | BIM (`.bim` text-DSL → IFC4 via IfcOpenShell; Revit-parity families/schedules/views/sheets/stairs/MEP/curtain wall) | ✅ |

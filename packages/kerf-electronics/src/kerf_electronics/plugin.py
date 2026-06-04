@@ -237,6 +237,11 @@ def _register_tools(ctx, provides: list) -> None:
         # power_build_y_bus: build bus admittance matrix Y_bus (G+jB)
         # power_ac_load_flow: Newton-Raphson AC load flow (Stevenson 1982 §9)
         "kerf_electronics.power.load_flow_tools",
+        # Wave 12D: KiCad v10 diff-pair length tuner
+        # electronics_tune_trace_to_length: serpentine meander insertion (rectangular/arc/45°)
+        # electronics_tune_diff_pair_lengths: symmetric diff-pair matching (Hall & Heck 2009 §3.6)
+        # Reference: IPC-2141A §6 + Wittwer 2012 DesignCon
+        "kerf_electronics.routing.diffpair_tuner_tools",
     ]
 
     for module_path in tool_modules:

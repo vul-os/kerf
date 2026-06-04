@@ -2,11 +2,12 @@
 //
 // Wires the Toolbar and Canvas sub-components together.
 // Backend contract:
-//   POST /api/llm-tools/electronics_route_trace  {start_pad, end_pad, layer, width}
-//   POST /api/llm-tools/electronics_delete_object {id, type}
-//   POST /api/llm-tools/pcb_shove_trace           {circuit_json, layer, points, clearance_mm}
-//   GET  /api/llm-tools/pcb_drc                   → {ok, violations:[]}
-//   GET  /api/projects/:id/pcb                    → {pads, traces, keepouts}
+//   POST /api/llm-tools/electronics_route_trace           {start_pad, end_pad, layer, width}
+//   POST /api/llm-tools/electronics_delete_object         {id, type}
+//   POST /api/llm-tools/pcb_shove_trace                   {circuit_json, layer, points, clearance_mm}
+//   POST /api/llm-tools/electronics_tune_diff_pair_lengths {path_a, path_b, target_length_mm, …}
+//   GET  /api/llm-tools/pcb_drc                           → {ok, violations:[]}
+//   GET  /api/projects/:id/pcb                            → {pads, traces, keepouts}
 //
 // Mock fixture is used when no project_id is provided or the load fails.
 
@@ -155,6 +156,14 @@ export default function PCBInteractiveEditor() {
   const [pushedTraceIds, setPushedTraceIds] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+
+  // ── Tune-Length mode state ─────────────────────────────────────────────────
+  const [tuneNetA, setTuneNetA] = useState('')
+  const [tuneNetB, setTuneNetB] = useState('')
+  const [tuneTargetMm, setTuneTargetMm] = useState('100')
+  const [tunePattern, setTunePattern] = useState('arc')
+  const [tuneResult, setTuneResult] = useState(null)
+  const [tuneLoading, setTuneLoading] = useState(false)
 
   const drcTimerRef = useRef(null)
 
@@ -347,6 +356,66 @@ export default function PCBInteractiveEditor() {
     setSelectedId(id)
   }, [])
 
+  // ── Tune-Length: diff-pair serpentine insertion ────────────────────────────
+  // Sends path_a and path_b polylines (traces by net name) to the backend
+  // electronics_tune_diff_pair_lengths tool and stores the result.
+  // Reference: Hall & Heck 2009 §3.6; IPC-2141A §6; Wittwer 2012 DesignCon.
+
+  const handleTuneDiffPair = useCallback(async () => {
+    const tracesA = boardState.traces.filter((t) => t.net === tuneNetA)
+    const tracesB = boardState.traces.filter((t) => t.net === tuneNetB)
+
+    if (tracesA.length === 0 || tracesB.length === 0) {
+      setTuneResult({ error: 'No traces found for one or both net names.' })
+      return
+    }
+
+    // Flatten all points from each net's traces (simple concatenation)
+    const toPath = (traces) => traces.flatMap((t) => t.points.map((p) => [p.x * 0.0254, p.y * 0.0254]))
+    const path_a = toPath(tracesA)
+    const path_b = toPath(tracesB)
+
+    const target = parseFloat(tuneTargetMm)
+    if (isNaN(target) || target <= 0) {
+      setTuneResult({ error: 'Target length must be a positive number.' })
+      return
+    }
+
+    setTuneLoading(true)
+    setTuneResult(null)
+
+    try {
+      const res = await fetch('/api/llm-tools/electronics_tune_diff_pair_lengths', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          path_a,
+          path_b,
+          target_length_mm: target,
+          skew_tolerance_mm: 0.025,
+          pattern: tunePattern,
+          segment_length_mm: 0.5,
+          spacing_mm: 0.3,
+          corner_radius_mm: 0.15,
+        }),
+      })
+      const data = await res.json()
+      if (data?.ok) {
+        setTuneResult(data.result)
+      } else {
+        setTuneResult({ error: data?.message ?? 'Tuner backend error.' })
+      }
+    } catch {
+      // Backend unavailable in demo mode — show mock result
+      setTuneResult({
+        _demo: true,
+        message: 'Backend offline — demo mode. In production this posts to /api/llm-tools/electronics_tune_diff_pair_lengths.',
+      })
+    } finally {
+      setTuneLoading(false)
+    }
+  }, [boardState.traces, tuneNetA, tuneNetB, tuneTargetMm, tunePattern])
+
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
@@ -378,6 +447,9 @@ export default function PCBInteractiveEditor() {
         )}
         {tool === 'delete' && (
           <span className="text-red-300">Click a trace or pad to delete</span>
+        )}
+        {tool === 'tune-length' && (
+          <span className="text-teal-300">Select nets P + N, set target length, click Tune — serpentine meanders inserted (Wittwer 2012)</span>
         )}
         <span className="ml-auto text-gray-600">
           {projectId ? `project: ${projectId}` : 'demo fixture'}
@@ -417,6 +489,109 @@ export default function PCBInteractiveEditor() {
           >
             Deselect
           </button>
+        </div>
+      )}
+
+      {/* ── Tune Length panel — shown when tune-length tool is active ─────── */}
+      {tool === 'tune-length' && (
+        <div
+          data-testid="tune-length-panel"
+          className="px-3 py-2 bg-[#0d2233] border-t border-teal-800/50 text-xs text-gray-300 flex flex-wrap items-end gap-3"
+        >
+          <span className="text-teal-400 font-semibold text-[11px] shrink-0">
+            Diff-Pair Length Tuner
+          </span>
+
+          {/* Net P */}
+          <label className="flex flex-col gap-0.5">
+            <span className="text-gray-500">Net P (trace A)</span>
+            <input
+              data-testid="tune-net-a"
+              type="text"
+              value={tuneNetA}
+              onChange={(e) => setTuneNetA(e.target.value)}
+              placeholder="e.g. USB_DP"
+              className="bg-black/40 border border-white/10 rounded px-2 py-1 text-white placeholder-gray-600 w-24 focus:outline-none focus:border-teal-600"
+            />
+          </label>
+
+          {/* Net N */}
+          <label className="flex flex-col gap-0.5">
+            <span className="text-gray-500">Net N (trace B)</span>
+            <input
+              data-testid="tune-net-b"
+              type="text"
+              value={tuneNetB}
+              onChange={(e) => setTuneNetB(e.target.value)}
+              placeholder="e.g. USB_DM"
+              className="bg-black/40 border border-white/10 rounded px-2 py-1 text-white placeholder-gray-600 w-24 focus:outline-none focus:border-teal-600"
+            />
+          </label>
+
+          {/* Target length */}
+          <label className="flex flex-col gap-0.5">
+            <span className="text-gray-500">Target (mm)</span>
+            <input
+              data-testid="tune-target-mm"
+              type="number"
+              min="0.1"
+              step="0.1"
+              value={tuneTargetMm}
+              onChange={(e) => setTuneTargetMm(e.target.value)}
+              className="bg-black/40 border border-white/10 rounded px-2 py-1 text-white w-20 focus:outline-none focus:border-teal-600"
+            />
+          </label>
+
+          {/* Pattern */}
+          <label className="flex flex-col gap-0.5">
+            <span className="text-gray-500">Pattern</span>
+            <select
+              data-testid="tune-pattern"
+              value={tunePattern}
+              onChange={(e) => setTunePattern(e.target.value)}
+              className="bg-black/40 border border-white/10 rounded px-2 py-1 text-white focus:outline-none focus:border-teal-600"
+            >
+              <option value="arc">Arc (best SI)</option>
+              <option value="rectangular">Rectangular</option>
+              <option value="chamfered_45">45° Chamfer</option>
+            </select>
+          </label>
+
+          {/* Tune button */}
+          <button
+            data-testid="tune-run-btn"
+            onClick={handleTuneDiffPair}
+            disabled={tuneLoading}
+            className="px-3 py-1.5 rounded-md bg-teal-700 hover:bg-teal-600 text-white font-medium transition-colors disabled:opacity-40 disabled:pointer-events-none"
+          >
+            {tuneLoading ? 'Tuning…' : 'Tune Pair'}
+          </button>
+
+          {/* Result inline */}
+          {tuneResult && !tuneResult.error && !tuneResult._demo && (
+            <div className="text-[11px] text-gray-300 flex gap-3 flex-wrap">
+              <span>
+                A: <span className="text-teal-300">{tuneResult.length_a_mm?.toFixed(3)} mm</span>
+                {' '}({tuneResult.meanders_a} meanders)
+              </span>
+              <span>
+                B: <span className="text-teal-300">{tuneResult.length_b_mm?.toFixed(3)} mm</span>
+                {' '}({tuneResult.meanders_b} meanders)
+              </span>
+              <span>
+                Skew: <span className={tuneResult.is_skew_within_tolerance ? 'text-emerald-400' : 'text-red-400'}>
+                  {(tuneResult.skew_mm * 1000)?.toFixed(1)} μm
+                </span>
+                {' '}{tuneResult.is_skew_within_tolerance ? '✓' : '✗'}
+              </span>
+            </div>
+          )}
+          {tuneResult?.error && (
+            <span className="text-red-400">{tuneResult.error}</span>
+          )}
+          {tuneResult?._demo && (
+            <span className="text-yellow-500 text-[11px]">{tuneResult.message}</span>
+          )}
         </div>
       )}
     </div>

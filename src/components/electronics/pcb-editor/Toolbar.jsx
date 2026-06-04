@@ -12,13 +12,14 @@
 //   onUndo        — () => void
 //   onRedo        — () => void
 
-import { MousePointer2, Route, Zap, Trash2, Layers, CheckCircle2, XCircle, Undo2, Redo2, Loader } from 'lucide-react'
+import { MousePointer2, Route, Zap, Trash2, Layers, CheckCircle2, XCircle, Undo2, Redo2, Loader, Ruler } from 'lucide-react'
 
 const TOOLS = [
   { id: 'select',     label: 'Select',      Icon: MousePointer2 },
   { id: 'route',      label: 'Route',       Icon: Route },
   { id: 'push-shove', label: 'Push-Shove',  Icon: Zap },
   { id: 'delete',     label: 'Delete',      Icon: Trash2 },
+  { id: 'tune-length', label: 'Tune Length', Icon: Ruler },
 ]
 
 const LAYERS = [

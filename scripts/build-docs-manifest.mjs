@@ -136,6 +136,96 @@ const SLUG_TO_GROUP = {
 
   // What's new
   'whats-new':           'whats-new',
+
+  // Feature-by-feature docs — Geometry kernel
+  'nurbs-surface-ops':       'reference',
+  'subd-to-nurbs':           'reference',
+  'subd-authoring':          'reference',
+  'match-surface-edge':      'reference',
+  'sdf-csg':                 'reference',
+  'brep-to-2d-hlr':          'reference',
+  'surface-analysis':        'reference',
+  'persistent-face-id':      'reference',
+  'afr-feature-dag':         'reference',
+  'quad-remesh':             'reference',
+  'frep-implicit':           'reference',
+
+  // CFD
+  'rans-turbulence':         'reference',
+  'conjugate-heat-transfer': 'reference',
+  'cfd-simple-solver':       'reference',
+  'cfd-openfoam':            'reference',
+
+  // FEM / Structural
+  'fem-linear-static':       'reference',
+  'fem-modal-buckling':      'reference',
+  'fem-nonlinear-plasticity':'reference',
+  'fem-harmonic-random-vib': 'reference',
+  'fem-calculix-bridge':     'reference',
+  'structural-frame-analysis':'reference',
+  'aisc-member-check':       'reference',
+
+  // Electronics
+  'pvt-corner-mc':           'reference',
+  'pdn-wizard':              'reference',
+  'electronics-autoroute':   'reference',
+  'electronics-drc-erc':     'reference',
+  'emc-si-pdn':              'reference',
+
+  // Controls
+  'transfer-function-control':'reference',
+  'state-space-lqr':         'reference',
+
+  // Building energy / civil
+  'ashrae-heat-load':        'reference',
+  'daylight-simulation':     'reference',
+  'tin-surface':             'reference',
+  'gravity-pipe-network':    'reference',
+  'civil-horizontal-alignment':'reference',
+
+  // Manufacturing / mold
+  'moldflow-injection-fill': 'reference',
+  'mold-parting-line':       'reference',
+  'composites-layup':        'reference',
+
+  // Materials
+  'ashby-material-selection':'reference',
+
+  // Dental
+  'dental-crown-bridge':     'reference',
+  'dental-surgical-guide':   'reference',
+  'dental-denture':          'reference',
+
+  // Apparel / textiles / packaging
+  'pattern-grading':         'reference',
+  'etextiles':               'reference',
+  'packaging-dieline':       'reference',
+
+  // Aerospace
+  'aero-vlm-wing':           'reference',
+  'rocket-propulsion':       'reference',
+  'orbital-mechanics':       'reference',
+  'aero-atmosphere':         'reference',
+  'aero-fin-flutter':        'reference',
+
+  // Mechanical
+  'robotics-kinematics':     'reference',
+  'five-axis-cam':           'reference',
+  'linkage-kinematics':      'reference',
+  'gears-strength':          'reference',
+  'pressure-vessel':         'reference',
+  'sheet-metal':             'reference',
+  'fasteners-library':       'reference',
+  'topology-optimization':   'reference',
+
+  // Other domains
+  'marine-hydrodynamics':    'reference',
+  'hvac-psychrometrics':     'reference',
+  'piping-stress':           'reference',
+  'gdt-tolerancing':         'reference',
+  'wiring-harness':          'reference',
+  'cam-layered':             'reference',
+  'optics-paraxial':         'reference',
 }
 
 // Per-plugin LLM-doc folders — these contribute schema references that humans

@@ -132,6 +132,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.fea.tools",
     "kerf_cad_core.springs.tools",
     "kerf_cad_core.piping.tools",
+    # Wave 12B: AVEVA E3D parity (piping catalog + multi-discipline + concurrent)
+    "kerf_cad_core.piping.piping_advanced_tools",
     "kerf_cad_core.hvac.tools",
     "kerf_cad_core.turning.tools",
     "kerf_cad_core.steelconn.tools",
@@ -665,6 +667,12 @@ _TOOL_MODULES = [
     "kerf_cad_core.civil.civil_advanced_tools",
     # Wave 11B: aerospace — openrocket motor DB (RASP .eng + Estes/AeroTech catalogs)
     "kerf_cad_core.aerospace.motor_database",
+    # Wave 12B: Ashby material selection — Cambridge Engineering Selector-equivalent
+    # material DB + selection charts + multi-criteria optimization (Granta MI parity)
+    # ashby_list_materials + ashby_get_material + ashby_select_materials +
+    # ashby_build_chart + ashby_pareto_front
+    # Ashby (2017) "Materials Selection in Mechanical Design" 5e; Ashby (2018) 4e
+    "kerf_cad_core.materials.material_tools",
 ]
 # NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
 # (already in _TOOL_MODULES above at line 128); sagitta_arrow_chart module is imported

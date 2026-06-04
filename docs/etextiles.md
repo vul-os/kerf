@@ -1,23 +1,28 @@
 # E-Textiles (Conductive Yarns and LED Layout)
 
-*Domain: Textiles · Module: `packages/kerf-textiles/src/kerf_textiles/etextiles.py` · Shipped: Wave 10*
+> Size resistive heater patches, route conductive-thread circuits, and lay out addressable LEDs on fabric.
 
-## Overview
+**Module**: `packages/kerf-textiles/src/kerf_textiles/etextiles.py`
+**Shipped**: Wave 10
+**LLM tools**: `textiles_etextiles`
 
-Design tools for electronic textiles: resistive-yarn heater element sizing, conductive-thread routing with resistance and voltage-drop prediction, and addressable LED layout on fabric substrates. `heating_calc` computes power density and temperature rise for a given yarn resistivity, stitch density, and driving voltage. `led_layout` places WS2812-style addressable LEDs along a fabric path and generates a wiring diagram with branch currents.
+---
 
-## When to use
+## What it is
 
-- Designing resistive heating patches for garments or medical wearables.
-- Routing conductive-thread power and data lines across a fabric panel.
-- Laying out addressable LED arrays on costumes or smart textiles.
+Design tools for electronic textiles: resistive-yarn heater element sizing (power density and temperature rise), conductive-thread routing with resistance and voltage-drop prediction, and WS2812-style addressable LED layout on fabric substrates with branch current analysis.
 
-## API
+## How to use it
+
+### From chat
+
+> "Size a resistive heating patch using Shieldex 117 yarn at 5V, 0.5 m stitch length."
+
+### From Python
 
 ```python
 from kerf_textiles.etextiles import (
     ResistiveYarn, HeaterSegment, heating_calc,
-    ThreadRoute, thread_route,
     LEDNode, LEDBranch, LEDLayout, led_layout,
 )
 
@@ -28,22 +33,41 @@ print(heat.power_w, heat.temp_rise_k)
 
 layout = led_layout(
     path_points=[[0,0],[50,0],[100,0],[150,0]],
-    n_leds=4,
-    supply_v=5.0,
-    wire_resistance_per_m=0.5,
+    n_leds=4, supply_v=5.0, wire_resistance_per_m=0.5,
 )
 print(layout.voltage_drop_end)
 ```
 
-## LLM tools
+### From an LLM tool spec
 
-`textiles_etextiles`
+```json
+{"tool": "textiles_etextiles", "input": {"yarn_resistance_per_m": 30, "length_m": 0.5, "voltage_v": 5.0, "mode": "heater"}}
+```
 
-## References
+## How it works
 
-- Stoppa & Chiolerio, "Wearable electronics and smart textiles", *Sensors* 14(7), 2014.
-- Post et al., "E-broidery: Design and fabrication of textile-based computing", *IBM Syst. J.* 39(3-4), 2000.
+`heating_calc` computes heater power as `P = V² / R_total` where `R_total = resistance_per_metre × length_m`. Temperature rise is estimated from power density and thermal resistance of the fabric layer (10–20 K/W/m² empirical). `led_layout` distributes LED nodes at equal spacings along the path and computes the daisy-chain voltage at each node using `V_n = V_supply − Σ I × R_wire`, where `I` is the total LED current drawn downstream of node `n`.
+
+## API reference
+
+| Function | Returns | Purpose |
+|---|---|---|
+| `heating_calc(segment)` | `HeaterResult` | Power, temperature rise |
+| `thread_route(route)` | `ThreadResult` | Resistance and voltage drop along route |
+| `led_layout(path_points, n_leds, supply_v, wire_resistance_per_m)` | `LEDLayout` | LED placement and voltage profile |
+
+## Example
+
+```python
+heat = heating_calc(HeaterSegment(yarn, length_m=0.5, voltage_v=5.0))
+# HeaterResult(power_w=0.83, temp_rise_k=12.5, resistance_ohm=30.0)
+```
 
 ## Honest caveats
 
-Yarn resistance values are typical; actual values vary by twist, tension, and wash cycles. The heater model assumes uniform stitch density and ignores thermal conduction to adjacent layers. LED branch current calculations assume ideal wire resistances; contact resistance at stitched joints (typically 1–5 Ω) must be added by the user.
+Yarn resistance values are typical mid-range; actual values vary by twist, tension, wash cycles, and contact resistance at stitched joints (typically 1–5 Ω). The heater model assumes uniform stitch density and ignores thermal conduction to adjacent garment layers. LED current calculations assume constant current draw per LED regardless of supply voltage variation.
+
+## References
+
+- Stoppa & Chiolerio, "Wearable electronics and smart textiles," *Sensors* 14(7), 2014.
+- Post et al., "E-broidery: Design and fabrication of textile-based computing," *IBM Syst. J.* 39(3-4), 2000.

@@ -1,52 +1,74 @@
-# Dental Implant and Surgical Guide Planning
+# Dental Surgical Guide Design
 
-*Domain: Dental · Module: `packages/kerf-dental/src/kerf_dental/guide.py` · Shipped: Wave 10*
+> Generate a stereolithographic surgical guide with drill sleeve from a jaw scan and implant plan.
 
-## Overview
+**Module**: `packages/kerf-dental/src/kerf_dental/surgical_guide.py`
+**Shipped**: Wave 10
+**LLM tools**: `dental_surgical_guide`
 
-Plans implant placement from a CBCT DICOM volume or STL scan mesh and generates a stereolithographic surgical guide with a drill sleeve. `place_surgical_guide` computes the optimal implant axis from bone density sampling, places the implant at the specified site, and builds the guide body that indexes against the adjacent teeth. Output is a guide STL for SLA/DLP printing and a drill protocol report.
+---
 
-## When to use
+## What it is
 
-- Planning single or multiple implant placements from CBCT data.
-- Generating a tooth-supported or mucosa-supported surgical guide.
-- Verifying implant angulation relative to the occlusal plane and adjacent roots.
+The surgical guide module builds a tooth-supported or mucosa-supported drill guide body that positions a cylindrical drill sleeve precisely over the planned implant axis. Input is a jaw scan mesh and an implant specification (site, diameter, length, angulation). Output is a guide STL for SLA/DLP printing and a drill protocol (ordered sequence of drill diameters and depths).
 
-## API
+## How to use it
+
+### From chat
+
+> "Generate a tooth-supported surgical guide for a 3.8 mm implant at site 14, axial angulation."
+
+### From Python
 
 ```python
-from kerf_dental.guide import (
-    ImplantSpec, SurgicalGuideResult,
-    place_surgical_guide,
+from kerf_dental.surgical_guide import (
+    DrillSleeve, SurgicalGuide, design_surgical_guide,
 )
 
-spec = ImplantSpec(
-    site="upper_right_first_premolar",  # FDI: 14
-    diameter_mm=3.8,
-    length_mm=10.0,
-    platform="bone_level",
-    angulation_deg=0.0,   # 0 = axial
-)
-
-result: SurgicalGuideResult = place_surgical_guide(
-    scan_mesh=scan_mesh,   # STL mesh of the jaw
-    implant=spec,
+guide = design_surgical_guide(
+    scan_mesh=jaw_mesh,
+    tooth_site="14",         # FDI notation
+    implant_diameter_mm=3.8,
+    implant_length_mm=10.0,
+    angulation_deg=0.0,
     support_type="tooth_supported",
 )
-
-# result.guide_mesh — triangulated guide body
-# result.drill_protocol — list of drill steps with diameters
+print(guide.drill_protocol)
+# guide.guide_mesh.vertices, guide.guide_mesh.faces — printable guide
 ```
 
-## LLM tools
+### From an LLM tool spec
 
-`dental_surgical_guide`
+```json
+{"tool": "dental_surgical_guide", "input": {"tooth_site": "14", "implant_diameter_mm": 3.8, "implant_length_mm": 10.0, "support_type": "tooth_supported"}}
+```
 
-## References
+## How it works
 
-- Tahmaseb et al., "The accuracy of computer-guided implant surgery with mucosa-supported surgical template", *Clinical Oral Implants Research* 25(7), 2014.
-- ITI SAC Assessment Tool criteria for implant complexity.
+`_build_arch_shell_mesh` creates a thin shell offset 1 mm from the arch scan surface that will index against adjacent tooth anatomy. `_build_sleeve_mesh` generates a cylindrical drill sleeve aligned with the implant axis, with an inner diameter matching the drill size (implant diameter − 0.2 mm) and a collar flange that registers the guide depth. The two meshes are Booleanunioned to form the final guide body.
+
+## API reference
+
+| Function | Returns | Purpose |
+|---|---|---|
+| `design_surgical_guide(scan_mesh, tooth_site, implant_diameter_mm, implant_length_mm, angulation_deg, support_type)` | `SurgicalGuide` | Complete guide mesh and drill protocol |
+| `DrillSleeve(inner_mm, outer_mm, height_mm, axis)` | instance | Drill sleeve geometry |
+
+## Example
+
+```python
+guide = design_surgical_guide(jaw_mesh, "14", 3.8, 10.0, 0.0, "tooth_supported")
+# SurgicalGuide(guide_mesh=<Mesh>, drill_protocol=[
+#   {'step': 1, 'drill_mm': 2.0, 'depth_mm': 10.0},
+#   {'step': 2, 'drill_mm': 3.5, 'depth_mm': 10.0},
+# ])
+```
 
 ## Honest caveats
 
-`place_surgical_guide` uses nearest-surface-point projection to locate the implant axis and does not perform bone density analysis from DICOM — supply the DICOM volume via `dental_dicom_ingest` first for density-guided placement. Angulation deviations > 5° from the planned axis require guide redesign; the tolerance check is the caller's responsibility.
+The guide indexing uses nearest-surface-point projection; it does not verify that the adjacent teeth are sufficiently stable to support the guide during drilling. Angulation deviations > 5° from the planned axis require guide redesign. DICOM bone density analysis (for density-guided axis selection) is handled separately by `dental_implant_metrics`.
+
+## References
+
+- Tahmaseb et al., "Accuracy of computer-guided implant surgery with mucosa-supported surgical template," *Clin. Oral Implants Res.* 25(7), 2014.
+- ITI SAC Assessment Tool, implant site complexity classification.

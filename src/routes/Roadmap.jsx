@@ -76,13 +76,27 @@ function slugify(text) {
 }
 
 function buildToc(md) {
+  // Hierarchical TOC: H2 sections with their H3 sub-sections nested under
+  // them. Avoid noisy "### 2026-..." date deltas under "What shipped" (those
+  // are time-series entries, not navigation targets).
   const lines = md.split('\n')
   const out = []
+  let current = null
   for (const ln of lines) {
-    const m = ln.match(/^##\s+(.+?)\s*$/)
-    if (m && !/^###/.test(ln)) {
-      const text = m[1].trim()
-      out.push({ id: slugify(text), text })
+    const h2 = ln.match(/^##\s+(.+?)\s*$/)
+    if (h2 && !ln.startsWith('###')) {
+      const text = h2[1].trim()
+      current = { id: slugify(text), text, level: 2, children: [] }
+      out.push(current)
+      continue
+    }
+    const h3 = ln.match(/^###\s+(.+?)\s*$/)
+    if (h3 && current) {
+      const text = h3[1].trim()
+      // Skip "### YYYY-MM-..." delta headings (they're already inside the
+      // collapsed "What shipped" section and would explode the TOC).
+      if (/^\d{4}-\d{2}-\d{2}/.test(text)) continue
+      current.children.push({ id: slugify(text), text, level: 3 })
     }
   }
   return out
@@ -114,15 +128,31 @@ const MD_COMPONENTS = {
       {children}
     </h2>
   ),
-  h3: ({ children, ...p }) => (
-    <h3
-      {...p}
-      id={slugify(flatten(children))}
-      className="font-display text-xl font-semibold tracking-tight mt-8 mb-2 text-kerf-200 scroll-mt-20"
-    >
-      {children}
-    </h3>
-  ),
+  h3: ({ children, ...p }) => {
+    const text = flatten(children)
+    const isDateDelta = /^\d{4}-\d{2}-\d{2}/.test(text)
+    if (isDateDelta) {
+      return (
+        <h3
+          {...p}
+          id={slugify(text)}
+          className="font-display text-base sm:text-lg font-semibold tracking-tight mt-10 mb-4 pt-3 pb-2 px-4 -mx-4 rounded-lg bg-gradient-to-r from-kerf-300/10 via-kerf-300/5 to-transparent border-l-2 border-kerf-300/60 text-kerf-200 scroll-mt-20 flex items-center gap-2"
+        >
+          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-kerf-400">Delta</span>
+          <span>{children}</span>
+        </h3>
+      )
+    }
+    return (
+      <h3
+        {...p}
+        id={slugify(text)}
+        className="font-display text-xl font-semibold tracking-tight mt-8 mb-2 text-kerf-200 scroll-mt-20"
+      >
+        {children}
+      </h3>
+    )
+  },
   h4: ({ children, ...p }) => (
     <h4 {...p} className="font-display text-base font-semibold mt-6 mb-2 text-ink-100">
       {children}
@@ -314,21 +344,35 @@ export default function Roadmap() {
         </section>
 
         {/* TOC + body 2-col on lg, stacked on small */}
-        <div className="lg:grid lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-12">
+        <div className="lg:grid lg:grid-cols-[16rem_minmax(0,1fr)] lg:gap-12">
           <aside className="hidden lg:block">
-            <nav aria-label="Table of contents" className="sticky top-20">
+            <nav aria-label="Table of contents" className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto pr-2">
               <p className="font-mono text-[10px] uppercase tracking-widest text-ink-500 mb-3">
                 Contents
               </p>
-              <ul className="space-y-2">
+              <ul className="space-y-1.5">
                 {toc.map((t) => (
                   <li key={t.id}>
                     <a
                       href={`#${t.id}`}
-                      className="block text-[11px] text-ink-400 hover:text-kerf-300 transition-colors leading-snug py-0.5"
+                      className="block text-[12px] font-medium text-ink-200 hover:text-kerf-300 transition-colors leading-snug py-0.5"
                     >
                       {t.text.replace(/^§\s*[\d.]+\s*[—-]\s*/, '').replace(/^§\s*[\d.]+\s*/, '')}
                     </a>
+                    {t.children && t.children.length > 0 && (
+                      <ul className="mt-1 ml-3 space-y-1 border-l border-ink-800 pl-3">
+                        {t.children.map((c) => (
+                          <li key={c.id}>
+                            <a
+                              href={`#${c.id}`}
+                              className="block text-[11px] text-ink-400 hover:text-kerf-300 transition-colors leading-snug py-0.5"
+                            >
+                              {c.text}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </li>
                 ))}
               </ul>

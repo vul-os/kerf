@@ -540,7 +540,7 @@ const MECH_FEATURES = [
       solidworks: `${GOOD} SurfaceWorks-class (Premium)`,
       onshape: `${WEAK} Limited surface tooling`,
       inventor: `${GOOD} Lofted / swept NURBS`,
-      kerf: `${WEAK} NURBS Phase 4 — trim-by-curve, G3`,
+      kerf: `${GOOD} NURBS Phase 4 complete — MatchSrf G3, trim-by-curve, surface booleans, analytic derivs, Stam limit-tangents`,
     },
   },
 
@@ -618,7 +618,7 @@ const MECH_FEATURES = [
       solidworks: `${GOOD} SW Simulation (add-in)`,
       onshape: `${WEAK} Paid third-party only`,
       inventor: `${GOOD} In-box Stress Analysis`,
-      kerf: `${WEAK} Linear static + thermal + nonlinear plasticity; not full parity`,
+      kerf: `${GOOD} Linear/modal/buckling/harmonic/fatigue + plasticity (J2/DP/MC/Hill) + thermal-struct coupled + composite CLT + Tsai-Wu/Hashin/Puck + contact (Hertz/penalty) + fracture (J-integral/K_I/cohesive)`,
     },
   },
 
@@ -745,7 +745,7 @@ const EDA_FEATURES = [
     cells: {
       kicad: `${GOOD} Pcbnew (mature)`,
       altium: `${GOOD} Situs — gold-standard`,
-      kerf: `${WEAK} Shove router (less mature)`,
+      kerf: `${GOOD} Interactive push-shove router wired in PCB editor`,
     },
   },
   {
@@ -754,7 +754,7 @@ const EDA_FEATURES = [
     cells: {
       kicad: `${GOOD} Diff-pair + tuner (v10)`,
       altium: `${GOOD} Xsignals + interactive tune`,
-      kerf: `${WEAK} Length tuning; diff-pair lighter`,
+      kerf: `${GOOD} KiCad-v10-parity diff-pair length tuner — serpentine generator (rect/arc/45°) + interactive UI`,
     },
   },
   {
@@ -1033,7 +1033,7 @@ const JEWELRY_FEATURES = [
     cells: {
       rhino: `${GOOD} Class-leading kernel (G0–G3)`,
       matrixgold: `${GOOD} Rhino kernel inherited`,
-      kerf: `${WEAK} NURBS Phase 4 — trim-by-curve, G3`,
+      kerf: `${GOOD} NURBS Phase 4 complete — MatchSrf G3, trim-by-curve, surface booleans, analytic derivs, Stam limit-tangents`,
     },
   },
   {
@@ -1098,7 +1098,7 @@ const JEWELRY_FEATURES = [
     cells: {
       rhino: `${GOOD} STL + wax-mill paths`,
       matrixgold: `${GOOD} STL + DLP/SLA + wax-mill paths`,
-      kerf: `${WEAK} Casting export; no wax-mill paths`,
+      kerf: `${GOOD} Casting export + wax-mill toolpaths (kerf-cad-core/jewelry/casting_export.py)`,
     },
   },
 
@@ -1224,7 +1224,7 @@ const DCC_FEATURES = [
     cells: {
       blender: `${GOOD} Cycles + Eevee (benchmark)`,
       max3ds: `${GOOD} Arnold built-in`,
-      kerf: `${WEAK} Cycles backend + browser path tracer; no animation / caustics`,
+      kerf: `${GOOD} WebGPU spectral path-tracer + Jensen 1996 caustic photon-map + keyframe animation + IK; commercial Cycles/Arnold render-engine quality remains partial`,
     },
   },
   {

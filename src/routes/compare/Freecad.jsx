@@ -65,7 +65,7 @@ const TABLE = [
     kerf: `${GOOD} OCCT fillet / chamfer / draft` },
   { group: 'Modeling', feature: 'NURBS surfacing',
     competitor: `${WEAK} Surface WB (limited)`,
-    kerf: `${WEAK} NURBS Phase 4 — trim-by-curve, G3 combs (early)` },
+    kerf: `${GOOD} NURBS Phase 4 complete — MatchSrf G3, trim-by-curve, surface booleans, analytic derivs, Stam limit-tangents` },
   { group: 'Modeling', feature: 'Sheet metal',
     competitor: `${GOOD} SheetMetal WB (community)`,
     kerf: `${GOOD} Flange + unfold + flat-pattern DXF` },
@@ -100,7 +100,7 @@ const TABLE = [
   // Simulation
   { group: 'Simulation', feature: 'FEM (structural / thermal)',
     competitor: `${GOOD} FEM WB — CalculiX / Elmer / Z88 / Mystran`,
-    kerf: `${WEAK} Linear static + thermal + nonlinear plasticity; not full multi-physics parity` },
+    kerf: `${GOOD} Linear/modal/buckling/harmonic/fatigue + plasticity (J2/DP/MC/Hill) + thermal-struct coupled + composite CLT + Tsai-Wu/Hashin/Puck + contact (Hertz/penalty) + fracture (J-integral/K_I/cohesive)` },
   { group: 'Simulation', feature: 'CFD',
     competitor: `${WEAK} CfdOF add-on (OpenFOAM)`,
     kerf: `${GAP} Not yet` },

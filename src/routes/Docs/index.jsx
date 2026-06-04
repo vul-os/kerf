@@ -5,12 +5,10 @@ import {
   ArrowRight,
   Menu,
   Sparkles,
-  Compass,
   Workflow,
   Cloud,
   BookOpen,
   Code2,
-  Wrench,
   Newspaper,
 } from 'lucide-react'
 import clsx from 'clsx'
@@ -25,7 +23,6 @@ import { buildSidebarGroups } from './groupTaxonomy.js'
 // lock-step with whatever sidebar groups are declared.
 const GROUP_ICONS = {
   'get-started': Sparkles,
-  'domains': Compass,
   'workflows': Workflow,
   'cloud-features': Cloud,
   'reference': BookOpen,
@@ -34,7 +31,6 @@ const GROUP_ICONS = {
 }
 const GROUP_ACCENTS = {
   'get-started': 'kerf-300',
-  'domains': 'cyan-edge',
   'workflows': 'kerf-200',
   'cloud-features': 'magenta-edge',
   'reference': 'kerf-300',
@@ -43,7 +39,6 @@ const GROUP_ACCENTS = {
 }
 const GROUP_BLURBS = {
   'get-started': 'Install, configure, and ship your first parametric model.',
-  'domains': 'Five CAD disciplines, one tool — jewelry, mechanical, electronics, architecture, automotive.',
   'workflows': 'End-to-end recipes for the everyday Kerf jobs.',
   'cloud-features': 'Projects, sharing, workshop, billing — everything the hosted service adds.',
   'reference': 'Architecture, data model, tool registry, SDK.',
@@ -129,7 +124,7 @@ export default function DocsHome() {
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search the docs..."
                   className={clsx(
-                    'w-full h-14 pl-12 pr-16 rounded-xl text-base',
+                    'w-full h-14 pl-12 pr-16 rounded-full text-base',
                     'bg-ink-900/80 backdrop-blur border border-ink-700',
                     'text-ink-50 placeholder:text-ink-400',
                     'focus:outline-none focus:border-kerf-300/50 focus:ring-4 focus:ring-kerf-300/15',
@@ -237,7 +232,8 @@ function GroupCard({ group }) {
     <div
       className={clsx(
         'group relative rounded-2xl border border-ink-800 bg-ink-900/50',
-        'hover:border-ink-600 hover:bg-ink-900 transition-all',
+        'hover:border-ink-600 hover:bg-ink-900/80 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/30',
+        'transition-all duration-200',
         'p-6 flex flex-col',
       )}
     >

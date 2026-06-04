@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { Link, useParams, Navigate } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
-import { InlineCode } from '../../components/CodeBlock.jsx'
 import {
   ArrowLeft,
   ArrowRight,
@@ -13,6 +12,8 @@ import {
   Link as LinkIcon,
   ChevronRight,
   ChevronDown,
+  Copy,
+  Check,
 } from 'lucide-react'
 import clsx from 'clsx'
 import Header from '../../components/Header.jsx'
@@ -116,7 +117,7 @@ function ArticleBody({ entry, prev, next, userGroup }) {
     <>
       <article
         ref={articleRef}
-        className="flex-1 min-w-0 px-6 sm:px-8 lg:px-14 xl:px-20 py-12 max-w-3xl"
+        className="flex-1 min-w-0 px-6 sm:px-8 lg:px-12 xl:px-16 py-12 max-w-[72ch]"
       >
         {/* Breadcrumb: Docs / Group / Page */}
         <nav
@@ -134,7 +135,7 @@ function ArticleBody({ entry, prev, next, userGroup }) {
           </span>
         </nav>
 
-        <h1 className="font-display text-[2.625rem] sm:text-5xl font-semibold tracking-tight text-ink-50 leading-[1.05]">
+        <h1 className="font-display text-4xl sm:text-5xl font-semibold tracking-tight text-ink-50 leading-[1.05] mb-6">
           {title}
         </h1>
 
@@ -364,13 +365,73 @@ function MobileTOC({ headings }) {
 // closer to Linear/Vercel docs than tailwindcss/typography's "prose-invert".
 // ----------------------------------------------------------------------------
 
+// Code-block pre wrapper with a copy button and optional language label.
+function CodePre({ children }) {
+  const [copied, setCopied] = useState(false)
+  // Extract language label from the nested <code className="language-X"> child.
+  const lang = useMemo(() => {
+    // children is a single <code> React element from react-markdown
+    const codeEl = Array.isArray(children) ? children[0] : children
+    if (!codeEl || typeof codeEl !== 'object') return null
+    const cn = codeEl.props?.className || ''
+    const m = cn.match(/\blanguage-(\w+)/)
+    return m ? m[1] : null
+  }, [children])
+
+  const handleCopy = useCallback(() => {
+    // Walk the code element's children to extract plain text.
+    function extractText(node) {
+      if (typeof node === 'string') return node
+      if (Array.isArray(node)) return node.map(extractText).join('')
+      if (node && typeof node === 'object' && node.props) return extractText(node.props.children)
+      return ''
+    }
+    const codeEl = Array.isArray(children) ? children[0] : children
+    const text = extractText(codeEl?.props?.children ?? children)
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).then(
+        () => { setCopied(true); setTimeout(() => setCopied(false), 1500) },
+        () => {},
+      )
+    }
+  }, [children])
+
+  return (
+    <div className="group/pre relative my-5" data-testid="docs-pre-scroll">
+      {lang && (
+        <div className="absolute top-0 right-0 px-3 py-1 text-[10px] font-mono uppercase tracking-wider text-ink-500 select-none pointer-events-none rounded-tr-xl">
+          {lang}
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={handleCopy}
+        aria-label={copied ? 'Copied!' : 'Copy code'}
+        title={copied ? 'Copied!' : 'Copy code'}
+        className={clsx(
+          'absolute top-2 right-2 z-10',
+          'opacity-0 group-hover/pre:opacity-100 focus:opacity-100',
+          'transition-opacity p-1.5 rounded-md',
+          'bg-ink-800 hover:bg-ink-700 text-ink-400 hover:text-ink-100',
+          lang ? 'top-7' : 'top-2',
+        )}
+      >
+        {copied ? <Check className="w-3.5 h-3.5 text-kerf-300" /> : <Copy className="w-3.5 h-3.5" />}
+      </button>
+      <pre className="overflow-x-auto bg-ink-900/80 rounded-xl p-4 text-sm border border-ink-800/80 leading-[1.65] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] pt-5">
+        {children}
+      </pre>
+    </div>
+  )
+}
+
 const mdComponents = {
   h2: ({ children, ...props }) => {
     const id = slugify(toText(children))
     return (
       <h2
         id={id}
-        className="font-display text-[1.75rem] font-semibold tracking-tight text-ink-50 mt-14 mb-4 scroll-mt-20 group flex items-baseline gap-2"
+        className="font-display text-[1.75rem] font-semibold tracking-tight text-ink-50 mt-14 mb-4 pt-5 border-t border-ink-800/70 scroll-mt-20 group flex items-baseline gap-2"
         {...props}
       >
         <span className="flex-1">{children}</span>
@@ -383,7 +444,7 @@ const mdComponents = {
     return (
       <h3
         id={id}
-        className="font-display text-xl font-semibold tracking-tight text-ink-100 mt-10 mb-3 scroll-mt-20 group flex items-baseline gap-2"
+        className="font-display text-[1.2rem] font-semibold italic tracking-tight text-kerf-200 mt-10 mb-3 scroll-mt-20 group flex items-baseline gap-2"
         {...props}
       >
         <span className="flex-1">{children}</span>
@@ -397,7 +458,7 @@ const mdComponents = {
     </h4>
   ),
   p: ({ children, ...props }) => (
-    <p className="text-[15.5px] text-ink-200 leading-[1.78] my-4" {...props}>{children}</p>
+    <p className="text-[15.5px] text-ink-200 leading-[1.78] my-5" {...props}>{children}</p>
   ),
   a: ({ children, href, ...props }) => {
     const isExternal = href && /^(https?:)?\/\//.test(href)
@@ -449,19 +510,19 @@ const mdComponents = {
     )
   },
   ul: ({ children, ...props }) => (
-    <ul className="list-disc pl-6 my-4 space-y-1.5 text-[15px] text-ink-200 leading-[1.7] marker:text-ink-500" {...props}>
+    <ul className="list-disc pl-6 my-6 space-y-2 text-[15px] text-ink-200 leading-[1.75] marker:text-ink-500" {...props}>
       {children}
     </ul>
   ),
   ol: ({ children, ...props }) => (
-    <ol className="list-decimal pl-6 my-4 space-y-1.5 text-[15px] text-ink-200 leading-[1.7] marker:text-ink-500" {...props}>
+    <ol className="list-decimal pl-6 my-6 space-y-2 text-[15px] text-ink-200 leading-[1.75] marker:text-ink-500" {...props}>
       {children}
     </ol>
   ),
   li: ({ children, ...props }) => <li {...props}>{children}</li>,
   blockquote: ({ children, ...props }) => (
     <blockquote
-      className="my-5 border-l-4 border-kerf-400 bg-kerf-300/[0.06] pl-4 pr-3 py-2 text-[14.5px] text-ink-200 italic rounded-r"
+      className="my-6 border-l-[3px] border-kerf-400 bg-kerf-300/[0.05] pl-5 pr-4 py-3 text-[15px] text-ink-300 italic rounded-r-lg ml-0"
       {...props}
     >
       {children}
@@ -474,7 +535,11 @@ const mdComponents = {
     // spans survive — never stringify the React tree.
     const isBlock = /\blanguage-/.test(className || '')
     if (!isBlock) {
-      return <InlineCode>{children}</InlineCode>
+      return (
+        <code className="font-mono text-[0.9em] bg-ink-900/80 text-kerf-200 border border-ink-700/60 rounded-md px-1.5 py-0.5">
+          {children}
+        </code>
+      )
     }
     return (
       <code
@@ -485,28 +550,27 @@ const mdComponents = {
       </code>
     )
   },
-  // pre wraps the highlighted code block.
-  pre: ({ children }) => (
-    <pre className="overflow-x-auto bg-ink-900 rounded-md p-3 my-3 text-sm border border-ink-800 leading-[1.6]" data-testid="docs-pre-scroll">
-      {children}
-    </pre>
-  ),
-  hr: (props) => <hr className="my-8 border-ink-800" {...props} />,
+  // pre wraps the highlighted code block — use our CodePre wrapper with copy button.
+  pre: ({ children }) => <CodePre>{children}</CodePre>,
+  hr: (props) => <hr className="my-10 border-ink-800" {...props} />,
   table: ({ children, ...props }) => (
-    <div className="my-5 overflow-x-auto rounded-lg border border-ink-800" data-testid="docs-table-scroll">
+    <div className="my-6 overflow-x-auto rounded-xl border border-ink-800" data-testid="docs-table-scroll">
       <table className="w-full text-sm border-collapse" {...props}>{children}</table>
     </div>
   ),
   thead: ({ children, ...props }) => (
-    <thead className="bg-ink-900/60 text-ink-100 text-left text-xs uppercase tracking-wider" {...props}>
+    <thead className="bg-ink-900 text-ink-100 text-left text-xs uppercase tracking-wider sticky top-0" {...props}>
       {children}
     </thead>
   ),
   th: ({ children, ...props }) => (
-    <th className="px-3 py-2 font-medium border-b border-ink-800" {...props}>{children}</th>
+    <th className="px-4 py-2.5 font-medium border-b border-ink-800" {...props}>{children}</th>
+  ),
+  tbody: ({ children, ...props }) => (
+    <tbody className="[&>tr:nth-child(even)]:bg-ink-900/30" {...props}>{children}</tbody>
   ),
   td: ({ children, ...props }) => (
-    <td className="px-3 py-2 border-t border-ink-800 text-ink-200 align-top" {...props}>{children}</td>
+    <td className="px-4 py-2.5 border-t border-ink-800/50 text-ink-200 align-top" {...props}>{children}</td>
   ),
   strong: ({ children, ...props }) => (
     <strong className="text-ink-50 font-semibold" {...props}>{children}</strong>

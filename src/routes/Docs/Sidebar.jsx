@@ -7,7 +7,6 @@ import {
   X,
   ChevronDown,
   ChevronRight,
-  Compass,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { useDocs } from './docsStore.js'
@@ -336,7 +335,6 @@ export default function Sidebar({ drawerOpen = false, onDrawerClose }) {
 
 function SidebarGroup({ group, collapsed, onToggle, activeSlug, activePathname, forceOpen }) {
   const isOpen = forceOpen ? true : !collapsed
-  const isDomains = group.key === 'domains'
   const headerId = `sidebar-group-${group.key}`
   const listId = `${headerId}-list`
 
@@ -350,9 +348,10 @@ function SidebarGroup({ group, collapsed, onToggle, activeSlug, activePathname, 
         aria-controls={listId}
         className={clsx(
           'group w-full flex items-center gap-1.5 px-3 py-1.5 mt-1 rounded-md',
-          'text-[11px] font-semibold uppercase tracking-[0.14em]',
-          'text-ink-400 hover:text-ink-200 hover:bg-ink-900/70',
+          'text-[11px] font-mono font-semibold uppercase tracking-[0.14em]',
+          'text-ink-500 hover:text-ink-200 hover:bg-ink-900/70',
           'transition-colors text-left',
+          'border-b border-transparent pb-2',
         )}
       >
         {isOpen ? (
@@ -361,9 +360,6 @@ function SidebarGroup({ group, collapsed, onToggle, activeSlug, activePathname, 
           <ChevronRight className="w-3 h-3 shrink-0" />
         )}
         <span className="flex-1">{group.label}</span>
-        {isDomains && (
-          <Compass className="w-3 h-3 text-kerf-300/70 shrink-0" aria-hidden="true" />
-        )}
       </button>
       {isOpen && (
         <ul id={listId} role="list" className="flex flex-col">
@@ -400,8 +396,8 @@ function SidebarLink({ to, active, children, isRoute }) {
         'group flex items-center gap-2 pl-5 pr-3 py-1.5 ml-2 text-sm',
         'rounded-md transition-colors no-underline',
         active
-          ? 'text-kerf-200 bg-ink-900 border-l-2 border-kerf-300 -ml-[2px] pl-[22px]'
-          : 'text-ink-300 hover:text-ink-100 hover:bg-ink-900',
+          ? 'text-kerf-300 font-medium bg-ink-900/80 border-l-2 border-kerf-300 -ml-[2px] pl-[22px]'
+          : 'text-ink-300 hover:text-ink-100 hover:bg-ink-900/30',
       )}
     >
       <span className="truncate">{children}</span>

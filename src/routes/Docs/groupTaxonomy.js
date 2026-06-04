@@ -62,6 +62,10 @@ export const DOMAIN_LINKS = [
 // User-facing group taxonomy. Each entry lists the slugs we WANT to surface
 // inside that group, in order. Slugs not present in the manifest are silently
 // skipped so the sidebar stays clean if a doc was removed upstream.
+//
+// NOTE: the Domains group is intentionally OMITTED here. Domain pages are
+// React routes under /domains/<slug> and belong to a different navigation
+// context — they should not appear in the docs sidebar or docs home grid.
 export const USER_GROUPS = [
   {
     label: 'Get started',
@@ -74,9 +78,6 @@ export const USER_GROUPS = [
       'concepts',
     ],
   },
-  // Domains slot is handled specially in buildSidebarGroups — its items are
-  // hardcoded route links and bypass the manifest lookup entirely.
-  { label: 'Domains', key: 'domains', kind: 'routes', items: DOMAIN_LINKS },
   {
     label: 'Workflows',
     key: 'workflows',

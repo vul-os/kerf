@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-04T07:51:18.000Z",
+  "generatedAt": "2026-06-04T08:11:49.000Z",
   "items": [
     {
       "slug": "revit",
@@ -319,9 +319,9 @@
             "source": "https://help.autodesk.com/view/CIV3D/2026/ENU/?guid=GUID-CF0B5B8A-8085-4768-92C6-E0BD5B8D37B5"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/civil/alignment_tools.py",
-            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/civil/tin_surface.py",
+            "notes": "Wave 11B build implementation."
           }
         },
         {
@@ -333,9 +333,9 @@
             "source": "https://help.autodesk.com/view/CIV3D/2026/ENU/?guid=GUID-4D3E2C98-E4A5-4F9D-9EFE-8A1F0BDCB5A1"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/piping/__init__.py",
-            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/civil/gravity_pipe_network.py",
+            "notes": "Wave 11B build implementation."
           }
         },
         {
@@ -347,9 +347,9 @@
             "source": "https://help.autodesk.com/view/CIV3D/2026/ENU/?guid=GUID-A57BA96E-A2F5-4A4F-B0B3-2E3D8F6E1C9D"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/piping/__init__.py",
-            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/civil/pressure_pipe_network.py",
+            "notes": "Wave 11B build implementation."
           }
         },
         {
@@ -4521,9 +4521,9 @@
             "note": "no textiles or drape simulation"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-textiles/src/kerf_textiles/mass_spring.py",
-            "note": "weave/knit/drape/cut-room (backend); no 3D avatar"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/apparel/pattern_grading.py",
+            "notes": "Wave 11B build implementation."
           }
         },
         {
@@ -6290,9 +6290,9 @@
             "source": "https://help.solidworks.com/2024/english/SolidWorks/sldworks/c_features_top.htm"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-electronics/src/kerf_electronics/tools/sim.py",
-            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/controls/transfer_function.py",
+            "notes": "Wave 11B build implementation."
           }
         },
         {
@@ -6346,9 +6346,9 @@
             "source": "https://help.solidworks.com/2024/english/SolidWorks/sldworks/c_features_top.htm"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-electronics/src/kerf_electronics/tools/sim.py",
-            "notes": "Wave 11A \u2014 honest implementation; commercial parity honest-flagged."
+            "status": "yes",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/power/ac_load_flow.py",
+            "notes": "Wave 11B build implementation."
           }
         },
         {
@@ -8353,9 +8353,9 @@
             "source": "https://www.3shape.com/en/software/dental-system"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-dental/",
-            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
+            "status": "yes",
+            "evidence": "packages/kerf-dental/src/kerf_dental/crown_bridge.py",
+            "notes": "Wave 11B build implementation."
           }
         },
         {
@@ -8367,9 +8367,9 @@
             "source": "https://www.3shape.com/en/software/dental-system"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-dental/",
-            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
+            "status": "yes",
+            "evidence": "packages/kerf-dental/src/kerf_dental/implant_plan_v2.py",
+            "notes": "Wave 11B build implementation."
           }
         },
         {
@@ -8381,9 +8381,9 @@
             "source": "https://www.3shape.com/en/software/dental-system"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-dental/",
-            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
+            "status": "yes",
+            "evidence": "packages/kerf-dental/src/kerf_dental/surgical_guide.py",
+            "notes": "Wave 11B build implementation."
           }
         },
         {
@@ -8409,9 +8409,9 @@
             "source": "https://www.3shape.com/en/software/dental-system"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-dental/",
-            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
+            "status": "yes",
+            "evidence": "packages/kerf-dental/src/kerf_dental/denture_v2.py",
+            "notes": "Wave 11B build implementation."
           }
         },
         {
@@ -8423,9 +8423,9 @@
             "source": "https://www.3shape.com/en/software/dental-system"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/sculpt/character_rigging.py",
-            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
+            "status": "yes",
+            "evidence": "packages/kerf-dental/src/kerf_dental/dental_ai_automation.py",
+            "notes": "Wave 11B build implementation."
           }
         },
         {
@@ -8437,9 +8437,9 @@
             "source": "https://www.3shape.com/en/software/trios-design-studio"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/scan/las_reader.py",
-            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
+            "status": "yes",
+            "evidence": "packages/kerf-dental/src/kerf_dental/intraoral_scan.py",
+            "notes": "Wave 11B build implementation."
           }
         },
         {
@@ -8451,9 +8451,9 @@
             "source": "https://www.3shape.com/en/software/dental-system"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-plm/src/kerf_plm/bom_cost_rollup.py",
-            "notes": "Wave 10B \u2014 cross-domain evidence map; commercial parity honest-flagged."
+            "status": "yes",
+            "evidence": "packages/kerf-dental/src/kerf_dental/lab_workflow.py",
+            "notes": "Wave 11B build implementation."
           }
         },
         {
@@ -8588,9 +8588,9 @@
             "source": "https://www.esko.com/en/products/artioscad"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Should-cost engine (backend) + nesting material calculation; no packaging-specific pricing UI",
-            "evidence": "packages/kerf-costing/src/"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/packaging/material_yield.py",
+            "notes": "Wave 11B build implementation."
           }
         },
         {
@@ -8935,9 +8935,9 @@
           "feature": "FE \u2014 solid (tet/hex)",
           "competitor": "{ status: paid, note: \"CATIA Simulation / SIMULIA Structural Analysis \u2014 Abaqus-class solid meshing; separate paid add-in or 3DEXPERIENCE role\", source: \"https://www.3ds.com/products/simulia/structural-simulation\" }",
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-fem/src/kerf_fem/plate.py",
-            "notes": "Wave 10 \u2014 comprehensive evidence flip; commercial-vendor parity honest-flagged."
+            "status": "yes",
+            "evidence": "packages/kerf-fem/src/kerf_fem/solid_tet.py",
+            "notes": "Wave 11B build implementation."
           }
         },
         {
@@ -9687,9 +9687,9 @@
             "source": "https://www.clo3d.com/en/"
           },
           "kerf": {
-            "status": "partial",
-            "note": "e-textiles module: conductive yarn routing, electrode placement, wearable circuit (backend)",
-            "evidence": "packages/kerf-textiles/src/kerf_textiles/etextiles.py"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/apparel/e_textiles.py",
+            "notes": "Wave 11B build implementation."
           }
         },
         {
@@ -13518,9 +13518,9 @@
             "source": "https://openrocket.info/documentation.html"
           },
           "kerf": {
-            "status": "partial",
-            "note": "Wraps OpenRocket motor database via integration; no independent replication",
-            "evidence": ""
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/aerospace/motor_database.py",
+            "notes": "Wave 11B build implementation."
           }
         },
         {
@@ -15772,9 +15772,9 @@
             "source": "https://help.autodesk.com/view/ACD/2025/ENU/?guid=GUID-3D-MODELING"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/afr/dag_order.py",
-            "notes": "Wave 10 \u2014 comprehensive evidence flip; commercial-vendor parity honest-flagged."
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/afr/persistent_face_id.py",
+            "notes": "Wave 11B build implementation."
           }
         },
         {

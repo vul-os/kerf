@@ -1,194 +1,759 @@
-# Thermodynamic Cycle Analysis — LLM Reference
+# thermocycle
 
-Air-standard and vapour-cycle thermodynamics per Cengel & Boles. No OCC dependency.
-All tools are stateless; no DB write. Units: K, Pa, J/kg, dimensionless efficiency.
+*Module: `kerf_cad_core.thermocycle.tools` · Domain: cad*
+
+This module registers **15** LLM tool(s):
+
+- [`thermo_isentropic_relations`](#thermo-isentropic-relations)
+- [`thermo_isothermal_process`](#thermo-isothermal-process)
+- [`thermo_isobaric_process`](#thermo-isobaric-process)
+- [`thermo_isochoric_process`](#thermo-isochoric-process)
+- [`thermo_isentropic_process`](#thermo-isentropic-process)
+- [`thermo_polytropic_process`](#thermo-polytropic-process)
+- [`thermo_carnot_efficiency`](#thermo-carnot-efficiency)
+- [`thermo_carnot_cop_refrigeration`](#thermo-carnot-cop-refrigeration)
+- [`thermo_carnot_cop_heat_pump`](#thermo-carnot-cop-heat-pump)
+- [`thermo_otto_cycle`](#thermo-otto-cycle)
+- [`thermo_diesel_cycle`](#thermo-diesel-cycle)
+- [`thermo_dual_cycle`](#thermo-dual-cycle)
+- [`thermo_brayton_cycle`](#thermo-brayton-cycle)
+- [`thermo_rankine_cycle_ideal`](#thermo-rankine-cycle-ideal)
+- [`thermo_refrigeration_cop`](#thermo-refrigeration-cop)
 
 ---
 
-## When to use
+## `thermo_isentropic_relations`
 
-Keywords: thermodynamic cycle, Otto cycle, Diesel cycle, Brayton cycle, Rankine cycle,
-Carnot efficiency, isentropic, isothermal, isobaric, isochoric, polytropic, heat engine,
-COP, refrigeration, heat pump, compression ratio, thermal efficiency, work output,
-steam cycle, gas turbine, regeneration, intercooling.
+Isentropic relations for an ideal gas with constant specific-heat ratio k.
 
----
+Computes unknown state-2 property from one pair of inputs:
+    T2/T1 = (p2/p1)^((k-1)/k)
+    T2/T1 = (v1/v2)^(k-1)
+    p2/p1 = (v1/v2)^k
 
-## Workflow
+Provide T1, p1 and then one of: T2, p2, or (v1+v2).
 
+Errors: {ok:false, reason} for invalid inputs. Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "T1": {
+      "type": "number",
+      "description": "Initial temperature (K). Must be > 0."
+    },
+    "p1": {
+      "type": "number",
+      "description": "Initial pressure (Pa). Must be > 0."
+    },
+    "T2": {
+      "type": "number",
+      "description": "Final temperature (K). Optional."
+    },
+    "p2": {
+      "type": "number",
+      "description": "Final pressure (Pa). Optional."
+    },
+    "v1": {
+      "type": "number",
+      "description": "Specific volume at state 1 (m\u00b3/kg). Optional."
+    },
+    "v2": {
+      "type": "number",
+      "description": "Specific volume at state 2 (m\u00b3/kg). Optional."
+    },
+    "k": {
+      "type": "number",
+      "description": "Specific heat ratio k (default 1.4 for air)."
+    }
+  },
+  "required": [
+    "T1",
+    "p1"
+  ]
+}
 ```
-# Process-level analysis
-thermo_isentropic_relations / thermo_isothermal_process / ... → state properties
 
-# Cycle-level analysis
-thermo_otto_cycle / thermo_diesel_cycle / thermo_dual_cycle     → SI engine
-thermo_brayton_cycle                                            → gas turbine
-thermo_rankine_cycle_ideal                                      → steam plant
-thermo_carnot_efficiency                                        → ideal upper bound
+---
+
+## `thermo_isothermal_process`
+
+Isothermal (constant-temperature) process for an ideal gas.
+
+    p·v = const   →   p2 = p1·v1/v2
+    w = p1·v1 · ln(v2/v1)   [J/kg]
+    q = w   (since Δu = 0 at constant T)
+
+Errors: {ok:false, reason} for invalid inputs. Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "p1": {
+      "type": "number",
+      "description": "Initial pressure (Pa). Must be > 0."
+    },
+    "v1": {
+      "type": "number",
+      "description": "Initial specific volume (m\u00b3/kg). Must be > 0."
+    },
+    "v2": {
+      "type": "number",
+      "description": "Final specific volume (m\u00b3/kg). Must be > 0."
+    },
+    "T": {
+      "type": "number",
+      "description": "Temperature (K). Optional; used to compute R\u00b7T."
+    }
+  },
+  "required": [
+    "p1",
+    "v1",
+    "v2"
+  ]
+}
 ```
 
 ---
 
-## Tools
+## `thermo_isobaric_process`
 
-### `thermo_isentropic_relations`
+Isobaric (constant-pressure) process for an ideal gas.
 
-Isentropic T/p/v relations for ideal gas state change.
+    q  = cp · (T2 - T1)   [J/kg]
+    w  = R  · (T2 - T1)   [J/kg]  (boundary work)
+    Δu = cv · (T2 - T1)   [J/kg]
 
-**Input:** `T1_K`, `p1_Pa` (or `v1_m3_kg`), `ratio` (compression or expansion), `k` (specific heat ratio, default 1.4).
+Default cp = 1005 J/kg·K (air). k = 1.4 assumed for deriving cv.
 
-**Returns:** `T2_K`, `p2_Pa`, `v2_m3_kg`.
+Errors: {ok:false, reason} for invalid inputs. Never raises.
 
----
+### Input schema
 
-### `thermo_isothermal_process`
-
-Isothermal (constant temperature) ideal-gas process.
-
-**Input:** `T_K`, `p1_Pa`, `v1_m3_kg`, `p2_Pa` (or `v2_m3_kg`).
-
-**Returns:** final state properties, `work_J_kg`, `heat_J_kg`.
-
----
-
-### `thermo_isobaric_process`
-
-Isobaric (constant pressure) ideal-gas process.
-
-**Input:** `p_Pa`, `T1_K`, `T2_K`, `cp_J_kgK` (default 1005).
-
-**Returns:** `v1_m3_kg`, `v2_m3_kg`, `work_J_kg` = p·Δv, `heat_J_kg` = cp·ΔT.
-
----
-
-### `thermo_isochoric_process`
-
-Isochoric (constant volume) ideal-gas process.
-
-**Input:** `v_m3_kg`, `T1_K`, `T2_K`, `cv_J_kgK` (default 717.86).
-
-**Returns:** `p1_Pa`, `p2_Pa`, `work_J_kg` (= 0), `heat_J_kg` = cv·ΔT.
+```json
+{
+  "type": "object",
+  "properties": {
+    "T1": {
+      "type": "number",
+      "description": "Initial temperature (K). Must be > 0."
+    },
+    "T2": {
+      "type": "number",
+      "description": "Final temperature (K). Must be > 0."
+    },
+    "cp": {
+      "type": "number",
+      "description": "Specific heat at constant pressure (J/kg\u00b7K). Default 1005 J/kg\u00b7K."
+    }
+  },
+  "required": [
+    "T1",
+    "T2"
+  ]
+}
+```
 
 ---
 
-### `thermo_isentropic_process`
+## `thermo_isochoric_process`
 
-Isentropic compression or expansion.
+Isochoric (constant-volume) process for an ideal gas.
 
-**Input:** `T1_K`, `p1_Pa`, `p2_Pa`, `k` (default 1.4), `cp`, `cv`.
+    q  = cv · (T2 - T1)   [J/kg]
+    w  = 0                 (no boundary work)
+    Δu = q
 
-**Returns:** `T2_K`, `v1_m3_kg`, `v2_m3_kg`, `work_J_kg`.
+Default cv = 717.86 J/kg·K (air).
 
----
+Errors: {ok:false, reason} for invalid inputs. Never raises.
 
-### `thermo_polytropic_process`
+### Input schema
 
-Polytropic process p·vⁿ = const.
-
-**Input:** `p1_Pa`, `v1_m3_kg`, `n` (polytropic index), `p2_Pa` (or `v2_m3_kg`).
-
-**Returns:** `T1_K`, `T2_K`, `p2_Pa`, `v2_m3_kg`, `work_J_kg`.
-
----
-
-### `thermo_carnot_efficiency`
-
-Carnot heat-engine efficiency (theoretical maximum).
-
-**Input:** `T_cold_K`, `T_hot_K`.
-
-**Returns:** `eta_carnot` = 1 − T_cold/T_hot; warns if T_cold ≥ T_hot.
-
----
-
-### `thermo_carnot_cop_refrigeration`
-
-Reverse-Carnot refrigeration COP (theoretical maximum).
-
-**Input:** `T_cold_K`, `T_hot_K`.
-
-**Returns:** `COP_ref` = T_cold / (T_hot − T_cold).
-
----
-
-### `thermo_carnot_cop_heat_pump`
-
-Reverse-Carnot heat-pump COP (theoretical maximum).
-
-**Input:** `T_cold_K`, `T_hot_K`.
-
-**Returns:** `COP_hp` = T_hot / (T_hot − T_cold).
+```json
+{
+  "type": "object",
+  "properties": {
+    "T1": {
+      "type": "number",
+      "description": "Initial temperature (K). Must be > 0."
+    },
+    "T2": {
+      "type": "number",
+      "description": "Final temperature (K). Must be > 0."
+    },
+    "cv": {
+      "type": "number",
+      "description": "Specific heat at constant volume (J/kg\u00b7K). Default 717.86 J/kg\u00b7K."
+    }
+  },
+  "required": [
+    "T1",
+    "T2"
+  ]
+}
+```
 
 ---
 
-### `thermo_otto_cycle`
+## `thermo_isentropic_process`
 
-Air-standard Otto cycle (ideal spark-ignition petrol engine).
+Isentropic (adiabatic, reversible) compression or expansion.
 
-**Input:** `r` (compression ratio, > 1), `T1_K` (BDC inlet temperature), `T3_K` (peak temperature after heat addition), `k` (default 1.4), `cp`, `cv`.
+    T2/T1 = (p2/p1)^((k-1)/k)
+    w_s   = cp · (T1 - T2)   [J/kg]  (positive = work output / expansion)
+    q     = 0
 
-**Returns:** `eta_otto`, `T2_K`, `T4_K`, `w_net_J_kg`, `q_in_J_kg`, `q_out_J_kg`; warns if η exceeds Carnot limit.
+Default k=1.4, cp=1005 J/kg·K (air).
+
+Errors: {ok:false, reason} for invalid inputs. Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "T1": {
+      "type": "number",
+      "description": "Initial temperature (K). Must be > 0."
+    },
+    "p1": {
+      "type": "number",
+      "description": "Initial pressure (Pa). Must be > 0."
+    },
+    "p2": {
+      "type": "number",
+      "description": "Final pressure (Pa). Must be > 0."
+    },
+    "k": {
+      "type": "number",
+      "description": "Specific heat ratio (default 1.4)."
+    },
+    "cp": {
+      "type": "number",
+      "description": "cp (J/kg\u00b7K). Default 1005."
+    }
+  },
+  "required": [
+    "T1",
+    "p1",
+    "p2"
+  ]
+}
+```
 
 ---
 
-### `thermo_diesel_cycle`
+## `thermo_polytropic_process`
+
+Polytropic process: p · v^n = const.
+
+    p2   = p1 · (v1/v2)^n
+    w    = (p2·v2 - p1·v1) / (1 - n)   [J/kg]  for n ≠ 1
+    w    = p1·v1 · ln(v2/v1)            [J/kg]  for n = 1
+    q    = Δu + w
+
+Special cases: n=0 isobaric, n=1 isothermal, n=1.4 isentropic (air),
+               n→∞ isochoric (use large n e.g. 1e9).
+
+Errors: {ok:false, reason} for invalid inputs. Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "p1": {
+      "type": "number",
+      "description": "Initial pressure (Pa). Must be > 0."
+    },
+    "v1": {
+      "type": "number",
+      "description": "Initial specific volume (m\u00b3/kg). Must be > 0."
+    },
+    "v2": {
+      "type": "number",
+      "description": "Final specific volume (m\u00b3/kg). Must be > 0."
+    },
+    "n": {
+      "type": "number",
+      "description": "Polytropic index."
+    },
+    "T1": {
+      "type": "number",
+      "description": "Initial temperature (K). Optional; used to compute T2."
+    }
+  },
+  "required": [
+    "p1",
+    "v1",
+    "v2",
+    "n"
+  ]
+}
+```
+
+---
+
+## `thermo_carnot_efficiency`
+
+Maximum (Carnot) thermal efficiency of a heat engine.
+
+    η_Carnot = 1 - T_L / T_H
+
+This is the upper bound for ANY heat engine operating between T_H and T_L.
+
+Errors: {ok:false, reason} for invalid inputs. Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "T_H": {
+      "type": "number",
+      "description": "High-temperature reservoir (K). Must be > T_L > 0."
+    },
+    "T_L": {
+      "type": "number",
+      "description": "Low-temperature reservoir (K). Must be > 0."
+    }
+  },
+  "required": [
+    "T_H",
+    "T_L"
+  ]
+}
+```
+
+---
+
+## `thermo_carnot_cop_refrigeration`
+
+Maximum (reverse-Carnot) COP for a refrigeration cycle.
+
+    COP_R = T_L / (T_H - T_L)
+
+This is the theoretical upper bound for a refrigerator between T_H and T_L.
+
+Errors: {ok:false, reason} for invalid inputs. Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "T_H": {
+      "type": "number",
+      "description": "High-temperature reservoir (K). Must be > T_L > 0."
+    },
+    "T_L": {
+      "type": "number",
+      "description": "Low-temperature reservoir (K). Must be > 0."
+    }
+  },
+  "required": [
+    "T_H",
+    "T_L"
+  ]
+}
+```
+
+---
+
+## `thermo_carnot_cop_heat_pump`
+
+Maximum (reverse-Carnot) COP for a heat-pump cycle.
+
+    COP_HP = T_H / (T_H - T_L)  = 1 + COP_R
+
+Always > 1 for T_H > T_L > 0.
+
+Errors: {ok:false, reason} for invalid inputs. Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "T_H": {
+      "type": "number",
+      "description": "High-temperature reservoir (K). Must be > T_L > 0."
+    },
+    "T_L": {
+      "type": "number",
+      "description": "Low-temperature source (K). Must be > 0."
+    }
+  },
+  "required": [
+    "T_H",
+    "T_L"
+  ]
+}
+```
+
+---
+
+## `thermo_otto_cycle`
+
+Air-standard Otto cycle (ideal spark-ignition engine).
+
+    η_Otto = 1 - 1/r^(k-1)
+    T2 = T1 · r^(k-1)   (end of isentropic compression)
+    T4 = T3 / r^(k-1)   (end of isentropic expansion)
+    w_net = cv · (T3-T2) - cv · (T4-T1)   [J/kg]
+
+Issues a warning if computed efficiency exceeds Carnot limit.
+
+Errors: {ok:false, reason} for invalid inputs. Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "r": {
+      "type": "number",
+      "description": "Compression ratio v1/v2. Must be > 1."
+    },
+    "T1": {
+      "type": "number",
+      "description": "Temperature at state 1 / BDC inlet (K). Must be > 0."
+    },
+    "T3": {
+      "type": "number",
+      "description": "Peak temperature at state 3 (after heat addition) (K). Must be > T2."
+    },
+    "k": {
+      "type": "number",
+      "description": "Specific heat ratio (default 1.4)."
+    },
+    "cp": {
+      "type": "number",
+      "description": "cp (J/kg\u00b7K). Default 1005."
+    },
+    "cv": {
+      "type": "number",
+      "description": "cv (J/kg\u00b7K). Default 717.86."
+    }
+  },
+  "required": [
+    "r",
+    "T1",
+    "T3"
+  ]
+}
+```
+
+---
+
+## `thermo_diesel_cycle`
 
 Air-standard Diesel cycle (ideal compression-ignition engine).
 
-**Input:** `r` (compression ratio), `r_c` (cutoff ratio v3/v2), `T1_K`, `k`, `cp`, `cv`.
+    r   = v1/v2  (compression ratio)
+    r_c = v3/v2  (cutoff ratio; v3 = volume at end of heat addition)
+    η_Diesel = 1 - (r_c^k - 1) / (k · r^(k-1) · (r_c - 1))
 
-**Returns:** `eta_diesel`, state temperatures, `w_net_J_kg`, `q_in_J_kg`.
+Issues a warning if computed efficiency exceeds Carnot limit.
 
----
+Errors: {ok:false, reason} for invalid inputs. Never raises.
 
-### `thermo_dual_cycle`
+### Input schema
 
-Air-standard Dual (mixed) cycle (combines constant-volume and constant-pressure heat addition).
-
-**Input:** `r`, `r_p` (pressure ratio p3/p2), `r_c` (cutoff ratio), `T1_K`, `k`, `cp`, `cv`.
-
-**Returns:** `eta_dual`, all state temperatures, `w_net_J_kg`.
-
----
-
-### `thermo_brayton_cycle`
-
-Brayton cycle (gas turbine) with optional regeneration.
-
-**Input:** `r_p` (pressure ratio), `T1_K` (compressor inlet), `T3_K` (turbine inlet), `k`, `eta_c` (compressor isentropic efficiency, default 1.0), `eta_t` (turbine isentropic efficiency, default 1.0), `regenerator` (bool, default false), `eta_regen` (regenerator effectiveness, default 0.8).
-
-**Returns:** `eta_brayton`, `w_net_J_kg`, `w_compressor_J_kg`, `w_turbine_J_kg`, `back_work_ratio`.
-
----
-
-### `thermo_rankine_cycle_ideal`
-
-Simplified ideal Rankine (steam) cycle using polynomial steam-table approximations.
-
-**Input:** `p_boiler_Pa` (boiler pressure), `p_condenser_Pa` (condenser pressure), `T_superheat_K` (optional superheat).
-
-**Returns:** `eta_rankine`, `w_net_J_kg`, `q_in_J_kg`, `q_out_J_kg`; warns if superheat temperature below saturation.
-
----
-
-### `thermo_refrigeration_cop`
-
-Refrigeration or heat-pump COP from measured or calculated heat flows.
-
-**Input:** `Q_L_J` (heat removed from cold space), `W_in_J` (compressor work input).
-
-**Returns:** `COP_ref` = Q_L / W_in, `COP_hp` = (Q_L + W_in) / W_in.
-
----
-
-## Example
-
+```json
+{
+  "type": "object",
+  "properties": {
+    "r": {
+      "type": "number",
+      "description": "Compression ratio v1/v2. Must be > 1."
+    },
+    "r_c": {
+      "type": "number",
+      "description": "Cutoff ratio v3/v2. Must be in (1, r)."
+    },
+    "T1": {
+      "type": "number",
+      "description": "Temperature at state 1 (K). Must be > 0."
+    },
+    "k": {
+      "type": "number",
+      "description": "Specific heat ratio (default 1.4)."
+    },
+    "cp": {
+      "type": "number",
+      "description": "cp (J/kg\u00b7K). Default 1005."
+    },
+    "cv": {
+      "type": "number",
+      "description": "cv (J/kg\u00b7K). Default 717.86."
+    }
+  },
+  "required": [
+    "r",
+    "r_c",
+    "T1"
+  ]
+}
 ```
-# Ideal Otto cycle at r=9, T1=300 K, T3=2200 K
-thermo_otto_cycle  r:9  T1_K:300  T3_K:2200
-  → eta_otto: 0.585  T2_K: 728  T4_K: 908  w_net_J_kg: 883 000
 
-# Brayton gas turbine r_p=10, T1=300 K, T3=1400 K with 85% component efficiency
-thermo_brayton_cycle  r_p:10  T1_K:300  T3_K:1400  eta_c:0.85  eta_t:0.88
-  → eta_brayton: 0.374  w_net_J_kg: 285 000  back_work_ratio: 0.62
+---
+
+## `thermo_dual_cycle`
+
+Air-standard Dual (mixed) cycle.
+
+Heat is added partly at constant volume (pressure ratio r_p)
+and partly at constant pressure (cutoff ratio r_c).
+Reduces to Otto when r_c=1; to Diesel when r_p=1.
+
+States: 1 BDC → 2 TDC (isentropic compression) → 3 const-V addition
+        → 4 const-P addition → 5 BDC (isentropic expansion).
+
+Errors: {ok:false, reason} for invalid inputs. Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "r": {
+      "type": "number",
+      "description": "Compression ratio v1/v2. Must be > 1."
+    },
+    "r_p": {
+      "type": "number",
+      "description": "Pressure ratio at const-V addition p3/p2. Must be >= 1."
+    },
+    "r_c": {
+      "type": "number",
+      "description": "Cutoff ratio v4/v3. Must be >= 1."
+    },
+    "T1": {
+      "type": "number",
+      "description": "Temperature at state 1 (K). Must be > 0."
+    },
+    "k": {
+      "type": "number",
+      "description": "Specific heat ratio (default 1.4)."
+    },
+    "cp": {
+      "type": "number",
+      "description": "cp (J/kg\u00b7K). Default 1005."
+    },
+    "cv": {
+      "type": "number",
+      "description": "cv (J/kg\u00b7K). Default 717.86."
+    }
+  },
+  "required": [
+    "r",
+    "r_p",
+    "r_c",
+    "T1"
+  ]
+}
 ```
+
+---
+
+## `thermo_brayton_cycle`
+
+Air-standard Brayton cycle (gas-turbine cycle).
+
+Supports ideal (eta_c=eta_t=1) or with isentropic component efficiencies,
+and optional regeneration (recuperator pre-heats compressed air with
+turbine exhaust).
+
+    w_net = w_t - w_c
+    η = w_net / q_in
+    BWR = w_c / w_t   (back-work ratio; typically 40-80% for gas turbines)
+
+Issues a warning if computed efficiency exceeds Carnot limit.
+
+Errors: {ok:false, reason} for invalid inputs. Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "r_p": {
+      "type": "number",
+      "description": "Pressure ratio p2/p1. Must be > 1."
+    },
+    "T1": {
+      "type": "number",
+      "description": "Compressor inlet temperature (K). Must be > 0."
+    },
+    "T3": {
+      "type": "number",
+      "description": "Turbine inlet temperature (K). Must be > T2."
+    },
+    "k": {
+      "type": "number",
+      "description": "Specific heat ratio (default 1.4)."
+    },
+    "cp": {
+      "type": "number",
+      "description": "cp (J/kg\u00b7K). Default 1005."
+    },
+    "eta_c": {
+      "type": "number",
+      "description": "Isentropic efficiency of compressor (0,1]. Default 1.0."
+    },
+    "eta_t": {
+      "type": "number",
+      "description": "Isentropic efficiency of turbine (0,1]. Default 1.0."
+    },
+    "eta_regen": {
+      "type": "number",
+      "description": "Regenerator effectiveness [0,1). 0 = no regeneration (default)."
+    }
+  },
+  "required": [
+    "r_p",
+    "T1",
+    "T3"
+  ]
+}
+```
+
+---
+
+## `thermo_rankine_cycle_ideal`
+
+Simplified ideal Rankine (steam) cycle — parametric engineering estimates.
+
+Uses an Antoine-form saturation temperature approximation (valid ~10 kPa–10 MPa).
+NOT a substitute for IAPWS-IF97 tables; use for cycle selection and preliminary design.
+
+Supports:
+  • Saturated or superheated steam at turbine inlet
+  • Pump and turbine isentropic efficiencies
+  • Single reheat stage
+  • Open feedwater heater count (informational note)
+
+Issues a warning if computed efficiency exceeds Carnot limit.
+
+Errors: {ok:false, reason} for invalid inputs. Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "p_high": {
+      "type": "number",
+      "description": "Boiler / high-side pressure (Pa). Must be > p_low."
+    },
+    "p_low": {
+      "type": "number",
+      "description": "Condenser / low-side pressure (Pa). Must be > 0."
+    },
+    "T_superheat": {
+      "type": "number",
+      "description": "Turbine inlet temperature (K) for superheated steam. Omit or set null for saturated vapour at p_high."
+    },
+    "eta_pump": {
+      "type": "number",
+      "description": "Isentropic pump efficiency (0,1]. Default 1.0."
+    },
+    "eta_turbine": {
+      "type": "number",
+      "description": "Isentropic turbine efficiency (0,1]. Default 1.0."
+    },
+    "T_reheat": {
+      "type": "number",
+      "description": "Reheat temperature (K) at p_reheat. Omit = no reheat."
+    },
+    "p_reheat": {
+      "type": "number",
+      "description": "Reheat pressure (Pa). Required when T_reheat is given."
+    },
+    "n_feedwater_heaters": {
+      "type": "integer",
+      "description": "Number of open feedwater heaters (0-3). Informational only."
+    }
+  },
+  "required": [
+    "p_high",
+    "p_low"
+  ]
+}
+```
+
+---
+
+## `thermo_refrigeration_cop`
+
+Coefficient of Performance (COP) for a refrigeration or heat-pump cycle.
+
+    COP_R  = Q_L / W_in           (refrigeration)
+    COP_HP = (Q_L + W_in) / W_in  (heat pump)
+    Q_H = Q_L + W_in
+
+If T_H and T_L are provided, the computed COP is compared against the
+reverse-Carnot limit; a warning is issued if COP > COP_Carnot.
+
+Errors: {ok:false, reason} for invalid inputs. Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "Q_L": {
+      "type": "number",
+      "description": "Heat removed from cold space per cycle (J or W). Must be > 0."
+    },
+    "W_in": {
+      "type": "number",
+      "description": "Net work input per cycle (J or W). Must be > 0."
+    },
+    "T_H": {
+      "type": "number",
+      "description": "High-temperature reservoir (K). Optional; enables Carnot comparison."
+    },
+    "T_L": {
+      "type": "number",
+      "description": "Low-temperature reservoir (K). Optional; enables Carnot comparison."
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "refrigeration",
+        "heat_pump"
+      ],
+      "description": "'refrigeration' (default) or 'heat_pump'."
+    }
+  },
+  "required": [
+    "Q_L",
+    "W_in"
+  ]
+}
+```
+
+---
+
+## See also
+
+- Package: `kerf_cad_core`

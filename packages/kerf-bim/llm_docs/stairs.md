@@ -1,111 +1,191 @@
-# Stairs (.stair) — Parametric staircase format
+# stairs
 
-A `.stair` file encodes a multi-flight parametric staircase. Geometry is
-derived from the params plus each flight's start point and direction.
-Files have `kind='stair'` in the DB.
+*Module: `kerf_bim.tools.stairs` · Domain: bim*
 
-## JSON schema
+This module registers **4** LLM tool(s):
 
-```jsonc
+- [`create_stair`](#create-stair)
+- [`add_stair_flight`](#add-stair-flight)
+- [`add_stair_landing`](#add-stair-landing)
+- [`validate_stair`](#validate-stair)
+
+---
+
+## `create_stair`
+
+Create a parametric staircase file. Supports straight, L-shaped (90°), and U-shaped (180°) stairs. Returns the file_id of the created stair document.
+
+### Input schema
+
+```json
 {
-  "version": 1,
-  "total_rise_mm": 2800,          // total vertical rise
-  "total_run_mm": 3360,           // total horizontal run
-  "tread_depth_mm": 280,          // going / tread depth
-  "riser_height_mm": 175,         // vertical riser height
-  "nosing_mm": 25,                // horizontal nosing overhang
-  "width_mm": 1000,               // stair clear width
-  "flights": [
-    {
-      "id": "flight-1",
-      "start_point": [0, 0, 0],   // [x, y, z] mm — bottom of flight
-      "direction": [1, 0, 0],     // unit direction vector (horizontal)
-      "step_count": 16            // number of risers
+  "type": "object",
+  "properties": {
+    "file_id": {
+      "type": "string",
+      "description": "Optional UUID for the new stair file."
+    },
+    "total_rise_mm": {
+      "type": "number",
+      "description": "Total vertical rise in mm."
+    },
+    "total_run_mm": {
+      "type": "number",
+      "description": "Total horizontal run in mm."
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "straight",
+        "L",
+        "U"
+      ],
+      "description": "Stair shape: straight, L (90\u00b0), or U (180\u00b0)."
+    },
+    "start_point": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "description": "[x, y, z] bottom start point in mm."
+    },
+    "direction": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "description": "[dx, dy, dz] direction vector for straight stair."
+    },
+    "riser_height_mm": {
+      "type": "number",
+      "description": "Riser height mm (default 175)."
+    },
+    "tread_depth_mm": {
+      "type": "number",
+      "description": "Tread depth mm (default 280)."
+    },
+    "width_mm": {
+      "type": "number",
+      "description": "Stair width mm (default 1000)."
     }
-  ],
-  "landings": [
-    {
-      "id": "landing-1",
-      "position": [2800, 0, 1400], // corner [x, y, z] mm
-      "size_mm": [1200, 1000]      // [width, depth]
+  },
+  "required": [
+    "total_rise_mm",
+    "total_run_mm",
+    "kind",
+    "start_point"
+  ]
+}
+```
+
+---
+
+## `add_stair_flight`
+
+Append a new flight to an existing stair file.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "file_id": {
+      "type": "string",
+      "description": "UUID of the stair file."
+    },
+    "start": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "description": "[x, y, z] start point of flight."
+    },
+    "direction": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "description": "[dx, dy, dz] direction vector."
+    },
+    "step_count": {
+      "type": "integer",
+      "description": "Number of steps in this flight."
     }
-  ],
-  "handedness": "right"           // "right" | "left" — railing side
+  },
+  "required": [
+    "file_id",
+    "start",
+    "direction",
+    "step_count"
+  ]
 }
 ```
 
-### Comfort formula
-`2 × riser_height_mm + tread_depth_mm` must be in **[550, 700] mm**.
-- riser_height_mm: 100 – 220 mm
-- tread_depth_mm: 200 – 350 mm
+---
 
-## LLM tools
+## `add_stair_landing`
 
-| Tool | Description |
-|------|-------------|
-| `create_stair` | Create a stair file (straight / L / U) |
-| `add_stair_flight` | Append a flight to an existing stair |
-| `add_stair_landing` | Append a landing platform |
-| `validate_stair` | Check code compliance (2R+T formula) |
+Append a landing platform to an existing stair file.
 
-## Examples
-
-### 1. Straight stair — 2.8 m rise
+### Input schema
 
 ```json
 {
-  "tool": "create_stair",
-  "args": {
-    "total_rise_mm": 2800,
-    "total_run_mm": 4480,
-    "kind": "straight",
-    "start_point": [0, 0, 0],
-    "direction": [1, 0, 0],
-    "riser_height_mm": 175,
-    "tread_depth_mm": 280,
-    "width_mm": 1200
-  }
+  "type": "object",
+  "properties": {
+    "file_id": {
+      "type": "string",
+      "description": "UUID of the stair file."
+    },
+    "position": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "description": "[x, y, z] corner position of landing."
+    },
+    "size_mm": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "description": "[width, depth] of landing in mm."
+    }
+  },
+  "required": [
+    "file_id",
+    "position",
+    "size_mm"
+  ]
 }
 ```
 
-16 steps, 2R+T = 630 (comfort code pass).
+---
 
-### 2. L-shaped stair — 90° turn at mid-landing
+## `validate_stair`
+
+Validate a stair file against building-code comfort rules. Checks riser height [100, 220], tread depth [200, 350], and 2R+T [550, 700].
+
+### Input schema
 
 ```json
 {
-  "tool": "create_stair",
-  "args": {
-    "total_rise_mm": 2800,
-    "total_run_mm": 4480,
-    "kind": "L",
-    "start_point": [0, 0, 0],
-    "riser_height_mm": 175,
-    "tread_depth_mm": 280,
-    "width_mm": 1000
-  }
+  "type": "object",
+  "properties": {
+    "file_id": {
+      "type": "string",
+      "description": "UUID of the stair file."
+    }
+  },
+  "required": [
+    "file_id"
+  ]
 }
 ```
 
-Two 8-step flights at 90°, one intermediate landing. First leg runs +x,
-second leg runs +y.
+---
 
-### 3. U-shaped stair — 180° switchback
+## See also
 
-```json
-{
-  "tool": "create_stair",
-  "args": {
-    "total_rise_mm": 2800,
-    "total_run_mm": 4480,
-    "kind": "U",
-    "start_point": [0, 0, 0],
-    "riser_height_mm": 175,
-    "tread_depth_mm": 280,
-    "width_mm": 1000
-  }
-}
-```
-
-Two 8-step flights in opposite directions (first +x, second −x),
-offset by `width_mm` in y. One mid-landing.
+- Package: `kerf_bim`

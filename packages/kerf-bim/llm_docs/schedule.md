@@ -1,150 +1,188 @@
-# Schedule (.schedule.json) — Revit-style query DSL
+# schedule
 
-A `.schedule.json` file defines a parameterized query over a `.bim` file's elements.
-It supports filtering, sorting, grouping, and column projection — similar to Revit
-schedule views or a simple SQL SELECT.
+*Module: `kerf_bim.tools.schedule` · Domain: bim*
 
-## JSON shape
+This module registers **3** LLM tool(s):
 
-```json
-{
-  "version": 1,
-  "name": "Concrete Walls",
-  "target_category": "Wall",
-  "filters": [
-    { "field": "material", "op": "eq", "value": "Concrete" }
-  ],
-  "columns": [
-    { "field": "name", "label": "Mark" },
-    { "field": "height", "label": "Height (mm)", "format": "integer" },
-    { "field": "thickness", "label": "Thickness (mm)" }
-  ],
-  "group_by": "material",
-  "sort_by": "name"
-}
-```
+- [`create_schedule`](#create-schedule)
+- [`update_schedule_filter`](#update-schedule-filter)
+- [`run_schedule`](#run-schedule)
 
-### Fields
+---
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `version` | integer | Must be `1` |
-| `name` | string | Schedule display name |
-| `target_category` | string | One of: `Wall`, `Door`, `Window`, `Room`, `Slab`, `Space`, `Opening`, `Level`, `Site` |
-| `filters` | array | List of filter objects |
-| `columns` | array | List of column projection objects |
-| `group_by` | string? | Optional field to group results by |
-| `sort_by` | string? | Optional field to sort by (`field` or `field:asc` / `field:desc`) |
+## `create_schedule`
 
-### Filter operators
+Create a new .schedule.json schedule definition file in the project tree.
 
-| Op | Meaning |
-|----|---------|
-| `eq` | equals |
-| `ne` | not equals |
-| `gt` | greater than |
-| `lt` | less than |
-| `gte` | greater than or equal |
-| `lte` | less than or equal |
-| `in` | value is in array |
-| `contains` | string/array contains value |
-
-### Nested fields
-
-Use dot-notation for nested access: `geometry.area`, `site.latitude`.
-
-## Example 1 — Door Schedule
+### Input schema
 
 ```json
 {
-  "version": 1,
-  "name": "Door Schedule",
-  "target_category": "Door",
-  "filters": [],
-  "columns": [
-    { "field": "name", "label": "Mark" },
-    { "field": "width", "label": "Width (mm)" },
-    { "field": "height", "label": "Height (mm)" }
-  ],
-  "sort_by": "name"
-}
-```
-
-**Bim source:**
-```json
-{
-  "elements": [
-    { "type": "Door", "name": "D1", "width": 900, "height": 2100 },
-    { "type": "Door", "name": "D2", "width": 800, "height": 2100 },
-    { "type": "Door", "name": "D3", "width": 1000, "height": 2400 }
+  "type": "object",
+  "properties": {
+    "path": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "target_category": {
+      "type": "string",
+      "enum": [
+        "Wall",
+        "Door",
+        "Window",
+        "Room",
+        "Slab",
+        "Space",
+        "Opening",
+        "Level",
+        "Site"
+      ]
+    },
+    "columns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "field"
+        ]
+      }
+    },
+    "filters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "op": {
+            "type": "string",
+            "enum": [
+              "eq",
+              "ne",
+              "gt",
+              "lt",
+              "gte",
+              "lte",
+              "in",
+              "contains"
+            ]
+          },
+          "value": {}
+        },
+        "required": [
+          "field",
+          "op",
+          "value"
+        ]
+      }
+    },
+    "group_by": {
+      "type": "string"
+    },
+    "sort_by": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "path",
+    "name",
+    "target_category"
   ]
 }
 ```
 
-**Result:**
+---
+
+## `update_schedule_filter`
+
+Update the filter on an existing .schedule.json file.
+
+### Input schema
+
 ```json
 {
-  "columns": [
-    { "field": "name", "label": "Mark", "format": null },
-    { "field": "width", "label": "Width (mm)", "format": null },
-    { "field": "height", "label": "Height (mm)", "format": null }
-  ],
-  "rows": [
-    [{ "name": "D1", "width": 900, "height": 2100 }],
-    [{ "name": "D2", "width": 800, "height": 2100 }],
-    [{ "name": "D3", "width": 1000, "height": 2400 }]
+  "type": "object",
+  "properties": {
+    "file_id": {
+      "type": "string"
+    },
+    "filter": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "eq",
+            "ne",
+            "gt",
+            "lt",
+            "gte",
+            "lte",
+            "in",
+            "contains"
+          ]
+        },
+        "value": {}
+      },
+      "required": [
+        "field",
+        "op",
+        "value"
+      ]
+    }
+  },
+  "required": [
+    "file_id",
+    "filter"
   ]
 }
 ```
 
-## Example 2 — Room Area Schedule
+---
+
+## `run_schedule`
+
+Execute a .schedule.json against a .bim file and return the table result.
+
+### Input schema
 
 ```json
 {
-  "version": 1,
-  "name": "Room Area Schedule",
-  "target_category": "Room",
-  "filters": [],
-  "columns": [
-    { "field": "name", "label": "Room Name" },
-    { "field": "level", "label": "Level" },
-    { "field": "area", "label": "Area (m²)", "format": "decimal" }
-  ],
-  "sort_by": "name"
-}
-```
-
-**Bim source:**
-```json
-{
-  "elements": [
-    { "type": "Room", "name": "Living Room", "level": "L1", "area": 45.5 },
-    { "type": "Room", "name": "Bedroom 1", "level": "L2", "area": 22.0 },
-    { "type": "Room", "name": "Kitchen", "level": "L1", "area": 18.0 }
+  "type": "object",
+  "properties": {
+    "schedule_file_id": {
+      "type": "string"
+    },
+    "bim_file_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schedule_file_id",
+    "bim_file_id"
   ]
 }
 ```
 
-**Result:**
-```json
-{
-  "columns": [
-    { "field": "name", "label": "Room Name", "format": null },
-    { "field": "level", "label": "Level", "format": null },
-    { "field": "area", "label": "Area (m²)", "format": "decimal" }
-  ],
-  "rows": [
-    [{ "name": "Bedroom 1", "level": "L2", "area": 22.0 }],
-    [{ "name": "Kitchen", "level": "L1", "area": 18.0 }],
-    [{ "name": "Living Room", "level": "L1", "area": 45.5 }]
-  ]
-}
-```
+---
 
-## LLM tools
+## See also
 
-| Tool | Description |
-|------|-------------|
-| `create_schedule` | Create a new `.schedule.json` file in the project tree |
-| `update_schedule_filter` | Update the filter on an existing `.schedule.json` file |
-| `run_schedule` | Execute a `.schedule.json` against a `.bim` file; returns the table JSON |
+- Package: `kerf_bim`

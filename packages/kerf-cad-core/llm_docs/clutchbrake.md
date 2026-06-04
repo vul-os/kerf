@@ -1,215 +1,549 @@
-# Clutch and Brake Design
+# clutchbrake
 
-Pure-Python clutch and brake engineering calculations. No OCC dependency. Covers disc
-clutches, cone clutches, band brakes, drum brakes, disc brakes, energy/temperature,
-cooling area, pV wear check, engagement time, and friction material lookup. All tools
-stateless. References: Shigley's MED 10th ed. §§16-1 to 16-12; Juvinall & Marshek
-Machine Component Design 5th ed.
+*Module: `kerf_cad_core.clutchbrake.tools` · Domain: cad*
 
----
+This module registers **11** LLM tool(s):
 
-## When to use
-
-Use these tools when the user asks about:
-- clutch, disc clutch, multi-plate clutch, friction clutch, plate clutch
-- cone clutch, conical clutch, cone angle, self-locking
-- band brake, flexible band, capstan equation, self-energizing brake
-- drum brake, shoe brake, leading shoe, trailing shoe, internal expanding
-- disc brake, caliper brake, brake pad
-- braking torque, clutch torque, torque capacity
-- engagement energy, heat generated during engagement, slip energy
-- temperature rise, thermal rise, single engagement
-- heat dissipation, cooling area, steady-state braking
-- pV limit, pressure-velocity, friction material wear
-- engagement time, synchronisation time, inertia
-- friction material, dry friction, wet friction, sintered, paper
+- [`disc_clutch_torque`](#disc-clutch-torque)
+- [`cone_clutch_torque`](#cone-clutch-torque)
+- [`band_brake_torque`](#band-brake-torque)
+- [`drum_brake_torque`](#drum-brake-torque)
+- [`disc_brake_torque`](#disc-brake-torque)
+- [`engagement_energy`](#engagement-energy)
+- [`clutch_temperature_rise`](#clutch-temperature-rise)
+- [`clutch_heat_dissipation_area`](#clutch-heat-dissipation-area)
+- [`clutch_wear_pv_check`](#clutch-wear-pv-check)
+- [`engagement_time`](#engagement-time)
+- [`friction_material_props`](#friction-material-props)
 
 ---
 
-## Tools
-
-### `disc_clutch_torque`
-
-Torque capacity of a disc/plate clutch (uniform-wear or uniform-pressure theory).
-
-Supports multi-plate configurations via `n_plates`.
-
-**Input:**
-- `F_a` (required) — axial actuation force (N)
-- `mu` (required) — coefficient of friction
-- `r_o` (required) — outer friction radius (m)
-- `r_i` (required) — inner friction radius (m)
-- `method` — `uniform-wear` (default, conservative) or `uniform-pressure` (new surfaces)
-- `n_plates` — number of friction disc pairs (default 1)
-
-**Returns:** `torque_Nm`, `torque_per_surface_Nm`, `r_eff_m`.
-
----
-
-### `cone_clutch_torque`
-
-Torque capacity and actuation force of a cone clutch.
-
-Cone half-angle α is from rotation axis to cone surface (typical 8°–15°; < 6° may self-lock).
-
-**Input:**
-- `F_a`, `mu`, `r_o`, `r_i` (all required)
-- `half_angle_deg` (required) — cone half-angle α (°)
-- `method` — `uniform-wear` (default) or `uniform-pressure`
-
-**Returns:** `torque_Nm`, `r_eff_m`, `sin_alpha`, `self_lock` (bool).
-
----
-
-### `band_brake_torque`
-
-Band brake braking torque using the capstan equation.
-
-`F_tight / F_slack = exp(μ·θ)`;  `T = (F_tight − F_slack) × r`
-
-**Input:**
-- `drum_radius` (required) — drum radius r (m)
-- `angle_wrap_deg` (required) — band wrap angle θ (°)
-- `mu` (required) — band-drum friction coefficient
-- `F_tight` (required) — tight-side tension (N)
-- `self_energizing` — report capstan ratio if true (default false)
-
-**Returns:** `torque_Nm`, `F_slack_N`, `capstan_ratio`.
-
----
-
-### `drum_brake_torque`
-
-Long-shoe drum brake torque for leading and trailing shoes.
-
-**Input:**
-- `F_a` (required) — actuating force per shoe (N)
-- `mu` (required), `drum_radius_m` (required)
-- `shoe_width_m` (required), `shoe_arc_deg` (required)
-- `a_m` (required) — pivot-to-drum-centre distance (m)
-- `c_m` (required) — pivot-to-line-of-action distance (m)
-
-**Returns:** `T_leading_Nm`, `T_trailing_Nm`, `T_total_Nm`, `self_energizing_factor`.
-
----
-
-### `disc_brake_torque`
-
-Caliper disc brake torque.
-
-`T = μ × F_clamp × r_eff × n_pads`
-
-**Input:**
-- `F_clamp` (required) — clamping force per pad pair (N)
-- `mu` (required), `r_eff_m` (required) — effective friction radius (m)
-- `n_pads` — number of pad pairs (default 1)
-
-**Returns:** `torque_Nm`.
-
----
-
-### `engagement_energy`
-
-Energy dissipated during a single clutch/brake engagement.
-
-`E = 0.5 × I × Δω²` (rotational inertia method) or `E = T × θ_slip`.
-
-**Input:**
-- `I_kgm2` (required) — combined moment of inertia (kg·m²)
-- `omega1_rads` (required) — initial angular velocity (rad/s)
-- `omega2_rads` (required) — final angular velocity (rad/s)
-
-**Returns:** `energy_J`, `energy_kJ`.
-
----
-
-### `temperature_rise`
-
-Lumped-mass temperature rise per single engagement.
-
-`ΔT = E / (m × Cp)`
-
-**Input:**
-- `energy_J` (required) — energy from `engagement_energy`
-- `mass_kg` (required) — heat-absorbing mass (kg)
-- `Cp_J_kgK` (default 460 J/(kg·K) for steel)
-
-**Returns:** `delta_T_C`.
-
----
-
-### `heat_dissipation_area`
-
-Minimum cooling surface area for steady continuous power dissipation.
-
-`A = P / (h × ΔT_limit)`
-
-**Input:**
-- `power_W` (required) — continuous friction power (W)
-- `h_W_m2K` (default 15 W/(m²·K) natural convection)
-- `delta_T_limit_C` (default 150 °C allowable surface rise)
-
-**Returns:** `area_m2`.
-
----
-
-### `wear_pv_check`
-
-Check operating pV (pressure × velocity) against friction material catalog limit.
-
-`p = F_a / A_friction`,  `V = π × D × n / 60000`
-
-**Input:**
-- `p_MPa` (required) — contact pressure (MPa)
-- `V_ms` (required) — rubbing velocity (m/s)
-- `material` — friction material name (looks up in built-in catalog; default `organic_dry`)
-
-**Returns:** `pV_MPa_ms`, `pV_limit_MPa_ms`, `ok` (bool), `material_props`.
-
----
-
-### `engagement_time`
-
-Synchronisation time and slip energy during engagement.
-
-`t_sync = I × Δω / T_clutch`;  `E_slip = 0.5 × I × Δω²`
-
-**Input:**
-- `I_kgm2` (required), `omega1_rads` (required), `omega2_rads` (required),
-  `T_clutch_Nm` (required)
-
-**Returns:** `t_sync_s`, `E_slip_J`, `average_slip_power_W`.
-
----
-
-### `friction_material_props`
-
-Look up coefficient of friction μ, max pV, and max operating temperature for a named
-friction material.
-
-**Input:**
-- `material` (required) — e.g. `organic_dry`, `organic_wet`, `sintered_dry`,
-  `sintered_wet`, `paper_wet`, `ceramic_dry`
-
-**Returns:** `mu`, `max_pV_MPa_ms`, `max_temp_C`, `material`.
-
----
-
-## Example
-
+## `disc_clutch_torque`
+
+Compute the torque capacity of a disc / plate clutch.
+
+Supports uniform-wear (Shigley §16-2, preferred for design) and uniform-pressure (new or relapped surfaces) theories. Multi-plate configurations are handled via n_plates.
+
+Returns torque_Nm (total), torque per friction surface, effective friction radius, and actuation force relationship.
+
+Errors: {ok:false, reason} for invalid inputs. Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "F_a": {
+      "type": "number",
+      "description": "Axial actuation force (N). Must be > 0."
+    },
+    "mu": {
+      "type": "number",
+      "description": "Coefficient of friction (dimensionless). Must be > 0."
+    },
+    "r_o": {
+      "type": "number",
+      "description": "Outer friction radius (m). Must be > r_i."
+    },
+    "r_i": {
+      "type": "number",
+      "description": "Inner friction radius (m). Must be >= 0."
+    },
+    "method": {
+      "type": "string",
+      "enum": [
+        "uniform-wear",
+        "uniform-pressure"
+      ],
+      "description": "Pressure distribution theory: 'uniform-wear' (default, conservative) or 'uniform-pressure' (new surfaces)."
+    },
+    "n_plates": {
+      "type": "integer",
+      "description": "Number of friction disc pairs (default 1). Each pair contributes 2 friction surfaces."
+    }
+  },
+  "required": [
+    "F_a",
+    "mu",
+    "r_o",
+    "r_i"
+  ]
+}
 ```
-1. friction_material_props  material:"organic_dry"
-   → mu:0.35  max_pV_MPa_ms:1.75  max_temp_C:250
 
-2. disc_clutch_torque  F_a:5000  mu:0.35  r_o:0.15  r_i:0.08  n_plates:2
-   → torque_Nm:248  r_eff_m:0.115
+---
 
-3. engagement_energy  I_kgm2:0.5  omega1_rads:104.7  omega2_rads:0
-   → energy_kJ:2.74
+## `cone_clutch_torque`
 
-4. temperature_rise  energy_J:2740  mass_kg:2.0
-   → delta_T_C:2.98
+Compute the torque capacity and actuation force of a cone clutch.
 
-5. engagement_time  I_kgm2:0.5  omega1_rads:104.7  omega2_rads:0  T_clutch_Nm:248
-   → t_sync_s:0.211
+The cone half-angle α is from the rotation axis to the cone surface (typically 8°–15°). Below ~6° the clutch may self-lock.
+
+Returns torque_Nm, actuation force, effective friction radius, sin(α), and self_lock flag.
+
+Errors: {ok:false, reason} for invalid inputs. Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "F_a": {
+      "type": "number",
+      "description": "Axial engagement force (N). Must be > 0."
+    },
+    "mu": {
+      "type": "number",
+      "description": "Coefficient of friction. Must be > 0."
+    },
+    "r_o": {
+      "type": "number",
+      "description": "Outer cone radius (m). Must be > r_i."
+    },
+    "r_i": {
+      "type": "number",
+      "description": "Inner cone radius (m). Must be >= 0."
+    },
+    "half_angle_deg": {
+      "type": "number",
+      "description": "Cone half-angle \u03b1 (degrees). Must be > 0. Typical: 8\u201315\u00b0."
+    },
+    "method": {
+      "type": "string",
+      "enum": [
+        "uniform-wear",
+        "uniform-pressure"
+      ],
+      "description": "Pressure distribution: 'uniform-wear' (default) or 'uniform-pressure'."
+    }
+  },
+  "required": [
+    "F_a",
+    "mu",
+    "r_o",
+    "r_i",
+    "half_angle_deg"
+  ]
+}
 ```
+
+---
+
+## `band_brake_torque`
+
+Compute band brake braking torque using the capstan equation.
+
+F_tight / F_slack = exp(μ·θ)
+T = (F_tight - F_slack) × r
+
+Returns torque_Nm, tight/slack forces, capstan ratio, and self-energizing factor exp(μ·θ).
+
+Errors: {ok:false, reason} for invalid inputs. Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "drum_radius": {
+      "type": "number",
+      "description": "Drum radius r (m). Must be > 0."
+    },
+    "angle_wrap_deg": {
+      "type": "number",
+      "description": "Band wrap angle \u03b8 (degrees). Must be > 0."
+    },
+    "mu": {
+      "type": "number",
+      "description": "Band-drum coefficient of friction. Must be > 0."
+    },
+    "F_tight": {
+      "type": "number",
+      "description": "Tight-side band tension (N). Must be > 0."
+    },
+    "self_energizing": {
+      "type": "boolean",
+      "description": "If true, report the self-energizing factor exp(\u03bc\u00b7\u03b8). Default false."
+    }
+  },
+  "required": [
+    "drum_radius",
+    "angle_wrap_deg",
+    "mu",
+    "F_tight"
+  ]
+}
+```
+
+---
+
+## `drum_brake_torque`
+
+Compute drum brake torque using the Shigley long-shoe formulation.
+
+Handles leading (self-energizing) and trailing (self-dragging) shoes. A self-locking warning is issued when the leading shoe geometry causes M_f >= M_n.
+
+Returns torque_Nm, required actuating force, M_n, M_f, and self_energizing flag.
+
+Errors: {ok:false, reason} for invalid inputs. Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "drum_radius": {
+      "type": "number",
+      "description": "Drum radius r (m). Must be > 0."
+    },
+    "shoe_width": {
+      "type": "number",
+      "description": "Shoe face width b (m). Must be > 0."
+    },
+    "mu": {
+      "type": "number",
+      "description": "Coefficient of friction. Must be > 0."
+    },
+    "p_max": {
+      "type": "number",
+      "description": "Maximum contact pressure on shoe (Pa). Must be > 0."
+    },
+    "theta1_deg": {
+      "type": "number",
+      "description": "Shoe leading-edge angle from pivot (degrees). Typically 0\u201330\u00b0."
+    },
+    "theta2_deg": {
+      "type": "number",
+      "description": "Shoe trailing-edge angle from pivot (degrees). Must be > theta1_deg."
+    },
+    "pivot_a": {
+      "type": "number",
+      "description": "Distance from drum centre to shoe pivot (m). Must be > 0."
+    },
+    "shoe_type": {
+      "type": "string",
+      "enum": [
+        "leading",
+        "trailing"
+      ],
+      "description": "'leading' (default, self-energizing) or 'trailing' (self-dragging)."
+    }
+  },
+  "required": [
+    "drum_radius",
+    "shoe_width",
+    "mu",
+    "p_max",
+    "theta1_deg",
+    "theta2_deg",
+    "pivot_a"
+  ]
+}
+```
+
+---
+
+## `disc_brake_torque`
+
+Compute caliper disc brake braking torque.
+
+T = n_pads × μ × F_clamp × r_eff
+
+Returns torque_Nm for the specified number of pads.
+
+Errors: {ok:false, reason} for invalid inputs. Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "F_clamp": {
+      "type": "number",
+      "description": "Clamping force per pad (N). Must be > 0."
+    },
+    "mu": {
+      "type": "number",
+      "description": "Pad-rotor coefficient of friction. Must be > 0."
+    },
+    "r_eff": {
+      "type": "number",
+      "description": "Effective friction radius \u2014 typically mid-pad radius (m). Must be > 0."
+    },
+    "n_pads": {
+      "type": "integer",
+      "description": "Number of friction pads (default 2 for floating caliper, 4 for fixed caliper)."
+    }
+  },
+  "required": [
+    "F_clamp",
+    "mu",
+    "r_eff"
+  ]
+}
+```
+
+---
+
+## `engagement_energy`
+
+Compute energy dissipated during a clutch / brake engagement.
+
+Two components:
+  1. Kinetic energy from inertia redistribution:  ½·I_eff·Δω²
+  2. Work done against load during slip (optional).
+
+Returns E_slip_J (total), E_kinetic_J, E_load_J, Δω, I_eff.
+
+Errors: {ok:false, reason} for invalid inputs. Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "omega1_rad_s": {
+      "type": "number",
+      "description": "Driving shaft angular velocity (rad/s). Must be >= 0."
+    },
+    "omega2_rad_s": {
+      "type": "number",
+      "description": "Driven shaft initial angular velocity (rad/s). Must be >= 0."
+    },
+    "I_driving": {
+      "type": "number",
+      "description": "Driving-side mass moment of inertia (kg\u00b7m\u00b2). Must be > 0."
+    },
+    "I_driven": {
+      "type": "number",
+      "description": "Driven-side mass moment of inertia (kg\u00b7m\u00b2). Must be > 0."
+    },
+    "T_load_Nm": {
+      "type": "number",
+      "description": "Resisting load torque on driven side (N\u00b7m, default 0)."
+    },
+    "t_engage_s": {
+      "type": "number",
+      "description": "Engagement/slip time (s). If provided, load work is added to slip energy. Must be > 0 if given."
+    }
+  },
+  "required": [
+    "omega1_rad_s",
+    "omega2_rad_s",
+    "I_driving",
+    "I_driven"
+  ]
+}
+```
+
+---
+
+## `clutch_temperature_rise`
+
+Estimate the lumped temperature rise of the rotor/drum from one clutch or brake engagement.
+
+ΔT = (fraction × E_slip) / (m × cp)
+
+Returns delta_T_K (°C increment). Input E_slip_J from engagement_energy.
+
+Errors: {ok:false, reason} for invalid inputs. Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "E_slip_J": {
+      "type": "number",
+      "description": "Slip energy dissipated (J). Must be > 0."
+    },
+    "mass_rotor_kg": {
+      "type": "number",
+      "description": "Effective thermal mass of rotor/drum (kg). Must be > 0."
+    },
+    "cp_J_per_kgK": {
+      "type": "number",
+      "description": "Specific heat (J/kg\u00b7K). Default 500 (steel/cast iron). Must be > 0."
+    },
+    "fraction_to_rotor": {
+      "type": "number",
+      "description": "Fraction of slip energy going to the rotor (0\u20131). Default 0.5."
+    }
+  },
+  "required": [
+    "E_slip_J",
+    "mass_rotor_kg"
+  ]
+}
+```
+
+---
+
+## `clutch_heat_dissipation_area`
+
+Compute the minimum heat-dissipation area for steady-state convective cooling of a clutch or brake.
+
+A = Q / (h × ΔT)
+
+Returns area_m2 (m²).
+
+Errors: {ok:false, reason} for invalid inputs. Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "power_W": {
+      "type": "number",
+      "description": "Heat dissipation power (W). Must be > 0."
+    },
+    "h_conv": {
+      "type": "number",
+      "description": "Convective heat-transfer coefficient (W/m\u00b2\u00b7K). Default 20 (natural convection in air). Must be > 0."
+    },
+    "delta_T_K": {
+      "type": "number",
+      "description": "Allowable surface-to-ambient temperature difference (K). Default 80 K. Must be > 0."
+    }
+  },
+  "required": [
+    "power_W"
+  ]
+}
+```
+
+---
+
+## `clutch_wear_pv_check`
+
+Check whether the contact pressure × slip velocity (pV) product is within the friction material's allowable limit.
+
+Returns pv_Pa_m_s, pv_max, pv_ok, safety_factor, and warnings if the limit is exceeded.
+
+Available materials include: cast_iron_dry, cast_iron_wet, molded_dry, molded_wet, sintered_metal_dry, paper_wet, carbon_graphite, asbestos_dry, asbestos_wet, bronze_dry, steel_dry, cork_dry, wood_dry.
+
+Errors: {ok:false, reason} for invalid inputs. Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "p_contact": {
+      "type": "number",
+      "description": "Average contact pressure on friction surface (Pa). Must be > 0."
+    },
+    "v_slip": {
+      "type": "number",
+      "description": "Average sliding / slip velocity at friction surface (m/s). Must be > 0."
+    },
+    "material": {
+      "type": "string",
+      "description": "Friction material name from built-in catalog (e.g. 'cast_iron_dry', 'molded_dry', 'sintered_metal_dry')."
+    }
+  },
+  "required": [
+    "p_contact",
+    "v_slip",
+    "material"
+  ]
+}
+```
+
+---
+
+## `engagement_time`
+
+Compute the synchronisation time and slip energy during a clutch engagement assuming constant transmitted torque.
+
+t_sync = Δω × I₁ × I₂ / [(T_c - T_load) × (I₁ + I₂)]
+
+Returns t_sync_s, E_slip_J, omega_sync, t_sync_feasible.
+
+Errors: {ok:false, reason} for invalid inputs. Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "omega1_rad_s": {
+      "type": "number",
+      "description": "Driving shaft initial angular velocity (rad/s). Must be >= 0."
+    },
+    "omega2_rad_s": {
+      "type": "number",
+      "description": "Driven shaft initial angular velocity (rad/s). Must be >= 0."
+    },
+    "I_driving": {
+      "type": "number",
+      "description": "Driving-side inertia (kg\u00b7m\u00b2). Must be > 0."
+    },
+    "I_driven": {
+      "type": "number",
+      "description": "Driven-side inertia (kg\u00b7m\u00b2). Must be > 0."
+    },
+    "T_clutch_Nm": {
+      "type": "number",
+      "description": "Clutch (transmitted) torque during slip (N\u00b7m). Must be > 0."
+    },
+    "T_load_Nm": {
+      "type": "number",
+      "description": "Load torque on driven side (N\u00b7m, default 0)."
+    }
+  },
+  "required": [
+    "omega1_rad_s",
+    "omega2_rad_s",
+    "I_driving",
+    "I_driven",
+    "T_clutch_Nm"
+  ]
+}
+```
+
+---
+
+## `friction_material_props`
+
+Look up friction material properties from the built-in catalog.
+
+Returns μ (dry coefficient of friction), max_pV (Pa·m/s), and max_temp (°C) for the specified material.
+
+Available materials: cast_iron_dry, cast_iron_wet, steel_dry, bronze_dry, asbestos_dry, asbestos_wet, molded_dry, molded_wet, paper_wet, sintered_metal_dry, cork_dry, wood_dry, carbon_graphite.
+
+Errors: {ok:false, reason} for unknown material. Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "material": {
+      "type": "string",
+      "description": "Friction material name from the built-in catalog (e.g. 'cast_iron_dry', 'molded_dry', 'sintered_metal_dry')."
+    }
+  },
+  "required": [
+    "material"
+  ]
+}
+```
+
+---
+
+## See also
+
+- Package: `kerf_cad_core`

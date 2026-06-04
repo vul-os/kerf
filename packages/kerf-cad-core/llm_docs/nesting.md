@@ -1,71 +1,130 @@
-# 2-D Part Nesting and Cut Optimisation
+# nesting
 
-Pure-Python rectangular bin-packing for laser cutting, sheet-metal blanking, and
-flat-pattern nesting. Packs parts onto stock sheets using a skyline algorithm with
-optional 90° rotation, and formats a cut-optimisation report.
+*Module: `kerf_cad_core.nesting.tools` · Domain: cad*
 
----
+This module registers **2** LLM tool(s):
 
-## When to use
-
-Reach for this module when the user asks about:
-
-- nesting parts on a sheet for laser cutting, waterjet, or plasma
-- minimising sheet waste or maximising material utilisation
-- calculating how many sheets are needed to cut a set of parts
-- estimating laser cut length or machine time
-- producing a cut-optimisation or nesting report
-- flat-pattern layout for sheet metal, plywood, acrylic, or fabric
-- packing rectangular blanks with a kerf gap and border margin
+- [`nest_parts`](#nest-parts)
+- [`nest_report`](#nest-report)
 
 ---
 
-## Tools
+## `nest_parts`
 
-### `nest_parts`
+Nest a list of rectangular parts onto stock sheets using a skyline bin-packing algorithm with optional 90° rotation. 
+Inputs: an array of part objects (name, w, h, optional qty), sheet dimensions (sheet_w × sheet_h), kerf gap, border margin, and allow_rotate flag. 
+Algorithm: deterministic skyline (bottom-left, best-fit segment). Rotation 0° tried first; 90° tried when allow_rotate=true and the rotated footprint is different. Parts that exceed the usable sheet area (sheet − 2×margin) trigger a friendly error — they are never silently dropped. 
+Returns: {ok, sheets:[{sheet, placements:[{part, x, y, w, h, rot}]}], sheets_used, utilization, cut_length, errors:[]}. utilization is total part area / (sheets_used × sheet area), in (0, 1]. cut_length is the estimated total laser path (sum of part perimeters, mm). 
+Units: same as input (mm recommended). Never raises; all errors returned in errors[].
 
-Pack a list of rectangular parts (with optional quantity) onto stock sheets using
-a deterministic skyline bin-packing algorithm. Returns per-sheet placement lists
-with x/y position and rotation, sheet count, utilisation fraction (0–1), and
-estimated total cut length (sum of part perimeters). Supports kerf gap and border
-margin. Parts that exceed the usable sheet area trigger an error — never silently
-dropped.
+### Input schema
 
-### `nest_report`
-
-Format a human-readable nesting / cut-optimisation report from `nest_parts`
-output. Accepts optional sheet dimensions, material name, and kerf for the header.
-Returns formatted report text and summary lines.
-
----
-
-## Example
-
-**User ask:** "I need to cut 10 × 300×200 mm and 6 × 150×100 mm pieces from
-1000×500 mm plywood sheet with a 3 mm kerf. How many sheets, and what is the
-utilisation?"
-
+```json
+{
+  "type": "object",
+  "properties": {
+    "parts": {
+      "type": "array",
+      "description": "Parts to nest. Each item: {name (str), w (float, mm), h (float, mm), qty (int, default 1)}. w and h are bounding-box dimensions.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Part identifier."
+          },
+          "w": {
+            "type": "number",
+            "description": "Bounding-box width (mm). Must be > 0."
+          },
+          "h": {
+            "type": "number",
+            "description": "Bounding-box height (mm). Must be > 0."
+          },
+          "qty": {
+            "type": "integer",
+            "description": "Repeat count (default 1)."
+          }
+        },
+        "required": [
+          "name",
+          "w",
+          "h"
+        ]
+      }
+    },
+    "sheet_w": {
+      "type": "number",
+      "description": "Stock sheet width (mm). Must be > 0."
+    },
+    "sheet_h": {
+      "type": "number",
+      "description": "Stock sheet height (mm). Must be > 0."
+    },
+    "kerf": {
+      "type": "number",
+      "description": "Kerf / cutter gap between adjacent parts (mm). Also applied between parts and the margin border. Default 0. Typical laser: 0.1\u20130.5 mm."
+    },
+    "margin": {
+      "type": "number",
+      "description": "Border margin inset on all four edges of each sheet (mm). Default 0. Typical value: 5\u201310 mm."
+    },
+    "allow_rotate": {
+      "type": "boolean",
+      "description": "Allow parts to be rotated 90\u00b0. Default true. Disable for parts with a fixed grain direction."
+    }
+  },
+  "required": [
+    "parts",
+    "sheet_w",
+    "sheet_h"
+  ]
+}
 ```
-1. nest_parts
-     parts:[{name:"A", w:300, h:200, qty:10},
-            {name:"B", w:150, h:100, qty:6}]
-     sheet_w:1000  sheet_h:500  kerf:3  margin:5  allow_rotate:true
-   → {sheets_used:3, utilization:0.72, cut_length:34200.0, sheets:[…]}
 
-2. nest_report
-     nesting:{from step 1}  sheet_w:1000  sheet_h:500
-     material:"12 mm plywood"  kerf:3
-   → formatted report text
+---
+
+## `nest_report`
+
+Format a human-readable nesting report from nest_parts output. 
+Input: the output dict from nest_parts (ok, sheets, sheets_used, utilization, cut_length). Optional: sheet_w, sheet_h (mm) for area context; material (string) and kerf (mm) for header context. 
+Output: {ok, report_text, summary_lines}. report_text is a formatted multi-line string. summary_lines is the same content as a list of strings.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "nesting": {
+      "type": "object",
+      "description": "Output dict from nest_parts."
+    },
+    "sheet_w": {
+      "type": "number",
+      "description": "Sheet width (mm) \u2014 used for context in the report header."
+    },
+    "sheet_h": {
+      "type": "number",
+      "description": "Sheet height (mm) \u2014 used for context in the report header."
+    },
+    "material": {
+      "type": "string",
+      "description": "Optional material name for the report header."
+    },
+    "kerf": {
+      "type": "number",
+      "description": "Kerf gap used (mm) \u2014 displayed in the report header."
+    }
+  },
+  "required": [
+    "nesting"
+  ]
+}
 ```
 
 ---
 
-## Notes
+## See also
 
-- All tools are **pure-Python**; no OCC dependency.
-- Algorithm is deterministic: same parts + same sheet → same layout every time.
-- 90° rotation is tried when `allow_rotate:true` and the rotated footprint differs.
-- `utilization` = total part area / (sheets_used × sheet area). Does not include
-  kerf losses in numerator — add kerf margins to part dimensions if needed.
-- Oversized parts (exceed sheet minus margin) return `{ok:false}` with a
-  descriptive error.
+- Package: `kerf_cad_core`

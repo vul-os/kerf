@@ -1,106 +1,158 @@
-# Railings (.railing) — Parametric handrail format
+# railings
 
-A `.railing` file defines a handrail / balustrade system that follows a
-polyline path. Posts and balusters are distributed evenly along the path.
-Files have `kind='railing'` in the DB.
+*Module: `kerf_bim.tools.railings` · Domain: bim*
 
-## JSON schema
+This module registers **4** LLM tool(s):
 
-```jsonc
+- [`create_railing`](#create-railing)
+- [`railing_from_stair`](#railing-from-stair)
+- [`set_baluster_spacing`](#set-baluster-spacing)
+- [`validate_railing`](#validate-railing)
+
+---
+
+## `create_railing`
+
+Create a parametric railing file from an explicit path. The path is a list of {x,y,z} points in mm.
+
+### Input schema
+
+```json
 {
-  "version": 1,
-  "path": [
-    { "x": 0,    "y": 0, "z": 0 },
-    { "x": 4480, "y": 0, "z": 2800 }
-  ],
-  "height_mm": 1000,              // top-rail height above tread nosing
-  "top_rail": {
-    "profile": "round",           // "round" | "square" | "flat"
-    "size_mm": 50,                // diameter or width
-    "offset_mm": 0                // lateral offset from path centre
+  "type": "object",
+  "properties": {
+    "file_id": {
+      "type": "string",
+      "description": "Optional UUID for the new railing file."
+    },
+    "path": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "z": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "x",
+          "y",
+          "z"
+        ]
+      },
+      "description": "List of {x,y,z} waypoints defining the railing centre-line."
+    },
+    "height_mm": {
+      "type": "number",
+      "description": "Top-rail height in mm (default 1000)."
+    }
   },
-  "posts": {
-    "spacing_mm": 1200,           // max centre-to-centre distance
-    "profile": "round",           // "round" | "square"
-    "size_mm": 40,
-    "height_mm": 1000
+  "required": [
+    "path"
+  ]
+}
+```
+
+---
+
+## `railing_from_stair`
+
+Generate a railing along the edge(s) of an existing stair. side = 'left' | 'right' | 'both'. When side='both', two railing files are created.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "stair_file_id": {
+      "type": "string",
+      "description": "UUID of the source stair file."
+    },
+    "side": {
+      "type": "string",
+      "enum": [
+        "left",
+        "right",
+        "both"
+      ],
+      "description": "Which edge(s) to add railing to."
+    },
+    "output_file_id": {
+      "type": "string",
+      "description": "Optional UUID for the output railing file (ignored when side='both')."
+    },
+    "height_mm": {
+      "type": "number",
+      "description": "Railing height mm (default 1000)."
+    }
   },
-  "balusters": {
-    "spacing_mm": 120,            // max gap between balusters
-    "profile": "round",           // "round" | "square"
-    "size_mm": 14,
-    "height_mm": 900
-  }
+  "required": [
+    "stair_file_id",
+    "side"
+  ]
 }
 ```
 
-### Height limits
-`height_mm` must be in **[600, 1200] mm**. Typical residential = 1000 mm,
-commercial = 1100 mm.
+---
 
-## LLM tools
+## `set_baluster_spacing`
 
-| Tool | Description |
-|------|-------------|
-| `create_railing` | Create railing from explicit path |
-| `railing_from_stair` | Auto-generate railing along stair edge(s) |
-| `set_baluster_spacing` | Update baluster spacing on existing railing |
-| `validate_railing` | Check height limits and path validity |
+Update the baluster spacing on an existing railing file.
 
-## Examples
-
-### 1. Stair railing — auto-generated along left and right edges
+### Input schema
 
 ```json
 {
-  "tool": "railing_from_stair",
-  "args": {
-    "stair_file_id": "<uuid>",
-    "side": "both",
-    "height_mm": 1000
-  }
+  "type": "object",
+  "properties": {
+    "file_id": {
+      "type": "string",
+      "description": "UUID of the railing file."
+    },
+    "spacing_mm": {
+      "type": "number",
+      "description": "New baluster centre-to-centre spacing in mm."
+    }
+  },
+  "required": [
+    "file_id",
+    "spacing_mm"
+  ]
 }
 ```
 
-Returns `left_file_id` and `right_file_id` for the two railing files.
+---
 
-### 2. Balcony railing — explicit rectangular path
+## `validate_railing`
+
+Validate a railing file for structural and code compliance.
+
+### Input schema
 
 ```json
 {
-  "tool": "create_railing",
-  "args": {
-    "path": [
-      { "x": 0,    "y": 0,    "z": 3000 },
-      { "x": 6000, "y": 0,    "z": 3000 },
-      { "x": 6000, "y": 3000, "z": 3000 },
-      { "x": 0,    "y": 3000, "z": 3000 }
-    ],
-    "height_mm": 1100
-  }
+  "type": "object",
+  "properties": {
+    "file_id": {
+      "type": "string",
+      "description": "UUID of the railing file."
+    }
+  },
+  "required": [
+    "file_id"
+  ]
 }
 ```
 
-Flat-level balcony perimeter railing at 3 m floor height.
+---
 
-### 3. Ramp railing — sloped path
+## See also
 
-```json
-{
-  "tool": "create_railing",
-  "args": {
-    "path": [
-      { "x": 0,    "y": 0, "z": 0   },
-      { "x": 1000, "y": 0, "z": 100 },
-      { "x": 2000, "y": 0, "z": 200 },
-      { "x": 3000, "y": 0, "z": 300 },
-      { "x": 4000, "y": 0, "z": 400 },
-      { "x": 5000, "y": 0, "z": 500 }
-    ],
-    "height_mm": 1000
-  }
-}
-```
-
-Ramp at 1:10 gradient; posts and balusters distribute automatically
-along the sloped path.
+- Package: `kerf_bim`

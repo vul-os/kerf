@@ -1,122 +1,175 @@
-# Sheet (.sheet.json) — Print-ready layouts
+# sheet
 
-A **sheet** is a print-ready composition: a paper size, title block, and one or
-more viewports that each reference a `.view.json` file. Sheets live as files
-with `kind = 'sheet'` in the project tree.
+*Module: `kerf_bim.tools.sheet` · Domain: bim*
+
+This module registers **4** LLM tool(s):
+
+- [`create_sheet`](#create-sheet)
+- [`add_viewport_to_sheet`](#add-viewport-to-sheet)
+- [`remove_viewport`](#remove-viewport)
+- [`add_revision_cloud`](#add-revision-cloud)
 
 ---
 
-## Schema
+## `create_sheet`
 
-```jsonc
+Create a new .sheet.json layout file inside the project. path must end with .sheet.json.
+
+### Input schema
+
+```json
 {
-  "version": 1,
-  "id": "uuid",
-  "name": "A-101 Floor Plans",
-  "sheet_number": "A-101",
-  "size": "A1",               // A0..A4 | ANSI_A..ANSI_E
-  "orientation": "landscape", // landscape | portrait
-  "titleblock": {
-    "project_name": "Office Tower",
-    "issue_date": "2026-05-14",
-    "revision": "A",
-    "drawn_by": "Jane Smith"
+  "type": "object",
+  "properties": {
+    "path": {
+      "type": "string",
+      "description": "Absolute project path ending in .sheet.json"
+    },
+    "name": {
+      "type": "string"
+    },
+    "sheet_number": {
+      "type": "string"
+    },
+    "size": {
+      "type": "string",
+      "enum": [
+        "A0",
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "ANSI_A",
+        "ANSI_B",
+        "ANSI_C",
+        "ANSI_D",
+        "ANSI_E"
+      ]
+    },
+    "orientation": {
+      "type": "string",
+      "enum": [
+        "landscape",
+        "portrait"
+      ]
+    }
   },
-  "viewports": [
-    {
-      "id": "vp-uuid",
-      "view_file_id": "view-uuid",
-      "position": [50, 80],   // mm from sheet origin (bottom-left)
-      "scale": 0.02,           // 0.02 = 1:50
-      "title": "Level 1"
-    }
-  ],
-  "revision_clouds": [
-    {
-      "id": "rc-uuid",
-      "polygon": [[100,200],[200,200],[200,300],[100,300]],
-      "revision": "A",
-      "note": "wall thickness updated"
-    }
+  "required": [
+    "path",
+    "name",
+    "sheet_number",
+    "size"
   ]
 }
 ```
 
-### Paper sizes (mm, portrait base)
+---
 
-| Size   | Width | Height |
-|--------|------:|-------:|
-| A0     |   841 |   1189 |
-| A1     |   594 |    841 |
-| A2     |   420 |    594 |
-| A3     |   297 |    420 |
-| A4     |   210 |    297 |
-| ANSI_A |   216 |    279 |
-| ANSI_B |   279 |    432 |
-| ANSI_C |   432 |    559 |
-| ANSI_D |   559 |    864 |
-| ANSI_E |   864 |   1118 |
+## `add_viewport_to_sheet`
 
-### Scale convention
+Add a viewport referencing a .view.json file to an existing .sheet.json.
 
-`scale` is the ratio of drawing units to real units.  
-`0.02` = 1:50, `0.01` = 1:100, `0.05` = 1:20.
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "sheet_file_id": {
+      "type": "string",
+      "description": "UUID of the .sheet.json file"
+    },
+    "view_file_id": {
+      "type": "string",
+      "description": "UUID of the .view.json file"
+    },
+    "position": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "description": "[x, y] in mm"
+    },
+    "scale": {
+      "type": "number",
+      "description": "e.g. 0.02 for 1:50"
+    },
+    "title": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sheet_file_id",
+    "view_file_id",
+    "position",
+    "scale"
+  ]
+}
+```
 
 ---
 
-## Tools
+## `remove_viewport`
 
-| Tool | Description |
-|------|-------------|
-| `create_sheet` | Create a new `.sheet.json` file |
-| `add_viewport_to_sheet` | Add a viewport referencing a view |
-| `remove_viewport` | Remove a viewport by id |
-| `add_revision_cloud` | Mark a revision area with a cloud polygon |
+Remove a viewport from a .sheet.json file by its id.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "sheet_file_id": {
+      "type": "string"
+    },
+    "viewport_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sheet_file_id",
+    "viewport_id"
+  ]
+}
+```
 
 ---
 
-## Examples
+## `add_revision_cloud`
 
-### 1 — Create an A1 landscape sheet
+Add a revision cloud annotation to a .sheet.json file.
 
-```json
-{
-  "tool": "create_sheet",
-  "args": {
-    "path": "/Office Tower/Sheets/A-101.sheet.json",
-    "name": "A-101 Floor Plans",
-    "sheet_number": "A-101",
-    "size": "A1",
-    "orientation": "landscape"
-  }
-}
-```
-
-### 2 — Place a floor-plan view at 1:50
+### Input schema
 
 ```json
 {
-  "tool": "add_viewport_to_sheet",
-  "args": {
-    "sheet_file_id": "sheet-file-uuid",
-    "view_file_id":  "view-file-uuid",
-    "position": [50, 80],
-    "scale": 0.02,
-    "title": "Level 1 Floor Plan"
-  }
+  "type": "object",
+  "properties": {
+    "sheet_file_id": {
+      "type": "string"
+    },
+    "polygon": {
+      "type": "array",
+      "description": "List of [x,y] points (min 3)"
+    },
+    "revision": {
+      "type": "string",
+      "description": "Revision label e.g. 'A'"
+    },
+    "note": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sheet_file_id",
+    "polygon",
+    "revision"
+  ]
 }
 ```
 
-### 3 — Mark a revision area
+---
 
-```json
-{
-  "tool": "add_revision_cloud",
-  "args": {
-    "sheet_file_id": "sheet-file-uuid",
-    "polygon": [[100,200],[250,200],[250,350],[100,350]],
-    "revision": "B",
-    "note": "structural column relocated"
-  }
-}
-```
+## See also
+
+- Package: `kerf_bim`

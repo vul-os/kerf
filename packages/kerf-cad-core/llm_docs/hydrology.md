@@ -1,250 +1,528 @@
-# Stormwater Hydrology
+# hydrology
 
-Pure-Python stormwater hydrology tools: peak flow estimation, runoff depth, time of
-concentration, IDF intensity, detention basin sizing, routing, and storm sewer pipe
-sizing. No OCC dependency. Units: SI (m³/s, mm, ha, km², hr).
+*Module: `kerf_cad_core.hydrology.tools` · Domain: cad*
 
-Authoritative standards:
-- **NRCS TR-55 (USDA SCS 1986)** — *Urban Hydrology for Small Watersheds*,
-  Technical Release 55 — SCS curve-number runoff, graphical-peak-flow method.
-- **NRCS NEH-630 (2004)** — *National Engineering Handbook, Part 630 Hydrology* —
-  curve-number theory, Ia = 0.2·S.
-- **Rational Method (Mulvaney 1851; Kuichling 1889)** — Q = C·i·A; ASCE/EWRI
-  Manual of Engineering Practice No. 36 (2005).
-- **ASCE/EWRI 45-05** — *Standard Guidelines for the Design of Urban Stormwater
-  Systems* — pipe-sizing criteria, Manning roughness, self-cleansing velocity.
-- **Kirpich (1940)** — "Time of concentration of small agricultural watersheds,"
-  *Civil Engineering*, 10(6):362 — Tc formula.
-- **Chow, Maidment & Mays (1988)** — *Applied Hydrology* — storage-indication
-  routing, general hydrology.
-- **Puls (1928) / Level-pool routing** — conservation of mass for detention basins.
+This module registers **9** LLM tool(s):
+
+- [`hydrology_rational_peak_flow`](#hydrology-rational-peak-flow)
+- [`hydrology_composite_runoff_coeff`](#hydrology-composite-runoff-coeff)
+- [`hydrology_scs_runoff_depth`](#hydrology-scs-runoff-depth)
+- [`hydrology_scs_peak_flow`](#hydrology-scs-peak-flow)
+- [`hydrology_time_of_concentration`](#hydrology-time-of-concentration)
+- [`hydrology_idf_intensity`](#hydrology-idf-intensity)
+- [`hydrology_detention_storage`](#hydrology-detention-storage)
+- [`hydrology_storage_indication_route`](#hydrology-storage-indication-route)
+- [`hydrology_storm_sewer_pipe_size`](#hydrology-storm-sewer-pipe-size)
 
 ---
 
-## When to use
+## `hydrology_rational_peak_flow`
 
-Use these tools when the user asks about:
-- stormwater, hydrology, runoff, peak flow
-- Rational method, Q = C·i·A, catchment flow
-- runoff coefficient, composite C
-- SCS curve number, CN, runoff depth, NRCS, TR-55
-- time of concentration, Tc, Kirpich, NRCS velocity method, sheet flow
-- IDF curve, intensity-duration-frequency, rainfall intensity
-- detention basin, retention pond, detention storage, modified rational method
-- level-pool routing, Puls routing, storage-indication method, hydrograph routing
-- storm sewer, pipe sizing, Manning equation, pipe diameter selection, self-cleansing
-  velocity
+Compute the rational-method peak stormwater flow.
+
+Formula:  Q = C · i · A / 360
+  Q in m³/s,  i in mm/hr,  A in ha.
+
+The Rational Method is applicable to urban catchments < ~80 ha with
+time of concentration < ~3 hr.  Use a composite C for mixed land use.
+
+Returns Q_m3s and Q_L_per_s.
+
+Reference: ASCE/EWRI 45-05.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "C": {
+      "type": "number",
+      "description": "Runoff coefficient (0 < C \u2264 1.0). Typical: 0.90 impervious, 0.35 lawn."
+    },
+    "i_mm_hr": {
+      "type": "number",
+      "description": "Design rainfall intensity (mm/hr) for the return period and storm duration equal to tc."
+    },
+    "A_ha": {
+      "type": "number",
+      "description": "Catchment area (ha)."
+    }
+  },
+  "required": [
+    "C",
+    "i_mm_hr",
+    "A_ha"
+  ]
+}
+```
 
 ---
 
-## Tools
+## `hydrology_composite_runoff_coeff`
 
-### `hydrology_rational_peak_flow`
+Compute an area-weighted composite runoff coefficient C for a catchment
+with multiple land-cover types.
 
-Rational-method peak stormwater flow.
+C_composite = Σ(C_i × A_i) / Σ(A_i)
 
+Returns C_composite and total_area_ha.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "areas": {
+      "type": "array",
+      "description": "List of sub-area objects, each: {C: number (0\u20131), area_ha: number (> 0)}.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "C": {
+            "type": "number"
+          },
+          "area_ha": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "C",
+          "area_ha"
+        ]
+      }
+    }
+  },
+  "required": [
+    "areas"
+  ]
+}
 ```
-Q = C · i · A / 360        (Q m³/s, i mm/hr, A ha)
-```
-
-**Input:** `C` (required, 0 < C ≤ 1), `i_mm_hr`, `A_ha`.
-
-**Returns:** `Q_m3s`, `Q_L_per_s`.
-
-**Standards alignment:** ASCE/EWRI Manual 36 (2005) §3.2; original Kuichling
-(1889) formulation. Valid for catchments < 80 ha (200 ac) with uniform runoff
-conditions. C values: impervious 0.90–0.95; lawn/turf 0.25–0.35; commercial
-0.70–0.95 per ASCE Table 3-1.
 
 ---
 
-### `hydrology_composite_runoff_coeff`
+## `hydrology_scs_runoff_depth`
 
-Area-weighted composite runoff coefficient for mixed land-cover catchments.
+Compute the SCS/NRCS curve-number runoff depth.
 
+SCS equations (NEH-630, TR-55):
+  S = 25400/CN − 254    (potential maximum retention, mm)
+  Ia = 0.2 × S          (initial abstraction, mm)
+  Q = (P − Ia)² / (P − Ia + S)   for P > Ia, else 0
+
+CN ranges: 30 (good woods, low runoff) to 98 (impervious pavement).
+AMC-II (average moisture) is assumed.
+
+Returns Q_mm (runoff depth), S_mm, Ia_mm.
+
+Reference: USDA NRCS NEH Part 630, Chapter 10 (2004).
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "P_mm": {
+      "type": "number",
+      "description": "Total storm rainfall (mm), >= 0."
+    },
+    "CN": {
+      "type": "number",
+      "description": "SCS runoff curve number (1\u2013100)."
+    }
+  },
+  "required": [
+    "P_mm",
+    "CN"
+  ]
+}
 ```
-C_composite = Σ(Ci × Ai) / Σ(Ai)
-```
-
-**Standards alignment:** ASCE/EWRI Manual 36 §3.2.1; ASCE Standard Practice
-for the Design of Stormwater Management Systems.
 
 ---
 
-### `hydrology_scs_runoff_depth`
+## `hydrology_scs_peak_flow`
 
-SCS/NRCS curve-number runoff depth — **NEH-630, TR-55**.
+Compute the SCS/TR-55 graphical-peak flow for a small watershed.
 
+Procedure (TR-55 Chapter 4):
+  1. Compute runoff depth Q from CN and P.
+  2. Compute Ia/P ratio.
+  3. Interpolate unit peak discharge qu from TR-55 Appendix B
+     (tabulated by tc and Ia/P).
+  4. Qp = qu × A × Q.
+
+Valid range: tc 0.1–2.0 hr; drainage areas < ~25 km²;
+24-hour Type II/III rainfall distribution.
+
+Returns Qp_m3s, Q_mm, qu, Ia_P_ratio.
+
+Reference: USDA SCS TR-55 (1986), Chapter 4.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "CN": {
+      "type": "number",
+      "description": "SCS runoff curve number (1\u2013100)."
+    },
+    "A_km2": {
+      "type": "number",
+      "description": "Drainage area (km\u00b2), > 0."
+    },
+    "tc_hr": {
+      "type": "number",
+      "description": "Time of concentration (hr). TR-55 valid range: 0.1\u20132.0 hr."
+    },
+    "P_mm": {
+      "type": "number",
+      "description": "24-hour design rainfall (mm), > 0."
+    }
+  },
+  "required": [
+    "CN",
+    "A_km2",
+    "tc_hr",
+    "P_mm"
+  ]
+}
 ```
-S = 25400/CN − 254          (maximum potential retention, mm)
-Ia = 0.2·S                  (initial abstraction)
-Q = (P − Ia)² / (P − Ia + S)  for P > Ia   [TR-55 Eq. 2-1]
-Q = 0                        for P ≤ Ia
-```
-
-**Input:** `P_mm` (total storm rainfall, mm), `CN` (1–100).
-
-**Returns:** `Q_mm` (runoff depth), `S_mm`, `Ia_mm`.
-
-**Standards alignment:** NRCS NEH-630 §10.2 (CN method); TR-55 Chapter 2 (Eq.
-2-1); Ia = 0.2S is the standard (NEH-630 §10.4 notes Ia = 0.05S for better urban
-fit — applies Ia=0.2S by default per TR-55 convention).
 
 ---
 
-### `hydrology_scs_peak_flow`
+## `hydrology_time_of_concentration`
 
-SCS/TR-55 graphical-peak flow for a small watershed — **TR-55 Chapter 4**.
+Compute the time of concentration (tc) using one of three methods.
 
-Uses unit-peak-discharge qu from TR-55 Appendix B tables interpolated by Tc and
-Ia/P ratio:
+Methods:
+
+'kirpich' — Kirpich (1940) formula for small agricultural watersheds:
+    tc [min] = 0.0195 × L^0.77 × S^-0.385;  S = H/L.
+    Inputs: L_m (channel length, m), H_m (elevation drop, m).
+
+'nrcs_velocity' — NRCS velocity method (TR-55 §3.2):
+    V = k × sqrt(slope)  [ft/s, converted internally];
+    tc = L / V.
+    Inputs: L_m, slope (m/m), cover (land cover type string).
+    Valid cover types: forest_with_litter, range_grass, short_grass_pasture,
+    cultivated_straight_rows, nearly_bare_fallow, grassed_waterway,
+    paved_gutter, concrete_channel.
+
+'sheet_shallow_channel' — TR-55 three-segment method (§3.1–3.3):
+    Segment 1 (sheet flow): TR-55 Eq. 3-3.
+    Segment 2 (shallow concentrated): NRCS velocity.
+    Segment 3 (channel): Manning's equation.
+    Inputs: sheet_length_m, sheet_n, sheet_P2_mm, sheet_slope,
+            shallow_length_m, shallow_slope, shallow_cover,
+            channel_length_m, channel_slope, channel_area_m2,
+            channel_wetted_perim_m, channel_n.
+
+Returns tc_hr, tc_min, method, warnings (and method-specific sub-times).
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "method": {
+      "type": "string",
+      "enum": [
+        "kirpich",
+        "nrcs_velocity",
+        "sheet_shallow_channel"
+      ],
+      "description": "Time-of-concentration method."
+    },
+    "L_m": {
+      "type": "number",
+      "description": "Flow/channel length (m)."
+    },
+    "H_m": {
+      "type": "number",
+      "description": "Elevation drop (m). Kirpich only."
+    },
+    "slope": {
+      "type": "number",
+      "description": "Average slope (m/m). nrcs_velocity only."
+    },
+    "cover": {
+      "type": "string",
+      "description": "Land cover type. nrcs_velocity only."
+    },
+    "sheet_length_m": {
+      "type": "number"
+    },
+    "sheet_n": {
+      "type": "number",
+      "description": "Manning n for sheet flow."
+    },
+    "sheet_P2_mm": {
+      "type": "number",
+      "description": "2-yr 24-hr rainfall (mm)."
+    },
+    "sheet_slope": {
+      "type": "number"
+    },
+    "shallow_length_m": {
+      "type": "number"
+    },
+    "shallow_slope": {
+      "type": "number"
+    },
+    "shallow_cover": {
+      "type": "string"
+    },
+    "channel_length_m": {
+      "type": "number"
+    },
+    "channel_slope": {
+      "type": "number"
+    },
+    "channel_area_m2": {
+      "type": "number",
+      "description": "Channel cross-section area (m\u00b2)."
+    },
+    "channel_wetted_perim_m": {
+      "type": "number",
+      "description": "Channel wetted perimeter (m)."
+    },
+    "channel_n": {
+      "type": "number",
+      "description": "Manning n for channel."
+    }
+  },
+  "required": [
+    "method"
+  ]
+}
 ```
-Qp = qu × A_km2 × Q_mm / 1000    (m³/s)    [TR-55 Eq. 4-1]
-```
-
-**Input:** `CN`, `A_km2`, `tc_hr` (0.1–2.0 hr), `P_mm` (24-hr design rainfall).
-
-**Returns:** `Qp_m3s`, `Q_mm`, `qu`, `Ia_P_ratio`.
-
-**Standards alignment:** TR-55 Chapter 4 (graphical peak-flow method); Appendix
-B tabular qu values for Type I, IA, II, III storm distributions. Implementation
-uses Type II (eastern US, general) as default; override by selecting distribution
-manually. Valid for A_km2 ≤ 25 km², single main channel, no ponding.
 
 ---
 
-### `hydrology_time_of_concentration`
+## `hydrology_idf_intensity`
 
-Time of concentration using one of three methods.
+Compute design rainfall intensity from a fitted IDF (Intensity-Duration-
+Frequency) formula.
 
-**Kirpich (1940):**
+Formula:  i = a / (t + b)^c   [mm/hr]
+  t = storm duration (min)
+  a, b, c = site-specific regression coefficients
+
+The parameters a, b, c are obtained by fitting regional IDF data
+(e.g. NOAA Atlas 14, SANRAL TRH 16, or similar) for the required
+return period.
+
+Returns intensity_mm_hr.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "duration_min": {
+      "type": "number",
+      "description": "Storm duration / time of concentration (min), > 0."
+    },
+    "a": {
+      "type": "number",
+      "description": "IDF scale coefficient (mm/hr \u00b7 min^c), > 0."
+    },
+    "b": {
+      "type": "number",
+      "description": "IDF time offset (min), >= 0."
+    },
+    "c": {
+      "type": "number",
+      "description": "IDF decay exponent (dimensionless), > 0."
+    }
+  },
+  "required": [
+    "duration_min",
+    "a",
+    "b",
+    "c"
+  ]
+}
 ```
-tc = 0.0663·(L^0.77 / H^0.385)    (hr, L = channel length m, H = elevation drop m)
-```
-
-**NRCS velocity method (NEH-630 §15.4):**
-```
-tc = L / (3600·V_avg)    where V_avg from land-cover velocity table
-```
-
-**Sheet–shallow–channel (TR-55 §3):**
-```
-t_sheet = 0.007·(nP2)^0.8 / (P2^0.5·S^0.4)   [TR-55 Eq. 3-3, hr]
-t_shallow = L / (3600·V_shallow)
-t_channel = L / (3600·V_channel)
-tc = t_sheet + t_shallow + t_channel
-```
-
-**Input:** `method` (`kirpich`, `nrcs_velocity`, or `sheet_shallow_channel`)
-plus method-specific parameters.
-
-**Returns:** `tc_hr`, `tc_min`, `method`, `warnings`, sub-times per segment.
-
-**Standards alignment:**
-- Kirpich: Kirpich (1940) — calibrated on Tennessee farm watersheds; ASCE
-  Manual 36 §3.4 (use with caution outside calibration range).
-- NRCS velocity: NEH-630 §15.4; velocity table from TR-55 Exhibit 3-1.
-- Sheet/shallow/channel: TR-55 §3; recommended maximum sheet-flow length 91 m
-  (300 ft) per TR-55 §3.2; Mannings n for sheet flow from TR-55 Table 3-1.
 
 ---
 
-### `hydrology_idf_intensity`
+## `hydrology_detention_storage`
 
-Design rainfall intensity from a fitted IDF formula.
+Estimate required detention basin storage volume by the modified-rational
+method.
 
+V ≈ 0.5 × (Q_in − Q_out) × tc × 3600   [m³]
+(triangular hydrograph approximation)
+
+Applicable to small urban catchments (A < ~80 ha, tc < 3 hr) where the
+rational method is valid.
+
+Returns V_m3 (required storage volume).
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "Q_in_cms": {
+      "type": "number",
+      "description": "Pre-development or design-storm peak inflow (m\u00b3/s)."
+    },
+    "Q_out_cms": {
+      "type": "number",
+      "description": "Allowable release rate / outflow (m\u00b3/s)."
+    },
+    "tc_hr": {
+      "type": "number",
+      "description": "Time of concentration (hr)."
+    }
+  },
+  "required": [
+    "Q_in_cms",
+    "Q_out_cms",
+    "tc_hr"
+  ]
+}
 ```
-i = a / (t + b)^c          (mm/hr, t in minutes)
-```
-
-**Input:** `duration_min`, `a`, `b`, `c` (IDF parameters from regional curves).
-
-**Returns:** `intensity_mm_hr`.
-
-**Standards alignment:** Three-parameter power-law IDF form per Chow et al.
-(1988) §3.2; regional a/b/c from NOAA Atlas 14 (US), equivalent national rain
-charts, or local drainage manuals.
 
 ---
 
-### `hydrology_detention_storage`
+## `hydrology_storage_indication_route`
 
-Required detention basin storage volume — modified-rational method.
+Route an inflow hydrograph through a detention basin using the
+storage-indication (Puls / level-pool) method.
 
+Routing equation (continuity, Δt time step):
+    (S/Δt + O/2)|₂ = (I₁ + I₂)/2 + (S/Δt − O/2)|₁
+
+Outflow is obtained from the user-supplied stage-storage-outflow
+rating table {storage_m3, outflow_m3s} via linear interpolation.
+
+Warns if storage exceeds the rating table (overtopping risk).
+
+Returns outflow hydrograph (outflow_m3s list), storage time series
+(storage_m3 list), peak_outflow_m3s, peak_storage_m3.
+
+Reference: Chow, Maidment & Mays (1988) — Applied Hydrology, §8.4.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "inflow_series": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "description": "Inflow hydrograph ordinates (m\u00b3/s) at uniform time step dt_s."
+    },
+    "outflow_rating": {
+      "type": "array",
+      "description": "Stage-storage-outflow table sorted by storage_m3 ascending. Each entry: {storage_m3: number, outflow_m3s: number}.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "storage_m3": {
+            "type": "number"
+          },
+          "outflow_m3s": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "storage_m3",
+          "outflow_m3s"
+        ]
+      }
+    },
+    "dt_s": {
+      "type": "number",
+      "description": "Time step (s), > 0."
+    },
+    "S0_m3": {
+      "type": "number",
+      "description": "Initial basin storage (m\u00b3, default 0)."
+    }
+  },
+  "required": [
+    "inflow_series",
+    "outflow_rating",
+    "dt_s"
+  ]
+}
 ```
-V ≈ 0.5·(Q_in − Q_out)·tc·3600   (m³)
-```
-
-**Standards alignment:** Modified-rational method (ASCE Manual 36 §4.2);
-conservative upper bound on required storage for simple triangular inflow
-hydrograph. For more accurate sizing, use `hydrology_storage_indication_route`.
 
 ---
 
-### `hydrology_storage_indication_route`
+## `hydrology_storm_sewer_pipe_size`
 
-Route an inflow hydrograph through a detention basin — storage-indication (Puls /
-level-pool) method.
+Select the minimum standard circular storm-sewer pipe diameter
+using Manning's full-flow equation.
 
+Manning full-flow:  Q = (1/n) · (π/4)·D² · (D/4)^(2/3) · S^(1/2)
+
+The smallest standard diameter (from the ASTM/ISO nominal series)
+where Q_full ≥ Q_design / freeboard_fraction is selected.
+If no standard size fits, the minimum required diameter is computed
+analytically and a warning is issued.
+
+Warns on: undersized pipe, freeboard exceedance, velocity below
+self-cleansing threshold (0.6 m/s).
+
+Returns diameter_m, diameter_mm, Q_full_m3s, utilisation, freeboard_ok.
+
+Reference: ASCE MOP 36 (2007); Ven Te Chow (1959).
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "Q_cms": {
+      "type": "number",
+      "description": "Design peak flow (m\u00b3/s), > 0."
+    },
+    "slope": {
+      "type": "number",
+      "description": "Hydraulic gradient (m/m), > 0."
+    },
+    "n": {
+      "type": "number",
+      "description": "Manning's roughness coefficient (default 0.013 for concrete). Typical: 0.010 PVC, 0.011 HDPE, 0.013 concrete/clay."
+    },
+    "min_d_m": {
+      "type": "number",
+      "description": "Minimum acceptable diameter (m, default 0.15 m = 150 mm)."
+    },
+    "max_d_m": {
+      "type": "number",
+      "description": "Maximum diameter to consider (m, default 3.0 m)."
+    },
+    "freeboard_fraction": {
+      "type": "number",
+      "description": "Ratio of design flow to full-flow capacity (default 0.85). E.g. 0.85 means pipe designed to flow 85% full."
+    }
+  },
+  "required": [
+    "Q_cms",
+    "slope"
+  ]
+}
 ```
-Conservation of mass (Puls 1928):
-(S/Δt + O/2)|₂ = (I₁ + I₂)/2 + (S/Δt − O/2)|₁
-```
-
-Outflow from user-supplied stage-storage-outflow rating table via linear
-interpolation.
-
-**Input:** `inflow_series` (m³/s), `outflow_rating` (list of `{storage_m3,
-outflow_m3s}`), `dt_s`, `S0_m3`.
-
-**Returns:** `outflow_m3s`, `storage_m3`, `peak_outflow_m3s`, `peak_storage_m3`.
-
-**Standards alignment:** Chow et al. (1988) §8.8 (storage-indication method);
-Puls (1928) continuity approximation; USACE HEC-HMS computational basis for
-simplified routing.
 
 ---
 
-### `hydrology_storm_sewer_pipe_size`
+## See also
 
-Select minimum standard circular storm-sewer diameter — Manning full-flow.
-
-```
-Q_full = (1/n)·(π/4)·D²·(D/4)^(2/3)·S^(1/2)
-Select smallest standard D where Q_full ≥ Q_design / freeboard_fraction
-```
-
-Standard diameters (mm): 150, 225, 300, 375, 450, 525, 600, 675, 750, 900,
-1050, 1200, 1350, 1500, 1800, 2100, 2400, 3000.
-
-**Input:** `Q_cms`, `slope`, `n` (default 0.013 concrete), `min_d_m`, `max_d_m`,
-`freeboard_fraction` (default 0.85).
-
-**Returns:** `diameter_m`, `diameter_mm`, `Q_full_m3s`, `utilisation`,
-`freeboard_ok`.
-
-**Standards alignment:** ASCE/EWRI 45-05 §5.4 (Manning full-flow pipe sizing);
-ASTM/ISO standard pipe sizes; minimum velocity 0.9 m/s (3 ft/s) for self-
-cleansing — check full-flow velocity (V_full = Q_full/A) against minimum.
-
----
-
-## Example
-
-```
-1. hydrology_idf_intensity  duration_min:30  a:1200  b:10  c:0.8
-   → intensity_mm_hr:58.3
-
-2. hydrology_rational_peak_flow  C:0.75  i_mm_hr:58.3  A_ha:5.0
-   → Q_m3s:0.0607  Q_L_per_s:60.7   [Q=C·i·A/360]
-
-3. hydrology_scs_runoff_depth  P_mm:75  CN:80
-   → S_mm:63.5  Ia_mm:12.7  Q_mm:30.4  [TR-55 Eq. 2-1]
-
-4. hydrology_time_of_concentration  method:"kirpich"  L_m:800  H_m:20
-   → tc_hr:0.28  tc_min:16.7  [Kirpich 1940]
-
-5. hydrology_storm_sewer_pipe_size  Q_cms:0.061  slope:0.003
-   → diameter_mm:450  utilisation:0.72  freeboard_ok:true
-   [ASCE/EWRI 45-05; Manning n=0.013; Q_full=0.085 m³/s]
-```
+- Package: `kerf_cad_core`

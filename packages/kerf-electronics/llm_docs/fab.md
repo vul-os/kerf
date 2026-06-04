@@ -1,89 +1,117 @@
-# Fabrication Output (Gerber / Drill / P&P / IPC-2581)
+# fab
 
-Two LLM tools generate PCB fabrication files from a CircuitJSON board:
+*Module: `kerf_electronics.tools.fab` · Domain: electronics*
+
+This module registers **3** LLM tool(s):
+
+- [`export_gerber`](#export-gerber)
+- [`export_fab_package`](#export-fab-package)
+- [`export_board_step`](#export-board-step)
+
+---
 
 ## `export_gerber`
 
-Converts CircuitJSON → Gerber RS-274X per copper/mask/silk layer.
+Export a CircuitJSON board as Gerber RS-274X files (one per layer). Returns a list of {filename, content_b64} objects — one entry per layer (GTL top copper, GBL bottom copper, GTO/GBO silkscreen, GTS/GBS soldermask, GKO board outline, inner layers if present). Pass the circuit_json array from the active .circuit.tsx file. Use this to generate individual Gerber files; for a complete fab package use export_fab_package instead.
 
-**When to use:** User asks to export Gerbers, generate layer files, or
-prepare for PCB manufacturing (layer-by-layer).
+### Input schema
 
-**Input:**
-- `circuit_json` (required) — the parsed CircuitJSON array from the active
-  `.circuit.tsx` file.
-- `stem` (optional) — base filename, default `"board"`.
+```json
+{
+  "type": "object",
+  "properties": {
+    "circuit_json": {
+      "type": "array",
+      "description": "Parsed CircuitJSON array from the board file.",
+      "items": {
+        "type": "object"
+      }
+    },
+    "stem": {
+      "type": "string",
+      "description": "Base filename stem (no extension). Defaults to 'board'."
+    }
+  },
+  "required": [
+    "circuit_json"
+  ]
+}
+```
 
-**Output layers:**
-| Layer name      | Extension | Description            |
-|-----------------|-----------|------------------------|
-| top_copper      | .GTL      | Top copper             |
-| bottom_copper   | .GBL      | Bottom copper          |
-| inner_N         | .GL(N+1)  | Inner copper layers    |
-| top_silk        | .GTO      | Top silkscreen         |
-| bottom_silk     | .GBO      | Bottom silkscreen      |
-| top_mask        | .GTS      | Top soldermask         |
-| bottom_mask     | .GBS      | Bottom soldermask      |
-| edge_cuts       | .GKO      | Board outline          |
-
-Returns `layers[]` — each entry has `filename` and `content_b64` (base64
-RS-274X text). Decode and save each file for upload to fab house.
+---
 
 ## `export_fab_package`
 
-Bundles a **complete fab package** into one downloadable zip:
-Gerbers + Excellon drill + pick-and-place CSVs + fab BOM CSV + IPC-2581 XML.
+Bundle a complete PCB fabrication package from a CircuitJSON board. Returns a zip archive (base64-encoded) containing: Gerber RS-274X per-layer files, Excellon drill file(s), pick-and-place CSVs (top + bottom), fab BOM CSV, and an IPC-2581 XML. This is the deliverable a fab house ingests (upload to JLC/PCBWay/MacroFab). The zip filename is <stem>-fab.zip.
 
-**When to use:** User wants to send the board to a fab/assembly house (JLC,
-PCBWay, MacroFab, etc.). This is the single deliverable covering manufacture
-+ assembly.
+### Input schema
 
-**Input:** same as `export_gerber`.
+```json
+{
+  "type": "object",
+  "properties": {
+    "circuit_json": {
+      "type": "array",
+      "description": "Parsed CircuitJSON array from the board file.",
+      "items": {
+        "type": "object"
+      }
+    },
+    "stem": {
+      "type": "string",
+      "description": "Base filename stem used for all files (default: 'board')."
+    }
+  },
+  "required": [
+    "circuit_json"
+  ]
+}
+```
 
-**Output:**
-- `zip_filename` — e.g. `board-fab.zip`
-- `zip_b64` — base64-encoded zip bytes; offer as download link.
-- `manifest` — list of all filenames in the zip.
-- `message` — human-readable summary.
+---
 
-**Contents of the zip:**
+## `export_board_step`
 
-| File(s)            | What it contains                                |
-|--------------------|-------------------------------------------------|
-| `board.GTL` etc.   | Gerber RS-274X layers (one per copper/mask/silk)|
-| `board.DRL`        | Excellon plated drill hits                      |
-| `board.NPTH.DRL`   | Excellon non-plated drill hits (if any)         |
-| `board-top-pnp.csv`| Pick-and-place centroid CSV (top side)          |
-| `board-bottom-pnp.csv` | Pick-and-place centroid CSV (bottom side)   |
-| `board-bom.csv`    | Fab BOM (grouped by value+footprint)            |
-| `board.xml`        | IPC-2581 Rev B XML                              |
+Export a CircuitJSON PCB board as a 3D STEP assembly for MCAD-ECAD co-design. Builds: (1) the board substrate — edge_cuts outline extruded to board_thickness_mm (default 1.6 mm FR4); (2) drilled holes subtracted from the substrate; (3) a parametric box body for each placed component at its (x, y, rotation, side). If a component element carries a 'step_model' path to an existing STEP file, that model is imported instead. Returns the STEP file bytes as base64 so the user can download it and drop the PCB into a mechanical assembly (enclosure fit-check, collision detection, etc.). Requires pythonOCC (conda install -c conda-forge pythonocc-core). If pythonOCC is not installed, returns an error with install instructions. Use export_fab_package for 2D fab files (Gerbers/drill/BOM); use this tool when the user needs a 3D model of the board.
 
-## Gerber format details
+### Input schema
 
-- Coordinate format: RS-274X, 4.6 integer (1e-6 mm resolution)
-- Apertures: D10+ using `%ADDnC/R/O,...*%` macros
-- Copper pours: G36/G37 region fills
-- Board outline: draw segments with 0.1 mm aperture
+```json
+{
+  "type": "object",
+  "properties": {
+    "circuit_json": {
+      "type": "array",
+      "description": "Parsed CircuitJSON array from the board file.",
+      "items": {
+        "type": "object"
+      }
+    },
+    "stem": {
+      "type": "string",
+      "description": "Base filename stem for the STEP file (default: 'board')."
+    },
+    "board_thickness_mm": {
+      "type": "number",
+      "description": "PCB substrate thickness in millimetres. Default 1.6 mm (standard FR4). Common values: 0.8, 1.0, 1.2, 1.6, 2.0."
+    },
+    "drill_holes": {
+      "type": "boolean",
+      "description": "If true (default), subtract cylindrical holes from the substrate using via and PTH pad coordinates. Set false for a solid block."
+    },
+    "place_components": {
+      "type": "boolean",
+      "description": "If true (default), add a parametric body solid for each placed pcb_component. Set false for a board-only export."
+    }
+  },
+  "required": [
+    "circuit_json"
+  ]
+}
+```
 
-## Excellon format details
+---
 
-- Format: Metric, TZ (trailing zeros), 3.3
-- One T-code per unique drill diameter
-- Plated (PTH) and non-plated (NPTH) in separate files when both present
+## See also
 
-## Pick-and-place CSV columns
-
-`Designator, Value, Footprint, MidX(mm), MidY(mm), Rotation(deg), Layer, MPN`
-
-## Fab BOM CSV columns
-
-`Item, Qty, Refdes, Value, Footprint, MPN, Manufacturer, Distributor, DistributorPN, Description`
-
-Groups by (Value, Footprint). Distributor is the cheapest entry from the
-component's `distributors[]` array (same data as the assembly BOM panel).
-
-## IPC-2581 subset
-
-The XML covers: Header, LayerStack, Bom (BomItem per placed component),
-Ecad (Board outline, ComponentPlacement, DrillPattern). Validates as
-well-formed XML with all required IPC-2581B structural elements.
+- Package: `kerf_electronics`

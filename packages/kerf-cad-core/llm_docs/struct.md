@@ -1,123 +1,215 @@
-# Structural Grid, Levels, and Framing
+# struct
 
-Pure-Python parametric structural framing layer: define a grid, place storey
-levels, add columns and beams, and generate a BOM-style steel tonnage summary.
-No OCC required. Units: **mm** (lengths, elevations), **kg** / **t** (mass).
+*Module: `kerf_cad_core.struct.tools` · Domain: cad*
 
-Authoritative standards:
-- **AISC Steel Construction Manual, 16th ed.** — W-section catalog (W8–W14).
-- **EN 10034:1993** — I and H structural sections; IPE and HEA section catalog.
-- **BS 4-1:2005** — Universal Beams (UB) and Universal Columns (UC) catalog.
-- **AISC 360-22 §C** — stability provisions governing frame behaviour.
-- **EN 1993-1-1 (Eurocode 3)** — member resistance framework; section classes.
+This module registers **5** LLM tool(s):
 
----
-
-## When to use
-
-Reach for this module when the user asks about:
-
-- setting up a structural grid with bay spacings
-- defining floor/storey levels or building heights
-- placing steel columns at grid intersections (IPE, HEA, UB, W sections)
-- adding beams between grid points at a given level
-- calculating steel quantities, tonnage, or a framing bill of materials
-- sizing a basic structural frame for a multi-storey building
-- checking column lengths or beam spans
+- [`struct_grid`](#struct-grid)
+- [`struct_level`](#struct-level)
+- [`struct_column`](#struct-column)
+- [`struct_beam`](#struct-beam)
+- [`struct_framing_summary`](#struct-framing-summary)
 
 ---
 
-## Tools
+## `struct_grid`
 
-### `struct_grid`
+Define a structural grid for a building layout. X-direction axes are labelled A, B, C, … (left to right); Y-direction axes are numbered 1, 2, 3, … (front to back). spacing_x is the list of bay widths between consecutive X-axes (mm). spacing_y is the list of bay depths between consecutive Y-axes (mm). Grid intersections are addressed as 'X/Y', e.g. 'B/3'. Returns the full grid dict (axis labels + cumulative coordinates) which is passed as `grid` to struct_column, struct_beam, etc. All spacings must be > 0. Maximum 26 X-axes (A–Z).
 
-Define the structural grid from X bay widths and Y bay depths. Grid intersections
-are addressed as `"letter/number"` (e.g. `"B/3"`). Returns a `grid` dict to pass
-to column and beam tools.
+### Input schema
 
-Up to 26 X-axes (A–Z). No OCC geometry; pure positional bookkeeping.
-
----
-
-### `struct_level`
-
-Define a floor or storey level at a fixed elevation (mm above datum; negative for
-basement). Returns a `level` dict; accumulate into a `levels` dict across calls.
-
----
-
-### `struct_column`
-
-Place a steel column at a grid intersection spanning base level to top level.
-Requires a section name from the built-in catalog:
-
-| Family | Sections | Standard |
-|--------|----------|----------|
-| IPE | IPE160–IPE360 | EN 10034 / Eurocode 3 |
-| HEA | HEA200–HEA400 | EN 10034 / Eurocode 3 |
-| UB | UB203–UB356 | BS 4-1 |
-| W | W8×31–W14×53 | AISC SCM 16th ed. |
-
-Returns column length (mm) and mass (kg) from catalog linear mass (kg/m).
-
-**Standards alignment:** Section designations follow EN 10034 (IPE/HEA metric
-series), BS 4-1 (UB/UC imperial-origin series), and AISC SCM 16th ed. Part 1
-(W-shapes). Linear mass values match the respective standard tables.
-
----
-
-### `struct_beam`
-
-Add a beam spanning between two grid intersections at a given level. Length is
-the Euclidean XY distance between grid points. Returns beam length (mm) and mass
-(kg).
-
----
-
-### `struct_framing_summary`
-
-BOM-style summary of all framing members. Accepts a list of column and beam dicts
-and returns:
-- `total_member_count`
-- `total_mass_kg` and `total_mass_t`
-- `by_section` breakdown (section name → count, total mass)
-- `by_type` breakdown (columns vs beams)
-
----
-
-## Example
-
-**User ask:** "Size a 3-bay × 2-bay steel frame, 6000/8000/6000 mm in X and
-5000/5000 mm in Y, with 4 m floor-to-floor height, using HEA200 columns and
-IPE270 beams. How much steel is there?"
-
-```
-1. struct_grid  spacing_x:[6000,8000,6000]  spacing_y:[5000,5000]
-2. struct_level  name:"Ground"  elevation_mm:0
-   struct_level  name:"L1"      elevation_mm:4000
-3. struct_column  id:"C-A1"  grid_label:"A/1"  section:"HEA200"
-                  base_level:"Ground"  top_level:"L1"  grid:{…}  levels:{…}
-   … (repeat for each grid intersection — 12 columns for 4×3 grid)
-4. struct_beam  id:"B-A1-B1"  start:"A/1"  end:"B/1"  section:"IPE270"
-                level:"L1"  grid:{…}  levels:{…}
-   … (repeat for each bay)
-5. struct_framing_summary  members:[all column + beam dicts]
-   → {total_mass_t: …, by_section: {HEA200:{…}, IPE270:{…}}}
+```json
+{
+  "type": "object",
+  "properties": {
+    "spacing_x": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "description": "Bay widths in X direction (mm), left to right. len(spacing_x) bays \u2192 len(spacing_x)+1 axes (A, B, C, \u2026). Example: [6000, 8000, 6000] \u2192 axes A, B, C, D."
+    },
+    "spacing_y": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "description": "Bay depths in Y direction (mm), front to back. len(spacing_y) bays \u2192 len(spacing_y)+1 axes (1, 2, 3, \u2026). Example: [5000, 5000] \u2192 axes 1, 2, 3."
+    },
+    "name": {
+      "type": "string",
+      "description": "Optional name/identifier for this grid (e.g. 'GridA')."
+    }
+  },
+  "required": [
+    "spacing_x",
+    "spacing_y"
+  ]
+}
 ```
 
 ---
 
-## Notes
+## `struct_level`
 
-- All tools are **pure-Python**; no OCC dependency.
-- Tools are **stateless** — accumulate grid, levels, and members in the session.
-- Invalid inputs return `{ok: false, errors: [...]}` — never raise.
-- Maximum 26 X-axes (A–Z) per grid. Beam length is horizontal only.
-- Section catalog: 12 sections; IPE/HEA per EN 10034; UB per BS 4-1; W per
-  AISC SCM 16th ed.
-- This module covers framing geometry and mass only. For member capacity checks
-  (moment, shear, buckling), combine with `beam` (cross-section + buckling) and
-  `steelconn` (connection design).
-- Eurocode 3 §6.2–6.3 section-class slenderness limits and partial factors (γM0,
-  γM1) are outside scope; apply them in a downstream design step after obtaining
-  section properties from `beam_section_properties`.
+Define a floor/storey level at a given elevation above the project datum. Returns a level dict that is accumulated into a levels dict keyed by name. Elevations are in mm from Z=0 (project datum). Negative elevations are valid (basement levels). The levels dict is passed to struct_column and struct_beam.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Level name, e.g. 'Ground', 'L1', 'L2', 'Mezzanine', 'Roof'. Must be unique within the project level set."
+    },
+    "elevation_mm": {
+      "type": "number",
+      "description": "Elevation of this level above the project datum (mm). Use 0 for ground floor. Negative for basements."
+    }
+  },
+  "required": [
+    "name",
+    "elevation_mm"
+  ]
+}
+```
+
+---
+
+## `struct_column`
+
+Place a structural column at a grid intersection, spanning from a base level to a top level. grid_label is the grid intersection address, e.g. 'B/3'. section is the steel section name from the built-in catalog (IPE160, IPE200, IPE270, IPE360, HEA200, HEA300, HEA400, UB203x133x25, UB356x171x51, W8x31, W12x50, W14x68). Pass the `grid` dict from struct_grid and the `levels` dict (keys = level names, values = level dicts from struct_level). Returns the column dict including length_mm and mass_kg.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique column identifier, e.g. 'C-B3-G-L1'."
+    },
+    "grid_label": {
+      "type": "string",
+      "description": "Grid intersection in 'X/Y' format, e.g. 'B/3'."
+    },
+    "section": {
+      "type": "string",
+      "description": "Steel section name from catalog: IPE160, IPE200, IPE270, IPE360, HEA200, HEA300, HEA400, UB203x133x25, UB356x171x51, W8x31, W12x50, W14x68."
+    },
+    "base_level": {
+      "type": "string",
+      "description": "Name of the base level (key in levels dict)."
+    },
+    "top_level": {
+      "type": "string",
+      "description": "Name of the top level (key in levels dict)."
+    },
+    "grid": {
+      "type": "object",
+      "description": "Grid dict from struct_grid output."
+    },
+    "levels": {
+      "type": "object",
+      "description": "Dict of level dicts keyed by level name (accumulated from struct_level outputs)."
+    }
+  },
+  "required": [
+    "id",
+    "grid_label",
+    "section",
+    "base_level",
+    "top_level",
+    "grid",
+    "levels"
+  ]
+}
+```
+
+---
+
+## `struct_beam`
+
+Add a structural beam spanning between two grid intersections at a given level. start and end are grid labels, e.g. 'A/2' and 'C/2'. They must resolve to different points (zero-length beam is rejected). section is the steel section name from the built-in catalog. Pass the `grid` dict from struct_grid and the `levels` dict. Returns the beam dict including length_mm and mass_kg.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique beam identifier, e.g. 'B-A2-C2-L1'."
+    },
+    "start": {
+      "type": "string",
+      "description": "Start grid intersection in 'X/Y' format, e.g. 'A/2'."
+    },
+    "end": {
+      "type": "string",
+      "description": "End grid intersection in 'X/Y' format, e.g. 'C/2'."
+    },
+    "section": {
+      "type": "string",
+      "description": "Steel section name from catalog."
+    },
+    "level": {
+      "type": "string",
+      "description": "Name of the level at which the beam sits."
+    },
+    "grid": {
+      "type": "object",
+      "description": "Grid dict from struct_grid output."
+    },
+    "levels": {
+      "type": "object",
+      "description": "Dict of level dicts keyed by level name."
+    }
+  },
+  "required": [
+    "id",
+    "start",
+    "end",
+    "section",
+    "level",
+    "grid",
+    "levels"
+  ]
+}
+```
+
+---
+
+## `struct_framing_summary`
+
+Compute a BOM-style framing summary from a list of column and beam dicts. Pass the members array (column dicts + beam dicts from struct_column / struct_beam outputs). Returns: total member count, grand total steel mass in kg and tonnes, breakdown by section (count + total length + total mass), and breakdown by member type (columns vs beams). Total mass = sum of (member length in m × section mass in kg/m) over all members. Use this for steel tonnage estimates and quantity take-offs.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "members": {
+      "type": "array",
+      "description": "List of member dicts from struct_column / struct_beam outputs (the 'column' or 'beam' dict from each tool's output).",
+      "items": {
+        "type": "object"
+      }
+    }
+  },
+  "required": [
+    "members"
+  ]
+}
+```
+
+---
+
+## See also
+
+- Package: `kerf_cad_core`

@@ -1,88 +1,112 @@
-# kerf-imports · heal.py
+# heal
 
-Triangle mesh healing pipeline and watertight validation.
+*Module: `kerf_imports.heal` · Domain: imports*
 
-## Entrypoints
+This module registers **4** LLM tool(s):
 
-### `heal(model, tolerance=1e-4) -> dict`
+- [`heal_mesh`](#heal-mesh)
+- [`validate_watertight`](#validate-watertight)
+- [`step_ap242_metadata`](#step-ap242-metadata)
+- [`interop_report`](#interop-report)
 
-8-step mesh healing pipeline. Returns `{model, report}`.
+---
 
-```python
-from kerf_imports.heal import heal
+## `heal_mesh`
 
-result = heal(model, tolerance=1e-4)
-healed_model = result["model"]
-report = result["report"]
-# report keys: steps_run, vertices_merged, slivers_removed,
-#              tiny_edges_merged, normals_flipped, holes_filled, warnings
+Run the full geometry healing pipeline on a .mesh file: stitch gaps, remove slivers, merge tiny edges, unify normals, remove duplicates, detect self-intersections, detect non-manifold geometry, and fill small holes. Returns a per-step delta report.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "file_id": {
+      "type": "string",
+      "description": "UUID of the .mesh file."
+    },
+    "tolerance": {
+      "type": "number",
+      "description": "Merge/stitch tolerance in model units (default 1e-4)."
+    }
+  },
+  "required": [
+    "file_id"
+  ]
+}
 ```
 
-Pipeline steps (in order):
+---
 
-1. **Vertex merge** — weld vertices within `tolerance` using spatial hashing.
-2. **Degenerate face removal** — remove zero-area triangles (area < tolerance²).
-3. **Sliver removal** — remove triangles with aspect ratio > threshold.
-4. **Tiny-edge merge** — collapse edges shorter than `tolerance`.
-5. **Duplicate face removal** — remove topologically identical faces.
-6. **Normal unification** — BFS orientation propagation (see below).
-7. **Hole filling** — fan-triangulate boundary loops up to 20 edges.
-8. **Validation** — check watertightness and report remaining issues.
+## `validate_watertight`
 
-### `_unify_normals(mesh)`
+Check whether a .mesh file is a closed watertight 2-manifold. Runs an Euler-characteristic check (V−E+F) and boundary-edge scan.
 
-BFS from the seed face with the largest positive-Z normal component.
-Propagates consistent outward orientation: if a shared edge between two
-faces has the same directed half-edge in both (co-directed), one face is
-flipped.
+### Input schema
 
-### `_fill_holes(mesh, tolerance)`
-
-Identifies boundary edge loops (edges belonging to exactly one face).
-Loops with ≤ 20 edges are filled by fan triangulation: a centroid vertex
-is added at the loop centroid, then triangles fan from it to each boundary
-edge.
-
-### `validate_watertight(mesh) -> dict`
-
-```python
-from kerf_imports.heal import validate_watertight
-
-v = validate_watertight(mesh)
-# v: {watertight, euler_characteristic, boundary_edge_count,
-#     non_manifold_edge_count, warnings}
+```json
+{
+  "type": "object",
+  "properties": {
+    "file_id": {
+      "type": "string",
+      "description": "UUID of the .mesh file."
+    }
+  },
+  "required": [
+    "file_id"
+  ]
+}
 ```
 
-Checks:
-- **Euler characteristic** V − E + F == 2 (genus-0 closed surface)
-- **No boundary edges** (edges shared by exactly one face)
-- **No non-manifold edges** (edges shared by more than two faces)
+---
 
-### `step_ap242_metadata(step_text) -> dict`
+## `step_ap242_metadata`
 
-Regex-based metadata extractor for STEP AP242 files.
+Parse STEP AP242 PMI and semantic metadata from a raw STEP file stored as a text/plain file. Extracts product name, GD&T annotation presence, assembly tree depth, and header timestamps.
 
-```python
-from kerf_imports.heal import step_ap242_metadata
+### Input schema
 
-meta = step_ap242_metadata(step_content)
-# meta: {file_schema, products, geometric_tolerances,
-#         pmi_items, assembly_usages, warnings}
+```json
+{
+  "type": "object",
+  "properties": {
+    "file_id": {
+      "type": "string",
+      "description": "UUID of the STEP file (kind=step or text)."
+    }
+  },
+  "required": [
+    "file_id"
+  ]
+}
 ```
 
-Extracts: `FILE_SCHEMA`, `PRODUCT`, `GEOMETRIC_TOLERANCE`,
-`PMI_REPRESENTATION_ITEM`, `NEXT_ASSEMBLY_USAGE_OCCURRENCE`.
+---
 
-## LLM tools
+## `interop_report`
 
-| Tool | Write | Description |
-|---|---|---|
-| `heal_mesh` | yes | Run the 8-step healing pipeline on a mesh file |
-| `validate_watertight` | no | Check Euler characteristic and manifoldness |
-| `step_ap242_metadata` | no | Extract GD&T/PMI metadata from a STEP file |
-| `interop_report` | no | Combined heal + validate + metadata report |
+Generate a downstream interoperability readiness report for a .mesh file: watertight, manifold, issue count, and face/vertex stats.
 
-## Standards reference
+### Input schema
 
-- ISO 10303-242: STEP AP242 Managed model-based 3D engineering
-- ASME Y14.41-2019: Digital Product Definition Data Practices (PMI)
+```json
+{
+  "type": "object",
+  "properties": {
+    "file_id": {
+      "type": "string",
+      "description": "UUID of the .mesh file."
+    }
+  },
+  "required": [
+    "file_id"
+  ]
+}
+```
+
+---
+
+## See also
+
+- Package: `kerf_imports`

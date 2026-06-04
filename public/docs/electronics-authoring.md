@@ -158,6 +158,31 @@ or by starting a file with the relevant extension.
 
 ---
 
+## LLM tools
+
+The following `kerf-electronics` LLM tools are relevant to electronics authoring
+and are available to the chat agent. Each file documents the tool name, input
+schema, and usage:
+
+| Tool file | Description |
+|-----------|-------------|
+| [`erc.md`](../../packages/kerf-electronics/llm_docs/erc.md) | Electrical rules check |
+| [`autoroute.md`](../../packages/kerf-electronics/llm_docs/autoroute.md) | FreeRouting-based auto-router |
+| [`routing.md`](../../packages/kerf-electronics/llm_docs/routing.md) | Interactive routing |
+| [`pcb_drc.md`](../../packages/kerf-electronics/llm_docs/pcb_drc.md) | PCB design rules check |
+| [`sim.md`](../../packages/kerf-electronics/llm_docs/sim.md) | SPICE simulation |
+| [`rf.md`](../../packages/kerf-electronics/llm_docs/rf.md) | RF / S-parameter analysis |
+| [`si.md`](../../packages/kerf-electronics/llm_docs/si.md) | Signal integrity |
+| [`pdn.md`](../../packages/kerf-electronics/llm_docs/pdn.md) | Power delivery network |
+| [`emc.md`](../../packages/kerf-electronics/llm_docs/emc.md) | EMC analysis |
+| [`fab.md`](../../packages/kerf-electronics/llm_docs/fab.md) | Fabrication output |
+| [`kicad_bridge_tools.md`](../../packages/kerf-electronics/llm_docs/kicad_bridge_tools.md) | KiCad import/bridge |
+| [`schematic capture`](../../packages/kerf-electronics/llm_docs/capture.md) | Schematic capture authoring |
+
+Full electronics tool index: [`packages/kerf-electronics/llm_docs/`](../../packages/kerf-electronics/llm_docs/)
+
+---
+
 ## Further reading
 
 - [Electronics capabilities overview](/docs/electronics)

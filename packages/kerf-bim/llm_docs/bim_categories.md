@@ -1,145 +1,187 @@
-# BIM Categories and Hosted-Element Relationships
+# bim_categories
 
-This document covers the `category` and `host_ref` fields added to BIM elements,
-the category enum, host rules, cascade behaviour, and the LLM validation tools.
+*Module: `kerf_bim.tools.bim_categories` · Domain: bim*
 
-See also: `bim.md` for the overall `.bim` file shape, levels, walls, slabs, and IFC4 mapping.
+This module registers **6** LLM tool(s):
 
----
-
-## CATEGORIES enum
-
-Every element inside a `.bim` doc may carry a `category` field.  Valid values:
-
-```
-Wall  Floor  Roof  Door  Window  Room
-Column  Beam  Stair  Railing  Casework  Site
-Generic  MEP_Duct  MEP_Pipe  MEP_Conduit
-```
-
-Validated by `validate_bim_categories` tool.  Unknown categories are errors.
+- [`set_element_category`](#set-element-category)
+- [`set_element_host`](#set-element-host)
+- [`unset_element_host`](#unset-element-host)
+- [`move_element`](#move-element)
+- [`find_hosted`](#find-hosted)
+- [`validate_bim_categories`](#validate-bim-categories)
 
 ---
 
-## HOST_RULES
+## `set_element_category`
 
-Some categories may only be hosted on specific parent categories:
+Set the category field on a BIM element. Valid categories: Wall, Floor, Roof, Door, Window, Room, Column, Beam, Stair, Railing, Casework, Site, Generic, MEP_Duct, MEP_Pipe, MEP_Conduit
 
-| Hosted category | Allowed host categories |
-|-----------------|------------------------|
-| Door            | Wall                   |
-| Window          | Wall                   |
-| Casework        | Floor, Wall            |
-| MEP_Duct        | *(none — cannot be hosted)* |
-| MEP_Pipe        | *(none)*               |
-| MEP_Conduit     | *(none)*               |
-| *all others*    | *(unconstrained — any host)* |
-
----
-
-## `host_ref` field
-
-`host_ref` is an optional string field on an element that holds the `id` of
-another element in the same `.bim` doc.
+### Input schema
 
 ```json
 {
-  "id": "door_01",
-  "category": "Door",
-  "host_ref": "wall_north",
-  "position": [1200, 0, 0]
+  "type": "object",
+  "properties": {
+    "file_id": {
+      "type": "string"
+    },
+    "element_id": {
+      "type": "string"
+    },
+    "category": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "file_id",
+    "element_id",
+    "category"
+  ]
 }
 ```
 
-Rules:
-- The referenced `host_ref` id must exist within the same document.
-- The `category` / `host_category` combination must satisfy HOST_RULES.
-- An element may not be its own host.
-
 ---
 
-## Cascade behaviour
+## `set_element_host`
 
-When a host element is moved (`move_element`), **all transitively hosted descendants**
-move by the same delta.  The chain is depth-first: host → direct children → grandchildren.
+Attach a BIM element to a host element via host_ref. Validates HOST_RULES (e.g. Door must host on Wall). Rejects invalid host category pairs.
 
-Example: moving `wall_north` by `[500, 0, 0]` also translates every Door and
-Window whose `host_ref` (directly or indirectly) resolves to `wall_north`.
-
-Translation is applied to whichever coordinate fields are present on each element:
-- `position: [x, y, z]`
-- `from: [x, y]` / `to: [x, y]`  (wall endpoints)
-- 3-D `from: [x, y, z]` / `to: [x, y, z]`  (beams etc.)
-
----
-
-## LLM tools
-
-| Tool | Description |
-|------|-------------|
-| `set_element_category` | Set `category` on one element. Rejects unknown categories. |
-| `set_element_host` | Set `host_ref` on one element. Validates HOST_RULES; rejects invalid pairs. |
-| `unset_element_host` | Remove `host_ref` (detach from host). |
-| `move_element` | Translate element + all hosted descendants by `delta=[dx,dy,dz]`. |
-| `find_hosted` | Return ids of elements directly hosted on a given host. |
-| `validate_bim_categories` | Full-doc audit: returns `{ok, errors, warnings}`. |
-
----
-
-## `validate_bim_categories` output shape
+### Input schema
 
 ```json
 {
-  "ok": false,
-  "errors": [
-    "openings[0] id=door_01: unknown category 'Spaceship'",
-    "openings[1] id=win_01: host_ref 'wall_deleted' does not exist in document",
-    "openings[2] id=door_02: 'Door' cannot be hosted on 'Floor' (host_ref=slab_01)"
-  ],
-  "warnings": []
+  "type": "object",
+  "properties": {
+    "file_id": {
+      "type": "string"
+    },
+    "element_id": {
+      "type": "string"
+    },
+    "host_ref": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "file_id",
+    "element_id",
+    "host_ref"
+  ]
 }
 ```
-
-`ok` is `true` only when `errors` is empty.  `warnings` is reserved for
-advisory issues (e.g. missing category on older elements).
 
 ---
 
-## Examples
+## `unset_element_host`
 
-### 1 — Tag existing walls and add a hosted door
+Remove the host_ref from a BIM element, detaching it from its host.
 
-```json
-// After create_bim, the doc has walls with ids set:
-// { "id": "w1", "from": [0,0], "to": [5000,0], "height": 3000, "thickness": 200 }
-
-// set_element_category
-{ "file_id": "<id>", "element_id": "w1", "category": "Wall" }
-
-// Add a door element (via write_file / edit_file) and then bind it:
-{ "id": "d1", "category": "Door", "position": [1200, 0, 0], "width": 900, "height": 2100 }
-
-// set_element_host
-{ "file_id": "<id>", "element_id": "d1", "host_ref": "w1" }
-```
-
-### 2 — Move a wall and cascade to its hosted door
+### Input schema
 
 ```json
-// move_element
 {
-  "file_id": "<id>",
-  "element_id": "w1",
-  "delta": [500, 0, 0]
+  "type": "object",
+  "properties": {
+    "file_id": {
+      "type": "string"
+    },
+    "element_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "file_id",
+    "element_id"
+  ]
 }
-// Response: { "element_id": "w1", "delta": [500,0,0], "also_moved": ["d1"] }
 ```
 
-### 3 — Validate the whole document
+---
+
+## `move_element`
+
+Translate a BIM element and all elements hosted on it (recursively) by delta=[dx, dy, dz] in millimetres.
+
+### Input schema
 
 ```json
-// validate_bim_categories
-{ "file_id": "<id>" }
-// Clean doc response:
-{ "ok": true, "errors": [], "warnings": [] }
+{
+  "type": "object",
+  "properties": {
+    "file_id": {
+      "type": "string"
+    },
+    "element_id": {
+      "type": "string"
+    },
+    "delta": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 2,
+      "maxItems": 3
+    }
+  },
+  "required": [
+    "file_id",
+    "element_id",
+    "delta"
+  ]
+}
 ```
+
+---
+
+## `find_hosted`
+
+Return the ids of all elements directly hosted on a given host element.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "file_id": {
+      "type": "string"
+    },
+    "host_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "file_id",
+    "host_id"
+  ]
+}
+```
+
+---
+
+## `validate_bim_categories`
+
+Validate all element categories and host_ref relationships in a .bim file. Returns {ok, errors, warnings}.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "file_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "file_id"
+  ]
+}
+```
+
+---
+
+## See also
+
+- Package: `kerf_bim`

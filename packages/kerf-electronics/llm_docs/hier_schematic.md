@@ -1,258 +1,288 @@
-# Hierarchical Schematics
+# hier_schematic
 
-KiCad-style hierarchical schematics allow a top-level circuit to reference child circuit files as **sub-sheet symbols**. Nets are connected between parent and child via **hierarchical labels** (scoped to the specific sheet pin) and across all sheets via **global labels** (e.g. GND, VCC).
+*Module: `kerf_electronics.tools.hier_schematic` · Domain: electronics*
 
-## Data model
+This module registers **7** LLM tool(s):
 
-Three keys are added to the `pcb_board` element:
+- [`add_sub_sheet`](#add-sub-sheet)
+- [`remove_sub_sheet`](#remove-sub-sheet)
+- [`add_global_label`](#add-global-label)
+- [`add_hierarchical_label`](#add-hierarchical-label)
+- [`flatten_hierarchy`](#flatten-hierarchy)
+- [`validate_hierarchy`](#validate-hierarchy)
+- [`replicate_channel`](#replicate-channel)
 
-```jsonc
+---
+
+## `add_sub_sheet`
+
+Add a sub-sheet symbol to a parent circuit. The sub-sheet references a child .circuit file by file_id and exposes hierarchical pins that connect to the child sheet's hierarchical_labels. Returns the updated circuit_json with a new sub_sheets entry including a generated id.
+
+### Input schema
+
+```json
 {
-  "type": "pcb_board",
-  // ...existing keys...
-  "sub_sheets": [
-    {
-      "id": "uuid-sh1",          // generated; stable reference
-      "name": "Power Supply",    // human label
-      "file_id": "uuid-of-child-circuit",
-      "position": [120, 80],     // schematic placement [x, y]
-      "pins": [
-        { "name": "VIN",  "type": "input",   "net_id": "net-vin-main"  },
-        { "name": "VOUT", "type": "output",  "net_id": "net-3v3-rail"  },
-        { "name": "GND",  "type": "passive", "net_id": "net-gnd-main"  }
-      ]
+  "type": "object",
+  "properties": {
+    "circuit_json": {
+      "type": "object",
+      "description": "The parent CircuitJSON board to modify."
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable label for this sheet instance."
+    },
+    "file_id": {
+      "type": "string",
+      "description": "UUID of the child circuit file."
+    },
+    "position": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "description": "Schematic placement position [x, y]."
+    },
+    "pins": {
+      "type": "array",
+      "description": "Hierarchical pins exposed by this sheet symbol.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "input",
+              "output",
+              "bidirectional",
+              "passive"
+            ]
+          },
+          "net_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "net_id"
+        ]
+      }
     }
-  ],
-  "global_labels": [
-    { "name": "GND", "net_id": "net-gnd-main" },
-    { "name": "VCC", "net_id": "net-vcc-main" }
-  ],
-  "hierarchical_labels": [
-    // Placed on CHILD sheets; sheet_id matches the parent's sub_sheets[].id
-    { "name": "VOUT", "net_id": "net-vout-local", "sheet_id": "uuid-sh1" }
-  ]
-}
-```
-
-### `sub_sheets[].pins`
-
-Each pin binds a **parent-side** net (`net_id`) to the **child sheet** via a matching `hierarchical_label` entry with the same `name` and `sheet_id`.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `name` | string | Pin label — must match a `hierarchical_label.name` in the child |
-| `type` | `"input"` \| `"output"` \| `"bidirectional"` \| `"passive"` | Signal direction |
-| `net_id` | string | Parent's local net identifier |
-
-### `global_labels[]`
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `name` | string | Global net name, e.g. `"GND"` |
-| `net_id` | string | Local net identifier on this sheet |
-
-Global labels with the same `name` on any sheet are **automatically equivalent** — `flatten_hierarchy` unions them regardless of depth.
-
-### `hierarchical_labels[]`
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `name` | string | Must match a pin `name` on the parent sheet symbol |
-| `net_id` | string | Local net identifier on this child sheet |
-| `sheet_id` | string | The `sub_sheets[].id` in the parent that owns this binding |
-
----
-
-## Flattening algorithm
-
-`flatten_hierarchy` uses **union-find** over `(sheet_path, net_id)` tuples where `sheet_path` is a slash-delimited path (e.g. `top/uuid-sh1/uuid-sh2`).
-
-1. **Seed**: for every `global_label` on a sheet, union `(sheet_path, net_id)` with `(__global__, label_name)`.
-2. **Pin binding**: for every `sub_sheets[].pins[]` entry, find the matching `hierarchical_label` (same `name` + `sheet_id`) in the child, and union `(parent_path, pin.net_id)` with `(child_path, hier_label.net_id)`.
-3. **Recurse** into each child sheet.
-4. **Output**: `net_groups` — a list of equivalent-net groups, each group being a list of `sheet_path::net_id` strings.
-
-No recursive re-flattening on collision: union-find handles convergence in O(α(n)) amortised.
-
----
-
-## Tools
-
-### `add_sub_sheet`
-
-Add a sub-sheet symbol to a parent circuit. Returns updated `circuit_json` and the generated `id`.
-
-```json
-{
-  "circuit_json": { "type": "pcb_board", "..." : "..." },
-  "name": "Power Supply",
-  "file_id": "uuid-of-child",
-  "position": [120, 80],
-  "pins": [
-    { "name": "VIN",  "type": "input",   "net_id": "net-vin"  },
-    { "name": "VOUT", "type": "output",  "net_id": "net-3v3"  },
-    { "name": "GND",  "type": "passive", "net_id": "net-gnd"  }
+  },
+  "required": [
+    "circuit_json",
+    "name",
+    "file_id"
   ]
 }
 ```
 
 ---
 
-### `remove_sub_sheet`
+## `remove_sub_sheet`
 
-Remove a sub-sheet symbol by `sub_sheet_id`. Also removes all `hierarchical_labels` scoped to that sheet.
+Remove a sub-sheet symbol from a circuit by its id. Also removes any hierarchical_labels in the same circuit that were scoped to that sheet. Returns the updated circuit_json.
 
-```json
-{
-  "circuit_json": { "..." : "..." },
-  "sub_sheet_id": "uuid-sh1"
-}
-```
-
----
-
-### `add_global_label`
-
-Add or update a global label. Calling again with the same `name` updates the `net_id`.
+### Input schema
 
 ```json
 {
-  "circuit_json": { "..." : "..." },
-  "name": "GND",
-  "net_id": "net-gnd-main"
-}
-```
-
----
-
-### `add_hierarchical_label`
-
-Add or update a hierarchical label on a **child** sheet. Scoped to a specific `sheet_id`.
-
-```json
-{
-  "circuit_json": { "..." : "..." },
-  "name": "VOUT",
-  "net_id": "net-vout-local",
-  "sheet_id": "uuid-sh1"
-}
-```
-
----
-
-### `flatten_hierarchy`
-
-Flatten a hierarchy into net equivalence groups.
-
-```json
-{
-  "top_circuit_json": { "type": "pcb_board", "..." : "..." },
-  "children": {
-    "uuid-of-child-1": { "type": "pcb_board", "..." : "..." },
-    "uuid-of-child-2": { "type": "pcb_board", "..." : "..." }
-  }
-}
-```
-
-Returns:
-
-```json
-{
-  "net_groups": [
-    ["top::net-gnd-main", "top/uuid-sh1::net-gnd-local", "__global__::GND"],
-    ["top::net-3v3",      "top/uuid-sh1::net-vout-local"]
+  "type": "object",
+  "properties": {
+    "circuit_json": {
+      "type": "object"
+    },
+    "sub_sheet_id": {
+      "type": "string",
+      "description": "The sub_sheet.id to remove."
+    }
+  },
+  "required": [
+    "circuit_json",
+    "sub_sheet_id"
   ]
 }
 ```
 
 ---
 
-### `validate_hierarchy`
+## `add_global_label`
 
-Validate a hierarchy and return all errors.
+Add or update a global label on a circuit sheet. Global labels with the same name automatically connect across ALL sheets in a hierarchy (e.g. GND, VCC). Calling again with the same name updates the net_id. Returns the updated circuit_json.
 
-```json
-{
-  "top_circuit_json": { "..." : "..." },
-  "children": { "uuid-child": { "..." : "..." } }
-}
-```
-
-Returns `{ "ok": true, "errors": [] }` or `{ "ok": false, "errors": ["..."] }`.
-
-Error categories:
-- `referenced file_id "..." not found in children`
-- `pin "X" has no matching hierarchical_label in child circuit`
-- `hierarchical_label "X" has no matching pin on parent sheet symbol`
-- `global label "X" has conflicting net_ids: "..." vs "..."`
-
----
-
-## Examples
-
-### Example 1 — Power supply sub-sheet
-
-A main board (`main.circuit.tsx`) instantiates a power-supply sub-sheet (`psu.circuit.tsx`).
-
-**Main board (parent)**:
+### Input schema
 
 ```json
 {
-  "type": "pcb_board",
-  "sub_sheets": [{
-    "id": "sh-psu",
-    "name": "Power Supply",
-    "file_id": "uuid-psu",
-    "position": [200, 100],
-    "pins": [
-      { "name": "VIN",  "type": "input",   "net_id": "net-vin"  },
-      { "name": "VOUT", "type": "output",  "net_id": "net-3v3"  },
-      { "name": "GND",  "type": "passive", "net_id": "net-gnd"  }
-    ]
-  }],
-  "global_labels": [
-    { "name": "GND", "net_id": "net-gnd" }
+  "type": "object",
+  "properties": {
+    "circuit_json": {
+      "type": "object"
+    },
+    "name": {
+      "type": "string",
+      "description": "Global net name, e.g. 'GND' or 'VCC'."
+    },
+    "net_id": {
+      "type": "string",
+      "description": "The local net identifier on this sheet."
+    }
+  },
+  "required": [
+    "circuit_json",
+    "name",
+    "net_id"
   ]
 }
 ```
 
-**PSU child** (`uuid-psu`):
+---
+
+## `add_hierarchical_label`
+
+Add or update a hierarchical label on a child circuit sheet. Hierarchical labels connect ONLY through the parent's matching sheet-symbol pin; they do not propagate globally. The sheet_id must match the sub_sheet.id in the parent circuit. Returns the updated circuit_json.
+
+### Input schema
 
 ```json
 {
-  "type": "pcb_board",
-  "hierarchical_labels": [
-    { "name": "VIN",  "net_id": "psu-vin",   "sheet_id": "sh-psu" },
-    { "name": "VOUT", "net_id": "psu-vout",  "sheet_id": "sh-psu" },
-    { "name": "GND",  "net_id": "psu-gnd",   "sheet_id": "sh-psu" }
-  ],
-  "global_labels": [
-    { "name": "GND", "net_id": "psu-gnd" }
+  "type": "object",
+  "properties": {
+    "circuit_json": {
+      "type": "object"
+    },
+    "name": {
+      "type": "string",
+      "description": "Pin name that must match the parent sheet symbol pin."
+    },
+    "net_id": {
+      "type": "string",
+      "description": "The local net identifier on this child sheet."
+    },
+    "sheet_id": {
+      "type": "string",
+      "description": "The sub_sheet.id in the parent that owns this label."
+    }
+  },
+  "required": [
+    "circuit_json",
+    "name",
+    "net_id",
+    "sheet_id"
   ]
 }
 ```
 
-After `flatten_hierarchy`:
-- `top::net-vin` ↔ `top/sh-psu::psu-vin`
-- `top::net-3v3` ↔ `top/sh-psu::psu-vout`
-- `top::net-gnd` ↔ `top/sh-psu::psu-gnd` ↔ `__global__::GND`
+---
+
+## `flatten_hierarchy`
+
+Flatten a multi-sheet hierarchy into a single net equivalence list using union-find over (sheet_path, net_id) tuples. Global labels across all sheets are merged by label name. Sub-sheet pins are merged with the matching child hierarchical_label. Returns {net_groups: [[key, ...], ...]} where each group contains electrically equivalent 'sheet_path::net_id' keys.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "top_circuit_json": {
+      "type": "object",
+      "description": "The top-level CircuitJSON board."
+    },
+    "children": {
+      "type": "object",
+      "description": "Map of file_id \u2192 circuit_json for all referenced child sheets.",
+      "additionalProperties": {
+        "type": "object"
+      }
+    }
+  },
+  "required": [
+    "top_circuit_json"
+  ]
+}
+```
 
 ---
 
-### Example 2 — Three-tier hierarchy (main → mid → leaf)
+## `validate_hierarchy`
 
+Validate a multi-sheet hierarchy. Checks: (1) every sub_sheet file_id is present in children; (2) every sheet-symbol pin has a matching hierarchical_label in the child; (3) no global label name collisions (same name → different net_id on same sheet); (4) no orphaned hierarchical_labels (label exists but no matching pin on parent). Returns {ok: bool, errors: [string]}.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "top_circuit_json": {
+      "type": "object"
+    },
+    "children": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object"
+      }
+    }
+  },
+  "required": [
+    "top_circuit_json"
+  ]
+}
 ```
-main.circuit.tsx
- └── comms.circuit.tsx   (file_id: uuid-comms)
-      └── uart.circuit.tsx  (file_id: uuid-uart)
+
+---
+
+## `replicate_channel`
+
+Replicate a schematic block N times (Altium-style multi-channel design). Each channel gets a unique prefix so its internal nets are independent. Global nets (GND, VCC, VDD, VBUS) are shared across all channels. Returns an array of merged circuit elements with offset positions.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "channel_circuit_json": {
+      "type": [
+        "object",
+        "array"
+      ],
+      "description": "The single-channel template CircuitJSON (block to replicate)."
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 64,
+      "description": "Number of channels to produce (2\u201364)."
+    },
+    "channel_prefix": {
+      "type": "string",
+      "description": "Short identifier used as the net-name prefix, e.g. 'CH' or 'AMP'."
+    },
+    "x_spacing_mm": {
+      "type": "number",
+      "description": "Horizontal offset in mm between channel instances (default 50)."
+    },
+    "y_spacing_mm": {
+      "type": "number",
+      "description": "Vertical offset in mm between channel instances (default 0)."
+    }
+  },
+  "required": [
+    "channel_circuit_json",
+    "count",
+    "channel_prefix"
+  ]
+}
 ```
 
-**main** has `sub_sheets: [{ id: "sh-comms", file_id: "uuid-comms", pins: [{ name: "TX", ... }] }]`
+---
 
-**comms** has `hierarchical_labels: [{ name: "TX", sheet_id: "sh-comms", net_id: "comms-tx" }]` and `sub_sheets: [{ id: "sh-uart", file_id: "uuid-uart", pins: [{ name: "TX", ... }] }]`
+## See also
 
-**uart** has `hierarchical_labels: [{ name: "TX", sheet_id: "sh-uart", net_id: "uart-tx" }]`
-
-`flatten_hierarchy(main, { "uuid-comms": comms, "uuid-uart": uart })` produces a single group containing `top::net-tx`, `top/sh-comms::comms-tx`, and `top/sh-comms/sh-uart::uart-tx`.
-
-All three are electrically equivalent — one net.
+- Package: `kerf_electronics`

@@ -1,203 +1,573 @@
-# Woodworking / Furniture / Joinery + Cut List
+# woodworking
 
-Use the `woodworking_*` tools to design timber joints, generate optimised cut
-lists from a bill-of-boards, and validate grain-direction metadata.
+*Module: `kerf_woodworking.tools` · Domain: woodworking*
 
-All dimensions are in **millimetres** unless noted.
+This module registers **13** LLM tool(s):
 
----
-
-## Joints
-
-### `woodworking_mortise_tenon`
-
-Design a mortise-and-tenon joint.
-
-| Input | Type | Required | Notes |
-|---|---|---|---|
-| `tenon_width_mm` | number | yes | Cheek width of the tenon |
-| `tenon_height_mm` | number | yes | Shoulder-to-shoulder height |
-| `tenon_depth_mm` | number | yes | Engagement depth (tenon length into mortise) |
-| `shoulder_gap_mm` | number | no | Clearance per cheek face (default 0.2 mm) |
-| `shoulder_grain` | string | no | `"along"` \| `"across"` \| `"diagonal"` \| `"any"` |
-
-**Key outputs:**
-- `tenon_volume_mm3` / `mortise_volume_mm3` — equal when `shoulder_gap_mm == 0`
-- `engagement_mm` — tenon depth into the mortise member
-- `warnings` — grain warnings if `shoulder_grain` is `"across"`
+- [`woodworking_mortise_tenon`](#woodworking-mortise-tenon)
+- [`woodworking_dovetail`](#woodworking-dovetail)
+- [`woodworking_finger_joint`](#woodworking-finger-joint)
+- [`woodworking_dowel`](#woodworking-dowel)
+- [`woodworking_biscuit`](#woodworking-biscuit)
+- [`woodworking_pocket_screw`](#woodworking-pocket-screw)
+- [`woodworking_cut_list`](#woodworking-cut-list)
+- [`woodworking_grain_check`](#woodworking-grain-check)
+- [`woodworking_hinge_cup_pattern`](#woodworking-hinge-cup-pattern)
+- [`woodworking_shelf_pin_pattern`](#woodworking-shelf-pin-pattern)
+- [`woodworking_drawer_runner_pattern`](#woodworking-drawer-runner-pattern)
+- [`woodworking_euro_screw_pattern`](#woodworking-euro-screw-pattern)
+- [`woodworking_handle_pattern`](#woodworking-handle-pattern)
 
 ---
 
-### `woodworking_dovetail`
+## `woodworking_mortise_tenon`
 
-Design a through or half-blind dovetail joint.
+Design a mortise-and-tenon joint. Returns geometry, engaged volumes, and any grain warnings. Tenon and mortise volumes are equal when shoulder_gap_mm is 0.
 
-| Input | Type | Required | Notes |
-|---|---|---|---|
-| `board_thickness_mm` | number | yes | Tail-board thickness |
-| `tail_count` | integer | no | Number of tails (default 4) |
-| `tail_angle_deg` | number | no | Splay angle in degrees (default 8; use 14 for softwood) |
-| `baseline_offset_mm` | number | no | Baseline distance from face (default 3 mm) |
-| `half_blind` | boolean | no | Half-blind dovetail (default false) |
-| `lap_mm` | number | no | Front lap thickness for half-blind (default board_thickness/4) |
-| `board_grain` | string | no | Grain direction flag |
-
----
-
-### `woodworking_finger_joint`
-
-Design a box / finger joint.
-
-| Input | Type | Required | Notes |
-|---|---|---|---|
-| `board_thickness_mm` | number | yes | Board thickness |
-| `finger_width_mm` | number | no | Finger width (default 10 mm) |
-| `kerf_mm` | number | no | Router-bit / saw kerf (default 3.175 mm = 1/8") |
-
----
-
-### `woodworking_dowel`
-
-Design a dowel joint.
-
-| Input | Type | Required | Notes |
-|---|---|---|---|
-| `diameter_mm` | number | no | Dowel diameter (default 8 mm; common: 6, 8, 10, 12) |
-| `length_mm` | number | no | Total dowel length (default 40 mm) |
-| `count` | integer | no | Number of dowels (default 2) |
-| `spacing_mm` | number | no | Centre-to-centre spacing (informational) |
-
----
-
-### `woodworking_biscuit`
-
-Design a biscuit (plate / spline) joint.
-
-| Input | Type | Required | Notes |
-|---|---|---|---|
-| `size` | string | no | `"#0"`, `"#10"`, or `"#20"` (default `"#20"`) |
-| `count` | integer | no | Number of biscuits (default 3) |
-| `spacing_mm` | number | no | Centre-to-centre spacing |
-
-Standard sizes:
-
-| Size | Length | Width | Thickness |
-|---|---|---|---|
-| #0  | 47 mm | 16 mm | 4 mm |
-| #10 | 53 mm | 19 mm | 4 mm |
-| #20 | 56 mm | 23 mm | 4 mm |
-
----
-
-### `woodworking_pocket_screw`
-
-Design a Kreg-style pocket-screw joint.
-
-| Input | Type | Required | Notes |
-|---|---|---|---|
-| `board_thickness_mm` | number | no | Pocket board thickness (default 19 mm) |
-| `screw_diameter_mm` | number | no | Screw shank diameter (default 4.5 mm) |
-| `screw_length_mm` | number | no | Total screw length (default 32 mm) |
-| `count` | integer | no | Number of screws (default 2) |
-| `spacing_mm` | number | no | Centre-to-centre spacing |
-| `target_grain` | string | no | `"along"` \| `"across"` \| `"end"` — warns on end grain |
-
----
-
-## Cut List
-
-### `woodworking_cut_list`
-
-Generate an optimised cut list using 1-D guillotine bin-packing (FFD +
-look-ahead consolidation). The algorithm is at least as efficient as plain
-First-Fit Decreasing for any input.
-
-| Input | Type | Required | Notes |
-|---|---|---|---|
-| `pieces` | array | yes | List of required piece objects |
-| `stock_length_mm` | number | yes | Uniform stock board length |
-| `kerf_mm` | number | no | Saw-blade kerf between cuts (default 3.175 mm) |
-| `allow_grain_mismatch` | boolean | no | Suppress cross-grain warnings (default false) |
-
-Each piece object:
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `label` | string | yes | Human-readable identifier |
-| `length_mm` | number | yes | Required cut length |
-| `quantity` | integer | no | How many of this piece (default 1) |
-| `grain_direction` | string | no | `"along"` \| `"across"` \| `"any"` |
-
-**Key outputs:**
-
-| Field | Description |
-|---|---|
-| `stock_used` | Number of stock boards consumed |
-| `total_waste_mm` | Sum of all off-cut lengths |
-| `utilisation_pct` | Material utilisation as a percentage |
-| `off_cuts` | `[{stock_index, length_mm}]` for each remaining off-cut |
-| `assignments` | `[{piece_label, piece_length_mm, stock_index, offset_mm}]` |
-| `warnings` | Cross-grain and over-length warnings |
-
-**Example** — four table legs + two rails:
+### Input schema
 
 ```json
 {
-  "pieces": [
-    { "label": "leg",       "length_mm": 700,  "quantity": 4 },
-    { "label": "long_rail", "length_mm": 1500, "quantity": 2 },
-    { "label": "short_rail","length_mm": 500,  "quantity": 4 }
-  ],
-  "stock_length_mm": 2400,
-  "kerf_mm": 3.175
+  "type": "object",
+  "properties": {
+    "tenon_width_mm": {
+      "type": "number",
+      "description": "Tenon cheek width (mm)"
+    },
+    "tenon_height_mm": {
+      "type": "number",
+      "description": "Tenon height (mm)"
+    },
+    "tenon_depth_mm": {
+      "type": "number",
+      "description": "Tenon engagement depth (mm)"
+    },
+    "shoulder_gap_mm": {
+      "type": "number",
+      "description": "Clearance per cheek face (mm, default 0.2)"
+    },
+    "shoulder_grain": {
+      "type": "string",
+      "enum": [
+        "along",
+        "across",
+        "diagonal",
+        "any"
+      ],
+      "description": "Grain direction at tenon shoulder"
+    }
+  },
+  "required": [
+    "tenon_width_mm",
+    "tenon_height_mm",
+    "tenon_depth_mm"
+  ]
 }
 ```
 
 ---
 
-## Grain Check
+## `woodworking_dovetail`
 
-### `woodworking_grain_check`
+Design a through or half-blind dovetail joint. Returns tail geometry and engagement depth.
 
-Validate grain-direction metadata on any joint descriptor dict returned by
-the joint tools.
+### Input schema
 
-| Input | Type | Required |
-|---|---|---|
-| `joint` | object | yes |
-
-Returns `{ "warnings": [...] }`.  Each warning has:
-
-| Field | Description |
-|---|---|
-| `kind` | `"grain_warning"` |
-| `severity` | `"error"` or `"warning"` |
-| `message` | Human-readable explanation |
-| `joint_type` | The joint type that triggered the warning |
-| `direction` | The problematic direction |
-
-**Key rules checked:**
-
-- Mortise-and-tenon `shoulder_grain = "across"` — tenon shoulder is cross-grain,
-  risk of splitting under bending load.
-- Pocket screw `target_grain = "end"` — end-grain screw holding strength is
-  25–40% of face-grain strength.
-- Dovetail `board_grain = "across"` — error; cross-grain dovetail will split
-  at the pins on narrow stock.
-- Any joint with `grain_direction = "across"` — general cross-grain warning.
+```json
+{
+  "type": "object",
+  "properties": {
+    "board_thickness_mm": {
+      "type": "number"
+    },
+    "tail_count": {
+      "type": "integer",
+      "description": "Number of tails (default 4)"
+    },
+    "tail_angle_deg": {
+      "type": "number",
+      "description": "Splay angle in degrees (default 8)"
+    },
+    "baseline_offset_mm": {
+      "type": "number",
+      "description": "Baseline distance from face (default 3)"
+    },
+    "half_blind": {
+      "type": "boolean",
+      "description": "Half-blind dovetail (default false)"
+    },
+    "lap_mm": {
+      "type": "number",
+      "description": "Front lap thickness (half-blind only)"
+    },
+    "board_grain": {
+      "type": "string",
+      "enum": [
+        "along",
+        "across",
+        "diagonal",
+        "any"
+      ]
+    }
+  },
+  "required": [
+    "board_thickness_mm"
+  ]
+}
+```
 
 ---
 
-## Workflow example
+## `woodworking_finger_joint`
 
+Design a box / finger joint for a given board thickness.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "board_thickness_mm": {
+      "type": "number"
+    },
+    "finger_width_mm": {
+      "type": "number",
+      "description": "Finger width (default 10 mm)"
+    },
+    "kerf_mm": {
+      "type": "number",
+      "description": "Router/saw kerf (default 3.175 mm)"
+    }
+  },
+  "required": [
+    "board_thickness_mm"
+  ]
+}
 ```
-1. Design the joints:
-   woodworking_mortise_tenon → leg-to-apron joint geometry
 
-2. Check grain:
-   woodworking_grain_check   → confirm shoulder_grain is acceptable
+---
 
-3. Build the cut list:
-   woodworking_cut_list      → optimised layout onto 2400 mm stock boards
-                             → review utilisation_pct and off_cuts
+## `woodworking_dowel`
+
+Design a dowel joint.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "diameter_mm": {
+      "type": "number",
+      "description": "Dowel diameter (default 8 mm)"
+    },
+    "length_mm": {
+      "type": "number",
+      "description": "Total dowel length (default 40 mm)"
+    },
+    "count": {
+      "type": "integer",
+      "description": "Number of dowels (default 2)"
+    },
+    "spacing_mm": {
+      "type": "number",
+      "description": "Centre-to-centre spacing"
+    }
+  }
+}
 ```
+
+---
+
+## `woodworking_biscuit`
+
+Design a biscuit (plate) joint. Standard sizes: #0, #10, #20.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "size": {
+      "type": "string",
+      "enum": [
+        "#0",
+        "#10",
+        "#20"
+      ],
+      "description": "Biscuit size (default #20)"
+    },
+    "count": {
+      "type": "integer",
+      "description": "Number of biscuits (default 3)"
+    },
+    "spacing_mm": {
+      "type": "number",
+      "description": "Centre-to-centre spacing"
+    }
+  }
+}
+```
+
+---
+
+## `woodworking_pocket_screw`
+
+Design a pocket-screw (Kreg-style) joint.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "board_thickness_mm": {
+      "type": "number",
+      "description": "Pocket board thickness (default 19 mm)"
+    },
+    "screw_diameter_mm": {
+      "type": "number",
+      "description": "Screw diameter (default 4.5 mm)"
+    },
+    "screw_length_mm": {
+      "type": "number",
+      "description": "Total screw length (default 32 mm)"
+    },
+    "count": {
+      "type": "integer",
+      "description": "Number of screws (default 2)"
+    },
+    "spacing_mm": {
+      "type": "number",
+      "description": "Centre-to-centre spacing"
+    },
+    "target_grain": {
+      "type": "string",
+      "enum": [
+        "along",
+        "across",
+        "end",
+        "any"
+      ],
+      "description": "Grain direction of the receiving board"
+    }
+  }
+}
+```
+
+---
+
+## `woodworking_cut_list`
+
+Generate an optimised cut list (1-D guillotine bin-packing) from a bill-of-boards and stock size. Returns piece assignments, waste, utilisation percentage, and off-cut lengths.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "pieces": {
+      "type": "array",
+      "description": "List of required pieces",
+      "items": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "length_mm": {
+            "type": "number"
+          },
+          "quantity": {
+            "type": "integer"
+          },
+          "grain_direction": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "length_mm"
+        ]
+      }
+    },
+    "stock_length_mm": {
+      "type": "number",
+      "description": "Uniform stock board length (mm)"
+    },
+    "kerf_mm": {
+      "type": "number",
+      "description": "Saw kerf (default 3.175 mm)"
+    },
+    "allow_grain_mismatch": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "pieces",
+    "stock_length_mm"
+  ]
+}
+```
+
+---
+
+## `woodworking_grain_check`
+
+Check grain-direction metadata on a joint descriptor dict. Returns a list of grain warnings.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "joint": {
+      "type": "object",
+      "description": "Joint descriptor as returned by any woodworking joint tool"
+    }
+  },
+  "required": [
+    "joint"
+  ]
+}
+```
+
+---
+
+## `woodworking_hinge_cup_pattern`
+
+Generate 35 mm hinge-cup and arm pilot-hole bore positions for a door panel. Follows the 32 mm System and Blum Clip-Top / INSERTA specifications. Returns hole centres (x, y), diameters, and depths for CNC machining.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "panel_height_mm": {
+      "type": "number",
+      "description": "Door height (mm)"
+    },
+    "panel_width_mm": {
+      "type": "number",
+      "description": "Door width (mm, default 600)"
+    },
+    "panel_thickness_mm": {
+      "type": "number",
+      "description": "Door thickness (mm, default 18)"
+    },
+    "overlay_mm": {
+      "type": "number",
+      "description": "Overlay over carcase (mm, default 0 = full-inset)"
+    },
+    "count": {
+      "type": "integer",
+      "description": "Number of hinges (default 2)"
+    }
+  },
+  "required": [
+    "panel_height_mm"
+  ]
+}
+```
+
+---
+
+## `woodworking_shelf_pin_pattern`
+
+Generate 5 mm shelf-pin socket holes on a 32 mm pitch for a cabinet side panel. Returns two rows of holes (front and rear) at the specified positions.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "panel_height_mm": {
+      "type": "number",
+      "description": "Cabinet side panel height (mm)"
+    },
+    "panel_width_mm": {
+      "type": "number",
+      "description": "Cabinet depth (mm, default 600)"
+    },
+    "panel_thickness_mm": {
+      "type": "number",
+      "description": "Panel thickness (mm, default 18)"
+    },
+    "num_positions": {
+      "type": "integer",
+      "description": "Number of shelf-pin positions per row (default 10)"
+    },
+    "start_y_mm": {
+      "type": "number",
+      "description": "Y of first hole from bottom (mm, default 96)"
+    }
+  },
+  "required": [
+    "panel_height_mm"
+  ]
+}
+```
+
+---
+
+## `woodworking_drawer_runner_pattern`
+
+Generate drawer-runner pilot-hole positions on a cabinet side panel. Supports undermount (Blum Movento / Tandem) and side-mount runner types.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "panel_height_mm": {
+      "type": "number",
+      "description": "Cabinet side panel height (mm)"
+    },
+    "drawer_height_mm": {
+      "type": "number",
+      "description": "Drawer box height (mm)"
+    },
+    "panel_width_mm": {
+      "type": "number",
+      "description": "Cabinet depth (mm, default 600)"
+    },
+    "runner_type": {
+      "type": "string",
+      "enum": [
+        "undermount",
+        "sidemount"
+      ],
+      "description": "Runner type (default 'undermount')"
+    },
+    "num_drawers": {
+      "type": "integer",
+      "description": "Number of drawers (default 1)"
+    }
+  },
+  "required": [
+    "panel_height_mm",
+    "drawer_height_mm"
+  ]
+}
+```
+
+---
+
+## `woodworking_euro_screw_pattern`
+
+Generate Confirmat / Euro-screw face pilot-hole positions for RTA panel joints (shelf-to-side or floor-to-side connections). Returns 5 mm pilot holes on the face panel at the specified edge.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "panel_width_mm": {
+      "type": "number",
+      "description": "Panel width (mm)"
+    },
+    "panel_height_mm": {
+      "type": "number",
+      "description": "Panel height (mm)"
+    },
+    "panel_thickness_mm": {
+      "type": "number",
+      "description": "Panel thickness (mm, default 18)"
+    },
+    "edge": {
+      "type": "string",
+      "enum": [
+        "bottom",
+        "top",
+        "left",
+        "right"
+      ],
+      "description": "Which edge is being joined (default 'bottom')"
+    },
+    "spacing_mm": {
+      "type": "number",
+      "description": "Screw spacing (mm, default 128)"
+    },
+    "count": {
+      "type": "integer",
+      "description": "Number of screws (default 2)"
+    }
+  },
+  "required": [
+    "panel_width_mm",
+    "panel_height_mm"
+  ]
+}
+```
+
+---
+
+## `woodworking_handle_pattern`
+
+Generate handle / rail through-hole positions for a cabinet door or drawer front. Supports horizontal and vertical handle orientations. Common centre-to-centre spacings: 96, 128, 160, 192, 224, 256, 320 mm.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "panel_width_mm": {
+      "type": "number",
+      "description": "Panel width (mm)"
+    },
+    "panel_height_mm": {
+      "type": "number",
+      "description": "Panel height (mm)"
+    },
+    "panel_thickness_mm": {
+      "type": "number",
+      "description": "Panel thickness (mm, default 18)"
+    },
+    "centres_mm": {
+      "type": "number",
+      "description": "Handle hole centres (mm, default 128)"
+    },
+    "orientation": {
+      "type": "string",
+      "enum": [
+        "horizontal",
+        "vertical"
+      ],
+      "description": "Handle orientation (default 'horizontal')"
+    },
+    "offset_from_edge_mm": {
+      "type": "number",
+      "description": "Distance from chosen edge to hole (mm, default 40)"
+    },
+    "edge": {
+      "type": "string",
+      "enum": [
+        "top",
+        "bottom",
+        "left",
+        "right"
+      ],
+      "description": "Edge the handle is near (default 'top')"
+    }
+  },
+  "required": [
+    "panel_width_mm",
+    "panel_height_mm"
+  ]
+}
+```
+
+---
+
+## See also
+
+- Package: `kerf_woodworking`

@@ -1,195 +1,293 @@
-# Family (.family.json) — Parametric component templates
+# family
 
-A **family** is a reusable parametric component template (Revit-style).
-It lives as a file with `kind = 'family'` in the project tree.
-Instances live inside `.bim` files and reference a family by its file id.
+*Module: `kerf_bim.tools.family` · Domain: bim*
+
+This module registers **7** LLM tool(s):
+
+- [`create_family`](#create-family)
+- [`add_family_param`](#add-family-param)
+- [`add_family_type`](#add-family-type)
+- [`instantiate_family`](#instantiate-family)
+- [`update_instance`](#update-instance)
+- [`flex_family`](#flex-family)
+- [`set_family_representation`](#set-family-representation)
 
 ---
 
-## Schema
+## `create_family`
 
-```jsonc
+Create a new .family.json parametric component template. category must be one of: Wall, Floor, Roof, Door, Window, Column, Beam, Stair, Railing, Ceiling, Furniture, Generic. Each param needs at minimum {name, type}; number params accept min/max; enum params require an options list.
+
+### Input schema
+
+```json
 {
-  "version": 1,
-  "name": "Standard Window",
-  "category": "Window",       // Wall | Floor | Roof | Door | Window | Column | Beam
-                               // Stair | Railing | Ceiling | Furniture | Generic
-  "params": [
-    {"name": "width",        "type": "number", "unit": "mm", "default": 900,  "min": 300, "max": 3000},
-    {"name": "height",       "type": "number", "unit": "mm", "default": 1200, "min": 300, "max": 3000},
-    {"name": "glazing",      "type": "enum",   "options": ["single","double","triple"], "default": "double"},
-    {"name": "sill_height",  "type": "number", "unit": "mm", "default": 900}
-  ],
-  "types": [
-    // Named presets — resolved between defaults and per-instance overrides
-    {"id": "type-600x900",   "name": "600×900",  "params": {"width": 600,  "height": 900}},
-    {"id": "type-1200x1500", "name": "1200×1500","params": {"width": 1200, "height": 1500}}
-  ],
-  "host_rules": {
-    "allowed_hosts": ["Wall"],
-    "host_alignment": "centered_on_face"
-  },
-  "representation": {
-    "kind": "geometry_ref",    // or "feature_tree" | "circuit_ref"
-    "file_id": "geo-uuid",
-    "param_bindings": {
-      "width":  "<param.width>",
-      "height": "<param.height>"
+  "type": "object",
+  "properties": {
+    "path": {
+      "type": "string",
+      "description": "Absolute path, must end with .family.json"
+    },
+    "name": {
+      "type": "string"
+    },
+    "category": {
+      "type": "string"
+    },
+    "params": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "default": {},
+          "options": {
+            "type": "array"
+          },
+          "min": {
+            "type": "number"
+          },
+          "max": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "type"
+        ]
+      }
     }
-  }
+  },
+  "required": [
+    "path",
+    "name",
+    "category"
+  ]
 }
 ```
 
-### Param types
+---
 
-| type    | required fields              | optional               |
-|---------|------------------------------|------------------------|
-| number  | name, type                   | unit, default, min, max|
-| enum    | name, type, options (array)  | default                |
-| string  | name, type                   | default                |
-| boolean | name, type                   | default                |
+## `add_family_param`
 
-### Precedence (lowest → highest)
+Add a parameter definition to an existing .family.json file.
 
-```
-param.default  →  type.params  →  instance.params
-```
+### Input schema
 
-### Instance record (inside a .bim file)
-
-```jsonc
+```json
 {
-  "id": "inst-uuid",
-  "type": "instance",
-  "family_id": "family-file-uuid",
-  "type_id": "type-600x900",    // optional named preset
-  "params": {"sill_height": 850},  // per-instance overrides
-  "host_ref": "wall-e1",
-  "transform": [...]
+  "type": "object",
+  "properties": {
+    "file_id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string"
+    },
+    "unit": {
+      "type": "string"
+    },
+    "default": {},
+    "options": {
+      "type": "array"
+    },
+    "min": {
+      "type": "number"
+    },
+    "max": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "file_id",
+    "name",
+    "type"
+  ]
 }
 ```
 
 ---
 
-## Tools
+## `add_family_type`
 
-| Tool | Description |
-|------|-------------|
-| `create_family` | Create a new `.family.json` file |
-| `add_family_param` | Append a param definition to a family |
-| `add_family_type` | Add a named param preset to a family |
-| `instantiate_family` | Append an instance record to a `.bim` file |
-| `update_instance` | Patch per-instance param overrides |
+Add a named parameter preset (type) to a .family.json file. A type is a saved set of param values; instances can reference it via type_id.
 
----
+### Input schema
 
-## Example 1 — Window family
-
-```
-create_family({
-  "path": "/families/windows/standard.family.json",
-  "name": "Standard Window",
-  "category": "Window",
-  "params": [
-    {"name": "width",       "type": "number", "unit": "mm", "default": 900,  "min": 300, "max": 3000},
-    {"name": "height",      "type": "number", "unit": "mm", "default": 1200, "min": 300, "max": 3000},
-    {"name": "glazing",     "type": "enum",   "options": ["single","double","triple"], "default": "double"},
-    {"name": "sill_height", "type": "number", "unit": "mm", "default": 900}
+```json
+{
+  "type": "object",
+  "properties": {
+    "file_id": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string",
+      "description": "Unique id for this type, e.g. 'type-600x900'"
+    },
+    "name": {
+      "type": "string"
+    },
+    "params": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "file_id",
+    "id",
+    "name"
   ]
-})
-```
-
-Add a narrow casement type preset:
-
-```
-add_family_type({
-  "file_id": "<family-uuid>",
-  "id": "type-narrow",
-  "name": "Narrow Casement",
-  "params": {"width": 450, "glazing": "double"}
-})
-```
-
-Place an instance on wall-e1, overriding sill_height:
-
-```
-instantiate_family({
-  "family_file_id": "<family-uuid>",
-  "host_file_id": "<bim-uuid>",
-  "host_ref": "wall-e1",
-  "type_id": "type-narrow",
-  "params": {"sill_height": 850}
-})
-```
-
-Resolved params: `width=450, height=1200, glazing=double, sill_height=850`.
-
----
-
-## Example 2 — Door family
-
-```
-create_family({
-  "path": "/families/doors/hinged.family.json",
-  "name": "Hinged Door",
-  "category": "Door",
-  "params": [
-    {"name": "width",           "type": "number", "unit": "mm", "default": 900, "min": 600, "max": 2400},
-    {"name": "height",          "type": "number", "unit": "mm", "default": 2100, "min": 1800, "max": 3000},
-    {"name": "swing_direction", "type": "enum",   "options": ["left","right","double"], "default": "right"},
-    {"name": "threshold",       "type": "number", "unit": "mm", "default": 0, "min": 0, "max": 50}
-  ]
-})
-```
-
-Add a double-door type:
-
-```
-add_family_type({
-  "file_id": "<family-uuid>",
-  "id": "type-double",
-  "name": "Double Door",
-  "params": {"width": 1800, "swing_direction": "double"}
-})
+}
 ```
 
 ---
 
-## Example 3 — Structural column with steel section types
+## `instantiate_family`
 
-```
-create_family({
-  "path": "/families/structure/steel-column.family.json",
-  "name": "Steel Column",
-  "category": "Column",
-  "params": [
-    {"name": "height",       "type": "number", "unit": "mm", "default": 3000, "min": 500, "max": 20000},
-    {"name": "section_depth","type": "number", "unit": "mm", "default": 200},
-    {"name": "section_width","type": "number", "unit": "mm", "default": 100},
-    {"name": "steel_grade",  "type": "enum",   "options": ["S235","S275","S355"], "default": "S275"}
+Append an instance record to a .bim file. The instance references a family by its file_id and optionally a type_id and per-instance param overrides.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "family_file_id": {
+      "type": "string"
+    },
+    "host_file_id": {
+      "type": "string",
+      "description": "UUID of the .bim file"
+    },
+    "host_ref": {
+      "type": "string",
+      "description": "e.g. wall element id"
+    },
+    "type_id": {
+      "type": "string"
+    },
+    "params": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "family_file_id",
+    "host_file_id"
   ]
-})
+}
 ```
 
-Add IPE section types:
+---
 
+## `update_instance`
+
+Update per-instance param overrides for an existing family instance in a .bim file.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "host_file_id": {
+      "type": "string"
+    },
+    "instance_id": {
+      "type": "string"
+    },
+    "params": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "host_file_id",
+    "instance_id",
+    "params"
+  ]
+}
 ```
-add_family_type({ "file_id": "<fam>", "id": "ipe200", "name": "IPE 200",
-  "params": {"section_depth": 200, "section_width": 100} })
 
-add_family_type({ "file_id": "<fam>", "id": "ipe300", "name": "IPE 300",
-  "params": {"section_depth": 300, "section_width": 150} })
+---
+
+## `flex_family`
+
+Exercise a .family.json definition across multiple parameter sets and return the resolved values for each set. Useful as a 'flex panel' to verify that the family produces correct resolved parameters across its full range. Each item in 'parameter_sets' is an instance dict ({type_id?, params?}) resolved against the family; results are returned in the same order.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "file_id": {
+      "type": "string",
+      "description": "UUID of the .family.json file to flex"
+    },
+    "parameter_sets": {
+      "type": "array",
+      "description": "List of instance dicts to resolve. Each item: {type_id?, params?}.",
+      "items": {
+        "type": "object"
+      },
+      "minItems": 1
+    }
+  },
+  "required": [
+    "file_id",
+    "parameter_sets"
+  ]
+}
 ```
 
-Place a column instance with S355 grade override:
+---
 
-```
-instantiate_family({
-  "family_file_id": "<fam>",
-  "host_file_id": "<bim>",
-  "type_id": "ipe300",
-  "params": {"steel_grade": "S355", "height": 4500}
-})
+## `set_family_representation`
+
+Attach a geometry representation hint to a .family.json file. This links the parametric parameter schema to a geometry source so renderers and exporters know how to produce geometry from resolved parameter values. kind must be one of: geometry_ref, feature_tree, circuit_ref, parametric_box.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "file_id": {
+      "type": "string",
+      "description": "UUID of the .family.json file"
+    },
+    "kind": {
+      "type": "string",
+      "description": "Representation kind (geometry_ref | feature_tree | circuit_ref | parametric_box)"
+    },
+    "ref": {
+      "type": "string",
+      "description": "For geometry_ref/feature_tree: file path or id of the geometry. For parametric_box: omit."
+    },
+    "size_params": {
+      "type": "object",
+      "description": "For parametric_box: mapping of box dimension to param name, e.g. {\"x\": \"width\", \"y\": \"depth\", \"z\": \"height\"}."
+    }
+  },
+  "required": [
+    "file_id",
+    "kind"
+  ]
+}
 ```
 
-Resolved: `height=4500, section_depth=300, section_width=150, steel_grade=S355`.
+---
+
+## See also
+
+- Package: `kerf_bim`

@@ -1,51 +1,58 @@
-# BOM Cost / Sourcing Rollup + DFM Report
+# bom_cost
 
-Three LLM tools for cost analysis and design-for-manufacture review of CircuitJSON boards.
-All are pure-Python with no network calls; results are deterministic.
+*Module: `kerf_electronics.tools.bom_cost` · Domain: electronics*
+
+This module registers **3** LLM tool(s):
+
+- [`bom_cost_rollup`](#bom-cost-rollup)
+- [`bom_dfm_report`](#bom-dfm-report)
+- [`bom_sourcing_risk`](#bom-sourcing-risk)
 
 ---
 
 ## `bom_cost_rollup`
 
-Computes extended BOM cost across a production run.
+Compute extended BOM cost from a list of BOM line items. Selects the best price-break tier at the assembled quantity. Amortises NRE (non-recurring engineering) charges across the run. Excludes DNP (do-not-populate) parts from cost — mark a line with dnp=true or pass refdes names in the dnp_list argument. Returns: per-line extended cost, parts subtotal, NRE, total, per-board cost, and lists of DNP / missing-price lines. No live network calls — all computation is deterministic.
 
-**Key features:**
-- Selects the best price-break tier at `assembly_qty × qty_per_board`
-- Amortises one-time NRE (stencil, fixtures, test) over the run
-- Excludes DNP parts (via per-line `dnp: true` flag or `dnp_list` argument)
-- Reports per-board cost and flags lines with missing prices
+### Input schema
 
-**Input** — `bom_lines` (array of line items):
 ```json
 {
-  "refdes": "R1,R2",
-  "qty": 2,
-  "unit_price": 0.10,
-  "price_breaks": [
-    {"min_qty": 1,   "unit_price": 0.15},
-    {"min_qty": 100, "unit_price": 0.10},
-    {"min_qty": 1000,"unit_price": 0.07}
-  ],
-  "dnp": false,
-  "mpn": "RC0402FR-0710KL",
-  "lead_time_weeks": 4,
-  "num_sources": 2
-}
-```
-
-**Output:**
-```json
-{
-  "ok": true,
-  "subtotal_parts_usd": 12.34,
-  "nre_usd": 50.00,
-  "total_usd": 62.34,
-  "per_board_usd": 0.6234,
-  "assembly_qty": 100,
-  "board_qty": 100,
-  "missing_price_lines": [],
-  "dnp_lines": ["R5"],
-  "line_items": [...]
+  "type": "object",
+  "properties": {
+    "bom_lines": {
+      "type": "array",
+      "description": "List of BOM line items. Each item: {refdes, qty, unit_price?, price_breaks?, dnp?, mpn?, description?, lead_time_weeks?, num_sources?, manufacturer?, distributor?}. price_breaks: [{min_qty, unit_price}, ...] sorted ascending.",
+      "items": {
+        "type": "object"
+      }
+    },
+    "board_qty": {
+      "type": "integer",
+      "description": "Number of bare boards being manufactured (\u22651).",
+      "minimum": 1
+    },
+    "assembly_qty": {
+      "type": "integer",
+      "description": "Number of boards to assemble with components. Defaults to board_qty. Price-break tier is selected at assembly_qty \u00d7 qty_per_board.",
+      "minimum": 1
+    },
+    "nre_usd": {
+      "type": "number",
+      "description": "One-time NRE charges in USD (stencil, fixtures, setup). Amortised over assembly_qty. Default 0.",
+      "minimum": 0
+    },
+    "dnp_list": {
+      "type": "array",
+      "description": "Additional refdes designators to treat as DNP regardless of line-level dnp flags. e.g. ['R5', 'C12'].",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "bom_lines"
+  ]
 }
 ```
 
@@ -53,87 +60,70 @@ Computes extended BOM cost across a production run.
 
 ## `bom_dfm_report`
 
-Runs DFM rule checks on a CircuitJSON board per IPC-2221B / IPC-A-600K class thresholds.
+Run IPC-class DFM (design-for-manufacture) rule checks on a CircuitJSON board and return a findings list plus a roll-up score (0–100, 100=clean). Rules checked: annular ring (PTH + via), min trace width/space, drill-to-copper, silkscreen-over-pad, acid traps, copper slivers, courtyard overlap, smallest passive size vs assembly capability. Thresholds follow IPC-2221B / IPC-A-600K for the selected board class. Pure-Python, no external tools required. board_class: 1=consumer, 2=commercial/industrial (default), 3=high-reliability.
 
-**Board classes** (IPC-2221B §9):
-- `1` — General/consumer electronics (least restrictive)
-- `2` — Commercial/industrial (default)
-- `3` — High-reliability: medical, aerospace (most restrictive)
+### Input schema
 
-**Rules checked:**
-
-| Rule | Threshold source | Severity |
-|------|-----------------|---------|
-| Annular ring — via | IPC-2221B Table 9-1 (0.050 / 0.050 / 0.075 mm) | fail |
-| Annular ring — PTH | IPC-2221B Table 9-1 (0.050 / 0.050 / 0.075 mm) | fail |
-| Min trace width | IPC-2221B §9.1.1 (0.10 / 0.10 / 0.125 mm) | fail |
-| Min trace space | IPC-2221B §9.1.1 (0.10 / 0.10 / 0.125 mm) | fail |
-| Drill-to-copper | IPC-2221B §9.3.1 (0.20 / 0.25 / 0.33 mm) | fail |
-| Silkscreen over pad | IPC-A-600K §3 | warn |
-| Acid trap (sharp corner) | < 45° junction | warn |
-| Copper sliver | short thin segment | warn |
-| Courtyard overlap | IPC-7251 §3.1 / IPC-2221B §9.4 | fail |
-| Smallest passive | IPC-7711/7721 §4.3 (0402 class 1/2; 0603 class 3) | warn |
-
-**Output:**
 ```json
 {
-  "ok": true,
-  "board_class": 2,
-  "score": 85,
-  "fail_count": 1,
-  "warn_count": 0,
-  "findings": [
-    {
-      "rule": "annular_ring_via",
-      "severity": "fail",
-      "message": "Via annular ring 0.020 mm < IPC minimum 0.050 mm",
-      "location": "45.000,32.000"
+  "type": "object",
+  "properties": {
+    "circuit_json": {
+      "type": "array",
+      "description": "Parsed CircuitJSON array from the board file.",
+      "items": {
+        "type": "object"
+      }
+    },
+    "board_class": {
+      "type": "integer",
+      "description": "IPC board class: 1 (consumer), 2 (commercial, default), 3 (high-reliability / medical / aerospace).",
+      "enum": [
+        1,
+        2,
+        3
+      ]
     }
+  },
+  "required": [
+    "circuit_json"
   ]
 }
 ```
-
-Score formula: `max(0, 100 − 15×fails − 5×warns)`.
 
 ---
 
 ## `bom_sourcing_risk`
 
-Scans BOM lines for supply-chain risks without any live distributor calls.
+Analyse BOM line items for sourcing risk: single-source parts, parts with no price information, and long-lead-time parts. Returns a risk list with severity (warn/fail) per line item. No live distributor calls — operates on the provided BOM data only. Input format is the same as bom_cost_rollup.bom_lines. long_lead_weeks threshold defaults to 16 weeks; single_source threshold is num_sources == 1.
 
-**Flags:**
-- `single_source` (fail) — `num_sources == 1`
-- `no_price` (warn) — no `unit_price` and no `price_breaks`
-- `long_lead` (warn) — `lead_time_weeks > long_lead_weeks` (default 16)
+### Input schema
 
-**Output:**
 ```json
 {
-  "ok": true,
-  "risk_count": 2,
-  "fail_count": 1,
-  "warn_count": 1,
-  "risks": [
-    {
-      "refdes": "U1",
-      "risk": "single_source",
-      "severity": "fail",
-      "message": "U1 (ATMEGA328P-AU): single-source part — supply disruption has no alternative"
+  "type": "object",
+  "properties": {
+    "bom_lines": {
+      "type": "array",
+      "description": "List of BOM line items (same schema as bom_cost_rollup).",
+      "items": {
+        "type": "object"
+      }
+    },
+    "long_lead_weeks": {
+      "type": "number",
+      "description": "Lead time (weeks) above which a part is flagged as long-lead. Default 16.",
+      "minimum": 1
     }
+  },
+  "required": [
+    "bom_lines"
   ]
 }
 ```
 
 ---
 
-## Combining the tools
+## See also
 
-Typical LLM workflow:
-1. `bom_cost_rollup` — get extended cost, identify missing prices
-2. `bom_sourcing_risk` — flag single-source / long-lead risks
-3. `bom_dfm_report` — run DFM check on the circuit_json, get score
-
-These tools complement the existing `variant_bom` / `variant_fab` tools in
-`kerf_electronics.tools.variants` — they operate on the same BOM line-item
-format and accept the same `dnp_list` / variant patterns.
+- Package: `kerf_electronics`

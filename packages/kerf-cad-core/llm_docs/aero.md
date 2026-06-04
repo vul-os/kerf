@@ -1,164 +1,446 @@
-# Applied Aerodynamics — LLM Reference
+# aero
 
-ICAO ISA atmosphere, thin-airfoil theory, finite-wing aerodynamics, and aircraft
-performance (Anderson). No OCC dependency. All tools are stateless; no DB write.
-Units: metres, m/s, Pa, kg/m³, dimensionless coefficients.
+*Module: `kerf_cad_core.aero.tools` · Domain: cad*
+
+This module registers **10** LLM tool(s):
+
+- [`aero_atmosphere`](#aero-atmosphere)
+- [`aero_dynamic_pressure`](#aero-dynamic-pressure)
+- [`aero_mach`](#aero-mach)
+- [`aero_thin_airfoil`](#aero-thin-airfoil)
+- [`aero_finite_wing`](#aero-finite-wing)
+- [`aero_drag_buildup`](#aero-drag-buildup)
+- [`aero_level_flight`](#aero-level-flight)
+- [`aero_climb_rate`](#aero-climb-rate)
+- [`aero_propeller`](#aero-propeller)
+- [`aero_breguet`](#aero-breguet)
 
 ---
 
-## When to use
+## `aero_atmosphere`
 
-Keywords: aerodynamics, airfoil, wing, lift, drag, thrust, Mach number, dynamic pressure,
-ISA atmosphere, altitude, standard atmosphere, CL, CD, L/D ratio, induced drag, thin airfoil,
-finite wing, aspect ratio, Prandtl, angle of attack, stall speed, rate of climb, propeller,
-thrust, Breguet range, endurance, level flight, glide, aircraft performance, subsonic,
-transonic.
+Compute ICAO Standard Atmosphere properties at a given altitude.
 
----
+Returns temperature T (K), pressure p (Pa), air density ρ (kg/m³), and speed of sound a (m/s).
 
-## Workflow
+Covers troposphere (0–11 000 m, lapse rate −6.5 K/km) and isothermal stratosphere (11 000–20 000 m, T = 216.65 K).
 
+Errors: {ok:false, reason} for out-of-range or invalid inputs.  Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "altitude_m": {
+      "type": "number",
+      "description": "Geopotential altitude (m).  Range: 0 \u2013 20 000 m."
+    }
+  },
+  "required": [
+    "altitude_m"
+  ]
+}
 ```
-aero_atmosphere           → ρ, p, T, a at altitude
-  → aero_dynamic_pressure → q = ½ρV²
-  → aero_mach             → Mach number
-aero_thin_airfoil         → Cl for symmetric/cambered airfoil section
-aero_finite_wing          → CL corrected for aspect ratio (Prandtl lifting-line)
-aero_drag_buildup         → total CD0 + CDi; L/D; best-glide CL
-aero_level_flight         → required thrust, power, stall speed
-aero_climb_rate           → rate of climb from excess power
-aero_propeller            → actuator-disc thrust and ideal efficiency
-aero_breguet              → cruise range and endurance
+
+---
+
+## `aero_dynamic_pressure`
+
+Compute dynamic pressure q = ½ ρ V²  (Pa).
+
+Errors: {ok:false, reason} for invalid inputs.  Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "rho": {
+      "type": "number",
+      "description": "Air density (kg/m\u00b3). Must be > 0."
+    },
+    "V": {
+      "type": "number",
+      "description": "Airspeed (m/s). Must be >= 0."
+    }
+  },
+  "required": [
+    "rho",
+    "V"
+  ]
+}
 ```
 
 ---
 
-## Tools
+## `aero_mach`
 
-### `aero_atmosphere`
+Compute Mach number M = V / a and Prandtl-Glauert compressibility correction factor β = √(1 − M²).
 
-ICAO Standard Atmosphere properties at a given altitude.
+Issues a transonic flag when M > 0.7 (PG correction degrades).
 
-**Input:** `altitude_m` (geopotential altitude, 0–20 000 m).
+Tip: use aero_atmosphere to get the local speed of sound 'a' at altitude.
 
-**Returns:** `T_K`, `p_Pa`, `rho_kg_m3`, `a_m_s` (speed of sound); covers troposphere and isothermal lower stratosphere.
+Errors: {ok:false, reason} for M >= 1 or invalid inputs.  Never raises.
 
----
+### Input schema
 
-### `aero_dynamic_pressure`
-
-Dynamic pressure q = ½ρV².
-
-**Input:** `rho_kg_m3`, `V_m_s` (airspeed).
-
-**Returns:** `q_Pa`.
-
----
-
-### `aero_mach`
-
-Mach number and transonic flag.
-
-**Input:** `V_m_s`, `a_m_s` (speed of sound from `aero_atmosphere`).
-
-**Returns:** `Mach`, `transonic` (true if 0.8 ≤ M ≤ 1.2), `supersonic`.
-
----
-
-### `aero_thin_airfoil`
-
-Thin-airfoil theory: section lift and moment coefficients.
-
-**Input:** `alpha_deg` (angle of attack), `camber_ratio` (max camber / chord, default 0 for symmetric), `camber_location` (x/c of max camber, default 0.4).
-
-**Returns:** `Cl` = 2π(α + 2·camber_ratio), `Cm_c4` (pitching moment about c/4 per unit span). Valid for small angles and thin sections; pre-stall only.
-
----
-
-### `aero_finite_wing`
-
-Finite-wing CL and corrected lift-curve slope via Prandtl lifting-line theory.
-
-**Input:** `alpha_deg`, `AR` (aspect ratio b²/S), `e` (span efficiency factor, default 1.0), `camber_ratio` (default 0), `camber_location` (default 0.4).
-
-**Returns:** `CL`, `dCL_dalpha` (rad⁻¹), `alpha_induced_deg`.
-
----
-
-### `aero_drag_buildup`
-
-Total aircraft drag coefficient, L/D ratio, and best-glide CL.
-
-**Input:** `CL`, `AR`, `e` (Oswald efficiency, default 0.8), `CD0` (zero-lift drag coefficient), `CL_max` (optional stall limit).
-
-**Returns:** `CDi` (induced drag), `CD_total`, `LD_ratio`, `best_glide_CL`, `best_glide_LD`.
-
----
-
-### `aero_level_flight`
-
-Required thrust, shaft power, and stall speed for steady level flight.
-
-**Input:** `W_N` (weight), `S_m2` (wing area), `rho_kg_m3`, `V_m_s`, `CD_total`, `CL`, `CL_max`.
-
-**Returns:** `T_required_N`, `P_required_W`, `V_stall_m_s`, `load_factor`.
-
----
-
-### `aero_climb_rate`
-
-Rate of climb from excess power.
-
-**Input:** `P_available_W` (engine/propeller shaft power), `P_required_W` (from `aero_level_flight`), `W_N`.
-
-**Returns:** `ROC_m_s` (rate of climb), `excess_power_W`, `climb_angle_deg`.
-
----
-
-### `aero_propeller`
-
-Actuator-disc propeller thrust and ideal propulsive efficiency.
-
-**Input:** `P_shaft_W` (shaft power), `rho_kg_m3`, `D_m` (propeller diameter), `V_inf_m_s` (free-stream speed).
-
-**Returns:** `T_N` (ideal thrust), `eta_propulsive` (ideal efficiency), `induced_velocity_m_s`.
-
----
-
-### `aero_breguet`
-
-Breguet range and endurance for a propeller-driven aircraft.
-
-**Input:** `eta_p` (propeller efficiency, 0–1), `c_specific` (specific fuel consumption, kg/(N·s)), `CL`, `CD`, `W_initial_N`, `W_final_N`.
-
-**Returns:** `range_m`, `range_km`, `endurance_s`, `endurance_h`.
-
----
-
-## Example
-
+```json
+{
+  "type": "object",
+  "properties": {
+    "V": {
+      "type": "number",
+      "description": "Airspeed (m/s). Must be >= 0."
+    },
+    "a": {
+      "type": "number",
+      "description": "Speed of sound (m/s). Must be > 0. Use aero_atmosphere to get local a."
+    }
+  },
+  "required": [
+    "V",
+    "a"
+  ]
+}
 ```
-# Cruise performance at 3000 m, 60 m/s
-aero_atmosphere  altitude_m:3000
-  → rho_kg_m3:0.909  T_K:268.7  a_m_s:328.6
 
-aero_dynamic_pressure  rho_kg_m3:0.909  V_m_s:60
-  → q_Pa: 1636
+---
 
-aero_mach  V_m_s:60  a_m_s:328.6
-  → Mach:0.183  transonic:false
+## `aero_thin_airfoil`
 
-aero_finite_wing  alpha_deg:4  AR:8  e:0.85  camber_ratio:0.04
-  → CL:0.72  dCL_dalpha:4.68
+Thin-airfoil theory: section lift coefficient and quarter-chord pitching moment coefficient.
 
-aero_drag_buildup  CL:0.72  AR:8  e:0.85  CD0:0.025
-  → CD_total:0.0485  LD_ratio:14.8  best_glide_CL:0.447
+  Cl      = 2π (α − α₀)          [dCl/dα = 2π rad⁻¹]
+  Cm_c/4  = −(π/2)(α − α₀)       [about aerodynamic centre]
 
-aero_level_flight  W_N:12000  S_m2:18  rho_kg_m3:0.909  V_m_s:60
-               CD_total:0.0485  CL:0.72  CL_max:1.6
-  → T_required_N:810  V_stall_m_s:38.2
+A stall warning is issued when |Cl| > 1.4.
 
-aero_breguet  eta_p:0.82  c_specific:8e-8  CL:0.72  CD:0.0485
-              W_initial_N:12000  W_final_N:9500
-  → range_km: 1842  endurance_h: 8.5
+Errors: {ok:false, reason} for invalid inputs.  Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "alpha_deg": {
+      "type": "number",
+      "description": "Angle of attack (degrees).  Converted to radians internally."
+    },
+    "alpha0_deg": {
+      "type": "number",
+      "description": "Zero-lift angle of attack (degrees).  0 for symmetric airfoils; typically negative for cambered.  Default 0."
+    }
+  },
+  "required": [
+    "alpha_deg"
+  ]
+}
 ```
+
+---
+
+## `aero_finite_wing`
+
+Prandtl lifting-line finite-wing analysis.
+
+Computes:
+  a_wing  — finite-wing lift-curve slope (rad⁻¹)
+              a = a₀ / (1 + a₀/(π AR e))
+  CL      — wing lift coefficient
+  CDi     — induced drag coefficient  CL²/(π AR e)
+
+A stall warning is issued when |CL| > 1.6.
+
+Errors: {ok:false, reason} for invalid inputs.  Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "alpha_deg": {
+      "type": "number",
+      "description": "Angle of attack (degrees)."
+    },
+    "alpha0_deg": {
+      "type": "number",
+      "description": "Zero-lift angle of attack (degrees).  Default 0."
+    },
+    "AR": {
+      "type": "number",
+      "description": "Wing aspect ratio b\u00b2/S.  Must be > 0."
+    },
+    "e": {
+      "type": "number",
+      "description": "Oswald span efficiency factor (0 < e \u2264 1).  Typical values: 0.75\u20130.95.  Default 0.85."
+    },
+    "a0": {
+      "type": "number",
+      "description": "Section lift-curve slope (rad\u207b\u00b9).  Default 2\u03c0 \u2248 6.283 (thin-airfoil theory)."
+    }
+  },
+  "required": [
+    "alpha_deg",
+    "AR"
+  ]
+}
+```
+
+---
+
+## `aero_drag_buildup`
+
+Total drag buildup: parasite + induced; L/D; best-glide condition.
+
+  CD      = CD0 + CL² / (π AR e)
+  L/D     = CL / CD
+  CL_best = √(π AR e CD0)   (CL for maximum L/D)
+  (L/D)_max = CL_best / (2 CD0)
+
+Errors: {ok:false, reason} for invalid inputs.  Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "CD0": {
+      "type": "number",
+      "description": "Zero-lift (parasite) drag coefficient.  Must be >= 0."
+    },
+    "CL": {
+      "type": "number",
+      "description": "Lift coefficient at the flight condition."
+    },
+    "AR": {
+      "type": "number",
+      "description": "Wing aspect ratio.  Must be > 0."
+    },
+    "e": {
+      "type": "number",
+      "description": "Oswald span efficiency factor (0 < e \u2264 1).  Default 0.85."
+    }
+  },
+  "required": [
+    "CD0",
+    "CL",
+    "AR"
+  ]
+}
+```
+
+---
+
+## `aero_level_flight`
+
+Level-flight performance: required thrust, shaft power, and stall speed.
+
+  T_req   = W × CD/CL           (N)
+  P_req   = T_req × V            (W)
+  V_stall = √(2W / (ρ S CLmax)) (m/s)
+
+Errors: {ok:false, reason} for invalid inputs.  Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "W": {
+      "type": "number",
+      "description": "Aircraft weight (N).  Must be > 0."
+    },
+    "CL": {
+      "type": "number",
+      "description": "Lift coefficient at flight condition.  Must be > 0."
+    },
+    "CD": {
+      "type": "number",
+      "description": "Drag coefficient at flight condition.  Must be > 0."
+    },
+    "V": {
+      "type": "number",
+      "description": "True airspeed (m/s).  Must be > 0."
+    },
+    "rho": {
+      "type": "number",
+      "description": "Air density (kg/m\u00b3).  Required for stall speed.  Must be > 0."
+    },
+    "S": {
+      "type": "number",
+      "description": "Wing reference area (m\u00b2).  Required for stall speed.  Must be > 0."
+    },
+    "CLmax": {
+      "type": "number",
+      "description": "Maximum lift coefficient.  Required for stall speed.  Must be > 0."
+    }
+  },
+  "required": [
+    "W",
+    "CL",
+    "CD",
+    "V"
+  ]
+}
+```
+
+---
+
+## `aero_climb_rate`
+
+Rate of climb from excess-power method.
+
+  RC = (T − D) × V / W   (m/s)
+
+A negative-climb warning is issued when T ≤ D.
+
+Errors: {ok:false, reason} for invalid inputs.  Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "T": {
+      "type": "number",
+      "description": "Available thrust (N).  Must be >= 0."
+    },
+    "D": {
+      "type": "number",
+      "description": "Drag at climb airspeed (N).  Must be >= 0."
+    },
+    "V": {
+      "type": "number",
+      "description": "True airspeed (m/s).  Must be > 0."
+    },
+    "W": {
+      "type": "number",
+      "description": "Aircraft weight (N).  Must be > 0."
+    }
+  },
+  "required": [
+    "T",
+    "D",
+    "V",
+    "W"
+  ]
+}
+```
+
+---
+
+## `aero_propeller`
+
+Ideal propeller (actuator-disc) thrust and efficiency.
+
+Actuator-disc (Froude momentum theory):
+  T      = 2 ρ A (V_inf + w) w   (N)
+  P_in   = T × (V_inf + w)        (W)
+  η      = V_inf / (V_inf + w)    (dimensionless)
+
+Disc area: A = π r² for propeller radius r.
+
+Errors: {ok:false, reason} for invalid inputs.  Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "rho": {
+      "type": "number",
+      "description": "Air density (kg/m\u00b3).  Must be > 0."
+    },
+    "A_disc": {
+      "type": "number",
+      "description": "Propeller disc area (m\u00b2) = \u03c0 r\u00b2.  Must be > 0."
+    },
+    "V_inf": {
+      "type": "number",
+      "description": "Freestream velocity (m/s).  Must be >= 0."
+    },
+    "w": {
+      "type": "number",
+      "description": "Induced velocity at disc (m/s).  Must be > 0."
+    }
+  },
+  "required": [
+    "rho",
+    "A_disc",
+    "V_inf",
+    "w"
+  ]
+}
+```
+
+---
+
+## `aero_breguet`
+
+Breguet range and endurance equations for propeller-driven aircraft.
+
+Range:     R = (η_p / c) × (L/D) × ln(W_i / W_f)          (m)
+Endurance: E = (η_p / c) × (CL/CD) × (1/g) × ln(W_i / W_f) (s)
+
+c_specific — specific fuel consumption (kg/(N·s)).
+  Typical piston: ~8e-8 kg/(N·s); turboprop: ~5e-8 kg/(N·s).
+
+Errors: {ok:false, reason} for invalid inputs.  Never raises.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "eta_p": {
+      "type": "number",
+      "description": "Propeller efficiency (0 < \u03b7_p \u2264 1)."
+    },
+    "c_specific": {
+      "type": "number",
+      "description": "Specific fuel consumption (kg/(N\u00b7s)).  Must be > 0."
+    },
+    "CL": {
+      "type": "number",
+      "description": "Lift coefficient at cruise.  Must be > 0."
+    },
+    "CD": {
+      "type": "number",
+      "description": "Drag coefficient at cruise.  Must be > 0."
+    },
+    "W_initial": {
+      "type": "number",
+      "description": "Take-off weight (N).  Must be > W_final."
+    },
+    "W_final": {
+      "type": "number",
+      "description": "Landing weight (N).  Must be > 0."
+    }
+  },
+  "required": [
+    "eta_p",
+    "c_specific",
+    "CL",
+    "CD",
+    "W_initial",
+    "W_final"
+  ]
+}
+```
+
+---
+
+## See also
+
+- Package: `kerf_cad_core`

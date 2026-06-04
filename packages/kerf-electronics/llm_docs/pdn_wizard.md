@@ -1,115 +1,140 @@
-# PDN (Power Delivery Network) Wizard — `pdn_wizard.py`
+# pdn_wizard
 
-Guided power delivery network analysis: decoupling capacitor impedance, anti-resonance detection, target impedance compliance, and ranked fix recommendations.
+*Module: `kerf_electronics.pdn_wizard` · Domain: electronics*
 
----
+This module registers **2** LLM tool(s):
 
-## When to use
-
-Use `pdn_impedance_wizard` when a user asks:
-- "Do I have enough decoupling on my 1.8 V rail?"
-- "What capacitors should I use for my DDR4 power supply?"
-- "My VRM shows ringing — what's causing it?"
-- Pre-layout PDN screening before full power-integrity simulation
+- [`pdn_decap_wizard`](#pdn-decap-wizard)
+- [`pdn_characterise_cap`](#pdn-characterise-cap)
 
 ---
 
-## Capacitor model
+## `pdn_decap_wizard`
 
-Each capacitor is modelled as a series RLC:
-- `Z(f) = R_esr + j(2πf·L_esl − 1/(2πf·C))`
+Power-delivery-network (PDN) decoupling-capacitor wizard.
 
-Anti-resonance between adjacent capacitor values creates impedance peaks; the wizard detects and flags these.
+Computes Z_target = (Vdd × ripple_frac) / I_transient, builds the PDN impedance spectrum from DC to the target bandwidth (VRM + bulk + ceramic decap banks), finds parallel-resonance (anti-resonance) peaks that exceed Z_target, and recommends a minimal decoupling set (count & value mix across decades) so |Z(f)| ≤ Z_target.
 
----
+Input: { vdd_v, ripple_frac, i_transient_a, bw_hz, l_vrm_h?, r_vrm_ohm?, l_plane_h?, banks? }
 
-## LLM tool
+Returns: { ok, z_target_ohm, meets_target, bandwidth_met_hz, anti_resonance_peaks[], recommended_banks[], per_bank_srf[], sweep{freqs_hz,z_mag_ohm}, summary }
 
-**`pdn_impedance_wizard`**
+### Input schema
 
-**Required input:**
 ```json
 {
-  "voltage_rail_v": 1.8,
-  "max_current_a": 5.0,
-  "transient_time_ns": 10.0
+  "type": "object",
+  "properties": {
+    "vdd_v": {
+      "type": "number",
+      "description": "Supply voltage [V]."
+    },
+    "ripple_frac": {
+      "type": "number",
+      "description": "Allowed ripple as fraction of Vdd (e.g. 0.05 for 5%)."
+    },
+    "i_transient_a": {
+      "type": "number",
+      "description": "Peak transient current [A]."
+    },
+    "bw_hz": {
+      "type": "number",
+      "description": "Target PDN bandwidth [Hz]."
+    },
+    "l_vrm_h": {
+      "type": "number",
+      "description": "VRM output inductance [H] (default 10 nH)."
+    },
+    "r_vrm_ohm": {
+      "type": "number",
+      "description": "VRM output resistance [\u03a9] (default 5 m\u03a9)."
+    },
+    "l_plane_h": {
+      "type": "number",
+      "description": "Plane spreading inductance per cap [H] (default 0.5 nH)."
+    },
+    "banks": {
+      "type": "array",
+      "description": "Cap banks: list of {cap_f, esr_ohm, esl_h, mount_l_h?, count}. Omit to use synthesised defaults.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "cap_f": {
+            "type": "number"
+          },
+          "esr_ohm": {
+            "type": "number"
+          },
+          "esl_h": {
+            "type": "number"
+          },
+          "mount_l_h": {
+            "type": "number"
+          },
+          "count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "cap_f",
+          "esr_ohm",
+          "esl_h"
+        ]
+      }
+    }
+  },
+  "required": [
+    "vdd_v",
+    "ripple_frac",
+    "i_transient_a",
+    "bw_hz"
+  ]
 }
 ```
 
-Target impedance: `Z_target = voltage_rail_v × allowable_ripple_pct / (100 × max_current_a)`
+---
 
-Default `allowable_ripple_pct = 3`.
+## `pdn_characterise_cap`
 
-**Optional fields:**
+Characterise a single decoupling capacitor: compute self-resonant frequency (f_srf = 1/(2π√(L_total·C))), |Z| at SRF, and the DC/HF asymptote behaviour.
 
-| Field | Default | Notes |
-|---|---|---|
-| `allowable_ripple_pct` | 3 | Allowable voltage ripple as % of rail |
-| `capacitors` | `[]` | List of `{C_f, L_esl_h, R_esr_ohm, count}` |
-| `vrm_output_impedance_ohm` | 0.05 | VRM output impedance |
-| `freq_min_hz` | 1e3 | Sweep start |
-| `freq_max_hz` | 1e9 | Sweep end |
-| `freq_points` | 200 | Log-spaced frequency points |
+Input: { cap_f, esr_ohm, esl_h, mount_l_h? }
 
-**Returns:**
+Returns: { ok, srf_hz, z_at_srf_ohm, l_total_h, dc_asymptote, hf_asymptote }
+
+### Input schema
+
 ```json
 {
-  "compliant": false,
-  "z_target_ohm": 0.011,
-  "worst_freq_hz": 45000000,
-  "worst_z_ohm": 0.038,
-  "anti_resonances": [
-    {"freq_hz": 45e6, "peak_z_ohm": 0.038, "cap_pair": [0, 1],
-     "severity": "high"}
-  ],
-  "impedance_profile": [[freq_hz, z_ohm], ...],
-  "findings": [...],
-  "recommendations": [
-    {"priority": 1, "action": "add_midfreq_cap",
-     "C_uf": 0.1, "target_freq_hz": 45e6,
-     "before_z_ohm": 0.038, "after_z_ohm": 0.009},
-    {"priority": 2, "action": "increase_bulk_cap",
-     "additional_C_uf": 100}
-  ],
-  "summary": "FAIL — peak impedance 0.038 Ω at 45 MHz exceeds target 0.011 Ω. 2 fix(es) recommended."
+  "type": "object",
+  "properties": {
+    "cap_f": {
+      "type": "number",
+      "description": "Capacitance [F]."
+    },
+    "esr_ohm": {
+      "type": "number",
+      "description": "Equivalent series resistance [\u03a9]."
+    },
+    "esl_h": {
+      "type": "number",
+      "description": "Equivalent series inductance [H]."
+    },
+    "mount_l_h": {
+      "type": "number",
+      "description": "Mounting/via inductance [H] (default 0)."
+    }
+  },
+  "required": [
+    "cap_f",
+    "esr_ohm",
+    "esl_h"
+  ]
 }
 ```
 
 ---
 
-## Fix recommendation logic
+## See also
 
-| Priority | Issue | Action |
-|---|---|---|
-| 1 | Anti-resonance peak | Add mid-frequency capacitor to fill the gap |
-| 2 | Low-freq bulk impedance too high | Increase bulk capacitance |
-| 3 | High-freq impedance too high | Add X5R/X7R 100 nF decoupling closer to IC |
-| 4 | VRM output impedance too high | Reduce VRM output inductance or add output cap |
-
----
-
-## Direct Python API
-
-```python
-from kerf_electronics.pdn_wizard import pdn_impedance_analysis
-
-result = pdn_impedance_analysis({
-    "voltage_rail_v": 1.8,
-    "max_current_a": 5.0,
-    "transient_time_ns": 10.0,
-    "capacitors": [
-        {"C_f": 100e-6, "L_esl_h": 3e-9, "R_esr_ohm": 0.005, "count": 2},
-        {"C_f": 100e-9, "L_esl_h": 0.5e-9, "R_esr_ohm": 0.05,  "count": 10},
-    ],
-})
-print(result["compliant"], result["summary"])
-```
-
----
-
-## Notes
-
-- Capacitor model is series RLC; mutual inductance between parallel caps is not modelled.
-- Anti-resonance detection finds local impedance maxima between adjacent capacitor self-resonant frequencies.
-- `impedance_profile` is omitted from the LLM payload for large frequency sweeps; available in the Python API result.
-- References: Ott, H.W., *Electromagnetic Compatibility Engineering*, Wiley 2009, §11.3; Novak, I. & Miller, J.R., *Frequency-Domain Characterization of Power Distribution Networks*, Artech House 2007.
+- Package: `kerf_electronics`

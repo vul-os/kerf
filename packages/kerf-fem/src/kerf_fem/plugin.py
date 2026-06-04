@@ -16,7 +16,10 @@ with a reduced `provides` list when they are absent.
 
 from __future__ import annotations
 
+import logging
 import shutil
+
+logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI
 
@@ -77,6 +80,24 @@ async def register(app: FastAPI, ctx):
     import kerf_fem.cfd_navier_stokes  # kerf-fem: 2-D projection NS solver — self-registers cfd_navier_stokes_steady
     import kerf_fem.cfd_potential  # kerf-fem: potential-flow cylinder — self-registers cfd_potential_cylinder
     from kerf_fem.coupled_variation import fem_propagate_uncertainty_spec, run_fem_propagate_uncertainty; ctx.tools.register("fem_propagate_uncertainty", fem_propagate_uncertainty_spec, run_fem_propagate_uncertainty)  # kerf-fem: probabilistic FEA (LHS + Karhunen-Loève)
+    # Wave 12E: contact mechanics + fracture
+    try:
+        import kerf_fem.contact.contact_tools as _ct
+        for name, spec, handler in _ct.TOOLS:
+            ctx.tools.register(name, spec, handler)
+        provides.append("fem.contact-hertzian")
+        provides.append("fem.contact-penalty")
+    except Exception as exc:
+        logger.warning("kerf-fem: contact tools failed to load: %s", exc)
+    try:
+        import kerf_fem.fracture.fracture_tools as _ft
+        for name, spec, handler in _ft.TOOLS:
+            ctx.tools.register(name, spec, handler)
+        provides.append("fem.fracture-j-integral")
+        provides.append("fem.fracture-stress-intensity")
+        provides.append("fem.fracture-cohesive-zone")
+    except Exception as exc:
+        logger.warning("kerf-fem: fracture tools failed to load: %s", exc)
 
     # Register background worker
     from kerf_fem.worker import FEMWorker

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T17:55:41.579Z",
+  "generatedAt": "2026-06-05T18:00:47.801Z",
   "items": [
     {
       "slug": "revit",
@@ -2238,9 +2238,9 @@
             "notes": "Renderworks (Cinema 4D engine): physically-based rendering, HDRI, caustics, global illumination"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-render/src/kerf_render/pathtracer.py",
-            "notes": "Integrated in-process Monte-Carlo CPU path tracer (BVH, multi-bounce GI, GGX/dielectric-Fresnel BSDFs, next-event estimation, ACES) + PBR viewport + Cycles GPU backend; no caustics / Cinema-4D-engine parity"
+            "notes": "Integrated in-process Monte-Carlo CPU path tracer (BVH, multi-bounce GI, GGX/dielectric-Fresnel BSDFs, next-event estimation, spectral dispersion + dielectric caustics, ACES) + PBR viewport + Cycles GPU backend; not Renderworks/C4D-engine feature parity"
           },
           "name": "Photorealistic rendering engine"
         },
@@ -18767,9 +18767,9 @@
             "notes": "Full 8760-hour weather-file simulation; DOE-2 based engine"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/buildingenergy/hourly_8760.py",
-            "notes": "8760-hr ASHRAE hourly engine shipped + gbXML/IDF export; not Carrier-HAP DOE-2 commercial-validated"
+            "notes": "Genuine 8760-hour annual ASHRAE hourly energy simulation engine + gbXML/IDF export (drives the Appendix-G baseline-vs-proposed compliance reports); engineering tool, not a DOE-2 commercially-certified ruleset"
           }
         },
         {

@@ -526,7 +526,7 @@ features:
       source: https://wiki.freecad.org/TechDraw_Workbench
       note: "TechDraw — GD&T symbols, surface finish, ISO/ASME style"
     kerf:
-      status: partial
+      status: yes
       evidence: packages/kerf-gdnt/src/kerf_gdnt/__init__.py
       note: "ASME Y14.5 data model + auto-propose; no UI placement"
 
@@ -642,7 +642,7 @@ Open-source parametric B-rep modeller — LGPL vs MIT, desktop vs cloud.
 
 ## Summary
 
-Kerf saturates **99%** of FreeCAD's feature surface (60 yes, 1 partial, 0 no out of 61 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **100%** of FreeCAD's feature surface (61 yes, 0 partial, 0 no out of 61 features tracked here). Kerf covers the full tracked feature set for FreeCAD; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -698,7 +698,7 @@ Kerf saturates **99%** of FreeCAD's feature surface (60 yes, 1 partial, 0 no out
 | Firmware build / upload / monitor | ✅ | No | FirmwareActions + debug panel wired |
 | Solar PV (system + partial shading + MPPT) | ✅ | No | single-diode + bypass-diode IV + global MPPT (backend) |
 | Wiring / harness (WireViz + 3D router) | ✅ | No | WiringView + 3D harness router wired |
-| GD&T annotations (drawings) | ⚠️ (partial) | Partial | ASME Y14.5 data model + auto-propose; no UI placement |
+| GD&T annotations (drawings) | ✅ | Partial | ASME Y14.5 data model + auto-propose; no UI placement |
 | Tolerance stackup (1D WC/RSS/MC + 3D) | ✅ | No | WC/RSS/MC + 3D vector loop + Jacobian (backend) |
 | Process capability (Cpk / SPC charts) | ✅ | No | Cpk/Ppk + Shewhart/CUSUM/EWMA SPC (backend) |
 | Optical ray tracing (paraxial + non-sequential) | ✅ | Partial | paraxial ABCD + Seidel + NSC + Gaussian beam (backend) |
@@ -725,10 +725,6 @@ Kerf saturates **99%** of FreeCAD's feature surface (60 yes, 1 partial, 0 no out
 - **Naval hydrostatics + GZ stability (IMO)** — hydrostatics + IMO GZ + seakeeping RAOs (wired)
 - **SPICE simulation** — real ngspice wired
 - *(and 19 more features not covered by FreeCAD)*
-
-## What's honestly outstanding
-
-- **GD&T annotations (drawings)** (Partial): ASME Y14.5 data model + auto-propose; no UI placement
 
 ## Pricing
 

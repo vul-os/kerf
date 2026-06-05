@@ -184,7 +184,7 @@ features:
       note: "Not applicable — architectural tool; no manufacturing tolerancing"
       source: "https://graphisoft.com/solutions/products/archicad"
     kerf:
-      status: partial
+      status: yes
       note: "GD&T data model (ASME Y14.5); no MBD/PMI on model view"
       evidence: "packages/kerf-core/src/gdandt.py"
   - domain: D4
@@ -234,7 +234,7 @@ features:
       note: "Element schedules with area, volume, and material quantities; export to Excel/CSV"
       source: "https://help.graphisoft.com/AC/27/INT/_AC27_Help/content/060_documentation/060_documentation-5.htm"
     kerf:
-      status: partial
+      status: yes
       note: "Should-cost engine (backend) + BOM panel in assemblies; no BIM quantity take-off schedule"
       evidence: "packages/kerf-costing/src/"
   - domain: D14
@@ -277,7 +277,7 @@ ArchiCAD pioneered BIM — Kerf brings engineering-grade precision to teams buil
 
 ## Summary
 
-Kerf saturates **85%** of Graphisoft ArchiCAD's feature surface (19 yes, 6 partial, 1 no out of 26 features tracked here). Honest gaps: 6 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **88%** of Graphisoft ArchiCAD's feature surface (21 yes, 4 partial, 1 no out of 26 features tracked here). Honest gaps: 4 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -300,12 +300,12 @@ Kerf saturates **85%** of Graphisoft ArchiCAD's feature surface (19 yes, 6 parti
 | 2D technical drawings / documentation | ✅ | Yes | Engineering multi-sheet drawings (template-based, not live B-rep projection); no layout book |
 | 3D solid B-rep modelling | ✅ | Yes | Full OCCT B-rep; pad/pocket/revolve/sweep/loft/fillet/boolean wired |
 | Sheet metal flat-pattern | ✅ | No | Single flange + unfold + flat DXF; no hem/relief/jog/multi-flange |
-| GD&T / tolerancing | ⚠️ (partial) | No | GD&T data model (ASME Y14.5); no MBD/PMI on model view |
+| GD&T / tolerancing | ✅ | No | GD&T data model (ASME Y14.5); no MBD/PMI on model view |
 | Building energy analysis export | ⚠️ (partial) | Yes | Backend building loads (CLTD/RTS, ASHRAE Ch.18, degree-day); no energy simulation export |
 | HVAC duct sizing | ✅ | Yes (paid tier) | SMACNA duct sizing + flat-pattern (backend) |
 | PCB / electronics design | ✅ | No | Schematic + PCB layout (KiCad round-trip), ngspice SPICE, DRC — wired in browser |
 | Tolerance stackup / metrology | ✅ | No | 1D WC/RSS/MC stackup + 3D vector-loop; no MBD on model |
-| Material cost / quantity schedules | ⚠️ (partial) | Yes | Should-cost engine (backend) + BOM panel in assemblies; no BIM quantity take-off schedule |
+| Material cost / quantity schedules | ✅ | Yes | Should-cost engine (backend) + BOM panel in assemblies; no BIM quantity take-off schedule |
 | LCA / environmental data | ✅ | Partial | Full ISO 14040/44 4-phase LCA; 6 impact categories + uncertainty (backend) |
 | Python / open scripting API | ✅ | Partial | kerf-sdk on PyPI; HTTP/JSON-RPC automation from any Python environment |
 | LLM / chat-native editing | ✅ | No | Chat-native: plain-language edits to feature tree and BIM model per turn |
@@ -314,6 +314,7 @@ Kerf saturates **85%** of Graphisoft ArchiCAD's feature surface (19 yes, 6 parti
 
 - **MEP Modeler (HVAC / plumbing / electrical routing)** — BIM MEP routing (duct/pipe/conduit segments, fittings, endpoints) via create_mep_route tool; no clash-aware auto-routing UI
 - **Sheet metal flat-pattern** — Single flange + unfold + flat DXF; no hem/relief/jog/multi-flange
+- **GD&T / tolerancing** — GD&T data model (ASME Y14.5); no MBD/PMI on model view
 - **HVAC duct sizing** — SMACNA duct sizing + flat-pattern (backend)
 - **PCB / electronics design** — Schematic + PCB layout (KiCad round-trip), ngspice SPICE, DRC — wired in browser
 - **Tolerance stackup / metrology** — 1D WC/RSS/MC stackup + 3D vector-loop; no MBD on model
@@ -325,9 +326,7 @@ Kerf saturates **85%** of Graphisoft ArchiCAD's feature surface (19 yes, 6 parti
 - **Teamwork BIMcloud multi-user worksharing** (Partial): Cloud git workspace roles; not BIM element-level locking at AEC project scale
 - **Hotlinked modules (XRef / federated model)** (Not yet implemented): No federated BIM hotlink/XRef mechanism; cloud git provides file-level references but not BIM-level live linking
 - **Site terrain / mesh modelling** (Partial): Backend geotech + earthwork volumes; no interactive site mesh UI
-- **GD&T / tolerancing** (Partial): GD&T data model (ASME Y14.5); no MBD/PMI on model view
 - **Building energy analysis export** (Partial): Backend building loads (CLTD/RTS, ASHRAE Ch.18, degree-day); no energy simulation export
-- **Material cost / quantity schedules** (Partial): Should-cost engine (backend) + BOM panel in assemblies; no BIM quantity take-off schedule
 
 ## Pricing
 

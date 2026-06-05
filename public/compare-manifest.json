@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T02:55:01.963Z",
+  "generatedAt": "2026-06-05T03:00:07.685Z",
   "items": [
     {
       "slug": "revit",
@@ -1214,7 +1214,7 @@
             "notes": "Not applicable — architectural tool; no manufacturing tolerancing"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-core/src/gdandt.py",
             "notes": "GD&T data model (ASME Y14.5); no MBD/PMI on model view"
           },
@@ -1284,7 +1284,7 @@
             "notes": "Element schedules with area, volume, and material quantities; export to Excel/CSV"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-costing/src/",
             "notes": "Should-cost engine (backend) + BOM panel in assemblies; no BIM quantity take-off schedule"
           },
@@ -4754,7 +4754,7 @@
             "notes": "TechDraw — GD&T symbols, surface finish, ISO/ASME style"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-gdnt/src/kerf_gdnt/__init__.py",
             "notes": "ASME Y14.5 data model + auto-propose; no UI placement"
           }

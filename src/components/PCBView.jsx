@@ -340,6 +340,51 @@ export default function PCBView({ circuitJson, highlightRefdes = null, onSelectR
   const handleReset = useCallback(() => setView({ tx: 0, ty: 0, scale: 1 }), [])
 
   // ---- Tool cursor tracking -------------------------------------------------
+  // ---- DiffPairTool mouse-move: update live shove preview ------------------
+  // NB: declared before handleSvgMouseMove because that callback lists it in its
+  // dependency array — a forward reference here is a temporal-dead-zone crash.
+  const handleDiffPairMove = useCallback((cursor) => {
+    if (activeTool !== 'diffpair' || !diffPairState || !cursor) return
+    const { start, layer, spacingMm } = diffPairState
+    const { pos, neg, centreline } = routeDiffPairCentreline(start, cursor, spacingMm)
+
+    // Extract existing traces from circuitJson for shove simulation.
+    const existingTraces = Array.isArray(circuitJson)
+      ? circuitJson
+          .filter(e => e.type === 'pcb_trace' && e.layer === layer)
+          .map(e => ({
+            id: e.pcb_trace_id || e.id,
+            netId: e.net_id || '',
+            layer: e.layer,
+            widthMm: e.width_mm ?? 0.25,
+            points: e.points || [],
+          }))
+      : []
+
+    // Shove against first leg of the centreline (representative segment).
+    const seg0End = centreline.length > 1 ? centreline[1] : cursor
+    const { shovedIds } = shovePairClearance(
+      existingTraces,
+      start,
+      seg0End,
+      layer,
+      [],   // netIds excluded — none yet (pair not committed)
+      0.2,  // clearance mm
+      0.25, // new trace width
+    )
+
+    // Length-match the two arms.
+    const matched = diffPairLengthMatch(pos, neg, 0.05)
+
+    setDiffPairPreview({
+      pos: matched.pos,
+      neg: matched.neg,
+      centreline,
+      shovedIds,
+      skewMm: matched.skewMm,
+    })
+  }, [activeTool, diffPairState, circuitJson])
+
   const handleSvgMouseMove = useCallback((e) => {
     if (!containerRef.current) return
     const r = containerRef.current.getBoundingClientRect()
@@ -401,49 +446,6 @@ export default function PCBView({ circuitJson, highlightRefdes = null, onSelectR
       })
     }
   }, [activeTool, cursorPos, pourInProgress, view.scale, layerMode])
-
-  // ---- DiffPairTool mouse-move: update live shove preview ------------------
-  const handleDiffPairMove = useCallback((cursor) => {
-    if (activeTool !== 'diffpair' || !diffPairState || !cursor) return
-    const { start, layer, spacingMm } = diffPairState
-    const { pos, neg, centreline } = routeDiffPairCentreline(start, cursor, spacingMm)
-
-    // Extract existing traces from circuitJson for shove simulation.
-    const existingTraces = Array.isArray(circuitJson)
-      ? circuitJson
-          .filter(e => e.type === 'pcb_trace' && e.layer === layer)
-          .map(e => ({
-            id: e.pcb_trace_id || e.id,
-            netId: e.net_id || '',
-            layer: e.layer,
-            widthMm: e.width_mm ?? 0.25,
-            points: e.points || [],
-          }))
-      : []
-
-    // Shove against first leg of the centreline (representative segment).
-    const seg0End = centreline.length > 1 ? centreline[1] : cursor
-    const { shovedIds } = shovePairClearance(
-      existingTraces,
-      start,
-      seg0End,
-      layer,
-      [],   // netIds excluded — none yet (pair not committed)
-      0.2,  // clearance mm
-      0.25, // new trace width
-    )
-
-    // Length-match the two arms.
-    const matched = diffPairLengthMatch(pos, neg, 0.05)
-
-    setDiffPairPreview({
-      pos: matched.pos,
-      neg: matched.neg,
-      centreline,
-      shovedIds,
-      skewMm: matched.skewMm,
-    })
-  }, [activeTool, diffPairState, circuitJson])
 
   // ---- DiffPairTool click ---------------------------------------------------
   const handleDiffPairClick = useCallback((e) => {

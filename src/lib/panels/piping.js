@@ -24,4 +24,13 @@ export default [
     load: () => import('../../components/piping/PipingCataloguePanel.jsx'),
     label: 'Piping Component Catalogue (ASME B16.9/B16.5)',
   },
+  {
+    // Multi-discipline federated plant model + cross-discipline coordination
+    // (structural/HVAC/piping/civil/equipment in shared 3D coordinate space)
+    id: 'plant_coordination',
+    kinds: ['plant_coordination', 'plant_federation', 'multi_discipline_plant'],
+    exts: ['.plant', '.plantmodel'],
+    load: () => import('../../components/piping/PlantCoordinationPanel.jsx'),
+    label: 'Plant Coordination (Multi-Discipline)',
+  },
 ]

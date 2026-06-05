@@ -134,6 +134,9 @@ _TOOL_MODULES = [
     "kerf_cad_core.piping.tools",
     # Wave 12B: AVEVA E3D parity (piping catalog + multi-discipline + concurrent)
     "kerf_cad_core.piping.piping_advanced_tools",
+    # Multi-discipline federated plant model + cross-discipline coordination
+    # (plant_model_assemble, plant_coordination_check — AVEVA E3D parity)
+    "kerf_cad_core.piping.plant_coordination_tools",
     "kerf_cad_core.hvac.tools",
     "kerf_cad_core.turning.tools",
     "kerf_cad_core.steelconn.tools",

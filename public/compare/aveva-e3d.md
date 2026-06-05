@@ -64,9 +64,9 @@ features:
       note: "Structural, civil, HVAC, cable tray, equipment — all disciplines in one AVEVA E3D model"
       source: "https://www.aveva.com/en/products/e3d-design/"
     kerf:
-      status: partial
-      note: "Structural FEA, HVAC sizing, civil — separate packages but not a unified plant model"
-      evidence: "packages/kerf-structural/"
+      status: yes
+      note: "PlantModel federates structural members, HVAC ducts, pipe routes, civil/equipment in a shared 3D coordinate space (metres, right-hand Z-up). Cross-discipline coordination: AABB-based hard-clash detection (pipe-through-beam, duct-through-column, equipment-vs-structure) + soft-clash clearance checking per discipline pair (ASME B31.3 §321 25 mm pipe-to-structure; SMACNA §5.4 50 mm duct-to-pipe; AISC §B3.9 100 mm equipment-to-structure). CoordinationReport groups clashes by discipline pair with location, gap_m, severity (critical/major/minor). Combined BOM rollup and spatial zone summary across all disciplines. LLM tools: plant_model_assemble, plant_coordination_check. Frontend: PlantCoordinationPanel with discipline legend, clash list, iso AABB view, BOM per discipline. Honest gaps: AABB geometry only (no swept/curved solids); no live concurrent multi-user design."
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/piping/plant_coordination.py, packages/kerf-cad-core/src/kerf_cad_core/piping/plant_coordination_tools.py, src/components/piping/PlantCoordinationPanel.jsx"
   - domain: D13
     feature: "Global multi-user concurrent design"
     competitor:
@@ -127,7 +127,7 @@ The enterprise piping and plant design platform — versus an open-core CAD with
 
 ## Summary
 
-Kerf saturates **86%** of AVEVA E3D Design's feature surface (8 yes, 3 partial, 0 no out of 11 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap).
+Kerf saturates **91%** of AVEVA E3D Design's feature surface (9 yes, 2 partial, 0 no out of 11 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -138,7 +138,7 @@ Kerf saturates **86%** of AVEVA E3D Design's feature surface (8 yes, 3 partial, 
 | Isometric drawing generation | ✅ | Yes | Isometric drawing generation from P&ID data (backend) |
 | P&ID integration / data synchronisation | ✅ | Yes | P&ID authoring with PID symbols; backend engine wired |
 | Clash detection (hard/soft) | ✅ | Yes | Clash detection in assembly (OBB-SAT + BVH backend); no P&ID/plant-specific clash UI |
-| Multi-discipline plant design (structural/HVAC/civil) | ⚠️ (partial) | Yes | Structural FEA, HVAC sizing, civil — separate packages but not a unified plant model |
+| Multi-discipline plant design (structural/HVAC/civil) | ✅ | Yes | PlantModel federates structural/HVAC/piping/civil/equipment in shared 3D coordinate space; AABB hard+soft clash detection per discipline-pair clearance rules (ASME B31.3/SMACNA/AISC); coordination report grouped by pair; combined BOM rollup; LLM tools: plant_model_assemble, plant_coordination_check. Gap: AABB geometry only; no live concurrent multi-user design. |
 | Global multi-user concurrent design | ⚠️ (partial) | Yes | Cloud git workspace with branch/merge; not real-time concurrent design at plant-model scale |
 | Laser scan / point cloud integration | ⚠️ (partial) | Yes | PLY ASCII + binary, XYZ text, LAS ingest; voxel-grid downsample (Zhang 2003); statistical outlier removal (SOR, Rusu ... |
 | HVAC duct sizing | ✅ | Yes | SMACNA duct sizing + flat-pattern (backend) |
@@ -147,7 +147,6 @@ Kerf saturates **86%** of AVEVA E3D Design's feature surface (8 yes, 3 partial, 
 
 ## What's honestly outstanding
 
-- **Multi-discipline plant design (structural/HVAC/civil)** (Partial): Structural FEA, HVAC sizing, civil — separate packages but not a unified plant model
 - **Global multi-user concurrent design** (Partial): Cloud git workspace with branch/merge; not real-time concurrent design at plant-model scale
 - **Laser scan / point cloud integration** (Partial): PLY ASCII + binary, XYZ text, LAS ingest; voxel-grid downsample (Zhang 2003); statistical outlier removal (SOR, Rusu & Cousins 2011); AABB; RANSAC plane fit (Fischler & Bolles 1981) for as-built floor/wall/pipe-rack extraction; cloud-to-mesh signed deviation (Eberly 2003) for scan-vs-model QA; isometric canvas viewport with deviation heatmap and stats sidebar; LLM tools: pointcloud_import, pointcloud_deviation_check, pointcloud_fit_plane. Missing: interactive 3D plant overlay, E3D-style brownfield pipe routing against scan, automated pipe-segment detection.
 

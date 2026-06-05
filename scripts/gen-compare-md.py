@@ -220,9 +220,22 @@ def generate_body(item):
     # Pricing
     category = item.get('category', '')
     is_paid_competitor = False
+    _PROP = ('proprietary', 'commercial-licensed', 'commercial license', 'subscription',
+             'commercial product', 'commercial-grade', 'closed-source')
     for feat in features:
-        cs, _ = extract_competitor(feat.get('competitor', ''))
+        cs, cn = extract_competitor(feat.get('competitor', ''))
         if cs == 'paid':
+            is_paid_competitor = True
+            break
+        # A competitor whose own notes describe it as proprietary / commercial /
+        # subscription is NOT free-and-open-source — don't mislabel it.
+        if any(k in (cn or '').lower() for k in _PROP):
+            is_paid_competitor = True
+            break
+        # Heuristic: an "open-source" feature row where the competitor is "no"
+        # means the competitor is closed-source.
+        name = (feat.get('name') or feat.get('feature') or '').lower()
+        if 'open-source' in name and cs in ('no', 'false'):
             is_paid_competitor = True
             break
 

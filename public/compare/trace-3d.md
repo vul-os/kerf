@@ -119,4 +119,4 @@ Kerf saturates **93%** of Trane TRACE 3D Plus's feature surface (6 yes, 1 partia
 
 ## Pricing
 
-Trane TRACE 3D Plus is free and open-source. Kerf is also MIT open-core: free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — MIT licensed throughout.
+Trane TRACE 3D Plus is a commercial product; pricing varies by tier, seat count, and region. Kerf is MIT open-core: the full feature set is free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — the MIT licence means you can inspect, fork, and self-host the entire codebase.

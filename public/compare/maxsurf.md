@@ -156,4 +156,4 @@ Kerf saturates **95%** of Bentley Maxsurf's feature surface (10 yes, 1 partial, 
 
 ## Pricing
 
-Bentley Maxsurf is free and open-source. Kerf is also MIT open-core: free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — MIT licensed throughout.
+Bentley Maxsurf is a commercial product; pricing varies by tier, seat count, and region. Kerf is MIT open-core: the full feature set is free to run locally (single Go binary, Postgres required). A hosted option with pay-as-you-go billing is available for teams that don't want to self-host. No feature gates — the MIT licence means you can inspect, fork, and self-host the entire codebase.

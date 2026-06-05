@@ -80,9 +80,9 @@ features:
       note: "Mooney-Rivlin, Ogden, Yeoh hyperelastic models"
       source: "https://www.ansys.com/products/structures/ansys-mechanical"
     kerf:
-      status: no
-      note: "Hyperelastic material models (Mooney-Rivlin/Ogden) not yet implemented"
-      evidence: ""
+      status: partial
+      note: "Neo-Hookean/Mooney-Rivlin/Ogden constitutive models + Cauchy stress + tangent (material-point); no full hyperelastic FEM block solver yet"
+      evidence: "packages/kerf-fem/src/kerf_fem/hyperelastic/models.py"
 
   - domain: D2
     feature: "Contact (friction / gap, penalty / augmented-Lagrange)"
@@ -125,8 +125,8 @@ features:
       source: "https://www.cadfem.net/en/cadfem-informs/newsroom/ansys-release/ansys-release-2025-structures.html"
     kerf:
       status: partial
-      note: "J-integral + SIF extraction; no XFEM / SMART crack-growth propagation yet"
-      evidence: "packages/kerf-fem/src/kerf_fem/fracture/j_integral.py"
+      note: "J-integral + SIF + Paris-law crack growth (da/dN) + Erdogan-Sih mixed-mode kink; geometry-factor SIFs, not full XFEM enrichment"
+      evidence: "packages/kerf-fem/src/kerf_fem/fracture/crack_growth.py"
 
   - domain: D2
     feature: "Explicit dynamics (impact / drop)"
@@ -214,7 +214,7 @@ The structural-FEA gold standard — compared honestly against MIT open-core.
 
 ## Summary
 
-Kerf saturates **83%** of Ansys Mechanical's feature surface (14 yes, 2 partial, 2 no out of 18 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap); 2 features not yet implemented.
+Kerf saturates **86%** of Ansys Mechanical's feature surface (14 yes, 3 partial, 1 no out of 18 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -226,11 +226,11 @@ Kerf saturates **83%** of Ansys Mechanical's feature surface (14 yes, 2 partial,
 | Random vibration (PSD) + response spectrum | ✅ | Yes | Random-vibration PSD response; SRSS/CQC response-spectrum analysis |
 | Eigenvalue buckling | ✅ | Yes | Eigenvalue buckling solver |
 | Nonlinear — metal plasticity (J2) | ✅ | Yes | J2 plasticity + Total-Lagrangian large-strain + Riks arc-length |
-| Nonlinear — hyperelastic (rubber/elastomer) | 🔴 (no) | Yes | Hyperelastic material models (Mooney-Rivlin/Ogden) not yet implemented |
+| Nonlinear — hyperelastic (rubber/elastomer) | ⚠️ (partial) | Yes | Neo-Hookean/Mooney-Rivlin/Ogden constitutive models + Cauchy stress + tangent (material-point); no full hyperelastic ... |
 | Contact (friction / gap, penalty / augmented-Lagrange) | ⚠️ (partial) | Yes | Node-to-surface penalty contact + Hertz closed-form; not full self-contact / augmented-Lagrange depth |
 | Steady + transient thermal; thermal-structural coupling | ✅ | Yes | Steady/transient thermal + thermal-structural coupling |
 | Fatigue / durability (S-N, E-N, mean-stress) | ✅ | Yes | S-N (Basquin) + E-N (Coffin-Manson) + rainflow + Goodman/Gerber/SWT + Haigh diagram |
-| Fracture mechanics (J-integral, crack growth) | ⚠️ (partial) | Yes | J-integral + SIF extraction; no XFEM / SMART crack-growth propagation yet |
+| Fracture mechanics (J-integral, crack growth) | ⚠️ (partial) | Yes | J-integral + SIF + Paris-law crack growth (da/dN) + Erdogan-Sih mixed-mode kink; geometry-factor SIFs, not full XFEM ... |
 | Explicit dynamics (impact / drop) | ✅ | Yes | Central-difference leapfrog explicit; CFL time-step |
 | Composite layered shells (Tsai-Wu / Hashin) | ✅ | Yes | CLT [A\|B\|D] + Tsai-Wu/Hill/Hashin first-ply-failure + interlaminar |
 | Structural acoustics (harmonic / modal) | ✅ | Yes | ISO 9613 propagation + RT60 + mass-law TL + wave SEA |
@@ -246,9 +246,9 @@ Kerf saturates **83%** of Ansys Mechanical's feature surface (14 yes, 2 partial,
 
 ## What's honestly outstanding
 
-- **Nonlinear — hyperelastic (rubber/elastomer)** (Not yet implemented): Hyperelastic material models (Mooney-Rivlin/Ogden) not yet implemented
+- **Nonlinear — hyperelastic (rubber/elastomer)** (Partial): Neo-Hookean/Mooney-Rivlin/Ogden constitutive models + Cauchy stress + tangent (material-point); no full hyperelastic FEM block solver yet
 - **Contact (friction / gap, penalty / augmented-Lagrange)** (Partial): Node-to-surface penalty contact + Hertz closed-form; not full self-contact / augmented-Lagrange depth
-- **Fracture mechanics (J-integral, crack growth)** (Partial): J-integral + SIF extraction; no XFEM / SMART crack-growth propagation yet
+- **Fracture mechanics (J-integral, crack growth)** (Partial): J-integral + SIF + Paris-law crack growth (da/dN) + Erdogan-Sih mixed-mode kink; geometry-factor SIFs, not full XFEM enrichment
 - **Additive manufacturing process simulation** (Not yet implemented): AM thermal-distortion process simulation not yet implemented
 
 ## Pricing

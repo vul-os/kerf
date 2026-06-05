@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T03:54:23.974Z",
+  "generatedAt": "2026-06-05T03:57:53.450Z",
   "items": [
     {
       "slug": "revit",
@@ -13654,9 +13654,9 @@
             "notes": "Mooney-Rivlin, Ogden, Yeoh hyperelastic models"
           },
           "kerf": {
-            "status": "no",
-            "evidence": "",
-            "notes": "Hyperelastic material models (Mooney-Rivlin/Ogden) not yet implemented"
+            "status": "partial",
+            "evidence": "packages/kerf-fem/src/kerf_fem/hyperelastic/models.py",
+            "notes": "Neo-Hookean/Mooney-Rivlin/Ogden constitutive models + Cauchy stress + tangent (material-point); no full hyperelastic FEM block solver yet"
           },
           "name": "Nonlinear — hyperelastic (rubber/elastomer)"
         },
@@ -13711,8 +13711,8 @@
           },
           "kerf": {
             "status": "partial",
-            "evidence": "packages/kerf-fem/src/kerf_fem/fracture/j_integral.py",
-            "notes": "J-integral + SIF extraction; no XFEM / SMART crack-growth propagation yet"
+            "evidence": "packages/kerf-fem/src/kerf_fem/fracture/crack_growth.py",
+            "notes": "J-integral + SIF + Paris-law crack growth (da/dN) + Erdogan-Sih mixed-mode kink; geometry-factor SIFs, not full XFEM enrichment"
           },
           "name": "Fracture mechanics (J-integral, crack growth)"
         },

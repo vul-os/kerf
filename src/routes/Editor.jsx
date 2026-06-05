@@ -87,6 +87,10 @@ import CrownSculptingPanel from '../components/dental/CrownSculptingPanel.jsx'
 import ImplantLibrary from '../components/dental/ImplantLibrary.jsx'
 import SurgicalGuide from '../components/dental/SurgicalGuide.jsx'
 import DerivedCacheOverlay from '../components/DerivedCacheOverlay.jsx'
+import NestingLayoutView from '../components/NestingLayoutView.jsx'
+import SPCChartPanel from '../components/SPCChartPanel.jsx'
+import CMMInspectionPanel from '../components/CMMInspectionPanel.jsx'
+import CostBreakdownPanel from '../components/CostBreakdownPanel.jsx'
 
 // ---------------------------------------------------------------------------
 // Build3DDropdown — toolbar dropdown in the sketch header that scaffolds a
@@ -769,6 +773,34 @@ function isDentalGuideFile(file) {
   if (file.kind === 'dental.guide') return true
   const n = (file.name || '').toLowerCase()
   return n.endsWith('.dental.guide')
+}
+
+function isNestFile(file) {
+  if (!file) return false
+  if (file.kind === 'nest') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.nest')
+}
+
+function isSPCFile(file) {
+  if (!file) return false
+  if (file.kind === 'spc') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.spc')
+}
+
+function isCMMFile(file) {
+  if (!file) return false
+  if (file.kind === 'cmm') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.cmm')
+}
+
+function isCostReportFile(file) {
+  if (!file) return false
+  if (file.kind === 'cost_report') return true
+  const n = (file.name || '').toLowerCase()
+  return n.endsWith('.cost_report')
 }
 
 // ---------------------------------------------------------------------------
@@ -1495,6 +1527,10 @@ export default function Editor() {
   const dentalCrownFile   = isDentalCrownFile(w.currentFile)
   const dentalImplantFile = isDentalImplantFile(w.currentFile)
   const dentalGuideFile   = isDentalGuideFile(w.currentFile)
+  const nestFile      = isNestFile(w.currentFile)
+  const spcFile       = isSPCFile(w.currentFile)
+  const cmmFile       = isCMMFile(w.currentFile)
+  const costReportFile = isCostReportFile(w.currentFile)
   // T-116: plain-text / code files — matched by extension via editorModes.js.
   // Must be checked AFTER all dedicated-extension checks above so that e.g.
   // a .json family file is not accidentally grabbed by the plain editor.
@@ -2257,6 +2293,36 @@ export default function Editor() {
           ) : dentalGuideFile ? (
             <div className="flex-1 min-h-0 overflow-y-auto">
               <SurgicalGuide projectId={projectId} />
+            </div>
+          ) : nestFile ? (
+            <div className="flex-1 min-h-0 overflow-auto p-3">
+              <NestingLayoutView
+                parsedContent={(() => {
+                  try { return JSON.parse(w.currentFileContent || '') } catch { return null }
+                })()}
+                fileName={w.currentFile?.name}
+              />
+            </div>
+          ) : spcFile ? (
+            <div className="flex-1 min-h-0 overflow-auto p-3">
+              <SPCChartPanel
+                rawContent={w.currentFileContent}
+                fileName={w.currentFile?.name}
+              />
+            </div>
+          ) : cmmFile ? (
+            <div className="flex-1 min-h-0 overflow-auto p-3">
+              <CMMInspectionPanel
+                rawContent={w.currentFileContent}
+                fileName={w.currentFile?.name}
+              />
+            </div>
+          ) : costReportFile ? (
+            <div className="flex-1 min-h-0 overflow-auto p-3">
+              <CostBreakdownPanel
+                rawContent={w.currentFileContent}
+                fileName={w.currentFile?.name}
+              />
             </div>
           ) : energyBldgFile ? (
             <div className="flex-1 min-h-0 overflow-y-auto">

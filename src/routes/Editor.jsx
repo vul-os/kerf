@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Share2, Save, Loader2, ArrowLeft, Check, X, RotateCcw, Undo2, Redo2, GitBranch, MessageSquare, PanelRightClose, PanelRightOpen, PanelLeftOpen, PanelLeftClose, Plus, Box, SlidersHorizontal, ChevronDown, ArrowRight, RotateCw, Activity as ActivityIcon, FileDown, LogOut, UserCog, Settings, CreditCard, Users } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -59,6 +59,7 @@ import { mateRefFromPick, parseAssembly } from '../lib/assembly.js'
 import { _internalLoops } from '../lib/sketchGeom2.js'
 import FileEditor from '../components/FileEditor.jsx'
 import { isTextCodeFile } from '../lib/editorModes.js'
+import { resolvePanelEntry } from '../lib/panelRegistry.js'
 import UnsavedRestoreBanner from '../components/UnsavedRestoreBanner.jsx'
 import Modal from '../components/Modal.jsx'
 import TopBarMoreMenu from '../components/TopBarMoreMenu.jsx'
@@ -1535,6 +1536,10 @@ export default function Editor() {
   // Must be checked AFTER all dedicated-extension checks above so that e.g.
   // a .json family file is not accidentally grabbed by the plain editor.
   const textCodeFile = isTextCodeFile(w.currentFile)
+  // Registry-resolved feature panel (wired via src/lib/panelRegistry.js) — takes
+  // precedence over the plain-text/code fallback so a registered file-kind opens
+  // its panel instead of the raw editor.
+  const registryEntry = resolvePanelEntry(w.currentFile)
   // Resolver used by FeatureView to fetch sketch contents on demand. We
   // re-read the latest file content rather than relying on the cached
   // sketch parse from the workspace store (which may be stale if the user
@@ -2625,6 +2630,18 @@ export default function Editor() {
                   : {})}
                 className="w-full"
               />
+            </div>
+          ) : registryEntry ? (
+            /* Registry-wired feature panel (panelRegistry.js) — lazy-loaded. */
+            <div className="flex-1 min-h-0 overflow-auto">
+              <Suspense fallback={<div className="p-6 text-ink-500 text-sm">Loading {registryEntry.label || 'panel'}…</div>}>
+                <registryEntry.Panel
+                  file={w.currentFile}
+                  content={w.currentFileContent}
+                  projectId={projectId}
+                  fileId={w.currentFileId}
+                />
+              </Suspense>
             </div>
           ) : textCodeFile ? (
             /* T-116: plain-text / code files open full-bleed in the FileEditor

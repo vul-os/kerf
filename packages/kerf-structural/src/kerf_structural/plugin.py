@@ -9,7 +9,8 @@ Registers:
                 structural_cfs_flexure, structural_cfs_compression,
                 structural_cfs_web_crippling,
                 structural_masonry_flexure, structural_masonry_shear,
-                structural_masonry_axial
+                structural_masonry_axial,
+                structural_aci_column_axial, structural_aci_column_pm
 """
 
 from __future__ import annotations
@@ -64,6 +65,14 @@ async def register(app: FastAPI, ctx):
     ctx.tools.register("structural_masonry_shear",   masonry_shear_spec,   run_masonry_shear)
     ctx.tools.register("structural_masonry_axial",   masonry_axial_spec,   run_masonry_axial)
 
+    # ACI 318-19 Column design — axial capacity + P-M interaction diagram
+    from kerf_structural.aci_column import (
+        aci_column_axial_spec, run_aci_column_axial,
+        aci_column_pm_spec,    run_aci_column_pm,
+    )
+    ctx.tools.register("structural_aci_column_axial", aci_column_axial_spec, run_aci_column_axial)
+    ctx.tools.register("structural_aci_column_pm",    aci_column_pm_spec,    run_aci_column_pm)
+
     provides = [
         "structural.rc-beam",
         "structural.steel-beam",
@@ -79,6 +88,8 @@ async def register(app: FastAPI, ctx):
         "structural.masonry-flexure",
         "structural.masonry-shear",
         "structural.masonry-axial",
+        "structural.aci-column-axial",
+        "structural.aci-column-pm",
     ]
 
     try:

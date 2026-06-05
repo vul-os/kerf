@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T04:00:31.563Z",
+  "generatedAt": "2026-06-05T04:11:02.001Z",
   "items": [
     {
       "slug": "revit",
@@ -1421,7 +1421,7 @@
             "notes": "NC (DSTV) for steel fabrication machines"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "",
             "notes": "No DSTV NC1 fabrication export for steel CNC machines yet"
           },

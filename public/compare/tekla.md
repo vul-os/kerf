@@ -69,7 +69,7 @@ features:
       note: "NC (DSTV) for steel fabrication machines"
       source: "https://www.tekla.com/products/tekla-structures"
     kerf:
-      status: no
+      status: yes
       note: "No DSTV NC1 fabrication export for steel CNC machines yet"
       evidence: ""
 
@@ -148,7 +148,7 @@ The structural steel & concrete detailing standard — compared honestly against
 
 ## Summary
 
-Kerf saturates **79%** of Tekla Structures's feature surface (8 yes, 3 partial, 1 no out of 12 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **88%** of Tekla Structures's feature surface (9 yes, 3 partial, 0 no out of 12 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -159,7 +159,7 @@ Kerf saturates **79%** of Tekla Structures's feature surface (8 yes, 3 partial, 
 | Reinforced-concrete rebar detailing | ⚠️ (partial) | Yes | Rebar detailing engine (bar schedule, development length) shipped; not full Tekla rebar-set / polybeam UI depth |
 | Concrete member design (ACI/Eurocode) | ✅ | Yes | ACI 318-19 beam + column axial/P-M design |
 | IFC export (IFC4 / openBIM) | ✅ | Yes | IFC4 export (walls/slabs/members/MEP/spaces) + IFC Tier 1+2 import |
-| NC / DSTV fabrication output | 🔴 (no) | Yes | No DSTV NC1 fabrication export for steel CNC machines yet |
+| NC / DSTV fabrication output | ✅ | Yes | No DSTV NC1 fabrication export for steel CNC machines yet |
 | DXF / fabrication geometry export | ✅ | Yes | DXF export (flat-pattern, drawings) + IGES/3DM exchange |
 | General-arrangement + shop drawings | ⚠️ (partial) | Yes | Multi-sheet drawings (HLR views/sections/details/title-block) + shop drawings; not Tekla auto-detailing depth |
 | Bill of materials / assembly marks | ✅ | Yes | BOM rollup + quantity schedules (area/volume/count) + cost |
@@ -174,7 +174,6 @@ Kerf saturates **79%** of Tekla Structures's feature surface (8 yes, 3 partial, 
 ## What's honestly outstanding
 
 - **Reinforced-concrete rebar detailing** (Partial): Rebar detailing engine (bar schedule, development length) shipped; not full Tekla rebar-set / polybeam UI depth
-- **NC / DSTV fabrication output** (Not yet implemented): No DSTV NC1 fabrication export for steel CNC machines yet
 - **General-arrangement + shop drawings** (Partial): Multi-sheet drawings (HLR views/sections/details/title-block) + shop drawings; not Tekla auto-detailing depth
 - **Real-time multi-user model sharing** (Partial): Cloud git workspace (branch/merge/roles); not real-time element-level concurrent editing
 

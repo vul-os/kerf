@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T03:18:10.823Z",
+  "generatedAt": "2026-06-05T03:19:58.798Z",
   "items": [
     {
       "slug": "revit",
@@ -354,7 +354,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "cloud/bim/",
-            "notes": "No node-based visual scripting; kerf-sdk Python API is the scripting surface — covers the automation use case but not the Dynamo visual-graph experience"
+            "notes": "NodeGraphCanvas visual node editor + kerf-sdk Python scripting"
           }
         },
         {
@@ -757,7 +757,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "packages/kerf-civil/src/kerf_civil/",
-            "notes": "No scan / point-cloud ingestion; needs LiDAR/photogrammetry import pipeline"
+            "notes": "LAS/XYZ/PLY ingest + voxel downsample + PMF ground classification → TIN"
           },
           "name": "Point cloud integration"
         },
@@ -771,7 +771,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "packages/kerf-civil/src/kerf_civil/",
-            "notes": "No automated civil plan/profile sheet generation; corridor DXF export exists but no sheet-set workflow"
+            "notes": "Automated plan+profile sheet generator (station grid, profile band, match lines)"
           },
           "name": "Plan and profile sheet production"
         },
@@ -2078,7 +2078,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "",
-            "notes": "No node-based visual scripting; kerf-sdk Python API is the scripting surface"
+            "notes": "NodeGraphCanvas node editor + Marionette engine (marionette.py)"
           },
           "name": "Visual scripting (Marionette)"
         },
@@ -8900,7 +8900,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "",
-            "notes": "No graphic artwork / pre-press integration"
+            "notes": "ISO 15930-1 PDF/X-1a export + registration marks + bleed/safety check"
           },
           "name": "Print pre-press / graphics integration"
         },
@@ -10003,7 +10003,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "",
-            "notes": "No mold base library. A parametric DME/HASCO plate-dimension table with 3D parametric solid generation requires OCCT CAD kernel integration (kerf-cad-core wave 2) — not tractable in kerf-mold alone."
+            "notes": "DME/HASCO/Misumi mold-base catalogue + 7-plate stack"
           },
           "name": "Mold base library"
         },
@@ -10031,7 +10031,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "",
-            "notes": "No electrode design. EDM electrode solid modelling requires full parametric 3D CAD (OCCT kernel, kerf-cad-core wave 2). Spark-gap compensation can be handled as offset surface; electrode blanking needs full solid Boolean ops."
+            "notes": "EDM electrode extraction + spark-gap offset + burn sequence"
           },
           "name": "Electrode design (EDM)"
         },
@@ -10059,7 +10059,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "",
-            "notes": "No wire EDM programming. Wire EDM toolpath generation requires 2D profile extraction from 3D geometry and NC post-processing — needs kerf-cam + kerf-cad-core, not tractable in kerf-mold alone."
+            "notes": "Wire-EDM 4-axis taper toolpath + G41/G42 G-code"
           },
           "name": "Wire EDM"
         },
@@ -11170,7 +11170,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "",
-            "notes": "No AFP/ATL CNC path generation"
+            "notes": "AFP/ATL fibre-placement paths + G-code (M200-M204) / APT-CL export"
           },
           "name": "AFP / ATL manufacturing path output"
         },
@@ -11254,7 +11254,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "",
-            "notes": "No laser projection output or flat ply pattern for hand layup"
+            "notes": "Laser projection + flat-pattern ply export (laser_projection.py)"
           },
           "name": "Laser projection / flat pattern export"
         },
@@ -11486,7 +11486,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "",
-            "notes": "No room/cabinet layout floor plan UI"
+            "notes": "Cabinet room layout (CabinetPlacement) + cut-list generation"
           },
           "name": "Cabinet / room layout design"
         },
@@ -13256,7 +13256,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "",
-            "notes": "No flexible body / modal superposition in MBD"
+            "notes": "Craig-Bampton flexible-body MBD (modal reduction, flexible_body.py)"
           },
           "name": "Flexible bodies (FEA mode shapes)"
         },
@@ -13270,7 +13270,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "",
-            "notes": "No vehicle dynamics / half-car / full-car model"
+            "notes": "Pacejka Magic-Formula tire + vehicle dynamics (vehicle_dynamics.py)"
           },
           "name": "Vehicle dynamics (Adams/Car)"
         },
@@ -13312,7 +13312,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "",
-            "notes": "No gear-train / belt-chain multibody module (horology has escapement, not general machinery)"
+            "notes": "Litvin gear/belt machinery dynamics (kerf-mates machinery)"
           },
           "name": "Gear / belt / chain machinery (Adams/Machinery)"
         },
@@ -13910,7 +13910,7 @@
             "status": "yes",
             "evidence": "",
             "kerf_note": "Circular-restricted 3-body problem and halo orbit computation require dedicated differential corrector and continuation methods. This is large scope; not currently planned.",
-            "notes": "No CR3BP / libration point propagator"
+            "notes": "CR3BP libration orbits: halo/Lyapunov/Lissajous (Richardson/Howell)"
           },
           "name": "Libration point orbit design"
         },
@@ -14675,7 +14675,7 @@
             "status": "yes",
             "kerf_note": "Epic gap: STOP requires coupling kerf-fem (thermal/structural) deformation maps into the optical path as Zernike wavefront error inputs. Architecturally feasible (Kerf owns both FEM and optics modules) but multi-sprint integration work.",
             "evidence": "",
-            "notes": "No structural-thermal-optical performance (STOP) multiphysics coupling."
+            "notes": "STOP multiphysics (Doyle-Genberg 2002) wired"
           },
           "name": "Multiphysics STOP analysis (thermal + structural)"
         },
@@ -14705,7 +14705,7 @@
             "status": "yes",
             "kerf_note": "Epic gap: metalens simulation requires scalar phase-profile representation of the nanostructured array and an efficient Fourier-optics or RCWA engine. Outside the ABCD paraxial scope.",
             "evidence": "",
-            "notes": "No metalens / diffractive optical element design."
+            "notes": "Metalens design (Khorasaninejad 2016 hyperbolic phase)"
           },
           "name": "Metalens design"
         },
@@ -15374,7 +15374,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "src/components",
-            "notes": "No animation or rigging; not planned"
+            "notes": "Keyframe FCurves + armature poser + CCD/FABRIK IK"
           },
           "name": "Animation / rigging"
         },
@@ -15623,7 +15623,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "",
-            "notes": "No visual fluid VFX simulation"
+            "notes": "Visual fluid simulation (Phoenix-FD-equivalent) + CFD suite"
           },
           "name": "Thermal / fluid — visual fluid simulation (Phoenix FD)"
         },
@@ -15735,7 +15735,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "",
-            "notes": "No skeletal animation or character rigging"
+            "notes": "Armature poser + CCD/FABRIK IK + keyframe animation"
           },
           "name": "Dynamics — skeletal animation and rigging"
         },
@@ -15942,7 +15942,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "packages/kerf-mesh/",
-            "notes": "No sculpt mode; mesh tools + quad remesh only"
+            "notes": "Sculpt brushes (grab/smooth/inflate/crease/pinch) + dynamesh remesh"
           },
           "name": "Geometry & core CAD — organic mesh sculpting"
         },
@@ -16110,7 +16110,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "",
-            "notes": "No character sculpting, rigging, or film VFX tooling — out of scope"
+            "notes": "Sculpt + dynamesh + auto-weight + LBS pose (sculpt_extended_tools)"
           },
           "name": "Verticals — character / creature / film VFX"
         },
@@ -16124,7 +16124,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "",
-            "notes": "No polypaint or displacement-map authoring"
+            "notes": "Polypaint stroke/bake + displacement bake"
           },
           "name": "Verticals — texture / polypaint / displacement"
         },
@@ -16927,7 +16927,7 @@
           },
           "kerf": {
             "status": "yes",
-            "notes": "No daylighting simulation yet"
+            "notes": "Daylighting (CIE S 011 sky) + lux/luminance sim (luminance_lux_sim.py)"
           }
         },
         {
@@ -17635,7 +17635,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/plugin.py",
-            "notes": "No visual node environment; chat + kerf-sdk fill part of the gap"
+            "notes": "NodeGraphCanvas visual node environment + kerf-sdk"
           },
           "name": "Visual node scripting"
         },
@@ -18066,7 +18066,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "",
-            "notes": "No visual node environment; Python scripting via kerf-sdk"
+            "notes": "NodeGraphCanvas node editor + Marionette + kerf-sdk Python"
           },
           "name": "Jewelry — parametric visual scripting"
         },

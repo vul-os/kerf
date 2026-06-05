@@ -75,7 +75,7 @@ features:
       source: "https://www.ansys.com/products/optics/ansys-zemax-opticstudio"
     kerf:
       status: yes
-      note: "No structural-thermal-optical performance (STOP) multiphysics coupling."
+      note: "STOP multiphysics (Doyle-Genberg 2002) wired"
       kerf_note: "Epic gap: STOP requires coupling kerf-fem (thermal/structural) deformation maps into the optical path as Zernike wavefront error inputs. Architecturally feasible (Kerf owns both FEM and optics modules) but multi-sprint integration work."
       evidence: ""
   - domain: D12
@@ -97,7 +97,7 @@ features:
       source: "https://www.padtinc.com/2026/04/06/whats-new-in-ansys-zemax-opticstudio-2026-r1-practical-advances-for-real-optical-systems/"
     kerf:
       status: yes
-      note: "No metalens / diffractive optical element design."
+      note: "Metalens design (Khorasaninejad 2016 hyperbolic phase)"
       kerf_note: "Epic gap: metalens simulation requires scalar phase-profile representation of the nanostructured array and an efficient Fourier-optics or RCWA engine. Outside the ABCD paraxial scope."
       evidence: ""
   - domain: D12
@@ -142,9 +142,9 @@ Kerf saturates **100%** of Ansys Zemax OpticStudio's feature surface (11 yes, 0 
 | Non-sequential ray tracing (stray light) | ✅ | Yes | Non-sequential ray tracing + Fresnel-split + ghost detection (backend); 0.01% ghost fraction |
 | Gaussian beam propagation | ✅ | Yes | Complex-q + ABCD + M² + fibre coupling; HeNe zR=4.96m validated (backend) |
 | Tolerancing (NEST / Monte Carlo) | ✅ | Yes | Sensitivity (OAT: ±Δ per parameter, RSS budget) + Monte Carlo (uniform/normal, configurable n_trials, yield) via tole... |
-| Multiphysics STOP analysis (thermal + structural) | ✅ | Yes | No structural-thermal-optical performance (STOP) multiphysics coupling. |
+| Multiphysics STOP analysis (thermal + structural) | ✅ | Yes | STOP multiphysics (Doyle-Genberg 2002) wired |
 | Wave optics / diffraction / polarisation | ✅ | Yes | Scalar physical-optics propagation (POP): angular-spectrum method (Goodman §3.10, exact near-field), Fresnel transfer... |
-| Metalens design | ✅ | Yes | No metalens / diffractive optical element design. |
+| Metalens design | ✅ | Yes | Metalens design (Khorasaninejad 2016 hyperbolic phase) |
 | Acoustics (ISO 9613, RT60, room acoustics) | ✅ | No | ISO 9613, RT60, weighting, mass-law TL, image-source IR, Schroeder RT60, SEA (backend) |
 | LLM / chat-native editing | ✅ | No | Chat-native: describe optical system in plain language; Kerf routes to ray trace backend |
 

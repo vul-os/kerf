@@ -55,7 +55,7 @@ features:
       source: "https://www.mechutils.com/msc-adams"
     kerf:
       status: yes
-      note: "No flexible body / modal superposition in MBD"
+      note: "Craig-Bampton flexible-body MBD (modal reduction, flexible_body.py)"
       evidence: ""
   - domain: D9
     feature: "Vehicle dynamics (Adams/Car)"
@@ -65,7 +65,7 @@ features:
       source: "https://www.mechutils.com/msc-adams"
     kerf:
       status: yes
-      note: "No vehicle dynamics / half-car / full-car model"
+      note: "Pacejka Magic-Formula tire + vehicle dynamics (vehicle_dynamics.py)"
       evidence: ""
   - domain: D9
     feature: "Controls co-simulation (MATLAB/Simulink)"
@@ -95,7 +95,7 @@ features:
       source: "https://www.mechutils.com/msc-adams"
     kerf:
       status: yes
-      note: "No gear-train / belt-chain multibody module (horology has escapement, not general machinery)"
+      note: "Litvin gear/belt machinery dynamics (kerf-mates machinery)"
       evidence: ""
   - domain: D3
     feature: "Gear geometry / tooth stress"
@@ -147,11 +147,11 @@ Kerf saturates **96%** of MSC Adams (Hexagon)'s feature surface (11 yes, 1 parti
 | 3D MBD with constraint enforcement | ✅ | Yes | 3D joints defined; integrator is not fully constrained for 3D MBD |
 | Contact / collision dynamics | ✅ | Yes | Sphere/plane + sphere/mesh + Hunt-Crossley + Coulomb + impulse-restitution; 0.15% bounce error |
 | Kinematics (four-bar/slider-crank/cam) | ✅ | Yes | Four-bar, slider-crank, cam kinematics (backend) |
-| Flexible bodies (FEA mode shapes) | ✅ | Yes | No flexible body / modal superposition in MBD |
-| Vehicle dynamics (Adams/Car) | ✅ | Yes | No vehicle dynamics / half-car / full-car model |
+| Flexible bodies (FEA mode shapes) | ✅ | Yes | Craig-Bampton flexible-body MBD (modal reduction, flexible_body.py) |
+| Vehicle dynamics (Adams/Car) | ✅ | Yes | Pacejka Magic-Formula tire + vehicle dynamics (vehicle_dynamics.py) |
 | Controls co-simulation (MATLAB/Simulink) | ✅ | Yes | Controls: state-space, LQR, Kalman, digital PID, Modelica DAE system simulation (backend) |
 | Robotics FK / IK (6-DOF) | ✅ | Partial | 6-DOF spatial IK via DLS Jacobian; PUMA-class validated (backend) |
-| Gear / belt / chain machinery (Adams/Machinery) | ✅ | Yes | No gear-train / belt-chain multibody module (horology has escapement, not general machinery) |
+| Gear / belt / chain machinery (Adams/Machinery) | ✅ | Yes | Litvin gear/belt machinery dynamics (kerf-mates machinery) |
 | Gear geometry / tooth stress | ✅ | Partial | Spur/helical/bevel/worm gear geometry + AGMA/ISO tooth bending + contact stress (backend) |
 | FEA load export | ⚠️ (partial) | Yes | Structural FEA native (CalculiX bridge); no load export to external FEA tools |
 | LLM / chat-native editing | ✅ | No | Chat-native: describe a mechanism in plain language; Kerf routes to MBD backend |

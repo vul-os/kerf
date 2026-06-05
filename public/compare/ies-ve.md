@@ -50,7 +50,7 @@ features:
       note: "Radiance integration; climate-based daylight; LEED v4 IEQ; BREEAM"
     kerf:
       status: yes
-      note: "No daylighting simulation yet"
+      note: "Daylighting (CIE S 011 sky) + lux/luminance sim (luminance_lux_sim.py)"
 
   # CFD airflow
   - name: "CFD internal airflow (IESVE MicroFlo)"
@@ -114,7 +114,7 @@ Kerf saturates **88%** of IES VE (Virtual Environment)'s feature surface (6 yes,
 | Dynamic thermal simulation (ASHRAE fundamentals) | ✅ | Yes | ASHRAE CLTD/RTS steady-state loads; dynamic 8760-hour not yet implemented |
 | AHRI-listed equipment catalogue | ✅ | Yes | 30 representative AHRI-listed models (6 categories, 5 per); real AHRI cert numbers + certified part-load curves. OEM-... |
 | Part-load efficiency curves (AHRI-certified) | ✅ | Yes | AHRI-certified part-load curves at 25/50/75/100% load from directory listings |
-| Daylighting + solar radiation simulation | ✅ | Yes | No daylighting simulation yet |
+| Daylighting + solar radiation simulation | ✅ | Yes | Daylighting (CIE S 011 sky) + lux/luminance sim (luminance_lux_sim.py) |
 | CFD internal airflow (IESVE MicroFlo) | ⚠️ (partial) | Yes | 2-D projection Navier-Stokes shipped; full 3-D room CFD not yet wired |
 | Full HVAC plant + air-side system modelling | ⚠️ (partial) | Yes | HVAC plant simulation (chiller/boiler/VAV) + AHRI catalogue shipped; not APACHE-HVAC full control-sequence depth |
 | IFC import for geometry | ✅ | Yes | Full IFC Tier 1+2 including MEP elements; IFC 2x3 + IFC4 |

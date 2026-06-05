@@ -170,7 +170,7 @@ features:
       source: "https://gmat.atlassian.net/wiki/spaces/GW/pages/380273275"
     kerf:
       status: yes
-      note: "No CR3BP / libration point propagator"
+      note: "CR3BP libration orbits: halo/Lyapunov/Lissajous (Richardson/Howell)"
       evidence: ""
       kerf_note: "Circular-restricted 3-body problem and halo orbit computation require dedicated differential corrector and continuation methods. This is large scope; not currently planned."
 
@@ -236,7 +236,7 @@ Kerf saturates **100%** of NASA GMAT's feature surface (18 yes, 0 partial, 0 no 
 | State transition matrix (STM) propagation | ✅ | Yes | Keplerian + J2 A-matrix; augmented RK4 STM (42-vector); P(t)=Φ P₀ Φᵀ covariance propagation; STM-based differential c... |
 | Launch window / access / coverage analysis | ✅ | Yes | Ground station contact intervals (rise/set bisection, ECI→ECEF→ENU, min elevation mask); multi-station coverage metrics |
 | Attitude dynamics (nadir / Sun-pointing / spin-stabilised) | ✅ | Yes | 6-DOF attitude dynamics + stability derivatives |
-| Libration point orbit design | ✅ | Yes | No CR3BP / libration point propagator |
+| Libration point orbit design | ✅ | Yes | CR3BP libration orbits: halo/Lyapunov/Lissajous (Richardson/Howell) |
 | Reentry / TPS analysis | ✅ | Yes | Heat-flux trajectory + TPS stack sizing + ablation |
 | 3D trajectory visualisation | ✅ | Yes | General 3D viewport; no mission-specific trajectory animation |
 | MATLAB / Python scripting API | ✅ | Yes | kerf-sdk on PyPI; JSON-RPC to all engines including aero/orbital |

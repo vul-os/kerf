@@ -75,7 +75,7 @@ features:
       source: "https://www.esko.com/en/products/artioscad"
     kerf:
       status: yes
-      note: "No graphic artwork / pre-press integration"
+      note: "ISO 15930-1 PDF/X-1a export + registration marks + bleed/safety check"
       evidence: ""
   - domain: D14
     feature: "Material cost / yield estimation"
@@ -129,7 +129,7 @@ Kerf saturates **100%** of Esko ArtiosCAD's feature surface (10 yes, 0 partial, 
 | Blank nesting optimisation | ✅ | Yes | Skyline + true-shape NFP nesting (backend); 57.6% L-shape utilisation validated |
 | Structural performance (BCT / ECT) | ✅ | Partial | McKee BCT solver (simplified + full-formula) with humidity correction and stacking analysis; packaging_bct_estimate L... |
 | Die-making integration / CNC output | ✅ | Yes | DXF layer separation (cut/crease/score/perf) for Kongsberg/Zünd tables |
-| Print pre-press / graphics integration | ✅ | Yes | No graphic artwork / pre-press integration |
+| Print pre-press / graphics integration | ✅ | Yes | ISO 15930-1 PDF/X-1a export + registration marks + bleed/safety check |
 | Material cost / yield estimation | ✅ | Yes | Should-cost engine (backend) + nesting material calculation; no packaging-specific pricing UI |
 | Open scripting / automation API | ✅ | Partial | kerf-sdk on PyPI; HTTP/JSON-RPC automation from any Python environment |
 | LLM / chat-native editing | ✅ | No | Chat-native: describe box dimensions in plain language, Kerf generates the dieline |

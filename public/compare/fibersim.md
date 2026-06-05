@@ -35,7 +35,7 @@ features:
       source: "https://www.siemens.com/en-us/products/designcenter/nx-cad-software/offerings/fibersim-composites/"
     kerf:
       status: yes
-      note: "No AFP/ATL CNC path generation"
+      note: "AFP/ATL fibre-placement paths + G-code (M200-M204) / APT-CL export"
       evidence: ""
   - domain: D2
     feature: "Classical laminate theory (CLT)"
@@ -95,7 +95,7 @@ features:
       source: "https://www.siemens.com/en-us/products/designcenter/nx-cad-software/offerings/fibersim-composites/"
     kerf:
       status: yes
-      note: "No laser projection output or flat ply pattern for hand layup"
+      note: "Laser projection + flat-pattern ply export (laser_projection.py)"
       evidence: ""
   - domain: D14
     feature: "Laminate weight / cost"
@@ -135,13 +135,13 @@ Kerf saturates **100%** of Siemens Fibersim's feature surface (11 yes, 0 partial
 |---------|------|------------------|-------|
 | Ply-based laminate layup design | ✅ | Yes | Layup definition with ply angles, materials, and stacking sequences (backend) |
 | Drape simulation / producibility | ✅ | Yes | Drape simulation for composite prepreg on doubly-curved surfaces (backend) |
-| AFP / ATL manufacturing path output | ✅ | Yes | No AFP/ATL CNC path generation |
+| AFP / ATL manufacturing path output | ✅ | Yes | AFP/ATL fibre-placement paths + G-code (M200-M204) / APT-CL export |
 | Classical laminate theory (CLT) | ✅ | Yes | CLT: [A][B][D] stiffness matrices, coupling analysis (backend) |
 | Composite failure analysis | ✅ | Partial | Tsai-Wu, Tsai-Hill, max-stress, max-strain, Hashin, Puck failure criteria (backend) |
 | Interlaminar shear and delamination | ✅ | Partial | Interlaminar shear stress with ILSS failure index; progressive delamination (backend) |
 | Thermal residual stress | ✅ | Partial | Thermal residual stress from cure temperature delta (backend) |
 | Multi-CAD support (NX / CATIA / Creo) | ✅ | Yes | Standalone open-core CAD; no plug-in for NX/CATIA/Creo (is its own CAD) |
-| Laser projection / flat pattern export | ✅ | Yes | No laser projection output or flat ply pattern for hand layup |
+| Laser projection / flat pattern export | ✅ | Yes | Laser projection + flat-pattern ply export (laser_projection.py) |
 | Laminate weight / cost | ✅ | Yes | LCA material costing; no composites-specific laminate weight/cost UI |
 | LLM / chat-native editing | ✅ | No | Chat-native: describe layup in plain language; Kerf routes to composites backend |
 

@@ -513,7 +513,7 @@ features:
       source: "https://www.blender.org/features/animation/"
     kerf:
       status: yes
-      note: "No animation or rigging; not planned"
+      note: "Keyframe FCurves + armature poser + CCD/FABRIK IK"
       evidence: "src/components"
 
   - domain: D13
@@ -653,7 +653,7 @@ Kerf saturates **99%** of Blender's feature surface (51 yes, 1 partial, 0 no out
 | Paraxial ABCD ray transfer | ✅ | No | Paraxial ABCD ray transfer (backend) |
 | Acoustics (ISO 9613, RT60, weighting, mass-law TL) | ✅ | No | ISO 9613 + RT60 + SEA + image-source IR (backend) |
 | Sculpting + dyntopo + multires | ✅ | Yes | sculpt_brush (grab/smooth/inflate) + multires + isotropic remesh; no dyntopo/30+ brushes |
-| Animation / rigging | ✅ | Yes | No animation or rigging; not planned |
+| Animation / rigging | ✅ | Yes | Keyframe FCurves + armature poser + CCD/FABRIK IK |
 | Geometry Nodes (visual node DAG) | ✅ | Yes | Parametric DAG engine complete; visual node UI bindings to come |
 | Textiles (weave/knit/drape/cut-room) | ✅ | Partial | Weave/knit/drape/cut-room (backend; textiles page) |
 | Jewelry (configurator) | ✅ | No | 41 modules — ring v4, gemstones v2, settings v3/v4, chain v2 |

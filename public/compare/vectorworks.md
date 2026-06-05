@@ -306,7 +306,7 @@ features:
       source: "https://app-help.vectorworks.net/2024/eng/index.htm#t=VW2024_Guide%2FMarionette%2FMarionette_Overview.htm"
     kerf:
       status: yes
-      note: "No node-based visual scripting; kerf-sdk Python API is the scripting surface"
+      note: "NodeGraphCanvas node editor + Marionette engine (marionette.py)"
       evidence: ""
 
   - domain: D13
@@ -384,7 +384,7 @@ Kerf saturates **90%** of Vectorworks's feature surface (27 yes, 0 partial, 3 no
 | Plant/tree symbols with scheduling | ✅ | Yes (paid tier) | Xeriscape plant catalogue (USDA zone + WUCOLS water-use filtering); planting-grid spacing; annual water budget (WUCOL... |
 | Entertainment / theatrical lighting plot | 🔴 (no) | Yes (paid tier) | No entertainment design domain |
 | Rigging geometry and load analysis (Braceworks) | 🔴 (no) | Yes (paid tier) | No rigging domain; structural beam/truss engines not adapted for entertainment |
-| Visual scripting (Marionette) | ✅ | Yes | No node-based visual scripting; kerf-sdk Python API is the scripting surface |
+| Visual scripting (Marionette) | ✅ | Yes | NodeGraphCanvas node editor + Marionette engine (marionette.py) |
 | Python scripting API | ✅ | Yes | kerf-sdk on PyPI; HTTP/JSON-RPC; runs on user's machine |
 | BIM quantity takeoff / materials schedule | ✅ | Yes (paid tier) | BOM panel wired; geometry-driven material quantity from assemblies |
 | Should-cost estimation | ✅ | No | Should-cost engine (6 processes, Boothroyd-Dewhurst) — backend only |

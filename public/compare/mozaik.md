@@ -25,7 +25,7 @@ features:
       source: "https://www.mozaiksoftware.com/mozaik-products"
     kerf:
       status: yes
-      note: "No room/cabinet layout floor plan UI"
+      note: "Cabinet room layout (CabinetPlacement) + cut-list generation"
       evidence: ""
   - domain: D13
     feature: "Parametric cabinet libraries"
@@ -124,7 +124,7 @@ Kerf saturates **100%** of Mozaik Software's feature surface (10 yes, 0 partial,
 | Feature | Kerf | Mozaik Software | Notes |
 |---------|------|-----------------|-------|
 | Woodworking (cut-list/joinery/grain) | ✅ | Yes | Cut list, joinery rules, grain direction engine (backend); no room-layout floor plan UI |
-| Cabinet / room layout design | ✅ | Yes | No room/cabinet layout floor plan UI |
+| Cabinet / room layout design | ✅ | Yes | Cabinet room layout (CabinetPlacement) + cut-list generation |
 | Parametric cabinet libraries | ✅ | Yes | Joinery rules (backend); no parametric cabinet library UI |
 | CNC cut list and nesting | ✅ | Yes | True-shape NFP nesting + G-code post (Fanuc/GRBL/LinuxCNC); no cabinet-specific bore patterns |
 | Hardware boring / machining automation | ✅ | Yes | 32 mm System bore-pattern generator: hinge cups (35 mm Blum-compatible), shelf-pin rows, undermount/sidemount drawer ... |

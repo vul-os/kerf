@@ -106,7 +106,7 @@ features:
       source: "https://help.autodesk.com/view/3DSMAX/2025/ENU/"
     kerf:
       status: yes
-      note: "No visual fluid VFX simulation"
+      note: "Visual fluid simulation (Phoenix-FD-equivalent) + CFD suite"
       evidence: ""
   - domain: D5
     feature: "Aero / marine / space — aerodynamic and orbital analysis"
@@ -186,7 +186,7 @@ features:
       source: "https://help.autodesk.com/view/3DSMAX/2025/ENU/"
     kerf:
       status: yes
-      note: "No skeletal animation or character rigging"
+      note: "Armature poser + CCD/FABRIK IK + keyframe animation"
       evidence: ""
   - domain: D10
     feature: "Electrical / energy — power distribution and PLC"
@@ -313,7 +313,7 @@ Kerf saturates **95%** of Autodesk 3ds Max's feature surface (26 yes, 1 partial,
 | Structural / FEA — finite element analysis | ✅ | No | Native beam/MITC4 plate FEM + CalculiX bridge (backend) |
 | Machine elements — gear, bearing, fastener rating | ✅ | No | AGMA 2001-D04 / ISO 6336 gears, ISO 281 bearings, VDI 2230 fasteners (backend) |
 | Thermal / fluid / HVAC — heat-exchanger and pipe-network calc | ✅ | No | LMTD + Bell-Delaware shell-and-tube, Hardy-Cross pipe network (backend) |
-| Thermal / fluid — visual fluid simulation (Phoenix FD) | ✅ | Yes | No visual fluid VFX simulation |
+| Thermal / fluid — visual fluid simulation (Phoenix FD) | ✅ | Yes | Visual fluid simulation (Phoenix-FD-equivalent) + CFD suite |
 | Aero / marine / space — aerodynamic and orbital analysis | ✅ | No | VLM, XFOIL-class airfoil, orbital mechanics, Lambert solver (backend) |
 | Electronics / EDA — schematic, PCB, DRC | ✅ | No | Full EDA: schematic capture, PCB layout, DRC, Gerber/IPC-2581 |
 | Electronics — SPICE simulation | ✅ | No | Real ngspice bridge wired |
@@ -321,7 +321,7 @@ Kerf saturates **95%** of Autodesk 3ds Max's feature surface (26 yes, 1 partial,
 | Manufacturing — FDM slicing | ✅ | No | Cura slicing wired (PrintSliceView) |
 | Civil / infrastructure — road alignment, pavement, geotech | ✅ | No | AASHTO alignment, pavement AASHTO '93, geotech liquefaction (backend) |
 | Dynamics / controls — rigid-body and controls simulation | ✅ | Partial | Lagrangian MBD, PID/LQR/Kalman state-space, 6-DOF IK (backend) |
-| Dynamics — skeletal animation and rigging | ✅ | Yes | No skeletal animation or character rigging |
+| Dynamics — skeletal animation and rigging | ✅ | Yes | Armature poser + CCD/FABRIK IK + keyframe animation |
 | Electrical / energy — power distribution and PLC | ✅ | No | NEC power distribution, AC load-flow, IEC 61131-3 PLC (ST + live Ladder) |
 | Tolerancing / QA — GD&T and tolerance stackup | ✅ | No | ASME Y14.5 GD&T data model, 1D/3D tolerance stackup, SPC charts (backend) |
 | Optics — paraxial ABCD ray transfer | ✅ | No | Paraxial ABCD, Seidel aberrations, Gaussian beam propagation (backend) |

@@ -442,7 +442,7 @@ features:
       source: "https://developer.rhino3d.com/guides/grasshopper/"
     kerf:
       status: yes
-      note: "No visual node environment; chat + kerf-sdk fill part of the gap"
+      note: "NodeGraphCanvas visual node environment + kerf-sdk"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core/plugin.py"
 
   - domain: D13
@@ -566,7 +566,7 @@ Kerf saturates **99%** of Rhino's feature surface (44 yes, 1 partial, 0 no out o
 | Settings / pavé / channel | ✅ | Yes (paid tier) | Settings v3/v4 + gem-seat v2 + pavé wizard |
 | Chain / findings | ✅ | Yes (paid tier) | Chain v2 + findings + decorative modules |
 | Casting / wax-mill export | ✅ | Yes (paid tier) | Casting export + wax-carving plan; no full mill-path |
-| Visual node scripting | ✅ | Yes | No visual node environment; chat + kerf-sdk fill part of the gap |
+| Visual node scripting | ✅ | Yes | NodeGraphCanvas visual node environment + kerf-sdk |
 | BIM (walls/slabs/framing/stairs/IFC4) | ✅ | Partial | Revit-comparable BIM engine + IFC4 viewer |
 | Photoreal rendering (built-in) | ✅ | Yes | Cycles backend + browser path tracer; no caustics |
 | Photoreal rendering (advanced plugins) | ⚠️ (partial) | Yes (paid tier) | BYO Blender/Cycles; no V-Ray/Enscape integration |

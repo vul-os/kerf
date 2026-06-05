@@ -35,7 +35,7 @@ features:
       source: "https://www.cimatron.com/en/cimatron-mold"
     kerf:
       status: yes
-      note: "No mold base library. A parametric DME/HASCO plate-dimension table with 3D parametric solid generation requires OCCT CAD kernel integration (kerf-cad-core wave 2) — not tractable in kerf-mold alone."
+      note: "DME/HASCO/Misumi mold-base catalogue + 7-plate stack"
       evidence: ""
   - domain: D7
     feature: "Cooling channel design"
@@ -55,7 +55,7 @@ features:
       source: "https://www.cimatron.com/en/cimatron-mold"
     kerf:
       status: yes
-      note: "No electrode design. EDM electrode solid modelling requires full parametric 3D CAD (OCCT kernel, kerf-cad-core wave 2). Spark-gap compensation can be handled as offset surface; electrode blanking needs full solid Boolean ops."
+      note: "EDM electrode extraction + spark-gap offset + burn sequence"
       evidence: ""
   - domain: D7
     feature: "5-axis CNC machining"
@@ -75,7 +75,7 @@ features:
       source: "https://www.cimatron.com/en/whats-new"
     kerf:
       status: yes
-      note: "No wire EDM programming. Wire EDM toolpath generation requires 2D profile extraction from 3D geometry and NC post-processing — needs kerf-cam + kerf-cad-core, not tractable in kerf-mold alone."
+      note: "Wire-EDM 4-axis taper toolpath + G41/G42 G-code"
       evidence: ""
   - domain: D1
     feature: "Draft angle analysis"
@@ -135,11 +135,11 @@ Kerf saturates **100%** of Cimatron's feature surface (11 yes, 0 partial, 0 no o
 |---------|------|----------|-------|
 | Moldflow / fill sim | ✅ | Yes | Hele-Shaw front tracking + weld-line + air-trap detection (backend) |
 | Parting line / cavity-core split | ✅ | Yes | Parting line data model (closed 3-D loop); flat and ruled parting surface generation; draft-angle check; moldability ... |
-| Mold base library | ✅ | Yes | No mold base library. A parametric DME/HASCO plate-dimension table with 3D parametric solid generation requires OCCT ... |
+| Mold base library | ✅ | Yes | DME/HASCO/Misumi mold-base catalogue + 7-plate stack |
 | Cooling channel design | ✅ | Yes | Cooling circuit thermal analysis: Re/Nu/HTC (Dittus-Boelter), pressure drop (Darcy-Weisbach), coolant temp rise, Jane... |
-| Electrode design (EDM) | ✅ | Yes | No electrode design. EDM electrode solid modelling requires full parametric 3D CAD (OCCT kernel, kerf-cad-core wave 2... |
+| Electrode design (EDM) | ✅ | Yes | EDM electrode extraction + spark-gap offset + burn sequence |
 | 5-axis CNC machining | ✅ | Yes | 5-axis engine (backend); no UI; 3-axis CAMView wired in browser |
-| Wire EDM | ✅ | Yes | No wire EDM programming. Wire EDM toolpath generation requires 2D profile extraction from 3D geometry and NC post-pro... |
+| Wire EDM | ✅ | Yes | Wire-EDM 4-axis taper toolpath + G41/G42 G-code |
 | Draft angle analysis | ✅ | Yes | Draft angle per face: signed draft_deg = asin(n·pull_hat); undercut detection; wall-thickness uniformity check; parti... |
 | Assembly and collision detection | ✅ | Yes | Assembly clash detection backend (OBB-SAT + BVH); no mold-specific motion/collision sequence |
 | Quote-to-delivery workflow | ✅ | Yes | Should-cost engine + BOM (backend); no mold-specific quoting workflow |

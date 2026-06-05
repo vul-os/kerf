@@ -246,7 +246,7 @@ features:
       source: "https://gemvision.com/matrixgold"
     kerf:
       status: yes
-      note: "No visual node environment; Python scripting via kerf-sdk"
+      note: "NodeGraphCanvas node editor + Marionette + kerf-sdk Python"
       evidence: ""
   - domain: D1
     feature: "NURBS surfacing (blend/network/patch)"
@@ -337,7 +337,7 @@ Kerf saturates **95%** of MatrixGold's feature surface (27 yes, 1 partial, 1 no 
 | Jewelry — enamel / engraving / laser marking | ✅ | Partial | Enamel + laser_marking modules built in |
 | Jewelry — retail workflow (appraisal / repair estimator / mount_finder) | ✅ | No | Appraisal + repair estimator + mount_finder modules included |
 | Jewelry — cost / quote panel | ✅ | No | Full metal + gem + labour cost/quote panel |
-| Jewelry — parametric visual scripting | ✅ | Yes (paid tier) | No visual node environment; Python scripting via kerf-sdk |
+| Jewelry — parametric visual scripting | ✅ | Yes (paid tier) | NodeGraphCanvas node editor + Marionette + kerf-sdk Python |
 | NURBS surfacing (blend/network/patch) | ✅ | Partial | blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends wired |
 | NURBS boolean operations (general) | ✅ | Partial | OCCT general booleans + robust retry layer (bbox-tol) + geometry heal |
 | Sweep (1 & 2 rail) | ✅ | Partial | BRepOffsetAPI_MakePipeShell; sweep1 + sweep2 wired |

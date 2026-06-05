@@ -275,7 +275,7 @@ features:
       paid: false
     kerf:
       status: yes
-      note: "No node-based visual scripting; kerf-sdk Python API is the scripting surface — covers the automation use case but not the Dynamo visual-graph experience"
+      note: "NodeGraphCanvas visual node editor + kerf-sdk Python scripting"
       evidence: "cloud/bim/"
 
   - name: "pyRevit / Revit API Python automation"
@@ -472,7 +472,7 @@ Kerf saturates **94%** of Autodesk Revit's feature surface (38 yes, 1 partial, 2
 | IFC export (IFC4 round-trip) | ✅ | ✅ certified — ifc 2x3 and ifc4 export with property sets |  |
 | Clash detection (cross-discipline) | ✅ | ✅ via navisworks — federated multi-model clash detection |  |
 | Worksharing / concurrent BIM editing | 🔴 (no) | ✅ full — worksets, central model, cloud worksharing via autodesk construction cloud | Needs BIM element-level locking epic; cloud git provides file-level workspace roles only |
-| Dynamo visual programming | ✅ | ✅ full — dynamo studio + dynamo player; node-based scripting of bim model | No node-based visual scripting; kerf-sdk Python API is the scripting surface — covers the automation use case but not... |
+| Dynamo visual programming | ✅ | ✅ full — dynamo studio + dynamo player; node-based scripting of bim model | NodeGraphCanvas visual node editor + kerf-sdk Python scripting |
 | pyRevit / Revit API Python automation | ✅ | ✅ full — open revit api + pyrevit community extensions |  |
 | BIM model-based energy analysis (Revit Insight) | ✅ | ✅ via autodesk insight — whole-building eui benchmarking from revit mass |  |
 | 4D construction sequencing | ✅ | ✅ via navisworks / autodesk construction cloud timeliner | Needs construction sequencing / schedule-linked model epic; out of current scope |

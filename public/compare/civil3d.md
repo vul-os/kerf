@@ -160,7 +160,7 @@ features:
       source: "https://help.autodesk.com/view/CIV3D/2026/ENU/?guid=GUID-D8E9F0A1-2B3C-4D5E-6F7A-8B9C0D1E2F3A"
     kerf:
       status: yes
-      note: "No scan / point-cloud ingestion; needs LiDAR/photogrammetry import pipeline"
+      note: "LAS/XYZ/PLY ingest + voxel downsample + PMF ground classification → TIN"
       evidence: "packages/kerf-civil/src/kerf_civil/"
 
   - domain: D8
@@ -171,7 +171,7 @@ features:
       source: "https://help.autodesk.com/view/CIV3D/2026/ENU/?guid=GUID-E9F0A1B2-3C4D-5E6F-7A8B-9C0D1E2F3A4B"
     kerf:
       status: yes
-      note: "No automated civil plan/profile sheet generation; corridor DXF export exists but no sheet-set workflow"
+      note: "Automated plan+profile sheet generator (station grid, profile band, match lines)"
       evidence: "packages/kerf-civil/src/kerf_civil/"
 
   # D2 — Structural / FEA
@@ -355,8 +355,8 @@ Kerf saturates **100%** of Civil 3D's feature surface (28 yes, 0 partial, 0 no o
 | Hydrology (rational/SCS/TR-55) | ✅ | Partial | Rational method (ASCE/EWRI 77-17) + TR-55 runoff + HDS-5 culvert inlet-control (unsubmerged/submerged, concrete box +... |
 | Spillway / dam / railway / earthworks | ✅ | Partial | Backend; spillway, dam, railway, earthworks modules |
 | Parcels and lot layout | ✅ | Yes | Needs parcel/lot-layout epic; not in current civil module scope |
-| Point cloud integration | ✅ | Yes | No scan / point-cloud ingestion; needs LiDAR/photogrammetry import pipeline |
-| Plan and profile sheet production | ✅ | Yes | No automated civil plan/profile sheet generation; corridor DXF export exists but no sheet-set workflow |
+| Point cloud integration | ✅ | Yes | LAS/XYZ/PLY ingest + voxel downsample + PMF ground classification → TIN |
+| Plan and profile sheet production | ✅ | Yes | Automated plan+profile sheet generator (station grid, profile band, match lines) |
 | ASCE 7-22 wind (MWFRS+C&C) | ✅ | No | Backend; full MWFRS + C&C |
 | ASCE 7-22 seismic (ELF + RSA + Newmark) | ✅ | No | Backend; ELF + RSA (SRSS+CQC) + Newmark time-history |
 | Pipe network (Hardy-Cross) | ✅ | No | Hardy-Cross / Global Gradient Algorithm (Hazen-Williams + Darcy-Weisbach) steady-state solver; also Manning gravity f... |

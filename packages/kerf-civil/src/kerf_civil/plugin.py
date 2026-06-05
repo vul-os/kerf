@@ -85,6 +85,17 @@ async def register(app: FastAPI, ctx):
             "kerf-civil: failed to load tools_hydraulics: %s", _exc
         )
 
+    # Parcels + point-cloud + plan-profile sheets (2026-06-05)
+    try:
+        from kerf_civil.tools_parcels_pointcloud_sheets import TOOLS as _gap_tools
+        for _tool_name, _tool_spec, _tool_handler in _gap_tools:
+            ctx.tools.register(_tool_name, _tool_spec, _tool_handler)
+    except Exception as _exc:
+        import logging as _logging
+        _logging.getLogger(__name__).warning(
+            "kerf-civil: failed to load tools_parcels_pointcloud_sheets: %s", _exc
+        )
+
     provides = [
         "civil.horizontal_alignment",
         "civil.vertical_alignment",
@@ -109,6 +120,12 @@ async def register(app: FastAPI, ctx):
         "civil.hydraulics-gravity-network",
         "civil.storm",
         "civil.drainage-rational-hec22",
+        "civil.parcel-subdivision",
+        "civil.pointcloud-ingest",
+        "civil.pointcloud-downsample",
+        "civil.pointcloud-pmf-ground",
+        "civil.pointcloud-surface",
+        "civil.plan-profile-sheets",
     ]
 
     try:

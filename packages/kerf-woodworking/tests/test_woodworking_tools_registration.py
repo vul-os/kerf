@@ -41,6 +41,8 @@ class TestToolsList:
         "woodworking_drawer_runner_pattern",
         "woodworking_euro_screw_pattern",
         "woodworking_handle_pattern",
+        "woodworking_validate_joinery",
+        "woodworking_joinery_strength",
     }
 
     def test_all_expected_tools_present(self):
@@ -83,7 +85,7 @@ class TestPluginRegistration:
         ctx = _MockCtx()
         provides = []
         _register_tools(ctx, provides)
-        assert len(ctx.tools.registered) == 13
+        assert len(ctx.tools.registered) == 24
 
     def test_all_tool_names_registered(self):
         from kerf_woodworking.plugin import _register_tools
@@ -92,6 +94,8 @@ class TestPluginRegistration:
         assert "woodworking_mortise_tenon" in ctx.tools.registered
         assert "woodworking_handle_pattern" in ctx.tools.registered
         assert "woodworking_hinge_cup_pattern" in ctx.tools.registered
+        assert "woodworking_validate_joinery" in ctx.tools.registered
+        assert "woodworking_joinery_strength" in ctx.tools.registered
 
 
 # ---------------------------------------------------------------------------

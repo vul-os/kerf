@@ -18,6 +18,8 @@ _TOOL_MODULES = [
     "kerf_woodworking.tools",
     # Wave 12B: Moldflow injection-fill + cabinet cut-list/joinery/grain
     "kerf_woodworking.woodworking_advanced_tools",
+    # Wave 12F/Mozaik: 2D nesting, pricing/estimating, shop drawings
+    "kerf_woodworking.woodworking_pricing_tools",
 ]
 
 
@@ -35,6 +37,10 @@ async def register(app: "FastAPI", ctx):
         "woodworking.cabinet_cut_list",
         "woodworking.joinery_advanced",
         "woodworking.grain_direction",
+        # Wave 12F/Mozaik
+        "woodworking.panel_nesting",
+        "woodworking.pricing",
+        "woodworking.shop_drawings",
     ]
 
     try:

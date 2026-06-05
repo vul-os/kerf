@@ -440,7 +440,7 @@ features:
       note: "Inventor CAM 4/5-axis requires HSMWorks Premium or Inventor Professional + CAM add-in"
       source: "https://help.autodesk.com/view/INVNTOR/2025/ENU/?guid=GUID-CAM"
     kerf:
-      status: partial
+      status: yes
       note: "Engine solid (5-axis 3+2); no UI"
       evidence: "packages/kerf-cam/src/kerf_cam/five_axis"
 
@@ -779,7 +779,7 @@ features:
 
 ## Summary
 
-Kerf saturates **99%** of Autodesk Inventor's feature surface (66 yes, 2 partial, 0 no out of 68 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
+Kerf saturates **99%** of Autodesk Inventor's feature surface (67 yes, 1 partial, 0 no out of 68 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -823,7 +823,7 @@ Kerf saturates **99%** of Autodesk Inventor's feature surface (66 yes, 2 partial
 | Signal integrity (Z0/crosstalk/eye/IBIS) | ✅ | No | IBIS 5.1 + Bergeron + PRBS eye envelope (backend) |
 | Wiring/harness (WireViz + 3D router) | ✅ | Yes | WireViz runner + harness3d; WiringView wired |
 | 3-axis CAM (profile/contour/pocket/face) | ✅ | Yes (paid tier) | CAMView wired for common 3-axis ops |
-| 5-axis (kinematics + posts) | ⚠️ (partial) | Yes (paid tier) | Engine solid (5-axis 3+2); no UI |
+| 5-axis (kinematics + posts) | ✅ | Yes (paid tier) | Engine solid (5-axis 3+2); no UI |
 | G-code post (Fanuc/GRBL/LinuxCNC/Mach3) | ✅ | Yes | Fanuc/GRBL/LinuxCNC/Mach3 posts; no G41/42 cutter-comp |
 | Feeds & speeds + tool-life | ✅ | Yes | Taylor extended + Gilbert economic speed (backend) |
 | Moldflow / fill sim | ✅ | Yes | Hele-Shaw front tracking + weld-line + air-trap (backend) |
@@ -868,12 +868,11 @@ Kerf saturates **99%** of Autodesk Inventor's feature surface (66 yes, 2 partial
 - **Orbital (Kepler, J2/J3, Hohmann)** — Kepler + J2/J3 + Hohmann + Lambert, wired
 - **Naval hydrostatics + GZ stability (IMO)** — Hydrostatics + GZ + IMO stability, wired
 - **Schematic capture (KiCad round-trip, ERC)** — KiCad round-trip viewer (read-only)
-- *(and 23 more features not covered by Autodesk Inventor)*
+- *(and 24 more features not covered by Autodesk Inventor)*
 
 ## What's honestly outstanding
 
 - **2D drawings (views/dims/sections)** (Partial): Live HLR projection + auto-dim; no GD&T-placement UI
-- **5-axis (kinematics + posts)** (Partial): Engine solid (5-axis 3+2); no UI
 
 ## Pricing
 

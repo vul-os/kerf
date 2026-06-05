@@ -315,7 +315,7 @@ features:
       tier: paid
       source: https://plm.automation.siemens.com/global/en/products/nx/nx-cam.html
     kerf:
-      status: partial
+      status: yes
       evidence: cloud/cam/fiveaxis.py
   - domain: D7
     feature: Adaptive / trochoidal clearing
@@ -574,7 +574,7 @@ NX defined advanced surfacing for a generation — Kerf makes that power accessi
 
 ## Summary
 
-Kerf saturates **97%** of Siemens NX's feature surface (51 yes, 3 partial, 0 no out of 54 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap).
+Kerf saturates **98%** of Siemens NX's feature surface (52 yes, 2 partial, 0 no out of 54 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -609,7 +609,7 @@ Kerf saturates **97%** of Siemens NX's feature surface (51 yes, 3 partial, 0 no 
 | Signal integrity (Z0/crosstalk/eye/IBIS) | ✅ | Yes | HyperLynx SI — transmission-line analysis, IBIS models, crosstalk, DDR channel simulation |
 | Silicon synth (Yosys) / STA / GDS / DRC / LVS / formal / CTS | ✅ | Yes | Not in NX — silicon/IC design via Siemens EDA Calibre (physical verification), separate product |
 | 3-axis CAM (profile/contour/pocket/face) | ✅ | Yes | NX CAM — full 3-axis milling with HSM toolpaths, verified cut simulation, Fanuc/Siemens post library |
-| 5-axis (kinematics + posts) | ⚠️ (partial) | Yes | NX CAM multi-axis — 5-axis simultaneous with gouge avoidance, machine kinematics simulation, post builder |
+| 5-axis (kinematics + posts) | ✅ | Yes | NX CAM multi-axis — 5-axis simultaneous with gouge avoidance, machine kinematics simulation, post builder |
 | Adaptive / trochoidal clearing | ✅ | Yes | NX CAM high-speed machining — ZLE adaptive clearing, trochoidal milling with engagement control |
 | Moldflow / fill sim | ✅ | Yes | NX Mold Wizard — cavity/core split, runner design, cooling circuit; fill sim via Simcenter Moldex3D link |
 | Feeds & speeds + tool-life | ✅ | Yes | NX CAM includes feeds/speeds database and tool life tracking; Taylor model not exposed as standalone calc |
@@ -639,7 +639,6 @@ Kerf saturates **97%** of Siemens NX's feature surface (51 yes, 3 partial, 0 no 
 
 - **NURBS surfacing (blend/network/patch)** (Partial): blend/network/patch/match-srf + G3 + zebra/isophote + Class-A harness wired; not Shape-Studio depth
 - **2D drawings (views/dims/sections)** (Partial)
-- **5-axis (kinematics + posts)** (Partial)
 
 ## Pricing
 

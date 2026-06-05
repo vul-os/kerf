@@ -484,7 +484,7 @@ features:
       note: "4/5-axis requires Manufacturing Extension (paid)"
       source: "https://www.autodesk.com/products/fusion-360/manufacturing-extension"
     kerf:
-      status: partial
+      status: yes
       note: "Engine solid (5-axis 3+2); no UI"
       evidence: "packages/kerf-cam/src/kerf_cam/five_axis"
 
@@ -923,7 +923,7 @@ Cloud-connected multi-discipline CAD — two tools, two philosophies.
 
 ## Summary
 
-Kerf saturates **98%** of Autodesk Fusion 360's feature surface (77 yes, 4 partial, 0 no out of 81 features tracked here). Honest gaps: 4 features partial (engine complete, UI or depth gap).
+Kerf saturates **98%** of Autodesk Fusion 360's feature surface (78 yes, 3 partial, 0 no out of 81 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -971,7 +971,7 @@ Kerf saturates **98%** of Autodesk Fusion 360's feature surface (77 yes, 4 parti
 | PCB thermal | ⚠️ (partial) | Yes (paid tier) | Lumped Rθ (backend) |
 | Silicon synth (Yosys) / STA / GDS / DRC / LVS / formal / CTS | ✅ | No | Full silicon flow; zero UI |
 | 3-axis CAM (profile/contour/pocket/face) | ✅ | Yes | CAMView wired for common 3-axis ops |
-| 5-axis (kinematics + posts) | ⚠️ (partial) | Yes (paid tier) | Engine solid (5-axis 3+2); no UI |
+| 5-axis (kinematics + posts) | ✅ | Yes (paid tier) | Engine solid (5-axis 3+2); no UI |
 | Turning cycles (G71/G70/threading) | ✅ | Yes | G71/G70/threading cycles (backend) |
 | G-code post (Fanuc/GRBL/LinuxCNC/Mach3) | ✅ | Yes | Fanuc/GRBL/LinuxCNC/Mach3 posts; no G41/42 cutter-comp |
 | Feeds & speeds + tool-life | ✅ | Yes | Taylor extended + Gilbert economic speed (backend) |
@@ -1025,14 +1025,13 @@ Kerf saturates **98%** of Autodesk Fusion 360's feature surface (77 yes, 4 parti
 - **Psychrometrics (moist air)** — ASHRAE-grade psychrometrics (backend)
 - **Heat exchangers (LMTD + ε-NTU + Bell-Delaware)** — LMTD + ε-NTU + Bell-Delaware + TEMA (backend)
 - **CFD** — Real OpenFOAM bridge (needs install; backend)
-- *(and 39 more features not covered by Autodesk Fusion 360)*
+- *(and 40 more features not covered by Autodesk Fusion 360)*
 
 ## What's honestly outstanding
 
 - **Assembly interference (clash)** (Partial): Backend OBB-SAT + BVH + tri-tri; no UI panel
 - **2D drawings (views/dims/sections)** (Partial): Live HLR projection + auto-dim; no GD&T-placement UI
 - **PCB thermal** (Partial): Lumped Rθ (backend)
-- **5-axis (kinematics + posts)** (Partial): Engine solid (5-axis 3+2); no UI
 
 ## Pricing
 

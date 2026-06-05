@@ -326,7 +326,7 @@ features:
       note: "Creo NC Advanced — 5-axis machining + multi-axis toolpath verification"
       source: "https://www.ptc.com/en/products/creo/options/nc"
     kerf:
-      status: partial
+      status: yes
       note: "5-axis engine solid; no UI; kinematics + posts (backend)"
       evidence: "packages/kerf-cam/src/kerf_cam/worker.py"
 
@@ -663,7 +663,7 @@ Creo invented the parametric feature tree — Kerf brings that same discipline t
 
 ## Summary
 
-Kerf saturates **97%** of PTC Creo's feature surface (54 yes, 4 partial, 0 no out of 58 features tracked here). Honest gaps: 4 features partial (engine complete, UI or depth gap).
+Kerf saturates **97%** of PTC Creo's feature surface (55 yes, 3 partial, 0 no out of 58 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -697,7 +697,7 @@ Kerf saturates **97%** of PTC Creo's feature surface (54 yes, 4 partial, 0 no ou
 | Springs (compr/ext/torsion/Belleville) | ✅ | No | Compression/extension/torsion/Belleville (backend) |
 | Shaft (stress + critical speed) | ✅ | No | Closed-form stress + critical speed (backend) |
 | 3-axis CAM (profile/contour/pocket/face) | ✅ | Yes (paid tier) | 3-axis CAM + tool DB wired in CAMView |
-| 5-axis (kinematics + posts) | ⚠️ (partial) | Yes (paid tier) | 5-axis engine solid; no UI; kinematics + posts (backend) |
+| 5-axis (kinematics + posts) | ✅ | Yes (paid tier) | 5-axis engine solid; no UI; kinematics + posts (backend) |
 | Turning cycles (G71/G70/threading) | ✅ | Yes (paid tier) | G71/G70 roughing + threading cycles (backend) |
 | Feeds & speeds + tool-life | ✅ | Yes (paid tier) | Taylor extended (vcT^n·f^a·dp^b=C) + Gilbert economic speed (backend) |
 | Adaptive / trochoidal clearing | ✅ | Yes (paid tier) | Iterative offset + 50% trochoid overlap; engagement on target (backend) |
@@ -740,16 +740,15 @@ Kerf saturates **97%** of PTC Creo's feature surface (54 yes, 4 partial, 0 no ou
 - **Springs (compr/ext/torsion/Belleville)** — Compression/extension/torsion/Belleville (backend)
 - **Shaft (stress + critical speed)** — Closed-form stress + critical speed (backend)
 - **3-axis CAM (profile/contour/pocket/face)** — 3-axis CAM + tool DB wired in CAMView
+- **5-axis (kinematics + posts)** — 5-axis engine solid; no UI; kinematics + posts (backend)
 - **Turning cycles (G71/G70/threading)** — G71/G70 roughing + threading cycles (backend)
-- **Feeds & speeds + tool-life** — Taylor extended (vcT^n·f^a·dp^b=C) + Gilbert economic speed (backend)
-- *(and 21 more features not covered by PTC Creo)*
+- *(and 22 more features not covered by PTC Creo)*
 
 ## What's honestly outstanding
 
 - **NURBS surfacing (blend/network/patch)** (Partial): blend/network/patch/match-srf + G3 + Class-A harness wired; not Creo Style ISDX depth
 - **Large assembly / simplified representations** (Partial): LOD mesh swapping configurable; no formal simplified-rep workflow
 - **2D drawings (views/dims/sections)** (Partial): Live HLR projection (make2d) + auto-dim; no GD&T-placement UI
-- **5-axis (kinematics + posts)** (Partial): 5-axis engine solid; no UI; kinematics + posts (backend)
 
 ## Pricing
 

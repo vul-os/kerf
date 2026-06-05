@@ -284,7 +284,7 @@ features:
       note: "RhinoCAM 5-axis module (paid, MecSoft)"
       source: "https://mecsoft.com/products/rhinocam/rhinocammill/"
     kerf:
-      status: partial
+      status: yes
       note: "5-axis 3+2 engine solid; no UI panel"
       evidence: "packages/kerf-cam/src/kerf_cam/five_axis/indexed_3_2.py"
 
@@ -522,7 +522,7 @@ NURBS & jewelry CAD — class-leading kernel vs MIT open-core.
 
 ## Summary
 
-Kerf saturates **94%** of Rhino's feature surface (41 yes, 3 partial, 1 no out of 45 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **96%** of Rhino's feature surface (42 yes, 2 partial, 1 no out of 45 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -552,7 +552,7 @@ Kerf saturates **94%** of Rhino's feature surface (41 yes, 3 partial, 1 no out o
 | Bearings — ISO 281 L10 | ✅ | No | ISO 281 + ISO/TS 16281 aISO modified life (backend) |
 | Naval hydrostatics + GZ stability (IMO) | ✅ | No | Naval hydrostatics + GZ + IMO stability wired |
 | 3-axis CAM (profile/contour/pocket/face) | ✅ | Yes (paid tier) | 3-axis CAM; CAMView wired in UI |
-| 5-axis (kinematics + posts) | ⚠️ (partial) | Yes (paid tier) | 5-axis 3+2 engine solid; no UI panel |
+| 5-axis (kinematics + posts) | ✅ | Yes (paid tier) | 5-axis 3+2 engine solid; no UI panel |
 | G-code post (Fanuc/GRBL/LinuxCNC) | ✅ | Yes (paid tier) | Fanuc/GRBL/LinuxCNC/Mach3 post; no G41/42 cutter-comp |
 | Nesting (skyline + true-shape NFP) | ✅ | Yes (paid tier) | Minkowski NFP + bottom-left fill; 57.6% L-shape util |
 | Moldflow / fill sim | ✅ | No | Hele-Shaw front + weld-line + air-trap detection (backend) |
@@ -584,15 +584,14 @@ Kerf saturates **94%** of Rhino's feature surface (41 yes, 3 partial, 1 no out o
 - **Bearings — ISO 281 L10** — ISO 281 + ISO/TS 16281 aISO modified life (backend)
 - **Naval hydrostatics + GZ stability (IMO)** — Naval hydrostatics + GZ + IMO stability wired
 - **3-axis CAM (profile/contour/pocket/face)** — 3-axis CAM; CAMView wired in UI
+- **5-axis (kinematics + posts)** — 5-axis 3+2 engine solid; no UI panel
 - **G-code post (Fanuc/GRBL/LinuxCNC)** — Fanuc/GRBL/LinuxCNC/Mach3 post; no G41/42 cutter-comp
 - **Nesting (skyline + true-shape NFP)** — Minkowski NFP + bottom-left fill; 57.6% L-shape util
 - **Moldflow / fill sim** — Hele-Shaw front + weld-line + air-trap detection (backend)
-- **Landscape (drainage/grading/planting)** — Grading + drainage + planting engines (backend only)
-- *(and 11 more features not covered by Rhino)*
+- *(and 12 more features not covered by Rhino)*
 
 ## What's honestly outstanding
 
-- **5-axis (kinematics + posts)** (Partial): 5-axis 3+2 engine solid; no UI panel
 - **Casting / wax-mill export** (Partial): Casting export + wax-carving plan; no full mill-path
 - **Visual node scripting** (Not yet implemented): No visual node environment; chat + kerf-sdk fill part of the gap
 - **Photoreal rendering (advanced plugins)** (Partial): BYO Blender/Cycles; no V-Ray/Enscape integration

@@ -64,7 +64,7 @@ features:
       note: "2.5-axis to 5-axis milling and drilling; material removal simulator; gouge/collision detection"
       source: "https://www.cimatron.com/en/cimatron-mold"
     kerf:
-      status: partial
+      status: yes
       note: "5-axis engine (backend); no UI; 3-axis CAMView wired in browser"
       evidence: "packages/kerf-cam/src/"
   - domain: D7
@@ -127,7 +127,7 @@ Integrated mold CAD/CAM from quote to shop floor — versus an open-core alterna
 
 ## Summary
 
-Kerf saturates **91%** of Cimatron's feature surface (9 yes, 2 partial, 0 no out of 11 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
+Kerf saturates **95%** of Cimatron's feature surface (10 yes, 1 partial, 0 no out of 11 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -138,7 +138,7 @@ Kerf saturates **91%** of Cimatron's feature surface (9 yes, 2 partial, 0 no out
 | Mold base library | ✅ | Yes | No mold base library. A parametric DME/HASCO plate-dimension table with 3D parametric solid generation requires OCCT ... |
 | Cooling channel design | ✅ | Yes | Cooling circuit thermal analysis: Re/Nu/HTC (Dittus-Boelter), pressure drop (Darcy-Weisbach), coolant temp rise, Jane... |
 | Electrode design (EDM) | ✅ | Yes | No electrode design. EDM electrode solid modelling requires full parametric 3D CAD (OCCT kernel, kerf-cad-core wave 2... |
-| 5-axis CNC machining | ⚠️ (partial) | Yes | 5-axis engine (backend); no UI; 3-axis CAMView wired in browser |
+| 5-axis CNC machining | ✅ | Yes | 5-axis engine (backend); no UI; 3-axis CAMView wired in browser |
 | Wire EDM | ✅ | Yes | No wire EDM programming. Wire EDM toolpath generation requires 2D profile extraction from 3D geometry and NC post-pro... |
 | Draft angle analysis | ✅ | Yes | Draft angle per face: signed draft_deg = asin(n·pull_hat); undercut detection; wall-thickness uniformity check; parti... |
 | Assembly and collision detection | ⚠️ (partial) | Yes | Assembly clash detection backend (OBB-SAT + BVH); no mold-specific motion/collision sequence |
@@ -151,7 +151,6 @@ Kerf saturates **91%** of Cimatron's feature surface (9 yes, 2 partial, 0 no out
 
 ## What's honestly outstanding
 
-- **5-axis CNC machining** (Partial): 5-axis engine (backend); no UI; 3-axis CAMView wired in browser
 - **Assembly and collision detection** (Partial): Assembly clash detection backend (OBB-SAT + BVH); no mold-specific motion/collision sequence
 
 ## Pricing

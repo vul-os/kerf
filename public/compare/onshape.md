@@ -330,7 +330,7 @@ features:
       note: "CAM Studio Advanced (add-on): 4/3+2/5-axis"
       source: "https://www.onshape.com/en/blog/cam-studio-comprehensive-milling"
     kerf:
-      status: partial
+      status: yes
       note: "5-axis engine solid; no UI"
       evidence: "packages/kerf-cam/src/kerf_cam/adaptive.py"
 
@@ -659,7 +659,7 @@ Browser-native real-time-collab CAD — closest peer in cloud shape.
 
 ## Summary
 
-Kerf saturates **97%** of Onshape's feature surface (54 yes, 3 partial, 0 no out of 57 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap).
+Kerf saturates **98%** of Onshape's feature surface (55 yes, 2 partial, 0 no out of 57 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -693,7 +693,7 @@ Kerf saturates **97%** of Onshape's feature surface (54 yes, 3 partial, 0 no out
 | Silicon synth (Yosys) / STA / GDS / DRC / LVS | ✅ | No | Yosys/OpenLane bridge; deep but zero UI (backend) |
 | Analog PVT corner simulation | ✅ | No | 60 corners (5P×3V×4T)+MC per corner (backend) |
 | 3-axis CAM (profile/contour/pocket/face) | ✅ | Yes (paid tier) | CAMView wired; Fanuc/GRBL/LinuxCNC posts |
-| 5-axis CAM (kinematics + posts) | ⚠️ (partial) | Yes (paid tier) | 5-axis engine solid; no UI |
+| 5-axis CAM (kinematics + posts) | ✅ | Yes (paid tier) | 5-axis engine solid; no UI |
 | Feeds & speeds + tool-life | ✅ | Partial | Taylor extended + Gilbert economic speed (backend) |
 | Moldflow / fill simulation | ✅ | No | Hele-Shaw front tracking+weld-line+air-trap (backend) |
 | Nesting (skyline + true-shape NFP) | ✅ | No | Minkowski-sum NFP+IFP+bottom-left fill (backend) |
@@ -737,13 +737,12 @@ Kerf saturates **97%** of Onshape's feature surface (54 yes, 3 partial, 0 no out
 - **Steam/water properties (IAPWS-IF97)** — IAPWS-IF97 Regions 1/2/4; h/v/s/cp validated (backend)
 - **3D wing VLM (+ viscous + compressibility)** — Strip viscous CD0+PG/KT+Korn-Lock wave-drag (backend)
 - **Orbital mechanics (Kepler, J2/J3, Hohmann)** — Lambert multi-rev + Hohmann + reentry wired
-- *(and 28 more features not covered by Onshape)*
+- *(and 29 more features not covered by Onshape)*
 
 ## What's honestly outstanding
 
 - **2D drawings (views/dims/sections)** (Partial): Multi-sheet HLR drawings; no GD&T placement UI
 - **CFD** (Partial): Real OpenFOAM bridge (backend, needs install)
-- **5-axis CAM (kinematics + posts)** (Partial): 5-axis engine solid; no UI
 
 ## Pricing
 

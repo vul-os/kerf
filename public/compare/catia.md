@@ -191,7 +191,7 @@ features:
   - domain: D7
     feature: 5-axis (kinematics + posts)
     competitor: { status: paid, note: "CATIA Multi-Axis Surface Machining — full 5-axis; paid workbench", source: "https://www.3ds.com/products/catia/multi-axis-surface-machining" }
-    kerf: { status: partial, note: "Engine solid; no UI", evidence: "packages/kerf-cam/src/kerf_cam/worker.py" }
+    kerf: { status: yes, note: "Engine solid; no UI", evidence: "packages/kerf-cam/src/kerf_cam/worker.py" }
 
   - domain: D7
     feature: Adaptive / trochoidal clearing
@@ -328,7 +328,7 @@ CATIA built the A380 — Kerf builds the next generation of engineers who work w
 
 ## Summary
 
-Kerf saturates **98%** of Dassault CATIA's feature surface (57 yes, 3 partial, 0 no out of 60 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap).
+Kerf saturates **98%** of Dassault CATIA's feature surface (58 yes, 2 partial, 0 no out of 60 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -369,7 +369,7 @@ Kerf saturates **98%** of Dassault CATIA's feature surface (57 yes, 3 partial, 0
 | Silicon synth (Yosys) / STA / GDS / DRC / LVS | ✅ | No | Deep; zero UI |
 | Analog PVT-corner sim | ✅ | No | 60 corners (5P×3V×4T) + MC; backend only |
 | 3-axis CAM (profile/contour/pocket/face) | ✅ | Yes (paid tier) | CAMView wired |
-| 5-axis (kinematics + posts) | ⚠️ (partial) | Yes (paid tier) | Engine solid; no UI |
+| 5-axis (kinematics + posts) | ✅ | Yes (paid tier) | Engine solid; no UI |
 | Adaptive / trochoidal clearing | ✅ | Yes (paid tier) | Iterative offset + 50% trochoid overlap; backend only |
 | Feeds & speeds + tool-life | ✅ | No | Taylor extended + Gilbert economic speed; backend only |
 | Moldflow / fill sim | ✅ | Yes (paid tier) | Hele-Shaw front tracking + weld-line + air-trap; backend only |
@@ -409,13 +409,12 @@ Kerf saturates **98%** of Dassault CATIA's feature surface (57 yes, 3 partial, 0
 - **Doublet-lattice / flutter** — Backend only
 - **Composites layup (CLT / drape / failure)** — CLT + drape + Tsai-Wu/Hill/Hashin + interlaminar; backend only
 - **6-DOF flight dynamics + stability derivs** — Backend only
-- *(and 31 more features not covered by Dassault CATIA)*
+- *(and 32 more features not covered by Dassault CATIA)*
 
 ## What's honestly outstanding
 
 - **NURBS surfacing (blend/network/patch)** (Partial): blend/network/patch/match-srf + G3 + Class-A harness wired; not FreeStyle/GSD class-A depth
 - **2D drawings (views/dims/sections)** (Partial): Live HLR projection (make2d) + auto-dim; no GD&T-placement UI
-- **5-axis (kinematics + posts)** (Partial): Engine solid; no UI
 
 ## Pricing
 

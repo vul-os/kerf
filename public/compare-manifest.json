@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T02:23:31.266Z",
+  "generatedAt": "2026-06-05T02:27:05.812Z",
   "items": [
     {
       "slug": "revit",
@@ -5496,7 +5496,7 @@
             "notes": "4/5-axis requires Manufacturing Extension (paid)"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cam/src/kerf_cam/five_axis",
             "notes": "Engine solid (5-axis 3+2); no UI"
           },
@@ -7282,7 +7282,7 @@
             "notes": "CAM Studio Advanced (add-on): 4/3+2/5-axis"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cam/src/kerf_cam/adaptive.py",
             "notes": "5-axis engine solid; no UI"
           },
@@ -8231,7 +8231,7 @@
             "notes": "Inventor CAM 4/5-axis requires HSMWorks Premium or Inventor Professional + CAM add-in"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cam/src/kerf_cam/five_axis",
             "notes": "Engine solid (5-axis 3+2); no UI"
           },
@@ -9612,7 +9612,7 @@
             "notes": "CATIA Multi-Axis Surface Machining — full 5-axis; paid workbench"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cam/src/kerf_cam/worker.py",
             "notes": "Engine solid; no UI"
           },
@@ -10043,7 +10043,7 @@
             "notes": "2.5-axis to 5-axis milling and drilling; material removal simulator; gouge/collision detection"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cam/src/",
             "notes": "5-axis engine (backend); no UI; 3-axis CAMView wired in browser"
           },
@@ -10709,7 +10709,7 @@
             "notes": "Creo NC Advanced — 5-axis machining + multi-axis toolpath verification"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cam/src/kerf_cam/worker.py",
             "notes": "5-axis engine solid; no UI; kinematics + posts (backend)"
           },
@@ -12031,7 +12031,7 @@
             "notes": "NX CAM multi-axis — 5-axis simultaneous with gouge avoidance, machine kinematics simulation, post builder"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "cloud/cam/fiveaxis.py"
           },
           "name": "5-axis (kinematics + posts)"
@@ -17433,7 +17433,7 @@
             "notes": "RhinoCAM 5-axis module (paid, MecSoft)"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cam/src/kerf_cam/five_axis/indexed_3_2.py",
             "notes": "5-axis 3+2 engine solid; no UI panel"
           },

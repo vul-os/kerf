@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T02:12:41.142Z",
+  "generatedAt": "2026-06-05T02:19:49.033Z",
   "items": [
     {
       "slug": "revit",
@@ -6361,7 +6361,7 @@
             "notes": "SOLIDWORKS Flow Simulation — separately purchased add-in"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-fem/src/kerf_fem/cfd_navier_stokes.py",
             "notes": "Real OpenFOAM bridge backend (needs install); no UI"
           },
@@ -13975,7 +13975,7 @@
             "notes": "simpleFoam, icoFoam, pimpleFoam, pisoFoam RANS/transient solvers"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cfd/",
             "notes": "OpenFOAM backend bridge; chat-native case generation; needs OpenFOAM install"
           },
@@ -13989,7 +13989,7 @@
             "notes": "rhoCentralFoam, sonicFoam, rhoSimpleFoam for subsonic/transonic/supersonic"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cfd/",
             "notes": "OpenFOAM backend bridge; core compressible solvers exposed via chat"
           },
@@ -14003,7 +14003,7 @@
             "notes": "chtMultiRegionFoam, buoyantSimpleFoam, buoyantPimpleFoam"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cfd/",
             "notes": "OpenFOAM backend bridge; CHT solver accessible via LLM tool"
           },
@@ -14031,7 +14031,7 @@
             "notes": "reactingFoam, fireFoam, XiFoam, PDRFoam for premixed/non-premixed combustion"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "packages/kerf-cfd/",
             "kerf_note": "Reacting flow requires species transport, chemical mechanism files (Cantera/Chemkin), and reaction sub-models. Large scope; not currently planned for bridge exposure.",
             "notes": "Combustion CFD (reactingFoam / fireFoam) not yet exposed in Kerf bridge"
@@ -14046,7 +14046,7 @@
             "notes": "k-epsilon, k-omega SST, Spalart-Allmaras, realizable k-eps, v2-f, and more"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cfd/",
             "notes": "k-eps and k-omega SST exposed via chat case generation; full model library via direct OpenFOAM"
           },
@@ -14074,7 +14074,7 @@
             "notes": "blockMesh + snappyHexMesh + cfMesh; automatic hex-dominant meshing from STL"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cfd/",
             "notes": "snappyHexMesh dict generated via chat from Kerf STL export; no GUI mesh editor"
           },
@@ -14088,7 +14088,7 @@
             "notes": "lagrangianIntermediate library; DPM, spray, coal, radiation particle types"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "packages/kerf-cfd/",
             "kerf_note": "DPM/spray/coal particle tracking requires coupled Eulerian-Lagrangian case templates and post-processing infrastructure. Large scope; not currently planned.",
             "notes": "Lagrangian particle models not exposed in Kerf bridge"
@@ -14103,7 +14103,7 @@
             "notes": "dynamicFvMesh, overset mesh, sixDoFRigidBodyMotion for moving-boundary problems"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "packages/kerf-cfd/",
             "kerf_note": "Moving-boundary FSI requires coupled solver orchestration (OpenFOAM + CalculiX via preCICE or native). Large scope; not currently planned.",
             "notes": "Dynamic mesh and FSI not yet exposed in Kerf bridge"

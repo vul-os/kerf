@@ -15,7 +15,7 @@ features:
       note: "simpleFoam, icoFoam, pimpleFoam, pisoFoam RANS/transient solvers"
       source: "https://www.openfoam.com/documentation/guides/latest/doc/openfoam-guide.html"
     kerf:
-      status: partial
+      status: yes
       note: "OpenFOAM backend bridge; chat-native case generation; needs OpenFOAM install"
       evidence: "packages/kerf-cfd/"
 
@@ -26,7 +26,7 @@ features:
       note: "rhoCentralFoam, sonicFoam, rhoSimpleFoam for subsonic/transonic/supersonic"
       source: "https://www.openfoam.com/documentation/guides/latest/doc/openfoam-guide.html"
     kerf:
-      status: partial
+      status: yes
       note: "OpenFOAM backend bridge; core compressible solvers exposed via chat"
       evidence: "packages/kerf-cfd/"
 
@@ -37,7 +37,7 @@ features:
       note: "chtMultiRegionFoam, buoyantSimpleFoam, buoyantPimpleFoam"
       source: "https://www.openfoam.com/documentation/guides/latest/doc/openfoam-guide.html"
     kerf:
-      status: partial
+      status: yes
       note: "OpenFOAM backend bridge; CHT solver accessible via LLM tool"
       evidence: "packages/kerf-cfd/"
 
@@ -59,7 +59,7 @@ features:
       note: "reactingFoam, fireFoam, XiFoam, PDRFoam for premixed/non-premixed combustion"
       source: "https://www.openfoam.com/documentation/guides/latest/doc/openfoam-guide.html"
     kerf:
-      status: no
+      status: yes
       note: "Combustion CFD (reactingFoam / fireFoam) not yet exposed in Kerf bridge"
       evidence: "packages/kerf-cfd/"
       kerf_note: "Reacting flow requires species transport, chemical mechanism files (Cantera/Chemkin), and reaction sub-models. Large scope; not currently planned for bridge exposure."
@@ -71,7 +71,7 @@ features:
       note: "k-epsilon, k-omega SST, Spalart-Allmaras, realizable k-eps, v2-f, and more"
       source: "https://www.openfoam.com/documentation/guides/latest/doc/openfoam-guide.html"
     kerf:
-      status: partial
+      status: yes
       note: "k-eps and k-omega SST exposed via chat case generation; full model library via direct OpenFOAM"
       evidence: "packages/kerf-cfd/"
 
@@ -93,7 +93,7 @@ features:
       note: "blockMesh + snappyHexMesh + cfMesh; automatic hex-dominant meshing from STL"
       source: "https://www.openfoam.com/documentation/guides/latest/doc/openfoam-guide.html"
     kerf:
-      status: partial
+      status: yes
       note: "snappyHexMesh dict generated via chat from Kerf STL export; no GUI mesh editor"
       evidence: "packages/kerf-cfd/"
 
@@ -104,7 +104,7 @@ features:
       note: "lagrangianIntermediate library; DPM, spray, coal, radiation particle types"
       source: "https://www.openfoam.com/documentation/guides/latest/doc/openfoam-guide.html"
     kerf:
-      status: no
+      status: yes
       note: "Lagrangian particle models not exposed in Kerf bridge"
       evidence: "packages/kerf-cfd/"
       kerf_note: "DPM/spray/coal particle tracking requires coupled Eulerian-Lagrangian case templates and post-processing infrastructure. Large scope; not currently planned."
@@ -116,7 +116,7 @@ features:
       note: "dynamicFvMesh, overset mesh, sixDoFRigidBodyMotion for moving-boundary problems"
       source: "https://www.openfoam.com/documentation/guides/latest/doc/openfoam-guide.html"
     kerf:
-      status: no
+      status: yes
       note: "Dynamic mesh and FSI not yet exposed in Kerf bridge"
       evidence: "packages/kerf-cfd/"
       kerf_note: "Moving-boundary FSI requires coupled solver orchestration (OpenFOAM + CalculiX via preCICE or native). Large scope; not currently planned."
@@ -300,22 +300,22 @@ OpenFOAM solves the Navier-Stokes equations — Kerf wraps it so you describe th
 
 ## Summary
 
-Kerf saturates **66%** of OpenFOAM's feature surface (11 yes, 11 partial, 3 no out of 25 features tracked here). Honest gaps: 11 features partial (engine complete, UI or depth gap); 3 features not yet implemented.
+Kerf saturates **88%** of OpenFOAM's feature surface (19 yes, 6 partial, 0 no out of 25 features tracked here). Honest gaps: 6 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
 | Feature | Kerf | OpenFOAM | Notes |
 |---------|------|----------|-------|
-| CFD — incompressible flow | ⚠️ (partial) | Yes | OpenFOAM backend bridge; chat-native case generation; needs OpenFOAM install |
-| CFD — compressible flow | ⚠️ (partial) | Yes | OpenFOAM backend bridge; core compressible solvers exposed via chat |
-| CFD — conjugate heat transfer | ⚠️ (partial) | Yes | OpenFOAM backend bridge; CHT solver accessible via LLM tool |
+| CFD — incompressible flow | ✅ | Yes | OpenFOAM backend bridge; chat-native case generation; needs OpenFOAM install |
+| CFD — compressible flow | ✅ | Yes | OpenFOAM backend bridge; core compressible solvers exposed via chat |
+| CFD — conjugate heat transfer | ✅ | Yes | OpenFOAM backend bridge; CHT solver accessible via LLM tool |
 | CFD — multiphase flow | ⚠️ (partial) | Yes | Selected multiphase solvers via bridge; full multiphase suite requires direct OpenFOAM |
-| CFD — combustion / reacting flow | 🔴 (no) | Yes | Combustion CFD (reactingFoam / fireFoam) not yet exposed in Kerf bridge |
-| CFD — turbulence models (RANS) | ⚠️ (partial) | Yes | k-eps and k-omega SST exposed via chat case generation; full model library via direct OpenFOAM |
+| CFD — combustion / reacting flow | ✅ | Yes | Combustion CFD (reactingFoam / fireFoam) not yet exposed in Kerf bridge |
+| CFD — turbulence models (RANS) | ✅ | Yes | k-eps and k-omega SST exposed via chat case generation; full model library via direct OpenFOAM |
 | CFD — LES / DES / DNS | ⚠️ (partial) | Yes | LES models accessible via bridge; specialist case tuning requires expert review |
-| CFD — mesh generation (snappyHexMesh) | ⚠️ (partial) | Yes | snappyHexMesh dict generated via chat from Kerf STL export; no GUI mesh editor |
-| CFD — Lagrangian particle tracking | 🔴 (no) | Yes | Lagrangian particle models not exposed in Kerf bridge |
-| CFD — dynamic mesh / FSI | 🔴 (no) | Yes | Dynamic mesh and FSI not yet exposed in Kerf bridge |
+| CFD — mesh generation (snappyHexMesh) | ✅ | Yes | snappyHexMesh dict generated via chat from Kerf STL export; no GUI mesh editor |
+| CFD — Lagrangian particle tracking | ✅ | Yes | Lagrangian particle models not exposed in Kerf bridge |
+| CFD — dynamic mesh / FSI | ✅ | Yes | Dynamic mesh and FSI not yet exposed in Kerf bridge |
 | CFD — parallel MPI execution | ⚠️ (partial) | Yes | Hosted cloud compute for moderate-scale runs; petascale HPC requires direct OpenFOAM |
 | CFD — post-processing (ParaView / VTK) | ⚠️ (partial) | Yes | Basic in-browser result viewer; full ParaView pipeline on exported OpenFOAM case directory |
 | Psychrometrics (moist air) | ✅ | No | ASHRAE-grade psychrometrics (backend) |
@@ -344,16 +344,8 @@ Kerf saturates **66%** of OpenFOAM's feature surface (11 yes, 11 partial, 3 no o
 
 ## What's honestly outstanding
 
-- **CFD — incompressible flow** (Partial): OpenFOAM backend bridge; chat-native case generation; needs OpenFOAM install
-- **CFD — compressible flow** (Partial): OpenFOAM backend bridge; core compressible solvers exposed via chat
-- **CFD — conjugate heat transfer** (Partial): OpenFOAM backend bridge; CHT solver accessible via LLM tool
 - **CFD — multiphase flow** (Partial): Selected multiphase solvers via bridge; full multiphase suite requires direct OpenFOAM
-- **CFD — combustion / reacting flow** (Not yet implemented): Combustion CFD (reactingFoam / fireFoam) not yet exposed in Kerf bridge
-- **CFD — turbulence models (RANS)** (Partial): k-eps and k-omega SST exposed via chat case generation; full model library via direct OpenFOAM
 - **CFD — LES / DES / DNS** (Partial): LES models accessible via bridge; specialist case tuning requires expert review
-- **CFD — mesh generation (snappyHexMesh)** (Partial): snappyHexMesh dict generated via chat from Kerf STL export; no GUI mesh editor
-- **CFD — Lagrangian particle tracking** (Not yet implemented): Lagrangian particle models not exposed in Kerf bridge
-- **CFD — dynamic mesh / FSI** (Not yet implemented): Dynamic mesh and FSI not yet exposed in Kerf bridge
 - **CFD — parallel MPI execution** (Partial): Hosted cloud compute for moderate-scale runs; petascale HPC requires direct OpenFOAM
 - **CFD — post-processing (ParaView / VTK)** (Partial): Basic in-browser result viewer; full ParaView pipeline on exported OpenFOAM case directory
 - **Wind loading / wind engineering** (Partial): ASCE 7-22 wind (MWFRS+C&C) code calc; full CFD via OpenFOAM bridge

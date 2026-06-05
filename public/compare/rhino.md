@@ -465,8 +465,8 @@ features:
       source: "https://docs.mcneel.com/rhino/8/help/en-us/options/rhino_render.htm"
     kerf:
       status: yes
-      note: "Cycles backend + browser path tracer; no caustics"
-      evidence: "packages/kerf-render/src/kerf_render/cycles_worker.py"
+      note: "In-process unidirectional Monte-Carlo CPU path tracer (BVH, Möller–Trumbore, multi-bounce GI, GGX/dielectric-Fresnel BSDFs, next-event estimation, Russian-roulette, ACES) + Cycles GPU backend + browser path tracer; no caustics"
+      evidence: "packages/kerf-render/src/kerf_render/pathtracer.py"
 
   - domain: D12
     feature: "Photoreal rendering (advanced plugins)"

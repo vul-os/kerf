@@ -54,13 +54,22 @@ async def register(app: "FastAPI", ctx):
     )
 
 
+_TOOL_MODULES = [
+    "kerf_render.tools",
+    "kerf_render.pathtrace_tools",
+]
+
+
 def _register_tools(ctx, provides: list) -> None:
     """Register render LLM tools into ctx.tools."""
-    try:
-        import importlib
-        mod = importlib.import_module("kerf_render.tools")
-        if hasattr(mod, "TOOLS"):
-            for name, spec, handler in mod.TOOLS:
-                ctx.tools.register(name, spec, handler)
-    except Exception as exc:
-        logger.warning("kerf-render: failed to load tools: %s", exc)
+    import importlib
+    for mod_name in _TOOL_MODULES:
+        try:
+            mod = importlib.import_module(mod_name)
+            if hasattr(mod, "TOOLS"):
+                for name, spec, handler in mod.TOOLS:
+                    ctx.tools.register(name, spec, handler)
+        except Exception as exc:
+            logger.warning("kerf-render: failed to load tools from %s: %s",
+                           mod_name, exc)
+    provides.append("render.pathtrace")

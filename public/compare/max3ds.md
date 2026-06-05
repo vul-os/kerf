@@ -225,9 +225,9 @@ features:
       note: "Arnold GPU/CPU path tracer built-in; V-Ray, Corona, Redshift via plugins"
       source: "https://help.autodesk.com/view/3DSMAX/2025/ENU/"
     kerf:
-      status: partial
-      note: "heroShot renderer (HDRI + ACES + bloom); no production path tracer"
-      evidence: "src/components/HeroShot/"
+      status: yes
+      note: "In-process unidirectional Monte-Carlo CPU path tracer (BVH, Möller–Trumbore, multi-bounce GI, GGX/dielectric-Fresnel BSDFs, next-event estimation, Russian-roulette, ACES). Production GPU path via Cycles backend. Not Arnold-feature-parity."
+      evidence: "packages/kerf-render/src/kerf_render/pathtracer.py"
   - domain: D12
     feature: "Acoustics — room acoustics and ISO 9613"
     competitor:

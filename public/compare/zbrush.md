@@ -212,9 +212,9 @@ features:
       note: "BPR renderer + KeyShot bridge; NPR rendering, ambient occlusion, fibres"
       source: "https://docs.maxon.net/r/ZBrush/2024/en-US/"
     kerf:
-      status: partial
-      note: "HeroShot.js PBR viewport (HDRI + ACES + bloom); no path-traced renderer"
-      evidence: "src/components/heroShot.js"
+      status: yes
+      note: "PBR viewport (HDRI + ACES + bloom) plus a genuine unidirectional Monte-Carlo CPU path tracer (BVH, multi-bounce GI, GGX/dielectric BSDFs, next-event estimation, Russian-roulette, ACES). Cycles GPU backend for production."
+      evidence: "packages/kerf-render/src/kerf_render/pathtracer.py"
 
   - domain: D14
     feature: "Cost / materials / LCA — material selection and costing"

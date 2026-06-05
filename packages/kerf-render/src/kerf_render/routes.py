@@ -586,6 +586,79 @@ async def _run_render_sync(req: RenderRequest) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# In-process CPU path-tracer route (no Blender required)
+# ---------------------------------------------------------------------------
+
+
+class PathTraceRequest(BaseModel):
+    preset: str = "cornell"
+    width: int = 128
+    height: int = 128
+    samples: int = 64
+    max_depth: int = 8
+    seed: int = 0
+    scene: Optional[Dict[str, Any]] = None
+    camera: Optional[Dict[str, Any]] = None
+
+
+@router.post("/render/pathtrace")
+async def pathtrace(req: PathTraceRequest):
+    """Render a scene with Kerf's in-process CPU Monte-Carlo path tracer.
+
+    This needs no Blender and no GPU — it is a genuine multi-bounce global-
+    illumination renderer (BVH, Moller-Trumbore, GGX/dielectric BSDFs, NEE,
+    Russian roulette). Returns a base64 PNG plus convergence stats. Resolution
+    and samples are capped so a single synchronous request stays bounded.
+    """
+    import asyncio
+
+    from kerf_render import pathtracer as pt
+
+    width = max(8, min(int(req.width), 256))
+    height = max(8, min(int(req.height), 256))
+    samples = max(1, min(int(req.samples), 256))
+    max_depth = max(1, min(int(req.max_depth), 16))
+
+    def _do_render():
+        if req.scene:
+            scene = pt.scene_from_dict(req.scene)
+        else:
+            scene = pt.build_cornell_box()
+        if req.camera:
+            cam = pt.camera_from_dict(req.camera, width, height)
+        else:
+            cam = pt.cornell_camera(width, height)
+        if not scene.tri_mat:
+            return None
+        fb = pt.render(scene, cam, width, height, samples,
+                       max_depth=max_depth, seed=int(req.seed))
+        img = fb.tonemapped_uint8()
+        return scene, fb, pt.encode_png_base64(img)
+
+    # Offload the CPU-bound render off the event loop.
+    out = await asyncio.to_thread(_do_render)
+    if out is None:
+        raise HTTPException(status_code=400, detail="scene has no triangles")
+    scene, fb, png_b64 = out
+    mean = fb.mean()
+    return {
+        "status": "ok",
+        "format": "png",
+        "width": width,
+        "height": height,
+        "samples": fb.samples,
+        "samples_total": samples,
+        "max_depth": max_depth,
+        "triangles": len(scene.tri_mat),
+        "emissive_triangles": len(scene.emissive_tris),
+        "avg_luminance": float(mean.mean()),
+        "peak_luminance": float(mean.max()),
+        "image_b64": png_b64,
+        "engine": "kerf-cpu-pathtracer",
+    }
+
+
+# ---------------------------------------------------------------------------
 # Status polling route
 # ---------------------------------------------------------------------------
 

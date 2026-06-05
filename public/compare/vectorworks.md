@@ -161,9 +161,9 @@ features:
       note: "Renderworks (Cinema 4D engine): physically-based rendering, HDRI, caustics, global illumination"
       source: "https://app-help.vectorworks.net/2024/eng/index.htm#t=VW2024_Guide%2FRendering%2FRenderworks_Overview.htm"
     kerf:
-      status: no
-      note: "No integrated renderer; geometry exported to external tools"
-      evidence: ""
+      status: partial
+      note: "Integrated in-process Monte-Carlo CPU path tracer (BVH, multi-bounce GI, GGX/dielectric-Fresnel BSDFs, next-event estimation, ACES) + PBR viewport + Cycles GPU backend; no caustics / Cinema-4D-engine parity"
+      evidence: "packages/kerf-render/src/kerf_render/pathtracer.py"
 
   - domain: D12
     feature: "Real-time OpenGL / GPU viewport"

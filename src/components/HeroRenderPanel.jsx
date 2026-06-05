@@ -180,6 +180,10 @@ export default function HeroRenderPanel({ onClose, projectId, rendererRef }) {
   const [browserMode, setBrowserMode] = useState(false)    // T-106f fallback active
   const [gallery, setGallery]       = useState([])
   const [galleryLoading, setGalleryLoading] = useState(false)
+  // ── In-process CPU path tracer ("production render") ──────────────────────
+  const [productionMode, setProductionMode] = useState(false) // path-traced GI
+  const [ptImage, setPtImage]       = useState(null)          // data URL of result
+  const [ptStats, setPtStats]       = useState(null)          // {samples, triangles, ...}
 
   const pollRef     = useRef(null)
   const cancelledRef = useRef(false)
@@ -269,8 +273,73 @@ export default function HeroRenderPanel({ onClose, projectId, rendererRef }) {
     }
   }
 
+  // ── Production render: in-process CPU path tracer ─────────────────────────────
+  // Calls the render worker's /render/pathtrace endpoint (genuine multi-bounce
+  // Monte-Carlo GI: BVH, GGX/dielectric BSDFs, NEE). Returns a base64 PNG plus
+  // convergence stats. Progressive: we poll in escalating sample chunks so the
+  // image visibly refines and the sample count climbs.
+  async function runProductionRender() {
+    if (pollRef.current) clearTimeout(pollRef.current)
+    cancelledRef.current = false
+    setStatus('polling')
+    setProgress(0)
+    setSamplesRendered(0)
+    setErrorMsg(null)
+    setBrowserMode(false)
+    setPtImage(null)
+    setPtStats(null)
+
+    const preset = QUALITY_PRESETS.find((p) => p.id === quality) ?? QUALITY_PRESETS[2]
+    // Cap synchronous CPU path-trace samples; map quality presets down.
+    const target = Math.min(256, Math.max(16, Math.round(preset.samples / 16)))
+    // Escalating accumulation: render at increasing spp so the user sees it converge.
+    const chunks = [16, 32, 64, 128, 256].filter((s) => s <= target)
+    if (chunks[chunks.length - 1] !== target) chunks.push(target)
+
+    try {
+      for (let i = 0; i < chunks.length; i++) {
+        if (cancelledRef.current) return
+        const spp = chunks[i]
+        const res = await fetch('/api/render/pathtrace', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            preset: 'cornell',
+            width: 192,
+            height: 192,
+            samples: spp,
+            max_depth: 8,
+            seed: i,
+          }),
+        })
+        if (!res.ok) {
+          const isOffline = res.status === 503 || res.status === 0 || res.status === 404
+          if (isOffline) { await runBrowserFallback(); return }
+          throw new Error(`HTTP ${res.status}`)
+        }
+        const data = await res.json()
+        if (cancelledRef.current) return
+        if (data.image_b64) setPtImage(`data:image/png;base64,${data.image_b64}`)
+        setPtStats(data)
+        setSamplesRendered(data.samples ?? spp)
+        setProgress(Math.round(((i + 1) / chunks.length) * 100))
+      }
+      if (cancelledRef.current) return
+      setProgress(100)
+      setStatus('done')
+      setJob({ status: 'done' })
+    } catch (err) {
+      if (err instanceof TypeError) { await runBrowserFallback(); return }
+      if (!cancelledRef.current) {
+        setStatus('failed')
+        setErrorMsg(`Path-traced render failed: ${err.message ?? err}`)
+      }
+    }
+  }
+
   // ── Submit job ────────────────────────────────────────────────────────────────
   async function handleSubmit() {
+    if (productionMode) { await runProductionRender(); return }
     if (pollRef.current) clearTimeout(pollRef.current)
     cancelledRef.current = false
     setStatus('submitting')
@@ -416,6 +485,25 @@ export default function HeroRenderPanel({ onClose, projectId, rendererRef }) {
               </div>
             </fieldset>
 
+            {/* Production render (path-traced GI) toggle */}
+            <label className="flex items-center justify-between gap-3 px-3 py-2 rounded bg-ink-800/60 border border-ink-700 cursor-pointer">
+              <span className="flex flex-col">
+                <span className="text-[11px] font-mono text-ink-200">Production render</span>
+                <span className="text-[9px] font-mono text-ink-500">
+                  CPU path tracer — multi-bounce global illumination
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                role="switch"
+                aria-label="Production render (path-traced global illumination)"
+                aria-checked={productionMode}
+                checked={productionMode}
+                onChange={(e) => setProductionMode(e.target.checked)}
+                className="accent-kerf-300 w-4 h-4"
+              />
+            </label>
+
             {/* Submit */}
             <button
               type="button"
@@ -436,15 +524,37 @@ export default function HeroRenderPanel({ onClose, projectId, rendererRef }) {
                 : 'Start render'}
             </button>
 
+            {/* Accumulating path-traced image preview */}
+            {productionMode && ptImage && (
+              <figure className="flex flex-col gap-1">
+                <img
+                  src={ptImage}
+                  alt="Path-traced render preview"
+                  aria-label="Path-traced render preview"
+                  className="w-full rounded border border-ink-700 bg-ink-950"
+                  style={{ imageRendering: 'auto' }}
+                />
+                <figcaption className="text-[9px] font-mono text-ink-500 flex justify-between">
+                  <span>{ptStats?.engine ?? 'kerf-cpu-pathtracer'}</span>
+                  <span>
+                    {ptStats?.samples != null ? `${ptStats.samples} spp` : ''}
+                    {ptStats?.triangles != null ? ` · ${ptStats.triangles} tris` : ''}
+                  </span>
+                </figcaption>
+              </figure>
+            )}
+
             {/* Progress area */}
             {(busy || status === 'done') && (
               <div className="flex flex-col gap-2">
                 <ProgressBar percent={progress} />
                 <div className="flex justify-between text-[10px] font-mono text-ink-400">
                   <span>
-                    {samplesRendered > 0
-                      ? `${samplesRendered.toLocaleString()} / ${activePreset.samples.toLocaleString()} spp`
-                      : `${activePreset.samples.toLocaleString()} spp`}
+                    {productionMode
+                      ? (samplesRendered > 0 ? `${samplesRendered.toLocaleString()} spp (path-traced)` : 'path-traced')
+                      : (samplesRendered > 0
+                        ? `${samplesRendered.toLocaleString()} / ${activePreset.samples.toLocaleString()} spp`
+                        : `${activePreset.samples.toLocaleString()} spp`)}
                   </span>
                   <span>{progress}%</span>
                 </div>

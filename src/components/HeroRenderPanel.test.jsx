@@ -190,3 +190,26 @@ describe('HeroRenderPanel — props', () => {
     expect(() => render({ rendererRef: undefined })).not.toThrow()
   })
 })
+
+describe('HeroRenderPanel — production render (path traced)', () => {
+  it('renders a Production render toggle switch', () => {
+    const html = render()
+    expect(html).toMatch(/Production render/)
+    expect(html).toMatch(/role="switch"/)
+    expect(html).toMatch(/aria-label="Production render \(path-traced global illumination\)"/)
+  })
+
+  it('describes the CPU path tracer / global illumination', () => {
+    const html = render()
+    expect(html).toMatch(/path tracer/i)
+    expect(html).toMatch(/global illumination/i)
+  })
+
+  it('toggle is off by default (production mode opt-in)', () => {
+    const html = render()
+    // unchecked switch: no checked attribute on the production switch input
+    const switchMatch = html.match(/role="switch"[^>]*>/)
+    expect(switchMatch).not.toBeNull()
+    expect(switchMatch[0]).not.toMatch(/\schecked\b/)
+  })
+})

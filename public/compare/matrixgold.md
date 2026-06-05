@@ -156,8 +156,8 @@ features:
       source: "https://gemvision.com/matrixgold"
     kerf:
       status: partial
-      note: "PBR materials for metals and gems; no gem caustics/dispersion"
-      evidence: "packages/kerf-jewelry/render/"
+      note: "Monte-Carlo CPU path tracer with GGX-metal + dielectric-Fresnel refraction BSDFs (handles metals + faceted gems) and multi-bounce GI; still no spectral dispersion or gem caustics"
+      evidence: "packages/kerf-render/src/kerf_render/pathtracer.py"
   - domain: D13
     feature: "Jewelry — findings library"
     competitor:

@@ -467,9 +467,9 @@ features:
       note: "Cycles (GPU path tracer) + EEVEE (real-time PBR) — benchmark quality"
       source: "https://www.blender.org/features/rendering/"
     kerf:
-      status: partial
-      note: "HDRI + ACES + bloom (heroShot.js); no full path tracer"
-      evidence: "src/components/HeroShot.jsx"
+      status: yes
+      note: "Unidirectional Monte-Carlo CPU path tracer: BVH + Möller–Trumbore, multi-bounce GI, cosine/GGX/dielectric-Fresnel BSDFs, next-event estimation, Russian-roulette, ACES tonemap, progressive accumulation. Plus rasterised HDRI+ACES viewport and Cycles backend."
+      evidence: "packages/kerf-render/src/kerf_render/pathtracer.py"
 
   - domain: D12
     feature: "Paraxial ABCD ray transfer"

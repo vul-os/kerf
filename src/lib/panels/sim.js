@@ -1,0 +1,137 @@
+// src/lib/panels/sim.js
+//
+// Panel registry fragment for simulation / analysis domain panels.
+// Domain coverage:
+//   ENERGY    — BuildingEnergyExportPanel, HeatExchangerPanel,
+//               Hourly8760Panel, ThermoCyclePanel
+//   OPTICS    — DaylightingPanel, LightingSimPanel, SequentialTracePanel
+//   ACOUSTICS — AcousticsResultPanel
+//   SOLAR     — SolarPVPanel
+//   CONTROLS  — ControlsPanel
+//   MATERIALS — AshbyChartPanel, LCAResultsPanel
+//   THERMAL   — ThermalNetworkViewer
+//   CFD       — CfdResultsPanel
+//
+// Each `load` points to a thin wrapper in ./sim-wrappers/*.jsx that:
+//   1. Accepts the standard Editor props: { file, content, projectId, fileId }
+//   2. JSON.parse(content) with try/catch; merges parsed keys over defaults.
+//   3. Passes resolved props down to the real panel.
+//
+// This file stays JSX-free so the `.js` glob in panelRegistry.js picks it up.
+
+/** @type {Array<{id:string,kinds?:string[],exts?:string[],load:()=>Promise<any>,label?:string}>} */
+export default [
+  // ── Energy ──────────────────────────────────────────────────────────────
+  {
+    id: 'building-energy-export',
+    kinds: ['building_energy_export', 'be_export'],
+    exts: ['.bemodel', '.gbxml', '.idf'],
+    load: () => import('./sim-wrappers/BuildingEnergyExportWrapper.jsx'),
+    label: 'Building Energy Export',
+  },
+  {
+    id: 'heat-exchanger',
+    kinds: ['heat_exchanger', 'hx_design'],
+    exts: ['.hxdesign', '.hx'],
+    load: () => import('./sim-wrappers/HeatExchangerWrapper.jsx'),
+    label: 'Heat Exchanger Design',
+  },
+  {
+    id: 'hourly-8760',
+    kinds: ['hourly_8760', 'building_energy_8760'],
+    exts: ['.8760', '.8760sim'],
+    load: () => import('./sim-wrappers/Hourly8760Wrapper.jsx'),
+    label: '8760-Hour Building Energy',
+  },
+  {
+    id: 'thermo-cycle',
+    kinds: ['thermo_cycle', 'thermodynamic_cycle'],
+    exts: ['.thermocycle', '.cycle'],
+    load: () => import('./sim-wrappers/ThermoCycleWrapper.jsx'),
+    label: 'Thermodynamic Cycle',
+  },
+
+  // ── Optics ──────────────────────────────────────────────────────────────
+  {
+    id: 'daylighting',
+    kinds: ['daylighting', 'daylighting_sim'],
+    exts: ['.daylight', '.daylighting'],
+    load: () => import('./sim-wrappers/DaylightingWrapper.jsx'),
+    label: 'Daylighting Simulation',
+  },
+  {
+    id: 'lighting-sim',
+    kinds: ['lighting_sim', 'photometric_sim'],
+    exts: ['.lightsim', '.photometric'],
+    load: () => import('./sim-wrappers/LightingSimWrapper.jsx'),
+    label: 'Lighting Simulation',
+  },
+  {
+    id: 'sequential-trace',
+    kinds: ['sequential_trace', 'ray_trace'],
+    exts: ['.raytrace', '.optrace'],
+    load: () => import('./sim-wrappers/SequentialTraceWrapper.jsx'),
+    label: 'Sequential Ray Trace',
+  },
+
+  // ── Acoustics ───────────────────────────────────────────────────────────
+  {
+    id: 'acoustics-result',
+    kinds: ['acoustics_result', 'acoustics_sim'],
+    exts: ['.acoustics', '.acresult'],
+    load: () => import('./sim-wrappers/AcousticsWrapper.jsx'),
+    label: 'Acoustics Analysis',
+  },
+
+  // ── Solar PV ────────────────────────────────────────────────────────────
+  {
+    id: 'solar-pv',
+    kinds: ['solar_pv', 'pv_iv'],
+    exts: ['.pvresult', '.pviv'],
+    load: () => import('./sim-wrappers/SolarPVWrapper.jsx'),
+    label: 'Solar PV I-V / P-V',
+  },
+
+  // ── Controls ────────────────────────────────────────────────────────────
+  {
+    id: 'controls',
+    kinds: ['controls_result', 'controls_analysis'],
+    exts: ['.ctrlresult', '.bode'],
+    load: () => import('./sim-wrappers/ControlsWrapper.jsx'),
+    label: 'Controls Analysis',
+  },
+
+  // ── Materials ────────────────────────────────────────────────────────────
+  {
+    id: 'ashby-chart',
+    kinds: ['ashby_chart', 'material_chart'],
+    exts: ['.ashby', '.matchart'],
+    load: () => import('./sim-wrappers/AshbyChartWrapper.jsx'),
+    label: 'Ashby Material Chart',
+  },
+  {
+    id: 'lca-results',
+    kinds: ['lca_result', 'lca_report'],
+    exts: ['.lcaresult', '.lca'],
+    load: () => import('./sim-wrappers/LCAResultsWrapper.jsx'),
+    label: 'LCA Results',
+  },
+
+  // ── Thermal network ──────────────────────────────────────────────────────
+  {
+    id: 'thermal-network',
+    kinds: ['thermal_network', 'thermal_net'],
+    exts: ['.thermalnet', '.tnet'],
+    load: () => import('./sim-wrappers/ThermalNetworkWrapper.jsx'),
+    label: 'Thermal Network',
+  },
+
+  // ── CFD ─────────────────────────────────────────────────────────────────
+  {
+    id: 'cfd-results',
+    kinds: ['cfd_result', 'cfd_post'],
+    exts: ['.cfdresult', '.cfd'],
+    load: () => import('./sim-wrappers/CfdResultsWrapper.jsx'),
+    label: 'CFD Results',
+  },
+]
